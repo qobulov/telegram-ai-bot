@@ -54,7 +54,8 @@ they test, which is the Go convention.
 
 Dependency direction: `service → agent → {ai, tools, storage interface}`.
 `agent` and `service` declare the small interfaces they consume; `storage`,
-`ai` and `telegram` do not import each other. No package-level mutable state.
+`ai` and `telegram` do not import each other, except that `storage` and `tools`
+use the message and tool-definition types from `ai`. No package-level mutable state.
 
 ## Configuration
 
