@@ -257,6 +257,13 @@ func (s *Service) remember(msg *telegram.Message) {
 	s.ambient.add(msg.Chat.ID, authorLabel(msg.From.FirstName), text, time.Now())
 }
 
+// silenced reports a message from a muted group that is not one of the
+// commands controlling the mute. The bot posts nothing at all in reply to
+// such a message, not even a notice.
+func (s *Service) silenced(in incoming) bool {
+	return in.group && s.isMuted(in.scope.ChatID) && !isMuteCommand(in.text)
+}
+
 func (s *Service) isMuted(chatID int64) bool {
 	s.mutedMu.RLock()
 	defer s.mutedMu.RUnlock()
@@ -276,6 +283,9 @@ func (s *Service) markMuted(chatID int64, muted bool) {
 // notifyBusy queues a "busy" reply without blocking the polling loop. If even
 // that queue is full the notice is dropped: the bot is overloaded.
 func (s *Service) notifyBusy(in incoming) {
+	if s.silenced(in) {
+		return
+	}
 	select {
 	case s.notices <- in:
 	default:
@@ -291,7 +301,9 @@ func (s *Service) sendBusyNotices() {
 func (s *Service) work(queue <-chan incoming) {
 	for in := range queue {
 		if s.closing.Load() {
-			s.reply(in, textBusy)
+			if !s.silenced(in) {
+				s.reply(in, textBusy)
+			}
 			continue
 		}
 		s.process(in)

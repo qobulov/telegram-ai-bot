@@ -88,7 +88,9 @@ Each wake word must be a single word.
   the messages that triggered the bot and the bot's replies.
 - Each stored group user message starts with its author's first name:
   `Bek: roast me`. The name is cut to 32 characters and stripped of line
-  breaks, colons and square brackets. The author's ID and name are also
+  breaks, colons, square brackets and invisible characters. The message
+  itself is folded to one line with its square brackets replaced, so that it
+  cannot contain a forged "Name:" line or marker. The author's ID and name are also
   stored in columns.
 - **Recent chatter.** For each group the bot keeps the last
   `GROUP_AMBIENT_MESSAGES` (default 20, 0 disables) ordinary text messages —
@@ -104,7 +106,7 @@ Each wake word must be a single word.
   ```
 
   They are not stored, are lost on restart, and a group's buffer is dropped
-  after six hours without messages. Square brackets inside them are replaced,
+  after six hours without messages, and when the group is muted or unmuted. Square brackets inside them are replaced,
   as for quotes. Nothing is collected while a group is muted.
 - The quoted message of a reply is included as now.
 - History sent to the model stays bounded by `MAX_HISTORY_MESSAGES`.

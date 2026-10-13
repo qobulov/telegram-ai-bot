@@ -109,8 +109,10 @@ which one it replied to. `chats` holds the mute setting.
 
 What is stored about people: the numeric Telegram ID, and, for messages that
 addressed the bot in a group, the sender's first name. No usernames or phone
-numbers. Message text is stored only for messages addressed to the bot and
-for its answers; ordinary group messages are never stored. The schema is
+numbers. Message text is stored for messages addressed to the bot and for
+its answers. Ordinary group messages are not stored, with one exception: a
+message someone replies to while addressing the bot is saved, shortened, as
+part of that question. The schema is
 defined by the files in
 [internal/storage/migrations/](internal/storage/migrations/).
 
@@ -298,8 +300,9 @@ and is the first word, the second word, or the last word of the message:
 
 - Triggers: "Mira, come here." · "Hey Mira!" · "Mira nima qilyapsan?" ·
   "MIRA: gapir-chi." · "Voy Mira, qarang bunga." · "nima gap, Mira?"
-- Does not trigger: "Miranda, hi" · "Miraga ayt" · "I think Mira is wrong" ·
-  "we asked Mira about it yesterday"
+- Does not trigger: "Miranda, hi" · "Miraga ayt" · "Mira-ga ayt" · "I think
+  Mira is wrong" · "we asked Mira about it yesterday" · `@mira`,
+  `mira_bot`, `#mira` and links such as `mira.uz`
 
 The call is removed before the text reaches the model ("Hey Mira, roast me"
 becomes "roast me"). "Hey Mira" on its own is passed on as it is, and she
@@ -309,8 +312,11 @@ A sentence that merely begins with the name ("Mira is my sister's name")
 does trigger. For that case the model is allowed to answer `[silent]`, and
 the bot then posts nothing.
 
-Add spellings with `BOT_WAKE_WORDS`, for example `mira,мира`. Each must be a
-single word.
+Matching is by exact spelling apart from upper and lower case. "Мира" in
+Cyrillic, or a look-alike letter such as the Turkish dotted "İ", does not
+match "mira" unless you add it:
+
+`BOT_WAKE_WORDS=mira,мира`. Each wake word must be a single word.
 
 **Commands** in a group need the bot's username (`/help@MyMiraBot`). A plain
 `/reset` is ignored, because it may be meant for another bot.
@@ -375,6 +381,10 @@ To keep the bot out of groups altogether, use `/setjoingroups` in @BotFather.
   the whole group's allowance for a minute; set the per-user limit lower than
   the group limit if that matters.
 - One group's messages are answered one at a time, in order.
+- A message addressed to her in a group is stored and passed on as a single
+  line: line breaks become spaces and square brackets become round ones.
+- `/mute` and `/unmute` are not held back by the group rate limit, and a
+  muted group gets no notices of any kind.
 - She reads text. A photo or document counts only through its caption; the
   image itself is not seen.
 - Telegram never delivers one bot's messages to another bot. Messages sent on
@@ -533,7 +543,7 @@ sudo -u postgres psql -d tgbot -c \
   'REVOKE INSERT, UPDATE, DELETE ON schema_migrations FROM tgbot'
 ```
 
-You should see `migrations finished applied=2` on a new database. Running it
+You should see `migrations finished applied=3` on a new database. Running it
 again prints
 `applied=0`: applied migrations are recorded in `schema_migrations` and never
 run twice. The bot does not migrate on its own; if the schema is behind it
@@ -726,12 +736,14 @@ Built in:
       comes from Telegram (`getMe`), not from configuration.
 - [x] Private and group conversations are stored under separate keys and are
       never loaded together; one group never sees another's history.
-- [x] Ordinary group messages are kept in memory only, never in the database
-      or the logs, and not at all while a group is muted.
-- [x] Quoted messages and recent group messages are marked as untrusted,
-      shortened, and stripped of anything that could imitate a marker or
-      another speaker before they reach the model. Author names are cleaned
-      the same way.
+- [x] Ordinary group messages are kept in memory only, never in the logs and
+      not at all while a group is muted. The one that reaches the database
+      is a message quoted by a reply that addresses the bot.
+- [x] Quoted messages and recent group messages are marked as untrusted and
+      shortened. Square brackets are replaced in them, in author names and in
+      group messages, and group messages and names are folded to one line,
+      so that no text can imitate a marker or another speaker in the shared
+      history.
 - [x] `/mute`, `/unmute` and a group's `/reset` are limited to that group's
       administrators, checked with Telegram, and the bot's own administrators.
 - [x] Input length, output tokens, tool output size, tool run time, tool

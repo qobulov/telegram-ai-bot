@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode"
 
 	"telegram-ai-bot/internal/ai"
 	"telegram-ai-bot/internal/storage"
@@ -186,11 +187,21 @@ func finish(t *turn, reply ai.Message) (string, error) {
 	if answer == "" {
 		return "", ai.ErrEmptyResponse
 	}
-	if strings.EqualFold(answer, SilentMarker) {
+	if isSilent(answer) {
 		return "", ErrSilent
 	}
 	t.messages = append(t.messages, ai.Message{Role: ai.RoleAssistant, Content: answer})
 	return answer, nil
+}
+
+// isSilent reports whether the whole answer is the silent marker. Models
+// often decorate it ("[silent].", "*[silent]*"), so punctuation around it is
+// ignored; an answer that says anything else is an answer.
+func isSilent(answer string) bool {
+	bare := strings.TrimFunc(answer, func(char rune) bool {
+		return char != '[' && char != ']' && !unicode.IsLetter(char) && !unicode.IsDigit(char)
+	})
+	return strings.EqualFold(bare, SilentMarker)
 }
 
 // runTools records the assistant's request and one result per call. Every

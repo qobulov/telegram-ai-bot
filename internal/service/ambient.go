@@ -54,7 +54,7 @@ func (a *ambient) add(chatID int64, author, text string, now time.Time) {
 		a.pruneLocked(now)
 	}
 	chat, ok := a.chats[chatID]
-	if !ok {
+	if !ok || isStale(chat, now) {
 		chat = &chatter{}
 		a.chats[chatID] = chat
 	}
@@ -77,12 +77,17 @@ func ambientLine(author, text string) string {
 }
 
 // block returns the chat's recent messages between their markers, or "" when
-// there are none.
-func (a *ambient) block(chatID int64) string {
+// there are none. Messages from before a long silence are not recent any
+// more and are forgotten instead of being returned.
+func (a *ambient) block(chatID int64, now time.Time) string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	chat, ok := a.chats[chatID]
-	if !ok || len(chat.lines) == 0 {
+	if !ok {
+		return ""
+	}
+	if isStale(chat, now) {
+		delete(a.chats, chatID)
 		return ""
 	}
 	return ambientHeader + "\n" + strings.Join(chat.lines, "\n") + "\n" + ambientFooter
@@ -103,8 +108,12 @@ func (a *ambient) prune(now time.Time) {
 
 func (a *ambient) pruneLocked(now time.Time) {
 	for chatID, chat := range a.chats {
-		if now.Sub(chat.last) > ambientIdleAfter {
+		if isStale(chat, now) {
 			delete(a.chats, chatID)
 		}
 	}
+}
+
+func isStale(chat *chatter, now time.Time) bool {
+	return now.Sub(chat.last) > ambientIdleAfter
 }

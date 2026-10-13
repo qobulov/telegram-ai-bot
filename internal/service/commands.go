@@ -30,7 +30,7 @@ func (s *Service) process(in incoming) {
 	// A muted group is ignored, except for the commands that control muting.
 	// This is checked here, in queue order, so that a message sent right
 	// after /unmute is answered and one sent right after /mute is not.
-	if in.group && s.isMuted(in.scope.ChatID) && !isMuteCommand(in.text) {
+	if s.silenced(in) {
 		return
 	}
 	if notice, limited := s.rateLimited(in); limited {
@@ -60,7 +60,9 @@ func (s *Service) rateLimited(in incoming) (notice string, limited bool) {
 	case deniedAgain:
 		return "", true
 	}
-	if !in.group {
+	// The group limit does not apply to /mute and /unmute: the off switch
+	// has to work precisely when the group is flooding the bot.
+	if !in.group || isMuteCommand(in.text) {
 		return "", false
 	}
 	groupDecision := s.groupLimiter.check(in.scope.ChatID, now)
@@ -144,11 +146,20 @@ func (s *Service) request(in incoming) agent.Request {
 	}
 	if in.group {
 		req.AuthorName = authorLabel(in.msg.From.FirstName)
-		req.Text = req.AuthorName + ": " + in.text
-		req.Context = s.ambient.block(in.scope.ChatID)
+		req.Text = req.AuthorName + ": " + oneLine(in.text)
+		req.Context = s.ambient.block(in.scope.ChatID, time.Now())
 	}
 	req.Text = withQuote(req.Text, in.msg.ReplyToMessage, s.opts.Bot.ID)
 	return req
+}
+
+// oneLine folds a group message into a single line without square brackets.
+// A group's history is shared and replayed to every member, and each line in
+// it starts with the name of who said it. Left as written, a message could
+// contain a line break followed by "Ann: ..." or a marker, and so put words
+// in someone else's mouth for everyone who talks to the bot afterwards.
+func oneLine(text string) string {
+	return strings.Join(strings.Fields(bracketless.Replace(text)), " ")
 }
 
 func repliedID(in incoming) int64 {
@@ -235,12 +246,12 @@ func (s *Service) setMuted(ctx context.Context, in incoming, muted bool) string 
 	}
 	s.markMuted(in.scope.ChatID, muted)
 	s.opts.Logger.Info("mute changed", "user_id", in.userID, "chat_id", in.scope.ChatID, "muted", muted)
-	if !muted {
-		return textUnmuted
-	}
-	// What was said before the mute should not resurface after it.
+	// What was said before or during the mute should not resurface after it.
 	s.ambient.clear(in.scope.ChatID)
-	return textMuted
+	if muted {
+		return textMuted
+	}
+	return textUnmuted
 }
 
 // refuseUnlessManager returns the refusal to send when the sender may not

@@ -464,3 +464,13 @@ func TestMarkerInsideASentenceIsAnOrdinaryAnswer(t *testing.T) {
 		t.Errorf("answer = %+v, err = %v", answer, err)
 	}
 }
+
+func TestSilentMarkerWithDecoration(t *testing.T) {
+	for _, content := range []string{"[silent].", "*[silent]*", "\"[silent]\"", "[silent]!"} {
+		f := newFixture(text(content))
+
+		if _, err := f.agent.Reply(context.Background(), request(1, "hm")); !errors.Is(err, ErrSilent) {
+			t.Errorf("answer %q: err = %v, want ErrSilent", content, err)
+		}
+	}
+}

@@ -3,6 +3,7 @@ package service
 import (
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 const (
@@ -14,6 +15,9 @@ const (
 type word struct {
 	text       string
 	start, end int
+	// The character just before the word, and the two just after it; zero
+	// where the text begins or ends. They tell a name from part of a link.
+	before, after, afterNext rune
 }
 
 // stripWakeWord reports whether a message calls the bot by one of its wake
@@ -52,11 +56,22 @@ func wakeWordIndex(words []word, wakeWords []string) (int, bool) {
 		if index < 0 || index >= len(words) {
 			continue
 		}
-		if isWakeWord(words[index].text, wakeWords) {
+		if isWakeWord(words[index].text, wakeWords) && standsAlone(words[index]) {
 			return index, true
 		}
 	}
 	return 0, false
+}
+
+// standsAlone rules out a wake word that is really part of something longer:
+// a username (@mira), a hashtag, a link or domain (mira.uz, site/mira), or a
+// hyphenated form (Mira-ga).
+func standsAlone(w word) bool {
+	if strings.ContainsRune("@#/.-", w.before) {
+		return false
+	}
+	joinsNext := w.after == '.' || w.after == '/' || w.after == '-'
+	return !joinsNext || !isWordChar(w.afterNext)
 }
 
 func isWakeWord(candidate string, wakeWords []string) bool {
@@ -70,32 +85,52 @@ func isWakeWord(candidate string, wakeWords []string) bool {
 	return false
 }
 
-// splitWords finds the words in text: runs of letters, digits and
-// apostrophes. Apostrophes are kept inside words because Uzbek spells with
-// them (o'zing, oʻylab), and so that "Mira's" is one word, not a call.
+// splitWords finds the words in text: runs of letters, digits, combining
+// marks, underscores and apostrophes. Apostrophes are kept inside words
+// because Uzbek spells with them (o'zing, oʻylab), and so that "Mira's" is
+// one word, not a call. Underscores are kept so "mira_bot" is one word.
 func splitWords(text string) []word {
+	runes := []rune(text)
 	var words []word
-	start := -1
-	for i, char := range text {
-		if isWordChar(char) {
-			if start < 0 {
-				start = i
-			}
-			continue
-		}
-		if start >= 0 {
-			words = append(words, word{text: text[start:i], start: start, end: i})
+	offset, start, startOffset := 0, -1, 0
+	for i, char := range runes {
+		switch {
+		case isWordChar(char) && start < 0:
+			start, startOffset = i, offset
+		case !isWordChar(char) && start >= 0:
+			words = append(words, newWord(runes, start, i, startOffset))
 			start = -1
 		}
+		offset += utf8.RuneLen(char)
 	}
 	if start >= 0 {
-		words = append(words, word{text: text[start:], start: start, end: len(text)})
+		words = append(words, newWord(runes, start, len(runes), startOffset))
 	}
 	return words
 }
 
+// newWord describes runes[from:to], which begins at byte startOffset.
+func newWord(runes []rune, from, to, startOffset int) word {
+	text := string(runes[from:to])
+	return word{
+		text:      text,
+		start:     startOffset,
+		end:       startOffset + len(text),
+		before:    runeAt(runes, from-1),
+		after:     runeAt(runes, to),
+		afterNext: runeAt(runes, to+1),
+	}
+}
+
+func runeAt(runes []rune, index int) rune {
+	if index < 0 || index >= len(runes) {
+		return 0
+	}
+	return runes[index]
+}
+
 func isWordChar(char rune) bool {
-	return unicode.IsLetter(char) || unicode.IsDigit(char) || isApostrophe(char)
+	return unicode.IsLetter(char) || unicode.IsDigit(char) || unicode.IsMark(char) || char == '_' || isApostrophe(char)
 }
 
 func isApostrophe(char rune) bool {
@@ -113,12 +148,16 @@ func isSeparator(char rune) bool {
 // authorLabel turns a Telegram first name into the label put in front of a
 // group message ("Bek: ..."). The name is chosen by its owner, so anything
 // that could fake another speaker or a marker line is removed: line breaks,
-// colons and square brackets.
+// colons, square brackets and invisible characters.
 func authorLabel(firstName string) string {
 	cleaned := strings.Map(func(char rune) rune {
-		switch char {
-		case '\n', '\r', ':', '[', ']':
+		switch {
+		case char == ':' || char == '：' || char == '[' || char == ']':
 			return ' '
+		case unicode.IsSpace(char):
+			return ' '
+		case unicode.IsControl(char) || unicode.Is(unicode.Cf, char):
+			return -1 // invisible: direction overrides, zero-width characters
 		}
 		return char
 	}, firstName)

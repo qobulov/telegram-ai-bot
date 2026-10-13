@@ -1,11 +1,12 @@
 package service
 
 // Fixed messages the bot sends itself. Answers from the model follow the
-// user's language; these are short and kept in English, except the welcome.
+// chat's language and the character's voice; these are plain, short and kept
+// in English, except the welcome.
 const (
-	textWelcome = `Assalomu alaykum! Men sun'iy intellekt yordamchisiman. Savolingizni yozing.
-Здравствуйте! Я ИИ-ассистент. Напишите свой вопрос.
-Hello! I am an AI assistant. Send me your question.
+	textWelcome = `Salom! Yozing, gaplashamiz.
+Привет! Пиши, поболтаем.
+Hi! Say something and we'll talk.
 
 /help — commands and usage`
 
@@ -13,7 +14,7 @@ Hello! I am an AI assistant. Send me your question.
 It answers through OpenRouter, remembers the conversation, and can check the time and do arithmetic.
 Send /reset to delete the conversation history.`
 
-	textResetDone        = "Your conversation history has been deleted."
+	textResetDone        = "The conversation history here has been deleted."
 	textUnknown          = "I don't know that command. Send /help to see what I can do."
 	textForbidden        = "This command is restricted to administrators."
 	textTextOnly         = "I can only read text messages for now."

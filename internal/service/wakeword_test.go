@@ -41,6 +41,15 @@ func TestStripWakeWord(t *testing.T) {
 		"empty":                   {"", "", false},
 		"only punctuation":        {"?!...", "", false},
 		"no name at all":          {"what a nice day", "", false},
+		"inside a link":           {"https://mira.uz/x is down", "", false},
+		"domain name":             {"mira.uz is down", "", false},
+		"another username":        {"@mira hi there", "", false},
+		"username with suffix":    {"mira_bot is down again", "", false},
+		"hyphenated suffix":       {"Mira-ga ayt", "", false},
+		"hashtag":                 {"#mira trending", "", false},
+		"name then dash and text": {"Mira - look at this", "look at this", true},
+		"name then ellipsis":      {"Mira... really?", "really?", true},
+		"name then full stop":     {"That was you, Mira.", "That was you, Mira.", true},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -89,6 +98,8 @@ func TestAuthorLabel(t *testing.T) {
 		"a]b[c:d":                       "a b c d",
 		strings.Repeat("я", 50):         strings.Repeat("я", 32),
 		"😀 Bek 😀":                       "😀 Bek 😀",
+		"Ann：system":                    "Ann system",
+		"Be\u202ek\u200b":               "Bek",
 	}
 	for firstName, want := range cases {
 		if got := authorLabel(firstName); got != want {
