@@ -15,9 +15,15 @@ import (
 var (
 	// ErrDuplicate means the Telegram update was already answered.
 	ErrDuplicate = errors.New("agent: update already processed")
+	// ErrSilent means the model decided the message needs no reply. Nothing
+	// is saved and nothing should be sent.
+	ErrSilent = errors.New("agent: the model chose not to reply")
 	// ErrToolLoop means the model kept requesting tools instead of answering.
 	ErrToolLoop = errors.New("agent: model did not produce an answer")
 )
+
+// SilentMarker is the whole answer the model gives to stay silent.
+const SilentMarker = "[silent]"
 
 const toolLimitResult = `{"ok":false,"error":{"code":"tool_limit","message":"The tool call limit for this message was reached. Answer with the information you already have."}}`
 
@@ -41,14 +47,15 @@ type Tools interface {
 
 // Options configures an Agent. All fields are required.
 type Options struct {
-	Store        Store
-	Model        Model
-	Tools        Tools
-	SystemPrompt string
-	// GroupSystemPrompt replaces SystemPrompt for messages from group chats.
-	GroupSystemPrompt string
-	MaxHistory        int
-	MaxToolCalls      int
+	Store Store
+	Model Model
+	Tools Tools
+	// Persona is the character's instructions, sent with every request.
+	Persona string
+	// GroupNote is added to Persona for messages from a group.
+	GroupNote    string
+	MaxHistory   int
+	MaxToolCalls int
 }
 
 // Agent answers user messages. It is safe for concurrent use as long as
@@ -64,14 +71,22 @@ func New(opts Options) *Agent {
 
 // Request is one user message to answer.
 type Request struct {
-	// Scope selects the conversation and, through its UserID, decides which
-	// tools may run. It must come from the authenticated Telegram update.
-	Scope    storage.Scope
-	UpdateID int64
+	// Scope selects the conversation. It must come from the Telegram update.
+	Scope storage.Scope
+	// UserID is who sent the message. It decides which tools may run, and
+	// must come from the Telegram update too: in a group the scope names no
+	// user, so this is the only identity there is.
+	UserID     int64
+	AuthorName string
+	UpdateID   int64
 	// MessageID and ReplyToMessageID are stored with the turn.
 	MessageID        int64
 	ReplyToMessageID int64
-	Text             string
+	// Text is the user's message as it is stored and replayed in later turns.
+	Text string
+	// Context is extra material for this turn only, such as recent group
+	// messages. It is sent in front of Text and never stored.
+	Context string
 	// Group is true for messages from a group or supergroup.
 	Group bool
 }
@@ -126,7 +141,7 @@ type turn struct {
 // model is told to stop using tools, and after MaxToolCalls+2 requests the
 // turn fails with ErrToolLoop.
 func (a *Agent) run(ctx context.Context, t *turn) (string, error) {
-	definitions := a.opts.Tools.Definitions(t.req.Scope.UserID)
+	definitions := a.opts.Tools.Definitions(t.req.UserID)
 	for range a.opts.MaxToolCalls + 2 {
 		reply, err := a.opts.Model.Complete(ctx, ai.Request{
 			Messages:    a.prompt(t),
@@ -148,20 +163,31 @@ func (a *Agent) prompt(t *turn) []ai.Message {
 	messages := make([]ai.Message, 0, 1+len(t.history)+len(t.messages))
 	messages = append(messages, ai.Message{Role: ai.RoleSystem, Content: a.systemPrompt(t.req)})
 	messages = append(messages, t.history...)
-	return append(messages, t.messages...)
+	messages = append(messages, t.messages...)
+	if t.req.Context != "" {
+		// The first message of the turn is the user's. The context goes in
+		// front of it in this request only; t.messages, which is what gets
+		// saved, keeps the plain text.
+		question := &messages[1+len(t.history)]
+		question.Content = t.req.Context + "\n\n" + question.Content
+	}
+	return messages
 }
 
 func (a *Agent) systemPrompt(req Request) string {
 	if req.Group {
-		return a.opts.GroupSystemPrompt
+		return a.opts.Persona + "\n\n" + a.opts.GroupNote
 	}
-	return a.opts.SystemPrompt
+	return a.opts.Persona
 }
 
 func finish(t *turn, reply ai.Message) (string, error) {
 	answer := strings.TrimSpace(reply.Content)
 	if answer == "" {
 		return "", ai.ErrEmptyResponse
+	}
+	if strings.EqualFold(answer, SilentMarker) {
+		return "", ErrSilent
 	}
 	t.messages = append(t.messages, ai.Message{Role: ai.RoleAssistant, Content: answer})
 	return answer, nil
@@ -187,7 +213,7 @@ func (a *Agent) execute(ctx context.Context, t *turn, call ai.ToolCall) string {
 	if t.toolsUsed > a.opts.MaxToolCalls {
 		return toolLimitResult
 	}
-	return a.opts.Tools.Execute(ctx, t.req.Scope.UserID, call.Function.Name, call.Function.Arguments)
+	return a.opts.Tools.Execute(ctx, t.req.UserID, call.Function.Name, call.Function.Arguments)
 }
 
 // identified returns the calls with an ID on each. Some models omit the ID,
@@ -212,6 +238,8 @@ func (a *Agent) save(ctx context.Context, t *turn) (int64, error) {
 		UpdateID:         t.req.UpdateID,
 		MessageID:        t.req.MessageID,
 		ReplyToMessageID: t.req.ReplyToMessageID,
+		AuthorID:         t.req.UserID,
+		AuthorName:       t.req.AuthorName,
 		Messages:         t.messages,
 	})
 	if errors.Is(err, storage.ErrDuplicateUpdate) {

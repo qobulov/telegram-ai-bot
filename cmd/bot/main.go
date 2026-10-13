@@ -160,13 +160,13 @@ func newService(cfg config.Config, store *storage.Store, bot botAccount, logger 
 		Logger:     logger,
 	})
 	assistant := agent.New(agent.Options{
-		Store:             store,
-		Model:             model,
-		Tools:             registry,
-		SystemPrompt:      cfg.PersonaPrompt,
-		GroupSystemPrompt: cfg.PersonaPrompt + "\n\n" + cfg.GroupNote,
-		MaxHistory:        cfg.MaxHistoryMessages,
-		MaxToolCalls:      cfg.MaxToolCallsPerTurn,
+		Store:        store,
+		Model:        model,
+		Tools:        registry,
+		Persona:      cfg.PersonaPrompt,
+		GroupNote:    cfg.GroupNote,
+		MaxHistory:   cfg.MaxHistoryMessages,
+		MaxToolCalls: cfg.MaxToolCallsPerTurn,
 	})
 	return service.New(service.Options{
 		Sender:        bot.client,

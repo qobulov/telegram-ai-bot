@@ -96,6 +96,7 @@ func (s *Service) ask(ctx context.Context, in incoming) outcome {
 	started := time.Now()
 	answer, err := s.opts.Replier.Reply(ctx, agent.Request{
 		Scope:            in.scope,
+		UserID:           in.scope.UserID,
 		UpdateID:         in.updateID,
 		MessageID:        in.msg.MessageID,
 		ReplyToMessageID: repliedID(in),

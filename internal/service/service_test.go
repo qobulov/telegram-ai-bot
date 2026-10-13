@@ -530,6 +530,7 @@ func TestGroupMentionIsAnsweredAsReplyInTheGroupScope(t *testing.T) {
 	req := f.replier.recorded()[0].req
 	want := agent.Request{
 		Scope:     storage.Scope{ChatID: groupID, UserID: userID},
+		UserID:    userID,
 		UpdateID:  update.UpdateID,
 		MessageID: 30,
 		Text:      "what is Go?",

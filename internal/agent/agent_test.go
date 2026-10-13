@@ -17,7 +17,7 @@ const testUser = int64(42)
 var testScope = storage.Scope{ChatID: testUser, UserID: testUser}
 
 func request(updateID int64, text string) Request {
-	return Request{Scope: testScope, UpdateID: updateID, Text: text}
+	return Request{Scope: testScope, UserID: testUser, UpdateID: updateID, Text: text}
 }
 
 // memoryStore is an in-memory Store keyed by conversation scope.
@@ -119,13 +119,13 @@ type fixture struct {
 func newFixture(replies ...ai.Message) fixture {
 	f := fixture{store: newMemoryStore(), model: &scriptedModel{replies: replies}, tools: &fakeTools{}}
 	f.agent = New(Options{
-		Store:             f.store,
-		Model:             f.model,
-		Tools:             f.tools,
-		SystemPrompt:      "be helpful",
-		GroupSystemPrompt: "be helpful in a group",
-		MaxHistory:        20,
-		MaxToolCalls:      2,
+		Store:        f.store,
+		Model:        f.model,
+		Tools:        f.tools,
+		Persona:      "be funny",
+		GroupNote:    "you are in a group",
+		MaxHistory:   20,
+		MaxToolCalls: 2,
 	})
 	return f
 }
@@ -152,7 +152,7 @@ func TestReplyAnswersAndSavesTurn(t *testing.T) {
 	if !reflect.DeepEqual(roles(sent.Messages), wantRoles) {
 		t.Errorf("request roles = %v, want %v", roles(sent.Messages), wantRoles)
 	}
-	if sent.Messages[0].Content != "be helpful" || sent.Messages[3].Content != "hi" {
+	if sent.Messages[0].Content != "be funny" || sent.Messages[3].Content != "hi" {
 		t.Errorf("request messages = %+v", sent.Messages)
 	}
 	if len(sent.Tools) != 1 || sent.ForbidTools {
@@ -338,17 +338,19 @@ func contains(text, part string) bool {
 	return false
 }
 
-func TestReplyUsesGroupPromptAndScope(t *testing.T) {
+func TestGroupTurnUsesSharedScopeAndTheSendersPermissions(t *testing.T) {
 	f := newFixture(toolCall("call_1"), text("group answer"))
-	groupScope := storage.Scope{ChatID: -100500, UserID: testUser}
+	groupScope := storage.Scope{ChatID: -100500} // shared: no user
 	f.store.history[testScope] = []ai.Message{{Role: ai.RoleUser, Content: "private secret"}, text("private answer")}
 
 	answer, err := f.agent.Reply(context.Background(), Request{
 		Scope:            groupScope,
+		UserID:           testUser,
+		AuthorName:       "Bek",
 		UpdateID:         5,
 		MessageID:        30,
 		ReplyToMessageID: 29,
-		Text:             "hello group",
+		Text:             "Bek: hello group",
 		Group:            true,
 	})
 	if err != nil {
@@ -359,7 +361,7 @@ func TestReplyUsesGroupPromptAndScope(t *testing.T) {
 	}
 
 	sent := f.model.requests[0].Messages
-	if sent[0].Content != "be helpful in a group" {
+	if sent[0].Content != "be funny\n\nyou are in a group" {
 		t.Errorf("system prompt = %q", sent[0].Content)
 	}
 	for _, msg := range sent {
@@ -375,18 +377,90 @@ func TestReplyUsesGroupPromptAndScope(t *testing.T) {
 	if saved.Scope != groupScope || saved.UpdateID != 5 || saved.MessageID != 30 || saved.ReplyToMessageID != 29 {
 		t.Errorf("saved turn = %+v", saved)
 	}
+	if saved.AuthorID != testUser || saved.AuthorName != "Bek" {
+		t.Errorf("saved author = %d %q", saved.AuthorID, saved.AuthorName)
+	}
 	if len(f.store.history[testScope]) != 2 {
 		t.Error("a group turn was written into the private history")
 	}
 }
 
-func TestReplyUsesPrivatePromptByDefault(t *testing.T) {
+func TestPrivateTurnUsesThePersonaAlone(t *testing.T) {
 	f := newFixture(text("ok"))
 
 	if _, err := f.agent.Reply(context.Background(), request(1, "hi")); err != nil {
 		t.Fatalf("Reply: %v", err)
 	}
-	if got := f.model.requests[0].Messages[0].Content; got != "be helpful" {
+	if got := f.model.requests[0].Messages[0].Content; got != "be funny" {
 		t.Errorf("system prompt = %q", got)
+	}
+}
+
+func TestContextIsSentForOneTurnAndNeverSaved(t *testing.T) {
+	f := newFixture(text("first answer"), text("second answer"))
+	req := request(1, "Bek: who is right?")
+	req.Context = "[Recent messages]\nAnn: Go is interpreted\n[End]"
+
+	if _, err := f.agent.Reply(context.Background(), req); err != nil {
+		t.Fatalf("Reply: %v", err)
+	}
+	sent := f.model.requests[0].Messages
+	last := sent[len(sent)-1]
+	if last.Role != ai.RoleUser || !strings.HasPrefix(last.Content, req.Context) || !strings.HasSuffix(last.Content, "Bek: who is right?") {
+		t.Errorf("user message sent to the model = %q", last.Content)
+	}
+	for _, msg := range f.store.turns[0].Messages {
+		if strings.Contains(msg.Content, "Go is interpreted") {
+			t.Errorf("the context block was saved: %q", msg.Content)
+		}
+	}
+	if got := f.store.turns[0].Messages[0].Content; got != "Bek: who is right?" {
+		t.Errorf("saved user message = %q", got)
+	}
+
+	if _, err := f.agent.Reply(context.Background(), request(2, "Bek: and now?")); err != nil {
+		t.Fatalf("second Reply: %v", err)
+	}
+	for _, msg := range f.model.requests[1].Messages {
+		if strings.Contains(msg.Content, "Go is interpreted") {
+			t.Errorf("the earlier context block came back in a later turn: %q", msg.Content)
+		}
+	}
+}
+
+func TestContextStaysInFrontThroughToolCalls(t *testing.T) {
+	f := newFixture(toolCall("call_1"), text("done"))
+	req := request(1, "what time is it?")
+	req.Context = "[Recent messages]"
+
+	if _, err := f.agent.Reply(context.Background(), req); err != nil {
+		t.Fatalf("Reply: %v", err)
+	}
+	second := f.model.requests[1].Messages
+	if question := second[1]; !strings.HasPrefix(question.Content, "[Recent messages]") {
+		t.Errorf("the context was dropped from the follow-up request: %q", question.Content)
+	}
+}
+
+func TestSilentAnswerSendsAndSavesNothing(t *testing.T) {
+	for _, content := range []string{"[silent]", "[Silent]", " [silent]\n", "[SILENT]"} {
+		f := newFixture(text(content))
+
+		_, err := f.agent.Reply(context.Background(), request(1, "Mira is my sister's name"))
+		if !errors.Is(err, ErrSilent) {
+			t.Errorf("answer %q: err = %v, want ErrSilent", content, err)
+		}
+		if f.store.saves != 0 {
+			t.Errorf("answer %q: a silent turn was saved", content)
+		}
+	}
+}
+
+func TestMarkerInsideASentenceIsAnOrdinaryAnswer(t *testing.T) {
+	f := newFixture(text("I could answer [silent] but where is the fun in that"))
+
+	answer, err := f.agent.Reply(context.Background(), request(1, "say something"))
+	if err != nil || !strings.Contains(answer.Text, "where is the fun") {
+		t.Errorf("answer = %+v, err = %v", answer, err)
 	}
 }
