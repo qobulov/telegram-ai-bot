@@ -352,3 +352,43 @@ func TestErrorsNeverContainToken(t *testing.T) {
 		t.Errorf("error leaks token: %v", err)
 	}
 }
+
+func TestGetUpdatesParsesFirstName(t *testing.T) {
+	client, _ := newTestClient(t, `{"ok":true,"result":[{"update_id":7,"message":{
+		"message_id":3,"from":{"id":42,"first_name":"Бек","username":"bek"},"chat":{"id":-5,"type":"group"},"text":"salom"}}]}`)
+
+	updates, err := client.GetUpdates(context.Background(), 0, 0)
+	if err != nil {
+		t.Fatalf("GetUpdates: %v", err)
+	}
+	if got := updates[0].Message.From.FirstName; got != "Бек" {
+		t.Errorf("FirstName = %q", got)
+	}
+}
+
+func TestGetChatMemberReturnsStatus(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"status":"administrator","user":{"id":42}}}`)
+
+	member, err := client.GetChatMember(context.Background(), -100123, 42)
+	if err != nil {
+		t.Fatalf("GetChatMember: %v", err)
+	}
+	if member.Status != "administrator" || !member.IsAdmin() {
+		t.Errorf("member = %+v", member)
+	}
+	sent := api.recorded()[0]
+	if sent.method != "getChatMember" || sent.params["chat_id"] != float64(-100123) || sent.params["user_id"] != float64(42) {
+		t.Errorf("call = %+v", sent)
+	}
+}
+
+func TestChatMemberIsAdmin(t *testing.T) {
+	for status, want := range map[string]bool{
+		"creator": true, "administrator": true,
+		"member": false, "restricted": false, "left": false, "kicked": false, "": false,
+	} {
+		if got := (ChatMember{Status: status}).IsAdmin(); got != want {
+			t.Errorf("IsAdmin(%q) = %v, want %v", status, got, want)
+		}
+	}
+}

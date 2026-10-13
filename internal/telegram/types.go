@@ -37,9 +37,20 @@ type Message struct {
 
 // User is a Telegram account: the sender of a message, or the bot itself.
 type User struct {
-	ID       int64  `json:"id"`
-	IsBot    bool   `json:"is_bot"`
-	Username string `json:"username"`
+	ID        int64  `json:"id"`
+	IsBot     bool   `json:"is_bot"`
+	Username  string `json:"username"`
+	FirstName string `json:"first_name"`
+}
+
+// ChatMember is a user's standing in a chat.
+type ChatMember struct {
+	Status string `json:"status"`
+}
+
+// IsAdmin reports whether the member owns or administers the chat.
+func (m ChatMember) IsAdmin() bool {
+	return m.Status == "creator" || m.Status == "administrator"
 }
 
 // Chat is where a message was sent.

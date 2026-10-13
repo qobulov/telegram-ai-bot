@@ -87,6 +87,21 @@ func (c *Client) GetMe(ctx context.Context) (User, error) {
 	return me, nil
 }
 
+type getChatMemberParams struct {
+	ChatID int64 `json:"chat_id"`
+	UserID int64 `json:"user_id"`
+}
+
+// GetChatMember returns a user's standing in a chat, which tells whether
+// they administer it.
+func (c *Client) GetChatMember(ctx context.Context, chatID, userID int64) (ChatMember, error) {
+	var member ChatMember
+	if err := c.call(ctx, "getChatMember", getChatMemberParams{ChatID: chatID, UserID: userID}, &member); err != nil {
+		return ChatMember{}, err
+	}
+	return member, nil
+}
+
 type sendMessageParams struct {
 	ChatID          int64            `json:"chat_id"`
 	Text            string           `json:"text"`
