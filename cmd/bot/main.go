@@ -116,7 +116,11 @@ func serve(ctx context.Context, cfg config.Config, store *storage.Store, logger 
 	if err != nil {
 		return fmt.Errorf("identify the bot: %w", err)
 	}
-	svc, err := newService(cfg, store, botAccount{client: bot, user: me}, logger)
+	mutedChats, err := store.MutedChats(ctx)
+	if err != nil {
+		return err
+	}
+	svc, err := newService(cfg, store, botAccount{client: bot, user: me, mutedChats: mutedChats}, logger)
 	if err != nil {
 		return err
 	}
@@ -127,7 +131,8 @@ func serve(ctx context.Context, cfg config.Config, store *storage.Store, logger 
 	var background sync.WaitGroup
 	background.Go(func() { maintain(ctx, cfg, store, logger) })
 
-	logger.Info("bot started", "username", me.Username, "model", cfg.Model, "workers", cfg.MaxConcurrentRequests)
+	logger.Info("bot started", "username", me.Username, "name", cfg.BotDisplayName,
+		"model", cfg.Model, "workers", cfg.MaxConcurrentRequests, "muted_groups", len(mutedChats))
 	pollErr := bot.Poll(ctx, svc.Handle)
 
 	// Polling has stopped, so no new updates arrive. Let queued and running
@@ -144,6 +149,21 @@ func serve(ctx context.Context, cfg config.Config, store *storage.Store, logger 
 type botAccount struct {
 	client *telegram.Client
 	user   telegram.User
+	// mutedChats are the groups where the bot was muted before this start.
+	mutedChats []int64
+}
+
+// groupMembers answers the service's administrator check through Telegram.
+type groupMembers struct {
+	client *telegram.Client
+}
+
+func (m groupMembers) IsGroupAdmin(ctx context.Context, chatID, userID int64) (bool, error) {
+	member, err := m.client.GetChatMember(ctx, chatID, userID)
+	if err != nil {
+		return false, err
+	}
+	return member.IsAdmin(), nil
 }
 
 func newService(cfg config.Config, store *storage.Store, bot botAccount, logger *slog.Logger) (*service.Service, error) {
@@ -173,6 +193,8 @@ func newService(cfg config.Config, store *storage.Store, bot botAccount, logger 
 		Replier:       assistant,
 		Resetter:      store,
 		Recorder:      store,
+		Members:       groupMembers{client: bot.client},
+		Muter:         store,
 		Logger:        logger,
 		Model:         cfg.Model,
 		Workers:       cfg.MaxConcurrentRequests,
@@ -190,6 +212,7 @@ func newService(cfg config.Config, store *storage.Store, bot botAccount, logger 
 		WakeWords:          cfg.WakeWords,
 		DisplayName:        cfg.BotDisplayName,
 		AmbientMessages:    cfg.AmbientMessages,
+		MutedChats:         bot.mutedChats,
 		GroupRatePerMinute: cfg.GroupRateLimitPerMinute,
 		MaxGroupReplyChars: cfg.MaxGroupReplyChars,
 	}), nil

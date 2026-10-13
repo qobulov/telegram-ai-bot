@@ -31,7 +31,7 @@ const (
 // fakeTelegram answers getMe, delivers one update, and records what the bot
 // sends back.
 type fakeTelegram struct {
-	update string // JSON of the single update to deliver
+	update string // JSON of the updates to deliver, comma-separated
 
 	mu        sync.Mutex
 	delivered bool
@@ -47,6 +47,8 @@ func (f *fakeTelegram) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case strings.HasSuffix(r.URL.Path, "/getMe"):
 		_, _ = io.WriteString(w, `{"ok":true,"result":{"id":777,"is_bot":true,"username":"MyBot"}}`)
+	case strings.HasSuffix(r.URL.Path, "/getChatMember"):
+		_, _ = io.WriteString(w, `{"ok":true,"result":{"status":"member"}}`)
 	case strings.HasSuffix(r.URL.Path, "/sendMessage"):
 		var params map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&params)
@@ -159,7 +161,7 @@ func startE2E(t *testing.T, update string, answer func([]modelMessage) string) *
 	if _, err := env.store.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
-	for _, scope := range []storage.Scope{privateScope(e2eUser), privateScope(e2eMember), {ChatID: e2eGroup, UserID: e2eMember}} {
+	for _, scope := range []storage.Scope{privateScope(e2eUser), privateScope(e2eMember), {ChatID: e2eGroup}} {
 		if err := env.store.Reset(ctx, scope); err != nil {
 			t.Fatal(err)
 		}
@@ -227,22 +229,26 @@ func TestServeAnswersMessageEndToEnd(t *testing.T) {
 	}
 }
 
-// A member mentions the bot in a group while replying to another member's
-// message. The bot must answer as a reply to the mentioning message, give
-// the model the quoted message as untrusted context under the group prompt,
-// and keep the exchange in that member's group conversation only.
-func TestServeAnswersGroupMentionEndToEnd(t *testing.T) {
-	env := startE2E(t, `{"update_id":900002,"message":{"message_id":30,
-		"from":{"id":777002,"is_bot":false},"chat":{"id":-100777000,"type":"supergroup"},
-		"text":"😀 @MyBot is that right?","entities":[{"type":"mention","offset":3,"length":6}],
-		"reply_to_message":{"message_id":29,"from":{"id":555,"is_bot":false},
-			"chat":{"id":-100777000,"type":"supergroup"},"text":"2+2 is 5"}}}`,
-		func([]modelMessage) string {
-			return `{"choices":[{"message":{"role":"assistant","content":"No, 2+2 is 4."}}]}`
-		})
+const groupChatter = `{"update_id":900010,"message":{"message_id":28,
+		"from":{"id":555,"is_bot":false,"first_name":"Ann"},"chat":{"id":-100777000,"type":"supergroup"},
+		"text":"Go is interpreted, everyone knows that"}},
+	{"update_id":900011,"message":{"message_id":29,
+		"from":{"id":777002,"is_bot":false,"first_name":"Bek"},"chat":{"id":-100777000,"type":"supergroup"},
+		"text":"no way 😀"}},
+	{"update_id":900012,"message":{"message_id":30,
+		"from":{"id":777002,"is_bot":false,"first_name":"Bek"},"chat":{"id":-100777000,"type":"supergroup"},
+		"text":"Hey Mira, who is right?"}}`
+
+// Two members chat, then one calls the bot by name. The bot must answer once,
+// as a reply to the message that called it, in character, with the earlier
+// chatter as context — and that chatter must not end up in the database.
+func TestServeAnswersWakeWordWithRecentChatterEndToEnd(t *testing.T) {
+	env := startE2E(t, groupChatter, func([]modelMessage) string {
+		return `{"choices":[{"message":{"role":"assistant","content":"Ann, compile your facts first 😂"}}]}`
+	})
 
 	sent := env.waitForSend(t)
-	if sent["text"] != "No, 2+2 is 4." || sent["chat_id"] != float64(e2eGroup) {
+	if sent["text"] != "Ann, compile your facts first 😂" || sent["chat_id"] != float64(e2eGroup) {
 		t.Errorf("bot sent %v", sent)
 	}
 	reply, _ := sent["reply_parameters"].(map[string]any)
@@ -252,36 +258,88 @@ func TestServeAnswersGroupMentionEndToEnd(t *testing.T) {
 	if err := env.stop(); err != nil {
 		t.Errorf("serve returned %v after shutdown", err)
 	}
+	select {
+	case extra := <-env.telegram.sent:
+		t.Errorf("the bot sent a second message: %v", extra)
+	default:
+	}
 
 	request := env.model.firstRequest()
-	if !strings.Contains(request[0].Content, "You are Mira") || !strings.Contains(request[0].Content, "group chat") {
-		t.Errorf("system prompt = %q, want the group prompt", request[0].Content)
+	system := request[0].Content
+	if !strings.Contains(system, "You are Mira") || !strings.Contains(system, "group chat") {
+		t.Errorf("system prompt = %.120q, want the persona with the group note", system)
 	}
 	question := request[len(request)-1].Content
-	for _, want := range []string{"Untrusted content", "2+2 is 5", "😀 is that right?"} {
+	for _, want := range []string{"Recent messages in the group", "Ann: Go is interpreted, everyone knows that", "Bek: no way 😀", "Bek: who is right?"} {
 		if !strings.Contains(question, want) {
 			t.Errorf("user message %q does not contain %q", question, want)
 		}
 	}
-	if strings.Contains(question, "@MyBot") {
-		t.Errorf("the mention was not removed: %q", question)
+	if strings.Contains(question, "Hey Mira") {
+		t.Errorf("the wake phrase was not removed: %q", question)
 	}
 
-	groupHistory := env.history(t, storage.Scope{ChatID: e2eGroup, UserID: e2eMember})
-	if len(groupHistory) != 2 || groupHistory[1].Content != "No, 2+2 is 4." {
-		t.Errorf("group history = %+v", groupHistory)
+	groupHistory := env.history(t, storage.Scope{ChatID: e2eGroup})
+	if len(groupHistory) != 2 || groupHistory[0].Content != "Bek: who is right?" || groupHistory[1].Content != "Ann, compile your facts first 😂" {
+		t.Errorf("shared group history = %+v", groupHistory)
 	}
 	if private := env.history(t, privateScope(e2eMember)); len(private) != 0 {
 		t.Errorf("the group exchange leaked into the private history: %+v", private)
 	}
-	if got := sentMessageID(t, 900002); got != 501 {
+	if got := sentMessageID(t, 900012); got != 501 {
 		t.Errorf("stored sent message ID = %d, want 501", got)
+	}
+	if rows := rowsContaining(t, "interpreted") + rowsContaining(t, "no way"); rows != 0 {
+		t.Errorf("%d database rows contain ordinary group messages; they must stay in memory", rows)
+	}
+	if author := storedAuthor(t, 900012); author != "777002 Bek" {
+		t.Errorf("stored author = %q, want the sender's ID and first name", author)
 	}
 }
 
-// sentMessageID reads the Telegram message ID recorded on the answer of the
-// turn that the given update produced.
-func sentMessageID(t *testing.T, updateID int64) int64 {
+// A group muted before the bot started must stay silent after a restart.
+func TestMutedGroupStaysSilentAfterRestart(t *testing.T) {
+	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("TEST_DATABASE_URL is not set; skipping end-to-end test")
+	}
+	setMuted(t, databaseURL, true)
+	t.Cleanup(func() { setMuted(t, databaseURL, false) })
+
+	env := startE2E(t, groupChatter, func([]modelMessage) string {
+		return `{"choices":[{"message":{"role":"assistant","content":"should never be sent"}}]}`
+	})
+
+	select {
+	case sent := <-env.telegram.sent:
+		t.Errorf("the bot spoke in a muted group: %v", sent)
+	case <-time.After(400 * time.Millisecond):
+	}
+	if err := env.stop(); err != nil {
+		t.Errorf("serve returned %v after shutdown", err)
+	}
+	if history := env.history(t, storage.Scope{ChatID: e2eGroup}); len(history) != 0 {
+		t.Errorf("a muted group got history: %+v", history)
+	}
+}
+
+func setMuted(t *testing.T, databaseURL string, muted bool) {
+	t.Helper()
+	ctx := context.Background()
+	store, err := storage.Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if _, err := store.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetMuted(ctx, e2eGroup, muted, e2eUser); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func queryOne[T any](t *testing.T, sql string, args ...any) T {
 	t.Helper()
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, os.Getenv("TEST_DATABASE_URL"))
@@ -289,20 +347,30 @@ func sentMessageID(t *testing.T, updateID int64) int64 {
 		t.Fatal(err)
 	}
 	defer conn.Close(ctx)
-	var id *int64
-	err = conn.QueryRow(ctx, `
-		SELECT answer.telegram_message_id
+	var value T
+	if err := conn.QueryRow(ctx, sql, args...).Scan(&value); err != nil {
+		t.Fatal(err)
+	}
+	return value
+}
+
+func rowsContaining(t *testing.T, text string) int {
+	return queryOne[int](t, `SELECT count(*) FROM messages WHERE content LIKE '%' || $1 || '%'`, text)
+}
+
+func storedAuthor(t *testing.T, updateID int64) string {
+	return queryOne[string](t, `SELECT author_id || ' ' || author_name FROM messages WHERE update_id = $1`, updateID)
+}
+
+// sentMessageID reads the Telegram message ID recorded on the answer of the
+// turn that the given update produced. Zero means none was recorded.
+func sentMessageID(t *testing.T, updateID int64) int64 {
+	return queryOne[int64](t, `
+		SELECT coalesce(answer.telegram_message_id, 0)
 		FROM messages question
 		JOIN messages answer ON answer.conversation_id = question.conversation_id AND answer.role = 'assistant'
 		WHERE question.update_id = $1
-		ORDER BY answer.id DESC LIMIT 1`, updateID).Scan(&id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if id == nil {
-		return 0
-	}
-	return *id
+		ORDER BY answer.id DESC LIMIT 1`, updateID)
 }
 
 func TestServeFailsFastOnBadToken(t *testing.T) {
