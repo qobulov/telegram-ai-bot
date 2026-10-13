@@ -105,15 +105,21 @@ func serve(ctx context.Context, cfg config.Config, store *storage.Store, logger 
 	if err := store.CheckSchema(ctx); err != nil {
 		return err
 	}
-	svc, err := newService(cfg, store, logger)
-	if err != nil {
-		return err
-	}
 	bot := telegram.NewClient(telegram.Options{
 		Token:   cfg.TelegramToken,
 		BaseURL: cfg.TelegramAPIURL,
 		Logger:  logger,
 	})
+	// Ask Telegram who the bot is. Mentions and replies in groups are matched
+	// against this ID and username, and a wrong token fails here, at startup.
+	me, err := bot.GetMe(ctx)
+	if err != nil {
+		return fmt.Errorf("identify the bot: %w", err)
+	}
+	svc, err := newService(cfg, store, botAccount{client: bot, user: me}, logger)
+	if err != nil {
+		return err
+	}
 
 	// The maintenance loop stops when polling does, whatever the reason.
 	ctx, cancel := context.WithCancel(ctx)
@@ -121,7 +127,7 @@ func serve(ctx context.Context, cfg config.Config, store *storage.Store, logger 
 	var background sync.WaitGroup
 	background.Go(func() { maintain(ctx, cfg, store, logger) })
 
-	logger.Info("bot started", "model", cfg.Model, "workers", cfg.MaxConcurrentRequests)
+	logger.Info("bot started", "username", me.Username, "model", cfg.Model, "workers", cfg.MaxConcurrentRequests)
 	pollErr := bot.Poll(ctx, svc.Handle)
 
 	// Polling has stopped, so no new updates arrive. Let queued and running
@@ -134,7 +140,13 @@ func serve(ctx context.Context, cfg config.Config, store *storage.Store, logger 
 	return pollErr
 }
 
-func newService(cfg config.Config, store *storage.Store, logger *slog.Logger) (*service.Service, error) {
+// botAccount is the Telegram client together with the account it acts as.
+type botAccount struct {
+	client *telegram.Client
+	user   telegram.User
+}
+
+func newService(cfg config.Config, store *storage.Store, bot botAccount, logger *slog.Logger) (*service.Service, error) {
 	registry, err := tools.NewRegistry(cfg.IsAdmin, tools.Builtin(service.HelpText())...)
 	if err != nil {
 		return nil, err
@@ -156,15 +168,11 @@ func newService(cfg config.Config, store *storage.Store, logger *slog.Logger) (*
 		MaxHistory:        cfg.MaxHistoryMessages,
 		MaxToolCalls:      cfg.MaxToolCallsPerTurn,
 	})
-	sender := telegram.NewClient(telegram.Options{
-		Token:   cfg.TelegramToken,
-		BaseURL: cfg.TelegramAPIURL,
-		Logger:  logger,
-	})
 	return service.New(service.Options{
-		Sender:        sender,
+		Sender:        bot.client,
 		Replier:       assistant,
 		Resetter:      store,
+		Recorder:      store,
 		Logger:        logger,
 		Model:         cfg.Model,
 		Workers:       cfg.MaxConcurrentRequests,
@@ -174,6 +182,14 @@ func newService(cfg config.Config, store *storage.Store, logger *slog.Logger) (*
 		TurnTimeout:   cfg.RequestTimeout,
 		IsAdmin:       cfg.IsAdmin,
 		AdminCommands: cfg.AdminCommands,
+
+		Bot:                service.Identity{ID: bot.user.ID, Username: bot.user.Username},
+		MentionTrigger:     cfg.MentionTrigger,
+		ReplyTrigger:       cfg.ReplyTrigger,
+		DisplayNameTrigger: cfg.DisplayNameTrigger,
+		DisplayName:        cfg.BotDisplayName,
+		GroupRatePerMinute: cfg.GroupRateLimitPerMinute,
+		MaxGroupReplyChars: cfg.MaxGroupReplyChars,
 	}), nil
 }
 

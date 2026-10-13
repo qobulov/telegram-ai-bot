@@ -1,12 +1,14 @@
 # telegram-ai-bot
 
-A Telegram AI assistant written in Go. It answers private messages through
-[OpenRouter](https://openrouter.ai), remembers each user's conversation in
-PostgreSQL, and can call a small set of safe tools (current time, calculator,
-bot help).
+A Telegram AI assistant written in Go. It answers private messages, and
+group messages that address it, through [OpenRouter](https://openrouter.ai).
+It remembers each user's conversation in PostgreSQL and can call a small set
+of safe tools (current time, calculator, bot help).
 
 - Long polling: no public port, domain or TLS certificate needed.
 - One dependency besides the Go standard library: `pgx` for PostgreSQL.
+- In groups it answers only when mentioned or replied to, as a reply to the
+  message that addressed it.
 - Replies in the user's language (Uzbek, Russian, English).
 - Tests run without Telegram or OpenRouter credentials.
 
@@ -17,12 +19,13 @@ bot help).
 3. [Local setup](#local-setup)
 4. [Tests](#tests)
 5. [Choosing a model](#choosing-a-model)
-6. [VPS deployment (systemd)](#vps-deployment-systemd)
-7. [Docker Compose deployment (optional)](#docker-compose-deployment-optional)
-8. [Backup and restore](#backup-and-restore)
-9. [Long polling and webhooks](#long-polling-and-webhooks)
-10. [Security checklist](#security-checklist)
-11. [Troubleshooting](#troubleshooting)
+6. [Groups](#groups)
+7. [VPS deployment (systemd)](#vps-deployment-systemd)
+8. [Docker Compose deployment (optional)](#docker-compose-deployment-optional)
+9. [Backup and restore](#backup-and-restore)
+10. [Long polling and webhooks](#long-polling-and-webhooks)
+11. [Security checklist](#security-checklist)
+12. [Troubleshooting](#troubleshooting)
 
 ## Architecture
 
@@ -41,10 +44,12 @@ internal/service                update dispatch: commands, rate limit, worker po
 How one message travels through the bot:
 
 1. `telegram` long-polls `getUpdates` and passes each update to `service`.
-2. `service` ignores anything that is not a private message from a person,
-   then puts the update on the queue of the worker that owns that user.
-3. The worker applies the per-user rate limit, then runs a command or calls
-   `agent`.
+2. `service` keeps messages from a person that are either in a private chat
+   or, in a group, addressed to the bot (see [Groups](#groups)). Everything
+   else is dropped. A kept update goes on the queue of the worker that owns
+   that user.
+3. The worker applies the per-user rate limit and, in a group, the per-group
+   limit, then runs a command or calls `agent`.
 4. `agent` loads the user's recent history, sends it to the model with the
    tool definitions, runs any tools the model asks for, and repeats until the
    model answers in text.
@@ -76,17 +81,25 @@ Design points worth knowing:
 
 ```text
 users(telegram_id PK, created_at, last_seen_at)
-conversations(id PK, user_id UNIQUE -> users, created_at, updated_at)
+conversations(id PK, chat_id, user_id -> users, created_at, updated_at,
+              UNIQUE (chat_id, user_id))
 messages(id PK, conversation_id -> conversations, role, content,
-         tool_calls jsonb, tool_call_id, update_id, created_at)
+         tool_calls jsonb, tool_call_id, update_id,
+         telegram_message_id, reply_to_message_id, created_at)
 schema_migrations(version PK, applied_at)
 ```
 
-A user has one conversation. `/reset` deletes it; its messages go with it
-through `ON DELETE CASCADE`. Only the numeric Telegram ID is stored about a
-user: no name, username or phone number. Message text is stored, because that
-is the conversation memory. The full schema is in
-[internal/storage/migrations/0001_init.sql](internal/storage/migrations/0001_init.sql).
+A conversation belongs to one user in one chat. A user's private chat (where
+the chat ID equals the user ID) and their conversation in each group are
+separate rows, so they are never loaded together. `/reset` deletes the
+sender's conversation in the chat where it was sent; its messages go with it
+through `ON DELETE CASCADE`.
+
+`telegram_message_id` and `reply_to_message_id` record which Telegram message
+a row corresponds to and which one it replied to. Only the numeric Telegram
+ID is stored about a user: no name, username or phone number. Message text is
+stored, because that is the conversation memory. The schema is defined by the
+files in [internal/storage/migrations/](internal/storage/migrations/).
 
 ## Configuration
 
@@ -111,6 +124,14 @@ in the environment win over the file.
 | `RETENTION_DAYS` | `90` | Delete conversations idle longer than this; `0` keeps them forever |
 | `ADMIN_USER_IDS` | empty | Comma-separated Telegram user IDs of administrators |
 | `ADMIN_COMMANDS` | empty | Comma-separated commands only administrators may use, e.g. `model,about` |
+| `ENABLE_MENTION_TRIGGER` | `true` | In groups, answer when `@username` is mentioned |
+| `ENABLE_REPLY_TRIGGER` | `true` | In groups, answer replies to the bot's messages |
+| `ENABLE_DISPLAY_NAME_TRIGGER` | `false` | In groups, answer messages that start with the bot's name; see [Groups](#groups) |
+| `BOT_DISPLAY_NAME` | empty | The name for that trigger, e.g. `Mira`; required when it is enabled |
+| `GROUP_CONTEXT_MODE` | `per_user` | Only `per_user` is supported |
+| `MAX_GROUP_REPLY_LENGTH` | `4000` | Longest answer posted in a group, in characters (at most 4096) |
+| `GROUP_RATE_LIMIT_PER_MINUTE` | `10` | Messages answered per group per minute, across all members |
+| `GROUP_SYSTEM_PROMPT` | built-in | Instructions sent to the model for group messages |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Override for testing or a proxy |
 | `TELEGRAM_API_URL` | `https://api.telegram.org` | Override for testing or a local Bot API server |
@@ -196,6 +217,105 @@ model may guess at the time or at arithmetic.
 
 Free models are rate limited by OpenRouter. The bot retries a rate-limited
 request up to three times and then tells the user something went wrong.
+
+## Groups
+
+Add the bot to a group or supergroup like any other member. It then answers
+only messages that address it, and posts each answer as a reply to the
+message that asked.
+
+### Ways to address the bot
+
+| How | Example | Setting |
+|---|---|---|
+| Mention its username | `@MyAssistantBot explain the difference between Go and Python` | `ENABLE_MENTION_TRIGGER` (on) |
+| Reply to one of its messages | reply to the bot's answer with `and which is faster?` | `ENABLE_REPLY_TRIGGER` (on) |
+| A command with its username | `/reset@MyAssistantBot` | always on |
+| Start the message with its name | `Mira, explain this code.` | `ENABLE_DISPLAY_NAME_TRIGGER` (off) |
+
+The username is the bot's real one, read from Telegram at startup; it is not
+configured. Mentions are found through Telegram's message entities, so
+`@MyAssistantBot2` or the name inside another word does not trigger the bot.
+
+A plain `/reset` or `/help` without the bot's username is ignored in a group,
+because it may be meant for another bot.
+
+The display-name trigger requires the name to open the message and be
+followed by a comma or colon. "I think Mira is wrong" and "Miranda, hi" do
+not trigger it.
+
+### Example
+
+```text
+Ann:   Go is interpreted, right?
+Bek:   (replying to Ann)  @MyAssistantBot is that right?
+Bot:   (replying to Bek)  No. Go is compiled ahead of time to machine code...
+Bek:   (replying to Bot)  and Python?
+Bot:   (replying to Bek)  Python is usually interpreted...
+Ann:   what a nice day
+       (no reaction: not addressed to the bot)
+```
+
+### What the model sees
+
+- The text of the message that addressed the bot, with the mention removed.
+- If that message is a reply, the one message it replies to, shortened to
+  1,000 characters and marked as a quote. A quote from another member is
+  labelled as untrusted content.
+- The asking member's own earlier exchanges with the bot **in that group**.
+
+Nothing else from the group is read, stored or sent to the model. Each member
+has their own conversation with the bot in each group, separate from every
+other member's and from their private chat with the bot. `/reset@YourBot`
+clears only the sender's conversation in that group.
+
+Tools work in groups as in private chats. Administrator-only tools and
+commands depend on who sent the message, not on the group.
+
+### Limits
+
+- Group answers are cut to `MAX_GROUP_REPLY_LENGTH` characters so the bot
+  posts one message. Ask in a private chat for long answers.
+- `GROUP_RATE_LIMIT_PER_MINUTE` caps answers per group across all members;
+  the per-user limit applies as well. The first refusal is announced, later
+  ones are silent.
+- The bot reads text. A photo or document counts only through its caption;
+  the image itself is not seen.
+- Messages from other bots are ignored. So are messages from anonymous group
+  administrators, which Telegram delivers as coming from a bot account.
+
+### BotFather privacy mode
+
+Telegram bots have *privacy mode*, which is **on** by default. With it on,
+Telegram delivers to a bot in a group only:
+
+- messages that mention the bot by `@username`,
+- replies to the bot's own messages,
+- commands addressed to it (`/command@YourBot`).
+
+That is exactly what the mention, reply and command triggers need, so
+**leave privacy mode on**. The bot then never receives the rest of the
+group's conversation at all.
+
+Only the display-name trigger needs more: "Mira, explain this" contains no
+mention, so Telegram does not deliver it with privacy mode on. To use that
+trigger:
+
+1. In [@BotFather](https://t.me/BotFather): `/setprivacy`, choose the bot,
+   choose **Disable**.
+2. Remove the bot from the group and add it again. Telegram applies the
+   setting when the bot joins.
+3. Set `ENABLE_DISPLAY_NAME_TRIGGER=true` and `BOT_DISPLAY_NAME=...`, and
+   restart the bot.
+
+With privacy mode off, Telegram sends the bot every message in the group. The
+bot still ignores, and does not store, anything that does not address it, but
+group members should be told the bot now receives their messages. (A bot that
+is a group administrator also receives all messages, whatever the setting.)
+
+To check the setting: `/mybots` in @BotFather, choose the bot, then *Bot
+Settings* and *Group Privacy*. To stop the bot from being added to groups at
+all, use `/setjoingroups`.
 
 ## VPS deployment (systemd)
 
@@ -306,7 +426,8 @@ sudo -u postgres psql -d tgbot -c \
   'REVOKE INSERT, UPDATE, DELETE ON schema_migrations FROM tgbot'
 ```
 
-You should see `migrations finished applied=1`. Running it again prints
+You should see `migrations finished applied=2` on a new database. Running it
+again prints
 `applied=0`: applied migrations are recorded in `schema_migrations` and never
 run twice. The bot does not migrate on its own; if the schema is behind it
 exits with `database schema is out of date; run the migrate command`.
@@ -345,7 +466,7 @@ journalctl -u telegram-ai-agent -f            # follow
 journalctl -u telegram-ai-agent --since today
 ```
 
-A healthy start logs `bot started`. Each answered message logs
+A healthy start logs `bot started` with the bot's username. Each answered message logs
 `turn completed` with the user ID and duration. Message text is never logged.
 
 ### 10. Updating safely
@@ -358,7 +479,9 @@ sudo -u postgres pg_dump -Fc tgbot > ~/tgbot-before-update.dump   # backup first
 sudo systemctl stop telegram-ai-agent
 sudo cp /usr/local/bin/telegram-ai-agent /usr/local/bin/telegram-ai-agent.previous
 sudo install -o root -g root -m 0755 /tmp/telegram-ai-agent /usr/local/bin/telegram-ai-agent
-# Apply migrations: repeat the first command of step 6.
+# Apply migrations: repeat the first command of step 6. Upgrading from a
+# version without group support applies migration 0002, which keeps all
+# existing private conversations.
 sudo systemctl start telegram-ai-agent
 journalctl -u telegram-ai-agent -n 20
 ```
@@ -479,7 +602,13 @@ Built in:
 - [x] All SQL is parameterized. The model cannot produce SQL that is run.
 - [x] Every query on a conversation is keyed by the sender's Telegram ID
       taken from the update, never by an ID in message text.
-- [x] Only private chats with human senders are accepted.
+- [x] Only messages from human senders are accepted: in private chats, and in
+      groups when they address the bot. The bot's identity for that check
+      comes from Telegram (`getMe`), not from configuration.
+- [x] Private and group conversations are stored under separate keys and are
+      never loaded together; group members never see each other's history.
+- [x] A message quoted from another group member is marked as untrusted and
+      shortened before it reaches the model.
 - [x] Input length, output tokens, tool output size, tool run time, tool
       calls per message and time per message are all limited.
 - [x] Per-user rate limit; fixed number of workers; bounded queues.
@@ -509,6 +638,8 @@ Known limits:
   if that matters for your users.
 - Message text is sent to OpenRouter and the model provider behind it. Tell
   your users, and check the provider's data policy for the model you choose.
+- In a group, anyone who can post can make the bot answer, within the rate
+  limits. The answer is visible to the whole group.
 - A model can still be talked into saying untrue or unwanted things. The bot
   limits what it can *do* (three harmless tools), not what it can *say*.
 
@@ -520,9 +651,15 @@ Known limits:
 | `database schema is out of date; run the migrate command` | Run `make migrate` locally, or step 6 on the server. |
 | `database is unreachable` | PostgreSQL is not running, or host, port, user or password in `DATABASE_URL` is wrong. Try `psql "$DATABASE_URL"`. |
 | `permission denied for table ...` | The runtime role lacks grants. Run the `ALTER DEFAULT PRIVILEGES` statements from step 3 *before* migrating, or grant on the existing tables: `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO tgbot; GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO tgbot;` |
-| `telegram: 401 Unauthorized` and the bot exits | The bot token is wrong or was revoked. |
 | `telegram polling failed ... 409 Conflict` | Another copy of the bot is running with the same token, or a webhook is set. Stop the other copy, or call `deleteWebhook`. |
-| The bot is silent in a group | By design: it answers only in private chats. |
+| The bot is silent in a group | It answers only when addressed: mention `@username`, reply to one of its messages, or use `/command@username`. Check `ENABLE_MENTION_TRIGGER` and `ENABLE_REPLY_TRIGGER`. If the sender is an anonymous admin or another bot, it is ignored by design. |
+| The bot ignores `/reset` in a group | Commands in groups need the bot's username: `/reset@YourBot`. |
+| "Mira, ..." gets no answer | The display-name trigger is off by default, and needs BotFather privacy mode disabled and the bot re-added to the group; see [Groups](#groups). The name must start the message and be followed by `,` or `:`. |
+| The bot answers but not as a reply | The original message was deleted before the answer arrived; the answer is then sent as an ordinary message. |
+| Group answers end in `…` | They were cut to `MAX_GROUP_REPLY_LENGTH`. |
+| "This group is sending me messages too quickly" | The per-group limit. Raise `GROUP_RATE_LIMIT_PER_MINUTE`. |
+| `identify the bot: telegram: 401 Unauthorized` at startup | The bot token is wrong or was revoked. |
+| `BOT_DISPLAY_NAME is required when ENABLE_DISPLAY_NAME_TRIGGER is true` | Set the name or turn the trigger off. |
 | "Something went wrong on my side" | Look at the log line `turn failed`. `status 401`: bad OpenRouter key. `status 402`: no credits. `status 429`: the free model is rate limited; wait or pick another model. `status 404`: the model ID does not exist. |
 | "That took too long to answer" | The model was slower than `REQUEST_TIMEOUT_SECONDS`. Raise it or use a faster model. |
 | Wrong time or wrong arithmetic | The model has no tool support and is guessing. Look for `model does not support tool calling` in the log and see [Choosing a model](#choosing-a-model). |
