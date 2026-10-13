@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	groupContextShared    = "shared"
-	telegramMessageLength = 4096
-	maxAmbientMessages    = 100
+	groupContextShared     = "shared"
+	telegramMessageLength  = 4096
+	maxAmbientMessages     = 100
+	maxWebhookSecretLength = 256
 )
 
 // removedVariables maps settings that no longer exist to their replacement,
@@ -28,7 +29,9 @@ var removedVariables = map[string]string{
 
 // Config holds every runtime setting. It is read once at startup and never mutated.
 type Config struct {
-	TelegramToken     string
+	TelegramToken string
+	// WebhookSecret is needed only when updates arrive by webhook.
+	WebhookSecret     string
 	TelegramAPIURL    string
 	OpenRouterAPIKey  string
 	OpenRouterBaseURL string
@@ -82,6 +85,7 @@ func Load(getenv func(string) string) (Config, error) {
 		TelegramToken:     r.required("TELEGRAM_BOT_TOKEN"),
 		OpenRouterAPIKey:  r.required("OPENROUTER_API_KEY"),
 		DatabaseURL:       r.required("DB_POSTGRES_URL"),
+		WebhookSecret:     r.webhookSecret("TELEGRAM_WEBHOOK_SECRET"),
 		TelegramAPIURL:    r.text("TELEGRAM_API_URL", "https://api.telegram.org"),
 		OpenRouterBaseURL: r.text("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
 		Model:             r.text("OPENROUTER_MODEL", "openrouter/free"),
@@ -211,6 +215,23 @@ func isSingleWord(word string) bool {
 		}
 	}
 	return word != ""
+}
+
+// webhookSecret reads the optional secret Telegram echoes with each webhook
+// request. Telegram accepts 1 to 256 characters from A-Z, a-z, 0-9, _ and -.
+func (r *reader) webhookSecret(name string) string {
+	secret := r.value(name)
+	if len(secret) > maxWebhookSecretLength || strings.ContainsFunc(secret, notSecretChar) {
+		r.fail(name, "must be at most 256 characters from A-Z, a-z, 0-9, _ and -")
+		return ""
+	}
+	return secret
+}
+
+func notSecretChar(char rune) bool {
+	isLetter := (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z')
+	isDigit := char >= '0' && char <= '9'
+	return !isLetter && !isDigit && char != '_' && char != '-'
 }
 
 func (r *reader) checkRemovedVariables() {

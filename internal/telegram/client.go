@@ -87,6 +87,26 @@ func (c *Client) GetMe(ctx context.Context) (User, error) {
 	return me, nil
 }
 
+type setWebhookParams struct {
+	URL            string   `json:"url"`
+	SecretToken    string   `json:"secret_token"`
+	AllowedUpdates []string `json:"allowed_updates"`
+}
+
+// SetWebhook tells Telegram to deliver updates to url instead of holding
+// them for getUpdates. Telegram sends secret back in a header with every
+// update, which is how the receiver knows a request is genuine. While a
+// webhook is set, long polling with the same token does not work.
+func (c *Client) SetWebhook(ctx context.Context, url, secret string) error {
+	params := setWebhookParams{URL: url, SecretToken: secret, AllowedUpdates: []string{"message"}}
+	return c.call(ctx, "setWebhook", params, nil)
+}
+
+// DeleteWebhook removes the webhook, so that long polling works again.
+func (c *Client) DeleteWebhook(ctx context.Context) error {
+	return c.call(ctx, "deleteWebhook", struct{}{}, nil)
+}
+
 type getChatMemberParams struct {
 	ChatID int64 `json:"chat_id"`
 	UserID int64 `json:"user_id"`

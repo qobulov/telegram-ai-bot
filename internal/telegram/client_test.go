@@ -392,3 +392,29 @@ func TestChatMemberIsAdmin(t *testing.T) {
 		}
 	}
 }
+
+func TestSetWebhookRegistersURLWithSecret(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":true}`)
+
+	if err := client.SetWebhook(context.Background(), "https://bot.example/api/webhook", "s3cret"); err != nil {
+		t.Fatalf("SetWebhook: %v", err)
+	}
+	sent := api.recorded()[0]
+	if sent.method != "setWebhook" || sent.params["url"] != "https://bot.example/api/webhook" || sent.params["secret_token"] != "s3cret" {
+		t.Errorf("call = %+v", sent)
+	}
+	if allowed, _ := sent.params["allowed_updates"].([]any); len(allowed) != 1 || allowed[0] != "message" {
+		t.Errorf("allowed_updates = %v", sent.params["allowed_updates"])
+	}
+}
+
+func TestDeleteWebhook(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":true}`)
+
+	if err := client.DeleteWebhook(context.Background()); err != nil {
+		t.Fatalf("DeleteWebhook: %v", err)
+	}
+	if got := api.recorded()[0].method; got != "deleteWebhook" {
+		t.Errorf("method = %q", got)
+	}
+}

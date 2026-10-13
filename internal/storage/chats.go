@@ -20,6 +20,17 @@ func (s *Store) SetMuted(ctx context.Context, chatID int64, muted bool, by int64
 	return nil
 }
 
+// IsMuted reports whether the bot is muted in a chat. A chat with no stored
+// setting is not muted.
+func (s *Store) IsMuted(ctx context.Context, chatID int64) (bool, error) {
+	var muted bool
+	err := s.pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM chats WHERE chat_id = $1 AND muted)`, chatID).Scan(&muted)
+	if err != nil {
+		return false, fmt.Errorf("storage: read muted: %w", err)
+	}
+	return muted, nil
+}
+
 // MutedChats returns the IDs of all chats where the bot is muted. It is read
 // once at startup; the running bot keeps the answer in memory.
 func (s *Store) MutedChats(ctx context.Context) ([]int64, error) {

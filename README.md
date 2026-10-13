@@ -26,15 +26,19 @@ time, calculator, bot help).
 7. [Groups](#groups)
 8. [VPS deployment (systemd)](#vps-deployment-systemd)
 9. [Docker Compose deployment (optional)](#docker-compose-deployment-optional)
-10. [Backup and restore](#backup-and-restore)
-11. [Long polling and webhooks](#long-polling-and-webhooks)
-12. [Security checklist](#security-checklist)
-13. [Troubleshooting](#troubleshooting)
+10. [Vercel deployment (webhook)](#vercel-deployment-webhook)
+11. [Backup and restore](#backup-and-restore)
+12. [Long polling and webhooks](#long-polling-and-webhooks)
+13. [Security checklist](#security-checklist)
+14. [Troubleshooting](#troubleshooting)
 
 ## Architecture
 
 ```text
-cmd/bot/main.go                 wiring, signals, "migrate" subcommand
+cmd/bot/main.go                 long-polling command; migrate and webhook subcommands
+api/webhook.go                  serverless function that receives updates by webhook
+internal/app                    assembles the bot for either way of running it
+internal/webhook                HTTP handler for webhook updates, with secret check
 internal/config                 load .env + environment, validate
 internal/telegram               Bot API client: long polling, sending, message splitting
 internal/ai                     OpenRouter client: types, retries, tool-calling format
@@ -129,6 +133,7 @@ in the environment win over the file.
 | `TELEGRAM_BOT_TOKEN`          | required                       | Token from [@BotFather](https://t.me/BotFather)                                                              |
 | `OPENROUTER_API_KEY`          | required                       | Key from <https://openrouter.ai/keys>                                                                        |
 | `DB_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
+| `TELEGRAM_WEBHOOK_SECRET` | empty | Only for webhook deployments; see [Vercel deployment](#vercel-deployment-webhook) |
 | `OPENROUTER_MODEL`            | `openrouter/free`              | Model ID, see [Choosing a model](#choosing-a-model)                                                          |
 | `MAX_OUTPUT_TOKENS`           | `1024`                         | Longest model reply, in tokens                                                                               |
 | `BOT_DISPLAY_NAME`            | `Maria`                         | The character's name                                                                                         |
@@ -643,6 +648,83 @@ docker compose exec -T db pg_dump -U tgbot -Fc tgbot > tgbot.dump  # backup
 docker compose pull && docker compose up -d --build                # update
 ```
 
+## Vercel deployment (webhook)
+
+On serverless hosting the bot cannot keep a polling connection open, so
+Telegram is told to call a function instead. The function is
+[api/webhook.go](api/webhook.go), served at `/api/webhook`; it handles one
+update per request and sends the reply before it responds.
+
+This path was tested locally against fake Telegram and OpenRouter servers,
+not on Vercel itself. In particular it is unverified that Vercel's Go runtime
+accepts the Go version in `go.mod`; if the build fails on that, lower the
+`go` line to a version Vercel supports.
+
+### What is different from long polling
+
+| | Long polling (`make run`, VPS) | Webhook (Vercel) |
+|---|---|---|
+| Recent group chatter as context | last `GROUP_AMBIENT_MESSAGES` in memory | off: nothing can be kept between requests |
+| Mute state | cached in memory | read from the database for each addressed group message |
+| Rate limits | exact | per instance only, so much weaker; do not rely on them |
+| Order of messages in a group | one at a time, in order | concurrent requests are not ordered |
+| Retention cleanup (`RETENTION_DAYS`) | hourly | does not run |
+| Time per message | `REQUEST_TIMEOUT_SECONDS` | must fit in the function's 60 seconds |
+
+With BotFather privacy mode off, every group message invokes the function,
+including the ones the bot ignores. Ignored messages return at once and
+touch neither the database nor the model, but they count as invocations.
+
+A model answer slower than about 60 seconds is cut off by the platform, and
+Telegram then delivers the update again. Keep `REQUEST_TIMEOUT_SECONDS` at
+45 or lower and prefer a fast model.
+
+### Steps
+
+1. **Database.** Apply migrations once from your machine, with
+   `DB_POSTGRES_URL` pointing at the production database: `make migrate`.
+2. **Settings.** In the Vercel project, under *Settings → Environment
+   Variables*, set at least:
+
+   | Variable | Value |
+   |---|---|
+   | `TELEGRAM_BOT_TOKEN` | the bot's token |
+   | `OPENROUTER_API_KEY` | your key |
+   | `DB_POSTGRES_URL` | the connection string (a Vercel database integration may set it for you) |
+   | `TELEGRAM_WEBHOOK_SECRET` | a secret you generate: `openssl rand -hex 32` |
+
+   Any other variable from [Configuration](#configuration) can be set the
+   same way.
+3. **Deploy.** Push to the branch Vercel builds. Then check the function:
+
+   ```bash
+   curl https://YOUR-APP.vercel.app/api/webhook     # prints: ok
+   ```
+
+   If it prints `the bot is not ready`, the function logs in Vercel name the
+   missing or invalid setting.
+4. **Point Telegram at it.** On your machine, with the same
+   `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET` in `.env`:
+
+   ```bash
+   go run ./cmd/bot set-webhook https://YOUR-APP.vercel.app/api/webhook
+   ```
+
+5. Send the bot a message.
+
+To go back to long polling: `go run ./cmd/bot delete-webhook`. A token works
+with one mode at a time; while a webhook is set, `make run` fails with
+`409 Conflict`.
+
+### Security of the webhook
+
+The URL is public, so anyone can send it requests. The function accepts an
+update only when the `X-Telegram-Bot-Api-Secret-Token` header equals
+`TELEGRAM_WEBHOOK_SECRET`; everything else gets `401`. Without that check
+anyone could forge messages from any user ID, including an administrator's.
+Treat the secret like the bot token, and change both together if either
+leaks (set the new secret in Vercel, redeploy, run `set-webhook` again).
+
 ## Backup and restore
 
 Back up:
@@ -701,24 +783,11 @@ The bot uses long polling: it asks Telegram for new messages and waits up to
 Polling has one real advantage: the server needs no public address, domain or
 certificate, and no inbound port.
 
-Switching to webhooks is worth it when you need several instances behind a
-load balancer. It is not implemented here; the outline is:
-
-1. Give the server a public HTTPS address (a domain and a reverse proxy such
-   as Caddy or nginx with a certificate). Telegram accepts ports 443, 80, 88
-   and 8443.
-2. Add an HTTP handler that reads the JSON update from the request body,
-   decodes it into `telegram.Update`, and calls `service.Handle`. Reply
-   `200 OK` immediately; the answer is sent later by a worker, as now.
-3. Reject requests whose `X-Telegram-Bot-Api-Secret-Token` header does not
-   match a secret you choose. Without this check anyone who finds the URL can
-   forge messages from any user ID.
-4. Register it:
-   `curl "https://api.telegram.org/bot$TOKEN/setWebhook" -d url=https://your.domain/webhook -d secret_token=$SECRET -d 'allowed_updates=["message"]'`
-5. Stop calling `Poll`. With several instances, move the rate limiter and the
-   per-user ordering to shared storage, because they are per-process today.
-
-To go back to polling: `curl "https://api.telegram.org/bot$TOKEN/deleteWebhook"`.
+A webhook receiver is included for serverless hosting; see
+[Vercel deployment (webhook)](#vercel-deployment-webhook) for how to use it
+and for what it gives up. It handles each update inside one request, so it
+does not by itself make several instances share rate limits or keep a
+group's messages in order.
 
 ## Security checklist
 

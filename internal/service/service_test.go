@@ -1250,3 +1250,97 @@ func TestGroupResetConfirmationDoesNotSayYour(t *testing.T) {
 		t.Errorf("group reset confirmation = %q; the history belongs to the group", sent[0].text)
 	}
 }
+
+// fakeMuteStore answers mute lookups the way the database would, for the
+// serverless setup where nothing can be cached between requests.
+type fakeMuteStore struct {
+	muted   map[int64]bool
+	err     error
+	lookups int
+}
+
+func (f *fakeMuteStore) IsMuted(_ context.Context, chatID int64) (bool, error) {
+	f.lookups++
+	return f.muted[chatID], f.err
+}
+
+// serverless builds the service the way the webhook does: no workers, no
+// recent-chatter buffer, mute state looked up on demand.
+func serverless(f *fixture, store *fakeMuteStore) *Service {
+	f.opts.Workers = 0
+	f.opts.QueueSize = 0
+	f.opts.AmbientMessages = 0
+	f.opts.MuteStore = store
+	return New(f.opts)
+}
+
+func TestHandleNowAnswersBeforeReturning(t *testing.T) {
+	f := newFixture()
+	s := serverless(f, &fakeMuteStore{})
+	defer s.Close()
+
+	s.HandleNow(textFrom(userID, "hi"))
+
+	expectOneReply(t, f.sender.messages(), "echo: hi")
+	if len(f.recorder.calls) != 1 {
+		t.Errorf("recorded sends = %+v; bookkeeping must finish before HandleNow returns", f.recorder.calls)
+	}
+}
+
+func TestHandleNowIgnoresWhatHandleIgnores(t *testing.T) {
+	f := newFixture()
+	store := &fakeMuteStore{}
+	s := serverless(f, store)
+	defer s.Close()
+
+	s.HandleNow(inGroup(groupMessage("just chatting")))
+	s.HandleNow(telegram.Update{UpdateID: 1})
+
+	if sent := f.sender.messages(); len(sent) != 0 {
+		t.Errorf("sent = %+v, want nothing", sent)
+	}
+	if store.lookups != 0 {
+		t.Errorf("mute lookups = %d; ordinary group messages must not cost a database query", store.lookups)
+	}
+}
+
+func TestMuteStoreDecidesInServerlessMode(t *testing.T) {
+	f := newFixture()
+	store := &fakeMuteStore{muted: map[int64]bool{groupID: true}}
+	s := serverless(f, store)
+	defer s.Close()
+
+	s.HandleNow(inGroup(groupMessage("Mira, hello?")))
+	if sent := f.sender.messages(); len(sent) != 0 {
+		t.Fatalf("the bot answered in a group the store reports as muted: %+v", sent)
+	}
+
+	store.muted[groupID] = false // unmuted by another instance
+	s.HandleNow(inGroup(groupMessage("Mira, hello?")))
+	expectOneReply(t, f.sender.messages(), "echo: hello?")
+}
+
+func TestMuteLookupFailureKeepsTheBotQuiet(t *testing.T) {
+	f := newFixture()
+	s := serverless(f, &fakeMuteStore{err: errors.New("database down")})
+	defer s.Close()
+
+	s.HandleNow(inGroup(groupMessage("Mira, hello?")))
+
+	if sent := f.sender.messages(); len(sent) != 0 {
+		t.Errorf("sent = %+v; if mute state is unknown the bot must not speak in a group", sent)
+	}
+}
+
+func TestMuteCommandWorksInServerlessMode(t *testing.T) {
+	f := newFixture()
+	s := serverless(f, &fakeMuteStore{})
+	defer s.Close()
+
+	s.HandleNow(inGroup(asAdmin(groupMessage("/mute@MyBot"))))
+
+	expectOneReply(t, f.sender.messages(), textMuted)
+	if len(f.muter.calls) != 1 || !f.muter.calls[0].muted {
+		t.Errorf("mute changes = %+v", f.muter.calls)
+	}
+}

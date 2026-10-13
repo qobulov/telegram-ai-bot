@@ -596,6 +596,35 @@ func TestMuteStateIsPersisted(t *testing.T) {
 	}
 }
 
+func TestIsMutedReadsTheStoredSetting(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	isMuted := func(chatID int64) bool {
+		t.Helper()
+		muted, err := store.IsMuted(ctx, chatID)
+		if err != nil {
+			t.Fatalf("IsMuted: %v", err)
+		}
+		return muted
+	}
+
+	if isMuted(group) {
+		t.Error("a chat with no setting is reported as muted")
+	}
+	if err := store.SetMuted(ctx, group, true, alice); err != nil {
+		t.Fatal(err)
+	}
+	if !isMuted(group) || isMuted(otherGroup) {
+		t.Error("muting one chat must affect that chat only")
+	}
+	if err := store.SetMuted(ctx, group, false, alice); err != nil {
+		t.Fatal(err)
+	}
+	if isMuted(group) {
+		t.Error("the chat is still reported as muted after unmuting")
+	}
+}
+
 func TestOpenErrorDoesNotLeakPassword(t *testing.T) {
 	_, err := Open(context.Background(), "postgres://bot:hunter2secret@127.0.0.1:1/db?connect_timeout=1")
 	if err == nil {

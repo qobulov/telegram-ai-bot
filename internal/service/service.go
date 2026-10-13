@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	noticeQueueSize = 64
-	sendTimeout     = 15 * time.Second
+	noticeQueueSize   = 64
+	sendTimeout       = 15 * time.Second
+	muteLookupTimeout = 5 * time.Second
 )
 
 // Sender delivers a text message and returns the ID Telegram gave it.
@@ -44,6 +45,12 @@ type Members interface {
 // Muter stores whether the bot is muted in a chat.
 type Muter interface {
 	SetMuted(ctx context.Context, chatID int64, muted bool, by int64) error
+}
+
+// MuteStore looks up whether the bot is muted in a chat. It is used where
+// the mute state cannot be kept in memory between updates.
+type MuteStore interface {
+	IsMuted(ctx context.Context, chatID int64) (bool, error)
 }
 
 // Recorder stores the Telegram message ID of an answer after it was sent.
@@ -89,6 +96,11 @@ type Options struct {
 	AmbientMessages int
 	// MutedChats are the groups where the bot starts muted.
 	MutedChats []int64
+	// MuteStore, when set, is asked about a group's mute state every time
+	// instead of the copy kept in memory. Serverless deployments need this:
+	// each request may run in a different instance, so memory cannot be
+	// trusted to know about a /mute handled elsewhere.
+	MuteStore MuteStore
 	// GroupRatePerMinute limits answers per group, across all its members.
 	GroupRatePerMinute int
 	// MaxGroupReplyChars is the longest answer posted in a group, in UTF-16
@@ -196,6 +208,17 @@ func (s *Service) Handle(update telegram.Update) {
 	}
 }
 
+// HandleNow processes one update on the calling goroutine and returns when
+// the reply, if any, has been sent and recorded. It is for callers that
+// cannot leave work running after they return, such as a webhook on
+// serverless hosting. Unlike Handle it does not use the workers, so it gives
+// no ordering between updates that arrive at the same time.
+func (s *Service) HandleNow(update telegram.Update) {
+	if in, ok := s.accept(update); ok {
+		s.process(in)
+	}
+}
+
 // accept keeps messages from a person, sent either in a private chat or, in
 // a group, addressed to the bot. The sender's ID from the update is the
 // identity used for permissions from here on.
@@ -236,7 +259,9 @@ func (s *Service) accept(update telegram.Update) (incoming, bool) {
 func (s *Service) acceptGroup(in incoming) (incoming, bool) {
 	text, addressed := s.address(in.msg)
 	if !addressed {
-		if !s.isMuted(in.scope.ChatID) {
+		// Checked in this order so that, with the buffer off, an ordinary
+		// group message costs no mute lookup at all.
+		if s.opts.AmbientMessages > 0 && !s.isMuted(in.scope.ChatID) {
 			s.remember(in.msg)
 		}
 		return incoming{}, false
@@ -265,9 +290,26 @@ func (s *Service) silenced(in incoming) bool {
 }
 
 func (s *Service) isMuted(chatID int64) bool {
+	if s.opts.MuteStore != nil {
+		return s.lookUpMuted(chatID)
+	}
 	s.mutedMu.RLock()
 	defer s.mutedMu.RUnlock()
 	return s.muted[chatID]
+}
+
+// lookUpMuted asks the store. If the answer cannot be had, the bot stays
+// quiet: speaking in a group that asked for silence is worse than missing
+// one message. The mute commands themselves are not affected by this.
+func (s *Service) lookUpMuted(chatID int64) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), muteLookupTimeout)
+	defer cancel()
+	muted, err := s.opts.MuteStore.IsMuted(ctx, chatID)
+	if err != nil {
+		s.opts.Logger.Error("mute lookup failed; staying quiet", "chat_id", chatID, "error", err)
+		return true
+	}
+	return muted
 }
 
 func (s *Service) markMuted(chatID int64, muted bool) {

@@ -374,3 +374,27 @@ func TestLoadGroupLimits(t *testing.T) {
 		}
 	}
 }
+
+func TestWebhookSecret(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil || cfg.WebhookSecret != "" {
+		t.Fatalf("default: secret = %q, err = %v; the secret is optional for polling", cfg.WebhookSecret, err)
+	}
+
+	env := validEnv()
+	env["TELEGRAM_WEBHOOK_SECRET"] = "Abc_123-xyz"
+	if cfg, err := Load(getenv(env)); err != nil || cfg.WebhookSecret != "Abc_123-xyz" {
+		t.Errorf("secret = %q, err = %v", cfg.WebhookSecret, err)
+	}
+
+	for _, bad := range []string{"has space", "semi;colon", "ünïcode", strings.Repeat("a", 257)} {
+		env["TELEGRAM_WEBHOOK_SECRET"] = bad
+		_, err := Load(getenv(env))
+		if err == nil || !strings.Contains(err.Error(), "TELEGRAM_WEBHOOK_SECRET") {
+			t.Errorf("%q: err = %v, want mention of TELEGRAM_WEBHOOK_SECRET", bad, err)
+		}
+		if err != nil && strings.Contains(err.Error(), bad) {
+			t.Errorf("the error repeats the secret %q", bad)
+		}
+	}
+}
