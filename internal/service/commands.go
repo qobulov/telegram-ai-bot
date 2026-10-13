@@ -27,7 +27,9 @@ func (s *Service) process(in incoming) {
 	ctx, cancel := context.WithTimeout(context.Background(), s.opts.TurnTimeout)
 	defer cancel()
 
-	// The group may have been muted while this update waited in the queue.
+	// A muted group is ignored, except for the commands that control muting.
+	// This is checked here, in queue order, so that a message sent right
+	// after /unmute is answered and one sent right after /mute is not.
 	if in.group && s.isMuted(in.scope.ChatID) && !isMuteCommand(in.text) {
 		return
 	}

@@ -225,17 +225,20 @@ func (s *Service) accept(update telegram.Update) (incoming, bool) {
 	}
 }
 
-// acceptGroup applies the group rules: a muted group is ignored except for
-// the commands that control muting, a message addressed to the bot is
-// accepted, and any other message is only remembered as recent chatter.
+// acceptGroup queues a group message that is addressed to the bot. Any other
+// message is only remembered as recent chatter, and not even that while the
+// group is muted.
+//
+// Whether a muted group's message is dropped is decided later, when a worker
+// takes it from the queue (see process). Deciding here would be wrong: the
+// /mute or /unmute that changes the answer may still be waiting in that same
+// queue, ahead of this message.
 func (s *Service) acceptGroup(in incoming) (incoming, bool) {
 	text, addressed := s.address(in.msg)
-	if s.isMuted(in.scope.ChatID) {
-		in.text = text
-		return in, addressed && isMuteCommand(text)
-	}
 	if !addressed {
-		s.remember(in.msg)
+		if !s.isMuted(in.scope.ChatID) {
+			s.remember(in.msg)
+		}
 		return incoming{}, false
 	}
 	in.text = text
