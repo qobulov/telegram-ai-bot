@@ -19,7 +19,7 @@ func validEnv() map[string]string {
 	return map[string]string{
 		"TELEGRAM_BOT_TOKEN": testToken,
 		"OPENROUTER_API_KEY": testKey,
-		"DATABASE_URL":       testDBURL,
+		"db_POSTGRES_URL":    testDBURL,
 	}
 }
 
@@ -67,7 +67,7 @@ func TestLoadAppliesDefaults(t *testing.T) {
 }
 
 func TestLoadRequiresSecrets(t *testing.T) {
-	for _, name := range []string{"TELEGRAM_BOT_TOKEN", "OPENROUTER_API_KEY", "DATABASE_URL"} {
+	for _, name := range []string{"TELEGRAM_BOT_TOKEN", "OPENROUTER_API_KEY", "db_POSTGRES_URL"} {
 		t.Run(name, func(t *testing.T) {
 			env := validEnv()
 			delete(env, name)

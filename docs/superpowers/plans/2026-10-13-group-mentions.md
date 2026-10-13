@@ -18,7 +18,7 @@
 - Private-chat behaviour must not change; every existing test keeps passing (adapted only where a signature changed).
 - User ID and chat ID always come from the update, never from message text.
 - Never log message text, quoted text, tokens or the database URL.
-- Each task ends with `gofmt -l .` empty, `go vet ./...` clean, `go test -race -p 1 ./...` green (with `TEST_DATABASE_URL` set), and a commit.
+- Each task ends with `gofmt -l .` empty, `go vet ./...` clean, `go test -race -p 1 ./...` green (with `TEST_db_POSTGRES_URL` set), and a commit.
 
 ## Review Focus
 
@@ -162,5 +162,5 @@ func withQuote(text string, replied *telegram.Message, botID int64) string
 - [ ] End-to-end test first (extends the fake Telegram server with `getMe` and a group update that mentions the bot and replies to another member's message): the `sendMessage` request carries the group `chat_id` and `reply_parameters.message_id`; the model request contains the group system prompt and the marked quote; history is stored under the group scope and the private scope is empty; the answer row has the sent message ID.
 - [ ] Wire `getMe` at startup (failure is a startup error), the new options, and `Recorder`.
 - [ ] README: a "Groups" section (how to add the bot, the three triggers, example interactions, what is and is not sent to the model), BotFather privacy mode, the new settings in the configuration table, the migration step for existing deployments, troubleshooting rows (bot silent in a group; display name not working; replies to deleted messages; anonymous admins).
-- [ ] Final verification with and without `TEST_DATABASE_URL`; `go build ./...`; smoke-run `migrate` on a database at version 1.
+- [ ] Final verification with and without `TEST_db_POSTGRES_URL`; `go build ./...`; smoke-run `migrate` on a database at version 1.
 - [ ] Commit.

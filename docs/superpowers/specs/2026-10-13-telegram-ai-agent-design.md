@@ -62,26 +62,26 @@ use the message and tool-definition types from `ai`. No package-level mutable st
 Loaded from the environment. A `.env` file in the working directory is read
 first if present and never overrides variables that are already set.
 
-| Variable | Default | Notes |
-|---|---|---|
-| `TELEGRAM_BOT_TOKEN` | required | |
-| `OPENROUTER_API_KEY` | required | |
-| `DATABASE_URL` | required | |
-| `OPENROUTER_MODEL` | `openrouter/free` | |
-| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | |
-| `TELEGRAM_API_URL` | `https://api.telegram.org` | |
-| `SYSTEM_PROMPT` | built-in prompt | |
-| `MAX_HISTORY_MESSAGES` | 20 | |
-| `MAX_TOOL_CALLS_PER_TURN` | 4 | |
-| `MAX_CONCURRENT_REQUESTS` | 10 | worker count |
-| `USER_RATE_LIMIT_PER_MINUTE` | 10 | |
-| `REQUEST_TIMEOUT_SECONDS` | 45 | budget for a whole turn |
-| `MAX_OUTPUT_TOKENS` | 1024 | |
-| `MAX_INPUT_CHARS` | 4000 | longer messages are rejected |
-| `RETENTION_DAYS` | 90 | 0 disables cleanup |
-| `LOG_LEVEL` | `info` | debug, info, warn, error |
-| `ADMIN_USER_IDS` | empty | comma-separated Telegram IDs |
-| `ADMIN_COMMANDS` | empty | comma-separated commands restricted to admins |
+| Variable                     | Default                        | Notes                                         |
+| ---------------------------- | ------------------------------ | --------------------------------------------- |
+| `TELEGRAM_BOT_TOKEN`         | required                       |                                               |
+| `OPENROUTER_API_KEY`         | required                       |                                               |
+| `db_POSTGRES_URL`            | required                       |                                               |
+| `OPENROUTER_MODEL`           | `openrouter/free`              |                                               |
+| `OPENROUTER_BASE_URL`        | `https://openrouter.ai/api/v1` |                                               |
+| `TELEGRAM_API_URL`           | `https://api.telegram.org`     |                                               |
+| `SYSTEM_PROMPT`              | built-in prompt                |                                               |
+| `MAX_HISTORY_MESSAGES`       | 20                             |                                               |
+| `MAX_TOOL_CALLS_PER_TURN`    | 4                              |                                               |
+| `MAX_CONCURRENT_REQUESTS`    | 10                             | worker count                                  |
+| `USER_RATE_LIMIT_PER_MINUTE` | 10                             |                                               |
+| `REQUEST_TIMEOUT_SECONDS`    | 45                             | budget for a whole turn                       |
+| `MAX_OUTPUT_TOKENS`          | 1024                           |                                               |
+| `MAX_INPUT_CHARS`            | 4000                           | longer messages are rejected                  |
+| `RETENTION_DAYS`             | 90                             | 0 disables cleanup                            |
+| `LOG_LEVEL`                  | `info`                         | debug, info, warn, error                      |
+| `ADMIN_USER_IDS`             | empty                          | comma-separated Telegram IDs                  |
+| `ADMIN_COMMANDS`             | empty                          | comma-separated commands restricted to admins |
 
 Validation fails startup with a message naming the variable, never its value.
 Numeric settings must be positive (except `RETENTION_DAYS`, which may be 0).
@@ -139,7 +139,7 @@ whose `updated_at` is older than that many days.
 ## A turn, end to end
 
 1. `telegram` long-polls `getUpdates` (timeout 30s, `allowed_updates:
-   ["message"]`). Network and 5xx errors back off exponentially with jitter up
+["message"]`). Network and 5xx errors back off exponentially with jitter up
    to 30s; a 429 waits for `retry_after`. A 401 is fatal.
 2. `service` drops updates that are not a private-chat message from a human
    sender. Non-text messages get a short "text only" reply.
@@ -269,7 +269,7 @@ the turn in progress, bounded by the turn timeout, then the pool is closed.
   backpressure, unsupported message types, per-user ordering.
 - `storage`: integration tests for history, reset, cross-user isolation,
   duplicate update IDs, retention and migrations. They run only when
-  `TEST_DATABASE_URL` is set and skip otherwise.
+  `TEST_db_POSTGRES_URL` is set and skip otherwise.
 
 ## Deployment and docs
 

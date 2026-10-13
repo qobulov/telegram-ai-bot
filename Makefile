@@ -10,11 +10,11 @@ build:
 run:
 	go run ./cmd/bot
 
-## migrate: apply database migrations using DATABASE_URL from .env
+## migrate: apply database migrations using db_POSTGRES_URL from .env
 migrate:
 	go run ./cmd/bot migrate
 
-## test: run all tests (storage tests need TEST_DATABASE_URL, otherwise they skip)
+## test: run all tests (storage tests need TEST_db_POSTGRES_URL, otherwise they skip)
 test:
 	go test -p 1 ./...
 

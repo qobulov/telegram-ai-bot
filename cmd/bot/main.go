@@ -75,13 +75,13 @@ func runBot(ctx context.Context) error {
 	return serve(ctx, cfg, store, newLogger(cfg.LogLevel))
 }
 
-// runMigrate needs only DATABASE_URL. Migrations are applied by an operator
+// runMigrate needs only db_POSTGRES_URL. Migrations are applied by an operator
 // with the database owner role, who should not have to supply the bot's
 // Telegram and OpenRouter secrets to do it.
 func runMigrate(ctx context.Context) error {
-	databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	databaseURL := strings.TrimSpace(os.Getenv("db_POSTGRES_URL"))
 	if databaseURL == "" {
-		return errors.New("DATABASE_URL is required")
+		return errors.New("db_POSTGRES_URL is required")
 	}
 	store, err := storage.Open(ctx, databaseURL)
 	if err != nil {

@@ -18,7 +18,7 @@
 - No package-level mutable state. `context.Context` is the first parameter of every call that does I/O.
 - All SQL parameterized. `pgx` is used directly; this is an owner-approved exception to the workspace `CLAUDE.md` Ucode rule.
 - Never log or return to users: bot token, API key, database URL, message text.
-- Tests need no network and no credentials. Storage tests skip unless `TEST_DATABASE_URL` is set.
+- Tests need no network and no credentials. Storage tests skip unless `TEST_db_POSTGRES_URL` is set.
 - Every task ends with `gofmt -l .` empty, `go vet ./...` clean, `go test -race ./...` green, and a commit on `feat/telegram-ai-agent`.
 - Functions stay short, errors are sentinel values or typed, early returns over nesting (workspace clean-Go rules).
 
@@ -214,8 +214,8 @@ var ErrDuplicateUpdate, ErrSchemaOutdated
 
 `SaveTurn` runs in one transaction: upsert user (`last_seen_at`), upsert conversation (`updated_at`), insert messages in order with `update_id` on the first. A unique violation on `update_id` returns `ErrDuplicateUpdate`. `Migrate` holds `pg_advisory_lock`, applies each embedded file in its own transaction and records the version. Schema is exactly the spec's.
 
-- [ ] Tests first (skip without `TEST_DATABASE_URL`; each test migrates and truncates): migrate twice applies 1 then 0; `CheckSchema` passes after migrate; `SaveTurn` then `History` round-trips roles, content, tool calls and tool-call IDs in order; `History` limit returns the newest N, oldest first; user A never sees user B's messages; `Reset` removes only the caller's history and is a no-op for an unknown user; the same `updateID` twice → `ErrDuplicateUpdate` and no extra rows; `UpdateProcessed` true/false; `DeleteIdle` removes a conversation with an old `updated_at` and keeps a fresh one; the role check constraint rejects `role='system'`.
-- [ ] Start a throwaway database: `docker run -d --rm --name tgbot-test-pg -e POSTGRES_PASSWORD=test -p 127.0.0.1:55432:5432 postgres:18` and run with `TEST_DATABASE_URL=postgres://postgres:test@127.0.0.1:55432/postgres?sslmode=disable`.
+- [ ] Tests first (skip without `TEST_db_POSTGRES_URL`; each test migrates and truncates): migrate twice applies 1 then 0; `CheckSchema` passes after migrate; `SaveTurn` then `History` round-trips roles, content, tool calls and tool-call IDs in order; `History` limit returns the newest N, oldest first; user A never sees user B's messages; `Reset` removes only the caller's history and is a no-op for an unknown user; the same `updateID` twice → `ErrDuplicateUpdate` and no extra rows; `UpdateProcessed` true/false; `DeleteIdle` removes a conversation with an old `updated_at` and keeps a fresh one; the role check constraint rejects `role='system'`.
+- [ ] Start a throwaway database: `docker run -d --rm --name tgbot-test-pg -e POSTGRES_PASSWORD=test -p 127.0.0.1:55432:5432 postgres:18` and run with `TEST_db_POSTGRES_URL=postgres://postgres:test@127.0.0.1:55432/postgres?sslmode=disable`.
 - [ ] Run — fails. Implement. Verify and commit.
 
 ### Task 6: Agent
@@ -298,5 +298,5 @@ Workers are started by `New`. Each job runs under `context.WithTimeout(context.B
 
 - [ ] Write the README sections listed in the spec, for a reader new to Go deployment: architecture, configuration table, local setup, tests, choosing a tool-capable model, VPS deployment end to end, backup and restore, long-polling limits and switching to webhooks, security checklist, troubleshooting.
 - [ ] Security pass over the diff: grep for logging of secrets and message text; confirm every SQL statement is parameterized and keyed by the update's user ID; confirm no `os/exec`; confirm response bodies are size-limited; confirm the admin gate cannot be reached through model output.
-- [ ] Run `gofmt -l .`, `go vet ./...`, `go test -race ./...` with and without `TEST_DATABASE_URL`; record the real output.
+- [ ] Run `gofmt -l .`, `go vet ./...`, `go test -race ./...` with and without `TEST_db_POSTGRES_URL`; record the real output.
 - [ ] Stop the throwaway database container. Commit.

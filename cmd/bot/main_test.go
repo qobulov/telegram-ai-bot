@@ -128,9 +128,9 @@ type e2e struct {
 
 func startE2E(t *testing.T, update string, answer func([]modelMessage) string) *e2e {
 	t.Helper()
-	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	databaseURL := os.Getenv("TEST_db_POSTGRES_URL")
 	if databaseURL == "" {
-		t.Skip("TEST_DATABASE_URL is not set; skipping end-to-end test")
+		t.Skip("TEST_db_POSTGRES_URL is not set; skipping end-to-end test")
 	}
 	env := &e2e{telegram: newFakeTelegram(update), model: &fakeOpenRouter{answer: answer}}
 	telegramServer := httptest.NewServer(env.telegram)
@@ -144,7 +144,7 @@ func startE2E(t *testing.T, update string, answer func([]modelMessage) string) *
 			"TELEGRAM_API_URL":    telegramServer.URL,
 			"OPENROUTER_API_KEY":  "test",
 			"OPENROUTER_BASE_URL": modelServer.URL,
-			"DATABASE_URL":        databaseURL,
+			"db_POSTGRES_URL":     databaseURL,
 		}[key]
 	})
 	if err != nil {
@@ -299,9 +299,9 @@ func TestServeAnswersWakeWordWithRecentChatterEndToEnd(t *testing.T) {
 
 // A group muted before the bot started must stay silent after a restart.
 func TestMutedGroupStaysSilentAfterRestart(t *testing.T) {
-	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	databaseURL := os.Getenv("TEST_db_POSTGRES_URL")
 	if databaseURL == "" {
-		t.Skip("TEST_DATABASE_URL is not set; skipping end-to-end test")
+		t.Skip("TEST_db_POSTGRES_URL is not set; skipping end-to-end test")
 	}
 	setMuted(t, databaseURL, true)
 	t.Cleanup(func() { setMuted(t, databaseURL, false) })
@@ -342,7 +342,7 @@ func setMuted(t *testing.T, databaseURL string, muted bool) {
 func queryOne[T any](t *testing.T, sql string, args ...any) T {
 	t.Helper()
 	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, os.Getenv("TEST_DATABASE_URL"))
+	conn, err := pgx.Connect(ctx, os.Getenv("TEST_db_POSTGRES_URL"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -374,9 +374,9 @@ func sentMessageID(t *testing.T, updateID int64) int64 {
 }
 
 func TestServeFailsFastOnBadToken(t *testing.T) {
-	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	databaseURL := os.Getenv("TEST_db_POSTGRES_URL")
 	if databaseURL == "" {
-		t.Skip("TEST_DATABASE_URL is not set; skipping startup test")
+		t.Skip("TEST_db_POSTGRES_URL is not set; skipping startup test")
 	}
 	telegramServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `{"ok":false,"error_code":401,"description":"Unauthorized"}`)
@@ -387,7 +387,7 @@ func TestServeFailsFastOnBadToken(t *testing.T) {
 			"TELEGRAM_BOT_TOKEN": "1:wrong-secret",
 			"TELEGRAM_API_URL":   telegramServer.URL,
 			"OPENROUTER_API_KEY": "test",
-			"DATABASE_URL":       databaseURL,
+			"db_POSTGRES_URL":    databaseURL,
 		}[key]
 	})
 	if err != nil {
@@ -412,11 +412,11 @@ func TestServeFailsFastOnBadToken(t *testing.T) {
 // Migrations are run by an operator with the owner role. They must not need
 // the bot's other secrets.
 func TestMigrateNeedsOnlyDatabaseURL(t *testing.T) {
-	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	databaseURL := os.Getenv("TEST_db_POSTGRES_URL")
 	if databaseURL == "" {
-		t.Skip("TEST_DATABASE_URL is not set; skipping migrate test")
+		t.Skip("TEST_db_POSTGRES_URL is not set; skipping migrate test")
 	}
-	t.Setenv("DATABASE_URL", databaseURL)
+	t.Setenv("db_POSTGRES_URL", databaseURL)
 	t.Setenv("TELEGRAM_BOT_TOKEN", "")
 	t.Setenv("OPENROUTER_API_KEY", "")
 
@@ -426,10 +426,10 @@ func TestMigrateNeedsOnlyDatabaseURL(t *testing.T) {
 }
 
 func TestMigrateWithoutDatabaseURLNamesTheVariable(t *testing.T) {
-	t.Setenv("DATABASE_URL", "")
+	t.Setenv("db_POSTGRES_URL", "")
 
 	err := run([]string{"migrate"})
-	if err == nil || !strings.Contains(err.Error(), "DATABASE_URL") {
-		t.Fatalf("err = %v, want mention of DATABASE_URL", err)
+	if err == nil || !strings.Contains(err.Error(), "db_POSTGRES_URL") {
+		t.Fatalf("err = %v, want mention of db_POSTGRES_URL", err)
 	}
 }

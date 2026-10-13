@@ -122,35 +122,35 @@ Settings come from environment variables. For local development, put them in
 a `.env` file in the directory you start the bot from; variables already set
 in the environment win over the file.
 
-| Variable | Default | Meaning |
-|---|---|---|
-| `TELEGRAM_BOT_TOKEN` | required | Token from [@BotFather](https://t.me/BotFather) |
-| `OPENROUTER_API_KEY` | required | Key from <https://openrouter.ai/keys> |
-| `DATABASE_URL` | required | PostgreSQL connection string |
-| `OPENROUTER_MODEL` | `openrouter/free` | Model ID, see [Choosing a model](#choosing-a-model) |
-| `MAX_OUTPUT_TOKENS` | `1024` | Longest model reply, in tokens |
-| `BOT_DISPLAY_NAME` | `Mira` | The character's name |
-| `PERSONA_PROMPT` | built-in | The character's personality and rules; `{name}` is replaced by the name. See [The character](#the-character) |
-| `MAX_HISTORY_MESSAGES` | `20` | Recent messages sent to the model as context |
-| `MAX_TOOL_CALLS_PER_TURN` | `4` | Tool calls allowed while answering one message |
-| `MAX_CONCURRENT_REQUESTS` | `10` | Number of workers |
-| `USER_RATE_LIMIT_PER_MINUTE` | `10` | Messages each user may send per minute |
-| `REQUEST_TIMEOUT_SECONDS` | `45` | Time budget for answering one message |
-| `MAX_INPUT_CHARS` | `4000` | Longest user message accepted |
-| `RETENTION_DAYS` | `90` | Delete conversations idle longer than this; `0` keeps them forever |
-| `ADMIN_USER_IDS` | empty | Comma-separated Telegram user IDs of administrators |
-| `ADMIN_COMMANDS` | empty | Comma-separated commands only administrators may use, e.g. `model,about` |
-| `ENABLE_WAKE_WORD_TRIGGER` | `true` | In groups, answer when called by name; needs privacy mode off, see [Groups](#groups) |
-| `BOT_WAKE_WORDS` | the display name | Comma-separated names the bot answers to, each one word, e.g. `mira,мира` |
-| `ENABLE_USERNAME_MENTION` | `true` | In groups, answer when `@username` is mentioned |
-| `ENABLE_REPLY_TRIGGER` | `true` | In groups, answer replies to the bot's messages |
-| `GROUP_AMBIENT_MESSAGES` | `20` | Recent ordinary group messages kept in memory as context (0 to 100; 0 turns it off) |
-| `GROUP_CONTEXT_MODE` | `shared` | Only `shared` is supported: one conversation per group |
-| `MAX_GROUP_REPLY_LENGTH` | `4000` | Longest answer posted in a group (at most 4096; an emoji usually counts as two) |
-| `GROUP_RATE_LIMIT_PER_MINUTE` | `10` | Messages answered per group per minute, across all members |
-| `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
-| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Override for testing or a proxy |
-| `TELEGRAM_API_URL` | `https://api.telegram.org` | Override for testing or a local Bot API server |
+| Variable                      | Default                        | Meaning                                                                                                      |
+| ----------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `TELEGRAM_BOT_TOKEN`          | required                       | Token from [@BotFather](https://t.me/BotFather)                                                              |
+| `OPENROUTER_API_KEY`          | required                       | Key from <https://openrouter.ai/keys>                                                                        |
+| `db_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
+| `OPENROUTER_MODEL`            | `openrouter/free`              | Model ID, see [Choosing a model](#choosing-a-model)                                                          |
+| `MAX_OUTPUT_TOKENS`           | `1024`                         | Longest model reply, in tokens                                                                               |
+| `BOT_DISPLAY_NAME`            | `Mira`                         | The character's name                                                                                         |
+| `PERSONA_PROMPT`              | built-in                       | The character's personality and rules; `{name}` is replaced by the name. See [The character](#the-character) |
+| `MAX_HISTORY_MESSAGES`        | `20`                           | Recent messages sent to the model as context                                                                 |
+| `MAX_TOOL_CALLS_PER_TURN`     | `4`                            | Tool calls allowed while answering one message                                                               |
+| `MAX_CONCURRENT_REQUESTS`     | `10`                           | Number of workers                                                                                            |
+| `USER_RATE_LIMIT_PER_MINUTE`  | `10`                           | Messages each user may send per minute                                                                       |
+| `REQUEST_TIMEOUT_SECONDS`     | `45`                           | Time budget for answering one message                                                                        |
+| `MAX_INPUT_CHARS`             | `4000`                         | Longest user message accepted                                                                                |
+| `RETENTION_DAYS`              | `90`                           | Delete conversations idle longer than this; `0` keeps them forever                                           |
+| `ADMIN_USER_IDS`              | empty                          | Comma-separated Telegram user IDs of administrators                                                          |
+| `ADMIN_COMMANDS`              | empty                          | Comma-separated commands only administrators may use, e.g. `model,about`                                     |
+| `ENABLE_WAKE_WORD_TRIGGER`    | `true`                         | In groups, answer when called by name; needs privacy mode off, see [Groups](#groups)                         |
+| `BOT_WAKE_WORDS`              | the display name               | Comma-separated names the bot answers to, each one word, e.g. `mira,мира`                                    |
+| `ENABLE_USERNAME_MENTION`     | `true`                         | In groups, answer when `@username` is mentioned                                                              |
+| `ENABLE_REPLY_TRIGGER`        | `true`                         | In groups, answer replies to the bot's messages                                                              |
+| `GROUP_AMBIENT_MESSAGES`      | `20`                           | Recent ordinary group messages kept in memory as context (0 to 100; 0 turns it off)                          |
+| `GROUP_CONTEXT_MODE`          | `shared`                       | Only `shared` is supported: one conversation per group                                                       |
+| `MAX_GROUP_REPLY_LENGTH`      | `4000`                         | Longest answer posted in a group (at most 4096; an emoji usually counts as two)                              |
+| `GROUP_RATE_LIMIT_PER_MINUTE` | `10`                           | Messages answered per group per minute, across all members                                                   |
+| `LOG_LEVEL`                   | `info`                         | `debug`, `info`, `warn` or `error`                                                                           |
+| `OPENROUTER_BASE_URL`         | `https://openrouter.ai/api/v1` | Override for testing or a proxy                                                                              |
+| `TELEGRAM_API_URL`            | `https://api.telegram.org`     | Override for testing or a local Bot API server                                                               |
 
 The bot refuses to start when a required variable is missing or a number is
 invalid, and says which variable is wrong. It never prints a variable's value.
@@ -173,7 +173,7 @@ createdb tgbot
 # 2. Configure
 cp .env.example .env
 # Edit .env: set TELEGRAM_BOT_TOKEN, OPENROUTER_API_KEY and, for example,
-# DATABASE_URL=postgres://localhost:5432/tgbot?sslmode=disable
+# db_POSTGRES_URL=postgres://localhost:5432/tgbot?sslmode=disable
 
 # 3. Create the tables
 make migrate
@@ -202,11 +202,11 @@ No test talks to Telegram or OpenRouter; both are replaced by local fake
 servers.
 
 The storage tests and the end-to-end test need a real PostgreSQL database and
-are skipped unless `TEST_DATABASE_URL` is set:
+are skipped unless `TEST_db_POSTGRES_URL` is set:
 
 ```bash
 createdb tgbot_test
-TEST_DATABASE_URL='postgres://localhost:5432/tgbot_test?sslmode=disable' go test -p 1 ./...
+TEST_db_POSTGRES_URL='postgres://localhost:5432/tgbot_test?sslmode=disable' go test -p 1 ./...
 ```
 
 **Use a disposable database.** These tests drop and recreate the bot's
@@ -288,12 +288,12 @@ addressed it. It never starts talking on its own.
 
 ### Ways to address the bot
 
-| How | Example | Setting |
-|---|---|---|
-| Call it by name | `Mira, nima gap?` · `Hey Mira, roast me` · `..., Mira?` | `ENABLE_WAKE_WORD_TRIGGER` (on) |
-| Mention its username | `@MyMiraBot hello` | `ENABLE_USERNAME_MENTION` (on) |
-| Reply to one of its messages | reply to its answer with `and you?` | `ENABLE_REPLY_TRIGGER` (on) |
-| A command with its username | `/mute@MyMiraBot` | always on |
+| How                          | Example                                                 | Setting                         |
+| ---------------------------- | ------------------------------------------------------- | ------------------------------- |
+| Call it by name              | `Mira, nima gap?` · `Hey Mira, roast me` · `..., Mira?` | `ENABLE_WAKE_WORD_TRIGGER` (on) |
+| Mention its username         | `@MyMiraBot hello`                                      | `ENABLE_USERNAME_MENTION` (on)  |
+| Reply to one of its messages | reply to its answer with `and you?`                     | `ENABLE_REPLY_TRIGGER` (on)     |
+| A command with its username  | `/mute@MyMiraBot`                                       | always on                       |
 
 **Calling by name.** A wake word counts when it is a whole word, in any case,
 and is the first word, the second word, or the last word of the message:
@@ -357,11 +357,11 @@ come back in her answer to another member of the same group.
 
 ### Muting and resetting
 
-| Command | Who | Effect |
-|---|---|---|
-| `/mute@Bot` | group admins | She stops reacting in this group, and stops keeping recent messages, until unmuted. |
-| `/unmute@Bot` | group admins | She is back. |
-| `/reset@Bot` | group admins | Deletes the group's conversation and its recent-message buffer. |
+| Command       | Who          | Effect                                                                              |
+| ------------- | ------------ | ----------------------------------------------------------------------------------- |
+| `/mute@Bot`   | group admins | She stops reacting in this group, and stops keeping recent messages, until unmuted. |
+| `/unmute@Bot` | group admins | She is back.                                                                        |
+| `/reset@Bot`  | group admins | Deletes the group's conversation and its recent-message buffer.                     |
 
 "Group admins" are the group's owner and administrators as Telegram reports
 them, plus anyone in `ADMIN_USER_IDS`. The mute setting is stored in the
@@ -400,7 +400,7 @@ To keep the bot out of groups altogether, use `/setjoingroups` in @BotFather.
 
 ### BotFather privacy mode
 
-Telegram bots have *privacy mode*, which is **on** by default. With it on,
+Telegram bots have _privacy mode_, which is **on** by default. With it on,
 Telegram delivers to a bot in a group only messages that mention it by
 `@username`, replies to its messages, commands addressed to it, and a few
 service messages. "Mira, nima gap?" contains no mention, so the bot never
@@ -431,8 +431,8 @@ She then answers `@username` mentions, replies and commands only, and never
 receives the rest of the conversation. (A bot that is a group administrator
 receives all messages whatever the setting.)
 
-To check the setting: `/mybots` in @BotFather, choose the bot, then *Bot
-Settings* and *Group Privacy*.
+To check the setting: `/mybots` in @BotFather, choose the bot, then _Bot
+Settings_ and _Group Privacy_.
 
 ## VPS deployment (systemd)
 
@@ -519,7 +519,7 @@ Put one `KEY=value` per line, without quotes:
 TELEGRAM_BOT_TOKEN=123456:your-token
 OPENROUTER_API_KEY=sk-or-your-key
 OPENROUTER_MODEL=openrouter/free
-DATABASE_URL=postgres://tgbot:RUNTIME_PASSWORD_HERE@127.0.0.1:5432/tgbot?sslmode=disable
+db_POSTGRES_URL=postgres://tgbot:RUNTIME_PASSWORD_HERE@127.0.0.1:5432/tgbot?sslmode=disable
 LOG_LEVEL=info
 ```
 
@@ -531,11 +531,11 @@ machine. A systemd environment file cannot hold a multi-line value; keep
 ### 6. Apply migrations
 
 Migrations run as the owner role. The `migrate` command needs only
-`DATABASE_URL`, not the bot's other secrets:
+`db_POSTGRES_URL`, not the bot's other secrets:
 
 ```bash
 sudo -u tgbot env \
-  DATABASE_URL='postgres://tgbot_owner:OWNER_PASSWORD_HERE@127.0.0.1:5432/tgbot?sslmode=disable' \
+  db_POSTGRES_URL='postgres://tgbot_owner:OWNER_PASSWORD_HERE@127.0.0.1:5432/tgbot?sslmode=disable' \
   /usr/local/bin/telegram-ai-agent migrate
 
 # The running bot only needs to read the migration history.
@@ -633,7 +633,7 @@ docker compose logs -f bot
 ```
 
 Compose starts PostgreSQL, applies migrations, then starts the bot.
-`DATABASE_URL` is set by the compose file, so the value in `.env` is ignored.
+`db_POSTGRES_URL` is set by the compose file, so the value in `.env` is ignored.
 The database publishes no ports. This setup uses a single database role for
 simplicity; prefer the systemd deployment when you want the restricted
 runtime role.
@@ -784,34 +784,34 @@ Known limits:
 - First names of people who address the bot in a group are stored with their
   messages.
 - A model can still be talked into saying untrue or unwanted things. The bot
-  limits what it can *do* (three harmless tools), not what it can *say*.
+  limits what it can _do_ (three harmless tools), not what it can _say_.
 
 ## Troubleshooting
 
-| Symptom | Likely cause and fix |
-|---|---|
-| `invalid configuration: X is required` | The variable is missing. Check `.env` or `/etc/telegram-ai-agent/env`. |
-| `database schema is out of date; run the migrate command` | Run `make migrate` locally, or step 6 on the server. |
-| `database is unreachable` | PostgreSQL is not running, or host, port, user or password in `DATABASE_URL` is wrong. Try `psql "$DATABASE_URL"`. |
-| `permission denied for table ...` | The runtime role lacks grants. Run the `ALTER DEFAULT PRIVILEGES` statements from step 3 *before* migrating, or grant on the existing tables: `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO tgbot; GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO tgbot;` |
-| `telegram polling failed ... 409 Conflict` | Another copy of the bot is running with the same token, or a webhook is set. Stop the other copy, or call `deleteWebhook`. |
-| The bot is silent in a group | It answers only when addressed. Check, in order: is the group muted (`/unmute@YourBot` by an admin)? Is privacy mode off, if you call it by name? Was the bot re-added after changing privacy mode? Is the sender an anonymous admin or another bot (ignored by design)? |
-| "Mira, ..." gets no answer but `@username` works | Privacy mode is still on, or the bot was not re-added after it was turned off; see [Groups](#groups). Also check `ENABLE_WAKE_WORD_TRIGGER` and `BOT_WAKE_WORDS`. |
-| The bot ignores `/reset` or `/mute` in a group | Commands in groups need the bot's username: `/mute@YourBot`. |
-| "Only this group's admins can do that" | `/mute`, `/unmute` and `/reset` in a group are for its admins. Anonymous admins are not recognised; turn "Remain anonymous" off or add your ID to `ADMIN_USER_IDS`. |
-| The bot answers messages that only mention the name | A message that starts or ends with the name counts as a call. The model may stay silent in such cases but does not always. Choose a less common wake word. |
-| The bot is too rude, too tame, or out of character | That is the model and the prompt. Try another model, or adjust `PERSONA_PROMPT`; see [The character](#the-character). |
-| `X is no longer supported; use Y` at startup | A setting was renamed. Rename it in the environment file. |
-| The bot answers but not as a reply | The original message was deleted before the answer arrived; the answer is then sent as an ordinary message. |
-| Group answers end in `…` | They were cut to `MAX_GROUP_REPLY_LENGTH`. |
-| "This group is sending me messages too quickly" | The per-group limit. Raise `GROUP_RATE_LIMIT_PER_MINUTE`. |
-| `identify the bot: telegram: 401 Unauthorized` at startup | The bot token is wrong or was revoked. |
-| "Something went wrong on my side" | Look at the log line `turn failed`. `status 401`: bad OpenRouter key. `status 402`: no credits. `status 429`: the free model is rate limited; wait or pick another model. `status 404`: the model ID does not exist. |
-| "That took too long to answer" | The model was slower than `REQUEST_TIMEOUT_SECONDS`. Raise it or use a faster model. |
-| Wrong time or wrong arithmetic | The model has no tool support and is guessing. Look for `model does not support tool calling` in the log and see [Choosing a model](#choosing-a-model). |
-| "You're sending messages too quickly" | Per-user rate limit. Raise `USER_RATE_LIMIT_PER_MINUTE` if it is too strict. |
-| "I'm handling a lot of messages right now" | Worker queues are full. Raise `MAX_CONCURRENT_REQUESTS`, and `pool_max_conns` to match. |
-| The bot forgot the conversation | History is limited to `MAX_HISTORY_MESSAGES`, and idle conversations are deleted after `RETENTION_DAYS`. |
-| Service will not start under systemd | `journalctl -u telegram-ai-agent -n 50`. Check the environment file's owner and mode, and that it has no quotes around values. |
+| Symptom                                                   | Likely cause and fix                                                                                                                                                                                                                                                                          |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `invalid configuration: X is required`                    | The variable is missing. Check `.env` or `/etc/telegram-ai-agent/env`.                                                                                                                                                                                                                        |
+| `database schema is out of date; run the migrate command` | Run `make migrate` locally, or step 6 on the server.                                                                                                                                                                                                                                          |
+| `database is unreachable`                                 | PostgreSQL is not running, or host, port, user or password in `db_POSTGRES_URL` is wrong. Try `psql "$db_POSTGRES_URL"`.                                                                                                                                                                      |
+| `permission denied for table ...`                         | The runtime role lacks grants. Run the `ALTER DEFAULT PRIVILEGES` statements from step 3 _before_ migrating, or grant on the existing tables: `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO tgbot; GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO tgbot;` |
+| `telegram polling failed ... 409 Conflict`                | Another copy of the bot is running with the same token, or a webhook is set. Stop the other copy, or call `deleteWebhook`.                                                                                                                                                                    |
+| The bot is silent in a group                              | It answers only when addressed. Check, in order: is the group muted (`/unmute@YourBot` by an admin)? Is privacy mode off, if you call it by name? Was the bot re-added after changing privacy mode? Is the sender an anonymous admin or another bot (ignored by design)?                      |
+| "Mira, ..." gets no answer but `@username` works          | Privacy mode is still on, or the bot was not re-added after it was turned off; see [Groups](#groups). Also check `ENABLE_WAKE_WORD_TRIGGER` and `BOT_WAKE_WORDS`.                                                                                                                             |
+| The bot ignores `/reset` or `/mute` in a group            | Commands in groups need the bot's username: `/mute@YourBot`.                                                                                                                                                                                                                                  |
+| "Only this group's admins can do that"                    | `/mute`, `/unmute` and `/reset` in a group are for its admins. Anonymous admins are not recognised; turn "Remain anonymous" off or add your ID to `ADMIN_USER_IDS`.                                                                                                                           |
+| The bot answers messages that only mention the name       | A message that starts or ends with the name counts as a call. The model may stay silent in such cases but does not always. Choose a less common wake word.                                                                                                                                    |
+| The bot is too rude, too tame, or out of character        | That is the model and the prompt. Try another model, or adjust `PERSONA_PROMPT`; see [The character](#the-character).                                                                                                                                                                         |
+| `X is no longer supported; use Y` at startup              | A setting was renamed. Rename it in the environment file.                                                                                                                                                                                                                                     |
+| The bot answers but not as a reply                        | The original message was deleted before the answer arrived; the answer is then sent as an ordinary message.                                                                                                                                                                                   |
+| Group answers end in `…`                                  | They were cut to `MAX_GROUP_REPLY_LENGTH`.                                                                                                                                                                                                                                                    |
+| "This group is sending me messages too quickly"           | The per-group limit. Raise `GROUP_RATE_LIMIT_PER_MINUTE`.                                                                                                                                                                                                                                     |
+| `identify the bot: telegram: 401 Unauthorized` at startup | The bot token is wrong or was revoked.                                                                                                                                                                                                                                                        |
+| "Something went wrong on my side"                         | Look at the log line `turn failed`. `status 401`: bad OpenRouter key. `status 402`: no credits. `status 429`: the free model is rate limited; wait or pick another model. `status 404`: the model ID does not exist.                                                                          |
+| "That took too long to answer"                            | The model was slower than `REQUEST_TIMEOUT_SECONDS`. Raise it or use a faster model.                                                                                                                                                                                                          |
+| Wrong time or wrong arithmetic                            | The model has no tool support and is guessing. Look for `model does not support tool calling` in the log and see [Choosing a model](#choosing-a-model).                                                                                                                                       |
+| "You're sending messages too quickly"                     | Per-user rate limit. Raise `USER_RATE_LIMIT_PER_MINUTE` if it is too strict.                                                                                                                                                                                                                  |
+| "I'm handling a lot of messages right now"                | Worker queues are full. Raise `MAX_CONCURRENT_REQUESTS`, and `pool_max_conns` to match.                                                                                                                                                                                                       |
+| The bot forgot the conversation                           | History is limited to `MAX_HISTORY_MESSAGES`, and idle conversations are deleted after `RETENTION_DAYS`.                                                                                                                                                                                      |
+| Service will not start under systemd                      | `journalctl -u telegram-ai-agent -n 50`. Check the environment file's owner and mode, and that it has no quotes around values.                                                                                                                                                                |
 
 More detail is available with `LOG_LEVEL=debug`.
