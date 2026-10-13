@@ -254,7 +254,7 @@ func TestServeAnswersGroupMentionEndToEnd(t *testing.T) {
 	}
 
 	request := env.model.firstRequest()
-	if !strings.Contains(request[0].Content, "Telegram group") {
+	if !strings.Contains(request[0].Content, "You are Mira") || !strings.Contains(request[0].Content, "group chat") {
 		t.Errorf("system prompt = %q, want the group prompt", request[0].Content)
 	}
 	question := request[len(request)-1].Content

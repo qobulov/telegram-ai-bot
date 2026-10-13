@@ -41,8 +41,8 @@ func TestLoadAppliesDefaults(t *testing.T) {
 	if cfg.TelegramAPIURL != "https://api.telegram.org" {
 		t.Errorf("TelegramAPIURL = %q", cfg.TelegramAPIURL)
 	}
-	if cfg.SystemPrompt == "" {
-		t.Error("SystemPrompt is empty")
+	if cfg.PersonaPrompt == "" {
+		t.Error("PersonaPrompt is empty")
 	}
 	wantInts := map[string][2]int{
 		"MaxHistoryMessages":     {cfg.MaxHistoryMessages, 20},
@@ -204,26 +204,99 @@ func TestLoadDotEnvRejectsMalformedLine(t *testing.T) {
 	}
 }
 
-func TestLoadGroupDefaults(t *testing.T) {
+func TestLoadCharacterDefaults(t *testing.T) {
 	cfg, err := Load(getenv(validEnv()))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if !cfg.MentionTrigger || !cfg.ReplyTrigger || cfg.DisplayNameTrigger {
-		t.Errorf("triggers = mention %v, reply %v, name %v", cfg.MentionTrigger, cfg.ReplyTrigger, cfg.DisplayNameTrigger)
+	if !cfg.WakeWordTrigger || !cfg.MentionTrigger || !cfg.ReplyTrigger {
+		t.Errorf("triggers = wake %v, mention %v, reply %v", cfg.WakeWordTrigger, cfg.MentionTrigger, cfg.ReplyTrigger)
 	}
-	if cfg.BotDisplayName != "" || cfg.MaxGroupReplyChars != 4000 || cfg.GroupRateLimitPerMinute != 10 {
-		t.Errorf("cfg = %q, %d, %d", cfg.BotDisplayName, cfg.MaxGroupReplyChars, cfg.GroupRateLimitPerMinute)
+	if cfg.BotDisplayName != "Mira" || len(cfg.WakeWords) != 1 || cfg.WakeWords[0] != "mira" {
+		t.Errorf("name = %q, wake words = %q", cfg.BotDisplayName, cfg.WakeWords)
 	}
-	if !strings.Contains(cfg.GroupSystemPrompt, "Telegram group") {
-		t.Errorf("GroupSystemPrompt = %q", cfg.GroupSystemPrompt)
+	if cfg.AmbientMessages != 20 || cfg.MaxGroupReplyChars != 4000 || cfg.GroupRateLimitPerMinute != 10 {
+		t.Errorf("cfg = %d, %d, %d", cfg.AmbientMessages, cfg.MaxGroupReplyChars, cfg.GroupRateLimitPerMinute)
+	}
+}
+
+func TestBuiltInPersona(t *testing.T) {
+	env := validEnv()
+	env["BOT_DISPLAY_NAME"] = "Zara"
+	cfg, err := Load(getenv(env))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !strings.Contains(cfg.PersonaPrompt, "You are Zara") || strings.Contains(cfg.PersonaPrompt, "{name}") {
+		t.Errorf("the name was not put into the persona: %.80q", cfg.PersonaPrompt)
+	}
+	for _, want := range []string{"slur", "untrusted", "threat"} {
+		if !strings.Contains(strings.ToLower(cfg.PersonaPrompt), want) {
+			t.Errorf("the built-in persona does not mention %q", want)
+		}
+	}
+	if !strings.Contains(cfg.GroupNote, "[silent]") {
+		t.Errorf("the group note does not explain the silent marker: %q", cfg.GroupNote)
+	}
+	if len(cfg.WakeWords) != 1 || cfg.WakeWords[0] != "zara" {
+		t.Errorf("wake words = %q, want the display name", cfg.WakeWords)
+	}
+}
+
+func TestCustomPersona(t *testing.T) {
+	env := validEnv()
+	env["PERSONA_PROMPT"] = "You are {name}, a grumpy cat. {name} hates Mondays."
+	cfg, err := Load(getenv(env))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.PersonaPrompt != "You are Mira, a grumpy cat. Mira hates Mondays." {
+		t.Errorf("PersonaPrompt = %q", cfg.PersonaPrompt)
+	}
+}
+
+func TestLoadWakeWords(t *testing.T) {
+	env := validEnv()
+	env["BOT_WAKE_WORDS"] = "Mira, мира ,MIRKA"
+	cfg, err := Load(getenv(env))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got := strings.Join(cfg.WakeWords, "|"); got != "mira|мира|mirka" {
+		t.Errorf("wake words = %q", got)
+	}
+
+	for _, bad := range []string{"hey mira", "mira!", "@mira"} {
+		env["BOT_WAKE_WORDS"] = bad
+		if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "BOT_WAKE_WORDS") {
+			t.Errorf("%q: err = %v, want mention of BOT_WAKE_WORDS", bad, err)
+		}
+	}
+}
+
+func TestDisplayNameMustWorkAsWakeWordOrBeOverridden(t *testing.T) {
+	env := validEnv()
+	env["BOT_DISPLAY_NAME"] = "Mira the Great"
+	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "BOT_WAKE_WORDS") {
+		t.Fatalf("err = %v, want a request to set BOT_WAKE_WORDS", err)
+	}
+
+	env["BOT_WAKE_WORDS"] = "mira"
+	if _, err := Load(getenv(env)); err != nil {
+		t.Errorf("a multi-word name with explicit wake words was rejected: %v", err)
+	}
+
+	delete(env, "BOT_WAKE_WORDS")
+	env["ENABLE_WAKE_WORD_TRIGGER"] = "false"
+	if _, err := Load(getenv(env)); err != nil {
+		t.Errorf("a multi-word name with the wake-word trigger off was rejected: %v", err)
 	}
 }
 
 func TestLoadParsesBooleans(t *testing.T) {
 	for value, want := range map[string]bool{"true": true, "TRUE": true, "1": true, "false": false, "False": false, "0": false} {
 		env := validEnv()
-		env["ENABLE_MENTION_TRIGGER"] = value
+		env["ENABLE_USERNAME_MENTION"] = value
 		cfg, err := Load(getenv(env))
 		if err != nil {
 			t.Fatalf("%q: Load: %v", value, err)
@@ -240,25 +313,8 @@ func TestLoadParsesBooleans(t *testing.T) {
 	}
 }
 
-func TestLoadDisplayNameTriggerNeedsName(t *testing.T) {
-	env := validEnv()
-	env["ENABLE_DISPLAY_NAME_TRIGGER"] = "true"
-	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "BOT_DISPLAY_NAME") {
-		t.Fatalf("err = %v, want mention of BOT_DISPLAY_NAME", err)
-	}
-
-	env["BOT_DISPLAY_NAME"] = "Mira"
-	cfg, err := Load(getenv(env))
-	if err != nil {
-		t.Fatalf("Load: %v", err)
-	}
-	if !cfg.DisplayNameTrigger || cfg.BotDisplayName != "Mira" {
-		t.Errorf("cfg = %v, %q", cfg.DisplayNameTrigger, cfg.BotDisplayName)
-	}
-}
-
 func TestLoadGroupContextMode(t *testing.T) {
-	for value, ok := range map[string]bool{"": true, "per_user": true, "shared": false, "bogus": false} {
+	for value, ok := range map[string]bool{"": true, "shared": true, "per_user": false, "bogus": false} {
 		env := validEnv()
 		env["GROUP_CONTEXT_MODE"] = value
 		_, err := Load(getenv(env))
@@ -267,6 +323,34 @@ func TestLoadGroupContextMode(t *testing.T) {
 		}
 		if !ok && (err == nil || !strings.Contains(err.Error(), "GROUP_CONTEXT_MODE")) {
 			t.Errorf("%q: err = %v, want mention of GROUP_CONTEXT_MODE", value, err)
+		}
+	}
+}
+
+func TestRemovedVariablesAreReported(t *testing.T) {
+	removed := map[string]string{
+		"SYSTEM_PROMPT":               "PERSONA_PROMPT",
+		"GROUP_SYSTEM_PROMPT":         "PERSONA_PROMPT",
+		"ENABLE_MENTION_TRIGGER":      "ENABLE_USERNAME_MENTION",
+		"ENABLE_DISPLAY_NAME_TRIGGER": "ENABLE_WAKE_WORD_TRIGGER",
+	}
+	for name, replacement := range removed {
+		env := validEnv()
+		env[name] = "true"
+		_, err := Load(getenv(env))
+		if err == nil || !strings.Contains(err.Error(), name) || !strings.Contains(err.Error(), replacement) {
+			t.Errorf("%s: err = %v, want it to name the variable and %s", name, err, replacement)
+		}
+	}
+}
+
+func TestLoadAmbientMessages(t *testing.T) {
+	for value, ok := range map[string]bool{"0": true, "100": true, "-1": false, "101": false} {
+		env := validEnv()
+		env["GROUP_AMBIENT_MESSAGES"] = value
+		_, err := Load(getenv(env))
+		if ok != (err == nil) {
+			t.Errorf("GROUP_AMBIENT_MESSAGES=%s: err = %v, want ok=%v", value, err, ok)
 		}
 	}
 }
