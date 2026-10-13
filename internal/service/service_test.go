@@ -102,15 +102,33 @@ func (f *fakeResetter) Reset(_ context.Context, scope storage.Scope) error {
 	return f.err
 }
 
+type recorded struct {
+	answerID, messageID int64
+}
+
+type fakeRecorder struct {
+	mu    sync.Mutex
+	calls []recorded
+	err   error
+}
+
+func (f *fakeRecorder) SetSentMessageID(_ context.Context, answerID, messageID int64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, recorded{answerID: answerID, messageID: messageID})
+	return f.err
+}
+
 type fixture struct {
 	sender   *fakeSender
 	replier  *fakeReplier
 	resetter *fakeResetter
+	recorder *fakeRecorder
 	opts     Options
 }
 
 func newFixture() *fixture {
-	f := &fixture{sender: &fakeSender{}, replier: &fakeReplier{}, resetter: &fakeResetter{}}
+	f := &fixture{sender: &fakeSender{}, replier: &fakeReplier{}, resetter: &fakeResetter{}, recorder: &fakeRecorder{}}
 	f.opts = Options{
 		Sender:        f.sender,
 		Replier:       f.replier,
@@ -124,6 +142,13 @@ func newFixture() *fixture {
 		TurnTimeout:   5 * time.Second,
 		IsAdmin:       func(id int64) bool { return id == adminID },
 		AdminCommands: map[string]bool{},
+
+		Recorder:           f.recorder,
+		Bot:                Identity{ID: botID, Username: botUsername},
+		MentionTrigger:     true,
+		ReplyTrigger:       true,
+		GroupRatePerMinute: 10,
+		MaxGroupReplyChars: 4000,
 	}
 	return f
 }
@@ -483,4 +508,314 @@ func TestHelpTextListsEveryCommand(t *testing.T) {
 			t.Errorf("help text does not mention %s", command)
 		}
 	}
+}
+
+// inGroup wraps a group message in an update with a fresh update ID.
+func inGroup(msg *telegram.Message) telegram.Update {
+	nextUpdateID++
+	return telegram.Update{UpdateID: nextUpdateID, Message: msg}
+}
+
+func TestGroupMentionIsAnsweredAsReplyInTheGroupScope(t *testing.T) {
+	f := newFixture()
+	update := inGroup(groupMessage("@MyBot what is Go?", "@MyBot"))
+
+	sent := f.run(update)
+
+	expectOneReply(t, sent, "echo: what is Go?")
+	if sent[0].chatID != groupID || sent[0].replyTo != 30 {
+		t.Errorf("sent to chat %d as a reply to %d; want chat %d, message 30", sent[0].chatID, sent[0].replyTo, groupID)
+	}
+	req := f.replier.recorded()[0].req
+	want := agent.Request{
+		Scope:     storage.Scope{ChatID: groupID, UserID: userID},
+		UpdateID:  update.UpdateID,
+		MessageID: 30,
+		Text:      "what is Go?",
+		Group:     true,
+	}
+	if req != want {
+		t.Errorf("request = %+v\nwant      %+v", req, want)
+	}
+}
+
+func TestPrivateMessageIsNotSentAsReply(t *testing.T) {
+	f := newFixture()
+
+	sent := f.run(textFrom(userID, "hi"))
+
+	expectOneReply(t, sent, "echo: hi")
+	if sent[0].replyTo != 0 {
+		t.Errorf("private answer replies to message %d; want an ordinary message", sent[0].replyTo)
+	}
+	req := f.replier.recorded()[0].req
+	if req.Group || req.Scope != (storage.Scope{ChatID: userID, UserID: userID}) {
+		t.Errorf("request = %+v, want the private scope", req)
+	}
+}
+
+func TestReplyToBotCarriesQuoteAndReplyID(t *testing.T) {
+	f := newFixture()
+
+	f.run(inGroup(replyingTo(groupMessage("and in Python?"), botID, "Go is compiled.")))
+
+	req := f.replier.recorded()[0].req
+	if req.ReplyToMessageID != 29 {
+		t.Errorf("ReplyToMessageID = %d, want 29", req.ReplyToMessageID)
+	}
+	if !strings.HasPrefix(req.Text, quoteFromBot) || !strings.Contains(req.Text, "Go is compiled.") || !strings.HasSuffix(req.Text, "and in Python?") {
+		t.Errorf("text sent to the agent = %q", req.Text)
+	}
+}
+
+func TestMentionWhileReplyingToMemberQuotesThatMember(t *testing.T) {
+	f := newFixture()
+
+	f.run(inGroup(replyingTo(groupMessage("@MyBot is that right?", "@MyBot"), 4242, "Go is interpreted.")))
+
+	req := f.replier.recorded()[0].req
+	if !strings.HasPrefix(req.Text, quoteFromMember) || !strings.Contains(req.Text, "Go is interpreted.") {
+		t.Errorf("text sent to the agent = %q", req.Text)
+	}
+}
+
+func TestBareMentionWithQuoteAsksAboutTheQuote(t *testing.T) {
+	f := newFixture()
+
+	f.run(inGroup(replyingTo(groupMessage("@MyBot", "@MyBot"), 4242, "What is the capital of France?")))
+
+	calls := f.replier.recorded()
+	if len(calls) != 1 || !strings.Contains(calls[0].req.Text, "capital of France") {
+		t.Errorf("replier calls = %+v", calls)
+	}
+}
+
+func TestBareMentionWithoutQuoteGetsHint(t *testing.T) {
+	f := newFixture()
+
+	sent := f.run(inGroup(groupMessage("@MyBot", "@MyBot")))
+
+	expectOneReply(t, sent, textMentionHint)
+	if sent[0].replyTo != 30 || len(f.replier.recorded()) != 0 {
+		t.Errorf("sent = %+v, model calls = %d", sent, len(f.replier.recorded()))
+	}
+}
+
+func TestAddressedMessageWithoutTextGetsTextOnlyReply(t *testing.T) {
+	f := newFixture()
+	sticker := replyingTo(groupMessage(""), botID, "answer")
+
+	sent := f.run(inGroup(sticker))
+
+	expectOneReply(t, sent, textTextOnly)
+	if sent[0].chatID != groupID || sent[0].replyTo != 30 {
+		t.Errorf("sent = %+v", sent)
+	}
+}
+
+func TestUnaddressedGroupMessagesCostNothing(t *testing.T) {
+	f := newFixture()
+	f.opts.RatePerMinute = 1
+	f.opts.GroupRatePerMinute = 1
+	var updates []telegram.Update
+	for range 5 {
+		updates = append(updates, inGroup(groupMessage("just chatting")))
+	}
+	updates = append(updates, inGroup(groupMessage("@MyBot hi", "@MyBot")))
+
+	sent := f.run(updates...)
+
+	expectOneReply(t, sent, "echo: hi")
+}
+
+func TestGroupSendersThatAreIgnored(t *testing.T) {
+	fromBot := groupMessage("@MyBot hi", "@MyBot")
+	fromBot.From.IsBot = true
+	anonymous := groupMessage("@MyBot hi", "@MyBot")
+	anonymous.From = nil
+	channel := groupMessage("@MyBot hi", "@MyBot")
+	channel.Chat.Type = "channel"
+
+	for name, msg := range map[string]*telegram.Message{"bot": fromBot, "no sender": anonymous, "channel": channel} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			if sent := f.run(inGroup(msg)); len(sent) != 0 || len(f.replier.recorded()) != 0 {
+				t.Errorf("sent = %+v, model calls = %d", sent, len(f.replier.recorded()))
+			}
+		})
+	}
+}
+
+func TestGroupAnswerIsCutToTheConfiguredLength(t *testing.T) {
+	f := newFixture()
+	f.opts.MaxGroupReplyChars = 20
+	f.opts.MaxInputChars = 500
+	long := strings.Repeat("я", 100)
+
+	sent := f.run(inGroup(groupMessage("@MyBot "+long, "@MyBot")))
+
+	if len(sent) != 1 {
+		t.Fatalf("sent = %+v", sent)
+	}
+	if runes := []rune(sent[0].text); len(runes) != 20 || !strings.HasSuffix(sent[0].text, "…") {
+		t.Errorf("group answer is %d characters: %q", len(runes), sent[0].text)
+	}
+
+	private := newFixture()
+	private.opts.MaxGroupReplyChars = 20
+	private.opts.MaxInputChars = 500
+	if sent := private.run(textFrom(userID, long)); len([]rune(sent[0].text)) <= 20 {
+		t.Errorf("a private answer was cut: %q", sent[0].text)
+	}
+}
+
+func TestSentMessageIDIsRecordedForTheAnswer(t *testing.T) {
+	f := newFixture()
+
+	sent := f.run(inGroup(groupMessage("@MyBot hi", "@MyBot")))
+
+	if len(sent) != 1 || len(f.recorder.calls) != 1 {
+		t.Fatalf("sent = %+v, recorded = %+v", sent, f.recorder.calls)
+	}
+	if got := f.recorder.calls[0]; got.answerID != 9001 || got.messageID != 1001 {
+		t.Errorf("recorded = %+v, want answer 9001 and sent message 1001", got)
+	}
+}
+
+func TestRecorderFailureDoesNotSendAgain(t *testing.T) {
+	f := newFixture()
+	f.recorder.err = errors.New("database down")
+
+	expectOneReply(t, f.run(inGroup(groupMessage("@MyBot hi", "@MyBot"))), "echo: hi")
+}
+
+func TestFixedRepliesAreNotRecorded(t *testing.T) {
+	f := newFixture()
+
+	f.run(inGroup(groupMessage("/help@MyBot")))
+
+	if len(f.recorder.calls) != 0 {
+		t.Errorf("recorded = %+v, want nothing for a command", f.recorder.calls)
+	}
+}
+
+func TestGroupResetClearsOnlyTheGroupScope(t *testing.T) {
+	f := newFixture()
+
+	sent := f.run(inGroup(groupMessage("/reset@MyBot")))
+
+	expectOneReply(t, sent, textResetDone)
+	want := storage.Scope{ChatID: groupID, UserID: userID}
+	if len(f.resetter.reset) != 1 || f.resetter.reset[0] != want {
+		t.Errorf("reset scopes = %v, want [%v]", f.resetter.reset, want)
+	}
+}
+
+func TestGroupRateLimitIsSharedByMembers(t *testing.T) {
+	f := newFixture()
+	f.opts.RatePerMinute = 100
+	f.opts.GroupRatePerMinute = 2
+	f.opts.Workers = 1
+	var updates []telegram.Update
+	for member := int64(1); member <= 5; member++ {
+		msg := groupMessage("@MyBot hi", "@MyBot")
+		msg.From.ID = 5000 + member
+		updates = append(updates, inGroup(msg))
+	}
+
+	sent := f.run(updates...)
+
+	if calls := f.replier.recorded(); len(calls) != 2 {
+		t.Errorf("model calls = %d, want the group limit of 2", len(calls))
+	}
+	warnings := 0
+	for _, msg := range sent {
+		if msg.text == textGroupRateLimited {
+			warnings++
+		}
+	}
+	if warnings != 1 || len(sent) != 3 {
+		t.Errorf("sent = %+v, want 2 answers and exactly 1 group rate-limit notice", sent)
+	}
+}
+
+func TestGroupLimitDoesNotAffectPrivateChats(t *testing.T) {
+	f := newFixture()
+	f.opts.GroupRatePerMinute = 1
+
+	f.run(textFrom(userID, "one"), textFrom(userID, "two"), textFrom(userID, "three"))
+
+	if calls := f.replier.recorded(); len(calls) != 3 {
+		t.Errorf("model calls = %d, want 3", len(calls))
+	}
+}
+
+func TestNegativeIDsAreHandled(t *testing.T) {
+	f := newFixture()
+	msg := groupMessage("@MyBot hi", "@MyBot")
+	msg.From.ID = -5 // never sent by Telegram; must still not panic
+	msg.Chat.ID = -9223372036854775808
+
+	expectOneReply(t, f.run(inGroup(msg)), "echo: hi")
+}
+
+func TestGroupErrorsAreSentAsReplies(t *testing.T) {
+	cases := map[string]struct {
+		err  error
+		want string
+	}{
+		"provider error": {errors.New("openrouter: status 502: upstream sk-or-secret"), textError},
+		"timeout":        {context.DeadlineExceeded, textTimeout},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			f.replier.err = tc.err
+
+			sent := f.run(inGroup(groupMessage("@MyBot hi", "@MyBot")))
+
+			expectOneReply(t, sent, tc.want)
+			if sent[0].replyTo != 30 || sent[0].chatID != groupID || strings.Contains(sent[0].text, "sk-or-secret") {
+				t.Errorf("sent = %+v", sent)
+			}
+		})
+	}
+}
+
+func TestGroupDuplicateIsSilent(t *testing.T) {
+	f := newFixture()
+	f.replier.err = agent.ErrDuplicate
+
+	if sent := f.run(inGroup(groupMessage("@MyBot hi", "@MyBot"))); len(sent) != 0 {
+		t.Errorf("sent = %+v, want nothing", sent)
+	}
+}
+
+func TestBusyNoticeInGroupRepliesToTheMessage(t *testing.T) {
+	f := newFixture()
+	f.opts.Workers = 1
+	f.opts.QueueSize = 1
+	f.replier.started = make(chan struct{}, 8)
+	f.replier.release = make(chan struct{})
+	s := New(f.opts)
+
+	s.Handle(inGroup(groupMessage("@MyBot first", "@MyBot")))
+	<-f.replier.started
+	s.Handle(inGroup(groupMessage("@MyBot second", "@MyBot")))
+	dropped := groupMessage("@MyBot third", "@MyBot")
+	dropped.MessageID = 99
+	s.Handle(inGroup(dropped))
+
+	close(f.replier.release)
+	s.stop()
+
+	for _, msg := range f.sender.messages() {
+		if msg.text == textBusy {
+			if msg.chatID != groupID || msg.replyTo != 99 {
+				t.Errorf("busy notice = %+v, want a reply to message 99 in the group", msg)
+			}
+			return
+		}
+	}
+	t.Errorf("no busy notice in %+v", f.sender.messages())
 }
