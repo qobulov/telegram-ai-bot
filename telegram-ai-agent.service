@@ -1,0 +1,41 @@
+[Unit]
+Description=Telegram AI Agent
+Documentation=file:///opt/telegram-ai-agent/README.md
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tgbot
+Group=tgbot
+
+# Secrets live in a root-owned file with mode 0640, group tgbot.
+# One KEY=value per line; values cannot span several lines.
+EnvironmentFile=/etc/telegram-ai-agent/env
+ExecStart=/usr/local/bin/telegram-ai-agent
+
+Restart=on-failure
+RestartSec=5
+# Longer than REQUEST_TIMEOUT_SECONDS so turns in progress can finish.
+TimeoutStopSec=75
+
+# Hardening: the bot needs outbound network access and nothing else.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

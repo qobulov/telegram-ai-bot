@@ -1,0 +1,57 @@
+# Optional Docker deployment. The systemd deployment in README.md is the
+# primary one.
+#
+# Usage:
+#   cp .env.example .env        # fill in the tokens; DATABASE_URL is set below
+#   echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)" >> .env
+#   docker compose up -d --build
+#
+# For simplicity this setup uses one database role for both migrations and
+# the bot. The systemd deployment uses a separate, restricted runtime role.
+
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tgbot
+      POSTGRES_DB: tgbot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - db-data:/var/lib/postgresql
+    # No "ports:" on purpose: the database is reachable only from the other
+    # containers on this compose network, never from the host or the internet.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tgbot -d tgbot"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build: .
+    command: ["migrate"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://tgbot:${POSTGRES_PASSWORD}@db:5432/tgbot?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://tgbot:${POSTGRES_PASSWORD}@db:5432/tgbot?sslmode=disable
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    # Give turns in progress time to finish on "docker compose stop".
+    stop_grace_period: 75s
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  db-data:
