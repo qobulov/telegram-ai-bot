@@ -1,0 +1,14 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Build output
+/bin/
+
+# Database dumps
+*.dump
+*.sql.gz
+
+# Tooling scratch
+.superpowers/
