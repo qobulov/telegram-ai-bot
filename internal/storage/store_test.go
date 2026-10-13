@@ -456,48 +456,6 @@ func TestSaveTurnStoresNoIDsWhenNoneGiven(t *testing.T) {
 	}
 }
 
-// Conversations saved by the first schema version had no chat ID. Migration
-// 0002 must keep them reachable as private conversations.
-func TestMigrationKeepsExistingPrivateConversations(t *testing.T) {
-	store := newTestStore(t)
-	ctx := context.Background()
-	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, schema_migrations CASCADE`); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := store.migrateTo(ctx, 1); err != nil {
-		t.Fatalf("migrate to version 1: %v", err)
-	}
-	_, err := store.pool.Exec(ctx, `
-		INSERT INTO users (telegram_id) VALUES (1001);
-		INSERT INTO conversations (user_id) VALUES (1001);
-		INSERT INTO messages (conversation_id, role, content, update_id)
-			SELECT id, 'user', 'from before the migration', 5 FROM conversations;
-		INSERT INTO messages (conversation_id, role, content)
-			SELECT id, 'assistant', 'old answer' FROM conversations;`)
-	if err != nil {
-		t.Fatalf("seed version 1 data: %v", err)
-	}
-
-	applied, err := store.Migrate(ctx)
-	if err != nil {
-		t.Fatalf("Migrate: %v", err)
-	}
-	if applied < 1 {
-		t.Errorf("applied = %d, want at least 1", applied)
-	}
-	got := historyIn(t, store, private(alice))
-	if len(got) != 2 || got[0].Content != "from before the migration" || got[1].Content != "old answer" {
-		t.Errorf("history after migration = %+v", got)
-	}
-	if got := historyIn(t, store, inGroup(alice)); len(got) != 0 {
-		t.Errorf("group history after migration = %+v, want empty", got)
-	}
-	saveIn(t, store, private(alice), 6, turn("after", "ok"))
-	if got := historyIn(t, store, private(alice)); len(got) != 4 {
-		t.Errorf("history after a new turn = %+v", got)
-	}
-}
-
 // shared is a group's single conversation with the bot.
 func shared(chatID int64) Scope {
 	return Scope{ChatID: chatID}
@@ -635,45 +593,6 @@ func TestMuteStateIsPersisted(t *testing.T) {
 	}
 	if got := muted(); len(got) != 0 {
 		t.Errorf("muted chats after unmuting = %v", got)
-	}
-}
-
-// A database at version 2 has private conversations and per-member group
-// conversations. Migration 0003 must keep the private ones readable and
-// start each group with an empty shared conversation.
-func TestMigrationToSharedGroups(t *testing.T) {
-	store := newTestStore(t)
-	ctx := context.Background()
-	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, schema_migrations CASCADE`); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := store.migrateTo(ctx, 2); err != nil {
-		t.Fatalf("migrate to version 2: %v", err)
-	}
-	// Seeded with SQL: the current code writes columns version 2 lacks.
-	_, err := store.pool.Exec(ctx, `
-		INSERT INTO users (telegram_id) VALUES (1001);
-		INSERT INTO conversations (chat_id, user_id) VALUES (1001, 1001), (-1001234567890, 1001);
-		INSERT INTO messages (conversation_id, role, content)
-			SELECT id, 'user', CASE WHEN chat_id = user_id THEN 'private before' ELSE 'per-member before' END FROM conversations;
-		INSERT INTO messages (conversation_id, role, content)
-			SELECT id, 'assistant', 'ok' FROM conversations;`)
-	if err != nil {
-		t.Fatalf("seed version 2 data: %v", err)
-	}
-
-	if _, err := store.Migrate(ctx); err != nil {
-		t.Fatalf("Migrate: %v", err)
-	}
-	if got := historyIn(t, store, private(alice)); len(got) != 2 || got[0].Content != "private before" {
-		t.Errorf("private history after migration = %+v", got)
-	}
-	if got := historyIn(t, store, shared(group)); len(got) != 0 {
-		t.Errorf("shared group history after migration = %+v, want empty", got)
-	}
-	saveBy(t, store, shared(group), 3, alice, "Alice", turn("Alice: after", "ok"))
-	if got := historyIn(t, store, shared(group)); len(got) != 2 {
-		t.Errorf("shared group history after a new turn = %+v", got)
 	}
 }
 

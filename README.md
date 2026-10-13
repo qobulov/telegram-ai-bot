@@ -114,7 +114,9 @@ its answers. Ordinary group messages are not stored, with one exception: a
 message someone replies to while addressing the bot is saved, shortened, as
 part of that question. The schema is
 defined by the files in
-[internal/storage/migrations/](internal/storage/migrations/).
+[internal/storage/migrations/](internal/storage/migrations/), one per table.
+To change the schema later, add a new numbered file there; do not edit one
+that has already been applied to a database you want to keep.
 
 ## Configuration
 
@@ -543,7 +545,7 @@ sudo -u postgres psql -d tgbot -c \
   'REVOKE INSERT, UPDATE, DELETE ON schema_migrations FROM tgbot'
 ```
 
-You should see `migrations finished applied=3` on a new database. Running it
+You should see `migrations finished applied=4` on a new database. Running it
 again prints
 `applied=0`: applied migrations are recorded in `schema_migrations` and never
 run twice. The bot does not migrate on its own; if the schema is behind it
@@ -618,9 +620,6 @@ Upgrading from a version before the character:
   becomes `ENABLE_USERNAME_MENTION`, and `ENABLE_DISPLAY_NAME_TRIGGER`
   becomes `ENABLE_WAKE_WORD_TRIGGER`. The bot refuses to start while an old
   name is set, and says which.
-- Migration 0003 starts every group with a new shared conversation. Earlier
-  per-member group conversations are no longer used and are removed by the
-  retention job.
 - Decide about privacy mode; see [Groups](#groups).
 
 ## Docker Compose deployment (optional)

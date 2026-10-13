@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -33,7 +32,7 @@ type migration struct {
 	sql     string
 }
 
-// loadMigrations reads the embedded files, named like 0001_init.sql, in
+// loadMigrations reads the embedded files, named like 0001_users.sql, in
 // version order.
 func loadMigrations() ([]migration, error) {
 	names, err := fs.Glob(migrationFiles, "migrations/*.sql")
@@ -63,11 +62,6 @@ func loadMigrations() ([]migration, error) {
 // failure leaves the database at the last good version. Applied migrations
 // are recorded in schema_migrations and never run twice.
 func (s *Store) Migrate(ctx context.Context) (int, error) {
-	return s.migrateTo(ctx, math.MaxInt)
-}
-
-// migrateTo applies unapplied migrations up to and including maxVersion.
-func (s *Store) migrateTo(ctx context.Context, maxVersion int) (int, error) {
 	migrations, err := loadMigrations()
 	if err != nil {
 		return 0, err
@@ -90,7 +84,7 @@ func (s *Store) migrateTo(ctx context.Context, maxVersion int) (int, error) {
 	}
 	applied := 0
 	for _, m := range migrations {
-		if m.version <= current || m.version > maxVersion {
+		if m.version <= current {
 			continue
 		}
 		if err := applyMigration(ctx, conn.Conn(), m); err != nil {
