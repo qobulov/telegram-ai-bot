@@ -48,15 +48,26 @@ func (s *Service) addressedText(msg *telegram.Message) (string, bool) {
 		return strings.TrimSpace(text), true
 	}
 	if mentions := s.mentionsOfBot(text, entities); len(mentions) > 0 {
-		return telegram.RemoveEntities(text, mentions), true
+		return s.orName(telegram.RemoveEntities(text, mentions)), true
+	}
+	if s.opts.WakeWordTrigger {
+		if rest, called := stripWakeWord(text, s.opts.WakeWords); called {
+			return rest, true
+		}
 	}
 	if s.opts.ReplyTrigger && s.isFromBot(msg.ReplyToMessage) {
 		return strings.TrimSpace(text), true
 	}
-	if s.opts.DisplayNameTrigger {
-		return afterDisplayName(text, s.opts.DisplayName)
-	}
 	return "", false
+}
+
+// orName stands in for a message that was nothing but a mention of the bot:
+// being called by name is something the character can answer.
+func (s *Service) orName(text string) string {
+	if text == "" {
+		return s.opts.DisplayName
+	}
+	return text
 }
 
 // commandTarget reports whether text is a command and which bot it names:
@@ -103,25 +114,6 @@ func (s *Service) mentionsBot(text string, entity telegram.MessageEntity) bool {
 
 func (s *Service) isFromBot(msg *telegram.Message) bool {
 	return msg != nil && msg.From != nil && msg.From.ID == s.opts.Bot.ID
-}
-
-// afterDisplayName matches a message that opens by calling the bot by name:
-// the name, then a comma or colon, as in "Mira, explain this". It returns
-// the rest of the message. The delimiter is required so that a longer word
-// ("Miranda") or a sentence about the bot ("Mira is wrong") does not match.
-func afterDisplayName(text, name string) (string, bool) {
-	opening := []rune(strings.TrimSpace(text))
-	nameLength := len([]rune(name))
-	if nameLength == 0 || len(opening) <= nameLength {
-		return "", false
-	}
-	if !strings.EqualFold(string(opening[:nameLength]), name) {
-		return "", false
-	}
-	if delimiter := opening[nameLength]; delimiter != ',' && delimiter != ':' {
-		return "", false
-	}
-	return strings.TrimSpace(string(opening[nameLength+1:])), true
 }
 
 // withQuote puts the message the user replied to in front of their own text,

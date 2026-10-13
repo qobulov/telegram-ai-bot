@@ -81,7 +81,7 @@ func (f *fakeReplier) Reply(ctx context.Context, req agent.Request) (agent.Answe
 	if err != nil {
 		return agent.Answer{}, err
 	}
-	return agent.Answer{Text: "echo: " + text, ID: 9001}, nil
+	return agent.Answer{Text: "echo: " + strings.TrimPrefix(text, req.AuthorName+": "), ID: 9001}, nil
 }
 
 func (f *fakeReplier) recorded() []replyCall {
@@ -120,16 +120,54 @@ func (f *fakeRecorder) SetSentMessageID(_ context.Context, answerID, messageID i
 	return f.err
 }
 
+// fakeMembers answers the group-administrator check.
+type fakeMembers struct {
+	admins map[int64]bool
+	err    error
+	calls  int
+}
+
+func (f *fakeMembers) IsGroupAdmin(_ context.Context, _, userID int64) (bool, error) {
+	f.calls++
+	return f.admins[userID], f.err
+}
+
+type muteCall struct {
+	chatID int64
+	muted  bool
+	by     int64
+}
+
+type fakeMuter struct {
+	mu    sync.Mutex
+	calls []muteCall
+	err   error
+}
+
+func (f *fakeMuter) SetMuted(_ context.Context, chatID int64, muted bool, by int64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, muteCall{chatID: chatID, muted: muted, by: by})
+	return f.err
+}
+
+const groupAdminID = int64(4001)
+
 type fixture struct {
 	sender   *fakeSender
 	replier  *fakeReplier
 	resetter *fakeResetter
 	recorder *fakeRecorder
+	members  *fakeMembers
+	muter    *fakeMuter
 	opts     Options
 }
 
 func newFixture() *fixture {
-	f := &fixture{sender: &fakeSender{}, replier: &fakeReplier{}, resetter: &fakeResetter{}, recorder: &fakeRecorder{}}
+	f := &fixture{
+		sender: &fakeSender{}, replier: &fakeReplier{}, resetter: &fakeResetter{}, recorder: &fakeRecorder{},
+		members: &fakeMembers{admins: map[int64]bool{groupAdminID: true}}, muter: &fakeMuter{},
+	}
 	f.opts = Options{
 		Sender:        f.sender,
 		Replier:       f.replier,
@@ -148,6 +186,12 @@ func newFixture() *fixture {
 		Bot:                Identity{ID: botID, Username: botUsername},
 		MentionTrigger:     true,
 		ReplyTrigger:       true,
+		WakeWordTrigger:    true,
+		WakeWords:          []string{"mira"},
+		DisplayName:        "Mira",
+		AmbientMessages:    5,
+		Members:            f.members,
+		Muter:              f.muter,
 		GroupRatePerMinute: 10,
 		MaxGroupReplyChars: 4000,
 	}
@@ -517,7 +561,7 @@ func inGroup(msg *telegram.Message) telegram.Update {
 	return telegram.Update{UpdateID: nextUpdateID, Message: msg}
 }
 
-func TestGroupMentionIsAnsweredAsReplyInTheGroupScope(t *testing.T) {
+func TestGroupMentionIsAnsweredAsReplyInTheSharedScope(t *testing.T) {
 	f := newFixture()
 	update := inGroup(groupMessage("@MyBot what is Go?", "@MyBot"))
 
@@ -529,15 +573,251 @@ func TestGroupMentionIsAnsweredAsReplyInTheGroupScope(t *testing.T) {
 	}
 	req := f.replier.recorded()[0].req
 	want := agent.Request{
-		Scope:     storage.Scope{ChatID: groupID, UserID: userID},
-		UserID:    userID,
-		UpdateID:  update.UpdateID,
-		MessageID: 30,
-		Text:      "what is Go?",
-		Group:     true,
+		Scope:      storage.Scope{ChatID: groupID}, // shared by the whole group
+		UserID:     userID,
+		AuthorName: "Bek",
+		UpdateID:   update.UpdateID,
+		MessageID:  30,
+		Text:       "Bek: what is Go?",
+		Group:      true,
 	}
 	if req != want {
 		t.Errorf("request = %+v\nwant      %+v", req, want)
+	}
+}
+
+func TestWakeWordReachesTheAgent(t *testing.T) {
+	f := newFixture()
+
+	sent := f.run(inGroup(groupMessage("Hey Mira, roast me")))
+
+	expectOneReply(t, sent, "echo: roast me")
+	if req := f.replier.recorded()[0].req; req.Text != "Bek: roast me" || req.UserID != userID {
+		t.Errorf("request = %+v", req)
+	}
+}
+
+func TestGreetingAloneIsPassedOnAsIs(t *testing.T) {
+	f := newFixture()
+
+	f.run(inGroup(groupMessage("Hey Mira")))
+
+	if req := f.replier.recorded()[0].req; req.Text != "Bek: Hey Mira" {
+		t.Errorf("text = %q", req.Text)
+	}
+}
+
+func TestRecentChatterIsGivenAsContextButNotAsText(t *testing.T) {
+	f := newFixture()
+	ann := groupMessage("Go is interpreted")
+	ann.From = &telegram.User{ID: 4242, FirstName: "Ann"}
+
+	sent := f.run(
+		inGroup(ann),
+		inGroup(groupMessage("no way")),
+		inGroup(groupMessage("Mira, who is right?")),
+	)
+
+	expectOneReply(t, sent, "echo: who is right?")
+	calls := f.replier.recorded()
+	if len(calls) != 1 {
+		t.Fatalf("model calls = %d, want only the addressed message", len(calls))
+	}
+	req := calls[0].req
+	want := ambientHeader + "\nAnn: Go is interpreted\nBek: no way\n" + ambientFooter
+	if req.Context != want {
+		t.Errorf("context = %q\nwant      %q", req.Context, want)
+	}
+	if strings.Contains(req.Text, "interpreted") || strings.Contains(req.Context, "who is right") {
+		t.Errorf("the chatter and the question were mixed up: text %q, context %q", req.Text, req.Context)
+	}
+}
+
+func TestPrivateChatHasNoRecentChatter(t *testing.T) {
+	f := newFixture()
+
+	f.run(inGroup(groupMessage("group talk")), textFrom(userID, "hi"))
+
+	if req := f.replier.recorded()[0].req; req.Context != "" || req.AuthorName != "" || req.Text != "hi" {
+		t.Errorf("private request = %+v", req)
+	}
+}
+
+func TestSilentModelSendsNothing(t *testing.T) {
+	f := newFixture()
+	f.replier.err = agent.ErrSilent
+
+	if sent := f.run(inGroup(groupMessage("Mira is my sister's name"))); len(sent) != 0 {
+		t.Errorf("sent = %+v, want nothing", sent)
+	}
+}
+
+func TestGroupMembersAreServedInArrivalOrder(t *testing.T) {
+	f := newFixture()
+	f.opts.Workers = 4
+	f.opts.RatePerMinute = 100
+	f.opts.GroupRatePerMinute = 100
+	f.opts.QueueSize = 32
+	var updates []telegram.Update
+	for i, text := range []string{"1", "2", "3", "4", "5", "6", "7", "8"} {
+		msg := groupMessage("Mira, " + text)
+		msg.From = &telegram.User{ID: int64(6000 + i), FirstName: "M"}
+		updates = append(updates, inGroup(msg))
+	}
+
+	f.run(updates...)
+
+	var order []string
+	for _, call := range f.replier.recorded() {
+		order = append(order, strings.TrimPrefix(call.text, "M: "))
+	}
+	if got := strings.Join(order, ""); got != "12345678" {
+		t.Errorf("processing order = %s; one group must be handled in order", got)
+	}
+}
+
+func asAdmin(msg *telegram.Message) *telegram.Message {
+	msg.From = &telegram.User{ID: groupAdminID, FirstName: "Boss"}
+	return msg
+}
+
+func TestMuteSilencesTheGroupUntilUnmuted(t *testing.T) {
+	f := newFixture()
+	f.opts.Workers = 1
+
+	sent := f.run(
+		inGroup(asAdmin(groupMessage("/mute@MyBot"))),
+		inGroup(groupMessage("Mira, hello?")),
+		inGroup(groupMessage("@MyBot hello?", "@MyBot")),
+		inGroup(groupMessage("secret chatter while muted")),
+		inGroup(asAdmin(groupMessage("/unmute@MyBot"))),
+		inGroup(groupMessage("Mira, back?")),
+	)
+
+	var texts []string
+	for _, msg := range sent {
+		texts = append(texts, msg.text)
+	}
+	want := []string{textMuted, textUnmuted, "echo: back?"}
+	if strings.Join(texts, "|") != strings.Join(want, "|") {
+		t.Errorf("sent = %q\nwant %q", texts, want)
+	}
+	if calls := f.muter.calls; len(calls) != 2 || calls[0] != (muteCall{groupID, true, groupAdminID}) || calls[1] != (muteCall{groupID, false, groupAdminID}) {
+		t.Errorf("stored mute changes = %+v", calls)
+	}
+	if context := f.replier.recorded()[0].req.Context; strings.Contains(context, "secret chatter") {
+		t.Errorf("messages sent while muted were collected: %q", context)
+	}
+}
+
+func TestMuteCommandsAreForAdmins(t *testing.T) {
+	for _, command := range []string{"/mute@MyBot", "/unmute@MyBot", "/reset@MyBot"} {
+		t.Run(command, func(t *testing.T) {
+			f := newFixture()
+			f.opts.MutedChats = []int64{groupID}
+			if command != "/unmute@MyBot" {
+				f.opts.MutedChats = nil
+			}
+
+			sent := f.run(inGroup(groupMessage(command)))
+
+			expectOneReply(t, sent, textAdminsOnly)
+			if len(f.muter.calls) != 0 || len(f.resetter.reset) != 0 {
+				t.Errorf("a member changed state: mute %+v, reset %+v", f.muter.calls, f.resetter.reset)
+			}
+		})
+	}
+}
+
+func TestMutedGroupStaysMutedAfterARefusedUnmute(t *testing.T) {
+	f := newFixture()
+	f.opts.Workers = 1
+	f.opts.MutedChats = []int64{groupID}
+
+	sent := f.run(
+		inGroup(groupMessage("/unmute@MyBot")), // a member, not an admin
+		inGroup(groupMessage("Mira, hello?")),
+	)
+
+	expectOneReply(t, sent, textAdminsOnly)
+	if len(f.replier.recorded()) != 0 {
+		t.Error("the bot answered in a group that should still be muted")
+	}
+}
+
+func TestBotAdminNeedsNoGroupAdminCheck(t *testing.T) {
+	f := newFixture()
+	msg := groupMessage("/mute@MyBot")
+	msg.From = &telegram.User{ID: adminID, FirstName: "Owner"} // in ADMIN_USER_IDS
+
+	expectOneReply(t, f.run(inGroup(msg)), textMuted)
+	if f.members.calls != 0 {
+		t.Errorf("Telegram was asked %d times about a bot administrator", f.members.calls)
+	}
+}
+
+func TestAdminCheckFailureRefusesTheCommand(t *testing.T) {
+	f := newFixture()
+	f.members.err = errors.New("telegram: 400 chat not found")
+
+	sent := f.run(inGroup(asAdmin(groupMessage("/mute@MyBot"))))
+
+	expectOneReply(t, sent, textError)
+	if len(f.muter.calls) != 0 {
+		t.Errorf("muted although the admin check failed: %+v", f.muter.calls)
+	}
+}
+
+func TestMuteStorageFailureLeavesTheGroupUnmuted(t *testing.T) {
+	f := newFixture()
+	f.opts.Workers = 1
+	f.muter.err = errors.New("database down")
+
+	sent := f.run(
+		inGroup(asAdmin(groupMessage("/mute@MyBot"))),
+		inGroup(groupMessage("Mira, still there?")),
+	)
+
+	if len(sent) != 2 || sent[0].text != textError || sent[1].text != "echo: still there?" {
+		t.Errorf("sent = %+v", sent)
+	}
+}
+
+func TestMuteInPrivateChatExplainsItself(t *testing.T) {
+	for _, command := range []string{"/mute", "/unmute"} {
+		f := newFixture()
+		expectOneReply(t, f.run(textFrom(userID, command)), textGroupsOnly)
+	}
+}
+
+func TestStartsMutedWhenListedAtStartup(t *testing.T) {
+	f := newFixture()
+	f.opts.MutedChats = []int64{groupID}
+
+	if sent := f.run(inGroup(groupMessage("Mira, hello?"))); len(sent) != 0 {
+		t.Errorf("sent = %+v, want silence in a muted group", sent)
+	}
+}
+
+func TestGroupResetByAdminClearsSharedHistoryAndChatter(t *testing.T) {
+	f := newFixture()
+	f.opts.Workers = 1
+
+	sent := f.run(
+		inGroup(groupMessage("old chatter")),
+		inGroup(asAdmin(groupMessage("/reset@MyBot"))),
+		inGroup(groupMessage("Mira, hi")),
+	)
+
+	if len(sent) != 2 || sent[0].text != textResetDone {
+		t.Fatalf("sent = %+v", sent)
+	}
+	want := storage.Scope{ChatID: groupID}
+	if len(f.resetter.reset) != 1 || f.resetter.reset[0] != want {
+		t.Errorf("reset scopes = %v, want [%v]", f.resetter.reset, want)
+	}
+	if context := f.replier.recorded()[0].req.Context; context != "" {
+		t.Errorf("recent chatter survived the reset: %q", context)
 	}
 }
 
@@ -581,6 +861,16 @@ func TestMentionWhileReplyingToMemberQuotesThatMember(t *testing.T) {
 	}
 }
 
+func TestBareMentionSendsTheBotsName(t *testing.T) {
+	f := newFixture()
+
+	f.run(inGroup(groupMessage("@MyBot", "@MyBot")))
+
+	if req := f.replier.recorded()[0].req; req.Text != "Bek: Mira" {
+		t.Errorf("text = %q", req.Text)
+	}
+}
+
 func TestBareMentionWithQuoteAsksAboutTheQuote(t *testing.T) {
 	f := newFixture()
 
@@ -589,17 +879,6 @@ func TestBareMentionWithQuoteAsksAboutTheQuote(t *testing.T) {
 	calls := f.replier.recorded()
 	if len(calls) != 1 || !strings.Contains(calls[0].req.Text, "capital of France") {
 		t.Errorf("replier calls = %+v", calls)
-	}
-}
-
-func TestBareMentionWithoutQuoteGetsHint(t *testing.T) {
-	f := newFixture()
-
-	sent := f.run(inGroup(groupMessage("@MyBot", "@MyBot")))
-
-	expectOneReply(t, sent, textMentionHint)
-	if sent[0].replyTo != 30 || len(f.replier.recorded()) != 0 {
-		t.Errorf("sent = %+v, model calls = %d", sent, len(f.replier.recorded()))
 	}
 }
 
@@ -698,18 +977,6 @@ func TestFixedRepliesAreNotRecorded(t *testing.T) {
 
 	if len(f.recorder.calls) != 0 {
 		t.Errorf("recorded = %+v, want nothing for a command", f.recorder.calls)
-	}
-}
-
-func TestGroupResetClearsOnlyTheGroupScope(t *testing.T) {
-	f := newFixture()
-
-	sent := f.run(inGroup(groupMessage("/reset@MyBot")))
-
-	expectOneReply(t, sent, textResetDone)
-	want := storage.Scope{ChatID: groupID, UserID: userID}
-	if len(f.resetter.reset) != 1 || f.resetter.reset[0] != want {
-		t.Errorf("reset scopes = %v, want [%v]", f.resetter.reset, want)
 	}
 }
 

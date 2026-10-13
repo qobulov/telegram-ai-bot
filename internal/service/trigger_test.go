@@ -16,10 +16,12 @@ const (
 
 func triggerService(change func(*Options)) *Service {
 	opts := Options{
-		Bot:            Identity{ID: botID, Username: botUsername},
-		MentionTrigger: true,
-		ReplyTrigger:   true,
-		DisplayName:    "Mira",
+		Bot:             Identity{ID: botID, Username: botUsername},
+		MentionTrigger:  true,
+		ReplyTrigger:    true,
+		WakeWordTrigger: true,
+		WakeWords:       []string{"mira"},
+		DisplayName:     "Mira",
 	}
 	if change != nil {
 		change(&opts)
@@ -44,7 +46,7 @@ func entityAt(entityType, text, part string) telegram.MessageEntity {
 func groupMessage(text string, mentions ...string) *telegram.Message {
 	msg := &telegram.Message{
 		MessageID: 30,
-		From:      &telegram.User{ID: userID},
+		From:      &telegram.User{ID: userID, FirstName: "Bek"},
 		Chat:      telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup},
 		Text:      text,
 	}
@@ -69,7 +71,7 @@ func TestAddressByMention(t *testing.T) {
 		"mention is case blind":    {groupMessage("@mybot hi", "@mybot"), "hi", true},
 		"mention in the middle":    {groupMessage("hey @MyBot what is Go", "@MyBot"), "hey what is Go", true},
 		"emoji before the mention": {groupMessage("😀😀 привет @MyBot как дела", "@MyBot"), "😀😀 привет как дела", true},
-		"bare mention":             {groupMessage("@MyBot", "@MyBot"), "", true},
+		"bare mention":             {groupMessage("@MyBot", "@MyBot"), "Mira", true},
 		"longer username":          {groupMessage("@MyBot2 hi", "@MyBot2"), "", false},
 		"shorter username":         {groupMessage("@MyBo hi", "@MyBo"), "", false},
 		"another user":             {groupMessage("@ann hi", "@ann"), "", false},
@@ -154,34 +156,48 @@ func TestAddressRespectsDisabledTriggers(t *testing.T) {
 	}
 }
 
-func TestAddressByDisplayName(t *testing.T) {
-	enabled := triggerService(func(o *Options) { o.DisplayNameTrigger = true })
+func TestAddressByWakeWord(t *testing.T) {
 	cases := map[string]struct {
 		text string
 		want string
 		ok   bool
 	}{
-		"name and comma":        {"Mira, explain this code.", "explain this code.", true},
-		"lower case and colon":  {"mira: explain", "explain", true},
-		"leading spaces":        {"  Mira, hi", "hi", true},
-		"name alone with comma": {"Mira,", "", true},
-		"longer word":           {"Miranda, hi", "", false},
-		"no delimiter":          {"Mira explain this", "", false},
-		"name mid-sentence":     {"I think Mira is wrong", "", false},
-		"name at the end":       {"explain this, Mira", "", false},
-		"just the name":         {"Mira", "", false},
+		"name and request":  {"Mira, roast me", "roast me", true},
+		"greeting only":     {"Hey Mira", "Hey Mira", true},
+		"name last":         {"nima gap, Mira?", "nima gap, Mira?", true},
+		"longer word":       {"Miranda, hi", "", false},
+		"name mid-sentence": {"I think Mira is wrong", "", false},
+		"ordinary chatter":  {"what a nice day", "", false},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got, ok := enabled.address(groupMessage(tc.text))
+			got, ok := triggerService(nil).address(groupMessage(tc.text))
 			if got != tc.want || ok != tc.ok {
 				t.Errorf("address(%q) = %q, %v; want %q, %v", tc.text, got, ok, tc.want, tc.ok)
 			}
 		})
 	}
 
-	if _, ok := triggerService(nil).address(groupMessage("Mira, explain this code.")); ok {
-		t.Error("display-name trigger is off by default but the name addressed the bot")
+	disabled := triggerService(func(o *Options) { o.WakeWordTrigger = false })
+	if _, ok := disabled.address(groupMessage("Mira, roast me")); ok {
+		t.Error("the wake-word trigger is disabled but the name addressed the bot")
+	}
+}
+
+func TestWakeWordIsStrippedFromRepliesToTheBot(t *testing.T) {
+	msg := replyingTo(groupMessage("Mira, and in Python?"), botID, "Go is compiled.")
+
+	if got, ok := triggerService(nil).address(msg); !ok || got != "and in Python?" {
+		t.Errorf("address = %q, %v", got, ok)
+	}
+}
+
+// "Mira, /reset" is a sentence said to the bot, not a command: the slash is
+// dropped with the rest of the punctuation after the name, so nothing runs.
+func TestWakeWordFollowedByACommandIsNotACommand(t *testing.T) {
+	got, ok := triggerService(nil).address(groupMessage("Mira, /reset"))
+	if !ok || strings.HasPrefix(got, "/") {
+		t.Errorf("address = %q, %v; want plain text that cannot run as a command", got, ok)
 	}
 }
 

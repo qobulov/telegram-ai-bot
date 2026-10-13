@@ -36,18 +36,29 @@ type Resetter interface {
 	Reset(ctx context.Context, scope storage.Scope) error
 }
 
+// Members answers whether a user administers a group.
+type Members interface {
+	IsGroupAdmin(ctx context.Context, chatID, userID int64) (bool, error)
+}
+
+// Muter stores whether the bot is muted in a chat.
+type Muter interface {
+	SetMuted(ctx context.Context, chatID int64, muted bool, by int64) error
+}
+
 // Recorder stores the Telegram message ID of an answer after it was sent.
 type Recorder interface {
 	SetSentMessageID(ctx context.Context, answerID, telegramMessageID int64) error
 }
 
-// Options configures a Service. All fields are required except DisplayName,
-// which is needed only when DisplayNameTrigger is set.
+// Options configures a Service. All fields are required except MutedChats.
 type Options struct {
 	Sender   Sender
 	Replier  Replier
 	Resetter Resetter
 	Recorder Recorder
+	Members  Members
+	Muter    Muter
 	Logger   *slog.Logger
 	// Model is the model name shown by /model.
 	Model string
@@ -58,17 +69,26 @@ type Options struct {
 	RatePerMinute int
 	MaxInputChars int
 	// TurnTimeout bounds the handling of one update, excluding sending the reply.
-	TurnTimeout   time.Duration
+	TurnTimeout time.Duration
+	// IsAdmin reports the bot's own administrators (ADMIN_USER_IDS).
 	IsAdmin       func(userID int64) bool
 	AdminCommands map[string]bool
 
 	// Bot is the bot's own account; group messages are matched against it.
 	Bot Identity
+	// DisplayName is the character's name.
+	DisplayName string
 	// The ways of addressing the bot in a group that it reacts to.
-	MentionTrigger     bool
-	ReplyTrigger       bool
-	DisplayNameTrigger bool
-	DisplayName        string
+	MentionTrigger  bool
+	ReplyTrigger    bool
+	WakeWordTrigger bool
+	// WakeWords are the names the bot answers to, in lower case.
+	WakeWords []string
+	// AmbientMessages is how many recent ordinary messages per group are kept
+	// in memory as context. Zero keeps none.
+	AmbientMessages int
+	// MutedChats are the groups where the bot starts muted.
+	MutedChats []int64
 	// GroupRatePerMinute limits answers per group, across all its members.
 	GroupRatePerMinute int
 	// MaxGroupReplyChars is the longest answer posted in a group, in UTF-16
@@ -78,32 +98,40 @@ type Options struct {
 
 // Service processes updates on a fixed pool of workers.
 //
-// Each user is always served by the same worker, which gives three things at
-// once: a user's messages are handled one at a time and in order, the number
-// of concurrent turns never exceeds Workers, and no goroutine is started per
-// update. When a worker's queue is full, new updates for it are refused with
-// a "busy" reply instead of piling up.
+// Each private chat, and each group, is always served by the same worker.
+// That gives three things at once: the messages of one conversation are
+// handled one at a time and in order, the number of concurrent turns never
+// exceeds Workers, and no goroutine is started per update. When a worker's
+// queue is full, new updates for it are refused with a "busy" reply instead
+// of piling up.
 //
-// In groups only messages addressed to the bot are queued at all, so ordinary
-// group conversation costs nothing.
+// In groups only messages addressed to the bot are queued. The others are
+// at most remembered briefly, in memory, as context for the next answer.
 type Service struct {
 	opts         Options
 	userLimiter  *limiter
 	groupLimiter *limiter
+	ambient      *ambient
 	queues       []chan incoming
 	notices      chan incoming
 	closing      atomic.Bool
 	workers      sync.WaitGroup
 	notifier     sync.WaitGroup
+
+	mutedMu sync.RWMutex
+	muted   map[int64]bool
 }
 
 // incoming is an accepted update, reduced to what handling it needs.
 type incoming struct {
 	updateID int64
 	msg      *telegram.Message
-	// scope is the conversation: this user in this chat.
+	// scope is the conversation: the user's own in a private chat, the
+	// group's shared one in a group.
 	scope storage.Scope
-	group bool
+	// userID is who sent the message, in private chats and groups alike.
+	userID int64
+	group  bool
 	// text is the user's text, trimmed, without the part addressing the bot.
 	text string
 }
@@ -118,14 +146,28 @@ func (in incoming) replyTarget() int64 {
 	return 0
 }
 
+// queueKey decides which worker handles the update. Everything from one
+// group goes to one worker, so its shared conversation stays in order.
+func (in incoming) queueKey() uint64 {
+	if in.group {
+		return uint64(in.scope.ChatID)
+	}
+	return uint64(in.userID)
+}
+
 // New starts the workers and returns the Service. Call Close to stop it.
 func New(opts Options) *Service {
 	s := &Service{
 		opts:         opts,
 		userLimiter:  newLimiter(opts.RatePerMinute),
 		groupLimiter: newLimiter(opts.GroupRatePerMinute),
+		ambient:      newAmbient(opts.AmbientMessages),
+		muted:        make(map[int64]bool, len(opts.MutedChats)),
 		queues:       make([]chan incoming, opts.Workers),
 		notices:      make(chan incoming, noticeQueueSize),
+	}
+	for _, chatID := range opts.MutedChats {
+		s.muted[chatID] = true
 	}
 	for i := range s.queues {
 		queue := make(chan incoming, opts.QueueSize)
@@ -144,19 +186,19 @@ func (s *Service) Handle(update telegram.Update) {
 	if !ok {
 		return
 	}
-	queue := s.queues[uint64(in.scope.UserID)%uint64(len(s.queues))]
+	queue := s.queues[in.queueKey()%uint64(len(s.queues))]
 	select {
 	case queue <- in:
 	default:
 		s.opts.Logger.Warn("worker queue full; dropping update",
-			"user_id", in.scope.UserID, "chat_id", in.scope.ChatID, "update_id", in.updateID)
+			"user_id", in.userID, "chat_id", in.scope.ChatID, "update_id", in.updateID)
 		s.notifyBusy(in)
 	}
 }
 
 // accept keeps messages from a person, sent either in a private chat or, in
 // a group, addressed to the bot. The sender's ID from the update is the
-// identity used for history and permissions from here on.
+// identity used for permissions from here on.
 func (s *Service) accept(update telegram.Update) (incoming, bool) {
 	msg := update.Message
 	if msg == nil || msg.From == nil || msg.From.IsBot {
@@ -168,22 +210,64 @@ func (s *Service) accept(update telegram.Update) (incoming, bool) {
 	if msg.SenderChat != nil || msg.IsAutomaticForward {
 		return incoming{}, false
 	}
-	in := incoming{
-		updateID: update.UpdateID,
-		msg:      msg,
-		scope:    storage.Scope{ChatID: msg.Chat.ID, UserID: msg.From.ID},
-	}
+	in := incoming{updateID: update.UpdateID, msg: msg, userID: msg.From.ID}
 	switch msg.Chat.Type {
 	case telegram.ChatTypePrivate:
+		in.scope = storage.Scope{ChatID: msg.Chat.ID, UserID: msg.From.ID}
 		in.text = strings.TrimSpace(msg.Text)
 		return in, true
 	case telegram.ChatTypeGroup, telegram.ChatTypeSupergroup:
-		text, addressed := s.address(msg)
-		in.group, in.text = true, text
-		return in, addressed
+		in.scope = storage.Scope{ChatID: msg.Chat.ID} // shared by the group
+		in.group = true
+		return s.acceptGroup(in)
 	default:
 		return incoming{}, false
 	}
+}
+
+// acceptGroup applies the group rules: a muted group is ignored except for
+// the commands that control muting, a message addressed to the bot is
+// accepted, and any other message is only remembered as recent chatter.
+func (s *Service) acceptGroup(in incoming) (incoming, bool) {
+	text, addressed := s.address(in.msg)
+	if s.isMuted(in.scope.ChatID) {
+		in.text = text
+		return in, addressed && isMuteCommand(text)
+	}
+	if !addressed {
+		s.remember(in.msg)
+		return incoming{}, false
+	}
+	in.text = text
+	return in, true
+}
+
+func isMuteCommand(text string) bool {
+	command := commandName(text)
+	return command == "/mute" || command == "/unmute"
+}
+
+// remember keeps an ordinary group message as context for the bot's next
+// answer in that group. It goes to memory only; see ambient.
+func (s *Service) remember(msg *telegram.Message) {
+	text, _ := msg.Content()
+	s.ambient.add(msg.Chat.ID, authorLabel(msg.From.FirstName), text, time.Now())
+}
+
+func (s *Service) isMuted(chatID int64) bool {
+	s.mutedMu.RLock()
+	defer s.mutedMu.RUnlock()
+	return s.muted[chatID]
+}
+
+func (s *Service) markMuted(chatID int64, muted bool) {
+	s.mutedMu.Lock()
+	defer s.mutedMu.Unlock()
+	if muted {
+		s.muted[chatID] = true
+		return
+	}
+	delete(s.muted, chatID)
 }
 
 // notifyBusy queues a "busy" reply without blocking the polling loop. If even

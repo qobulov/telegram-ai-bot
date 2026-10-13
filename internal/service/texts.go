@@ -9,9 +9,9 @@ Hello! I am an AI assistant. Send me your question.
 
 /help — commands and usage`
 
-	textAbout = `An AI assistant for Telegram, written in Go.
-It answers through OpenRouter, remembers your conversation, and can check the time and do arithmetic.
-Send /reset at any time to delete your conversation history.`
+	textAbout = `An AI chat character for Telegram, written in Go.
+It answers through OpenRouter, remembers the conversation, and can check the time and do arithmetic.
+Send /reset to delete the conversation history.`
 
 	textResetDone        = "Your conversation history has been deleted."
 	textUnknown          = "I don't know that command. Send /help to see what I can do."
@@ -20,23 +20,27 @@ Send /reset at any time to delete your conversation history.`
 	textBusy             = "I'm handling a lot of messages right now. Please try again in a moment."
 	textRateLimited      = "You're sending messages too quickly. Please wait a little and try again."
 	textGroupRateLimited = "This group is sending me messages too quickly. Please wait a little and try again."
-	textMentionHint      = "Yes? Mention me together with your question and I'll answer."
+	textMuted            = "Fine, I'll be quiet here. An admin can bring me back with /unmute."
+	textUnmuted          = "I'm back."
+	textAdminsOnly       = "Only this group's admins can do that."
+	textGroupsOnly       = "That command is for groups."
 	textTimeout          = "That took too long to answer. Please try again."
 	textError            = "Something went wrong on my side. Please try again later."
 	textTooLong          = "Your message is too long. Please keep it under %d characters."
 	textModel            = "Current model: %s"
 )
 
-const helpText = `Send me any message and I will answer it. I reply in Uzbek, Russian or English, matching your language.
+const helpText = `Talk to me and I will answer, in Uzbek, Russian or English, matching your language.
 
 Commands:
 /start — welcome message
 /help — this help
-/reset — delete your conversation history
+/reset — delete the conversation history
 /model — show the AI model in use
 /about — about this bot
+/mute, /unmute — group admins: make me stay quiet in a group, or bring me back
 
-In a group, mention me (@username) or reply to one of my messages. I keep a separate conversation with each member of each group; /reset there clears only yours in that group.
+In a group, call me by name, mention me (@username) or reply to one of my messages. Commands there need my username, like /help@username. A group shares one conversation with me; /reset there is for the group's admins.
 
 I remember the recent part of our conversation, and I can look up the current time in any timezone and calculate arithmetic expressions.`
 

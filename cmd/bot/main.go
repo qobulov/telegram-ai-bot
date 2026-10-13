@@ -186,8 +186,10 @@ func newService(cfg config.Config, store *storage.Store, bot botAccount, logger 
 		Bot:                service.Identity{ID: bot.user.ID, Username: bot.user.Username},
 		MentionTrigger:     cfg.MentionTrigger,
 		ReplyTrigger:       cfg.ReplyTrigger,
-		DisplayNameTrigger: cfg.WakeWordTrigger,
+		WakeWordTrigger:    cfg.WakeWordTrigger,
+		WakeWords:          cfg.WakeWords,
 		DisplayName:        cfg.BotDisplayName,
+		AmbientMessages:    cfg.AmbientMessages,
 		GroupRatePerMinute: cfg.GroupRateLimitPerMinute,
 		MaxGroupReplyChars: cfg.MaxGroupReplyChars,
 	}), nil
