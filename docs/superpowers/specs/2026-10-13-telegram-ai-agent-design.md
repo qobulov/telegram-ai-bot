@@ -283,7 +283,9 @@ the turn in progress, bounded by the turn timeout, then the pool is closed.
   limits and how to move to webhooks, security checklist, troubleshooting.
 
 Two database roles are documented: an owner role used only for `bot migrate`,
-and a runtime role with `SELECT, INSERT, UPDATE, DELETE` on the three tables.
+and a runtime role with `SELECT, INSERT, UPDATE, DELETE` on the three tables,
+`USAGE` on their sequences, and `SELECT` on `schema_migrations` for the
+startup version check.
 
 ## Out of scope
 
