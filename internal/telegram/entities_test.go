@@ -1,6 +1,9 @@
 package telegram
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 func TestEntityText(t *testing.T) {
 	cases := map[string]struct {
@@ -17,6 +20,8 @@ func TestEntityText(t *testing.T) {
 		"negative offset":          {"@bot", MessageEntity{Offset: -1, Length: 2}, "", false},
 		"zero length":              {"@bot", MessageEntity{Offset: 0, Length: 0}, "", false},
 		"empty text":               {"", MessageEntity{Offset: 0, Length: 1}, "", false},
+		"offset that overflows":    {"@bot", MessageEntity{Offset: math.MaxInt, Length: 1}, "", false},
+		"length that overflows":    {"@bot", MessageEntity{Offset: 1, Length: math.MaxInt}, "", false},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

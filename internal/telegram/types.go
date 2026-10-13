@@ -27,6 +27,12 @@ type Message struct {
 	CaptionEntities []MessageEntity `json:"caption_entities"`
 	// ReplyToMessage is the message this one replies to, if any.
 	ReplyToMessage *Message `json:"reply_to_message"`
+	// SenderChat is set when the message was sent on behalf of a chat: a
+	// channel, or a group posting as itself (anonymous administrators).
+	SenderChat *Chat `json:"sender_chat"`
+	// IsAutomaticForward marks a channel post forwarded automatically to the
+	// channel's linked discussion group.
+	IsAutomaticForward bool `json:"is_automatic_forward"`
 }
 
 // User is a Telegram account: the sender of a message, or the bot itself.

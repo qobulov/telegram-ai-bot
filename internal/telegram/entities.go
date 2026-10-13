@@ -59,8 +59,10 @@ func RemoveEntities(text string, remove []MessageEntity) string {
 	return strings.TrimSpace(string(utf16.Decode(units)))
 }
 
+// fits reports whether the entity lies inside a text of the given length.
+// It is written without adding offset and length, which could overflow.
 func fits(e MessageEntity, length int) bool {
-	return e.Offset >= 0 && e.Length > 0 && e.Offset+e.Length <= length
+	return e.Offset >= 0 && e.Length > 0 && e.Offset <= length && e.Length <= length-e.Offset
 }
 
 // cut removes units[start:end]. When that leaves a space on both sides, one

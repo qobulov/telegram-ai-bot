@@ -129,7 +129,7 @@ in the environment win over the file.
 | `ENABLE_DISPLAY_NAME_TRIGGER` | `false` | In groups, answer messages that start with the bot's name; see [Groups](#groups) |
 | `BOT_DISPLAY_NAME` | empty | The name for that trigger, e.g. `Mira`; required when it is enabled |
 | `GROUP_CONTEXT_MODE` | `per_user` | Only `per_user` is supported |
-| `MAX_GROUP_REPLY_LENGTH` | `4000` | Longest answer posted in a group, in characters (at most 4096) |
+| `MAX_GROUP_REPLY_LENGTH` | `4000` | Longest answer posted in a group (at most 4096; an emoji usually counts as two) |
 | `GROUP_RATE_LIMIT_PER_MINUTE` | `10` | Messages answered per group per minute, across all members |
 | `GROUP_SYSTEM_PROMPT` | built-in | Instructions sent to the model for group messages |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
@@ -238,7 +238,7 @@ configured. Mentions are found through Telegram's message entities, so
 `@MyAssistantBot2` or the name inside another word does not trigger the bot.
 
 A plain `/reset` or `/help` without the bot's username is ignored in a group,
-because it may be meant for another bot.
+even in a reply to the bot, because it may be meant for another bot.
 
 The display-name trigger requires the name to open the message and be
 followed by a comma or colon. "I think Mira is wrong" and "Miranda, hi" do
@@ -260,8 +260,9 @@ Ann:   what a nice day
 
 - The text of the message that addressed the bot, with the mention removed.
 - If that message is a reply, the one message it replies to, shortened to
-  1,000 characters and marked as a quote. A quote from another member is
-  labelled as untrusted content.
+  1,000 characters and marked as a quote. Unless the bot wrote it, the quote
+  is labelled as untrusted content. The quoted text is saved as part of the
+  asking member's conversation, since it is part of their question.
 - The asking member's own earlier exchanges with the bot **in that group**.
 
 Nothing else from the group is read, stored or sent to the model. Each member
@@ -274,28 +275,42 @@ commands depend on who sent the message, not on the group.
 
 ### Limits
 
-- Group answers are cut to `MAX_GROUP_REPLY_LENGTH` characters so the bot
-  posts one message. Ask in a private chat for long answers.
+- Group answers are cut to `MAX_GROUP_REPLY_LENGTH` so the bot posts one
+  message. The length is counted the way Telegram counts it, in which an
+  emoji usually counts as two. Ask in a private chat for long answers.
 - `GROUP_RATE_LIMIT_PER_MINUTE` caps answers per group across all members;
   the per-user limit applies as well. The first refusal is announced, later
-  ones are silent.
+  ones are silent. With the defaults (10 and 10) one busy member can use up
+  the whole group's allowance for a minute; set the per-user limit lower than
+  the group limit if that matters.
 - The bot reads text. A photo or document counts only through its caption;
   the image itself is not seen.
-- Messages from other bots are ignored. So are messages from anonymous group
-  administrators, which Telegram delivers as coming from a bot account.
+- Telegram never delivers one bot's messages to another bot, so bots cannot
+  talk to this one. Messages sent on behalf of a chat are ignored as well:
+  anonymous group administrators, members posting as a channel, and channel
+  posts forwarded into a linked discussion group.
+- The bot needs permission to send messages in the group.
+- When a group is upgraded to a supergroup, Telegram gives it a new chat ID.
+  Conversations from before the upgrade are no longer used and are removed
+  by the retention job after `RETENTION_DAYS`.
+- In forum-style supergroups the bot answers in the topic of the message it
+  replies to. This was not tested against a real forum.
 
 ### BotFather privacy mode
 
 Telegram bots have *privacy mode*, which is **on** by default. With it on,
-Telegram delivers to a bot in a group only:
+Telegram delivers to a bot in a group:
 
 - messages that mention the bot by `@username`,
 - replies to the bot's own messages,
-- commands addressed to it (`/command@YourBot`).
+- commands addressed to it (`/command@YourBot`),
+- a few other kinds this bot ignores: plain commands when it was the last
+  bot to post, messages sent through it, and service messages such as
+  members joining.
 
-That is exactly what the mention, reply and command triggers need, so
-**leave privacy mode on**. The bot then never receives the rest of the
-group's conversation at all.
+That covers what the mention, reply and command triggers need, so **leave
+privacy mode on**. The bot then never receives the ordinary conversation of
+the group at all.
 
 Only the display-name trigger needs more: "Mira, explain this" contains no
 mention, so Telegram does not deliver it with privacy mode on. To use that
@@ -492,7 +507,9 @@ bot is down are not lost: Telegram keeps them for up to 24 hours and delivers
 them when the bot starts again.
 
 To roll back, stop the service, copy `telegram-ai-agent.previous` back and
-start it. If the new version applied a migration, also restore the backup.
+start it. If the new version applied a migration, restore the backup too:
+an older binary cannot work with a newer schema. This applies to the upgrade
+that adds group support (migration 0002).
 
 ## Docker Compose deployment (optional)
 

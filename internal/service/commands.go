@@ -57,13 +57,17 @@ func (s *Service) rateLimited(in incoming) (notice string, limited bool) {
 	if !in.group {
 		return "", false
 	}
-	switch s.groupLimiter.check(in.scope.ChatID, now) {
-	case deniedFirst:
-		return textGroupRateLimited, true
-	case deniedAgain:
-		return "", true
+	groupDecision := s.groupLimiter.check(in.scope.ChatID, now)
+	if groupDecision == allowed {
+		return "", false
 	}
-	return "", false
+	// The group as a whole is over its limit. That is not this member's
+	// doing, so it must not use up their own allowance.
+	s.userLimiter.refund(in.scope.UserID)
+	if groupDecision == deniedFirst {
+		return textGroupRateLimited, true
+	}
+	return "", true
 }
 
 // respond decides what to send back. An empty outcome sends nothing.
@@ -132,7 +136,7 @@ func (s *Service) fitted(in incoming, answer string) string {
 	if !in.group {
 		return answer
 	}
-	return truncate(answer, s.opts.MaxGroupReplyChars)
+	return truncateUnits(answer, s.opts.MaxGroupReplyChars)
 }
 
 // recordSent stores which Telegram message carries the answer. It is
@@ -182,7 +186,10 @@ func (s *Service) reset(ctx context.Context, in incoming) string {
 // commandName extracts the command from text such as "/Help@my_bot extra",
 // giving "/help".
 func commandName(text string) string {
-	first, _, _ := strings.Cut(text, " ")
-	name, _, _ := strings.Cut(first, "@")
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		return ""
+	}
+	name, _, _ := strings.Cut(words[0], "@")
 	return strings.ToLower(name)
 }

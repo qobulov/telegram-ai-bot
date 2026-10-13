@@ -76,6 +76,15 @@ func (b *bucket) take() decision {
 	return deniedFirst
 }
 
+// refund gives back the token the last allowed check took.
+func (l *limiter) refund(userID int64) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if b, ok := l.buckets[userID]; ok {
+		b.tokens = min(l.perMinute, b.tokens+1)
+	}
+}
+
 // prune forgets users who have been idle long enough for their bucket to be
 // full again, so the map does not grow without bound.
 func (l *limiter) prune(now time.Time) {

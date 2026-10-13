@@ -9,6 +9,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf16"
 
 	"telegram-ai-bot/internal/agent"
 	"telegram-ai-bot/internal/storage"
@@ -818,4 +819,69 @@ func TestBusyNoticeInGroupRepliesToTheMessage(t *testing.T) {
 		}
 	}
 	t.Errorf("no busy notice in %+v", f.sender.messages())
+}
+
+func TestGroupRefusalDoesNotSpendTheMembersOwnAllowance(t *testing.T) {
+	f := newFixture()
+	f.opts.RatePerMinute = 3
+	f.opts.GroupRatePerMinute = 1
+	f.opts.Workers = 1
+	other := groupMessage("@MyBot hi", "@MyBot")
+	other.From.ID = adminID
+	updates := []telegram.Update{inGroup(other)} // uses the group's only token
+	for range 3 {
+		updates = append(updates, inGroup(groupMessage("@MyBot hi", "@MyBot"))) // refused by the group limit
+	}
+	updates = append(updates, textFrom(userID, "private question"))
+
+	sent := f.run(updates...)
+
+	for _, msg := range sent {
+		if msg.chatID == userID && msg.text == "echo: private question" {
+			return
+		}
+	}
+	t.Errorf("the member's private message was not answered: %+v", sent)
+}
+
+func TestGroupAnswerWithEmojiIsOneTelegramMessage(t *testing.T) {
+	f := newFixture()
+	f.opts.MaxGroupReplyChars = 100
+	f.opts.MaxInputChars = 500
+	emoji := strings.Repeat("😀", 90) // 180 UTF-16 units, 90 characters
+
+	sent := f.run(inGroup(groupMessage("@MyBot "+emoji, "@MyBot")))
+
+	if len(sent) != 1 {
+		t.Fatalf("sent = %+v", sent)
+	}
+	if units := len(utf16.Encode([]rune(sent[0].text))); units > 100 {
+		t.Errorf("group answer is %d UTF-16 units, over the limit of 100", units)
+	}
+	if !strings.HasSuffix(sent[0].text, "…") || strings.ContainsRune(sent[0].text, '\uFFFD') {
+		t.Errorf("group answer was not cut cleanly: %q", sent[0].text)
+	}
+}
+
+func TestPostsOnBehalfOfAChatAreIgnored(t *testing.T) {
+	forwarded := groupMessage("@MyBot hi", "@MyBot")
+	forwarded.From.ID = 777000 // Telegram's service account for linked-channel posts
+	forwarded.IsAutomaticForward = true
+	asChannel := groupMessage("@MyBot hi", "@MyBot")
+	asChannel.SenderChat = &telegram.Chat{ID: -100999, Type: "channel"}
+
+	for name, msg := range map[string]*telegram.Message{"automatic forward": forwarded, "sent as a channel": asChannel} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			if sent := f.run(inGroup(msg)); len(sent) != 0 || len(f.replier.recorded()) != 0 {
+				t.Errorf("sent = %+v, model calls = %d", sent, len(f.replier.recorded()))
+			}
+		})
+	}
+}
+
+func TestPrivateCommandWithNewLine(t *testing.T) {
+	f := newFixture()
+
+	expectOneReply(t, f.run(textFrom(userID, "/help\nplease")), "/reset")
 }

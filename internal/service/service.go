@@ -71,7 +71,8 @@ type Options struct {
 	DisplayName        string
 	// GroupRatePerMinute limits answers per group, across all its members.
 	GroupRatePerMinute int
-	// MaxGroupReplyChars is the longest answer posted in a group.
+	// MaxGroupReplyChars is the longest answer posted in a group, in UTF-16
+	// code units as Telegram counts them.
 	MaxGroupReplyChars int
 }
 
@@ -159,6 +160,12 @@ func (s *Service) Handle(update telegram.Update) {
 func (s *Service) accept(update telegram.Update) (incoming, bool) {
 	msg := update.Message
 	if msg == nil || msg.From == nil || msg.From.IsBot {
+		return incoming{}, false
+	}
+	// Posts made on behalf of a chat have no person behind them to keep a
+	// conversation with: channel posts forwarded into a linked group, and
+	// messages sent as a channel or as the group itself.
+	if msg.SenderChat != nil || msg.IsAutomaticForward {
 		return incoming{}, false
 	}
 	in := incoming{
