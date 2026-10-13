@@ -130,7 +130,7 @@ func (f *fixture) run(updates ...telegram.Update) []sentMessage {
 	for _, u := range updates {
 		s.Handle(u)
 	}
-	s.Close()
+	s.stop() // unlike Close, runs everything that is queued
 	return f.sender.messages()
 }
 
@@ -383,7 +383,7 @@ func TestFullQueueGetsBusyReply(t *testing.T) {
 	s.Handle(textFrom(userID, "third")) // queue is full
 
 	close(f.replier.release)
-	s.Close()
+	s.stop() // unlike Close, runs everything that is queued
 
 	busy := 0
 	for _, msg := range f.sender.messages() {
@@ -435,6 +435,40 @@ func TestCloseWaitsForTurnInProgress(t *testing.T) {
 	s.Close()
 
 	expectOneReply(t, f.sender.messages(), "echo: slow")
+}
+
+func TestCloseRefusesQueuedUpdatesInsteadOfRunningThem(t *testing.T) {
+	f := newFixture()
+	f.opts.Workers = 1
+	f.replier.started = make(chan struct{}, 8)
+	f.replier.release = make(chan struct{})
+	s := New(f.opts)
+	s.Handle(textFrom(userID, "in progress"))
+	<-f.replier.started
+	s.Handle(textFrom(userID, "queued 1"))
+	s.Handle(textFrom(userID, "queued 2"))
+
+	go func() {
+		time.Sleep(30 * time.Millisecond)
+		close(f.replier.release)
+	}()
+	s.Close()
+
+	if calls := f.replier.recorded(); len(calls) != 1 {
+		t.Errorf("model calls = %d, want only the turn that was in progress", len(calls))
+	}
+	answered, busy := 0, 0
+	for _, msg := range f.sender.messages() {
+		switch msg.text {
+		case "echo: in progress":
+			answered++
+		case textBusy:
+			busy++
+		}
+	}
+	if answered != 1 || busy != 2 {
+		t.Errorf("sent = %+v, want 1 answer and 2 busy replies", f.sender.messages())
+	}
 }
 
 func TestHelpTextListsEveryCommand(t *testing.T) {

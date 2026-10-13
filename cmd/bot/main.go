@@ -8,11 +8,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -47,38 +49,56 @@ func run(args []string) error {
 	if err := config.LoadDotEnv(".env"); err != nil {
 		return err
 	}
-	cfg, err := config.Load(os.Getenv)
-	if err != nil {
-		return err
-	}
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: cfg.LogLevel}))
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	store, err := storage.Open(ctx, cfg.DatabaseURL)
-	if err != nil {
-		return err
-	}
-	defer store.Close()
-
 	switch {
 	case len(args) == 0:
-		return serve(ctx, cfg, store, logger)
+		return runBot(ctx)
 	case len(args) == 1 && args[0] == "migrate":
-		return migrate(ctx, store, logger)
+		return runMigrate(ctx)
 	default:
 		return fmt.Errorf("unknown arguments %q; run without arguments to start the bot, or with \"migrate\"", args)
 	}
 }
 
-func migrate(ctx context.Context, store *storage.Store, logger *slog.Logger) error {
+func runBot(ctx context.Context) error {
+	cfg, err := config.Load(os.Getenv)
+	if err != nil {
+		return err
+	}
+	store, err := storage.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	return serve(ctx, cfg, store, newLogger(cfg.LogLevel))
+}
+
+// runMigrate needs only DATABASE_URL. Migrations are applied by an operator
+// with the database owner role, who should not have to supply the bot's
+// Telegram and OpenRouter secrets to do it.
+func runMigrate(ctx context.Context) error {
+	databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	if databaseURL == "" {
+		return errors.New("DATABASE_URL is required")
+	}
+	store, err := storage.Open(ctx, databaseURL)
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+
 	applied, err := store.Migrate(ctx)
 	if err != nil {
 		return err
 	}
-	logger.Info("migrations finished", "applied", applied)
+	newLogger(slog.LevelInfo).Info("migrations finished", "applied", applied)
 	return nil
+}
+
+func newLogger(level slog.Level) *slog.Logger {
+	return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
 }
 
 func serve(ctx context.Context, cfg config.Config, store *storage.Store, logger *slog.Logger) error {

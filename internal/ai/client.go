@@ -69,9 +69,16 @@ func (c *Client) Complete(ctx context.Context, req Request) (Message, error) {
 	if !withTools || !isToolsUnsupported(err) {
 		return msg, err
 	}
-	c.noTools.Store(true)
-	c.opts.Logger.Warn("model does not support tool calling; continuing without tools", "model", c.opts.Model)
-	return c.completeWithRetry(ctx, req, false)
+	msg, err = c.completeWithRetry(ctx, req, false)
+	if err != nil {
+		return Message{}, err
+	}
+	// Remember the result only now that the request is known to work without
+	// tools; a failure here may have had nothing to do with tool support.
+	if c.noTools.CompareAndSwap(false, true) {
+		c.opts.Logger.Warn("model does not support tool calling; continuing without tools", "model", c.opts.Model)
+	}
+	return msg, nil
 }
 
 func (c *Client) completeWithRetry(ctx context.Context, req Request, withTools bool) (Message, error) {
@@ -209,7 +216,10 @@ func isToolsUnsupported(err error) bool {
 	if apiErr.Status != http.StatusBadRequest && apiErr.Status != http.StatusNotFound {
 		return false
 	}
-	return strings.Contains(strings.ToLower(apiErr.Message), "tool")
+	// For example: "No endpoints found that support tool use." Requiring both
+	// words avoids matching unrelated errors that merely mention tools.
+	message := strings.ToLower(apiErr.Message)
+	return strings.Contains(message, "support") && strings.Contains(message, "tool")
 }
 
 // retryDelay prefers the server's Retry-After and otherwise backs off

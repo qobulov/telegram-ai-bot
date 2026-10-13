@@ -7,6 +7,7 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"telegram-ai-bot/internal/telegram"
@@ -64,6 +65,7 @@ type Service struct {
 	limiter  *limiter
 	queues   []chan telegram.Update
 	notices  chan int64
+	closing  atomic.Bool
 	workers  sync.WaitGroup
 	notifier sync.WaitGroup
 }
@@ -129,13 +131,25 @@ func (s *Service) sendBusyNotices() {
 
 func (s *Service) work(queue <-chan telegram.Update) {
 	for update := range queue {
+		if s.closing.Load() {
+			s.reply(update.Message.Chat.ID, textBusy)
+			continue
+		}
 		s.process(update)
 	}
 }
 
-// Close stops accepting updates and waits until every queued update has been
-// processed. A turn in progress is given up to TurnTimeout to finish.
+// Close shuts the service down. The turn each worker is busy with is allowed
+// to finish, bounded by TurnTimeout. Updates still waiting in a queue are not
+// run: their senders get the "busy" reply, so that shutdown takes about one
+// turn at most and nobody is left without an answer.
 func (s *Service) Close() {
+	s.closing.Store(true)
+	s.stop()
+}
+
+// stop closes the queues and waits for the workers to empty them.
+func (s *Service) stop() {
 	for _, queue := range s.queues {
 		close(queue)
 	}

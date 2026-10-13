@@ -274,6 +274,42 @@ func TestCompleteFallsBackWhenToolsUnsupported(t *testing.T) {
 	}
 }
 
+func TestUnrelatedToolErrorDoesNotDisableTools(t *testing.T) {
+	client, rec := newTestClient(t,
+		reply{status: 400, body: `{"error":{"message":"maximum context length exceeded: 500 tokens of tool input"}}`},
+		reply{status: 200, body: plainReply},
+	)
+
+	if _, err := client.Complete(context.Background(), toolRequest()); err == nil {
+		t.Fatal("expected the context-length error to be returned")
+	}
+	if _, err := client.Complete(context.Background(), toolRequest()); err != nil {
+		t.Fatalf("second Complete: %v", err)
+	}
+	last := rec.requests[len(rec.requests)-1]
+	if _, present := last["tools"]; !present {
+		t.Error("tools were disabled by an error that is not about tool support")
+	}
+}
+
+func TestFailedFallbackDoesNotDisableTools(t *testing.T) {
+	client, rec := newTestClient(t,
+		reply{status: 404, body: `{"error":{"message":"No endpoints found that support tool use."}}`},
+		reply{status: 400, body: `{"error":{"message":"bad request"}}`},
+		reply{status: 200, body: plainReply},
+	)
+
+	if _, err := client.Complete(context.Background(), toolRequest()); err == nil {
+		t.Fatal("expected the fallback's error to be returned")
+	}
+	if _, err := client.Complete(context.Background(), toolRequest()); err != nil {
+		t.Fatalf("second Complete: %v", err)
+	}
+	if _, present := rec.requests[2]["tools"]; !present {
+		t.Error("tools were disabled although the fallback request never succeeded")
+	}
+}
+
 func TestCompleteForbidTools(t *testing.T) {
 	client, rec := newTestClient(t, reply{status: 200, body: plainReply})
 	req := toolRequest()

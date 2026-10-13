@@ -293,13 +293,13 @@ machine. A systemd environment file cannot hold a multi-line value; keep
 
 ### 6. Apply migrations
 
-Migrations run as the owner role, with the same settings file for everything
-else:
+Migrations run as the owner role. The `migrate` command needs only
+`DATABASE_URL`, not the bot's other secrets:
 
 ```bash
-sudo bash -c 'set -a; . /etc/telegram-ai-agent/env; \
-  DATABASE_URL="postgres://tgbot_owner:OWNER_PASSWORD_HERE@127.0.0.1:5432/tgbot?sslmode=disable" \
-  /usr/local/bin/telegram-ai-agent migrate'
+sudo -u tgbot env \
+  DATABASE_URL='postgres://tgbot_owner:OWNER_PASSWORD_HERE@127.0.0.1:5432/tgbot?sslmode=disable' \
+  /usr/local/bin/telegram-ai-agent migrate
 
 # The running bot only needs to read the migration history.
 sudo -u postgres psql -d tgbot -c \
@@ -363,7 +363,8 @@ sudo systemctl start telegram-ai-agent
 journalctl -u telegram-ai-agent -n 20
 ```
 
-Stopping waits for messages in progress to finish. Messages sent while the
+Stopping lets the message each worker is answering finish; anyone still
+waiting in a queue is told the bot is busy. Messages sent while the
 bot is down are not lost: Telegram keeps them for up to 24 hours and delivers
 them when the bot starts again.
 
@@ -386,7 +387,7 @@ simplicity; prefer the systemd deployment when you want the restricted
 runtime role.
 
 ```bash
-docker compose exec db pg_dump -U tgbot -Fc tgbot > tgbot.dump     # backup
+docker compose exec -T db pg_dump -U tgbot -Fc tgbot > tgbot.dump  # backup
 docker compose pull && docker compose up -d --build                # update
 ```
 
@@ -413,7 +414,7 @@ Restore:
 
 ```bash
 sudo systemctl stop telegram-ai-agent
-sudo -u postgres pg_restore --clean --if-exists -d tgbot tgbot-2026-01-31.dump
+sudo -u postgres pg_restore --clean --if-exists -d tgbot < tgbot-2026-01-31.dump
 sudo systemctl start telegram-ai-agent
 ```
 
@@ -421,7 +422,7 @@ Test a restore into a scratch database once, before you need it:
 
 ```bash
 sudo -u postgres createdb tgbot_restore_test
-sudo -u postgres pg_restore -d tgbot_restore_test tgbot-2026-01-31.dump
+sudo -u postgres pg_restore -d tgbot_restore_test < tgbot-2026-01-31.dump
 sudo -u postgres psql -d tgbot_restore_test -c 'SELECT count(*) FROM messages'
 sudo -u postgres dropdb tgbot_restore_test
 ```

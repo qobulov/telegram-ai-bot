@@ -22,7 +22,9 @@ services:
     # No "ports:" on purpose: the database is reachable only from the other
     # containers on this compose network, never from the host or the internet.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tgbot -d tgbot"]
+      # -h forces TCP: during first start the image runs a temporary server
+      # that answers on the unix socket only, before the real one is ready.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U tgbot -d tgbot"]
       interval: 5s
       timeout: 3s
       retries: 10

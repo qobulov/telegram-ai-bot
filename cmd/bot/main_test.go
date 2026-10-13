@@ -144,3 +144,28 @@ func TestServeAnswersMessageEndToEnd(t *testing.T) {
 		t.Errorf("saved history = %+v", history)
 	}
 }
+
+// Migrations are run by an operator with the owner role. They must not need
+// the bot's other secrets.
+func TestMigrateNeedsOnlyDatabaseURL(t *testing.T) {
+	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("TEST_DATABASE_URL is not set; skipping migrate test")
+	}
+	t.Setenv("DATABASE_URL", databaseURL)
+	t.Setenv("TELEGRAM_BOT_TOKEN", "")
+	t.Setenv("OPENROUTER_API_KEY", "")
+
+	if err := run([]string{"migrate"}); err != nil {
+		t.Fatalf("run migrate: %v", err)
+	}
+}
+
+func TestMigrateWithoutDatabaseURLNamesTheVariable(t *testing.T) {
+	t.Setenv("DATABASE_URL", "")
+
+	err := run([]string{"migrate"})
+	if err == nil || !strings.Contains(err.Error(), "DATABASE_URL") {
+		t.Fatalf("err = %v, want mention of DATABASE_URL", err)
+	}
+}
