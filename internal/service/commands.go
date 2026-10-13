@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"telegram-ai-bot/internal/agent"
+	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 )
 
@@ -54,13 +55,19 @@ func (s *Service) answer(ctx context.Context, update telegram.Update) string {
 func (s *Service) ask(ctx context.Context, update telegram.Update, text string) string {
 	userID := update.Message.From.ID
 	started := time.Now()
-	answer, err := s.opts.Replier.Reply(ctx, userID, update.UpdateID, text)
+	msg := update.Message
+	answer, err := s.opts.Replier.Reply(ctx, agent.Request{
+		Scope:     storage.Scope{ChatID: msg.Chat.ID, UserID: userID},
+		UpdateID:  update.UpdateID,
+		MessageID: msg.MessageID,
+		Text:      text,
+	})
 	log := s.opts.Logger.With("user_id", userID, "update_id", update.UpdateID, "duration", time.Since(started).String())
 
 	switch {
 	case err == nil:
 		log.Info("turn completed")
-		return answer
+		return answer.Text
 	case errors.Is(err, agent.ErrDuplicate):
 		log.Info("duplicate update skipped")
 		return ""
@@ -98,7 +105,7 @@ func (s *Service) runCommand(ctx context.Context, userID int64, text string) str
 }
 
 func (s *Service) reset(ctx context.Context, userID int64) string {
-	if err := s.opts.Resetter.Reset(ctx, userID); err != nil {
+	if err := s.opts.Resetter.Reset(ctx, storage.Scope{ChatID: userID, UserID: userID}); err != nil {
 		s.opts.Logger.Error("reset failed", "user_id", userID, "error", err)
 		return textError
 	}

@@ -23,8 +23,8 @@ const toolLimitResult = `{"ok":false,"error":{"code":"tool_limit","message":"The
 
 // Store is the conversation persistence the agent needs.
 type Store interface {
-	History(ctx context.Context, userID int64, limit int) ([]ai.Message, error)
-	SaveTurn(ctx context.Context, userID, updateID int64, msgs []ai.Message) error
+	History(ctx context.Context, scope storage.Scope, limit int) ([]ai.Message, error)
+	SaveTurn(ctx context.Context, turn storage.Turn) (answerID int64, err error)
 	UpdateProcessed(ctx context.Context, updateID int64) (bool, error)
 }
 
@@ -45,8 +45,10 @@ type Options struct {
 	Model        Model
 	Tools        Tools
 	SystemPrompt string
-	MaxHistory   int
-	MaxToolCalls int
+	// GroupSystemPrompt replaces SystemPrompt for messages from group chats.
+	GroupSystemPrompt string
+	MaxHistory        int
+	MaxToolCalls      int
 }
 
 // Agent answers user messages. It is safe for concurrent use as long as
@@ -60,42 +62,60 @@ func New(opts Options) *Agent {
 	return &Agent{opts: opts}
 }
 
-// Reply answers the user's message and saves the whole turn. userID must come
-// from the authenticated Telegram update: it selects the history and decides
-// which tools may run. Nothing is saved when the turn fails.
-func (a *Agent) Reply(ctx context.Context, userID, updateID int64, text string) (string, error) {
-	processed, err := a.opts.Store.UpdateProcessed(ctx, updateID)
+// Request is one user message to answer.
+type Request struct {
+	// Scope selects the conversation and, through its UserID, decides which
+	// tools may run. It must come from the authenticated Telegram update.
+	Scope    storage.Scope
+	UpdateID int64
+	// MessageID and ReplyToMessageID are stored with the turn.
+	MessageID        int64
+	ReplyToMessageID int64
+	Text             string
+	// Group is true for messages from a group or supergroup.
+	Group bool
+}
+
+// Answer is the assistant's reply. ID identifies the stored answer.
+type Answer struct {
+	Text string
+	ID   int64
+}
+
+// Reply answers the user's message and saves the whole turn. Nothing is
+// saved when the turn fails.
+func (a *Agent) Reply(ctx context.Context, req Request) (Answer, error) {
+	processed, err := a.opts.Store.UpdateProcessed(ctx, req.UpdateID)
 	if err != nil {
-		return "", err
+		return Answer{}, err
 	}
 	if processed {
-		return "", ErrDuplicate
+		return Answer{}, ErrDuplicate
 	}
-	history, err := a.opts.Store.History(ctx, userID, a.opts.MaxHistory)
+	history, err := a.opts.Store.History(ctx, req.Scope, a.opts.MaxHistory)
 	if err != nil {
-		return "", err
+		return Answer{}, err
 	}
 
 	t := &turn{
-		userID:   userID,
-		updateID: updateID,
+		req:      req,
 		history:  sanitize(history),
-		messages: []ai.Message{{Role: ai.RoleUser, Content: text}},
+		messages: []ai.Message{{Role: ai.RoleUser, Content: req.Text}},
 	}
-	answer, err := a.run(ctx, t)
+	text, err := a.run(ctx, t)
 	if err != nil {
-		return "", err
+		return Answer{}, err
 	}
-	if err := a.save(ctx, t); err != nil {
-		return "", err
+	answerID, err := a.save(ctx, t)
+	if err != nil {
+		return Answer{}, err
 	}
-	return answer, nil
+	return Answer{Text: text, ID: answerID}, nil
 }
 
 // turn is the state of one Reply call.
 type turn struct {
-	userID    int64
-	updateID  int64
+	req       Request
 	history   []ai.Message
 	messages  []ai.Message // this turn: user message, tool exchanges, answer
 	toolsUsed int
@@ -106,7 +126,7 @@ type turn struct {
 // model is told to stop using tools, and after MaxToolCalls+2 requests the
 // turn fails with ErrToolLoop.
 func (a *Agent) run(ctx context.Context, t *turn) (string, error) {
-	definitions := a.opts.Tools.Definitions(t.userID)
+	definitions := a.opts.Tools.Definitions(t.req.Scope.UserID)
 	for range a.opts.MaxToolCalls + 2 {
 		reply, err := a.opts.Model.Complete(ctx, ai.Request{
 			Messages:    a.prompt(t),
@@ -126,9 +146,16 @@ func (a *Agent) run(ctx context.Context, t *turn) (string, error) {
 
 func (a *Agent) prompt(t *turn) []ai.Message {
 	messages := make([]ai.Message, 0, 1+len(t.history)+len(t.messages))
-	messages = append(messages, ai.Message{Role: ai.RoleSystem, Content: a.opts.SystemPrompt})
+	messages = append(messages, ai.Message{Role: ai.RoleSystem, Content: a.systemPrompt(t.req)})
 	messages = append(messages, t.history...)
 	return append(messages, t.messages...)
+}
+
+func (a *Agent) systemPrompt(req Request) string {
+	if req.Group {
+		return a.opts.GroupSystemPrompt
+	}
+	return a.opts.SystemPrompt
 }
 
 func finish(t *turn, reply ai.Message) (string, error) {
@@ -160,7 +187,7 @@ func (a *Agent) execute(ctx context.Context, t *turn, call ai.ToolCall) string {
 	if t.toolsUsed > a.opts.MaxToolCalls {
 		return toolLimitResult
 	}
-	return a.opts.Tools.Execute(ctx, t.userID, call.Function.Name, call.Function.Arguments)
+	return a.opts.Tools.Execute(ctx, t.req.Scope.UserID, call.Function.Name, call.Function.Arguments)
 }
 
 // identified returns the calls with an ID on each. Some models omit the ID,
@@ -169,7 +196,7 @@ func identified(t *turn, calls []ai.ToolCall) []ai.ToolCall {
 	out := make([]ai.ToolCall, len(calls))
 	for i, call := range calls {
 		if call.ID == "" {
-			call.ID = fmt.Sprintf("call_%d_%d", t.updateID, len(t.messages)+i)
+			call.ID = fmt.Sprintf("call_%d_%d", t.req.UpdateID, len(t.messages)+i)
 		}
 		if call.Type == "" {
 			call.Type = "function"
@@ -179,10 +206,16 @@ func identified(t *turn, calls []ai.ToolCall) []ai.ToolCall {
 	return out
 }
 
-func (a *Agent) save(ctx context.Context, t *turn) error {
-	err := a.opts.Store.SaveTurn(ctx, t.userID, t.updateID, t.messages)
+func (a *Agent) save(ctx context.Context, t *turn) (int64, error) {
+	answerID, err := a.opts.Store.SaveTurn(ctx, storage.Turn{
+		Scope:            t.req.Scope,
+		UpdateID:         t.req.UpdateID,
+		MessageID:        t.req.MessageID,
+		ReplyToMessageID: t.req.ReplyToMessageID,
+		Messages:         t.messages,
+	})
 	if errors.Is(err, storage.ErrDuplicateUpdate) {
-		return ErrDuplicate
+		return 0, ErrDuplicate
 	}
-	return err
+	return answerID, err
 }

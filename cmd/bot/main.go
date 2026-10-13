@@ -148,12 +148,13 @@ func newService(cfg config.Config, store *storage.Store, logger *slog.Logger) (*
 		Logger:     logger,
 	})
 	assistant := agent.New(agent.Options{
-		Store:        store,
-		Model:        model,
-		Tools:        registry,
-		SystemPrompt: cfg.SystemPrompt,
-		MaxHistory:   cfg.MaxHistoryMessages,
-		MaxToolCalls: cfg.MaxToolCallsPerTurn,
+		Store:             store,
+		Model:             model,
+		Tools:             registry,
+		SystemPrompt:      cfg.SystemPrompt,
+		GroupSystemPrompt: cfg.GroupSystemPrompt,
+		MaxHistory:        cfg.MaxHistoryMessages,
+		MaxToolCalls:      cfg.MaxToolCallsPerTurn,
 	})
 	sender := telegram.NewClient(telegram.Options{
 		Token:   cfg.TelegramToken,

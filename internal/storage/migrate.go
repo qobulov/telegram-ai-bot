@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -62,6 +63,11 @@ func loadMigrations() ([]migration, error) {
 // failure leaves the database at the last good version. Applied migrations
 // are recorded in schema_migrations and never run twice.
 func (s *Store) Migrate(ctx context.Context) (int, error) {
+	return s.migrateTo(ctx, math.MaxInt)
+}
+
+// migrateTo applies unapplied migrations up to and including maxVersion.
+func (s *Store) migrateTo(ctx context.Context, maxVersion int) (int, error) {
 	migrations, err := loadMigrations()
 	if err != nil {
 		return 0, err
@@ -84,7 +90,7 @@ func (s *Store) Migrate(ctx context.Context) (int, error) {
 	}
 	applied := 0
 	for _, m := range migrations {
-		if m.version <= current {
+		if m.version <= current || m.version > maxVersion {
 			continue
 		}
 		if err := applyMigration(ctx, conn.Conn(), m); err != nil {

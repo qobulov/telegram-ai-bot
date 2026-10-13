@@ -10,6 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"telegram-ai-bot/internal/agent"
+	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 )
 
@@ -25,12 +27,12 @@ type Sender interface {
 
 // Replier answers a user's message.
 type Replier interface {
-	Reply(ctx context.Context, userID, updateID int64, text string) (string, error)
+	Reply(ctx context.Context, req agent.Request) (agent.Answer, error)
 }
 
 // Resetter deletes a user's conversation history.
 type Resetter interface {
-	Reset(ctx context.Context, userID int64) error
+	Reset(ctx context.Context, scope storage.Scope) error
 }
 
 // Options configures a Service. All fields are required.

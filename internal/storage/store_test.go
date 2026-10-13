@@ -14,6 +14,19 @@ import (
 
 const alice, bob = int64(1001), int64(1002)
 
+// group is a supergroup chat ID; Telegram's are negative.
+const group = int64(-1001234567890)
+
+// private is the scope of a user's one-to-one chat with the bot, where the
+// chat ID equals the user ID.
+func private(userID int64) Scope {
+	return Scope{ChatID: userID, UserID: userID}
+}
+
+func inGroup(userID int64) Scope {
+	return Scope{ChatID: group, UserID: userID}
+}
+
 // newTestStore connects to the database named by TEST_DATABASE_URL and
 // rebuilds the schema from scratch. It DROPS the bot's tables, so point it
 // only at a disposable database. Without the variable the test is skipped.
@@ -48,14 +61,14 @@ func turn(question, answer string) []ai.Message {
 
 func mustSave(t *testing.T, store *Store, userID, updateID int64, msgs []ai.Message) {
 	t.Helper()
-	if err := store.SaveTurn(context.Background(), userID, updateID, msgs); err != nil {
+	if _, err := store.SaveTurn(context.Background(), Turn{Scope: private(userID), UpdateID: updateID, Messages: msgs}); err != nil {
 		t.Fatalf("SaveTurn: %v", err)
 	}
 }
 
 func mustHistory(t *testing.T, store *Store, userID int64, limit int) []ai.Message {
 	t.Helper()
-	history, err := store.History(context.Background(), userID, limit)
+	history, err := store.History(context.Background(), private(userID), limit)
 	if err != nil {
 		t.Fatalf("History: %v", err)
 	}
@@ -172,7 +185,7 @@ func TestResetRemovesOnlyTheCallersHistory(t *testing.T) {
 	mustSave(t, store, alice, 1, turn("q", "a"))
 	mustSave(t, store, bob, 2, turn("q", "a"))
 
-	if err := store.Reset(context.Background(), alice); err != nil {
+	if err := store.Reset(context.Background(), private(alice)); err != nil {
 		t.Fatalf("Reset: %v", err)
 	}
 	if got := mustHistory(t, store, alice, 20); len(got) != 0 {
@@ -194,7 +207,7 @@ func TestResetRemovesOnlyTheCallersHistory(t *testing.T) {
 func TestResetOfUnknownUserIsNoOp(t *testing.T) {
 	store := newTestStore(t)
 
-	if err := store.Reset(context.Background(), 999); err != nil {
+	if err := store.Reset(context.Background(), private(999)); err != nil {
 		t.Errorf("Reset: %v", err)
 	}
 }
@@ -203,7 +216,7 @@ func TestSaveTurnRejectsDuplicateUpdate(t *testing.T) {
 	store := newTestStore(t)
 	mustSave(t, store, alice, 7, turn("q", "a"))
 
-	err := store.SaveTurn(context.Background(), alice, 7, turn("q", "a"))
+	_, err := store.SaveTurn(context.Background(), Turn{Scope: private(alice), UpdateID: 7, Messages: turn("q", "a")})
 	if !errors.Is(err, ErrDuplicateUpdate) {
 		t.Fatalf("err = %v, want ErrDuplicateUpdate", err)
 	}
@@ -231,7 +244,7 @@ func TestUpdateProcessed(t *testing.T) {
 func TestSaveTurnRejectsEmptyTurn(t *testing.T) {
 	store := newTestStore(t)
 
-	if err := store.SaveTurn(context.Background(), alice, 1, nil); err == nil {
+	if _, err := store.SaveTurn(context.Background(), Turn{Scope: private(alice), UpdateID: 1}); err == nil {
 		t.Error("empty turn accepted")
 	}
 }
@@ -279,6 +292,209 @@ func TestSchemaConstraintsRejectInvalidMessages(t *testing.T) {
 				t.Error("invalid row accepted")
 			}
 		})
+	}
+}
+
+func saveIn(t *testing.T, store *Store, scope Scope, updateID int64, msgs []ai.Message) int64 {
+	t.Helper()
+	answerID, err := store.SaveTurn(context.Background(), Turn{Scope: scope, UpdateID: updateID, Messages: msgs})
+	if err != nil {
+		t.Fatalf("SaveTurn: %v", err)
+	}
+	return answerID
+}
+
+func historyIn(t *testing.T, store *Store, scope Scope) []ai.Message {
+	t.Helper()
+	history, err := store.History(context.Background(), scope, 20)
+	if err != nil {
+		t.Fatalf("History: %v", err)
+	}
+	return history
+}
+
+func TestPrivateAndGroupHistoriesAreSeparate(t *testing.T) {
+	store := newTestStore(t)
+	saveIn(t, store, private(alice), 1, turn("private question", "private answer"))
+	saveIn(t, store, inGroup(alice), 2, turn("group question", "group answer"))
+
+	privateHistory := historyIn(t, store, private(alice))
+	groupHistory := historyIn(t, store, inGroup(alice))
+	if len(privateHistory) != 2 || privateHistory[0].Content != "private question" {
+		t.Errorf("private history = %+v", privateHistory)
+	}
+	if len(groupHistory) != 2 || groupHistory[0].Content != "group question" {
+		t.Errorf("group history = %+v", groupHistory)
+	}
+}
+
+func TestGroupMembersHaveSeparateHistories(t *testing.T) {
+	store := newTestStore(t)
+	saveIn(t, store, inGroup(alice), 1, turn("alice asks", "to alice"))
+	saveIn(t, store, inGroup(bob), 2, turn("bob asks", "to bob"))
+
+	if got := historyIn(t, store, inGroup(alice)); len(got) != 2 || got[0].Content != "alice asks" {
+		t.Errorf("alice's group history = %+v", got)
+	}
+	if got := historyIn(t, store, inGroup(bob)); len(got) != 2 || got[0].Content != "bob asks" {
+		t.Errorf("bob's group history = %+v", got)
+	}
+}
+
+func TestResetClearsOneScopeOnly(t *testing.T) {
+	store := newTestStore(t)
+	saveIn(t, store, private(alice), 1, turn("q", "a"))
+	saveIn(t, store, inGroup(alice), 2, turn("q", "a"))
+	saveIn(t, store, inGroup(bob), 3, turn("q", "a"))
+
+	if err := store.Reset(context.Background(), inGroup(alice)); err != nil {
+		t.Fatalf("Reset: %v", err)
+	}
+	if got := historyIn(t, store, inGroup(alice)); len(got) != 0 {
+		t.Errorf("alice's group history after reset = %+v", got)
+	}
+	if got := historyIn(t, store, private(alice)); len(got) != 2 {
+		t.Errorf("alice's private history after a group reset = %+v", got)
+	}
+	if got := historyIn(t, store, inGroup(bob)); len(got) != 2 {
+		t.Errorf("bob's group history after alice's reset = %+v", got)
+	}
+}
+
+func TestDuplicateUpdateIsRejectedAcrossScopes(t *testing.T) {
+	store := newTestStore(t)
+	saveIn(t, store, private(alice), 9, turn("q", "a"))
+
+	_, err := store.SaveTurn(context.Background(), Turn{Scope: inGroup(alice), UpdateID: 9, Messages: turn("q", "a")})
+	if !errors.Is(err, ErrDuplicateUpdate) {
+		t.Fatalf("err = %v, want ErrDuplicateUpdate", err)
+	}
+}
+
+type storedIDs struct {
+	role             string
+	messageID, reply *int64
+}
+
+func readIDs(t *testing.T, store *Store) []storedIDs {
+	t.Helper()
+	rows, err := store.pool.Query(context.Background(),
+		`SELECT role, telegram_message_id, reply_to_message_id FROM messages ORDER BY id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var out []storedIDs
+	for rows.Next() {
+		var row storedIDs
+		if err := rows.Scan(&row.role, &row.messageID, &row.reply); err != nil {
+			t.Fatal(err)
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
+func equalID(got *int64, want int64) bool {
+	if want == 0 {
+		return got == nil
+	}
+	return got != nil && *got == want
+}
+
+func TestSaveTurnStoresMessageAndReplyIDs(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	answerID, err := store.SaveTurn(ctx, Turn{
+		Scope:            inGroup(alice),
+		UpdateID:         1,
+		MessageID:        30,
+		ReplyToMessageID: 29,
+		Messages: []ai.Message{
+			{Role: ai.RoleUser, Content: "q"},
+			{Role: ai.RoleAssistant, ToolCalls: []ai.ToolCall{{ID: "c", Type: "function", Function: ai.FunctionCall{Name: "calculator"}}}},
+			{Role: ai.RoleTool, ToolCallID: "c", Content: "{}"},
+			{Role: ai.RoleAssistant, Content: "a"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("SaveTurn: %v", err)
+	}
+
+	rows := readIDs(t, store)
+	if len(rows) != 4 {
+		t.Fatalf("rows = %+v", rows)
+	}
+	if !equalID(rows[0].messageID, 30) || !equalID(rows[0].reply, 29) {
+		t.Errorf("user row: message %v, reply %v; want 30 and 29", rows[0].messageID, rows[0].reply)
+	}
+	for _, middle := range rows[1:3] {
+		if middle.messageID != nil || middle.reply != nil {
+			t.Errorf("%s row carries Telegram IDs", middle.role)
+		}
+	}
+	if !equalID(rows[3].messageID, 0) || !equalID(rows[3].reply, 30) {
+		t.Errorf("answer row: message %v, reply %v; want unset and 30", rows[3].messageID, rows[3].reply)
+	}
+
+	if err := store.SetSentMessageID(ctx, answerID, 501); err != nil {
+		t.Fatalf("SetSentMessageID: %v", err)
+	}
+	if rows := readIDs(t, store); !equalID(rows[3].messageID, 501) || rows[0].messageID == nil || *rows[0].messageID != 30 {
+		t.Errorf("after SetSentMessageID: rows = %+v", rows)
+	}
+}
+
+func TestSaveTurnStoresNoIDsWhenNoneGiven(t *testing.T) {
+	store := newTestStore(t)
+	saveIn(t, store, private(alice), 1, turn("q", "a"))
+
+	for _, row := range readIDs(t, store) {
+		if row.messageID != nil || row.reply != nil {
+			t.Errorf("%s row has IDs although none were given: %+v", row.role, row)
+		}
+	}
+}
+
+// Conversations saved by the first schema version had no chat ID. Migration
+// 0002 must keep them reachable as private conversations.
+func TestMigrationKeepsExistingPrivateConversations(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, schema_migrations CASCADE`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.migrateTo(ctx, 1); err != nil {
+		t.Fatalf("migrate to version 1: %v", err)
+	}
+	_, err := store.pool.Exec(ctx, `
+		INSERT INTO users (telegram_id) VALUES (1001);
+		INSERT INTO conversations (user_id) VALUES (1001);
+		INSERT INTO messages (conversation_id, role, content, update_id)
+			SELECT id, 'user', 'from before the migration', 5 FROM conversations;
+		INSERT INTO messages (conversation_id, role, content)
+			SELECT id, 'assistant', 'old answer' FROM conversations;`)
+	if err != nil {
+		t.Fatalf("seed version 1 data: %v", err)
+	}
+
+	applied, err := store.Migrate(ctx)
+	if err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+	if applied < 1 {
+		t.Errorf("applied = %d, want at least 1", applied)
+	}
+	got := historyIn(t, store, private(alice))
+	if len(got) != 2 || got[0].Content != "from before the migration" || got[1].Content != "old answer" {
+		t.Errorf("history after migration = %+v", got)
+	}
+	if got := historyIn(t, store, inGroup(alice)); len(got) != 0 {
+		t.Errorf("group history after migration = %+v, want empty", got)
+	}
+	saveIn(t, store, private(alice), 6, turn("after", "ok"))
+	if got := historyIn(t, store, private(alice)); len(got) != 4 {
+		t.Errorf("history after a new turn = %+v", got)
 	}
 }
 

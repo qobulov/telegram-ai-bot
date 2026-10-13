@@ -109,7 +109,7 @@ func TestServeAnswersMessageEndToEnd(t *testing.T) {
 	if _, err := store.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.Reset(ctx, e2eUser); err != nil {
+	if err := store.Reset(ctx, storage.Scope{ChatID: e2eUser, UserID: e2eUser}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -136,7 +136,7 @@ func TestServeAnswersMessageEndToEnd(t *testing.T) {
 		t.Fatal("serve did not shut down")
 	}
 
-	history, err := store.History(context.Background(), e2eUser, 20)
+	history, err := store.History(context.Background(), storage.Scope{ChatID: e2eUser, UserID: e2eUser}, 20)
 	if err != nil {
 		t.Fatal(err)
 	}

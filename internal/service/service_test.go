@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"telegram-ai-bot/internal/agent"
+	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 )
 
@@ -46,6 +47,7 @@ func (f *fakeSender) messages() []sentMessage {
 type replyCall struct {
 	userID, updateID int64
 	text             string
+	req              agent.Request
 }
 
 type fakeReplier struct {
@@ -58,9 +60,10 @@ type fakeReplier struct {
 	waitForDeadline bool
 }
 
-func (f *fakeReplier) Reply(ctx context.Context, userID, updateID int64, text string) (string, error) {
+func (f *fakeReplier) Reply(ctx context.Context, req agent.Request) (agent.Answer, error) {
+	text := req.Text
 	f.mu.Lock()
-	f.calls = append(f.calls, replyCall{userID: userID, updateID: updateID, text: text})
+	f.calls = append(f.calls, replyCall{userID: req.Scope.UserID, updateID: req.UpdateID, text: text, req: req})
 	err := f.err
 	f.mu.Unlock()
 
@@ -72,12 +75,12 @@ func (f *fakeReplier) Reply(ctx context.Context, userID, updateID int64, text st
 	}
 	if f.waitForDeadline {
 		<-ctx.Done()
-		return "", ctx.Err()
+		return agent.Answer{}, ctx.Err()
 	}
 	if err != nil {
-		return "", err
+		return agent.Answer{}, err
 	}
-	return "echo: " + text, nil
+	return agent.Answer{Text: "echo: " + text, ID: 9001}, nil
 }
 
 func (f *fakeReplier) recorded() []replyCall {
@@ -88,14 +91,14 @@ func (f *fakeReplier) recorded() []replyCall {
 
 type fakeResetter struct {
 	mu    sync.Mutex
-	reset []int64
+	reset []storage.Scope
 	err   error
 }
 
-func (f *fakeResetter) Reset(_ context.Context, userID int64) error {
+func (f *fakeResetter) Reset(_ context.Context, scope storage.Scope) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.reset = append(f.reset, userID)
+	f.reset = append(f.reset, scope)
 	return f.err
 }
 
@@ -191,8 +194,9 @@ func TestResetClearsOnlyTheSendersHistory(t *testing.T) {
 	sent := f.run(textFrom(userID, "/reset"))
 
 	expectOneReply(t, sent, textResetDone)
-	if len(f.resetter.reset) != 1 || f.resetter.reset[0] != userID {
-		t.Errorf("reset calls = %v, want [%d]", f.resetter.reset, userID)
+	want := storage.Scope{ChatID: userID, UserID: userID}
+	if len(f.resetter.reset) != 1 || f.resetter.reset[0] != want {
+		t.Errorf("reset calls = %v, want [%v]", f.resetter.reset, want)
 	}
 }
 

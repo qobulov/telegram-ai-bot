@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"telegram-ai-bot/internal/ai"
@@ -13,34 +14,42 @@ import (
 
 const testUser = int64(42)
 
-// memoryStore is an in-memory Store keyed by user ID.
+var testScope = storage.Scope{ChatID: testUser, UserID: testUser}
+
+func request(updateID int64, text string) Request {
+	return Request{Scope: testScope, UpdateID: updateID, Text: text}
+}
+
+// memoryStore is an in-memory Store keyed by conversation scope.
 type memoryStore struct {
-	history   map[int64][]ai.Message
+	history   map[storage.Scope][]ai.Message
 	processed map[int64]bool
+	turns     []storage.Turn
 	saveErr   error
 	saves     int
 }
 
 func newMemoryStore() *memoryStore {
-	return &memoryStore{history: map[int64][]ai.Message{}, processed: map[int64]bool{}}
+	return &memoryStore{history: map[storage.Scope][]ai.Message{}, processed: map[int64]bool{}}
 }
 
-func (s *memoryStore) History(_ context.Context, userID int64, limit int) ([]ai.Message, error) {
-	all := s.history[userID]
+func (s *memoryStore) History(_ context.Context, scope storage.Scope, limit int) ([]ai.Message, error) {
+	all := s.history[scope]
 	if len(all) > limit {
 		all = all[len(all)-limit:]
 	}
 	return append([]ai.Message(nil), all...), nil
 }
 
-func (s *memoryStore) SaveTurn(_ context.Context, userID, updateID int64, msgs []ai.Message) error {
+func (s *memoryStore) SaveTurn(_ context.Context, turn storage.Turn) (int64, error) {
 	if s.saveErr != nil {
-		return s.saveErr
+		return 0, s.saveErr
 	}
 	s.saves++
-	s.processed[updateID] = true
-	s.history[userID] = append(s.history[userID], msgs...)
-	return nil
+	s.turns = append(s.turns, turn)
+	s.processed[turn.UpdateID] = true
+	s.history[turn.Scope] = append(s.history[turn.Scope], turn.Messages...)
+	return int64(9000 + s.saves), nil
 }
 
 func (s *memoryStore) UpdateProcessed(_ context.Context, updateID int64) (bool, error) {
@@ -110,12 +119,13 @@ type fixture struct {
 func newFixture(replies ...ai.Message) fixture {
 	f := fixture{store: newMemoryStore(), model: &scriptedModel{replies: replies}, tools: &fakeTools{}}
 	f.agent = New(Options{
-		Store:        f.store,
-		Model:        f.model,
-		Tools:        f.tools,
-		SystemPrompt: "be helpful",
-		MaxHistory:   20,
-		MaxToolCalls: 2,
+		Store:             f.store,
+		Model:             f.model,
+		Tools:             f.tools,
+		SystemPrompt:      "be helpful",
+		GroupSystemPrompt: "be helpful in a group",
+		MaxHistory:        20,
+		MaxToolCalls:      2,
 	})
 	return f
 }
@@ -130,11 +140,11 @@ func roles(msgs []ai.Message) []string {
 
 func TestReplyAnswersAndSavesTurn(t *testing.T) {
 	f := newFixture(text("Salom!"))
-	f.store.history[testUser] = []ai.Message{{Role: ai.RoleUser, Content: "earlier"}, text("earlier answer")}
+	f.store.history[testScope] = []ai.Message{{Role: ai.RoleUser, Content: "earlier"}, text("earlier answer")}
 
-	answer, err := f.agent.Reply(context.Background(), testUser, 1, "hi")
-	if err != nil || answer != "Salom!" {
-		t.Fatalf("answer = %q, err = %v", answer, err)
+	answer, err := f.agent.Reply(context.Background(), request(1, "hi"))
+	if err != nil || answer.Text != "Salom!" {
+		t.Fatalf("answer = %q, err = %v", answer.Text, err)
 	}
 
 	sent := f.model.requests[0]
@@ -149,7 +159,7 @@ func TestReplyAnswersAndSavesTurn(t *testing.T) {
 		t.Errorf("request tools = %+v, forbid = %v", sent.Tools, sent.ForbidTools)
 	}
 
-	saved := f.store.history[testUser][2:]
+	saved := f.store.history[testScope][2:]
 	if !reflect.DeepEqual(roles(saved), []string{ai.RoleUser, ai.RoleAssistant}) || saved[1].Content != "Salom!" {
 		t.Errorf("saved = %+v", saved)
 	}
@@ -158,9 +168,9 @@ func TestReplyAnswersAndSavesTurn(t *testing.T) {
 func TestReplyRunsToolAndFeedsResultBack(t *testing.T) {
 	f := newFixture(toolCall("call_1"), text("2"))
 
-	answer, err := f.agent.Reply(context.Background(), testUser, 1, "1+1?")
-	if err != nil || answer != "2" {
-		t.Fatalf("answer = %q, err = %v", answer, err)
+	answer, err := f.agent.Reply(context.Background(), request(1, "1+1?"))
+	if err != nil || answer.Text != "2" {
+		t.Fatalf("answer = %q, err = %v", answer.Text, err)
 	}
 
 	if len(f.tools.executions) != 1 {
@@ -180,7 +190,7 @@ func TestReplyRunsToolAndFeedsResultBack(t *testing.T) {
 	}
 
 	wantSaved := []string{ai.RoleUser, ai.RoleAssistant, ai.RoleTool, ai.RoleAssistant}
-	if got := roles(f.store.history[testUser]); !reflect.DeepEqual(got, wantSaved) {
+	if got := roles(f.store.history[testScope]); !reflect.DeepEqual(got, wantSaved) {
 		t.Errorf("saved roles = %v, want %v", got, wantSaved)
 	}
 }
@@ -188,9 +198,9 @@ func TestReplyRunsToolAndFeedsResultBack(t *testing.T) {
 func TestReplyStopsToolLoopAtLimit(t *testing.T) {
 	f := newFixture(toolCall("a"), toolCall("b"), toolCall("c"), text("done"))
 
-	answer, err := f.agent.Reply(context.Background(), testUser, 1, "loop")
-	if err != nil || answer != "done" {
-		t.Fatalf("answer = %q, err = %v", answer, err)
+	answer, err := f.agent.Reply(context.Background(), request(1, "loop"))
+	if err != nil || answer.Text != "done" {
+		t.Fatalf("answer = %q, err = %v", answer.Text, err)
 	}
 	if len(f.tools.executions) != 2 {
 		t.Errorf("executions = %d, want the limit of 2", len(f.tools.executions))
@@ -204,7 +214,7 @@ func TestReplyStopsToolLoopAtLimit(t *testing.T) {
 		t.Errorf("ForbidTools per request = %v, want %v", forbidden, want)
 	}
 
-	saved := f.store.history[testUser]
+	saved := f.store.history[testScope]
 	refused := saved[len(saved)-2]
 	if refused.Role != ai.RoleTool || refused.ToolCallID != "c" || !contains(refused.Content, "tool_limit") {
 		t.Errorf("over-limit call result = %+v", refused)
@@ -214,14 +224,14 @@ func TestReplyStopsToolLoopAtLimit(t *testing.T) {
 func TestReplyCountsParallelCallsAgainstLimit(t *testing.T) {
 	f := newFixture(toolCall("a", "b", "c"), text("done"))
 
-	if _, err := f.agent.Reply(context.Background(), testUser, 1, "many"); err != nil {
+	if _, err := f.agent.Reply(context.Background(), request(1, "many")); err != nil {
 		t.Fatalf("Reply: %v", err)
 	}
 	if len(f.tools.executions) != 2 {
 		t.Errorf("executions = %d, want 2", len(f.tools.executions))
 	}
 	wantSaved := []string{ai.RoleUser, ai.RoleAssistant, ai.RoleTool, ai.RoleTool, ai.RoleTool, ai.RoleAssistant}
-	if got := roles(f.store.history[testUser]); !reflect.DeepEqual(got, wantSaved) {
+	if got := roles(f.store.history[testScope]); !reflect.DeepEqual(got, wantSaved) {
 		t.Errorf("saved roles = %v, want %v (every call needs a result)", got, wantSaved)
 	}
 }
@@ -229,7 +239,7 @@ func TestReplyCountsParallelCallsAgainstLimit(t *testing.T) {
 func TestReplyGivesUpWhenModelNeverAnswers(t *testing.T) {
 	f := newFixture(toolCall("x"))
 
-	_, err := f.agent.Reply(context.Background(), testUser, 1, "loop forever")
+	_, err := f.agent.Reply(context.Background(), request(1, "loop forever"))
 	if !errors.Is(err, ErrToolLoop) {
 		t.Fatalf("err = %v, want ErrToolLoop", err)
 	}
@@ -245,7 +255,7 @@ func TestReplySavesNothingWhenModelFails(t *testing.T) {
 	f := newFixture()
 	f.model.err = errors.New("provider down")
 
-	if _, err := f.agent.Reply(context.Background(), testUser, 1, "hi"); err == nil {
+	if _, err := f.agent.Reply(context.Background(), request(1, "hi")); err == nil {
 		t.Fatal("expected error")
 	}
 	if f.store.saves != 0 {
@@ -257,7 +267,7 @@ func TestReplyRejectsEmptyAnswer(t *testing.T) {
 	for _, content := range []string{"", "  \n"} {
 		f := newFixture(text(content))
 
-		_, err := f.agent.Reply(context.Background(), testUser, 1, "hi")
+		_, err := f.agent.Reply(context.Background(), request(1, "hi"))
 		if !errors.Is(err, ai.ErrEmptyResponse) {
 			t.Errorf("content %q: err = %v, want ErrEmptyResponse", content, err)
 		}
@@ -271,7 +281,7 @@ func TestReplySkipsProcessedUpdate(t *testing.T) {
 	f := newFixture(text("first"))
 	f.store.processed[7] = true
 
-	_, err := f.agent.Reply(context.Background(), testUser, 7, "again")
+	_, err := f.agent.Reply(context.Background(), request(7, "again"))
 	if !errors.Is(err, ErrDuplicate) {
 		t.Fatalf("err = %v, want ErrDuplicate", err)
 	}
@@ -284,7 +294,7 @@ func TestReplyMapsDuplicateSave(t *testing.T) {
 	f := newFixture(text("answer"))
 	f.store.saveErr = storage.ErrDuplicateUpdate
 
-	if _, err := f.agent.Reply(context.Background(), testUser, 1, "hi"); !errors.Is(err, ErrDuplicate) {
+	if _, err := f.agent.Reply(context.Background(), request(1, "hi")); !errors.Is(err, ErrDuplicate) {
 		t.Fatalf("err = %v, want ErrDuplicate", err)
 	}
 }
@@ -292,10 +302,10 @@ func TestReplyMapsDuplicateSave(t *testing.T) {
 func TestReplyFillsMissingToolCallIDs(t *testing.T) {
 	f := newFixture(toolCall(""), text("ok"))
 
-	if _, err := f.agent.Reply(context.Background(), testUser, 1, "hi"); err != nil {
+	if _, err := f.agent.Reply(context.Background(), request(1, "hi")); err != nil {
 		t.Fatalf("Reply: %v", err)
 	}
-	saved := f.store.history[testUser]
+	saved := f.store.history[testScope]
 	callID := saved[1].ToolCalls[0].ID
 	if callID == "" || saved[2].ToolCallID != callID {
 		t.Errorf("call id = %q, result id = %q; both must match and be non-empty", callID, saved[2].ToolCallID)
@@ -304,13 +314,13 @@ func TestReplyFillsMissingToolCallIDs(t *testing.T) {
 
 func TestReplySendsOnlySanitizedHistory(t *testing.T) {
 	f := newFixture(text("ok"))
-	f.store.history[testUser] = []ai.Message{
+	f.store.history[testScope] = []ai.Message{
 		{Role: ai.RoleTool, ToolCallID: "lost", Content: "orphan"},
 		text("answer without question"),
 		{Role: ai.RoleUser, Content: "kept"},
 	}
 
-	if _, err := f.agent.Reply(context.Background(), testUser, 1, "hi"); err != nil {
+	if _, err := f.agent.Reply(context.Background(), request(1, "hi")); err != nil {
 		t.Fatalf("Reply: %v", err)
 	}
 	want := []string{ai.RoleSystem, ai.RoleUser, ai.RoleUser}
@@ -326,4 +336,57 @@ func contains(text, part string) bool {
 		}
 	}
 	return false
+}
+
+func TestReplyUsesGroupPromptAndScope(t *testing.T) {
+	f := newFixture(toolCall("call_1"), text("group answer"))
+	groupScope := storage.Scope{ChatID: -100500, UserID: testUser}
+	f.store.history[testScope] = []ai.Message{{Role: ai.RoleUser, Content: "private secret"}, text("private answer")}
+
+	answer, err := f.agent.Reply(context.Background(), Request{
+		Scope:            groupScope,
+		UpdateID:         5,
+		MessageID:        30,
+		ReplyToMessageID: 29,
+		Text:             "hello group",
+		Group:            true,
+	})
+	if err != nil {
+		t.Fatalf("Reply: %v", err)
+	}
+	if answer.Text != "group answer" || answer.ID != 9001 {
+		t.Errorf("answer = %+v, want the text and the stored row ID 9001", answer)
+	}
+
+	sent := f.model.requests[0].Messages
+	if sent[0].Content != "be helpful in a group" {
+		t.Errorf("system prompt = %q", sent[0].Content)
+	}
+	for _, msg := range sent {
+		if strings.Contains(msg.Content, "private") {
+			t.Errorf("private history leaked into a group turn: %q", msg.Content)
+		}
+	}
+	if got := f.tools.executions[0].callerID; got != testUser {
+		t.Errorf("tool caller = %d, want the sender %d", got, testUser)
+	}
+
+	saved := f.store.turns[0]
+	if saved.Scope != groupScope || saved.UpdateID != 5 || saved.MessageID != 30 || saved.ReplyToMessageID != 29 {
+		t.Errorf("saved turn = %+v", saved)
+	}
+	if len(f.store.history[testScope]) != 2 {
+		t.Error("a group turn was written into the private history")
+	}
+}
+
+func TestReplyUsesPrivatePromptByDefault(t *testing.T) {
+	f := newFixture(text("ok"))
+
+	if _, err := f.agent.Reply(context.Background(), request(1, "hi")); err != nil {
+		t.Fatalf("Reply: %v", err)
+	}
+	if got := f.model.requests[0].Messages[0].Content; got != "be helpful" {
+		t.Errorf("system prompt = %q", got)
+	}
 }
