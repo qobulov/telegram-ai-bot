@@ -203,3 +203,87 @@ func TestLoadDotEnvRejectsMalformedLine(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestLoadGroupDefaults(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !cfg.MentionTrigger || !cfg.ReplyTrigger || cfg.DisplayNameTrigger {
+		t.Errorf("triggers = mention %v, reply %v, name %v", cfg.MentionTrigger, cfg.ReplyTrigger, cfg.DisplayNameTrigger)
+	}
+	if cfg.BotDisplayName != "" || cfg.MaxGroupReplyChars != 4000 || cfg.GroupRateLimitPerMinute != 10 {
+		t.Errorf("cfg = %q, %d, %d", cfg.BotDisplayName, cfg.MaxGroupReplyChars, cfg.GroupRateLimitPerMinute)
+	}
+	if !strings.Contains(cfg.GroupSystemPrompt, "Telegram group") {
+		t.Errorf("GroupSystemPrompt = %q", cfg.GroupSystemPrompt)
+	}
+}
+
+func TestLoadParsesBooleans(t *testing.T) {
+	for value, want := range map[string]bool{"true": true, "TRUE": true, "1": true, "false": false, "False": false, "0": false} {
+		env := validEnv()
+		env["ENABLE_MENTION_TRIGGER"] = value
+		cfg, err := Load(getenv(env))
+		if err != nil {
+			t.Fatalf("%q: Load: %v", value, err)
+		}
+		if cfg.MentionTrigger != want {
+			t.Errorf("%q parsed as %v", value, cfg.MentionTrigger)
+		}
+	}
+
+	env := validEnv()
+	env["ENABLE_REPLY_TRIGGER"] = "yes"
+	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "ENABLE_REPLY_TRIGGER") {
+		t.Errorf("err = %v, want mention of ENABLE_REPLY_TRIGGER", err)
+	}
+}
+
+func TestLoadDisplayNameTriggerNeedsName(t *testing.T) {
+	env := validEnv()
+	env["ENABLE_DISPLAY_NAME_TRIGGER"] = "true"
+	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "BOT_DISPLAY_NAME") {
+		t.Fatalf("err = %v, want mention of BOT_DISPLAY_NAME", err)
+	}
+
+	env["BOT_DISPLAY_NAME"] = "Mira"
+	cfg, err := Load(getenv(env))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !cfg.DisplayNameTrigger || cfg.BotDisplayName != "Mira" {
+		t.Errorf("cfg = %v, %q", cfg.DisplayNameTrigger, cfg.BotDisplayName)
+	}
+}
+
+func TestLoadGroupContextMode(t *testing.T) {
+	for value, ok := range map[string]bool{"": true, "per_user": true, "shared": false, "bogus": false} {
+		env := validEnv()
+		env["GROUP_CONTEXT_MODE"] = value
+		_, err := Load(getenv(env))
+		if ok && err != nil {
+			t.Errorf("%q rejected: %v", value, err)
+		}
+		if !ok && (err == nil || !strings.Contains(err.Error(), "GROUP_CONTEXT_MODE")) {
+			t.Errorf("%q: err = %v, want mention of GROUP_CONTEXT_MODE", value, err)
+		}
+	}
+}
+
+func TestLoadGroupLimits(t *testing.T) {
+	cases := map[string]map[string]bool{
+		"MAX_GROUP_REPLY_LENGTH":      {"0": false, "4097": false, "4096": true, "1": true},
+		"GROUP_RATE_LIMIT_PER_MINUTE": {"0": false, "-1": false, "5": true},
+	}
+	for name, values := range cases {
+		for value, ok := range values {
+			env := validEnv()
+			env[name] = value
+			_, err := Load(getenv(env))
+			if ok != (err == nil) {
+				t.Errorf("%s=%s: err = %v, want ok=%v", name, value, err, ok)
+			}
+		}
+	}
+}
