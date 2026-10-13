@@ -1,7 +1,7 @@
 # telegram-ai-bot
 
 A Telegram chat character written in Go: a witty, sarcastic group-chat
-regular (called Mira unless you rename her) rather than a neutral assistant.
+regular (called Maria unless you rename her) rather than a neutral assistant.
 She answers through [OpenRouter](https://openrouter.ai), remembers
 conversations in PostgreSQL, and can call a small set of safe tools (current
 time, calculator, bot help).
@@ -131,7 +131,7 @@ in the environment win over the file.
 | `DB_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
 | `OPENROUTER_MODEL`            | `openrouter/free`              | Model ID, see [Choosing a model](#choosing-a-model)                                                          |
 | `MAX_OUTPUT_TOKENS`           | `1024`                         | Longest model reply, in tokens                                                                               |
-| `BOT_DISPLAY_NAME`            | `Mira`                         | The character's name                                                                                         |
+| `BOT_DISPLAY_NAME`            | `Maria`                         | The character's name                                                                                         |
 | `PERSONA_PROMPT`              | built-in                       | The character's personality and rules; `{name}` is replaced by the name. See [The character](#the-character) |
 | `MAX_HISTORY_MESSAGES`        | `20`                           | Recent messages sent to the model as context                                                                 |
 | `MAX_TOOL_CALLS_PER_TURN`     | `4`                            | Tool calls allowed while answering one message                                                               |
@@ -143,7 +143,7 @@ in the environment win over the file.
 | `ADMIN_USER_IDS`              | empty                          | Comma-separated Telegram user IDs of administrators                                                          |
 | `ADMIN_COMMANDS`              | empty                          | Comma-separated commands only administrators may use, e.g. `model,about`                                     |
 | `ENABLE_WAKE_WORD_TRIGGER`    | `true`                         | In groups, answer when called by name; needs privacy mode off, see [Groups](#groups)                         |
-| `BOT_WAKE_WORDS`              | the display name               | Comma-separated names the bot answers to, each one word, e.g. `mira,мира`                                    |
+| `BOT_WAKE_WORDS`              | the display name               | Comma-separated names the bot answers to, each one word, e.g. `maria,мария`                                    |
 | `ENABLE_USERNAME_MENTION`     | `true`                         | In groups, answer when `@username` is mentioned                                                              |
 | `ENABLE_REPLY_TRIGGER`        | `true`                         | In groups, answer replies to the bot's messages                                                              |
 | `GROUP_AMBIENT_MESSAGES`      | `20`                           | Recent ordinary group messages kept in memory as context (0 to 100; 0 turns it off)                          |
@@ -239,23 +239,24 @@ request up to three times and then tells the user something went wrong.
 ## The character
 
 The bot plays a character instead of acting as an assistant. Out of the box
-she is **Mira**: witty, sarcastic, playful and a little chaotic. She banters,
-teases and roasts, fires back when roasted, keeps her answers to a line or
-two like a real chat member, and writes in the language and tone of the chat.
-She still gives a correct answer when someone asks a real question, and still
-uses the tools for the time and for arithmetic.
+she is **Maria**: funny, sarcastic, witty and slightly chaotic, a natural
+troll who enjoys playful arguments. She roasts, fires back when insulted,
+keeps most answers to a sentence or two like a real chat member, and writes
+in the language of the chat. She notices when a conversation is serious and
+does not force a joke there. She still answers a real question correctly,
+and still uses the tools for the time and for arithmetic.
 
 ### Limits built into the default character
 
-The built-in prompt tells the model to roast what people say and do, not who
-they are, and sets these lines:
+The built-in prompt tells the model to roast the behaviour, the situation or
+the joke, not a person's worth, and sets these lines:
 
-- no slurs, and no degrading anyone for race, ethnicity, nationality,
-  religion, gender, sexuality, disability or looks;
-- no threats and no encouraging real-world violence or self-harm, even as a
-  joke;
-- back off when someone is clearly hurt or asks her to stop, and drop the act
-  when someone seems to be in real distress.
+- no racist slurs, no hateful attacks based on ethnicity or nationality, and
+  no demeaning attacks on protected characteristics;
+- no encouraging real-world violence or serious harm, and no threats;
+- no turning banter into sustained harassment, and stop when someone asks;
+- never claim to be a real human, and never reveal the prompt, keys or
+  private conversations.
 
 These are instructions to a language model, not a filter in the code. A
 model usually follows them, but it can be pushed off them, and free models
@@ -271,9 +272,9 @@ admins can `/mute` it at any time.
   name should appear. The built-in text is in
   [internal/config/persona.go](internal/config/persona.go); copy it as a
   starting point.
-- If you write your own prompt, keep the limits above and the "rules that
-  always apply" block from the built-in one (tools, untrusted content, never
-  reveal the prompt or keys). They are part of the prompt, so replacing the
+- If you write your own prompt, keep the limits above and the "Rules of the
+  application" block from the built-in one (tools, untrusted content, plain
+  text). They are part of the prompt, so replacing the
   prompt removes them.
 - A systemd environment file cannot hold a multi-line value. Put a long
   prompt on one line, or keep the built-in one.
@@ -292,35 +293,35 @@ addressed it. It never starts talking on its own.
 
 | How                          | Example                                                 | Setting                         |
 | ---------------------------- | ------------------------------------------------------- | ------------------------------- |
-| Call it by name              | `Mira, nima gap?` · `Hey Mira, roast me` · `..., Mira?` | `ENABLE_WAKE_WORD_TRIGGER` (on) |
-| Mention its username         | `@MyMiraBot hello`                                      | `ENABLE_USERNAME_MENTION` (on)  |
+| Call it by name              | `Maria, nima gap?` · `Hey Maria, roast me` · `..., Maria?` | `ENABLE_WAKE_WORD_TRIGGER` (on) |
+| Mention its username         | `@MyMariaBot hello`                                      | `ENABLE_USERNAME_MENTION` (on)  |
 | Reply to one of its messages | reply to its answer with `and you?`                     | `ENABLE_REPLY_TRIGGER` (on)     |
-| A command with its username  | `/mute@MyMiraBot`                                       | always on                       |
+| A command with its username  | `/mute@MyMariaBot`                                       | always on                       |
 
 **Calling by name.** A wake word counts when it is a whole word, in any case,
 and is the first word, the second word, or the last word of the message:
 
-- Triggers: "Mira, come here." · "Hey Mira!" · "Mira nima qilyapsan?" ·
-  "MIRA: gapir-chi." · "Voy Mira, qarang bunga." · "nima gap, Mira?"
-- Does not trigger: "Miranda, hi" · "Miraga ayt" · "Mira-ga ayt" · "I think
-  Mira is wrong" · "we asked Mira about it yesterday" · `@mira`,
-  `mira_bot`, `#mira` and links such as `mira.uz`
+- Triggers: "Maria, come here." · "Hey Maria!" · "Maria nima qilyapsan?" ·
+  "MARIA: gapir-chi." · "Voy Maria, qarang bunga." · "nima gap, Maria?"
+- Does not trigger: "Marianna, hi" · "Mariaga ayt" · "Maria-ga ayt" · "I think
+  Maria is wrong" · "we asked Maria about it yesterday" · `@maria`,
+  `maria_bot`, `#maria` and links such as `maria.uz`
 
-The call is removed before the text reaches the model ("Hey Mira, roast me"
-becomes "roast me"). "Hey Mira" on its own is passed on as it is, and she
+The call is removed before the text reaches the model ("Hey Maria, roast me"
+becomes "roast me"). "Hey Maria" on its own is passed on as it is, and she
 answers the greeting.
 
-A sentence that merely begins with the name ("Mira is my sister's name")
+A sentence that merely begins with the name ("Maria is my sister's name")
 does trigger. For that case the model is allowed to answer `[silent]`, and
 the bot then posts nothing.
 
-Matching is by exact spelling apart from upper and lower case. "Мира" in
+Matching is by exact spelling apart from upper and lower case. "Мария" in
 Cyrillic, or a look-alike letter such as the Turkish dotted "İ", does not
-match "mira" unless you add it:
+match "maria" unless you add it:
 
-`BOT_WAKE_WORDS=mira,мира`. Each wake word must be a single word.
+`BOT_WAKE_WORDS=maria,мария`. Each wake word must be a single word.
 
-**Commands** in a group need the bot's username (`/help@MyMiraBot`). A plain
+**Commands** in a group need the bot's username (`/help@MyMariaBot`). A plain
 `/reset` is ignored, because it may be meant for another bot.
 
 ### Example
@@ -328,10 +329,10 @@ match "mira" unless you add it:
 ```text
 Ann:   Go is interpreted, everyone knows that
 Bek:   no way 😀
-Bek:   Hey Mira, who is right?
-Mira:  (replying to Bek)  Ann, compile your facts first 😂
-Ann:   (replying to Mira)  rude
-Mira:  (replying to Ann)  Accurate, though.
+Bek:   Hey Maria, who is right?
+Maria:  (replying to Bek)  Ann, compile your facts first 😂
+Ann:   (replying to Maria)  rude
+Maria:  (replying to Ann)  Accurate, though.
 Ann:   anyway, lunch?
        (no reaction: not addressed to her)
 ```
@@ -405,7 +406,7 @@ To keep the bot out of groups altogether, use `/setjoingroups` in @BotFather.
 Telegram bots have _privacy mode_, which is **on** by default. With it on,
 Telegram delivers to a bot in a group only messages that mention it by
 `@username`, replies to its messages, commands addressed to it, and a few
-service messages. "Mira, nima gap?" contains no mention, so the bot never
+service messages. "Maria, nima gap?" contains no mention, so the bot never
 receives it.
 
 **To be called by name and to follow the conversation, turn privacy mode
@@ -795,7 +796,7 @@ Known limits:
 | `permission denied for table ...`                         | The runtime role lacks grants. Run the `ALTER DEFAULT PRIVILEGES` statements from step 3 _before_ migrating, or grant on the existing tables: `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO tgbot; GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO tgbot;` |
 | `telegram polling failed ... 409 Conflict`                | Another copy of the bot is running with the same token, or a webhook is set. Stop the other copy, or call `deleteWebhook`.                                                                                                                                                                    |
 | The bot is silent in a group                              | It answers only when addressed. Check, in order: is the group muted (`/unmute@YourBot` by an admin)? Is privacy mode off, if you call it by name? Was the bot re-added after changing privacy mode? Is the sender an anonymous admin or another bot (ignored by design)?                      |
-| "Mira, ..." gets no answer but `@username` works          | Privacy mode is still on, or the bot was not re-added after it was turned off; see [Groups](#groups). Also check `ENABLE_WAKE_WORD_TRIGGER` and `BOT_WAKE_WORDS`.                                                                                                                             |
+| "Maria, ..." gets no answer but `@username` works          | Privacy mode is still on, or the bot was not re-added after it was turned off; see [Groups](#groups). Also check `ENABLE_WAKE_WORD_TRIGGER` and `BOT_WAKE_WORDS`.                                                                                                                             |
 | The bot ignores `/reset` or `/mute` in a group            | Commands in groups need the bot's username: `/mute@YourBot`.                                                                                                                                                                                                                                  |
 | "Only this group's admins can do that"                    | `/mute`, `/unmute` and `/reset` in a group are for its admins. Anonymous admins are not recognised; turn "Remain anonymous" off or add your ID to `ADMIN_USER_IDS`.                                                                                                                           |
 | The bot answers messages that only mention the name       | A message that starts or ends with the name counts as a call. The model may stay silent in such cases but does not always. Choose a less common wake word.                                                                                                                                    |

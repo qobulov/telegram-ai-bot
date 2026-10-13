@@ -144,6 +144,7 @@ func startE2E(t *testing.T, update string, answer func([]modelMessage) string) *
 			"TELEGRAM_API_URL":    telegramServer.URL,
 			"OPENROUTER_API_KEY":  "test",
 			"OPENROUTER_BASE_URL": modelServer.URL,
+			"BOT_DISPLAY_NAME":    "Mira",
 			"DB_POSTGRES_URL":     databaseURL,
 		}[key]
 	})

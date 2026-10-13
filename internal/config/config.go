@@ -85,7 +85,7 @@ func Load(getenv func(string) string) (Config, error) {
 		TelegramAPIURL:    r.text("TELEGRAM_API_URL", "https://api.telegram.org"),
 		OpenRouterBaseURL: r.text("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
 		Model:             r.text("OPENROUTER_MODEL", "openrouter/free"),
-		BotDisplayName:    r.text("BOT_DISPLAY_NAME", "Mira"),
+		BotDisplayName:    r.text("BOT_DISPLAY_NAME", "Maria"),
 		GroupNote:         groupNote,
 
 		MaxHistoryMessages:     r.positive("MAX_HISTORY_MESSAGES", 20),

@@ -212,7 +212,7 @@ func TestLoadCharacterDefaults(t *testing.T) {
 	if !cfg.WakeWordTrigger || !cfg.MentionTrigger || !cfg.ReplyTrigger {
 		t.Errorf("triggers = wake %v, mention %v, reply %v", cfg.WakeWordTrigger, cfg.MentionTrigger, cfg.ReplyTrigger)
 	}
-	if cfg.BotDisplayName != "Mira" || len(cfg.WakeWords) != 1 || cfg.WakeWords[0] != "mira" {
+	if cfg.BotDisplayName != "Maria" || len(cfg.WakeWords) != 1 || cfg.WakeWords[0] != "maria" {
 		t.Errorf("name = %q, wake words = %q", cfg.BotDisplayName, cfg.WakeWords)
 	}
 	if cfg.AmbientMessages != 20 || cfg.MaxGroupReplyChars != 4000 || cfg.GroupRateLimitPerMinute != 10 {
@@ -230,7 +230,10 @@ func TestBuiltInPersona(t *testing.T) {
 	if !strings.Contains(cfg.PersonaPrompt, "You are Zara") || strings.Contains(cfg.PersonaPrompt, "{name}") {
 		t.Errorf("the name was not put into the persona: %.80q", cfg.PersonaPrompt)
 	}
-	for _, want := range []string{"slur", "untrusted", "threat"} {
+	if strings.Contains(cfg.PersonaPrompt, "Mira") {
+		t.Error("the built-in persona names the character directly instead of using the configured name")
+	}
+	for _, want := range []string{"slur", "untrusted", "threat", "never claim to be a real human", "calculator", "plain text"} {
 		if !strings.Contains(strings.ToLower(cfg.PersonaPrompt), want) {
 			t.Errorf("the built-in persona does not mention %q", want)
 		}
@@ -250,7 +253,7 @@ func TestCustomPersona(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.PersonaPrompt != "You are Mira, a grumpy cat. Mira hates Mondays." {
+	if cfg.PersonaPrompt != "You are Maria, a grumpy cat. Maria hates Mondays." {
 		t.Errorf("PersonaPrompt = %q", cfg.PersonaPrompt)
 	}
 }
