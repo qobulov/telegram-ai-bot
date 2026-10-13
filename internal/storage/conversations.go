@@ -22,13 +22,22 @@ const (
 	updateIDConstraint = "messages_update_id_key"
 )
 
-// Scope identifies one conversation: one user in one chat. In a private chat
-// the chat ID equals the user ID; in a group each member has their own
-// scope. Both IDs must come from the Telegram update, never from message
-// text, because the scope is what keeps conversations apart.
+// Scope identifies one conversation.
+//
+//   - Private chat: ChatID and UserID are both the user's ID.
+//   - Group: UserID is zero. The group has one conversation shared by all
+//     its members.
+//
+// Both IDs must come from the Telegram update, never from message text,
+// because the scope is what keeps conversations apart.
 type Scope struct {
 	ChatID int64
 	UserID int64
+}
+
+// Shared reports whether the scope is a group's shared conversation.
+func (s Scope) Shared() bool {
+	return s.UserID == 0
 }
 
 // Turn is one complete exchange to save: the user's message followed by
@@ -40,7 +49,11 @@ type Turn struct {
 	MessageID int64
 	// ReplyToMessageID is the message the incoming one replied to, if any.
 	ReplyToMessageID int64
-	Messages         []ai.Message
+	// AuthorID and AuthorName say who wrote the user message. They matter in
+	// a shared conversation, where the scope does not name the author.
+	AuthorID   int64
+	AuthorName string
+	Messages   []ai.Message
 }
 
 // History returns the most recent messages of one conversation, oldest first.
@@ -51,11 +64,11 @@ func (s *Store) History(ctx context.Context, scope Scope, limit int) ([]ai.Messa
 			SELECT m.id, m.role, m.content, m.tool_calls, m.tool_call_id
 			FROM messages m
 			JOIN conversations c ON c.id = m.conversation_id
-			WHERE c.chat_id = $1 AND c.user_id = $2
+			WHERE c.chat_id = $1 AND c.user_id IS NOT DISTINCT FROM $2
 			ORDER BY m.id DESC
 			LIMIT $3
 		) recent
-		ORDER BY id`, scope.ChatID, scope.UserID, limit)
+		ORDER BY id`, scope.ChatID, nonZero(scope.UserID), limit)
 	if err != nil {
 		return nil, fmt.Errorf("storage: load history: %w", err)
 	}
@@ -99,7 +112,7 @@ func (s *Store) SaveTurn(ctx context.Context, turn Turn) (int64, error) {
 	}
 	var answerID int64
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		conversationID, err := touchConversation(ctx, tx, turn.Scope)
+		conversationID, err := touchConversation(ctx, tx, turn)
 		if err != nil {
 			return err
 		}
@@ -115,21 +128,49 @@ func (s *Store) SaveTurn(ctx context.Context, turn Turn) (int64, error) {
 	return answerID, nil
 }
 
-// touchConversation makes sure the user and the conversation exist, marks
+// touchConversation makes sure the author and the conversation exist, marks
 // both as active now, and returns the conversation ID.
-func touchConversation(ctx context.Context, tx pgx.Tx, scope Scope) (int64, error) {
-	_, err := tx.Exec(ctx, `
-		INSERT INTO users (telegram_id) VALUES ($1)
-		ON CONFLICT (telegram_id) DO UPDATE SET last_seen_at = now()`, scope.UserID)
-	if err != nil {
+func touchConversation(ctx context.Context, tx pgx.Tx, turn Turn) (int64, error) {
+	if err := touchUser(ctx, tx, authorOf(turn)); err != nil {
 		return 0, err
 	}
 	var conversationID int64
-	err = tx.QueryRow(ctx, `
+	err := tx.QueryRow(ctx, upsertConversation(turn.Scope), turn.Scope.ChatID, nonZero(turn.Scope.UserID)).Scan(&conversationID)
+	return conversationID, err
+}
+
+// authorOf is the user who wrote the turn's message: the scope's user in a
+// private chat, the named author in a group.
+func authorOf(turn Turn) int64 {
+	if turn.Scope.Shared() {
+		return turn.AuthorID
+	}
+	return turn.Scope.UserID
+}
+
+func touchUser(ctx context.Context, tx pgx.Tx, userID int64) error {
+	if userID == 0 {
+		return nil
+	}
+	_, err := tx.Exec(ctx, `
+		INSERT INTO users (telegram_id) VALUES ($1)
+		ON CONFLICT (telegram_id) DO UPDATE SET last_seen_at = now()`, userID)
+	return err
+}
+
+// upsertConversation returns the statement for the scope's kind. The two
+// kinds are kept unique by different indexes, so the conflict target differs.
+func upsertConversation(scope Scope) string {
+	if scope.Shared() {
+		return `
+			INSERT INTO conversations (chat_id, user_id) VALUES ($1, $2)
+			ON CONFLICT (chat_id) WHERE user_id IS NULL DO UPDATE SET updated_at = now()
+			RETURNING id`
+	}
+	return `
 		INSERT INTO conversations (chat_id, user_id) VALUES ($1, $2)
 		ON CONFLICT (chat_id, user_id) DO UPDATE SET updated_at = now()
-		RETURNING id`, scope.ChatID, scope.UserID).Scan(&conversationID)
-	return conversationID, err
+		RETURNING id`
 }
 
 // insertMessages writes the turn's messages in order and returns the row ID
@@ -144,11 +185,12 @@ func insertMessages(ctx context.Context, tx pgx.Tx, conversationID int64, turn T
 		ids := telegramIDs(turn, i)
 		err = tx.QueryRow(ctx, `
 			INSERT INTO messages (conversation_id, role, content, tool_calls, tool_call_id,
-			                      update_id, telegram_message_id, reply_to_message_id)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			                      update_id, telegram_message_id, reply_to_message_id,
+			                      author_id, author_name)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			RETURNING id`,
 			conversationID, msg.Role, msg.Content, toolCalls, nullable(msg.ToolCallID),
-			ids.update, ids.message, ids.replyTo).Scan(&lastID)
+			ids.update, ids.message, ids.replyTo, ids.authorID, ids.authorName).Scan(&lastID)
 		if err != nil {
 			return 0, err
 		}
@@ -160,6 +202,7 @@ func insertMessages(ctx context.Context, tx pgx.Tx, conversationID int64, turn T
 // value is stored as NULL.
 type rowIDs struct {
 	update, message, replyTo any
+	authorID, authorName     any
 }
 
 // telegramIDs decides which identifiers belong on the message at index. The
@@ -170,7 +213,13 @@ type rowIDs struct {
 func telegramIDs(turn Turn, index int) rowIDs {
 	switch index {
 	case 0:
-		return rowIDs{update: turn.UpdateID, message: nonZero(turn.MessageID), replyTo: nonZero(turn.ReplyToMessageID)}
+		return rowIDs{
+			update:     turn.UpdateID,
+			message:    nonZero(turn.MessageID),
+			replyTo:    nonZero(turn.ReplyToMessageID),
+			authorID:   nonZero(turn.AuthorID),
+			authorName: nullable(turn.AuthorName),
+		}
 	case len(turn.Messages) - 1:
 		return rowIDs{replyTo: nonZero(turn.MessageID)}
 	default:
@@ -233,7 +282,9 @@ func (s *Store) UpdateProcessed(ctx context.Context, updateID int64) (bool, erro
 // foreign key's ON DELETE CASCADE, within the same statement, so the deletion
 // is atomic. Other conversations of the same user, in other chats, are kept.
 func (s *Store) Reset(ctx context.Context, scope Scope) error {
-	_, err := s.pool.Exec(ctx, `DELETE FROM conversations WHERE chat_id = $1 AND user_id = $2`, scope.ChatID, scope.UserID)
+	_, err := s.pool.Exec(ctx,
+		`DELETE FROM conversations WHERE chat_id = $1 AND user_id IS NOT DISTINCT FROM $2`,
+		scope.ChatID, nonZero(scope.UserID))
 	if err != nil {
 		return fmt.Errorf("storage: reset conversation: %w", err)
 	}

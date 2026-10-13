@@ -43,7 +43,7 @@ func newTestStore(t *testing.T) *Store {
 	}
 	t.Cleanup(store.Close)
 
-	if _, err := store.pool.Exec(ctx, `DROP TABLE IF EXISTS messages, conversations, users, schema_migrations CASCADE`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DROP TABLE IF EXISTS messages, conversations, users, chats, schema_migrations CASCADE`); err != nil {
 		t.Fatalf("drop tables: %v", err)
 	}
 	if _, err := store.Migrate(ctx); err != nil {
@@ -104,7 +104,7 @@ func TestMigrateIsIdempotent(t *testing.T) {
 func TestMigrateReportsAppliedCount(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
-	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, schema_migrations CASCADE`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, schema_migrations CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 
@@ -461,7 +461,7 @@ func TestSaveTurnStoresNoIDsWhenNoneGiven(t *testing.T) {
 func TestMigrationKeepsExistingPrivateConversations(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
-	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, schema_migrations CASCADE`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, schema_migrations CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.migrateTo(ctx, 1); err != nil {
@@ -495,6 +495,185 @@ func TestMigrationKeepsExistingPrivateConversations(t *testing.T) {
 	saveIn(t, store, private(alice), 6, turn("after", "ok"))
 	if got := historyIn(t, store, private(alice)); len(got) != 4 {
 		t.Errorf("history after a new turn = %+v", got)
+	}
+}
+
+// shared is a group's single conversation with the bot.
+func shared(chatID int64) Scope {
+	return Scope{ChatID: chatID}
+}
+
+const otherGroup = int64(-1009999999999)
+
+func saveBy(t *testing.T, store *Store, scope Scope, updateID, authorID int64, name string, msgs []ai.Message) {
+	t.Helper()
+	_, err := store.SaveTurn(context.Background(), Turn{
+		Scope: scope, UpdateID: updateID, AuthorID: authorID, AuthorName: name, Messages: msgs,
+	})
+	if err != nil {
+		t.Fatalf("SaveTurn: %v", err)
+	}
+}
+
+func TestSharedGroupConversationCollectsAllMembers(t *testing.T) {
+	store := newTestStore(t)
+	saveBy(t, store, shared(group), 1, alice, "Alice", turn("Alice: roast me", "no material needed"))
+	saveBy(t, store, shared(group), 2, bob, "Bob", turn("Bob: me too", "you first"))
+
+	got := historyIn(t, store, shared(group))
+	want := []string{"Alice: roast me", "no material needed", "Bob: me too", "you first"}
+	if len(got) != len(want) {
+		t.Fatalf("shared history = %+v", got)
+	}
+	for i, content := range want {
+		if got[i].Content != content {
+			t.Errorf("history[%d] = %q, want %q", i, got[i].Content, content)
+		}
+	}
+	if rows := countRows(t, store, "conversations"); rows != 1 {
+		t.Errorf("conversations rows = %d, want one shared conversation", rows)
+	}
+}
+
+func TestSharedGroupScopeIsSeparateFromEverythingElse(t *testing.T) {
+	store := newTestStore(t)
+	saveBy(t, store, shared(group), 1, alice, "Alice", turn("in the group", "group answer"))
+	saveBy(t, store, shared(otherGroup), 2, alice, "Alice", turn("in another group", "other answer"))
+	saveIn(t, store, private(alice), 3, turn("in private", "private answer"))
+
+	for name, tc := range map[string]struct {
+		scope Scope
+		want  string
+	}{
+		"group":         {shared(group), "in the group"},
+		"another group": {shared(otherGroup), "in another group"},
+		"private":       {private(alice), "in private"},
+	} {
+		got := historyIn(t, store, tc.scope)
+		if len(got) != 2 || got[0].Content != tc.want {
+			t.Errorf("%s history = %+v", name, got)
+		}
+	}
+}
+
+func TestResetOfSharedScopeLeavesOtherScopes(t *testing.T) {
+	store := newTestStore(t)
+	saveBy(t, store, shared(group), 1, alice, "Alice", turn("q", "a"))
+	saveBy(t, store, shared(otherGroup), 2, alice, "Alice", turn("q", "a"))
+	saveIn(t, store, private(alice), 3, turn("q", "a"))
+
+	if err := store.Reset(context.Background(), shared(group)); err != nil {
+		t.Fatalf("Reset: %v", err)
+	}
+	if got := historyIn(t, store, shared(group)); len(got) != 0 {
+		t.Errorf("group history after reset = %+v", got)
+	}
+	if len(historyIn(t, store, shared(otherGroup))) != 2 || len(historyIn(t, store, private(alice))) != 2 {
+		t.Error("resetting one group removed another scope's history")
+	}
+}
+
+func TestAuthorIsStoredOnTheUserMessage(t *testing.T) {
+	store := newTestStore(t)
+	saveBy(t, store, shared(group), 1, bob, "Bob", turn("Bob: hi", "hello"))
+
+	rows, err := store.pool.Query(context.Background(), `SELECT role, author_id, author_name FROM messages ORDER BY id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	type authored struct {
+		role string
+		id   *int64
+		name *string
+	}
+	var got []authored
+	for rows.Next() {
+		var row authored
+		if err := rows.Scan(&row.role, &row.id, &row.name); err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, row)
+	}
+	if len(got) != 2 || got[0].id == nil || *got[0].id != bob || got[0].name == nil || *got[0].name != "Bob" {
+		t.Fatalf("user row author = %+v", got)
+	}
+	if got[1].id != nil || got[1].name != nil {
+		t.Errorf("the assistant row carries an author: %+v", got[1])
+	}
+}
+
+func TestMuteStateIsPersisted(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	muted := func() []int64 {
+		t.Helper()
+		chats, err := store.MutedChats(ctx)
+		if err != nil {
+			t.Fatalf("MutedChats: %v", err)
+		}
+		return chats
+	}
+
+	if got := muted(); len(got) != 0 {
+		t.Fatalf("muted chats in a new database = %v", got)
+	}
+	for range 2 { // muting twice is not an error
+		if err := store.SetMuted(ctx, group, true, alice); err != nil {
+			t.Fatalf("SetMuted: %v", err)
+		}
+	}
+	if err := store.SetMuted(ctx, otherGroup, false, alice); err != nil {
+		t.Fatalf("SetMuted: %v", err)
+	}
+	if got := muted(); len(got) != 1 || got[0] != group {
+		t.Errorf("muted chats = %v, want [%d]", got, group)
+	}
+
+	if err := store.SetMuted(ctx, group, false, bob); err != nil {
+		t.Fatalf("SetMuted: %v", err)
+	}
+	if got := muted(); len(got) != 0 {
+		t.Errorf("muted chats after unmuting = %v", got)
+	}
+}
+
+// A database at version 2 has private conversations and per-member group
+// conversations. Migration 0003 must keep the private ones readable and
+// start each group with an empty shared conversation.
+func TestMigrationToSharedGroups(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, schema_migrations CASCADE`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.migrateTo(ctx, 2); err != nil {
+		t.Fatalf("migrate to version 2: %v", err)
+	}
+	// Seeded with SQL: the current code writes columns version 2 lacks.
+	_, err := store.pool.Exec(ctx, `
+		INSERT INTO users (telegram_id) VALUES (1001);
+		INSERT INTO conversations (chat_id, user_id) VALUES (1001, 1001), (-1001234567890, 1001);
+		INSERT INTO messages (conversation_id, role, content)
+			SELECT id, 'user', CASE WHEN chat_id = user_id THEN 'private before' ELSE 'per-member before' END FROM conversations;
+		INSERT INTO messages (conversation_id, role, content)
+			SELECT id, 'assistant', 'ok' FROM conversations;`)
+	if err != nil {
+		t.Fatalf("seed version 2 data: %v", err)
+	}
+
+	if _, err := store.Migrate(ctx); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+	if got := historyIn(t, store, private(alice)); len(got) != 2 || got[0].Content != "private before" {
+		t.Errorf("private history after migration = %+v", got)
+	}
+	if got := historyIn(t, store, shared(group)); len(got) != 0 {
+		t.Errorf("shared group history after migration = %+v, want empty", got)
+	}
+	saveBy(t, store, shared(group), 3, alice, "Alice", turn("Alice: after", "ok"))
+	if got := historyIn(t, store, shared(group)); len(got) != 2 {
+		t.Errorf("shared group history after a new turn = %+v", got)
 	}
 }
 
