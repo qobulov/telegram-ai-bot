@@ -15,29 +15,48 @@ type Update struct {
 }
 
 // Message is an incoming chat message. Text is empty for photos, stickers,
-// documents and other non-text content.
+// documents and other non-text content; a photo or document may carry a
+// Caption instead.
 type Message struct {
-	MessageID int64  `json:"message_id"`
-	From      *User  `json:"from"`
-	Chat      Chat   `json:"chat"`
-	Text      string `json:"text"`
+	MessageID       int64           `json:"message_id"`
+	From            *User           `json:"from"`
+	Chat            Chat            `json:"chat"`
+	Text            string          `json:"text"`
+	Entities        []MessageEntity `json:"entities"`
+	Caption         string          `json:"caption"`
+	CaptionEntities []MessageEntity `json:"caption_entities"`
+	// ReplyToMessage is the message this one replies to, if any.
+	ReplyToMessage *Message `json:"reply_to_message"`
 }
 
-// User is the sender of a message.
+// User is a Telegram account: the sender of a message, or the bot itself.
 type User struct {
-	ID    int64 `json:"id"`
-	IsBot bool  `json:"is_bot"`
+	ID       int64  `json:"id"`
+	IsBot    bool   `json:"is_bot"`
+	Username string `json:"username"`
 }
 
-// Chat is where a message was sent. Type is "private", "group", "supergroup"
-// or "channel".
+// Chat is where a message was sent.
 type Chat struct {
 	ID   int64  `json:"id"`
 	Type string `json:"type"`
 }
 
-// ChatTypePrivate is the Chat.Type of a one-to-one conversation with the bot.
-const ChatTypePrivate = "private"
+// Chat types. Channels are not handled by the bot.
+const (
+	ChatTypePrivate    = "private"
+	ChatTypeGroup      = "group"
+	ChatTypeSupergroup = "supergroup"
+)
+
+// Outgoing is a text message to send.
+type Outgoing struct {
+	ChatID int64
+	Text   string
+	// ReplyToMessageID makes the message a reply to that message in the same
+	// chat. Zero sends an ordinary message.
+	ReplyToMessageID int64
+}
 
 // APIError is an error returned by the Bot API.
 type APIError struct {

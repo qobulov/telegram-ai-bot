@@ -20,7 +20,7 @@ const (
 
 // Sender delivers a text message to a chat.
 type Sender interface {
-	SendMessage(ctx context.Context, chatID int64, text string) error
+	SendMessage(ctx context.Context, msg telegram.Outgoing) (messageID int64, err error)
 }
 
 // Replier answers a user's message.
@@ -163,7 +163,7 @@ func (s *Service) stop() {
 func (s *Service) reply(chatID int64, text string) {
 	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
 	defer cancel()
-	if err := s.opts.Sender.SendMessage(ctx, chatID, text); err != nil {
+	if _, err := s.opts.Sender.SendMessage(ctx, telegram.Outgoing{ChatID: chatID, Text: text}); err != nil {
 		s.opts.Logger.Error("send message failed", "chat_id", chatID, "error", err)
 	}
 }

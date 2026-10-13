@@ -77,34 +77,73 @@ func (c *Client) GetUpdates(ctx context.Context, offset int64, timeoutSeconds in
 	return updates, nil
 }
 
-type sendMessageParams struct {
-	ChatID int64  `json:"chat_id"`
-	Text   string `json:"text"`
+// GetMe returns the bot's own account. Its ID and username are what
+// mentions of the bot and replies to it are matched against.
+func (c *Client) GetMe(ctx context.Context) (User, error) {
+	var me User
+	if err := c.call(ctx, "getMe", struct{}{}, &me); err != nil {
+		return User{}, err
+	}
+	return me, nil
 }
 
-// SendMessage sends plain text, splitting it into several messages when it
-// is longer than Telegram allows. Text is sent without a parse mode so that
-// stray Markdown or HTML in a model reply can never make the send fail.
-func (c *Client) SendMessage(ctx context.Context, chatID int64, text string) error {
-	for _, chunk := range Split(text, MessageLimit) {
+type sendMessageParams struct {
+	ChatID          int64            `json:"chat_id"`
+	Text            string           `json:"text"`
+	ReplyParameters *replyParameters `json:"reply_parameters,omitempty"`
+}
+
+type replyParameters struct {
+	MessageID int64 `json:"message_id"`
+	// AllowSendingWithoutReply sends the message as an ordinary one when the
+	// original was deleted in the meantime, instead of failing.
+	AllowSendingWithoutReply bool `json:"allow_sending_without_reply"`
+}
+
+type sentMessage struct {
+	MessageID int64 `json:"message_id"`
+}
+
+// SendMessage sends plain text and returns the ID of the message Telegram
+// created. Text longer than Telegram allows is split into several messages;
+// only the first is a reply, and its ID is the one returned. Text is sent
+// without a parse mode so that stray Markdown or HTML in a model reply can
+// never make the send fail.
+func (c *Client) SendMessage(ctx context.Context, msg Outgoing) (int64, error) {
+	var firstID int64
+	reply := replyTo(msg.ReplyToMessageID)
+	for _, chunk := range Split(msg.Text, MessageLimit) {
 		if strings.TrimSpace(chunk) == "" {
 			continue
 		}
-		if err := c.sendChunk(ctx, sendMessageParams{ChatID: chatID, Text: chunk}); err != nil {
-			return err
+		id, err := c.sendChunk(ctx, sendMessageParams{ChatID: msg.ChatID, Text: chunk, ReplyParameters: reply})
+		if err != nil {
+			return firstID, err
 		}
+		if firstID == 0 {
+			firstID = id
+		}
+		reply = nil
 	}
-	return nil
+	return firstID, nil
 }
 
-func (c *Client) sendChunk(ctx context.Context, params sendMessageParams) error {
+func replyTo(messageID int64) *replyParameters {
+	if messageID == 0 {
+		return nil
+	}
+	return &replyParameters{MessageID: messageID, AllowSendingWithoutReply: true}
+}
+
+func (c *Client) sendChunk(ctx context.Context, params sendMessageParams) (int64, error) {
 	for attempt := 1; ; attempt++ {
-		err := c.call(ctx, "sendMessage", params, nil)
+		var sent sentMessage
+		err := c.call(ctx, "sendMessage", params, &sent)
 		if err == nil || attempt >= maxSendAttempts || !isRateLimited(err) {
-			return err
+			return sent.MessageID, err
 		}
 		if err := sleep(ctx, c.retryDelay(attempt, err)); err != nil {
-			return err
+			return 0, err
 		}
 	}
 }

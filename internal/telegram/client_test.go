@@ -112,7 +112,7 @@ func TestAPIErrorIsDecoded(t *testing.T) {
 func TestSendMessageSendsPlainText(t *testing.T) {
 	client, api := newTestClient(t, okSent)
 
-	if err := client.SendMessage(context.Background(), 42, "hello *world*"); err != nil {
+	if _, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: "hello *world*"}); err != nil {
 		t.Fatalf("SendMessage: %v", err)
 	}
 	sent := api.recorded()[0]
@@ -128,7 +128,7 @@ func TestSendMessageSplitsLongText(t *testing.T) {
 	client, api := newTestClient(t, okSent)
 	text := strings.Repeat("a", 4000) + "\n" + strings.Repeat("b", 999)
 
-	if err := client.SendMessage(context.Background(), 42, text); err != nil {
+	if _, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: text}); err != nil {
 		t.Fatalf("SendMessage: %v", err)
 	}
 	calls := api.recorded()
@@ -145,7 +145,7 @@ func TestSendMessageSplitsLongText(t *testing.T) {
 func TestSendMessageSkipsBlankText(t *testing.T) {
 	client, api := newTestClient(t, okSent)
 
-	if err := client.SendMessage(context.Background(), 42, " \n "); err != nil {
+	if _, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: " \n "}); err != nil {
 		t.Fatalf("SendMessage: %v", err)
 	}
 	if calls := api.recorded(); len(calls) != 0 {
@@ -159,7 +159,7 @@ func TestSendMessageRetriesRateLimit(t *testing.T) {
 		okSent,
 	)
 
-	if err := client.SendMessage(context.Background(), 42, "hi"); err != nil {
+	if _, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: "hi"}); err != nil {
 		t.Fatalf("SendMessage: %v", err)
 	}
 	if calls := api.recorded(); len(calls) != 2 {
@@ -170,7 +170,7 @@ func TestSendMessageRetriesRateLimit(t *testing.T) {
 func TestSendMessageGivesUpOnPersistentRateLimit(t *testing.T) {
 	client, api := newTestClient(t, `{"ok":false,"error_code":429,"description":"Too Many Requests"}`)
 
-	err := client.SendMessage(context.Background(), 42, "hi")
+	_, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: "hi"})
 	var apiErr *APIError
 	if !errors.As(err, &apiErr) || apiErr.Code != 429 {
 		t.Fatalf("err = %v", err)
@@ -183,11 +183,114 @@ func TestSendMessageGivesUpOnPersistentRateLimit(t *testing.T) {
 func TestSendMessageDoesNotRetryOtherErrors(t *testing.T) {
 	client, api := newTestClient(t, `{"ok":false,"error_code":403,"description":"Forbidden: bot was blocked by the user"}`)
 
-	if err := client.SendMessage(context.Background(), 42, "hi"); err == nil {
+	if _, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: "hi"}); err == nil {
 		t.Fatal("expected error")
 	}
 	if calls := api.recorded(); len(calls) != 1 {
 		t.Errorf("calls = %d, want 1", len(calls))
+	}
+}
+
+func TestGetMeReturnsBotIdentity(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"id":777,"is_bot":true,"username":"MyAssistantBot"}}`)
+
+	me, err := client.GetMe(context.Background())
+	if err != nil {
+		t.Fatalf("GetMe: %v", err)
+	}
+	if me.ID != 777 || me.Username != "MyAssistantBot" || !me.IsBot {
+		t.Errorf("me = %+v", me)
+	}
+	if got := api.recorded()[0].method; got != "getMe" {
+		t.Errorf("method = %q", got)
+	}
+}
+
+func TestGetUpdatesParsesEntitiesAndReply(t *testing.T) {
+	client, _ := newTestClient(t, `{"ok":true,"result":[{"update_id":7,"message":{
+		"message_id":30,"from":{"id":42,"username":"ann"},"chat":{"id":-100123,"type":"supergroup"},
+		"text":"@MyBot hi","entities":[{"type":"mention","offset":0,"length":6},
+			{"type":"text_mention","offset":7,"length":2,"user":{"id":777}}],
+		"caption":"cap","caption_entities":[{"type":"mention","offset":0,"length":3}],
+		"reply_to_message":{"message_id":29,"from":{"id":777,"is_bot":true},"chat":{"id":-100123,"type":"supergroup"},"text":"earlier answer"}}}]}`)
+
+	updates, err := client.GetUpdates(context.Background(), 0, 0)
+	if err != nil {
+		t.Fatalf("GetUpdates: %v", err)
+	}
+	msg := updates[0].Message
+	if msg.MessageID != 30 || msg.Chat.ID != -100123 || msg.Chat.Type != ChatTypeSupergroup || msg.From.Username != "ann" {
+		t.Errorf("message = %+v", msg)
+	}
+	if len(msg.Entities) != 2 || msg.Entities[0].Type != EntityMention || msg.Entities[0].Length != 6 {
+		t.Fatalf("entities = %+v", msg.Entities)
+	}
+	if mention := msg.Entities[1]; mention.Type != EntityTextMention || mention.User == nil || mention.User.ID != 777 {
+		t.Errorf("text_mention = %+v", mention)
+	}
+	if msg.Caption != "cap" || len(msg.CaptionEntities) != 1 {
+		t.Errorf("caption = %q, %+v", msg.Caption, msg.CaptionEntities)
+	}
+	replied := msg.ReplyToMessage
+	if replied == nil || replied.MessageID != 29 || replied.From.ID != 777 || replied.Text != "earlier answer" {
+		t.Errorf("reply_to_message = %+v", replied)
+	}
+}
+
+func TestSendMessageRepliesToOriginalMessage(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"message_id":501}}`)
+
+	sentID, err := client.SendMessage(context.Background(), Outgoing{ChatID: -100123, Text: "answer", ReplyToMessageID: 30})
+	if err != nil {
+		t.Fatalf("SendMessage: %v", err)
+	}
+	if sentID != 501 {
+		t.Errorf("sent message ID = %d, want 501", sentID)
+	}
+	sent := api.recorded()[0]
+	if sent.params["chat_id"] != float64(-100123) {
+		t.Errorf("chat_id = %v", sent.params["chat_id"])
+	}
+	reply, _ := sent.params["reply_parameters"].(map[string]any)
+	if reply["message_id"] != float64(30) || reply["allow_sending_without_reply"] != true {
+		t.Errorf("reply_parameters = %v", sent.params["reply_parameters"])
+	}
+}
+
+func TestSendMessageWithoutReplyTargetOmitsReplyParameters(t *testing.T) {
+	client, api := newTestClient(t, okSent)
+
+	if _, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: "hi"}); err != nil {
+		t.Fatalf("SendMessage: %v", err)
+	}
+	if _, present := api.recorded()[0].params["reply_parameters"]; present {
+		t.Error("reply_parameters sent for a message that replies to nothing")
+	}
+}
+
+func TestSendMessageRepliesOnlyWithFirstChunk(t *testing.T) {
+	client, api := newTestClient(t,
+		`{"ok":true,"result":{"message_id":10}}`,
+		`{"ok":true,"result":{"message_id":11}}`,
+	)
+	text := strings.Repeat("a", 4000) + "\n" + strings.Repeat("b", 999)
+
+	sentID, err := client.SendMessage(context.Background(), Outgoing{ChatID: 1, Text: text, ReplyToMessageID: 30})
+	if err != nil {
+		t.Fatalf("SendMessage: %v", err)
+	}
+	if sentID != 10 {
+		t.Errorf("sent message ID = %d, want the first chunk's 10", sentID)
+	}
+	calls := api.recorded()
+	if len(calls) != 2 {
+		t.Fatalf("calls = %d, want 2", len(calls))
+	}
+	if _, present := calls[0].params["reply_parameters"]; !present {
+		t.Error("first chunk does not reply to the original message")
+	}
+	if _, present := calls[1].params["reply_parameters"]; present {
+		t.Error("second chunk also carries reply_parameters")
 	}
 }
 

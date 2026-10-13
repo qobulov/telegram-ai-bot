@@ -17,8 +17,9 @@ import (
 const adminID, userID = int64(1), int64(2)
 
 type sentMessage struct {
-	chatID int64
-	text   string
+	chatID  int64
+	text    string
+	replyTo int64
 }
 
 type fakeSender struct {
@@ -26,14 +27,14 @@ type fakeSender struct {
 	sent []sentMessage
 }
 
-func (f *fakeSender) SendMessage(ctx context.Context, chatID int64, text string) error {
+func (f *fakeSender) SendMessage(ctx context.Context, msg telegram.Outgoing) (int64, error) {
 	if err := ctx.Err(); err != nil {
-		return err // like a real client, an expired context sends nothing
+		return 0, err // like a real client, an expired context sends nothing
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.sent = append(f.sent, sentMessage{chatID: chatID, text: text})
-	return nil
+	f.sent = append(f.sent, sentMessage{chatID: msg.ChatID, text: msg.Text, replyTo: msg.ReplyToMessageID})
+	return int64(1000 + len(f.sent)), nil
 }
 
 func (f *fakeSender) messages() []sentMessage {
