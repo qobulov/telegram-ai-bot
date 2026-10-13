@@ -24,7 +24,7 @@ func Open(ctx context.Context, databaseURL string) (*Store, error) {
 	cfg, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
 		// The parse error can echo the URL, which contains the password.
-		return nil, errors.New("storage: db_POSTGRES_URL is not a valid PostgreSQL connection string")
+		return nil, errors.New("storage: DB_POSTGRES_URL is not a valid PostgreSQL connection string")
 	}
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {

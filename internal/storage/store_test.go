@@ -27,14 +27,14 @@ func inGroup(userID int64) Scope {
 	return Scope{ChatID: group, UserID: userID}
 }
 
-// newTestStore connects to the database named by TEST_db_POSTGRES_URL and
+// newTestStore connects to the database named by TEST_DB_POSTGRES_URL and
 // rebuilds the schema from scratch. It DROPS the bot's tables, so point it
 // only at a disposable database. Without the variable the test is skipped.
 func newTestStore(t *testing.T) *Store {
 	t.Helper()
-	url := os.Getenv("TEST_db_POSTGRES_URL")
+	url := os.Getenv("TEST_DB_POSTGRES_URL")
 	if url == "" {
-		t.Skip("TEST_db_POSTGRES_URL is not set; skipping PostgreSQL integration test")
+		t.Skip("TEST_DB_POSTGRES_URL is not set; skipping PostgreSQL integration test")
 	}
 	ctx := context.Background()
 	store, err := Open(ctx, url)

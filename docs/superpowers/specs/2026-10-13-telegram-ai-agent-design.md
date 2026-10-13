@@ -66,7 +66,7 @@ first if present and never overrides variables that are already set.
 | ---------------------------- | ------------------------------ | --------------------------------------------- |
 | `TELEGRAM_BOT_TOKEN`         | required                       |                                               |
 | `OPENROUTER_API_KEY`         | required                       |                                               |
-| `db_POSTGRES_URL`            | required                       |                                               |
+| `DB_POSTGRES_URL`            | required                       |                                               |
 | `OPENROUTER_MODEL`           | `openrouter/free`              |                                               |
 | `OPENROUTER_BASE_URL`        | `https://openrouter.ai/api/v1` |                                               |
 | `TELEGRAM_API_URL`           | `https://api.telegram.org`     |                                               |
@@ -269,7 +269,7 @@ the turn in progress, bounded by the turn timeout, then the pool is closed.
   backpressure, unsupported message types, per-user ordering.
 - `storage`: integration tests for history, reset, cross-user isolation,
   duplicate update IDs, retention and migrations. They run only when
-  `TEST_db_POSTGRES_URL` is set and skip otherwise.
+  `TEST_DB_POSTGRES_URL` is set and skip otherwise.
 
 ## Deployment and docs
 

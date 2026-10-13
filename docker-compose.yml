@@ -2,7 +2,7 @@
 # primary one.
 #
 # Usage:
-#   cp .env.example .env        # fill in the tokens; db_POSTGRES_URL is set below
+#   cp .env.example .env        # fill in the tokens; DB_POSTGRES_URL is set below
 #   echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)" >> .env
 #   docker compose up -d --build
 #
@@ -34,7 +34,7 @@ services:
     command: ["migrate"]
     env_file: .env
     environment:
-      db_POSTGRES_URL: postgres://tgbot:${POSTGRES_PASSWORD}@db:5432/tgbot?sslmode=disable
+      DB_POSTGRES_URL: postgres://tgbot:${POSTGRES_PASSWORD}@db:5432/tgbot?sslmode=disable
     depends_on:
       db:
         condition: service_healthy
@@ -44,7 +44,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      db_POSTGRES_URL: postgres://tgbot:${POSTGRES_PASSWORD}@db:5432/tgbot?sslmode=disable
+      DB_POSTGRES_URL: postgres://tgbot:${POSTGRES_PASSWORD}@db:5432/tgbot?sslmode=disable
     depends_on:
       migrate:
         condition: service_completed_successfully

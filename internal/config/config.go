@@ -81,7 +81,7 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg := Config{
 		TelegramToken:     r.required("TELEGRAM_BOT_TOKEN"),
 		OpenRouterAPIKey:  r.required("OPENROUTER_API_KEY"),
-		DatabaseURL:       r.required("db_POSTGRES_URL"),
+		DatabaseURL:       r.required("DB_POSTGRES_URL"),
 		TelegramAPIURL:    r.text("TELEGRAM_API_URL", "https://api.telegram.org"),
 		OpenRouterBaseURL: r.text("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
 		Model:             r.text("OPENROUTER_MODEL", "openrouter/free"),

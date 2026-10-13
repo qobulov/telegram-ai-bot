@@ -126,7 +126,7 @@ in the environment win over the file.
 | ----------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
 | `TELEGRAM_BOT_TOKEN`          | required                       | Token from [@BotFather](https://t.me/BotFather)                                                              |
 | `OPENROUTER_API_KEY`          | required                       | Key from <https://openrouter.ai/keys>                                                                        |
-| `db_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
+| `DB_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
 | `OPENROUTER_MODEL`            | `openrouter/free`              | Model ID, see [Choosing a model](#choosing-a-model)                                                          |
 | `MAX_OUTPUT_TOKENS`           | `1024`                         | Longest model reply, in tokens                                                                               |
 | `BOT_DISPLAY_NAME`            | `Mira`                         | The character's name                                                                                         |
@@ -173,7 +173,7 @@ createdb tgbot
 # 2. Configure
 cp .env.example .env
 # Edit .env: set TELEGRAM_BOT_TOKEN, OPENROUTER_API_KEY and, for example,
-# db_POSTGRES_URL=postgres://localhost:5432/tgbot?sslmode=disable
+# DB_POSTGRES_URL=postgres://localhost:5432/tgbot?sslmode=disable
 
 # 3. Create the tables
 make migrate
@@ -202,11 +202,11 @@ No test talks to Telegram or OpenRouter; both are replaced by local fake
 servers.
 
 The storage tests and the end-to-end test need a real PostgreSQL database and
-are skipped unless `TEST_db_POSTGRES_URL` is set:
+are skipped unless `TEST_DB_POSTGRES_URL` is set:
 
 ```bash
 createdb tgbot_test
-TEST_db_POSTGRES_URL='postgres://localhost:5432/tgbot_test?sslmode=disable' go test -p 1 ./...
+TEST_DB_POSTGRES_URL='postgres://localhost:5432/tgbot_test?sslmode=disable' go test -p 1 ./...
 ```
 
 **Use a disposable database.** These tests drop and recreate the bot's
@@ -519,7 +519,7 @@ Put one `KEY=value` per line, without quotes:
 TELEGRAM_BOT_TOKEN=123456:your-token
 OPENROUTER_API_KEY=sk-or-your-key
 OPENROUTER_MODEL=openrouter/free
-db_POSTGRES_URL=postgres://tgbot:RUNTIME_PASSWORD_HERE@127.0.0.1:5432/tgbot?sslmode=disable
+DB_POSTGRES_URL=postgres://tgbot:RUNTIME_PASSWORD_HERE@127.0.0.1:5432/tgbot?sslmode=disable
 LOG_LEVEL=info
 ```
 
@@ -531,11 +531,11 @@ machine. A systemd environment file cannot hold a multi-line value; keep
 ### 6. Apply migrations
 
 Migrations run as the owner role. The `migrate` command needs only
-`db_POSTGRES_URL`, not the bot's other secrets:
+`DB_POSTGRES_URL`, not the bot's other secrets:
 
 ```bash
 sudo -u tgbot env \
-  db_POSTGRES_URL='postgres://tgbot_owner:OWNER_PASSWORD_HERE@127.0.0.1:5432/tgbot?sslmode=disable' \
+  DB_POSTGRES_URL='postgres://tgbot_owner:OWNER_PASSWORD_HERE@127.0.0.1:5432/tgbot?sslmode=disable' \
   /usr/local/bin/telegram-ai-agent migrate
 
 # The running bot only needs to read the migration history.
@@ -633,7 +633,7 @@ docker compose logs -f bot
 ```
 
 Compose starts PostgreSQL, applies migrations, then starts the bot.
-`db_POSTGRES_URL` is set by the compose file, so the value in `.env` is ignored.
+`DB_POSTGRES_URL` is set by the compose file, so the value in `.env` is ignored.
 The database publishes no ports. This setup uses a single database role for
 simplicity; prefer the systemd deployment when you want the restricted
 runtime role.
@@ -792,7 +792,7 @@ Known limits:
 | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `invalid configuration: X is required`                    | The variable is missing. Check `.env` or `/etc/telegram-ai-agent/env`.                                                                                                                                                                                                                        |
 | `database schema is out of date; run the migrate command` | Run `make migrate` locally, or step 6 on the server.                                                                                                                                                                                                                                          |
-| `database is unreachable`                                 | PostgreSQL is not running, or host, port, user or password in `db_POSTGRES_URL` is wrong. Try `psql "$db_POSTGRES_URL"`.                                                                                                                                                                      |
+| `database is unreachable`                                 | PostgreSQL is not running, or host, port, user or password in `DB_POSTGRES_URL` is wrong. Try `psql "$DB_POSTGRES_URL"`.                                                                                                                                                                      |
 | `permission denied for table ...`                         | The runtime role lacks grants. Run the `ALTER DEFAULT PRIVILEGES` statements from step 3 _before_ migrating, or grant on the existing tables: `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO tgbot; GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO tgbot;` |
 | `telegram polling failed ... 409 Conflict`                | Another copy of the bot is running with the same token, or a webhook is set. Stop the other copy, or call `deleteWebhook`.                                                                                                                                                                    |
 | The bot is silent in a group                              | It answers only when addressed. Check, in order: is the group muted (`/unmute@YourBot` by an admin)? Is privacy mode off, if you call it by name? Was the bot re-added after changing privacy mode? Is the sender an anonymous admin or another bot (ignored by design)?                      |

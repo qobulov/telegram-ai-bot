@@ -18,7 +18,7 @@
 - User ID, chat ID and author name always come from the update.
 - Ordinary group messages are never written to the database or to logs.
 - Never log message text, names, tokens or the database URL.
-- Each task ends with `gofmt -l .` empty, `go vet ./...` clean, `go test -race -p 1 ./...` green (with `TEST_db_POSTGRES_URL` set), and a commit.
+- Each task ends with `gofmt -l .` empty, `go vet ./...` clean, `go test -race -p 1 ./...` green (with `TEST_DB_POSTGRES_URL` set), and a commit.
 
 ## Review Focus
 
@@ -144,5 +144,5 @@ Group updates are queued by chat ID; private ones by user ID.
 - [ ] End-to-end tests first: two ordinary group messages then "Hey Mira, who is right?" → one `sendMessage`, a reply to the third message; the model request has the persona, the group note, both ordinary messages in the recent-messages block, and `Bek: who is right?`; the database holds the exchange under the shared scope with the author columns, and no row contains the ordinary messages' text; a group muted in the database before startup stays silent (Review Focus 4).
 - [ ] Wire `MutedChats`, `Members` (an adapter over `GetChatMember`), `Muter`, and the new options.
 - [ ] README: the character and how to change it (`PERSONA_PROMPT`, name, wake words); triggers with examples; BotFather privacy mode off, and how to run mentions-only; what is remembered and what is not; `/mute`, `/unmute`, `/reset` and who may use them; humour limits; updated settings table, schema, security checklist and troubleshooting; upgrade note for migration 0003 and the renamed variables.
-- [ ] Final verification with and without `TEST_db_POSTGRES_URL`; `go build ./...`; smoke-run `migrate` on a version-2 database.
+- [ ] Final verification with and without `TEST_DB_POSTGRES_URL`; `go build ./...`; smoke-run `migrate` on a version-2 database.
 - [ ] Commit.
