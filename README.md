@@ -907,9 +907,9 @@ Built in:
       comes from Telegram (`getMe`), not from configuration.
 - [x] Private and group conversations are stored under separate keys and are
       never loaded together; one group never sees another's history.
-- [x] Ordinary group messages are kept in memory only, never in the logs and
-      not at all while a group is muted. The one that reaches the database
-      is a message quoted by a reply that addresses the bot.
+- [x] Group messages are kept for the day only (`group_messages`, deleted
+      after `RETENTION_DAYS`), never in the logs, and not at all while a
+      group is muted.
 - [x] Quoted messages and recent group messages are marked as untrusted and
       shortened. Square brackets are replaced in them, in author names and in
       group messages, and group messages and names are folded to one line,
