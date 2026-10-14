@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"telegram-ai-bot/internal/storage"
+	"telegram-ai-bot/internal/telegram"
 )
 
 const (
@@ -61,21 +62,33 @@ func (a *ambient) enabled() bool {
 // reproduce a marker. A failure is logged and otherwise ignored: the log is
 // context, not something a reply depends on.
 func (a *ambient) add(chatID, messageID, authorID int64, author, text string) {
-	text = strings.Join(strings.Fields(bracketless.Replace(text)), " ")
-	if !a.enabled() || text == "" {
+	a.append(storage.GroupMessage{ChatID: chatID, MessageID: messageID, AuthorID: authorID, AuthorName: author, Text: text})
+}
+
+// addMessage logs a member's message along with the group's name, which
+// keeps the bot's list of groups up to date.
+func (a *ambient) addMessage(msg *telegram.Message, author, text string) {
+	a.append(storage.GroupMessage{
+		ChatID:       msg.Chat.ID,
+		ChatTitle:    msg.Chat.Title,
+		ChatUsername: msg.Chat.Username,
+		MessageID:    msg.MessageID,
+		AuthorID:     msg.From.ID,
+		AuthorName:   author,
+		Text:         text,
+	})
+}
+
+func (a *ambient) append(m storage.GroupMessage) {
+	m.Text = strings.Join(strings.Fields(bracketless.Replace(m.Text)), " ")
+	if !a.enabled() || m.Text == "" {
 		return
 	}
+	m.Text = truncate(m.Text, maxAmbientChars)
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
 	defer cancel()
-	err := a.log.AppendGroupMessage(ctx, storage.GroupMessage{
-		ChatID:     chatID,
-		MessageID:  messageID,
-		AuthorID:   authorID,
-		AuthorName: author,
-		Text:       truncate(text, maxAmbientChars),
-	})
-	if err != nil {
-		a.logger.Warn("could not log group message", "chat_id", chatID, "error", err)
+	if err := a.log.AppendGroupMessage(ctx, m); err != nil {
+		a.logger.Warn("could not log group message", "chat_id", m.ChatID, "error", err)
 	}
 }
 

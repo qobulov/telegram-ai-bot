@@ -1725,3 +1725,15 @@ func TestAllowedBotsChatterIsLogged(t *testing.T) {
 		t.Errorf("log = %q", got)
 	}
 }
+
+func TestLoggedGroupMessagesCarryTheGroupsName(t *testing.T) {
+	f := newFixture()
+	msg := groupMessage("just chatting")
+	msg.Chat.Title, msg.Chat.Username = "Devs", "devs_uz"
+
+	f.run(inGroup(msg))
+
+	if len(f.chatLog.messages) != 1 || f.chatLog.messages[0].ChatTitle != "Devs" || f.chatLog.messages[0].ChatUsername != "devs_uz" {
+		t.Errorf("log = %+v; the group's name is how owners recognise it", f.chatLog.messages)
+	}
+}

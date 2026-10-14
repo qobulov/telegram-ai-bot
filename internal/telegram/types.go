@@ -97,6 +97,9 @@ func (m ChatMember) IsAdmin() bool {
 type Chat struct {
 	ID   int64  `json:"id"`
 	Type string `json:"type"`
+	// Title and Username are set for groups; Username only for public ones.
+	Title    string `json:"title,omitempty"`
+	Username string `json:"username,omitempty"`
 }
 
 // Chat types. Channels are not handled by the bot.

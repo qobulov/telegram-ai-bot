@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"telegram-ai-bot/internal/agent"
@@ -76,11 +77,37 @@ func (m groupMembers) IsGroupAdmin(ctx context.Context, chatID, userID int64) (b
 	return member.IsAdmin(), nil
 }
 
+// MemberCount counts a group's members, for the owners' bot_database tool.
+func (m groupMembers) MemberCount(ctx context.Context, chatID int64) (int, error) {
+	count, err := m.client.GetChatMemberCount(ctx, chatID)
+	return count, memberCountError(err)
+}
+
+// memberCountError reports the bot having been removed, or the group having
+// gone, as tools.ErrNotInGroup.
+func memberCountError(err error) error {
+	var apiErr *telegram.APIError
+	if !errors.As(err, &apiErr) {
+		return err
+	}
+	if apiErr.Code == http.StatusForbidden || strings.Contains(apiErr.Description, "chat not found") {
+		return fmt.Errorf("%w: %s", tools.ErrNotInGroup, apiErr.Description)
+	}
+	return err
+}
+
 // NewService wires the tools, the model client, the agent and the service.
 func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, logger *slog.Logger) (*service.Service, error) {
 	builtin := tools.Builtin(service.HelpText())
 	if cfg.ImagesEnabled {
 		builtin = append(builtin, imageTool(cfg, store))
+	}
+	if len(cfg.OwnerUsernames) > 0 {
+		builtin = append(builtin, tools.DatabaseTool(tools.DatabaseOptions{
+			Store:    store,
+			Members:  groupMembers{client: bot.Client},
+			Location: cfg.Location,
+		}))
 	}
 	registry, err := tools.NewRegistry(cfg.IsAdmin, builtin...)
 	if err != nil {

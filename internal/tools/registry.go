@@ -38,6 +38,11 @@ type Tool struct {
 	Schema json.RawMessage
 	// AdminOnly restricts the tool to users listed as administrators.
 	AdminOnly bool
+	// OwnerOnly restricts the tool to the bot's owners, as the turn's
+	// Caller says.
+	OwnerOnly bool
+	// MaxOutputBytes bounds the result. Zero means maxOutputBytes.
+	MaxOutputBytes int
 	// Timeout bounds one execution. Zero means defaultTimeout.
 	Timeout time.Duration
 	// Run validates args and does the work. Return an *ArgumentError when
@@ -74,6 +79,9 @@ func NewRegistry(isAdmin func(userID int64) bool, tools ...Tool) (*Registry, err
 		if tool.Timeout <= 0 {
 			tool.Timeout = defaultTimeout
 		}
+		if tool.MaxOutputBytes <= 0 {
+			tool.MaxOutputBytes = maxOutputBytes
+		}
 		registry.tools = append(registry.tools, tool)
 		registry.byName[tool.Name] = tool
 	}
@@ -81,11 +89,12 @@ func NewRegistry(isAdmin func(userID int64) bool, tools ...Tool) (*Registry, err
 }
 
 // Definitions lists the tools the caller is allowed to use, in the format
-// the model expects.
-func (r *Registry) Definitions(callerID int64) []ai.ToolDefinition {
+// the model expects. ctx carries the turn, which says whether the caller is
+// an owner.
+func (r *Registry) Definitions(ctx context.Context, callerID int64) []ai.ToolDefinition {
 	var definitions []ai.ToolDefinition
 	for _, tool := range r.tools {
-		if !r.allowed(tool, callerID) {
+		if !r.allowed(ctx, tool, callerID) {
 			continue
 		}
 		definitions = append(definitions, ai.ToolDefinition{
@@ -103,15 +112,16 @@ func (r *Registry) Definitions(callerID int64) []ai.ToolDefinition {
 // Execute runs a tool on behalf of callerID and returns a JSON result for the
 // model: {"ok":true,"result":...} or {"ok":false,"error":{"code","message"}}.
 //
-// Permission depends only on callerID, which the caller must take from the
-// authenticated Telegram update. Nothing in name or args can grant access.
+// Permission depends only on callerID and the turn in ctx, which the caller
+// must take from the authenticated Telegram update. Nothing in name or args
+// can grant access.
 func (r *Registry) Execute(ctx context.Context, callerID int64, name, args string) string {
 	tool, ok := r.byName[name]
 	if !ok {
 		return failure(codeUnknownTool, fmt.Sprintf("there is no tool named %q", name))
 	}
-	if !r.allowed(tool, callerID) {
-		return failure(codeForbidden, "this tool is restricted to administrators")
+	if !r.allowed(ctx, tool, callerID) {
+		return failure(codeForbidden, "this tool is restricted to administrators or owners")
 	}
 	raw, err := normalizeArgs(args)
 	if err != nil {
@@ -121,11 +131,18 @@ func (r *Registry) Execute(ctx context.Context, callerID int64, name, args strin
 	if err != nil {
 		return failure(errorCode(err), err.Error())
 	}
-	return success(result)
+	return success(result, tool.MaxOutputBytes)
 }
 
-func (r *Registry) allowed(tool Tool, callerID int64) bool {
-	return !tool.AdminOnly || r.isAdmin(callerID)
+func (r *Registry) allowed(ctx context.Context, tool Tool, callerID int64) bool {
+	if tool.AdminOnly && !r.isAdmin(callerID) {
+		return false
+	}
+	if tool.OwnerOnly {
+		caller, ok := CallerFrom(ctx)
+		return ok && caller.Owner && caller.UserID == callerID
+	}
+	return true
 }
 
 // normalizeArgs accepts only a JSON object. Models often send an empty string
@@ -197,13 +214,13 @@ type toolError struct {
 	Message string `json:"message"`
 }
 
-func success(result any) string {
+func success(result any, limit int) string {
 	encoded, err := json.Marshal(resultEnvelope{OK: true, Result: result})
 	if err != nil {
 		return failure(codeExecutionFailed, "the tool returned a result that could not be encoded")
 	}
-	if len(encoded) > maxOutputBytes {
-		return failure(codeOutputTooLarge, fmt.Sprintf("the tool result exceeded %d bytes", maxOutputBytes))
+	if len(encoded) > limit {
+		return failure(codeOutputTooLarge, fmt.Sprintf("the tool result exceeded %d bytes", limit))
 	}
 	return string(encoded)
 }

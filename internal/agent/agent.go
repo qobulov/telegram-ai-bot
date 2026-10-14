@@ -42,7 +42,7 @@ type Model interface {
 
 // Tools lists and executes the tools a caller may use.
 type Tools interface {
-	Definitions(callerID int64) []ai.ToolDefinition
+	Definitions(ctx context.Context, callerID int64) []ai.ToolDefinition
 	Execute(ctx context.Context, callerID int64, name, args string) string
 }
 
@@ -146,7 +146,7 @@ type turn struct {
 // model is told to stop using tools, and after MaxToolCalls+2 requests the
 // turn fails with ErrToolLoop.
 func (a *Agent) run(ctx context.Context, t *turn) (string, error) {
-	definitions := a.opts.Tools.Definitions(t.req.UserID)
+	definitions := a.opts.Tools.Definitions(ctx, t.req.UserID)
 	for range a.opts.MaxToolCalls + 2 {
 		reply, err := a.opts.Model.Complete(ctx, ai.Request{
 			Messages:    a.prompt(t),

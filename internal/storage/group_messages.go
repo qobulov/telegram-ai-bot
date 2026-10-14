@@ -10,20 +10,32 @@ import (
 
 // GroupMessage is one message seen in a group.
 type GroupMessage struct {
-	ChatID     int64
-	MessageID  int64
-	AuthorID   int64
-	AuthorName string
-	Text       string
-	SentAt     time.Time
+	ChatID int64
+	// ChatTitle and ChatUsername update the group's entry in groups. The
+	// bot's own messages leave them empty, which keeps what is stored.
+	ChatTitle    string
+	ChatUsername string
+	MessageID    int64
+	AuthorID     int64
+	AuthorName   string
+	Text         string
+	SentAt       time.Time
 }
 
-// AppendGroupMessage records a group message for the day's log.
+// AppendGroupMessage records a group message for the day's log, and notes
+// the group as one the bot is in.
 func (s *Store) AppendGroupMessage(ctx context.Context, m GroupMessage) error {
 	_, err := s.pool.Exec(ctx, `
+		WITH seen AS (
+			INSERT INTO groups (chat_id, title, username) VALUES ($1, $6, nullif($7, ''))
+			ON CONFLICT (chat_id) DO UPDATE
+			SET title = coalesce(nullif(EXCLUDED.title, ''), groups.title),
+			    username = CASE WHEN EXCLUDED.title = '' THEN groups.username ELSE EXCLUDED.username END,
+			    last_seen_at = now()
+		)
 		INSERT INTO group_messages (chat_id, message_id, author_id, author_name, text)
 		VALUES ($1, $2, $3, $4, $5)`,
-		m.ChatID, nonZero(m.MessageID), nonZero(m.AuthorID), m.AuthorName, m.Text)
+		m.ChatID, nonZero(m.MessageID), nonZero(m.AuthorID), m.AuthorName, m.Text, m.ChatTitle, m.ChatUsername)
 	if err != nil {
 		return fmt.Errorf("storage: append group message: %w", err)
 	}

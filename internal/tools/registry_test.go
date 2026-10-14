@@ -106,10 +106,10 @@ func TestAdminOnlyToolIsGatedByCallerID(t *testing.T) {
 		t.Errorf("admin was refused: %+v", env)
 	}
 
-	if defs := registry.Definitions(userID); len(defs) != 1 || defs[0].Function.Name != "echo" {
+	if defs := registry.Definitions(context.Background(), userID); len(defs) != 1 || defs[0].Function.Name != "echo" {
 		t.Errorf("user definitions = %+v", defs)
 	}
-	if defs := registry.Definitions(adminID); len(defs) != 2 {
+	if defs := registry.Definitions(context.Background(), adminID); len(defs) != 2 {
 		t.Errorf("admin definitions = %+v", defs)
 	}
 }
@@ -117,7 +117,7 @@ func TestAdminOnlyToolIsGatedByCallerID(t *testing.T) {
 func TestDefinitionsDescribeTools(t *testing.T) {
 	registry := mustRegistry(t, echoTool())
 
-	def := registry.Definitions(userID)[0]
+	def := registry.Definitions(context.Background(), userID)[0]
 	if def.Type != "function" || def.Function.Description != "returns its arguments" || string(def.Function.Parameters) != `{"type":"object"}` {
 		t.Errorf("definition = %+v", def)
 	}
@@ -190,7 +190,7 @@ func TestBuiltinToolsRegisterAndValidate(t *testing.T) {
 	ctx := context.Background()
 
 	names := map[string]bool{}
-	for _, def := range registry.Definitions(userID) {
+	for _, def := range registry.Definitions(context.Background(), userID) {
 		names[def.Function.Name] = true
 		if !json.Valid(def.Function.Parameters) {
 			t.Errorf("%s has an invalid schema", def.Function.Name)

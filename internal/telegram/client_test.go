@@ -558,3 +558,15 @@ func TestSendPhotoCutsLongCaptions(t *testing.T) {
 		t.Errorf("caption is %d characters, over Telegram's %d", n, CaptionLimit)
 	}
 }
+
+func TestGetChatMemberCountReturnsTheCount(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":37}`)
+
+	count, err := client.GetChatMemberCount(context.Background(), -100123)
+	if err != nil || count != 37 {
+		t.Fatalf("count = %d, err = %v", count, err)
+	}
+	if sent := api.recorded()[0]; sent.method != "getChatMemberCount" || sent.params["chat_id"] != float64(-100123) {
+		t.Errorf("call = %+v", sent)
+	}
+}

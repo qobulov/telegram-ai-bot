@@ -340,7 +340,7 @@ func (s *Service) logMessage(msg *telegram.Message) {
 	defer cancel()
 	content, _ := msg.Content()
 	text := s.describe(ctx, msg, content)
-	s.ambient.add(msg.Chat.ID, msg.MessageID, msg.From.ID, s.label(msg.From), text)
+	s.ambient.addMessage(msg, s.label(msg.From), text)
 }
 
 // rememberInBackground transcribes off the polling loop, which must not wait
@@ -352,7 +352,7 @@ func (s *Service) rememberInBackground(msg *telegram.Message) {
 	default:
 		content, _ := msg.Content()
 		m, _ := s.mediaOf(msg)
-		s.ambient.add(msg.Chat.ID, msg.MessageID, msg.From.ID, s.label(msg.From), withMediaLabel(m, content))
+		s.ambient.addMessage(msg, s.label(msg.From), withMediaLabel(m, content))
 		return
 	}
 	s.background.Go(func() {

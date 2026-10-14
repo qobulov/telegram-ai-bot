@@ -388,6 +388,22 @@ Your messages are additionally marked `[owner]`, based on your
 Telegram account, so someone who copies your name or says they are the owner
 gets no special treatment.
 
+Owners can also ask the bot about its own data ("Maria, nechta guruhdasan?"),
+which it looks up with the owner-only `bot_database` tool:
+
+- `overview`: how many groups it has been in, users, and today's messages and
+  pictures.
+- `groups`: every group it has seen a message in, with whether it is still
+  there and the member count, both checked live with Telegram.
+- `messages`: today's messages of one group. Another group's messages are
+  given only in a private chat with the owner, so they never land in a
+  different group.
+
+Groups are recorded from the messages the bot logs, so they appear once
+someone writes there, and only while `GROUP_AMBIENT_MESSAGES` is above 0. The
+`groups` table keeps only each group's name and is not expired; messages
+still are.
+
 ## Drawing pictures
 
 With a Gemini key the bot can draw. When someone asks for a picture ("Maria,

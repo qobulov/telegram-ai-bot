@@ -108,7 +108,7 @@ func (s *Service) logExchange(in incoming, out outcome) {
 	if !in.group || strings.HasPrefix(in.text, "/") {
 		return
 	}
-	s.ambient.add(in.scope.ChatID, in.msg.MessageID, in.userID, s.label(in.msg.From), in.described)
+	s.ambient.addMessage(in.msg, s.label(in.msg.From), in.described)
 	if out.answerID != 0 {
 		answer := out.text
 		if len(out.drawings) > 0 {

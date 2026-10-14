@@ -84,7 +84,7 @@ type fakeTools struct {
 	executions []toolExecution
 }
 
-func (f *fakeTools) Definitions(int64) []ai.ToolDefinition {
+func (f *fakeTools) Definitions(context.Context, int64) []ai.ToolDefinition {
 	return []ai.ToolDefinition{{Type: "function", Function: ai.FunctionDefinition{Name: "calculator"}}}
 }
 

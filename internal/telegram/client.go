@@ -254,6 +254,20 @@ func (c *Client) GetChatMember(ctx context.Context, chatID, userID int64) (ChatM
 	return member, nil
 }
 
+type chatParams struct {
+	ChatID int64 `json:"chat_id"`
+}
+
+// GetChatMemberCount returns how many members a chat has. It fails when the
+// bot is no longer in the chat.
+func (c *Client) GetChatMemberCount(ctx context.Context, chatID int64) (int, error) {
+	var count int
+	if err := c.call(ctx, "getChatMemberCount", chatParams{ChatID: chatID}, &count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 type sendMessageParams struct {
 	ChatID          int64            `json:"chat_id"`
 	Text            string           `json:"text"`
