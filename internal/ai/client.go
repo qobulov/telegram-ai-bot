@@ -96,26 +96,32 @@ func (c *Client) Complete(ctx context.Context, req Request) (Message, error) {
 	return msg, nil
 }
 
+// completeWithRetry goes through the models in order, and when every one
+// failed, waits and goes round again while attempts and time remain. Models
+// found out of quota or missing are left out of later rounds.
 func (c *Client) completeWithRetry(ctx context.Context, req Request, withTools bool) (Message, error) {
 	models := c.models()
+	next := 0
 	for attempt := 1; ; attempt++ {
-		model := models[min(attempt, len(models))-1]
+		model := models[next]
 		body, err := json.Marshal(c.payload(req, model, withTools))
 		if err != nil {
 			return Message{}, fmt.Errorf("encode request: %w", err)
 		}
 		msg, err := c.attempt(ctx, body)
-		if isOutOfQuota(err) {
-			c.outOfQuota.Store(model, c.now().Add(quotaCooldown))
-		}
-		if err == nil || attempt >= c.opts.MaxAttempts || !isRetryable(ctx, err) {
+		c.noteUnusable(model, err)
+		if err == nil || attempt >= c.opts.MaxAttempts || !c.isRetryable(ctx, err) {
 			return msg, err
 		}
-		next := models[min(attempt+1, len(models))-1]
-		if next != model {
+		next++
+		if next < len(models) {
 			// Another model is not slowed by this one's load: no need to wait.
-			c.opts.Logger.Warn("model unavailable; trying another", "model", model, "next", next, "error", err)
+			c.opts.Logger.Warn("model unavailable; trying another", "model", model, "next", models[next], "error", err)
 			continue
+		}
+		models, next = c.models(), 0
+		if !c.timeForAnotherRound(ctx) {
+			return msg, err
 		}
 		if err := sleep(ctx, c.retryDelay(attempt, err)); err != nil {
 			return Message{}, err
@@ -123,8 +129,42 @@ func (c *Client) completeWithRetry(ctx context.Context, req Request, withTools b
 	}
 }
 
-// quotaCooldown is how long a model out of quota is skipped.
-const quotaCooldown = 15 * time.Minute
+// noteUnusable skips a model for a while when its quota ran out or the
+// provider does not have it.
+func (c *Client) noteUnusable(model string, err error) {
+	switch {
+	case isOutOfQuota(err):
+		c.outOfQuota.Store(model, c.now().Add(quotaCooldown))
+	case isModelNotFound(err):
+		c.outOfQuota.Store(model, c.now().Add(missingModelCooldown))
+	}
+}
+
+func (c *Client) isRetryable(ctx context.Context, err error) bool {
+	// A missing model is worth retrying only on another one.
+	if isModelNotFound(err) {
+		return len(c.opts.FallbackModels) > 0 && ctx.Err() == nil
+	}
+	return isRetryable(ctx, err)
+}
+
+// timeForAnotherRound reports whether a new round of attempts can finish
+// before the caller's deadline.
+func (c *Client) timeForAnotherRound(ctx context.Context) bool {
+	deadline, ok := ctx.Deadline()
+	if !ok || c.opts.AttemptTimeout <= 0 {
+		return true
+	}
+	return time.Until(deadline) > c.opts.AttemptTimeout
+}
+
+const (
+	// quotaCooldown is how long a model out of quota is skipped.
+	quotaCooldown = 15 * time.Minute
+	// missingModelCooldown is how long a model the provider does not have
+	// is skipped.
+	missingModelCooldown = time.Hour
+)
 
 // models lists the models to try, in order: the configured one first, then
 // each fallback, leaving out those whose quota recently ran out. If that
@@ -142,6 +182,11 @@ func (c *Client) models() []string {
 		return all
 	}
 	return usable
+}
+
+func isModelNotFound(err error) bool {
+	var apiErr *APIError
+	return errors.As(err, &apiErr) && apiErr.Status == http.StatusNotFound
 }
 
 // isOutOfQuota reports a 429 that is about the quota, such as Gemini's

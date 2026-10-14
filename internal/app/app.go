@@ -148,11 +148,13 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		return nil, err
 	}
 	model := ai.NewClient(ai.Options{
-		BaseURL:    cfg.AIBaseURL,
-		APIKey:     cfg.AIAPIKey,
-		Model:      cfg.Model,
-		MaxTokens:  cfg.MaxOutputTokens,
-		HTTPClient: &http.Client{Timeout: cfg.RequestTimeout},
+		BaseURL:   cfg.AIBaseURL,
+		APIKey:    cfg.AIAPIKey,
+		Model:     cfg.Model,
+		MaxTokens: cfg.MaxOutputTokens,
+		// Two rounds through every model; the turn's deadline still applies.
+		MaxAttempts: 2 * (1 + len(cfg.FallbackModels)),
+		HTTPClient:  &http.Client{Timeout: cfg.RequestTimeout},
 		// A stuck attempt is retried well before the turn runs out of time.
 		AttemptTimeout: attemptTimeout,
 		FallbackModels: cfg.FallbackModels,

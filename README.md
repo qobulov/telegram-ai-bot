@@ -136,7 +136,7 @@ in the environment win over the file.
 | `GEMINI_API_KEY` | one of the two keys | Google Gemini key from <https://aistudio.google.com/apikey> |
 | `OPENROUTER_API_KEY` | one of the two keys | OpenRouter key from <https://openrouter.ai/keys>; set this or `GEMINI_API_KEY`, not both |
 | `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Gemini model ID, used with `GEMINI_API_KEY` |
-| `FALLBACK_MODELS` | Gemini: `gemini-3.1-flash-lite,gemini-flash-lite-latest` | Models tried in order when the main one is overloaded or does not answer; `none` turns this off |
+| `FALLBACK_MODELS` | Gemini: `gemini-3.1-flash-lite,gemini-flash-lite-latest,gemini-flash-latest` | Models tried in order when the main one is overloaded, out of quota or does not answer, then once more after a pause; a model out of quota is skipped for 15 minutes; `none` turns this off |
 | `XAI_API_KEY` | one of the keys | xAI (Grok) key from <https://console.x.ai>; images yes, voice no |
 | `XAI_MODEL` | `grok-4` | Grok model ID, used with `XAI_API_KEY` |
 | `MAX_MEDIA_MB` | `5` | Largest photo or sticker file downloaded for the model (1 to 20) |

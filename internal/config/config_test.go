@@ -551,7 +551,7 @@ func TestGeminiFallbackModels(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(cfg.FallbackModels, ","); got != "gemini-3.1-flash-lite,gemini-flash-lite-latest" {
+	if got := strings.Join(cfg.FallbackModels, ","); got != "gemini-3.1-flash-lite,gemini-flash-lite-latest,gemini-flash-latest" {
 		t.Errorf("default Gemini fallbacks = %q", got)
 	}
 

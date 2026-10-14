@@ -487,6 +487,11 @@ func (m *modelServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func fallbackClient(t *testing.T, server *modelServer) *Client {
 	t.Helper()
+	return fallbackClientWithAttempts(t, server, 0)
+}
+
+func fallbackClientWithAttempts(t *testing.T, server *modelServer, attempts int) *Client {
+	t.Helper()
 	server.cancel = make(chan struct{})
 	ts := httptest.NewServer(server)
 	t.Cleanup(ts.Close)
@@ -496,6 +501,7 @@ func fallbackClient(t *testing.T, server *modelServer) *Client {
 		APIKey:         testAPIKey,
 		Model:          "primary",
 		FallbackModels: []string{"backup-1", "backup-2"},
+		MaxAttempts:    attempts,
 		BaseDelay:      time.Millisecond,
 		AttemptTimeout: 100 * time.Millisecond,
 	})
@@ -662,5 +668,46 @@ func TestEveryModelOutOfQuotaStillTriesThem(t *testing.T) {
 
 	if msg, err := client.Complete(context.Background(), userRequest()); err != nil || msg.Content != "from primary" {
 		t.Errorf("msg = %+v, err = %v; with every model skipped, all are tried again", msg, err)
+	}
+}
+
+func TestBusyModelsAreTriedAgainInASecondRound(t *testing.T) {
+	server := &modelServer{
+		outOfQuota: map[string]bool{"primary": true},
+		down:       map[string]int{"backup-1": 503, "backup-2": 503},
+	}
+	client := fallbackClientWithAttempts(t, server, 5)
+
+	_, err := client.Complete(context.Background(), userRequest())
+
+	if !IsOverloaded(err) {
+		t.Errorf("err = %v", err)
+	}
+	if got := strings.Join(server.asked, ","); got != "primary,backup-1,backup-2,backup-1,backup-2" {
+		t.Errorf("models asked = %s; the second round should skip the model out of quota", got)
+	}
+}
+
+func TestUnknownFallbackModelIsSkipped(t *testing.T) {
+	server := &modelServer{down: map[string]int{"primary": 503, "backup-1": 404}}
+	client := fallbackClient(t, server)
+
+	msg, err := client.Complete(context.Background(), userRequest())
+
+	if err != nil || msg.Content != "from backup-2" {
+		t.Errorf("msg = %+v, err = %v; a model the key does not have should not end the turn", msg, err)
+	}
+}
+
+func TestNoSecondRoundWithoutTimeForIt(t *testing.T) {
+	server := &modelServer{down: map[string]int{"primary": 503, "backup-1": 503, "backup-2": 503}}
+	client := fallbackClientWithAttempts(t, server, 6)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	_, _ = client.Complete(ctx, userRequest())
+
+	if len(server.asked) != 3 {
+		t.Errorf("models asked = %v; a round that cannot finish in time is not started", server.asked)
 	}
 }

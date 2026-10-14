@@ -1786,3 +1786,9 @@ func TestMembershipChangesAreRecordedOnTheWebhookPathToo(t *testing.T) {
 		t.Errorf("recorded = %+v", groups.recorded)
 	}
 }
+
+func TestOverloadReplyIsInUzbek(t *testing.T) {
+	if !strings.Contains(textOverloaded, "daqiqa") {
+		t.Errorf("textOverloaded = %q; the groups speak Uzbek", textOverloaded)
+	}
+}
