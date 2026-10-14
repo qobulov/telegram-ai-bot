@@ -134,7 +134,8 @@ in the environment win over the file.
 | `TELEGRAM_BOT_TOKEN`          | required                       | Token from [@BotFather](https://t.me/BotFather)                                                              |
 | `GEMINI_API_KEY` | one of the two keys | Google Gemini key from <https://aistudio.google.com/apikey> |
 | `OPENROUTER_API_KEY` | one of the two keys | OpenRouter key from <https://openrouter.ai/keys>; set this or `GEMINI_API_KEY`, not both |
-| `GEMINI_MODEL` | `gemini-3.8-flash` | Gemini model ID, used with `GEMINI_API_KEY` |
+| `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Gemini model ID, used with `GEMINI_API_KEY` |
+| `FALLBACK_MODELS` | Gemini: `gemini-3.1-flash-lite,gemini-flash-lite-latest` | Models tried in order when the main one is overloaded or does not answer; `none` turns this off |
 | `XAI_API_KEY` | one of the keys | xAI (Grok) key from <https://console.x.ai>; images yes, voice no |
 | `XAI_MODEL` | `grok-4` | Grok model ID, used with `XAI_API_KEY` |
 | `MAX_MEDIA_MB` | `5` | Largest photo or sticker file downloaded for the model (1 to 20) |
@@ -240,7 +241,8 @@ and stickers but cannot listen to voice messages here; for those, use
 Gemini.
 
 **Gemini.** Create a key at <https://aistudio.google.com/apikey> and set
-`GEMINI_API_KEY`. The model defaults to `gemini-3.8-flash`; set
+`GEMINI_API_KEY`. The model defaults to `gemini-3.5-flash-lite`, a fast model
+that was the most reliable in testing; set
 `GEMINI_MODEL` for another one from
 <https://ai.google.dev/gemini-api/docs/models>. Gemini models support the
 tools (time, calculator) and are usually much faster than OpenRouter's free
@@ -248,6 +250,12 @@ models, which matters for the 60-second limit on Vercel. The bot talks to
 Gemini through Google's OpenAI-compatible endpoint, so nothing else changes.
 The free tier has per-minute and per-day request limits; when they are hit
 the user gets the generic error and the log shows `status 429`.
+
+When Google answers that a model is overloaded (`503`), that the account is
+over its limits (`429`), or does not answer within 20 seconds, the same
+request is sent to the next model in `FALLBACK_MODELS`. Each new message
+starts again with the main model. If every model is busy, the user is told
+the AI is overloaded and to try again in a minute.
 
 **OpenRouter**, described below, gives access to many models from one key.
 

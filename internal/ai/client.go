@@ -35,6 +35,10 @@ type Options struct {
 	// holds a request without answering; past this, the attempt is given up
 	// and retried. Zero means only the caller's context limits it.
 	AttemptTimeout time.Duration
+	// FallbackModels are tried in order when a model is overloaded, over its
+	// limits or does not answer: each retry goes to the next one. Every
+	// request starts again with Model.
+	FallbackModels []string
 	HTTPClient     *http.Client
 	Logger         *slog.Logger
 }
@@ -52,6 +56,8 @@ func NewClient(opts Options) *Client {
 	if opts.MaxAttempts <= 0 {
 		opts.MaxAttempts = defaultMaxAttempts
 	}
+	// Enough attempts to try every model once.
+	opts.MaxAttempts = max(opts.MaxAttempts, 1+len(opts.FallbackModels))
 	if opts.BaseDelay <= 0 {
 		opts.BaseDelay = defaultBaseDelay
 	}
@@ -86,19 +92,33 @@ func (c *Client) Complete(ctx context.Context, req Request) (Message, error) {
 }
 
 func (c *Client) completeWithRetry(ctx context.Context, req Request, withTools bool) (Message, error) {
-	body, err := json.Marshal(c.payload(req, withTools))
-	if err != nil {
-		return Message{}, fmt.Errorf("encode request: %w", err)
-	}
 	for attempt := 1; ; attempt++ {
+		model := c.modelFor(attempt)
+		body, err := json.Marshal(c.payload(req, model, withTools))
+		if err != nil {
+			return Message{}, fmt.Errorf("encode request: %w", err)
+		}
 		msg, err := c.attempt(ctx, body)
 		if err == nil || attempt >= c.opts.MaxAttempts || !isRetryable(ctx, err) {
 			return msg, err
+		}
+		next := c.modelFor(attempt + 1)
+		if next != model {
+			// Another model is not slowed by this one's load: no need to wait.
+			c.opts.Logger.Warn("model unavailable; trying another", "model", model, "next", next, "error", err)
+			continue
 		}
 		if err := sleep(ctx, c.retryDelay(attempt, err)); err != nil {
 			return Message{}, err
 		}
 	}
+}
+
+// modelFor picks the model for an attempt: the configured one first, then
+// each fallback in turn, staying on the last one if attempts remain.
+func (c *Client) modelFor(attempt int) string {
+	models := append([]string{c.opts.Model}, c.opts.FallbackModels...)
+	return models[min(attempt, len(models))-1]
 }
 
 // attempt sends the request once, within AttemptTimeout.
@@ -129,9 +149,9 @@ type chatRequest struct {
 	ToolChoice string           `json:"tool_choice,omitempty"`
 }
 
-func (c *Client) payload(req Request, withTools bool) chatRequest {
+func (c *Client) payload(req Request, model string, withTools bool) chatRequest {
 	payload := chatRequest{
-		Model:     c.opts.Model,
+		Model:     model,
 		Messages:  req.Messages,
 		MaxTokens: c.opts.MaxTokens,
 	}

@@ -447,3 +447,119 @@ func TestIsOverloaded(t *testing.T) {
 		t.Error("a wrapped overload error was not recognised")
 	}
 }
+
+// modelServer answers per model: a model listed in down gets that status, the
+// rest a normal reply. It records which model each request asked for.
+type modelServer struct {
+	mu     sync.Mutex
+	down   map[string]int
+	stuck  map[string]bool
+	asked  []string
+	cancel chan struct{}
+}
+
+func (m *modelServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Model string `json:"model"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	m.mu.Lock()
+	m.asked = append(m.asked, req.Model)
+	status, isDown := m.down[req.Model]
+	isStuck := m.stuck[req.Model]
+	m.mu.Unlock()
+	switch {
+	case isStuck:
+		<-m.cancel
+	case isDown:
+		w.WriteHeader(status)
+		_, _ = io.WriteString(w, `{"error":{"message":"This model is currently experiencing high demand"}}`)
+	default:
+		_, _ = io.WriteString(w, `{"choices":[{"message":{"role":"assistant","content":"from `+req.Model+`"}}]}`)
+	}
+}
+
+func fallbackClient(t *testing.T, server *modelServer) *Client {
+	t.Helper()
+	server.cancel = make(chan struct{})
+	ts := httptest.NewServer(server)
+	t.Cleanup(ts.Close)
+	t.Cleanup(func() { close(server.cancel) })
+	return NewClient(Options{
+		BaseURL:        ts.URL,
+		APIKey:         testAPIKey,
+		Model:          "primary",
+		FallbackModels: []string{"backup-1", "backup-2"},
+		BaseDelay:      time.Millisecond,
+		AttemptTimeout: 100 * time.Millisecond,
+	})
+}
+
+func TestOverloadedModelFallsBackToTheNext(t *testing.T) {
+	for _, status := range []int{503, 429} {
+		server := &modelServer{down: map[string]int{"primary": status}}
+		client := fallbackClient(t, server)
+
+		msg, err := client.Complete(context.Background(), userRequest())
+
+		if err != nil || msg.Content != "from backup-1" {
+			t.Errorf("status %d: msg = %+v, err = %v", status, msg, err)
+		}
+		if got := strings.Join(server.asked, ","); got != "primary,backup-1" {
+			t.Errorf("status %d: models asked = %s", status, got)
+		}
+	}
+}
+
+func TestStuckModelFallsBackToTheNext(t *testing.T) {
+	server := &modelServer{stuck: map[string]bool{"primary": true}}
+	client := fallbackClient(t, server)
+
+	msg, err := client.Complete(context.Background(), userRequest())
+
+	if err != nil || msg.Content != "from backup-1" {
+		t.Errorf("msg = %+v, err = %v", msg, err)
+	}
+}
+
+func TestEveryModelDownReturnsTheLastError(t *testing.T) {
+	server := &modelServer{down: map[string]int{"primary": 503, "backup-1": 503, "backup-2": 503}}
+	client := fallbackClient(t, server)
+
+	_, err := client.Complete(context.Background(), userRequest())
+
+	if !IsOverloaded(err) {
+		t.Errorf("err = %v, want the overload error", err)
+	}
+	if got := strings.Join(server.asked, ","); got != "primary,backup-1,backup-2" {
+		t.Errorf("models asked = %s, want each model once", got)
+	}
+}
+
+func TestBadRequestDoesNotFallBack(t *testing.T) {
+	server := &modelServer{down: map[string]int{"primary": 400}}
+	client := fallbackClient(t, server)
+
+	if _, err := client.Complete(context.Background(), userRequest()); err == nil {
+		t.Fatal("expected the 400 to be returned")
+	}
+	if len(server.asked) != 1 {
+		t.Errorf("models asked = %v; a bad request would fail on every model", server.asked)
+	}
+}
+
+func TestEachTurnStartsWithThePrimaryModel(t *testing.T) {
+	server := &modelServer{down: map[string]int{"primary": 503}}
+	client := fallbackClient(t, server)
+	_, _ = client.Complete(context.Background(), userRequest())
+
+	server.mu.Lock()
+	delete(server.down, "primary")
+	server.asked = nil
+	server.mu.Unlock()
+	msg, _ := client.Complete(context.Background(), userRequest())
+
+	if msg.Content != "from primary" {
+		t.Errorf("msg = %+v; once the primary recovers it should be used again", msg)
+	}
+}

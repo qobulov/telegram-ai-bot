@@ -417,7 +417,7 @@ func TestGeminiKeySelectsGemini(t *testing.T) {
 	if cfg.AIBaseURL != "https://generativelanguage.googleapis.com/v1beta/openai" {
 		t.Errorf("base URL = %q, want Gemini's OpenAI-compatible endpoint", cfg.AIBaseURL)
 	}
-	if cfg.Model != "gemini-3.8-flash" {
+	if cfg.Model != "gemini-3.5-flash-lite" {
 		t.Errorf("model = %q", cfg.Model)
 	}
 }
@@ -441,7 +441,7 @@ func TestOpenRouterSettingsDoNotLeakIntoGemini(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.Model != "gemini-3.8-flash" {
+	if cfg.Model != "gemini-3.5-flash-lite" {
 		t.Errorf("model = %q; an OpenRouter model name must not be sent to Gemini", cfg.Model)
 	}
 }
@@ -543,5 +543,30 @@ func TestCronSecret(t *testing.T) {
 	env["CRON_SECRET"] = "short"
 	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "CRON_SECRET") || strings.Contains(err.Error(), "short") {
 		t.Errorf("short secret: err = %v, want it rejected without repeating it", err)
+	}
+}
+
+func TestGeminiFallbackModels(t *testing.T) {
+	cfg, err := Load(getenv(geminiEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(cfg.FallbackModels, ","); got != "gemini-3.1-flash-lite,gemini-flash-lite-latest" {
+		t.Errorf("default Gemini fallbacks = %q", got)
+	}
+
+	env := geminiEnv()
+	env["FALLBACK_MODELS"] = "gemini-3.6-flash, gemini-3.5-flash"
+	if cfg, _ := Load(getenv(env)); strings.Join(cfg.FallbackModels, ",") != "gemini-3.6-flash,gemini-3.5-flash" {
+		t.Errorf("custom fallbacks = %q", cfg.FallbackModels)
+	}
+
+	env["FALLBACK_MODELS"] = "none"
+	if cfg, _ := Load(getenv(env)); len(cfg.FallbackModels) != 0 {
+		t.Errorf("FALLBACK_MODELS=none gave %q", cfg.FallbackModels)
+	}
+
+	if cfg, _ := Load(getenv(validEnv())); len(cfg.FallbackModels) != 0 {
+		t.Errorf("OpenRouter got default fallbacks %q; they are Gemini model names", cfg.FallbackModels)
 	}
 }

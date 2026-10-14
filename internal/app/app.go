@@ -89,6 +89,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		HTTPClient: &http.Client{Timeout: cfg.RequestTimeout},
 		// A stuck attempt is retried well before the turn runs out of time.
 		AttemptTimeout: attemptTimeout,
+		FallbackModels: cfg.FallbackModels,
 		Logger:         logger,
 	})
 	assistant := agent.New(agent.Options{

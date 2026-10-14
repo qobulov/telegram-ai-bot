@@ -41,6 +41,8 @@ type Config struct {
 	AIProvider string
 	AIAPIKey   string
 	AIBaseURL  string
+	// FallbackModels are tried when the model is overloaded.
+	FallbackModels []string
 	// AudioInput is true when the provider understands voice messages.
 	AudioInput bool
 
@@ -219,14 +221,17 @@ const (
 // OpenAI-compatible chat completions API.
 type provider struct {
 	name, keyVar, baseURLVar, baseURL, modelVar, model string
+	// fallbacks are used when FALLBACK_MODELS is not set.
+	fallbacks []string
 	// audio is true when the provider accepts voice messages as input.
 	audio bool
 }
 
 var providers = []provider{
-	{providerGemini, "GEMINI_API_KEY", "GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai", "GEMINI_MODEL", "gemini-3.8-flash", true},
-	{providerXAI, "XAI_API_KEY", "XAI_BASE_URL", "https://api.x.ai/v1", "XAI_MODEL", "grok-4", false},
-	{providerOpenRouter, "OPENROUTER_API_KEY", "OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1", "OPENROUTER_MODEL", "openrouter/free", false},
+	{providerGemini, "GEMINI_API_KEY", "GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai", "GEMINI_MODEL", "gemini-3.5-flash-lite",
+		[]string{"gemini-3.1-flash-lite", "gemini-flash-lite-latest"}, true},
+	{providerXAI, "XAI_API_KEY", "XAI_BASE_URL", "https://api.x.ai/v1", "XAI_MODEL", "grok-4", nil, false},
+	{providerOpenRouter, "OPENROUTER_API_KEY", "OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1", "OPENROUTER_MODEL", "openrouter/free", nil, false},
 }
 
 // chooseProvider picks the model provider by which API key is set. Exactly
@@ -246,6 +251,7 @@ func (r *reader) chooseProvider(cfg *Config) {
 		cfg.AIProvider, cfg.AIAPIKey, cfg.AudioInput = p.name, r.value(p.keyVar), p.audio
 		cfg.AIBaseURL = r.text(p.baseURLVar, p.baseURL)
 		cfg.Model = r.text(p.modelVar, p.model)
+		cfg.FallbackModels = r.fallbackModels(p.fallbacks)
 	default:
 		r.fail(chosen[0].keyVar, "and "+chosen[1].keyVar+" are both set; keep only one, for the provider you want to use")
 	}
@@ -306,6 +312,19 @@ func notSecretChar(char rune) bool {
 	isLetter := (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z')
 	isDigit := char >= '0' && char <= '9'
 	return !isLetter && !isDigit && char != '_' && char != '-'
+}
+
+// fallbackModels reads FALLBACK_MODELS: a comma-separated list, "none" for
+// no fallbacks, or empty for the provider's defaults.
+func (r *reader) fallbackModels(defaults []string) []string {
+	switch value := r.value("FALLBACK_MODELS"); value {
+	case "":
+		return defaults
+	case "none":
+		return nil
+	default:
+		return splitList(value)
+	}
 }
 
 func (r *reader) checkRemovedVariables() {
