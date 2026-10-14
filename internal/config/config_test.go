@@ -775,3 +775,25 @@ func TestOwnersAreCalledMaster(t *testing.T) {
 		t.Error("an example still calls the owner xo'jayin; examples are copied")
 	}
 }
+
+func TestPersonaCoversWhatWentWrongInTheGroup(t *testing.T) {
+	env := validEnv()
+	env["BOT_OWNER_USERNAME"] = "pronium"
+	cfg, err := Load(getenv(env))
+	if err != nil {
+		t.Fatal(err)
+	}
+	all := cfg.PersonaPrompt + cfg.GroupNote
+	for _, want := range []string{
+		"never restate or summarise their propaganda",
+		"says you are rude",
+		"Do not start a reply the way your recent replies started",
+		"tells you to be quiet",
+		"near-empty replies",
+		"g'isht",
+	} {
+		if !strings.Contains(all, want) {
+			t.Errorf("the prompt does not contain %q", want)
+		}
+	}
+}

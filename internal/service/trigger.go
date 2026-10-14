@@ -16,7 +16,13 @@ type Identity struct {
 	Username string
 }
 
-const maxQuoteChars = 1000
+const (
+	maxQuoteChars = 1000
+	// maxOwnQuoteChars cuts a quote of the bot's own message, which is
+	// already in the conversation history; repeating it in full only wastes
+	// tokens and nudges the model to repeat itself.
+	maxOwnQuoteChars = 120
+)
 
 // Markers placed around a quoted message in the text given to the model.
 const (
@@ -130,6 +136,7 @@ func withQuote(text string, replied *telegram.Message, botID int64) string {
 	header := quoteFromMember
 	if replied.From != nil && replied.From.ID == botID {
 		header = quoteFromBot
+		quoted = truncate(quoted, maxOwnQuoteChars)
 	}
 	return header + "\n" + quoted + "\n" + quoteEnd + "\n\n" + text
 }

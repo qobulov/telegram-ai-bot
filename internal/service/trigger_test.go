@@ -298,3 +298,16 @@ func TestQuoteUsesCaptionWhenThereIsNoText(t *testing.T) {
 		t.Errorf("quote = %q", got)
 	}
 }
+
+// The bot's own message is already in the conversation history, so a reply
+// to it only needs enough of it to show which message is meant.
+func TestQuoteOfTheBotsOwnMessageIsShort(t *testing.T) {
+	own := &telegram.Message{From: &telegram.User{ID: botID, IsBot: true}, Text: strings.Repeat("я", 500)}
+
+	got := withQuote("and?", own, botID)
+
+	quoted := got[len(quoteFromBot)+1 : strings.Index(got, "\n"+quoteEnd)]
+	if n := len([]rune(quoted)); n > maxOwnQuoteChars {
+		t.Errorf("quote of the bot's own message is %d characters, want at most %d", n, maxOwnQuoteChars)
+	}
+}
