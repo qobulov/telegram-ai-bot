@@ -801,3 +801,13 @@ func TestPersonaCoversWhatWentWrongInTheGroup(t *testing.T) {
 		}
 	}
 }
+
+func TestPersonaNeverPromisesWhatItCannotDo(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(cfg.PersonaPrompt, "Never promise or claim an action you have no tool for") {
+		t.Error("the persona lets the bot promise things it cannot do, such as messaging other groups")
+	}
+}
