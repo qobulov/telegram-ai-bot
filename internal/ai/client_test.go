@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -392,5 +393,57 @@ func TestMessageWithoutPartsKeepsStringContent(t *testing.T) {
 	}
 	if string(encoded) != `{"role":"user","content":"hi"}` {
 		t.Errorf("encoded = %s", encoded)
+	}
+}
+
+// A provider under load sometimes accepts a request and then sits on it.
+// One stuck attempt must not use up the whole turn: it is abandoned and the
+// request is sent again.
+func TestStuckAttemptIsAbandonedAndRetried(t *testing.T) {
+	var mu sync.Mutex
+	calls := 0
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		calls++
+		first := calls == 1
+		mu.Unlock()
+		if first {
+			<-release // never answers the first attempt while the test runs
+			return
+		}
+		_, _ = io.WriteString(w, plainReply)
+	}))
+	defer server.Close()
+	defer close(release) // runs before Close, so the stuck handler can end
+	client := NewClient(Options{
+		BaseURL:        server.URL,
+		APIKey:         testAPIKey,
+		Model:          "m",
+		BaseDelay:      time.Millisecond,
+		AttemptTimeout: 100 * time.Millisecond,
+	})
+
+	start := time.Now()
+	msg, err := client.Complete(context.Background(), userRequest())
+	if err != nil || msg.Content != "Salom!" {
+		t.Fatalf("msg = %+v, err = %v", msg, err)
+	}
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Errorf("took %v; the stuck attempt should have been cut off after 100ms", elapsed)
+	}
+}
+
+func TestIsOverloaded(t *testing.T) {
+	for status, want := range map[int]bool{429: true, 503: true, 500: false, 400: false} {
+		if got := IsOverloaded(&APIError{Status: status}); got != want {
+			t.Errorf("IsOverloaded(%d) = %v, want %v", status, got, want)
+		}
+	}
+	if IsOverloaded(errors.New("other")) {
+		t.Error("a non-provider error was reported as overload")
+	}
+	if !IsOverloaded(fmt.Errorf("agent: %w", &APIError{Status: 503})) {
+		t.Error("a wrapped overload error was not recognised")
 	}
 }

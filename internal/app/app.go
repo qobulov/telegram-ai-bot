@@ -25,6 +25,9 @@ import (
 // are refused with a "busy" reply.
 const queuePerWorker = 8
 
+// attemptTimeout bounds one request to the model provider.
+const attemptTimeout = 20 * time.Second
+
 // Bot is the Telegram client together with the account it acts as.
 type Bot struct {
 	Client *telegram.Client
@@ -84,7 +87,9 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Model:      cfg.Model,
 		MaxTokens:  cfg.MaxOutputTokens,
 		HTTPClient: &http.Client{Timeout: cfg.RequestTimeout},
-		Logger:     logger,
+		// A stuck attempt is retried well before the turn runs out of time.
+		AttemptTimeout: attemptTimeout,
+		Logger:         logger,
 	})
 	assistant := agent.New(agent.Options{
 		Store:        store,

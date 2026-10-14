@@ -31,8 +31,12 @@ type Options struct {
 	MaxTokens   int
 	MaxAttempts int
 	BaseDelay   time.Duration
-	HTTPClient  *http.Client
-	Logger      *slog.Logger
+	// AttemptTimeout bounds one attempt. A provider under load sometimes
+	// holds a request without answering; past this, the attempt is given up
+	// and retried. Zero means only the caller's context limits it.
+	AttemptTimeout time.Duration
+	HTTPClient     *http.Client
+	Logger         *slog.Logger
 }
 
 // Client talks to OpenRouter. It is safe for concurrent use.
@@ -87,7 +91,7 @@ func (c *Client) completeWithRetry(ctx context.Context, req Request, withTools b
 		return Message{}, fmt.Errorf("encode request: %w", err)
 	}
 	for attempt := 1; ; attempt++ {
-		msg, err := c.send(ctx, body)
+		msg, err := c.attempt(ctx, body)
 		if err == nil || attempt >= c.opts.MaxAttempts || !isRetryable(ctx, err) {
 			return msg, err
 		}
@@ -95,6 +99,26 @@ func (c *Client) completeWithRetry(ctx context.Context, req Request, withTools b
 			return Message{}, err
 		}
 	}
+}
+
+// attempt sends the request once, within AttemptTimeout.
+func (c *Client) attempt(ctx context.Context, body []byte) (Message, error) {
+	if c.opts.AttemptTimeout <= 0 {
+		return c.send(ctx, body)
+	}
+	ctx, cancel := context.WithTimeout(ctx, c.opts.AttemptTimeout)
+	defer cancel()
+	return c.send(ctx, body)
+}
+
+// IsOverloaded reports that the provider refused because it is busy or the
+// account is over its limits: 429 or 503. Trying again later may work.
+func IsOverloaded(err error) bool {
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	return apiErr.Status == http.StatusTooManyRequests || apiErr.Status == http.StatusServiceUnavailable
 }
 
 type chatRequest struct {

@@ -26,6 +26,7 @@ Send /reset to delete the conversation history.`
 	textAdminsOnly       = "Only this group's admins can do that."
 	textGroupsOnly       = "That command is for groups."
 	textTimeout          = "That took too long to answer. Please try again."
+	textOverloaded       = "The AI is overloaded right now. Give it a minute and try again."
 	textError            = "Something went wrong on my side. Please try again later."
 	textTooLong          = "Your message is too long. Please keep it under %d characters."
 	textModel            = "Current model: %s"

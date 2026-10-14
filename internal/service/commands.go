@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"telegram-ai-bot/internal/agent"
+	"telegram-ai-bot/internal/ai"
 )
 
 // outcome is what handling a message produced: the text to send back, and
@@ -128,6 +129,9 @@ func (s *Service) ask(ctx context.Context, in incoming) outcome {
 	case errors.Is(err, agent.ErrDuplicate):
 		log.Info("duplicate update skipped")
 		return outcome{}
+	case ai.IsOverloaded(err):
+		log.Warn("model provider overloaded or over its limits", "error", err)
+		return say(textOverloaded)
 	case errors.Is(err, context.DeadlineExceeded):
 		log.Warn("turn timed out")
 		return say(textTimeout)

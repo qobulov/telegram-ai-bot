@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"telegram-ai-bot/internal/ai"
 	"testing"
 	"time"
 	"unicode/utf16"
@@ -1349,5 +1350,19 @@ func TestMuteCommandWorksInServerlessMode(t *testing.T) {
 	expectOneReply(t, f.sender.messages(), textMuted)
 	if len(f.muter.calls) != 1 || !f.muter.calls[0].muted {
 		t.Errorf("mute changes = %+v", f.muter.calls)
+	}
+}
+
+func TestOverloadedProviderGetsItsOwnMessage(t *testing.T) {
+	for _, status := range []int{429, 503} {
+		f := newFixture()
+		f.replier.err = &ai.APIError{Status: status, Message: "This model is currently experiencing high demand"}
+
+		sent := f.run(inGroup(groupMessage("Mira, alive?")))
+
+		expectOneReply(t, sent, textOverloaded)
+		if sent[0].replyTo != 30 {
+			t.Errorf("status %d: the notice does not reply to the message: %+v", status, sent[0])
+		}
 	}
 }
