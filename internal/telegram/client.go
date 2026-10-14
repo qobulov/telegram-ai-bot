@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"mime/multipart"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -155,6 +157,86 @@ func (c *Client) download(ctx context.Context, path string, maxBytes int64) ([]b
 		return nil, ErrFileTooLarge
 	}
 	return data, nil
+}
+
+// CaptionLimit is the longest photo caption Telegram accepts.
+const CaptionLimit = 1024
+
+// Photo is a picture to send.
+type Photo struct {
+	ChatID           int64
+	ReplyToMessageID int64
+	Data             []byte
+	Caption          string
+}
+
+// SendPhoto uploads a picture and returns the ID of the sent message. A
+// caption longer than Telegram allows is cut.
+func (c *Client) SendPhoto(ctx context.Context, photo Photo) (int64, error) {
+	body, contentType, err := photoForm(photo)
+	if err != nil {
+		return 0, fmt.Errorf("telegram sendPhoto: encode: %w", err)
+	}
+	endpoint := c.opts.BaseURL + "/bot" + c.opts.Token + "/sendPhoto"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, body)
+	if err != nil {
+		return 0, errors.New("telegram sendPhoto: build request")
+	}
+	req.Header.Set("Content-Type", contentType)
+	resp, err := c.opts.HTTPClient.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("telegram sendPhoto: %w", withoutURL(err))
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	if err != nil {
+		return 0, fmt.Errorf("telegram sendPhoto: read response: %w", err)
+	}
+	var sent sentMessage
+	if err := decode("sendPhoto", resp.StatusCode, raw, &sent); err != nil {
+		return 0, err
+	}
+	return sent.MessageID, nil
+}
+
+func photoForm(photo Photo) (io.Reader, string, error) {
+	var body bytes.Buffer
+	form := multipart.NewWriter(&body)
+	fields := map[string]string{"chat_id": strconv.FormatInt(photo.ChatID, 10)}
+	if caption := strings.TrimSpace(photo.Caption); caption != "" {
+		fields["caption"] = cutRunes(caption, CaptionLimit)
+	}
+	if reply := replyTo(photo.ReplyToMessageID); reply != nil {
+		encoded, err := json.Marshal(reply)
+		if err != nil {
+			return nil, "", err
+		}
+		fields["reply_parameters"] = string(encoded)
+	}
+	for name, value := range fields {
+		if err := form.WriteField(name, value); err != nil {
+			return nil, "", err
+		}
+	}
+	file, err := form.CreateFormFile("photo", "image.png")
+	if err != nil {
+		return nil, "", err
+	}
+	if _, err := file.Write(photo.Data); err != nil {
+		return nil, "", err
+	}
+	if err := form.Close(); err != nil {
+		return nil, "", err
+	}
+	return &body, form.FormDataContentType(), nil
+}
+
+func cutRunes(text string, limit int) string {
+	runes := []rune(text)
+	if len(runes) <= limit {
+		return text
+	}
+	return string(runes[:limit-1]) + "…"
 }
 
 type getChatMemberParams struct {

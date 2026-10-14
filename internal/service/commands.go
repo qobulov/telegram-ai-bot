@@ -10,6 +10,8 @@ import (
 
 	"telegram-ai-bot/internal/agent"
 	"telegram-ai-bot/internal/ai"
+	"telegram-ai-bot/internal/telegram"
+	"telegram-ai-bot/internal/tools"
 )
 
 // outcome is what handling a message produced: the text to send back, and
@@ -17,6 +19,8 @@ import (
 type outcome struct {
 	text     string
 	answerID int64
+	// drawings are pictures made during the turn, sent with the text.
+	drawings []tools.Drawing
 }
 
 func say(text string) outcome { return outcome{text: text} }
@@ -42,13 +46,56 @@ func (s *Service) process(in incoming) {
 	}
 	in.described = s.describe(ctx, in.msg, in.text)
 	out := s.respond(ctx, in)
-	if out.text != "" {
-		sentID := s.reply(in, out.text)
-		if out.answerID != 0 && sentID != 0 {
-			s.recordSent(out.answerID, sentID)
-		}
+	if sentID := s.deliver(in, out); out.answerID != 0 && sentID != 0 {
+		s.recordSent(out.answerID, sentID)
 	}
 	s.logExchange(in, out)
+}
+
+// deliver sends the outcome and returns the ID of the message that carries
+// the answer. A picture goes first, with the answer as its caption when it
+// fits; a longer answer follows as its own message.
+func (s *Service) deliver(in incoming, out outcome) int64 {
+	if len(out.drawings) == 0 {
+		if out.text == "" {
+			return 0
+		}
+		return s.reply(in, out.text)
+	}
+	caption := out.text
+	if utf8.RuneCountInString(caption) > telegram.CaptionLimit {
+		caption = ""
+	}
+	var answerID int64
+	for i, drawing := range out.drawings {
+		text := ""
+		if i == 0 {
+			text = caption
+		}
+		if id := s.replyPhoto(in, drawing, text); answerID == 0 {
+			answerID = id
+		}
+	}
+	if caption == "" && out.text != "" {
+		answerID = s.reply(in, out.text)
+	}
+	return answerID
+}
+
+func (s *Service) replyPhoto(in incoming, drawing tools.Drawing, caption string) int64 {
+	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
+	defer cancel()
+	sentID, err := s.opts.Sender.SendPhoto(ctx, telegram.Photo{
+		ChatID:           in.msg.Chat.ID,
+		ReplyToMessageID: in.replyTarget(),
+		Data:             drawing.Data,
+		Caption:          caption,
+	})
+	if err != nil {
+		s.opts.Logger.Error("send photo failed", "chat_id", in.msg.Chat.ID, "error", err)
+		return 0
+	}
+	return sentID
 }
 
 // logExchange adds an addressed group message, and the bot's answer to it,
@@ -60,7 +107,11 @@ func (s *Service) logExchange(in incoming, out outcome) {
 	}
 	s.ambient.add(in.scope.ChatID, in.msg.MessageID, in.userID, s.label(in.msg.From), in.described)
 	if out.answerID != 0 {
-		s.ambient.add(in.scope.ChatID, 0, s.opts.Bot.ID, botAuthor, out.text)
+		answer := out.text
+		if len(out.drawings) > 0 {
+			answer = "<photo> " + answer
+		}
+		s.ambient.add(in.scope.ChatID, 0, s.opts.Bot.ID, botAuthor, answer)
 	}
 }
 
@@ -129,6 +180,15 @@ func hasNoText(in incoming) bool {
 
 func (s *Service) ask(ctx context.Context, in incoming) outcome {
 	started := time.Now()
+	sink := &tools.Sink{}
+	ctx = tools.WithTurn(ctx, tools.Caller{UserID: in.userID, ChatID: in.scope.ChatID, Owner: s.isOwner(in.msg.From)}, sink)
+	out := s.answerOf(ctx, in, started)
+	// A picture drawn before a later failure is still worth sending.
+	out.drawings = sink.Take()
+	return out
+}
+
+func (s *Service) answerOf(ctx context.Context, in incoming, started time.Time) outcome {
 	answer, err := s.opts.Replier.Reply(ctx, s.request(ctx, in))
 	log := s.opts.Logger.With("user_id", in.userID, "chat_id", in.scope.ChatID,
 		"update_id", in.updateID, "duration", time.Since(started).String())

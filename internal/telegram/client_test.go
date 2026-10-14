@@ -506,3 +506,55 @@ func TestDownloadFileErrorsDoNotLeakTheToken(t *testing.T) {
 		}
 	}
 }
+
+func TestSendPhotoUploadsTheImageAsAReply(t *testing.T) {
+	var got struct {
+		method, chatID, caption, reply string
+		photo                          []byte
+		filename                       string
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got.method = strings.TrimPrefix(r.URL.Path, "/bot"+testToken+"/")
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			t.Errorf("not a multipart upload: %v", err)
+		}
+		got.chatID, got.caption, got.reply = r.FormValue("chat_id"), r.FormValue("caption"), r.FormValue("reply_parameters")
+		file, header, err := r.FormFile("photo")
+		if err == nil {
+			got.photo, _ = io.ReadAll(file)
+			got.filename = header.Filename
+		}
+		_, _ = io.WriteString(w, `{"ok":true,"result":{"message_id":777}}`)
+	}))
+	defer server.Close()
+	client := NewClient(Options{Token: testToken, BaseURL: server.URL})
+
+	id, err := client.SendPhoto(context.Background(), Photo{ChatID: -100, ReplyToMessageID: 30, Data: []byte("PNGDATA"), Caption: "here you go"})
+	if err != nil || id != 777 {
+		t.Fatalf("id = %d, err = %v", id, err)
+	}
+	if got.method != "sendPhoto" || got.chatID != "-100" || got.caption != "here you go" || string(got.photo) != "PNGDATA" || got.filename == "" {
+		t.Errorf("request = %+v", got)
+	}
+	if !strings.Contains(got.reply, `"message_id":30`) {
+		t.Errorf("reply_parameters = %q", got.reply)
+	}
+}
+
+func TestSendPhotoCutsLongCaptions(t *testing.T) {
+	var caption string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseMultipartForm(1 << 20)
+		caption = r.FormValue("caption")
+		_, _ = io.WriteString(w, `{"ok":true,"result":{"message_id":1}}`)
+	}))
+	defer server.Close()
+	client := NewClient(Options{Token: testToken, BaseURL: server.URL})
+
+	if _, err := client.SendPhoto(context.Background(), Photo{ChatID: 1, Data: []byte("x"), Caption: strings.Repeat("я", 2000)}); err != nil {
+		t.Fatal(err)
+	}
+	if n := len([]rune(caption)); n > CaptionLimit {
+		t.Errorf("caption is %d characters, over Telegram's %d", n, CaptionLimit)
+	}
+}

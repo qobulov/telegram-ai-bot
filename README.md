@@ -24,14 +24,15 @@ time, calculator, bot help).
 5. [Choosing a model](#choosing-a-model)
 6. [The character](#the-character)
 7. [Photos, stickers, GIFs and voice messages](#photos-stickers-gifs-and-voice-messages)
-8. [Groups](#groups)
-9. [VPS deployment (systemd)](#vps-deployment-systemd)
-10. [Docker Compose deployment (optional)](#docker-compose-deployment-optional)
-11. [Vercel deployment (webhook)](#vercel-deployment-webhook)
-12. [Backup and restore](#backup-and-restore)
-13. [Long polling and webhooks](#long-polling-and-webhooks)
-14. [Security checklist](#security-checklist)
-15. [Troubleshooting](#troubleshooting)
+8. [Drawing pictures](#drawing-pictures)
+9. [Groups](#groups)
+10. [VPS deployment (systemd)](#vps-deployment-systemd)
+11. [Docker Compose deployment (optional)](#docker-compose-deployment-optional)
+12. [Vercel deployment (webhook)](#vercel-deployment-webhook)
+13. [Backup and restore](#backup-and-restore)
+14. [Long polling and webhooks](#long-polling-and-webhooks)
+15. [Security checklist](#security-checklist)
+16. [Troubleshooting](#troubleshooting)
 
 ## Architecture
 
@@ -140,6 +141,9 @@ in the environment win over the file.
 | `XAI_MODEL` | `grok-4` | Grok model ID, used with `XAI_API_KEY` |
 | `MAX_MEDIA_MB` | `5` | Largest photo or sticker file downloaded for the model (1 to 20) |
 | `MAX_VOICE_SECONDS` | `120` | Longest voice message passed to the model |
+| `ENABLE_IMAGE_GENERATION` | `true` | Let the bot draw pictures (Gemini only; needs billing on the Gemini key) |
+| `IMAGE_MODEL` | `gemini-3.1-flash-image` | Gemini model that draws |
+| `DAILY_IMAGE_LIMIT` | `2` | Pictures per user per day; owners have no limit; `0` lets only owners draw |
 | `DB_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
 | `TELEGRAM_WEBHOOK_SECRET` | empty | Only for webhook deployments; see [Vercel deployment](#vercel-deployment-webhook) |
 | `CRON_SECRET` | empty | Only on Vercel: protects the daily cleanup endpoint |
@@ -381,6 +385,25 @@ in any group. In groups every sender is shown to the model by first name and `@u
 Your messages are additionally marked `[owner]`, based on your
 Telegram account, so someone who copies your name or says they are the owner
 gets no special treatment.
+
+## Drawing pictures
+
+With a Gemini key the bot can draw. When someone asks for a picture ("Maria,
+mushuk chizib ber"), the model calls the `generate_image` tool with an
+English prompt, the picture is drawn by `IMAGE_MODEL`, and it is posted as a
+reply with the bot's answer as its caption.
+
+- Owners (`BOT_OWNER_USERNAME`) may draw as much as they like.
+- Everyone else gets `DAILY_IMAGE_LIMIT` pictures a day (default 2),
+  counted per user in the `image_generations` table from midnight in
+  `GROUP_HISTORY_TIMEZONE`. The count is safe with several copies of the bot
+  running at once. A picture that fails to draw does not count.
+- Over the limit, the model tells the person they can get more tomorrow.
+
+**Gemini's free tier does not include image generation**: with a free key
+every request is refused with `429 You exceeded your current quota`, and the
+bot says drawing is not available right now. Turn on billing for the key in
+Google AI Studio to use it. Each picture is billed by Google.
 
 ## Groups
 

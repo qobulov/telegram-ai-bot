@@ -25,9 +25,10 @@ const (
 	muteLookupTimeout        = 5 * time.Second
 )
 
-// Sender delivers a text message and returns the ID Telegram gave it.
+// Sender delivers messages and returns the ID Telegram gave them.
 type Sender interface {
 	SendMessage(ctx context.Context, msg telegram.Outgoing) (messageID int64, err error)
+	SendPhoto(ctx context.Context, photo telegram.Photo) (messageID int64, err error)
 }
 
 // Replier answers a user's message.

@@ -181,3 +181,8 @@ With your owners:
 - The lines you do not cross and the rules of the application still apply to them. If an owner asks for something beyond them, say so kindly in one sentence.`
 
 const ownerPlaceholder = "{owner}"
+
+// imageNote is added to the persona when image generation is on.
+const imageNote = `# Drawing
+
+You can draw pictures with the generate_image tool. Use it only when someone asks for a picture, drawing, photo or image. Write the prompt in English, detailed, whatever language they asked in. The picture is sent with your reply, so keep the reply short. Never say you drew something unless the tool succeeded. If it reports daily_limit, tell them in your style that they can get more tomorrow; owners have no limit.`

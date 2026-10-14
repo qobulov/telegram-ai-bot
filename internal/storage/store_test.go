@@ -6,6 +6,8 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -43,7 +45,7 @@ func newTestStore(t *testing.T) *Store {
 	}
 	t.Cleanup(store.Close)
 
-	if _, err := store.pool.Exec(ctx, `DROP TABLE IF EXISTS messages, conversations, users, chats, group_messages, schema_migrations CASCADE`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DROP TABLE IF EXISTS messages, conversations, users, chats, group_messages, image_generations, schema_migrations CASCADE`); err != nil {
 		t.Fatalf("drop tables: %v", err)
 	}
 	if _, err := store.Migrate(ctx); err != nil {
@@ -104,7 +106,7 @@ func TestMigrateIsIdempotent(t *testing.T) {
 func TestMigrateReportsAppliedCount(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
-	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, group_messages, schema_migrations CASCADE`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, group_messages, image_generations, schema_migrations CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 
@@ -767,6 +769,62 @@ func TestExpireAlsoRemovesOldGroupMessages(t *testing.T) {
 	}
 	if rows := countRows(t, store, "group_messages"); rows != 1 {
 		t.Errorf("group_messages rows = %d, want 1", rows)
+	}
+}
+
+func TestImageReservationsAreCountedPerUserPerDay(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	today := time.Now().Add(-time.Hour)
+
+	for i := range 2 {
+		id, ok, err := store.ReserveImage(ctx, alice, group, today, 2)
+		if err != nil || !ok || id == 0 {
+			t.Fatalf("reservation %d: id = %d, ok = %v, err = %v", i+1, id, ok, err)
+		}
+	}
+	if _, ok, err := store.ReserveImage(ctx, alice, group, today, 2); err != nil || ok {
+		t.Errorf("third reservation: ok = %v, err = %v; the daily limit is 2", ok, err)
+	}
+	if _, ok, _ := store.ReserveImage(ctx, bob, group, today, 2); !ok {
+		t.Error("another user was refused because of alice's count")
+	}
+	if _, ok, _ := store.ReserveImage(ctx, alice, group, time.Now().Add(time.Hour), 2); !ok {
+		t.Error("yesterday's images counted against a new day")
+	}
+}
+
+func TestReleasedReservationDoesNotCount(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	since := time.Now().Add(-time.Hour)
+	id, _, _ := store.ReserveImage(ctx, alice, group, since, 1)
+
+	if err := store.ReleaseImage(ctx, id); err != nil {
+		t.Fatalf("ReleaseImage: %v", err)
+	}
+	if _, ok, _ := store.ReserveImage(ctx, alice, group, since, 1); !ok {
+		t.Error("a failed generation still used up the day's only image")
+	}
+}
+
+func TestConcurrentReservationsRespectTheLimit(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	since := time.Now().Add(-time.Hour)
+
+	var granted atomic.Int32
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() {
+			if _, ok, err := store.ReserveImage(ctx, alice, group, since, 2); err == nil && ok {
+				granted.Add(1)
+			}
+		})
+	}
+	wg.Wait()
+	if n := granted.Load(); n != 2 {
+		t.Errorf("granted = %d of 8 simultaneous requests, want exactly 2", n)
 	}
 }
 

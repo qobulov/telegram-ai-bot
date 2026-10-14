@@ -27,6 +27,7 @@ const (
 	codeTimeout          = "timeout"
 	codeOutputTooLarge   = "output_too_large"
 	codeExecutionFailed  = "execution_failed"
+	codeDailyLimit       = "daily_limit"
 )
 
 // Tool is one function the model may call.
@@ -172,7 +173,10 @@ func runWithTimeout(ctx context.Context, tool Tool, args json.RawMessage) (any, 
 
 func errorCode(err error) string {
 	var argErr *ArgumentError
+	var limitErr *LimitError
 	switch {
+	case errors.As(err, &limitErr):
+		return codeDailyLimit
 	case errors.As(err, &argErr):
 		return codeInvalidArguments
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):

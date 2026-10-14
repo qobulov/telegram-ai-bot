@@ -710,3 +710,33 @@ func TestOwnersAreEquals(t *testing.T) {
 		t.Error("the persona does not forbid ranking or mocking an owner")
 	}
 }
+
+func TestImageGenerationSettings(t *testing.T) {
+	cfg, err := Load(getenv(geminiEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.ImagesEnabled || cfg.ImageModel != "gemini-3.1-flash-image" || cfg.DailyImageLimit != 2 {
+		t.Errorf("images = %v, model = %q, limit = %d", cfg.ImagesEnabled, cfg.ImageModel, cfg.DailyImageLimit)
+	}
+	if cfg.ImageBaseURL != "https://generativelanguage.googleapis.com/v1beta" {
+		t.Errorf("ImageBaseURL = %q, want Gemini's native API", cfg.ImageBaseURL)
+	}
+	if !strings.Contains(cfg.PersonaPrompt, "generate_image") {
+		t.Error("the persona does not tell the model it can draw")
+	}
+
+	env := geminiEnv()
+	env["ENABLE_IMAGE_GENERATION"] = "false"
+	if cfg, _ := Load(getenv(env)); cfg.ImagesEnabled || strings.Contains(cfg.PersonaPrompt, "generate_image") {
+		t.Error("image generation could not be turned off")
+	}
+	env = geminiEnv()
+	env["DAILY_IMAGE_LIMIT"] = "0"
+	if cfg, err := Load(getenv(env)); err != nil || cfg.DailyImageLimit != 0 {
+		t.Errorf("DAILY_IMAGE_LIMIT=0 (owners only): %d, %v", cfg.DailyImageLimit, err)
+	}
+	if cfg, _ := Load(getenv(validEnv())); cfg.ImagesEnabled {
+		t.Error("image generation is on without a Gemini key")
+	}
+}

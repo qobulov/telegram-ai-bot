@@ -46,6 +46,12 @@ type Config struct {
 	// AudioInput is true when the provider understands voice messages.
 	AudioInput bool
 
+	// Image generation, Gemini only. Owners have no daily limit.
+	ImagesEnabled   bool
+	ImageModel      string
+	ImageBaseURL    string
+	DailyImageLimit int
+
 	// Media limits: the largest file the bot downloads, and the longest
 	// voice message it listens to.
 	MaxMediaBytes   int64
@@ -142,6 +148,13 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.Location = r.location("GROUP_HISTORY_TIMEZONE", "Asia/Tashkent")
 	cfg.OwnerUsernames = r.usernames("BOT_OWNER_USERNAME")
 	cfg.PersonaPrompt = strings.ReplaceAll(r.text("PERSONA_PROMPT", defaultPersona), namePlaceholder, cfg.BotDisplayName)
+	cfg.ImagesEnabled = cfg.AIProvider == providerGemini && r.boolean("ENABLE_IMAGE_GENERATION", true)
+	cfg.ImageModel = r.text("IMAGE_MODEL", "gemini-3.1-flash-image")
+	cfg.ImageBaseURL = strings.TrimSuffix(cfg.AIBaseURL, "/openai")
+	cfg.DailyImageLimit = r.integer("DAILY_IMAGE_LIMIT", 2, 0)
+	if cfg.ImagesEnabled {
+		cfg.PersonaPrompt += "\n\n" + imageNote
+	}
 	if len(cfg.OwnerUsernames) > 0 {
 		cfg.PersonaPrompt += "\n\n" + strings.ReplaceAll(ownerNote, ownerPlaceholder, mentionList(cfg.OwnerUsernames))
 	}

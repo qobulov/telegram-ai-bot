@@ -78,7 +78,11 @@ func (m groupMembers) IsGroupAdmin(ctx context.Context, chatID, userID int64) (b
 
 // NewService wires the tools, the model client, the agent and the service.
 func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, logger *slog.Logger) (*service.Service, error) {
-	registry, err := tools.NewRegistry(cfg.IsAdmin, tools.Builtin(service.HelpText())...)
+	builtin := tools.Builtin(service.HelpText())
+	if cfg.ImagesEnabled {
+		builtin = append(builtin, imageTool(cfg, store))
+	}
+	registry, err := tools.NewRegistry(cfg.IsAdmin, builtin...)
 	if err != nil {
 		return nil, err
 	}
@@ -144,6 +148,20 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		opts.MuteStore = store
 	}
 	return service.New(opts), nil
+}
+
+// imageTool draws with Gemini and counts pictures in the database.
+func imageTool(cfg config.Config, store *storage.Store) tools.Tool {
+	return tools.ImageTool(tools.ImageOptions{
+		Generator: ai.NewImageClient(ai.ImageOptions{
+			BaseURL: cfg.ImageBaseURL,
+			APIKey:  cfg.AIAPIKey,
+			Model:   cfg.ImageModel,
+		}),
+		Quota:      store,
+		DailyLimit: cfg.DailyImageLimit,
+		Location:   cfg.Location,
+	})
 }
 
 // transcriber is the model client when the provider can listen to audio,

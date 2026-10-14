@@ -16,6 +16,7 @@ import (
 	"telegram-ai-bot/internal/agent"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
+	"telegram-ai-bot/internal/tools"
 )
 
 const adminID, userID = int64(1), int64(2)
@@ -24,6 +25,7 @@ type sentMessage struct {
 	chatID  int64
 	text    string
 	replyTo int64
+	photo   bool
 }
 
 type fakeSender struct {
@@ -41,6 +43,16 @@ func (f *fakeSender) SendMessage(ctx context.Context, msg telegram.Outgoing) (in
 	return int64(1000 + len(f.sent)), nil
 }
 
+func (f *fakeSender) SendPhoto(ctx context.Context, photo telegram.Photo) (int64, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sent = append(f.sent, sentMessage{chatID: photo.ChatID, text: photo.Caption, replyTo: photo.ReplyToMessageID, photo: true})
+	return int64(1000 + len(f.sent)), nil
+}
+
 func (f *fakeSender) messages() []sentMessage {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -51,6 +63,8 @@ type replyCall struct {
 	userID, updateID int64
 	text             string
 	req              agent.Request
+	hadSink          bool
+	caller           tools.Caller
 }
 
 type fakeReplier struct {
@@ -61,12 +75,24 @@ type fakeReplier struct {
 	release chan struct{} // each call waits for it, if set
 	// waitForDeadline makes Reply use up the whole turn timeout.
 	waitForDeadline bool
+	// draws is how many pictures Reply draws, as the image tool would.
+	draws int
+	// answer replaces the echo when set.
+	answer string
 }
 
 func (f *fakeReplier) Reply(ctx context.Context, req agent.Request) (agent.Answer, error) {
 	text := req.Text
 	f.mu.Lock()
-	f.calls = append(f.calls, replyCall{userID: req.Scope.UserID, updateID: req.UpdateID, text: text, req: req})
+	call := replyCall{userID: req.Scope.UserID, updateID: req.UpdateID, text: text, req: req}
+	if sink, ok := tools.SinkFrom(ctx); ok {
+		call.hadSink = true
+		for range f.draws {
+			sink.Add(tools.Drawing{Data: []byte("PNG"), MimeType: "image/png"})
+		}
+	}
+	call.caller, _ = tools.CallerFrom(ctx)
+	f.calls = append(f.calls, call)
 	err := f.err
 	f.mu.Unlock()
 
@@ -82,6 +108,9 @@ func (f *fakeReplier) Reply(ctx context.Context, req agent.Request) (agent.Answe
 	}
 	if err != nil {
 		return agent.Answer{}, err
+	}
+	if f.answer != "" {
+		return agent.Answer{Text: f.answer, ID: 9001}, nil
 	}
 	return agent.Answer{Text: "echo: " + strings.TrimPrefix(text, req.AuthorName+": "), ID: 9001}, nil
 }
@@ -1513,5 +1542,52 @@ func TestUsernamesAreShownToTheModel(t *testing.T) {
 
 	if req := f.replier.recorded()[0].req; req.Text != "Ann @ann_k: salom" {
 		t.Errorf("text = %q, want the first name and the username", req.Text)
+	}
+}
+
+func TestDrawnPictureIsSentWithTheAnswerAsCaption(t *testing.T) {
+	f := newFixture()
+	f.replier.draws = 1
+
+	sent := f.run(inGroup(groupMessage("Mira, draw a cat")))
+
+	if len(sent) != 1 || !sent[0].photo || sent[0].text != "echo: draw a cat" || sent[0].replyTo != 30 {
+		t.Fatalf("sent = %+v, want one photo replying to the message with the answer as caption", sent)
+	}
+	if got := f.recorder.calls; len(got) != 1 || got[0].messageID != 1001 {
+		t.Errorf("recorded = %+v, want the photo's message ID", got)
+	}
+	if log := f.chatLog.texts(groupID); len(log) != 2 || log[1] != "You: <photo> echo: draw a cat" {
+		t.Errorf("log = %q", log)
+	}
+}
+
+func TestLongAnswerFollowsThePicture(t *testing.T) {
+	f := newFixture()
+	f.replier.draws = 1
+	f.replier.answer = strings.Repeat("a", telegram.CaptionLimit+10)
+
+	sent := f.run(textFrom(userID, "draw"))
+
+	if len(sent) != 2 || !sent[0].photo || sent[0].text != "" || sent[1].photo || sent[1].text != f.replier.answer {
+		t.Errorf("sent = %d messages; want the photo, then the long answer as text", len(sent))
+	}
+}
+
+func TestTurnTellsToolsWhoIsAsking(t *testing.T) {
+	f := newFixture()
+	f.opts.OwnerUsernames = []string{ownerUsername}
+
+	f.run(inGroup(fromOwner(groupMessage("Mira, draw"))), inGroup(groupMessage("Mira, draw")))
+
+	calls := f.replier.recorded()
+	if len(calls) != 2 || !calls[0].hadSink {
+		t.Fatalf("calls = %+v", calls)
+	}
+	if c := calls[0].caller; !c.Owner || c.UserID != 9001 || c.ChatID != groupID {
+		t.Errorf("owner's caller = %+v", c)
+	}
+	if c := calls[1].caller; c.Owner || c.UserID != userID {
+		t.Errorf("member's caller = %+v", c)
 	}
 }
