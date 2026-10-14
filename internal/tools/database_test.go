@@ -37,20 +37,20 @@ func (f *fakeDatabase) GroupMessagesSince(_ context.Context, chatID int64, _ tim
 	return messages, nil
 }
 
-type fakeMembers map[int64]int
+type fakeMembers map[int64]Membership
 
-func (f fakeMembers) MemberCount(_ context.Context, chatID int64) (int, error) {
-	if n, ok := f[chatID]; ok {
-		return n, nil
+func (f fakeMembers) Membership(_ context.Context, chatID int64) (Membership, error) {
+	if m, ok := f[chatID]; ok {
+		return m, nil
 	}
-	return 0, ErrNotInGroup
+	return Membership{}, ErrNotInGroup
 }
 
 func databaseRegistry(t *testing.T, db *fakeDatabase) *Registry {
 	t.Helper()
 	tool := DatabaseTool(DatabaseOptions{
 		Store:    db,
-		Members:  fakeMembers{groupA: 12},
+		Members:  fakeMembers{groupA: {Status: "administrator", Members: 12, Title: "Devs Uz"}},
 		Location: tashkent,
 		Now:      func() time.Time { return time.Date(2026, 10, 14, 15, 0, 0, 0, tashkent) },
 	})
@@ -97,32 +97,47 @@ func TestOverviewCountsFromTheStartOfToday(t *testing.T) {
 	}
 }
 
-func TestGroupsShowWhetherTheBotIsStillThere(t *testing.T) {
+func TestGroupsShowTheBotsLiveStatus(t *testing.T) {
 	env := query(databaseRegistry(t, &fakeDatabase{}), ownerIn(userID), `{"action":"groups"}`)
 	if !env.OK {
 		t.Fatalf("groups = %+v", env)
 	}
 	var result struct {
 		Groups []struct {
-			ChatID     int64 `json:"chat_id"`
-			Title      string
-			Members    *int  `json:"members"`
-			BotInGroup *bool `json:"bot_in_group"`
+			Title      string `json:"title"`
+			Members    *int   `json:"members"`
+			BotInGroup *bool  `json:"bot_in_group"`
+			BotStatus  string `json:"bot_status"`
+			BotIsAdmin bool   `json:"bot_is_admin"`
 		} `json:"groups"`
-		BotIsIn int `json:"bot_is_in"`
+		BotIsIn    int `json:"bot_is_in"`
+		BotIsAdmin int `json:"bot_is_admin_in"`
 	}
 	if err := json.Unmarshal(env.Result, &result); err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Groups) != 2 || result.BotIsIn != 1 {
+	if len(result.Groups) != 2 || result.BotIsIn != 1 || result.BotIsAdmin != 1 {
 		t.Fatalf("result = %+v", result)
 	}
 	devs, old := result.Groups[0], result.Groups[1]
-	if devs.Members == nil || *devs.Members != 12 || devs.BotInGroup == nil || !*devs.BotInGroup {
+	if devs.Members == nil || *devs.Members != 12 || devs.BotInGroup == nil || !*devs.BotInGroup || !devs.BotIsAdmin || devs.BotStatus != "administrator" {
 		t.Errorf("devs = %+v", devs)
 	}
-	if old.BotInGroup == nil || *old.BotInGroup || old.Members != nil {
+	// Telegram's current title wins over the stored one.
+	if devs.Title != "Devs Uz" {
+		t.Errorf("title = %q", devs.Title)
+	}
+	if old.BotInGroup == nil || *old.BotInGroup || old.Members != nil || old.BotIsAdmin {
 		t.Errorf("a group that removed the bot = %+v", old)
+	}
+}
+
+func TestBotThatLeftIsNotInTheGroup(t *testing.T) {
+	tool := DatabaseTool(DatabaseOptions{Store: &fakeDatabase{}, Members: fakeMembers{groupA: {Status: "left"}, groupB: {Status: "member", Members: 3}}})
+	env := query(mustRegistry(t, tool), ownerIn(userID), `{"action":"groups"}`)
+
+	if !env.OK || !strings.Contains(string(env.Result), `"bot_is_in":1`) || !strings.Contains(string(env.Result), `"bot_is_admin_in":0`) {
+		t.Errorf("groups = %s", env.Result)
 	}
 }
 

@@ -75,3 +75,44 @@ func TestOverviewCountsWhatTheBotKnows(t *testing.T) {
 		t.Errorf("overview = %+v, want %+v", got, want)
 	}
 }
+
+func TestRecordGroupKeepsTheBotsStatus(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	if err := store.RecordGroup(ctx, GroupStatus{ChatID: group, Title: "Devs", BotStatus: "administrator"}); err != nil {
+		t.Fatalf("RecordGroup: %v", err)
+	}
+	// A later message must not reset what Telegram said about the bot.
+	logMessage(t, store, group, "Ann", "hi")
+
+	groups, err := store.Groups(ctx, time.Now().Add(-time.Hour), 10)
+	if err != nil || len(groups) != 1 || groups[0].BotStatus != "administrator" || groups[0].Title != "Devs" {
+		t.Errorf("groups = %+v, err = %v", groups, err)
+	}
+	if err := store.RecordGroup(ctx, GroupStatus{ChatID: group, Title: "Devs", BotStatus: "kicked"}); err != nil {
+		t.Fatal(err)
+	}
+	if groups, _ := store.Groups(ctx, time.Now().Add(-time.Hour), 10); groups[0].BotStatus != "kicked" {
+		t.Errorf("status after removal = %q", groups[0].BotStatus)
+	}
+}
+
+func TestMigrationRecordsGroupsSeenBefore(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	logMessage(t, store, group, "Ann", "hi")
+	if err := store.SetMuted(ctx, otherGroup, true, alice); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.pool.Exec(ctx, `DELETE FROM groups; DELETE FROM schema_migrations WHERE version = 9`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Migrate(ctx); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+
+	groups, err := store.Groups(ctx, time.Now().Add(-time.Hour), 10)
+	if err != nil || len(groups) != 2 {
+		t.Errorf("groups = %+v, err = %v; both groups the bot knew of should be listed", groups, err)
+	}
+}

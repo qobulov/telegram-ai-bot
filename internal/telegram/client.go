@@ -59,6 +59,10 @@ func NewClient(opts Options) *Client {
 	return &Client{opts: opts}
 }
 
+// allowedUpdates are the update kinds the bot asks Telegram for: messages,
+// and changes to its own membership, which keep its list of groups true.
+var allowedUpdates = []string{"message", "my_chat_member"}
+
 type getUpdatesParams struct {
 	Offset         int64    `json:"offset"`
 	Timeout        int      `json:"timeout"`
@@ -70,7 +74,7 @@ func (c *Client) GetUpdates(ctx context.Context, offset int64, timeoutSeconds in
 	params := getUpdatesParams{
 		Offset:         offset,
 		Timeout:        timeoutSeconds,
-		AllowedUpdates: []string{"message"},
+		AllowedUpdates: allowedUpdates,
 	}
 	var updates []Update
 	if err := c.call(ctx, "getUpdates", params, &updates); err != nil {
@@ -100,7 +104,7 @@ type setWebhookParams struct {
 // update, which is how the receiver knows a request is genuine. While a
 // webhook is set, long polling with the same token does not work.
 func (c *Client) SetWebhook(ctx context.Context, url, secret string) error {
-	params := setWebhookParams{URL: url, SecretToken: secret, AllowedUpdates: []string{"message"}}
+	params := setWebhookParams{URL: url, SecretToken: secret, AllowedUpdates: allowedUpdates}
 	return c.call(ctx, "setWebhook", params, nil)
 }
 
@@ -252,6 +256,15 @@ func (c *Client) GetChatMember(ctx context.Context, chatID, userID int64) (ChatM
 		return ChatMember{}, err
 	}
 	return member, nil
+}
+
+// GetChat returns a chat's current details, such as a group's title.
+func (c *Client) GetChat(ctx context.Context, chatID int64) (Chat, error) {
+	var chat Chat
+	if err := c.call(ctx, "getChat", chatParams{ChatID: chatID}, &chat); err != nil {
+		return Chat{}, err
+	}
+	return chat, nil
 }
 
 type chatParams struct {

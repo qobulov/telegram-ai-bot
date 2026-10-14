@@ -1737,3 +1737,52 @@ func TestLoggedGroupMessagesCarryTheGroupsName(t *testing.T) {
 		t.Errorf("log = %+v; the group's name is how owners recognise it", f.chatLog.messages)
 	}
 }
+
+type fakeGroups struct {
+	mu       sync.Mutex
+	recorded []storage.GroupStatus
+}
+
+func (f *fakeGroups) RecordGroup(_ context.Context, g storage.GroupStatus) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recorded = append(f.recorded, g)
+	return nil
+}
+
+func membershipChange(chat telegram.Chat, status string) telegram.Update {
+	nextUpdateID++
+	return telegram.Update{UpdateID: nextUpdateID, MyChatMember: &telegram.ChatMemberUpdated{
+		Chat: chat, From: &telegram.User{ID: groupAdminID}, NewChatMember: telegram.ChatMember{Status: status},
+	}}
+}
+
+func TestBeingAddedToAGroupIsRecorded(t *testing.T) {
+	f := newFixture()
+	groups := &fakeGroups{}
+	f.opts.Groups = groups
+	devs := telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup, Title: "Devs", Username: "devs_uz"}
+
+	sent := f.run(membershipChange(devs, "administrator"), membershipChange(telegram.Chat{ID: userID, Type: telegram.ChatTypePrivate}, "kicked"))
+
+	want := []storage.GroupStatus{{ChatID: groupID, Title: "Devs", Username: "devs_uz", BotStatus: "administrator"}}
+	if !reflect.DeepEqual(groups.recorded, want) {
+		t.Errorf("recorded = %+v, want %+v; private chats are not groups", groups.recorded, want)
+	}
+	if len(sent) != 0 {
+		t.Errorf("sent = %+v; a membership change needs no reply", sent)
+	}
+}
+
+func TestMembershipChangesAreRecordedOnTheWebhookPathToo(t *testing.T) {
+	f := newFixture()
+	groups := &fakeGroups{}
+	f.opts.Groups = groups
+	f.opts.Workers, f.opts.QueueSize = 0, 0
+
+	New(f.opts).HandleNow(membershipChange(telegram.Chat{ID: groupID, Type: telegram.ChatTypeGroup, Title: "Devs"}, "member"))
+
+	if len(groups.recorded) != 1 || groups.recorded[0].BotStatus != "member" {
+		t.Errorf("recorded = %+v", groups.recorded)
+	}
+}

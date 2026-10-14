@@ -92,7 +92,7 @@ func TestGetUpdatesParsesTextMessage(t *testing.T) {
 	if sent.method != "getUpdates" || sent.params["offset"] != float64(5) {
 		t.Errorf("call = %+v", sent)
 	}
-	if allowed, _ := sent.params["allowed_updates"].([]any); len(allowed) != 1 || allowed[0] != "message" {
+	if allowed, _ := sent.params["allowed_updates"].([]any); len(allowed) != 2 || allowed[0] != "message" || allowed[1] != "my_chat_member" {
 		t.Errorf("allowed_updates = %v", sent.params["allowed_updates"])
 	}
 }
@@ -404,7 +404,7 @@ func TestSetWebhookRegistersURLWithSecret(t *testing.T) {
 	if sent.method != "setWebhook" || sent.params["url"] != "https://bot.example/api/webhook" || sent.params["secret_token"] != "s3cret" {
 		t.Errorf("call = %+v", sent)
 	}
-	if allowed, _ := sent.params["allowed_updates"].([]any); len(allowed) != 1 || allowed[0] != "message" {
+	if allowed, _ := sent.params["allowed_updates"].([]any); len(allowed) != 2 || allowed[0] != "message" || allowed[1] != "my_chat_member" {
 		t.Errorf("allowed_updates = %v", sent.params["allowed_updates"])
 	}
 }
@@ -568,5 +568,29 @@ func TestGetChatMemberCountReturnsTheCount(t *testing.T) {
 	}
 	if sent := api.recorded()[0]; sent.method != "getChatMemberCount" || sent.params["chat_id"] != float64(-100123) {
 		t.Errorf("call = %+v", sent)
+	}
+}
+
+func TestGetChatReturnsTheTitle(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"id":-100123,"type":"supergroup","title":"Devs"}}`)
+
+	chat, err := client.GetChat(context.Background(), -100123)
+	if err != nil || chat.Title != "Devs" {
+		t.Fatalf("chat = %+v, err = %v", chat, err)
+	}
+	if sent := api.recorded()[0]; sent.method != "getChat" || sent.params["chat_id"] != float64(-100123) {
+		t.Errorf("call = %+v", sent)
+	}
+}
+
+func TestMyChatMemberUpdateIsDecoded(t *testing.T) {
+	var update Update
+	raw := `{"update_id":7,"my_chat_member":{"chat":{"id":-100123,"type":"supergroup","title":"Devs"},"from":{"id":5},"new_chat_member":{"status":"administrator"}}}`
+	if err := json.Unmarshal([]byte(raw), &update); err != nil {
+		t.Fatal(err)
+	}
+	change := update.MyChatMember
+	if change == nil || change.Chat.Title != "Devs" || change.NewChatMember.Status != "administrator" || change.From.ID != 5 {
+		t.Errorf("update = %+v", update)
 	}
 }

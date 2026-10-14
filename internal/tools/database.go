@@ -40,10 +40,22 @@ type DatabaseReader interface {
 	GroupMessagesSince(ctx context.Context, chatID int64, since time.Time, limit int) ([]storage.GroupMessage, error)
 }
 
-// GroupMembers counts a group's members live. It returns ErrNotInGroup when
-// the bot has left or was removed.
+// Membership is the bot's standing in a group, as Telegram reports it now.
+type Membership struct {
+	// Status is the bot's: "member", "administrator", "left", "kicked"...
+	Status  string
+	Members int
+	Title   string
+}
+
+func (m Membership) in() bool {
+	return m.Status != "left" && m.Status != "kicked"
+}
+
+// GroupMembers asks Telegram about the bot in a group. It returns
+// ErrNotInGroup when the group cannot be reached by the bot at all.
 type GroupMembers interface {
-	MemberCount(ctx context.Context, chatID int64) (int, error)
+	Membership(ctx context.Context, chatID int64) (Membership, error)
 }
 
 // DatabaseOptions configures the bot_database tool.
@@ -75,9 +87,9 @@ func DatabaseTool(opts DatabaseOptions) Tool {
 		Name: "bot_database",
 		Description: "Owners only. Look up the bot's own data. " +
 			"overview: how many groups the bot has been in, users, and today's messages and pictures. " +
-			"groups: every group seen, with its chat_id, whether the bot is still there and its member count. " +
+			"groups: every group seen, with its chat_id, whether the bot is still there, whether it is an admin there, and the member count, checked live. " +
 			"messages: today's messages of one group by chat_id (from the groups list); another group's messages only in a private chat. " +
-			"Messages are kept only for today.",
+			"Messages are kept only for today. Answer only from what this returns; never guess groups or admin rights.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
@@ -129,6 +141,8 @@ type groupEntry struct {
 	Title         string `json:"title"`
 	Username      string `json:"username,omitempty"`
 	BotInGroup    *bool  `json:"bot_in_group,omitempty"`
+	BotStatus     string `json:"bot_status,omitempty"`
+	BotIsAdmin    bool   `json:"bot_is_admin"`
 	Members       *int   `json:"members,omitempty"`
 	Muted         bool   `json:"muted,omitempty"`
 	MessagesToday int    `json:"messages_today"`
@@ -137,9 +151,10 @@ type groupEntry struct {
 }
 
 type groupList struct {
-	Groups  []groupEntry `json:"groups"`
-	BotIsIn int          `json:"bot_is_in"`
-	Note    string       `json:"note,omitempty"`
+	Groups     []groupEntry `json:"groups"`
+	BotIsIn    int          `json:"bot_is_in"`
+	BotIsAdmin int          `json:"bot_is_admin_in"`
+	Note       string       `json:"note,omitempty"`
 }
 
 func listGroups(ctx context.Context, opts DatabaseOptions, today time.Time) (groupList, error) {
@@ -153,6 +168,8 @@ func listGroups(ctx context.Context, opts DatabaseOptions, today time.Time) (gro
 			ChatID:        g.ChatID,
 			Title:         g.Title,
 			Username:      g.Username,
+			BotStatus:     g.BotStatus,
+			BotIsAdmin:    isAdminStatus(g.BotStatus),
 			Muted:         g.Muted,
 			MessagesToday: g.MessagesToday,
 			FirstSeen:     g.FirstSeen.In(opts.Location).Format(databaseTimeLayout),
@@ -161,20 +178,27 @@ func listGroups(ctx context.Context, opts DatabaseOptions, today time.Time) (gro
 	}
 	list := groupList{Groups: entries}
 	if opts.Members == nil {
-		list.Note = "membership was not checked"
-		return list, nil
+		list.Note = "membership was not checked live; bot_status is the last one Telegram reported"
+	} else {
+		checkMembership(ctx, opts.Members, entries)
 	}
-	checkMembership(ctx, opts.Members, entries)
 	for _, e := range entries {
 		if e.BotInGroup != nil && *e.BotInGroup {
 			list.BotIsIn++
+		}
+		if e.BotIsAdmin {
+			list.BotIsAdmin++
 		}
 	}
 	return list, nil
 }
 
+func isAdminStatus(status string) bool {
+	return status == "administrator" || status == "creator"
+}
+
 // checkMembership asks Telegram about each group, a few at a time. A group
-// that could not be checked is left without bot_in_group.
+// that could not be checked keeps what was stored and has no bot_in_group.
 func checkMembership(ctx context.Context, members GroupMembers, entries []groupEntry) {
 	slots := make(chan struct{}, memberCountsAtOnce)
 	var wg sync.WaitGroup
@@ -182,18 +206,28 @@ func checkMembership(ctx context.Context, members GroupMembers, entries []groupE
 		wg.Go(func() {
 			slots <- struct{}{}
 			defer func() { <-slots }()
-			count, err := members.MemberCount(ctx, entries[i].ChatID)
+			membership, err := members.Membership(ctx, entries[i].ChatID)
 			switch {
 			case err == nil:
-				in := true
-				entries[i].BotInGroup, entries[i].Members = &in, &count
+				applyMembership(&entries[i], membership)
 			case errors.Is(err, ErrNotInGroup):
-				in := false
-				entries[i].BotInGroup = &in
+				applyMembership(&entries[i], Membership{Status: "left"})
 			}
 		})
 	}
 	wg.Wait()
+}
+
+func applyMembership(e *groupEntry, m Membership) {
+	in := m.in()
+	e.BotInGroup, e.BotStatus, e.BotIsAdmin = &in, m.Status, isAdminStatus(m.Status)
+	if in {
+		members := m.Members
+		e.Members = &members
+	}
+	if m.Title != "" {
+		e.Title = m.Title
+	}
 }
 
 type messageLog struct {

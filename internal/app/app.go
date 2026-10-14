@@ -67,6 +67,8 @@ type Mode struct {
 // groupMembers answers the service's administrator check through Telegram.
 type groupMembers struct {
 	client *telegram.Client
+	// botID is the bot's own user ID, for asking about its membership.
+	botID int64
 }
 
 func (m groupMembers) IsGroupAdmin(ctx context.Context, chatID, userID int64) (bool, error) {
@@ -77,15 +79,30 @@ func (m groupMembers) IsGroupAdmin(ctx context.Context, chatID, userID int64) (b
 	return member.IsAdmin(), nil
 }
 
-// MemberCount counts a group's members, for the owners' bot_database tool.
-func (m groupMembers) MemberCount(ctx context.Context, chatID int64) (int, error) {
-	count, err := m.client.GetChatMemberCount(ctx, chatID)
-	return count, memberCountError(err)
+// Membership asks Telegram about the bot in a group, for the owners'
+// bot_database tool: its status, and for a group it is in, the member count
+// and current title.
+func (m groupMembers) Membership(ctx context.Context, chatID int64) (tools.Membership, error) {
+	me, err := m.client.GetChatMember(ctx, chatID, m.botID)
+	if err != nil {
+		return tools.Membership{}, membershipError(err)
+	}
+	membership := tools.Membership{Status: me.Status}
+	if !me.IsMember() {
+		return membership, nil
+	}
+	if membership.Members, err = m.client.GetChatMemberCount(ctx, chatID); err != nil {
+		return tools.Membership{}, membershipError(err)
+	}
+	if chat, err := m.client.GetChat(ctx, chatID); err == nil {
+		membership.Title = chat.Title
+	}
+	return membership, nil
 }
 
-// memberCountError reports the bot having been removed, or the group having
+// membershipError reports the bot having been removed, or the group having
 // gone, as tools.ErrNotInGroup.
-func memberCountError(err error) error {
+func membershipError(err error) error {
 	var apiErr *telegram.APIError
 	if !errors.As(err, &apiErr) {
 		return err
@@ -105,7 +122,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 	if len(cfg.OwnerUsernames) > 0 {
 		builtin = append(builtin, tools.DatabaseTool(tools.DatabaseOptions{
 			Store:    store,
-			Members:  groupMembers{client: bot.Client},
+			Members:  groupMembers{client: bot.Client, botID: bot.User.ID},
 			Location: cfg.Location,
 		}))
 	}
@@ -138,7 +155,8 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Replier:       assistant,
 		Resetter:      store,
 		Recorder:      store,
-		Members:       groupMembers{client: bot.Client},
+		Members:       groupMembers{client: bot.Client, botID: bot.User.ID},
+		Groups:        store,
 		Muter:         store,
 		Logger:        logger,
 		Model:         cfg.Model,

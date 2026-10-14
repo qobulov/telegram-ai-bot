@@ -393,14 +393,17 @@ which it looks up with the owner-only `bot_database` tool:
 
 - `overview`: how many groups it has been in, users, and today's messages and
   pictures.
-- `groups`: every group it has seen a message in, with whether it is still
-  there and the member count, both checked live with Telegram.
+- `groups`: every group it knows, with whether it is still there, whether it
+  is an admin there and the member count, all checked live with Telegram.
 - `messages`: today's messages of one group. Another group's messages are
   given only in a private chat with the owner, so they never land in a
   different group.
 
-Groups are recorded from the messages the bot logs, so they appear once
-someone writes there, and only while `GROUP_AMBIENT_MESSAGES` is above 0. The
+Groups are recorded when the bot is added, promoted or removed (Telegram's
+`my_chat_member` updates) and from the messages it logs. Telegram has no way
+to list a bot's groups, so a group the bot joined before this, where nobody
+has written since, is not known. After upgrading, run `set-webhook` again so
+Telegram starts sending `my_chat_member`. The
 `groups` table keeps only each group's name and is not expired; messages
 still are.
 

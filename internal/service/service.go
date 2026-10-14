@@ -81,7 +81,10 @@ type Options struct {
 	Transcriber Transcriber
 	// ChatLog stores the day's group messages; nil turns the log off.
 	ChatLog ChatLog
-	Logger  *slog.Logger
+	// Groups records the bot being added to or removed from groups; nil
+	// ignores those updates.
+	Groups GroupRegistry
+	Logger *slog.Logger
 	// Model is the model name shown by /model.
 	Model string
 	// Workers is how many messages are processed at once.
@@ -238,6 +241,10 @@ func New(opts Options) *Service {
 // the bot should not react to are dropped here. Handle must not be called
 // after Close.
 func (s *Service) Handle(update telegram.Update) {
+	if update.MyChatMember != nil {
+		s.recordMembership(update.MyChatMember)
+		return
+	}
 	in, ok := s.accept(update)
 	if !ok {
 		return
@@ -258,9 +265,40 @@ func (s *Service) Handle(update telegram.Update) {
 // serverless hosting. Unlike Handle it does not use the workers, so it gives
 // no ordering between updates that arrive at the same time.
 func (s *Service) HandleNow(update telegram.Update) {
+	if update.MyChatMember != nil {
+		s.recordMembership(update.MyChatMember)
+		return
+	}
 	if in, ok := s.accept(update); ok {
 		s.process(in)
 	}
+}
+
+// GroupRegistry keeps the list of groups the bot is in.
+type GroupRegistry interface {
+	RecordGroup(ctx context.Context, g storage.GroupStatus) error
+}
+
+// recordMembership notes the bot being added to, promoted in or removed from
+// a group, so its owners' list of groups stays true even for quiet groups.
+func (s *Service) recordMembership(change *telegram.ChatMemberUpdated) {
+	isGroup := change.Chat.Type == telegram.ChatTypeGroup || change.Chat.Type == telegram.ChatTypeSupergroup
+	if s.opts.Groups == nil || !isGroup {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
+	defer cancel()
+	err := s.opts.Groups.RecordGroup(ctx, storage.GroupStatus{
+		ChatID:    change.Chat.ID,
+		Title:     change.Chat.Title,
+		Username:  change.Chat.Username,
+		BotStatus: change.NewChatMember.Status,
+	})
+	if err != nil {
+		s.opts.Logger.Warn("could not record group membership", "chat_id", change.Chat.ID, "error", err)
+		return
+	}
+	s.opts.Logger.Info("bot membership changed", "chat_id", change.Chat.ID, "status", change.NewChatMember.Status)
 }
 
 // accept keeps messages from a person, sent either in a private chat or, in

@@ -7,11 +7,21 @@ import (
 	"time"
 )
 
-// Update is one incoming event. Message is nil for update kinds the bot does
-// not subscribe to.
+// Update is one incoming event: a message, or a change to the bot's own
+// membership in a chat. Each kind the update is not is nil.
 type Update struct {
-	UpdateID int64    `json:"update_id"`
-	Message  *Message `json:"message"`
+	UpdateID     int64              `json:"update_id"`
+	Message      *Message           `json:"message"`
+	MyChatMember *ChatMemberUpdated `json:"my_chat_member"`
+}
+
+// ChatMemberUpdated reports that the bot was added to, promoted in, demoted
+// in or removed from a chat.
+type ChatMemberUpdated struct {
+	Chat Chat `json:"chat"`
+	// From is who made the change.
+	From          *User      `json:"from"`
+	NewChatMember ChatMember `json:"new_chat_member"`
 }
 
 // Message is an incoming chat message. Text is empty for photos, stickers,
@@ -86,6 +96,11 @@ type User struct {
 // ChatMember is a user's standing in a chat.
 type ChatMember struct {
 	Status string `json:"status"`
+}
+
+// IsMember reports whether the user is still in the chat.
+func (m ChatMember) IsMember() bool {
+	return m.Status != "" && m.Status != "left" && m.Status != "kicked"
 }
 
 // IsAdmin reports whether the member owns or administers the chat.

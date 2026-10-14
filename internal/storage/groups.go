@@ -46,13 +46,15 @@ type GroupSummary struct {
 	LastSeen      time.Time
 	MessagesToday int
 	Muted         bool
+	// BotStatus is what Telegram last said about the bot here, or "".
+	BotStatus string
 }
 
 // Groups returns up to limit groups, most recently active first, with their
 // message counts since the given moment.
 func (s *Store) Groups(ctx context.Context, since time.Time, limit int) ([]GroupSummary, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT g.chat_id, g.title, coalesce(g.username, ''), g.first_seen_at, g.last_seen_at,
+		SELECT g.chat_id, g.title, coalesce(g.username, ''), g.first_seen_at, g.last_seen_at, coalesce(g.bot_status, ''),
 			(SELECT count(*) FROM group_messages m WHERE m.chat_id = g.chat_id AND m.created_at >= $1),
 			EXISTS (SELECT 1 FROM chats c WHERE c.chat_id = g.chat_id AND c.muted)
 		FROM groups g
@@ -63,11 +65,36 @@ func (s *Store) Groups(ctx context.Context, since time.Time, limit int) ([]Group
 	}
 	groups, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (GroupSummary, error) {
 		var g GroupSummary
-		err := row.Scan(&g.ChatID, &g.Title, &g.Username, &g.FirstSeen, &g.LastSeen, &g.MessagesToday, &g.Muted)
+		err := row.Scan(&g.ChatID, &g.Title, &g.Username, &g.FirstSeen, &g.LastSeen, &g.BotStatus, &g.MessagesToday, &g.Muted)
 		return g, err
 	})
 	if err != nil {
 		return nil, fmt.Errorf("storage: read groups: %w", err)
 	}
 	return groups, nil
+}
+
+// GroupStatus is a change to the bot's membership in a group.
+type GroupStatus struct {
+	ChatID    int64
+	Title     string
+	Username  string
+	BotStatus string
+}
+
+// RecordGroup notes the bot being added to, promoted in or removed from a
+// group.
+func (s *Store) RecordGroup(ctx context.Context, g GroupStatus) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO groups (chat_id, title, username, bot_status) VALUES ($1, $2, nullif($3, ''), $4)
+		ON CONFLICT (chat_id) DO UPDATE
+		SET title = coalesce(nullif(EXCLUDED.title, ''), groups.title),
+		    username = EXCLUDED.username,
+		    bot_status = EXCLUDED.bot_status,
+		    last_seen_at = now()`,
+		g.ChatID, g.Title, g.Username, g.BotStatus)
+	if err != nil {
+		return fmt.Errorf("storage: record group: %w", err)
+	}
+	return nil
 }
