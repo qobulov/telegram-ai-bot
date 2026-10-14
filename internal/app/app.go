@@ -100,6 +100,16 @@ func (m groupMembers) Membership(ctx context.Context, chatID int64) (tools.Membe
 	return membership, nil
 }
 
+// groupSender posts an owner's confirmed broadcast in a group.
+type groupSender struct {
+	client *telegram.Client
+}
+
+func (g groupSender) SendToGroup(ctx context.Context, chatID int64, text string) error {
+	_, err := g.client.SendMessage(ctx, telegram.Outgoing{ChatID: chatID, Text: text})
+	return err
+}
+
 // membershipError reports the bot having been removed, or the group having
 // gone, as tools.ErrNotInGroup.
 func membershipError(err error) error {
@@ -120,11 +130,18 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		builtin = append(builtin, imageTool(cfg, store))
 	}
 	if len(cfg.OwnerUsernames) > 0 {
-		builtin = append(builtin, tools.DatabaseTool(tools.DatabaseOptions{
-			Store:    store,
-			Members:  groupMembers{client: bot.Client, botID: bot.User.ID},
-			Location: cfg.Location,
-		}))
+		builtin = append(builtin,
+			tools.DatabaseTool(tools.DatabaseOptions{
+				Store:    store,
+				Members:  groupMembers{client: bot.Client, botID: bot.User.ID},
+				Location: cfg.Location,
+			}),
+			tools.BroadcastTool(tools.BroadcastOptions{
+				Groups: store,
+				Drafts: store,
+				Sender: groupSender{client: bot.Client},
+			}),
+		)
 	}
 	registry, err := tools.NewRegistry(cfg.IsAdmin, builtin...)
 	if err != nil {

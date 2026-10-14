@@ -25,6 +25,9 @@ type Caller struct {
 	ChatID int64
 	// Owner is true for the bot's owners, who have no daily limits.
 	Owner bool
+	// UpdateID is the Telegram update being answered. A broadcast drafted
+	// in one update can only be confirmed in another.
+	UpdateID int64
 }
 
 // Drawing is a picture made during a turn, to be sent with the answer.

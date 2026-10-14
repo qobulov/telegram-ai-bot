@@ -1612,7 +1612,7 @@ func TestTurnTellsToolsWhoIsAsking(t *testing.T) {
 	if len(calls) != 2 || !calls[0].hadSink {
 		t.Fatalf("calls = %+v", calls)
 	}
-	if c := calls[0].caller; !c.Owner || c.UserID != 9001 || c.ChatID != groupID {
+	if c := calls[0].caller; !c.Owner || c.UserID != 9001 || c.ChatID != groupID || c.UpdateID == 0 {
 		t.Errorf("owner's caller = %+v", c)
 	}
 	if c := calls[1].caller; c.Owner || c.UserID != userID {

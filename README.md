@@ -399,6 +399,13 @@ which it looks up with the owner-only `bot_database` tool:
   given only in a private chat with the owner, so they never land in a
   different group.
 
+Owners can also have the bot post in its groups ("Maria, guruhlarga master
+qaytdi deb yoz") with the owner-only `send_to_groups` tool. It works in two
+steps: the bot first shows the exact text and the groups, and sends only after
+the owner says yes in a later message, within 10 minutes. The code refuses a
+confirmation made in the same message as the draft, so the model cannot send
+on its own.
+
 Groups are recorded when the bot is added, promoted or removed (Telegram's
 `my_chat_member` updates) and from the messages it logs. Telegram has no way
 to list a bot's groups, so a group the bot joined before this, where nobody

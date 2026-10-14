@@ -104,7 +104,7 @@ func TestMigrationRecordsGroupsSeenBefore(t *testing.T) {
 	if err := store.SetMuted(ctx, otherGroup, true, alice); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.pool.Exec(ctx, `DELETE FROM groups; DELETE FROM schema_migrations WHERE version = 9`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DELETE FROM groups; DROP TABLE broadcasts; DELETE FROM schema_migrations WHERE version >= 9`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.Migrate(ctx); err != nil {

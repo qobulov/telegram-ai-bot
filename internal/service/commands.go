@@ -207,7 +207,7 @@ func hasNoText(in incoming) bool {
 func (s *Service) ask(ctx context.Context, in incoming) outcome {
 	started := time.Now()
 	sink := &tools.Sink{}
-	ctx = tools.WithTurn(ctx, tools.Caller{UserID: in.userID, ChatID: in.scope.ChatID, Owner: s.isOwner(in.msg.From)}, sink)
+	ctx = tools.WithTurn(ctx, tools.Caller{UserID: in.userID, ChatID: in.scope.ChatID, Owner: s.isOwner(in.msg.From), UpdateID: in.updateID}, sink)
 	out := s.answerOf(ctx, in, started)
 	// A picture drawn before a later failure is still worth sending.
 	out.drawings = sink.Take()
