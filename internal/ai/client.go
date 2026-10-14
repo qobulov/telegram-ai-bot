@@ -131,6 +131,28 @@ func (c *Client) attempt(ctx context.Context, body []byte) (Message, error) {
 	return c.send(ctx, body)
 }
 
+// AudioLabel is the format name sent with audio. Telegram voice is
+// OGG/Opus, but Gemini's OpenAI-compatible endpoint refuses the label "ogg"
+// ("Valid formats are: [wav, mp3]"). It reads the audio from its bytes
+// whatever the label says: an OGG/Opus file sent as "mp3" was understood in
+// testing, so the accepted label is used and the bytes are left as they are.
+const AudioLabel = "mp3"
+
+const transcribePrompt = "Transcribe this voice message word for word, in the language it is spoken. Reply with the transcript only, without quotes or comments. If there is no speech, reply with nothing."
+
+// Transcribe turns a voice message into text with the configured model.
+func (c *Client) Transcribe(ctx context.Context, audio []byte) (string, error) {
+	msg, err := c.Complete(ctx, Request{Messages: []Message{{
+		Role:    RoleUser,
+		Content: transcribePrompt,
+		Parts:   []ContentPart{AudioPart(AudioLabel, audio)},
+	}}})
+	if err != nil {
+		return "", fmt.Errorf("transcribe: %w", err)
+	}
+	return strings.TrimSpace(msg.Content), nil
+}
+
 // IsOverloaded reports that the provider refused because it is busy or the
 // account is over its limits: 429 or 503. Trying again later may work.
 func IsOverloaded(err error) bool {

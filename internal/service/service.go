@@ -17,9 +17,12 @@ import (
 )
 
 const (
-	noticeQueueSize   = 64
-	sendTimeout       = 15 * time.Second
-	muteLookupTimeout = 5 * time.Second
+	noticeQueueSize = 64
+	// backgroundTranscriptions bounds voice messages transcribed at once
+	// for the day's log while polling.
+	backgroundTranscriptions = 2
+	sendTimeout              = 15 * time.Second
+	muteLookupTimeout        = 5 * time.Second
 )
 
 // Sender delivers a text message and returns the ID Telegram gave it.
@@ -67,6 +70,9 @@ type Options struct {
 	Members  Members
 	Muter    Muter
 	Media    Media
+	// Transcriber turns voice messages into text; nil means the bot cannot
+	// listen to them.
+	Transcriber Transcriber
 	// ChatLog stores the day's group messages; nil turns the log off.
 	ChatLog ChatLog
 	Logger  *slog.Logger
@@ -144,6 +150,10 @@ type Service struct {
 	notices      chan incoming
 	closing      atomic.Bool
 	workers      sync.WaitGroup
+	// background tracks voice messages being transcribed for the day's log
+	// while polling; transcribing bounds how many run at once.
+	background   sync.WaitGroup
+	transcribing chan struct{}
 	notifier     sync.WaitGroup
 
 	mutedMu sync.RWMutex
@@ -162,6 +172,9 @@ type incoming struct {
 	group  bool
 	// text is the user's text, trimmed, without the part addressing the bot.
 	text string
+	// described is text with the message's media described in front of it,
+	// a voice message's transcript included. Filled in by process.
+	described string
 }
 
 // replyTarget is the message an answer should reply to: the original message
@@ -193,6 +206,7 @@ func New(opts Options) *Service {
 		muted:        make(map[int64]bool, len(opts.MutedChats)),
 		queues:       make([]chan incoming, opts.Workers),
 		notices:      make(chan incoming, noticeQueueSize),
+		transcribing: make(chan struct{}, backgroundTranscriptions),
 	}
 	for _, chatID := range opts.MutedChats {
 		s.muted[chatID] = true
@@ -293,13 +307,41 @@ func isMuteCommand(text string) bool {
 }
 
 // remember logs a group message as context for the bot's next answer in
-// that group.
+// that group. Photos and stickers are only noted; a voice message is
+// transcribed, so that "what did she say?" can be answered later.
 func (s *Service) remember(msg *telegram.Message) {
-	text, _ := msg.Content()
-	if m, ok := s.mediaOf(msg); ok {
-		text = withMediaLabel(m, text) // noted, never downloaded
+	m, isMedia := s.mediaOf(msg)
+	if isMedia && m.audio && len(s.queues) > 0 {
+		s.rememberInBackground(msg)
+		return
 	}
+	s.logMessage(msg)
+}
+
+func (s *Service) logMessage(msg *telegram.Message) {
+	ctx, cancel := context.WithTimeout(context.Background(), transcribeTimeout+mediaTimeout)
+	defer cancel()
+	content, _ := msg.Content()
+	text := s.describe(ctx, msg, content)
 	s.ambient.add(msg.Chat.ID, msg.MessageID, msg.From.ID, s.label(msg.From), text)
+}
+
+// rememberInBackground transcribes off the polling loop, which must not wait
+// seconds for a model. When too many are already running, the voice message
+// is logged without its words rather than queued.
+func (s *Service) rememberInBackground(msg *telegram.Message) {
+	select {
+	case s.transcribing <- struct{}{}:
+	default:
+		content, _ := msg.Content()
+		m, _ := s.mediaOf(msg)
+		s.ambient.add(msg.Chat.ID, msg.MessageID, msg.From.ID, s.label(msg.From), withMediaLabel(m, content))
+		return
+	}
+	s.background.Go(func() {
+		defer func() { <-s.transcribing }()
+		s.logMessage(msg)
+	})
 }
 
 // ownerNotice tells the model, in a private chat, that the owner is writing.
@@ -418,6 +460,7 @@ func (s *Service) stop() {
 		close(queue)
 	}
 	s.workers.Wait()
+	s.background.Wait()
 	close(s.notices)
 	s.notifier.Wait()
 }

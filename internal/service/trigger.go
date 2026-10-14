@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"strings"
 	"unicode"
 	"unicode/utf16"
@@ -135,14 +136,13 @@ func withQuote(text string, replied *telegram.Message, botID int64) string {
 
 // quoted returns the replied-to message with its media described in its
 // text, so that a quote of a photo reads "<photo> caption".
-func (s *Service) quoted(replied *telegram.Message) *telegram.Message {
-	m, ok := s.mediaOf(replied)
-	if !ok {
+func (s *Service) quoted(ctx context.Context, replied *telegram.Message) *telegram.Message {
+	if _, ok := s.mediaOf(replied); !ok {
 		return replied
 	}
 	described := *replied
 	content, _ := replied.Content()
-	described.Text = withMediaLabel(m, content)
+	described.Text = s.describe(ctx, replied, content)
 	return &described
 }
 

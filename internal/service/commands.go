@@ -40,6 +40,7 @@ func (s *Service) process(in incoming) {
 		}
 		return
 	}
+	in.described = s.describe(ctx, in.msg, in.text)
 	out := s.respond(ctx, in)
 	if out.text != "" {
 		sentID := s.reply(in, out.text)
@@ -57,11 +58,7 @@ func (s *Service) logExchange(in incoming, out outcome) {
 	if !in.group || strings.HasPrefix(in.text, "/") {
 		return
 	}
-	text := in.text
-	if m, ok := s.mediaOf(in.msg); ok {
-		text = withMediaLabel(m, in.text)
-	}
-	s.ambient.add(in.scope.ChatID, in.msg.MessageID, in.userID, s.label(in.msg.From), text)
+	s.ambient.add(in.scope.ChatID, in.msg.MessageID, in.userID, s.label(in.msg.From), in.described)
 	if out.answerID != 0 {
 		s.ambient.add(in.scope.ChatID, 0, s.opts.Bot.ID, botAuthor, out.text)
 	}
@@ -174,8 +171,8 @@ func (s *Service) request(ctx context.Context, in incoming) agent.Request {
 		Group:            in.group,
 		Attachments:      s.attachments(ctx, in),
 	}
-	if m, ok := s.mediaOf(in.msg); ok {
-		req.Text = withMediaLabel(m, in.text)
+	if _, ok := s.mediaOf(in.msg); ok {
+		req.Text = in.described
 	}
 	if !in.group && s.isOwner(in.msg.From) {
 		req.Context = ownerNotice
@@ -185,7 +182,7 @@ func (s *Service) request(ctx context.Context, in incoming) agent.Request {
 		req.Text = req.AuthorName + ": " + oneLine(req.Text)
 		req.Context = s.ambient.block(in.scope.ChatID, time.Now())
 	}
-	req.Text = withQuote(req.Text, s.quoted(in.msg.ReplyToMessage), s.opts.Bot.ID)
+	req.Text = withQuote(req.Text, s.quoted(ctx, in.msg.ReplyToMessage), s.opts.Bot.ID)
 	return req
 }
 

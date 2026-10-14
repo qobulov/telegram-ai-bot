@@ -11,15 +11,19 @@ import (
 	"telegram-ai-bot/internal/telegram"
 )
 
-// voiceFormat labels voice messages sent to the model. Telegram voice is
-// OGG/Opus, but Gemini's OpenAI-compatible endpoint refuses the label "ogg"
-// ("Valid formats are: [wav, mp3]"). It reads the audio from its bytes,
-// whatever the label says: an OGG/Opus file sent as "mp3" was understood in
-// testing, so the accepted label is used and the bytes are left as they are.
-const voiceFormat = "mp3"
+const (
+	// mediaTimeout bounds downloading one file from Telegram.
+	mediaTimeout = 15 * time.Second
+	// transcribeTimeout bounds turning one voice message into text.
+	transcribeTimeout = 30 * time.Second
+	// maxTranscriptChars cuts very long transcripts.
+	maxTranscriptChars = 2000
+)
 
-// mediaTimeout bounds downloading one file from Telegram.
-const mediaTimeout = 15 * time.Second
+// Transcriber turns a voice message into text.
+type Transcriber interface {
+	Transcribe(ctx context.Context, audio []byte) (string, error)
+}
 
 // Media downloads files that were sent to the bot.
 type Media interface {
@@ -97,13 +101,50 @@ func thumbnailID(thumbnail *telegram.PhotoSize) string {
 func (s *Service) voiceMedia(voice *telegram.Voice) media {
 	label := fmt.Sprintf("<voice message, %d s", voice.Duration)
 	switch {
-	case !s.opts.AudioInput:
+	case !s.opts.AudioInput || s.opts.Transcriber == nil:
 		return media{label: label + "; you cannot listen to voice messages>"}
 	case voice.Duration > s.opts.MaxVoiceSeconds:
 		return media{label: label + "; too long to listen to>"}
 	default:
 		return media{label: label + ">", fileID: voice.FileID, audio: true}
 	}
+}
+
+// describe returns text with the message's media described in front of it.
+// A voice message is downloaded and transcribed; the transcript is folded
+// to one line without square brackets, like anything else a user produced.
+func (s *Service) describe(ctx context.Context, msg *telegram.Message, text string) string {
+	m, ok := s.mediaOf(msg)
+	if !ok {
+		return text
+	}
+	if m.audio {
+		m.label = s.transcript(ctx, msg, m)
+	}
+	return withMediaLabel(m, text)
+}
+
+func (s *Service) transcript(ctx context.Context, msg *telegram.Message, m media) string {
+	unheard := strings.TrimSuffix(m.label, ">") + "; it could not be transcribed>"
+	downloadCtx, cancel := context.WithTimeout(ctx, mediaTimeout)
+	audio, err := s.opts.Media.DownloadFile(downloadCtx, m.fileID, s.opts.MaxMediaBytes)
+	cancel()
+	if err != nil {
+		s.opts.Logger.Warn("voice download failed", "chat_id", msg.Chat.ID, "error", err)
+		return unheard
+	}
+	transcribeCtx, cancel := context.WithTimeout(ctx, transcribeTimeout)
+	words, err := s.opts.Transcriber.Transcribe(transcribeCtx, audio)
+	cancel()
+	if err != nil {
+		s.opts.Logger.Warn("transcription failed", "chat_id", msg.Chat.ID, "error", err)
+		return unheard
+	}
+	words = truncate(oneLine(words), maxTranscriptChars)
+	if words == "" {
+		return strings.TrimSuffix(m.label, ">") + "; no speech>"
+	}
+	return m.label + ` "` + strings.ReplaceAll(words, `"`, "'") + `"`
 }
 
 // withMediaLabel puts the description of a message's media in front of its
@@ -122,8 +163,8 @@ func (s *Service) attachments(ctx context.Context, in incoming) []ai.ContentPart
 	var parts []ai.ContentPart
 	for _, msg := range []*telegram.Message{in.msg, in.msg.ReplyToMessage} {
 		m, ok := s.mediaOf(msg)
-		if !ok || m.fileID == "" {
-			continue
+		if !ok || m.fileID == "" || m.audio {
+			continue // voice is given as its transcript, in the text
 		}
 		if part, ok := s.download(ctx, in, m); ok {
 			parts = append(parts, part)
@@ -139,9 +180,6 @@ func (s *Service) download(ctx context.Context, in incoming, m media) (ai.Conten
 	if err != nil {
 		s.opts.Logger.Warn("media download failed", "chat_id", in.scope.ChatID, "update_id", in.updateID, "error", err)
 		return ai.ContentPart{}, false
-	}
-	if m.audio {
-		return ai.AudioPart(voiceFormat, data), true
 	}
 	// Telegram serves photos as JPEG and stickers as WebP; the bytes say
 	// which, so the declared type does not have to be trusted.

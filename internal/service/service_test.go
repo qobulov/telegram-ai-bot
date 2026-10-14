@@ -156,22 +156,23 @@ func (f *fakeMuter) SetMuted(_ context.Context, chatID int64, muted bool, by int
 const groupAdminID = int64(4001)
 
 type fixture struct {
-	sender   *fakeSender
-	replier  *fakeReplier
-	resetter *fakeResetter
-	recorder *fakeRecorder
-	members  *fakeMembers
-	muter    *fakeMuter
-	media    *fakeMedia
-	chatLog  *memoryLog
-	opts     Options
+	sender      *fakeSender
+	replier     *fakeReplier
+	resetter    *fakeResetter
+	recorder    *fakeRecorder
+	members     *fakeMembers
+	muter       *fakeMuter
+	media       *fakeMedia
+	chatLog     *memoryLog
+	transcriber *fakeTranscriber
+	opts        Options
 }
 
 func newFixture() *fixture {
 	f := &fixture{
 		sender: &fakeSender{}, replier: &fakeReplier{}, resetter: &fakeResetter{}, recorder: &fakeRecorder{},
 		members: &fakeMembers{admins: map[int64]bool{groupAdminID: true}}, muter: &fakeMuter{},
-		media: newFakeMedia(), chatLog: newMemoryLog(),
+		media: newFakeMedia(), chatLog: newMemoryLog(), transcriber: &fakeTranscriber{text: "salom dunyo"},
 	}
 	f.opts = Options{
 		Sender:        f.sender,
@@ -205,6 +206,7 @@ func newFixture() *fixture {
 		MaxMediaBytes:      5 << 20,
 		MaxVoiceSeconds:    120,
 		AudioInput:         true,
+		Transcriber:        f.transcriber,
 	}
 	return f
 }

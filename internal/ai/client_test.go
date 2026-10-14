@@ -563,3 +563,25 @@ func TestEachTurnStartsWithThePrimaryModel(t *testing.T) {
 		t.Errorf("msg = %+v; once the primary recovers it should be used again", msg)
 	}
 }
+
+func TestTranscribeSendsTheAudioAndReturnsTheText(t *testing.T) {
+	client, rec := newTestClient(t, reply{status: 200, body: `{"choices":[{"message":{"role":"assistant","content":"  salom dunyo \n"}}]}`})
+
+	text, err := client.Transcribe(context.Background(), []byte("OggS-voice"))
+	if err != nil || text != "salom dunyo" {
+		t.Fatalf("text = %q, err = %v", text, err)
+	}
+	messages, _ := rec.requests[0]["messages"].([]any)
+	content, _ := messages[0].(map[string]any)["content"].([]any)
+	if len(content) != 2 {
+		t.Fatalf("content = %v, want the instruction and the audio", messages[0])
+	}
+	instruction := content[0].(map[string]any)["text"].(string)
+	audio := content[1].(map[string]any)["input_audio"].(map[string]any)
+	if !strings.Contains(instruction, "Transcribe") || audio["format"] != "mp3" || audio["data"] != "T2dnUy12b2ljZQ==" {
+		t.Errorf("instruction = %q, audio = %v", instruction, audio)
+	}
+	if _, present := rec.requests[0]["tools"]; present {
+		t.Error("a transcription request offered tools")
+	}
+}

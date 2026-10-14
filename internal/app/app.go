@@ -136,6 +136,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		MaxMediaBytes:      cfg.MaxMediaBytes,
 		MaxVoiceSeconds:    cfg.MaxVoiceSeconds,
 		AudioInput:         cfg.AudioInput,
+		Transcriber:        transcriber(cfg, model),
 	}
 	if mode.Serverless {
 		opts.Workers, opts.QueueSize = 0, 0
@@ -143,6 +144,15 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		opts.MuteStore = store
 	}
 	return service.New(opts), nil
+}
+
+// transcriber is the model client when the provider can listen to audio,
+// and nil otherwise, which tells the service it cannot hear voice messages.
+func transcriber(cfg config.Config, model *ai.Client) service.Transcriber {
+	if !cfg.AudioInput {
+		return nil
+	}
+	return model
 }
 
 // Webhook is a running webhook receiver.

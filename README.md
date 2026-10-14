@@ -338,7 +338,7 @@ The bot can look at what people send, not only read it.
 | Sticker | the sticker image and its emoji |
 | Animated or video sticker | its first frame and its emoji |
 | GIF | its first frame |
-| Voice message | the audio, with Gemini only, up to `MAX_VOICE_SECONDS` |
+| Voice message | its transcript, made by the model from the audio (Gemini only), up to `MAX_VOICE_SECONDS` |
 
 Videos, documents, round video messages and audio files are not read; the
 bot says so.
@@ -364,6 +364,12 @@ request to the model, so answers take a little longer. Gemini's
 OpenAI-compatible endpoint refuses the label `ogg` that Telegram's voice
 format would need, but reads the audio from its bytes; voice messages are
 therefore sent unchanged with the accepted label `mp3`.
+
+Voice messages are turned into text first, and the transcript is what the
+model reads and what is stored: `<voice message, 38 s> "..."`. In groups
+every voice message is transcribed as it arrives, even when it does not
+address the bot, so that "what did he say?" or "write it as text" can be
+answered later from the day's log. Each one costs one extra model request.
 
 ## The owner
 
