@@ -4,6 +4,15 @@
   "functions": {
     "api/webhook.go": {
       "maxDuration": 60
+    },
+    "api/cleanup.go": {
+      "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cleanup",
+      "schedule": "0 3 * * *"
+    }
+  ]
 }

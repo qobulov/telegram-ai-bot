@@ -85,13 +85,21 @@ func (s *Service) respond(ctx context.Context, in incoming) outcome {
 		return say(s.runCommand(ctx, in))
 	case utf8.RuneCountInString(in.text) > s.opts.MaxInputChars:
 		return say(fmt.Sprintf(textTooLong, s.opts.MaxInputChars))
-	case in.text != "":
+	case in.text != "" || s.hasMedia(in):
 		return s.ask(ctx, in)
 	case hasNoText(in):
-		return say(textTextOnly) // a photo, sticker, document or other non-text message
+		return say(textTextOnly) // a document, video, location or other kind the bot does not read
 	default:
 		return outcome{} // whitespace only
 	}
+}
+
+// hasMedia reports a photo, sticker, GIF or voice message the bot can be
+// shown, on the message itself or on the one it replies to.
+func (s *Service) hasMedia(in incoming) bool {
+	_, own := s.mediaOf(in.msg)
+	_, replied := s.mediaOf(in.msg.ReplyToMessage)
+	return own || (replied && in.group)
 }
 
 // hasNoText reports a message with nothing to read. A caption counts as text
@@ -106,7 +114,7 @@ func hasNoText(in incoming) bool {
 
 func (s *Service) ask(ctx context.Context, in incoming) outcome {
 	started := time.Now()
-	answer, err := s.opts.Replier.Reply(ctx, s.request(in))
+	answer, err := s.opts.Replier.Reply(ctx, s.request(ctx, in))
 	log := s.opts.Logger.With("user_id", in.userID, "chat_id", in.scope.ChatID,
 		"update_id", in.updateID, "duration", time.Since(started).String())
 
@@ -134,7 +142,7 @@ func (s *Service) ask(ctx context.Context, in incoming) outcome {
 // request builds what the agent needs. In a group the stored text names its
 // author ("Bek: ..."), because the conversation is shared, and the recent
 // chatter is passed along as context for this turn only.
-func (s *Service) request(in incoming) agent.Request {
+func (s *Service) request(ctx context.Context, in incoming) agent.Request {
 	req := agent.Request{
 		Scope:            in.scope,
 		UserID:           in.userID,
@@ -143,13 +151,17 @@ func (s *Service) request(in incoming) agent.Request {
 		ReplyToMessageID: repliedID(in),
 		Text:             in.text,
 		Group:            in.group,
+		Attachments:      s.attachments(ctx, in),
+	}
+	if m, ok := s.mediaOf(in.msg); ok {
+		req.Text = withMediaLabel(m, in.text)
 	}
 	if in.group {
 		req.AuthorName = authorLabel(in.msg.From.FirstName)
-		req.Text = req.AuthorName + ": " + oneLine(in.text)
+		req.Text = req.AuthorName + ": " + oneLine(req.Text)
 		req.Context = s.ambient.block(in.scope.ChatID, time.Now())
 	}
-	req.Text = withQuote(req.Text, in.msg.ReplyToMessage, s.opts.Bot.ID)
+	req.Text = withQuote(req.Text, s.quoted(in.msg.ReplyToMessage), s.opts.Bot.ID)
 	return req
 }
 

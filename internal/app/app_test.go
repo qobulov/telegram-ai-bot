@@ -12,6 +12,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
+
 	"telegram-ai-bot/internal/config"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/webhook"
@@ -238,5 +240,55 @@ func TestWebhookNeedsASecret(t *testing.T) {
 	_, err := NewWebhook(context.Background(), env.config(t), slog.Default())
 	if err == nil || !strings.Contains(err.Error(), "TELEGRAM_WEBHOOK_SECRET") {
 		t.Fatalf("err = %v, want it to name TELEGRAM_WEBHOOK_SECRET", err)
+	}
+}
+
+const cronSecret = "a-long-random-cron-secret"
+
+func TestCleanupEndpointExpiresOldHistory(t *testing.T) {
+	env := startWebhook(t)
+	env.baseEnv["CRON_SECRET"] = cronSecret
+	ctx := context.Background()
+	env.deliver(privateUpdate, hookSecret) // one turn: 2 messages
+	conn, err := pgx.Connect(ctx, os.Getenv("TEST_DB_POSTGRES_URL"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(ctx)
+	if _, err := conn.Exec(ctx, `UPDATE messages SET created_at = now() - interval '2 days'`); err != nil {
+		t.Fatal(err)
+	}
+
+	cleanup, err := NewCleanup(ctx, env.config(t), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatalf("NewCleanup: %v", err)
+	}
+	defer cleanup.Close()
+
+	unauthorized := httptest.NewRecorder()
+	cleanup.Handler.ServeHTTP(unauthorized, httptest.NewRequest(http.MethodGet, "/api/cleanup", nil))
+	if unauthorized.Code != http.StatusUnauthorized {
+		t.Errorf("without the secret: status = %d", unauthorized.Code)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/cleanup", nil)
+	req.Header.Set("Authorization", "Bearer "+cronSecret)
+	resp := httptest.NewRecorder()
+	cleanup.Handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK || !strings.Contains(resp.Body.String(), `"messages":2`) {
+		t.Errorf("status = %d, body = %s", resp.Code, resp.Body.String())
+	}
+	history, _ := env.store.History(ctx, storage.Scope{ChatID: hookUser, UserID: hookUser}, 10)
+	if len(history) != 0 {
+		t.Errorf("history after cleanup = %+v", history)
+	}
+}
+
+func TestCleanupNeedsACronSecret(t *testing.T) {
+	env := startWebhook(t)
+
+	_, err := NewCleanup(context.Background(), env.config(t), slog.Default())
+	if err == nil || !strings.Contains(err.Error(), "CRON_SECRET") {
+		t.Fatalf("err = %v, want it to name CRON_SECRET", err)
 	}
 }

@@ -107,6 +107,56 @@ func (c *Client) DeleteWebhook(ctx context.Context) error {
 	return c.call(ctx, "deleteWebhook", struct{}{}, nil)
 }
 
+// ErrFileTooLarge means a file is bigger than the caller allowed.
+var ErrFileTooLarge = errors.New("telegram: file is too large")
+
+type getFileParams struct {
+	FileID string `json:"file_id"`
+}
+
+type file struct {
+	FileSize int64  `json:"file_size"`
+	FilePath string `json:"file_path"`
+}
+
+// DownloadFile fetches a file sent to the bot, such as a photo or a voice
+// message. Files larger than maxBytes are refused with ErrFileTooLarge,
+// before or while downloading.
+func (c *Client) DownloadFile(ctx context.Context, fileID string, maxBytes int64) ([]byte, error) {
+	var info file
+	if err := c.call(ctx, "getFile", getFileParams{FileID: fileID}, &info); err != nil {
+		return nil, err
+	}
+	if info.FileSize > maxBytes {
+		return nil, ErrFileTooLarge
+	}
+	return c.download(ctx, info.FilePath, maxBytes)
+}
+
+func (c *Client) download(ctx context.Context, path string, maxBytes int64) ([]byte, error) {
+	endpoint := c.opts.BaseURL + "/file/bot" + c.opts.Token + "/" + path
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, errors.New("telegram download: build request")
+	}
+	resp, err := c.opts.HTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("telegram download: %w", withoutURL(err))
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("telegram download: status %d", resp.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("telegram download: %w", withoutURL(err))
+	}
+	if int64(len(data)) > maxBytes {
+		return nil, ErrFileTooLarge
+	}
+	return data, nil
+}
+
 type getChatMemberParams struct {
 	ChatID int64 `json:"chat_id"`
 	UserID int64 `json:"user_id"`

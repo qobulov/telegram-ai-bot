@@ -249,28 +249,92 @@ func TestSaveTurnRejectsEmptyTurn(t *testing.T) {
 	}
 }
 
-func TestDeleteIdleRemovesOnlyOldConversations(t *testing.T) {
-	store := newTestStore(t)
-	ctx := context.Background()
-	mustSave(t, store, alice, 1, turn("old", "old"))
-	mustSave(t, store, bob, 2, turn("fresh", "fresh"))
-	if _, err := store.pool.Exec(ctx,
-		`UPDATE conversations SET updated_at = now() - interval '40 days' WHERE user_id = $1`, alice); err != nil {
+// age makes every message of a user's private conversation look older.
+func age(t *testing.T, store *Store, userID int64, by string) {
+	t.Helper()
+	_, err := store.pool.Exec(context.Background(), `
+		UPDATE messages SET created_at = now() - $2::interval
+		WHERE conversation_id IN (SELECT id FROM conversations WHERE user_id = $1)`, userID, by)
+	if err != nil {
 		t.Fatal(err)
 	}
+}
 
-	deleted, err := store.DeleteIdle(ctx, 30*24*time.Hour)
+func TestExpireRemovesMessagesOlderThanTheRetention(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	mustSave(t, store, alice, 1, turn("yesterday's question", "yesterday's answer"))
+	age(t, store, alice, "25 hours")
+	mustSave(t, store, alice, 2, turn("today's question", "today's answer"))
+	mustSave(t, store, bob, 3, turn("bob today", "ok"))
+
+	expired, err := store.Expire(ctx, 24*time.Hour)
 	if err != nil {
-		t.Fatalf("DeleteIdle: %v", err)
+		t.Fatalf("Expire: %v", err)
 	}
-	if deleted != 1 {
-		t.Errorf("deleted = %d, want 1", deleted)
+	if expired.Messages != 2 || expired.Conversations != 0 {
+		t.Errorf("expired = %+v, want 2 messages and no conversations", expired)
 	}
-	if got := mustHistory(t, store, alice, 20); len(got) != 0 {
-		t.Errorf("alice history = %+v, want empty", got)
+	got := mustHistory(t, store, alice, 20)
+	if len(got) != 2 || got[0].Content != "today's question" {
+		t.Errorf("alice history = %+v, want only today's turn", got)
 	}
 	if got := mustHistory(t, store, bob, 20); len(got) != 2 {
 		t.Errorf("bob history = %+v", got)
+	}
+}
+
+func TestExpireRemovesConversationsLeftEmpty(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	mustSave(t, store, alice, 1, turn("old", "old"))
+	age(t, store, alice, "2 days")
+	if err := store.SetMuted(ctx, group, true, alice); err != nil {
+		t.Fatal(err)
+	}
+
+	expired, err := store.Expire(ctx, 24*time.Hour)
+	if err != nil {
+		t.Fatalf("Expire: %v", err)
+	}
+	if expired.Messages != 2 || expired.Conversations != 1 {
+		t.Errorf("expired = %+v, want 2 messages and 1 conversation", expired)
+	}
+	if rows := countRows(t, store, "conversations"); rows != 0 {
+		t.Errorf("conversations left = %d", rows)
+	}
+	if muted, _ := store.MutedChats(ctx); len(muted) != 1 {
+		t.Errorf("muted chats = %v; settings are not chat history and must survive", muted)
+	}
+}
+
+func TestExpireNeverSplitsATurn(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	saveIn(t, store, private(alice), 1, []ai.Message{
+		{Role: ai.RoleUser, Content: "2+2?"},
+		{Role: ai.RoleAssistant, ToolCalls: []ai.ToolCall{{ID: "c", Type: "function", Function: ai.FunctionCall{Name: "calculator"}}}},
+		{Role: ai.RoleTool, ToolCallID: "c", Content: "4"},
+		{Role: ai.RoleAssistant, Content: "4"},
+	})
+
+	// All rows of a turn are written in one transaction and share its
+	// timestamp, so a cutoff can never fall between them.
+	var distinct int
+	if err := store.pool.QueryRow(ctx, `SELECT count(DISTINCT created_at) FROM messages`).Scan(&distinct); err != nil {
+		t.Fatal(err)
+	}
+	if distinct != 1 {
+		t.Errorf("one turn has %d different timestamps", distinct)
+	}
+}
+
+func TestExpireOnAnEmptyDatabase(t *testing.T) {
+	store := newTestStore(t)
+
+	expired, err := store.Expire(context.Background(), 24*time.Hour)
+	if err != nil || expired.Messages != 0 || expired.Conversations != 0 {
+		t.Errorf("expired = %+v, err = %v", expired, err)
 	}
 }
 

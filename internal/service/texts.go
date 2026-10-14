@@ -11,13 +11,13 @@ Hi! Say something and we'll talk.
 /help — commands and usage`
 
 	textAbout = `An AI chat character for Telegram, written in Go.
-It answers through OpenRouter, remembers the conversation, and can check the time and do arithmetic.
+It answers with an AI model (Gemini or OpenRouter), remembers the conversation, and can check the time and do arithmetic.
 Send /reset to delete the conversation history.`
 
 	textResetDone        = "The conversation history here has been deleted."
 	textUnknown          = "I don't know that command. Send /help to see what I can do."
 	textForbidden        = "This command is restricted to administrators."
-	textTextOnly         = "I can only read text messages for now."
+	textTextOnly         = "I can read text, photos, stickers, GIFs and voice messages, but not this."
 	textBusy             = "I'm handling a lot of messages right now. Please try again in a moment."
 	textRateLimited      = "You're sending messages too quickly. Please wait a little and try again."
 	textGroupRateLimited = "This group is sending me messages too quickly. Please wait a little and try again."

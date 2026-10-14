@@ -339,3 +339,58 @@ func TestErrorsNeverContainAPIKey(t *testing.T) {
 		}
 	}
 }
+
+// Gemini's OpenAI-compatible endpoint wraps some errors in a JSON array.
+func TestCompleteReadsErrorsWrappedInAnArray(t *testing.T) {
+	client, _ := newTestClient(t, reply{status: 400, body: `[{"error":{"code":400,"message":"API key not valid","status":"INVALID_ARGUMENT"}}]`})
+
+	_, err := client.Complete(context.Background(), userRequest())
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) || apiErr.Status != 400 || apiErr.Message != "API key not valid" {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestMessageWithPartsIsSentAsContentArray(t *testing.T) {
+	client, rec := newTestClient(t, reply{status: 200, body: plainReply})
+	req := Request{Messages: []Message{{
+		Role:    RoleUser,
+		Content: "Bek: what is this?",
+		Parts: []ContentPart{
+			ImagePart("image/jpeg", []byte{0xff, 0xd8, 0xff}),
+			AudioPart("ogg", []byte("OggS")),
+		},
+	}}}
+
+	if _, err := client.Complete(context.Background(), req); err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+	messages, _ := rec.requests[0]["messages"].([]any)
+	content, ok := messages[0].(map[string]any)["content"].([]any)
+	if !ok || len(content) != 3 {
+		t.Fatalf("content = %v, want text, image and audio parts", messages[0])
+	}
+	text := content[0].(map[string]any)
+	image := content[1].(map[string]any)
+	audio := content[2].(map[string]any)
+	if text["type"] != "text" || text["text"] != "Bek: what is this?" {
+		t.Errorf("text part = %v", text)
+	}
+	if image["type"] != "image_url" || image["image_url"].(map[string]any)["url"] != "data:image/jpeg;base64,/9j/" {
+		t.Errorf("image part = %v", image)
+	}
+	inputAudio := audio["input_audio"].(map[string]any)
+	if audio["type"] != "input_audio" || inputAudio["format"] != "ogg" || inputAudio["data"] != "T2dnUw==" {
+		t.Errorf("audio part = %v", audio)
+	}
+}
+
+func TestMessageWithoutPartsKeepsStringContent(t *testing.T) {
+	encoded, err := json.Marshal(Message{Role: RoleUser, Content: "hi"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(encoded) != `{"role":"user","content":"hi"}` {
+		t.Errorf("encoded = %s", encoded)
+	}
+}

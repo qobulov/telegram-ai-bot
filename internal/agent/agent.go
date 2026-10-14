@@ -88,6 +88,10 @@ type Request struct {
 	// Context is extra material for this turn only, such as recent group
 	// messages. It is sent in front of Text and never stored.
 	Context string
+	// Attachments are images or audio the message carries, sent with Text in
+	// this request only. They are never stored: later turns see only the
+	// text, which should say what was attached ("[photo]").
+	Attachments []ai.ContentPart
 	// Group is true for messages from a group or supergroup.
 	Group bool
 }
@@ -165,13 +169,14 @@ func (a *Agent) prompt(t *turn) []ai.Message {
 	messages = append(messages, ai.Message{Role: ai.RoleSystem, Content: a.systemPrompt(t.req)})
 	messages = append(messages, t.history...)
 	messages = append(messages, t.messages...)
+	// The first message of the turn is the user's. Context and attachments
+	// are added to it in this request only; t.messages, which is what gets
+	// saved, keeps the plain text.
+	question := &messages[1+len(t.history)]
 	if t.req.Context != "" {
-		// The first message of the turn is the user's. The context goes in
-		// front of it in this request only; t.messages, which is what gets
-		// saved, keeps the plain text.
-		question := &messages[1+len(t.history)]
 		question.Content = t.req.Context + "\n\n" + question.Content
 	}
+	question.Parts = t.req.Attachments
 	return messages
 }
 

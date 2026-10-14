@@ -291,13 +291,33 @@ func (s *Store) Reset(ctx context.Context, scope Scope) error {
 	return nil
 }
 
-// DeleteIdle removes conversations with no activity for longer than
-// olderThan and returns how many were deleted.
-func (s *Store) DeleteIdle(ctx context.Context, olderThan time.Duration) (int64, error) {
-	cutoff := time.Now().Add(-olderThan)
-	tag, err := s.pool.Exec(ctx, `DELETE FROM conversations WHERE updated_at < $1`, cutoff)
+// Expired counts what Expire removed.
+type Expired struct {
+	Messages      int64 `json:"messages"`
+	Conversations int64 `json:"conversations"`
+}
+
+// Expire deletes messages older than maxAge, then the conversations that have
+// no messages left. A turn's messages are written in one transaction and
+// share its timestamp, so a turn is always kept or removed whole. Settings
+// such as a group's mute are not history and are kept.
+func (s *Store) Expire(ctx context.Context, maxAge time.Duration) (Expired, error) {
+	cutoff := time.Now().Add(-maxAge)
+	var expired Expired
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `DELETE FROM messages WHERE created_at < $1`, cutoff)
+		if err != nil {
+			return err
+		}
+		expired.Messages = tag.RowsAffected()
+		tag, err = tx.Exec(ctx, `
+			DELETE FROM conversations c
+			WHERE NOT EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id)`)
+		expired.Conversations = tag.RowsAffected()
+		return err
+	})
 	if err != nil {
-		return 0, fmt.Errorf("storage: delete idle conversations: %w", err)
+		return Expired{}, fmt.Errorf("storage: expire history: %w", err)
 	}
-	return tag.RowsAffected(), nil
+	return expired, nil
 }

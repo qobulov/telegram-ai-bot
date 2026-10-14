@@ -474,3 +474,34 @@ func TestSilentMarkerWithDecoration(t *testing.T) {
 		}
 	}
 }
+
+func TestAttachmentsAreSentWithTheQuestionButNeverSaved(t *testing.T) {
+	f := newFixture(toolCall("call_1"), text("nice cat"), text("still nice"))
+	photo := ai.ImagePart("image/jpeg", []byte{1, 2, 3})
+	req := request(1, "Bek: <photo> look")
+	req.Attachments = []ai.ContentPart{photo}
+
+	if _, err := f.agent.Reply(context.Background(), req); err != nil {
+		t.Fatalf("Reply: %v", err)
+	}
+	for i, sent := range f.model.requests {
+		question := sent.Messages[1]
+		if len(question.Parts) != 1 || question.Parts[0].ImageURL == nil || question.Content != "Bek: <photo> look" {
+			t.Errorf("request %d: question = %+v, want the text with the photo attached", i, question)
+		}
+	}
+	for _, msg := range f.store.turns[0].Messages {
+		if len(msg.Parts) != 0 {
+			t.Errorf("a saved message carries media: %+v", msg)
+		}
+	}
+
+	if _, err := f.agent.Reply(context.Background(), request(2, "Bek: and now?")); err != nil {
+		t.Fatalf("second Reply: %v", err)
+	}
+	for _, msg := range f.model.requests[2].Messages {
+		if len(msg.Parts) != 0 {
+			t.Errorf("the earlier photo came back in a later turn: %+v", msg)
+		}
+	}
+}

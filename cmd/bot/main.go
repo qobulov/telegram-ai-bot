@@ -202,17 +202,7 @@ func maintain(ctx context.Context, cfg config.Config, store *storage.Store, logg
 }
 
 func applyRetention(ctx context.Context, cfg config.Config, store *storage.Store, logger *slog.Logger) {
-	if cfg.RetentionDays == 0 {
-		return
-	}
-	deleted, err := store.DeleteIdle(ctx, time.Duration(cfg.RetentionDays)*dayDuration)
-	if err != nil {
-		if ctx.Err() == nil {
-			logger.Error("retention cleanup failed", "error", err)
-		}
-		return
-	}
-	if deleted > 0 {
-		logger.Info("retention cleanup removed idle conversations", "count", deleted, "older_than_days", cfg.RetentionDays)
+	if err := app.Expire(ctx, cfg, store, logger); err != nil && ctx.Err() == nil {
+		logger.Error("retention cleanup failed", "error", err)
 	}
 }

@@ -33,6 +33,46 @@ type Message struct {
 	// IsAutomaticForward marks a channel post forwarded automatically to the
 	// channel's linked discussion group.
 	IsAutomaticForward bool `json:"is_automatic_forward"`
+
+	// Media. At most one of these is set on a message.
+	Photo     []PhotoSize `json:"photo"` // the same picture in several sizes, smallest first
+	Sticker   *Sticker    `json:"sticker"`
+	Animation *Animation  `json:"animation"` // a GIF, which Telegram stores as a video
+	Voice     *Voice      `json:"voice"`
+}
+
+// PhotoSize is one size of a photo, or a thumbnail.
+type PhotoSize struct {
+	FileID   string `json:"file_id"`
+	FileSize int64  `json:"file_size"`
+	Width    int    `json:"width"`
+	Height   int    `json:"height"`
+}
+
+// Sticker is a sticker. A static sticker is a WebP image; animated (Lottie)
+// and video stickers cannot be shown as an image, but have a thumbnail.
+type Sticker struct {
+	FileID     string     `json:"file_id"`
+	Emoji      string     `json:"emoji"`
+	IsAnimated bool       `json:"is_animated"`
+	IsVideo    bool       `json:"is_video"`
+	FileSize   int64      `json:"file_size"`
+	Thumbnail  *PhotoSize `json:"thumbnail"`
+}
+
+// Animation is a GIF or a silent video clip.
+type Animation struct {
+	FileID    string     `json:"file_id"`
+	MimeType  string     `json:"mime_type"`
+	Thumbnail *PhotoSize `json:"thumbnail"`
+}
+
+// Voice is a voice message: OGG audio encoded with Opus.
+type Voice struct {
+	FileID   string `json:"file_id"`
+	Duration int    `json:"duration"` // seconds
+	MimeType string `json:"mime_type"`
+	FileSize int64  `json:"file_size"`
 }
 
 // User is a Telegram account: the sender of a message, or the bot itself.

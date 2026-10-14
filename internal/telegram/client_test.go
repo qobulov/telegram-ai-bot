@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -416,5 +417,92 @@ func TestDeleteWebhook(t *testing.T) {
 	}
 	if got := api.recorded()[0].method; got != "deleteWebhook" {
 		t.Errorf("method = %q", got)
+	}
+}
+
+func TestGetUpdatesParsesMedia(t *testing.T) {
+	client, _ := newTestClient(t, `{"ok":true,"result":[{"update_id":8,"message":{
+		"message_id":4,"from":{"id":42},"chat":{"id":42,"type":"private"},
+		"photo":[{"file_id":"small","file_size":900,"width":90,"height":90},{"file_id":"big","file_size":90000,"width":800,"height":800}],
+		"sticker":{"file_id":"stk","emoji":"😂","is_animated":true,"is_video":false,"thumbnail":{"file_id":"stk-thumb","file_size":5000}},
+		"animation":{"file_id":"gif","mime_type":"video/mp4","thumbnail":{"file_id":"gif-thumb"}},
+		"voice":{"file_id":"vc","duration":12,"mime_type":"audio/ogg","file_size":40000}}}]}`)
+
+	updates, err := client.GetUpdates(context.Background(), 0, 0)
+	if err != nil {
+		t.Fatalf("GetUpdates: %v", err)
+	}
+	msg := updates[0].Message
+	if len(msg.Photo) != 2 || msg.Photo[1].FileID != "big" || msg.Photo[1].FileSize != 90000 {
+		t.Errorf("photo = %+v", msg.Photo)
+	}
+	if msg.Sticker == nil || msg.Sticker.Emoji != "😂" || !msg.Sticker.IsAnimated || msg.Sticker.Thumbnail.FileID != "stk-thumb" {
+		t.Errorf("sticker = %+v", msg.Sticker)
+	}
+	if msg.Animation == nil || msg.Animation.Thumbnail == nil || msg.Animation.Thumbnail.FileID != "gif-thumb" {
+		t.Errorf("animation = %+v", msg.Animation)
+	}
+	if msg.Voice == nil || msg.Voice.FileID != "vc" || msg.Voice.Duration != 12 || msg.Voice.FileSize != 40000 {
+		t.Errorf("voice = %+v", msg.Voice)
+	}
+}
+
+// fileServer serves getFile and the file download, as Telegram does.
+func fileServer(t *testing.T, path string, content []byte) *Client {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/bot" + testToken + "/getFile":
+			var params map[string]any
+			_ = json.NewDecoder(r.Body).Decode(&params)
+			if params["file_id"] != "file-1" {
+				_, _ = io.WriteString(w, `{"ok":false,"error_code":400,"description":"Bad Request: invalid file_id"}`)
+				return
+			}
+			_, _ = io.WriteString(w, `{"ok":true,"result":{"file_id":"file-1","file_size":`+strconv.Itoa(len(content))+`,"file_path":"`+path+`"}}`)
+		case "/file/bot" + testToken + "/" + path:
+			_, _ = w.Write(content)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	return NewClient(Options{Token: testToken, BaseURL: server.URL})
+}
+
+func TestDownloadFile(t *testing.T) {
+	client := fileServer(t, "photos/file_1.jpg", []byte("JPEGDATA"))
+
+	data, err := client.DownloadFile(context.Background(), "file-1", 1<<20)
+	if err != nil {
+		t.Fatalf("DownloadFile: %v", err)
+	}
+	if string(data) != "JPEGDATA" {
+		t.Errorf("data = %q", data)
+	}
+}
+
+func TestDownloadFileRefusesFilesOverTheLimit(t *testing.T) {
+	client := fileServer(t, "voice/file_2.oga", make([]byte, 5000))
+
+	_, err := client.DownloadFile(context.Background(), "file-1", 1000)
+	if !errors.Is(err, ErrFileTooLarge) {
+		t.Fatalf("err = %v, want ErrFileTooLarge", err)
+	}
+}
+
+func TestDownloadFileErrorsDoNotLeakTheToken(t *testing.T) {
+	client := fileServer(t, "photos/x.jpg", []byte("x"))
+
+	_, err := client.DownloadFile(context.Background(), "unknown", 1000)
+	if err == nil {
+		t.Fatal("expected an error for an unknown file")
+	}
+	unreachable := NewClient(Options{Token: testToken, BaseURL: "http://127.0.0.1:1"})
+	_, netErr := unreachable.DownloadFile(context.Background(), "file-1", 1000)
+	for _, e := range []error{err, netErr} {
+		if e == nil || strings.Contains(e.Error(), "test-secret") {
+			t.Errorf("error = %v; it must exist and must not contain the token", e)
+		}
 	}
 }

@@ -160,16 +160,30 @@ func (c *Client) send(ctx context.Context, body []byte) (Message, error) {
 }
 
 func statusError(resp *http.Response, raw []byte) *APIError {
-	var parsed chatResponse
 	message := http.StatusText(resp.StatusCode)
-	if json.Unmarshal(raw, &parsed) == nil && parsed.Error != nil && parsed.Error.Message != "" {
-		message = parsed.Error.Message
+	if body := errorMessage(raw); body != "" {
+		message = body
 	}
 	return &APIError{
 		Status:     resp.StatusCode,
 		Message:    truncate(message),
 		RetryAfter: parseRetryAfter(resp.Header.Get("Retry-After")),
 	}
+}
+
+// errorMessage finds the provider's explanation in an error body. OpenRouter
+// sends {"error":{...}}; Gemini's OpenAI-compatible endpoint sometimes sends
+// the same object wrapped in an array.
+func errorMessage(raw []byte) string {
+	var single chatResponse
+	if json.Unmarshal(raw, &single) == nil && single.Error != nil {
+		return single.Error.Message
+	}
+	var wrapped []chatResponse
+	if json.Unmarshal(raw, &wrapped) == nil && len(wrapped) > 0 && wrapped[0].Error != nil {
+		return wrapped[0].Error.Message
+	}
+	return ""
 }
 
 func decodeReply(raw []byte) (Message, error) {

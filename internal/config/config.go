@@ -16,6 +16,7 @@ const (
 	telegramMessageLength  = 4096
 	maxAmbientMessages     = 100
 	maxWebhookSecretLength = 256
+	minCronSecretLength    = 16
 )
 
 // removedVariables maps settings that no longer exist to their replacement,
@@ -31,12 +32,24 @@ var removedVariables = map[string]string{
 type Config struct {
 	TelegramToken string
 	// WebhookSecret is needed only when updates arrive by webhook.
-	WebhookSecret     string
-	TelegramAPIURL    string
-	OpenRouterAPIKey  string
-	OpenRouterBaseURL string
-	Model             string
-	DatabaseURL       string
+	WebhookSecret string
+	// CronSecret is what Vercel Cron sends to authenticate scheduled calls.
+	CronSecret     string
+	TelegramAPIURL string
+	// The model provider. Both Gemini and OpenRouter are reached through the
+	// same OpenAI-compatible chat completions API; only these differ.
+	AIProvider string
+	AIAPIKey   string
+	AIBaseURL  string
+	// AudioInput is true when the provider understands voice messages.
+	AudioInput bool
+
+	// Media limits: the largest file the bot downloads, and the longest
+	// voice message it listens to.
+	MaxMediaBytes   int64
+	MaxVoiceSeconds int
+	Model           string
+	DatabaseURL     string
 
 	// The character. PersonaPrompt is given to the model on every request,
 	// followed by GroupNote for messages from a group.
@@ -82,15 +95,13 @@ func (c Config) IsAdmin(userID int64) bool {
 func Load(getenv func(string) string) (Config, error) {
 	r := reader{getenv: getenv}
 	cfg := Config{
-		TelegramToken:     r.required("TELEGRAM_BOT_TOKEN"),
-		OpenRouterAPIKey:  r.required("OPENROUTER_API_KEY"),
-		DatabaseURL:       r.required("DB_POSTGRES_URL"),
-		WebhookSecret:     r.webhookSecret("TELEGRAM_WEBHOOK_SECRET"),
-		TelegramAPIURL:    r.text("TELEGRAM_API_URL", "https://api.telegram.org"),
-		OpenRouterBaseURL: r.text("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
-		Model:             r.text("OPENROUTER_MODEL", "openrouter/free"),
-		BotDisplayName:    r.text("BOT_DISPLAY_NAME", "Maria"),
-		GroupNote:         groupNote,
+		TelegramToken:  r.required("TELEGRAM_BOT_TOKEN"),
+		DatabaseURL:    r.required("DB_POSTGRES_URL"),
+		WebhookSecret:  r.webhookSecret("TELEGRAM_WEBHOOK_SECRET"),
+		CronSecret:     r.cronSecret("CRON_SECRET"),
+		TelegramAPIURL: r.text("TELEGRAM_API_URL", "https://api.telegram.org"),
+		BotDisplayName: r.text("BOT_DISPLAY_NAME", "Maria"),
+		GroupNote:      groupNote,
 
 		MaxHistoryMessages:     r.positive("MAX_HISTORY_MESSAGES", 20),
 		MaxToolCallsPerTurn:    r.positive("MAX_TOOL_CALLS_PER_TURN", 4),
@@ -98,7 +109,7 @@ func Load(getenv func(string) string) (Config, error) {
 		UserRateLimitPerMinute: r.positive("USER_RATE_LIMIT_PER_MINUTE", 10),
 		MaxOutputTokens:        r.positive("MAX_OUTPUT_TOKENS", 1024),
 		MaxInputChars:          r.positive("MAX_INPUT_CHARS", 4000),
-		RetentionDays:          r.integer("RETENTION_DAYS", 90, 0),
+		RetentionDays:          r.integer("RETENTION_DAYS", 1, 0),
 
 		RequestTimeout: time.Duration(r.positive("REQUEST_TIMEOUT_SECONDS", 45)) * time.Second,
 		LogLevel:       r.logLevel("LOG_LEVEL"),
@@ -113,6 +124,12 @@ func Load(getenv func(string) string) (Config, error) {
 		AmbientMessages:         r.integer("GROUP_AMBIENT_MESSAGES", 20, 0),
 		MaxGroupReplyChars:      r.positive("MAX_GROUP_REPLY_LENGTH", 4000),
 		GroupRateLimitPerMinute: r.positive("GROUP_RATE_LIMIT_PER_MINUTE", 10),
+	}
+	r.chooseProvider(&cfg)
+	cfg.MaxMediaBytes = int64(r.positive("MAX_MEDIA_MB", 5)) << 20
+	cfg.MaxVoiceSeconds = r.positive("MAX_VOICE_SECONDS", 120)
+	if cfg.MaxMediaBytes > telegramDownloadLimit {
+		r.fail("MAX_MEDIA_MB", "must be at most 20: Telegram does not let bots download larger files")
 	}
 	cfg.PersonaPrompt = strings.ReplaceAll(r.text("PERSONA_PROMPT", defaultPersona), namePlaceholder, cfg.BotDisplayName)
 	cfg.WakeWords = r.wakeWords(cfg)
@@ -188,6 +205,52 @@ func (r *reader) boolean(name string, fallback bool) bool {
 	}
 }
 
+// Model providers. Gemini is used through Google's OpenAI-compatible
+// endpoint, so the same client serves both.
+const (
+	providerGemini     = "gemini"
+	providerOpenRouter = "openrouter"
+	providerXAI        = "xai"
+
+	telegramDownloadLimit = 20 << 20
+)
+
+// provider describes one model provider. All are reached through the
+// OpenAI-compatible chat completions API.
+type provider struct {
+	name, keyVar, baseURLVar, baseURL, modelVar, model string
+	// audio is true when the provider accepts voice messages as input.
+	audio bool
+}
+
+var providers = []provider{
+	{providerGemini, "GEMINI_API_KEY", "GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai", "GEMINI_MODEL", "gemini-2.5-flash", true},
+	{providerXAI, "XAI_API_KEY", "XAI_BASE_URL", "https://api.x.ai/v1", "XAI_MODEL", "grok-4", false},
+	{providerOpenRouter, "OPENROUTER_API_KEY", "OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1", "OPENROUTER_MODEL", "openrouter/free", false},
+}
+
+// chooseProvider picks the model provider by which API key is set. Exactly
+// one must be: with more, it would be unclear which account is billed.
+func (r *reader) chooseProvider(cfg *Config) {
+	var chosen []provider
+	for _, p := range providers {
+		if r.value(p.keyVar) != "" {
+			chosen = append(chosen, p)
+		}
+	}
+	switch len(chosen) {
+	case 0:
+		r.fail("GEMINI_API_KEY", "or XAI_API_KEY or OPENROUTER_API_KEY is required")
+	case 1:
+		p := chosen[0]
+		cfg.AIProvider, cfg.AIAPIKey, cfg.AudioInput = p.name, r.value(p.keyVar), p.audio
+		cfg.AIBaseURL = r.text(p.baseURLVar, p.baseURL)
+		cfg.Model = r.text(p.modelVar, p.model)
+	default:
+		r.fail(chosen[0].keyVar, "and "+chosen[1].keyVar+" are both set; keep only one, for the provider you want to use")
+	}
+}
+
 // wakeWords reads BOT_WAKE_WORDS, falling back to the display name. Each
 // must be a single word of letters and digits, because that is what the
 // wake-word matcher compares against.
@@ -223,6 +286,17 @@ func (r *reader) webhookSecret(name string) string {
 	secret := r.value(name)
 	if len(secret) > maxWebhookSecretLength || strings.ContainsFunc(secret, notSecretChar) {
 		r.fail(name, "must be at most 256 characters from A-Z, a-z, 0-9, _ and -")
+		return ""
+	}
+	return secret
+}
+
+// cronSecret reads the optional secret for scheduled calls. It guards an
+// endpoint that deletes history, so it must not be easy to guess.
+func (r *reader) cronSecret(name string) string {
+	secret := r.value(name)
+	if secret != "" && len(secret) < minCronSecretLength {
+		r.fail(name, fmt.Sprintf("must be at least %d characters", minCronSecretLength))
 		return ""
 	}
 	return secret

@@ -35,8 +35,8 @@ func TestLoadAppliesDefaults(t *testing.T) {
 	if cfg.Model != "openrouter/free" {
 		t.Errorf("Model = %q", cfg.Model)
 	}
-	if cfg.OpenRouterBaseURL != "https://openrouter.ai/api/v1" {
-		t.Errorf("OpenRouterBaseURL = %q", cfg.OpenRouterBaseURL)
+	if cfg.AIBaseURL != "https://openrouter.ai/api/v1" || cfg.AIProvider != "openrouter" || cfg.AIAPIKey != testKey {
+		t.Errorf("AI settings = %q, %q", cfg.AIProvider, cfg.AIBaseURL)
 	}
 	if cfg.TelegramAPIURL != "https://api.telegram.org" {
 		t.Errorf("TelegramAPIURL = %q", cfg.TelegramAPIURL)
@@ -51,7 +51,7 @@ func TestLoadAppliesDefaults(t *testing.T) {
 		"UserRateLimitPerMinute": {cfg.UserRateLimitPerMinute, 10},
 		"MaxOutputTokens":        {cfg.MaxOutputTokens, 1024},
 		"MaxInputChars":          {cfg.MaxInputChars, 4000},
-		"RetentionDays":          {cfg.RetentionDays, 90},
+		"RetentionDays":          {cfg.RetentionDays, 1},
 	}
 	for name, pair := range wantInts {
 		if pair[0] != pair[1] {
@@ -396,5 +396,152 @@ func TestWebhookSecret(t *testing.T) {
 		if err != nil && strings.Contains(err.Error(), bad) {
 			t.Errorf("the error repeats the secret %q", bad)
 		}
+	}
+}
+
+func geminiEnv() map[string]string {
+	env := validEnv()
+	delete(env, "OPENROUTER_API_KEY")
+	env["GEMINI_API_KEY"] = "AIza-gemini-secret"
+	return env
+}
+
+func TestGeminiKeySelectsGemini(t *testing.T) {
+	cfg, err := Load(getenv(geminiEnv()))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.AIProvider != "gemini" || cfg.AIAPIKey != "AIza-gemini-secret" {
+		t.Errorf("provider = %q", cfg.AIProvider)
+	}
+	if cfg.AIBaseURL != "https://generativelanguage.googleapis.com/v1beta/openai" {
+		t.Errorf("base URL = %q, want Gemini's OpenAI-compatible endpoint", cfg.AIBaseURL)
+	}
+	if cfg.Model != "gemini-2.5-flash" {
+		t.Errorf("model = %q", cfg.Model)
+	}
+}
+
+func TestGeminiModelCanBeChosen(t *testing.T) {
+	env := geminiEnv()
+	env["GEMINI_MODEL"] = "gemini-2.5-pro"
+	cfg, err := Load(getenv(env))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Model != "gemini-2.5-pro" {
+		t.Errorf("model = %q", cfg.Model)
+	}
+}
+
+func TestOpenRouterSettingsDoNotLeakIntoGemini(t *testing.T) {
+	env := geminiEnv()
+	env["OPENROUTER_MODEL"] = "openrouter/free"
+	cfg, err := Load(getenv(env))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Model != "gemini-2.5-flash" {
+		t.Errorf("model = %q; an OpenRouter model name must not be sent to Gemini", cfg.Model)
+	}
+}
+
+func TestOneAIKeyIsRequired(t *testing.T) {
+	env := validEnv()
+	delete(env, "OPENROUTER_API_KEY")
+	_, err := Load(getenv(env))
+	if err == nil || !strings.Contains(err.Error(), "GEMINI_API_KEY") || !strings.Contains(err.Error(), "OPENROUTER_API_KEY") {
+		t.Errorf("no key: err = %v, want it to name both variables", err)
+	}
+
+	both := geminiEnv()
+	both["OPENROUTER_API_KEY"] = testKey
+	_, err = Load(getenv(both))
+	if err == nil || !strings.Contains(err.Error(), "only one") {
+		t.Errorf("both keys: err = %v, want a request to keep only one", err)
+	}
+	if err != nil && (strings.Contains(err.Error(), testKey) || strings.Contains(err.Error(), "AIza-gemini-secret")) {
+		t.Errorf("the error repeats a key: %v", err)
+	}
+}
+
+func TestXAIKeySelectsGrok(t *testing.T) {
+	env := validEnv()
+	delete(env, "OPENROUTER_API_KEY")
+	env["XAI_API_KEY"] = "xai-secret"
+	cfg, err := Load(getenv(env))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.AIProvider != "xai" || cfg.AIAPIKey != "xai-secret" || cfg.AIBaseURL != "https://api.x.ai/v1" || cfg.Model != "grok-4" {
+		t.Errorf("provider = %q, base = %q, model = %q", cfg.AIProvider, cfg.AIBaseURL, cfg.Model)
+	}
+	if cfg.AudioInput {
+		t.Error("audio input is enabled for Grok; only Gemini understands voice messages here")
+	}
+
+	env["XAI_MODEL"] = "grok-4-fast"
+	if cfg, _ := Load(getenv(env)); cfg.Model != "grok-4-fast" {
+		t.Errorf("model = %q", cfg.Model)
+	}
+}
+
+func TestOnlyGeminiHearsVoice(t *testing.T) {
+	cfg, err := Load(getenv(geminiEnv()))
+	if err != nil || !cfg.AudioInput {
+		t.Errorf("Gemini: audio input = %v, err = %v", cfg.AudioInput, err)
+	}
+	cfg, err = Load(getenv(validEnv()))
+	if err != nil || cfg.AudioInput {
+		t.Errorf("OpenRouter: audio input = %v, err = %v", cfg.AudioInput, err)
+	}
+}
+
+func TestExactlyOneOfThreeKeys(t *testing.T) {
+	env := geminiEnv()
+	env["XAI_API_KEY"] = "xai-secret"
+	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "only one") {
+		t.Errorf("Gemini and xAI keys: err = %v", err)
+	}
+	none := validEnv()
+	delete(none, "OPENROUTER_API_KEY")
+	if _, err := Load(getenv(none)); err == nil || !strings.Contains(err.Error(), "XAI_API_KEY") {
+		t.Errorf("no key: err = %v, want it to mention XAI_API_KEY too", err)
+	}
+}
+
+func TestMediaLimits(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.MaxMediaBytes != 5<<20 || cfg.MaxVoiceSeconds != 120 {
+		t.Errorf("defaults = %d bytes, %d s", cfg.MaxMediaBytes, cfg.MaxVoiceSeconds)
+	}
+	env := validEnv()
+	env["MAX_MEDIA_MB"] = "25"
+	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "MAX_MEDIA_MB") {
+		t.Errorf("MAX_MEDIA_MB=25: err = %v; Telegram lets bots download at most 20 MB", err)
+	}
+	env["MAX_MEDIA_MB"] = "2"
+	env["MAX_VOICE_SECONDS"] = "30"
+	if cfg, err := Load(getenv(env)); err != nil || cfg.MaxMediaBytes != 2<<20 || cfg.MaxVoiceSeconds != 30 {
+		t.Errorf("custom limits = %d, %d, err = %v", cfg.MaxMediaBytes, cfg.MaxVoiceSeconds, err)
+	}
+}
+
+func TestCronSecret(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil || cfg.CronSecret != "" {
+		t.Fatalf("default: %q, %v", cfg.CronSecret, err)
+	}
+	env := validEnv()
+	env["CRON_SECRET"] = "a-long-random-cron-secret"
+	if cfg, err := Load(getenv(env)); err != nil || cfg.CronSecret != "a-long-random-cron-secret" {
+		t.Errorf("CronSecret = %q, err = %v", cfg.CronSecret, err)
+	}
+	env["CRON_SECRET"] = "short"
+	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "CRON_SECRET") || strings.Contains(err.Error(), "short") {
+		t.Errorf("short secret: err = %v, want it rejected without repeating it", err)
 	}
 }

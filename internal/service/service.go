@@ -66,6 +66,7 @@ type Options struct {
 	Recorder Recorder
 	Members  Members
 	Muter    Muter
+	Media    Media
 	Logger   *slog.Logger
 	// Model is the model name shown by /model.
 	Model string
@@ -106,6 +107,13 @@ type Options struct {
 	// MaxGroupReplyChars is the longest answer posted in a group, in UTF-16
 	// code units as Telegram counts them.
 	MaxGroupReplyChars int
+
+	// MaxMediaBytes is the largest file downloaded for the model to see.
+	MaxMediaBytes int64
+	// MaxVoiceSeconds is the longest voice message passed on.
+	MaxVoiceSeconds int
+	// AudioInput is true when the model provider can hear voice messages.
+	AudioInput bool
 }
 
 // Service processes updates on a fixed pool of workers.
@@ -237,7 +245,8 @@ func (s *Service) accept(update telegram.Update) (incoming, bool) {
 	switch msg.Chat.Type {
 	case telegram.ChatTypePrivate:
 		in.scope = storage.Scope{ChatID: msg.Chat.ID, UserID: msg.From.ID}
-		in.text = strings.TrimSpace(msg.Text)
+		text, _ := msg.Content() // the caption, for a photo
+		in.text = strings.TrimSpace(text)
 		return in, true
 	case telegram.ChatTypeGroup, telegram.ChatTypeSupergroup:
 		in.scope = storage.Scope{ChatID: msg.Chat.ID} // shared by the group
@@ -279,6 +288,9 @@ func isMuteCommand(text string) bool {
 // answer in that group. It goes to memory only; see ambient.
 func (s *Service) remember(msg *telegram.Message) {
 	text, _ := msg.Content()
+	if m, ok := s.mediaOf(msg); ok {
+		text = withMediaLabel(m, text) // noted, never downloaded
+	}
 	s.ambient.add(msg.Chat.ID, authorLabel(msg.From.FirstName), text, time.Now())
 }
 

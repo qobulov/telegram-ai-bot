@@ -23,14 +23,15 @@ time, calculator, bot help).
 4. [Tests](#tests)
 5. [Choosing a model](#choosing-a-model)
 6. [The character](#the-character)
-7. [Groups](#groups)
-8. [VPS deployment (systemd)](#vps-deployment-systemd)
-9. [Docker Compose deployment (optional)](#docker-compose-deployment-optional)
-10. [Vercel deployment (webhook)](#vercel-deployment-webhook)
-11. [Backup and restore](#backup-and-restore)
-12. [Long polling and webhooks](#long-polling-and-webhooks)
-13. [Security checklist](#security-checklist)
-14. [Troubleshooting](#troubleshooting)
+7. [Photos, stickers, GIFs and voice messages](#photos-stickers-gifs-and-voice-messages)
+8. [Groups](#groups)
+9. [VPS deployment (systemd)](#vps-deployment-systemd)
+10. [Docker Compose deployment (optional)](#docker-compose-deployment-optional)
+11. [Vercel deployment (webhook)](#vercel-deployment-webhook)
+12. [Backup and restore](#backup-and-restore)
+13. [Long polling and webhooks](#long-polling-and-webhooks)
+14. [Security checklist](#security-checklist)
+15. [Troubleshooting](#troubleshooting)
 
 ## Architecture
 
@@ -131,9 +132,16 @@ in the environment win over the file.
 | Variable                      | Default                        | Meaning                                                                                                      |
 | ----------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
 | `TELEGRAM_BOT_TOKEN`          | required                       | Token from [@BotFather](https://t.me/BotFather)                                                              |
-| `OPENROUTER_API_KEY`          | required                       | Key from <https://openrouter.ai/keys>                                                                        |
+| `GEMINI_API_KEY` | one of the two keys | Google Gemini key from <https://aistudio.google.com/apikey> |
+| `OPENROUTER_API_KEY` | one of the two keys | OpenRouter key from <https://openrouter.ai/keys>; set this or `GEMINI_API_KEY`, not both |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model ID, used with `GEMINI_API_KEY` |
+| `XAI_API_KEY` | one of the keys | xAI (Grok) key from <https://console.x.ai>; images yes, voice no |
+| `XAI_MODEL` | `grok-4` | Grok model ID, used with `XAI_API_KEY` |
+| `MAX_MEDIA_MB` | `5` | Largest photo or sticker file downloaded for the model (1 to 20) |
+| `MAX_VOICE_SECONDS` | `120` | Longest voice message passed to the model |
 | `DB_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
 | `TELEGRAM_WEBHOOK_SECRET` | empty | Only for webhook deployments; see [Vercel deployment](#vercel-deployment-webhook) |
+| `CRON_SECRET` | empty | Only on Vercel: protects the daily cleanup endpoint |
 | `OPENROUTER_MODEL`            | `openrouter/free`              | Model ID, see [Choosing a model](#choosing-a-model)                                                          |
 | `MAX_OUTPUT_TOKENS`           | `1024`                         | Longest model reply, in tokens                                                                               |
 | `BOT_DISPLAY_NAME`            | `Maria`                         | The character's name                                                                                         |
@@ -144,7 +152,7 @@ in the environment win over the file.
 | `USER_RATE_LIMIT_PER_MINUTE`  | `10`                           | Messages each user may send per minute                                                                       |
 | `REQUEST_TIMEOUT_SECONDS`     | `45`                           | Time budget for answering one message                                                                        |
 | `MAX_INPUT_CHARS`             | `4000`                         | Longest user message accepted                                                                                |
-| `RETENTION_DAYS`              | `90`                           | Delete conversations idle longer than this; `0` keeps them forever                                           |
+| `RETENTION_DAYS` | `1` | Chat history is kept this many days, then deleted; `0` keeps it forever |
 | `ADMIN_USER_IDS`              | empty                          | Comma-separated Telegram user IDs of administrators                                                          |
 | `ADMIN_COMMANDS`              | empty                          | Comma-separated commands only administrators may use, e.g. `model,about`                                     |
 | `ENABLE_WAKE_WORD_TRIGGER`    | `true`                         | In groups, answer when called by name; needs privacy mode off, see [Groups](#groups)                         |
@@ -222,6 +230,28 @@ database at the same time.
 
 ## Choosing a model
 
+The bot works with **Google Gemini**, **xAI Grok** or **OpenRouter**. Which
+one is used depends on which key is set: `GEMINI_API_KEY`, `XAI_API_KEY` or
+`OPENROUTER_API_KEY`. Set exactly one; with more the bot refuses to start.
+
+**Grok.** Create a key at <https://console.x.ai> and set `XAI_API_KEY`. The
+model defaults to `grok-4`; set `XAI_MODEL` for another. Grok sees photos
+and stickers but cannot listen to voice messages here; for those, use
+Gemini.
+
+**Gemini.** Create a key at <https://aistudio.google.com/apikey> and set
+`GEMINI_API_KEY`. The model defaults to `gemini-2.5-flash`; set
+`GEMINI_MODEL` for another one from
+<https://ai.google.dev/gemini-api/docs/models>. Gemini models support the
+tools (time, calculator) and are usually much faster than OpenRouter's free
+models, which matters for the 60-second limit on Vercel. The bot talks to
+Gemini through Google's OpenAI-compatible endpoint, so nothing else changes.
+The free tier has per-minute and per-day request limits; when they are hit
+the user gets the generic error and the log shows `status 429`.
+
+**OpenRouter**, described below, gives access to many models from one key.
+
+
 `OPENROUTER_MODEL` accepts any model ID from <https://openrouter.ai/models>.
 
 Tools (time, calculator, help) only work with models that support tool
@@ -287,6 +317,43 @@ admins can `/mute` it at any time.
 The same character answers in private chats and in groups. In groups a short
 fixed note is added that explains the message format and lets the model stay
 silent (below).
+
+## Photos, stickers, GIFs and voice messages
+
+The bot can look at what people send, not only read it.
+
+| Sent | What the model gets |
+|---|---|
+| Photo | the photo (the largest size under `MAX_MEDIA_MB`) and its caption |
+| Sticker | the sticker image and its emoji |
+| Animated or video sticker | its first frame and its emoji |
+| GIF | its first frame |
+| Voice message | the audio, with Gemini only, up to `MAX_VOICE_SECONDS` |
+
+Videos, documents, round video messages and audio files are not read; the
+bot says so.
+
+In the text the model and the history see, media appears as a label:
+`<photo>`, `<sticker 😂>`, `<animated sticker 🔥>`, `<GIF>`,
+`<voice message, 12 s>`. The file itself is sent to the model only with the
+message it came in. It is not stored, so in later turns the bot remembers
+that a photo was sent and what it answered, not the photo.
+
+**In groups** the bot looks only at media meant for it:
+
+- a photo or GIF whose caption calls the bot or mentions it;
+- a photo, sticker, GIF or voice message sent as a reply to the bot;
+- the photo, sticker, GIF or voice message someone replies to while calling
+  the bot ("Maria, nima deysan?" as a reply to a friend's photo).
+
+Other media is never downloaded. With the recent-chatter buffer on, it is
+noted as "Ann: <photo>" without being seen.
+
+Each photo or voice message adds a download from Telegram and a larger
+request to the model, so answers take a little longer. Gemini's support for
+Telegram's OGG voice format through its OpenAI-compatible endpoint has not
+been verified; if voice messages fail, the log shows the provider's error
+on `turn failed`.
 
 ## Groups
 
@@ -668,7 +735,7 @@ accepts the Go version in `go.mod`; if the build fails on that, lower the
 | Mute state | cached in memory | read from the database for each addressed group message |
 | Rate limits | exact | per instance only, so much weaker; do not rely on them |
 | Order of messages in a group | one at a time, in order | concurrent requests are not ordered |
-| Retention cleanup (`RETENTION_DAYS`) | hourly | does not run |
+| Retention cleanup (`RETENTION_DAYS`) | hourly | daily, by Vercel Cron at 03:00 UTC |
 | Time per message | `REQUEST_TIMEOUT_SECONDS` | must fit in the function's 60 seconds |
 
 With BotFather privacy mode off, every group message invokes the function,
@@ -692,6 +759,7 @@ Telegram then delivers the update again. Keep `REQUEST_TIMEOUT_SECONDS` at
    | `OPENROUTER_API_KEY` | your key |
    | `DB_POSTGRES_URL` | the connection string (a Vercel database integration may set it for you) |
    | `TELEGRAM_WEBHOOK_SECRET` | a secret you generate: `openssl rand -hex 32` |
+   | `CRON_SECRET` | another secret you generate: `openssl rand -hex 32` |
 
    Any other variable from [Configuration](#configuration) can be set the
    same way.
@@ -715,6 +783,18 @@ Telegram then delivers the update again. Keep `REQUEST_TIMEOUT_SECONDS` at
 To go back to long polling: `go run ./cmd/bot delete-webhook`. A token works
 with one mode at a time; while a webhook is set, `make run` fails with
 `409 Conflict`.
+
+### Daily cleanup
+
+`vercel.json` schedules a Vercel Cron job that calls `/api/cleanup` every
+day at 03:00 UTC. It deletes chat history older than `RETENTION_DAYS`
+(default 1 day) and conversations left empty; group mute settings are kept.
+Vercel sends `CRON_SECRET` with the call, and the endpoint refuses any
+request without it, so nobody else can trigger it. Without `CRON_SECRET`
+set in the project the endpoint answers `503` and nothing is deleted.
+
+Runs and their results are listed in the Vercel dashboard under the
+project's *Cron Jobs* settings, where a run can also be started by hand.
 
 ### Security of the webhook
 
@@ -761,8 +841,8 @@ sudo -u postgres psql -d tgbot_restore_test -c 'SELECT count(*) FROM messages'
 sudo -u postgres dropdb tgbot_restore_test
 ```
 
-**Retention.** Conversations idle for more than `RETENTION_DAYS` are deleted
-by an hourly job. A user can delete their own history at any time with
+**Retention.** Messages older than `RETENTION_DAYS` (default 1 day) are deleted
+by an hourly job, or daily by Vercel Cron. A user can delete their own history at any time with
 `/reset`. Backups keep deleted data until they are rotated out.
 
 ## Long polling and webhooks

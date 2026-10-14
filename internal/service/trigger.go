@@ -133,6 +133,19 @@ func withQuote(text string, replied *telegram.Message, botID int64) string {
 	return header + "\n" + quoted + "\n" + quoteEnd + "\n\n" + text
 }
 
+// quoted returns the replied-to message with its media described in its
+// text, so that a quote of a photo reads "<photo> caption".
+func (s *Service) quoted(replied *telegram.Message) *telegram.Message {
+	m, ok := s.mediaOf(replied)
+	if !ok {
+		return replied
+	}
+	described := *replied
+	content, _ := replied.Content()
+	described.Text = withMediaLabel(m, content)
+	return &described
+}
+
 func quotedText(replied *telegram.Message) string {
 	if replied == nil {
 		return ""

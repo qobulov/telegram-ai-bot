@@ -2,6 +2,7 @@
 package ai
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,6 +27,58 @@ type Message struct {
 	Content    string     `json:"content"`
 	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string     `json:"tool_call_id,omitempty"`
+	// Parts are images or audio sent along with Content. They are only ever
+	// part of a request: they are not stored, and never come back in a reply.
+	Parts []ContentPart `json:"-"`
+}
+
+// ContentPart is one piece of a multimodal message.
+type ContentPart struct {
+	Type       string      `json:"type"`
+	Text       string      `json:"text,omitempty"`
+	ImageURL   *ImageURL   `json:"image_url,omitempty"`
+	InputAudio *InputAudio `json:"input_audio,omitempty"`
+}
+
+// ImageURL holds an image, here always inlined as a data URL.
+type ImageURL struct {
+	URL string `json:"url"`
+}
+
+// InputAudio holds base64 audio and its format, such as "ogg".
+type InputAudio struct {
+	Data   string `json:"data"`
+	Format string `json:"format"`
+}
+
+// ImagePart inlines an image of the given MIME type.
+func ImagePart(mimeType string, data []byte) ContentPart {
+	url := "data:" + mimeType + ";base64," + base64.StdEncoding.EncodeToString(data)
+	return ContentPart{Type: "image_url", ImageURL: &ImageURL{URL: url}}
+}
+
+// AudioPart inlines audio in the given format.
+func AudioPart(format string, data []byte) ContentPart {
+	return ContentPart{Type: "input_audio", InputAudio: &InputAudio{Data: base64.StdEncoding.EncodeToString(data), Format: format}}
+}
+
+// MarshalJSON sends a message with Parts in the multimodal form, where
+// content is a list of parts with the text first. Without Parts, content
+// stays a plain string, which every provider accepts.
+func (m Message) MarshalJSON() ([]byte, error) {
+	type plain Message // same fields, without this method
+	if len(m.Parts) == 0 {
+		return json.Marshal(plain(m))
+	}
+	parts := make([]ContentPart, 0, 1+len(m.Parts))
+	if m.Content != "" {
+		parts = append(parts, ContentPart{Type: "text", Text: m.Content})
+	}
+	parts = append(parts, m.Parts...)
+	return json.Marshal(struct {
+		plain
+		Content []ContentPart `json:"content"`
+	}{plain: plain(m), Content: parts})
 }
 
 // ToolCall is the model's request to run a tool.

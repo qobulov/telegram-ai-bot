@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"telegram-ai-bot/internal/agent"
 	"telegram-ai-bot/internal/ai"
 	"telegram-ai-bot/internal/config"
+	"telegram-ai-bot/internal/cron"
 	"telegram-ai-bot/internal/service"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
@@ -77,8 +79,8 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		return nil, err
 	}
 	model := ai.NewClient(ai.Options{
-		BaseURL:    cfg.OpenRouterBaseURL,
-		APIKey:     cfg.OpenRouterAPIKey,
+		BaseURL:    cfg.AIBaseURL,
+		APIKey:     cfg.AIAPIKey,
 		Model:      cfg.Model,
 		MaxTokens:  cfg.MaxOutputTokens,
 		HTTPClient: &http.Client{Timeout: cfg.RequestTimeout},
@@ -120,6 +122,10 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		MutedChats:         mode.MutedChats,
 		GroupRatePerMinute: cfg.GroupRateLimitPerMinute,
 		MaxGroupReplyChars: cfg.MaxGroupReplyChars,
+		Media:              bot.Client,
+		MaxMediaBytes:      cfg.MaxMediaBytes,
+		MaxVoiceSeconds:    cfg.MaxVoiceSeconds,
+		AudioInput:         cfg.AudioInput,
 	}
 	if mode.Serverless {
 		opts.Workers, opts.QueueSize = 0, 0
@@ -184,4 +190,62 @@ func newWebhook(ctx context.Context, cfg config.Config, store *storage.Store, lo
 			store.Close()
 		},
 	}, nil
+}
+
+// Retention is how long chat history is kept, from RETENTION_DAYS. Zero
+// keeps it forever.
+func Retention(cfg config.Config) time.Duration {
+	return time.Duration(cfg.RetentionDays) * 24 * time.Hour
+}
+
+// Cleanup is the endpoint Vercel Cron calls to delete old history.
+type Cleanup struct {
+	Handler http.Handler
+	// Close releases the database pool.
+	Close func()
+}
+
+// NewCleanup builds the scheduled-cleanup endpoint. Each authorised call
+// deletes messages older than RETENTION_DAYS and reports what it removed.
+func NewCleanup(ctx context.Context, cfg config.Config, logger *slog.Logger) (*Cleanup, error) {
+	if cfg.CronSecret == "" {
+		return nil, errors.New("CRON_SECRET is required for the cleanup endpoint")
+	}
+	store, err := storage.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return nil, err
+	}
+	handler, err := cron.NewHandler(cron.Options{
+		Secret: cfg.CronSecret,
+		Logger: logger,
+		Run: func(ctx context.Context) (any, error) {
+			return expire(ctx, cfg, store, logger)
+		},
+	})
+	if err != nil {
+		store.Close()
+		return nil, err
+	}
+	return &Cleanup{Handler: handler, Close: store.Close}, nil
+}
+
+// expire applies the retention policy once.
+func expire(ctx context.Context, cfg config.Config, store *storage.Store, logger *slog.Logger) (storage.Expired, error) {
+	if cfg.RetentionDays == 0 {
+		return storage.Expired{}, nil
+	}
+	expired, err := store.Expire(ctx, Retention(cfg))
+	if err != nil {
+		return storage.Expired{}, err
+	}
+	logger.Info("old history deleted", "messages", expired.Messages, "conversations", expired.Conversations,
+		"older_than_days", cfg.RetentionDays)
+	return expired, nil
+}
+
+// Expire applies the retention policy once; the long-polling command calls
+// it on a timer.
+func Expire(ctx context.Context, cfg config.Config, store *storage.Store, logger *slog.Logger) error {
+	_, err := expire(ctx, cfg, store, logger)
+	return err
 }

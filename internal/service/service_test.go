@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -160,6 +161,7 @@ type fixture struct {
 	recorder *fakeRecorder
 	members  *fakeMembers
 	muter    *fakeMuter
+	media    *fakeMedia
 	opts     Options
 }
 
@@ -167,6 +169,7 @@ func newFixture() *fixture {
 	f := &fixture{
 		sender: &fakeSender{}, replier: &fakeReplier{}, resetter: &fakeResetter{}, recorder: &fakeRecorder{},
 		members: &fakeMembers{admins: map[int64]bool{groupAdminID: true}}, muter: &fakeMuter{},
+		media: newFakeMedia(),
 	}
 	f.opts = Options{
 		Sender:        f.sender,
@@ -194,6 +197,10 @@ func newFixture() *fixture {
 		Muter:              f.muter,
 		GroupRatePerMinute: 10,
 		MaxGroupReplyChars: 4000,
+		Media:              f.media,
+		MaxMediaBytes:      5 << 20,
+		MaxVoiceSeconds:    120,
+		AudioInput:         true,
 	}
 	return f
 }
@@ -581,7 +588,7 @@ func TestGroupMentionIsAnsweredAsReplyInTheSharedScope(t *testing.T) {
 		Text:       "Bek: what is Go?",
 		Group:      true,
 	}
-	if req != want {
+	if !reflect.DeepEqual(req, want) {
 		t.Errorf("request = %+v\nwant      %+v", req, want)
 	}
 }
