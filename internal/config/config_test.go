@@ -652,8 +652,12 @@ func TestPersonaUsesEmojiSparingly(t *testing.T) {
 	if !strings.Contains(cfg.PersonaPrompt, "Most of your messages have no emoji") {
 		t.Error("the persona does not limit emoji")
 	}
-	if n := strings.Count(cfg.PersonaPrompt, "😂"); n > 1 {
-		t.Errorf("the persona's examples use 😂 %d times; examples teach the habit", n)
+	if !strings.Contains(cfg.PersonaPrompt, "Use 😂 only when something is actually funny") {
+		t.Error("the persona does not say when 😂 fits")
+	}
+	_, examples, _ := strings.Cut(cfg.PersonaPrompt, "# Response Examples")
+	if strings.Contains(examples, "😂") {
+		t.Error("a response example uses 😂; examples teach the habit")
 	}
 }
 
