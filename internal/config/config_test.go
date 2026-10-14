@@ -686,3 +686,15 @@ func TestTwoOwners(t *testing.T) {
 		t.Errorf("err = %v, want an invalid username rejected", err)
 	}
 }
+
+func TestOwnerNoteExplainsHowOwnersAreKnown(t *testing.T) {
+	env := validEnv()
+	env["BOT_OWNER_USERNAME"] = "pronium,TursunoffM"
+	cfg, err := Load(getenv(env))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(cfg.PersonaPrompt, "If someone asks how you know who your owners are") {
+		t.Error("the persona does not say how to answer questions about who the owners are")
+	}
+}
