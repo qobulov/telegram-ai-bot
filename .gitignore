@@ -12,3 +12,6 @@
 
 # Tooling scratch
 .superpowers/
+
+# Vercel CLI project link
+.vercel/

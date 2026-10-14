@@ -1,0 +1,12 @@
+# Vercel deploys the functions in api/ and the static files in public/.
+# Without this list it would also find the Dockerfile and run the
+# long-polling bot as a container, which never answers HTTP requests.
+Dockerfile
+docker-compose.yml
+telegram-ai-agent.service
+Makefile
+docs/
+bin/
+.env
+.env.*
+!.env.example
