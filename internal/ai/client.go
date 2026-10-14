@@ -189,13 +189,13 @@ func (c *Client) send(ctx context.Context, body []byte) (Message, error) {
 
 	resp, err := c.opts.HTTPClient.Do(httpReq)
 	if err != nil {
-		return Message{}, fmt.Errorf("openrouter request: %w", err)
+		return Message{}, fmt.Errorf("model provider request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
-		return Message{}, fmt.Errorf("read openrouter response: %w", err)
+		return Message{}, fmt.Errorf("read model provider response: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
 		return Message{}, statusError(resp, raw)
@@ -233,7 +233,7 @@ func errorMessage(raw []byte) string {
 func decodeReply(raw []byte) (Message, error) {
 	var parsed chatResponse
 	if err := json.Unmarshal(raw, &parsed); err != nil {
-		return Message{}, fmt.Errorf("decode openrouter response: %w", err)
+		return Message{}, fmt.Errorf("decode model provider response: %w", err)
 	}
 	if parsed.Error != nil {
 		status, _ := parsed.Error.Code.(float64)

@@ -570,3 +570,35 @@ func TestGeminiFallbackModels(t *testing.T) {
 		t.Errorf("OpenRouter got default fallbacks %q; they are Gemini model names", cfg.FallbackModels)
 	}
 }
+
+func TestBuiltInPersonaPutsMoodBeforeJokes(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	persona := cfg.PersonaPrompt
+	mood := strings.Index(persona, "# Read the mood first")
+	humor := strings.Index(persona, "# Humor and Roasting")
+	if mood < 0 || humor < 0 || mood > humor {
+		t.Errorf("the mood rule must come before the humor section (mood at %d, humor at %d)", mood, humor)
+	}
+	// Small models copy examples. No example may joke at someone who is down.
+	if strings.Contains(persona, "beta-test") {
+		t.Error("the persona still has the example that mocks a person having a terrible day")
+	}
+	for _, want := range []string{"kayfiyatim yo'q", "roast me"} {
+		if !strings.Contains(persona, want) {
+			t.Errorf("the persona has no example for %q", want)
+		}
+	}
+}
+
+func TestGroupNoteReservesSilenceForMessagesNotMeantForTheBot(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(cfg.GroupNote, "talking about you rather than to you") || !strings.Contains(cfg.GroupNote, "fire back") {
+		t.Errorf("group note = %q; it must say when to stay silent and that jabs get an answer", cfg.GroupNote)
+	}
+}
