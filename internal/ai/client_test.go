@@ -451,11 +451,13 @@ func TestIsOverloaded(t *testing.T) {
 // modelServer answers per model: a model listed in down gets that status, the
 // rest a normal reply. It records which model each request asked for.
 type modelServer struct {
-	mu     sync.Mutex
-	down   map[string]int
-	stuck  map[string]bool
-	asked  []string
-	cancel chan struct{}
+	mu    sync.Mutex
+	down  map[string]int
+	stuck map[string]bool
+	// outOfQuota models answer 429 with Gemini's quota message.
+	outOfQuota map[string]bool
+	asked      []string
+	cancel     chan struct{}
 }
 
 func (m *modelServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -467,10 +469,14 @@ func (m *modelServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m.asked = append(m.asked, req.Model)
 	status, isDown := m.down[req.Model]
 	isStuck := m.stuck[req.Model]
+	noQuota := m.outOfQuota[req.Model]
 	m.mu.Unlock()
 	switch {
 	case isStuck:
 		<-m.cancel
+	case noQuota:
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = io.WriteString(w, `{"error":{"message":"You exceeded your current quota, please check your plan and billing details."}}`)
 	case isDown:
 		w.WriteHeader(status)
 		_, _ = io.WriteString(w, `{"error":{"message":"This model is currently experiencing high demand"}}`)
@@ -619,5 +625,42 @@ func TestToolCallSignatureIsKeptAndSentBack(t *testing.T) {
 	sent, _ := json.Marshal(rec.requests[1]["messages"])
 	if !strings.Contains(string(sent), `"thought_signature":"SIG123"`) {
 		t.Errorf("follow-up request lost the signature: %s", sent)
+	}
+}
+
+func TestModelOutOfQuotaIsSkippedForAWhile(t *testing.T) {
+	server := &modelServer{outOfQuota: map[string]bool{"primary": true}}
+	client := fallbackClient(t, server)
+	now := time.Date(2026, 10, 14, 18, 0, 0, 0, time.UTC)
+	client.now = func() time.Time { return now }
+
+	_, _ = client.Complete(context.Background(), userRequest())
+	msg, err := client.Complete(context.Background(), userRequest())
+	if err != nil || msg.Content != "from backup-1" {
+		t.Fatalf("msg = %+v, err = %v", msg, err)
+	}
+	if got := strings.Join(server.asked, ","); got != "primary,backup-1,backup-1" {
+		t.Errorf("models asked = %s; a model out of quota should not be asked on every turn", got)
+	}
+
+	now = now.Add(quotaCooldown + time.Second)
+	server.mu.Lock()
+	server.outOfQuota, server.asked = nil, nil
+	server.mu.Unlock()
+	if msg, _ := client.Complete(context.Background(), userRequest()); msg.Content != "from primary" {
+		t.Errorf("after the cooldown msg = %+v; the primary model should be tried again", msg)
+	}
+}
+
+func TestEveryModelOutOfQuotaStillTriesThem(t *testing.T) {
+	server := &modelServer{outOfQuota: map[string]bool{"primary": true, "backup-1": true, "backup-2": true}}
+	client := fallbackClient(t, server)
+	_, _ = client.Complete(context.Background(), userRequest())
+	server.mu.Lock()
+	server.outOfQuota, server.asked = nil, nil
+	server.mu.Unlock()
+
+	if msg, err := client.Complete(context.Background(), userRequest()); err != nil || msg.Content != "from primary" {
+		t.Errorf("msg = %+v, err = %v; with every model skipped, all are tried again", msg, err)
 	}
 }

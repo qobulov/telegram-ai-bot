@@ -110,11 +110,6 @@ func (g groupSender) SendToGroup(ctx context.Context, chatID int64, text string)
 	return err
 }
 
-func (g groupSender) CopyToGroup(ctx context.Context, chatID, fromChatID, messageID int64) error {
-	_, err := g.client.CopyMessage(ctx, chatID, fromChatID, messageID)
-	return err
-}
-
 // membershipError reports the bot having been removed, or the group having
 // gone, as tools.ErrNotInGroup.
 func membershipError(err error) error {

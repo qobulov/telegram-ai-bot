@@ -594,16 +594,3 @@ func TestMyChatMemberUpdateIsDecoded(t *testing.T) {
 		t.Errorf("update = %+v", update)
 	}
 }
-
-func TestCopyMessageCopiesWithoutAForwardLabel(t *testing.T) {
-	client, api := newTestClient(t, `{"ok":true,"result":{"message_id":55}}`)
-
-	id, err := client.CopyMessage(context.Background(), -100123, 42, 7)
-	if err != nil || id != 55 {
-		t.Fatalf("id = %d, err = %v", id, err)
-	}
-	sent := api.recorded()[0]
-	if sent.method != "copyMessage" || sent.params["chat_id"] != float64(-100123) || sent.params["from_chat_id"] != float64(42) || sent.params["message_id"] != float64(7) {
-		t.Errorf("call = %+v", sent)
-	}
-}

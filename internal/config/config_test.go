@@ -819,7 +819,7 @@ func TestOwnerNoteKeepsMasterAndToolUse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`"jonim"`, "call it in that same reply", "cannot see private chats"} {
+	for _, want := range []string{`"jonim"`, "call it in that same reply", "cannot see private chats", "A voice message from an owner is a request"} {
 		if !strings.Contains(cfg.PersonaPrompt, want) {
 			t.Errorf("the owner note does not contain %q", want)
 		}

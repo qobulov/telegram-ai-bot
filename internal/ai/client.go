@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -46,6 +47,10 @@ type Options struct {
 // Client talks to OpenRouter. It is safe for concurrent use.
 type Client struct {
 	opts Options
+	now  func() time.Time
+	// outOfQuota holds, per model, until when it is skipped because its
+	// quota ran out: retrying it on every turn only adds a wasted request.
+	outOfQuota sync.Map
 	// noTools is set once the configured model turns out not to support tool
 	// calling, so later requests skip the doomed first attempt.
 	noTools atomic.Bool
@@ -68,7 +73,7 @@ func NewClient(opts Options) *Client {
 		opts.Logger = slog.Default()
 	}
 	opts.BaseURL = strings.TrimRight(opts.BaseURL, "/")
-	return &Client{opts: opts}
+	return &Client{opts: opts, now: time.Now}
 }
 
 // Complete sends the conversation and returns the assistant's next message.
@@ -92,17 +97,21 @@ func (c *Client) Complete(ctx context.Context, req Request) (Message, error) {
 }
 
 func (c *Client) completeWithRetry(ctx context.Context, req Request, withTools bool) (Message, error) {
+	models := c.models()
 	for attempt := 1; ; attempt++ {
-		model := c.modelFor(attempt)
+		model := models[min(attempt, len(models))-1]
 		body, err := json.Marshal(c.payload(req, model, withTools))
 		if err != nil {
 			return Message{}, fmt.Errorf("encode request: %w", err)
 		}
 		msg, err := c.attempt(ctx, body)
+		if isOutOfQuota(err) {
+			c.outOfQuota.Store(model, c.now().Add(quotaCooldown))
+		}
 		if err == nil || attempt >= c.opts.MaxAttempts || !isRetryable(ctx, err) {
 			return msg, err
 		}
-		next := c.modelFor(attempt + 1)
+		next := models[min(attempt+1, len(models))-1]
 		if next != model {
 			// Another model is not slowed by this one's load: no need to wait.
 			c.opts.Logger.Warn("model unavailable; trying another", "model", model, "next", next, "error", err)
@@ -114,11 +123,33 @@ func (c *Client) completeWithRetry(ctx context.Context, req Request, withTools b
 	}
 }
 
-// modelFor picks the model for an attempt: the configured one first, then
-// each fallback in turn, staying on the last one if attempts remain.
-func (c *Client) modelFor(attempt int) string {
-	models := append([]string{c.opts.Model}, c.opts.FallbackModels...)
-	return models[min(attempt, len(models))-1]
+// quotaCooldown is how long a model out of quota is skipped.
+const quotaCooldown = 15 * time.Minute
+
+// models lists the models to try, in order: the configured one first, then
+// each fallback, leaving out those whose quota recently ran out. If that
+// leaves none, all are tried.
+func (c *Client) models() []string {
+	all := append([]string{c.opts.Model}, c.opts.FallbackModels...)
+	var usable []string
+	for _, model := range all {
+		if until, ok := c.outOfQuota.Load(model); ok && c.now().Before(until.(time.Time)) {
+			continue
+		}
+		usable = append(usable, model)
+	}
+	if len(usable) == 0 {
+		return all
+	}
+	return usable
+}
+
+// isOutOfQuota reports a 429 that is about the quota, such as Gemini's
+// daily free limit, rather than a short burst of load.
+func isOutOfQuota(err error) bool {
+	var apiErr *APIError
+	return errors.As(err, &apiErr) && apiErr.Status == http.StatusTooManyRequests &&
+		strings.Contains(strings.ToLower(apiErr.Message), "quota")
 }
 
 // attempt sends the request once, within AttemptTimeout.
