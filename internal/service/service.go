@@ -67,7 +67,9 @@ type Options struct {
 	Members  Members
 	Muter    Muter
 	Media    Media
-	Logger   *slog.Logger
+	// ChatLog stores the day's group messages; nil turns the log off.
+	ChatLog ChatLog
+	Logger  *slog.Logger
 	// Model is the model name shown by /model.
 	Model string
 	// Workers is how many messages are processed at once.
@@ -92,9 +94,15 @@ type Options struct {
 	WakeWordTrigger bool
 	// WakeWords are the names the bot answers to, in lower case.
 	WakeWords []string
-	// AmbientMessages is how many recent ordinary messages per group are kept
-	// in memory as context. Zero keeps none.
+	// AmbientMessages is how many of today's group messages are given to the
+	// model with a question. Zero turns the group log off.
 	AmbientMessages int
+	// Location decides when "today" starts for the group log.
+	Location *time.Location
+	// OwnerUsername is the bot owner's Telegram username, lower case,
+	// without @. The owner's messages are marked for the model and the owner
+	// may manage the bot in any group.
+	OwnerUsername string
 	// MutedChats are the groups where the bot starts muted.
 	MutedChats []int64
 	// MuteStore, when set, is asked about a group's mute state every time
@@ -181,7 +189,7 @@ func New(opts Options) *Service {
 		opts:         opts,
 		userLimiter:  newLimiter(opts.RatePerMinute),
 		groupLimiter: newLimiter(opts.GroupRatePerMinute),
-		ambient:      newAmbient(opts.AmbientMessages),
+		ambient:      newAmbient(opts.ChatLog, opts.AmbientMessages, opts.Location, opts.Logger),
 		muted:        make(map[int64]bool, len(opts.MutedChats)),
 		queues:       make([]chan incoming, opts.Workers),
 		notices:      make(chan incoming, noticeQueueSize),
@@ -270,7 +278,7 @@ func (s *Service) acceptGroup(in incoming) (incoming, bool) {
 	if !addressed {
 		// Checked in this order so that, with the buffer off, an ordinary
 		// group message costs no mute lookup at all.
-		if s.opts.AmbientMessages > 0 && !s.isMuted(in.scope.ChatID) {
+		if s.ambient.enabled() && !s.isMuted(in.scope.ChatID) {
 			s.remember(in.msg)
 		}
 		return incoming{}, false
@@ -284,14 +292,34 @@ func isMuteCommand(text string) bool {
 	return command == "/mute" || command == "/unmute"
 }
 
-// remember keeps an ordinary group message as context for the bot's next
-// answer in that group. It goes to memory only; see ambient.
+// remember logs a group message as context for the bot's next answer in
+// that group.
 func (s *Service) remember(msg *telegram.Message) {
 	text, _ := msg.Content()
 	if m, ok := s.mediaOf(msg); ok {
 		text = withMediaLabel(m, text) // noted, never downloaded
 	}
-	s.ambient.add(msg.Chat.ID, authorLabel(msg.From.FirstName), text, time.Now())
+	s.ambient.add(msg.Chat.ID, msg.MessageID, msg.From.ID, s.label(msg.From), text)
+}
+
+// ownerNotice tells the model, in a private chat, that the owner is writing.
+const ownerNotice = "[This message is from your owner.]"
+
+// isOwner reports whether the sender is the bot's owner. It compares the
+// Telegram username, which Telegram sets and nobody can type in.
+func (s *Service) isOwner(user *telegram.User) bool {
+	return user != nil && s.opts.OwnerUsername != "" && strings.EqualFold(user.Username, s.opts.OwnerUsername)
+}
+
+// label names a sender in a group: their first name, with [owner] after the
+// owner's. authorLabel strips square brackets from names, so nobody else can
+// carry the mark.
+func (s *Service) label(user *telegram.User) string {
+	label := authorLabel(user.FirstName)
+	if s.isOwner(user) {
+		label += " [owner]"
+	}
+	return label
 }
 
 // silenced reports a message from a muted group that is not one of the

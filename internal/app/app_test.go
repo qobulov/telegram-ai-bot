@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -105,6 +106,9 @@ func startWebhook(t *testing.T) *hookEnv {
 		if err := store.Reset(ctx, scope); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if err := store.ClearGroupMessages(ctx, hookGroup); err != nil {
+		t.Fatal(err)
 	}
 	if err := store.SetMuted(ctx, hookGroup, false, hookUser); err != nil {
 		t.Fatal(err)
@@ -205,8 +209,17 @@ func TestWebhookGroupFlow(t *testing.T) {
 	env.apis.mu.Lock()
 	input := env.apis.modelInputs[0]
 	env.apis.mu.Unlock()
-	if strings.Contains(input, "just chatting") {
-		t.Error("an ordinary group message reached the model; the recent-chatter buffer must be off in webhook mode")
+	// Each request may run in a different instance, so the day's log has to
+	// come from the database for the earlier message to be seen.
+	if !strings.Contains(input, "just chatting with friends") {
+		t.Error("the earlier group message did not reach the model")
+	}
+	logged, err := env.store.GroupMessagesSince(context.Background(), hookGroup, time.Now().Add(-time.Hour), 10)
+	if err != nil || len(logged) != 3 {
+		t.Fatalf("group log = %+v, err = %v; want the chatter, the question and the answer", logged, err)
+	}
+	if logged[2].AuthorName != "You" || logged[2].Text != "webhook answer" {
+		t.Errorf("the bot's answer was not logged: %+v", logged[2])
 	}
 }
 

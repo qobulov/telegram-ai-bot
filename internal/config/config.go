@@ -14,7 +14,7 @@ import (
 const (
 	groupContextShared     = "shared"
 	telegramMessageLength  = 4096
-	maxAmbientMessages     = 100
+	maxAmbientMessages     = 500
 	maxWebhookSecretLength = 256
 	minCronSecretLength    = 16
 )
@@ -82,7 +82,13 @@ type Config struct {
 
 	// AmbientMessages is how many recent ordinary group messages are kept in
 	// memory as context. Zero disables it.
-	AmbientMessages         int
+	AmbientMessages int
+	// Location is the time zone that decides when "today" starts for the
+	// group history.
+	Location *time.Location
+	// OwnerUsername is the Telegram username of the bot's owner, lower case
+	// and without @. Empty when no owner is configured.
+	OwnerUsername           string
 	MaxGroupReplyChars      int
 	GroupRateLimitPerMinute int
 }
@@ -123,7 +129,7 @@ func Load(getenv func(string) string) (Config, error) {
 		MentionTrigger:  r.boolean("ENABLE_USERNAME_MENTION", true),
 		ReplyTrigger:    r.boolean("ENABLE_REPLY_TRIGGER", true),
 
-		AmbientMessages:         r.integer("GROUP_AMBIENT_MESSAGES", 20, 0),
+		AmbientMessages:         r.integer("GROUP_AMBIENT_MESSAGES", 200, 0),
 		MaxGroupReplyChars:      r.positive("MAX_GROUP_REPLY_LENGTH", 4000),
 		GroupRateLimitPerMinute: r.positive("GROUP_RATE_LIMIT_PER_MINUTE", 10),
 	}
@@ -133,7 +139,12 @@ func Load(getenv func(string) string) (Config, error) {
 	if cfg.MaxMediaBytes > telegramDownloadLimit {
 		r.fail("MAX_MEDIA_MB", "must be at most 20: Telegram does not let bots download larger files")
 	}
+	cfg.Location = r.location("GROUP_HISTORY_TIMEZONE", "Asia/Tashkent")
+	cfg.OwnerUsername = strings.ToLower(strings.TrimPrefix(r.value("BOT_OWNER_USERNAME"), "@"))
 	cfg.PersonaPrompt = strings.ReplaceAll(r.text("PERSONA_PROMPT", defaultPersona), namePlaceholder, cfg.BotDisplayName)
+	if cfg.OwnerUsername != "" {
+		cfg.PersonaPrompt += "\n\n" + strings.ReplaceAll(ownerNote, ownerPlaceholder, cfg.OwnerUsername)
+	}
 	cfg.WakeWords = r.wakeWords(cfg)
 	r.checkRemovedVariables()
 	r.checkGroupSettings(cfg)
@@ -325,6 +336,15 @@ func (r *reader) fallbackModels(defaults []string) []string {
 	default:
 		return splitList(value)
 	}
+}
+
+func (r *reader) location(name, fallback string) *time.Location {
+	location, err := time.LoadLocation(r.text(name, fallback))
+	if err != nil {
+		r.fail(name, "must be an IANA time zone such as Asia/Tashkent")
+		return time.UTC
+	}
+	return location
 }
 
 func (r *reader) checkRemovedVariables() {

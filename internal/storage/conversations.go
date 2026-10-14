@@ -295,6 +295,7 @@ func (s *Store) Reset(ctx context.Context, scope Scope) error {
 type Expired struct {
 	Messages      int64 `json:"messages"`
 	Conversations int64 `json:"conversations"`
+	GroupMessages int64 `json:"group_messages"`
 }
 
 // Expire deletes messages older than maxAge, then the conversations that have
@@ -313,7 +314,12 @@ func (s *Store) Expire(ctx context.Context, maxAge time.Duration) (Expired, erro
 		tag, err = tx.Exec(ctx, `
 			DELETE FROM conversations c
 			WHERE NOT EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id)`)
+		if err != nil {
+			return err
+		}
 		expired.Conversations = tag.RowsAffected()
+		tag, err = tx.Exec(ctx, `DELETE FROM group_messages WHERE created_at < $1`, cutoff)
+		expired.GroupMessages = tag.RowsAffected()
 		return err
 	})
 	if err != nil {

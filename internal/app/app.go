@@ -54,8 +54,9 @@ func Connect(ctx context.Context, cfg config.Config, logger *slog.Logger) (Bot, 
 type Mode struct {
 	// Serverless is true when each update is handled inside one short-lived
 	// request (a webhook function). Nothing can then be kept in memory from
-	// one update to the next: there are no workers, the recent-chatter
-	// buffer is off, and mute state is read from the database when needed.
+	// one update to the next: there are no workers, and mute state is read
+	// from the database when needed. The day's group log is in the database
+	// in both modes.
 	Serverless bool
 	// MutedChats are the groups muted before this start. Unused when
 	// Serverless.
@@ -125,6 +126,9 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		WakeWords:          cfg.WakeWords,
 		DisplayName:        cfg.BotDisplayName,
 		AmbientMessages:    cfg.AmbientMessages,
+		ChatLog:            store,
+		Location:           cfg.Location,
+		OwnerUsername:      cfg.OwnerUsername,
 		MutedChats:         mode.MutedChats,
 		GroupRatePerMinute: cfg.GroupRateLimitPerMinute,
 		MaxGroupReplyChars: cfg.MaxGroupReplyChars,
@@ -135,7 +139,6 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 	}
 	if mode.Serverless {
 		opts.Workers, opts.QueueSize = 0, 0
-		opts.AmbientMessages = 0
 		opts.MutedChats = nil
 		opts.MuteStore = store
 	}

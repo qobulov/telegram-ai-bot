@@ -41,12 +41,29 @@ func (s *Service) process(in incoming) {
 		return
 	}
 	out := s.respond(ctx, in)
-	if out.text == "" {
+	if out.text != "" {
+		sentID := s.reply(in, out.text)
+		if out.answerID != 0 && sentID != 0 {
+			s.recordSent(out.answerID, sentID)
+		}
+	}
+	s.logExchange(in, out)
+}
+
+// logExchange adds an addressed group message, and the bot's answer to it,
+// to the day's log, after the answer: logged before, the question would
+// also appear in its own context.
+func (s *Service) logExchange(in incoming, out outcome) {
+	if !in.group || strings.HasPrefix(in.text, "/") {
 		return
 	}
-	sentID := s.reply(in, out.text)
-	if out.answerID != 0 && sentID != 0 {
-		s.recordSent(out.answerID, sentID)
+	text := in.text
+	if m, ok := s.mediaOf(in.msg); ok {
+		text = withMediaLabel(m, in.text)
+	}
+	s.ambient.add(in.scope.ChatID, in.msg.MessageID, in.userID, s.label(in.msg.From), text)
+	if out.answerID != 0 {
+		s.ambient.add(in.scope.ChatID, 0, s.opts.Bot.ID, botAuthor, out.text)
 	}
 }
 
@@ -160,8 +177,11 @@ func (s *Service) request(ctx context.Context, in incoming) agent.Request {
 	if m, ok := s.mediaOf(in.msg); ok {
 		req.Text = withMediaLabel(m, in.text)
 	}
+	if !in.group && s.isOwner(in.msg.From) {
+		req.Context = ownerNotice
+	}
 	if in.group {
-		req.AuthorName = authorLabel(in.msg.From.FirstName)
+		req.AuthorName = s.label(in.msg.From)
 		req.Text = req.AuthorName + ": " + oneLine(req.Text)
 		req.Context = s.ambient.block(in.scope.ChatID, time.Now())
 	}
@@ -275,7 +295,7 @@ func (s *Service) setMuted(ctx context.Context, in incoming, muted bool) string 
 // user manages their own conversation. In a group it takes one of the bot's
 // administrators or an administrator of that group, as Telegram reports it.
 func (s *Service) refuseUnlessManager(ctx context.Context, in incoming) string {
-	if !in.group || s.opts.IsAdmin(in.userID) {
+	if !in.group || s.opts.IsAdmin(in.userID) || s.isOwner(in.msg.From) {
 		return ""
 	}
 	isAdmin, err := s.opts.Members.IsGroupAdmin(ctx, in.scope.ChatID, in.userID)

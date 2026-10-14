@@ -12,6 +12,7 @@ import (
 	"os"
 	"sync"
 	"time"
+	_ "time/tzdata" // time zones for the group log and get_current_time; the host has none
 
 	"telegram-ai-bot/internal/app"
 	"telegram-ai-bot/internal/config"

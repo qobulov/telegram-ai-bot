@@ -43,7 +43,7 @@ func newTestStore(t *testing.T) *Store {
 	}
 	t.Cleanup(store.Close)
 
-	if _, err := store.pool.Exec(ctx, `DROP TABLE IF EXISTS messages, conversations, users, chats, schema_migrations CASCADE`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DROP TABLE IF EXISTS messages, conversations, users, chats, group_messages, schema_migrations CASCADE`); err != nil {
 		t.Fatalf("drop tables: %v", err)
 	}
 	if _, err := store.Migrate(ctx); err != nil {
@@ -104,7 +104,7 @@ func TestMigrateIsIdempotent(t *testing.T) {
 func TestMigrateReportsAppliedCount(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
-	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, schema_migrations CASCADE`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, group_messages, schema_migrations CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 
@@ -686,6 +686,87 @@ func TestIsMutedReadsTheStoredSetting(t *testing.T) {
 	}
 	if isMuted(group) {
 		t.Error("the chat is still reported as muted after unmuting")
+	}
+}
+
+func logMessage(t *testing.T, store *Store, chatID int64, name, text string) {
+	t.Helper()
+	err := store.AppendGroupMessage(context.Background(), GroupMessage{ChatID: chatID, AuthorID: alice, AuthorName: name, Text: text})
+	if err != nil {
+		t.Fatalf("AppendGroupMessage: %v", err)
+	}
+}
+
+func TestGroupMessagesAreReadBackOldestFirst(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	for _, text := range []string{"one", "two", "three"} {
+		logMessage(t, store, group, "Ann", text)
+	}
+	logMessage(t, store, otherGroup, "Bek", "elsewhere")
+
+	got, err := store.GroupMessagesSince(ctx, group, time.Now().Add(-time.Hour), 2)
+	if err != nil {
+		t.Fatalf("GroupMessagesSince: %v", err)
+	}
+	if len(got) != 2 || got[0].Text != "two" || got[1].Text != "three" || got[0].AuthorName != "Ann" {
+		t.Errorf("messages = %+v, want the newest two, oldest first", got)
+	}
+	if got[0].SentAt.IsZero() {
+		t.Error("SentAt is not filled in")
+	}
+}
+
+func TestGroupMessagesBeforeTheCutoffAreLeftOut(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	logMessage(t, store, group, "Ann", "yesterday")
+	if _, err := store.pool.Exec(ctx, `UPDATE group_messages SET created_at = now() - interval '20 hours'`); err != nil {
+		t.Fatal(err)
+	}
+	logMessage(t, store, group, "Ann", "today")
+
+	got, err := store.GroupMessagesSince(ctx, group, time.Now().Add(-time.Hour), 100)
+	if err != nil || len(got) != 1 || got[0].Text != "today" {
+		t.Errorf("messages = %+v, err = %v", got, err)
+	}
+}
+
+func TestClearGroupMessagesClearsOneChat(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	logMessage(t, store, group, "Ann", "a")
+	logMessage(t, store, otherGroup, "Bek", "b")
+
+	if err := store.ClearGroupMessages(ctx, group); err != nil {
+		t.Fatalf("ClearGroupMessages: %v", err)
+	}
+	if got, _ := store.GroupMessagesSince(ctx, group, time.Now().Add(-time.Hour), 10); len(got) != 0 {
+		t.Errorf("cleared chat still has %+v", got)
+	}
+	if got, _ := store.GroupMessagesSince(ctx, otherGroup, time.Now().Add(-time.Hour), 10); len(got) != 1 {
+		t.Errorf("another chat lost its messages: %+v", got)
+	}
+}
+
+func TestExpireAlsoRemovesOldGroupMessages(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	logMessage(t, store, group, "Ann", "old")
+	if _, err := store.pool.Exec(ctx, `UPDATE group_messages SET created_at = now() - interval '2 days'`); err != nil {
+		t.Fatal(err)
+	}
+	logMessage(t, store, group, "Ann", "new")
+
+	expired, err := store.Expire(ctx, 24*time.Hour)
+	if err != nil {
+		t.Fatalf("Expire: %v", err)
+	}
+	if expired.GroupMessages != 1 {
+		t.Errorf("expired = %+v, want 1 group message", expired)
+	}
+	if rows := countRows(t, store, "group_messages"); rows != 1 {
+		t.Errorf("group_messages rows = %d, want 1", rows)
 	}
 }
 

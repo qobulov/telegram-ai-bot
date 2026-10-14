@@ -162,6 +162,9 @@ func startE2E(t *testing.T, update string, answer func([]modelMessage) string) *
 	if _, err := env.store.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
+	if err := env.store.ClearGroupMessages(ctx, e2eGroup); err != nil {
+		t.Fatal(err)
+	}
 	for _, scope := range []storage.Scope{privateScope(e2eUser), privateScope(e2eMember), {ChatID: e2eGroup}} {
 		if err := env.store.Reset(ctx, scope); err != nil {
 			t.Fatal(err)
@@ -241,8 +244,9 @@ const groupChatter = `{"update_id":900010,"message":{"message_id":28,
 		"text":"Hey Mira, who is right?"}}`
 
 // Two members chat, then one calls the bot by name. The bot must answer once,
-// as a reply to the message that called it, in character, with the earlier
-// chatter as context — and that chatter must not end up in the database.
+// as a reply to the message that called it, in character, with the day's
+// earlier chatter as context. The chatter is kept in the day's group log,
+// never in the conversation history.
 func TestServeAnswersWakeWordWithRecentChatterEndToEnd(t *testing.T) {
 	env := startE2E(t, groupChatter, func([]modelMessage) string {
 		return `{"choices":[{"message":{"role":"assistant","content":"Ann, compile your facts first 😂"}}]}`
@@ -271,7 +275,7 @@ func TestServeAnswersWakeWordWithRecentChatterEndToEnd(t *testing.T) {
 		t.Errorf("system prompt = %.120q, want the persona with the group note", system)
 	}
 	question := request[len(request)-1].Content
-	for _, want := range []string{"Recent messages in the group", "Ann: Go is interpreted, everyone knows that", "Bek: no way 😀", "Bek: who is right?"} {
+	for _, want := range []string{"Today's messages in the group", "Ann: Go is interpreted, everyone knows that", "Bek: no way 😀", "Bek: who is right?"} {
 		if !strings.Contains(question, want) {
 			t.Errorf("user message %q does not contain %q", question, want)
 		}
@@ -291,7 +295,10 @@ func TestServeAnswersWakeWordWithRecentChatterEndToEnd(t *testing.T) {
 		t.Errorf("stored sent message ID = %d, want 501", got)
 	}
 	if rows := rowsContaining(t, "interpreted") + rowsContaining(t, "no way"); rows != 0 {
-		t.Errorf("%d database rows contain ordinary group messages; they must stay in memory", rows)
+		t.Errorf("%d conversation rows contain ordinary group messages; they belong in the day's log only", rows)
+	}
+	if logged := queryOne[int](t, `SELECT count(*) FROM group_messages WHERE chat_id = $1`, e2eGroup); logged != 4 {
+		t.Errorf("group log rows = %d, want the 2 chatter messages, the question and the answer", logged)
 	}
 	if author := storedAuthor(t, 900012); author != "777002 Bek" {
 		t.Errorf("stored author = %q, want the sender's ID and first name", author)

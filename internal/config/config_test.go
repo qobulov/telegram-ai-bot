@@ -215,7 +215,7 @@ func TestLoadCharacterDefaults(t *testing.T) {
 	if cfg.BotDisplayName != "Maria" || len(cfg.WakeWords) != 1 || cfg.WakeWords[0] != "maria" {
 		t.Errorf("name = %q, wake words = %q", cfg.BotDisplayName, cfg.WakeWords)
 	}
-	if cfg.AmbientMessages != 20 || cfg.MaxGroupReplyChars != 4000 || cfg.GroupRateLimitPerMinute != 10 {
+	if cfg.AmbientMessages != 200 || cfg.MaxGroupReplyChars != 4000 || cfg.GroupRateLimitPerMinute != 10 {
 		t.Errorf("cfg = %d, %d, %d", cfg.AmbientMessages, cfg.MaxGroupReplyChars, cfg.GroupRateLimitPerMinute)
 	}
 }
@@ -348,7 +348,7 @@ func TestRemovedVariablesAreReported(t *testing.T) {
 }
 
 func TestLoadAmbientMessages(t *testing.T) {
-	for value, ok := range map[string]bool{"0": true, "100": true, "-1": false, "101": false} {
+	for value, ok := range map[string]bool{"0": true, "500": true, "-1": false, "501": false} {
 		env := validEnv()
 		env["GROUP_AMBIENT_MESSAGES"] = value
 		_, err := Load(getenv(env))
@@ -600,5 +600,69 @@ func TestGroupNoteReservesSilenceForMessagesNotMeantForTheBot(t *testing.T) {
 	}
 	if !strings.Contains(cfg.GroupNote, "talking about you rather than to you") || !strings.Contains(cfg.GroupNote, "fire back") {
 		t.Errorf("group note = %q; it must say when to stay silent and that jabs get an answer", cfg.GroupNote)
+	}
+}
+
+func TestGroupHistoryTimezone(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Location == nil || cfg.Location.String() != "Asia/Tashkent" {
+		t.Errorf("Location = %v, want Asia/Tashkent", cfg.Location)
+	}
+	env := validEnv()
+	env["GROUP_HISTORY_TIMEZONE"] = "Mars/Olympus"
+	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "GROUP_HISTORY_TIMEZONE") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestBotOwner(t *testing.T) {
+	env := validEnv()
+	env["BOT_OWNER_USERNAME"] = "@Pronium"
+	cfg, err := Load(getenv(env))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.OwnerUsername != "pronium" {
+		t.Errorf("OwnerUsername = %q, want it without @ and in lower case", cfg.OwnerUsername)
+	}
+	if !strings.Contains(cfg.PersonaPrompt, "@pronium") || !strings.Contains(cfg.PersonaPrompt, "[owner]") {
+		t.Error("the persona does not tell the model who its owner is and how owner messages are marked")
+	}
+
+	env["PERSONA_PROMPT"] = "You are {name}."
+	cfg, _ = Load(getenv(env))
+	if !strings.Contains(cfg.PersonaPrompt, "@pronium") {
+		t.Error("a custom persona lost the owner note")
+	}
+
+	cfg, _ = Load(getenv(validEnv()))
+	if strings.Contains(cfg.PersonaPrompt, "[owner]") {
+		t.Error("an owner note was added although no owner is configured")
+	}
+}
+
+func TestPersonaUsesEmojiSparingly(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(cfg.PersonaPrompt, "Most of your messages have no emoji") {
+		t.Error("the persona does not limit emoji")
+	}
+	if n := strings.Count(cfg.PersonaPrompt, "😂"); n > 1 {
+		t.Errorf("the persona's examples use 😂 %d times; examples teach the habit", n)
+	}
+}
+
+func TestPersonaDoesNotClaimExperiences(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(cfg.PersonaPrompt, "never claim you did") {
+		t.Error("the persona does not stop the model inventing things it saw or did")
 	}
 }

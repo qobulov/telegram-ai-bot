@@ -160,7 +160,9 @@ in the environment win over the file.
 | `BOT_WAKE_WORDS`              | the display name               | Comma-separated names the bot answers to, each one word, e.g. `maria,мария`                                    |
 | `ENABLE_USERNAME_MENTION`     | `true`                         | In groups, answer when `@username` is mentioned                                                              |
 | `ENABLE_REPLY_TRIGGER`        | `true`                         | In groups, answer replies to the bot's messages                                                              |
-| `GROUP_AMBIENT_MESSAGES`      | `20`                           | Recent ordinary group messages kept in memory as context (0 to 100; 0 turns it off)                          |
+| `GROUP_AMBIENT_MESSAGES` | `200` | How many of today's group messages are given to the model with a question (0 to 500; 0 turns the group log off) |
+| `GROUP_HISTORY_TIMEZONE` | `Asia/Tashkent` | Time zone that decides when "today" starts for the group log |
+| `BOT_OWNER_USERNAME` | empty | The owner's Telegram username; the bot treats the owner warmly, follows his instructions and lets him manage it in any group |
 | `GROUP_CONTEXT_MODE`          | `shared`                       | Only `shared` is supported: one conversation per group                                                       |
 | `MAX_GROUP_REPLY_LENGTH`      | `4000`                         | Longest answer posted in a group (at most 4096; an emoji usually counts as two)                              |
 | `GROUP_RATE_LIMIT_PER_MINUTE` | `10`                           | Messages answered per group per minute, across all members                                                   |
@@ -363,6 +365,15 @@ Telegram's OGG voice format through its OpenAI-compatible endpoint has not
 been verified; if voice messages fail, the log shows the provider's error
 on `turn failed`.
 
+## The owner
+
+Set `BOT_OWNER_USERNAME` to your Telegram username (with or without `@`).
+The bot then knows you made it: it is friendly to you, does what you ask in
+the chat within its limits, and lets you use `/mute`, `/unmute` and `/reset`
+in any group. Your messages are marked `[owner]` for the model based on your
+Telegram account, so someone who copies your name or says they are the owner
+gets no special treatment.
+
 ## Groups
 
 Add the bot to a group or supergroup like any other member. It speaks only
@@ -419,16 +430,19 @@ Ann:   anyway, lunch?
 
 ### What she remembers, and what she does not
 
-- **Stored in PostgreSQL:** the messages that addressed her and her answers,
+- **Conversation:** the messages that addressed her and her answers,
   as one conversation per group. Each is labelled with the sender's first
   name so she can tell members apart and return to earlier jokes. The last
   `MAX_HISTORY_MESSAGES` of these are sent to the model.
-- **Kept in memory only:** the last `GROUP_AMBIENT_MESSAGES` ordinary
-  messages of each group (first name and up to 300 characters). They are
-  given to the model as context with the next answer, marked as untrusted.
-  They are never written to the database or to logs, are pushed out by newer
-  messages, are dropped after six hours of silence, and are gone after a
-  restart. Set `GROUP_AMBIENT_MESSAGES=0` to keep none.
+- **Today's group log:** every text message seen in the group today (name,
+  time, up to 300 characters), including the ones that did not address her,
+  is stored in the `group_messages` table. When she answers, the latest
+  `GROUP_AMBIENT_MESSAGES` (default 200) of today's messages, counted from
+  midnight in `GROUP_HISTORY_TIMEZONE`, are given to the model as context,
+  marked as untrusted. The log is deleted with the rest of the history after
+  `RETENTION_DAYS`, by `/reset`, and when the group is muted. Nothing is
+  logged while a group is muted. Set `GROUP_AMBIENT_MESSAGES=0` to turn the
+  log off.
 - **The quoted message:** when someone replies to a message while addressing
   her, that one message is included, shortened to 1,000 characters. It is
   saved as part of the question.
@@ -739,7 +753,7 @@ accepts the Go version in `go.mod`; if the build fails on that, lower the
 
 | | Long polling (`make run`, VPS) | Webhook (Vercel) |
 |---|---|---|
-| Recent group chatter as context | last `GROUP_AMBIENT_MESSAGES` in memory | off: nothing can be kept between requests |
+| Today's group messages as context | from the `group_messages` table | the same |
 | Mute state | cached in memory | read from the database for each addressed group message |
 | Rate limits | exact | per instance only, so much weaker; do not rely on them |
 | Order of messages in a group | one at a time, in order | concurrent requests are not ordered |
