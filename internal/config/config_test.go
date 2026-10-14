@@ -740,3 +740,23 @@ func TestImageGenerationSettings(t *testing.T) {
 		t.Error("image generation is on without a Gemini key")
 	}
 }
+
+func TestAllowedBots(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil || len(cfg.AllowedBots) != 0 || cfg.BotRepliesPer10Min != 5 {
+		t.Fatalf("defaults: %q, %d, %v", cfg.AllowedBots, cfg.BotRepliesPer10Min, err)
+	}
+	env := validEnv()
+	env["ALLOWED_BOTS"] = "@Other_Bot, helperbot"
+	if cfg, err := Load(getenv(env)); err != nil || strings.Join(cfg.AllowedBots, ",") != "other_bot,helperbot" {
+		t.Errorf("AllowedBots = %q, err = %v", cfg.AllowedBots, err)
+	}
+	env["ALLOWED_BOTS"] = "*"
+	if cfg, err := Load(getenv(env)); err != nil || strings.Join(cfg.AllowedBots, ",") != "*" {
+		t.Errorf("wildcard: %q, err = %v", cfg.AllowedBots, err)
+	}
+	env["ALLOWED_BOTS"] = "bad name"
+	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "ALLOWED_BOTS") {
+		t.Errorf("err = %v", err)
+	}
+}

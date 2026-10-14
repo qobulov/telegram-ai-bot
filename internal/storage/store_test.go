@@ -45,7 +45,7 @@ func newTestStore(t *testing.T) *Store {
 	}
 	t.Cleanup(store.Close)
 
-	if _, err := store.pool.Exec(ctx, `DROP TABLE IF EXISTS messages, conversations, users, chats, group_messages, image_generations, schema_migrations CASCADE`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DROP TABLE IF EXISTS messages, conversations, users, chats, group_messages, image_generations, bot_replies, schema_migrations CASCADE`); err != nil {
 		t.Fatalf("drop tables: %v", err)
 	}
 	if _, err := store.Migrate(ctx); err != nil {
@@ -106,7 +106,7 @@ func TestMigrateIsIdempotent(t *testing.T) {
 func TestMigrateReportsAppliedCount(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
-	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, group_messages, image_generations, schema_migrations CASCADE`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, group_messages, image_generations, bot_replies, schema_migrations CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 
@@ -825,6 +825,27 @@ func TestConcurrentReservationsRespectTheLimit(t *testing.T) {
 	wg.Wait()
 	if n := granted.Load(); n != 2 {
 		t.Errorf("granted = %d of 8 simultaneous requests, want exactly 2", n)
+	}
+}
+
+func TestBotRepliesAreLimitedPerChatInAWindow(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	window := time.Now().Add(-10 * time.Minute)
+
+	for i := range 3 {
+		if ok, err := store.ReserveBotReply(ctx, group, 555, window, 3); err != nil || !ok {
+			t.Fatalf("reply %d: ok = %v, err = %v", i+1, ok, err)
+		}
+	}
+	if ok, _ := store.ReserveBotReply(ctx, group, 666, window, 3); ok {
+		t.Error("a fourth reply to bots in the window was allowed, from another bot")
+	}
+	if ok, _ := store.ReserveBotReply(ctx, otherGroup, 555, window, 3); !ok {
+		t.Error("another chat was refused because of this chat's count")
+	}
+	if ok, _ := store.ReserveBotReply(ctx, group, 555, time.Now().Add(time.Minute), 3); !ok {
+		t.Error("replies before the window still counted")
 	}
 }
 

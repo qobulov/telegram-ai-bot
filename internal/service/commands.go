@@ -38,8 +38,11 @@ func (s *Service) process(in incoming) {
 	if s.silenced(in) {
 		return
 	}
+	if in.fromBot && !s.mayAnswerBot(in) {
+		return
+	}
 	if notice, limited := s.rateLimited(in); limited {
-		if notice != "" {
+		if notice != "" && !in.fromBot {
 			s.reply(in, notice)
 		}
 		return
@@ -113,6 +116,29 @@ func (s *Service) logExchange(in incoming, out outcome) {
 		}
 		s.ambient.add(in.scope.ChatID, 0, s.opts.Bot.ID, botAuthor, answer)
 	}
+}
+
+// botWindow is the period BotRepliesPer10Min counts over.
+const botWindow = 10 * time.Minute
+
+// mayAnswerBot takes one of the chat's replies to bots. Past the limit, or
+// when the count cannot be read, the bot stays silent: two bots answering
+// each other must not run on.
+func (s *Service) mayAnswerBot(in incoming) bool {
+	if s.opts.BotReplies == nil {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
+	defer cancel()
+	ok, err := s.opts.BotReplies.ReserveBotReply(ctx, in.scope.ChatID, in.userID, time.Now().Add(-botWindow), s.opts.BotRepliesPer10Min)
+	if err != nil {
+		s.opts.Logger.Warn("bot reply count failed; staying quiet", "chat_id", in.scope.ChatID, "error", err)
+		return false
+	}
+	if !ok {
+		s.opts.Logger.Info("bot conversation limit reached", "chat_id", in.scope.ChatID, "bot_id", in.userID)
+	}
+	return ok
 }
 
 // rateLimited applies the per-user limit and, in a group, the per-group

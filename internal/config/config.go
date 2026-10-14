@@ -94,7 +94,14 @@ type Config struct {
 	Location *time.Location
 	// OwnerUsernames are the Telegram usernames of the bot's owners, lower
 	// case and without @. Empty when no owner is configured.
-	OwnerUsernames          []string
+	OwnerUsernames []string
+
+	// AllowedBots are the usernames of other bots the bot answers in groups,
+	// lower case; "*" allows any bot. Empty answers no bots.
+	AllowedBots []string
+	// BotRepliesPer10Min caps replies to bots per chat, so two bots cannot
+	// keep talking to each other.
+	BotRepliesPer10Min      int
 	MaxGroupReplyChars      int
 	GroupRateLimitPerMinute int
 }
@@ -147,6 +154,8 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	cfg.Location = r.location("GROUP_HISTORY_TIMEZONE", "Asia/Tashkent")
 	cfg.OwnerUsernames = r.usernames("BOT_OWNER_USERNAME")
+	cfg.AllowedBots = r.allowedBots("ALLOWED_BOTS")
+	cfg.BotRepliesPer10Min = r.integer("BOT_REPLIES_PER_10_MIN", 5, 0)
 	cfg.PersonaPrompt = strings.ReplaceAll(r.text("PERSONA_PROMPT", defaultPersona), namePlaceholder, cfg.BotDisplayName)
 	cfg.ImagesEnabled = cfg.AIProvider == providerGemini && r.boolean("ENABLE_IMAGE_GENERATION", true)
 	cfg.ImageModel = r.text("IMAGE_MODEL", "gemini-3.1-flash-image")
@@ -364,6 +373,13 @@ func (r *reader) usernames(name string) []string {
 		names = append(names, username)
 	}
 	return names
+}
+
+func (r *reader) allowedBots(name string) []string {
+	if r.value(name) == "*" {
+		return []string{"*"}
+	}
+	return r.usernames(name)
 }
 
 // isUsername accepts what Telegram allows: letters, digits and underscores.

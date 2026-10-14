@@ -184,7 +184,32 @@ func (f *fakeMuter) SetMuted(_ context.Context, chatID int64, muted bool, by int
 
 const groupAdminID = int64(4001)
 
+// fakeBotQuota allows a fixed number of replies to bots per chat.
+type fakeBotQuota struct {
+	mu    sync.Mutex
+	left  map[int64]int
+	limit int
+}
+
+func (f *fakeBotQuota) ReserveBotReply(_ context.Context, chatID, _ int64, _ time.Time, limit int) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.limit = limit
+	if f.left == nil {
+		f.left = map[int64]int{}
+	}
+	if _, seen := f.left[chatID]; !seen {
+		f.left[chatID] = limit
+	}
+	if f.left[chatID] == 0 {
+		return false, nil
+	}
+	f.left[chatID]--
+	return true, nil
+}
+
 type fixture struct {
+	botQuota    *fakeBotQuota
 	sender      *fakeSender
 	replier     *fakeReplier
 	resetter    *fakeResetter
@@ -202,6 +227,7 @@ func newFixture() *fixture {
 		sender: &fakeSender{}, replier: &fakeReplier{}, resetter: &fakeResetter{}, recorder: &fakeRecorder{},
 		members: &fakeMembers{admins: map[int64]bool{groupAdminID: true}}, muter: &fakeMuter{},
 		media: newFakeMedia(), chatLog: newMemoryLog(), transcriber: &fakeTranscriber{text: "salom dunyo"},
+		botQuota: &fakeBotQuota{},
 	}
 	f.opts = Options{
 		Sender:        f.sender,
@@ -236,6 +262,8 @@ func newFixture() *fixture {
 		MaxVoiceSeconds:    120,
 		AudioInput:         true,
 		Transcriber:        f.transcriber,
+		BotReplies:         f.botQuota,
+		BotRepliesPer10Min: 3,
 	}
 	return f
 }
@@ -1589,5 +1617,111 @@ func TestTurnTellsToolsWhoIsAsking(t *testing.T) {
 	}
 	if c := calls[1].caller; c.Owner || c.UserID != userID {
 		t.Errorf("member's caller = %+v", c)
+	}
+}
+
+func fromBot(msg *telegram.Message, username string) *telegram.Message {
+	msg.From = &telegram.User{ID: 8800, IsBot: true, FirstName: "Helper", Username: username}
+	return msg
+}
+
+func TestAllowedBotIsAnsweredWhenItAddressesMaria(t *testing.T) {
+	f := newFixture()
+	f.opts.AllowedBots = []string{"helper_bot"}
+
+	sent := f.run(inGroup(fromBot(groupMessage("@MyBot salom", "@MyBot"), "Helper_Bot")))
+
+	expectOneReply(t, sent, "echo: salom")
+	if req := f.replier.recorded()[0].req; req.AuthorName != "Helper @Helper_Bot [bot]" {
+		t.Errorf("author = %q, want the bot marked as a bot", req.AuthorName)
+	}
+}
+
+func TestBotsAreIgnoredUnlessAllowed(t *testing.T) {
+	f := newFixture()
+	f.opts.AllowedBots = []string{"helper_bot"}
+
+	f.run(inGroup(fromBot(groupMessage("@MyBot salom", "@MyBot"), "stranger_bot")))
+
+	if len(f.replier.recorded()) != 0 {
+		t.Error("a bot that is not allowed was answered")
+	}
+}
+
+func TestWildcardAllowsAnyBotButNeverItself(t *testing.T) {
+	f := newFixture()
+	f.opts.AllowedBots = []string{"*"}
+	f.opts.Workers = 1
+	self := groupMessage("@MyBot hello me", "@MyBot")
+	self.From = &telegram.User{ID: botID, IsBot: true, FirstName: "Mira", Username: botUsername}
+
+	f.run(inGroup(fromBot(groupMessage("Mira, salom"), "any_bot")), inGroup(self))
+
+	if calls := f.replier.recorded(); len(calls) != 1 || !strings.Contains(calls[0].req.AuthorName, "@any_bot") {
+		t.Errorf("calls = %+v, want only the other bot answered", calls)
+	}
+}
+
+func TestBotConversationStopsAtTheLimit(t *testing.T) {
+	f := newFixture()
+	f.opts.AllowedBots = []string{"*"}
+	f.opts.Workers = 1
+	var updates []telegram.Update
+	for range 6 {
+		updates = append(updates, inGroup(fromBot(replyingTo(groupMessage("and you?"), botID, "answer"), "ping_bot")))
+	}
+
+	sent := f.run(updates...)
+
+	if len(sent) != 3 || len(f.replier.recorded()) != 3 {
+		t.Errorf("sent = %d, model calls = %d; want the limit of 3 and silence after it", len(sent), len(f.replier.recorded()))
+	}
+	if f.botQuota.limit != 3 {
+		t.Errorf("limit passed = %d", f.botQuota.limit)
+	}
+}
+
+func TestPeopleAreNotLimitedByTheBotQuota(t *testing.T) {
+	f := newFixture()
+	f.opts.AllowedBots = []string{"*"}
+	f.opts.BotRepliesPer10Min = 0
+
+	sent := f.run(inGroup(groupMessage("Mira, salom")))
+
+	expectOneReply(t, sent, "echo: salom")
+}
+
+func TestBotsCannotRunCommands(t *testing.T) {
+	f := newFixture()
+	f.opts.AllowedBots = []string{"*"}
+	f.opts.Workers = 1
+	f.members.admins[8800] = true
+
+	sent := f.run(inGroup(fromBot(groupMessage("/mute@MyBot"), "admin_bot")))
+
+	if len(sent) != 0 || len(f.muter.calls) != 0 {
+		t.Errorf("a bot ran a command: sent = %+v, mute = %+v", sent, f.muter.calls)
+	}
+}
+
+func TestBotsAreAnsweredInGroupsOnly(t *testing.T) {
+	f := newFixture()
+	f.opts.AllowedBots = []string{"*"}
+	update := textFrom(8800, "hi")
+	update.Message.From.IsBot = true
+
+	if sent := f.run(update); len(sent) != 0 {
+		t.Errorf("sent = %+v; bots are answered in groups only", sent)
+	}
+}
+
+func TestAllowedBotsChatterIsLogged(t *testing.T) {
+	f := newFixture()
+	f.opts.AllowedBots = []string{"*"}
+
+	f.run(inGroup(fromBot(groupMessage("weather today: sunny"), "weather_bot")))
+
+	if got := f.chatLog.texts(groupID); len(got) != 1 || got[0] != "Helper @weather_bot [bot]: weather today: sunny" {
+		t.Errorf("log = %q", got)
 	}
 }

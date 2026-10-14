@@ -167,6 +167,8 @@ in the environment win over the file.
 | `GROUP_AMBIENT_MESSAGES` | `200` | How many of today's group messages are given to the model with a question (0 to 500; 0 turns the group log off) |
 | `GROUP_HISTORY_TIMEZONE` | `Asia/Tashkent` | Time zone that decides when "today" starts for the group log |
 | `BOT_OWNER_USERNAME` | empty | The owners' Telegram usernames, comma-separated (e.g. `pronium,TursunoffM`); the bot treats owners warmly, follows their instructions and lets them manage it in any group |
+| `ALLOWED_BOTS` | empty | Other bots the bot answers in groups, comma-separated usernames, or `*` for any bot; empty answers no bots |
+| `BOT_REPLIES_PER_10_MIN` | `5` | Most replies to bots per group in 10 minutes, so two bots cannot talk without end |
 | `GROUP_CONTEXT_MODE`          | `shared`                       | Only `shared` is supported: one conversation per group                                                       |
 | `MAX_GROUP_REPLY_LENGTH`      | `4000`                         | Longest answer posted in a group (at most 4096; an emoji usually counts as two)                              |
 | `GROUP_RATE_LIMIT_PER_MINUTE` | `10`                           | Messages answered per group per minute, across all members                                                   |
@@ -515,10 +517,15 @@ To keep the bot out of groups altogether, use `/setjoingroups` in @BotFather.
   muted group gets no notices of any kind.
 - She reads text. A photo or document counts only through its caption; the
   image itself is not seen.
-- Telegram never delivers one bot's messages to another bot. Messages sent on
-  behalf of a chat are ignored as well: anonymous group administrators,
-  members posting as a channel, and channel posts forwarded into a linked
-  discussion group. An anonymous admin therefore cannot use `/mute`.
+- Other bots: Telegram delivers another bot's messages only when
+  *Bot-to-Bot Communication Mode* is enabled in @BotFather for at least one
+  of the two bots. The bot answers bots listed in `ALLOWED_BOTS` (or any bot
+  with `*`), in groups only, when they address it, and at most
+  `BOT_REPLIES_PER_10_MIN` times per group in 10 minutes; after that it is
+  silent. Bots cannot run commands. Messages sent on behalf of a chat are
+  ignored: anonymous group administrators, members posting as a channel, and
+  channel posts forwarded into a linked discussion group. An anonymous admin
+  therefore cannot use `/mute`.
 - The bot needs permission to send messages in the group.
 - When a group is upgraded to a supergroup, Telegram gives it a new chat ID.
   The conversation and the mute setting from before the upgrade no longer

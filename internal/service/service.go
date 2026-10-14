@@ -57,6 +57,11 @@ type MuteStore interface {
 	IsMuted(ctx context.Context, chatID int64) (bool, error)
 }
 
+// BotReplyQuota counts replies to other bots per chat.
+type BotReplyQuota interface {
+	ReserveBotReply(ctx context.Context, chatID, botID int64, since time.Time, limit int) (bool, error)
+}
+
 // Recorder stores the Telegram message ID of an answer after it was sent.
 type Recorder interface {
 	SetSentMessageID(ctx context.Context, answerID, telegramMessageID int64) error
@@ -106,6 +111,12 @@ type Options struct {
 	AmbientMessages int
 	// Location decides when "today" starts for the group log.
 	Location *time.Location
+	// AllowedBots are other bots answered in groups, lower case; "*" means
+	// any bot. BotReplies counts those replies, at most BotRepliesPer10Min
+	// per chat.
+	AllowedBots        []string
+	BotReplies         BotReplyQuota
+	BotRepliesPer10Min int
 	// OwnerUsernames are the bot owners' Telegram usernames, lower case,
 	// without @. Owners' messages are marked for the model and owners may
 	// manage the bot in any group.
@@ -170,7 +181,9 @@ type incoming struct {
 	scope storage.Scope
 	// userID is who sent the message, in private chats and groups alike.
 	userID int64
-	group  bool
+	// fromBot is true for a message from another bot.
+	fromBot bool
+	group   bool
 	// text is the user's text, trimmed, without the part addressing the bot.
 	text string
 	// described is text with the message's media described in front of it,
@@ -255,7 +268,7 @@ func (s *Service) HandleNow(update telegram.Update) {
 // identity used for permissions from here on.
 func (s *Service) accept(update telegram.Update) (incoming, bool) {
 	msg := update.Message
-	if msg == nil || msg.From == nil || msg.From.IsBot {
+	if msg == nil || msg.From == nil || !s.acceptsSender(msg) {
 		return incoming{}, false
 	}
 	// Posts made on behalf of a chat have no person behind them to keep a
@@ -264,7 +277,7 @@ func (s *Service) accept(update telegram.Update) (incoming, bool) {
 	if msg.SenderChat != nil || msg.IsAutomaticForward {
 		return incoming{}, false
 	}
-	in := incoming{updateID: update.UpdateID, msg: msg, userID: msg.From.ID}
+	in := incoming{updateID: update.UpdateID, msg: msg, userID: msg.From.ID, fromBot: msg.From.IsBot}
 	switch msg.Chat.Type {
 	case telegram.ChatTypePrivate:
 		in.scope = storage.Scope{ChatID: msg.Chat.ID, UserID: msg.From.ID}
@@ -290,6 +303,9 @@ func (s *Service) accept(update telegram.Update) (incoming, bool) {
 // queue, ahead of this message.
 func (s *Service) acceptGroup(in incoming) (incoming, bool) {
 	text, addressed := s.address(in.msg)
+	if in.fromBot && strings.HasPrefix(text, "/") {
+		addressed = false // bots do not run commands
+	}
 	if !addressed {
 		// Checked in this order so that, with the buffer off, an ordinary
 		// group message costs no mute lookup at all.
@@ -348,6 +364,24 @@ func (s *Service) rememberInBackground(msg *telegram.Message) {
 // ownerNotice tells the model, in a private chat, that the owner is writing.
 const ownerNotice = "[This message is from your owner.]"
 
+// acceptsSender keeps people, and in groups the other bots on the allow
+// list. The bot never answers itself.
+func (s *Service) acceptsSender(msg *telegram.Message) bool {
+	from := msg.From
+	if !from.IsBot {
+		return true
+	}
+	if from.ID == s.opts.Bot.ID || msg.Chat.Type == telegram.ChatTypePrivate {
+		return false
+	}
+	for _, allowed := range s.opts.AllowedBots {
+		if allowed == "*" || strings.EqualFold(allowed, from.Username) {
+			return true
+		}
+	}
+	return false
+}
+
 // isOwner reports whether the sender is the bot's owner. It compares the
 // Telegram username, which Telegram sets and nobody can type in.
 func (s *Service) isOwner(user *telegram.User) bool {
@@ -370,8 +404,11 @@ func (s *Service) label(user *telegram.User) string {
 	if username := usernameLabel(user.Username); username != "" {
 		label += " " + username
 	}
-	if s.isOwner(user) {
+	switch {
+	case s.isOwner(user):
 		label += " [owner]"
+	case user.IsBot:
+		label += " [bot]"
 	}
 	return label
 }
