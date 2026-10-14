@@ -181,8 +181,8 @@ func TestVoiceMessageIsHeard(t *testing.T) {
 	if req.Text != "<voice message, 12 s>" {
 		t.Errorf("text = %q", req.Text)
 	}
-	if len(req.Attachments) != 1 || req.Attachments[0].InputAudio == nil || req.Attachments[0].InputAudio.Format != "ogg" {
-		t.Errorf("attachments = %+v, want OGG audio", req.Attachments)
+	if len(req.Attachments) != 1 || req.Attachments[0].InputAudio == nil || req.Attachments[0].InputAudio.Format != "mp3" {
+		t.Errorf("attachments = %+v, want the audio sent with the mp3 label Gemini accepts", req.Attachments)
 	}
 }
 

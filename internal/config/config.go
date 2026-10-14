@@ -86,9 +86,9 @@ type Config struct {
 	// Location is the time zone that decides when "today" starts for the
 	// group history.
 	Location *time.Location
-	// OwnerUsername is the Telegram username of the bot's owner, lower case
-	// and without @. Empty when no owner is configured.
-	OwnerUsername           string
+	// OwnerUsernames are the Telegram usernames of the bot's owners, lower
+	// case and without @. Empty when no owner is configured.
+	OwnerUsernames          []string
 	MaxGroupReplyChars      int
 	GroupRateLimitPerMinute int
 }
@@ -140,10 +140,10 @@ func Load(getenv func(string) string) (Config, error) {
 		r.fail("MAX_MEDIA_MB", "must be at most 20: Telegram does not let bots download larger files")
 	}
 	cfg.Location = r.location("GROUP_HISTORY_TIMEZONE", "Asia/Tashkent")
-	cfg.OwnerUsername = strings.ToLower(strings.TrimPrefix(r.value("BOT_OWNER_USERNAME"), "@"))
+	cfg.OwnerUsernames = r.usernames("BOT_OWNER_USERNAME")
 	cfg.PersonaPrompt = strings.ReplaceAll(r.text("PERSONA_PROMPT", defaultPersona), namePlaceholder, cfg.BotDisplayName)
-	if cfg.OwnerUsername != "" {
-		cfg.PersonaPrompt += "\n\n" + strings.ReplaceAll(ownerNote, ownerPlaceholder, cfg.OwnerUsername)
+	if len(cfg.OwnerUsernames) > 0 {
+		cfg.PersonaPrompt += "\n\n" + strings.ReplaceAll(ownerNote, ownerPlaceholder, mentionList(cfg.OwnerUsernames))
 	}
 	cfg.WakeWords = r.wakeWords(cfg)
 	r.checkRemovedVariables()
@@ -336,6 +336,48 @@ func (r *reader) fallbackModels(defaults []string) []string {
 	default:
 		return splitList(value)
 	}
+}
+
+// usernames reads a comma-separated list of Telegram usernames, with or
+// without @, and returns them in lower case without @.
+func (r *reader) usernames(name string) []string {
+	var names []string
+	for _, item := range splitList(r.value(name)) {
+		username := strings.ToLower(strings.TrimPrefix(item, "@"))
+		if !isUsername(username) {
+			r.fail(name, "must be a comma-separated list of Telegram usernames")
+			return nil
+		}
+		names = append(names, username)
+	}
+	return names
+}
+
+// isUsername accepts what Telegram allows: letters, digits and underscores.
+func isUsername(name string) bool {
+	if name == "" {
+		return false
+	}
+	for _, char := range name {
+		isLetter := char >= 'a' && char <= 'z'
+		isDigit := char >= '0' && char <= '9'
+		if !isLetter && !isDigit && char != '_' {
+			return false
+		}
+	}
+	return true
+}
+
+// mentionList writes usernames as "@a" or "@a and @b".
+func mentionList(names []string) string {
+	mentions := make([]string, len(names))
+	for i, name := range names {
+		mentions[i] = "@" + name
+	}
+	if len(mentions) == 1 {
+		return mentions[0]
+	}
+	return strings.Join(mentions[:len(mentions)-1], ", ") + " and " + mentions[len(mentions)-1]
 }
 
 func (r *reader) location(name, fallback string) *time.Location {

@@ -170,3 +170,20 @@ func authorLabel(firstName string) string {
 	}
 	return label
 }
+
+// usernameLabel returns "@username", or "" when there is none. Telegram
+// usernames are letters, digits and underscores; anything else is dropped
+// rather than shown, since the label goes in front of what people say.
+func usernameLabel(username string) string {
+	if username == "" {
+		return ""
+	}
+	for _, char := range username {
+		isLetter := (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z')
+		isDigit := char >= '0' && char <= '9'
+		if !isLetter && !isDigit && char != '_' {
+			return ""
+		}
+	}
+	return "@" + username
+}

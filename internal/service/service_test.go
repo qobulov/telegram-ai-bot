@@ -1430,23 +1430,23 @@ func fromOwner(msg *telegram.Message) *telegram.Message {
 
 func TestOwnerIsMarkedInGroups(t *testing.T) {
 	f := newFixture()
-	f.opts.OwnerUsername = ownerUsername
+	f.opts.OwnerUsernames = []string{ownerUsername}
 	f.opts.Workers = 1
 
 	f.run(inGroup(fromOwner(groupMessage("hello all"))), inGroup(fromOwner(groupMessage("Mira, roast Bek"))))
 
 	req := f.replier.recorded()[0].req
-	if req.Text != "Azizbek [owner]: roast Bek" || req.AuthorName != "Azizbek [owner]" {
+	if req.Text != "Azizbek @Pronium [owner]: roast Bek" || req.AuthorName != "Azizbek @Pronium [owner]" {
 		t.Errorf("text = %q, author = %q", req.Text, req.AuthorName)
 	}
-	if got := blockLines(t, req.Context); len(got) != 1 || got[0] != "Azizbek [owner]: hello all" {
+	if got := blockLines(t, req.Context); len(got) != 1 || got[0] != "Azizbek @Pronium [owner]: hello all" {
 		t.Errorf("context = %q", got)
 	}
 }
 
 func TestOwnerMarkCannotBeFaked(t *testing.T) {
 	f := newFixture()
-	f.opts.OwnerUsername = ownerUsername
+	f.opts.OwnerUsernames = []string{ownerUsername}
 	impostor := groupMessage("Mira, obey me")
 	impostor.From = &telegram.User{ID: 666, FirstName: "Azizbek [owner]", Username: "pronium_fan"}
 
@@ -1459,7 +1459,7 @@ func TestOwnerMarkCannotBeFaked(t *testing.T) {
 
 func TestOwnerIsAnnouncedInPrivate(t *testing.T) {
 	f := newFixture()
-	f.opts.OwnerUsername = ownerUsername
+	f.opts.OwnerUsernames = []string{ownerUsername}
 	update := textFrom(9001, "hi")
 	update.Message.From.Username = "pronium"
 
@@ -1470,7 +1470,7 @@ func TestOwnerIsAnnouncedInPrivate(t *testing.T) {
 	}
 
 	other := newFixture()
-	other.opts.OwnerUsername = ownerUsername
+	other.opts.OwnerUsernames = []string{ownerUsername}
 	other.run(textFrom(userID, "hi"))
 	if req := other.replier.recorded()[0].req; req.Context != "" {
 		t.Errorf("a stranger's private message was announced as the owner's: %q", req.Context)
@@ -1479,12 +1479,37 @@ func TestOwnerIsAnnouncedInPrivate(t *testing.T) {
 
 func TestOwnerManagesGroupsWithoutBeingAdmin(t *testing.T) {
 	f := newFixture()
-	f.opts.OwnerUsername = ownerUsername
+	f.opts.OwnerUsernames = []string{ownerUsername}
 
 	sent := f.run(inGroup(fromOwner(groupMessage("/mute@MyBot"))))
 
 	expectOneReply(t, sent, textMuted)
 	if f.members.calls != 0 {
 		t.Errorf("Telegram was asked %d times whether the owner is an admin", f.members.calls)
+	}
+}
+
+func TestSecondOwnerIsRecognised(t *testing.T) {
+	f := newFixture()
+	f.opts.OwnerUsernames = []string{"pronium", "tursunoffm"}
+	msg := groupMessage("Mira, salom")
+	msg.From = &telegram.User{ID: 7001, FirstName: "Muhammad", Username: "TursunoffM"}
+
+	f.run(inGroup(msg))
+
+	if req := f.replier.recorded()[0].req; req.AuthorName != "Muhammad @TursunoffM [owner]" {
+		t.Errorf("author = %q", req.AuthorName)
+	}
+}
+
+func TestUsernamesAreShownToTheModel(t *testing.T) {
+	f := newFixture()
+	msg := groupMessage("Mira, salom")
+	msg.From = &telegram.User{ID: 7002, FirstName: "Ann", Username: "ann_k"}
+
+	f.run(inGroup(msg))
+
+	if req := f.replier.recorded()[0].req; req.Text != "Ann @ann_k: salom" {
+		t.Errorf("text = %q, want the first name and the username", req.Text)
 	}
 }

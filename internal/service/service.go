@@ -99,10 +99,10 @@ type Options struct {
 	AmbientMessages int
 	// Location decides when "today" starts for the group log.
 	Location *time.Location
-	// OwnerUsername is the bot owner's Telegram username, lower case,
-	// without @. The owner's messages are marked for the model and the owner
-	// may manage the bot in any group.
-	OwnerUsername string
+	// OwnerUsernames are the bot owners' Telegram usernames, lower case,
+	// without @. Owners' messages are marked for the model and owners may
+	// manage the bot in any group.
+	OwnerUsernames []string
 	// MutedChats are the groups where the bot starts muted.
 	MutedChats []int64
 	// MuteStore, when set, is asked about a group's mute state every time
@@ -308,14 +308,25 @@ const ownerNotice = "[This message is from your owner.]"
 // isOwner reports whether the sender is the bot's owner. It compares the
 // Telegram username, which Telegram sets and nobody can type in.
 func (s *Service) isOwner(user *telegram.User) bool {
-	return user != nil && s.opts.OwnerUsername != "" && strings.EqualFold(user.Username, s.opts.OwnerUsername)
+	if user == nil || user.Username == "" {
+		return false
+	}
+	for _, owner := range s.opts.OwnerUsernames {
+		if strings.EqualFold(user.Username, owner) {
+			return true
+		}
+	}
+	return false
 }
 
-// label names a sender in a group: their first name, with [owner] after the
-// owner's. authorLabel strips square brackets from names, so nobody else can
-// carry the mark.
+// label names a sender in a group: their first name and @username, with
+// [owner] after an owner's. authorLabel strips square brackets from names,
+// so nobody else can carry the mark.
 func (s *Service) label(user *telegram.User) string {
 	label := authorLabel(user.FirstName)
+	if username := usernameLabel(user.Username); username != "" {
+		label += " " + username
+	}
 	if s.isOwner(user) {
 		label += " [owner]"
 	}

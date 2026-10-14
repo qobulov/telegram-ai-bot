@@ -128,7 +128,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		AmbientMessages:    cfg.AmbientMessages,
 		ChatLog:            store,
 		Location:           cfg.Location,
-		OwnerUsername:      cfg.OwnerUsername,
+		OwnerUsernames:     cfg.OwnerUsernames,
 		MutedChats:         mode.MutedChats,
 		GroupRatePerMinute: cfg.GroupRateLimitPerMinute,
 		MaxGroupReplyChars: cfg.MaxGroupReplyChars,

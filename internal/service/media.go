@@ -11,6 +11,13 @@ import (
 	"telegram-ai-bot/internal/telegram"
 )
 
+// voiceFormat labels voice messages sent to the model. Telegram voice is
+// OGG/Opus, but Gemini's OpenAI-compatible endpoint refuses the label "ogg"
+// ("Valid formats are: [wav, mp3]"). It reads the audio from its bytes,
+// whatever the label says: an OGG/Opus file sent as "mp3" was understood in
+// testing, so the accepted label is used and the bytes are left as they are.
+const voiceFormat = "mp3"
+
 // mediaTimeout bounds downloading one file from Telegram.
 const mediaTimeout = 15 * time.Second
 
@@ -134,7 +141,7 @@ func (s *Service) download(ctx context.Context, in incoming, m media) (ai.Conten
 		return ai.ContentPart{}, false
 	}
 	if m.audio {
-		return ai.AudioPart("ogg", data), true
+		return ai.AudioPart(voiceFormat, data), true
 	}
 	// Telegram serves photos as JPEG and stickers as WebP; the bytes say
 	// which, so the declared type does not have to be trusted.

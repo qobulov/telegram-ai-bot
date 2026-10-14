@@ -625,8 +625,8 @@ func TestBotOwner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.OwnerUsername != "pronium" {
-		t.Errorf("OwnerUsername = %q, want it without @ and in lower case", cfg.OwnerUsername)
+	if len(cfg.OwnerUsernames) != 1 || cfg.OwnerUsernames[0] != "pronium" {
+		t.Errorf("OwnerUsernames = %q, want it without @ and in lower case", cfg.OwnerUsernames)
 	}
 	if !strings.Contains(cfg.PersonaPrompt, "@pronium") || !strings.Contains(cfg.PersonaPrompt, "[owner]") {
 		t.Error("the persona does not tell the model who its owner is and how owner messages are marked")
@@ -664,5 +664,25 @@ func TestPersonaDoesNotClaimExperiences(t *testing.T) {
 	}
 	if !strings.Contains(cfg.PersonaPrompt, "never claim you did") {
 		t.Error("the persona does not stop the model inventing things it saw or did")
+	}
+}
+
+func TestTwoOwners(t *testing.T) {
+	env := validEnv()
+	env["BOT_OWNER_USERNAME"] = "pronium, @TursunoffM"
+	cfg, err := Load(getenv(env))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(cfg.OwnerUsernames, ",") != "pronium,tursunoffm" {
+		t.Errorf("OwnerUsernames = %q", cfg.OwnerUsernames)
+	}
+	if !strings.Contains(cfg.PersonaPrompt, "@pronium") || !strings.Contains(cfg.PersonaPrompt, "@tursunoffm") {
+		t.Error("the persona does not name both owners")
+	}
+
+	env["BOT_OWNER_USERNAME"] = "pronium, not a username"
+	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "BOT_OWNER_USERNAME") {
+		t.Errorf("err = %v, want an invalid username rejected", err)
 	}
 }

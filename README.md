@@ -162,7 +162,7 @@ in the environment win over the file.
 | `ENABLE_REPLY_TRIGGER`        | `true`                         | In groups, answer replies to the bot's messages                                                              |
 | `GROUP_AMBIENT_MESSAGES` | `200` | How many of today's group messages are given to the model with a question (0 to 500; 0 turns the group log off) |
 | `GROUP_HISTORY_TIMEZONE` | `Asia/Tashkent` | Time zone that decides when "today" starts for the group log |
-| `BOT_OWNER_USERNAME` | empty | The owner's Telegram username; the bot treats the owner warmly, follows his instructions and lets him manage it in any group |
+| `BOT_OWNER_USERNAME` | empty | The owners' Telegram usernames, comma-separated (e.g. `pronium,TursunoffM`); the bot treats owners warmly, follows their instructions and lets them manage it in any group |
 | `GROUP_CONTEXT_MODE`          | `shared`                       | Only `shared` is supported: one conversation per group                                                       |
 | `MAX_GROUP_REPLY_LENGTH`      | `4000`                         | Longest answer posted in a group (at most 4096; an emoji usually counts as two)                              |
 | `GROUP_RATE_LIMIT_PER_MINUTE` | `10`                           | Messages answered per group per minute, across all members                                                   |
@@ -360,17 +360,19 @@ Other media is never downloaded. With the recent-chatter buffer on, it is
 noted as "Ann: <photo>" without being seen.
 
 Each photo or voice message adds a download from Telegram and a larger
-request to the model, so answers take a little longer. Gemini's support for
-Telegram's OGG voice format through its OpenAI-compatible endpoint has not
-been verified; if voice messages fail, the log shows the provider's error
-on `turn failed`.
+request to the model, so answers take a little longer. Gemini's
+OpenAI-compatible endpoint refuses the label `ogg` that Telegram's voice
+format would need, but reads the audio from its bytes; voice messages are
+therefore sent unchanged with the accepted label `mp3`.
 
 ## The owner
 
-Set `BOT_OWNER_USERNAME` to your Telegram username (with or without `@`).
-The bot then knows you made it: it is friendly to you, does what you ask in
+Set `BOT_OWNER_USERNAME` to your Telegram username (with or without `@`);
+for several owners, separate them with commas. The bot then knows you made
+it: it is friendly to you, does what you ask in
 the chat within its limits, and lets you use `/mute`, `/unmute` and `/reset`
-in any group. Your messages are marked `[owner]` for the model based on your
+in any group. In groups every sender is shown to the model by first name and `@username`.
+Your messages are additionally marked `[owner]`, based on your
 Telegram account, so someone who copies your name or says they are the owner
 gets no special treatment.
 

@@ -107,3 +107,12 @@ func TestAuthorLabel(t *testing.T) {
 		}
 	}
 }
+
+func TestUsernameLabel(t *testing.T) {
+	cases := map[string]string{"ann_k": "@ann_k", "": "", "bad name!": "", "Mixed_Case9": "@Mixed_Case9"}
+	for username, want := range cases {
+		if got := usernameLabel(username); got != want {
+			t.Errorf("usernameLabel(%q) = %q, want %q", username, got, want)
+		}
+	}
+}
