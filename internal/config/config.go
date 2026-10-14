@@ -45,6 +45,11 @@ type Config struct {
 	FallbackModels []string
 	// AudioInput is true when the provider understands voice messages.
 	AudioInput bool
+	// The backup provider, asked when every model of the main one failed.
+	// Empty BackupAPIKey means none.
+	BackupAPIKey  string
+	BackupBaseURL string
+	BackupModel   string
 
 	// Image generation, Gemini only. Owners have no daily limit.
 	ImagesEnabled   bool
@@ -248,6 +253,10 @@ const (
 	providerXAI        = "xai"
 
 	telegramDownloadLimit = 20 << 20
+
+	// The backup provider defaults to Groq, which has a free tier.
+	defaultBackupBaseURL = "https://api.groq.com/openai/v1"
+	defaultBackupModel   = "openai/gpt-oss-120b"
 )
 
 // provider describes one model provider. All are reached through the
@@ -285,6 +294,9 @@ func (r *reader) chooseProvider(cfg *Config) {
 		cfg.AIBaseURL = r.text(p.baseURLVar, p.baseURL)
 		cfg.Model = r.text(p.modelVar, p.model)
 		cfg.FallbackModels = r.fallbackModels(p.fallbacks)
+		cfg.BackupAPIKey = r.value("BACKUP_API_KEY")
+		cfg.BackupBaseURL = r.text("BACKUP_BASE_URL", defaultBackupBaseURL)
+		cfg.BackupModel = r.text("BACKUP_MODEL", defaultBackupModel)
 	default:
 		r.fail(chosen[0].keyVar, "and "+chosen[1].keyVar+" are both set; keep only one, for the provider you want to use")
 	}

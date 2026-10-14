@@ -162,7 +162,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 	})
 	assistant := agent.New(agent.Options{
 		Store:        store,
-		Model:        model,
+		Model:        withBackup(cfg, model, logger),
 		Tools:        registry,
 		Persona:      cfg.PersonaPrompt,
 		GroupNote:    cfg.GroupNote,
@@ -229,6 +229,26 @@ func imageTool(cfg config.Config, store *storage.Store) tools.Tool {
 		DailyLimit: cfg.DailyImageLimit,
 		Location:   cfg.Location,
 	})
+}
+
+// withBackup puts the backup provider behind the main one when
+// BACKUP_API_KEY is set. Voice messages are still transcribed by the main
+// one only.
+func withBackup(cfg config.Config, model *ai.Client, logger *slog.Logger) agent.Model {
+	if cfg.BackupAPIKey == "" {
+		return model
+	}
+	backup := ai.NewClient(ai.Options{
+		BaseURL:        cfg.BackupBaseURL,
+		APIKey:         cfg.BackupAPIKey,
+		Model:          cfg.BackupModel,
+		MaxTokens:      cfg.MaxOutputTokens,
+		MaxAttempts:    2,
+		HTTPClient:     &http.Client{Timeout: cfg.RequestTimeout},
+		AttemptTimeout: attemptTimeout,
+		Logger:         logger,
+	})
+	return ai.NewChain(model, backup, logger)
 }
 
 // transcriber is the model client when the provider can listen to audio,

@@ -137,6 +137,9 @@ in the environment win over the file.
 | `OPENROUTER_API_KEY` | one of the two keys | OpenRouter key from <https://openrouter.ai/keys>; set this or `GEMINI_API_KEY`, not both |
 | `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Gemini model ID, used with `GEMINI_API_KEY` |
 | `FALLBACK_MODELS` | Gemini: `gemini-3.1-flash-lite,gemini-flash-lite-latest,gemini-flash-latest` | Models tried in order when the main one is overloaded, out of quota or does not answer, then once more after a pause; a model out of quota is skipped for 15 minutes; `none` turns this off |
+| `BACKUP_API_KEY` | empty | Key for a backup provider, asked when every model of the main one failed; replies that already moved to it stay on it |
+| `BACKUP_BASE_URL` | `https://api.groq.com/openai/v1` | The backup's OpenAI-compatible API (Groq by default) |
+| `BACKUP_MODEL` | `openai/gpt-oss-120b` | The backup's model; it gets voice messages as transcripts only |
 | `XAI_API_KEY` | one of the keys | xAI (Grok) key from <https://console.x.ai>; images yes, voice no |
 | `XAI_MODEL` | `grok-4` | Grok model ID, used with `XAI_API_KEY` |
 | `MAX_MEDIA_MB` | `5` | Largest photo or sticker file downloaded for the model (1 to 20) |
