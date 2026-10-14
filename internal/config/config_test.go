@@ -698,3 +698,15 @@ func TestOwnerNoteExplainsHowOwnersAreKnown(t *testing.T) {
 		t.Error("the persona does not say how to answer questions about who the owners are")
 	}
 }
+
+func TestOwnersAreEquals(t *testing.T) {
+	env := validEnv()
+	env["BOT_OWNER_USERNAME"] = "pronium,TursunoffM"
+	cfg, err := Load(getenv(env))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(cfg.PersonaPrompt, "Your owners are equals") {
+		t.Error("the persona does not forbid ranking or mocking an owner")
+	}
+}
