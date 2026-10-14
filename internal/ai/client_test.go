@@ -585,3 +585,39 @@ func TestTranscribeSendsTheAudioAndReturnsTheText(t *testing.T) {
 		t.Error("a transcription request offered tools")
 	}
 }
+
+// Gemini 3 signs each tool call and refuses the follow-up request unless the
+// signature comes back with the call ("Function call is missing a
+// thought_signature").
+func TestToolCallSignatureIsKeptAndSentBack(t *testing.T) {
+	client, rec := newTestClient(t,
+		reply{status: 200, body: `{"choices":[{"message":{"role":"assistant","content":null,"tool_calls":[
+			{"id":"call_1","type":"function","function":{"name":"generate_image","arguments":"{}"},
+			 "extra_content":{"google":{"thought_signature":"SIG123"}}}]}}]}`},
+		reply{status: 200, body: plainReply},
+	)
+
+	first, err := client.Complete(context.Background(), toolRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first.ToolCalls) != 1 || !strings.Contains(string(first.ToolCalls[0].ExtraContent), "SIG123") {
+		t.Fatalf("tool call = %+v, want the signature kept", first.ToolCalls)
+	}
+
+	stored, _ := json.Marshal(first.ToolCalls) // as storage keeps them
+	var restored []ToolCall
+	if err := json.Unmarshal(stored, &restored); err != nil {
+		t.Fatal(err)
+	}
+	req := toolRequest()
+	req.Messages = append(req.Messages, Message{Role: RoleAssistant, ToolCalls: restored},
+		Message{Role: RoleTool, ToolCallID: "call_1", Content: "{}"})
+	if _, err := client.Complete(context.Background(), req); err != nil {
+		t.Fatal(err)
+	}
+	sent, _ := json.Marshal(rec.requests[1]["messages"])
+	if !strings.Contains(string(sent), `"thought_signature":"SIG123"`) {
+		t.Errorf("follow-up request lost the signature: %s", sent)
+	}
+}

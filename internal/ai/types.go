@@ -86,6 +86,10 @@ type ToolCall struct {
 	ID       string       `json:"id"`
 	Type     string       `json:"type"`
 	Function FunctionCall `json:"function"`
+	// ExtraContent is provider data attached to the call, kept verbatim.
+	// Gemini 3 puts a thought signature here and rejects the follow-up
+	// request unless the call comes back with it.
+	ExtraContent json.RawMessage `json:"extra_content,omitempty"`
 }
 
 // FunctionCall names the tool and carries its arguments as a JSON string,
