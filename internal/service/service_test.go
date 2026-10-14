@@ -1612,7 +1612,7 @@ func TestTurnTellsToolsWhoIsAsking(t *testing.T) {
 	if len(calls) != 2 || !calls[0].hadSink {
 		t.Fatalf("calls = %+v", calls)
 	}
-	if c := calls[0].caller; !c.Owner || c.UserID != 9001 || c.ChatID != groupID || c.UpdateID == 0 {
+	if c := calls[0].caller; !c.Owner || c.UserID != 9001 || c.ChatID != groupID || c.UpdateID == 0 || c.MessageID == 0 {
 		t.Errorf("owner's caller = %+v", c)
 	}
 	if c := calls[1].caller; c.Owner || c.UserID != userID {
@@ -1784,5 +1784,17 @@ func TestMembershipChangesAreRecordedOnTheWebhookPathToo(t *testing.T) {
 
 	if len(groups.recorded) != 1 || groups.recorded[0].BotStatus != "member" {
 		t.Errorf("recorded = %+v", groups.recorded)
+	}
+}
+
+func TestTurnTellsToolsWhichMessageWasRepliedTo(t *testing.T) {
+	f := newFixture()
+	f.opts.OwnerUsernames = []string{ownerUsername}
+
+	f.run(inGroup(replyingTo(fromOwner(groupMessage("Mira, send this to the groups")), userID, "a joke")))
+
+	calls := f.replier.recorded()
+	if len(calls) != 1 || calls[0].caller.MessageID != 30 || calls[0].caller.ReplyToMessageID != 29 {
+		t.Errorf("calls = %+v", calls)
 	}
 }

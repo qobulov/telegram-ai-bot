@@ -17,8 +17,12 @@ type Broadcast struct {
 	OwnerID int64
 	// UpdateID is the Telegram update the draft was made in.
 	UpdateID int64
-	Text     string
-	ChatIDs  []int64
+	// Text is sent as a message; or, when it is empty, the message
+	// MessageID in FromChatID is copied.
+	Text       string
+	FromChatID int64
+	MessageID  int64
+	ChatIDs    []int64
 }
 
 // SaveBroadcast stores a draft, replacing the owner's earlier unsent ones.
@@ -27,8 +31,10 @@ func (s *Store) SaveBroadcast(ctx context.Context, b Broadcast) error {
 		if _, err := tx.Exec(ctx, `DELETE FROM broadcasts WHERE owner_id = $1 AND sent_at IS NULL`, b.OwnerID); err != nil {
 			return err
 		}
-		_, err := tx.Exec(ctx, `INSERT INTO broadcasts (owner_id, update_id, text, chat_ids) VALUES ($1, $2, $3, $4)`,
-			b.OwnerID, b.UpdateID, b.Text, b.ChatIDs)
+		_, err := tx.Exec(ctx, `
+			INSERT INTO broadcasts (owner_id, update_id, text, chat_ids, from_chat_id, message_id)
+			VALUES ($1, $2, $3, $4, $5, $6)`,
+			b.OwnerID, b.UpdateID, b.Text, b.ChatIDs, nonZero(b.FromChatID), nonZero(b.MessageID))
 		return err
 	})
 	if err != nil {
@@ -46,8 +52,8 @@ func (s *Store) ConfirmBroadcast(ctx context.Context, ownerID, updateID int64, m
 		UPDATE broadcasts SET sent_at = now()
 		WHERE owner_id = $1 AND sent_at IS NULL AND update_id <> $2
 		  AND created_at > now() - make_interval(secs => $3)
-		RETURNING update_id, text, chat_ids`, ownerID, updateID, maxAge.Seconds()).
-		Scan(&b.UpdateID, &b.Text, &b.ChatIDs)
+		RETURNING update_id, text, chat_ids, coalesce(from_chat_id, 0), coalesce(message_id, 0)`, ownerID, updateID, maxAge.Seconds()).
+		Scan(&b.UpdateID, &b.Text, &b.ChatIDs, &b.FromChatID, &b.MessageID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Broadcast{}, ErrNoBroadcast
 	}

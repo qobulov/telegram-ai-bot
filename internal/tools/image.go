@@ -28,6 +28,10 @@ type Caller struct {
 	// UpdateID is the Telegram update being answered. A broadcast drafted
 	// in one update can only be confirmed in another.
 	UpdateID int64
+	// MessageID is the message being answered, and ReplyToMessageID the one
+	// it replies to (0 if none), both in ChatID.
+	MessageID        int64
+	ReplyToMessageID int64
 }
 
 // Drawing is a picture made during a turn, to be sent with the answer.

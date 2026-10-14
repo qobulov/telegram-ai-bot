@@ -267,6 +267,24 @@ func (c *Client) GetChat(ctx context.Context, chatID int64) (Chat, error) {
 	return chat, nil
 }
 
+type copyMessageParams struct {
+	ChatID     int64 `json:"chat_id"`
+	FromChatID int64 `json:"from_chat_id"`
+	MessageID  int64 `json:"message_id"`
+}
+
+// CopyMessage posts a copy of a message, such as a voice message or a
+// photo, in another chat, without a "forwarded from" label. It returns the
+// ID of the new message.
+func (c *Client) CopyMessage(ctx context.Context, chatID, fromChatID, messageID int64) (int64, error) {
+	var copied sentMessage
+	params := copyMessageParams{ChatID: chatID, FromChatID: fromChatID, MessageID: messageID}
+	if err := c.call(ctx, "copyMessage", params, &copied); err != nil {
+		return 0, err
+	}
+	return copied.MessageID, nil
+}
+
 type chatParams struct {
 	ChatID int64 `json:"chat_id"`
 }

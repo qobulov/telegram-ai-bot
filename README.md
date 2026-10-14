@@ -404,7 +404,9 @@ qaytdi deb yoz") with the owner-only `send_to_groups` tool. It works in two
 steps: the bot first shows the exact text and the groups, and sends only after
 the owner says yes in a later message, within 10 minutes. The code refuses a
 confirmation made in the same message as the draft, so the model cannot send
-on its own.
+on its own. To post a voice message, photo or video as it is, reply to it
+with the request ("shuni guruhlarga yubor"); the bot copies it to the groups
+without a "forwarded from" label.
 
 Groups are recorded when the bot is added, promoted or removed (Telegram's
 `my_chat_member` updates) and from the messages it logs. Telegram has no way

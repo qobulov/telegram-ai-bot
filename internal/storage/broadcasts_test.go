@@ -73,3 +73,16 @@ func TestCancelBroadcastDropsTheDraft(t *testing.T) {
 		t.Errorf("a cancelled draft was confirmed: err = %v", err)
 	}
 }
+
+func TestBroadcastCanCopyAMessage(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	draft := Broadcast{OwnerID: owner, UpdateID: 1, FromChatID: owner, MessageID: 77, ChatIDs: []int64{group}}
+	if err := store.SaveBroadcast(ctx, draft); err != nil {
+		t.Fatalf("SaveBroadcast: %v", err)
+	}
+	got, err := store.ConfirmBroadcast(ctx, owner, 2, time.Minute)
+	if err != nil || got.FromChatID != owner || got.MessageID != 77 || got.Text != "" {
+		t.Errorf("confirmed = %+v, err = %v", got, err)
+	}
+}

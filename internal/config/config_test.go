@@ -811,3 +811,17 @@ func TestPersonaNeverPromisesWhatItCannotDo(t *testing.T) {
 		t.Error("the persona lets the bot promise things it cannot do, such as messaging other groups")
 	}
 }
+
+func TestOwnerNoteKeepsMasterAndToolUse(t *testing.T) {
+	env := validEnv()
+	env["BOT_OWNER_USERNAME"] = "pronium"
+	cfg, err := Load(getenv(env))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"jonim"`, "call it in that same reply", "cannot see private chats"} {
+		if !strings.Contains(cfg.PersonaPrompt, want) {
+			t.Errorf("the owner note does not contain %q", want)
+		}
+	}
+}

@@ -44,9 +44,20 @@ func (f *fakeDrafts) CancelBroadcast(_ context.Context, ownerID int64) (bool, er
 }
 
 type fakeGroupSender struct {
-	mu   sync.Mutex
-	sent map[int64]string
-	fail map[int64]bool
+	mu     sync.Mutex
+	sent   map[int64]string
+	copied map[int64][2]int64
+	fail   map[int64]bool
+}
+
+func (f *fakeGroupSender) CopyToGroup(_ context.Context, chatID, fromChatID, messageID int64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.copied == nil {
+		f.copied = map[int64][2]int64{}
+	}
+	f.copied[chatID] = [2]int64{fromChatID, messageID}
+	return nil
 }
 
 func (f *fakeGroupSender) SendToGroup(_ context.Context, chatID int64, text string) error {
@@ -161,5 +172,39 @@ func TestBroadcastCanBeCancelled(t *testing.T) {
 	}
 	if env := broadcast(registry, ownerTurn(userID, 3), `{"action":"confirm"}`); env.OK || len(sender.sent) != 0 {
 		t.Errorf("a cancelled broadcast was sent: %+v", sender.sent)
+	}
+}
+
+func TestBroadcastCopiesTheRepliedMessage(t *testing.T) {
+	drafts, sender := &fakeDrafts{}, &fakeGroupSender{}
+	registry := broadcastRegistry(t, drafts, sender)
+	replying := WithTurn(context.Background(), Caller{UserID: userID, ChatID: userID, Owner: true, UpdateID: 1, MessageID: 50, ReplyToMessageID: 49}, &Sink{})
+
+	if env := broadcast(registry, replying, `{"action":"prepare","copy":"replied","chat_ids":[-100111]}`); !env.OK {
+		t.Fatalf("prepare = %+v", env)
+	}
+	if env := broadcast(registry, ownerTurn(userID, 2), `{"action":"confirm"}`); !env.OK {
+		t.Fatalf("confirm = %+v", env)
+	}
+	if got := sender.copied[groupA]; got != [2]int64{userID, 49} || len(sender.sent) != 0 {
+		t.Errorf("copied = %+v, sent = %+v; want the replied message copied", sender.copied, sender.sent)
+	}
+}
+
+func TestCopyNeedsAMessageAndNoText(t *testing.T) {
+	registry := broadcastRegistry(t, &fakeDrafts{}, &fakeGroupSender{})
+	notReplying := ownerTurn(userID, 1)
+	for _, args := range []string{
+		`{"action":"prepare","copy":"replied"}`,
+		`{"action":"prepare","copy":"replied","text":"hi"}`,
+		`{"action":"prepare","copy":"elsewhere"}`,
+	} {
+		env := broadcast(registry, notReplying, args)
+		if env.OK || env.Error.Code != "invalid_arguments" {
+			t.Errorf("%s: %+v", args, env)
+		}
+	}
+	if env := broadcast(registry, notReplying, `{"action":"prepare","copy":"replied"}`); !strings.Contains(env.Error.Message, "reply") {
+		t.Errorf("message = %q; it should tell the owner to reply to the message", env.Error.Message)
 	}
 }
