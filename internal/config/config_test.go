@@ -760,3 +760,18 @@ func TestAllowedBots(t *testing.T) {
 		t.Errorf("err = %v", err)
 	}
 }
+
+func TestOwnersAreCalledMaster(t *testing.T) {
+	env := validEnv()
+	env["BOT_OWNER_USERNAME"] = "pronium"
+	cfg, err := Load(getenv(env))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(cfg.PersonaPrompt, `call them "master"`) {
+		t.Error("the persona does not tell the model to call owners master")
+	}
+	if strings.Contains(cfg.PersonaPrompt, "Xo'jayin") {
+		t.Error("an example still calls the owner xo'jayin; examples are copied")
+	}
+}
