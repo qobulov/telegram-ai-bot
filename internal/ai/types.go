@@ -124,5 +124,5 @@ type APIError struct {
 }
 
 func (e *APIError) Error() string {
-	return fmt.Sprintf("openrouter: status %d: %s", e.Status, e.Message)
+	return fmt.Sprintf("model provider: status %d: %s", e.Status, e.Message)
 }

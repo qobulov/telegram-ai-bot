@@ -134,7 +134,7 @@ in the environment win over the file.
 | `TELEGRAM_BOT_TOKEN`          | required                       | Token from [@BotFather](https://t.me/BotFather)                                                              |
 | `GEMINI_API_KEY` | one of the two keys | Google Gemini key from <https://aistudio.google.com/apikey> |
 | `OPENROUTER_API_KEY` | one of the two keys | OpenRouter key from <https://openrouter.ai/keys>; set this or `GEMINI_API_KEY`, not both |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model ID, used with `GEMINI_API_KEY` |
+| `GEMINI_MODEL` | `gemini-3.8-flash` | Gemini model ID, used with `GEMINI_API_KEY` |
 | `XAI_API_KEY` | one of the keys | xAI (Grok) key from <https://console.x.ai>; images yes, voice no |
 | `XAI_MODEL` | `grok-4` | Grok model ID, used with `XAI_API_KEY` |
 | `MAX_MEDIA_MB` | `5` | Largest photo or sticker file downloaded for the model (1 to 20) |
@@ -240,7 +240,7 @@ and stickers but cannot listen to voice messages here; for those, use
 Gemini.
 
 **Gemini.** Create a key at <https://aistudio.google.com/apikey> and set
-`GEMINI_API_KEY`. The model defaults to `gemini-2.5-flash`; set
+`GEMINI_API_KEY`. The model defaults to `gemini-3.8-flash`; set
 `GEMINI_MODEL` for another one from
 <https://ai.google.dev/gemini-api/docs/models>. Gemini models support the
 tools (time, calculator) and are usually much faster than OpenRouter's free

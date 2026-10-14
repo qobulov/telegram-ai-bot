@@ -417,7 +417,7 @@ func TestGeminiKeySelectsGemini(t *testing.T) {
 	if cfg.AIBaseURL != "https://generativelanguage.googleapis.com/v1beta/openai" {
 		t.Errorf("base URL = %q, want Gemini's OpenAI-compatible endpoint", cfg.AIBaseURL)
 	}
-	if cfg.Model != "gemini-2.5-flash" {
+	if cfg.Model != "gemini-3.8-flash" {
 		t.Errorf("model = %q", cfg.Model)
 	}
 }
@@ -441,7 +441,7 @@ func TestOpenRouterSettingsDoNotLeakIntoGemini(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.Model != "gemini-2.5-flash" {
+	if cfg.Model != "gemini-3.8-flash" {
 		t.Errorf("model = %q; an OpenRouter model name must not be sent to Gemini", cfg.Model)
 	}
 }
