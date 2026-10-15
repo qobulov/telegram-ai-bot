@@ -846,3 +846,20 @@ func TestBackupProviderDefaultsToGroq(t *testing.T) {
 		t.Errorf("override: %q %q", cfg.BackupModel, cfg.BackupBaseURL)
 	}
 }
+
+func TestPersonaIsComposedNotQuarrelsome(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"nothing to prove", "Say it once", "Never chase the last word", "Do not end a reply with a question that keeps an argument going"} {
+		if !strings.Contains(cfg.PersonaPrompt, want) {
+			t.Errorf("the persona does not contain %q", want)
+		}
+	}
+	for _, unwanted := range []string{"enjoys playful arguments", "slightly chaotic", "Friendly rivalry"} {
+		if strings.Contains(cfg.PersonaPrompt, unwanted) {
+			t.Errorf("the persona still invites arguing: %q", unwanted)
+		}
+	}
+}
