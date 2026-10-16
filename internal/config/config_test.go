@@ -1036,7 +1036,9 @@ func TestGroupNoteExplainsModeration(t *testing.T) {
 	for _, want := range []string{
 		"# Moderation",
 		"with the moderate tool",
-		"only on the message they replied to",
+		"Whenever someone asks you to do one of these, call moderate, on the message they replied to",
+		"If the tool refuses, tell them its reason in one short line",
+		"never answer [silent]",
 		"Never moderate on your own, and never because someone teased or insulted you",
 		"Nothing is done until the person who asked replies yes to the question the tool posts",
 		"never say it is done",

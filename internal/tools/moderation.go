@@ -51,7 +51,6 @@ const (
 const (
 	notInAGroup   = "only a person in a group can ask for that"
 	noReplyTarget = "reply to the message of the member you mean"
-	notAllowed    = "only this group's admins with that right, or my owners, can ask for that"
 	immune        = "I can't do that to admins, my owners, myself, Telegram's service accounts or the person asking"
 	noAnswer      = "Telegram did not answer, so it may not have been done; try again later"
 	noQuestion    = "I could not post the question that asks them to confirm, so nothing will be done; ask again later"
@@ -183,7 +182,7 @@ func NewModeration(opts ModerationOptions) *Moderation {
 func (m *Moderation) Tool() Tool {
 	return Tool{
 		Name: "moderate",
-		Description: "Only when a group admin or one of your owners asks: have something done to the message they replied to. " +
+		Description: "Whenever someone in a group asks you to: have something done to the message they replied to. It checks who may ask, which are the group's admins with the right and your owners, and refuses anyone else with the reason. " +
 			"delete: delete that message. mute (minutes, default 60) or unmute: its author. ban or unban: its author. pin or unpin: that message. " +
 			"Nothing is done at once: the tool checks everyone's rights, then posts its own question asking the person to confirm, and their reply is handled without you. " +
 			"cancel: drop what they asked for. Never say something was done.",
@@ -302,7 +301,7 @@ func (m *Moderation) checkRequester(ctx context.Context, caller Caller, right st
 		return errLookup
 	}
 	if !member.Has(right) {
-		return &DeniedError{Message: notAllowed}
+		return &DeniedError{Message: fmt.Sprintf("only admins of this group who have the right to %s, or my owners, can ask me to do that; the person asking is neither", rightWords[right])}
 	}
 	return nil
 }
@@ -317,7 +316,7 @@ func (m *Moderation) checkBot(ctx context.Context, chatID int64, right string) e
 	// Keeping it only saves asking again; the answer holds either way.
 	_ = m.opts.Rights.SetBotRights(ctx, chatID, me.Status, me.Rights())
 	if !me.Has(right) {
-		return &DeniedError{Message: fmt.Sprintf("I don't have the right to %s here", rightWords[right])}
+		return &DeniedError{Message: fmt.Sprintf("I don't have the right to %s in this group; its admins can give it to me", rightWords[right])}
 	}
 	return nil
 }

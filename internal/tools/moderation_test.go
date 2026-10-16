@@ -599,7 +599,7 @@ func TestModerateRefusesAdminWithoutTheRight(t *testing.T) {
 
 			got := env.moderate(asking(100, bekTarget()), `{"action":"mute"}`)
 
-			expectRefusal(t, got, "forbidden", "only this group's admins with that right, or my owners")
+			expectRefusal(t, got, "forbidden", "only admins of this group who have the right to ban and mute members, or my owners, can ask me to do that; the person asking is neither")
 			env.nothingDone(t)
 			if asked := env.chat.lookups(); !slices.Equal(asked, []int64{userID}) {
 				t.Errorf("looked up %v, want only the person asking", asked)
@@ -636,7 +636,7 @@ func TestModerateOwnerByUsernameIsAnOrdinaryMember(t *testing.T) {
 	env.registry = mustRegistry(t, env.moderation.Tool())
 	env.chat.set(userID, telegram.ChatMember{Status: "member"})
 
-	expectRefusal(t, env.moderate(ownerAsking(100, bekTarget()), `{"action":"delete"}`), "forbidden", "only this group's admins with that right")
+	expectRefusal(t, env.moderate(ownerAsking(100, bekTarget()), `{"action":"delete"}`), "forbidden", "only admins of this group who have the right to delete messages, or my owners, can ask me to do that; the person asking is neither")
 	env.nothingDone(t)
 
 	// An admin may have an owner's message deleted.
@@ -657,7 +657,7 @@ func TestModerateNeedsBotRight(t *testing.T) {
 			env.chat.set(rulesBotID, bot)
 
 			for _, ctx := range []context.Context{asking(100, bekTarget()), ownerAsking(101, bekTarget())} {
-				expectRefusal(t, env.moderate(ctx, `{"action":"mute"}`), "forbidden", "I don't have the right to ban and mute members here")
+				expectRefusal(t, env.moderate(ctx, `{"action":"mute"}`), "forbidden", "I don't have the right to ban and mute members in this group; its admins can give it to me")
 			}
 			env.nothingDone(t)
 			// What Telegram said is kept, for the turn header.
@@ -800,8 +800,8 @@ func TestModerateConfirmationRechecksRights(t *testing.T) {
 		change func(env *moderationEnv)
 		text   string
 	}{
-		"the person asking lost the right": {func(env *moderationEnv) { env.chat.set(userID, admin(telegram.RightDeleteMessages)) }, "Not done: only this group's admins with that right, or my owners, can ask for that."},
-		"the bot lost the right":           {func(env *moderationEnv) { env.chat.set(rulesBotID, admin(telegram.RightPinMessages)) }, "Not done: I don't have the right to ban and mute members here."},
+		"the person asking lost the right": {func(env *moderationEnv) { env.chat.set(userID, admin(telegram.RightDeleteMessages)) }, "Not done: only admins of this group who have the right to ban and mute members, or my owners, can ask me to do that; the person asking is neither."},
+		"the bot lost the right":           {func(env *moderationEnv) { env.chat.set(rulesBotID, admin(telegram.RightPinMessages)) }, "Not done: I don't have the right to ban and mute members in this group; its admins can give it to me."},
 		"the member became an admin":       {func(env *moderationEnv) { env.chat.set(memberID, admin()) }, "Not done: I can't do that to admins, my owners, myself, Telegram's service accounts or the person asking."},
 		"Telegram cannot say":              {func(env *moderationEnv) { env.chat.failing[memberID] = true }, "Not done: could not ask Telegram who may do this, so nothing was done; try again later."},
 		"the person asking did 10 actions": {func(env *moderationEnv) {
