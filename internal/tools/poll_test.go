@@ -147,10 +147,8 @@ func TestPollSent(t *testing.T) {
 	if audit := env.audit.recorded(); len(audit) != 1 || audit[0] != wantAudit {
 		t.Errorf("audit = %+v\nwant    [%+v]", audit, wantAudit)
 	}
-	for _, since := range env.audit.since {
-		if !since.Equal(rulesNow.Add(-10 * time.Minute)) {
-			t.Errorf("counted polls since %v, want 10 minutes before now", since)
-		}
+	if len(env.audit.since) != 1 || !env.audit.since[0].Equal(rulesNow.Add(-10*time.Minute)) {
+		t.Errorf("counted polls since %v, want once, 10 minutes before now", env.audit.since)
 	}
 }
 
@@ -209,7 +207,7 @@ func TestPollOncePerTenMinutes(t *testing.T) {
 	env.now = rulesNow.Add(9 * time.Minute)
 	got := env.poll(memberAsking(groupA, 101), lunchPoll)
 
-	if got.OK || got.Error.Code != "invalid_arguments" || got.Error.Message != "a poll was made here less than 10 minutes ago" {
+	if got.OK || got.Error.Code != "invalid_arguments" || got.Error.Message != "a poll was made or asked for here less than 10 minutes ago" {
 		t.Errorf("second poll = %+v, want refused", got)
 	}
 	if audit := env.audit.recorded(); len(audit) != 1 || audit[0].UpdateID != 100 {
@@ -246,9 +244,10 @@ func TestPollSameUpdateTwiceSendsOnce(t *testing.T) {
 
 	got := env.poll(memberAsking(groupA, 100), lunchPoll)
 
-	// The first delivery may still be waiting for Telegram, or fail yet, so
-	// the second says nothing of how it went.
-	want := `{"action":"poll","already_handled":true,"note":"This message was delivered twice and the first delivery already asked for this, so nothing more was done now. Don't say whether it worked."}`
+	// Telegram delivered the update again, or the model asked for two polls
+	// in one turn. The first may still be waiting for Telegram, so the
+	// second says nothing of how it went.
+	want := `{"action":"poll","already_handled":true,"note":"This message already asked for a poll, so no other was made; a group gets one poll every 10 minutes. Don't say whether the first worked."}`
 	if !got.OK || string(got.Result) != want {
 		t.Errorf("second delivery = %+v %s\nwant %s", got, got.Result, want)
 	}
@@ -260,7 +259,7 @@ func TestPollSameUpdateTwiceSendsOnce(t *testing.T) {
 	}
 }
 
-func TestPollSendFailureIsReportedAndForgotten(t *testing.T) {
+func TestPollRefusedByTelegramIsForgotten(t *testing.T) {
 	env := newPollEnv(t)
 	env.sender.err = &telegram.APIError{Code: 400, Description: "Bad Request: not enough rights to send polls to the chat"}
 
@@ -270,21 +269,59 @@ func TestPollSendFailureIsReportedAndForgotten(t *testing.T) {
 		t.Errorf("create_poll = %+v, want Telegram's reason", got)
 	}
 	if audit := env.audit.recorded(); len(audit) != 0 {
-		t.Errorf("audit = %+v, want the failed poll forgotten", audit)
+		t.Errorf("audit = %+v, want the refused poll forgotten", audit)
 	}
 
-	env.sender.err = errors.New("dial tcp: i/o timeout")
-	if got := env.poll(memberAsking(groupA, 100), lunchPoll); got.OK || !strings.Contains(got.Error.Message, "may not have been done") {
-		t.Errorf("create_poll without an answer = %+v", got)
-	}
-
-	// The failed poll does not count, and the same update may try again.
+	// The refused poll does not count, and the same update may try again.
 	env.sender.err = nil
 	if got := env.poll(memberAsking(groupA, 100), lunchPoll); !got.OK {
 		t.Errorf("create_poll again = %+v", got)
 	}
-	if polls, audit := env.sender.sent(), env.audit.recorded(); len(polls) != 3 || len(audit) != 1 {
-		t.Errorf("polls = %d, audit = %+v; want three tries and one record", len(polls), audit)
+	if polls, audit := env.sender.sent(), env.audit.recorded(); len(polls) != 2 || len(audit) != 1 {
+		t.Errorf("polls = %d, audit = %+v; want two tries and one record", len(polls), audit)
+	}
+}
+
+// A poll Telegram did not answer for may be in the chat all the same, so it
+// keeps counting: no second poll, from the same update or another, until
+// the window has passed.
+func TestPollUnansweredIsKept(t *testing.T) {
+	const noAnswer = "Telegram did not answer, so the poll may be in the chat or not; to keep it from showing twice, this group gets no other poll for 10 minutes"
+	cases := map[string]error{
+		"a network error": errors.New("dial tcp: i/o timeout"),
+		"a server error":  &telegram.APIError{Code: 502, Description: "unreadable response from sendPoll"},
+		"the deadline":    context.DeadlineExceeded,
+	}
+	for name, sendErr := range cases {
+		t.Run(name, func(t *testing.T) {
+			env := newPollEnv(t)
+			env.sender.err = sendErr
+
+			got := env.poll(memberAsking(groupA, 100), lunchPoll)
+
+			if got.OK || got.Error.Code != "execution_failed" || got.Error.Message != noAnswer {
+				t.Errorf("create_poll = %+v, want %q", got, noAnswer)
+			}
+			if audit := env.audit.recorded(); len(audit) != 1 || audit[0].UpdateID != 100 {
+				t.Errorf("audit = %+v, want the unanswered poll kept", audit)
+			}
+
+			env.sender.err = nil
+			if got := env.poll(memberAsking(groupA, 100), lunchPoll); !got.OK || !strings.Contains(string(got.Result), `"already_handled":true`) {
+				t.Errorf("same update again = %+v %s, want already handled", got, got.Result)
+			}
+			env.now = rulesNow.Add(9 * time.Minute)
+			if got := env.poll(memberAsking(groupA, 101), lunchPoll); got.OK || got.Error.Code != "invalid_arguments" {
+				t.Errorf("another update within 10 minutes = %+v, want refused", got)
+			}
+			env.now = rulesNow.Add(10*time.Minute + time.Second)
+			if got := env.poll(memberAsking(groupA, 102), lunchPoll); !got.OK {
+				t.Errorf("poll after 10 minutes = %+v", got)
+			}
+			if polls := env.sender.sent(); len(polls) != 2 {
+				t.Errorf("polls = %d, want the unanswered try and the one after 10 minutes", len(polls))
+			}
+		})
 	}
 }
 
@@ -297,6 +334,10 @@ func TestPollHiddenInPrivate(t *testing.T) {
 	}
 	if got := env.poll(private, lunchPoll); got.OK || got.Error.Code != "forbidden" {
 		t.Errorf("create_poll in private = %+v, want forbidden", got)
+	}
+	// A group turn without its update could not be posted once only.
+	if got := env.poll(memberAsking(groupA, 0), lunchPoll); got.OK || got.Error.Code != "forbidden" {
+		t.Errorf("create_poll without an update = %+v, want forbidden", got)
 	}
 	// Any member of a group is offered it.
 	if defs := env.registry.Definitions(memberAsking(groupA, 101), memberID); len(defs) != 1 || defs[0].Function.Name != "create_poll" {

@@ -471,14 +471,23 @@ func (m moderation) send(ctx context.Context, o order) error {
 }
 
 // telegramFailure tells the model why nothing was done, in Telegram's words
-// when it gave a reason. A server error, such as a proxy's 502 page, is no
-// refusal: Telegram may have acted before it.
+// when it gave a reason.
 func telegramFailure(err error) error {
-	var apiErr *telegram.APIError
-	if errors.As(err, &apiErr) && apiErr.Code < http.StatusInternalServerError {
-		return fmt.Errorf("Telegram refused: %s", apiErr.Description)
+	if refusal, ok := telegramRefusal(err); ok {
+		return fmt.Errorf("Telegram refused: %s", refusal.Description)
 	}
 	return errors.New(noAnswer)
+}
+
+// telegramRefusal is Telegram's answer when it turned a request down, and
+// so surely did not act. A server error, such as a proxy's 502 page, is no
+// refusal: Telegram may have acted before it.
+func telegramRefusal(err error) (*telegram.APIError, bool) {
+	var apiErr *telegram.APIError
+	if errors.As(err, &apiErr) && apiErr.Code < http.StatusInternalServerError {
+		return apiErr, true
+	}
+	return nil, false
 }
 
 func (m moderation) done(o order) map[string]any {

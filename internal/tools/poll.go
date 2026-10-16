@@ -24,14 +24,24 @@ const (
 	maxPollOptions       = 10
 	// A group gets one poll per pollWindow, so that asking for polls cannot
 	// flood it.
-	pollWindow  = 10 * time.Minute
+	pollWindow = 10 * time.Minute
+	// pollTimeout is above the registry's 5 s default, which could cut off a
+	// slow sendPoll and leave unknown whether the poll was posted.
 	pollTimeout = 15 * time.Second
 )
 
 const (
 	notInAGroupForPoll = "a poll can only be made in a group"
-	pollTooSoon        = "a poll was made here less than 10 minutes ago"
-	pollSentNote       = "The poll is in the chat now. Don't repeat its question or options; reply in one short line at most."
+	// pollTooSoon says "or asked for" because a poll counts from its record,
+	// made before it is sent: the poll counted may still be on its way, or
+	// have gone unanswered.
+	pollTooSoon  = "a poll was made or asked for here less than 10 minutes ago"
+	pollNoAnswer = "Telegram did not answer, so the poll may be in the chat or not; to keep it from showing twice, this group gets no other poll for 10 minutes"
+	pollSentNote = "The poll is in the chat now. Don't repeat its question or options; reply in one short line at most."
+	// pollAskedNote answers a second create_poll in one update: Telegram
+	// delivered the update again, or the model asked for two polls. The
+	// first may still be on its way, so this says nothing of how it went.
+	pollAskedNote = "This message already asked for a poll, so no other was made; a group gets one poll every 10 minutes. Don't say whether the first worked."
 )
 
 // PollSender posts a poll in a chat.
@@ -39,8 +49,9 @@ type PollSender interface {
 	SendPoll(ctx context.Context, poll telegram.OutgoingPoll) (int64, error)
 }
 
-// PollCounter keeps the polls the bot posted in the moderation audit, which
-// tells how recently a group got one and whether an update already asked.
+// PollCounter keeps the polls the bot posted, or may have posted, in the
+// moderation audit, which tells how recently a group got one and whether an
+// update already asked.
 type PollCounter interface {
 	RecordModeration(ctx context.Context, a storage.ModerationAction) (bool, error)
 	ForgetModeration(ctx context.Context, updateID int64, action string) error
@@ -94,8 +105,10 @@ type polls struct {
 
 // run records the poll, then has Telegram post it. The record comes first
 // and is unique per update, so an update Telegram delivers twice posts one
-// poll. A poll that is not posted, because the group had one too recently
-// or Telegram did not take it, has its record dropped again.
+// poll, and it counts against the group at once, so two updates at the same
+// moment cannot both post. A poll that surely was not posted, because the
+// group had one too recently or Telegram refused it, has its record dropped
+// again.
 func (p polls) run(ctx context.Context, raw json.RawMessage) (any, error) {
 	var args pollArgs
 	if err := decodeArgs(raw, &args); err != nil {
@@ -116,13 +129,13 @@ func (p polls) run(ctx context.Context, raw json.RawMessage) (any, error) {
 		return nil, err
 	}
 	if !first {
-		return alreadyHandled(actionPoll), nil
+		return map[string]any{"already_handled": true, "action": actionPoll, "note": pollAskedNote}, nil
 	}
 	if err := p.checkPace(ctx, caller.ChatID); err != nil {
 		return nil, p.forget(ctx, caller, err)
 	}
 	if _, err := p.Sender.SendPoll(ctx, poll); err != nil {
-		return nil, p.forget(ctx, caller, telegramFailure(err))
+		return nil, p.notSent(ctx, caller, err)
 	}
 	return map[string]any{"sent": true, "note": pollSentNote}, nil
 }
@@ -143,16 +156,16 @@ func newPoll(chatID int64, args pollArgs) (telegram.OutgoingPoll, error) {
 	if !runesWithin(question, maxPollQuestionRunes) {
 		return telegram.OutgoingPoll{}, &ArgumentError{Message: fmt.Sprintf("question must be 1 to %d characters", maxPollQuestionRunes)}
 	}
-	options, err := pollOptions(args.Options)
+	options, err := checkedOptions(args.Options)
 	if err != nil {
 		return telegram.OutgoingPoll{}, err
 	}
 	return telegram.OutgoingPoll{ChatID: chatID, Question: question, Options: options, Multiple: args.Multiple}, nil
 }
 
-// pollOptions trims the options and refuses two that differ only in case or
-// spaces, which voters could not tell apart.
-func pollOptions(raw []string) ([]string, error) {
+// checkedOptions trims the options and refuses two that differ only in case
+// or spaces, which voters could not tell apart.
+func checkedOptions(raw []string) ([]string, error) {
 	if len(raw) < minPollOptions || len(raw) > maxPollOptions {
 		return nil, &ArgumentError{Message: fmt.Sprintf("give %d to %d options", minPollOptions, maxPollOptions)}
 	}
@@ -190,6 +203,18 @@ func (p polls) checkPace(ctx context.Context, chatID int64) error {
 		return &ArgumentError{Message: pollTooSoon}
 	}
 	return nil
+}
+
+// notSent says why the poll may not be in the chat. A poll Telegram refused
+// is forgotten, so that it does not count against the group and may be
+// asked for again. When Telegram did not answer, the poll may have been
+// posted all the same, and a poll, unlike a second mute, would show twice:
+// its record is kept and the group waits out pollWindow instead.
+func (p polls) notSent(ctx context.Context, caller Caller, sendErr error) error {
+	if _, refused := telegramRefusal(sendErr); refused {
+		return p.forget(ctx, caller, telegramFailure(sendErr))
+	}
+	return errors.New(pollNoAnswer)
 }
 
 // forget drops the record of a poll that was not posted, so that it does
