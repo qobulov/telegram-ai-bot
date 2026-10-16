@@ -199,6 +199,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		// A stuck attempt is retried well before the turn runs out of time.
 		AttemptTimeout: attemptTimeout,
 		FallbackModels: cfg.FallbackModels,
+		NoReasoning:    cfg.NoReasoning,
 		Logger:         logger,
 	})
 	assistant := agent.New(agent.Options{
@@ -349,6 +350,7 @@ func withBackup(cfg config.Config, model *ai.Client, logger *slog.Logger) agent.
 		MaxAttempts:    2,
 		HTTPClient:     &http.Client{Timeout: cfg.RequestTimeout},
 		AttemptTimeout: attemptTimeout,
+		NoReasoning:    cfg.BackupNoReasoning,
 		Logger:         logger,
 	})
 	return ai.NewChain(model, backup, logger)

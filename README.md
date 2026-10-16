@@ -169,7 +169,7 @@ in the environment win over the file.
 | `GEMINI_MODEL` | `gemini-3.6-flash` | Gemini model ID, used with `GEMINI_API_KEY` |
 | `FALLBACK_MODELS` | Gemini: `gemini-3.5-flash,gemini-flash-latest,gemini-3.5-flash-lite` | Models tried in order when the main one is overloaded, out of quota or does not answer, then once more after a pause; a model out of quota is skipped for 15 minutes; `none` turns this off |
 | `BACKUP_API_KEY` | empty | Key for a backup provider, asked when every model of the main one failed; replies that already moved to it stay on it |
-| `BACKUP_BASE_URL` | `https://api.groq.com/openai/v1` | The backup's OpenAI-compatible API (Groq by default) |
+| `BACKUP_BASE_URL` | `https://api.groq.com/openai/v1` | The backup's OpenAI-compatible API (Groq by default). Groq's free tier allows 8,000 tokens a minute, which is one group reply at most: a request with the persona and the group log is 6,000 tokens or more |
 | `BACKUP_MODEL` | `openai/gpt-oss-120b` | The backup's model; it gets voice messages as transcripts only |
 | `XAI_API_KEY` | one of the keys | xAI (Grok) key from <https://console.x.ai>; images yes, voice no |
 | `XAI_MODEL` | `grok-4` | Grok model ID, used with `XAI_API_KEY` |
@@ -183,7 +183,7 @@ in the environment win over the file.
 | `DB_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
 | `TELEGRAM_WEBHOOK_SECRET` | empty | Only for webhook deployments; see [Vercel deployment](#vercel-deployment-webhook) |
 | `CRON_SECRET` | empty | Only on Vercel: protects the daily cleanup endpoint |
-| `OPENROUTER_MODEL`            | `openrouter/free`              | Model ID, see [Choosing a model](#choosing-a-model)                                                          |
+| `OPENROUTER_MODEL`            | `nvidia/nemotron-3.5-super-vl:free` | Model ID, see [Choosing a model](#choosing-a-model)                                                     |
 | `MAX_OUTPUT_TOKENS`           | `1024`                         | Longest model reply, in tokens                                                                               |
 | `BOT_DISPLAY_NAME`            | `Maria`                         | The character's name                                                                                         |
 | `PERSONA_PROMPT`              | built-in                       | The character's personality and rules; `{name}` is replaced by the name. See [The character](#the-character) |
@@ -318,9 +318,16 @@ calling. To list those, filter the catalogue by the "tools" supported
 parameter: <https://openrouter.ai/models?supported_parameters=tools>. Add
 `max_price=0` to the filter to see only free ones.
 
-The default, `openrouter/free`, lets OpenRouter pick a free model for each
-request. That is convenient for trying the bot, but the chosen model changes
-and may not support tools. For predictable behaviour set a specific model ID.
+The default is `nvidia/nemotron-3.5-super-vl:free`, a free model that calls
+tools and writes Uzbek in both scripts. When it is busy the request goes to
+`openrouter/free`, which lets OpenRouter pick another free model; that one
+changes from request to request and may not support tools. Set
+`FALLBACK_MODELS` to choose other fallbacks, or `none`.
+
+On OpenRouter the bot asks the model not to think before answering
+(`"reasoning": {"effort": "none"}`). Free reasoning models otherwise spend the
+whole `MAX_OUTPUT_TOKENS` thinking and send back an empty answer. The same
+applies to a backup provider whose `BACKUP_BASE_URL` is OpenRouter's.
 
 If the model rejects a request because it cannot use tools, the bot logs
 `model does not support tool calling; continuing without tools`, answers
@@ -940,7 +947,7 @@ Put one `KEY=value` per line, without quotes:
 ```dotenv
 TELEGRAM_BOT_TOKEN=123456:your-token
 OPENROUTER_API_KEY=sk-or-your-key
-OPENROUTER_MODEL=openrouter/free
+OPENROUTER_MODEL=nvidia/nemotron-3.5-super-vl:free
 DB_POSTGRES_URL=postgres://tgbot:RUNTIME_PASSWORD_HERE@127.0.0.1:5432/tgbot?sslmode=disable
 LOG_LEVEL=info
 ```

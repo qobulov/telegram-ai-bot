@@ -40,8 +40,12 @@ type Options struct {
 	// limits or does not answer: each retry goes to the next one. Every
 	// request starts again with Model.
 	FallbackModels []string
-	HTTPClient     *http.Client
-	Logger         *slog.Logger
+	// NoReasoning asks the model to answer without thinking first, in
+	// OpenRouter's reasoning field. A reasoning model's thinking counts
+	// against MaxTokens and can use all of it, leaving an empty answer.
+	NoReasoning bool
+	HTTPClient  *http.Client
+	Logger      *slog.Logger
 }
 
 // Client talks to OpenRouter. It is safe for concurrent use.
@@ -245,6 +249,11 @@ type chatRequest struct {
 	MaxTokens  int              `json:"max_tokens,omitempty"`
 	Tools      []ToolDefinition `json:"tools,omitempty"`
 	ToolChoice string           `json:"tool_choice,omitempty"`
+	Reasoning  *reasoning       `json:"reasoning,omitempty"`
+}
+
+type reasoning struct {
+	Effort string `json:"effort"`
 }
 
 func (c *Client) payload(req Request, model string, withTools bool) chatRequest {
@@ -252,6 +261,9 @@ func (c *Client) payload(req Request, model string, withTools bool) chatRequest 
 		Model:     model,
 		Messages:  req.Messages,
 		MaxTokens: c.opts.MaxTokens,
+	}
+	if c.opts.NoReasoning {
+		payload.Reasoning = &reasoning{Effort: "none"}
 	}
 	if !withTools {
 		return payload

@@ -36,8 +36,8 @@ func TestLoadAppliesDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.Model != "openrouter/free" {
-		t.Errorf("Model = %q", cfg.Model)
+	if cfg.Model != "nvidia/nemotron-3.5-super-vl:free" || !cfg.NoReasoning {
+		t.Errorf("Model = %q, NoReasoning = %v", cfg.Model, cfg.NoReasoning)
 	}
 	if cfg.AIBaseURL != "https://openrouter.ai/api/v1" || cfg.AIProvider != "openrouter" || cfg.AIAPIKey != testKey {
 		t.Errorf("AI settings = %q, %q", cfg.AIProvider, cfg.AIBaseURL)
@@ -597,8 +597,12 @@ func TestGeminiFallbackModels(t *testing.T) {
 		t.Errorf("FALLBACK_MODELS=none gave %q", cfg.FallbackModels)
 	}
 
-	if cfg, _ := Load(getenv(validEnv())); len(cfg.FallbackModels) != 0 {
-		t.Errorf("OpenRouter got default fallbacks %q; they are Gemini model names", cfg.FallbackModels)
+	if cfg.NoReasoning {
+		t.Error("NoReasoning is set for Gemini, which does not know OpenRouter's reasoning field")
+	}
+
+	if cfg, _ := Load(getenv(validEnv())); strings.Join(cfg.FallbackModels, ",") != "openrouter/free" {
+		t.Errorf("default OpenRouter fallbacks = %q", cfg.FallbackModels)
 	}
 }
 
@@ -944,13 +948,17 @@ func TestBackupProviderDefaultsToGroq(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.BackupAPIKey != "gsk-secret" || cfg.BackupBaseURL != "https://api.groq.com/openai/v1" || cfg.BackupModel != "openai/gpt-oss-120b" {
-		t.Errorf("backup = %q %q %q", cfg.BackupAPIKey, cfg.BackupBaseURL, cfg.BackupModel)
+	if cfg.BackupAPIKey != "gsk-secret" || cfg.BackupBaseURL != "https://api.groq.com/openai/v1" || cfg.BackupModel != "openai/gpt-oss-120b" || cfg.BackupNoReasoning {
+		t.Errorf("backup = %q %q %q, no reasoning %v", cfg.BackupAPIKey, cfg.BackupBaseURL, cfg.BackupModel, cfg.BackupNoReasoning)
 	}
 	env["BACKUP_MODEL"] = "qwen/qwen3.8-27b"
 	env["BACKUP_BASE_URL"] = "https://api.x.ai/v1"
 	if cfg, _ := Load(getenv(env)); cfg.BackupModel != "qwen/qwen3.8-27b" || cfg.BackupBaseURL != "https://api.x.ai/v1" {
 		t.Errorf("override: %q %q", cfg.BackupModel, cfg.BackupBaseURL)
+	}
+	env["BACKUP_BASE_URL"] = "https://openrouter.ai/api/v1"
+	if cfg, _ := Load(getenv(env)); !cfg.BackupNoReasoning {
+		t.Error("a backup on OpenRouter thinks before answering")
 	}
 }
 
