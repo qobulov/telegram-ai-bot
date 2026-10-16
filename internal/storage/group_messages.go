@@ -87,21 +87,30 @@ func (s *Store) ClearGroupMessages(ctx context.Context, chatID int64) error {
 	return nil
 }
 
-// AuthorByUsername returns who last wrote in the group chatID under the
-// @username, read from the names the log keeps ("Ann @ann"), or
-// ErrUnknownAuthor. It is only a lead: the caller must have Telegram confirm
+// AuthorByUsername returns the member of the group chatID known by the
+// @username: from the member list, or else the last author under it in the
+// day's log ("Ann @ann"); ErrUnknownAuthor when there is none. It is only a lead: the caller must have Telegram confirm
 // the account still has that username, since usernames change hands.
 func (s *Store) AuthorByUsername(ctx context.Context, chatID int64, username string) (int64, error) {
 	username = strings.ToLower(username)
 	if !isUsername(username) {
 		return 0, ErrUnknownAuthor
 	}
+	// The member list keeps each member's current username for good; the
+	// day's log only for a day, and it is read when the list has nobody.
 	var id int64
 	err := s.pool.QueryRow(ctx, `
-		SELECT author_id FROM group_messages
-		WHERE chat_id = $1 AND author_id IS NOT NULL
-		  AND lower(author_name) ~ ('(^|\s)@' || $2 || '(\s|$)')
-		ORDER BY id DESC
+		SELECT user_id FROM (
+			(SELECT user_id, 1 AS source FROM group_members
+			 WHERE chat_id = $1 AND lower(username) = $2
+			 ORDER BY last_seen_at DESC LIMIT 1)
+			UNION ALL
+			(SELECT author_id, 2 FROM group_messages
+			 WHERE chat_id = $1 AND author_id IS NOT NULL
+			   AND lower(author_name) ~ ('(^|\s)@' || $2 || '(\s|$)')
+			 ORDER BY id DESC LIMIT 1)
+		) found
+		ORDER BY source
 		LIMIT 1`, chatID, username).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return 0, ErrUnknownAuthor

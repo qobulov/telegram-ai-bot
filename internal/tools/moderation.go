@@ -54,7 +54,7 @@ const (
 	noReplyTarget = "reply to the message of the member you mean, or tag that one member with @ in the request"
 	// Tags that do not name one member Telegram vouches for act on nobody.
 	manyMentions   = "more than one member is tagged; reply to the message of the one you mean, or tag only that member"
-	unknownMention = "that @username has not written here recently, so I can't tell who it is; reply to one of their own messages instead"
+	unknownMention = "I have not seen that @username in this group, so I can't tell who it is; reply to one of their own messages instead"
 	unsureMention  = "Telegram did not confirm that the tagged account is a member here under that name, so nothing was done; reply to one of their own messages instead"
 	immune         = "I can't do that to admins, my owners, myself, Telegram's service accounts or the person asking"
 	noAnswer       = "Telegram did not answer, so it may not have been done; try again later"
@@ -140,8 +140,9 @@ type MemberLookup interface {
 	GetChatMember(ctx context.Context, chatID, userID int64) (telegram.ChatMember, error)
 }
 
-// UsernameLookup finds who wrote in a group under an @username, from the
-// group's log; storage.ErrUnknownAuthor when nobody did. The Bot API cannot
+// UsernameLookup finds the member a group knows by an @username, from the
+// bot's member list or the day's log; storage.ErrUnknownAuthor when it knows
+// nobody by it. The Bot API cannot
 // turn a username into a member, so a tag is only as good as this, checked
 // against Telegram.
 type UsernameLookup interface {

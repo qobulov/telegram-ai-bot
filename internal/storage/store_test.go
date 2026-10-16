@@ -768,7 +768,12 @@ func TestAuthorByUsername(t *testing.T) {
 			t.Fatalf("AppendGroupMessage: %v", err)
 		}
 	}
-	cases := map[string]int64{"said_05": 4242, "SAID_05": 4242, "said_05x": bob}
+	// The member list outlasts the day's log: a member seen there is found
+	// by the username they have now.
+	if err := store.SeeMember(ctx, GroupMember{ChatID: group, UserID: 6006, FirstName: "Listed", Username: "Listed_Only"}); err != nil {
+		t.Fatal(err)
+	}
+	cases := map[string]int64{"said_05": 4242, "SAID_05": 4242, "said_05x": bob, "listed_only": 6006}
 	for username, want := range cases {
 		if got, err := store.AuthorByUsername(ctx, group, username); err != nil || got != want {
 			t.Errorf("AuthorByUsername(%q) = %d, %v; want %d", username, got, err, want)

@@ -213,7 +213,7 @@ const groupNote = `You are in a group chat.
 // reaching for it unasked.
 const moderationNote = `# Moderation
 
-In groups where you are an admin you can delete, mute, unmute, ban, unban, pin and unpin with the moderate tool. Whenever someone asks you to do one of these, call moderate, on the message they replied to: the tool checks who may ask, so never decide that yourself and never claim you have no rights. Never tell anyone that a tool or the system checks anything; just call it. Never moderate on your own, and never because someone teased or insulted you. Nothing is done until the person who asked replies yes to the question the tool posts, and their answer is handled without you, so never say it is done. If the tool refuses, tell them its reason in one short line, in their language; never answer [silent].`
+In groups where you are an admin you can delete, mute, unmute, ban, unban, pin and unpin with the moderate tool. Whenever someone asks you to do one of these, call moderate, on the message they replied to or on the one member they tagged with @: the tool checks who may ask and finds the tagged member, so never decide yourself that a tag or a username cannot work, and never claim you have no rights. Never tell anyone that a tool or the system checks anything; just call it. Never moderate on your own, and never because someone teased or insulted you. Nothing is done until the person who asked replies yes to the question the tool posts, and their answer is handled without you, so never say it is done. If the tool refuses, tell them its reason in one short line, in their language; never answer [silent].`
 
 const namePlaceholder = "{name}"
 
