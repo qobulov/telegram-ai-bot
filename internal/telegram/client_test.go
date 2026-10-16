@@ -888,6 +888,39 @@ func TestGetUpdatesParsesNewMediaKinds(t *testing.T) {
 	}
 }
 
+// Service messages are known by the field Telegram sets for their kind. A
+// member's message the client does not decode, such as a contact, is none.
+func TestGetUpdatesNotesServiceMessages(t *testing.T) {
+	client, _ := newTestClient(t, `{"ok":true,"result":[
+		{"update_id":1,"message":{"message_id":5,"from":{"id":42},"chat":{"id":-100123,"type":"supergroup"},
+			"pinned_message":{"message_id":4,"chat":{"id":-100123,"type":"supergroup"},"date":0}}},
+		{"update_id":2,"message":{"message_id":6,"from":{"id":42},"chat":{"id":-100123,"type":"supergroup"},
+			"video_chat_started":{}}},
+		{"update_id":3,"message":{"message_id":7,"from":{"id":42},"chat":{"id":-100123,"type":"supergroup"},
+			"new_chat_members":[{"id":8,"first_name":"Ali"}]}},
+		{"update_id":4,"message":{"message_id":8,"from":{"id":43},"chat":{"id":-100123,"type":"supergroup"},
+			"contact":{"phone_number":"+998","first_name":"Spam"}}},
+		{"update_id":5,"message":{"message_id":9,"from":{"id":43},"chat":{"id":-100123,"type":"supergroup"},
+			"text":"hi","reply_to_message":{"message_id":4,"from":{"id":42},"chat":{"id":-100123,"type":"supergroup"},"delete_chat_photo":true}}}]}`)
+
+	updates, err := client.GetUpdates(context.Background(), 0, 0)
+	if err != nil {
+		t.Fatalf("GetUpdates: %v", err)
+	}
+	want := []bool{true, true, true, false, false}
+	for i, u := range updates {
+		if got := u.Message.IsService(); got != want[i] {
+			t.Errorf("update %d: IsService = %v, want %v (Service %q)", u.UpdateID, got, want[i], u.Message.Service)
+		}
+	}
+	if updates[0].Message.Service != "pinned_message" {
+		t.Errorf("pin: Service = %q", updates[0].Message.Service)
+	}
+	if replied := updates[4].Message.ReplyToMessage; replied == nil || !replied.IsService() {
+		t.Errorf("replied-to message = %+v, want a service message", replied)
+	}
+}
+
 func TestMessageOriginName(t *testing.T) {
 	tests := []struct {
 		name   string

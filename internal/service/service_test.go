@@ -3068,9 +3068,10 @@ func TestServiceMessagesAreNoTarget(t *testing.T) {
 	ann := &telegram.User{ID: 555, FirstName: "Ann", Username: "ann"}
 	spammer := telegram.User{ID: 666, FirstName: "Spammer", Username: "spam"}
 	cases := map[string]*telegram.Message{
-		"a join":  {MessageID: 29, From: ann, NewChatMembers: []telegram.User{spammer}},
-		"a leave": {MessageID: 29, From: ann, LeftChatMember: &spammer},
-		"a pin, or any kind without text or media": {MessageID: 29, From: ann},
+		"a join":   {MessageID: 29, From: ann, NewChatMembers: []telegram.User{spammer}},
+		"a leave":  {MessageID: 29, From: ann, LeftChatMember: &spammer},
+		"a pin":    {MessageID: 29, From: ann, Service: "pinned_message"},
+		"a rename": {MessageID: 29, From: ann, Service: "new_chat_title"},
 	}
 	for name, replied := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -3092,6 +3093,31 @@ func TestServiceMessagesAreNoTarget(t *testing.T) {
 				t.Errorf("/ignore sent %+v and saved %+v; want it refused", sent, book.saved)
 			}
 		})
+	}
+}
+
+// A contact, a location, dice or a story has no text or media the bot can
+// read, but a member sent it: an admin may still have it deleted, or its
+// author banned or ignored.
+func TestUnreadableMemberMessageIsATarget(t *testing.T) {
+	f := newFixture()
+	book := &fakeRuleBook{}
+	f.opts.Rules = book
+	spammer := &telegram.User{ID: 666, FirstName: "Spammer", Username: "spam"}
+	contact := &telegram.Message{MessageID: 29, From: spammer}
+	request := asAdmin(groupMessage("Mira, delete this"))
+	request.ReplyToMessage = contact
+	command := groupMessage("/ignore@MyBot")
+	command.From = boss
+	command.ReplyToMessage = contact
+
+	sent := f.run(inGroup(request), inGroup(command))
+
+	if calls := f.replier.recorded(); len(calls) != 1 || calls[0].caller.Target == nil || calls[0].caller.Target.UserID != 666 {
+		t.Errorf("model calls = %+v, want the spammer as the target", calls)
+	}
+	if len(sent) != 2 || sent[1].text == textReplyToMember || len(book.saved) != 1 {
+		t.Errorf("/ignore sent %+v and saved %+v; want the spammer ignored", sent, book.saved)
 	}
 }
 

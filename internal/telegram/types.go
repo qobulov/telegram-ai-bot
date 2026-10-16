@@ -3,6 +3,7 @@
 package telegram
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"time"
@@ -57,6 +58,10 @@ type Message struct {
 	// Service messages: members who joined or left. They carry no text.
 	NewChatMembers []User `json:"new_chat_members"`
 	LeftChatMember *User  `json:"left_chat_member"`
+	// Service is, for any other service message, the field Telegram set for
+	// its kind, such as "pinned_message" (see serviceKinds), and "" for a
+	// message someone wrote. Only the kind is kept.
+	Service string `json:"-"`
 
 	// Media. At most one of these is set on a message, except that Telegram
 	// also sets Document on a GIF, for clients that predate Animation.
@@ -69,6 +74,48 @@ type Message struct {
 	Document  *Document   `json:"document"`
 	Audio     *Audio      `json:"audio"`
 	Poll      *Poll       `json:"poll"`
+}
+
+// serviceKinds are the fields that make a message a service message:
+// Telegram's note that something happened in the chat, such as a pin, a new
+// title or a video chat, rather than something a member wrote.
+var serviceKinds = []string{
+	"pinned_message", "new_chat_title", "new_chat_photo", "delete_chat_photo",
+	"group_chat_created", "supergroup_chat_created", "channel_chat_created",
+	"message_auto_delete_timer_changed", "migrate_to_chat_id", "migrate_from_chat_id",
+	"forum_topic_created", "forum_topic_edited", "forum_topic_closed", "forum_topic_reopened",
+	"general_forum_topic_hidden", "general_forum_topic_unhidden",
+	"video_chat_scheduled", "video_chat_started", "video_chat_ended", "video_chat_participants_invited",
+	"boost_added", "chat_background_set", "giveaway_created", "giveaway_completed",
+	"proximity_alert_triggered", "write_access_allowed", "users_shared", "chat_shared",
+	"successful_payment", "refunded_payment", "connected_website",
+}
+
+// UnmarshalJSON decodes a message, and notes in Service the kind of a
+// service message.
+func (m *Message) UnmarshalJSON(data []byte) error {
+	type fields Message // without this method, so decoding does not recurse
+	if err := json.Unmarshal(data, (*fields)(m)); err != nil {
+		return err
+	}
+	var keys map[string]json.RawMessage
+	if err := json.Unmarshal(data, &keys); err != nil {
+		return err
+	}
+	for _, kind := range serviceKinds {
+		if _, ok := keys[kind]; ok {
+			m.Service = kind
+			break
+		}
+	}
+	return nil
+}
+
+// IsService reports a message Telegram posted about something that
+// happened, such as "Ann added Spammer" or "Boss pinned a message". Its
+// author is whoever made it happen, not a member speaking.
+func (m *Message) IsService() bool {
+	return len(m.NewChatMembers) > 0 || m.LeftChatMember != nil || m.Service != ""
 }
 
 // ImplicitTopicReply reports a message whose ReplyToMessage is only the first

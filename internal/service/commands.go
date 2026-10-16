@@ -525,9 +525,11 @@ func (s *Service) confirmedModeration(ctx context.Context, in incoming) bool {
 
 // target describes the message a request replied to, for the tools that act
 // on a member. It is taken from the update, so the model can never choose
-// whom such a tool acts on. A service message is none: see isServiceMessage.
+// whom such a tool acts on. A service message is none: its author is whoever
+// made something happen, not the member it is about. A member's message the
+// bot cannot read, such as a contact or a location, is one.
 func (s *Service) target(replied *telegram.Message) *tools.Target {
-	if replied == nil || replied.From == nil || s.isServiceMessage(replied) {
+	if replied == nil || replied.From == nil || replied.IsService() {
 		return nil
 	}
 	text, _ := replied.Content()
@@ -749,7 +751,7 @@ func (s *Service) ignoreTarget(ctx context.Context, in incoming) (*tools.Target,
 		return nil, refusal
 	}
 	replied := in.msg.ReplyToMessage
-	if replied == nil || replied.From == nil || replied.SenderChat != nil || s.isServiceMessage(replied) {
+	if replied == nil || replied.From == nil || replied.SenderChat != nil || replied.IsService() {
 		return nil, textReplyToMember
 	}
 	if replied.From.ID != s.opts.Bot.ID {
@@ -759,20 +761,6 @@ func (s *Service) ignoreTarget(ctx context.Context, in incoming) (*tools.Target,
 		return member, ""
 	}
 	return nil, textRepliedToMe
-}
-
-// isServiceMessage reports a message Telegram posted about something that
-// happened, such as "Ann added Spammer", "Bek left" or "Boss pinned a
-// message", or any other with no text or media of its own. Its author is
-// whoever made it happen, not the member it is about, so nothing is done to
-// its author on its account.
-func (s *Service) isServiceMessage(msg *telegram.Message) bool {
-	if len(msg.NewChatMembers) > 0 || msg.LeftChatMember != nil {
-		return true
-	}
-	text, _ := msg.Content()
-	_, isMedia := s.mediaOf(msg)
-	return text == "" && !isMedia
 }
 
 // refuseUnignorable returns the refusal to send when member may not be
