@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -167,5 +168,48 @@ func TestDatabaseToolChecksItsArguments(t *testing.T) {
 		if env := query(registry, ownerIn(userID), args); env.OK || env.Error.Code != "invalid_arguments" {
 			t.Errorf("%s: %+v", args, env)
 		}
+	}
+}
+
+// rightsDatabase stores rights for both groups, as Telegram last reported
+// them.
+type rightsDatabase struct{ fakeDatabase }
+
+func (rightsDatabase) Groups(context.Context, time.Time, int) ([]storage.GroupSummary, error) {
+	return []storage.GroupSummary{
+		{ChatID: groupA, Title: "Devs", BotStatus: "administrator", Rights: []string{"can_delete_messages"}},
+		{ChatID: groupB, Title: "Old", BotStatus: "administrator", Rights: []string{"can_pin_messages"}},
+	}, nil
+}
+
+func TestGroupsListShowsBotRights(t *testing.T) {
+	type entry struct {
+		ChatID    int64    `json:"chat_id"`
+		BotRights []string `json:"bot_rights"`
+	}
+	groupsOf := func(t *testing.T, members GroupMembers) map[int64][]string {
+		t.Helper()
+		tool := DatabaseTool(DatabaseOptions{Store: &rightsDatabase{}, Members: members})
+		env := query(mustRegistry(t, tool), ownerIn(userID), `{"action":"groups"}`)
+		var result struct{ Groups []entry }
+		if err := json.Unmarshal(env.Result, &result); !env.OK || err != nil {
+			t.Fatalf("groups = %+v, err = %v", env, err)
+		}
+		rights := map[int64][]string{}
+		for _, g := range result.Groups {
+			rights[g.ChatID] = g.BotRights
+		}
+		return rights
+	}
+
+	stored := groupsOf(t, nil)
+	if !reflect.DeepEqual(stored, map[int64][]string{groupA: {"can_delete_messages"}, groupB: {"can_pin_messages"}}) {
+		t.Errorf("rights without a live check = %v, want the stored ones", stored)
+	}
+
+	// Checked live, Telegram's answer wins; a group the bot left gives none.
+	live := groupsOf(t, fakeMembers{groupA: {Status: "administrator", Members: 5, Rights: []string{"can_delete_messages", "can_restrict_members"}}})
+	if !reflect.DeepEqual(live, map[int64][]string{groupA: {"can_delete_messages", "can_restrict_members"}, groupB: nil}) {
+		t.Errorf("rights checked live = %v", live)
 	}
 }

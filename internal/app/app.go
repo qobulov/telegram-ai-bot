@@ -87,7 +87,7 @@ func (m groupMembers) Membership(ctx context.Context, chatID int64) (tools.Membe
 	if err != nil {
 		return tools.Membership{}, membershipError(err)
 	}
-	membership := tools.Membership{Status: me.Status}
+	membership := tools.Membership{Status: me.Status, Rights: me.Rights()}
 	if !me.IsMember() {
 		return membership, nil
 	}
@@ -98,6 +98,49 @@ func (m groupMembers) Membership(ctx context.Context, chatID int64) (tools.Membe
 		membership.Title = chat.Title
 	}
 	return membership, nil
+}
+
+// rightsStore keeps the bot's admin rights in each group.
+type rightsStore interface {
+	BotRights(ctx context.Context, chatID int64) (rights []string, known bool, err error)
+	SetBotRights(ctx context.Context, chatID int64, status string, rights []string) error
+}
+
+// memberLookup asks Telegram about a member of a chat.
+type memberLookup interface {
+	GetChatMember(ctx context.Context, chatID, userID int64) (telegram.ChatMember, error)
+}
+
+// botRights tells the service which admin rights the bot holds in a group,
+// for the turn header. Telegram reports every change to them in a
+// my_chat_member update, which is stored, so the stored rights are used
+// when there are any. A group joined before rights were kept has none
+// stored; Telegram is asked once and the answer stored.
+type botRights struct {
+	store   rightsStore
+	members memberLookup
+	botID   int64
+	logger  *slog.Logger
+}
+
+func (b botRights) BotRights(ctx context.Context, chatID int64) ([]string, error) {
+	rights, known, err := b.store.BotRights(ctx, chatID)
+	if err != nil {
+		return nil, err
+	}
+	if known {
+		return rights, nil
+	}
+	me, err := b.members.GetChatMember(ctx, chatID, b.botID)
+	if err != nil {
+		return nil, err
+	}
+	rights = me.Rights()
+	// Storing only saves asking again: Telegram's answer holds either way.
+	if err := b.store.SetBotRights(ctx, chatID, me.Status, rights); err != nil {
+		b.logger.Warn("could not store the bot's admin rights", "chat_id", chatID, "error", err)
+	}
+	return rights, nil
 }
 
 // groupSender posts an owner's confirmed broadcast in a group.
@@ -213,6 +256,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		MemberRepliesPer10Min: cfg.MemberRepliesPer10Min,
 		Reactor:               bot.Client,
 		ChatActor:             bot.Client,
+		BotRights:             botRights{store: store, members: bot.Client, botID: bot.User.ID, logger: logger},
 	}
 	if mode.Serverless {
 		opts.Workers, opts.QueueSize = 0, 0

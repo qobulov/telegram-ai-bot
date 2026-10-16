@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -114,5 +115,64 @@ func TestMigrationRecordsGroupsSeenBefore(t *testing.T) {
 	groups, err := store.Groups(ctx, time.Now().Add(-time.Hour), 10)
 	if err != nil || len(groups) != 2 {
 		t.Errorf("groups = %+v, err = %v; both groups the bot knew of should be listed", groups, err)
+	}
+}
+
+func TestBotRightsRoundTrip(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	rights, known, err := store.BotRights(ctx, group)
+	if err != nil || known || len(rights) != 0 {
+		t.Fatalf("a group never seen: rights = %v, known = %v, err = %v; want unknown", rights, known, err)
+	}
+	// A group logged before its rights were ever stored is still unknown.
+	logMessage(t, store, group, "Ann", "hi")
+	if _, known, err := store.BotRights(ctx, group); err != nil || known {
+		t.Fatalf("a group with no stored rights: known = %v, err = %v", known, err)
+	}
+
+	if err := store.RecordGroup(ctx, GroupStatus{ChatID: group, Title: "Devs", BotStatus: "member"}); err != nil {
+		t.Fatalf("RecordGroup: %v", err)
+	}
+	rights, known, err = store.BotRights(ctx, group)
+	if err != nil || !known || len(rights) != 0 {
+		t.Errorf("after a membership change without rights: rights = %v, known = %v, err = %v; want known and none", rights, known, err)
+	}
+
+	want := []string{"can_delete_messages"}
+	if err := store.SetBotRights(ctx, group, "administrator", want); err != nil {
+		t.Fatalf("SetBotRights: %v", err)
+	}
+	rights, known, err = store.BotRights(ctx, group)
+	if err != nil || !known || !reflect.DeepEqual(rights, want) {
+		t.Errorf("rights = %v, known = %v, err = %v; want %v", rights, known, err, want)
+	}
+	groups, err := store.Groups(ctx, time.Now().Add(-time.Hour), 10)
+	if err != nil || len(groups) != 1 {
+		t.Fatalf("groups = %+v, err = %v", groups, err)
+	}
+	if g := groups[0]; g.Title != "Devs" || g.BotStatus != "administrator" || !reflect.DeepEqual(g.Rights, want) {
+		t.Errorf("group = %+v; SetBotRights must keep the title and show the new status and rights", g)
+	}
+
+	promoted := []string{"can_delete_messages", "can_pin_messages"}
+	if err := store.RecordGroup(ctx, GroupStatus{ChatID: group, Title: "Devs", BotStatus: "administrator", Rights: promoted}); err != nil {
+		t.Fatal(err)
+	}
+	if rights, _, _ := store.BotRights(ctx, group); !reflect.DeepEqual(rights, promoted) {
+		t.Errorf("rights after a promotion = %v, want %v", rights, promoted)
+	}
+}
+
+func TestSetBotRightsForAGroupNotSeenYet(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	if err := store.SetBotRights(ctx, otherGroup, "member", nil); err != nil {
+		t.Fatalf("SetBotRights: %v", err)
+	}
+	rights, known, err := store.BotRights(ctx, otherGroup)
+	if err != nil || !known || len(rights) != 0 {
+		t.Errorf("rights = %v, known = %v, err = %v; want known and none", rights, known, err)
 	}
 }

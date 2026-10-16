@@ -752,6 +752,10 @@ func TestGroupMentionIsAnsweredAsReplyInTheSharedScope(t *testing.T) {
 		t.Errorf("sent to chat %d as a reply to %d; want chat %d, message 30", sent[0].chatID, sent[0].replyTo, groupID)
 	}
 	req := f.replier.recorded()[0].req
+	if !strings.HasPrefix(req.Context, "[About this chat:") || dayLog(req.Context) != "" {
+		t.Errorf("context = %q, want only the chat header", req.Context)
+	}
+	req.Context = "" // the header has its own tests
 	want := agent.Request{
 		Scope:      storage.Scope{ChatID: groupID}, // shared by the whole group
 		UserID:     userID,
@@ -804,7 +808,7 @@ func TestRecentChatterIsGivenAsContextButNotAsText(t *testing.T) {
 		t.Fatalf("model calls = %d, want only the addressed message", len(calls))
 	}
 	req := calls[0].req
-	if got := blockLines(t, req.Context); strings.Join(got, "|") != "Ann: Go is interpreted|Bek: no way" {
+	if got := blockLines(t, dayLog(req.Context)); strings.Join(got, "|") != "Ann: Go is interpreted|Bek: no way" {
 		t.Errorf("context lines = %q", got)
 	}
 	if strings.Contains(req.Text, "interpreted") || strings.Contains(req.Context, "who is right") {
@@ -817,7 +821,7 @@ func TestPrivateChatHasNoRecentChatter(t *testing.T) {
 
 	f.run(inGroup(groupMessage("group talk")), textFrom(userID, "hi"))
 
-	if req := f.replier.recorded()[0].req; req.Context != "" || req.AuthorName != "" || req.Text != "hi" {
+	if req := f.replier.recorded()[0].req; dayLog(req.Context) != "" || req.AuthorName != "" || req.Text != "hi" {
 		t.Errorf("private request = %+v", req)
 	}
 }
@@ -995,7 +999,7 @@ func TestGroupResetByAdminClearsSharedHistoryAndChatter(t *testing.T) {
 	if len(f.resetter.reset) != 1 || f.resetter.reset[0] != want {
 		t.Errorf("reset scopes = %v, want [%v]", f.resetter.reset, want)
 	}
-	if context := f.replier.recorded()[0].req.Context; context != "" {
+	if context := f.replier.recorded()[0].req.Context; dayLog(context) != "" {
 		t.Errorf("recent chatter survived the reset: %q", context)
 	}
 }
@@ -1475,7 +1479,7 @@ func TestChatterSeenWhileMutedDoesNotSurfaceAfterUnmute(t *testing.T) {
 	s.Handle(inGroup(groupMessage("Mira, hi")))
 	s.stop()
 
-	if context := f.replier.recorded()[0].req.Context; context != "" {
+	if context := f.replier.recorded()[0].req.Context; dayLog(context) != "" {
 		t.Errorf("context after unmute = %q, want nothing from the muted period", context)
 	}
 }
@@ -1614,7 +1618,7 @@ func TestAddressedMessagesAndAnswersJoinTheDaysLog(t *testing.T) {
 		t.Errorf("log = %q\nwant  %q", got, want)
 	}
 	second := f.replier.recorded()[1].req.Context
-	if got := blockLines(t, second); strings.Join(got, "|") != "Bek: just chatting|Bek: who is right?|You: echo: who is right?" {
+	if got := blockLines(t, dayLog(second)); strings.Join(got, "|") != "Bek: just chatting|Bek: who is right?|You: echo: who is right?" {
 		t.Errorf("context for the second question = %q", got)
 	}
 }
@@ -1690,7 +1694,7 @@ func TestMemberCalledYouIsNotTakenForTheBot(t *testing.T) {
 
 	f.run(inGroup(you), inGroup(groupMessage("Mira, what did they say?")))
 
-	if got := blockLines(t, onlyRequest(t, f).req.Context); len(got) != 1 || got[0] != "You (member): "+long {
+	if got := blockLines(t, dayLog(onlyRequest(t, f).req.Context)); len(got) != 1 || got[0] != "You (member): "+long {
 		t.Errorf("context lines = %q, want the member's whole line under their own name", got)
 	}
 }
@@ -1781,7 +1785,7 @@ func TestOwnerIsMarkedInGroups(t *testing.T) {
 	if req.Text != "Azizbek @Pronium [owner]: roast Bek" || req.AuthorName != "Azizbek @Pronium [owner]" {
 		t.Errorf("text = %q, author = %q", req.Text, req.AuthorName)
 	}
-	if got := blockLines(t, req.Context); len(got) != 1 || got[0] != "Azizbek @Pronium [owner]: hello all" {
+	if got := blockLines(t, dayLog(req.Context)); len(got) != 1 || got[0] != "Azizbek @Pronium [owner]: hello all" {
 		t.Errorf("context = %q", got)
 	}
 }
@@ -1807,14 +1811,14 @@ func TestOwnerIsAnnouncedInPrivate(t *testing.T) {
 
 	f.run(update)
 
-	if req := f.replier.recorded()[0].req; req.Context != ownerNotice || req.Text != "hi" {
+	if req := f.replier.recorded()[0].req; !strings.HasSuffix(req.Context, "\n\n"+ownerNotice) || req.Text != "hi" {
 		t.Errorf("request = %+v", req)
 	}
 
 	other := newFixture()
 	other.opts.OwnerUsernames = []string{ownerUsername}
 	other.run(textFrom(userID, "hi"))
-	if req := other.replier.recorded()[0].req; req.Context != "" {
+	if req := other.replier.recorded()[0].req; strings.Contains(req.Context, ownerNotice) {
 		t.Errorf("a stranger's private message was announced as the owner's: %q", req.Context)
 	}
 }
@@ -2306,9 +2310,13 @@ func (f *fakeGroups) RecordGroup(_ context.Context, g storage.GroupStatus) error
 }
 
 func membershipChange(chat telegram.Chat, status string) telegram.Update {
+	return memberChange(chat, telegram.ChatMember{Status: status})
+}
+
+func memberChange(chat telegram.Chat, bot telegram.ChatMember) telegram.Update {
 	nextUpdateID++
 	return telegram.Update{UpdateID: nextUpdateID, MyChatMember: &telegram.ChatMemberUpdated{
-		Chat: chat, From: &telegram.User{ID: groupAdminID}, NewChatMember: telegram.ChatMember{Status: status},
+		Chat: chat, From: &telegram.User{ID: groupAdminID}, NewChatMember: bot,
 	}}
 }
 
@@ -2318,11 +2326,16 @@ func TestBeingAddedToAGroupIsRecorded(t *testing.T) {
 	f.opts.Groups = groups
 	devs := telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup, Title: "Devs", Username: "devs_uz"}
 
-	sent := f.run(membershipChange(devs, "administrator"), membershipChange(telegram.Chat{ID: userID, Type: telegram.ChatTypePrivate}, "kicked"))
+	promoted := telegram.ChatMember{Status: "administrator", CanDeleteMessages: true, CanPinMessages: true}
 
-	want := []storage.GroupStatus{{ChatID: groupID, Title: "Devs", Username: "devs_uz", BotStatus: "administrator"}}
+	sent := f.run(memberChange(devs, promoted), membershipChange(telegram.Chat{ID: userID, Type: telegram.ChatTypePrivate}, "kicked"))
+
+	want := []storage.GroupStatus{{
+		ChatID: groupID, Title: "Devs", Username: "devs_uz", BotStatus: "administrator",
+		Rights: []string{telegram.RightDeleteMessages, telegram.RightPinMessages},
+	}}
 	if !reflect.DeepEqual(groups.recorded, want) {
-		t.Errorf("recorded = %+v, want %+v; private chats are not groups", groups.recorded, want)
+		t.Errorf("recorded = %+v, want %+v; private chats are not groups, and the bot's rights are kept", groups.recorded, want)
 	}
 	if len(sent) != 0 {
 		t.Errorf("sent = %+v; a membership change needs no reply", sent)

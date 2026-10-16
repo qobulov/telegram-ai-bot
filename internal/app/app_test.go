@@ -3,11 +3,13 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -17,6 +19,7 @@ import (
 
 	"telegram-ai-bot/internal/config"
 	"telegram-ai-bot/internal/storage"
+	"telegram-ai-bot/internal/telegram"
 	"telegram-ai-bot/internal/webhook"
 )
 
@@ -142,8 +145,10 @@ func (env *hookEnv) deliver(update, secret string) int {
 const privateUpdate = `{"update_id":910001,"message":{"message_id":7,
 	"from":{"id":778001,"is_bot":false,"first_name":"Bek"},"chat":{"id":778001,"type":"private"},"text":"salom"}}`
 
+// groupUpdate is a group message whose message ID is its update ID: like
+// Telegram's, every message has its own, which the group log relies on.
 func groupUpdate(updateID, text string) string {
-	return `{"update_id":` + updateID + `,"message":{"message_id":31,
+	return `{"update_id":` + updateID + `,"message":{"message_id":` + updateID + `,
 		"from":{"id":778001,"is_bot":false,"first_name":"Bek"},"chat":{"id":-100778000,"type":"supergroup"},
 		"text":"` + text + `"}}`
 }
@@ -203,7 +208,7 @@ func TestWebhookGroupFlow(t *testing.T) {
 	if len(sent) != 1 || sent[0]["chat_id"] != float64(hookGroup) {
 		t.Fatalf("sent = %v", sent)
 	}
-	if reply, _ := sent[0]["reply_parameters"].(map[string]any); reply["message_id"] != float64(31) {
+	if reply, _ := sent[0]["reply_parameters"].(map[string]any); reply["message_id"] != float64(910011) {
 		t.Errorf("reply_parameters = %v", sent[0]["reply_parameters"])
 	}
 	env.apis.mu.Lock()
@@ -213,6 +218,14 @@ func TestWebhookGroupFlow(t *testing.T) {
 	// come from the database for the earlier message to be seen.
 	if !strings.Contains(input, "just chatting with friends") {
 		t.Error("the earlier group message did not reach the model")
+	}
+	// The fake Telegram says the bot is a plain member, and that answer is
+	// kept, so later turns need not ask again.
+	if !strings.Contains(input, "You are not an admin here.") {
+		t.Error("the turn header with the bot's rights did not reach the model")
+	}
+	if _, known, err := env.store.BotRights(context.Background(), hookGroup); err != nil || !known {
+		t.Errorf("bot rights known = %v, err = %v; want them stored", known, err)
 	}
 	logged, err := env.store.GroupMessagesSince(context.Background(), hookGroup, time.Now().Add(-time.Hour), 10)
 	if err != nil || len(logged) != 3 {
@@ -303,5 +316,116 @@ func TestCleanupNeedsACronSecret(t *testing.T) {
 	_, err := NewCleanup(context.Background(), env.config(t), slog.Default())
 	if err == nil || !strings.Contains(err.Error(), "CRON_SECRET") {
 		t.Fatalf("err = %v, want it to name CRON_SECRET", err)
+	}
+}
+
+// fakeRightsStore keeps one group's rights in memory.
+type fakeRightsStore struct {
+	rights  []string
+	known   bool
+	readErr error
+	saveErr error
+	saved   []savedRights
+}
+
+type savedRights struct {
+	chatID int64
+	status string
+	rights []string
+}
+
+func (f *fakeRightsStore) BotRights(context.Context, int64) ([]string, bool, error) {
+	return f.rights, f.known, f.readErr
+}
+
+func (f *fakeRightsStore) SetBotRights(_ context.Context, chatID int64, status string, rights []string) error {
+	f.saved = append(f.saved, savedRights{chatID, status, rights})
+	return f.saveErr
+}
+
+// fakeMemberLookup answers getChatMember for the bot.
+type fakeMemberLookup struct {
+	member telegram.ChatMember
+	err    error
+	asked  [][2]int64
+}
+
+func (f *fakeMemberLookup) GetChatMember(_ context.Context, chatID, userID int64) (telegram.ChatMember, error) {
+	f.asked = append(f.asked, [2]int64{chatID, userID})
+	return f.member, f.err
+}
+
+func TestBotRightsFallsBackToTelegramAndStores(t *testing.T) {
+	const botID = int64(777)
+	admin := telegram.ChatMember{Status: "administrator", CanDeleteMessages: true, CanRestrictMembers: true}
+	adminRights := []string{telegram.RightDeleteMessages, telegram.RightRestrictMembers}
+	cases := map[string]struct {
+		store      *fakeRightsStore
+		telegram   *fakeMemberLookup
+		want       []string
+		wantErr    bool
+		wantAsked  bool
+		wantStored []savedRights
+	}{
+		"stored rights are used as they are": {
+			store:    &fakeRightsStore{known: true, rights: []string{telegram.RightPinMessages}},
+			telegram: &fakeMemberLookup{member: admin},
+			want:     []string{telegram.RightPinMessages},
+		},
+		"stored as none is still known": {
+			store:    &fakeRightsStore{known: true},
+			telegram: &fakeMemberLookup{member: admin},
+		},
+		"unknown rights are asked of Telegram and stored": {
+			store:      &fakeRightsStore{},
+			telegram:   &fakeMemberLookup{member: admin},
+			want:       adminRights,
+			wantAsked:  true,
+			wantStored: []savedRights{{hookGroup, "administrator", adminRights}},
+		},
+		"a member holds none": {
+			store:      &fakeRightsStore{},
+			telegram:   &fakeMemberLookup{member: telegram.ChatMember{Status: "member"}},
+			wantAsked:  true,
+			wantStored: []savedRights{{hookGroup, "member", nil}},
+		},
+		"Telegram cannot be asked": {
+			store:     &fakeRightsStore{},
+			telegram:  &fakeMemberLookup{err: errors.New("telegram: 502")},
+			wantErr:   true,
+			wantAsked: true,
+		},
+		"the store cannot be read": {
+			store:    &fakeRightsStore{readErr: errors.New("connection refused")},
+			telegram: &fakeMemberLookup{member: admin},
+			wantErr:  true,
+		},
+		// Storing is only a cache: Telegram's answer is still the truth.
+		"the answer cannot be stored": {
+			store:      &fakeRightsStore{saveErr: errors.New("connection refused")},
+			telegram:   &fakeMemberLookup{member: admin},
+			want:       adminRights,
+			wantAsked:  true,
+			wantStored: []savedRights{{hookGroup, "administrator", adminRights}},
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			source := botRights{store: c.store, members: c.telegram, botID: botID, logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+
+			rights, err := source.BotRights(context.Background(), hookGroup)
+
+			if (err != nil) != c.wantErr || !reflect.DeepEqual(rights, c.want) {
+				t.Errorf("rights = %v, err = %v; want %v, error %v", rights, err, c.want, c.wantErr)
+			}
+			if asked := len(c.telegram.asked) > 0; asked != c.wantAsked {
+				t.Errorf("Telegram asked = %v, want %v", c.telegram.asked, c.wantAsked)
+			} else if asked && c.telegram.asked[0] != [2]int64{hookGroup, botID} {
+				t.Errorf("Telegram asked about %v, want the bot in the group", c.telegram.asked[0])
+			}
+			if !reflect.DeepEqual(c.store.saved, c.wantStored) {
+				t.Errorf("stored = %+v, want %+v", c.store.saved, c.wantStored)
+			}
+		})
 	}
 }

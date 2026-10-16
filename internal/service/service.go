@@ -131,8 +131,15 @@ type Options struct {
 	// AmbientMessages is how many of a group's recent messages are given to
 	// the model with a question. Zero turns the group log off.
 	AmbientMessages int
-	// Location is the time zone of the times shown in the group log.
+	// Location is the time zone of the times shown to the model: the turn
+	// header's date and the group log's times. Nil is UTC.
 	Location *time.Location
+	// Now is the clock of the turn header and of the log's window; nil is
+	// time.Now.
+	Now func() time.Time
+	// BotRights tells the turn header which admin rights the bot holds in a
+	// group; nil leaves them unknown.
+	BotRights BotRightsSource
 	// AllowedBots are other bots answered in groups, lower case; "*" means
 	// any bot. BotReplies counts those replies, at most BotRepliesPer10Min
 	// per chat.
@@ -249,6 +256,12 @@ func (in incoming) queueKey() uint64 {
 
 // New starts the workers and returns the Service. Call Close to stop it.
 func New(opts Options) *Service {
+	if opts.Location == nil {
+		opts.Location = time.UTC
+	}
+	if opts.Now == nil {
+		opts.Now = time.Now
+	}
 	s := &Service{
 		opts:           opts,
 		userLimiter:    newLimiter(opts.RatePerMinute),
@@ -327,6 +340,7 @@ func (s *Service) recordMembership(change *telegram.ChatMemberUpdated) {
 		Title:     change.Chat.Title,
 		Username:  change.Chat.Username,
 		BotStatus: change.NewChatMember.Status,
+		Rights:    change.NewChatMember.Rights(),
 	})
 	if err != nil {
 		s.opts.Logger.Warn("could not record group membership", "chat_id", change.Chat.ID, "error", err)

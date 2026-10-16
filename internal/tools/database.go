@@ -46,6 +46,8 @@ type Membership struct {
 	Status  string
 	Members int
 	Title   string
+	// Rights are the bot's admin rights, by their Bot API names.
+	Rights []string
 }
 
 func (m Membership) in() bool {
@@ -87,7 +89,7 @@ func DatabaseTool(opts DatabaseOptions) Tool {
 		Name: "bot_database",
 		Description: "Owners only. Look up the bot's own data. " +
 			"overview: how many groups the bot has been in, users, and today's messages and pictures. " +
-			"groups: every group seen, with its chat_id, whether the bot is still there, whether it is an admin there, and the member count, checked live. " +
+			"groups: every group seen, with its chat_id, whether the bot is still there, whether it is an admin there and with which rights, and the member count, checked live. " +
 			"messages: today's messages of one group by chat_id (from the groups list); another group's messages only in a private chat. " +
 			"Messages are kept only for today. Answer only from what this returns; never guess groups or admin rights.",
 		Schema: json.RawMessage(`{
@@ -137,17 +139,18 @@ func startOfDay(now time.Time, location *time.Location) time.Time {
 }
 
 type groupEntry struct {
-	ChatID        int64  `json:"chat_id"`
-	Title         string `json:"title"`
-	Username      string `json:"username,omitempty"`
-	BotInGroup    *bool  `json:"bot_in_group,omitempty"`
-	BotStatus     string `json:"bot_status,omitempty"`
-	BotIsAdmin    bool   `json:"bot_is_admin"`
-	Members       *int   `json:"members,omitempty"`
-	Muted         bool   `json:"muted,omitempty"`
-	MessagesToday int    `json:"messages_today"`
-	FirstSeen     string `json:"first_seen"`
-	LastSeen      string `json:"last_seen"`
+	ChatID        int64    `json:"chat_id"`
+	Title         string   `json:"title"`
+	Username      string   `json:"username,omitempty"`
+	BotInGroup    *bool    `json:"bot_in_group,omitempty"`
+	BotStatus     string   `json:"bot_status,omitempty"`
+	BotIsAdmin    bool     `json:"bot_is_admin"`
+	BotRights     []string `json:"bot_rights,omitempty"`
+	Members       *int     `json:"members,omitempty"`
+	Muted         bool     `json:"muted,omitempty"`
+	MessagesToday int      `json:"messages_today"`
+	FirstSeen     string   `json:"first_seen"`
+	LastSeen      string   `json:"last_seen"`
 }
 
 type groupList struct {
@@ -170,6 +173,7 @@ func listGroups(ctx context.Context, opts DatabaseOptions, today time.Time) (gro
 			Username:      g.Username,
 			BotStatus:     g.BotStatus,
 			BotIsAdmin:    isAdminStatus(g.BotStatus),
+			BotRights:     g.Rights,
 			Muted:         g.Muted,
 			MessagesToday: g.MessagesToday,
 			FirstSeen:     g.FirstSeen.In(opts.Location).Format(databaseTimeLayout),
@@ -220,7 +224,7 @@ func checkMembership(ctx context.Context, members GroupMembers, entries []groupE
 
 func applyMembership(e *groupEntry, m Membership) {
 	in := m.in()
-	e.BotInGroup, e.BotStatus, e.BotIsAdmin = &in, m.Status, isAdminStatus(m.Status)
+	e.BotInGroup, e.BotStatus, e.BotIsAdmin, e.BotRights = &in, m.Status, isAdminStatus(m.Status), m.Rights
 	if in {
 		members := m.Members
 		e.Members = &members

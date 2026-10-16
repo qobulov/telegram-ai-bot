@@ -103,6 +103,15 @@ func newTestAmbient(size int) (*ambient, *memoryLog) {
 
 var lineTime = regexp.MustCompile(`^\d\d:\d\d `)
 
+// dayLog is the log block in a request's context, which follows the turn
+// header, or "" when the context has none.
+func dayLog(context string) string {
+	if i := strings.Index(context, ambientHeader); i >= 0 {
+		return context[i:]
+	}
+	return ""
+}
+
 func blockLines(t *testing.T, block string) []string {
 	t.Helper()
 	lines := strings.Split(block, "\n")

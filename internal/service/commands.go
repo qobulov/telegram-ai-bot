@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -313,8 +314,9 @@ func (s *Service) answerOf(ctx context.Context, in incoming, started time.Time) 
 }
 
 // request builds what the agent needs. In a group the stored text names its
-// author ("Bek: ..."), because the conversation is shared, and the recent
-// chatter is passed along as context for this turn only.
+// author ("Bek: ..."), because the conversation is shared. The context, for
+// this turn only, is the chat header, then in a private chat the owner
+// notice, in a group the recent chatter.
 func (s *Service) request(ctx context.Context, in incoming) agent.Request {
 	req := agent.Request{
 		Scope:            in.scope,
@@ -326,19 +328,25 @@ func (s *Service) request(ctx context.Context, in incoming) agent.Request {
 		Group:            in.group,
 		Attachments:      s.attachments(ctx, in),
 	}
-	if !in.group && s.isOwner(in.msg.From) {
-		req.Context = ownerNotice
-	}
+	var notice, log string
 	if in.group {
 		req.AuthorName = s.label(in.msg.From)
 		req.Text = req.AuthorName + ": " + oneLine(req.Text)
-		req.Context = s.ambient.block(in.scope.ChatID, time.Now())
+		log = s.ambient.block(in.scope.ChatID, s.opts.Now())
+	} else if s.isOwner(in.msg.From) {
+		notice = ownerNotice
 	}
+	req.Context = paragraphs(s.chatHeader(ctx, in), notice, log)
 	replied := in.msg.ReplyToMessage
 	if replied != nil {
 		req.Text = withQuote(req.Text, s.quoted(ctx, replied), s.opts.Bot.ID, plainLabel(replied.From))
 	}
 	return req
+}
+
+// paragraphs joins the parts that are not empty, a blank line apart.
+func paragraphs(parts ...string) string {
+	return strings.Join(slices.DeleteFunc(parts, func(p string) bool { return p == "" }), "\n\n")
 }
 
 // oneLine folds a group message into a single line without square brackets.
