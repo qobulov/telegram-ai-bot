@@ -224,15 +224,41 @@ func finish(t *turn, reply ai.Message) (Answer, error) {
 }
 
 // react answers with the emoji of marker, the whole of the answer. The
-// model wanted no words; Telegram refuses any emoji not on its list, so for
-// any other one silence is the closest it can have.
+// model wanted no words. Telegram refuses any emoji not on its list, so a
+// near miss becomes the nearest one on it, and for any other, silence is the
+// closest the model can have.
 func react(t *turn, marker string) (Answer, error) {
-	emoji := strings.ReplaceAll(markerArgument(marker), variationSelector, "")
+	emoji := plainEmoji(markerArgument(marker))
+	if nearest, ok := nearestReaction[emoji]; ok {
+		emoji = nearest
+	}
 	if !telegram.IsReactionEmoji(emoji) {
 		return Answer{}, ErrSilent
 	}
 	t.messages = append(t.messages, ai.Message{Role: ai.RoleAssistant, Content: "<reacted " + emoji + ">"})
 	return Answer{Reaction: emoji}, nil
+}
+
+// nearestReaction maps emoji models react with, but Telegram does not take,
+// to the nearest one it does. 😂 above all: it ends most of Maria's old
+// answers, which stay in the history.
+var nearestReaction = map[string]string{
+	"😂": "🤣", "😆": "🤣", "😹": "🤣",
+	"😀": "😁", "😃": "😁", "😄": "😁", "😅": "😁",
+	"🙂": "👍", "☺": "👍", "😊": "👍",
+	"♥": "❤", "💖": "❤", "💕": "❤", "💗": "❤",
+}
+
+// plainEmoji drops what Telegram's list of reactions does not have: the
+// invisible variation selector models often write after an emoji such as ❤
+// or ⚡, and skin tones.
+func plainEmoji(emoji string) string {
+	return strings.Map(func(char rune) rune {
+		if string(char) == variationSelector || (char >= 0x1F3FB && char <= 0x1F3FF) {
+			return -1
+		}
+		return char
+	}, emoji)
 }
 
 // isSilent reports an answer with the silent marker anywhere in it. The

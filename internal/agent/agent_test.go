@@ -547,8 +547,33 @@ func TestReactMarkerAmongWordsIsDropped(t *testing.T) {
 	}
 }
 
+// Maria's history is full of 😂, which Telegram does not take as a
+// reaction; nor 🙂 or a skin tone. The nearest one it takes is set instead of
+// nothing.
+func TestReactWithANearMissEmojiUsesTheNearestReaction(t *testing.T) {
+	cases := map[string]string{
+		"[react 😂]":  "🤣",
+		"[react 😆]":  "🤣",
+		"[react 😅]":  "😁",
+		"[react 😄]":  "😁",
+		"[react 🙂]":  "👍",
+		"[react 😊]":  "👍",
+		"[react 💖]":  "❤",
+		"[react 👍🏻]": "👍",
+		"[react 👏🏽]": "👏",
+	}
+	for content, want := range cases {
+		f := newFixture(text(content))
+
+		answer, err := f.agent.Reply(context.Background(), request(1, "xaxa"))
+		if err != nil || answer.Reaction != want {
+			t.Errorf("answer %q: got %+v, err = %v; want the reaction %s", content, answer, err, want)
+		}
+	}
+}
+
 func TestReactWithUnknownEmojiIsSilent(t *testing.T) {
-	for _, content := range []string{"[react 🙂]", "[react]", "[react 🔥🔥]", "[react fire]", "[react 🔥 👍]"} {
+	for _, content := range []string{"[react 🥲]", "[react]", "[react 🔥🔥]", "[react fire]", "[react 🔥 👍]"} {
 		f := newFixture(text(content))
 
 		answer, err := f.agent.Reply(context.Background(), request(1, "xaxa"))
