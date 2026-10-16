@@ -62,10 +62,12 @@ var ignoreOrders = map[string]bool{
 // whom it means, and how firmly.
 var orderFillers = map[string]bool{
 	"bunga": true, "unga": true, "shunga": true, "shu": true, "bu": true, "u": true, "odamga": true, "bilan": true,
+	"buni": true, "uni": true, "shuni": true, "odamni": true, "ushbu": true,
 	"endi": true, "boshqa": true, "hech": true, "umuman": true, "iltimos": true, "him": true, "her": true, "this": true,
 	"бунга": true, "унга": true, "шунга": true, "шу": true, "бу": true, "у": true, "одамга": true, "билан": true,
+	"буни": true, "уни": true, "шуни": true, "одамни": true, "ушбу": true,
 	"энди": true, "бошка": true, "хеч": true, "умуман": true, "илтимос": true,
-	"ему": true, "ей": true, "его": true, "ее": true, "этому": true, "этой": true, "с": true, "ним": true, "ней": true,
+	"ему": true, "ей": true, "его": true, "ее": true, "этому": true, "этой": true, "этого": true, "с": true, "ним": true, "ней": true,
 	"больше": true, "вообще": true, "пожалуйста": true,
 }
 
