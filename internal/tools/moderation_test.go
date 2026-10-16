@@ -202,6 +202,9 @@ func (f *fakeAudit) SavePendingModeration(_ context.Context, p storage.PendingMo
 	}
 	key := [2]int64{p.RequesterID, p.ChatID}
 	if old, ok := f.pending[key]; ok && old.UpdateID == p.UpdateID {
+		if old.Action != p.Action {
+			return false, storage.ErrOtherModerationPending
+		}
 		return false, nil
 	}
 	f.pending[key] = waiting{PendingModeration: p}
@@ -754,6 +757,27 @@ func TestModerateSameUpdateTwiceAsksOnce(t *testing.T) {
 	// The first question still stands.
 	if c := env.confirm(t, 101, promptID, true); !strings.HasPrefix(c.Text, "Done:") {
 		t.Errorf("confirmation = %+v", c)
+	}
+}
+
+// "Delete this and ban him" calls the tool twice in one update. The second
+// action is refused in plain words, not taken for a redelivery, and the
+// question about the first still stands.
+func TestModerateSecondActionInOneUpdateIsRefusedHonestly(t *testing.T) {
+	env := newModerationEnv(t)
+	promptID := env.ask(t, asking(100, bekTarget()), `{"action":"ban"}`)
+
+	got := env.moderate(asking(100, bekTarget()), `{"action":"delete"}`)
+
+	expectRefusal(t, got, "forbidden", "one action at a time")
+	if strings.Contains(got.Error.Message, "delivered twice") {
+		t.Errorf("refusal = %q, it is no redelivery", got.Error.Message)
+	}
+	if questions, _ := env.telegram.asked(); len(questions) != 1 {
+		t.Errorf("questions = %+v, want one", questions)
+	}
+	if c := env.confirm(t, 101, promptID, true); !strings.HasPrefix(c.Text, "Done:") || !strings.Contains(c.Text, "banned") {
+		t.Errorf("confirmation = %+v, want the ban done", c)
 	}
 }
 

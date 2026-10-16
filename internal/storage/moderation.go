@@ -13,6 +13,11 @@ import (
 // now.
 var ErrNoPendingModeration = errors.New("storage: no moderation to confirm")
 
+// ErrOtherModerationPending means the update asked for another action
+// before, which still waits for confirmation: one message asked for two,
+// as in "delete this and ban him".
+var ErrOtherModerationPending = errors.New("storage: the update asked for another moderation already")
+
 // ModerationAction is one thing the bot did in a group for someone, kept as
 // an audit: who had it delete, mute, ban or pin what, and when. Polls are
 // recorded here too, so that one chat gets few of them.
@@ -117,7 +122,9 @@ type PendingModeration struct {
 // it, replacing what they asked for before in the same chat, whose question
 // then confirms nothing. It reports false, and changes nothing, when the same
 // update saved it already: Telegram delivered that update again, and the
-// question asked the first time still stands.
+// question asked the first time still stands. When the same update saved
+// another action, it changes nothing and the error is
+// ErrOtherModerationPending.
 func (s *Store) SavePendingModeration(ctx context.Context, p PendingModeration) (bool, error) {
 	tag, err := s.pool.Exec(ctx, `
 		INSERT INTO pending_moderation
@@ -134,7 +141,30 @@ func (s *Store) SavePendingModeration(ctx context.Context, p PendingModeration) 
 	if err != nil {
 		return false, fmt.Errorf("storage: save pending moderation: %w", err)
 	}
-	return tag.RowsAffected() == 1, nil
+	if tag.RowsAffected() == 1 {
+		return true, nil
+	}
+	return false, s.checkSamePending(ctx, p)
+}
+
+// checkSamePending returns ErrOtherModerationPending when the action p's
+// update saved before is not p's. When nothing waits any more, the first
+// action was answered meanwhile, and p is taken for a redelivery.
+func (s *Store) checkSamePending(ctx context.Context, p PendingModeration) error {
+	var action string
+	err := s.pool.QueryRow(ctx, `
+		SELECT action FROM pending_moderation
+		WHERE requester_id = $1 AND chat_id = $2 AND update_id = $3`,
+		p.RequesterID, p.ChatID, p.UpdateID).Scan(&action)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return nil
+	case err != nil:
+		return fmt.Errorf("storage: check pending moderation: %w", err)
+	case action != p.Action:
+		return ErrOtherModerationPending
+	}
+	return nil
 }
 
 // SetModerationPrompt records promptID, the bot's question, on the action

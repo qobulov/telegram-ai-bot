@@ -57,6 +57,7 @@ const (
 	noQuestion    = "I could not post the question that asks them to confirm, so nothing will be done; ask again later"
 	askedNote     = "Nothing is done yet. I posted my own question asking them to confirm by replying yes to it; their answer is handled without you. Don't ask again and don't say it is done: reply with exactly [react 👌]."
 	askedTwice    = "This message was delivered twice and the first delivery already asked them to confirm, so nothing more was done now: reply with exactly [silent]."
+	oneAtATime    = "one action at a time: I already posted my question about the other action they asked for in this message. Nothing is asked or done for this one; tell them to ask for it again after answering that question"
 	cancelledText = "Cancelled: nothing was done."
 )
 
@@ -369,9 +370,13 @@ func (m *Moderation) checkPace(ctx context.Context, caller Caller) error {
 
 // ask keeps o until the person who asked confirms it, and posts the bot's
 // question to them, as a reply to their request. An update Telegram
-// delivers again asks nothing more: its first delivery asked.
+// delivers again asks nothing more: its first delivery asked. A second
+// action in the same update is refused: one question waits at a time.
 func (m *Moderation) ask(ctx context.Context, o order) (any, error) {
 	saved, err := m.opts.Store.SavePendingModeration(ctx, o.pending())
+	if errors.Is(err, storage.ErrOtherModerationPending) {
+		return nil, &DeniedError{Message: oneAtATime}
+	}
 	if err != nil {
 		return nil, internal(err)
 	}

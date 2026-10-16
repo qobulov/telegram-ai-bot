@@ -173,10 +173,28 @@ func TestPendingModerationRedeliveredIsSavedOnce(t *testing.T) {
 
 	// Telegram delivered the update that asked again: it neither replaces
 	// the action nor forgets the question already asked.
-	again := first
-	again.Action = "ban"
-	if mustSavePending(t, store, again) {
+	if mustSavePending(t, store, first) {
 		t.Error("the same update saved its action twice")
+	}
+	if got, err := store.TakePendingModeration(ctx, alice, group, 77, 5*time.Minute); err != nil || got != first {
+		t.Errorf("confirmed = %+v, %v; want the first %+v", got, err, first)
+	}
+}
+
+// "Delete this and ban him" asks for two actions in one update. The second
+// is not a redelivery: it is told apart, and the first still waits.
+func TestPendingModerationSecondActionOfAnUpdateIsToldApart(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	first := asked()
+	mustSavePending(t, store, first)
+	mustSetPrompt(t, store, first, 77)
+
+	second := first
+	second.Action = "ban"
+	saved, err := store.SavePendingModeration(ctx, second)
+	if saved || !errors.Is(err, ErrOtherModerationPending) {
+		t.Errorf("second action = %v, %v; want ErrOtherModerationPending", saved, err)
 	}
 	if got, err := store.TakePendingModeration(ctx, alice, group, 77, 5*time.Minute); err != nil || got != first {
 		t.Errorf("confirmed = %+v, %v; want the first %+v", got, err, first)
