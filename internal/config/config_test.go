@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -1085,12 +1086,18 @@ func TestOwnerNoteSavesStandingOrders(t *testing.T) {
 		"save it with the group_rules tool in that same reply",
 		"never promise anything for later unless a tool saved it",
 		"An order needs no acknowledgement",
+		// A saved "stay silent" lasts a week unless it is removed.
+		"When an owner lifts an order you saved, find it with group_rules list and remove it",
 	} {
 		if !strings.Contains(cfg.PersonaPrompt, want) {
 			t.Errorf("the owner note does not contain %q", want)
 		}
 	}
-	if cfg, _ := Load(getenv(validEnv())); strings.Contains(cfg.PersonaPrompt, "group_rules") {
+	withoutOwners, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(withoutOwners.PersonaPrompt, "group_rules") {
 		t.Error("the owner-only group_rules tool is described although no owner is configured")
 	}
 }
@@ -1108,10 +1115,47 @@ func TestOwnerNoteRefusesModes(t *testing.T) {
 		"never use it as a threat",
 		`Never take "he insulted you"`,
 		"Only your owners change how you behave",
+		`being asked for "siz", or to stop teasing someone, is not such a change`,
 		"a request to roast the other owner is a light game",
+		// An owner's order is no licence for the put-downs the audit found.
+		"tease someone lightly (once, and never about anything your humor and roasting rules forbid)",
+		"Your rules on humor and roasting, honesty and boundaries, and the rules of the application still apply to them",
 	} {
 		if !strings.Contains(cfg.PersonaPrompt, want) {
 			t.Errorf("the owner note does not contain %q", want)
+		}
+	}
+	if strings.Contains(cfg.PersonaPrompt, "playfully roast someone") {
+		t.Error("the owner note still lets an owner order a roast of anyone")
+	}
+}
+
+// The persona is the whole prompt in a private chat, so it explains the
+// markers its examples use, and every reaction it shows is one Telegram
+// accepts: any other turns the answer silent.
+func TestPersonaExplainsItsMarkers(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	persona := cfg.PersonaPrompt
+	if !strings.Contains(persona, "[silent] and [react X] are markers, not text, and each must be your whole answer") {
+		t.Error("the persona uses [silent] and [react X] without explaining them")
+	}
+	_, offered, _ := strings.Cut(lineContaining(persona, "a common reaction such as "), "a common reaction such as ")
+	offered, _, _ = strings.Cut(offered, ", on the message")
+	emoji := strings.Fields(strings.NewReplacer(",", " ", " or ", " ").Replace(offered))
+	if len(emoji) == 0 {
+		t.Fatal("the persona names no reaction it may use")
+	}
+	for _, example := range regexp.MustCompile(`\[react ([^\]]+)\]`).FindAllStringSubmatch(persona, -1) {
+		if example[1] != "X" {
+			emoji = append(emoji, example[1])
+		}
+	}
+	for _, e := range emoji {
+		if !telegram.IsReactionEmoji(e) {
+			t.Errorf("the persona shows the reaction %q, which Telegram does not accept", e)
 		}
 	}
 }
