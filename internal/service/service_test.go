@@ -2910,19 +2910,23 @@ func TestCommandsDoNotCountTowardsTheDailyLimit(t *testing.T) {
 func TestFailedTurnReleasesItsReservation(t *testing.T) {
 	cases := map[string]struct {
 		err     error
+		draws   int
 		release bool
 	}{
-		"overloaded":      {&ai.APIError{Status: 503, Message: "high demand"}, true},
-		"any other error": {errors.New("database down"), true},
-		"answered":        {nil, false},
-		"silence":         {agent.ErrSilent, false},
-		"duplicate":       {agent.ErrDuplicate, false},
+		"overloaded":      {err: &ai.APIError{Status: 503, Message: "high demand"}, release: true},
+		"any other error": {err: errors.New("database down"), release: true},
+		// The turn that answered the update first keeps its own reservation.
+		"duplicate": {err: agent.ErrDuplicate, release: true},
+		"answered":  {release: false},
+		"silence":   {err: agent.ErrSilent, release: false},
+		// The picture is sent despite the error, and it is the dearest answer.
+		"drew, then failed": {err: errors.New("model down"), draws: 1, release: false},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			f := newFixture()
 			quota := withPrivateLimit(f, 10)
-			f.replier.err = tc.err
+			f.replier.err, f.replier.draws = tc.err, tc.draws
 
 			f.run(textFrom(userID, "hi"))
 

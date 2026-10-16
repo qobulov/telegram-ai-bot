@@ -498,8 +498,10 @@ In a private chat each user gets `PRIVATE_DAILY_LIMIT` answers a day
 
 - Counted: every message that reaches the model, photos and voice messages
   included, and one the model chose not to answer. Not counted: commands, a
-  message too long or of a kind she cannot read, and a turn that failed with
-  an error (the model overloaded, out of time, or any other error).
+  message too long or of a kind she cannot read, a message Telegram delivers
+  twice (it counts once), and a turn that failed with an error (the model
+  overloaded, out of time, or any other error), unless she drew a picture
+  before the error: the picture is still sent, and counted.
 - The first message past the limit gets one notice, in Uzbek, Russian and
   English; later ones that day get nothing. A voice message past the limit is
   not even transcribed.

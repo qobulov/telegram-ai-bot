@@ -338,18 +338,19 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 		Target:    s.target(in.msg.ReplyToMessage),
 	}, sink)
 	answer, err := s.opts.Replier.Reply(ctx, s.request(ctx, in, rules))
-	if reservation != 0 && turnFailed(err) {
+	// A picture drawn before a later failure is still worth sending.
+	drawings := sink.Take()
+	if reservation != 0 && !usedAnAnswer(err, drawings) {
 		s.releasePrivateAnswer(in, reservation)
 	}
 	out := s.answerOf(in, answer, err, started)
-	// A picture drawn before a later failure is still worth sending.
-	out.drawings = sink.Take()
+	out.drawings = drawings
 	return out
 }
 
 // takePrivateAnswer takes one of the sender's answers for the day in a
 // private chat, from the quota kept in the database, and returns the
-// reservation to give back if the turn fails. When the day's answers are
+// reservation to give back if the turn uses none. When the day's answers are
 // used up it returns allowed false and the notice to send: the limit the
 // first time that day, nothing after. Owners are not counted. When the count
 // cannot be read the sender is answered anyway: the limit guards the cost,
@@ -380,8 +381,8 @@ func (s *Service) takePrivateAnswer(ctx context.Context, in incoming) (reservati
 	return 0, "", false
 }
 
-// releasePrivateAnswer gives back the answer of a turn that failed. It has
-// its own deadline: the turn's may be what ran out.
+// releasePrivateAnswer gives back the answer of a turn that used none. It
+// has its own deadline: the turn's may be what ran out.
 func (s *Service) releasePrivateAnswer(in incoming, reservation int64) {
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
 	defer cancel()
@@ -390,10 +391,12 @@ func (s *Service) releasePrivateAnswer(in incoming, reservation int64) {
 	}
 }
 
-// turnFailed reports a turn that ended in an error. Silence and an update
-// answered before are how a turn ends without an answer, not failures.
-func turnFailed(err error) bool {
-	return err != nil && !errors.Is(err, agent.ErrSilent) && !errors.Is(err, agent.ErrDuplicate)
+// usedAnAnswer reports whether a turn used up one of the day's answers: the
+// model answered, chose to stay silent, or drew a picture, which is sent even
+// when the turn then failed. A failed turn did not, nor did a duplicate
+// update: the turn that answered it keeps its own reservation.
+func usedAnAnswer(err error, drawings []tools.Drawing) bool {
+	return err == nil || errors.Is(err, agent.ErrSilent) || len(drawings) > 0
 }
 
 // startOfDay is midnight, in location, of the day now falls on there.
