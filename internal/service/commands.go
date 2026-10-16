@@ -75,7 +75,11 @@ func (s *Service) process(in incoming) {
 		s.passOver(in)
 		return
 	}
-	in.described = s.describe(ctx, in.msg, in.text)
+	if in.group {
+		// The group's log needs it even when no answer follows. A private
+		// message is described in ask, within the daily limit.
+		in.described = s.describe(ctx, in.msg, in.text)
+	}
 	out := s.respond(ctx, in, rules)
 	if sentID := s.deliver(in, out); out.answerID != 0 && sentID != 0 {
 		s.recordSent(out.answerID, sentID)
@@ -311,6 +315,15 @@ func (s *Service) hasMedia(in incoming) bool {
 }
 
 func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRule) outcome {
+	reservation, notice, allowed := s.takePrivateAnswer(ctx, in)
+	if !allowed {
+		return say(notice)
+	}
+	if !in.group {
+		// Only now, so that a voice message past the limit is not
+		// transcribed: that is a call to the model too.
+		in.described = s.describe(ctx, in.msg, in.text)
+	}
 	started := time.Now()
 	stopTyping := s.showTyping(ctx, in.msg.Chat.ID)
 	defer stopTyping()
@@ -324,10 +337,69 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 		MessageID: in.msg.MessageID,
 		Target:    s.target(in.msg.ReplyToMessage),
 	}, sink)
-	out := s.answerOf(ctx, in, rules, started)
+	answer, err := s.opts.Replier.Reply(ctx, s.request(ctx, in, rules))
+	if reservation != 0 && turnFailed(err) {
+		s.releasePrivateAnswer(in, reservation)
+	}
+	out := s.answerOf(in, answer, err, started)
 	// A picture drawn before a later failure is still worth sending.
 	out.drawings = sink.Take()
 	return out
+}
+
+// takePrivateAnswer takes one of the sender's answers for the day in a
+// private chat, from the quota kept in the database, and returns the
+// reservation to give back if the turn fails. When the day's answers are
+// used up it returns allowed false and the notice to send: the limit the
+// first time that day, nothing after. Owners are not counted. When the count
+// cannot be read the sender is answered anyway: the limit guards the cost,
+// and unlike a group's quota, one answer too many disturbs nobody else.
+func (s *Service) takePrivateAnswer(ctx context.Context, in incoming) (reservation int64, notice string, allowed bool) {
+	limit := s.opts.PrivateDailyLimit
+	if in.group || s.opts.PrivateQuota == nil || limit <= 0 || s.isOwner(in.msg.From) {
+		return 0, "", true
+	}
+	ctx, cancel := context.WithTimeout(ctx, logTimeout)
+	defer cancel()
+	id, allowed, notify, err := s.opts.PrivateQuota.ReservePrivateMessage(ctx, storage.DailyQuota{
+		UserID: in.userID,
+		Since:  startOfDay(s.opts.Now(), s.opts.Location),
+		Limit:  limit,
+	})
+	switch {
+	case err != nil:
+		s.opts.Logger.Warn("private message count failed; answering anyway", "user_id", in.userID, "error", err)
+		return 0, "", true
+	case allowed:
+		return id, "", true
+	}
+	s.opts.Logger.Info("private daily limit reached", "user_id", in.userID, "notified", notify)
+	if notify {
+		return 0, fmt.Sprintf(textDailyLimit, limit, limit, limit), false
+	}
+	return 0, "", false
+}
+
+// releasePrivateAnswer gives back the answer of a turn that failed. It has
+// its own deadline: the turn's may be what ran out.
+func (s *Service) releasePrivateAnswer(in incoming, reservation int64) {
+	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
+	defer cancel()
+	if err := s.opts.PrivateQuota.ReleasePrivateMessage(ctx, reservation); err != nil {
+		s.opts.Logger.Warn("could not give back a failed turn's answer", "user_id", in.userID, "error", err)
+	}
+}
+
+// turnFailed reports a turn that ended in an error. Silence and an update
+// answered before are how a turn ends without an answer, not failures.
+func turnFailed(err error) bool {
+	return err != nil && !errors.Is(err, agent.ErrSilent) && !errors.Is(err, agent.ErrDuplicate)
+}
+
+// startOfDay is midnight, in location, of the day now falls on there.
+func startOfDay(now time.Time, location *time.Location) time.Time {
+	local := now.In(location)
+	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, location)
 }
 
 // target describes the message a request replied to, for the tools that act
@@ -348,8 +420,8 @@ func (s *Service) target(replied *telegram.Message) *tools.Target {
 	}
 }
 
-func (s *Service) answerOf(ctx context.Context, in incoming, rules []storage.GroupRule, started time.Time) outcome {
-	answer, err := s.opts.Replier.Reply(ctx, s.request(ctx, in, rules))
+// answerOf turns the agent's answer, or its error, into what is sent back.
+func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started time.Time) outcome {
 	log := s.opts.Logger.With("user_id", in.userID, "chat_id", in.scope.ChatID,
 		"update_id", in.updateID, "duration", time.Since(started).String())
 

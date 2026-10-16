@@ -361,3 +361,47 @@ Write spec §11 into the three constants, keeping what still holds (mood modes, 
 - [ ] **Step 3: Edit** `persona.go`.
 - [ ] **Step 4: Run** `go test -p 1 ./... && go vet ./... && test -z "$(gofmt -l .)"` — PASS.
 - [ ] **Step 5: Commit** "Rewrite Maria's character to be playful, brief and in the speaker's script".
+
+---
+
+### Task 12: A daily limit for private chats
+
+Owner's request (2026-10-16): "single chatlarga kunlik limit qoyish kerak 10ta xabar uchun faqat owners no limit" — in private chats every user may get 10 answers a day; only the bot's owners are unlimited.
+
+Decisions (lead's calls, told to the owner):
+- What counts: a private message that reaches the model (`ask`). Commands (`/start`, `/help`, `/reset`, ...) do not count. A turn that fails with an error (overloaded, timeout, any error other than silent or duplicate) gives its reservation back.
+- The day starts at midnight in `cfg.Location` (Asia/Tashkent).
+- The 11th message gets one notice; later messages that day get nothing.
+- Owners (`isOwner`) are exempt. Nobody else is (not even ADMIN_USER_IDS).
+- Groups are not affected.
+- Setting `PRIVATE_DAILY_LIMIT`, integer ≥ 0, default 10; 0 turns the limit off.
+- Counting lives in Postgres (serverless instances share no memory).
+
+**Files:**
+- Create: `internal/storage/migrations/0017_private_messages.sql`, `internal/storage/private_quota.go`
+- Modify: `internal/storage/conversations.go` (Expire), `internal/storage/store_test.go` (DROP list + test), `internal/service/service.go` (Options), `internal/service/commands.go` (ask/answerOf), `internal/service/texts.go`, `internal/config/config.go`, `internal/app/app.go`, `.env.example`, `README.md`
+- Test: storage, service, config tests
+
+**Interfaces:**
+- migration: `private_messages (id bigserial PRIMARY KEY, user_id bigint NOT NULL, denied boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now())`, index `(user_id, created_at)`.
+- storage: `type DailyQuota struct{ UserID int64; Since time.Time; Limit int }`; `func (s *Store) ReservePrivateMessage(ctx context.Context, q DailyQuota) (id int64, allowed bool, notify bool, err error)` — one transaction under `pg_advisory_xact_lock(userID ^ 0x50524956)`: count rows with `denied = false` since `Since`; under `Limit` → insert an allowed row, return its id, allowed; otherwise insert a `denied = true` row only if none exists since `Since` and return `notify = true` for that first denial, else `notify = false`. `func (s *Store) ReleasePrivateMessage(ctx context.Context, id int64) error` deletes the allowed row. `Store.Expire` deletes rows older than the cutoff.
+- service: `type PrivateQuota interface{ ReservePrivateMessage(ctx context.Context, q storage.DailyQuota) (int64, bool, bool, error); ReleasePrivateMessage(ctx context.Context, id int64) error }`, `Options.PrivateQuota PrivateQuota`, `Options.PrivateDailyLimit int`.
+- config: `Config.PrivateDailyLimit` from `PRIVATE_DAILY_LIMIT` (≥ 0, default 10).
+
+Behaviour: in `respond`/`ask`, for a private chat, a non-owner, `PrivateDailyLimit > 0` and a non-nil quota, reserve before calling the model (Since = start of today in `Location`, via `Options.Now`). Not allowed → send `textDailyLimit` when `notify`, else nothing. A store error → log a warning and answer anyway (the limit is a cost guard; failing open in a private chat is the lesser harm — unlike group quotas, nobody else is disturbed). After the turn, release the reservation when the turn failed with an error other than `agent.ErrSilent` / `agent.ErrDuplicate`.
+
+Added during implementation: a private message is described (media, voice transcript) in `ask` after the reservation instead of in `process`, so a voice message past the limit costs no transcription; groups still describe in `process`, for their log. Test `TestVoicePastTheDailyLimitIsNotTranscribed`. The webhook tests clear the test user's `private_messages` rows and `TestWebhookLimitsPrivateChats` checks the wiring.
+
+Copy (exact): `textDailyLimit = "Bugungi limit tugadi: kuniga %d ta xabar. Ertaga yana yozing.\nЛимит на сегодня исчерпан: %d сообщений в день. Напишите завтра.\nThat's today's limit: %d messages a day. Write again tomorrow."`
+
+Tests:
+- storage `TestReservePrivateMessageCountsPerDayAndNotifiesOnce`: limit 2 → allowed, allowed, then (notify=true, allowed=false), then (false,false); rows before `Since` do not count; `ReleasePrivateMessage` frees a slot.
+- service `TestPrivateDailyLimitNoticeOnceThenSilence` (fake quota: 10 allowed, 11th notify, 12th silent → exactly one notice, 10 model calls).
+- `TestOwnersHaveNoPrivateLimit` (owner never reserves).
+- `TestCommandsDoNotCountTowardsTheDailyLimit` (/help, /start never reserve).
+- `TestFailedTurnReleasesItsReservation` (replier returns an overloaded error → Release called with the id; ErrSilent → not released).
+- `TestGroupsIgnoreThePrivateLimit`.
+- `TestPrivateQuotaErrorStillAnswers`.
+- config `TestPrivateDailyLimit` (default 10, `0` accepted, `-1` rejected).
+
+Commit: "Give private chats a daily limit of ten answers, owners excepted".

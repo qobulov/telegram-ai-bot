@@ -96,8 +96,8 @@ type Config struct {
 	AmbientMessages int
 	// Location is the groups' time zone: the times shown in the group log
 	// and the turn header, the time get_current_time gives when no zone is
-	// named, and where a day starts for the daily picture limit and the
-	// owners' database tool.
+	// named, and where a day starts for the daily picture limit, the private
+	// chats' daily limit and the owners' database tool.
 	Location *time.Location
 	// OwnerUsernames are the Telegram usernames of the bot's owners, lower
 	// case and without @. Empty when no owner is configured.
@@ -120,6 +120,10 @@ type Config struct {
 	// takes over a conversation.
 	GroupRateLimitPerMinute int
 	MemberRepliesPer10Min   int
+	// PrivateDailyLimit caps the answers each user gets in private chats in
+	// a day, from midnight in Location; owners have no limit and 0 turns it
+	// off.
+	PrivateDailyLimit int
 }
 
 // IsAdmin reports whether the Telegram user is listed in ADMIN_USER_IDS.
@@ -162,6 +166,7 @@ func Load(getenv func(string) string) (Config, error) {
 		MaxGroupReplyChars:      r.positive("MAX_GROUP_REPLY_LENGTH", 4000),
 		GroupRateLimitPerMinute: r.positive("GROUP_RATE_LIMIT_PER_MINUTE", 6),
 		MemberRepliesPer10Min:   r.positive("MEMBER_REPLIES_PER_10_MIN", 4),
+		PrivateDailyLimit:       r.integer("PRIVATE_DAILY_LIMIT", 10, 0),
 	}
 	r.chooseProvider(&cfg)
 	cfg.MaxMediaBytes = int64(r.positive("MAX_MEDIA_MB", 5)) << 20

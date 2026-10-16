@@ -4,7 +4,7 @@ import "fmt"
 
 // Fixed messages the bot sends itself. Answers from the model follow the
 // chat's language and the character's voice; these are plain, short and kept
-// in English, except the welcome.
+// in English, except the welcome, the overload notice and the daily limit.
 const (
 	textWelcome = `Salom! Yozing, gaplashamiz.
 Привет! Пиши, поболтаем.
@@ -31,6 +31,9 @@ Send /reset to delete the conversation history.`
 	textError       = "Something went wrong on my side. Please try again later."
 	textTooLong     = "Your message is too long. Please keep it under %d characters."
 	textModel       = "Current model: %s"
+	// textDailyLimit takes the private chats' daily limit three times, once
+	// for each language.
+	textDailyLimit = "Bugungi limit tugadi: kuniga %d ta xabar. Ertaga yana yozing.\nЛимит на сегодня исчерпан: %d сообщений в день. Напишите завтра.\nThat's today's limit: %d messages a day. Write again tomorrow."
 
 	textIgnored       = "Okay, I won't answer %s for the next 24 hours."
 	textUnignored     = "I'll answer %s again."

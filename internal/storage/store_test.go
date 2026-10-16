@@ -45,7 +45,7 @@ func newTestStore(t *testing.T) *Store {
 	}
 	t.Cleanup(store.Close)
 
-	if _, err := store.pool.Exec(ctx, `DROP TABLE IF EXISTS messages, conversations, users, chats, group_messages, image_generations, bot_replies, groups, broadcasts, group_replies, group_rules, moderation_actions, pending_bans, schema_migrations CASCADE`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DROP TABLE IF EXISTS messages, conversations, users, chats, group_messages, image_generations, bot_replies, groups, broadcasts, group_replies, group_rules, moderation_actions, pending_bans, private_messages, schema_migrations CASCADE`); err != nil {
 		t.Fatalf("drop tables: %v", err)
 	}
 	if _, err := store.Migrate(ctx); err != nil {
@@ -106,7 +106,7 @@ func TestMigrateIsIdempotent(t *testing.T) {
 func TestMigrateReportsAppliedCount(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
-	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, group_messages, image_generations, bot_replies, groups, broadcasts, group_replies, group_rules, moderation_actions, pending_bans, schema_migrations CASCADE`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, group_messages, image_generations, bot_replies, groups, broadcasts, group_replies, group_rules, moderation_actions, pending_bans, private_messages, schema_migrations CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 
@@ -942,6 +942,109 @@ func TestExpireAlsoRemovesOldGroupReplies(t *testing.T) {
 	}
 	if rows := countRows(t, store, "group_replies"); rows != 1 {
 		t.Errorf("group_replies rows = %d, want only today's", rows)
+	}
+}
+
+// privateReservation is what ReservePrivateMessage answered.
+type privateReservation struct{ allowed, notify bool }
+
+func reservePrivate(t *testing.T, store *Store, q DailyQuota) (int64, privateReservation) {
+	t.Helper()
+	id, allowed, notify, err := store.ReservePrivateMessage(context.Background(), q)
+	if err != nil {
+		t.Fatalf("ReservePrivateMessage: %v", err)
+	}
+	if allowed != (id != 0) {
+		t.Errorf("id = %d with allowed = %v; only an allowed answer has a reservation", id, allowed)
+	}
+	return id, privateReservation{allowed: allowed, notify: notify}
+}
+
+func TestReservePrivateMessageCountsPerDayAndNotifiesOnce(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	today := DailyQuota{UserID: alice, Since: time.Now().Add(-time.Hour), Limit: 2}
+	reserveTimes := func(n int) []privateReservation {
+		t.Helper()
+		var got []privateReservation
+		for range n {
+			_, r := reservePrivate(t, store, today)
+			got = append(got, r)
+		}
+		return got
+	}
+	allowed, notice, silence := privateReservation{allowed: true}, privateReservation{notify: true}, privateReservation{}
+
+	if got, want := reserveTimes(4), []privateReservation{allowed, allowed, notice, silence}; !reflect.DeepEqual(got, want) {
+		t.Errorf("reservations = %+v, want %+v: two answers, then one notice, then silence", got, want)
+	}
+	if _, r := reservePrivate(t, store, DailyQuota{UserID: bob, Since: today.Since, Limit: 2}); r != allowed {
+		t.Errorf("bob = %+v; another user was refused because of alice's count", r)
+	}
+
+	if _, err := store.pool.Exec(ctx, `UPDATE private_messages SET created_at = created_at - interval '1 day' WHERE user_id = $1`, alice); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := reserveTimes(3), []privateReservation{allowed, allowed, notice}; !reflect.DeepEqual(got, want) {
+		t.Errorf("next day = %+v, want %+v: yesterday's answers and notice do not count", got, want)
+	}
+}
+
+func TestReleasedPrivateMessageDoesNotCount(t *testing.T) {
+	store := newTestStore(t)
+	today := DailyQuota{UserID: alice, Since: time.Now().Add(-time.Hour), Limit: 1}
+	id, _ := reservePrivate(t, store, today)
+
+	if err := store.ReleasePrivateMessage(context.Background(), id); err != nil {
+		t.Fatalf("ReleasePrivateMessage: %v", err)
+	}
+	if _, r := reservePrivate(t, store, today); !r.allowed {
+		t.Error("a failed turn still used up the day's only answer")
+	}
+	if _, r := reservePrivate(t, store, today); r.allowed || !r.notify {
+		t.Errorf("after the limit = %+v, want the notice", r)
+	}
+}
+
+func TestConcurrentPrivateReservationsNotifyOnce(t *testing.T) {
+	store := newTestStore(t)
+	today := DailyQuota{UserID: alice, Since: time.Now().Add(-time.Hour), Limit: 2}
+
+	var granted, notified atomic.Int32
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() {
+			_, allowed, notify, err := store.ReservePrivateMessage(context.Background(), today)
+			if err == nil && allowed {
+				granted.Add(1)
+			}
+			if err == nil && notify {
+				notified.Add(1)
+			}
+		})
+	}
+	wg.Wait()
+	if granted.Load() != 2 || notified.Load() != 1 {
+		t.Errorf("granted = %d, notified = %d of 8 simultaneous messages, want 2 and 1", granted.Load(), notified.Load())
+	}
+}
+
+func TestExpireAlsoRemovesOldPrivateMessages(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	today := DailyQuota{UserID: alice, Since: time.Now().Add(-time.Hour), Limit: 1}
+	reservePrivate(t, store, today)
+	reservePrivate(t, store, today) // the notice's row
+	if _, err := store.pool.Exec(ctx, `UPDATE private_messages SET created_at = now() - interval '2 days'`); err != nil {
+		t.Fatal(err)
+	}
+	reservePrivate(t, store, today)
+
+	if _, err := store.Expire(ctx, 24*time.Hour); err != nil {
+		t.Fatalf("Expire: %v", err)
+	}
+	if rows := countRows(t, store, "private_messages"); rows != 1 {
+		t.Errorf("private_messages rows = %d, want only today's", rows)
 	}
 }
 

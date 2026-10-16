@@ -116,7 +116,7 @@ func startWebhook(t *testing.T) *hookEnv {
 	if err := store.SetMuted(ctx, hookGroup, false, hookUser); err != nil {
 		t.Fatal(err)
 	}
-	forgetBotRights(t, databaseURL)
+	forgetEarlierRuns(t, databaseURL)
 
 	env.hook, err = NewWebhook(ctx, env.config(t), slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
@@ -126,10 +126,11 @@ func startWebhook(t *testing.T) *hookEnv {
 	return env
 }
 
-// forgetBotRights clears the test group's stored rights. Rights stored by an
-// earlier run would be used as they are, and the fallback to Telegram would
-// then go untested.
-func forgetBotRights(t *testing.T, databaseURL string) {
+// forgetEarlierRuns clears what earlier runs stored for the test chats that
+// Reset leaves. Rights stored by an earlier run would be used as they are,
+// and the fallback to Telegram would then go untested; earlier answers would
+// count towards the group's reply quota and today's private limit.
+func forgetEarlierRuns(t *testing.T, databaseURL string) {
 	t.Helper()
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, databaseURL)
@@ -138,6 +139,12 @@ func forgetBotRights(t *testing.T, databaseURL string) {
 	}
 	defer conn.Close(ctx)
 	if _, err := conn.Exec(ctx, `UPDATE groups SET bot_status = NULL, bot_rights = NULL WHERE chat_id = $1`, hookGroup); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(ctx, `DELETE FROM group_replies WHERE chat_id = $1`, hookGroup); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(ctx, `DELETE FROM private_messages WHERE user_id = $1`, hookUser); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -302,6 +309,34 @@ func TestWebhookOwnersAreKnownByID(t *testing.T) {
 	}
 	if strings.Contains(inputs[0], "@bek_owner [owner]") {
 		t.Error("an account not in BOT_OWNER_IDS was marked as an owner for having an owner's username")
+	}
+}
+
+// The private limit has to reach the service and be counted in the
+// database, which the service's own tests cannot see.
+func TestWebhookLimitsPrivateChats(t *testing.T) {
+	env := startWebhook(t)
+	env.baseEnv["PRIVATE_DAILY_LIMIT"] = "1"
+	hook, err := NewWebhook(context.Background(), env.config(t), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatalf("NewWebhook: %v", err)
+	}
+	t.Cleanup(hook.Close)
+	env.hook = hook
+
+	for _, updateID := range []string{"910040", "910041", "910042"} {
+		env.deliver(`{"update_id":`+updateID+`,"message":{"message_id":`+updateID+`,
+			"from":{"id":778001,"is_bot":false,"first_name":"Bek"},"chat":{"id":778001,"type":"private"},"text":"salom"}}`, hookSecret)
+	}
+
+	sent := env.apis.messages()
+	if len(sent) != 2 || sent[0]["text"] != "webhook answer" || !strings.Contains(sent[1]["text"].(string), "That's today's limit: 1 messages a day.") {
+		t.Errorf("sent = %v, want the answer, then the limit once and silence", sent)
+	}
+	env.apis.mu.Lock()
+	defer env.apis.mu.Unlock()
+	if len(env.apis.modelInputs) != 1 {
+		t.Errorf("model calls = %d, want 1", len(env.apis.modelInputs))
 	}
 }
 

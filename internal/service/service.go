@@ -74,6 +74,13 @@ type GroupReplyQuota interface {
 	ReserveGroupReply(ctx context.Context, q storage.ReplyQuota) (bool, error)
 }
 
+// PrivateQuota counts the answers each user gets in private chats in a day.
+// Like GroupReplyQuota it lives in the database, which every instance shares.
+type PrivateQuota interface {
+	ReservePrivateMessage(ctx context.Context, q storage.DailyQuota) (id int64, allowed, notify bool, err error)
+	ReleasePrivateMessage(ctx context.Context, id int64) error
+}
+
 // Reactor sets the bot's emoji reaction on a message.
 type Reactor interface {
 	SetMessageReaction(ctx context.Context, chatID, messageID int64, emoji string) error
@@ -174,6 +181,11 @@ type Options struct {
 	GroupReplies          GroupReplyQuota
 	GroupRatePerMinute    int
 	MemberRepliesPer10Min int
+	// PrivateQuota counts the answers each user gets in private chats: at
+	// most PrivateDailyLimit a day, from midnight in Location. Owners are not
+	// counted. Nil, or a limit of 0, does not limit.
+	PrivateQuota      PrivateQuota
+	PrivateDailyLimit int
 	// Reactor sets emoji reactions, the bot's answer to applause and the
 	// model's when it reacts instead of writing; nil means it never reacts.
 	Reactor Reactor
@@ -248,7 +260,8 @@ type incoming struct {
 	// text is the user's text, trimmed, without the part addressing the bot.
 	text string
 	// described is text with the message's media described in front of it,
-	// a voice message's transcript included. Filled in by process.
+	// a voice message's transcript included. Filled in by process in a
+	// group, and by ask in a private chat.
 	described string
 }
 

@@ -2792,3 +2792,220 @@ func TestTurnTellsToolsTheRepliedMessage(t *testing.T) {
 		t.Errorf("target without a reply = %+v", target)
 	}
 }
+
+// fakePrivateQuota allows Limit answers, as the store does within a day: a
+// notice on the first refusal, silence after it. It records what it was
+// asked and what was given back.
+type fakePrivateQuota struct {
+	mu       sync.Mutex
+	asked    []storage.DailyQuota
+	released []int64
+	used     int
+	refused  bool
+	err      error
+}
+
+func (f *fakePrivateQuota) ReservePrivateMessage(_ context.Context, q storage.DailyQuota) (int64, bool, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.asked = append(f.asked, q)
+	switch {
+	case f.err != nil:
+		return 0, false, false, f.err
+	case f.used < q.Limit:
+		f.used++
+		return int64(500 + len(f.asked)), true, false, nil
+	}
+	notify := !f.refused
+	f.refused = true
+	return 0, false, notify, nil
+}
+
+func (f *fakePrivateQuota) ReleasePrivateMessage(ctx context.Context, id int64) error {
+	if err := ctx.Err(); err != nil {
+		return err // like the store, an expired context gives nothing back
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.released = append(f.released, id)
+	f.used--
+	return nil
+}
+
+func (f *fakePrivateQuota) recorded() ([]storage.DailyQuota, []int64) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]storage.DailyQuota(nil), f.asked...), append([]int64(nil), f.released...)
+}
+
+func withPrivateLimit(f *fixture, limit int) *fakePrivateQuota {
+	quota := &fakePrivateQuota{}
+	f.opts.PrivateQuota, f.opts.PrivateDailyLimit = quota, limit
+	return quota
+}
+
+func TestPrivateDailyLimitNoticeOnceThenSilence(t *testing.T) {
+	f := newFixture()
+	quota := withPrivateLimit(f, 10)
+	f.opts.RatePerMinute = 100 // the flood guard is tested elsewhere
+	f.opts.QueueSize = 16      // and so is a full queue
+	// 01:30 on 17 October in Tashkent, while it is still the 16th in UTC.
+	f.opts.Now = func() time.Time { return time.Date(2026, 10, 16, 20, 30, 0, 0, time.UTC) }
+	var updates []telegram.Update
+	for range 12 {
+		updates = append(updates, textFrom(userID, "hi"))
+	}
+
+	sent := f.run(updates...)
+
+	if calls := len(f.replier.recorded()); calls != 10 {
+		t.Errorf("model calls = %d, want 10", calls)
+	}
+	notice := fmt.Sprintf(textDailyLimit, 10, 10, 10)
+	if len(sent) != 11 || sent[10].text != notice || sent[9].text != "echo: hi" {
+		t.Errorf("sent = %+v, want 10 answers, then one notice and silence", sent)
+	}
+	asked, _ := quota.recorded()
+	midnight := time.Date(2026, 10, 17, 0, 0, 0, 0, tashkent)
+	if len(asked) != 12 || asked[0].UserID != userID || asked[0].Limit != 10 || !asked[0].Since.Equal(midnight) {
+		t.Errorf("asked = %+v, want 12 times user %d, limit 10, since %v: the day starts at midnight in Tashkent", asked, userID, midnight)
+	}
+}
+
+func TestOwnersHaveNoPrivateLimit(t *testing.T) {
+	f := newFixture()
+	quota := withPrivateLimit(f, 1)
+	f.opts.OwnerUsernames = []string{ownerUsername}
+	var updates []telegram.Update
+	for range 3 {
+		update := textFrom(9001, "hi")
+		update.Message.From.Username = "Pronium"
+		updates = append(updates, update)
+	}
+
+	f.run(updates...)
+
+	if calls := len(f.replier.recorded()); calls != 3 {
+		t.Errorf("model calls = %d, want 3", calls)
+	}
+	if asked, _ := quota.recorded(); len(asked) != 0 {
+		t.Errorf("asked = %+v; an owner's messages are not counted", asked)
+	}
+}
+
+func TestCommandsDoNotCountTowardsTheDailyLimit(t *testing.T) {
+	f := newFixture()
+	quota := withPrivateLimit(f, 1)
+
+	sent := f.run(textFrom(userID, "/help"), textFrom(userID, "/start"), textFrom(userID, "hi"))
+
+	if len(sent) != 3 || sent[2].text != "echo: hi" {
+		t.Errorf("sent = %+v; the commands used up the day's only answer", sent)
+	}
+	if asked, _ := quota.recorded(); len(asked) != 1 {
+		t.Errorf("asked = %+v, want only the message for the model", asked)
+	}
+}
+
+func TestFailedTurnReleasesItsReservation(t *testing.T) {
+	cases := map[string]struct {
+		err     error
+		release bool
+	}{
+		"overloaded":      {&ai.APIError{Status: 503, Message: "high demand"}, true},
+		"any other error": {errors.New("database down"), true},
+		"answered":        {nil, false},
+		"silence":         {agent.ErrSilent, false},
+		"duplicate":       {agent.ErrDuplicate, false},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			quota := withPrivateLimit(f, 10)
+			f.replier.err = tc.err
+
+			f.run(textFrom(userID, "hi"))
+
+			_, released := quota.recorded()
+			if tc.release && !reflect.DeepEqual(released, []int64{501}) {
+				t.Errorf("released = %v, want the turn's reservation 501 back", released)
+			}
+			if !tc.release && len(released) != 0 {
+				t.Errorf("released = %v, want the answer counted", released)
+			}
+		})
+	}
+	t.Run("timed out", func(t *testing.T) {
+		f := newFixture()
+		quota := withPrivateLimit(f, 10)
+		f.opts.TurnTimeout = 20 * time.Millisecond
+		f.replier.waitForDeadline = true
+
+		expectOneReply(t, f.run(textFrom(userID, "hi")), textTimeout)
+		if _, released := quota.recorded(); len(released) != 1 {
+			t.Errorf("released = %v; a turn out of time must still give its answer back", released)
+		}
+	})
+}
+
+func TestGroupsIgnoreThePrivateLimit(t *testing.T) {
+	f := newFixture()
+	quota := withPrivateLimit(f, 1)
+
+	f.run(inGroup(groupMessage("Mira, one")), inGroup(groupMessage("Mira, two")), inGroup(groupMessage("Mira, three")))
+
+	if calls := len(f.replier.recorded()); calls != 3 {
+		t.Errorf("model calls = %d, want 3", calls)
+	}
+	if asked, _ := quota.recorded(); len(asked) != 0 {
+		t.Errorf("asked = %+v; groups have their own quota", asked)
+	}
+}
+
+func TestPrivateQuotaErrorStillAnswers(t *testing.T) {
+	f := newFixture()
+	quota := withPrivateLimit(f, 1)
+	quota.err = errors.New("database down")
+
+	expectOneReply(t, f.run(textFrom(userID, "hi")), "echo: hi")
+
+	f = newFixture()
+	quota = withPrivateLimit(f, 1)
+	quota.err = errors.New("database down")
+	f.replier.err = errors.New("model down")
+	f.run(textFrom(userID, "hi"))
+	if _, released := quota.recorded(); len(released) != 0 {
+		t.Errorf("released = %v; nothing was reserved", released)
+	}
+}
+
+func TestZeroPrivateLimitCountsNothing(t *testing.T) {
+	f := newFixture()
+	quota := withPrivateLimit(f, 0)
+
+	f.run(textFrom(userID, "one"), textFrom(userID, "two"))
+
+	if calls := len(f.replier.recorded()); calls != 2 {
+		t.Errorf("model calls = %d, want 2", calls)
+	}
+	if asked, _ := quota.recorded(); len(asked) != 0 {
+		t.Errorf("asked = %+v; 0 turns the limit off", asked)
+	}
+}
+
+// The limit guards the model's cost, and listening to a voice message is a
+// call to the model too.
+func TestVoicePastTheDailyLimitIsNotTranscribed(t *testing.T) {
+	f := newFixture()
+	withPrivateLimit(f, 1)
+	voice := func(m *telegram.Message) { m.Voice = &telegram.Voice{FileID: "voice", Duration: 12} }
+
+	f.run(privateWith(voice), privateWith(voice), privateWith(voice))
+
+	if calls := f.transcriber.count(); calls != 1 {
+		t.Errorf("transcriptions = %d, want 1: only the answered message is listened to", calls)
+	}
+	if calls := f.replier.recorded(); len(calls) != 1 || calls[0].text != `<voice message, 12 s> "salom dunyo"` {
+		t.Errorf("model calls = %+v, want the one transcript", calls)
+	}
+}

@@ -385,6 +385,27 @@ func TestLoadGroupLimits(t *testing.T) {
 	}
 }
 
+func TestPrivateDailyLimit(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil || cfg.PrivateDailyLimit != 10 {
+		t.Fatalf("default = %d, err = %v; want 10", cfg.PrivateDailyLimit, err)
+	}
+	for value, want := range map[string]int{"0": 0, "25": 25} {
+		env := validEnv()
+		env["PRIVATE_DAILY_LIMIT"] = value
+		if cfg, err := Load(getenv(env)); err != nil || cfg.PrivateDailyLimit != want {
+			t.Errorf("PRIVATE_DAILY_LIMIT=%s: %d, %v; want %d", value, cfg.PrivateDailyLimit, err, want)
+		}
+	}
+	for _, bad := range []string{"-1", "ten"} {
+		env := validEnv()
+		env["PRIVATE_DAILY_LIMIT"] = bad
+		if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "PRIVATE_DAILY_LIMIT") {
+			t.Errorf("PRIVATE_DAILY_LIMIT=%s: err = %v, want it refused", bad, err)
+		}
+	}
+}
+
 func TestWebhookSecret(t *testing.T) {
 	cfg, err := Load(getenv(validEnv()))
 	if err != nil || cfg.WebhookSecret != "" {

@@ -29,14 +29,15 @@ moderation for group admins).
 6. [The character](#the-character)
 7. [Photos, stickers, GIFs and voice messages](#photos-stickers-gifs-and-voice-messages)
 8. [Drawing pictures](#drawing-pictures)
-9. [Groups](#groups)
-10. [VPS deployment (systemd)](#vps-deployment-systemd)
-11. [Docker Compose deployment (optional)](#docker-compose-deployment-optional)
-12. [Vercel deployment (webhook)](#vercel-deployment-webhook)
-13. [Backup and restore](#backup-and-restore)
-14. [Long polling and webhooks](#long-polling-and-webhooks)
-15. [Security checklist](#security-checklist)
-16. [Troubleshooting](#troubleshooting)
+9. [Daily limit in private chats](#daily-limit-in-private-chats)
+10. [Groups](#groups)
+11. [VPS deployment (systemd)](#vps-deployment-systemd)
+12. [Docker Compose deployment (optional)](#docker-compose-deployment-optional)
+13. [Vercel deployment (webhook)](#vercel-deployment-webhook)
+14. [Backup and restore](#backup-and-restore)
+15. [Long polling and webhooks](#long-polling-and-webhooks)
+16. [Security checklist](#security-checklist)
+17. [Troubleshooting](#troubleshooting)
 
 ## Architecture
 
@@ -64,7 +65,7 @@ How one message travels through the bot:
    that user.
 3. The worker applies the per-user flood guard and, in a group, the ignore
    list, the emoji reaction to applause and the reply quota, then runs a
-   command or calls `agent`.
+   command or calls `agent`, in a private chat only within the daily limit.
 4. `agent` loads the user's recent history, sends it to the model with the
    tool definitions, runs any tools the model asks for, and repeats until the
    model answers in text.
@@ -110,6 +111,7 @@ groups(chat_id PK, title, username, bot_status, bot_rights jsonb,
 image_generations(id PK, user_id, chat_id, created_at)
 bot_replies(id PK, chat_id, bot_id, created_at)
 group_replies(chat_id, user_id, created_at)
+private_messages(id PK, user_id, denied, created_at)
 broadcasts(id PK, owner_id, update_id, text, chat_ids bigint[],
            created_at, sent_at)
 group_rules(id PK, chat_id (0 for every group), kind, user_id, user_name,
@@ -181,6 +183,7 @@ in the environment win over the file.
 | `MAX_TOOL_CALLS_PER_TURN`     | `4`                            | Tool calls allowed while answering one message                                                               |
 | `MAX_CONCURRENT_REQUESTS`     | `10`                           | Number of workers                                                                                            |
 | `USER_RATE_LIMIT_PER_MINUTE`  | `10`                           | Messages each user may send per minute                                                                       |
+| `PRIVATE_DAILY_LIMIT` | `10` | Answers each user gets per day in private chats, from midnight in `GROUP_HISTORY_TIMEZONE`; the next message gets one notice, later ones nothing. Owners have no limit (admins do); commands and failed turns are not counted; `0` turns it off. Counted in the database |
 | `REQUEST_TIMEOUT_SECONDS`     | `45`                           | Time budget for answering one message                                                                        |
 | `MAX_INPUT_CHARS`             | `4000`                         | Longest user message accepted                                                                                |
 | `RETENTION_DAYS` | `1` | Chat history is kept this many days, then deleted; `0` keeps it forever |
@@ -191,7 +194,7 @@ in the environment win over the file.
 | `ENABLE_USERNAME_MENTION`     | `true`                         | In groups, answer when `@username` is mentioned                                                              |
 | `ENABLE_REPLY_TRIGGER`        | `true`                         | In groups, answer replies to the bot's messages                                                              |
 | `GROUP_AMBIENT_MESSAGES` | `200` | How many of the last 12 hours' group messages are given to the model with a question (0 to 500; 0 turns the group log off) |
-| `GROUP_HISTORY_TIMEZONE` | `Asia/Tashkent` | The groups' time zone: the times in the group log and in what the model is told, the day the picture limit counts, and the time given when nobody names a zone |
+| `GROUP_HISTORY_TIMEZONE` | `Asia/Tashkent` | The groups' time zone: the times in the group log and in what the model is told, the day the picture and private-chat limits count, and the time given when nobody names a zone |
 | `BOT_OWNER_USERNAME` | empty | The owners' Telegram usernames, comma-separated (e.g. `pronium,TursunoffM`); the bot treats owners warmly, follows their instructions and lets them manage it in any group |
 | `BOT_OWNER_IDS` | empty | The owners' numeric Telegram user IDs, comma-separated; when set, only these accounts are owners and `BOT_OWNER_USERNAME` (then required) only names them. Safer: a username can be given up and taken by someone else |
 | `ALLOWED_BOTS` | empty | Other bots the bot answers in groups, comma-separated usernames, or `*` for any bot; empty answers no bots |
@@ -432,7 +435,8 @@ holds the admin right (see [Moderation](#moderation)). In groups every
 sender is shown to the model by first name and `@username`.
 Your messages are additionally marked `[owner]`, based on your
 Telegram account, so someone who copies your name or says they are the owner
-gets no special treatment.
+gets no special treatment. Owners have no daily limit, on answers in private
+chats or on pictures.
 
 Also set `BOT_OWNER_IDS` to the owners' numeric Telegram IDs (the bot logs
 `user_id=` for each message). Then only those accounts are owners, and the
@@ -486,6 +490,28 @@ reply with the bot's answer as its caption.
 every request is refused with `429 You exceeded your current quota`, and the
 bot says drawing is not available right now. Turn on billing for the key in
 Google AI Studio to use it. Each picture is billed by Google.
+
+## Daily limit in private chats
+
+In a private chat each user gets `PRIVATE_DAILY_LIMIT` answers a day
+(default 10), counted from midnight in `GROUP_HISTORY_TIMEZONE`.
+
+- Counted: every message that reaches the model, photos and voice messages
+  included, and one the model chose not to answer. Not counted: commands, a
+  message too long or of a kind she cannot read, and a turn that failed with
+  an error (the model overloaded, out of time, or any other error).
+- The first message past the limit gets one notice, in Uzbek, Russian and
+  English; later ones that day get nothing. A voice message past the limit is
+  not even transcribed.
+- Owners have no limit. Everyone else has, the administrators in
+  `ADMIN_USER_IDS` included. Groups are not affected; they have their own
+  [limits](#limits).
+- The count is kept in the database (`private_messages`: the user's ID and
+  the time of each answer, never the text), so it holds on Vercel and across
+  restarts. When it cannot be read she answers anyway and logs a warning:
+  the limit guards the model's cost, and one answer too many disturbs
+  nobody else.
+- `0` turns the limit off.
 
 ## Groups
 
@@ -1031,10 +1057,10 @@ with one mode at a time; while a webhook is set, `make run` fails with
 ### Deploying this change
 
 The group manners and admin powers update (reactions, reply quotas in the
-database, standing rules, moderation, polls, owners by ID) needs, in this
-order:
+database, standing rules, moderation, polls, owners by ID, a daily limit in
+private chats) needs, in this order:
 
-1. **Apply migrations 0013 to 0016 before deploying**: `make migrate` with
+1. **Apply migrations 0013 to 0017 before deploying**: `make migrate` with
    `DB_POSTGRES_URL` pointing at the production database, as in step 1
    above. They only add tables and one column; nothing existing is changed.
    The new version refuses to start on the old schema (the function answers
@@ -1043,8 +1069,9 @@ order:
    one.
 2. **Set in Vercel**: `BOT_WAKE_WORDS=maria,mariya,мария,мариа`, and,
    optionally but preferably, `BOT_OWNER_IDS` with the owners' numeric IDs.
-   The new limits default to `GROUP_RATE_LIMIT_PER_MINUTE=6` and
-   `MEMBER_REPLIES_PER_10_MIN=4`; set them only to change that.
+   The new limits default to `GROUP_RATE_LIMIT_PER_MINUTE=6`,
+   `MEMBER_REPLIES_PER_10_MIN=4` and `PRIVATE_DAILY_LIMIT=10`; set them only
+   to change that.
 3. **Deploy.**
 4. **Give Maria the admin rights she should use** in each group: *Delete
    messages*, *Ban users* (for mute and ban) and *Pin messages*. She does
@@ -1113,7 +1140,9 @@ sudo -u postgres dropdb tgbot_restore_test
 
 **Retention.** Messages older than `RETENTION_DAYS` (default 1 day) are deleted
 by an hourly job, or daily by Vercel Cron. A user can delete their own history at any time with
-`/reset`. Standing rules are deleted when they expire. The moderation audit
+`/reset`. The counts behind the limits (`image_generations`, `bot_replies`,
+`group_replies`, `private_messages`) hold IDs and times, no message text, and
+are deleted with the history. Standing rules are deleted when they expire. The moderation audit
 (`moderation_actions`, `pending_bans`) is never deleted automatically; delete
 old rows yourself if you do not want to keep them. Backups keep deleted data
 until they are rotated out.
@@ -1187,8 +1216,9 @@ Built in:
       cannot be passed on the way a username can.
 - [x] Input length, output tokens, tool output size, tool run time, tool
       calls per message and time per message are all limited.
-- [x] Group reply quotas, replies to bots and polls are counted in the
-      database, so they hold with several instances; per-user flood guard;
+- [x] Group reply quotas, the private chats' daily limit, replies to bots
+      and polls are counted in the database, so they hold with several
+      instances; per-user flood guard;
       fixed number of workers; bounded queues.
 - [x] Only registered tools run. No shell, no `eval`, no model-written SQL.
 - [x] Tool permissions and restricted commands are checked in code against
@@ -1258,6 +1288,7 @@ Known limits:
 | "That took too long to answer"                            | The model was slower than `REQUEST_TIMEOUT_SECONDS`. Raise it or use a faster model.                                                                                                                                                                                                          |
 | Wrong time or wrong arithmetic                            | The model has no tool support and is guessing. Look for `model does not support tool calling` in the log and see [Choosing a model](#choosing-a-model). The time is given in `GROUP_HISTORY_TIMEZONE` unless another zone is asked for.                                                     |
 | "You're sending messages too quickly"                     | Per-user rate limit, announced in private chats only. Raise `USER_RATE_LIMIT_PER_MINUTE` if it is too strict.                                                                                                                                                                                 |
+| "That's today's limit", then silence, in a private chat   | The private daily limit: the log shows `private daily limit reached`. Raise `PRIVATE_DAILY_LIMIT`, or `0` to turn it off; owners are never limited. `private message count failed; answering anyway` means the database could not be asked. |
 | "I'm handling a lot of messages right now"                | Worker queues are full. Raise `MAX_CONCURRENT_REQUESTS`, and `pool_max_conns` to match.                                                                                                                                                                                                       |
 | The bot forgot the conversation                           | History is limited to `MAX_HISTORY_MESSAGES`, and idle conversations are deleted after `RETENTION_DAYS`.                                                                                                                                                                                      |
 | Service will not start under systemd                      | `journalctl -u telegram-ai-agent -n 50`. Check the environment file's owner and mode, and that it has no quotes around values.                                                                                                                                                                |
