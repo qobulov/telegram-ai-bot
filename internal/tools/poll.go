@@ -126,7 +126,7 @@ func (p polls) run(ctx context.Context, raw json.RawMessage) (any, error) {
 		ChatID: caller.ChatID, Action: actionPoll, RequesterID: caller.UserID, UpdateID: caller.UpdateID,
 	})
 	if err != nil {
-		return nil, err
+		return nil, internal(err)
 	}
 	if !first {
 		return map[string]any{"already_handled": true, "action": actionPoll, "note": pollAskedNote}, nil
@@ -197,7 +197,7 @@ func runesWithin(text string, limit int) bool {
 func (p polls) checkPace(ctx context.Context, chatID int64) error {
 	made, err := p.Store.ChatModeration(ctx, chatID, actionPoll, p.Now().Add(-pollWindow))
 	if err != nil {
-		return err
+		return internal(err)
 	}
 	if made > 1 {
 		return &ArgumentError{Message: pollTooSoon}
@@ -222,7 +222,7 @@ func (p polls) notSent(ctx context.Context, caller Caller, sendErr error) error 
 // it was not posted. A record that cannot be dropped is reported too.
 func (p polls) forget(ctx context.Context, caller Caller, why error) error {
 	if err := p.Store.ForgetModeration(context.WithoutCancel(ctx), caller.UpdateID, actionPoll); err != nil {
-		return errors.Join(why, err)
+		return errors.Join(why, internal(err))
 	}
 	return why
 }

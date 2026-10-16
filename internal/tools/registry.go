@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -69,17 +70,55 @@ type DeniedError struct {
 
 func (e *DeniedError) Error() string { return e.Message }
 
+// internalFailure is all the model is told of a failure on the bot's own
+// side.
+const internalFailure = "something went wrong on my side; try again later"
+
+// InternalError is a failure on the bot's own side, such as an unreachable
+// database. The model is told only internalFailure: the cause can name
+// hosts, users and databases, and the model may repeat what it is told in a
+// group. The registry logs the cause.
+type InternalError struct {
+	Err error
+}
+
+func (e *InternalError) Error() string { return internalFailure }
+
+func (e *InternalError) Unwrap() error { return e.Err }
+
+// internal is err as an InternalError, or nil.
+func internal(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &InternalError{Err: err}
+}
+
+// cause is err as the logs need it: with what an InternalError hides.
+func cause(err error) error {
+	var hidden *InternalError
+	if errors.As(err, &hidden) {
+		return hidden.Err
+	}
+	return err
+}
+
 // Registry is the fixed set of tools available to the model. Nothing outside
 // it can be executed. It is safe for concurrent use.
 type Registry struct {
 	isAdmin func(userID int64) bool
+	logger  *slog.Logger
 	tools   []Tool
 	byName  map[string]Tool
 }
 
-// NewRegistry builds a registry. isAdmin decides who may use admin-only tools.
-func NewRegistry(isAdmin func(userID int64) bool, tools ...Tool) (*Registry, error) {
-	registry := &Registry{isAdmin: isAdmin, byName: make(map[string]Tool, len(tools))}
+// NewRegistry builds a registry. isAdmin decides who may use admin-only
+// tools; logger, slog.Default when nil, gets what InternalErrors hide.
+func NewRegistry(isAdmin func(userID int64) bool, logger *slog.Logger, tools ...Tool) (*Registry, error) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	registry := &Registry{isAdmin: isAdmin, logger: logger, byName: make(map[string]Tool, len(tools))}
 	for _, tool := range tools {
 		if tool.Name == "" || tool.Run == nil {
 			return nil, errors.New("tools: every tool needs a name and a Run function")
@@ -140,6 +179,10 @@ func (r *Registry) Execute(ctx context.Context, callerID int64, name, args strin
 	}
 	result, err := runWithTimeout(ctx, tool, raw)
 	if err != nil {
+		var hidden *InternalError
+		if errors.As(err, &hidden) {
+			r.logger.Warn("tool failed", "tool", name, "user_id", callerID, "error", hidden.Err)
+		}
 		return failure(errorCode(err), err.Error())
 	}
 	return success(result, tool.MaxOutputBytes)

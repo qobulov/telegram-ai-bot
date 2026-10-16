@@ -207,7 +207,7 @@ func reserve(ctx context.Context, opts ImageOptions, caller Caller) (int64, erro
 	midnight := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, opts.Location)
 	id, granted, err := opts.Quota.ReserveImage(ctx, caller.UserID, caller.ChatID, midnight, limit)
 	if err != nil {
-		return 0, err
+		return 0, internal(err)
 	}
 	if !granted {
 		return 0, &LimitError{Message: fmt.Sprintf("this person has used their %d pictures for today; more after midnight", opts.DailyLimit)}

@@ -1048,3 +1048,17 @@ func TestConfirmationAnswer(t *testing.T) {
 		}
 	}
 }
+
+// Any member's turn can reach the tool, so the database's errors, which
+// name its host and user, must not reach the model and so the group.
+func TestModerateHidesStoreErrors(t *testing.T) {
+	env := newModerationEnv(t)
+	env.audit.countErr = errors.New("storage: count moderation: failed to connect to `user=maria_app database=maria_prod`")
+
+	got := env.moderate(asking(100, bekTarget()), `{"action":"ban"}`)
+
+	if got.OK || strings.Contains(got.Error.Message, "maria_prod") || got.Error.Message != "something went wrong on my side; try again later" {
+		t.Errorf("ban = %+v, want the store's error hidden", got)
+	}
+	env.nothingDone(t)
+}

@@ -225,7 +225,7 @@ func (m *Moderation) run(ctx context.Context, raw json.RawMessage) (any, error) 
 	if args.Action == actionCancel {
 		cancelled, err := m.opts.Store.CancelPendingModeration(ctx, caller.UserID, caller.ChatID)
 		if err != nil {
-			return nil, err
+			return nil, internal(err)
 		}
 		return map[string]bool{"cancelled": cancelled}, nil
 	}
@@ -359,7 +359,7 @@ func ownMessageOnly(action string) error {
 func (m *Moderation) checkPace(ctx context.Context, caller Caller) error {
 	done, err := m.opts.Store.ModerationBy(ctx, caller.UserID, m.opts.Now().Add(-actionWindow))
 	if err != nil {
-		return err
+		return internal(err)
 	}
 	if done >= maxActions {
 		return &DeniedError{Message: fmt.Sprintf("that's %d actions in %d minutes; wait a bit", maxActions, int(actionWindow.Minutes()))}
@@ -373,7 +373,7 @@ func (m *Moderation) checkPace(ctx context.Context, caller Caller) error {
 func (m *Moderation) ask(ctx context.Context, o order) (any, error) {
 	saved, err := m.opts.Store.SavePendingModeration(ctx, o.pending())
 	if err != nil {
-		return nil, err
+		return nil, internal(err)
 	}
 	if !saved {
 		return map[string]any{"already_asked": true, "note": askedTwice}, nil
@@ -514,11 +514,11 @@ func notDone(err error) (Confirmation, error) {
 	case errors.As(err, &failure):
 		text = failure.message
 	default:
-		return Confirmation{Found: true, Text: "Not done: something went wrong on my side; ask again later."}, err
+		return Confirmation{Found: true, Text: "Not done: something went wrong on my side; ask again later."}, cause(err)
 	}
 	if failure != nil && err != error(failure) {
 		// The store could not drop the record of what Telegram did not do.
-		return Confirmation{Found: true, Text: "Not done: " + text + "."}, err
+		return Confirmation{Found: true, Text: "Not done: " + text + "."}, cause(err)
 	}
 	return Confirmation{Found: true, Text: "Not done: " + text + "."}, nil
 }

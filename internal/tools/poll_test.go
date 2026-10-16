@@ -50,11 +50,16 @@ type fakePollAudit struct {
 	now     func() time.Time
 	records []pollRecord
 	since   []time.Time
+	// err makes RecordModeration fail.
+	err error
 }
 
 func (f *fakePollAudit) RecordModeration(_ context.Context, a storage.ModerationAction) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.err != nil {
+		return false, f.err
+	}
 	if slices.ContainsFunc(f.records, func(r pollRecord) bool {
 		return r.action.UpdateID == a.UpdateID && r.action.Action == a.Action
 	}) {
@@ -357,5 +362,21 @@ func TestPollHiddenInPrivate(t *testing.T) {
 	}
 	if polls, audit := env.sender.sent(), env.audit.recorded(); len(polls) != 0 || len(audit) != 0 {
 		t.Errorf("polls = %+v, audit = %+v; want nothing", polls, audit)
+	}
+}
+
+// Anyone may ask for a poll, so the database's errors, which name its host
+// and user, must not reach the model and so the group.
+func TestPollHidesStoreErrors(t *testing.T) {
+	env := newPollEnv(t)
+	env.audit.err = errors.New("storage: record moderation: failed to connect to `user=maria_app database=maria_prod`")
+
+	got := env.poll(memberAsking(groupA, 100), lunchPoll)
+
+	if got.OK || strings.Contains(got.Error.Message, "maria_prod") || got.Error.Message != "something went wrong on my side; try again later" {
+		t.Errorf("poll = %+v, want the store's error hidden", got)
+	}
+	if polls := env.sender.sent(); len(polls) != 0 {
+		t.Errorf("polls = %+v, want none", polls)
 	}
 }

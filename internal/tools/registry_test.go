@@ -1,8 +1,12 @@
 package tools
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -43,7 +47,7 @@ func echoTool() Tool {
 
 func mustRegistry(t *testing.T, tools ...Tool) *Registry {
 	t.Helper()
-	registry, err := NewRegistry(isAdmin, tools...)
+	registry, err := NewRegistry(isAdmin, slog.New(slog.NewTextHandler(io.Discard, nil)), tools...)
 	if err != nil {
 		t.Fatalf("NewRegistry: %v", err)
 	}
@@ -170,17 +174,17 @@ func TestExecuteSurvivesPanickingTool(t *testing.T) {
 }
 
 func TestNewRegistryRejectsBadTools(t *testing.T) {
-	if _, err := NewRegistry(isAdmin, echoTool(), echoTool()); err == nil {
+	if _, err := NewRegistry(isAdmin, nil, echoTool(), echoTool()); err == nil {
 		t.Error("duplicate tool names accepted")
 	}
 	nameless := echoTool()
 	nameless.Name = ""
-	if _, err := NewRegistry(isAdmin, nameless); err == nil {
+	if _, err := NewRegistry(isAdmin, nil, nameless); err == nil {
 		t.Error("tool without a name accepted")
 	}
 	noRun := echoTool()
 	noRun.Run = nil
-	if _, err := NewRegistry(isAdmin, noRun); err == nil {
+	if _, err := NewRegistry(isAdmin, nil, noRun); err == nil {
 		t.Error("tool without Run accepted")
 	}
 }
@@ -258,5 +262,34 @@ func TestDeniedErrorIsForbidden(t *testing.T) {
 	env := decodeEnvelope(t, registry.Execute(context.Background(), userID, "refusing", `{}`))
 	if env.OK || env.Error.Code != "forbidden" || env.Error.Message != "only admins may ask for that" {
 		t.Errorf("envelope = %+v, want forbidden with the tool's reason", env)
+	}
+}
+
+// A failure on the bot's own side, such as the database's, can name hosts,
+// users and databases; the model, which may repeat it in a group, is told
+// only that something went wrong, and the logs get the cause.
+func TestInternalErrorIsHiddenFromTheModelAndLogged(t *testing.T) {
+	cause := errors.New("storage: take pending moderation: failed to connect to `user=maria_app database=maria_prod`")
+	failing := Tool{
+		Name:   "failing",
+		Schema: json.RawMessage(`{"type":"object"}`),
+		Run: func(context.Context, json.RawMessage) (any, error) {
+			return nil, errors.Join(errors.New("Telegram refused: Bad Request"), internal(cause))
+		},
+	}
+	var logs bytes.Buffer
+	registry, err := NewRegistry(isAdmin, slog.New(slog.NewTextHandler(&logs, nil)), failing)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	env := decodeEnvelope(t, registry.Execute(context.Background(), userID, "failing", ""))
+
+	if env.OK || env.Error.Code != "execution_failed" || strings.Contains(env.Error.Message, "maria_prod") ||
+		env.Error.Message != "Telegram refused: Bad Request\nsomething went wrong on my side; try again later" {
+		t.Errorf("result = %+v, want the cause hidden and the rest kept", env)
+	}
+	if !strings.Contains(logs.String(), "maria_prod") || !strings.Contains(logs.String(), "tool=failing") {
+		t.Errorf("logs = %q, want the cause and the tool", logs.String())
 	}
 }
