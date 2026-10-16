@@ -262,38 +262,82 @@ From the review:
   `internal/webapi/internal/genplaces` from the GeoNames extract for
   Uzbekistan (CC BY 4.0) and committed, so builds never touch the
   network: every PPLC, PPLA, PPLA2, PPLA3, town of 5,000 people or more,
-  and region and district (ADM1, ADM2). A region or district named like
-  its seat adds its names to the seat; one that is not (Forish,
-  Bo'stonliq) is its own row at its seat, else at its own point. Regions
-  and districts keep only their Uzbek and English names: their Russian
-  and Soviet ones ("Moskva Rayoni", now Shahrixon) would shadow cities
-  abroad. A few fixes are written in the generator (Nurafshon is Tashkent
-  region's centre, Termiz's spelling, Zarafshon, which GeoNames counts
-  nobody in). `places_world.go` holds about a hundred cities abroad by
+  and region and district (ADM1, ADM2), each district at its seat. A
+  region or district named like its seat adds its names to the seat; one
+  that is not (Forish, Bo'stonliq) is its own row at its seat. GeoNames
+  links few districts to their seats and has stale seats and districts,
+  so `genplaces/fixes.go` names by GeoNames id the seat of every
+  district (Tomdi's is Tomdibuloq, 80 km from the district's point;
+  Arnasoy's G'oliblar, not the village Arnasoy), the places it lists
+  twice, the districts made since (Ko'kdala, Tuproqqal'a, Yangihayot,
+  Yangiobod in Jizzax, Sardoba), today's names of renamed ones (Bo'z is
+  Bo'ston tumani, Oxunboboyev Qo'shtepa), wrong regions, Yangiyo'l (a
+  city GeoNames calls a village), the resorts members ask about
+  (Chorvoq, Chimyon, Xumson, Burchmulla) and Russian names of seats and
+  of Tashkent's districts it lacks. A name in a language other than
+  Uzbek is kept only if it is the place's own name written another way:
+  as many words, the same consonants but for one more or one other at
+  the end (Kokand for Qo'qon, Dzhizak for Jizzax); Soviet names that are
+  other cities today (Ul'yanovsk was Mug'lon, Sverdlovsk Jondor,
+  Kuybyshev Rishton, Kyzyl-Tepa Qo'rg'ontepa's) are dropped. Russian
+  adjectives ("Farishskiy Rayon") are read as the nouns they come from
+  (Farish). Each row says whether it is a town, a district or a region,
+  and its region. `places_world.go` holds about 125 cities abroad by
   their Uzbek Latin, Uzbek Cyrillic, Russian and English names, with time
-  zones. `internal/webapi/internal/placename` folds names for both
-  tables: case, apostrophes, spaces, hyphens, diacritics, words such as
-  "shahri" and "tumani", Cyrillic read as Uzbek Latin, and the letters
-  Uzbek and Russian spellings differ in (q/k, x/kh, g/gh, j/dzh, v/w).
-  A name as written beats a folded one, and at each step Uzbekistan beats
-  the world: Bo'ston is the Uzbek town and Boston the American city.
-  Among Uzbek places sharing a name, the capital, then a region centre, a
-  region, a district seat, a district, then a town, and then the larger.
-  prayer_times keeps its 14 region centres and their checked coordinates,
-  and takes a name to the centre within 0.1 degrees of the place it finds
-  ("Qashqadaryo" is Qarshi).
-- Geocoder: asked only when both tables miss, for 20 answers. A Latin
-  name is asked in Uzbek and English at once; one with an apostrophe is
-  also asked in Uzbek with it written as U+2018, as U+2019 and dropped,
-  since GeoNames finds nothing for `Bo'ritepa`. All questions share a 2 s
-  deadline, so the forecast keeps its time. An answer counts only if it
-  is named as asked: as written, or in Uzbekistan also folded, so the
-  extra spellings never land abroad; anything else is an argument error
-  asking for the nearest town or region centre. Among matches, one named
-  as written, then Uzbekistan, then the larger town, then the geocoder's
-  order. Results without a country, country code or time zone, and
-  historical or abandoned places, are dropped. The cache key is the name
-  as sent (normalizeName made "Mexico City" share "Mexico"'s entry).
+  zones (the ones the geocoder cannot find by those names, or whose
+  names are Uzbek places too: Baghdad, Ansan, Qarag'anda, O'zgan,
+  Bohtar for Kurgan-Tyube), and the names of countries.
+  `internal/webapi/internal/placename` folds names for both tables: case,
+  apostrophes, spaces, hyphens, diacritics, words such as "shahri",
+  "sh." and "tumani", Cyrillic read as Uzbek Latin, and the letters
+  Uzbek and Russian spellings differ in (q/k, x/kh/h, g/gh, j/zh/dzh,
+  v/w). A name as written beats a folded one, and at each step
+  Uzbekistan beats the world: Bo'ston is the Uzbek town and Boston the
+  American city, but an Uzbek place word ("Boston tumani", "Boston
+  shahri") puts the folded Uzbek names first and picks a district, town
+  or region among Uzbek namesakes. Among Uzbek places sharing a name, the
+  capital and its districts (Uchtepa is Tashkent's, not the Jizzax
+  village), then a region centre, a district seat, a region (Sirdaryo is
+  the town, Sirdaryo viloyati the region), a district, a smaller seat
+  and a town; then a row named so before one with the name as an alias;
+  then the larger. Names Uzbek places share with cities abroad stay
+  Uzbek, as the design says: Bagdad and Багдад are the Farg'ona town,
+  Naryn and Нарын the Norin district. A country's name without a place
+  word is an argument error asking for a town. What follows a comma
+  narrows the place: an Uzbek region, district or town there picks the
+  Uzbek place of the name in that region ("Yangibozor, Xorazm"; "Farg'ona
+  viloyati, Qo'qon" is read either way round), anything else must be the
+  country, state or province of a geocoder answer ("Paris, Texas",
+  "Olot, Ispaniya"); words that name nothing ("New York, NY") are
+  ignored. prayer_times keeps its 14 region centres and their checked
+  coordinates, and takes a name to the centre within 0.1 degrees of the
+  place it finds ("Qashqadaryo" is Qarshi).
+- Geocoder: asked only when both tables miss, for 20 answers, with the
+  Uzbek and Russian place words dropped ("Keles shahri" is asked as
+  Keles; "Mexico City" keeps its City). A Latin name is asked in Uzbek
+  and English, and in Russian spelled in Cyrillic letters, since
+  members' Latin spellings of cities abroad follow their Russian names
+  (Venetsiya, Xyuston, Maskat); one with an apostrophe is also asked in
+  Uzbek with it written as U+2018, as U+2019 and dropped, since GeoNames
+  finds nothing for `Bo'ritepa`. A Cyrillic name is asked in Russian, and
+  in Uzbek and English in Latin letters (Дамашқ is Damashq). All
+  questions share a 2 s deadline, so the forecast keeps its time. An
+  answer counts only if it is named as asked: as written, or by one word
+  of its name (Эр-Рияд for Riyad), or by a Russian name spelled as the
+  name reads in Russian letters (Венеция for Venetsiya), or, in
+  Uzbekistan only, folded, so the extra spellings never land abroad;
+  anything else is an argument error asking for the nearest town or
+  region centre. A country named as asked is an argument error too,
+  unless its capital is named so (Mexico is Mexico City). Among matches,
+  Uzbekistan first, but a city abroad of 15,000 people or more is its
+  equal: the Uzbek table already has every Uzbek place of 5,000 or more,
+  so an Uzbek answer here is a village, and Kirov is the Russian city
+  before the Kirov in Andijon. Then one named as written, then the larger
+  town, then the geocoder's order; the place is named as the language
+  asked first names it (Kyoto, not the Russian answer's Киото). Results
+  without a country, country code or time zone, and historical or
+  abandoned places, are dropped. The cache key is the name as sent
+  (normalizeName made "Mexico City" share "Mexico"'s entry).
 - News: feeds may be up to 1 MB (daryo.uz sends whole articles, 247 KB on
   2026-10-16); uza.uz's `+0000` dates are read as Tashkent time; a date
   more than 10 minutes ahead is dropped rather than allowed to top the

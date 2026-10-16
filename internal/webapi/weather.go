@@ -152,10 +152,8 @@ func (a *apis) weather(ctx context.Context, raw json.RawMessage) (any, error) {
 	if args.Days != nil {
 		days = *args.Days
 	}
-	// "New York, NY" is New York.
-	city, _, _ := strings.Cut(args.City, ",")
-	city = strings.TrimSpace(city)
-	if city == "" || len([]rune(city)) > maxCityName || days < 1 || days > 3 {
+	city := strings.TrimSpace(args.City)
+	if parsePlace(city).name == "" || len([]rune(city)) > maxCityName || days < 1 || days > 3 {
 		return nil, argumentError("city must be a name of at most %d characters and days 1 to 3", maxCityName)
 	}
 	where, err := a.findSpot(ctx, city)
@@ -480,22 +478,205 @@ func metDay(points []metPoint, date string, location *time.Location) (weatherDay
 	return day, found
 }
 
+// placeQuery is a member's place: a name and what may follow a comma, a
+// region, district, state or country it is in.
+type placeQuery struct {
+	name   string
+	within []string
+}
+
+func parsePlace(city string) placeQuery {
+	parts := strings.Split(city, ",")
+	q := placeQuery{name: strings.TrimSpace(parts[0])}
+	for _, part := range parts[1:] {
+		if part = strings.TrimSpace(part); part != "" {
+			q.within = append(q.within, part)
+		}
+	}
+	return q
+}
+
+// countryKeys fold the names in countries.
+var countryKeys = func() map[string]bool {
+	keys := map[string]bool{}
+	for _, name := range countries {
+		keys[placename.Key(name)] = true
+	}
+	return keys
+}()
+
+// isCountry reports whether name is a country's, written without a place
+// word: "O'zbekiston tumani" is a district in Farg'ona.
+func isCountry(name string) bool {
+	kind, _ := placename.KindOf(name)
+	return kind == placename.AnyKind && countryKeys[placename.Key(name)]
+}
+
+var uzbekistanKeys = map[string]bool{
+	placename.Key("O'zbekiston"): true, placename.Key("Uzbekistan"): true,
+	placename.Key("Ўзбекистон"): true, placename.Key("Узбекистан"): true,
+}
+
+func isUzbekistan(name string) bool {
+	return uzbekistanKeys[placename.Key(name)]
+}
+
 // findSpot looks in the place tables first and asks the geocoder only
-// when both miss.
+// when both miss. What follows a comma narrows the answer: "Yangibozor,
+// Xorazm" is the Yangibozor in Khorezm, "Paris, Texas" the town in Texas,
+// and "Rossiya, Moskva", country first, Moscow.
 func (a *apis) findSpot(ctx context.Context, city string) (spot, error) {
-	if p, found := lookupPlace(city); found {
+	q := parsePlace(city)
+	if isCountry(q.name) && len(q.within) > 0 {
+		q = placeQuery{name: q.within[0], within: slices.Concat(q.within[1:], []string{q.name})}
+	}
+	if isCountry(q.name) {
+		return spot{}, argumentError("%q is a country, not a town; ask which town or city", q.name)
+	}
+	if len(q.within) > 0 {
+		if where, found, err := a.findWithin(ctx, q); found || err != nil {
+			return where, err
+		}
+	}
+	if p, found := lookupPlace(q.name); found {
 		return p.spot()
 	}
-	geocoding, cancel := context.WithTimeout(ctx, geocodingTimeout)
-	defer cancel()
-	results, err := a.geocode(geocoding, geocoderQueries(city))
-	if match, found := matchingPlace(city, results); found {
+	results, err := a.geocodeName(ctx, q.name)
+	if capital, country := countryAnswer(q.name, results); country {
+		if capital.Name == "" {
+			return spot{}, argumentError("%q is a country, not a town; ask which town or city", q.name)
+		}
+		return capital.spot()
+	}
+	if match, found := matchingPlace(q.name, results); found {
 		return match.spot()
 	}
 	if err != nil {
 		return spot{}, err
 	}
-	return spot{}, argumentError("no place called %q was found; ask for the nearest town or region centre", city)
+	return spot{}, argumentError("no place called %q was found; ask for the nearest town or region centre", q.name)
+}
+
+// findWithin answers a name with what followed its comma. An Uzbek
+// region, district or town there, or Uzbekistan itself, picks the Uzbek
+// place of the name in that region ("Farg'ona viloyati, Qo'qon" is read
+// either way round). Anything else must be the country, state or province
+// of one of the geocoder's answers. found is false when the words after
+// the comma name nothing ("New York, NY"), and the name is then looked up
+// alone.
+func (a *apis) findWithin(ctx context.Context, q placeQuery) (where spot, found bool, err error) {
+	for _, qualifier := range q.within {
+		if isUzbekistan(qualifier) {
+			return a.findInUzbekistan(ctx, q.name, nil)
+		}
+		if row, inTable := bestUzbekPlace(uzbekCandidates(qualifier), kindOfName(qualifier), placename.Key(qualifier)); inTable {
+			name, around := q.name, uzbekPlaces[row]
+			if head, ok := bestUzbekPlace(uzbekCandidates(name), kindOfName(name), placename.Key(name)); ok && readBackwards(uzbekPlaces[head], around) {
+				name, around = qualifier, uzbekPlaces[head]
+			}
+			return a.findInUzbekistan(ctx, name, &around)
+		}
+	}
+	results, err := a.geocodeName(ctx, q.name)
+	var inside []geocodingResult
+	for _, r := range results {
+		if slices.ContainsFunc(q.within, r.isIn) {
+			inside = append(inside, r)
+		}
+	}
+	if match, matched := matchingPlace(q.name, inside); matched {
+		where, err := match.spot()
+		return where, true, err
+	}
+	return spot{}, err != nil, err
+}
+
+func kindOfName(name string) placename.Kind {
+	kind, _ := placename.KindOf(name)
+	return kind
+}
+
+// readBackwards reports whether "region, town" was written region first:
+// the name is a region and what follows is a place inside it.
+func readBackwards(head, qualifier uzbekPlace) bool {
+	return head.kinds&regionKind != 0 && qualifier.kinds&regionKind == 0 && sameProvince(head, qualifier)
+}
+
+// findInUzbekistan finds name among Uzbek places, in around's region when
+// around is set: in the table, else among the geocoder's Uzbek answers.
+func (a *apis) findInUzbekistan(ctx context.Context, name string, around *uzbekPlace) (spot, bool, error) {
+	var rows []int
+	for _, row := range uzbekCandidates(name) {
+		if around == nil || sameProvince(uzbekPlaces[row], *around) {
+			rows = append(rows, row)
+		}
+	}
+	if row, found := bestUzbekPlace(rows, kindOfName(name), placename.Key(name)); found {
+		where, err := uzbekPlaces[row].place().spot()
+		return where, true, err
+	}
+	results, err := a.geocodeName(ctx, name)
+	var inside []geocodingResult
+	for _, r := range results {
+		if r.CountryCode == "UZ" && (around == nil || r.inProvince(around.province)) {
+			inside = append(inside, r)
+		}
+	}
+	if match, found := matchingPlace(name, inside); found {
+		where, err := match.spot()
+		return where, true, err
+	}
+	if err != nil {
+		return spot{}, true, err
+	}
+	where := "Uzbekistan"
+	if around != nil {
+		where = around.name
+	}
+	return spot{}, true, argumentError("no place called %q was found in %s; ask for the nearest town or region centre", name, where)
+}
+
+// isIn reports whether the words after a comma name r's country, state or
+// province, in any language the geocoder answered in, or its country code.
+func (r geocodingResult) isIn(qualifier string) bool {
+	key := placename.Key(qualifier)
+	if key == "" {
+		return false
+	}
+	for _, field := range []string{r.Country, r.Admin1, r.Admin2} {
+		if placename.Key(field) == key {
+			return true
+		}
+	}
+	return strings.EqualFold(strings.TrimSpace(qualifier), r.CountryCode)
+}
+
+// provinceKeys fold the names of each Uzbek region, as the geocoder names
+// a result's admin1 ("Sirdaryo viloyati", "Fergana").
+var provinceKeys = func() map[int]map[string]bool {
+	keys := map[int]map[string]bool{}
+	for _, p := range uzbekPlaces {
+		if p.kinds&regionKind == 0 {
+			continue
+		}
+		if keys[p.province] == nil {
+			keys[p.province] = map[string]bool{}
+		}
+		for _, name := range append([]string{p.name}, strings.Split(p.aliases, "|")...) {
+			keys[p.province][placename.Key(name)] = true
+		}
+	}
+	return keys
+}()
+
+// inProvince reports whether r, an Uzbek answer, lies in the region with
+// GeoNames' code province; Tashkent and its region count as one.
+func (r geocodingResult) inProvince(province int) bool {
+	key := placename.Key(r.Admin1)
+	if province == tashkentRegion || province == tashkentCity {
+		return provinceKeys[tashkentCity][key] || provinceKeys[tashkentRegion][key]
+	}
+	return provinceKeys[province][key]
 }
 
 func (p place) spot() (spot, error) {
@@ -512,12 +693,16 @@ func (p place) spot() (spot, error) {
 }
 
 type geocodingResult struct {
+	// ID is the GeoNames id, the same in every language's answer.
+	ID          int64   `json:"id"`
 	Name        string  `json:"name"`
 	Latitude    float64 `json:"latitude"`
 	Longitude   float64 `json:"longitude"`
 	FeatureCode string  `json:"feature_code"`
 	CountryCode string  `json:"country_code"`
 	Country     string  `json:"country"`
+	Admin1      string  `json:"admin1"`
+	Admin2      string  `json:"admin2"`
 	Population  int64   `json:"population"`
 	Timezone    string  `json:"timezone"`
 }
@@ -544,16 +729,29 @@ func (r geocodingResult) spot() (spot, error) {
 // geocoderQuery is one question to the geocoder.
 type geocoderQuery struct{ name, language string }
 
-// geocoderQueries says what to ask the geocoder about city: a Cyrillic
-// name in Russian, a Latin one in Uzbek and English. GeoNames writes the
-// apostrophe of o‘ and g‘ as U+2018 (Qo‘ng‘irot), as U+2019 (Bulung’ur)
-// or not at all, and finds nothing for the other ways, so a Latin name
-// with an apostrophe is also asked in Uzbek in each of those spellings.
+// geocodeName asks the geocoder about name, its place words dropped, in
+// the 2 s that leave the forecast its time.
+func (a *apis) geocodeName(ctx context.Context, name string) ([]geocodingResult, error) {
+	geocoding, cancel := context.WithTimeout(ctx, geocodingTimeout)
+	defer cancel()
+	return a.geocode(geocoding, geocoderQueries(cmp.Or(placename.Trim(name), name)))
+}
+
+// geocoderQueries say what to ask the geocoder about city. A Cyrillic name
+// is asked in Russian, and in Uzbek and English in Latin letters (Дамашқ
+// is Damashq, Токмок Tokmok). A Latin name is asked in Uzbek and English,
+// and in Russian in Cyrillic letters, as the Russian names of cities
+// abroad are the ones its Latin spellings follow (Venetsiya is Венеция,
+// Xyuston Хьюстон). GeoNames writes the apostrophe of o‘ and g‘ as U+2018
+// (Qo‘ng‘irot), as U+2019 (Bulung’ur) or not at all, and finds nothing
+// for the other ways, so a Latin name with an apostrophe is also asked in
+// Uzbek in each of those spellings.
 func geocoderQueries(city string) []geocoderQuery {
 	if hasCyrillic(city) {
-		return []geocoderQuery{{city, "ru"}}
+		latin := placename.Latin(city)
+		return []geocoderQuery{{city, "ru"}, {latin, "uz"}, {latin, "en"}}
 	}
-	queries := []geocoderQuery{{city, "uz"}, {city, "en"}}
+	queries := []geocoderQuery{{city, "uz"}, {city, "en"}, {placename.Cyrillic(city), "ru"}}
 	spellings := []string{city}
 	// -1 drops the apostrophe.
 	for _, mark := range []rune{'\u2018', '\u2019', -1} {
@@ -599,34 +797,102 @@ func (a *apis) geocodeIn(ctx context.Context, city, language string) ([]geocodin
 	})
 }
 
+// cityPopulation is the size GeoNames calls a city (its cities15000).
+const cityPopulation = 15000
+
 // matchingPlace picks the geocoder's town named as asked: it also answers
 // lookalikes, such as Farishonki in Russia for Forish. A result must be
-// named as the query is written (placename.Strict) or, in Uzbekistan
-// only, as it is folded (placename.Key): members drop apostrophes, and
-// the extra spellings asked for them (Boston for Bo'ston) must not land
-// abroad. A name as written comes first, then Uzbekistan, then the larger
-// town, then the geocoder's order. Airports, abandoned places and results
-// without a country or time zone, such as the parish in Montserrat that
-// "Sankt-Peterburg" finds, are never picked.
+// named as the query is written (placename.Strict), or have it as one
+// word of its name (Ansan for Ansan-si, Riyad for Эр-Рияд), or have a
+// Russian name spelled as the query reads in Russian letters (Venetsiya
+// for Венеция). In Uzbekistan only, it may also be named as the query
+// folds (placename.Key): members drop apostrophes, and the extra
+// spellings asked for them (Boston for Bo'ston) must not land abroad.
+//
+// Uzbekistan comes first, but a city abroad of cityPopulation or more is
+// its equal: the Uzbek table already holds every Uzbek place of 5,000
+// people or more, so an Uzbek answer here is a village, and Kirov is the
+// Russian city before the Kirov in Andijon. Then a name as written before
+// a folded one, then the larger, then the geocoder's order. Airports,
+// abandoned places and results without a country or time zone, such as
+// the parish in Montserrat that "Sankt-Peterburg" finds, are never
+// picked.
 func matchingPlace(query string, results []geocodingResult) (geocodingResult, bool) {
-	strict, loose := placename.Strict(query), placename.Key(query)
-	var matches []geocodingResult
+	type match struct {
+		geocodingResult
+		written bool
+	}
+	var matches []match
 	for _, r := range results {
-		named := placename.Strict(r.Name) == strict || (r.CountryCode == "UZ" && placename.Key(r.Name) == loose)
-		if named && strict != "" && isTown(r.FeatureCode) && r.CountryCode != "" && r.Country != "" && r.Timezone != "" {
-			matches = append(matches, r)
+		strict, loose := namedAs(query, r)
+		if (strict || loose) && isTown(r.FeatureCode) && r.CountryCode != "" && r.Country != "" && r.Timezone != "" {
+			matches = append(matches, match{r, strict})
 		}
 	}
 	if len(matches) == 0 {
 		return geocodingResult{}, false
 	}
-	return slices.MinFunc(matches, func(x, y geocodingResult) int {
+	best := slices.MinFunc(matches, func(x, y match) int {
 		return cmp.Or(
-			trueFirst(placename.Strict(x.Name) == strict, placename.Strict(y.Name) == strict),
-			trueFirst(x.CountryCode == "UZ", y.CountryCode == "UZ"),
+			trueFirst(x.preferred(), y.preferred()),
+			trueFirst(x.written, y.written),
 			cmp.Compare(y.Population, x.Population),
 		)
-	}), true
+	})
+	// The place is named in the language asked first: Kyoto, Yaponiya
+	// rather than the Russian answer's Киото, Япония that matched "Kioto".
+	for _, r := range results {
+		if r.ID != 0 && r.ID == best.ID && r.Country != "" {
+			return r, true
+		}
+	}
+	return best.geocodingResult, true
+}
+
+func (r geocodingResult) preferred() bool {
+	return r.CountryCode == "UZ" || r.Population >= cityPopulation
+}
+
+// namedAs reports whether r is named as query is written (strict) or, in
+// Uzbekistan, as it folds (loose); matchingPlace says how.
+func namedAs(query string, r geocodingResult) (strict, loose bool) {
+	asked := placename.Strict(query)
+	if asked == "" {
+		return false, false
+	}
+	readings := []string{asked}
+	if hasCyrillic(r.Name) {
+		readings = append(readings, placename.Strict(placename.Cyrillic(query)))
+	}
+	name, words := placename.Strict(r.Name), placename.Words(r.Name)
+	oneWord := len(placename.Words(query)) == 1
+	for _, reading := range readings {
+		if name == reading || (oneWord && len(words) > 1 && slices.Contains(words, reading)) {
+			return true, false
+		}
+	}
+	return false, r.CountryCode == "UZ" && placename.Key(r.Name) == placename.Key(query)
+}
+
+// countryAnswer reports whether the geocoder takes query, written without
+// a place word, for a country: Turkiya is Turkey, not a village in Nepal.
+// A capital named like its country is the answer then (Kuwait, Mexico for
+// Mexico City, Braziliya for Brasília).
+func countryAnswer(query string, results []geocodingResult) (capital geocodingResult, country bool) {
+	if kind, _ := placename.KindOf(query); kind != placename.AnyKind {
+		return geocodingResult{}, false
+	}
+	for _, r := range results {
+		if strict, _ := namedAs(query, r); strict && strings.HasPrefix(r.FeatureCode, "PCL") && r.FeatureCode != "PCLH" {
+			country = true
+			for _, c := range results {
+				if named, _ := namedAs(query, c); named && c.FeatureCode == "PPLC" && c.CountryCode == r.CountryCode && c.Timezone != "" && c.Country != "" {
+					return c, true
+				}
+			}
+		}
+	}
+	return geocodingResult{}, country
 }
 
 // isTown is true for GeoNames' populated places (PPL, PPLA, PPLC...) that

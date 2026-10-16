@@ -5,6 +5,7 @@ package webapi
 import (
 	"cmp"
 	"math"
+	"slices"
 	"strings"
 
 	"telegram-ai-bot/internal/webapi/internal/placename"
@@ -29,32 +30,63 @@ type uzbekPlace struct {
 	// feature is the GeoNames feature code: PPLC, PPLA, ADM1, PPLA2, ADM2,
 	// PPLA3 or PPL.
 	feature string
+	// province is GeoNames' code of the region: 13 is the city of
+	// Tashkent, 14 the region around it.
+	province int
+	kinds    placeKind
 	// aliases are the other spellings, separated by "|".
 	aliases string
 }
 
-// featureRanks order Uzbek places that share a name: the capital, a region
-// centre, a region, a district seat, a district, a smaller seat, a town.
-var featureRanks = map[string]int{"PPLC": 0, "PPLA": 1, "ADM1": 2, "PPLA2": 3, "ADM2": 4, "PPLA3": 5, "PPL": 6}
+// placeKind says what a row is to a member who writes "tumani" or
+// "viloyati": a town that is a district seat named like its district is
+// both.
+type placeKind int
 
-// nameIndex finds a table's row by a name as written (placename.Strict:
-// apostrophes count) or folded (placename.Key: they do not).
-type nameIndex struct{ strict, loose map[string]int }
+const (
+	townKind placeKind = 1 << iota
+	districtKind
+	regionKind
+)
+
+const (
+	tashkentCity   = 13
+	tashkentRegion = 14
+)
+
+// featureRanks order Uzbek places that share a name: the capital, a region
+// centre, a district seat, a region, a district, a smaller seat, a town.
+// A region ranks after a seat of its name: Sirdaryo is the town, Sirdaryo
+// viloyati the region.
+var featureRanks = map[string]int{"PPLC": 0, "PPLA": 1, "PPLA2": 2, "ADM1": 3, "ADM2": 4, "PPLA3": 5, "PPL": 6}
+
+// rank is a row's place in featureRanks. Tashkent's districts are parts of
+// the capital and rank with it: Uchtepa is the district of Tashkent, not
+// the village in Jizzax.
+func (p uzbekPlace) rank() int {
+	if p.feature == "ADM2" && p.province == tashkentCity {
+		return featureRanks["PPLC"]
+	}
+	return featureRanks[p.feature]
+}
+
+// nameIndex finds the rows of a table by a name as written
+// (placename.Strict: apostrophes count) or folded (placename.Key: they do
+// not).
+type nameIndex struct{ strict, loose map[string][]int }
 
 func newNameIndex() nameIndex {
-	return nameIndex{strict: map[string]int{}, loose: map[string]int{}}
+	return nameIndex{strict: map[string][]int{}, loose: map[string][]int{}}
 }
 
-// add files row under name, unless another row owns the name and
-// replaces says to keep it.
-func (x nameIndex) add(name string, row int, replaces func(old int) bool) {
-	addKey(x.strict, placename.Strict(name), row, replaces)
-	addKey(x.loose, placename.Key(name), row, replaces)
+func (x nameIndex) add(name string, row int) {
+	addKey(x.strict, placename.Strict(name), row)
+	addKey(x.loose, placename.Key(name), row)
 }
 
-func addKey(keys map[string]int, key string, row int, replaces func(old int) bool) {
-	if old, taken := keys[key]; key != "" && (!taken || replaces(old)) {
-		keys[key] = row
+func addKey(keys map[string][]int, key string, row int) {
+	if key != "" && !slices.Contains(keys[key], row) {
+		keys[key] = append(keys[key], row)
 	}
 }
 
@@ -63,18 +95,12 @@ var (
 	worldIndex = indexWorldCities()
 )
 
-// indexUzbekPlaces lets the higher-ranked, then the more populous, place
-// own a name that several share.
 func indexUzbekPlaces() nameIndex {
 	index := newNameIndex()
 	for row, p := range uzbekPlaces {
-		outranks := func(old int) bool {
-			other := uzbekPlaces[old]
-			return cmp.Or(cmp.Compare(featureRanks[p.feature], featureRanks[other.feature]), cmp.Compare(other.population, p.population)) < 0
-		}
-		index.add(p.name, row, outranks)
+		index.add(p.name, row)
 		for _, alias := range strings.Split(p.aliases, "|") {
-			index.add(alias, row, outranks)
+			index.add(alias, row)
 		}
 	}
 	return index
@@ -84,7 +110,7 @@ func indexWorldCities() nameIndex {
 	index := newNameIndex()
 	for row, city := range worldCities {
 		for _, spelling := range append([]string{city.name}, city.aliases...) {
-			index.add(spelling, row, func(int) bool { return false })
+			index.add(spelling, row)
 		}
 	}
 	return index
@@ -93,27 +119,104 @@ func indexWorldCities() nameIndex {
 // lookupPlace finds a place by any spelling: a name as written before one
 // that matches only folded, so Bo'ston is the Uzbek town and Boston the
 // American city, and at each step Uzbekistan before the rest of the world.
+// An Uzbek place word puts the folded Uzbek names first ("Boston tumani"
+// is Bo'ston) and picks a district, region or town among Uzbek places of
+// one name. A Russian adjective ("Китабский район") is read as its noun.
 func lookupPlace(name string) (place, bool) {
-	strict, loose := placename.Strict(name), placename.Key(name)
-	if row, found := uzbekIndex.strict[strict]; found {
-		return uzbekPlaces[row].place(), true
-	}
-	if row, found := worldIndex.strict[strict]; found {
-		return worldCities[row].place(), true
-	}
-	if row, found := uzbekIndex.loose[loose]; found {
-		return uzbekPlaces[row].place(), true
-	}
-	if row, found := worldIndex.loose[loose]; found {
-		return worldCities[row].place(), true
+	kind, uzbekWord := placename.KindOf(name)
+	for _, spelling := range append([]string{name}, placename.Nouns(name)...) {
+		strict, loose := placename.Strict(spelling), placename.Key(spelling)
+		uzbekStrict, inUzbekStrict := bestUzbekPlace(uzbekIndex.strict[strict], kind, loose)
+		uzbekLoose, inUzbekLoose := bestUzbekPlace(uzbekIndex.loose[loose], kind, loose)
+		worldStrict, worldLoose := worldIndex.strict[strict], worldIndex.loose[loose]
+		switch {
+		case inUzbekStrict:
+			return uzbekPlaces[uzbekStrict].place(), true
+		case inUzbekLoose && uzbekWord:
+			return uzbekPlaces[uzbekLoose].place(), true
+		case len(worldStrict) > 0:
+			return worldCities[worldStrict[0]].place(), true
+		case inUzbekLoose:
+			return uzbekPlaces[uzbekLoose].place(), true
+		case len(worldLoose) > 0:
+			return worldCities[worldLoose[0]].place(), true
+		}
 	}
 	return place{}, false
+}
+
+// uzbekCandidates are the rows a name can mean, as written or folded.
+func uzbekCandidates(name string) []int {
+	var rows []int
+	for _, spelling := range append([]string{name}, placename.Nouns(name)...) {
+		for _, row := range slices.Concat(uzbekIndex.strict[placename.Strict(spelling)], uzbekIndex.loose[placename.Key(spelling)]) {
+			if !slices.Contains(rows, row) {
+				rows = append(rows, row)
+			}
+		}
+	}
+	return rows
+}
+
+// bestUzbekPlace picks among rows sharing a name, key folded: those of
+// the kind asked for, if any; then by rank; then a row named so before
+// one that has the name as an alias (Bo'ston, Karakalpakstan, before the
+// district of Andijan that took the name); then the more populous.
+func bestUzbekPlace(rows []int, kind placename.Kind, key string) (int, bool) {
+	if len(rows) == 0 {
+		return 0, false
+	}
+	if wanted := kindOf(kind); wanted != 0 {
+		var ofKind []int
+		for _, row := range rows {
+			if uzbekPlaces[row].kinds&wanted != 0 {
+				ofKind = append(ofKind, row)
+			}
+		}
+		if len(ofKind) > 0 {
+			rows = ofKind
+		}
+	}
+	return slices.MinFunc(rows, func(x, y int) int {
+		px, py := uzbekPlaces[x], uzbekPlaces[y]
+		return cmp.Or(
+			cmp.Compare(px.rank(), py.rank()),
+			trueFirst(placename.Key(px.name) == key, placename.Key(py.name) == key),
+			cmp.Compare(py.population, px.population),
+			cmp.Compare(x, y),
+		)
+	}), true
+}
+
+func kindOf(kind placename.Kind) placeKind {
+	switch kind {
+	case placename.Town:
+		return townKind
+	case placename.District:
+		return districtKind
+	case placename.Region:
+		return regionKind
+	default:
+		return 0
+	}
 }
 
 func (p uzbekPlace) place() place { return place{name: p.name, lat: p.lat, lon: p.lon} }
 
 func (c worldCity) place() place {
 	return place{name: c.name, timezone: c.timezone, lat: c.lat, lon: c.lon}
+}
+
+// sameProvince reports whether two rows are in one region, Tashkent and
+// the region around it counting as one: members say "Toshkent" for both.
+func sameProvince(x, y uzbekPlace) bool {
+	fold := func(province int) int {
+		if province == tashkentRegion {
+			return tashkentCity
+		}
+		return province
+	}
+	return fold(x.province) == fold(y.province)
 }
 
 // region is a region centre that prayer_times knows. The coordinates are

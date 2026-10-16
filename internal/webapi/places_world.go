@@ -18,7 +18,7 @@ type worldCity struct {
 var worldCities = []worldCity{
 	// Russia, Ukraine, Belarus, the Baltics and Moldova.
 	{name: "Moskva", timezone: "Europe/Moscow", lat: 55.7520, lon: 37.6178, aliases: []string{"Moscow", "Москва"}},
-	{name: "Sankt-Peterburg", timezone: "Europe/Moscow", lat: 59.9386, lon: 30.3141, aliases: []string{"Saint Petersburg", "St Petersburg", "Peterburg", "Piter", "Санкт-Петербург", "Петербург", "Питер"}},
+	{name: "Sankt-Peterburg", timezone: "Europe/Moscow", lat: 59.9386, lon: 30.3141, aliases: []string{"Saint Petersburg", "St Petersburg", "Peterburg", "Piter", "Leningrad", "Санкт-Петербург", "Петербург", "Питер", "Ленинград"}},
 	{name: "Qozon", timezone: "Europe/Moscow", lat: 55.7887, lon: 49.1221, aliases: []string{"Kazan", "Қозон", "Казань"}},
 	{name: "Novosibirsk", timezone: "Asia/Novosibirsk", lat: 55.0226, lon: 82.9318, aliases: []string{"Новосибирск"}},
 	{name: "Yekaterinburg", timezone: "Asia/Yekaterinburg", lat: 56.8573, lon: 60.6153, aliases: []string{"Ekaterinburg", "Екатеринбург"}},
@@ -73,6 +73,7 @@ var worldCities = []worldCity{
 
 	// Iran, Afghanistan, Pakistan and India.
 	{name: "Tehron", timezone: "Asia/Tehran", lat: 35.6944, lon: 51.4215, aliases: []string{"Tehran", "Teheran", "Теҳрон", "Тегеран"}},
+	{name: "Sheroz", timezone: "Asia/Tehran", lat: 29.6103, lon: 52.5311, aliases: []string{"Shiraz", "Shiroz", "Шероз", "Шираз"}},
 	{name: "Mashhad", timezone: "Asia/Tehran", lat: 36.2981, lon: 59.6057, aliases: []string{"Mashad", "Машҳад", "Мешхед"}},
 	{name: "Kobul", timezone: "Asia/Kabul", lat: 34.5281, lon: 69.1723, aliases: []string{"Kabul", "Кобул", "Кабул"}},
 	{name: "Hirot", timezone: "Asia/Kabul", lat: 34.3482, lon: 62.1997, aliases: []string{"Herat", "Hirat", "Ҳирот", "Герат"}},
@@ -94,8 +95,21 @@ var worldCities = []worldCity{
 	{name: "Turkiston", timezone: "Asia/Almaty", lat: 43.2946, lon: 68.2569, aliases: []string{"Turkistan", "Turkestan", "Туркистон", "Туркестан", "Түркістан"}},
 	{name: "Taroz", timezone: "Asia/Almaty", lat: 42.8980, lon: 71.3733, aliases: []string{"Taraz", "Тароз", "Тараз"}},
 	{name: "Ashxobod", timezone: "Asia/Ashgabat", lat: 37.9500, lon: 58.3833, aliases: []string{"Ashgabat", "Ashkhabad", "Aşgabat", "Ашхобод", "Ашхабад"}},
+	{name: "Qarag'anda", timezone: "Asia/Almaty", lat: 49.8019, lon: 73.1021, aliases: []string{"Qarag'andi", "Karaganda", "Karagandy", "Qaraghandy", "Қарағанда", "Қарағанди", "Караганда", "Қарағанды"}},
+	{name: "Aqto'be", timezone: "Asia/Aqtobe", lat: 50.2797, lon: 57.2072, aliases: []string{"Aktobe", "Aqtobe", "Aktyubinsk", "Ақтўбе", "Актобе", "Актюбинск"}},
+	{name: "Qizilo'rda", timezone: "Asia/Qyzylorda", lat: 44.8528, lon: 65.5092, aliases: []string{"Kyzylorda", "Qyzylorda", "Қизилўрда", "Кызылорда"}},
+	{name: "Saryog'och", timezone: "Asia/Almaty", lat: 41.4604, lon: 69.1679, aliases: []string{"Saryagash", "Saryaghash", "Сарёғоч", "Сарыагаш"}},
+	{name: "Jetisoy", timezone: "Asia/Almaty", lat: 40.7763, lon: 68.3277, aliases: []string{"Zhetysay", "Zhetysai", "Жетисой", "Жетысай"}},
+	{name: "O'zgan", timezone: "Asia/Bishkek", lat: 40.7699, lon: 73.3007, aliases: []string{"Uzgen", "Özgön", "Ўзган", "Узген", "Узгень"}},
+	{name: "Ko'lob", timezone: "Asia/Dushanbe", lat: 37.9146, lon: 69.7845, aliases: []string{"Kulob", "Kulyab", "Кўлоб", "Куляб", "Кулоб"}},
+	{name: "Bohtar", timezone: "Asia/Dushanbe", lat: 37.8365, lon: 68.7776, aliases: []string{"Bokhtar", "Kurgan-Tyube", "Qurghonteppa", "Бохтар", "Курган-Тюбе"}},
+	{name: "Panjikent", timezone: "Asia/Dushanbe", lat: 39.4952, lon: 67.6093, aliases: []string{"Panjakent", "Penjikent", "Панжикент", "Пенджикент"}},
+	{name: "O'ratepa", timezone: "Asia/Dushanbe", lat: 39.9142, lon: 69.0033, aliases: []string{"Istaravshan", "Ura-Tyube", "Ўратепа", "Истаравшан", "Ура-Тюбе"}},
 	{name: "Toshhovuz", timezone: "Asia/Ashgabat", lat: 41.8363, lon: 59.9666, aliases: []string{"Dashoguz", "Daşoguz", "Tashauz", "Тошҳовуз", "Дашогуз", "Ташауз"}},
 	{name: "Turkmanobod", timezone: "Asia/Ashgabat", lat: 39.0733, lon: 63.5786, aliases: []string{"Türkmenabat", "Turkmenabat", "Chorjo'y", "Chardzhou", "Туркманобод", "Чоржўй", "Туркменабат", "Чарджоу"}},
+	{name: "Turkmanboshi", timezone: "Asia/Ashgabat", lat: 40.0222, lon: 52.9552, aliases: []string{"Turkmenbashi", "Türkmenbaşy", "Krasnovodsk", "Туркманбоши", "Туркменбаши", "Красноводск"}},
+	{name: "Ko'hna Urganch", timezone: "Asia/Ashgabat", lat: 42.3261, lon: 59.1531, aliases: []string{"Köneürgenç", "Konye-Urgench", "Kunya-Urgench", "Кўҳна Урганч", "Куня-Ургенч", "Кёнеургенч"}},
+	{name: "Shibirg'on", timezone: "Asia/Kabul", lat: 36.6676, lon: 65.7529, aliases: []string{"Sheberghan", "Shibirghan", "Шибирғон", "Шибирган", "Шеберган"}},
 
 	// The Middle East and Egypt.
 	{name: "Dubay", timezone: "Asia/Dubai", lat: 25.0773, lon: 55.3093, aliases: []string{"Dubai", "Дубай"}},
@@ -104,7 +118,9 @@ var worldCities = []worldCity{
 	{name: "Makka", timezone: "Asia/Riyadh", lat: 21.4266, lon: 39.8256, aliases: []string{"Mecca", "Makkah", "Макка", "Мекка"}},
 	{name: "Madina", timezone: "Asia/Riyadh", lat: 24.4686, lon: 39.6142, aliases: []string{"Medina", "Madinah", "Мадина", "Медина"}},
 	{name: "Jidda", timezone: "Asia/Riyadh", lat: 21.4901, lon: 39.1862, aliases: []string{"Jeddah", "Жидда", "Джидда"}},
-	{name: "Ar-Riyod", timezone: "Asia/Riyadh", lat: 24.6877, lon: 46.7219, aliases: []string{"Riyod", "Riyadh", "Ар-Риёд", "Эр-Рияд"}},
+	{name: "Ar-Riyod", timezone: "Asia/Riyadh", lat: 24.6877, lon: 46.7219, aliases: []string{"Riyod", "Riyadh", "Riyad", "Ар-Риёд", "Эр-Рияд", "Рияд"}},
+	// Bag'dod, and Russian Багдад, are the town in Farg'ona.
+	{name: "Baghdad", timezone: "Asia/Baghdad", lat: 33.3406, lon: 44.4009},
 	{name: "Doha", timezone: "Asia/Qatar", lat: 25.2855, lon: 51.5310, aliases: []string{"Доҳа", "Доха"}},
 	{name: "Quvayt", timezone: "Asia/Kuwait", lat: 29.3670, lon: 47.9743, aliases: []string{"Kuwait", "Kuwait City", "Қувайт", "Эль-Кувейт", "Кувейт"}},
 	{name: "Qohira", timezone: "Africa/Cairo", lat: 30.0626, lon: 31.2497, aliases: []string{"Cairo", "Қоҳира", "Каир"}},
@@ -118,6 +134,10 @@ var worldCities = []worldCity{
 	{name: "Gonkong", timezone: "Asia/Hong_Kong", lat: 22.2783, lon: 114.1747, aliases: []string{"Hong Kong", "Гонконг"}},
 	{name: "Seul", timezone: "Asia/Seoul", lat: 37.5660, lon: 126.9784, aliases: []string{"Seoul", "Сеул"}},
 	{name: "Pusan", timezone: "Asia/Seoul", lat: 35.1017, lon: 129.0300, aliases: []string{"Busan", "Пусан"}},
+	// GeoNames names it Ansan-si, so the geocoder offers a French village.
+	{name: "Ansan", timezone: "Asia/Seoul", lat: 37.3236, lon: 126.8219, aliases: []string{"Ansan-si", "Ансан"}},
+	{name: "Tegu", timezone: "Asia/Seoul", lat: 35.8703, lon: 128.5911, aliases: []string{"Daegu", "Тегу"}},
+	{name: "Kvanju", timezone: "Asia/Seoul", lat: 35.1547, lon: 126.9156, aliases: []string{"Gwangju", "Kwangju", "Кванджу", "Кванжу"}},
 	{name: "Tokio", timezone: "Asia/Tokyo", lat: 35.6895, lon: 139.6917, aliases: []string{"Tokyo", "Токио"}},
 	{name: "Osaka", timezone: "Asia/Tokyo", lat: 34.6938, lon: 135.5011, aliases: []string{"Осака"}},
 	{name: "Ulan-Bator", timezone: "Asia/Ulaanbaatar", lat: 47.9077, lon: 106.8832, aliases: []string{"Ulaanbaatar", "Улан-Батор"}},
@@ -138,4 +158,51 @@ var worldCities = []worldCity{
 	{name: "San-Fransisko", timezone: "America/Los_Angeles", lat: 37.7749, lon: -122.4194, aliases: []string{"San Francisco", "Сан-Франсиско", "Сан-Франциско"}},
 	{name: "Toronto", timezone: "America/Toronto", lat: 43.7064, lon: -79.3986, aliases: []string{"Торонто"}},
 	{name: "Sidney", timezone: "Australia/Sydney", lat: -33.8679, lon: 151.2073, aliases: []string{"Sydney", "Сидней"}},
+}
+
+// countries are the names of countries members write where a town is
+// wanted, in Uzbek, Russian and English. The weather tool asks for a town
+// instead of forecasting a namesake: Turkiya is a village in Nepal, Xitoy
+// one in Qashqadaryo, Rossiya one in Orenburg oblast. The geocoder knows
+// the rest: a country is among its answers.
+var countries = []string{
+	"O'zbekiston", "Uzbekistan", "Ўзбекистон", "Узбекистан",
+	"Qozog'iston", "Kazakhstan", "Қозоғистон", "Казахстан",
+	"Qirg'iziston", "Kyrgyzstan", "Kirgiziya", "Қирғизистон", "Кыргызстан", "Киргизия",
+	"Tojikiston", "Tajikistan", "Тожикистон", "Таджикистан",
+	"Turkmaniston", "Turkmenistan", "Туркманистон", "Туркменистан",
+	"Afg'oniston", "Afghanistan", "Афғонистон", "Афганистан",
+	"Rossiya", "Russia", "Россия",
+	"Ukraina", "Ukraine", "Украина",
+	"Belarus", "Belorussiya", "Беларусь", "Белоруссия",
+	"Turkiya", "Turkey", "Türkiye", "Туркия", "Турция",
+	"Ozarbayjon", "Azerbaijan", "Озарбайжон", "Азербайджан",
+	"Gruziya", "Georgia", "Грузия",
+	"Armaniston", "Armenia", "Арманистон", "Армения",
+	"Eron", "Iran", "Эрон", "Иран",
+	"Iroq", "Iraq", "Ироқ", "Ирак",
+	"Suriya", "Syria", "Сурия", "Сирия",
+	"Saudiya Arabistoni", "Arabiston", "Saudi Arabia", "Саудия Арабистони", "Саудовская Аравия",
+	"BAA", "UAE", "United Arab Emirates", "Birlashgan Arab Amirliklari", "ОАЭ",
+	"Misr", "Egypt", "Миср", "Египет",
+	"Isroil", "Israel", "Исроил", "Израиль",
+	"Xitoy", "China", "Хитой", "Китай",
+	"Yaponiya", "Japan", "Япония",
+	"Koreya", "Korea", "Janubiy Koreya", "South Korea", "Корея", "Южная Корея",
+	"Hindiston", "India", "Ҳиндистон", "Индия",
+	"Pokiston", "Pakistan", "Покистон", "Пакистан",
+	"Malayziya", "Malaysia", "Малайзия",
+	"Indoneziya", "Indonesia", "Индонезия",
+	"Tailand", "Thailand", "Таиланд",
+	"Germaniya", "Germany", "Германия",
+	"Fransiya", "France", "Франция",
+	"Angliya", "England", "Britaniya", "Buyuk Britaniya", "United Kingdom", "Англия", "Великобритания",
+	"Italiya", "Italy", "Италия",
+	"Ispaniya", "Spain", "Испания",
+	"Polsha", "Poland", "Польша",
+	"Chexiya", "Czechia", "Чехия",
+	"AQSH", "Amerika", "USA", "America", "United States", "АҚШ", "США", "Америка",
+	"Kanada", "Canada", "Канада",
+	"Avstraliya", "Australia", "Австралия",
+	"Yevropa", "Europe", "Европа",
 }

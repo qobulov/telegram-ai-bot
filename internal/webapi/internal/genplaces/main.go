@@ -12,10 +12,17 @@
 //
 // The table holds every capital and seat of a region or district (PPLC,
 // PPLA, PPLA2, PPLA3), every other town of at least 5,000 people, and
-// every region and district (ADM1, ADM2). A region or district named like
-// its seat (Paxtakor Tumani and Paxtakor) adds its names to the seat; one
-// that is not (Bo'stonliq Tumani and G'azalkent) is an entry of its own at
-// its seat when the seat is known, else at its own coordinates.
+// every region and district (ADM1, ADM2), each district at its seat. A
+// region or district named like its seat (Paxtakor Tumani and Paxtakor)
+// adds its names to the seat; one that is not (Bo'stonliq Tumani and
+// G'azalkent) is a row of its own at its seat. GeoNames links few
+// districts to their seats, and some of its seats are stale, so fixes.go
+// names the seat of every district by its GeoNames id.
+//
+// A name in a language other than Uzbek is kept only if it is the place's
+// own name written another way (Kokand for Qo'qon, Farish for Forish), not
+// a Soviet name that is today another city's (Ul'yanovsk for Mug'lon,
+// Kuybyshev for Rishton).
 package main
 
 import (
@@ -26,6 +33,7 @@ import (
 	"fmt"
 	"go/format"
 	"log"
+	"maps"
 	"math"
 	"os"
 	"slices"
@@ -48,31 +56,9 @@ const (
 	// the same across a region border, which GeoNames sometimes has wrong.
 	seatReach = 0.6
 	nearReach = 0.25
-)
-
-// Fixes for what GeoNames lacks or has wrong, by GeoNames id.
-var (
-	// seats GeoNames does not link to their region or district.
-	seats = map[int]int{
-		1484838: 1512524, // Tashkent Region: Nurafshon (GeoNames says Amir Timur).
-		1514338: 1513996, // Bo'stonliq District: G'azalkent.
-		1514024: 1512355, // Forish District: Yangiqishloq (GeoNames' Bog'don).
-	}
-	// extraTowns are towns GeoNames counts nobody in.
-	extraTowns = map[int]bool{
-		1538230: true, // Zarafshon, Navoiy region.
-	}
-	// displayNames replace the Uzbek name GeoNames has.
-	displayNames = map[int]string{
-		1215957: "Termiz",
-		1538230: "Zarafshon",
-		453752:  "Qoraqalpog'iston",
-	}
-	// extraNames are spellings members use that GeoNames lacks.
-	extraNames = map[int][]string{
-		1215957: {"Termiz", "Термиз"},
-		1538230: {"Zarafshon", "Зарафшон", "Зарафшан"},
-	}
+	// duplicateReach is how close two towns sharing a name must be to be
+	// one town GeoNames lists twice (Pop and Pop Shahri).
+	duplicateReach = 0.1
 )
 
 // skippedLanguages are alternate-name "languages" that are not names:
@@ -97,10 +83,15 @@ type feature struct {
 	admin1, admin2 string
 	population     int
 	alternates     []alternate
-	// keys fold every name of the feature; current folds only today's
-	// names, so a district is not taken for a town that shares an old
+	// current are today's names: GeoNames' name and ASCII name, the Uzbek
+	// ones and the fixes. keys fold every kept name; currentKeys only
+	// today's, so a district is not taken for a town that shares an old
 	// Soviet name with it (Kirovskiy Rayon).
-	keys, current map[string]bool
+	current           []string
+	keys, currentKeys map[string]bool
+	// twins are today's names of the places GeoNames lists twice for this
+	// one (sameAs): its own names too, but never shown.
+	twins []string
 }
 
 type alternate struct {
@@ -108,12 +99,20 @@ type alternate struct {
 	preferred, historic bool
 }
 
+// kinds of a row, as places.go declares them.
+const (
+	kindTown     = 1
+	kindDistrict = 2
+	kindRegion   = 4
+)
+
 // entry is one row of the table.
 type entry struct {
 	name       string
 	at         *feature // whose coordinates the row has
 	population int
 	code       string
+	kinds      int
 	aliases    []string
 }
 
@@ -121,6 +120,7 @@ func main() {
 	placesPath := flag.String("places", "", "UZ.txt from export/dump/UZ.zip")
 	alternatesPath := flag.String("alternates", "", "UZ.txt from export/dump/alternatenames/UZ.zip")
 	out := flag.String("out", "places_uz_gen.go", "file to write")
+	report := flag.Bool("report", false, "print where each region and district was put")
 	flag.Parse()
 	if *placesPath == "" || *alternatesPath == "" {
 		log.Fatal("genplaces needs -places and -alternates; the package comment says where to download them")
@@ -132,7 +132,9 @@ func main() {
 	if err := readAlternates(*alternatesPath, features); err != nil {
 		log.Fatal(err)
 	}
-	source, err := render(table(features))
+	features = append(features, newDistricts()...)
+	rows := table(features, *report)
+	source, err := render(rows)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -208,21 +210,59 @@ func eachRow(path string, columns int, row func([]string) error) error {
 	return scanner.Err()
 }
 
+// newDistricts are the districts GeoNames lacks, as features of their own.
+func newDistricts() []*feature {
+	var features []*feature
+	for _, d := range missingDistricts {
+		f := &feature{id: d.id, name: d.name, ascii: d.name, lat: d.lat, lon: d.lon, class: "A", code: "ADM2", admin1: d.region}
+		for _, name := range d.names {
+			f.alternates = append(f.alternates, alternate{language: "uz", name: name})
+		}
+		features = append(features, f)
+	}
+	return features
+}
+
 // table builds the rows: towns, then regions and districts merged into
-// their seats or added on their own.
-func table(features []*feature) []*entry {
+// their seats or added on their own, then towns GeoNames lists twice made
+// one.
+func table(features []*feature, report bool) []*entry {
 	byID := map[int]*feature{}
 	for _, f := range features {
 		byID[f.id] = f
-		f.keys = keysOf(names(f))
-		f.current = keysOf(currentNames(f))
 	}
 	checkFixes(byID)
+	for _, f := range features {
+		applyFixes(f)
+	}
+	// A duplicate's names and people go to the place it duplicates: its
+	// names today are that place's names too, its others are filtered as
+	// the place's own are.
+	for _, duplicate := range slices.Sorted(maps.Keys(sameAs)) {
+		f, canonical := byID[duplicate], byID[sameAs[duplicate]]
+		canonical.twins = append(canonical.twins, f.name, f.ascii)
+		for _, alt := range f.alternates {
+			if alt.language == "uz" && usable(alt) {
+				canonical.twins = append(canonical.twins, alt.name)
+			} else if alt.language != "uz" {
+				canonical.alternates = append(canonical.alternates, alt)
+			}
+		}
+		canonical.population = max(canonical.population, f.population)
+	}
+	for _, f := range features {
+		f.current = currentNames(f)
+		f.currentKeys = keysOf(f.current)
+		f.keys = keysOf(names(f))
+	}
 	var rows []*entry
 	towns := map[int]*entry{}
 	addTown := func(f *feature) *entry {
+		if canonical, found := sameAs[f.id]; found {
+			f = byID[canonical]
+		}
 		if towns[f.id] == nil {
-			towns[f.id] = &entry{name: townName(f), at: f, population: f.population, code: f.code, aliases: names(f)}
+			towns[f.id] = &entry{name: townName(f), at: f, population: f.population, code: f.code, kinds: kindTown, aliases: names(f)}
 			rows = append(rows, towns[f.id])
 		}
 		return towns[f.id]
@@ -233,22 +273,29 @@ func table(features []*feature) []*entry {
 		}
 	}
 	for _, f := range features {
-		if f.code != "ADM1" && f.code != "ADM2" {
+		if _, duplicate := sameAs[f.id]; duplicate || (f.code != "ADM1" && f.code != "ADM2") {
 			continue
 		}
 		seat := findSeat(f, byID, features)
+		kind := adminKind(f)
 		if seat == nil {
-			rows = append(rows, &entry{name: adminName(f), at: f, population: f.population, code: f.code, aliases: names(f)})
+			rows = append(rows, &entry{name: adminName(f), at: f, population: f.population, code: f.code, kinds: kind, aliases: names(f)})
+			reportAdmin(report, f, nil, "own point")
 			continue
 		}
 		town := addTown(seat)
 		town.code = better(town.code, seatCodes[f.code])
-		if namedLike(f, seat) {
+		if kind == kindTown || namedLike(f, seat) {
+			town.kinds |= kind
+			town.population = max(town.population, f.population)
 			town.aliases = append(town.aliases, names(f)...)
+			reportAdmin(report, f, seat, "merged")
 		} else {
-			rows = append(rows, &entry{name: adminName(f), at: seat, population: f.population, code: f.code, aliases: names(f)})
+			rows = append(rows, &entry{name: adminName(f), at: seat, population: f.population, code: f.code, kinds: kind, aliases: names(f)})
+			reportAdmin(report, f, seat, "at seat")
 		}
 	}
+	rows = mergeDuplicates(rows)
 	for _, row := range rows {
 		row.aliases = distinct(row.name, row.aliases)
 	}
@@ -258,14 +305,84 @@ func table(features []*feature) []*entry {
 	return rows
 }
 
-// checkFixes stops when a fix above names a place GeoNames no longer has,
-// rather than drop the fix unnoticed.
+func reportAdmin(report bool, admin, seat *feature, how string) {
+	if !report {
+		return
+	}
+	if seat == nil {
+		fmt.Fprintf(os.Stderr, "%s\t%d\t%s\t%s\t-\t-\t-\n", admin.code, admin.id, admin.name, how)
+		return
+	}
+	fmt.Fprintf(os.Stderr, "%s\t%d\t%s\t%s\t%d\t%s\t%.2f\n", admin.code, admin.id, admin.name, how, seat.id, seat.name, math.Hypot(seat.lat-admin.lat, seat.lon-admin.lon))
+}
+
+// adminKind is what a region or district is to a member: a city that is
+// a district of its own (Andijon Shahri) is a town.
+func adminKind(f *feature) int {
+	switch {
+	case f.code == "ADM1":
+		return kindRegion
+	case isPlaceWord(lastWord(f.name), "shahri", "shahar"):
+		return kindTown
+	default:
+		return kindDistrict
+	}
+}
+
+// mergeDuplicates makes one row of towns that share a name and lie within
+// duplicateReach: the seat's name, code and point, the larger population
+// and both rows' names and kinds.
+func mergeDuplicates(rows []*entry) []*entry {
+	var kept []*entry
+	for _, row := range rows {
+		merged := false
+		for _, other := range kept {
+			if other.kinds&kindTown == 0 || row.kinds&kindTown == 0 || !shareName(row, other) ||
+				math.Hypot(row.at.lat-other.at.lat, row.at.lon-other.at.lon) > duplicateReach {
+				continue
+			}
+			other.aliases = slices.Concat(other.aliases, []string{other.name, row.name}, row.aliases)
+			if slices.Index(placeCodes, row.code) < slices.Index(placeCodes, other.code) {
+				other.name, other.at, other.code = row.name, row.at, row.code
+			}
+			other.population = max(other.population, row.population)
+			other.kinds |= row.kinds
+			merged = true
+			break
+		}
+		if !merged {
+			kept = append(kept, row)
+		}
+	}
+	return kept
+}
+
+func shareName(x, y *entry) bool {
+	keys := keysOf(append([]string{x.name}, x.aliases...))
+	for _, name := range append([]string{y.name}, y.aliases...) {
+		if keys[placename.Key(name)] {
+			return true
+		}
+	}
+	return false
+}
+
+// checkFixes stops when a fix in fixes.go names a place GeoNames no longer
+// has, rather than drop the fix unnoticed.
 func checkFixes(byID map[int]*feature) {
 	var ids []int
 	for admin, seat := range seats {
 		ids = append(ids, admin, seat)
 	}
-	for id := range extraTowns {
+	for duplicate, canonical := range sameAs {
+		ids = append(ids, duplicate, canonical)
+	}
+	for _, fixes := range []map[int]bool{extraTowns, demoted, promoted} {
+		for id := range fixes {
+			ids = append(ids, id)
+		}
+	}
+	for id := range regionFixes {
 		ids = append(ids, id)
 	}
 	for id := range displayNames {
@@ -281,6 +398,18 @@ func checkFixes(byID map[int]*feature) {
 	}
 }
 
+func applyFixes(f *feature) {
+	if demoted[f.id] {
+		f.code = "PPL"
+	}
+	if promoted[f.id] {
+		f.code = "PPLA2"
+	}
+	if region, found := regionFixes[f.id]; found {
+		f.admin1 = region
+	}
+}
+
 func isTown(f *feature) bool {
 	switch {
 	case f.class != "P":
@@ -293,8 +422,8 @@ func isTown(f *feature) bool {
 }
 
 // findSeat is where a region's or district's weather is taken: a seat
-// fixed above, the region centre or linked district seat GeoNames has, or
-// else a town of the same name nearby.
+// fixed in fixes.go, the region centre or linked district seat GeoNames
+// has, or else a town of the same name nearby.
 func findSeat(admin *feature, byID map[int]*feature, features []*feature) *feature {
 	if id, found := seats[admin.id]; found {
 		return byID[id]
@@ -334,7 +463,7 @@ func namesake(admin *feature, features []*feature) *feature {
 // namedLike reports whether a region's or district's name today is one of
 // the town's names.
 func namedLike(admin, town *feature) bool {
-	for key := range admin.current {
+	for key := range admin.currentKeys {
 		if town.keys[key] {
 			return true
 		}
@@ -350,20 +479,33 @@ func better(code, floor string) string {
 	return code
 }
 
-// names are a feature's spellings: GeoNames' name and ASCII name, the
-// alternate names in Latin or Cyrillic letters, the fixes above, and
-// GeoNames' ŭ (Uzbek ў) also written o', as Uzbek Latin has it. A region
-// or district keeps only its Uzbek and English alternate names: the rest
-// are Russian adjectives ("Alatskiy Rayon") and Soviet names ("Moskva
-// Rayoni", now Shahrixon), which would shadow Moscow.
+// names are a feature's spellings: today's names, and the other alternate
+// names in Latin or Cyrillic letters that are the same name written
+// another way (sameName), with Russian adjectives ("Farishskiy Rayon")
+// read as the nouns they come from (Farish). GeoNames' ŭ (Uzbek ў) is
+// also written o', as Uzbek Latin has it.
 func names(f *feature) []string {
-	all := []string{f.name, f.ascii}
+	all := slices.Clone(f.current)
 	for _, alt := range f.alternates {
-		if usable(alt) && (f.class != "A" || alt.language == "uz" || alt.language == "en") {
-			all = append(all, alt.name)
+		if alt.language == "uz" || !usable(alt) {
+			continue
+		}
+		nouns := placename.Nouns(alt.name)
+		if nouns == nil {
+			if sameName(alt.name, f.current) {
+				all = append(all, alt.name)
+			}
+			continue
+		}
+		// Of the nouns an adjective may come from, only those with the
+		// very consonants and the ending of a name today: Zangiatinskiy is
+		// Zangiata, as Zangiota ends in a vowel, but Farishskiy is Farish.
+		for _, noun := range nouns {
+			if sameSkeleton(noun, f.current) {
+				all = append(all, capitalized(noun))
+			}
 		}
 	}
-	all = append(all, extraNames[f.id]...)
 	for _, name := range all {
 		if strings.ContainsAny(name, "ŭŬ") {
 			all = append(all, oWithApostrophe.Replace(name))
@@ -374,15 +516,109 @@ func names(f *feature) []string {
 
 var oWithApostrophe = strings.NewReplacer("ŭ", "o'", "Ŭ", "O'")
 
-// currentNames are GeoNames' name and ASCII name and the Uzbek names.
+// currentNames are GeoNames' name and ASCII name, the Uzbek names, the
+// fixes' names and the names of its twins.
 func currentNames(f *feature) []string {
 	current := []string{f.name, f.ascii, oWithApostrophe.Replace(f.name)}
+	if name, found := displayNames[f.id]; found {
+		current = append(current, name)
+	}
+	current = append(current, extraNames[f.id]...)
+	current = append(current, f.twins...)
 	for _, alt := range f.alternates {
 		if alt.language == "uz" && usable(alt) {
 			current = append(current, alt.name)
 		}
 	}
 	return current
+}
+
+func sameSkeleton(noun string, names []string) bool {
+	for _, name := range names {
+		if skeleton(noun) == skeleton(name) && ending(noun) == ending(name) {
+			return true
+		}
+	}
+	return false
+}
+
+// ending is the kind of sound a name's key ends in: a consonant, a or o
+// (Uzbek o is Russian a), i, e or y, or u.
+func ending(name string) byte {
+	key := placename.Key(name)
+	if key == "" {
+		return 0
+	}
+	switch last := key[len(key)-1]; {
+	case last == 'a' || last == 'o':
+		return 'a'
+	case last == 'i' || last == 'e' || last == 'y':
+		return 'i'
+	case last == 'u':
+		return 'u'
+	default:
+		return 'c'
+	}
+}
+
+func capitalized(name string) string {
+	words := strings.Fields(name)
+	for i, word := range words {
+		first, size := utf8.DecodeRuneInString(word)
+		words[i] = string(unicode.ToUpper(first)) + word[size:]
+	}
+	return strings.Join(words, " ")
+}
+
+// sameName reports whether alias is one of names written another way: it
+// has as many words, and their consonants agree but for one more or one
+// other at the end (Kokand and Qo'qon, Dzhizak and Jizzax), while
+// Kuybyshev and Rishton, or Kyzyl-Tepa and Qo'rg'ontepa, have little in
+// common.
+func sameName(alias string, names []string) bool {
+	a := skeleton(alias)
+	if a == "" {
+		return false
+	}
+	for _, name := range names {
+		if alike(a, skeleton(name)) && len(placename.Words(alias)) == len(placename.Words(name)) {
+			return true
+		}
+	}
+	return false
+}
+
+func alike(a, b string) bool {
+	if len(a) > len(b) {
+		a, b = b, a
+	}
+	common := 0
+	for common < len(a) && a[common] == b[common] {
+		common++
+	}
+	switch {
+	case common == len(a):
+		return len(b)-len(a) <= 1 && len(a) >= 1
+	case common == len(a)-1:
+		return len(a) == len(b) && len(a) >= 3
+	default:
+		return false
+	}
+}
+
+// skeleton is a name's folded key without vowels and doubled letters.
+func skeleton(name string) string {
+	var b []byte
+	for _, c := range []byte(placename.Key(name)) {
+		if strings.IndexByte("aeiouy", c) >= 0 || c < 'a' || c > 'z' {
+			continue
+		}
+		if len(b) > 0 && b[len(b)-1] == c {
+			continue
+		}
+		b = append(b, c)
+	}
+	return string(b)
 }
 
 func usable(alt alternate) bool {
@@ -440,10 +676,10 @@ func adminName(f *feature) string {
 		return name
 	}
 	name := trimPlaceWords(uzbekName(f))
-	switch {
-	case f.code == "ADM1":
+	switch adminKind(f) {
+	case kindRegion:
 		return name + " viloyati"
-	case isPlaceWord(lastWord(f.name), "shahri", "shahar"):
+	case kindTown:
 		return name
 	default:
 		return name + " tumani"
@@ -540,11 +776,28 @@ func render(rows []*entry) ([]byte, error) {
 	var b bytes.Buffer
 	b.WriteString(header)
 	for _, row := range rows {
-		fmt.Fprintf(&b, "\t{%q, %s, %s, %d, %q, %q},\n", row.name, coordinate(row.at.lat), coordinate(row.at.lon),
-			row.population, row.code, strings.Join(row.aliases, "|"))
+		region, err := strconv.Atoi(row.at.admin1)
+		if err != nil {
+			return nil, fmt.Errorf("%s has no region: %w", row.name, err)
+		}
+		fmt.Fprintf(&b, "\t{%q, %s, %s, %d, %q, %d, %s, %q},\n", row.name, coordinate(row.at.lat), coordinate(row.at.lon),
+			row.population, row.code, region, kindsOf(row.kinds), strings.Join(row.aliases, "|"))
 	}
 	b.WriteString("}\n")
 	return format.Source(b.Bytes())
+}
+
+func kindsOf(kinds int) string {
+	var names []string
+	for _, kind := range []struct {
+		bit  int
+		name string
+	}{{kindTown, "townKind"}, {kindDistrict, "districtKind"}, {kindRegion, "regionKind"}} {
+		if kinds&kind.bit != 0 {
+			names = append(names, kind.name)
+		}
+	}
+	return strings.Join(names, " | ")
 }
 
 func coordinate(value float64) string {

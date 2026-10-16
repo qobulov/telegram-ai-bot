@@ -21,8 +21,13 @@ func TestKeyFoldsTheWaysANameIsWritten(t *testing.T) {
 		{name: "Nyu-York", want: "nyuyork", alike: []string{"Нью-Йорк", "Nyu York"}},
 		{name: "Jidda", want: "jidda", alike: []string{"Джидда", "Djidda", "Dzhidda"}},
 		{name: "İstanbul", want: "istanbul", alike: []string{"Istanbul", "ISTANBUL"}},
-		{name: "Khiwa Shahri", want: "xiva", alike: []string{"Xiva", "Хива", "Khiva"}},
+		{name: "Khiwa Shahri", want: "xiva", alike: []string{"Xiva", "Хива", "Khiva", "Hiva"}},
 		{name: "Ёшлик", want: "yoshlik", alike: []string{"Yoshlik"}},
+		// h and x are one letter to members, and Russian writes both х.
+		{name: "Hazorasp", want: "xazorasp", alike: []string{"Xazorasp", "Khazorasp", "Ҳазорасп", "Хазорасп"}},
+		{name: "Sayhunobod", want: "sayxunobod", alike: []string{"Sayxunobod", "Saykhunobod"}},
+		{name: "Andijan", want: "andijan", alike: []string{"Andizhan", "Andidzhan", "Андижан"}},
+		{name: "Shahrisabz", want: "shaxrisabz", alike: []string{"Shakhrisabz", "Шаҳрисабз", "Шахрисабз"}},
 	}
 	for _, test := range tests {
 		if got := Key(test.name); got != test.want {
@@ -76,5 +81,123 @@ func TestStrictKeepsApostrophesAndLetters(t *testing.T) {
 		if Key(test.a) != Key(test.b) {
 			t.Errorf("Key(%q) = %q, Key(%q) = %q; want equal", test.a, Key(test.a), test.b, Key(test.b))
 		}
+	}
+}
+
+func TestKindOf(t *testing.T) {
+	tests := []struct {
+		name  string
+		kind  Kind
+		uzbek bool
+	}{
+		{"Forish tumani", District, true},
+		{"Бўстон тумани", District, true},
+		{"Qashqadaryo viloyati", Region, true},
+		{"Boston shahri", Town, true},
+		{"Toshkent sh.", Town, true},
+		{"Келес шахри", Town, true},
+		{"Qo'rg'ontepa qishlog'i", Town, true},
+		{"г. Москва", Town, false},
+		{"Mexico City", Town, false},
+		{"Китабский район", District, false},
+		{"Ташкентская область", Region, false},
+		{"Toshkent", AnyKind, false},
+	}
+	for _, test := range tests {
+		if kind, uzbek := KindOf(test.name); kind != test.kind || uzbek != test.uzbek {
+			t.Errorf("KindOf(%q) = %v, %v; want %v, %v", test.name, kind, uzbek, test.kind, test.uzbek)
+		}
+	}
+}
+
+func TestTrimDropsUzbekAndRussianPlaceWords(t *testing.T) {
+	for name, want := range map[string]string{
+		"Keles shahri":        "Keles",
+		"Toshkent sh.":        "Toshkent",
+		"Ташкент шахар":       "Ташкент",
+		"г. Ош":               "Ош",
+		"Bo'ritepa qishlog'i": "Bo'ritepa",
+		"Mexico City":         "Mexico City",
+		"Kuwait City":         "Kuwait City",
+		"Toshkent":            "Toshkent",
+		"shahri":              "",
+	} {
+		if got := Trim(name); got != want {
+			t.Errorf("Trim(%q) = %q, want %q", name, got, want)
+		}
+	}
+}
+
+func TestNounsReadRussianAdjectives(t *testing.T) {
+	tests := []struct {
+		name string
+		noun string
+	}{
+		{"Китабский район", "kitab"},
+		{"Бостанлыкский район", "bostanlyk"},
+		{"Ферганская область", "fergana"},
+		{"Хорезмская область", "xorezm"},
+		{"Кашкадарьинская область", "kashkadarya"},
+		{"Зангиатинский район", "zangiata"},
+		{"Кегейлинский район", "kegeyli"},
+		{"Farishskiy Rayon", "farish"},
+	}
+	for _, test := range tests {
+		nouns := Nouns(test.name)
+		found := false
+		for _, noun := range nouns {
+			found = found || noun == test.noun
+		}
+		if !found {
+			t.Errorf("Nouns(%q) = %q, want %q among them", test.name, nouns, test.noun)
+		}
+	}
+	for _, name := range []string{"Toshkent", "Forish tumani", "Китабский", "Toshkent shahri"} {
+		if nouns := Nouns(name); nouns != nil {
+			t.Errorf("Nouns(%q) = %q, want none", name, nouns)
+		}
+	}
+}
+
+func TestCyrillicSpellsAsRussianDoes(t *testing.T) {
+	for latin, want := range map[string]string{
+		"Venetsiya":       "венеция",
+		"Xyuston":         "хьюстон",
+		"Qarag'anda":      "караганда",
+		"Edinburg":        "эдинбург",
+		"Nijniy Novgorod": "нижний новгород",
+		"Zaporojye":       "запорожье",
+		"Buenos-Ayres":    "буэнос-айрес",
+		"Bo'ritepa":       "буритепа",
+		"Shiroz":          "широз",
+	} {
+		if got := Cyrillic(latin); got != want {
+			t.Errorf("Cyrillic(%q) = %q, want %q", latin, got, want)
+		}
+	}
+}
+
+func TestLatinSpellsAsUzbekDoes(t *testing.T) {
+	for cyrillic, want := range map[string]string{
+		"Дамашқ":    "Damashq",
+		"Кўлоб":     "Ko‘lob",
+		"Қарағанди": "Qarag‘andi",
+		"Джидда":    "Jidda",
+		"Тошкент":   "Toshkent",
+		"Moskva":    "Moskva",
+	} {
+		if got := Latin(cyrillic); got != want {
+			t.Errorf("Latin(%q) = %q, want %q", cyrillic, got, want)
+		}
+	}
+}
+
+func TestWords(t *testing.T) {
+	words := Words("Ansan-si")
+	if len(words) != 2 || words[0] != "ansan" || words[1] != "si" {
+		t.Errorf("Words(Ansan-si) = %q", words)
+	}
+	if words := Words("Kogon Shahri"); len(words) != 1 || words[0] != "kogon" {
+		t.Errorf("Words(Kogon Shahri) = %q", words)
 	}
 }
