@@ -29,7 +29,7 @@ const (
 const (
 	adminsNotInAGroup = "this works only in a group"
 	adminsUnavailable = "Telegram did not give the admin list just now; try again later"
-	adminsNote        = "These are the group's admins, as Telegram reports them now. You cannot see the full member list: anyone else who wrote in the messages you were given is a regular member. Never guess about members who did not write."
+	adminsNote        = "These are the group's admins, as Telegram reports them now. You cannot see the full member list: anyone else who wrote in the messages you were given is a regular member, except your owners: they are your owners whatever their rights here, so never call an owner a regular member. Never guess about members who did not write."
 	anonymousNote     = "An anonymous admin hides who they are: never guess or say who it is."
 	adminsCutNote     = "%d more admins were left out of this list, so someone not listed may be an admin too."
 )
@@ -72,7 +72,7 @@ func AdminsTool(opts AdminsOptions) Tool {
 	return Tool{
 		Name: "group_admins",
 		Description: "List this group's admins, as Telegram reports them now. Use it when someone asks who the admins are or who the regular members are. " +
-			"You cannot see the full member list: anyone not listed who wrote in the messages you were given is a regular member.",
+			"You cannot see the full member list: anyone not listed who wrote in the messages you were given is a regular member, except your owners.",
 		Schema:         json.RawMessage(`{"type": "object", "properties": {}, "additionalProperties": false}`),
 		GroupOnly:      true,
 		MaxOutputBytes: adminsOutputBytes,

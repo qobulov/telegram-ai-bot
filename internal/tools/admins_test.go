@@ -242,3 +242,13 @@ func TestAdminsDescription(t *testing.T) {
 		t.Errorf("description = %q, want regular members limited to the messages given", description)
 	}
 }
+
+// An owner who is not a Telegram admin was listed among the regular members
+// ("o'zingiz (master)"): the note must say owners never are.
+func TestAdminsNoteKeepsOwnersOutOfRegularMembers(t *testing.T) {
+	for _, want := range []string{"except your owners", "never call an owner a regular member"} {
+		if !strings.Contains(adminsNote, want) {
+			t.Errorf("the note does not say %q: %q", want, adminsNote)
+		}
+	}
+}
