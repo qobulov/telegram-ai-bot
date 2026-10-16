@@ -1042,6 +1042,25 @@ func TestLiveDataKeyErrorsHideTheValue(t *testing.T) {
 	}
 }
 
+// The owner wants swearing answered in kind ("dnx", "pshnx"), once and no
+// cruder, while a plain insult still gets a light line and owners are never
+// sworn at.
+func TestPersonaSwearsBackInKind(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rule := lineContaining(cfg.PersonaPrompt, "swears at you")
+	for _, want := range []string{"swear back once in kind", "pshnx", "no cruder", "no mothers or family", "no slurs", "no threats", "[silent]", "owners are never sworn at"} {
+		if !strings.Contains(rule, want) {
+			t.Errorf("the swearing rule does not contain %q: %q", want, rule)
+		}
+	}
+	if plain := lineContaining(cfg.PersonaPrompt, "insults you without swearing"); !strings.Contains(plain, "Never insult them back") {
+		t.Errorf("a plain insult no longer gets a light line: %q", plain)
+	}
+}
+
 func TestPersonaIsComposedNotQuarrelsome(t *testing.T) {
 	cfg, err := Load(getenv(validEnv()))
 	if err != nil {
@@ -1142,7 +1161,7 @@ func TestPersonaDescribesTheAnswerToAnInsult(t *testing.T) {
 			t.Errorf("an insult has an answer to quote: %q", ex.answer)
 		}
 	}
-	insult := lineContaining(cfg.PersonaPrompt, "An insult (")
+	insult := lineContaining(cfg.PersonaPrompt, "An insult without swearing (")
 	for _, want := range []string{"one short, calm line", "fresh words every time", "never aimed back at them"} {
 		if !strings.Contains(insult, want) {
 			t.Errorf("the insult line %q does not say %q", insult, want)
