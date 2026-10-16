@@ -1114,6 +1114,13 @@ private chats) needs, in this order:
    messages*, *Ban users* (for mute and ban) and *Pin messages*. She does
    only what both she and the admin asking may do; leave out a right to keep
    her from using it.
+5. **Clear each group's old conversation**: send `/reset@YourBot` in every
+   group, as an admin or owner. Each turn replays the group's last
+   `MAX_HISTORY_MESSAGES` (20) stored messages whatever their age, and the
+   stored ones are the old put-downs, Latin answers to Cyrillic and "Xo'p
+   bo'ladi, xo'jayin" lines that the rewritten character must not copy.
+   `/reset` deletes the group's conversation and day log; standing rules
+   stay. Waiting for `RETENTION_DAYS` to remove them works too, more slowly.
 
 `set-webhook` need not be run again: the update asks Telegram for no new kind
 of update.
