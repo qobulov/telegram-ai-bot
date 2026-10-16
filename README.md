@@ -724,9 +724,17 @@ check is made in code:
   before the reply quota and the applause rule, so a busy group cannot
   swallow it. A text in the chat, a quoted message or a voice transcript can
   talk the model into asking, but only the person's own yes acts.
-- **Target:** always the message the person replied to, as Telegram
-  delivered it. Nothing the model, a member or a quoted message writes can
-  choose whom she acts on.
+- **Target:** the message the person replied to, as Telegram delivered it.
+  For mute, unmute, ban and unban, someone who replied to nothing or to
+  their own message may instead tag one member: with a link to a member
+  without a username, Telegram gives the ID; with an `@username`, the ID is
+  the last author seen under it in that group's log, and Telegram must
+  confirm that this account still has that username and is in the group.
+  Two tags, an unknown username or any mismatch act on nobody, and she asks
+  for a reply to the member's message instead. The confirmation question
+  names the member, so the person sees whom they are confirming. Nothing
+  the model, a member or a quoted message writes can choose whom she acts
+  on. Her answers always reply to the person's own request.
 - **Who may ask:** a bot owner recognised by `BOT_OWNER_IDS` (not by
   username alone), or the group's creator or an administrator
   who holds the matching right, as Telegram reports it at that moment:

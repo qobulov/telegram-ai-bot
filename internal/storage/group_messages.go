@@ -2,7 +2,9 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -83,4 +85,43 @@ func (s *Store) ClearGroupMessages(ctx context.Context, chatID int64) error {
 		return fmt.Errorf("storage: clear group messages: %w", err)
 	}
 	return nil
+}
+
+// AuthorByUsername returns who last wrote in the group chatID under the
+// @username, read from the names the log keeps ("Ann @ann"), or
+// ErrUnknownAuthor. It is only a lead: the caller must have Telegram confirm
+// the account still has that username, since usernames change hands.
+func (s *Store) AuthorByUsername(ctx context.Context, chatID int64, username string) (int64, error) {
+	username = strings.ToLower(username)
+	if !isUsername(username) {
+		return 0, ErrUnknownAuthor
+	}
+	var id int64
+	err := s.pool.QueryRow(ctx, `
+		SELECT author_id FROM group_messages
+		WHERE chat_id = $1 AND author_id IS NOT NULL
+		  AND lower(author_name) ~ ('(^|\s)@' || $2 || '(\s|$)')
+		ORDER BY id DESC
+		LIMIT 1`, chatID, username).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, ErrUnknownAuthor
+	}
+	if err != nil {
+		return 0, fmt.Errorf("storage: author by username: %w", err)
+	}
+	return id, nil
+}
+
+// isUsername reports a Telegram username: 4 to 32 letters, digits and
+// underscores. Only such text goes into the pattern above.
+func isUsername(s string) bool {
+	if len(s) < 4 || len(s) > 32 {
+		return false
+	}
+	for _, r := range s {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '_' {
+			return false
+		}
+	}
+	return true
 }

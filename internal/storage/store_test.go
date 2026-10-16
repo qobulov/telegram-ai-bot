@@ -752,6 +752,35 @@ func TestGroupMessagesAreReadBackOldestFirst(t *testing.T) {
 	}
 }
 
+// A tagged @username is the member last seen writing under it in that
+// group; a name that merely contains it, another group, or a username that
+// is not one are nobody.
+func TestAuthorByUsername(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	for _, m := range []GroupMessage{
+		{ChatID: group, MessageID: 1, AuthorID: alice, AuthorName: "Ann @said_05", Text: "salom"},
+		{ChatID: group, MessageID: 2, AuthorID: bob, AuthorName: "Bek @said_05x [owner]", Text: "hi"},
+		{ChatID: group, MessageID: 3, AuthorID: 4242, AuthorName: "New @Said_05", Text: "username changed hands"},
+		{ChatID: otherGroup, MessageID: 4, AuthorID: 5151, AuthorName: "Elsewhere @only_there", Text: "x"},
+	} {
+		if err := store.AppendGroupMessage(ctx, m); err != nil {
+			t.Fatalf("AppendGroupMessage: %v", err)
+		}
+	}
+	cases := map[string]int64{"said_05": 4242, "SAID_05": 4242, "said_05x": bob}
+	for username, want := range cases {
+		if got, err := store.AuthorByUsername(ctx, group, username); err != nil || got != want {
+			t.Errorf("AuthorByUsername(%q) = %d, %v; want %d", username, got, err, want)
+		}
+	}
+	for _, username := range []string{"said", "only_there", "", "x.*", "a' OR '1'='1"} {
+		if got, err := store.AuthorByUsername(ctx, group, username); !errors.Is(err, ErrUnknownAuthor) {
+			t.Errorf("AuthorByUsername(%q) = %d, %v; want ErrUnknownAuthor", username, got, err)
+		}
+	}
+}
+
 // A redelivered update must not log its message twice; the bot's own lines,
 // which have no message ID, are all kept.
 func TestGroupMessageIsLoggedOnce(t *testing.T) {

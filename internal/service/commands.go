@@ -475,8 +475,51 @@ func (s *Service) caller(in incoming) tools.Caller {
 		UpdateID:  in.updateID,
 		MessageID: in.msg.MessageID,
 		Target:    s.target(in.msg.ReplyToMessage),
+		Mentions:  s.mentions(in),
 		Words:     in.described,
 	}
+}
+
+// mentions are the members a request tags, for moderation: in the request,
+// and in the asker's own message it replies to, which is how someone who
+// tagged a member often asks. The bot and the asker are left out, and each
+// member is listed once.
+func (s *Service) mentions(in incoming) []tools.Mention {
+	var found []tools.Mention
+	add := func(m tools.Mention) {
+		for _, f := range found {
+			if (m.UserID != 0 && f.UserID == m.UserID) || (m.Username != "" && strings.EqualFold(f.Username, m.Username)) {
+				return
+			}
+		}
+		found = append(found, m)
+	}
+	asker := ""
+	if in.msg.From != nil {
+		asker = in.msg.From.Username
+	}
+	scan := func(msg *telegram.Message) {
+		text, entities := msg.Content()
+		for _, e := range entities {
+			switch e.Type {
+			case telegram.EntityTextMention:
+				if e.User != nil && e.User.ID != s.opts.Bot.ID && e.User.ID != in.userID {
+					add(tools.Mention{UserID: e.User.ID})
+				}
+			case telegram.EntityMention:
+				tag, ok := telegram.EntityText(text, e)
+				username := strings.TrimPrefix(tag, "@")
+				if ok && username != "" && !strings.EqualFold(username, s.opts.Bot.Username) && !strings.EqualFold(username, asker) {
+					add(tools.Mention{Username: username})
+				}
+			}
+		}
+	}
+	scan(in.msg)
+	if replied := in.msg.ReplyToMessage; replied != nil && replied.From != nil && replied.From.ID == in.userID {
+		scan(replied)
+	}
+	return found
 }
 
 // answeredMember is the member whose message the bot's message botMessageID
@@ -564,6 +607,9 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 	case err == nil:
 		log.Info("turn completed")
 		return outcome{text: s.fitted(in, answer.Text), answerID: answer.ID}
+	case errors.Is(err, agent.ErrLeakedThinking):
+		log.Warn("the model answered with its own reasoning; nothing was sent")
+		return outcome{}
 	case errors.Is(err, agent.ErrSilent):
 		log.Info("the model chose not to reply")
 		return outcome{}

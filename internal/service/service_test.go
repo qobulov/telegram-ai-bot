@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -3047,6 +3048,47 @@ func TestIgnoreCommandOnTheBotsAnswerIgnoresWhomItAnswered(t *testing.T) {
 // A service message names as its author whoever caused it: "Ann added
 // Spammer" comes from Ann, "Boss pinned a message" from Boss. Acting on
 // that author would hit the wrong person, so such a message is no target.
+// Tools learn whom a request tags from Telegram's entities, never from the
+// model: in the request, and in the asker's own message it replies to. The
+// bot and the asker are left out. The answer still replies to the request.
+func TestTurnTellsToolsTheTaggedMembers(t *testing.T) {
+	f := newFixture()
+	text := "@MyBot @said_05 ni mute qil, Ali ham, @bek emas"
+	request := groupMessage(text, "@MyBot", "@said_05", "@bek")
+	request.From.Username = "bek"
+	ali := entityAt(telegram.EntityTextMention, text, "Ali")
+	ali.User = &telegram.User{ID: 7007, FirstName: "Ali"}
+	request.Entities = append(request.Entities, ali)
+	selfReply := groupMessage("Mira, mute qil")
+	own := groupMessage("@Said_05 go mute", "@Said_05")
+	own.MessageID = 28
+	selfReply.ReplyToMessage = own
+	toBot := groupMessage("Mira, @said_05 ni mute qil", "@said_05")
+	toBot.ReplyToMessage = &telegram.Message{MessageID: 27, From: &telegram.User{ID: botID, IsBot: true}, Text: "salom"}
+
+	sent := f.run(inGroup(request), inGroup(selfReply), inGroup(toBot))
+
+	calls := f.replier.recorded()
+	if len(calls) != 3 {
+		t.Fatalf("model calls = %d, want 3", len(calls))
+	}
+	wants := [][]tools.Mention{
+		{{Username: "said_05"}, {UserID: 7007}},
+		{{Username: "Said_05"}},
+		{{Username: "said_05"}},
+	}
+	for i, want := range wants {
+		if got := calls[i].caller.Mentions; !slices.Equal(got, want) {
+			t.Errorf("call %d: mentions = %+v, want %+v", i, got, want)
+		}
+	}
+	for _, m := range sent {
+		if m.chatID != groupID || m.replyTo != 30 {
+			t.Errorf("sent %+v; every answer must reply to the request itself, message 30", m)
+		}
+	}
+}
+
 func TestServiceMessagesAreNoTarget(t *testing.T) {
 	ann := &telegram.User{ID: 555, FirstName: "Ann", Username: "ann"}
 	spammer := telegram.User{ID: 666, FirstName: "Spammer", Username: "spam"}

@@ -51,13 +51,17 @@ const (
 // Refusals, in words the model, or the chat, can be given.
 const (
 	notInAGroup   = "only a person in a group can ask for that"
-	noReplyTarget = "reply to the message of the member you mean"
-	immune        = "I can't do that to admins, my owners, myself, Telegram's service accounts or the person asking"
-	noAnswer      = "Telegram did not answer, so it may not have been done; try again later"
-	noQuestion    = "I could not post the question that asks them to confirm, so nothing will be done; ask again later"
-	askedNote     = "Nothing is done yet. I posted my own question asking them to confirm by replying yes to it; their answer is handled without you. Don't ask again and don't say it is done: reply with exactly [react 👌]."
-	askedTwice    = "This message was delivered twice and the first delivery already asked them to confirm, so nothing more was done now: reply with exactly [silent]."
-	oneAtATime    = "one action at a time: I already posted my question about the other action they asked for in this message. Nothing is asked or done for this one; tell them to ask for it again after answering that question"
+	noReplyTarget = "reply to the message of the member you mean, or tag that one member with @ in the request"
+	// Tags that do not name one member Telegram vouches for act on nobody.
+	manyMentions   = "more than one member is tagged; reply to the message of the one you mean, or tag only that member"
+	unknownMention = "that @username has not written here recently, so I can't tell who it is; reply to one of their own messages instead"
+	unsureMention  = "Telegram did not confirm that the tagged account is a member here under that name, so nothing was done; reply to one of their own messages instead"
+	immune         = "I can't do that to admins, my owners, myself, Telegram's service accounts or the person asking"
+	noAnswer       = "Telegram did not answer, so it may not have been done; try again later"
+	noQuestion     = "I could not post the question that asks them to confirm, so nothing will be done; ask again later"
+	askedNote      = "Nothing is done yet. I posted my own question asking them to confirm by replying yes to it; their answer is handled without you. Don't ask again and don't say it is done: reply with exactly [react 👌]."
+	askedTwice     = "This message was delivered twice and the first delivery already asked them to confirm, so nothing more was done now: reply with exactly [silent]."
+	oneAtATime     = "one action at a time: I already posted my question about the other action they asked for in this message. Nothing is asked or done for this one; tell them to ask for it again after answering that question"
 )
 
 // chatText is something the bot says to a group in its own words, never the
@@ -135,6 +139,14 @@ type MemberLookup interface {
 	GetChatMember(ctx context.Context, chatID, userID int64) (telegram.ChatMember, error)
 }
 
+// UsernameLookup finds who wrote in a group under an @username, from the
+// group's log; storage.ErrUnknownAuthor when nobody did. The Bot API cannot
+// turn a username into a member, so a tag is only as good as this, checked
+// against Telegram.
+type UsernameLookup interface {
+	AuthorByUsername(ctx context.Context, chatID int64, username string) (int64, error)
+}
+
 // Moderator has Telegram act on a group's messages and members.
 type Moderator interface {
 	DeleteMessage(ctx context.Context, chatID, messageID int64) error
@@ -190,6 +202,10 @@ type ModerationOptions struct {
 	// and is an owner spared: a username can be given up and taken by
 	// someone else, who would get both.
 	OwnersByID bool
+	// Owners are the owners' IDs, to spare a tagged owner. Usernames finds
+	// tagged members; without it only tags that carry an ID work.
+	Owners    map[int64]bool
+	Usernames UsernameLookup
 }
 
 type moderationArgs struct {
@@ -231,6 +247,7 @@ func (m *Moderation) Tool() Tool {
 		Name: "moderate",
 		Description: "Whenever someone in a group asks you to: have something done to the message they replied to. It checks who may ask, which are the group's admins with the right and your owners, and refuses anyone else with the reason. " +
 			"delete: delete that message. mute (minutes, default 60) or unmute: its author. ban or unban: its author. pin or unpin: that message. " +
+			"For mute, unmute, ban and unban without such a reply, or replying to their own message, it acts on the one member they tagged with @, once Telegram confirms who that is. " +
 			"Nothing is done at once: the tool checks everyone's rights, then posts its own question asking the person to confirm, and their reply is handled without you. " +
 			"cancel: drop what they asked for. Never say something was done.",
 		Schema: json.RawMessage(`{
@@ -279,14 +296,91 @@ func (m *Moderation) run(ctx context.Context, raw json.RawMessage) (any, error) 
 	if _, known := neededRight[args.Action]; !known {
 		return nil, &ArgumentError{Message: "action must be delete, mute, unmute, ban, unban, pin, unpin or cancel"}
 	}
-	if caller.Target == nil {
-		return nil, &DeniedError{Message: noReplyTarget}
+	target, err := m.targetOf(ctx, caller, args.Action)
+	if err != nil {
+		return nil, err
 	}
-	o := m.newOrder(caller, args.Action, *caller.Target, args.Minutes, args.Reason)
+	o := m.newOrder(caller, args.Action, target, args.Minutes, args.Reason)
 	if err := m.check(ctx, o); err != nil {
 		return nil, err
 	}
 	return m.ask(ctx, o)
+}
+
+// targetOf is what an order acts on. A reply to someone else's message
+// names that message and its author. Without a reply, or with a reply to
+// their own message, which is how a member who tagged someone often asks,
+// an action on a member names the one member they tagged, once Telegram
+// confirms that account. Anything less certain acts on nobody: the person
+// is asked to reply to the member's message instead.
+func (m *Moderation) targetOf(ctx context.Context, caller Caller, action string) (Target, error) {
+	replied := caller.Target
+	ownReply := replied != nil && replied.UserID == caller.UserID
+	switch {
+	case replied != nil && (!ownReply || !onMember(action) || len(caller.Mentions) == 0):
+		// Acting on oneself is refused when the order is checked.
+		return *replied, nil
+	case !onMember(action) || len(caller.Mentions) == 0:
+		return Target{}, &DeniedError{Message: noReplyTarget}
+	case len(caller.Mentions) > 1:
+		return Target{}, &DeniedError{Message: manyMentions}
+	}
+	return m.tagged(ctx, caller.ChatID, caller.Mentions[0], action)
+}
+
+// tagged is the member a tag names, as Telegram knows them now: the ID a
+// username was last seen with must still have that username, and be in the
+// group (or, to be unbanned, have been).
+func (m *Moderation) tagged(ctx context.Context, chatID int64, mention Mention, action string) (Target, error) {
+	userID := mention.UserID
+	if userID == 0 {
+		if m.opts.Usernames == nil {
+			return Target{}, &DeniedError{Message: unknownMention}
+		}
+		id, err := m.opts.Usernames.AuthorByUsername(ctx, chatID, mention.Username)
+		if errors.Is(err, storage.ErrUnknownAuthor) {
+			return Target{}, &DeniedError{Message: unknownMention}
+		}
+		if err != nil {
+			return Target{}, internal(err)
+		}
+		userID = id
+	}
+	member, err := m.opts.Members.GetChatMember(ctx, chatID, userID)
+	if err != nil {
+		return Target{}, errLookup
+	}
+	user := member.User
+	renamed := mention.Username != "" && (user == nil || !strings.EqualFold(user.Username, mention.Username))
+	if user == nil || user.ID != userID || renamed || !present(member.Status, action) {
+		return Target{}, &DeniedError{Message: unsureMention}
+	}
+	name := user.FirstName
+	if user.Username != "" {
+		name = strings.TrimSpace(name + " @" + user.Username)
+	}
+	return Target{UserID: userID, Name: name, IsBot: user.IsBot, Owner: m.opts.Owners[userID]}, nil
+}
+
+// onMember reports an action on a member rather than on a message.
+func onMember(action string) bool {
+	switch action {
+	case actionMute, actionUnmute, actionBan, actionUnban:
+		return true
+	}
+	return false
+}
+
+// present reports a member status an action may be taken on: someone in
+// the group, or for unban someone who was in it.
+func present(status, action string) bool {
+	switch status {
+	case "creator", "administrator", "member", "restricted":
+		return true
+	case "kicked", "left":
+		return action == actionUnban
+	}
+	return false
 }
 
 // groupRequester is who the turn is for, if a person in a group: a bot, or

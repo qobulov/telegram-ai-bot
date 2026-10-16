@@ -36,11 +36,22 @@ type Caller struct {
 	// Target is the message the caller replied to, or nil. Tools that act on
 	// a member act on its author: the model cannot name anyone else.
 	Target *Target
+	// Mentions are the members the caller tagged in the message being
+	// answered, or in their own message it replies to, from Telegram's
+	// entities; never the bot or the caller.
+	Mentions []Mention
 	// Words is what the caller wrote in the message being answered, its
 	// media described and a voice message's transcript included, without the
 	// message it replies to: their own words, as opposed to anything quoted
 	// or logged.
 	Words string
+}
+
+// Mention is a member tagged in a message: by @username, or, for a member
+// without one, by a link that carries their ID.
+type Mention struct {
+	UserID   int64
+	Username string
 }
 
 // MaxTargetRunes is the most of a Target's text that is kept.
