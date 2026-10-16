@@ -202,11 +202,16 @@ func (s *Service) rateLimited(in incoming) (notice string, limited bool) {
 	return "", false
 }
 
+// overQuotaReaction is set on a message the quota leaves unanswered, so
+// that the bot is seen to have read it: silence alone looked as if it were
+// broken.
+const overQuotaReaction = "👀"
+
 // mayAnswerInGroup takes one of the group's answers from the quota kept in
 // the database, and reports whether there was one. Past either limit the
-// bot stays silent, without a notice: a notice is one more message in a
-// group that already has too many. When the count cannot be read it stays
-// silent too, like mayAnswerBot.
+// bot answers with a reaction only, without a notice: a notice is one more
+// message in a group that already has too many. When the count cannot be
+// read it stays silent, like mayAnswerBot.
 //
 // Owners are not counted, other bots have their own quota, and the off
 // switch always passes for those who may use it: it has to work precisely
@@ -230,6 +235,7 @@ func (s *Service) mayAnswerInGroup(in incoming) bool {
 	}
 	if !ok {
 		s.opts.Logger.Info("group reply limit reached", "chat_id", in.scope.ChatID, "user_id", in.userID)
+		s.react(in, overQuotaReaction)
 	}
 	return ok
 }

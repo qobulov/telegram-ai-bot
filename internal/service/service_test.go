@@ -1254,6 +1254,11 @@ func TestGroupQuotaDeniedStaysSilent(t *testing.T) {
 	if got := f.chatLog.texts(groupID); len(got) == 0 || got[len(got)-1] != "Bek: Mira, three" {
 		t.Errorf("log = %q, want the unanswered message noted like chatter", got)
 	}
+	// Silence alone looked as if she were broken: the message she does not
+	// answer gets a reaction, which is no message and takes no quota.
+	if got, want := f.reactor.recorded(), []reaction{{chatID: groupID, messageID: 30, emoji: "👀"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("reactions = %+v, want %+v on the third message", got, want)
+	}
 }
 
 func TestMembersMuteAttemptsAreCounted(t *testing.T) {
@@ -1299,6 +1304,9 @@ func TestGroupQuotaFailureStaysQuietButOwnersAndMuteWork(t *testing.T) {
 	}
 	if want := []string{"echo: status?", textMuted}; strings.Join(texts, "|") != strings.Join(want, "|") {
 		t.Errorf("sent = %q, want %q: a member gets silence, the owner and the off switch still work", texts, want)
+	}
+	if got := f.reactor.recorded(); len(got) != 0 {
+		t.Errorf("reactions = %+v; a count that failed denied nothing", got)
 	}
 }
 

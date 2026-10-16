@@ -733,7 +733,8 @@ cannot make one.
 - **Reply quota.** She answers at most `GROUP_RATE_LIMIT_PER_MINUTE` (6)
   messages per group per minute, and each member at most
   `MEMBER_REPLIES_PER_10_MIN` (4) times per group in 10 minutes. Past either
-  limit she stays silent, without a notice. The counts are kept in the
+  limit she answers with a 👀 reaction only, without a notice, so that she is
+  seen to have read the message. The counts are kept in the
   database (`group_replies`), so they hold on Vercel and across restarts.
   Not counted: owners; other bots, which have their own limit (below);
   reactions to applause; and `/mute` and `/unmute` from those who may use
