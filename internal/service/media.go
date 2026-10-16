@@ -146,12 +146,17 @@ func thumbnailID(thumbnail *telegram.PhotoSize) string {
 	return thumbnail.FileID
 }
 
+// canListen reports whether voice messages can be turned into text.
+func (s *Service) canListen() bool {
+	return s.opts.AudioInput && s.opts.Transcriber != nil
+}
+
 // voiceMedia passes a voice message on only when the provider can hear it
 // and it is not too long; otherwise the model is told why it was not.
 func (s *Service) voiceMedia(voice *telegram.Voice) media {
 	label := fmt.Sprintf("<voice message, %d s", voice.Duration)
 	switch {
-	case !s.opts.AudioInput || s.opts.Transcriber == nil:
+	case !s.canListen():
 		return media{label: label + "; you cannot listen to voice messages>"}
 	case voice.Duration > s.opts.MaxVoiceSeconds:
 		return media{label: label + "; too long to listen to>"}

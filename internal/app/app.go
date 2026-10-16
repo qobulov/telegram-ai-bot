@@ -168,44 +168,7 @@ func membershipError(err error) error {
 
 // NewService wires the tools, the model client, the agent and the service.
 func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, logger *slog.Logger) (*service.Service, error) {
-	builtin := tools.Builtin(service.HelpText(), cfg.Location)
-	if cfg.ImagesEnabled {
-		builtin = append(builtin, imageTool(cfg, store))
-	}
-	// Any group's admins, and any member for a poll, may use these, so they
-	// are there with or without owners.
-	builtin = append(builtin,
-		tools.ModerationTool(tools.ModerationOptions{
-			BotID:    bot.User.ID,
-			Members:  bot.Client,
-			Telegram: bot.Client,
-			Store:    store,
-			Rights:   store,
-			Location: cfg.Location,
-		}),
-		tools.PollTool(tools.PollOptions{Sender: bot.Client, Store: store}),
-	)
-	if len(cfg.OwnerUsernames) > 0 {
-		builtin = append(builtin,
-			tools.DatabaseTool(tools.DatabaseOptions{
-				Store:    store,
-				Members:  groupMembers{client: bot.Client, botID: bot.User.ID},
-				Location: cfg.Location,
-			}),
-			tools.BroadcastTool(tools.BroadcastOptions{
-				Groups: store,
-				Drafts: store,
-				Sender: groupSender{client: bot.Client},
-			}),
-			tools.RulesTool(tools.RulesOptions{
-				Store:    store,
-				Admins:   groupMembers{client: bot.Client, botID: bot.User.ID},
-				BotID:    bot.User.ID,
-				Location: cfg.Location,
-			}),
-		)
-	}
-	registry, err := tools.NewRegistry(cfg.IsAdmin, builtin...)
+	registry, err := tools.NewRegistry(cfg.IsAdmin, builtinTools(cfg, store, bot)...)
 	if err != nil {
 		return nil, err
 	}
@@ -270,6 +233,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		MaxVoiceSeconds:    cfg.MaxVoiceSeconds,
 		AudioInput:         cfg.AudioInput,
 		Transcriber:        transcriber(cfg, model),
+		ImagesEnabled:      cfg.ImagesEnabled,
 
 		GroupReplies:          store,
 		GroupRatePerMinute:    cfg.GroupRateLimitPerMinute,
@@ -285,6 +249,50 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		opts.MuteStore = store
 	}
 	return service.New(opts), nil
+}
+
+// builtinTools are the tools the model may call in this deployment: the help
+// and the image tool follow what is enabled, and the time is the groups'.
+func builtinTools(cfg config.Config, store *storage.Store, bot Bot) []tools.Tool {
+	help := service.HelpText(service.Abilities{Draw: cfg.ImagesEnabled, Listen: cfg.AudioInput})
+	builtin := tools.Builtin(help, cfg.Location)
+	if cfg.ImagesEnabled {
+		builtin = append(builtin, imageTool(cfg, store))
+	}
+	// Any group's admins, and any member for a poll, may use these, so they
+	// are there with or without owners.
+	builtin = append(builtin,
+		tools.ModerationTool(tools.ModerationOptions{
+			BotID:    bot.User.ID,
+			Members:  bot.Client,
+			Telegram: bot.Client,
+			Store:    store,
+			Rights:   store,
+			Location: cfg.Location,
+		}),
+		tools.PollTool(tools.PollOptions{Sender: bot.Client, Store: store}),
+	)
+	if len(cfg.OwnerUsernames) > 0 {
+		builtin = append(builtin,
+			tools.DatabaseTool(tools.DatabaseOptions{
+				Store:    store,
+				Members:  groupMembers{client: bot.Client, botID: bot.User.ID},
+				Location: cfg.Location,
+			}),
+			tools.BroadcastTool(tools.BroadcastOptions{
+				Groups: store,
+				Drafts: store,
+				Sender: groupSender{client: bot.Client},
+			}),
+			tools.RulesTool(tools.RulesOptions{
+				Store:    store,
+				Admins:   groupMembers{client: bot.Client, botID: bot.User.ID},
+				BotID:    bot.User.ID,
+				Location: cfg.Location,
+			}),
+		)
+	}
+	return builtin
 }
 
 // imageTool draws with Gemini and counts pictures in the database.

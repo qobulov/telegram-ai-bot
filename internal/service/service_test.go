@@ -727,7 +727,7 @@ func TestCloseRefusesQueuedUpdatesInsteadOfRunningThem(t *testing.T) {
 }
 
 func TestHelpTextListsEveryCommand(t *testing.T) {
-	help := HelpText()
+	help := HelpText(Abilities{})
 	for _, command := range []string{"/start", "/help", "/reset", "/model", "/about"} {
 		if !strings.Contains(help, command) {
 			t.Errorf("help text does not mention %s", command)
@@ -736,17 +736,60 @@ func TestHelpTextListsEveryCommand(t *testing.T) {
 }
 
 func TestHelpMentionsModerationAndPolls(t *testing.T) {
-	help := HelpText()
+	help := HelpText(Abilities{Draw: true, Listen: true})
 	for _, want := range []string{
 		"Uzbek", "Russian", "English",
-		"photos", "stickers", "GIFs", "voice", "round videos",
-		"draw", "time", "arithmetic", "poll",
-		"delete", "mute", "ban", "pin",
-		"/ignore@username", "/unignore@username", "/mute", "/unmute", "/reset",
+		"photos", "stickers", "GIFs", "round videos",
+		"tell the time anywhere", "arithmetic", "make a poll in a group",
 	} {
 		if !strings.Contains(help, want) {
 			t.Errorf("help text does not mention %q", want)
 		}
+	}
+	// The words below were in the help before moderation existed ("/reset —
+	// delete the conversation history", "/mute"), so they are looked for
+	// only in the admins' part.
+	_, admins, found := strings.Cut(help, "For a group's admins:")
+	if !found {
+		t.Fatalf("help text has no part for group admins:\n%s", help)
+	}
+	for _, want := range []string{
+		"ask me to delete or pin it", "to mute or ban its author", "confirm a ban",
+		"/mute@username", "/unmute@username", "/ignore@username", "/unignore@username", "/reset@username",
+	} {
+		if !strings.Contains(admins, want) {
+			t.Errorf("the admins' part of the help does not mention %q:\n%s", want, admins)
+		}
+	}
+}
+
+// /help offers drawing and listening only when this deployment can do them,
+// as the voice handling and the registered tools decide.
+func TestHelpPromisesOnlyWhatTheBotCanDo(t *testing.T) {
+	cases := map[string]struct {
+		change      func(*fixture)
+		draw, voice bool
+	}{
+		"listens, cannot draw":   {func(*fixture) {}, false, true},
+		"draws":                  {func(f *fixture) { f.opts.ImagesEnabled = true }, true, true},
+		"provider without audio": {func(f *fixture) { f.opts.AudioInput = false }, false, false},
+		"no transcriber":         {func(f *fixture) { f.opts.Transcriber = nil }, false, false},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			tc.change(f)
+
+			sent := f.run(textFrom(userID, "/help"))
+
+			expectOneReply(t, sent, "/reset")
+			if got := strings.Contains(sent[0].text, "draw a picture"); got != tc.draw {
+				t.Errorf("offers drawing = %t, want %t:\n%s", got, tc.draw, sent[0].text)
+			}
+			if got := strings.Contains(sent[0].text, "voice messages"); got != tc.voice {
+				t.Errorf("offers listening = %t, want %t:\n%s", got, tc.voice, sent[0].text)
+			}
+		})
 	}
 }
 

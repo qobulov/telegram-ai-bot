@@ -339,7 +339,7 @@ The group log no longer starts at midnight (Task 4: the last 12 hours). Rewrite 
 ### Task 11: Persona that agrees with the code
 
 **Files:**
-- Modify: `internal/config/persona.go` (defaultPersona, groupNote, ownerNote)
+- Modify: `internal/config/persona.go` (defaultPersona, groupNote, ownerNote); `README.md` (the intro's "a witty, sarcastic group-chat regular" and "The character" section's "natural troll", "She roasts, fires back when insulted"), so the docs describe the same character
 - Test: `internal/config/config_test.go`
 
 **Interfaces:**

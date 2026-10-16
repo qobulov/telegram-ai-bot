@@ -193,6 +193,9 @@ type Options struct {
 	MaxVoiceSeconds int
 	// AudioInput is true when the model provider can hear voice messages.
 	AudioInput bool
+	// ImagesEnabled is true when the model has the image tool; /help offers
+	// drawing only then.
+	ImagesEnabled bool
 }
 
 // Service processes updates on a fixed pool of workers.

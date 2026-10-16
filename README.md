@@ -103,6 +103,22 @@ messages(id PK, conversation_id -> conversations, role, content,
          telegram_message_id, reply_to_message_id,
          author_id, author_name, created_at)
 chats(chat_id PK, muted, updated_by, updated_at)
+group_messages(id PK, chat_id, message_id, author_id, author_name, text,
+               created_at)
+groups(chat_id PK, title, username, bot_status, bot_rights jsonb,
+       first_seen_at, last_seen_at)
+image_generations(id PK, user_id, chat_id, created_at)
+bot_replies(id PK, chat_id, bot_id, created_at)
+group_replies(chat_id, user_id, created_at)
+broadcasts(id PK, owner_id, update_id, text, chat_ids bigint[],
+           created_at, sent_at)
+group_rules(id PK, chat_id (0 for every group), kind, user_id, user_name,
+            text, set_by, created_at, expires_at)
+moderation_actions(id PK, chat_id, action, requester_id, target_user_id,
+                   target_message_id, target_text, minutes, reason,
+                   update_id, created_at, UNIQUE (update_id, action))
+pending_bans(requester_id, chat_id, target_user_id, target_name,
+             update_id, created_at, PK (requester_id, chat_id))
 schema_migrations(version PK, applied_at)
 ```
 
@@ -127,7 +143,7 @@ is deleted after `RETENTION_DAYS`. Owners' standing rules are kept until
 they expire, and the moderation audit until you delete it; see
 [Groups](#groups). The schema is
 defined by the files in
-[internal/storage/migrations/](internal/storage/migrations/), one per table.
+[internal/storage/migrations/](internal/storage/migrations/), one per change.
 To change the schema later, add a new numbered file there; do not edit one
 that has already been applied to a database you want to keep.
 
@@ -988,8 +1004,8 @@ Telegram then delivers the update again. Keep `REQUEST_TIMEOUT_SECONDS` at
    curl https://YOUR-APP.vercel.app/api/webhook     # prints: ok
    ```
 
-   If it prints `the bot is not ready`, the function logs in Vercel name the
-   missing or invalid setting.
+   If it answers `webhook is not ready; see the function logs` (status 503),
+   the function logs in Vercel name the missing or invalid setting.
 4. **Point Telegram at it.** On your machine, with the same
    `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET` in `.env`:
 
@@ -1013,8 +1029,9 @@ order:
    `DB_POSTGRES_URL` pointing at the production database, as in step 1
    above. They only add tables and one column; nothing existing is changed.
    The new version refuses to start on the old schema (the function answers
-   `the bot is not ready`, and Telegram delivers the updates again later),
-   while the old version keeps working on the new one.
+   503 `webhook is not ready; see the function logs`, and Telegram delivers
+   the updates again later), while the old version keeps working on the new
+   one.
 2. **Set in Vercel**: `BOT_WAKE_WORDS=maria,mariya,мария,мариа`, and,
    optionally but preferably, `BOT_OWNER_IDS` with the owners' numeric IDs.
    The new limits default to `GROUP_RATE_LIMIT_PER_MINUTE=6` and

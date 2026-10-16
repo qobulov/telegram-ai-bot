@@ -1,5 +1,7 @@
 package service
 
+import "fmt"
+
 // Fixed messages the bot sends itself. Answers from the model follow the
 // chat's language and the character's voice; these are plain, short and kept
 // in English, except the welcome.
@@ -37,9 +39,11 @@ Send /reset to delete the conversation history.`
 	textNotIgnored    = "%s wasn't on my ignore list."
 )
 
+// helpText is the help with two blanks, filled by HelpText: the sentences on
+// what she can see and what she can do.
 const helpText = `Talk to me and I will answer, in Uzbek, Russian or English, matching your language.
 
-I remember the recent part of our conversation. I can see photos, stickers and GIFs, a frame of videos and round videos, and I listen to voice messages. I can draw a picture when you ask, tell the time anywhere, calculate arithmetic, and make a poll in a group.
+I remember the recent part of our conversation. %s %s
 
 Commands:
 /start — welcome message
@@ -56,8 +60,26 @@ Reply to a message and ask me to delete or pin it, or to mute or ban its author.
 /ignore@username, /unignore@username — as a reply to a member's message: I stop answering them for 24 hours, or answer them again
 /reset@username — delete the group's conversation with me`
 
-// HelpText describes the bot's commands and capabilities. It is shown by
-// /help and returned to the model by the get_bot_help tool.
-func HelpText() string {
-	return helpText
+// Abilities are what a deployment may lack: drawing needs the image tool and
+// listening needs a provider that hears audio. The help names only those
+// present, because get_bot_help hands it to the model, which would otherwise
+// promise a picture or a transcript it cannot make.
+type Abilities struct {
+	Draw   bool
+	Listen bool
+}
+
+// HelpText describes the bot's commands and what it can do with these
+// abilities. It is shown by /help and returned to the model by the
+// get_bot_help tool.
+func HelpText(abilities Abilities) string {
+	seeing := "I can see photos, stickers and GIFs, and a frame of videos and round videos."
+	if abilities.Listen {
+		seeing = "I can see photos, stickers and GIFs, a frame of videos and round videos, and I listen to voice messages."
+	}
+	skills := "I can tell the time anywhere, calculate arithmetic, and make a poll in a group."
+	if abilities.Draw {
+		skills = "I can draw a picture when you ask, tell the time anywhere, calculate arithmetic, and make a poll in a group."
+	}
+	return fmt.Sprintf(helpText, seeing, skills)
 }
