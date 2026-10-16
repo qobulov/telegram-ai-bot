@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"unicode"
 
@@ -209,18 +210,29 @@ func finish(t *turn, reply ai.Message) (Answer, error) {
 	if isSilent(answer) {
 		return Answer{}, ErrSilent
 	}
-	if emoji, ok := reactionOf(answer); ok {
-		// The model wanted no words. Telegram refuses any emoji not on its
-		// list, so for any other one silence is the closest it can have.
-		emoji = strings.ReplaceAll(emoji, variationSelector, "")
-		if !telegram.IsReactionEmoji(emoji) {
-			return Answer{}, ErrSilent
+	if markers := reactMarkers.FindAllString(answer, -1); len(markers) > 0 {
+		words := withoutMarkers(answer)
+		if !hasWords(words) {
+			return react(t, markers[0])
 		}
-		t.messages = append(t.messages, ai.Message{Role: ai.RoleAssistant, Content: "<reacted " + emoji + ">"})
-		return Answer{Reaction: emoji}, nil
+		// A marker among words would be posted as text, so it is dropped:
+		// the words are what the model wanted to say.
+		answer = words
 	}
 	t.messages = append(t.messages, ai.Message{Role: ai.RoleAssistant, Content: answer})
 	return Answer{Text: answer}, nil
+}
+
+// react answers with the emoji of marker, the whole of the answer. The
+// model wanted no words; Telegram refuses any emoji not on its list, so for
+// any other one silence is the closest it can have.
+func react(t *turn, marker string) (Answer, error) {
+	emoji := strings.ReplaceAll(markerArgument(marker), variationSelector, "")
+	if !telegram.IsReactionEmoji(emoji) {
+		return Answer{}, ErrSilent
+	}
+	t.messages = append(t.messages, ai.Message{Role: ai.RoleAssistant, Content: "<reacted " + emoji + ">"})
+	return Answer{Reaction: emoji}, nil
 }
 
 // isSilent reports an answer with the silent marker anywhere in it. The
@@ -237,31 +249,41 @@ func isSilent(answer string) bool {
 	return false
 }
 
-// reactionOf returns X when the whole answer is "[react X]", ignoring
-// decoration around it as in "*[react 🔥]*". It also takes "<reacted X>":
-// that is how past reactions look in the history, and models copy it.
-// X may be empty or not an emoji at all; finish decides what it is worth.
-func reactionOf(answer string) (string, bool) {
-	bare := strings.TrimFunc(answer, func(char rune) bool {
-		return !strings.ContainsRune("[]<>", char) && !unicode.IsLetter(char) && !unicode.IsDigit(char)
+// reactMarkers finds "[react X]", and "<reacted X>", which is how past
+// reactions look in the history and which models copy, in either bracket
+// style and any case.
+var reactMarkers = regexp.MustCompile(`(?i)\[\s*react(?:ed)?\b[^\]]*\]|<\s*react(?:ed)?\b[^>]*>`)
+
+// leftSpaces are the spaces a dropped marker leaves: doubled, or at the
+// edge of a line.
+var leftSpaces = regexp.MustCompile(`[ \t]*\n[ \t]*|[ \t]{2,}`)
+
+// withoutMarkers is answer with its reaction markers taken out.
+func withoutMarkers(answer string) string {
+	text := reactMarkers.ReplaceAllString(answer, " ")
+	text = leftSpaces.ReplaceAllStringFunc(text, func(spaces string) string {
+		if strings.Contains(spaces, "\n") {
+			return "\n"
+		}
+		return " "
 	})
-	switch {
-	case strings.HasPrefix(bare, "[") && strings.HasSuffix(bare, "]"):
-		return argument(bare[1:len(bare)-1], "react")
-	case strings.HasPrefix(bare, "<") && strings.HasSuffix(bare, ">"):
-		return argument(bare[1:len(bare)-1], "reacted")
-	}
-	return "", false
+	return strings.TrimSpace(text)
 }
 
-// argument returns the rest of command when its first word is verb, in any
-// case: "🔥" for "react 🔥".
-func argument(command, verb string) (string, bool) {
-	words := strings.Fields(command)
-	if len(words) == 0 || !strings.EqualFold(words[0], verb) {
-		return "", false
+// hasWords reports text with a letter or a digit in it: more than the
+// decoration models put around a marker, as in "*[react 🔥]*".
+func hasWords(text string) bool {
+	return strings.IndexFunc(text, func(char rune) bool { return unicode.IsLetter(char) || unicode.IsDigit(char) }) >= 0
+}
+
+// markerArgument is what a reaction marker carries after its verb: "🔥" for
+// "[react 🔥]". It may be empty or not an emoji at all; react decides.
+func markerArgument(marker string) string {
+	words := strings.Fields(strings.Trim(marker, "[]<>"))
+	if len(words) == 0 {
+		return ""
 	}
-	return strings.Join(words[1:], " "), true
+	return strings.Join(words[1:], " ")
 }
 
 // runTools records the assistant's request and one result per call. Every

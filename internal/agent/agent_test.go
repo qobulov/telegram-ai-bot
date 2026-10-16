@@ -520,6 +520,33 @@ func TestReactAnswerIsSavedAsReaction(t *testing.T) {
 	}
 }
 
+// [silent] leaked into groups inside sentences; [react X] and the
+// <reacted X> of the history do too, so a marker among words is dropped and
+// the words are sent.
+func TestReactMarkerAmongWordsIsDropped(t *testing.T) {
+	cases := map[string]string{
+		"Zo'r! [react 🔥]":                  "Zo'r!",
+		"[react 😁] xaxa":                    "xaxa",
+		"Haha <reacted 🤣>":                  "Haha",
+		"Ha, <Reacted 👍> qoyil":             "Ha, qoyil",
+		"Birinchi qator [react 🔥]\nIkkinchi": "Birinchi qator\nIkkinchi",
+		"[reacted 🔥] ok":                    "ok",
+	}
+	for content, want := range cases {
+		f := newFixture(text(content))
+
+		answer, err := f.agent.Reply(context.Background(), request(1, "xaxa zo'r"))
+		if err != nil || answer.Text != want || answer.Reaction != "" {
+			t.Errorf("answer %q: got %+v, err = %v; want the text %q", content, answer, err, want)
+			continue
+		}
+		saved := f.store.history[testScope]
+		if last := saved[len(saved)-1]; last.Content != want {
+			t.Errorf("answer %q: saved %q, want %q", content, last.Content, want)
+		}
+	}
+}
+
 func TestReactWithUnknownEmojiIsSilent(t *testing.T) {
 	for _, content := range []string{"[react 🙂]", "[react]", "[react 🔥🔥]", "[react fire]", "[react 🔥 👍]"} {
 		f := newFixture(text(content))
