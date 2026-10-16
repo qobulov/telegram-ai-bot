@@ -43,8 +43,9 @@ const (
 	maxActions   = 10
 	actionWindow = 10 * time.Minute
 	// maxReasonRunes keeps the audit's reason short.
-	maxReasonRunes = 200
-	clockLayout    = "15:04"
+	maxReasonRunes  = 200
+	clockLayout     = "15:04"
+	dateClockLayout = "02.01 15:04"
 )
 
 // Refusals, in words the model, or the chat, can be given.
@@ -57,12 +58,50 @@ const (
 	askedNote     = "Nothing is done yet. I posted my own question asking them to confirm by replying yes to it; their answer is handled without you. Don't ask again and don't say it is done: reply with exactly [react 👌]."
 	askedTwice    = "This message was delivered twice and the first delivery already asked them to confirm, so nothing more was done now: reply with exactly [silent]."
 	oneAtATime    = "one action at a time: I already posted my question about the other action they asked for in this message. Nothing is asked or done for this one; tell them to ask for it again after answering that question"
-	cancelledText = "Cancelled: nothing was done."
+)
+
+// chatText is something the bot says to a group in its own words, never the
+// model's: in Uzbek, then in Russian on the next line.
+type chatText struct{ uz, ru string }
+
+func (t chatText) String() string { return t.uz + "\n" + t.ru }
+
+// What the chat is told when an action is not done: cancelledText when the
+// person said no, the others why not, in words that complete "Bajarilmadi:
+// ..." and "Не выполнено: ...".
+var (
+	cancelledText = chatText{"Bekor qilindi: hech narsa qilinmadi.", "Отменено: ничего не сделано."}
+	lookupWords   = chatText{
+		"Telegram'dan kim nima qila olishini bilib bo'lmadi; keyinroq urinib ko'ring",
+		"не удалось узнать у Telegram, кто что может; попробуйте позже",
+	}
+	noAnswerWords = chatText{
+		"Telegram javob bermadi, bajarilmagan bo'lishi mumkin; keyinroq urinib ko'ring",
+		"Telegram не ответил, возможно, ничего не сделано; попробуйте позже",
+	}
+	brokenWords = chatText{"men tomonda nimadir buzildi; keyinroq yana so'rang", "у меня что-то сломалось; попросите позже"}
+	immuneWords = chatText{
+		"buni adminlarga, egalarimga, o'zimga, Telegram xizmat akkauntlariga yoki so'ragan odamning o'ziga qila olmayman",
+		"я не могу сделать это с админами, моими владельцами, собой, служебными аккаунтами Telegram или с тем, кто просит",
+	}
 )
 
 // errLookup reports that Telegram could not say who may do what. Moderation
 // then does nothing: it never acts on a guess.
 var errLookup = errors.New("could not ask Telegram who may do this, so nothing was done; try again later")
+
+// refusal is a DeniedError that also says why for the chat, which is told
+// when an action it confirmed is refused after all.
+type refusal struct {
+	DeniedError
+	chat chatText
+}
+
+func (r *refusal) Unwrap() error { return &r.DeniedError }
+
+func refuse(message string, chat chatText) error {
+	return &refusal{DeniedError: DeniedError{Message: message}, chat: chat}
+}
 
 // neededRight is the admin right an action needs, from the person asking
 // and from the bot. cancel needs none.
@@ -76,12 +115,20 @@ var neededRight = map[string]string{
 	actionUnpin:  telegram.RightPinMessages,
 }
 
-// rightWords names the rights moderation needs, for refusals.
-var rightWords = map[string]string{
-	telegram.RightDeleteMessages:  "delete messages",
-	telegram.RightRestrictMembers: "ban and mute members",
-	telegram.RightPinMessages:     "pin messages",
-}
+// rightWords names the rights moderation needs, for refusals; rightChat,
+// for the chat.
+var (
+	rightWords = map[string]string{
+		telegram.RightDeleteMessages:  "delete messages",
+		telegram.RightRestrictMembers: "ban and mute members",
+		telegram.RightPinMessages:     "pin messages",
+	}
+	rightChat = map[string]chatText{
+		telegram.RightDeleteMessages:  {"xabarlarni o'chirish", "удалять сообщения"},
+		telegram.RightRestrictMembers: {"a'zolarni bloklash va ovozsiz qilish", "банить и заглушать участников"},
+		telegram.RightPinMessages:     {"xabarlarni qadash", "закреплять сообщения"},
+	}
+)
 
 // MemberLookup asks Telegram about a member of a chat.
 type MemberLookup interface {
@@ -301,7 +348,13 @@ func (m *Moderation) checkRequester(ctx context.Context, caller Caller, right st
 		return errLookup
 	}
 	if !member.Has(right) {
-		return &DeniedError{Message: fmt.Sprintf("only admins of this group who have the right to %s, or my owners, can ask me to do that; the person asking is neither", rightWords[right])}
+		words := rightChat[right]
+		return refuse(
+			fmt.Sprintf("only admins of this group who have the right to %s, or my owners, can ask me to do that; the person asking is neither", rightWords[right]),
+			chatText{
+				"buni faqat guruhning " + words.uz + " huquqi bor adminlari yoki egalarim so'ray oladi; so'ragan odam ulardan emas",
+				"об этом могут просить только админы группы с правом " + words.ru + " или мои владельцы; тот, кто просит, к ним не относится",
+			})
 	}
 	return nil
 }
@@ -316,7 +369,13 @@ func (m *Moderation) checkBot(ctx context.Context, chatID int64, right string) e
 	// Keeping it only saves asking again; the answer holds either way.
 	_ = m.opts.Rights.SetBotRights(ctx, chatID, me.Status, me.Rights())
 	if !me.Has(right) {
-		return &DeniedError{Message: fmt.Sprintf("I don't have the right to %s in this group; its admins can give it to me", rightWords[right])}
+		words := rightChat[right]
+		return refuse(
+			fmt.Sprintf("I don't have the right to %s in this group; its admins can give it to me", rightWords[right]),
+			chatText{
+				"menda bu guruhda " + words.uz + " huquqi yo'q; uni adminlar bera oladi",
+				"у меня нет права " + words.ru + " в этой группе; его могут дать админы",
+			})
 	}
 	return nil
 }
@@ -332,14 +391,14 @@ func (m *Moderation) checkTarget(ctx context.Context, o order) error {
 		return ownMessageOnly(o.action)
 	}
 	if isTelegramAccount(userID) || (o.target.Owner && m.opts.OwnersByID) {
-		return &DeniedError{Message: immune}
+		return refuse(immune, immuneWords)
 	}
 	member, err := m.opts.Members.GetChatMember(ctx, o.caller.ChatID, userID)
 	if err != nil {
 		return errLookup
 	}
 	if member.IsAdmin() {
-		return &DeniedError{Message: immune}
+		return refuse(immune, immuneWords)
 	}
 	return nil
 }
@@ -351,7 +410,7 @@ func ownMessageOnly(action string) error {
 	case actionDelete, actionPin, actionUnpin:
 		return nil
 	}
-	return &DeniedError{Message: immune}
+	return refuse(immune, immuneWords)
 }
 
 // checkPace allows maxActions per actionWindow per person, counted in the
@@ -362,7 +421,13 @@ func (m *Moderation) checkPace(ctx context.Context, caller Caller) error {
 		return internal(err)
 	}
 	if done >= maxActions {
-		return &DeniedError{Message: fmt.Sprintf("that's %d actions in %d minutes; wait a bit", maxActions, int(actionWindow.Minutes()))}
+		minutes := int(actionWindow.Minutes())
+		return refuse(
+			fmt.Sprintf("that's %d actions in %d minutes; wait a bit", maxActions, minutes),
+			chatText{
+				fmt.Sprintf("%d daqiqada %d ta amal bo'ldi; biroz kuting", minutes, maxActions),
+				fmt.Sprintf("это уже %d действий за %d минут; подождите немного", maxActions, minutes),
+			})
 	}
 	return nil
 }
@@ -410,43 +475,69 @@ func (o order) pending() storage.PendingModeration {
 // never the model's, so that what the person confirms is what will be done.
 // The model's reason is left out for the same cause.
 func (m *Moderation) question(o order) string {
-	return fmt.Sprintf("Confirm: %s? Reply yes (ha, да) to this message within %d minutes, or no to cancel.",
-		o.describe(), int(pendingMaxAge.Minutes()))
+	what, minutes := o.describe(), int(pendingMaxAge.Minutes())
+	return chatText{
+		fmt.Sprintf("Tasdiqlaysizmi: %s? Shu xabarga «ha» deb javob bering (%d daqiqa ichida), yo'q bo'lsa «yo'q».", what.uz, minutes),
+		fmt.Sprintf("Подтвердите: %s? Ответьте «да» на это сообщение (в течение %d минут), иначе «нет».", what.ru, minutes),
+	}.String()
 }
 
-// describe says what o will do, in words that complete "Confirm: ...?".
-func (o order) describe() string {
+// describe says what o will do, in words that complete "Tasdiqlaysizmi:
+// ...?" and "Подтвердите: ...?".
+func (o order) describe() chatText {
 	name := o.target.Name
 	switch o.action {
 	case actionDelete:
-		return "delete the message by " + name
+		return chatText{name + " xabari o'chirilsinmi", "удалить сообщение от " + name}
 	case actionMute:
-		return "mute " + name + " for " + durationWords(o.minutes)
+		return chatText{name + " " + uzbekDuration(o.minutes) + "ga ovozsiz qilinsinmi", "заглушить " + name + " на " + russianDuration(o.minutes)}
+	case actionUnmute:
+		return chatText{name + " ovozsizlikdan chiqarilsinmi", "снова разрешить " + name + " писать"}
+	case actionBan:
+		return chatText{name + " bloklansinmi", "забанить " + name}
+	case actionUnban:
+		return chatText{name + " blokdan chiqarilsinmi", "разбанить " + name}
 	case actionPin:
-		return "pin the message by " + name
-	case actionUnpin:
-		return "unpin the message by " + name
+		return chatText{name + " xabari qadalsinmi", "закрепить сообщение от " + name}
 	}
-	return o.action + " " + name // unmute, ban, unban
+	return chatText{name + " xabari qadashdan olinsinmi", "открепить сообщение от " + name}
 }
 
-// durationWords writes minutes the way a person would: "90 minutes",
-// "2 hours", "7 days".
-func durationWords(minutes int) string {
+// uzbekDuration writes minutes the way a person would: "90 daqiqa",
+// "2 soat", "7 kun".
+func uzbekDuration(minutes int) string {
 	switch {
 	case minutes%(24*60) == 0:
-		return plural(minutes/(24*60), "day")
+		return fmt.Sprintf("%d kun", minutes/(24*60))
 	case minutes%60 == 0:
-		return plural(minutes/60, "hour")
+		return fmt.Sprintf("%d soat", minutes/60)
 	}
-	return plural(minutes, "minute")
+	return fmt.Sprintf("%d daqiqa", minutes)
 }
 
-func plural(n int, unit string) string {
-	if n == 1 {
-		return "1 " + unit
+// russianDuration is uzbekDuration in Russian, in the form that follows
+// "на": "1 минуту", "2 часа", "7 дней".
+func russianDuration(minutes int) string {
+	switch {
+	case minutes%(24*60) == 0:
+		return russianCount(minutes/(24*60), "день", "дня", "дней")
+	case minutes%60 == 0:
+		return russianCount(minutes/60, "час", "часа", "часов")
 	}
-	return fmt.Sprintf("%d %ss", n, unit)
+	return russianCount(minutes, "минуту", "минуты", "минут")
+}
+
+// russianCount is n with the word in the form Russian puts after it: one
+// for 1, 21, 31; few for 2-4, 22-24; many for the rest, 11-14 among them.
+func russianCount(n int, one, few, many string) string {
+	word := many
+	switch {
+	case n%10 == 1 && n%100 != 11:
+		word = one
+	case n%10 >= 2 && n%10 <= 4 && (n%100 < 12 || n%100 > 14):
+		word = few
+	}
+	return fmt.Sprintf("%d %s", n, word)
 }
 
 // Confirmation is what came of someone's answer to the bot's question about
@@ -477,7 +568,7 @@ func (m *Moderation) Confirm(ctx context.Context, caller Caller, promptID int64,
 		return Confirmation{}, err
 	}
 	if !yes {
-		return Confirmation{Found: true, Text: cancelledText}, nil
+		return Confirmation{Found: true, Text: cancelledText.String()}, nil
 	}
 	target := Target{UserID: pending.TargetUserID, MessageID: pending.TargetMessageID, Name: pending.TargetName, Text: pending.TargetText}
 	o := m.newOrder(caller, pending.Action, target, pending.Minutes, pending.Reason)
@@ -507,25 +598,29 @@ func (m *Moderation) answeredBefore(ctx context.Context, caller Caller) (Confirm
 // returned for the logs.
 func notDone(err error) (Confirmation, error) {
 	var (
-		denied  *DeniedError
+		refused *refusal
 		failure *telegramError
-		text    string
+		why     chatText
 	)
 	switch {
-	case errors.As(err, &denied):
-		text = denied.Message
+	case errors.As(err, &refused):
+		why = refused.chat
 	case errors.Is(err, errLookup):
-		text = errLookup.Error()
+		why = lookupWords
 	case errors.As(err, &failure):
-		text = failure.message
+		why = failure.chat
 	default:
-		return Confirmation{Found: true, Text: "Not done: something went wrong on my side; ask again later."}, cause(err)
+		return notDoneText(brokenWords), cause(err)
 	}
 	if failure != nil && err != error(failure) {
 		// The store could not drop the record of what Telegram did not do.
-		return Confirmation{Found: true, Text: "Not done: " + text + "."}, cause(err)
+		return notDoneText(why), cause(err)
 	}
-	return Confirmation{Found: true, Text: "Not done: " + text + "."}, nil
+	return notDoneText(why), nil
+}
+
+func notDoneText(why chatText) Confirmation {
+	return Confirmation{Found: true, Text: chatText{"Bajarilmadi: " + why.uz + ".", "Не выполнено: " + why.ru + "."}.String()}
 }
 
 // carryOut records o, then has Telegram do it. The record comes first and
@@ -599,8 +694,12 @@ func (m *Moderation) send(ctx context.Context, o order) error {
 	return fmt.Errorf("moderation: unknown action %q", o.action)
 }
 
-// telegramError is why Telegram did not act, in words safe for the chat.
-type telegramError struct{ message string }
+// telegramError is why Telegram did not act, in words safe for the model
+// and, in Uzbek and Russian, for the chat.
+type telegramError struct {
+	message string
+	chat    chatText
+}
 
 func (e *telegramError) Error() string { return e.message }
 
@@ -613,9 +712,10 @@ func isTelegramFailure(err error) bool {
 // gave a reason.
 func telegramFailure(err error) error {
 	if refusal, ok := telegramRefusal(err); ok {
-		return &telegramError{"Telegram refused: " + refusal.Description}
+		reason := refusal.Description
+		return &telegramError{"Telegram refused: " + reason, chatText{"Telegram rad etdi: " + reason, "Telegram отказал: " + reason}}
 	}
-	return &telegramError{noAnswer}
+	return &telegramError{noAnswer, noAnswerWords}
 }
 
 // telegramRefusal is Telegram's answer when it turned a request down, and
@@ -631,22 +731,27 @@ func telegramRefusal(err error) (*telegram.APIError, bool) {
 
 // doneText says, for the chat, what o did.
 func (m *Moderation) doneText(o order) string {
+	return o.done(m.untilText(o.until)).String()
+}
+
+// done says what o did, given when a mute ends.
+func (o order) done(until string) chatText {
 	name := o.target.Name
 	switch o.action {
 	case actionDelete:
-		return "Done: the message by " + name + " is deleted."
+		return chatText{"Bajarildi: " + name + " xabari o'chirildi.", "Готово: сообщение от " + name + " удалено."}
 	case actionMute:
-		return "Done: " + name + " is muted until " + m.untilText(o.until) + "."
+		return chatText{"Bajarildi: " + name + " " + until + " gacha yoza olmaydi.", "Готово: " + name + " не может писать до " + until + "."}
 	case actionUnmute:
-		return "Done: " + name + " can write again."
+		return chatText{"Bajarildi: " + name + " yana yoza oladi.", "Готово: " + name + " снова может писать."}
 	case actionBan:
-		return "Done: " + name + " is banned."
+		return chatText{"Bajarildi: " + name + " bloklandi.", "Готово: " + name + " забанен(а)."}
 	case actionUnban:
-		return "Done: " + name + " is unbanned and may join again."
+		return chatText{"Bajarildi: " + name + " blokdan chiqarildi va qayta qo'shila oladi.", "Готово: " + name + " разбанен(а) и может вернуться."}
 	case actionPin:
-		return "Done: the message by " + name + " is pinned."
+		return chatText{"Bajarildi: " + name + " xabari qadaldi.", "Готово: сообщение от " + name + " закреплено."}
 	}
-	return "Done: the message by " + name + " is unpinned."
+	return chatText{"Bajarildi: " + name + " xabari qadashdan olindi.", "Готово: сообщение от " + name + " откреплено."}
 }
 
 // untilText is when a mute ends: the time, and the date too when it is not
@@ -656,7 +761,7 @@ func (m *Moderation) untilText(until time.Time) string {
 	if local.Format(time.DateOnly) == now.Format(time.DateOnly) {
 		return local.Format(clockLayout)
 	}
-	return local.Format(ruleTimeLayout)
+	return local.Format(dateClockLayout)
 }
 
 // The answers to the bot's question, checked in code. Only the whole message

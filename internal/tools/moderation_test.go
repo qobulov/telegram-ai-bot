@@ -439,14 +439,15 @@ func TestModerateDoesNothingUntilTheRequesterConfirms(t *testing.T) {
 	// says exactly what will be done; the model's reason is not in it.
 	questions, promptID := env.telegram.asked()
 	wantQuestion := telegram.Outgoing{ChatID: groupA, ReplyToMessageID: 50,
-		Text: "Confirm: mute Bek @bek for 7 days? Reply yes (ha, да) to this message within 5 minutes, or no to cancel."}
+		Text: "Tasdiqlaysizmi: Bek @bek 7 kunga ovozsiz qilinsinmi? Shu xabarga «ha» deb javob bering (5 daqiqa ichida), yo'q bo'lsa «yo'q».\n" +
+			"Подтвердите: заглушить Bek @bek на 7 дней? Ответьте «да» на это сообщение (в течение 5 минут), иначе «нет»."}
 	if len(questions) != 1 || questions[0] != wantQuestion {
 		t.Fatalf("questions = %+v\nwant [%+v]", questions, wantQuestion)
 	}
 
 	c := env.confirm(t, 101, promptID, true)
 
-	if want := (Confirmation{Found: true, Text: "Done: Bek @bek is muted until 23 Oct 15:04."}); c != want {
+	if want := (Confirmation{Found: true, Text: "Bajarildi: Bek @bek 23.10 15:04 gacha yoza olmaydi.\nГотово: Bek @bek не может писать до 23.10 15:04."}); c != want {
 		t.Errorf("confirmation = %+v, want %+v", c, want)
 	}
 	restrictions := env.telegram.restricted()
@@ -472,16 +473,30 @@ func TestModerateDoesNothingUntilTheRequesterConfirms(t *testing.T) {
 
 func TestModerateActions(t *testing.T) {
 	cases := []struct {
-		action, call, question, done string
+		action, call string
+		// question and done are in Uzbek, then in Russian.
+		question, done [2]string
 		// text is what the audit keeps of the message.
 		text string
 	}{
-		{"delete", "deleteMessage -100111 29", "delete the message by Bek @bek", "Done: the message by Bek @bek is deleted.", "you're slow"},
-		{"unmute", "restrictChatMember -100111 5005", "unmute Bek @bek", "Done: Bek @bek can write again.", ""},
-		{"ban", "banChatMember -100111 5005", "ban Bek @bek", "Done: Bek @bek is banned.", ""},
-		{"unban", "unbanChatMember -100111 5005", "unban Bek @bek", "Done: Bek @bek is unbanned and may join again.", ""},
-		{"pin", "pinChatMessage -100111 29", "pin the message by Bek @bek", "Done: the message by Bek @bek is pinned.", ""},
-		{"unpin", "unpinChatMessage -100111 29", "unpin the message by Bek @bek", "Done: the message by Bek @bek is unpinned.", ""},
+		{"delete", "deleteMessage -100111 29",
+			[2]string{"Bek @bek xabari o'chirilsinmi", "удалить сообщение от Bek @bek"},
+			[2]string{"Bajarildi: Bek @bek xabari o'chirildi.", "Готово: сообщение от Bek @bek удалено."}, "you're slow"},
+		{"unmute", "restrictChatMember -100111 5005",
+			[2]string{"Bek @bek ovozsizlikdan chiqarilsinmi", "снова разрешить Bek @bek писать"},
+			[2]string{"Bajarildi: Bek @bek yana yoza oladi.", "Готово: Bek @bek снова может писать."}, ""},
+		{"ban", "banChatMember -100111 5005",
+			[2]string{"Bek @bek bloklansinmi", "забанить Bek @bek"},
+			[2]string{"Bajarildi: Bek @bek bloklandi.", "Готово: Bek @bek забанен(а)."}, ""},
+		{"unban", "unbanChatMember -100111 5005",
+			[2]string{"Bek @bek blokdan chiqarilsinmi", "разбанить Bek @bek"},
+			[2]string{"Bajarildi: Bek @bek blokdan chiqarildi va qayta qo'shila oladi.", "Готово: Bek @bek разбанен(а) и может вернуться."}, ""},
+		{"pin", "pinChatMessage -100111 29",
+			[2]string{"Bek @bek xabari qadalsinmi", "закрепить сообщение от Bek @bek"},
+			[2]string{"Bajarildi: Bek @bek xabari qadaldi.", "Готово: сообщение от Bek @bek закреплено."}, ""},
+		{"unpin", "unpinChatMessage -100111 29",
+			[2]string{"Bek @bek xabari qadashdan olinsinmi", "открепить сообщение от Bek @bek"},
+			[2]string{"Bajarildi: Bek @bek xabari qadashdan olindi.", "Готово: сообщение от Bek @bek откреплено."}, ""},
 	}
 	for _, c := range cases {
 		t.Run(c.action, func(t *testing.T) {
@@ -489,11 +504,12 @@ func TestModerateActions(t *testing.T) {
 
 			got := env.done(t, asking(100, bekTarget()), `{"action":"`+c.action+`"}`)
 
-			if questions, _ := env.telegram.asked(); !strings.HasPrefix(questions[0].Text, "Confirm: "+c.question+"? ") {
-				t.Errorf("question = %q, want it to ask to %s", questions[0].Text, c.question)
+			questions, _ := env.telegram.asked()
+			if q := questions[0].Text; !strings.HasPrefix(q, "Tasdiqlaysizmi: "+c.question[0]+"? ") || !strings.Contains(q, "\nПодтвердите: "+c.question[1]+"? ") {
+				t.Errorf("question = %q, want it to ask %q", q, c.question)
 			}
-			if got != (Confirmation{Found: true, Text: c.done}) {
-				t.Errorf("confirmation = %+v, want %q", got, c.done)
+			if done := c.done[0] + "\n" + c.done[1]; got != (Confirmation{Found: true, Text: done}) {
+				t.Errorf("confirmation = %+v, want %q", got, done)
 			}
 			if calls := env.telegram.made(); len(calls) != 1 || calls[0] != c.call {
 				t.Errorf("calls = %q, want [%q]", calls, c.call)
@@ -529,7 +545,7 @@ func TestModerateConfirmationIsTheRequestersReplyToTheQuestion(t *testing.T) {
 	}
 	env.nothingActed(t)
 
-	if c := env.confirm(t, 103, promptID, true); c.Text != "Done: Bek @bek is banned." {
+	if c := env.confirm(t, 103, promptID, true); c.Text != "Bajarildi: Bek @bek bloklandi.\nГотово: Bek @bek забанен(а)." {
 		t.Fatalf("the requester's yes = %+v", c)
 	}
 	// It is used up: the same question confirms nothing more.
@@ -545,7 +561,7 @@ func TestModerateNoCancels(t *testing.T) {
 	env := newModerationEnv(t)
 	promptID := env.ask(t, asking(100, bekTarget()), `{"action":"ban"}`)
 
-	if c := env.confirm(t, 101, promptID, false); c != (Confirmation{Found: true, Text: "Cancelled: nothing was done."}) {
+	if c := env.confirm(t, 101, promptID, false); c != (Confirmation{Found: true, Text: "Bekor qilindi: hech narsa qilinmadi.\nОтменено: ничего не сделано."}) {
 		t.Errorf("no = %+v", c)
 	}
 	if c := env.confirm(t, 102, promptID, true); c.Found {
@@ -578,7 +594,7 @@ func TestModerateLaterRequestReplacesTheQuestion(t *testing.T) {
 	if c := env.confirm(t, 102, first, true); c.Found {
 		t.Errorf("a yes to the replaced question = %+v", c)
 	}
-	if c := env.confirm(t, 103, second, true); c.Text != "Done: Bek @bek is muted until 16:04." {
+	if c := env.confirm(t, 103, second, true); c.Text != "Bajarildi: Bek @bek 16:04 gacha yoza olmaydi.\nГотово: Bek @bek не может писать до 16:04." {
 		t.Errorf("a yes to the latest question = %+v", c)
 	}
 	if calls := env.telegram.made(); len(calls) != 1 || !strings.HasPrefix(calls[0], "restrictChatMember") {
@@ -615,7 +631,7 @@ func TestModerateOwnerMayActWithoutBeingAdmin(t *testing.T) {
 
 	c := env.confirmAs(t, Caller{UserID: userID, ChatID: groupA, Owner: true, Human: true, UpdateID: 101}, promptID, true)
 
-	if !strings.HasPrefix(c.Text, "Done:") {
+	if !strings.HasPrefix(c.Text, "Bajarildi:") {
 		t.Fatalf("delete by an owner = %+v", c)
 	}
 	if calls := env.telegram.made(); !slices.Equal(calls, []string{"deleteMessage -100111 29"}) {
@@ -642,7 +658,7 @@ func TestModerateOwnerByUsernameIsAnOrdinaryMember(t *testing.T) {
 	// An admin may have an owner's message deleted.
 	env.chat.set(userID, admin(moderationRights...))
 	owners := &Target{MessageID: 29, UserID: 9002, Name: "Muhammad", Owner: true}
-	if c := env.done(t, asking(101, owners), `{"action":"delete"}`); !strings.HasPrefix(c.Text, "Done:") {
+	if c := env.done(t, asking(101, owners), `{"action":"delete"}`); !strings.HasPrefix(c.Text, "Bajarildi:") {
 		t.Errorf("deleting an owner's message = %+v", c)
 	}
 }
@@ -710,7 +726,7 @@ func TestModerateRefusesImmuneTargets(t *testing.T) {
 func TestModerateOwnMessageDeleteAllowedMuteRefused(t *testing.T) {
 	env := newModerationEnv(t)
 
-	if c := env.done(t, asking(100, botMessage()), `{"action":"delete"}`); !strings.HasPrefix(c.Text, "Done:") {
+	if c := env.done(t, asking(100, botMessage()), `{"action":"delete"}`); !strings.HasPrefix(c.Text, "Bajarildi:") {
 		t.Fatalf("deleting the bot's own message = %+v", c)
 	}
 	expectRefusal(t, env.moderate(asking(102, botMessage()), `{"action":"mute"}`), "forbidden", "I can't do that to")
@@ -720,7 +736,7 @@ func TestModerateOwnMessageDeleteAllowedMuteRefused(t *testing.T) {
 	own := &Target{MessageID: 27, UserID: userID, Name: "Ali"}
 	for i, action := range []string{"delete", "pin", "unpin"} {
 		promptID := env.ask(t, asking(int64(110+2*i), own), `{"action":"`+action+`"}`)
-		if c := env.confirm(t, int64(111+2*i), promptID, true); !strings.HasPrefix(c.Text, "Done:") {
+		if c := env.confirm(t, int64(111+2*i), promptID, true); !strings.HasPrefix(c.Text, "Bajarildi:") {
 			t.Errorf("%s of one's own message = %+v", action, c)
 		}
 	}
@@ -755,7 +771,7 @@ func TestModerateSameUpdateTwiceAsksOnce(t *testing.T) {
 		t.Errorf("questions = %+v, want one", questions)
 	}
 	// The first question still stands.
-	if c := env.confirm(t, 101, promptID, true); !strings.HasPrefix(c.Text, "Done:") {
+	if c := env.confirm(t, 101, promptID, true); !strings.HasPrefix(c.Text, "Bajarildi:") {
 		t.Errorf("confirmation = %+v", c)
 	}
 }
@@ -776,7 +792,7 @@ func TestModerateSecondActionInOneUpdateIsRefusedHonestly(t *testing.T) {
 	if questions, _ := env.telegram.asked(); len(questions) != 1 {
 		t.Errorf("questions = %+v, want one", questions)
 	}
-	if c := env.confirm(t, 101, promptID, true); !strings.HasPrefix(c.Text, "Done:") || !strings.Contains(c.Text, "banned") {
+	if c := env.confirm(t, 101, promptID, true); !strings.HasPrefix(c.Text, "Bajarildi:") || !strings.Contains(c.Text, "bloklandi") {
 		t.Errorf("confirmation = %+v, want the ban done", c)
 	}
 }
@@ -800,15 +816,19 @@ func TestModerateConfirmationRechecksRights(t *testing.T) {
 		change func(env *moderationEnv)
 		text   string
 	}{
-		"the person asking lost the right": {func(env *moderationEnv) { env.chat.set(userID, admin(telegram.RightDeleteMessages)) }, "Not done: only admins of this group who have the right to ban and mute members, or my owners, can ask me to do that; the person asking is neither."},
-		"the bot lost the right":           {func(env *moderationEnv) { env.chat.set(rulesBotID, admin(telegram.RightPinMessages)) }, "Not done: I don't have the right to ban and mute members in this group; its admins can give it to me."},
-		"the member became an admin":       {func(env *moderationEnv) { env.chat.set(memberID, admin()) }, "Not done: I can't do that to admins, my owners, myself, Telegram's service accounts or the person asking."},
-		"Telegram cannot say":              {func(env *moderationEnv) { env.chat.failing[memberID] = true }, "Not done: could not ask Telegram who may do this, so nothing was done; try again later."},
+		"the person asking lost the right": {func(env *moderationEnv) { env.chat.set(userID, admin(telegram.RightDeleteMessages)) }, "Bajarilmadi: buni faqat guruhning a'zolarni bloklash va ovozsiz qilish huquqi bor adminlari yoki egalarim so'ray oladi; so'ragan odam ulardan emas.\n" +
+			"Не выполнено: об этом могут просить только админы группы с правом банить и заглушать участников или мои владельцы; тот, кто просит, к ним не относится."},
+		"the bot lost the right": {func(env *moderationEnv) { env.chat.set(rulesBotID, admin(telegram.RightPinMessages)) }, "Bajarilmadi: menda bu guruhda a'zolarni bloklash va ovozsiz qilish huquqi yo'q; uni adminlar bera oladi.\n" +
+			"Не выполнено: у меня нет права банить и заглушать участников в этой группе; его могут дать админы."},
+		"the member became an admin": {func(env *moderationEnv) { env.chat.set(memberID, admin()) }, "Bajarilmadi: buni adminlarga, egalarimga, o'zimga, Telegram xizmat akkauntlariga yoki so'ragan odamning o'ziga qila olmayman.\n" +
+			"Не выполнено: я не могу сделать это с админами, моими владельцами, собой, служебными аккаунтами Telegram или с тем, кто просит."},
+		"Telegram cannot say": {func(env *moderationEnv) { env.chat.failing[memberID] = true }, "Bajarilmadi: Telegram'dan kim nima qila olishini bilib bo'lmadi; keyinroq urinib ko'ring.\n" +
+			"Не выполнено: не удалось узнать у Telegram, кто что может; попробуйте позже."},
 		"the person asking did 10 actions": {func(env *moderationEnv) {
 			for i := range 10 {
 				_, _ = env.audit.RecordModeration(context.Background(), storage.ModerationAction{ChatID: groupA, Action: "delete", RequesterID: userID, UpdateID: int64(i + 1)})
 			}
-		}, "Not done: that's 10 actions in 10 minutes; wait a bit."},
+		}, "Bajarilmadi: 10 daqiqada 10 ta amal bo'ldi; biroz kuting.\nНе выполнено: это уже 10 действий за 10 минут; подождите немного."},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -835,7 +855,7 @@ func TestModerateConfirmationTellsNothingOfTheStore(t *testing.T) {
 
 	c, err := env.moderation.Confirm(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: 101}, promptID, true)
 
-	if c != (Confirmation{Found: true, Text: "Not done: something went wrong on my side; ask again later."}) {
+	if c != (Confirmation{Found: true, Text: "Bajarilmadi: men tomonda nimadir buzildi; keyinroq yana so'rang.\nНе выполнено: у меня что-то сломалось; попросите позже."}) {
 		t.Errorf("confirmation = %+v", c)
 	}
 	if err == nil || !strings.Contains(err.Error(), "maria_prod") {
@@ -868,7 +888,7 @@ func TestModerateRateLimit(t *testing.T) {
 		record(9004, "delete", int64(i+11)) // someone else's
 	}
 
-	if c := env.done(t, asking(100, bekTarget()), `{"action":"mute"}`); !strings.HasPrefix(c.Text, "Done:") {
+	if c := env.done(t, asking(100, bekTarget()), `{"action":"mute"}`); !strings.HasPrefix(c.Text, "Bajarildi:") {
 		t.Fatalf("the 10th action = %+v", c)
 	}
 	expectRefusal(t, env.moderate(asking(102, bekTarget()), `{"action":"mute"}`), "forbidden", "10 actions in 10 minutes")
@@ -899,7 +919,12 @@ func TestModerateQuestionThatCannotBePostedLeavesNothingWaiting(t *testing.T) {
 }
 
 func TestModerateTelegramErrorIsReported(t *testing.T) {
-	const noAnswer = "Not done: Telegram did not answer, so it may not have been done; try again later."
+	const (
+		noAnswer = "Bajarilmadi: Telegram javob bermadi, bajarilmagan bo'lishi mumkin; keyinroq urinib ko'ring.\n" +
+			"Не выполнено: Telegram не ответил, возможно, ничего не сделано; попробуйте позже."
+		refused = "Bajarilmadi: Telegram rad etdi: Bad Request: message can't be deleted.\n" +
+			"Не выполнено: Telegram отказал: Bad Request: message can't be deleted."
+	)
 	failures := []struct {
 		err  error
 		text string
@@ -907,7 +932,7 @@ func TestModerateTelegramErrorIsReported(t *testing.T) {
 		// taken it unless it refused.
 		kept bool
 	}{
-		{&telegram.APIError{Code: 400, Description: "Bad Request: message can't be deleted"}, "Not done: Telegram refused: Bad Request: message can't be deleted.", false},
+		{&telegram.APIError{Code: 400, Description: "Bad Request: message can't be deleted"}, refused, false},
 		// Without an answer from Telegram, or with a server's error page
 		// instead, it may have acted.
 		{errors.New("dial tcp: i/o timeout"), noAnswer, true},
@@ -948,7 +973,7 @@ func TestModerateReportsARecordItCannotDrop(t *testing.T) {
 	c, err := env.moderation.Confirm(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: 101}, promptID, true)
 
 	// The chat is told Telegram's reason only; the logs get the store's too.
-	if c != (Confirmation{Found: true, Text: "Not done: Telegram refused: Bad Request: message can't be deleted."}) {
+	if c != (Confirmation{Found: true, Text: "Bajarilmadi: Telegram rad etdi: Bad Request: message can't be deleted.\nНе выполнено: Telegram отказал: Bad Request: message can't be deleted."}) {
 		t.Errorf("confirmation = %+v", c)
 	}
 	if err == nil || !strings.Contains(err.Error(), "connection reset") {
@@ -966,18 +991,23 @@ func TestModerateReportsARecordItCannotDrop(t *testing.T) {
 
 func TestModerateMinutesClamped(t *testing.T) {
 	cases := []struct {
-		args     string
-		minutes  int
-		duration string
+		args    string
+		minutes int
+		// duration is in Uzbek, then in Russian.
+		duration [2]string
 		until    string
 	}{
-		{`{"action":"mute"}`, 60, "1 hour", "16:04"},
-		{`{"action":"mute","minutes":0}`, 60, "1 hour", "16:04"},
-		{`{"action":"mute","minutes":90}`, 90, "90 minutes", "16:34"},
-		{`{"action":"mute","minutes":-5}`, 1, "1 minute", "15:05"},
-		{`{"action":"mute","minutes":20000}`, 10080, "7 days", "23 Oct 15:04"},
+		{`{"action":"mute"}`, 60, [2]string{"1 soat", "1 час"}, "16:04"},
+		{`{"action":"mute","minutes":0}`, 60, [2]string{"1 soat", "1 час"}, "16:04"},
+		{`{"action":"mute","minutes":90}`, 90, [2]string{"90 daqiqa", "90 минут"}, "16:34"},
+		{`{"action":"mute","minutes":-5}`, 1, [2]string{"1 daqiqa", "1 минуту"}, "15:05"},
+		{`{"action":"mute","minutes":22}`, 22, [2]string{"22 daqiqa", "22 минуты"}, "15:26"},
+		{`{"action":"mute","minutes":120}`, 120, [2]string{"2 soat", "2 часа"}, "17:04"},
+		{`{"action":"mute","minutes":20000}`, 10080, [2]string{"7 kun", "7 дней"}, "23.10 15:04"},
+		{`{"action":"mute","minutes":1440}`, 1440, [2]string{"1 kun", "1 день"}, "17.10 15:04"},
 		// Past midnight the date is given too.
-		{`{"action":"mute","minutes":600}`, 600, "10 hours", "17 Oct 01:04"},
+		{`{"action":"mute","minutes":600}`, 600, [2]string{"10 soat", "10 часов"}, "17.10 01:04"},
+		{`{"action":"mute","minutes":660}`, 660, [2]string{"11 soat", "11 часов"}, "17.10 02:04"},
 	}
 	for _, c := range cases {
 		t.Run(c.args, func(t *testing.T) {
@@ -985,10 +1015,11 @@ func TestModerateMinutesClamped(t *testing.T) {
 
 			got := env.done(t, asking(100, bekTarget()), c.args)
 
-			if questions, _ := env.telegram.asked(); !strings.Contains(questions[0].Text, "mute Bek @bek for "+c.duration+"?") {
-				t.Errorf("question = %q, want %s", questions[0].Text, c.duration)
+			questions, _ := env.telegram.asked()
+			if q := questions[0].Text; !strings.Contains(q, "Bek @bek "+c.duration[0]+"ga ovozsiz qilinsinmi?") || !strings.Contains(q, "заглушить Bek @bek на "+c.duration[1]+"?") {
+				t.Errorf("question = %q, want %q", q, c.duration)
 			}
-			if want := "Done: Bek @bek is muted until " + c.until + "."; got.Text != want {
+			if want := "Bajarildi: Bek @bek " + c.until + " gacha yoza olmaydi.\nГотово: Bek @bek не может писать до " + c.until + "."; got.Text != want {
 				t.Errorf("confirmation = %+v, want %q", got, want)
 			}
 			wantUntil := rulesNow.Add(time.Duration(c.minutes) * time.Minute)
@@ -1051,7 +1082,7 @@ func TestModerateChecksItsArguments(t *testing.T) {
 	env.nothingDone(t)
 
 	// A long reason is kept short in the audit.
-	if c := env.done(t, asking(101, bekTarget()), `{"action":"delete","reason":"`+strings.Repeat("я", 300)+`"}`); !strings.HasPrefix(c.Text, "Done:") {
+	if c := env.done(t, asking(101, bekTarget()), `{"action":"delete","reason":"`+strings.Repeat("я", 300)+`"}`); !strings.HasPrefix(c.Text, "Bajarildi:") {
 		t.Fatalf("delete with a long reason = %+v", c)
 	}
 	if audit := env.audit.recorded(); len(audit) != 1 || len([]rune(audit[0].Reason)) > 201 {
