@@ -76,10 +76,12 @@ func (s *Service) process(in incoming) {
 	if s.reactedToApplause(in) {
 		return
 	}
-	if !s.mayAnswerInGroup(in) {
+	reservation, allowed := s.mayAnswerInGroup(in)
+	if !allowed {
 		s.passOver(in)
 		return
 	}
+	in.groupReply = reservation
 	if in.group {
 		// The group's log needs it even when no answer follows. A private
 		// message is described in ask, within the daily limit.
@@ -219,13 +221,16 @@ const overQuotaReaction = "👀"
 // group admin's message, past the quota, that replies to another member's:
 // that is how moderation and ignoring are asked for. A message with nothing
 // the bot can read is not counted either: respond sends no answer to it.
-func (s *Service) mayAnswerInGroup(in incoming) bool {
+//
+// It also returns the answer taken, to give back if the turn answers
+// nothing; 0 when none was taken.
+func (s *Service) mayAnswerInGroup(in incoming) (reservation int64, allowed bool) {
 	if !in.group || in.fromBot || s.opts.GroupReplies == nil || s.isOwner(in.msg.From) || !s.hasContent(in) || s.isManagerCommand(in) {
-		return true
+		return 0, true
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
 	defer cancel()
-	ok, err := s.opts.GroupReplies.ReserveGroupReply(ctx, storage.ReplyQuota{
+	id, ok, err := s.opts.GroupReplies.ReserveGroupReply(ctx, storage.ReplyQuota{
 		ChatID:    in.scope.ChatID,
 		UserID:    in.userID,
 		PerMinute: s.opts.GroupRatePerMinute,
@@ -233,18 +238,18 @@ func (s *Service) mayAnswerInGroup(in incoming) bool {
 	})
 	if err != nil {
 		s.opts.Logger.Warn("group reply count failed; staying quiet", "chat_id", in.scope.ChatID, "error", err)
-		return false
+		return 0, false
 	}
 	switch {
 	case ok:
-		return true
+		return id, true
 	case s.isAdminActingOnAMember(in):
 		s.opts.Logger.Info("group reply limit reached, but an admin replied to a member", "chat_id", in.scope.ChatID, "user_id", in.userID)
-		return true
+		return 0, true
 	}
 	s.opts.Logger.Info("group reply limit reached", "chat_id", in.scope.ChatID, "user_id", in.userID)
 	s.react(in, overQuotaReaction)
-	return false
+	return 0, false
 }
 
 // managerCommands manage the bot in a group, and are for its admins.
@@ -376,8 +381,8 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	answer, err := s.opts.Replier.Reply(ctx, s.request(ctx, in, rules))
 	// A picture drawn before a later failure is still worth sending.
 	drawings := sink.Take()
-	if reservation != 0 && !usedAnAnswer(err, drawings) {
-		s.releasePrivateAnswer(in, reservation)
+	if !usedAnAnswer(err, drawings) {
+		s.giveBackAnswer(in, reservation)
 	}
 	out := s.answerOf(in, answer, err, started)
 	out.drawings = drawings
@@ -417,20 +422,29 @@ func (s *Service) takePrivateAnswer(ctx context.Context, in incoming) (reservati
 	return 0, "", false
 }
 
-// releasePrivateAnswer gives back the answer of a turn that used none. It
-// has its own deadline: the turn's may be what ran out.
-func (s *Service) releasePrivateAnswer(in incoming, reservation int64) {
+// giveBackAnswer gives back the answer a turn that used none took: from the
+// private chat's daily quota, reservation, or from the group's, in.groupReply.
+// It has its own deadline: the turn's may be what ran out.
+func (s *Service) giveBackAnswer(in incoming, reservation int64) {
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
 	defer cancel()
-	if err := s.opts.PrivateQuota.ReleasePrivateMessage(ctx, reservation); err != nil {
-		s.opts.Logger.Warn("could not give back a failed turn's answer", "user_id", in.userID, "error", err)
+	var err error
+	switch {
+	case reservation != 0:
+		err = s.opts.PrivateQuota.ReleasePrivateMessage(ctx, reservation)
+	case in.groupReply != 0:
+		err = s.opts.GroupReplies.ReleaseGroupReply(ctx, in.groupReply)
+	}
+	if err != nil {
+		s.opts.Logger.Warn("could not give back a failed turn's answer", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
 	}
 }
 
-// usedAnAnswer reports whether a turn used up one of the day's answers: the
-// model answered, chose to stay silent, or drew a picture, which is sent even
-// when the turn then failed. A failed turn did not, nor did a duplicate
-// update: the turn that answered it keeps its own reservation.
+// usedAnAnswer reports whether a turn used up one of its answers, of the
+// day's or the group's: the model answered, chose to stay silent, or drew a
+// picture, which is sent even when the turn then failed. A failed turn did
+// not, nor did a duplicate update: the turn that answered it keeps its own
+// reservation.
 func usedAnAnswer(err error, drawings []tools.Drawing) bool {
 	return err == nil || errors.Is(err, agent.ErrSilent) || len(drawings) > 0
 }

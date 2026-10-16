@@ -930,9 +930,12 @@ func TestReserveGroupReplyLimitsChatAndMember(t *testing.T) {
 	const carol = int64(1003)
 	reserve := func(chatID, userID int64) bool {
 		t.Helper()
-		ok, err := store.ReserveGroupReply(ctx, ReplyQuota{ChatID: chatID, UserID: userID, PerMinute: 3, PerMember: 2})
+		id, ok, err := store.ReserveGroupReply(ctx, ReplyQuota{ChatID: chatID, UserID: userID, PerMinute: 3, PerMember: 2})
 		if err != nil {
 			t.Fatalf("ReserveGroupReply: %v", err)
+		}
+		if ok != (id != 0) {
+			t.Fatalf("ReserveGroupReply = %d, %t; want an ID exactly when granted", id, ok)
 		}
 		return ok
 	}
@@ -958,15 +961,37 @@ func TestReserveGroupReplyLimitsChatAndMember(t *testing.T) {
 	}
 }
 
+// A turn that answers nothing, such as one Telegram delivered again, gives
+// its answer back.
+func TestReleasedGroupReplyDoesNotCount(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	quota := ReplyQuota{ChatID: group, UserID: alice, PerMinute: 3, PerMember: 1}
+
+	id, ok, err := store.ReserveGroupReply(ctx, quota)
+	if err != nil || !ok {
+		t.Fatalf("ReserveGroupReply = %t, %v", ok, err)
+	}
+	if _, ok, _ := store.ReserveGroupReply(ctx, quota); ok {
+		t.Fatal("alice got a second answer")
+	}
+	if err := store.ReleaseGroupReply(ctx, id); err != nil {
+		t.Fatalf("ReleaseGroupReply: %v", err)
+	}
+	if _, ok, _ := store.ReserveGroupReply(ctx, quota); !ok {
+		t.Error("the answer given back was still counted")
+	}
+}
+
 func TestExpireAlsoRemovesOldGroupReplies(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 	quota := ReplyQuota{ChatID: group, UserID: alice, PerMinute: 5, PerMember: 5}
-	if _, err := store.ReserveGroupReply(ctx, quota); err != nil {
+	if _, _, err := store.ReserveGroupReply(ctx, quota); err != nil {
 		t.Fatal(err)
 	}
 	ageGroupReplies(t, store, 2*24*60)
-	if _, err := store.ReserveGroupReply(ctx, quota); err != nil {
+	if _, _, err := store.ReserveGroupReply(ctx, quota); err != nil {
 		t.Fatal(err)
 	}
 

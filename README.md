@@ -111,7 +111,7 @@ groups(chat_id PK, title, username, bot_status, bot_rights jsonb,
        first_seen_at, last_seen_at)
 image_generations(id PK, user_id, chat_id, created_at)
 bot_replies(id PK, chat_id, bot_id, created_at)
-group_replies(chat_id, user_id, created_at)
+group_replies(id PK, chat_id, user_id, created_at)
 private_messages(id PK, user_id, denied, created_at)
 broadcasts(id PK, owner_id, update_id, text, chat_ids bigint[],
            created_at, sent_at)
@@ -738,7 +738,9 @@ cannot make one.
   `MEMBER_REPLIES_PER_10_MIN` (4) times per group in 10 minutes. Past either
   limit she answers with a 👀 reaction only, without a notice, so that she is
   seen to have read the message. The counts are kept in the
-  database (`group_replies`), so they hold on Vercel and across restarts.
+  database (`group_replies`), so they hold on Vercel and across restarts. A
+  turn that answers nothing (an update Telegram delivered again, or a failed
+  turn) gives its answer back.
   Not counted: owners; other bots, which have their own limit (below);
   reactions to applause; answers to her moderation questions; and `/mute`,
   `/unmute`, `/ignore`, `/unignore` and `/reset` from those who may use
@@ -1093,9 +1095,9 @@ The group manners and admin powers update (reactions, reply quotas in the
 database, standing rules, moderation, polls, owners by ID, a daily limit in
 private chats) needs, in this order:
 
-1. **Apply migrations 0013 to 0018 before deploying**: `make migrate` with
+1. **Apply migrations 0013 to 0019 before deploying**: `make migrate` with
    `DB_POSTGRES_URL` pointing at the production database, as in step 1
-   above. They add tables and one column, and 0018 replaces 0016's
+   above. They add tables and two columns, and 0018 replaces 0016's
    `pending_bans` with `pending_moderation`: a ban waiting for confirmation
    at that moment has to be asked for again. Nothing else existing is
    changed. The new version refuses to start on the old schema (the function answers

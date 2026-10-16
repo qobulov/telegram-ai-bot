@@ -284,25 +284,41 @@ type fakeGroupQuota struct {
 	perChat   map[int64]int
 	perMember map[[2]int64]int
 	err       error
+	// released are the reservations given back; the ID of a reservation is
+	// the number of the call that made it.
+	released []int64
 }
 
-func (f *fakeGroupQuota) ReserveGroupReply(_ context.Context, q storage.ReplyQuota) (bool, error) {
+func (f *fakeGroupQuota) ReserveGroupReply(_ context.Context, q storage.ReplyQuota) (int64, bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, q)
 	if f.err != nil {
-		return false, f.err
+		return 0, false, f.err
 	}
 	if f.perChat == nil {
 		f.perChat, f.perMember = map[int64]int{}, map[[2]int64]int{}
 	}
 	member := [2]int64{q.ChatID, q.UserID}
 	if f.perChat[q.ChatID] >= q.PerMinute || f.perMember[member] >= q.PerMember {
-		return false, nil
+		return 0, false, nil
 	}
 	f.perChat[q.ChatID]++
 	f.perMember[member]++
-	return true, nil
+	return int64(len(f.calls)), true, nil
+}
+
+func (f *fakeGroupQuota) ReleaseGroupReply(_ context.Context, id int64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.released = append(f.released, id)
+	return nil
+}
+
+func (f *fakeGroupQuota) givenBack() []int64 {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]int64(nil), f.released...)
 }
 
 func (f *fakeGroupQuota) asked() []storage.ReplyQuota {
@@ -1258,6 +1274,35 @@ func TestGroupQuotaDeniedStaysSilent(t *testing.T) {
 	// answer gets a reaction, which is no message and takes no quota.
 	if got, want := f.reactor.recorded(), []reaction{{chatID: groupID, messageID: 30, emoji: "👀"}}; !reflect.DeepEqual(got, want) {
 		t.Errorf("reactions = %+v, want %+v on the third message", got, want)
+	}
+}
+
+// Telegram delivers an update again after a slow turn on Vercel; a turn
+// that failed sent no answer either. Neither costs the member an answer.
+func TestGroupTurnThatAnswersNothingGivesItsAnswerBack(t *testing.T) {
+	cases := map[string]struct {
+		err      error
+		answer   string
+		released []int64
+	}{
+		"answered":             {nil, "", nil},
+		"a duplicate update":   {agent.ErrDuplicate, "", []int64{1}},
+		"a failed turn":        {errors.New("model down"), "", []int64{1}},
+		"the model kept quiet": {agent.ErrSilent, "", nil},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			quota := &fakeGroupQuota{}
+			f.opts.GroupReplies = quota
+			f.replier.err = c.err
+
+			f.run(inGroup(groupMessage("Mira, hi")))
+
+			if got := quota.givenBack(); !reflect.DeepEqual(got, c.released) {
+				t.Errorf("given back = %v, want %v", got, c.released)
+			}
+		})
 	}
 }
 

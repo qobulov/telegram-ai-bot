@@ -72,7 +72,8 @@ type Recorder interface {
 // live outside the process: on serverless hosting each update may run in a
 // different instance, and a count kept in memory would limit nothing.
 type GroupReplyQuota interface {
-	ReserveGroupReply(ctx context.Context, q storage.ReplyQuota) (bool, error)
+	ReserveGroupReply(ctx context.Context, q storage.ReplyQuota) (id int64, granted bool, err error)
+	ReleaseGroupReply(ctx context.Context, id int64) error
 }
 
 // PrivateQuota counts the answers each user gets in private chats in a day.
@@ -284,6 +285,9 @@ type incoming struct {
 	// a voice message's transcript included. Filled in by process in a
 	// group, and by ask in a private chat.
 	described string
+	// groupReply is the answer taken from the group's quota for this
+	// message, to give back if the turn answers nothing; 0 when none was.
+	groupReply int64
 }
 
 // replyTarget is the message an answer should reply to: the original message
