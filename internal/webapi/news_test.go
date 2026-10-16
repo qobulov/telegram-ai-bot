@@ -77,8 +77,10 @@ func TestNewsHeadlines(t *testing.T) {
 						t.Errorf("item = %+v", item)
 					}
 				}
-				if !strings.Contains(r.Note, "untrusted") {
-					t.Errorf("note = %q", r.Note)
+				for _, want := range []string{"untrusted", "its own line", `"title — source"`, "no commentary"} {
+					if !strings.Contains(r.Note, want) {
+						t.Errorf("note = %q, want it to say %q", r.Note, want)
+					}
 				}
 			},
 		},
@@ -332,6 +334,16 @@ func TestCleanText(t *testing.T) {
 	for _, test := range tests {
 		if got := cleanText(test.in, 50); got != test.want {
 			t.Errorf("cleanText(%q) = %q, want %q", test.in, got, test.want)
+		}
+	}
+}
+
+// The model once added its own summary of "other news" to the headlines.
+func TestNewsToolAsksForHeadlinesAsTheyAre(t *testing.T) {
+	tool := (&apis{}).newsTool()
+	for _, want := range []string{"one per line", `"title — source"`, "no commentary"} {
+		if !strings.Contains(tool.Description, want) {
+			t.Errorf("description = %q, want it to say %q", tool.Description, want)
 		}
 	}
 }
