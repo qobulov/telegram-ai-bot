@@ -4,8 +4,9 @@ A Telegram chat character written in Go: a playful, quick-witted group-chat
 regular (called Maria unless you rename her) rather than a neutral assistant.
 She answers through [OpenRouter](https://openrouter.ai), remembers
 conversations in PostgreSQL, and can call a small set of tools that are
-checked in code (current time, calculator, bot help, drawing, polls, and
-moderation for group admins).
+checked in code (current time, calculator, bot help, drawing, polls,
+moderation for group admins, and live data: exchange rates, weather, prayer
+times, news headlines, Wikipedia, football and crypto prices).
 
 - In groups she answers when called by name, mentioned or replied to, as a
   reply to the message that addressed her, and follows the recent chatter.
@@ -30,15 +31,16 @@ moderation for group admins).
 6. [The character](#the-character)
 7. [Photos, stickers, GIFs and voice messages](#photos-stickers-gifs-and-voice-messages)
 8. [Drawing pictures](#drawing-pictures)
-9. [Daily limit in private chats](#daily-limit-in-private-chats)
-10. [Groups](#groups)
-11. [VPS deployment (systemd)](#vps-deployment-systemd)
-12. [Docker Compose deployment (optional)](#docker-compose-deployment-optional)
-13. [Vercel deployment (webhook)](#vercel-deployment-webhook)
-14. [Backup and restore](#backup-and-restore)
-15. [Long polling and webhooks](#long-polling-and-webhooks)
-16. [Security checklist](#security-checklist)
-17. [Troubleshooting](#troubleshooting)
+9. [Live data](#live-data)
+10. [Daily limit in private chats](#daily-limit-in-private-chats)
+11. [Groups](#groups)
+12. [VPS deployment (systemd)](#vps-deployment-systemd)
+13. [Docker Compose deployment (optional)](#docker-compose-deployment-optional)
+14. [Vercel deployment (webhook)](#vercel-deployment-webhook)
+15. [Backup and restore](#backup-and-restore)
+16. [Long polling and webhooks](#long-polling-and-webhooks)
+17. [Security checklist](#security-checklist)
+18. [Troubleshooting](#troubleshooting)
 
 ## Architecture
 
@@ -51,6 +53,7 @@ internal/config                 load .env + environment, validate
 internal/telegram               Bot API client: long polling, sending, message splitting
 internal/ai                     OpenRouter client: types, retries, tool-calling format
 internal/tools                  tool registry + time, calculator, help, drawing, polls, moderation, owners' tools
+internal/webapi                 live-data tools: rates, weather, prayer times, news, Wikipedia, football, crypto
 internal/storage                pgx pool, migrations, conversation queries
 internal/storage/migrations     SQL migrations, embedded in the binary
 internal/agent                  one conversation turn and the tool-calling loop
@@ -175,6 +178,8 @@ in the environment win over the file.
 | `ENABLE_IMAGE_GENERATION` | `true` | Let the bot draw pictures (Gemini only; needs billing on the Gemini key) |
 | `IMAGE_MODEL` | `gemini-3.1-flash-image` | Gemini model that draws |
 | `DAILY_IMAGE_LIMIT` | `2` | Pictures per user per day; owners have no limit; `0` lets only owners draw |
+| `FOOTBALL_DATA_TOKEN` | empty | Free key from <https://www.football-data.org/client/register>; without it there is no football tool. See [Live data](#live-data) |
+| `COINGECKO_DEMO_KEY` | empty | Optional CoinGecko demo key from <https://www.coingecko.com/en/api>; without it crypto prices share CoinGecko's keyless quota |
 | `DB_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
 | `TELEGRAM_WEBHOOK_SECRET` | empty | Only for webhook deployments; see [Vercel deployment](#vercel-deployment-webhook) |
 | `CRON_SECRET` | empty | Only on Vercel: protects the daily cleanup endpoint |
@@ -305,7 +310,7 @@ the AI is overloaded and to try again in a minute.
 
 `OPENROUTER_MODEL` accepts any model ID from <https://openrouter.ai/models>.
 
-Tools (time, calculator, help) only work with models that support tool
+Tools (time, calculator, help, live data) only work with models that support tool
 calling. To list those, filter the catalogue by the "tools" supported
 parameter: <https://openrouter.ai/models?supported_parameters=tools>. Add
 `max_price=0` to the filter to see only free ones.
@@ -496,6 +501,29 @@ reply with the bot's answer as its caption.
 every request is refused with `429 You exceeded your current quota`, and the
 bot says drawing is not available right now. Turn on billing for the key in
 Google AI Studio to use it. Each picture is billed by Google.
+
+## Live data
+
+Seven tools look things up on public web APIs, so she does not guess numbers.
+Every deployment has them; football needs `FOOTBALL_DATA_TOKEN`. Each result
+names its source, and the persona tells her to say it in a few words, to call
+currency and crypto prices data rather than advice, and to say a tool did not
+answer instead of making up a number.
+
+| Tool | What | Source and licence |
+| --- | --- | --- |
+| `currency_rate` | Exchange rates in so'm, gold and silver per gram | Central Bank of Uzbekistan (cbu.uz), official rates; gold and silver are an approximate world price from currency-api (jsDelivr mirror as a fallback) |
+| `get_weather` | Current weather, up to 3 days of forecast, air quality | Open-Meteo (CC BY 4.0), MET Norway as a fallback; places from GeoNames (CC BY 4.0). She says which place it matched |
+| `prayer_times` | Prayer and Ramadan times | Aladhan; approximate, the Muslim Board of Uzbekistan (muslim.uz) is official |
+| `news_headlines` | Latest headlines in Uzbek or Russian | RSS feeds of kun.uz, gazeta.uz, uza.uz and daryo.uz; headlines and links only |
+| `wiki_lookup` | Article summaries, "on this day" | Wikipedia (CC BY-SA) |
+| `football` | League tables, the current matchday's matches, top scorers | football-data.org free tier; scores can lag, so "latest", not live |
+| `crypto_price` | Coin prices in dollars and sums | CoinGecko |
+
+The tools share one HTTP client with short timeouts and a small in-memory
+cache, send `MariaBot/1.0 (+https://t.me/<bot username>)` as the user agent,
+and need no key except football. Text from outside sites comes back marked as
+untrusted in the tool descriptions.
 
 ## Daily limit in private chats
 

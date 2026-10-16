@@ -19,6 +19,7 @@ import (
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 	"telegram-ai-bot/internal/tools"
+	"telegram-ai-bot/internal/webapi"
 	"telegram-ai-bot/internal/webhook"
 )
 
@@ -182,7 +183,8 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 	if len(cfg.OwnerUsernames) > 0 && len(cfg.OwnerIDs) == 0 {
 		logger.Warn("BOT_OWNER_IDS is not set: owners are known only by username, which can change hands, so they moderate only with their own admin rights")
 	}
-	registry, err := tools.NewRegistry(cfg.IsAdmin, logger, builtinTools(cfg, store, bot, moderation.Tool())...)
+	available := append(builtinTools(cfg, store, bot, moderation.Tool()), liveDataTools(cfg, bot)...)
+	registry, err := tools.NewRegistry(cfg.IsAdmin, logger, available...)
 	if err != nil {
 		return nil, err
 	}
@@ -248,6 +250,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		AudioInput:         cfg.AudioInput,
 		Transcriber:        transcriber(cfg, model),
 		ImagesEnabled:      cfg.ImagesEnabled,
+		FootballEnabled:    cfg.FootballDataToken != "",
 
 		GroupReplies:          store,
 		GroupRatePerMinute:    cfg.GroupRateLimitPerMinute,
@@ -274,7 +277,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 // moderate is made by the caller, which also hands its confirmations to the
 // service.
 func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate tools.Tool) []tools.Tool {
-	help := service.HelpText(service.Abilities{Draw: cfg.ImagesEnabled, Listen: cfg.AudioInput})
+	help := service.HelpText(service.Abilities{Draw: cfg.ImagesEnabled, Listen: cfg.AudioInput, Football: cfg.FootballDataToken != ""})
 	builtin := tools.Builtin(help, cfg.Location)
 	if cfg.ImagesEnabled {
 		builtin = append(builtin, imageTool(cfg, store))
@@ -303,6 +306,18 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 		)
 	}
 	return builtin
+}
+
+// liveDataTools look things up on public web APIs: rates, weather, prayer
+// times, news, Wikipedia, crypto, and football when a token is set. The
+// user agent gives the bot's t.me link as the contact some APIs ask for.
+func liveDataTools(cfg config.Config, bot Bot) []tools.Tool {
+	return webapi.Tools(webapi.Options{
+		UserAgent:     "MariaBot/1.0 (+https://t.me/" + bot.User.Username + ")",
+		Location:      cfg.Location,
+		FootballToken: cfg.FootballDataToken,
+		CoinGeckoKey:  cfg.CoinGeckoDemoKey,
+	})
 }
 
 // imageTool draws with Gemini and counts pictures in the database.

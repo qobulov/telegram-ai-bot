@@ -1,0 +1,641 @@
+{
+ "filters": {
+  "season": "2026",
+  "matchday": "8"
+ },
+ "resultSet": {
+  "count": 10,
+  "first": "2026-10-17",
+  "last": "2026-10-18",
+  "played": 0
+ },
+ "competition": {
+  "id": 2021,
+  "name": "Premier League",
+  "code": "PL",
+  "type": "LEAGUE",
+  "emblem": "https://crests.football-data.org/PL.png"
+ },
+ "matches": [
+  {
+   "area": {
+    "id": 2072,
+    "name": "England",
+    "code": "ENG",
+    "flag": "https://crests.football-data.org/770.svg"
+   },
+   "competition": {
+    "id": 2021,
+    "name": "Premier League",
+    "code": "PL",
+    "type": "LEAGUE",
+    "emblem": "https://crests.football-data.org/PL.png"
+   },
+   "season": {
+    "id": 2502,
+    "startDate": "2026-08-21",
+    "endDate": "2027-05-30",
+    "currentMatchday": 7,
+    "winner": null,
+    "stages": [
+     "REGULAR_SEASON"
+    ]
+   },
+   "id": 540071,
+   "utcDate": "2026-10-17T11:30:00Z",
+   "status": "TIMED",
+   "matchday": 8,
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "lastUpdated": "2026-10-16T06:00:00Z",
+   "homeTeam": {
+    "id": 61,
+    "name": "Chelsea FC",
+    "shortName": "Chelsea",
+    "tla": "CHE",
+    "crest": "https://crests.football-data.org/61.png"
+   },
+   "awayTeam": {
+    "id": 65,
+    "name": "Manchester City FC",
+    "shortName": "Man City",
+    "tla": "MCI",
+    "crest": "https://crests.football-data.org/65.png"
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   },
+   "odds": {
+    "msg": "Activate Odds-Package in User-Panel to retrieve odds."
+   },
+   "referees": []
+  },
+  {
+   "area": {
+    "id": 2072,
+    "name": "England",
+    "code": "ENG",
+    "flag": "https://crests.football-data.org/770.svg"
+   },
+   "competition": {
+    "id": 2021,
+    "name": "Premier League",
+    "code": "PL",
+    "type": "LEAGUE",
+    "emblem": "https://crests.football-data.org/PL.png"
+   },
+   "season": {
+    "id": 2502,
+    "startDate": "2026-08-21",
+    "endDate": "2027-05-30",
+    "currentMatchday": 7,
+    "winner": null,
+    "stages": [
+     "REGULAR_SEASON"
+    ]
+   },
+   "id": 540072,
+   "utcDate": "2026-10-17T14:00:00Z",
+   "status": "TIMED",
+   "matchday": 8,
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "lastUpdated": "2026-10-16T06:00:00Z",
+   "homeTeam": {
+    "id": 66,
+    "name": "Manchester United FC",
+    "shortName": "Man United",
+    "tla": "MUN",
+    "crest": "https://crests.football-data.org/66.png"
+   },
+   "awayTeam": {
+    "id": 57,
+    "name": "Arsenal FC",
+    "shortName": "Arsenal",
+    "tla": "ARS",
+    "crest": "https://crests.football-data.org/57.png"
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   },
+   "odds": {
+    "msg": "Activate Odds-Package in User-Panel to retrieve odds."
+   },
+   "referees": []
+  },
+  {
+   "area": {
+    "id": 2072,
+    "name": "England",
+    "code": "ENG",
+    "flag": "https://crests.football-data.org/770.svg"
+   },
+   "competition": {
+    "id": 2021,
+    "name": "Premier League",
+    "code": "PL",
+    "type": "LEAGUE",
+    "emblem": "https://crests.football-data.org/PL.png"
+   },
+   "season": {
+    "id": 2502,
+    "startDate": "2026-08-21",
+    "endDate": "2027-05-30",
+    "currentMatchday": 7,
+    "winner": null,
+    "stages": [
+     "REGULAR_SEASON"
+    ]
+   },
+   "id": 540073,
+   "utcDate": "2026-10-17T14:00:00Z",
+   "status": "TIMED",
+   "matchday": 8,
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "lastUpdated": "2026-10-16T06:00:00Z",
+   "homeTeam": {
+    "id": 58,
+    "name": "Aston Villa FC",
+    "shortName": "Aston Villa",
+    "tla": "AVL",
+    "crest": "https://crests.football-data.org/58.png"
+   },
+   "awayTeam": {
+    "id": 67,
+    "name": "Newcastle United FC",
+    "shortName": "Newcastle",
+    "tla": "NEW",
+    "crest": "https://crests.football-data.org/67.png"
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   },
+   "odds": {
+    "msg": "Activate Odds-Package in User-Panel to retrieve odds."
+   },
+   "referees": []
+  },
+  {
+   "area": {
+    "id": 2072,
+    "name": "England",
+    "code": "ENG",
+    "flag": "https://crests.football-data.org/770.svg"
+   },
+   "competition": {
+    "id": 2021,
+    "name": "Premier League",
+    "code": "PL",
+    "type": "LEAGUE",
+    "emblem": "https://crests.football-data.org/PL.png"
+   },
+   "season": {
+    "id": 2502,
+    "startDate": "2026-08-21",
+    "endDate": "2027-05-30",
+    "currentMatchday": 7,
+    "winner": null,
+    "stages": [
+     "REGULAR_SEASON"
+    ]
+   },
+   "id": 540074,
+   "utcDate": "2026-10-17T14:00:00Z",
+   "status": "TIMED",
+   "matchday": 8,
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "lastUpdated": "2026-10-16T06:00:00Z",
+   "homeTeam": {
+    "id": 73,
+    "name": "Tottenham Hotspur FC",
+    "shortName": "Tottenham",
+    "tla": "TOT",
+    "crest": "https://crests.football-data.org/73.png"
+   },
+   "awayTeam": {
+    "id": 397,
+    "name": "Brighton & Hove Albion FC",
+    "shortName": "Brighton Hove",
+    "tla": "BHA",
+    "crest": "https://crests.football-data.org/397.png"
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   },
+   "odds": {
+    "msg": "Activate Odds-Package in User-Panel to retrieve odds."
+   },
+   "referees": []
+  },
+  {
+   "area": {
+    "id": 2072,
+    "name": "England",
+    "code": "ENG",
+    "flag": "https://crests.football-data.org/770.svg"
+   },
+   "competition": {
+    "id": 2021,
+    "name": "Premier League",
+    "code": "PL",
+    "type": "LEAGUE",
+    "emblem": "https://crests.football-data.org/PL.png"
+   },
+   "season": {
+    "id": 2502,
+    "startDate": "2026-08-21",
+    "endDate": "2027-05-30",
+    "currentMatchday": 7,
+    "winner": null,
+    "stages": [
+     "REGULAR_SEASON"
+    ]
+   },
+   "id": 540075,
+   "utcDate": "2026-10-17T14:00:00Z",
+   "status": "TIMED",
+   "matchday": 8,
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "lastUpdated": "2026-10-16T06:00:00Z",
+   "homeTeam": {
+    "id": 351,
+    "name": "Nottingham Forest FC",
+    "shortName": "Nottingham",
+    "tla": "NOT",
+    "crest": "https://crests.football-data.org/351.png"
+   },
+   "awayTeam": {
+    "id": 1044,
+    "name": "AFC Bournemouth",
+    "shortName": "Bournemouth",
+    "tla": "BOU",
+    "crest": "https://crests.football-data.org/1044.png"
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   },
+   "odds": {
+    "msg": "Activate Odds-Package in User-Panel to retrieve odds."
+   },
+   "referees": []
+  },
+  {
+   "area": {
+    "id": 2072,
+    "name": "England",
+    "code": "ENG",
+    "flag": "https://crests.football-data.org/770.svg"
+   },
+   "competition": {
+    "id": 2021,
+    "name": "Premier League",
+    "code": "PL",
+    "type": "LEAGUE",
+    "emblem": "https://crests.football-data.org/PL.png"
+   },
+   "season": {
+    "id": 2502,
+    "startDate": "2026-08-21",
+    "endDate": "2027-05-30",
+    "currentMatchday": 7,
+    "winner": null,
+    "stages": [
+     "REGULAR_SEASON"
+    ]
+   },
+   "id": 540076,
+   "utcDate": "2026-10-17T16:30:00Z",
+   "status": "TIMED",
+   "matchday": 8,
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "lastUpdated": "2026-10-16T06:00:00Z",
+   "homeTeam": {
+    "id": 402,
+    "name": "Brentford FC",
+    "shortName": "Brentford",
+    "tla": "BRE",
+    "crest": "https://crests.football-data.org/402.png"
+   },
+   "awayTeam": {
+    "id": 64,
+    "name": "Liverpool FC",
+    "shortName": "Liverpool",
+    "tla": "LIV",
+    "crest": "https://crests.football-data.org/64.png"
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   },
+   "odds": {
+    "msg": "Activate Odds-Package in User-Panel to retrieve odds."
+   },
+   "referees": []
+  },
+  {
+   "area": {
+    "id": 2072,
+    "name": "England",
+    "code": "ENG",
+    "flag": "https://crests.football-data.org/770.svg"
+   },
+   "competition": {
+    "id": 2021,
+    "name": "Premier League",
+    "code": "PL",
+    "type": "LEAGUE",
+    "emblem": "https://crests.football-data.org/PL.png"
+   },
+   "season": {
+    "id": 2502,
+    "startDate": "2026-08-21",
+    "endDate": "2027-05-30",
+    "currentMatchday": 7,
+    "winner": null,
+    "stages": [
+     "REGULAR_SEASON"
+    ]
+   },
+   "id": 540077,
+   "utcDate": "2026-10-18T13:00:00Z",
+   "status": "TIMED",
+   "matchday": 8,
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "lastUpdated": "2026-10-16T06:00:00Z",
+   "homeTeam": {
+    "id": 354,
+    "name": "Crystal Palace FC",
+    "shortName": "Crystal Palace",
+    "tla": "CRY",
+    "crest": "https://crests.football-data.org/354.png"
+   },
+   "awayTeam": {
+    "id": 62,
+    "name": "Everton FC",
+    "shortName": "Everton",
+    "tla": "EVE",
+    "crest": "https://crests.football-data.org/62.png"
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   },
+   "odds": {
+    "msg": "Activate Odds-Package in User-Panel to retrieve odds."
+   },
+   "referees": []
+  },
+  {
+   "area": {
+    "id": 2072,
+    "name": "England",
+    "code": "ENG",
+    "flag": "https://crests.football-data.org/770.svg"
+   },
+   "competition": {
+    "id": 2021,
+    "name": "Premier League",
+    "code": "PL",
+    "type": "LEAGUE",
+    "emblem": "https://crests.football-data.org/PL.png"
+   },
+   "season": {
+    "id": 2502,
+    "startDate": "2026-08-21",
+    "endDate": "2027-05-30",
+    "currentMatchday": 7,
+    "winner": null,
+    "stages": [
+     "REGULAR_SEASON"
+    ]
+   },
+   "id": 540078,
+   "utcDate": "2026-10-18T13:00:00Z",
+   "status": "TIMED",
+   "matchday": 8,
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "lastUpdated": "2026-10-16T06:00:00Z",
+   "homeTeam": {
+    "id": 563,
+    "name": "West Ham United FC",
+    "shortName": "West Ham",
+    "tla": "WHU",
+    "crest": "https://crests.football-data.org/563.png"
+   },
+   "awayTeam": {
+    "id": 71,
+    "name": "Sunderland AFC",
+    "shortName": "Sunderland",
+    "tla": "SUN",
+    "crest": "https://crests.football-data.org/71.png"
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   },
+   "odds": {
+    "msg": "Activate Odds-Package in User-Panel to retrieve odds."
+   },
+   "referees": []
+  },
+  {
+   "area": {
+    "id": 2072,
+    "name": "England",
+    "code": "ENG",
+    "flag": "https://crests.football-data.org/770.svg"
+   },
+   "competition": {
+    "id": 2021,
+    "name": "Premier League",
+    "code": "PL",
+    "type": "LEAGUE",
+    "emblem": "https://crests.football-data.org/PL.png"
+   },
+   "season": {
+    "id": 2502,
+    "startDate": "2026-08-21",
+    "endDate": "2027-05-30",
+    "currentMatchday": 7,
+    "winner": null,
+    "stages": [
+     "REGULAR_SEASON"
+    ]
+   },
+   "id": 540079,
+   "utcDate": "2026-10-18T15:30:00Z",
+   "status": "TIMED",
+   "matchday": 8,
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "lastUpdated": "2026-10-16T06:00:00Z",
+   "homeTeam": {
+    "id": 341,
+    "name": "Leeds United FC",
+    "shortName": "Leeds United",
+    "tla": "LEE",
+    "crest": "https://crests.football-data.org/341.png"
+   },
+   "awayTeam": {
+    "id": 63,
+    "name": "Fulham FC",
+    "shortName": "Fulham",
+    "tla": "FUL",
+    "crest": "https://crests.football-data.org/63.png"
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   },
+   "odds": {
+    "msg": "Activate Odds-Package in User-Panel to retrieve odds."
+   },
+   "referees": []
+  },
+  {
+   "area": {
+    "id": 2072,
+    "name": "England",
+    "code": "ENG",
+    "flag": "https://crests.football-data.org/770.svg"
+   },
+   "competition": {
+    "id": 2021,
+    "name": "Premier League",
+    "code": "PL",
+    "type": "LEAGUE",
+    "emblem": "https://crests.football-data.org/PL.png"
+   },
+   "season": {
+    "id": 2502,
+    "startDate": "2026-08-21",
+    "endDate": "2027-05-30",
+    "currentMatchday": 7,
+    "winner": null,
+    "stages": [
+     "REGULAR_SEASON"
+    ]
+   },
+   "id": 540080,
+   "utcDate": "2026-10-18T15:30:00Z",
+   "status": "TIMED",
+   "matchday": 8,
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "lastUpdated": "2026-10-16T06:00:00Z",
+   "homeTeam": {
+    "id": 76,
+    "name": "Wolverhampton Wanderers FC",
+    "shortName": "Wolverhampton",
+    "tla": "WOL",
+    "crest": "https://crests.football-data.org/76.png"
+   },
+   "awayTeam": {
+    "id": 328,
+    "name": "Burnley FC",
+    "shortName": "Burnley",
+    "tla": "BUR",
+    "crest": "https://crests.football-data.org/328.png"
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   },
+   "odds": {
+    "msg": "Activate Odds-Package in User-Panel to retrieve odds."
+   },
+   "referees": []
+  }
+ ]
+}

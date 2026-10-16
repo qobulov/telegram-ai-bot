@@ -78,6 +78,35 @@ func runTool(t *testing.T, builtin []tools.Tool, name string, out any) {
 	t.Fatalf("no %s tool", name)
 }
 
+// The live-data tools sit beside the built-in ones in one registry, and
+// football, in the tools and in the help, needs its token.
+func TestLiveDataToolsFollowTheConfiguration(t *testing.T) {
+	for _, token := range []string{"", "fd-token"} {
+		cfg := config.Config{Location: time.UTC, FootballDataToken: token}
+		bot := Bot{User: telegram.User{ID: 777, Username: "maria_bot"}}
+		live := liveDataTools(cfg, bot)
+		for _, name := range []string{"currency_rate", "get_weather", "prayer_times", "news_headlines", "wiki_lookup", "crypto_price"} {
+			if !hasTool(live, name) {
+				t.Errorf("token %q: no %s tool", token, name)
+			}
+		}
+		if got := hasTool(live, "football"); got != (token != "") {
+			t.Errorf("token %q: football registered = %t", token, got)
+		}
+		builtin := builtinTools(cfg, nil, bot, tools.NewModeration(tools.ModerationOptions{}).Tool())
+		if _, err := tools.NewRegistry(cfg.IsAdmin, nil, append(builtin, live...)...); err != nil {
+			t.Errorf("token %q: NewRegistry: %v", token, err)
+		}
+		var help struct {
+			Help string `json:"help"`
+		}
+		runTool(t, builtin, "get_bot_help", &help)
+		if got := strings.Contains(help.Help, "football"); got != (token != "") {
+			t.Errorf("token %q: help offers football = %t", token, got)
+		}
+	}
+}
+
 func hasTool(builtin []tools.Tool, name string) bool {
 	for _, tool := range builtin {
 		if tool.Name == name {

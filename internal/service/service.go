@@ -230,6 +230,9 @@ type Options struct {
 	// ImagesEnabled is true when the model has the image tool; /help offers
 	// drawing only then.
 	ImagesEnabled bool
+	// FootballEnabled is true when the model has the football tool; /help
+	// offers football results only then.
+	FootballEnabled bool
 }
 
 // Service processes updates on a fixed pool of workers.

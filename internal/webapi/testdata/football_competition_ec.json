@@ -1,0 +1,21 @@
+{
+ "id": 2018,
+ "area": {
+  "id": 2077,
+  "name": "Europe",
+  "code": "EUR",
+  "flag": "https://crests.football-data.org/EUR.svg"
+ },
+ "name": "European Championship",
+ "code": "EC",
+ "type": "CUP",
+ "emblem": "https://crests.football-data.org/ec.png",
+ "plan": "TIER_ONE",
+ "currentSeason": {
+  "id": 1537,
+  "startDate": "2024-06-14",
+  "endDate": "2024-07-14",
+  "currentMatchday": 5,
+  "winner": null
+ }
+}
