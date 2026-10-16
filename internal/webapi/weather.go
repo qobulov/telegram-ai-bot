@@ -21,8 +21,14 @@ const (
 	weatherTTL     = 10 * time.Minute
 	geocodingTTL   = 24 * time.Hour
 	weatherTimeout = 6 * time.Second
-	maxCityName    = 100
-	maxPlaceName   = 80
+	// geocodingTimeout leaves the forecast its 3 s and MET Norway a second
+	// of the tool's 6, however many spellings of a name are asked.
+	geocodingTimeout = 2 * time.Second
+	// bigCity is how many people make a town abroad worth more than an
+	// uncounted namesake in Uzbekistan.
+	bigCity      = 100_000
+	maxCityName  = 100
+	maxPlaceName = 80
 	// metBodyLimit leaves room above MET Norway's usual 40 KB, so the
 	// fallback does not break when they add a field.
 	metBodyLimit = 128 << 10
@@ -471,17 +477,14 @@ func metDay(points []metPoint, date string, location *time.Location) (weatherDay
 }
 
 // findSpot looks in the place table first and asks the geocoder only on a
-// miss: Cyrillic names in Russian, Latin ones in Uzbek and English at
-// once, keeping the best town of both answers.
+// miss, keeping the best town of all its answers.
 func (a *apis) findSpot(ctx context.Context, city string) (spot, error) {
 	if p, found := lookupPlace(city); found {
 		return p.spot()
 	}
-	languages := []string{"uz", "en"}
-	if hasCyrillic(city) {
-		languages = []string{"ru"}
-	}
-	results, err := a.geocode(ctx, city, languages)
+	geocoding, cancel := context.WithTimeout(ctx, geocodingTimeout)
+	defer cancel()
+	results, err := a.geocode(geocoding, geocoderQueries(city))
 	if best, found := bestPlace(results); found {
 		return best.spot()
 	}
@@ -534,14 +537,44 @@ func (r geocodingResult) spot() (spot, error) {
 	return s, nil
 }
 
-// geocode asks the geocoder in every language at once and merges the
-// answers, first language first. The error is the first one, if any.
-func (a *apis) geocode(ctx context.Context, city string, languages []string) ([]geocodingResult, error) {
-	answers := make([][]geocodingResult, len(languages))
-	errs := make([]error, len(languages))
+// geocoderQuery is one question to the geocoder.
+type geocoderQuery struct{ name, language string }
+
+// geocoderQueries says what to ask the geocoder about city: a Cyrillic
+// name in Russian, a Latin one in Uzbek and English. GeoNames writes the
+// apostrophe of o‘ and g‘ as U+2018 (Qo‘ng‘irot), as U+2019 (Bulung’ur)
+// or not at all, and finds nothing for the other ways, so a Latin name
+// with an apostrophe is also asked in Uzbek in each of those spellings.
+func geocoderQueries(city string) []geocoderQuery {
+	if hasCyrillic(city) {
+		return []geocoderQuery{{city, "ru"}}
+	}
+	queries := []geocoderQuery{{city, "uz"}, {city, "en"}}
+	spellings := []string{city}
+	// -1 drops the apostrophe.
+	for _, mark := range []rune{'\u2018', '\u2019', -1} {
+		spelling := strings.Map(func(r rune) rune {
+			if isApostrophe(r) {
+				return mark
+			}
+			return r
+		}, city)
+		if !slices.Contains(spellings, spelling) {
+			spellings = append(spellings, spelling)
+			queries = append(queries, geocoderQuery{spelling, "uz"})
+		}
+	}
+	return queries
+}
+
+// geocode asks every query at once and merges the answers in the queries'
+// order. The error is the first one, if any.
+func (a *apis) geocode(ctx context.Context, queries []geocoderQuery) ([]geocodingResult, error) {
+	answers := make([][]geocodingResult, len(queries))
+	errs := make([]error, len(queries))
 	var wg sync.WaitGroup
-	for i, language := range languages {
-		wg.Go(func() { answers[i], errs[i] = a.geocodeIn(ctx, city, language) })
+	for i, query := range queries {
+		wg.Go(func() { answers[i], errs[i] = a.geocodeIn(ctx, query.name, query.language) })
 	}
 	wg.Wait()
 	return slices.Concat(answers...), cmp.Or(errs...)
@@ -562,15 +595,11 @@ func (a *apis) geocodeIn(ctx context.Context, city, language string) ([]geocodin
 	})
 }
 
-// bestPlace picks the town a member most likely means. A town with a
-// known population comes first: the geocoder knows it for real cities,
-// while the namesakes it often lists first have none (a village in
-// Farg'ona for "Chimkent") or few people (York, Nebraska, for "New York"
-// in Uzbek). Then Uzbekistan, then a capital or region centre, then the
-// larger town; ties keep the geocoder's order. Airports, countries,
-// abandoned places and results without a country or time zone (such as
-// the parish in Montserrat that "Sankt-Peterburg" finds in Uzbek) are
-// never picked.
+// bestPlace picks the town a member most likely means (see placeRank);
+// among equals a capital or region centre, then the larger town, then the
+// geocoder's order. Airports, countries, abandoned places and results
+// without a country or time zone (such as the parish in Montserrat that
+// "Sankt-Peterburg" finds in Uzbek) are never picked.
 func bestPlace(results []geocodingResult) (geocodingResult, bool) {
 	var towns []geocodingResult
 	for _, r := range results {
@@ -583,18 +612,54 @@ func bestPlace(results []geocodingResult) (geocodingResult, bool) {
 	}
 	return slices.MinFunc(towns, func(x, y geocodingResult) int {
 		return cmp.Or(
-			trueFirst(x.Population > 0, y.Population > 0),
-			trueFirst(x.CountryCode == "UZ", y.CountryCode == "UZ"),
-			trueFirst(x.FeatureCode == "PPLC" || x.FeatureCode == "PPLA", y.FeatureCode == "PPLC" || y.FeatureCode == "PPLA"),
+			cmp.Compare(placeRank(x), placeRank(y)),
+			trueFirst(isCentre(x.FeatureCode), isCentre(y.FeatureCode)),
 			cmp.Compare(y.Population, x.Population),
 		)
 	}), true
+}
+
+// placeRank orders places from the most likely meant:
+//
+//  0. a town in Uzbekistan that GeoNames counts: it has people or is a
+//     seat, so Pop in Namangan beats Puerto Plata, which the geocoder
+//     also lists for "Pop", and Qo‘ng‘irot Shahri the villages of that
+//     name in Andijon and Farg'ona;
+//  1. a big city abroad, so Shymkent beats a village in Farg'ona called
+//     Chimkent, and New York beats York, Nebraska;
+//  2. any other place in Uzbekistan: GeoNames counts nobody in many towns,
+//     and Keles, Tashkent region, must still beat Keles, Bursa (3,772
+//     people);
+//  3. any other place abroad.
+func placeRank(r geocodingResult) int {
+	home := r.CountryCode == "UZ"
+	switch {
+	case home && (r.Population > 0 || isSeat(r.FeatureCode)):
+		return 0
+	case !home && (isCentre(r.FeatureCode) || r.Population >= bigCity):
+		return 1
+	case home:
+		return 2
+	default:
+		return 3
+	}
 }
 
 // isTown is true for GeoNames' populated places (PPL, PPLA, PPLC...) that
 // still exist: PPLH is historical, PPLQ abandoned and PPLW destroyed.
 func isTown(featureCode string) bool {
 	return strings.HasPrefix(featureCode, "PPL") && featureCode != "PPLH" && featureCode != "PPLQ" && featureCode != "PPLW"
+}
+
+// isCentre is true for a capital or a region centre.
+func isCentre(featureCode string) bool {
+	return featureCode == "PPLC" || featureCode == "PPLA"
+}
+
+// isSeat is true for a capital or the seat of a region, district or
+// smaller division (PPLA2, PPLA3...).
+func isSeat(featureCode string) bool {
+	return featureCode == "PPLC" || strings.HasPrefix(featureCode, "PPLA")
 }
 
 // trueFirst orders true before false.

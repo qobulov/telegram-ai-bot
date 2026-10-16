@@ -259,12 +259,22 @@ From the review:
   (Moskva, Sankt-Peterburg, Qozon, Seul, Istanbul, Dubay, Nyu-York,
   Chimkent, Olmaota, Bishkek, Dushanbe, Xo'jand) with their time zones,
   and Yangiyo'l and G'ijduvon, which the geocoder misses.
-- Geocoder: a Latin name is asked in Uzbek and English at once and the
-  best town of both answers is kept: a known population first, then
-  Uzbekistan, then a capital or region centre, then the larger town.
-  Results without a country, country code or time zone, and historical or
-  abandoned places, are dropped. The cache key is the name as sent
-  (normalizeName made "Mexico City" share "Mexico"'s entry).
+- Geocoder: a Latin name is asked in Uzbek and English at once; one with
+  an apostrophe is also asked in Uzbek with it written as U+2018
+  (Qo‘ng‘irot), as U+2019 (Bulung’ur) and dropped, since GeoNames finds
+  nothing for `Qo'ng'irot`. All questions share a 2 s deadline, so the
+  forecast keeps its time. The best town of all answers is kept: a town
+  in Uzbekistan that GeoNames counts (people, or the seat of a region or
+  district), then a big city abroad (capital, region centre or 100,000
+  people), then any place in Uzbekistan, then the rest; among equals a
+  capital or region centre, then the larger town, then the geocoder's
+  order. GeoNames counts nobody in many Uzbek towns, so a known
+  population no longer comes first (Keles in Turkey beat Keles, Tashkent
+  region); a counted Uzbek town beats a big city abroad because the
+  geocoder lists Puerto Plata for "Pop". Results without a country,
+  country code or time zone, and historical or abandoned places, are
+  dropped. The cache key is the name as sent (normalizeName made "Mexico
+  City" share "Mexico"'s entry).
 - News: feeds may be up to 1 MB (daryo.uz sends whole articles, 247 KB on
   2026-10-16); uza.uz's `+0000` dates are read as Tashkent time; a date
   more than 10 minutes ahead is dropped rather than allowed to top the
