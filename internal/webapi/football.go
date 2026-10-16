@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -16,9 +17,11 @@ import (
 
 const (
 	// footballTTL keeps the free plan's 10 calls a minute out of reach.
-	footballTTL   = 10 * time.Minute
-	tableRows     = 10
-	maxMatches    = 12
+	footballTTL = 10 * time.Minute
+	tableRows   = 10
+	// maxMatches fits a whole World Cup group matchday (24 matches) and a
+	// Champions League one (18) in about 2.5 KB.
+	maxMatches    = 24
 	topScorers    = 5
 	maxTeamName   = 60
 	footballCodes = "PL, PD, SA, BL1, FL1, CL, DED, PPL, ELC, EC, WC"
@@ -70,6 +73,7 @@ type tableOutput struct {
 	Group       string     `json:"group,omitempty"`
 	Matchday    int        `json:"matchday,omitempty"`
 	Rows        []tableRow `json:"rows"`
+	Note        string     `json:"note,omitempty"`
 	Source      string     `json:"source"`
 }
 
@@ -90,7 +94,9 @@ type matchesOutput struct {
 }
 
 type matchRow struct {
-	Kickoff string `json:"kickoff"`
+	// Kickoff is in Tashkent time; the field name says so, because the
+	// source is British and Champions League times are known in CET.
+	Kickoff string `json:"kickoff_tashkent"`
 	Home    string `json:"home"`
 	Away    string `json:"away"`
 	Score   string `json:"score,omitempty"`
@@ -179,17 +185,72 @@ type footballTeam struct {
 // label is the name to show: the short one when there is one.
 func (t footballTeam) label() string { return or(t.ShortName, t.Name) }
 
-// is reports whether the user's words name this team.
-func (t footballTeam) is(team string) bool {
+// teamMatch is how closely a fan's words name a team.
+type teamMatch int
+
+const (
+	noMatch teamMatch = iota
+	// partMatch is part of a word: "milan" in "internazionale milano".
+	partMatch
+	// wordMatch is whole words of a name: "milan" in "ac milan".
+	wordMatch
+	// fullMatch is the whole short name, TLA or name.
+	fullMatch
+)
+
+// match says how closely wanted, already folded, names the team.
+func (t footballTeam) match(wanted string) teamMatch {
+	names := []string{foldTeam(t.ShortName), foldTeam(t.TLA), foldTeam(t.Name)}
+	if slices.Contains(names, wanted) {
+		return fullMatch
+	}
+	for _, name := range names {
+		if strings.Contains(" "+name+" ", " "+wanted+" ") {
+			return wordMatch
+		}
+	}
+	for _, name := range names {
+		if strings.Contains(name, wanted) {
+			return partMatch
+		}
+	}
+	return noMatch
+}
+
+// teamFilter keeps the teams a fan named. Only the closest kind of match
+// among the teams in view counts, so "Milan" keeps AC Milan and not
+// Internazionale Milano, and "Guinea" keeps Guinea and not Equatorial
+// Guinea; part of a word counts only when nothing matches better.
+type teamFilter struct {
+	wanted string
+	best   teamMatch
+}
+
+func newTeamFilter(team string, teams []footballTeam) teamFilter {
 	if team == "" {
-		return true
+		return teamFilter{}
 	}
 	wanted := foldTeam(team)
 	if nickname, found := teamNicknames[wanted]; found {
 		wanted = nickname
 	}
-	return strings.Contains(foldTeam(t.Name+" | "+t.ShortName+" | "+t.TLA), wanted)
+	f := teamFilter{wanted: wanted}
+	for _, t := range teams {
+		f.best = max(f.best, t.match(wanted))
+	}
+	return f
 }
+
+// names reports whether a team was named and t is it.
+func (f teamFilter) names(t footballTeam) bool {
+	return f.wanted != "" && f.best != noMatch && t.match(f.wanted) == f.best
+}
+
+// keeps is names, or true for every team when none was named.
+func (f teamFilter) keeps(t footballTeam) bool { return f.wanted == "" || f.names(t) }
+
+// found reports whether a named team was among the teams in view.
+func (f teamFilter) found() bool { return f.wanted == "" || f.best != noMatch }
 
 // foldTeam lowers a name and drops the accents that names such as
 // Atlético carry and fans do not type.
@@ -227,6 +288,13 @@ func (a *apis) table(ctx context.Context, code, team string) (tableOutput, error
 		return tableOutput{}, err
 	}
 	out := tableOutput{Competition: answer.Competition.Name, Matchday: answer.Season.CurrentMatchday, Source: footballSource}
+	var teams []footballTeam
+	for _, standing := range answer.Standings {
+		for _, row := range standing.Table {
+			teams = append(teams, row.Team)
+		}
+	}
+	filter := newTeamFilter(team, teams)
 	chosen := -1
 	for i, standing := range answer.Standings {
 		if standing.Type != "TOTAL" {
@@ -236,7 +304,7 @@ func (a *apis) table(ctx context.Context, code, team string) (tableOutput, error
 			chosen = i
 		}
 		for _, row := range standing.Table {
-			if team != "" && row.Team.is(team) {
+			if filter.names(row.Team) {
 				chosen = i
 			}
 		}
@@ -247,9 +315,12 @@ func (a *apis) table(ctx context.Context, code, team string) (tableOutput, error
 	standing := answer.Standings[chosen]
 	out.Group = strings.Replace(standing.Group, "GROUP_", "Group ", 1)
 	for i, row := range standing.Table {
-		if i < tableRows || (team != "" && row.Team.is(team)) {
+		if i < tableRows || filter.names(row.Team) {
 			out.Rows = append(out.Rows, tableRow{Pos: row.Position, Team: row.Team.label(), Played: row.PlayedGames, Points: row.Points, GD: row.GoalDifference})
 		}
+	}
+	if !filter.found() {
+		out.Note = fmt.Sprintf("%s is not in this table; check the team's name or the competition", team)
 	}
 	return out, nil
 }
@@ -269,16 +340,44 @@ type matchesAnswer struct {
 }
 
 type footballMatch struct {
-	UTCDate  time.Time    `json:"utcDate"`
-	Status   string       `json:"status"`
-	HomeTeam footballTeam `json:"homeTeam"`
-	AwayTeam footballTeam `json:"awayTeam"`
-	Score    struct {
-		FullTime struct {
-			Home *int `json:"home"`
-			Away *int `json:"away"`
-		} `json:"fullTime"`
-	} `json:"score"`
+	UTCDate  time.Time     `json:"utcDate"`
+	Status   string        `json:"status"`
+	HomeTeam footballTeam  `json:"homeTeam"`
+	AwayTeam footballTeam  `json:"awayTeam"`
+	Score    footballScore `json:"score"`
+}
+
+type footballScore struct {
+	// Duration is REGULAR, EXTRA_TIME or PENALTY_SHOOTOUT.
+	Duration  string `json:"duration"`
+	FullTime  goals  `json:"fullTime"`
+	Penalties goals  `json:"penalties"`
+}
+
+type goals struct {
+	Home *int `json:"home"`
+	Away *int `json:"away"`
+}
+
+// text writes the score the way fans say it. football-data.org's fullTime
+// counts shootout goals too (a 1-1 draw won 6-5 on penalties is 7-6), so
+// those are taken out and shown apart.
+func (s footballScore) text(finished bool) string {
+	if s.FullTime.Home == nil || s.FullTime.Away == nil {
+		return ""
+	}
+	home, away := *s.FullTime.Home, *s.FullTime.Away
+	switch {
+	case s.Duration == "PENALTY_SHOOTOUT" && s.Penalties.Home != nil && s.Penalties.Away != nil:
+		penHome, penAway := *s.Penalties.Home, *s.Penalties.Away
+		return fmt.Sprintf("%d-%d (pen %d-%d)", home-penHome, away-penAway, penHome, penAway)
+	case s.Duration == "EXTRA_TIME" && finished:
+		return fmt.Sprintf("%d-%d (aet)", home, away)
+	case s.Duration == "EXTRA_TIME":
+		return fmt.Sprintf("%d-%d (extra time)", home, away)
+	default:
+		return fmt.Sprintf("%d-%d", home, away)
+	}
 }
 
 func (m footballMatch) finished() bool {
@@ -287,7 +386,9 @@ func (m footballMatch) finished() bool {
 
 // matches gives the current matchday, or the next one once every match
 // of the current one is over; with a team, its last result comes too.
-// Competitions without a current matchday list scheduled matches.
+// Competitions without a current matchday list upcoming matches: TIMED
+// ones (date and time fixed) as well as SCHEDULED, because the status
+// filter is a plain list.
 func (a *apis) matches(ctx context.Context, code, team string) (matchesOutput, error) {
 	competition, err := askFootball[competitionAnswer](ctx, a, code)
 	if err != nil {
@@ -296,29 +397,28 @@ func (a *apis) matches(ctx context.Context, code, team string) (matchesOutput, e
 	out := matchesOutput{Competition: competition.Name, Matches: []matchRow{}, Source: footballSource}
 	current := competition.CurrentSeason.CurrentMatchday
 	if current == nil {
-		scheduled, err := askFootball[matchesAnswer](ctx, a, code+"/matches?status=SCHEDULED")
+		upcoming, err := askFootball[matchesAnswer](ctx, a, code+"/matches?status=SCHEDULED,TIMED")
 		if err != nil {
 			return matchesOutput{}, err
 		}
-		a.addMatches(&out, scheduled.Matches, team)
-		return withMatchNote(out, team), nil
+		return a.matchList(out, team, upcoming.Matches), nil
 	}
 	shown, err := askFootball[matchesAnswer](ctx, a, code+"/matches?matchday="+strconv.Itoa(*current))
 	if err != nil {
 		return matchesOutput{}, err
 	}
 	out.Matchday = *current
+	var previous []footballMatch
 	if allFinished(shown.Matches) {
 		next, err := askFootball[matchesAnswer](ctx, a, code+"/matches?matchday="+strconv.Itoa(*current+1))
 		if err == nil && len(next.Matches) > 0 {
 			if team != "" {
-				a.addMatches(&out, shown.Matches, team)
+				previous = shown.Matches
 			}
 			shown, out.Matchday = next, *current+1
 		}
 	}
-	a.addMatches(&out, shown.Matches, team)
-	return withMatchNote(out, team), nil
+	return a.matchList(out, team, previous, shown.Matches), nil
 }
 
 func allFinished(matches []footballMatch) bool {
@@ -330,30 +430,37 @@ func allFinished(matches []footballMatch) bool {
 	return len(matches) > 0
 }
 
-func (a *apis) addMatches(out *matchesOutput, matches []footballMatch, team string) {
+// matchList shows the lists' matches of the named team, or all of them,
+// up to maxMatches, and says when some had to be left out.
+func (a *apis) matchList(out matchesOutput, team string, lists ...[]footballMatch) matchesOutput {
+	matches := slices.Concat(lists...)
+	var teams []footballTeam
 	for _, m := range matches {
-		if len(out.Matches) == maxMatches {
-			return
-		}
-		if team != "" && !m.HomeTeam.is(team) && !m.AwayTeam.is(team) {
+		teams = append(teams, m.HomeTeam, m.AwayTeam)
+	}
+	filter := newTeamFilter(team, teams)
+	total := 0
+	for _, m := range matches {
+		if !filter.keeps(m.HomeTeam) && !filter.keeps(m.AwayTeam) {
 			continue
 		}
-		row := matchRow{
+		total++
+		if len(out.Matches) == maxMatches {
+			continue
+		}
+		out.Matches = append(out.Matches, matchRow{
 			Kickoff: m.UTCDate.In(a.location).Format("Mon 02 Jan 15:04"),
 			Home:    m.HomeTeam.label(),
 			Away:    m.AwayTeam.label(),
+			Score:   m.Score.text(m.finished()),
 			Status:  matchStatus(m.Status),
-		}
-		if home, away := m.Score.FullTime.Home, m.Score.FullTime.Away; home != nil && away != nil {
-			row.Score = fmt.Sprintf("%d-%d", *home, *away)
-		}
-		out.Matches = append(out.Matches, row)
+		})
 	}
-}
-
-func withMatchNote(out matchesOutput, team string) matchesOutput {
-	if len(out.Matches) == 0 && team != "" {
+	switch {
+	case total == 0 && team != "":
 		out.Note = fmt.Sprintf("%s has no match in this list; check the team's name or the competition", team)
+	case total > len(out.Matches):
+		out.Note = fmt.Sprintf("showing %d of %d matches; name a team for the rest", len(out.Matches), total)
 	}
 	return out
 }

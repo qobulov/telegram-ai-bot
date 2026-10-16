@@ -1,0 +1,88 @@
+{
+ "filters": {
+  "season": "2024",
+  "matchday": "5"
+ },
+ "resultSet": {
+  "count": 4,
+  "first": "2024-07-05",
+  "last": "2024-07-06",
+  "played": 4
+ },
+ "competition": {
+  "id": 2018,
+  "name": "European Championship",
+  "code": "EC",
+  "type": "CUP"
+ },
+ "matches": [
+  {
+   "id": 1,
+   "utcDate": "2024-07-05T16:00:00Z",
+   "status": "FINISHED",
+   "matchday": 5,
+   "stage": "QUARTER_FINALS",
+   "homeTeam": {"id": 760, "name": "Spain", "shortName": "Spain", "tla": "ESP"},
+   "awayTeam": {"id": 759, "name": "Germany", "shortName": "Germany", "tla": "GER"},
+   "score": {
+    "winner": "HOME_TEAM",
+    "duration": "EXTRA_TIME",
+    "fullTime": {"home": 2, "away": 1},
+    "halfTime": {"home": 0, "away": 0},
+    "regularTime": {"home": 1, "away": 1},
+    "extraTime": {"home": 1, "away": 0}
+   }
+  },
+  {
+   "id": 2,
+   "utcDate": "2024-07-05T19:00:00Z",
+   "status": "FINISHED",
+   "matchday": 5,
+   "stage": "QUARTER_FINALS",
+   "homeTeam": {"id": 765, "name": "Portugal", "shortName": "Portugal", "tla": "POR"},
+   "awayTeam": {"id": 773, "name": "France", "shortName": "France", "tla": "FRA"},
+   "score": {
+    "winner": "AWAY_TEAM",
+    "duration": "PENALTY_SHOOTOUT",
+    "fullTime": {"home": 3, "away": 5},
+    "halfTime": {"home": 0, "away": 0},
+    "regularTime": {"home": 0, "away": 0},
+    "extraTime": {"home": 0, "away": 0},
+    "penalties": {"home": 3, "away": 5}
+   }
+  },
+  {
+   "id": 3,
+   "utcDate": "2024-07-06T16:00:00Z",
+   "status": "FINISHED",
+   "matchday": 5,
+   "stage": "QUARTER_FINALS",
+   "homeTeam": {"id": 770, "name": "England", "shortName": "England", "tla": "ENG"},
+   "awayTeam": {"id": 788, "name": "Switzerland", "shortName": "Switzerland", "tla": "SUI"},
+   "score": {
+    "winner": "HOME_TEAM",
+    "duration": "PENALTY_SHOOTOUT",
+    "fullTime": {"home": 6, "away": 4},
+    "halfTime": {"home": 0, "away": 0},
+    "regularTime": {"home": 1, "away": 1},
+    "extraTime": {"home": 0, "away": 0},
+    "penalties": {"home": 5, "away": 3}
+   }
+  },
+  {
+   "id": 4,
+   "utcDate": "2024-07-06T19:00:00Z",
+   "status": "FINISHED",
+   "matchday": 5,
+   "stage": "QUARTER_FINALS",
+   "homeTeam": {"id": 8601, "name": "Netherlands", "shortName": "Netherlands", "tla": "NED"},
+   "awayTeam": {"id": 803, "name": "Turkey", "shortName": "Türkiye", "tla": "TUR"},
+   "score": {
+    "winner": "HOME_TEAM",
+    "duration": "REGULAR",
+    "fullTime": {"home": 2, "away": 1},
+    "halfTime": {"home": 0, "away": 1}
+   }
+  }
+ ]
+}

@@ -1,6 +1,7 @@
 package webapi
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -17,7 +18,7 @@ type footballResult struct {
 		GD     int    `json:"gd"`
 	} `json:"rows"`
 	Matches []struct {
-		Kickoff string `json:"kickoff"`
+		Kickoff string `json:"kickoff_tashkent"`
 		Home    string `json:"home"`
 		Away    string `json:"away"`
 		Score   string `json:"score"`
@@ -38,17 +39,22 @@ const (
 	plTablePath   = plPath + "/standings"
 	plMatchesPath = plPath + "/matches"
 	clPath        = "/football/v4/competitions/CL"
+	ecPath        = "/football/v4/competitions/EC"
 )
 
 func footballRoutes(t *testing.T) map[string]stub {
 	return map[string]stub{
-		plPath:                                   ok(fixture(t, "football_competition_pl.json")),
-		plTablePath:                              ok(fixture(t, "football_standings_pl.json")),
-		plMatchesPath + "?matchday=7":            ok(fixture(t, "football_matches_pl_7.json")),
-		plMatchesPath + "?matchday=8":            ok(fixture(t, "football_matches_pl_8.json")),
-		plPath + "/scorers":                      ok(fixture(t, "football_scorers_pl.json")),
-		clPath:                                   ok(fixture(t, "football_competition_cl.json")),
-		clPath + "/matches?status=SCHEDULED":     ok(fixture(t, "football_matches_cl_scheduled.json")),
+		plPath:                        ok(fixture(t, "football_competition_pl.json")),
+		plTablePath:                   ok(fixture(t, "football_standings_pl.json")),
+		plMatchesPath + "?matchday=7": ok(fixture(t, "football_matches_pl_7.json")),
+		plMatchesPath + "?matchday=8": ok(fixture(t, "football_matches_pl_8.json")),
+		plPath + "/scorers":           ok(fixture(t, "football_scorers_pl.json")),
+		clPath:                        ok(fixture(t, "football_competition_cl.json")),
+		clPath + "/matches?status=SCHEDULED,TIMED": ok(fixture(t, "football_matches_cl_scheduled.json")),
+		// Hand-made from the v4 documentation of extra time and shootouts
+		// (no key to capture a live one): Euro 2024's quarter-finals.
+		ecPath:                                   ok(fixture(t, "football_competition_ec.json")),
+		ecPath + "/matches?matchday=5":           ok(fixture(t, "football_matches_ec_5.json")),
 		"/football/v4/competitions/PD/standings": {status: http.StatusForbidden, body: fixture(t, "football_403.json")},
 	}
 }
@@ -123,10 +129,55 @@ func TestFootball(t *testing.T) {
 			},
 		},
 		{
-			name: "a cup between matchdays lists scheduled matches",
+			name: "a cup between matchdays lists scheduled and timed matches",
 			args: `{"action":"matches","competition":"Chempionlar ligasi"}`,
+			check: func(t *testing.T, r footballResult, u *upstream) {
+				if r.Competition != "UEFA Champions League" || len(r.Matches) != 14 || r.Matches[0].Home != "Real Madrid" || r.Matches[0].Kickoff != "Wed 21 Oct 21:45" || r.Note != "" {
+					t.Errorf("result = %+v", r)
+				}
+				if got := u.requests(clPath + "/matches")[0].URL.Query().Get("status"); got != "SCHEDULED,TIMED" {
+					t.Errorf("status = %q", got)
+				}
+			},
+		},
+		{
+			name: "extra time and penalty shootouts",
+			args: `{"action":"matches","competition":"Euro"}`,
 			check: func(t *testing.T, r footballResult, _ *upstream) {
-				if r.Competition != "UEFA Champions League" || len(r.Matches) != 12 || r.Matches[0].Home != "Real Madrid" || r.Matches[0].Kickoff != "Wed 21 Oct 21:45" {
+				want := []string{"2-1 (aet)", "0-0 (pen 3-5)", "1-1 (pen 5-3)", "2-1"}
+				if len(r.Matches) != len(want) {
+					t.Fatalf("matches = %+v", r.Matches)
+				}
+				for i, score := range want {
+					if r.Matches[i].Score != score || r.Matches[i].Status != "finished" {
+						t.Errorf("match %d = %+v, want score %q", i, r.Matches[i], score)
+					}
+				}
+			},
+		},
+		{
+			name: "Milan is not Inter",
+			args: `{"action":"matches","competition":"CL","team":"Милан"}`,
+			check: func(t *testing.T, r footballResult, _ *upstream) {
+				if len(r.Matches) != 1 || r.Matches[0].Home != "Milan" {
+					t.Errorf("matches = %+v", r.Matches)
+				}
+			},
+		},
+		{
+			name: "part of a name is enough when nothing matches better",
+			args: `{"action":"matches","competition":"CL","team":"Leverk"}`,
+			check: func(t *testing.T, r footballResult, _ *upstream) {
+				if len(r.Matches) != 1 || r.Matches[0].Away != "Leverkusen" {
+					t.Errorf("matches = %+v", r.Matches)
+				}
+			},
+		},
+		{
+			name: "a team that is not in the table",
+			args: `{"action":"table","team":"Pakhtakor"}`,
+			check: func(t *testing.T, r footballResult, _ *upstream) {
+				if len(r.Rows) != 10 || !strings.Contains(r.Note, "Pakhtakor is not in this table") {
 					t.Errorf("result = %+v", r)
 				}
 			},
@@ -224,5 +275,73 @@ func TestFootballNeedsAToken(t *testing.T) {
 	opts.FootballToken = "fd-secret"
 	if names := toolNames(Tools(opts)); !strings.Contains(names, "football") {
 		t.Errorf("tools with a token = %s", names)
+	}
+}
+
+// matchday is an answer with n timed matches between made-up teams.
+func matchday(n int) string {
+	var matches []string
+	for i := range n {
+		matches = append(matches, fmt.Sprintf(`{"utcDate":"2026-10-21T19:00:00Z","status":"TIMED","homeTeam":{"name":"Home %d FC","shortName":"Home %d"},"awayTeam":{"name":"Away %d FC","shortName":"Away %d"},"score":{"duration":"REGULAR","fullTime":{"home":null,"away":null}}}`, i, i, i, i))
+	}
+	return `{"competition":{"name":"UEFA Champions League"},"matches":[` + strings.Join(matches, ",") + `]}`
+}
+
+func TestFootballShowsAWholeMatchdayOrSaysWhatIsLeftOut(t *testing.T) {
+	tests := []struct {
+		matches, shown int
+		note           string
+	}{
+		{matches: 18, shown: 18},
+		{matches: 24, shown: 24},
+		{matches: 30, shown: 24, note: "showing 24 of 30 matches"},
+	}
+	for _, test := range tests {
+		routes := footballRoutes(t)
+		routes[clPath+"/matches?status=SCHEDULED,TIMED"] = ok(matchday(test.matches))
+		env := run(t, footballOptions(newUpstream(t, routes)), "football", `{"action":"matches","competition":"CL"}`)
+
+		wantFits(t, env, registryLimit)
+		r := result[footballResult](t, env)
+		if len(r.Matches) != test.shown || (test.note == "") != (r.Note == "") || !strings.Contains(r.Note, test.note) {
+			t.Errorf("%d matches: %d shown, note %q", test.matches, len(r.Matches), r.Note)
+		}
+	}
+}
+
+func TestTeamFilterPrefersTheClosestMatch(t *testing.T) {
+	teams := []footballTeam{
+		{Name: "Niger", TLA: "NIG"}, {Name: "Nigeria", TLA: "NGA"},
+		{Name: "Guinea", TLA: "GUI"}, {Name: "Equatorial Guinea", TLA: "EQG"},
+		{Name: "South Sudan", TLA: "SSD"}, {Name: "Sudan", TLA: "SDN"},
+		{Name: "AC Milan", ShortName: "Milan", TLA: "MIL"}, {Name: "FC Internazionale Milano", ShortName: "Inter", TLA: "INT"},
+		{Name: "FC Barcelona", ShortName: "Barça", TLA: "FCB"}, {Name: "FC Bayern München", ShortName: "Bayern", TLA: "FCB"},
+	}
+	tests := []struct {
+		team string
+		want []string
+	}{
+		{team: "Niger", want: []string{"Niger"}},
+		{team: "nigeria", want: []string{"Nigeria"}},
+		{team: "Guinea", want: []string{"Guinea"}},
+		{team: "Sudan", want: []string{"Sudan"}},
+		{team: "south sudan", want: []string{"South Sudan"}},
+		{team: "milan", want: []string{"AC Milan"}},
+		{team: "barsa", want: []string{"FC Barcelona"}},
+		{team: "Bayern Munchen", want: []string{"FC Bayern München"}},
+		{team: "internaz", want: []string{"FC Internazionale Milano"}},
+		{team: "Pakhtakor"},
+	}
+	for _, test := range tests {
+		filter := newTeamFilter(test.team, teams)
+		var got []string
+		for _, team := range teams {
+			if filter.names(team) {
+				got = append(got, team.Name)
+			}
+		}
+		if strings.Join(got, ",") != strings.Join(test.want, ",") || filter.found() != (len(test.want) > 0) {
+			t.Errorf("%q names %v, want %v", test.team, got, test.want)
+		}
 	}
 }

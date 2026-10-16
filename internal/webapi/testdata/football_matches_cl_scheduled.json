@@ -2,7 +2,8 @@
  "filters": {
   "season": "2026",
   "status": [
-   "SCHEDULED"
+   "SCHEDULED",
+   "TIMED"
   ]
  },
  "resultSet": {
