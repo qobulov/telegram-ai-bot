@@ -411,8 +411,8 @@ func (c *Client) RestrictChatMember(ctx context.Context, r Restriction) error {
 	return c.call(ctx, "restrictChatMember", params, nil)
 }
 
-// BanChatMember removes a member from a group for good: they cannot come
-// back until unbanned.
+// BanChatMember removes a member from a group. In a supergroup they cannot
+// rejoin until unbanned; in a basic group an invite link still lets them back.
 func (c *Client) BanChatMember(ctx context.Context, chatID, userID int64) error {
 	return c.call(ctx, "banChatMember", chatMemberParams{ChatID: chatID, UserID: userID}, nil)
 }

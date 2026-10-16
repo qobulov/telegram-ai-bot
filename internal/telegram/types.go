@@ -4,6 +4,7 @@ package telegram
 
 import (
 	"fmt"
+	"slices"
 	"time"
 )
 
@@ -205,54 +206,53 @@ const (
 	RightManageTopics    = "can_manage_topics"
 )
 
-// adminRights is every right, in the order Rights reports them.
-var adminRights = []string{
-	RightDeleteMessages, RightRestrictMembers, RightPinMessages, RightPromoteMembers,
-	RightChangeInfo, RightInviteUsers, RightManageTopics,
+// adminRight ties a right's Bot API name to the field that holds it.
+type adminRight struct {
+	name string
+	held func(ChatMember) bool
+}
+
+// adminRights is every right, in the order Rights reports them. Has and
+// Rights both read this one table, so a new right is added in one place.
+var adminRights = []adminRight{
+	{RightDeleteMessages, func(m ChatMember) bool { return m.CanDeleteMessages }},
+	{RightRestrictMembers, func(m ChatMember) bool { return m.CanRestrictMembers }},
+	{RightPinMessages, func(m ChatMember) bool { return m.CanPinMessages }},
+	{RightPromoteMembers, func(m ChatMember) bool { return m.CanPromoteMembers }},
+	{RightChangeInfo, func(m ChatMember) bool { return m.CanChangeInfo }},
+	{RightInviteUsers, func(m ChatMember) bool { return m.CanInviteUsers }},
+	{RightManageTopics, func(m ChatMember) bool { return m.CanManageTopics }},
 }
 
 // Has reports whether the member holds an admin right. Anyone who is not
-// the creator or an administrator holds none.
-func (m ChatMember) Has(right string) bool {
-	held, known := m.right(right)
-	switch m.Status {
-	case "creator":
-		return known
-	case "administrator":
-		return held
-	}
-	return false
+// the creator or an administrator holds none, and nobody holds a right
+// that is not in adminRights.
+func (m ChatMember) Has(name string) bool {
+	i := slices.IndexFunc(adminRights, func(r adminRight) bool { return r.name == name })
+	return i >= 0 && m.holds(adminRights[i])
 }
 
 // Rights lists the admin rights the member holds; nil when they hold none.
 func (m ChatMember) Rights() []string {
 	var rights []string
-	for _, right := range adminRights {
-		if m.Has(right) {
-			rights = append(rights, right)
+	for _, r := range adminRights {
+		if m.holds(r) {
+			rights = append(rights, r.name)
 		}
 	}
 	return rights
 }
 
-func (m ChatMember) right(name string) (held, known bool) {
-	switch name {
-	case RightDeleteMessages:
-		return m.CanDeleteMessages, true
-	case RightRestrictMembers:
-		return m.CanRestrictMembers, true
-	case RightPinMessages:
-		return m.CanPinMessages, true
-	case RightPromoteMembers:
-		return m.CanPromoteMembers, true
-	case RightChangeInfo:
-		return m.CanChangeInfo, true
-	case RightInviteUsers:
-		return m.CanInviteUsers, true
-	case RightManageTopics:
-		return m.CanManageTopics, true
+// holds applies the status rule: a creator holds every right whatever the
+// fields say, an administrator the ones granted, anyone else none.
+func (m ChatMember) holds(r adminRight) bool {
+	switch m.Status {
+	case "creator":
+		return true
+	case "administrator":
+		return r.held(m)
 	}
-	return false, false
+	return false
 }
 
 // IsMember reports whether the user is still in the chat.

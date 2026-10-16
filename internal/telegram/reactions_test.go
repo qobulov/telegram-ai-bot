@@ -20,8 +20,8 @@ func TestReactionEmojiList(t *testing.T) {
 		want  bool
 	}{
 		{"fire", "🔥", true},
-		{"heart on fire, a joined sequence", "❤‍\U0001F525", true},
-		{"technologist, a joined sequence", "\U0001F468‍\U0001F4BB", true},
+		{"heart on fire, a joined sequence", "❤\u200d\U0001F525", true},
+		{"technologist, a joined sequence", "\U0001F468\u200d\U0001F4BB", true},
 		{"slightly smiling face is not allowed", "🙂", false},
 		{"empty", "", false},
 		{"two emoji", "🔥🔥", false},
