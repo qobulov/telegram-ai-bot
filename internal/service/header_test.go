@@ -40,16 +40,17 @@ func withRights(f *fixture, rights BotRightsSource) {
 }
 
 // inDevs is a message in a group whose title would break the header's
-// line, and fake a marker, if it were not folded.
+// line, fake a marker, and close the header's quote around it, if it were
+// not folded.
 func inDevs(text string) telegram.Update {
 	msg := groupMessage(text)
-	msg.Chat.Title = "Devs\n[Uz]"
+	msg.Chat.Title = "Devs\n[Uz] \"Core\""
 	return inGroup(msg)
 }
 
 // groupHeader is the header copy with rightsLine in the middle.
 func groupHeader(rightsLine string) string {
-	return `[About this chat: the group "Devs (Uz)". Now: ` + headerDate + ".\n" +
+	return `[About this chat: the group "Devs (Uz) 'Core'". Now: ` + headerDate + ".\n" +
 		rightsLine + "\n" +
 		"You can reply here, react with one emoji, and use your tools. You cannot see read receipts, who is online, the member list, other chats or private chats, open links, join groups, or remember anything older than the messages below unless a rule says so.]"
 }

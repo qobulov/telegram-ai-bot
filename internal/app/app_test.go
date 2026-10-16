@@ -116,6 +116,7 @@ func startWebhook(t *testing.T) *hookEnv {
 	if err := store.SetMuted(ctx, hookGroup, false, hookUser); err != nil {
 		t.Fatal(err)
 	}
+	forgetBotRights(t, databaseURL)
 
 	env.hook, err = NewWebhook(ctx, env.config(t), slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
@@ -123,6 +124,22 @@ func startWebhook(t *testing.T) *hookEnv {
 	}
 	t.Cleanup(env.hook.Close)
 	return env
+}
+
+// forgetBotRights clears the test group's stored rights. Rights stored by an
+// earlier run would be used as they are, and the fallback to Telegram would
+// then go untested.
+func forgetBotRights(t *testing.T, databaseURL string) {
+	t.Helper()
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(ctx)
+	if _, err := conn.Exec(ctx, `UPDATE groups SET bot_status = NULL, bot_rights = NULL WHERE chat_id = $1`, hookGroup); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func (env *hookEnv) config(t *testing.T) config.Config {

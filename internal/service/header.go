@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"strings"
+	"time"
 
 	"telegram-ai-bot/internal/telegram"
 )
@@ -24,6 +25,10 @@ const (
 	groupAbilities = "You can reply here, react with one emoji, and use your tools. You cannot see read receipts, who is online, the member list, other chats or private chats, open links, join groups, or remember anything older than the messages below unless a rule says so."
 	rightsUnknown  = "Your admin rights here are unknown."
 	notAnAdmin     = "You are not an admin here."
+	// rightsLookupTimeout bounds learning the bot's rights, which may mean
+	// asking Telegram. Past it the header says they are unknown rather than
+	// hold up the answer.
+	rightsLookupTimeout = 5 * time.Second
 )
 
 // chatHeader is the first part of a turn's context: where the model is, the
@@ -35,9 +40,18 @@ func (s *Service) chatHeader(ctx context.Context, in incoming) string {
 	if !in.group {
 		return "[" + date + "]"
 	}
-	return `[About this chat: the group "` + oneLine(in.msg.Chat.Title) + `". ` + date + "\n" +
+	return `[About this chat: the group "` + headerTitle(in.msg.Chat.Title) + `". ` + date + "\n" +
 		s.rightsLine(ctx, in.scope.ChatID) + "\n" +
 		groupAbilities + "]"
+}
+
+// headerTitle folds a group's title onto the header's first line, inside its
+// double quotes. Admins, and members where the group allows it, can rename a
+// group: a double quote in the title would close the quote and let the rest
+// pass for the header's own words, such as admin rights the bot does not
+// hold. So double quotes become single ones.
+func headerTitle(title string) string {
+	return strings.ReplaceAll(oneLine(title), `"`, "'")
 }
 
 // rightsLine says which admin rights the bot holds in the group. When they
@@ -47,7 +61,7 @@ func (s *Service) rightsLine(ctx context.Context, chatID int64) string {
 	if s.opts.BotRights == nil {
 		return rightsUnknown
 	}
-	ctx, cancel := context.WithTimeout(ctx, muteLookupTimeout)
+	ctx, cancel := context.WithTimeout(ctx, rightsLookupTimeout)
 	defer cancel()
 	rights, err := s.opts.BotRights.BotRights(ctx, chatID)
 	if err != nil {

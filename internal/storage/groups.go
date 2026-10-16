@@ -127,7 +127,10 @@ func (s *Store) BotRights(ctx context.Context, chatID int64) (rights []string, k
 
 // SetBotRights stores what Telegram answered when asked about the bot in a
 // group. Unlike RecordGroup it is not a membership change, so it leaves the
-// group's name and last-seen time alone.
+// group's name and last-seen time alone. The last writer wins: the caller has
+// just asked Telegram, and its answer must be able to correct rights already
+// stored. An answer that loses a race with a newer my_chat_member update
+// leaves older rights until the next answer or membership change.
 func (s *Store) SetBotRights(ctx context.Context, chatID int64, status string, rights []string) error {
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO groups (chat_id, bot_status, bot_rights) VALUES ($1, $2, $3)

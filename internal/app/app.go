@@ -80,8 +80,8 @@ func (m groupMembers) IsGroupAdmin(ctx context.Context, chatID, userID int64) (b
 }
 
 // Membership asks Telegram about the bot in a group, for the owners'
-// bot_database tool: its status, and for a group it is in, the member count
-// and current title.
+// bot_database tool: its status and admin rights, and for a group it is in,
+// the member count and current title.
 func (m groupMembers) Membership(ctx context.Context, chatID int64) (tools.Membership, error) {
 	me, err := m.client.GetChatMember(ctx, chatID, m.botID)
 	if err != nil {
