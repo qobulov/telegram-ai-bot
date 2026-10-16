@@ -715,7 +715,7 @@ check is made in code:
   otherwise, at most a week; supergroups only) or unmute them; ban them, or
   unban; pin the message without a notification, or unpin it.
 - **Confirmation:** the model only asks for an action; it never carries one
-  out. She posts her own fixed question, saying exactly what she will do
+  out. She posts her own fixed question, in Uzbek, saying exactly what she will do
   ("Confirm: mute Bek @bek for 30 minutes? Reply yes (ha, да) to this
   message within 5 minutes, or no to cancel."), and acts only when the same
   person replies to that question with a plain yes (`ha`, `да`, `yes`,

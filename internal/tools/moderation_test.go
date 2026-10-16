@@ -439,15 +439,14 @@ func TestModerateDoesNothingUntilTheRequesterConfirms(t *testing.T) {
 	// says exactly what will be done; the model's reason is not in it.
 	questions, promptID := env.telegram.asked()
 	wantQuestion := telegram.Outgoing{ChatID: groupA, ReplyToMessageID: 50,
-		Text: "Tasdiqlaysizmi: Bek @bek 7 kunga ovozsiz qilinsinmi? Shu xabarga «ha» deb javob bering (5 daqiqa ichida), yo'q bo'lsa «yo'q».\n" +
-			"Подтвердите: заглушить Bek @bek на 7 дней? Ответьте «да» на это сообщение (в течение 5 минут), иначе «нет»."}
+		Text: "Tasdiqlaysizmi: Bek @bek 7 kunga ovozsiz qilinsinmi? Shu xabarga «ha» deb javob bering (5 daqiqa ichida), yo'q bo'lsa «yo'q»."}
 	if len(questions) != 1 || questions[0] != wantQuestion {
 		t.Fatalf("questions = %+v\nwant [%+v]", questions, wantQuestion)
 	}
 
 	c := env.confirm(t, 101, promptID, true)
 
-	if want := (Confirmation{Found: true, Text: "Bajarildi: Bek @bek 23.10 15:04 gacha yoza olmaydi.\nГотово: Bek @bek не может писать до 23.10 15:04."}); c != want {
+	if want := (Confirmation{Found: true, Text: "Bajarildi: Bek @bek 23.10 15:04 gacha yoza olmaydi."}); c != want {
 		t.Errorf("confirmation = %+v, want %+v", c, want)
 	}
 	restrictions := env.telegram.restricted()
@@ -505,10 +504,10 @@ func TestModerateActions(t *testing.T) {
 			got := env.done(t, asking(100, bekTarget()), `{"action":"`+c.action+`"}`)
 
 			questions, _ := env.telegram.asked()
-			if q := questions[0].Text; !strings.HasPrefix(q, "Tasdiqlaysizmi: "+c.question[0]+"? ") || !strings.Contains(q, "\nПодтвердите: "+c.question[1]+"? ") {
+			if q := questions[0].Text; !strings.HasPrefix(q, "Tasdiqlaysizmi: "+c.question[0]+"? ") || strings.Contains(q, "\n") {
 				t.Errorf("question = %q, want it to ask %q", q, c.question)
 			}
-			if done := c.done[0] + "\n" + c.done[1]; got != (Confirmation{Found: true, Text: done}) {
+			if done := c.done[0]; got != (Confirmation{Found: true, Text: done}) {
 				t.Errorf("confirmation = %+v, want %q", got, done)
 			}
 			if calls := env.telegram.made(); len(calls) != 1 || calls[0] != c.call {
@@ -545,7 +544,7 @@ func TestModerateConfirmationIsTheRequestersReplyToTheQuestion(t *testing.T) {
 	}
 	env.nothingActed(t)
 
-	if c := env.confirm(t, 103, promptID, true); c.Text != "Bajarildi: Bek @bek bloklandi.\nГотово: Bek @bek забанен(а)." {
+	if c := env.confirm(t, 103, promptID, true); c.Text != "Bajarildi: Bek @bek bloklandi." {
 		t.Fatalf("the requester's yes = %+v", c)
 	}
 	// It is used up: the same question confirms nothing more.
@@ -561,7 +560,7 @@ func TestModerateNoCancels(t *testing.T) {
 	env := newModerationEnv(t)
 	promptID := env.ask(t, asking(100, bekTarget()), `{"action":"ban"}`)
 
-	if c := env.confirm(t, 101, promptID, false); c != (Confirmation{Found: true, Text: "Bekor qilindi: hech narsa qilinmadi.\nОтменено: ничего не сделано."}) {
+	if c := env.confirm(t, 101, promptID, false); c != (Confirmation{Found: true, Text: "Bekor qilindi: hech narsa qilinmadi."}) {
 		t.Errorf("no = %+v", c)
 	}
 	if c := env.confirm(t, 102, promptID, true); c.Found {
@@ -594,7 +593,7 @@ func TestModerateLaterRequestReplacesTheQuestion(t *testing.T) {
 	if c := env.confirm(t, 102, first, true); c.Found {
 		t.Errorf("a yes to the replaced question = %+v", c)
 	}
-	if c := env.confirm(t, 103, second, true); c.Text != "Bajarildi: Bek @bek 16:04 gacha yoza olmaydi.\nГотово: Bek @bek не может писать до 16:04." {
+	if c := env.confirm(t, 103, second, true); c.Text != "Bajarildi: Bek @bek 16:04 gacha yoza olmaydi." {
 		t.Errorf("a yes to the latest question = %+v", c)
 	}
 	if calls := env.telegram.made(); len(calls) != 1 || !strings.HasPrefix(calls[0], "restrictChatMember") {
@@ -816,19 +815,15 @@ func TestModerateConfirmationRechecksRights(t *testing.T) {
 		change func(env *moderationEnv)
 		text   string
 	}{
-		"the person asking lost the right": {func(env *moderationEnv) { env.chat.set(userID, admin(telegram.RightDeleteMessages)) }, "Bajarilmadi: buni faqat guruhning a'zolarni bloklash va ovozsiz qilish huquqi bor adminlari yoki egalarim so'ray oladi; so'ragan odam ulardan emas.\n" +
-			"Не выполнено: об этом могут просить только админы группы с правом банить и заглушать участников или мои владельцы; тот, кто просит, к ним не относится."},
-		"the bot lost the right": {func(env *moderationEnv) { env.chat.set(rulesBotID, admin(telegram.RightPinMessages)) }, "Bajarilmadi: menda bu guruhda a'zolarni bloklash va ovozsiz qilish huquqi yo'q; uni adminlar bera oladi.\n" +
-			"Не выполнено: у меня нет права банить и заглушать участников в этой группе; его могут дать админы."},
-		"the member became an admin": {func(env *moderationEnv) { env.chat.set(memberID, admin()) }, "Bajarilmadi: buni adminlarga, egalarimga, o'zimga, Telegram xizmat akkauntlariga yoki so'ragan odamning o'ziga qila olmayman.\n" +
-			"Не выполнено: я не могу сделать это с админами, моими владельцами, собой, служебными аккаунтами Telegram или с тем, кто просит."},
-		"Telegram cannot say": {func(env *moderationEnv) { env.chat.failing[memberID] = true }, "Bajarilmadi: Telegram'dan kim nima qila olishini bilib bo'lmadi; keyinroq urinib ko'ring.\n" +
-			"Не выполнено: не удалось узнать у Telegram, кто что может; попробуйте позже."},
+		"the person asking lost the right": {func(env *moderationEnv) { env.chat.set(userID, admin(telegram.RightDeleteMessages)) }, "Bajarilmadi: buni faqat guruhning a'zolarni bloklash va ovozsiz qilish huquqi bor adminlari yoki egalarim so'ray oladi; so'ragan odam ulardan emas."},
+		"the bot lost the right":           {func(env *moderationEnv) { env.chat.set(rulesBotID, admin(telegram.RightPinMessages)) }, "Bajarilmadi: menda bu guruhda a'zolarni bloklash va ovozsiz qilish huquqi yo'q; uni adminlar bera oladi."},
+		"the member became an admin":       {func(env *moderationEnv) { env.chat.set(memberID, admin()) }, "Bajarilmadi: buni adminlarga, egalarimga, o'zimga, Telegram xizmat akkauntlariga yoki so'ragan odamning o'ziga qila olmayman."},
+		"Telegram cannot say":              {func(env *moderationEnv) { env.chat.failing[memberID] = true }, "Bajarilmadi: Telegram'dan kim nima qila olishini bilib bo'lmadi; keyinroq urinib ko'ring."},
 		"the person asking did 10 actions": {func(env *moderationEnv) {
 			for i := range 10 {
 				_, _ = env.audit.RecordModeration(context.Background(), storage.ModerationAction{ChatID: groupA, Action: "delete", RequesterID: userID, UpdateID: int64(i + 1)})
 			}
-		}, "Bajarilmadi: 10 daqiqada 10 ta amal bo'ldi; biroz kuting.\nНе выполнено: это уже 10 действий за 10 минут; подождите немного."},
+		}, "Bajarilmadi: 10 daqiqada 10 ta amal bo'ldi; biroz kuting."},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -855,7 +850,7 @@ func TestModerateConfirmationTellsNothingOfTheStore(t *testing.T) {
 
 	c, err := env.moderation.Confirm(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: 101}, promptID, true)
 
-	if c != (Confirmation{Found: true, Text: "Bajarilmadi: men tomonda nimadir buzildi; keyinroq yana so'rang.\nНе выполнено: у меня что-то сломалось; попросите позже."}) {
+	if c != (Confirmation{Found: true, Text: "Bajarilmadi: men tomonda nimadir buzildi; keyinroq yana so'rang."}) {
 		t.Errorf("confirmation = %+v", c)
 	}
 	if err == nil || !strings.Contains(err.Error(), "maria_prod") {
@@ -920,10 +915,8 @@ func TestModerateQuestionThatCannotBePostedLeavesNothingWaiting(t *testing.T) {
 
 func TestModerateTelegramErrorIsReported(t *testing.T) {
 	const (
-		noAnswer = "Bajarilmadi: Telegram javob bermadi, bajarilmagan bo'lishi mumkin; keyinroq urinib ko'ring.\n" +
-			"Не выполнено: Telegram не ответил, возможно, ничего не сделано; попробуйте позже."
-		refused = "Bajarilmadi: Telegram rad etdi: Bad Request: message can't be deleted.\n" +
-			"Не выполнено: Telegram отказал: Bad Request: message can't be deleted."
+		noAnswer = "Bajarilmadi: Telegram javob bermadi, bajarilmagan bo'lishi mumkin; keyinroq urinib ko'ring."
+		refused  = "Bajarilmadi: Telegram rad etdi: Bad Request: message can't be deleted."
 	)
 	failures := []struct {
 		err  error
@@ -973,7 +966,7 @@ func TestModerateReportsARecordItCannotDrop(t *testing.T) {
 	c, err := env.moderation.Confirm(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: 101}, promptID, true)
 
 	// The chat is told Telegram's reason only; the logs get the store's too.
-	if c != (Confirmation{Found: true, Text: "Bajarilmadi: Telegram rad etdi: Bad Request: message can't be deleted.\nНе выполнено: Telegram отказал: Bad Request: message can't be deleted."}) {
+	if c != (Confirmation{Found: true, Text: "Bajarilmadi: Telegram rad etdi: Bad Request: message can't be deleted."}) {
 		t.Errorf("confirmation = %+v", c)
 	}
 	if err == nil || !strings.Contains(err.Error(), "connection reset") {
@@ -1016,10 +1009,10 @@ func TestModerateMinutesClamped(t *testing.T) {
 			got := env.done(t, asking(100, bekTarget()), c.args)
 
 			questions, _ := env.telegram.asked()
-			if q := questions[0].Text; !strings.Contains(q, "Bek @bek "+c.duration[0]+"ga ovozsiz qilinsinmi?") || !strings.Contains(q, "заглушить Bek @bek на "+c.duration[1]+"?") {
+			if q := questions[0].Text; !strings.Contains(q, "Bek @bek "+c.duration[0]+"ga ovozsiz qilinsinmi?") || strings.Contains(q, "\n") {
 				t.Errorf("question = %q, want %q", q, c.duration)
 			}
-			if want := "Bajarildi: Bek @bek " + c.until + " gacha yoza olmaydi.\nГотово: Bek @bek не может писать до " + c.until + "."; got.Text != want {
+			if want := "Bajarildi: Bek @bek " + c.until + " gacha yoza olmaydi."; got.Text != want {
 				t.Errorf("confirmation = %+v, want %q", got, want)
 			}
 			wantUntil := rulesNow.Add(time.Duration(c.minutes) * time.Minute)

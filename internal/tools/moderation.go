@@ -65,10 +65,11 @@ const (
 )
 
 // chatText is something the bot says to a group in its own words, never the
-// model's: in Uzbek, then in Russian on the next line.
+// model's. Only the Uzbek is posted, as the owner asked for one language; the
+// Russian is kept for when a group needs it.
 type chatText struct{ uz, ru string }
 
-func (t chatText) String() string { return t.uz + "\n" + t.ru }
+func (t chatText) String() string { return t.uz }
 
 // What the chat is told when an action is not done: cancelledText when the
 // person said no, the others why not, in words that complete "Bajarilmadi:
