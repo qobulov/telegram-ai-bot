@@ -364,9 +364,9 @@ func TestOtherMediaGetsTheSupportedKindsReply(t *testing.T) {
 
 	sent := f.run(textFrom(userID, "")) // a location or contact: nothing the bot reads
 
-	expectOneReply(t, sent, textTextOnly)
-	if !strings.Contains(textTextOnly, "photo") || !strings.Contains(textTextOnly, "voice") {
-		t.Errorf("textTextOnly = %q; it should say what the bot can read", textTextOnly)
+	expectOneReply(t, sent, textTextOnly(true))
+	if text := textTextOnly(true); !strings.Contains(text, "photo") || !strings.Contains(text, "voice") {
+		t.Errorf("textTextOnly = %q; it should say what the bot can read", text)
 	}
 }
 

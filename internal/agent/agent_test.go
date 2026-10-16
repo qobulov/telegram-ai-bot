@@ -525,12 +525,12 @@ func TestReactAnswerIsSavedAsReaction(t *testing.T) {
 // the words are sent.
 func TestReactMarkerAmongWordsIsDropped(t *testing.T) {
 	cases := map[string]string{
-		"Zo'r! [react 🔥]":                  "Zo'r!",
-		"[react 😁] xaxa":                    "xaxa",
-		"Haha <reacted 🤣>":                  "Haha",
-		"Ha, <Reacted 👍> qoyil":             "Ha, qoyil",
+		"Zo'r! [react 🔥]":                    "Zo'r!",
+		"[react 😁] xaxa":                     "xaxa",
+		"Haha <reacted 🤣>":                   "Haha",
+		"Ha, <Reacted 👍> qoyil":              "Ha, qoyil",
 		"Birinchi qator [react 🔥]\nIkkinchi": "Birinchi qator\nIkkinchi",
-		"[reacted 🔥] ok":                    "ok",
+		"[reacted 🔥] ok":                     "ok",
 	}
 	for content, want := range cases {
 		f := newFixture(text(content))
