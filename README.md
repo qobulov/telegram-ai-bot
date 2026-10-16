@@ -763,8 +763,8 @@ cannot make one.
 
 ### Admins
 
-Anyone in a group can ask her who its admins are, who may moderate, or who
-the regular members are. The `group_admins` tool asks Telegram for the
+Anyone in a group can ask her who its admins are or who the regular members
+are. The `group_admins` tool asks Telegram for the
 group's creator and administrators (`getChatAdministrators`, which needs no
 admin right) and marks her own entry, her owners recognised by
 `BOT_OWNER_IDS`, and other bots. No bot can read a group's full member list,

@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -72,8 +71,8 @@ type adminsResult struct {
 func AdminsTool(opts AdminsOptions) Tool {
 	return Tool{
 		Name: "group_admins",
-		Description: "List this group's admins, as Telegram reports them now. Use it when someone asks who the admins are, who may moderate, or who the regular members are. " +
-			"Nobody can see the full member list: anyone not listed who wrote in the chat is a regular member.",
+		Description: "List this group's admins, as Telegram reports them now. Use it when someone asks who the admins are or who the regular members are. " +
+			"You cannot see the full member list: anyone not listed who wrote in the messages you were given is a regular member.",
 		Schema:         json.RawMessage(`{"type": "object", "properties": {}, "additionalProperties": false}`),
 		GroupOnly:      true,
 		MaxOutputBytes: adminsOutputBytes,
@@ -94,7 +93,7 @@ func listAdmins(ctx context.Context, opts AdminsOptions, raw json.RawMessage) (a
 	}
 	members, err := opts.Telegram.GetChatAdministrators(ctx, caller.ChatID)
 	if err != nil {
-		return nil, errors.New(adminsUnavailable)
+		return nil, &InternalError{Err: err, Message: adminsUnavailable}
 	}
 	return newAdminsResult(opts, members), nil
 }

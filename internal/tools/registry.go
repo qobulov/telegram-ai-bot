@@ -74,15 +74,21 @@ func (e *DeniedError) Error() string { return e.Message }
 // side.
 const internalFailure = "something went wrong on my side; try again later"
 
-// InternalError is a failure on the bot's own side, such as an unreachable
-// database. The model is told only internalFailure: the cause can name
-// hosts, users and databases, and the model may repeat what it is told in a
-// group. The registry logs the cause.
+// InternalError is a failure whose cause the model must not see, such as an
+// unreachable database. The model is told only Message, or internalFailure
+// when it is empty: the cause can name hosts, users and databases, and the
+// model may repeat what it is told in a group. The registry logs the cause.
 type InternalError struct {
-	Err error
+	Err     error
+	Message string
 }
 
-func (e *InternalError) Error() string { return internalFailure }
+func (e *InternalError) Error() string {
+	if e.Message != "" {
+		return e.Message
+	}
+	return internalFailure
+}
 
 func (e *InternalError) Unwrap() error { return e.Err }
 

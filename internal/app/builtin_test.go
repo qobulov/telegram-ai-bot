@@ -142,6 +142,9 @@ func TestGroupAdminsKnowsTheBotAndItsOwners(t *testing.T) {
 	}{
 		"owners by ID": {config.Config{Location: time.UTC, OwnerUsernames: []string{"pronium"}, OwnerIDs: map[int64]bool{9001: true}}, `,"owner":true`},
 		"no owners":    {config.Config{Location: time.UTC}, ""},
+		// A username can be given up and taken by someone else, so only an
+		// ID marks an owner.
+		"owners by username only": {config.Config{Location: time.UTC, OwnerUsernames: []string{"pronium"}}, ""},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

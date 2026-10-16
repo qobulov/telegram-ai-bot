@@ -1,10 +1,12 @@
 package tools
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"sync"
@@ -124,15 +126,15 @@ func TestAdminsHidesAnonymousAdmins(t *testing.T) {
 }
 
 // Telegram allows a supergroup 50 admins, but the list is bounded all the
-// same, and at Telegram's longest names and titles it still fits in the
-// result.
+// same, names and titles longer than Telegram's are cut, and the list still
+// fits in the result. '<' is escaped in JSON, so each takes 6 bytes.
 func TestAdminsListIsCut(t *testing.T) {
 	list := &fakeAdminList{}
 	for i := range 60 {
 		member := listedAdmin("administrator", telegram.User{
-			ID: int64(1000 + i), FirstName: strings.Repeat("<", 64), Username: fmt.Sprintf("%032d", i),
+			ID: int64(1000 + i), FirstName: strings.Repeat("<", 70), Username: fmt.Sprintf("%032d", i),
 		})
-		member.CustomTitle = strings.Repeat("<", 16)
+		member.CustomTitle = strings.Repeat("<", 20)
 		list.admins = append(list.admins, member)
 	}
 
@@ -144,6 +146,11 @@ func TestAdminsListIsCut(t *testing.T) {
 	}
 	if len(admins) != 50 || admins[49]["username"] != "@"+fmt.Sprintf("%032d", 49) {
 		t.Errorf("listed %d admins, the last %v; want the first 50", len(admins), admins[len(admins)-1])
+	}
+	for _, admin := range admins {
+		if admin["name"] != strings.Repeat("<", 64)+"…" || admin["title"] != strings.Repeat("<", 16)+"…" {
+			t.Fatalf("admin %v, want the name cut to 64 runes and the title to 16", admin)
+		}
 	}
 	if !strings.Contains(got.Note, "10 more admins") {
 		t.Errorf("note = %q, want it to say 10 admins were left out", got.Note)
@@ -192,19 +199,46 @@ func TestAdminsTakesNoArguments(t *testing.T) {
 	}
 }
 
+// The model gets a short message; the logs get Telegram's reason, so that a
+// timeout can be told from a refusal.
 func TestAdminsTelegramFailureIsShort(t *testing.T) {
-	for name, err := range map[string]error{
-		"no answer": errors.New("telegram getChatAdministrators: dial tcp 149.154.167.220:443: i/o timeout"),
-		"refused":   &telegram.APIError{Code: 400, Description: "Bad Request: chat not found"},
+	for name, tc := range map[string]struct {
+		err    error
+		logged string
+	}{
+		"no answer": {errors.New("telegram getChatAdministrators: dial tcp 149.154.167.220:443: i/o timeout"), "i/o timeout"},
+		"refused":   {&telegram.APIError{Code: 400, Description: "Bad Request: chat not found"}, "chat not found"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			list := &fakeAdminList{err: err}
+			list := &fakeAdminList{err: tc.err}
+			var logs bytes.Buffer
+			registry, err := NewRegistry(isAdmin, slog.New(slog.NewTextHandler(&logs, nil)),
+				AdminsTool(AdminsOptions{Telegram: list, BotID: rulesBotID}))
+			if err != nil {
+				t.Fatal(err)
+			}
 
-			got := askAdmins(adminsRegistry(t, list), memberAsking(groupA, 100), `{}`)
+			got := askAdmins(registry, memberAsking(groupA, 100), `{}`)
 
 			if got.OK || got.Error.Code != "execution_failed" || got.Error.Message != adminsUnavailable {
 				t.Errorf("group_admins = %+v, want only %q", got, adminsUnavailable)
 			}
+			if !strings.Contains(logs.String(), tc.logged) || !strings.Contains(logs.String(), "tool=group_admins") {
+				t.Errorf("logs = %q, want %q for group_admins", logs.String(), tc.logged)
+			}
 		})
+	}
+}
+
+// The list says nothing about rights, so the model must not use it to say
+// who may moderate; and only those who wrote in its messages are known to
+// be regular members.
+func TestAdminsDescription(t *testing.T) {
+	description := AdminsTool(AdminsOptions{}).Description
+	if strings.Contains(description, "moderate") {
+		t.Errorf("description = %q, want nothing about who may moderate", description)
+	}
+	if !strings.Contains(description, "anyone not listed who wrote in the messages you were given is a regular member") {
+		t.Errorf("description = %q, want regular members limited to the messages given", description)
 	}
 }
