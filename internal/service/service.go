@@ -158,6 +158,9 @@ type Options struct {
 	// without @. Owners' messages are marked for the model and owners may
 	// manage the bot in any group.
 	OwnerUsernames []string
+	// OwnerIDs, when not empty, replace OwnerUsernames in deciding who is an
+	// owner: only these Telegram user IDs are owners.
+	OwnerIDs map[int64]bool
 	// MutedChats are the groups where the bot starts muted.
 	MutedChats []int64
 	// MuteStore, when set, is asked about a group's mute state every time
@@ -515,10 +518,18 @@ func (s *Service) acceptsSender(msg *telegram.Message) bool {
 	return false
 }
 
-// isOwner reports whether the sender is the bot's owner. It compares the
-// Telegram username, which Telegram sets and nobody can type in.
+// isOwner reports whether the sender is the bot's owner. Both checks use what
+// Telegram sets and nobody can type in. With OwnerIDs it compares the account
+// ID, because a username can be given up and then taken by someone else;
+// without them it compares the username.
 func (s *Service) isOwner(user *telegram.User) bool {
-	if user == nil || user.Username == "" {
+	if user == nil {
+		return false
+	}
+	if len(s.opts.OwnerIDs) > 0 {
+		return s.opts.OwnerIDs[user.ID]
+	}
+	if user.Username == "" {
 		return false
 	}
 	for _, owner := range s.opts.OwnerUsernames {

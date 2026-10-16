@@ -697,6 +697,42 @@ func TestTwoOwners(t *testing.T) {
 	}
 }
 
+func TestLoadOwnerIDs(t *testing.T) {
+	env := validEnv()
+	env["BOT_OWNER_USERNAME"] = "pronium,TursunoffM"
+	cfg, err := Load(getenv(env))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.OwnerIDs) != 0 {
+		t.Errorf("OwnerIDs = %v, want none when BOT_OWNER_IDS is not set", cfg.OwnerIDs)
+	}
+
+	env["BOT_OWNER_IDS"] = "9001, 7001"
+	cfg, err = Load(getenv(env))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.OwnerIDs) != 2 || !cfg.OwnerIDs[9001] || !cfg.OwnerIDs[7001] {
+		t.Errorf("OwnerIDs = %v, want 9001 and 7001", cfg.OwnerIDs)
+	}
+
+	env["BOT_OWNER_IDS"] = "9001,pronium"
+	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "BOT_OWNER_IDS") {
+		t.Errorf("err = %v, want a username among the IDs rejected", err)
+	}
+}
+
+func TestOwnerIDsWithoutUsernamesRejected(t *testing.T) {
+	env := validEnv()
+	env["BOT_OWNER_IDS"] = "9001"
+	_, err := Load(getenv(env))
+	want := "BOT_OWNER_IDS needs BOT_OWNER_USERNAME, which names the owners in the persona"
+	if err == nil || !strings.Contains(err.Error(), want) {
+		t.Errorf("err = %v, want %q", err, want)
+	}
+}
+
 func TestOwnerNoteExplainsHowOwnersAreKnown(t *testing.T) {
 	env := validEnv()
 	env["BOT_OWNER_USERNAME"] = "pronium,TursunoffM"

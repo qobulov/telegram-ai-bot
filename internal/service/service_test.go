@@ -1848,6 +1848,43 @@ func TestSecondOwnerIsRecognised(t *testing.T) {
 	}
 }
 
+// A username can be given up and taken by someone else; an account's ID
+// cannot. Once IDs are configured, the username alone proves nothing.
+func TestOwnerIDsOverrideUsernames(t *testing.T) {
+	cases := map[string]struct {
+		from *telegram.User
+		want string
+	}{
+		"owner's username on an unlisted account": {
+			from: &telegram.User{ID: 9001, FirstName: "Azizbek", Username: "Pronium"},
+			want: "Azizbek @Pronium",
+		},
+		"listed account under another username": {
+			from: &telegram.User{ID: 7001, FirstName: "Azizbek", Username: "new_name"},
+			want: "Azizbek @new_name [owner]",
+		},
+		"listed account without a username": {
+			from: &telegram.User{ID: 7001, FirstName: "Azizbek"},
+			want: "Azizbek [owner]",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			f.opts.OwnerUsernames = []string{ownerUsername}
+			f.opts.OwnerIDs = map[int64]bool{7001: true}
+			msg := groupMessage("Mira, salom")
+			msg.From = tc.from
+
+			f.run(inGroup(msg))
+
+			if req := f.replier.recorded()[0].req; req.AuthorName != tc.want {
+				t.Errorf("author = %q, want %q", req.AuthorName, tc.want)
+			}
+		})
+	}
+}
+
 func TestUsernamesAreShownToTheModel(t *testing.T) {
 	f := newFixture()
 	msg := groupMessage("Mira, salom")

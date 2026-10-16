@@ -101,6 +101,11 @@ type Config struct {
 	// OwnerUsernames are the Telegram usernames of the bot's owners, lower
 	// case and without @. Empty when no owner is configured.
 	OwnerUsernames []string
+	// OwnerIDs are the owners' numeric Telegram user IDs. When any are set,
+	// only these accounts are owners and OwnerUsernames merely name them in
+	// the persona: a username can be given up and taken by someone else, an
+	// ID cannot.
+	OwnerIDs map[int64]bool
 
 	// AllowedBots are the usernames of other bots the bot answers in groups,
 	// lower case; "*" allows any bot. Empty answers no bots.
@@ -165,6 +170,10 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	cfg.Location = r.location("GROUP_HISTORY_TIMEZONE", "Asia/Tashkent")
 	cfg.OwnerUsernames = r.usernames("BOT_OWNER_USERNAME")
+	cfg.OwnerIDs = r.userIDs("BOT_OWNER_IDS")
+	if len(cfg.OwnerIDs) > 0 && len(cfg.OwnerUsernames) == 0 {
+		r.fail("BOT_OWNER_IDS", "needs BOT_OWNER_USERNAME, which names the owners in the persona")
+	}
 	cfg.AllowedBots = r.allowedBots("ALLOWED_BOTS")
 	cfg.BotRepliesPer10Min = r.integer("BOT_REPLIES_PER_10_MIN", 5, 0)
 	cfg.PersonaPrompt = strings.ReplaceAll(r.text("PERSONA_PROMPT", defaultPersona), namePlaceholder, cfg.BotDisplayName)
