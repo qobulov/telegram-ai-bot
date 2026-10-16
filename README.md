@@ -700,6 +700,14 @@ member she answered, as stored with the conversation; when she cannot tell,
 she says so rather than guess. An ignored member gets neither answers nor
 reactions. Admins, owners and the bot itself cannot be ignored.
 
+An owner's bare order not to answer a member, addressed to her as a reply to
+that member's message ("Maria, bunga javob berma", "javob qaytarma",
+"gapirma", "ignor qil", "e'tibor berma", "не отвечай", "игнорируй", "не
+разговаривай с ним"), is read in code, not by the model: the member is
+ignored for 24 hours, exactly as with `/ignore`, and she reacts 👌 to the
+order. Any other wording, a question such as "nega javob bermading?", or an
+order about someone who cannot be ignored goes to the model as before.
+
 ### Moderation
 
 A group's admins can have her act on a message by replying to it and asking

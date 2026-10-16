@@ -61,6 +61,10 @@ func (s *Service) process(in incoming) {
 	if s.confirmedModeration(ctx, in) {
 		return
 	}
+	// So is an owner's order not to answer a member.
+	if s.obeyedIgnoreOrder(ctx, in) {
+		return
+	}
 	rules := s.loadRules(ctx, in)
 	// An ignored member gets nothing, not even a reaction, and takes none of
 	// the group's quota. The managing commands still work for them if they
@@ -718,21 +722,29 @@ func (s *Service) ignore(ctx context.Context, in incoming) string {
 	if refusal := s.refuseUnignorable(ctx, in, member); refusal != "" {
 		return refusal
 	}
-	name := member.Name
+	if err := s.saveIgnore(ctx, in, member); err != nil {
+		return textError
+	}
+	return fmt.Sprintf(textIgnored, member.Name)
+}
+
+// saveIgnore stops the bot answering member in this group for
+// ignoreCommandFor, on the word of the sender of in.
+func (s *Service) saveIgnore(ctx context.Context, in incoming, member *tools.Target) error {
 	_, err := s.opts.Rules.SetGroupRule(ctx, storage.GroupRule{
 		ChatID:    in.scope.ChatID,
 		Kind:      storage.RuleIgnore,
 		UserID:    member.UserID,
-		UserName:  name,
+		UserName:  member.Name,
 		SetBy:     in.userID,
 		ExpiresAt: s.opts.Now().Add(ignoreCommandFor),
 	})
 	if err != nil {
 		s.opts.Logger.Error("ignore failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
-		return textError
+		return err
 	}
 	s.opts.Logger.Info("member ignored", "user_id", in.userID, "chat_id", in.scope.ChatID, "member_id", member.UserID)
-	return fmt.Sprintf(textIgnored, name)
+	return nil
 }
 
 // unignore answers again a member ignored in this group.
