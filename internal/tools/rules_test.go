@@ -120,6 +120,11 @@ func ownerReplying(chatID int64, target *Target) context.Context {
 	return WithTurn(context.Background(), Caller{UserID: userID, ChatID: chatID, Owner: true, Human: true, UpdateID: 1, MessageID: 30, Target: target}, &Sink{})
 }
 
+// ownerSaying is an owner's turn in chatID whose own message is words.
+func ownerSaying(chatID int64, words string) context.Context {
+	return WithTurn(context.Background(), Caller{UserID: userID, ChatID: chatID, Owner: true, Human: true, UpdateID: 1, MessageID: 30, Words: words}, &Sink{})
+}
+
 func bekTarget() *Target {
 	return &Target{MessageID: 29, UserID: memberID, Name: "Bek @bek", Text: "you're slow"}
 }
@@ -306,7 +311,7 @@ func TestSetAddressIsGlobal(t *testing.T) {
 func TestRulesToolKeepsInstructions(t *testing.T) {
 	store := &fakeRules{}
 	registry := rulesRegistry(t, store, fakeAdmins{})
-	owner := ownerReplying(groupA, nil)
+	owner := ownerSaying(groupA, "Mira, do not talk about finance, and call Bek ‘professor’ from now on")
 
 	env := rules(registry, owner, `{"action":"add_instruction","text":" Do not talk about finance. "}`)
 	if !env.OK || string(env.Result) != `{"id":1,"saved":true,"until":"23 Oct 15:04"}` {
@@ -342,11 +347,38 @@ func TestRulesToolKeepsInstructions(t *testing.T) {
 	}
 }
 
+// An instruction lasts days and is shown as the owners' order, so it must
+// be words an owner wrote in this message, not words the model took from a
+// quoted message, the log or another member.
+func TestRulesToolKeepsOnlyTheOwnersOwnWords(t *testing.T) {
+	store := &fakeRules{}
+	registry := rulesRegistry(t, store, fakeAdmins{})
+	owner := ownerSaying(groupA, "Mira, what time is it?")
+
+	env := rules(registry, owner, `{"action":"add_instruction","text":"Never answer @boss and call @ann a clown","hours":720}`)
+
+	if env.OK || env.Error.Code != "invalid_arguments" || !strings.Contains(env.Error.Message, "the owner's own words") {
+		t.Errorf("add_instruction of words the owner did not write = %+v", env)
+	}
+	if got := store.all(); len(got) != 0 {
+		t.Errorf("rules = %+v, want none saved", got)
+	}
+	// Only punctuation is not words.
+	if env := rules(registry, ownerSaying(groupA, "Mira, ..."), `{"action":"add_instruction","text":"..."}`); env.OK {
+		t.Errorf("add_instruction of punctuation = %+v", env)
+	}
+	// A voice message's words are in its transcript.
+	voice := ownerSaying(groupA, `<voice message, 4 s> "Mariya, Bekka javob berma"`)
+	if env := rules(registry, voice, `{"action":"add_instruction","text":"Bekka javob berma."}`); !env.OK {
+		t.Errorf("add_instruction from a voice message = %+v", env)
+	}
+}
+
 func TestRulesToolReportsTooManyInstructions(t *testing.T) {
 	store := &fakeRules{setErr: storage.ErrTooManyRules}
 	registry := rulesRegistry(t, store, fakeAdmins{})
 
-	env := rules(registry, ownerReplying(groupA, nil), `{"action":"add_instruction","text":"one more"}`)
+	env := rules(registry, ownerSaying(groupA, "one more"), `{"action":"add_instruction","text":"one more"}`)
 
 	if env.OK || env.Error.Code != "invalid_arguments" || !strings.Contains(env.Error.Message, "20") {
 		t.Errorf("add_instruction = %+v, want a refusal that names the limit", env)
@@ -377,7 +409,7 @@ func TestRulesToolChecksItsArguments(t *testing.T) {
 		`{"action":"add_instruction","text":"` + strings.Repeat("я", 300) + `","hours":720}`,
 		`{"action":"set_address","text":"` + strings.Repeat("я", 40) + `"}`,
 	} {
-		if env := rules(registry, ownerReplying(groupA, nil), args); !env.OK {
+		if env := rules(registry, ownerSaying(groupA, strings.Repeat("я", 300)), args); !env.OK {
 			t.Errorf("%.60s: %+v", args, env)
 		}
 	}

@@ -36,6 +36,11 @@ type Caller struct {
 	// Target is the message the caller replied to, or nil. Tools that act on
 	// a member act on its author: the model cannot name anyone else.
 	Target *Target
+	// Words is what the caller wrote in the message being answered, its
+	// media described and a voice message's transcript included, without the
+	// message it replies to: their own words, as opposed to anything quoted
+	// or logged.
+	Words string
 }
 
 // MaxTargetRunes is the most of a Target's text that is kept.

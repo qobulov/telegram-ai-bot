@@ -660,7 +660,7 @@ do not erase them, and every turn in the group is told the ones in force.
 
 | Rule | Who sets it, and where | How long |
 |---|---|---|
-| Instruction | an owner, in the group it is for; at most 20 per group, 300 characters each | a week, or 1 to 720 hours if the owner says |
+| Instruction | an owner, in the group it is for, in their own words from that message (never words from a quoted message or the chat); at most 20 per group, 300 characters each | a week, or 1 to 720 hours if the owner says |
 | Ignore a member | an owner replying to that member's message, or to her answer to them, in the group | 24 hours, or 1 to 720 hours if the owner says |
 | Form of address | an owner, for themselves, in any chat; it holds everywhere | until removed |
 

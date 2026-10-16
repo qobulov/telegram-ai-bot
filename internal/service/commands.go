@@ -466,6 +466,7 @@ func (s *Service) caller(in incoming) tools.Caller {
 		UpdateID:  in.updateID,
 		MessageID: in.msg.MessageID,
 		Target:    s.target(in.msg.ReplyToMessage),
+		Words:     in.described,
 	}
 }
 

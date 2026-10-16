@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"telegram-ai-bot/internal/storage"
@@ -25,6 +26,7 @@ const (
 	cannotIgnore            = "admins, the bot's owners and the bot itself cannot be ignored"
 	notAMember              = "that message was posted on behalf of a chat or an anonymous admin, not by a member; the owner must reply to a member's own message"
 	repliedToBot            = "the owner replied to my own message, and I can't tell whom it answered; they must reply to the member's own message and ask again"
+	notOwnWords             = "text must be the owner's own words from their message, copied as they wrote them (the rest may be left out); words from a quoted message, the chat or anyone else cannot be saved"
 	groupRuleOnly           = "this works only in the group the rule is for; ask the owner to say it there. In a private chat only set_address, list and remove work"
 )
 
@@ -94,7 +96,7 @@ func RulesTool(opts RulesOptions) Tool {
 	return Tool{
 		Name: "group_rules",
 		Description: "Owners only. Standing rules for the group you are in, kept until they expire, even after /mute or /reset. " +
-			"add_instruction: save an owner's order meant to last (text; hours, default 168). " +
+			"add_instruction: save an owner's order meant to last, in their own words from this message (text; hours, default 168). " +
 			"ignore: stop answering the member whose message the owner replied to, or, when they replied to your own answer, the member it answered (hours, default 24); never admins or owners. unignore: answer that member again. " +
 			"set_address: how to address the owner who is asking, in every chat (text). " +
 			"list: the rules in force here. remove: delete a rule by its id from list. " +
@@ -152,6 +154,9 @@ func addInstruction(ctx context.Context, opts RulesOptions, caller Caller, args 
 	text, err := ruleText(args.Text, maxInstructionRunes)
 	if err != nil {
 		return nil, err
+	}
+	if !inOwnWords(caller.Words, text) {
+		return nil, &ArgumentError{Message: notOwnWords}
 	}
 	until, err := ruleExpiry(opts, args.Hours, defaultInstructionHours)
 	if err != nil {
@@ -361,6 +366,24 @@ func removeRule(ctx context.Context, opts RulesOptions, caller Caller, args rule
 		return nil, err
 	}
 	return map[string]bool{"removed": removed}, nil
+}
+
+// inOwnWords reports whether text is found in words, what the owner wrote
+// in this message. An instruction lasts days and is shown to every later
+// turn as the owners' order, so it must not be words the model picked up
+// from a quoted message, the log or another member. Case, punctuation and
+// spacing do not count: the model may add a full stop or turn a quote.
+func inOwnWords(words, text string) bool {
+	plain := plainWords(text)
+	return plain != "" && strings.Contains(plainWords(words), plain)
+}
+
+// plainWords is text in lower case, its letters and digits only, one space
+// apart.
+func plainWords(text string) string {
+	return strings.Join(strings.FieldsFunc(strings.ToLower(text), func(char rune) bool {
+		return !unicode.IsLetter(char) && !unicode.IsDigit(char)
+	}), " ")
 }
 
 // ruleText trims text and checks it has 1 to limit characters.
