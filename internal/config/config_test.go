@@ -1090,6 +1090,29 @@ func TestPersonaIsPlayfulNotCruel(t *testing.T) {
 	}
 }
 
+// The model copied the English insult example word for word, so insults
+// are described, not answered with a line to quote.
+func TestPersonaDescribesTheAnswerToAnInsult(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(cfg.PersonaPrompt, "My mood is still great") {
+		t.Error("the persona still has the insult answer the model copied")
+	}
+	for _, ex := range responseExamples(cfg.PersonaPrompt, cfg.BotDisplayName) {
+		if strings.Contains(strings.ToLower(ex.question), "stupid") {
+			t.Errorf("an insult has an answer to quote: %q", ex.answer)
+		}
+	}
+	insult := lineContaining(cfg.PersonaPrompt, "An insult (")
+	for _, want := range []string{"one short, calm line", "fresh words every time", "never aimed back at them"} {
+		if !strings.Contains(insult, want) {
+			t.Errorf("the insult line %q does not say %q", insult, want)
+		}
+	}
+}
+
 // Not one of 517 replies in the audit was in Cyrillic, though members wrote
 // in it. Small models copy examples, so every example is answered in the
 // script it was asked in, and one answers Uzbek written in Cyrillic.
