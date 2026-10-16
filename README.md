@@ -701,7 +701,8 @@ check is made in code:
   *delete messages* for delete; *ban users* for mute, unmute, ban and
   unban; *pin messages* for pin and unpin.
 - **Her rights:** she needs the same right herself, checked with Telegram
-  each time. The model is told her rights in each group so that it does not
+  each time. The model is told those of her rights in each group that a tool
+  uses (delete, ban and mute, pin) so that it does not
   offer what she cannot do. Give her only the rights you want her to use.
 - **Never a target:** the person asking (they may still have their own
   message deleted or pinned), the bot itself (its own messages may be

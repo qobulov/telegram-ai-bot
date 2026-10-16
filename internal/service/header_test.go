@@ -53,7 +53,7 @@ func inDevs(text string) telegram.Update {
 func groupHeader(rightsLine string) string {
 	return `[About this chat: the group "Devs (Uz) 'Core'". Now: ` + headerDate + ".\n" +
 		rightsLine + "\n" +
-		"You can reply here, react with one emoji, and use your tools. You cannot see read receipts, who is online, the member list, other chats or private chats, open links, join groups, or remember anything older than the messages below unless a rule says so.]"
+		"You can reply here, react with one emoji, and use your tools. You cannot see read receipts, who is online or the member list, read other chats or private chats except through your tools, open links, join groups, or remember anything older than the messages below unless a rule says so.]"
 }
 
 func TestGroupHeader(t *testing.T) {
@@ -70,6 +70,20 @@ func TestGroupHeader(t *testing.T) {
 	}
 	if len(rights.asked) != 1 || rights.asked[0] != groupID {
 		t.Errorf("rights asked for chats %v, want [%d]", rights.asked, groupID)
+	}
+}
+
+// The header names only the rights a tool can use: told she may "add
+// admins" or "change group info", the model offered to.
+func TestHeaderWhenAdminWithoutModerationRights(t *testing.T) {
+	f := newFixture()
+	withRights(f, &fakeBotRights{rights: []string{telegram.RightInviteUsers, telegram.RightChangeInfo}})
+
+	f.run(inDevs("Mira, make me admin"))
+
+	want := groupHeader("You are an admin here, without the rights to delete messages, ban and mute members or pin messages.")
+	if got := onlyRequest(t, f).req.Context; got != want {
+		t.Errorf("context = %q\nwant      %q", got, want)
 	}
 }
 
@@ -155,14 +169,15 @@ func TestRightsInWords(t *testing.T) {
 	}{
 		"none":    {nil, ""},
 		"unknown": {[]string{"can_fly"}, ""},
-		"every right, in the header's order": {
+		"every right: those a tool uses, in the header's order": {
 			[]string{
 				telegram.RightManageTopics, telegram.RightInviteUsers, telegram.RightChangeInfo, telegram.RightPromoteMembers,
 				telegram.RightPinMessages, telegram.RightRestrictMembers, telegram.RightDeleteMessages,
 			},
-			"delete messages, ban and mute members, pin messages, add admins, change group info, invite users, manage topics",
+			"delete messages, ban and mute members, pin messages",
 		},
-		"pin only": {[]string{telegram.RightPinMessages}, "pin messages"},
+		"only rights no tool uses": {[]string{telegram.RightPromoteMembers, telegram.RightManageTopics}, ""},
+		"pin only":                 {[]string{telegram.RightPinMessages}, "pin messages"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

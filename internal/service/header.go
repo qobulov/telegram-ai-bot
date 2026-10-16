@@ -24,9 +24,12 @@ const (
 	// groupAbilities tells the model, every group turn, what it can and
 	// cannot do. Without it the model claimed things it has no means to do
 	// or know: messages "sent to all groups", groups "joined", photos "seen".
-	groupAbilities = "You can reply here, react with one emoji, and use your tools. You cannot see read receipts, who is online, the member list, other chats or private chats, open links, join groups, or remember anything older than the messages below unless a rule says so."
+	groupAbilities = "You can reply here, react with one emoji, and use your tools. You cannot see read receipts, who is online or the member list, read other chats or private chats except through your tools, open links, join groups, or remember anything older than the messages below unless a rule says so."
 	rightsUnknown  = "Your admin rights here are unknown."
 	notAnAdmin     = "You are not an admin here."
+	// noToolRights is said of a bot that is an admin, but holds none of the
+	// rights its tools use.
+	noToolRights = "You are an admin here, without the rights to delete messages, ban and mute members or pin messages."
 	// rightsLookupTimeout bounds learning the bot's rights, which may mean
 	// asking Telegram. Past it the header says they are unknown rather than
 	// hold up the answer.
@@ -72,8 +75,11 @@ func (s *Service) rightsLine(ctx context.Context, chatID int64) string {
 		return rightsUnknown
 	}
 	words := rightsInWords(rights)
-	if words == "" {
+	switch {
+	case len(rights) == 0:
 		return notAnAdmin
+	case words == "":
+		return noToolRights
 	}
 	return "Your admin rights here: " + words + "."
 }
@@ -142,20 +148,18 @@ func (s *Service) addressFor(rules []storage.GroupRule, in incoming) string {
 }
 
 // rightWords names each admin right the way the header lists it, in the
-// order it lists them.
+// order it lists them. Only the rights a tool uses are listed: told she may
+// add admins or change the group's info, the model offered to, and no tool
+// can.
 var rightWords = []struct{ right, words string }{
 	{telegram.RightDeleteMessages, "delete messages"},
 	{telegram.RightRestrictMembers, "ban and mute members"},
 	{telegram.RightPinMessages, "pin messages"},
-	{telegram.RightPromoteMembers, "add admins"},
-	{telegram.RightChangeInfo, "change group info"},
-	{telegram.RightInviteUsers, "invite users"},
-	{telegram.RightManageTopics, "manage topics"},
 }
 
 // rightsInWords renders rights, given by their Bot API names, as plain words
-// joined by commas, always in the same order. Names it does not know are
-// left out; with none it knows, it returns "".
+// joined by commas, always in the same order. Rights no tool uses are left
+// out; with none left, it returns "".
 func rightsInWords(rights []string) string {
 	var words []string
 	for _, r := range rightWords {
