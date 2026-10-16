@@ -273,7 +273,7 @@ func toolNames(list []tools.Tool) string {
 
 func TestToolsListsTheLiveDataTools(t *testing.T) {
 	opts := newUpstream(t, nil).options()
-	if got, want := toolNames(Tools(opts)), "currency_rate,get_weather,prayer_times,news_headlines"; got != want {
+	if got, want := toolNames(Tools(opts)), "currency_rate,get_weather,prayer_times,news_headlines,wiki_lookup"; got != want {
 		t.Errorf("tools = %s, want %s", got, want)
 	}
 }

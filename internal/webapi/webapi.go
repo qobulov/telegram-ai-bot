@@ -123,6 +123,7 @@ func Tools(opts Options) []tools.Tool {
 		a.weatherTool(),
 		a.prayerTool(),
 		a.newsTool(),
+		a.wikiTool(),
 	}
 }
 
