@@ -14,10 +14,10 @@ import (
 const (
 	clientTimeout = 4 * time.Second
 	maxRedirects  = 2
-	// defaultBodyLimit bounds a JSON answer. Feeds and the "on this day"
-	// list are larger and ask for feedBodyLimit.
+	// defaultBodyLimit bounds a JSON answer. News feeds, the "on this day"
+	// list and football tables are larger and ask for largeBodyLimit.
 	defaultBodyLimit = 64 << 10
-	feedBodyLimit    = 256 << 10
+	largeBodyLimit   = 256 << 10
 	// errorBodyLimit is how much of a failed answer is kept for the tools
 	// that read an API's own explanation.
 	errorBodyLimit = 4 << 10

@@ -119,7 +119,7 @@ func TestClientFollowsOnlyShortSameHostRedirects(t *testing.T) {
 func TestClientBodyLimitCanBeRaised(t *testing.T) {
 	u := newUpstream(t, map[string]stub{"/feed": ok(strings.Repeat("a", 100<<10))})
 
-	body, err := testClient(time.Second).get(context.Background(), call{service: "Feed", url: u.server.URL + "/feed", limit: feedBodyLimit})
+	body, err := testClient(time.Second).get(context.Background(), call{service: "Feed", url: u.server.URL + "/feed", limit: largeBodyLimit})
 
 	if err != nil || len(body) != 100<<10 {
 		t.Errorf("get = %d bytes, %v", len(body), err)

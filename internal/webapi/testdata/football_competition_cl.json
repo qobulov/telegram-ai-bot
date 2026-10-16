@@ -1,0 +1,38 @@
+{
+ "id": 2001,
+ "area": {
+  "id": 2077,
+  "name": "Europe",
+  "code": "EUR",
+  "flag": "https://crests.football-data.org/EUR.svg"
+ },
+ "name": "UEFA Champions League",
+ "code": "CL",
+ "type": "CUP",
+ "emblem": "https://crests.football-data.org/CL.png",
+ "plan": "TIER_ONE",
+ "currentSeason": {
+  "id": 2557,
+  "startDate": "2026-09-08",
+  "endDate": "2027-01-27",
+  "currentMatchday": null,
+  "winner": null,
+  "stages": [
+   "LEAGUE_STAGE"
+  ]
+ },
+ "numberOfAvailableSeasons": 47,
+ "lastUpdated": "2026-05-31T11:41:29Z",
+ "seasons": [
+  {
+   "id": 2557,
+   "startDate": "2026-09-08",
+   "endDate": "2027-01-27",
+   "currentMatchday": null,
+   "winner": null,
+   "stages": [
+    "LEAGUE_STAGE"
+   ]
+  }
+ ]
+}

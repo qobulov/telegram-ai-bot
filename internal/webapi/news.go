@@ -251,7 +251,7 @@ func (a *apis) feed(ctx context.Context, f feed) ([]headline, error) {
 	return remember(a.cache, "rss:"+f.url, newsTTL, func() ([]headline, error) {
 		feedCtx, cancel := context.WithTimeout(ctx, feedTimeout)
 		defer cancel()
-		body, err := a.client.get(feedCtx, call{service: f.source, url: f.url, limit: feedBodyLimit})
+		body, err := a.client.get(feedCtx, call{service: f.source, url: f.url, limit: largeBodyLimit})
 		if err != nil {
 			return nil, err
 		}

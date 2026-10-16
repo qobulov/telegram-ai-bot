@@ -118,13 +118,17 @@ type apis struct {
 // Tools once and register what it returns.
 func Tools(opts Options) []tools.Tool {
 	a := newAPIs(opts)
-	return []tools.Tool{
+	list := []tools.Tool{
 		a.currencyTool(),
 		a.weatherTool(),
 		a.prayerTool(),
 		a.newsTool(),
 		a.wikiTool(),
 	}
+	if a.footballToken != "" {
+		list = append(list, a.footballTool())
+	}
+	return list
 }
 
 func newAPIs(opts Options) *apis {

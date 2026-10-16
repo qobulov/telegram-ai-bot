@@ -177,7 +177,7 @@ func (a *apis) onThisDay(ctx context.Context, lang string) (wikiDay, error) {
 		var answer struct {
 			Selected []event `json:"selected"`
 		}
-		err := a.client.getJSON(ctx, call{service: "Wikipedia", url: fmt.Sprintf(a.urls.Wikipedia, lang) + path, limit: feedBodyLimit}, &answer)
+		err := a.client.getJSON(ctx, call{service: "Wikipedia", url: fmt.Sprintf(a.urls.Wikipedia, lang) + path, limit: largeBodyLimit}, &answer)
 		if err == nil && len(answer.Selected) == 0 {
 			err = fmt.Errorf("Wikipedia has no events for today")
 		}
