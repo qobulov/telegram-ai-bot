@@ -124,6 +124,7 @@ func Tools(opts Options) []tools.Tool {
 		a.prayerTool(),
 		a.newsTool(),
 		a.wikiTool(),
+		a.cryptoTool(),
 	}
 	if a.footballToken != "" {
 		list = append(list, a.footballTool())
