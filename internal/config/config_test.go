@@ -1002,12 +1002,14 @@ func TestPersonaIsComposedNotQuarrelsome(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"nothing to prove", "Say it once", "Never chase the last word", "Do not end a reply with a question that keeps an argument going"} {
+	// An eval found insults answered with a jab at the member's mind, after
+	// an example that turned "You're stupid" back on the speaker.
+	for _, want := range []string{"nothing to prove", "Say it once", "Never chase the last word", "Do not end a reply with a question that keeps an argument going", "never about them", "Never insult them back"} {
 		if !strings.Contains(cfg.PersonaPrompt, want) {
 			t.Errorf("the persona does not contain %q", want)
 		}
 	}
-	for _, unwanted := range []string{"enjoys playful arguments", "slightly chaotic", "Friendly rivalry", "Put people in their place"} {
+	for _, unwanted := range []string{"enjoys playful arguments", "slightly chaotic", "Friendly rivalry", "Put people in their place", "Bold words for someone", "clever, light comeback"} {
 		if strings.Contains(cfg.PersonaPrompt, unwanted) {
 			t.Errorf("the persona still invites arguing: %q", unwanted)
 		}
@@ -1144,14 +1146,19 @@ func TestMarkersAreDefinedOnceInThePersona(t *testing.T) {
 	}
 	_, offered, _ := strings.Cut(lineContaining(persona, "X is one of "), "X is one of ")
 	offered, _, _ = strings.Cut(offered, ".")
+	// An eval saw [react ☕], copied from the chat, while the list was 13
+	// long: it is kept short enough to be remembered.
 	emoji := strings.Fields(offered)
-	if len(emoji) < 10 {
-		t.Fatalf("the persona offers %d reactions: %q", len(emoji), emoji)
+	if len(emoji) < 5 || len(emoji) > 10 {
+		t.Fatalf("the persona offers %d reactions, want 5 to 10: %q", len(emoji), emoji)
 	}
 	for _, e := range emoji {
 		if !telegram.IsReactionEmoji(e) {
 			t.Errorf("the persona offers %q, which Telegram does not accept as a reaction", e)
 		}
+	}
+	if !strings.Contains(persona, "No other emoji works, not even one from the chat") {
+		t.Error("the persona does not say that other emoji, such as one from the chat, do not work")
 	}
 }
 
@@ -1194,6 +1201,9 @@ func TestOwnerNoteSavesStandingOrders(t *testing.T) {
 		"An order needs no acknowledgement",
 		// A saved "stay silent" lasts a week unless it is removed.
 		"When an owner lifts an order you saved, find it with group_rules list and remove it",
+		// "Don't answer this", replying to a member, got [silent] once and
+		// no rule.
+		`even just "don't answer this", in any language, means that member from now on: call group_rules ignore`,
 	} {
 		if !strings.Contains(cfg.PersonaPrompt, want) {
 			t.Errorf("the owner note does not contain %q", want)

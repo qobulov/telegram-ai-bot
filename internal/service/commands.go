@@ -578,7 +578,8 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 // request builds what the agent needs. In a group the stored text names its
 // author ("Bek: ..."), because the conversation is shared. The context, for
 // this turn only, is the chat header and the owners' standing rules, then in
-// a private chat the owner notice, in a group the recent chatter.
+// a private chat the owner notice, in a group the recent chatter and, when an
+// owner replies to a member, whom an order not to answer would mean.
 func (s *Service) request(ctx context.Context, in incoming, rules []storage.GroupRule) agent.Request {
 	req := agent.Request{
 		Scope:            in.scope,
@@ -604,12 +605,29 @@ func (s *Service) request(ctx context.Context, in incoming, rules []storage.Grou
 			notice = ownerNotice
 		}
 	}
-	req.Context = paragraphs(s.chatHeader(ctx, in), s.rulesHeader(rules, in), notice, log)
+	req.Context = paragraphs(s.chatHeader(ctx, in), s.rulesHeader(rules, in), notice, log, s.ownerReplyHint(in))
 	replied := in.msg.ReplyToMessage
 	if replied != nil {
 		req.Text = withQuote(req.Text, s.quoted(ctx, replied), s.opts.Bot.ID, plainLabel(replied.From))
 	}
 	return req
+}
+
+// ownerReplyNote names the member an owner replied to. Told "don't answer
+// this" in reply to a member, the model stayed silent once instead of saving
+// the order with group_rules ignore, whatever the persona said.
+const ownerReplyNote = "[Your owner is replying to a message from %s. If they tell you not to answer, in any words, they mean %s from now on: call group_rules ignore before you react; a reaction or [silent] alone saves nothing.]"
+
+// ownerReplyHint is said, right before the message, when an owner replies in
+// a group to a member who could be ignored; otherwise it is "".
+func (s *Service) ownerReplyHint(in incoming) string {
+	replied := in.msg.ReplyToMessage
+	if !in.group || s.opts.Rules == nil || !s.isOwner(in.msg.From) || replied == nil ||
+		replied.From == nil || replied.From.ID == s.opts.Bot.ID || s.isOwner(replied.From) {
+		return ""
+	}
+	member := plainLabel(replied.From)
+	return fmt.Sprintf(ownerReplyNote, member, member)
 }
 
 // paragraphs joins the parts that are not empty, a blank line apart.
