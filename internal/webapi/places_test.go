@@ -1,6 +1,9 @@
 package webapi
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestLookupPlaceAcceptsEverySpelling(t *testing.T) {
 	tests := []struct {
@@ -28,6 +31,17 @@ func TestLookupPlaceAcceptsEverySpelling(t *testing.T) {
 		{"Bukhara", "Buxoro"},
 		{"Xiva", "Xiva"},
 		{"Хива", "Xiva"},
+		{"Yangiyo‘l", "Yangiyo'l"},
+		{"G'ijduvon", "G'ijduvon"},
+		{"Moskva", "Moskva"},
+		{"г. Москва", "Moskva"},
+		{"Sankt Peterburg", "Sankt-Peterburg"},
+		{"St. Petersburg", "Sankt-Peterburg"},
+		{"Seul", "Seul"},
+		{"Nyu York", "Nyu-York"},
+		{"Чимкент", "Chimkent"},
+		{"Olmaota", "Olmaota"},
+		{"Xo'jand", "Xo'jand"},
 	}
 	for _, test := range tests {
 		p, found := lookupPlace(test.input)
@@ -35,18 +49,32 @@ func TestLookupPlaceAcceptsEverySpelling(t *testing.T) {
 			t.Errorf("lookupPlace(%q) = %q, %v; want %q", test.input, p.name, found, test.want)
 		}
 	}
-	for _, unknown := range []string{"", "London", "Toshkentda yomg'ir", "'"} {
+	for _, unknown := range []string{"", "Mexico City", "Toshkentda yomg'ir", "'"} {
 		if p, found := lookupPlace(unknown); found {
 			t.Errorf("lookupPlace(%q) = %q, want no match", unknown, p.name)
 		}
 	}
 }
 
-func TestPlacesAreInUzbekistan(t *testing.T) {
+func TestPlacesHaveTheirTimeZone(t *testing.T) {
 	regions := 0
+	keys := map[string]string{}
 	for _, p := range places {
-		if p.lat < 37 || p.lat > 46 || p.lon < 55 || p.lon > 74 {
-			t.Errorf("%s at %v,%v is outside Uzbekistan", p.name, p.lat, p.lon)
+		inUzbekistan := p.lat >= 37 && p.lat <= 46 && p.lon >= 55 && p.lon <= 74
+		if p.timezone == "" && !inUzbekistan {
+			t.Errorf("%s at %v,%v is outside Uzbekistan but has no time zone", p.name, p.lat, p.lon)
+		}
+		if p.timezone != "" {
+			if _, err := time.LoadLocation(p.timezone); err != nil || p.region != "" {
+				t.Errorf("%s: time zone %q (%v), region %q", p.name, p.timezone, err, p.region)
+			}
+		}
+		for _, spelling := range append([]string{p.name}, p.aliases...) {
+			key := normalizeName(spelling)
+			if other, taken := keys[key]; taken && other != p.name {
+				t.Errorf("%q names both %s and %s", spelling, other, p.name)
+			}
+			keys[key] = p.name
 		}
 		if p.region != "" {
 			regions++

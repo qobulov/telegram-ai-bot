@@ -8,7 +8,10 @@ type place struct {
 	// name is the Latin Uzbek name shown to the model.
 	name string
 	// region is the prayer_times key of a region centre, empty otherwise.
-	region   string
+	region string
+	// timezone is the IANA zone of a place abroad. It is empty in
+	// Uzbekistan, which keeps Tashkent time everywhere.
+	timezone string
 	lat, lon float64
 	// aliases are other spellings: English, Uzbek Cyrillic, Russian.
 	aliases []string
@@ -40,6 +43,27 @@ var places = []place{
 	{name: "Kattaqo'rg'on", lat: 39.8989, lon: 66.2561, aliases: []string{"Kattakurgan", "Каттақўрғон", "Каттакурган"}},
 	{name: "Bekobod", lat: 40.2208, lon: 69.2697, aliases: []string{"Bekabad", "Бекобод", "Бекабад"}},
 	{name: "Zarafshon", lat: 41.5800, lon: 64.1949, aliases: []string{"Zarafshan", "Зарафшон", "Зарафшан"}},
+	// The geocoder finds nothing for these Uzbek spellings, or only a
+	// village of the same name elsewhere.
+	{name: "Yangiyo'l", lat: 41.1120, lon: 69.0471, aliases: []string{"Yangiyul", "Янгийўл", "Янгиюль"}},
+	{name: "G'ijduvon", lat: 40.1000, lon: 64.6833, aliases: []string{"Gijduvan", "Ғиждувон", "Гиждуван"}},
+
+	// Cities abroad that members ask about, where the geocoder misses or
+	// finds a namesake: Seul gives Seulo in Italy, Chimkent a village in
+	// Farg'ona, Sankt-Peterburg a parish in Montserrat, Olmaota only an
+	// airport, Чимкент nothing.
+	{name: "Moskva", timezone: "Europe/Moscow", lat: 55.7520, lon: 37.6178, aliases: []string{"Moscow", "Москва"}},
+	{name: "Sankt-Peterburg", timezone: "Europe/Moscow", lat: 59.9386, lon: 30.3141, aliases: []string{"Saint Petersburg", "St Petersburg", "Peterburg", "Piter", "Санкт-Петербург", "Петербург", "Питер"}},
+	{name: "Qozon", timezone: "Europe/Moscow", lat: 55.7887, lon: 49.1221, aliases: []string{"Kazan", "Қозон", "Казань"}},
+	{name: "Seul", timezone: "Asia/Seoul", lat: 37.5660, lon: 126.9784, aliases: []string{"Seoul", "Сеул"}},
+	{name: "Istanbul", timezone: "Europe/Istanbul", lat: 41.0138, lon: 28.9497, aliases: []string{"İstanbul", "Стамбул", "Истанбул"}},
+	{name: "Dubay", timezone: "Asia/Dubai", lat: 25.0773, lon: 55.3093, aliases: []string{"Dubai", "Дубай"}},
+	{name: "Nyu-York", timezone: "America/New_York", lat: 40.7143, lon: -74.0060, aliases: []string{"New York", "NYC", "Нью-Йорк", "Нью Йорк"}},
+	{name: "Chimkent", timezone: "Asia/Almaty", lat: 42.3099, lon: 69.6004, aliases: []string{"Shymkent", "Чимкент", "Шымкент", "Шимкент"}},
+	{name: "Olmaota", timezone: "Asia/Almaty", lat: 43.2525, lon: 76.9115, aliases: []string{"Almaty", "Alma-Ata", "Олмаота", "Алматы", "Алма-Ата"}},
+	{name: "Bishkek", timezone: "Asia/Bishkek", lat: 42.8700, lon: 74.5900, aliases: []string{"Бишкек"}},
+	{name: "Dushanbe", timezone: "Asia/Dushanbe", lat: 38.5358, lon: 68.7791, aliases: []string{"Душанбе"}},
+	{name: "Xo'jand", timezone: "Asia/Dushanbe", lat: 40.2826, lon: 69.6222, aliases: []string{"Khujand", "Khodjent", "Хўжанд", "Худжанд", "Ходжент"}},
 }
 
 var placeIndex = indexPlaces()
