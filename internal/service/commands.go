@@ -56,6 +56,11 @@ func (s *Service) process(in incoming) {
 		s.passOver(in)
 		return
 	}
+	// An admin's yes to the bot's question is handled here, in code, before
+	// it could be taken for applause or run into the group's quota.
+	if s.confirmedModeration(ctx, in) {
+		return
+	}
 	rules := s.loadRules(ctx, in)
 	// An ignored member gets nothing, not even a reaction, and takes none of
 	// the group's quota. The off switch still works for them if they may
@@ -328,15 +333,7 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	stopTyping := s.showTyping(ctx, in.msg.Chat.ID)
 	defer stopTyping()
 	sink := &tools.Sink{}
-	ctx = tools.WithTurn(ctx, tools.Caller{
-		UserID:    in.userID,
-		ChatID:    in.scope.ChatID,
-		Owner:     s.isOwner(in.msg.From),
-		Human:     !in.fromBot,
-		UpdateID:  in.updateID,
-		MessageID: in.msg.MessageID,
-		Target:    s.target(in.msg.ReplyToMessage),
-	}, sink)
+	ctx = tools.WithTurn(ctx, s.caller(in), sink)
 	answer, err := s.opts.Replier.Reply(ctx, s.request(ctx, in, rules))
 	// A picture drawn before a later failure is still worth sending.
 	drawings := sink.Take()
@@ -403,6 +400,50 @@ func usedAnAnswer(err error, drawings []tools.Drawing) bool {
 func startOfDay(now time.Time, location *time.Location) time.Time {
 	local := now.In(location)
 	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, location)
+}
+
+// caller is who the turn is for, as the tools see them. Everything in it
+// comes from the update.
+func (s *Service) caller(in incoming) tools.Caller {
+	return tools.Caller{
+		UserID:    in.userID,
+		ChatID:    in.scope.ChatID,
+		Owner:     s.isOwner(in.msg.From),
+		Human:     !in.fromBot,
+		UpdateID:  in.updateID,
+		MessageID: in.msg.MessageID,
+		Target:    s.target(in.msg.ReplyToMessage),
+	}
+}
+
+// confirmedModeration passes on a group member's plain yes or no, written
+// as a reply to one of the bot's messages, to moderation, and reports
+// whether it was the answer to the bot's question about an action they had
+// asked for. Then what came of it is said, and the exchange logged; nothing
+// else is done with the message. The model never sees it: whether an action
+// is carried out is decided by the person's own words, read in code.
+func (s *Service) confirmedModeration(ctx context.Context, in incoming) bool {
+	replied := in.msg.ReplyToMessage
+	if !in.group || in.fromBot || s.opts.Moderation == nil || replied == nil || replied.From == nil || replied.From.ID != s.opts.Bot.ID {
+		return false
+	}
+	yes, ok := tools.ConfirmationAnswer(in.text)
+	if !ok {
+		return false
+	}
+	confirmation, err := s.opts.Moderation.Confirm(ctx, s.caller(in), replied.MessageID, yes)
+	if err != nil {
+		s.opts.Logger.Warn("moderation confirmation failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
+	}
+	if !confirmation.Found {
+		return false
+	}
+	if confirmation.Text != "" {
+		s.reply(in, confirmation.Text)
+		s.logFrom(in.msg, in.text)
+		s.ambient.add(in.scope.ChatID, 0, s.opts.Bot.ID, botAuthor, confirmation.Text)
+	}
+	return true
 }
 
 // target describes the message a request replied to, for the tools that act

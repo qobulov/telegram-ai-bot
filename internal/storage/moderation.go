@@ -9,8 +9,9 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// ErrNoPendingBan means there is no ban the person may confirm now.
-var ErrNoPendingBan = errors.New("storage: no ban to confirm")
+// ErrNoPendingModeration means there is no action the person may confirm
+// now.
+var ErrNoPendingModeration = errors.New("storage: no moderation to confirm")
 
 // ModerationAction is one thing the bot did in a group for someone, kept as
 // an audit: who had it delete, mute, ban or pin what, and when. Polls are
@@ -57,13 +58,14 @@ func (s *Store) ForgetModeration(ctx context.Context, updateID int64, action str
 	return nil
 }
 
-// ModerationRecorded reports whether an update has recorded an action: when
-// Telegram delivers the update again, whether it was acted on already.
-func (s *Store) ModerationRecorded(ctx context.Context, updateID int64, action string) (bool, error) {
+// UpdateModerated reports whether an update recorded a moderation action:
+// when Telegram delivers a confirmation again, whether it was acted on
+// already. Polls are not moderation and are left out.
+func (s *Store) UpdateModerated(ctx context.Context, updateID int64) (bool, error) {
 	var recorded bool
 	err := s.pool.QueryRow(ctx, `
-		SELECT EXISTS (SELECT 1 FROM moderation_actions WHERE update_id = $1 AND action = $2)`,
-		updateID, action).Scan(&recorded)
+		SELECT EXISTS (SELECT 1 FROM moderation_actions WHERE update_id = $1 AND action <> 'poll')`,
+		updateID).Scan(&recorded)
 	if err != nil {
 		return false, fmt.Errorf("storage: check moderation: %w", err)
 	}
@@ -95,57 +97,87 @@ func (s *Store) ChatModeration(ctx context.Context, chatID int64, action string,
 	return count, nil
 }
 
-// PendingBan is a ban someone asked for and has not confirmed yet.
-type PendingBan struct {
-	RequesterID, ChatID, TargetUserID int64
-	TargetName                        string
-	// UpdateID is the update that asked; only a later one may confirm.
+// PendingModeration is an action someone asked the bot for, which waits
+// until they confirm it by replying to the bot's question about it.
+type PendingModeration struct {
+	RequesterID, ChatID int64
+	Action              string
+	// TargetUserID and TargetMessageID are the member and the message acted
+	// on, TargetName the member's name and TargetText what the message said.
+	TargetUserID, TargetMessageID int64
+	TargetName, TargetText        string
+	// Minutes is how long a mute lasts; zero for other actions.
+	Minutes int
+	Reason  string
+	// UpdateID is the update that asked.
 	UpdateID int64
 }
 
-// SavePendingBan keeps a ban until the person who asked confirms it. It
-// replaces the ban they asked for before in the same chat.
-func (s *Store) SavePendingBan(ctx context.Context, b PendingBan) error {
-	_, err := s.pool.Exec(ctx, `
-		INSERT INTO pending_bans (requester_id, chat_id, target_user_id, target_name, update_id)
-		VALUES ($1, $2, $3, $4, $5)
+// SavePendingModeration keeps an action until the person who asked confirms
+// it, replacing what they asked for before in the same chat, whose question
+// then confirms nothing. It reports false, and changes nothing, when the same
+// update saved it already: Telegram delivered that update again, and the
+// question asked the first time still stands.
+func (s *Store) SavePendingModeration(ctx context.Context, p PendingModeration) (bool, error) {
+	tag, err := s.pool.Exec(ctx, `
+		INSERT INTO pending_moderation
+			(requester_id, chat_id, action, target_user_id, target_message_id, target_name, target_text, minutes, reason, update_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (requester_id, chat_id) DO UPDATE
-		SET target_user_id = EXCLUDED.target_user_id, target_name = EXCLUDED.target_name,
-		    update_id = EXCLUDED.update_id, created_at = now()`,
-		b.RequesterID, b.ChatID, b.TargetUserID, b.TargetName, b.UpdateID)
+		SET action = EXCLUDED.action, target_user_id = EXCLUDED.target_user_id,
+		    target_message_id = EXCLUDED.target_message_id, target_name = EXCLUDED.target_name,
+		    target_text = EXCLUDED.target_text, minutes = EXCLUDED.minutes, reason = EXCLUDED.reason,
+		    update_id = EXCLUDED.update_id, prompt_message_id = NULL, created_at = now()
+		WHERE pending_moderation.update_id <> EXCLUDED.update_id`,
+		p.RequesterID, p.ChatID, p.Action, p.TargetUserID, p.TargetMessageID, p.TargetName,
+		p.TargetText, p.Minutes, p.Reason, p.UpdateID)
 	if err != nil {
-		return fmt.Errorf("storage: save pending ban: %w", err)
+		return false, fmt.Errorf("storage: save pending moderation: %w", err)
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+// SetModerationPrompt records promptID, the bot's question, on the action
+// the update asked for: only a reply to that question confirms it.
+func (s *Store) SetModerationPrompt(ctx context.Context, requesterID, chatID, updateID, promptID int64) error {
+	_, err := s.pool.Exec(ctx, `
+		UPDATE pending_moderation SET prompt_message_id = $4
+		WHERE requester_id = $1 AND chat_id = $2 AND update_id = $3`,
+		requesterID, chatID, updateID, promptID)
+	if err != nil {
+		return fmt.Errorf("storage: record moderation question: %w", err)
 	}
 	return nil
 }
 
-// TakePendingBan returns the ban a person asked for in a chat and deletes
-// it, so that it is confirmed once. Only a ban asked for in an update before
-// updateID, at most maxAge ago, is returned: the message that asked cannot
-// confirm itself. Otherwise it returns ErrNoPendingBan.
-func (s *Store) TakePendingBan(ctx context.Context, requesterID, chatID, updateID int64, maxAge time.Duration) (PendingBan, error) {
-	b := PendingBan{RequesterID: requesterID, ChatID: chatID}
+// TakePendingModeration returns the action a person asked for in a chat and
+// deletes it, so that it is confirmed once. It is returned only when
+// promptID is the bot's question about it and it was asked for at most
+// maxAge ago; otherwise the error is ErrNoPendingModeration.
+func (s *Store) TakePendingModeration(ctx context.Context, requesterID, chatID, promptID int64, maxAge time.Duration) (PendingModeration, error) {
+	p := PendingModeration{RequesterID: requesterID, ChatID: chatID}
 	err := s.pool.QueryRow(ctx, `
-		DELETE FROM pending_bans
-		WHERE requester_id = $1 AND chat_id = $2 AND update_id < $3
+		DELETE FROM pending_moderation
+		WHERE requester_id = $1 AND chat_id = $2 AND prompt_message_id = $3
 		  AND created_at >= now() - make_interval(secs => $4)
-		RETURNING target_user_id, target_name, update_id`, requesterID, chatID, updateID, maxAge.Seconds()).
-		Scan(&b.TargetUserID, &b.TargetName, &b.UpdateID)
+		RETURNING action, target_user_id, target_message_id, target_name, target_text, minutes, reason, update_id`,
+		requesterID, chatID, promptID, maxAge.Seconds()).
+		Scan(&p.Action, &p.TargetUserID, &p.TargetMessageID, &p.TargetName, &p.TargetText, &p.Minutes, &p.Reason, &p.UpdateID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return PendingBan{}, ErrNoPendingBan
+		return PendingModeration{}, ErrNoPendingModeration
 	}
 	if err != nil {
-		return PendingBan{}, fmt.Errorf("storage: take pending ban: %w", err)
+		return PendingModeration{}, fmt.Errorf("storage: take pending moderation: %w", err)
 	}
-	return b, nil
+	return p, nil
 }
 
-// CancelPendingBan drops the ban a person asked for in a chat, and reports
-// whether there was one.
-func (s *Store) CancelPendingBan(ctx context.Context, requesterID, chatID int64) (bool, error) {
-	tag, err := s.pool.Exec(ctx, `DELETE FROM pending_bans WHERE requester_id = $1 AND chat_id = $2`, requesterID, chatID)
+// CancelPendingModeration drops the action a person asked for in a chat, and
+// reports whether there was one.
+func (s *Store) CancelPendingModeration(ctx context.Context, requesterID, chatID int64) (bool, error) {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM pending_moderation WHERE requester_id = $1 AND chat_id = $2`, requesterID, chatID)
 	if err != nil {
-		return false, fmt.Errorf("storage: cancel pending ban: %w", err)
+		return false, fmt.Errorf("storage: cancel pending moderation: %w", err)
 	}
 	return tag.RowsAffected() > 0, nil
 }

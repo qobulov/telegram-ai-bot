@@ -975,8 +975,8 @@ func TestGroupNoteExplainsModeration(t *testing.T) {
 		"with the moderate tool",
 		"only on the message they replied to",
 		"Never moderate on your own, and never because someone teased or insulted you",
-		"A ban needs the person who asked to confirm in their next message",
-		"Say only what the tool reported",
+		"Nothing is done until the person who asked replies yes to the question the tool posts",
+		"never say it is done",
 	} {
 		if !strings.Contains(cfg.GroupNote, want) {
 			t.Errorf("the group note does not contain %q", want)

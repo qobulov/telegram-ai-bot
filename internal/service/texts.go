@@ -58,7 +58,7 @@ Commands:
 In a group, call me by name, mention me (@username) or reply to one of my messages. Commands there need my username, like /help@username. A group shares one conversation with me.
 
 For a group's admins:
-Reply to a message and ask me to delete or pin it, or to mute or ban its author. It takes that admin right, yours and mine, and I ask you to confirm a ban first.
+Reply to a message and ask me to delete or pin it, or to mute or ban its author. It takes that admin right, yours and mine, and I act only once you reply yes to my question about it.
 /mute@username, /unmute@username — make me stay quiet in the group, or bring me back
 /ignore@username, /unignore@username — as a reply to a member's message: I stop answering them for 24 hours, or answer them again
 /reset@username — delete the group's conversation with me`

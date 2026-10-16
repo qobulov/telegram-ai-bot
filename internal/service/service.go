@@ -14,6 +14,7 @@ import (
 	"telegram-ai-bot/internal/agent"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
+	"telegram-ai-bot/internal/tools"
 )
 
 const (
@@ -89,6 +90,12 @@ type Reactor interface {
 // ChatActor shows a status, such as "typing", in a chat.
 type ChatActor interface {
 	SendChatAction(ctx context.Context, chatID int64, action string) error
+}
+
+// Confirmer carries out a moderation action once the person who asked for
+// it confirms it, by replying yes to the bot's question about it.
+type Confirmer interface {
+	Confirm(ctx context.Context, caller tools.Caller, promptID int64, yes bool) (tools.Confirmation, error)
 }
 
 // RuleBook keeps the owners' standing rules, among them whom not to answer.
@@ -195,6 +202,9 @@ type Options struct {
 	// Rules keeps the owners' standing rules and the ignore list; nil means
 	// there are none, and /ignore and /unignore are unknown commands.
 	Rules RuleBook
+	// Moderation carries out what a group's admins asked the bot to do, once
+	// they reply yes to its question about it; nil means nothing waits.
+	Moderation Confirmer
 	// MaxGroupReplyChars is the longest answer posted in a group, in UTF-16
 	// code units as Telegram counts them.
 	MaxGroupReplyChars int

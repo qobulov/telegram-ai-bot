@@ -168,7 +168,16 @@ func membershipError(err error) error {
 
 // NewService wires the tools, the model client, the agent and the service.
 func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, logger *slog.Logger) (*service.Service, error) {
-	registry, err := tools.NewRegistry(cfg.IsAdmin, builtinTools(cfg, store, bot)...)
+	moderation := tools.NewModeration(tools.ModerationOptions{
+		BotID:     bot.User.ID,
+		Members:   bot.Client,
+		Telegram:  bot.Client,
+		Questions: bot.Client,
+		Store:     store,
+		Rights:    store,
+		Location:  cfg.Location,
+	})
+	registry, err := tools.NewRegistry(cfg.IsAdmin, builtinTools(cfg, store, bot, moderation.Tool())...)
 	if err != nil {
 		return nil, err
 	}
@@ -244,6 +253,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		ChatActor:             bot.Client,
 		BotRights:             botRights{store: store, members: bot.Client, botID: bot.User.ID, logger: logger},
 		Rules:                 store,
+		Moderation:            moderation,
 	}
 	if mode.Serverless {
 		opts.Workers, opts.QueueSize = 0, 0
@@ -255,7 +265,9 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 
 // builtinTools are the tools the model may call in this deployment: the help
 // and the image tool follow what is enabled, and the time is the groups'.
-func builtinTools(cfg config.Config, store *storage.Store, bot Bot) []tools.Tool {
+// moderate is made by the caller, which also hands its confirmations to the
+// service.
+func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate tools.Tool) []tools.Tool {
 	help := service.HelpText(service.Abilities{Draw: cfg.ImagesEnabled, Listen: cfg.AudioInput})
 	builtin := tools.Builtin(help, cfg.Location)
 	if cfg.ImagesEnabled {
@@ -263,17 +275,7 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot) []tools.Tool
 	}
 	// Any group's admins, and any member for a poll, may use these, so they
 	// are there with or without owners.
-	builtin = append(builtin,
-		tools.ModerationTool(tools.ModerationOptions{
-			BotID:    bot.User.ID,
-			Members:  bot.Client,
-			Telegram: bot.Client,
-			Store:    store,
-			Rights:   store,
-			Location: cfg.Location,
-		}),
-		tools.PollTool(tools.PollOptions{Sender: bot.Client, Store: store}),
-	)
+	builtin = append(builtin, moderate, tools.PollTool(tools.PollOptions{Sender: bot.Client, Store: store}))
 	if len(cfg.OwnerUsernames) > 0 {
 		builtin = append(builtin,
 			tools.DatabaseTool(tools.DatabaseOptions{

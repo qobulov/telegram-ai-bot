@@ -13,7 +13,8 @@ moderation for group admins).
   instead of words, and limits kept in the database keep her from flooding.
 - A group shares one conversation with her; private chats stay private.
 - Group admins can mute her with `/mute`, and have her delete, pin, mute or
-  ban by replying to a message; see [Groups](#groups).
+  ban by replying to a message and then saying yes to her question; see
+  [Groups](#groups).
 - Replies in the chat's language (Uzbek, Russian, English).
 - Long polling: no public port, domain or TLS certificate needed.
 - One dependency besides the Go standard library: `pgx` for PostgreSQL.
@@ -119,8 +120,10 @@ group_rules(id PK, chat_id (0 for every group), kind, user_id, user_name,
 moderation_actions(id PK, chat_id, action, requester_id, target_user_id,
                    target_message_id, target_text, minutes, reason,
                    update_id, created_at, UNIQUE (update_id, action))
-pending_bans(requester_id, chat_id, target_user_id, target_name,
-             update_id, created_at, PK (requester_id, chat_id))
+pending_moderation(requester_id, chat_id, action, target_user_id,
+                   target_message_id, target_name, target_text, minutes,
+                   reason, update_id, prompt_message_id, created_at,
+                   PK (requester_id, chat_id))
 schema_migrations(version PK, applied_at)
 ```
 
@@ -595,9 +598,10 @@ Ann:   anyway, lunch?
   touch them.
 - **Moderation:** what she did, and for whom, is kept in the
   `moderation_actions` table until you delete it, including up to 500
-  characters of each message she deleted. A ban waiting for confirmation is
-  kept in `pending_bans`, with the member's ID and name, until it is
-  confirmed, cancelled or replaced.
+  characters of each message she deleted. An action waiting for
+  confirmation is kept in `pending_moderation`, with the member's ID and
+  name and up to 500 characters of the message, until it is confirmed,
+  cancelled or replaced.
 - **The quoted message:** when someone replies to a message while addressing
   her, that one message is included, shortened to 1,000 characters. It is
   saved as part of the question.
@@ -670,9 +674,17 @@ check is made in code:
 
 - **Actions:** delete the message; mute its author (an hour unless asked
   otherwise, at most a week; supergroups only) or unmute them; ban them, or
-  unban; pin the message without a notification, or unpin it. A ban waits
-  until the same person confirms it in a later message within 5 minutes,
-  and can be cancelled.
+  unban; pin the message without a notification, or unpin it.
+- **Confirmation:** the model only asks for an action; it never carries one
+  out. She posts her own fixed question, saying exactly what she will do
+  ("Confirm: mute Bek @bek for 30 minutes? Reply yes (ha, да) to this
+  message within 5 minutes, or no to cancel."), and acts only when the same
+  person replies to that question with a plain yes (`ha`, `да`, `yes`,
+  `ok`, `+`, 👍 and a few more), read in code, within 5 minutes. A plain no
+  cancels it; anything else is an ordinary message. The answer is handled
+  before the reply quota and the applause rule, so a busy group cannot
+  swallow it. A text in the chat, a quoted message or a voice transcript can
+  talk the model into asking, but only the person's own yes acts.
 - **Target:** always the message the person replied to, as Telegram
   delivered it. Nothing the model, a member or a quoted message writes can
   choose whom she acts on.
@@ -690,11 +702,12 @@ check is made in code:
 - **Limits:** at most 10 actions per person in 10 minutes. When Telegram
   cannot say who may do what, nothing is done.
 - **Once only:** each action is recorded in `moderation_actions` under the
-  Telegram update that asked, before Telegram is called, so an update
-  delivered twice is acted on once.
+  Telegram update that confirmed it, before Telegram is called, so an update
+  delivered twice is acted on once, and a request delivered twice asks once.
 
 She is told to use the tool only when an admin or owner asks, never on her
-own initiative, and to report exactly what the tool returned.
+own initiative, and never to say an action was done: the result is her own
+fixed reply to the confirmation ("Done: ..." or "Not done: ...").
 
 ### Polls
 
@@ -1062,10 +1075,12 @@ The group manners and admin powers update (reactions, reply quotas in the
 database, standing rules, moderation, polls, owners by ID, a daily limit in
 private chats) needs, in this order:
 
-1. **Apply migrations 0013 to 0017 before deploying**: `make migrate` with
+1. **Apply migrations 0013 to 0018 before deploying**: `make migrate` with
    `DB_POSTGRES_URL` pointing at the production database, as in step 1
-   above. They only add tables and one column; nothing existing is changed.
-   The new version refuses to start on the old schema (the function answers
+   above. They add tables and one column, and 0018 replaces 0016's
+   `pending_bans` with `pending_moderation`: a ban waiting for confirmation
+   at that moment has to be asked for again. Nothing else existing is
+   changed. The new version refuses to start on the old schema (the function answers
    503 `webhook is not ready; see the function logs`, and Telegram delivers
    the updates again later), while the old version keeps working on the new
    one.
@@ -1145,7 +1160,7 @@ by an hourly job, or daily by Vercel Cron. A user can delete their own history a
 `/reset`. The counts behind the limits (`image_generations`, `bot_replies`,
 `group_replies`, `private_messages`) hold IDs and times, no message text, and
 are deleted with the history. Standing rules are deleted when they expire. The moderation audit
-(`moderation_actions`, `pending_bans`) is never deleted automatically; delete
+(`moderation_actions`, `pending_moderation`) is never deleted automatically; delete
 old rows yourself if you do not want to keep them. Backups keep deleted data
 until they are rotated out.
 
@@ -1207,9 +1222,10 @@ Built in:
       must hold it too, both asked of Telegram at that moment; admins,
       owners and Telegram's service accounts are never targets, nor is the
       bot, except to delete or pin its own message; at most 10 actions per
-      person in 10 minutes; a ban needs a confirmation in a later message;
-      an update delivered twice acts once. When Telegram cannot be asked,
-      nothing is done.
+      person in 10 minutes; nothing is done until the person who asked
+      replies yes to the bot's own question, read in code; an update
+      delivered twice acts once. When Telegram cannot be asked, nothing is
+      done.
 - [x] Only owners can give standing orders, and only owners and group
       admins can have a member ignored. Whom to ignore is the author of the
       message they replied to, taken from the update, never from the model;

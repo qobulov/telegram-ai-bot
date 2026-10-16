@@ -71,28 +71,33 @@ func TestModerationAuditIsIdempotent(t *testing.T) {
 		t.Errorf("ChatModeration(otherGroup, poll) = %d, want 0", n)
 	}
 
-	recorded := func(updateID int64, action string) bool {
+	moderated := func(updateID int64) bool {
 		t.Helper()
-		ok, err := store.ModerationRecorded(ctx, updateID, action)
+		ok, err := store.UpdateModerated(ctx, updateID)
 		if err != nil {
-			t.Fatalf("ModerationRecorded(%d, %s): %v", updateID, action, err)
+			t.Fatalf("UpdateModerated(%d): %v", updateID, err)
 		}
 		return ok
 	}
-	if !recorded(500, "mute") || !recorded(502, "ban") {
-		t.Error("a recorded action was not found")
+	if !moderated(500) || !moderated(502) {
+		t.Error("an update that recorded an action was not found")
 	}
-	if recorded(500, "ban") || recorded(503, "mute") {
-		t.Error("an action found in an update that did not record it")
+	// A poll is not moderation.
+	if moderated(501) || moderated(503) {
+		t.Error("an action found in an update that did not record one")
 	}
 
 	// A call Telegram refused is forgotten, so a redelivery may try again.
 	if err := store.ForgetModeration(ctx, 500, "mute"); err != nil {
 		t.Fatalf("ForgetModeration: %v", err)
 	}
-	if recorded(500, "mute") {
-		t.Error("a forgotten mute was still found")
+	if err := store.ForgetModeration(ctx, 500, "delete"); err != nil {
+		t.Fatalf("ForgetModeration: %v", err)
 	}
+	if moderated(500) {
+		t.Error("an update whose actions were all forgotten was still found")
+	}
+	mustRecord(t, store, deletion)
 	if !mustRecord(t, store, mute) {
 		t.Error("a forgotten mute could not be recorded again")
 	}
@@ -101,76 +106,135 @@ func TestModerationAuditIsIdempotent(t *testing.T) {
 	}
 }
 
-func TestPendingBanMustBeConfirmedLater(t *testing.T) {
-	store := newTestStore(t)
-	ctx := context.Background()
-	save := func(b PendingBan) {
-		t.Helper()
-		if err := store.SavePendingBan(ctx, b); err != nil {
-			t.Fatalf("SavePendingBan: %v", err)
-		}
-	}
-	take := func(requesterID, chatID, updateID int64) (PendingBan, error) {
-		return store.TakePendingBan(ctx, requesterID, chatID, updateID, 5*time.Minute)
-	}
-	asked := PendingBan{RequesterID: alice, ChatID: group, TargetUserID: bob, TargetName: "Bob @bob", UpdateID: 10}
-	save(asked)
-
-	for name, try := range map[string][3]int64{
-		"in the same message": {alice, group, 10},
-		"by someone else":     {bob, group, 11},
-		"in another chat":     {alice, otherGroup, 11},
-	} {
-		if _, err := take(try[0], try[1], try[2]); !errors.Is(err, ErrNoPendingBan) {
-			t.Errorf("confirmed %s: err = %v, want ErrNoPendingBan", name, err)
-		}
-	}
-	got, err := take(alice, group, 11)
-	if err != nil || got != asked {
-		t.Fatalf("confirmed = %+v, %v; want %+v", got, err, asked)
-	}
-	if _, err := take(alice, group, 12); !errors.Is(err, ErrNoPendingBan) {
-		t.Errorf("confirmed twice: err = %v", err)
-	}
-
-	// Asking again replaces the ban asked for before, and waits from now:
-	// an old ban asked for again is not already too old.
-	save(asked)
-	if _, err := store.pool.Exec(ctx, `UPDATE pending_bans SET created_at = now() - interval '10 minutes'`); err != nil {
-		t.Fatal(err)
-	}
-	newer := PendingBan{RequesterID: alice, ChatID: group, TargetUserID: 1003, TargetName: "Cy", UpdateID: 20}
-	save(newer)
-	if got, err := take(alice, group, 21); err != nil || got != newer {
-		t.Errorf("confirmed = %+v, %v; want the newer ban %+v", got, err, newer)
-	}
-
-	save(PendingBan{RequesterID: alice, ChatID: group, TargetUserID: bob, TargetName: "Bob", UpdateID: 30})
-	if _, err := store.pool.Exec(ctx, `UPDATE pending_bans SET created_at = now() - interval '10 minutes'`); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := take(alice, group, 31); !errors.Is(err, ErrNoPendingBan) {
-		t.Errorf("a ban asked for 10 minutes ago was confirmed: err = %v", err)
+// asked is what alice asked the bot to do to bob in group, in update 10.
+func asked() PendingModeration {
+	return PendingModeration{
+		RequesterID: alice, ChatID: group, Action: "mute", TargetUserID: bob, TargetMessageID: 40,
+		TargetName: "Bob @bob", TargetText: "buy crypto", Minutes: 90, Reason: "spam", UpdateID: 10,
 	}
 }
 
-func TestCancelPendingBan(t *testing.T) {
+func mustSavePending(t *testing.T, store *Store, p PendingModeration) bool {
+	t.Helper()
+	saved, err := store.SavePendingModeration(context.Background(), p)
+	if err != nil {
+		t.Fatalf("SavePendingModeration: %v", err)
+	}
+	return saved
+}
+
+func mustSetPrompt(t *testing.T, store *Store, p PendingModeration, promptID int64) {
+	t.Helper()
+	if err := store.SetModerationPrompt(context.Background(), p.RequesterID, p.ChatID, p.UpdateID, promptID); err != nil {
+		t.Fatalf("SetModerationPrompt: %v", err)
+	}
+}
+
+func TestPendingModerationIsConfirmedByAReplyToItsQuestion(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
-	if err := store.SavePendingBan(ctx, PendingBan{RequesterID: alice, ChatID: group, TargetUserID: bob, TargetName: "Bob", UpdateID: 40}); err != nil {
-		t.Fatal(err)
+	take := func(requesterID, chatID, promptID int64) (PendingModeration, error) {
+		return store.TakePendingModeration(ctx, requesterID, chatID, promptID, 5*time.Minute)
+	}
+	want := asked()
+	if !mustSavePending(t, store, want) {
+		t.Fatal("the action was not saved")
+	}
+	// Before the question is posted, nothing can confirm it.
+	if _, err := take(alice, group, 0); !errors.Is(err, ErrNoPendingModeration) {
+		t.Errorf("confirmed before the question was asked: err = %v", err)
+	}
+	mustSetPrompt(t, store, want, 77)
+
+	for name, try := range map[string][3]int64{
+		"by a reply to another message": {alice, group, 76},
+		"by someone else":               {bob, group, 77},
+		"in another chat":               {alice, otherGroup, 77},
+	} {
+		if _, err := take(try[0], try[1], try[2]); !errors.Is(err, ErrNoPendingModeration) {
+			t.Errorf("confirmed %s: err = %v, want ErrNoPendingModeration", name, err)
+		}
+	}
+	got, err := take(alice, group, 77)
+	if err != nil || got != want {
+		t.Fatalf("confirmed = %+v, %v\nwant        %+v", got, err, want)
+	}
+	if _, err := take(alice, group, 77); !errors.Is(err, ErrNoPendingModeration) {
+		t.Errorf("confirmed twice: err = %v", err)
+	}
+}
+
+func TestPendingModerationRedeliveredIsSavedOnce(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	first := asked()
+	mustSavePending(t, store, first)
+	mustSetPrompt(t, store, first, 77)
+
+	// Telegram delivered the update that asked again: it neither replaces
+	// the action nor forgets the question already asked.
+	again := first
+	again.Action = "ban"
+	if mustSavePending(t, store, again) {
+		t.Error("the same update saved its action twice")
+	}
+	if got, err := store.TakePendingModeration(ctx, alice, group, 77, 5*time.Minute); err != nil || got != first {
+		t.Errorf("confirmed = %+v, %v; want the first %+v", got, err, first)
+	}
+}
+
+func TestPendingModerationIsReplacedAndExpires(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	old := asked()
+	mustSavePending(t, store, old)
+	mustSetPrompt(t, store, old, 77)
+	age := func() {
+		t.Helper()
+		if _, err := store.pool.Exec(ctx, `UPDATE pending_moderation SET created_at = now() - interval '10 minutes'`); err != nil {
+			t.Fatal(err)
+		}
+	}
+	age()
+
+	// Asking again replaces what was asked before, and waits from now: the
+	// old question no longer confirms anything.
+	newer := PendingModeration{RequesterID: alice, ChatID: group, Action: "ban", TargetUserID: 1003, TargetMessageID: 41, TargetName: "Cy", UpdateID: 20}
+	if !mustSavePending(t, store, newer) {
+		t.Fatal("a later request was not saved")
+	}
+	mustSetPrompt(t, store, newer, 88)
+	if _, err := store.TakePendingModeration(ctx, alice, group, 77, 5*time.Minute); !errors.Is(err, ErrNoPendingModeration) {
+		t.Errorf("the replaced question confirmed something: err = %v", err)
+	}
+	if got, err := store.TakePendingModeration(ctx, alice, group, 88, 5*time.Minute); err != nil || got != newer {
+		t.Errorf("confirmed = %+v, %v; want the newer %+v", got, err, newer)
 	}
 
-	if cancelled, err := store.CancelPendingBan(ctx, alice, otherGroup); err != nil || cancelled {
+	mustSavePending(t, store, PendingModeration{RequesterID: alice, ChatID: group, Action: "pin", TargetUserID: bob, TargetMessageID: 42, TargetName: "Bob", UpdateID: 30})
+	mustSetPrompt(t, store, PendingModeration{RequesterID: alice, ChatID: group, UpdateID: 30}, 99)
+	age()
+	if _, err := store.TakePendingModeration(ctx, alice, group, 99, 5*time.Minute); !errors.Is(err, ErrNoPendingModeration) {
+		t.Errorf("an action asked for 10 minutes ago was confirmed: err = %v", err)
+	}
+}
+
+func TestCancelPendingModeration(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	mustSavePending(t, store, asked())
+	mustSetPrompt(t, store, asked(), 77)
+
+	if cancelled, err := store.CancelPendingModeration(ctx, alice, otherGroup); err != nil || cancelled {
 		t.Errorf("cancelled in another chat = %v, %v", cancelled, err)
 	}
-	if cancelled, err := store.CancelPendingBan(ctx, alice, group); err != nil || !cancelled {
+	if cancelled, err := store.CancelPendingModeration(ctx, alice, group); err != nil || !cancelled {
 		t.Fatalf("cancelled = %v, %v", cancelled, err)
 	}
-	if cancelled, _ := store.CancelPendingBan(ctx, alice, group); cancelled {
+	if cancelled, _ := store.CancelPendingModeration(ctx, alice, group); cancelled {
 		t.Error("cancelled twice")
 	}
-	if _, err := store.TakePendingBan(ctx, alice, group, 41, 5*time.Minute); !errors.Is(err, ErrNoPendingBan) {
-		t.Errorf("a cancelled ban was confirmed: err = %v", err)
+	if _, err := store.TakePendingModeration(ctx, alice, group, 77, 5*time.Minute); !errors.Is(err, ErrNoPendingModeration) {
+		t.Errorf("a cancelled action was confirmed: err = %v", err)
 	}
 }

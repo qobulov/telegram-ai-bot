@@ -754,7 +754,7 @@ func TestHelpMentionsModerationAndPolls(t *testing.T) {
 		t.Fatalf("help text has no part for group admins:\n%s", help)
 	}
 	for _, want := range []string{
-		"ask me to delete or pin it", "to mute or ban its author", "confirm a ban",
+		"ask me to delete or pin it", "to mute or ban its author", "reply yes to my question",
 		"/mute@username", "/unmute@username", "/ignore@username", "/unignore@username", "/reset@username",
 	} {
 		if !strings.Contains(admins, want) {

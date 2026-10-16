@@ -29,7 +29,7 @@ func TestBuiltinToolsFollowTheConfiguration(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			builtin := builtinTools(tc.cfg, nil, Bot{User: telegram.User{ID: 777}})
+			builtin := builtinTools(tc.cfg, nil, Bot{User: telegram.User{ID: 777}}, tools.NewModeration(tools.ModerationOptions{}).Tool())
 
 			var now struct {
 				Timezone string `json:"timezone"`
