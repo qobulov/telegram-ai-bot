@@ -49,18 +49,20 @@ func (s *Service) process(in incoming) {
 	if in.fromBot && !s.mayAnswerBot(in) {
 		return
 	}
-	rules := s.loadRules(ctx, in)
-	// An ignored member gets nothing, not even a reaction, and takes none of
-	// the group's quota. The off switch still works for them if they may
-	// use it, as it does over the quota.
-	if s.ignored(in, rules) && !s.isOffSwitch(in) {
-		s.passOver(in)
-		return
-	}
 	if notice, limited := s.rateLimited(in); limited {
 		if notice != "" {
 			s.reply(in, notice)
 		}
+		s.passOver(in)
+		return
+	}
+	rules := s.loadRules(ctx, in)
+	// An ignored member gets nothing, not even a reaction, and takes none of
+	// the group's quota. The off switch still works for them if they may
+	// use it, as it does over the quota. The flood guard above comes first,
+	// so that a flood of theirs cannot ask Telegram, or the rules, without
+	// end.
+	if s.ignored(in, rules) && !s.isOffSwitch(in) {
 		s.passOver(in)
 		return
 	}
@@ -486,7 +488,9 @@ const ignoreCommandFor = 24 * time.Hour
 // ignore stops the bot answering, for a day, the member whose message the
 // command replies to. Like /mute it is for the group's admins and the bot's
 // owners. Admins, owners and the bot itself cannot be ignored: the first two
-// must always be able to reach it.
+// must always be able to reach it. It replaces an earlier ignore of the
+// member, even a longer one an owner set with the tool, so the day starts
+// now, as the reply says; whoever may /ignore may /unignore them anyway.
 func (s *Service) ignore(ctx context.Context, in incoming) string {
 	member, refusal := s.ignoreTarget(ctx, in)
 	if refusal != "" {

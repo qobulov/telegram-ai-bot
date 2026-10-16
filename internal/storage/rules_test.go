@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 )
@@ -110,16 +111,50 @@ func TestInstructionsAreLimitedPerChat(t *testing.T) {
 	}
 }
 
+// Expire removes rules that have expired, and only those: a rule set long
+// before maxAge, and still in force, stays.
 func TestExpireRemovesExpiredRules(t *testing.T) {
 	store := newTestStore(t)
+	ctx := context.Background()
 	mustSetRule(t, store, GroupRule{ChatID: group, Kind: RuleInstruction, Text: "gone", SetBy: owner, ExpiresAt: time.Now().Add(-time.Minute)})
 	mustSetRule(t, store, instruction(group, "still on"))
 	mustSetRule(t, store, GroupRule{ChatID: group, Kind: RuleInstruction, Text: "forever", SetBy: owner})
+	if _, err := store.pool.Exec(ctx, `UPDATE group_rules SET created_at = now() - interval '2 days'`); err != nil {
+		t.Fatalf("backdate rules: %v", err)
+	}
 
-	if _, err := store.Expire(context.Background(), 24*time.Hour); err != nil {
+	if _, err := store.Expire(ctx, 24*time.Hour); err != nil {
 		t.Fatalf("Expire: %v", err)
 	}
+	rules := mustRules(t, store, group)
+	if len(rules) != 2 || rules[0].Text != "still on" || rules[1].Text != "forever" {
+		t.Errorf("rules = %+v, want the two still in force", rules)
+	}
 	if rows := countRows(t, store, "group_rules"); rows != 2 {
-		t.Errorf("group_rules rows = %d, want the two still in force", rows)
+		t.Errorf("group_rules rows = %d, want the expired one deleted", rows)
+	}
+}
+
+// What /mute and /reset do to a group in the store leaves its rules alone.
+func TestRulesSurviveMuteAndReset(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	mustSetRule(t, store, instruction(group, "No finance talk."))
+	mustSetRule(t, store, GroupRule{ChatID: group, Kind: RuleIgnore, UserID: bob, UserName: "Bob", SetBy: owner, ExpiresAt: time.Now().Add(time.Hour)})
+	mustSetRule(t, store, GroupRule{Kind: RuleAddress, UserID: owner, Text: "aka", SetBy: owner})
+	before := mustRules(t, store, group)
+
+	if err := store.SetMuted(ctx, group, true, owner); err != nil {
+		t.Fatalf("SetMuted: %v", err)
+	}
+	if err := store.ClearGroupMessages(ctx, group); err != nil {
+		t.Fatalf("ClearGroupMessages: %v", err)
+	}
+	if err := store.Reset(ctx, Scope{ChatID: group}); err != nil {
+		t.Fatalf("Reset: %v", err)
+	}
+
+	if after := mustRules(t, store, group); !slices.Equal(after, before) {
+		t.Errorf("rules after  = %+v\nrules before = %+v", after, before)
 	}
 }

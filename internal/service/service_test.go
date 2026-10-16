@@ -2470,6 +2470,38 @@ func TestIgnoredMemberKeepsTheOffSwitchOnlyAsAnAdmin(t *testing.T) {
 	}
 }
 
+// An ignore rule that names an owner, however it got there, never silences
+// them.
+func TestOwnerIsNeverIgnored(t *testing.T) {
+	f := newFixture()
+	f.opts.OwnerUsernames = []string{ownerUsername}
+	f.opts.Rules = &fakeRuleBook{rules: []storage.GroupRule{ignoring(9001)}}
+	msg := groupMessage("Mira, hi")
+	msg.From = &telegram.User{ID: 9001, FirstName: "Azizbek", Username: "Pronium"}
+
+	expectOneReply(t, f.run(inGroup(msg)), "echo: hi")
+}
+
+// An ignored member's off switch is looked up only as often as the flood
+// guard lets their messages through.
+func TestIgnoredMemberCannotFloodTheAdminLookup(t *testing.T) {
+	f := newFixture()
+	f.opts.Workers = 1
+	f.opts.QueueSize = 32
+	f.opts.Rules = &fakeRuleBook{rules: []storage.GroupRule{ignoring(userID)}}
+	var updates []telegram.Update
+	for range f.opts.RatePerMinute + 5 {
+		updates = append(updates, inGroup(groupMessage("/mute@MyBot")))
+	}
+
+	if sent := f.run(updates...); len(sent) != 0 {
+		t.Errorf("sent = %+v; an ignored member gets nothing", sent)
+	}
+	if f.members.calls != f.opts.RatePerMinute {
+		t.Errorf("Telegram was asked %d times, want %d: once per message the flood guard let through", f.members.calls, f.opts.RatePerMinute)
+	}
+}
+
 // commandReplyingTo is a group command sent by sender as a reply to a message
 // from author.
 func commandReplyingTo(sender, author *telegram.User, command string) telegram.Update {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -22,7 +23,28 @@ const (
 	defaultIgnoreHours      = 24
 	ruleTimeLayout          = "2 Jan 15:04"
 	cannotIgnore            = "admins, the bot's owners and the bot itself cannot be ignored"
+	notAMember              = "that message was posted on behalf of a chat or an anonymous admin, not by a member; the owner must reply to a member's own message"
 	groupRuleOnly           = "this works only in the group the rule is for; ask the owner to say it there. In a private chat only set_address, list and remove work"
+)
+
+const (
+	// maxIgnoresListed bounds the ignores list returns, the newest. A group
+	// may ignore any number of members; the others are counted in a note.
+	maxIgnoresListed = 50
+	// maxListedNameRunes cuts an ignored member's name in list. A name is a
+	// first name and an @username, well under it.
+	maxListedNameRunes = 80
+	// maxEncodedRuneBytes is the most JSON spends on one character: "<"
+	// is written \u003c.
+	maxEncodedRuneBytes = 6
+	// listEntryBytes is the most a listed rule takes besides its text: the
+	// keys, an id of 19 digits, the kind and the date.
+	listEntryBytes = 120
+	// rulesOutputBytes fits the longest list there can be: every
+	// instruction a group may have, maxIgnoresListed ignores and the
+	// owner's form of address, each at its longest, and the note.
+	rulesOutputBytes = (storage.MaxInstructions*maxInstructionRunes+maxIgnoresListed*(maxListedNameRunes+1)+maxAddressRunes)*maxEncodedRuneBytes +
+		(storage.MaxInstructions+maxIgnoresListed+1)*listEntryBytes + 200
 )
 
 // RuleStore keeps the owners' standing rules.
@@ -87,7 +109,8 @@ func RulesTool(opts RulesOptions) Tool {
 			"required": ["action"],
 			"additionalProperties": false
 		}`),
-		OwnerOnly: true,
+		OwnerOnly:      true,
+		MaxOutputBytes: rulesOutputBytes,
 		Run: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			return runRules(ctx, opts, raw)
 		},
@@ -174,6 +197,9 @@ func ignorable(ctx context.Context, opts RulesOptions, caller Caller) (*Target, 
 	if target == nil {
 		return nil, &ArgumentError{Message: "the owner must reply to a message of the member to ignore, and ask again"}
 	}
+	if isTelegramAccount(target.UserID) {
+		return nil, &ArgumentError{Message: notAMember}
+	}
 	if target.UserID == opts.BotID || target.Owner {
 		return nil, &ArgumentError{Message: cannotIgnore}
 	}
@@ -185,6 +211,19 @@ func ignorable(ctx context.Context, opts RulesOptions, caller Caller) (*Target, 
 		return nil, &ArgumentError{Message: cannotIgnore}
 	}
 	return target, nil
+}
+
+// isTelegramAccount reports one of Telegram's own accounts, which post on
+// behalf of someone else: 777000 a linked channel, 1087968824
+// (GroupAnonymousBot) an anonymous admin, 136817688 (Channel_Bot) a channel.
+// No member stands behind such a message, and the bot does not answer them
+// anyway.
+func isTelegramAccount(userID int64) bool {
+	switch userID {
+	case 777000, 1087968824, 136817688:
+		return true
+	}
+	return false
 }
 
 func unignoreMember(ctx context.Context, opts RulesOptions, caller Caller) (any, error) {
@@ -225,33 +264,77 @@ type ruleEntry struct {
 	Until  string `json:"until,omitempty"`
 }
 
-// listRules lists the chat's rules and the calling owner's form of address.
-// Another owner's form of address is theirs, and left out.
+// ruleList is what list returns. Note says how many ignores were left out.
+type ruleList struct {
+	Rules []ruleEntry `json:"rules"`
+	Note  string      `json:"note,omitempty"`
+}
+
+// listRules lists, oldest first, the rules the caller may see, keeping only
+// the newest maxIgnoresListed ignores so that the list always fits in the
+// result.
 func listRules(ctx context.Context, opts RulesOptions, caller Caller) (any, error) {
+	rules, err := visibleRules(ctx, opts, caller)
+	if err != nil {
+		return nil, err
+	}
+	ignores := 0
+	for _, r := range rules {
+		if r.Kind == storage.RuleIgnore {
+			ignores++
+		}
+	}
+	leftOut := max(0, ignores-maxIgnoresListed)
+	list := ruleList{Rules: make([]ruleEntry, 0, len(rules))}
+	skipped := 0
+	for _, r := range rules {
+		if r.Kind == storage.RuleIgnore && skipped < leftOut {
+			skipped++
+			continue
+		}
+		list.Rules = append(list.Rules, listEntry(opts, r))
+	}
+	if leftOut > 0 {
+		list.Note = fmt.Sprintf("%d older ignores left out; unignore works on them too", leftOut)
+	}
+	return list, nil
+}
+
+func listEntry(opts RulesOptions, r storage.GroupRule) ruleEntry {
+	entry := ruleEntry{ID: r.ID, Kind: r.Kind, Text: r.Text}
+	if r.Kind == storage.RuleIgnore {
+		entry.Member = cutRunes(r.UserName, maxListedNameRunes)
+	}
+	if !r.ExpiresAt.IsZero() {
+		entry.Until = r.ExpiresAt.In(opts.Location).Format(ruleTimeLayout)
+	}
+	return entry
+}
+
+// visibleRules are the rules in force in the caller's chat, and those that
+// hold everywhere, without other owners' forms of address: each owner's is
+// theirs, to see and to remove.
+func visibleRules(ctx context.Context, opts RulesOptions, caller Caller) ([]storage.GroupRule, error) {
 	rules, err := opts.Store.GroupRules(ctx, caller.ChatID)
 	if err != nil {
 		return nil, err
 	}
-	entries := make([]ruleEntry, 0, len(rules))
-	for _, r := range rules {
-		if r.Kind == storage.RuleAddress && r.UserID != caller.UserID {
-			continue
-		}
-		entry := ruleEntry{ID: r.ID, Kind: r.Kind, Text: r.Text}
-		if r.Kind == storage.RuleIgnore {
-			entry.Member = r.UserName
-		}
-		if !r.ExpiresAt.IsZero() {
-			entry.Until = r.ExpiresAt.In(opts.Location).Format(ruleTimeLayout)
-		}
-		entries = append(entries, entry)
-	}
-	return map[string]any{"rules": entries}, nil
+	return slices.DeleteFunc(rules, func(r storage.GroupRule) bool {
+		return r.Kind == storage.RuleAddress && r.UserID != caller.UserID
+	}), nil
 }
 
+// removeRule deletes a rule the caller may see, by its id.
 func removeRule(ctx context.Context, opts RulesOptions, caller Caller, args rulesArgs) (any, error) {
 	if args.ID <= 0 {
 		return nil, &ArgumentError{Message: "id is required; take it from list"}
+	}
+	rules, err := visibleRules(ctx, opts, caller)
+	if err != nil {
+		return nil, err
+	}
+	if !slices.ContainsFunc(rules, func(r storage.GroupRule) bool { return r.ID == args.ID }) {
+		return map[string]bool{"removed": false}, nil
 	}
 	removed, err := opts.Store.RemoveGroupRule(ctx, caller.ChatID, args.ID)
 	if err != nil {

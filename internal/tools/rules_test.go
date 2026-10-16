@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"math"
 	"strings"
 	"sync"
 	"testing"
@@ -168,6 +170,11 @@ func TestRulesToolRefusesOwnersAdminsAndTheBot(t *testing.T) {
 		"the bot":       {&Target{MessageID: 29, UserID: rulesBotID, Name: "Mira", IsBot: true}, fakeAdmins{}, "invalid_arguments"},
 		"an owner":      {&Target{MessageID: 29, UserID: 9002, Name: "Muhammad", Owner: true}, fakeAdmins{}, "invalid_arguments"},
 		"a group admin": {bekTarget(), fakeAdmins{admins: map[int64]bool{memberID: true}}, "invalid_arguments"},
+		// Messages posted on behalf of a chat come from Telegram's accounts;
+		// an anonymous admin's would otherwise pass for a member's.
+		"a linked channel's post": {&Target{MessageID: 29, UserID: 777000, Name: "Telegram"}, fakeAdmins{}, "invalid_arguments"},
+		"an anonymous admin":      {&Target{MessageID: 29, UserID: 1087968824, Name: "Group @GroupAnonymousBot", IsBot: true}, fakeAdmins{}, "invalid_arguments"},
+		"a channel":               {&Target{MessageID: 29, UserID: 136817688, Name: "Channel @Channel_Bot", IsBot: true}, fakeAdmins{}, "invalid_arguments"},
 		// Without an answer from Telegram the member might be an admin.
 		"admin check fails": {bekTarget(), fakeAdmins{err: errors.New("telegram: 502 Bad Gateway")}, "execution_failed"},
 	}
@@ -337,5 +344,110 @@ func TestRulesToolChecksItsArguments(t *testing.T) {
 		if env := rules(registry, ownerReplying(groupA, nil), args); !env.OK {
 			t.Errorf("%.60s: %+v", args, env)
 		}
+	}
+}
+
+// An owner's form of address is theirs: another owner neither sees it in
+// list nor removes it by its id.
+func TestRulesToolKeepsAnOwnersAddressTheirs(t *testing.T) {
+	store := &fakeRules{}
+	registry := rulesRegistry(t, store, fakeAdmins{})
+	if env := rules(registry, ownerReplying(groupA, nil), `{"action":"set_address","text":"aka"}`); !env.OK {
+		t.Fatalf("set_address = %+v", env)
+	}
+
+	const otherOwner = int64(9003)
+	other := WithTurn(context.Background(), Caller{UserID: otherOwner, ChatID: groupA, Owner: true, Human: true, UpdateID: 2, MessageID: 31}, &Sink{})
+	for _, c := range []struct{ args, want string }{
+		{`{"action":"list"}`, `{"rules":[]}`},
+		{`{"action":"remove","id":1}`, `{"removed":false}`},
+	} {
+		var env envelope
+		_ = json.Unmarshal([]byte(registry.Execute(other, otherOwner, "group_rules", c.args)), &env)
+		if !env.OK || string(env.Result) != c.want {
+			t.Errorf("another owner's %s = %+v %s, want %s", c.args, env, env.Result, c.want)
+		}
+	}
+	if got := store.all(); len(got) != 1 {
+		t.Fatalf("rules = %+v, want the address kept", got)
+	}
+
+	if env := rules(registry, ownerReplying(userID, nil), `{"action":"remove","id":1}`); string(env.Result) != `{"removed":true}` {
+		t.Errorf("the owner's own remove = %+v %s", env, env.Result)
+	}
+}
+
+// The longest list there can be fits in the tool's result: every
+// instruction a group may have and the form of address, at their longest
+// and in the character JSON spends most on, ids of 19 digits, and more
+// ignores than are listed, with names longer than any member has.
+func TestRulesToolListsTheLongestRules(t *testing.T) {
+	ctx := context.Background()
+	store := &fakeRules{nextID: math.MaxInt64 - 1000}
+	for range storage.MaxInstructions {
+		_, _ = store.SetGroupRule(ctx, storage.GroupRule{
+			ChatID: groupA, Kind: storage.RuleInstruction, Text: strings.Repeat("<", maxInstructionRunes),
+			SetBy: userID, ExpiresAt: rulesNow.Add(time.Hour),
+		})
+	}
+	var ignoreIDs []int64
+	for i := range maxIgnoresListed + 5 {
+		id, _ := store.SetGroupRule(ctx, storage.GroupRule{
+			ChatID: groupA, Kind: storage.RuleIgnore, UserID: int64(10000 + i), UserName: strings.Repeat("<", 200),
+			SetBy: userID, ExpiresAt: rulesNow.Add(time.Hour),
+		})
+		ignoreIDs = append(ignoreIDs, id)
+	}
+	registry := rulesRegistry(t, store, fakeAdmins{})
+	owner := ownerReplying(groupA, nil)
+	if env := rules(registry, owner, `{"action":"set_address","text":"`+strings.Repeat("<", maxAddressRunes)+`"}`); !env.OK {
+		t.Fatalf("set_address = %+v", env)
+	}
+
+	raw := registry.Execute(owner, userID, "group_rules", `{"action":"list"}`)
+
+	var env envelope
+	_ = json.Unmarshal([]byte(raw), &env)
+	if !env.OK {
+		t.Fatalf("list = %+v", env)
+	}
+	if len(raw) <= maxOutputBytes {
+		t.Errorf("the list is %d bytes; the test means to exceed the default limit of %d", len(raw), maxOutputBytes)
+	}
+	var list ruleList
+	if err := json.Unmarshal(env.Result, &list); err != nil {
+		t.Fatalf("list result: %v", err)
+	}
+	if want := storage.MaxInstructions + maxIgnoresListed + 1; len(list.Rules) != want {
+		t.Fatalf("listed %d rules, want %d", len(list.Rules), want)
+	}
+	if want := "5 older ignores left out; unignore works on them too"; list.Note != want {
+		t.Errorf("note = %q, want %q", list.Note, want)
+	}
+	// The newest ignores are the ones listed, each name cut short.
+	first := list.Rules[storage.MaxInstructions]
+	if first.ID != ignoreIDs[5] || first.Member != strings.Repeat("<", maxListedNameRunes)+"…" {
+		t.Errorf("first ignore listed = %+v, want id %d with its name cut", first, ignoreIDs[5])
+	}
+	if last := list.Rules[len(list.Rules)-1]; last.Kind != storage.RuleAddress {
+		t.Errorf("last = %+v, want the address", last)
+	}
+}
+
+func TestRulesToolListsIgnoresUpToTheLimit(t *testing.T) {
+	for _, ignores := range []int{maxIgnoresListed - 1, maxIgnoresListed} {
+		t.Run(fmt.Sprint(ignores), func(t *testing.T) {
+			store := &fakeRules{}
+			for i := range ignores {
+				_, _ = store.SetGroupRule(context.Background(), storage.GroupRule{ChatID: groupA, Kind: storage.RuleIgnore, UserID: int64(10000 + i), UserName: "Bek"})
+			}
+			env := rules(rulesRegistry(t, store, fakeAdmins{}), ownerReplying(groupA, nil), `{"action":"list"}`)
+
+			var list ruleList
+			_ = json.Unmarshal(env.Result, &list)
+			if !env.OK || len(list.Rules) != ignores || list.Note != "" {
+				t.Errorf("list = %d rules, note %q; want all %d and no note", len(list.Rules), list.Note, ignores)
+			}
+		})
 	}
 }
