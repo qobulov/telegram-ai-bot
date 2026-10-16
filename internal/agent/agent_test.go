@@ -456,12 +456,81 @@ func TestSilentAnswerSendsAndSavesNothing(t *testing.T) {
 	}
 }
 
-func TestMarkerInsideASentenceIsAnOrdinaryAnswer(t *testing.T) {
-	f := newFixture(text("I could answer [silent] but where is the fun in that"))
+// The marker leaked into groups when the model wrapped it in a sentence, so
+// wherever it appears the whole answer is withheld.
+func TestSilentMarkerAnywhereSilencesTheAnswer(t *testing.T) {
+	for _, content := range []string{
+		"Yana bitta gap bo'lsa, [silent].",
+		"(SILENT)",
+		"ok [Silent]",
+		"I could answer [silent] but where is the fun in that",
+		"(silent) — they are not talking to me",
+	} {
+		f := newFixture(text(content))
 
-	answer, err := f.agent.Reply(context.Background(), request(1, "say something"))
-	if err != nil || !strings.Contains(answer.Text, "where is the fun") {
-		t.Errorf("answer = %+v, err = %v", answer, err)
+		answer, err := f.agent.Reply(context.Background(), request(1, "hm"))
+		if !errors.Is(err, ErrSilent) {
+			t.Errorf("answer %q: got %+v, err = %v, want ErrSilent", content, answer, err)
+		}
+		if f.store.saves != 0 {
+			t.Errorf("answer %q: a silent turn was saved", content)
+		}
+	}
+}
+
+func TestSilentAsAnOrdinaryWordIsAnAnswer(t *testing.T) {
+	f := newFixture(text("Silent night, holy night"))
+
+	if answer, err := f.agent.Reply(context.Background(), request(1, "sing")); err != nil || answer.Text != "Silent night, holy night" {
+		t.Errorf("answer = %+v, err = %v; only the marker silences", answer, err)
+	}
+}
+
+func TestReactAnswerIsSavedAsReaction(t *testing.T) {
+	cases := map[string]string{
+		"[react 🔥]":    "🔥",
+		"[React 🔥]":    "🔥",
+		" [react  🔥 ]": "🔥",
+		"[react\n🔥]":   "🔥",
+		"*[react 🔥]*":  "🔥",
+		"[react 🔥].":   "🔥",
+		// Models often add the U+FE0F variation selector, which Telegram's
+		// list does not have.
+		"[react ❤\uFE0F]":        "❤",
+		"[react ❤\uFE0F\u200d🔥]": "❤\u200d🔥",
+		"[react ⚡\uFE0F]":        "⚡",
+		// The history shows past reactions in this form, and models copy it.
+		"<reacted 👍>": "👍",
+	}
+	for content, want := range cases {
+		f := newFixture(text(content))
+
+		answer, err := f.agent.Reply(context.Background(), request(1, "xaxa"))
+		if err != nil {
+			t.Errorf("answer %q: err = %v", content, err)
+			continue
+		}
+		if answer.Reaction != want || answer.Text != "" || answer.ID != 9001 {
+			t.Errorf("answer %q: got %+v, want reaction %q, no text, the stored row's ID", content, answer, want)
+		}
+		saved := f.store.history[testScope]
+		if last := saved[len(saved)-1]; last.Role != ai.RoleAssistant || last.Content != "<reacted "+want+">" {
+			t.Errorf("answer %q: saved last message = %+v, want <reacted %s>", content, last, want)
+		}
+	}
+}
+
+func TestReactWithUnknownEmojiIsSilent(t *testing.T) {
+	for _, content := range []string{"[react 🙂]", "[react]", "[react 🔥🔥]", "[react fire]", "[react 🔥 👍]"} {
+		f := newFixture(text(content))
+
+		answer, err := f.agent.Reply(context.Background(), request(1, "xaxa"))
+		if !errors.Is(err, ErrSilent) {
+			t.Errorf("answer %q: got %+v, err = %v, want ErrSilent", content, answer, err)
+		}
+		if f.store.saves != 0 {
+			t.Errorf("answer %q: a turn Telegram cannot show was saved", content)
+		}
 	}
 }
 

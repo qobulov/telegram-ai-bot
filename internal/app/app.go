@@ -212,6 +212,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		GroupRatePerMinute:    cfg.GroupRateLimitPerMinute,
 		MemberRepliesPer10Min: cfg.MemberRepliesPer10Min,
 		Reactor:               bot.Client,
+		ChatActor:             bot.Client,
 	}
 	if mode.Serverless {
 		opts.Workers, opts.QueueSize = 0, 0

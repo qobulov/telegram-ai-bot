@@ -79,6 +79,9 @@ type fakeReplier struct {
 	draws int
 	// answer replaces the echo when set.
 	answer string
+	// reaction, when set, is answered instead of text, as the agent does
+	// for "[react X]".
+	reaction string
 }
 
 func (f *fakeReplier) Reply(ctx context.Context, req agent.Request) (agent.Answer, error) {
@@ -108,6 +111,9 @@ func (f *fakeReplier) Reply(ctx context.Context, req agent.Request) (agent.Answe
 	}
 	if err != nil {
 		return agent.Answer{}, err
+	}
+	if f.reaction != "" {
+		return agent.Answer{Reaction: f.reaction, ID: 9001}, nil
 	}
 	if f.answer != "" {
 		return agent.Answer{Text: f.answer, ID: 9001}, nil
@@ -234,6 +240,32 @@ func (f *fakeReactor) recorded() []reaction {
 	return append([]reaction(nil), f.reactions...)
 }
 
+// chatAction is a status the bot showed in a chat.
+type chatAction struct {
+	chatID int64
+	action string
+}
+
+// fakeChatActor records chat actions. It is called from the goroutine that
+// keeps "typing" shown, hence the lock.
+type fakeChatActor struct {
+	mu      sync.Mutex
+	actions []chatAction
+}
+
+func (f *fakeChatActor) SendChatAction(_ context.Context, chatID int64, action string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.actions = append(f.actions, chatAction{chatID: chatID, action: action})
+	return nil
+}
+
+func (f *fakeChatActor) recorded() []chatAction {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]chatAction(nil), f.actions...)
+}
+
 // fakeGroupQuota counts answers per chat and per member like the store does,
 // without its time windows, and records what it was asked.
 type fakeGroupQuota struct {
@@ -271,6 +303,7 @@ func (f *fakeGroupQuota) asked() []storage.ReplyQuota {
 
 type fixture struct {
 	reactor     *fakeReactor
+	chatActor   *fakeChatActor
 	botQuota    *fakeBotQuota
 	sender      *fakeSender
 	replier     *fakeReplier
@@ -289,7 +322,7 @@ func newFixture() *fixture {
 		sender: &fakeSender{}, replier: &fakeReplier{}, resetter: &fakeResetter{}, recorder: &fakeRecorder{},
 		members: &fakeMembers{admins: map[int64]bool{groupAdminID: true}}, muter: &fakeMuter{},
 		media: newFakeMedia(), chatLog: newMemoryLog(), transcriber: &fakeTranscriber{text: "salom dunyo"},
-		botQuota: &fakeBotQuota{}, reactor: &fakeReactor{},
+		botQuota: &fakeBotQuota{}, reactor: &fakeReactor{}, chatActor: &fakeChatActor{},
 	}
 	f.opts = Options{
 		Sender:        f.sender,
@@ -327,6 +360,7 @@ func newFixture() *fixture {
 		BotReplies:         f.botQuota,
 		BotRepliesPer10Min: 3,
 		Reactor:            f.reactor,
+		ChatActor:          f.chatActor,
 		// GroupReplies is left nil, which does not limit; the tests of the
 		// group quota set one.
 		MemberRepliesPer10Min: 4,
@@ -1837,6 +1871,93 @@ func TestPrivateApplauseIsAnswered(t *testing.T) {
 
 	if len(f.replier.recorded()) != 1 || len(f.reactor.recorded()) != 0 {
 		t.Errorf("reactions = %+v; a private chat has nobody else to talk to", f.reactor.recorded())
+	}
+}
+
+func TestReactionAnswerSetsReactionAndSendsNothing(t *testing.T) {
+	f := newFixture()
+	f.replier.reaction = "👍"
+
+	sent := f.run(inGroup(groupMessage("Mira, I won the match")))
+
+	if len(sent) != 0 {
+		t.Errorf("sent = %+v; the reaction is the whole answer", sent)
+	}
+	want := []reaction{{chatID: groupID, messageID: 30, emoji: "👍"}}
+	if got := f.reactor.recorded(); !reflect.DeepEqual(got, want) {
+		t.Errorf("reactions = %+v, want %+v on the question", got, want)
+	}
+	if len(f.recorder.calls) != 0 {
+		t.Errorf("recorded = %+v; no message was sent to record", f.recorder.calls)
+	}
+	wantLog := []string{"Bek: I won the match", "You: <reacted 👍>"}
+	if got := f.chatLog.texts(groupID); !reflect.DeepEqual(got, wantLog) {
+		t.Errorf("log = %q, want %q", got, wantLog)
+	}
+}
+
+func TestPrivateReactionAnswerReactsToTheMessage(t *testing.T) {
+	f := newFixture()
+	f.replier.reaction = "🔥"
+	update := textFrom(userID, "I passed the exam")
+	update.Message.MessageID = 12
+
+	if sent := f.run(update); len(sent) != 0 {
+		t.Errorf("sent = %+v, want nothing", sent)
+	}
+	want := []reaction{{chatID: userID, messageID: 12, emoji: "🔥"}}
+	if got := f.reactor.recorded(); !reflect.DeepEqual(got, want) {
+		t.Errorf("reactions = %+v, want %+v", got, want)
+	}
+}
+
+// typingAtSend notes how many chat actions had been shown when the answer
+// was sent: "typing" shown after it would hang over the finished answer.
+type typingAtSend struct {
+	*fakeSender
+	actor *fakeChatActor
+	seen  int
+}
+
+func (s *typingAtSend) SendMessage(ctx context.Context, msg telegram.Outgoing) (int64, error) {
+	s.seen = len(s.actor.recorded())
+	return s.fakeSender.SendMessage(ctx, msg)
+}
+
+func TestTypingShownDuringTurn(t *testing.T) {
+	f := newFixture()
+	sender := &typingAtSend{fakeSender: f.sender, actor: f.chatActor}
+	f.opts.Sender = sender
+	s := serverless(f, &fakeMuteStore{})
+	defer s.Close()
+
+	s.HandleNow(inGroup(groupMessage("Mira, think hard")))
+
+	shown := f.chatActor.recorded()
+	if len(shown) == 0 {
+		t.Fatal("no typing was shown while the model worked")
+	}
+	for _, action := range shown {
+		if action != (chatAction{chatID: groupID, action: "typing"}) {
+			t.Errorf("chat action = %+v, want typing in the group", action)
+		}
+	}
+	if sender.seen != len(shown) {
+		t.Errorf("typing shown %d times before the answer and %d in all; it must stop first", sender.seen, len(shown))
+	}
+	time.Sleep(50 * time.Millisecond)
+	if after := f.chatActor.recorded(); len(after) != len(shown) {
+		t.Errorf("typing went on after the turn: %d calls, then %d", len(shown), len(after))
+	}
+}
+
+func TestCommandsAndApplauseShowNoTyping(t *testing.T) {
+	f := newFixture()
+
+	f.run(inGroup(groupMessage("/help@MyBot")), inGroup(stickerReply()))
+
+	if shown := f.chatActor.recorded(); len(shown) != 0 {
+		t.Errorf("chat actions = %+v; only a model turn takes long enough to need one", shown)
 	}
 }
 

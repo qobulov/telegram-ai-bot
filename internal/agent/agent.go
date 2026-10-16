@@ -6,11 +6,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"unicode"
 
 	"telegram-ai-bot/internal/ai"
 	"telegram-ai-bot/internal/storage"
+	"telegram-ai-bot/internal/telegram"
 )
 
 var (
@@ -23,8 +25,21 @@ var (
 	ErrToolLoop = errors.New("agent: model did not produce an answer")
 )
 
-// SilentMarker is the whole answer the model gives to stay silent.
+// SilentMarker is the answer the model gives to stay silent.
 const SilentMarker = "[silent]"
+
+// silentMarkers are the spellings of SilentMarker that silence an answer
+// wherever they appear in it, compared in lower case.
+var silentMarkers = []string{SilentMarker, "(silent)"}
+
+// reactionVerbs open an answer that is a reaction: "[react 🔥]" is what the
+// model is told to write, and "<reacted 🔥>" is how its past reactions look
+// in the history, which models copy.
+var reactionVerbs = []string{"react", "reacted"}
+
+// variationSelector is the invisible U+FE0F that models often write after
+// an emoji such as ❤ or ⚡. Telegram's list of reactions does not have it.
+const variationSelector = "\uFE0F"
 
 const toolLimitResult = `{"ok":false,"error":{"code":"tool_limit","message":"The tool call limit for this message was reached. Answer with the information you already have."}}`
 
@@ -99,7 +114,10 @@ type Request struct {
 // Answer is the assistant's reply. ID identifies the stored answer.
 type Answer struct {
 	Text string
-	ID   int64
+	// Reaction is the emoji the model chose to react with instead of
+	// writing. Text is then empty.
+	Reaction string
+	ID       int64
 }
 
 // Reply answers the user's message and saves the whole turn. Nothing is
@@ -122,15 +140,14 @@ func (a *Agent) Reply(ctx context.Context, req Request) (Answer, error) {
 		history:  sanitize(history),
 		messages: []ai.Message{{Role: ai.RoleUser, Content: req.Text}},
 	}
-	text, err := a.run(ctx, t)
+	answer, err := a.run(ctx, t)
 	if err != nil {
 		return Answer{}, err
 	}
-	answerID, err := a.save(ctx, t)
-	if err != nil {
+	if answer.ID, err = a.save(ctx, t); err != nil {
 		return Answer{}, err
 	}
-	return Answer{Text: text, ID: answerID}, nil
+	return answer, nil
 }
 
 // turn is the state of one Reply call.
@@ -145,7 +162,7 @@ type turn struct {
 // answers in text. The loop cannot run away: once MaxToolCalls is reached the
 // model is told to stop using tools, and after MaxToolCalls+2 requests the
 // turn fails with ErrToolLoop.
-func (a *Agent) run(ctx context.Context, t *turn) (string, error) {
+func (a *Agent) run(ctx context.Context, t *turn) (Answer, error) {
 	definitions := a.opts.Tools.Definitions(ctx, t.req.UserID)
 	for range a.opts.MaxToolCalls + 2 {
 		reply, err := a.opts.Model.Complete(ctx, ai.Request{
@@ -154,14 +171,14 @@ func (a *Agent) run(ctx context.Context, t *turn) (string, error) {
 			ForbidTools: t.toolsUsed >= a.opts.MaxToolCalls,
 		})
 		if err != nil {
-			return "", err
+			return Answer{}, err
 		}
 		if len(reply.ToolCalls) == 0 {
 			return finish(t, reply)
 		}
 		a.runTools(ctx, t, reply)
 	}
-	return "", ErrToolLoop
+	return Answer{}, ErrToolLoop
 }
 
 func (a *Agent) prompt(t *turn) []ai.Message {
@@ -187,26 +204,72 @@ func (a *Agent) systemPrompt(req Request) string {
 	return a.opts.Persona
 }
 
-func finish(t *turn, reply ai.Message) (string, error) {
+// finish turns the model's final message into the answer and adds it to the
+// turn. A reaction is saved as "<reacted X>", so that later turns see that
+// the bot answered and how.
+func finish(t *turn, reply ai.Message) (Answer, error) {
 	answer := strings.TrimSpace(reply.Content)
 	if answer == "" {
-		return "", ai.ErrEmptyResponse
+		return Answer{}, ai.ErrEmptyResponse
 	}
 	if isSilent(answer) {
-		return "", ErrSilent
+		return Answer{}, ErrSilent
+	}
+	if emoji, ok := reactionOf(answer); ok {
+		// The model wanted no words. Telegram refuses any emoji not on its
+		// list, so for any other one silence is the closest it can have.
+		emoji = strings.ReplaceAll(emoji, variationSelector, "")
+		if !telegram.IsReactionEmoji(emoji) {
+			return Answer{}, ErrSilent
+		}
+		t.messages = append(t.messages, ai.Message{Role: ai.RoleAssistant, Content: "<reacted " + emoji + ">"})
+		return Answer{Reaction: emoji}, nil
 	}
 	t.messages = append(t.messages, ai.Message{Role: ai.RoleAssistant, Content: answer})
-	return answer, nil
+	return Answer{Text: answer}, nil
 }
 
-// isSilent reports whether the whole answer is the silent marker. Models
-// often decorate it ("[silent].", "*[silent]*"), so punctuation around it is
-// ignored; an answer that says anything else is an answer.
+// isSilent reports an answer with the silent marker anywhere in it. The
+// marker is meant to be the whole answer, but models wrap it in a sentence
+// ("Yana bitta gap bo'lsa, [silent].") or change its brackets, and sending
+// such an answer would post the marker into the chat.
 func isSilent(answer string) bool {
+	lower := strings.ToLower(answer)
+	for _, marker := range silentMarkers {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// reactionOf returns X when the whole answer is "[react X]" (or the saved
+// form "<reacted X>"), ignoring decoration around it as in "*[react 🔥]*".
+// X may be empty or not an emoji at all; finish decides what it is worth.
+func reactionOf(answer string) (string, bool) {
 	bare := strings.TrimFunc(answer, func(char rune) bool {
-		return char != '[' && char != ']' && !unicode.IsLetter(char) && !unicode.IsDigit(char)
+		return !strings.ContainsRune("[]<>", char) && !unicode.IsLetter(char) && !unicode.IsDigit(char)
 	})
-	return strings.EqualFold(bare, SilentMarker)
+	inner, ok := enclosed(bare)
+	if !ok {
+		return "", false
+	}
+	words := strings.Fields(inner)
+	isVerb := func(verb string) bool { return len(words) > 0 && strings.EqualFold(words[0], verb) }
+	if !slices.ContainsFunc(reactionVerbs, isVerb) {
+		return "", false
+	}
+	return strings.Join(words[1:], " "), true
+}
+
+// enclosed returns what is between the brackets of "[...]" or "<...>".
+func enclosed(text string) (string, bool) {
+	for _, brackets := range []string{"[]", "<>"} {
+		if inner, ok := strings.CutPrefix(text, brackets[:1]); ok {
+			return strings.CutSuffix(inner, brackets[1:])
+		}
+	}
+	return "", false
 }
 
 // runTools records the assistant's request and one result per call. Every

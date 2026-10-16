@@ -79,6 +79,11 @@ type Reactor interface {
 	SetMessageReaction(ctx context.Context, chatID, messageID int64, emoji string) error
 }
 
+// ChatActor shows a status, such as "typing", in a chat.
+type ChatActor interface {
+	SendChatAction(ctx context.Context, chatID int64, action string) error
+}
+
 // Options configures a Service. A field may be left nil when its comment
 // says what nil, or leaving it unset, does; lists may be empty. The other
 // fields are required.
@@ -151,9 +156,12 @@ type Options struct {
 	GroupReplies          GroupReplyQuota
 	GroupRatePerMinute    int
 	MemberRepliesPer10Min int
-	// Reactor sets emoji reactions, the bot's answer to applause; nil means
-	// it never reacts.
+	// Reactor sets emoji reactions, the bot's answer to applause and the
+	// model's when it reacts instead of writing; nil means it never reacts.
 	Reactor Reactor
+	// ChatActor shows "typing" while the model works on an answer; nil
+	// shows nothing.
+	ChatActor ChatActor
 	// MaxGroupReplyChars is the longest answer posted in a group, in UTF-16
 	// code units as Telegram counts them.
 	MaxGroupReplyChars int
@@ -592,5 +600,41 @@ func (s *Service) react(in incoming, emoji string) {
 	defer cancel()
 	if err := s.opts.Reactor.SetMessageReaction(ctx, in.msg.Chat.ID, in.msg.MessageID, emoji); err != nil {
 		s.opts.Logger.Debug("reaction failed", "chat_id", in.msg.Chat.ID, "emoji", emoji, "error", err)
+	}
+}
+
+// typingInterval is how often "typing" is shown again while a turn runs.
+// Telegram clears it after about 5 seconds.
+const typingInterval = 4 * time.Second
+
+// showTyping shows "typing" in the chat at once and again every
+// typingInterval, until stop is called or ctx ends: a turn can take many
+// seconds, and without a sign of life people ask again. stop waits for the
+// goroutine, so that no "typing" is sent after the answer, where it would
+// hang over a finished reply. Like a reaction, it is a gesture, so failures
+// are only logged at debug level.
+func (s *Service) showTyping(ctx context.Context, chatID int64) (stop func()) {
+	if s.opts.ChatActor == nil {
+		return func() {}
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	var typing sync.WaitGroup
+	typing.Go(func() {
+		ticker := time.NewTicker(typingInterval)
+		defer ticker.Stop()
+		for {
+			if err := s.opts.ChatActor.SendChatAction(ctx, chatID, "typing"); err != nil {
+				s.opts.Logger.Debug("typing indicator failed", "chat_id", chatID, "error", err)
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+			}
+		}
+	})
+	return func() {
+		cancel()
+		typing.Wait()
 	}
 }

@@ -20,6 +20,9 @@ import (
 type outcome struct {
 	text     string
 	answerID int64
+	// reaction is the emoji the model answered with instead of text. It is
+	// set on the message being answered; no message is sent for it.
+	reaction string
 	// drawings are pictures made during the turn, sent with the text.
 	drawings []tools.Drawing
 }
@@ -68,8 +71,12 @@ func (s *Service) process(in incoming) {
 
 // deliver sends the outcome and returns the ID of the message that carries
 // the answer. A picture goes first, with the answer as its caption when it
-// fits; a longer answer follows as its own message.
+// fits; a longer answer follows as its own message. A reaction is set on the
+// message being answered and is not a message, so alone it returns 0.
 func (s *Service) deliver(in incoming, out outcome) int64 {
+	if out.reaction != "" {
+		s.react(in, out.reaction)
+	}
 	if len(out.drawings) == 0 {
 		if out.text == "" {
 			return 0
@@ -122,6 +129,9 @@ func (s *Service) logExchange(in incoming, out outcome) {
 	s.ambient.addMessage(in.msg, s.label(in.msg.From), in.described)
 	if out.answerID != 0 {
 		answer := out.text
+		if out.reaction != "" {
+			answer = "<reacted " + out.reaction + ">"
+		}
 		if len(out.drawings) > 0 {
 			answer = "<photo> " + answer
 		}
@@ -257,6 +267,8 @@ func hasNoText(in incoming) bool {
 
 func (s *Service) ask(ctx context.Context, in incoming) outcome {
 	started := time.Now()
+	stopTyping := s.showTyping(ctx, in.msg.Chat.ID)
+	defer stopTyping()
 	sink := &tools.Sink{}
 	ctx = tools.WithTurn(ctx, tools.Caller{UserID: in.userID, ChatID: in.scope.ChatID, Owner: s.isOwner(in.msg.From), UpdateID: in.updateID}, sink)
 	out := s.answerOf(ctx, in, started)
@@ -271,6 +283,9 @@ func (s *Service) answerOf(ctx context.Context, in incoming, started time.Time) 
 		"update_id", in.updateID, "duration", time.Since(started).String())
 
 	switch {
+	case err == nil && answer.Reaction != "":
+		log.Info("turn completed with a reaction", "emoji", answer.Reaction)
+		return outcome{reaction: answer.Reaction, answerID: answer.ID}
 	case err == nil:
 		log.Info("turn completed")
 		return outcome{text: s.fitted(in, answer.Text), answerID: answer.ID}
