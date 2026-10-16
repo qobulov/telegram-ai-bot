@@ -276,9 +276,14 @@ func isSilent(answer string) bool {
 }
 
 // reactMarkers finds "[react X]", and "<reacted X>", which is how past
-// reactions look in the history and which models copy, in either bracket
-// style and any case.
-var reactMarkers = regexp.MustCompile(`(?i)\[\s*react(?:ed)?\b[^\]]*\]|<\s*react(?:ed)?\b[^>]*>`)
+// reactions look in the history and which models copy, in any case, with
+// "reaction" for the verb, and in round brackets too, as "(silent)" is. Round
+// brackets are common in prose ("I use (React)"), so a round marker is one
+// only when what follows the verb has no letters or digits, such as an
+// emoji.
+var reactMarkers = regexp.MustCompile(`(?i)\[\s*react(?:ed|ion)?\b[^\]]*\]` +
+	`|<\s*react(?:ed|ion)?\b[^>]*>` +
+	`|\(\s*react(?:ed|ion)?\b[^)\pL\pN]*[^)\s\pL\pN][^)\pL\pN]*\)`)
 
 // leftSpaces are the spaces a dropped marker leaves: doubled, or at the
 // edge of a line.
@@ -305,7 +310,7 @@ func hasWords(text string) bool {
 // markerArgument is what a reaction marker carries after its verb: "🔥" for
 // "[react 🔥]". It may be empty or not an emoji at all; react decides.
 func markerArgument(marker string) string {
-	words := strings.Fields(strings.Trim(marker, "[]<>"))
+	words := strings.Fields(strings.Trim(marker, "[]<>()"))
 	if len(words) == 0 {
 		return ""
 	}

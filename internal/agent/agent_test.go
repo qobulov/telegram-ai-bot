@@ -501,6 +501,12 @@ func TestReactAnswerIsSavedAsReaction(t *testing.T) {
 		"[react ⚡\uFE0F]":        "⚡",
 		// The history shows past reactions in this form, and models copy it.
 		"<reacted 👍>": "👍",
+		// Models change the brackets and the word, as they do with silence.
+		"(react 🔥)":    "🔥",
+		"(React: 🔥)":   "🔥",
+		"[reaction 🔥]": "🔥",
+		"(reaction 👍)": "👍",
+		"<reaction 👍>": "👍",
 	}
 	for content, want := range cases {
 		f := newFixture(text(content))
@@ -531,6 +537,9 @@ func TestReactMarkerAmongWordsIsDropped(t *testing.T) {
 		"Ha, <Reacted 👍> qoyil":              "Ha, qoyil",
 		"Birinchi qator [react 🔥]\nIkkinchi": "Birinchi qator\nIkkinchi",
 		"[reacted 🔥] ok":                     "ok",
+		"Zo'r! (react 🔥)":                    "Zo'r!",
+		"Zo'r [reaction 🔥]":                  "Zo'r",
+		"(reacted 😁) xaxa":                   "xaxa",
 	}
 	for content, want := range cases {
 		f := newFixture(text(content))
@@ -543,6 +552,24 @@ func TestReactMarkerAmongWordsIsDropped(t *testing.T) {
 		saved := f.store.history[testScope]
 		if last := saved[len(saved)-1]; last.Content != want {
 			t.Errorf("answer %q: saved %q, want %q", content, last.Content, want)
+		}
+	}
+}
+
+// Round brackets are common in prose, so only a round marker with an emoji
+// and no words in it is taken for one.
+func TestRoundBracketsAroundTheWordReactAreText(t *testing.T) {
+	for _, content := range []string{
+		"Men frontendda (React) ishlayman",
+		"Kutubxona (react.js) yaxshi",
+		"Uni (react native) bilan yozganman",
+		"(React 18) chiqdi",
+	} {
+		f := newFixture(text(content))
+
+		answer, err := f.agent.Reply(context.Background(), request(1, "qaysi?"))
+		if err != nil || answer.Text != content || answer.Reaction != "" {
+			t.Errorf("answer %q: got %+v, err = %v; want it sent as written", content, answer, err)
 		}
 	}
 }
