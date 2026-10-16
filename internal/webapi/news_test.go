@@ -1,6 +1,7 @@
 package webapi
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -223,6 +224,27 @@ func TestNewsFeedsAreCached(t *testing.T) {
 	}
 	if n := len(u.requests("/rss/kun")); n != 1 {
 		t.Errorf("kun.uz was asked %d times, want 1", n)
+	}
+}
+
+func TestFitNewsDropsTheOldestWhenEverythingIsLong(t *testing.T) {
+	long := newsItem{
+		Title:  strings.Repeat("ж", maxTitle),
+		Lead:   strings.Repeat("ж", maxLead),
+		Source: "daryo.uz",
+		Link:   "https://daryo.uz/" + strings.Repeat("a", maxLink-17),
+		Time:   "15 Oct 23:47",
+	}
+	out := newsOutput{Note: newsNote}
+	for range 8 {
+		out.Items = append(out.Items, long)
+	}
+
+	fitted := fitNews(out)
+
+	encoded, _ := json.Marshal(fitted)
+	if len(fitted.Items) == 0 || len(fitted.Items) == 8 || len(encoded)+len(`{"ok":true,"result":}`) > newsMaxBytes {
+		t.Errorf("%d items in %d bytes", len(fitted.Items), len(encoded))
 	}
 }
 

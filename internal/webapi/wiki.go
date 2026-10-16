@@ -59,7 +59,7 @@ func (a *apis) wikiTool() tools.Tool {
 			"type": "object",
 			"properties": {
 				"query": {"type": "string", "description": "What to look up, e.g. Amir Temur, Навои. Not needed for on_this_day."},
-				"lang": {"type": "string", "enum": ["uz", "ru", "en"], "description": "Language to try first. Default uz."},
+				"lang": {"type": "string", "enum": ["uz", "ru", "en"], "description": "Language to try first; ru for a query in Russian. Default uz."},
 				"mode": {"type": "string", "enum": ["summary", "on_this_day"], "description": "Default summary."}
 			},
 			"additionalProperties": false

@@ -261,14 +261,14 @@ func (a *apis) feed(ctx context.Context, f feed) ([]headline, error) {
 		if err := xml.Unmarshal(xmlSafe(body), &rss); err != nil {
 			return nil, fmt.Errorf("%s sent a feed that could not be read", f.source)
 		}
-		if len(rss.Items) == 0 {
-			return nil, errors.New(f.source + " sent no headlines")
-		}
 		var items []headline
 		for _, item := range rss.Items[:min(len(rss.Items), maxPerFeed)] {
 			if h := item.headline(f.source); h.title != "" {
 				items = append(items, h)
 			}
+		}
+		if len(items) == 0 {
+			return nil, errors.New(f.source + " sent no headlines")
 		}
 		return items, nil
 	})
