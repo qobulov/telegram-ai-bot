@@ -524,6 +524,30 @@ func TestAgentErrorShowsGenericError(t *testing.T) {
 	}
 }
 
+// In production a member swore a second time, the model gave back nothing
+// where [silent] was meant, and the group got the English error. In a group
+// an empty answer is silence; a private chat still hears that it failed.
+func TestEmptyAnswerIsSilentInAGroup(t *testing.T) {
+	f := newFixture()
+	f.replier.err = fmt.Errorf("agent: %w", ai.ErrEmptyResponse)
+	if sent := f.run(inGroup(groupMessage("Mira, сукма нахуй"))); len(sent) != 0 {
+		t.Errorf("sent %+v; an empty answer in a group sends nothing", sent)
+	}
+
+	f = newFixture()
+	f.replier.err = fmt.Errorf("agent: %w", ai.ErrEmptyResponse)
+	expectOneReply(t, f.run(textFrom(userID, "hi")), textError)
+}
+
+// The bot's own messages are in Uzbek, like the people it talks to.
+func TestErrorTextsAreUzbek(t *testing.T) {
+	for name, text := range map[string]string{"error": textError, "timeout": textTimeout, "busy": textBusy, "rate limited": textRateLimited, "too long": textTooLong} {
+		if strings.Contains(text, "Please") || strings.Contains(text, "try again") {
+			t.Errorf("%s text is still English: %q", name, text)
+		}
+	}
+}
+
 func TestAgentTimeoutShowsTimeoutText(t *testing.T) {
 	f := newFixture()
 	f.replier.err = context.DeadlineExceeded

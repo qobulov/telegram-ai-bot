@@ -19,16 +19,16 @@ Send /reset to delete the conversation history.`
 	textResetDone   = "The conversation history here has been deleted."
 	textUnknown     = "I don't know that command. Send /help to see what I can do."
 	textForbidden   = "This command is restricted to administrators."
-	textBusy        = "I'm handling a lot of messages right now. Please try again in a moment."
-	textRateLimited = "You're sending messages too quickly. Please wait a little and try again."
+	textBusy        = "Hozir xabarlar juda ko'p, birozdan keyin qayta yozing."
+	textRateLimited = "Juda tez yozyapsiz, biroz kutib qayta yozing."
 	textMuted       = "Fine, I'll be quiet here. An admin can bring me back with /unmute@%s." // the bot's username
 	textUnmuted     = "I'm back."
 	textAdminsOnly  = "Only this group's admins can do that."
 	textGroupsOnly  = "That command is for groups."
-	textTimeout     = "That took too long to answer. Please try again."
+	textTimeout     = "Javob berish juda cho'zilib ketdi, qayta yozing."
 	textOverloaded  = "Hozir juda band ekanman, bir daqiqadan keyin qayta yozing."
-	textError       = "Something went wrong on my side. Please try again later."
-	textTooLong     = "Your message is too long. Please keep it under %d characters."
+	textError       = "Nimadir xato ketdi, birozdan keyin qayta yozing."
+	textTooLong     = "Xabaringiz juda uzun, %d belgidan qisqaroq yozing."
 	textModel       = "Current model: %s"
 	// textDailyLimit takes the private chats' daily limit three times, once
 	// for each language.

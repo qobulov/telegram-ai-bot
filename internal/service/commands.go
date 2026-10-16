@@ -613,6 +613,11 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 	case errors.Is(err, agent.ErrSilent):
 		log.Info("the model chose not to reply")
 		return outcome{}
+	case in.group && errors.Is(err, ai.ErrEmptyResponse):
+		// Models give back nothing where [silent] was meant, such as after a
+		// second insult; an error message would be worse than silence.
+		log.Warn("the model gave an empty answer; nothing was sent")
+		return outcome{}
 	case errors.Is(err, agent.ErrDuplicate):
 		log.Info("duplicate update skipped")
 		return outcome{duplicate: true}
