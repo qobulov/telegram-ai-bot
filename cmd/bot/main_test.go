@@ -77,15 +77,15 @@ type modelMessage struct {
 	Content string `json:"content"`
 }
 
-// fakeOpenRouter records the messages of each request and replies through
+// fakeModel records the messages of each request and replies through
 // answer, which sees the request's messages.
-type fakeOpenRouter struct {
+type fakeModel struct {
 	mu       sync.Mutex
 	requests [][]modelMessage
 	answer   func(messages []modelMessage) string
 }
 
-func (f *fakeOpenRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (f *fakeModel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Messages []modelMessage `json:"messages"`
 	}
@@ -96,7 +96,7 @@ func (f *fakeOpenRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.WriteString(w, f.answer(req.Messages))
 }
 
-func (f *fakeOpenRouter) firstRequest() []modelMessage {
+func (f *fakeModel) firstRequest() []modelMessage {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.requests[0]
@@ -118,10 +118,10 @@ func calculatorThenAnswer(t *testing.T) func([]modelMessage) string {
 }
 
 // e2e is the bot wired from real packages against fake Telegram and
-// OpenRouter servers and a real PostgreSQL database.
+// model servers and a real PostgreSQL database.
 type e2e struct {
 	telegram *fakeTelegram
-	model    *fakeOpenRouter
+	model    *fakeModel
 	store    *storage.Store
 	stop     func() error // shuts the bot down and returns serve's error
 }
@@ -132,7 +132,7 @@ func startE2E(t *testing.T, update string, answer func([]modelMessage) string) *
 	if databaseURL == "" {
 		t.Skip("TEST_DB_POSTGRES_URL is not set; skipping end-to-end test")
 	}
-	env := &e2e{telegram: newFakeTelegram(update), model: &fakeOpenRouter{answer: answer}}
+	env := &e2e{telegram: newFakeTelegram(update), model: &fakeModel{answer: answer}}
 	telegramServer := httptest.NewServer(env.telegram)
 	t.Cleanup(telegramServer.Close)
 	modelServer := httptest.NewServer(env.model)
@@ -140,12 +140,14 @@ func startE2E(t *testing.T, update string, answer func([]modelMessage) string) *
 
 	cfg, err := config.Load(func(key string) string {
 		return map[string]string{
-			"TELEGRAM_BOT_TOKEN":  "1:test",
-			"TELEGRAM_API_URL":    telegramServer.URL,
-			"OPENROUTER_API_KEY":  "test",
-			"OPENROUTER_BASE_URL": modelServer.URL,
-			"BOT_DISPLAY_NAME":    "Mira",
-			"DB_POSTGRES_URL":     databaseURL,
+			"TELEGRAM_BOT_TOKEN":      "1:test",
+			"TELEGRAM_API_URL":        telegramServer.URL,
+			"GEMINI_API_KEY":          "test",
+			"GEMINI_BASE_URL":         modelServer.URL,
+			"FALLBACK_MODELS":         "none",
+			"ENABLE_IMAGE_GENERATION": "false",
+			"BOT_DISPLAY_NAME":        "Mira",
+			"DB_POSTGRES_URL":         databaseURL,
 		}[key]
 	})
 	if err != nil {
@@ -394,7 +396,7 @@ func TestServeFailsFastOnBadToken(t *testing.T) {
 		return map[string]string{
 			"TELEGRAM_BOT_TOKEN": "1:wrong-secret",
 			"TELEGRAM_API_URL":   telegramServer.URL,
-			"OPENROUTER_API_KEY": "test",
+			"GEMINI_API_KEY":     "test",
 			"DB_POSTGRES_URL":    databaseURL,
 		}[key]
 	})
@@ -426,7 +428,7 @@ func TestMigrateNeedsOnlyDatabaseURL(t *testing.T) {
 	}
 	t.Setenv("DB_POSTGRES_URL", databaseURL)
 	t.Setenv("TELEGRAM_BOT_TOKEN", "")
-	t.Setenv("OPENROUTER_API_KEY", "")
+	t.Setenv("GEMINI_API_KEY", "")
 
 	if err := run([]string{"migrate"}); err != nil {
 		t.Fatalf("run migrate: %v", err)

@@ -29,7 +29,7 @@ const (
 	hookGroup  = int64(-100778000)
 )
 
-// fakeAPIs stands in for Telegram and OpenRouter and records what is sent.
+// fakeAPIs stands in for Telegram and the model provider and records what is sent.
 type fakeAPIs struct {
 	mu          sync.Mutex
 	sent        []map[string]any
@@ -89,8 +89,10 @@ func startWebhook(t *testing.T) *hookEnv {
 		"TELEGRAM_BOT_TOKEN":      "1:test",
 		"TELEGRAM_API_URL":        telegramServer.URL,
 		"TELEGRAM_WEBHOOK_SECRET": hookSecret,
-		"OPENROUTER_API_KEY":      "test",
-		"OPENROUTER_BASE_URL":     modelServer.URL,
+		"GEMINI_API_KEY":          "test",
+		"GEMINI_BASE_URL":         modelServer.URL,
+		"FALLBACK_MODELS":         "none",
+		"ENABLE_IMAGE_GENERATION": "false",
 		"DB_POSTGRES_URL":         databaseURL,
 		"BOT_DISPLAY_NAME":        "Mira",
 	}

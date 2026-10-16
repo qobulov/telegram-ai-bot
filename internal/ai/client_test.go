@@ -18,7 +18,7 @@ const testAPIKey = "sk-or-test-secret"
 
 const plainReply = `{"choices":[{"message":{"role":"assistant","content":"Salom!"}}]}`
 
-// recorder is a fake OpenRouter that replies with a scripted sequence and
+// recorder is a fake model provider that replies with a scripted sequence and
 // remembers what it was sent.
 type recorder struct {
 	mu       sync.Mutex
@@ -115,25 +115,6 @@ func TestCompleteSendsRequestAndDecodesReply(t *testing.T) {
 	}
 	if _, present := sent["tool_choice"]; present {
 		t.Errorf("tool_choice sent unexpectedly: %v", sent["tool_choice"])
-	}
-	// Providers other than OpenRouter may reject a field they do not know.
-	if _, present := sent["reasoning"]; present {
-		t.Errorf("reasoning sent unexpectedly: %v", sent["reasoning"])
-	}
-}
-
-func TestNoReasoningAsksTheModelNotToThink(t *testing.T) {
-	rec := &recorder{replies: []reply{{status: 200, body: plainReply}}}
-	server := httptest.NewServer(rec)
-	t.Cleanup(server.Close)
-	client := NewClient(Options{BaseURL: server.URL, APIKey: testAPIKey, Model: "test/model", NoReasoning: true})
-
-	if _, err := client.Complete(context.Background(), userRequest()); err != nil {
-		t.Fatalf("Complete: %v", err)
-	}
-	want := map[string]any{"effort": "none"}
-	if got, _ := rec.requests[0]["reasoning"].(map[string]any); fmt.Sprint(got) != fmt.Sprint(want) {
-		t.Errorf("reasoning = %v, want %v", rec.requests[0]["reasoning"], want)
 	}
 }
 

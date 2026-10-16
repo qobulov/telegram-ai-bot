@@ -75,7 +75,7 @@ func runBot(ctx context.Context) error {
 
 // runMigrate needs only DB_POSTGRES_URL. Migrations are applied by an operator
 // with the database owner role, who should not have to supply the bot's
-// Telegram and OpenRouter secrets to do it.
+// Telegram and model provider secrets to do it.
 func runMigrate(ctx context.Context) error {
 	databaseURL := strings.TrimSpace(os.Getenv("DB_POSTGRES_URL"))
 	if databaseURL == "" {

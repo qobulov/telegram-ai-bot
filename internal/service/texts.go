@@ -13,7 +13,7 @@ Hi! Say something and we'll talk.
 /help — commands and usage`
 
 	textAbout = `An AI chat character for Telegram, written in Go.
-It answers with an AI model (Gemini or OpenRouter), remembers the conversation, and can check the time and do arithmetic.
+It answers with an AI model (Gemini or Grok), remembers the conversation, and can check the time and do arithmetic.
 Send /reset to delete the conversation history.`
 
 	textResetDone   = "The conversation history here has been deleted."

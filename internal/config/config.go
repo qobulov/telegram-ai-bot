@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -37,25 +36,20 @@ type Config struct {
 	// CronSecret is what Vercel Cron sends to authenticate scheduled calls.
 	CronSecret     string
 	TelegramAPIURL string
-	// The model provider. Both Gemini and OpenRouter are reached through the
-	// same OpenAI-compatible chat completions API; only these differ.
+	// The model provider. Gemini and xAI are both reached through the same
+	// OpenAI-compatible chat completions API; only these differ.
 	AIProvider string
 	AIAPIKey   string
 	AIBaseURL  string
 	// FallbackModels are tried when the model is overloaded.
 	FallbackModels []string
-	// NoReasoning asks the model to answer without thinking first. It is
-	// set on OpenRouter, whose free reasoning models otherwise spend the
-	// whole MAX_OUTPUT_TOKENS thinking and answer nothing.
-	NoReasoning bool
 	// AudioInput is true when the provider understands voice messages.
 	AudioInput bool
 	// The backup provider, asked when every model of the main one failed.
 	// Empty BackupAPIKey means none.
-	BackupAPIKey      string
-	BackupBaseURL     string
-	BackupModel       string
-	BackupNoReasoning bool
+	BackupAPIKey  string
+	BackupBaseURL string
+	BackupModel   string
 
 	// Keys for the live-data tools, both optional: without FootballDataToken
 	// there is no football tool, and without CoinGeckoDemoKey crypto prices
@@ -294,9 +288,8 @@ func (r *reader) boolean(name string, fallback bool) bool {
 // Model providers. Gemini is used through Google's OpenAI-compatible
 // endpoint, so the same client serves both.
 const (
-	providerGemini     = "gemini"
-	providerOpenRouter = "openrouter"
-	providerXAI        = "xai"
+	providerGemini = "gemini"
+	providerXAI    = "xai"
 
 	telegramDownloadLimit = 20 << 20
 
@@ -313,18 +306,12 @@ type provider struct {
 	fallbacks []string
 	// audio is true when the provider accepts voice messages as input.
 	audio bool
-	// noReasoning is true when the provider takes OpenRouter's reasoning
-	// field; others may reject it.
-	noReasoning bool
 }
 
 var providers = []provider{
 	{providerGemini, "GEMINI_API_KEY", "GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai", "GEMINI_MODEL", "gemini-3.6-flash",
-		[]string{"gemini-3.5-flash", "gemini-flash-latest", "gemini-3.5-flash-lite"}, true, false},
-	{providerXAI, "XAI_API_KEY", "XAI_BASE_URL", "https://api.x.ai/v1", "XAI_MODEL", "grok-4", nil, false, false},
-	// When the free Nemotron is busy, openrouter/free picks another free model.
-	{providerOpenRouter, "OPENROUTER_API_KEY", "OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1", "OPENROUTER_MODEL", "nvidia/nemotron-3.5-super-vl:free",
-		[]string{"openrouter/free"}, false, true},
+		[]string{"gemini-3.5-flash", "gemini-flash-latest", "gemini-3.5-flash-lite"}, true},
+	{providerXAI, "XAI_API_KEY", "XAI_BASE_URL", "https://api.x.ai/v1", "XAI_MODEL", "grok-4", nil, false},
 }
 
 // chooseProvider picks the model provider by which API key is set. Exactly
@@ -338,26 +325,23 @@ func (r *reader) chooseProvider(cfg *Config) {
 	}
 	switch len(chosen) {
 	case 0:
-		r.fail("GEMINI_API_KEY", "or XAI_API_KEY or OPENROUTER_API_KEY is required")
+		if r.value("OPENROUTER_API_KEY") != "" {
+			r.fail("OPENROUTER_API_KEY", "is no longer supported; set GEMINI_API_KEY instead")
+			return
+		}
+		r.fail("GEMINI_API_KEY", "or XAI_API_KEY is required")
 	case 1:
 		p := chosen[0]
-		cfg.AIProvider, cfg.AIAPIKey, cfg.AudioInput, cfg.NoReasoning = p.name, r.value(p.keyVar), p.audio, p.noReasoning
+		cfg.AIProvider, cfg.AIAPIKey, cfg.AudioInput = p.name, r.value(p.keyVar), p.audio
 		cfg.AIBaseURL = r.text(p.baseURLVar, p.baseURL)
 		cfg.Model = r.text(p.modelVar, p.model)
 		cfg.FallbackModels = r.fallbackModels(p.fallbacks)
 		cfg.BackupAPIKey = r.value("BACKUP_API_KEY")
 		cfg.BackupBaseURL = r.text("BACKUP_BASE_URL", defaultBackupBaseURL)
 		cfg.BackupModel = r.text("BACKUP_MODEL", defaultBackupModel)
-		cfg.BackupNoReasoning = isOpenRouter(cfg.BackupBaseURL)
 	default:
 		r.fail(chosen[0].keyVar, "and "+chosen[1].keyVar+" are both set; keep only one, for the provider you want to use")
 	}
-}
-
-// isOpenRouter reports whether an API address is OpenRouter's.
-func isOpenRouter(baseURL string) bool {
-	u, err := url.Parse(baseURL)
-	return err == nil && (u.Hostname() == "openrouter.ai" || strings.HasSuffix(u.Hostname(), ".openrouter.ai"))
 }
 
 // wakeWords reads BOT_WAKE_WORDS, falling back to the display name. Each

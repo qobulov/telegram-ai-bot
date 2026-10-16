@@ -1,4 +1,5 @@
-// Package ai is a client for the OpenRouter Chat Completions API.
+// Package ai is a client for OpenAI-compatible Chat Completions APIs, such as
+// Gemini's, xAI's and Groq's.
 package ai
 
 import (
@@ -120,7 +121,7 @@ type Request struct {
 	ForbidTools bool
 }
 
-// APIError is a failure reported by OpenRouter or the upstream provider.
+// APIError is a failure reported by the model provider.
 type APIError struct {
 	Status     int
 	Message    string

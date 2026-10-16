@@ -40,15 +40,11 @@ type Options struct {
 	// limits or does not answer: each retry goes to the next one. Every
 	// request starts again with Model.
 	FallbackModels []string
-	// NoReasoning asks the model to answer without thinking first, in
-	// OpenRouter's reasoning field. A reasoning model's thinking counts
-	// against MaxTokens and can use all of it, leaving an empty answer.
-	NoReasoning bool
-	HTTPClient  *http.Client
-	Logger      *slog.Logger
+	HTTPClient     *http.Client
+	Logger         *slog.Logger
 }
 
-// Client talks to OpenRouter. It is safe for concurrent use.
+// Client talks to the model provider. It is safe for concurrent use.
 type Client struct {
 	opts Options
 	now  func() time.Time
@@ -249,11 +245,6 @@ type chatRequest struct {
 	MaxTokens  int              `json:"max_tokens,omitempty"`
 	Tools      []ToolDefinition `json:"tools,omitempty"`
 	ToolChoice string           `json:"tool_choice,omitempty"`
-	Reasoning  *reasoning       `json:"reasoning,omitempty"`
-}
-
-type reasoning struct {
-	Effort string `json:"effort"`
 }
 
 func (c *Client) payload(req Request, model string, withTools bool) chatRequest {
@@ -261,9 +252,6 @@ func (c *Client) payload(req Request, model string, withTools bool) chatRequest 
 		Model:     model,
 		Messages:  req.Messages,
 		MaxTokens: c.opts.MaxTokens,
-	}
-	if c.opts.NoReasoning {
-		payload.Reasoning = &reasoning{Effort: "none"}
 	}
 	if !withTools {
 		return payload
@@ -282,7 +270,7 @@ type chatResponse struct {
 	Error *errorBody `json:"error"`
 }
 
-// errorBody is OpenRouter's error object. Code is a number for HTTP-like
+// errorBody is the provider's error object. Code is a number for HTTP-like
 // failures and a string for some provider errors, so it is decoded loosely.
 type errorBody struct {
 	Message string `json:"message"`
@@ -325,8 +313,8 @@ func statusError(resp *http.Response, raw []byte) *APIError {
 	}
 }
 
-// errorMessage finds the provider's explanation in an error body. OpenRouter
-// sends {"error":{...}}; Gemini's OpenAI-compatible endpoint sometimes sends
+// errorMessage finds the provider's explanation in an error body. Most
+// providers send {"error":{...}}; Gemini's OpenAI-compatible endpoint sometimes sends
 // the same object wrapped in an array.
 func errorMessage(raw []byte) string {
 	var single chatResponse

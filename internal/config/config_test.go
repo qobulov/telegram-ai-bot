@@ -22,7 +22,7 @@ const (
 func validEnv() map[string]string {
 	return map[string]string{
 		"TELEGRAM_BOT_TOKEN": testToken,
-		"OPENROUTER_API_KEY": testKey,
+		"GEMINI_API_KEY":     testKey,
 		"DB_POSTGRES_URL":    testDBURL,
 	}
 }
@@ -36,10 +36,10 @@ func TestLoadAppliesDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.Model != "nvidia/nemotron-3.5-super-vl:free" || !cfg.NoReasoning {
-		t.Errorf("Model = %q, NoReasoning = %v", cfg.Model, cfg.NoReasoning)
+	if cfg.Model != "gemini-3.6-flash" {
+		t.Errorf("Model = %q", cfg.Model)
 	}
-	if cfg.AIBaseURL != "https://openrouter.ai/api/v1" || cfg.AIProvider != "openrouter" || cfg.AIAPIKey != testKey {
+	if cfg.AIBaseURL != "https://generativelanguage.googleapis.com/v1beta/openai" || cfg.AIProvider != "gemini" || cfg.AIAPIKey != testKey {
 		t.Errorf("AI settings = %q, %q", cfg.AIProvider, cfg.AIBaseURL)
 	}
 	if cfg.TelegramAPIURL != "https://api.telegram.org" {
@@ -71,7 +71,7 @@ func TestLoadAppliesDefaults(t *testing.T) {
 }
 
 func TestLoadRequiresSecrets(t *testing.T) {
-	for _, name := range []string{"TELEGRAM_BOT_TOKEN", "OPENROUTER_API_KEY", "DB_POSTGRES_URL"} {
+	for _, name := range []string{"TELEGRAM_BOT_TOKEN", "GEMINI_API_KEY", "DB_POSTGRES_URL"} {
 		t.Run(name, func(t *testing.T) {
 			env := validEnv()
 			delete(env, name)
@@ -253,6 +253,7 @@ func TestBuiltInPersona(t *testing.T) {
 func TestCustomPersona(t *testing.T) {
 	env := validEnv()
 	env["PERSONA_PROMPT"] = "You are {name}, a grumpy cat. {name} hates Mondays."
+	env["ENABLE_IMAGE_GENERATION"] = "false"
 	cfg, err := Load(getenv(env))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -432,7 +433,6 @@ func TestWebhookSecret(t *testing.T) {
 
 func geminiEnv() map[string]string {
 	env := validEnv()
-	delete(env, "OPENROUTER_API_KEY")
 	env["GEMINI_API_KEY"] = "AIza-gemini-secret"
 	return env
 }
@@ -465,40 +465,60 @@ func TestGeminiModelCanBeChosen(t *testing.T) {
 	}
 }
 
-func TestOpenRouterSettingsDoNotLeakIntoGemini(t *testing.T) {
+func TestXAISettingsDoNotLeakIntoGemini(t *testing.T) {
 	env := geminiEnv()
-	env["OPENROUTER_MODEL"] = "openrouter/free"
+	env["XAI_MODEL"] = "grok-4-fast"
 	cfg, err := Load(getenv(env))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
 	if cfg.Model != "gemini-3.6-flash" {
-		t.Errorf("model = %q; an OpenRouter model name must not be sent to Gemini", cfg.Model)
+		t.Errorf("model = %q; a Grok model name must not be sent to Gemini", cfg.Model)
 	}
 }
 
 func TestOneAIKeyIsRequired(t *testing.T) {
 	env := validEnv()
-	delete(env, "OPENROUTER_API_KEY")
+	delete(env, "GEMINI_API_KEY")
 	_, err := Load(getenv(env))
-	if err == nil || !strings.Contains(err.Error(), "GEMINI_API_KEY") || !strings.Contains(err.Error(), "OPENROUTER_API_KEY") {
+	if err == nil || !strings.Contains(err.Error(), "GEMINI_API_KEY") || !strings.Contains(err.Error(), "XAI_API_KEY") {
 		t.Errorf("no key: err = %v, want it to name both variables", err)
 	}
 
 	both := geminiEnv()
-	both["OPENROUTER_API_KEY"] = testKey
+	both["XAI_API_KEY"] = "xai-secret"
 	_, err = Load(getenv(both))
 	if err == nil || !strings.Contains(err.Error(), "only one") {
 		t.Errorf("both keys: err = %v, want a request to keep only one", err)
 	}
-	if err != nil && (strings.Contains(err.Error(), testKey) || strings.Contains(err.Error(), "AIza-gemini-secret")) {
+	if err != nil && (strings.Contains(err.Error(), "xai-secret") || strings.Contains(err.Error(), "AIza-gemini-secret")) {
 		t.Errorf("the error repeats a key: %v", err)
+	}
+}
+
+// A deployment still configured for OpenRouter is told what to change
+// instead of being asked for a key it may think it has set.
+func TestOpenRouterKeyIsNoLongerAccepted(t *testing.T) {
+	env := validEnv()
+	delete(env, "GEMINI_API_KEY")
+	env["OPENROUTER_API_KEY"] = "sk-or-secret"
+	_, err := Load(getenv(env))
+	if err == nil || !strings.Contains(err.Error(), "OPENROUTER_API_KEY") || !strings.Contains(err.Error(), "GEMINI_API_KEY") {
+		t.Errorf("err = %v, want it to say OpenRouter is gone and Gemini is needed", err)
+	}
+	if err != nil && strings.Contains(err.Error(), "sk-or-secret") {
+		t.Errorf("the error repeats the key: %v", err)
+	}
+
+	env["GEMINI_API_KEY"] = testKey
+	if cfg, err := Load(getenv(env)); err != nil || cfg.AIProvider != "gemini" {
+		t.Errorf("with a Gemini key too: provider = %q, err = %v; the old key is ignored", cfg.AIProvider, err)
 	}
 }
 
 func TestXAIKeySelectsGrok(t *testing.T) {
 	env := validEnv()
-	delete(env, "OPENROUTER_API_KEY")
+	delete(env, "GEMINI_API_KEY")
 	env["XAI_API_KEY"] = "xai-secret"
 	cfg, err := Load(getenv(env))
 	if err != nil {
@@ -521,23 +541,6 @@ func TestOnlyGeminiHearsVoice(t *testing.T) {
 	cfg, err := Load(getenv(geminiEnv()))
 	if err != nil || !cfg.AudioInput {
 		t.Errorf("Gemini: audio input = %v, err = %v", cfg.AudioInput, err)
-	}
-	cfg, err = Load(getenv(validEnv()))
-	if err != nil || cfg.AudioInput {
-		t.Errorf("OpenRouter: audio input = %v, err = %v", cfg.AudioInput, err)
-	}
-}
-
-func TestExactlyOneOfThreeKeys(t *testing.T) {
-	env := geminiEnv()
-	env["XAI_API_KEY"] = "xai-secret"
-	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "only one") {
-		t.Errorf("Gemini and xAI keys: err = %v", err)
-	}
-	none := validEnv()
-	delete(none, "OPENROUTER_API_KEY")
-	if _, err := Load(getenv(none)); err == nil || !strings.Contains(err.Error(), "XAI_API_KEY") {
-		t.Errorf("no key: err = %v, want it to mention XAI_API_KEY too", err)
 	}
 }
 
@@ -597,12 +600,11 @@ func TestGeminiFallbackModels(t *testing.T) {
 		t.Errorf("FALLBACK_MODELS=none gave %q", cfg.FallbackModels)
 	}
 
-	if cfg.NoReasoning {
-		t.Error("NoReasoning is set for Gemini, which does not know OpenRouter's reasoning field")
-	}
-
-	if cfg, _ := Load(getenv(validEnv())); strings.Join(cfg.FallbackModels, ",") != "openrouter/free" {
-		t.Errorf("default OpenRouter fallbacks = %q", cfg.FallbackModels)
+	xai := validEnv()
+	delete(xai, "GEMINI_API_KEY")
+	xai["XAI_API_KEY"] = "xai-secret"
+	if cfg, _ := Load(getenv(xai)); len(cfg.FallbackModels) != 0 {
+		t.Errorf("xAI got default fallbacks %q; they are Gemini model names", cfg.FallbackModels)
 	}
 }
 
@@ -833,7 +835,10 @@ func TestImageGenerationSettings(t *testing.T) {
 	if cfg, err := Load(getenv(env)); err != nil || cfg.DailyImageLimit != 0 {
 		t.Errorf("DAILY_IMAGE_LIMIT=0 (owners only): %d, %v", cfg.DailyImageLimit, err)
 	}
-	if cfg, _ := Load(getenv(validEnv())); cfg.ImagesEnabled {
+	xai := validEnv()
+	delete(xai, "GEMINI_API_KEY")
+	xai["XAI_API_KEY"] = "xai-secret"
+	if cfg, _ := Load(getenv(xai)); cfg.ImagesEnabled {
 		t.Error("image generation is on without a Gemini key")
 	}
 }
@@ -948,17 +953,13 @@ func TestBackupProviderDefaultsToGroq(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.BackupAPIKey != "gsk-secret" || cfg.BackupBaseURL != "https://api.groq.com/openai/v1" || cfg.BackupModel != "openai/gpt-oss-120b" || cfg.BackupNoReasoning {
-		t.Errorf("backup = %q %q %q, no reasoning %v", cfg.BackupAPIKey, cfg.BackupBaseURL, cfg.BackupModel, cfg.BackupNoReasoning)
+	if cfg.BackupAPIKey != "gsk-secret" || cfg.BackupBaseURL != "https://api.groq.com/openai/v1" || cfg.BackupModel != "openai/gpt-oss-120b" {
+		t.Errorf("backup = %q %q %q", cfg.BackupAPIKey, cfg.BackupBaseURL, cfg.BackupModel)
 	}
 	env["BACKUP_MODEL"] = "qwen/qwen3.8-27b"
 	env["BACKUP_BASE_URL"] = "https://api.x.ai/v1"
 	if cfg, _ := Load(getenv(env)); cfg.BackupModel != "qwen/qwen3.8-27b" || cfg.BackupBaseURL != "https://api.x.ai/v1" {
 		t.Errorf("override: %q %q", cfg.BackupModel, cfg.BackupBaseURL)
-	}
-	env["BACKUP_BASE_URL"] = "https://openrouter.ai/api/v1"
-	if cfg, _ := Load(getenv(env)); !cfg.BackupNoReasoning {
-		t.Error("a backup on OpenRouter thinks before answering")
 	}
 }
 

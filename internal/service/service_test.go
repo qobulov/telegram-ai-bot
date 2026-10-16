@@ -432,7 +432,7 @@ func TestCommandsReply(t *testing.T) {
 	cases := map[string]string{
 		"/start":       "/help",
 		"/help":        "/reset",
-		"/about":       "OpenRouter",
+		"/about":       "Gemini",
 		"/model":       "test/model",
 		"/model@mybot": "test/model",
 		"/HELP":        "/reset",

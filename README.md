@@ -2,7 +2,7 @@
 
 A Telegram chat character written in Go: a playful, quick-witted group-chat
 regular (called Maria unless you rename her) rather than a neutral assistant.
-She answers through [OpenRouter](https://openrouter.ai), remembers
+She answers through [Google Gemini](https://ai.google.dev), remembers
 conversations in PostgreSQL, and can call a small set of tools that are
 checked in code (current time, calculator, bot help, drawing, polls,
 moderation for group admins, and live data: exchange rates, weather, prayer
@@ -19,7 +19,7 @@ times, news headlines, Wikipedia, football and crypto prices).
 - Replies in the chat's language (Uzbek, Russian, English).
 - Long polling: no public port, domain or TLS certificate needed.
 - One dependency besides the Go standard library: `pgx` for PostgreSQL.
-- Tests run without Telegram or OpenRouter credentials.
+- Tests run without Telegram or model provider credentials.
 
 ## Contents
 
@@ -51,7 +51,7 @@ internal/app                    assembles the bot for either way of running it
 internal/webhook                HTTP handler for webhook updates, with secret check
 internal/config                 load .env + environment, validate
 internal/telegram               Bot API client: long polling, sending, message splitting
-internal/ai                     OpenRouter client: types, retries, tool-calling format
+internal/ai                     Model client: types, retries, tool-calling format
 internal/tools                  tool registry + time, calculator, help, drawing, polls, moderation, owners' tools
 internal/webapi                 live-data tools: rates, weather, prayer times, news, Wikipedia, football, crypto
 internal/storage                pgx pool, migrations, conversation queries
@@ -164,8 +164,7 @@ in the environment win over the file.
 | Variable                      | Default                        | Meaning                                                                                                      |
 | ----------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
 | `TELEGRAM_BOT_TOKEN`          | required                       | Token from [@BotFather](https://t.me/BotFather)                                                              |
-| `GEMINI_API_KEY` | one of the two keys | Google Gemini key from <https://aistudio.google.com/apikey> |
-| `OPENROUTER_API_KEY` | one of the two keys | OpenRouter key from <https://openrouter.ai/keys>; set this or `GEMINI_API_KEY`, not both |
+| `GEMINI_API_KEY` | one of the two keys | Google Gemini key from <https://aistudio.google.com/apikey>; set this or `XAI_API_KEY`, not both |
 | `GEMINI_MODEL` | `gemini-3.6-flash` | Gemini model ID, used with `GEMINI_API_KEY` |
 | `FALLBACK_MODELS` | Gemini: `gemini-3.5-flash,gemini-flash-latest,gemini-3.5-flash-lite` | Models tried in order when the main one is overloaded, out of quota or does not answer, then once more after a pause; a model out of quota is skipped for 15 minutes; `none` turns this off |
 | `BACKUP_API_KEY` | empty | Key for a backup provider, asked when every model of the main one failed; replies that already moved to it stay on it |
@@ -183,7 +182,6 @@ in the environment win over the file.
 | `DB_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
 | `TELEGRAM_WEBHOOK_SECRET` | empty | Only for webhook deployments; see [Vercel deployment](#vercel-deployment-webhook) |
 | `CRON_SECRET` | empty | Only on Vercel: protects the daily cleanup endpoint |
-| `OPENROUTER_MODEL`            | `nvidia/nemotron-3.5-super-vl:free` | Model ID, see [Choosing a model](#choosing-a-model)                                                     |
 | `MAX_OUTPUT_TOKENS`           | `1024`                         | Longest model reply, in tokens                                                                               |
 | `BOT_DISPLAY_NAME`            | `Maria`                         | The character's name                                                                                         |
 | `PERSONA_PROMPT`              | built-in                       | The character's personality and rules; `{name}` is replaced by the name. See [The character](#the-character) |
@@ -212,7 +210,7 @@ in the environment win over the file.
 | `GROUP_RATE_LIMIT_PER_MINUTE` | `6`                            | Answers per group per minute, across all members; past it she is silent. Counted in the database             |
 | `MEMBER_REPLIES_PER_10_MIN`   | `4`                            | Answers each member gets per group in 10 minutes; past it she is silent with them. Counted in the database    |
 | `LOG_LEVEL`                   | `info`                         | `debug`, `info`, `warn` or `error`                                                                           |
-| `OPENROUTER_BASE_URL`         | `https://openrouter.ai/api/v1` | Override for testing or a proxy                                                                              |
+| `GEMINI_BASE_URL`             | Google's OpenAI-compatible API | Override for testing or a proxy; `XAI_BASE_URL` likewise for Grok                                            |
 | `TELEGRAM_API_URL`            | `https://api.telegram.org`     | Override for testing or a local Bot API server                                                               |
 
 The bot refuses to start when a required variable is missing or a number is
@@ -235,7 +233,7 @@ createdb tgbot
 
 # 2. Configure
 cp .env.example .env
-# Edit .env: set TELEGRAM_BOT_TOKEN, OPENROUTER_API_KEY and, for example,
+# Edit .env: set TELEGRAM_BOT_TOKEN, GEMINI_API_KEY and, for example,
 # DB_POSTGRES_URL=postgres://localhost:5432/tgbot?sslmode=disable
 
 # 3. Create the tables
@@ -262,7 +260,7 @@ gofmt -w .
 make check             # vet + race tests + formatting check
 ```
 
-No test talks to Telegram or OpenRouter; both are replaced by local fake
+No test talks to Telegram or a model provider; both are replaced by local fake
 servers.
 
 The storage tests and the end-to-end test need a real PostgreSQL database and
@@ -279,9 +277,11 @@ database at the same time.
 
 ## Choosing a model
 
-The bot works with **Google Gemini**, **xAI Grok** or **OpenRouter**. Which
-one is used depends on which key is set: `GEMINI_API_KEY`, `XAI_API_KEY` or
-`OPENROUTER_API_KEY`. Set exactly one; with more the bot refuses to start.
+The bot works with **Google Gemini** or **xAI Grok**. Which one is used
+depends on which key is set: `GEMINI_API_KEY` or `XAI_API_KEY`. Set exactly
+one; with both the bot refuses to start. OpenRouter is no longer supported:
+with only `OPENROUTER_API_KEY` set, the bot refuses to start and says to set
+`GEMINI_API_KEY`.
 
 **Grok.** Create a key at <https://console.x.ai> and set `XAI_API_KEY`. The
 model defaults to `grok-4`; set `XAI_MODEL` for another. Grok sees photos
@@ -293,8 +293,8 @@ Gemini.
 that answered in about 1.5 s in testing; change it any time by setting
 `GEMINI_MODEL` for another one from
 <https://ai.google.dev/gemini-api/docs/models>. Gemini models support the
-tools (time, calculator) and are usually much faster than OpenRouter's free
-models, which matters for the 60-second limit on Vercel. The bot talks to
+tools (time, calculator) and answer within seconds, which matters for the
+60-second limit on Vercel. The bot talks to
 Gemini through Google's OpenAI-compatible endpoint, so nothing else changes.
 On Vercel, set `GEMINI_MODEL` (and, if you like, `FALLBACK_MODELS`) under
 Project Settings → Environment Variables and redeploy: the variable always
@@ -308,34 +308,14 @@ request is sent to the next model in `FALLBACK_MODELS`. Each new message
 starts again with the main model. If every model is busy, the user is told
 the AI is overloaded and to try again in a minute.
 
-**OpenRouter**, described below, gives access to many models from one key.
-
-
-`OPENROUTER_MODEL` accepts any model ID from <https://openrouter.ai/models>.
-
-Tools (time, calculator, help, live data) only work with models that support tool
-calling. To list those, filter the catalogue by the "tools" supported
-parameter: <https://openrouter.ai/models?supported_parameters=tools>. Add
-`max_price=0` to the filter to see only free ones.
-
-The default is `nvidia/nemotron-3.5-super-vl:free`, a free model that calls
-tools and writes Uzbek in both scripts. When it is busy the request goes to
-`openrouter/free`, which lets OpenRouter pick another free model; that one
-changes from request to request and may not support tools. Set
-`FALLBACK_MODELS` to choose other fallbacks, or `none`.
-
-On OpenRouter the bot asks the model not to think before answering
-(`"reasoning": {"effort": "none"}`). Free reasoning models otherwise spend the
-whole `MAX_OUTPUT_TOKENS` thinking and send back an empty answer. The same
-applies to a backup provider whose `BACKUP_BASE_URL` is OpenRouter's.
+When every Gemini model failed and `BACKUP_API_KEY` is set, the request
+goes to the backup provider, Groq by default (see
+[Configuration](#configuration) for its free-tier limit).
 
 If the model rejects a request because it cannot use tools, the bot logs
 `model does not support tool calling; continuing without tools`, answers
 without tools, and stays in that mode until it is restarted. In that mode the
 model may guess at the time or at arithmetic.
-
-Free models are rate limited by OpenRouter. The bot retries a rate-limited
-request up to three times and then tells the user something went wrong.
 
 ## The character
 
@@ -946,8 +926,7 @@ Put one `KEY=value` per line, without quotes:
 
 ```dotenv
 TELEGRAM_BOT_TOKEN=123456:your-token
-OPENROUTER_API_KEY=sk-or-your-key
-OPENROUTER_MODEL=nvidia/nemotron-3.5-super-vl:free
+GEMINI_API_KEY=your-gemini-key
 DB_POSTGRES_URL=postgres://tgbot:RUNTIME_PASSWORD_HERE@127.0.0.1:5432/tgbot?sslmode=disable
 LOG_LEVEL=info
 ```
@@ -1052,7 +1031,7 @@ Upgrading from a version before the character:
 ## Docker Compose deployment (optional)
 
 ```bash
-cp .env.example .env            # set TELEGRAM_BOT_TOKEN and OPENROUTER_API_KEY
+cp .env.example .env            # set TELEGRAM_BOT_TOKEN and GEMINI_API_KEY
 echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)" >> .env
 docker compose up -d --build
 docker compose logs -f bot
@@ -1076,7 +1055,7 @@ Telegram is told to call a function instead. The function is
 [api/webhook.go](api/webhook.go), served at `/api/webhook`; it handles one
 update per request and sends the reply before it responds.
 
-This path was tested locally against fake Telegram and OpenRouter servers,
+This path was tested locally against fake Telegram and model servers,
 not on Vercel itself. In particular it is unverified that Vercel's Go runtime
 accepts the Go version in `go.mod`; if the build fails on that, lower the
 `go` line to a version Vercel supports.
@@ -1111,7 +1090,7 @@ Telegram then delivers the update again. Keep `REQUEST_TIMEOUT_SECONDS` at
    | Variable | Value |
    |---|---|
    | `TELEGRAM_BOT_TOKEN` | the bot's token |
-   | `OPENROUTER_API_KEY` | your key |
+   | `GEMINI_API_KEY` | your key |
    | `DB_POSTGRES_URL` | the connection string (a Vercel database integration may set it for you) |
    | `TELEGRAM_WEBHOOK_SECRET` | a secret you generate: `openssl rand -hex 32` |
    | `CRON_SECRET` | another secret you generate: `openssl rand -hex 32` |
@@ -1330,21 +1309,21 @@ For you to do when deploying:
 - [ ] Keep PostgreSQL on `localhost`; do not open port 5432.
 - [ ] Enable the firewall with only SSH allowed in.
 - [ ] Use SSH keys and disable password login.
-- [ ] Set a spending limit on the OpenRouter key.
+- [ ] Set a budget alert on the Google Cloud project behind the Gemini key.
 - [ ] Give the bot only the group admin rights you want it to use, and set
       `BOT_OWNER_IDS`.
 - [ ] Schedule backups, copy them off the server, and test a restore.
 - [ ] Keep Ubuntu, PostgreSQL and Go dependencies updated
       (`go list -m -u all`, `govulncheck ./...`).
 - [ ] If a token leaks, revoke it in @BotFather (`/revoke`) or on
-      openrouter.ai and update the environment file.
+      Google AI Studio and update the environment file.
 
 Known limits:
 
 - Conversation text is stored unencrypted in PostgreSQL. Use disk encryption
   if that matters for your users.
-- Message text is sent to OpenRouter and the model provider behind it. Tell
-  your users, and check the provider's data policy for the model you choose.
+- Message text is sent to the model provider (Google, or Groq when the
+  backup answers). Tell your users, and check the provider's data policy.
 - In a group, anyone who can post can make the bot answer, within the rate
   limits. The answer is visible to the whole group, and it can draw on what
   other members said to the bot there.
@@ -1381,7 +1360,7 @@ Known limits:
 | She puts an emoji on a reply instead of answering         | The reply was applause (a sticker, a GIF, laughter, emoji or a nod), or the model chose to react. Call her by name or `@username` to get words.                                                                                                                                |
 | She says she cannot delete, mute, ban or pin              | She lacks that admin right in the group, the person asking lacks it, or the target is an admin or owner; see [Moderation](#moderation). Mute works only in supergroups.                                                                                                                         |
 | `identify the bot: telegram: 401 Unauthorized` at startup | The bot token is wrong or was revoked.                                                                                                                                                                                                                                                        |
-| "Something went wrong on my side"                         | Look at the log line `turn failed`. `status 401`: bad OpenRouter key. `status 402`: no credits. `status 429`: the free model is rate limited; wait or pick another model. `status 404`: the model ID does not exist.                                                                          |
+| "Something went wrong on my side"                         | Look at the log line `turn failed`. `status 401` or `400 API key not valid`: bad Gemini key. `status 429`: the free tier's limit is reached; wait or pick another model. `status 404`: the model ID does not exist.                                                                          |
 | "That took too long to answer"                            | The model was slower than `REQUEST_TIMEOUT_SECONDS`. Raise it or use a faster model.                                                                                                                                                                                                          |
 | Wrong time or wrong arithmetic                            | The model has no tool support and is guessing. Look for `model does not support tool calling` in the log and see [Choosing a model](#choosing-a-model). The time is given in `GROUP_HISTORY_TIMEZONE` unless another zone is asked for.                                                     |
 | "You're sending messages too quickly"                     | Per-user rate limit, announced in private chats only. Raise `USER_RATE_LIMIT_PER_MINUTE` if it is too strict.                                                                                                                                                                                 |
