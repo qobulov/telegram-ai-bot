@@ -737,16 +737,20 @@ cannot make one.
   seen to have read the message. The counts are kept in the
   database (`group_replies`), so they hold on Vercel and across restarts.
   Not counted: owners; other bots, which have their own limit (below);
-  reactions to applause; and `/mute` and `/unmute` from those who may use
-  them. When the count cannot be read she stays silent and logs a warning.
+  reactions to applause; answers to her moderation questions; and `/mute`,
+  `/unmute`, `/ignore`, `/unignore` and `/reset` from those who may use
+  them. Past the quota a group admin is still answered when their message
+  replies to another member's, as asking to moderate or ignore them does.
+  When the count cannot be read she stays silent and logs a warning.
 - The per-user limit, `USER_RATE_LIMIT_PER_MINUTE`, is a flood guard kept in
   memory. In a private chat its first refusal is announced; in a group it
   never is.
 - One group's messages are answered one at a time, in order.
 - A message addressed to her in a group is stored and passed on as a single
   line: line breaks become spaces and square brackets become round ones.
-- `/mute` and `/unmute` are not held back by the quotas, and a muted group
-  gets no notices of any kind.
+- The managing commands (`/mute`, `/unmute`, `/ignore`, `/unignore`,
+  `/reset`) from those who may use them are not held back by the quotas, and
+  a muted group gets no notices of any kind.
 - Other bots: Telegram delivers another bot's messages only when
   *Bot-to-Bot Communication Mode* is enabled in @BotFather for at least one
   of the two bots. The bot answers bots listed in `ALLOWED_BOTS` (or any bot

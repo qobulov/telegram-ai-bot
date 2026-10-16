@@ -1286,6 +1286,40 @@ func TestMembersMuteAttemptsAreCounted(t *testing.T) {
 	}
 }
 
+// A busy group is when admins need /ignore and moderation most, and when
+// the quota is full.
+func TestManagersCommandsAndModerationRequestsPassAFullQuota(t *testing.T) {
+	f := newFixture()
+	quota := &fakeGroupQuota{}
+	f.opts.GroupReplies = quota
+	f.opts.MemberRepliesPer10Min = 0 // every answer is over the quota
+	f.opts.Rules = &fakeRuleBook{}
+	f.opts.Workers = 1
+	request := asAdmin(groupMessage("Mira, mute him"))
+	request.ReplyToMessage = &telegram.Message{MessageID: 29, From: bek, Text: "buy crypto"}
+
+	sent := f.run(
+		commandReplyingTo(boss, bek, "/ignore@MyBot"),
+		inGroup(asAdmin(groupMessage("/reset@MyBot"))),
+		inGroup(request),
+		inGroup(asAdmin(groupMessage("Mira, how are you?"))),
+		commandReplyingTo(&telegram.User{ID: 555, FirstName: "Ann"}, bek, "/ignore@MyBot"),
+	)
+
+	var texts []string
+	for _, msg := range sent {
+		texts = append(texts, msg.text)
+	}
+	want := []string{"Okay, I won't answer Bek @bek for the next 24 hours.", textResetDone, "Boss: mute him"}
+	if len(texts) != len(want) || texts[0] != want[0] || texts[1] != want[1] || !strings.HasSuffix(texts[2], want[2]) {
+		t.Errorf("sent = %q\nwant %q: the admin's commands and moderation request pass, their chat does not", texts, want)
+	}
+	// The admin's chat and the member's command are counted, and denied.
+	if asked := quota.asked(); len(asked) != 3 {
+		t.Errorf("quota asked %d times, want 3: the request, the chat and the member's command", len(asked))
+	}
+}
+
 func TestGroupQuotaFailureStaysQuietButOwnersAndMuteWork(t *testing.T) {
 	f := newFixture()
 	f.opts.OwnerUsernames = []string{ownerUsername}

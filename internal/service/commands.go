@@ -63,11 +63,11 @@ func (s *Service) process(in incoming) {
 	}
 	rules := s.loadRules(ctx, in)
 	// An ignored member gets nothing, not even a reaction, and takes none of
-	// the group's quota. The off switch still works for them if they may
-	// use it, as it does over the quota. The flood guard above comes first,
-	// so that a flood of theirs cannot ask Telegram, or the rules, without
-	// end.
-	if s.ignored(in, rules) && !s.isOffSwitch(in) {
+	// the group's quota. The managing commands still work for them if they
+	// may use them, as they do over the quota. The flood guard above comes
+	// first, so that a flood of theirs cannot ask Telegram, or the rules,
+	// without end.
+	if s.ignored(in, rules) && !s.isManagerCommand(in) {
 		s.passOver(in)
 		return
 	}
@@ -213,12 +213,14 @@ const overQuotaReaction = "👀"
 // message in a group that already has too many. When the count cannot be
 // read it stays silent, like mayAnswerBot.
 //
-// Owners are not counted, other bots have their own quota, and the off
-// switch always passes for those who may use it: it has to work precisely
-// when the group is flooding the bot. A message with nothing the bot can
-// read is not counted either: respond sends no answer to it.
+// Owners are not counted, other bots have their own quota, and the
+// commands that manage the bot always pass for those who may use them: they
+// have to work precisely when the group is flooding the bot. So does a
+// group admin's message, past the quota, that replies to another member's:
+// that is how moderation and ignoring are asked for. A message with nothing
+// the bot can read is not counted either: respond sends no answer to it.
 func (s *Service) mayAnswerInGroup(in incoming) bool {
-	if !in.group || in.fromBot || s.opts.GroupReplies == nil || s.isOwner(in.msg.From) || !s.hasContent(in) || s.isOffSwitch(in) {
+	if !in.group || in.fromBot || s.opts.GroupReplies == nil || s.isOwner(in.msg.From) || !s.hasContent(in) || s.isManagerCommand(in) {
 		return true
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
@@ -233,23 +235,48 @@ func (s *Service) mayAnswerInGroup(in incoming) bool {
 		s.opts.Logger.Warn("group reply count failed; staying quiet", "chat_id", in.scope.ChatID, "error", err)
 		return false
 	}
-	if !ok {
-		s.opts.Logger.Info("group reply limit reached", "chat_id", in.scope.ChatID, "user_id", in.userID)
-		s.react(in, overQuotaReaction)
+	switch {
+	case ok:
+		return true
+	case s.isAdminActingOnAMember(in):
+		s.opts.Logger.Info("group reply limit reached, but an admin replied to a member", "chat_id", in.scope.ChatID, "user_id", in.userID)
+		return true
 	}
-	return ok
+	s.opts.Logger.Info("group reply limit reached", "chat_id", in.scope.ChatID, "user_id", in.userID)
+	s.react(in, overQuotaReaction)
+	return false
 }
 
-// isOffSwitch reports /mute or /unmute from someone who may use them. Anyone
-// else's is counted like any other message: it only gets a refusal, and
-// refusals sent without limit would flood the group themselves.
-func (s *Service) isOffSwitch(in incoming) bool {
-	if !isMuteCommand(in.text) {
+// managerCommands manage the bot in a group, and are for its admins.
+var managerCommands = map[string]bool{"/mute": true, "/unmute": true, "/ignore": true, "/unignore": true, "/reset": true}
+
+// isManagerCommand reports one of managerCommands from someone who may use
+// it. Anyone else's is counted like any other message: it only gets a
+// refusal, and refusals sent without limit would flood the group themselves.
+func (s *Service) isManagerCommand(in incoming) bool {
+	if !managerCommands[commandName(in.text)] {
 		return false
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
 	defer cancel()
 	return s.refuseUnlessManager(ctx, in) == ""
+}
+
+// isAdminActingOnAMember reports a group admin's message that replies to
+// another member's, as asking to moderate or ignore them does. Telegram is
+// asked only then, past the quota.
+func (s *Service) isAdminActingOnAMember(in incoming) bool {
+	replied := in.msg.ReplyToMessage
+	if replied == nil || replied.From == nil || replied.From.ID == s.opts.Bot.ID || replied.From.ID == in.userID {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
+	defer cancel()
+	isAdmin, err := s.opts.Members.IsGroupAdmin(ctx, in.scope.ChatID, in.userID)
+	if err != nil {
+		s.opts.Logger.Warn("group admin check failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
+	}
+	return isAdmin && err == nil
 }
 
 // passOver logs a group message the bot will not answer, as unaddressed
