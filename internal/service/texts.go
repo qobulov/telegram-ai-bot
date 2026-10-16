@@ -39,17 +39,22 @@ Send /reset to delete the conversation history.`
 
 const helpText = `Talk to me and I will answer, in Uzbek, Russian or English, matching your language.
 
+I remember the recent part of our conversation. I can see photos, stickers and GIFs, a frame of videos and round videos, and I listen to voice messages. I can draw a picture when you ask, tell the time anywhere, calculate arithmetic, and make a poll in a group.
+
 Commands:
 /start — welcome message
 /help — this help
 /reset — delete the conversation history
 /model — show the AI model in use
 /about — about this bot
-/mute, /unmute — group admins: make me stay quiet in a group, or bring me back
 
-In a group, call me by name, mention me (@username) or reply to one of my messages. Commands there need my username, like /help@username. A group shares one conversation with me; /reset there is for the group's admins.
+In a group, call me by name, mention me (@username) or reply to one of my messages. Commands there need my username, like /help@username. A group shares one conversation with me.
 
-I remember the recent part of our conversation, and I can look up the current time in any timezone and calculate arithmetic expressions.`
+For a group's admins:
+Reply to a message and ask me to delete or pin it, or to mute or ban its author. It takes that admin right, yours and mine, and I ask you to confirm a ban first.
+/mute@username, /unmute@username — make me stay quiet in the group, or bring me back
+/ignore@username, /unignore@username — as a reply to a member's message: I stop answering them for 24 hours, or answer them again
+/reset@username — delete the group's conversation with me`
 
 // HelpText describes the bot's commands and capabilities. It is shown by
 // /help and returned to the model by the get_bot_help tool.

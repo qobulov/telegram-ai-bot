@@ -168,7 +168,7 @@ func membershipError(err error) error {
 
 // NewService wires the tools, the model client, the agent and the service.
 func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, logger *slog.Logger) (*service.Service, error) {
-	builtin := tools.Builtin(service.HelpText())
+	builtin := tools.Builtin(service.HelpText(), cfg.Location)
 	if cfg.ImagesEnabled {
 		builtin = append(builtin, imageTool(cfg, store))
 	}

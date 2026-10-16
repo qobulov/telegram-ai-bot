@@ -186,7 +186,7 @@ func TestNewRegistryRejectsBadTools(t *testing.T) {
 }
 
 func TestBuiltinToolsRegisterAndValidate(t *testing.T) {
-	registry := mustRegistry(t, Builtin("help text")...)
+	registry := mustRegistry(t, Builtin("help text", nil)...)
 	ctx := context.Background()
 
 	names := map[string]bool{}

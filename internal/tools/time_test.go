@@ -15,7 +15,14 @@ type timeResult struct {
 
 func runTime(t *testing.T, args string) (timeResult, envelope) {
 	t.Helper()
-	registry := mustRegistry(t, Builtin("")...)
+	return runTimeIn(t, nil, args)
+}
+
+// runTimeIn runs get_current_time as built for a group whose time zone is
+// location.
+func runTimeIn(t *testing.T, location *time.Location, args string) (timeResult, envelope) {
+	t.Helper()
+	registry := mustRegistry(t, Builtin("", location)...)
 	env := decodeEnvelope(t, registry.Execute(context.Background(), userID, "get_current_time", args))
 	var result timeResult
 	if env.OK {
@@ -41,6 +48,43 @@ func TestCurrentTimeDefaultsToUTC(t *testing.T) {
 	if drift := time.Since(parsed); drift < -time.Minute || drift > time.Minute {
 		t.Errorf("time %q is not the current time", result.Time)
 	}
+}
+
+func TestCurrentTimeDefaultsToTheGroupTimezone(t *testing.T) {
+	tashkent, err := time.LoadLocation("Asia/Tashkent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, env := runTimeIn(t, tashkent, `{}`)
+	if !env.OK || result.Timezone != "Asia/Tashkent" {
+		t.Fatalf("envelope = %+v, result = %+v", env, result)
+	}
+	if !strings.HasSuffix(result.Time, "+05:00") {
+		t.Errorf("time %q does not carry the Tashkent offset", result.Time)
+	}
+
+	// A zone the person names still wins over the group's.
+	result, env = runTimeIn(t, tashkent, `{"timezone":"Europe/Moscow"}`)
+	if !env.OK || result.Timezone != "Europe/Moscow" {
+		t.Errorf("named zone: envelope = %+v, result = %+v", env, result)
+	}
+}
+
+func TestCurrentTimeDescribesItsDefault(t *testing.T) {
+	registry := mustRegistry(t, Builtin("", time.UTC)...)
+	for _, def := range registry.Definitions(context.Background(), userID) {
+		if def.Function.Name != "get_current_time" {
+			continue
+		}
+		if strings.Contains(def.Function.Description, "UTC") || !strings.Contains(def.Function.Description, "group's local time") {
+			t.Errorf("description = %q, want the group's local time as the default", def.Function.Description)
+		}
+		if !strings.Contains(string(def.Function.Parameters), "Omit for the group's local time") {
+			t.Errorf("schema = %s, want the group's local time as the default", def.Function.Parameters)
+		}
+		return
+	}
+	t.Fatal("get_current_time is not registered")
 }
 
 func TestCurrentTimeAcceptsIANATimezone(t *testing.T) {

@@ -735,6 +735,21 @@ func TestHelpTextListsEveryCommand(t *testing.T) {
 	}
 }
 
+func TestHelpMentionsModerationAndPolls(t *testing.T) {
+	help := HelpText()
+	for _, want := range []string{
+		"Uzbek", "Russian", "English",
+		"photos", "stickers", "GIFs", "voice", "round videos",
+		"draw", "time", "arithmetic", "poll",
+		"delete", "mute", "ban", "pin",
+		"/ignore@username", "/unignore@username", "/mute", "/unmute", "/reset",
+	} {
+		if !strings.Contains(help, want) {
+			t.Errorf("help text does not mention %q", want)
+		}
+	}
+}
+
 // inGroup wraps a group message in an update with a fresh update ID.
 func inGroup(msg *telegram.Message) telegram.Update {
 	nextUpdateID++

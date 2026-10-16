@@ -3,13 +3,16 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"time"
 )
 
 // Builtin returns the tools shipped with the bot. helpText is what
-// get_bot_help reports; the caller owns its wording.
-func Builtin(helpText string) []Tool {
+// get_bot_help reports; the caller owns its wording. location is the groups'
+// time zone, which get_current_time answers in unless asked for another; nil
+// means UTC.
+func Builtin(helpText string, location *time.Location) []Tool {
 	return []Tool{
-		currentTimeTool(),
+		currentTimeTool(location),
 		calculatorTool(),
 		helpTool(helpText),
 	}

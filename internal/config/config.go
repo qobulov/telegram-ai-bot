@@ -94,9 +94,10 @@ type Config struct {
 	// AmbientMessages is how many of a group's recent messages are given to
 	// the model with a question. Zero turns the group log off.
 	AmbientMessages int
-	// Location is the groups' time zone: the times shown in the group log,
-	// and where a day starts for the daily picture limit and the owners'
-	// database tool.
+	// Location is the groups' time zone: the times shown in the group log
+	// and the turn header, the time get_current_time gives when no zone is
+	// named, and where a day starts for the daily picture limit and the
+	// owners' database tool.
 	Location *time.Location
 	// OwnerUsernames are the Telegram usernames of the bot's owners, lower
 	// case and without @. Empty when no owner is configured.

@@ -17,27 +17,35 @@ type timeOutput struct {
 	Weekday  string `json:"weekday"`
 }
 
-func currentTimeTool() Tool {
+// currentTimeTool answers in location when no timezone is asked for: people
+// asking "what time is it?" in a group mean the group's local time, and UTC
+// answered them wrong. A nil location means UTC.
+func currentTimeTool(location *time.Location) Tool {
+	if location == nil {
+		location = time.UTC
+	}
 	return Tool{
 		Name:        "get_current_time",
-		Description: "Get the current date and time. Returns UTC unless an IANA timezone name is given.",
+		Description: "Get the current date and time. Returns the group's local time unless an IANA timezone name is given.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"timezone": {"type": "string", "description": "IANA timezone name, for example Asia/Tashkent or Europe/Moscow. Omit for UTC."}
+				"timezone": {"type": "string", "description": "IANA timezone name, for example Asia/Tashkent or Europe/Moscow. Omit for the group's local time."}
 			},
 			"additionalProperties": false
 		}`),
-		Run: runCurrentTime,
+		Run: func(_ context.Context, raw json.RawMessage) (any, error) {
+			return runCurrentTime(raw, location)
+		},
 	}
 }
 
-func runCurrentTime(_ context.Context, raw json.RawMessage) (any, error) {
+func runCurrentTime(raw json.RawMessage, fallback *time.Location) (any, error) {
 	var args timeArgs
 	if err := decodeArgs(raw, &args); err != nil {
 		return nil, err
 	}
-	location, err := loadLocation(args.Timezone)
+	location, err := loadLocation(args.Timezone, fallback)
 	if err != nil {
 		return nil, err
 	}
@@ -49,11 +57,12 @@ func runCurrentTime(_ context.Context, raw json.RawMessage) (any, error) {
 	}, nil
 }
 
-// loadLocation resolves an IANA timezone name. "Local" is refused because it
-// would expose the server's own timezone rather than a zone the user named.
-func loadLocation(name string) (*time.Location, error) {
+// loadLocation resolves an IANA timezone name, or gives fallback when none
+// is named. "Local" is refused because it would expose the server's own
+// timezone rather than a zone the user named.
+func loadLocation(name string, fallback *time.Location) (*time.Location, error) {
 	if name == "" {
-		return time.UTC, nil
+		return fallback, nil
 	}
 	if name == "Local" {
 		return nil, unknownTimezone(name)
