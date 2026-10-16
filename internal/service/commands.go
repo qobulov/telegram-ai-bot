@@ -578,8 +578,14 @@ func (s *Service) request(ctx context.Context, in incoming, rules []storage.Grou
 		req.AuthorName = s.label(in.msg.From)
 		req.Text = req.AuthorName + ": " + oneLine(req.Text)
 		log = s.ambient.block(in.scope.ChatID, s.opts.Now())
-	} else if s.isOwner(in.msg.From) {
-		notice = ownerNotice
+	} else {
+		// Its lines are kept, but not its square brackets: the owner's notice
+		// is bracketed, and typed in front of a message it would read the
+		// same as the real one.
+		req.Text = bracketless.Replace(req.Text)
+		if s.isOwner(in.msg.From) {
+			notice = ownerNotice
+		}
 	}
 	req.Context = paragraphs(s.chatHeader(ctx, in), s.rulesHeader(rules, in), notice, log)
 	replied := in.msg.ReplyToMessage

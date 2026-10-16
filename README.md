@@ -747,7 +747,9 @@ cannot make one.
   never is.
 - One group's messages are answered one at a time, in order.
 - A message addressed to her in a group is stored and passed on as a single
-  line: line breaks become spaces and square brackets become round ones.
+  line: line breaks become spaces and square brackets become round ones. A
+  private message keeps its lines, but its square brackets become round
+  too, so nobody can type the bracketed note that marks the owner.
 - The managing commands (`/mute`, `/unmute`, `/ignore`, `/unignore`,
   `/reset`) from those who may use them are not held back by the quotas, and
   a muted group gets no notices of any kind.
