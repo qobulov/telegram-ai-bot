@@ -48,6 +48,15 @@ func (s *Service) ignoreOrderTarget(ctx context.Context, in incoming) *tools.Tar
 	return member
 }
 
+// isOthersIgnoreOrder reports whether someone other than an owner, in a
+// group, replied to a message with nothing but an order not to answer its
+// author. Only owners decide whom the bot ignores, so the order is passed
+// over: any answer, even a refusal, would repeat it to the group.
+func (s *Service) isOthersIgnoreOrder(in incoming) bool {
+	return in.group && in.msg.ReplyToMessage != nil && !s.isOwner(in.msg.From) &&
+		!strings.HasPrefix(in.text, "/") && isIgnoreOrder(in.text, s.opts.WakeWords)
+}
+
 // ignoreOrders are the orders not to answer someone, folded as isIgnoreOrder
 // folds a message.
 var ignoreOrders = map[string]bool{

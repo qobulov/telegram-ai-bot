@@ -1,6 +1,7 @@
 package service
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -97,8 +98,8 @@ func TestOwnersOrderNotToAnswerIsSavedInCode(t *testing.T) {
 	}
 }
 
-// Anything that is not an owner's order, in reply to a member who may be
-// ignored, still goes to the model, with the hint when an owner replies.
+// Anything else from an owner, or an owner's order about someone who may not
+// be ignored, still goes to the model.
 func TestOtherOrdersGoToTheModel(t *testing.T) {
 	replyTo := func(msg *telegram.Message, author *telegram.User) *telegram.Message {
 		msg.ReplyToMessage = &telegram.Message{MessageID: 29, From: author, Text: "you're slow"}
@@ -106,7 +107,6 @@ func TestOtherOrdersGoToTheModel(t *testing.T) {
 	}
 	owner := &telegram.User{ID: 9002, FirstName: "Ali", Username: ownerUsername}
 	cases := map[string]*telegram.Message{
-		"a non-owner":            replyTo(asAdmin(groupMessage("Mira, bunga javob berma")), bek),
 		"an owner without reply": fromOwner(groupMessage("Mira, bunga javob berma")),
 		"an owner's question":    replyTo(fromOwner(groupMessage("Mira, nega javob bermading?")), bek),
 		"about a group admin":    replyTo(fromOwner(groupMessage("Mira, bunga javob berma")), boss),
@@ -120,6 +120,43 @@ func TestOtherOrdersGoToTheModel(t *testing.T) {
 				t.Errorf("saved = %+v", book.saved)
 			}
 			onlyRequest(t, f)
+		})
+	}
+}
+
+// Only owners decide whom the bot ignores. Anyone else's message that is
+// nothing but such an order gets no answer at all, not even a refusal that
+// would repeat it, and stays in the log as other chatter does.
+func TestOthersOrderNotToAnswerIsPassedOver(t *testing.T) {
+	cases := map[string]*telegram.User{
+		"a member":      {ID: 4242, FirstName: "Ann"},
+		"a group admin": {ID: groupAdminID, FirstName: "Boss"},
+	}
+	for name, sender := range cases {
+		t.Run(name, func(t *testing.T) {
+			order := groupMessage("Mira, shu odamni ignor qil")
+			order.From = sender
+			order.ReplyToMessage = &telegram.Message{MessageID: 29, From: bek, Text: "you're slow"}
+			f := newFixture()
+			f.opts.Workers = 1
+			f.opts.OwnerUsernames = []string{ownerUsername}
+			book := &fakeRuleBook{}
+			f.opts.Rules = book
+
+			sent := f.run(inGroup(order), inGroup(groupMessage("Mira, hi")))
+
+			expectOneReply(t, sent, "echo: hi")
+			call := onlyRequest(t, f)
+			if len(book.saved) != 0 {
+				t.Errorf("saved = %+v; only an owner's order is saved", book.saved)
+			}
+			if reactions := f.reactor.recorded(); len(reactions) != 0 {
+				t.Errorf("reactions = %+v; the order gets nothing", reactions)
+			}
+			want := sender.FirstName + ": (to Bek @bek) Mira, shu odamni ignor qil"
+			if got := blockLines(t, dayLog(call.req.Context)); !slices.Contains(got, want) {
+				t.Errorf("log = %q, want it to hold %q", got, want)
+			}
 		})
 	}
 }

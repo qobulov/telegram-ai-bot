@@ -65,6 +65,10 @@ func (s *Service) process(in incoming) {
 	if s.obeyedIgnoreOrder(ctx, in) {
 		return
 	}
+	if s.isOthersIgnoreOrder(in) {
+		s.passOver(in)
+		return
+	}
 	rules := s.loadRules(ctx, in)
 	// An ignored member gets nothing, not even a reaction, and takes none of
 	// the group's quota. The managing commands still work for them if they
