@@ -133,3 +133,31 @@ func lastSpace(runes []rune) int {
 	}
 	return -1
 }
+
+// placeWords are dropped from names, so "Toshkent shahri" finds Toshkent.
+var placeWords = map[string]bool{"shahri": true, "shahar": true, "city": true, "город": true, "г": true, "шаҳри": true, "шахри": true}
+
+// normalizeName folds the ways people write a name: case, spaces, hyphens
+// and the four apostrophes used for o' and g' (', ʻ, ‘, ’).
+func normalizeName(name string) string {
+	var b strings.Builder
+	for _, word := range strings.Fields(strings.ToLower(name)) {
+		if placeWords[strings.Trim(word, ".,")] {
+			continue
+		}
+		for _, r := range word {
+			switch {
+			case isApostrophe(r) || r == '-' || r == '.' || r == ',':
+			case r == 'ё':
+				b.WriteRune('е')
+			default:
+				b.WriteRune(r)
+			}
+		}
+	}
+	return b.String()
+}
+
+func isApostrophe(r rune) bool {
+	return strings.ContainsRune("'`´ʻʼ‘’", r)
+}

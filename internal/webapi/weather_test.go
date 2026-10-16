@@ -69,11 +69,12 @@ func TestWeather(t *testing.T) {
 				if len(r.Daily) != 1 || day.Date != "2026-10-16" || day.MinC != 11.6 || day.MaxC != 24.3 || day.RainChancePct == nil || *day.RainChancePct != 0 || day.Sunrise != "06:35" || day.Sunset != "17:41" {
 					t.Errorf("daily = %+v", r.Daily)
 				}
-				if r.Air != nil || !strings.Contains(r.Source, "Open-Meteo") {
+				if r.Air != nil || !strings.Contains(r.Source, "Open-Meteo") || !strings.Contains(r.Source, "places: GeoNames") {
 					t.Errorf("result = %+v", r)
 				}
+				// GeoNames' point for Tashkent.
 				query := u.requests(forecastPath)[0].URL.Query()
-				if query.Get("latitude") != "41.2995" || query.Get("longitude") != "69.2401" || query.Get("forecast_days") != "1" || query.Get("timezone") != "Asia/Tashkent" {
+				if query.Get("latitude") != "41.2647" || query.Get("longitude") != "69.2163" || query.Get("forecast_days") != "1" || query.Get("timezone") != "Asia/Tashkent" {
 					t.Errorf("forecast query = %v", query)
 				}
 				if len(u.requests(geocodingPath)) != 0 {
@@ -95,64 +96,73 @@ func TestWeather(t *testing.T) {
 		},
 		{
 			name:     "a Cyrillic name goes to the geocoder in Russian",
-			override: map[string]stub{geocodingPath + "?language=ru": ok(fixture(t, "geocoding_urgut.json"))},
-			args:     `{"city":"Ургут"}`,
+			override: map[string]stub{geocodingPath + "?language=ru": ok(fixture(t, "geocoding_keles_ru.json"))},
+			args:     `{"city":"Келес"}`,
 			check: func(t *testing.T, r weatherResult, u *upstream) {
-				if r.Place != "Ургут, Узбекистан" {
-					t.Errorf("place = %q", r.Place)
+				if r.Place != "Келес, Узбекистан" || r.Timezone != "" {
+					t.Errorf("place = %q, timezone %q", r.Place, r.Timezone)
 				}
-				if query := u.requests(forecastPath)[0].URL.Query(); query.Get("latitude") != "39.419" || query.Get("longitude") != "67.2612" {
+				if query := u.requests(forecastPath)[0].URL.Query(); query.Get("latitude") != "41.4033" || query.Get("longitude") != "69.2067" {
 					t.Errorf("forecast query = %v", query)
 				}
 			},
 		},
 		{
-			name:     "a Latin name asks in Uzbek and English and prefers Uzbekistan",
-			override: map[string]stub{geocodingPath + "?language=en": ok(fixture(t, "geocoding_gazli.json"))},
-			args:     `{"city":"Gazli"}`,
+			// Keles, Bursa, has 3,772 people; Keles, Tashkent region, nobody
+			// GeoNames counted. Both are named exactly as asked.
+			name: "a Latin name asks in Uzbek and English and prefers Uzbekistan",
+			override: map[string]stub{
+				geocodingPath + "?language=uz": ok(fixture(t, "geocoding_keles_uz.json")),
+				geocodingPath + "?language=en": ok(fixture(t, "geocoding_keles_en.json")),
+			},
+			args: `{"city":"Keles"}`,
 			check: func(t *testing.T, r weatherResult, u *upstream) {
 				languages := map[string]bool{}
 				for _, request := range u.requests(geocodingPath) {
 					languages[request.URL.Query().Get("language")] = true
+					if count := request.URL.Query().Get("count"); count != "20" {
+						t.Errorf("count = %s, want 20", count)
+					}
 				}
-				if r.Place != "Gazli, Uzbekistan" || r.Timezone != "" || len(languages) != 2 || !languages["uz"] || !languages["en"] {
+				if r.Place != "Keles, O‘zbekiston" || r.Timezone != "" || len(languages) != 2 || !languages["uz"] || !languages["en"] {
 					t.Errorf("place = %q, timezone %q, languages %v", r.Place, r.Timezone, languages)
 				}
-				if query := u.requests(forecastPath)[0].URL.Query(); query.Get("timezone") != "Asia/Tashkent" {
+				if query := u.requests(forecastPath)[0].URL.Query(); query.Get("latitude") != "41.4033" || query.Get("timezone") != "Asia/Tashkent" {
 					t.Errorf("forecast query = %v", query)
 				}
 			},
 		},
 		{
-			// The live geocoder lists York, Nebraska, first for "New York"
-			// in Uzbek; only the English answer has the city.
-			name: "the best town of both answers, in its own time zone",
+			name: "a town abroad named as asked, in its own time zone",
 			override: map[string]stub{
-				geocodingPath + "?language=uz": ok(fixture(t, "geocoding_new_york_uz.json")),
-				geocodingPath + "?language=en": ok(fixture(t, "geocoding_new_york_en.json")),
+				geocodingPath + "?language=uz": ok(fixture(t, "geocoding_bursa_uz.json")),
+				geocodingPath + "?language=en": ok(fixture(t, "geocoding_bursa_en.json")),
 			},
-			args: `{"city":"New York, NY"}`,
+			args: `{"city":"Bursa, Turkey"}`,
 			check: func(t *testing.T, r weatherResult, u *upstream) {
-				if r.Place != "New York, United States" || r.Timezone != "America/New_York" {
+				if r.Place != "Bursa, Turkiya" || r.Timezone != "Europe/Istanbul" {
 					t.Errorf("place = %q, timezone %q", r.Place, r.Timezone)
 				}
 				query := u.requests(forecastPath)[0].URL.Query()
-				if query.Get("latitude") != "40.7143" || query.Get("timezone") != "America/New_York" {
+				if query.Get("latitude") != "40.1956" || query.Get("timezone") != "Europe/Istanbul" {
 					t.Errorf("forecast query = %v", query)
+				}
+				if name := u.requests(geocodingPath)[0].URL.Query().Get("name"); name != "Bursa" {
+					t.Errorf("the geocoder was asked %q", name)
 				}
 			},
 		},
 		{
-			// Live, "Qo'ng'irot" and "Qongirot" find nothing; GeoNames
-			// writes o‘ and g‘ with U+2018.
+			// Live, only "Bo‘ritepa" finds the village: GeoNames writes o‘
+			// and g‘ with U+2018.
 			name:     "a name with apostrophes is also asked as GeoNames writes it",
-			override: map[string]stub{geocodingPath + "?name=Qo‘ng‘irot": ok(fixture(t, "geocoding_qongirot_quoted_uz.json"))},
-			args:     `{"city":"Qo'ng'irot"}`,
+			override: map[string]stub{geocodingPath + "?name=Bo‘ritepa": ok(fixture(t, "geocoding_boritepa_quoted_uz.json"))},
+			args:     `{"city":"Bo'ritepa"}`,
 			check: func(t *testing.T, r weatherResult, u *upstream) {
-				if r.Place != "Qo‘ng‘irot Shahri, O‘zbekiston" || r.Timezone != "" {
+				if r.Place != "Bo‘ritepa, O‘zbekiston" || r.Timezone != "" {
 					t.Errorf("place = %q, timezone %q", r.Place, r.Timezone)
 				}
-				if query := u.requests(forecastPath)[0].URL.Query(); query.Get("latitude") != "43.0521" || query.Get("timezone") != "Asia/Tashkent" {
+				if query := u.requests(forecastPath)[0].URL.Query(); query.Get("latitude") != "40.9604" || query.Get("timezone") != "Asia/Tashkent" {
 					t.Errorf("forecast query = %v", query)
 				}
 				asked := map[string]bool{}
@@ -160,7 +170,7 @@ func TestWeather(t *testing.T) {
 					query := request.URL.Query()
 					asked[query.Get("name")+" in "+query.Get("language")] = true
 				}
-				want := []string{"Qo'ng'irot in uz", "Qo'ng'irot in en", "Qo‘ng‘irot in uz", "Qo’ng’irot in uz", "Qongirot in uz"}
+				want := []string{"Bo'ritepa in uz", "Bo'ritepa in en", "Bo‘ritepa in uz", "Bo’ritepa in uz", "Boritepa in uz"}
 				for _, question := range want {
 					if !asked[question] {
 						t.Errorf("the geocoder was not asked %q", question)
@@ -168,18 +178,6 @@ func TestWeather(t *testing.T) {
 				}
 				if len(asked) != len(want) {
 					t.Errorf("the geocoder was asked %v, want %v", asked, want)
-				}
-			},
-		},
-		{
-			// Some towns have U+2019 instead: live, only "Bulung’ur"
-			// finds Bulung'ur.
-			name:     "a name with apostrophes is also asked with U+2019",
-			override: map[string]stub{geocodingPath + "?name=Bulung’ur": ok(fixture(t, "geocoding_bulungur_rquote_uz.json"))},
-			args:     `{"city":"Bulungʻur"}`,
-			check: func(t *testing.T, r weatherResult, _ *upstream) {
-				if r.Place != "Bulung’ur Shahri, O‘zbekiston" {
-					t.Errorf("place = %q", r.Place)
 				}
 			},
 		},
@@ -214,7 +212,7 @@ func TestWeather(t *testing.T) {
 					t.Errorf("note = %q", r.Note)
 				}
 				request := u.requests(metPath)[0]
-				if request.URL.Query().Get("lat") != "41.2995" || request.Header.Get("User-Agent") == "" {
+				if request.URL.Query().Get("lat") != "41.2647" || request.Header.Get("User-Agent") == "" {
 					t.Errorf("MET request = %s %v", request.URL, request.Header)
 				}
 			},
@@ -294,7 +292,16 @@ func TestWeatherFailures(t *testing.T) {
 		code     string
 		words    []string
 	}{
-		{name: "no such place", args: `{"city":"Qwzxqy"}`, code: "invalid_arguments", words: []string{"Qwzxqy"}},
+		{name: "no such place", args: `{"city":"Qwzxqy"}`, code: "invalid_arguments", words: []string{"Qwzxqy", "nearest town"}},
+		{
+			// Live, the geocoder's only answer for "Forish" is Farishonki in
+			// Russia.
+			name:     "the geocoder knows only a lookalike",
+			override: map[string]stub{geocodingPath: ok(fixture(t, "geocoding_forish_uz.json"))},
+			args:     `{"city":"Forishkent"}`,
+			code:     "invalid_arguments",
+			words:    []string{"no place called", "nearest town or region centre"},
+		},
 		{name: "no city", args: `{}`, code: "invalid_arguments"},
 		{name: "too many days", args: `{"city":"Toshkent","days":4}`, code: "invalid_arguments"},
 		{name: "no days", args: `{"city":"Toshkent","days":0}`, code: "invalid_arguments"},
@@ -329,7 +336,7 @@ func TestWeatherFailures(t *testing.T) {
 		{
 			name:     "the geocoder is busy",
 			override: map[string]stub{geocodingPath: status(http.StatusTooManyRequests)},
-			args:     `{"city":"Gazli"}`,
+			args:     `{"city":"Keles"}`,
 			code:     "execution_failed",
 			words:    []string{"busy"},
 		},
@@ -364,7 +371,7 @@ func TestWeatherGeocoderKeepsMexicoCityApartFromMexico(t *testing.T) {
 	registry := newRegistry(t, u.options())
 
 	for _, city := range []string{"Mexico", "Mexico City"} {
-		result[weatherResult](t, execute(t, registry, "get_weather", `{"city":"`+city+`"}`))
+		execute(t, registry, "get_weather", `{"city":"`+city+`"}`)
 	}
 	asked := map[string]bool{}
 	for _, request := range u.requests(geocodingPath) {
@@ -396,25 +403,25 @@ func TestWeatherDoesNotWaitLongForAirQuality(t *testing.T) {
 func TestWeatherDoesNotWaitLongForTheGeocoder(t *testing.T) {
 	t.Parallel()
 	routes := weatherRoutes(t)
-	routes[geocodingPath+"?name=Qo‘ng‘irot"] = ok(fixture(t, "geocoding_qongirot_quoted_uz.json"))
-	routes[geocodingPath+"?name=Qongirot"] = slow
+	routes[geocodingPath+"?name=Bo‘ritepa"] = ok(fixture(t, "geocoding_boritepa_quoted_uz.json"))
+	routes[geocodingPath+"?name=Boritepa"] = slow
 	u := newUpstream(t, routes)
 	opts := u.options()
 	// A caller's client without short timeouts.
 	opts.HTTPClient = &http.Client{Timeout: 10 * time.Second}
 
 	start := time.Now()
-	r := result[weatherResult](t, run(t, opts, "get_weather", `{"city":"Qo'ng'irot"}`))
+	r := result[weatherResult](t, run(t, opts, "get_weather", `{"city":"Bo'ritepa"}`))
 
 	if elapsed := time.Since(start); elapsed > 3*time.Second {
 		t.Errorf("the answer took %v", elapsed)
 	}
-	if r.Place != "Qo‘ng‘irot Shahri, O‘zbekiston" || !strings.Contains(r.Source, "Open-Meteo") {
+	if r.Place != "Bo‘ritepa, O‘zbekiston" || !strings.Contains(r.Source, "Open-Meteo") {
 		t.Errorf("result = %+v", r)
 	}
 }
 
-func TestBestPlace(t *testing.T) {
+func TestMatchingPlace(t *testing.T) {
 	answer := func(names ...string) []geocodingResult {
 		var all []geocodingResult
 		for _, name := range names {
@@ -428,35 +435,49 @@ func TestBestPlace(t *testing.T) {
 		}
 		return all
 	}
-	abroad := answer("geocoding_gazli.json")[1:]
-	uncounted := answer("geocoding_gazli.json")[0]
-	uncounted.Population = 0
+	// The live answer for "Boston" in Uzbek, which the tool asks for
+	// Bo'ston without its apostrophe: Boston, Massachusetts, first and a
+	// Bo‘ston in Andijon 19th.
+	boston := answer("geocoding_boston_uz.json")
+	var bostonAbroad []geocodingResult
+	for _, r := range boston {
+		if r.CountryCode != "UZ" {
+			bostonAbroad = append(bostonAbroad, r)
+		}
+	}
 	tests := []struct {
-		name    string
-		results []geocodingResult
-		want    string
-		country string
+		name, query string
+		results     []geocodingResult
+		want        string
+		country     string
 		// latitude tells namesakes in one country apart; zero skips it.
 		latitude float64
 	}{
-		{name: "the city over York, Nebraska", results: answer("geocoding_new_york_uz.json", "geocoding_new_york_en.json"), want: "New York", country: "US"},
-		{name: "Shymkent over a village without people", results: answer("geocoding_chimkent_uz.json"), want: "Chimkent", country: "KZ"},
-		{name: "a counted town in Uzbekistan over a region centre abroad", results: answer("geocoding_pop_uz.json"), want: "Pop", country: "UZ"},
-		{name: "the geocoder's order when nothing else differs", results: abroad, want: "Gāzlī", country: "IR"},
-		{name: "Uzbekistan when nobody has a population", results: append(abroad, uncounted), want: "Gazli", country: "UZ"},
+		{name: "Bo'ston is the Uzbek town, not Boston", query: "Bo'ston", results: boston, want: "Bo‘ston", country: "UZ", latitude: 40.83231},
+		{name: "Bo'ston is never a town abroad", query: "Bo'ston", results: bostonAbroad},
+		{name: "Boston as written is the city", query: "Boston", results: boston, want: "Boston", country: "US", latitude: 42.35843},
+		{name: "a lookalike is not a match", query: "Forish", results: answer("geocoding_forish_uz.json")},
+		// The 8th of 20 answers, after five Kogons in the Philippines.
+		{name: "the Uzbek town far down the list", query: "Kogon", results: answer("geocoding_kogon_uz.json"), want: "Kogon Shahri", country: "UZ"},
+		{name: "the city, not York, Nebraska", query: "New York", results: answer("geocoding_new_york_uz.json", "geocoding_new_york_en.json"), want: "New York", country: "US", latitude: 40.71427},
+		{name: "Pop in Namangan, not Puerto Plata", query: "Pop", results: answer("geocoding_pop_uz.json"), want: "Pop", country: "UZ"},
 		// GeoNames counts nobody in Keles, Tashkent region, and 3,772
 		// people in Keles, Bursa.
-		{name: "an uncounted town in Uzbekistan over a small one abroad", results: answer("geocoding_keles_uz.json", "geocoding_keles_en.json"), want: "Keles", country: "UZ", latitude: 41.40333},
-		{name: "the first of four uncounted towns over a village abroad with people", results: answer("geocoding_baxt_uz.json", "geocoding_baxt_en.json"), want: "Baxt", country: "UZ", latitude: 40.72},
-		{name: "an uncounted town in Uzbekistan over a district seat abroad", results: answer("geocoding_dangara_uz.json", "geocoding_dangara_en.json"), want: "Dangara", country: "UZ"},
-		{name: "a district seat over villages of the same name", results: answer("geocoding_qongirot_quoted_uz.json"), want: "Qo‘ng‘irot Shahri", country: "UZ"},
-		{name: "nothing but a parish without a country", results: answer("geocoding_montserrat_uz.json")},
-		{name: "nothing at all", results: answer("geocoding_none.json")},
+		{name: "Uzbekistan before a larger namesake abroad", query: "Keles", results: answer("geocoding_keles_uz.json", "geocoding_keles_en.json"), want: "Keles", country: "UZ", latitude: 41.40333},
+		{name: "a Cyrillic name", query: "Келес", results: answer("geocoding_keles_ru.json"), want: "Келес", country: "UZ"},
+		{name: "the geocoder's order among uncounted towns", query: "Baxt", results: answer("geocoding_baxt_uz.json", "geocoding_baxt_en.json"), want: "Baxt", country: "UZ", latitude: 40.72},
+		{name: "Danghara is another name", query: "Dangara", results: answer("geocoding_dangara_uz.json", "geocoding_dangara_en.json"), want: "Dangara", country: "UZ", latitude: 39.66667},
+		// Why Chimkent is in the world table: the geocoder cannot tell the
+		// city from a village in Farg'ona.
+		{name: "a village of the city's name in Uzbekistan", query: "Chimkent", results: answer("geocoding_chimkent_uz.json"), want: "Chimkent", country: "UZ"},
+		{name: "a parish without a country", query: "Sankt-Peterburg", results: answer("geocoding_montserrat_uz.json")},
+		{name: "nothing at all", query: "Gazli", results: answer("geocoding_none.json")},
+		{name: "a name that folds to nothing", query: "'", results: boston},
 	}
 	for _, test := range tests {
-		got, found := bestPlace(test.results)
+		got, found := matchingPlace(test.query, test.results)
 		if found != (test.want != "") || got.Name != test.want || got.CountryCode != test.country || (test.latitude != 0 && got.Latitude != test.latitude) {
-			t.Errorf("%s: bestPlace = %s, %s, %v, %v", test.name, got.Name, got.CountryCode, got.Latitude, found)
+			t.Errorf("%s: matchingPlace(%q) = %s, %s, %v, %v", test.name, test.query, got.Name, got.CountryCode, got.Latitude, found)
 		}
 	}
 }

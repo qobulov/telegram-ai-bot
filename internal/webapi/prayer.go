@@ -76,14 +76,14 @@ type ramadanDay struct {
 }
 
 func (a *apis) prayerTool() tools.Tool {
-	regions, _ := json.Marshal(regionKeys())
+	keys, _ := json.Marshal(regionKeys())
 	return tools.Tool{
 		Name:        "prayer_times",
 		Description: "Namoz times for an Uzbek region centre on a day, or the Ramadan saharlik and iftar timetable. Times are approximate (within a few minutes); muslim.uz announces the official ones.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"region": {"type": "string", "enum": ` + string(regions) + `, "description": "Region centre; use the nearest one for other towns. Default toshkent."},
+				"region": {"type": "string", "enum": ` + string(keys) + `, "description": "Region centre; use the nearest one for other towns. Default toshkent."},
 				"date": {"type": "string", "description": "YYYY-MM-DD; omit for today."},
 				"mode": {"type": "string", "enum": ["day", "ramadan"], "description": "day: the day's prayers; ramadan: saharlik end and iftar for each day of the current or next Ramadan. Default day."}
 			},
@@ -96,10 +96,8 @@ func (a *apis) prayerTool() tools.Tool {
 
 func regionKeys() []string {
 	var keys []string
-	for _, p := range places {
-		if p.region != "" {
-			keys = append(keys, p.region)
-		}
+	for _, r := range regions {
+		keys = append(keys, r.key)
 	}
 	return keys
 }
@@ -109,7 +107,7 @@ func (a *apis) prayerTimes(ctx context.Context, raw json.RawMessage) (any, error
 	if err := decodeArgs(raw, &args); err != nil {
 		return nil, err
 	}
-	region, found := regionPlace(cmp.Or(args.Region, "toshkent"))
+	centre, found := regionPlace(cmp.Or(args.Region, "toshkent"))
 	if !found {
 		return nil, argumentError("region must be one of %s", strings.Join(regionKeys(), ", "))
 	}
@@ -119,9 +117,9 @@ func (a *apis) prayerTimes(ctx context.Context, raw json.RawMessage) (any, error
 	}
 	switch args.Mode {
 	case "", "day":
-		return a.prayerDay(ctx, region, day)
+		return a.prayerDay(ctx, centre, day)
 	case "ramadan":
-		return a.ramadan(ctx, region, day)
+		return a.ramadan(ctx, centre, day)
 	default:
 		return nil, argumentError("mode must be day or ramadan")
 	}
@@ -174,13 +172,13 @@ func (d aladhanDay) isoDate() string {
 	return day.Format(time.DateOnly)
 }
 
-func (a *apis) prayerDay(ctx context.Context, region place, day time.Time) (prayerDayOutput, error) {
+func (a *apis) prayerDay(ctx context.Context, centre region, day time.Time) (prayerDayOutput, error) {
 	date := day.Format(time.DateOnly)
-	answer, err := remember(a.cache, "prayer:"+region.region+":"+date, prayerTTL, func() (aladhanDay, error) {
+	answer, err := remember(a.cache, "prayer:"+centre.key+":"+date, prayerTTL, func() (aladhanDay, error) {
 		var answer struct {
 			Data aladhanDay `json:"data"`
 		}
-		err := a.askAladhan(ctx, "/v1/timings/"+day.Format("02-01-2006"), region, &answer)
+		err := a.askAladhan(ctx, "/v1/timings/"+day.Format("02-01-2006"), centre, &answer)
 		// Aladhan answers a date it cannot use with today's times.
 		if err == nil && answer.Data.isoDate() != date {
 			err = errors.New("Aladhan answered for another day")
@@ -195,7 +193,7 @@ func (a *apis) prayerDay(ctx context.Context, region place, day time.Time) (pray
 	}
 	times, _ := answer.times(prayerNames...)
 	return prayerDayOutput{
-		Region: region.name,
+		Region: centre.name,
 		Date:   date,
 		Hijri:  answer.hijri(),
 		Bomdod: times[0],
@@ -224,30 +222,30 @@ func (d aladhanDay) hijri() hijriDate {
 }
 
 // ramadan gives the Ramadan that is under way or next after day.
-func (a *apis) ramadan(ctx context.Context, region place, day time.Time) (ramadanOutput, error) {
+func (a *apis) ramadan(ctx context.Context, centre region, day time.Time) (ramadanOutput, error) {
 	date := day.Format(time.DateOnly)
 	year := hijriYear(day)
-	days, err := a.ramadanDays(ctx, region, year)
+	days, err := a.ramadanDays(ctx, centre, year)
 	if err == nil && days[len(days)-1].Date < date {
 		year++
-		days, err = a.ramadanDays(ctx, region, year)
+		days, err = a.ramadanDays(ctx, centre, year)
 	}
 	if err != nil {
 		return ramadanOutput{}, err
 	}
-	return ramadanOutput{Region: region.name, HijriYear: year, Days: days, Note: ramadanNote, Source: prayerSource}, nil
+	return ramadanOutput{Region: centre.name, HijriYear: year, Days: days, Note: ramadanNote, Source: prayerSource}, nil
 }
 
 const ramadanNote = "saharlik_end is a minute before bomdod and iftar a minute after shom, to be safe"
 
-func (a *apis) ramadanDays(ctx context.Context, region place, year int) ([]ramadanDay, error) {
-	key := fmt.Sprintf("ramadan:%s:%d", region.region, year)
+func (a *apis) ramadanDays(ctx context.Context, centre region, year int) ([]ramadanDay, error) {
+	key := fmt.Sprintf("ramadan:%s:%d", centre.key, year)
 	return remember(a.cache, key, prayerTTL, func() ([]ramadanDay, error) {
 		var answer struct {
 			Data []aladhanDay `json:"data"`
 		}
 		path := fmt.Sprintf("/v1/hijriCalendar/%d/%d", year, ramadanMonth)
-		if err := a.askAladhan(ctx, path, region, &answer); err != nil {
+		if err := a.askAladhan(ctx, path, centre, &answer); err != nil {
 			return nil, err
 		}
 		var days []ramadanDay
@@ -273,10 +271,10 @@ func (a *apis) ramadanDays(ctx context.Context, region place, year int) ([]ramad
 // muslimUzTune. On 2026-10-16 in Tashkent that gave muslim.uz's times to
 // the minute except Asr, a minute late. Method 3, which many sites use,
 // is 12 to 14 minutes off. A first call that hangs is tried once more.
-func (a *apis) askAladhan(ctx context.Context, path string, region place, into any) error {
+func (a *apis) askAladhan(ctx context.Context, path string, centre region, into any) error {
 	query := url.Values{
-		"latitude":       {coordinate(region.lat)},
-		"longitude":      {coordinate(region.lon)},
+		"latitude":       {coordinate(centre.lat)},
+		"longitude":      {coordinate(centre.lon)},
 		"method":         {"99"},
 		"methodSettings": {"15,null,15"},
 		"school":         {"1"},
