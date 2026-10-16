@@ -1,13 +1,16 @@
 package webapi
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -19,13 +22,19 @@ const (
 	geocodingTTL   = 24 * time.Hour
 	weatherTimeout = 6 * time.Second
 	maxCityName    = 100
+	maxPlaceName   = 80
 	// metBodyLimit leaves room above MET Norway's usual 40 KB, so the
 	// fallback does not break when they add a field.
 	metBodyLimit = 128 << 10
+	// tashkentZone is what Open-Meteo is asked for places in Uzbekistan.
+	tashkentZone = "Asia/Tashkent"
 
 	openMeteoSource = "Open-Meteo (CC BY 4.0)"
 	metSource       = "MET Norway (CC BY 4.0)"
 	airNote         = "model estimate (CAMS), not a station reading"
+	// metTodayNote warns that MET Norway's timeseries starts at the
+	// current hour, so the morning is missing from today's figures.
+	metTodayNote = "today's min_c and max_c cover only the rest of the day"
 )
 
 type weatherArgs struct {
@@ -35,12 +44,22 @@ type weatherArgs struct {
 }
 
 type weatherOutput struct {
-	Place  string       `json:"place"`
-	Now    weatherNow   `json:"now"`
-	Daily  []weatherDay `json:"daily"`
-	Air    *airOutput   `json:"air,omitempty"`
-	Note   string       `json:"note,omitempty"`
-	Source string       `json:"source"`
+	Place string `json:"place"`
+	// Timezone is set for places abroad: their sunrise and sunset are in
+	// local time.
+	Timezone string       `json:"timezone,omitempty"`
+	Now      weatherNow   `json:"now"`
+	Daily    []weatherDay `json:"daily"`
+	Air      *airOutput   `json:"air,omitempty"`
+	Note     string       `json:"note,omitempty"`
+	Source   string       `json:"source"`
+}
+
+func (o *weatherOutput) addNote(note string) {
+	if o.Note != "" {
+		o.Note += "; "
+	}
+	o.Note += note
 }
 
 type weatherNow struct {
@@ -70,7 +89,7 @@ type airOutput struct {
 func (a *apis) weatherTool() tools.Tool {
 	return tools.Tool{
 		Name:        "get_weather",
-		Description: "Current weather and a forecast of up to 3 days for a city (best for Uzbekistan, any spelling), optionally with air quality. Temperatures in °C, conditions in Uzbek.",
+		Description: "Current weather and a forecast of up to 3 days for a city (best for Uzbekistan, any spelling), optionally with air quality. Temperatures in °C, conditions in Uzbek; sunrise and sunset are the place's local time.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
@@ -90,6 +109,9 @@ func (a *apis) weatherTool() tools.Tool {
 type spot struct {
 	name     string
 	lat, lon float64
+	// zone is the time zone of a place abroad. Nil means Tashkent time,
+	// which all of Uzbekistan keeps.
+	zone *time.Location
 }
 
 // coordinate keeps at most four decimals, which MET Norway requires and
@@ -99,6 +121,19 @@ func coordinate(value float64) string {
 }
 
 func (s spot) key() string { return coordinate(s.lat) + "," + coordinate(s.lon) }
+
+// zoneName is the time zone to ask Open-Meteo for, so that sunrise,
+// sunset and the days themselves are the place's own.
+func (s spot) zoneName() string {
+	if s.zone == nil {
+		return tashkentZone
+	}
+	return s.zone.String()
+}
+
+func (s spot) location(home *time.Location) *time.Location {
+	return cmp.Or(s.zone, home)
+}
 
 func (a *apis) weather(ctx context.Context, raw json.RawMessage) (any, error) {
 	var args weatherArgs
@@ -118,19 +153,28 @@ func (a *apis) weather(ctx context.Context, raw json.RawMessage) (any, error) {
 		return nil, err
 	}
 
+	// Air quality is optional, so it gets a deadline of its own: a stalled
+	// answer must not cost the forecast.
 	air := make(chan airAnswer, 1)
 	if args.IncludeAir {
-		go func() { air <- a.airQuality(ctx, where) }()
+		go func() {
+			airCtx, cancel := context.WithTimeout(ctx, primaryTimeout)
+			defer cancel()
+			air <- a.airQuality(airCtx, where)
+		}()
 	}
 	out, err := a.forecast(ctx, where, days)
 	if err != nil {
 		return nil, err
 	}
+	if where.zone != nil {
+		out.Timezone = where.zone.String()
+	}
 	if args.IncludeAir {
 		answer := <-air
 		out.Air = answer.air
 		if answer.err != nil {
-			out.Note = "air quality is not available right now"
+			out.addNote("air quality is not available right now")
 		}
 	}
 	return out, nil
@@ -152,21 +196,37 @@ func (a *apis) forecast(ctx context.Context, where spot, days int) (weatherOutpu
 	return out, nil
 }
 
+// openMeteoForecast holds pointers so that a missing number is noticed
+// instead of shown as 0 °C and "ochiq".
 type openMeteoForecast struct {
 	Current struct {
-		Temperature float64 `json:"temperature_2m"`
-		FeelsLike   float64 `json:"apparent_temperature"`
-		WeatherCode int     `json:"weather_code"`
-		WindSpeed   float64 `json:"wind_speed_10m"`
+		Temperature *float64 `json:"temperature_2m"`
+		FeelsLike   *float64 `json:"apparent_temperature"`
+		WeatherCode *int     `json:"weather_code"`
+		WindSpeed   *float64 `json:"wind_speed_10m"`
 	} `json:"current"`
 	Daily struct {
 		Time       []string   `json:"time"`
-		Max        []float64  `json:"temperature_2m_max"`
-		Min        []float64  `json:"temperature_2m_min"`
+		Max        []*float64 `json:"temperature_2m_max"`
+		Min        []*float64 `json:"temperature_2m_min"`
 		RainChance []*float64 `json:"precipitation_probability_max"`
 		Sunrise    []string   `json:"sunrise"`
 		Sunset     []string   `json:"sunset"`
 	} `json:"daily"`
+}
+
+// complete reports whether the answer has every number the output shows.
+func (f openMeteoForecast) complete(days int) bool {
+	now := f.Current
+	if now.Temperature == nil || now.FeelsLike == nil || now.WeatherCode == nil || now.WindSpeed == nil || len(f.Daily.Time) < days {
+		return false
+	}
+	for i := range days {
+		if at(f.Daily.Max, i) == nil || at(f.Daily.Min, i) == nil {
+			return false
+		}
+	}
+	return true
 }
 
 func (a *apis) openMeteo(ctx context.Context, where spot, days int) (weatherOutput, error) {
@@ -175,15 +235,15 @@ func (a *apis) openMeteo(ctx context.Context, where spot, days int) (weatherOutp
 		"longitude":     {coordinate(where.lon)},
 		"current":       {"temperature_2m,apparent_temperature,weather_code,wind_speed_10m"},
 		"daily":         {"temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset"},
-		"timezone":      {"Asia/Tashkent"},
+		"timezone":      {where.zoneName()},
 		"forecast_days": {strconv.Itoa(days)},
 	}
 	key := fmt.Sprintf("open-meteo:%s:%d", where.key(), days)
 	forecast, err := remember(a.cache, key, weatherTTL, func() (openMeteoForecast, error) {
 		var forecast openMeteoForecast
 		err := a.client.getJSON(ctx, call{service: "Open-Meteo", url: a.urls.OpenMeteo + "/v1/forecast?" + query.Encode()}, &forecast)
-		if err == nil && len(forecast.Daily.Time) == 0 {
-			err = errors.New("Open-Meteo sent no forecast")
+		if err == nil && !forecast.complete(days) {
+			err = errors.New("Open-Meteo sent an incomplete forecast")
 		}
 		return forecast, openMeteoError(err)
 	})
@@ -193,24 +253,25 @@ func (a *apis) openMeteo(ctx context.Context, where spot, days int) (weatherOutp
 	return forecast.output(where.name, days), nil
 }
 
+// output reads a forecast that complete has checked.
 func (f openMeteoForecast) output(place string, days int) weatherOutput {
-	feelsLike := f.Current.FeelsLike
+	feelsLike := *f.Current.FeelsLike
 	out := weatherOutput{
 		Place: place,
 		Now: weatherNow{
-			TempC:      f.Current.Temperature,
+			TempC:      *f.Current.Temperature,
 			FeelsLikeC: &feelsLike,
-			Conditions: wmoConditions(f.Current.WeatherCode),
-			WindKmh:    f.Current.WindSpeed,
+			Conditions: wmoConditions(*f.Current.WeatherCode),
+			WindKmh:    *f.Current.WindSpeed,
 		},
 		Source: openMeteoSource,
 	}
 	daily := f.Daily
-	for i := 0; i < days && i < len(daily.Time); i++ {
+	for i := range days {
 		day := weatherDay{
 			Date:    daily.Time[i],
-			MaxC:    at(daily.Max, i),
-			MinC:    at(daily.Min, i),
+			MaxC:    *daily.Max[i],
+			MinC:    *daily.Min[i],
 			Sunrise: hourMinute(at(daily.Sunrise, i)),
 			Sunset:  hourMinute(at(daily.Sunset, i)),
 		}
@@ -264,7 +325,7 @@ func (a *apis) airQuality(ctx context.Context, where spot) airAnswer {
 		"latitude":  {coordinate(where.lat)},
 		"longitude": {coordinate(where.lon)},
 		"current":   {"us_aqi,pm2_5"},
-		"timezone":  {"Asia/Tashkent"},
+		"timezone":  {where.zoneName()},
 	}
 	type answer struct {
 		Current struct {
@@ -300,8 +361,8 @@ type metPoint struct {
 	Data struct {
 		Instant struct {
 			Details struct {
-				AirTemperature float64 `json:"air_temperature"`
-				WindSpeed      float64 `json:"wind_speed"`
+				AirTemperature *float64 `json:"air_temperature"`
+				WindSpeed      *float64 `json:"wind_speed"`
 			} `json:"details"`
 		} `json:"instant"`
 		Next1Hours *metSummary `json:"next_1_hours"`
@@ -326,26 +387,37 @@ func (p metPoint) symbol() string {
 	}
 }
 
+// complete reports whether every point has the numbers the output shows.
+func (f metForecast) complete() bool {
+	points := f.Properties.Timeseries
+	for _, p := range points {
+		if p.Data.Instant.Details.AirTemperature == nil || p.Data.Instant.Details.WindSpeed == nil {
+			return false
+		}
+	}
+	return len(points) > 0
+}
+
 func (a *apis) metNorway(ctx context.Context, where spot, days int) (weatherOutput, error) {
 	query := url.Values{"lat": {coordinate(where.lat)}, "lon": {coordinate(where.lon)}}
 	forecast, err := remember(a.cache, "met:"+where.key(), weatherTTL, func() (metForecast, error) {
 		var forecast metForecast
 		err := a.client.getJSON(ctx, call{service: "MET Norway", url: a.urls.METNorway + "/weatherapi/locationforecast/2.0/compact?" + query.Encode(), limit: metBodyLimit}, &forecast)
-		if err == nil && len(forecast.Properties.Timeseries) == 0 {
-			err = errors.New("MET Norway sent no forecast")
+		if err == nil && !forecast.complete() {
+			err = errors.New("MET Norway sent an incomplete forecast")
 		}
 		return forecast, err
 	})
 	if err != nil {
 		return weatherOutput{}, err
 	}
-	return a.metOutput(forecast.Properties.Timeseries, where.name, days), nil
+	return a.metOutput(forecast.Properties.Timeseries, where, days), nil
 }
 
 // metOutput takes the latest point as "now" and the minimum and maximum
-// of each local day as the forecast. MET Norway has no sunrise or chance
-// of rain.
-func (a *apis) metOutput(points []metPoint, place string, days int) weatherOutput {
+// of each of the place's days as the forecast. MET Norway has no sunrise
+// or chance of rain, and no hours before now.
+func (a *apis) metOutput(points []metPoint, where spot, days int) weatherOutput {
 	current := points[0]
 	now := a.now()
 	for _, p := range points {
@@ -356,18 +428,21 @@ func (a *apis) metOutput(points []metPoint, place string, days int) weatherOutpu
 	}
 	details := current.Data.Instant.Details
 	out := weatherOutput{
-		Place: place,
+		Place: where.name,
 		Now: weatherNow{
-			TempC:      details.AirTemperature,
+			TempC:      *details.AirTemperature,
 			Conditions: metConditions(current.symbol()),
-			WindKmh:    round(details.WindSpeed*3.6, 1),
+			WindKmh:    round(*details.WindSpeed*3.6, 1),
 		},
+		Note:   metTodayNote,
 		Source: metSource,
 	}
-	today := a.today()
+	location := where.location(a.location)
+	local := now.In(location)
+	today := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, location)
 	for i := range days {
 		date := today.AddDate(0, 0, i).Format(time.DateOnly)
-		day, found := metDay(points, date, a.location)
+		day, found := metDay(points, date, location)
 		if !found {
 			break
 		}
@@ -383,7 +458,7 @@ func metDay(points []metPoint, date string, location *time.Location) (weatherDay
 		if p.Time.In(location).Format(time.DateOnly) != date {
 			continue
 		}
-		temperature := p.Data.Instant.Details.AirTemperature
+		temperature := *p.Data.Instant.Details.AirTemperature
 		if !found || temperature < day.MinC {
 			day.MinC = temperature
 		}
@@ -396,22 +471,37 @@ func metDay(points []metPoint, date string, location *time.Location) (weatherDay
 }
 
 // findSpot looks in the place table first and asks the geocoder only on a
-// miss: Cyrillic names in Russian, Latin ones in Uzbek and then English.
+// miss: Cyrillic names in Russian, Latin ones in Uzbek and English at
+// once, keeping the best town of both answers.
 func (a *apis) findSpot(ctx context.Context, city string) (spot, error) {
 	if p, found := lookupPlace(city); found {
-		return spot{name: p.name, lat: p.lat, lon: p.lon}, nil
+		return p.spot()
 	}
 	languages := []string{"uz", "en"}
 	if hasCyrillic(city) {
 		languages = []string{"ru"}
 	}
-	for _, language := range languages {
-		found, ok, err := a.geocode(ctx, city, language)
-		if err != nil || ok {
-			return found, err
-		}
+	results, err := a.geocode(ctx, city, languages)
+	if best, found := bestPlace(results); found {
+		return best.spot()
+	}
+	if err != nil {
+		return spot{}, err
 	}
 	return spot{}, argumentError("no place called %q was found; try the city's usual name", city)
+}
+
+func (p place) spot() (spot, error) {
+	s := spot{name: p.name, lat: p.lat, lon: p.lon}
+	if p.timezone == "" {
+		return s, nil
+	}
+	zone, err := time.LoadLocation(p.timezone)
+	if err != nil {
+		return spot{}, fmt.Errorf("the time zone of %s is not known on this server", p.name)
+	}
+	s.zone = zone
+	return s, nil
 }
 
 type geocodingResult struct {
@@ -421,12 +511,48 @@ type geocodingResult struct {
 	FeatureCode string  `json:"feature_code"`
 	CountryCode string  `json:"country_code"`
 	Country     string  `json:"country"`
+	Population  int64   `json:"population"`
+	Timezone    string  `json:"timezone"`
 }
 
-func (a *apis) geocode(ctx context.Context, city, language string) (spot, bool, error) {
+// spot names the place for the model. The name and country are written by
+// GeoNames contributors, so they are cleaned like any outside text.
+func (r geocodingResult) spot() (spot, error) {
+	name := cleanText(r.Name, maxPlaceName)
+	if country := cleanText(r.Country, maxPlaceName); country != "" {
+		name += ", " + country
+	}
+	s := spot{name: name, lat: r.Latitude, lon: r.Longitude}
+	if r.CountryCode == "UZ" {
+		return s, nil
+	}
+	zone, err := time.LoadLocation(r.Timezone)
+	if err != nil {
+		return spot{}, errors.New("the Open-Meteo geocoder sent a time zone that could not be read")
+	}
+	s.zone = zone
+	return s, nil
+}
+
+// geocode asks the geocoder in every language at once and merges the
+// answers, first language first. The error is the first one, if any.
+func (a *apis) geocode(ctx context.Context, city string, languages []string) ([]geocodingResult, error) {
+	answers := make([][]geocodingResult, len(languages))
+	errs := make([]error, len(languages))
+	var wg sync.WaitGroup
+	for i, language := range languages {
+		wg.Go(func() { answers[i], errs[i] = a.geocodeIn(ctx, city, language) })
+	}
+	wg.Wait()
+	return slices.Concat(answers...), cmp.Or(errs...)
+}
+
+func (a *apis) geocodeIn(ctx context.Context, city, language string) ([]geocodingResult, error) {
 	query := url.Values{"name": {city}, "count": {"5"}, "language": {language}, "format": {"json"}}
-	key := "geocoding:" + language + ":" + normalizeName(city)
-	results, err := remember(a.cache, key, geocodingTTL, func() ([]geocodingResult, error) {
+	// The key is the name as sent. normalizeName would drop words such as
+	// "city", and "Mexico City" is not "Mexico".
+	key := "geocoding:" + language + ":" + strings.ToLower(strings.Join(strings.Fields(city), " "))
+	return remember(a.cache, key, geocodingTTL, func() ([]geocodingResult, error) {
 		// Nothing found comes as an answer without "results".
 		var answer struct {
 			Results []geocodingResult `json:"results"`
@@ -434,40 +560,53 @@ func (a *apis) geocode(ctx context.Context, city, language string) (spot, bool, 
 		err := a.client.getJSON(ctx, call{service: "the Open-Meteo geocoder", url: a.urls.Geocoding + "/v1/search?" + query.Encode()}, &answer)
 		return answer.Results, err
 	})
-	if err != nil {
-		return spot{}, false, err
-	}
-	best, found := bestPlace(results)
-	return best, found, nil
 }
 
-// bestPlace prefers a town in Uzbekistan, then a town anywhere, and never
-// an airport.
-func bestPlace(results []geocodingResult) (spot, bool) {
-	bestRank := 3
-	var best geocodingResult
+// bestPlace picks the town a member most likely means. A town with a
+// known population comes first: the geocoder knows it for real cities,
+// while the namesakes it often lists first have none (a village in
+// Farg'ona for "Chimkent") or few people (York, Nebraska, for "New York"
+// in Uzbek). Then Uzbekistan, then a capital or region centre, then the
+// larger town; ties keep the geocoder's order. Airports, countries,
+// abandoned places and results without a country or time zone (such as
+// the parish in Montserrat that "Sankt-Peterburg" finds in Uzbek) are
+// never picked.
+func bestPlace(results []geocodingResult) (geocodingResult, bool) {
+	var towns []geocodingResult
 	for _, r := range results {
-		rank := 2
-		switch {
-		case r.FeatureCode == "AIRP" || r.FeatureCode == "AIRF":
-			continue
-		case strings.HasPrefix(r.FeatureCode, "PPL") && r.CountryCode == "UZ":
-			rank = 0
-		case strings.HasPrefix(r.FeatureCode, "PPL"):
-			rank = 1
-		}
-		if rank < bestRank {
-			bestRank, best = rank, r
+		if isTown(r.FeatureCode) && r.CountryCode != "" && r.Country != "" && r.Timezone != "" {
+			towns = append(towns, r)
 		}
 	}
-	if bestRank == 3 {
-		return spot{}, false
+	if len(towns) == 0 {
+		return geocodingResult{}, false
 	}
-	name := best.Name
-	if best.Country != "" {
-		name += ", " + best.Country
+	return slices.MinFunc(towns, func(x, y geocodingResult) int {
+		return cmp.Or(
+			trueFirst(x.Population > 0, y.Population > 0),
+			trueFirst(x.CountryCode == "UZ", y.CountryCode == "UZ"),
+			trueFirst(x.FeatureCode == "PPLC" || x.FeatureCode == "PPLA", y.FeatureCode == "PPLC" || y.FeatureCode == "PPLA"),
+			cmp.Compare(y.Population, x.Population),
+		)
+	}), true
+}
+
+// isTown is true for GeoNames' populated places (PPL, PPLA, PPLC...) that
+// still exist: PPLH is historical, PPLQ abandoned and PPLW destroyed.
+func isTown(featureCode string) bool {
+	return strings.HasPrefix(featureCode, "PPL") && featureCode != "PPLH" && featureCode != "PPLQ" && featureCode != "PPLW"
+}
+
+// trueFirst orders true before false.
+func trueFirst(x, y bool) int {
+	switch {
+	case x == y:
+		return 0
+	case x:
+		return -1
+	default:
+		return 1
 	}
-	return spot{name: name, lat: best.Latitude, lon: best.Longitude}, true
 }
 
 func hasCyrillic(text string) bool {
