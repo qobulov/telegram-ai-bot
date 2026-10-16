@@ -448,9 +448,9 @@ func (s *Service) confirmedModeration(ctx context.Context, in incoming) bool {
 
 // target describes the message a request replied to, for the tools that act
 // on a member. It is taken from the update, so the model can never choose
-// whom such a tool acts on.
+// whom such a tool acts on. A service message is none: see isServiceMessage.
 func (s *Service) target(replied *telegram.Message) *tools.Target {
-	if replied == nil || replied.From == nil {
+	if replied == nil || replied.From == nil || s.isServiceMessage(replied) {
 		return nil
 	}
 	text, _ := replied.Content()
@@ -665,10 +665,24 @@ func (s *Service) ignoreTarget(ctx context.Context, in incoming) (*telegram.User
 		return nil, refusal
 	}
 	replied := in.msg.ReplyToMessage
-	if replied == nil || replied.From == nil || replied.SenderChat != nil {
+	if replied == nil || replied.From == nil || replied.SenderChat != nil || s.isServiceMessage(replied) {
 		return nil, textReplyToMember
 	}
 	return replied.From, ""
+}
+
+// isServiceMessage reports a message Telegram posted about something that
+// happened, such as "Ann added Spammer", "Bek left" or "Boss pinned a
+// message", or any other with no text or media of its own. Its author is
+// whoever made it happen, not the member it is about, so nothing is done to
+// its author on its account.
+func (s *Service) isServiceMessage(msg *telegram.Message) bool {
+	if len(msg.NewChatMembers) > 0 || msg.LeftChatMember != nil {
+		return true
+	}
+	text, _ := msg.Content()
+	_, isMedia := s.mediaOf(msg)
+	return text == "" && !isMedia
 }
 
 // refuseUnignorable returns the refusal to send when member may not be

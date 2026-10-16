@@ -2793,6 +2793,40 @@ func TestTurnTellsToolsTheRepliedMessage(t *testing.T) {
 	}
 }
 
+// A service message names as its author whoever caused it: "Ann added
+// Spammer" comes from Ann, "Boss pinned a message" from Boss. Acting on
+// that author would hit the wrong person, so such a message is no target.
+func TestServiceMessagesAreNoTarget(t *testing.T) {
+	ann := &telegram.User{ID: 555, FirstName: "Ann", Username: "ann"}
+	spammer := telegram.User{ID: 666, FirstName: "Spammer", Username: "spam"}
+	cases := map[string]*telegram.Message{
+		"a join":  {MessageID: 29, From: ann, NewChatMembers: []telegram.User{spammer}},
+		"a leave": {MessageID: 29, From: ann, LeftChatMember: &spammer},
+		"a pin, or any kind without text or media": {MessageID: 29, From: ann},
+	}
+	for name, replied := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			book := &fakeRuleBook{}
+			f.opts.Rules = book
+			request := asAdmin(groupMessage("Mira, mute him"))
+			request.ReplyToMessage = replied
+			command := groupMessage("/ignore@MyBot")
+			command.From = boss
+			command.ReplyToMessage = replied
+
+			sent := f.run(inGroup(request), inGroup(command))
+
+			if calls := f.replier.recorded(); len(calls) != 1 || calls[0].caller.Target != nil {
+				t.Errorf("target = %+v, want none", calls[0].caller.Target)
+			}
+			if len(sent) != 2 || sent[1].text != textReplyToMember || len(book.saved) != 0 {
+				t.Errorf("/ignore sent %+v and saved %+v; want it refused", sent, book.saved)
+			}
+		})
+	}
+}
+
 // fakePrivateQuota allows Limit answers, as the store does within a day: a
 // notice on the first refusal, silence after it. It records what it was
 // asked and what was given back.
