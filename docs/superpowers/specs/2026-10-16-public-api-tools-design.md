@@ -151,7 +151,8 @@ it has no sunrise. Source: "Open-Meteo (CC BY 4.0)" or "MET Norway".
 `{date, hijri{day, month, year}, bomdod, quyosh, peshin, asr, shom,
 xufton, source}`; ramadan: up to 30 `{date, saharlik_end, iftar}` for
 Ramadan of the Hijri year that is current or next. Endpoints:
-`https://api.aladhan.com/v1/timings/{DD-MM-YYYY}?latitude=..&longitude=..&method=99&methodSettings=15,null,15&school=1&timezonestring=Asia/Tashkent&tune=0,0,0,4,0,0,0,0,0`
+`https://api.aladhan.com/v1/timings/{DD-MM-YYYY}?latitude=..&longitude=..&method=99&methodSettings=15,null,15&school=1&timezonestring=Asia/Tashkent&tune=0,-3,0,0,0,4,0,3,0`
+(see Deviations: calibrated to muslim.uz)
 and `https://api.aladhan.com/v1/hijriCalendar/{hijriYear}/9?` with the same
 parameters. Never method 3, never the by-city or undated endpoints. Date
 always explicit, computed in Asia/Tashkent. One retry when the first call
@@ -220,3 +221,68 @@ source; currency and crypto are data, not advice; prayer and Ramadan times
 are approximate and the Muslim Board's announcements are official; scores
 are "latest", not "live"; news items are headlines, stated neutrally, never
 Maria's opinion on politics; never invent a number when a tool fails.
+
+## Deviations
+
+Where the code differs from the contract above, after the build and a
+review against the live APIs on 2026-10-16.
+
+From the build:
+
+- `wiki_lookup` asks for `exchars=600` instead of `exsentences=3`: the
+  extract is capped at 600 characters anyway.
+- `news_headlines` sets `MaxOutputBytes` to 8000: eight Russian headlines
+  with leads do not fit in 4000 bytes, Cyrillic taking two bytes a letter.
+  The oldest items are dropped if even that is too little.
+- `currency_rate` refuses a future date, which the Central Bank silently
+  answers with today's rate.
+- `football` matches: once every match of the current matchday is over,
+  the next matchday is shown, with a named team's last result.
+
+From the review:
+
+- Prayer times: `tune=0,-3,0,0,0,4,0,3,0` (Fajr 3 minutes earlier,
+  Maghrib 4 and Isha 3 later). The first `Dhuhr +4` matched
+  namozvaqti.uz, not the Muslim Board; this tune gave muslim.uz's Tashkent
+  times for 2026-10-16 to the minute except Asr (one minute late).
+  muslim.uz shows only today's Tashkent times, so other days and regions
+  were not compared. In `ramadan` mode `saharlik_end` is a minute before
+  Fajr and `iftar` a minute after Maghrib, toward a safe fast, and the
+  result says so. Times that are not `HH:MM` are an error.
+- Weather: Open-Meteo is asked for the place's own time zone: Asia/Tashkent
+  in Uzbekistan, the city's zone abroad (sunrise for Moscow was two hours
+  off), and the result then carries `timezone`. MET Norway's days are the
+  place's days, and its today's min/max carry a note that they cover only
+  the rest of the day. Missing numbers are an error, so the fallback runs,
+  instead of 0 °C and "ochiq". Air quality has its own 3 s deadline.
+- Places: the table also holds the cities abroad that members ask about
+  (Moskva, Sankt-Peterburg, Qozon, Seul, Istanbul, Dubay, Nyu-York,
+  Chimkent, Olmaota, Bishkek, Dushanbe, Xo'jand) with their time zones,
+  and Yangiyo'l and G'ijduvon, which the geocoder misses.
+- Geocoder: a Latin name is asked in Uzbek and English at once and the
+  best town of both answers is kept: a known population first, then
+  Uzbekistan, then a capital or region centre, then the larger town.
+  Results without a country, country code or time zone, and historical or
+  abandoned places, are dropped. The cache key is the name as sent
+  (normalizeName made "Mexico City" share "Mexico"'s entry).
+- News: feeds may be up to 1 MB (daryo.uz sends whole articles, 247 KB on
+  2026-10-16); uza.uz's `+0000` dates are read as Tashkent time; a date
+  more than 10 minutes ahead is dropped rather than allowed to top the
+  list; HTML entities outside CDATA are accepted; a link must be on the
+  site's own domain and is passed on as parsed (percent-encoded).
+- Football: up to 24 matches (a World Cup matchday), with a note when more
+  exist; cups between matchdays ask for `status=SCHEDULED,TIMED`; scores
+  show extra time and penalty shootouts apart (`1-1 (pen 6-5)`, `2-1
+  (aet)`), since `fullTime` counts shootout goals; a team name matches
+  whole names and words before parts of words ("Milan" is not Inter); a
+  table without the named team says so; kickoff is `kickoff_tashkent`.
+- Crypto: the search result whose symbol, then name, is the asked word
+  wins over the first one; DOGS, HMSTR, MAJOR and CATI are known coins;
+  names and symbols are cleaned and capped; searches run at once.
+- Currency: the tool has 6 s; currency-api gets 1.5 s so its mirror is
+  still asked; a Central Bank row must be a positive finite rate in the
+  asked currency, and an empty `Diff` (rows before 2000) means no change.
+- Client: a redirect must keep the scheme as well as the host, so https
+  never falls to plain http with the keys. The default User-Agent is
+  `MariaBot/1.0`: gazeta.uz answers any agent containing "telegram" with
+  an empty feed.
