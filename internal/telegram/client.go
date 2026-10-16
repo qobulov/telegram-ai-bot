@@ -243,7 +243,7 @@ func cutRunes(text string, limit int) string {
 	return string(runes[:limit-1]) + "…"
 }
 
-type getChatMemberParams struct {
+type chatMemberParams struct {
 	ChatID int64 `json:"chat_id"`
 	UserID int64 `json:"user_id"`
 }
@@ -252,7 +252,7 @@ type getChatMemberParams struct {
 // they administer it.
 func (c *Client) GetChatMember(ctx context.Context, chatID, userID int64) (ChatMember, error) {
 	var member ChatMember
-	if err := c.call(ctx, "getChatMember", getChatMemberParams{ChatID: chatID, UserID: userID}, &member); err != nil {
+	if err := c.call(ctx, "getChatMember", chatMemberParams{ChatID: chatID, UserID: userID}, &member); err != nil {
 		return ChatMember{}, err
 	}
 	return member, nil
@@ -340,6 +340,144 @@ func (c *Client) sendChunk(ctx context.Context, params sendMessageParams) (int64
 			return 0, err
 		}
 	}
+}
+
+type reactionParams struct {
+	ChatID    int64          `json:"chat_id"`
+	MessageID int64          `json:"message_id"`
+	Reaction  []reactionType `json:"reaction"`
+}
+
+type reactionType struct {
+	Type  string `json:"type"`
+	Emoji string `json:"emoji"`
+}
+
+// SetMessageReaction replaces the bot's reaction to a message with one
+// emoji, which must be one of ReactionEmoji. An empty emoji removes the
+// bot's reaction.
+func (c *Client) SetMessageReaction(ctx context.Context, chatID, messageID int64, emoji string) error {
+	params := reactionParams{ChatID: chatID, MessageID: messageID, Reaction: []reactionType{}}
+	if emoji != "" {
+		params.Reaction = append(params.Reaction, reactionType{Type: "emoji", Emoji: emoji})
+	}
+	return c.call(ctx, "setMessageReaction", params, nil)
+}
+
+type chatActionParams struct {
+	ChatID int64  `json:"chat_id"`
+	Action string `json:"action"`
+}
+
+// SendChatAction shows a status such as "typing" in the chat. Telegram
+// clears it after about 5 seconds, or as soon as the bot sends a message.
+func (c *Client) SendChatAction(ctx context.Context, chatID int64, action string) error {
+	return c.call(ctx, "sendChatAction", chatActionParams{ChatID: chatID, Action: action}, nil)
+}
+
+type messageParams struct {
+	ChatID    int64 `json:"chat_id"`
+	MessageID int64 `json:"message_id"`
+}
+
+// DeleteMessage deletes a message. Telegram refuses messages older than 48
+// hours, which comes back as an *APIError.
+func (c *Client) DeleteMessage(ctx context.Context, chatID, messageID int64) error {
+	return c.call(ctx, "deleteMessage", messageParams{ChatID: chatID, MessageID: messageID}, nil)
+}
+
+type restrictParams struct {
+	ChatID      int64           `json:"chat_id"`
+	UserID      int64           `json:"user_id"`
+	Permissions ChatPermissions `json:"permissions"`
+	// IndependentPermissions makes Telegram apply each permission as given,
+	// instead of deriving some from others.
+	IndependentPermissions bool  `json:"use_independent_chat_permissions"`
+	UntilDate              int64 `json:"until_date,omitempty"`
+}
+
+// RestrictChatMember sets what a member of a supergroup may do: mute them
+// with NoPermissions, or lift a mute with AllPermissions.
+func (c *Client) RestrictChatMember(ctx context.Context, r Restriction) error {
+	params := restrictParams{
+		ChatID:                 r.ChatID,
+		UserID:                 r.UserID,
+		Permissions:            r.Permissions,
+		IndependentPermissions: true,
+	}
+	if !r.Until.IsZero() {
+		params.UntilDate = r.Until.Unix()
+	}
+	return c.call(ctx, "restrictChatMember", params, nil)
+}
+
+// BanChatMember removes a member from a group for good: they cannot come
+// back until unbanned.
+func (c *Client) BanChatMember(ctx context.Context, chatID, userID int64) error {
+	return c.call(ctx, "banChatMember", chatMemberParams{ChatID: chatID, UserID: userID}, nil)
+}
+
+type unbanParams struct {
+	ChatID int64 `json:"chat_id"`
+	UserID int64 `json:"user_id"`
+	// OnlyIfBanned keeps the call harmless for someone who is not banned:
+	// without it Telegram removes a current member from the group.
+	OnlyIfBanned bool `json:"only_if_banned"`
+}
+
+// UnbanChatMember lets a banned user join the group again. It does nothing
+// to a user who is not banned.
+func (c *Client) UnbanChatMember(ctx context.Context, chatID, userID int64) error {
+	return c.call(ctx, "unbanChatMember", unbanParams{ChatID: chatID, UserID: userID, OnlyIfBanned: true}, nil)
+}
+
+type pinParams struct {
+	ChatID              int64 `json:"chat_id"`
+	MessageID           int64 `json:"message_id"`
+	DisableNotification bool  `json:"disable_notification"`
+}
+
+// PinChatMessage pins a message without notifying the members: a pin asked
+// for in passing should not ping the whole group.
+func (c *Client) PinChatMessage(ctx context.Context, chatID, messageID int64) error {
+	return c.call(ctx, "pinChatMessage", pinParams{ChatID: chatID, MessageID: messageID, DisableNotification: true}, nil)
+}
+
+// UnpinChatMessage unpins one pinned message.
+func (c *Client) UnpinChatMessage(ctx context.Context, chatID, messageID int64) error {
+	return c.call(ctx, "unpinChatMessage", messageParams{ChatID: chatID, MessageID: messageID}, nil)
+}
+
+type sendPollParams struct {
+	ChatID                int64             `json:"chat_id"`
+	Question              string            `json:"question"`
+	Options               []inputPollOption `json:"options"`
+	IsAnonymous           bool              `json:"is_anonymous"`
+	AllowsMultipleAnswers bool              `json:"allows_multiple_answers"`
+}
+
+type inputPollOption struct {
+	Text string `json:"text"`
+}
+
+// SendPoll sends a poll and returns the ID of the sent message. Polls are
+// anonymous, so the bot never learns or reveals who voted for what.
+func (c *Client) SendPoll(ctx context.Context, poll OutgoingPoll) (int64, error) {
+	params := sendPollParams{
+		ChatID:                poll.ChatID,
+		Question:              poll.Question,
+		Options:               make([]inputPollOption, 0, len(poll.Options)),
+		IsAnonymous:           true,
+		AllowsMultipleAnswers: poll.Multiple,
+	}
+	for _, option := range poll.Options {
+		params.Options = append(params.Options, inputPollOption{Text: option})
+	}
+	var sent sentMessage
+	if err := c.call(ctx, "sendPoll", params, &sent); err != nil {
+		return 0, err
+	}
+	return sent.MessageID, nil
 }
 
 type apiResponse struct {

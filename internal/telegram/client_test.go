@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -592,5 +593,295 @@ func TestMyChatMemberUpdateIsDecoded(t *testing.T) {
 	change := update.MyChatMember
 	if change == nil || change.Chat.Title != "Devs" || change.NewChatMember.Status != "administrator" || change.From.ID != 5 {
 		t.Errorf("update = %+v", update)
+	}
+}
+
+const okTrue = `{"ok":true,"result":true}`
+
+func TestSetMessageReactionSendsOneEmoji(t *testing.T) {
+	client, api := newTestClient(t, okTrue)
+
+	if err := client.SetMessageReaction(context.Background(), -100123, 30, "🔥"); err != nil {
+		t.Fatalf("SetMessageReaction: %v", err)
+	}
+	sent := api.recorded()[0]
+	if sent.method != "setMessageReaction" || sent.params["chat_id"] != float64(-100123) || sent.params["message_id"] != float64(30) {
+		t.Errorf("call = %+v", sent)
+	}
+	want := []any{map[string]any{"type": "emoji", "emoji": "🔥"}}
+	if got := sent.params["reaction"]; !reflect.DeepEqual(got, want) {
+		t.Errorf("reaction = %v, want %v", got, want)
+	}
+}
+
+func TestSetMessageReactionWithoutEmojiClearsIt(t *testing.T) {
+	client, api := newTestClient(t, okTrue)
+
+	if err := client.SetMessageReaction(context.Background(), -100123, 30, ""); err != nil {
+		t.Fatalf("SetMessageReaction: %v", err)
+	}
+	if reaction, ok := api.recorded()[0].params["reaction"].([]any); !ok || len(reaction) != 0 {
+		t.Errorf("reaction = %v, want an empty list", api.recorded()[0].params["reaction"])
+	}
+}
+
+func TestRestrictChatMemberSendsExplicitFalsesAndUntil(t *testing.T) {
+	client, api := newTestClient(t, okTrue)
+	until := time.Date(2026, 10, 16, 16, 4, 0, 0, time.UTC)
+
+	restriction := Restriction{ChatID: -100123, UserID: 42, Permissions: NoPermissions(), Until: until}
+	if err := client.RestrictChatMember(context.Background(), restriction); err != nil {
+		t.Fatalf("RestrictChatMember: %v", err)
+	}
+	sent := api.recorded()[0]
+	if sent.method != "restrictChatMember" || sent.params["chat_id"] != float64(-100123) || sent.params["user_id"] != float64(42) {
+		t.Errorf("call = %+v", sent)
+	}
+	if sent.params["use_independent_chat_permissions"] != true {
+		t.Errorf("use_independent_chat_permissions = %v, want true", sent.params["use_independent_chat_permissions"])
+	}
+	permissions, _ := sent.params["permissions"].(map[string]any)
+	if value, present := permissions["can_send_messages"]; !present || value != false {
+		t.Errorf("can_send_messages = %v (present %v), want an explicit false", value, present)
+	}
+	assertAllPermissions(t, permissions, false)
+	if sent.params["until_date"] != float64(until.Unix()) {
+		t.Errorf("until_date = %v, want %d", sent.params["until_date"], until.Unix())
+	}
+}
+
+func TestRestrictChatMemberWithoutUntilOmitsIt(t *testing.T) {
+	client, api := newTestClient(t, okTrue)
+
+	restriction := Restriction{ChatID: -100123, UserID: 42, Permissions: AllPermissions()}
+	if err := client.RestrictChatMember(context.Background(), restriction); err != nil {
+		t.Fatalf("RestrictChatMember: %v", err)
+	}
+	sent := api.recorded()[0]
+	if _, present := sent.params["until_date"]; present {
+		t.Errorf("until_date = %v, want it left out", sent.params["until_date"])
+	}
+	permissions, _ := sent.params["permissions"].(map[string]any)
+	assertAllPermissions(t, permissions, true)
+}
+
+// assertAllPermissions checks that every one of the 15 permissions was sent
+// with the given value: a missing key would leave Telegram's default.
+func assertAllPermissions(t *testing.T, permissions map[string]any, want bool) {
+	t.Helper()
+	if len(permissions) != 15 {
+		t.Errorf("permissions has %d keys, want all 15: %v", len(permissions), permissions)
+	}
+	for name, value := range permissions {
+		if value != want {
+			t.Errorf("%s = %v, want %v", name, value, want)
+		}
+	}
+}
+
+func TestUnbanAlwaysOnlyIfBanned(t *testing.T) {
+	client, api := newTestClient(t, okTrue)
+
+	if err := client.UnbanChatMember(context.Background(), -100123, 42); err != nil {
+		t.Fatalf("UnbanChatMember: %v", err)
+	}
+	want := map[string]any{"chat_id": float64(-100123), "user_id": float64(42), "only_if_banned": true}
+	if sent := api.recorded()[0]; sent.method != "unbanChatMember" || !reflect.DeepEqual(sent.params, want) {
+		t.Errorf("call = %+v, want unbanChatMember %v", sent, want)
+	}
+}
+
+func TestPinIsSilent(t *testing.T) {
+	client, api := newTestClient(t, okTrue)
+
+	if err := client.PinChatMessage(context.Background(), -100123, 30); err != nil {
+		t.Fatalf("PinChatMessage: %v", err)
+	}
+	want := map[string]any{"chat_id": float64(-100123), "message_id": float64(30), "disable_notification": true}
+	if sent := api.recorded()[0]; sent.method != "pinChatMessage" || !reflect.DeepEqual(sent.params, want) {
+		t.Errorf("call = %+v, want pinChatMessage %v", sent, want)
+	}
+}
+
+func TestChatAndMemberMethodsSendExactParams(t *testing.T) {
+	ctx := context.Background()
+	tests := []struct {
+		method string
+		call   func(*Client) error
+		want   map[string]any
+	}{
+		{
+			method: "sendChatAction",
+			call:   func(c *Client) error { return c.SendChatAction(ctx, -100123, "typing") },
+			want:   map[string]any{"chat_id": float64(-100123), "action": "typing"},
+		},
+		{
+			method: "deleteMessage",
+			call:   func(c *Client) error { return c.DeleteMessage(ctx, -100123, 30) },
+			want:   map[string]any{"chat_id": float64(-100123), "message_id": float64(30)},
+		},
+		{
+			// No until_date: the ban is forever until someone unbans.
+			method: "banChatMember",
+			call:   func(c *Client) error { return c.BanChatMember(ctx, -100123, 42) },
+			want:   map[string]any{"chat_id": float64(-100123), "user_id": float64(42)},
+		},
+		{
+			method: "unpinChatMessage",
+			call:   func(c *Client) error { return c.UnpinChatMessage(ctx, -100123, 30) },
+			want:   map[string]any{"chat_id": float64(-100123), "message_id": float64(30)},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.method, func(t *testing.T) {
+			client, api := newTestClient(t, okTrue)
+
+			if err := tt.call(client); err != nil {
+				t.Fatalf("%s: %v", tt.method, err)
+			}
+			sent := api.recorded()[0]
+			if sent.method != tt.method || !reflect.DeepEqual(sent.params, tt.want) {
+				t.Errorf("call = %+v, want %s %v", sent, tt.method, tt.want)
+			}
+		})
+	}
+}
+
+func TestDeleteMessageReturnsTelegramRefusal(t *testing.T) {
+	client, _ := newTestClient(t, `{"ok":false,"error_code":400,"description":"Bad Request: message can't be deleted"}`)
+
+	err := client.DeleteMessage(context.Background(), -100123, 30)
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) || apiErr.Code != 400 || !strings.Contains(apiErr.Description, "can't be deleted") {
+		t.Fatalf("err = %v, want Telegram's 400", err)
+	}
+}
+
+func TestSendPollSendsOptionObjects(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"message_id":88}}`)
+
+	poll := OutgoingPoll{ChatID: -100123, Question: "Lunch?", Options: []string{"yes", "no"}, Multiple: true}
+	id, err := client.SendPoll(context.Background(), poll)
+	if err != nil || id != 88 {
+		t.Fatalf("id = %d, err = %v, want 88", id, err)
+	}
+	sent := api.recorded()[0]
+	if sent.method != "sendPoll" || sent.params["chat_id"] != float64(-100123) || sent.params["question"] != "Lunch?" {
+		t.Errorf("call = %+v", sent)
+	}
+	options, _ := sent.params["options"].([]any)
+	if len(options) != 2 {
+		t.Fatalf("options = %v", sent.params["options"])
+	}
+	if second, _ := options[1].(map[string]any); second["text"] != "no" {
+		t.Errorf("options[1] = %v, want {text: no}", options[1])
+	}
+	if sent.params["is_anonymous"] != true || sent.params["allows_multiple_answers"] != true {
+		t.Errorf("is_anonymous = %v, allows_multiple_answers = %v", sent.params["is_anonymous"], sent.params["allows_multiple_answers"])
+	}
+}
+
+func TestChatMemberRightsDecoded(t *testing.T) {
+	decode := func(raw string) ChatMember {
+		t.Helper()
+		var member ChatMember
+		if err := json.Unmarshal([]byte(raw), &member); err != nil {
+			t.Fatal(err)
+		}
+		return member
+	}
+
+	admin := decode(`{"status":"administrator","user":{"id":777,"is_bot":true},
+		"can_delete_messages":true,"can_restrict_members":false,"can_pin_messages":true}`)
+	if got, want := admin.Rights(), []string{"can_delete_messages", "can_pin_messages"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("administrator Rights() = %v, want %v", got, want)
+	}
+	if admin.Has(RightRestrictMembers) || !admin.Has(RightDeleteMessages) {
+		t.Errorf("administrator Has: restrict %v, delete %v", admin.Has(RightRestrictMembers), admin.Has(RightDeleteMessages))
+	}
+	if admin.User == nil || admin.User.ID != 777 || !admin.User.IsBot {
+		t.Errorf("administrator user = %+v", admin.User)
+	}
+
+	creator := decode(`{"status":"creator","user":{"id":5}}`)
+	if !creator.Has(RightRestrictMembers) || len(creator.Rights()) != 7 {
+		t.Errorf("creator Has(restrict) = %v, Rights() = %v; a creator holds every right", creator.Has(RightRestrictMembers), creator.Rights())
+	}
+	if creator.Has("can_fly") {
+		t.Error("creator holds a right that does not exist")
+	}
+
+	if member := decode(`{"status":"member","user":{"id":42}}`); member.Rights() != nil {
+		t.Errorf("member Rights() = %v, want nil", member.Rights())
+	}
+	// A restricted member's can_* fields are permissions, not admin rights.
+	restricted := decode(`{"status":"restricted","user":{"id":43},"until_date":1792166400,"can_pin_messages":true}`)
+	if restricted.Has(RightPinMessages) || restricted.Rights() != nil || restricted.UntilDate != 1792166400 {
+		t.Errorf("restricted = %+v, Rights() = %v", restricted, restricted.Rights())
+	}
+}
+
+func TestGetUpdatesParsesNewMediaKinds(t *testing.T) {
+	client, _ := newTestClient(t, `{"ok":true,"result":[{"update_id":9,"message":{
+		"message_id":5,"from":{"id":42},"chat":{"id":-100123,"type":"supergroup"},
+		"video":{"file_id":"vid","duration":15,"thumbnail":{"file_id":"vid-thumb"}},
+		"video_note":{"file_id":"round","duration":8,"length":240,"thumbnail":{"file_id":"round-thumb"}},
+		"document":{"file_id":"doc","file_name":"report.pdf","mime_type":"application/pdf"},
+		"audio":{"file_id":"aud","duration":200,"title":"Song","performer":"Band"},
+		"poll":{"id":"p1","question":"Lunch?","options":[{"text":"plov","voter_count":3},{"text":"somsa","voter_count":1}]},
+		"forward_origin":{"type":"user","date":1792166400,"sender_user":{"id":7,"first_name":"Bek"}},
+		"new_chat_members":[{"id":8,"first_name":"Ali"},{"id":9,"first_name":"Vali"}],
+		"left_chat_member":{"id":10,"first_name":"Sardor"}}}]}`)
+
+	updates, err := client.GetUpdates(context.Background(), 0, 0)
+	if err != nil {
+		t.Fatalf("GetUpdates: %v", err)
+	}
+	msg := updates[0].Message
+	if v := msg.Video; v == nil || v.FileID != "vid" || v.Duration != 15 || v.Thumbnail == nil || v.Thumbnail.FileID != "vid-thumb" {
+		t.Errorf("video = %+v", msg.Video)
+	}
+	if v := msg.VideoNote; v == nil || v.FileID != "round" || v.Duration != 8 || v.Thumbnail == nil || v.Thumbnail.FileID != "round-thumb" {
+		t.Errorf("video_note = %+v", msg.VideoNote)
+	}
+	if d := msg.Document; d == nil || d.FileID != "doc" || d.FileName != "report.pdf" || d.MimeType != "application/pdf" {
+		t.Errorf("document = %+v", msg.Document)
+	}
+	if a := msg.Audio; a == nil || a.FileID != "aud" || a.Duration != 200 || a.Title != "Song" || a.Performer != "Band" {
+		t.Errorf("audio = %+v", msg.Audio)
+	}
+	if p := msg.Poll; p == nil || p.Question != "Lunch?" || len(p.Options) != 2 || p.Options[1].Text != "somsa" {
+		t.Errorf("poll = %+v", msg.Poll)
+	}
+	if o := msg.ForwardOrigin; o == nil || o.Type != "user" || o.SenderUser == nil || o.SenderUser.ID != 7 || o.Name() != "Bek" {
+		t.Errorf("forward_origin = %+v", msg.ForwardOrigin)
+	}
+	if joined := msg.NewChatMembers; len(joined) != 2 || joined[0].FirstName != "Ali" || joined[1].ID != 9 {
+		t.Errorf("new_chat_members = %+v", msg.NewChatMembers)
+	}
+	if left := msg.LeftChatMember; left == nil || left.ID != 10 || left.FirstName != "Sardor" {
+		t.Errorf("left_chat_member = %+v", msg.LeftChatMember)
+	}
+}
+
+func TestMessageOriginName(t *testing.T) {
+	tests := []struct {
+		name   string
+		origin *MessageOrigin
+		want   string
+	}{
+		{"user", &MessageOrigin{Type: "user", SenderUser: &User{ID: 7, FirstName: "Bek"}}, "Bek"},
+		{"hidden user", &MessageOrigin{Type: "hidden_user", SenderUserName: "Ali V."}, "Ali V."},
+		{"group posting as itself", &MessageOrigin{Type: "chat", SenderChat: &Chat{Title: "Devs"}}, "Devs"},
+		{"channel", &MessageOrigin{Type: "channel", Chat: &Chat{Title: "News"}}, "News"},
+		{"nothing known", &MessageOrigin{Type: "user"}, ""},
+		{"no origin", nil, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.origin.Name(); got != tt.want {
+				t.Errorf("Name() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }

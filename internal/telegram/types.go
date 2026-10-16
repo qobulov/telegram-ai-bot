@@ -1,5 +1,5 @@
 // Package telegram is a small client for the Telegram Bot API: long polling
-// for updates and sending text messages.
+// for updates, sending messages, and the few admin actions the bot takes.
 package telegram
 
 import (
@@ -43,12 +43,53 @@ type Message struct {
 	// IsAutomaticForward marks a channel post forwarded automatically to the
 	// channel's linked discussion group.
 	IsAutomaticForward bool `json:"is_automatic_forward"`
+	// ForwardOrigin says where a forwarded message first came from.
+	ForwardOrigin *MessageOrigin `json:"forward_origin"`
 
-	// Media. At most one of these is set on a message.
+	// Service messages: members who joined or left. They carry no text.
+	NewChatMembers []User `json:"new_chat_members"`
+	LeftChatMember *User  `json:"left_chat_member"`
+
+	// Media. At most one of these is set on a message, except that Telegram
+	// also sets Document on a GIF, for clients that predate Animation.
 	Photo     []PhotoSize `json:"photo"` // the same picture in several sizes, smallest first
 	Sticker   *Sticker    `json:"sticker"`
 	Animation *Animation  `json:"animation"` // a GIF, which Telegram stores as a video
 	Voice     *Voice      `json:"voice"`
+	Video     *Video      `json:"video"`
+	VideoNote *VideoNote  `json:"video_note"` // a round video
+	Document  *Document   `json:"document"`
+	Audio     *Audio      `json:"audio"`
+	Poll      *Poll       `json:"poll"`
+}
+
+// MessageOrigin is where a forwarded message came from. Type is "user",
+// "hidden_user" (the sender hides their account), "chat" or "channel"; only
+// the fields of that type are set.
+type MessageOrigin struct {
+	Type           string `json:"type"`
+	SenderUser     *User  `json:"sender_user"`
+	SenderUserName string `json:"sender_user_name"`
+	SenderChat     *Chat  `json:"sender_chat"`
+	Chat           *Chat  `json:"chat"`
+}
+
+// Name is what the origin is called: a person's first name, or a group's or
+// channel's title. It is empty when Telegram gave no name.
+func (o *MessageOrigin) Name() string {
+	switch {
+	case o == nil:
+		return ""
+	case o.SenderUser != nil && o.SenderUser.FirstName != "":
+		return o.SenderUser.FirstName
+	case o.SenderUserName != "":
+		return o.SenderUserName
+	case o.SenderChat != nil && o.SenderChat.Title != "":
+		return o.SenderChat.Title
+	case o.Chat != nil:
+		return o.Chat.Title
+	}
+	return ""
 }
 
 // PhotoSize is one size of a photo, or a thumbnail.
@@ -85,6 +126,46 @@ type Voice struct {
 	FileSize int64  `json:"file_size"`
 }
 
+// Video is a video file. Only its thumbnail can be shown as an image.
+type Video struct {
+	FileID    string     `json:"file_id"`
+	Duration  int        `json:"duration"` // seconds
+	Thumbnail *PhotoSize `json:"thumbnail"`
+}
+
+// VideoNote is a round video message.
+type VideoNote struct {
+	FileID    string     `json:"file_id"`
+	Duration  int        `json:"duration"` // seconds
+	Thumbnail *PhotoSize `json:"thumbnail"`
+}
+
+// Document is a file sent as a file rather than as a photo or video.
+type Document struct {
+	FileID   string `json:"file_id"`
+	FileName string `json:"file_name"`
+	MimeType string `json:"mime_type"`
+}
+
+// Audio is a music file, as opposed to a Voice message.
+type Audio struct {
+	FileID    string `json:"file_id"`
+	Duration  int    `json:"duration"` // seconds
+	Title     string `json:"title"`
+	Performer string `json:"performer"`
+}
+
+// Poll is a poll someone posted in a chat.
+type Poll struct {
+	Question string       `json:"question"`
+	Options  []PollOption `json:"options"`
+}
+
+// PollOption is one answer of a Poll.
+type PollOption struct {
+	Text string `json:"text"`
+}
+
 // User is a Telegram account: the sender of a message, or the bot itself.
 type User struct {
 	ID        int64  `json:"id"`
@@ -93,9 +174,85 @@ type User struct {
 	FirstName string `json:"first_name"`
 }
 
-// ChatMember is a user's standing in a chat.
+// ChatMember is a user's standing in a chat. Its Can fields count only for
+// an administrator: a creator holds every right regardless, and a restricted
+// member's fields of the same name are permissions, not rights.
 type ChatMember struct {
 	Status string `json:"status"`
+	User   *User  `json:"user,omitempty"`
+	// UntilDate is when a restriction or ban ends, in Unix seconds; zero
+	// means never.
+	UntilDate int64 `json:"until_date,omitempty"`
+
+	CanDeleteMessages  bool `json:"can_delete_messages,omitempty"`
+	CanRestrictMembers bool `json:"can_restrict_members,omitempty"`
+	CanPinMessages     bool `json:"can_pin_messages,omitempty"`
+	CanPromoteMembers  bool `json:"can_promote_members,omitempty"`
+	CanChangeInfo      bool `json:"can_change_info,omitempty"`
+	CanInviteUsers     bool `json:"can_invite_users,omitempty"`
+	CanManageTopics    bool `json:"can_manage_topics,omitempty"`
+}
+
+// Admin rights, named as in the Bot API. Moderation checks that both the
+// person asking and the bot hold the right an action needs.
+const (
+	RightDeleteMessages  = "can_delete_messages"
+	RightRestrictMembers = "can_restrict_members"
+	RightPinMessages     = "can_pin_messages"
+	RightPromoteMembers  = "can_promote_members"
+	RightChangeInfo      = "can_change_info"
+	RightInviteUsers     = "can_invite_users"
+	RightManageTopics    = "can_manage_topics"
+)
+
+// adminRights is every right, in the order Rights reports them.
+var adminRights = []string{
+	RightDeleteMessages, RightRestrictMembers, RightPinMessages, RightPromoteMembers,
+	RightChangeInfo, RightInviteUsers, RightManageTopics,
+}
+
+// Has reports whether the member holds an admin right. Anyone who is not
+// the creator or an administrator holds none.
+func (m ChatMember) Has(right string) bool {
+	held, known := m.right(right)
+	switch m.Status {
+	case "creator":
+		return known
+	case "administrator":
+		return held
+	}
+	return false
+}
+
+// Rights lists the admin rights the member holds; nil when they hold none.
+func (m ChatMember) Rights() []string {
+	var rights []string
+	for _, right := range adminRights {
+		if m.Has(right) {
+			rights = append(rights, right)
+		}
+	}
+	return rights
+}
+
+func (m ChatMember) right(name string) (held, known bool) {
+	switch name {
+	case RightDeleteMessages:
+		return m.CanDeleteMessages, true
+	case RightRestrictMembers:
+		return m.CanRestrictMembers, true
+	case RightPinMessages:
+		return m.CanPinMessages, true
+	case RightPromoteMembers:
+		return m.CanPromoteMembers, true
+	case RightChangeInfo:
+		return m.CanChangeInfo, true
+	case RightInviteUsers:
+		return m.CanInviteUsers, true
+	case RightManageTopics:
+		return m.CanManageTopics, true
+	}
+	return false, false
 }
 
 // IsMember reports whether the user is still in the chat.
@@ -131,6 +288,72 @@ type Outgoing struct {
 	// ReplyToMessageID makes the message a reply to that message in the same
 	// chat. Zero sends an ordinary message.
 	ReplyToMessageID int64
+}
+
+// ChatPermissions is what a member may do in a group. Every field is always
+// sent, false included, so a restriction means exactly what it says rather
+// than whatever Telegram assumes for a missing field.
+type ChatPermissions struct {
+	CanSendMessages       bool `json:"can_send_messages"`
+	CanSendAudios         bool `json:"can_send_audios"`
+	CanSendDocuments      bool `json:"can_send_documents"`
+	CanSendPhotos         bool `json:"can_send_photos"`
+	CanSendVideos         bool `json:"can_send_videos"`
+	CanSendVideoNotes     bool `json:"can_send_video_notes"`
+	CanSendVoiceNotes     bool `json:"can_send_voice_notes"`
+	CanSendPolls          bool `json:"can_send_polls"`
+	CanSendOtherMessages  bool `json:"can_send_other_messages"`
+	CanAddWebPagePreviews bool `json:"can_add_web_page_previews"`
+	CanReactToMessages    bool `json:"can_react_to_messages"`
+	CanChangeInfo         bool `json:"can_change_info"`
+	CanInviteUsers        bool `json:"can_invite_users"`
+	CanPinMessages        bool `json:"can_pin_messages"`
+	CanManageTopics       bool `json:"can_manage_topics"`
+}
+
+// NoPermissions mutes a member: they may do nothing but read.
+func NoPermissions() ChatPermissions {
+	return ChatPermissions{}
+}
+
+// AllPermissions lifts a member's restrictions: the Bot API treats a
+// restriction that allows everything as none.
+func AllPermissions() ChatPermissions {
+	return ChatPermissions{
+		CanSendMessages:       true,
+		CanSendAudios:         true,
+		CanSendDocuments:      true,
+		CanSendPhotos:         true,
+		CanSendVideos:         true,
+		CanSendVideoNotes:     true,
+		CanSendVoiceNotes:     true,
+		CanSendPolls:          true,
+		CanSendOtherMessages:  true,
+		CanAddWebPagePreviews: true,
+		CanReactToMessages:    true,
+		CanChangeInfo:         true,
+		CanInviteUsers:        true,
+		CanPinMessages:        true,
+		CanManageTopics:       true,
+	}
+}
+
+// Restriction sets what a member of a supergroup may do, until a time.
+type Restriction struct {
+	ChatID      int64
+	UserID      int64
+	Permissions ChatPermissions
+	// Until is when the restriction ends. Zero means never.
+	Until time.Time
+}
+
+// OutgoingPoll is an anonymous poll to send.
+type OutgoingPoll struct {
+	ChatID   int64
+	Question string
+	Options  []string
+	// Multiple lets a voter pick more than one option.
+	Multiple bool
 }
 
 // APIError is an error returned by the Bot API.
