@@ -46,11 +46,16 @@ func (s *Service) process(in incoming) {
 		if notice != "" {
 			s.reply(in, notice)
 		}
+		s.passOver(in)
 		return
 	}
 	// Applause is answered with a reaction, which takes nothing from the
 	// group's quota of answers.
-	if s.reactedToApplause(in) || !s.mayAnswerInGroup(in) {
+	if s.reactedToApplause(in) {
+		return
+	}
+	if !s.mayAnswerInGroup(in) {
+		s.passOver(in)
 		return
 	}
 	in.described = s.describe(ctx, in.msg, in.text)
@@ -170,11 +175,11 @@ func (s *Service) rateLimited(in incoming) (notice string, limited bool) {
 // group that already has too many. When the count cannot be read it stays
 // silent too, like mayAnswerBot.
 //
-// Owners are not counted, other bots have their own quota, and /mute and
-// /unmute always pass: the off switch has to work precisely when the group
-// is flooding the bot.
+// Owners are not counted, other bots have their own quota, and the off
+// switch always passes for those who may use it: it has to work precisely
+// when the group is flooding the bot.
 func (s *Service) mayAnswerInGroup(in incoming) bool {
-	if !in.group || in.fromBot || s.opts.GroupReplies == nil || isMuteCommand(in.text) || s.isOwner(in.msg.From) {
+	if !in.group || in.fromBot || s.opts.GroupReplies == nil || s.isOwner(in.msg.From) || s.isOffSwitch(in) {
 		return true
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
@@ -193,6 +198,27 @@ func (s *Service) mayAnswerInGroup(in incoming) bool {
 		s.opts.Logger.Info("group reply limit reached", "chat_id", in.scope.ChatID, "user_id", in.userID)
 	}
 	return ok
+}
+
+// isOffSwitch reports /mute or /unmute from someone who may use them. Anyone
+// else's is counted like any other message: it only gets a refusal, and
+// refusals sent without limit would flood the group themselves.
+func (s *Service) isOffSwitch(in incoming) bool {
+	if !isMuteCommand(in.text) {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
+	defer cancel()
+	return s.refuseUnlessManager(ctx, in) == ""
+}
+
+// passOver logs a group message the bot will not answer, as unaddressed
+// chatter is logged, so that its next answer knows what was said while it
+// was quiet. Commands are left out, as logExchange leaves them out.
+func (s *Service) passOver(in incoming) {
+	if in.group && !strings.HasPrefix(in.text, "/") {
+		s.remember(in.msg)
+	}
 }
 
 // respond decides what to send back. An empty outcome sends nothing.

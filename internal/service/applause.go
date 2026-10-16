@@ -63,23 +63,16 @@ func carriesContent(msg *telegram.Message) bool {
 }
 
 // isApplauseText reports text of at most two visible characters, or made
-// only of emoji, punctuation, digits and laughter: "xaxa", "ахахах)))",
-// "😂😂😂".
+// only of emoji, punctuation, digits and laughter: "xaxa", "ха-ха)))",
+// "xa xa 😂", "😂😂😂".
 func isApplauseText(text string) bool {
-	if visibleChars(text) <= maxApplauseChars {
-		return true
-	}
-	for _, word := range letterWords(text) {
-		if !isLaughter(word) {
-			return false
-		}
-	}
-	return true
+	return visibleChars(text) <= maxApplauseChars || !hasLetters(text) || isLaughter(text)
 }
 
-// applauseReaction picks the reaction to applause.
+// applauseReaction picks the reaction to applause. A sticker laughs when the
+// emoji Telegram gives it does.
 func applauseReaction(msg *telegram.Message, text string) string {
-	if laughs(text) {
+	if laughs(text) || (msg.Sticker != nil && laughs(msg.Sticker.Emoji)) {
 		return laughReaction
 	}
 	count := int64(len(applauseReactions))
@@ -87,38 +80,51 @@ func applauseReaction(msg *telegram.Message, text string) string {
 	return applauseReactions[index]
 }
 
-// laughs reports text with a laughing word or emoji in it.
+// laughs reports text with a laughing emoji in it, or text that is laughter.
 func laughs(text string) bool {
-	if strings.ContainsAny(text, laughEmoji) {
-		return true
-	}
-	for _, word := range letterWords(text) {
-		if isLaughter(word) {
-			return true
-		}
-	}
-	return false
+	return strings.ContainsAny(text, laughEmoji) || isLaughter(text)
 }
 
-// isLaughter reports a laughing word: one of laughWords, or a word spelled
-// only with the sounds of laughing, at least two of them: "xaxa", "Хахаха",
-// "ахахах", "hehe", "пхпх", "ҳаҳа". One sound is not laughter: "ha", "xa"
-// and "haa" mean "yes" in Uzbek.
-func isLaughter(word string) bool {
-	if laughWords[word] {
-		return true
+// isLaughter reports text whose letters, read together, only laugh. Emoji,
+// punctuation, digits and spaces are dropped first, so "ха-ха", "xa xa xa"
+// and "ха)))" laugh as much as "xaxa" does, and laughing words such as
+// "lol" may stand among them. Text without letters is not laughter.
+func isLaughter(text string) bool {
+	words := letterWords(text)
+	var sounds strings.Builder
+	for _, word := range words {
+		if !laughWords[word] {
+			sounds.WriteString(word)
+		}
 	}
-	sounds := 0
-	for _, char := range strings.ReplaceAll(word, "пх", "х") {
+	return len(words) > 0 && (sounds.Len() == 0 || isLaughSounds(sounds.String()))
+}
+
+// isLaughSounds reports letters that spell only the sounds of laughing, one
+// or more of them: "xa", "Хахаха", "ахах", "hehe", "пхпх", "ҳаҳа", "хх". A
+// doubled vowel is not laughter: "haa" means "yes" in Uzbek.
+func isLaughSounds(letters string) bool {
+	consonants := 0
+	afterVowel := false
+	for _, char := range strings.ReplaceAll(letters, "пх", "х") {
 		switch char {
 		case 'x', 'h', 'х', 'ҳ':
-			sounds++
+			consonants++
+			afterVowel = false
 		case 'a', 'e', 'а', 'е':
+			if afterVowel {
+				return false
+			}
+			afterVowel = true
 		default:
 			return false
 		}
 	}
-	return sounds >= 2
+	return consonants > 0
+}
+
+func hasLetters(text string) bool {
+	return strings.IndexFunc(text, unicode.IsLetter) >= 0
 }
 
 // letterWords returns the runs of letters in text, in lower case. Emoji,

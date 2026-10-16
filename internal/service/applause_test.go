@@ -10,6 +10,13 @@ func withSticker(m *telegram.Message) {
 	m.Sticker = &telegram.Sticker{FileID: "sticker", Emoji: "😂"}
 }
 
+// withStickerOf sets a sticker that Telegram gives the emoji.
+func withStickerOf(emoji string) func(*telegram.Message) {
+	return func(m *telegram.Message) {
+		m.Sticker = &telegram.Sticker{FileID: "sticker", Emoji: emoji}
+	}
+}
+
 // withGIF sets Document as well, as Telegram does on a GIF.
 func withGIF(m *telegram.Message) {
 	m.Animation = &telegram.Animation{FileID: "gif"}
@@ -27,6 +34,13 @@ func TestIsApplause(t *testing.T) {
 		"laughter and smiles":           {"ахахах)))", nil, true},
 		"uzbek cyrillic laughter":       {"ҳаҳаҳа", nil, true},
 		"laughing abbreviation":         {"LOL", nil, true},
+		"laughter split by a hyphen":    {"ха-ха", nil, true},
+		"laughter split by spaces":      {"xa xa xa", nil, true},
+		"one laugh and smiles":          {"ха)))", nil, true},
+		"one laugh and an emoji":        {"xa 😂", nil, true},
+		"one laugh and a mark":          {"ha!", nil, true},
+		"a chuckle":                     {"хе-хе", nil, true},
+		"a laughing word and laughter":  {"lol xaxa", nil, true},
 		"emoji only":                    {"😂😂", nil, true},
 		"three emoji":                   {"😂😂😂", nil, true},
 		"zero":                          {"0", nil, true},
@@ -37,7 +51,8 @@ func TestIsApplause(t *testing.T) {
 		"a GIF with a laughing caption": {"xaxa", withGIF, true},
 		"a question":                    {"nima gap", nil, false},
 		"a short question":              {"what?", nil, false},
-		"one laugh means yes":           {"haa", nil, false},
+		"a long yes":                    {"haa", nil, false},
+		"laughter and words":            {"xa xa nima", nil, false},
 		"emoji and words":               {"😂 bu nima", nil, false},
 		"a GIF with a question":         {"bu nima?", withGIF, false},
 		"a photo without caption":       {"", func(m *telegram.Message) { m.Photo = photo() }, false},
@@ -68,11 +83,14 @@ func TestApplauseReaction(t *testing.T) {
 		want      string
 	}{
 		{"xaxa", 6, nil, "🤣"},
+		{"ха-ха", 7, nil, "🤣"},
 		{"😂😂", 5, nil, "🤣"},
-		{"", 4, withSticker, "👍"},
-		{"", 5, withSticker, "🔥"},
-		{"", 6, withSticker, "😁"},
-		{"", 7, withSticker, "👌"},
+		{"", 5, withSticker, "🤣"}, // a 😂 sticker laughs
+		{"", 5, withStickerOf("🤣"), "🤣"},
+		{"", 4, withStickerOf("😺"), "👍"},
+		{"", 5, withStickerOf("😺"), "🔥"},
+		{"", 6, withStickerOf("😺"), "😁"},
+		{"", 7, withStickerOf("😺"), "👌"},
 		{"ok", 8, nil, "👍"},
 		{"!", -3, nil, "🔥"}, // never sent by Telegram; must still not panic
 	}

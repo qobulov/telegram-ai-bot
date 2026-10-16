@@ -79,7 +79,9 @@ type Reactor interface {
 	SetMessageReaction(ctx context.Context, chatID, messageID int64, emoji string) error
 }
 
-// Options configures a Service. All fields are required except MutedChats.
+// Options configures a Service. A field may be left nil when its comment
+// says what nil, or leaving it unset, does; lists may be empty. The other
+// fields are required.
 type Options struct {
 	Sender   Sender
 	Replier  Replier

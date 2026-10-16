@@ -1140,6 +1140,34 @@ func TestGroupQuotaDeniedStaysSilent(t *testing.T) {
 	if asked := quota.asked(); len(asked) != 3 || asked[0] != want {
 		t.Errorf("quota asked = %+v, want 3 times %+v", asked, want)
 	}
+	if got := f.chatLog.texts(groupID); len(got) == 0 || got[len(got)-1] != "Bek: Mira, three" {
+		t.Errorf("log = %q, want the unanswered message noted like chatter", got)
+	}
+}
+
+func TestMembersMuteAttemptsAreCounted(t *testing.T) {
+	f := newFixture()
+	quota := &fakeGroupQuota{}
+	f.opts.GroupReplies = quota
+	f.opts.MemberRepliesPer10Min = 2
+	f.opts.Workers = 1
+
+	sent := f.run(
+		inGroup(groupMessage("/mute@MyBot")),
+		inGroup(groupMessage("/mute@MyBot")),
+		inGroup(groupMessage("/mute@MyBot")),
+	)
+
+	if len(sent) != 2 || sent[0].text != textAdminsOnly || len(quota.asked()) != 3 {
+		t.Errorf("sent = %+v, quota asked %d times; a member's /mute is only refused, and the refusals are counted",
+			sent, len(quota.asked()))
+	}
+	if len(f.muter.calls) != 0 {
+		t.Errorf("a member muted the group: %+v", f.muter.calls)
+	}
+	if got := f.chatLog.texts(groupID); len(got) != 0 {
+		t.Errorf("log = %q; commands are not chatter", got)
+	}
 }
 
 func TestGroupQuotaFailureStaysQuietButOwnersAndMuteWork(t *testing.T) {
@@ -1199,6 +1227,9 @@ func TestGroupFloodGetsNoNotice(t *testing.T) {
 	sent := f.run(inGroup(groupMessage("Mira, one")), inGroup(groupMessage("Mira, two")))
 
 	expectOneReply(t, sent, "echo: one")
+	if got := f.chatLog.texts(groupID); len(got) == 0 || got[len(got)-1] != "Bek: Mira, two" {
+		t.Errorf("log = %q, want the unanswered message noted like chatter", got)
+	}
 }
 
 func TestNegativeIDsAreHandled(t *testing.T) {
@@ -1728,7 +1759,7 @@ func TestApplauseReplyGetsReactionNotAnswer(t *testing.T) {
 	if len(sent) != 0 || len(f.replier.recorded()) != 0 {
 		t.Errorf("sent = %+v, model calls = %d; applause needs no words", sent, len(f.replier.recorded()))
 	}
-	want := []reaction{{chatID: groupID, messageID: 30, emoji: "😁"}} // message 30: 30 % 4 picks 😁
+	want := []reaction{{chatID: groupID, messageID: 30, emoji: "🤣"}} // the sticker's emoji is 😂
 	if got := f.reactor.recorded(); !reflect.DeepEqual(got, want) {
 		t.Errorf("reactions = %+v, want %+v", got, want)
 	}
@@ -1744,15 +1775,21 @@ func TestFailedReactionIsIgnored(t *testing.T) {
 	f := newFixture()
 	f.reactor.err = errors.New("telegram: 400 REACTION_INVALID")
 
-	if sent := f.run(inGroup(stickerReply())); len(sent) != 0 {
-		t.Errorf("sent = %+v; a failed reaction is not worth a message", sent)
+	if sent := f.run(inGroup(stickerReply())); len(sent) != 0 || len(f.replier.recorded()) != 0 {
+		t.Errorf("sent = %+v, model calls = %d; a failed reaction is not worth a message", sent, len(f.replier.recorded()))
+	}
+	if got := f.chatLog.texts(groupID); len(got) != 1 || got[0] != "Bek: <sticker 😂>" {
+		t.Errorf("log = %q, want the sticker noted although the reaction failed", got)
 	}
 }
 
 func TestApplauseNeverSwallowsAWakeWordOrMention(t *testing.T) {
 	calls := map[string]*telegram.Message{
-		"wake word": replyingTo(groupMessage("😂😂 Maria"), botID, "answer"),
-		"mention":   replyingTo(groupMessage("@MyBot 😂", "@MyBot"), botID, "answer"),
+		"wake word last": replyingTo(groupMessage("😂😂 Maria"), botID, "answer"),
+		// The name is stripped, leaving "xaxa": only how she was called
+		// keeps this from being applause.
+		"wake word first": replyingTo(groupMessage("Maria, xaxa"), botID, "answer"),
+		"mention":         replyingTo(groupMessage("@MyBot 😂", "@MyBot"), botID, "answer"),
 	}
 	for name, msg := range calls {
 		t.Run(name, func(t *testing.T) {
@@ -1776,6 +1813,20 @@ func TestOwnerApplauseStillAnswered(t *testing.T) {
 
 	if len(sent) != 1 || len(f.replier.recorded()) != 1 || len(f.reactor.recorded()) != 0 {
 		t.Errorf("sent = %+v, reactions = %+v; an owner's message is always answered", sent, f.reactor.recorded())
+	}
+}
+
+func TestBotsStickerIsNotApplause(t *testing.T) {
+	f := newFixture()
+	f.opts.AllowedBots = []string{"*"}
+
+	f.run(inGroup(fromBot(stickerReply(), "fun_bot")))
+
+	if calls, reactions := f.replier.recorded(), f.reactor.recorded(); len(calls) != 1 || len(reactions) != 0 {
+		t.Errorf("model calls = %d, reactions = %+v; applause is for people, bots have their own quota", len(calls), reactions)
+	}
+	if f.botQuota.limit != 3 {
+		t.Errorf("bot quota limit passed = %d; the answer was not counted by the bot quota", f.botQuota.limit)
 	}
 }
 
