@@ -1064,6 +1064,24 @@ func TestPersonaSwearsBackInKind(t *testing.T) {
 	}
 }
 
+// The owner wants a member who finds fault with the bot answered with
+// just "poxuymasmi", and owners answered normally.
+func TestPersonaShrugsOffFaultFinding(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rule := lineContaining(cfg.PersonaPrompt, "points out a flaw of yours")
+	for _, want := range []string{`just "poxuymasmi"`, `"похуймасми"`, "nothing added", "still gets its answer", "owners get a normal answer"} {
+		if !strings.Contains(rule, want) {
+			t.Errorf("the fault-finding rule does not contain %q: %q", want, rule)
+		}
+	}
+	if swear := lineContaining(cfg.PersonaPrompt, "swears at you"); !strings.Contains(swear, `"иди нахуй" gets "днх"`) {
+		t.Errorf("Russian swearing does not get днх: %q", swear)
+	}
+}
+
 func TestPersonaIsComposedNotQuarrelsome(t *testing.T) {
 	cfg, err := Load(getenv(validEnv()))
 	if err != nil {
