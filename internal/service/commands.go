@@ -338,7 +338,7 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		// whitespace. Saying so would be one more message in the group.
 		return outcome{}
 	case in.msg.Text == "":
-		return say(textTextOnly) // a location, a contact or another kind the bot does not read
+		return say(textTextOnly(s.canListen())) // a location, a contact or another kind the bot does not read
 	default:
 		return outcome{} // whitespace only
 	}

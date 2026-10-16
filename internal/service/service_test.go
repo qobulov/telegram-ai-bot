@@ -573,7 +573,18 @@ func TestNonTextMessageGetsTextOnlyReply(t *testing.T) {
 
 	sent := f.run(textFrom(userID, "")) // a location or contact has no text
 
-	expectOneReply(t, sent, textTextOnly)
+	expectOneReply(t, sent, "Send me text, a photo, a video or a voice message instead.")
+}
+
+// Where the provider cannot hear, the notice offers no voice messages, as
+// the help does not.
+func TestTextOnlyReplyOffersVoiceOnlyWhereTheBotListens(t *testing.T) {
+	f := newFixture()
+	f.opts.AudioInput = false
+
+	sent := f.run(textFrom(userID, ""))
+
+	expectOneReply(t, sent, "Send me text, a photo or a video instead.")
 }
 
 func TestIgnoredUpdates(t *testing.T) {

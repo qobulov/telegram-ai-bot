@@ -19,7 +19,6 @@ Send /reset to delete the conversation history.`
 	textResetDone   = "The conversation history here has been deleted."
 	textUnknown     = "I don't know that command. Send /help to see what I can do."
 	textForbidden   = "This command is restricted to administrators."
-	textTextOnly    = "I can't read this kind of message. Send me text, a photo, a video or a voice message instead."
 	textBusy        = "I'm handling a lot of messages right now. Please try again in a moment."
 	textRateLimited = "You're sending messages too quickly. Please wait a little and try again."
 	textMuted       = "Fine, I'll be quiet here. An admin can bring me back with /unmute."
@@ -42,6 +41,16 @@ Send /reset to delete the conversation history.`
 	textCannotIgnore  = "I can't ignore admins, my owners or myself."
 	textNotIgnored    = "%s wasn't on my ignore list."
 )
+
+// textTextOnly answers, in a private chat, a kind of message the bot cannot
+// read. Like the help, it offers voice messages only where the bot hears
+// them.
+func textTextOnly(listen bool) string {
+	if listen {
+		return "I can't read this kind of message. Send me text, a photo, a video or a voice message instead."
+	}
+	return "I can't read this kind of message. Send me text, a photo or a video instead."
+}
 
 // helpText is the help with two blanks, filled by HelpText: the sentences on
 // what she can see and what she can do.
