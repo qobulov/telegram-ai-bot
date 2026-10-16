@@ -1,0 +1,4 @@
+{
+ "message": "You reached your request limit. Wait 52 seconds.",
+ "errorCode": 429
+}

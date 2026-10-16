@@ -1,0 +1,151 @@
+{
+ "count": 5,
+ "filters": {
+  "season": "2026",
+  "limit": 5
+ },
+ "competition": {
+  "id": 2021,
+  "name": "Premier League",
+  "code": "PL",
+  "type": "LEAGUE",
+  "emblem": "https://crests.football-data.org/PL.png"
+ },
+ "season": {
+  "id": 2502,
+  "startDate": "2026-08-21",
+  "endDate": "2027-05-30",
+  "currentMatchday": 7,
+  "winner": null,
+  "stages": [
+   "REGULAR_SEASON"
+  ]
+ },
+ "scorers": [
+  {
+   "player": {
+    "id": 38101,
+    "name": "Erling Haaland",
+    "firstName": "Erling",
+    "lastName": null,
+    "dateOfBirth": "2000-07-21",
+    "nationality": "Norway",
+    "section": "Offence",
+    "position": null,
+    "shirtNumber": null,
+    "lastUpdated": "2026-10-01T00:00:00Z"
+   },
+   "team": {
+    "id": 65,
+    "name": "Manchester City FC",
+    "shortName": "Man City",
+    "tla": "MCI",
+    "crest": "https://crests.football-data.org/65.png"
+   },
+   "playedMatches": 7,
+   "goals": 9,
+   "assists": 1,
+   "penalties": 2
+  },
+  {
+   "player": {
+    "id": 38102,
+    "name": "Bukayo Saka",
+    "firstName": "Bukayo",
+    "lastName": null,
+    "dateOfBirth": "2000-07-21",
+    "nationality": "England",
+    "section": "Offence",
+    "position": null,
+    "shirtNumber": null,
+    "lastUpdated": "2026-10-01T00:00:00Z"
+   },
+   "team": {
+    "id": 57,
+    "name": "Arsenal FC",
+    "shortName": "Arsenal",
+    "tla": "ARS",
+    "crest": "https://crests.football-data.org/57.png"
+   },
+   "playedMatches": 7,
+   "goals": 6,
+   "assists": 3,
+   "penalties": 1
+  },
+  {
+   "player": {
+    "id": 38103,
+    "name": "Alexander Isak",
+    "firstName": "Alexander",
+    "lastName": null,
+    "dateOfBirth": "2000-07-21",
+    "nationality": "Sweden",
+    "section": "Offence",
+    "position": null,
+    "shirtNumber": null,
+    "lastUpdated": "2026-10-01T00:00:00Z"
+   },
+   "team": {
+    "id": 64,
+    "name": "Liverpool FC",
+    "shortName": "Liverpool",
+    "tla": "LIV",
+    "crest": "https://crests.football-data.org/64.png"
+   },
+   "playedMatches": 7,
+   "goals": 5,
+   "assists": null,
+   "penalties": 0
+  },
+  {
+   "player": {
+    "id": 38104,
+    "name": "Ollie Watkins",
+    "firstName": "Ollie",
+    "lastName": null,
+    "dateOfBirth": "2000-07-21",
+    "nationality": "England",
+    "section": "Offence",
+    "position": null,
+    "shirtNumber": null,
+    "lastUpdated": "2026-10-01T00:00:00Z"
+   },
+   "team": {
+    "id": 58,
+    "name": "Aston Villa FC",
+    "shortName": "Aston Villa",
+    "tla": "AVL",
+    "crest": "https://crests.football-data.org/58.png"
+   },
+   "playedMatches": 7,
+   "goals": 5,
+   "assists": 2,
+   "penalties": 0
+  },
+  {
+   "player": {
+    "id": 38105,
+    "name": "Cole Palmer",
+    "firstName": "Cole",
+    "lastName": null,
+    "dateOfBirth": "2000-07-21",
+    "nationality": "England",
+    "section": "Offence",
+    "position": null,
+    "shirtNumber": null,
+    "lastUpdated": "2026-10-01T00:00:00Z"
+   },
+   "team": {
+    "id": 61,
+    "name": "Chelsea FC",
+    "shortName": "Chelsea",
+    "tla": "CHE",
+    "crest": "https://crests.football-data.org/61.png"
+   },
+   "playedMatches": 7,
+   "goals": 4,
+   "assists": 4,
+   "penalties": 2
+  }
+ ]
+}
