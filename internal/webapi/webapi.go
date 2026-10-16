@@ -6,6 +6,7 @@ package webapi
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -71,17 +72,17 @@ type BaseURLs struct {
 }
 
 func (b BaseURLs) withDefaults() BaseURLs {
-	b.CBU = or(b.CBU, "https://cbu.uz/uz/arkhiv-kursov-valyut/json")
-	b.CurrencyAPI = or(b.CurrencyAPI, "https://latest.currency-api.pages.dev/v1/currencies/usd.json")
-	b.CurrencyAPIMirror = or(b.CurrencyAPIMirror, "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json")
-	b.OpenMeteo = or(b.OpenMeteo, "https://api.open-meteo.com")
-	b.AirQuality = or(b.AirQuality, "https://air-quality-api.open-meteo.com")
-	b.Geocoding = or(b.Geocoding, "https://geocoding-api.open-meteo.com")
-	b.METNorway = or(b.METNorway, "https://api.met.no")
-	b.Aladhan = or(b.Aladhan, "https://api.aladhan.com")
-	b.FootballData = or(b.FootballData, "https://api.football-data.org")
-	b.CoinGecko = or(b.CoinGecko, "https://api.coingecko.com")
-	b.Wikipedia = or(b.Wikipedia, "https://%s.wikipedia.org")
+	b.CBU = cmp.Or(b.CBU, "https://cbu.uz/uz/arkhiv-kursov-valyut/json")
+	b.CurrencyAPI = cmp.Or(b.CurrencyAPI, "https://latest.currency-api.pages.dev/v1/currencies/usd.json")
+	b.CurrencyAPIMirror = cmp.Or(b.CurrencyAPIMirror, "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json")
+	b.OpenMeteo = cmp.Or(b.OpenMeteo, "https://api.open-meteo.com")
+	b.AirQuality = cmp.Or(b.AirQuality, "https://air-quality-api.open-meteo.com")
+	b.Geocoding = cmp.Or(b.Geocoding, "https://geocoding-api.open-meteo.com")
+	b.METNorway = cmp.Or(b.METNorway, "https://api.met.no")
+	b.Aladhan = cmp.Or(b.Aladhan, "https://api.aladhan.com")
+	b.FootballData = cmp.Or(b.FootballData, "https://api.football-data.org")
+	b.CoinGecko = cmp.Or(b.CoinGecko, "https://api.coingecko.com")
+	b.Wikipedia = cmp.Or(b.Wikipedia, "https://%s.wikipedia.org")
 	if b.News == nil {
 		b.News = map[string]map[string]string{
 			"uz": {
@@ -98,13 +99,6 @@ func (b BaseURLs) withDefaults() BaseURLs {
 		}
 	}
 	return b
-}
-
-func or(value, fallback string) string {
-	if value == "" {
-		return fallback
-	}
-	return value
 }
 
 // apis is what the tools share: one client, one cache and the settings.
@@ -145,7 +139,7 @@ func newAPIs(opts Options) *apis {
 		opts.Location = defaultLocation()
 	}
 	return &apis{
-		client:        newClient(opts.HTTPClient, or(opts.UserAgent, defaultUserAgent)),
+		client:        newClient(opts.HTTPClient, cmp.Or(opts.UserAgent, defaultUserAgent)),
 		cache:         newCache(opts.Now),
 		urls:          opts.BaseURLs.withDefaults(),
 		location:      opts.Location,
@@ -184,7 +178,9 @@ func (a *apis) parseDay(value string) (time.Time, error) {
 }
 
 // decodeArgs unmarshals arguments into a typed struct and rejects
-// properties the tool does not define.
+// properties the tool does not define. It mirrors the unexported
+// decodeArgs in internal/tools on purpose; keep the two alike, or export
+// that one when the tools are wired in.
 func decodeArgs(raw json.RawMessage, into any) error {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()

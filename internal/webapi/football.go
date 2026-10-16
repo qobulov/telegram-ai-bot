@@ -1,6 +1,7 @@
 package webapi
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -140,7 +141,7 @@ func (a *apis) football(ctx context.Context, raw json.RawMessage) (any, error) {
 	if err := decodeArgs(raw, &args); err != nil {
 		return nil, err
 	}
-	code, found := competitionNames[normalizeName(or(args.Competition, "PL"))]
+	code, found := competitionNames[normalizeName(cmp.Or(args.Competition, "PL"))]
 	if !found {
 		return nil, argumentError("unknown competition %q; use one of %s", args.Competition, footballCodes)
 	}
@@ -183,7 +184,7 @@ type footballTeam struct {
 }
 
 // label is the name to show: the short one when there is one.
-func (t footballTeam) label() string { return or(t.ShortName, t.Name) }
+func (t footballTeam) label() string { return cmp.Or(t.ShortName, t.Name) }
 
 // teamMatch is how closely a fan's words name a team.
 type teamMatch int

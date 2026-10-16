@@ -1,6 +1,7 @@
 package webapi
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -108,7 +109,7 @@ func (a *apis) prayerTimes(ctx context.Context, raw json.RawMessage) (any, error
 	if err := decodeArgs(raw, &args); err != nil {
 		return nil, err
 	}
-	region, found := regionPlace(or(args.Region, "toshkent"))
+	region, found := regionPlace(cmp.Or(args.Region, "toshkent"))
 	if !found {
 		return nil, argumentError("region must be one of %s", strings.Join(regionKeys(), ", "))
 	}

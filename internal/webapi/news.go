@@ -93,7 +93,7 @@ func (a *apis) news(ctx context.Context, raw json.RawMessage) (any, error) {
 	if err := decodeArgs(raw, &args); err != nil {
 		return nil, err
 	}
-	lang := or(args.Lang, "uz")
+	lang := cmp.Or(args.Lang, "uz")
 	limit := 5
 	if args.Limit != nil {
 		limit = *args.Limit

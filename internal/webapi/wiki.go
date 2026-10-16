@@ -1,6 +1,7 @@
 package webapi
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -73,7 +74,7 @@ func (a *apis) wiki(ctx context.Context, raw json.RawMessage) (any, error) {
 	if err := decodeArgs(raw, &args); err != nil {
 		return nil, err
 	}
-	lang := or(args.Lang, "uz")
+	lang := cmp.Or(args.Lang, "uz")
 	if _, known := wikiFallbacks[lang]; !known {
 		return nil, argumentError("lang must be uz, ru or en")
 	}
