@@ -20,6 +20,14 @@ const (
 	// when the live API was tried, and a second call usually answers.
 	aladhanAttempt = 2500 * time.Millisecond
 	ramadanMonth   = 9
+	// ramadanMargin moves saharlik earlier and iftar later, so that the
+	// minute or so Aladhan can be off from the Muslim Board never ends a
+	// fast late or breaks it early.
+	ramadanMargin = time.Minute
+	// muslimUzTune shifts Aladhan's times (Imsak, Fajr, Sunrise, Dhuhr,
+	// Asr, Maghrib, Sunset, Isha, Midnight) to the Muslim Board's
+	// published ones; see askAladhan.
+	muslimUzTune = "0,-3,0,0,0,4,0,3,0"
 
 	prayerSource = "Aladhan, approximate (within a few minutes); official times and Ramadan dates: muslim.uz"
 )
@@ -56,6 +64,7 @@ type ramadanOutput struct {
 	Region    string       `json:"region"`
 	HijriYear int          `json:"hijri_year"`
 	Days      []ramadanDay `json:"days"`
+	Note      string       `json:"note"`
 	Source    string       `json:"source"`
 }
 
@@ -135,9 +144,24 @@ type aladhanDay struct {
 	} `json:"date"`
 }
 
-func (d aladhanDay) time(name string) string {
-	hhmm, _, _ := strings.Cut(d.Timings[name], " ")
-	return hhmm
+// times returns the named times as HH:MM, in order. Anything else is an
+// error rather than text passed on to the model.
+func (d aladhanDay) times(names ...string) ([]string, error) {
+	var times []string
+	for _, name := range names {
+		hhmm, _, _ := strings.Cut(d.Timings[name], " ")
+		if _, err := time.Parse("15:04", hhmm); err != nil || len(hhmm) != len("15:04") {
+			return nil, errors.New("Aladhan sent a time that could not be read")
+		}
+		times = append(times, hhmm)
+	}
+	return times, nil
+}
+
+// shift moves an HH:MM time that times has checked by d.
+func shift(hhmm string, d time.Duration) string {
+	clock, _ := time.Parse("15:04", hhmm)
+	return clock.Add(d).Format("15:04")
 }
 
 // isoDate turns Aladhan's DD-MM-YYYY into YYYY-MM-DD.
@@ -160,24 +184,32 @@ func (a *apis) prayerDay(ctx context.Context, region place, day time.Time) (pray
 		if err == nil && answer.Data.isoDate() != date {
 			err = errors.New("Aladhan answered for another day")
 		}
+		if err == nil {
+			_, err = answer.Data.times(prayerNames...)
+		}
 		return answer.Data, err
 	})
 	if err != nil {
 		return prayerDayOutput{}, err
 	}
+	times, _ := answer.times(prayerNames...)
 	return prayerDayOutput{
 		Region: region.name,
 		Date:   date,
 		Hijri:  answer.hijri(),
-		Bomdod: answer.time("Fajr"),
-		Quyosh: answer.time("Sunrise"),
-		Peshin: answer.time("Dhuhr"),
-		Asr:    answer.time("Asr"),
-		Shom:   answer.time("Maghrib"),
-		Xufton: answer.time("Isha"),
+		Bomdod: times[0],
+		Quyosh: times[1],
+		Peshin: times[2],
+		Asr:    times[3],
+		Shom:   times[4],
+		Xufton: times[5],
 		Source: prayerSource,
 	}, nil
 }
+
+// prayerNames are Aladhan's names for bomdod, quyosh, peshin, asr, shom
+// and xufton, in that order.
+var prayerNames = []string{"Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"}
 
 func (d aladhanDay) hijri() hijriDate {
 	hijri := d.Date.Hijri
@@ -202,8 +234,10 @@ func (a *apis) ramadan(ctx context.Context, region place, day time.Time) (ramada
 	if err != nil {
 		return ramadanOutput{}, err
 	}
-	return ramadanOutput{Region: region.name, HijriYear: year, Days: days, Source: prayerSource}, nil
+	return ramadanOutput{Region: region.name, HijriYear: year, Days: days, Note: ramadanNote, Source: prayerSource}, nil
 }
+
+const ramadanNote = "saharlik_end is a minute before bomdod and iftar a minute after shom, to be safe"
 
 func (a *apis) ramadanDays(ctx context.Context, region place, year int) ([]ramadanDay, error) {
 	key := fmt.Sprintf("ramadan:%s:%d", region.region, year)
@@ -217,9 +251,14 @@ func (a *apis) ramadanDays(ctx context.Context, region place, year int) ([]ramad
 		}
 		var days []ramadanDay
 		for _, d := range answer.Data {
-			if d.Date.Hijri.Month.Number == ramadanMonth && d.isoDate() != "" {
-				days = append(days, ramadanDay{Date: d.isoDate(), SaharlikEnd: d.time("Fajr"), Iftar: d.time("Maghrib")})
+			if d.Date.Hijri.Month.Number != ramadanMonth || d.isoDate() == "" {
+				continue
 			}
+			times, err := d.times("Fajr", "Maghrib")
+			if err != nil {
+				return nil, err
+			}
+			days = append(days, ramadanDay{Date: d.isoDate(), SaharlikEnd: shift(times[0], -ramadanMargin), Iftar: shift(times[1], ramadanMargin)})
 		}
 		if len(days) == 0 {
 			return nil, errors.New("Aladhan sent no Ramadan timetable")
@@ -229,10 +268,10 @@ func (a *apis) ramadanDays(ctx context.Context, region place, year int) ([]ramad
 }
 
 // askAladhan calls Aladhan with the settings that match the Muslim Board
-// of Uzbekistan's times within about four minutes: 15° for Fajr and Isha,
-// Hanafi Asr and Dhuhr four minutes after noon. Method 3, which many
-// sites use, is 12 to 14 minutes off. A first call that hangs is tried
-// once more.
+// of Uzbekistan (muslim.uz): 15° for Fajr and Isha, Hanafi Asr, and
+// muslimUzTune. On 2026-10-16 in Tashkent that gave muslim.uz's times to
+// the minute except Asr, a minute late. Method 3, which many sites use,
+// is 12 to 14 minutes off. A first call that hangs is tried once more.
 func (a *apis) askAladhan(ctx context.Context, path string, region place, into any) error {
 	query := url.Values{
 		"latitude":       {coordinate(region.lat)},
@@ -241,7 +280,7 @@ func (a *apis) askAladhan(ctx context.Context, path string, region place, into a
 		"methodSettings": {"15,null,15"},
 		"school":         {"1"},
 		"timezonestring": {"Asia/Tashkent"},
-		"tune":           {"0,0,0,4,0,0,0,0,0"},
+		"tune":           {muslimUzTune},
 	}
 	request := call{service: "Aladhan", url: a.urls.Aladhan + path + "?" + query.Encode()}
 	first, cancel := context.WithTimeout(ctx, aladhanAttempt)
