@@ -368,6 +368,9 @@ type OutgoingPoll struct {
 	Options  []string
 	// Multiple lets a voter pick more than one option.
 	Multiple bool
+	// ReplyToMessageID makes the poll a reply to that message, which keeps
+	// it in the message's forum topic. Zero replies to nothing.
+	ReplyToMessageID int64
 }
 
 // APIError is an error returned by the Bot API.

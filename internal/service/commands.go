@@ -363,7 +363,7 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 		in.described = s.describe(ctx, in.msg, in.text)
 	}
 	started := time.Now()
-	stopTyping := s.showTyping(ctx, in.msg.Chat.ID)
+	stopTyping := s.showTyping(ctx, in.msg)
 	defer stopTyping()
 	sink := &tools.Sink{}
 	caller := s.caller(in)

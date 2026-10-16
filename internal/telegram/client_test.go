@@ -712,8 +712,14 @@ func TestChatAndMemberMethodsSendExactParams(t *testing.T) {
 	}{
 		{
 			method: "sendChatAction",
-			call:   func(c *Client) error { return c.SendChatAction(ctx, -100123, "typing") },
+			call:   func(c *Client) error { return c.SendChatAction(ctx, -100123, 0, "typing") },
 			want:   map[string]any{"chat_id": float64(-100123), "action": "typing"},
+		},
+		{
+			// In a forum topic, or "typing" shows in the General topic.
+			method: "sendChatAction",
+			call:   func(c *Client) error { return c.SendChatAction(ctx, -100123, 7, "typing") },
+			want:   map[string]any{"chat_id": float64(-100123), "message_thread_id": float64(7), "action": "typing"},
 		},
 		{
 			method: "deleteMessage",
@@ -778,6 +784,24 @@ func TestSendPollSendsOptionObjects(t *testing.T) {
 	}
 	if sent.params["is_anonymous"] != true || sent.params["allows_multiple_answers"] != true {
 		t.Errorf("is_anonymous = %v, allows_multiple_answers = %v", sent.params["is_anonymous"], sent.params["allows_multiple_answers"])
+	}
+	if _, ok := sent.params["reply_parameters"]; ok {
+		t.Errorf("reply_parameters = %v, want none for a poll that replies to nothing", sent.params["reply_parameters"])
+	}
+}
+
+// A poll asked for in a forum topic replies to the request, which keeps it
+// in that topic rather than the General one.
+func TestSendPollRepliesToTheRequest(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"message_id":88}}`)
+
+	poll := OutgoingPoll{ChatID: -100123, Question: "Lunch?", Options: []string{"yes", "no"}, ReplyToMessageID: 60}
+	if _, err := client.SendPoll(context.Background(), poll); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]any{"message_id": float64(60), "allow_sending_without_reply": true}
+	if got := api.recorded()[0].params["reply_parameters"]; !reflect.DeepEqual(got, want) {
+		t.Errorf("reply_parameters = %v, want %v", got, want)
 	}
 }
 

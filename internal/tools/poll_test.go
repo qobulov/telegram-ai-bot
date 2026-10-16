@@ -142,10 +142,11 @@ func TestPollSent(t *testing.T) {
 	if !got.OK || !strings.Contains(string(got.Result), `"sent":true`) {
 		t.Fatalf("create_poll = %+v %s, want sent", got, got.Result)
 	}
-	want := telegram.OutgoingPoll{ChatID: groupA, Question: "Lunch where?", Options: []string{"Plov", "Lagman", "Somsa"}, Multiple: true}
+	// The poll replies to the request, which keeps it in a forum topic.
+	want := telegram.OutgoingPoll{ChatID: groupA, Question: "Lunch where?", Options: []string{"Plov", "Lagman", "Somsa"}, Multiple: true, ReplyToMessageID: 60}
 	polls := env.sender.sent()
 	if len(polls) != 1 || polls[0].ChatID != want.ChatID || polls[0].Question != want.Question ||
-		!slices.Equal(polls[0].Options, want.Options) || polls[0].Multiple != want.Multiple {
+		!slices.Equal(polls[0].Options, want.Options) || polls[0].Multiple != want.Multiple || polls[0].ReplyToMessageID != 60 {
 		t.Errorf("polls = %+v\nwant    [%+v]", polls, want)
 	}
 	wantAudit := storage.ModerationAction{ChatID: groupA, Action: "poll", RequesterID: memberID, UpdateID: 100}

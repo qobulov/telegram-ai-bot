@@ -243,10 +243,10 @@ func (f *fakeReactor) recorded() []reaction {
 	return append([]reaction(nil), f.reactions...)
 }
 
-// chatAction is a status the bot showed in a chat.
+// chatAction is a status the bot showed in a chat, and the forum topic.
 type chatAction struct {
-	chatID int64
-	action string
+	chatID, threadID int64
+	action           string
 }
 
 // fakeChatActor records chat actions. It is called from the goroutine that
@@ -259,10 +259,10 @@ type fakeChatActor struct {
 	shown chan struct{}
 }
 
-func (f *fakeChatActor) SendChatAction(_ context.Context, chatID int64, action string) error {
+func (f *fakeChatActor) SendChatAction(_ context.Context, chatID, threadID int64, action string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.actions = append(f.actions, chatAction{chatID: chatID, action: action})
+	f.actions = append(f.actions, chatAction{chatID: chatID, threadID: threadID, action: action})
 	select {
 	case f.shown <- struct{}{}:
 	default:
@@ -2265,6 +2265,36 @@ func TestTypingShownDuringTurn(t *testing.T) {
 	}
 }
 
+// In a forum topic "typing" is shown in that topic, where the answer goes,
+// not in the General one.
+// (TestTypingShownDuringTurn shows it outside topics.)
+func TestTypingIsShownInTheTopic(t *testing.T) {
+	f := newFixture()
+	f.chatActor.shown = make(chan struct{}, 1)
+	f.replier.release = make(chan struct{})
+	inTopic := groupMessage("Mira, think hard")
+	inTopic.IsTopicMessage, inTopic.MessageThreadID = true, 7
+	s := serverless(f, &fakeMuteStore{})
+	defer s.Close()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		s.HandleNow(inGroup(inTopic))
+	}()
+	select {
+	case <-f.chatActor.shown:
+	case <-time.After(time.Second):
+		t.Error("typing was not shown")
+	}
+	close(f.replier.release)
+	<-done
+
+	if shown := f.chatActor.recorded(); len(shown) == 0 || shown[0] != (chatAction{chatID: groupID, threadID: 7, action: "typing"}) {
+		t.Errorf("chat actions = %+v, want typing in topic 7", shown)
+	}
+}
+
 // heldTyping keeps its one "typing" request open, whatever ctx says, until
 // the test lets it finish: a request already on its way to Telegram.
 type heldTyping struct {
@@ -2273,7 +2303,7 @@ type heldTyping struct {
 	finished atomic.Bool
 }
 
-func (h *heldTyping) SendChatAction(context.Context, int64, string) error {
+func (h *heldTyping) SendChatAction(context.Context, int64, int64, string) error {
 	close(h.sent)
 	<-h.finish
 	h.finished.Store(true)
@@ -2315,7 +2345,7 @@ func TestAnswerWaitsForTypingInFlight(t *testing.T) {
 // as the real client does when its request is cancelled.
 type heldChatActor struct{}
 
-func (heldChatActor) SendChatAction(ctx context.Context, _ int64, _ string) error {
+func (heldChatActor) SendChatAction(ctx context.Context, _, _ int64, _ string) error {
 	<-ctx.Done()
 	return ctx.Err()
 }

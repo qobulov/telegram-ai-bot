@@ -365,14 +365,16 @@ func (c *Client) SetMessageReaction(ctx context.Context, chatID, messageID int64
 }
 
 type chatActionParams struct {
-	ChatID int64  `json:"chat_id"`
-	Action string `json:"action"`
+	ChatID          int64  `json:"chat_id"`
+	MessageThreadID int64  `json:"message_thread_id,omitempty"`
+	Action          string `json:"action"`
 }
 
-// SendChatAction shows a status such as "typing" in the chat. Telegram
-// clears it after about 5 seconds, or as soon as the bot sends a message.
-func (c *Client) SendChatAction(ctx context.Context, chatID int64, action string) error {
-	return c.call(ctx, "sendChatAction", chatActionParams{ChatID: chatID, Action: action}, nil)
+// SendChatAction shows a status such as "typing" in the chat, in the forum
+// topic threadID unless it is 0. Telegram clears it after about 5 seconds,
+// or as soon as the bot sends a message.
+func (c *Client) SendChatAction(ctx context.Context, chatID, threadID int64, action string) error {
+	return c.call(ctx, "sendChatAction", chatActionParams{ChatID: chatID, MessageThreadID: threadID, Action: action}, nil)
 }
 
 type messageParams struct {
@@ -454,6 +456,7 @@ type sendPollParams struct {
 	Options               []inputPollOption `json:"options"`
 	IsAnonymous           bool              `json:"is_anonymous"`
 	AllowsMultipleAnswers bool              `json:"allows_multiple_answers"`
+	ReplyParameters       *replyParameters  `json:"reply_parameters,omitempty"`
 }
 
 type inputPollOption struct {
@@ -472,6 +475,9 @@ func (c *Client) SendPoll(ctx context.Context, poll OutgoingPoll) (int64, error)
 	}
 	for _, option := range poll.Options {
 		params.Options = append(params.Options, inputPollOption{Text: option})
+	}
+	if poll.ReplyToMessageID != 0 {
+		params.ReplyParameters = &replyParameters{MessageID: poll.ReplyToMessageID, AllowSendingWithoutReply: true}
 	}
 	var sent sentMessage
 	if err := c.call(ctx, "sendPoll", params, &sent); err != nil {

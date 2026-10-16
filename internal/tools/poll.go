@@ -118,7 +118,7 @@ func (p polls) run(ctx context.Context, raw json.RawMessage) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	poll, err := newPoll(caller.ChatID, args)
+	poll, err := newPoll(caller, args)
 	if err != nil {
 		return nil, err
 	}
@@ -150,8 +150,9 @@ func pollAsker(ctx context.Context) (Caller, error) {
 	return caller, nil
 }
 
-// newPoll is the poll asked for, trimmed and within Telegram's limits.
-func newPoll(chatID int64, args pollArgs) (telegram.OutgoingPoll, error) {
+// newPoll is the poll asked for, trimmed and within Telegram's limits. It
+// replies to the request: in a forum, that keeps it in the request's topic.
+func newPoll(caller Caller, args pollArgs) (telegram.OutgoingPoll, error) {
 	question := strings.TrimSpace(args.Question)
 	if !runesWithin(question, maxPollQuestionRunes) {
 		return telegram.OutgoingPoll{}, &ArgumentError{Message: fmt.Sprintf("question must be 1 to %d characters", maxPollQuestionRunes)}
@@ -160,7 +161,7 @@ func newPoll(chatID int64, args pollArgs) (telegram.OutgoingPoll, error) {
 	if err != nil {
 		return telegram.OutgoingPoll{}, err
 	}
-	return telegram.OutgoingPoll{ChatID: chatID, Question: question, Options: options, Multiple: args.Multiple}, nil
+	return telegram.OutgoingPoll{ChatID: caller.ChatID, Question: question, Options: options, Multiple: args.Multiple, ReplyToMessageID: caller.MessageID}, nil
 }
 
 // checkedOptions trims the options and refuses two that differ only in case

@@ -87,9 +87,10 @@ type Reactor interface {
 	SetMessageReaction(ctx context.Context, chatID, messageID int64, emoji string) error
 }
 
-// ChatActor shows a status, such as "typing", in a chat.
+// ChatActor shows a status, such as "typing", in a chat, in the forum topic
+// threadID unless it is 0.
 type ChatActor interface {
-	SendChatAction(ctx context.Context, chatID int64, action string) error
+	SendChatAction(ctx context.Context, chatID, threadID int64, action string) error
 }
 
 // Confirmer carries out a moderation action once the person who asked for
@@ -769,9 +770,13 @@ const typingRefresh = 4 * time.Second
 // hang over a finished reply. Like a reaction, it is a gesture, so failures
 // are only logged at debug level, and not at all once the turn is over: a
 // send cut off by stop is expected.
-func (s *Service) showTyping(ctx context.Context, chatID int64) (stop func()) {
+func (s *Service) showTyping(ctx context.Context, msg *telegram.Message) (stop func()) {
 	if s.opts.ChatActor == nil {
 		return func() {}
+	}
+	chatID, threadID := msg.Chat.ID, int64(0)
+	if msg.IsTopicMessage {
+		threadID = msg.MessageThreadID // where the answer goes, as a reply
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	var typing sync.WaitGroup
@@ -782,7 +787,7 @@ func (s *Service) showTyping(ctx context.Context, chatID int64) (stop func()) {
 		// once the turn is over: stop may come before the first one, and
 		// select may pick the ticker even when ctx is already done.
 		for ctx.Err() == nil {
-			err := s.opts.ChatActor.SendChatAction(ctx, chatID, "typing")
+			err := s.opts.ChatActor.SendChatAction(ctx, chatID, threadID, "typing")
 			if err != nil && ctx.Err() == nil {
 				s.opts.Logger.Debug("typing indicator failed", "chat_id", chatID, "error", err)
 			}
