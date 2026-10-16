@@ -478,6 +478,32 @@ func TestSilentMarkerAnywhereSilencesTheAnswer(t *testing.T) {
 	}
 }
 
+// In production the model once sent its own reasoning, a stray character
+// and "thought" in front, into a group. Such an answer is never sent.
+func TestLeakedThinkingIsNotSent(t *testing.T) {
+	for _, content := range []string{
+		"쳤thought He replied to his own message, so explain it.Username bilan mute qila olmayman.",
+		"thought\nThe user asks about the weather; call get_weather.",
+		" *thought The member is joking.",
+	} {
+		f := newFixture(text(content))
+
+		answer, err := f.agent.Reply(context.Background(), request(1, "hm"))
+		if !errors.Is(err, ErrSilent) || !errors.Is(err, ErrLeakedThinking) {
+			t.Errorf("answer %q: got %+v, err = %v, want ErrLeakedThinking", content, answer, err)
+		}
+		if f.store.saves != 0 {
+			t.Errorf("answer %q: the leaked thinking was saved", content)
+		}
+	}
+	for _, content := range []string{"Thought so 😏", "thought so, ha", "Thoughtful of you"} {
+		f := newFixture(text(content))
+		if answer, err := f.agent.Reply(context.Background(), request(1, "hm")); err != nil || answer.Text != content {
+			t.Errorf("answer %q: got %+v, err = %v; ordinary words are an answer", content, answer, err)
+		}
+	}
+}
+
 func TestSilentAsAnOrdinaryWordIsAnAnswer(t *testing.T) {
 	f := newFixture(text("Silent night, holy night"))
 

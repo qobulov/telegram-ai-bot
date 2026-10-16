@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"telegram-ai-bot/internal/ai"
 	"telegram-ai-bot/internal/storage"
@@ -21,6 +22,9 @@ var (
 	// ErrSilent means the model decided the message needs no reply. Nothing
 	// is saved and nothing should be sent.
 	ErrSilent = errors.New("agent: the model chose not to reply")
+	// ErrLeakedThinking means the answer was the model's own reasoning. It
+	// is a kind of ErrSilent: nothing is saved or sent.
+	ErrLeakedThinking = fmt.Errorf("agent: the answer was the model's reasoning: %w", ErrSilent)
 	// ErrToolLoop means the model kept requesting tools instead of answering.
 	ErrToolLoop = errors.New("agent: model did not produce an answer")
 )
@@ -210,6 +214,9 @@ func finish(t *turn, reply ai.Message) (Answer, error) {
 	if isSilent(answer) {
 		return Answer{}, ErrSilent
 	}
+	if isThinking(answer) {
+		return Answer{}, ErrLeakedThinking
+	}
 	if markers := reactMarkers.FindAllString(answer, -1); len(markers) > 0 {
 		words := withoutMarkers(answer)
 		if !hasWords(words) {
@@ -273,6 +280,28 @@ func isSilent(answer string) bool {
 		}
 	}
 	return false
+}
+
+// isThinking reports an answer that is the model's reasoning, as Gemini
+// once sent it: "thought" at the start, after a stray character or two or
+// followed by a line break. An answer that only begins with the word, such
+// as "Thought so", is not.
+func isThinking(answer string) bool {
+	rest := strings.TrimLeftFunc(answer, unicode.IsSpace)
+	stray := 0
+	for stray < 2 && rest != "" && !strings.HasPrefix(rest, "thought") {
+		r, size := utf8.DecodeRuneInString(rest)
+		if unicode.In(r, unicode.Latin) {
+			return false
+		}
+		rest, stray = rest[size:], stray+1
+	}
+	after, ok := strings.CutPrefix(rest, "thought")
+	if !ok || after == "" {
+		return false
+	}
+	next, _ := utf8.DecodeRuneInString(after)
+	return next == '\n' || (stray > 0 && unicode.IsSpace(next))
 }
 
 // reactMarkers finds "[react X]", and "<reacted X>", which is how past
