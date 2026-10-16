@@ -868,6 +868,9 @@ func TestModerateQuestionThatCannotBePostedLeavesNothingWaiting(t *testing.T) {
 	got := env.moderate(asking(100, bekTarget()), `{"action":"ban"}`)
 
 	expectRefusal(t, got, "execution_failed", "I could not post the question that asks them to confirm, so nothing will be done")
+	if strings.Contains(got.Error.Message, "i/o timeout") {
+		t.Errorf("the cause reached the model: %q", got.Error.Message)
+	}
 	env.nothingDone(t)
 }
 

@@ -386,8 +386,9 @@ func (m *Moderation) ask(ctx context.Context, o order) (any, error) {
 	}
 	if err != nil {
 		// Without a question to reply to, the action can never be confirmed.
+		// Why the question failed is for the logs.
 		_, _ = m.opts.Store.CancelPendingModeration(context.WithoutCancel(ctx), o.caller.UserID, o.caller.ChatID)
-		return nil, errors.New(noQuestion)
+		return nil, errors.Join(errors.New(noQuestion), internal(err))
 	}
 	return map[string]any{"asked": true, "action": o.action, "target": o.target.Name, "note": askedNote}, nil
 }
