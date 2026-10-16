@@ -49,7 +49,8 @@ type Client struct {
 	opts Options
 	now  func() time.Time
 	// outOfQuota holds, per model, until when it is skipped because its
-	// quota ran out: retrying it on every turn only adds a wasted request.
+	// quota ran out, the provider does not have it or it did not answer in
+	// time: trying it on every turn only adds a wasted request or wait.
 	outOfQuota sync.Map
 	// noTools is set once the configured model turns out not to support tool
 	// calling, so later requests skip the doomed first attempt.
@@ -109,7 +110,7 @@ func (c *Client) completeWithRetry(ctx context.Context, req Request, withTools b
 			return Message{}, fmt.Errorf("encode request: %w", err)
 		}
 		msg, err := c.attempt(ctx, body)
-		c.noteUnusable(model, err)
+		c.noteUnusable(ctx, model, err)
 		if err == nil || attempt >= c.opts.MaxAttempts || !c.isRetryable(ctx, err) {
 			return msg, err
 		}
@@ -129,14 +130,17 @@ func (c *Client) completeWithRetry(ctx context.Context, req Request, withTools b
 	}
 }
 
-// noteUnusable skips a model for a while when its quota ran out or the
-// provider does not have it.
-func (c *Client) noteUnusable(model string, err error) {
+// noteUnusable skips a model for a while when its quota ran out, the
+// provider does not have it, or it did not answer within AttemptTimeout
+// while the caller still had time.
+func (c *Client) noteUnusable(ctx context.Context, model string, err error) {
 	switch {
 	case isOutOfQuota(err):
 		c.outOfQuota.Store(model, c.now().Add(quotaCooldown))
 	case isModelNotFound(err):
 		c.outOfQuota.Store(model, c.now().Add(missingModelCooldown))
+	case ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded):
+		c.outOfQuota.Store(model, c.now().Add(slowModelCooldown))
 	}
 }
 
@@ -164,6 +168,9 @@ const (
 	// missingModelCooldown is how long a model the provider does not have
 	// is skipped.
 	missingModelCooldown = time.Hour
+	// slowModelCooldown is how long a model that did not answer in time is
+	// skipped.
+	slowModelCooldown = 10 * time.Minute
 )
 
 // models lists the models to try, in order: the configured one first, then

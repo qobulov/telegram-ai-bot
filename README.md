@@ -166,7 +166,7 @@ in the environment win over the file.
 | `TELEGRAM_BOT_TOKEN`          | required                       | Token from [@BotFather](https://t.me/BotFather)                                                              |
 | `GEMINI_API_KEY` | one of the two keys | Google Gemini key from <https://aistudio.google.com/apikey>; set this or `XAI_API_KEY`, not both |
 | `GEMINI_MODEL` | `gemini-3.6-flash` | Gemini model ID, used with `GEMINI_API_KEY` |
-| `FALLBACK_MODELS` | Gemini: `gemini-3.5-flash,gemini-flash-latest,gemini-3.5-flash-lite` | Models tried in order when the main one is overloaded, out of quota or does not answer, then once more after a pause; a model out of quota is skipped for 15 minutes; `none` turns this off |
+| `FALLBACK_MODELS` | Gemini: `gemini-3.5-flash,gemini-flash-latest,gemini-3.5-flash-lite` | Models tried in order when the main one is overloaded, out of quota or does not answer, then once more after a pause; a model out of quota is skipped for 15 minutes, one that did not answer within 20 seconds for 10; `none` turns this off |
 | `BACKUP_API_KEY` | empty | Key for a backup provider, asked when every model of the main one failed; replies that already moved to it stay on it |
 | `BACKUP_BASE_URL` | `https://api.groq.com/openai/v1` | The backup's OpenAI-compatible API (Groq by default). Groq's free tier allows 8,000 tokens a minute, which is one group reply at most: a request with the persona and the group log is 6,000 tokens or more |
 | `BACKUP_MODEL` | `openai/gpt-oss-120b` | The backup's model; it gets voice messages as transcripts only |
@@ -305,7 +305,9 @@ the user gets the generic error and the log shows `status 429`.
 When Google answers that a model is overloaded (`503`), that the account is
 over its limits (`429`), or does not answer within 20 seconds, the same
 request is sent to the next model in `FALLBACK_MODELS`. Each new message
-starts again with the main model. If every model is busy, the user is told
+starts again with the main model, unless it ran out of quota (skipped for 15
+minutes) or did not answer in time (skipped for 10 minutes, so a slow model
+does not make every reply wait 20 seconds). If every model is busy, the user is told
 the AI is overloaded and to try again in a minute.
 
 When every Gemini model failed and `BACKUP_API_KEY` is set, the request

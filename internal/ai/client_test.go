@@ -658,6 +658,49 @@ func TestModelOutOfQuotaIsSkippedForAWhile(t *testing.T) {
 	}
 }
 
+// A model that does not answer within AttemptTimeout costs that whole wait
+// on every turn: in production gemini-4-argon made each reply wait 20 s
+// before the fallback answered, and some turns ran out of time.
+func TestSlowModelIsSkippedForAWhile(t *testing.T) {
+	server := &modelServer{stuck: map[string]bool{"primary": true}}
+	client := fallbackClient(t, server)
+	now := time.Date(2026, 10, 16, 19, 0, 0, 0, time.UTC)
+	client.now = func() time.Time { return now }
+
+	_, _ = client.Complete(context.Background(), userRequest())
+	msg, err := client.Complete(context.Background(), userRequest())
+	if err != nil || msg.Content != "from backup-1" {
+		t.Fatalf("msg = %+v, err = %v", msg, err)
+	}
+	if got := strings.Join(server.asked, ","); got != "primary,backup-1,backup-1" {
+		t.Errorf("models asked = %s; a model that did not answer in time should not be waited for on every turn", got)
+	}
+
+	now = now.Add(slowModelCooldown + time.Second)
+	server.mu.Lock()
+	server.stuck, server.asked = nil, nil
+	server.mu.Unlock()
+	if msg, _ := client.Complete(context.Background(), userRequest()); msg.Content != "from primary" {
+		t.Errorf("after the cooldown msg = %+v; the primary model should be tried again", msg)
+	}
+}
+
+// Running out of the caller's time says nothing about the model.
+func TestCallerDeadlineDoesNotMarkTheModelSlow(t *testing.T) {
+	server := &modelServer{stuck: map[string]bool{"primary": true}}
+	client := fallbackClient(t, server)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	_, _ = client.Complete(ctx, userRequest())
+	cancel()
+
+	server.mu.Lock()
+	server.stuck, server.asked = nil, nil
+	server.mu.Unlock()
+	if msg, _ := client.Complete(context.Background(), userRequest()); msg.Content != "from primary" {
+		t.Errorf("msg = %+v; the primary model was skipped although only the caller ran out of time", msg)
+	}
+}
+
 func TestEveryModelOutOfQuotaStillTriesThem(t *testing.T) {
 	server := &modelServer{outOfQuota: map[string]bool{"primary": true, "backup-1": true, "backup-2": true}}
 	client := fallbackClient(t, server)
