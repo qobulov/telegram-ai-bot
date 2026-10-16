@@ -14,8 +14,9 @@ import (
 const (
 	clientTimeout = 4 * time.Second
 	maxRedirects  = 2
-	// defaultBodyLimit bounds a JSON answer. News feeds, the "on this day"
-	// list and football tables are larger and ask for largeBodyLimit.
+	// defaultBodyLimit bounds a JSON answer. The "on this day" list and
+	// football answers are larger and ask for largeBodyLimit; news feeds
+	// have a limit of their own.
 	defaultBodyLimit = 64 << 10
 	largeBodyLimit   = 256 << 10
 	// errorBodyLimit is how much of a failed answer is kept for the tools
