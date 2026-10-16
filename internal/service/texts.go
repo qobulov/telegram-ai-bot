@@ -38,6 +38,7 @@ Send /reset to delete the conversation history.`
 	textIgnored       = "Okay, I won't answer %s for the next 24 hours."
 	textUnignored     = "I'll answer %s again."
 	textReplyToMember = "Reply to that member's message with this command."
+	textRepliedToMe   = "That's my own message, and I can't tell whom it answered. Reply to the member's own message with this command."
 	textCannotIgnore  = "I can't ignore admins, my owners or myself."
 	textNotIgnored    = "%s wasn't on my ignore list."
 )

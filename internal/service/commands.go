@@ -333,7 +333,13 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	stopTyping := s.showTyping(ctx, in.msg.Chat.ID)
 	defer stopTyping()
 	sink := &tools.Sink{}
-	ctx = tools.WithTurn(ctx, s.caller(in), sink)
+	caller := s.caller(in)
+	if caller.Target != nil && caller.Target.UserID == s.opts.Bot.ID && in.group && s.isOwner(in.msg.From) {
+		// An owner's "don't answer him" in reply to the bot's answer means
+		// the member it answered; only owners give such orders.
+		caller.Target.Answered = s.answeredMember(ctx, in.scope.ChatID, caller.Target.MessageID)
+	}
+	ctx = tools.WithTurn(ctx, caller, sink)
 	answer, err := s.opts.Replier.Reply(ctx, s.request(ctx, in, rules))
 	// A picture drawn before a later failure is still worth sending.
 	drawings := sink.Take()
@@ -414,6 +420,29 @@ func (s *Service) caller(in incoming) tools.Caller {
 		MessageID: in.msg.MessageID,
 		Target:    s.target(in.msg.ReplyToMessage),
 	}
+}
+
+// answeredMember is the member whose message the bot's message botMessageID
+// answered, as stored with the group's conversation, or nil when that is
+// not known.
+func (s *Service) answeredMember(ctx context.Context, chatID, botMessageID int64) *tools.Target {
+	if s.opts.Answers == nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, logTimeout)
+	defer cancel()
+	author, err := s.opts.Answers.AnsweredAuthor(ctx, chatID, botMessageID)
+	if err != nil {
+		if !errors.Is(err, storage.ErrUnknownAuthor) {
+			s.opts.Logger.Warn("could not learn whom an answer was for", "chat_id", chatID, "error", err)
+		}
+		return nil
+	}
+	name, owner, bot := unlabel(author.Name)
+	if len(s.opts.OwnerIDs) > 0 {
+		owner = s.opts.OwnerIDs[author.ID]
+	}
+	return &tools.Target{MessageID: author.MessageID, UserID: author.ID, Name: name, IsBot: bot, Owner: owner}
 }
 
 // confirmedModeration passes on a group member's plain yes or no, written
@@ -615,11 +644,11 @@ func (s *Service) ignore(ctx context.Context, in incoming) string {
 	if refusal := s.refuseUnignorable(ctx, in, member); refusal != "" {
 		return refusal
 	}
-	name := plainLabel(member)
+	name := member.Name
 	_, err := s.opts.Rules.SetGroupRule(ctx, storage.GroupRule{
 		ChatID:    in.scope.ChatID,
 		Kind:      storage.RuleIgnore,
-		UserID:    member.ID,
+		UserID:    member.UserID,
 		UserName:  name,
 		SetBy:     in.userID,
 		ExpiresAt: s.opts.Now().Add(ignoreCommandFor),
@@ -628,7 +657,7 @@ func (s *Service) ignore(ctx context.Context, in incoming) string {
 		s.opts.Logger.Error("ignore failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
 		return textError
 	}
-	s.opts.Logger.Info("member ignored", "user_id", in.userID, "chat_id", in.scope.ChatID, "member_id", member.ID)
+	s.opts.Logger.Info("member ignored", "user_id", in.userID, "chat_id", in.scope.ChatID, "member_id", member.UserID)
 	return fmt.Sprintf(textIgnored, name)
 }
 
@@ -638,23 +667,24 @@ func (s *Service) unignore(ctx context.Context, in incoming) string {
 	if refusal != "" {
 		return refusal
 	}
-	removed, err := s.opts.Rules.RemoveIgnore(ctx, in.scope.ChatID, member.ID)
+	removed, err := s.opts.Rules.RemoveIgnore(ctx, in.scope.ChatID, member.UserID)
 	if err != nil {
 		s.opts.Logger.Error("unignore failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
 		return textError
 	}
 	if !removed {
-		return fmt.Sprintf(textNotIgnored, plainLabel(member))
+		return fmt.Sprintf(textNotIgnored, member.Name)
 	}
-	s.opts.Logger.Info("member unignored", "user_id", in.userID, "chat_id", in.scope.ChatID, "member_id", member.ID)
-	return fmt.Sprintf(textUnignored, plainLabel(member))
+	s.opts.Logger.Info("member unignored", "user_id", in.userID, "chat_id", in.scope.ChatID, "member_id", member.UserID)
+	return fmt.Sprintf(textUnignored, member.Name)
 }
 
 // ignoreTarget checks what /ignore and /unignore have in common, and returns
 // the member they are about: the author of the message the command replies
-// to, never a name typed after it. A message posted on behalf of a channel
-// or of the group has no member behind it.
-func (s *Service) ignoreTarget(ctx context.Context, in incoming) (*telegram.User, string) {
+// to, or for one of the bot's own answers, the member it answered; never a
+// name typed after it. A message posted on behalf of a channel or of the
+// group has no member behind it.
+func (s *Service) ignoreTarget(ctx context.Context, in incoming) (*tools.Target, string) {
 	switch {
 	case s.opts.Rules == nil:
 		return nil, textUnknown
@@ -668,7 +698,13 @@ func (s *Service) ignoreTarget(ctx context.Context, in incoming) (*telegram.User
 	if replied == nil || replied.From == nil || replied.SenderChat != nil || s.isServiceMessage(replied) {
 		return nil, textReplyToMember
 	}
-	return replied.From, ""
+	if replied.From.ID != s.opts.Bot.ID {
+		return s.target(replied), ""
+	}
+	if member := s.answeredMember(ctx, in.scope.ChatID, replied.MessageID); member != nil {
+		return member, ""
+	}
+	return nil, textRepliedToMe
 }
 
 // isServiceMessage reports a message Telegram posted about something that
@@ -688,13 +724,13 @@ func (s *Service) isServiceMessage(msg *telegram.Message) bool {
 // refuseUnignorable returns the refusal to send when member may not be
 // ignored, and "" when they may. When Telegram cannot say whether they are
 // an admin, they are not ignored.
-func (s *Service) refuseUnignorable(ctx context.Context, in incoming, member *telegram.User) string {
-	if member.ID == s.opts.Bot.ID || s.isOwner(member) {
+func (s *Service) refuseUnignorable(ctx context.Context, in incoming, member *tools.Target) string {
+	if member.UserID == s.opts.Bot.ID || member.Owner {
 		return textCannotIgnore
 	}
-	isAdmin, err := s.opts.Members.IsGroupAdmin(ctx, in.scope.ChatID, member.ID)
+	isAdmin, err := s.opts.Members.IsGroupAdmin(ctx, in.scope.ChatID, member.UserID)
 	if err != nil {
-		s.opts.Logger.Error("group admin check failed", "member_id", member.ID, "chat_id", in.scope.ChatID, "error", err)
+		s.opts.Logger.Error("group admin check failed", "member_id", member.UserID, "chat_id", in.scope.ChatID, "error", err)
 		return textError
 	}
 	if isAdmin {

@@ -2699,10 +2699,11 @@ func TestIgnoreCommandNeedsAManagerAndAReply(t *testing.T) {
 }
 
 func TestIgnoreCommandRefusesAdmins(t *testing.T) {
+	// The bot's own messages stand for whom they answered; see
+	// TestIgnoreCommandOnTheBotsAnswerIgnoresWhomItAnswered.
 	cases := map[string]*telegram.User{
 		"a group admin": boss,
 		"an owner":      {ID: 9001, FirstName: "Azizbek", Username: "Pronium"},
-		"the bot":       {ID: botID, IsBot: true, FirstName: "Mira", Username: botUsername},
 	}
 	// The bot's own administrator asks, so that only the target is looked up.
 	requester := &telegram.User{ID: adminID, FirstName: "Admin"}
@@ -2790,6 +2791,91 @@ func TestTurnTellsToolsTheRepliedMessage(t *testing.T) {
 	}
 	if target := calls[1].caller.Target; target != nil {
 		t.Errorf("target without a reply = %+v", target)
+	}
+}
+
+// fakeAnswers knows whom some of the bot's messages answered.
+type fakeAnswers struct {
+	mu      sync.Mutex
+	authors map[int64]storage.Author
+	asked   []int64
+}
+
+func (f *fakeAnswers) AnsweredAuthor(_ context.Context, _, botMessageID int64) (storage.Author, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.asked = append(f.asked, botMessageID)
+	author, ok := f.authors[botMessageID]
+	if !ok {
+		return storage.Author{}, storage.ErrUnknownAuthor
+	}
+	return author, nil
+}
+
+// answersTo29 knows that the bot's message 29 answered Bek's 28.
+func answersTo29(f *fixture) *fakeAnswers {
+	answers := &fakeAnswers{authors: map[int64]storage.Author{29: {ID: userID, Name: "Bek @bek", MessageID: 28}}}
+	f.opts.Answers = answers
+	return answers
+}
+
+// The owners' "javob berma dedim" were replies to the bot's answer to the
+// member they meant.
+func TestOwnersReplyToTheBotsAnswerNamesWhomItAnswered(t *testing.T) {
+	f := newFixture()
+	f.opts.OwnerUsernames = []string{ownerUsername}
+	answers := answersTo29(f)
+
+	f.run(
+		inGroup(fromOwner(replyingTo(groupMessage("Mira, javob berma unga"), botID, "salom Bek"))),
+		inGroup(replyingTo(groupMessage("Mira, kimga javob berding?"), botID, "salom Bek")),
+	)
+
+	calls := f.replier.recorded()
+	if len(calls) != 2 {
+		t.Fatalf("model calls = %d, want 2", len(calls))
+	}
+	want := tools.Target{MessageID: 28, UserID: userID, Name: "Bek @bek"}
+	if target := calls[0].caller.Target; target == nil || target.UserID != botID || target.Answered == nil || *target.Answered != want {
+		t.Errorf("owner's target = %+v, want the bot's message answering %+v", target, want)
+	}
+	// Only owners give such orders; nobody else's turn asks.
+	if target := calls[1].caller.Target; target == nil || target.Answered != nil || len(answers.asked) != 1 {
+		t.Errorf("member's target = %+v, lookups = %v; want none", target, answers.asked)
+	}
+}
+
+func TestIgnoreCommandOnTheBotsAnswerIgnoresWhomItAnswered(t *testing.T) {
+	mira := &telegram.User{ID: botID, IsBot: true, FirstName: "Mira"}
+	cases := map[string]struct {
+		author storage.Author
+		known  bool
+		want   string
+	}{
+		"a member":         {storage.Author{ID: userID, Name: "Bek @bek", MessageID: 28}, true, "Okay, I won't answer Bek @bek for the next 24 hours."},
+		"an owner":         {storage.Author{ID: 9001, Name: "Azizbek @Pronium [owner]", MessageID: 28}, true, textCannotIgnore},
+		"an unknown reply": {storage.Author{}, false, textRepliedToMe},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			book := &fakeRuleBook{}
+			f.opts.Rules = book
+			answers := &fakeAnswers{authors: map[int64]storage.Author{}}
+			if c.known {
+				answers.authors[29] = c.author
+			}
+			f.opts.Answers = answers
+
+			sent := f.run(commandReplyingTo(boss, mira, "/ignore@MyBot"))
+
+			expectOneReply(t, sent, c.want)
+			if saved := book.all(); c.want != textCannotIgnore && c.known && (len(saved) != 1 || saved[0].UserID != userID || saved[0].UserName != "Bek @bek") {
+				t.Errorf("saved = %+v, want Bek ignored", saved)
+			} else if !(c.want != textCannotIgnore && c.known) && len(saved) != 0 {
+				t.Errorf("saved = %+v, want nothing", saved)
+			}
+		})
 	}
 }
 

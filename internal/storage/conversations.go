@@ -244,6 +244,44 @@ func (s *Store) SetSentMessageID(ctx context.Context, answerID, telegramMessageI
 	return nil
 }
 
+// ErrUnknownAuthor means it is not known whom a message of the bot's
+// answered.
+var ErrUnknownAuthor = errors.New("storage: unknown author")
+
+// Author is who wrote a message in a group that the bot answered.
+type Author struct {
+	ID int64
+	// Name is the name they were shown to the model under.
+	Name string
+	// MessageID is their message.
+	MessageID int64
+}
+
+// AnsweredAuthor returns the author of the message that the bot's message
+// botMessageID, sent in the group chatID, answered: whom an owner means by
+// "don't answer him" when replying to the bot's answer. It returns
+// ErrUnknownAuthor when the bot's message is not an answer it stored.
+func (s *Store) AnsweredAuthor(ctx context.Context, chatID, botMessageID int64) (Author, error) {
+	var a Author
+	err := s.pool.QueryRow(ctx, `
+		SELECT q.author_id, coalesce(q.author_name, ''), q.telegram_message_id
+		FROM messages a
+		JOIN conversations c ON c.id = a.conversation_id
+		JOIN messages q ON q.conversation_id = a.conversation_id
+		               AND q.role = 'user' AND q.telegram_message_id = a.reply_to_message_id
+		WHERE c.chat_id = $1 AND c.user_id IS NULL
+		  AND a.role = 'assistant' AND a.telegram_message_id = $2 AND q.author_id IS NOT NULL
+		ORDER BY a.id DESC
+		LIMIT 1`, chatID, botMessageID).Scan(&a.ID, &a.Name, &a.MessageID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Author{}, ErrUnknownAuthor
+	}
+	if err != nil {
+		return Author{}, fmt.Errorf("storage: find answered author: %w", err)
+	}
+	return a, nil
+}
+
 // encodeToolCalls returns nil, which is stored as NULL, when there are none.
 func encodeToolCalls(calls []ai.ToolCall) (any, error) {
 	if len(calls) == 0 {

@@ -627,6 +627,39 @@ func TestAuthorIsStoredOnTheUserMessage(t *testing.T) {
 	}
 }
 
+func TestAnsweredAuthorIsWhomTheBotsMessageAnswered(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	answer := func(scope Scope, updateID, messageID, authorID int64, name string, sentID int64) {
+		t.Helper()
+		answerID, err := store.SaveTurn(ctx, Turn{Scope: scope, UpdateID: updateID, MessageID: messageID, AuthorID: authorID, AuthorName: name, Messages: turn(name+": hi", "hello")})
+		if err != nil {
+			t.Fatalf("SaveTurn: %v", err)
+		}
+		if err := store.SetSentMessageID(ctx, answerID, sentID); err != nil {
+			t.Fatalf("SetSentMessageID: %v", err)
+		}
+	}
+	answer(shared(group), 1, 30, bob, "Bob @bob", 31)
+	answer(shared(group), 2, 32, alice, "Alice [owner]", 33)
+	// Telegram numbers messages per chat: another chat's 31 is another message.
+	answer(shared(otherGroup), 3, 30, alice, "Alice", 31)
+	answer(private(bob), 4, 34, 0, "", 35)
+
+	got, err := store.AnsweredAuthor(ctx, group, 31)
+	if want := (Author{ID: bob, Name: "Bob @bob", MessageID: 30}); err != nil || got != want {
+		t.Errorf("AnsweredAuthor(group, 31) = %+v, %v; want %+v", got, err, want)
+	}
+	if got, err := store.AnsweredAuthor(ctx, group, 33); err != nil || got.ID != alice || got.Name != "Alice [owner]" {
+		t.Errorf("AnsweredAuthor(group, 33) = %+v, %v; want Alice as stored", got, err)
+	}
+	for name, id := range map[string]int64{"a member's message": 30, "an unknown message": 99, "a private chat's": 35} {
+		if _, err := store.AnsweredAuthor(ctx, group, id); !errors.Is(err, ErrUnknownAuthor) {
+			t.Errorf("%s: err = %v, want ErrUnknownAuthor", name, err)
+		}
+	}
+}
+
 func TestMuteStateIsPersisted(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()

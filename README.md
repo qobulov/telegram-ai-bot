@@ -661,13 +661,15 @@ do not erase them, and every turn in the group is told the ones in force.
 | Rule | Who sets it, and where | How long |
 |---|---|---|
 | Instruction | an owner, in the group it is for; at most 20 per group, 300 characters each | a week, or 1 to 720 hours if the owner says |
-| Ignore a member | an owner replying to that member's message in the group | 24 hours, or 1 to 720 hours if the owner says |
+| Ignore a member | an owner replying to that member's message, or to her answer to them, in the group | 24 hours, or 1 to 720 hours if the owner says |
 | Form of address | an owner, for themselves, in any chat; it holds everywhere | until removed |
 
 Owners can ask her to list the rules and remove one by its number. Group
 admins and owners can also ignore a member for 24 hours with `/ignore@Bot`
 sent as a reply to the member's message, and undo it with `/unignore@Bot`
-(see the table above). An ignored member gets neither answers nor
+(see the table above). Replying to one of her own answers instead means the
+member she answered, as stored with the conversation; when she cannot tell,
+she says so rather than guess. An ignored member gets neither answers nor
 reactions. Admins, owners and the bot itself cannot be ignored.
 
 ### Moderation
@@ -1234,8 +1236,9 @@ Built in:
       done.
 - [x] Only owners can give standing orders, and only owners and group
       admins can have a member ignored. Whom to ignore is the author of the
-      message they replied to, taken from the update, never from the model;
-      admins and owners cannot be ignored.
+      message they replied to, taken from the update, or the member her own
+      answer replied to, taken from the stored conversation; never from the
+      model. Admins and owners cannot be ignored.
 - [x] With `BOT_OWNER_IDS` set, owners are recognised by account ID, which
       cannot be passed on the way a username can. Without it, being an owner
       grants no moderation and no protection from it.

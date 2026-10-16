@@ -52,6 +52,10 @@ type Target struct {
 	Owner bool
 	// Text is the message's text or caption, at most MaxTargetRunes.
 	Text string
+	// Answered is, when the message is one of the bot's answers, the member
+	// whose message it answered, if known: whom an owner means by "don't
+	// answer him" in a reply to that answer.
+	Answered *Target
 }
 
 // Drawing is a picture made during a turn, to be sent with the answer.

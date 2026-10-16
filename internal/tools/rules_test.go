@@ -160,6 +160,42 @@ func TestRulesToolIgnoresTheRepliedMember(t *testing.T) {
 	}
 }
 
+// The owners' real orders ("javob berma dedim") were replies to the bot's
+// answer to the member they meant: that member is whom they mean.
+func TestRulesToolIgnoresWhomTheBotsMessageAnswered(t *testing.T) {
+	store := &fakeRules{}
+	registry := rulesRegistry(t, store, fakeAdmins{})
+	botsAnswer := &Target{MessageID: 31, UserID: rulesBotID, Name: "Mira", IsBot: true, Answered: bekTarget()}
+
+	env := rules(registry, ownerReplying(groupA, botsAnswer), `{"action":"ignore"}`)
+
+	if !env.OK || !strings.Contains(string(env.Result), `"ignored":"Bek @bek"`) {
+		t.Fatalf("ignore = %+v %s", env, env.Result)
+	}
+	if got := store.all(); len(got) != 1 || got[0].UserID != memberID {
+		t.Errorf("rules = %+v, want Bek ignored", got)
+	}
+	env = rules(registry, ownerReplying(groupA, botsAnswer), `{"action":"unignore"}`)
+	if !env.OK || string(env.Result) != `{"member":"Bek @bek","removed":true}` {
+		t.Errorf("unignore = %+v %s", env, env.Result)
+	}
+
+	// When the bot cannot tell whom its message answered, the refusal says
+	// what to do instead, rather than that the bot cannot be ignored.
+	unknown := &Target{MessageID: 31, UserID: rulesBotID, Name: "Mira", IsBot: true}
+	for _, action := range []string{"ignore", "unignore"} {
+		env = rules(registry, ownerReplying(groupA, unknown), `{"action":"`+action+`"}`)
+		if env.OK || !strings.Contains(env.Error.Message, "replied to my own message") {
+			t.Errorf("%s replying to an unknown answer = %+v", action, env)
+		}
+	}
+	// Whom it answered is held to the same rules as a member replied to.
+	owners := &Target{MessageID: 31, UserID: rulesBotID, Name: "Mira", IsBot: true, Answered: &Target{UserID: 9002, Name: "Muhammad", Owner: true}}
+	if env = rules(registry, ownerReplying(groupA, owners), `{"action":"ignore"}`); env.OK || !strings.Contains(env.Error.Message, "cannot be ignored") {
+		t.Errorf("ignoring an owner the bot answered = %+v", env)
+	}
+}
+
 func TestRulesToolRefusesOwnersAdminsAndTheBot(t *testing.T) {
 	cases := map[string]struct {
 		target *Target

@@ -24,6 +24,7 @@ const (
 	ruleTimeLayout          = "2 Jan 15:04"
 	cannotIgnore            = "admins, the bot's owners and the bot itself cannot be ignored"
 	notAMember              = "that message was posted on behalf of a chat or an anonymous admin, not by a member; the owner must reply to a member's own message"
+	repliedToBot            = "the owner replied to my own message, and I can't tell whom it answered; they must reply to the member's own message and ask again"
 	groupRuleOnly           = "this works only in the group the rule is for; ask the owner to say it there. In a private chat only set_address, list and remove work"
 )
 
@@ -94,7 +95,7 @@ func RulesTool(opts RulesOptions) Tool {
 		Name: "group_rules",
 		Description: "Owners only. Standing rules for the group you are in, kept until they expire, even after /mute or /reset. " +
 			"add_instruction: save an owner's order meant to last (text; hours, default 168). " +
-			"ignore: stop answering the member whose message the owner replied to (hours, default 24); never admins or owners. unignore: answer that member again. " +
+			"ignore: stop answering the member whose message the owner replied to, or, when they replied to your own answer, the member it answered (hours, default 24); never admins or owners. unignore: answer that member again. " +
 			"set_address: how to address the owner who is asking, in every chat (text). " +
 			"list: the rules in force here. remove: delete a rule by its id from list. " +
 			"add_instruction, ignore and unignore work only in a group. Never say a rule is saved unless this tool reported it.",
@@ -193,9 +194,12 @@ func ignoreMember(ctx context.Context, opts RulesOptions, caller Caller, args ru
 // ignorable is the member the owner replied to, if the bot may ignore them.
 // When Telegram cannot say whether they are an admin, the answer is no.
 func ignorable(ctx context.Context, opts RulesOptions, caller Caller) (*Target, error) {
-	target := caller.Target
-	if target == nil {
+	if caller.Target == nil {
 		return nil, &ArgumentError{Message: "the owner must reply to a message of the member to ignore, and ask again"}
+	}
+	target, err := meant(opts, caller.Target)
+	if err != nil {
+		return nil, err
 	}
 	if isTelegramAccount(target.UserID) {
 		return nil, &ArgumentError{Message: notAMember}
@@ -233,11 +237,27 @@ func unignoreMember(ctx context.Context, opts RulesOptions, caller Caller) (any,
 	if caller.Target == nil {
 		return nil, &ArgumentError{Message: "the owner must reply to a message of the member to answer again, and ask again"}
 	}
-	removed, err := opts.Store.RemoveIgnore(ctx, caller.ChatID, caller.Target.UserID)
+	member, err := meant(opts, caller.Target)
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"removed": removed, "member": caller.Target.Name}, nil
+	removed, err := opts.Store.RemoveIgnore(ctx, caller.ChatID, member.UserID)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"removed": removed, "member": member.Name}, nil
+}
+
+// meant is the member an owner means by the message they replied to: its
+// author, or for one of the bot's own answers, the member it answered.
+func meant(opts RulesOptions, target *Target) (*Target, error) {
+	if target.UserID != opts.BotID {
+		return target, nil
+	}
+	if target.Answered == nil {
+		return nil, &ArgumentError{Message: repliedToBot}
+	}
+	return target.Answered, nil
 }
 
 // setAddress saves how the bot addresses the calling owner. It holds in

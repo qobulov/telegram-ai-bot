@@ -259,6 +259,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		BotRights:             botRights{store: store, members: bot.Client, botID: bot.User.ID, logger: logger},
 		Rules:                 store,
 		Moderation:            moderation,
+		Answers:               store,
 	}
 	if mode.Serverless {
 		opts.Workers, opts.QueueSize = 0, 0

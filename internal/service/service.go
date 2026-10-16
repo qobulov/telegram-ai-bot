@@ -98,6 +98,12 @@ type Confirmer interface {
 	Confirm(ctx context.Context, caller tools.Caller, promptID int64, yes bool) (tools.Confirmation, error)
 }
 
+// AnswerLog tells whom a message of the bot's answered, from the stored
+// conversations.
+type AnswerLog interface {
+	AnsweredAuthor(ctx context.Context, chatID, botMessageID int64) (storage.Author, error)
+}
+
 // RuleBook keeps the owners' standing rules, among them whom not to answer.
 // They live apart from the conversation, so /mute and /reset leave them.
 type RuleBook interface {
@@ -205,6 +211,10 @@ type Options struct {
 	// Moderation carries out what a group's admins asked the bot to do, once
 	// they reply yes to its question about it; nil means nothing waits.
 	Moderation Confirmer
+	// Answers tells whom one of the bot's answers in a group answered, so
+	// that "don't answer him", replying to it, means that member; nil means
+	// it is never known.
+	Answers AnswerLog
 	// MaxGroupReplyChars is the longest answer posted in a group, in UTF-16
 	// code units as Telegram counts them.
 	MaxGroupReplyChars int
@@ -566,6 +576,12 @@ func (s *Service) isOwner(user *telegram.User) bool {
 	return false
 }
 
+// The marks label puts after an owner's name and another bot's.
+const (
+	ownerMark = " [owner]"
+	botMark   = " [bot]"
+)
+
 // label names a sender in a group: their first name and @username, with
 // [owner] after an owner's. authorLabel strips square brackets from names,
 // so nobody else can carry the mark.
@@ -573,11 +589,21 @@ func (s *Service) label(user *telegram.User) string {
 	label := withUsername(authorLabel(user.FirstName), user.Username)
 	switch {
 	case s.isOwner(user):
-		label += " [owner]"
+		label += ownerMark
 	case user.IsBot:
-		label += " [bot]"
+		label += botMark
 	}
 	return label
+}
+
+// unlabel undoes label for a name stored with a turn: the name without its
+// mark, and whether the mark said owner or bot.
+func unlabel(label string) (name string, owner, bot bool) {
+	if name, owner := strings.CutSuffix(label, ownerMark); owner {
+		return name, true, false
+	}
+	name, bot = strings.CutSuffix(label, botMark)
+	return name, false, bot
 }
 
 // someone stands in, mid-sentence, for a person Telegram did not name. At
