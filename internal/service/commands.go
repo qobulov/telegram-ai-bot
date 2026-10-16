@@ -25,6 +25,9 @@ type outcome struct {
 	reaction string
 	// drawings are pictures made during the turn, sent with the text.
 	drawings []tools.Drawing
+	// duplicate marks an update that was already answered: Telegram sent it
+	// again after a slow turn. The exchange is in the log already.
+	duplicate bool
 }
 
 func say(text string) outcome { return outcome{text: text} }
@@ -120,13 +123,13 @@ func (s *Service) replyPhoto(in incoming, drawing tools.Drawing, caption string)
 }
 
 // logExchange adds an addressed group message, and the bot's answer to it,
-// to the day's log, after the answer: logged before, the question would
+// to the group's log, after the answer: logged before, the question would
 // also appear in its own context.
 func (s *Service) logExchange(in incoming, out outcome) {
-	if !in.group || strings.HasPrefix(in.text, "/") {
+	if !in.group || out.duplicate || strings.HasPrefix(in.text, "/") {
 		return
 	}
-	s.ambient.addMessage(in.msg, s.label(in.msg.From), in.described)
+	s.logFrom(in.msg, in.described)
 	if out.answerID != 0 {
 		answer := out.text
 		if out.reaction != "" {
@@ -240,29 +243,23 @@ func (s *Service) respond(ctx context.Context, in incoming) outcome {
 		return say(fmt.Sprintf(textTooLong, s.opts.MaxInputChars))
 	case in.text != "" || s.hasMedia(in):
 		return s.ask(ctx, in)
-	case hasNoText(in):
-		return say(textTextOnly) // a document, video, location or other kind the bot does not read
+	case in.group:
+		// A location, a contact or another kind the bot does not read, or
+		// whitespace. Saying so would be one more message in the group.
+		return outcome{}
+	case in.msg.Text == "":
+		return say(textTextOnly) // a location, a contact or another kind the bot does not read
 	default:
 		return outcome{} // whitespace only
 	}
 }
 
-// hasMedia reports a photo, sticker, GIF or voice message the bot can be
-// shown, on the message itself or on the one it replies to.
+// hasMedia reports media the bot can describe (see mediaOf), on the message
+// itself or, in a group, on the one it replies to.
 func (s *Service) hasMedia(in incoming) bool {
 	_, own := s.mediaOf(in.msg)
 	_, replied := s.mediaOf(in.msg.ReplyToMessage)
 	return own || (replied && in.group)
-}
-
-// hasNoText reports a message with nothing to read. A caption counts as text
-// only in groups, where it is how a photo can address the bot.
-func hasNoText(in incoming) bool {
-	if in.group {
-		content, _ := in.msg.Content()
-		return content == ""
-	}
-	return in.msg.Text == ""
 }
 
 func (s *Service) ask(ctx context.Context, in incoming) outcome {
@@ -294,7 +291,7 @@ func (s *Service) answerOf(ctx context.Context, in incoming, started time.Time) 
 		return outcome{}
 	case errors.Is(err, agent.ErrDuplicate):
 		log.Info("duplicate update skipped")
-		return outcome{}
+		return outcome{duplicate: true}
 	case ai.IsOverloaded(err):
 		log.Warn("model provider overloaded or over its limits", "error", err)
 		return say(textOverloaded)
@@ -319,12 +316,9 @@ func (s *Service) request(ctx context.Context, in incoming) agent.Request {
 		UpdateID:         in.updateID,
 		MessageID:        in.msg.MessageID,
 		ReplyToMessageID: repliedID(in),
-		Text:             in.text,
+		Text:             in.described,
 		Group:            in.group,
 		Attachments:      s.attachments(ctx, in),
-	}
-	if _, ok := s.mediaOf(in.msg); ok {
-		req.Text = in.described
 	}
 	if !in.group && s.isOwner(in.msg.From) {
 		req.Context = ownerNotice
@@ -334,7 +328,10 @@ func (s *Service) request(ctx context.Context, in incoming) agent.Request {
 		req.Text = req.AuthorName + ": " + oneLine(req.Text)
 		req.Context = s.ambient.block(in.scope.ChatID, time.Now())
 	}
-	req.Text = withQuote(req.Text, s.quoted(ctx, in.msg.ReplyToMessage), s.opts.Bot.ID)
+	replied := in.msg.ReplyToMessage
+	if replied != nil {
+		req.Text = withQuote(req.Text, s.quoted(ctx, replied), s.opts.Bot.ID, plainLabel(replied.From))
+	}
 	return req
 }
 

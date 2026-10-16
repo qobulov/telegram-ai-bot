@@ -18,6 +18,9 @@ const (
 	transcribeTimeout = 30 * time.Second
 	// maxTranscriptChars cuts very long transcripts.
 	maxTranscriptChars = 2000
+	// maxPollLabelChars bounds a poll's label: a long poll is named, not
+	// copied out.
+	maxPollLabelChars = 200
 )
 
 // Transcriber turns a voice message into text.
@@ -30,18 +33,20 @@ type Media interface {
 	DownloadFile(ctx context.Context, fileID string, maxBytes int64) ([]byte, error)
 }
 
-// media is what the bot can make of a photo, sticker, GIF or voice message.
+// media is what the bot can make of a photo, sticker, GIF, voice message,
+// video, file, song or poll.
 type media struct {
 	// label describes it in text, as the model and the stored history see it.
 	label string
 	// fileID is the file to show the model; empty when there is nothing the
 	// model can take in (an animated sticker without a thumbnail, a voice
-	// message the provider cannot hear).
+	// message the provider cannot hear, a file, a song, a poll).
 	fileID string
 	audio  bool
 }
 
-// mediaOf describes the media a message carries.
+// mediaOf describes the media a message carries. Videos are shown by their
+// thumbnail, like a GIF; files, songs and polls only by their label.
 func (s *Service) mediaOf(msg *telegram.Message) (media, bool) {
 	if msg == nil {
 		return media{}, false
@@ -51,13 +56,56 @@ func (s *Service) mediaOf(msg *telegram.Message) (media, bool) {
 		return media{label: "<photo>", fileID: s.photoSize(msg.Photo)}, true
 	case msg.Sticker != nil:
 		return stickerMedia(msg.Sticker), true
-	case msg.Animation != nil:
+	case msg.Animation != nil: // before Document, which Telegram also sets on a GIF
 		return media{label: "<GIF>", fileID: thumbnailID(msg.Animation.Thumbnail)}, true
 	case msg.Voice != nil:
 		return s.voiceMedia(msg.Voice), true
+	case msg.Video != nil:
+		return media{label: "<video " + clock(msg.Video.Duration) + ">", fileID: thumbnailID(msg.Video.Thumbnail)}, true
+	case msg.VideoNote != nil:
+		return media{label: "<round video " + clock(msg.VideoNote.Duration) + ">", fileID: thumbnailID(msg.VideoNote.Thumbnail)}, true
+	case msg.Document != nil:
+		return media{label: labelWith("<file", oneLine(msg.Document.FileName))}, true
+	case msg.Audio != nil:
+		return media{label: audioLabel(msg.Audio)}, true
+	case msg.Poll != nil:
+		return media{label: pollLabel(msg.Poll)}, true
 	default:
 		return media{}, false
 	}
+}
+
+// clock writes a duration as a player shows it: "0:08", "1:05", "1:02:05".
+func clock(seconds int) string {
+	seconds = max(seconds, 0)
+	if seconds >= 3600 {
+		return fmt.Sprintf("%d:%02d:%02d", seconds/3600, seconds/60%60, seconds%60)
+	}
+	return fmt.Sprintf("%d:%02d", seconds/60, seconds%60)
+}
+
+// audioLabel names a song by its performer and title, whichever Telegram
+// has: "<audio Yulduz - Bahor>".
+func audioLabel(audio *telegram.Audio) string {
+	var tags []string
+	for _, tag := range []string{audio.Performer, audio.Title} {
+		if tag = oneLine(tag); tag != "" {
+			tags = append(tags, tag)
+		}
+	}
+	return labelWith("<audio", strings.Join(tags, " - "))
+}
+
+// pollLabel gives a poll's question and options: "<poll: Lunch? / plov /
+// manti>", cut to maxPollLabelChars.
+func pollLabel(poll *telegram.Poll) string {
+	const prefix, suffix = "<poll: ", ">"
+	parts := []string{poll.Question}
+	for _, option := range poll.Options {
+		parts = append(parts, option.Text)
+	}
+	text := oneLine(strings.Join(parts, " / "))
+	return prefix + truncate(text, maxPollLabelChars-len(prefix)-len(suffix)) + suffix
 }
 
 // photoSize picks the largest size that fits the download limit. Telegram
@@ -77,16 +125,18 @@ func (s *Service) photoSize(sizes []telegram.PhotoSize) string {
 // says what the sticker means either way.
 func stickerMedia(sticker *telegram.Sticker) media {
 	if !sticker.IsAnimated && !sticker.IsVideo {
-		return media{label: labelWithEmoji("<sticker", sticker.Emoji), fileID: sticker.FileID}
+		return media{label: labelWith("<sticker", sticker.Emoji), fileID: sticker.FileID}
 	}
-	return media{label: labelWithEmoji("<animated sticker", sticker.Emoji), fileID: thumbnailID(sticker.Thumbnail)}
+	return media{label: labelWith("<animated sticker", sticker.Emoji), fileID: thumbnailID(sticker.Thumbnail)}
 }
 
-func labelWithEmoji(kind, emoji string) string {
-	if emoji == "" {
+// labelWith closes a label, with a detail when there is one: "<sticker 😂>",
+// "<file report.pdf>", "<file>".
+func labelWith(kind, detail string) string {
+	if detail == "" {
 		return kind + ">"
 	}
-	return kind + " " + emoji + ">"
+	return kind + " " + detail + ">"
 }
 
 func thumbnailID(thumbnail *telegram.PhotoSize) string {
@@ -110,18 +160,55 @@ func (s *Service) voiceMedia(voice *telegram.Voice) media {
 	}
 }
 
-// describe returns text with the message's media described in front of it.
-// A voice message is downloaded and transcribed; the transcript is folded
-// to one line without square brackets, like anything else a user produced.
+// describe returns text with the message's media described in front of it,
+// and where it was forwarded from in front of that. A voice message is
+// downloaded and transcribed; the transcript is folded to one line without
+// square brackets, like anything else a user produced. A message with
+// nothing in it may be a member joining or leaving, which is described
+// instead.
 func (s *Service) describe(ctx context.Context, msg *telegram.Message, text string) string {
 	m, ok := s.mediaOf(msg)
-	if !ok {
+	switch {
+	case ok:
+		if m.audio {
+			m.label = s.transcript(ctx, msg, m)
+		}
+		text = withMediaLabel(m, text)
+	case text == "":
+		text = memberNote(msg)
+	}
+	return withForward(msg, text)
+}
+
+// withForward puts where a forwarded message came from in front of its text,
+// so that the model does not take a forwarded post for the sender's words.
+func withForward(msg *telegram.Message, text string) string {
+	if msg.ForwardOrigin == nil {
 		return text
 	}
-	if m.audio {
-		m.label = s.transcript(ctx, msg, m)
+	name := oneLine(msg.ForwardOrigin.Name())
+	if name == "" {
+		name = someone
 	}
-	return withMediaLabel(m, text)
+	return strings.TrimSpace("<forwarded from " + name + "> " + text)
+}
+
+// memberNote describes members joining or leaving, which Telegram sends as
+// messages with nothing in them: "<Ali, Vali joined the group>", "<Ali left
+// the group>". It is "" for any other message.
+func memberNote(msg *telegram.Message) string {
+	switch {
+	case len(msg.NewChatMembers) > 0:
+		names := make([]string, len(msg.NewChatMembers))
+		for i := range msg.NewChatMembers {
+			names[i] = plainLabel(&msg.NewChatMembers[i])
+		}
+		return "<" + strings.Join(names, ", ") + " joined the group>"
+	case msg.LeftChatMember != nil:
+		return "<" + plainLabel(msg.LeftChatMember) + " left the group>"
+	default:
+		return ""
+	}
 }
 
 func (s *Service) transcript(ctx context.Context, msg *telegram.Message, m media) string {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"reflect"
@@ -554,7 +555,7 @@ func TestInputLimitCountsCharactersNotBytes(t *testing.T) {
 func TestNonTextMessageGetsTextOnlyReply(t *testing.T) {
 	f := newFixture()
 
-	sent := f.run(textFrom(userID, "")) // a photo, sticker or document has no text
+	sent := f.run(textFrom(userID, "")) // a location or contact has no text
 
 	expectOneReply(t, sent, textTextOnly)
 }
@@ -1034,7 +1035,7 @@ func TestMentionWhileReplyingToMemberQuotesThatMember(t *testing.T) {
 	f.run(inGroup(replyingTo(groupMessage("@MyBot is that right?", "@MyBot"), 4242, "Go is interpreted.")))
 
 	req := f.replier.recorded()[0].req
-	if !strings.HasPrefix(req.Text, quoteFromMember) || !strings.Contains(req.Text, "Go is interpreted.") {
+	if !strings.HasPrefix(req.Text, fmt.Sprintf(quoteFromMember, "Someone")) || !strings.Contains(req.Text, "Go is interpreted.") {
 		t.Errorf("text sent to the agent = %q", req.Text)
 	}
 }
@@ -1060,15 +1061,14 @@ func TestBareMentionWithQuoteAsksAboutTheQuote(t *testing.T) {
 	}
 }
 
-func TestAddressedMessageWithoutTextGetsTextOnlyReply(t *testing.T) {
+// A kind the bot cannot read, such as a location sent in reply to it, is
+// let pass in a group: saying so would be one more message nobody needs.
+func TestUnreadableKindIsSilentInGroups(t *testing.T) {
 	f := newFixture()
-	sticker := replyingTo(groupMessage(""), botID, "answer")
+	location := replyingTo(groupMessage(""), botID, "where are you?")
 
-	sent := f.run(inGroup(sticker))
-
-	expectOneReply(t, sent, textTextOnly)
-	if sent[0].chatID != groupID || sent[0].replyTo != 30 {
-		t.Errorf("sent = %+v", sent)
+	if sent := f.run(inGroup(location)); len(sent) != 0 || len(f.replier.recorded()) != 0 {
+		t.Errorf("sent = %+v, model calls = %d; want nothing", sent, len(f.replier.recorded()))
 	}
 }
 
@@ -1613,6 +1613,67 @@ func TestAddressedMessagesAndAnswersJoinTheDaysLog(t *testing.T) {
 	}
 }
 
+// The log says whom a reply answers, so the model can follow who is talking
+// to whom. Names carry no marks there: brackets are not kept in the log.
+func TestReplyIsLoggedWithItsAddressee(t *testing.T) {
+	f := newFixture()
+	f.opts.OwnerUsernames = []string{ownerUsername}
+	f.opts.Workers = 1
+	toMember := replyingTo(groupMessage("I disagree"), 4242, "Go is interpreted.")
+	toMember.ReplyToMessage.From.FirstName, toMember.ReplyToMessage.From.Username = "Ann", "ann_k"
+	toOwner := groupMessage("yes, boss")
+	toOwner.ReplyToMessage = &telegram.Message{MessageID: 28, From: &telegram.User{ID: 9001, FirstName: "Azizbek", Username: "Pronium"}, Text: "who is in?"}
+	toBot := replyingTo(groupMessage("and in Python?"), botID, "Go is compiled.")
+
+	f.run(inGroup(toMember), inGroup(toOwner), inGroup(toBot))
+
+	want := []string{
+		"Bek: (to Ann @ann_k) I disagree",
+		"Bek: (to Azizbek @Pronium) yes, boss",
+		"Bek: (to You) and in Python?",
+	}
+	got := f.chatLog.texts(groupID)
+	if len(got) != 4 || strings.Join(got[:3], "|") != strings.Join(want, "|") || !strings.HasPrefix(got[3], "You: echo: ") {
+		t.Errorf("log = %q\nwant  %q and the answer", got, want)
+	}
+}
+
+func TestJoinsAndLeavesAreLogged(t *testing.T) {
+	f := newFixture()
+	f.opts.Workers = 1
+	added := groupMessage("")
+	added.NewChatMembers = []telegram.User{{ID: 11, FirstName: "Ali"}, {ID: 12, FirstName: "Vali", Username: "vali_uz"}}
+	left := groupMessage("")
+	left.From = &telegram.User{ID: 11, FirstName: "Ali"}
+	left.LeftChatMember = &telegram.User{ID: 11, FirstName: "Ali"}
+
+	sent := f.run(inGroup(added), inGroup(left))
+
+	want := []string{"Bek: <Ali, Vali @vali_uz joined the group>", "Ali: <Ali left the group>"}
+	if got := f.chatLog.texts(groupID); strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Errorf("log = %q, want %q", got, want)
+	}
+	if len(sent) != 0 || len(f.replier.recorded()) != 0 {
+		t.Errorf("sent = %+v; joining is not talking to the bot", sent)
+	}
+}
+
+// Telegram redelivers an update when the answer took too long. The agent
+// then refuses to answer twice, and the log must not gain the question again.
+func TestDuplicateUpdateIsNotLoggedTwice(t *testing.T) {
+	f := newFixture()
+	update := inGroup(groupMessage("Mira, who is right?"))
+	f.run(update)
+
+	f.replier.err = agent.ErrDuplicate
+	f.run(update)
+
+	want := []string{"Bek: who is right?", "You: echo: who is right?"}
+	if got := f.chatLog.texts(groupID); strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Errorf("log = %q, want the exchange once: %q", got, want)
+	}
+}
+
 func TestPrivateMessagesAreNeverLogged(t *testing.T) {
 	f := newFixture()
 
@@ -1806,7 +1867,7 @@ func TestApplauseReplyGetsReactionNotAnswer(t *testing.T) {
 	if got := f.reactor.recorded(); !reflect.DeepEqual(got, want) {
 		t.Errorf("reactions = %+v, want %+v", got, want)
 	}
-	if got := f.chatLog.texts(groupID); len(got) != 1 || got[0] != "Bek: <sticker 😂>" {
+	if got := f.chatLog.texts(groupID); len(got) != 1 || got[0] != "Bek: (to You) <sticker 😂>" {
 		t.Errorf("log = %q, want the sticker noted once", got)
 	}
 	if asked := quota.asked(); len(asked) != 0 {
@@ -1821,7 +1882,7 @@ func TestFailedReactionIsIgnored(t *testing.T) {
 	if sent := f.run(inGroup(stickerReply())); len(sent) != 0 || len(f.replier.recorded()) != 0 {
 		t.Errorf("sent = %+v, model calls = %d; a failed reaction is not worth a message", sent, len(f.replier.recorded()))
 	}
-	if got := f.chatLog.texts(groupID); len(got) != 1 || got[0] != "Bek: <sticker 😂>" {
+	if got := f.chatLog.texts(groupID); len(got) != 1 || got[0] != "Bek: (to You) <sticker 😂>" {
 		t.Errorf("log = %q, want the sticker noted although the reaction failed", got)
 	}
 }

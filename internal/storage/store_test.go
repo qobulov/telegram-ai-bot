@@ -719,6 +719,39 @@ func TestGroupMessagesAreReadBackOldestFirst(t *testing.T) {
 	}
 }
 
+// A redelivered update must not log its message twice; the bot's own lines,
+// which have no message ID, are all kept.
+func TestGroupMessageIsLoggedOnce(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	for _, m := range []GroupMessage{
+		{ChatID: group, MessageID: 30, AuthorID: alice, AuthorName: "Ann", Text: "xaxa"},
+		{ChatID: group, MessageID: 30, AuthorID: alice, AuthorName: "Ann", Text: "xaxa"},
+		{ChatID: otherGroup, MessageID: 30, AuthorID: bob, AuthorName: "Bek", Text: "same ID, another chat"},
+		{ChatID: group, AuthorID: 777, AuthorName: "You", Text: "ha"},
+		{ChatID: group, AuthorID: 777, AuthorName: "You", Text: "ha"},
+	} {
+		if err := store.AppendGroupMessage(ctx, m); err != nil {
+			t.Fatalf("AppendGroupMessage: %v", err)
+		}
+	}
+
+	got, err := store.GroupMessagesSince(ctx, group, time.Now().Add(-time.Hour), 10)
+	if err != nil {
+		t.Fatalf("GroupMessagesSince: %v", err)
+	}
+	var texts []string
+	for _, m := range got {
+		texts = append(texts, m.AuthorName+": "+m.Text)
+	}
+	if want := "Ann: xaxa|You: ha|You: ha"; strings.Join(texts, "|") != want {
+		t.Errorf("log = %q, want %q", texts, want)
+	}
+	if other, _ := store.GroupMessagesSince(ctx, otherGroup, time.Now().Add(-time.Hour), 10); len(other) != 1 {
+		t.Errorf("another chat's message with the same ID = %+v, want it logged", other)
+	}
+}
+
 func TestGroupMessagesBeforeTheCutoffAreLeftOut(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()

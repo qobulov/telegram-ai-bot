@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"regexp"
@@ -21,6 +22,8 @@ type memoryLog struct {
 	messages []storage.GroupMessage
 	now      func() time.Time
 	failWith error
+	// since is the start of the last window that was read.
+	since time.Time
 }
 
 func newMemoryLog() *memoryLog {
@@ -41,6 +44,7 @@ func (m *memoryLog) AppendGroupMessage(_ context.Context, msg storage.GroupMessa
 func (m *memoryLog) GroupMessagesSince(_ context.Context, chatID int64, since time.Time, limit int) ([]storage.GroupMessage, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.since = since
 	if m.failWith != nil {
 		return nil, m.failWith
 	}
@@ -115,7 +119,7 @@ func blockLines(t *testing.T, block string) []string {
 	return out
 }
 
-func TestTodaysMessagesAreGivenOldestFirstWithTimes(t *testing.T) {
+func TestRecentMessagesAreGivenOldestFirstWithTimes(t *testing.T) {
 	a, _ := newTestAmbient(3)
 	for _, text := range []string{"one", "two", "three", "four"} {
 		a.add(groupID, 0, 4242, "Ann", text)
@@ -125,25 +129,67 @@ func TestTodaysMessagesAreGivenOldestFirstWithTimes(t *testing.T) {
 	if strings.Join(got, "|") != "Ann: two|Ann: three|Ann: four" {
 		t.Errorf("lines = %q, want the newest three, oldest first", got)
 	}
-	if !strings.Contains(strings.ToLower(ambientHeader), "untrusted") || !strings.Contains(ambientHeader, "Today") {
+	if !strings.Contains(strings.ToLower(ambientHeader), "untrusted") || !strings.Contains(ambientHeader, "the last 12 hours") {
 		t.Errorf("header = %q", ambientHeader)
 	}
 }
 
-func TestOnlyTodaysMessagesAreGiven(t *testing.T) {
+// The log reaches back 12 hours whatever the time of day, so a conversation
+// that runs past midnight is not cut in two.
+func TestAmbientUsesTwelveHourWindow(t *testing.T) {
 	a, log := newTestAmbient(10)
 	now := time.Date(2026, 10, 14, 9, 0, 0, 0, tashkent)
-	log.now = func() time.Time { return now.Add(-10 * time.Hour) } // 23:00 yesterday in Tashkent
-	a.add(groupID, 0, 4242, "Ann", "yesterday")
+	log.now = func() time.Time { return now.Add(-13 * time.Hour) } // 20:00 yesterday in Tashkent
+	a.add(groupID, 0, 4242, "Ann", "too long ago")
+	log.now = func() time.Time { return now.Add(-10 * time.Hour) } // 23:00 yesterday
+	a.add(groupID, 0, 4242, "Ann", "last night")
 	log.now = func() time.Time { return now.Add(-time.Hour) } // 08:00 today
 	a.add(groupID, 0, 4242, "Ann", "this morning")
 
-	got := blockLines(t, a.block(groupID, now))
-	if strings.Join(got, "|") != "Ann: this morning" {
-		t.Errorf("lines = %q, want only today's (Tashkent time)", got)
+	block := a.block(groupID, now)
+
+	if want := now.Add(-12 * time.Hour); !log.since.Equal(want) {
+		t.Errorf("read since %v, want %v", log.since, want)
 	}
-	if block := a.block(groupID, now); !strings.Contains(block, "08:00 Ann: this morning") {
+	if got := blockLines(t, block); strings.Join(got, "|") != "Ann: last night|Ann: this morning" {
+		t.Errorf("lines = %q, want the last 12 hours, across midnight", got)
+	}
+	if !strings.Contains(block, "08:00 Ann: this morning") {
 		t.Errorf("block = %q, want the time in Tashkent", block)
+	}
+}
+
+// Her own lines are already in the conversation history. In full, and all
+// of them, they cost tokens and nudge the model to repeat itself.
+func TestAmbientKeepsOnlyLastFiveOwnLines(t *testing.T) {
+	a, _ := newTestAmbient(50)
+	for i := range 8 {
+		a.add(groupID, 0, botID, botAuthor, fmt.Sprintf("own %d %s", i, strings.Repeat("я", 300)))
+		if i%3 == 0 {
+			a.add(groupID, 0, 4242, "Ann", fmt.Sprintf("member %d %s", i, strings.Repeat("ю", 200)))
+		}
+	}
+
+	var own, members []string
+	for _, line := range blockLines(t, a.block(groupID, time.Now())) {
+		author, text, _ := strings.Cut(line, ": ")
+		if author == botAuthor {
+			own = append(own, text)
+			if n := len([]rune(text)); n > maxOwnQuoteChars {
+				t.Errorf("own line is %d characters, want at most %d", n, maxOwnQuoteChars)
+			}
+			continue
+		}
+		members = append(members, text)
+		if n := len([]rune(text)); n < 200 {
+			t.Errorf("a member's line was cut to %d characters", n)
+		}
+	}
+	if len(own) != maxOwnLines || !strings.HasPrefix(own[0], "own 3 ") || !strings.HasPrefix(own[4], "own 7 ") {
+		t.Errorf("own lines = %q, want the newest %d", own, maxOwnLines)
+	}
+	if len(members) != 3 {
+		t.Errorf("member lines = %d, want all 3", len(members))
 	}
 }
 

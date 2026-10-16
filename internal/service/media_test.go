@@ -29,6 +29,7 @@ func newFakeMedia() *fakeMedia {
 	return &fakeMedia{files: map[string][]byte{
 		"photo-small": jpegData, "photo-big": jpegData,
 		"sticker": webpData, "sticker-thumb": webpData, "gif-thumb": jpegData,
+		"video-thumb": jpegData, "round-thumb": jpegData,
 		"voice": oggData,
 	}}
 }
@@ -128,7 +129,7 @@ func TestStickerRepliedToTheBotIsSeen(t *testing.T) {
 	}
 }
 
-func TestAnimatedStickerAndGIFUseTheirThumbnail(t *testing.T) {
+func TestMoviesAndAnimationsUseTheirThumbnail(t *testing.T) {
 	cases := map[string]struct {
 		change func(*telegram.Message)
 		label  string
@@ -143,6 +144,12 @@ func TestAnimatedStickerAndGIFUseTheirThumbnail(t *testing.T) {
 		"GIF": {func(m *telegram.Message) {
 			m.Animation = &telegram.Animation{FileID: "gif", Thumbnail: &telegram.PhotoSize{FileID: "gif-thumb"}}
 		}, "<GIF>", "gif-thumb"},
+		"video": {func(m *telegram.Message) {
+			m.Video = &telegram.Video{FileID: "video", Duration: 15, Thumbnail: &telegram.PhotoSize{FileID: "video-thumb"}}
+		}, "<video 0:15>", "video-thumb"},
+		"round video": {func(m *telegram.Message) {
+			m.VideoNote = &telegram.VideoNote{FileID: "round", Duration: 8, Thumbnail: &telegram.PhotoSize{FileID: "round-thumb"}}
+		}, "<round video 0:08>", "round-thumb"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -248,7 +255,7 @@ func TestVoiceIsTranscribedOnceForQuestionAndLog(t *testing.T) {
 	if n := f.transcriber.count(); n != 1 {
 		t.Errorf("transcriptions = %d, want 1", n)
 	}
-	if got := f.chatLog.texts(groupID); len(got) == 0 || got[0] != `Bek: <voice message, 5 s> "salom dunyo"` {
+	if got := f.chatLog.texts(groupID); len(got) == 0 || got[0] != `Bek: (to You) <voice message, 5 s> "salom dunyo"` {
 		t.Errorf("log = %q", got)
 	}
 }
@@ -355,7 +362,7 @@ func TestDownloadFailureStillGetsAnAnswer(t *testing.T) {
 func TestOtherMediaGetsTheSupportedKindsReply(t *testing.T) {
 	f := newFixture()
 
-	sent := f.run(textFrom(userID, "")) // a document, location or video: nothing the bot reads
+	sent := f.run(textFrom(userID, "")) // a location or contact: nothing the bot reads
 
 	expectOneReply(t, sent, textTextOnly)
 	if !strings.Contains(textTextOnly, "photo") || !strings.Contains(textTextOnly, "voice") {
@@ -374,5 +381,109 @@ func TestPhotoMentionsAreRememberedAsChatter(t *testing.T) {
 
 	if context := onlyRequest(t, f).req.Context; !strings.Contains(context, "Ann: <photo>") {
 		t.Errorf("context = %q, want the photo noted (but not shown)", context)
+	}
+}
+
+// Media the model cannot be shown is still named for it and the log: a file
+// by its name, a song by its artist and title, a poll by its question and
+// options. A forward says where it came from.
+func TestMediaLabels(t *testing.T) {
+	longPoll := &telegram.Poll{Question: strings.Repeat("Which one? ", 30), Options: []telegram.PollOption{{Text: "a"}, {Text: "b"}}}
+	cases := map[string]struct {
+		change func(*telegram.Message)
+		want   string
+		file   string
+	}{
+		"video": {func(m *telegram.Message) {
+			m.Video = &telegram.Video{FileID: "video", Duration: 15, Thumbnail: &telegram.PhotoSize{FileID: "video-thumb"}}
+		}, "<video 0:15>", "video-thumb"},
+		"video without a thumbnail": {func(m *telegram.Message) {
+			m.Video = &telegram.Video{FileID: "video", Duration: 65}
+		}, "<video 1:05>", ""},
+		"video note": {func(m *telegram.Message) {
+			m.VideoNote = &telegram.VideoNote{FileID: "round", Duration: 8, Thumbnail: &telegram.PhotoSize{FileID: "round-thumb"}}
+		}, "<round video 0:08>", "round-thumb"},
+		"document": {func(m *telegram.Message) {
+			m.Document = &telegram.Document{FileID: "doc", FileName: "report [final].pdf"}
+		}, "<file report (final).pdf>", ""},
+		"document without a name": {func(m *telegram.Message) {
+			m.Document = &telegram.Document{FileID: "doc"}
+		}, "<file>", ""},
+		"GIF, which Telegram also sends as a document": {withGIF, "<GIF>", ""},
+		"audio": {func(m *telegram.Message) {
+			m.Audio = &telegram.Audio{FileID: "song", Performer: "Yulduz", Title: "Bahor\nkeldi"}
+		}, "<audio Yulduz - Bahor keldi>", ""},
+		"audio without tags": {func(m *telegram.Message) {
+			m.Audio = &telegram.Audio{FileID: "song"}
+		}, "<audio>", ""},
+		"poll": {func(m *telegram.Message) {
+			m.Poll = &telegram.Poll{Question: "Lunch?", Options: []telegram.PollOption{{Text: "plov"}, {Text: "[manti]"}}}
+		}, "<poll: Lunch? / plov / (manti)>", ""},
+		"forward": {func(m *telegram.Message) {
+			m.Text = "look at this"
+			m.ForwardOrigin = &telegram.MessageOrigin{Type: "user", SenderUser: &telegram.User{ID: 5, FirstName: "Ann"}}
+		}, "<forwarded from Ann> look at this", ""},
+		"forward of a photo from a channel": {func(m *telegram.Message) {
+			m.Photo = []telegram.PhotoSize{{FileID: "photo-small"}}
+			m.ForwardOrigin = &telegram.MessageOrigin{Type: "channel", Chat: &telegram.Chat{Title: "Kun.uz\n[news]"}}
+		}, "<forwarded from Kun.uz (news)> <photo>", "photo-small"},
+		"forward from a hidden account": {func(m *telegram.Message) {
+			m.Text = "hi"
+			m.ForwardOrigin = &telegram.MessageOrigin{Type: "hidden_user"}
+		}, "<forwarded from someone> hi", ""},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			s := &Service{}
+			msg := groupMessage("")
+			tc.change(msg)
+
+			content, _ := msg.Content()
+			if got := s.describe(context.Background(), msg, content); got != tc.want {
+				t.Errorf("described = %q, want %q", got, tc.want)
+			}
+			if m, _ := s.mediaOf(msg); m.fileID != tc.file {
+				t.Errorf("file shown = %q, want %q", m.fileID, tc.file)
+			}
+		})
+	}
+
+	t.Run("long poll", func(t *testing.T) {
+		msg := groupMessage("")
+		msg.Poll = longPoll
+		got := (&Service{}).describe(context.Background(), msg, "")
+		if n := len([]rune(got)); n > maxPollLabelChars || !strings.HasPrefix(got, "<poll: Which one?") || !strings.HasSuffix(got, "…>") {
+			t.Errorf("label = %q (%d characters), want it cut to %d and closed", got, n, maxPollLabelChars)
+		}
+	})
+}
+
+func TestClock(t *testing.T) {
+	for seconds, want := range map[int]string{0: "0:00", 8: "0:08", 65: "1:05", 600: "10:00", 3725: "1:02:05", -3: "0:00"} {
+		if got := clock(seconds); got != want {
+			t.Errorf("clock(%d) = %q, want %q", seconds, got, want)
+		}
+	}
+}
+
+// Videos, files and polls in a group are logged with their labels, though
+// nobody asked the bot about them.
+func TestGroupMediaIsLoggedByKind(t *testing.T) {
+	f := newFixture()
+	f.opts.Workers = 1
+	video := groupMessage("")
+	video.Video = &telegram.Video{FileID: "video", Duration: 15, Thumbnail: &telegram.PhotoSize{FileID: "video-thumb"}}
+	file := groupMessage("")
+	file.Caption = "the minutes"
+	file.Document = &telegram.Document{FileID: "doc", FileName: "minutes.pdf"}
+
+	f.run(inGroup(video), inGroup(file))
+
+	want := []string{"Bek: <video 0:15>", "Bek: <file minutes.pdf> the minutes"}
+	if got := f.chatLog.texts(groupID); strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Errorf("log = %q, want %q", got, want)
+	}
+	if got := f.media.downloaded(); len(got) != 0 {
+		t.Errorf("downloaded = %v; media nobody showed the bot is never fetched", got)
 	}
 }

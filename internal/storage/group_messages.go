@@ -22,8 +22,14 @@ type GroupMessage struct {
 	SentAt       time.Time
 }
 
-// AppendGroupMessage records a group message for the day's log, and notes
-// the group as one the bot is in.
+// AppendGroupMessage records a group message for the log, and notes the
+// group as one the bot is in.
+//
+// A message already logged in that chat is not logged again: Telegram
+// redelivers an update when the bot was slow to answer it, and the second
+// delivery must not repeat the line. Redeliveries come within minutes, so
+// only the last day is checked, which the (chat_id, created_at) index keeps
+// cheap. The bot's own lines have no message ID and are always added.
 func (s *Store) AppendGroupMessage(ctx context.Context, m GroupMessage) error {
 	_, err := s.pool.Exec(ctx, `
 		WITH seen AS (
@@ -34,7 +40,10 @@ func (s *Store) AppendGroupMessage(ctx context.Context, m GroupMessage) error {
 			    last_seen_at = now()
 		)
 		INSERT INTO group_messages (chat_id, message_id, author_id, author_name, text)
-		VALUES ($1, $2, $3, $4, $5)`,
+		SELECT $1, $2, $3, $4, $5
+		WHERE $2::bigint IS NULL OR NOT EXISTS (
+			SELECT 1 FROM group_messages
+			WHERE chat_id = $1 AND message_id = $2 AND created_at > now() - interval '1 day')`,
 		m.ChatID, nonZero(m.MessageID), nonZero(m.AuthorID), m.AuthorName, m.Text, m.ChatTitle, m.ChatUsername)
 	if err != nil {
 		return fmt.Errorf("storage: append group message: %w", err)

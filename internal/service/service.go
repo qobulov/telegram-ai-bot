@@ -128,10 +128,10 @@ type Options struct {
 	WakeWordTrigger bool
 	// WakeWords are the names the bot answers to, in lower case.
 	WakeWords []string
-	// AmbientMessages is how many of today's group messages are given to the
-	// model with a question. Zero turns the group log off.
+	// AmbientMessages is how many of a group's recent messages are given to
+	// the model with a question. Zero turns the group log off.
 	AmbientMessages int
-	// Location decides when "today" starts for the group log.
+	// Location is the time zone of the times shown in the group log.
 	Location *time.Location
 	// AllowedBots are other bots answered in groups, lower case; "*" means
 	// any bot. BotReplies counts those replies, at most BotRepliesPer10Min
@@ -411,8 +411,29 @@ func (s *Service) logMessage(msg *telegram.Message) {
 	ctx, cancel := context.WithTimeout(context.Background(), transcribeTimeout+mediaTimeout)
 	defer cancel()
 	content, _ := msg.Content()
-	text := s.describe(ctx, msg, content)
-	s.ambient.addMessage(msg, s.label(msg.From), text)
+	s.logFrom(msg, s.describe(ctx, msg, content))
+}
+
+// logFrom adds a message from a member, or from an allowed bot, to the
+// group's log, as text: the one place where the log's member lines are made.
+func (s *Service) logFrom(msg *telegram.Message, text string) {
+	s.ambient.addMessage(msg, s.label(msg.From), s.logText(msg, text))
+}
+
+// logText is how a message is written in the log. A reply first says whom it
+// answers, "(to Ann @ann) no way", so that the log shows who is talking to
+// whom; the bot is "You", as in its own lines. A message with no text stays
+// empty and so is not logged.
+func (s *Service) logText(msg *telegram.Message, text string) string {
+	replied := msg.ReplyToMessage
+	if text == "" || replied == nil || replied.From == nil {
+		return text
+	}
+	addressee := plainLabel(replied.From)
+	if s.isFromBot(replied) {
+		addressee = botAuthor
+	}
+	return "(to " + addressee + ") " + text
 }
 
 // rememberInBackground transcribes off the polling loop, which must not wait
@@ -424,7 +445,7 @@ func (s *Service) rememberInBackground(msg *telegram.Message) {
 	default:
 		content, _ := msg.Content()
 		m, _ := s.mediaOf(msg)
-		s.ambient.addMessage(msg, s.label(msg.From), withMediaLabel(m, content))
+		s.logFrom(msg, withForward(msg, withMediaLabel(m, content)))
 		return
 	}
 	s.background.Go(func() {
@@ -472,15 +493,30 @@ func (s *Service) isOwner(user *telegram.User) bool {
 // [owner] after an owner's. authorLabel strips square brackets from names,
 // so nobody else can carry the mark.
 func (s *Service) label(user *telegram.User) string {
-	label := authorLabel(user.FirstName)
-	if username := usernameLabel(user.Username); username != "" {
-		label += " " + username
-	}
+	label := plainLabel(user)
 	switch {
 	case s.isOwner(user):
 		label += " [owner]"
 	case user.IsBot:
 		label += " [bot]"
+	}
+	return label
+}
+
+// someone stands in, mid-sentence, for a person Telegram did not name.
+const someone = "someone"
+
+// plainLabel names a user inside a line rather than in front of what they
+// said: in a quote's header, "(to Ann @ann)" or "<Ann joined the group>". It
+// is the first name and @username without label's marks, which only mean
+// something in front of a message; a nil user is someone.
+func plainLabel(user *telegram.User) string {
+	if user == nil {
+		return someone
+	}
+	label := authorLabel(user.FirstName)
+	if username := usernameLabel(user.Username); username != "" {
+		label += " " + username
 	}
 	return label
 }
