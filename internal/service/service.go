@@ -542,6 +542,7 @@ func (s *Service) rememberInBackground(msg *telegram.Message) {
 }
 
 // ownerNotice tells the model, in a private chat, that the owner is writing.
+// The persona's owner note quotes it exactly; change both together.
 const ownerNotice = "[This message is from your owner.]"
 
 // acceptsSender keeps people, and in groups the other bots on the allow
