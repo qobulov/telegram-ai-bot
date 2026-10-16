@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -53,6 +54,9 @@ const (
 	immune           = "I can't do that to admins, my owners, myself, Telegram's service accounts or the person asking"
 	nothingToConfirm = "there is no ban to confirm: the same person must ask for it, then confirm in a later message within 5 minutes"
 	pendingNote      = "Nothing is done yet. Ask the person who asked to confirm in their next message, then call confirm_ban."
+	banDropped       = "the ban no longer waits for confirmation, so it must be asked for again"
+	handledNote      = "This message was delivered twice and the first delivery already asked for this, so nothing more was done now. Don't say whether it worked."
+	noAnswer         = "Telegram did not answer, so it may not have been done; try again later"
 )
 
 // errLookup reports that Telegram could not say who may do what. Moderation
@@ -98,6 +102,7 @@ type Moderator interface {
 type ModerationStore interface {
 	RecordModeration(ctx context.Context, a storage.ModerationAction) (bool, error)
 	ForgetModeration(ctx context.Context, updateID int64, action string) error
+	ModerationRecorded(ctx context.Context, updateID int64, action string) (bool, error)
 	ModerationBy(ctx context.Context, requesterID int64, since time.Time) (int, error)
 	SavePendingBan(ctx context.Context, b storage.PendingBan) error
 	TakePendingBan(ctx context.Context, requesterID, chatID, updateID int64, maxAge time.Duration) (storage.PendingBan, error)
@@ -195,7 +200,10 @@ func (m moderation) run(ctx context.Context, raw json.RawMessage) (any, error) {
 	switch args.Action {
 	case actionCancel:
 		cancelled, err := m.Store.CancelPendingBan(ctx, caller.UserID, caller.ChatID)
-		return map[string]bool{"cancelled": cancelled}, err
+		if err != nil {
+			return nil, err
+		}
+		return map[string]bool{"cancelled": cancelled}, nil
 	case actionConfirmBan:
 		return m.confirmBan(ctx, caller, args)
 	}
@@ -355,16 +363,40 @@ func (m moderation) askToConfirm(ctx context.Context, o order) (any, error) {
 func (m moderation) confirmBan(ctx context.Context, caller Caller, args moderationArgs) (any, error) {
 	pending, err := m.Store.TakePendingBan(ctx, caller.UserID, caller.ChatID, caller.UpdateID, pendingBanMaxAge)
 	if errors.Is(err, storage.ErrNoPendingBan) {
-		return nil, &DeniedError{Message: nothingToConfirm}
+		return m.noBanWaiting(ctx, caller)
 	}
 	if err != nil {
 		return nil, err
 	}
 	o := m.newOrder(caller, actionBan, Target{UserID: pending.TargetUserID, Name: pending.TargetName}, args)
 	if err := m.check(ctx, o); err != nil {
+		return nil, withBanDropped(err)
+	}
+	result, err := m.carryOut(ctx, o)
+	if err != nil {
+		return nil, withBanDropped(err)
+	}
+	return result, nil
+}
+
+// noBanWaiting refuses a confirmation that finds no ban waiting, unless this
+// update has already confirmed one: Telegram delivered it again.
+func (m moderation) noBanWaiting(ctx context.Context, caller Caller) (any, error) {
+	recorded, err := m.Store.ModerationRecorded(ctx, caller.UpdateID, actionBan)
+	if err != nil {
 		return nil, err
 	}
-	return m.carryOut(ctx, o)
+	if recorded {
+		return alreadyHandled(actionBan), nil
+	}
+	return nil, &DeniedError{Message: nothingToConfirm}
+}
+
+// withBanDropped adds to why a confirmed ban was not carried out that a
+// later confirmation will not find it, so that nobody is told to simply try
+// again. The kind of err is kept.
+func withBanDropped(err error) error {
+	return fmt.Errorf("%w; %s", err, banDropped)
 }
 
 // carryOut records o, then has Telegram do it. The record comes first and
@@ -377,14 +409,30 @@ func (m moderation) carryOut(ctx context.Context, o order) (any, error) {
 		return nil, err
 	}
 	if !first {
-		// This update was delivered again; it was acted on the first time.
-		return m.done(o), nil
+		return alreadyHandled(o.action), nil
 	}
 	if err := m.send(ctx, o); err != nil {
-		_ = m.Store.ForgetModeration(context.WithoutCancel(ctx), o.caller.UpdateID, o.action)
-		return nil, telegramFailure(err)
+		return nil, m.failed(ctx, o, err)
 	}
 	return m.done(o), nil
+}
+
+// alreadyHandled answers an update Telegram delivered again. The first
+// delivery recorded the action and did it, or is still doing it and may yet
+// fail, so this one neither acts nor says it was done.
+func alreadyHandled(action string) map[string]any {
+	return map[string]any{"already_handled": true, "action": action, "note": handledNote}
+}
+
+// failed drops the record of o, which Telegram did not take, and says why.
+// A record that cannot be dropped is reported too: the audit then holds an
+// action that was never taken, and counts it.
+func (m moderation) failed(ctx context.Context, o order, sendErr error) error {
+	failure := telegramFailure(sendErr)
+	if err := m.Store.ForgetModeration(context.WithoutCancel(ctx), o.caller.UpdateID, o.action); err != nil {
+		return errors.Join(failure, err)
+	}
+	return failure
 }
 
 // audit is the record of o. The text of a deleted message is kept, since
@@ -423,13 +471,14 @@ func (m moderation) send(ctx context.Context, o order) error {
 }
 
 // telegramFailure tells the model why nothing was done, in Telegram's words
-// when it gave a reason.
+// when it gave a reason. A server error, such as a proxy's 502 page, is no
+// refusal: Telegram may have acted before it.
 func telegramFailure(err error) error {
 	var apiErr *telegram.APIError
-	if errors.As(err, &apiErr) {
+	if errors.As(err, &apiErr) && apiErr.Code < http.StatusInternalServerError {
 		return fmt.Errorf("Telegram refused: %s", apiErr.Description)
 	}
-	return errors.New("Telegram did not answer, so it may not have been done; try again later")
+	return errors.New(noAnswer)
 }
 
 func (m moderation) done(o order) map[string]any {

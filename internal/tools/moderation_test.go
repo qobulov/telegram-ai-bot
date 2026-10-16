@@ -113,6 +113,8 @@ type fakeAudit struct {
 	// since and maxAges are what the tool asked the store for.
 	since   []time.Time
 	maxAges []time.Duration
+	// forgetErr makes ForgetModeration fail and keep the record.
+	forgetErr error
 }
 
 func (f *fakeAudit) RecordModeration(_ context.Context, a storage.ModerationAction) (bool, error) {
@@ -130,10 +132,21 @@ func (f *fakeAudit) RecordModeration(_ context.Context, a storage.ModerationActi
 func (f *fakeAudit) ForgetModeration(_ context.Context, updateID int64, action string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.forgetErr != nil {
+		return f.forgetErr
+	}
 	f.actions = slices.DeleteFunc(f.actions, func(a storage.ModerationAction) bool {
 		return a.UpdateID == updateID && a.Action == action
 	})
 	return nil
+}
+
+func (f *fakeAudit) ModerationRecorded(_ context.Context, updateID int64, action string) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.ContainsFunc(f.actions, func(a storage.ModerationAction) bool {
+		return a.UpdateID == updateID && a.Action == action
+	}), nil
 }
 
 func (f *fakeAudit) ModerationBy(_ context.Context, requesterID int64, since time.Time) (int, error) {
@@ -435,22 +448,27 @@ func TestModerateNeedsBotRight(t *testing.T) {
 func TestModerateRefusesImmuneTargets(t *testing.T) {
 	creator := telegram.ChatMember{Status: "creator"}
 	noRights := admin()
+	// The person asking and the bot may have their own messages deleted or
+	// pinned; everyone else here is kept off even that.
+	members := []string{"mute", "ban"}
+	everything := []string{"mute", "ban", "delete", "pin"}
 	cases := map[string]struct {
-		target *Target
-		member *telegram.ChatMember
+		target  *Target
+		member  *telegram.ChatMember
+		actions []string
 	}{
-		"the person asking": {&Target{MessageID: 29, UserID: userID, Name: "Ali"}, nil},
-		"the bot":           {botMessage(), nil},
-		"an owner":          {&Target{MessageID: 29, UserID: 9002, Name: "Muhammad", Owner: true}, nil},
-		"the creator":       {bekTarget(), &creator},
+		"the person asking": {&Target{MessageID: 29, UserID: userID, Name: "Ali"}, nil, members},
+		"the bot":           {botMessage(), nil, members},
+		"an owner":          {&Target{MessageID: 29, UserID: 9002, Name: "Muhammad", Owner: true}, nil, everything},
+		"the creator":       {bekTarget(), &creator, everything},
 		// An admin is immune whatever rights they hold.
-		"an administrator":        {bekTarget(), &noRights},
-		"a linked channel's post": {&Target{MessageID: 29, UserID: 777000, Name: "Telegram"}, nil},
-		"an anonymous admin":      {&Target{MessageID: 29, UserID: 1087968824, Name: "Group @GroupAnonymousBot", IsBot: true}, nil},
-		"a channel":               {&Target{MessageID: 29, UserID: 136817688, Name: "Channel @Channel_Bot", IsBot: true}, nil},
+		"an administrator":        {bekTarget(), &noRights, everything},
+		"a linked channel's post": {&Target{MessageID: 29, UserID: 777000, Name: "Telegram"}, nil, everything},
+		"an anonymous admin":      {&Target{MessageID: 29, UserID: 1087968824, Name: "Group @GroupAnonymousBot", IsBot: true}, nil, everything},
+		"a channel":               {&Target{MessageID: 29, UserID: 136817688, Name: "Channel @Channel_Bot", IsBot: true}, nil, everything},
 	}
 	for name, c := range cases {
-		for _, action := range []string{"mute", "ban"} {
+		for _, action := range c.actions {
 			t.Run(name+" "+action, func(t *testing.T) {
 				env := newModerationEnv(t)
 				if c.member != nil {
@@ -502,11 +520,15 @@ func TestModerateNeedsAReplyTarget(t *testing.T) {
 func TestModerateSameUpdateTwiceActsOnce(t *testing.T) {
 	env := newModerationEnv(t)
 
-	for range 2 {
-		got := env.moderate(asking(100, bekTarget()), `{"action":"mute"}`)
-		if !got.OK || !strings.Contains(string(got.Result), `"done":true`) {
-			t.Errorf("mute = %+v %s", got, got.Result)
-		}
+	if got := env.moderate(asking(100, bekTarget()), `{"action":"mute"}`); !got.OK || !strings.Contains(string(got.Result), `"done":true`) {
+		t.Errorf("mute = %+v %s", got, got.Result)
+	}
+	// The first delivery may still be waiting for Telegram, or fail yet, so
+	// the second says nothing of how it went, nor when a mute ends.
+	got := env.moderate(asking(100, bekTarget()), `{"action":"mute"}`)
+	want := `{"action":"mute","already_handled":true,"note":"This message was delivered twice and the first delivery already asked for this, so nothing more was done now. Don't say whether it worked."}`
+	if !got.OK || string(got.Result) != want {
+		t.Errorf("mute again = %+v %s\nwant %s", got, got.Result, want)
 	}
 
 	if calls := env.telegram.made(); len(calls) != 1 {
@@ -558,6 +580,10 @@ func TestModerateBanNeedsConfirmationInALaterMessage(t *testing.T) {
 			t.Errorf("a ban may wait %v, want 5 minutes", maxAge)
 		}
 	}
+	// The confirmation delivered again finds its own ban, not a refusal.
+	if got := env.moderate(asking(102, nil), `{"action":"confirm_ban"}`); !got.OK || !strings.Contains(string(got.Result), `"already_handled":true`) {
+		t.Errorf("confirm_ban again = %+v %s, want already handled", got, got.Result)
+	}
 	expectRefusal(t, env.moderate(asking(103, nil), `{"action":"confirm_ban"}`), "forbidden", "no ban to confirm")
 	if calls := env.telegram.made(); len(calls) != 1 {
 		t.Errorf("calls = %q, want the one ban", calls)
@@ -603,14 +629,25 @@ func TestModerateConfirmBanRechecksRights(t *testing.T) {
 
 			got := env.moderate(asking(101, nil), `{"action":"confirm_ban"}`)
 
-			if got.OK || got.Error.Code != c.code {
-				t.Errorf("confirm_ban = %+v, want %s", got, c.code)
-			}
+			// The ban is no longer waiting, so the refusal says to ask again.
+			expectRefusal(t, got, c.code, "must be asked for again")
 			if calls := env.telegram.made(); len(calls) != 0 {
 				t.Errorf("calls = %q, want no ban", calls)
 			}
 		})
 	}
+}
+
+func TestModerateFailedConfirmationSaysToAskAgain(t *testing.T) {
+	env := newModerationEnv(t)
+	env.moderate(asking(100, bekTarget()), `{"action":"ban"}`)
+	env.telegram.err = errors.New("dial tcp: i/o timeout")
+
+	got := env.moderate(asking(101, nil), `{"action":"confirm_ban"}`)
+
+	expectRefusal(t, got, "execution_failed", "may not have been done; try again later; the ban no longer waits for confirmation, so it must be asked for again")
+	env.telegram.err = nil
+	expectRefusal(t, env.moderate(asking(102, nil), `{"action":"confirm_ban"}`), "forbidden", "no ban to confirm")
 }
 
 func TestModerateFailsClosedWhenLookupFails(t *testing.T) {
@@ -656,24 +693,28 @@ func TestModerateRateLimit(t *testing.T) {
 
 func TestModerateTelegramErrorIsReportedAndForgotten(t *testing.T) {
 	env := newModerationEnv(t)
-	env.telegram.err = &telegram.APIError{Code: 400, Description: "Bad Request: message can't be deleted"}
-
-	got := env.moderate(asking(100, bekTarget()), `{"action":"delete"}`)
-
-	if got.OK || got.Error.Code != "execution_failed" || got.Error.Message != "Telegram refused: Bad Request: message can't be deleted" {
-		t.Errorf("delete = %+v, want Telegram's reason", got)
+	const noAnswer = "Telegram did not answer, so it may not have been done; try again later"
+	failures := []struct {
+		err     error
+		message string
+	}{
+		{&telegram.APIError{Code: 400, Description: "Bad Request: message can't be deleted"}, "Telegram refused: Bad Request: message can't be deleted"},
+		// Without an answer from Telegram, or with a server's error page
+		// instead, it may have acted.
+		{errors.New("dial tcp: i/o timeout"), noAnswer},
+		{&telegram.APIError{Code: 502, Description: "unreadable response from deleteMessage"}, noAnswer},
 	}
-	if audit := env.audit.recorded(); len(audit) != 0 {
-		t.Errorf("audit = %+v, want the refused action forgotten", audit)
-	}
+	for _, f := range failures {
+		env.telegram.err = f.err
 
-	// A failure without an answer from Telegram is forgotten too.
-	env.telegram.err = errors.New("dial tcp: i/o timeout")
-	if got := env.moderate(asking(100, bekTarget()), `{"action":"delete"}`); got.OK || strings.Contains(got.Error.Message, "dial") {
-		t.Errorf("delete = %+v, want a plain failure", got)
-	}
-	if audit := env.audit.recorded(); len(audit) != 0 {
-		t.Errorf("audit = %+v, want the failed action forgotten", audit)
+		got := env.moderate(asking(100, bekTarget()), `{"action":"delete"}`)
+
+		if got.OK || got.Error.Code != "execution_failed" || got.Error.Message != f.message {
+			t.Errorf("delete failing with %v = %+v, want %q", f.err, got, f.message)
+		}
+		if audit := env.audit.recorded(); len(audit) != 0 {
+			t.Errorf("audit = %+v, want the failed action forgotten", audit)
+		}
 	}
 
 	// The same update may try again once Telegram agrees.
@@ -681,8 +722,30 @@ func TestModerateTelegramErrorIsReportedAndForgotten(t *testing.T) {
 	if got := env.moderate(asking(100, bekTarget()), `{"action":"delete"}`); !got.OK {
 		t.Errorf("delete again = %+v", got)
 	}
-	if calls, audit := env.telegram.made(), env.audit.recorded(); len(calls) != 3 || len(audit) != 1 {
-		t.Errorf("calls = %q, audit = %+v; want three tries and one record", calls, audit)
+	if calls, audit := env.telegram.made(), env.audit.recorded(); len(calls) != 4 || len(audit) != 1 {
+		t.Errorf("calls = %q, audit = %+v; want four tries and one record", calls, audit)
+	}
+}
+
+func TestModerateReportsARecordItCannotDrop(t *testing.T) {
+	env := newModerationEnv(t)
+	env.telegram.err = &telegram.APIError{Code: 400, Description: "Bad Request: message can't be deleted"}
+	env.audit.forgetErr = errors.New("storage: forget moderation: connection reset")
+
+	got := env.moderate(asking(100, bekTarget()), `{"action":"delete"}`)
+
+	if got.OK || !strings.Contains(got.Error.Message, "Telegram refused: Bad Request: message can't be deleted") || !strings.Contains(got.Error.Message, "connection reset") {
+		t.Errorf("delete = %+v, want Telegram's reason and the store's", got)
+	}
+	// The record stayed, so the update delivered again does nothing, and
+	// does not claim it was done.
+	env.telegram.err = nil
+	got = env.moderate(asking(100, bekTarget()), `{"action":"delete"}`)
+	if !got.OK || !strings.Contains(string(got.Result), `"already_handled":true`) || strings.Contains(string(got.Result), `"done"`) {
+		t.Errorf("delete again = %+v %s, want already handled", got, got.Result)
+	}
+	if calls := env.telegram.made(); len(calls) != 1 {
+		t.Errorf("calls = %q, want the one refused", calls)
 	}
 }
 

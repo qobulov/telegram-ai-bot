@@ -57,6 +57,19 @@ func (s *Store) ForgetModeration(ctx context.Context, updateID int64, action str
 	return nil
 }
 
+// ModerationRecorded reports whether an update has recorded an action: when
+// Telegram delivers the update again, whether it was acted on already.
+func (s *Store) ModerationRecorded(ctx context.Context, updateID int64, action string) (bool, error) {
+	var recorded bool
+	err := s.pool.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM moderation_actions WHERE update_id = $1 AND action = $2)`,
+		updateID, action).Scan(&recorded)
+	if err != nil {
+		return false, fmt.Errorf("storage: check moderation: %w", err)
+	}
+	return recorded, nil
+}
+
 // ModerationBy counts the actions taken for a person since a moment, in
 // every group. Polls are not moderation and are left out.
 func (s *Store) ModerationBy(ctx context.Context, requesterID int64, since time.Time) (int, error) {

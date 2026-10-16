@@ -71,9 +71,27 @@ func TestModerationAuditIsIdempotent(t *testing.T) {
 		t.Errorf("ChatModeration(otherGroup, poll) = %d, want 0", n)
 	}
 
+	recorded := func(updateID int64, action string) bool {
+		t.Helper()
+		ok, err := store.ModerationRecorded(ctx, updateID, action)
+		if err != nil {
+			t.Fatalf("ModerationRecorded(%d, %s): %v", updateID, action, err)
+		}
+		return ok
+	}
+	if !recorded(500, "mute") || !recorded(502, "ban") {
+		t.Error("a recorded action was not found")
+	}
+	if recorded(500, "ban") || recorded(503, "mute") {
+		t.Error("an action found in an update that did not record it")
+	}
+
 	// A call Telegram refused is forgotten, so a redelivery may try again.
 	if err := store.ForgetModeration(ctx, 500, "mute"); err != nil {
 		t.Fatalf("ForgetModeration: %v", err)
+	}
+	if recorded(500, "mute") {
+		t.Error("a forgotten mute was still found")
 	}
 	if !mustRecord(t, store, mute) {
 		t.Error("a forgotten mute could not be recorded again")
@@ -115,8 +133,12 @@ func TestPendingBanMustBeConfirmedLater(t *testing.T) {
 		t.Errorf("confirmed twice: err = %v", err)
 	}
 
-	// Asking again replaces the ban asked for before.
+	// Asking again replaces the ban asked for before, and waits from now:
+	// an old ban asked for again is not already too old.
 	save(asked)
+	if _, err := store.pool.Exec(ctx, `UPDATE pending_bans SET created_at = now() - interval '10 minutes'`); err != nil {
+		t.Fatal(err)
+	}
 	newer := PendingBan{RequesterID: alice, ChatID: group, TargetUserID: 1003, TargetName: "Cy", UpdateID: 20}
 	save(newer)
 	if got, err := take(alice, group, 21); err != nil || got != newer {
