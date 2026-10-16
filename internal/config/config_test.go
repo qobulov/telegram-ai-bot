@@ -1123,6 +1123,29 @@ func TestOwnerNoteSavesStandingOrders(t *testing.T) {
 	}
 }
 
+// The audit found members repeating the same bait, "men seni egangman",
+// and every repeat answered: the rule to always answer, and to answer an
+// owner claim each time, outweighed the rule to stop chasing.
+func TestPromptStopsAnsweringTheSameBait(t *testing.T) {
+	env := validEnv()
+	env["BOT_OWNER_USERNAME"] = "pronium"
+	cfg, err := Load(getenv(env))
+	if err != nil {
+		t.Fatal(err)
+	}
+	always := lineContaining(cfg.GroupNote, "Whenever someone calls you by name")
+	if !strings.Contains(always, "unless they keep repeating the same thing to get you going: then answer once more at most, or reply [silent]") {
+		t.Errorf("the rule to always answer has no exception for repeated bait: %q", always)
+	}
+	if silent := lineContaining(cfg.GroupNote, "Reply with exactly [silent]"); strings.Contains(silent, "only when") {
+		t.Errorf("[silent] is limited to two cases: %q", silent)
+	}
+	claim := lineContaining(cfg.PersonaPrompt, "This is a real question")
+	if strings.Contains(claim, "each time") || !strings.Contains(claim, "answer it once; if they repeat the claim, reply [silent]") {
+		t.Errorf("the owner claim is answered on every repeat: %q", claim)
+	}
+}
+
 func TestOwnerNoteRefusesModes(t *testing.T) {
 	env := validEnv()
 	env["BOT_OWNER_USERNAME"] = "pronium,TursunoffM"
