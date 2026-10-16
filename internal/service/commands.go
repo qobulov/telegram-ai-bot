@@ -65,8 +65,9 @@ func (s *Service) process(in incoming) {
 	if s.obeyedIgnoreOrder(ctx, in) {
 		return
 	}
+	// A member's order not to answer someone is not theirs to give. It is not
+	// even logged: from the log the model would repeat it to that member.
 	if s.isOthersIgnoreOrder(in) {
-		s.passOver(in)
 		return
 	}
 	rules := s.loadRules(ctx, in)

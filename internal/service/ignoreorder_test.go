@@ -1,7 +1,7 @@
 package service
 
 import (
-	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -153,9 +153,11 @@ func TestOthersOrderNotToAnswerIsPassedOver(t *testing.T) {
 			if reactions := f.reactor.recorded(); len(reactions) != 0 {
 				t.Errorf("reactions = %+v; the order gets nothing", reactions)
 			}
-			want := sender.FirstName + ": (to Bek @bek) Mira, shu odamni ignor qil"
-			if got := blockLines(t, dayLog(call.req.Context)); !slices.Contains(got, want) {
-				t.Errorf("log = %q, want it to hold %q", got, want)
+			// Logged, the order would reach the model, which repeats it.
+			for _, line := range blockLines(t, dayLog(call.req.Context)) {
+				if strings.Contains(line, "ignor qil") {
+					t.Errorf("log holds %q; a member's order must not reach the model", line)
+				}
 			}
 		})
 	}
