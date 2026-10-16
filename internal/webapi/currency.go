@@ -98,8 +98,15 @@ func (a *apis) currencyArgs(raw json.RawMessage) (currencyArgs, error) {
 		return args, argumentError("gold and silver have only today's price")
 	}
 	day, err := a.parseDay(args.Date)
+	if err != nil {
+		return args, err
+	}
+	// The bank silently answers a future date with today's rate.
+	if day.After(a.today()) {
+		return args, argumentError("%s is in the future", args.Date)
+	}
 	args.Date = day.Format(time.DateOnly)
-	return args, err
+	return args, nil
 }
 
 func isMetal(code string) bool { return code == "XAU" || code == "XAG" }

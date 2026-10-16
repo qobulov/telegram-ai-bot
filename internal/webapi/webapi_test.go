@@ -30,6 +30,8 @@ type stub struct {
 	body   string
 	// slow holds the answer until the client gives up.
 	slow bool
+	// slowCalls makes only the first few requests to the path slow.
+	slowCalls int
 }
 
 func ok(body string) stub  { return stub{body: body} }
@@ -63,7 +65,7 @@ func (u *upstream) serve(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if answer.slow {
+	if answer.slow || len(u.requests(r.URL.Path)) <= answer.slowCalls {
 		select {
 		case <-r.Context().Done():
 		case <-time.After(5 * time.Second):
@@ -271,7 +273,7 @@ func toolNames(list []tools.Tool) string {
 
 func TestToolsListsTheLiveDataTools(t *testing.T) {
 	opts := newUpstream(t, nil).options()
-	if got, want := toolNames(Tools(opts)), "currency_rate,get_weather"; got != want {
+	if got, want := toolNames(Tools(opts)), "currency_rate,get_weather,prayer_times"; got != want {
 		t.Errorf("tools = %s, want %s", got, want)
 	}
 }

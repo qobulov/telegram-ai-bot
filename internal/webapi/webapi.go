@@ -121,6 +121,7 @@ func Tools(opts Options) []tools.Tool {
 	return []tools.Tool{
 		a.currencyTool(),
 		a.weatherTool(),
+		a.prayerTool(),
 	}
 }
 
@@ -159,8 +160,6 @@ func (a *apis) today() time.Time {
 }
 
 // parseDay reads an optional YYYY-MM-DD argument; empty means today.
-// Future dates are refused, because the APIs silently answer them with
-// another day's data.
 func (a *apis) parseDay(value string) (time.Time, error) {
 	if value == "" {
 		return a.today(), nil
@@ -168,9 +167,6 @@ func (a *apis) parseDay(value string) (time.Time, error) {
 	day, err := time.ParseInLocation(time.DateOnly, value, a.location)
 	if err != nil {
 		return time.Time{}, argumentError("date must look like YYYY-MM-DD, got %q", value)
-	}
-	if day.After(a.today()) {
-		return time.Time{}, argumentError("%s is in the future", value)
 	}
 	return day, nil
 }
