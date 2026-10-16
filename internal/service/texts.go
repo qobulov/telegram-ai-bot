@@ -52,11 +52,12 @@ func textTextOnly(listen bool) string {
 	return "I can't read this kind of message. Send me text, a photo or a video instead."
 }
 
-// helpText is the help with two blanks, filled by HelpText: the sentences on
-// what she can see and what she can do.
+// helpText is the help with three blanks, filled by HelpText: the sentences
+// on what she can see, what she can do and what she can look up.
 const helpText = `Talk to me and I will answer, in Uzbek, Russian or English, matching your language.
 
 I remember the recent part of our conversation. %s %s
+%s
 
 Commands:
 /start — welcome message
@@ -73,13 +74,15 @@ Reply to a message and ask me to delete or pin it, or to mute or ban its author.
 /ignore@username, /unignore@username — as a reply to a member's message: I stop answering them for 24 hours, or answer them again
 /reset@username — delete the group's conversation with me`
 
-// Abilities are what a deployment may lack: drawing needs the image tool and
-// listening needs a provider that hears audio. The help names only those
-// present, because get_bot_help hands it to the model, which would otherwise
-// promise a picture or a transcript it cannot make.
+// Abilities are what a deployment may lack: drawing needs the image tool,
+// listening needs a provider that hears audio and football needs a
+// football-data.org token. The help names only those present, because
+// get_bot_help hands it to the model, which would otherwise promise a
+// picture, a transcript or a score it cannot give.
 type Abilities struct {
-	Draw   bool
-	Listen bool
+	Draw     bool
+	Listen   bool
+	Football bool
 }
 
 // HelpText describes the bot's commands and what it can do with these
@@ -94,5 +97,9 @@ func HelpText(abilities Abilities) string {
 	if abilities.Draw {
 		skills = "I can draw a picture when you ask, tell the time anywhere, calculate arithmetic, and make a poll in a group."
 	}
-	return fmt.Sprintf(helpText, seeing, skills)
+	lookups := "I can look up exchange rates, the weather, prayer times, news headlines, Wikipedia and crypto prices."
+	if abilities.Football {
+		lookups = "I can look up exchange rates, the weather, prayer times, news headlines, Wikipedia, football results and crypto prices."
+	}
+	return fmt.Sprintf(helpText, seeing, skills, lookups)
 }

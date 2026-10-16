@@ -166,7 +166,7 @@ type envelope struct {
 
 func newRegistry(t *testing.T, opts Options) *tools.Registry {
 	t.Helper()
-	registry, err := tools.NewRegistry(func(int64) bool { return false }, Tools(opts)...)
+	registry, err := tools.NewRegistry(func(int64) bool { return false }, nil, Tools(opts)...)
 	if err != nil {
 		t.Fatalf("NewRegistry: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestToolsHaveStrictSchemas(t *testing.T) {
 			t.Errorf("%s: description is %d bytes; it is sent on every turn", tool.Name, len(tool.Description))
 		}
 	}
-	if _, err := tools.NewRegistry(func(int64) bool { return false }, Tools(opts)...); err != nil {
+	if _, err := tools.NewRegistry(func(int64) bool { return false }, nil, Tools(opts)...); err != nil {
 		t.Errorf("NewRegistry: %v", err)
 	}
 }

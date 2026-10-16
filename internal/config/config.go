@@ -51,6 +51,12 @@ type Config struct {
 	BackupBaseURL string
 	BackupModel   string
 
+	// Keys for the live-data tools, both optional: without FootballDataToken
+	// there is no football tool, and without CoinGeckoDemoKey crypto prices
+	// share CoinGecko's keyless quota.
+	FootballDataToken string
+	CoinGeckoDemoKey  string
+
 	// Image generation, Gemini only. Owners have no daily limit.
 	ImagesEnabled   bool
 	ImageModel      string
@@ -193,6 +199,8 @@ func Load(getenv func(string) string) (Config, error) {
 	if len(cfg.OwnerUsernames) > 0 {
 		cfg.PersonaPrompt += "\n\n" + strings.ReplaceAll(ownerNote, ownerPlaceholder, mentionList(cfg.OwnerUsernames))
 	}
+	cfg.FootballDataToken = r.apiKey("FOOTBALL_DATA_TOKEN")
+	cfg.CoinGeckoDemoKey = r.apiKey("COINGECKO_DEMO_KEY")
 	cfg.WakeWords = r.wakeWords(cfg)
 	r.checkRemovedVariables()
 	r.checkGroupSettings(cfg)
@@ -229,6 +237,17 @@ func (r *reader) text(name, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// apiKey reads an optional key that goes into a request header, where a
+// space or a control character would break the request.
+func (r *reader) apiKey(name string) string {
+	value := r.value(name)
+	if strings.IndexFunc(value, func(c rune) bool { return unicode.IsSpace(c) || unicode.IsControl(c) }) >= 0 {
+		r.fail(name, "must not contain spaces or control characters")
+		return ""
+	}
+	return value
 }
 
 func (r *reader) positive(name string, fallback int) int {

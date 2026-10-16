@@ -659,7 +659,7 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 	case "/start":
 		return textWelcome
 	case "/help":
-		return HelpText(Abilities{Draw: s.opts.ImagesEnabled, Listen: s.canListen()})
+		return HelpText(Abilities{Draw: s.opts.ImagesEnabled, Listen: s.canListen(), Football: s.opts.FootballEnabled})
 	case "/about":
 		return textAbout
 	case "/model":

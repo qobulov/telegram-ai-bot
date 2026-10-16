@@ -762,6 +762,20 @@ func TestHelpTextListsEveryCommand(t *testing.T) {
 	}
 }
 
+func TestHelpListsLiveDataAndFootballOnlyWhenConfigured(t *testing.T) {
+	for _, football := range []bool{false, true} {
+		help := HelpText(Abilities{Football: football})
+		for _, want := range []string{"exchange rates", "the weather", "prayer times", "news headlines", "Wikipedia", "crypto prices"} {
+			if !strings.Contains(help, want) {
+				t.Errorf("football = %t: help text does not mention %q", football, want)
+			}
+		}
+		if got := strings.Contains(help, "football"); got != football {
+			t.Errorf("help offers football = %t, want %t", got, football)
+		}
+	}
+}
+
 func TestHelpMentionsModerationAndPolls(t *testing.T) {
 	help := HelpText(Abilities{Draw: true, Listen: true})
 	for _, want := range []string{

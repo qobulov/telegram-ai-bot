@@ -945,6 +945,58 @@ func TestBackupProviderDefaultsToGroq(t *testing.T) {
 	}
 }
 
+func TestLiveDataKeysAreOptional(t *testing.T) {
+	cfg, err := Load(getenv(geminiEnv()))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.FootballDataToken != "" || cfg.CoinGeckoDemoKey != "" {
+		t.Errorf("without keys: football = %q, coingecko = %q", cfg.FootballDataToken, cfg.CoinGeckoDemoKey)
+	}
+	env := geminiEnv()
+	env["FOOTBALL_DATA_TOKEN"] = " fd-token "
+	env["COINGECKO_DEMO_KEY"] = "CG-key"
+	cfg, err = Load(getenv(env))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.FootballDataToken != "fd-token" || cfg.CoinGeckoDemoKey != "CG-key" {
+		t.Errorf("football = %q, coingecko = %q", cfg.FootballDataToken, cfg.CoinGeckoDemoKey)
+	}
+}
+
+func TestPersonaExplainsLiveData(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"# Live data", "not advice", "muslim.uz", "not live", "opinion on politics", "never make up a number", "say which place"} {
+		if !strings.Contains(cfg.PersonaPrompt, want) {
+			t.Errorf("the persona does not contain %q", want)
+		}
+	}
+}
+
+func TestLiveDataKeyErrorsHideTheValue(t *testing.T) {
+	env := geminiEnv()
+	env["FOOTBALL_DATA_TOKEN"] = "fd hidden1"
+	env["COINGECKO_DEMO_KEY"] = "CG-hid\nden2"
+	_, err := Load(getenv(env))
+	if err == nil {
+		t.Fatal("keys with a space or a newline were accepted")
+	}
+	for _, want := range []string{"FOOTBALL_DATA_TOKEN", "COINGECKO_DEMO_KEY"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not name %s", err, want)
+		}
+	}
+	for _, secret := range []string{"hidden1", "hid", "den2"} {
+		if strings.Contains(err.Error(), secret) {
+			t.Errorf("error %q prints a key", err)
+		}
+	}
+}
+
 func TestPersonaIsComposedNotQuarrelsome(t *testing.T) {
 	cfg, err := Load(getenv(validEnv()))
 	if err != nil {
