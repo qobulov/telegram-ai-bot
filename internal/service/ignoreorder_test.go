@@ -154,10 +154,8 @@ func TestOthersOrderNotToAnswerIsPassedOver(t *testing.T) {
 				t.Errorf("reactions = %+v; the order gets nothing", reactions)
 			}
 			// Logged, the order would reach the model, which repeats it.
-			for _, line := range blockLines(t, dayLog(call.req.Context)) {
-				if strings.Contains(line, "ignor qil") {
-					t.Errorf("log holds %q; a member's order must not reach the model", line)
-				}
+			if strings.Contains(call.req.Context, "ignor qil") {
+				t.Errorf("context = %q; a member's order must not reach the model", call.req.Context)
 			}
 		})
 	}
