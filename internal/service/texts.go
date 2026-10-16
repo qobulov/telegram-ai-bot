@@ -17,7 +17,7 @@ Send /reset to delete the conversation history.`
 	textResetDone   = "The conversation history here has been deleted."
 	textUnknown     = "I don't know that command. Send /help to see what I can do."
 	textForbidden   = "This command is restricted to administrators."
-	textTextOnly    = "I can read text, photos, stickers, GIFs and voice messages, but not this."
+	textTextOnly    = "I can't read this kind of message. Send me text, a photo, a video or a voice message instead."
 	textBusy        = "I'm handling a lot of messages right now. Please try again in a moment."
 	textRateLimited = "You're sending messages too quickly. Please wait a little and try again."
 	textMuted       = "Fine, I'll be quiet here. An admin can bring me back with /unmute."

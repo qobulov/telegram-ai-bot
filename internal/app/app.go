@@ -56,8 +56,8 @@ type Mode struct {
 	// Serverless is true when each update is handled inside one short-lived
 	// request (a webhook function). Nothing can then be kept in memory from
 	// one update to the next: there are no workers, and mute state is read
-	// from the database when needed. The day's group log is in the database
-	// in both modes.
+	// from the database when needed. The group log is in the database in
+	// both modes.
 	Serverless bool
 	// MutedChats are the groups muted before this start. Unused when
 	// Serverless.

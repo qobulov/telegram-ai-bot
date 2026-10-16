@@ -1035,7 +1035,7 @@ func TestMentionWhileReplyingToMemberQuotesThatMember(t *testing.T) {
 	f.run(inGroup(replyingTo(groupMessage("@MyBot is that right?", "@MyBot"), 4242, "Go is interpreted.")))
 
 	req := f.replier.recorded()[0].req
-	if !strings.HasPrefix(req.Text, fmt.Sprintf(quoteFromMember, "Someone")) || !strings.Contains(req.Text, "Go is interpreted.") {
+	if !strings.HasPrefix(req.Text, fmt.Sprintf(quoteFromMember, "someone")) || !strings.Contains(req.Text, "Go is interpreted.") {
 		t.Errorf("text sent to the agent = %q", req.Text)
 	}
 }
@@ -1063,12 +1063,18 @@ func TestBareMentionWithQuoteAsksAboutTheQuote(t *testing.T) {
 
 // A kind the bot cannot read, such as a location sent in reply to it, is
 // let pass in a group: saying so would be one more message nobody needs.
+// Getting no answer, it costs the member none of their answers either.
 func TestUnreadableKindIsSilentInGroups(t *testing.T) {
 	f := newFixture()
+	quota := &fakeGroupQuota{}
+	f.opts.GroupReplies = quota
 	location := replyingTo(groupMessage(""), botID, "where are you?")
 
 	if sent := f.run(inGroup(location)); len(sent) != 0 || len(f.replier.recorded()) != 0 {
 		t.Errorf("sent = %+v, model calls = %d; want nothing", sent, len(f.replier.recorded()))
+	}
+	if asked := quota.asked(); len(asked) != 0 {
+		t.Errorf("quota asked %d times; an unanswered message must not use it", len(asked))
 	}
 }
 
@@ -1635,6 +1641,57 @@ func TestReplyIsLoggedWithItsAddressee(t *testing.T) {
 	got := f.chatLog.texts(groupID)
 	if len(got) != 4 || strings.Join(got[:3], "|") != strings.Join(want, "|") || !strings.HasPrefix(got[3], "You: echo: ") {
 		t.Errorf("log = %q\nwant  %q and the answer", got, want)
+	}
+}
+
+// In a forum topic Telegram makes every message a reply to the topic's first
+// message, sent by whoever opened the topic. That is not a reply to anyone:
+// the log must not say each line answers the topic's creator, and the model
+// is not told the message replies to anything. A real reply in a topic is
+// still one.
+func TestTopicMessagesAreNotRepliesToTheTopic(t *testing.T) {
+	f := newFixture()
+	f.opts.Workers = 1
+	inTopic := func(msg *telegram.Message) *telegram.Message {
+		msg.MessageThreadID, msg.IsTopicMessage = 7, true
+		if msg.ReplyToMessage == nil {
+			msg.ReplyToMessage = &telegram.Message{MessageID: 7, From: &telegram.User{ID: 4242, FirstName: "Ann"}}
+		}
+		return msg
+	}
+	chatter := inTopic(groupMessage("memes go here"))
+	realReply := inTopic(replyingTo(groupMessage("I disagree"), 4243, "Go is interpreted."))
+	realReply.ReplyToMessage.From.FirstName = "Vali"
+	question := inTopic(groupMessage("Mira, who is right?"))
+
+	f.run(inGroup(chatter), inGroup(realReply), inGroup(question))
+
+	want := []string{"Bek: memes go here", "Bek: (to Vali) I disagree", "Bek: who is right?"}
+	got := f.chatLog.texts(groupID)
+	if len(got) != 4 || strings.Join(got[:3], "|") != strings.Join(want, "|") {
+		t.Errorf("log = %q\nwant  %q and the answer", got, want)
+	}
+	if req := onlyRequest(t, f).req; req.ReplyToMessageID != 0 || req.Text != "Bek: who is right?" {
+		t.Errorf("request = %+v; a topic message replies to nothing", req)
+	}
+	if chatter.ReplyToMessage == nil {
+		t.Error("the update's own message was changed")
+	}
+}
+
+// A member whose first name is "You" must not pass for the bot, whose own
+// lines in the log are "You": those are cut short and only the newest kept.
+func TestMemberCalledYouIsNotTakenForTheBot(t *testing.T) {
+	f := newFixture()
+	f.opts.Workers = 1
+	long := strings.Repeat("ha", 80)
+	you := groupMessage(long)
+	you.From = &telegram.User{ID: 4242, FirstName: "You"}
+
+	f.run(inGroup(you), inGroup(groupMessage("Mira, what did they say?")))
+
+	if got := blockLines(t, onlyRequest(t, f).req.Context); len(got) != 1 || got[0] != "You (member): "+long {
+		t.Errorf("context lines = %q, want the member's whole line under their own name", got)
 	}
 }
 

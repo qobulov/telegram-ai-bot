@@ -30,7 +30,7 @@ var laughWords = map[string]bool{"lol": true, "kek": true, "rofl": true, "lmao":
 const laughEmoji = "😂🤣"
 
 // reactedToApplause answers applause from a member with a reaction, logs
-// the message for the day's log, and reports whether it did. Only a reply
+// the message in the group log, and reports whether it did. Only a reply
 // to the bot can be applause: a mention or the bot's name is a call and is
 // always answered, and so is an owner, whatever they send.
 func (s *Service) reactedToApplause(in incoming) bool {

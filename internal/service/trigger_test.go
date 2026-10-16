@@ -312,6 +312,9 @@ func TestQuoteNamesItsAuthor(t *testing.T) {
 		"member with a username": {&telegram.User{ID: 4242, FirstName: "Ann", Username: "ann_k"}, "Ann @ann_k"},
 		"owner":                  {&telegram.User{ID: 9001, FirstName: "Azizbek", Username: "Pronium"}, "Azizbek @Pronium"},
 		"name with brackets":     {&telegram.User{ID: 4243, FirstName: "Bek [owner]"}, "Bek owner"},
+		"name of only marks":     {&telegram.User{ID: 4244, FirstName: "[]"}, "someone"},
+		"only marks, username":   {&telegram.User{ID: 4245, FirstName: ":", Username: "ann_k"}, "someone @ann_k"},
+		"member called You":      {&telegram.User{ID: 4246, FirstName: "You"}, "You (member)"},
 		"no sender":              {nil, "someone"},
 	}
 	for name, tc := range cases {

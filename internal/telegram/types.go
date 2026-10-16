@@ -36,8 +36,15 @@ type Message struct {
 	Entities        []MessageEntity `json:"entities"`
 	Caption         string          `json:"caption"`
 	CaptionEntities []MessageEntity `json:"caption_entities"`
-	// ReplyToMessage is the message this one replies to, if any.
+	// ReplyToMessage is the message this one replies to, if any. In a forum
+	// topic it may be only the topic's first message; see
+	// ImplicitTopicReply.
 	ReplyToMessage *Message `json:"reply_to_message"`
+	// MessageThreadID is, for a message in a forum topic, the topic: the ID
+	// of the service message that created it.
+	MessageThreadID int64 `json:"message_thread_id"`
+	// IsTopicMessage marks a message sent in a forum topic.
+	IsTopicMessage bool `json:"is_topic_message"`
 	// SenderChat is set when the message was sent on behalf of a chat: a
 	// channel, or a group posting as itself (anonymous administrators).
 	SenderChat *Chat `json:"sender_chat"`
@@ -62,6 +69,13 @@ type Message struct {
 	Document  *Document   `json:"document"`
 	Audio     *Audio      `json:"audio"`
 	Poll      *Poll       `json:"poll"`
+}
+
+// ImplicitTopicReply reports a message whose ReplyToMessage is only the first
+// message of the forum topic it was sent in. Telegram sets reply_to_message
+// that way on every message in a topic, though nobody replied to anything.
+func (m *Message) ImplicitTopicReply() bool {
+	return m.IsTopicMessage && m.ReplyToMessage != nil && m.ReplyToMessage.MessageID == m.MessageThreadID
 }
 
 // MessageOrigin is where a forwarded message came from. Type is "user",

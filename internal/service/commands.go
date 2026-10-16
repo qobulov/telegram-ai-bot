@@ -190,9 +190,10 @@ func (s *Service) rateLimited(in incoming) (notice string, limited bool) {
 //
 // Owners are not counted, other bots have their own quota, and the off
 // switch always passes for those who may use it: it has to work precisely
-// when the group is flooding the bot.
+// when the group is flooding the bot. A message with nothing the bot can
+// read is not counted either: respond sends no answer to it.
 func (s *Service) mayAnswerInGroup(in incoming) bool {
-	if !in.group || in.fromBot || s.opts.GroupReplies == nil || s.isOwner(in.msg.From) || s.isOffSwitch(in) {
+	if !in.group || in.fromBot || s.opts.GroupReplies == nil || s.isOwner(in.msg.From) || !s.hasContent(in) || s.isOffSwitch(in) {
 		return true
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
@@ -241,7 +242,7 @@ func (s *Service) respond(ctx context.Context, in incoming) outcome {
 		return say(s.runCommand(ctx, in))
 	case utf8.RuneCountInString(in.text) > s.opts.MaxInputChars:
 		return say(fmt.Sprintf(textTooLong, s.opts.MaxInputChars))
-	case in.text != "" || s.hasMedia(in):
+	case s.hasContent(in):
 		return s.ask(ctx, in)
 	case in.group:
 		// A location, a contact or another kind the bot does not read, or
@@ -252,6 +253,11 @@ func (s *Service) respond(ctx context.Context, in incoming) outcome {
 	default:
 		return outcome{} // whitespace only
 	}
+}
+
+// hasContent reports text, or media the bot can describe, to answer.
+func (s *Service) hasContent(in incoming) bool {
+	return in.text != "" || s.hasMedia(in)
 }
 
 // hasMedia reports media the bot can describe (see mediaOf), on the message

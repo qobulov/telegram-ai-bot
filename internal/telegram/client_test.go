@@ -885,3 +885,31 @@ func TestMessageOriginName(t *testing.T) {
 		})
 	}
 }
+
+// In a forum topic Telegram makes every message a reply to the topic's first
+// message. Only a reply to some other message is a reply.
+func TestImplicitTopicReply(t *testing.T) {
+	tests := []struct {
+		name string
+		json string
+		want bool
+	}{
+		{"plain message in a topic", `{"message_id":40,"message_thread_id":7,"is_topic_message":true,
+			"reply_to_message":{"message_id":7,"forum_topic_created":{"name":"Memes"}}}`, true},
+		{"reply inside a topic", `{"message_id":40,"message_thread_id":7,"is_topic_message":true,
+			"reply_to_message":{"message_id":39,"text":"hi"}}`, false},
+		{"reply outside topics", `{"message_id":40,"reply_to_message":{"message_id":39,"text":"hi"}}`, false},
+		{"topic message that replies to nothing", `{"message_id":40,"message_thread_id":7,"is_topic_message":true}`, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var msg Message
+			if err := json.Unmarshal([]byte(tt.json), &msg); err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			if got := msg.ImplicitTopicReply(); got != tt.want {
+				t.Errorf("ImplicitTopicReply() = %v, want %v (message %+v)", got, tt.want, msg)
+			}
+		})
+	}
+}

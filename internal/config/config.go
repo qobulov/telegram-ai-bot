@@ -91,11 +91,12 @@ type Config struct {
 	// WakeWords are the names the bot answers to, in lower case.
 	WakeWords []string
 
-	// AmbientMessages is how many recent ordinary group messages are kept in
-	// memory as context. Zero disables it.
+	// AmbientMessages is how many of a group's recent messages are given to
+	// the model with a question. Zero turns the group log off.
 	AmbientMessages int
-	// Location is the time zone that decides when "today" starts for the
-	// group history.
+	// Location is the groups' time zone: the times shown in the group log,
+	// and where a day starts for the daily picture limit and the owners'
+	// database tool.
 	Location *time.Location
 	// OwnerUsernames are the Telegram usernames of the bot's owners, lower
 	// case and without @. Empty when no owner is configured.

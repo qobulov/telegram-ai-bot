@@ -19,7 +19,7 @@ import (
 const (
 	noticeQueueSize = 64
 	// backgroundTranscriptions bounds voice messages transcribed at once
-	// for the day's log while polling.
+	// for the group log while polling.
 	backgroundTranscriptions = 2
 	sendTimeout              = 15 * time.Second
 	muteLookupTimeout        = 5 * time.Second
@@ -98,7 +98,7 @@ type Options struct {
 	// Transcriber turns voice messages into text; nil means the bot cannot
 	// listen to them.
 	Transcriber Transcriber
-	// ChatLog stores the day's group messages; nil turns the log off.
+	// ChatLog stores the groups' messages; nil turns the log off.
 	ChatLog ChatLog
 	// Groups records the bot being added to or removed from groups; nil
 	// ignores those updates.
@@ -193,7 +193,7 @@ type Service struct {
 	notices     chan incoming
 	closing     atomic.Bool
 	workers     sync.WaitGroup
-	// background tracks voice messages being transcribed for the day's log
+	// background tracks voice messages being transcribed for the group log
 	// while polling; transcribing bounds how many run at once.
 	background   sync.WaitGroup
 	transcribing chan struct{}
@@ -349,6 +349,7 @@ func (s *Service) accept(update telegram.Update) (incoming, bool) {
 	if msg.SenderChat != nil || msg.IsAutomaticForward {
 		return incoming{}, false
 	}
+	msg = withoutTopicReply(msg)
 	in := incoming{updateID: update.UpdateID, msg: msg, userID: msg.From.ID, fromBot: msg.From.IsBot}
 	switch msg.Chat.Type {
 	case telegram.ChatTypePrivate:
@@ -363,6 +364,20 @@ func (s *Service) accept(update telegram.Update) (incoming, bool) {
 	default:
 		return incoming{}, false
 	}
+}
+
+// withoutTopicReply drops the reply Telegram puts on every message in a forum
+// topic (see telegram.Message.ImplicitTopicReply), so that it is not taken
+// for one: the log would say every line answers the topic's creator, and the
+// model would be shown the topic's first message as a quote. The update's
+// own message is left as it was.
+func withoutTopicReply(msg *telegram.Message) *telegram.Message {
+	if !msg.ImplicitTopicReply() {
+		return msg
+	}
+	plain := *msg
+	plain.ReplyToMessage = nil
+	return &plain
 }
 
 // acceptGroup queues a group message that is addressed to the bot. Any other
@@ -493,7 +508,7 @@ func (s *Service) isOwner(user *telegram.User) bool {
 // [owner] after an owner's. authorLabel strips square brackets from names,
 // so nobody else can carry the mark.
 func (s *Service) label(user *telegram.User) string {
-	label := plainLabel(user)
+	label := withUsername(authorLabel(user.FirstName), user.Username)
 	switch {
 	case s.isOwner(user):
 		label += " [owner]"
@@ -503,22 +518,33 @@ func (s *Service) label(user *telegram.User) string {
 	return label
 }
 
-// someone stands in, mid-sentence, for a person Telegram did not name.
+// someone stands in, mid-sentence, for a person Telegram did not name. At
+// the start of a line, in front of what they said, label writes
+// unknownAuthor instead.
 const someone = "someone"
 
 // plainLabel names a user inside a line rather than in front of what they
 // said: in a quote's header, "(to Ann @ann)" or "<Ann joined the group>". It
 // is the first name and @username without label's marks, which only mean
-// something in front of a message; a nil user is someone.
+// something in front of a message. A nil user, or one whose name was nothing
+// authorLabel keeps, is someone.
 func plainLabel(user *telegram.User) string {
 	if user == nil {
 		return someone
 	}
-	label := authorLabel(user.FirstName)
-	if username := usernameLabel(user.Username); username != "" {
-		label += " " + username
+	name := authorLabel(user.FirstName)
+	if name == unknownAuthor {
+		name = someone
 	}
-	return label
+	return withUsername(name, user.Username)
+}
+
+// withUsername adds the user's @username, if they have one, after name.
+func withUsername(name, username string) string {
+	if at := usernameLabel(username); at != "" {
+		return name + " " + at
+	}
+	return name
 }
 
 // silenced reports a message from a muted group that is not one of the

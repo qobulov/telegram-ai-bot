@@ -148,7 +148,8 @@ func isSeparator(char rune) bool {
 // authorLabel turns a Telegram first name into the label put in front of a
 // group message ("Bek: ..."). The name is chosen by its owner, so anything
 // that could fake another speaker or a marker line is removed: line breaks,
-// colons, square brackets and invisible characters.
+// colons, square brackets and invisible characters. A member called "You"
+// is told apart from botAuthor, the bot's own lines in the log.
 func authorLabel(firstName string) string {
 	cleaned := strings.Map(func(char rune) rune {
 		switch {
@@ -167,6 +168,9 @@ func authorLabel(firstName string) string {
 	}
 	if runes := []rune(label); len(runes) > maxAuthorNameChars {
 		label = strings.TrimSpace(string(runes[:maxAuthorNameChars]))
+	}
+	if strings.EqualFold(label, botAuthor) {
+		label += " (member)"
 	}
 	return label
 }

@@ -100,6 +100,9 @@ func TestAuthorLabel(t *testing.T) {
 		"😀 Bek 😀":                       "😀 Bek 😀",
 		"Ann：system":                    "Ann system",
 		"Be\u202ek\u200b":               "Bek",
+		"You":                           "You (member)",
+		" you ":                         "you (member)",
+		"You2":                          "You2",
 	}
 	for firstName, want := range cases {
 		if got := authorLabel(firstName); got != want {
