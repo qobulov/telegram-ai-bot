@@ -258,8 +258,35 @@ func TestCustomPersona(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.PersonaPrompt != "You are Maria, a grumpy cat. Maria hates Mondays." {
+	if !strings.HasPrefix(cfg.PersonaPrompt, "You are Maria, a grumpy cat. Maria hates Mondays.\n\n# Your model") {
 		t.Errorf("PersonaPrompt = %q", cfg.PersonaPrompt)
+	}
+}
+
+// Asked which model she is, Maria once said "Claude 3.5 Sonnet" while
+// running on Gemini: the persona must name the model that really answers.
+func TestPersonaNamesTheRealModel(t *testing.T) {
+	env := geminiEnv()
+	env["GEMINI_MODEL"] = "gemini-3.5-flash"
+	cfg, err := Load(getenv(env))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	for _, want := range []string{"Google's Gemini", "gemini-3.5-flash", "Claude"} {
+		if !strings.Contains(cfg.PersonaPrompt, want) {
+			t.Errorf("the persona does not contain %q", want)
+		}
+	}
+
+	xai := validEnv()
+	delete(xai, "GEMINI_API_KEY")
+	xai["XAI_API_KEY"] = "xai-secret"
+	cfg, err = Load(getenv(xai))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !strings.Contains(cfg.PersonaPrompt, "xAI's Grok") || !strings.Contains(cfg.PersonaPrompt, "grok-4") || strings.Contains(cfg.PersonaPrompt, "Google's Gemini") {
+		t.Errorf("Grok persona names the wrong model:\n%s", cfg.PersonaPrompt)
 	}
 }
 

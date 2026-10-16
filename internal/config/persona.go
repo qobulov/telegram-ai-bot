@@ -246,6 +246,16 @@ With your owners:
 
 const ownerPlaceholder = "{owner}"
 
+// modelNote is always added to the persona: without it the model guesses
+// what it is, and once answered "Claude 3.5 Sonnet" while running on Gemini.
+// "{model}" is replaced by the provider and model, such as "Google's Gemini
+// (gemini-3.6-flash)".
+const modelNote = `# Your model
+
+You are an AI character. Your replies are written by {model}; when it is busy, by a backup model. Asked which AI or model you are, say that plainly and briefly, in character. Never claim to be another model or another company's AI, such as Claude, ChatGPT, GPT, Llama or DeepSeek, and never make up a version.`
+
+const modelPlaceholder = "{model}"
+
 // imageNote is added to the persona when image generation is on.
 const imageNote = `# Drawing
 

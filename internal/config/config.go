@@ -189,6 +189,7 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.AllowedBots = r.allowedBots("ALLOWED_BOTS")
 	cfg.BotRepliesPer10Min = r.integer("BOT_REPLIES_PER_10_MIN", 5, 0)
 	cfg.PersonaPrompt = strings.ReplaceAll(r.text("PERSONA_PROMPT", defaultPersona), namePlaceholder, cfg.BotDisplayName)
+	cfg.PersonaPrompt += "\n\n" + strings.ReplaceAll(modelNote, modelPlaceholder, providerLabel(cfg.AIProvider)+" ("+cfg.Model+")")
 	cfg.ImagesEnabled = cfg.AIProvider == providerGemini && r.boolean("ENABLE_IMAGE_GENERATION", true)
 	cfg.ImageModel = r.text("IMAGE_MODEL", "gemini-3.1-flash-image")
 	cfg.ImageBaseURL = strings.TrimSuffix(cfg.AIBaseURL, "/openai")
@@ -306,12 +307,24 @@ type provider struct {
 	fallbacks []string
 	// audio is true when the provider accepts voice messages as input.
 	audio bool
+	// label names the provider and its models for the persona.
+	label string
 }
 
 var providers = []provider{
 	{providerGemini, "GEMINI_API_KEY", "GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai", "GEMINI_MODEL", "gemini-3.6-flash",
-		[]string{"gemini-3.5-flash", "gemini-flash-latest", "gemini-3.5-flash-lite"}, true},
-	{providerXAI, "XAI_API_KEY", "XAI_BASE_URL", "https://api.x.ai/v1", "XAI_MODEL", "grok-4", nil, false},
+		[]string{"gemini-3.5-flash", "gemini-flash-latest", "gemini-3.5-flash-lite"}, true, "Google's Gemini"},
+	{providerXAI, "XAI_API_KEY", "XAI_BASE_URL", "https://api.x.ai/v1", "XAI_MODEL", "grok-4", nil, false, "xAI's Grok"},
+}
+
+// providerLabel is the provider's label, or its name when it has none.
+func providerLabel(name string) string {
+	for _, p := range providers {
+		if p.name == name {
+			return p.label
+		}
+	}
+	return name
 }
 
 // chooseProvider picks the model provider by which API key is set. Exactly
