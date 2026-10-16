@@ -545,12 +545,3 @@ func aqiCategory(aqi int) string {
 		return "xavfli"
 	}
 }
-
-// truncate cuts text to at most limit characters, marking the cut.
-func truncate(text string, limit int) string {
-	runes := []rune(text)
-	if len(runes) <= limit {
-		return text
-	}
-	return strings.TrimSpace(string(runes[:limit-1])) + "…"
-}

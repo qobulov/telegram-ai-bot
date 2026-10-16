@@ -122,6 +122,7 @@ func Tools(opts Options) []tools.Tool {
 		a.currencyTool(),
 		a.weatherTool(),
 		a.prayerTool(),
+		a.newsTool(),
 	}
 }
 
