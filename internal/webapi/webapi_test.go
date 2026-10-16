@@ -278,6 +278,13 @@ func TestToolsListsTheLiveDataTools(t *testing.T) {
 	}
 }
 
+func TestDefaultUserAgentIsNotRefused(t *testing.T) {
+	// gazeta.uz answers any agent containing "telegram" with an empty feed.
+	if agent := newAPIs(Options{}).client.userAgent; agent == "" || strings.Contains(strings.ToLower(agent), "telegram") {
+		t.Errorf("default User-Agent = %q", agent)
+	}
+}
+
 func TestOptionsDefaultToProductionURLs(t *testing.T) {
 	urls := BaseURLs{}.withDefaults()
 	all := []string{urls.CBU, urls.CurrencyAPI, urls.CurrencyAPIMirror, urls.OpenMeteo, urls.AirQuality, urls.Geocoding,

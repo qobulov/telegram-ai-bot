@@ -21,7 +21,8 @@ import (
 // source, so the second still has time inside the tool's deadline.
 const primaryTimeout = 3 * time.Second
 
-const defaultUserAgent = "telegram-ai-bot/1.0"
+// defaultUserAgent must not contain "telegram": see Options.UserAgent.
+const defaultUserAgent = "MariaBot/1.0"
 
 // Options configures the tools. Zero values mean production defaults.
 type Options struct {
@@ -30,7 +31,9 @@ type Options struct {
 	HTTPClient *http.Client
 	// UserAgent identifies the bot to every API. Wikipedia and MET Norway
 	// throttle anonymous agents, so give a contact, for example
-	// "MariaBot/1.0 (+https://t.me/<bot>)".
+	// "MariaBot/1.0 (+https://t.me/<bot>)". Keep the word "telegram" out
+	// of it (a t.me link is fine): gazeta.uz answers any agent containing
+	// it with an empty feed.
 	UserAgent string
 	// Location decides what "today" is. Nil means Asia/Tashkent.
 	Location *time.Location

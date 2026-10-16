@@ -190,6 +190,8 @@ func TestNewsHeadlinesFitWithEightRussianItems(t *testing.T) {
 func TestNewsHeadlinesFailures(t *testing.T) {
 	allBusy := map[string]stub{"/rss/kun": status(429), "/rss/gazeta-oz": status(503), "/rss/uza-oz": status(429), "/rss/daryo": status(429)}
 	allSlow := map[string]stub{"/rss/kun": slow, "/rss/gazeta-oz": slow, "/rss/uza-oz": slow, "/rss/daryo": slow}
+	// gazeta.uz answers an agent it does not like with an empty 200.
+	allEmpty := map[string]stub{"/rss/kun": ok(""), "/rss/gazeta-oz": ok(""), "/rss/uza-oz": ok(" "), "/rss/daryo": ok("")}
 	tests := []struct {
 		name   string
 		routes map[string]stub
@@ -199,6 +201,7 @@ func TestNewsHeadlinesFailures(t *testing.T) {
 	}{
 		{name: "every site busy", routes: allBusy, args: `{}`, code: "execution_failed", words: []string{"none of the news feeds answered", "kun.uz is busy"}},
 		{name: "every site slow", routes: allSlow, args: `{}`, code: "timeout"},
+		{name: "every site sends an empty feed", routes: allEmpty, args: `{}`, code: "execution_failed", words: []string{"gazeta.uz sent an empty feed"}},
 		{name: "unknown language", args: `{"lang":"en"}`, code: "invalid_arguments"},
 		{name: "too many", args: `{"limit":9}`, code: "invalid_arguments"},
 		{name: "too few", args: `{"limit":0}`, code: "invalid_arguments"},

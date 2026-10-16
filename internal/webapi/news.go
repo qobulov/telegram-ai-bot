@@ -255,6 +255,10 @@ func (a *apis) feed(ctx context.Context, f feed) ([]headline, error) {
 		if err != nil {
 			return nil, err
 		}
+		// gazeta.uz blanks its feed for agents it does not like.
+		if len(bytes.TrimSpace(body)) == 0 {
+			return nil, fmt.Errorf("%s sent an empty feed", f.source)
+		}
 		var rss struct {
 			Items []rssItem `xml:"channel>item"`
 		}
