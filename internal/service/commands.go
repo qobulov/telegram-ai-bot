@@ -827,7 +827,7 @@ func (s *Service) setMuted(ctx context.Context, in incoming, muted bool) string 
 	// What was said before or during the mute should not resurface after it.
 	s.ambient.clear(in.scope.ChatID)
 	if muted {
-		return textMuted
+		return fmt.Sprintf(textMuted, s.opts.Bot.Username)
 	}
 	return textUnmuted
 }

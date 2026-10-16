@@ -21,7 +21,7 @@ Send /reset to delete the conversation history.`
 	textForbidden   = "This command is restricted to administrators."
 	textBusy        = "I'm handling a lot of messages right now. Please try again in a moment."
 	textRateLimited = "You're sending messages too quickly. Please wait a little and try again."
-	textMuted       = "Fine, I'll be quiet here. An admin can bring me back with /unmute."
+	textMuted       = "Fine, I'll be quiet here. An admin can bring me back with /unmute@%s." // the bot's username
 	textUnmuted     = "I'm back."
 	textAdminsOnly  = "Only this group's admins can do that."
 	textGroupsOnly  = "That command is for groups."

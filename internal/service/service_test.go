@@ -949,6 +949,19 @@ func asAdmin(msg *telegram.Message) *telegram.Message {
 	return msg
 }
 
+// mutedReply is what /mute@MyBot answers.
+var mutedReply = fmt.Sprintf(textMuted, botUsername)
+
+// In a group a command must name the bot, so the reply to /mute names the
+// way back that works: a plain /unmute is not for the bot.
+func TestMutedReplyNamesTheWayBack(t *testing.T) {
+	f := newFixture()
+
+	sent := f.run(inGroup(asAdmin(groupMessage("/mute@MyBot"))))
+
+	expectOneReply(t, sent, "An admin can bring me back with /unmute@MyBot.")
+}
+
 func TestMuteSilencesTheGroupUntilUnmuted(t *testing.T) {
 	f := newFixture()
 	f.opts.Workers = 1
@@ -966,7 +979,7 @@ func TestMuteSilencesTheGroupUntilUnmuted(t *testing.T) {
 	for _, msg := range sent {
 		texts = append(texts, msg.text)
 	}
-	want := []string{textMuted, textUnmuted, "echo: back?"}
+	want := []string{mutedReply, textUnmuted, "echo: back?"}
 	if strings.Join(texts, "|") != strings.Join(want, "|") {
 		t.Errorf("sent = %q\nwant %q", texts, want)
 	}
@@ -1018,7 +1031,7 @@ func TestBotAdminNeedsNoGroupAdminCheck(t *testing.T) {
 	msg := groupMessage("/mute@MyBot")
 	msg.From = &telegram.User{ID: adminID, FirstName: "Owner"} // in ADMIN_USER_IDS
 
-	expectOneReply(t, f.run(inGroup(msg)), textMuted)
+	expectOneReply(t, f.run(inGroup(msg)), mutedReply)
 	if f.members.calls != 0 {
 		t.Errorf("Telegram was asked %d times about a bot administrator", f.members.calls)
 	}
@@ -1392,7 +1405,7 @@ func TestGroupQuotaFailureStaysQuietButOwnersAndMuteWork(t *testing.T) {
 	for _, msg := range sent {
 		texts = append(texts, msg.text)
 	}
-	if want := []string{"echo: status?", textMuted}; strings.Join(texts, "|") != strings.Join(want, "|") {
+	if want := []string{"echo: status?", mutedReply}; strings.Join(texts, "|") != strings.Join(want, "|") {
 		t.Errorf("sent = %q, want %q: a member gets silence, the owner and the off switch still work", texts, want)
 	}
 	if got := f.reactor.recorded(); len(got) != 0 {
@@ -1604,7 +1617,7 @@ func TestAdminCanMuteAGroupThatIsOverItsRateLimit(t *testing.T) {
 	if len(f.muter.calls) != 1 || !f.muter.calls[0].muted {
 		t.Errorf("mute changes = %+v; the off switch must work during a flood", f.muter.calls)
 	}
-	if last := sent[len(sent)-1]; last.text != textMuted {
+	if last := sent[len(sent)-1]; last.text != mutedReply {
 		t.Errorf("last message = %q, want the mute confirmation", last.text)
 	}
 }
@@ -1749,7 +1762,7 @@ func TestMuteCommandWorksInServerlessMode(t *testing.T) {
 
 	s.HandleNow(inGroup(asAdmin(groupMessage("/mute@MyBot"))))
 
-	expectOneReply(t, f.sender.messages(), textMuted)
+	expectOneReply(t, f.sender.messages(), mutedReply)
 	if len(f.muter.calls) != 1 || !f.muter.calls[0].muted {
 		t.Errorf("mute changes = %+v", f.muter.calls)
 	}
@@ -1995,7 +2008,7 @@ func TestOwnerManagesGroupsWithoutBeingAdmin(t *testing.T) {
 
 	sent := f.run(inGroup(fromOwner(groupMessage("/mute@MyBot"))))
 
-	expectOneReply(t, sent, textMuted)
+	expectOneReply(t, sent, mutedReply)
 	if f.members.calls != 0 {
 		t.Errorf("Telegram was asked %d times whether the owner is an admin", f.members.calls)
 	}
@@ -2713,7 +2726,7 @@ func TestIgnoredMemberGetsNothing(t *testing.T) {
 func TestIgnoredMemberKeepsTheOffSwitchOnlyAsAnAdmin(t *testing.T) {
 	admin := newFixture()
 	admin.opts.Rules = &fakeRuleBook{rules: []storage.GroupRule{ignoring(groupAdminID)}}
-	expectOneReply(t, admin.run(inGroup(asAdmin(groupMessage("/mute@MyBot")))), textMuted)
+	expectOneReply(t, admin.run(inGroup(asAdmin(groupMessage("/mute@MyBot")))), mutedReply)
 
 	member := newFixture()
 	member.opts.Rules = &fakeRuleBook{rules: []storage.GroupRule{ignoring(userID)}}

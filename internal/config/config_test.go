@@ -1146,6 +1146,20 @@ func TestPromptStopsAnsweringTheSameBait(t *testing.T) {
 	}
 }
 
+// A plain /mute is not for the bot in a group, which ignores commands that
+// do not name it.
+func TestOwnerNoteNamesNoPlainMuteCommand(t *testing.T) {
+	env := validEnv()
+	env["BOT_OWNER_USERNAME"] = "pronium"
+	cfg, err := Load(getenv(env))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(cfg.PersonaPrompt, "use /mute") {
+		t.Error("the owner note tells owners to use a plain /mute")
+	}
+}
+
 func TestOwnerNoteRefusesModes(t *testing.T) {
 	env := validEnv()
 	env["BOT_OWNER_USERNAME"] = "pronium,TursunoffM"
