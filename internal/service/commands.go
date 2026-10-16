@@ -49,6 +49,14 @@ func (s *Service) process(in incoming) {
 	if in.fromBot && !s.mayAnswerBot(in) {
 		return
 	}
+	rules := s.loadRules(ctx, in)
+	// An ignored member gets nothing, not even a reaction, and takes none of
+	// the group's quota. The off switch still works for them if they may
+	// use it, as it does over the quota.
+	if s.ignored(in, rules) && !s.isOffSwitch(in) {
+		s.passOver(in)
+		return
+	}
 	if notice, limited := s.rateLimited(in); limited {
 		if notice != "" {
 			s.reply(in, notice)
@@ -66,7 +74,7 @@ func (s *Service) process(in incoming) {
 		return
 	}
 	in.described = s.describe(ctx, in.msg, in.text)
-	out := s.respond(ctx, in)
+	out := s.respond(ctx, in, rules)
 	if sentID := s.deliver(in, out); out.answerID != 0 && sentID != 0 {
 		s.recordSent(out.answerID, sentID)
 	}
@@ -236,15 +244,46 @@ func (s *Service) passOver(in incoming) {
 	}
 }
 
-// respond decides what to send back. An empty outcome sends nothing.
-func (s *Service) respond(ctx context.Context, in incoming) outcome {
+// loadRules reads the standing rules for this turn, once: a group's own and
+// those that hold everywhere, such as how an owner wants to be addressed. In
+// a private chat only an owner has any. When they cannot be read the turn
+// goes on without them: answering an ignored member once is better than
+// going quiet for the whole group.
+func (s *Service) loadRules(ctx context.Context, in incoming) []storage.GroupRule {
+	if s.opts.Rules == nil || (!in.group && !s.isOwner(in.msg.From)) {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, logTimeout)
+	defer cancel()
+	rules, err := s.opts.Rules.GroupRules(ctx, in.scope.ChatID)
+	if err != nil {
+		s.opts.Logger.Warn("could not load standing rules; going on without them", "chat_id", in.scope.ChatID, "error", err)
+		return nil
+	}
+	return rules
+}
+
+// ignored reports a group member whom the rules say not to answer here.
+// Owners are never ignored.
+func (s *Service) ignored(in incoming, rules []storage.GroupRule) bool {
+	if !in.group || s.isOwner(in.msg.From) {
+		return false
+	}
+	return slices.ContainsFunc(rules, func(r storage.GroupRule) bool {
+		return r.Kind == storage.RuleIgnore && r.ChatID == in.scope.ChatID && r.UserID == in.userID
+	})
+}
+
+// respond decides what to send back. An empty outcome sends nothing. rules
+// are the standing rules loaded for this turn.
+func (s *Service) respond(ctx context.Context, in incoming, rules []storage.GroupRule) outcome {
 	switch {
 	case strings.HasPrefix(in.text, "/"):
 		return say(s.runCommand(ctx, in))
 	case utf8.RuneCountInString(in.text) > s.opts.MaxInputChars:
 		return say(fmt.Sprintf(textTooLong, s.opts.MaxInputChars))
 	case s.hasContent(in):
-		return s.ask(ctx, in)
+		return s.ask(ctx, in, rules)
 	case in.group:
 		// A location, a contact or another kind the bot does not read, or
 		// whitespace. Saying so would be one more message in the group.
@@ -269,20 +308,46 @@ func (s *Service) hasMedia(in incoming) bool {
 	return own || (replied && in.group)
 }
 
-func (s *Service) ask(ctx context.Context, in incoming) outcome {
+func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRule) outcome {
 	started := time.Now()
 	stopTyping := s.showTyping(ctx, in.msg.Chat.ID)
 	defer stopTyping()
 	sink := &tools.Sink{}
-	ctx = tools.WithTurn(ctx, tools.Caller{UserID: in.userID, ChatID: in.scope.ChatID, Owner: s.isOwner(in.msg.From), UpdateID: in.updateID}, sink)
-	out := s.answerOf(ctx, in, started)
+	ctx = tools.WithTurn(ctx, tools.Caller{
+		UserID:    in.userID,
+		ChatID:    in.scope.ChatID,
+		Owner:     s.isOwner(in.msg.From),
+		Human:     !in.fromBot,
+		UpdateID:  in.updateID,
+		MessageID: in.msg.MessageID,
+		Target:    s.target(in.msg.ReplyToMessage),
+	}, sink)
+	out := s.answerOf(ctx, in, rules, started)
 	// A picture drawn before a later failure is still worth sending.
 	out.drawings = sink.Take()
 	return out
 }
 
-func (s *Service) answerOf(ctx context.Context, in incoming, started time.Time) outcome {
-	answer, err := s.opts.Replier.Reply(ctx, s.request(ctx, in))
+// target describes the message a request replied to, for the tools that act
+// on a member. It is taken from the update, so the model can never choose
+// whom such a tool acts on.
+func (s *Service) target(replied *telegram.Message) *tools.Target {
+	if replied == nil || replied.From == nil {
+		return nil
+	}
+	text, _ := replied.Content()
+	return &tools.Target{
+		MessageID: replied.MessageID,
+		UserID:    replied.From.ID,
+		Name:      plainLabel(replied.From),
+		IsBot:     replied.From.IsBot,
+		Owner:     s.isOwner(replied.From),
+		Text:      truncate(text, tools.MaxTargetRunes),
+	}
+}
+
+func (s *Service) answerOf(ctx context.Context, in incoming, rules []storage.GroupRule, started time.Time) outcome {
+	answer, err := s.opts.Replier.Reply(ctx, s.request(ctx, in, rules))
 	log := s.opts.Logger.With("user_id", in.userID, "chat_id", in.scope.ChatID,
 		"update_id", in.updateID, "duration", time.Since(started).String())
 
@@ -315,9 +380,9 @@ func (s *Service) answerOf(ctx context.Context, in incoming, started time.Time) 
 
 // request builds what the agent needs. In a group the stored text names its
 // author ("Bek: ..."), because the conversation is shared. The context, for
-// this turn only, is the chat header, then in a private chat the owner
-// notice, in a group the recent chatter.
-func (s *Service) request(ctx context.Context, in incoming) agent.Request {
+// this turn only, is the chat header and the owners' standing rules, then in
+// a private chat the owner notice, in a group the recent chatter.
+func (s *Service) request(ctx context.Context, in incoming, rules []storage.GroupRule) agent.Request {
 	req := agent.Request{
 		Scope:            in.scope,
 		UserID:           in.userID,
@@ -336,7 +401,7 @@ func (s *Service) request(ctx context.Context, in incoming) agent.Request {
 	} else if s.isOwner(in.msg.From) {
 		notice = ownerNotice
 	}
-	req.Context = paragraphs(s.chatHeader(ctx, in), notice, log)
+	req.Context = paragraphs(s.chatHeader(ctx, in), s.rulesHeader(rules, in), notice, log)
 	replied := in.msg.ReplyToMessage
 	if replied != nil {
 		req.Text = withQuote(req.Text, s.quoted(ctx, replied), s.opts.Bot.ID, plainLabel(replied.From))
@@ -405,9 +470,103 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 		return s.setMuted(ctx, in, true)
 	case "/unmute":
 		return s.setMuted(ctx, in, false)
+	case "/ignore":
+		return s.ignore(ctx, in)
+	case "/unignore":
+		return s.unignore(ctx, in)
 	default:
 		return textUnknown
 	}
+}
+
+// ignoreCommandFor is how long /ignore lasts. An owner who wants longer uses
+// the group_rules tool.
+const ignoreCommandFor = 24 * time.Hour
+
+// ignore stops the bot answering, for a day, the member whose message the
+// command replies to. Like /mute it is for the group's admins and the bot's
+// owners. Admins, owners and the bot itself cannot be ignored: the first two
+// must always be able to reach it.
+func (s *Service) ignore(ctx context.Context, in incoming) string {
+	member, refusal := s.ignoreTarget(ctx, in)
+	if refusal != "" {
+		return refusal
+	}
+	if refusal := s.refuseUnignorable(ctx, in, member); refusal != "" {
+		return refusal
+	}
+	name := plainLabel(member)
+	_, err := s.opts.Rules.SetGroupRule(ctx, storage.GroupRule{
+		ChatID:    in.scope.ChatID,
+		Kind:      storage.RuleIgnore,
+		UserID:    member.ID,
+		UserName:  name,
+		SetBy:     in.userID,
+		ExpiresAt: s.opts.Now().Add(ignoreCommandFor),
+	})
+	if err != nil {
+		s.opts.Logger.Error("ignore failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
+		return textError
+	}
+	s.opts.Logger.Info("member ignored", "user_id", in.userID, "chat_id", in.scope.ChatID, "member_id", member.ID)
+	return fmt.Sprintf(textIgnored, name)
+}
+
+// unignore answers again a member ignored in this group.
+func (s *Service) unignore(ctx context.Context, in incoming) string {
+	member, refusal := s.ignoreTarget(ctx, in)
+	if refusal != "" {
+		return refusal
+	}
+	removed, err := s.opts.Rules.RemoveIgnore(ctx, in.scope.ChatID, member.ID)
+	if err != nil {
+		s.opts.Logger.Error("unignore failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
+		return textError
+	}
+	if !removed {
+		return fmt.Sprintf(textNotIgnored, plainLabel(member))
+	}
+	s.opts.Logger.Info("member unignored", "user_id", in.userID, "chat_id", in.scope.ChatID, "member_id", member.ID)
+	return fmt.Sprintf(textUnignored, plainLabel(member))
+}
+
+// ignoreTarget checks what /ignore and /unignore have in common, and returns
+// the member they are about: the author of the message the command replies
+// to, never a name typed after it. A message posted on behalf of a channel
+// or of the group has no member behind it.
+func (s *Service) ignoreTarget(ctx context.Context, in incoming) (*telegram.User, string) {
+	switch {
+	case s.opts.Rules == nil:
+		return nil, textUnknown
+	case !in.group:
+		return nil, textGroupsOnly
+	}
+	if refusal := s.refuseUnlessManager(ctx, in); refusal != "" {
+		return nil, refusal
+	}
+	replied := in.msg.ReplyToMessage
+	if replied == nil || replied.From == nil || replied.SenderChat != nil {
+		return nil, textReplyToMember
+	}
+	return replied.From, ""
+}
+
+// refuseUnignorable returns the refusal to send when member may not be
+// ignored, and "" when they may. When Telegram cannot say whether they are
+// an admin, they are not ignored.
+func (s *Service) refuseUnignorable(ctx context.Context, in incoming, member *telegram.User) string {
+	if member.ID == s.opts.Bot.ID || s.isOwner(member) {
+		return textCannotIgnore
+	}
+	isAdmin, err := s.opts.Members.IsGroupAdmin(ctx, in.scope.ChatID, member.ID)
+	if err != nil {
+		s.opts.Logger.Error("group admin check failed", "member_id", member.ID, "chat_id", in.scope.ChatID, "error", err)
+		return textError
+	}
+	if isAdmin {
+		return textCannotIgnore
+	}
+	return ""
 }
 
 // reset deletes the conversation of the chat the command was sent in. In a

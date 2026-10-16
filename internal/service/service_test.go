@@ -2360,3 +2360,289 @@ func TestOverloadReplyIsInUzbek(t *testing.T) {
 		t.Errorf("textOverloaded = %q; the groups speak Uzbek", textOverloaded)
 	}
 }
+
+// fakeRuleBook keeps standing rules in memory, as the store does without its
+// expiry, and records the rules saved.
+type fakeRuleBook struct {
+	mu     sync.Mutex
+	rules  []storage.GroupRule
+	saved  []storage.GroupRule
+	err    error // fails GroupRules
+	nextID int64
+}
+
+func (f *fakeRuleBook) GroupRules(_ context.Context, chatID int64) ([]storage.GroupRule, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.err != nil {
+		return nil, f.err
+	}
+	var out []storage.GroupRule
+	for _, r := range f.rules {
+		if r.ChatID == chatID || r.ChatID == 0 {
+			out = append(out, r)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeRuleBook) SetGroupRule(_ context.Context, r storage.GroupRule) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.nextID++
+	r.ID = f.nextID
+	f.saved = append(f.saved, r)
+	f.rules = append(f.rules, r)
+	return r.ID, nil
+}
+
+func (f *fakeRuleBook) RemoveIgnore(_ context.Context, chatID, userID int64) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	kept := f.rules[:0]
+	for _, r := range f.rules {
+		if r.ChatID != chatID || r.Kind != storage.RuleIgnore || r.UserID != userID {
+			kept = append(kept, r)
+		}
+	}
+	removed := len(kept) < len(f.rules)
+	f.rules = kept
+	return removed, nil
+}
+
+func (f *fakeRuleBook) all() []storage.GroupRule {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]storage.GroupRule(nil), f.rules...)
+}
+
+// ignoring is the rule that says not to answer userID in the test group.
+func ignoring(userID int64) storage.GroupRule {
+	return storage.GroupRule{ID: 7, ChatID: groupID, Kind: storage.RuleIgnore, UserID: userID, UserName: "Bek", SetBy: 9001, ExpiresAt: headerNow.Add(24 * time.Hour)}
+}
+
+func TestIgnoredMemberGetsNothing(t *testing.T) {
+	f := newFixture()
+	f.opts.Workers = 1
+	f.opts.Rules = &fakeRuleBook{rules: []storage.GroupRule{ignoring(userID)}}
+	quota := &fakeGroupQuota{}
+	f.opts.GroupReplies = quota
+	ann := groupMessage("Mira, hi")
+	ann.From = &telegram.User{ID: 4242, FirstName: "Ann"}
+
+	sent := f.run(
+		inGroup(groupMessage("Mira, answer me")),
+		inGroup(stickerReply()),
+		inGroup(groupMessage("@MyBot hello?", "@MyBot")),
+		inGroup(groupMessage("/help@MyBot")),
+		inGroup(ann),
+	)
+
+	expectOneReply(t, sent, "echo: hi")
+	calls := f.replier.recorded()
+	if len(calls) != 1 || calls[0].userID != 0 || calls[0].req.UserID != 4242 {
+		t.Fatalf("model calls = %+v, want only Ann's", calls)
+	}
+	if reactions := f.reactor.recorded(); len(reactions) != 0 {
+		t.Errorf("reactions = %+v; an ignored member gets none", reactions)
+	}
+	if asked := quota.asked(); len(asked) != 1 || asked[0].UserID != 4242 {
+		t.Errorf("quota asked = %+v; an ignored member's messages take none of it", asked)
+	}
+	// What they said is still in the log, as their other chatter is.
+	want := "Bek: Mira, answer me|Bek: (to You) <sticker 😂>|Bek: @MyBot hello?"
+	if got := blockLines(t, dayLog(calls[0].req.Context)); strings.Join(got, "|") != want {
+		t.Errorf("log = %q, want %q", got, want)
+	}
+}
+
+// An ignored member who became an admin afterwards can still turn the bot
+// off: the off switch has to work when the group needs it.
+func TestIgnoredMemberKeepsTheOffSwitchOnlyAsAnAdmin(t *testing.T) {
+	admin := newFixture()
+	admin.opts.Rules = &fakeRuleBook{rules: []storage.GroupRule{ignoring(groupAdminID)}}
+	expectOneReply(t, admin.run(inGroup(asAdmin(groupMessage("/mute@MyBot")))), textMuted)
+
+	member := newFixture()
+	member.opts.Rules = &fakeRuleBook{rules: []storage.GroupRule{ignoring(userID)}}
+	if sent := member.run(inGroup(groupMessage("/mute@MyBot"))); len(sent) != 0 || len(member.muter.calls) != 0 {
+		t.Errorf("sent = %+v, mute changes = %+v; an ignored member gets not even a refusal", sent, member.muter.calls)
+	}
+}
+
+// commandReplyingTo is a group command sent by sender as a reply to a message
+// from author.
+func commandReplyingTo(sender, author *telegram.User, command string) telegram.Update {
+	msg := groupMessage(command)
+	msg.From = sender
+	msg.ReplyToMessage = &telegram.Message{MessageID: 29, From: author, Text: "you're slow"}
+	return inGroup(msg)
+}
+
+var (
+	boss = &telegram.User{ID: groupAdminID, FirstName: "Boss"}
+	bek  = &telegram.User{ID: userID, FirstName: "Bek", Username: "bek"}
+)
+
+func TestIgnoreCommandByGroupAdmin(t *testing.T) {
+	f := newFixture()
+	f.opts.Workers = 1
+	f.opts.Now = func() time.Time { return headerNow }
+	book := &fakeRuleBook{}
+	f.opts.Rules = book
+
+	sent := f.run(
+		commandReplyingTo(boss, bek, "/ignore@MyBot"),
+		inGroup(groupMessage("Mira, hi")),
+		commandReplyingTo(boss, bek, "/unignore@MyBot"),
+		commandReplyingTo(boss, bek, "/unignore@MyBot"),
+		inGroup(groupMessage("Mira, hi again")),
+	)
+
+	var texts []string
+	for _, msg := range sent {
+		texts = append(texts, msg.text)
+	}
+	want := []string{
+		"Okay, I won't answer Bek @bek for the next 24 hours.",
+		"I'll answer Bek @bek again.",
+		"Bek @bek wasn't on my ignore list.",
+		"echo: hi again",
+	}
+	if strings.Join(texts, "|") != strings.Join(want, "|") {
+		t.Errorf("sent = %q\nwant %q", texts, want)
+	}
+	rule := storage.GroupRule{
+		ID: 1, ChatID: groupID, Kind: storage.RuleIgnore, UserID: userID, UserName: "Bek @bek",
+		SetBy: groupAdminID, ExpiresAt: headerNow.Add(24 * time.Hour),
+	}
+	if len(book.saved) != 1 || book.saved[0] != rule {
+		t.Errorf("saved = %+v\nwant    [%+v]", book.saved, rule)
+	}
+	if left := book.all(); len(left) != 0 {
+		t.Errorf("rules left = %+v", left)
+	}
+}
+
+func TestIgnoreCommandNeedsAManagerAndAReply(t *testing.T) {
+	channelPost := groupMessage("/ignore@MyBot")
+	channelPost.From = boss
+	channelPost.ReplyToMessage = &telegram.Message{MessageID: 29, From: &telegram.User{ID: 136817688, IsBot: true}, SenderChat: &telegram.Chat{ID: -100500, Type: "channel"}}
+	cases := map[string]struct {
+		update telegram.Update
+		want   string
+	}{
+		"a member":            {commandReplyingTo(bek, &telegram.User{ID: 4242, FirstName: "Ann"}, "/ignore@MyBot"), textAdminsOnly},
+		"no reply":            {inGroup(asAdmin(groupMessage("/ignore@MyBot"))), textReplyToMember},
+		"unignore, no reply":  {inGroup(asAdmin(groupMessage("/unignore@MyBot"))), textReplyToMember},
+		"a channel's message": {inGroup(channelPost), textReplyToMember},
+		"a private chat":      {textFrom(userID, "/ignore"), textGroupsOnly},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			book := &fakeRuleBook{}
+			f.opts.Rules = book
+
+			expectOneReply(t, f.run(c.update), c.want)
+			if len(book.saved) != 0 {
+				t.Errorf("saved = %+v", book.saved)
+			}
+		})
+	}
+}
+
+func TestIgnoreCommandRefusesAdmins(t *testing.T) {
+	cases := map[string]*telegram.User{
+		"a group admin": boss,
+		"an owner":      {ID: 9001, FirstName: "Azizbek", Username: "Pronium"},
+		"the bot":       {ID: botID, IsBot: true, FirstName: "Mira", Username: botUsername},
+	}
+	// The bot's own administrator asks, so that only the target is looked up.
+	requester := &telegram.User{ID: adminID, FirstName: "Admin"}
+	for name, target := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			f.opts.OwnerUsernames = []string{ownerUsername}
+			book := &fakeRuleBook{}
+			f.opts.Rules = book
+
+			expectOneReply(t, f.run(commandReplyingTo(requester, target, "/ignore@MyBot")), textCannotIgnore)
+			if len(book.saved) != 0 {
+				t.Errorf("saved = %+v", book.saved)
+			}
+		})
+	}
+
+	t.Run("admin check fails", func(t *testing.T) {
+		f := newFixture()
+		f.members.err = errors.New("telegram: 502 Bad Gateway")
+		book := &fakeRuleBook{}
+		f.opts.Rules = book
+
+		expectOneReply(t, f.run(commandReplyingTo(requester, bek, "/ignore@MyBot")), textError)
+		if len(book.saved) != 0 {
+			t.Errorf("saved = %+v; Bek might be an admin", book.saved)
+		}
+	})
+}
+
+func TestRulesSurviveMuteAndReset(t *testing.T) {
+	f := newFixture()
+	f.opts.Workers = 1
+	instruction := storage.GroupRule{ID: 12, ChatID: groupID, Kind: storage.RuleInstruction, Text: "No finance talk.", SetBy: 9001}
+	book := &fakeRuleBook{rules: []storage.GroupRule{instruction}}
+	f.opts.Rules = book
+
+	f.run(
+		inGroup(asAdmin(groupMessage("/mute@MyBot"))),
+		inGroup(asAdmin(groupMessage("/unmute@MyBot"))),
+		inGroup(asAdmin(groupMessage("/reset@MyBot"))),
+		inGroup(groupMessage("Mira, can we talk money?")),
+	)
+
+	if context := onlyRequest(t, f).req.Context; !strings.Contains(context, "\n- (#12) No finance talk.]") {
+		t.Errorf("context = %q, want the standing instruction", context)
+	}
+	if rules := book.all(); len(rules) != 1 || rules[0] != instruction {
+		t.Errorf("rules = %+v, want them untouched", rules)
+	}
+}
+
+func TestRulesThatCannotBeLoadedAreLeftOut(t *testing.T) {
+	f := newFixture()
+	f.opts.Rules = &fakeRuleBook{rules: []storage.GroupRule{ignoring(userID)}, err: errors.New("database down")}
+
+	sent := f.run(inGroup(groupMessage("Mira, hi")))
+
+	expectOneReply(t, sent, "echo: hi")
+	if context := onlyRequest(t, f).req.Context; strings.Contains(context, "Standing rules") {
+		t.Errorf("context = %q", context)
+	}
+}
+
+func TestTurnTellsToolsTheRepliedMessage(t *testing.T) {
+	f := newFixture()
+	f.opts.OwnerUsernames = []string{ownerUsername}
+	request := groupMessage("Mira, delete this")
+	request.ReplyToMessage = &telegram.Message{
+		MessageID: 29,
+		From:      &telegram.User{ID: 9001, FirstName: "Azizbek", Username: "Pronium"},
+		Text:      strings.Repeat("я", 600),
+	}
+
+	f.run(inGroup(request), inGroup(groupMessage("Mira, hi")))
+
+	calls := f.replier.recorded()
+	if len(calls) != 2 {
+		t.Fatalf("model calls = %d, want 2", len(calls))
+	}
+	caller := calls[0].caller
+	want := tools.Target{MessageID: 29, UserID: 9001, Name: "Azizbek @Pronium", Owner: true, Text: strings.Repeat("я", 499) + "…"}
+	if !caller.Human || caller.MessageID != 30 || caller.Target == nil || *caller.Target != want {
+		t.Errorf("caller = %+v, target = %+v\nwant target %+v", caller, caller.Target, want)
+	}
+	if target := calls[1].caller.Target; target != nil {
+		t.Errorf("target without a reply = %+v", target)
+	}
+}

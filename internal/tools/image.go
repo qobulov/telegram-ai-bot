@@ -19,15 +19,39 @@ const (
 	imageTimeout = 50 * time.Second
 )
 
-// Caller is who a turn is for and where its answer goes.
+// Caller is who a turn is for and where its answer goes. Every field comes
+// from the Telegram update, never from the model.
 type Caller struct {
 	UserID int64
 	ChatID int64
 	// Owner is true for the bot's owners, who have no daily limits.
 	Owner bool
+	// Human is false when another bot is asking.
+	Human bool
 	// UpdateID is the Telegram update being answered. A broadcast drafted
 	// in one update can only be confirmed in another.
 	UpdateID int64
+	// MessageID is the message being answered.
+	MessageID int64
+	// Target is the message the caller replied to, or nil. Tools that act on
+	// a member act on its author: the model cannot name anyone else.
+	Target *Target
+}
+
+// MaxTargetRunes is the most of a Target's text that is kept.
+const MaxTargetRunes = 500
+
+// Target is the message a caller replied to, and its author.
+type Target struct {
+	MessageID int64
+	UserID    int64
+	// Name is the author's first name and @username.
+	Name  string
+	IsBot bool
+	// Owner is true when the author is one of the bot's owners.
+	Owner bool
+	// Text is the message's text or caption, at most MaxTargetRunes.
+	Text string
 }
 
 // Drawing is a picture made during a turn, to be sent with the answer.

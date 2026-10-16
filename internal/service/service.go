@@ -84,6 +84,14 @@ type ChatActor interface {
 	SendChatAction(ctx context.Context, chatID int64, action string) error
 }
 
+// RuleBook keeps the owners' standing rules, among them whom not to answer.
+// They live apart from the conversation, so /mute and /reset leave them.
+type RuleBook interface {
+	GroupRules(ctx context.Context, chatID int64) ([]storage.GroupRule, error)
+	SetGroupRule(ctx context.Context, r storage.GroupRule) (int64, error)
+	RemoveIgnore(ctx context.Context, chatID, userID int64) (bool, error)
+}
+
 // Options configures a Service. A field may be left nil when its comment
 // says what nil, or leaving it unset, does; lists may be empty. The other
 // fields are required.
@@ -169,6 +177,9 @@ type Options struct {
 	// ChatActor shows "typing" while the model works on an answer; nil
 	// shows nothing.
 	ChatActor ChatActor
+	// Rules keeps the owners' standing rules and the ignore list; nil means
+	// there are none, and /ignore and /unignore are unknown commands.
+	Rules RuleBook
 	// MaxGroupReplyChars is the longest answer posted in a group, in UTF-16
 	// code units as Telegram counts them.
 	MaxGroupReplyChars int

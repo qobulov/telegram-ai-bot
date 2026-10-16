@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 )
 
@@ -167,6 +168,60 @@ func TestRightsInWords(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if got := rightsInWords(c.rights); got != c.want {
 				t.Errorf("rightsInWords(%v) = %q, want %q", c.rights, got, c.want)
+			}
+		})
+	}
+}
+
+// standingRules are an owner's rules for the Devs group, two owners' forms of
+// address, and a rule of another group.
+func standingRules() []storage.GroupRule {
+	return []storage.GroupRule{
+		{ID: 12, ChatID: groupID, Kind: storage.RuleInstruction, Text: "Do not talk\nabout [finance].", SetBy: 9001, ExpiresAt: time.Date(2026, 10, 23, 15, 4, 0, 0, tashkent)},
+		{ID: 13, ChatID: groupID, Kind: storage.RuleIgnore, UserID: 4242, UserName: "Ann @ann", SetBy: 9001, ExpiresAt: time.Date(2026, 10, 17, 15, 0, 0, 0, time.UTC)},
+		{ID: 14, ChatID: groupID, Kind: storage.RuleInstruction, Text: "Call Bek professor.", SetBy: 9001},
+		{ID: 15, ChatID: 0, Kind: storage.RuleAddress, UserID: 9001, Text: `my "aka"`, SetBy: 9001},
+		{ID: 16, ChatID: 0, Kind: storage.RuleAddress, UserID: 7001, Text: "boss", SetBy: 7001},
+		{ID: 17, ChatID: -100500, Kind: storage.RuleInstruction, Text: "Elsewhere.", SetBy: 9001},
+	}
+}
+
+// contextWithRules is the context of the one model call for update, with
+// standingRules in force and owners configured.
+func contextWithRules(t *testing.T, update telegram.Update) string {
+	t.Helper()
+	f := newFixture()
+	withRights(f, &fakeBotRights{})
+	f.opts.OwnerUsernames = []string{ownerUsername}
+	f.opts.Rules = &fakeRuleBook{rules: standingRules()}
+	f.run(update)
+	return onlyRequest(t, f).req.Context
+}
+
+func TestRulesHeaderListsInstructionsAndAddress(t *testing.T) {
+	rules := "[Standing rules from your owners for this group:\n" +
+		"- (#12) Do not talk about (finance). (until 23 Oct)\n" +
+		"- (#14) Call Bek professor.\n" +
+		"- Do not answer Ann @ann; ignored until 17 Oct 20:00.]"
+	address := `[Address the owner who is writing as: "my 'aka'".]`
+	ownerInDevs := inDevs("Mira, hi")
+	fromOwner(ownerInDevs.Message)
+	ownerInPrivate := textFrom(9001, "hi")
+	ownerInPrivate.Message.From.Username = ownerUsername
+
+	cases := map[string]struct {
+		update telegram.Update
+		want   string
+	}{
+		"an owner in the group": {ownerInDevs, groupHeader("You are not an admin here.") + "\n\n" + rules + "\n" + address},
+		"a member in the group": {inDevs("Mira, hi"), groupHeader("You are not an admin here.") + "\n\n" + rules},
+		"an owner in private":   {ownerInPrivate, "[Now: " + headerDate + ".]\n\n" + address + "\n\n" + ownerNotice},
+		"a member in private":   {textFrom(userID, "hi"), "[Now: " + headerDate + ".]"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := contextWithRules(t, c.update); got != c.want {
+				t.Errorf("context = %q\nwant      %q", got, c.want)
 			}
 		})
 	}

@@ -301,7 +301,8 @@ type Expired struct {
 // Expire deletes messages older than maxAge, then the conversations that have
 // no messages left. A turn's messages are written in one transaction and
 // share its timestamp, so a turn is always kept or removed whole. Settings
-// such as a group's mute are not history and are kept.
+// such as a group's mute are not history and are kept; standing rules are
+// kept until their own expiry, whatever maxAge is.
 func (s *Store) Expire(ctx context.Context, maxAge time.Duration) (Expired, error) {
 	cutoff := time.Now().Add(-maxAge)
 	var expired Expired
@@ -331,6 +332,9 @@ func (s *Store) Expire(ctx context.Context, maxAge time.Duration) (Expired, erro
 			return err
 		}
 		if _, err = tx.Exec(ctx, `DELETE FROM group_replies WHERE created_at < $1`, cutoff); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(ctx, `DELETE FROM group_rules WHERE expires_at < now()`); err != nil {
 			return err
 		}
 		_, err = tx.Exec(ctx, `DELETE FROM broadcasts WHERE created_at < $1`, cutoff)

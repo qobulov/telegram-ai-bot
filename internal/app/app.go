@@ -184,6 +184,12 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 				Drafts: store,
 				Sender: groupSender{client: bot.Client},
 			}),
+			tools.RulesTool(tools.RulesOptions{
+				Store:    store,
+				Admins:   groupMembers{client: bot.Client, botID: bot.User.ID},
+				BotID:    bot.User.ID,
+				Location: cfg.Location,
+			}),
 		)
 	}
 	registry, err := tools.NewRegistry(cfg.IsAdmin, builtin...)
@@ -257,6 +263,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Reactor:               bot.Client,
 		ChatActor:             bot.Client,
 		BotRights:             botRights{store: store, members: bot.Client, botID: bot.User.ID, logger: logger},
+		Rules:                 store,
 	}
 	if mode.Serverless {
 		opts.Workers, opts.QueueSize = 0, 0
