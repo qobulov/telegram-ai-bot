@@ -11,9 +11,9 @@ import (
 // formatting characters (such as right-to-left overrides) dropped,
 // whitespace folded and the length capped at limit characters.
 func cleanText(text string, limit int) string {
-	text = dropBlocks(text, "script")
-	text = dropBlocks(text, "style")
-	text = html.UnescapeString(stripTags(text))
+	text = html.UnescapeString(stripMarkup(text))
+	// Again, for a feed that escapes its HTML twice.
+	text = stripMarkup(text)
 	text = strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
 			return ' '
@@ -23,12 +23,16 @@ func cleanText(text string, limit int) string {
 	return truncate(strings.Join(strings.Fields(text), " "), limit)
 }
 
+func stripMarkup(text string) string {
+	return stripTags(dropBlocks(dropBlocks(text, "script"), "style"))
+}
+
 // dropBlocks removes <name ...>...</name> elements with their content.
 func dropBlocks(text, name string) string {
 	lower := asciiLower(text)
 	var b strings.Builder
 	for {
-		start := strings.Index(lower, "<"+name)
+		start := indexOpening(lower, name)
 		if start < 0 {
 			break
 		}
@@ -43,6 +47,24 @@ func dropBlocks(text, name string) string {
 	}
 	b.WriteString(text)
 	return b.String()
+}
+
+// indexOpening finds the first <name tag in lower: "<script>" or
+// "<script src=...>", but not "<scripture>", which is just a word.
+func indexOpening(lower, name string) int {
+	offset := 0
+	for {
+		start := strings.Index(lower[offset:], "<"+name)
+		if start < 0 {
+			return -1
+		}
+		start += offset
+		end := start + len("<"+name)
+		if end == len(lower) || strings.IndexByte(" \t\r\n>/", lower[end]) >= 0 {
+			return start
+		}
+		offset = end
+	}
 }
 
 // asciiLower lowers only A to Z, so byte offsets still match text.

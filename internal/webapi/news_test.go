@@ -258,6 +258,9 @@ func TestCleanText(t *testing.T) {
 		{"x < y and y > z", "x < y and y > z"},
 		{"zero​width‮flip\u0000", "zero width flip"},
 		{"<script>steal()</script><style>p{}</style>kept", "kept"},
+		{`<SCRIPT type="x">steal()</script>kept`, "kept"},
+		{"Bible <scripture> study and more words after", "Bible study and more words after"},
+		{"&lt;b&gt;double&lt;/b&gt; escaped &lt;3", "double escaped <3"},
 		{strings.Repeat("so'z ", 40), strings.TrimSpace(strings.Repeat("so'z ", 10)) + "…"},
 		{strings.Repeat("uzun", 20), strings.Repeat("uzun", 12) + "u…"},
 	}
