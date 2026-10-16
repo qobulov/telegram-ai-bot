@@ -138,6 +138,11 @@ type ModerationOptions struct {
 	// Location is the time zone of the times reported.
 	Location *time.Location
 	Now      func() time.Time
+	// OwnersByID is true when the bot's owners are recognised by their
+	// Telegram ID. Only then may an owner moderate without being an admin,
+	// and is an owner spared: a username can be given up and taken by
+	// someone else, who would get both.
+	OwnersByID bool
 }
 
 type moderationArgs struct {
@@ -285,10 +290,10 @@ func (m *Moderation) check(ctx context.Context, o order) error {
 	return m.checkPace(ctx, o.caller)
 }
 
-// checkRequester lets an owner ask in any group, and anyone else only when
-// Telegram says they hold the right themselves.
+// checkRequester lets an owner known by ID ask in any group, and anyone
+// else only when Telegram says they hold the right themselves.
 func (m *Moderation) checkRequester(ctx context.Context, caller Caller, right string) error {
-	if caller.Owner {
+	if caller.Owner && m.opts.OwnersByID {
 		return nil
 	}
 	member, err := m.opts.Members.GetChatMember(ctx, caller.ChatID, caller.UserID)
@@ -317,7 +322,7 @@ func (m *Moderation) checkBot(ctx context.Context, chatID int64, right string) e
 }
 
 // checkTarget keeps the bot off those it must not act on: Telegram's own
-// accounts, the bot's owners and the group's admins. The bot and the person
+// accounts, the bot's owners known by ID and the group's admins. The bot and the person
 // asking may have their own messages deleted, pinned or unpinned, but never
 // mute or ban themselves. A confirmed action's target is not known to be an
 // owner or not; that was checked when it was asked for.
@@ -326,7 +331,7 @@ func (m *Moderation) checkTarget(ctx context.Context, o order) error {
 	if userID == m.opts.BotID || userID == o.caller.UserID {
 		return ownMessageOnly(o.action)
 	}
-	if isTelegramAccount(userID) || o.target.Owner {
+	if isTelegramAccount(userID) || (o.target.Owner && m.opts.OwnersByID) {
 		return &DeniedError{Message: immune}
 	}
 	member, err := m.opts.Members.GetChatMember(ctx, o.caller.ChatID, userID)

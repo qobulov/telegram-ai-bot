@@ -433,8 +433,9 @@ Set `BOT_OWNER_USERNAME` to your Telegram username (with or without `@`);
 for several owners, separate them with commas. The bot then knows you made
 it: it is friendly to you, does what you ask in
 the chat within its limits, and lets you use `/mute`, `/unmute`, `/reset`,
-`/ignore` and `/unignore` in any group, and have it moderate wherever it
-holds the admin right (see [Moderation](#moderation)). In groups every
+`/ignore` and `/unignore` in any group, and, once `BOT_OWNER_IDS` is set,
+have it moderate wherever it holds the admin right (see
+[Moderation](#moderation)). In groups every
 sender is shown to the model by first name and `@username`.
 Your messages are additionally marked `[owner]`, based on your
 Telegram account, so someone who copies your name or says they are the owner
@@ -444,7 +445,9 @@ chats or on pictures.
 Also set `BOT_OWNER_IDS` to the owners' numeric Telegram IDs (the bot logs
 `user_id=` for each message). Then only those accounts are owners, and the
 usernames merely name them in the prompt: a username can be given up and
-later taken by someone else, an ID cannot.
+later taken by someone else, an ID cannot. Without it, owners moderate only
+where they are admins with the right, like anyone else, and are not spared
+by moderation; the bot logs a warning at startup.
 
 Owners can give the bot orders that last, with the owner-only `group_rules`
 tool; see [Standing rules and the ignore list](#standing-rules-and-the-ignore-list).
@@ -688,7 +691,8 @@ check is made in code:
 - **Target:** always the message the person replied to, as Telegram
   delivered it. Nothing the model, a member or a quoted message writes can
   choose whom she acts on.
-- **Who may ask:** a bot owner, or the group's creator or an administrator
+- **Who may ask:** a bot owner recognised by `BOT_OWNER_IDS` (not by
+  username alone), or the group's creator or an administrator
   who holds the matching right, as Telegram reports it at that moment:
   *delete messages* for delete; *ban users* for mute, unmute, ban and
   unban; *pin messages* for pin and unpin.
@@ -697,8 +701,8 @@ check is made in code:
   offer what she cannot do. Give her only the rights you want her to use.
 - **Never a target:** the person asking (they may still have their own
   message deleted or pinned), the bot itself (its own messages may be
-  deleted or pinned), the bot's owners, the group's admins, and Telegram's
-  service accounts.
+  deleted or pinned), the bot's owners recognised by `BOT_OWNER_IDS`, the
+  group's admins, and Telegram's service accounts.
 - **Limits:** at most 10 actions per person in 10 minutes. When Telegram
   cannot say who may do what, nothing is done.
 - **Once only:** each action is recorded in `moderation_actions` under the
@@ -1231,7 +1235,8 @@ Built in:
       message they replied to, taken from the update, never from the model;
       admins and owners cannot be ignored.
 - [x] With `BOT_OWNER_IDS` set, owners are recognised by account ID, which
-      cannot be passed on the way a username can.
+      cannot be passed on the way a username can. Without it, being an owner
+      grants no moderation and no protection from it.
 - [x] Input length, output tokens, tool output size, tool run time, tool
       calls per message and time per message are all limited.
 - [x] Group reply quotas, the private chats' daily limit, replies to bots

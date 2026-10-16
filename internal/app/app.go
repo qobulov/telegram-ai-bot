@@ -176,7 +176,12 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Store:     store,
 		Rights:    store,
 		Location:  cfg.Location,
+		// A username can change hands; only an ID makes an owner a moderator.
+		OwnersByID: len(cfg.OwnerIDs) > 0,
 	})
+	if len(cfg.OwnerUsernames) > 0 && len(cfg.OwnerIDs) == 0 {
+		logger.Warn("BOT_OWNER_IDS is not set: owners are known only by username, which can change hands, so they moderate only with their own admin rights")
+	}
 	registry, err := tools.NewRegistry(cfg.IsAdmin, builtinTools(cfg, store, bot, moderation.Tool())...)
 	if err != nil {
 		return nil, err

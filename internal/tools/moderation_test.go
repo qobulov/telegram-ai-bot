@@ -315,14 +315,15 @@ func newModerationEnv(t *testing.T) *moderationEnv {
 		rights:   &fakeRightsBook{},
 	}
 	env.opts = ModerationOptions{
-		BotID:     rulesBotID,
-		Members:   env.chat,
-		Telegram:  env.telegram,
-		Questions: env.telegram,
-		Store:     env.audit,
-		Rights:    env.rights,
-		Location:  tashkent,
-		Now:       func() time.Time { return rulesNow },
+		BotID:      rulesBotID,
+		Members:    env.chat,
+		Telegram:   env.telegram,
+		Questions:  env.telegram,
+		Store:      env.audit,
+		Rights:     env.rights,
+		Location:   tashkent,
+		Now:        func() time.Time { return rulesNow },
+		OwnersByID: true,
 	}
 	env.moderation = NewModeration(env.opts)
 	env.registry = mustRegistry(t, env.moderation.Tool())
@@ -619,6 +620,27 @@ func TestModerateOwnerMayActWithoutBeingAdmin(t *testing.T) {
 	}
 	if slices.Contains(env.chat.lookups(), userID) {
 		t.Error("the owner's own rights were looked up")
+	}
+}
+
+// Without BOT_OWNER_IDS an owner is known only by a username, which can be
+// given up and registered by someone else: that is no ground to moderate
+// any group, nor to be spared.
+func TestModerateOwnerByUsernameIsAnOrdinaryMember(t *testing.T) {
+	env := newModerationEnv(t)
+	env.opts.OwnersByID = false
+	env.moderation = NewModeration(env.opts)
+	env.registry = mustRegistry(t, env.moderation.Tool())
+	env.chat.set(userID, telegram.ChatMember{Status: "member"})
+
+	expectRefusal(t, env.moderate(ownerAsking(100, bekTarget()), `{"action":"delete"}`), "forbidden", "only this group's admins with that right")
+	env.nothingDone(t)
+
+	// An admin may have an owner's message deleted.
+	env.chat.set(userID, admin(moderationRights...))
+	owners := &Target{MessageID: 29, UserID: 9002, Name: "Muhammad", Owner: true}
+	if c := env.done(t, asking(101, owners), `{"action":"delete"}`); !strings.HasPrefix(c.Text, "Done:") {
+		t.Errorf("deleting an owner's message = %+v", c)
 	}
 }
 
