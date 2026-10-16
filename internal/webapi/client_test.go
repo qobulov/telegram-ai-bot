@@ -116,6 +116,32 @@ func TestClientFollowsOnlyShortSameHostRedirects(t *testing.T) {
 	}
 }
 
+func TestRedirectsKeepTheHostAndScheme(t *testing.T) {
+	request := func(address string) *http.Request {
+		r, err := http.NewRequest(http.MethodGet, address, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	first := request("https://api.football-data.org/v4/competitions/PL")
+	tests := []struct {
+		to     string
+		wantOK bool
+	}{
+		{to: "https://api.football-data.org/v4/competitions/PL/", wantOK: true},
+		{to: "http://api.football-data.org/v4/competitions/PL", wantOK: false},
+		{to: "https://evil.example/v4/competitions/PL", wantOK: false},
+		{to: "https://api.football-data.org:8443/v4/competitions/PL", wantOK: false},
+	}
+	for _, test := range tests {
+		err := sameHostRedirects(request(test.to), []*http.Request{first})
+		if (err == nil) != test.wantOK {
+			t.Errorf("redirect to %s: error = %v, want allowed %v", test.to, err, test.wantOK)
+		}
+	}
+}
+
 func TestClientBodyLimitCanBeRaised(t *testing.T) {
 	u := newUpstream(t, map[string]stub{"/feed": ok(strings.Repeat("a", 100<<10))})
 

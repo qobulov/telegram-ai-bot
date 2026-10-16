@@ -69,13 +69,18 @@ func defaultHTTPClient() *http.Client {
 }
 
 // sameHostRedirects keeps a redirect from taking a request, and its key
-// headers, to another host.
+// headers, to another host, or from https down to plain http on the same
+// host: Go copies custom headers such as X-Auth-Token on a same-host
+// redirect, so either would hand the key to whoever is listening.
 func sameHostRedirects(req *http.Request, via []*http.Request) error {
 	if len(via) > maxRedirects {
 		return errors.New("too many redirects")
 	}
 	if req.URL.Host != via[0].URL.Host {
 		return errors.New("redirected to another host")
+	}
+	if req.URL.Scheme != via[0].URL.Scheme {
+		return errors.New("redirected to another scheme")
 	}
 	return nil
 }
