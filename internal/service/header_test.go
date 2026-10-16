@@ -241,3 +241,40 @@ func TestRulesHeaderListsInstructionsAndAddress(t *testing.T) {
 		})
 	}
 }
+
+// Told "don't answer this" in reply to a member, the model stayed silent
+// once instead of saving the order with group_rules ignore. When an owner
+// replies to a member, the context ends with whom the order would mean.
+func TestOwnerReplyToAMemberNamesTheMember(t *testing.T) {
+	member := &telegram.User{ID: 4242, FirstName: "Ann", Username: "ann"}
+	asMember := func(msg *telegram.Message) *telegram.Message { return msg }
+	hint := "[Your owner is replying to a message from Ann @ann. If they tell you not to answer, in any words, they mean Ann @ann from now on: call group_rules ignore before you react; a reaction or [silent] alone saves nothing.]"
+	cases := map[string]struct {
+		from    func(*telegram.Message) *telegram.Message
+		replied *telegram.User
+		rules   bool
+		want    bool
+	}{
+		"an owner replying to a member": {fromOwner, member, true, true},
+		"a member replying to a member": {asMember, member, true, false},
+		"an owner replying to the bot":  {fromOwner, &telegram.User{ID: botID, IsBot: true, FirstName: "Mira"}, true, false},
+		"an owner replying to an owner": {fromOwner, &telegram.User{ID: 9002, FirstName: "Ali", Username: ownerUsername}, true, false},
+		"no standing rules":             {fromOwner, member, false, false},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			f.opts.OwnerUsernames = []string{ownerUsername}
+			if c.rules {
+				f.opts.Rules = &fakeRuleBook{}
+			}
+			msg := c.from(groupMessage("Mira, don't answer this"))
+			msg.ReplyToMessage = &telegram.Message{MessageID: 29, From: c.replied, Chat: msg.Chat, Text: "hello all"}
+			f.run(inGroup(msg))
+			context := onlyRequest(t, f).req.Context
+			if got := strings.HasSuffix(context, "\n\n"+hint); got != c.want {
+				t.Errorf("context ends with the hint = %v, want %v: %q", got, c.want, context)
+			}
+		})
+	}
+}
