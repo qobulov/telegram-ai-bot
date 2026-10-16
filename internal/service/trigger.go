@@ -31,41 +31,58 @@ const (
 	quoteEnd        = "[End of quoted message]"
 )
 
-// address decides whether a group message is meant for the bot. When it is,
-// address returns the message text with the part that addresses the bot (its
-// mention or display name) removed.
+// trigger is how a group message addressed the bot. The difference matters
+// for applause: a sticker sent only as a reply to the bot needs no words,
+// while being called by name or mention always gets an answer.
+type trigger int
+
+const (
+	triggerNone trigger = iota
+	triggerCommand
+	triggerMention
+	triggerWakeWord
+	// triggerReply is a reply to one of the bot's messages that does not
+	// otherwise call it.
+	triggerReply
+)
+
+// address decides whether a group message is meant for the bot, and how it
+// was addressed. When it is, address returns the message text with the part
+// that addresses the bot (its mention or display name) removed.
 //
 // In a group a command counts only when it names this bot ("/reset@MyBot").
 // A plain "/reset", or one naming another bot, may be meant for someone else
 // and is ignored however the rest of the message addresses the bot.
-func (s *Service) address(msg *telegram.Message) (string, bool) {
-	text, addressed := s.addressedText(msg)
-	if !addressed {
-		return "", false
+func (s *Service) address(msg *telegram.Message) (string, trigger) {
+	text, how := s.addressedText(msg)
+	if how == triggerNone {
+		return "", triggerNone
 	}
 	if target, isCommand := commandTarget(text); isCommand && !strings.EqualFold(target, s.opts.Bot.Username) {
-		return "", false
+		return "", triggerNone
 	}
-	return text, true
+	return text, how
 }
 
-func (s *Service) addressedText(msg *telegram.Message) (string, bool) {
+// addressedText checks the ways of addressing the bot from the most
+// explicit to the least, so a reply that also names the bot counts as a call.
+func (s *Service) addressedText(msg *telegram.Message) (string, trigger) {
 	text, entities := msg.Content()
 	if _, isCommand := commandTarget(text); isCommand {
-		return strings.TrimSpace(text), true
+		return strings.TrimSpace(text), triggerCommand
 	}
 	if mentions := s.mentionsOfBot(text, entities); len(mentions) > 0 {
-		return s.orName(telegram.RemoveEntities(text, mentions)), true
+		return s.orName(telegram.RemoveEntities(text, mentions)), triggerMention
 	}
 	if s.opts.WakeWordTrigger {
 		if rest, called := stripWakeWord(text, s.opts.WakeWords); called {
-			return rest, true
+			return rest, triggerWakeWord
 		}
 	}
 	if s.opts.ReplyTrigger && s.isFromBot(msg.ReplyToMessage) {
-		return strings.TrimSpace(text), true
+		return strings.TrimSpace(text), triggerReply
 	}
-	return "", false
+	return "", triggerNone
 }
 
 // orName stands in for a message that was nothing but a mention of the bot:

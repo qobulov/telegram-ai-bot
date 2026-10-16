@@ -215,7 +215,7 @@ func TestLoadCharacterDefaults(t *testing.T) {
 	if cfg.BotDisplayName != "Maria" || len(cfg.WakeWords) != 1 || cfg.WakeWords[0] != "maria" {
 		t.Errorf("name = %q, wake words = %q", cfg.BotDisplayName, cfg.WakeWords)
 	}
-	if cfg.AmbientMessages != 200 || cfg.MaxGroupReplyChars != 4000 || cfg.GroupRateLimitPerMinute != 10 {
+	if cfg.AmbientMessages != 200 || cfg.MaxGroupReplyChars != 4000 || cfg.GroupRateLimitPerMinute != 6 {
 		t.Errorf("cfg = %d, %d, %d", cfg.AmbientMessages, cfg.MaxGroupReplyChars, cfg.GroupRateLimitPerMinute)
 	}
 }
@@ -359,9 +359,15 @@ func TestLoadAmbientMessages(t *testing.T) {
 }
 
 func TestLoadGroupLimits(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil || cfg.GroupRateLimitPerMinute != 6 || cfg.MemberRepliesPer10Min != 4 {
+		t.Fatalf("defaults: %d a minute per group, %d per member in 10 minutes, err = %v; want 6 and 4",
+			cfg.GroupRateLimitPerMinute, cfg.MemberRepliesPer10Min, err)
+	}
 	cases := map[string]map[string]bool{
 		"MAX_GROUP_REPLY_LENGTH":      {"0": false, "4097": false, "4096": true, "1": true},
 		"GROUP_RATE_LIMIT_PER_MINUTE": {"0": false, "-1": false, "5": true},
+		"MEMBER_REPLIES_PER_10_MIN":   {"0": false, "-1": false, "1": true, "10": true},
 	}
 	for name, values := range cases {
 		for value, ok := range values {

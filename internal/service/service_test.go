@@ -208,7 +208,69 @@ func (f *fakeBotQuota) ReserveBotReply(_ context.Context, chatID, _ int64, _ tim
 	return true, nil
 }
 
+// reaction is an emoji the bot set on a message.
+type reaction struct {
+	chatID, messageID int64
+	emoji             string
+}
+
+// fakeReactor records the bot's emoji reactions.
+type fakeReactor struct {
+	mu        sync.Mutex
+	reactions []reaction
+	err       error
+}
+
+func (f *fakeReactor) SetMessageReaction(_ context.Context, chatID, messageID int64, emoji string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.reactions = append(f.reactions, reaction{chatID: chatID, messageID: messageID, emoji: emoji})
+	return f.err
+}
+
+func (f *fakeReactor) recorded() []reaction {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]reaction(nil), f.reactions...)
+}
+
+// fakeGroupQuota counts answers per chat and per member like the store does,
+// without its time windows, and records what it was asked.
+type fakeGroupQuota struct {
+	mu        sync.Mutex
+	calls     []storage.ReplyQuota
+	perChat   map[int64]int
+	perMember map[[2]int64]int
+	err       error
+}
+
+func (f *fakeGroupQuota) ReserveGroupReply(_ context.Context, q storage.ReplyQuota) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, q)
+	if f.err != nil {
+		return false, f.err
+	}
+	if f.perChat == nil {
+		f.perChat, f.perMember = map[int64]int{}, map[[2]int64]int{}
+	}
+	member := [2]int64{q.ChatID, q.UserID}
+	if f.perChat[q.ChatID] >= q.PerMinute || f.perMember[member] >= q.PerMember {
+		return false, nil
+	}
+	f.perChat[q.ChatID]++
+	f.perMember[member]++
+	return true, nil
+}
+
+func (f *fakeGroupQuota) asked() []storage.ReplyQuota {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]storage.ReplyQuota(nil), f.calls...)
+}
+
 type fixture struct {
+	reactor     *fakeReactor
 	botQuota    *fakeBotQuota
 	sender      *fakeSender
 	replier     *fakeReplier
@@ -227,7 +289,7 @@ func newFixture() *fixture {
 		sender: &fakeSender{}, replier: &fakeReplier{}, resetter: &fakeResetter{}, recorder: &fakeRecorder{},
 		members: &fakeMembers{admins: map[int64]bool{groupAdminID: true}}, muter: &fakeMuter{},
 		media: newFakeMedia(), chatLog: newMemoryLog(), transcriber: &fakeTranscriber{text: "salom dunyo"},
-		botQuota: &fakeBotQuota{},
+		botQuota: &fakeBotQuota{}, reactor: &fakeReactor{},
 	}
 	f.opts = Options{
 		Sender:        f.sender,
@@ -264,6 +326,10 @@ func newFixture() *fixture {
 		Transcriber:        f.transcriber,
 		BotReplies:         f.botQuota,
 		BotRepliesPer10Min: 3,
+		Reactor:            f.reactor,
+		// GroupReplies is left nil, which does not limit; the tests of the
+		// group quota set one.
+		MemberRepliesPer10Min: 4,
 	}
 	return f
 }
@@ -965,6 +1031,8 @@ func TestAddressedMessageWithoutTextGetsTextOnlyReply(t *testing.T) {
 
 func TestUnaddressedGroupMessagesCostNothing(t *testing.T) {
 	f := newFixture()
+	quota := &fakeGroupQuota{}
+	f.opts.GroupReplies = quota
 	f.opts.RatePerMinute = 1
 	f.opts.GroupRatePerMinute = 1
 	var updates []telegram.Update
@@ -976,6 +1044,9 @@ func TestUnaddressedGroupMessagesCostNothing(t *testing.T) {
 	sent := f.run(updates...)
 
 	expectOneReply(t, sent, "echo: hi")
+	if asked := quota.asked(); len(asked) != 1 {
+		t.Errorf("quota asked %d times, want only for the addressed message", len(asked))
+	}
 }
 
 func TestGroupSendersThatAreIgnored(t *testing.T) {
@@ -1049,43 +1120,85 @@ func TestFixedRepliesAreNotRecorded(t *testing.T) {
 	}
 }
 
-func TestGroupRateLimitIsSharedByMembers(t *testing.T) {
+func TestGroupQuotaDeniedStaysSilent(t *testing.T) {
 	f := newFixture()
-	f.opts.RatePerMinute = 100
-	f.opts.GroupRatePerMinute = 2
+	quota := &fakeGroupQuota{}
+	f.opts.GroupReplies = quota
+	f.opts.GroupRatePerMinute, f.opts.MemberRepliesPer10Min = 6, 2
 	f.opts.Workers = 1
-	var updates []telegram.Update
-	for member := int64(1); member <= 5; member++ {
-		msg := groupMessage("@MyBot hi", "@MyBot")
-		msg.From.ID = 5000 + member
-		updates = append(updates, inGroup(msg))
-	}
 
-	sent := f.run(updates...)
+	sent := f.run(
+		inGroup(groupMessage("Mira, one")),
+		inGroup(groupMessage("Mira, two")),
+		inGroup(groupMessage("Mira, three")),
+	)
 
-	if calls := f.replier.recorded(); len(calls) != 2 {
-		t.Errorf("model calls = %d, want the group limit of 2", len(calls))
+	if len(sent) != 2 || len(f.replier.recorded()) != 2 {
+		t.Errorf("sent = %+v, model calls = %d; want 2 answers, then silence without a notice", sent, len(f.replier.recorded()))
 	}
-	warnings := 0
-	for _, msg := range sent {
-		if msg.text == textGroupRateLimited {
-			warnings++
-		}
-	}
-	if warnings != 1 || len(sent) != 3 {
-		t.Errorf("sent = %+v, want 2 answers and exactly 1 group rate-limit notice", sent)
+	want := storage.ReplyQuota{ChatID: groupID, UserID: userID, PerMinute: 6, PerMember: 2}
+	if asked := quota.asked(); len(asked) != 3 || asked[0] != want {
+		t.Errorf("quota asked = %+v, want 3 times %+v", asked, want)
 	}
 }
 
-func TestGroupLimitDoesNotAffectPrivateChats(t *testing.T) {
+func TestGroupQuotaFailureStaysQuietButOwnersAndMuteWork(t *testing.T) {
 	f := newFixture()
-	f.opts.GroupRatePerMinute = 1
+	f.opts.OwnerUsernames = []string{ownerUsername}
+	f.opts.GroupReplies = &fakeGroupQuota{err: errors.New("database down")}
+	f.opts.Workers = 1
+
+	sent := f.run(
+		inGroup(groupMessage("Mira, hello?")),
+		inGroup(fromOwner(groupMessage("Mira, status?"))),
+		inGroup(asAdmin(groupMessage("/mute@MyBot"))),
+	)
+
+	var texts []string
+	for _, msg := range sent {
+		texts = append(texts, msg.text)
+	}
+	if want := []string{"echo: status?", textMuted}; strings.Join(texts, "|") != strings.Join(want, "|") {
+		t.Errorf("sent = %q, want %q: a member gets silence, the owner and the off switch still work", texts, want)
+	}
+}
+
+func TestPrivateChatsSkipTheGroupQuota(t *testing.T) {
+	f := newFixture()
+	quota := &fakeGroupQuota{}
+	f.opts.GroupReplies = quota
+	f.opts.GroupRatePerMinute, f.opts.MemberRepliesPer10Min = 1, 1
 
 	f.run(textFrom(userID, "one"), textFrom(userID, "two"), textFrom(userID, "three"))
 
 	if calls := f.replier.recorded(); len(calls) != 3 {
 		t.Errorf("model calls = %d, want 3", len(calls))
 	}
+	if asked := quota.asked(); len(asked) != 0 {
+		t.Errorf("quota asked = %+v; private chats are not groups", asked)
+	}
+}
+
+func TestOtherBotsAreCountedByTheirOwnQuota(t *testing.T) {
+	f := newFixture()
+	quota := &fakeGroupQuota{}
+	f.opts.GroupReplies = quota
+	f.opts.AllowedBots = []string{"*"}
+
+	expectOneReply(t, f.run(inGroup(fromBot(groupMessage("@MyBot salom", "@MyBot"), "helper_bot"))), "echo: salom")
+	if asked := quota.asked(); len(asked) != 0 {
+		t.Errorf("quota asked = %+v; replies to bots are counted by the bot quota", asked)
+	}
+}
+
+func TestGroupFloodGetsNoNotice(t *testing.T) {
+	f := newFixture()
+	f.opts.RatePerMinute = 1
+	f.opts.Workers = 1
+
+	sent := f.run(inGroup(groupMessage("Mira, one")), inGroup(groupMessage("Mira, two")))
+
+	expectOneReply(t, sent, "echo: one")
 }
 
 func TestNegativeIDsAreHandled(t *testing.T) {
@@ -1156,29 +1269,6 @@ func TestBusyNoticeInGroupRepliesToTheMessage(t *testing.T) {
 		}
 	}
 	t.Errorf("no busy notice in %+v", f.sender.messages())
-}
-
-func TestGroupRefusalDoesNotSpendTheMembersOwnAllowance(t *testing.T) {
-	f := newFixture()
-	f.opts.RatePerMinute = 3
-	f.opts.GroupRatePerMinute = 1
-	f.opts.Workers = 1
-	other := groupMessage("@MyBot hi", "@MyBot")
-	other.From.ID = adminID
-	updates := []telegram.Update{inGroup(other)} // uses the group's only token
-	for range 3 {
-		updates = append(updates, inGroup(groupMessage("@MyBot hi", "@MyBot"))) // refused by the group limit
-	}
-	updates = append(updates, textFrom(userID, "private question"))
-
-	sent := f.run(updates...)
-
-	for _, msg := range sent {
-		if msg.chatID == userID && msg.text == "echo: private question" {
-			return
-		}
-	}
-	t.Errorf("the member's private message was not answered: %+v", sent)
 }
 
 func TestGroupAnswerWithEmojiIsOneTelegramMessage(t *testing.T) {
@@ -1252,6 +1342,7 @@ func TestPrivateMessageKeepsItsLineBreaks(t *testing.T) {
 func TestAdminCanMuteAGroupThatIsOverItsRateLimit(t *testing.T) {
 	f := newFixture()
 	f.opts.Workers = 1
+	f.opts.GroupReplies = &fakeGroupQuota{}
 	f.opts.GroupRatePerMinute = 1
 
 	sent := f.run(
@@ -1617,6 +1708,84 @@ func TestTurnTellsToolsWhoIsAsking(t *testing.T) {
 	}
 	if c := calls[1].caller; c.Owner || c.UserID != userID {
 		t.Errorf("member's caller = %+v", c)
+	}
+}
+
+// stickerReply is a member's sticker sent as a reply to the bot's message.
+func stickerReply() *telegram.Message {
+	msg := replyingTo(groupMessage(""), botID, "your move")
+	withSticker(msg)
+	return msg
+}
+
+func TestApplauseReplyGetsReactionNotAnswer(t *testing.T) {
+	f := newFixture()
+	quota := &fakeGroupQuota{}
+	f.opts.GroupReplies = quota
+
+	sent := f.run(inGroup(stickerReply()))
+
+	if len(sent) != 0 || len(f.replier.recorded()) != 0 {
+		t.Errorf("sent = %+v, model calls = %d; applause needs no words", sent, len(f.replier.recorded()))
+	}
+	want := []reaction{{chatID: groupID, messageID: 30, emoji: "😁"}} // message 30: 30 % 4 picks 😁
+	if got := f.reactor.recorded(); !reflect.DeepEqual(got, want) {
+		t.Errorf("reactions = %+v, want %+v", got, want)
+	}
+	if got := f.chatLog.texts(groupID); len(got) != 1 || got[0] != "Bek: <sticker 😂>" {
+		t.Errorf("log = %q, want the sticker noted once", got)
+	}
+	if asked := quota.asked(); len(asked) != 0 {
+		t.Errorf("quota asked = %+v; a reaction is not an answer", asked)
+	}
+}
+
+func TestFailedReactionIsIgnored(t *testing.T) {
+	f := newFixture()
+	f.reactor.err = errors.New("telegram: 400 REACTION_INVALID")
+
+	if sent := f.run(inGroup(stickerReply())); len(sent) != 0 {
+		t.Errorf("sent = %+v; a failed reaction is not worth a message", sent)
+	}
+}
+
+func TestApplauseNeverSwallowsAWakeWordOrMention(t *testing.T) {
+	calls := map[string]*telegram.Message{
+		"wake word": replyingTo(groupMessage("😂😂 Maria"), botID, "answer"),
+		"mention":   replyingTo(groupMessage("@MyBot 😂", "@MyBot"), botID, "answer"),
+	}
+	for name, msg := range calls {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			f.opts.WakeWords = []string{"maria"}
+
+			f.run(inGroup(msg))
+
+			if calls, reactions := f.replier.recorded(), f.reactor.recorded(); len(calls) != 1 || len(reactions) != 0 {
+				t.Errorf("model calls = %d, reactions = %+v; being called is never applause", len(calls), reactions)
+			}
+		})
+	}
+}
+
+func TestOwnerApplauseStillAnswered(t *testing.T) {
+	f := newFixture()
+	f.opts.OwnerUsernames = []string{ownerUsername}
+
+	sent := f.run(inGroup(fromOwner(replyingTo(groupMessage("xaxaxa"), botID, "answer"))))
+
+	if len(sent) != 1 || len(f.replier.recorded()) != 1 || len(f.reactor.recorded()) != 0 {
+		t.Errorf("sent = %+v, reactions = %+v; an owner's message is always answered", sent, f.reactor.recorded())
+	}
+}
+
+func TestPrivateApplauseIsAnswered(t *testing.T) {
+	f := newFixture()
+
+	f.run(privateWith(withSticker))
+
+	if len(f.replier.recorded()) != 1 || len(f.reactor.recorded()) != 0 {
+		t.Errorf("reactions = %+v; a private chat has nobody else to talk to", f.reactor.recorded())
 	}
 }
 

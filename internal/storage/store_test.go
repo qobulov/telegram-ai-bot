@@ -45,7 +45,7 @@ func newTestStore(t *testing.T) *Store {
 	}
 	t.Cleanup(store.Close)
 
-	if _, err := store.pool.Exec(ctx, `DROP TABLE IF EXISTS messages, conversations, users, chats, group_messages, image_generations, bot_replies, groups, broadcasts, schema_migrations CASCADE`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DROP TABLE IF EXISTS messages, conversations, users, chats, group_messages, image_generations, bot_replies, groups, broadcasts, group_replies, schema_migrations CASCADE`); err != nil {
 		t.Fatalf("drop tables: %v", err)
 	}
 	if _, err := store.Migrate(ctx); err != nil {
@@ -106,7 +106,7 @@ func TestMigrateIsIdempotent(t *testing.T) {
 func TestMigrateReportsAppliedCount(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
-	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, group_messages, image_generations, bot_replies, groups, broadcasts, schema_migrations CASCADE`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, group_messages, image_generations, bot_replies, groups, broadcasts, group_replies, schema_migrations CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 
@@ -846,6 +846,69 @@ func TestBotRepliesAreLimitedPerChatInAWindow(t *testing.T) {
 	}
 	if ok, _ := store.ReserveBotReply(ctx, group, 555, time.Now().Add(time.Minute), 3); !ok {
 		t.Error("replies before the window still counted")
+	}
+}
+
+// ageGroupReplies moves every recorded group answer minutes into the past.
+func ageGroupReplies(t *testing.T, store *Store, minutes int) {
+	t.Helper()
+	_, err := store.pool.Exec(context.Background(), `UPDATE group_replies SET created_at = created_at - make_interval(mins => $1)`, minutes)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReserveGroupReplyLimitsChatAndMember(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	const carol = int64(1003)
+	reserve := func(chatID, userID int64) bool {
+		t.Helper()
+		ok, err := store.ReserveGroupReply(ctx, ReplyQuota{ChatID: chatID, UserID: userID, PerMinute: 3, PerMember: 2})
+		if err != nil {
+			t.Fatalf("ReserveGroupReply: %v", err)
+		}
+		return ok
+	}
+
+	got := []bool{reserve(group, alice), reserve(group, alice), reserve(group, alice), reserve(group, bob), reserve(group, carol)}
+	if want := []bool{true, true, false, true, false}; !reflect.DeepEqual(got, want) {
+		t.Errorf("granted = %v, want %v: alice may have 2 answers, the chat 3 a minute", got, want)
+	}
+	if !reserve(otherGroup, carol) {
+		t.Error("another chat was refused because of this chat's count")
+	}
+
+	ageGroupReplies(t, store, 2)
+	if !reserve(group, carol) {
+		t.Error("the chat was still full a minute later")
+	}
+	if reserve(group, alice) {
+		t.Error("alice was answered again within her 10 minutes")
+	}
+	ageGroupReplies(t, store, 9)
+	if !reserve(group, alice) {
+		t.Error("alice was refused after her 10 minutes were over")
+	}
+}
+
+func TestExpireAlsoRemovesOldGroupReplies(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	quota := ReplyQuota{ChatID: group, UserID: alice, PerMinute: 5, PerMember: 5}
+	if _, err := store.ReserveGroupReply(ctx, quota); err != nil {
+		t.Fatal(err)
+	}
+	ageGroupReplies(t, store, 2*24*60)
+	if _, err := store.ReserveGroupReply(ctx, quota); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := store.Expire(ctx, 24*time.Hour); err != nil {
+		t.Fatalf("Expire: %v", err)
+	}
+	if rows := countRows(t, store, "group_replies"); rows != 1 {
+		t.Errorf("group_replies rows = %d, want only today's", rows)
 	}
 }
 

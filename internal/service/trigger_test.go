@@ -65,25 +65,25 @@ func TestAddressByMention(t *testing.T) {
 	cases := map[string]struct {
 		msg  *telegram.Message
 		want string
-		ok   bool
+		how  trigger
 	}{
-		"mention first":            {groupMessage("@MyBot hi", "@MyBot"), "hi", true},
-		"mention is case blind":    {groupMessage("@mybot hi", "@mybot"), "hi", true},
-		"mention in the middle":    {groupMessage("hey @MyBot what is Go", "@MyBot"), "hey what is Go", true},
-		"emoji before the mention": {groupMessage("😀😀 привет @MyBot как дела", "@MyBot"), "😀😀 привет как дела", true},
-		"bare mention":             {groupMessage("@MyBot", "@MyBot"), "Mira", true},
-		"longer username":          {groupMessage("@MyBot2 hi", "@MyBot2"), "", false},
-		"shorter username":         {groupMessage("@MyBo hi", "@MyBo"), "", false},
-		"another user":             {groupMessage("@ann hi", "@ann"), "", false},
-		"text without an entity":   {groupMessage("@MyBot hi"), "", false},
-		"plain chatter":            {groupMessage("what a nice day"), "", false},
-		"both bots mentioned":      {groupMessage("@Other and @MyBot hi", "@Other", "@MyBot"), "@Other and hi", true},
+		"mention first":            {groupMessage("@MyBot hi", "@MyBot"), "hi", triggerMention},
+		"mention is case blind":    {groupMessage("@mybot hi", "@mybot"), "hi", triggerMention},
+		"mention in the middle":    {groupMessage("hey @MyBot what is Go", "@MyBot"), "hey what is Go", triggerMention},
+		"emoji before the mention": {groupMessage("😀😀 привет @MyBot как дела", "@MyBot"), "😀😀 привет как дела", triggerMention},
+		"bare mention":             {groupMessage("@MyBot", "@MyBot"), "Mira", triggerMention},
+		"longer username":          {groupMessage("@MyBot2 hi", "@MyBot2"), "", triggerNone},
+		"shorter username":         {groupMessage("@MyBo hi", "@MyBo"), "", triggerNone},
+		"another user":             {groupMessage("@ann hi", "@ann"), "", triggerNone},
+		"text without an entity":   {groupMessage("@MyBot hi"), "", triggerNone},
+		"plain chatter":            {groupMessage("what a nice day"), "", triggerNone},
+		"both bots mentioned":      {groupMessage("@Other and @MyBot hi", "@Other", "@MyBot"), "@Other and hi", triggerMention},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got, ok := triggerService(nil).address(tc.msg)
-			if got != tc.want || ok != tc.ok {
-				t.Errorf("address = %q, %v; want %q, %v", got, ok, tc.want, tc.ok)
+			got, how := triggerService(nil).address(tc.msg)
+			if got != tc.want || how != tc.how {
+				t.Errorf("address = %q, %v; want %q, %v", got, how, tc.want, tc.how)
 			}
 		})
 	}
@@ -96,14 +96,14 @@ func TestAddressByTextMention(t *testing.T) {
 	entity.User = &telegram.User{ID: botID}
 	mine.Entities = []telegram.MessageEntity{entity}
 
-	if got, ok := triggerService(nil).address(mine); !ok || got != "what is Go" {
-		t.Errorf("address = %q, %v", got, ok)
+	if got, how := triggerService(nil).address(mine); how != triggerMention || got != "what is Go" {
+		t.Errorf("address = %q, %v", got, how)
 	}
 
 	someoneElse := groupMessage(text)
 	entity.User = &telegram.User{ID: 4242}
 	someoneElse.Entities = []telegram.MessageEntity{entity}
-	if _, ok := triggerService(nil).address(someoneElse); ok {
+	if _, how := triggerService(nil).address(someoneElse); how != triggerNone {
 		t.Error("a text_mention of another user addressed the bot")
 	}
 }
@@ -113,8 +113,8 @@ func TestAddressByCaptionMention(t *testing.T) {
 	msg.Caption = "@MyBot what is this"
 	msg.CaptionEntities = []telegram.MessageEntity{entityAt(telegram.EntityMention, msg.Caption, "@MyBot")}
 
-	if got, ok := triggerService(nil).address(msg); !ok || got != "what is this" {
-		t.Errorf("address = %q, %v", got, ok)
+	if got, how := triggerService(nil).address(msg); how != triggerMention || got != "what is this" {
+		t.Errorf("address = %q, %v", got, how)
 	}
 }
 
@@ -122,36 +122,41 @@ func TestAddressIgnoresMalformedEntity(t *testing.T) {
 	msg := groupMessage("hi")
 	msg.Entities = []telegram.MessageEntity{{Type: telegram.EntityMention, Offset: 50, Length: 6}}
 
-	if _, ok := triggerService(nil).address(msg); ok {
+	if _, how := triggerService(nil).address(msg); how != triggerNone {
 		t.Error("an out-of-range entity addressed the bot")
 	}
 }
 
 func TestAddressByReply(t *testing.T) {
 	toBot := replyingTo(groupMessage("and in Python?"), botID, "Go is compiled.")
-	if got, ok := triggerService(nil).address(toBot); !ok || got != "and in Python?" {
-		t.Errorf("reply to the bot: address = %q, %v", got, ok)
+	if got, how := triggerService(nil).address(toBot); how != triggerReply || got != "and in Python?" {
+		t.Errorf("reply to the bot: address = %q, %v", got, how)
 	}
 
 	toMember := replyingTo(groupMessage("I disagree"), 4242, "Go is compiled.")
-	if _, ok := triggerService(nil).address(toMember); ok {
+	if _, how := triggerService(nil).address(toMember); how != triggerNone {
 		t.Error("a reply to another member addressed the bot")
 	}
 
 	mentionInReply := replyingTo(groupMessage("@MyBot is that right?", "@MyBot"), 4242, "Go is interpreted.")
-	if got, ok := triggerService(nil).address(mentionInReply); !ok || got != "is that right?" {
-		t.Errorf("mention while replying to a member: address = %q, %v", got, ok)
+	if got, how := triggerService(nil).address(mentionInReply); how != triggerMention || got != "is that right?" {
+		t.Errorf("mention while replying to a member: address = %q, %v", got, how)
+	}
+
+	mentionInReplyToBot := replyingTo(groupMessage("@MyBot 😂", "@MyBot"), botID, "Go is compiled.")
+	if got, how := triggerService(nil).address(mentionInReplyToBot); how != triggerMention || got != "😂" {
+		t.Errorf("mention while replying to the bot: address = %q, %v; a mention is a call, not just a reply", got, how)
 	}
 }
 
 func TestAddressRespectsDisabledTriggers(t *testing.T) {
 	noMention := triggerService(func(o *Options) { o.MentionTrigger = false })
-	if _, ok := noMention.address(groupMessage("@MyBot hi", "@MyBot")); ok {
+	if _, how := noMention.address(groupMessage("@MyBot hi", "@MyBot")); how != triggerNone {
 		t.Error("mention trigger is disabled but a mention addressed the bot")
 	}
 
 	noReply := triggerService(func(o *Options) { o.ReplyTrigger = false })
-	if _, ok := noReply.address(replyingTo(groupMessage("more"), botID, "answer")); ok {
+	if _, how := noReply.address(replyingTo(groupMessage("more"), botID, "answer")); how != triggerNone {
 		t.Error("reply trigger is disabled but a reply addressed the bot")
 	}
 }
@@ -160,26 +165,27 @@ func TestAddressByWakeWord(t *testing.T) {
 	cases := map[string]struct {
 		text string
 		want string
-		ok   bool
+		how  trigger
 	}{
-		"name and request":  {"Mira, roast me", "roast me", true},
-		"greeting only":     {"Hey Mira", "Hey Mira", true},
-		"name last":         {"nima gap, Mira?", "nima gap, Mira?", true},
-		"longer word":       {"Miranda, hi", "", false},
-		"name mid-sentence": {"I think Mira is wrong", "", false},
-		"ordinary chatter":  {"what a nice day", "", false},
+		"name and request":  {"Mira, roast me", "roast me", triggerWakeWord},
+		"greeting only":     {"Hey Mira", "Hey Mira", triggerWakeWord},
+		"name last":         {"nima gap, Mira?", "nima gap, Mira?", triggerWakeWord},
+		"emoji and name":    {"😂😂 Mira", "😂😂 Mira", triggerWakeWord},
+		"longer word":       {"Miranda, hi", "", triggerNone},
+		"name mid-sentence": {"I think Mira is wrong", "", triggerNone},
+		"ordinary chatter":  {"what a nice day", "", triggerNone},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got, ok := triggerService(nil).address(groupMessage(tc.text))
-			if got != tc.want || ok != tc.ok {
-				t.Errorf("address(%q) = %q, %v; want %q, %v", tc.text, got, ok, tc.want, tc.ok)
+			got, how := triggerService(nil).address(groupMessage(tc.text))
+			if got != tc.want || how != tc.how {
+				t.Errorf("address(%q) = %q, %v; want %q, %v", tc.text, got, how, tc.want, tc.how)
 			}
 		})
 	}
 
 	disabled := triggerService(func(o *Options) { o.WakeWordTrigger = false })
-	if _, ok := disabled.address(groupMessage("Mira, roast me")); ok {
+	if _, how := disabled.address(groupMessage("Mira, roast me")); how != triggerNone {
 		t.Error("the wake-word trigger is disabled but the name addressed the bot")
 	}
 }
@@ -187,17 +193,17 @@ func TestAddressByWakeWord(t *testing.T) {
 func TestWakeWordIsStrippedFromRepliesToTheBot(t *testing.T) {
 	msg := replyingTo(groupMessage("Mira, and in Python?"), botID, "Go is compiled.")
 
-	if got, ok := triggerService(nil).address(msg); !ok || got != "and in Python?" {
-		t.Errorf("address = %q, %v", got, ok)
+	if got, how := triggerService(nil).address(msg); how != triggerWakeWord || got != "and in Python?" {
+		t.Errorf("address = %q, %v", got, how)
 	}
 }
 
 // "Mira, /reset" is a sentence said to the bot, not a command: the slash is
 // dropped with the rest of the punctuation after the name, so nothing runs.
 func TestWakeWordFollowedByACommandIsNotACommand(t *testing.T) {
-	got, ok := triggerService(nil).address(groupMessage("Mira, /reset"))
-	if !ok || strings.HasPrefix(got, "/") {
-		t.Errorf("address = %q, %v; want plain text that cannot run as a command", got, ok)
+	got, how := triggerService(nil).address(groupMessage("Mira, /reset"))
+	if how != triggerWakeWord || strings.HasPrefix(got, "/") {
+		t.Errorf("address = %q, %v; want plain text that cannot run as a command", got, how)
 	}
 }
 
@@ -205,28 +211,28 @@ func TestAddressByCommand(t *testing.T) {
 	cases := map[string]struct {
 		msg  *telegram.Message
 		want string
-		ok   bool
+		how  trigger
 	}{
-		"command for this bot":             {groupMessage("/reset@MyBot"), "/reset@MyBot", true},
-		"case-blind bot name":              {groupMessage("/help@mybot now"), "/help@mybot now", true},
-		"command for nobody in particular": {groupMessage("/reset"), "", false},
-		"command for another bot":          {groupMessage("/reset@OtherBot"), "", false},
+		"command for this bot":             {groupMessage("/reset@MyBot"), "/reset@MyBot", triggerCommand},
+		"case-blind bot name":              {groupMessage("/help@mybot now"), "/help@mybot now", triggerCommand},
+		"command for nobody in particular": {groupMessage("/reset"), "", triggerNone},
+		"command for another bot":          {groupMessage("/reset@OtherBot"), "", triggerNone},
 		"another bot's command as a reply to this bot": {
-			replyingTo(groupMessage("/reset@OtherBot"), botID, "answer"), "", false,
+			replyingTo(groupMessage("/reset@OtherBot"), botID, "answer"), "", triggerNone,
 		},
 		"plain command as a reply to this bot": {
-			replyingTo(groupMessage("/help"), botID, "answer"), "", false,
+			replyingTo(groupMessage("/help"), botID, "answer"), "", triggerNone,
 		},
-		"command for this bot followed by a new line": {groupMessage("/reset@MyBot\nplease"), "/reset@MyBot\nplease", true},
-		"mention followed by another bot's command":   {groupMessage("@MyBot /reset@OtherBot", "@MyBot"), "", false},
-		"mention followed by a plain command":         {groupMessage("@MyBot /reset", "@MyBot"), "", false},
-		"mention followed by this bot's command":      {groupMessage("@MyBot /help@MyBot", "@MyBot"), "/help@MyBot", true},
+		"command for this bot followed by a new line": {groupMessage("/reset@MyBot\nplease"), "/reset@MyBot\nplease", triggerCommand},
+		"mention followed by another bot's command":   {groupMessage("@MyBot /reset@OtherBot", "@MyBot"), "", triggerNone},
+		"mention followed by a plain command":         {groupMessage("@MyBot /reset", "@MyBot"), "", triggerNone},
+		"mention followed by this bot's command":      {groupMessage("@MyBot /help@MyBot", "@MyBot"), "/help@MyBot", triggerMention},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got, ok := triggerService(nil).address(tc.msg)
-			if got != tc.want || ok != tc.ok {
-				t.Errorf("address = %q, %v; want %q, %v", got, ok, tc.want, tc.ok)
+			got, how := triggerService(nil).address(tc.msg)
+			if got != tc.want || how != tc.how {
+				t.Errorf("address = %q, %v; want %q, %v", got, how, tc.want, tc.how)
 			}
 		})
 	}

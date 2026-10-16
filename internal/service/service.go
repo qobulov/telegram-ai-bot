@@ -67,6 +67,18 @@ type Recorder interface {
 	SetSentMessageID(ctx context.Context, answerID, telegramMessageID int64) error
 }
 
+// GroupReplyQuota counts the bot's answers to people in groups. It has to
+// live outside the process: on serverless hosting each update may run in a
+// different instance, and a count kept in memory would limit nothing.
+type GroupReplyQuota interface {
+	ReserveGroupReply(ctx context.Context, q storage.ReplyQuota) (bool, error)
+}
+
+// Reactor sets the bot's emoji reaction on a message.
+type Reactor interface {
+	SetMessageReaction(ctx context.Context, chatID, messageID int64, emoji string) error
+}
+
 // Options configures a Service. All fields are required except MutedChats.
 type Options struct {
 	Sender   Sender
@@ -131,8 +143,15 @@ type Options struct {
 	// each request may run in a different instance, so memory cannot be
 	// trusted to know about a /mute handled elsewhere.
 	MuteStore MuteStore
-	// GroupRatePerMinute limits answers per group, across all its members.
-	GroupRatePerMinute int
+	// GroupReplies counts answers to people in groups: at most
+	// GroupRatePerMinute per group in a minute, across all its members, and
+	// MemberRepliesPer10Min to one member in 10 minutes. Nil does not limit.
+	GroupReplies          GroupReplyQuota
+	GroupRatePerMinute    int
+	MemberRepliesPer10Min int
+	// Reactor sets emoji reactions, the bot's answer to applause; nil means
+	// it never reacts.
+	Reactor Reactor
 	// MaxGroupReplyChars is the longest answer posted in a group, in UTF-16
 	// code units as Telegram counts them.
 	MaxGroupReplyChars int
@@ -157,14 +176,13 @@ type Options struct {
 // In groups only messages addressed to the bot are queued. The others are
 // at most remembered briefly, in memory, as context for the next answer.
 type Service struct {
-	opts         Options
-	userLimiter  *limiter
-	groupLimiter *limiter
-	ambient      *ambient
-	queues       []chan incoming
-	notices      chan incoming
-	closing      atomic.Bool
-	workers      sync.WaitGroup
+	opts        Options
+	userLimiter *limiter
+	ambient     *ambient
+	queues      []chan incoming
+	notices     chan incoming
+	closing     atomic.Bool
+	workers     sync.WaitGroup
 	// background tracks voice messages being transcribed for the day's log
 	// while polling; transcribing bounds how many run at once.
 	background   sync.WaitGroup
@@ -187,6 +205,8 @@ type incoming struct {
 	// fromBot is true for a message from another bot.
 	fromBot bool
 	group   bool
+	// trigger is how a group message addressed the bot.
+	trigger trigger
 	// text is the user's text, trimmed, without the part addressing the bot.
 	text string
 	// described is text with the message's media described in front of it,
@@ -218,7 +238,6 @@ func New(opts Options) *Service {
 	s := &Service{
 		opts:         opts,
 		userLimiter:  newLimiter(opts.RatePerMinute),
-		groupLimiter: newLimiter(opts.GroupRatePerMinute),
 		ambient:      newAmbient(opts.ChatLog, opts.AmbientMessages, opts.Location, opts.Logger),
 		muted:        make(map[int64]bool, len(opts.MutedChats)),
 		queues:       make([]chan incoming, opts.Workers),
@@ -340,11 +359,11 @@ func (s *Service) accept(update telegram.Update) (incoming, bool) {
 // /mute or /unmute that changes the answer may still be waiting in that same
 // queue, ahead of this message.
 func (s *Service) acceptGroup(in incoming) (incoming, bool) {
-	text, addressed := s.address(in.msg)
+	text, how := s.address(in.msg)
 	if in.fromBot && strings.HasPrefix(text, "/") {
-		addressed = false // bots do not run commands
+		how = triggerNone // bots do not run commands
 	}
-	if !addressed {
+	if how == triggerNone {
 		// Checked in this order so that, with the buffer off, an ordinary
 		// group message costs no mute lookup at all.
 		if s.ambient.enabled() && !s.isMuted(in.scope.ChatID) {
@@ -352,7 +371,7 @@ func (s *Service) acceptGroup(in incoming) (incoming, bool) {
 		}
 		return incoming{}, false
 	}
-	in.text = text
+	in.text, in.trigger = text, how
 	return in, true
 }
 
@@ -558,4 +577,18 @@ func (s *Service) reply(in incoming, text string) int64 {
 		return 0
 	}
 	return sentID
+}
+
+// react sets an emoji reaction on the message being handled. A reaction is
+// a gesture, not an answer anyone waits for, so a failure is only logged at
+// debug level. Like reply, it has its own deadline.
+func (s *Service) react(in incoming, emoji string) {
+	if s.opts.Reactor == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
+	defer cancel()
+	if err := s.opts.Reactor.SetMessageReaction(ctx, in.msg.Chat.ID, in.msg.MessageID, emoji); err != nil {
+		s.opts.Logger.Debug("reaction failed", "chat_id", in.msg.Chat.ID, "emoji", emoji, "error", err)
+	}
 }

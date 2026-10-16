@@ -109,15 +109,18 @@ func TestLargestPhotoUnderTheLimitIsChosen(t *testing.T) {
 	}
 }
 
+// A member's sticker in reply to the bot is applause and gets a reaction; an
+// owner's is answered, and the model sees the sticker.
 func TestStickerRepliedToTheBotIsSeen(t *testing.T) {
 	f := newFixture()
-	msg := replyingTo(groupMessage(""), botID, "your move")
+	f.opts.OwnerUsernames = []string{ownerUsername}
+	msg := fromOwner(replyingTo(groupMessage(""), botID, "your move"))
 	msg.Sticker = &telegram.Sticker{FileID: "sticker", Emoji: "😂"}
 
 	f.run(inGroup(msg))
 
 	req := onlyRequest(t, f).req
-	if !strings.HasSuffix(req.Text, "Bek: <sticker 😂>") {
+	if !strings.HasSuffix(req.Text, "Azizbek @Pronium [owner]: <sticker 😂>") {
 		t.Errorf("text = %q", req.Text)
 	}
 	if len(req.Attachments) != 1 || !strings.HasPrefix(req.Attachments[0].ImageURL.URL, "data:image/webp;base64,") {

@@ -10,6 +10,7 @@ import (
 
 	"telegram-ai-bot/internal/agent"
 	"telegram-ai-bot/internal/ai"
+	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 	"telegram-ai-bot/internal/tools"
 )
@@ -42,9 +43,14 @@ func (s *Service) process(in incoming) {
 		return
 	}
 	if notice, limited := s.rateLimited(in); limited {
-		if notice != "" && !in.fromBot {
+		if notice != "" {
 			s.reply(in, notice)
 		}
+		return
+	}
+	// Applause is answered with a reaction, which takes nothing from the
+	// group's quota of answers.
+	if s.reactedToApplause(in) || !s.mayAnswerInGroup(in) {
 		return
 	}
 	in.described = s.describe(ctx, in.msg, in.text)
@@ -141,33 +147,52 @@ func (s *Service) mayAnswerBot(in incoming) bool {
 	return ok
 }
 
-// rateLimited applies the per-user limit and, in a group, the per-group
-// limit. It returns the notice to send, which is empty when the sender was
-// already told: answering every message of a flood would itself be a flood.
+// rateLimited applies the per-user limit, a flood guard kept in memory. It
+// returns the notice to send, which is empty when the sender was already
+// told: answering every message of a flood would itself be a flood. A group
+// is never sent a notice; there the bot just stays quiet.
 func (s *Service) rateLimited(in incoming) (notice string, limited bool) {
-	now := time.Now()
-	switch s.userLimiter.check(in.userID, now) {
+	switch s.userLimiter.check(in.userID, time.Now()) {
 	case deniedFirst:
+		if in.group {
+			return "", true
+		}
 		return textRateLimited, true
 	case deniedAgain:
 		return "", true
 	}
-	// The group limit does not apply to /mute and /unmute: the off switch
-	// has to work precisely when the group is flooding the bot.
-	if !in.group || isMuteCommand(in.text) {
-		return "", false
+	return "", false
+}
+
+// mayAnswerInGroup takes one of the group's answers from the quota kept in
+// the database, and reports whether there was one. Past either limit the
+// bot stays silent, without a notice: a notice is one more message in a
+// group that already has too many. When the count cannot be read it stays
+// silent too, like mayAnswerBot.
+//
+// Owners are not counted, other bots have their own quota, and /mute and
+// /unmute always pass: the off switch has to work precisely when the group
+// is flooding the bot.
+func (s *Service) mayAnswerInGroup(in incoming) bool {
+	if !in.group || in.fromBot || s.opts.GroupReplies == nil || isMuteCommand(in.text) || s.isOwner(in.msg.From) {
+		return true
 	}
-	groupDecision := s.groupLimiter.check(in.scope.ChatID, now)
-	if groupDecision == allowed {
-		return "", false
+	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
+	defer cancel()
+	ok, err := s.opts.GroupReplies.ReserveGroupReply(ctx, storage.ReplyQuota{
+		ChatID:    in.scope.ChatID,
+		UserID:    in.userID,
+		PerMinute: s.opts.GroupRatePerMinute,
+		PerMember: s.opts.MemberRepliesPer10Min,
+	})
+	if err != nil {
+		s.opts.Logger.Warn("group reply count failed; staying quiet", "chat_id", in.scope.ChatID, "error", err)
+		return false
 	}
-	// The group as a whole is over its limit. That is not this member's
-	// doing, so it must not use up their own allowance.
-	s.userLimiter.refund(in.userID)
-	if groupDecision == deniedFirst {
-		return textGroupRateLimited, true
+	if !ok {
+		s.opts.Logger.Info("group reply limit reached", "chat_id", in.scope.ChatID, "user_id", in.userID)
 	}
-	return "", true
+	return ok
 }
 
 // respond decides what to send back. An empty outcome sends nothing.

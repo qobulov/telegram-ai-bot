@@ -201,13 +201,17 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		BotReplies:         store,
 		BotRepliesPer10Min: cfg.BotRepliesPer10Min,
 		MutedChats:         mode.MutedChats,
-		GroupRatePerMinute: cfg.GroupRateLimitPerMinute,
 		MaxGroupReplyChars: cfg.MaxGroupReplyChars,
 		Media:              bot.Client,
 		MaxMediaBytes:      cfg.MaxMediaBytes,
 		MaxVoiceSeconds:    cfg.MaxVoiceSeconds,
 		AudioInput:         cfg.AudioInput,
 		Transcriber:        transcriber(cfg, model),
+
+		GroupReplies:          store,
+		GroupRatePerMinute:    cfg.GroupRateLimitPerMinute,
+		MemberRepliesPer10Min: cfg.MemberRepliesPer10Min,
+		Reactor:               bot.Client,
 	}
 	if mode.Serverless {
 		opts.Workers, opts.QueueSize = 0, 0

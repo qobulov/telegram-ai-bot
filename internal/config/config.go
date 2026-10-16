@@ -106,9 +106,13 @@ type Config struct {
 	AllowedBots []string
 	// BotRepliesPer10Min caps replies to bots per chat, so two bots cannot
 	// keep talking to each other.
-	BotRepliesPer10Min      int
-	MaxGroupReplyChars      int
+	BotRepliesPer10Min int
+	MaxGroupReplyChars int
+	// GroupRateLimitPerMinute caps answers per group across its members, and
+	// MemberRepliesPer10Min answers to one member of a group, so the bot never
+	// takes over a conversation.
 	GroupRateLimitPerMinute int
+	MemberRepliesPer10Min   int
 }
 
 // IsAdmin reports whether the Telegram user is listed in ADMIN_USER_IDS.
@@ -149,7 +153,8 @@ func Load(getenv func(string) string) (Config, error) {
 
 		AmbientMessages:         r.integer("GROUP_AMBIENT_MESSAGES", 200, 0),
 		MaxGroupReplyChars:      r.positive("MAX_GROUP_REPLY_LENGTH", 4000),
-		GroupRateLimitPerMinute: r.positive("GROUP_RATE_LIMIT_PER_MINUTE", 10),
+		GroupRateLimitPerMinute: r.positive("GROUP_RATE_LIMIT_PER_MINUTE", 6),
+		MemberRepliesPer10Min:   r.positive("MEMBER_REPLIES_PER_10_MIN", 4),
 	}
 	r.chooseProvider(&cfg)
 	cfg.MaxMediaBytes = int64(r.positive("MAX_MEDIA_MB", 5)) << 20
