@@ -64,7 +64,9 @@ type BaseURLs struct {
 	CoinGecko         string
 	// Wikipedia is a format string with %s for the language code.
 	Wikipedia string
-	// News maps a language (uz, ru) to its feeds by source name.
+	// News maps a language (uz, ru) to its feeds by source name. The name
+	// is the site's domain, such as kun.uz: a headline's link must be on
+	// it.
 	News map[string]map[string]string
 }
 

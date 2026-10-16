@@ -42,7 +42,11 @@ const hostileFeed = `<?xml version="1.0" encoding="UTF-8"?>
   <pubDate>Fri, 16 Oct 2026 11:50:00 +0500</pubDate>
 </item>
 <item>
-  <title>Duplicate</title><link>https://kun.uz/news/2026/10/16/kosmosdan-okeanga-okeandan-texasga-starship-qariyb-uch-oyda-uyiga-qaytdi</link>
+  <title>Twice</title><link>https://www.gazeta.uz/oz/2026/10/16/twice/</link>
+  <pubDate>Fri, 16 Oct 2026 11:40:00 +0500</pubDate>
+</item>
+<item>
+  <title>Twice again</title><link>https://www.gazeta.uz/oz/2026/10/16/twice/</link>
   <pubDate>not a date</pubDate>
 </item>
 </channel></rss>`
@@ -147,7 +151,7 @@ func TestNewsHeadlines(t *testing.T) {
 				}
 				duplicates := 0
 				for _, item := range r.Items {
-					if strings.Contains(item.Link, "kosmosdan-okeanga") {
+					if strings.Contains(item.Link, "/twice/") {
 						duplicates++
 					}
 				}
@@ -184,6 +188,67 @@ func TestNewsHeadlinesFitWithEightRussianItems(t *testing.T) {
 	}
 	if len(r.Items) != 8 || len(sources) < 2 {
 		t.Errorf("%d items from %v", len(r.Items), sources)
+	}
+}
+
+// siteFeed tests one feed: it is served as gazeta.uz and the other
+// sites fail.
+const siteFeed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+<item><title>Off site</title><link>https://evil.example/phish</link><pubDate>Fri, 16 Oct 2026 11:00:00 +0500</pubDate></item>
+<item><title>Look-alike</title><link>https://gazeta.uz.evil.example/x</link><pubDate>Fri, 16 Oct 2026 10:59:00 +0500</pubDate></item>
+<item><title>With a password</title><link>https://user:pass@www.gazeta.uz/oz/</link><pubDate>Fri, 16 Oct 2026 10:58:00 +0500</pubDate></item>
+<item><title>Subdomain</title><link>https://www.gazeta.uz/oz/2026/10/16/a/</link><pubDate>Fri, 16 Oct 2026 10:57:00 +0500</pubDate></item>
+<item><title>Override</title><link>https://www.gazeta.uz/oz/` + "‮" + `fdp.exe</link><pubDate>Fri, 16 Oct 2026 10:56:00 +0500</pubDate></item>
+<item><title>A&nbsp;B &laquo;quoted&raquo; &mdash; C</title><link>https://www.gazeta.uz/oz/2026/10/16/b/</link><pubDate>Fri, 16 Oct 2026 10:55:00 +0500</pubDate></item>
+<item><title>From the future</title><link>https://www.gazeta.uz/oz/2026/10/16/c/</link><pubDate>Fri, 16 Oct 2026 23:00:00 +0500</pubDate></item>
+</channel></rss>`
+
+func TestNewsLinksDatesAndEntities(t *testing.T) {
+	routes := newsRoutes(t)
+	routes["/rss/gazeta-oz"] = ok(siteFeed)
+	for _, other := range []string{"/rss/kun", "/rss/uza-oz", "/rss/daryo"} {
+		routes[other] = status(http.StatusNotFound)
+	}
+	r := result[newsResult](t, run(t, newUpstream(t, routes).options(), "news_headlines", `{"limit":8}`))
+
+	want := []struct{ title, link, time string }{
+		{"Off site", "", "11:00"},
+		{"Look-alike", "", "10:59"},
+		{"With a password", "", "10:58"},
+		{"Subdomain", "https://www.gazeta.uz/oz/2026/10/16/a/", "10:57"},
+		{"Override", "https://www.gazeta.uz/oz/%E2%80%AEfdp.exe", "10:56"},
+		{"A B «quoted» — C", "https://www.gazeta.uz/oz/2026/10/16/b/", "10:55"},
+		// A date hours ahead is wrong: it must not top the list.
+		{"From the future", "https://www.gazeta.uz/oz/2026/10/16/c/", ""},
+	}
+	if len(r.Items) != len(want) {
+		t.Fatalf("items = %+v", r.Items)
+	}
+	for i, w := range want {
+		if got := r.Items[i]; got.Title != w.title || got.Link != w.link || got.Time != w.time {
+			t.Errorf("item %d = %+v, want %+v", i, got, w)
+		}
+	}
+}
+
+func TestNewsReadsUzaDatesAsTashkentTime(t *testing.T) {
+	r := result[newsResult](t, run(t, newUpstream(t, newsRoutes(t)).options(), "news_headlines", `{"lang":"ru","topic":"визит в Баку"}`))
+
+	// uza.uz writes "Thu, 15 Oct 2026 20:41:37 +0000"; its page says 20:41.
+	if len(r.Items) != 1 || r.Items[0].Source != "uza.uz" || r.Items[0].Time != "15 Oct 20:41" {
+		t.Errorf("items = %+v", r.Items)
+	}
+}
+
+func TestNewsAcceptsAFeedWithWholeArticles(t *testing.T) {
+	routes := newsRoutes(t)
+	articles := "<!-- " + strings.Repeat("a", 400<<10) + " --></channel>"
+	routes["/rss/daryo"] = ok(strings.Replace(fixture(t, "rss_daryo_uz.xml"), "</channel>", articles, 1))
+	r := result[newsResult](t, run(t, newUpstream(t, routes).options(), "news_headlines", `{"limit":1}`))
+
+	if len(r.Items) != 1 || r.Items[0].Source != "daryo.uz" {
+		t.Errorf("items = %+v", r.Items)
 	}
 }
 
