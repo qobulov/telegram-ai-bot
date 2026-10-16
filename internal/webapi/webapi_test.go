@@ -57,7 +57,7 @@ func newUpstream(t *testing.T, routes map[string]stub) *upstream {
 func (u *upstream) serve(w http.ResponseWriter, r *http.Request) {
 	u.mu.Lock()
 	u.seen = append(u.seen, r.Clone(context.Background()))
-	answer, found := u.routes[r.URL.Path]
+	answer, found := u.route(r)
 	u.mu.Unlock()
 	if !found {
 		http.NotFound(w, r)
@@ -74,6 +74,20 @@ func (u *upstream) serve(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(answer.status)
 	}
 	_, _ = w.Write([]byte(answer.body))
+}
+
+// route finds the answer for r: a route written "path?name=value" wins over
+// the bare path when the query has that parameter.
+func (u *upstream) route(r *http.Request) (stub, bool) {
+	for name, values := range r.URL.Query() {
+		for _, value := range values {
+			if answer, found := u.routes[r.URL.Path+"?"+name+"="+value]; found {
+				return answer, true
+			}
+		}
+	}
+	answer, found := u.routes[r.URL.Path]
+	return answer, found
 }
 
 // requests returns the requests made to path, in order.
@@ -257,7 +271,7 @@ func toolNames(list []tools.Tool) string {
 
 func TestToolsListsTheLiveDataTools(t *testing.T) {
 	opts := newUpstream(t, nil).options()
-	if got, want := toolNames(Tools(opts)), "currency_rate"; got != want {
+	if got, want := toolNames(Tools(opts)), "currency_rate,get_weather"; got != want {
 		t.Errorf("tools = %s, want %s", got, want)
 	}
 }

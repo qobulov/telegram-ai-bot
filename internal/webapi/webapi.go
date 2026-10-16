@@ -120,6 +120,7 @@ func Tools(opts Options) []tools.Tool {
 	a := newAPIs(opts)
 	return []tools.Tool{
 		a.currencyTool(),
+		a.weatherTool(),
 	}
 }
 
