@@ -2004,7 +2004,7 @@ func TestOwnerIsAnnouncedInPrivate(t *testing.T) {
 
 	f.run(update)
 
-	if req := f.replier.recorded()[0].req; !strings.HasSuffix(req.Context, "\n\n"+ownerNotice) || req.Text != "hi" {
+	if req := f.replier.recorded()[0].req; !strings.HasSuffix(req.Context, "\n\n"+ownerNotice+inEnglish) || req.Text != "hi" {
 		t.Errorf("request = %+v", req)
 	}
 

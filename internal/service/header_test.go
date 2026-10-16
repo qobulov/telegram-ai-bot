@@ -32,6 +32,9 @@ var headerNow = time.Date(2026, 10, 16, 15, 4, 0, 0, tashkent)
 
 const headerDate = "Friday 16 October 2026, 15:04 (Asia/Tashkent)"
 
+// inEnglish ends the context of a turn whose message is in English.
+const inEnglish = "\n\n[Answer in English.]"
+
 // withRights gives the fixture a fixed clock and a source of the bot's
 // rights; nil is none.
 func withRights(f *fixture, rights BotRightsSource) {
@@ -64,7 +67,7 @@ func TestGroupHeader(t *testing.T) {
 
 	f.run(inDevs("Mira, can you mute people?"))
 
-	want := groupHeader("Your admin rights here: delete messages, ban and mute members.")
+	want := groupHeader("Your admin rights here: delete messages, ban and mute members.") + inEnglish
 	if got := onlyRequest(t, f).req.Context; got != want {
 		t.Errorf("context = %q\nwant      %q", got, want)
 	}
@@ -81,7 +84,7 @@ func TestHeaderWhenAdminWithoutModerationRights(t *testing.T) {
 
 	f.run(inDevs("Mira, make me admin"))
 
-	want := groupHeader("You are an admin here, without the rights to delete messages, ban and mute members or pin messages.")
+	want := groupHeader("You are an admin here, without the rights to delete messages, ban and mute members or pin messages.") + inEnglish
 	if got := onlyRequest(t, f).req.Context; got != want {
 		t.Errorf("context = %q\nwant      %q", got, want)
 	}
@@ -93,7 +96,7 @@ func TestHeaderWhenNotAdmin(t *testing.T) {
 
 	f.run(inDevs("Mira, hi"))
 
-	if got, want := onlyRequest(t, f).req.Context, groupHeader("You are not an admin here."); got != want {
+	if got, want := onlyRequest(t, f).req.Context, groupHeader("You are not an admin here.")+inEnglish; got != want {
 		t.Errorf("context = %q\nwant      %q", got, want)
 	}
 }
@@ -111,7 +114,7 @@ func TestHeaderWhenRightsUnknown(t *testing.T) {
 
 			sent := f.run(inDevs("Mira, hi"))
 
-			if got, want := onlyRequest(t, f).req.Context, groupHeader("Your admin rights here are unknown."); got != want {
+			if got, want := onlyRequest(t, f).req.Context, groupHeader("Your admin rights here are unknown.")+inEnglish; got != want {
 				t.Errorf("context = %q\nwant      %q", got, want)
 			}
 			expectOneReply(t, sent, "echo: hi")
@@ -126,7 +129,7 @@ func TestPrivateHeaderHasOnlyTheDate(t *testing.T) {
 
 	f.run(textFrom(userID, "what day is it?"))
 
-	if got, want := onlyRequest(t, f).req.Context, "[Now: "+headerDate+".]"; got != want {
+	if got, want := onlyRequest(t, f).req.Context, "[Now: "+headerDate+".]"+inEnglish; got != want {
 		t.Errorf("context = %q, want %q", got, want)
 	}
 	if len(rights.asked) != 0 {
@@ -135,7 +138,8 @@ func TestPrivateHeaderHasOnlyTheDate(t *testing.T) {
 }
 
 // The header comes first; then, in a private chat, the owner notice, and in
-// a group, the log; each part apart from the next by a blank line.
+// a group, the log; each part apart from the next by a blank line, and the
+// language to answer in last.
 func TestHeaderComesBeforeTheOwnerNoticeAndTheLog(t *testing.T) {
 	f := newFixture()
 	withRights(f, &fakeBotRights{})
@@ -150,13 +154,14 @@ func TestHeaderComesBeforeTheOwnerNoticeAndTheLog(t *testing.T) {
 	if len(calls) != 2 {
 		t.Fatalf("model calls = %d, want 2", len(calls))
 	}
-	if got, want := calls[0].req.Context, "[Now: "+headerDate+".]\n\n"+ownerNotice; got != want {
+	if got, want := calls[0].req.Context, "[Now: "+headerDate+".]\n\n"+ownerNotice+inEnglish; got != want {
 		t.Errorf("owner's private context = %q, want %q", got, want)
 	}
-	header, log, _ := strings.Cut(calls[1].req.Context, "\n\n")
-	if header != groupHeader("You are not an admin here.") {
-		t.Errorf("group header = %q", header)
+	parts := strings.Split(calls[1].req.Context, "\n\n")
+	if len(parts) != 3 || parts[0] != groupHeader("You are not an admin here.") || "\n\n"+parts[2] != inEnglish {
+		t.Fatalf("group context = %q", parts)
 	}
+	log := parts[1]
 	if got := blockLines(t, log); len(got) != 1 || got[0] != "Bek: just chatting" {
 		t.Errorf("log after the header = %q", got)
 	}
@@ -228,10 +233,10 @@ func TestRulesHeaderListsInstructionsAndAddress(t *testing.T) {
 		update telegram.Update
 		want   string
 	}{
-		"an owner in the group": {ownerInDevs, groupHeader("You are not an admin here.") + "\n\n" + rules + "\n" + address},
-		"a member in the group": {inDevs("Mira, hi"), groupHeader("You are not an admin here.") + "\n\n" + rules},
-		"an owner in private":   {ownerInPrivate, "[Now: " + headerDate + ".]\n\n" + address + "\n\n" + ownerNotice},
-		"a member in private":   {textFrom(userID, "hi"), "[Now: " + headerDate + ".]"},
+		"an owner in the group": {ownerInDevs, groupHeader("You are not an admin here.") + "\n\n" + rules + "\n" + address + inEnglish},
+		"a member in the group": {inDevs("Mira, hi"), groupHeader("You are not an admin here.") + "\n\n" + rules + inEnglish},
+		"an owner in private":   {ownerInPrivate, "[Now: " + headerDate + ".]\n\n" + address + "\n\n" + ownerNotice + inEnglish},
+		"a member in private":   {textFrom(userID, "hi"), "[Now: " + headerDate + ".]" + inEnglish},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -244,7 +249,8 @@ func TestRulesHeaderListsInstructionsAndAddress(t *testing.T) {
 
 // Told "don't answer this" in reply to a member, the model stayed silent
 // once instead of saving the order with group_rules ignore. When an owner
-// replies to a member, the context ends with whom the order would mean.
+// replies to a member, the context names, right before the language to
+// answer in, whom the order would mean.
 func TestOwnerReplyToAMemberNamesTheMember(t *testing.T) {
 	member := &telegram.User{ID: 4242, FirstName: "Ann", Username: "ann"}
 	asMember := func(msg *telegram.Message) *telegram.Message { return msg }
@@ -272,7 +278,7 @@ func TestOwnerReplyToAMemberNamesTheMember(t *testing.T) {
 			msg.ReplyToMessage = &telegram.Message{MessageID: 29, From: c.replied, Chat: msg.Chat, Text: "hello all"}
 			f.run(inGroup(msg))
 			context := onlyRequest(t, f).req.Context
-			if got := strings.HasSuffix(context, "\n\n"+hint); got != c.want {
+			if got := strings.HasSuffix(context, "\n\n"+hint+inEnglish); got != c.want {
 				t.Errorf("context ends with the hint = %v, want %v: %q", got, c.want, context)
 			}
 		})

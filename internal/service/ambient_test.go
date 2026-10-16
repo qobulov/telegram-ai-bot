@@ -106,10 +106,15 @@ var lineTime = regexp.MustCompile(`^\d\d:\d\d `)
 // dayLog is the log block in a request's context, which follows the turn
 // header, or "" when the context has none.
 func dayLog(context string) string {
-	if i := strings.Index(context, ambientHeader); i >= 0 {
-		return context[i:]
+	i := strings.Index(context, ambientHeader)
+	if i < 0 {
+		return ""
 	}
-	return ""
+	log := context[i:]
+	if end := strings.Index(log, ambientFooter); end >= 0 {
+		return log[:end+len(ambientFooter)]
+	}
+	return log
 }
 
 func blockLines(t *testing.T, block string) []string {

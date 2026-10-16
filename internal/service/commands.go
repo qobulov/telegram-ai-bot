@@ -583,7 +583,8 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 // author ("Bek: ..."), because the conversation is shared. The context, for
 // this turn only, is the chat header and the owners' standing rules, then in
 // a private chat the owner notice, in a group the recent chatter and, when an
-// owner replies to a member, whom an order not to answer would mean.
+// owner replies to a member, whom an order not to answer would mean, and last
+// the language to answer in.
 func (s *Service) request(ctx context.Context, in incoming, rules []storage.GroupRule) agent.Request {
 	req := agent.Request{
 		Scope:            in.scope,
@@ -609,7 +610,7 @@ func (s *Service) request(ctx context.Context, in incoming, rules []storage.Grou
 			notice = ownerNotice
 		}
 	}
-	req.Context = paragraphs(s.chatHeader(ctx, in), s.rulesHeader(rules, in), notice, log, s.ownerReplyHint(in))
+	req.Context = paragraphs(s.chatHeader(ctx, in), s.rulesHeader(rules, in), notice, log, s.ownerReplyHint(in), languageHint(in.text))
 	replied := in.msg.ReplyToMessage
 	if replied != nil {
 		req.Text = withQuote(req.Text, s.quoted(ctx, replied), s.opts.Bot.ID, plainLabel(replied.From))
