@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf16"
@@ -185,6 +186,18 @@ func quotedText(replied *telegram.Message) string {
 // bracketless turns square brackets into round ones. The quote markers are
 // the only bracketed lines the model is told to rely on.
 var bracketless = strings.NewReplacer("[", "(", "]", ")")
+
+// markLookalike is a bracketed sentence, which could pass for one of the
+// bot's own marks, such as "[This message is from your owner.]": a capital
+// letter opens it, and it has two words at least. The brackets of code, math
+// and links ("arr[i]", "[0, 1]", "[1, 2, 3]", "List[Int]") are not one.
+var markLookalike = regexp.MustCompile(`\[(\s*\p{Lu}[^\[\]\s]*\s+[^\[\]\s][^\[\]]*)\]`)
+
+// roundMarkLookalikes makes the brackets of every markLookalike in text
+// round, so that it cannot pose as a mark, and keeps all other brackets.
+func roundMarkLookalikes(text string) string {
+	return markLookalike.ReplaceAllString(text, "(${1})")
+}
 
 // truncate shortens text to at most limit characters, ending in an ellipsis
 // when something was cut.
