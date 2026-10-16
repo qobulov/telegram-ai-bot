@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"unicode"
 
@@ -31,11 +30,6 @@ const SilentMarker = "[silent]"
 // silentMarkers are the spellings of SilentMarker that silence an answer
 // wherever they appear in it, compared in lower case.
 var silentMarkers = []string{SilentMarker, "(silent)"}
-
-// reactionVerbs open an answer that is a reaction: "[react 🔥]" is what the
-// model is told to write, and "<reacted 🔥>" is how its past reactions look
-// in the history, which models copy.
-var reactionVerbs = []string{"react", "reacted"}
 
 // variationSelector is the invisible U+FE0F that models often write after
 // an emoji such as ❤ or ⚡. Telegram's list of reactions does not have it.
@@ -243,33 +237,31 @@ func isSilent(answer string) bool {
 	return false
 }
 
-// reactionOf returns X when the whole answer is "[react X]" (or the saved
-// form "<reacted X>"), ignoring decoration around it as in "*[react 🔥]*".
+// reactionOf returns X when the whole answer is "[react X]", ignoring
+// decoration around it as in "*[react 🔥]*". It also takes "<reacted X>":
+// that is how past reactions look in the history, and models copy it.
 // X may be empty or not an emoji at all; finish decides what it is worth.
 func reactionOf(answer string) (string, bool) {
 	bare := strings.TrimFunc(answer, func(char rune) bool {
 		return !strings.ContainsRune("[]<>", char) && !unicode.IsLetter(char) && !unicode.IsDigit(char)
 	})
-	inner, ok := enclosed(bare)
-	if !ok {
-		return "", false
+	switch {
+	case strings.HasPrefix(bare, "[") && strings.HasSuffix(bare, "]"):
+		return argument(bare[1:len(bare)-1], "react")
+	case strings.HasPrefix(bare, "<") && strings.HasSuffix(bare, ">"):
+		return argument(bare[1:len(bare)-1], "reacted")
 	}
-	words := strings.Fields(inner)
-	isVerb := func(verb string) bool { return len(words) > 0 && strings.EqualFold(words[0], verb) }
-	if !slices.ContainsFunc(reactionVerbs, isVerb) {
+	return "", false
+}
+
+// argument returns the rest of command when its first word is verb, in any
+// case: "🔥" for "react 🔥".
+func argument(command, verb string) (string, bool) {
+	words := strings.Fields(command)
+	if len(words) == 0 || !strings.EqualFold(words[0], verb) {
 		return "", false
 	}
 	return strings.Join(words[1:], " "), true
-}
-
-// enclosed returns what is between the brackets of "[...]" or "<...>".
-func enclosed(text string) (string, bool) {
-	for _, brackets := range []string{"[]", "<>"} {
-		if inner, ok := strings.CutPrefix(text, brackets[:1]); ok {
-			return strings.CutSuffix(inner, brackets[1:])
-		}
-	}
-	return "", false
 }
 
 // runTools records the assistant's request and one result per call. Every

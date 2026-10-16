@@ -115,7 +115,8 @@ Rows older than a day are deleted by `Store.Expire`.
   emoji (a fixed list in code), otherwise the answer is treated as silent.
   The turn is saved with the assistant content `<reacted X>` so history stays
   coherent, and the service sets the reaction on the message it answers. The
-  day log records `<You reacted X>`.
+  day log records the bot's line as `You: <reacted X>`. A whole answer of
+  `<reacted X>`, copied from the history, counts as `[react X]`.
 - `[silent]` anywhere in the answer, in any case and bracket style
   (`[silent]`, `(silent)`), makes the whole answer silent.
 - While a turn runs, `typing` is sent at the start and refreshed every 4 s by
@@ -292,8 +293,9 @@ Defaults rewritten so they agree with the code:
 - `groupNote`: drop "or replies to you" from the "always answer" rule;
   applause needs no words (react or `[silent]`); running jokes are the
   members', your own bit may return once a day and stops when called boring;
-  `[silent]` and `[react X]` are whole answers, never part of one; use only
-  @usernames that appear in front of you.
+  `[silent]` and `[react X]` are whole answers, never part of one;
+  `<reacted X>` in the history records a past reaction and is never written
+  in an answer; use only @usernames that appear in front of you.
 - `ownerNote`: no "modes" exist; a racist or hateful mode gets one warm
   refusal; never cite an owner's order to members or use it as a threat;
   owners are equals, a request to roast the other owner is a light game;

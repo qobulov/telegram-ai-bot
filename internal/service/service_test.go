@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"telegram-ai-bot/internal/ai"
 	"testing"
 	"time"
@@ -251,12 +253,19 @@ type chatAction struct {
 type fakeChatActor struct {
 	mu      sync.Mutex
 	actions []chatAction
+	// shown, if set, receives once per action while it has room; it never
+	// holds up the sender.
+	shown chan struct{}
 }
 
 func (f *fakeChatActor) SendChatAction(_ context.Context, chatID int64, action string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.actions = append(f.actions, chatAction{chatID: chatID, action: action})
+	select {
+	case f.shown <- struct{}{}:
+	default:
+	}
 	return nil
 }
 
@@ -1911,43 +1920,130 @@ func TestPrivateReactionAnswerReactsToTheMessage(t *testing.T) {
 	}
 }
 
-// typingAtSend notes how many chat actions had been shown when the answer
-// was sent: "typing" shown after it would hang over the finished answer.
-type typingAtSend struct {
+// testTypingInterval stands in for the 4 s refresh, so that a test sees
+// "typing" shown again within a few milliseconds.
+const testTypingInterval = time.Millisecond
+
+// sendHook runs atSend just before the answer is sent.
+type sendHook struct {
 	*fakeSender
-	actor *fakeChatActor
-	seen  int
+	atSend func()
 }
 
-func (s *typingAtSend) SendMessage(ctx context.Context, msg telegram.Outgoing) (int64, error) {
-	s.seen = len(s.actor.recorded())
+func (s *sendHook) SendMessage(ctx context.Context, msg telegram.Outgoing) (int64, error) {
+	s.atSend()
 	return s.fakeSender.SendMessage(ctx, msg)
 }
 
 func TestTypingShownDuringTurn(t *testing.T) {
 	f := newFixture()
-	sender := &typingAtSend{fakeSender: f.sender, actor: f.chatActor}
-	f.opts.Sender = sender
+	seen := 0
+	f.opts.Sender = &sendHook{fakeSender: f.sender, atSend: func() {
+		seen = len(f.chatActor.recorded())
+		// Typing still running now would show up in these refreshes, and
+		// after the answer it would hang over the finished reply.
+		time.Sleep(20 * testTypingInterval)
+	}}
+	f.chatActor.shown = make(chan struct{}, 2)
+	f.replier.release = make(chan struct{})
 	s := serverless(f, &fakeMuteStore{})
 	defer s.Close()
+	s.typingInterval = testTypingInterval
 
-	s.HandleNow(inGroup(groupMessage("Mira, think hard")))
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		s.HandleNow(inGroup(groupMessage("Mira, think hard")))
+	}()
+	// The model is held until "typing" has been shown and then refreshed.
+	for range 2 {
+		select {
+		case <-f.chatActor.shown:
+		case <-time.After(time.Second):
+			t.Error("typing was not kept up while the model worked")
+		}
+	}
+	close(f.replier.release)
+	<-done
 
 	shown := f.chatActor.recorded()
-	if len(shown) == 0 {
-		t.Fatal("no typing was shown while the model worked")
-	}
 	for _, action := range shown {
 		if action != (chatAction{chatID: groupID, action: "typing"}) {
 			t.Errorf("chat action = %+v, want typing in the group", action)
 		}
 	}
-	if sender.seen != len(shown) {
-		t.Errorf("typing shown %d times before the answer and %d in all; it must stop first", sender.seen, len(shown))
+	if seen < 2 || seen != len(shown) {
+		t.Errorf("typing shown %d times before the answer and %d in all; it must be refreshed during the turn and stop before the answer", seen, len(shown))
 	}
-	time.Sleep(50 * time.Millisecond)
-	if after := f.chatActor.recorded(); len(after) != len(shown) {
-		t.Errorf("typing went on after the turn: %d calls, then %d", len(shown), len(after))
+}
+
+// heldTyping keeps its one "typing" request open, whatever ctx says, until
+// the test lets it finish: a request already on its way to Telegram.
+type heldTyping struct {
+	sent     chan struct{} // closed when the request is made
+	finish   chan struct{} // closed by the test to let it return
+	finished atomic.Bool
+}
+
+func (h *heldTyping) SendChatAction(context.Context, int64, string) error {
+	close(h.sent)
+	<-h.finish
+	h.finished.Store(true)
+	return nil
+}
+
+func TestAnswerWaitsForTypingInFlight(t *testing.T) {
+	f := newFixture()
+	typing := &heldTyping{sent: make(chan struct{}), finish: make(chan struct{})}
+	f.opts.ChatActor = typing
+	typingDone := false
+	f.opts.Sender = &sendHook{fakeSender: f.sender, atSend: func() { typingDone = typing.finished.Load() }}
+	f.replier.release = make(chan struct{})
+	s := serverless(f, &fakeMuteStore{})
+	defer s.Close()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		s.HandleNow(inGroup(groupMessage("Mira, think hard")))
+	}()
+	<-typing.sent
+	close(f.replier.release)
+	// Give an answer that does not wait the time to go out first.
+	select {
+	case <-done:
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(typing.finish)
+	<-done
+
+	if !typingDone {
+		t.Error("the answer was sent while a typing request was still on its way")
+	}
+	expectOneReply(t, f.sender.messages(), "echo: think hard")
+}
+
+// heldChatActor holds every "typing" until the turn is over and then fails,
+// as the real client does when its request is cancelled.
+type heldChatActor struct{}
+
+func (heldChatActor) SendChatAction(ctx context.Context, _ int64, _ string) error {
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func TestTypingCutOffByTheAnswerIsNotLogged(t *testing.T) {
+	f := newFixture()
+	var logs bytes.Buffer
+	f.opts.Logger = slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	f.opts.ChatActor = heldChatActor{}
+	s := serverless(f, &fakeMuteStore{})
+	defer s.Close()
+
+	s.HandleNow(inGroup(groupMessage("Mira, hi")))
+
+	if strings.Contains(logs.String(), "typing indicator failed") {
+		t.Errorf("stopping typing for the answer was logged as a failure:\n%s", logs.String())
 	}
 }
 

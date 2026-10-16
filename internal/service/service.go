@@ -201,6 +201,10 @@ type Service struct {
 
 	mutedMu sync.RWMutex
 	muted   map[int64]bool
+
+	// typingInterval is how often "typing" is shown again while a turn
+	// runs: typingRefresh, shortened by tests.
+	typingInterval time.Duration
 }
 
 // incoming is an accepted update, reduced to what handling it needs.
@@ -246,13 +250,14 @@ func (in incoming) queueKey() uint64 {
 // New starts the workers and returns the Service. Call Close to stop it.
 func New(opts Options) *Service {
 	s := &Service{
-		opts:         opts,
-		userLimiter:  newLimiter(opts.RatePerMinute),
-		ambient:      newAmbient(opts.ChatLog, opts.AmbientMessages, opts.Location, opts.Logger),
-		muted:        make(map[int64]bool, len(opts.MutedChats)),
-		queues:       make([]chan incoming, opts.Workers),
-		notices:      make(chan incoming, noticeQueueSize),
-		transcribing: make(chan struct{}, backgroundTranscriptions),
+		opts:           opts,
+		userLimiter:    newLimiter(opts.RatePerMinute),
+		ambient:        newAmbient(opts.ChatLog, opts.AmbientMessages, opts.Location, opts.Logger),
+		muted:          make(map[int64]bool, len(opts.MutedChats)),
+		queues:         make([]chan incoming, opts.Workers),
+		notices:        make(chan incoming, noticeQueueSize),
+		transcribing:   make(chan struct{}, backgroundTranscriptions),
+		typingInterval: typingRefresh,
 	}
 	for _, chatID := range opts.MutedChats {
 		s.muted[chatID] = true
@@ -603,16 +608,17 @@ func (s *Service) react(in incoming, emoji string) {
 	}
 }
 
-// typingInterval is how often "typing" is shown again while a turn runs.
+// typingRefresh is how often "typing" is shown again while a turn runs.
 // Telegram clears it after about 5 seconds.
-const typingInterval = 4 * time.Second
+const typingRefresh = 4 * time.Second
 
 // showTyping shows "typing" in the chat at once and again every
 // typingInterval, until stop is called or ctx ends: a turn can take many
 // seconds, and without a sign of life people ask again. stop waits for the
 // goroutine, so that no "typing" is sent after the answer, where it would
 // hang over a finished reply. Like a reaction, it is a gesture, so failures
-// are only logged at debug level.
+// are only logged at debug level, and not at all once the turn is over: a
+// send cut off by stop is expected.
 func (s *Service) showTyping(ctx context.Context, chatID int64) (stop func()) {
 	if s.opts.ChatActor == nil {
 		return func() {}
@@ -620,15 +626,18 @@ func (s *Service) showTyping(ctx context.Context, chatID int64) (stop func()) {
 	ctx, cancel := context.WithCancel(ctx)
 	var typing sync.WaitGroup
 	typing.Go(func() {
-		ticker := time.NewTicker(typingInterval)
+		ticker := time.NewTicker(s.typingInterval)
 		defer ticker.Stop()
-		for {
-			if err := s.opts.ChatActor.SendChatAction(ctx, chatID, "typing"); err != nil {
+		// The loop condition, not the select, ends it, so that no send starts
+		// once the turn is over: stop may come before the first one, and
+		// select may pick the ticker even when ctx is already done.
+		for ctx.Err() == nil {
+			err := s.opts.ChatActor.SendChatAction(ctx, chatID, "typing")
+			if err != nil && ctx.Err() == nil {
 				s.opts.Logger.Debug("typing indicator failed", "chat_id", chatID, "error", err)
 			}
 			select {
 			case <-ctx.Done():
-				return
 			case <-ticker.C:
 			}
 		}
