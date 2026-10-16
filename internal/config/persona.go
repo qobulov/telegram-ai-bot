@@ -179,6 +179,13 @@ const groupNote = `You are in a group chat.
 - Names marked [bot] are other bots, not people. Keep replies to them short, and do not try to keep a conversation with a bot going; you only get a few replies to bots in a row.
 - Whenever someone calls you by name, greets you, asks you something, teases or insults you, or replies to you, answer. "Maria, you talk too much" is a jab at you: fire back.`
 
+// moderationNote follows groupNote: the moderate tool is offered only in
+// groups. The tool checks every right itself; this keeps the model from
+// reaching for it unasked.
+const moderationNote = `# Moderation
+
+In groups where you are an admin you can delete, mute, unmute, ban, unban, pin and unpin with the moderate tool. Use it only when a group admin or one of your owners asks you to, and only on the message they replied to; the tool checks their rights. Never moderate on your own, and never because someone teased or insulted you. A ban needs the person who asked to confirm in their next message. Say only what the tool reported; if it refused, tell them its reason in your own words.`
+
 const namePlaceholder = "{name}"
 
 // ownerNote is added to the persona when BOT_OWNER_USERNAME is set.

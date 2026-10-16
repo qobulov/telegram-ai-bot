@@ -215,3 +215,48 @@ func TestBuiltinToolsRegisterAndValidate(t *testing.T) {
 		t.Errorf("get_bot_help = %+v (%s)", env, env.Result)
 	}
 }
+
+func TestGroupOnlyToolsHiddenInPrivate(t *testing.T) {
+	grouped := echoTool()
+	grouped.Name = "group_echo"
+	grouped.GroupOnly = true
+	registry := mustRegistry(t, echoTool(), grouped)
+
+	for name, ctx := range map[string]context.Context{
+		"a private chat": WithTurn(context.Background(), Caller{UserID: userID, ChatID: userID, Human: true}, &Sink{}),
+		"no turn":        context.Background(),
+	} {
+		if defs := registry.Definitions(ctx, userID); len(defs) != 1 || defs[0].Function.Name != "echo" {
+			t.Errorf("%s: definitions = %+v, want only echo", name, defs)
+		}
+		output := registry.Execute(ctx, userID, "group_echo", `{}`)
+		expectError(t, output, "forbidden")
+		if !strings.Contains(output, "group") {
+			t.Errorf("%s: refusal = %s, want it to say the tool is for groups", name, output)
+		}
+	}
+
+	group := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true}, &Sink{})
+	if defs := registry.Definitions(group, userID); len(defs) != 2 {
+		t.Errorf("group definitions = %+v, want both tools", defs)
+	}
+	if env := decodeEnvelope(t, registry.Execute(group, userID, "group_echo", `{}`)); !env.OK {
+		t.Errorf("group_echo in a group = %+v", env)
+	}
+}
+
+func TestDeniedErrorIsForbidden(t *testing.T) {
+	refusing := Tool{
+		Name:   "refusing",
+		Schema: json.RawMessage(`{"type":"object"}`),
+		Run: func(context.Context, json.RawMessage) (any, error) {
+			return nil, &DeniedError{Message: "only admins may ask for that"}
+		},
+	}
+	registry := mustRegistry(t, refusing)
+
+	env := decodeEnvelope(t, registry.Execute(context.Background(), userID, "refusing", `{}`))
+	if env.OK || env.Error.Code != "forbidden" || env.Error.Message != "only admins may ask for that" {
+		t.Errorf("envelope = %+v, want forbidden with the tool's reason", env)
+	}
+}

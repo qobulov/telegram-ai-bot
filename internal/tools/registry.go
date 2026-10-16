@@ -41,6 +41,9 @@ type Tool struct {
 	// OwnerOnly restricts the tool to the bot's owners, as the turn's
 	// Caller says.
 	OwnerOnly bool
+	// GroupOnly offers the tool only in a group's turns, as the turn's
+	// Caller says.
+	GroupOnly bool
 	// MaxOutputBytes bounds the result. Zero means maxOutputBytes.
 	MaxOutputBytes int
 	// Timeout bounds one execution. Zero means defaultTimeout.
@@ -57,6 +60,14 @@ type ArgumentError struct {
 }
 
 func (e *ArgumentError) Error() string { return e.Message }
+
+// DeniedError reports that the caller may not have the tool do this. Its
+// message says why in plain words, for the model to pass on.
+type DeniedError struct {
+	Message string
+}
+
+func (e *DeniedError) Error() string { return e.Message }
 
 // Registry is the fixed set of tools available to the model. Nothing outside
 // it can be executed. It is safe for concurrent use.
@@ -94,7 +105,7 @@ func NewRegistry(isAdmin func(userID int64) bool, tools ...Tool) (*Registry, err
 func (r *Registry) Definitions(ctx context.Context, callerID int64) []ai.ToolDefinition {
 	var definitions []ai.ToolDefinition
 	for _, tool := range r.tools {
-		if !r.allowed(ctx, tool, callerID) {
+		if r.refusal(ctx, tool, callerID) != "" {
 			continue
 		}
 		definitions = append(definitions, ai.ToolDefinition{
@@ -120,8 +131,8 @@ func (r *Registry) Execute(ctx context.Context, callerID int64, name, args strin
 	if !ok {
 		return failure(codeUnknownTool, fmt.Sprintf("there is no tool named %q", name))
 	}
-	if !r.allowed(ctx, tool, callerID) {
-		return failure(codeForbidden, "this tool is restricted to administrators or owners")
+	if reason := r.refusal(ctx, tool, callerID); reason != "" {
+		return failure(codeForbidden, reason)
 	}
 	raw, err := normalizeArgs(args)
 	if err != nil {
@@ -134,15 +145,18 @@ func (r *Registry) Execute(ctx context.Context, callerID int64, name, args strin
 	return success(result, tool.MaxOutputBytes)
 }
 
-func (r *Registry) allowed(ctx context.Context, tool Tool, callerID int64) bool {
-	if tool.AdminOnly && !r.isAdmin(callerID) {
-		return false
+// refusal says why the caller may not use the tool here, or "" when they
+// may.
+func (r *Registry) refusal(ctx context.Context, tool Tool, callerID int64) string {
+	caller, inTurn := CallerFrom(ctx)
+	switch {
+	case tool.AdminOnly && !r.isAdmin(callerID),
+		tool.OwnerOnly && !(inTurn && caller.Owner && caller.UserID == callerID):
+		return "this tool is restricted to administrators or owners"
+	case tool.GroupOnly && !(inTurn && caller.ChatID < 0):
+		return "this tool works only in a group"
 	}
-	if tool.OwnerOnly {
-		caller, ok := CallerFrom(ctx)
-		return ok && caller.Owner && caller.UserID == callerID
-	}
-	return true
+	return ""
 }
 
 // normalizeArgs accepts only a JSON object. Models often send an empty string
@@ -191,9 +205,12 @@ func runWithTimeout(ctx context.Context, tool Tool, args json.RawMessage) (any, 
 func errorCode(err error) string {
 	var argErr *ArgumentError
 	var limitErr *LimitError
+	var deniedErr *DeniedError
 	switch {
 	case errors.As(err, &limitErr):
 		return codeDailyLimit
+	case errors.As(err, &deniedErr):
+		return codeForbidden
 	case errors.As(err, &argErr):
 		return codeInvalidArguments
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):

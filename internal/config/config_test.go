@@ -869,3 +869,28 @@ func TestPersonaIsComposedNotQuarrelsome(t *testing.T) {
 		}
 	}
 }
+
+func TestGroupNoteExplainsModeration(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(cfg.GroupNote, "You are in a group chat.") {
+		t.Errorf("the group note no longer starts with the group rules: %.60q", cfg.GroupNote)
+	}
+	for _, want := range []string{
+		"# Moderation",
+		"with the moderate tool",
+		"only on the message they replied to",
+		"Never moderate on your own, and never because someone teased or insulted you",
+		"A ban needs the person who asked to confirm in their next message",
+		"Say only what the tool reported",
+	} {
+		if !strings.Contains(cfg.GroupNote, want) {
+			t.Errorf("the group note does not contain %q", want)
+		}
+	}
+	if strings.Contains(cfg.PersonaPrompt, "moderate tool") {
+		t.Error("moderation is explained in private chats too, where the tool is never offered")
+	}
+}

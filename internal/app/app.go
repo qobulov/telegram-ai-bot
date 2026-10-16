@@ -172,6 +172,15 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 	if cfg.ImagesEnabled {
 		builtin = append(builtin, imageTool(cfg, store))
 	}
+	// Any group's admins may use it, so it is there with or without owners.
+	builtin = append(builtin, tools.ModerationTool(tools.ModerationOptions{
+		BotID:    bot.User.ID,
+		Members:  bot.Client,
+		Telegram: bot.Client,
+		Store:    store,
+		Rights:   store,
+		Location: cfg.Location,
+	}))
 	if len(cfg.OwnerUsernames) > 0 {
 		builtin = append(builtin,
 			tools.DatabaseTool(tools.DatabaseOptions{
