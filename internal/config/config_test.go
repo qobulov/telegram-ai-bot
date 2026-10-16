@@ -448,7 +448,7 @@ func TestGeminiKeySelectsGemini(t *testing.T) {
 	if cfg.AIBaseURL != "https://generativelanguage.googleapis.com/v1beta/openai" {
 		t.Errorf("base URL = %q, want Gemini's OpenAI-compatible endpoint", cfg.AIBaseURL)
 	}
-	if cfg.Model != "gemini-3.5-flash-lite" {
+	if cfg.Model != "gemini-3.6-flash" {
 		t.Errorf("model = %q", cfg.Model)
 	}
 }
@@ -472,7 +472,7 @@ func TestOpenRouterSettingsDoNotLeakIntoGemini(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.Model != "gemini-3.5-flash-lite" {
+	if cfg.Model != "gemini-3.6-flash" {
 		t.Errorf("model = %q; an OpenRouter model name must not be sent to Gemini", cfg.Model)
 	}
 }
@@ -582,7 +582,7 @@ func TestGeminiFallbackModels(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(cfg.FallbackModels, ","); got != "gemini-3.1-flash-lite,gemini-flash-lite-latest,gemini-flash-latest" {
+	if got := strings.Join(cfg.FallbackModels, ","); got != "gemini-3.5-flash,gemini-flash-latest,gemini-3.5-flash-lite" {
 		t.Errorf("default Gemini fallbacks = %q", got)
 	}
 

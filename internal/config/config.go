@@ -310,8 +310,8 @@ type provider struct {
 }
 
 var providers = []provider{
-	{providerGemini, "GEMINI_API_KEY", "GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai", "GEMINI_MODEL", "gemini-3.5-flash-lite",
-		[]string{"gemini-3.1-flash-lite", "gemini-flash-lite-latest", "gemini-flash-latest"}, true},
+	{providerGemini, "GEMINI_API_KEY", "GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai", "GEMINI_MODEL", "gemini-3.6-flash",
+		[]string{"gemini-3.5-flash", "gemini-flash-latest", "gemini-3.5-flash-lite"}, true},
 	{providerXAI, "XAI_API_KEY", "XAI_BASE_URL", "https://api.x.ai/v1", "XAI_MODEL", "grok-4", nil, false},
 	{providerOpenRouter, "OPENROUTER_API_KEY", "OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1", "OPENROUTER_MODEL", "openrouter/free", nil, false},
 }

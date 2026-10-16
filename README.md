@@ -166,8 +166,8 @@ in the environment win over the file.
 | `TELEGRAM_BOT_TOKEN`          | required                       | Token from [@BotFather](https://t.me/BotFather)                                                              |
 | `GEMINI_API_KEY` | one of the two keys | Google Gemini key from <https://aistudio.google.com/apikey> |
 | `OPENROUTER_API_KEY` | one of the two keys | OpenRouter key from <https://openrouter.ai/keys>; set this or `GEMINI_API_KEY`, not both |
-| `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Gemini model ID, used with `GEMINI_API_KEY` |
-| `FALLBACK_MODELS` | Gemini: `gemini-3.1-flash-lite,gemini-flash-lite-latest,gemini-flash-latest` | Models tried in order when the main one is overloaded, out of quota or does not answer, then once more after a pause; a model out of quota is skipped for 15 minutes; `none` turns this off |
+| `GEMINI_MODEL` | `gemini-3.6-flash` | Gemini model ID, used with `GEMINI_API_KEY` |
+| `FALLBACK_MODELS` | Gemini: `gemini-3.5-flash,gemini-flash-latest,gemini-3.5-flash-lite` | Models tried in order when the main one is overloaded, out of quota or does not answer, then once more after a pause; a model out of quota is skipped for 15 minutes; `none` turns this off |
 | `BACKUP_API_KEY` | empty | Key for a backup provider, asked when every model of the main one failed; replies that already moved to it stay on it |
 | `BACKUP_BASE_URL` | `https://api.groq.com/openai/v1` | The backup's OpenAI-compatible API (Groq by default) |
 | `BACKUP_MODEL` | `openai/gpt-oss-120b` | The backup's model; it gets voice messages as transcripts only |
@@ -289,13 +289,16 @@ and stickers but cannot listen to voice messages here; for those, use
 Gemini.
 
 **Gemini.** Create a key at <https://aistudio.google.com/apikey> and set
-`GEMINI_API_KEY`. The model defaults to `gemini-3.5-flash-lite`, a fast model
-that was the most reliable in testing; set
+`GEMINI_API_KEY`. The model defaults to `gemini-3.6-flash`, a fast full flash model
+that answered in about 1.5 s in testing; change it any time by setting
 `GEMINI_MODEL` for another one from
 <https://ai.google.dev/gemini-api/docs/models>. Gemini models support the
 tools (time, calculator) and are usually much faster than OpenRouter's free
 models, which matters for the 60-second limit on Vercel. The bot talks to
 Gemini through Google's OpenAI-compatible endpoint, so nothing else changes.
+On Vercel, set `GEMINI_MODEL` (and, if you like, `FALLBACK_MODELS`) under
+Project Settings → Environment Variables and redeploy: the variable always
+wins over the default in the code.
 The free tier has per-minute and per-day request limits; when they are hit
 the user gets the generic error and the log shows `status 429`.
 
