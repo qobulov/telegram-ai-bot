@@ -525,8 +525,8 @@ func notDone(err error) (Confirmation, error) {
 
 // carryOut records o, then has Telegram do it. The record comes first and
 // is unique per update and action, so an update Telegram delivers twice is
-// acted on once. When Telegram does not act, the record is dropped, so that
-// the action may be tried again.
+// acted on once. When Telegram refuses, the record is dropped, so that the
+// action may be tried again.
 func (m *Moderation) carryOut(ctx context.Context, o order) error {
 	first, err := m.opts.Store.RecordModeration(ctx, o.audit())
 	if err != nil {
@@ -541,11 +541,18 @@ func (m *Moderation) carryOut(ctx context.Context, o order) error {
 	return nil
 }
 
-// failed drops the record of o, which Telegram did not take, and says why.
-// A record that cannot be dropped is reported too: the audit then holds an
-// action that was never taken, and counts it.
+// failed says why o was not carried out, and drops its record when
+// Telegram refused it. Without an answer, or with a server's error instead,
+// Telegram may have acted, so the record stays: the audit keeps what may
+// have been done, a deleted message's text with it, the pace counts it, and
+// the same update cannot act twice. A record that cannot be dropped is
+// reported too: the audit then holds an action that was never taken, and
+// counts it.
 func (m *Moderation) failed(ctx context.Context, o order, sendErr error) error {
 	failure := telegramFailure(sendErr)
+	if _, refused := telegramRefusal(sendErr); !refused {
+		return failure
+	}
 	if err := m.opts.Store.ForgetModeration(context.WithoutCancel(ctx), o.caller.UpdateID, o.action); err != nil {
 		return errors.Join(failure, err)
 	}

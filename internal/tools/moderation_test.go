@@ -871,29 +871,43 @@ func TestModerateQuestionThatCannotBePostedLeavesNothingWaiting(t *testing.T) {
 	env.nothingDone(t)
 }
 
-func TestModerateTelegramErrorIsReportedAndForgotten(t *testing.T) {
+func TestModerateTelegramErrorIsReported(t *testing.T) {
 	const noAnswer = "Not done: Telegram did not answer, so it may not have been done; try again later."
 	failures := []struct {
 		err  error
 		text string
+		// kept is whether the audit keeps the action: Telegram may have
+		// taken it unless it refused.
+		kept bool
 	}{
-		{&telegram.APIError{Code: 400, Description: "Bad Request: message can't be deleted"}, "Not done: Telegram refused: Bad Request: message can't be deleted."},
+		{&telegram.APIError{Code: 400, Description: "Bad Request: message can't be deleted"}, "Not done: Telegram refused: Bad Request: message can't be deleted.", false},
 		// Without an answer from Telegram, or with a server's error page
 		// instead, it may have acted.
-		{errors.New("dial tcp: i/o timeout"), noAnswer},
-		{&telegram.APIError{Code: 502, Description: "unreadable response from deleteMessage"}, noAnswer},
+		{errors.New("dial tcp: i/o timeout"), noAnswer, true},
+		{&telegram.APIError{Code: 502, Description: "unreadable response from deleteMessage"}, noAnswer, true},
 	}
 	for _, f := range failures {
 		env := newModerationEnv(t)
 		env.telegram.err = f.err
 
-		got := env.done(t, asking(100, bekTarget()), `{"action":"delete"}`)
+		promptID := env.ask(t, asking(100, bekTarget()), `{"action":"delete"}`)
+		got := env.confirm(t, 101, promptID, true)
 
 		if got != (Confirmation{Found: true, Text: f.text}) {
 			t.Errorf("delete failing with %v = %+v, want %q", f.err, got, f.text)
 		}
-		if audit := env.audit.recorded(); len(audit) != 0 {
-			t.Errorf("audit = %+v, want the failed action forgotten", audit)
+		audit := env.audit.recorded()
+		if kept := len(audit) == 1 && audit[0].TargetText == "you're slow"; kept != f.kept {
+			t.Errorf("delete failing with %v: audit = %+v, want kept %t", f.err, audit, f.kept)
+		}
+		// The yes delivered again acts no more when the action may be done.
+		env.telegram.err = nil
+		again := env.confirm(t, 101, promptID, true)
+		if f.kept && again != (Confirmation{Found: true}) {
+			t.Errorf("the yes again after %v = %+v, want found and silent", f.err, again)
+		}
+		if calls := env.telegram.made(); len(calls) != 1 {
+			t.Errorf("calls after %v = %q, want one", f.err, calls)
 		}
 	}
 }

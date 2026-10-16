@@ -712,6 +712,9 @@ check is made in code:
 - **Once only:** each action is recorded in `moderation_actions` under the
   Telegram update that confirmed it, before Telegram is called, so an update
   delivered twice is acted on once, and a request delivered twice asks once.
+  A record is dropped only when Telegram refuses; when it does not answer,
+  or a server's error comes back instead, it may have acted, so the record,
+  and a deleted message's text, stay.
 
 She is told to use the tool only when an admin or owner asks, never on her
 own initiative, and never to say an action was done: the result is her own
