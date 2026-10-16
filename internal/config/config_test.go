@@ -1065,19 +1065,20 @@ func TestPersonaSwearsBackInKind(t *testing.T) {
 }
 
 // The owner wants a member who finds fault with the bot answered with
-// just "poxuymasmi", and owners answered normally.
+// "poxuymasmi", alone or with a few dismissive words, and owners answered
+// normally.
 func TestPersonaShrugsOffFaultFinding(t *testing.T) {
 	cfg, err := Load(getenv(validEnv()))
 	if err != nil {
 		t.Fatal(err)
 	}
 	rule := lineContaining(cfg.PersonaPrompt, "points out a flaw of yours")
-	for _, want := range []string{`just "poxuymasmi"`, `"похуймасми"`, "nothing added", "still gets its answer", "owners get a normal answer"} {
+	for _, want := range []string{`start your answer with "poxuymasmi"`, `"похуймасми"`, `"poxuymasmi, senga chort"`, "never an apology", "still gets its answer", "owners get a normal answer"} {
 		if !strings.Contains(rule, want) {
 			t.Errorf("the fault-finding rule does not contain %q: %q", want, rule)
 		}
 	}
-	if swear := lineContaining(cfg.PersonaPrompt, "swears at you"); !strings.Contains(swear, `"иди нахуй" gets "днх"`) {
+	if swear := lineContaining(cfg.PersonaPrompt, "swears at you"); !strings.Contains(swear, `"иди нахуй" gets "днх" or "pshnx"`) {
 		t.Errorf("Russian swearing does not get днх: %q", swear)
 	}
 }
