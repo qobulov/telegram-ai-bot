@@ -638,10 +638,12 @@ To keep the bot out of groups altogether, use `/setjoingroups` in @BotFather.
 - A member's reply to one of her messages that is only applause gets an
   emoji reaction instead of an answer: 🤣 for laughter, otherwise one of
   👍 🔥 😁 👌. Applause is a sticker or GIF, text made only of laughter
-  (`xaxa`, `ахах`, `lol`, `)))`), emoji, punctuation and digits, or at most
-  two characters. It takes
-  no model call and nothing from the reply quota. Calling her by name or
-  `@username` is never applause, and owners always get an answer.
+  (`xaxa`, `ахах`, `lol`, `)))`; a single `ha` or `xa` is Uzbek for yes and
+  laughs only with 😂 or `))` beside it), emoji, punctuation and digits, or
+  `ok`. A question (`?`, `Ha?`), a sum (`2+2`), a sad face or sticker
+  (😢 😭 💔), and a number answering her own question are not applause.
+  It takes no model call and nothing from the reply quota. Calling her by
+  name or `@username` is never applause, and owners always get an answer.
 - The model may itself answer with one emoji reaction or with nothing. The
   history and the group log record a reaction as `You: <reacted 🔥>`.
 - While she is working on an answer the chat shows her as typing.
@@ -1304,7 +1306,7 @@ Known limits:
 | The bot answers but not as a reply                        | The original message was deleted before the answer arrived; the answer is then sent as an ordinary message.                                                                                                                                                                                   |
 | Group answers end in `…`                                  | They were cut to `MAX_GROUP_REPLY_LENGTH`.                                                                                                                                                                                                                                                    |
 | She stops answering a busy group for a while              | The reply quota: the log shows `group reply limit reached`. Raise `GROUP_RATE_LIMIT_PER_MINUTE` or `MEMBER_REPLIES_PER_10_MIN`. `group reply count failed; staying quiet` means the database could not be asked.                                                                             |
-| She puts an emoji on a reply instead of answering         | The reply was applause (a sticker, a GIF, laughter, emoji or a couple of characters), or the model chose to react. Call her by name or `@username` to get words.                                                                                                                                |
+| She puts an emoji on a reply instead of answering         | The reply was applause (a sticker, a GIF, laughter, emoji or a nod), or the model chose to react. Call her by name or `@username` to get words.                                                                                                                                |
 | She says she cannot delete, mute, ban or pin              | She lacks that admin right in the group, the person asking lacks it, or the target is an admin or owner; see [Moderation](#moderation). Mute works only in supergroups.                                                                                                                         |
 | `identify the bot: telegram: 401 Unauthorized` at startup | The bot token is wrong or was revoked.                                                                                                                                                                                                                                                        |
 | "Something went wrong on my side"                         | Look at the log line `turn failed`. `status 401`: bad OpenRouter key. `status 402`: no credits. `status 429`: the free model is rate limited; wait or pick another model. `status 404`: the model ID does not exist.                                                                          |
