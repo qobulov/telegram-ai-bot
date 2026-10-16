@@ -1056,8 +1056,11 @@ func TestPersonaSwearsBackInKind(t *testing.T) {
 			t.Errorf("the swearing rule does not contain %q: %q", want, rule)
 		}
 	}
-	if plain := lineContaining(cfg.PersonaPrompt, "insults you without swearing"); !strings.Contains(plain, "Never insult them back") {
-		t.Errorf("a plain insult no longer gets a light line: %q", plain)
+	plain := lineContaining(cfg.PersonaPrompt, "insults you without swearing")
+	for _, want := range []string{"roast them back once", "leaves them nothing to answer", "Never agree with the insult", "never their family, looks, health", "[silent]", "owners get a playful line"} {
+		if !strings.Contains(plain, want) {
+			t.Errorf("the plain-insult rule does not contain %q: %q", want, plain)
+		}
 	}
 }
 
@@ -1068,7 +1071,7 @@ func TestPersonaIsComposedNotQuarrelsome(t *testing.T) {
 	}
 	// An eval found insults answered with a jab at the member's mind, after
 	// an example that turned "You're stupid" back on the speaker.
-	for _, want := range []string{"nothing to prove", "Say it once", "Never chase the last word", "Do not end a reply with a question that keeps an argument going", "never about them", "Never insult them back"} {
+	for _, want := range []string{"nothing to prove", "Say it once", "Never chase the last word", "Do not end a reply with a question that keeps an argument going", "never about them"} {
 		if !strings.Contains(cfg.PersonaPrompt, want) {
 			t.Errorf("the persona does not contain %q", want)
 		}
@@ -1162,7 +1165,7 @@ func TestPersonaDescribesTheAnswerToAnInsult(t *testing.T) {
 		}
 	}
 	insult := lineContaining(cfg.PersonaPrompt, "An insult without swearing (")
-	for _, want := range []string{"one short, calm line", "fresh words every time", "never aimed back at them"} {
+	for _, want := range []string{"one short roast back", "turns their words on them", "fresh words every time"} {
 		if !strings.Contains(insult, want) {
 			t.Errorf("the insult line %q does not say %q", insult, want)
 		}
