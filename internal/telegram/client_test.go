@@ -93,7 +93,7 @@ func TestGetUpdatesParsesTextMessage(t *testing.T) {
 	if sent.method != "getUpdates" || sent.params["offset"] != float64(5) {
 		t.Errorf("call = %+v", sent)
 	}
-	if allowed, _ := sent.params["allowed_updates"].([]any); len(allowed) != 2 || allowed[0] != "message" || allowed[1] != "my_chat_member" {
+	if allowed, _ := sent.params["allowed_updates"].([]any); len(allowed) != 3 || allowed[0] != "message" || allowed[1] != "my_chat_member" || allowed[2] != "chat_member" {
 		t.Errorf("allowed_updates = %v", sent.params["allowed_updates"])
 	}
 }
@@ -405,7 +405,7 @@ func TestSetWebhookRegistersURLWithSecret(t *testing.T) {
 	if sent.method != "setWebhook" || sent.params["url"] != "https://bot.example/api/webhook" || sent.params["secret_token"] != "s3cret" {
 		t.Errorf("call = %+v", sent)
 	}
-	if allowed, _ := sent.params["allowed_updates"].([]any); len(allowed) != 2 || allowed[0] != "message" || allowed[1] != "my_chat_member" {
+	if allowed, _ := sent.params["allowed_updates"].([]any); len(allowed) != 3 || allowed[0] != "message" || allowed[1] != "my_chat_member" || allowed[2] != "chat_member" {
 		t.Errorf("allowed_updates = %v", sent.params["allowed_updates"])
 	}
 }

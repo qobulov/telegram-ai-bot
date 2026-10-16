@@ -378,6 +378,9 @@ func (s *Store) Expire(ctx context.Context, maxAge time.Duration) (Expired, erro
 		if _, err = tx.Exec(ctx, `DELETE FROM group_rules WHERE expires_at < now()`); err != nil {
 			return err
 		}
+		if _, err = tx.Exec(ctx, `DELETE FROM group_members WHERE status IN ('left', 'kicked') AND last_seen_at < $1`, time.Now().Add(-forgetLeftAfter)); err != nil {
+			return err
+		}
 		_, err = tx.Exec(ctx, `DELETE FROM broadcasts WHERE created_at < $1`, cutoff)
 		return err
 	})

@@ -133,6 +133,8 @@ type Options struct {
 	// Groups records the bot being added to or removed from groups; nil
 	// ignores those updates.
 	Groups GroupRegistry
+	// Roster keeps the members seen in each group; nil keeps none.
+	Roster MemberBook
 	Logger *slog.Logger
 	// Model is the model name shown by /model.
 	Model string
@@ -350,6 +352,10 @@ func (s *Service) Handle(update telegram.Update) {
 		s.recordMembership(update.MyChatMember)
 		return
 	}
+	if update.ChatMember != nil {
+		s.recordMember(update.ChatMember)
+		return
+	}
 	in, ok := s.accept(update)
 	if !ok {
 		return
@@ -372,6 +378,10 @@ func (s *Service) Handle(update telegram.Update) {
 func (s *Service) HandleNow(update telegram.Update) {
 	if update.MyChatMember != nil {
 		s.recordMembership(update.MyChatMember)
+		return
+	}
+	if update.ChatMember != nil {
+		s.recordMember(update.ChatMember)
 		return
 	}
 	if in, ok := s.accept(update); ok {
@@ -407,6 +417,49 @@ func (s *Service) recordMembership(change *telegram.ChatMemberUpdated) {
 	s.opts.Logger.Info("bot membership changed", "chat_id", change.Chat.ID, "status", change.NewChatMember.Status)
 }
 
+// MemberBook keeps the members seen in each group. The Bot API cannot list
+// them, so this is what the group_members tool reads.
+type MemberBook interface {
+	SeeMember(ctx context.Context, m storage.GroupMember) error
+}
+
+// recordMember notes another member's change in a group, which Telegram
+// reports where the bot is an admin: joined, left, banned, promoted.
+func (s *Service) recordMember(change *telegram.ChatMemberUpdated) {
+	isGroup := change.Chat.Type == telegram.ChatTypeGroup || change.Chat.Type == telegram.ChatTypeSupergroup
+	if isGroup {
+		s.seeMember(change.Chat.ID, change.NewChatMember.User, change.NewChatMember.Status)
+	}
+}
+
+// noteMembers notes the people a group message shows: its sender, who is
+// there, and anyone it says joined or left.
+func (s *Service) noteMembers(msg *telegram.Message) {
+	s.seeMember(msg.Chat.ID, msg.From, "")
+	for i := range msg.NewChatMembers {
+		s.seeMember(msg.Chat.ID, &msg.NewChatMembers[i], "member")
+	}
+	if msg.LeftChatMember != nil {
+		s.seeMember(msg.Chat.ID, msg.LeftChatMember, "left")
+	}
+}
+
+// seeMember records one member. The bot itself is not one of them. A
+// failure is logged: the list is a convenience, not something a reply needs.
+func (s *Service) seeMember(chatID int64, user *telegram.User, status string) {
+	if s.opts.Roster == nil || user == nil || user.ID == s.opts.Bot.ID {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
+	defer cancel()
+	err := s.opts.Roster.SeeMember(ctx, storage.GroupMember{
+		ChatID: chatID, UserID: user.ID, FirstName: user.FirstName, Username: user.Username, IsBot: user.IsBot, Status: status,
+	})
+	if err != nil {
+		s.opts.Logger.Warn("could not record a group member", "chat_id", chatID, "error", err)
+	}
+}
+
 // accept keeps messages from a person, sent either in a private chat or, in
 // a group, addressed to the bot. The sender's ID from the update is the
 // identity used for permissions from here on.
@@ -430,6 +483,7 @@ func (s *Service) accept(update telegram.Update) (incoming, bool) {
 		in.text = strings.TrimSpace(text)
 		return in, true
 	case telegram.ChatTypeGroup, telegram.ChatTypeSupergroup:
+		s.noteMembers(msg)
 		in.scope = storage.Scope{ChatID: msg.Chat.ID} // shared by the group
 		in.group = true
 		return s.acceptGroup(in)

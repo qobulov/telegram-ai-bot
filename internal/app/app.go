@@ -219,6 +219,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Recorder:      store,
 		Members:       groupMembers{client: bot.Client, botID: bot.User.ID},
 		Groups:        store,
+		Roster:        store,
 		Muter:         store,
 		Logger:        logger,
 		Model:         cfg.Model,
@@ -289,6 +290,7 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 	builtin = append(builtin, moderate,
 		tools.PollTool(tools.PollOptions{Sender: bot.Client, Store: store}),
 		tools.AdminsTool(tools.AdminsOptions{Telegram: bot.Client, BotID: bot.User.ID, Owners: cfg.OwnerIDs}),
+		tools.MembersTool(tools.MembersOptions{Store: store, Telegram: bot.Client, Owners: cfg.OwnerIDs, Location: cfg.Location}),
 	)
 	if len(cfg.OwnerUsernames) > 0 {
 		builtin = append(builtin,

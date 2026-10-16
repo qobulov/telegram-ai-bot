@@ -781,6 +781,24 @@ member, and she says nothing about members who did not write. An admin who
 stays anonymous in the group is listed only as an anonymous admin, never by
 name. In a private chat the tool is not offered.
 
+### Members
+
+No bot can read a group's member list, so she keeps her own: the
+`group_members` table notes everyone a group shows her, by ID, first name and
+`@username` — a sender of any message, members who join or leave, and, in
+groups where she is an admin, Telegram's `chat_member` reports of joins,
+leaves, bans, mutes and promotions. No message text is kept there. Members
+who left or were banned are forgotten 90 days after they were last seen,
+by the daily cleanup.
+
+Asked who is in the group, who the regular members are or how many there
+are, she calls the `group_members` tool: the 50 members she saw most
+recently, the admins among them marked from `getChatAdministrators`, her
+owners marked, and the group's size from `getChatMemberCount`. The list is
+not everyone: members who have not written or joined since she started
+keeping it are missing, and she says so. An anonymous admin's messages are
+sent as the group, so they never appear.
+
 ### Limits
 
 - Group answers are cut to `MAX_GROUP_REPLY_LENGTH` so she posts one message.
@@ -1174,8 +1192,10 @@ private chats) needs, in this order:
    `/reset` deletes the group's conversation and day log; standing rules
    stay. Waiting for `RETENTION_DAYS` to remove them works too, more slowly.
 
-`set-webhook` need not be run again: the update asks Telegram for no new kind
-of update.
+Run `set-webhook` again after this update: the bot now asks Telegram for
+`chat_member` updates too, and Telegram keeps sending only the kinds named
+when the webhook was last set. Until then the member list still fills from
+messages, joins and leaves.
 
 ### Daily cleanup
 

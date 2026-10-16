@@ -60,8 +60,10 @@ func NewClient(opts Options) *Client {
 }
 
 // allowedUpdates are the update kinds the bot asks Telegram for: messages,
-// and changes to its own membership, which keep its list of groups true.
-var allowedUpdates = []string{"message", "my_chat_member"}
+// changes to its own membership, which keep its list of groups true, and,
+// where it is an admin, changes to other members', which keep its list of
+// each group's members true.
+var allowedUpdates = []string{"message", "my_chat_member", "chat_member"}
 
 type getUpdatesParams struct {
 	Offset         int64    `json:"offset"`

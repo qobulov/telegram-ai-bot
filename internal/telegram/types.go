@@ -9,16 +9,17 @@ import (
 	"time"
 )
 
-// Update is one incoming event: a message, or a change to the bot's own
-// membership in a chat. Each kind the update is not is nil.
+// Update is one incoming event: a message, or a change to the bot's own or
+// another member's membership in a chat. Each kind the update is not is nil.
 type Update struct {
 	UpdateID     int64              `json:"update_id"`
 	Message      *Message           `json:"message"`
 	MyChatMember *ChatMemberUpdated `json:"my_chat_member"`
+	ChatMember   *ChatMemberUpdated `json:"chat_member"`
 }
 
-// ChatMemberUpdated reports that the bot was added to, promoted in, demoted
-// in or removed from a chat.
+// ChatMemberUpdated reports that the bot, or another member, was added to,
+// promoted in, demoted in, restricted in or removed from a chat.
 type ChatMemberUpdated struct {
 	Chat Chat `json:"chat"`
 	// From is who made the change.
