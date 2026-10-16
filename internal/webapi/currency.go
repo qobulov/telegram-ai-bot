@@ -3,7 +3,9 @@ package webapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -13,8 +15,12 @@ import (
 
 const (
 	rateTTL           = 30 * time.Minute
+	currencyTimeout   = 6 * time.Second
 	gramsPerTroyOunce = 31.1035
 	maxAmount         = 1e12
+	// currencyAPIAttempt bounds currency-api, so its mirror still has time
+	// when the Central Bank has already used its three seconds.
+	currencyAPIAttempt = 1500 * time.Millisecond
 
 	cbuSource    = "Central Bank of Uzbekistan (official rate, not bank buy/sell)"
 	approxSource = "currency-api, approximate (the Central Bank did not answer)"
@@ -61,7 +67,8 @@ func (a *apis) currencyTool() tools.Tool {
 			},
 			"additionalProperties": false
 		}`),
-		Run: a.currencyRate,
+		Timeout: currencyTimeout,
+		Run:     a.currencyRate,
 	}
 }
 
@@ -188,27 +195,48 @@ func (a *apis) officialRate(ctx context.Context, code, date string) (rate, error
 		if len(rows) == 0 {
 			return rate{}, argumentError("the Central Bank has no rate for %s; use an ISO code such as USD, EUR or RUB", code)
 		}
+		if !strings.EqualFold(rows[0].Ccy, code) {
+			return rate{}, errors.New("the Central Bank answered with another currency")
+		}
 		return rows[0].parse()
 	})
 }
 
+// parse checks the row before it is cached: strconv accepts "NaN" and
+// "Infinity", and a rate that is not a positive number is no rate.
+// Rows from before about 2000 have an empty Diff, which means no change
+// is known.
 func (row cbuRate) parse() (rate, error) {
-	nominal, errNominal := strconv.ParseFloat(row.Nominal, 64)
-	value, errRate := strconv.ParseFloat(row.Rate, 64)
-	diff, errDiff := strconv.ParseFloat(row.Diff, 64)
+	nominal, errNominal := positiveNumber(row.Nominal)
+	value, errRate := positiveNumber(row.Rate)
 	date, errDate := time.Parse("02.01.2006", row.Date)
-	if errNominal != nil || errRate != nil || errDiff != nil || errDate != nil || nominal <= 0 {
-		return rate{}, fmt.Errorf("the Central Bank sent a rate that could not be read")
+	if errNominal != nil || errRate != nil || errDate != nil {
+		return rate{}, errors.New("the Central Bank sent a rate that could not be read")
 	}
-	diff /= nominal
-	return rate{
-		code:   row.Ccy,
-		name:   row.Name,
+	r := rate{
+		code:   strings.ToUpper(row.Ccy),
+		name:   cleanText(row.Name, 60),
 		uzs:    value / nominal,
-		diff:   &diff,
 		date:   date.Format(time.DateOnly),
 		source: cbuSource,
-	}, nil
+	}
+	if row.Diff != "" {
+		diff, err := strconv.ParseFloat(row.Diff, 64)
+		if err != nil || math.IsNaN(diff) || math.IsInf(diff, 0) {
+			return rate{}, errors.New("the Central Bank sent a rate that could not be read")
+		}
+		diff /= nominal
+		r.diff = &diff
+	}
+	return r, nil
+}
+
+func positiveNumber(text string) (float64, error) {
+	value, err := strconv.ParseFloat(text, 64)
+	if err != nil || math.IsNaN(value) || math.IsInf(value, 0) || value <= 0 {
+		return 0, errors.New("not a positive number")
+	}
+	return value, nil
 }
 
 // usdRates is currency-api's answer: how much of each currency (lower-case
@@ -222,7 +250,9 @@ type usdRates struct {
 func (a *apis) usdRates(ctx context.Context) (usdRates, error) {
 	return remember(a.cache, "currency-api", rateTTL, func() (usdRates, error) {
 		var rates usdRates
-		err := a.client.getJSON(ctx, call{service: "currency-api", url: a.urls.CurrencyAPI}, &rates)
+		first, cancel := context.WithTimeout(ctx, currencyAPIAttempt)
+		err := a.client.getJSON(first, call{service: "currency-api", url: a.urls.CurrencyAPI}, &rates)
+		cancel()
 		if err != nil && ctx.Err() == nil {
 			err = a.client.getJSON(ctx, call{service: "currency-api's mirror", url: a.urls.CurrencyAPIMirror}, &rates)
 		}

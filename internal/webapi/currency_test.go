@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 type currencyResult struct {
@@ -22,6 +23,7 @@ func currencyRoutes(t *testing.T) map[string]stub {
 	return map[string]stub{
 		"/cbu/USD/":              ok(fixture(t, "cbu_usd.json")),
 		"/cbu/USD/2026-10-11/":   ok(fixture(t, "cbu_usd_2026-10-11.json")),
+		"/cbu/USD/2000-01-01/":   ok(fixture(t, "cbu_usd_2000-01-01.json")),
 		"/cbu/IRR/":              ok(fixture(t, "cbu_irr.json")),
 		"/cbu/XYZ/":              ok(`[]`),
 		"/currency-api/usd.json": ok(fixture(t, "currency_api_usd.json")),
@@ -72,6 +74,15 @@ func TestCurrencyRate(t *testing.T) {
 			check: func(t *testing.T, r currencyResult) {
 				if r.RateDate != "2026-10-10" || r.RateUZS != 11897.90 {
 					t.Errorf("result = %+v, want the rate dated 2026-10-10", r)
+				}
+			},
+		},
+		{
+			name: "an old rate without a change is still a rate",
+			args: `{"date":"2000-01-01"}`,
+			check: func(t *testing.T, r currencyResult) {
+				if r.RateUZS != 140 || r.Diff != nil || r.RateDate != "1999-12-28" || !strings.Contains(r.Source, "Central Bank") {
+					t.Errorf("result = %+v", r)
 				}
 			},
 		},
@@ -168,5 +179,57 @@ func TestCurrencyRateIsCached(t *testing.T) {
 	}
 	if n := len(u.requests("/cbu/USD/")); n != 1 {
 		t.Errorf("CBU was asked %d times, want 1", n)
+	}
+}
+
+// cbuRow is a Central Bank answer with one row, for answers that are wrong.
+func cbuRow(ccy, nominal, rate, diff string) stub {
+	return ok(`[{"Ccy":"` + ccy + `","CcyNm_UZ":"AQSH dollari","Nominal":"` + nominal + `","Rate":"` + rate + `","Diff":"` + diff + `","Date":"16.10.2026"}]`)
+}
+
+func TestCurrencyRateDoesNotTrustABrokenRow(t *testing.T) {
+	broken := map[string]stub{
+		"not a number nominal": cbuRow("USD", "NaN", "12011.65", "48.49"),
+		"infinite rate":        cbuRow("USD", "1", "Infinity", "48.49"),
+		"negative rate":        cbuRow("USD", "1", "-5", "48.49"),
+		"zero rate":            cbuRow("USD", "1", "0", "0"),
+		"not a number diff":    cbuRow("USD", "1", "12011.65", "NaN"),
+		"another currency":     cbuRow("EUR", "1", "13990.12", "10.00"),
+	}
+	for name, answer := range broken {
+		t.Run(name, func(t *testing.T) {
+			routes := currencyRoutes(t)
+			routes["/cbu/USD/"] = answer
+			u := newUpstream(t, routes)
+			registry := newRegistry(t, u.options())
+
+			for range 2 {
+				r := result[currencyResult](t, execute(t, registry, "currency_rate", `{"code":"USD","amount":100}`))
+				if r.Code != "USD" || r.RateUZS != 11984.67 || !strings.Contains(r.Source, "approximate") {
+					t.Errorf("result = %+v, want currency-api's approximate rate", r)
+				}
+			}
+			if n := len(u.requests("/cbu/USD/")); n != 2 {
+				t.Errorf("the Central Bank was asked %d times; a broken answer must not be cached", n)
+			}
+		})
+	}
+}
+
+func TestCurrencyRateReachesTheMirrorWhenEverythingElseStalls(t *testing.T) {
+	t.Parallel()
+	routes := currencyRoutes(t)
+	routes["/cbu/USD/"] = slow
+	routes["/currency-api/usd.json"] = slow
+	u := newUpstream(t, routes)
+	opts := u.options()
+	// A caller's client without short timeouts: only the tool's own
+	// sub-deadlines leave the mirror time to answer.
+	opts.HTTPClient = &http.Client{Timeout: 10 * time.Second}
+
+	r := result[currencyResult](t, run(t, opts, "currency_rate", `{}`))
+
+	if r.RateUZS != 11984.67 || len(u.requests("/mirror/usd.json")) != 1 {
+		t.Errorf("result = %+v", r)
 	}
 }
