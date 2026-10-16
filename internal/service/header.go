@@ -24,7 +24,7 @@ const (
 	// groupAbilities tells the model, every group turn, what it can and
 	// cannot do. Without it the model claimed things it has no means to do
 	// or know: messages "sent to all groups", groups "joined", photos "seen".
-	groupAbilities = "You can reply here, react with one emoji, and use your tools. You cannot see read receipts, who is online or the member list, read other chats or private chats except through your tools, open links, join groups, or remember anything older than the messages below unless a rule says so."
+	groupAbilities = "You can reply here, react with one emoji, and use your tools. You cannot see read receipts, who is online or the full member list (group_admins lists the admins), read other chats or private chats except through your tools, open links, join groups, or remember anything older than the messages below unless a rule says so."
 	rightsUnknown  = "Your admin rights here are unknown."
 	notAnAdmin     = "You are not an admin here."
 	// noToolRights is said of a bot that is an admin, but holds none of the

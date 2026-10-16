@@ -4,9 +4,10 @@ A Telegram chat character written in Go: a playful, quick-witted group-chat
 regular (called Maria unless you rename her) rather than a neutral assistant.
 She answers through [Google Gemini](https://ai.google.dev), remembers
 conversations in PostgreSQL, and can call a small set of tools that are
-checked in code (current time, calculator, bot help, drawing, polls,
-moderation for group admins, and live data: exchange rates, weather, prayer
-times, news headlines, Wikipedia, football and crypto prices).
+checked in code (current time, calculator, bot help, drawing, polls, a
+group's admin list, moderation for group admins, and live data: exchange
+rates, weather, prayer times, news headlines, Wikipedia, football and crypto
+prices).
 
 - In groups she answers when called by name, mentioned or replied to, as a
   reply to the message that addressed her, and follows the recent chatter.
@@ -52,7 +53,7 @@ internal/webhook                HTTP handler for webhook updates, with secret ch
 internal/config                 load .env + environment, validate
 internal/telegram               Bot API client: long polling, sending, message splitting
 internal/ai                     Model client: types, retries, tool-calling format
-internal/tools                  tool registry + time, calculator, help, drawing, polls, moderation, owners' tools
+internal/tools                  tool registry + time, calculator, help, drawing, polls, admin list, moderation, owners' tools
 internal/webapi                 live-data tools: rates, weather, prayer times, news, Wikipedia, football, crypto
 internal/storage                pgx pool, migrations, conversation queries
 internal/storage/migrations     SQL migrations, embedded in the binary
@@ -759,6 +760,18 @@ manti?"). She posts an anonymous poll in that group, with 2 to 10 options
 and one or several answers allowed, at most one per group every 10 minutes.
 Polls are counted in `moderation_actions` as `poll`. In a private chat she
 cannot make one.
+
+### Admins
+
+Anyone in a group can ask her who its admins are, who may moderate, or who
+the regular members are. The `group_admins` tool asks Telegram for the
+group's creator and administrators (`getChatAdministrators`, which needs no
+admin right) and marks her own entry, her owners recognised by
+`BOT_OWNER_IDS`, and other bots. No bot can read a group's full member list,
+so everyone else who wrote in the messages she was given counts as a regular
+member, and she says nothing about members who did not write. An admin who
+stays anonymous in the group is listed only as an anonymous admin, never by
+name. In a private chat the tool is not offered.
 
 ### Limits
 

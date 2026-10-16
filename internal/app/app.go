@@ -282,9 +282,12 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 	if cfg.ImagesEnabled {
 		builtin = append(builtin, imageTool(cfg, store))
 	}
-	// Any group's admins, and any member for a poll, may use these, so they
-	// are there with or without owners.
-	builtin = append(builtin, moderate, tools.PollTool(tools.PollOptions{Sender: bot.Client, Store: store}))
+	// Any group's admins, and any member for a poll or the admin list, may
+	// use these, so they are there with or without owners.
+	builtin = append(builtin, moderate,
+		tools.PollTool(tools.PollOptions{Sender: bot.Client, Store: store}),
+		tools.AdminsTool(tools.AdminsOptions{Telegram: bot.Client, BotID: bot.User.ID, Owners: cfg.OwnerIDs}),
+	)
 	if len(cfg.OwnerUsernames) > 0 {
 		builtin = append(builtin,
 			tools.DatabaseTool(tools.DatabaseOptions{

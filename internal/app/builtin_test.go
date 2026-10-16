@@ -3,6 +3,9 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -114,4 +117,48 @@ func hasTool(builtin []tools.Tool, name string) bool {
 		}
 	}
 	return false
+}
+
+// group_admins is there for every group, with or without owners, and knows
+// the bot by its ID and the owners by theirs.
+func TestGroupAdminsKnowsTheBotAndItsOwners(t *testing.T) {
+	telegramAPI := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasSuffix(r.URL.Path, "/getChatAdministrators") {
+			http.NotFound(w, r)
+			return
+		}
+		fmt.Fprint(w, `{"ok":true,"result":[
+			{"status":"creator","user":{"id":9001,"first_name":"Javohir","username":"pronium"}},
+			{"status":"administrator","user":{"id":777,"is_bot":true,"first_name":"Maria","username":"maria_bot"}}]}`)
+	}))
+	t.Cleanup(telegramAPI.Close)
+	bot := Bot{
+		Client: telegram.NewClient(telegram.Options{Token: "test-token", BaseURL: telegramAPI.URL}),
+		User:   telegram.User{ID: 777, Username: "maria_bot"},
+	}
+	cases := map[string]struct {
+		cfg   config.Config
+		owner string
+	}{
+		"owners by ID": {config.Config{Location: time.UTC, OwnerUsernames: []string{"pronium"}, OwnerIDs: map[int64]bool{9001: true}}, `,"owner":true`},
+		"no owners":    {config.Config{Location: time.UTC}, ""},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			builtin := builtinTools(tc.cfg, nil, bot, tools.NewModeration(tools.ModerationOptions{}).Tool())
+			registry, err := tools.NewRegistry(tc.cfg.IsAdmin, nil, builtin...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			member := tools.WithTurn(context.Background(), tools.Caller{UserID: 5005, ChatID: -100123, Human: true, UpdateID: 1}, &tools.Sink{})
+
+			got := registry.Execute(member, 5005, "group_admins", "{}")
+
+			want := `{"name":"Javohir","username":"@pronium","role":"creator"` + tc.owner + `},` +
+				`{"name":"Maria","username":"@maria_bot","role":"administrator","you":true,"bot":true}]`
+			if !strings.Contains(got, `"admins":[`+want) {
+				t.Errorf("group_admins = %s\nwant the admins %s", got, want)
+			}
+		})
+	}
 }

@@ -572,6 +572,30 @@ func TestGetChatMemberCountReturnsTheCount(t *testing.T) {
 	}
 }
 
+func TestGetChatAdministratorsReturnsTheAdmins(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":[
+		{"status":"creator","user":{"id":1,"first_name":"Ann","username":"ann"},"is_anonymous":false},
+		{"status":"administrator","user":{"id":2,"first_name":"Bek"},"custom_title":"Boss","is_anonymous":true,"can_pin_messages":true}]}`)
+
+	admins, err := client.GetChatAdministrators(context.Background(), -100123)
+	if err != nil {
+		t.Fatalf("GetChatAdministrators: %v", err)
+	}
+	if len(admins) != 2 {
+		t.Fatalf("admins = %+v, want two", admins)
+	}
+	ann, bek := admins[0], admins[1]
+	if ann.Status != "creator" || ann.User == nil || ann.User.ID != 1 || ann.User.Username != "ann" || ann.IsAnonymous || ann.CustomTitle != "" {
+		t.Errorf("first admin = %+v", ann)
+	}
+	if bek.Status != "administrator" || bek.User == nil || bek.User.FirstName != "Bek" || !bek.IsAnonymous || bek.CustomTitle != "Boss" || !bek.CanPinMessages {
+		t.Errorf("second admin = %+v", bek)
+	}
+	if sent := api.recorded()[0]; sent.method != "getChatAdministrators" || sent.params["chat_id"] != float64(-100123) {
+		t.Errorf("call = %+v", sent)
+	}
+}
+
 func TestGetChatReturnsTheTitle(t *testing.T) {
 	client, api := newTestClient(t, `{"ok":true,"result":{"id":-100123,"type":"supergroup","title":"Devs"}}`)
 

@@ -281,6 +281,16 @@ func (c *Client) GetChatMemberCount(ctx context.Context, chatID int64) (int, err
 	return count, nil
 }
 
+// GetChatAdministrators returns a group's creator and administrators. Unlike
+// the full member list, which no bot can read, any member may ask for it.
+func (c *Client) GetChatAdministrators(ctx context.Context, chatID int64) ([]ChatMember, error) {
+	var admins []ChatMember
+	if err := c.call(ctx, "getChatAdministrators", chatParams{ChatID: chatID}, &admins); err != nil {
+		return nil, err
+	}
+	return admins, nil
+}
+
 type sendMessageParams struct {
 	ChatID          int64            `json:"chat_id"`
 	Text            string           `json:"text"`

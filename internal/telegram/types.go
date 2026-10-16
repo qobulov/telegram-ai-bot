@@ -245,6 +245,12 @@ type ChatMember struct {
 	// UntilDate is when a restriction or ban ends, in Unix seconds; zero
 	// means never.
 	UntilDate int64 `json:"until_date,omitempty"`
+	// CustomTitle is an admin's title in the group, shown instead of
+	// "admin".
+	CustomTitle string `json:"custom_title,omitempty"`
+	// IsAnonymous is true for an admin who posts in the group's name, hiding
+	// who they are.
+	IsAnonymous bool `json:"is_anonymous,omitempty"`
 
 	CanDeleteMessages  bool `json:"can_delete_messages,omitempty"`
 	CanRestrictMembers bool `json:"can_restrict_members,omitempty"`
