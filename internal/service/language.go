@@ -3,6 +3,7 @@ package service
 import (
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 // languageHint tells the model, right before the message, which language
@@ -19,8 +20,9 @@ func languageHint(text string) string {
 // replyLanguage reads the language and script of text from its letters and
 // common words: Uzbek Cyrillic by its own letters, Russian by letters or
 // words Uzbek does not have, English by common words and nothing Uzbek, and
-// Uzbek Latin otherwise. It is "" for fewer than two Latin or Cyrillic
-// letters.
+// Uzbek Latin otherwise. The script is the one most words are written in,
+// so names typed in Latin letters, such as ChatGPT, do not turn a Russian
+// message Uzbek. It is "" for fewer than two Latin or Cyrillic letters.
 func replyLanguage(text string) string {
 	lower := strings.ToLower(text)
 	latin, cyrillic := 0, 0
@@ -33,20 +35,39 @@ func replyLanguage(text string) string {
 		}
 	}
 	words := strings.FieldsFunc(strings.Map(oneApostrophe, lower), func(r rune) bool { return !unicode.IsLetter(r) && r != '\'' })
+	// Э and ъ are Uzbek Cyrillic letters too; ы and щ are Russian only.
+	russian := strings.ContainsAny(lower, "ыщ") || hasAny(words, russianWords)
 	switch {
 	case latin+cyrillic < 2:
 		return ""
 	case strings.ContainsAny(lower, "ўқғҳ"):
 		return "Uzbek, in Cyrillic script"
-	// Э and ъ are Uzbek Cyrillic letters too; ы and щ are Russian only.
-	case cyrillic > latin && (strings.ContainsAny(lower, "ыщ") || hasAny(words, russianWords)):
+	case mostlyCyrillic(words, cyrillic > latin || russian) && russian:
 		return "Russian"
-	case cyrillic > latin:
+	case mostlyCyrillic(words, cyrillic > latin):
 		return "the language of the message, in Cyrillic script"
 	case looksEnglish(words):
 		return "English"
 	}
 	return "Uzbek, in Latin script"
+}
+
+// mostlyCyrillic reports more Cyrillic words than Latin ones, and tie when
+// there are as many of each.
+func mostlyCyrillic(words []string, tie bool) bool {
+	cyrillic, latin := 0, 0
+	for _, w := range words {
+		switch r, _ := utf8.DecodeRuneInString(w); {
+		case unicode.Is(unicode.Cyrillic, r):
+			cyrillic++
+		case unicode.Is(unicode.Latin, r):
+			latin++
+		}
+	}
+	if cyrillic == latin {
+		return tie
+	}
+	return cyrillic > latin
 }
 
 // looksEnglish reports Latin words with common English words and none of

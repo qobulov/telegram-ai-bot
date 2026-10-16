@@ -37,6 +37,14 @@ func TestReplyLanguage(t *testing.T) {
 		"salom, how are you? qalesan":     "Uzbek, in Latin script",
 		"what is this? nima bu, shunaqa?": "Uzbek, in Latin script",
 		"should I learn English first?":   "English",
+		// Names typed in Latin letters do not make a Russian message Uzbek.
+		"Мария, ты ChatGPT или Claude?": "Russian",
+		"Ты ChatGPT?":             "Russian",
+		"скинь ссылку на YouTube": "Russian",
+		// The bot's name in Cyrillic does not make an Uzbek message Cyrillic.
+		"Мария qalaysan":            "Uzbek, in Latin script",
+		"Мария, salom":              "Uzbek, in Latin script",
+		"Мария, sen qaysi modelsan": "Uzbek, in Latin script",
 	}
 	for text, want := range cases {
 		if got := replyLanguage(text); got != want {
