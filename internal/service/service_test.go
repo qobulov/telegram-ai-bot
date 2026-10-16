@@ -1885,6 +1885,25 @@ func TestOwnerIDsOverrideUsernames(t *testing.T) {
 	}
 }
 
+// The [owner] mark is only what the model sees; an owner's powers are checked
+// in code. An account that took over an owner's old username gets none of
+// them: its /mute goes through the group-admin check like anyone's.
+func TestOwnerUsernameOnUnlistedAccountCannotMute(t *testing.T) {
+	f := newFixture()
+	f.opts.OwnerUsernames = []string{ownerUsername}
+	f.opts.OwnerIDs = map[int64]bool{7001: true}
+
+	sent := f.run(inGroup(fromOwner(groupMessage("/mute@MyBot"))))
+
+	expectOneReply(t, sent, textAdminsOnly)
+	if f.members.calls != 1 {
+		t.Errorf("Telegram was asked %d times whether the sender is an admin, want 1", f.members.calls)
+	}
+	if len(f.muter.calls) != 0 {
+		t.Errorf("stored mute changes = %+v, want none", f.muter.calls)
+	}
+}
+
 func TestUsernamesAreShownToTheModel(t *testing.T) {
 	f := newFixture()
 	msg := groupMessage("Mira, salom")

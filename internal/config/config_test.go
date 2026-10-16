@@ -721,6 +721,16 @@ func TestLoadOwnerIDs(t *testing.T) {
 	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "BOT_OWNER_IDS") {
 		t.Errorf("err = %v, want a username among the IDs rejected", err)
 	}
+
+	// A group's chat ID is negative and no user's ID is zero: either would
+	// never match, and the owners would quietly lose their powers.
+	for _, ids := range []string{"9001,-1001234567890", "0"} {
+		env["BOT_OWNER_IDS"] = ids
+		want := "BOT_OWNER_IDS must be positive Telegram user IDs, not chat IDs"
+		if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("BOT_OWNER_IDS=%s: err = %v, want %q", ids, err, want)
+		}
+	}
 }
 
 func TestOwnerIDsWithoutUsernamesRejected(t *testing.T) {

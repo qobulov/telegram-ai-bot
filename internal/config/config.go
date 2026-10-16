@@ -170,7 +170,7 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	cfg.Location = r.location("GROUP_HISTORY_TIMEZONE", "Asia/Tashkent")
 	cfg.OwnerUsernames = r.usernames("BOT_OWNER_USERNAME")
-	cfg.OwnerIDs = r.userIDs("BOT_OWNER_IDS")
+	cfg.OwnerIDs = r.ownerIDs("BOT_OWNER_IDS")
 	if len(cfg.OwnerIDs) > 0 && len(cfg.OwnerUsernames) == 0 {
 		r.fail("BOT_OWNER_IDS", "needs BOT_OWNER_USERNAME, which names the owners in the persona")
 	}
@@ -491,6 +491,21 @@ func (r *reader) userIDs(name string) map[int64]bool {
 			return ids
 		}
 		ids[id] = true
+	}
+	return ids
+}
+
+// ownerIDs reads the owners' account IDs. Once set they are the only way an
+// owner is recognised, so an entry no user can have, such as a group's
+// negative chat ID pasted by mistake, would quietly leave the bot without
+// owners; it is refused instead.
+func (r *reader) ownerIDs(name string) map[int64]bool {
+	ids := r.userIDs(name)
+	for id := range ids {
+		if id <= 0 {
+			r.fail(name, "must be positive Telegram user IDs, not chat IDs")
+			break
+		}
 	}
 	return ids
 }

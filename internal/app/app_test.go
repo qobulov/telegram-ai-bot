@@ -276,6 +276,35 @@ func TestWebhookHonoursMuteSetElsewhere(t *testing.T) {
 	}
 }
 
+// If BOT_OWNER_IDS stopped reaching the service, owners would quietly be
+// recognised by username again, and whoever took over an owner's old
+// username would be one. The service's own tests cannot see that wiring.
+func TestWebhookOwnersAreKnownByID(t *testing.T) {
+	env := startWebhook(t)
+	env.baseEnv["BOT_OWNER_USERNAME"] = "bek_owner"
+	env.baseEnv["BOT_OWNER_IDS"] = "778009"
+	hook, err := NewWebhook(context.Background(), env.config(t), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatalf("NewWebhook: %v", err)
+	}
+	t.Cleanup(hook.Close)
+	env.hook = hook
+
+	env.deliver(`{"update_id":910030,"message":{"message_id":910030,
+		"from":{"id":778002,"is_bot":false,"first_name":"Bek","username":"bek_owner"},
+		"chat":{"id":-100778000,"type":"supergroup"},"text":"Mira, salom"}}`, hookSecret)
+
+	env.apis.mu.Lock()
+	inputs := env.apis.modelInputs
+	env.apis.mu.Unlock()
+	if len(inputs) != 1 || !strings.Contains(inputs[0], "Bek @bek_owner") {
+		t.Fatalf("model inputs = %q, want one naming Bek @bek_owner", inputs)
+	}
+	if strings.Contains(inputs[0], "@bek_owner [owner]") {
+		t.Error("an account not in BOT_OWNER_IDS was marked as an owner for having an owner's username")
+	}
+}
+
 func TestWebhookNeedsASecret(t *testing.T) {
 	env := startWebhook(t)
 	delete(env.baseEnv, "TELEGRAM_WEBHOOK_SECRET")
