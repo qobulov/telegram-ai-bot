@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"telegram-ai-bot/internal/ai"
 )
 
 func TestGroupMembersAreTheOnesSeenAndStillThere(t *testing.T) {
@@ -96,6 +98,44 @@ func TestProfileIsSetChangedAndCleared(t *testing.T) {
 	}
 	if p, _ := store.Profile(ctx, alice); !p.Empty() {
 		t.Errorf("an empty profile was kept: %+v", p)
+	}
+}
+
+// A person's own exchanges with the bot in other chats, with the answers;
+// never someone else's, never this chat's, never older than since.
+func TestExchangesElsewhereAreThePersonsOwn(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	save := func(scope Scope, update, msgID, author int64, name, asked, answer string) {
+		t.Helper()
+		if _, err := store.SaveTurn(ctx, Turn{Scope: scope, UpdateID: update, MessageID: msgID, AuthorID: author, AuthorName: name,
+			Messages: []ai.Message{{Role: ai.RoleUser, Content: asked}, {Role: ai.RoleAssistant, Content: answer}}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := store.AppendGroupMessage(ctx, GroupMessage{ChatID: otherGroup, ChatTitle: "Do'stlar", MessageID: 1, AuthorID: alice, AuthorName: "Ann", Text: "x"}); err != nil {
+		t.Fatal(err)
+	}
+	save(Scope{ChatID: otherGroup}, 1, 10, alice, "Ann", "Ann: qiz bilan qanday yarashsa bo'ladi", "Aybingni tan ol")
+	save(Scope{ChatID: otherGroup}, 2, 11, bob, "Bob", "Bob: menga ham maslahat", "Senga yo'q")
+	save(Scope{ChatID: group}, 3, 12, alice, "Ann", "Ann: bu guruhda", "shu yerda")
+	save(private(alice), 4, 13, alice, "", "shaxsiyda", "ha")
+
+	got, err := store.ExchangesElsewhere(ctx, alice, group, time.Now().Add(-time.Hour), 10)
+	if err != nil {
+		t.Fatalf("ExchangesElsewhere: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("exchanges = %+v, want Ann's in the other group and in private", got)
+	}
+	if e := got[0]; e.ChatID != otherGroup || e.ChatTitle != "Do'stlar" || e.Asked != "Ann: qiz bilan qanday yarashsa bo'ladi" || e.Answer != "Aybingni tan ol" {
+		t.Errorf("first = %+v", e)
+	}
+	if e := got[1]; e.ChatID != alice || e.ChatTitle != "" || e.Asked != "shaxsiyda" {
+		t.Errorf("second = %+v", e)
+	}
+	if late, _ := store.ExchangesElsewhere(ctx, alice, group, time.Now().Add(time.Hour), 10); len(late) != 0 {
+		t.Errorf("since the future = %+v", late)
 	}
 }
 

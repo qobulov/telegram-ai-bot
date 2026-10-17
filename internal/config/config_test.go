@@ -1497,6 +1497,17 @@ func TestPersonaKeepsOwnersFormsAndKnowsNotifyOwner(t *testing.T) {
 	}
 }
 
+// Asked about the other group's talk, Maria said she had just joined.
+func TestPersonaDoesNotInventWhyItCannotRecall(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(cfg.PersonaPrompt, "each group's talks stay in that group") || !strings.Contains(cfg.PersonaPrompt, "Never invent a reason, such as having just joined") {
+		t.Error("the persona does not say how to answer about another group's talk")
+	}
+}
+
 func TestPrivateChats(t *testing.T) {
 	cfg, err := Load(getenv(validEnv()))
 	if err != nil || cfg.PrivateChats != "on" {

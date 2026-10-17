@@ -136,6 +136,11 @@ type Options struct {
 	// Profiles holds what each person asked to be remembered about talking
 	// to them; nil holds nothing.
 	Profiles ProfileBook
+	// Exchanges reads a person's talks with the bot in other chats, and
+	// MemberCount how many members a group has: together they let a chat
+	// that only the person and the bot can read recall those talks.
+	Exchanges   ExchangeBook
+	MemberCount MemberCounter
 	// Roster keeps the members seen in each group; nil keeps none.
 	Roster MemberBook
 	Logger *slog.Logger

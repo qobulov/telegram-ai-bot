@@ -351,6 +351,16 @@ message, and nobody else's turn ever shows it. Nothing they said is kept;
 "profilimni o'chir" clears it. An owner's own form of address wins over the
 name.
 
+### Recalling other chats
+
+In a chat that nobody but the person and Maria can read, a private chat or a
+group of just the two of them (`getChatMemberCount` is 2), each turn also
+carries that person's own exchanges with her in other chats over the last
+day: their messages and her answers, never what anyone else said. She
+brings them up only when the person does. In any group with other people
+each group's talks stay in that group, and asked about another group she
+says so.
+
 ### Messages to the owners
 
 Asked in a group to tell an owner something ("Мариа @pronium га ёз ..."),

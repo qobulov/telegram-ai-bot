@@ -358,12 +358,16 @@ func TestCleanupEndpointExpiresOldHistory(t *testing.T) {
 	env := startWebhook(t)
 	env.baseEnv["CRON_SECRET"] = cronSecret
 	ctx := context.Background()
-	env.deliver(privateUpdate, hookSecret) // one turn: 2 messages
 	conn, err := pgx.Connect(ctx, os.Getenv("TEST_DB_POSTGRES_URL"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer conn.Close(ctx)
+	// Other packages' tests share the database: only this turn may be there.
+	if _, err := conn.Exec(ctx, `DELETE FROM messages`); err != nil {
+		t.Fatal(err)
+	}
+	env.deliver(privateUpdate, hookSecret) // one turn: 2 messages
 	if _, err := conn.Exec(ctx, `UPDATE messages SET created_at = now() - interval '2 days'`); err != nil {
 		t.Fatal(err)
 	}

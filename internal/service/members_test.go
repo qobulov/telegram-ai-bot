@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
@@ -121,5 +122,51 @@ func TestProfileReachesThePersonsTurns(t *testing.T) {
 	}
 	if strings.Contains(calls[1].req.Context, "Aziz aka") || strings.Contains(calls[1].req.Context, "asked, for every chat") {
 		t.Errorf("another member's turn carries the profile: %q", calls[1].req.Context)
+	}
+}
+
+type fakeExchanges struct{ list []storage.Exchange }
+
+func (f fakeExchanges) ExchangesElsewhere(context.Context, int64, int64, time.Time, int) ([]storage.Exchange, error) {
+	return f.list, nil
+}
+
+type fakeCounter struct {
+	count int
+	asked int
+}
+
+func (f *fakeCounter) GetChatMemberCount(context.Context, int64) (int, error) {
+	f.asked++
+	return f.count, nil
+}
+
+// Where only the person and the bot can read the chat, their talks with her
+// elsewhere come along; in a group with others they never do.
+func TestTalksElsewhereComeOnlyWhereNobodyElseReads(t *testing.T) {
+	talk := []storage.Exchange{{ChatID: -100777, ChatTitle: "Do'stlar", Asked: "Bek: qiz bilan qanday yarashsa bo'ladi", Answer: "Aybingni tan ol", At: headerNow}}
+	cases := map[string]struct {
+		members  int
+		list     []storage.Exchange
+		want     bool
+		wantAsks int
+	}{
+		"two members: the person and the bot": {2, talk, true, 1},
+		"a group with others":                 {3, talk, false, 1},
+		"nothing elsewhere":                   {2, nil, false, 0},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			counter := &fakeCounter{count: c.members}
+			f.opts.Exchanges = fakeExchanges{c.list}
+			f.opts.MemberCount = counter
+			f.run(inGroup(groupMessage("Mira, esingdami narigi gruppadagi gaplar")))
+			ctx := onlyRequest(t, f).req.Context
+			got := strings.Contains(ctx, "qiz bilan qanday yarashsa") && strings.Contains(ctx, "«Do'stlar»") && strings.Contains(ctx, "Aybingni tan ol")
+			if got != c.want || counter.asked != c.wantAsks {
+				t.Errorf("recalled = %v (asked count %d times), want %v (%d)\ncontext: %q", got, counter.asked, c.want, c.wantAsks, ctx)
+			}
+		})
 	}
 }

@@ -223,6 +223,8 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Groups:        store,
 		Roster:        store,
 		Profiles:      store,
+		Exchanges:     store,
+		MemberCount:   bot.Client,
 		Muter:         store,
 		Logger:        logger,
 		Model:         cfg.Model,
