@@ -130,6 +130,9 @@ type Config struct {
 	// a day, from midnight in Location; owners have no limit and 0 turns it
 	// off.
 	PrivateDailyLimit int
+	// PrivateChats is whom the bot answers in private chats: "on" everyone,
+	// "owners" its owners only, "off" nobody, which keeps it to groups.
+	PrivateChats string
 }
 
 // IsAdmin reports whether the Telegram user is listed in ADMIN_USER_IDS.
@@ -173,6 +176,7 @@ func Load(getenv func(string) string) (Config, error) {
 		GroupRateLimitPerMinute: r.positive("GROUP_RATE_LIMIT_PER_MINUTE", 6),
 		MemberRepliesPer10Min:   r.positive("MEMBER_REPLIES_PER_10_MIN", 4),
 		PrivateDailyLimit:       r.integer("PRIVATE_DAILY_LIMIT", 10, 0),
+		PrivateChats:            r.privateChats(),
 	}
 	r.chooseProvider(&cfg)
 	cfg.MaxMediaBytes = int64(r.positive("MAX_MEDIA_MB", 5)) << 20
@@ -355,6 +359,17 @@ func (r *reader) chooseProvider(cfg *Config) {
 	default:
 		r.fail(chosen[0].keyVar, "and "+chosen[1].keyVar+" are both set; keep only one, for the provider you want to use")
 	}
+}
+
+// privateChats reads PRIVATE_CHATS: on, owners or off.
+func (r *reader) privateChats() string {
+	mode := strings.ToLower(r.text("PRIVATE_CHATS", "on"))
+	switch mode {
+	case "on", "owners", "off":
+		return mode
+	}
+	r.fail("PRIVATE_CHATS", "must be on, owners or off")
+	return "on"
 }
 
 // wakeWords reads BOT_WAKE_WORDS, falling back to the display name. Each

@@ -1474,3 +1474,22 @@ func script(text string) string {
 	}
 	return "Latin"
 }
+
+func TestPrivateChats(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil || cfg.PrivateChats != "on" {
+		t.Errorf("default = %q, %v; want on", cfg.PrivateChats, err)
+	}
+	for _, mode := range []string{"on", "owners", "off", "OFF"} {
+		env := validEnv()
+		env["PRIVATE_CHATS"] = mode
+		if cfg, err := Load(getenv(env)); err != nil || cfg.PrivateChats != strings.ToLower(mode) {
+			t.Errorf("PRIVATE_CHATS=%s: %q, %v", mode, cfg.PrivateChats, err)
+		}
+	}
+	env := validEnv()
+	env["PRIVATE_CHATS"] = "nobody"
+	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "PRIVATE_CHATS") {
+		t.Errorf("PRIVATE_CHATS=nobody: err = %v, want it rejected", err)
+	}
+}

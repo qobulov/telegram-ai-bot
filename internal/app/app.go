@@ -260,6 +260,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		MemberRepliesPer10Min: cfg.MemberRepliesPer10Min,
 		PrivateQuota:          store,
 		PrivateDailyLimit:     cfg.PrivateDailyLimit,
+		PrivateChats:          cfg.PrivateChats,
 		Reactor:               bot.Client,
 		ChatActor:             bot.Client,
 		BotRights:             botRights{store: store, members: bot.Client, botID: bot.User.ID, logger: logger},

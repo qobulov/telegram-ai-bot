@@ -191,6 +191,7 @@ in the environment win over the file.
 | `MAX_CONCURRENT_REQUESTS`     | `10`                           | Number of workers                                                                                            |
 | `USER_RATE_LIMIT_PER_MINUTE`  | `10`                           | Messages each user may send per minute                                                                       |
 | `PRIVATE_DAILY_LIMIT` | `10` | Answers each user gets per day in private chats, from midnight in `GROUP_HISTORY_TIMEZONE`; the next message gets one notice, later ones nothing. Owners have no limit (admins do); commands and failed turns are not counted; `0` turns it off. Counted in the database |
+| `PRIVATE_CHATS` | `on` | Whom she answers in private chats: `on` everyone, `owners` the owners only, `off` nobody, so that she works in groups only. A message that is not answered gets nothing at all, not even a notice. With `off`, owners cannot use private-chat tools such as broadcasts either |
 | `REQUEST_TIMEOUT_SECONDS`     | `45`                           | Time budget for answering one message                                                                        |
 | `MAX_INPUT_CHARS`             | `4000`                         | Longest user message accepted                                                                                |
 | `RETENTION_DAYS` | `1` | Chat history is kept this many days, then deleted; `0` keeps it forever |

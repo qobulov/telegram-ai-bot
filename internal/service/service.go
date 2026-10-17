@@ -203,6 +203,9 @@ type Options struct {
 	// counted. Nil, or a limit of 0, does not limit.
 	PrivateQuota      PrivateQuota
 	PrivateDailyLimit int
+	// PrivateChats is whom private chats are answered for: "off" nobody,
+	// "owners" the owners only; anything else, everyone.
+	PrivateChats string
 	// Reactor sets emoji reactions, the bot's answer to applause and the
 	// model's when it reacts instead of writing; nil means it never reacts.
 	Reactor Reactor
@@ -478,6 +481,9 @@ func (s *Service) accept(update telegram.Update) (incoming, bool) {
 	in := incoming{updateID: update.UpdateID, msg: msg, userID: msg.From.ID, fromBot: msg.From.IsBot}
 	switch msg.Chat.Type {
 	case telegram.ChatTypePrivate:
+		if !s.answersPrivately(msg.From) {
+			return incoming{}, false
+		}
 		in.scope = storage.Scope{ChatID: msg.Chat.ID, UserID: msg.From.ID}
 		text, _ := msg.Content() // the caption, for a photo
 		in.text = strings.TrimSpace(text)
@@ -490,6 +496,19 @@ func (s *Service) accept(update telegram.Update) (incoming, bool) {
 	default:
 		return incoming{}, false
 	}
+}
+
+// answersPrivately reports whether a private message from user is answered
+// at all under PrivateChats. One that is not gets nothing: no reply, no
+// notice, no model call.
+func (s *Service) answersPrivately(user *telegram.User) bool {
+	switch s.opts.PrivateChats {
+	case "off":
+		return false
+	case "owners":
+		return s.isOwner(user)
+	}
+	return true
 }
 
 // withoutTopicReply drops the reply Telegram puts on every message in a forum

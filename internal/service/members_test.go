@@ -64,3 +64,30 @@ func TestMembersAreNotedFromWhatTheGroupShows(t *testing.T) {
 		t.Errorf("noted %+v\nwant  %+v", got, want)
 	}
 }
+
+// PRIVATE_CHATS=off keeps the bot to groups: a private message gets nothing,
+// not even a model call; "owners" answers only them. Groups are unchanged.
+func TestPrivateChatsCanBeTurnedOff(t *testing.T) {
+	owner := textFrom(9001, "salom")
+	owner.Message.From.Username = ownerUsername
+	cases := map[string]struct {
+		mode      string
+		wantSent  int
+		wantCalls int
+	}{
+		"off":    {"off", 1, 1},    // only the group message is answered
+		"owners": {"owners", 2, 2}, // the owner and the group
+		"on":     {"on", 3, 3},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			f.opts.OwnerUsernames = []string{ownerUsername}
+			f.opts.PrivateChats = c.mode
+			sent := f.run(textFrom(userID, "salom"), owner, inGroup(groupMessage("Mira, salom")))
+			if len(sent) != c.wantSent || len(f.replier.recorded()) != c.wantCalls {
+				t.Errorf("sent %d, model calls %d; want %d and %d", len(sent), len(f.replier.recorded()), c.wantSent, c.wantCalls)
+			}
+		})
+	}
+}
