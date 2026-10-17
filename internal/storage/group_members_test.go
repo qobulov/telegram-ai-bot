@@ -71,6 +71,34 @@ func TestOwnerNoticeIsOnceADayPerGroup(t *testing.T) {
 	}
 }
 
+// A profile is kept for the person across chats until they change or clear
+// it; one that asks for nothing is not kept.
+func TestProfileIsSetChangedAndCleared(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	if p, err := store.Profile(ctx, alice); err != nil || !p.Empty() || p.UserID != alice {
+		t.Fatalf("no profile = %+v, %v", p, err)
+	}
+	if err := store.SetProfile(ctx, UserProfile{UserID: alice, CallName: "Aziz aka", Siz: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetProfile(ctx, UserProfile{UserID: alice, CallName: "Aziz", Siz: true}); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := store.Profile(ctx, alice); p.CallName != "Aziz" || !p.Siz {
+		t.Errorf("profile = %+v, want Aziz with siz", p)
+	}
+	if p, _ := store.Profile(ctx, bob); !p.Empty() {
+		t.Errorf("another user has %+v", p)
+	}
+	if err := store.SetProfile(ctx, UserProfile{UserID: alice}); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := store.Profile(ctx, alice); !p.Empty() {
+		t.Errorf("an empty profile was kept: %+v", p)
+	}
+}
+
 // Members who left are forgotten after 90 days; those still there are kept.
 func TestExpireForgetsMembersWhoLeftLongAgo(t *testing.T) {
 	store := newTestStore(t)

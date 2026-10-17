@@ -105,7 +105,7 @@ func TestMigrationRecordsGroupsSeenBefore(t *testing.T) {
 	if err := store.SetMuted(ctx, otherGroup, true, alice); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.pool.Exec(ctx, `DELETE FROM groups; DROP TABLE broadcasts, group_replies, group_rules, moderation_actions, pending_moderation, private_messages, group_members, owner_notices; DELETE FROM schema_migrations WHERE version >= 9`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DELETE FROM groups; DROP TABLE broadcasts, group_replies, group_rules, moderation_actions, pending_moderation, private_messages, group_members, owner_notices, user_profiles; DELETE FROM schema_migrations WHERE version >= 9`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.Migrate(ctx); err != nil {

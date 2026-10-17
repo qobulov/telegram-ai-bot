@@ -110,6 +110,39 @@ func (s *Service) rulesHeader(rules []storage.GroupRule, in incoming) string {
 	return strings.Join(parts, "\n")
 }
 
+// ProfileBook reads what each person asked the bot to remember about
+// talking to them.
+type ProfileBook interface {
+	Profile(ctx context.Context, userID int64) (storage.UserProfile, error)
+}
+
+// profileLine tells the model what the person writing asked for in every
+// chat: a name and "siz". An owner's own form of address wins over the name.
+// It is "" when they asked for nothing or it cannot be read.
+func (s *Service) profileLine(ctx context.Context, in incoming, rules []storage.GroupRule) string {
+	if s.opts.Profiles == nil || in.fromBot {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(ctx, logTimeout)
+	defer cancel()
+	p, err := s.opts.Profiles.Profile(ctx, in.userID)
+	if err != nil {
+		s.opts.Logger.Warn("could not read a profile", "user_id", in.userID, "error", err)
+		return ""
+	}
+	var asks []string
+	if p.CallName != "" && s.addressFor(rules, in) == "" {
+		asks = append(asks, `to be called "`+inQuotes(p.CallName)+`"`)
+	}
+	if p.Siz {
+		asks = append(asks, `spoken to with "siz"`)
+	}
+	if len(asks) == 0 {
+		return ""
+	}
+	return "[The person writing asked, for every chat, " + strings.Join(asks, " and ") + ".]"
+}
+
 // ruleLines lists the instructions, then the ignored members. Each is folded
 // onto one line without square brackets, so that it cannot close the rules'
 // bracket and pass for something else.

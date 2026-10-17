@@ -339,6 +339,18 @@ serious and does not force a joke there. A plain question gets a plain
 answer first, even in the middle of an argument; she does not guess dates
 or facts, and still uses the tools for the time and for arithmetic.
 
+### Profiles
+
+Each group's memory is separate, so what is said in one group never reaches
+another. What does follow a person everywhere is how they asked to be
+spoken to: when someone says "meni Aziz aka deb chaqir" or "menga siz deb
+gapir", she saves it with `my_profile` (the `user_profiles` table), and every
+later turn of theirs, in any group or chat, is told the name and the "siz".
+Only the person themselves can set it, the name must be in their own
+message, and nobody else's turn ever shows it. Nothing they said is kept;
+"profilimni o'chir" clears it. An owner's own form of address wins over the
+name.
+
 ### Messages to the owners
 
 Asked in a group to tell an owner something ("Мариа @pronium га ёз ..."),

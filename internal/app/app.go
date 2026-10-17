@@ -222,6 +222,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Members:       groupMembers{client: bot.Client, botID: bot.User.ID},
 		Groups:        store,
 		Roster:        store,
+		Profiles:      store,
 		Muter:         store,
 		Logger:        logger,
 		Model:         cfg.Model,
@@ -294,6 +295,7 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 		tools.PollTool(tools.PollOptions{Sender: bot.Client, Store: store}),
 		tools.AdminsTool(tools.AdminsOptions{Telegram: bot.Client, BotID: bot.User.ID, Owners: cfg.OwnerIDs}),
 		tools.MembersTool(tools.MembersOptions{Store: store, Telegram: bot.Client, Owners: cfg.OwnerIDs, Location: cfg.Location}),
+		tools.ProfileTool(tools.ProfileOptions{Store: store}),
 	)
 	// Only owners known by ID can be written to, and only they are.
 	if len(cfg.OwnerIDs) > 0 {

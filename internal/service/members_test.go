@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 
@@ -89,5 +90,36 @@ func TestPrivateChatsCanBeTurnedOff(t *testing.T) {
 				t.Errorf("sent %d, model calls %d; want %d and %d", len(sent), len(f.replier.recorded()), c.wantSent, c.wantCalls)
 			}
 		})
+	}
+}
+
+type fakeProfileBook map[int64]storage.UserProfile
+
+func (f fakeProfileBook) Profile(_ context.Context, userID int64) (storage.UserProfile, error) {
+	p := f[userID]
+	p.UserID = userID
+	return p, nil
+}
+
+// What a person asked to be called, and "siz", reach every turn of theirs,
+// in any group; no one else's turn carries it.
+func TestProfileReachesThePersonsTurns(t *testing.T) {
+	f := newFixture()
+	f.opts.Profiles = fakeProfileBook{userID: {CallName: "Aziz aka", Siz: true}}
+	other := groupMessage("Mira, salom")
+	other.From = &telegram.User{ID: 4242, FirstName: "Ann"}
+
+	f.run(inGroup(groupMessage("Mira, salom")), inGroup(other))
+
+	calls := f.replier.recorded()
+	if len(calls) != 2 {
+		t.Fatalf("model calls = %d", len(calls))
+	}
+	want := `[The person writing asked, for every chat, to be called "Aziz aka" and spoken to with "siz".]`
+	if !strings.Contains(calls[0].req.Context, want) {
+		t.Errorf("context = %q, want %q", calls[0].req.Context, want)
+	}
+	if strings.Contains(calls[1].req.Context, "Aziz aka") || strings.Contains(calls[1].req.Context, "asked, for every chat") {
+		t.Errorf("another member's turn carries the profile: %q", calls[1].req.Context)
 	}
 }

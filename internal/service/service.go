@@ -133,6 +133,9 @@ type Options struct {
 	// Groups records the bot being added to or removed from groups; nil
 	// ignores those updates.
 	Groups GroupRegistry
+	// Profiles holds what each person asked to be remembered about talking
+	// to them; nil holds nothing.
+	Profiles ProfileBook
 	// Roster keeps the members seen in each group; nil keeps none.
 	Roster MemberBook
 	Logger *slog.Logger
