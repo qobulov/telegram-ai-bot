@@ -255,6 +255,10 @@ func (s *Service) mayAnswerInGroup(in incoming) (reservation int64, allowed bool
 	case s.isAdminActingOnAMember(in):
 		s.opts.Logger.Info("group reply limit reached, but an admin replied to a member", "chat_id", in.scope.ChatID, "user_id", in.userID)
 		return 0, true
+	case s.onlyTheyRead(ctx, in):
+		// Nobody else reads a group of two, so there is nobody to flood; the
+		// limit once left someone in distress there unanswered.
+		return 0, true
 	}
 	s.opts.Logger.Info("group reply limit reached", "chat_id", in.scope.ChatID, "user_id", in.userID)
 	s.react(in, overQuotaReaction)

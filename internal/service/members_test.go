@@ -170,3 +170,24 @@ func TestTalksElsewhereComeOnlyWhereNobodyElseReads(t *testing.T) {
 		})
 	}
 }
+
+// In a group of just the person and the bot nobody else is flooded, so the
+// group's reply limit does not cut a conversation short there; it once left
+// someone in distress unanswered. Other groups keep it.
+func TestReplyLimitSparesAGroupOfTwo(t *testing.T) {
+	for name, c := range map[string]struct {
+		members, want int
+	}{"two members": {2, 3}, "a bigger group": {5, 1}} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			f.opts.GroupReplies = &fakeGroupQuota{}
+			f.opts.GroupRatePerMinute = 1
+			f.opts.MemberRepliesPer10Min = 1
+			f.opts.MemberCount = &fakeCounter{count: c.members}
+			sent := f.run(inGroup(groupMessage("Mira, bir")), inGroup(groupMessage("Mira, ikki")), inGroup(groupMessage("Mira, uch")))
+			if len(sent) != c.want {
+				t.Errorf("answers = %d, want %d", len(sent), c.want)
+			}
+		})
+	}
+}

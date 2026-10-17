@@ -1497,6 +1497,20 @@ func TestPersonaKeepsOwnersFormsAndKnowsNotifyOwner(t *testing.T) {
 	}
 }
 
+// Someone cried, could not sleep and had no strength left; Maria listened
+// well but never suggested anyone who could be there for them.
+func TestPersonaPointsToRealPeopleInDeepDistress(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"talking to someone they trust", "psychologist or doctor", "not a replacement for people around them", "get help right now", "emergency services"} {
+		if !strings.Contains(cfg.PersonaPrompt, want) {
+			t.Errorf("the persona does not contain %q", want)
+		}
+	}
+}
+
 // Asked about the other group's talk, Maria said she had just joined.
 func TestPersonaDoesNotInventWhyItCannotRecall(t *testing.T) {
 	cfg, err := Load(getenv(validEnv()))
