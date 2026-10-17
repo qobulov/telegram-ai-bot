@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -293,6 +295,15 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 		tools.AdminsTool(tools.AdminsOptions{Telegram: bot.Client, BotID: bot.User.ID, Owners: cfg.OwnerIDs}),
 		tools.MembersTool(tools.MembersOptions{Store: store, Telegram: bot.Client, Owners: cfg.OwnerIDs, Location: cfg.Location}),
 	)
+	// Only owners known by ID can be written to, and only they are.
+	if len(cfg.OwnerIDs) > 0 {
+		builtin = append(builtin, tools.NotifyOwnerTool(tools.NotifyOptions{
+			Quota:    store,
+			Telegram: bot.Client,
+			Owners:   slices.Sorted(maps.Keys(cfg.OwnerIDs)),
+			Location: cfg.Location,
+		}))
+	}
 	if len(cfg.OwnerUsernames) > 0 {
 		builtin = append(builtin,
 			tools.DatabaseTool(tools.DatabaseOptions{

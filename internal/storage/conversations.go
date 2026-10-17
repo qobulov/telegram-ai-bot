@@ -381,6 +381,10 @@ func (s *Store) Expire(ctx context.Context, maxAge time.Duration) (Expired, erro
 		if _, err = tx.Exec(ctx, `DELETE FROM group_members WHERE status IN ('left', 'kicked') AND last_seen_at < $1`, time.Now().Add(-forgetLeftAfter)); err != nil {
 			return err
 		}
+		// Owner notices count per day, so two days' are more than enough.
+		if _, err = tx.Exec(ctx, `DELETE FROM owner_notices WHERE created_at < now() - interval '2 days'`); err != nil {
+			return err
+		}
 		_, err = tx.Exec(ctx, `DELETE FROM broadcasts WHERE created_at < $1`, cutoff)
 		return err
 	})

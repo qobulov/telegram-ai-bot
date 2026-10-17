@@ -339,6 +339,19 @@ serious and does not force a joke there. A plain question gets a plain
 answer first, even in the middle of an argument; she does not guess dates
 or facts, and still uses the tools for the time and for arithmetic.
 
+### Messages to the owners
+
+Asked in a group to tell an owner something ("Мариа @pronium га ёз ..."),
+she calls `notify_owner`, which sends the owner a private message: the
+group's name, who asked, and the asker's own words as they wrote them,
+never text the model wrote. It writes only to owners known by
+`BOT_OWNER_IDS`, a named owner matched by Telegram's own record of their
+username, and each group may send one such message a day (counted in the
+`owner_notices` table, from midnight in `GROUP_HISTORY_TIMEZONE`). Telegram
+lets a bot write only to someone who started a private chat with it, so each
+owner must send the bot `/start` once; until then she says so and the day's
+message is not spent. `PRIVATE_CHATS=off` does not stop this.
+
 ### Limits built into the default character
 
 The built-in prompt tells the model to tease the situation, the message or

@@ -44,6 +44,33 @@ func TestGroupMembersAreTheOnesSeenAndStillThere(t *testing.T) {
 	}
 }
 
+// A group passes one message a day to its owners; one given back can be
+// taken again, and another group has its own.
+func TestOwnerNoticeIsOnceADayPerGroup(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	today := time.Now().Add(-time.Hour)
+	id, ok, err := store.ReserveOwnerNotice(ctx, group, alice, today)
+	if err != nil || !ok || id == 0 {
+		t.Fatalf("first = %d, %v, %v", id, ok, err)
+	}
+	if _, ok, err := store.ReserveOwnerNotice(ctx, group, bob, today); err != nil || ok {
+		t.Errorf("second the same day = %v, %v; want refused", ok, err)
+	}
+	if _, ok, _ := store.ReserveOwnerNotice(ctx, otherGroup, bob, today); !ok {
+		t.Error("another group was refused")
+	}
+	if err := store.ReleaseOwnerNotice(ctx, id); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, _ := store.ReserveOwnerNotice(ctx, group, bob, today); !ok {
+		t.Error("a released notice could not be taken again")
+	}
+	if _, ok, _ := store.ReserveOwnerNotice(ctx, group, bob, time.Now().Add(time.Minute)); !ok {
+		t.Error("a new day was refused")
+	}
+}
+
 // Members who left are forgotten after 90 days; those still there are kept.
 func TestExpireForgetsMembersWhoLeftLongAgo(t *testing.T) {
 	store := newTestStore(t)

@@ -1475,6 +1475,27 @@ func script(text string) string {
 	return "Latin"
 }
 
+// Maria called members "жоним", the form one owner chose for himself, and
+// said she could not write to an owner although notify_owner can.
+func TestPersonaKeepsOwnersFormsAndKnowsNotifyOwner(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := validEnv()
+	env["BOT_OWNER_USERNAME"] = "pronium"
+	owners, err := Load(getenv(env))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(owners.PersonaPrompt, "A form an owner chose is for that owner only: never use it with anyone else") {
+		t.Error("the owner note does not keep an owner's form to that owner")
+	}
+	if !strings.Contains(cfg.PersonaPrompt, "pass on is to your owners, with notify_owner") {
+		t.Error("the honesty rule does not name notify_owner")
+	}
+}
+
 func TestPrivateChats(t *testing.T) {
 	cfg, err := Load(getenv(validEnv()))
 	if err != nil || cfg.PrivateChats != "on" {

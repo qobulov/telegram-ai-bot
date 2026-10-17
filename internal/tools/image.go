@@ -24,6 +24,8 @@ const (
 type Caller struct {
 	UserID int64
 	ChatID int64
+	// Name is the caller's first name and @username, as the log shows them.
+	Name string
 	// Owner is true for the bot's owners, who have no daily limits.
 	Owner bool
 	// Human is false when another bot is asking.

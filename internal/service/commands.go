@@ -470,6 +470,7 @@ func (s *Service) caller(in incoming) tools.Caller {
 	return tools.Caller{
 		UserID:    in.userID,
 		ChatID:    in.scope.ChatID,
+		Name:      plainLabel(in.msg.From),
 		Owner:     s.isOwner(in.msg.From),
 		Human:     !in.fromBot,
 		UpdateID:  in.updateID,
