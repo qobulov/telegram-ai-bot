@@ -82,6 +82,9 @@ func (s *Store) Migrate(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	if current > 0 && current < mergedThrough {
+		return 0, fmt.Errorf("storage: the database is at schema version %d, from before migrations 1 to %d were merged into one file per table; migrate it with a release from before the merge first", current, mergedThrough)
+	}
 	applied := 0
 	for _, m := range migrations {
 		if m.version <= current {
@@ -92,8 +95,21 @@ func (s *Store) Migrate(ctx context.Context) (int, error) {
 		}
 		applied++
 	}
+	if current == 0 {
+		// A new database now has every table as version mergedThrough left
+		// them, which is what a database that ran them one by one records.
+		if _, err := conn.Exec(ctx, `INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING`, mergedThrough); err != nil {
+			return applied, fmt.Errorf("storage: record merged migrations: %w", err)
+		}
+	}
 	return applied, nil
 }
+
+// mergedThrough is the last of the migrations that were merged into one
+// file per table, each holding the table as it ended up. A database that
+// ran them one by one is at this version and skips the files; a new one
+// runs the files and is then recorded at it. The next migration is 0023.
+const mergedThrough = 22
 
 func prepareVersionTable(ctx context.Context, conn *pgx.Conn) (int, error) {
 	_, err := conn.Exec(ctx, `

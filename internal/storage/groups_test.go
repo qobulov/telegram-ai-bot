@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -98,23 +99,33 @@ func TestRecordGroupKeepsTheBotsStatus(t *testing.T) {
 	}
 }
 
-func TestMigrationRecordsGroupsSeenBefore(t *testing.T) {
+// A new database runs the one-file-per-table migrations and is recorded at
+// the version a database that ran the old ones is at, so both skip them
+// from then on.
+func TestNewDatabaseIsRecordedAtTheMergedVersion(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
-	logMessage(t, store, group, "Ann", "hi")
-	if err := store.SetMuted(ctx, otherGroup, true, alice); err != nil {
-		t.Fatal(err)
+	if version, err := currentVersion(ctx, store.pool); err != nil || version != mergedThrough {
+		t.Errorf("version = %d, %v; want %d", version, err, mergedThrough)
 	}
-	if _, err := store.pool.Exec(ctx, `DELETE FROM groups; DROP TABLE broadcasts, group_replies, group_rules, moderation_actions, pending_moderation, private_messages, group_members, owner_notices, user_profiles; DELETE FROM schema_migrations WHERE version >= 9`); err != nil {
-		t.Fatal(err)
+	if applied, err := store.Migrate(ctx); err != nil || applied != 0 {
+		t.Errorf("second Migrate applied %d, %v; want nothing", applied, err)
 	}
-	if _, err := store.Migrate(ctx); err != nil {
-		t.Fatalf("Migrate: %v", err)
+	if err := store.CheckSchema(ctx); err != nil {
+		t.Errorf("CheckSchema: %v", err)
 	}
+}
 
-	groups, err := store.Groups(ctx, time.Now().Add(-time.Hour), 10)
-	if err != nil || len(groups) != 2 {
-		t.Errorf("groups = %+v, err = %v; both groups the bot knew of should be listed", groups, err)
+// A database part way through the old migrations would get tables twice or
+// miss some from the merged files, so it is stopped with what to do.
+func TestDatabaseFromBeforeTheMergeIsStopped(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	if _, err := store.pool.Exec(ctx, `DELETE FROM schema_migrations WHERE version > 12`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Migrate(ctx); err == nil || !strings.Contains(err.Error(), "merged") {
+		t.Errorf("Migrate = %v, want it stopped", err)
 	}
 }
 

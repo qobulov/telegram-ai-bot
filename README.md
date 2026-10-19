@@ -152,9 +152,13 @@ is deleted after `RETENTION_DAYS`. Owners' standing rules are kept until
 they expire, and the moderation audit until you delete it; see
 [Groups](#groups). The schema is
 defined by the files in
-[internal/storage/migrations/](internal/storage/migrations/), one per change.
-To change the schema later, add a new numbered file there; do not edit one
-that has already been applied to a database you want to keep.
+[internal/storage/migrations/](internal/storage/migrations/), one file per
+table holding the table as it is now (migrations 1 to 22 were merged into
+them). A new database runs them and is recorded at version 22; a database
+that ran the old migrations is already there and skips them. A database
+part way through the old ones is refused: migrate it with a release from
+before the merge first. To change the schema later, add a new file numbered
+from 0023; do not edit one that has already been applied.
 
 ## Configuration
 
@@ -1028,7 +1032,7 @@ sudo -u postgres psql -d tgbot -c \
   'REVOKE INSERT, UPDATE, DELETE ON schema_migrations FROM tgbot'
 ```
 
-You should see `migrations finished applied=4` on a new database. Running it
+You should see `migrations finished applied=17` on a new database. Running it
 again prints
 `applied=0`: applied migrations are recorded in `schema_migrations` and never
 run twice. The bot does not migrate on its own; if the schema is behind it

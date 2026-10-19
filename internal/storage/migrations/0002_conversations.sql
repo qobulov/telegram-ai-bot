@@ -9,7 +9,6 @@ CREATE TABLE conversations (
     user_id    bigint      REFERENCES users (telegram_id) ON DELETE CASCADE,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-
     -- At most one conversation per user in a chat.
     CONSTRAINT conversations_chat_id_user_id_key UNIQUE (chat_id, user_id)
 );

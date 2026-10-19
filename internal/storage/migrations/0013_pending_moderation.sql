@@ -1,9 +1,5 @@
--- Every moderation action now waits until the person who asked for it
--- confirms it, by replying to the question the bot posts, so the bans that
--- waited become any action that waits. A ban asked for before this cannot
--- be confirmed after it; it only has to be asked for again.
-
-DROP TABLE pending_bans;
+-- A moderation action waits until the person who asked for it confirms it,
+-- by replying to the question the bot posts. One per person and group.
 
 CREATE TABLE pending_moderation (
     requester_id      bigint,

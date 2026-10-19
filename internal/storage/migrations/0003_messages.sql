@@ -21,7 +21,6 @@ CREATE TABLE messages (
     author_id       bigint,
     author_name     text,
     created_at      timestamptz NOT NULL DEFAULT now(),
-
     CONSTRAINT messages_role_check CHECK (role IN ('user', 'assistant', 'tool')),
     CONSTRAINT messages_tool_calls_check CHECK (tool_calls IS NULL OR role = 'assistant'),
     CONSTRAINT messages_tool_call_id_check CHECK ((role = 'tool') = (tool_call_id IS NOT NULL))

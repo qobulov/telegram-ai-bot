@@ -5,7 +5,11 @@
 CREATE TABLE group_replies (
     chat_id    bigint      NOT NULL,
     user_id    bigint      NOT NULL,
-    created_at timestamptz NOT NULL DEFAULT now()
+    created_at timestamptz NOT NULL DEFAULT now(),
+    -- An answer reserved for a turn that then answered nothing, such as an
+    -- update Telegram delivered again, is given back by this ID. Last, as in
+    -- databases where it was added later.
+    id         bigserial   PRIMARY KEY
 );
 
 CREATE INDEX group_replies_chat_id_created_at_idx ON group_replies (chat_id, created_at);

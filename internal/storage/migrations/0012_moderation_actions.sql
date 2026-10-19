@@ -1,5 +1,4 @@
--- What the bot did in groups for their admins and its owners, and bans that
--- wait for the person who asked to confirm them.
+-- What the bot did in groups for their admins and its owners.
 
 CREATE TABLE moderation_actions (
     id                bigserial   PRIMARY KEY,
@@ -23,14 +22,3 @@ CREATE TABLE moderation_actions (
 
 CREATE INDEX moderation_actions_requester_id_created_at_idx ON moderation_actions (requester_id, created_at);
 CREATE INDEX moderation_actions_chat_id_action_created_at_idx ON moderation_actions (chat_id, action, created_at);
-
-CREATE TABLE pending_bans (
-    requester_id   bigint,
-    chat_id        bigint,
-    target_user_id bigint      NOT NULL,
-    target_name    text        NOT NULL,
-    -- The update that asked; only a later one may confirm.
-    update_id      bigint      NOT NULL,
-    created_at     timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (requester_id, chat_id)
-);

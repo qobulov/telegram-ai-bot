@@ -1,5 +1,6 @@
 -- Messages an owner asked the bot to post in its groups. A draft is sent only
--- when the owner confirms it in a later message.
+-- when the owner confirms it in a later message. Text only: an owner's voice
+-- message is a request to act on, not something to repost.
 
 CREATE TABLE broadcasts (
     id         bigserial   PRIMARY KEY,
