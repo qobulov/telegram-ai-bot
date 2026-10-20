@@ -191,3 +191,35 @@ func TestReplyLimitSparesAGroupOfTwo(t *testing.T) {
 		})
 	}
 }
+
+// A group of the person and the bot alone is a private chat in all but
+// name, so it is answered only as private chats are: with PRIVATE_CHATS=owners
+// a member there gets nothing, an owner an answer, and a real group everyone.
+func TestTooSmallAGroupIsAnsweredAsAPrivateChat(t *testing.T) {
+	for name, c := range map[string]struct {
+		mode    string
+		members int
+		owner   bool
+		want    int
+	}{
+		"member, two in the group, owners only":   {"owners", 2, false, 0},
+		"owner, two in the group, owners only":    {"owners", 2, true, 1},
+		"member, three in the group, owners only": {"owners", 3, false, 1},
+		"member, two in the group, private on":    {"on", 2, false, 1},
+		"member, two in the group, private off":   {"off", 2, false, 0},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			f.opts.PrivateChats = c.mode
+			f.opts.OwnerUsernames = []string{ownerUsername}
+			f.opts.MemberCount = &fakeCounter{count: c.members}
+			msg := groupMessage("Mira, salom")
+			if c.owner {
+				fromOwner(msg)
+			}
+			if sent := f.run(inGroup(msg)); len(sent) != c.want {
+				t.Errorf("answers = %d, want %d", len(sent), c.want)
+			}
+		})
+	}
+}

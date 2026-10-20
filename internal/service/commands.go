@@ -56,6 +56,14 @@ func (s *Service) process(in incoming) {
 		s.passOver(in)
 		return
 	}
+	// A group of fewer than three, the person and the bot, is a private chat
+	// in all but name: it is answered only as private chats are, or a group
+	// of two would get around PRIVATE_CHATS. After the flood guard, so that
+	// a flood cannot ask Telegram for the count without end.
+	if s.isPrivateInDisguise(ctx, in) {
+		s.passOver(in)
+		return
+	}
 	// An admin's yes to the bot's question is handled here, in code, before
 	// it could be taken for applause or run into the group's quota.
 	if s.confirmedModeration(ctx, in) {
