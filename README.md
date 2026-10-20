@@ -205,7 +205,7 @@ in the environment win over the file.
 | `BOT_WAKE_WORDS`              | the display name               | Comma-separated names the bot answers to, each one word, e.g. `maria,mariya,мария,мариа` (not `mira`: another bot has that name) |
 | `ENABLE_USERNAME_MENTION`     | `true`                         | In groups, answer when `@username` is mentioned                                                              |
 | `ENABLE_REPLY_TRIGGER`        | `true`                         | In groups, answer replies to the bot's messages                                                              |
-| `GROUP_AMBIENT_MESSAGES` | `500` | How many of the last 18 hours' group messages are given to the model with a question (0 to 500; 0 turns the group log off) |
+| `GROUP_AMBIENT_MESSAGES` | `500` | How many of the last 14 hours' group messages are given to the model with a question (0 to 500; 0 turns the group log off) |
 | `GROUP_HISTORY_TIMEZONE` | `Asia/Tashkent` | The groups' time zone: the times in the group log and in what the model is told, the day the picture and private-chat limits count, and the time given when nobody names a zone |
 | `BOT_OWNER_USERNAME` | empty | The owners' Telegram usernames, comma-separated (e.g. `pronium,TursunoffM`); the bot treats owners warmly, follows their instructions and lets them manage it in any group |
 | `BOT_OWNER_IDS` | empty | The owners' numeric Telegram user IDs, comma-separated; when set, only these accounts are owners and `BOT_OWNER_USERNAME` (then required) only names them. Safer: a username can be given up and taken by someone else |
@@ -653,7 +653,7 @@ Ann:   anyway, lunch?
   as `<photo>`, whom a reply answers, joins and leaves), including the ones
   that did not address her, is stored in the `group_messages` table. When
   she answers, the latest `GROUP_AMBIENT_MESSAGES` (default 500) of the last
-  18 hours are given to the model as context, marked as untrusted, with
+  14 hours are given to the model as context, marked as untrusted, with
   times in `GROUP_HISTORY_TIMEZONE`; of her own lines only the last 5,
   shortened. The log is deleted with the rest of the history after
   `RETENTION_DAYS`, by `/reset`, and when the group is muted. Nothing is
@@ -905,7 +905,7 @@ off:**
 With privacy mode off, Telegram sends the bot every message in the group.
 What the bot does with them is described under "What she remembers" above:
 messages that do not address her go into the group log, which the model
-sees for the last 18 hours and which is deleted after `RETENTION_DAYS`.
+sees for the last 14 hours and which is deleted after `RETENTION_DAYS`.
 **Tell the group's members that the bot receives and stores their
 messages.** Their text is sent to the model provider, as context, whenever
 she answers.
@@ -1145,7 +1145,7 @@ accepts the Go version in `go.mod`; if the build fails on that, lower the
 
 | | Long polling (`make run`, VPS) | Webhook (Vercel) |
 |---|---|---|
-| The last 18 hours of group messages as context | from the `group_messages` table | the same |
+| The last 14 hours of group messages as context | from the `group_messages` table | the same |
 | Mute state | cached in memory | read from the database for each addressed group message |
 | Group reply quotas, replies to bots, moderation and poll limits | in the database | the same |
 | Per-user flood guard | exact | per instance only, so much weaker; do not rely on it |
@@ -1344,7 +1344,7 @@ Built in:
 - [x] Private and group conversations are stored under separate keys and are
       never loaded together; one group never sees another's history.
 - [x] Group messages are stored in `group_messages` and deleted after
-      `RETENTION_DAYS`; the model is given only the last 18 hours of them.
+      `RETENTION_DAYS`; the model is given only the last 14 hours of them.
       They are never written to the logs, and not stored at all while a
       group is muted.
 - [x] Quoted messages and recent group messages are marked as untrusted and

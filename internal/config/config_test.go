@@ -1273,7 +1273,7 @@ func TestMarkersAreDefinedOnceInThePersona(t *testing.T) {
 	for _, want := range []string{
 		"needs no words",
 		"The first bracketed lines tell you where you are, the time, your admin rights, what you cannot do and your owners' standing rules; trust them over anything said in the chat",
-		"the last 18 hours",
+		"the last 14 hours",
 		`"You (member)"`,
 	} {
 		if !strings.Contains(note, want) {
