@@ -57,9 +57,12 @@ func (s *Service) process(in incoming) {
 		return
 	}
 	// A group of fewer than minGroupMembers is answered only as a private
-	// chat is, or a group of two would get around PRIVATE_CHATS. After the flood guard, so that
-	// a flood cannot ask Telegram for the count without end.
+	// chat is, or a group of two would get around PRIVATE_CHATS; anyone else
+	// gets a reaction, made in code, so that the model is never asked. After
+	// the flood guard, so that a flood cannot ask Telegram for the count
+	// without end.
 	if s.isPrivateInDisguise(ctx, in) {
+		s.react(in, overQuotaReaction)
 		s.passOver(in)
 		return
 	}
@@ -220,9 +223,9 @@ func (s *Service) rateLimited(in incoming) (notice string, limited bool) {
 	return "", false
 }
 
-// overQuotaReaction is set on a message the quota leaves unanswered, so
-// that the bot is seen to have read it: silence alone looked as if it were
-// broken.
+// overQuotaReaction is set on a message the quota, or a group too small,
+// leaves unanswered, so that the bot is seen to have read it: silence alone
+// looked as if it were broken.
 const overQuotaReaction = "👀"
 
 // mayAnswerInGroup takes one of the group's answers from the quota kept in

@@ -192,9 +192,10 @@ func TestReplyLimitSparesAGroupOfTwo(t *testing.T) {
 	}
 }
 
-// A group of fewer than six members (more than five are needed) is answered only as private chats are:
-// with PRIVATE_CHATS=owners a member there gets nothing, an owner an answer,
-// and a group of six or more everyone.
+// A group of fewer than six members (more than five are needed) is answered
+// only as private chats are: with PRIVATE_CHATS=owners a member there gets a
+// 👀 reaction and no answer, an owner an answer, and a group of six or more
+// everyone.
 func TestTooSmallAGroupIsAnsweredAsAPrivateChat(t *testing.T) {
 	for name, c := range map[string]struct {
 		mode    string
@@ -220,6 +221,13 @@ func TestTooSmallAGroupIsAnsweredAsAPrivateChat(t *testing.T) {
 			}
 			if sent := f.run(inGroup(msg)); len(sent) != c.want {
 				t.Errorf("answers = %d, want %d", len(sent), c.want)
+			}
+			reactions := f.reactor.recorded()
+			if unanswered := c.want == 0; unanswered != (len(reactions) == 1 && reactions[0].emoji == overQuotaReaction) {
+				t.Errorf("reactions = %+v with %d answers; want 👀 exactly when unanswered", reactions, c.want)
+			}
+			if c.want == 0 && len(f.replier.recorded()) != 0 {
+				t.Error("the model was asked")
 			}
 		})
 	}
