@@ -937,6 +937,7 @@ func TestPersonaCoversWhatWentWrongInTheGroup(t *testing.T) {
 		"near-empty replies",
 		"Running jokes belong to the members",
 		"Mention only @usernames that appear in front of you",
+		"start with their @username from the messages in front of you",
 		"g'isht",
 	} {
 		if !strings.Contains(all, want) {
