@@ -64,12 +64,13 @@ func (s *Service) talksElsewhere(ctx context.Context, in incoming) string {
 	return strings.Join(append(lines, elsewhereFooter), "\n")
 }
 
-// minGroupMembers is the smallest group that is not a private chat: the bot
-// and at least two people.
-const minGroupMembers = 3
+// minGroupMembers is the smallest group answered as a group, the bot counted:
+// the owners want Maria for real groups, and a smaller one is answered only
+// as a private chat would be.
+const minGroupMembers = 10
 
-// isPrivateInDisguise reports a group too small to be one, from someone a
-// private chat would not answer. When Telegram cannot say, the group is
+// isPrivateInDisguise reports a group smaller than minGroupMembers, from
+// someone a private chat would not answer. When Telegram cannot say, the group is
 // answered: going quiet in every group because of a failed count is worse.
 func (s *Service) isPrivateInDisguise(ctx context.Context, in incoming) bool {
 	if !in.group || s.opts.MemberCount == nil || s.answersPrivately(in.msg.From) {
@@ -83,7 +84,7 @@ func (s *Service) isPrivateInDisguise(ctx context.Context, in incoming) bool {
 	if count >= minGroupMembers {
 		return false
 	}
-	s.opts.Logger.Info("a group too small to be one; answered as a private chat would be", "chat_id", in.scope.ChatID, "user_id", in.userID, "members", count)
+	s.opts.Logger.Info("a group below the size Maria answers; answered as a private chat would be", "chat_id", in.scope.ChatID, "user_id", in.userID, "members", count)
 	return true
 }
 
