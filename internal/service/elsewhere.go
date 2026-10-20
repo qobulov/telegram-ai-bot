@@ -73,19 +73,29 @@ const minGroupMembers = 6
 // someone a private chat would not answer. When Telegram cannot say, the group is
 // answered: going quiet in every group because of a failed count is worse.
 func (s *Service) isPrivateInDisguise(ctx context.Context, in incoming) bool {
-	if !in.group || s.opts.MemberCount == nil || s.answersPrivately(in.msg.From) {
+	if !in.group || s.answersPrivately(in.msg.From) || !s.isSmallGroup(ctx, in.scope.ChatID) {
 		return false
 	}
-	count, err := s.opts.MemberCount.GetChatMemberCount(ctx, in.scope.ChatID)
-	if err != nil {
-		s.opts.Logger.Warn("could not count a group's members; answering", "chat_id", in.scope.ChatID, "error", err)
-		return false
-	}
-	if count >= minGroupMembers {
-		return false
-	}
-	s.opts.Logger.Info("a group below the size Maria answers; answered as a private chat would be", "chat_id", in.scope.ChatID, "user_id", in.userID, "members", count)
+	s.opts.Logger.Info("a group below the size Maria answers; answered as a private chat would be", "chat_id", in.scope.ChatID, "user_id", in.userID)
 	return true
+}
+
+// isSmallGroup reports a group of fewer than minGroupMembers, as Telegram
+// counts them, when small groups are answered only as private chats are.
+// When Telegram cannot say, the group is not small: going quiet in every
+// group because of a failed count is worse.
+func (s *Service) isSmallGroup(ctx context.Context, chatID int64) bool {
+	if s.opts.MemberCount == nil || s.opts.PrivateChats == "" || s.opts.PrivateChats == "on" {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(ctx, logTimeout)
+	defer cancel()
+	count, err := s.opts.MemberCount.GetChatMemberCount(ctx, chatID)
+	if err != nil {
+		s.opts.Logger.Warn("could not count a group's members; taking it for a big one", "chat_id", chatID, "error", err)
+		return false
+	}
+	return count < minGroupMembers
 }
 
 // onlyTheyRead reports a chat nobody but the person and the bot can read.

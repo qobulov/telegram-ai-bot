@@ -245,6 +245,39 @@ func TestEveryGroupVoiceIsLoggedWithItsTranscript(t *testing.T) {
 	}
 }
 
+// A group too small for Maria to answer its members gets no call to the
+// model at all: its voice messages are logged by their label alone. A group
+// big enough keeps its transcripts.
+func TestSmallGroupVoiceIsNotTranscribed(t *testing.T) {
+	for name, c := range map[string]struct {
+		members     int
+		transcribed bool
+	}{"five members": {5, false}, "six members": {6, true}} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			f.opts.PrivateChats = "owners"
+			f.opts.MemberCount = &fakeCounter{count: c.members}
+			voice := groupMessage("")
+			voice.From = &telegram.User{ID: 4242, FirstName: "Ann"}
+			voice.Voice = &telegram.Voice{FileID: "voice", Duration: 38}
+			addressed := replyingTo(groupMessage(""), botID, "your move")
+			addressed.Voice = &telegram.Voice{FileID: "voice", Duration: 5}
+
+			f.run(inGroup(voice), inGroup(addressed))
+
+			if got := f.transcriber.count() > 0; got != c.transcribed {
+				t.Errorf("transcribed = %v (%d times), want %v", got, f.transcriber.count(), c.transcribed)
+			}
+			if got := f.chatLog.texts(groupID); len(got) < 2 || !strings.HasPrefix(got[0], "Ann: <voice message, 38 s>") {
+				t.Errorf("log = %q, want both voices logged", got)
+			}
+			if !c.transcribed && len(f.replier.recorded()) != 0 {
+				t.Error("the model was asked in a small group")
+			}
+		})
+	}
+}
+
 func TestVoiceIsTranscribedOnceForQuestionAndLog(t *testing.T) {
 	f := newFixture()
 	msg := replyingTo(groupMessage(""), botID, "your move")

@@ -565,14 +565,26 @@ func isMuteCommand(text string) bool {
 
 // remember logs a group message as context for the bot's next answer in
 // that group. Photos and stickers are only noted; a voice message is
-// transcribed, so that "what did she say?" can be answered later.
+// transcribed, so that "what did she say?" can be answered later, except in
+// a group too small for her to answer its members: that would be a call to
+// the model for nobody.
 func (s *Service) remember(msg *telegram.Message) {
 	m, isMedia := s.mediaOf(msg)
+	if isMedia && m.audio && s.isSmallGroup(context.Background(), msg.Chat.ID) {
+		s.logUnheard(msg, m)
+		return
+	}
 	if isMedia && m.audio && len(s.queues) > 0 {
 		s.rememberInBackground(msg)
 		return
 	}
 	s.logMessage(msg)
+}
+
+// logUnheard logs a voice message by its label alone, untranscribed.
+func (s *Service) logUnheard(msg *telegram.Message, m media) {
+	content, _ := msg.Content()
+	s.logFrom(msg, withForward(msg, withMediaLabel(m, content)))
 }
 
 func (s *Service) logMessage(msg *telegram.Message) {
@@ -611,9 +623,8 @@ func (s *Service) rememberInBackground(msg *telegram.Message) {
 	select {
 	case s.transcribing <- struct{}{}:
 	default:
-		content, _ := msg.Content()
 		m, _ := s.mediaOf(msg)
-		s.logFrom(msg, withForward(msg, withMediaLabel(m, content)))
+		s.logUnheard(msg, m)
 		return
 	}
 	s.background.Go(func() {
