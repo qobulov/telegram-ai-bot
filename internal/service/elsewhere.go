@@ -67,7 +67,7 @@ func (s *Service) talksElsewhere(ctx context.Context, in incoming) string {
 // minGroupMembers is the smallest group answered as a group, the bot counted:
 // the owners want Maria for real groups, and a smaller one is answered only
 // as a private chat would be.
-const minGroupMembers = 10
+const minGroupMembers = 5
 
 // isPrivateInDisguise reports a group smaller than minGroupMembers, from
 // someone a private chat would not answer. When Telegram cannot say, the group is
