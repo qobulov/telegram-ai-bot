@@ -304,6 +304,9 @@ type incoming struct {
 	// groupReply is the answer taken from the group's quota for this
 	// message, to give back if the turn answers nothing; 0 when none was.
 	groupReply int64
+	// unanswered marks a private message PRIVATE_CHATS does not answer: it
+	// gets a reaction, chosen in code, and nothing else.
+	unanswered bool
 }
 
 // replyTarget is the message an answer should reply to: the original message
@@ -489,10 +492,11 @@ func (s *Service) accept(update telegram.Update) (incoming, bool) {
 	in := incoming{updateID: update.UpdateID, msg: msg, userID: msg.From.ID, fromBot: msg.From.IsBot}
 	switch msg.Chat.Type {
 	case telegram.ChatTypePrivate:
-		if !s.answersPrivately(msg.From) {
-			return incoming{}, false
-		}
 		in.scope = storage.Scope{ChatID: msg.Chat.ID, UserID: msg.From.ID}
+		if !s.answersPrivately(msg.From) {
+			in.unanswered = true
+			return in, true
+		}
 		text, _ := msg.Content() // the caption, for a photo
 		in.text = strings.TrimSpace(text)
 		return in, true
@@ -777,9 +781,10 @@ func (s *Service) markMuted(chatID int64, muted bool) {
 }
 
 // notifyBusy queues a "busy" reply without blocking the polling loop. If even
-// that queue is full the notice is dropped: the bot is overloaded.
+// that queue is full the notice is dropped: the bot is overloaded. A message
+// that would not be answered anyway gets none.
 func (s *Service) notifyBusy(in incoming) {
-	if s.silenced(in) {
+	if s.silenced(in) || in.unanswered {
 		return
 	}
 	select {
@@ -797,7 +802,7 @@ func (s *Service) sendBusyNotices() {
 func (s *Service) work(queue <-chan incoming) {
 	for in := range queue {
 		if s.closing.Load() {
-			if !s.silenced(in) {
+			if !s.silenced(in) && !in.unanswered {
 				s.reply(in, textBusy)
 			}
 			continue

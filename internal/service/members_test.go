@@ -73,13 +73,14 @@ func TestPrivateChatsCanBeTurnedOff(t *testing.T) {
 	owner := textFrom(9001, "salom")
 	owner.Message.From.Username = ownerUsername
 	cases := map[string]struct {
-		mode      string
-		wantSent  int
-		wantCalls int
+		mode          string
+		wantSent      int
+		wantCalls     int
+		wantReactions int
 	}{
-		"off":    {"off", 1, 1},    // only the group message is answered
-		"owners": {"owners", 2, 2}, // the owner and the group
-		"on":     {"on", 3, 3},
+		"off":    {"off", 1, 1, 2},    // only the group message is answered
+		"owners": {"owners", 2, 2, 1}, // the owner and the group
+		"on":     {"on", 3, 3, 0},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -90,7 +91,46 @@ func TestPrivateChatsCanBeTurnedOff(t *testing.T) {
 			if len(sent) != c.wantSent || len(f.replier.recorded()) != c.wantCalls {
 				t.Errorf("sent %d, model calls %d; want %d and %d", len(sent), len(f.replier.recorded()), c.wantSent, c.wantCalls)
 			}
+			// Who is not answered gets a reaction, chosen in code.
+			reactions := f.reactor.recorded()
+			if len(reactions) != c.wantReactions {
+				t.Errorf("reactions = %+v, want %d", reactions, c.wantReactions)
+			}
+			for _, r := range reactions {
+				if !slices.Contains(privateReactions, r.emoji) {
+					t.Errorf("reaction %q is not one of privateReactions", r.emoji)
+				}
+			}
 		})
+	}
+}
+
+func TestPrivateReactionsAreAllowedByTelegram(t *testing.T) {
+	for _, e := range privateReactions {
+		if !telegram.IsReactionEmoji(e) {
+			t.Errorf("%q is not a reaction Telegram accepts", e)
+		}
+	}
+}
+
+// A flood of private messages from someone not answered gets no reaction
+// past the flood guard, and never the guard's text notice.
+func TestUnansweredPrivateFloodGetsNothing(t *testing.T) {
+	f := newFixture()
+	f.opts.PrivateChats = "owners"
+	var updates []telegram.Update
+	for i := range 30 {
+		u := textFrom(userID, "salom")
+		u.UpdateID += int64(i)
+		u.Message.MessageID += int64(i)
+		updates = append(updates, u)
+	}
+	sent := f.run(updates...)
+	if len(sent) != 0 || len(f.replier.recorded()) != 0 {
+		t.Errorf("sent %d (%+v), model calls %d; want none", len(sent), sent, len(f.replier.recorded()))
+	}
+	if n := len(f.reactor.recorded()); n == 0 || n == 30 {
+		t.Errorf("reactions = %d, want some, cut by the flood guard", n)
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"slices"
 	"strings"
 	"time"
@@ -40,6 +41,14 @@ func (s *Service) process(in incoming) {
 	ctx, cancel := context.WithTimeout(context.Background(), s.opts.TurnTimeout)
 	defer cancel()
 
+	// A private message nobody may answer gets a reaction only, chosen here
+	// so that the model is never asked; a flood gets nothing at all.
+	if in.unanswered {
+		if _, limited := s.rateLimited(in); !limited {
+			s.react(in, privateReactions[rand.IntN(len(privateReactions))])
+		}
+		return
+	}
 	// A muted group is ignored, except for the commands that control muting.
 	// This is checked here, in queue order, so that a message sent right
 	// after /unmute is answered and one sent right after /mute is not.
@@ -222,6 +231,10 @@ func (s *Service) rateLimited(in incoming) (notice string, limited bool) {
 	}
 	return "", false
 }
+
+// privateReactions are the friendly reactions a private message that is not
+// answered gets one of, at random, so that it is seen to have been read.
+var privateReactions = []string{"👍", "❤", "🔥", "😁", "🤗", "😎", "🤝", "🫡", "👌", "😇", "🙈", "🆒", "🦄", "💯", "⚡", "🤩"}
 
 // overQuotaReaction is set on a message the quota, or a group too small,
 // leaves unanswered, so that the bot is seen to have read it: silence alone
