@@ -192,9 +192,9 @@ func TestReplyLimitSparesAGroupOfTwo(t *testing.T) {
 	}
 }
 
-// A group of fewer than five members is answered only as private chats are:
+// A group of fewer than six members (more than five are needed) is answered only as private chats are:
 // with PRIVATE_CHATS=owners a member there gets nothing, an owner an answer,
-// and a group of five or more everyone.
+// and a group of six or more everyone.
 func TestTooSmallAGroupIsAnsweredAsAPrivateChat(t *testing.T) {
 	for name, c := range map[string]struct {
 		mode    string
@@ -204,8 +204,8 @@ func TestTooSmallAGroupIsAnsweredAsAPrivateChat(t *testing.T) {
 	}{
 		"member, two in the group, owners only":  {"owners", 2, false, 0},
 		"owner, two in the group, owners only":   {"owners", 2, true, 1},
-		"member, four in the group, owners only": {"owners", 4, false, 0},
-		"member, five in the group, owners only": {"owners", 5, false, 1},
+		"member, five in the group, owners only": {"owners", 5, false, 0},
+		"member, six in the group, owners only":  {"owners", 6, false, 1},
 		"member, two in the group, private on":   {"on", 2, false, 1},
 		"member, two in the group, private off":  {"off", 2, false, 0},
 	} {
