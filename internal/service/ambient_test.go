@@ -143,17 +143,17 @@ func TestRecentMessagesAreGivenOldestFirstWithTimes(t *testing.T) {
 	if strings.Join(got, "|") != "Ann: two|Ann: three|Ann: four" {
 		t.Errorf("lines = %q, want the newest three, oldest first", got)
 	}
-	if !strings.Contains(strings.ToLower(ambientHeader), "untrusted") || !strings.Contains(ambientHeader, "the last 12 hours") {
+	if !strings.Contains(strings.ToLower(ambientHeader), "untrusted") || !strings.Contains(ambientHeader, "the last 18 hours") {
 		t.Errorf("header = %q", ambientHeader)
 	}
 }
 
-// The log reaches back 12 hours whatever the time of day, so a conversation
+// The log reaches back 18 hours whatever the time of day, so a conversation
 // that runs past midnight is not cut in two.
-func TestAmbientUsesTwelveHourWindow(t *testing.T) {
+func TestAmbientUsesEighteenHourWindow(t *testing.T) {
 	a, log := newTestAmbient(10)
 	now := time.Date(2026, 10, 14, 9, 0, 0, 0, tashkent)
-	log.now = func() time.Time { return now.Add(-13 * time.Hour) } // 20:00 yesterday in Tashkent
+	log.now = func() time.Time { return now.Add(-19 * time.Hour) } // 14:00 yesterday in Tashkent
 	a.add(groupID, 0, 4242, "Ann", "too long ago")
 	log.now = func() time.Time { return now.Add(-10 * time.Hour) } // 23:00 yesterday
 	a.add(groupID, 0, 4242, "Ann", "last night")
@@ -162,11 +162,11 @@ func TestAmbientUsesTwelveHourWindow(t *testing.T) {
 
 	block := a.block(groupID, now)
 
-	if want := now.Add(-12 * time.Hour); !log.since.Equal(want) {
+	if want := now.Add(-18 * time.Hour); !log.since.Equal(want) {
 		t.Errorf("read since %v, want %v", log.since, want)
 	}
 	if got := blockLines(t, block); strings.Join(got, "|") != "Ann: last night|Ann: this morning" {
-		t.Errorf("lines = %q, want the last 12 hours, across midnight", got)
+		t.Errorf("lines = %q, want the last 18 hours, across midnight", got)
 	}
 	if !strings.Contains(block, "08:00 Ann: this morning") {
 		t.Errorf("block = %q, want the time in Tashkent", block)

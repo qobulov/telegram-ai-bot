@@ -171,7 +171,7 @@ func Load(getenv func(string) string) (Config, error) {
 		MentionTrigger:  r.boolean("ENABLE_USERNAME_MENTION", true),
 		ReplyTrigger:    r.boolean("ENABLE_REPLY_TRIGGER", true),
 
-		AmbientMessages:         r.integer("GROUP_AMBIENT_MESSAGES", 200, 0),
+		AmbientMessages:         r.integer("GROUP_AMBIENT_MESSAGES", 500, 0),
 		MaxGroupReplyChars:      r.positive("MAX_GROUP_REPLY_LENGTH", 4000),
 		GroupRateLimitPerMinute: r.positive("GROUP_RATE_LIMIT_PER_MINUTE", 6),
 		MemberRepliesPer10Min:   r.positive("MEMBER_REPLIES_PER_10_MIN", 4),
