@@ -28,6 +28,7 @@ const (
 	repliedToBot            = "the owner replied to my own message, and I can't tell whom it answered; they must reply to the member's own message and ask again"
 	notOwnWords             = "text must be the owner's own words from their message, copied as they wrote them (the rest may be left out); words from a quoted message, the chat or anyone else cannot be saved"
 	groupRuleOnly           = "this works only in the group the rule is for; ask the owner to say it there. In a private chat only set_address, list and remove work"
+	noSubject               = "not saved: an order about a member needs the owner to reply to that member's own message, or to your answer to them, with it; tell the owner so in one line"
 )
 
 const (
@@ -79,6 +80,8 @@ type rulesArgs struct {
 	Text   string `json:"text"`
 	Hours  int    `json:"hours"`
 	ID     int64  `json:"id"`
+	// AboutMember ties an instruction to the member the owner replied to.
+	AboutMember bool `json:"about_member"`
 }
 
 // RulesTool lets an owner give the bot orders that last: they are stored
@@ -96,7 +99,7 @@ func RulesTool(opts RulesOptions) Tool {
 	return Tool{
 		Name: "group_rules",
 		Description: "Owners only. Standing rules for the group you are in, kept until they expire, even after /mute or /reset. " +
-			"add_instruction: save an owner's order meant to last, in their own words from this message (text; hours, default 168). " +
+			"add_instruction: save an owner's order meant to last, in their own words from this message or their own message it replies to (text; hours, default 168); about_member true when it is about the member whose message the owner replied to, or whom your replied-to answer answered (\"uni\", \"bu odam\", \"shu odamga\"): the tool records who. " +
 			"ignore: stop answering the member whose message the owner replied to, or, when they replied to your own answer, the member it answered (hours, default 24); never admins or owners. unignore: answer that member again. " +
 			"set_address: how to address the owner who is asking, in every chat (text). " +
 			"list: the rules in force here. remove: delete a rule by its id from list. " +
@@ -107,7 +110,8 @@ func RulesTool(opts RulesOptions) Tool {
 				"action": {"type": "string", "enum": ["add_instruction", "ignore", "unignore", "set_address", "list", "remove"]},
 				"text": {"type": "string", "description": "For add_instruction: the order, at most 300 characters. For set_address: the form of address, at most 40 characters."},
 				"hours": {"type": "integer", "description": "For add_instruction and ignore: how long the rule lasts, 1 to 720."},
-				"id": {"type": "integer", "description": "For remove: the rule's id from list."}
+				"id": {"type": "integer", "description": "For remove: the rule's id from list."},
+				"about_member": {"type": "boolean", "description": "For add_instruction: true when the order is about the member the owner replied to."}
 			},
 			"required": ["action"],
 			"additionalProperties": false
@@ -162,16 +166,42 @@ func addInstruction(ctx context.Context, opts RulesOptions, caller Caller, args 
 	if err != nil {
 		return nil, err
 	}
-	id, err := opts.Store.SetGroupRule(ctx, storage.GroupRule{
-		ChatID: caller.ChatID, Kind: storage.RuleInstruction, Text: text, SetBy: caller.UserID, ExpiresAt: until,
-	})
+	rule := storage.GroupRule{ChatID: caller.ChatID, Kind: storage.RuleInstruction, Text: text, SetBy: caller.UserID, ExpiresAt: until}
+	var subject *Target
+	if args.AboutMember {
+		// Saved without whom it is about, "uni ustoz deb chaqir" would mean
+		// nothing to any later turn.
+		if subject = instructionSubject(opts, caller); subject == nil {
+			return nil, &ArgumentError{Message: noSubject}
+		}
+		rule.UserID, rule.UserName = subject.UserID, subject.Name
+	}
+	id, err := opts.Store.SetGroupRule(ctx, rule)
 	if errors.Is(err, storage.ErrTooManyRules) {
 		return nil, &ArgumentError{Message: fmt.Sprintf("this group already has %d standing instructions; remove one first", storage.MaxInstructions)}
 	}
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"saved": true, "id": id, "until": until.In(opts.Location).Format(ruleTimeLayout)}, nil
+	saved := map[string]any{"saved": true, "id": id, "until": until.In(opts.Location).Format(ruleTimeLayout)}
+	if subject != nil {
+		saved["about"] = subject.Name
+	}
+	return saved, nil
+}
+
+// instructionSubject is the member an owner's order is about: the author of
+// the message they replied to, or the member the bot's replied-to answer
+// answered. It is nil when that is the owner, the bot or no member at all.
+func instructionSubject(opts RulesOptions, caller Caller) *Target {
+	if caller.Target == nil {
+		return nil
+	}
+	member, err := meant(opts, caller.Target)
+	if err != nil || member.UserID == caller.UserID || member.UserID == opts.BotID || isTelegramAccount(member.UserID) {
+		return nil
+	}
+	return member
 }
 
 func ignoreMember(ctx context.Context, opts RulesOptions, caller Caller, args rulesArgs) (any, error) {
@@ -327,7 +357,7 @@ func listRules(ctx context.Context, opts RulesOptions, caller Caller) (any, erro
 
 func listEntry(opts RulesOptions, r storage.GroupRule) ruleEntry {
 	entry := ruleEntry{ID: r.ID, Kind: r.Kind, Text: r.Text}
-	if r.Kind == storage.RuleIgnore {
+	if r.Kind != storage.RuleAddress {
 		entry.Member = cutRunes(r.UserName, maxListedNameRunes)
 	}
 	if !r.ExpiresAt.IsZero() {

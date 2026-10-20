@@ -519,3 +519,46 @@ func TestRulesToolListsIgnoresUpToTheLimit(t *testing.T) {
 		})
 	}
 }
+
+// In production an owner said "uni Imom buva deb chaqir" in reply to a
+// member, and the order was saved as "uni ...": later turns could not tell
+// whom it meant. The member replied to is now saved with it.
+func TestRulesToolTiesAnInstructionToTheMemberItIsAbout(t *testing.T) {
+	store := &fakeRules{}
+	registry := rulesRegistry(t, store, fakeAdmins{})
+	turn := func(target *Target) context.Context {
+		return WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Owner: true, Human: true, UpdateID: 1, MessageID: 30, Target: target, Words: "uni Imom buva deb chaqir"}, &Sink{})
+	}
+	botsAnswer := &Target{MessageID: 31, UserID: rulesBotID, Name: "Mira", IsBot: true, Answered: bekTarget()}
+
+	for name, target := range map[string]*Target{"the member's message": bekTarget(), "the bot's answer to them": botsAnswer} {
+		store.rules = nil
+		env := rules(registry, turn(target), `{"action":"add_instruction","text":"uni Imom buva deb chaqir","about_member":true}`)
+		if !env.OK || !strings.Contains(string(env.Result), `"about":"Bek @bek"`) {
+			t.Errorf("%s: add_instruction = %+v %s", name, env, env.Result)
+		}
+		if got := store.all(); len(got) != 1 || got[0].UserID != memberID || got[0].UserName != "Bek @bek" {
+			t.Errorf("%s: rules = %+v, want the order tied to Bek", name, got)
+		}
+	}
+	env := rules(registry, turn(bekTarget()), `{"action":"list"}`)
+	if !strings.Contains(string(env.Result), `"kind":"instruction","text":"uni Imom buva deb chaqir","member":"Bek @bek"`) {
+		t.Errorf("list = %s, want the member named", env.Result)
+	}
+
+	// Not replying to the member, or replying to the owner's own message,
+	// nobody can tell whom it means: it is refused with what to do.
+	ownMessage := &Target{MessageID: 28, UserID: userID, Name: "Owner", Owner: true}
+	for name, target := range map[string]*Target{"no reply": nil, "the owner's own message": ownMessage} {
+		store.rules = nil
+		env = rules(registry, turn(target), `{"action":"add_instruction","text":"uni Imom buva deb chaqir","about_member":true}`)
+		if env.OK || !strings.Contains(env.Error.Message, "reply to that member's own message") || len(store.all()) != 0 {
+			t.Errorf("%s: about no one = %+v, rules %+v", name, env, store.all())
+		}
+	}
+	// An order about the group, not about the member replied to, names no one.
+	store.rules = nil
+	if env = rules(registry, turn(bekTarget()), `{"action":"add_instruction","text":"uni Imom buva deb chaqir"}`); !env.OK || store.all()[0].UserID != 0 {
+		t.Errorf("without about_member = %+v, rules %+v", env, store.all())
+	}
+}

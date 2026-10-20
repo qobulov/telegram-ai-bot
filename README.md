@@ -350,8 +350,10 @@ another. What does follow a person everywhere is how they asked to be
 spoken to: when someone says "meni Aziz aka deb chaqir" or "menga siz deb
 gapir", she saves it with `my_profile` (the `user_profiles` table), and every
 later turn of theirs, in any group or chat, is told the name and the "siz".
-Only the person themselves can set it, the name must be in their own
-message, and nobody else's turn ever shows it. Nothing they said is kept;
+Only the person themselves can set it, or an owner replying to their
+message (or to Maria's answer to them) with "buni Ustoz deb chaqir"; the
+name must be in the asker's own message, and nobody else's turn ever shows
+it. Nothing they said is kept;
 "profilimni o'chir" clears it. An owner's own form of address wins over the
 name.
 
@@ -724,7 +726,7 @@ do not erase them, and every turn in the group is told the ones in force.
 
 | Rule | Who sets it, and where | How long |
 |---|---|---|
-| Instruction | an owner, in the group it is for, in their own words from that message (never words from a quoted message or the chat); at most 20 per group, 300 characters each | a week, or 1 to 720 hours if the owner says |
+| Instruction | an owner, in the group it is for, in their own words from that message or their own message it replies to (never words from someone else's message or the chat); at most 20 per group, 300 characters each. An order about one member ("uni", "bu odam") is saved with that member, and only when the owner replied to their message or to her answer to them | a week, or 1 to 720 hours if the owner says |
 | Ignore a member | an owner replying to that member's message, or to her answer to them, in the group | 24 hours, or 1 to 720 hours if the owner says |
 | Form of address | an owner, for themselves, in any chat; it holds everywhere | until removed |
 

@@ -33,8 +33,8 @@ var ErrTooManyRules = errors.New("storage: too many standing instructions in thi
 type GroupRule struct {
 	ID, ChatID int64
 	Kind       string
-	// UserID is the ignored member, or the owner an address is for; zero for
-	// an instruction.
+	// UserID is the ignored member, the owner an address is for, or the
+	// member an instruction is about; zero for an instruction about no one.
 	UserID int64
 	// UserName names UserID in lists and in the turn header.
 	UserName string

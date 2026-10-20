@@ -43,9 +43,9 @@ type Caller struct {
 	// entities; never the bot or the caller.
 	Mentions []Mention
 	// Words is what the caller wrote in the message being answered, its
-	// media described and a voice message's transcript included, without the
-	// message it replies to: their own words, as opposed to anything quoted
-	// or logged.
+	// media described and a voice message's transcript included, and in
+	// their own message it replies to: their own words, as opposed to
+	// anything quoted from someone else or logged.
 	Words string
 }
 

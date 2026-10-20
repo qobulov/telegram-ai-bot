@@ -116,8 +116,9 @@ type ProfileBook interface {
 	Profile(ctx context.Context, userID int64) (storage.UserProfile, error)
 }
 
-// profileLine tells the model what the person writing asked for in every
-// chat: a name and "siz". An owner's own form of address wins over the name.
+// profileLine tells the model how to talk to the person writing in every
+// chat, as they or an owner asked: a name and "siz". An owner's own form of
+// address wins over the name.
 // It is "" when they asked for nothing or it cannot be read.
 func (s *Service) profileLine(ctx context.Context, in incoming, rules []storage.GroupRule) string {
 	if s.opts.Profiles == nil || in.fromBot {
@@ -132,7 +133,7 @@ func (s *Service) profileLine(ctx context.Context, in incoming, rules []storage.
 	}
 	var asks []string
 	if p.CallName != "" && s.addressFor(rules, in) == "" {
-		asks = append(asks, `to be called "`+inQuotes(p.CallName)+`"`)
+		asks = append(asks, `called "`+inQuotes(p.CallName)+`"`)
 	}
 	if p.Siz {
 		asks = append(asks, `spoken to with "siz"`)
@@ -140,7 +141,7 @@ func (s *Service) profileLine(ctx context.Context, in incoming, rules []storage.
 	if len(asks) == 0 {
 		return ""
 	}
-	return "[The person writing asked, for every chat, " + strings.Join(asks, " and ") + ".]"
+	return "[In every chat, the person writing is to be " + strings.Join(asks, " and ") + ".]"
 }
 
 // ruleLines lists the instructions, then the ignored members. Each is folded
@@ -152,6 +153,9 @@ func (s *Service) ruleLines(rules []storage.GroupRule) []string {
 		switch r.Kind {
 		case storage.RuleInstruction:
 			line := fmt.Sprintf("- (#%d) %s", r.ID, oneLine(r.Text))
+			if r.UserID != 0 && r.UserName != "" {
+				line = fmt.Sprintf("- (#%d) About %s: %s", r.ID, oneLine(r.UserName), oneLine(r.Text))
+			}
 			if !r.ExpiresAt.IsZero() {
 				line += " (until " + r.ExpiresAt.In(s.opts.Location).Format(ruleDayLayout) + ")"
 			}

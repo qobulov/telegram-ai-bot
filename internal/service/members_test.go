@@ -116,11 +116,11 @@ func TestProfileReachesThePersonsTurns(t *testing.T) {
 	if len(calls) != 2 {
 		t.Fatalf("model calls = %d", len(calls))
 	}
-	want := `[The person writing asked, for every chat, to be called "Aziz aka" and spoken to with "siz".]`
+	want := `[In every chat, the person writing is to be called "Aziz aka" and spoken to with "siz".]`
 	if !strings.Contains(calls[0].req.Context, want) {
 		t.Errorf("context = %q, want %q", calls[0].req.Context, want)
 	}
-	if strings.Contains(calls[1].req.Context, "Aziz aka") || strings.Contains(calls[1].req.Context, "asked, for every chat") {
+	if strings.Contains(calls[1].req.Context, "Aziz aka") || strings.Contains(calls[1].req.Context, "In every chat, the person writing") {
 		t.Errorf("another member's turn carries the profile: %q", calls[1].req.Context)
 	}
 }

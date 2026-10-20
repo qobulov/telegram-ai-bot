@@ -1178,7 +1178,7 @@ func TestPersonaIsPlayfulNotCruel(t *testing.T) {
 		"Swearing is normal in these chats",
 		"Never lecture anyone about manners",
 		`asks for "siz"`,
-		"save it with my_profile, for themselves only",
+		"save it with my_profile, for themselves; an owner may set it for a member with for_member",
 		"introduce yourself in one friendly line",
 		"Newcomers",
 	} {

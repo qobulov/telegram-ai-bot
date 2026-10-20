@@ -200,6 +200,7 @@ func standingRules() []storage.GroupRule {
 		{ID: 12, ChatID: groupID, Kind: storage.RuleInstruction, Text: "Do not talk\nabout [finance].", SetBy: 9001, ExpiresAt: time.Date(2026, 10, 23, 15, 4, 0, 0, tashkent)},
 		{ID: 13, ChatID: groupID, Kind: storage.RuleIgnore, UserID: 4242, UserName: "Ann @ann", SetBy: 9001, ExpiresAt: time.Date(2026, 10, 17, 15, 0, 0, 0, time.UTC)},
 		{ID: 14, ChatID: groupID, Kind: storage.RuleInstruction, Text: "Call Bek professor.", SetBy: 9001},
+		{ID: 18, ChatID: groupID, Kind: storage.RuleInstruction, UserID: 5005, UserName: "Patrick @tuturu", Text: "uni ustoz deb chaqir", SetBy: 9001},
 		{ID: 15, ChatID: 0, Kind: storage.RuleAddress, UserID: 9001, Text: `my "aka"`, SetBy: 9001},
 		{ID: 16, ChatID: 0, Kind: storage.RuleAddress, UserID: 7001, Text: "boss", SetBy: 7001},
 		{ID: 17, ChatID: -100500, Kind: storage.RuleInstruction, Text: "Elsewhere.", SetBy: 9001},
@@ -222,6 +223,7 @@ func TestRulesHeaderListsInstructionsAndAddress(t *testing.T) {
 	rules := "[Standing rules from your owners for this group:\n" +
 		"- (#12) Do not talk about (finance). (until 23 Oct)\n" +
 		"- (#14) Call Bek professor.\n" +
+		"- (#18) About Patrick @tuturu: uni ustoz deb chaqir\n" +
 		"- Do not answer Ann @ann; ignored until 17 Oct 20:00.]"
 	address := `[Address the owner who is writing as: "my 'aka'".]`
 	ownerInDevs := inDevs("Mira, hi")

@@ -83,3 +83,43 @@ func TestProfileNameMustBeTheirOwnWords(t *testing.T) {
 		t.Errorf("saved %+v", store.profiles)
 	}
 }
+
+// "Buni Ustoz deb chaqir", from an owner replying to a member, names that
+// member in every chat; nobody else may set another's profile.
+func TestOwnerSetsTheRepliedMembersName(t *testing.T) {
+	store := &fakeProfiles{profiles: map[int64]storage.UserProfile{}}
+	registry := mustRegistry(t, ProfileTool(ProfileOptions{Store: store}))
+	call := func(c Caller, args string) envelope {
+		var got envelope
+		_ = json.Unmarshal([]byte(registry.Execute(WithTurn(context.Background(), c, &Sink{}), c.UserID, "my_profile", args)), &got)
+		return got
+	}
+	patrick := &Target{MessageID: 29, UserID: 6006, Name: "Patrick @tuturu"}
+	owner := Caller{UserID: userID, ChatID: groupA, Owner: true, Human: true, Words: "buni Ustoz deb chaqir", Target: patrick}
+
+	got := call(owner, `{"action":"set_name","name":"Ustoz","for_member":true}`)
+	if !got.OK || !strings.Contains(string(got.Result), `"member":"Patrick @tuturu"`) || store.profiles[6006].CallName != "Ustoz" {
+		t.Fatalf("set_name for the member = %+v %s, profiles %+v", got, got.Result, store.profiles)
+	}
+	if _, ownChanged := store.profiles[userID]; ownChanged {
+		t.Error("the owner's own profile was changed")
+	}
+	// The bot's answer to the member means that member.
+	owner.Target = &Target{MessageID: 31, UserID: 777, IsBot: true, Answered: patrick}
+	owner.Words = "unga siz deb gapir"
+	if got := call(owner, `{"action":"siz","for_member":true}`); !got.OK || !store.profiles[6006].Siz {
+		t.Errorf("siz for the member the bot answered = %+v, profile %+v", got, store.profiles[6006])
+	}
+
+	member := Caller{UserID: 5005, ChatID: groupA, Human: true, Words: "buni Boss deb chaqir", Target: patrick}
+	if got := call(member, `{"action":"set_name","name":"Boss","for_member":true}`); got.OK {
+		t.Errorf("a member set another's name: %+v", got)
+	}
+	nobody := Caller{UserID: userID, ChatID: groupA, Owner: true, Human: true, Words: "uni Boss deb chaqir"}
+	if got := call(nobody, `{"action":"set_name","name":"Boss","for_member":true}`); got.OK || !strings.Contains(got.Error.Message, "reply to their message") {
+		t.Errorf("for_member without a reply = %+v", got)
+	}
+	if store.profiles[6006].CallName != "Ustoz" {
+		t.Errorf("profile = %+v, want Ustoz kept", store.profiles[6006])
+	}
+}

@@ -481,8 +481,20 @@ func (s *Service) caller(in incoming) tools.Caller {
 		MessageID: in.msg.MessageID,
 		Target:    s.target(in.msg.ReplyToMessage),
 		Mentions:  s.mentions(in),
-		Words:     in.described,
+		Words:     ownWords(in),
 	}
+}
+
+// ownWords is what the caller wrote: the message being answered, and their
+// own earlier message it replies to, which is how an owner often adds "did
+// you get that?" to an order they gave a moment before.
+func ownWords(in incoming) string {
+	replied := in.msg.ReplyToMessage
+	if replied == nil || replied.From == nil || in.msg.From == nil || replied.From.ID != in.msg.From.ID {
+		return in.described
+	}
+	text, _ := replied.Content()
+	return strings.TrimSpace(text + "\n" + in.described)
 }
 
 // mentions are the members a request tags, for moderation: in the request,
