@@ -18,6 +18,7 @@ import (
 	"telegram-ai-bot/internal/config"
 	"telegram-ai-bot/internal/cron"
 	"telegram-ai-bot/internal/service"
+	"telegram-ai-bot/internal/stickers"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 	"telegram-ai-bot/internal/tools"
@@ -276,6 +277,9 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		AdminList:             bot.Client,
 		Restrictor:            bot.Client,
 		Judge:                 answering,
+		Stickers:              store,
+		StickerSender:         bot.Client,
+		StickerImporter:       &stickers.Importer{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger), Workers: stickerWorkers, Logger: logger},
 		Answers:               store,
 	}
 	if mode.Serverless {
@@ -359,6 +363,26 @@ func imageTool(cfg config.Config, store *storage.Store) tools.Tool {
 		Quota:      store,
 		DailyLimit: cfg.DailyImageLimit,
 		Location:   cfg.Location,
+	})
+}
+
+// stickerWorkers is how many stickers the model looks at at once on import:
+// enough to label a pack of a hundred within one serverless request or two.
+const stickerWorkers = 10
+
+// stickerLabeller is the model that looks at stickers on import. It gets
+// more room than an answer: Gemini spends output tokens thinking, and with
+// a small limit a fifth of its labels came back cut off.
+func stickerLabeller(cfg config.Config, logger *slog.Logger) *ai.Client {
+	return ai.NewClient(ai.Options{
+		BaseURL:        cfg.AIBaseURL,
+		APIKey:         cfg.AIAPIKey,
+		Model:          cfg.Model,
+		MaxTokens:      max(cfg.MaxOutputTokens, 2048),
+		MaxAttempts:    2,
+		HTTPClient:     &http.Client{Timeout: cfg.RequestTimeout},
+		AttemptTimeout: attemptTimeout,
+		Logger:         logger,
 	})
 }
 

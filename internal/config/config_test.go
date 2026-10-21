@@ -1581,3 +1581,18 @@ func TestPersonaNeverPromisesToWatchTheChat(t *testing.T) {
 		}
 	}
 }
+
+// The persona offers stickers only by the categories the code knows
+// (stickers.Categories), and keeps them for answers with feeling.
+func TestPersonaOffersStickersSparingly(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	line := lineContaining(cfg.PersonaPrompt, "[sticker CATEGORY]")
+	for _, want := range []string{"funny, sarcasm, flirting, jealousy, sad, comfort, shock, celebration, facepalm, angry, wholesome, cool", "Use it seldom", "Never with a plain question", "someone in distress", "never write it in an answer"} {
+		if !strings.Contains(line, want) {
+			t.Errorf("the sticker line does not say %q: %q", want, line)
+		}
+	}
+}

@@ -228,6 +228,12 @@ type Options struct {
 	Restrictor Restrictor
 	// Judge is the model asked whom a message the guard caught is aimed at.
 	Judge InsultJudge
+	// Stickers picks the sticker the model asked for, StickerSender sends
+	// it, and StickerImporter brings packs in for /import_stickers; with any
+	// nil, no sticker is sent or imported.
+	Stickers        StickerPicker
+	StickerSender   StickerSender
+	StickerImporter StickerImporter
 	// Answers tells whom one of the bot's answers in a group answered, so
 	// that "don't answer him", replying to it, means that member; nil means
 	// it is never known.

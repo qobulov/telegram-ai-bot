@@ -825,6 +825,28 @@ own initiative, and to say an action was done only when the tool reports
 it done; she then says so in one short line, like "Bajarildi: Bek @bek
 15:04 gacha yoza olmaydi".
 
+### Stickers
+
+She can send a sticker after an answer, or as the answer, from packs an
+owner imported. The model never picks a sticker: it ends an answer with
+`[sticker CATEGORY]`, one of funny, sarcasm, flirting, jealousy, sad,
+comfort, shock, celebration, facepalm, angry, wholesome and cool, and the
+code sends the enabled sticker of that category used longest ago. She is told
+to use one in about a third of her playful answers and never with facts, a
+tool's result, moderation, serious talk or someone in distress. A chat gets
+at most one sticker in 30 seconds, and a sticker that cannot be sent costs
+only itself, never the answer.
+
+An owner imports a pack with `/import_stickers https://t.me/addstickers/name`
+(in a private chat, or `/import_stickers@Bot …` in a group). Pack emoji are
+often meaningless, so the model looks at each sticker once, a moving one by
+its thumbnail, and gives it up to three categories, a short description and
+whether it is fit to send: anything sexual, hateful, gory or cruel is kept
+but never sent. One request labels what it can in about 40 seconds; sending
+the command again goes on where it stopped, and the reply says how many are
+left. The stickers are kept in `bot_stickers`, and when each chat last got
+one in `sticker_sends`.
+
 ### Polls
 
 Anyone in a group can ask her for a poll ("Maria, so'rovnoma qil: plov yoki

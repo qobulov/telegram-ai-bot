@@ -994,3 +994,31 @@ func TestImplicitTopicReply(t *testing.T) {
 		})
 	}
 }
+
+func TestGetStickerSetReadsThePack(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"name":"xaa_by_qstickbot","title":"12:43","stickers":[
+		{"file_id":"f1","file_unique_id":"u1","emoji":"🫥","is_animated":false,"is_video":false},
+		{"file_id":"f2","file_unique_id":"u2","emoji":"🌟","is_video":true,"thumbnail":{"file_id":"t2","width":128,"height":128}}]}}`)
+
+	set, err := client.GetStickerSet(context.Background(), "xaa_by_qstickbot")
+	if err != nil || len(set.Stickers) != 2 || set.Stickers[0].FileUniqueID != "u1" || set.Stickers[1].Thumbnail == nil || set.Stickers[1].Thumbnail.FileID != "t2" {
+		t.Fatalf("set = %+v, err = %v", set, err)
+	}
+	if sent := api.recorded()[0]; sent.method != "getStickerSet" || sent.params["name"] != "xaa_by_qstickbot" {
+		t.Errorf("call = %+v", sent)
+	}
+}
+
+func TestSendStickerRepliesToTheMessage(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"message_id":91}}`)
+
+	id, err := client.SendSticker(context.Background(), -100123, "f1", 40)
+	if err != nil || id != 91 {
+		t.Fatalf("id = %d, err = %v", id, err)
+	}
+	sent := api.recorded()[0]
+	reply, _ := sent.params["reply_parameters"].(map[string]any)
+	if sent.method != "sendSticker" || sent.params["sticker"] != "f1" || reply["message_id"] != float64(40) {
+		t.Errorf("call = %+v", sent)
+	}
+}

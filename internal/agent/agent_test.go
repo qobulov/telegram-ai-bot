@@ -679,3 +679,28 @@ func TestAttachmentsAreSentWithTheQuestionButNeverSaved(t *testing.T) {
 		}
 	}
 }
+
+// A sticker marker asks for a sticker of its category after the text, or
+// alone; it is never sent as text, and the history shows that one was sent.
+func TestStickerMarkerIsTakenOut(t *testing.T) {
+	cases := map[string]struct{ text, sticker, saved string }{
+		"Voy, yana maqtanish 😂 [sticker sarcasm]": {"Voy, yana maqtanish 😂", "sarcasm", "Voy, yana maqtanish 😂 <sticker sarcasm>"},
+		"[Sticker Funny]":                       {"", "funny", "<sticker funny>"},
+		"<sticker sad>":                         {"", "sad", "<sticker sad>"},
+		"Tabriklayman! [sticker celebration]\n": {"Tabriklayman!", "celebration", "Tabriklayman! <sticker celebration>"},
+		"Oddiy javob":                           {"Oddiy javob", "", "Oddiy javob"},
+	}
+	for content, want := range cases {
+		f := newFixture(text(content))
+
+		answer, err := f.agent.Reply(context.Background(), request(1, "xaxa"))
+		if err != nil || answer.Text != want.text || answer.Sticker != want.sticker {
+			t.Errorf("answer %q: got %+v, err = %v; want text %q and sticker %q", content, answer, err, want.text, want.sticker)
+			continue
+		}
+		saved := f.store.history[testScope]
+		if last := saved[len(saved)-1]; last.Content != want.saved {
+			t.Errorf("answer %q: saved %q, want %q", content, last.Content, want.saved)
+		}
+	}
+}

@@ -116,7 +116,10 @@ type Answer struct {
 	// Reaction is the emoji the model chose to react with instead of
 	// writing. Text is then empty.
 	Reaction string
-	ID       int64
+	// Sticker is the category of sticker the model asked to send after its
+	// text, or alone; "" for none. Whether it fits is not checked here.
+	Sticker string
+	ID      int64
 }
 
 // Reply answers the user's message and saves the whole turn. Nothing is
@@ -217,6 +220,16 @@ func finish(t *turn, reply ai.Message) (Answer, error) {
 	if isThinking(answer) {
 		return Answer{}, ErrLeakedThinking
 	}
+	sticker := ""
+	if marker := stickerMarkers.FindStringSubmatch(answer); marker != nil {
+		sticker = strings.ToLower(marker[1])
+		answer = tidy(stickerMarkers.ReplaceAllString(answer, " "))
+		if !hasWords(answer) && !reactMarkers.MatchString(answer) {
+			// A sticker alone is the whole answer.
+			t.messages = append(t.messages, ai.Message{Role: ai.RoleAssistant, Content: "<sticker " + sticker + ">"})
+			return Answer{Sticker: sticker}, nil
+		}
+	}
 	if markers := reactMarkers.FindAllString(answer, -1); len(markers) > 0 {
 		words := withoutMarkers(answer)
 		if !hasWords(words) {
@@ -226,9 +239,17 @@ func finish(t *turn, reply ai.Message) (Answer, error) {
 		// the words are what the model wanted to say.
 		answer = words
 	}
-	t.messages = append(t.messages, ai.Message{Role: ai.RoleAssistant, Content: answer})
-	return Answer{Text: answer}, nil
+	saved := answer
+	if sticker != "" {
+		saved += " <sticker " + sticker + ">"
+	}
+	t.messages = append(t.messages, ai.Message{Role: ai.RoleAssistant, Content: saved})
+	return Answer{Text: answer, Sticker: sticker}, nil
 }
+
+// stickerMarkers finds "[sticker funny]", and "<sticker funny>", which is
+// how a sticker looks in the history and which models copy.
+var stickerMarkers = regexp.MustCompile(`(?i)[\[<]\s*sticker\s+([a-z]+)\s*[\]>]`)
 
 // react answers with the emoji of marker, the whole of the answer. The
 // model wanted no words. Telegram refuses any emoji not on its list, so a
@@ -320,7 +341,11 @@ var leftSpaces = regexp.MustCompile(`[ \t]*\n[ \t]*|[ \t]{2,}`)
 
 // withoutMarkers is answer with its reaction markers taken out.
 func withoutMarkers(answer string) string {
-	text := reactMarkers.ReplaceAllString(answer, " ")
+	return tidy(reactMarkers.ReplaceAllString(answer, " "))
+}
+
+// tidy folds the spaces a dropped marker leaves.
+func tidy(text string) string {
 	text = leftSpaces.ReplaceAllStringFunc(text, func(spaces string) string {
 		if strings.Contains(spaces, "\n") {
 			return "\n"

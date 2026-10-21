@@ -86,6 +86,9 @@ type fakeReplier struct {
 	// reaction, when set, is answered instead of text, as the agent does
 	// for "[react X]".
 	reaction string
+	// sticker, when set, is asked for with answer, which may be empty, as
+	// the agent does for "[sticker X]".
+	sticker string
 }
 
 func (f *fakeReplier) Reply(ctx context.Context, req agent.Request) (agent.Answer, error) {
@@ -118,6 +121,9 @@ func (f *fakeReplier) Reply(ctx context.Context, req agent.Request) (agent.Answe
 	}
 	if f.reaction != "" {
 		return agent.Answer{Reaction: f.reaction, ID: 9001}, nil
+	}
+	if f.sticker != "" {
+		return agent.Answer{Text: f.answer, Sticker: f.sticker, ID: 9001}, nil
 	}
 	if f.answer != "" {
 		return agent.Answer{Text: f.answer, ID: 9001}, nil

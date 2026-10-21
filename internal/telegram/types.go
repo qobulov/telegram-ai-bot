@@ -166,12 +166,21 @@ type PhotoSize struct {
 // Sticker is a sticker. A static sticker is a WebP image; animated (Lottie)
 // and video stickers cannot be shown as an image, but have a thumbnail.
 type Sticker struct {
-	FileID     string     `json:"file_id"`
-	Emoji      string     `json:"emoji"`
-	IsAnimated bool       `json:"is_animated"`
-	IsVideo    bool       `json:"is_video"`
-	FileSize   int64      `json:"file_size"`
-	Thumbnail  *PhotoSize `json:"thumbnail"`
+	FileID string `json:"file_id"`
+	// FileUniqueID stays the same for a sticker, unlike FileID.
+	FileUniqueID string     `json:"file_unique_id"`
+	Emoji        string     `json:"emoji"`
+	IsAnimated   bool       `json:"is_animated"`
+	IsVideo      bool       `json:"is_video"`
+	FileSize     int64      `json:"file_size"`
+	Thumbnail    *PhotoSize `json:"thumbnail"`
+}
+
+// StickerSet is a sticker pack.
+type StickerSet struct {
+	Name     string    `json:"name"`
+	Title    string    `json:"title"`
+	Stickers []Sticker `json:"stickers"`
 }
 
 // Animation is a GIF or a silent video clip.

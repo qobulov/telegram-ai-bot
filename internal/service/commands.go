@@ -30,6 +30,9 @@ type outcome struct {
 	// duplicate marks an update that was already answered: Telegram sent it
 	// again after a slow turn. The exchange is in the log already.
 	duplicate bool
+	// sticker is the category of sticker the model asked to send after the
+	// text, or alone; "" for none.
+	sticker string
 }
 
 func say(text string) outcome { return outcome{text: text} }
@@ -122,6 +125,15 @@ func (s *Service) process(in incoming) {
 // fits; a longer answer follows as its own message. A reaction is set on the
 // message being answered and is not a message, so alone it returns 0.
 func (s *Service) deliver(in incoming, out outcome) int64 {
+	answerID := s.deliverAnswer(in, out)
+	if id := s.sendSticker(in, out.sticker); answerID == 0 {
+		answerID = id
+	}
+	return answerID
+}
+
+// deliverAnswer sends the outcome's text, pictures and reaction.
+func (s *Service) deliverAnswer(in incoming, out outcome) int64 {
 	if out.reaction != "" {
 		s.react(in, out.reaction)
 	}
@@ -182,6 +194,9 @@ func (s *Service) logExchange(in incoming, out outcome) {
 		}
 		if len(out.drawings) > 0 {
 			answer = "<photo> " + answer
+		}
+		if out.sticker != "" {
+			answer = strings.TrimSpace(answer + " <sticker " + out.sticker + ">")
 		}
 		s.ambient.add(in.scope.ChatID, 0, s.opts.Bot.ID, botAuthor, answer)
 	}
@@ -611,7 +626,7 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 		return outcome{reaction: answer.Reaction, answerID: answer.ID}
 	case err == nil:
 		log.Info("turn completed")
-		return outcome{text: s.fitted(in, answer.Text), answerID: answer.ID}
+		return outcome{text: s.fitted(in, answer.Text), answerID: answer.ID, sticker: answer.Sticker}
 	case errors.Is(err, agent.ErrLeakedThinking):
 		log.Warn("the model answered with its own reasoning; nothing was sent")
 		return outcome{}
@@ -761,6 +776,8 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 		return s.ignore(ctx, in)
 	case "/unignore":
 		return s.unignore(ctx, in)
+	case "/import_stickers":
+		return s.importStickers(ctx, in)
 	default:
 		return textUnknown
 	}

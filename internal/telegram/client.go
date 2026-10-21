@@ -293,6 +293,37 @@ func (c *Client) GetChatAdministrators(ctx context.Context, chatID int64) ([]Cha
 	return admins, nil
 }
 
+type stickerSetParams struct {
+	Name string `json:"name"`
+}
+
+// GetStickerSet reads a sticker pack by its name, the last part of its
+// t.me/addstickers link.
+func (c *Client) GetStickerSet(ctx context.Context, name string) (StickerSet, error) {
+	var set StickerSet
+	if err := c.call(ctx, "getStickerSet", stickerSetParams{Name: name}, &set); err != nil {
+		return StickerSet{}, err
+	}
+	return set, nil
+}
+
+type sendStickerParams struct {
+	ChatID          int64            `json:"chat_id"`
+	Sticker         string           `json:"sticker"`
+	ReplyParameters *replyParameters `json:"reply_parameters,omitempty"`
+}
+
+// SendSticker sends a sticker Telegram knows by fileID, as a reply to
+// replyToMessageID when it is not zero, and returns the sent message's ID.
+func (c *Client) SendSticker(ctx context.Context, chatID int64, fileID string, replyToMessageID int64) (int64, error) {
+	var sent sentMessage
+	params := sendStickerParams{ChatID: chatID, Sticker: fileID, ReplyParameters: replyTo(replyToMessageID)}
+	if err := c.call(ctx, "sendSticker", params, &sent); err != nil {
+		return 0, err
+	}
+	return sent.MessageID, nil
+}
+
 type sendMessageParams struct {
 	ChatID          int64            `json:"chat_id"`
 	Text            string           `json:"text"`
