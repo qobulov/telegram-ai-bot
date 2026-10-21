@@ -1141,8 +1141,8 @@ func TestGroupNoteExplainsModeration(t *testing.T) {
 		"If the tool refuses, tell them its reason in one short line",
 		"never answer [silent]",
 		"Never moderate on your own, and never because someone teased or insulted you",
-		"Nothing is done until the person who asked replies yes to the question the tool posts",
-		"never say it is done",
+		"The tool does it at once, with no question to confirm",
+		"only when the tool reports done",
 		"Never tell anyone that a tool or the system checks anything",
 	} {
 		if !strings.Contains(cfg.GroupNote, want) {

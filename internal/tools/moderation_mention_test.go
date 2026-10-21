@@ -37,7 +37,7 @@ func mentionEnv(t *testing.T) *moderationEnv {
 // taggingAs is userID's turn, replying to target (or to nothing), with the
 // members their words tag.
 func taggingAs(updateID int64, target *Target, mentions ...Mention) context.Context {
-	return WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: updateID, MessageID: 50, Target: target, Mentions: mentions}, &Sink{})
+	return WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: updateID, MessageID: 50, Target: target, Mentions: mentions, Words: askingForAll}, &Sink{})
 }
 
 // ownMessage is a message of the person asking, userID.
@@ -58,32 +58,30 @@ func (env *moderationEnv) mutedOnly(t *testing.T, want int64) {
 // confirms who that is.
 func TestMuteReplyingToOwnMessageActsOnTheTaggedMember(t *testing.T) {
 	env := mentionEnv(t)
-	promptID := env.ask(t, taggingAs(100, ownMessage(), Mention{Username: "said_05"}), `{"action":"mute","minutes":10}`)
-	questions, _ := env.telegram.asked()
-	if len(questions) != 1 || !strings.Contains(questions[0].Text, "Said @said_05") || questions[0].ReplyToMessageID != 50 {
-		t.Fatalf("question = %+v; it must name the tagged member and reply to the request", questions)
+	said := env.act(t, taggingAs(100, ownMessage(), Mention{Username: "said_05"}), `{"action":"mute","minutes":10}`)
+	if !strings.Contains(said, "Said @said_05") {
+		t.Errorf("said %q; it must name the tagged member", said)
 	}
-	env.confirm(t, 101, promptID, true)
 	env.mutedOnly(t, saidID)
 }
 
 func TestMuteByTagWithoutReply(t *testing.T) {
 	env := mentionEnv(t)
-	env.confirm(t, 101, env.ask(t, taggingAs(100, nil, Mention{Username: "Said_05"}), `{"action":"mute"}`), true)
+	env.act(t, taggingAs(100, nil, Mention{Username: "Said_05"}), `{"action":"mute"}`)
 	env.mutedOnly(t, saidID)
 }
 
 // A link to a member without a username carries their ID from Telegram.
 func TestMuteByTextMention(t *testing.T) {
 	env := mentionEnv(t)
-	env.confirm(t, 101, env.ask(t, taggingAs(100, nil, Mention{UserID: saidID}), `{"action":"mute"}`), true)
+	env.act(t, taggingAs(100, nil, Mention{UserID: saidID}), `{"action":"mute"}`)
 	env.mutedOnly(t, saidID)
 }
 
 // A reply to someone else's message names its author, whatever is tagged.
 func TestReplyToAnotherMemberWinsOverATag(t *testing.T) {
 	env := mentionEnv(t)
-	env.confirm(t, 101, env.ask(t, taggingAs(100, bekTarget(), Mention{Username: "said_05"}), `{"action":"mute"}`), true)
+	env.act(t, taggingAs(100, bekTarget(), Mention{Username: "said_05"}), `{"action":"mute"}`)
 	env.mutedOnly(t, memberID)
 }
 
@@ -142,7 +140,7 @@ func TestUncertainTagsActOnNobody(t *testing.T) {
 			if got.OK || !strings.Contains(got.Error.Message, c.want) {
 				t.Errorf("moderate = %+v, want refused with %q", got, c.want)
 			}
-			env.nothingDone(t)
+			env.nothingActed(t)
 		})
 	}
 }
@@ -150,7 +148,7 @@ func TestUncertainTagsActOnNobody(t *testing.T) {
 // Deleting or pinning acts on the message replied to, never on a tag.
 func TestTagsDoNotChangeWhichMessageIsDeleted(t *testing.T) {
 	env := mentionEnv(t)
-	env.confirm(t, 101, env.ask(t, taggingAs(100, ownMessage(), Mention{Username: "said_05"}), `{"action":"delete"}`), true)
+	env.act(t, taggingAs(100, ownMessage(), Mention{Username: "said_05"}), `{"action":"delete"}`)
 	if calls := env.telegram.made(); len(calls) != 1 || !strings.Contains(calls[0], "49") {
 		t.Errorf("calls = %q, want the own message 49 deleted", calls)
 	}

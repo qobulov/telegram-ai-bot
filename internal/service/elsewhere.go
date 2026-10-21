@@ -64,7 +64,8 @@ func (s *Service) talksElsewhere(ctx context.Context, in incoming) string {
 	return strings.Join(append(lines, elsewhereFooter), "\n")
 }
 
-// minGroupMembers is the smallest group answered as a group, the bot counted:
+// minGroupMembers is the smallest group answered as a group, Maria counted
+// and other bots not:
 // the owners want Maria for real groups, and a smaller one is answered only
 // as a private chat would be.
 const minGroupMembers = 6
@@ -80,22 +81,44 @@ func (s *Service) isPrivateInDisguise(ctx context.Context, in incoming) bool {
 	return true
 }
 
-// isSmallGroup reports a group of fewer than minGroupMembers, as Telegram
-// counts them, when small groups are answered only as private chats are.
-// When Telegram cannot say, the group is not small: going quiet in every
-// group because of a failed count is worse.
+// isSmallGroup reports a group of fewer than minGroupMembers when small
+// groups are answered only as private chats are. When Telegram cannot say,
+// the group is not small: going quiet in every group because of a failed
+// count is worse.
 func (s *Service) isSmallGroup(ctx context.Context, chatID int64) bool {
 	if s.opts.MemberCount == nil || s.opts.PrivateChats == "" || s.opts.PrivateChats == "on" {
 		return false
 	}
-	ctx, cancel := context.WithTimeout(ctx, logTimeout)
-	defer cancel()
-	count, err := s.opts.MemberCount.GetChatMemberCount(ctx, chatID)
+	count, err := s.memberCount(ctx, chatID)
 	if err != nil {
 		s.opts.Logger.Warn("could not count a group's members; taking it for a big one", "chat_id", chatID, "error", err)
 		return false
 	}
 	return count < minGroupMembers
+}
+
+// BotTally counts the other bots seen in a group.
+type BotTally interface {
+	OtherBots(ctx context.Context, chatID, botID int64) (int, error)
+}
+
+// memberCount is the group's members as Telegram counts them, less the other
+// bots seen in it: a member padded a group of two with a music bot to get
+// past minGroupMembers. When the bots cannot be counted, Telegram's count
+// stands.
+func (s *Service) memberCount(ctx context.Context, chatID int64) (int, error) {
+	ctx, cancel := context.WithTimeout(ctx, logTimeout)
+	defer cancel()
+	count, err := s.opts.MemberCount.GetChatMemberCount(ctx, chatID)
+	if err != nil || s.opts.Bots == nil {
+		return count, err
+	}
+	bots, err := s.opts.Bots.OtherBots(ctx, chatID, s.opts.Bot.ID)
+	if err != nil {
+		s.opts.Logger.Warn("could not count a group's bots", "chat_id", chatID, "error", err)
+		return count, nil
+	}
+	return count - bots, nil
 }
 
 // onlyTheyRead reports a chat nobody but the person and the bot can read.
@@ -106,6 +129,6 @@ func (s *Service) onlyTheyRead(ctx context.Context, in incoming) bool {
 	if s.opts.MemberCount == nil {
 		return false
 	}
-	count, err := s.opts.MemberCount.GetChatMemberCount(ctx, in.scope.ChatID)
+	count, err := s.memberCount(ctx, in.scope.ChatID)
 	return err == nil && count == 2
 }

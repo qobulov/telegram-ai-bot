@@ -75,12 +75,7 @@ func (s *Service) process(in incoming) {
 		s.passOver(in)
 		return
 	}
-	// An admin's yes to the bot's question is handled here, in code, before
-	// it could be taken for applause or run into the group's quota.
-	if s.confirmedModeration(ctx, in) {
-		return
-	}
-	// So is an owner's order not to answer a member.
+	// An owner's order not to answer a member is handled here, in code.
 	if s.obeyedIgnoreOrder(ctx, in) {
 		return
 	}
@@ -583,36 +578,6 @@ func (s *Service) answeredMember(ctx context.Context, chatID, botMessageID int64
 		owner = s.opts.OwnerIDs[author.ID]
 	}
 	return &tools.Target{MessageID: author.MessageID, UserID: author.ID, Name: name, IsBot: bot, Owner: owner}
-}
-
-// confirmedModeration passes on a group member's plain yes or no, written
-// as a reply to one of the bot's messages, to moderation, and reports
-// whether it was the answer to the bot's question about an action they had
-// asked for. Then what came of it is said, and the exchange logged; nothing
-// else is done with the message. The model never sees it: whether an action
-// is carried out is decided by the person's own words, read in code.
-func (s *Service) confirmedModeration(ctx context.Context, in incoming) bool {
-	replied := in.msg.ReplyToMessage
-	if !in.group || in.fromBot || s.opts.Moderation == nil || replied == nil || replied.From == nil || replied.From.ID != s.opts.Bot.ID {
-		return false
-	}
-	yes, ok := tools.ConfirmationAnswer(in.text)
-	if !ok {
-		return false
-	}
-	confirmation, err := s.opts.Moderation.Confirm(ctx, s.caller(in), replied.MessageID, yes)
-	if err != nil {
-		s.opts.Logger.Warn("moderation confirmation failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
-	}
-	if !confirmation.Found {
-		return false
-	}
-	if confirmation.Text != "" {
-		s.reply(in, confirmation.Text)
-		s.logFrom(in.msg, in.text)
-		s.ambient.add(in.scope.ChatID, 0, s.opts.Bot.ID, botAuthor, confirmation.Text)
-	}
-	return true
 }
 
 // target describes the message a request replied to, for the tools that act

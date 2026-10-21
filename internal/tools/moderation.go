@@ -6,17 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 	"time"
-	"unicode"
 
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 )
 
-// The moderate tool's actions. All but cancel act on the message the person
-// asking replied to, or on its author.
+// The moderate tool's actions. Each acts on the message the person asking
+// replied to, or on its author.
 const (
 	actionDelete = "delete"
 	actionMute   = "mute"
@@ -25,7 +23,6 @@ const (
 	actionUnban  = "unban"
 	actionPin    = "pin"
 	actionUnpin  = "unpin"
-	actionCancel = "cancel"
 )
 
 const (
@@ -34,9 +31,6 @@ const (
 	// week at most.
 	defaultMuteMinutes = 60
 	maxMuteMinutes     = 7 * 24 * 60
-	// pendingMaxAge is how long an action waits for the person who asked to
-	// confirm it.
-	pendingMaxAge = 5 * time.Minute
 	// One person may have the bot act maxActions times per actionWindow, so
 	// that a careless or stolen admin account cannot empty a group through
 	// it.
@@ -57,11 +51,8 @@ const (
 	unknownMention = "I have not seen that @username in this group, so I can't tell who it is; reply to one of their own messages instead"
 	unsureMention  = "Telegram did not confirm that the tagged account is a member here under that name, so nothing was done; reply to one of their own messages instead"
 	immune         = "I can't do that to admins, my owners, myself, Telegram's service accounts or the person asking"
+	notAsked       = "their own message does not ask for this, so nothing was done; do it only when they ask for it in words, such as \"mute qil\" or \"o'chir\""
 	noAnswer       = "Telegram did not answer, so it may not have been done; try again later"
-	noQuestion     = "I could not post the question that asks them to confirm, so nothing will be done; ask again later"
-	askedNote      = "Nothing is done yet. I posted my own question asking them to confirm by replying yes to it; their answer is handled without you. Don't ask again and don't say it is done: reply with exactly [react 👌]."
-	askedTwice     = "This message was delivered twice and the first delivery already asked them to confirm, so nothing more was done now: reply with exactly [silent]."
-	oneAtATime     = "one action at a time: I already posted my question about the other action they asked for in this message. Nothing is asked or done for this one; tell them to ask for it again after answering that question"
 )
 
 // chatText is something the bot says to a group in its own words, never the
@@ -71,20 +62,13 @@ type chatText struct{ uz, ru string }
 
 func (t chatText) String() string { return t.uz }
 
-// What the chat is told when an action is not done: cancelledText when the
-// person said no, the others why not, in words that complete "Bajarilmadi:
-// ..." and "Не выполнено: ...".
+// What Telegram's silence is called in the chat, in words that complete
+// "Bajarilmadi: ..." and "Не выполнено: ...".
 var (
-	cancelledText = chatText{"Bekor qilindi: hech narsa qilinmadi.", "Отменено: ничего не сделано."}
-	lookupWords   = chatText{
-		"Telegram'dan kim nima qila olishini bilib bo'lmadi; keyinroq urinib ko'ring",
-		"не удалось узнать у Telegram, кто что может; попробуйте позже",
-	}
 	noAnswerWords = chatText{
 		"Telegram javob bermadi, bajarilmagan bo'lishi mumkin; keyinroq urinib ko'ring",
 		"Telegram не ответил, возможно, ничего не сделано; попробуйте позже",
 	}
-	brokenWords = chatText{"men tomonda nimadir buzildi; keyinroq yana so'rang", "у меня что-то сломалось; попросите позже"}
 	immuneWords = chatText{
 		"buni adminlarga, egalarimga, o'zimga, Telegram xizmat akkauntlariga yoki so'ragan odamning o'ziga qila olmayman",
 		"я не могу сделать это с админами, моими владельцами, собой, служебными аккаунтами Telegram или с тем, кто просит",
@@ -95,8 +79,7 @@ var (
 // then does nothing: it never acts on a guess.
 var errLookup = errors.New("could not ask Telegram who may do this, so nothing was done; try again later")
 
-// refusal is a DeniedError that also says why for the chat, which is told
-// when an action it confirmed is refused after all.
+// refusal is a DeniedError that also says why in the chat's own words.
 type refusal struct {
 	DeniedError
 	chat chatText
@@ -109,7 +92,7 @@ func refuse(message string, chat chatText) error {
 }
 
 // neededRight is the admin right an action needs, from the person asking
-// and from the bot. cancel needs none.
+// and from the bot.
 var neededRight = map[string]string{
 	actionDelete: telegram.RightDeleteMessages,
 	actionMute:   telegram.RightRestrictMembers,
@@ -159,22 +142,11 @@ type Moderator interface {
 	UnpinChatMessage(ctx context.Context, chatID, messageID int64) error
 }
 
-// QuestionSender posts the bot's question that asks to confirm an action.
-type QuestionSender interface {
-	SendMessage(ctx context.Context, msg telegram.Outgoing) (int64, error)
-}
-
-// ModerationStore keeps the audit of what the bot did for whom, and the
-// actions that wait for confirmation.
+// ModerationStore keeps the audit of what the bot did for whom.
 type ModerationStore interface {
 	RecordModeration(ctx context.Context, a storage.ModerationAction) (bool, error)
 	ForgetModeration(ctx context.Context, updateID int64, action string) error
-	UpdateModerated(ctx context.Context, updateID int64) (bool, error)
 	ModerationBy(ctx context.Context, requesterID int64, since time.Time) (int, error)
-	SavePendingModeration(ctx context.Context, p storage.PendingModeration) (bool, error)
-	SetModerationPrompt(ctx context.Context, requesterID, chatID, updateID, promptID int64) error
-	TakePendingModeration(ctx context.Context, requesterID, chatID, promptID int64, maxAge time.Duration) (storage.PendingModeration, error)
-	CancelPendingModeration(ctx context.Context, requesterID, chatID int64) (bool, error)
 }
 
 // RightsRecorder stores what Telegram said about the bot in a group.
@@ -190,9 +162,7 @@ type ModerationOptions struct {
 	// Members tells who holds which rights, asked anew for every action.
 	Members  MemberLookup
 	Telegram Moderator
-	// Questions posts the question that asks to confirm an action.
-	Questions QuestionSender
-	Store     ModerationStore
+	Store    ModerationStore
 	// Rights keeps the bot's rights learned along the way, for the turn
 	// header.
 	Rights RightsRecorder
@@ -223,11 +193,10 @@ type moderationArgs struct {
 // from the model or the chat.
 //
 // The model is not trusted to have understood that it was asked, either: it
-// reads the whole chat, and a line in it can talk it into anything. So
-// nothing is done when it calls the tool. The bot posts a question of its
-// own, saying exactly what it will do, and acts only when the person who
-// asked replies yes to that question, which Confirm checks without the
-// model.
+// reads the whole chat, and a line in it can talk it into anything. So the
+// action is done only when the asker's own message asks for it in words, as
+// askedFor checks; it is then done at once, without a question to confirm,
+// as the owners want.
 type Moderation struct {
 	opts ModerationOptions
 }
@@ -250,12 +219,11 @@ func (m *Moderation) Tool() Tool {
 		Description: "Whenever someone in a group asks you to: have something done to the message they replied to. It checks who may ask, which are the group's admins with the right and your owners, and refuses anyone else with the reason. " +
 			"delete: delete that message. mute (minutes, default 60) or unmute: its author. ban or unban: its author. pin or unpin: that message. " +
 			"For mute, unmute, ban and unban without such a reply, or replying to their own message, it acts on the one member they tagged with @, once Telegram confirms who that is. " +
-			"Nothing is done at once: the tool checks everyone's rights, then posts its own question asking the person to confirm, and their reply is handled without you. " +
-			"cancel: drop what they asked for. Never say something was done.",
+			"It checks everyone's rights and does it at once, with no question, but only when the person's own message asks for it; say it is done only when it reports done.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["delete", "mute", "unmute", "ban", "unban", "pin", "unpin", "cancel"]},
+				"action": {"type": "string", "enum": ["delete", "mute", "unmute", "ban", "unban", "pin", "unpin"]},
 				"minutes": {"type": "integer", "description": "For mute: how long, 1 to 10080. Default 60."},
 				"reason": {"type": "string", "description": "Optional: why, in a few words."}
 			},
@@ -288,15 +256,11 @@ func (m *Moderation) run(ctx context.Context, raw json.RawMessage) (any, error) 
 	if err != nil {
 		return nil, err
 	}
-	if args.Action == actionCancel {
-		cancelled, err := m.opts.Store.CancelPendingModeration(ctx, caller.UserID, caller.ChatID)
-		if err != nil {
-			return nil, internal(err)
-		}
-		return map[string]bool{"cancelled": cancelled}, nil
-	}
 	if _, known := neededRight[args.Action]; !known {
-		return nil, &ArgumentError{Message: "action must be delete, mute, unmute, ban, unban, pin, unpin or cancel"}
+		return nil, &ArgumentError{Message: "action must be delete, mute, unmute, ban, unban, pin or unpin"}
+	}
+	if !askedFor(caller.Words, args.Action) {
+		return nil, &DeniedError{Message: notAsked}
 	}
 	target, err := m.targetOf(ctx, caller, args.Action)
 	if err != nil {
@@ -306,7 +270,33 @@ func (m *Moderation) run(ctx context.Context, raw json.RawMessage) (any, error) 
 	if err := m.check(ctx, o); err != nil {
 		return nil, err
 	}
-	return m.ask(ctx, o)
+	// The owners want it done at once, with no question to confirm: the
+	// rights were just checked, and the target came from the update.
+	acted, err := m.carryOut(ctx, o)
+	if err != nil {
+		return nil, notCarriedOut(err)
+	}
+	if !acted {
+		return map[string]any{"done": true, "note": alreadyDoneNote}, nil
+	}
+	return map[string]any{"done": true, "said": m.doneText(o), "note": doneNote}, nil
+}
+
+// doneNote tells the model how to report an action the tool carried out;
+// alreadyDoneNote, one this message already had done.
+const (
+	doneNote        = "Done. Tell them in one short line, in their language, like the line in said; do not ask anything."
+	alreadyDoneNote = "This was already done for this message; do not say it again: reply with exactly [silent] unless something else needs an answer."
+)
+
+// notCarriedOut is why Telegram did not do it, for the model to tell them.
+// Anything else stays hidden as the tool's failure, and so reaches the logs,
+// a record that could not be dropped after Telegram refused among them.
+func notCarriedOut(err error) error {
+	if failure, ok := err.(*telegramError); ok {
+		return &DeniedError{Message: failure.message}
+	}
+	return internal(err)
 }
 
 // targetOf is what an order acts on. A reply to someone else's message
@@ -395,8 +385,8 @@ func groupRequester(ctx context.Context) (Caller, error) {
 	return caller, nil
 }
 
-// newOrder is caller's request. A mute's end is counted from now: from the
-// confirmation, when the order is carried out.
+// newOrder is caller's request. A mute's end is counted from now, when the
+// order is carried out.
 func (m *Moderation) newOrder(caller Caller, action string, target Target, minutes int, reason string) order {
 	o := order{caller: caller, action: action, target: target, reason: cutRunes(strings.TrimSpace(reason), maxReasonRunes)}
 	if action == actionMute {
@@ -479,8 +469,7 @@ func (m *Moderation) checkBot(ctx context.Context, chatID int64, right string) e
 // checkTarget keeps the bot off those it must not act on: Telegram's own
 // accounts, the bot's owners known by ID and the group's admins. The bot and the person
 // asking may have their own messages deleted, pinned or unpinned, but never
-// mute or ban themselves. A confirmed action's target is not known to be an
-// owner or not; that was checked when it was asked for.
+// mute or ban themselves.
 func (m *Moderation) checkTarget(ctx context.Context, o order) error {
 	userID := o.target.UserID
 	if userID == m.opts.BotID || userID == o.caller.UserID {
@@ -528,213 +517,20 @@ func (m *Moderation) checkPace(ctx context.Context, caller Caller) error {
 	return nil
 }
 
-// ask keeps o until the person who asked confirms it, and posts the bot's
-// question to them, as a reply to their request. An update Telegram
-// delivers again asks nothing more: its first delivery asked. A second
-// action in the same update is refused: one question waits at a time.
-func (m *Moderation) ask(ctx context.Context, o order) (any, error) {
-	saved, err := m.opts.Store.SavePendingModeration(ctx, o.pending())
-	if errors.Is(err, storage.ErrOtherModerationPending) {
-		return nil, &DeniedError{Message: oneAtATime}
-	}
-	if err != nil {
-		return nil, internal(err)
-	}
-	if !saved {
-		return map[string]any{"already_asked": true, "note": askedTwice}, nil
-	}
-	promptID, err := m.opts.Questions.SendMessage(ctx, telegram.Outgoing{
-		ChatID: o.caller.ChatID, Text: m.question(o), ReplyToMessageID: o.caller.MessageID,
-	})
-	if err == nil {
-		err = m.opts.Store.SetModerationPrompt(ctx, o.caller.UserID, o.caller.ChatID, o.caller.UpdateID, promptID)
-	}
-	if err != nil {
-		// Without a question to reply to, the action can never be confirmed.
-		// Why the question failed is for the logs.
-		_, _ = m.opts.Store.CancelPendingModeration(context.WithoutCancel(ctx), o.caller.UserID, o.caller.ChatID)
-		return nil, errors.Join(errors.New(noQuestion), internal(err))
-	}
-	return map[string]any{"asked": true, "action": o.action, "target": o.target.Name, "note": askedNote}, nil
-}
-
-func (o order) pending() storage.PendingModeration {
-	return storage.PendingModeration{
-		RequesterID: o.caller.UserID, ChatID: o.caller.ChatID, Action: o.action,
-		TargetUserID: o.target.UserID, TargetMessageID: o.target.MessageID,
-		TargetName: o.target.Name, TargetText: o.target.Text,
-		Minutes: o.minutes, Reason: o.reason, UpdateID: o.caller.UpdateID,
-	}
-}
-
-// question is what the bot asks before it acts. It is the bot's own words,
-// never the model's, so that what the person confirms is what will be done.
-// The model's reason is left out for the same cause.
-func (m *Moderation) question(o order) string {
-	what, minutes := o.describe(), int(pendingMaxAge.Minutes())
-	return chatText{
-		fmt.Sprintf("Tasdiqlaysizmi: %s? Shu xabarga «ha» deb javob bering (%d daqiqa ichida), yo'q bo'lsa «yo'q».", what.uz, minutes),
-		fmt.Sprintf("Подтвердите: %s? Ответьте «да» на это сообщение (в течение %d минут), иначе «нет».", what.ru, minutes),
-	}.String()
-}
-
-// describe says what o will do, in words that complete "Tasdiqlaysizmi:
-// ...?" and "Подтвердите: ...?".
-func (o order) describe() chatText {
-	name := o.target.Name
-	switch o.action {
-	case actionDelete:
-		return chatText{name + " xabari o'chirilsinmi", "удалить сообщение от " + name}
-	case actionMute:
-		return chatText{name + " " + uzbekDuration(o.minutes) + "ga ovozsiz qilinsinmi", "заглушить " + name + " на " + russianDuration(o.minutes)}
-	case actionUnmute:
-		return chatText{name + " ovozsizlikdan chiqarilsinmi", "снова разрешить " + name + " писать"}
-	case actionBan:
-		return chatText{name + " bloklansinmi", "забанить " + name}
-	case actionUnban:
-		return chatText{name + " blokdan chiqarilsinmi", "разбанить " + name}
-	case actionPin:
-		return chatText{name + " xabari qadalsinmi", "закрепить сообщение от " + name}
-	}
-	return chatText{name + " xabari qadashdan olinsinmi", "открепить сообщение от " + name}
-}
-
-// uzbekDuration writes minutes the way a person would: "90 daqiqa",
-// "2 soat", "7 kun".
-func uzbekDuration(minutes int) string {
-	switch {
-	case minutes%(24*60) == 0:
-		return fmt.Sprintf("%d kun", minutes/(24*60))
-	case minutes%60 == 0:
-		return fmt.Sprintf("%d soat", minutes/60)
-	}
-	return fmt.Sprintf("%d daqiqa", minutes)
-}
-
-// russianDuration is uzbekDuration in Russian, in the form that follows
-// "на": "1 минуту", "2 часа", "7 дней".
-func russianDuration(minutes int) string {
-	switch {
-	case minutes%(24*60) == 0:
-		return russianCount(minutes/(24*60), "день", "дня", "дней")
-	case minutes%60 == 0:
-		return russianCount(minutes/60, "час", "часа", "часов")
-	}
-	return russianCount(minutes, "минуту", "минуты", "минут")
-}
-
-// russianCount is n with the word in the form Russian puts after it: one
-// for 1, 21, 31; few for 2-4, 22-24; many for the rest, 11-14 among them.
-func russianCount(n int, one, few, many string) string {
-	word := many
-	switch {
-	case n%10 == 1 && n%100 != 11:
-		word = one
-	case n%10 >= 2 && n%10 <= 4 && (n%100 < 12 || n%100 > 14):
-		word = few
-	}
-	return fmt.Sprintf("%d %s", n, word)
-}
-
-// Confirmation is what came of someone's answer to the bot's question about
-// an action they asked for.
-type Confirmation struct {
-	// Found is false when no action waited for that person's answer to that
-	// message: what they wrote is then an ordinary message.
-	Found bool
-	// Text says, for the chat, what was done or why not; "" when nothing
-	// needs saying, as for an answer Telegram delivered again.
-	Text string
-}
-
-// Confirm carries out, or cancels, the action caller asked for and the bot
-// asked them about in promptID, now that they replied to that question with
-// yes or no. Everything is checked again first: rights may have changed
-// while it waited. The error, when there is one, is only for the logs: the
-// Confirmation already says, in safe words, that it failed.
-func (m *Moderation) Confirm(ctx context.Context, caller Caller, promptID int64, yes bool) (Confirmation, error) {
-	if !caller.Human || caller.ChatID >= 0 || caller.UpdateID == 0 {
-		return Confirmation{}, nil
-	}
-	pending, err := m.opts.Store.TakePendingModeration(ctx, caller.UserID, caller.ChatID, promptID, pendingMaxAge)
-	if errors.Is(err, storage.ErrNoPendingModeration) {
-		return m.answeredBefore(ctx, caller)
-	}
-	if err != nil {
-		return Confirmation{}, err
-	}
-	if !yes {
-		return Confirmation{Found: true, Text: cancelledText.String()}, nil
-	}
-	target := Target{UserID: pending.TargetUserID, MessageID: pending.TargetMessageID, Name: pending.TargetName, Text: pending.TargetText}
-	o := m.newOrder(caller, pending.Action, target, pending.Minutes, pending.Reason)
-	if err := m.check(ctx, o); err != nil {
-		return notDone(err)
-	}
-	if err := m.carryOut(ctx, o); err != nil {
-		return notDone(err)
-	}
-	return Confirmation{Found: true, Text: m.doneText(o)}, nil
-}
-
-// answeredBefore handles an answer that finds nothing waiting. When the
-// same update already acted, Telegram delivered it again, and nothing more
-// is said; otherwise it was no answer to a question, and is left alone.
-func (m *Moderation) answeredBefore(ctx context.Context, caller Caller) (Confirmation, error) {
-	acted, err := m.opts.Store.UpdateModerated(ctx, caller.UpdateID)
-	if err != nil || !acted {
-		return Confirmation{}, err
-	}
-	return Confirmation{Found: true}, nil
-}
-
-// notDone says why a confirmed action was not carried out. A refusal, or
-// Telegram's answer, is safe to show; anything else, such as the database's
-// error, is told only as something going wrong. What the chat is not told is
-// returned for the logs.
-func notDone(err error) (Confirmation, error) {
-	var (
-		refused *refusal
-		failure *telegramError
-		why     chatText
-	)
-	switch {
-	case errors.As(err, &refused):
-		why = refused.chat
-	case errors.Is(err, errLookup):
-		why = lookupWords
-	case errors.As(err, &failure):
-		why = failure.chat
-	default:
-		return notDoneText(brokenWords), cause(err)
-	}
-	if failure != nil && err != error(failure) {
-		// The store could not drop the record of what Telegram did not do.
-		return notDoneText(why), cause(err)
-	}
-	return notDoneText(why), nil
-}
-
-func notDoneText(why chatText) Confirmation {
-	return Confirmation{Found: true, Text: chatText{"Bajarilmadi: " + why.uz + ".", "Не выполнено: " + why.ru + "."}.String()}
-}
-
-// carryOut records o, then has Telegram do it. The record comes first and
-// is unique per update and action, so an update Telegram delivers twice is
-// acted on once. When Telegram refuses, the record is dropped, so that the
-// action may be tried again.
-func (m *Moderation) carryOut(ctx context.Context, o order) error {
+// carryOut records o, then has Telegram do it, and reports whether it did
+// now. The record comes first and is unique per update and action, so an
+// update Telegram delivers twice, or a second call in the same turn, acts
+// once. When Telegram refuses, the record is dropped, so that the action may
+// be tried again.
+func (m *Moderation) carryOut(ctx context.Context, o order) (bool, error) {
 	first, err := m.opts.Store.RecordModeration(ctx, o.audit())
-	if err != nil {
-		return err
-	}
-	if !first {
-		return nil
+	if err != nil || !first {
+		return false, err
 	}
 	if err := m.send(ctx, o); err != nil {
-		return m.failed(ctx, o, err)
+		return false, m.failed(ctx, o, err)
 	}
-	return nil
+	return true, nil
 }
 
 // failed says why o was not carried out, and drops its record when
@@ -799,11 +595,6 @@ type telegramError struct {
 
 func (e *telegramError) Error() string { return e.message }
 
-func isTelegramFailure(err error) bool {
-	var failure *telegramError
-	return errors.As(err, &failure)
-}
-
 // telegramFailure tells why nothing was done, in Telegram's words when it
 // gave a reason.
 func telegramFailure(err error) error {
@@ -860,47 +651,30 @@ func (m *Moderation) untilText(until time.Time) string {
 	return local.Format(dateClockLayout)
 }
 
-// The answers to the bot's question, checked in code. Only the whole message
-// counts: "ha, but not him" is no yes.
-var (
-	yesWords = []string{
-		"yes", "y", "yep", "yeah", "sure", "ok", "okay",
-		"ha", "xa", "haa", "ҳа", "ха", "албатта", "albatta", "mayli", "майли",
-		"да", "da", "ага", "конечно",
-		"+", "👍", "✅", "👌",
-	}
-	noWords = []string{
-		"no", "n", "nope", "cancel",
-		"yo'q", "yoq", "yo‘q", "yo’q", "yo`q", "йўқ", "йук", "kerakmas", "kerak emas",
-		"нет", "net", "не", "не надо", "отмена",
-		"-", "👎", "❌",
-	}
-)
-
-// ConfirmationAnswer reads a reply to the bot's question about an action:
-// yes, no, or, when ok is false, neither.
-func ConfirmationAnswer(text string) (yes, ok bool) {
-	answer := plainAnswer(text)
-	switch {
-	case slices.Contains(yesWords, answer):
-		return true, true
-	case slices.Contains(noWords, answer):
-		return false, true
-	}
-	return false, false
+// actionWords are what a person asking for each action says, written as
+// askedFor folds a message. Many are only the start of a word, so that
+// "o'chirib tashla", "mute qilvor" and "заблокируй" count.
+var actionWords = map[string][]string{
+	actionDelete: {"ochir", "delete", "del ", "sil", "olib tashla", "yoq qil", "удал", "сотри"},
+	actionMute:   {"mute", "myut", "мут", "мют", "ovozsiz", "jim qil", "yozolmasin", "yoza olmasin", "yozmasin", "yozdirma", "заглуш", "молч", "readonly", "read only"},
+	actionUnmute: {"mute", "мут", "мют", "ovozsiz", "yozsin", "yoza olsin", "ochib qoy", "ochvor", "разреш"},
+	actionBan:    {"ban", "бан", "blok", "chiqar", "hayda", "kick", "кик", "выгн", "выкин", "заблок"},
+	actionUnban:  {"ban", "бан", "blok", "qaytar", "верн", "разблок"},
+	actionPin:    {"pin", "qada", "закреп"},
+	actionUnpin:  {"pin", "qada", "закреп", "откреп"},
 }
 
-// plainAnswer is text in lower case without what does not change its
-// meaning: spaces, end punctuation, a smiley's brackets, and the invisible
-// variation selector and skin tones of an emoji.
-func plainAnswer(text string) string {
-	text = strings.Map(func(char rune) rune {
-		if char == '️' || (char >= 0x1F3FB && char <= 0x1F3FF) {
-			return -1
+var foldApostrophes = strings.NewReplacer("'", "", "ʻ", "", "ʼ", "", "’", "", "‘", "", "`", "")
+
+// askedFor reports whether words, what the person asking wrote themselves,
+// ask for action. With no question to confirm, this is what keeps a line
+// in the chat from talking the model into moderating on someone's turn.
+func askedFor(words, action string) bool {
+	folded := foldApostrophes.Replace(strings.ToLower(words)) + " "
+	for _, word := range actionWords[action] {
+		if strings.Contains(folded, word) {
+			return true
 		}
-		return char
-	}, strings.ToLower(text))
-	return strings.TrimFunc(text, func(char rune) bool {
-		return unicode.IsSpace(char) || strings.ContainsRune(".!,)", char)
-	})
+	}
+	return false
 }

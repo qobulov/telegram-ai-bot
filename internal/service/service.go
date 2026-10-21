@@ -14,7 +14,6 @@ import (
 	"telegram-ai-bot/internal/agent"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
-	"telegram-ai-bot/internal/tools"
 )
 
 const (
@@ -94,12 +93,6 @@ type ChatActor interface {
 	SendChatAction(ctx context.Context, chatID, threadID int64, action string) error
 }
 
-// Confirmer carries out a moderation action once the person who asked for
-// it confirms it, by replying yes to the bot's question about it.
-type Confirmer interface {
-	Confirm(ctx context.Context, caller tools.Caller, promptID int64, yes bool) (tools.Confirmation, error)
-}
-
 // AnswerLog tells whom a message of the bot's answered, from the stored
 // conversations.
 type AnswerLog interface {
@@ -141,6 +134,8 @@ type Options struct {
 	// that only the person and the bot can read recall those talks.
 	Exchanges   ExchangeBook
 	MemberCount MemberCounter
+	// Bots counts the other bots a group has, which MemberCount includes.
+	Bots BotTally
 	// Roster keeps the members seen in each group; nil keeps none.
 	Roster MemberBook
 	Logger *slog.Logger
@@ -228,9 +223,6 @@ type Options struct {
 	Strikes    SwearStrikes
 	AdminList  AdminLister
 	Restrictor Restrictor
-	// Moderation carries out what a group's admins asked the bot to do, once
-	// they reply yes to its question about it; nil means nothing waits.
-	Moderation Confirmer
 	// Answers tells whom one of the bot's answers in a group answered, so
 	// that "don't answer him", replying to it, means that member; nil means
 	// it is never known.

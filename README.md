@@ -668,10 +668,8 @@ Ann:   anyway, lunch?
   touch them.
 - **Moderation:** what she did, and for whom, is kept in the
   `moderation_actions` table until you delete it, including up to 500
-  characters of each message she deleted. An action waiting for
-  confirmation is kept in `pending_moderation`, with the member's ID and
-  name and up to 500 characters of the message, until it is confirmed,
-  cancelled or replaced.
+  characters of each message she deleted. The `pending_moderation` table,
+  from when actions waited for a yes, is no longer written to.
 - **The quoted message:** when someone replies to a message while addressing
   her, that one message is included, shortened to 1,000 characters. It is
   saved as part of the question.
@@ -773,16 +771,13 @@ check is made in code:
 - **Actions:** delete the message; mute its author (an hour unless asked
   otherwise, at most a week; supergroups only) or unmute them; ban them, or
   unban; pin the message without a notification, or unpin it.
-- **Confirmation:** the model only asks for an action; it never carries one
-  out. She posts her own fixed question, in Uzbek, saying exactly what she will do
-  ("Confirm: mute Bek @bek for 30 minutes? Reply yes (ha, да) to this
-  message within 5 minutes, or no to cancel."), and acts only when the same
-  person replies to that question with a plain yes (`ha`, `да`, `yes`,
-  `ok`, `+`, 👍 and a few more), read in code, within 5 minutes. A plain no
-  cancels it; anything else is an ordinary message. The answer is handled
-  before the reply quota and the applause rule, so a busy group cannot
-  swallow it. A text in the chat, a quoted message or a voice transcript can
-  talk the model into asking, but only the person's own yes acts.
+- **No confirmation:** as the owners asked, the action is done at once,
+  with no question to answer. Instead, the person's own message (or their
+  voice message's transcript) must ask for it in words, checked in code:
+  "o'chir", "mute qil", "jim qil", "ban", "blokla", "pin qil", "заблокируй",
+  "закрепи" and the like. A text in the chat or a quoted message can talk
+  the model into calling the tool on someone's turn, but nothing is done
+  unless that person asked for it themselves.
 - **Target:** the message the person replied to, as Telegram delivered it.
   For mute, unmute, ban and unban, someone who replied to nothing or to
   their own message may instead tag one member: with a link to a member
@@ -790,8 +785,7 @@ check is made in code:
   the last author seen under it in that group's log, and Telegram must
   confirm that this account still has that username and is in the group.
   Two tags, an unknown username or any mismatch act on nobody, and she asks
-  for a reply to the member's message instead. The confirmation question
-  names the member, so the person sees whom they are confirming. Nothing
+  for a reply to the member's message instead. Nothing
   the model, a member or a quoted message writes can choose whom she acts
   on. Her answers always reply to the person's own request.
 - **Who may ask:** a bot owner recognised by `BOT_OWNER_IDS` (not by
@@ -810,15 +804,16 @@ check is made in code:
 - **Limits:** at most 10 actions per person in 10 minutes. When Telegram
   cannot say who may do what, nothing is done.
 - **Once only:** each action is recorded in `moderation_actions` under the
-  Telegram update that confirmed it, before Telegram is called, so an update
-  delivered twice is acted on once, and a request delivered twice asks once.
+  Telegram update that asked for it, before Telegram is called, so an
+  update delivered twice is acted on once.
   A record is dropped only when Telegram refuses; when it does not answer,
   or a server's error comes back instead, it may have acted, so the record,
   and a deleted message's text, stay.
 
 She is told to use the tool only when an admin or owner asks, never on her
-own initiative, and never to say an action was done: the result is her own
-fixed reply to the confirmation ("Done: ..." or "Not done: ...").
+own initiative, and to say an action was done only when the tool reports
+it done; she then says so in one short line, like "Bajarildi: Bek @bek
+15:04 gacha yoza olmaydi".
 
 ### Polls
 
@@ -1380,9 +1375,9 @@ Built in:
       must hold it too, both asked of Telegram at that moment; admins,
       owners and Telegram's service accounts are never targets, nor is the
       bot, except to delete or pin its own message; at most 10 actions per
-      person in 10 minutes; nothing is done until the person who asked
-      replies yes to the bot's own question, read in code; an update
-      delivered twice acts once. When Telegram cannot be asked, nothing is
+      person in 10 minutes; nothing is done unless the person's own message
+      asks for it in words, read in code; an update delivered twice acts
+      once. When Telegram cannot be asked, nothing is
       done.
 - [x] Only owners can give standing orders, and only owners and group
       admins can have a member ignored. Whom to ignore is the author of the

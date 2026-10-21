@@ -272,3 +272,25 @@ func TestTooSmallAGroupIsAnsweredAsAPrivateChat(t *testing.T) {
 		})
 	}
 }
+
+type fakeBotTally struct{ bots int }
+
+func (f fakeBotTally) OtherBots(context.Context, int64, int64) (int, error) { return f.bots, nil }
+
+// In production a member added a music bot to a group of five to reach six;
+// the bots seen in a group do not count as members.
+func TestBotsDoNotMakeAGroupBigEnough(t *testing.T) {
+	for name, c := range map[string]struct {
+		members, bots, want int
+	}{"six with a bot": {6, 1, 0}, "seven with a bot": {7, 1, 1}, "six, no bots": {6, 0, 1}} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			f.opts.PrivateChats = "owners"
+			f.opts.MemberCount = &fakeCounter{count: c.members}
+			f.opts.Bots = fakeBotTally{bots: c.bots}
+			if sent := f.run(inGroup(groupMessage("Mira, salom"))); len(sent) != c.want {
+				t.Errorf("answers = %d, want %d", len(sent), c.want)
+			}
+		})
+	}
+}

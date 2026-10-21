@@ -19,6 +19,21 @@ type GroupMember struct {
 	LastSeen time.Time
 }
 
+// OtherBots counts the bots besides botID seen in a group and not seen to
+// leave it. Telegram's member count includes them, and a group padded with
+// bots is no bigger for it.
+func (s *Store) OtherBots(ctx context.Context, chatID, botID int64) (int, error) {
+	var count int
+	err := s.pool.QueryRow(ctx, `
+		SELECT count(*) FROM group_members
+		WHERE chat_id = $1 AND is_bot AND user_id <> $2 AND status NOT IN ('left', 'kicked')`,
+		chatID, botID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("storage: count a group's bots: %w", err)
+	}
+	return count, nil
+}
+
 // forgetLeftAfter is how long a member who left or was banned is kept.
 const forgetLeftAfter = 90 * 24 * time.Hour
 

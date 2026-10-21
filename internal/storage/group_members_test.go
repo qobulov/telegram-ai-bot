@@ -173,3 +173,24 @@ func TestExpireForgetsMembersWhoLeftLongAgo(t *testing.T) {
 		t.Errorf("kept %v; want Ann (still there) and the recent leaver, not Bek", kept)
 	}
 }
+
+// The bots seen in a group, besides the bot itself and those that left.
+func TestOtherBotsCountsTheBotsStillThere(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	const self = int64(777)
+	for _, m := range []GroupMember{
+		{ChatID: group, UserID: self, FirstName: "Maria", IsBot: true},
+		{ChatID: group, UserID: 801, FirstName: "Navo", IsBot: true},
+		{ChatID: group, UserID: 802, FirstName: "Gone", IsBot: true, Status: "left"},
+		{ChatID: group, UserID: alice, FirstName: "Alice"},
+		{ChatID: otherGroup, UserID: 803, FirstName: "Elsewhere", IsBot: true},
+	} {
+		if err := store.SeeMember(ctx, m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n, err := store.OtherBots(ctx, group, self); err != nil || n != 1 {
+		t.Errorf("OtherBots = %d, %v; want 1", n, err)
+	}
+}

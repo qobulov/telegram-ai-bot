@@ -172,13 +172,12 @@ func membershipError(err error) error {
 // NewService wires the tools, the model client, the agent and the service.
 func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, logger *slog.Logger) (*service.Service, error) {
 	moderation := tools.NewModeration(tools.ModerationOptions{
-		BotID:     bot.User.ID,
-		Members:   bot.Client,
-		Telegram:  bot.Client,
-		Questions: bot.Client,
-		Store:     store,
-		Rights:    store,
-		Location:  cfg.Location,
+		BotID:    bot.User.ID,
+		Members:  bot.Client,
+		Telegram: bot.Client,
+		Store:    store,
+		Rights:   store,
+		Location: cfg.Location,
 		// A username can change hands; only an ID makes an owner a moderator.
 		OwnersByID: len(cfg.OwnerIDs) > 0,
 		Owners:     cfg.OwnerIDs,
@@ -225,6 +224,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Profiles:      store,
 		Exchanges:     store,
 		MemberCount:   bot.Client,
+		Bots:          store,
 		Muter:         store,
 		Logger:        logger,
 		Model:         cfg.Model,
@@ -273,7 +273,6 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Strikes:               store,
 		AdminList:             bot.Client,
 		Restrictor:            bot.Client,
-		Moderation:            moderation,
 		Answers:               store,
 	}
 	if mode.Serverless {
