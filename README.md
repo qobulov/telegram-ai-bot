@@ -733,13 +733,14 @@ do not erase them, and every turn in the group is told the ones in force.
 
 The swear guard runs in code, without the model. In a group where it is
 on, every message from a member is checked against a list of swear words
-(dnx, pshnx, нахуй, бля, qo'tog', jalab and the like; words that also mean
-something harmless, such as "jala" or "kot", are left out). A member's first
-swear gets a reply warning them; the next one within 24 hours mutes them
-for an hour, and the notice tags the @username the owner named, or else the
-group's creator. Admins, the creator, owners and bots are never touched,
-forwarded messages are not checked, and a message the guard handled is not
-answered by the model. Each caught swear is kept in `moderation_actions`
+(dnx, pshnx, нахуй, бля, qo'tog', jalab, jala, kot, ske and the like;
+words that mostly mean something harmless, such as "am" or "mol", are left
+out). A member's first swear gets a reply warning them; the next one within
+24 hours mutes them for an hour, and the notice tags the @username the owner
+named, or else the group's creator. Telegram does not let an admin be muted,
+so an admin is warned the same way and the next swear only tags that person.
+The creator, owners and bots are never touched, forwarded messages are not
+checked, and a message the guard handled is not answered by the model. Each caught swear is kept in `moderation_actions`
 (action `swear`), which is how the count is kept and how an update
 delivered twice is handled once. Muting needs her to be an admin who may
 restrict members; without that right the notice says so and still tags.

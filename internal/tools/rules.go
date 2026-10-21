@@ -102,7 +102,7 @@ func RulesTool(opts RulesOptions) Tool {
 			"add_instruction: save an owner's order meant to last, in their own words from this message or their own message it replies to (text; hours, default 168); about_member true when it is about the member whose message the owner replied to, or whom your replied-to answer answered (\"uni\", \"bu odam\", \"shu odamga\"): the tool records who. " +
 			"ignore: stop answering the member whose message the owner replied to, or, when they replied to your own answer, the member it answered (hours, default 24); never admins or owners. unignore: answer that member again. " +
 			"set_address: how to address the owner who is asking, in every chat (text). " +
-			"watch_swearing: from now on, in code and without you, a member's first swear here gets a warning and the next within a day a 1-hour mute that tags the group's creator, or the @username in text when the owner names whom to call; admins and owners are left alone. stop_watching_swearing turns it off. " +
+			"watch_swearing: from now on, in code and without you, a member's first swear here gets a warning and the next within a day a 1-hour mute that tags the group's creator, or the @username in text when the owner names whom to call; an admin, who cannot be muted, gets the warning and then that tag; the creator and owners are left alone. stop_watching_swearing turns it off. " +
 			"list: the rules in force here. remove: delete a rule by its id from list. " +
 			"add_instruction, ignore and unignore work only in a group. Never say a rule is saved unless this tool reported it.",
 		Schema: json.RawMessage(`{

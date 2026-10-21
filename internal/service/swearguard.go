@@ -37,15 +37,18 @@ type AdminLister interface {
 }
 
 // swearWords are whole words that are swearing whatever the context.
-// Words that also mean something harmless are left out, such as "jala"
-// (a downpour), "am" or "kot" (a cat): a wrong mute is worse than a missed
-// swear.
+// "jala" and "kot" can mean a downpour and a cat, but a week of the groups'
+// messages used them for neither, 146 and 106 times. Words that mostly mean
+// something harmless are left out, such as "am" ("I am") or "mol": a wrong
+// mute is worse than a missed swear.
 var swearWords = map[string]bool{
 	"dnx": true, "днх": true, "pshnx": true, "пшнх": true, "nx": true, "нх": true, "нах": true,
 	"pzds": true, "пздс": true, "naxuy": true, "nahuy": true, "naxui": true, "наху": true, "нахуй": true, "нахуя": true,
 	"бля": true, "blya": true, "blyat": true, "blyad": true, "сука": true, "suka": true, "сучка": true,
 	"pizdes": true, "pizdec": true, "pidr": true, "пидр": true, "пидор": true,
 	"yeban": true, "dalbayob": true, "dalbayop": true, "qotoq": true, "қотоқ": true, "котак": true,
+	"jala": true, "жала": true, "kot": true, "кот": true, "ko't": true, "ske": true,
+	"harp": true, "xarp": true, "onangni": true, "онангни": true,
 }
 
 // swearStems are beginnings of words that are swearing in any form:
@@ -79,8 +82,10 @@ var apostrophes = strings.NewReplacer("ʻ", "'", "ʼ", "'", "’", "'", "‘", "
 
 // guardedSwearing handles a member's swearing in a group whose owners turned
 // the swear guard on, and reports whether it did: the message then gets no
-// answer from the model, which would only swear back. Admins, owners, bots
-// and posts on behalf of a chat are left alone, and so is a muted group.
+// answer from the model, which would only swear back. An admin is warned
+// too, but Telegram does not let an admin be muted, so a second swear tags
+// whom a mute would. The creator, owners, bots and posts on behalf of a chat
+// are left alone, and so is a muted group.
 func (s *Service) guardedSwearing(msg *telegram.Message, updateID int64) bool {
 	if s.opts.Strikes == nil || s.opts.Rules == nil || s.opts.AdminList == nil || s.opts.Restrictor == nil ||
 		msg.From == nil || msg.From.IsBot || msg.SenderChat != nil || msg.ForwardOrigin != nil || s.isOwner(msg.From) {
@@ -101,7 +106,8 @@ func (s *Service) guardedSwearing(msg *telegram.Message, updateID int64) bool {
 		s.opts.Logger.Warn("swear guard: could not list the admins; leaving it", "chat_id", msg.Chat.ID, "error", err)
 		return false
 	}
-	if isAmong(admins, msg.From.ID) {
+	role := roleOf(admins, msg.From.ID)
+	if role == "creator" {
 		return false
 	}
 	// Recorded first: an update Telegram delivers twice is handled once,
@@ -114,10 +120,20 @@ func (s *Service) guardedSwearing(msg *telegram.Message, updateID int64) bool {
 		s.opts.Logger.Warn("swear guard: could not count strikes; leaving it", "chat_id", msg.Chat.ID, "error", err)
 		return false
 	}
-	if strikes <= 1 {
+	caller := swearCaller(guard, admins)
+	switch {
+	case strikes <= 1 && role != "":
+		s.postGuard(msg, mentionOf(msg.From)+", guruhda so'kinish mumkin emas, adminlar uchun ham. Bu ogohlantirish.")
+	case strikes <= 1:
 		s.postGuard(msg, mentionOf(msg.From)+", guruhda so'kinish mumkin emas. Bu ogohlantirish: yana so'kinsangiz, 1 soat yozolmaysiz.")
-	} else {
-		s.muteSwearer(ctx, msg, swearCaller(guard, admins))
+	case role != "":
+		text := mentionOf(msg.From) + " yana so'kindi; u admin, uni yozolmaydigan qila olmayman."
+		if caller != "" {
+			text += " " + caller + ", qarab qo'ying."
+		}
+		s.postGuard(msg, text)
+	default:
+		s.muteSwearer(ctx, msg, caller)
 	}
 	return true
 }
@@ -200,13 +216,15 @@ func swearCaller(guard storage.GroupRule, admins []telegram.ChatMember) string {
 	return ""
 }
 
-func isAmong(admins []telegram.ChatMember, userID int64) bool {
+// roleOf is a member's status among the admins, "creator" or
+// "administrator", or "" for a member who is neither.
+func roleOf(admins []telegram.ChatMember, userID int64) string {
 	for _, a := range admins {
 		if a.User != nil && a.User.ID == userID {
-			return true
+			return a.Status
 		}
 	}
-	return false
+	return ""
 }
 
 // mentionOf tags a member by @username, which notifies them; one without

@@ -138,8 +138,8 @@ func TestSwearGuardTagsWhomTheOwnerNamed(t *testing.T) {
 	}
 }
 
-// Admins, owners and the creator are never warned, a group without the
-// guard is left alone, and neither is ordinary talk.
+// Owners and the creator are never warned, a group without the guard is
+// left alone, and neither is ordinary talk.
 func TestSwearGuardLeavesAlone(t *testing.T) {
 	owner := groupMessage("dnx")
 	fromOwner(owner)
@@ -147,10 +147,9 @@ func TestSwearGuardLeavesAlone(t *testing.T) {
 		update telegram.Update
 		off    bool
 	}{
-		"an admin":       {update: swearFrom(guardAdminID, "dnx")},
 		"the creator":    {update: swearFrom(creatorID, "dnx")},
 		"an owner":       {update: inGroup(owner)},
-		"no swearing":    {update: swearFrom(swearerID, "kecha jala yog'di, kot ham ho'l bo'ldi")},
+		"no swearing":    {update: swearFrom(swearerID, "kecha yomg'ir yog'di, mushuk ham ho'l bo'ldi, I am home")},
 		"the guard off":  {update: swearFrom(swearerID, "dnx"), off: true},
 		"a bot swearing": {update: inGroup(&telegram.Message{MessageID: 31, From: &telegram.User{ID: 555, IsBot: true}, Chat: telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup}, Text: "dnx"})},
 	} {
@@ -185,9 +184,10 @@ func TestIsSwearing(t *testing.T) {
 		"jalablar":                      true,
 		"пиздец":                        true,
 		"Gandonlar":                     true,
-		"kecha jala yog'di":             false,
+		"o'zing jala":                   true,
+		"kot":                           true,
 		"I am here":                     false,
-		"kot ham bor":                   false,
+		"mol bozori":                    false,
 		"xuy-atvori yaxshi odam":        false,
 		"Salom, qalaysizlar?":           false,
 		"хуже некуда":                   false,
@@ -208,5 +208,24 @@ func TestRulesHeaderSaysSwearingIsWatched(t *testing.T) {
 	lines := s.ruleLines([]storage.GroupRule{{ID: 3, ChatID: groupID, Kind: storage.RuleSwearGuard, UserName: "@Bakxtyorvch"}})
 	if len(lines) != 1 || !strings.Contains(lines[0], "watched here in code, not by you") || !strings.Contains(lines[0], "tags @Bakxtyorvch") || !strings.Contains(lines[0], "Never swear back") {
 		t.Errorf("lines = %q", lines)
+	}
+}
+
+// In production most of a group's swearers were admins, whom the guard left
+// alone. Telegram does not let an admin be muted, so an admin is warned, and
+// the next swear tags whom a mute would.
+func TestSwearGuardWarnsAnAdminThenTags(t *testing.T) {
+	f, restrictor := guardFixture("@Bakxtyorvch")
+
+	sent := f.run(swearFrom(guardAdminID, "dnx"), swearFrom(guardAdminID, "jala"))
+
+	if len(sent) != 2 || !strings.Contains(sent[0].text, "adminlar uchun ham") {
+		t.Fatalf("sent = %+v", sent)
+	}
+	if !strings.Contains(sent[1].text, "u admin") || !strings.HasSuffix(sent[1].text, "@Bakxtyorvch, qarab qo'ying.") {
+		t.Errorf("second notice = %q", sent[1].text)
+	}
+	if done := restrictor.recorded(); len(done) != 0 {
+		t.Errorf("an admin was restricted: %+v", done)
 	}
 }
