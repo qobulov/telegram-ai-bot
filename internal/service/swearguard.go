@@ -79,7 +79,7 @@ var swearWords = map[string]bool{
 	"pizdes": true, "pizdec": true, "pidr": true, "пидр": true, "пидор": true,
 	"yeban": true, "dalbayob": true, "dalbayop": true, "qotoq": true, "қотоқ": true, "котак": true,
 	"jala": true, "жала": true, "kot": true, "кот": true, "ko't": true, "ske": true,
-	"harp": true, "xarp": true, "onangni": true, "онангни": true,
+	"harp": true, "xarp": true, "onangni": true, "онангни": true,"Pawolnaххuy": true, "Pawolnaxuy": true, "Pasholnaxuy": true, "Pawolnaxuiy": true, "Pawolnaxuiya": true,
 }
 
 // swearStems are beginnings of words that are swearing in any form:
