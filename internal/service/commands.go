@@ -629,7 +629,13 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 		return outcome{reaction: answer.Reaction, answerID: answer.ID}
 	case err == nil:
 		log.Info("turn completed")
-		return outcome{text: s.fitted(in, answer.Text), answerID: answer.ID, sticker: answer.Sticker, gif: answer.GIF}
+		out := outcome{text: s.fitted(in, answer.Text), answerID: answer.ID}
+		if answer.Text == "" {
+			// A sticker or a GIF is an answer of its own, never one more
+			// message after the words.
+			out.sticker, out.gif = answer.Sticker, answer.GIF
+		}
+		return out
 	case errors.Is(err, agent.ErrLeakedThinking):
 		log.Warn("the model answered with its own reasoning; nothing was sent")
 		return outcome{}

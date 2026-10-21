@@ -680,14 +680,15 @@ func TestAttachmentsAreSentWithTheQuestionButNeverSaved(t *testing.T) {
 	}
 }
 
-// A sticker marker asks for a sticker of its category after the text, or
-// alone; it is never sent as text, and the history shows that one was sent.
+// A sticker marker alone asks for a sticker of its category. With words it
+// is dropped, as the owners asked for one or the other: the words are sent.
+// It is never sent as text.
 func TestStickerMarkerIsTakenOut(t *testing.T) {
 	cases := map[string]struct{ text, sticker, saved string }{
-		"Voy, yana maqtanish 😂 [sticker sarcasm]": {"Voy, yana maqtanish 😂", "sarcasm", "Voy, yana maqtanish 😂 <sticker sarcasm>"},
+		"Voy, yana maqtanish 😂 [sticker sarcasm]": {"Voy, yana maqtanish 😂", "", "Voy, yana maqtanish 😂"},
 		"[Sticker Funny]":                       {"", "funny", "<sticker funny>"},
 		"<sticker sad>":                         {"", "sad", "<sticker sad>"},
-		"Tabriklayman! [sticker celebration]\n": {"Tabriklayman!", "celebration", "Tabriklayman! <sticker celebration>"},
+		"Tabriklayman! [sticker celebration]\n": {"Tabriklayman!", "", "Tabriklayman!"},
 		"Oddiy javob":                           {"Oddiy javob", "", "Oddiy javob"},
 	}
 	for content, want := range cases {
@@ -708,7 +709,7 @@ func TestStickerMarkerIsTakenOut(t *testing.T) {
 // "[gif X]" asks for a GIF the way "[sticker X]" asks for a sticker.
 func TestGIFMarkerIsTakenOut(t *testing.T) {
 	cases := map[string]struct{ text, gif, saved string }{
-		"Yana shu ahvol [gif facepalm]": {"Yana shu ahvol", "facepalm", "Yana shu ahvol <gif facepalm>"},
+		"Yana shu ahvol [gif facepalm]": {"Yana shu ahvol", "", "Yana shu ahvol"},
 		"[GIF celebration]":             {"", "celebration", "<gif celebration>"},
 	}
 	for content, want := range cases {

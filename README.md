@@ -823,9 +823,10 @@ it done; she then says so in one short line, like "Bajarildi: Bek @bek
 
 ### Stickers
 
-She can send a sticker after an answer, or as the answer, from packs an
-owner imported. The model never picks a sticker: it ends an answer with
-`[sticker CATEGORY]`, one of funny, sarcasm, flirting, jealousy, sad,
+She can answer with a sticker instead of words, from packs an owner
+imported; never words and a sticker together, as the owners asked: words
+that come with a sticker marker are sent without it. The model never picks
+a sticker: it answers with `[sticker CATEGORY]`, one of funny, sarcasm, flirting, jealousy, sad,
 comfort, shock, celebration, facepalm, angry, wholesome and cool, and the
 code sends the enabled sticker of that category used longest ago. She is told
 to use one in about a third of her playful answers and never with facts, a

@@ -223,15 +223,17 @@ func finish(t *turn, reply ai.Message) (Answer, error) {
 	if isThinking(answer) {
 		return Answer{}, ErrLeakedThinking
 	}
-	media, kind := "", ""
 	if marker := mediaMarkers.FindStringSubmatch(answer); marker != nil {
-		kind, media = strings.ToLower(marker[1]), strings.ToLower(marker[2])
+		kind, media := strings.ToLower(marker[1]), strings.ToLower(marker[2])
 		answer = tidy(mediaMarkers.ReplaceAllString(answer, " "))
 		if !hasWords(answer) && !reactMarkers.MatchString(answer) {
 			// A sticker or a GIF alone is the whole answer.
 			t.messages = append(t.messages, ai.Message{Role: ai.RoleAssistant, Content: "<" + kind + " " + media + ">"})
 			return withMedia(Answer{}, kind, media), nil
 		}
+		// A sticker or a GIF is an answer of its own, as the owners asked:
+		// with words, the words are sent and the sticker is dropped, since
+		// they may answer a question.
 	}
 	if markers := reactMarkers.FindAllString(answer, -1); len(markers) > 0 {
 		words := withoutMarkers(answer)
@@ -242,12 +244,8 @@ func finish(t *turn, reply ai.Message) (Answer, error) {
 		// the words are what the model wanted to say.
 		answer = words
 	}
-	saved := answer
-	if media != "" {
-		saved += " <" + kind + " " + media + ">"
-	}
-	t.messages = append(t.messages, ai.Message{Role: ai.RoleAssistant, Content: saved})
-	return withMedia(Answer{Text: answer}, kind, media), nil
+	t.messages = append(t.messages, ai.Message{Role: ai.RoleAssistant, Content: answer})
+	return Answer{Text: answer}, nil
 }
 
 // mediaMarkers finds "[sticker funny]" and "[gif facepalm]", and "<sticker

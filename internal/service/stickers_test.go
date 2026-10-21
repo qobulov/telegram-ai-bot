@@ -55,21 +55,27 @@ func withStickers(f *fixture) *fakeStickers {
 	return st
 }
 
-func TestStickerFollowsTheAnswer(t *testing.T) {
+// The owners asked for one or the other: a sticker alone is the answer, and
+// words with a sticker are sent without it.
+func TestStickerIsAnAnswerOfItsOwn(t *testing.T) {
 	f := newFixture()
 	st := withStickers(f)
-	f.replier.answer, f.replier.sticker = "Voy, maqtanish boshlandi", "sarcasm"
+	f.replier.sticker = "sarcasm"
 
 	sent := f.run(inGroup(groupMessage("Mira, men eng zo'r o'yinchiman")))
 
-	if len(sent) != 1 || sent[0].text != "Voy, maqtanish boshlandi" {
-		t.Errorf("sent = %+v", sent)
+	if len(sent) != 0 || len(st.sent) != 1 || st.sent[0] != "file-sarcasm" {
+		t.Errorf("texts %+v, stickers %q; want the sticker alone", sent, st.sent)
 	}
-	if len(st.sent) != 1 || st.sent[0] != "file-sarcasm" {
-		t.Errorf("stickers sent = %q", st.sent)
-	}
-	if got := f.chatLog.texts(groupID); !strings.Contains(strings.Join(got, "\n"), "You: Voy, maqtanish boshlandi <sticker sarcasm>") {
+	if got := f.chatLog.texts(groupID); !strings.Contains(strings.Join(got, "\n"), "You: <sticker sarcasm>") {
 		t.Errorf("log = %q", got)
+	}
+
+	f = newFixture()
+	st = withStickers(f)
+	f.replier.answer, f.replier.sticker = "Voy, maqtanish boshlandi", "sarcasm"
+	if sent := f.run(inGroup(groupMessage("Mira, men eng zo'r o'yinchiman"))); len(sent) != 1 || len(st.sent) != 0 {
+		t.Errorf("texts %+v, stickers %q; want the words alone", sent, st.sent)
 	}
 }
 
@@ -195,7 +201,7 @@ func TestGIFOrItsSticker(t *testing.T) {
 			if c.gifs != nil {
 				f.opts.GIFs, f.opts.AnimationSender, f.opts.MediaSlots = c.gifs, c.gifs, c.gifs
 			}
-			f.replier.answer, f.replier.gif = "Yana shu ahvol", "facepalm"
+			f.replier.gif = "facepalm"
 			f.run(inGroup(groupMessage("Mira, yana yutqazdik")))
 			gifsSent := 0
 			if c.gifs != nil {
