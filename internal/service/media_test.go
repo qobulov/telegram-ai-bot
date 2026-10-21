@@ -256,6 +256,7 @@ func TestSmallGroupVoiceIsNotTranscribed(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			f := newFixture()
 			f.opts.PrivateChats = "owners"
+			f.opts.MinGroupMembers = 6
 			f.opts.MemberCount = &fakeCounter{count: c.members}
 			voice := groupMessage("")
 			voice.From = &telegram.User{ID: 4242, FirstName: "Ann"}

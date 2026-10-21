@@ -253,6 +253,7 @@ func TestTooSmallAGroupIsAnsweredAsAPrivateChat(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			f := newFixture()
 			f.opts.PrivateChats = c.mode
+			f.opts.MinGroupMembers = 6
 			f.opts.OwnerUsernames = []string{ownerUsername}
 			f.opts.MemberCount = &fakeCounter{count: c.members}
 			msg := groupMessage("Mira, salom")
@@ -286,8 +287,27 @@ func TestBotsDoNotMakeAGroupBigEnough(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			f := newFixture()
 			f.opts.PrivateChats = "owners"
+			f.opts.MinGroupMembers = 6
 			f.opts.MemberCount = &fakeCounter{count: c.members}
 			f.opts.Bots = fakeBotTally{bots: c.bots}
+			if sent := f.run(inGroup(groupMessage("Mira, salom"))); len(sent) != c.want {
+				t.Errorf("answers = %d, want %d", len(sent), c.want)
+			}
+		})
+	}
+}
+
+// GROUP_MIN_MEMBERS sets the size from Vercel: 3 lets a group of three in,
+// and 0 answers groups of any size.
+func TestTheGroupSizeLimitIsASetting(t *testing.T) {
+	for name, c := range map[string]struct{ min, members, want int }{
+		"three of three": {3, 3, 1}, "two of three": {3, 2, 0}, "no minimum": {0, 2, 1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			f.opts.PrivateChats = "owners"
+			f.opts.MinGroupMembers = c.min
+			f.opts.MemberCount = &fakeCounter{count: c.members}
 			if sent := f.run(inGroup(groupMessage("Mira, salom"))); len(sent) != c.want {
 				t.Errorf("answers = %d, want %d", len(sent), c.want)
 			}

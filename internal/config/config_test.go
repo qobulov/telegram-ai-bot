@@ -392,7 +392,7 @@ func TestLoadAmbientMessages(t *testing.T) {
 
 func TestLoadGroupLimits(t *testing.T) {
 	cfg, err := Load(getenv(validEnv()))
-	if err != nil || cfg.GroupRateLimitPerMinute != 6 || cfg.MemberRepliesPer10Min != 4 {
+	if err != nil || cfg.GroupRateLimitPerMinute != 6 || cfg.MemberRepliesPer10Min != 4 || cfg.MinGroupMembers != 6 {
 		t.Fatalf("defaults: %d a minute per group, %d per member in 10 minutes, err = %v; want 6 and 4",
 			cfg.GroupRateLimitPerMinute, cfg.MemberRepliesPer10Min, err)
 	}
@@ -400,6 +400,7 @@ func TestLoadGroupLimits(t *testing.T) {
 		"MAX_GROUP_REPLY_LENGTH":      {"0": false, "4097": false, "4096": true, "1": true},
 		"GROUP_RATE_LIMIT_PER_MINUTE": {"0": false, "-1": false, "5": true},
 		"MEMBER_REPLIES_PER_10_MIN":   {"0": false, "-1": false, "1": true, "10": true},
+		"GROUP_MIN_MEMBERS":           {"-1": false, "0": true, "3": true, "20": true},
 	}
 	for name, values := range cases {
 		for value, ok := range values {

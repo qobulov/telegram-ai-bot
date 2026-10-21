@@ -133,6 +133,10 @@ type Config struct {
 	// PrivateChats is whom the bot answers in private chats: "on" everyone,
 	// "owners" its owners only, "off" nobody, which keeps it to groups.
 	PrivateChats string
+	// MinGroupMembers is the smallest group answered as a group, the bot
+	// counted and other bots not; a smaller one is answered only as a
+	// private chat would be. 0 answers groups of any size.
+	MinGroupMembers int
 }
 
 // IsAdmin reports whether the Telegram user is listed in ADMIN_USER_IDS.
@@ -177,6 +181,7 @@ func Load(getenv func(string) string) (Config, error) {
 		MemberRepliesPer10Min:   r.positive("MEMBER_REPLIES_PER_10_MIN", 4),
 		PrivateDailyLimit:       r.integer("PRIVATE_DAILY_LIMIT", 10, 0),
 		PrivateChats:            r.privateChats(),
+		MinGroupMembers:         r.integer("GROUP_MIN_MEMBERS", 6, 0),
 	}
 	r.chooseProvider(&cfg)
 	cfg.MaxMediaBytes = int64(r.positive("MAX_MEDIA_MB", 5)) << 20

@@ -64,13 +64,12 @@ func (s *Service) talksElsewhere(ctx context.Context, in incoming) string {
 	return strings.Join(append(lines, elsewhereFooter), "\n")
 }
 
-// minGroupMembers is the smallest group answered as a group, Maria counted
-// and other bots not:
+// MinGroupMembers (in Options) is the smallest group answered as a group,
+// Maria counted and other bots not:
 // the owners want Maria for real groups, and a smaller one is answered only
 // as a private chat would be.
-const minGroupMembers = 6
 
-// isPrivateInDisguise reports a group smaller than minGroupMembers, from
+// isPrivateInDisguise reports a group smaller than MinGroupMembers, from
 // someone a private chat would not answer. When Telegram cannot say, the group is
 // answered: going quiet in every group because of a failed count is worse.
 func (s *Service) isPrivateInDisguise(ctx context.Context, in incoming) bool {
@@ -81,12 +80,12 @@ func (s *Service) isPrivateInDisguise(ctx context.Context, in incoming) bool {
 	return true
 }
 
-// isSmallGroup reports a group of fewer than minGroupMembers when small
+// isSmallGroup reports a group of fewer than MinGroupMembers when small
 // groups are answered only as private chats are. When Telegram cannot say,
 // the group is not small: going quiet in every group because of a failed
 // count is worse.
 func (s *Service) isSmallGroup(ctx context.Context, chatID int64) bool {
-	if s.opts.MemberCount == nil || s.opts.PrivateChats == "" || s.opts.PrivateChats == "on" {
+	if s.opts.MemberCount == nil || s.opts.MinGroupMembers <= 0 || s.opts.PrivateChats == "" || s.opts.PrivateChats == "on" {
 		return false
 	}
 	count, err := s.memberCount(ctx, chatID)
@@ -94,7 +93,7 @@ func (s *Service) isSmallGroup(ctx context.Context, chatID int64) bool {
 		s.opts.Logger.Warn("could not count a group's members; taking it for a big one", "chat_id", chatID, "error", err)
 		return false
 	}
-	return count < minGroupMembers
+	return count < s.opts.MinGroupMembers
 }
 
 // BotTally counts the other bots seen in a group.
@@ -104,7 +103,7 @@ type BotTally interface {
 
 // memberCount is the group's members as Telegram counts them, less the other
 // bots seen in it: a member padded a group of two with a music bot to get
-// past minGroupMembers. When the bots cannot be counted, Telegram's count
+// past MinGroupMembers. When the bots cannot be counted, Telegram's count
 // stands.
 func (s *Service) memberCount(ctx context.Context, chatID int64) (int, error) {
 	ctx, cancel := context.WithTimeout(ctx, logTimeout)

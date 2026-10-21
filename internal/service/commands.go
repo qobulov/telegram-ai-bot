@@ -65,7 +65,7 @@ func (s *Service) process(in incoming) {
 		s.passOver(in)
 		return
 	}
-	// A group of fewer than minGroupMembers is answered only as a private
+	// A group of fewer than MinGroupMembers is answered only as a private
 	// chat is, or a group of two would get around PRIVATE_CHATS; anyone else
 	// gets a reaction, made in code, so that the model is never asked. After
 	// the flood guard, so that a flood cannot ask Telegram for the count

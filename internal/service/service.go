@@ -136,6 +136,9 @@ type Options struct {
 	MemberCount MemberCounter
 	// Bots counts the other bots a group has, which MemberCount includes.
 	Bots BotTally
+	// MinGroupMembers is the smallest group whose members are answered as a
+	// group's; a smaller one only as PrivateChats allows. 0 is no minimum.
+	MinGroupMembers int
 	// Roster keeps the members seen in each group; nil keeps none.
 	Roster MemberBook
 	Logger *slog.Logger
