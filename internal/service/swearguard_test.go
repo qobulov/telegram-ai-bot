@@ -203,6 +203,9 @@ func TestIsSwearing(t *testing.T) {
 		"jalablar":                      true,
 		"пиздец":                        true,
 		"Gandonlar":                     true,
+		"Pawolnaxuy":                    true,
+		"Pawolnaххuy":                   true,
+		"pasholnaxuiya":                 true,
 		"o'zing jala":                   true,
 		"kot":                           true,
 		"I am here":                     false,
@@ -321,5 +324,20 @@ func TestSwearGuardStaysQuietWhenItCannotMuteForTheBot(t *testing.T) {
 				t.Errorf("sent %+v after the second swear, want silence", sent[before:])
 			}
 		})
+	}
+}
+
+// Messages are lower-cased before they are looked up, so a word or stem
+// with a capital in the lists would never match.
+func TestSwearListsAreLowerCase(t *testing.T) {
+	for w := range swearWords {
+		if w != strings.ToLower(w) {
+			t.Errorf("swearWords has %q; write it in lower case", w)
+		}
+	}
+	for _, s := range swearStems {
+		if s != strings.ToLower(s) {
+			t.Errorf("swearStems has %q; write it in lower case", s)
+		}
 	}
 }
