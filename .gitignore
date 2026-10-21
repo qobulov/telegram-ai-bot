@@ -18,3 +18,4 @@
 .vercel
 .env*
 !.env.example
+.claude
