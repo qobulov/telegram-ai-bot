@@ -124,10 +124,6 @@ group_rules(id PK, chat_id (0 for every group), kind, user_id, user_name,
 moderation_actions(id PK, chat_id, action, requester_id, target_user_id,
                    target_message_id, target_text, minutes, reason,
                    update_id, created_at, UNIQUE (update_id, action))
-pending_moderation(requester_id, chat_id, action, target_user_id,
-                   target_message_id, target_name, target_text, minutes,
-                   reason, update_id, prompt_message_id, created_at,
-                   PK (requester_id, chat_id))
 schema_migrations(version PK, applied_at)
 ```
 
@@ -669,8 +665,7 @@ Ann:   anyway, lunch?
   touch them.
 - **Moderation:** what she did, and for whom, is kept in the
   `moderation_actions` table until you delete it, including up to 500
-  characters of each message she deleted. The `pending_moderation` table,
-  from when actions waited for a yes, is no longer written to.
+  characters of each message she deleted.
 - **The quoted message:** when someone replies to a message while addressing
   her, that one message is included, shortened to 1,000 characters. It is
   saved as part of the question.
@@ -1345,7 +1340,7 @@ by an hourly job, or daily by Vercel Cron. A user can delete their own history a
 `/reset`. The counts behind the limits (`image_generations`, `bot_replies`,
 `group_replies`, `private_messages`) hold IDs and times, no message text, and
 are deleted with the history. Standing rules are deleted when they expire. The moderation audit
-(`moderation_actions`, `pending_moderation`) is never deleted automatically; delete
+(`moderation_actions`) is never deleted automatically; delete
 old rows yourself if you do not want to keep them. Backups keep deleted data
 until they are rotated out.
 
