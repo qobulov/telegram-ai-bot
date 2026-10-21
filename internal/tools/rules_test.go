@@ -562,3 +562,41 @@ func TestRulesToolTiesAnInstructionToTheMemberItIsAbout(t *testing.T) {
 		t.Errorf("without about_member = %+v, rules %+v", env, store.all())
 	}
 }
+
+// An owner turns the swear guard on, naming whom a mute tags or leaving it
+// to the group's creator, and off again; only in a group, and the
+// @username must be the owner's own word.
+func TestRulesToolWatchesSwearing(t *testing.T) {
+	store := &fakeRules{}
+	registry := rulesRegistry(t, store, fakeAdmins{})
+
+	env := rules(registry, ownerSaying(groupA, "Maria, so'kinganlarni mute qil"), `{"action":"watch_swearing"}`)
+	if !env.OK || !strings.Contains(string(env.Result), `"mute_tags":"the group's creator"`) {
+		t.Fatalf("watch_swearing = %+v %s", env, env.Result)
+	}
+	env = rules(registry, ownerSaying(groupA, "so'kinsa @Bakxtyorvch ni chaqir"), `{"action":"watch_swearing","text":"@Bakxtyorvch"}`)
+	if !env.OK || !strings.Contains(string(env.Result), `"mute_tags":"@Bakxtyorvch"`) {
+		t.Fatalf("watch_swearing naming someone = %+v %s", env, env.Result)
+	}
+	if got := store.all(); len(got) != 1 || got[0].Kind != storage.RuleSwearGuard || got[0].UserName != "@Bakxtyorvch" || got[0].ChatID != groupA {
+		t.Errorf("rules = %+v, want one guard tagging @Bakxtyorvch", got)
+	}
+
+	for name, c := range map[string]struct {
+		ctx  context.Context
+		args string
+	}{
+		"a name the owner did not write": {ownerSaying(groupA, "so'kinganni mute qil"), `{"action":"watch_swearing","text":"@someone_else"}`},
+		"not a username":                 {ownerSaying(groupA, "so'kinsa Bobur akani chaqir"), `{"action":"watch_swearing","text":"Bobur aka"}`},
+		"in a private chat":              {ownerSaying(9001, "so'kinganni mute qil"), `{"action":"watch_swearing"}`},
+	} {
+		if env := rules(registry, c.ctx, c.args); env.OK {
+			t.Errorf("%s: %+v, want refused", name, env)
+		}
+	}
+
+	env = rules(registry, ownerSaying(groupA, "endi so'kinishni kuzatma"), `{"action":"stop_watching_swearing"}`)
+	if !env.OK || string(env.Result) != `{"removed":true}` || len(store.all()) != 0 {
+		t.Errorf("stop_watching_swearing = %s, rules %+v", env.Result, store.all())
+	}
+}

@@ -270,6 +270,9 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		ChatActor:             bot.Client,
 		BotRights:             botRights{store: store, members: bot.Client, botID: bot.User.ID, logger: logger},
 		Rules:                 store,
+		Strikes:               store,
+		AdminList:             bot.Client,
+		Restrictor:            bot.Client,
 		Moderation:            moderation,
 		Answers:               store,
 	}

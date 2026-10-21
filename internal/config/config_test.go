@@ -1565,3 +1565,18 @@ func TestPrivateChats(t *testing.T) {
 		t.Errorf("PRIVATE_CHATS=nobody: err = %v, want it rejected", err)
 	}
 }
+
+// Owners asked Maria to watch a group for swearing, and she promised to;
+// she cannot, so she says so, and the swear guard does it in code.
+func TestPersonaNeverPromisesToWatchTheChat(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	line := lineContaining(cfg.GroupNote, "you cannot watch the chat")
+	for _, want := range []string{"Never promise to keep an eye on the group", "group_rules watch_swearing", "tagging the group's creator"} {
+		if !strings.Contains(line, want) {
+			t.Errorf("the line does not say %q: %q", want, line)
+		}
+	}
+}

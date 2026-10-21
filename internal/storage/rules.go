@@ -18,6 +18,9 @@ const (
 	RuleIgnore = "ignore"
 	// RuleAddress is how the bot addresses one owner, everywhere.
 	RuleAddress = "address"
+	// RuleSwearGuard has the group's swearing warned about, then muted, in
+	// code; its UserName is whom a mute tags, "" for the group's creator.
+	RuleSwearGuard = "swear_guard"
 )
 
 // MaxInstructions is how many instructions a group may have in force at

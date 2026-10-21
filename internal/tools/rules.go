@@ -102,13 +102,14 @@ func RulesTool(opts RulesOptions) Tool {
 			"add_instruction: save an owner's order meant to last, in their own words from this message or their own message it replies to (text; hours, default 168); about_member true when it is about the member whose message the owner replied to, or whom your replied-to answer answered (\"uni\", \"bu odam\", \"shu odamga\"): the tool records who. " +
 			"ignore: stop answering the member whose message the owner replied to, or, when they replied to your own answer, the member it answered (hours, default 24); never admins or owners. unignore: answer that member again. " +
 			"set_address: how to address the owner who is asking, in every chat (text). " +
+			"watch_swearing: from now on, in code and without you, a member's first swear here gets a warning and the next within a day a 1-hour mute that tags the group's creator, or the @username in text when the owner names whom to call; admins and owners are left alone. stop_watching_swearing turns it off. " +
 			"list: the rules in force here. remove: delete a rule by its id from list. " +
 			"add_instruction, ignore and unignore work only in a group. Never say a rule is saved unless this tool reported it.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["add_instruction", "ignore", "unignore", "set_address", "list", "remove"]},
-				"text": {"type": "string", "description": "For add_instruction: the order, at most 300 characters. For set_address: the form of address, at most 40 characters."},
+				"action": {"type": "string", "enum": ["add_instruction", "ignore", "unignore", "set_address", "watch_swearing", "stop_watching_swearing", "list", "remove"]},
+				"text": {"type": "string", "description": "For add_instruction: the order, at most 300 characters. For set_address: the form of address, at most 40 characters. For watch_swearing: the @username a mute tags, if the owner named one."},
 				"hours": {"type": "integer", "description": "For add_instruction and ignore: how long the rule lasts, 1 to 720."},
 				"id": {"type": "integer", "description": "For remove: the rule's id from list."},
 				"about_member": {"type": "boolean", "description": "For add_instruction: true when the order is about the member the owner replied to."}
@@ -142,12 +143,16 @@ func runRules(ctx context.Context, opts RulesOptions, raw json.RawMessage) (any,
 		return unignoreMember(ctx, opts, caller)
 	case "set_address":
 		return setAddress(ctx, opts, caller, args)
+	case "watch_swearing":
+		return watchSwearing(ctx, opts, caller, args)
+	case "stop_watching_swearing":
+		return stopWatchingSwearing(ctx, opts, caller)
 	case "list":
 		return listRules(ctx, opts, caller)
 	case "remove":
 		return removeRule(ctx, opts, caller, args)
 	default:
-		return nil, &ArgumentError{Message: "action must be add_instruction, ignore, unignore, set_address, list or remove"}
+		return nil, &ArgumentError{Message: "action must be add_instruction, ignore, unignore, set_address, watch_swearing, stop_watching_swearing, list or remove"}
 	}
 }
 
@@ -309,6 +314,72 @@ func setAddress(ctx context.Context, opts RulesOptions, caller Caller, args rule
 		return nil, err
 	}
 	return map[string]any{"saved": true, "id": id, "address": text}, nil
+}
+
+// watchSwearing turns the group's swear guard on, which the service runs
+// in code. A group has one; saying it again replaces whom it tags.
+func watchSwearing(ctx context.Context, opts RulesOptions, caller Caller, args rulesArgs) (any, error) {
+	if caller.ChatID >= 0 {
+		return nil, &ArgumentError{Message: groupRuleOnly}
+	}
+	tag := ""
+	if strings.TrimSpace(args.Text) != "" {
+		username := strings.TrimPrefix(strings.TrimSpace(args.Text), "@")
+		if !isUsername(username) {
+			return nil, &ArgumentError{Message: "text must be one @username, or empty to tag the group's creator"}
+		}
+		if !inOwnWords(caller.Words, username) {
+			return nil, &ArgumentError{Message: "the @username must be in the owner's own message"}
+		}
+		tag = "@" + username
+	}
+	id, err := opts.Store.SetGroupRule(ctx, storage.GroupRule{
+		ChatID: caller.ChatID, Kind: storage.RuleSwearGuard, UserName: tag, SetBy: caller.UserID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	calls := tag
+	if calls == "" {
+		calls = "the group's creator"
+	}
+	return map[string]any{"saved": true, "id": id, "mute_tags": calls,
+		"note": "On now, in code: a first swear gets a warning, the next within a day a 1-hour mute. It needs you to be an admin who may restrict members."}, nil
+}
+
+func stopWatchingSwearing(ctx context.Context, opts RulesOptions, caller Caller) (any, error) {
+	if caller.ChatID >= 0 {
+		return nil, &ArgumentError{Message: groupRuleOnly}
+	}
+	rules, err := opts.Store.GroupRules(ctx, caller.ChatID)
+	if err != nil {
+		return nil, err
+	}
+	removed := false
+	for _, r := range rules {
+		if r.Kind == storage.RuleSwearGuard && r.ChatID == caller.ChatID {
+			ok, err := opts.Store.RemoveGroupRule(ctx, caller.ChatID, r.ID)
+			if err != nil {
+				return nil, err
+			}
+			removed = removed || ok
+		}
+	}
+	return map[string]bool{"removed": removed}, nil
+}
+
+// isUsername reports a Telegram username: 4 to 32 letters, digits and
+// underscores.
+func isUsername(name string) bool {
+	if len(name) < 4 || len(name) > 32 {
+		return false
+	}
+	for _, r := range name {
+		if !(r == '_' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z') {
+			return false
+		}
+	}
+	return true
 }
 
 type ruleEntry struct {

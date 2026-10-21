@@ -160,6 +160,12 @@ func (s *Service) ruleLines(rules []storage.GroupRule) []string {
 				line += " (until " + r.ExpiresAt.In(s.opts.Location).Format(ruleDayLayout) + ")"
 			}
 			instructions = append(instructions, line)
+		case storage.RuleSwearGuard:
+			calls := "the group's creator"
+			if r.UserName != "" {
+				calls = oneLine(r.UserName)
+			}
+			instructions = append(instructions, "- Swearing is watched here in code, not by you: a member's first swear gets a warning, the next within a day a 1-hour mute that tags "+calls+". Never swear back at anyone in this group, and never mute anyone for swearing yourself.")
 		case storage.RuleIgnore:
 			line := "- Do not answer " + oneLine(r.UserName)
 			if !r.ExpiresAt.IsZero() {

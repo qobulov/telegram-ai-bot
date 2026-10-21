@@ -154,8 +154,9 @@ they expire, and the moderation audit until you delete it; see
 defined by the files in
 [internal/storage/migrations/](internal/storage/migrations/), one file per
 table holding the table as it is now (migrations 1 to 22 were merged into
-them). A new database runs them and is recorded at version 22; a database
-that ran the old migrations is already there and skips them. A database
+them). A new database runs them and is recorded at version 22, then runs
+any newer file; a database that ran the old migrations is already there and
+skips them. A database
 part way through the old ones is refused: migrate it with a release from
 before the merge first. To change the schema later, add a new file numbered
 from 0023; do not edit one that has already been applied.
@@ -729,6 +730,22 @@ do not erase them, and every turn in the group is told the ones in force.
 | Instruction | an owner, in the group it is for, in their own words from that message or their own message it replies to (never words from someone else's message or the chat); at most 20 per group, 300 characters each. An order about one member ("uni", "bu odam") is saved with that member, and only when the owner replied to their message or to her answer to them | a week, or 1 to 720 hours if the owner says |
 | Ignore a member | an owner replying to that member's message, or to her answer to them, in the group | 24 hours, or 1 to 720 hours if the owner says |
 | Form of address | an owner, for themselves, in any chat; it holds everywhere | until removed |
+| Swear guard | an owner, in the group it is for ("so'kinganlarni avtomatik mute qil", optionally "@Bakxtyorvch ni chaqir"); one per group | until turned off |
+
+The swear guard runs in code, without the model. In a group where it is
+on, every message from a member is checked against a list of swear words
+(dnx, pshnx, нахуй, бля, qo'tog', jalab and the like; words that also mean
+something harmless, such as "jala" or "kot", are left out). A member's first
+swear gets a reply warning them; the next one within 24 hours mutes them
+for an hour, and the notice tags the @username the owner named, or else the
+group's creator. Admins, the creator, owners and bots are never touched,
+forwarded messages are not checked, and a message the guard handled is not
+answered by the model. Each caught swear is kept in `moderation_actions`
+(action `swear`), which is how the count is kept and how an update
+delivered twice is handled once. Muting needs her to be an admin who may
+restrict members; without that right the notice says so and still tags.
+"Maria, endi so'kinishni kuzatma" turns it off. She cannot watch a chat
+herself, and says so rather than promise to.
 
 Owners can ask her to list the rules and remove one by its number. Group
 admins and owners can also ignore a member for 24 hours with `/ignore@Bot`

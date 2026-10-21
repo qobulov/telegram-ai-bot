@@ -158,3 +158,18 @@ func TestRulesSurviveMuteAndReset(t *testing.T) {
 		t.Errorf("rules after  = %+v\nrules before = %+v", after, before)
 	}
 }
+
+// A group has one swear guard: turning it on again replaces whom it tags.
+func TestSwearGuardIsOnePerGroup(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	for _, tag := range []string{"", "@Bakxtyorvch"} {
+		if _, err := store.SetGroupRule(ctx, GroupRule{ChatID: group, Kind: RuleSwearGuard, UserName: tag, SetBy: alice}); err != nil {
+			t.Fatalf("SetGroupRule: %v", err)
+		}
+	}
+	rules, err := store.GroupRules(ctx, group)
+	if err != nil || len(rules) != 1 || rules[0].Kind != RuleSwearGuard || rules[0].UserName != "@Bakxtyorvch" {
+		t.Errorf("rules = %+v, %v; want one guard tagging @Bakxtyorvch", rules, err)
+	}
+}

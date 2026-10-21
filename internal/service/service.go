@@ -223,6 +223,11 @@ type Options struct {
 	// Rules keeps the owners' standing rules and the ignore list; nil means
 	// there are none, and /ignore and /unignore are unknown commands.
 	Rules RuleBook
+	// Strikes, AdminList and Restrictor run the swear guard an owner may
+	// turn on in a group; with any of them nil it never acts.
+	Strikes    SwearStrikes
+	AdminList  AdminLister
+	Restrictor Restrictor
 	// Moderation carries out what a group's admins asked the bot to do, once
 	// they reply yes to its question about it; nil means nothing waits.
 	Moderation Confirmer
@@ -546,6 +551,13 @@ func withoutTopicReply(msg *telegram.Message) *telegram.Message {
 // /mute or /unmute that changes the answer may still be waiting in that same
 // queue, ahead of this message.
 func (s *Service) acceptGroup(in incoming) (incoming, bool) {
+	// Swearing in a guarded group is handled in code and not answered.
+	if s.guardedSwearing(in.msg, in.updateID) {
+		if s.ambient.enabled() {
+			s.remember(in.msg)
+		}
+		return incoming{}, false
+	}
 	text, how := s.address(in.msg)
 	if in.fromBot && strings.HasPrefix(text, "/") {
 		how = triggerNone // bots do not run commands

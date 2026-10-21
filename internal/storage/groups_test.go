@@ -105,8 +105,17 @@ func TestRecordGroupKeepsTheBotsStatus(t *testing.T) {
 func TestNewDatabaseIsRecordedAtTheMergedVersion(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
-	if version, err := currentVersion(ctx, store.pool); err != nil || version != mergedThrough {
-		t.Errorf("version = %d, %v; want %d", version, err, mergedThrough)
+	migrations, err := loadMigrations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	latest := migrations[len(migrations)-1].version
+	if version, err := currentVersion(ctx, store.pool); err != nil || version != latest {
+		t.Errorf("version = %d, %v; want %d", version, err, latest)
+	}
+	var merged bool
+	if err := store.pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE version = $1)`, mergedThrough).Scan(&merged); err != nil || !merged {
+		t.Errorf("merged version %d recorded = %v, %v", mergedThrough, merged, err)
 	}
 	if applied, err := store.Migrate(ctx); err != nil || applied != 0 {
 		t.Errorf("second Migrate applied %d, %v; want nothing", applied, err)
