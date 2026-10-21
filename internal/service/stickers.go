@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"strings"
 	"time"
 
@@ -46,6 +47,80 @@ func (s *Service) noStickersHint(ctx context.Context) string {
 	return noStickers
 }
 
+// GIFSearcher finds GIFs for a sticker category.
+type GIFSearcher interface {
+	Search(ctx context.Context, category string) ([]string, error)
+}
+
+// AnimationSender sends a GIF.
+type AnimationSender interface {
+	SendAnimation(ctx context.Context, chatID int64, animation string, replyToMessageID int64) (int64, error)
+}
+
+// MediaSlots spaces the stickers and GIFs a chat gets.
+type MediaSlots interface {
+	ClaimMediaSlot(ctx context.Context, chatID int64, gap time.Duration) (bool, error)
+}
+
+// sendMedia sends the sticker or GIF the model asked for, and returns its
+// message's ID, or 0. A GIF that cannot be sent becomes a sticker of the
+// same category. What was not sent is cleared from out, so that the log
+// tells later turns only of what the chat saw.
+func (s *Service) sendMedia(in incoming, out *outcome) int64 {
+	if out.gif != "" && (s.opts.GIFs == nil || s.opts.AnimationSender == nil || s.opts.MediaSlots == nil) {
+		out.sticker, out.gif = out.gif, ""
+	}
+	if out.gif != "" {
+		id, claimed := s.sendGIF(in, out.gif)
+		if id != 0 {
+			return id
+		}
+		if claimed {
+			// The slot is this answer's already; a sticker may use it.
+			out.sticker = out.gif
+			out.gif = ""
+			return s.sendStickerWithin(in, out, 0)
+		}
+		out.gif = ""
+		return 0
+	}
+	return s.sendStickerWithin(in, out, stickerGap)
+}
+
+func (s *Service) sendStickerWithin(in incoming, out *outcome, gap time.Duration) int64 {
+	id := s.sendSticker(in, out.sticker, gap)
+	if id == 0 {
+		out.sticker = ""
+	}
+	return id
+}
+
+// sendGIF sends a GIF of category and returns its message's ID, or 0, and
+// whether it took the chat's slot for one. A failure after that costs only
+// the GIF.
+func (s *Service) sendGIF(in incoming, category string) (int64, bool) {
+	if !stickers.IsCategory(category) {
+		return 0, false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
+	defer cancel()
+	claimed, err := s.opts.MediaSlots.ClaimMediaSlot(ctx, in.msg.Chat.ID, stickerGap)
+	if err != nil || !claimed {
+		return 0, false
+	}
+	links, err := s.opts.GIFs.Search(ctx, category)
+	if err != nil || len(links) == 0 {
+		s.opts.Logger.Warn("could not find a GIF", "chat_id", in.msg.Chat.ID, "category", category, "error", err)
+		return 0, true
+	}
+	sentID, err := s.opts.AnimationSender.SendAnimation(ctx, in.msg.Chat.ID, links[rand.IntN(len(links))], in.replyTarget())
+	if err != nil {
+		s.opts.Logger.Warn("could not send a GIF", "chat_id", in.msg.Chat.ID, "category", category, "error", err)
+		return 0, true
+	}
+	return sentID, true
+}
+
 // StickerSender sends a sticker.
 type StickerSender interface {
 	SendSticker(ctx context.Context, chatID int64, fileID string, replyToMessageID int64) (int64, error)
@@ -60,13 +135,13 @@ type StickerImporter interface {
 // message's ID, or 0 when none was sent: no category, an unknown one, none
 // of it, or one sent to the chat too recently. A failure costs only the
 // sticker, never the answer.
-func (s *Service) sendSticker(in incoming, category string) int64 {
+func (s *Service) sendSticker(in incoming, category string, gap time.Duration) int64 {
 	if category == "" || s.opts.Stickers == nil || s.opts.StickerSender == nil || !stickers.IsCategory(category) {
 		return 0
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
 	defer cancel()
-	fileID, err := s.opts.Stickers.PickSticker(ctx, in.msg.Chat.ID, category, stickerGap)
+	fileID, err := s.opts.Stickers.PickSticker(ctx, in.msg.Chat.ID, category, gap)
 	if errors.Is(err, storage.ErrNoSticker) {
 		return 0
 	}

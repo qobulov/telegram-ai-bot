@@ -119,7 +119,10 @@ type Answer struct {
 	// Sticker is the category of sticker the model asked to send after its
 	// text, or alone; "" for none. Whether it fits is not checked here.
 	Sticker string
-	ID      int64
+	// GIF is the same for a GIF, which the model asks for instead of a
+	// sticker now and then.
+	GIF string
+	ID  int64
 }
 
 // Reply answers the user's message and saves the whole turn. Nothing is
@@ -220,14 +223,14 @@ func finish(t *turn, reply ai.Message) (Answer, error) {
 	if isThinking(answer) {
 		return Answer{}, ErrLeakedThinking
 	}
-	sticker := ""
-	if marker := stickerMarkers.FindStringSubmatch(answer); marker != nil {
-		sticker = strings.ToLower(marker[1])
-		answer = tidy(stickerMarkers.ReplaceAllString(answer, " "))
+	media, kind := "", ""
+	if marker := mediaMarkers.FindStringSubmatch(answer); marker != nil {
+		kind, media = strings.ToLower(marker[1]), strings.ToLower(marker[2])
+		answer = tidy(mediaMarkers.ReplaceAllString(answer, " "))
 		if !hasWords(answer) && !reactMarkers.MatchString(answer) {
-			// A sticker alone is the whole answer.
-			t.messages = append(t.messages, ai.Message{Role: ai.RoleAssistant, Content: "<sticker " + sticker + ">"})
-			return Answer{Sticker: sticker}, nil
+			// A sticker or a GIF alone is the whole answer.
+			t.messages = append(t.messages, ai.Message{Role: ai.RoleAssistant, Content: "<" + kind + " " + media + ">"})
+			return withMedia(Answer{}, kind, media), nil
 		}
 	}
 	if markers := reactMarkers.FindAllString(answer, -1); len(markers) > 0 {
@@ -240,16 +243,26 @@ func finish(t *turn, reply ai.Message) (Answer, error) {
 		answer = words
 	}
 	saved := answer
-	if sticker != "" {
-		saved += " <sticker " + sticker + ">"
+	if media != "" {
+		saved += " <" + kind + " " + media + ">"
 	}
 	t.messages = append(t.messages, ai.Message{Role: ai.RoleAssistant, Content: saved})
-	return Answer{Text: answer, Sticker: sticker}, nil
+	return withMedia(Answer{Text: answer}, kind, media), nil
 }
 
-// stickerMarkers finds "[sticker funny]", and "<sticker funny>", which is
-// how a sticker looks in the history and which models copy.
-var stickerMarkers = regexp.MustCompile(`(?i)[\[<]\s*sticker\s+([a-z]+)\s*[\]>]`)
+// mediaMarkers finds "[sticker funny]" and "[gif facepalm]", and "<sticker
+// funny>", which is how one looks in the history and which models copy.
+var mediaMarkers = regexp.MustCompile(`(?i)[\[<]\s*(sticker|gif)\s+([a-z]+)\s*[\]>]`)
+
+// withMedia is answer asking for a sticker or a GIF of category.
+func withMedia(answer Answer, kind, category string) Answer {
+	if kind == "gif" {
+		answer.GIF = category
+	} else {
+		answer.Sticker = category
+	}
+	return answer
+}
 
 // react answers with the emoji of marker, the whole of the answer. The
 // model wanted no words. Telegram refuses any emoji not on its list, so a

@@ -147,3 +147,67 @@ func TestLogRecordsOnlyASentSticker(t *testing.T) {
 		t.Errorf("log = %q, want no sticker recorded", got)
 	}
 }
+
+type fakeGIFs struct {
+	mu        sync.Mutex
+	links     []string
+	searchErr error
+	sendErr   error
+	slotTaken bool
+	sent      []string
+}
+
+func (f *fakeGIFs) Search(context.Context, string) ([]string, error) { return f.links, f.searchErr }
+
+func (f *fakeGIFs) SendAnimation(_ context.Context, _ int64, link string, _ int64) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.sendErr != nil {
+		return 0, f.sendErr
+	}
+	f.sent = append(f.sent, link)
+	return 800, nil
+}
+
+func (f *fakeGIFs) ClaimMediaSlot(context.Context, int64, time.Duration) (bool, error) {
+	return !f.slotTaken, nil
+}
+
+// A GIF the model asks for is sent; one that cannot be becomes a sticker of
+// the same category; one past the chat's slot is nothing; and without GIPHY
+// it is a sticker.
+func TestGIFOrItsSticker(t *testing.T) {
+	for name, c := range map[string]struct {
+		gifs              *fakeGIFs
+		wantGIF, wantStkr int
+		log               string
+	}{
+		"sent":           {&fakeGIFs{links: []string{"https://g/1.mp4"}}, 1, 0, "<gif facepalm>"},
+		"search fails":   {&fakeGIFs{searchErr: errors.New("429")}, 0, 1, "<sticker facepalm>"},
+		"none found":     {&fakeGIFs{}, 0, 1, "<sticker facepalm>"},
+		"send fails":     {&fakeGIFs{links: []string{"https://g/1.mp4"}, sendErr: errors.New("400")}, 0, 1, "<sticker facepalm>"},
+		"slot taken":     {&fakeGIFs{links: []string{"https://g/1.mp4"}, slotTaken: true}, 0, 0, ""},
+		"no GIPHY wired": {nil, 0, 1, "<sticker facepalm>"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			st := withStickers(f)
+			if c.gifs != nil {
+				f.opts.GIFs, f.opts.AnimationSender, f.opts.MediaSlots = c.gifs, c.gifs, c.gifs
+			}
+			f.replier.answer, f.replier.gif = "Yana shu ahvol", "facepalm"
+			f.run(inGroup(groupMessage("Mira, yana yutqazdik")))
+			gifsSent := 0
+			if c.gifs != nil {
+				gifsSent = len(c.gifs.sent)
+			}
+			if gifsSent != c.wantGIF || len(st.sent) != c.wantStkr {
+				t.Errorf("GIFs %d, stickers %q; want %d and %d", gifsSent, st.sent, c.wantGIF, c.wantStkr)
+			}
+			log := strings.Join(f.chatLog.texts(groupID), "\n")
+			if c.log != "" && !strings.Contains(log, c.log) || c.log == "" && (strings.Contains(log, "<gif") || strings.Contains(log, "<sticker")) {
+				t.Errorf("log = %q, want %q", log, c.log)
+			}
+		})
+	}
+}

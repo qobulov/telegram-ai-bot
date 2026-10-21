@@ -96,6 +96,35 @@ func (s *Store) PackStickers(ctx context.Context, pack string) (StickerCount, er
 	return c, nil
 }
 
+// ClaimMediaSlot notes that chatID gets a sticker or a GIF now and reports
+// true, or reports false when it had one within gap: the two share it, so
+// that they stay a seasoning. The chat's row is locked while it decides.
+func (s *Store) ClaimMediaSlot(ctx context.Context, chatID int64, gap time.Duration) (bool, error) {
+	var claimed bool
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO sticker_sends (chat_id, sent_at) VALUES ($1, 'epoch') ON CONFLICT DO NOTHING`, chatID); err != nil {
+			return err
+		}
+		var recent bool
+		if err := tx.QueryRow(ctx, `
+			SELECT sent_at > now() - $2::interval FROM sticker_sends WHERE chat_id = $1 FOR UPDATE`,
+			chatID, gap.String()).Scan(&recent); err != nil {
+			return err
+		}
+		if recent {
+			return nil
+		}
+		claimed = true
+		_, err := tx.Exec(ctx, `UPDATE sticker_sends SET sent_at = now() WHERE chat_id = $1`, chatID)
+		return err
+	})
+	if err != nil {
+		return false, fmt.Errorf("storage: claim a media slot: %w", err)
+	}
+	return claimed, nil
+}
+
 // HasStickers reports whether any sticker may be sent at all.
 func (s *Store) HasStickers(ctx context.Context) (bool, error) {
 	var has bool

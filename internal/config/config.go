@@ -55,7 +55,10 @@ type Config struct {
 	// there is no football tool, and without CoinGeckoDemoKey crypto prices
 	// share CoinGecko's keyless quota.
 	FootballDataToken string
-	CoinGeckoDemoKey  string
+	// GiphyAPIKey lets Maria send a GIF now and then instead of a sticker;
+	// without it, a GIF she asks for becomes a sticker.
+	GiphyAPIKey      string
+	CoinGeckoDemoKey string
 
 	// Image generation, Gemini only. Owners have no daily limit.
 	ImagesEnabled   bool
@@ -210,6 +213,7 @@ func Load(getenv func(string) string) (Config, error) {
 		cfg.PersonaPrompt += "\n\n" + strings.ReplaceAll(ownerNote, ownerPlaceholder, mentionList(cfg.OwnerUsernames))
 	}
 	cfg.FootballDataToken = r.apiKey("FOOTBALL_DATA_TOKEN")
+	cfg.GiphyAPIKey = r.apiKey("GIPHY_API_KEY")
 	cfg.CoinGeckoDemoKey = r.apiKey("COINGECKO_DEMO_KEY")
 	cfg.WakeWords = r.wakeWords(cfg)
 	r.checkRemovedVariables()

@@ -179,6 +179,7 @@ in the environment win over the file.
 | `ENABLE_IMAGE_GENERATION` | `true` | Let the bot draw pictures (Gemini only; needs billing on the Gemini key) |
 | `IMAGE_MODEL` | `gemini-3.1-flash-image` | Gemini model that draws |
 | `DAILY_IMAGE_LIMIT` | `2` | Pictures per user per day; owners have no limit; `0` lets only owners draw |
+| `GIPHY_API_KEY` | empty | Key from <https://developers.giphy.com/dashboard/> (API, not SDK); lets her send a GIF now and then instead of a sticker. See [Stickers](#stickers) |
 | `FOOTBALL_DATA_TOKEN` | empty | Free key from <https://www.football-data.org/client/register>; without it there is no football tool. See [Live data](#live-data) |
 | `COINGECKO_DEMO_KEY` | empty | Optional CoinGecko demo key from <https://www.coingecko.com/en/api>; without it crypto prices share CoinGecko's keyless quota |
 | `DB_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
@@ -841,6 +842,13 @@ but never sent. One request labels what it can in about 40 seconds; sending
 the command again goes on where it stopped, and the reply says how many are
 left. The stickers are kept in `bot_stickers`, and when each chat last got
 one in `sticker_sends`.
+
+Now and then, about one time in four, she asks for `[gif CATEGORY]` instead.
+With `GIPHY_API_KEY` set, the code searches GIPHY for that mood (rated PG at
+most), picks one of the first ten at random and sends it; the GIF and the
+stickers share the 30-second gap. When the search or the send fails, or
+there is no key, a sticker of the same category goes instead. GIPHY's free
+key allows 100 searches an hour, far more than she sends.
 
 ### Polls
 

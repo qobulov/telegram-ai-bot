@@ -1590,9 +1590,21 @@ func TestPersonaOffersStickersSparingly(t *testing.T) {
 		t.Fatal(err)
 	}
 	line := lineContaining(cfg.PersonaPrompt, "[sticker CATEGORY]")
-	for _, want := range []string{"funny, sarcasm, flirting, jealousy, sad, comfort, shock, celebration, facepalm, angry, wholesome, cool", "Use it seldom", "Never with a plain question", "someone in distress", "never write it in an answer"} {
+	for _, want := range []string{"funny, sarcasm, flirting, jealousy, sad, comfort, shock, celebration, facepalm, angry, wholesome, cool", "Use it seldom", "Never with a plain question", "someone in distress", "[gif CATEGORY]", "never write them in an answer"} {
 		if !strings.Contains(line, want) {
 			t.Errorf("the sticker line does not say %q: %q", want, line)
 		}
+	}
+}
+
+func TestLoadGiphyKeyIsOptional(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil || cfg.GiphyAPIKey != "" {
+		t.Fatalf("default: %q, %v", cfg.GiphyAPIKey, err)
+	}
+	env := validEnv()
+	env["GIPHY_API_KEY"] = "abc123"
+	if cfg, err := Load(getenv(env)); err != nil || cfg.GiphyAPIKey != "abc123" {
+		t.Errorf("set: %q, %v", cfg.GiphyAPIKey, err)
 	}
 }

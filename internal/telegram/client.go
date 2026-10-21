@@ -324,6 +324,24 @@ func (c *Client) SendSticker(ctx context.Context, chatID int64, fileID string, r
 	return sent.MessageID, nil
 }
 
+type sendAnimationParams struct {
+	ChatID          int64            `json:"chat_id"`
+	Animation       string           `json:"animation"`
+	ReplyParameters *replyParameters `json:"reply_parameters,omitempty"`
+}
+
+// SendAnimation sends a GIF, given by an HTTPS link Telegram fetches or by
+// a file ID, as a reply to replyToMessageID when it is not zero, and returns
+// the sent message's ID.
+func (c *Client) SendAnimation(ctx context.Context, chatID int64, animation string, replyToMessageID int64) (int64, error) {
+	var sent sentMessage
+	params := sendAnimationParams{ChatID: chatID, Animation: animation, ReplyParameters: replyTo(replyToMessageID)}
+	if err := c.call(ctx, "sendAnimation", params, &sent); err != nil {
+		return 0, err
+	}
+	return sent.MessageID, nil
+}
+
 type sendMessageParams struct {
 	ChatID          int64            `json:"chat_id"`
 	Text            string           `json:"text"`

@@ -79,3 +79,28 @@ func TestHasStickersOnlyOnceOneIsEnabled(t *testing.T) {
 		t.Errorf("after labelling: %v, %v", has, err)
 	}
 }
+
+// A sticker and a GIF share a chat's slot: one within the gap of the
+// other is refused.
+func TestStickersAndGIFsShareTheGap(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	if ok, err := store.ClaimMediaSlot(ctx, group, time.Minute); err != nil || !ok {
+		t.Fatalf("first GIF: %v, %v", ok, err)
+	}
+	if ok, _ := store.ClaimMediaSlot(ctx, group, time.Minute); ok {
+		t.Error("a second GIF within the gap")
+	}
+	if ok, _ := store.ClaimMediaSlot(ctx, otherGroup, time.Minute); !ok {
+		t.Error("another chat was refused")
+	}
+	if _, err := store.SaveStickers(ctx, []PackSticker{{FileUniqueID: "u1", FileID: "f1", Pack: "xaa"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.LabelSticker(ctx, "u1", []string{"funny"}, "cat", true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.PickSticker(ctx, group, "funny", time.Minute); !errors.Is(err, ErrNoSticker) {
+		t.Errorf("a sticker right after a GIF: %v, want ErrNoSticker", err)
+	}
+}

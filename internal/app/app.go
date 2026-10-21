@@ -17,6 +17,7 @@ import (
 	"telegram-ai-bot/internal/ai"
 	"telegram-ai-bot/internal/config"
 	"telegram-ai-bot/internal/cron"
+	"telegram-ai-bot/internal/gifs"
 	"telegram-ai-bot/internal/service"
 	"telegram-ai-bot/internal/stickers"
 	"telegram-ai-bot/internal/storage"
@@ -282,6 +283,10 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		StickerImporter:       &stickers.Importer{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger), Workers: stickerWorkers, Logger: logger},
 		Answers:               store,
 	}
+	if cfg.GiphyAPIKey != "" {
+		opts.GIFs = &gifs.Client{APIKey: cfg.GiphyAPIKey, HTTPClient: &http.Client{Timeout: giphyTimeout}}
+		opts.AnimationSender, opts.MediaSlots = bot.Client, store
+	}
 	if mode.Serverless {
 		opts.Workers, opts.QueueSize = 0, 0
 		opts.MutedChats = nil
@@ -365,6 +370,9 @@ func imageTool(cfg config.Config, store *storage.Store) tools.Tool {
 		Location:   cfg.Location,
 	})
 }
+
+// giphyTimeout bounds a GIF search: a GIF that is late is not worth the wait.
+const giphyTimeout = 5 * time.Second
 
 // stickerWorkers is how many stickers the model looks at at once on import:
 // enough to label a pack of a hundred within one serverless request or two.

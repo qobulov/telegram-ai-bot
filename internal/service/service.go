@@ -234,6 +234,12 @@ type Options struct {
 	Stickers        StickerPicker
 	StickerSender   StickerSender
 	StickerImporter StickerImporter
+	// GIFs finds the GIF the model asked for, AnimationSender sends it and
+	// MediaSlots spaces it with the stickers; with any nil, a GIF becomes a
+	// sticker of the same category.
+	GIFs            GIFSearcher
+	AnimationSender AnimationSender
+	MediaSlots      MediaSlots
 	// Answers tells whom one of the bot's answers in a group answered, so
 	// that "don't answer him", replying to it, means that member; nil means
 	// it is never known.

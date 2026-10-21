@@ -31,8 +31,8 @@ type outcome struct {
 	// again after a slow turn. The exchange is in the log already.
 	duplicate bool
 	// sticker is the category of sticker the model asked to send after the
-	// text, or alone; "" for none.
-	sticker string
+	// text, or alone; "" for none. gif is the same for a GIF.
+	sticker, gif string
 }
 
 func say(text string) outcome { return outcome{text: text} }
@@ -126,12 +126,7 @@ func (s *Service) process(in incoming) {
 // message being answered and is not a message, so alone it returns 0.
 func (s *Service) deliver(in incoming, out *outcome) int64 {
 	answerID := s.deliverAnswer(in, *out)
-	id := s.sendSticker(in, out.sticker)
-	if id == 0 {
-		// The log tells later turns only of a sticker that was sent.
-		out.sticker = ""
-	}
-	if answerID == 0 {
+	if id := s.sendMedia(in, out); answerID == 0 {
 		answerID = id
 	}
 	return answerID
@@ -202,6 +197,9 @@ func (s *Service) logExchange(in incoming, out outcome) {
 		}
 		if out.sticker != "" {
 			answer = strings.TrimSpace(answer + " <sticker " + out.sticker + ">")
+		}
+		if out.gif != "" {
+			answer = strings.TrimSpace(answer + " <gif " + out.gif + ">")
 		}
 		s.ambient.add(in.scope.ChatID, 0, s.opts.Bot.ID, botAuthor, answer)
 	}
@@ -631,7 +629,7 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 		return outcome{reaction: answer.Reaction, answerID: answer.ID}
 	case err == nil:
 		log.Info("turn completed")
-		return outcome{text: s.fitted(in, answer.Text), answerID: answer.ID, sticker: answer.Sticker}
+		return outcome{text: s.fitted(in, answer.Text), answerID: answer.ID, sticker: answer.Sticker, gif: answer.GIF}
 	case errors.Is(err, agent.ErrLeakedThinking):
 		log.Warn("the model answered with its own reasoning; nothing was sent")
 		return outcome{}

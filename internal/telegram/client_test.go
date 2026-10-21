@@ -1022,3 +1022,14 @@ func TestSendStickerRepliesToTheMessage(t *testing.T) {
 		t.Errorf("call = %+v", sent)
 	}
 }
+
+func TestSendAnimationSendsTheLink(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"message_id":92}}`)
+	id, err := client.SendAnimation(context.Background(), -100123, "https://media.giphy.com/1.mp4", 40)
+	if err != nil || id != 92 {
+		t.Fatalf("id = %d, err = %v", id, err)
+	}
+	if sent := api.recorded()[0]; sent.method != "sendAnimation" || sent.params["animation"] != "https://media.giphy.com/1.mp4" {
+		t.Errorf("call = %+v", sent)
+	}
+}

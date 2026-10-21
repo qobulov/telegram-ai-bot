@@ -704,3 +704,23 @@ func TestStickerMarkerIsTakenOut(t *testing.T) {
 		}
 	}
 }
+
+// "[gif X]" asks for a GIF the way "[sticker X]" asks for a sticker.
+func TestGIFMarkerIsTakenOut(t *testing.T) {
+	cases := map[string]struct{ text, gif, saved string }{
+		"Yana shu ahvol [gif facepalm]": {"Yana shu ahvol", "facepalm", "Yana shu ahvol <gif facepalm>"},
+		"[GIF celebration]":             {"", "celebration", "<gif celebration>"},
+	}
+	for content, want := range cases {
+		f := newFixture(text(content))
+		answer, err := f.agent.Reply(context.Background(), request(1, "xaxa"))
+		if err != nil || answer.Text != want.text || answer.GIF != want.gif || answer.Sticker != "" {
+			t.Errorf("answer %q: got %+v, err = %v; want text %q and GIF %q", content, answer, err, want.text, want.gif)
+			continue
+		}
+		saved := f.store.history[testScope]
+		if last := saved[len(saved)-1]; last.Content != want.saved {
+			t.Errorf("answer %q: saved %q, want %q", content, last.Content, want.saved)
+		}
+	}
+}
