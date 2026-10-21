@@ -42,7 +42,7 @@ const (
 	dateClockLayout = "02.01 15:04"
 )
 
-// Refusals, in words the model, or the chat, can be given.
+// Refusals, in words the model can be given.
 const (
 	notInAGroup   = "only a person in a group can ask for that"
 	noReplyTarget = "reply to the message of the member you mean, or tag that one member with @ in the request"
@@ -62,34 +62,9 @@ type chatText struct{ uz, ru string }
 
 func (t chatText) String() string { return t.uz }
 
-// What Telegram's silence is called in the chat, in words that complete
-// "Bajarilmadi: ..." and "Не выполнено: ...".
-var (
-	noAnswerWords = chatText{
-		"Telegram javob bermadi, bajarilmagan bo'lishi mumkin; keyinroq urinib ko'ring",
-		"Telegram не ответил, возможно, ничего не сделано; попробуйте позже",
-	}
-	immuneWords = chatText{
-		"buni adminlarga, egalarimga, o'zimga, Telegram xizmat akkauntlariga yoki so'ragan odamning o'ziga qila olmayman",
-		"я не могу сделать это с админами, моими владельцами, собой, служебными аккаунтами Telegram или с тем, кто просит",
-	}
-)
-
 // errLookup reports that Telegram could not say who may do what. Moderation
 // then does nothing: it never acts on a guess.
 var errLookup = errors.New("could not ask Telegram who may do this, so nothing was done; try again later")
-
-// refusal is a DeniedError that also says why in the chat's own words.
-type refusal struct {
-	DeniedError
-	chat chatText
-}
-
-func (r *refusal) Unwrap() error { return &r.DeniedError }
-
-func refuse(message string, chat chatText) error {
-	return &refusal{DeniedError: DeniedError{Message: message}, chat: chat}
-}
 
 // neededRight is the admin right an action needs, from the person asking
 // and from the bot.
@@ -103,20 +78,12 @@ var neededRight = map[string]string{
 	actionUnpin:  telegram.RightPinMessages,
 }
 
-// rightWords names the rights moderation needs, for refusals; rightChat,
-// for the chat.
-var (
-	rightWords = map[string]string{
-		telegram.RightDeleteMessages:  "delete messages",
-		telegram.RightRestrictMembers: "ban and mute members",
-		telegram.RightPinMessages:     "pin messages",
-	}
-	rightChat = map[string]chatText{
-		telegram.RightDeleteMessages:  {"xabarlarni o'chirish", "удалять сообщения"},
-		telegram.RightRestrictMembers: {"a'zolarni bloklash va ovozsiz qilish", "банить и заглушать участников"},
-		telegram.RightPinMessages:     {"xabarlarni qadash", "закреплять сообщения"},
-	}
-)
+// rightWords names the rights moderation needs, for refusals.
+var rightWords = map[string]string{
+	telegram.RightDeleteMessages:  "delete messages",
+	telegram.RightRestrictMembers: "ban and mute members",
+	telegram.RightPinMessages:     "pin messages",
+}
 
 // MemberLookup asks Telegram about a member of a chat.
 type MemberLookup interface {
@@ -434,13 +401,7 @@ func (m *Moderation) checkRequester(ctx context.Context, caller Caller, right st
 		return errLookup
 	}
 	if !member.Has(right) {
-		words := rightChat[right]
-		return refuse(
-			fmt.Sprintf("only admins of this group who have the right to %s, or my owners, can ask me to do that; the person asking is neither", rightWords[right]),
-			chatText{
-				"buni faqat guruhning " + words.uz + " huquqi bor adminlari yoki egalarim so'ray oladi; so'ragan odam ulardan emas",
-				"об этом могут просить только админы группы с правом " + words.ru + " или мои владельцы; тот, кто просит, к ним не относится",
-			})
+		return &DeniedError{Message: fmt.Sprintf("only admins of this group who have the right to %s, or my owners, can ask me to do that; the person asking is neither", rightWords[right])}
 	}
 	return nil
 }
@@ -455,13 +416,7 @@ func (m *Moderation) checkBot(ctx context.Context, chatID int64, right string) e
 	// Keeping it only saves asking again; the answer holds either way.
 	_ = m.opts.Rights.SetBotRights(ctx, chatID, me.Status, me.Rights())
 	if !me.Has(right) {
-		words := rightChat[right]
-		return refuse(
-			fmt.Sprintf("I don't have the right to %s in this group; its admins can give it to me", rightWords[right]),
-			chatText{
-				"menda bu guruhda " + words.uz + " huquqi yo'q; uni adminlar bera oladi",
-				"у меня нет права " + words.ru + " в этой группе; его могут дать админы",
-			})
+		return &DeniedError{Message: fmt.Sprintf("I don't have the right to %s in this group; its admins can give it to me", rightWords[right])}
 	}
 	return nil
 }
@@ -476,14 +431,14 @@ func (m *Moderation) checkTarget(ctx context.Context, o order) error {
 		return ownMessageOnly(o.action)
 	}
 	if isTelegramAccount(userID) || (o.target.Owner && m.opts.OwnersByID) {
-		return refuse(immune, immuneWords)
+		return &DeniedError{Message: immune}
 	}
 	member, err := m.opts.Members.GetChatMember(ctx, o.caller.ChatID, userID)
 	if err != nil {
 		return errLookup
 	}
 	if member.IsAdmin() {
-		return refuse(immune, immuneWords)
+		return &DeniedError{Message: immune}
 	}
 	return nil
 }
@@ -495,7 +450,7 @@ func ownMessageOnly(action string) error {
 	case actionDelete, actionPin, actionUnpin:
 		return nil
 	}
-	return refuse(immune, immuneWords)
+	return &DeniedError{Message: immune}
 }
 
 // checkPace allows maxActions per actionWindow per person, counted in the
@@ -506,13 +461,7 @@ func (m *Moderation) checkPace(ctx context.Context, caller Caller) error {
 		return internal(err)
 	}
 	if done >= maxActions {
-		minutes := int(actionWindow.Minutes())
-		return refuse(
-			fmt.Sprintf("that's %d actions in %d minutes; wait a bit", maxActions, minutes),
-			chatText{
-				fmt.Sprintf("%d daqiqada %d ta amal bo'ldi; biroz kuting", minutes, maxActions),
-				fmt.Sprintf("это уже %d действий за %d минут; подождите немного", maxActions, minutes),
-			})
+		return &DeniedError{Message: fmt.Sprintf("that's %d actions in %d minutes; wait a bit", maxActions, int(actionWindow.Minutes()))}
 	}
 	return nil
 }
@@ -586,11 +535,9 @@ func (m *Moderation) send(ctx context.Context, o order) error {
 	return fmt.Errorf("moderation: unknown action %q", o.action)
 }
 
-// telegramError is why Telegram did not act, in words safe for the model
-// and, in Uzbek and Russian, for the chat.
+// telegramError is why Telegram did not act, in words safe for the model.
 type telegramError struct {
 	message string
-	chat    chatText
 }
 
 func (e *telegramError) Error() string { return e.message }
@@ -599,10 +546,9 @@ func (e *telegramError) Error() string { return e.message }
 // gave a reason.
 func telegramFailure(err error) error {
 	if refusal, ok := telegramRefusal(err); ok {
-		reason := refusal.Description
-		return &telegramError{"Telegram refused: " + reason, chatText{"Telegram rad etdi: " + reason, "Telegram отказал: " + reason}}
+		return &telegramError{"Telegram refused: " + refusal.Description}
 	}
-	return &telegramError{noAnswer, noAnswerWords}
+	return &telegramError{noAnswer}
 }
 
 // telegramRefusal is Telegram's answer when it turned a request down, and
