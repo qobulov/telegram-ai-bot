@@ -96,6 +96,15 @@ func (s *Store) PackStickers(ctx context.Context, pack string) (StickerCount, er
 	return c, nil
 }
 
+// HasStickers reports whether any sticker may be sent at all.
+func (s *Store) HasStickers(ctx context.Context) (bool, error) {
+	var has bool
+	if err := s.pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM bot_stickers WHERE enabled)`).Scan(&has); err != nil {
+		return false, fmt.Errorf("storage: any stickers: %w", err)
+	}
+	return has, nil
+}
+
 // ErrNoSticker means no sticker may be sent now: none fits, or the chat had
 // one too recently.
 var ErrNoSticker = errors.New("storage: no sticker to send")

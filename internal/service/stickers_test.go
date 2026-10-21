@@ -19,6 +19,8 @@ type fakeStickers struct {
 	sent   []string
 	report stickers.Report
 	pack   string
+	// none says no pack was imported.
+	none bool
 }
 
 func (f *fakeStickers) PickSticker(_ context.Context, _ int64, category string, gap time.Duration) (string, error) {
@@ -29,6 +31,10 @@ func (f *fakeStickers) PickSticker(_ context.Context, _ int64, category string, 
 		return "", f.err
 	}
 	return "file-" + category, nil
+}
+
+func (f *fakeStickers) HasStickers(context.Context) (bool, error) {
+	return !f.none, nil
 }
 
 func (f *fakeStickers) SendSticker(_ context.Context, _ int64, fileID string, _ int64) (int64, error) {
@@ -111,5 +117,33 @@ func TestImportStickersIsForOwners(t *testing.T) {
 	sent := f.run(owner)
 	if st.pack != "xaa_by_qstickbot" || len(sent) != 2 || !strings.Contains(sent[1].text, "120 ta stiker, 70 tasi ko'rib chiqildi, 55 tasi") || !strings.Contains(sent[1].text, "Qolgan 50 tasi") {
 		t.Errorf("import of %q, sent %+v", st.pack, sent)
+	}
+}
+
+// Before a pack is imported the model is told it has no stickers: it once
+// said "here you are" with none to send.
+func TestModelIsToldWhenThereAreNoStickers(t *testing.T) {
+	for name, none := range map[string]bool{"no pack yet": true, "a pack": false} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			st := withStickers(f)
+			st.none = none
+			f.run(inGroup(groupMessage("Mira, stiker tasha")))
+			if got := strings.Contains(onlyRequest(t, f).req.Context, noStickers); got != none {
+				t.Errorf("told there are no stickers = %v, want %v", got, none)
+			}
+		})
+	}
+}
+
+// The log records a sticker only when one was sent.
+func TestLogRecordsOnlyASentSticker(t *testing.T) {
+	f := newFixture()
+	st := withStickers(f)
+	st.err = storage.ErrNoSticker
+	f.replier.answer, f.replier.sticker = "Mana", "cool"
+	f.run(inGroup(groupMessage("Mira, stiker tasha")))
+	if got := strings.Join(f.chatLog.texts(groupID), "\n"); strings.Contains(got, "<sticker") {
+		t.Errorf("log = %q, want no sticker recorded", got)
 	}
 }

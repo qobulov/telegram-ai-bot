@@ -59,3 +59,23 @@ func TestStickersArePickedByCategoryAndSpaced(t *testing.T) {
 		t.Errorf("with no gap: %q, %v; want f1", got, err)
 	}
 }
+
+func TestHasStickersOnlyOnceOneIsEnabled(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	if has, err := store.HasStickers(ctx); err != nil || has {
+		t.Fatalf("empty: %v, %v", has, err)
+	}
+	if _, err := store.SaveStickers(ctx, []PackSticker{{FileUniqueID: "u1", FileID: "f1", Pack: "xaa"}}); err != nil {
+		t.Fatal(err)
+	}
+	if has, _ := store.HasStickers(ctx); has {
+		t.Error("an unlabelled sticker counts")
+	}
+	if err := store.LabelSticker(ctx, "u1", []string{"funny"}, "cat", true); err != nil {
+		t.Fatal(err)
+	}
+	if has, err := store.HasStickers(ctx); err != nil || !has {
+		t.Errorf("after labelling: %v, %v", has, err)
+	}
+}

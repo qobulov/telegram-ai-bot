@@ -114,7 +114,7 @@ func (s *Service) process(in incoming) {
 		in.described = s.describe(ctx, in.msg, in.text)
 	}
 	out := s.respond(ctx, in, rules)
-	if sentID := s.deliver(in, out); out.answerID != 0 && sentID != 0 {
+	if sentID := s.deliver(in, &out); out.answerID != 0 && sentID != 0 {
 		s.recordSent(out.answerID, sentID)
 	}
 	s.logExchange(in, out)
@@ -124,9 +124,14 @@ func (s *Service) process(in incoming) {
 // the answer. A picture goes first, with the answer as its caption when it
 // fits; a longer answer follows as its own message. A reaction is set on the
 // message being answered and is not a message, so alone it returns 0.
-func (s *Service) deliver(in incoming, out outcome) int64 {
-	answerID := s.deliverAnswer(in, out)
-	if id := s.sendSticker(in, out.sticker); answerID == 0 {
+func (s *Service) deliver(in incoming, out *outcome) int64 {
+	answerID := s.deliverAnswer(in, *out)
+	id := s.sendSticker(in, out.sticker)
+	if id == 0 {
+		// The log tells later turns only of a sticker that was sent.
+		out.sticker = ""
+	}
+	if answerID == 0 {
 		answerID = id
 	}
 	return answerID
@@ -686,7 +691,7 @@ func (s *Service) request(ctx context.Context, in incoming, rules []storage.Grou
 			notice = ownerNotice
 		}
 	}
-	req.Context = paragraphs(s.chatHeader(ctx, in), s.rulesHeader(rules, in), s.profileLine(ctx, in, rules), notice, s.talksElsewhere(ctx, in), log, s.ownerReplyHint(in), languageHint(in.text))
+	req.Context = paragraphs(s.chatHeader(ctx, in), s.rulesHeader(rules, in), s.profileLine(ctx, in, rules), notice, s.talksElsewhere(ctx, in), log, s.noStickersHint(ctx), s.ownerReplyHint(in), languageHint(in.text))
 	replied := in.msg.ReplyToMessage
 	if replied != nil {
 		req.Text = withQuote(req.Text, s.quoted(ctx, replied), s.opts.Bot.ID, plainLabel(replied.From))

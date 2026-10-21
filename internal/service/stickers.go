@@ -21,9 +21,29 @@ const (
 )
 
 // StickerPicker chooses a sticker of a category for a chat, or says none
-// may be sent now.
+// may be sent now, and tells whether there are any to send at all.
 type StickerPicker interface {
 	PickSticker(ctx context.Context, chatID int64, category string, gap time.Duration) (string, error)
+	HasStickers(ctx context.Context) (bool, error)
+}
+
+// noStickers tells the model, before any pack is imported, that it has no
+// stickers: told nothing, it said "here you are" with nothing to show.
+const noStickers = "[You have no stickers yet: an owner must import a pack first. Never write a sticker marker, and never say you sent or can send a sticker.]"
+
+// noStickersHint is noStickers when there are no stickers to send, and ""
+// otherwise, when that cannot be told, or when stickers are not wired at all.
+func (s *Service) noStickersHint(ctx context.Context) string {
+	if s.opts.Stickers == nil {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(ctx, logTimeout)
+	defer cancel()
+	has, err := s.opts.Stickers.HasStickers(ctx)
+	if err != nil || has {
+		return ""
+	}
+	return noStickers
 }
 
 // StickerSender sends a sticker.
