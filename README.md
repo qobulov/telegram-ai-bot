@@ -731,18 +731,26 @@ do not erase them, and every turn in the group is told the ones in force.
 | Form of address | an owner, for themselves, in any chat; it holds everywhere | until removed |
 | Swear guard | an owner, in the group it is for ("so'kinganlarni avtomatik mute qil", optionally "@Bakxtyorvch ni chaqir"); one per group | until turned off |
 
-The swear guard runs in code, without the model. In a group where it is
-on, every message from a member is checked against a list of swear words
-(dnx, pshnx, нахуй, бля, qo'tog', jalab, jala, kot, ske and the like;
-words that mostly mean something harmless, such as "am" or "mol", are left
-out). A member's first swear gets a reply warning them; the next one within
-24 hours mutes them for an hour, and the notice tags the @username the owner
-named, or else the group's creator. Telegram does not let an admin be muted,
-so an admin is warned the same way and the next swear only tags that person.
+The swear guard runs in code, asking the model only one thing. In a group
+where it is on, every message from a member is checked against a list of
+swear words (dnx, pshnx, нахуй, бля, qo'tog', jalab, jala, kot, ske and the
+like; words that mostly mean something harmless, such as "am" or "mol", are
+left out). Only a message the list catches goes to the model, which answers
+in one word whom it is aimed at: the bot, a person, or nobody. Swearing aimed
+at nobody ("давай хуярить", "бля, yutqazdik") is left alone, and so is a
+message the model cannot judge. A member's first insult at a person gets a
+reply warning them; the next one within 24 hours mutes them for an hour.
+A swear at the bot gets no warning: the first is answered by the model, which
+is told not to swear back, and the second within 24 hours mutes them for 15
+minutes, or, when she cannot mute (an admin, or no right to), gets silence.
+A mute notice tags the @username the owner named, or else the group's
+creator. Telegram does not let an admin be muted, so an admin who insults a
+person is warned the same way and the next insult only tags that person.
 The creator, owners and bots are never touched, forwarded messages are not
-checked, and a message the guard handled is not answered by the model. Each caught swear is kept in `moderation_actions`
-(action `swear`), which is how the count is kept and how an update
-delivered twice is handled once. Muting needs her to be an admin who may
+checked, and a message the guard handled is not answered by the model. Each
+caught insult is kept in `moderation_actions` (action `swear`, or
+`swear_bot` for one at the bot), which is how the count is kept and how an
+update delivered twice is handled once. Muting needs her to be an admin who may
 restrict members; without that right the notice says so and still tags.
 "Maria, endi so'kinishni kuzatma" turns it off. She cannot watch a chat
 herself, and says so rather than promise to.

@@ -204,9 +204,10 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		FallbackModels: cfg.FallbackModels,
 		Logger:         logger,
 	})
+	answering := withBackup(cfg, model, logger)
 	assistant := agent.New(agent.Options{
 		Store:        store,
-		Model:        withBackup(cfg, model, logger),
+		Model:        answering,
 		Tools:        registry,
 		Persona:      cfg.PersonaPrompt,
 		GroupNote:    cfg.GroupNote,
@@ -274,6 +275,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Strikes:               store,
 		AdminList:             bot.Client,
 		Restrictor:            bot.Client,
+		Judge:                 answering,
 		Answers:               store,
 	}
 	if mode.Serverless {

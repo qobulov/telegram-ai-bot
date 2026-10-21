@@ -226,6 +226,8 @@ type Options struct {
 	Strikes    SwearStrikes
 	AdminList  AdminLister
 	Restrictor Restrictor
+	// Judge is the model asked whom a message the guard caught is aimed at.
+	Judge InsultJudge
 	// Answers tells whom one of the bot's answers in a group answered, so
 	// that "don't answer him", replying to it, means that member; nil means
 	// it is never known.

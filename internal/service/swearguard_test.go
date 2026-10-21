@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"telegram-ai-bot/internal/ai"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 )
@@ -19,12 +21,12 @@ type fakeStrikes struct {
 	actions []storage.ModerationAction
 }
 
-func (f *fakeStrikes) SwearStrikes(_ context.Context, chatID, userID int64, _ time.Time) (int, error) {
+func (f *fakeStrikes) SwearStrikes(_ context.Context, chatID, userID int64, action string, _ time.Time) (int, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	n := 0
 	for _, a := range f.actions {
-		if a.ChatID == chatID && a.TargetUserID == userID {
+		if a.ChatID == chatID && a.TargetUserID == userID && a.Action == action {
 			n++
 		}
 	}
@@ -41,6 +43,22 @@ func (f *fakeStrikes) RecordModeration(_ context.Context, a storage.ModerationAc
 	}
 	f.actions = append(f.actions, a)
 	return true, nil
+}
+
+// fakeJudge answers whom a message is aimed at with answer, and counts the
+// questions.
+type fakeJudge struct {
+	mu     sync.Mutex
+	answer string
+	err    error
+	asked  []string
+}
+
+func (f *fakeJudge) Complete(_ context.Context, req ai.Request) (ai.Message, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.asked = append(f.asked, req.Messages[0].Content)
+	return ai.Message{Role: ai.RoleAssistant, Content: f.answer}, f.err
 }
 
 type fakeAdminList struct{ admins []telegram.ChatMember }
@@ -81,6 +99,7 @@ func guardFixture(tag string) (*fixture, *fakeRestrictor) {
 	f.opts.OwnerUsernames = []string{ownerUsername}
 	f.opts.Rules = &fakeRuleBook{rules: []storage.GroupRule{{ID: 1, ChatID: groupID, Kind: storage.RuleSwearGuard, UserName: tag, SetBy: 9001}}}
 	f.opts.Strikes = &fakeStrikes{}
+	f.opts.Judge = &fakeJudge{answer: "PERSON"}
 	f.opts.Restrictor = restrictor
 	f.opts.AdminList = fakeAdminList{admins: []telegram.ChatMember{
 		{Status: "creator", User: &telegram.User{ID: creatorID, FirstName: "Boss", Username: "boss"}},
@@ -227,5 +246,80 @@ func TestSwearGuardWarnsAnAdminThenTags(t *testing.T) {
 	}
 	if done := restrictor.recorded(); len(done) != 0 {
 		t.Errorf("an admin was restricted: %+v", done)
+	}
+}
+
+// Swearing as emphasis, aimed at nobody, is left alone, and so is a message
+// the model cannot judge: the model answers it if it was asked.
+func TestSwearGuardLeavesSwearingAimedAtNobody(t *testing.T) {
+	for name, judge := range map[string]*fakeJudge{
+		"aimed at nobody":   {answer: "NONE"},
+		"the model fails":   {err: errors.New("ai: 503")},
+		"an unclear answer": {answer: "maybe"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f, restrictor := guardFixture("")
+			f.opts.Judge = judge
+			sent := f.run(swearFrom(swearerID, "Mira, давай хуярить, ps 5 olish kerak"), swearFrom(swearerID, "Mira, давай хуярить"))
+			if len(restrictor.recorded()) != 0 || len(f.replier.recorded()) != 2 {
+				t.Errorf("restrictions %+v, model calls %d; want none and 2", restrictor.recorded(), len(f.replier.recorded()))
+			}
+			for _, m := range sent {
+				if strings.Contains(m.text, "so'kinish mumkin emas") {
+					t.Errorf("warned: %q", m.text)
+				}
+			}
+		})
+	}
+}
+
+// The owners asked: a swear at Maria gets no warning, and the second one a
+// 15-minute mute; when she cannot mute, she stays quiet.
+func TestSwearGuardMutesTheSecondSwearAtTheBot(t *testing.T) {
+	f, restrictor := guardFixture("@Bakxtyorvch")
+	f.opts.Judge = &fakeJudge{answer: "BOT"}
+	start := time.Now()
+
+	sent := f.run(swearFrom(swearerID, "Mira dnx"), swearFrom(swearerID, "Mira jalab"))
+
+	if calls := f.replier.recorded(); len(calls) != 1 {
+		t.Errorf("model calls = %d, want the first swear answered by the model and the second not", len(calls))
+	}
+	for _, m := range sent {
+		if strings.Contains(m.text, "ogohlantirish") {
+			t.Errorf("warned: %q", m.text)
+		}
+	}
+	want := "@ali_s menga so'kingani uchun 15 daqiqa yozolmaydi. @Bakxtyorvch, xabaringiz bo'lsin."
+	if !slices.ContainsFunc(sent, func(m sentMessage) bool { return m.text == want }) {
+		t.Errorf("sent = %+v, want the mute notice %q", sent, want)
+	}
+	done := restrictor.recorded()
+	if len(done) != 1 || done[0].UserID != swearerID {
+		t.Fatalf("restrictions = %+v, want the swearer muted", done)
+	}
+	if d := done[0].Until.Sub(start); d < 14*time.Minute || d > 16*time.Minute {
+		t.Errorf("mute lasts %v, want 15 minutes", d)
+	}
+}
+
+func TestSwearGuardStaysQuietWhenItCannotMuteForTheBot(t *testing.T) {
+	for name, c := range map[string]struct {
+		swearer int64
+		failing bool
+	}{"an admin": {guardAdminID, false}, "the mute fails": {swearerID, true}} {
+		t.Run(name, func(t *testing.T) {
+			f, restrictor := guardFixture("")
+			f.opts.Judge = &fakeJudge{answer: "BOT"}
+			if c.failing {
+				restrictor.err = errors.New("not enough rights")
+			}
+			f.run(swearFrom(c.swearer, "Maria dnx"))
+			before := len(f.sender.messages())
+			sent := f.run(swearFrom(c.swearer, "Maria dnx"))
+			if len(sent) != before {
+				t.Errorf("sent %+v after the second swear, want silence", sent[before:])
+			}
+		})
 	}
 }

@@ -272,10 +272,10 @@ func TestSwearStrikesCountOneMembersRecentSwears(t *testing.T) {
 	swear(group, alice, 903)
 	mustRecord(t, store, ModerationAction{ChatID: group, Action: "mute", RequesterID: alice, TargetUserID: bob, Minutes: 60, UpdateID: 904})
 
-	if n, err := store.SwearStrikes(ctx, group, bob, time.Now().Add(-time.Hour)); err != nil || n != 2 {
+	if n, err := store.SwearStrikes(ctx, group, bob, ActionSwear, time.Now().Add(-time.Hour)); err != nil || n != 2 {
 		t.Errorf("strikes = %d, %v; want 2", n, err)
 	}
-	if n, err := store.SwearStrikes(ctx, group, bob, time.Now().Add(time.Minute)); err != nil || n != 0 {
+	if n, err := store.SwearStrikes(ctx, group, bob, ActionSwear, time.Now().Add(time.Minute)); err != nil || n != 0 {
 		t.Errorf("strikes since later = %d, %v; want 0", n, err)
 	}
 }

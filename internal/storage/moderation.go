@@ -90,18 +90,21 @@ func (s *Store) ModerationBy(ctx context.Context, requesterID int64, since time.
 	return count, nil
 }
 
-// ActionSwear is a swear the swear guard caught, recorded like any other
-// moderation.
-const ActionSwear = "swear"
+// The swears the swear guard caught, recorded like any other moderation:
+// ActionSwear insults a person, ActionSwearAtBot the bot itself.
+const (
+	ActionSwear      = "swear"
+	ActionSwearAtBot = "swear_bot"
+)
 
-// SwearStrikes counts the swears the swear guard caught from one member in a
-// chat since a moment.
-func (s *Store) SwearStrikes(ctx context.Context, chatID, userID int64, since time.Time) (int, error) {
+// SwearStrikes counts the swears of one kind the swear guard caught from one
+// member in a chat since a moment.
+func (s *Store) SwearStrikes(ctx context.Context, chatID, userID int64, action string, since time.Time) (int, error) {
 	var count int
 	err := s.pool.QueryRow(ctx, `
 		SELECT count(*) FROM moderation_actions
 		WHERE chat_id = $1 AND target_user_id = $2 AND action = $3 AND created_at >= $4`,
-		chatID, userID, ActionSwear, since).Scan(&count)
+		chatID, userID, action, since).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("storage: count swear strikes: %w", err)
 	}
