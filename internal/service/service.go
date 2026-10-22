@@ -242,6 +242,9 @@ type Options struct {
 	MediaSlots      MediaSlots
 	// AudioSender sends the sounds a tool found, such as a song's preview;
 	// nil sends none.
+	// ClipSender sends the clips the guard answers a swear at the bot with;
+	// without it the first swear is left to the model.
+	ClipSender  ClipSender
 	AudioSender AudioSender
 	// Answers tells whom one of the bot's answers in a group answered, so
 	// that "don't answer him", replying to it, means that member; nil means

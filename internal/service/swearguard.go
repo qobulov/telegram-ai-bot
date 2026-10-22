@@ -184,11 +184,16 @@ func (s *Service) guardedSwearing(msg *telegram.Message, updateID int64) bool {
 }
 
 // guardedSwearingAtBot handles a swear at the bot, as the owners asked: no
-// warning, and the second time a quarter of an hour's mute, or silence when
-// the swearer is an admin or the mute fails. The first is left to the model.
+// warning but one of the swear clips, and the second time a quarter of an
+// hour's mute with a clip, or silence when the swearer is an admin or the
+// mute fails. Without clips the first swear is left to the model.
 func (s *Service) guardedSwearingAtBot(ctx context.Context, msg *telegram.Message, strikes int, role, caller string) bool {
 	if strikes <= 1 {
-		return false
+		if s.opts.ClipSender == nil {
+			return false
+		}
+		s.replyWithClip(ctx, msg)
+		return true
 	}
 	if role != "" {
 		return true
@@ -205,6 +210,7 @@ func (s *Service) guardedSwearingAtBot(ctx context.Context, msg *telegram.Messag
 		text += " " + caller + ", xabaringiz bo'lsin."
 	}
 	s.postGuard(msg, text)
+	s.replyWithClip(ctx, msg)
 	return true
 }
 

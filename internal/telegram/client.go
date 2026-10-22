@@ -218,6 +218,26 @@ func (c *Client) SendAudio(ctx context.Context, track Track) (int64, error) {
 	})
 }
 
+// Clip is a short video to upload: shown round, as a video message, or as
+// a silent looping animation.
+type Clip struct {
+	ChatID           int64
+	ReplyToMessageID int64
+	Data             []byte
+	Round            bool
+}
+
+// SendClip uploads a clip and returns the ID of the sent message. A round
+// clip must be square: Telegram crops a video message to a circle.
+func (c *Client) SendClip(ctx context.Context, clip Clip) (int64, error) {
+	u := upload{chatID: clip.ChatID, replyTo: clip.ReplyToMessageID, field: "animation", filename: "clip.mp4", data: clip.Data}
+	method := "sendAnimation"
+	if clip.Round {
+		u.field, method = "video_note", "sendVideoNote"
+	}
+	return c.upload(ctx, method, u)
+}
+
 // upload is one file sent as a multipart form.
 type upload struct {
 	chatID, replyTo int64

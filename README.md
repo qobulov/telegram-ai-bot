@@ -752,9 +752,11 @@ in one word whom it is aimed at: the bot, a person, or nobody. Swearing aimed
 at nobody ("давай хуярить", "бля, yutqazdik") is left alone, and so is a
 message the model cannot judge. A member's first insult at a person gets a
 reply warning them; the next one within 24 hours mutes them for an hour.
-A swear at the bot gets no warning: the first is answered by the model, which
-is told not to swear back, and the second within 24 hours mutes them for 15
-minutes, or, when she cannot mute (an admin, or no right to), gets silence.
+A swear at the bot gets no warning: the first is answered with one of the
+owners' two clips, chosen at random and embedded in the binary
+(`internal/service/clips`; the square one goes as a round video message),
+and the second within 24 hours mutes them for 15 minutes, with a clip, or,
+when she cannot mute (an admin, or no right to), gets silence.
 A mute notice tags the @username the owner named, or else the group's
 creator. Telegram does not let an admin be muted, so an admin who insults a
 person is warned the same way and the next insult only tags that person.

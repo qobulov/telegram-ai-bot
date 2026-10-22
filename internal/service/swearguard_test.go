@@ -341,3 +341,50 @@ func TestSwearListsAreLowerCase(t *testing.T) {
 		}
 	}
 }
+
+type fakeClipSender struct {
+	mu    sync.Mutex
+	clips []telegram.Clip
+}
+
+func (f *fakeClipSender) SendClip(_ context.Context, clip telegram.Clip) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.clips = append(f.clips, clip)
+	return int64(700 + len(f.clips)), nil
+}
+
+// With clips, a swear at the bot gets one of them as a reply instead of the
+// model's answer, and the second swear gets the mute and a clip.
+func TestSwearGuardAnswersASwearAtTheBotWithAClip(t *testing.T) {
+	f, restrictor := guardFixture("")
+	f.opts.Judge = &fakeJudge{answer: "BOT"}
+	clips := &fakeClipSender{}
+	f.opts.ClipSender = clips
+
+	f.run(swearFrom(swearerID, "Mira dnx"))
+
+	if calls := f.replier.recorded(); len(calls) != 0 {
+		t.Errorf("model calls = %d, want the clip instead of an answer", len(calls))
+	}
+	if len(clips.clips) != 1 || len(clips.clips[0].Data) == 0 || clips.clips[0].ReplyToMessageID == 0 || clips.clips[0].ChatID != groupID {
+		t.Fatalf("clips = %+v, want one, replying to the swear", clips.clips)
+	}
+	if len(restrictor.recorded()) != 0 {
+		t.Error("the first swear was muted")
+	}
+	f.run(swearFrom(swearerID, "Mira jalab"))
+	if len(clips.clips) != 2 || len(restrictor.recorded()) != 1 {
+		t.Errorf("clips %d, mutes %d; want a second clip with the mute", len(clips.clips), len(restrictor.recorded()))
+	}
+	if log := strings.Join(f.chatLog.texts(groupID), "\n"); !strings.Contains(log, "<video in answer to the swearing>") {
+		t.Errorf("log = %q", log)
+	}
+}
+
+// Both clips are there, and the square one is sent round.
+func TestSwearClips(t *testing.T) {
+	if len(swearClips) != 2 || len(blokkaClip) < 1000 || len(aqliniClip) < 1000 || swearClips[0].Round || !swearClips[1].Round {
+		t.Errorf("clips = %d, sizes %d and %d", len(swearClips), len(blokkaClip), len(aqliniClip))
+	}
+}

@@ -127,3 +127,27 @@ func TestSendMessageFallsBackFromARefusedRichMessage(t *testing.T) {
 		t.Errorf("err %v, methods %v, want the rate limit returned", err, *methods)
 	}
 }
+
+func TestSendClipUploadsRoundOrLooping(t *testing.T) {
+	for _, round := range []bool{false, true} {
+		var method, field string
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			method = strings.TrimPrefix(r.URL.Path, "/bot"+testToken+"/")
+			_ = r.ParseMultipartForm(1 << 20)
+			for name := range r.MultipartForm.File {
+				field = name
+			}
+			_, _ = io.WriteString(w, `{"ok":true,"result":{"message_id":5}}`)
+		}))
+		client := NewClient(Options{Token: testToken, BaseURL: server.URL})
+		id, err := client.SendClip(context.Background(), Clip{ChatID: 1, ReplyToMessageID: 9, Data: []byte("MP4"), Round: round})
+		server.Close()
+		want, wantField := "sendAnimation", "animation"
+		if round {
+			want, wantField = "sendVideoNote", "video_note"
+		}
+		if err != nil || id != 5 || method != want || field != wantField {
+			t.Errorf("round %v: id %d, err %v, %s with %s", round, id, err, method, field)
+		}
+	}
+}
