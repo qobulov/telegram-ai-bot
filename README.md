@@ -556,7 +556,7 @@ answer instead of making up a number.
 | `wiki_lookup` | Article summaries, "on this day" | Wikipedia (CC BY-SA) |
 | `football` | League tables, the current matchday's matches, top scorers | football-data.org free tier; scores can lag, so "latest", not live |
 | `crypto_price` | Coin prices in dollars and sums | CoinGecko |
-| `music_search` | Songs by title or artist with their links; a 30-second preview of the first match is sent as audio after her answer | Deezer, keyless |
+| `music_search` | Songs by title or artist with their links; a 30-second preview of the first match, named after the song, is sent as audio and is her whole answer | Deezer, keyless; Deezer gives only previews |
 
 The tools share one HTTP client with short timeouts and a small in-memory
 cache, send `MariaBot/1.0 (+https://t.me/<bot username>)` as the user agent,

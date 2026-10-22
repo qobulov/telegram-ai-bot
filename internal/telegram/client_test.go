@@ -1034,14 +1034,34 @@ func TestSendAnimationSendsTheLink(t *testing.T) {
 	}
 }
 
-func TestSendAudioSendsTheLinkWithItsTitle(t *testing.T) {
-	client, api := newTestClient(t, `{"ok":true,"result":{"message_id":93}}`)
-	id, err := client.SendAudio(context.Background(), -100123, "https://cdns-preview.dzcdn.net/1.mp3", "Yurak", "Shohruhxon", 40)
+func TestSendAudioUploadsTheTrackWithItsName(t *testing.T) {
+	var got struct {
+		method, title, performer, reply, filename string
+		audio                                     []byte
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got.method = strings.TrimPrefix(r.URL.Path, "/bot"+testToken+"/")
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			t.Errorf("not a multipart upload: %v", err)
+		}
+		got.title, got.performer, got.reply = r.FormValue("title"), r.FormValue("performer"), r.FormValue("reply_parameters")
+		if file, header, err := r.FormFile("audio"); err == nil {
+			got.audio, _ = io.ReadAll(file)
+			got.filename = header.Filename
+		}
+		_, _ = io.WriteString(w, `{"ok":true,"result":{"message_id":93}}`)
+	}))
+	defer server.Close()
+	client := NewClient(Options{Token: testToken, BaseURL: server.URL})
+
+	id, err := client.SendAudio(context.Background(), Track{ChatID: -100123, ReplyToMessageID: 40, Data: []byte("MP3"), Title: "Yurak", Performer: "Shohruhxon"})
 	if err != nil || id != 93 {
 		t.Fatalf("id = %d, err = %v", id, err)
 	}
-	sent := api.recorded()[0]
-	if sent.method != "sendAudio" || sent.params["audio"] != "https://cdns-preview.dzcdn.net/1.mp3" || sent.params["title"] != "Yurak" || sent.params["performer"] != "Shohruhxon" {
-		t.Errorf("call = %+v", sent)
+	if got.method != "sendAudio" || got.title != "Yurak" || got.performer != "Shohruhxon" || string(got.audio) != "MP3" || got.filename != "Shohruhxon - Yurak.mp3" {
+		t.Errorf("request = %+v", got)
+	}
+	if !strings.Contains(got.reply, `"message_id":40`) {
+		t.Errorf("reply_parameters = %q", got.reply)
 	}
 }

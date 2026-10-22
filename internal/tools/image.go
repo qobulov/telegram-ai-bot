@@ -83,9 +83,10 @@ type Drawing struct {
 }
 
 // Audio is a sound a tool found during a turn, such as a song's preview,
-// sent with the answer: Telegram fetches it from URL.
+// sent as the answer.
 type Audio struct {
-	URL, Title, Performer string
+	Data             []byte
+	Title, Performer string
 }
 
 // Sink collects the pictures drawn and the sounds found during one turn. It

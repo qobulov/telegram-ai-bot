@@ -127,27 +127,45 @@ func (s *Service) process(in incoming) {
 // fits; a longer answer follows as its own message. A reaction is set on the
 // message being answered and is not a message, so alone it returns 0.
 func (s *Service) deliver(in incoming, out *outcome) int64 {
+	if id := s.sendAudios(in, out.audios); id != 0 {
+		// A song asked for is the answer alone, as a sticker is: words with
+		// it only say what it is. Only when it cannot be sent do they go.
+		out.text, out.drawings, out.sticker, out.gif = "", nil, "", ""
+		if out.reaction != "" {
+			s.react(in, out.reaction)
+		}
+		return id
+	}
+	out.audios = nil
 	answerID := s.deliverAnswer(in, *out)
 	if id := s.sendMedia(in, out); answerID == 0 {
 		answerID = id
 	}
-	for _, audio := range out.audios {
-		if id := s.sendAudio(in, audio); answerID == 0 {
-			answerID = id
-		}
-	}
 	return answerID
 }
 
-// sendAudio sends a sound a tool found and returns its message's ID, or 0
-// when it could not be sent; the answer is sent either way.
+// sendAudios sends the sounds a tool found and returns the first sent
+// message's ID, or 0 when none could be sent.
+func (s *Service) sendAudios(in incoming, audios []tools.Audio) int64 {
+	var firstID int64
+	for _, audio := range audios {
+		if id := s.sendAudio(in, audio); firstID == 0 {
+			firstID = id
+		}
+	}
+	return firstID
+}
+
 func (s *Service) sendAudio(in incoming, audio tools.Audio) int64 {
 	if s.opts.AudioSender == nil {
 		return 0
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
 	defer cancel()
-	id, err := s.opts.AudioSender.SendAudio(ctx, in.msg.Chat.ID, audio.URL, audio.Title, audio.Performer, in.replyTarget())
+	id, err := s.opts.AudioSender.SendAudio(ctx, telegram.Track{
+		ChatID: in.msg.Chat.ID, ReplyToMessageID: in.replyTarget(),
+		Data: audio.Data, Title: audio.Title, Performer: audio.Performer,
+	})
 	if err != nil {
 		s.opts.Logger.Warn("could not send audio", "chat_id", in.msg.Chat.ID, "error", err)
 		return 0

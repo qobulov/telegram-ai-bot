@@ -10,6 +10,7 @@ import (
 
 	"telegram-ai-bot/internal/stickers"
 	"telegram-ai-bot/internal/storage"
+	"telegram-ai-bot/internal/telegram"
 )
 
 const (
@@ -121,9 +122,9 @@ func (s *Service) sendGIF(in incoming, category string) (int64, bool) {
 	return sentID, true
 }
 
-// AudioSender sends a sound Telegram fetches from a link.
+// AudioSender sends a track.
 type AudioSender interface {
-	SendAudio(ctx context.Context, chatID int64, link, title, performer string, replyToMessageID int64) (int64, error)
+	SendAudio(ctx context.Context, track telegram.Track) (int64, error)
 }
 
 // StickerSender sends a sticker.

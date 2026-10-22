@@ -179,40 +179,82 @@ type Photo struct {
 // SendPhoto uploads a picture and returns the ID of the sent message. A
 // caption longer than Telegram allows is cut.
 func (c *Client) SendPhoto(ctx context.Context, photo Photo) (int64, error) {
-	body, contentType, err := photoForm(photo)
-	if err != nil {
-		return 0, fmt.Errorf("telegram sendPhoto: encode: %w", err)
+	fields := map[string]string{}
+	if caption := strings.TrimSpace(photo.Caption); caption != "" {
+		fields["caption"] = cutRunes(caption, CaptionLimit)
 	}
-	endpoint := c.opts.BaseURL + "/bot" + c.opts.Token + "/sendPhoto"
+	return c.upload(ctx, "sendPhoto", upload{
+		chatID: photo.ChatID, replyTo: photo.ReplyToMessageID, fields: fields,
+		field: "photo", filename: "image.png", data: photo.Data,
+	})
+}
+
+// Track is a sound to send as music, shown with its title and performer.
+type Track struct {
+	ChatID           int64
+	ReplyToMessageID int64
+	Data             []byte
+	Title            string
+	Performer        string
+}
+
+// SendAudio uploads a track and returns the ID of the sent message. It is
+// uploaded rather than given as a link because Telegram names a fetched
+// file after its URL and ignores the title and performer.
+func (c *Client) SendAudio(ctx context.Context, track Track) (int64, error) {
+	name := strings.TrimSpace(track.Performer + " - " + track.Title)
+	return c.upload(ctx, "sendAudio", upload{
+		chatID: track.ChatID, replyTo: track.ReplyToMessageID,
+		fields: map[string]string{"title": track.Title, "performer": track.Performer},
+		field:  "audio", filename: strings.Trim(name, "- ") + ".mp3", data: track.Data,
+	})
+}
+
+// upload is one file sent as a multipart form.
+type upload struct {
+	chatID, replyTo int64
+	fields          map[string]string
+	field, filename string
+	data            []byte
+}
+
+func (c *Client) upload(ctx context.Context, method string, u upload) (int64, error) {
+	body, contentType, err := uploadForm(u)
+	if err != nil {
+		return 0, fmt.Errorf("telegram %s: encode: %w", method, err)
+	}
+	endpoint := c.opts.BaseURL + "/bot" + c.opts.Token + "/" + method
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, body)
 	if err != nil {
-		return 0, errors.New("telegram sendPhoto: build request")
+		return 0, fmt.Errorf("telegram %s: build request", method)
 	}
 	req.Header.Set("Content-Type", contentType)
 	resp, err := c.opts.HTTPClient.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("telegram sendPhoto: %w", withoutURL(err))
+		return 0, fmt.Errorf("telegram %s: %w", method, withoutURL(err))
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
-		return 0, fmt.Errorf("telegram sendPhoto: read response: %w", err)
+		return 0, fmt.Errorf("telegram %s: read response: %w", method, err)
 	}
 	var sent sentMessage
-	if err := decode("sendPhoto", resp.StatusCode, raw, &sent); err != nil {
+	if err := decode(method, resp.StatusCode, raw, &sent); err != nil {
 		return 0, err
 	}
 	return sent.MessageID, nil
 }
 
-func photoForm(photo Photo) (io.Reader, string, error) {
+func uploadForm(u upload) (io.Reader, string, error) {
 	var body bytes.Buffer
 	form := multipart.NewWriter(&body)
-	fields := map[string]string{"chat_id": strconv.FormatInt(photo.ChatID, 10)}
-	if caption := strings.TrimSpace(photo.Caption); caption != "" {
-		fields["caption"] = cutRunes(caption, CaptionLimit)
+	fields := map[string]string{"chat_id": strconv.FormatInt(u.chatID, 10)}
+	for name, value := range u.fields {
+		if value != "" {
+			fields[name] = value
+		}
 	}
-	if reply := replyTo(photo.ReplyToMessageID); reply != nil {
+	if reply := replyTo(u.replyTo); reply != nil {
 		encoded, err := json.Marshal(reply)
 		if err != nil {
 			return nil, "", err
@@ -224,11 +266,11 @@ func photoForm(photo Photo) (io.Reader, string, error) {
 			return nil, "", err
 		}
 	}
-	file, err := form.CreateFormFile("photo", "image.png")
+	file, err := form.CreateFormFile(u.field, u.filename)
 	if err != nil {
 		return nil, "", err
 	}
-	if _, err := file.Write(photo.Data); err != nil {
+	if _, err := file.Write(u.data); err != nil {
 		return nil, "", err
 	}
 	if err := form.Close(); err != nil {
@@ -319,26 +361,6 @@ func (c *Client) SendSticker(ctx context.Context, chatID int64, fileID string, r
 	var sent sentMessage
 	params := sendStickerParams{ChatID: chatID, Sticker: fileID, ReplyParameters: replyTo(replyToMessageID)}
 	if err := c.call(ctx, "sendSticker", params, &sent); err != nil {
-		return 0, err
-	}
-	return sent.MessageID, nil
-}
-
-type sendAudioParams struct {
-	ChatID          int64            `json:"chat_id"`
-	Audio           string           `json:"audio"`
-	Title           string           `json:"title,omitempty"`
-	Performer       string           `json:"performer,omitempty"`
-	ReplyParameters *replyParameters `json:"reply_parameters,omitempty"`
-}
-
-// SendAudio sends a sound Telegram fetches from an HTTPS link, shown with
-// its title and performer, as a reply to replyToMessageID when it is not
-// zero, and returns the sent message's ID.
-func (c *Client) SendAudio(ctx context.Context, chatID int64, link, title, performer string, replyToMessageID int64) (int64, error) {
-	var sent sentMessage
-	params := sendAudioParams{ChatID: chatID, Audio: link, Title: title, Performer: performer, ReplyParameters: replyTo(replyToMessageID)}
-	if err := c.call(ctx, "sendAudio", params, &sent); err != nil {
 		return 0, err
 	}
 	return sent.MessageID, nil
