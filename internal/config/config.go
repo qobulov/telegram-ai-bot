@@ -61,6 +61,9 @@ type Config struct {
 	CoinGeckoDemoKey string
 	// TavilyAPIKey gives Maria a web search; without it she has none.
 	TavilyAPIKey string
+	// TMDBToken is a TMDB read access token; without it there is no
+	// film and series tool.
+	TMDBToken string
 
 	// Image generation, Gemini only. Owners have no daily limit.
 	ImagesEnabled   bool
@@ -218,6 +221,7 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.GiphyAPIKey = r.apiKey("GIPHY_API_KEY")
 	cfg.CoinGeckoDemoKey = r.apiKey("COINGECKO_DEMO_KEY")
 	cfg.TavilyAPIKey = r.apiKey("TAVILY_API_KEY")
+	cfg.TMDBToken = r.apiKey("TMDB_TOKEN")
 	cfg.WakeWords = r.wakeWords(cfg)
 	r.checkRemovedVariables()
 	r.checkGroupSettings(cfg)

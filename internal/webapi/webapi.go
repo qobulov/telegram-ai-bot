@@ -47,6 +47,9 @@ type Options struct {
 	CoinGeckoKey string
 	// TavilyKey is a Tavily key. Without it there is no web search.
 	TavilyKey string
+	// TMDBToken is a TMDB read access token. Without it there is no
+	// movies tool.
+	TMDBToken string
 	BaseURLs  BaseURLs
 }
 
@@ -68,6 +71,7 @@ type BaseURLs struct {
 	Deezer            string
 	RoneArena         string
 	Tavily            string
+	TMDB              string
 	Isan              string
 	// Wikipedia is a format string with %s for the language code.
 	Wikipedia string
@@ -92,6 +96,7 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.Deezer = cmp.Or(b.Deezer, "https://api.deezer.com")
 	b.RoneArena = cmp.Or(b.RoneArena, "https://arena.rone.dev")
 	b.Tavily = cmp.Or(b.Tavily, "https://api.tavily.com")
+	b.TMDB = cmp.Or(b.TMDB, "https://api.themoviedb.org")
 	b.Isan = cmp.Or(b.Isan, "https://api.isan.eu.org")
 	b.Wikipedia = cmp.Or(b.Wikipedia, "https://%s.wikipedia.org")
 	if b.News == nil {
@@ -130,6 +135,7 @@ type apis struct {
 	footballToken string
 	coinGeckoKey  string
 	tavilyKey     string
+	tmdbToken     string
 }
 
 // Tools returns the live-data tools. Football is included only when
@@ -153,6 +159,9 @@ func Tools(opts Options) []tools.Tool {
 	if a.tavilyKey != "" {
 		list = append(list, a.searchTool())
 	}
+	if a.tmdbToken != "" {
+		list = append(list, a.moviesTool())
+	}
 	return list
 }
 
@@ -173,6 +182,7 @@ func newAPIs(opts Options) *apis {
 		footballToken: opts.FootballToken,
 		coinGeckoKey:  opts.CoinGeckoKey,
 		tavilyKey:     opts.TavilyKey,
+		tmdbToken:     opts.TMDBToken,
 	}
 }
 

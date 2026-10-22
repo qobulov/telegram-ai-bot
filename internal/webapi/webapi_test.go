@@ -140,6 +140,7 @@ func (u *upstream) options() Options {
 			RoneArena:         base + "/arena",
 			Isan:              base + "/isan",
 			Tavily:            base + "/tavily",
+			TMDB:              base + "/tmdb",
 			Wikipedia:         base + "/wiki/%s",
 			News: map[string]map[string]string{
 				"uz":       {"kun.uz": base + "/rss/kun", "gazeta.uz": base + "/rss/gazeta-oz", "uza.uz": base + "/rss/uza-oz", "daryo.uz": base + "/rss/daryo"},
