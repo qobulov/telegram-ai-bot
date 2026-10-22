@@ -3,12 +3,7 @@ package telegram
 import (
 	"strings"
 	"testing"
-	"unicode/utf16"
 )
-
-func utf16Len(s string) int {
-	return len(utf16.Encode([]rune(s)))
-}
 
 func TestSplitKeepsShortText(t *testing.T) {
 	chunks := Split("hello", MessageLimit)

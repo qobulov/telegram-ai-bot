@@ -564,6 +564,12 @@ cache, send `MariaBot/1.0 (+https://t.me/<bot username>)` as the user agent,
 and need no key except football. Text from outside sites comes back marked as
 untrusted in the tool descriptions.
 
+For data, such as a hero's stats or a list of prices, she marks key names and
+numbers with `**bold**` and puts items on lines starting with "• ". Messages
+are still sent without a parse mode: the code turns `**bold**`, `` `code` ``,
+headings and "* " bullets into Telegram entities itself, so a stray mark stays
+as text and never makes a send fail.
+
 ## Daily limit in private chats
 
 In a private chat each user gets `PRIVATE_DAILY_LIMIT` answers a day

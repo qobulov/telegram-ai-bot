@@ -181,7 +181,15 @@ type Photo struct {
 func (c *Client) SendPhoto(ctx context.Context, photo Photo) (int64, error) {
 	fields := map[string]string{}
 	if caption := strings.TrimSpace(photo.Caption); caption != "" {
-		fields["caption"] = cutRunes(caption, CaptionLimit)
+		text, entities := formatted(cutRunes(caption, CaptionLimit))
+		fields["caption"] = text
+		if len(entities) > 0 {
+			encoded, err := json.Marshal(entities)
+			if err != nil {
+				return 0, fmt.Errorf("telegram sendPhoto: encode: %w", err)
+			}
+			fields["caption_entities"] = string(encoded)
+		}
 	}
 	return c.upload(ctx, "sendPhoto", upload{
 		chatID: photo.ChatID, replyTo: photo.ReplyToMessageID, fields: fields,
@@ -387,6 +395,7 @@ func (c *Client) SendAnimation(ctx context.Context, chatID int64, animation stri
 type sendMessageParams struct {
 	ChatID          int64            `json:"chat_id"`
 	Text            string           `json:"text"`
+	Entities        []messageEntity  `json:"entities,omitempty"`
 	ReplyParameters *replyParameters `json:"reply_parameters,omitempty"`
 }
 
@@ -401,11 +410,12 @@ type sentMessage struct {
 	MessageID int64 `json:"message_id"`
 }
 
-// SendMessage sends plain text and returns the ID of the message Telegram
+// SendMessage sends text and returns the ID of the message Telegram
 // created. Text longer than Telegram allows is split into several messages;
 // only the first is a reply, and its ID is the one returned. Text is sent
-// without a parse mode so that stray Markdown or HTML in a model reply can
-// never make the send fail.
+// without a parse mode, so that stray Markdown or HTML in a model reply can
+// never make the send fail; its bold, code and bullets become entities
+// (see formatted).
 func (c *Client) SendMessage(ctx context.Context, msg Outgoing) (int64, error) {
 	var firstID int64
 	reply := replyTo(msg.ReplyToMessageID)
@@ -413,7 +423,8 @@ func (c *Client) SendMessage(ctx context.Context, msg Outgoing) (int64, error) {
 		if strings.TrimSpace(chunk) == "" {
 			continue
 		}
-		id, err := c.sendChunk(ctx, sendMessageParams{ChatID: msg.ChatID, Text: chunk, ReplyParameters: reply})
+		text, entities := formatted(chunk)
+		id, err := c.sendChunk(ctx, sendMessageParams{ChatID: msg.ChatID, Text: text, Entities: entities, ReplyParameters: reply})
 		if err != nil {
 			return firstID, err
 		}
