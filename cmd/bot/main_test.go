@@ -277,7 +277,7 @@ func TestServeAnswersWakeWordWithRecentChatterEndToEnd(t *testing.T) {
 		t.Errorf("system prompt = %.120q, want the persona with the group note", system)
 	}
 	question := request[len(request)-1].Content
-	for _, want := range []string{"Recent messages in the group, the last 14 hours", "Ann: Go is interpreted, everyone knows that", "Bek: no way 😀", "Bek: who is right?"} {
+	for _, want := range []string{"Recent messages in the group, the last 10 hours", "Ann: Go is interpreted, everyone knows that", "Bek: no way 😀", "Bek: who is right?"} {
 		if !strings.Contains(question, want) {
 			t.Errorf("user message %q does not contain %q", question, want)
 		}

@@ -143,30 +143,30 @@ func TestRecentMessagesAreGivenOldestFirstWithTimes(t *testing.T) {
 	if strings.Join(got, "|") != "Ann: two|Ann: three|Ann: four" {
 		t.Errorf("lines = %q, want the newest three, oldest first", got)
 	}
-	if !strings.Contains(strings.ToLower(ambientHeader), "untrusted") || !strings.Contains(ambientHeader, "the last 14 hours") {
+	if !strings.Contains(strings.ToLower(ambientHeader), "untrusted") || !strings.Contains(ambientHeader, "the last 10 hours") {
 		t.Errorf("header = %q", ambientHeader)
 	}
 }
 
-// The log reaches back 14 hours whatever the time of day, so a conversation
+// The log reaches back 10 hours whatever the time of day, so a conversation
 // that runs past midnight is not cut in two.
-func TestAmbientUsesFourteenHourWindow(t *testing.T) {
+func TestAmbientUsesTenHourWindow(t *testing.T) {
 	a, log := newTestAmbient(10)
 	now := time.Date(2026, 10, 14, 9, 0, 0, 0, tashkent)
-	log.now = func() time.Time { return now.Add(-15 * time.Hour) } // 18:00 yesterday in Tashkent
+	log.now = func() time.Time { return now.Add(-11 * time.Hour) } // 22:00 yesterday in Tashkent
 	a.add(groupID, 0, 4242, "Ann", "too long ago")
-	log.now = func() time.Time { return now.Add(-10 * time.Hour) } // 23:00 yesterday
+	log.now = func() time.Time { return now.Add(-9*time.Hour - 30*time.Minute) } // 23:30 yesterday
 	a.add(groupID, 0, 4242, "Ann", "last night")
 	log.now = func() time.Time { return now.Add(-time.Hour) } // 08:00 today
 	a.add(groupID, 0, 4242, "Ann", "this morning")
 
 	block := a.block(groupID, now)
 
-	if want := now.Add(-14 * time.Hour); !log.since.Equal(want) {
+	if want := now.Add(-10 * time.Hour); !log.since.Equal(want) {
 		t.Errorf("read since %v, want %v", log.since, want)
 	}
 	if got := blockLines(t, block); strings.Join(got, "|") != "Ann: last night|Ann: this morning" {
-		t.Errorf("lines = %q, want the last 14 hours, across midnight", got)
+		t.Errorf("lines = %q, want the last 10 hours, across midnight", got)
 	}
 	if !strings.Contains(block, "08:00 Ann: this morning") {
 		t.Errorf("block = %q, want the time in Tashkent", block)
