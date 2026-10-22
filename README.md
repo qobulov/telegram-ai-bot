@@ -556,7 +556,7 @@ answer instead of making up a number.
 | `wiki_lookup` | Article summaries, "on this day" | Wikipedia (CC BY-SA) |
 | `football` | League tables, the current matchday's matches, top scorers | football-data.org free tier; scores can lag, so "latest", not live |
 | `crypto_price` | Coin prices in dollars and sums | CoinGecko |
-| `mlbb` | Mobile Legends heroes: the meta by win, ban or pick rate, and a hero's rates, counters and best and worst teammates, by rank, over the last 7 days | Rone Arena API, a fan-made, keyless mirror of Moonton's MLBB Academy statistics; unofficial, cached for 3 hours |
+| `mlbb` | Mobile Legends heroes: the meta by win, ban or pick rate; a hero's role, lane, speciality, difficulty, skills and the game's tips, and its rates, counters and partners, by rank, over the last 7 days | Rone Arena API, a fan-made, keyless mirror of Moonton's MLBB Academy statistics; unofficial, cached for 3 hours |
 | `music_search` | Songs by title or artist with their links; a 30-second preview of the first match, named after the song, is sent as audio and is her whole answer | Deezer, keyless; Deezer gives only previews |
 
 The tools share one HTTP client with short timeouts and a small in-memory

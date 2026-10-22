@@ -18,20 +18,22 @@ const (
 		"main_hero":{"data":{"name":"Ling"}},"main_hero_win_rate":0.527652,"main_hero_appearance_rate":0.006991,"main_hero_ban_rate":0.006833,
 		"sub_hero":[{"heroid":69,"increase_win_rate":0.036573},{"heroid":999,"increase_win_rate":0.03}],
 		"sub_hero_last":[{"heroid":24,"increase_win_rate":-0.049257}]}}]}}`
-	arenaLingTeammates = `{"code":0,"data":{"records":[{"data":{
-		"main_hero":{"data":{"name":"Ling"}},"main_hero_win_rate":0.527652,
-		"sub_hero":[{"heroid":46,"increase_win_rate":0.014886}],
-		"sub_hero_last":[{"heroid":69,"increase_win_rate":-0.178989}]}}]}}`
+	arenaLingPage = `{"code":0,"data":{"records":[{"data":{
+		"hero":{"data":{"name":"Ling","difficulty":"60","speciality":["Chase","Burst"],"sortlabel":["Assassin",""],"roadsortlabel":["Jungling",""],
+			"story":"A graceful Finch.","heroskilllist":[{"skilllist":[
+				{"skillname":"Cloud Walker","skilldesc":"Leaps among walls.","skilltag":[{"tagname":"Buff"}]},
+				{"skillname":"Tempest of Blades","skilldesc":"<font color=\"a6aafb\">Ultimate</font>: Ling leaps into the air.","skilltag":[{"tagname":"Burst"},{"tagname":"CC"}]}]}]}},
+		"relation":{"assist":{"desc":"Works with CC supports.","target_hero_id":[46,0]},"strong":{"desc":"Strong against squishy heroes."},"weak":{"desc":"Weak against single-target CC."}}}}]}}`
 	arenaRank = `{"code":0,"data":{"records":[
 		{"data":{"main_hero":{"data":{"name":"Masha"}},"main_hero_win_rate":0.60985,"main_hero_appearance_rate":0.005404,"main_hero_ban_rate":0.35482}},
 		{"data":{"main_hero":{"data":{"name":"Marcel"}},"main_hero_win_rate":0.585272,"main_hero_appearance_rate":0.002,"main_hero_ban_rate":0.01}}]}}`
 )
 
-func TestMLBBHeroGivesRatesCountersAndTeammates(t *testing.T) {
+func TestMLBBHeroGivesItsPageRatesAndCounters(t *testing.T) {
 	u := newUpstream(t, map[string]stub{
-		"/arena/api/heroes":                  ok(arenaHeroes),
-		"/arena/api/heroes/84/counters":      ok(arenaLingCounters),
-		"/arena/api/heroes/84/compatibility": ok(arenaLingTeammates),
+		"/arena/api/heroes":             ok(arenaHeroes),
+		"/arena/api/heroes/84/counters": ok(arenaLingCounters),
+		"/arena/api/heroes/84":          ok(arenaLingPage),
 	})
 
 	out := result[mlbbHeroOutput](t, run(t, u.options(), "mlbb", `{"action":"hero","hero":"LING","rank":"mythic"}`))
@@ -45,8 +47,17 @@ func TestMLBBHeroGivesRatesCountersAndTeammates(t *testing.T) {
 	if len(out.CounteredBy) != 1 || out.CounteredBy[0] != (mlbbMatchup{Hero: "Natalia", WinRateChange: "-4.9%"}) {
 		t.Errorf("countered by = %+v", out.CounteredBy)
 	}
-	if len(out.BestTeammates) != 1 || out.BestTeammates[0].Hero != "Odette" || len(out.WorstTeammates) != 1 || out.WorstTeammates[0] != (mlbbMatchup{Hero: "Hanzo", WinRateChange: "-17.9%"}) {
-		t.Errorf("teammates = %+v / %+v", out.BestTeammates, out.WorstTeammates)
+	if strings.Join(out.GoodPartners, ",") != "Odette" {
+		t.Errorf("partners = %q, want Odette and the padding 0 left out", out.GoodPartners)
+	}
+	if strings.Join(out.Roles, ",") != "Assassin" || strings.Join(out.Lanes, ",") != "Jungling" || strings.Join(out.Specialities, ",") != "Chase,Burst" || out.Difficulty != "60/100" || out.Story != "A graceful Finch." {
+		t.Errorf("hero = %+v, want empty labels dropped", out)
+	}
+	if len(out.Skills) != 2 || out.Skills[1].Name != "Tempest of Blades" || out.Skills[1].Description != "Ultimate : Ling leaps into the air." || strings.Join(out.Skills[1].Tags, ",") != "Burst,CC" {
+		t.Errorf("skills = %+v, want the game's markup taken out", out.Skills)
+	}
+	if out.Tips != (mlbbTips{WorksWith: "Works with CC supports.", StrongAgainst: "Strong against squishy heroes.", WeakAgainst: "Weak against single-target CC."}) {
+		t.Errorf("tips = %+v", out.Tips)
 	}
 	if q := u.requests("/arena/api/heroes/84/counters")[0].URL.Query(); q.Get("rank") != "mythic" || q.Get("days") != "7" {
 		t.Errorf("query = %v", q)
@@ -57,9 +68,9 @@ func TestMLBBHeroGivesRatesCountersAndTeammates(t *testing.T) {
 // for once.
 func TestMLBBHeroNames(t *testing.T) {
 	u := newUpstream(t, map[string]stub{
-		"/arena/api/heroes":                  ok(arenaHeroes),
-		"/arena/api/heroes/30/counters":      ok(arenaLingCounters),
-		"/arena/api/heroes/30/compatibility": ok(arenaLingTeammates),
+		"/arena/api/heroes":             ok(arenaHeroes),
+		"/arena/api/heroes/30/counters": ok(arenaLingCounters),
+		"/arena/api/heroes/30":          ok(arenaLingPage),
 	})
 	reg := newRegistry(t, u.options())
 
@@ -103,10 +114,10 @@ func TestMLBBRefusesBadArguments(t *testing.T) {
 // model can tell, not an empty answer.
 func TestMLBBUpstreamTrouble(t *testing.T) {
 	u := newUpstream(t, map[string]stub{
-		"/arena/api/heroes":                  ok(arenaHeroes),
-		"/arena/api/heroes/84/counters":      ok(`{"code":0,"data":{"records":[]}}`),
-		"/arena/api/heroes/84/compatibility": ok(arenaLingTeammates),
-		"/arena/api/heroes/rank":             status(503),
+		"/arena/api/heroes":             ok(arenaHeroes),
+		"/arena/api/heroes/84/counters": ok(`{"code":0,"data":{"records":[]}}`),
+		"/arena/api/heroes/84":          ok(arenaLingPage),
+		"/arena/api/heroes/rank":        status(503),
 	})
 	if env := run(t, u.options(), "mlbb", `{"action":"hero","hero":"Ling"}`); env.OK || !strings.Contains(env.raw, "no statistics") {
 		t.Errorf("an empty answer was taken for statistics: %s", env.raw)
