@@ -382,9 +382,9 @@ func TestSwearGuardAnswersASwearAtTheBotWithAClip(t *testing.T) {
 	}
 }
 
-// Both clips are there, and the square one is sent round.
+// Both clips are there, and both go as GIFs.
 func TestSwearClips(t *testing.T) {
-	if len(swearClips) != 2 || len(blokkaClip) < 1000 || len(aqliniClip) < 1000 || swearClips[0].Round || !swearClips[1].Round {
+	if len(swearClips) != 2 || len(blokkaClip) < 1000 || len(aqliniClip) < 1000 || swearClips[0].Round || swearClips[1].Round {
 		t.Errorf("clips = %d, sizes %d and %d", len(swearClips), len(blokkaClip), len(aqliniClip))
 	}
 }

@@ -9,15 +9,15 @@ import (
 )
 
 // The clips the guard answers a swear at the bot with, chosen by the
-// owners: "Блокка кетдинг", wide, and "Aqlini kiritib", square, which is
-// sent round.
+// owners: "Блокка кетдинг" and "Aqlini kiritib", both sent as GIFs, as the
+// owners asked.
 var (
 	//go:embed clips/blokka.mp4
 	blokkaClip []byte
 	//go:embed clips/aqlini.mp4
 	aqliniClip []byte
 
-	swearClips = []telegram.Clip{{Data: blokkaClip}, {Data: aqliniClip, Round: true}}
+	swearClips = []telegram.Clip{{Data: blokkaClip}, {Data: aqliniClip}}
 )
 
 // ClipSender uploads a short video.
