@@ -875,9 +875,9 @@ instead. The model reads the item's English name off each card and keeps it
 as the sticker's description, marked `mlbb_item` (`mlbb_item_none` for a
 sticker that is no card), which takes the card out of the moods even when
 `/import_stickers` labelled it first. When someone asks about an item, the
-`mlbb_item_card` tool finds its card by name, or by a part of the name only
-one card has, and the card is sent as a sticker after a one-line answer,
-outside the stickers' 30-second gap.
+`mlbb_item_card` tool finds the cards, up to six in one call for a whole
+build, by name or by a part of the name only one card has, and they are sent
+as stickers after a one-line answer, outside the stickers' 30-second gap.
 
 Now and then, about one time in four, she asks for `[gif CATEGORY]` instead.
 With `GIPHY_API_KEY` set, the code searches GIPHY for that mood (rated PG at
