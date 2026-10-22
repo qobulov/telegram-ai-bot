@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 const (
@@ -53,11 +54,15 @@ type searchResult struct {
 	} `json:"data"`
 }
 
-// Search returns the MP4 links of GIFs for category, rated PG at most so
-// that nothing unfit for a group comes back; none for an unknown category.
-func (c *Client) Search(ctx context.Context, category string) ([]string, error) {
-	query, ok := queries[category]
+// Search returns the MP4 links of GIFs for subject, a sticker category or
+// a topic in a few English words such as "pubg", rated PG at most so that
+// nothing unfit for a group comes back.
+func (c *Client) Search(ctx context.Context, subject string) ([]string, error) {
+	query, ok := queries[subject]
 	if !ok {
+		query = strings.TrimSpace(subject)
+	}
+	if query == "" {
 		return nil, nil
 	}
 	base := c.BaseURL

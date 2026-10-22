@@ -56,7 +56,23 @@ func TestEveryCategoryHasAQuery(t *testing.T) {
 	if len(queries) != len(stickers.Categories) {
 		t.Errorf("%d queries for %d categories", len(queries), len(stickers.Categories))
 	}
-	if links, err := (&Client{}).Search(context.Background(), "dancing"); links != nil || err != nil {
-		t.Errorf("an unknown category searched: %q, %v", links, err)
+}
+
+// A topic, which is no mood, is searched as written; nothing is not searched.
+func TestSearchForATopic(t *testing.T) {
+	var asked string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked = r.URL.Query().Get("q")
+		_, _ = w.Write([]byte(`{"data":[{"images":{"fixed_height":{"mp4":"https://media.giphy.com/2.mp4"}}}]}`))
+	}))
+	defer server.Close()
+	c := &Client{APIKey: "k", BaseURL: server.URL}
+
+	if links, err := c.Search(context.Background(), "pubg winner"); err != nil || len(links) != 1 || asked != "pubg winner" {
+		t.Errorf("links = %q, err = %v, asked %q", links, err, asked)
+	}
+	asked = ""
+	if links, err := c.Search(context.Background(), "  "); links != nil || err != nil || asked != "" {
+		t.Errorf("an empty topic searched: %q, %v", links, err)
 	}
 }

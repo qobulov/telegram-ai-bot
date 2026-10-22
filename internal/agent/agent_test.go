@@ -711,6 +711,7 @@ func TestGIFMarkerIsTakenOut(t *testing.T) {
 	cases := map[string]struct{ text, gif, saved string }{
 		"Yana shu ahvol [gif facepalm]": {"Yana shu ahvol", "", "Yana shu ahvol"},
 		"[GIF celebration]":             {"", "celebration", "<gif celebration>"},
+		"[gif PUBG  winner]":            {"", "pubg winner", "<gif pubg winner>"},
 	}
 	for content, want := range cases {
 		f := newFixture(text(content))

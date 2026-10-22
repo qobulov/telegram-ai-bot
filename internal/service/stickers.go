@@ -64,9 +64,10 @@ type MediaSlots interface {
 }
 
 // sendMedia sends the sticker or GIF the model asked for, and returns its
-// message's ID, or 0. A GIF that cannot be sent becomes a sticker of the
-// same category. What was not sent is cleared from out, so that the log
-// tells later turns only of what the chat saw.
+// message's ID, or 0. A GIF of a mood that cannot be sent becomes a sticker
+// of that mood; one of a topic, such as "pubg", has none to become. What
+// was not sent is cleared from out, so that the log tells later turns only
+// of what the chat saw.
 func (s *Service) sendMedia(in incoming, out *outcome) int64 {
 	if out.gif != "" && (s.opts.GIFs == nil || s.opts.AnimationSender == nil || s.opts.MediaSlots == nil) {
 		out.sticker, out.gif = out.gif, ""
@@ -76,7 +77,7 @@ func (s *Service) sendMedia(in incoming, out *outcome) int64 {
 		if id != 0 {
 			return id
 		}
-		if claimed {
+		if claimed && stickers.IsCategory(out.gif) {
 			// The slot is this answer's already; a sticker may use it.
 			out.sticker = out.gif
 			out.gif = ""
@@ -96,13 +97,10 @@ func (s *Service) sendStickerWithin(in incoming, out *outcome, gap time.Duration
 	return id
 }
 
-// sendGIF sends a GIF of category and returns its message's ID, or 0, and
-// whether it took the chat's slot for one. A failure after that costs only
-// the GIF.
+// sendGIF sends a GIF of category, a mood or a topic, and returns its
+// message's ID, or 0, and whether it took the chat's slot for one. A
+// failure after that costs only the GIF.
 func (s *Service) sendGIF(in incoming, category string) (int64, bool) {
-	if !stickers.IsCategory(category) {
-		return 0, false
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
 	defer cancel()
 	claimed, err := s.opts.MediaSlots.ClaimMediaSlot(ctx, in.msg.Chat.ID, stickerGap)

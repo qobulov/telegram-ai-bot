@@ -224,7 +224,7 @@ func finish(t *turn, reply ai.Message) (Answer, error) {
 		return Answer{}, ErrLeakedThinking
 	}
 	if marker := mediaMarkers.FindStringSubmatch(answer); marker != nil {
-		kind, media := strings.ToLower(marker[1]), strings.ToLower(marker[2])
+		kind, media := strings.ToLower(marker[1]), strings.Join(strings.Fields(strings.ToLower(marker[2])), " ")
 		answer = tidy(mediaMarkers.ReplaceAllString(answer, " "))
 		if !hasWords(answer) && !reactMarkers.MatchString(answer) {
 			// A sticker or a GIF alone is the whole answer.
@@ -248,9 +248,10 @@ func finish(t *turn, reply ai.Message) (Answer, error) {
 	return Answer{Text: answer}, nil
 }
 
-// mediaMarkers finds "[sticker funny]" and "[gif facepalm]", and "<sticker
-// funny>", which is how one looks in the history and which models copy.
-var mediaMarkers = regexp.MustCompile(`(?i)[\[<]\s*(sticker|gif)\s+([a-z]+)\s*[\]>]`)
+// mediaMarkers finds "[sticker funny]", "[gif facepalm]" and a GIF of a
+// topic, "[gif pubg winner]", and "<sticker funny>", which is how one looks
+// in the history and which models copy.
+var mediaMarkers = regexp.MustCompile(`(?i)[\[<]\s*(sticker|gif)\s+([a-z0-9][a-z0-9 '-]{0,39}?)\s*[\]>]`)
 
 // withMedia is answer asking for a sticker or a GIF of category.
 func withMedia(answer Answer, kind, category string) Answer {

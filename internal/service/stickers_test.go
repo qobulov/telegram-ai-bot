@@ -181,6 +181,34 @@ func (f *fakeGIFs) ClaimMediaSlot(context.Context, int64, time.Duration) (bool, 
 	return !f.slotTaken, nil
 }
 
+// A GIF of a topic is sent; one that cannot be is nothing, since a topic has
+// no sticker.
+func TestGIFOfATopic(t *testing.T) {
+	for name, c := range map[string]struct {
+		gifs *fakeGIFs
+		want int
+		log  string
+	}{
+		"sent":       {&fakeGIFs{links: []string{"https://g/1.mp4"}}, 1, "<gif pubg>"},
+		"none found": {&fakeGIFs{}, 0, ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			st := withStickers(f)
+			f.opts.GIFs, f.opts.AnimationSender, f.opts.MediaSlots = c.gifs, c.gifs, c.gifs
+			f.replier.gif = "pubg"
+			f.run(inGroup(groupMessage("Mira, pubg haqida gif tasha")))
+			if len(c.gifs.sent) != c.want || len(st.sent) != 0 {
+				t.Errorf("GIFs %d, stickers %q; want %d GIFs and no sticker", len(c.gifs.sent), st.sent, c.want)
+			}
+			log := strings.Join(f.chatLog.texts(groupID), "\n")
+			if c.log != "" && !strings.Contains(log, c.log) || c.log == "" && strings.Contains(log, "<gif") {
+				t.Errorf("log = %q, want %q", log, c.log)
+			}
+		})
+	}
+}
+
 // A GIF the model asks for is sent; one that cannot be becomes a sticker of
 // the same category; one past the chat's slot is nothing; and without GIPHY
 // it is a sticker.

@@ -849,7 +849,10 @@ Now and then, about one time in four, she asks for `[gif CATEGORY]` instead.
 With `GIPHY_API_KEY` set, the code searches GIPHY for that mood (rated PG at
 most), picks one of the first ten at random and sends it; the GIF and the
 stickers share the 30-second gap. When the search or the send fails, or
-there is no key, a sticker of the same category goes instead. GIPHY's free
+there is no key, a sticker of the same category goes instead. Asked for a
+GIF of something, she writes `[gif TOPIC]`, the topic in a few English words
+such as `[gif pubg]`, and GIPHY is searched for those words; a topic has no
+sticker to fall back on, so when it fails nothing is sent. GIPHY's free
 key allows 100 searches an hour, far more than she sends.
 
 ### Polls
