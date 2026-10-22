@@ -100,9 +100,10 @@ func scanMessage(row pgx.CollectableRow) (ai.Message, error) {
 	return msg, nil
 }
 
-// SaveTurn stores one complete turn in a single transaction, so the history
-// never contains half of a tool exchange. It returns the row ID of the last
-// message, the assistant's answer, for use with SetSentMessageID.
+// SaveTurn stores one complete turn in a single statement, so the history
+// never contains half of a tool exchange, and the database, which bills
+// every query, is asked once. It returns the row ID of the last message,
+// the assistant's answer, for use with SetSentMessageID.
 //
 // The update ID is recorded on the first message. Saving the same update
 // twice returns ErrDuplicateUpdate and changes nothing.
@@ -110,15 +111,15 @@ func (s *Store) SaveTurn(ctx context.Context, turn Turn) (int64, error) {
 	if len(turn.Messages) == 0 {
 		return 0, errors.New("storage: a turn needs at least one message")
 	}
+	rows, err := turnRows(turn)
+	if err != nil {
+		return 0, fmt.Errorf("storage: save turn: %w", err)
+	}
 	var answerID int64
-	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		conversationID, err := touchConversation(ctx, tx, turn)
-		if err != nil {
-			return err
-		}
-		answerID, err = insertMessages(ctx, tx, conversationID, turn)
-		return err
-	})
+	err = s.pool.QueryRow(ctx, saveTurnSQL(turn.Scope),
+		turn.Scope.ChatID, nonZero(turn.Scope.UserID), nonZero(authorOf(turn)),
+		rows.role, rows.content, rows.toolCalls, rows.toolCallID,
+		rows.update, rows.message, rows.replyTo, rows.authorID, rows.authorName).Scan(&answerID)
 	if isDuplicateUpdate(err) {
 		return 0, ErrDuplicateUpdate
 	}
@@ -128,15 +129,38 @@ func (s *Store) SaveTurn(ctx context.Context, turn Turn) (int64, error) {
 	return answerID, nil
 }
 
-// touchConversation makes sure the author and the conversation exist, marks
-// both as active now, and returns the conversation ID.
-func touchConversation(ctx context.Context, tx pgx.Tx, turn Turn) (int64, error) {
-	if err := touchUser(ctx, tx, authorOf(turn)); err != nil {
-		return 0, err
+// saveTurnSQL makes sure the author and the conversation exist, marks both
+// as active now, and appends the turn's messages in order, returning the
+// last one's ID. The two kinds of conversation are kept unique by different
+// indexes, so the conflict target differs.
+func saveTurnSQL(scope Scope) string {
+	conflict := `(chat_id, user_id)`
+	if scope.Shared() {
+		conflict = `(chat_id) WHERE user_id IS NULL`
 	}
-	var conversationID int64
-	err := tx.QueryRow(ctx, upsertConversation(turn.Scope), turn.Scope.ChatID, nonZero(turn.Scope.UserID)).Scan(&conversationID)
-	return conversationID, err
+	return `
+		WITH author AS (
+			INSERT INTO users (telegram_id) SELECT $3 WHERE $3::bigint IS NOT NULL
+			ON CONFLICT (telegram_id) DO UPDATE SET last_seen_at = now()
+		), conversation AS (
+			INSERT INTO conversations (chat_id, user_id) VALUES ($1, $2)
+			ON CONFLICT ` + conflict + ` DO UPDATE SET updated_at = now()
+			RETURNING id
+		), saved AS (
+			INSERT INTO messages (conversation_id, role, content, tool_calls, tool_call_id,
+			                      update_id, telegram_message_id, reply_to_message_id,
+			                      author_id, author_name)
+			SELECT conversation.id, m.role, m.content, m.tool_calls::jsonb, m.tool_call_id,
+			       m.update_id, m.message_id, m.reply_to, m.author_id, m.author_name
+			FROM conversation,
+			     unnest($4::text[], $5::text[], $6::text[], $7::text[], $8::bigint[], $9::bigint[],
+			            $10::bigint[], $11::bigint[], $12::text[])
+			     WITH ORDINALITY AS m(role, content, tool_calls, tool_call_id, update_id, message_id,
+			                          reply_to, author_id, author_name, ord)
+			ORDER BY m.ord
+			RETURNING id
+		)
+		SELECT max(id) FROM saved`
 }
 
 // authorOf is the user who wrote the turn's message: the scope's user in a
@@ -148,54 +172,49 @@ func authorOf(turn Turn) int64 {
 	return turn.Scope.UserID
 }
 
-func touchUser(ctx context.Context, tx pgx.Tx, userID int64) error {
-	if userID == 0 {
-		return nil
-	}
-	_, err := tx.Exec(ctx, `
-		INSERT INTO users (telegram_id) VALUES ($1)
-		ON CONFLICT (telegram_id) DO UPDATE SET last_seen_at = now()`, userID)
-	return err
+// messageRows are a turn's messages as columns, one array each, for unnest.
+type messageRows struct {
+	role, content                     []string
+	toolCalls, toolCallID, authorName []*string
+	update, message, replyTo          []*int64
+	authorID                          []*int64
 }
 
-// upsertConversation returns the statement for the scope's kind. The two
-// kinds are kept unique by different indexes, so the conflict target differs.
-func upsertConversation(scope Scope) string {
-	if scope.Shared() {
-		return `
-			INSERT INTO conversations (chat_id, user_id) VALUES ($1, $2)
-			ON CONFLICT (chat_id) WHERE user_id IS NULL DO UPDATE SET updated_at = now()
-			RETURNING id`
-	}
-	return `
-		INSERT INTO conversations (chat_id, user_id) VALUES ($1, $2)
-		ON CONFLICT (chat_id, user_id) DO UPDATE SET updated_at = now()
-		RETURNING id`
-}
-
-// insertMessages writes the turn's messages in order and returns the row ID
-// of the last one.
-func insertMessages(ctx context.Context, tx pgx.Tx, conversationID int64, turn Turn) (int64, error) {
-	var lastID int64
+func turnRows(turn Turn) (messageRows, error) {
+	var rows messageRows
 	for i, msg := range turn.Messages {
 		toolCalls, err := encodeToolCalls(msg.ToolCalls)
 		if err != nil {
-			return 0, err
+			return messageRows{}, err
 		}
 		ids := telegramIDs(turn, i)
-		err = tx.QueryRow(ctx, `
-			INSERT INTO messages (conversation_id, role, content, tool_calls, tool_call_id,
-			                      update_id, telegram_message_id, reply_to_message_id,
-			                      author_id, author_name)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-			RETURNING id`,
-			conversationID, msg.Role, msg.Content, toolCalls, nullable(msg.ToolCallID),
-			ids.update, ids.message, ids.replyTo, ids.authorID, ids.authorName).Scan(&lastID)
-		if err != nil {
-			return 0, err
-		}
+		rows.role = append(rows.role, msg.Role)
+		rows.content = append(rows.content, msg.Content)
+		rows.toolCalls = append(rows.toolCalls, textOrNil(toolCalls))
+		rows.toolCallID = append(rows.toolCallID, textOrNil(nullable(msg.ToolCallID)))
+		rows.update = append(rows.update, numberOrNil(ids.update))
+		rows.message = append(rows.message, numberOrNil(ids.message))
+		rows.replyTo = append(rows.replyTo, numberOrNil(ids.replyTo))
+		rows.authorID = append(rows.authorID, numberOrNil(ids.authorID))
+		rows.authorName = append(rows.authorName, textOrNil(ids.authorName))
 	}
-	return lastID, nil
+	return rows, nil
+}
+
+// textOrNil and numberOrNil turn the values nullable and nonZero give, nil
+// or a value, into what an array of a nullable column takes.
+func textOrNil(value any) *string {
+	if text, ok := value.(string); ok {
+		return &text
+	}
+	return nil
+}
+
+func numberOrNil(value any) *int64 {
+	if n, ok := value.(int64); ok {
+		return &n
+	}
+	return nil
 }
 
 // rowIDs are the Telegram identifiers stored with one message row. A nil

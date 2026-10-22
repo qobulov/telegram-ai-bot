@@ -298,6 +298,10 @@ type Service struct {
 
 	mutedMu sync.RWMutex
 	muted   map[int64]bool
+	// mutes and members remember what the database said lately; see
+	// recently.go.
+	mutes   *recently[int64, bool]
+	members *recently[memberKey, memberName]
 
 	// typingInterval is how often "typing" is shown again while a turn
 	// runs: typingRefresh, shortened by tests.
@@ -364,6 +368,8 @@ func New(opts Options) *Service {
 		userLimiter:    newLimiter(opts.RatePerMinute),
 		ambient:        newAmbient(opts.ChatLog, opts.AmbientMessages, opts.Location, opts.Logger),
 		muted:          make(map[int64]bool, len(opts.MutedChats)),
+		mutes:          newRecently[int64, bool](muteMemory, opts.Now),
+		members:        newRecently[memberKey, memberName](memberMemory, opts.Now),
 		queues:         make([]chan incoming, opts.Workers),
 		notices:        make(chan incoming, noticeQueueSize),
 		transcribing:   make(chan struct{}, backgroundTranscriptions),
@@ -487,6 +493,12 @@ func (s *Service) seeMember(chatID int64, user *telegram.User, status string) {
 	if s.opts.Roster == nil || user == nil || user.ID == s.opts.Bot.ID {
 		return
 	}
+	// A member who only wrote again, under the same name, is recorded
+	// already; a join, leave or ban always is.
+	key, name := memberKey{chatID, user.ID}, memberName{user.FirstName, user.Username}
+	if seen, ok := s.members.get(key); ok && status == "" && seen == name {
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
 	defer cancel()
 	err := s.opts.Roster.SeeMember(ctx, storage.GroupMember{
@@ -494,7 +506,9 @@ func (s *Service) seeMember(chatID int64, user *telegram.User, status string) {
 	})
 	if err != nil {
 		s.opts.Logger.Warn("could not record a group member", "chat_id", chatID, "error", err)
+		return
 	}
+	s.members.set(key, name)
 }
 
 // accept keeps messages from a person, sent either in a private chat or, in
@@ -583,7 +597,7 @@ func (s *Service) acceptGroup(in incoming) (incoming, bool) {
 	if how == triggerNone {
 		// Checked in this order so that, with the buffer off, an ordinary
 		// group message costs no mute lookup at all.
-		if s.ambient.enabled() && !s.isMuted(in.scope.ChatID) {
+		if s.ambient.enabled() && !s.isMutedLately(in.scope.ChatID) {
 			s.remember(in.msg)
 		}
 		return incoming{}, false
@@ -786,6 +800,22 @@ func (s *Service) isMuted(chatID int64) bool {
 	return s.muted[chatID]
 }
 
+// isMutedLately is isMuted for what only decides whether chatter is logged,
+// where an answer up to muteMemory old does no harm: every message of a busy
+// group would otherwise cost a query. Whether the bot speaks is always asked
+// afresh, as another instance may have just muted or unmuted it.
+func (s *Service) isMutedLately(chatID int64) bool {
+	if s.opts.MuteStore == nil {
+		return s.isMuted(chatID)
+	}
+	if muted, ok := s.mutes.get(chatID); ok {
+		return muted
+	}
+	muted := s.lookUpMuted(chatID)
+	s.mutes.set(chatID, muted)
+	return muted
+}
+
 // lookUpMuted asks the store. If the answer cannot be had, the bot stays
 // quiet: speaking in a group that asked for silence is worse than missing
 // one message. The mute commands themselves are not affected by this.
@@ -797,10 +827,12 @@ func (s *Service) lookUpMuted(chatID int64) bool {
 		s.opts.Logger.Error("mute lookup failed; staying quiet", "chat_id", chatID, "error", err)
 		return true
 	}
+	s.mutes.set(chatID, muted)
 	return muted
 }
 
 func (s *Service) markMuted(chatID int64, muted bool) {
+	s.mutes.set(chatID, muted)
 	s.mutedMu.Lock()
 	defer s.mutedMu.Unlock()
 	if muted {

@@ -54,11 +54,12 @@ func TestMembersAreNotedFromWhatTheGroupShows(t *testing.T) {
 
 	f.run(inGroup(chatter), inGroup(joined), inGroup(left), banned, inGroup(fromBot), textFrom(userID, "private hi"))
 
+	// Bek is noted again only when his name changed: the third and fourth
+	// messages show him as the second did, so he is not written again.
 	want := []storage.GroupMember{
 		{ChatID: groupID, UserID: userID, FirstName: "Bek", Username: "bek"},
 		{ChatID: groupID, UserID: userID, FirstName: "Bek"},
 		{ChatID: groupID, UserID: 7007, FirstName: "Said", Username: "said_05", Status: "member"},
-		{ChatID: groupID, UserID: userID, FirstName: "Bek"},
 		{ChatID: groupID, UserID: 8008, FirstName: "Gone", Status: "left"},
 		{ChatID: groupID, UserID: 9009, FirstName: "Spam", Status: "kicked"},
 	}

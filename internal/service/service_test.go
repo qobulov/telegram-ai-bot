@@ -3434,3 +3434,27 @@ func TestVoicePastTheDailyLimitIsNotTranscribed(t *testing.T) {
 		t.Errorf("model calls = %+v, want the one transcript", calls)
 	}
 }
+
+// Whether chatter is logged asks the store once a muteMemory, not once a
+// message: a busy group would otherwise cost a query a message.
+func TestChatterAsksTheMuteStoreOnceAWhile(t *testing.T) {
+	f := newFixture()
+	now := time.Now()
+	f.opts.Now = func() time.Time { return now }
+	store := &fakeMuteStore{}
+	f.opts.Workers, f.opts.QueueSize, f.opts.MuteStore = 0, 0, store
+	s := New(f.opts)
+	defer s.Close()
+
+	for range 5 {
+		s.HandleNow(inGroup(groupMessage("just chatting")))
+	}
+	if store.lookups != 1 {
+		t.Errorf("lookups = %d for five messages, want 1", store.lookups)
+	}
+	now = now.Add(muteMemory + time.Second)
+	s.HandleNow(inGroup(groupMessage("still chatting")))
+	if store.lookups != 2 {
+		t.Errorf("lookups = %d, want a second once the answer is old", store.lookups)
+	}
+}
