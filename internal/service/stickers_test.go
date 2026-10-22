@@ -177,8 +177,9 @@ func (f *fakeGIFs) SendAnimation(_ context.Context, _ int64, link string, _ int6
 	return 800, nil
 }
 
-func (f *fakeGIFs) ClaimMediaSlot(context.Context, int64, time.Duration) (bool, error) {
-	return !f.slotTaken, nil
+func (f *fakeGIFs) ClaimMediaSlot(_ context.Context, _ int64, gap time.Duration) (bool, error) {
+	// A slot taken is taken for any gap but none.
+	return !f.slotTaken || gap == 0, nil
 }
 
 // A GIF of a topic is sent; when none is found, the asker is told so, as a
@@ -191,6 +192,8 @@ func TestGIFOfATopic(t *testing.T) {
 	}{
 		"sent":       {&fakeGIFs{links: []string{"https://g/1.mp4"}}, 1, "<gif pubg>"},
 		"none found": {&fakeGIFs{}, 0, textNoGIF},
+		// Asked for, it does not wait out the gap after the last sticker.
+		"right after a sticker": {&fakeGIFs{links: []string{"https://g/1.mp4"}, slotTaken: true}, 1, "<gif pubg>"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := newFixture()

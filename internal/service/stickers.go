@@ -109,7 +109,13 @@ func (s *Service) sendStickerWithin(in incoming, out *outcome, gap time.Duration
 func (s *Service) sendGIF(in incoming, category string) (int64, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
 	defer cancel()
-	claimed, err := s.opts.MediaSlots.ClaimMediaSlot(ctx, in.msg.Chat.ID, stickerGap)
+	// A GIF of a topic was asked for, so the gap that keeps the bot's own
+	// stickers a seasoning does not hold it back.
+	gap := stickerGap
+	if !stickers.IsCategory(category) {
+		gap = 0
+	}
+	claimed, err := s.opts.MediaSlots.ClaimMediaSlot(ctx, in.msg.Chat.ID, gap)
 	if err != nil || !claimed {
 		return 0, false
 	}
