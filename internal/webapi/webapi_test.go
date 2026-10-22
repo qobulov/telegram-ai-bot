@@ -131,6 +131,7 @@ func (u *upstream) options() Options {
 			FootballData:      base + "/football",
 			CoinGecko:         base + "/coingecko",
 			Deezer:            base + "/deezer",
+			RoneArena:         base + "/arena",
 			Wikipedia:         base + "/wiki/%s",
 			News: map[string]map[string]string{
 				"uz": {"kun.uz": base + "/rss/kun", "gazeta.uz": base + "/rss/gazeta-oz", "uza.uz": base + "/rss/uza-oz", "daryo.uz": base + "/rss/daryo"},
@@ -274,7 +275,7 @@ func toolNames(list []tools.Tool) string {
 
 func TestToolsListsTheLiveDataTools(t *testing.T) {
 	opts := newUpstream(t, nil).options()
-	if got, want := toolNames(Tools(opts)), "currency_rate,get_weather,prayer_times,news_headlines,wiki_lookup,crypto_price,music_search"; got != want {
+	if got, want := toolNames(Tools(opts)), "currency_rate,get_weather,prayer_times,news_headlines,wiki_lookup,crypto_price,music_search,mlbb"; got != want {
 		t.Errorf("tools = %s, want %s", got, want)
 	}
 }

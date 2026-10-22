@@ -1,6 +1,6 @@
 // Package webapi gives the model live data from public web APIs: exchange
 // rates, weather, prayer times, news headlines, Wikipedia, football, crypto
-// prices and songs. Every result names its source, and text written by outside
+// prices, songs and Mobile Legends heroes. Every result names its source, and text written by outside
 // sites comes back under fields the tool descriptions call untrusted.
 package webapi
 
@@ -64,6 +64,7 @@ type BaseURLs struct {
 	FootballData      string
 	CoinGecko         string
 	Deezer            string
+	RoneArena         string
 	// Wikipedia is a format string with %s for the language code.
 	Wikipedia string
 	// News maps a language (uz, ru) to its feeds by source name. The name
@@ -84,6 +85,7 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.FootballData = cmp.Or(b.FootballData, "https://api.football-data.org")
 	b.CoinGecko = cmp.Or(b.CoinGecko, "https://api.coingecko.com")
 	b.Deezer = cmp.Or(b.Deezer, "https://api.deezer.com")
+	b.RoneArena = cmp.Or(b.RoneArena, "https://arena.rone.dev")
 	b.Wikipedia = cmp.Or(b.Wikipedia, "https://%s.wikipedia.org")
 	if b.News == nil {
 		b.News = map[string]map[string]string{
@@ -127,6 +129,7 @@ func Tools(opts Options) []tools.Tool {
 		a.wikiTool(),
 		a.cryptoTool(),
 		a.musicTool(),
+		a.mlbbTool(),
 	}
 	if a.footballToken != "" {
 		list = append(list, a.footballTool())
