@@ -240,6 +240,9 @@ type Options struct {
 	GIFs            GIFSearcher
 	AnimationSender AnimationSender
 	MediaSlots      MediaSlots
+	// AudioSender sends the sounds a tool found, such as a song's preview;
+	// nil sends none.
+	AudioSender AudioSender
 	// Answers tells whom one of the bot's answers in a group answered, so
 	// that "don't answer him", replying to it, means that member; nil means
 	// it is never known.

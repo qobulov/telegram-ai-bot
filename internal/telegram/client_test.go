@@ -1033,3 +1033,15 @@ func TestSendAnimationSendsTheLink(t *testing.T) {
 		t.Errorf("call = %+v", sent)
 	}
 }
+
+func TestSendAudioSendsTheLinkWithItsTitle(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"message_id":93}}`)
+	id, err := client.SendAudio(context.Background(), -100123, "https://cdns-preview.dzcdn.net/1.mp3", "Yurak", "Shohruhxon", 40)
+	if err != nil || id != 93 {
+		t.Fatalf("id = %d, err = %v", id, err)
+	}
+	sent := api.recorded()[0]
+	if sent.method != "sendAudio" || sent.params["audio"] != "https://cdns-preview.dzcdn.net/1.mp3" || sent.params["title"] != "Yurak" || sent.params["performer"] != "Shohruhxon" {
+		t.Errorf("call = %+v", sent)
+	}
+}

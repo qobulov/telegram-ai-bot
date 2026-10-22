@@ -10,6 +10,7 @@ import (
 
 	"telegram-ai-bot/internal/stickers"
 	"telegram-ai-bot/internal/storage"
+	"telegram-ai-bot/internal/tools"
 )
 
 type fakeStickers struct {
@@ -215,5 +216,36 @@ func TestGIFOrItsSticker(t *testing.T) {
 				t.Errorf("log = %q, want %q", log, c.log)
 			}
 		})
+	}
+}
+
+type fakeAudioSender struct {
+	mu   sync.Mutex
+	sent []string
+}
+
+func (f *fakeAudioSender) SendAudio(_ context.Context, _ int64, link, title, performer string, _ int64) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sent = append(f.sent, performer+" — "+title+" "+link)
+	return 900, nil
+}
+
+// A song's preview the music tool found goes after the answer that tells of
+// it, and the log notes it.
+func TestSongPreviewFollowsTheAnswer(t *testing.T) {
+	f := newFixture()
+	audio := &fakeAudioSender{}
+	f.opts.AudioSender = audio
+	f.replier.answer = "Mana, Shohruhxonning «Yurak» qo'shig'i"
+	f.replier.audios = []tools.Audio{{URL: "https://cdns-preview.dzcdn.net/1.mp3", Title: "Yurak", Performer: "Shohruhxon"}}
+
+	sent := f.run(inGroup(groupMessage("Mira, Shohruhxon Yurak qo'shig'ini top")))
+
+	if len(sent) != 1 || len(audio.sent) != 1 || audio.sent[0] != "Shohruhxon — Yurak https://cdns-preview.dzcdn.net/1.mp3" {
+		t.Errorf("texts %+v, audio %q", sent, audio.sent)
+	}
+	if log := strings.Join(f.chatLog.texts(groupID), "\n"); !strings.Contains(log, "<audio Shohruhxon — Yurak>") {
+		t.Errorf("log = %q", log)
 	}
 }

@@ -324,6 +324,26 @@ func (c *Client) SendSticker(ctx context.Context, chatID int64, fileID string, r
 	return sent.MessageID, nil
 }
 
+type sendAudioParams struct {
+	ChatID          int64            `json:"chat_id"`
+	Audio           string           `json:"audio"`
+	Title           string           `json:"title,omitempty"`
+	Performer       string           `json:"performer,omitempty"`
+	ReplyParameters *replyParameters `json:"reply_parameters,omitempty"`
+}
+
+// SendAudio sends a sound Telegram fetches from an HTTPS link, shown with
+// its title and performer, as a reply to replyToMessageID when it is not
+// zero, and returns the sent message's ID.
+func (c *Client) SendAudio(ctx context.Context, chatID int64, link, title, performer string, replyToMessageID int64) (int64, error) {
+	var sent sentMessage
+	params := sendAudioParams{ChatID: chatID, Audio: link, Title: title, Performer: performer, ReplyParameters: replyTo(replyToMessageID)}
+	if err := c.call(ctx, "sendAudio", params, &sent); err != nil {
+		return 0, err
+	}
+	return sent.MessageID, nil
+}
+
 type sendAnimationParams struct {
 	ChatID          int64            `json:"chat_id"`
 	Animation       string           `json:"animation"`

@@ -121,6 +121,11 @@ func (s *Service) sendGIF(in incoming, category string) (int64, bool) {
 	return sentID, true
 }
 
+// AudioSender sends a sound Telegram fetches from a link.
+type AudioSender interface {
+	SendAudio(ctx context.Context, chatID int64, link, title, performer string, replyToMessageID int64) (int64, error)
+}
+
 // StickerSender sends a sticker.
 type StickerSender interface {
 	SendSticker(ctx context.Context, chatID int64, fileID string, replyToMessageID int64) (int64, error)

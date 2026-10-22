@@ -25,8 +25,10 @@ type outcome struct {
 	// reaction is the emoji the model answered with instead of text. It is
 	// set on the message being answered; no message is sent for it.
 	reaction string
-	// drawings are pictures made during the turn, sent with the text.
+	// drawings are pictures made during the turn, sent with the text, and
+	// audios the sounds found, such as a song's preview, sent after it.
 	drawings []tools.Drawing
+	audios   []tools.Audio
 	// duplicate marks an update that was already answered: Telegram sent it
 	// again after a slow turn. The exchange is in the log already.
 	duplicate bool
@@ -129,7 +131,28 @@ func (s *Service) deliver(in incoming, out *outcome) int64 {
 	if id := s.sendMedia(in, out); answerID == 0 {
 		answerID = id
 	}
+	for _, audio := range out.audios {
+		if id := s.sendAudio(in, audio); answerID == 0 {
+			answerID = id
+		}
+	}
 	return answerID
+}
+
+// sendAudio sends a sound a tool found and returns its message's ID, or 0
+// when it could not be sent; the answer is sent either way.
+func (s *Service) sendAudio(in incoming, audio tools.Audio) int64 {
+	if s.opts.AudioSender == nil {
+		return 0
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
+	defer cancel()
+	id, err := s.opts.AudioSender.SendAudio(ctx, in.msg.Chat.ID, audio.URL, audio.Title, audio.Performer, in.replyTarget())
+	if err != nil {
+		s.opts.Logger.Warn("could not send audio", "chat_id", in.msg.Chat.ID, "error", err)
+		return 0
+	}
+	return id
 }
 
 // deliverAnswer sends the outcome's text, pictures and reaction.
@@ -200,6 +223,9 @@ func (s *Service) logExchange(in incoming, out outcome) {
 		}
 		if out.gif != "" {
 			answer = strings.TrimSpace(answer + " <gif " + out.gif + ">")
+		}
+		for _, audio := range out.audios {
+			answer = strings.TrimSpace(answer + " <audio " + audio.Performer + " — " + audio.Title + ">")
 		}
 		s.ambient.add(in.scope.ChatID, 0, s.opts.Bot.ID, botAuthor, answer)
 	}
@@ -435,6 +461,10 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	}
 	out := s.answerOf(in, answer, err, started)
 	out.drawings = drawings
+	if err == nil {
+		// A song's preview goes only with an answer that tells of it.
+		out.audios = sink.TakeAudios()
+	}
 	return out
 }
 

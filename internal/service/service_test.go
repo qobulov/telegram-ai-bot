@@ -79,8 +79,10 @@ type fakeReplier struct {
 	release chan struct{} // each call waits for it, if set
 	// waitForDeadline makes Reply use up the whole turn timeout.
 	waitForDeadline bool
-	// draws is how many pictures Reply draws, as the image tool would.
-	draws int
+	// draws is how many pictures Reply draws, as the image tool would, and
+	// audios the sounds it finds, as the music tool would.
+	draws  int
+	audios []tools.Audio
 	// answer replaces the echo when set.
 	answer string
 	// reaction, when set, is answered instead of text, as the agent does
@@ -99,6 +101,9 @@ func (f *fakeReplier) Reply(ctx context.Context, req agent.Request) (agent.Answe
 		call.hadSink = true
 		for range f.draws {
 			sink.Add(tools.Drawing{Data: []byte("PNG"), MimeType: "image/png"})
+		}
+		for _, a := range f.audios {
+			sink.AddAudio(a)
 		}
 	}
 	call.caller, _ = tools.CallerFrom(ctx)

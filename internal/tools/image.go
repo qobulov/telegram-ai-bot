@@ -82,11 +82,34 @@ type Drawing struct {
 	MimeType string
 }
 
-// Sink collects the pictures drawn during one turn. It is safe for
-// concurrent use.
+// Audio is a sound a tool found during a turn, such as a song's preview,
+// sent with the answer: Telegram fetches it from URL.
+type Audio struct {
+	URL, Title, Performer string
+}
+
+// Sink collects the pictures drawn and the sounds found during one turn. It
+// is safe for concurrent use.
 type Sink struct {
 	mu       sync.Mutex
 	drawings []Drawing
+	audios   []Audio
+}
+
+// AddAudio keeps a sound to send with the answer.
+func (s *Sink) AddAudio(a Audio) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.audios = append(s.audios, a)
+}
+
+// TakeAudios returns the sounds found so far and empties the sink.
+func (s *Sink) TakeAudios() []Audio {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	audios := s.audios
+	s.audios = nil
+	return audios
 }
 
 func (s *Sink) Add(d Drawing) {
