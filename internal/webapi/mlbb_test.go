@@ -1,8 +1,12 @@
 package webapi
 
 import (
+	"context"
+	"encoding/json"
 	"strings"
 	"testing"
+
+	"telegram-ai-bot/internal/tools"
 )
 
 const (
@@ -168,5 +172,35 @@ func TestMLBBPlayerRefusesBadIDs(t *testing.T) {
 	}
 	if u.total() != 0 {
 		t.Errorf("bad IDs reached the service %d times", u.total())
+	}
+}
+
+// Asked for, the hero's picture goes into the turn's sink to be sent as a
+// photo; one that cannot be fetched leaves the answer and says so.
+func TestMLBBHeroPicture(t *testing.T) {
+	for name, picture := range map[string]stub{"sent": ok("JPEG"), "missing": status(404)} {
+		t.Run(name, func(t *testing.T) {
+			u := newUpstream(t, map[string]stub{
+				"/arena/api/heroes":             ok(arenaHeroes),
+				"/arena/api/heroes/84/counters": ok(arenaLingCounters),
+				"/img/ling.jpg":                 picture,
+			})
+			u.routes["/arena/api/heroes/84"] = ok(strings.Replace(arenaLingPage, `"story":`, `"squareheadbig":"`+u.server.URL+`/img/ling.jpg","story":`, 1))
+			sink := &tools.Sink{}
+			ctx := tools.WithTurn(context.Background(), tools.Caller{UserID: 1, ChatID: -100, Human: true}, sink)
+			var env envelope
+			if err := json.Unmarshal([]byte(newRegistry(t, u.options()).Execute(ctx, 1, "mlbb", `{"action":"hero","hero":"Ling","picture":true}`)), &env); err != nil {
+				t.Fatal(err)
+			}
+			env.raw = string(env.Result)
+			out := result[mlbbHeroOutput](t, env)
+			drawings := sink.Take()
+			if name == "sent" && (len(drawings) != 1 || string(drawings[0].Data) != "JPEG" || !strings.Contains(out.Note, "picture is sent")) {
+				t.Errorf("drawings = %d, note = %q", len(drawings), out.Note)
+			}
+			if name == "missing" && (len(drawings) != 0 || !strings.Contains(out.Note, "could not be fetched") || out.Hero != "Ling") {
+				t.Errorf("drawings = %d, output = %+v", len(drawings), out)
+			}
+		})
 	}
 }

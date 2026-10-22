@@ -33,6 +33,8 @@ const (
 	shownTip        = 200
 	mlbbOutputBytes = 6000
 	mlbbTimeout     = 9 * time.Second
+	// heroPictureLimit is well above a portrait's 40 KB.
+	heroPictureLimit = 1 << 20
 )
 
 const (
@@ -52,6 +54,7 @@ var (
 type mlbbArgs struct {
 	Action   string `json:"action"`
 	Hero     string `json:"hero"`
+	Picture  bool   `json:"picture"`
 	PlayerID string `json:"player_id"`
 	Zone     string `json:"zone"`
 	Rank     string `json:"rank"`
@@ -122,6 +125,7 @@ func (a *apis) mlbbTool() tools.Tool {
 				"player_id": {"type": "string", "description": "For player: the account ID, the long number, such as 1407157025."},
 				"zone": {"type": "string", "description": "For player: the zone (server) ID, the number in brackets after the ID, such as 15832."},
 				"hero": {"type": "string", "description": "For hero: the hero's English name, such as Ling, Fanny or Yi Sun-shin."},
+				"picture": {"type": "boolean", "description": "For hero: also send the hero's picture, when someone asks to see the hero or for its picture."},
 				"rank": {"type": "string", "enum": ["all", "epic", "legend", "mythic", "honor", "glory"], "description": "Rank of the games counted. Default all; honor and glory are Mythical Honor and Mythical Glory."},
 				"sort": {"type": "string", "enum": ["win_rate", "ban_rate", "pick_rate"], "description": "For meta: what the heroes are ranked by. Default win_rate."}
 			},
@@ -152,7 +156,7 @@ func (a *apis) mlbb(ctx context.Context, raw json.RawMessage) (any, error) {
 		}
 		return a.mlbbMeta(ctx, rank, sort)
 	case "hero":
-		return a.mlbbHero(ctx, args.Hero, rank)
+		return a.mlbbHero(ctx, args.Hero, rank, args.Picture)
 	case "player":
 		return a.mlbbPlayer(ctx, args.PlayerID, args.Zone)
 	default:
@@ -195,11 +199,13 @@ type arenaStats struct {
 type arenaDetail struct {
 	Hero struct {
 		Data struct {
-			Difficulty  string   `json:"difficulty"`
-			Speciality  []string `json:"speciality"`
-			Roles       []string `json:"sortlabel"`
-			Lanes       []string `json:"roadsortlabel"`
-			Story       string   `json:"story"`
+			Difficulty string   `json:"difficulty"`
+			Speciality []string `json:"speciality"`
+			Roles      []string `json:"sortlabel"`
+			Lanes      []string `json:"roadsortlabel"`
+			Story      string   `json:"story"`
+			// Picture is the hero's 500 by 500 portrait.
+			Picture     string `json:"squareheadbig"`
 			SkillGroups []struct {
 				Skills []struct {
 					Name string `json:"skillname"`
@@ -247,7 +253,7 @@ func (a *apis) mlbbMeta(ctx context.Context, rank, sort string) (mlbbMetaOutput,
 	return out, nil
 }
 
-func (a *apis) mlbbHero(ctx context.Context, name, rank string) (mlbbHeroOutput, error) {
+func (a *apis) mlbbHero(ctx context.Context, name, rank string, picture bool) (mlbbHeroOutput, error) {
 	names, err := a.mlbbHeroes(ctx)
 	if err != nil {
 		return mlbbHeroOutput{}, err
@@ -269,6 +275,10 @@ func (a *apis) mlbbHero(ctx context.Context, name, rank string) (mlbbHeroOutput,
 		return mlbbHeroOutput{}, err
 	}
 	hero := detail.Hero.Data
+	note := mlbbNote
+	if picture {
+		note = a.sendHeroPicture(ctx, hero.Picture)
+	}
 	return mlbbHeroOutput{
 		mlbbRates:    enemies.rates(),
 		Roles:        nonEmpty(hero.Roles),
@@ -287,8 +297,24 @@ func (a *apis) mlbbHero(ctx context.Context, name, rank string) (mlbbHeroOutput,
 		CounteredBy:   matchups(names, enemies.Lowering),
 		GoodPartners:  heroNames(names, detail.Relation.Assist.Heroes),
 		Source:        mlbbSource,
-		Note:          mlbbNote,
+		Note:          note,
 	}, nil
+}
+
+// sendHeroPicture fetches the hero's picture into the turn's sink, to go
+// with the answer as a photo, and returns the note that says whether it
+// will.
+func (a *apis) sendHeroPicture(ctx context.Context, link string) string {
+	sink, ok := tools.SinkFrom(ctx)
+	if !ok || link == "" {
+		return mlbbNote + "; there is no picture of this hero to send"
+	}
+	data, err := a.patient.get(ctx, call{service: arenaService, url: link, limit: heroPictureLimit})
+	if err != nil {
+		return mlbbNote + "; the picture could not be fetched, say so"
+	}
+	sink.Add(tools.Drawing{Data: data, MimeType: "image/jpeg"})
+	return mlbbNote + "; the hero's picture is sent with your answer, which becomes its caption: keep the answer short"
 }
 
 // mlbbHeroes maps every hero's ID to its English name.
