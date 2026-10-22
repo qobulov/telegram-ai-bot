@@ -1608,3 +1608,21 @@ func TestLoadGiphyKeyIsOptional(t *testing.T) {
 		t.Errorf("set: %q, %v", cfg.GiphyAPIKey, err)
 	}
 }
+
+func TestReasoningEffort(t *testing.T) {
+	if cfg, err := Load(getenv(geminiEnv())); err != nil || cfg.ReasoningEffort != "low" {
+		t.Errorf("default = %q, err = %v, want low for Gemini", cfg.ReasoningEffort, err)
+	}
+	for value, want := range map[string]string{"HIGH": "high", "none": "none", "default": ""} {
+		env := geminiEnv()
+		env["AI_REASONING_EFFORT"] = value
+		if cfg, err := Load(getenv(env)); err != nil || cfg.ReasoningEffort != want {
+			t.Errorf("%s: %q, err = %v, want %q", value, cfg.ReasoningEffort, err, want)
+		}
+	}
+	env := geminiEnv()
+	env["AI_REASONING_EFFORT"] = "max"
+	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "AI_REASONING_EFFORT") {
+		t.Errorf("err = %v, want AI_REASONING_EFFORT refused", err)
+	}
+}

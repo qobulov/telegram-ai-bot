@@ -39,8 +39,12 @@ type Config struct {
 	// The model provider. Gemini and xAI are both reached through the same
 	// OpenAI-compatible chat completions API; only these differ.
 	AIProvider string
-	AIAPIKey   string
-	AIBaseURL  string
+	// ReasoningEffort is how hard Gemini thinks before it answers: none,
+	// minimal, low, medium or high, from AI_REASONING_EFFORT; "" leaves it
+	// to the model. Thinking is paid as output, so it defaults to low.
+	ReasoningEffort string
+	AIAPIKey        string
+	AIBaseURL       string
 	// FallbackModels are tried when the model is overloaded.
 	FallbackModels []string
 	// AudioInput is true when the provider understands voice messages.
@@ -211,6 +215,9 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.PersonaPrompt = strings.ReplaceAll(r.text("PERSONA_PROMPT", defaultPersona), namePlaceholder, cfg.BotDisplayName)
 	cfg.PersonaPrompt += "\n\n" + strings.ReplaceAll(modelNote, modelPlaceholder, providerLabel(cfg.AIProvider)+" ("+cfg.Model+")")
 	cfg.ImagesEnabled = cfg.AIProvider == providerGemini && r.boolean("ENABLE_IMAGE_GENERATION", true)
+	if cfg.AIProvider == providerGemini {
+		cfg.ReasoningEffort = r.reasoningEffort("AI_REASONING_EFFORT", "low")
+	}
 	cfg.ImageModel = r.text("IMAGE_MODEL", "gemini-3.1-flash-image")
 	cfg.ImageBaseURL = strings.TrimSuffix(cfg.AIBaseURL, "/openai")
 	cfg.DailyImageLimit = r.integer("DAILY_IMAGE_LIMIT", 2, 0)
@@ -255,6 +262,20 @@ func (r *reader) required(name string) string {
 		r.fail(name, "is required")
 	}
 	return value
+}
+
+// reasoningEffort reads a reasoning effort: none, minimal, low, medium or
+// high, or "default" for the model's own, which is sent as "".
+func (r *reader) reasoningEffort(name, fallback string) string {
+	switch value := strings.ToLower(r.text(name, fallback)); value {
+	case "none", "minimal", "low", "medium", "high":
+		return value
+	case "default":
+		return ""
+	default:
+		r.fail(name, "must be none, minimal, low, medium, high or default")
+		return ""
+	}
 }
 
 func (r *reader) text(name, fallback string) string {

@@ -40,8 +40,12 @@ type Options struct {
 	// limits or does not answer: each retry goes to the next one. Every
 	// request starts again with Model.
 	FallbackModels []string
-	HTTPClient     *http.Client
-	Logger         *slog.Logger
+	// ReasoningEffort is how hard a thinking model thinks before it
+	// answers, such as "low"; "" leaves it to the model. Thinking is paid
+	// as output and takes from MaxTokens.
+	ReasoningEffort string
+	HTTPClient      *http.Client
+	Logger          *slog.Logger
 }
 
 // Client talks to the model provider. It is safe for concurrent use.
@@ -109,7 +113,10 @@ func (c *Client) completeWithRetry(ctx context.Context, req Request, withTools b
 		if err != nil {
 			return Message{}, fmt.Errorf("encode request: %w", err)
 		}
-		msg, err := c.attempt(ctx, body)
+		msg, used, err := c.attempt(ctx, body)
+		if err == nil {
+			c.logUsage(model, used)
+		}
 		c.noteUnusable(ctx, model, err)
 		if err == nil || attempt >= c.opts.MaxAttempts || !c.isRetryable(ctx, err) {
 			return msg, err
@@ -205,13 +212,34 @@ func isOutOfQuota(err error) bool {
 }
 
 // attempt sends the request once, within AttemptTimeout.
-func (c *Client) attempt(ctx context.Context, body []byte) (Message, error) {
+func (c *Client) attempt(ctx context.Context, body []byte) (Message, usage, error) {
 	if c.opts.AttemptTimeout <= 0 {
 		return c.send(ctx, body)
 	}
 	ctx, cancel := context.WithTimeout(ctx, c.opts.AttemptTimeout)
 	defer cancel()
 	return c.send(ctx, body)
+}
+
+// usage is what a request cost, as the provider counts it. Cached prompt
+// tokens are a part of the prompt's, paid at a fraction of the price.
+type usage struct {
+	PromptTokens        int `json:"prompt_tokens"`
+	CompletionTokens    int `json:"completion_tokens"`
+	PromptTokensDetails struct {
+		CachedTokens int `json:"cached_tokens"`
+	} `json:"prompt_tokens_details"`
+	CompletionTokensDetails struct {
+		ReasoningTokens int `json:"reasoning_tokens"`
+	} `json:"completion_tokens_details"`
+}
+
+// logUsage logs a request's tokens, so that what the bot costs can be read
+// from the logs.
+func (c *Client) logUsage(model string, u usage) {
+	c.opts.Logger.Info("model usage", "model", model,
+		"prompt_tokens", u.PromptTokens, "cached_tokens", u.PromptTokensDetails.CachedTokens,
+		"completion_tokens", u.CompletionTokens, "reasoning_tokens", u.CompletionTokensDetails.ReasoningTokens)
 }
 
 // AudioLabel is the format name sent with audio. Telegram voice is
@@ -247,18 +275,20 @@ func IsOverloaded(err error) bool {
 }
 
 type chatRequest struct {
-	Model      string           `json:"model"`
-	Messages   []Message        `json:"messages"`
-	MaxTokens  int              `json:"max_tokens,omitempty"`
-	Tools      []ToolDefinition `json:"tools,omitempty"`
-	ToolChoice string           `json:"tool_choice,omitempty"`
+	Model           string           `json:"model"`
+	Messages        []Message        `json:"messages"`
+	MaxTokens       int              `json:"max_tokens,omitempty"`
+	ReasoningEffort string           `json:"reasoning_effort,omitempty"`
+	Tools           []ToolDefinition `json:"tools,omitempty"`
+	ToolChoice      string           `json:"tool_choice,omitempty"`
 }
 
 func (c *Client) payload(req Request, model string, withTools bool) chatRequest {
 	payload := chatRequest{
-		Model:     model,
-		Messages:  req.Messages,
-		MaxTokens: c.opts.MaxTokens,
+		Model:           model,
+		Messages:        req.Messages,
+		MaxTokens:       c.opts.MaxTokens,
+		ReasoningEffort: c.opts.ReasoningEffort,
 	}
 	if !withTools {
 		return payload
@@ -285,28 +315,33 @@ type errorBody struct {
 	Code    any    `json:"code"`
 }
 
-func (c *Client) send(ctx context.Context, body []byte) (Message, error) {
+func (c *Client) send(ctx context.Context, body []byte) (Message, usage, error) {
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.opts.BaseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
-		return Message{}, fmt.Errorf("build request: %w", err)
+		return Message{}, usage{}, fmt.Errorf("build request: %w", err)
 	}
 	httpReq.Header.Set("Authorization", "Bearer "+c.opts.APIKey)
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.opts.HTTPClient.Do(httpReq)
 	if err != nil {
-		return Message{}, fmt.Errorf("model provider request: %w", err)
+		return Message{}, usage{}, fmt.Errorf("model provider request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
-		return Message{}, fmt.Errorf("read model provider response: %w", err)
+		return Message{}, usage{}, fmt.Errorf("read model provider response: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return Message{}, statusError(resp, raw)
+		return Message{}, usage{}, statusError(resp, raw)
 	}
-	return decodeReply(raw)
+	var counted struct {
+		Usage usage `json:"usage"`
+	}
+	_ = json.Unmarshal(raw, &counted)
+	msg, err := decodeReply(raw)
+	return msg, counted.Usage, err
 }
 
 func statusError(resp *http.Response, raw []byte) *APIError {

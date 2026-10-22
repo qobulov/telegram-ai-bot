@@ -202,9 +202,10 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		MaxAttempts: 2 * (1 + len(cfg.FallbackModels)),
 		HTTPClient:  &http.Client{Timeout: cfg.RequestTimeout},
 		// A stuck attempt is retried well before the turn runs out of time.
-		AttemptTimeout: attemptTimeout,
-		FallbackModels: cfg.FallbackModels,
-		Logger:         logger,
+		AttemptTimeout:  attemptTimeout,
+		FallbackModels:  cfg.FallbackModels,
+		ReasoningEffort: cfg.ReasoningEffort,
+		Logger:          logger,
 	})
 	answering := withBackup(cfg, model, logger)
 	assistant := agent.New(agent.Options{
@@ -277,7 +278,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Strikes:               store,
 		AdminList:             bot.Client,
 		Restrictor:            bot.Client,
-		Judge:                 answering,
+		Judge:                 swearJudge(cfg, logger),
 		Stickers:              store,
 		ClipSender:            bot.Client,
 		AudioSender:           bot.Client,
@@ -388,17 +389,39 @@ const stickerWorkers = 10
 
 // stickerLabeller is the model that looks at stickers on import. It gets
 // more room than an answer: Gemini spends output tokens thinking, and with
+// judgeTokens is room for the judge's one word and a little thinking.
+const judgeTokens = 512
+
+// swearJudge asks whom swearing is aimed at: a one-word answer to a short
+// prompt, so it gets few tokens and thinks little, on the main model and
+// its fallbacks, which judge better than a lighter one.
+func swearJudge(cfg config.Config, logger *slog.Logger) *ai.Client {
+	return ai.NewClient(ai.Options{
+		BaseURL:         cfg.AIBaseURL,
+		APIKey:          cfg.AIAPIKey,
+		Model:           cfg.Model,
+		FallbackModels:  cfg.FallbackModels,
+		ReasoningEffort: cfg.ReasoningEffort,
+		MaxTokens:       judgeTokens,
+		MaxAttempts:     2,
+		HTTPClient:      &http.Client{Timeout: cfg.RequestTimeout},
+		AttemptTimeout:  attemptTimeout,
+		Logger:          logger,
+	})
+}
+
 // a small limit a fifth of its labels came back cut off.
 func stickerLabeller(cfg config.Config, logger *slog.Logger) *ai.Client {
 	return ai.NewClient(ai.Options{
-		BaseURL:        cfg.AIBaseURL,
-		APIKey:         cfg.AIAPIKey,
-		Model:          cfg.Model,
-		MaxTokens:      max(cfg.MaxOutputTokens, 2048),
-		MaxAttempts:    2,
-		HTTPClient:     &http.Client{Timeout: cfg.RequestTimeout},
-		AttemptTimeout: attemptTimeout,
-		Logger:         logger,
+		BaseURL:         cfg.AIBaseURL,
+		APIKey:          cfg.AIAPIKey,
+		Model:           cfg.Model,
+		ReasoningEffort: cfg.ReasoningEffort,
+		MaxTokens:       max(cfg.MaxOutputTokens, 2048),
+		MaxAttempts:     2,
+		HTTPClient:      &http.Client{Timeout: cfg.RequestTimeout},
+		AttemptTimeout:  attemptTimeout,
+		Logger:          logger,
 	})
 }
 

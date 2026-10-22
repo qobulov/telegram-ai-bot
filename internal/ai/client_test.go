@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -766,5 +767,36 @@ func TestCompleteRefusesAReplyCutOffAtTheTokenLimit(t *testing.T) {
 	client, _ = newTestClient(t, reply{status: 200, body: whole})
 	if msg, err := client.Complete(context.Background(), toolRequest()); err != nil || len(msg.ToolCalls) != 1 {
 		t.Errorf("msg = %+v, err = %v, want the tool call", msg, err)
+	}
+}
+
+// The reasoning effort goes with every request when set, and not at all
+// otherwise; each answered request logs its tokens.
+func TestCompleteSendsTheReasoningEffortAndLogsUsage(t *testing.T) {
+	rec := &recorder{replies: []reply{{status: 200, body: `{"choices":[{"message":{"role":"assistant","content":"hi"}}],
+		"usage":{"prompt_tokens":7400,"completion_tokens":30,"prompt_tokens_details":{"cached_tokens":6000},"completion_tokens_details":{"reasoning_tokens":12}}}`}}}
+	server := httptest.NewServer(rec)
+	defer server.Close()
+	var logs strings.Builder
+	client := NewClient(Options{BaseURL: server.URL, APIKey: testAPIKey, Model: "m", ReasoningEffort: "low",
+		Logger: slog.New(slog.NewTextHandler(&logs, nil))})
+
+	if _, err := client.Complete(context.Background(), userRequest()); err != nil {
+		t.Fatal(err)
+	}
+	if rec.requests[0]["reasoning_effort"] != "low" {
+		t.Errorf("request = %v, want reasoning_effort low", rec.requests[0])
+	}
+	for _, want := range []string{"model usage", "prompt_tokens=7400", "cached_tokens=6000", "completion_tokens=30", "reasoning_tokens=12"} {
+		if !strings.Contains(logs.String(), want) {
+			t.Errorf("logs %q lack %q", logs.String(), want)
+		}
+	}
+	plain, rec2 := newTestClient(t, reply{status: 200, body: plainReply})
+	if _, err := plain.Complete(context.Background(), userRequest()); err != nil {
+		t.Fatal(err)
+	}
+	if _, sent := rec2.requests[0]["reasoning_effort"]; sent {
+		t.Error("an empty reasoning effort was sent")
 	}
 }

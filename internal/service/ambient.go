@@ -15,7 +15,7 @@ const (
 	maxAmbientChars = 300
 	// maxContextChars bounds the log given to the model with one question,
 	// so a busy day does not make every answer slow and costly.
-	maxContextChars = 40_000
+	maxContextChars = 24_000
 	logTimeout      = 5 * time.Second
 	// ambientWindow is how far back the log given to the model reaches. A
 	// fixed span rather than "since midnight" keeps a conversation that runs
