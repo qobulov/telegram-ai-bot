@@ -151,3 +151,16 @@ func TestSendClipUploadsRoundOrLooping(t *testing.T) {
 		}
 	}
 }
+
+func TestSetMyCommandsSendsScope(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":true}`)
+	if err := client.SetMyCommands(context.Background(), ScopeAllChatAdmins, []BotCommand{{Command: "mute", Description: "Jim"}}); err != nil {
+		t.Fatal(err)
+	}
+	sent := api.recorded()[0]
+	scope, _ := sent.params["scope"].(map[string]any)
+	commands, _ := sent.params["commands"].([]any)
+	if sent.method != "setMyCommands" || scope["type"] != "all_chat_administrators" || len(commands) != 1 {
+		t.Errorf("call = %+v", sent)
+	}
+}

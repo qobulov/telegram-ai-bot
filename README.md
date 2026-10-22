@@ -619,6 +619,13 @@ keep it from taking over the chat.
 | Reply to one of its messages | reply to its answer with `and you?`                     | `ENABLE_REPLY_TRIGGER` (on)     |
 | A command with its username  | `/mute@MyMariaBot`                                       | always on                       |
 
+Each start sets the menu Telegram opens on "/" (`setMyCommands`, in
+`internal/app/commands.go`): `/start`, `/help`, `/reset`, `/model` and
+`/about` in private chats; `/help`, `/model` and `/about` for a group's
+members; and for its admins also `/mute`, `/unmute`, `/ignore`, `/unignore`
+and `/reset`. In a group the menu adds the bot's username itself. A failure is
+only logged.
+
 **Calling by name.** A wake word counts when it is a whole word, in any case,
 and is the first word, the second word, or the last word of the message:
 

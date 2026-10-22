@@ -1,0 +1,64 @@
+package app
+
+import (
+	"context"
+	"errors"
+	"io"
+	"log/slog"
+	"regexp"
+	"slices"
+	"testing"
+
+	"telegram-ai-bot/internal/telegram"
+)
+
+type fakeCommandSetter struct {
+	set map[string][]telegram.BotCommand
+	err error
+}
+
+func (f *fakeCommandSetter) SetMyCommands(_ context.Context, scope string, commands []telegram.BotCommand) error {
+	if f.set == nil {
+		f.set = map[string][]telegram.BotCommand{}
+	}
+	f.set[scope] = commands
+	return f.err
+}
+
+// Every menu is set, admins get the commands only they may use, and every
+// command is one Telegram accepts.
+func TestSetCommandMenus(t *testing.T) {
+	setter := &fakeCommandSetter{}
+	SetCommandMenus(context.Background(), setter, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	if len(setter.set) != 3 {
+		t.Fatalf("menus = %v, want private chats, groups and admins", setter.set)
+	}
+	names := func(scope string) []string {
+		var out []string
+		for _, c := range setter.set[scope] {
+			out = append(out, c.Command)
+		}
+		return out
+	}
+	if !slices.Contains(names(telegram.ScopeAllChatAdmins), "mute") || slices.Contains(names(telegram.ScopeAllGroupChats), "mute") {
+		t.Errorf("admins %v, groups %v: only admins may mute the bot", names(telegram.ScopeAllChatAdmins), names(telegram.ScopeAllGroupChats))
+	}
+	valid := regexp.MustCompile(`^[a-z0-9_]{1,32}$`)
+	for scope, commands := range setter.set {
+		for _, c := range commands {
+			if !valid.MatchString(c.Command) || c.Description == "" || len([]rune(c.Description)) > 256 {
+				t.Errorf("%s: %+v is not a command Telegram takes", scope, c)
+			}
+		}
+	}
+}
+
+// A failure is logged and does not stop the start.
+func TestSetCommandMenusFailure(t *testing.T) {
+	setter := &fakeCommandSetter{err: errors.New("telegram is down")}
+	SetCommandMenus(context.Background(), setter, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if len(setter.set) != 3 {
+		t.Errorf("tried %d menus, want all three despite the failures", len(setter.set))
+	}
+}

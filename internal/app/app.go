@@ -467,6 +467,7 @@ func newWebhook(ctx context.Context, cfg config.Config, store *storage.Store, lo
 	if err != nil {
 		return nil, err
 	}
+	SetCommandMenus(ctx, bot.Client, logger)
 	svc, err := NewService(cfg, store, bot, Mode{Serverless: true}, logger)
 	if err != nil {
 		return nil, err

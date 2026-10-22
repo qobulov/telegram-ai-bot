@@ -28,8 +28,8 @@ const (
 	e2eBotName = "MyBot"
 )
 
-// fakeTelegram answers getMe, delivers one update, and records what the bot
-// sends back.
+// fakeTelegram answers getMe and setMyCommands, delivers one update, and
+// records what the bot sends back.
 type fakeTelegram struct {
 	update string // JSON of the updates to deliver, comma-separated
 
@@ -47,6 +47,8 @@ func (f *fakeTelegram) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case strings.HasSuffix(r.URL.Path, "/getMe"):
 		_, _ = io.WriteString(w, `{"ok":true,"result":{"id":777,"is_bot":true,"username":"MyBot"}}`)
+	case strings.HasSuffix(r.URL.Path, "/setMyCommands"):
+		_, _ = io.WriteString(w, `{"ok":true,"result":true}`)
 	case strings.HasSuffix(r.URL.Path, "/getChatMember"):
 		_, _ = io.WriteString(w, `{"ok":true,"result":{"status":"member"}}`)
 	case strings.HasSuffix(r.URL.Path, "/sendMessage"):

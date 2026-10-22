@@ -749,3 +749,32 @@ func (c *Client) sendRich(ctx context.Context, msg Outgoing) (int64, error) {
 	}
 	return sent.MessageID, nil
 }
+
+// BotCommand is a command shown in the menu Telegram opens on "/".
+type BotCommand struct {
+	Command     string `json:"command"`
+	Description string `json:"description"`
+}
+
+// Command menu scopes: private chats and any chat without its own list,
+// every group's members, and every group's administrators.
+const (
+	ScopeDefault       = "default"
+	ScopeAllGroupChats = "all_group_chats"
+	ScopeAllChatAdmins = "all_chat_administrators"
+)
+
+type setMyCommandsParams struct {
+	Commands []BotCommand `json:"commands"`
+	Scope    struct {
+		Type string `json:"type"`
+	} `json:"scope"`
+}
+
+// SetMyCommands sets the command menu for scope.
+func (c *Client) SetMyCommands(ctx context.Context, scope string, commands []BotCommand) error {
+	params := setMyCommandsParams{Commands: commands}
+	params.Scope.Type = scope
+	var ok bool
+	return c.call(ctx, "setMyCommands", params, &ok)
+}
