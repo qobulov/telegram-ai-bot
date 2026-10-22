@@ -1065,3 +1065,18 @@ func TestSendAudioUploadsTheTrackWithItsName(t *testing.T) {
 		t.Errorf("reply_parameters = %q", got.reply)
 	}
 }
+
+// A quiz names its right answer, even the first (0, which JSON would drop
+// were it left out when empty), and allows one answer only.
+func TestSendPollSendsAQuiz(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"message_id":89}}`)
+
+	poll := OutgoingPoll{ChatID: -100123, Question: "Ling?", Options: []string{"Assassin", "Tank"}, Multiple: true, Quiz: true, Correct: 0, Explanation: "Jungler"}
+	if _, err := client.SendPoll(context.Background(), poll); err != nil {
+		t.Fatal(err)
+	}
+	p := api.recorded()[0].params
+	if p["type"] != "quiz" || p["correct_option_id"] != float64(0) || p["explanation"] != "Jungler" || p["allows_multiple_answers"] != false {
+		t.Errorf("params = %+v", p)
+	}
+}

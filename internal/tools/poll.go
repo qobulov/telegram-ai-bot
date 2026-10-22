@@ -131,11 +131,11 @@ func (p polls) run(ctx context.Context, raw json.RawMessage) (any, error) {
 	if !first {
 		return map[string]any{"already_handled": true, "action": actionPoll, "note": pollAskedNote}, nil
 	}
-	if err := p.checkPace(ctx, caller.ChatID); err != nil {
-		return nil, p.forget(ctx, caller, err)
+	if err := p.checkPace(ctx, caller.ChatID, actionPoll); err != nil {
+		return nil, p.forget(ctx, caller, actionPoll, err)
 	}
 	if _, err := p.Sender.SendPoll(ctx, poll); err != nil {
-		return nil, p.notSent(ctx, caller, err)
+		return nil, p.notSent(ctx, caller, actionPoll, err)
 	}
 	return map[string]any{"sent": true, "note": pollSentNote}, nil
 }
@@ -193,10 +193,11 @@ func runesWithin(text string, limit int) bool {
 	return count >= 1 && count <= limit
 }
 
-// checkPace allows a group one poll per pollWindow. The count includes the
-// record this update has just made, so any other poll is one too many.
-func (p polls) checkPace(ctx context.Context, chatID int64) error {
-	made, err := p.Store.ChatModeration(ctx, chatID, actionPoll, p.Now().Add(-pollWindow))
+// checkPace allows a group one poll, or one quiz, per pollWindow. The count
+// includes the record this update has just made, so any other is one too
+// many.
+func (p polls) checkPace(ctx context.Context, chatID int64, action string) error {
+	made, err := p.Store.ChatModeration(ctx, chatID, action, p.Now().Add(-pollWindow))
 	if err != nil {
 		return internal(err)
 	}
@@ -211,9 +212,9 @@ func (p polls) checkPace(ctx context.Context, chatID int64) error {
 // asked for again. When Telegram did not answer, the poll may have been
 // posted all the same, and a poll, unlike a second mute, would show twice:
 // its record is kept and the group waits out pollWindow instead.
-func (p polls) notSent(ctx context.Context, caller Caller, sendErr error) error {
+func (p polls) notSent(ctx context.Context, caller Caller, action string, sendErr error) error {
 	if _, refused := telegramRefusal(sendErr); refused {
-		return p.forget(ctx, caller, telegramFailure(sendErr))
+		return p.forget(ctx, caller, action, telegramFailure(sendErr))
 	}
 	return errors.New(pollNoAnswer)
 }
@@ -221,8 +222,8 @@ func (p polls) notSent(ctx context.Context, caller Caller, sendErr error) error 
 // forget drops the record of a poll that was not posted, so that it does
 // not count against the group and the update may try again, and returns why
 // it was not posted. A record that cannot be dropped is reported too.
-func (p polls) forget(ctx context.Context, caller Caller, why error) error {
-	if err := p.Store.ForgetModeration(context.WithoutCancel(ctx), caller.UpdateID, actionPoll); err != nil {
+func (p polls) forget(ctx context.Context, caller Caller, action string, why error) error {
+	if err := p.Store.ForgetModeration(context.WithoutCancel(ctx), caller.UpdateID, action); err != nil {
 		return errors.Join(why, internal(err))
 	}
 	return why

@@ -431,6 +431,11 @@ type OutgoingPoll struct {
 	Options  []string
 	// Multiple lets a voter pick more than one option.
 	Multiple bool
+	// Quiz makes it a quiz with one right answer, Options[Correct], and
+	// Explanation shown to whoever answers.
+	Quiz        bool
+	Correct     int
+	Explanation string
 	// ReplyToMessageID makes the poll a reply to that message, which keeps
 	// it in the message's forum topic. Zero replies to nothing.
 	ReplyToMessageID int64

@@ -310,6 +310,7 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 	// use these, so they are there with or without owners.
 	builtin = append(builtin, moderate,
 		tools.PollTool(tools.PollOptions{Sender: bot.Client, Store: store}),
+		tools.QuizTool(tools.PollOptions{Sender: bot.Client, Store: store}),
 		tools.AdminsTool(tools.AdminsOptions{Telegram: bot.Client, BotID: bot.User.ID, Owners: cfg.OwnerIDs}),
 		tools.MembersTool(tools.MembersOptions{Store: store, Telegram: bot.Client, Owners: cfg.OwnerIDs, Location: cfg.Location}),
 		tools.ProfileTool(tools.ProfileOptions{Store: store}),

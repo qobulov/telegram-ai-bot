@@ -817,7 +817,7 @@ func TestHelpMentionsModerationAndPolls(t *testing.T) {
 	for _, want := range []string{
 		"Uzbek", "Russian", "English",
 		"photos", "stickers", "GIFs", "round videos",
-		"tell the time anywhere", "arithmetic", "make a poll in a group",
+		"tell the time anywhere", "arithmetic", "make a poll or a quiz in a group",
 	} {
 		if !strings.Contains(help, want) {
 			t.Errorf("help text does not mention %q", want)

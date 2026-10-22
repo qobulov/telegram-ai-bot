@@ -4,7 +4,7 @@ A Telegram chat character written in Go: a playful, quick-witted group-chat
 regular (called Maria unless you rename her) rather than a neutral assistant.
 She answers through [Google Gemini](https://ai.google.dev), remembers
 conversations in PostgreSQL, and can call a small set of tools that are
-checked in code (current time, calculator, bot help, drawing, polls, a
+checked in code (current time, calculator, bot help, drawing, polls and quizzes, a
 group's admin list, moderation for group admins, and live data: exchange
 rates, weather, prayer times, news headlines, Wikipedia, football and crypto
 prices).
@@ -53,7 +53,7 @@ internal/webhook                HTTP handler for webhook updates, with secret ch
 internal/config                 load .env + environment, validate
 internal/telegram               Bot API client: long polling, sending, message splitting
 internal/ai                     Model client: types, retries, tool-calling format
-internal/tools                  tool registry + time, calculator, help, drawing, polls, admin list, moderation, owners' tools
+internal/tools                  tool registry + time, calculator, help, drawing, polls, quizzes, admin list, moderation, owners' tools
 internal/webapi                 live-data tools: rates, weather, prayer times, news, Wikipedia, football, crypto
 internal/storage                pgx pool, migrations, conversation queries
 internal/storage/migrations     SQL migrations, embedded in the binary

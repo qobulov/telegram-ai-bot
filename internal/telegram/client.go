@@ -570,6 +570,9 @@ type sendPollParams struct {
 	Options               []inputPollOption `json:"options"`
 	IsAnonymous           bool              `json:"is_anonymous"`
 	AllowsMultipleAnswers bool              `json:"allows_multiple_answers"`
+	Type                  string            `json:"type,omitempty"`
+	CorrectOptionID       *int              `json:"correct_option_id,omitempty"`
+	Explanation           string            `json:"explanation,omitempty"`
 	ReplyParameters       *replyParameters  `json:"reply_parameters,omitempty"`
 }
 
@@ -577,8 +580,9 @@ type inputPollOption struct {
 	Text string `json:"text"`
 }
 
-// SendPoll sends a poll and returns the ID of the sent message. Polls are
-// anonymous, so the bot never learns or reveals who voted for what.
+// SendPoll sends a poll or a quiz and returns the ID of the sent message.
+// Polls are anonymous, so the bot never learns or reveals who voted for
+// what.
 func (c *Client) SendPoll(ctx context.Context, poll OutgoingPoll) (int64, error) {
 	params := sendPollParams{
 		ChatID:                poll.ChatID,
@@ -589,6 +593,10 @@ func (c *Client) SendPoll(ctx context.Context, poll OutgoingPoll) (int64, error)
 	}
 	for _, option := range poll.Options {
 		params.Options = append(params.Options, inputPollOption{Text: option})
+	}
+	if poll.Quiz {
+		params.Type, params.CorrectOptionID, params.Explanation = "quiz", &poll.Correct, poll.Explanation
+		params.AllowsMultipleAnswers = false
 	}
 	if poll.ReplyToMessageID != 0 {
 		params.ReplyParameters = &replyParameters{MessageID: poll.ReplyToMessageID, AllowSendingWithoutReply: true}

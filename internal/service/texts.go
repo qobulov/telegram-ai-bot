@@ -93,9 +93,9 @@ func HelpText(abilities Abilities) string {
 	if abilities.Listen {
 		seeing = "I can see photos, stickers and GIFs, a frame of videos and round videos, and I listen to voice messages."
 	}
-	skills := "I can tell the time anywhere, calculate arithmetic, and make a poll in a group."
+	skills := "I can tell the time anywhere, calculate arithmetic, and make a poll or a quiz in a group."
 	if abilities.Draw {
-		skills = "I can draw a picture when you ask, tell the time anywhere, calculate arithmetic, and make a poll in a group."
+		skills = "I can draw a picture when you ask, tell the time anywhere, calculate arithmetic, and make a poll or a quiz in a group."
 	}
 	lookups := "I can look up exchange rates, the weather, prayer times, news headlines, Wikipedia and crypto prices, Mobile Legends hero statistics, and find songs."
 	if abilities.Football {
