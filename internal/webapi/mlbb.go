@@ -379,7 +379,7 @@ const arenaService = "Rone Arena API"
 // method, because Go methods cannot take type parameters.
 func arenaList[T any](ctx context.Context, a *apis, path string) ([]T, error) {
 	var answer arenaRecords[T]
-	if err := a.client.getJSON(ctx, call{service: arenaService, url: a.urls.RoneArena + path, limit: largeBodyLimit}, &answer); err != nil {
+	if err := a.patient.getJSON(ctx, call{service: arenaService, url: a.urls.RoneArena + path, limit: largeBodyLimit}, &answer); err != nil {
 		return nil, err
 	}
 	list := make([]T, 0, len(answer.Data.Records))

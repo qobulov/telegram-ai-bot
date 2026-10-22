@@ -356,6 +356,7 @@ func liveDataTools(cfg config.Config, bot Bot) []tools.Tool {
 		Location:      cfg.Location,
 		FootballToken: cfg.FootballDataToken,
 		CoinGeckoKey:  cfg.CoinGeckoDemoKey,
+		TavilyKey:     cfg.TavilyAPIKey,
 	})
 }
 

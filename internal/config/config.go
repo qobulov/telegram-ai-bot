@@ -59,6 +59,8 @@ type Config struct {
 	// without it, a GIF she asks for becomes a sticker.
 	GiphyAPIKey      string
 	CoinGeckoDemoKey string
+	// TavilyAPIKey gives Maria a web search; without it she has none.
+	TavilyAPIKey string
 
 	// Image generation, Gemini only. Owners have no daily limit.
 	ImagesEnabled   bool
@@ -215,6 +217,7 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.FootballDataToken = r.apiKey("FOOTBALL_DATA_TOKEN")
 	cfg.GiphyAPIKey = r.apiKey("GIPHY_API_KEY")
 	cfg.CoinGeckoDemoKey = r.apiKey("COINGECKO_DEMO_KEY")
+	cfg.TavilyAPIKey = r.apiKey("TAVILY_API_KEY")
 	cfg.WakeWords = r.wakeWords(cfg)
 	r.checkRemovedVariables()
 	r.checkGroupSettings(cfg)

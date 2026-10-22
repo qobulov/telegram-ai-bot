@@ -45,7 +45,9 @@ type Options struct {
 	// CoinGeckoKey is an optional CoinGecko demo key. Keyless calls share
 	// a quota with every other client on the same IP.
 	CoinGeckoKey string
-	BaseURLs     BaseURLs
+	// TavilyKey is a Tavily key. Without it there is no web search.
+	TavilyKey string
+	BaseURLs  BaseURLs
 }
 
 // BaseURLs says where each API lives. Empty fields mean the production
@@ -65,6 +67,7 @@ type BaseURLs struct {
 	CoinGecko         string
 	Deezer            string
 	RoneArena         string
+	Tavily            string
 	Isan              string
 	// Wikipedia is a format string with %s for the language code.
 	Wikipedia string
@@ -88,6 +91,7 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.CoinGecko = cmp.Or(b.CoinGecko, "https://api.coingecko.com")
 	b.Deezer = cmp.Or(b.Deezer, "https://api.deezer.com")
 	b.RoneArena = cmp.Or(b.RoneArena, "https://arena.rone.dev")
+	b.Tavily = cmp.Or(b.Tavily, "https://api.tavily.com")
 	b.Isan = cmp.Or(b.Isan, "https://api.isan.eu.org")
 	b.Wikipedia = cmp.Or(b.Wikipedia, "https://%s.wikipedia.org")
 	if b.News == nil {
@@ -113,15 +117,19 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	return b
 }
 
-// apis is what the tools share: one client, one cache and the settings.
+// apis is what the tools share: the clients, one cache and the settings.
 type apis struct {
-	client        *client
+	client *client
+	// patient waits longer, for the web search and the MLBB statistics,
+	// which often take over 3 s.
+	patient       *client
 	cache         *cache
 	urls          BaseURLs
 	location      *time.Location
 	now           func() time.Time
 	footballToken string
 	coinGeckoKey  string
+	tavilyKey     string
 }
 
 // Tools returns the live-data tools. Football is included only when
@@ -142,6 +150,9 @@ func Tools(opts Options) []tools.Tool {
 	if a.footballToken != "" {
 		list = append(list, a.footballTool())
 	}
+	if a.tavilyKey != "" {
+		list = append(list, a.searchTool())
+	}
 	return list
 }
 
@@ -154,12 +165,14 @@ func newAPIs(opts Options) *apis {
 	}
 	return &apis{
 		client:        newClient(opts.HTTPClient, cmp.Or(opts.UserAgent, defaultUserAgent)),
+		patient:       patientClient(opts.HTTPClient, cmp.Or(opts.UserAgent, defaultUserAgent)),
 		cache:         newCache(opts.Now),
 		urls:          opts.BaseURLs.withDefaults(),
 		location:      opts.Location,
 		now:           opts.Now,
 		footballToken: opts.FootballToken,
 		coinGeckoKey:  opts.CoinGeckoKey,
+		tavilyKey:     opts.TavilyKey,
 	}
 }
 

@@ -1,6 +1,7 @@
 package webapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,7 +14,10 @@ import (
 
 const (
 	clientTimeout = 4 * time.Second
-	maxRedirects  = 2
+	// patientTimeout is for services that think before answering, such as
+	// a web search, which took over 3 s.
+	patientTimeout = 10 * time.Second
+	maxRedirects   = 2
 	// defaultBodyLimit bounds a JSON answer. The "on this day" list and
 	// football answers are larger and ask for largeBodyLimit; news feeds
 	// have a limit of their own.
@@ -32,7 +36,7 @@ type client struct {
 	userAgent string
 }
 
-// call is one GET request.
+// call is one GET request, or a POST when it has a body.
 type call struct {
 	// service names the API in errors, e.g. "Open-Meteo".
 	service string
@@ -41,27 +45,38 @@ type call struct {
 	header http.Header
 	// limit bounds the body. Zero means defaultBodyLimit.
 	limit int64
+	// body, when set, makes the call a POST of this JSON.
+	body []byte
 }
 
 // newClient wraps base, or a client with short timeouts when base is nil,
 // so that redirects can only stay on the same host.
 func newClient(base *http.Client, userAgent string) *client {
 	if base == nil {
-		base = defaultHTTPClient()
+		base = defaultHTTPClient(clientTimeout)
 	}
 	wrapped := *base
 	wrapped.CheckRedirect = sameHostRedirects
 	return &client{http: &wrapped, userAgent: userAgent}
 }
 
-func defaultHTTPClient() *http.Client {
+// patientClient is newClient for slow services, waiting patientTimeout.
+func patientClient(base *http.Client, userAgent string) *client {
+	if base == nil {
+		base = defaultHTTPClient(patientTimeout)
+	}
+	return newClient(base, userAgent)
+}
+
+// defaultHTTPClient gives up after timeout, and on headers a second before.
+func defaultHTTPClient(timeout time.Duration) *http.Client {
 	return &http.Client{
-		Timeout: clientTimeout,
+		Timeout: timeout,
 		Transport: &http.Transport{
 			Proxy:                 http.ProxyFromEnvironment,
 			DialContext:           (&net.Dialer{Timeout: 2 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
 			TLSHandshakeTimeout:   2 * time.Second,
-			ResponseHeaderTimeout: 3 * time.Second,
+			ResponseHeaderTimeout: timeout - time.Second,
 			MaxIdleConnsPerHost:   4,
 			IdleConnTimeout:       90 * time.Second,
 			ForceAttemptHTTP2:     true,
@@ -87,9 +102,16 @@ func sameHostRedirects(req *http.Request, via []*http.Request) error {
 }
 
 func (c *client) get(ctx context.Context, cl call) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, cl.url, nil)
+	method, payload := http.MethodGet, io.Reader(nil)
+	if cl.body != nil {
+		method, payload = http.MethodPost, bytes.NewReader(cl.body)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, cl.url, payload)
 	if err != nil {
 		return nil, fmt.Errorf("%s could not be asked", cl.service)
+	}
+	if cl.body != nil {
+		req.Header.Set("Content-Type", "application/json")
 	}
 	for name, values := range cl.header {
 		req.Header[name] = values

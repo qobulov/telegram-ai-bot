@@ -1,8 +1,10 @@
 package webapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -57,8 +59,12 @@ func newUpstream(t *testing.T, routes map[string]stub) *upstream {
 }
 
 func (u *upstream) serve(w http.ResponseWriter, r *http.Request) {
+	// The copy keeps the body, which the handler's own request loses.
+	body, _ := io.ReadAll(r.Body)
+	seen := r.Clone(context.Background())
+	seen.Body = io.NopCloser(bytes.NewReader(body))
 	u.mu.Lock()
-	u.seen = append(u.seen, r.Clone(context.Background()))
+	u.seen = append(u.seen, seen)
 	answer, found := u.route(r)
 	u.mu.Unlock()
 	if !found {
@@ -133,6 +139,7 @@ func (u *upstream) options() Options {
 			Deezer:            base + "/deezer",
 			RoneArena:         base + "/arena",
 			Isan:              base + "/isan",
+			Tavily:            base + "/tavily",
 			Wikipedia:         base + "/wiki/%s",
 			News: map[string]map[string]string{
 				"uz":       {"kun.uz": base + "/rss/kun", "gazeta.uz": base + "/rss/gazeta-oz", "uza.uz": base + "/rss/uza-oz", "daryo.uz": base + "/rss/daryo"},
