@@ -128,13 +128,19 @@ func imageOf(st telegram.Sticker) string {
 // labelAll labels stickers, Workers at a time, until they are all done or
 // ctx ends. A sticker that fails is left for the next import.
 func (im *Importer) labelAll(ctx context.Context, stickers []storage.PackSticker) {
+	each(ctx, im.Workers, im.Logger, stickers, im.label)
+}
+
+// each runs look on stickers, workers at a time, until they are all done or
+// ctx ends, logging a sticker that fails; it is left for the next import.
+func each(ctx context.Context, workers int, logger *slog.Logger, stickers []storage.PackSticker, look func(context.Context, storage.PackSticker) error) {
 	jobs := make(chan storage.PackSticker)
 	var wg sync.WaitGroup
-	for range max(1, im.Workers) {
+	for range max(1, workers) {
 		wg.Go(func() {
 			for st := range jobs {
-				if err := im.label(ctx, st); err != nil && ctx.Err() == nil && im.Logger != nil {
-					im.Logger.Warn("could not label a sticker", "pack", st.Pack, "sticker", st.FileUniqueID, "error", err)
+				if err := look(ctx, st); err != nil && ctx.Err() == nil && logger != nil {
+					logger.Warn("could not look at a sticker", "pack", st.Pack, "sticker", st.FileUniqueID, "error", err)
 				}
 			}
 		})

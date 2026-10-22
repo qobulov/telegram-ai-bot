@@ -283,6 +283,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		AudioSender:           bot.Client,
 		StickerSender:         bot.Client,
 		StickerImporter:       &stickers.Importer{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger), Workers: stickerWorkers, Logger: logger},
+		CardImporter:          &stickers.CardImporter{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger), Workers: stickerWorkers, Logger: logger},
 		Answers:               store,
 	}
 	if cfg.GiphyAPIKey != "" {
@@ -312,6 +313,7 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 	builtin = append(builtin, moderate,
 		tools.PollTool(tools.PollOptions{Sender: bot.Client, Store: store}),
 		tools.QuizTool(tools.PollOptions{Sender: bot.Client, Store: store}),
+		tools.ItemCardTool(tools.ItemCardOptions{Store: store}),
 		tools.AdminsTool(tools.AdminsOptions{Telegram: bot.Client, BotID: bot.User.ID, Owners: cfg.OwnerIDs}),
 		tools.MembersTool(tools.MembersOptions{Store: store, Telegram: bot.Client, Owners: cfg.OwnerIDs, Location: cfg.Location}),
 		tools.ProfileTool(tools.ProfileOptions{Store: store}),

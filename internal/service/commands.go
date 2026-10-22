@@ -29,6 +29,8 @@ type outcome struct {
 	// audios the sounds found, such as a song's preview, sent after it.
 	drawings []tools.Drawing
 	audios   []tools.Audio
+	// cards are item cards, stickers by file ID, sent after the answer.
+	cards []string
 	// duplicate marks an update that was already answered: Telegram sent it
 	// again after a slow turn. The exchange is in the log already.
 	duplicate bool
@@ -141,7 +143,37 @@ func (s *Service) deliver(in incoming, out *outcome) int64 {
 	if id := s.sendMedia(in, out); answerID == 0 {
 		answerID = id
 	}
+	if id := s.sendCards(in, out); answerID == 0 {
+		answerID = id
+	}
 	return answerID
+}
+
+// sendCards sends the item cards a tool chose, after the answer, and returns
+// the first one's message ID; those that could not be sent are dropped from
+// out, so that the log tells only of what the chat saw.
+func (s *Service) sendCards(in incoming, out *outcome) int64 {
+	if s.opts.StickerSender == nil {
+		out.cards = nil
+		return 0
+	}
+	var firstID int64
+	sent := out.cards[:0]
+	for _, card := range out.cards {
+		ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
+		id, err := s.opts.StickerSender.SendSticker(ctx, in.msg.Chat.ID, card, in.replyTarget())
+		cancel()
+		if err != nil {
+			s.opts.Logger.Warn("could not send an item card", "chat_id", in.msg.Chat.ID, "error", err)
+			continue
+		}
+		sent = append(sent, card)
+		if firstID == 0 {
+			firstID = id
+		}
+	}
+	out.cards = sent
+	return firstID
 }
 
 // sendAudios sends the sounds a tool found and returns the first sent
@@ -241,6 +273,9 @@ func (s *Service) logExchange(in incoming, out outcome) {
 		}
 		if out.gif != "" {
 			answer = strings.TrimSpace(answer + " <gif " + out.gif + ">")
+		}
+		for range out.cards {
+			answer = strings.TrimSpace(answer + " <item card sticker>")
 		}
 		for _, audio := range out.audios {
 			answer = strings.TrimSpace(answer + " <audio " + audio.Performer + " — " + audio.Title + ">")
@@ -480,8 +515,10 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	out := s.answerOf(in, answer, err, started)
 	out.drawings = drawings
 	if err == nil {
-		// A song's preview goes only with an answer that tells of it.
+		// A song's preview and an item's card go only with an answer that
+		// tells of them.
 		out.audios = sink.TakeAudios()
+		out.cards = sink.TakeStickers()
 	}
 	return out
 }
@@ -838,6 +875,8 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 		return s.unignore(ctx, in)
 	case "/import_stickers":
 		return s.importStickers(ctx, in)
+	case "/import_items":
+		return s.importItems(ctx, in)
 	default:
 		return textUnknown
 	}

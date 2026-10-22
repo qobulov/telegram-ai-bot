@@ -294,3 +294,21 @@ func TestSongIsTheAnswerAlone(t *testing.T) {
 		})
 	}
 }
+
+// An item's card goes after the short answer that tells of it, outside the
+// gap that spaces the bot's own stickers, and the log notes it.
+func TestItemCardFollowsTheAnswer(t *testing.T) {
+	f := newFixture()
+	st := withStickers(f)
+	f.replier.answer = "Mana Athena's Shield"
+	f.replier.cards = []string{"card-athena"}
+
+	sent := f.run(inGroup(groupMessage("Mira, Athena's Shield nima beradi?")))
+
+	if len(sent) != 1 || len(st.sent) != 1 || st.sent[0] != "card-athena" {
+		t.Errorf("texts %+v, stickers %q", sent, st.sent)
+	}
+	if log := strings.Join(f.chatLog.texts(groupID), "\n"); !strings.Contains(log, "<item card sticker>") {
+		t.Errorf("log = %q", log)
+	}
+}

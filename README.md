@@ -869,6 +869,16 @@ the command again goes on where it stopped, and the reply says how many are
 left. The stickers are kept in `bot_stickers`, and when each chat last got
 one in `sticker_sends`.
 
+A pack of Mobile Legends item cards, stickers that show an item's icon and
+stats, is imported with `/import_items https://t.me/addstickers/name`
+instead. The model reads the item's English name off each card and keeps it
+as the sticker's description, marked `mlbb_item` (`mlbb_item_none` for a
+sticker that is no card), which takes the card out of the moods even when
+`/import_stickers` labelled it first. When someone asks about an item, the
+`mlbb_item_card` tool finds its card by name, or by a part of the name only
+one card has, and the card is sent as a sticker after a one-line answer,
+outside the stickers' 30-second gap.
+
 Now and then, about one time in four, she asks for `[gif CATEGORY]` instead.
 With `GIPHY_API_KEY` set, the code searches GIPHY for that mood (rated PG at
 most), picks one of the first ten at random and sends it; the GIF and the

@@ -147,6 +147,41 @@ type StickerImporter interface {
 	Import(ctx context.Context, name string) (stickers.Report, error)
 }
 
+// CardImporter brings packs of Mobile Legends item cards in for
+// /import_items.
+type CardImporter interface {
+	Import(ctx context.Context, name string) (stickers.CardReport, error)
+}
+
+// importItems is /import_items <link or name>, for the bot's owners: it
+// imports a pack of Mobile Legends item cards and has the model name the
+// item on as many of them as importBudget allows, and says how far it came.
+func (s *Service) importItems(ctx context.Context, in incoming) string {
+	if !s.isOwner(in.msg.From) {
+		return textForbidden
+	}
+	if s.opts.CardImporter == nil {
+		return "Stikerlar bu botda yoqilmagan."
+	}
+	_, arg, _ := strings.Cut(strings.TrimSpace(in.text), " ")
+	name, ok := stickers.PackName(arg)
+	if !ok {
+		return "Pack havolasini yozing: /import_items https://t.me/addstickers/nomi"
+	}
+	ctx, cancel := context.WithTimeout(ctx, importBudget)
+	defer cancel()
+	report, err := s.opts.CardImporter.Import(ctx, name)
+	if err != nil {
+		s.opts.Logger.Warn("item card import failed", "pack", name, "error", err)
+		return "Pack'ni o'qib bo'lmadi: nomi to'g'rimi?"
+	}
+	text := fmt.Sprintf("%s: %d ta stiker, %d tasi ko'rib chiqildi, %d tasi buyum kartochkasi.", report.Pack, report.Total, report.Looked, report.Named)
+	if left := report.Total - report.Looked; left > 0 {
+		text += fmt.Sprintf(" Qolgan %d tasi uchun buyruqni yana yuboring.", left)
+	}
+	return text
+}
+
 // sendSticker sends a sticker of category after an answer and returns its
 // message's ID, or 0 when none was sent: no category, an unknown one, none
 // of it, or one sent to the chat too recently. A failure costs only the

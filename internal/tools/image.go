@@ -89,12 +89,29 @@ type Audio struct {
 	Title, Performer string
 }
 
-// Sink collects the pictures drawn and the sounds found during one turn. It
-// is safe for concurrent use.
+// Sink collects the pictures drawn, the sounds found and the stickers chosen
+// during one turn. It is safe for concurrent use.
 type Sink struct {
 	mu       sync.Mutex
 	drawings []Drawing
 	audios   []Audio
+	stickers []string
+}
+
+// AddSticker keeps a sticker, by its file ID, to send with the answer.
+func (s *Sink) AddSticker(fileID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stickers = append(s.stickers, fileID)
+}
+
+// TakeStickers returns the stickers kept so far and empties the sink.
+func (s *Sink) TakeStickers() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	stickers := s.stickers
+	s.stickers = nil
+	return stickers
 }
 
 // AddAudio keeps a sound to send with the answer.

@@ -104,3 +104,43 @@ func TestStickersAndGIFsShareTheGap(t *testing.T) {
 		t.Errorf("a sticker right after a GIF: %v, want ErrNoSticker", err)
 	}
 }
+
+// A pack's stickers are named as item cards one by one; the cards are found
+// by name, the stickers that are no card are not, and neither is ever a mood.
+func TestItemCards(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	if _, err := store.SaveStickers(ctx, []PackSticker{
+		{FileUniqueID: "ua", FileID: "fa", Pack: "items", ImageFileID: "ia"},
+		{FileUniqueID: "ub", FileID: "fb", Pack: "items", ImageFileID: "ib"},
+		{FileUniqueID: "uc", FileID: "fc", Pack: "items", ImageFileID: "ic"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// A card the mood labeller saw first is named all the same.
+	if err := store.LabelSticker(ctx, "ua", []string{"funny"}, "item stats", true); err != nil {
+		t.Fatal(err)
+	}
+	unnamed, err := store.UnnamedCards(ctx, "items")
+	if err != nil || len(unnamed) != 3 {
+		t.Fatalf("unnamed = %+v, err = %v", unnamed, err)
+	}
+	if err := store.LabelSticker(ctx, "ua", []string{ItemCard}, "Athena's Shield", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.LabelSticker(ctx, "ub", []string{NotItemCard}, "", false); err != nil {
+		t.Fatal(err)
+	}
+	if unnamed, _ := store.UnnamedCards(ctx, "items"); len(unnamed) != 1 || unnamed[0].FileUniqueID != "uc" {
+		t.Errorf("unnamed = %+v, want only uc", unnamed)
+	}
+	if c, err := store.PackCards(ctx, "items"); err != nil || c != (CardCount{Total: 3, Looked: 2, Named: 1}) {
+		t.Errorf("count = %+v, err = %v", c, err)
+	}
+	if cards, err := store.ItemCards(ctx); err != nil || len(cards) != 1 || cards[0] != (ItemCardSticker{FileID: "fa", Name: "Athena's Shield"}) {
+		t.Errorf("cards = %+v, err = %v", cards, err)
+	}
+	if id, _ := store.PickSticker(ctx, -1, "funny", 0); id != "" {
+		t.Errorf("a card was picked for a mood: %q", id)
+	}
+}
