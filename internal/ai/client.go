@@ -272,7 +272,8 @@ func (c *Client) payload(req Request, model string, withTools bool) chatRequest 
 
 type chatResponse struct {
 	Choices []struct {
-		Message Message `json:"message"`
+		Message      Message `json:"message"`
+		FinishReason string  `json:"finish_reason"`
 	} `json:"choices"`
 	Error *errorBody `json:"error"`
 }
@@ -348,6 +349,9 @@ func decodeReply(raw []byte) (Message, error) {
 		return Message{}, ErrEmptyResponse
 	}
 	msg := parsed.Choices[0].Message
+	if parsed.Choices[0].FinishReason == "length" && len(msg.ToolCalls) == 0 {
+		return Message{}, ErrTruncated
+	}
 	msg.Role = RoleAssistant
 	return msg, nil
 }
@@ -362,7 +366,7 @@ func isRetryable(ctx context.Context, err error) bool {
 	}
 	// Anything else that reached here is a transport failure: the request may
 	// not have arrived, and a completion has no side effects, so retry.
-	return !errors.Is(err, ErrEmptyResponse) && !isDecodeError(err)
+	return !errors.Is(err, ErrEmptyResponse) && !errors.Is(err, ErrTruncated) && !isDecodeError(err)
 }
 
 func isDecodeError(err error) bool {

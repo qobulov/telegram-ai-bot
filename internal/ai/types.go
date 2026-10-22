@@ -21,6 +21,11 @@ const (
 // ErrEmptyResponse means the provider answered without any usable message.
 var ErrEmptyResponse = errors.New("ai: empty response")
 
+// ErrTruncated is a reply the model ran out of tokens in before it was done:
+// a fragment of words, or of a tool call written out as words, that must not
+// be sent. Asking again would end the same way.
+var ErrTruncated = errors.New("ai: the reply was cut off at the token limit")
+
 // Message is one chat message. An assistant message may carry ToolCalls; a
 // tool message answers one of them through ToolCallID.
 type Message struct {

@@ -695,6 +695,9 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 		// second insult; an error message would be worse than silence.
 		log.Warn("the model gave an empty answer; nothing was sent")
 		return outcome{}
+	case errors.Is(err, ai.ErrTruncated):
+		log.Warn("the model ran out of tokens mid-answer; the fragment was not sent")
+		return say(textCutOff)
 	case errors.Is(err, agent.ErrDuplicate):
 		log.Info("duplicate update skipped")
 		return outcome{duplicate: true}

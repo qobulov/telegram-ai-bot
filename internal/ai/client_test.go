@@ -754,3 +754,17 @@ func TestNoSecondRoundWithoutTimeForIt(t *testing.T) {
 		t.Errorf("models asked = %v; a round that cannot finish in time is not started", server.asked)
 	}
 }
+
+// A reply cut off at the token limit is an error, asked for once: the same
+// request would be cut off again. A tool call that came whole stands.
+func TestCompleteRefusesAReplyCutOffAtTheTokenLimit(t *testing.T) {
+	client, rec := newTestClient(t, reply{status: 200, body: `{"choices":[{"message":{"role":"assistant","content":") имлосидан асосан қайси рол"},"finish_reason":"length"}]}`})
+	if _, err := client.Complete(context.Background(), userRequest()); !errors.Is(err, ErrTruncated) || rec.count() != 1 {
+		t.Errorf("err = %v after %d requests, want ErrTruncated after one", err, rec.count())
+	}
+	whole := `{"choices":[{"message":{"role":"assistant","tool_calls":[{"id":"c","type":"function","function":{"name":"calculator","arguments":"{}"}}]},"finish_reason":"length"}]}`
+	client, _ = newTestClient(t, reply{status: 200, body: whole})
+	if msg, err := client.Complete(context.Background(), toolRequest()); err != nil || len(msg.ToolCalls) != 1 {
+		t.Errorf("msg = %+v, err = %v, want the tool call", msg, err)
+	}
+}
