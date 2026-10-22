@@ -65,6 +65,7 @@ type BaseURLs struct {
 	CoinGecko         string
 	Deezer            string
 	RoneArena         string
+	Isan              string
 	// Wikipedia is a format string with %s for the language code.
 	Wikipedia string
 	// News maps a language (uz, ru) to its feeds by source name. The name
@@ -86,6 +87,7 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.CoinGecko = cmp.Or(b.CoinGecko, "https://api.coingecko.com")
 	b.Deezer = cmp.Or(b.Deezer, "https://api.deezer.com")
 	b.RoneArena = cmp.Or(b.RoneArena, "https://arena.rone.dev")
+	b.Isan = cmp.Or(b.Isan, "https://api.isan.eu.org")
 	b.Wikipedia = cmp.Or(b.Wikipedia, "https://%s.wikipedia.org")
 	if b.News == nil {
 		b.News = map[string]map[string]string{

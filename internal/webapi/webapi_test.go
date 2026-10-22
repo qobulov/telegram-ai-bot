@@ -132,6 +132,7 @@ func (u *upstream) options() Options {
 			CoinGecko:         base + "/coingecko",
 			Deezer:            base + "/deezer",
 			RoneArena:         base + "/arena",
+			Isan:              base + "/isan",
 			Wikipedia:         base + "/wiki/%s",
 			News: map[string]map[string]string{
 				"uz": {"kun.uz": base + "/rss/kun", "gazeta.uz": base + "/rss/gazeta-oz", "uza.uz": base + "/rss/uza-oz", "daryo.uz": base + "/rss/daryo"},

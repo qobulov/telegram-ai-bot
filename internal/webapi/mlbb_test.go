@@ -99,7 +99,7 @@ func TestMLBBMeta(t *testing.T) {
 func TestMLBBRefusesBadArguments(t *testing.T) {
 	u := newUpstream(t, nil)
 	for args, word := range map[string]string{
-		`{"action":"player"}`:                    "action",
+		`{"action":"build"}`:                     "action",
 		`{"action":"meta","rank":"grandmaster"}`: "rank",
 		`{"action":"meta","sort":"kda"}`:         "sort",
 	} {
@@ -124,5 +124,49 @@ func TestMLBBUpstreamTrouble(t *testing.T) {
 	}
 	if env := run(t, u.options(), "mlbb", `{"action":"meta"}`); env.OK {
 		t.Errorf("a 503 was taken for an answer: %s", env.raw)
+	}
+}
+
+func TestMLBBPlayerGivesNicknameAndCountry(t *testing.T) {
+	u := newUpstream(t, map[string]stub{
+		"/isan/nickname/ml": ok(`{"success":true,"game":"Mobile Legends: Bang Bang","id":1407157025,"server":15832,"name":"ᴀᴢɪᴢʙᴇᴋ‮","country":"Uzbekistan"}`),
+	})
+
+	out := result[mlbbPlayerOutput](t, run(t, u.options(), "mlbb", `{"action":"player","player_id":"1407157025","zone":"15832"}`))
+
+	if out.Nickname != "ᴀᴢɪᴢʙᴇᴋ" || out.Country != "Uzbekistan" || out.PlayerID != "1407157025" || out.Zone != "15832" || out.Source == "" {
+		t.Errorf("player = %+v, want the nickname without its invisible override", out)
+	}
+	if q := u.requests("/isan/nickname/ml")[0].URL.Query(); q.Get("id") != "1407157025" || q.Get("zone") != "15832" {
+		t.Errorf("query = %v", q)
+	}
+}
+
+// The service answers a wrong ID with a 500, as it does its own failure;
+// the model is told it cannot tell them apart.
+func TestMLBBPlayerNotFound(t *testing.T) {
+	u := newUpstream(t, map[string]stub{
+		"/isan/nickname/ml":        status(500),
+		"/isan/nickname/ml?zone=2": ok(`{"success":false}`),
+	})
+	for _, args := range []string{`{"action":"player","player_id":"12345","zone":"1"}`, `{"action":"player","player_id":"12345","zone":"2"}`} {
+		if env := run(t, u.options(), "mlbb", args); env.OK || !strings.Contains(env.raw, "no account found") || !strings.Contains(env.raw, "check both") {
+			t.Errorf("%s: %s", args, env.raw)
+		}
+	}
+}
+
+func TestMLBBPlayerRefusesBadIDs(t *testing.T) {
+	u := newUpstream(t, nil)
+	for _, args := range []string{
+		`{"action":"player","player_id":"1407157025"}`,
+		`{"action":"player","player_id":"14071 57025","zone":"15832"}`,
+		`{"action":"player","player_id":"1407157025","zone":"(15832)"}`,
+		`{"action":"player","player_id":"../admin","zone":"1"}`,
+	} {
+		wantError(t, run(t, u.options(), "mlbb", args), "invalid_arguments", "player_id")
+	}
+	if u.total() != 0 {
+		t.Errorf("bad IDs reached the service %d times", u.total())
 	}
 }
