@@ -29,6 +29,7 @@ Send /reset to delete the conversation history.`
 	textOverloaded  = "Hozir juda band ekanman, bir daqiqadan keyin qayta yozing."
 	textError       = "Nimadir xato ketdi, birozdan keyin qayta yozing."
 	textTooLong     = "Xabaringiz juda uzun, %d belgidan qisqaroq yozing."
+	textNoGIF       = "Bunga mos GIF topilmadi."
 	textModel       = "Current model: %s"
 	// textDailyLimit takes the private chats' daily limit three times, once
 	// for each language.

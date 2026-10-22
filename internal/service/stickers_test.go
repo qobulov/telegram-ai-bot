@@ -181,8 +181,8 @@ func (f *fakeGIFs) ClaimMediaSlot(context.Context, int64, time.Duration) (bool, 
 	return !f.slotTaken, nil
 }
 
-// A GIF of a topic is sent; one that cannot be is nothing, since a topic has
-// no sticker.
+// A GIF of a topic is sent; when none is found, the asker is told so, as a
+// topic has no sticker to fall back on.
 func TestGIFOfATopic(t *testing.T) {
 	for name, c := range map[string]struct {
 		gifs *fakeGIFs
@@ -190,14 +190,17 @@ func TestGIFOfATopic(t *testing.T) {
 		log  string
 	}{
 		"sent":       {&fakeGIFs{links: []string{"https://g/1.mp4"}}, 1, "<gif pubg>"},
-		"none found": {&fakeGIFs{}, 0, ""},
+		"none found": {&fakeGIFs{}, 0, textNoGIF},
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := newFixture()
 			st := withStickers(f)
 			f.opts.GIFs, f.opts.AnimationSender, f.opts.MediaSlots = c.gifs, c.gifs, c.gifs
 			f.replier.gif = "pubg"
-			f.run(inGroup(groupMessage("Mira, pubg haqida gif tasha")))
+			sent := f.run(inGroup(groupMessage("Mira, pubg haqida gif tasha")))
+			if c.want == 0 && (len(sent) != 1 || sent[0].text != textNoGIF) {
+				t.Errorf("texts = %+v, want the asker told no GIF was found", sent)
+			}
 			if len(c.gifs.sent) != c.want || len(st.sent) != 0 {
 				t.Errorf("GIFs %d, stickers %q; want %d GIFs and no sticker", len(c.gifs.sent), st.sent, c.want)
 			}
