@@ -552,7 +552,7 @@ answer instead of making up a number.
 | `currency_rate` | Exchange rates in so'm, gold and silver per gram | Central Bank of Uzbekistan (cbu.uz), official rates; gold and silver are an approximate world price from currency-api (jsDelivr mirror as a fallback) |
 | `get_weather` | Current weather, up to 3 days of forecast, air quality | Open-Meteo (CC BY 4.0), MET Norway as a fallback; places from GeoNames (CC BY 4.0). She says which place it matched |
 | `prayer_times` | Prayer and Ramadan times | Aladhan; approximate, the Muslim Board of Uzbekistan (muslim.uz) is official |
-| `news_headlines` | Latest headlines in Uzbek or Russian | RSS feeds of kun.uz, gazeta.uz, uza.uz and daryo.uz; headlines and links only |
+| `news_headlines` | Latest headlines in Uzbek or Russian; with `world`, world news in Uzbek (Cyrillic), Russian or English | RSS feeds of kun.uz, gazeta.uz, uza.uz and daryo.uz, and of BBC O'zbek, BBC Russian and BBC World; headlines and links only |
 | `wiki_lookup` | Article summaries, "on this day" | Wikipedia (CC BY-SA) |
 | `football` | League tables, the current matchday's matches, top scorers | football-data.org free tier; scores can lag, so "latest", not live |
 | `crypto_price` | Coin prices in dollars and sums | CoinGecko |

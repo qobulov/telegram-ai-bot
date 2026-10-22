@@ -135,8 +135,9 @@ func (u *upstream) options() Options {
 			Isan:              base + "/isan",
 			Wikipedia:         base + "/wiki/%s",
 			News: map[string]map[string]string{
-				"uz": {"kun.uz": base + "/rss/kun", "gazeta.uz": base + "/rss/gazeta-oz", "uza.uz": base + "/rss/uza-oz", "daryo.uz": base + "/rss/daryo"},
-				"ru": {"gazeta.uz": base + "/rss/gazeta-ru", "uza.uz": base + "/rss/uza-ru", "daryo.uz": base + "/rss/daryo-ru"},
+				"uz":       {"kun.uz": base + "/rss/kun", "gazeta.uz": base + "/rss/gazeta-oz", "uza.uz": base + "/rss/uza-oz", "daryo.uz": base + "/rss/daryo"},
+				"ru":       {"gazeta.uz": base + "/rss/gazeta-ru", "uza.uz": base + "/rss/uza-ru", "daryo.uz": base + "/rss/daryo-ru"},
+				"world-en": {"bbc.co.uk": base + "/rss/bbc-world"},
 			},
 		},
 	}

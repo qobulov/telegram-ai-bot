@@ -68,7 +68,8 @@ type BaseURLs struct {
 	Isan              string
 	// Wikipedia is a format string with %s for the language code.
 	Wikipedia string
-	// News maps a language (uz, ru) to its feeds by source name. The name
+	// News maps a language (uz, ru), or world- and a language for the
+	// BBC, to its feeds by source name. The name
 	// is the site's domain, such as kun.uz: a headline's link must be on
 	// it.
 	News map[string]map[string]string
@@ -102,6 +103,11 @@ func (b BaseURLs) withDefaults() BaseURLs {
 				"uza.uz":    "https://uza.uz/ru/rss",
 				"daryo.uz":  "https://daryo.uz/ru/rss-full/",
 			},
+			// The BBC's Uzbek service writes in Cyrillic and links to
+			// bbc.com; its Russian and world services link to bbc.co.uk.
+			"world-uz": {"bbc.com": "https://feeds.bbci.co.uk/uzbek/cyr/rss.xml"},
+			"world-ru": {"bbc.co.uk": "https://feeds.bbci.co.uk/russian/rss.xml"},
+			"world-en": {"bbc.co.uk": "https://feeds.bbci.co.uk/news/world/rss.xml"},
 		}
 	}
 	return b

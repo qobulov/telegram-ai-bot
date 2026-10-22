@@ -347,3 +347,18 @@ func TestNewsToolAsksForHeadlinesAsTheyAre(t *testing.T) {
 		}
 	}
 }
+
+// World news comes from the BBC's feed in the language asked for, and only
+// links on the BBC's site are kept; English is only for world news.
+func TestNewsWorldFromTheBBC(t *testing.T) {
+	u := newUpstream(t, map[string]stub{"/rss/bbc-world": ok(`<rss><channel>
+		<item><title>Summit ends</title><link>https://www.bbc.co.uk/news/articles/a1</link><pubDate>Thu, 22 Oct 2026 08:00:00 GMT</pubDate></item>
+		<item><title>Elsewhere</title><link>https://evil.example/bbc.co.uk</link></item></channel></rss>`)})
+
+	r := result[newsResult](t, run(t, u.options(), "news_headlines", `{"world":true,"lang":"en"}`))
+
+	if len(r.Items) != 2 || r.Items[0].Title != "Summit ends" || r.Items[0].Source != "bbc.co.uk" || r.Items[0].Link != "https://www.bbc.co.uk/news/articles/a1" || r.Items[1].Link != "" {
+		t.Errorf("items = %+v", r.Items)
+	}
+	wantError(t, run(t, u.options(), "news_headlines", `{"lang":"en"}`), "invalid_arguments", "en with world")
+}
