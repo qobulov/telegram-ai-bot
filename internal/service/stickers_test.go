@@ -21,8 +21,10 @@ type fakeStickers struct {
 	sent   []string
 	report stickers.Report
 	pack   string
-	// none says no pack was imported.
+	// none says no pack was imported, and busy that the chat had a sticker
+	// within the gap.
 	none bool
+	busy bool
 }
 
 func (f *fakeStickers) PickSticker(_ context.Context, _ int64, category string, gap time.Duration) (string, error) {
@@ -31,6 +33,9 @@ func (f *fakeStickers) PickSticker(_ context.Context, _ int64, category string, 
 	f.asked = append(f.asked, category)
 	if f.err != nil {
 		return "", f.err
+	}
+	if f.busy && gap > 0 {
+		return "", storage.ErrNoSticker
 	}
 	return "file-" + category, nil
 }
@@ -310,5 +315,40 @@ func TestItemCardFollowsTheAnswer(t *testing.T) {
 	}
 	if log := strings.Join(f.chatLog.texts(groupID), "\n"); !strings.Contains(log, "<item card sticker>") {
 		t.Errorf("log = %q", log)
+	}
+}
+
+// A sticker that was the whole answer and is held back by the gap becomes
+// a reaction of its mood; one asked for is not held back.
+func TestStickerWithinTheGap(t *testing.T) {
+	for name, c := range map[string]struct {
+		text     string
+		stickers int
+		reaction string
+	}{
+		"unasked":   {"Mira, haha", 0, "🤣"},
+		"asked for": {"Mira, endi stik", 1, ""},
+		"stikerini": {"Mira, stikerini tashla", 1, ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			st := withStickers(f)
+			st.busy = true
+			f.replier.sticker = "funny"
+			f.run(inGroup(groupMessage(c.text)))
+			reactions := f.reactor.recorded()
+			if len(st.sent) != c.stickers || (c.reaction == "") != (len(reactions) == 0) || (c.reaction != "" && reactions[0].emoji != c.reaction) {
+				t.Errorf("stickers %q, reactions %+v", st.sent, reactions)
+			}
+		})
+	}
+}
+
+// Every mood has a reaction, and Telegram takes each.
+func TestMoodReactions(t *testing.T) {
+	for _, mood := range stickers.Categories {
+		if emoji, ok := moodReactions[mood]; !ok || !telegram.IsReactionEmoji(emoji) {
+			t.Errorf("%s: %q is not a reaction Telegram takes", mood, emoji)
+		}
 	}
 }

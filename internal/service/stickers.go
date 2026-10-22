@@ -1,10 +1,12 @@
 package service
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"regexp"
 	"strings"
 	"time"
 
@@ -69,11 +71,40 @@ type MediaSlots interface {
 // was not sent is cleared from out, so that the log tells later turns only
 // of what the chat saw.
 func (s *Service) sendMedia(in incoming, out *outcome) int64 {
+	mood, alone := cmp.Or(out.sticker, out.gif), out.text == "" && out.reaction == ""
+	id := s.sendMediaOnce(in, out)
+	if id == 0 && alone && mood != "" && out.text == "" {
+		// A sticker or GIF that was the whole answer and could not go, most
+		// often within the gap after the last one, becomes a reaction of
+		// its mood rather than no answer at all.
+		if emoji, ok := moodReactions[mood]; ok {
+			s.react(in, emoji)
+		}
+	}
+	return id
+}
+
+// moodReactions are the reactions that stand in for a sticker of each mood.
+var moodReactions = map[string]string{
+	"funny": "🤣", "sarcasm": "🙈", "flirting": "😘", "jealousy": "💔", "sad": "😢", "comfort": "🤗",
+	"shock": "😱", "celebration": "🎉", "facepalm": "😐", "angry": "😡", "wholesome": "🥰", "cool": "😎",
+}
+
+// askedForMedia reports a message that asks for a sticker or a GIF, which
+// then does not wait out the gap that keeps the bot's own stickers a
+// seasoning.
+var askedForMedia = regexp.MustCompile(`(?i)(stik|stic|стик|gif|гиф)`)
+
+func (s *Service) sendMediaOnce(in incoming, out *outcome) int64 {
+	gap := stickerGap
+	if askedForMedia.MatchString(in.text) {
+		gap = 0
+	}
 	if out.gif != "" && (s.opts.GIFs == nil || s.opts.AnimationSender == nil || s.opts.MediaSlots == nil) {
 		out.sticker, out.gif = out.gif, ""
 	}
 	if out.gif != "" {
-		id, claimed := s.sendGIF(in, out.gif)
+		id, claimed := s.sendGIF(in, out.gif, gap)
 		if id != 0 {
 			return id
 		}
@@ -92,7 +123,7 @@ func (s *Service) sendMedia(in incoming, out *outcome) int64 {
 		out.gif = ""
 		return 0
 	}
-	return s.sendStickerWithin(in, out, stickerGap)
+	return s.sendStickerWithin(in, out, gap)
 }
 
 func (s *Service) sendStickerWithin(in incoming, out *outcome, gap time.Duration) int64 {
@@ -106,12 +137,11 @@ func (s *Service) sendStickerWithin(in incoming, out *outcome, gap time.Duration
 // sendGIF sends a GIF of category, a mood or a topic, and returns its
 // message's ID, or 0, and whether it took the chat's slot for one. A
 // failure after that costs only the GIF.
-func (s *Service) sendGIF(in incoming, category string) (int64, bool) {
+func (s *Service) sendGIF(in incoming, category string, gap time.Duration) (int64, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
 	defer cancel()
 	// A GIF of a topic was asked for, so the gap that keeps the bot's own
 	// stickers a seasoning does not hold it back.
-	gap := stickerGap
 	if !stickers.IsCategory(category) {
 		gap = 0
 	}
