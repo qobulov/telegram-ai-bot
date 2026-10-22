@@ -180,6 +180,7 @@ in the environment win over the file.
 | `IMAGE_MODEL` | `gemini-3.1-flash-image` | Gemini model that draws |
 | `DAILY_IMAGE_LIMIT` | `2` | Pictures per user per day; owners have no limit; `0` lets only owners draw |
 | `GIPHY_API_KEY` | empty | Key from <https://developers.giphy.com/dashboard/> (API, not SDK); lets her send a GIF now and then instead of a sticker. See [Stickers](#stickers) |
+| `YOUTUBE_API_KEY` | empty | YouTube Data API v3 key from Google Cloud Console, not bound to a service account; without it there is no video search |
 | `TMDB_TOKEN` | empty | TMDB API Read Access Token from <https://www.themoviedb.org/settings/api>; without it there is no movies tool |
 | `TAVILY_API_KEY` | empty | Free key from <https://app.tavily.com>; without it there is no web search. See [Live data](#live-data) |
 | `FOOTBALL_DATA_TOKEN` | empty | Free key from <https://www.football-data.org/client/register>; without it there is no football tool. See [Live data](#live-data) |
@@ -561,6 +562,7 @@ answer instead of making up a number.
 | `mlbb` | Mobile Legends heroes: the meta by win, ban or pick rate; a hero's role, lane, speciality, difficulty, skills and the game's tips, and its rates, counters and partners, by rank, over the last 7 days; an account's nickname and country from its ID and zone | Rone Arena API, a fan-made, keyless mirror of Moonton's MLBB Academy statistics, cached for 3 hours; api.isan.eu.org for accounts, which answers a wrong ID and its own failure alike. Both unofficial |
 | `web_search` | Current facts from the web: an answer and up to five results with their sites, or news of the last 7 days | Tavily, with `TAVILY_API_KEY` (free: 1,000 searches a month); without the key there is no web search |
 | `movies` | Films and series: search by title, a title's plot, genres, length, director and cast, and what is trending or popular in a genre | TMDB, with `TMDB_TOKEN`; plots in Russian or English, as TMDB has few Uzbek ones. This product uses the TMDB API but is not endorsed or certified by TMDB |
+| `youtube_search` | YouTube videos: guides, highlights, trailers, full songs, with channel, length, views and a youtu.be link that Telegram plays | YouTube Data API, with `YOUTUBE_API_KEY` (an `AIza…` key restricted to YouTube Data API v3; free: 10,000 units a day, a search costs 101); results cached for 2 hours |
 | `music_search` | Songs by title or artist with their links; a 30-second preview of the first match, named after the song, is sent as audio and is her whole answer | Deezer, keyless; Deezer gives only previews |
 
 The tools share one HTTP client with short timeouts and a small in-memory

@@ -64,6 +64,9 @@ type Config struct {
 	// TMDBToken is a TMDB read access token; without it there is no
 	// film and series tool.
 	TMDBToken string
+	// YouTubeAPIKey is a YouTube Data API key; without it there is no
+	// video search.
+	YouTubeAPIKey string
 
 	// Image generation, Gemini only. Owners have no daily limit.
 	ImagesEnabled   bool
@@ -222,6 +225,7 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.CoinGeckoDemoKey = r.apiKey("COINGECKO_DEMO_KEY")
 	cfg.TavilyAPIKey = r.apiKey("TAVILY_API_KEY")
 	cfg.TMDBToken = r.apiKey("TMDB_TOKEN")
+	cfg.YouTubeAPIKey = r.apiKey("YOUTUBE_API_KEY")
 	cfg.WakeWords = r.wakeWords(cfg)
 	r.checkRemovedVariables()
 	r.checkGroupSettings(cfg)

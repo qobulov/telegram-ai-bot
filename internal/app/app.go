@@ -358,6 +358,7 @@ func liveDataTools(cfg config.Config, bot Bot) []tools.Tool {
 		CoinGeckoKey:  cfg.CoinGeckoDemoKey,
 		TavilyKey:     cfg.TavilyAPIKey,
 		TMDBToken:     cfg.TMDBToken,
+		YouTubeKey:    cfg.YouTubeAPIKey,
 	})
 }
 
