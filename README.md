@@ -570,11 +570,13 @@ cache, send `MariaBot/1.0 (+https://t.me/<bot username>)` as the user agent,
 and need no key except football. Text from outside sites comes back marked as
 untrusted in the tool descriptions.
 
-For data, such as a hero's stats or a list of prices, she marks key names and
-numbers with `**bold**` and puts items on lines starting with "• ". Messages
-are still sent without a parse mode: the code turns `**bold**`, `` `code` ``,
-headings and "* " bullets into Telegram entities itself, so a stray mark stays
-as text and never makes a send fail.
+For data and longer explanations she writes Markdown: `**bold**`, "- " lists,
+"## " headings and tables. An answer with headings, lists, tables or
+quotations goes as a rich message (`sendRichMessage`, Bot API 10.1), which
+Telegram renders with large headings and real lists; if Telegram refuses it,
+it goes as ordinary text. Ordinary messages are sent without a parse mode: the
+code turns `**bold**` and `` `code` `` into entities itself, so a stray mark
+stays as text and never makes a send fail.
 
 ## Daily limit in private chats
 

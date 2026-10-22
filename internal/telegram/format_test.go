@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"slices"
+	"strings"
 	"testing"
 )
 
@@ -65,5 +67,63 @@ func TestSendPhotoSendsCaptionEntities(t *testing.T) {
 	}
 	if caption != "Ling rasmi" || entities != `[{"type":"bold","offset":0,"length":4}]` {
 		t.Errorf("caption %q, entities %q", caption, entities)
+	}
+}
+
+func TestIsRich(t *testing.T) {
+	for text, want := range map[string]bool{
+		"Salom, senpai":                             false,
+		"**Ling** zo'r":                             false,
+		"## Ling\nAssassin":                         true,
+		"Meta:\n- Masha\n- Marcel":                  true,
+		"Top:\n1. Masha\n2. Marcel":                 true,
+		"| Hero | Win |\n|---|---|\n| Ling | 52% |": true,
+		"> iqtibos":                                 true,
+		"2-3 kun":                                   false,
+		strings.Repeat("- x\n", RichLimit):          false,
+	} {
+		if got := isRich(text); got != want {
+			t.Errorf("isRich(%.30q) = %v, want %v", text, got, want)
+		}
+	}
+}
+
+// richServer answers sendRichMessage with rich and anything else with OK,
+// and records the methods called.
+func richServer(t *testing.T, rich string) (*Client, *[]string) {
+	t.Helper()
+	var methods []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		method := strings.TrimPrefix(r.URL.Path, "/bot"+testToken+"/")
+		methods = append(methods, method)
+		if method == "sendRichMessage" {
+			_, _ = io.WriteString(w, rich)
+			return
+		}
+		_, _ = io.WriteString(w, `{"ok":true,"result":{"message_id":2}}`)
+	}))
+	t.Cleanup(server.Close)
+	return NewClient(Options{Token: testToken, BaseURL: server.URL}), &methods
+}
+
+func TestSendMessageSendsStructureAsARichMessage(t *testing.T) {
+	client, methods := richServer(t, `{"ok":true,"result":{"message_id":1}}`)
+	id, err := client.SendMessage(context.Background(), Outgoing{ChatID: 1, Text: "## Ling\n- Assassin"})
+	if err != nil || id != 1 || strings.Join(*methods, ",") != "sendRichMessage" {
+		t.Errorf("id %d, err %v, methods %v", id, err, *methods)
+	}
+}
+
+// A rich message Telegram refuses goes as ordinary text; a rate limit does
+// not, as the plain one would be refused too.
+func TestSendMessageFallsBackFromARefusedRichMessage(t *testing.T) {
+	client, methods := richServer(t, `{"ok":false,"error_code":400,"description":"Bad Request: can't parse rich message"}`)
+	id, err := client.SendMessage(context.Background(), Outgoing{ChatID: 1, Text: "## Ling\n- Assassin"})
+	if err != nil || id != 2 || strings.Join(*methods, ",") != "sendRichMessage,sendMessage" {
+		t.Errorf("id %d, err %v, methods %v", id, err, *methods)
+	}
+	client, methods = richServer(t, `{"ok":false,"error_code":429,"description":"Too Many Requests","parameters":{"retry_after":1}}`)
+	if _, err := client.SendMessage(context.Background(), Outgoing{ChatID: 1, Text: "## Ling\n- Assassin"}); err == nil || slices.Contains(*methods, "sendMessage") {
+		t.Errorf("err %v, methods %v, want the rate limit returned", err, *methods)
 	}
 }

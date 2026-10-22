@@ -411,12 +411,23 @@ type sentMessage struct {
 }
 
 // SendMessage sends text and returns the ID of the message Telegram
-// created. Text longer than Telegram allows is split into several messages;
+// created. Text with headings, lists, tables or quotations goes as a rich
+// message, which Telegram renders as such; when Telegram refuses it, it goes
+// as ordinary text. Text longer than Telegram allows is split into several messages;
 // only the first is a reply, and its ID is the one returned. Text is sent
 // without a parse mode, so that stray Markdown or HTML in a model reply can
 // never make the send fail; its bold, code and bullets become entities
 // (see formatted).
 func (c *Client) SendMessage(ctx context.Context, msg Outgoing) (int64, error) {
+	if isRich(msg.Text) {
+		id, err := c.sendRich(ctx, msg)
+		var refused *APIError
+		// Telegram answered no, so nothing was sent: the plain message
+		// follows. Without an answer the rich one may be in the chat.
+		if err == nil || !errors.As(err, &refused) || refused.Code == http.StatusTooManyRequests {
+			return id, err
+		}
+	}
 	var firstID int64
 	reply := replyTo(msg.ReplyToMessageID)
 	for _, chunk := range Split(msg.Text, MessageLimit) {
@@ -696,4 +707,25 @@ func sleep(ctx context.Context, d time.Duration) error {
 	case <-timer.C:
 		return nil
 	}
+}
+
+type sendRichMessageParams struct {
+	ChatID          int64            `json:"chat_id"`
+	RichMessage     inputRichMessage `json:"rich_message"`
+	ReplyParameters *replyParameters `json:"reply_parameters,omitempty"`
+}
+
+type inputRichMessage struct {
+	Markdown string `json:"markdown"`
+}
+
+// sendRich sends msg's text as a rich message, written in Telegram's rich
+// Markdown, whole: a rich message holds far more than an ordinary one.
+func (c *Client) sendRich(ctx context.Context, msg Outgoing) (int64, error) {
+	var sent sentMessage
+	params := sendRichMessageParams{ChatID: msg.ChatID, RichMessage: inputRichMessage{Markdown: msg.Text}, ReplyParameters: replyTo(msg.ReplyToMessageID)}
+	if err := c.call(ctx, "sendRichMessage", params, &sent); err != nil {
+		return 0, err
+	}
+	return sent.MessageID, nil
 }

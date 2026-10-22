@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 	"unicode/utf16"
+	"unicode/utf8"
 )
 
 // messageEntity marks a span of a message's text, in UTF-16 code units as
@@ -12,6 +13,18 @@ type messageEntity struct {
 	Type   string `json:"type"`
 	Offset int    `json:"offset"`
 	Length int    `json:"length"`
+}
+
+// RichLimit is the most characters a rich message holds.
+const RichLimit = 32768
+
+// richBlocks are the lines that make text structured: headings, list items,
+// table rows and quotations. Bold alone is not enough: entities show it.
+var richBlocks = regexp.MustCompile(`(?m)^[ \t]*(#{1,6}[ \t]|[-*+][ \t]|[0-9]+\.[ \t]|\|.*\||>)`)
+
+// isRich reports text with structure to send as a rich message.
+func isRich(text string) bool {
+	return utf8.RuneCountInString(text) <= RichLimit && richBlocks.MatchString(text)
 }
 
 var (
