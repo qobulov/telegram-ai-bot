@@ -63,7 +63,7 @@ func TestSearchForATopic(t *testing.T) {
 	var asked string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		asked = r.URL.Query().Get("q")
-		_, _ = w.Write([]byte(`{"data":[{"images":{"fixed_height":{"mp4":"https://media.giphy.com/2.mp4"}}}]}`))
+		_, _ = w.Write([]byte(`{"data":[{"title":"PUBG Winner GIF","images":{"fixed_height":{"mp4":"https://media.giphy.com/2.mp4"}}}]}`))
 	}))
 	defer server.Close()
 	c := &Client{APIKey: "k", BaseURL: server.URL}
@@ -74,5 +74,28 @@ func TestSearchForATopic(t *testing.T) {
 	asked = ""
 	if links, err := c.Search(context.Background(), "  "); links != nil || err != nil || asked != "" {
 		t.Errorf("an empty topic searched: %q, %v", links, err)
+	}
+}
+
+// A GIF of a topic must be about it: one about the game alone is not a GIF
+// of one of its heroes.
+func TestSearchKeepsGIFsAboutTheTopic(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[
+			{"title":"Mobile Legends Gg GIF","slug":"mobilelegends-gg-abc","images":{"fixed_height":{"mp4":"https://g/1.mp4"}}},
+			{"title":"Free Fire Ff GIF","slug":"freefire-xyz","images":{"fixed_height":{"mp4":"https://g/2.mp4"}}},
+			{"title":"","slug":"mlbb-ling-skin-123","images":{"fixed_height":{"mp4":"https://g/3.mp4"}}}]}`))
+	}))
+	defer server.Close()
+	c := &Client{APIKey: "k", BaseURL: server.URL}
+
+	if links, _ := c.Search(context.Background(), "mobile legends ling"); len(links) != 1 || links[0] != "https://g/3.mp4" {
+		t.Errorf("ling = %q, want only the GIF about Ling", links)
+	}
+	if links, _ := c.Search(context.Background(), "mlbb"); len(links) != 3 {
+		t.Errorf("mlbb = %q, want every GIF: the topic is the game", links)
+	}
+	if links, _ := c.Search(context.Background(), "facepalm"); len(links) != 3 {
+		t.Errorf("a mood = %q, want every GIF", links)
 	}
 }

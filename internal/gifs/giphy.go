@@ -46,6 +46,8 @@ type Client struct {
 
 type searchResult struct {
 	Data []struct {
+		Title  string `json:"title"`
+		Slug   string `json:"slug"`
 		Images struct {
 			FixedHeight struct {
 				MP4 string `json:"mp4"`
@@ -95,12 +97,44 @@ func (c *Client) Search(ctx context.Context, subject string) ([]string, error) {
 		return nil, fmt.Errorf("giphy: read the answer: %w", err)
 	}
 	var links []string
+	words := distinctWords(subject)
 	for _, g := range found.Data {
-		if link := g.Images.FixedHeight.MP4; link != "" {
+		if link := g.Images.FixedHeight.MP4; link != "" && (ok || about(g.Title+" "+g.Slug, words)) {
 			links = append(links, link)
 		}
 	}
 	return links, nil
+}
+
+// broadWords name a whole game or say nothing: a GIF of "mobile legends
+// ling" must be about Ling, not about the game, which GIPHY gives for any
+// of its heroes.
+var broadWords = map[string]bool{"mobile": true, "legends": true, "legend": true, "mlbb": true, "ml": true, "bang": true, "gif": true, "the": true, "a": true, "of": true, "game": true}
+
+// distinctWords are the words of a topic that a GIF about it must mention.
+func distinctWords(topic string) []string {
+	var words []string
+	for _, w := range strings.Fields(strings.ToLower(topic)) {
+		if !broadWords[w] {
+			words = append(words, w)
+		}
+	}
+	return words
+}
+
+// about reports whether a GIF's title and slug mention one of words; any
+// GIF is about a topic made only of broad words.
+func about(text string, words []string) bool {
+	if len(words) == 0 {
+		return true
+	}
+	text = strings.ToLower(text)
+	for _, w := range words {
+		if strings.Contains(text, w) {
+			return true
+		}
+	}
+	return false
 }
 
 // unwrapURL drops the request URL, with the key in it, from err.
