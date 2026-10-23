@@ -942,7 +942,7 @@ func (s *Service) request(ctx context.Context, in incoming, rules []storage.Grou
 			notice = ownerNotice
 		}
 	}
-	req.Context = paragraphs(s.chatHeader(ctx, in), s.rulesHeader(rules, in), s.profileLine(ctx, in, rules), notice, s.talksElsewhere(ctx, in), log, s.noStickersHint(ctx), s.ownerReplyHint(in), languageHint(in.text))
+	req.Context = paragraphs(s.chatHeader(ctx, in), s.rulesHeader(rules, in), s.profileLine(ctx, in, rules), notice, s.talksElsewhere(ctx, in), log, s.noStickersHint(ctx), s.ownerReplyHint(in), s.toThemHint(in), languageHint(in.text))
 	replied := in.msg.ReplyToMessage
 	if replied != nil {
 		req.Text = withQuote(req.Text, s.quoted(ctx, replied), s.opts.Bot.ID, plainLabel(replied.From))
@@ -965,6 +965,21 @@ func (s *Service) ownerReplyHint(in incoming) string {
 	}
 	member := plainLabel(replied.From)
 	return fmt.Sprintf(ownerReplyNote, member, member)
+}
+
+const toThemNote = "[%s is replying to a message from %s. If they ask you to say something to %s, in any words (\"nimadir de\", \"bunga bir nima de\", \"unga ayt\"), say it: start with [to them] and speak to %s, by name, not to %s, and never ask %s what to say. Without such a request, answer %s and leave out [to them].]"
+
+// toThemHint names, right before the message, the member whose message a
+// group message replies to, so that "nimadir de" is said to that member
+// and [to them] goes only with words for them; otherwise it is "".
+func (s *Service) toThemHint(in incoming) string {
+	replied := in.msg.ReplyToMessage
+	if !in.group || replied == nil || replied.From == nil || replied.IsService() ||
+		replied.From.ID == s.opts.Bot.ID || replied.From.ID == in.userID {
+		return ""
+	}
+	asker, member := plainLabel(in.msg.From), plainLabel(replied.From)
+	return fmt.Sprintf(toThemNote, asker, member, member, member, asker, asker, asker)
 }
 
 // paragraphs joins the parts that are not empty, a blank line apart.

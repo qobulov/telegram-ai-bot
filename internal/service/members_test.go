@@ -424,3 +424,27 @@ func TestToThemAnswerInReplyToTheBotGoesToWhomItAnswered(t *testing.T) {
 		t.Errorf("sent = %+v, want one reply to Bek's message 28", sent)
 	}
 }
+
+// A group message that replies to another member names that member for the
+// model, with when to use [to them]; one replying to the bot or to oneself
+// does not.
+func TestToThemHintNamesTheRepliedMember(t *testing.T) {
+	f := newFixture()
+	toMember := replyingTo(groupMessage("Mira, nimadir de"), 4242, "Дэ")
+	toMember.ReplyToMessage.From.FirstName = "Patrick"
+	toBot := replyingTo(groupMessage("Mira, nimadir de"), botID, "salom")
+	toBot.MessageID = 31
+
+	f.run(inGroup(toMember), inGroup(toBot))
+
+	calls := f.replier.recorded()
+	if len(calls) != 2 {
+		t.Fatalf("model calls = %d", len(calls))
+	}
+	if ctx := calls[0].req.Context; !strings.Contains(ctx, "is replying to a message from Patrick") || !strings.Contains(ctx, "start with [to them] and speak to Patrick") {
+		t.Errorf("context = %q, want Patrick named", ctx)
+	}
+	if strings.Contains(calls[1].req.Context, "[to them]") {
+		t.Errorf("a reply to the bot carries the hint: %q", calls[1].req.Context)
+	}
+}
