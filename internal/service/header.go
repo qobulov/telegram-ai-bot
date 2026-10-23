@@ -116,53 +116,55 @@ type ProfileBook interface {
 	Profile(ctx context.Context, userID int64) (storage.UserProfile, error)
 }
 
-// profileLine tells the model how to talk to the person writing in every
-// chat, as they or an owner asked: a name and "siz". An owner's own form of
-// address wins over the name.
-// It is "" when they asked for nothing or it cannot be read.
+// profileLine tells the model how to talk to the person writing: by the
+// name they or an owner asked for in every chat, unless an owner's own form
+// of address wins, and with "sen" when they swore at the bot; "siz", for
+// everyone else, is the persona's. It is "" when there is nothing to tell.
 func (s *Service) profileLine(ctx context.Context, in incoming, rules []storage.GroupRule) string {
-	if s.opts.Profiles == nil || in.fromBot {
+	if in.fromBot {
 		return ""
 	}
 	ctx, cancel := context.WithTimeout(ctx, logTimeout)
 	defer cancel()
+	var lines []string
+	if name := s.callName(ctx, in); name != "" && s.addressFor(rules, in) == "" {
+		lines = append(lines, `[In every chat, the person writing is to be called "`+inQuotes(name)+`".]`)
+	}
+	if s.sworeAtBot(ctx, in) {
+		lines = append(lines, senLine)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// senLine tells the model to drop "siz" for someone who swore at it.
+const senLine = `[The person writing swore at you today: speak to them with "sen" ("ты" in Russian), not "siz".]`
+
+// callName is the name the person writing asked to be called, "" when they
+// asked for none or it cannot be read.
+func (s *Service) callName(ctx context.Context, in incoming) string {
+	if s.opts.Profiles == nil {
+		return ""
+	}
 	p, err := s.opts.Profiles.Profile(ctx, in.userID)
 	if err != nil {
 		s.opts.Logger.Warn("could not read a profile", "user_id", in.userID, "error", err)
 		return ""
 	}
-	var asks []string
-	if p.CallName != "" && s.addressFor(rules, in) == "" {
-		asks = append(asks, `called "`+inQuotes(p.CallName)+`"`)
-	}
-	if p.Siz {
-		asks = append(asks, `spoken to with "siz"`)
-	}
-	var lines []string
-	if len(asks) > 0 {
-		lines = append(lines, "[In every chat, the person writing is to be "+strings.Join(asks, " and ")+".]")
-	}
-	if !p.Siz && s.isNewcomer(in, p) {
-		lines = append(lines, newcomerLine)
-	}
-	return strings.Join(lines, "\n")
+	return p.CallName
 }
 
-// newcomerWindow is how long after first talking to the bot a person is
-// still new to it.
-const newcomerWindow = 24 * time.Hour
-
-// newcomerLine tells the model, from the database rather than its guess,
-// that the person writing is new to it.
-const newcomerLine = `[The person writing is talking to you for the first time today or ever: speak to them with "siz" ("вы" in Russian), politely, unless they are rude to you.]`
-
-// isNewcomer reports a person who first talked to the bot within
-// newcomerWindow, or never did; owners are never new.
-func (s *Service) isNewcomer(in incoming, p storage.UserProfile) bool {
-	if s.isOwner(in.msg.From) {
+// sworeAtBot reports a person the swear guard caught swearing at the bot in
+// this chat within swearWindow.
+func (s *Service) sworeAtBot(ctx context.Context, in incoming) bool {
+	if s.opts.Strikes == nil || !in.group {
 		return false
 	}
-	return p.FirstTalk.IsZero() || s.opts.Now().Sub(p.FirstTalk) < newcomerWindow
+	n, err := s.opts.Strikes.SwearStrikes(ctx, in.msg.Chat.ID, in.userID, storage.ActionSwearAtBot, s.opts.Now().Add(-swearWindow))
+	if err != nil {
+		s.opts.Logger.Warn("could not count swearing at the bot", "user_id", in.userID, "error", err)
+		return false
+	}
+	return n > 0
 }
 
 // ruleLines lists the instructions, then the ignored members. Each is folded

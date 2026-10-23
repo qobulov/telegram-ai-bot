@@ -157,7 +157,7 @@ func TestProfileReachesThePersonsTurns(t *testing.T) {
 	if len(calls) != 2 {
 		t.Fatalf("model calls = %d", len(calls))
 	}
-	want := `[In every chat, the person writing is to be called "Aziz aka" and spoken to with "siz".]`
+	want := `[In every chat, the person writing is to be called "Aziz aka".]`
 	if !strings.Contains(calls[0].req.Context, want) {
 		t.Errorf("context = %q, want %q", calls[0].req.Context, want)
 	}
@@ -316,26 +316,31 @@ func TestTheGroupSizeLimitIsASetting(t *testing.T) {
 	}
 }
 
-// Someone who first talked to the bot within a day, or never, is marked new
-// so the model speaks to them with "siz"; a long-known person, one already
-// asking for "siz" and an owner are not.
-func TestNewcomerIsMarkedForSiz(t *testing.T) {
+// Someone the swear guard caught swearing at the bot in this chat is to be
+// spoken to with "sen"; anyone else keeps the persona's "siz".
+func TestWhoSworeAtTheBotGetsSen(t *testing.T) {
 	cases := map[string]struct {
-		profile storage.UserProfile
 		owner   bool
+		strikes []storage.ModerationAction
 		want    bool
 	}{
-		"never talked before":    {storage.UserProfile{}, false, true},
-		"first talk an hour ago": {storage.UserProfile{FirstTalk: headerNow.Add(-time.Hour)}, false, true},
-		"known for a week":       {storage.UserProfile{FirstTalk: headerNow.Add(-7 * 24 * time.Hour)}, false, false},
-		"already asks for siz":   {storage.UserProfile{Siz: true}, false, false},
-		"an owner":               {storage.UserProfile{}, true, false},
+		"a member": {},
+		"an owner": {owner: true},
+		"swore at the bot here": {
+			strikes: []storage.ModerationAction{{ChatID: groupID, TargetUserID: userID, Action: storage.ActionSwearAtBot}},
+			want:    true,
+		},
+		"swore at the bot elsewhere": {
+			strikes: []storage.ModerationAction{{ChatID: -100999, TargetUserID: userID, Action: storage.ActionSwearAtBot}},
+		},
+		"swore at a person": {
+			strikes: []storage.ModerationAction{{ChatID: groupID, TargetUserID: userID, Action: storage.ActionSwear}},
+		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			f := newFixture()
-			f.opts.Now = func() time.Time { return headerNow }
-			f.opts.Profiles = fakeProfileBook{userID: c.profile}
+			f.opts.Strikes = &fakeStrikes{actions: c.strikes}
 			if c.owner {
 				f.opts.OwnerIDs = map[int64]bool{userID: true}
 			}
@@ -346,8 +351,8 @@ func TestNewcomerIsMarkedForSiz(t *testing.T) {
 			if len(calls) != 1 {
 				t.Fatalf("model calls = %d", len(calls))
 			}
-			if got := strings.Contains(calls[0].req.Context, newcomerLine); got != c.want {
-				t.Errorf("newcomer line = %v, want %v; context %q", got, c.want, calls[0].req.Context)
+			if got := strings.Contains(calls[0].req.Context, senLine); got != c.want {
+				t.Errorf("sen line = %v, want %v; context %q", got, c.want, calls[0].req.Context)
 			}
 		})
 	}

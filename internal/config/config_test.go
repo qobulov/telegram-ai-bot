@@ -1179,12 +1179,12 @@ func TestPersonaIsPlayfulNotCruel(t *testing.T) {
 		"Roast only someone who is bantering with you",
 		"Swearing is normal in these chats",
 		"Never lecture anyone about manners",
-		`asks for "siz"`,
+		`or for "siz"`,
 		"save it with my_profile, for themselves; an owner may set it for a member with for_member",
 		"introduce yourself in one friendly line",
 		"Newcomers",
-		`Speak to them with "siz"`,
-		`switch to "sen"`,
+		`Speak to everyone with "siz"`,
+		`Only someone swearing at you gets "sen"`,
 	} {
 		if !strings.Contains(persona, want) {
 			t.Errorf("the persona does not contain %q", want)
