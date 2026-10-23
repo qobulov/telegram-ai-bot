@@ -771,7 +771,8 @@ func TestToThemMarkerAddressesTheRepliedMember(t *testing.T) {
 		"[to them] Miyang kichkina emas.": {Text: "Miyang kichkina emas.", ToReplied: true},
 		"(To Them)Salom":                  {Text: "Salom", ToReplied: true},
 		"Salom [to them]":                 {Text: "Salom [to them]"},
-		"[to Chaizooo @naniwo_desu]\n손이 안 닿으니까 걱정 마세요.": {Text: "손이 안 닿으니까 걱정 마세요.", ToReplied: true},
+		"[to Chaizooo @naniwo_desu]\n손이 안 닿으니까 걱정 마세요.": {Text: "손이 안 닿으니까 걱정 마세요.", ToReplied: true, To: "Chaizooo @naniwo_desu"},
+		"[to James] [gif funny]":   {GIF: "funny", ToReplied: true, To: "James"},
 		"(to be honest) it's fine": {Text: "(to be honest) it's fine"},
 		"[to them] [react 🤣]":      {Reaction: "🤣"},
 	} {

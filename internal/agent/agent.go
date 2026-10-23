@@ -130,8 +130,11 @@ type Answer struct {
 	// sticker now and then.
 	GIF string
 	// ToReplied means the answer speaks to the member whose message the
-	// asker replied to, so it is sent as a reply to that message.
+	// asker replied to, so it is sent as a reply to that message; To, when
+	// set, is the member the model named instead, "[to James]", to reply to
+	// their latest message.
 	ToReplied bool
+	To        string
 	ID        int64
 }
 
@@ -284,9 +287,11 @@ func writesToolCall(answer string, definitions []ai.ToolDefinition) bool {
 // turn. A reaction is saved as "<reacted X>", so that later turns see that
 // the bot answered and how.
 func finish(t *turn, reply ai.Message) (Answer, error) {
-	answer, toReplied := cutToThem(strings.TrimSpace(reply.Content))
+	answer, to, toReplied := cutToThem(strings.TrimSpace(reply.Content))
 	result, err := finishText(t, answer)
-	result.ToReplied = toReplied && err == nil && result.Text != ""
+	if toReplied && err == nil && (result.Text != "" || result.Sticker != "" || result.GIF != "") {
+		result.ToReplied, result.To = true, to
+	}
 	return result, err
 }
 
@@ -295,13 +300,16 @@ func finish(t *turn, reply ai.Message) (Answer, error) {
 // the member named in square brackets: "[to Chaizooo @naniwo_desu]". A
 // round "(to ...)" is a marker only as "(to them)": "(to be honest)" is
 // prose.
-var toThemMarker = regexp.MustCompile(`(?i)^(?:[\[(<]\s*to\s+them\s*[\])>]|\[\s*to\s+[^\]\n]{1,60}\])\s*`)
+var toThemMarker = regexp.MustCompile(`(?i)^(?:[\[(<]\s*to\s+them\s*[\])>]|\[\s*to\s+([^\]\n]{1,60})\])\s*`)
 
-// cutToThem is answer without its "[to them]" marker, and whether it had
-// one.
-func cutToThem(answer string) (string, bool) {
-	marker := toThemMarker.FindString(answer)
-	return strings.TrimSpace(answer[len(marker):]), marker != ""
+// cutToThem is answer without its "[to them]" marker, the member the
+// marker names instead of "them", and whether it had one.
+func cutToThem(answer string) (rest, to string, found bool) {
+	m := toThemMarker.FindStringSubmatch(answer)
+	if m == nil {
+		return answer, "", false
+	}
+	return strings.TrimSpace(answer[len(m[0]):]), strings.TrimSpace(m[1]), true
 }
 
 func finishText(t *turn, answer string) (Answer, error) {

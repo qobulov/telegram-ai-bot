@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"telegram-ai-bot/internal/agent"
@@ -44,6 +45,9 @@ type outcome struct {
 	// asker replied to, as the model chose for an answer that speaks to
 	// them.
 	toReplied bool
+	// toName is the member the model named for toReplied, whose latest
+	// message the answer replies to when the asker replied to nobody.
+	toName string
 }
 
 func say(text string) outcome { return outcome{text: text} }
@@ -144,6 +148,9 @@ func (s *Service) process(in incoming) {
 func (s *Service) deliver(in incoming, out *outcome) int64 {
 	if out.toReplied {
 		in.replyTo = s.repliedMember(in)
+		if in.replyTo == 0 && out.toName != "" {
+			in.replyTo = s.namedMembersMessage(in, out.toName)
+		}
 	}
 	if id := s.sendAudios(in, out.audios); id != 0 {
 		// A song asked for is the answer alone, as a sticker is: words with
@@ -163,6 +170,71 @@ func (s *Service) deliver(in incoming, out *outcome) int64 {
 		answerID = id
 	}
 	return answerID
+}
+
+// namedWindow is how far back the group log is searched for the latest
+// message of a member the model named.
+const namedWindow = 3 * time.Hour
+
+// namedMembersMessage is the latest message in the group log, of the last
+// namedWindow, by the one member whose name or @username is name: "Mari
+// Jamesga gif tashla" asks for an answer to James. It is 0 for the asker,
+// the bot, a name that fits several members or none.
+func (s *Service) namedMembersMessage(in incoming, name string) int64 {
+	if !in.group || !s.ambient.enabled() {
+		return 0
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
+	defer cancel()
+	recent, err := s.ambient.log.GroupMessagesSince(ctx, in.scope.ChatID, s.opts.Now().Add(-namedWindow), s.ambient.size)
+	if err != nil {
+		s.opts.Logger.Warn("could not read the group log for a named member", "chat_id", in.scope.ChatID, "error", err)
+		return 0
+	}
+	wanted := foldName(name)
+	var member, messageID int64
+	for _, m := range recent {
+		if m.AuthorID == 0 || m.AuthorID == in.userID || m.AuthorID == s.opts.Bot.ID || m.MessageID == 0 || !namesMatch(foldName(m.AuthorName), wanted) {
+			continue
+		}
+		if member != 0 && member != m.AuthorID {
+			return 0
+		}
+		member, messageID = m.AuthorID, m.MessageID
+	}
+	return messageID
+}
+
+// foldName is a name's words in lower case, letters and digits only, "@"
+// dropped, so "JAMES @james_k" is "james james_k".
+func foldName(name string) []string {
+	var words []string
+	for word := range strings.FieldsSeq(strings.ToLower(name)) {
+		word = strings.Map(func(r rune) rune {
+			if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' {
+				return r
+			}
+			return -1
+		}, word)
+		if word != "" {
+			words = append(words, word)
+		}
+	}
+	return words
+}
+
+// namesMatch reports an author whose name has every word of wanted, so
+// "James" and "@james_k" find "JAMES @james_k".
+func namesMatch(author, wanted []string) bool {
+	if len(wanted) == 0 {
+		return false
+	}
+	for _, w := range wanted {
+		if !slices.Contains(author, w) {
+			return false
+		}
+	}
+	return true
 }
 
 // repliedMember is the message of another member the asker replied to, or,
@@ -905,7 +977,7 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 		return outcome{reaction: answer.Reaction, answerID: answer.ID}
 	case err == nil:
 		log.Info("turn completed")
-		out := outcome{text: s.fitted(in, answer.Text), answerID: answer.ID, toReplied: answer.ToReplied}
+		out := outcome{text: s.fitted(in, answer.Text), answerID: answer.ID, toReplied: answer.ToReplied, toName: answer.To}
 		if answer.Text == "" {
 			// A sticker or a GIF is an answer of its own, never one more
 			// message after the words.

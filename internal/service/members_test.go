@@ -513,3 +513,41 @@ func TestActiveCountIsReadOnceForAWhile(t *testing.T) {
 		t.Errorf("asked %d, model calls %d; want one count for two answers", actives.asked, len(f.replier.recorded()))
 	}
 }
+
+// "Mari Jamesga gif tashla" names James without replying to him: the answer
+// goes as a reply to James's latest message in the log, not to the asker,
+// and nowhere when the name fits nobody or more than one.
+func TestAnswerToANamedMemberRepliesToTheirLatestMessage(t *testing.T) {
+	cases := map[string]struct {
+		name string
+		want int64
+	}{
+		"James":           {name: "James", want: 52},
+		"by username":     {name: "@james_k", want: 52},
+		"nobody":          {name: "Ali", want: 30},
+		"two of the name": {name: "Ann", want: 30},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			for i, m := range []storage.GroupMessage{
+				{ChatID: groupID, MessageID: 51, AuthorID: 7001, AuthorName: "JAMES @james_k", Text: "salom"},
+				{ChatID: groupID, MessageID: 52, AuthorID: 7001, AuthorName: "JAMES @james_k", Text: "Axxaxaxa"},
+				{ChatID: groupID, MessageID: 53, AuthorID: 7002, AuthorName: "Ann", Text: "hi"},
+				{ChatID: groupID, MessageID: 54, AuthorID: 7003, AuthorName: "Ann @ann_b", Text: "yo"},
+			} {
+				m.SentAt = time.Now().Add(time.Duration(i-10) * time.Minute)
+				if err := f.chatLog.AppendGroupMessage(context.Background(), m); err != nil {
+					t.Fatal(err)
+				}
+			}
+			f.replier.answer, f.replier.toReplied, f.replier.to = "Mana!", true, c.name
+
+			sent := f.run(inGroup(groupMessage("Mira, Jamesga gif tashla")))
+
+			if len(sent) != 1 || sent[0].replyTo != c.want {
+				t.Errorf("sent = %+v, want one reply to %d", sent, c.want)
+			}
+		})
+	}
+}

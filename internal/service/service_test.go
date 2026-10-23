@@ -94,8 +94,10 @@ type fakeReplier struct {
 	// sticker, when set, is asked for with answer, which may be empty, as
 	// the agent does for "[sticker X]"; gif the same for "[gif X]".
 	sticker, gif string
-	// toReplied is answered with answer, as the agent does for "[to them]".
+	// toReplied is answered with answer, as the agent does for "[to them]",
+	// and to with the member named, as for "[to James]".
 	toReplied bool
+	to        string
 }
 
 func (f *fakeReplier) Reply(ctx context.Context, req agent.Request) (agent.Answer, error) {
@@ -145,7 +147,7 @@ func (f *fakeReplier) Reply(ctx context.Context, req agent.Request) (agent.Answe
 		return agent.Answer{Text: f.answer, Sticker: f.sticker, GIF: f.gif, ID: 9001}, nil
 	}
 	if f.answer != "" {
-		return agent.Answer{Text: f.answer, ToReplied: f.toReplied, ID: 9001}, nil
+		return agent.Answer{Text: f.answer, ToReplied: f.toReplied, To: f.to, ID: 9001}, nil
 	}
 	return agent.Answer{Text: "echo: " + strings.TrimPrefix(text, req.AuthorName+": "), ID: 9001}, nil
 }
