@@ -1707,3 +1707,24 @@ func TestActiveMembersLimit(t *testing.T) {
 		t.Errorf("set = %d in %d days, %v", cfg.MinActiveMembers, cfg.ActiveDays, err)
 	}
 }
+
+// A member once had Maria swear at another member, and in private chats
+// she translated intimate memes and played along with sexual flirting.
+func TestPersonaRefusesInsultsOnRequestAndSexualContent(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	insult := lineContaining(cfg.PersonaPrompt, "because another member asks you to")
+	for _, want := range []string{`"azimga zaybal de"`, "not even as a joke or a quote", "Only your owners may ask you to tease someone"} {
+		if !strings.Contains(insult, want) {
+			t.Errorf("the insult rule does not contain %q: %q", want, insult)
+		}
+	}
+	sexual := lineContaining(cfg.PersonaPrompt, "No sexual content in any chat")
+	for _, want := range []string{"private ones included", "may be minors", "Do not translate", "do not play along when flirting turns sexual", "reply [silent]"} {
+		if !strings.Contains(sexual, want) {
+			t.Errorf("the sexual content rule does not contain %q: %q", want, sexual)
+		}
+	}
+}
