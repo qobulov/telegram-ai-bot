@@ -84,6 +84,7 @@ type BaseURLs struct {
 	FreeToGame        string
 	CatAPI            string
 	Dictionary        string
+	AniList           string
 	// Wikipedia is a format string with %s for the language code.
 	Wikipedia string
 	// News maps a language (uz, ru), or world- and a language for the
@@ -115,6 +116,7 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.FreeToGame = cmp.Or(b.FreeToGame, "https://www.freetogame.com")
 	b.CatAPI = cmp.Or(b.CatAPI, "https://api.thecatapi.com")
 	b.Dictionary = cmp.Or(b.Dictionary, "https://api.dictionaryapi.dev")
+	b.AniList = cmp.Or(b.AniList, "https://graphql.anilist.co")
 	b.Wikipedia = cmp.Or(b.Wikipedia, "https://%s.wikipedia.org")
 	if b.News == nil {
 		b.News = map[string]map[string]string{
@@ -176,6 +178,7 @@ func Tools(opts Options) []tools.Tool {
 		a.freeGamesTool(),
 		a.catTool(),
 		a.dictionaryTool(),
+		a.animeTool(),
 	}
 	if a.footballToken != "" {
 		list = append(list, a.footballTool())

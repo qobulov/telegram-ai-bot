@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"telegram-ai-bot/internal/tools"
 )
@@ -101,4 +102,29 @@ func TestEnglishWord(t *testing.T) {
 	}
 	env, _ = runTool(t, u, "english_word", `{"word":"qwzx"}`)
 	wantError(t, env, "invalid_arguments", "no English word")
+}
+
+// A search gives the title in English, the score out of 100, the main
+// studio and a description without HTML; nothing found is an argument
+// error, and the season is the one the date falls in.
+func TestAnime(t *testing.T) {
+	u := newUpstream(t, map[string]stub{
+		"/anilist": ok(`{"data":{"Page":{"media":[{"title":{"romaji":"NARUTO","english":"Naruto","native":"NARUTO -ナルト-"},"averageScore":80,"episodes":220,"seasonYear":2002,"status":"FINISHED","genres":["Action"],"siteUrl":"https://anilist.co/anime/20","description":"Naruto <br>is a ninja.","studios":{"nodes":[{"name":"Studio Pierrot"}]}}]}}}`),
+	})
+
+	env, _ := runTool(t, u, "anime", `{"action":"search","query":"naruto"}`)
+
+	for _, want := range []string{`"title":"Naruto"`, `"score":"80/100"`, `"studio":"Studio Pierrot"`, `"about":"Naruto is a ninja."`, `"status":"finished"`} {
+		if !strings.Contains(env.raw, want) {
+			t.Errorf("result does not contain %s: %s", want, env.raw)
+		}
+	}
+	if env, _ := runTool(t, u, "anime", `{"action":"search"}`); env.OK {
+		t.Errorf("a search without a query = %s", env.raw)
+	}
+	for month, want := range map[time.Month]string{time.December: "WINTER", time.January: "WINTER", time.April: "SPRING", time.July: "SUMMER", time.October: "FALL"} {
+		if got, _ := animeSeason(time.Date(2026, month, 5, 0, 0, 0, 0, time.UTC)); got != want {
+			t.Errorf("%s: season %s, want %s", month, got, want)
+		}
+	}
 }
