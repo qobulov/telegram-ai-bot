@@ -169,7 +169,7 @@ func (env *hookEnv) deliver(update, secret string) int {
 }
 
 const privateUpdate = `{"update_id":910001,"message":{"message_id":7,
-	"from":{"id":778001,"is_bot":false,"first_name":"Bek"},"chat":{"id":778001,"type":"private"},"text":"salom"}}`
+	"from":{"id":778001,"is_bot":false,"first_name":"Bek"},"chat":{"id":778001,"type":"private"},"text":"bugun nima qilamiz"}}`
 
 // groupUpdate is a group message whose message ID is its update ID: like
 // Telegram's, every message has its own, which the group log relies on.
@@ -328,7 +328,7 @@ func TestWebhookLimitsPrivateChats(t *testing.T) {
 
 	for _, updateID := range []string{"910040", "910041", "910042"} {
 		env.deliver(`{"update_id":`+updateID+`,"message":{"message_id":`+updateID+`,
-			"from":{"id":778001,"is_bot":false,"first_name":"Bek","language_code":"en"},"chat":{"id":778001,"type":"private"},"text":"salom"}}`, hookSecret)
+			"from":{"id":778001,"is_bot":false,"first_name":"Bek","language_code":"en"},"chat":{"id":778001,"type":"private"},"text":"bugun nima qilamiz"}}`, hookSecret)
 	}
 
 	sent := env.apis.messages()

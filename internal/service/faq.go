@@ -2,10 +2,14 @@ package service
 
 import (
 	"cmp"
+	"context"
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"strings"
 	"unicode"
+
+	"telegram-ai-bot/internal/agent"
 )
 
 // A private chat's small talk and most common questions are answered here,
@@ -103,24 +107,47 @@ func emojiOnly(text string) bool {
 
 // quickAnswer answers a private message that is only small talk or a common
 // question, and reports whether it did. Owners always get the model.
-func (s *Service) quickAnswer(in incoming) (outcome, bool) {
-	if in.group || in.fromBot || s.isOwner(in.msg.From) || s.hasMedia(in) {
+func (s *Service) quickAnswer(ctx context.Context, in incoming) (outcome, bool) {
+	if !s.opts.QuickAnswers || in.group || in.fromBot || s.isOwner(in.msg.From) || s.hasMedia(in) {
 		return outcome{}, false
 	}
-	if emojiOnly(in.text) {
-		return outcome{reaction: "👍"}, true
-	}
-	phrase, ok := faqPhrases[foldPhrase(in.text)]
+	answer, ok := s.quickReply(in.text)
 	if !ok {
 		return outcome{}, false
 	}
+	// Saved through the agent, so that the update is answered once and the
+	// model sees the exchange in later turns.
+	saved, err := s.opts.Replier.Reply(ctx, agent.Request{
+		Scope: in.scope, UserID: in.userID, UpdateID: in.updateID, MessageID: in.msg.MessageID,
+		Text: in.text, Fixed: &answer,
+	})
+	switch {
+	case errors.Is(err, agent.ErrDuplicate):
+		return outcome{duplicate: true}, true
+	case err != nil:
+		s.opts.Logger.Warn("could not save a quick answer; sending it anyway", "user_id", in.userID, "error", err)
+		saved = answer
+	}
+	return outcome{text: saved.Text, reaction: saved.Reaction, answerID: saved.ID}, true
+}
+
+// quickReply is the answer to small talk or a common question, if text is
+// one.
+func (s *Service) quickReply(text string) (agent.Answer, bool) {
+	if emojiOnly(text) {
+		return agent.Answer{Reaction: "👍"}, true
+	}
+	phrase, ok := faqPhrases[foldPhrase(text)]
+	if !ok {
+		return agent.Answer{}, false
+	}
 	switch phrase.kind {
 	case faqThanks:
-		return outcome{reaction: "❤"}, true
+		return agent.Answer{Reaction: "❤"}, true
 	case faqOkay:
-		return outcome{reaction: "👍"}, true
+		return agent.Answer{Reaction: "👍"}, true
 	}
-	return say(s.faqText(phrase)), true
+	return agent.Answer{Text: s.faqText(phrase)}, true
 }
 
 // faqText is the answer to a known question, in its language.

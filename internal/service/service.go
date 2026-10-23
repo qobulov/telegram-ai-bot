@@ -223,6 +223,9 @@ type Options struct {
 	// need not.
 	RequiredChannels []string
 	Channels         ChannelMembers
+	// QuickAnswers answers a private chat's small talk and common questions
+	// without the model; see faq.go.
+	QuickAnswers bool
 	// Reactor sets emoji reactions, the bot's answer to applause and the
 	// model's when it reacts instead of writing; nil means it never reacts.
 	Reactor Reactor

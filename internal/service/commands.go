@@ -524,7 +524,7 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	if notice, joined := s.joinedChannels(ctx, in); !joined {
 		return notice
 	}
-	if out, ok := s.quickAnswer(in); ok {
+	if out, ok := s.quickAnswer(ctx, in); ok {
 		return out
 	}
 	reservation, notice, allowed := s.takePrivateAnswer(ctx, in)

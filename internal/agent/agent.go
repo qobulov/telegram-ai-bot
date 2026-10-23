@@ -112,6 +112,9 @@ type Request struct {
 	Attachments []ai.ContentPart
 	// Group is true for messages from a group or supergroup.
 	Group bool
+	// Fixed, when set, is the answer, decided without the model: the turn
+	// is only saved, which keeps the history and answers an update once.
+	Fixed *Answer
 }
 
 // Answer is the assistant's reply. ID identifies the stored answer.
@@ -142,6 +145,9 @@ func (a *Agent) Reply(ctx context.Context, req Request) (Answer, error) {
 	if processed {
 		return Answer{}, ErrDuplicate
 	}
+	if req.Fixed != nil {
+		return a.saveFixed(ctx, req)
+	}
 	history, err := a.opts.Store.History(ctx, req.Scope, a.opts.MaxHistory)
 	if err != nil {
 		return Answer{}, err
@@ -156,6 +162,22 @@ func (a *Agent) Reply(ctx context.Context, req Request) (Answer, error) {
 	if err != nil {
 		return Answer{}, err
 	}
+	if answer.ID, err = a.save(ctx, t); err != nil {
+		return Answer{}, err
+	}
+	return answer, nil
+}
+
+// saveFixed saves a turn whose answer was decided without the model, the
+// reaction as "<reacted X>" as finish does.
+func (a *Agent) saveFixed(ctx context.Context, req Request) (Answer, error) {
+	answer := *req.Fixed
+	content := answer.Text
+	if content == "" {
+		content = "<reacted " + answer.Reaction + ">"
+	}
+	t := &turn{req: req, messages: []ai.Message{{Role: ai.RoleUser, Content: req.Text}, {Role: ai.RoleAssistant, Content: content}}}
+	var err error
 	if answer.ID, err = a.save(ctx, t); err != nil {
 		return Answer{}, err
 	}

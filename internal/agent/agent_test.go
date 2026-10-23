@@ -786,3 +786,25 @@ func TestToThemMarkerAddressesTheRepliedMember(t *testing.T) {
 		}
 	}
 }
+
+// A fixed answer is saved as the turn, without the model, and answers a
+// redelivered update once.
+func TestFixedAnswerIsSavedWithoutTheModel(t *testing.T) {
+	f := newFixture(text("never asked"))
+	req := request(7, "salom")
+	req.Fixed = &Answer{Text: "Salom! Nima gaplar?"}
+
+	answer, err := f.agent.Reply(context.Background(), req)
+	if err != nil || answer.Text != "Salom! Nima gaplar?" || answer.ID == 0 {
+		t.Fatalf("answer = %+v, %v", answer, err)
+	}
+	if len(f.model.requests) != 0 {
+		t.Errorf("model asked %d times", len(f.model.requests))
+	}
+	if h := f.store.history[testScope]; len(h) != 2 || h[1].Content != "Salom! Nima gaplar?" {
+		t.Errorf("history = %+v", h)
+	}
+	if _, err := f.agent.Reply(context.Background(), req); !errors.Is(err, ErrDuplicate) {
+		t.Errorf("redelivered: err = %v, want ErrDuplicate", err)
+	}
+}

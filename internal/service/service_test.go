@@ -99,6 +99,12 @@ type fakeReplier struct {
 }
 
 func (f *fakeReplier) Reply(ctx context.Context, req agent.Request) (agent.Answer, error) {
+	if req.Fixed != nil {
+		// Saved as the agent would, with no model call to record.
+		answer := *req.Fixed
+		answer.ID = 9002
+		return answer, nil
+	}
 	text := req.Text
 	f.mu.Lock()
 	call := replyCall{userID: req.Scope.UserID, updateID: req.UpdateID, text: text, req: req}
@@ -3613,6 +3619,7 @@ func TestPrivateSmallTalkSkipsTheModel(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			f := newFixture()
+			f.opts.QuickAnswers = true
 			quota := withPrivateLimit(f, 8)
 			if c.owner {
 				f.opts.OwnerIDs = map[int64]bool{userID: true}
