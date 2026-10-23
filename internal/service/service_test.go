@@ -3588,3 +3588,56 @@ func TestFixedMessagesFollowTheAppLanguage(t *testing.T) {
 
 	expectOneReply(t, sent, textTextOnly(true).ru)
 }
+
+// Small talk and the common questions in a private chat are answered
+// without the model and take nothing from the day; anything more, and an
+// owner's message, goes to the model.
+func TestPrivateSmallTalkSkipsTheModel(t *testing.T) {
+	cases := map[string]struct {
+		text     string
+		owner    bool
+		model    bool
+		reaction string
+		reply    func(string) bool
+	}{
+		"a greeting": {text: "Salom!", reply: func(r string) bool {
+			return slices.ContainsFunc(faqGreetings, func(g localText) bool { return g.uz == r })
+		}},
+		"a Russian name asked": {text: "Как тебя зовут?", reply: func(r string) bool { return r == "Меня зовут Mira. 😊" }},
+		"thanks":               {text: "rahmat", reaction: "❤"},
+		"an emoji":             {text: "😂😂", reaction: "👍"},
+		"a greeting and more":  {text: "salom, ob-havo qanaqa?", model: true},
+		"a yes":                {text: "ha", model: true},
+		"an owner's greeting":  {text: "salom", owner: true, model: true},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			quota := withPrivateLimit(f, 8)
+			if c.owner {
+				f.opts.OwnerIDs = map[int64]bool{userID: true}
+			}
+
+			sent := f.run(textFrom(userID, c.text))
+
+			if calls := len(f.replier.recorded()); (calls == 1) != c.model {
+				t.Fatalf("model calls = %d, want model %v", calls, c.model)
+			}
+			if c.model {
+				return
+			}
+			if asked, _ := quota.recorded(); len(asked) != 0 {
+				t.Errorf("quota asked %+v; small talk takes nothing", asked)
+			}
+			if c.reaction != "" {
+				if r := f.reactor.recorded(); len(r) != 1 || r[0].emoji != c.reaction || len(sent) != 0 {
+					t.Errorf("reactions %+v, sent %+v; want %s alone", r, sent, c.reaction)
+				}
+				return
+			}
+			if len(sent) != 1 || !c.reply(sent[0].text) {
+				t.Errorf("sent = %+v", sent)
+			}
+		})
+	}
+}
