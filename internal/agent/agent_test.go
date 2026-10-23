@@ -769,9 +769,9 @@ func TestToolCallWrittenAsTextIsNotSent(t *testing.T) {
 func TestToThemMarkerAddressesTheRepliedMember(t *testing.T) {
 	for content, want := range map[string]Answer{
 		"[to them] Miyang kichkina emas.": {Text: "Miyang kichkina emas.", ToReplied: true},
-		"(To Them)Salom":                   {Text: "Salom", ToReplied: true},
-		"Salom [to them]":                  {Text: "Salom [to them]"},
-		"[to them] [react 🤣]":              {Reaction: "🤣"},
+		"(To Them)Salom":                  {Text: "Salom", ToReplied: true},
+		"Salom [to them]":                 {Text: "Salom [to them]"},
+		"[to them] [react 🤣]":             {Reaction: "🤣"},
 	} {
 		f := newFixture(text(content))
 		answer, err := f.agent.Reply(context.Background(), request(1, "Mari, bunga bir nima de"))
