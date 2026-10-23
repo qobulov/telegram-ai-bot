@@ -36,7 +36,12 @@ Send /reset to delete the conversation history.`
 	// for each language.
 	textDailyLimit = "Bugungi limit tugadi: kuniga %d ta xabar. Ertaga yana yozing.\nЛимит на сегодня исчерпан: %d сообщений в день. Напишите завтра.\nThat's today's limit: %d messages a day. Write again tomorrow."
 
-	textJoinChannel = "Botdan shaxsiy chatda foydalanish uchun avval kanalga a'zo bo'ling: %s\nA'zo bo'lgach, qayta yozing.\nЧтобы пользоваться ботом в личке, подпишитесь на канал: %s\nПосле подписки напишите снова."
+	textJoinChannel    = "❌ Botdan foydalanish uchun avval kanalga a'zo bo'ling, keyin «✅ Tasdiqlash» ni bosing.\n❌ Чтобы пользоваться ботом, подпишитесь на канал и нажмите «✅ Tasdiqlash»."
+	textJoinChannels   = "❌ Botdan foydalanish uchun avval ushbu kanallarga a'zo bo'ling, keyin «✅ Tasdiqlash» ni bosing.\n❌ Чтобы пользоваться ботом, подпишитесь на эти каналы и нажмите «✅ Tasdiqlash»."
+	textJoinButton     = "📢 Kanalga a'zo bo'lish"
+	textJoinButtonN    = "%d - kanal"
+	textCheckButton    = "✅ Tasdiqlash"
+	textChannelsJoined = "✅ Rahmat! Endi bemalol yozishingiz mumkin.\n✅ Спасибо! Теперь можете писать."
 
 	textIgnored       = "Okay, I won't answer %s for the next 24 hours."
 	textUnignored     = "I'll answer %s again."

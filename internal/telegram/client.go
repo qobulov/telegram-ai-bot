@@ -432,6 +432,11 @@ type sendMessageParams struct {
 	Text            string           `json:"text"`
 	Entities        []messageEntity  `json:"entities,omitempty"`
 	ReplyParameters *replyParameters `json:"reply_parameters,omitempty"`
+	ReplyMarkup     *inlineKeyboard  `json:"reply_markup,omitempty"`
+}
+
+type inlineKeyboard struct {
+	InlineKeyboard [][]Button `json:"inline_keyboard"`
 }
 
 type replyParameters struct {
@@ -454,7 +459,7 @@ type sentMessage struct {
 // never make the send fail; its bold, code and bullets become entities
 // (see formatted).
 func (c *Client) SendMessage(ctx context.Context, msg Outgoing) (int64, error) {
-	if isRich(msg.Text) {
+	if isRich(msg.Text) && len(msg.Buttons) == 0 {
 		id, err := c.sendRich(ctx, msg)
 		var refused *APIError
 		// Telegram answered no, so nothing was sent: the plain message
@@ -465,19 +470,23 @@ func (c *Client) SendMessage(ctx context.Context, msg Outgoing) (int64, error) {
 	}
 	var firstID int64
 	reply := replyTo(msg.ReplyToMessageID)
+	var buttons *inlineKeyboard
+	if len(msg.Buttons) > 0 {
+		buttons = &inlineKeyboard{InlineKeyboard: msg.Buttons}
+	}
 	for _, chunk := range Split(msg.Text, MessageLimit) {
 		if strings.TrimSpace(chunk) == "" {
 			continue
 		}
 		text, entities := formatted(chunk)
-		id, err := c.sendChunk(ctx, sendMessageParams{ChatID: msg.ChatID, Text: text, Entities: entities, ReplyParameters: reply})
+		id, err := c.sendChunk(ctx, sendMessageParams{ChatID: msg.ChatID, Text: text, Entities: entities, ReplyParameters: reply, ReplyMarkup: buttons})
 		if err != nil {
 			return firstID, err
 		}
 		if firstID == 0 {
 			firstID = id
 		}
-		reply = nil
+		reply, buttons = nil, nil
 	}
 	return firstID, nil
 }

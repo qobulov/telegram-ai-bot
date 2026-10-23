@@ -149,10 +149,10 @@ type Config struct {
 	// PrivateChats is whom the bot answers in private chats: "on" everyone,
 	// "owners" its owners only, "off" nobody, which keeps it to groups.
 	PrivateChats string
-	// RequiredChannel is the channel, its @username or -100 ID, that a
-	// member must have joined to be answered in a private chat; owners need
-	// not. "" asks for none.
-	RequiredChannel string
+	// RequiredChannels are the channels, each its @username or -100 ID,
+	// that a member must have joined to be answered in a private chat;
+	// owners need not. None asks for none.
+	RequiredChannels []string
 	// MinGroupMembers is the smallest group answered as a group, the bot
 	// counted and other bots not; a smaller one is answered only as a
 	// private chat would be. 0 answers groups of any size.
@@ -201,7 +201,7 @@ func Load(getenv func(string) string) (Config, error) {
 		MemberRepliesPer10Min:   r.positive("MEMBER_REPLIES_PER_10_MIN", 4),
 		PrivateDailyLimit:       r.integer("PRIVATE_DAILY_LIMIT", 10, 0),
 		PrivateChats:            r.privateChats(),
-		RequiredChannel:         r.requiredChannel(),
+		RequiredChannels:        r.requiredChannels(),
 		MinGroupMembers:         r.integer("GROUP_MIN_MEMBERS", 6, 0),
 	}
 	r.chooseProvider(&cfg)
@@ -408,15 +408,22 @@ func (r *reader) chooseProvider(cfg *Config) {
 	}
 }
 
-// requiredChannel reads REQUIRED_CHANNEL: a channel's @username or its -100
-// ID, or nothing.
-func (r *reader) requiredChannel() string {
-	channel := strings.TrimSpace(r.text("REQUIRED_CHANNEL", ""))
-	if channel == "" || channelName.MatchString(channel) {
-		return channel
+// requiredChannels reads REQUIRED_CHANNEL: channels' @usernames or -100
+// IDs, separated by commas, or nothing.
+func (r *reader) requiredChannels() []string {
+	var channels []string
+	for _, channel := range strings.Split(r.text("REQUIRED_CHANNEL", ""), ",") {
+		channel = strings.TrimSpace(channel)
+		if channel == "" {
+			continue
+		}
+		if !channelName.MatchString(channel) {
+			r.fail("REQUIRED_CHANNEL", "must be channels' @usernames or -100 IDs, separated by commas")
+			return nil
+		}
+		channels = append(channels, channel)
 	}
-	r.fail("REQUIRED_CHANNEL", "must be a channel's @username or its -100 ID")
-	return ""
+	return channels
 }
 
 var channelName = regexp.MustCompile(`^(@[A-Za-z][A-Za-z0-9_]{3,31}|-100[0-9]{5,})$`)

@@ -30,6 +30,7 @@ type sentMessage struct {
 	text    string
 	replyTo int64
 	photo   bool
+	buttons [][]telegram.Button
 }
 
 type fakeSender struct {
@@ -43,7 +44,7 @@ func (f *fakeSender) SendMessage(ctx context.Context, msg telegram.Outgoing) (in
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.sent = append(f.sent, sentMessage{chatID: msg.ChatID, text: msg.Text, replyTo: msg.ReplyToMessageID})
+	f.sent = append(f.sent, sentMessage{chatID: msg.ChatID, text: msg.Text, replyTo: msg.ReplyToMessageID, buttons: msg.Buttons})
 	return int64(1000 + len(f.sent)), nil
 }
 
@@ -3501,7 +3502,7 @@ func TestPrivateChatNeedsTheRequiredChannel(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			f := newFixture()
 			quota := withPrivateLimit(f, 10)
-			f.opts.RequiredChannel = "@maria_news"
+			f.opts.RequiredChannels = []string{"@maria_news"}
 			f.opts.Channels = &fakeChannel{members: map[int64]telegram.ChatMember{userID: c.member}, err: c.err}
 			update := textFrom(userID, "salom")
 			if c.owner {
@@ -3515,8 +3516,9 @@ func TestPrivateChatNeedsTheRequiredChannel(t *testing.T) {
 				t.Errorf("model calls = %d, want answered %v", calls, c.answered)
 			}
 			if !c.answered {
-				if len(sent) != 1 || !strings.Contains(sent[0].text, "https://t.me/maria_news") {
-					t.Errorf("sent = %+v, want the notice to join", sent)
+				if len(sent) != 1 || sent[0].text != textJoinChannel || len(sent[0].buttons) != 2 ||
+					sent[0].buttons[0][0].URL != "https://t.me/maria_news" || sent[0].buttons[1][0].Text != textCheckButton {
+					t.Errorf("sent = %+v, want the notice to join with its buttons", sent)
 				}
 				if asked, _ := quota.recorded(); len(asked) != 0 {
 					t.Errorf("quota asked %+v; a refused message takes nothing", asked)
@@ -3530,7 +3532,7 @@ func TestPrivateChatNeedsTheRequiredChannel(t *testing.T) {
 func TestRequiredChannelIsCheckedOnceForAWhile(t *testing.T) {
 	f := newFixture()
 	channel := &fakeChannel{members: map[int64]telegram.ChatMember{userID: {Status: "member"}}}
-	f.opts.RequiredChannel, f.opts.Channels = "@maria_news", channel
+	f.opts.RequiredChannels, f.opts.Channels = []string{"@maria_news"}, channel
 	first, second := textFrom(userID, "salom"), textFrom(userID, "qalaysan")
 	second.UpdateID++
 	second.Message.MessageID++
@@ -3539,5 +3541,32 @@ func TestRequiredChannelIsCheckedOnceForAWhile(t *testing.T) {
 
 	if channel.asked != 1 || len(f.replier.recorded()) != 2 {
 		t.Errorf("asked %d, model calls %d; want one check for two answers", channel.asked, len(f.replier.recorded()))
+	}
+}
+
+// /start asks to join every required channel missing, with a button each
+// and one to check; the check, once all are joined, says the chat is open.
+func TestStartAsksToJoinAndChecks(t *testing.T) {
+	f := newFixture()
+	channel := &fakeChannel{members: map[int64]telegram.ChatMember{}}
+	f.opts.RequiredChannels, f.opts.Channels = []string{"@maria_news", "@maria_music"}, channel
+	f.opts.Bot.Username = "maria_bot"
+
+	sent := f.run(textFrom(userID, "/start"))
+
+	if len(sent) != 1 || sent[0].text != textJoinChannels || len(sent[0].buttons) != 3 {
+		t.Fatalf("sent = %+v, want the notice with two channels and the check", sent)
+	}
+	if b := sent[0].buttons; b[0][0].Text != "1 - kanal" || b[1][0].URL != "https://t.me/maria_music" || b[2][0].URL != "https://t.me/maria_bot?start=check" {
+		t.Errorf("buttons = %+v", b)
+	}
+
+	channel.members[userID] = telegram.ChatMember{Status: "member"}
+	check := textFrom(userID, "/start check")
+	check.UpdateID++
+	check.Message.MessageID++
+	sent = f.run(check)
+	if len(sent) != 2 || sent[1].text != textChannelsJoined || len(f.replier.recorded()) != 0 {
+		t.Errorf("sent = %+v, model calls %d; want the thanks and no model call", sent, len(f.replier.recorded()))
 	}
 }

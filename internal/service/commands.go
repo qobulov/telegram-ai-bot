@@ -38,6 +38,8 @@ type outcome struct {
 	// sticker is the category of sticker the model asked to send after the
 	// text, or alone; "" for none. gif is the same for a GIF.
 	sticker, gif string
+	// buttons are link buttons under the text.
+	buttons [][]telegram.Button
 	// toReplied sends the answer as a reply to the member's message the
 	// asker replied to, as the model chose for an answer that speaks to
 	// them.
@@ -245,7 +247,7 @@ func (s *Service) deliverAnswer(in incoming, out outcome) int64 {
 		if out.text == "" {
 			return 0
 		}
-		return s.reply(in, out.text)
+		return s.replyWithButtons(in, out.text, out.buttons)
 	}
 	caption := out.text
 	if utf8.RuneCountInString(caption) > telegram.CaptionLimit {
@@ -486,6 +488,8 @@ func (s *Service) ignored(in incoming, rules []storage.GroupRule) bool {
 // are the standing rules loaded for this turn.
 func (s *Service) respond(ctx context.Context, in incoming, rules []storage.GroupRule) outcome {
 	switch {
+	case !in.group && commandName(in.text) == "/start" && len(s.opts.RequiredChannels) > 0:
+		return s.start(ctx, in)
 	case strings.HasPrefix(in.text, "/"):
 		return say(s.runCommand(ctx, in))
 	case utf8.RuneCountInString(in.text) > s.opts.MaxInputChars:
@@ -517,8 +521,8 @@ func (s *Service) hasMedia(in incoming) bool {
 }
 
 func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRule) outcome {
-	if notice, joined := s.joinedChannel(ctx, in); !joined {
-		return say(notice)
+	if notice, joined := s.joinedChannels(ctx, in); !joined {
+		return notice
 	}
 	reservation, notice, allowed := s.takePrivateAnswer(ctx, in)
 	if !allowed {
@@ -560,47 +564,91 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	return out
 }
 
-// joinedChannel reports whether the sender of a private message may be
-// answered under the required channel, and if not the notice that asks them
-// to join. Owners and groups need no channel. When Telegram refuses to say,
-// as it does while the bot is no admin of the channel, nobody is let
-// through: the owners asked that only the channel's members be answered.
-// When Telegram does not answer at all, the sender is: the daily limit still
-// guards the cost.
-func (s *Service) joinedChannel(ctx context.Context, in incoming) (notice string, joined bool) {
-	channel := s.opts.RequiredChannel
-	if in.group || channel == "" || s.opts.Channels == nil || s.isOwner(in.msg.From) {
-		return "", true
+// joinedChannels reports whether the sender of a private message may be
+// answered under the required channels, and if not the notice, with a
+// button for each channel and one to check again, that asks them to join.
+// Owners and groups need no channel. When Telegram refuses to say, as it
+// does while the bot is no admin of a channel, nobody is let through: the
+// owners asked that only the channels' members be answered. When Telegram
+// does not answer at all, the sender is: the daily limit still guards the
+// cost.
+func (s *Service) joinedChannels(ctx context.Context, in incoming) (notice outcome, joined bool) {
+	channels := s.opts.RequiredChannels
+	if in.group || len(channels) == 0 || s.opts.Channels == nil || s.isOwner(in.msg.From) {
+		return outcome{}, true
 	}
 	if _, ok := s.subscribers.get(in.userID); ok {
-		return "", true
+		return outcome{}, true
 	}
 	ctx, cancel := context.WithTimeout(ctx, logTimeout)
 	defer cancel()
-	member, err := s.opts.Channels.ChannelMember(ctx, channel, in.userID)
-	var refused *telegram.APIError
-	switch {
-	case errors.As(err, &refused) && refused.Code < http.StatusInternalServerError:
-		s.opts.Logger.Error("Telegram will not say who is in the required channel; make the bot an admin there", "channel", channel, "error", err)
-	case err != nil:
-		s.opts.Logger.Warn("could not check the required channel; answering anyway", "user_id", in.userID, "error", err)
-		return "", true
+	var missing []string
+	for _, channel := range channels {
+		member, err := s.opts.Channels.ChannelMember(ctx, channel, in.userID)
+		var refused *telegram.APIError
+		switch {
+		case errors.As(err, &refused) && refused.Code < http.StatusInternalServerError:
+			s.opts.Logger.Error("Telegram will not say who is in a required channel; make the bot an admin there", "channel", channel, "error", err)
+			missing = append(missing, channel)
+		case err != nil:
+			s.opts.Logger.Warn("could not check a required channel; taking it as joined", "user_id", in.userID, "channel", channel, "error", err)
+		case !member.Subscribed():
+			missing = append(missing, channel)
+		}
 	}
-	if err != nil || !member.Subscribed() {
-		link := channelLink(channel)
-		return fmt.Sprintf(textJoinChannel, link, link), false
+	if len(missing) > 0 {
+		return s.joinNotice(missing), false
 	}
 	s.subscribers.set(in.userID, true)
-	return "", true
+	return outcome{}, true
 }
 
-// channelLink is where a channel can be joined: its t.me link, or the
-// channel as given when it has no public name.
-func channelLink(channel string) string {
-	if name, ok := strings.CutPrefix(channel, "@"); ok {
-		return "https://t.me/" + name
+// checkPayload is what the check button sends as /start's parameter.
+const checkPayload = "check"
+
+// joinNotice asks to join channels, with a button that opens each and one
+// that sends "/start check", which checks again.
+func (s *Service) joinNotice(channels []string) outcome {
+	var buttons [][]telegram.Button
+	for i, channel := range channels {
+		link, ok := channelLink(channel)
+		if !ok {
+			continue
+		}
+		label := textJoinButton
+		if len(channels) > 1 {
+			label = fmt.Sprintf(textJoinButtonN, i+1)
+		}
+		buttons = append(buttons, []telegram.Button{{Text: label, URL: link}})
 	}
-	return channel
+	if s.opts.Bot.Username != "" {
+		buttons = append(buttons, []telegram.Button{{Text: textCheckButton, URL: "https://t.me/" + s.opts.Bot.Username + "?start=" + checkPayload}})
+	}
+	text := textJoinChannel
+	if len(channels) > 1 {
+		text = textJoinChannels
+	}
+	return outcome{text: text, buttons: buttons}
+}
+
+// start greets a private chat when channels are required: the notice to
+// join them, until the sender has, then the welcome, or, after the check
+// button, word that they may write now.
+func (s *Service) start(ctx context.Context, in incoming) outcome {
+	if notice, joined := s.joinedChannels(ctx, in); !joined {
+		return notice
+	}
+	if strings.TrimSpace(strings.TrimPrefix(in.text, commandName(in.text))) == checkPayload {
+		return say(textChannelsJoined)
+	}
+	return say(s.runCommand(ctx, in))
+}
+
+// channelLink is where a channel can be joined: its t.me link, when it has
+// a public name.
+func channelLink(channel string) (string, bool) {
+	name, ok := strings.CutPrefix(channel, "@")
+	return "https://t.me/" + name, ok
 }
 
 // takePrivateAnswer takes one of the sender's answers for the day in a

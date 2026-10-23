@@ -218,10 +218,11 @@ type Options struct {
 	// PrivateChats is whom private chats are answered for: "off" nobody,
 	// "owners" the owners only; anything else, everyone.
 	PrivateChats string
-	// RequiredChannel, when set, is the channel a member must have joined,
-	// as Channels tells, to be answered in a private chat; owners need not.
-	RequiredChannel string
-	Channels        ChannelMembers
+	// RequiredChannels, when set, are the channels a member must have
+	// joined, as Channels tells, to be answered in a private chat; owners
+	// need not.
+	RequiredChannels []string
+	Channels         ChannelMembers
 	// Reactor sets emoji reactions, the bot's answer to applause and the
 	// model's when it reacts instead of writing; nil means it never reacts.
 	Reactor Reactor
@@ -915,12 +916,18 @@ func (s *Service) stop() {
 // from the turn's: a turn that used up its whole time budget must still be
 // able to tell the user so.
 func (s *Service) reply(in incoming, text string) int64 {
+	return s.replyWithButtons(in, text, nil)
+}
+
+// replyWithButtons is reply with link buttons under the text.
+func (s *Service) replyWithButtons(in incoming, text string, buttons [][]telegram.Button) int64 {
 	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
 	defer cancel()
 	sentID, err := s.opts.Sender.SendMessage(ctx, telegram.Outgoing{
 		ChatID:           in.msg.Chat.ID,
 		Text:             text,
 		ReplyToMessageID: in.replyTarget(),
+		Buttons:          buttons,
 	})
 	if err != nil {
 		s.opts.Logger.Error("send message failed", "chat_id", in.msg.Chat.ID, "error", err)

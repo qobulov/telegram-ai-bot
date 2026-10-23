@@ -277,7 +277,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Rules:                 store,
 		Strikes:               store,
 		AdminList:             bot.Client,
-		RequiredChannel:       cfg.RequiredChannel,
+		RequiredChannels:      cfg.RequiredChannels,
 		Channels:              bot.Client,
 		Restrictor:            bot.Client,
 		Judge:                 swearJudge(cfg, logger),

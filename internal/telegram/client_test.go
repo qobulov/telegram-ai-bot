@@ -1080,3 +1080,20 @@ func TestSendPollSendsAQuiz(t *testing.T) {
 		t.Errorf("params = %+v", p)
 	}
 }
+
+// Link buttons go under the message as an inline keyboard, and keep a
+// rich-looking text plain so that they are not lost.
+func TestSendMessageSendsButtons(t *testing.T) {
+	client, api := newTestClient(t, okSent)
+	buttons := [][]Button{{{Text: "1 - kanal", URL: "https://t.me/news"}}, {{Text: "✅ Tasdiqlash", URL: "https://t.me/bot?start=check"}}}
+
+	if _, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: "- join", Buttons: buttons}); err != nil {
+		t.Fatalf("SendMessage: %v", err)
+	}
+	sent := api.recorded()[0]
+	markup, _ := json.Marshal(sent.params["reply_markup"])
+	want := `{"inline_keyboard":[[{"text":"1 - kanal","url":"https://t.me/news"}],[{"text":"✅ Tasdiqlash","url":"https://t.me/bot?start=check"}]]}`
+	if sent.method != "sendMessage" || string(markup) != want {
+		t.Errorf("call %s, reply_markup = %s\nwant %s", sent.method, markup, want)
+	}
+}

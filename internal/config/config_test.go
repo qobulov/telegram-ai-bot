@@ -1643,17 +1643,17 @@ func TestPersonaNeverInventsPersonalFacts(t *testing.T) {
 }
 
 func TestRequiredChannel(t *testing.T) {
-	if cfg, err := Load(getenv(validEnv())); err != nil || cfg.RequiredChannel != "" {
-		t.Errorf("default = %q, %v; want none", cfg.RequiredChannel, err)
+	if cfg, err := Load(getenv(validEnv())); err != nil || len(cfg.RequiredChannels) != 0 {
+		t.Errorf("default = %q, %v; want none", cfg.RequiredChannels, err)
 	}
-	for _, channel := range []string{"@maria_news", "-1001234567890"} {
+	for value, want := range map[string]string{"@maria_news": "@maria_news", "-1001234567890": "-1001234567890", " @maria_news, @maria_music ": "@maria_news @maria_music"} {
 		env := validEnv()
-		env["REQUIRED_CHANNEL"] = channel
-		if cfg, err := Load(getenv(env)); err != nil || cfg.RequiredChannel != channel {
-			t.Errorf("REQUIRED_CHANNEL=%s: %q, %v", channel, cfg.RequiredChannel, err)
+		env["REQUIRED_CHANNEL"] = value
+		if cfg, err := Load(getenv(env)); err != nil || strings.Join(cfg.RequiredChannels, " ") != want {
+			t.Errorf("REQUIRED_CHANNEL=%s: %q, %v; want %s", value, cfg.RequiredChannels, err, want)
 		}
 	}
-	for _, channel := range []string{"maria_news", "https://t.me/maria_news", "@ab", "123"} {
+	for _, channel := range []string{"maria_news", "https://t.me/maria_news", "@ab", "123", "@maria_news, nope"} {
 		env := validEnv()
 		env["REQUIRED_CHANNEL"] = channel
 		if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "REQUIRED_CHANNEL") {

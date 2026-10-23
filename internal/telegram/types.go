@@ -379,6 +379,14 @@ type Outgoing struct {
 	// ReplyToMessageID makes the message a reply to that message in the same
 	// chat. Zero sends an ordinary message.
 	ReplyToMessageID int64
+	// Buttons are link buttons under the message, in rows.
+	Buttons [][]Button
+}
+
+// Button is a button under a message that opens a link.
+type Button struct {
+	Text string `json:"text"`
+	URL  string `json:"url"`
 }
 
 // ChatPermissions is what a member may do in a group. Every field is always
