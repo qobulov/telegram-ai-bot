@@ -184,9 +184,11 @@ func (s *Service) makerText(kind faqKind, pick func(localText) string) string {
 	developer := s.opts.Developer
 	owners := s.ownerHandles(developer)
 	switch {
-	case developer != "" && owners != "" && kind == faqOwner:
+	case developer != "" && owners == "":
+		return fmt.Sprintf(pick(textProgrammedAndOwned), "@"+developer)
+	case developer != "" && kind == faqOwner:
 		return fmt.Sprintf(pick(textOwnedBy), owners, "@"+developer)
-	case developer != "" && owners != "":
+	case developer != "":
 		return fmt.Sprintf(pick(textProgrammedBy), "@"+developer, owners)
 	case owners != "":
 		return fmt.Sprintf(pick(textMadeBy), owners)
@@ -216,12 +218,13 @@ var (
 		{uz: "Yaxshi, rahmat! O'zingizda nima gaplar?", ru: "Хорошо, спасибо! А у вас как?", en: "Good, thanks! How about you?"},
 		{uz: "Zo'r! Sizdachi?", ru: "Отлично! А у вас?", en: "Great! And you?"},
 	}
-	textMyName       = localText{uz: "Mening ismim %s. 😊", ru: "Меня зовут %s. 😊", en: "My name is %s. 😊"}
-	textMadeBy       = localText{uz: "Meni %s yaratgan.", ru: "Меня создали %s.", en: "I was made by %s."}
-	textProgrammedBy = localText{uz: "Meni %s dasturlagan, egam esa %s.", ru: "Меня запрограммировал %s, а мой владелец — %s.", en: "I was programmed by %s, and my owner is %s."}
-	textOwnedBy      = localText{uz: "Egam — %s. Meni esa %s dasturlagan.", ru: "Мой владелец — %s. А запрограммировал меня %s.", en: "My owner is %s. I was programmed by %s."}
-	textMadeByOwners = localText{uz: "Meni egalarim yaratgan.", ru: "Меня создали мои владельцы.", en: "My owners made me."}
-	textAbilities    = localText{
+	textMyName             = localText{uz: "Mening ismim %s. 😊", ru: "Меня зовут %s. 😊", en: "My name is %s. 😊"}
+	textMadeBy             = localText{uz: "Meni %s yaratgan.", ru: "Меня создали %s.", en: "I was made by %s."}
+	textProgrammedBy       = localText{uz: "Meni %s dasturlagan, egam esa %s.", ru: "Меня запрограммировал %s, а мой владелец — %s.", en: "I was programmed by %s, and my owner is %s."}
+	textProgrammedAndOwned = localText{uz: "Meni %s dasturlagan, egam ham o'sha.", ru: "Меня запрограммировал %s, он же мой владелец.", en: "I was programmed by %s, who is also my owner."}
+	textOwnedBy            = localText{uz: "Egam — %s. Meni esa %s dasturlagan.", ru: "Мой владелец — %s. А запрограммировал меня %s.", en: "My owner is %s. I was programmed by %s."}
+	textMadeByOwners       = localText{uz: "Meni egalarim yaratgan.", ru: "Меня создали мои владельцы.", en: "My owners made me."}
+	textAbilities          = localText{
 		uz: "Gaplashaman, savollarga javob beraman, valyuta kursi, ob-havo, namoz vaqti, yangiliklar, MLBB qahramonlari, kino va musiqa topaman, rasm, stiker va ovozli xabarlarni tushunaman. Shunchaki yozing!",
 		ru: "Болтаю, отвечаю на вопросы, ищу курсы валют, погоду, время намаза, новости, героев MLBB, фильмы и музыку, понимаю фото, стикеры и голосовые. Просто пишите!",
 		en: "I chat, answer questions, look up exchange rates, weather, prayer times, news, MLBB heroes, films and music, and understand photos, stickers and voice messages. Just write!",

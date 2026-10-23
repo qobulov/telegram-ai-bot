@@ -3666,4 +3666,12 @@ func TestQuickAnswerNamesTheDeveloperAndTheOwner(t *testing.T) {
 			t.Errorf("%q: sent = %+v, want %q", text, sent, want)
 		}
 	}
+	for _, text := range []string{"seni kim yaratgan", "egang kim"} {
+		f := newFixture()
+		f.opts.QuickAnswers = true
+		f.opts.OwnerUsernames, f.opts.Developer = []string{"pronium"}, "pronium"
+		if sent := f.run(textFrom(userID, text)); len(sent) != 1 || sent[0].text != "Meni @pronium dasturlagan, egam ham o'sha." {
+			t.Errorf("one person as both, %q: sent = %+v", text, sent)
+		}
+	}
 }

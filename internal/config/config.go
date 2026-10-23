@@ -246,10 +246,11 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	if cfg.Developer != "" {
 		owners := slices.DeleteFunc(slices.Clone(cfg.OwnerUsernames), func(u string) bool { return u == cfg.Developer })
+		note := developerNote
 		if len(owners) == 0 {
-			owners = cfg.OwnerUsernames
+			note, owners = developerOwnerNote, cfg.OwnerUsernames
 		}
-		cfg.PersonaPrompt += "\n\n" + strings.NewReplacer(developerPlaceholder, "@"+cfg.Developer, ownerPlaceholder, mentionList(owners)).Replace(developerNote)
+		cfg.PersonaPrompt += "\n\n" + strings.NewReplacer(developerPlaceholder, "@"+cfg.Developer, ownerPlaceholder, mentionList(owners)).Replace(note)
 	}
 	cfg.FootballDataToken = r.apiKey("FOOTBALL_DATA_TOKEN")
 	cfg.GiphyAPIKey = r.apiKey("GIPHY_API_KEY")

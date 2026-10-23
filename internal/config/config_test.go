@@ -1674,6 +1674,10 @@ func TestDeveloperIsToldApartFromTheOwner(t *testing.T) {
 	if !strings.Contains(cfg.PersonaPrompt, "You were programmed by @pronium, and you belong to @tursunoffm.") {
 		t.Errorf("the persona does not tell them apart")
 	}
+	env["BOT_OWNER_USERNAME"] = "pronium"
+	if cfg, _ := Load(getenv(env)); !strings.Contains(cfg.PersonaPrompt, "You were programmed by @pronium, who is also your owner.") {
+		t.Errorf("one person as both: the persona does not say so")
+	}
 	env["BOT_DEVELOPER_USERNAME"] = "a_one,b_two"
 	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "BOT_DEVELOPER_USERNAME") {
 		t.Errorf("two developers: err = %v, want it rejected", err)

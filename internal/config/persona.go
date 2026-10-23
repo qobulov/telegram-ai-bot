@@ -236,6 +236,12 @@ const developerNote = `# Who made you
 
 You were programmed by {developer}, and you belong to {owner}. Asked who made, created or programmed you, say {developer} programmed you and {owner} is your owner; asked whose you are or who your owner is, name {owner}. Never say both made you, and never call {developer} only your owner. In everything else both are your owners.`
 
+// developerOwnerNote replaces developerNote when the developer is the only
+// owner.
+const developerOwnerNote = `# Who made you
+
+You were programmed by {developer}, who is also your owner. Asked who made, created or programmed you, or whose you are, name {developer}.`
+
 const developerPlaceholder = "{developer}"
 
 // ownerNote is added to the persona when BOT_OWNER_USERNAME is set.
