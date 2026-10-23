@@ -248,7 +248,7 @@ func Load(getenv func(string) string) (Config, error) {
 		owners := slices.DeleteFunc(slices.Clone(cfg.OwnerUsernames), func(u string) bool { return u == cfg.Developer })
 		note := developerNote
 		if len(owners) == 0 {
-			note, owners = developerOwnerNote, cfg.OwnerUsernames
+			note, owners = developerOwnerNote, []string{cfg.Developer}
 		}
 		cfg.PersonaPrompt += "\n\n" + strings.NewReplacer(developerPlaceholder, "@"+cfg.Developer, ownerPlaceholder, mentionList(owners)).Replace(note)
 	}
