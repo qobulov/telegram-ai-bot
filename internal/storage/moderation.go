@@ -71,6 +71,14 @@ const (
 	ActionSwearAtBot = "swear_bot"
 )
 
+// What the guards an owner may turn on did: banned a known spammer, deleted
+// a link to a malicious host or an unsafe picture.
+const (
+	ActionSpamBan     = "spam_ban"
+	ActionLinkDelete  = "link_delete"
+	ActionImageDelete = "image_delete"
+)
+
 // SwearStrikes counts the swears of one kind the swear guard caught from one
 // member in a chat since a moment.
 func (s *Store) SwearStrikes(ctx context.Context, chatID, userID int64, action string, since time.Time) (int, error) {

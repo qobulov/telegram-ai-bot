@@ -678,3 +678,32 @@ func TestRulesToolSetsAndRemovesTheWelcome(t *testing.T) {
 		t.Errorf("remove_welcome = %+v, rules %+v", env, store.all())
 	}
 }
+
+func TestRulesToolTurnsGuardsOnAndOff(t *testing.T) {
+	store := &fakeRules{}
+	registry := mustRegistry(t, RulesTool(RulesOptions{Store: store, BotID: rulesBotID, CanCheckLinks: true}))
+	ctx := ownerSaying(groupA, "Mari, spamerlarni va yomon havolalarni o'chir")
+
+	for _, guard := range []string{"spam", "links"} {
+		if env := rules(registry, ctx, `{"action":"guard","guard":"`+guard+`"}`); !env.OK || !strings.Contains(string(env.Result), "On within a minute") {
+			t.Fatalf("guard %s = %+v %s", guard, env, env.Result)
+		}
+	}
+	env := rules(registry, ctx, `{"action":"guard","guard":"images"}`)
+	if env.OK || !strings.Contains(env.Error.Message, "SIGHTENGINE_API_USER") {
+		t.Errorf("the picture guard was turned on without its key: %+v", env)
+	}
+	if env := rules(registry, ctx, `{"action":"guard","guard":"everything"}`); env.OK || env.Error.Code != "invalid_arguments" {
+		t.Errorf("an unknown guard = %+v", env)
+	}
+	if env := rules(registry, ownerSaying(9001, "spamni o'chir"), `{"action":"guard","guard":"spam"}`); env.OK {
+		t.Errorf("a guard was turned on in a private chat: %+v", env)
+	}
+	got := store.all()
+	if len(got) != 2 || got[0].Kind != storage.RuleSpamGuard || got[1].Kind != storage.RuleLinkGuard || got[0].ChatID != groupA {
+		t.Fatalf("rules = %+v", got)
+	}
+	if env := rules(registry, ctx, `{"action":"unguard","guard":"spam"}`); !env.OK || len(store.all()) != 1 || store.all()[0].Kind != storage.RuleLinkGuard {
+		t.Errorf("unguard = %+v, rules %+v", env, store.all())
+	}
+}

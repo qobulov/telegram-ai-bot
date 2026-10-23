@@ -23,6 +23,8 @@ type MessageEntity struct {
 	Length int    `json:"length"`
 	// User is set for text_mention entities.
 	User *User `json:"user"`
+	// URL is set for text_link entities: the link behind the text.
+	URL string `json:"url,omitempty"`
 }
 
 // Content returns the message's text with its entities, or the caption with

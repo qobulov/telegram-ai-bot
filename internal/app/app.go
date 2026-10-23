@@ -18,6 +18,7 @@ import (
 	"telegram-ai-bot/internal/config"
 	"telegram-ai-bot/internal/cron"
 	"telegram-ai-bot/internal/gifs"
+	"telegram-ai-bot/internal/guards"
 	"telegram-ai-bot/internal/service"
 	"telegram-ai-bot/internal/stickers"
 	"telegram-ai-bot/internal/storage"
@@ -287,6 +288,8 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Channels:              bot.Client,
 		Buttons:               bot.Client,
 		Restrictor:            bot.Client,
+		Guards:                checker(cfg),
+		GroupModerator:        bot.Client,
 		Judge:                 swearJudge(cfg, logger),
 		Stickers:              store,
 		ClipSender:            bot.Client,
@@ -356,10 +359,22 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 				Location: cfg.Location,
 				Groups:   store,
 				Muter:    store,
+
+				CanCheckLinks:  checker(cfg).CanCheckLinks(),
+				CanCheckImages: checker(cfg).CanCheckImages(),
 			}),
 		)
 	}
 	return builtin
+}
+
+// checker asks the spam lists, URLhaus and Sightengine for the guards.
+func checker(cfg config.Config) *guards.Checker {
+	return guards.New(guards.Options{
+		URLhausKey:        cfg.URLhausAuthKey,
+		SightengineUser:   cfg.SightengineUser,
+		SightengineSecret: cfg.SightengineSecret,
+	})
 }
 
 // liveDataTools look things up on public web APIs: rates, weather, prayer

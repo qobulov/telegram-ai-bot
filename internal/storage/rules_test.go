@@ -173,3 +173,18 @@ func TestSwearGuardIsOnePerGroup(t *testing.T) {
 		t.Errorf("rules = %+v, %v; want one guard tagging @Bakxtyorvch", rules, err)
 	}
 }
+
+// The spam, link and picture guards are rules the schema accepts, one of
+// each per group.
+func TestGuardsAreOnePerGroup(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	for _, kind := range []string{RuleSpamGuard, RuleLinkGuard, RuleImageGuard, RuleSpamGuard} {
+		if _, err := store.SetGroupRule(ctx, GroupRule{ChatID: group, Kind: kind, SetBy: alice}); err != nil {
+			t.Fatalf("SetGroupRule(%s): %v", kind, err)
+		}
+	}
+	if rules := mustRules(t, store, group); len(rules) != 3 {
+		t.Errorf("rules = %+v, want one of each guard", rules)
+	}
+}

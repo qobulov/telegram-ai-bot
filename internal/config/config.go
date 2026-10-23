@@ -72,6 +72,12 @@ type Config struct {
 	// YouTubeAPIKey is a YouTube Data API key; without it there is no
 	// video search.
 	YouTubeAPIKey string
+	// URLhausAuthKey lets owners turn on the link guard, and
+	// SightengineUser and SightengineSecret the picture guard; without them
+	// those guards are refused. The spam guard needs no key.
+	URLhausAuthKey    string
+	SightengineUser   string
+	SightengineSecret string
 
 	// Image generation, Gemini only. Owners have no daily limit.
 	ImagesEnabled   bool
@@ -246,6 +252,9 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.TavilyAPIKey = r.apiKey("TAVILY_API_KEY")
 	cfg.TMDBToken = r.apiKey("TMDB_TOKEN")
 	cfg.YouTubeAPIKey = r.apiKey("YOUTUBE_API_KEY")
+	cfg.URLhausAuthKey = r.apiKey("URLHAUS_AUTH_KEY")
+	cfg.SightengineUser = r.apiKey("SIGHTENGINE_API_USER")
+	cfg.SightengineSecret = r.apiKey("SIGHTENGINE_API_SECRET")
 	cfg.WakeWords = r.wakeWords(cfg)
 	r.checkRemovedVariables()
 	r.checkGroupSettings(cfg)

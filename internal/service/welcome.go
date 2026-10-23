@@ -10,14 +10,15 @@ import (
 // welcome greets people who joined a group with the welcome an owner set
 // for it, "{name}" in it being their first names; in code, with no model.
 // Bots joining, the bot itself among them, are not greeted, nor anyone in a
-// group without a welcome or with the bot muted.
-func (s *Service) welcome(in incoming) {
+// group without a welcome or with the bot muted, nor those banned as
+// spammers.
+func (s *Service) welcome(in incoming, banned map[int64]bool) {
 	if s.opts.Rules == nil || s.isMutedLately(in.scope.ChatID) {
 		return
 	}
 	var names []string
 	for _, u := range in.msg.NewChatMembers {
-		if !u.IsBot && strings.TrimSpace(u.FirstName) != "" {
+		if !u.IsBot && !banned[u.ID] && strings.TrimSpace(u.FirstName) != "" {
 			names = append(names, strings.TrimSpace(u.FirstName))
 		}
 	}

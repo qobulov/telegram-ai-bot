@@ -24,6 +24,12 @@ const (
 	// RuleWelcome is what the bot says to new members of one group, in an
 	// owner's words; "{name}" in it is the newcomers' names.
 	RuleWelcome = "welcome"
+	// RuleSpamGuard bans members known as spammers, RuleLinkGuard deletes
+	// links to malicious hosts and RuleImageGuard nude or gory pictures, in
+	// one group, in code.
+	RuleSpamGuard  = "spam_guard"
+	RuleLinkGuard  = "link_guard"
+	RuleImageGuard = "image_guard"
 )
 
 // MaxInstructions is how many instructions a group may have in force at

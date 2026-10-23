@@ -272,6 +272,10 @@ type Options struct {
 	Strikes    SwearStrikes
 	AdminList  AdminLister
 	Restrictor Restrictor
+	// Guards and GroupModerator run the spam, link and picture guards an
+	// owner may turn on in a group; with either nil they never act.
+	Guards         Guards
+	GroupModerator GroupModerator
 	// Judge is the model asked whom a message the guard caught is aimed at.
 	Judge InsultJudge
 	// Stickers picks the sticker the model asked for, StickerSender sends
@@ -356,6 +360,11 @@ type Service struct {
 	ownersHere *recently[int64, []string]
 	// heroRounds are groups' open rounds of "guess the hero", lately read.
 	heroRounds *recently[int64, storage.HeroGame]
+	// guardSets are the guards on in each group, and spamVerdicts and
+	// hostVerdicts what the outside services lately said; see protect.go.
+	guardSets    *recently[int64, guardSet]
+	spamVerdicts *recently[int64, verdict]
+	hostVerdicts *recently[string, verdict]
 
 	// typingInterval is how often "typing" is shown again while a turn
 	// runs: typingRefresh, shortened by tests.
@@ -432,6 +441,9 @@ func New(opts Options) *Service {
 		actives:        newRecently[int64, int](activeMemory, opts.Now),
 		ownersHere:     newRecently[int64, []string](activeMemory, opts.Now),
 		heroRounds:     newRecently[int64, storage.HeroGame](heroMemory, opts.Now),
+		guardSets:      newRecently[int64, guardSet](guardsMemory, opts.Now),
+		spamVerdicts:   newRecently[int64, verdict](verdictMemory, opts.Now),
+		hostVerdicts:   newRecently[string, verdict](verdictMemory, opts.Now),
 		queues:         make([]chan incoming, opts.Workers),
 		notices:        make(chan incoming, noticeQueueSize),
 		transcribing:   make(chan struct{}, backgroundTranscriptions),
@@ -612,7 +624,7 @@ func (s *Service) accept(update telegram.Update) (incoming, bool) {
 		in.scope = storage.Scope{ChatID: msg.Chat.ID} // shared by the group
 		in.group = true
 		if len(msg.NewChatMembers) > 0 {
-			s.welcome(in)
+			s.welcome(in, s.guardJoiners(in))
 		}
 		return s.acceptGroup(in)
 	default:
@@ -656,6 +668,10 @@ func withoutTopicReply(msg *telegram.Message) *telegram.Message {
 // /mute or /unmute that changes the answer may still be waiting in that same
 // queue, ahead of this message.
 func (s *Service) acceptGroup(in incoming) (incoming, bool) {
+	// What the spam, link and picture guards caught is deleted, unanswered.
+	if s.protected(in) {
+		return incoming{}, false
+	}
 	// Swearing in a guarded group is handled in code and not answered.
 	if s.guardedSwearing(in.msg, in.updateID) {
 		if s.ambient.enabled() {

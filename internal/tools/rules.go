@@ -81,6 +81,10 @@ type RulesOptions struct {
 	// naming a group and mute do not work.
 	Groups GroupLister
 	Muter  Muter
+	// CanCheckLinks and CanCheckImages say the link and picture guards
+	// have their services' keys; without them those guards are refused.
+	CanCheckLinks  bool
+	CanCheckImages bool
 }
 
 // Muter turns the bot's silence in a chat on or off.
@@ -98,6 +102,8 @@ type rulesArgs struct {
 	// Group names another group the rule is for: its title, @username or
 	// chat id.
 	Group string `json:"group"`
+	// Guard names the guard guard and unguard turn on or off.
+	Guard string `json:"guard"`
 }
 
 // RulesTool lets an owner give the bot orders that last: they are stored
@@ -119,6 +125,7 @@ func RulesTool(opts RulesOptions) Tool {
 			"ignore: stop answering the member whose message the owner replied to, or, when they replied to your own answer, the member it answered (hours, default 24); never admins or owners. unignore: answer that member again. " +
 			"set_address: how to address the owner who is asking, in every chat (text). " +
 			"watch_swearing: from now on, without you, a member's first insult here gets a warning and the next within a day a 1-hour mute, and a second swear at you within a day a 15-minute mute without warning that tags the group's creator, or the @username in text when the owner names whom to call; an admin, who cannot be muted, gets the warning and then that tag; the creator and owners are left alone. stop_watching_swearing turns it off. " +
+			"guard: turn on a guard run in code, without you (guard): spam bans members on the CAS and lols.bot spammer lists, links deletes links to malware and phishing hosts (URLhaus), images deletes nude or gory pictures (Sightengine); admins and owners are left alone. unguard turns one off. " +
 			"mute: stop writing in the group at all, until unmute. " +
 			"set_welcome: what you say, in code, to everyone who joins the group from now on, the owner's words copied exactly (text), \"{name}\" in it standing for the newcomers' names; remove_welcome: stop. " +
 			"list: the rules in force here. remove: delete a rule by its id from list. " +
@@ -127,7 +134,8 @@ func RulesTool(opts RulesOptions) Tool {
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["add_instruction", "ignore", "unignore", "set_address", "watch_swearing", "stop_watching_swearing", "mute", "unmute", "set_welcome", "remove_welcome", "list", "remove"]},
+				"action": {"type": "string", "enum": ["add_instruction", "ignore", "unignore", "set_address", "watch_swearing", "stop_watching_swearing", "mute", "unmute", "set_welcome", "remove_welcome", "guard", "unguard", "list", "remove"]},
+				"guard": {"type": "string", "enum": ["spam", "links", "images"], "description": "For guard and unguard: which guard."},
 				"group": {"type": "string", "description": "Another group the action is for, as the owner named it: its title, @username or id. Leave out for this chat."},
 				"text": {"type": "string", "description": "For add_instruction: the owner's words, copied exactly as they wrote them, at most 300 characters: no rephrasing, translating, added names or fixed spelling; leave out words that are not the order. For set_address: the form of address, at most 40 characters. For watch_swearing: the @username a mute tags, if the owner named one."},
 				"hours": {"type": "integer", "description": "For add_instruction and ignore: how long the rule lasts, 1 to 720."},
@@ -190,12 +198,20 @@ func runRule(ctx context.Context, opts RulesOptions, caller Caller, args rulesAr
 		return setWelcome(ctx, opts, caller, args)
 	case "remove_welcome":
 		return removeWelcome(ctx, opts, caller)
+	case "guard":
+		return setGuard(ctx, opts, caller, args.Guard)
+	case "unguard":
+		kind, err := guardKind(opts, args.Guard, false)
+		if err != nil {
+			return nil, err
+		}
+		return removeKind(ctx, opts, caller, kind)
 	case "list":
 		return listRules(ctx, opts, caller)
 	case "remove":
 		return removeRule(ctx, opts, caller, args)
 	default:
-		return nil, &ArgumentError{Message: "action must be add_instruction, ignore, unignore, set_address, watch_swearing, stop_watching_swearing, mute, unmute, set_welcome, remove_welcome, list or remove"}
+		return nil, &ArgumentError{Message: "action must be add_instruction, ignore, unignore, set_address, watch_swearing, stop_watching_swearing, mute, unmute, set_welcome, remove_welcome, guard, unguard, list or remove"}
 	}
 }
 
@@ -391,6 +407,11 @@ func watchSwearing(ctx context.Context, opts RulesOptions, caller Caller, args r
 }
 
 func stopWatchingSwearing(ctx context.Context, opts RulesOptions, caller Caller) (any, error) {
+	return removeKind(ctx, opts, caller, storage.RuleSwearGuard)
+}
+
+// removeKind removes the group's rule of a kind it has one of.
+func removeKind(ctx context.Context, opts RulesOptions, caller Caller, kind string) (any, error) {
 	if caller.ChatID >= 0 {
 		return nil, &ArgumentError{Message: groupRuleOnly}
 	}
@@ -400,7 +421,7 @@ func stopWatchingSwearing(ctx context.Context, opts RulesOptions, caller Caller)
 	}
 	removed := false
 	for _, r := range rules {
-		if r.Kind == storage.RuleSwearGuard && r.ChatID == caller.ChatID {
+		if r.Kind == kind && r.ChatID == caller.ChatID {
 			ok, err := opts.Store.RemoveGroupRule(ctx, caller.ChatID, r.ID)
 			if err != nil {
 				return nil, err
@@ -409,6 +430,49 @@ func stopWatchingSwearing(ctx context.Context, opts RulesOptions, caller Caller)
 		}
 	}
 	return map[string]bool{"removed": removed}, nil
+}
+
+// guardNotes say what each guard does once it is on.
+var guardNotes = map[string]string{
+	storage.RuleSpamGuard:  "On within a minute, in code: members on the CAS or lols.bot spammer lists are banned when they join or write, and their message deleted. It needs you to be an admin who may ban and delete.",
+	storage.RuleLinkGuard:  "On within a minute, in code: messages linking to hosts URLhaus lists for malware or phishing are deleted. It needs you to be an admin who may delete messages.",
+	storage.RuleImageGuard: "On within a minute, in code: nude or gory pictures are deleted. It needs you to be an admin who may delete messages.",
+}
+
+// setGuard turns a guard on in the group.
+func setGuard(ctx context.Context, opts RulesOptions, caller Caller, guard string) (any, error) {
+	if caller.ChatID >= 0 {
+		return nil, &ArgumentError{Message: groupRuleOnly}
+	}
+	kind, err := guardKind(opts, guard, true)
+	if err != nil {
+		return nil, err
+	}
+	id, err := opts.Store.SetGroupRule(ctx, storage.GroupRule{ChatID: caller.ChatID, Kind: kind, SetBy: caller.UserID})
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"saved": true, "id": id, "note": guardNotes[kind]}, nil
+}
+
+// guardKind is the rule kind of a guard; turning on one whose service has
+// no key is refused.
+func guardKind(opts RulesOptions, guard string, on bool) (string, error) {
+	switch guard {
+	case "spam":
+		return storage.RuleSpamGuard, nil
+	case "links":
+		if on && !opts.CanCheckLinks {
+			return "", errors.New("the link guard needs URLHAUS_AUTH_KEY, which is not set: nothing was done; tell the owner so")
+		}
+		return storage.RuleLinkGuard, nil
+	case "images":
+		if on && !opts.CanCheckImages {
+			return "", errors.New("the picture guard needs SIGHTENGINE_API_USER and SIGHTENGINE_API_SECRET, which are not set: nothing was done; tell the owner so")
+		}
+		return storage.RuleImageGuard, nil
+	}
+	return "", &ArgumentError{Message: "guard must be spam, links or images"}
 }
 
 // setWelcome keeps the group's welcome for new members, in the owner's own
@@ -433,24 +497,7 @@ func setWelcome(ctx context.Context, opts RulesOptions, caller Caller, args rule
 }
 
 func removeWelcome(ctx context.Context, opts RulesOptions, caller Caller) (any, error) {
-	if caller.ChatID >= 0 {
-		return nil, &ArgumentError{Message: groupRuleOnly}
-	}
-	rules, err := opts.Store.GroupRules(ctx, caller.ChatID)
-	if err != nil {
-		return nil, err
-	}
-	removed := false
-	for _, r := range rules {
-		if r.Kind == storage.RuleWelcome && r.ChatID == caller.ChatID {
-			ok, err := opts.Store.RemoveGroupRule(ctx, caller.ChatID, r.ID)
-			if err != nil {
-				return nil, err
-			}
-			removed = removed || ok
-		}
-	}
-	return map[string]bool{"removed": removed}, nil
+	return removeKind(ctx, opts, caller, storage.RuleWelcome)
 }
 
 // muteGroup silences the bot in the group, or lets it speak again, as the
