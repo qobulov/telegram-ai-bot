@@ -3489,12 +3489,13 @@ func TestPrivateChatNeedsTheRequiredChannel(t *testing.T) {
 		owner    bool
 		answered bool
 	}{
-		"not joined":          {member: telegram.ChatMember{Status: "left"}},
-		"joined":              {member: telegram.ChatMember{Status: "member"}, answered: true},
-		"restricted but in":   {member: telegram.ChatMember{Status: "restricted", StillIn: true}, answered: true},
-		"restricted and gone": {member: telegram.ChatMember{Status: "restricted"}},
-		"an owner":            {member: telegram.ChatMember{Status: "left"}, owner: true, answered: true},
-		"Telegram cannot say": {err: errors.New("bot is not an admin"), answered: true},
+		"not joined":                            {member: telegram.ChatMember{Status: "left"}},
+		"joined":                                {member: telegram.ChatMember{Status: "member"}, answered: true},
+		"restricted but in":                     {member: telegram.ChatMember{Status: "restricted", StillIn: true}, answered: true},
+		"restricted and gone":                   {member: telegram.ChatMember{Status: "restricted"}},
+		"an owner":                              {member: telegram.ChatMember{Status: "left"}, owner: true, answered: true},
+		"Telegram refuses: the bot is no admin": {err: &telegram.APIError{Code: 400, Description: "Bad Request: member list is inaccessible"}},
+		"Telegram does not answer":              {err: errors.New("timeout"), answered: true},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

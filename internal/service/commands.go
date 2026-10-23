@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"net/http"
 	"slices"
 	"strings"
 	"time"
@@ -561,8 +562,11 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 
 // joinedChannel reports whether the sender of a private message may be
 // answered under the required channel, and if not the notice that asks them
-// to join. Owners and groups need no channel. When Telegram cannot say, the
-// sender is answered: the daily limit still guards the cost.
+// to join. Owners and groups need no channel. When Telegram refuses to say,
+// as it does while the bot is no admin of the channel, nobody is let
+// through: the owners asked that only the channel's members be answered.
+// When Telegram does not answer at all, the sender is: the daily limit still
+// guards the cost.
 func (s *Service) joinedChannel(ctx context.Context, in incoming) (notice string, joined bool) {
 	channel := s.opts.RequiredChannel
 	if in.group || channel == "" || s.opts.Channels == nil || s.isOwner(in.msg.From) {
@@ -574,11 +578,15 @@ func (s *Service) joinedChannel(ctx context.Context, in incoming) (notice string
 	ctx, cancel := context.WithTimeout(ctx, logTimeout)
 	defer cancel()
 	member, err := s.opts.Channels.ChannelMember(ctx, channel, in.userID)
-	if err != nil {
+	var refused *telegram.APIError
+	switch {
+	case errors.As(err, &refused) && refused.Code < http.StatusInternalServerError:
+		s.opts.Logger.Error("Telegram will not say who is in the required channel; make the bot an admin there", "channel", channel, "error", err)
+	case err != nil:
 		s.opts.Logger.Warn("could not check the required channel; answering anyway", "user_id", in.userID, "error", err)
 		return "", true
 	}
-	if !member.Subscribed() {
+	if err != nil || !member.Subscribed() {
 		link := channelLink(channel)
 		return fmt.Sprintf(textJoinChannel, link, link), false
 	}
