@@ -62,3 +62,13 @@ func TestSetCommandMenusFailure(t *testing.T) {
 		t.Errorf("tried %d menus, want all three despite the failures", len(setter.set))
 	}
 }
+
+// The swear judge thinks little whatever answers do: at medium its
+// thinking filled its few tokens and cut its one word off.
+func TestSwearJudgeThinksLittle(t *testing.T) {
+	for effort, want := range map[string]string{"": "", "none": "none", "minimal": "minimal", "low": "low", "medium": "low", "high": "low", "default": "low"} {
+		if got := judgeReasoning(effort); got != want {
+			t.Errorf("judgeReasoning(%q) = %q, want %q", effort, got, want)
+		}
+	}
+}

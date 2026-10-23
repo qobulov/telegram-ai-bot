@@ -396,10 +396,13 @@ const giphyTimeout = 5 * time.Second
 // enough to label a pack of a hundred within one serverless request or two.
 const stickerWorkers = 10
 
-// stickerLabeller is the model that looks at stickers on import. It gets
-// more room than an answer: Gemini spends output tokens thinking, and with
 // judgeTokens is room for the judge's one word and a little thinking.
 const judgeTokens = 512
+
+// judgeEffort is how hard the judge thinks, whatever AI_REASONING_EFFORT
+// asks of answers: at medium, its thinking used up judgeTokens and the
+// judge's word was cut off.
+const judgeEffort = "low"
 
 // swearJudge asks whom swearing is aimed at: a one-word answer to a short
 // prompt, so it gets few tokens and thinks little, on the main model and
@@ -410,7 +413,7 @@ func swearJudge(cfg config.Config, logger *slog.Logger) *ai.Client {
 		APIKey:          cfg.AIAPIKey,
 		Model:           cfg.Model,
 		FallbackModels:  cfg.FallbackModels,
-		ReasoningEffort: cfg.ReasoningEffort,
+		ReasoningEffort: judgeReasoning(cfg.ReasoningEffort),
 		MaxTokens:       judgeTokens,
 		MaxAttempts:     2,
 		HTTPClient:      &http.Client{Timeout: cfg.RequestTimeout},
@@ -419,6 +422,18 @@ func swearJudge(cfg config.Config, logger *slog.Logger) *ai.Client {
 	})
 }
 
+// judgeReasoning is judgeEffort, unless thinking is off or left to the
+// model's default: the judge never thinks more than answers do.
+func judgeReasoning(effort string) string {
+	switch effort {
+	case "", "none", "minimal", "low":
+		return effort
+	}
+	return judgeEffort
+}
+
+// stickerLabeller is the model that looks at stickers on import. It gets
+// more room than an answer: Gemini spends output tokens thinking, and with
 // a small limit a fifth of its labels came back cut off.
 func stickerLabeller(cfg config.Config, logger *slog.Logger) *ai.Client {
 	return ai.NewClient(ai.Options{
