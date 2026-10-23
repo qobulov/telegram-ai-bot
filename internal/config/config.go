@@ -72,6 +72,9 @@ type Config struct {
 	// YouTubeAPIKey is a YouTube Data API key; without it there is no
 	// video search.
 	YouTubeAPIKey string
+	// WolframAppID is a Wolfram|Alpha AppID; without it there is no
+	// wolfram tool.
+	WolframAppID string
 	// URLhausAuthKey or SafeBrowsingKey lets owners turn on the link guard,
 	// each service judging links when its key is set, and
 	// SightengineUser and SightengineSecret the picture guard; without them
@@ -86,6 +89,9 @@ type Config struct {
 	ImageModel      string
 	ImageBaseURL    string
 	DailyImageLimit int
+	// DailyPresentationLimit is how many presentations a user who is not
+	// an owner may get per day; 0 lets only owners have them.
+	DailyPresentationLimit int
 
 	// Media limits: the largest file the bot downloads, and the longest
 	// voice message it listens to.
@@ -242,6 +248,7 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.ImageModel = r.text("IMAGE_MODEL", "gemini-3.1-flash-image")
 	cfg.ImageBaseURL = strings.TrimSuffix(cfg.AIBaseURL, "/openai")
 	cfg.DailyImageLimit = r.integer("DAILY_IMAGE_LIMIT", 2, 0)
+	cfg.DailyPresentationLimit = r.integer("PRESENTATION_DAILY_LIMIT", 3, 0)
 	if cfg.ImagesEnabled {
 		cfg.PersonaPrompt += "\n\n" + imageNote
 	}
@@ -254,6 +261,7 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.TavilyAPIKey = r.apiKey("TAVILY_API_KEY")
 	cfg.TMDBToken = r.apiKey("TMDB_TOKEN")
 	cfg.YouTubeAPIKey = r.apiKey("YOUTUBE_API_KEY")
+	cfg.WolframAppID = r.apiKey("WOLFRAM_APP_ID")
 	cfg.URLhausAuthKey = r.apiKey("URLHAUS_AUTH_KEY")
 	cfg.SafeBrowsingKey = r.apiKey("GOOGLE_SAFE_BROWSING_KEY")
 	cfg.SightengineUser = r.apiKey("SIGHTENGINE_API_USER")

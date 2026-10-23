@@ -272,6 +272,28 @@ func (c *Client) SendAudio(ctx context.Context, track Track) (int64, error) {
 	})
 }
 
+// File is a document to upload, such as a presentation, with an optional
+// caption.
+type File struct {
+	ChatID           int64
+	ReplyToMessageID int64
+	Data             []byte
+	Name             string
+	Caption          string
+}
+
+// SendFile uploads a document and returns the ID of the sent message.
+func (c *Client) SendFile(ctx context.Context, file File) (int64, error) {
+	fields := map[string]string{}
+	if file.Caption != "" {
+		fields["caption"] = file.Caption
+	}
+	return c.upload(ctx, "sendDocument", upload{
+		chatID: file.ChatID, replyTo: file.ReplyToMessageID, fields: fields,
+		field: "document", filename: file.Name, data: file.Data,
+	})
+}
+
 // Clip is a short video to upload: shown round, as a video message, or as
 // a silent looping animation.
 type Clip struct {

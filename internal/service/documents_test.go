@@ -3,10 +3,14 @@ package service
 import (
 	"archive/zip"
 	"bytes"
+	"context"
+	"errors"
 	"strings"
+	"sync"
 	"testing"
 
 	"telegram-ai-bot/internal/telegram"
+	"telegram-ai-bot/internal/tools"
 )
 
 // docxWith is a Word file whose body is the given WordprocessingML.
@@ -97,5 +101,57 @@ func TestFileOverTheLimitIsNotDownloaded(t *testing.T) {
 	sendFile(f, telegram.Document{FileID: "big", FileName: "kitob.pdf", FileSize: f.opts.MaxMediaBytes + 1}, []byte("%PDF-1.4"))
 	if got := f.media.downloaded(); len(got) != 0 {
 		t.Errorf("downloaded = %v", got)
+	}
+}
+
+type fakeFileSender struct {
+	mu    sync.Mutex
+	files []telegram.File
+	fail  bool
+}
+
+func (f *fakeFileSender) SendFile(_ context.Context, file telegram.File) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.fail {
+		return 0, errors.New("telegram is down")
+	}
+	f.files = append(f.files, file)
+	return 7001, nil
+}
+
+// A file a tool made is the answer, its text the caption, and the log says
+// it was sent.
+func TestMadeFileIsSentWithTheAnswerAsCaption(t *testing.T) {
+	f := newFixture()
+	files := &fakeFileSender{}
+	f.opts.Files = files
+	f.replier.answer = "Mana taqdimotingiz 📊"
+	f.replier.documents = []tools.Document{{Data: []byte("PK"), Name: "Suv.pptx"}}
+
+	sent := f.run(inGroup(groupMessage("@MyBot taqdimot qilib ber", "@MyBot")))
+
+	if len(sent) != 0 {
+		t.Errorf("text sent too: %+v", sent)
+	}
+	if len(files.files) != 1 || files.files[0].Name != "Suv.pptx" || files.files[0].Caption != "Mana taqdimotingiz 📊" || files.files[0].ReplyToMessageID != 30 {
+		t.Fatalf("files = %+v", files.files)
+	}
+	if log := strings.Join(f.chatLog.texts(groupID), "\n"); !strings.Contains(log, "<file Suv.pptx>") {
+		t.Errorf("log = %q", log)
+	}
+}
+
+// When the file cannot be sent, the answer still goes as text.
+func TestTextGoesWhenTheFileCannotBeSent(t *testing.T) {
+	f := newFixture()
+	f.opts.Files = &fakeFileSender{fail: true}
+	f.replier.answer = "Mana taqdimotingiz"
+	f.replier.documents = []tools.Document{{Data: []byte("PK"), Name: "Suv.pptx"}}
+
+	sent := f.run(privateWith(func(m *telegram.Message) { m.Text = "taqdimot" }))
+
+	if len(sent) != 1 || sent[0].text != "Mana taqdimotingiz" {
+		t.Errorf("sent = %+v", sent)
 	}
 }

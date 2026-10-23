@@ -89,13 +89,54 @@ type Audio struct {
 	Title, Performer string
 }
 
-// Sink collects the pictures drawn, the sounds found and the stickers chosen
-// during one turn. It is safe for concurrent use.
+// Document is a file a tool made during a turn, such as a presentation,
+// sent as the answer.
+type Document struct {
+	Data []byte
+	Name string
+}
+
+// Sink collects the pictures drawn, the sounds found, the stickers chosen
+// and the files made during one turn, and the answer a tool gave for the
+// whole turn. It is safe for concurrent use.
 type Sink struct {
-	mu       sync.Mutex
-	drawings []Drawing
-	audios   []Audio
-	stickers []string
+	mu        sync.Mutex
+	drawings  []Drawing
+	audios    []Audio
+	stickers  []string
+	documents []Document
+	final     string
+}
+
+// AddDocument keeps a file to send as the answer.
+func (s *Sink) AddDocument(d Document) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.documents = append(s.documents, d)
+}
+
+// TakeDocuments returns the files made so far and empties the sink.
+func (s *Sink) TakeDocuments() []Document {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	documents := s.documents
+	s.documents = nil
+	return documents
+}
+
+// Finish ends the turn with text as its answer, without asking the model
+// again: a tool whose result is the whole answer saves that call.
+func (s *Sink) Finish(text string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.final = text
+}
+
+// Finished is the answer a tool ended the turn with, if one did.
+func (s *Sink) Finished() (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.final, s.final != ""
 }
 
 // AddSticker keeps a sticker, by its file ID, to send with the answer.
@@ -258,18 +299,33 @@ func drawImage(ctx context.Context, opts ImageOptions, raw json.RawMessage) (any
 }
 
 func reserve(ctx context.Context, opts ImageOptions, caller Caller) (int64, error) {
-	limit := opts.DailyLimit
+	return reserveToday(ctx, caller, daily{limit: opts.DailyLimit, location: opts.Location, now: opts.Now, what: "pictures"}, opts.Quota.ReserveImage)
+}
+
+// daily is a per-user daily limit: limit things a day, counted from
+// midnight where location is; owners have none.
+type daily struct {
+	limit    int
+	location *time.Location
+	now      func() time.Time
+	what     string
+}
+
+// reserveToday takes one of the caller's things for today with reserve,
+// or reports with a LimitError that they have used them all.
+func reserveToday(ctx context.Context, caller Caller, d daily, reserve func(ctx context.Context, userID, chatID int64, since time.Time, limit int) (int64, bool, error)) (int64, error) {
+	limit := d.limit
 	if caller.Owner {
 		limit = -1
 	}
-	local := opts.Now().In(opts.Location)
-	midnight := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, opts.Location)
-	id, granted, err := opts.Quota.ReserveImage(ctx, caller.UserID, caller.ChatID, midnight, limit)
+	local := d.now().In(d.location)
+	midnight := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, d.location)
+	id, granted, err := reserve(ctx, caller.UserID, caller.ChatID, midnight, limit)
 	if err != nil {
 		return 0, internal(err)
 	}
 	if !granted {
-		return 0, &LimitError{Message: fmt.Sprintf("this person has used their %d pictures for today; more after midnight", opts.DailyLimit)}
+		return 0, &LimitError{Message: fmt.Sprintf("this person has used their %d %s for today; more after midnight", d.limit, d.what)}
 	}
 	return id, nil
 }

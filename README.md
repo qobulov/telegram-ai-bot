@@ -183,6 +183,8 @@ in the environment win over the file.
 | `YOUTUBE_API_KEY` | empty | YouTube Data API v3 key from Google Cloud Console, not bound to a service account; without it there is no video search |
 | `TMDB_TOKEN` | empty | TMDB API Read Access Token from <https://www.themoviedb.org/settings/api>; without it there is no movies tool |
 | `GOOGLE_SAFE_BROWSING_KEY` | empty | Google Cloud API key restricted to the Safe Browsing API; lets owners turn on the link guard (`group_rules` `guard` `links`), which deletes links Google takes for malware, phishing or unwanted software. Google offers this API for non-commercial use |
+| `PRESENTATION_DAILY_LIMIT` | `3` | Presentations (.pptx) per user per day; owners have no limit; `0` lets only owners have them |
+| `WOLFRAM_APP_ID` | empty | Wolfram|Alpha AppID from <https://developer.wolframalpha.com> (free: 2,000 calls a month); adds the `wolfram` tool, which solves equations, integrals, physics and chemistry. It is sent in a header, never in a URL |
 | `URLHAUS_AUTH_KEY` | empty | Free Auth-Key from <https://auth.abuse.ch/>; also lets owners turn on the link guard, and with both keys a link is deleted when either service lists it (URLhaus by its host) |
 | `SIGHTENGINE_API_USER`, `SIGHTENGINE_API_SECRET` | empty | From <https://dashboard.sightengine.com/api-credentials>; let owners turn on the picture guard (`guard` `images`), which deletes nude or gory photos, each photo checked using two operations of its monthly quota (nudity and gore). The spam guard (`guard` `spam`: CAS and lols.bot, banning listed accounts) needs no key |
 | `TAVILY_API_KEY` | empty | Free key from <https://app.tavily.com>; without it there is no web search. See [Live data](#live-data) |
@@ -550,6 +552,19 @@ every request is refused with `429 You exceeded your current quota`, and the
 bot says drawing is not available right now. Turn on billing for the key in
 Google AI Studio to use it. Each picture is billed by Google.
 
+## Presentations
+
+Asked for a presentation, slides or a *taqdimot*, the model calls
+`make_presentation` with a title, a subtitle, a color theme (blue, green,
+purple or dark) and 2 to 12 slides of a title and up to 6 bullet points, in
+the asker's language. The bot writes the .pptx itself (`internal/slides`,
+no library and no Google account: the file opens in PowerPoint, Google
+Slides, Keynote and LibreOffice) and sends it with the model's one-line
+caption. That caption is the whole answer: the tool ends the turn, so the
+slides cost one call to the model, about two ordinary answers' worth of
+tokens. `PRESENTATION_DAILY_LIMIT` (3) bounds them per user and day;
+owners have no limit.
+
 ## Live data
 
 Seven tools look things up on public web APIs, so she does not guess numbers.
@@ -576,6 +591,7 @@ answer instead of making up a number.
 | `fun` | One tool for small amusements: a trivia question with shuffled options and its answer (by category and difficulty), a random fact (facts about sex, drink or drugs are skipped), a piece of advice, a famous quote, a dog picture | Open Trivia DB, Useless Facts, Advice Slip, ZenQuotes and Dog CEO, all keyless; gathered under one schema so that they cost the prompt one tool |
 | `more_info` | One tool for more look-ups: books by title or author, recipes by the dish's English name (pork and alcohol left out), the world gold and silver price per ounce and gram, Lichess's daily puzzle and a player's ratings, this Formula 1 season's standings and the last race | Open Library, TheMealDB, gold-api.com, Lichess and Jolpica (the Ergast API's successor), all keyless; cached for an hour, metal prices for 10 minutes |
 | `study` | For students: exact math with math.js (derivatives, matrices, units, big numbers; no integrals), scholarly articles from Crossref with DOI links, arXiv preprints with PDF links, and English synonyms, antonyms, rhymes and words of like meaning | math.js, Crossref, arXiv and Datamuse, all keyless; one schema; papers and words cached for 6 hours |
+| `wolfram` | Exact answers from Wolfram|Alpha's LLM API: equations, integrals, limits, physics and chemistry, statistics, units; plot images and code are dropped from its answer | Only with `WOLFRAM_APP_ID`; cached for 6 hours |
 | `read_page` | A web page's title and text, cut to 8,000 characters, to summarize a link or answer about it | Jina Reader (r.jina.ai), keyless (about 20 pages a minute); local addresses and Telegram's file links are refused; cached for 30 minutes |
 
 The tools share one HTTP client with short timeouts and a small in-memory

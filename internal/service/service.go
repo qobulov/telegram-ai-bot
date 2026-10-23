@@ -299,6 +299,9 @@ type Options struct {
 	// without it the first swear is left to the model.
 	ClipSender  ClipSender
 	AudioSender AudioSender
+	// Files sends the files a tool made, such as a presentation; nil sends
+	// none, and the answer's text goes alone.
+	Files FileSender
 	// Answers tells whom one of the bot's answers in a group answered, so
 	// that "don't answer him", replying to it, means that member; nil means
 	// it is never known.

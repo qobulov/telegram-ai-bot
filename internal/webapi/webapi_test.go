@@ -162,6 +162,7 @@ func (u *upstream) options() Options {
 			Crossref:          base + "/crossref",
 			ArXiv:             base + "/arxiv",
 			Datamuse:          base + "/datamuse",
+			Wolfram:           base + "/wolfram",
 			Tavily:            base + "/tavily",
 			TMDB:              base + "/tmdb",
 			YouTube:           base + "/youtube",

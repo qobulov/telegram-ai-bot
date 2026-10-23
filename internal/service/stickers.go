@@ -162,6 +162,11 @@ func (s *Service) sendGIF(in incoming, category string, gap time.Duration) (int6
 	return sentID, true
 }
 
+// FileSender sends a document.
+type FileSender interface {
+	SendFile(ctx context.Context, file telegram.File) (int64, error)
+}
+
 // AudioSender sends a track.
 type AudioSender interface {
 	SendAudio(ctx context.Context, track telegram.Track) (int64, error)

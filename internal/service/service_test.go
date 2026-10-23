@@ -86,6 +86,8 @@ type fakeReplier struct {
 	audios []tools.Audio
 	// cards are item cards it chooses, as the item card tool would.
 	cards []string
+	// documents are files it makes, as the presentation tool would.
+	documents []tools.Document
 	// answer replaces the echo when set.
 	answer string
 	// reaction, when set, is answered instead of text, as the agent does
@@ -120,6 +122,9 @@ func (f *fakeReplier) Reply(ctx context.Context, req agent.Request) (agent.Answe
 		}
 		for _, c := range f.cards {
 			sink.AddSticker(c)
+		}
+		for _, d := range f.documents {
+			sink.AddDocument(d)
 		}
 	}
 	call.caller, _ = tools.CallerFrom(ctx)

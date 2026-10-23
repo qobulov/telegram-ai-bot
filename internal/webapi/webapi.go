@@ -53,6 +53,9 @@ type Options struct {
 	// YouTubeKey is a YouTube Data API key. Without it there is no
 	// youtube_search tool.
 	YouTubeKey string
+	// WolframAppID is a Wolfram|Alpha AppID. Without it there is no
+	// wolfram tool.
+	WolframAppID string
 	// HeroGames keeps "guess the hero"; without it there is no game.
 	HeroGames HeroGames
 	BaseURLs  BaseURLs
@@ -102,6 +105,7 @@ type BaseURLs struct {
 	Crossref          string
 	ArXiv             string
 	Datamuse          string
+	Wolfram           string
 	// Wikipedia is a format string with %s for the language code.
 	Wikipedia string
 	// News maps a language (uz, ru), or world- and a language for the
@@ -151,6 +155,7 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.Crossref = cmp.Or(b.Crossref, "https://api.crossref.org")
 	b.ArXiv = cmp.Or(b.ArXiv, "https://export.arxiv.org")
 	b.Datamuse = cmp.Or(b.Datamuse, "https://api.datamuse.com")
+	b.Wolfram = cmp.Or(b.Wolfram, "https://api.wolframalpha.com")
 	b.Wikipedia = cmp.Or(b.Wikipedia, "https://%s.wikipedia.org")
 	if b.News == nil {
 		b.News = map[string]map[string]string{
@@ -190,6 +195,7 @@ type apis struct {
 	tavilyKey     string
 	tmdbToken     string
 	youtubeKey    string
+	wolframAppID  string
 	heroGames     HeroGames
 }
 
@@ -234,6 +240,9 @@ func Tools(opts Options) []tools.Tool {
 	if a.youtubeKey != "" {
 		list = append(list, a.youtubeTool())
 	}
+	if a.wolframAppID != "" {
+		list = append(list, a.wolframTool())
+	}
 	return list
 }
 
@@ -256,6 +265,7 @@ func newAPIs(opts Options) *apis {
 		tavilyKey:     opts.TavilyKey,
 		tmdbToken:     opts.TMDBToken,
 		youtubeKey:    opts.YouTubeKey,
+		wolframAppID:  opts.WolframAppID,
 		heroGames:     opts.HeroGames,
 	}
 }

@@ -33,6 +33,9 @@ type outcome struct {
 	audios   []tools.Audio
 	// cards are item cards, stickers by file ID, sent after the answer.
 	cards []string
+	// documents are files a tool made, such as a presentation, sent as the
+	// answer with its text as their caption.
+	documents []tools.Document
 	// duplicate marks an update that was already answered: Telegram sent it
 	// again after a slow turn. The exchange is in the log already.
 	duplicate bool
@@ -151,6 +154,11 @@ func (s *Service) deliver(in incoming, out *outcome) int64 {
 		if in.replyTo == 0 && out.toName != "" {
 			in.replyTo = s.namedMembersMessage(in, out.toName)
 		}
+	}
+	if id := s.sendDocuments(in, out); id != 0 {
+		// A file is the answer, its text the caption.
+		out.text, out.drawings, out.sticker, out.gif, out.audios = "", nil, "", "", nil
+		return id
 	}
 	if id := s.sendAudios(in, out.audios); id != 0 {
 		// A song asked for is the answer alone, as a sticker is: words with
@@ -299,6 +307,36 @@ func (s *Service) sendAudios(in incoming, audios []tools.Audio) int64 {
 	return firstID
 }
 
+// sendDocuments sends the files a tool made, the first with the answer's
+// text as its caption, and returns the ID of the first sent; 0 when none
+// was, and the text then goes as usual.
+func (s *Service) sendDocuments(in incoming, out *outcome) int64 {
+	if s.opts.Files == nil {
+		return 0
+	}
+	var firstID int64
+	caption := out.text
+	if utf8.RuneCountInString(caption) > telegram.CaptionLimit {
+		caption = ""
+	}
+	for _, document := range out.documents {
+		ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
+		id, err := s.opts.Files.SendFile(ctx, telegram.File{
+			ChatID: in.msg.Chat.ID, ReplyToMessageID: in.replyTarget(),
+			Data: document.Data, Name: document.Name, Caption: caption,
+		})
+		cancel()
+		if err != nil {
+			s.opts.Logger.Warn("could not send a file", "chat_id", in.msg.Chat.ID, "file", document.Name, "error", err)
+			continue
+		}
+		if firstID == 0 {
+			firstID, caption = id, ""
+		}
+	}
+	return firstID
+}
+
 func (s *Service) sendAudio(in incoming, audio tools.Audio) int64 {
 	if s.opts.AudioSender == nil {
 		return 0
@@ -387,6 +425,9 @@ func (s *Service) logExchange(in incoming, out outcome) {
 		}
 		for range out.cards {
 			answer = strings.TrimSpace(answer + " <item card sticker>")
+		}
+		for _, document := range out.documents {
+			answer = strings.TrimSpace(answer + " <file " + document.Name + ">")
 		}
 		for _, audio := range out.audios {
 			answer = strings.TrimSpace(answer + " <audio " + audio.Performer + " — " + audio.Title + ">")
@@ -657,11 +698,13 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	answer, err := s.opts.Replier.Reply(ctx, s.request(ctx, in, rules))
 	// A picture drawn before a later failure is still worth sending.
 	drawings := sink.Take()
-	if !usedAnAnswer(err, drawings) {
+	documents := sink.TakeDocuments()
+	if !usedAnAnswer(err, drawings) && len(documents) == 0 {
 		s.giveBackAnswer(in, reservation)
 	}
 	out := s.answerOf(in, answer, err, started)
 	out.drawings = drawings
+	out.documents = documents
 	if err == nil {
 		// A song's preview and an item's card go only with an answer that
 		// tells of them.

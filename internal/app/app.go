@@ -294,6 +294,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Stickers:              store,
 		ClipSender:            bot.Client,
 		AudioSender:           bot.Client,
+		Files:                 bot.Client,
 		StickerSender:         bot.Client,
 		StickerImporter:       &stickers.Importer{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger), Workers: stickerWorkers, Logger: logger},
 		CardImporter:          &stickers.CardImporter{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger), Workers: stickerWorkers, Logger: logger},
@@ -321,6 +322,11 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 	if cfg.ImagesEnabled {
 		builtin = append(builtin, imageTool(cfg, store))
 	}
+	builtin = append(builtin, tools.PresentationTool(tools.PresentationOptions{
+		Quota:      store,
+		DailyLimit: cfg.DailyPresentationLimit,
+		Location:   cfg.Location,
+	}))
 	// Any group's admins, and any member for a poll or the admin list, may
 	// use these, so they are there with or without owners.
 	builtin = append(builtin, moderate,
@@ -391,6 +397,7 @@ func liveDataTools(cfg config.Config, bot Bot, store *storage.Store) []tools.Too
 		TavilyKey:     cfg.TavilyAPIKey,
 		TMDBToken:     cfg.TMDBToken,
 		YouTubeKey:    cfg.YouTubeAPIKey,
+		WolframAppID:  cfg.WolframAppID,
 	}
 	if store != nil {
 		opts.HeroGames = store

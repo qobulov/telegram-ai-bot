@@ -14,6 +14,7 @@ import (
 	"telegram-ai-bot/internal/ai"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
+	"telegram-ai-bot/internal/tools"
 )
 
 var (
@@ -224,8 +225,21 @@ func (a *Agent) run(ctx context.Context, t *turn) (Answer, error) {
 			continue
 		}
 		a.runTools(ctx, t, reply)
+		if text, done := finishedByTool(ctx); done {
+			return finish(t, ai.Message{Role: ai.RoleAssistant, Content: text})
+		}
 	}
 	return Answer{}, ErrToolLoop
+}
+
+// finishedByTool is the answer a tool ended the turn with, such as the
+// caption of a file it sent: asking the model again would only cost a call.
+func finishedByTool(ctx context.Context) (string, bool) {
+	sink, ok := tools.SinkFrom(ctx)
+	if !ok {
+		return "", false
+	}
+	return sink.Finished()
 }
 
 func (a *Agent) prompt(t *turn) []ai.Message {
