@@ -148,6 +148,16 @@ func (u *upstream) options() Options {
 			QuranCom:          base + "/qurancom",
 			AlQuran:           base + "/alquran",
 			Jina:              base + "/jina",
+			OpenTrivia:        base + "/trivia",
+			UselessFacts:      base + "/facts",
+			AdviceSlip:        base + "/advice",
+			ZenQuotes:         base + "/zen",
+			DogCEO:            base + "/dog",
+			OpenLibrary:       base + "/openlibrary",
+			MealDB:            base + "/mealdb",
+			GoldAPI:           base + "/gold",
+			Lichess:           base + "/lichess",
+			Jolpica:           base + "/jolpica",
 			Tavily:            base + "/tavily",
 			TMDB:              base + "/tmdb",
 			YouTube:           base + "/youtube",
@@ -295,7 +305,7 @@ func toolNames(list []tools.Tool) string {
 
 func TestToolsListsTheLiveDataTools(t *testing.T) {
 	opts := newUpstream(t, nil).options()
-	if got, want := toolNames(Tools(opts)), "currency_rate,get_weather,prayer_times,news_headlines,wiki_lookup,crypto_price,music_search,mlbb,earthquakes,qr_code,free_games,cat_picture,english_word,anime,quran,read_page"; got != want {
+	if got, want := toolNames(Tools(opts)), "currency_rate,get_weather,prayer_times,news_headlines,wiki_lookup,crypto_price,music_search,mlbb,earthquakes,qr_code,free_games,cat_picture,english_word,anime,quran,read_page,fun,more_info"; got != want {
 		t.Errorf("tools = %s, want %s", got, want)
 	}
 }

@@ -88,6 +88,16 @@ type BaseURLs struct {
 	QuranCom          string
 	AlQuran           string
 	Jina              string
+	OpenTrivia        string
+	UselessFacts      string
+	AdviceSlip        string
+	ZenQuotes         string
+	DogCEO            string
+	OpenLibrary       string
+	MealDB            string
+	GoldAPI           string
+	Lichess           string
+	Jolpica           string
 	// Wikipedia is a format string with %s for the language code.
 	Wikipedia string
 	// News maps a language (uz, ru), or world- and a language for the
@@ -123,6 +133,16 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.QuranCom = cmp.Or(b.QuranCom, "https://api.quran.com")
 	b.AlQuran = cmp.Or(b.AlQuran, "https://api.alquran.cloud")
 	b.Jina = cmp.Or(b.Jina, "https://r.jina.ai")
+	b.OpenTrivia = cmp.Or(b.OpenTrivia, "https://opentdb.com")
+	b.UselessFacts = cmp.Or(b.UselessFacts, "https://uselessfacts.jsph.pl")
+	b.AdviceSlip = cmp.Or(b.AdviceSlip, "https://api.adviceslip.com")
+	b.ZenQuotes = cmp.Or(b.ZenQuotes, "https://zenquotes.io")
+	b.DogCEO = cmp.Or(b.DogCEO, "https://dog.ceo")
+	b.OpenLibrary = cmp.Or(b.OpenLibrary, "https://openlibrary.org")
+	b.MealDB = cmp.Or(b.MealDB, "https://www.themealdb.com")
+	b.GoldAPI = cmp.Or(b.GoldAPI, "https://api.gold-api.com")
+	b.Lichess = cmp.Or(b.Lichess, "https://lichess.org")
+	b.Jolpica = cmp.Or(b.Jolpica, "https://api.jolpi.ca")
 	b.Wikipedia = cmp.Or(b.Wikipedia, "https://%s.wikipedia.org")
 	if b.News == nil {
 		b.News = map[string]map[string]string{
@@ -187,6 +207,8 @@ func Tools(opts Options) []tools.Tool {
 		a.animeTool(),
 		a.quranTool(),
 		a.readerTool(),
+		a.funTool(),
+		a.moreTool(),
 	}
 	if a.footballToken != "" {
 		list = append(list, a.footballTool())
