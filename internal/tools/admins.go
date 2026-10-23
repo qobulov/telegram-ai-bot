@@ -27,7 +27,8 @@ const (
 )
 
 const (
-	adminsNotInAGroup = "this works only in a group"
+	adminsNotInAGroup = "this works only in a group, or for an owner who names one by chat_id"
+	adminsOtherGroup  = "only the bot's owners may ask about another group's admins"
 	adminsUnavailable = "Telegram did not give the admin list just now; try again later"
 	adminsNote        = "These are the group's admins, as Telegram reports them now. You cannot see the full member list: anyone else who wrote in the messages you were given is a regular member, except your owners: they are your owners whatever their rights here, so never call an owner a regular member. Never guess about members who did not write."
 	anonymousNote     = "An anonymous admin hides who they are: never guess or say who it is."
@@ -72,9 +73,9 @@ func AdminsTool(opts AdminsOptions) Tool {
 	return Tool{
 		Name: "group_admins",
 		Description: "List this group's admins, as Telegram reports them now. Use it when someone asks who the admins are or who the regular members are. " +
-			"You cannot see the full member list: anyone not listed who wrote in the messages you were given is a regular member, except your owners.",
-		Schema:         json.RawMessage(`{"type": "object", "properties": {}, "additionalProperties": false}`),
-		GroupOnly:      true,
+			"You cannot see the full member list: anyone not listed who wrote in the messages you were given is a regular member, except your owners. " +
+			"Your owners, and only they, may ask about another group, from anywhere: pass its chat_id from bot_database groups.",
+		Schema:         json.RawMessage(`{"type": "object", "properties": {"chat_id": {"type": "integer", "description": "Owners only: another group's id, from bot_database groups. Leave out for this group."}}, "additionalProperties": false}`),
 		MaxOutputBytes: adminsOutputBytes,
 		Run: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			return listAdmins(ctx, opts, raw)
@@ -83,15 +84,27 @@ func AdminsTool(opts AdminsOptions) Tool {
 }
 
 func listAdmins(ctx context.Context, opts AdminsOptions, raw json.RawMessage) (any, error) {
-	var args struct{}
+	var args struct {
+		ChatID int64 `json:"chat_id"`
+	}
 	if err := decodeArgs(raw, &args); err != nil {
 		return nil, err
 	}
 	caller, ok := CallerFrom(ctx)
-	if !ok || caller.ChatID >= 0 {
+	if !ok {
 		return nil, &DeniedError{Message: adminsNotInAGroup}
 	}
-	members, err := opts.Telegram.GetChatAdministrators(ctx, caller.ChatID)
+	chatID := caller.ChatID
+	switch {
+	case args.ChatID != 0 && args.ChatID != caller.ChatID && !caller.Owner:
+		return nil, &DeniedError{Message: adminsOtherGroup}
+	case args.ChatID != 0:
+		chatID = args.ChatID
+	}
+	if chatID >= 0 {
+		return nil, &DeniedError{Message: adminsNotInAGroup}
+	}
+	members, err := opts.Telegram.GetChatAdministrators(ctx, chatID)
 	if err != nil {
 		return nil, &InternalError{Err: err, Message: adminsUnavailable}
 	}

@@ -165,9 +165,6 @@ func TestAdminsOnlyInAGroup(t *testing.T) {
 	if got := askAdmins(registry, private, `{}`); got.OK || got.Error.Code != "forbidden" || !strings.Contains(got.Error.Message, "only in a group") {
 		t.Errorf("group_admins in a private chat = %+v, want refused", got)
 	}
-	if defs := registry.Definitions(private, memberID); len(defs) != 0 {
-		t.Errorf("offered in a private chat: %+v", defs)
-	}
 	// Any member of a group may ask, not only admins and owners.
 	if defs := registry.Definitions(memberAsking(groupA, 100), memberID); len(defs) != 1 {
 		t.Errorf("offered to a member of a group: %+v, want group_admins", defs)
@@ -185,17 +182,26 @@ func TestAdminsOnlyInAGroup(t *testing.T) {
 	}
 }
 
-// The model cannot point the tool at another group.
-func TestAdminsTakesNoArguments(t *testing.T) {
+// A member cannot point the tool at another group; an owner can, from
+// anywhere, by its chat_id.
+func TestAdminsOfAnotherGroupOnlyForOwners(t *testing.T) {
 	list := &fakeAdminList{}
+	registry := adminsRegistry(t, list)
 
-	got := askAdmins(adminsRegistry(t, list), memberAsking(groupA, 100), `{"chat_id":-100222}`)
-
-	if got.OK || got.Error.Code != "invalid_arguments" {
-		t.Errorf("group_admins with a chat_id = %+v, want invalid_arguments", got)
+	got := askAdmins(registry, memberAsking(groupA, 100), `{"chat_id":-100222}`)
+	if got.OK || got.Error.Code != "forbidden" {
+		t.Errorf("a member naming another group = %+v, want refused", got)
 	}
 	if chats := list.chats(); len(chats) != 0 {
 		t.Errorf("asked Telegram about chats %v", chats)
+	}
+
+	ownerPrivate := WithTurn(context.Background(), Caller{UserID: userID, ChatID: userID, Owner: true, Human: true, UpdateID: 101}, &Sink{})
+	if got := askAdmins(registry, ownerPrivate, `{"chat_id":-100222}`); !got.OK {
+		t.Errorf("an owner naming a group = %+v, want the list", got)
+	}
+	if chats := list.chats(); len(chats) != 1 || chats[0] != -100222 {
+		t.Errorf("asked Telegram about chats %v, want -100222", chats)
 	}
 }
 
