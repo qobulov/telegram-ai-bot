@@ -226,6 +226,7 @@ func (c *Client) attempt(ctx context.Context, body []byte) (Message, usage, erro
 type usage struct {
 	PromptTokens        int `json:"prompt_tokens"`
 	CompletionTokens    int `json:"completion_tokens"`
+	TotalTokens         int `json:"total_tokens"`
 	PromptTokensDetails struct {
 		CachedTokens int `json:"cached_tokens"`
 	} `json:"prompt_tokens_details"`
@@ -239,7 +240,16 @@ type usage struct {
 func (c *Client) logUsage(model string, u usage) {
 	c.opts.Logger.Info("model usage", "model", model,
 		"prompt_tokens", u.PromptTokens, "cached_tokens", u.PromptTokensDetails.CachedTokens,
-		"completion_tokens", u.CompletionTokens, "reasoning_tokens", u.CompletionTokensDetails.ReasoningTokens)
+		"completion_tokens", u.CompletionTokens, "reasoning_tokens", u.reasoning())
+}
+
+// reasoning is the thinking tokens: as the provider names them, or, as
+// Gemini counts them, what the total has beyond the prompt and the answer.
+func (u usage) reasoning() int {
+	if u.CompletionTokensDetails.ReasoningTokens > 0 {
+		return u.CompletionTokensDetails.ReasoningTokens
+	}
+	return max(0, u.TotalTokens-u.PromptTokens-u.CompletionTokens)
 }
 
 // AudioLabel is the format name sent with audio. Telegram voice is

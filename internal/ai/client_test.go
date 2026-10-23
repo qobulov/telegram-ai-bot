@@ -800,3 +800,26 @@ func TestCompleteSendsTheReasoningEffortAndLogsUsage(t *testing.T) {
 		t.Error("an empty reasoning effort was sent")
 	}
 }
+
+// Gemini leaves out completion_tokens_details and counts thinking only in
+// the total: what it has beyond the prompt and the answer is logged.
+func TestUsageCountsGeminiThinkingFromTheTotal(t *testing.T) {
+	cases := map[string]struct {
+		u    usage
+		want int
+	}{
+		"Gemini":      {u: usage{PromptTokens: 40, CompletionTokens: 4, TotalTokens: 380}, want: 336},
+		"no thinking": {u: usage{PromptTokens: 40, CompletionTokens: 4, TotalTokens: 44}, want: 0},
+		"no total":    {u: usage{PromptTokens: 40, CompletionTokens: 4}, want: 0},
+	}
+	for name, c := range cases {
+		if got := c.u.reasoning(); got != c.want {
+			t.Errorf("%s: reasoning = %d, want %d", name, got, c.want)
+		}
+	}
+	named := usage{PromptTokens: 40, CompletionTokens: 4, TotalTokens: 380}
+	named.CompletionTokensDetails.ReasoningTokens = 12
+	if got := named.reasoning(); got != 12 {
+		t.Errorf("named reasoning = %d, want 12", got)
+	}
+}
