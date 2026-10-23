@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -129,6 +130,11 @@ type Config struct {
 	// the persona: a username can be given up and taken by someone else, an
 	// ID cannot.
 	OwnerIDs map[int64]bool
+	// Developer is the username, lower case and without @, of whoever
+	// programmed the bot, when that is told apart from whom it belongs to:
+	// asked who made it, the bot names the developer, and the other owners
+	// as its owners. "" when not set.
+	Developer string
 
 	// AllowedBots are the usernames of other bots the bot answers in groups,
 	// lower case; "*" allows any bot. Empty answers no bots.
@@ -213,6 +219,11 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.Location = r.location("GROUP_HISTORY_TIMEZONE", "Asia/Tashkent")
 	cfg.OwnerUsernames = r.usernames("BOT_OWNER_USERNAME")
 	cfg.OwnerIDs = r.ownerIDs("BOT_OWNER_IDS")
+	if developer := r.usernames("BOT_DEVELOPER_USERNAME"); len(developer) > 1 {
+		r.fail("BOT_DEVELOPER_USERNAME", "must be one Telegram username")
+	} else if len(developer) == 1 {
+		cfg.Developer = developer[0]
+	}
 	if len(cfg.OwnerIDs) > 0 && len(cfg.OwnerUsernames) == 0 {
 		r.fail("BOT_OWNER_IDS", "needs BOT_OWNER_USERNAME, which names the owners in the persona")
 	}
@@ -232,6 +243,13 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	if len(cfg.OwnerUsernames) > 0 {
 		cfg.PersonaPrompt += "\n\n" + strings.ReplaceAll(ownerNote, ownerPlaceholder, mentionList(cfg.OwnerUsernames))
+	}
+	if cfg.Developer != "" {
+		owners := slices.DeleteFunc(slices.Clone(cfg.OwnerUsernames), func(u string) bool { return u == cfg.Developer })
+		if len(owners) == 0 {
+			owners = cfg.OwnerUsernames
+		}
+		cfg.PersonaPrompt += "\n\n" + strings.NewReplacer(developerPlaceholder, "@"+cfg.Developer, ownerPlaceholder, mentionList(owners)).Replace(developerNote)
 	}
 	cfg.FootballDataToken = r.apiKey("FOOTBALL_DATA_TOKEN")
 	cfg.GiphyAPIKey = r.apiKey("GIPHY_API_KEY")

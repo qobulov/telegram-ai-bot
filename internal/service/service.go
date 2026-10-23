@@ -223,6 +223,9 @@ type Options struct {
 	// need not.
 	RequiredChannels []string
 	Channels         ChannelMembers
+	// Developer is the username of whoever programmed the bot, named apart
+	// from the owners it belongs to; "" when not told apart.
+	Developer string
 	// QuickAnswers answers a private chat's small talk and common questions
 	// without the model; see faq.go.
 	QuickAnswers bool

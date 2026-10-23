@@ -211,6 +211,7 @@ in the environment win over the file.
 | `GROUP_AMBIENT_MESSAGES` | `500` | How many of the last 10 hours' group messages are given to the model with a question (0 to 500; 0 turns the group log off) |
 | `GROUP_HISTORY_TIMEZONE` | `Asia/Tashkent` | The groups' time zone: the times in the group log and in what the model is told, the day the picture and private-chat limits count, and the time given when nobody names a zone |
 | `BOT_OWNER_USERNAME` | empty | The owners' Telegram usernames, comma-separated (e.g. `pronium,TursunoffM`); the bot treats owners warmly, follows their instructions and lets them manage it in any group |
+| `BOT_DEVELOPER_USERNAME` | empty | The username of whoever programmed the bot, when that is told apart from whom it belongs to: asked who made it, the bot says this person programmed it and the other owners own it |
 | `BOT_OWNER_IDS` | empty | The owners' numeric Telegram user IDs, comma-separated; when set, only these accounts are owners and `BOT_OWNER_USERNAME` (then required) only names them. Safer: a username can be given up and taken by someone else |
 | `ALLOWED_BOTS` | empty | Other bots the bot answers in groups, comma-separated usernames, or `*` for any bot; empty answers no bots |
 | `BOT_REPLIES_PER_10_MIN` | `5` | Most replies to bots per group in 10 minutes, so two bots cannot talk without end |

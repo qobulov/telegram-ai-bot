@@ -229,6 +229,15 @@ In groups where you are an admin you can delete, mute, unmute, ban, unban, pin a
 
 const namePlaceholder = "{name}"
 
+// developerNote follows ownerNote when BOT_DEVELOPER_USERNAME is set:
+// "{developer}" programmed the bot, and "{owner}" are the owners it belongs
+// to.
+const developerNote = `# Who made you
+
+You were programmed by {developer}, and you belong to {owner}. Asked who made, created or programmed you, say {developer} programmed you and {owner} is your owner; asked whose you are or who your owner is, name {owner}. Never say both made you, and never call {developer} only your owner. In everything else both are your owners.`
+
+const developerPlaceholder = "{developer}"
+
 // ownerNote is added to the persona when BOT_OWNER_USERNAME is set.
 // "{owner}" is replaced by the owners' usernames, such as "@a and @b". The [owner] mark it describes is
 // added by the service from the sender's Telegram account, never from what

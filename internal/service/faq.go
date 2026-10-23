@@ -28,6 +28,7 @@ const (
 	faqOkay
 	faqName
 	faqCreator
+	faqOwner
 	faqAbilities
 )
 
@@ -63,9 +64,12 @@ func init() {
 	add(faqName, "uz", "isming nima", "ismingiz nima", "sen kimsan", "siz kimsiz", "исминг нима", "сен кимсан")
 	add(faqName, "ru", "как тебя зовут", "как вас зовут", "ты кто", "кто ты")
 	add(faqName, "en", "whats your name", "what is your name", "who are you")
-	add(faqCreator, "uz", "seni kim yaratgan", "sizni kim yaratgan", "kim yaratgan", "egang kim", "egangiz kim", "xo'jayining kim", "сени ким яратган")
-	add(faqCreator, "ru", "кто тебя создал", "кто вас создал", "кто твой создатель", "кто твой хозяин")
-	add(faqCreator, "en", "who made you", "who created you", "who is your owner", "who owns you")
+	add(faqCreator, "uz", "seni kim yaratgan", "sizni kim yaratgan", "kim yaratgan", "seni kim yasagan", "seni kim dasturlagan", "сени ким яратган")
+	add(faqCreator, "ru", "кто тебя создал", "кто вас создал", "кто твой создатель", "кто тебя сделал")
+	add(faqCreator, "en", "who made you", "who created you", "who built you")
+	add(faqOwner, "uz", "egang kim", "egangiz kim", "xo'jayining kim", "xo'jayiningiz kim", "эганг ким")
+	add(faqOwner, "ru", "кто твой хозяин", "кто твой владелец", "чей ты бот")
+	add(faqOwner, "en", "who is your owner", "who owns you")
 	add(faqAbilities, "uz", "nima qila olasan", "nimalar qila olasan", "nima qila olasiz", "nimalar qila olasiz", "нима кила оласан", "нималар кила оласан")
 	add(faqAbilities, "ru", "что ты умеешь", "что умеешь", "что вы умеете", "что ты можешь")
 	add(faqAbilities, "en", "what can you do", "what do you do")
@@ -168,20 +172,36 @@ func (s *Service) faqText(phrase faqPhrase) string {
 		return pick(faqMoods[rand.IntN(len(faqMoods))])
 	case faqName:
 		return fmt.Sprintf(pick(textMyName), cmp.Or(s.opts.DisplayName, "Maria"))
-	case faqCreator:
-		if owners := s.ownerHandles(); owners != "" {
-			return fmt.Sprintf(pick(textMadeBy), owners)
-		}
-		return pick(textMadeByOwners)
+	case faqCreator, faqOwner:
+		return s.makerText(phrase.kind, pick)
 	}
 	return pick(textAbilities)
 }
 
-// ownerHandles are the owners' @usernames, joined for a sentence.
-func (s *Service) ownerHandles() string {
-	handles := make([]string, 0, len(s.opts.OwnerUsernames))
+// makerText says who programmed the bot and whose it is: the developer and
+// the other owners when the developer is told apart, the owners otherwise.
+func (s *Service) makerText(kind faqKind, pick func(localText) string) string {
+	developer := s.opts.Developer
+	owners := s.ownerHandles(developer)
+	switch {
+	case developer != "" && owners != "" && kind == faqOwner:
+		return fmt.Sprintf(pick(textOwnedBy), owners, "@"+developer)
+	case developer != "" && owners != "":
+		return fmt.Sprintf(pick(textProgrammedBy), "@"+developer, owners)
+	case owners != "":
+		return fmt.Sprintf(pick(textMadeBy), owners)
+	}
+	return pick(textMadeByOwners)
+}
+
+// ownerHandles are the owners' @usernames but except's, joined for a
+// sentence.
+func (s *Service) ownerHandles(except string) string {
+	var handles []string
 	for _, u := range s.opts.OwnerUsernames {
-		handles = append(handles, "@"+u)
+		if u != except {
+			handles = append(handles, "@"+u)
+		}
 	}
 	return strings.Join(handles, ", ")
 }
@@ -198,6 +218,8 @@ var (
 	}
 	textMyName       = localText{uz: "Mening ismim %s. 😊", ru: "Меня зовут %s. 😊", en: "My name is %s. 😊"}
 	textMadeBy       = localText{uz: "Meni %s yaratgan.", ru: "Меня создали %s.", en: "I was made by %s."}
+	textProgrammedBy = localText{uz: "Meni %s dasturlagan, egam esa %s.", ru: "Меня запрограммировал %s, а мой владелец — %s.", en: "I was programmed by %s, and my owner is %s."}
+	textOwnedBy      = localText{uz: "Egam — %s. Meni esa %s dasturlagan.", ru: "Мой владелец — %s. А запрограммировал меня %s.", en: "My owner is %s. I was programmed by %s."}
 	textMadeByOwners = localText{uz: "Meni egalarim yaratgan.", ru: "Меня создали мои владельцы.", en: "My owners made me."}
 	textAbilities    = localText{
 		uz: "Gaplashaman, savollarga javob beraman, valyuta kursi, ob-havo, namoz vaqti, yangiliklar, MLBB qahramonlari, kino va musiqa topaman, rasm, stiker va ovozli xabarlarni tushunaman. Shunchaki yozing!",
