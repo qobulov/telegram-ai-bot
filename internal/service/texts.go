@@ -130,8 +130,13 @@ var (
 	}
 	textJoinButton = localText{uz: "📢 Kanalga a'zo bo'lish", ru: "📢 Подписаться на канал", en: "📢 Join the channel"}
 	// textJoinButtonN takes the channel's number.
-	textJoinButtonN    = localText{uz: "%d - kanal", ru: "Канал %d", en: "Channel %d"}
-	textCheckButton    = localText{uz: "✅ Tasdiqlash", ru: "✅ Проверить", en: "✅ Check"}
+	textJoinButtonN  = localText{uz: "%d - kanal", ru: "Канал %d", en: "Channel %d"}
+	textCheckButton  = localText{uz: "✅ Tasdiqlash", ru: "✅ Проверить", en: "✅ Check"}
+	textNotJoinedYet = localText{
+		uz: "Hali hamma kanallarga a'zo bo'lmadingiz. Avval a'zo bo'ling, keyin qayta bosing.",
+		ru: "Вы ещё не подписались на все каналы. Подпишитесь и нажмите снова.",
+		en: "You haven't joined every channel yet. Join, then tap again.",
+	}
 	textChannelsJoined = localText{
 		uz: "✅ Rahmat! Endi bemalol yozishingiz mumkin.",
 		ru: "✅ Спасибо! Теперь можете писать.",

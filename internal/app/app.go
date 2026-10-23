@@ -284,6 +284,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		ActiveWindow:          time.Duration(cfg.ActiveDays) * 24 * time.Hour,
 		ActiveCounter:         store,
 		Channels:              bot.Client,
+		Buttons:               bot.Client,
 		Restrictor:            bot.Client,
 		Judge:                 swearJudge(cfg, logger),
 		Stickers:              store,
@@ -517,6 +518,11 @@ func newWebhook(ctx context.Context, cfg config.Config, store *storage.Store, lo
 		return nil, err
 	}
 	SetCommandMenus(ctx, bot.Client, logger)
+	if changed, err := bot.Client.EnsureAllowedUpdates(ctx, cfg.WebhookSecret); err != nil {
+		logger.Warn("could not check the webhook's update kinds", "error", err)
+	} else if changed {
+		logger.Info("webhook set again to receive every update kind the bot handles")
+	}
 	svc, err := NewService(cfg, store, bot, Mode{Serverless: true}, logger)
 	if err != nil {
 		return nil, err

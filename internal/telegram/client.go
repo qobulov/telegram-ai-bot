@@ -11,6 +11,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -63,7 +64,7 @@ func NewClient(opts Options) *Client {
 // changes to its own membership, which keep its list of groups true, and,
 // where it is an admin, changes to other members', which keep its list of
 // each group's members true.
-var allowedUpdates = []string{"message", "my_chat_member", "chat_member"}
+var allowedUpdates = []string{"message", "my_chat_member", "chat_member", "callback_query"}
 
 type getUpdatesParams struct {
 	Offset         int64    `json:"offset"`
@@ -108,6 +109,59 @@ type setWebhookParams struct {
 func (c *Client) SetWebhook(ctx context.Context, url, secret string) error {
 	params := setWebhookParams{URL: url, SecretToken: secret, AllowedUpdates: allowedUpdates}
 	return c.call(ctx, "setWebhook", params, nil)
+}
+
+type webhookInfo struct {
+	URL            string   `json:"url"`
+	AllowedUpdates []string `json:"allowed_updates"`
+}
+
+// EnsureAllowedUpdates sets the webhook again, at the same address, when it
+// was set before the bot asked for every kind of update it handles now,
+// such as button presses: until then Telegram does not send them. It does
+// nothing without a webhook.
+func (c *Client) EnsureAllowedUpdates(ctx context.Context, secret string) (changed bool, err error) {
+	var info webhookInfo
+	if err := c.call(ctx, "getWebhookInfo", struct{}{}, &info); err != nil {
+		return false, err
+	}
+	if info.URL == "" || containsAll(info.AllowedUpdates, allowedUpdates) {
+		return false, nil
+	}
+	return true, c.SetWebhook(ctx, info.URL, secret)
+}
+
+func containsAll(have, want []string) bool {
+	for _, w := range want {
+		if !slices.Contains(have, w) {
+			return false
+		}
+	}
+	return true
+}
+
+type answerCallbackParams struct {
+	CallbackQueryID string `json:"callback_query_id"`
+	Text            string `json:"text,omitempty"`
+	ShowAlert       bool   `json:"show_alert,omitempty"`
+}
+
+// AnswerCallbackQuery ends a button press's spinner, showing text, as a
+// box to close when alert is set and briefly otherwise.
+func (c *Client) AnswerCallbackQuery(ctx context.Context, id, text string, alert bool) error {
+	return c.call(ctx, "answerCallbackQuery", answerCallbackParams{CallbackQueryID: id, Text: text, ShowAlert: alert}, nil)
+}
+
+type editMessageTextParams struct {
+	ChatID    int64  `json:"chat_id"`
+	MessageID int64  `json:"message_id"`
+	Text      string `json:"text"`
+}
+
+// EditMessageText replaces the text of one of the bot's messages, and with
+// it the buttons under it.
+func (c *Client) EditMessageText(ctx context.Context, chatID, messageID int64, text string) error {
+	return c.call(ctx, "editMessageText", editMessageTextParams{ChatID: chatID, MessageID: messageID, Text: text}, nil)
 }
 
 // DeleteWebhook removes the webhook, so that long polling works again.

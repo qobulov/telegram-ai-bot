@@ -81,6 +81,13 @@ type ActiveCounter interface {
 	ActiveMembers(ctx context.Context, chatID int64, since time.Time) (int, error)
 }
 
+// ButtonAnswerer answers a button press and replaces the message it was
+// under.
+type ButtonAnswerer interface {
+	AnswerCallbackQuery(ctx context.Context, id, text string, alert bool) error
+	EditMessageText(ctx context.Context, chatID, messageID int64, text string) error
+}
+
 // ChannelMembers tells whether a user has joined a channel.
 type ChannelMembers interface {
 	ChannelMember(ctx context.Context, channel string, userID int64) (telegram.ChatMember, error)
@@ -234,6 +241,10 @@ type Options struct {
 	// need not.
 	RequiredChannels []string
 	Channels         ChannelMembers
+	// Buttons answers presses of the check button under the notice to
+	// join the required channels; without it the button is a link that
+	// sends "/start check".
+	Buttons ButtonAnswerer
 	// Developer is the username of whoever programmed the bot, named apart
 	// from the owners it belongs to; "" when not told apart.
 	Developer string
@@ -437,6 +448,10 @@ func (s *Service) Handle(update telegram.Update) {
 		s.recordMember(update.ChatMember)
 		return
 	}
+	if update.CallbackQuery != nil {
+		s.pressed(update.CallbackQuery)
+		return
+	}
 	in, ok := s.accept(update)
 	if !ok {
 		return
@@ -463,6 +478,10 @@ func (s *Service) HandleNow(update telegram.Update) {
 	}
 	if update.ChatMember != nil {
 		s.recordMember(update.ChatMember)
+		return
+	}
+	if update.CallbackQuery != nil {
+		s.pressed(update.CallbackQuery)
 		return
 	}
 	if in, ok := s.accept(update); ok {

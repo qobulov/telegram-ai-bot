@@ -93,7 +93,7 @@ func TestGetUpdatesParsesTextMessage(t *testing.T) {
 	if sent.method != "getUpdates" || sent.params["offset"] != float64(5) {
 		t.Errorf("call = %+v", sent)
 	}
-	if allowed, _ := sent.params["allowed_updates"].([]any); len(allowed) != 3 || allowed[0] != "message" || allowed[1] != "my_chat_member" || allowed[2] != "chat_member" {
+	if allowed, _ := sent.params["allowed_updates"].([]any); len(allowed) != 4 || allowed[0] != "message" || allowed[1] != "my_chat_member" || allowed[2] != "chat_member" || allowed[3] != "callback_query" {
 		t.Errorf("allowed_updates = %v", sent.params["allowed_updates"])
 	}
 }
@@ -405,7 +405,7 @@ func TestSetWebhookRegistersURLWithSecret(t *testing.T) {
 	if sent.method != "setWebhook" || sent.params["url"] != "https://bot.example/api/webhook" || sent.params["secret_token"] != "s3cret" {
 		t.Errorf("call = %+v", sent)
 	}
-	if allowed, _ := sent.params["allowed_updates"].([]any); len(allowed) != 3 || allowed[0] != "message" || allowed[1] != "my_chat_member" || allowed[2] != "chat_member" {
+	if allowed, _ := sent.params["allowed_updates"].([]any); len(allowed) != 4 || allowed[0] != "message" || allowed[1] != "my_chat_member" || allowed[2] != "chat_member" || allowed[3] != "callback_query" {
 		t.Errorf("allowed_updates = %v", sent.params["allowed_updates"])
 	}
 }
@@ -1095,5 +1095,40 @@ func TestSendMessageSendsButtons(t *testing.T) {
 	want := `{"inline_keyboard":[[{"text":"1 - kanal","url":"https://t.me/news"}],[{"text":"✅ Tasdiqlash","url":"https://t.me/bot?start=check"}]]}`
 	if sent.method != "sendMessage" || string(markup) != want {
 		t.Errorf("call %s, reply_markup = %s\nwant %s", sent.method, markup, want)
+	}
+}
+
+// A webhook set before button presses were asked for is set again, at the
+// same address with the secret; one already asking for every kind, or no
+// webhook at all, is left alone.
+func TestEnsureAllowedUpdatesSetsAnOldWebhookAgain(t *testing.T) {
+	cases := map[string]struct {
+		info    string
+		changed bool
+	}{
+		"old kinds":  {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member"]}}`, true},
+		"every kind": {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query"]}}`, false},
+		"no webhook": {`{"ok":true,"result":{"url":""}}`, false},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			client, api := newTestClient(t, c.info)
+
+			changed, err := client.EnsureAllowedUpdates(context.Background(), "s3cret")
+
+			if err != nil || changed != c.changed {
+				t.Fatalf("changed = %v, %v; want %v", changed, err, c.changed)
+			}
+			calls := api.recorded()
+			if !c.changed {
+				if len(calls) != 1 {
+					t.Errorf("calls = %+v, want only getWebhookInfo", calls)
+				}
+				return
+			}
+			if len(calls) != 2 || calls[1].method != "setWebhook" || calls[1].params["url"] != "https://bot.example/api/webhook" || calls[1].params["secret_token"] != "s3cret" {
+				t.Errorf("calls = %+v", calls)
+			}
+		})
 	}
 }

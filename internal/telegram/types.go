@@ -16,6 +16,17 @@ type Update struct {
 	Message      *Message           `json:"message"`
 	MyChatMember *ChatMemberUpdated `json:"my_chat_member"`
 	ChatMember   *ChatMemberUpdated `json:"chat_member"`
+	// CallbackQuery is a press of a button under one of the bot's messages.
+	CallbackQuery *CallbackQuery `json:"callback_query"`
+}
+
+// CallbackQuery is a press of a button with callback data: who pressed it,
+// under which message, and the button's data.
+type CallbackQuery struct {
+	ID      string   `json:"id"`
+	From    *User    `json:"from"`
+	Message *Message `json:"message"`
+	Data    string   `json:"data"`
 }
 
 // ChatMemberUpdated reports that the bot, or another member, was added to,
@@ -386,10 +397,12 @@ type Outgoing struct {
 	Buttons [][]Button
 }
 
-// Button is a button under a message that opens a link.
+// Button is a button under a message that opens a link, or, with Data,
+// tells the bot it was pressed without writing anything in the chat.
 type Button struct {
 	Text string `json:"text"`
-	URL  string `json:"url"`
+	URL  string `json:"url,omitempty"`
+	Data string `json:"callback_data,omitempty"`
 }
 
 // ChatPermissions is what a member may do in a group. Every field is always

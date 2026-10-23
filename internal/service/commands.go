@@ -728,7 +728,10 @@ func (s *Service) joinNotice(in incoming, channels []string) outcome {
 		}
 		buttons = append(buttons, []telegram.Button{{Text: label, URL: link}})
 	}
-	if s.opts.Bot.Username != "" {
+	switch {
+	case s.opts.Buttons != nil:
+		buttons = append(buttons, []telegram.Button{{Text: textCheckButton.to(in), Data: checkPayload}})
+	case s.opts.Bot.Username != "":
 		buttons = append(buttons, []telegram.Button{{Text: textCheckButton.to(in), URL: "https://t.me/" + s.opts.Bot.Username + "?start=" + checkPayload}})
 	}
 	text := textJoinChannel.to(in)
@@ -749,6 +752,35 @@ func (s *Service) start(ctx context.Context, in incoming) outcome {
 		return say(textChannelsJoined.to(in))
 	}
 	return say(s.runCommand(ctx, in))
+}
+
+// pressed answers a press of the check button: the notice becomes the
+// thanks once every channel is joined, and otherwise a box asks to join
+// them first; nothing is written in the chat either way.
+func (s *Service) pressed(q *telegram.CallbackQuery) {
+	if s.opts.Buttons == nil || q.From == nil || q.Message == nil || q.Data != checkPayload {
+		return
+	}
+	in := incoming{
+		msg:    &telegram.Message{MessageID: q.Message.MessageID, From: q.From, Chat: q.Message.Chat},
+		scope:  storage.Scope{ChatID: q.Message.Chat.ID, UserID: q.From.ID},
+		userID: q.From.ID,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
+	defer cancel()
+	if _, joined := s.joinedChannels(ctx, in); !joined {
+		if err := s.opts.Buttons.AnswerCallbackQuery(ctx, q.ID, textNotJoinedYet.to(in), true); err != nil {
+			s.opts.Logger.Warn("could not answer the check button", "user_id", in.userID, "error", err)
+		}
+		return
+	}
+	thanks := textChannelsJoined.to(in)
+	if err := s.opts.Buttons.AnswerCallbackQuery(ctx, q.ID, thanks, false); err != nil {
+		s.opts.Logger.Warn("could not answer the check button", "user_id", in.userID, "error", err)
+	}
+	if err := s.opts.Buttons.EditMessageText(ctx, q.Message.Chat.ID, q.Message.MessageID, thanks); err != nil {
+		s.opts.Logger.Warn("could not replace the channel notice", "user_id", in.userID, "error", err)
+	}
 }
 
 // channelLink is where a channel can be joined: its t.me link, when it has

@@ -3677,3 +3677,60 @@ func TestQuickAnswerNamesTheDeveloperAndTheOwner(t *testing.T) {
 		}
 	}
 }
+
+type pressAnswer struct {
+	id, text string
+	alert    bool
+}
+
+type fakeButtons struct {
+	mu      sync.Mutex
+	answers []pressAnswer
+	edits   []string
+}
+
+func (f *fakeButtons) AnswerCallbackQuery(_ context.Context, id, text string, alert bool) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.answers = append(f.answers, pressAnswer{id, text, alert})
+	return nil
+}
+
+func (f *fakeButtons) EditMessageText(_ context.Context, _, _ int64, text string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.edits = append(f.edits, text)
+	return nil
+}
+
+// The check button tells the bot it was pressed, writing nothing in the
+// chat: not yet joined gets a box asking to join, joined turns the notice
+// into the thanks.
+func TestCheckButtonAnswersWithoutWriting(t *testing.T) {
+	f := newFixture()
+	channel := &fakeChannel{members: map[int64]telegram.ChatMember{}}
+	buttons := &fakeButtons{}
+	f.opts.RequiredChannels, f.opts.Channels, f.opts.Buttons = []string{"@maria_news"}, channel, buttons
+
+	sent := f.run(textFrom(userID, "/start"))
+	if len(sent) != 1 || len(sent[0].buttons) != 2 || sent[0].buttons[1][0].Data != checkPayload || sent[0].buttons[1][0].URL != "" {
+		t.Fatalf("sent = %+v, want the check as a callback button", sent)
+	}
+
+	press := func(id int64) telegram.Update {
+		return telegram.Update{UpdateID: 900 + id, CallbackQuery: &telegram.CallbackQuery{
+			ID: fmt.Sprint(id), From: &telegram.User{ID: userID, FirstName: "Bek"}, Data: checkPayload,
+			Message: &telegram.Message{MessageID: 77, Chat: telegram.Chat{ID: userID, Type: telegram.ChatTypePrivate}},
+		}}
+	}
+	sent = f.run(press(1))
+	if len(sent) != 1 || len(buttons.answers) != 1 || !buttons.answers[0].alert || buttons.answers[0].text != textNotJoinedYet.uz || len(buttons.edits) != 0 {
+		t.Errorf("not joined: sent %d, answers %+v, edits %v", len(sent), buttons.answers, buttons.edits)
+	}
+
+	channel.members[userID] = telegram.ChatMember{Status: "member"}
+	sent = f.run(press(2))
+	if len(sent) != 1 || len(buttons.answers) != 2 || buttons.answers[1].alert || len(buttons.edits) != 1 || buttons.edits[0] != textChannelsJoined.uz {
+		t.Errorf("joined: sent %d, answers %+v, edits %v", len(sent), buttons.answers, buttons.edits)
+	}
+}
