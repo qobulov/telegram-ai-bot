@@ -79,6 +79,11 @@ type BaseURLs struct {
 	TMDB              string
 	YouTube           string
 	Isan              string
+	USGS              string
+	QRServer          string
+	FreeToGame        string
+	CatAPI            string
+	Dictionary        string
 	// Wikipedia is a format string with %s for the language code.
 	Wikipedia string
 	// News maps a language (uz, ru), or world- and a language for the
@@ -105,6 +110,11 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.TMDB = cmp.Or(b.TMDB, "https://api.themoviedb.org")
 	b.YouTube = cmp.Or(b.YouTube, "https://www.googleapis.com/youtube/v3")
 	b.Isan = cmp.Or(b.Isan, "https://api.isan.eu.org")
+	b.USGS = cmp.Or(b.USGS, "https://earthquake.usgs.gov")
+	b.QRServer = cmp.Or(b.QRServer, "https://api.qrserver.com")
+	b.FreeToGame = cmp.Or(b.FreeToGame, "https://www.freetogame.com")
+	b.CatAPI = cmp.Or(b.CatAPI, "https://api.thecatapi.com")
+	b.Dictionary = cmp.Or(b.Dictionary, "https://api.dictionaryapi.dev")
 	b.Wikipedia = cmp.Or(b.Wikipedia, "https://%s.wikipedia.org")
 	if b.News == nil {
 		b.News = map[string]map[string]string{
@@ -161,6 +171,11 @@ func Tools(opts Options) []tools.Tool {
 		a.cryptoTool(),
 		a.musicTool(),
 		a.mlbbTool(),
+		a.quakeTool(),
+		a.qrTool(),
+		a.freeGamesTool(),
+		a.catTool(),
+		a.dictionaryTool(),
 	}
 	if a.footballToken != "" {
 		list = append(list, a.footballTool())
