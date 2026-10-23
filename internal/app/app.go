@@ -252,6 +252,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Location:           cfg.Location,
 		OwnerUsernames:     cfg.OwnerUsernames,
 		OwnerPresence:      store,
+		HeroGuesses:        store,
 		OwnerIDs:           cfg.OwnerIDs,
 		AllowedBots:        cfg.AllowedBots,
 		BotReplies:         store,
