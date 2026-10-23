@@ -219,11 +219,7 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.Location = r.location("GROUP_HISTORY_TIMEZONE", "Asia/Tashkent")
 	cfg.OwnerUsernames = r.usernames("BOT_OWNER_USERNAME")
 	cfg.OwnerIDs = r.ownerIDs("BOT_OWNER_IDS")
-	if developer := r.usernames("BOT_DEVELOPER_USERNAME"); len(developer) > 1 {
-		r.fail("BOT_DEVELOPER_USERNAME", "must be one Telegram username")
-	} else if len(developer) == 1 {
-		cfg.Developer = developer[0]
-	}
+	cfg.Developer = r.developer()
 	if len(cfg.OwnerIDs) > 0 && len(cfg.OwnerUsernames) == 0 {
 		r.fail("BOT_OWNER_IDS", "needs BOT_OWNER_USERNAME, which names the owners in the persona")
 	}
@@ -548,6 +544,24 @@ func (r *reader) allowedBots(name string) []string {
 		return []string{"*"}
 	}
 	return r.usernames(name)
+}
+
+// developer reads BOT_DEVELOPER_USERNAME: one username, which the bot names
+// as "@" plus it, so a numeric ID, which would be named "@1688909825", is
+// refused.
+func (r *reader) developer() string {
+	names := r.usernames("BOT_DEVELOPER_USERNAME")
+	switch {
+	case len(names) == 0:
+		return ""
+	case len(names) > 1:
+		r.fail("BOT_DEVELOPER_USERNAME", "must be one Telegram username")
+	case names[0][0] >= '0' && names[0][0] <= '9':
+		r.fail("BOT_DEVELOPER_USERNAME", "must be a Telegram username such as pronium, not a numeric ID")
+	default:
+		return names[0]
+	}
+	return ""
 }
 
 // isUsername accepts what Telegram allows: letters, digits and underscores.

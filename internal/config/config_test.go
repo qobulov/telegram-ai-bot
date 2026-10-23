@@ -1682,6 +1682,10 @@ func TestDeveloperIsToldApartFromTheOwner(t *testing.T) {
 	if _, err := Load(getenv(env)); err != nil {
 		t.Errorf("a developer and no owners: %v", err)
 	}
+	env["BOT_DEVELOPER_USERNAME"] = "1688909825"
+	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "not a numeric ID") {
+		t.Errorf("an ID: err = %v, want it rejected", err)
+	}
 	env["BOT_DEVELOPER_USERNAME"] = "a_one,b_two"
 	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "BOT_DEVELOPER_USERNAME") {
 		t.Errorf("two developers: err = %v, want it rejected", err)
