@@ -771,7 +771,9 @@ func TestToThemMarkerAddressesTheRepliedMember(t *testing.T) {
 		"[to them] Miyang kichkina emas.": {Text: "Miyang kichkina emas.", ToReplied: true},
 		"(To Them)Salom":                  {Text: "Salom", ToReplied: true},
 		"Salom [to them]":                 {Text: "Salom [to them]"},
-		"[to them] [react 🤣]":             {Reaction: "🤣"},
+		"[to Chaizooo @naniwo_desu]\n손이 안 닿으니까 걱정 마세요.": {Text: "손이 안 닿으니까 걱정 마세요.", ToReplied: true},
+		"(to be honest) it's fine": {Text: "(to be honest) it's fine"},
+		"[to them] [react 🤣]":      {Reaction: "🤣"},
 	} {
 		f := newFixture(text(content))
 		answer, err := f.agent.Reply(context.Background(), request(1, "Mari, bunga bir nima de"))

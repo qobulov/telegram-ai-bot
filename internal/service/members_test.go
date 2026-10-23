@@ -442,7 +442,7 @@ func TestToThemHintNamesTheRepliedMember(t *testing.T) {
 	if len(calls) != 2 {
 		t.Fatalf("model calls = %d", len(calls))
 	}
-	if ctx := calls[0].req.Context; !strings.Contains(ctx, "is replying to a message from Patrick") || !strings.Contains(ctx, "start with [to them] and speak to Patrick") {
+	if ctx := calls[0].req.Context; !strings.Contains(ctx, "is replying to a message from Patrick") || !strings.Contains(ctx, "then speak to Patrick, by name") {
 		t.Errorf("context = %q, want Patrick named", ctx)
 	}
 	if strings.Contains(calls[1].req.Context, "[to them]") {

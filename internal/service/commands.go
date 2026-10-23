@@ -1002,7 +1002,7 @@ func (s *Service) ownerReplyHint(in incoming) string {
 	return fmt.Sprintf(ownerReplyNote, member, member)
 }
 
-const toThemNote = "[%s is replying to a message from %s. If they ask you to say something to %s, in any words (\"nimadir de\", \"bunga bir nima de\", \"unga ayt\"), say it: start with [to them] and speak to %s, by name, not to %s, and never ask %s what to say. Without such a request, answer %s and leave out [to them].]"
+const toThemNote = "[%s is replying to a message from %s. If they ask you to say something to %s, in any words (\"nimadir de\", \"bunga bir nima de\", \"unga ayt\"), say it: start with exactly [to them], those two words and no name, then speak to %s, by name, not to %s, and never ask %s what to say. Without such a request, answer %s and leave out [to them].]"
 
 // toThemHint names, right before the message, the member whose message a
 // group message replies to, so that "nimadir de" is said to that member

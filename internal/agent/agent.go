@@ -291,8 +291,11 @@ func finish(t *turn, reply ai.Message) (Answer, error) {
 }
 
 // toThemMarker opens an answer meant for the member the asker replied to:
-// "[to them]", in any case or bracket.
-var toThemMarker = regexp.MustCompile(`(?i)^[\[(<]\s*to\s+them\s*[\])>]\s*`)
+// "[to them]", in any case or bracket, or, as models also write it, with
+// the member named in square brackets: "[to Chaizooo @naniwo_desu]". A
+// round "(to ...)" is a marker only as "(to them)": "(to be honest)" is
+// prose.
+var toThemMarker = regexp.MustCompile(`(?i)^(?:[\[(<]\s*to\s+them\s*[\])>]|\[\s*to\s+[^\]\n]{1,60}\])\s*`)
 
 // cutToThem is answer without its "[to them]" marker, and whether it had
 // one.
