@@ -3460,3 +3460,83 @@ func TestChatterAsksTheMuteStoreOnceAWhile(t *testing.T) {
 		t.Errorf("lookups = %d, want a second once the answer is old", store.lookups)
 	}
 }
+
+type fakeChannel struct {
+	mu      sync.Mutex
+	members map[int64]telegram.ChatMember
+	err     error
+	asked   int
+}
+
+func (f *fakeChannel) ChannelMember(_ context.Context, channel string, userID int64) (telegram.ChatMember, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.asked++
+	if f.err != nil {
+		return telegram.ChatMember{}, f.err
+	}
+	return f.members[userID], nil
+}
+
+// In a private chat only those who joined the required channel are
+// answered; the others are asked to join, with no model call and nothing
+// taken from their day. Owners need no channel, and a check that fails
+// lets the message through.
+func TestPrivateChatNeedsTheRequiredChannel(t *testing.T) {
+	cases := map[string]struct {
+		member   telegram.ChatMember
+		err      error
+		owner    bool
+		answered bool
+	}{
+		"not joined":          {member: telegram.ChatMember{Status: "left"}},
+		"joined":              {member: telegram.ChatMember{Status: "member"}, answered: true},
+		"restricted but in":   {member: telegram.ChatMember{Status: "restricted", StillIn: true}, answered: true},
+		"restricted and gone": {member: telegram.ChatMember{Status: "restricted"}},
+		"an owner":            {member: telegram.ChatMember{Status: "left"}, owner: true, answered: true},
+		"Telegram cannot say": {err: errors.New("bot is not an admin"), answered: true},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			quota := withPrivateLimit(f, 10)
+			f.opts.RequiredChannel = "@maria_news"
+			f.opts.Channels = &fakeChannel{members: map[int64]telegram.ChatMember{userID: c.member}, err: c.err}
+			update := textFrom(userID, "salom")
+			if c.owner {
+				f.opts.OwnerIDs = map[int64]bool{userID: true}
+			}
+
+			sent := f.run(update)
+
+			calls := len(f.replier.recorded())
+			if c.answered != (calls == 1) {
+				t.Errorf("model calls = %d, want answered %v", calls, c.answered)
+			}
+			if !c.answered {
+				if len(sent) != 1 || !strings.Contains(sent[0].text, "https://t.me/maria_news") {
+					t.Errorf("sent = %+v, want the notice to join", sent)
+				}
+				if asked, _ := quota.recorded(); len(asked) != 0 {
+					t.Errorf("quota asked %+v; a refused message takes nothing", asked)
+				}
+			}
+		})
+	}
+}
+
+// A member found in the channel is not asked about again for a while.
+func TestRequiredChannelIsCheckedOnceForAWhile(t *testing.T) {
+	f := newFixture()
+	channel := &fakeChannel{members: map[int64]telegram.ChatMember{userID: {Status: "member"}}}
+	f.opts.RequiredChannel, f.opts.Channels = "@maria_news", channel
+	first, second := textFrom(userID, "salom"), textFrom(userID, "qalaysan")
+	second.UpdateID++
+	second.Message.MessageID++
+
+	f.run(first, second)
+
+	if channel.asked != 1 || len(f.replier.recorded()) != 2 {
+		t.Errorf("asked %d, model calls %d; want one check for two answers", channel.asked, len(f.replier.recorded()))
+	}
+}

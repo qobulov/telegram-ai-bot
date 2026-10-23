@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -148,6 +149,10 @@ type Config struct {
 	// PrivateChats is whom the bot answers in private chats: "on" everyone,
 	// "owners" its owners only, "off" nobody, which keeps it to groups.
 	PrivateChats string
+	// RequiredChannel is the channel, its @username or -100 ID, that a
+	// member must have joined to be answered in a private chat; owners need
+	// not. "" asks for none.
+	RequiredChannel string
 	// MinGroupMembers is the smallest group answered as a group, the bot
 	// counted and other bots not; a smaller one is answered only as a
 	// private chat would be. 0 answers groups of any size.
@@ -196,6 +201,7 @@ func Load(getenv func(string) string) (Config, error) {
 		MemberRepliesPer10Min:   r.positive("MEMBER_REPLIES_PER_10_MIN", 4),
 		PrivateDailyLimit:       r.integer("PRIVATE_DAILY_LIMIT", 10, 0),
 		PrivateChats:            r.privateChats(),
+		RequiredChannel:         r.requiredChannel(),
 		MinGroupMembers:         r.integer("GROUP_MIN_MEMBERS", 6, 0),
 	}
 	r.chooseProvider(&cfg)
@@ -401,6 +407,19 @@ func (r *reader) chooseProvider(cfg *Config) {
 		r.fail(chosen[0].keyVar, "and "+chosen[1].keyVar+" are both set; keep only one, for the provider you want to use")
 	}
 }
+
+// requiredChannel reads REQUIRED_CHANNEL: a channel's @username or its -100
+// ID, or nothing.
+func (r *reader) requiredChannel() string {
+	channel := strings.TrimSpace(r.text("REQUIRED_CHANNEL", ""))
+	if channel == "" || channelName.MatchString(channel) {
+		return channel
+	}
+	r.fail("REQUIRED_CHANNEL", "must be a channel's @username or its -100 ID")
+	return ""
+}
+
+var channelName = regexp.MustCompile(`^(@[A-Za-z][A-Za-z0-9_]{3,31}|-100[0-9]{5,})$`)
 
 // privateChats reads PRIVATE_CHATS: on, owners or off.
 func (r *reader) privateChats() string {

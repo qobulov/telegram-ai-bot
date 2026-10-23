@@ -76,6 +76,11 @@ type GroupReplyQuota interface {
 	ReleaseGroupReply(ctx context.Context, id int64) error
 }
 
+// ChannelMembers tells whether a user has joined a channel.
+type ChannelMembers interface {
+	ChannelMember(ctx context.Context, channel string, userID int64) (telegram.ChatMember, error)
+}
+
 // PrivateQuota counts the answers each user gets in private chats in a day.
 // Like GroupReplyQuota it lives in the database, which every instance shares.
 type PrivateQuota interface {
@@ -213,6 +218,10 @@ type Options struct {
 	// PrivateChats is whom private chats are answered for: "off" nobody,
 	// "owners" the owners only; anything else, everyone.
 	PrivateChats string
+	// RequiredChannel, when set, is the channel a member must have joined,
+	// as Channels tells, to be answered in a private chat; owners need not.
+	RequiredChannel string
+	Channels        ChannelMembers
 	// Reactor sets emoji reactions, the bot's answer to applause and the
 	// model's when it reacts instead of writing; nil means it never reacts.
 	Reactor Reactor
@@ -303,6 +312,8 @@ type Service struct {
 	// recently.go.
 	mutes   *recently[int64, bool]
 	members *recently[memberKey, memberName]
+	// subscribers are users lately found in the required channel.
+	subscribers *recently[int64, bool]
 
 	// typingInterval is how often "typing" is shown again while a turn
 	// runs: typingRefresh, shortened by tests.
@@ -375,6 +386,7 @@ func New(opts Options) *Service {
 		muted:          make(map[int64]bool, len(opts.MutedChats)),
 		mutes:          newRecently[int64, bool](muteMemory, opts.Now),
 		members:        newRecently[memberKey, memberName](memberMemory, opts.Now),
+		subscribers:    newRecently[int64, bool](subscriberMemory, opts.Now),
 		queues:         make([]chan incoming, opts.Workers),
 		notices:        make(chan incoming, noticeQueueSize),
 		transcribing:   make(chan struct{}, backgroundTranscriptions),

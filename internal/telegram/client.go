@@ -330,6 +330,21 @@ func (c *Client) GetChatMember(ctx context.Context, chatID, userID int64) (ChatM
 	return member, nil
 }
 
+type channelMemberParams struct {
+	ChatID string `json:"chat_id"`
+	UserID int64  `json:"user_id"`
+}
+
+// ChannelMember returns a user's standing in a channel named by its
+// @username or ID, which the bot must administer to ask.
+func (c *Client) ChannelMember(ctx context.Context, channel string, userID int64) (ChatMember, error) {
+	var member ChatMember
+	if err := c.call(ctx, "getChatMember", channelMemberParams{ChatID: channel, UserID: userID}, &member); err != nil {
+		return ChatMember{}, err
+	}
+	return member, nil
+}
+
 // GetChat returns a chat's current details, such as a group's title.
 func (c *Client) GetChat(ctx context.Context, chatID int64) (Chat, error) {
 	var chat Chat

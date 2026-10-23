@@ -516,6 +516,9 @@ func (s *Service) hasMedia(in incoming) bool {
 }
 
 func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRule) outcome {
+	if notice, joined := s.joinedChannel(ctx, in); !joined {
+		return say(notice)
+	}
 	reservation, notice, allowed := s.takePrivateAnswer(ctx, in)
 	if !allowed {
 		return say(notice)
@@ -554,6 +557,42 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 		out.cards = sink.TakeStickers()
 	}
 	return out
+}
+
+// joinedChannel reports whether the sender of a private message may be
+// answered under the required channel, and if not the notice that asks them
+// to join. Owners and groups need no channel. When Telegram cannot say, the
+// sender is answered: the daily limit still guards the cost.
+func (s *Service) joinedChannel(ctx context.Context, in incoming) (notice string, joined bool) {
+	channel := s.opts.RequiredChannel
+	if in.group || channel == "" || s.opts.Channels == nil || s.isOwner(in.msg.From) {
+		return "", true
+	}
+	if _, ok := s.subscribers.get(in.userID); ok {
+		return "", true
+	}
+	ctx, cancel := context.WithTimeout(ctx, logTimeout)
+	defer cancel()
+	member, err := s.opts.Channels.ChannelMember(ctx, channel, in.userID)
+	if err != nil {
+		s.opts.Logger.Warn("could not check the required channel; answering anyway", "user_id", in.userID, "error", err)
+		return "", true
+	}
+	if !member.Subscribed() {
+		link := channelLink(channel)
+		return fmt.Sprintf(textJoinChannel, link, link), false
+	}
+	s.subscribers.set(in.userID, true)
+	return "", true
+}
+
+// channelLink is where a channel can be joined: its t.me link, or the
+// channel as given when it has no public name.
+func channelLink(channel string) string {
+	if name, ok := strings.CutPrefix(channel, "@"); ok {
+		return "https://t.me/" + name
+	}
+	return channel
 }
 
 // takePrivateAnswer takes one of the sender's answers for the day in a

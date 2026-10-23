@@ -15,6 +15,9 @@ const (
 	// memberMemory is how long a member already recorded, under the same
 	// name, is not recorded again; their last_seen_at may lag by as much.
 	memberMemory = 6 * time.Hour
+	// subscriberMemory is how long a user found in the required channel is
+	// not asked about again; one who left is answered that long at most.
+	subscriberMemory = 10 * time.Minute
 	// maxRemembered bounds each cache; past it, the expired are dropped, and
 	// if none is, everything.
 	maxRemembered = 10_000

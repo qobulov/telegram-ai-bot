@@ -255,6 +255,8 @@ type ChatMember struct {
 	// UntilDate is when a restriction or ban ends, in Unix seconds; zero
 	// means never.
 	UntilDate int64 `json:"until_date,omitempty"`
+	// StillIn is true for a restricted member who is still in the chat.
+	StillIn bool `json:"is_member,omitempty"`
 	// CustomTitle is an admin's title in the group, shown instead of
 	// "admin".
 	CustomTitle string `json:"custom_title,omitempty"`
@@ -335,6 +337,18 @@ func (m ChatMember) holds(r adminRight) bool {
 // IsMember reports whether the user is still in the chat.
 func (m ChatMember) IsMember() bool {
 	return m.Status != "" && m.Status != "left" && m.Status != "kicked"
+}
+
+// Subscribed reports whether the user is in a channel: its owner, an admin,
+// a member, or a restricted member still in it.
+func (m ChatMember) Subscribed() bool {
+	switch m.Status {
+	case "creator", "administrator", "member":
+		return true
+	case "restricted":
+		return m.StillIn
+	}
+	return false
 }
 
 // IsAdmin reports whether the member owns or administers the chat.
