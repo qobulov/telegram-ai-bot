@@ -3654,9 +3654,9 @@ func TestPrivateSmallTalkSkipsTheModel(t *testing.T) {
 // Asked who made her, the bot names who programmed her and whose she is.
 func TestQuickAnswerNamesTheDeveloperAndTheOwner(t *testing.T) {
 	for text, want := range map[string]string{
-		"seni kim yaratgan?": "Meni @pronium dasturlagan, egam esa @tursunoffm.",
-		"Egang kim":          "Egam — @tursunoffm. Meni esa @pronium dasturlagan.",
-		"Кто тебя создал?":   "Меня запрограммировал @pronium, а мой владелец — @tursunoffm.",
+		"seni kim yaratgan?": "Meni pronium dasturlagan, egam esa tursunoffm.",
+		"Egang kim":          "Egam — tursunoffm. Meni esa pronium dasturlagan.",
+		"Кто тебя создал?":   "Меня запрограммировал pronium, а мой владелец — tursunoffm.",
 	} {
 		f := newFixture()
 		f.opts.QuickAnswers = true
@@ -3672,7 +3672,7 @@ func TestQuickAnswerNamesTheDeveloperAndTheOwner(t *testing.T) {
 		f := newFixture()
 		f.opts.QuickAnswers = true
 		f.opts.OwnerUsernames, f.opts.Developer = []string{"pronium"}, "pronium"
-		if sent := f.run(textFrom(userID, text)); len(sent) != 1 || sent[0].text != "Meni @pronium dasturlagan, egam ham o'sha." {
+		if sent := f.run(textFrom(userID, text)); len(sent) != 1 || sent[0].text != "Meni pronium dasturlagan, egam ham o'sha." {
 			t.Errorf("one person as both, %q: sent = %+v", text, sent)
 		}
 	}

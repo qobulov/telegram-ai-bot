@@ -245,7 +245,7 @@ func Load(getenv func(string) string) (Config, error) {
 		cfg.PersonaPrompt += "\n\n" + imageNote
 	}
 	if len(cfg.OwnerUsernames) > 0 {
-		cfg.PersonaPrompt += "\n\n" + strings.ReplaceAll(ownerNote, ownerPlaceholder, mentionList(cfg.OwnerUsernames))
+		cfg.PersonaPrompt += "\n\n" + strings.ReplaceAll(ownerNote, ownerPlaceholder, nameList(cfg.OwnerUsernames))
 	}
 	if cfg.Developer != "" {
 		owners := slices.DeleteFunc(slices.Clone(cfg.OwnerUsernames), func(u string) bool { return u == cfg.Developer })
@@ -253,7 +253,7 @@ func Load(getenv func(string) string) (Config, error) {
 		if len(owners) == 0 {
 			note, owners = developerOwnerNote, []string{cfg.Developer}
 		}
-		cfg.PersonaPrompt += "\n\n" + strings.NewReplacer(developerPlaceholder, "@"+cfg.Developer, ownerPlaceholder, mentionList(owners)).Replace(note)
+		cfg.PersonaPrompt += "\n\n" + strings.NewReplacer(developerPlaceholder, cfg.Developer, ownerPlaceholder, nameList(owners)).Replace(note)
 	}
 	cfg.FootballDataToken = r.apiKey("FOOTBALL_DATA_TOKEN")
 	cfg.GiphyAPIKey = r.apiKey("GIPHY_API_KEY")
@@ -586,16 +586,13 @@ func isUsername(name string) bool {
 	return true
 }
 
-// mentionList writes usernames as "@a" or "@a and @b".
-func mentionList(names []string) string {
-	mentions := make([]string, len(names))
-	for i, name := range names {
-		mentions[i] = "@" + name
+// nameList writes usernames as "a" or "a and b", without "@": written
+// with it, the model tagged the owners in groups they are not in.
+func nameList(names []string) string {
+	if len(names) == 1 {
+		return names[0]
 	}
-	if len(mentions) == 1 {
-		return mentions[0]
-	}
-	return strings.Join(mentions[:len(mentions)-1], ", ") + " and " + mentions[len(mentions)-1]
+	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
 }
 
 func (r *reader) location(name, fallback string) *time.Location {

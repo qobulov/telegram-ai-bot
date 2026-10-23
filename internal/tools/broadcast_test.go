@@ -163,3 +163,19 @@ func TestBroadcastCanBeCancelled(t *testing.T) {
 		t.Errorf("a cancelled broadcast was sent: %+v", sender.sent)
 	}
 }
+
+// A broadcast that calls someone would tag them in every group: it is
+// refused before anything is saved. An announcement naming people is not.
+func TestBroadcastRefusesSummons(t *testing.T) {
+	for text, refused := range map[string]bool{
+		"@pronium sizni @tursunoffm chaqiryapti!":                true,
+		"Azizbek, sizni @pronium chaqiryapti!":                   true,
+		"@pronium, тебя зовёт @tursunoffm":                       true,
+		"Maria'ni @pronium dasturlagan, egasi esa @tursunoffm 🤍": false,
+		"Ertaga turnir bor, hammani chaqiramiz!":                 false,
+	} {
+		if got := summons(text); got != refused {
+			t.Errorf("summons(%q) = %v, want %v", text, got, refused)
+		}
+	}
+}

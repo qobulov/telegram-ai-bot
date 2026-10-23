@@ -696,13 +696,13 @@ func TestBotOwner(t *testing.T) {
 	if len(cfg.OwnerUsernames) != 1 || cfg.OwnerUsernames[0] != "pronium" {
 		t.Errorf("OwnerUsernames = %q, want it without @ and in lower case", cfg.OwnerUsernames)
 	}
-	if !strings.Contains(cfg.PersonaPrompt, "@pronium") || !strings.Contains(cfg.PersonaPrompt, "[owner]") {
+	if !strings.Contains(cfg.PersonaPrompt, "Your owners are pronium:") || !strings.Contains(cfg.PersonaPrompt, "[owner]") {
 		t.Error("the persona does not tell the model who its owner is and how owner messages are marked")
 	}
 
 	env["PERSONA_PROMPT"] = "You are {name}."
 	cfg, _ = Load(getenv(env))
-	if !strings.Contains(cfg.PersonaPrompt, "@pronium") {
+	if !strings.Contains(cfg.PersonaPrompt, "Your owners are pronium:") {
 		t.Error("a custom persona lost the owner note")
 	}
 
@@ -749,8 +749,8 @@ func TestTwoOwners(t *testing.T) {
 	if strings.Join(cfg.OwnerUsernames, ",") != "pronium,tursunoffm" {
 		t.Errorf("OwnerUsernames = %q", cfg.OwnerUsernames)
 	}
-	if !strings.Contains(cfg.PersonaPrompt, "@pronium") || !strings.Contains(cfg.PersonaPrompt, "@tursunoffm") {
-		t.Error("the persona does not name both owners")
+	if !strings.Contains(cfg.PersonaPrompt, "Your owners are pronium and tursunoffm:") || strings.Contains(cfg.PersonaPrompt, "@pronium") {
+		t.Error("the persona does not name both owners, without @")
 	}
 
 	env["BOT_OWNER_USERNAME"] = "pronium, not a username"
@@ -1671,11 +1671,11 @@ func TestDeveloperIsToldApartFromTheOwner(t *testing.T) {
 	if err != nil || cfg.Developer != "pronium" {
 		t.Fatalf("developer = %q, %v", cfg.Developer, err)
 	}
-	if !strings.Contains(cfg.PersonaPrompt, "You were programmed by @pronium, and you belong to @tursunoffm.") {
+	if !strings.Contains(cfg.PersonaPrompt, "You were programmed by pronium, and you belong to tursunoffm.") {
 		t.Errorf("the persona does not tell them apart")
 	}
 	env["BOT_OWNER_USERNAME"] = "pronium"
-	if cfg, _ := Load(getenv(env)); !strings.Contains(cfg.PersonaPrompt, "You were programmed by @pronium, who is also your owner.") {
+	if cfg, _ := Load(getenv(env)); !strings.Contains(cfg.PersonaPrompt, "You were programmed by pronium, who is also your owner.") {
 		t.Errorf("one person as both: the persona does not say so")
 	}
 	delete(env, "BOT_OWNER_USERNAME")

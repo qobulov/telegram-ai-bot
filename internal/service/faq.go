@@ -185,24 +185,24 @@ func (s *Service) makerText(kind faqKind, pick func(localText) string) string {
 	owners := s.ownerHandles(developer)
 	switch {
 	case developer != "" && owners == "":
-		return fmt.Sprintf(pick(textProgrammedAndOwned), "@"+developer)
+		return fmt.Sprintf(pick(textProgrammedAndOwned), developer)
 	case developer != "" && kind == faqOwner:
-		return fmt.Sprintf(pick(textOwnedBy), owners, "@"+developer)
+		return fmt.Sprintf(pick(textOwnedBy), owners, developer)
 	case developer != "":
-		return fmt.Sprintf(pick(textProgrammedBy), "@"+developer, owners)
+		return fmt.Sprintf(pick(textProgrammedBy), developer, owners)
 	case owners != "":
 		return fmt.Sprintf(pick(textMadeBy), owners)
 	}
 	return pick(textMadeByOwners)
 }
 
-// ownerHandles are the owners' @usernames but except's, joined for a
-// sentence.
+// ownerHandles are the owners' usernames but except's, joined for a
+// sentence, without "@": a private chat is no place to tag them.
 func (s *Service) ownerHandles(except string) string {
 	var handles []string
 	for _, u := range s.opts.OwnerUsernames {
 		if u != except {
-			handles = append(handles, "@"+u)
+			handles = append(handles, u)
 		}
 	}
 	return strings.Join(handles, ", ")

@@ -76,6 +76,11 @@ type GroupReplyQuota interface {
 	ReleaseGroupReply(ctx context.Context, id int64) error
 }
 
+// OwnerPresence finds the member of a group known by a username.
+type OwnerPresence interface {
+	AuthorByUsername(ctx context.Context, chatID int64, username string) (int64, error)
+}
+
 // ActiveCounter counts the people seen writing in a group lately.
 type ActiveCounter interface {
 	ActiveMembers(ctx context.Context, chatID int64, since time.Time) (int, error)
@@ -245,6 +250,9 @@ type Options struct {
 	// join the required channels; without it the button is a link that
 	// sends "/start check".
 	Buttons ButtonAnswerer
+	// OwnerPresence finds an owner's username among a group's members, to
+	// tell the model whom it may tag there; nil tags no owner.
+	OwnerPresence OwnerPresence
 	// Developer is the username of whoever programmed the bot, named apart
 	// from the owners it belongs to; "" when not told apart.
 	Developer string
@@ -343,8 +351,10 @@ type Service struct {
 	members *recently[memberKey, memberName]
 	// subscribers are users lately found in the required channel.
 	subscribers *recently[int64, bool]
-	// actives are groups' counts of active members, lately read.
-	actives *recently[int64, int]
+	// actives are groups' counts of active members, lately read, and
+	// ownersHere the owners lately found in each group.
+	actives    *recently[int64, int]
+	ownersHere *recently[int64, []string]
 
 	// typingInterval is how often "typing" is shown again while a turn
 	// runs: typingRefresh, shortened by tests.
@@ -419,6 +429,7 @@ func New(opts Options) *Service {
 		members:        newRecently[memberKey, memberName](memberMemory, opts.Now),
 		subscribers:    newRecently[int64, bool](subscriberMemory, opts.Now),
 		actives:        newRecently[int64, int](activeMemory, opts.Now),
+		ownersHere:     newRecently[int64, []string](activeMemory, opts.Now),
 		queues:         make([]chan incoming, opts.Workers),
 		notices:        make(chan incoming, noticeQueueSize),
 		transcribing:   make(chan struct{}, backgroundTranscriptions),

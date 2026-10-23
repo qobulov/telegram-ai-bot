@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -58,6 +59,7 @@ func BroadcastTool(opts BroadcastOptions) Tool {
 		Description: "Owners only. Post a message in the bot's groups. " +
 			"prepare: save the text (and optionally chat_ids from bot_database; default all groups the bot is in), then show the owner the exact text and the groups and ask them to confirm. Nothing is sent yet. " +
 			"confirm: send it, only after the owner said yes in a new message. cancel: drop the draft. " +
+			"It is for announcements: a message that calls or pings a person (\"@pronium sizni @tursunoffm chaqiryapti\") is refused, as it would tag them in every group; tell the owner to write to that person directly. " +
 			"Never say a message was sent unless confirm reported it.",
 		Schema: json.RawMessage(`{
 			"type": "object",
@@ -103,6 +105,9 @@ func prepareBroadcast(ctx context.Context, opts BroadcastOptions, caller Caller,
 	text := strings.TrimSpace(args.Text)
 	if text == "" || len([]rune(text)) > maxBroadcastRunes {
 		return nil, &ArgumentError{Message: fmt.Sprintf("text must be 1 to %d characters", maxBroadcastRunes)}
+	}
+	if summons(text) {
+		return nil, &ArgumentError{Message: notASummons}
 	}
 	targets, err := broadcastTargets(ctx, opts.Groups, args.ChatIDs)
 	if err != nil {
@@ -182,4 +187,20 @@ func confirmBroadcast(ctx context.Context, opts BroadcastOptions, caller Caller)
 		sent++
 	}
 	return map[string]any{"sent": sent, "failed": failed}, nil
+}
+
+// notASummons refuses a broadcast that calls someone.
+const notASummons = "this calls or pings a person, which would tag them in every group; nothing was prepared. Tell the owner, in one line, to write to that person directly; broadcasts are for announcements"
+
+var (
+	// tagged finds an @username.
+	tagged = regexp.MustCompile(`@[A-Za-z][A-Za-z0-9_]{3,}`)
+	// callingWords are the words of a message that calls someone: "sizni
+	// X chaqiryapti", "тебя зовёт X", "X is calling you".
+	callingWords = regexp.MustCompile(`(?i)chaqir|чақир|чакир|зов[её]т|позов|calling you|wants you`)
+)
+
+// summons reports a message that tags someone and calls them.
+func summons(text string) bool {
+	return tagged.MatchString(text) && callingWords.MatchString(text)
 }

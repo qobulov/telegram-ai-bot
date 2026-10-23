@@ -1081,7 +1081,7 @@ func (s *Service) request(ctx context.Context, in incoming, rules []storage.Grou
 			notice = ownerNotice
 		}
 	}
-	req.Context = paragraphs(s.chatHeader(ctx, in), s.rulesHeader(rules, in), s.profileLine(ctx, in, rules), notice, s.talksElsewhere(ctx, in), log, s.noStickersHint(ctx), s.ownerReplyHint(in), s.toThemHint(in), languageHint(in.text))
+	req.Context = paragraphs(s.chatHeader(ctx, in), s.rulesHeader(rules, in), s.profileLine(ctx, in, rules), notice, s.talksElsewhere(ctx, in), log, s.noStickersHint(ctx), s.ownerReplyHint(in), s.toThemHint(in), s.ownersHereLine(ctx, in), languageHint(in.text))
 	replied := in.msg.ReplyToMessage
 	if replied != nil {
 		req.Text = withQuote(req.Text, s.quoted(ctx, replied), s.opts.Bot.ID, plainLabel(replied.From))
@@ -1119,6 +1119,31 @@ func (s *Service) toThemHint(in incoming) string {
 	}
 	asker, member := plainLabel(in.msg.From), plainLabel(replied.From)
 	return fmt.Sprintf(toThemNote, asker, member, member, member, asker, asker, asker)
+}
+
+// ownersHereLine tells the model, in a group, which owners are members
+// there and may be tagged with @; the others are named without it, as the
+// persona asks. It is "" outside groups or with no owner usernames.
+func (s *Service) ownersHereLine(ctx context.Context, in incoming) string {
+	if !in.group || s.opts.OwnerPresence == nil || len(s.opts.OwnerUsernames) == 0 {
+		return ""
+	}
+	here, ok := s.ownersHere.get(in.scope.ChatID)
+	if !ok {
+		ctx, cancel := context.WithTimeout(ctx, logTimeout)
+		defer cancel()
+		here = []string{}
+		for _, owner := range s.opts.OwnerUsernames {
+			if _, err := s.opts.OwnerPresence.AuthorByUsername(ctx, in.scope.ChatID, owner); err == nil {
+				here = append(here, "@"+owner)
+			}
+		}
+		s.ownersHere.set(in.scope.ChatID, here)
+	}
+	if len(here) == 0 {
+		return "[None of your owners is in this group: name them without @.]"
+	}
+	return "[Your owners in this group, whom you may tag: " + strings.Join(here, ", ") + ". Name any other owner without @.]"
 }
 
 // paragraphs joins the parts that are not empty, a blank line apart.

@@ -551,3 +551,35 @@ func TestAnswerToANamedMemberRepliesToTheirLatestMessage(t *testing.T) {
 		})
 	}
 }
+
+type fakePresence map[string]int64
+
+func (f fakePresence) AuthorByUsername(_ context.Context, _ int64, username string) (int64, error) {
+	if id, ok := f[username]; ok {
+		return id, nil
+	}
+	return 0, storage.ErrUnknownAuthor
+}
+
+// The model is told which owners are in the group, to tag only them; the
+// others it names without @.
+func TestOwnersHereLineNamesOnlyOwnersInTheGroup(t *testing.T) {
+	for name, c := range map[string]struct {
+		here fakePresence
+		want string
+	}{
+		"one here": {fakePresence{"tursunoffm": 9002}, "[Your owners in this group, whom you may tag: @tursunoffm. Name any other owner without @.]"},
+		"none":     {fakePresence{}, "[None of your owners is in this group: name them without @.]"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			f.opts.OwnerUsernames, f.opts.OwnerPresence = []string{"pronium", "tursunoffm"}, c.here
+
+			f.run(inGroup(groupMessage("Mira, seni kim yaratgan")))
+
+			if ctx := onlyRequest(t, f).req.Context; !strings.Contains(ctx, c.want) {
+				t.Errorf("context = %q, want %q", ctx, c.want)
+			}
+		})
+	}
+}
