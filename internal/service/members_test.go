@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"sync"
@@ -581,5 +582,80 @@ func TestOwnersHereLineNamesOnlyOwnersInTheGroup(t *testing.T) {
 				t.Errorf("context = %q, want %q", ctx, c.want)
 			}
 		})
+	}
+}
+
+type fakeHeroGuesses struct {
+	mu    sync.Mutex
+	game  storage.HeroGame
+	open  bool
+	asked int
+	wins  []int64
+}
+
+func (f *fakeHeroGuesses) OpenHeroGame(context.Context, int64, time.Time) (storage.HeroGame, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.asked++
+	return f.game, f.open, nil
+}
+
+func (f *fakeHeroGuesses) WinHeroGame(_ context.Context, _, userID int64, _ string, _ time.Time) (int, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.open {
+		return 0, false, nil
+	}
+	f.open = false
+	f.wins = append(f.wins, userID)
+	return 3, true, nil
+}
+
+// The first message naming the round's hero, addressed to the bot or not,
+// wins it and is answered in code; a wrong one is left to the usual path,
+// and a guess after the round is won wins nothing.
+func TestHeroGuessIsCheckedInCode(t *testing.T) {
+	f := newFixture()
+	f.opts.Now = func() time.Time { return headerNow }
+	games := &fakeHeroGuesses{game: storage.HeroGame{Hero: "X.Borg", EndsAt: headerNow.Add(time.Minute)}, open: true}
+	f.opts.HeroGuesses = games
+	wrong, right, late := groupMessage("Ling"), groupMessage("bu x borg"), groupMessage("xborg")
+	right.MessageID, late.MessageID = 31, 32
+
+	sent := f.run(inGroup(wrong), inGroup(right), inGroup(late))
+
+	if len(sent) != 1 || sent[0].text != fmt.Sprintf(textHeroWon.uz, "Bek", "X.Borg", 3) || sent[0].replyTo != 31 {
+		t.Errorf("sent = %+v, want the win once, in reply to the right guess", sent)
+	}
+	if len(games.wins) != 1 || len(f.replier.recorded()) != 0 {
+		t.Errorf("wins %v, model calls %d", games.wins, len(f.replier.recorded()))
+	}
+	for text, want := range map[string]bool{"X.Borg": true, "xborg!": true, "x borg zo'r": true, "borg": false, "Ling": false} {
+		if got := namesHero(text, "X.Borg"); got != want {
+			t.Errorf("namesHero(%q) = %v, want %v", text, got, want)
+		}
+	}
+}
+
+// People joining a group with a welcome get it, with their names; bots
+// joining, and groups without one, get nothing.
+func TestNewMembersAreWelcomed(t *testing.T) {
+	join := func(users ...telegram.User) telegram.Update {
+		u := inGroup(groupMessage(""))
+		u.Message.Text, u.Message.NewChatMembers = "", users
+		return u
+	}
+	f := newFixture()
+	f.opts.Rules = &fakeRuleBook{rules: []storage.GroupRule{{ChatID: groupID, Kind: storage.RuleWelcome, Text: "Xush kelibsiz, {name}! Qoidalar: so'kinmang."}}}
+
+	sent := f.run(join(telegram.User{ID: 51, FirstName: "Ali"}, telegram.User{ID: 52, FirstName: "Vali"}), join(telegram.User{ID: 53, FirstName: "Bot", IsBot: true}))
+
+	if len(sent) != 1 || sent[0].text != "Xush kelibsiz, Ali, Vali! Qoidalar: so'kinmang." {
+		t.Errorf("sent = %+v", sent)
+	}
+	g := newFixture()
+	g.opts.Rules = &fakeRuleBook{}
+	if sent := g.run(join(telegram.User{ID: 51, FirstName: "Ali"})); len(sent) != 0 {
+		t.Errorf("a group without a welcome sent %+v", sent)
 	}
 }

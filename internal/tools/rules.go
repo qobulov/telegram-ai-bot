@@ -18,6 +18,7 @@ import (
 
 const (
 	maxInstructionRunes = 300
+	maxWelcomeRunes     = 600
 	maxAddressRunes     = 40
 	maxRuleHours        = 720
 	// An instruction lasts a week unless the owner says otherwise; ignoring
@@ -119,13 +120,14 @@ func RulesTool(opts RulesOptions) Tool {
 			"set_address: how to address the owner who is asking, in every chat (text). " +
 			"watch_swearing: from now on, without you, a member's first insult here gets a warning and the next within a day a 1-hour mute, and a second swear at you within a day a 15-minute mute without warning that tags the group's creator, or the @username in text when the owner names whom to call; an admin, who cannot be muted, gets the warning and then that tag; the creator and owners are left alone. stop_watching_swearing turns it off. " +
 			"mute: stop writing in the group at all, until unmute. " +
+			"set_welcome: what you say, in code, to everyone who joins the group from now on, the owner's words copied exactly (text), \"{name}\" in it standing for the newcomers' names; remove_welcome: stop. " +
 			"list: the rules in force here. remove: delete a rule by its id from list. " +
 			"group: for another group than this chat, such as an order given in a private chat (\"Xz chatiga umuman yozma\" is mute with group Xz): its title, @username or id; ignore, unignore and about_member still need the owner's reply in that group. " +
 			"Never say a rule is saved unless this tool reported it.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["add_instruction", "ignore", "unignore", "set_address", "watch_swearing", "stop_watching_swearing", "mute", "unmute", "list", "remove"]},
+				"action": {"type": "string", "enum": ["add_instruction", "ignore", "unignore", "set_address", "watch_swearing", "stop_watching_swearing", "mute", "unmute", "set_welcome", "remove_welcome", "list", "remove"]},
 				"group": {"type": "string", "description": "Another group the action is for, as the owner named it: its title, @username or id. Leave out for this chat."},
 				"text": {"type": "string", "description": "For add_instruction: the owner's words, copied exactly as they wrote them, at most 300 characters: no rephrasing, translating, added names or fixed spelling; leave out words that are not the order. For set_address: the form of address, at most 40 characters. For watch_swearing: the @username a mute tags, if the owner named one."},
 				"hours": {"type": "integer", "description": "For add_instruction and ignore: how long the rule lasts, 1 to 720."},
@@ -184,12 +186,16 @@ func runRule(ctx context.Context, opts RulesOptions, caller Caller, args rulesAr
 		return stopWatchingSwearing(ctx, opts, caller)
 	case "mute", "unmute":
 		return muteGroup(ctx, opts, caller, args.Action == "mute")
+	case "set_welcome":
+		return setWelcome(ctx, opts, caller, args)
+	case "remove_welcome":
+		return removeWelcome(ctx, opts, caller)
 	case "list":
 		return listRules(ctx, opts, caller)
 	case "remove":
 		return removeRule(ctx, opts, caller, args)
 	default:
-		return nil, &ArgumentError{Message: "action must be add_instruction, ignore, unignore, set_address, watch_swearing, stop_watching_swearing, mute, unmute, list or remove"}
+		return nil, &ArgumentError{Message: "action must be add_instruction, ignore, unignore, set_address, watch_swearing, stop_watching_swearing, mute, unmute, set_welcome, remove_welcome, list or remove"}
 	}
 }
 
@@ -395,6 +401,48 @@ func stopWatchingSwearing(ctx context.Context, opts RulesOptions, caller Caller)
 	removed := false
 	for _, r := range rules {
 		if r.Kind == storage.RuleSwearGuard && r.ChatID == caller.ChatID {
+			ok, err := opts.Store.RemoveGroupRule(ctx, caller.ChatID, r.ID)
+			if err != nil {
+				return nil, err
+			}
+			removed = removed || ok
+		}
+	}
+	return map[string]bool{"removed": removed}, nil
+}
+
+// setWelcome keeps the group's welcome for new members, in the owner's own
+// words; a group has one, and a new one replaces it.
+func setWelcome(ctx context.Context, opts RulesOptions, caller Caller, args rulesArgs) (any, error) {
+	if caller.ChatID >= 0 {
+		return nil, &ArgumentError{Message: groupRuleOnly}
+	}
+	text, err := ruleText(args.Text, maxWelcomeRunes)
+	if err != nil {
+		return nil, err
+	}
+	// "{name}" is the model's to put in, where the owner said "ismini".
+	if !inOwnWords(caller.Words, strings.ReplaceAll(text, "{name}", "")) {
+		return nil, &ArgumentError{Message: notOwnWords}
+	}
+	id, err := opts.Store.SetGroupRule(ctx, storage.GroupRule{ChatID: caller.ChatID, Kind: storage.RuleWelcome, Text: text, SetBy: caller.UserID})
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"saved": true, "id": id, "note": "From now on everyone who joins gets this, sent in code."}, nil
+}
+
+func removeWelcome(ctx context.Context, opts RulesOptions, caller Caller) (any, error) {
+	if caller.ChatID >= 0 {
+		return nil, &ArgumentError{Message: groupRuleOnly}
+	}
+	rules, err := opts.Store.GroupRules(ctx, caller.ChatID)
+	if err != nil {
+		return nil, err
+	}
+	removed := false
+	for _, r := range rules {
+		if r.Kind == storage.RuleWelcome && r.ChatID == caller.ChatID {
 			ok, err := opts.Store.RemoveGroupRule(ctx, caller.ChatID, r.ID)
 			if err != nil {
 				return nil, err

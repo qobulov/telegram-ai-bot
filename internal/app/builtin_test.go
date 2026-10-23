@@ -87,7 +87,7 @@ func TestLiveDataToolsFollowTheConfiguration(t *testing.T) {
 	for _, token := range []string{"", "fd-token"} {
 		cfg := config.Config{Location: time.UTC, FootballDataToken: token}
 		bot := Bot{User: telegram.User{ID: 777, Username: "maria_bot"}}
-		live := liveDataTools(cfg, bot)
+		live := liveDataTools(cfg, bot, nil)
 		for _, name := range []string{"currency_rate", "get_weather", "prayer_times", "news_headlines", "wiki_lookup", "crypto_price"} {
 			if !hasTool(live, name) {
 				t.Errorf("token %q: no %s tool", token, name)

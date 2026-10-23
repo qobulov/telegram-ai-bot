@@ -21,6 +21,9 @@ const (
 	// RuleSwearGuard has the group's swearing warned about, then muted, in
 	// code; its UserName is whom a mute tags, "" for the group's creator.
 	RuleSwearGuard = "swear_guard"
+	// RuleWelcome is what the bot says to new members of one group, in an
+	// owner's words; "{name}" in it is the newcomers' names.
+	RuleWelcome = "welcome"
 )
 
 // MaxInstructions is how many instructions a group may have in force at

@@ -656,3 +656,25 @@ func TestRulesToolActsOnANamedGroupFromPrivate(t *testing.T) {
 		t.Errorf("ignore from private = %+v, want it to need a reply in the group", env)
 	}
 }
+
+// An owner sets the group's welcome in their own words, "{name}" being the
+// model's to add, and can remove it; it is one per group.
+func TestRulesToolSetsAndRemovesTheWelcome(t *testing.T) {
+	store := &fakeRules{}
+	registry := rulesRegistry(t, store, fakeAdmins{})
+	ctx := ownerSaying(groupA, "Mari, yangi kelganlarga yoz: Xush kelibsiz! Qoidalarni o'qing")
+
+	if env := rules(registry, ctx, `{"action":"set_welcome","text":"Xush kelibsiz, {name}! Qoidalarni o'qing"}`); !env.OK {
+		t.Fatalf("set_welcome = %+v", env)
+	}
+	if env := rules(registry, ctx, `{"action":"set_welcome","text":"Salom, bu yerda reklama mumkin"}`); env.OK {
+		t.Errorf("a welcome not in the owner's words was saved: %+v", env)
+	}
+	got := store.all()
+	if len(got) != 1 || got[0].Kind != storage.RuleWelcome || got[0].Text != "Xush kelibsiz, {name}! Qoidalarni o'qing" {
+		t.Fatalf("rules = %+v", got)
+	}
+	if env := rules(registry, ctx, `{"action":"remove_welcome"}`); !env.OK || len(store.all()) != 0 {
+		t.Errorf("remove_welcome = %+v, rules %+v", env, store.all())
+	}
+}

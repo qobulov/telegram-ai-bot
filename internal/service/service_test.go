@@ -3748,7 +3748,6 @@ func TestCheckButtonAnswersWithoutWriting(t *testing.T) {
 	}
 }
 
-
 // /help writes the group commands with the bot's own username, so they can
 // be tapped: "/mute@mira_bot", not "/mute@username".
 func TestHelpNamesTheBotsUsername(t *testing.T) {

@@ -143,6 +143,12 @@ var (
 		ru: "Вы ещё не подписались на все каналы. Подпишитесь и нажмите снова.",
 		en: "You haven't joined every channel yet. Join, then tap again.",
 	}
+	// textHeroWon takes the winner's name, the hero and their points.
+	textHeroWon = localText{
+		uz: "🎉 To'g'ri, %s! Bu — %s. +1 ochko (jami %d).",
+		ru: "🎉 Верно, %s! Это — %s. +1 очко (всего %d).",
+		en: "🎉 Right, %s! It's %s. +1 point (%d in all).",
+	}
 	textChannelsJoined = localText{
 		uz: "✅ Rahmat! Endi bemalol yozishingiz mumkin.",
 		ru: "✅ Спасибо! Теперь можете писать.",

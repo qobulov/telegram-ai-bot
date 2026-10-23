@@ -188,7 +188,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 	if len(cfg.OwnerUsernames) > 0 && len(cfg.OwnerIDs) == 0 {
 		logger.Warn("BOT_OWNER_IDS is not set: owners are known only by username, which can change hands, so they moderate only with their own admin rights")
 	}
-	available := append(builtinTools(cfg, store, bot, moderation.Tool()), liveDataTools(cfg, bot)...)
+	available := append(builtinTools(cfg, store, bot, moderation.Tool()), liveDataTools(cfg, bot, store)...)
 	registry, err := tools.NewRegistry(cfg.IsAdmin, logger, available...)
 	if err != nil {
 		return nil, err
@@ -364,8 +364,8 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 // liveDataTools look things up on public web APIs: rates, weather, prayer
 // times, news, Wikipedia, crypto, and football when a token is set. The
 // user agent gives the bot's t.me link as the contact some APIs ask for.
-func liveDataTools(cfg config.Config, bot Bot) []tools.Tool {
-	return webapi.Tools(webapi.Options{
+func liveDataTools(cfg config.Config, bot Bot, store *storage.Store) []tools.Tool {
+	opts := webapi.Options{
 		UserAgent:     "MariaBot/1.0 (+https://t.me/" + bot.User.Username + ")",
 		Location:      cfg.Location,
 		FootballToken: cfg.FootballDataToken,
@@ -373,7 +373,11 @@ func liveDataTools(cfg config.Config, bot Bot) []tools.Tool {
 		TavilyKey:     cfg.TavilyAPIKey,
 		TMDBToken:     cfg.TMDBToken,
 		YouTubeKey:    cfg.YouTubeAPIKey,
-	})
+	}
+	if store != nil {
+		opts.HeroGames = store
+	}
+	return webapi.Tools(opts)
 }
 
 // imageTool draws with Gemini and counts pictures in the database.
@@ -568,6 +572,8 @@ func NewCleanup(ctx context.Context, cfg config.Config, logger *slog.Logger) (*C
 		Secret: cfg.CronSecret,
 		Logger: logger,
 		Run: func(ctx context.Context) (any, error) {
+			// The report comes first: the history it counts is then still there.
+			sendDailyReport(ctx, cfg, store, reportSender(cfg, logger), time.Now(), logger)
 			return expire(ctx, cfg, store, logger)
 		},
 	})
@@ -576,6 +582,12 @@ func NewCleanup(ctx context.Context, cfg config.Config, logger *slog.Logger) (*C
 		return nil, err
 	}
 	return &Cleanup{Handler: handler, Close: store.Close}, nil
+}
+
+// reportSender is the Telegram client the daily report goes out with. The
+// cleanup function has no bot of its own, and needs no getMe for this.
+func reportSender(cfg config.Config, logger *slog.Logger) ReportSender {
+	return telegram.NewClient(telegram.Options{Token: cfg.TelegramToken, BaseURL: cfg.TelegramAPIURL, Logger: logger})
 }
 
 // expire applies the retention policy once.

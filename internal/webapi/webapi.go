@@ -53,7 +53,9 @@ type Options struct {
 	// YouTubeKey is a YouTube Data API key. Without it there is no
 	// youtube_search tool.
 	YouTubeKey string
-	BaseURLs   BaseURLs
+	// HeroGames keeps "guess the hero"; without it there is no game.
+	HeroGames HeroGames
+	BaseURLs  BaseURLs
 }
 
 // BaseURLs says where each API lives. Empty fields mean the production
@@ -142,6 +144,7 @@ type apis struct {
 	tavilyKey     string
 	tmdbToken     string
 	youtubeKey    string
+	heroGames     HeroGames
 }
 
 // Tools returns the live-data tools. Football is included only when
@@ -168,6 +171,9 @@ func Tools(opts Options) []tools.Tool {
 	if a.tmdbToken != "" {
 		list = append(list, a.moviesTool())
 	}
+	if a.heroGames != nil {
+		list = append(list, a.heroQuizTool())
+	}
 	if a.youtubeKey != "" {
 		list = append(list, a.youtubeTool())
 	}
@@ -193,6 +199,7 @@ func newAPIs(opts Options) *apis {
 		tavilyKey:     opts.TavilyKey,
 		tmdbToken:     opts.TMDBToken,
 		youtubeKey:    opts.YouTubeKey,
+		heroGames:     opts.HeroGames,
 	}
 }
 
