@@ -2,10 +2,8 @@ package storage
 
 import (
 	"context"
-	"errors"
 	"fmt"
-
-	"github.com/jackc/pgx/v5"
+	"time"
 )
 
 // UserProfile is what a person asked the bot to remember about talking to
@@ -14,6 +12,9 @@ type UserProfile struct {
 	UserID   int64
 	CallName string
 	Siz      bool
+	// FirstTalk is when the user first talked to the bot, zero when they
+	// never did; it is read, not saved.
+	FirstTalk time.Time
 }
 
 // Empty reports a profile that asks for nothing.
@@ -24,12 +25,17 @@ func (p UserProfile) Empty() bool {
 // Profile returns the user's profile, empty when they have none.
 func (s *Store) Profile(ctx context.Context, userID int64) (UserProfile, error) {
 	p := UserProfile{UserID: userID}
-	err := s.pool.QueryRow(ctx, `SELECT call_name, siz FROM user_profiles WHERE user_id = $1`, userID).Scan(&p.CallName, &p.Siz)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return p, nil
-	}
+	var firstTalk *time.Time
+	err := s.pool.QueryRow(ctx, `
+		SELECT coalesce(p.call_name, ''), coalesce(p.siz, false), u.created_at
+		FROM (SELECT $1::bigint AS id) asked
+		LEFT JOIN user_profiles p ON p.user_id = asked.id
+		LEFT JOIN users u ON u.telegram_id = asked.id`, userID).Scan(&p.CallName, &p.Siz, &firstTalk)
 	if err != nil {
 		return UserProfile{}, fmt.Errorf("storage: profile: %w", err)
+	}
+	if firstTalk != nil {
+		p.FirstTalk = *firstTalk
 	}
 	return p, nil
 }

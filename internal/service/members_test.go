@@ -315,3 +315,40 @@ func TestTheGroupSizeLimitIsASetting(t *testing.T) {
 		})
 	}
 }
+
+// Someone who first talked to the bot within a day, or never, is marked new
+// so the model speaks to them with "siz"; a long-known person, one already
+// asking for "siz" and an owner are not.
+func TestNewcomerIsMarkedForSiz(t *testing.T) {
+	cases := map[string]struct {
+		profile storage.UserProfile
+		owner   bool
+		want    bool
+	}{
+		"never talked before":    {storage.UserProfile{}, false, true},
+		"first talk an hour ago": {storage.UserProfile{FirstTalk: headerNow.Add(-time.Hour)}, false, true},
+		"known for a week":       {storage.UserProfile{FirstTalk: headerNow.Add(-7 * 24 * time.Hour)}, false, false},
+		"already asks for siz":   {storage.UserProfile{Siz: true}, false, false},
+		"an owner":               {storage.UserProfile{}, true, false},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			f.opts.Now = func() time.Time { return headerNow }
+			f.opts.Profiles = fakeProfileBook{userID: c.profile}
+			if c.owner {
+				f.opts.OwnerIDs = map[int64]bool{userID: true}
+			}
+
+			f.run(inGroup(groupMessage("Mira, salom")))
+
+			calls := f.replier.recorded()
+			if len(calls) != 1 {
+				t.Fatalf("model calls = %d", len(calls))
+			}
+			if got := strings.Contains(calls[0].req.Context, newcomerLine); got != c.want {
+				t.Errorf("newcomer line = %v, want %v; context %q", got, c.want, calls[0].req.Context)
+			}
+		})
+	}
+}

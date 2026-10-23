@@ -101,6 +101,26 @@ func TestProfileIsSetChangedAndCleared(t *testing.T) {
 	}
 }
 
+// A profile carries when the person first talked to the bot, and nothing
+// for someone it has never seen.
+func TestProfileCarriesFirstTalk(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	if _, err := store.pool.Exec(ctx, `INSERT INTO users (telegram_id, created_at) VALUES ($1, now() - interval '3 days')`, alice); err != nil {
+		t.Fatal(err)
+	}
+	p, err := store.Profile(ctx, alice)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if age := time.Since(p.FirstTalk); age < 71*time.Hour || age > 73*time.Hour {
+		t.Errorf("first talk %v ago, want about 3 days", age)
+	}
+	if p, _ := store.Profile(ctx, bob); !p.FirstTalk.IsZero() {
+		t.Errorf("an unseen user first talked at %v", p.FirstTalk)
+	}
+}
+
 // A person's own exchanges with the bot in other chats, with the answers;
 // never someone else's, never this chat's, never older than since.
 func TestExchangesElsewhereAreThePersonsOwn(t *testing.T) {

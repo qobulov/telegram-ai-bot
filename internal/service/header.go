@@ -138,10 +138,31 @@ func (s *Service) profileLine(ctx context.Context, in incoming, rules []storage.
 	if p.Siz {
 		asks = append(asks, `spoken to with "siz"`)
 	}
-	if len(asks) == 0 {
-		return ""
+	var lines []string
+	if len(asks) > 0 {
+		lines = append(lines, "[In every chat, the person writing is to be "+strings.Join(asks, " and ")+".]")
 	}
-	return "[In every chat, the person writing is to be " + strings.Join(asks, " and ") + ".]"
+	if !p.Siz && s.isNewcomer(in, p) {
+		lines = append(lines, newcomerLine)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// newcomerWindow is how long after first talking to the bot a person is
+// still new to it.
+const newcomerWindow = 24 * time.Hour
+
+// newcomerLine tells the model, from the database rather than its guess,
+// that the person writing is new to it.
+const newcomerLine = `[The person writing is talking to you for the first time today or ever: speak to them with "siz" ("вы" in Russian), politely, unless they are rude to you.]`
+
+// isNewcomer reports a person who first talked to the bot within
+// newcomerWindow, or never did; owners are never new.
+func (s *Service) isNewcomer(in incoming, p storage.UserProfile) bool {
+	if s.isOwner(in.msg.From) {
+		return false
+	}
+	return p.FirstTalk.IsZero() || s.opts.Now().Sub(p.FirstTalk) < newcomerWindow
 }
 
 // ruleLines lists the instructions, then the ignored members. Each is folded
