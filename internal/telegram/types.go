@@ -415,6 +415,14 @@ func AllPermissions() ChatPermissions {
 	}
 }
 
+// NoStickers lets a member do everything but send stickers and GIFs, which
+// Telegram allows or forbids together with games and inline bots.
+func NoStickers() ChatPermissions {
+	p := AllPermissions()
+	p.CanSendOtherMessages = false
+	return p
+}
+
 // Restriction sets what a member of a supergroup may do, until a time.
 type Restriction struct {
 	ChatID      int64

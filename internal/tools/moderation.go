@@ -23,6 +23,10 @@ const (
 	actionUnban  = "unban"
 	actionPin    = "pin"
 	actionUnpin  = "unpin"
+	// actionNoStickers takes away a member's stickers and GIFs, which
+	// Telegram allows or forbids together; actionStickers gives them back.
+	actionNoStickers = "no_stickers"
+	actionStickers   = "allow_stickers"
 )
 
 const (
@@ -31,6 +35,11 @@ const (
 	// week at most.
 	defaultMuteMinutes = 60
 	maxMuteMinutes     = 7 * 24 * 60
+	// Stickers are taken away for a day unless the person asking says
+	// otherwise, and for a year at most: Telegram counts a longer
+	// restriction as forever.
+	defaultNoStickersMinutes = 24 * 60
+	maxNoStickersMinutes     = 365 * 24 * 60
 	// One person may have the bot act maxActions times per actionWindow, so
 	// that a careless or stolen admin account cannot empty a group through
 	// it.
@@ -40,6 +49,7 @@ const (
 	maxReasonRunes  = 200
 	clockLayout     = "15:04"
 	dateClockLayout = "02.01 15:04"
+	yearClockLayout = "02.01.2006 15:04"
 )
 
 // Refusals, in words the model can be given.
@@ -76,6 +86,9 @@ var neededRight = map[string]string{
 	actionUnban:  telegram.RightRestrictMembers,
 	actionPin:    telegram.RightPinMessages,
 	actionUnpin:  telegram.RightPinMessages,
+
+	actionNoStickers: telegram.RightRestrictMembers,
+	actionStickers:   telegram.RightRestrictMembers,
 }
 
 // rightWords names the rights moderation needs, for refusals.
@@ -185,13 +198,14 @@ func (m *Moderation) Tool() Tool {
 		Name: "moderate",
 		Description: "Whenever someone in a group asks you to: have something done to the message they replied to. It checks who may ask, which are the group's admins with the right and your owners, and refuses anyone else with the reason. " +
 			"delete: delete that message. mute (minutes, default 60) or unmute: its author. ban or unban: its author. pin or unpin: that message. " +
-			"For mute, unmute, ban and unban without such a reply, or replying to their own message, it acts on the one member they tagged with @, once Telegram confirms who that is. " +
+			"no_stickers (minutes, default a day) or allow_stickers: take away or give back its author's stickers and GIFs, which Telegram only allows or forbids together; use it, not ban or ignore, when they ask to block someone's stickers. " +
+			"For mute, unmute, ban, unban, no_stickers and allow_stickers without such a reply, or replying to their own message, it acts on the one member they tagged with @, once Telegram confirms who that is. " +
 			"It checks everyone's rights and does it at once, with no question, but only when the person's own message asks for it; say it is done only when it reports done.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["delete", "mute", "unmute", "ban", "unban", "pin", "unpin"]},
-				"minutes": {"type": "integer", "description": "For mute: how long, 1 to 10080. Default 60."},
+				"action": {"type": "string", "enum": ["delete", "mute", "unmute", "ban", "unban", "pin", "unpin", "no_stickers", "allow_stickers"]},
+				"minutes": {"type": "integer", "description": "For mute: how long, 1 to 10080, default 60. For no_stickers: 1 to 525600, default 1440; the most for \"forever\"."},
 				"reason": {"type": "string", "description": "Optional: why, in a few words."}
 			},
 			"required": ["action"],
@@ -224,7 +238,7 @@ func (m *Moderation) run(ctx context.Context, raw json.RawMessage) (any, error) 
 		return nil, err
 	}
 	if _, known := neededRight[args.Action]; !known {
-		return nil, &ArgumentError{Message: "action must be delete, mute, unmute, ban, unban, pin or unpin"}
+		return nil, &ArgumentError{Message: "action must be delete, mute, unmute, ban, unban, pin, unpin, no_stickers or allow_stickers"}
 	}
 	if !askedFor(caller.Words, args.Action) {
 		return nil, &DeniedError{Message: notAsked}
@@ -324,7 +338,7 @@ func (m *Moderation) tagged(ctx context.Context, chatID int64, mention Mention, 
 // onMember reports an action on a member rather than on a message.
 func onMember(action string) bool {
 	switch action {
-	case actionMute, actionUnmute, actionBan, actionUnban:
+	case actionMute, actionUnmute, actionBan, actionUnban, actionNoStickers, actionStickers:
 		return true
 	}
 	return false
@@ -356,8 +370,13 @@ func groupRequester(ctx context.Context) (Caller, error) {
 // order is carried out.
 func (m *Moderation) newOrder(caller Caller, action string, target Target, minutes int, reason string) order {
 	o := order{caller: caller, action: action, target: target, reason: cutRunes(strings.TrimSpace(reason), maxReasonRunes)}
-	if action == actionMute {
+	switch action {
+	case actionMute:
 		o.minutes = muteMinutes(minutes)
+	case actionNoStickers:
+		o.minutes = clampMinutes(minutes, defaultNoStickersMinutes, maxNoStickersMinutes)
+	}
+	if o.minutes > 0 {
 		o.until = m.opts.Now().Add(time.Duration(o.minutes) * time.Minute)
 	}
 	return o
@@ -366,10 +385,16 @@ func (m *Moderation) newOrder(caller Caller, action string, target Target, minut
 // muteMinutes is how long a mute lasts: an hour when not given, otherwise
 // a minute to a week.
 func muteMinutes(minutes int) int {
+	return clampMinutes(minutes, defaultMuteMinutes, maxMuteMinutes)
+}
+
+// clampMinutes is minutes, or byDefault when not given, kept between a
+// minute and most.
+func clampMinutes(minutes, byDefault, most int) int {
 	if minutes == 0 {
-		return defaultMuteMinutes
+		return byDefault
 	}
-	return min(max(minutes, 1), maxMuteMinutes)
+	return min(max(minutes, 1), most)
 }
 
 // check decides whether the bot may carry out o: whether the person asking
@@ -523,6 +548,10 @@ func (m *Moderation) send(ctx context.Context, o order) error {
 		return m.opts.Telegram.RestrictChatMember(ctx, telegram.Restriction{ChatID: chatID, UserID: userID, Permissions: telegram.NoPermissions(), Until: o.until})
 	case actionUnmute:
 		return m.opts.Telegram.RestrictChatMember(ctx, telegram.Restriction{ChatID: chatID, UserID: userID, Permissions: telegram.AllPermissions()})
+	case actionNoStickers:
+		return m.opts.Telegram.RestrictChatMember(ctx, telegram.Restriction{ChatID: chatID, UserID: userID, Permissions: telegram.NoStickers(), Until: o.until})
+	case actionStickers:
+		return m.opts.Telegram.RestrictChatMember(ctx, telegram.Restriction{ChatID: chatID, UserID: userID, Permissions: telegram.AllPermissions()})
 	case actionBan:
 		return m.opts.Telegram.BanChatMember(ctx, chatID, userID)
 	case actionUnban:
@@ -581,6 +610,10 @@ func (o order) done(until string) chatText {
 		return chatText{"Bajarildi: " + name + " bloklandi.", "Готово: " + name + " забанен(а)."}
 	case actionUnban:
 		return chatText{"Bajarildi: " + name + " blokdan chiqarildi va qayta qo'shila oladi.", "Готово: " + name + " разбанен(а) и может вернуться."}
+	case actionNoStickers:
+		return chatText{"Bajarildi: " + name + " " + until + " gacha stiker va GIF yubora olmaydi.", "Готово: " + name + " не может отправлять стикеры и GIF до " + until + "."}
+	case actionStickers:
+		return chatText{"Bajarildi: " + name + " yana stiker va GIF yubora oladi.", "Готово: " + name + " снова может отправлять стикеры и GIF."}
 	case actionPin:
 		return chatText{"Bajarildi: " + name + " xabari qadaldi.", "Готово: сообщение от " + name + " закреплено."}
 	}
@@ -588,11 +621,14 @@ func (o order) done(until string) chatText {
 }
 
 // untilText is when a mute ends: the time, and the date too when it is not
-// today.
+// today, with the year when it is not this year.
 func (m *Moderation) untilText(until time.Time) string {
 	local, now := until.In(m.opts.Location), m.opts.Now().In(m.opts.Location)
-	if local.Format(time.DateOnly) == now.Format(time.DateOnly) {
+	switch {
+	case local.Format(time.DateOnly) == now.Format(time.DateOnly):
 		return local.Format(clockLayout)
+	case local.Year() != now.Year():
+		return local.Format(yearClockLayout)
 	}
 	return local.Format(dateClockLayout)
 }
@@ -607,7 +643,10 @@ var actionWords = map[string][]string{
 	actionBan:    {"ban", "бан", "blok", "chiqar", "hayda", "kick", "кик", "выгн", "выкин", "заблок"},
 	actionUnban:  {"ban", "бан", "blok", "qaytar", "верн", "разблок"},
 	actionPin:    {"pin", "qada", "закреп"},
-	actionUnpin:  {"pin", "qada", "закреп", "откреп"},
+	// Asking about someone's stickers is enough: the model picks which.
+	actionNoStickers: {"stik", "stic", "стик", "gif", "гиф"},
+	actionStickers:   {"stik", "stic", "стик", "gif", "гиф"},
+	actionUnpin:      {"pin", "qada", "закреп", "откреп"},
 }
 
 var foldApostrophes = strings.NewReplacer("'", "", "ʻ", "", "ʼ", "", "’", "", "‘", "", "`", "")

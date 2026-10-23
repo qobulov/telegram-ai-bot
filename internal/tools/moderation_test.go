@@ -798,3 +798,46 @@ func TestModerateSecondCallInATurnSaysAlreadyDone(t *testing.T) {
 		t.Errorf("calls = %q, want one", calls)
 	}
 }
+
+// Stickers and GIFs are taken away for as long as asked, a day by default
+// and a year at most, and given back; nothing else is taken.
+func TestModerateTakesAwayAndGivesBackStickers(t *testing.T) {
+	env := newModerationEnv(t)
+	ctx := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Owner: true, Human: true, UpdateID: 300, MessageID: 50, Target: bekTarget(), Words: "Maria, stiker tashashini blokla"}, &Sink{})
+
+	said := env.act(t, ctx, `{"action":"no_stickers"}`)
+
+	if want := "Bajarildi: Bek @bek 17.10 15:04 gacha stiker va GIF yubora olmaydi."; said != want {
+		t.Errorf("said %q, want %q", said, want)
+	}
+	r := env.telegram.restricted()
+	if len(r) != 1 || r[0].UserID != memberID || r[0].Permissions != telegram.NoStickers() || !r[0].Until.Equal(rulesNow.Add(24*time.Hour)) {
+		t.Fatalf("restrictions = %+v, want Bek's stickers taken for a day", r)
+	}
+	if p := r[0].Permissions; !p.CanSendMessages || !p.CanSendPhotos || p.CanSendOtherMessages {
+		t.Errorf("permissions = %+v, want only stickers and GIFs taken", p)
+	}
+
+	ctx = WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Owner: true, Human: true, UpdateID: 301, MessageID: 51, Target: bekTarget(), Words: "100 yilga stikerini blokla"}, &Sink{})
+	said = env.act(t, ctx, `{"action":"no_stickers","minutes":52560000}`)
+	if want := "Bajarildi: Bek @bek 16.10.2027 15:04 gacha stiker va GIF yubora olmaydi."; said != want {
+		t.Errorf("said %q, want %q, a year at most", said, want)
+	}
+
+	ctx = WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Owner: true, Human: true, UpdateID: 302, MessageID: 52, Target: bekTarget(), Words: "stikerini och"}, &Sink{})
+	if said := env.act(t, ctx, `{"action":"allow_stickers"}`); said != "Bajarildi: Bek @bek yana stiker va GIF yubora oladi." {
+		t.Errorf("said %q", said)
+	}
+	if r := env.telegram.restricted(); len(r) != 3 || r[2].Permissions != telegram.AllPermissions() || !r[2].Until.IsZero() {
+		t.Errorf("restrictions = %+v, want the stickers given back", r)
+	}
+}
+
+// Taking stickers needs the asker's own words to be about stickers.
+func TestModerateStickersOnlyWhenAsked(t *testing.T) {
+	env := newModerationEnv(t)
+	ctx := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Owner: true, Human: true, UpdateID: 303, MessageID: 50, Target: bekTarget(), Words: "Maria, salom"}, &Sink{})
+
+	expectRefusal(t, env.moderate(ctx, `{"action":"no_stickers"}`), "forbidden", "does not ask for this")
+	env.nothingActed(t)
+}
