@@ -4,6 +4,7 @@
 package service
 
 import (
+	"cmp"
 	"context"
 	"log/slog"
 	"strings"
@@ -334,6 +335,10 @@ type incoming struct {
 	// unanswered marks a private message PRIVATE_CHATS does not answer: it
 	// gets a reaction, chosen in code, and nothing else.
 	unanswered bool
+	// replyTo, when set, is the message answers reply to instead of the
+	// one being handled: a member's message the asker replied to, when the
+	// answer speaks to that member.
+	replyTo int64
 }
 
 // replyTarget is the message an answer should reply to: the original message
@@ -341,7 +346,7 @@ type incoming struct {
 // private chat.
 func (in incoming) replyTarget() int64 {
 	if in.group {
-		return in.msg.MessageID
+		return cmp.Or(in.replyTo, in.msg.MessageID)
 	}
 	return 0
 }

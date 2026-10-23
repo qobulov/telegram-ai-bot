@@ -383,3 +383,29 @@ func TestOwnersEarlierMessagesCountAsTheirWords(t *testing.T) {
 		t.Errorf("a member's words carry the owner's order: %q", member.Words)
 	}
 }
+
+// An answer the model meant for the member the asker replied to goes as a
+// reply to that member's message; never to the bot's own or the asker's.
+func TestToThemAnswerRepliesToTheMember(t *testing.T) {
+	cases := map[string]struct {
+		repliedTo int64
+		want      int64
+	}{
+		"a member's message": {repliedTo: 4242, want: 29},
+		"the bot's message":  {repliedTo: botID, want: 30},
+		"the asker's own":    {repliedTo: userID, want: 30},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			f.replier.answer, f.replier.toReplied = "Miyang joyida.", true
+			ask := replyingTo(groupMessage("Mira, bunga bir nima de"), c.repliedTo, "miyasi kichkina")
+
+			sent := f.run(inGroup(ask))
+
+			if len(sent) != 1 || sent[0].replyTo != c.want {
+				t.Errorf("sent = %+v, want one reply to %d", sent, c.want)
+			}
+		})
+	}
+}

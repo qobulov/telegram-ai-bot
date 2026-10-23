@@ -126,7 +126,10 @@ type Answer struct {
 	// GIF is the same for a GIF, which the model asks for instead of a
 	// sticker now and then.
 	GIF string
-	ID  int64
+	// ToReplied means the answer speaks to the member whose message the
+	// asker replied to, so it is sent as a reply to that message.
+	ToReplied bool
+	ID        int64
 }
 
 // Reply answers the user's message and saves the whole turn. Nothing is
@@ -259,7 +262,24 @@ func writesToolCall(answer string, definitions []ai.ToolDefinition) bool {
 // turn. A reaction is saved as "<reacted X>", so that later turns see that
 // the bot answered and how.
 func finish(t *turn, reply ai.Message) (Answer, error) {
-	answer := strings.TrimSpace(reply.Content)
+	answer, toReplied := cutToThem(strings.TrimSpace(reply.Content))
+	result, err := finishText(t, answer)
+	result.ToReplied = toReplied && err == nil && result.Text != ""
+	return result, err
+}
+
+// toThemMarker opens an answer meant for the member the asker replied to:
+// "[to them]", in any case or bracket.
+var toThemMarker = regexp.MustCompile(`(?i)^[\[(<]\s*to\s+them\s*[\])>]\s*`)
+
+// cutToThem is answer without its "[to them]" marker, and whether it had
+// one.
+func cutToThem(answer string) (string, bool) {
+	marker := toThemMarker.FindString(answer)
+	return strings.TrimSpace(answer[len(marker):]), marker != ""
+}
+
+func finishText(t *turn, answer string) (Answer, error) {
 	if answer == "" {
 		return Answer{}, ai.ErrEmptyResponse
 	}

@@ -37,6 +37,10 @@ type outcome struct {
 	// sticker is the category of sticker the model asked to send after the
 	// text, or alone; "" for none. gif is the same for a GIF.
 	sticker, gif string
+	// toReplied sends the answer as a reply to the member's message the
+	// asker replied to, as the model chose for an answer that speaks to
+	// them.
+	toReplied bool
 }
 
 func say(text string) outcome { return outcome{text: text} }
@@ -129,6 +133,9 @@ func (s *Service) process(in incoming) {
 // fits; a longer answer follows as its own message. A reaction is set on the
 // message being answered and is not a message, so alone it returns 0.
 func (s *Service) deliver(in incoming, out *outcome) int64 {
+	if out.toReplied {
+		in.replyTo = s.repliedMember(in)
+	}
 	if id := s.sendAudios(in, out.audios); id != 0 {
 		// A song asked for is the answer alone, as a sticker is: words with
 		// it only say what it is. Only when it cannot be sent do they go.
@@ -147,6 +154,18 @@ func (s *Service) deliver(in incoming, out *outcome) int64 {
 		answerID = id
 	}
 	return answerID
+}
+
+// repliedMember is the message of another member the asker replied to, or
+// 0: an answer is never sent as a reply to the bot's own message, the
+// asker's or a service message.
+func (s *Service) repliedMember(in incoming) int64 {
+	replied := in.msg.ReplyToMessage
+	if !in.group || replied == nil || replied.From == nil || replied.IsService() ||
+		replied.From.ID == s.opts.Bot.ID || replied.From.ID == in.userID {
+		return 0
+	}
+	return replied.MessageID
 }
 
 // sendCards sends the item cards a tool chose, after the answer, and returns
@@ -745,7 +764,7 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 		return outcome{reaction: answer.Reaction, answerID: answer.ID}
 	case err == nil:
 		log.Info("turn completed")
-		out := outcome{text: s.fitted(in, answer.Text), answerID: answer.ID}
+		out := outcome{text: s.fitted(in, answer.Text), answerID: answer.ID, toReplied: answer.ToReplied}
 		if answer.Text == "" {
 			// A sticker or a GIF is an answer of its own, never one more
 			// message after the words.

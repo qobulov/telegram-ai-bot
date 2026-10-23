@@ -763,3 +763,26 @@ func TestToolCallWrittenAsTextIsNotSent(t *testing.T) {
 		}
 	}
 }
+
+// "[to them]" opening an answer sends it to the member the asker replied
+// to; it is never posted or saved, and anywhere else it is no marker.
+func TestToThemMarkerAddressesTheRepliedMember(t *testing.T) {
+	for content, want := range map[string]Answer{
+		"[to them] Miyang kichkina emas.": {Text: "Miyang kichkina emas.", ToReplied: true},
+		"(To Them)Salom":                   {Text: "Salom", ToReplied: true},
+		"Salom [to them]":                  {Text: "Salom [to them]"},
+		"[to them] [react 🤣]":              {Reaction: "🤣"},
+	} {
+		f := newFixture(text(content))
+		answer, err := f.agent.Reply(context.Background(), request(1, "Mari, bunga bir nima de"))
+		answer.ID = 0
+		if err != nil || answer != want {
+			t.Errorf("%q: got %+v, %v; want %+v", content, answer, err, want)
+		}
+		for _, m := range f.store.history[testScope] {
+			if want.ToReplied && strings.Contains(strings.ToLower(m.Content), "to them") {
+				t.Errorf("%q: saved %q with the marker", content, m.Content)
+			}
+		}
+	}
+}
