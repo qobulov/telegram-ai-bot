@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"net/url"
 	"slices"
 	"strings"
 	"sync"
@@ -33,11 +34,16 @@ func (f *fakeGuards) Spammer(_ context.Context, userID int64) (string, bool, err
 	return source, bad, nil
 }
 
-func (f *fakeGuards) MaliciousHost(_ context.Context, host string) (string, bool, error) {
+// MaliciousLink judges a link by its host.
+func (f *fakeGuards) MaliciousLink(_ context.Context, link string) (string, bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.hosts = append(f.hosts, host)
-	reason, bad := f.badHosts[host]
+	f.hosts = append(f.hosts, link)
+	u, err := url.Parse(link)
+	if err != nil {
+		return "", false, err
+	}
+	reason, bad := f.badHosts[u.Hostname()]
 	return reason, bad, nil
 }
 
@@ -201,8 +207,9 @@ func TestLinkGuardDeletesLinksToMaliciousHosts(t *testing.T) {
 	if !slices.Equal(moderator.deleted, []int64{30}) {
 		t.Errorf("deleted %v, want only the bad link's message", moderator.deleted)
 	}
-	if !slices.Equal(guards.hosts, []string{"evil.example", "good.example"}) {
-		t.Errorf("hosts asked = %v, want each once", guards.hosts)
+	// The rest of a message with a bad link need not be asked about.
+	if want := []string{"https://evil.example/app.apk", "https://good.example/page"}; !slices.Equal(guards.hosts, want) {
+		t.Errorf("links asked = %v, want %v", guards.hosts, want)
 	}
 }
 

@@ -1,13 +1,14 @@
 // Package guards asks outside services whether a member, a link or a
 // picture is to be kept out of a group: spam lists of Telegram accounts
-// (CAS, lols.bot), malicious hosts (URLhaus) and nudity and gore in
-// pictures (Sightengine). They answer only; the service acts.
+// (CAS, lols.bot), malicious links (Google Safe Browsing, URLhaus) and
+// nudity and gore in pictures (Sightengine). They answer only; the service acts.
 package guards
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -30,6 +31,8 @@ type Options struct {
 	CAS, Lols         string
 	URLhaus           string
 	URLhausKey        string
+	SafeBrowsing      string
+	SafeBrowsingKey   string
 	Sightengine       string
 	SightengineUser   string
 	SightengineSecret string
@@ -55,6 +58,9 @@ func New(opts Options) *Checker {
 	if opts.URLhaus == "" {
 		opts.URLhaus = "https://urlhaus-api.abuse.ch"
 	}
+	if opts.SafeBrowsing == "" {
+		opts.SafeBrowsing = "https://safebrowsing.googleapis.com"
+	}
 	if opts.Sightengine == "" {
 		opts.Sightengine = "https://api.sightengine.com"
 	}
@@ -63,7 +69,9 @@ func New(opts Options) *Checker {
 
 // CanCheckLinks and CanCheckImages report whether the keys those need are
 // set.
-func (c *Checker) CanCheckLinks() bool { return c.opts.URLhausKey != "" }
+func (c *Checker) CanCheckLinks() bool {
+	return c.opts.URLhausKey != "" || c.opts.SafeBrowsingKey != ""
+}
 func (c *Checker) CanCheckImages() bool {
 	return c.opts.SightengineUser != "" && c.opts.SightengineSecret != ""
 }
@@ -92,9 +100,84 @@ func (c *Checker) Spammer(ctx context.Context, userID int64) (string, bool, erro
 	return "", false, nil
 }
 
-// MaliciousHost reports whether URLhaus lists a host, by its own entries or
+// MaliciousLink reports whether a link is to malware, phishing or unwanted
+// software, and why: Google Safe Browsing judges the link, URLhaus its
+// host, each when its key is set. One service failing does not hide the
+// other's answer.
+func (c *Checker) MaliciousLink(ctx context.Context, link string) (string, bool, error) {
+	u, err := url.Parse(link)
+	if err != nil || u.Hostname() == "" {
+		return "", false, fmt.Errorf("guards: not a link: %q", link)
+	}
+	var errs []error
+	if c.opts.SafeBrowsingKey != "" {
+		reason, bad, err := c.safeBrowsing(ctx, link)
+		if bad {
+			return reason, true, nil
+		}
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if c.opts.URLhausKey != "" {
+		reason, bad, err := c.urlhausHost(ctx, strings.ToLower(u.Hostname()))
+		if bad {
+			return reason, true, nil
+		}
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) > 0 && len(errs) == c.linkServices() {
+		return "", false, errors.Join(errs...)
+	}
+	return "", false, nil
+}
+
+// linkServices is how many services judge links.
+func (c *Checker) linkServices() int {
+	n := 0
+	for _, key := range []string{c.opts.SafeBrowsingKey, c.opts.URLhausKey} {
+		if key != "" {
+			n++
+		}
+	}
+	return n
+}
+
+// safeBrowsing asks Google Safe Browsing about a link. The key goes in a
+// header, so that it is in no URL an error or a log could show.
+func (c *Checker) safeBrowsing(ctx context.Context, link string) (string, bool, error) {
+	query, err := json.Marshal(map[string]any{
+		"client": map[string]string{"clientId": "maria-bot", "clientVersion": "1.0"},
+		"threatInfo": map[string]any{
+			"threatTypes":      []string{"MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION"},
+			"platformTypes":    []string{"ANY_PLATFORM"},
+			"threatEntryTypes": []string{"URL"},
+			"threatEntries":    []map[string]string{{"url": link}},
+		},
+	})
+	if err != nil {
+		return "", false, err
+	}
+	var answer struct {
+		Matches []struct {
+			ThreatType string `json:"threatType"`
+		} `json:"matches"`
+	}
+	header := http.Header{"X-Goog-Api-Key": {c.opts.SafeBrowsingKey}, "Content-Type": {"application/json"}}
+	if err := c.postJSON(ctx, c.opts.SafeBrowsing+"/v4/threatMatches:find", header, bytes.NewReader(query), &answer); err != nil {
+		return "", false, err
+	}
+	if len(answer.Matches) == 0 {
+		return "", false, nil
+	}
+	return "Google: " + strings.ToLower(answer.Matches[0].ThreatType), true, nil
+}
+
+// urlhausHost reports whether URLhaus lists a host, by its own entries or
 // the blocklists it relays (Spamhaus DBL, SURBL), and why.
-func (c *Checker) MaliciousHost(ctx context.Context, host string) (string, bool, error) {
+func (c *Checker) urlhausHost(ctx context.Context, host string) (string, bool, error) {
 	var answer struct {
 		QueryStatus string `json:"query_status"`
 		Blacklists  struct {

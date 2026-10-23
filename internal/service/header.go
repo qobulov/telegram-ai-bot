@@ -170,7 +170,7 @@ func (s *Service) sworeAtBot(ctx context.Context, in incoming) bool {
 // guardLines tell the model what a guard on in the group does without it.
 var guardLines = map[string]string{
 	storage.RuleSpamGuard:  "Known spammers (CAS, lols.bot) are banned here in code, not by you.",
-	storage.RuleLinkGuard:  "Links to malware or phishing hosts (URLhaus) are deleted here in code, not by you.",
+	storage.RuleLinkGuard:  "Links to malware or phishing (Google Safe Browsing, URLhaus) are deleted here in code, not by you.",
 	storage.RuleImageGuard: "Nude or gory pictures are deleted here in code, not by you.",
 }
 

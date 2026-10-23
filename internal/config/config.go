@@ -72,10 +72,12 @@ type Config struct {
 	// YouTubeAPIKey is a YouTube Data API key; without it there is no
 	// video search.
 	YouTubeAPIKey string
-	// URLhausAuthKey lets owners turn on the link guard, and
+	// URLhausAuthKey or SafeBrowsingKey lets owners turn on the link guard,
+	// each service judging links when its key is set, and
 	// SightengineUser and SightengineSecret the picture guard; without them
 	// those guards are refused. The spam guard needs no key.
 	URLhausAuthKey    string
+	SafeBrowsingKey   string
 	SightengineUser   string
 	SightengineSecret string
 
@@ -253,6 +255,7 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.TMDBToken = r.apiKey("TMDB_TOKEN")
 	cfg.YouTubeAPIKey = r.apiKey("YOUTUBE_API_KEY")
 	cfg.URLhausAuthKey = r.apiKey("URLHAUS_AUTH_KEY")
+	cfg.SafeBrowsingKey = r.apiKey("GOOGLE_SAFE_BROWSING_KEY")
 	cfg.SightengineUser = r.apiKey("SIGHTENGINE_API_USER")
 	cfg.SightengineSecret = r.apiKey("SIGHTENGINE_API_SECRET")
 	cfg.WakeWords = r.wakeWords(cfg)

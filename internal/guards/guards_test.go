@@ -35,7 +35,8 @@ func fakeServices(t *testing.T, answers map[string]string) (*Checker, *http.Requ
 	t.Cleanup(server.Close)
 	return New(Options{
 		CAS: server.URL + "/cas", Lols: server.URL + "/lols", URLhaus: server.URL + "/urlhaus", Sightengine: server.URL + "/se",
-		URLhausKey: "uh-key", SightengineUser: "se-user", SightengineSecret: "se-secret",
+		SafeBrowsing: server.URL + "/sb",
+		URLhausKey:   "uh-key", SightengineUser: "se-user", SightengineSecret: "se-secret",
 	}), seen
 }
 
@@ -59,10 +60,10 @@ func TestSpammerChecksBothLists(t *testing.T) {
 	}
 }
 
-func TestMaliciousHostSendsTheKeyAndReadsTheVerdict(t *testing.T) {
+func TestMaliciousLinkAsksURLhausAboutTheHost(t *testing.T) {
 	c, seen := fakeServices(t, map[string]string{"/urlhaus/v1/host/": `{"query_status":"ok","blacklists":{"spamhaus_dbl":"not listed","surbl":"not listed"},
 		"urls":[{"url_status":"offline","threat":"malware_download"},{"url_status":"online","threat":"malware_download"}]}`})
-	reason, bad, err := c.MaliciousHost(context.Background(), "evil.example")
+	reason, bad, err := c.MaliciousLink(context.Background(), "https://Evil.example/app.apk")
 	if err != nil || !bad || reason != "URLhaus: malware_download" {
 		t.Fatalf("MaliciousHost = %q, %v, %v", reason, bad, err)
 	}
@@ -71,18 +72,18 @@ func TestMaliciousHostSendsTheKeyAndReadsTheVerdict(t *testing.T) {
 	}
 }
 
-func TestMaliciousHostKeepsUnknownAndOfflineHosts(t *testing.T) {
+func TestMaliciousLinkKeepsUnknownAndOfflineHosts(t *testing.T) {
 	for name, answer := range map[string]string{
 		"unknown": `{"query_status":"no_results"}`,
 		"offline": `{"query_status":"ok","blacklists":{"spamhaus_dbl":"not listed","surbl":"not listed"},"urls":[{"url_status":"offline","threat":"malware_download"}]}`,
 	} {
 		c, _ := fakeServices(t, map[string]string{"/urlhaus/v1/host/": answer})
-		if _, bad, err := c.MaliciousHost(context.Background(), "x.example"); bad || err != nil {
+		if _, bad, err := c.MaliciousLink(context.Background(), "http://x.example/"); bad || err != nil {
 			t.Errorf("%s host: bad %v, err %v", name, bad, err)
 		}
 	}
 	c, _ := fakeServices(t, map[string]string{"/urlhaus/v1/host/": `{"query_status":"ok","blacklists":{"spamhaus_dbl":"abused_legit_malware","surbl":"not listed"},"urls":[]}`})
-	if reason, bad, _ := c.MaliciousHost(context.Background(), "x.example"); !bad || reason != "URLhaus: abused_legit_malware" {
+	if reason, bad, _ := c.MaliciousLink(context.Background(), "http://x.example/"); !bad || reason != "URLhaus: abused_legit_malware" {
 		t.Errorf("a blocklisted host = %q, %v", reason, bad)
 	}
 }
@@ -115,5 +116,49 @@ func TestKeysDecideWhatCanBeChecked(t *testing.T) {
 	}
 	if c := New(Options{URLhausKey: "k", SightengineUser: "u"}); !c.CanCheckLinks() || c.CanCheckImages() {
 		t.Error("the picture check needs both Sightengine keys")
+	}
+	if c := New(Options{SafeBrowsingKey: "k"}); !c.CanCheckLinks() {
+		t.Error("Safe Browsing alone cannot check links")
+	}
+}
+
+func TestMaliciousLinkAsksSafeBrowsingWithTheKeyInAHeader(t *testing.T) {
+	c, seen := fakeServices(t, map[string]string{
+		"/sb/v4/threatMatches:find": `{"matches":[{"threatType":"SOCIAL_ENGINEERING","platformType":"ANY_PLATFORM","threat":{"url":"https://login.example/"}}]}`,
+	})
+	c.opts.URLhausKey, c.opts.SafeBrowsingKey = "", "sb-key"
+
+	reason, bad, err := c.MaliciousLink(context.Background(), "https://login.example/")
+
+	if err != nil || !bad || reason != "Google: social_engineering" {
+		t.Fatalf("MaliciousLink = %q, %v, %v", reason, bad, err)
+	}
+	if seen.Header.Get("X-Goog-Api-Key") != "sb-key" || strings.Contains(seen.URL.String(), "sb-key") {
+		t.Errorf("the key was not sent in the header alone: %v %v", seen.URL, seen.Header)
+	}
+}
+
+// With both keys, a link either service lists is malicious, and one
+// service failing hides nothing; both failing is an error.
+func TestMaliciousLinkUsesBothServices(t *testing.T) {
+	c, _ := fakeServices(t, map[string]string{
+		"/sb/v4/threatMatches:find": `{}`,
+		"/urlhaus/v1/host/":         `{"query_status":"ok","blacklists":{"spamhaus_dbl":"not listed","surbl":"not listed"},"urls":[{"url_status":"online","threat":"malware_download"}]}`,
+	})
+	c.opts.SafeBrowsingKey = "sb-key"
+	if reason, bad, err := c.MaliciousLink(context.Background(), "http://evil.example/x"); !bad || err != nil || reason != "URLhaus: malware_download" {
+		t.Errorf("URLhaus's listing = %q, %v, %v", reason, bad, err)
+	}
+
+	c, _ = fakeServices(t, map[string]string{"/urlhaus/v1/host/": `{"query_status":"no_results"}`})
+	c.opts.SafeBrowsingKey = "sb-key"
+	if _, bad, err := c.MaliciousLink(context.Background(), "http://ok.example/"); bad || err != nil {
+		t.Errorf("Safe Browsing failing alone = %v, %v", bad, err)
+	}
+
+	c, _ = fakeServices(t, nil)
+	c.opts.SafeBrowsingKey = "sb-key"
+	if _, _, err := c.MaliciousLink(context.Background(), "http://ok.example/"); err == nil {
+		t.Error("both services failing was taken for a clean link")
 	}
 }

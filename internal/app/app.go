@@ -368,10 +368,12 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 	return builtin
 }
 
-// checker asks the spam lists, URLhaus and Sightengine for the guards.
+// checker asks the spam lists, Google Safe Browsing, URLhaus and
+// Sightengine for the guards.
 func checker(cfg config.Config) *guards.Checker {
 	return guards.New(guards.Options{
 		URLhausKey:        cfg.URLhausAuthKey,
+		SafeBrowsingKey:   cfg.SafeBrowsingKey,
 		SightengineUser:   cfg.SightengineUser,
 		SightengineSecret: cfg.SightengineSecret,
 	})

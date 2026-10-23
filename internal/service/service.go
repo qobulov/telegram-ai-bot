@@ -361,10 +361,10 @@ type Service struct {
 	// heroRounds are groups' open rounds of "guess the hero", lately read.
 	heroRounds *recently[int64, storage.HeroGame]
 	// guardSets are the guards on in each group, and spamVerdicts and
-	// hostVerdicts what the outside services lately said; see protect.go.
+	// linkVerdicts what the outside services lately said; see protect.go.
 	guardSets    *recently[int64, guardSet]
 	spamVerdicts *recently[int64, verdict]
-	hostVerdicts *recently[string, verdict]
+	linkVerdicts *recently[string, verdict]
 
 	// typingInterval is how often "typing" is shown again while a turn
 	// runs: typingRefresh, shortened by tests.
@@ -443,7 +443,7 @@ func New(opts Options) *Service {
 		heroRounds:     newRecently[int64, storage.HeroGame](heroMemory, opts.Now),
 		guardSets:      newRecently[int64, guardSet](guardsMemory, opts.Now),
 		spamVerdicts:   newRecently[int64, verdict](verdictMemory, opts.Now),
-		hostVerdicts:   newRecently[string, verdict](verdictMemory, opts.Now),
+		linkVerdicts:   newRecently[string, verdict](verdictMemory, opts.Now),
 		queues:         make([]chan incoming, opts.Workers),
 		notices:        make(chan incoming, noticeQueueSize),
 		transcribing:   make(chan struct{}, backgroundTranscriptions),

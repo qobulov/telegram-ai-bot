@@ -182,7 +182,8 @@ in the environment win over the file.
 | `GIPHY_API_KEY` | empty | Key from <https://developers.giphy.com/dashboard/> (API, not SDK); lets her send a GIF now and then instead of a sticker. See [Stickers](#stickers) |
 | `YOUTUBE_API_KEY` | empty | YouTube Data API v3 key from Google Cloud Console, not bound to a service account; without it there is no video search |
 | `TMDB_TOKEN` | empty | TMDB API Read Access Token from <https://www.themoviedb.org/settings/api>; without it there is no movies tool |
-| `URLHAUS_AUTH_KEY` | empty | Free Auth-Key from <https://auth.abuse.ch/>; lets owners turn on the link guard (`group_rules` `guard` `links`), which deletes links to hosts URLhaus lists for malware or phishing |
+| `GOOGLE_SAFE_BROWSING_KEY` | empty | Google Cloud API key restricted to the Safe Browsing API; lets owners turn on the link guard (`group_rules` `guard` `links`), which deletes links Google takes for malware, phishing or unwanted software. Google offers this API for non-commercial use |
+| `URLHAUS_AUTH_KEY` | empty | Free Auth-Key from <https://auth.abuse.ch/>; also lets owners turn on the link guard, and with both keys a link is deleted when either service lists it (URLhaus by its host) |
 | `SIGHTENGINE_API_USER`, `SIGHTENGINE_API_SECRET` | empty | From <https://dashboard.sightengine.com/api-credentials>; let owners turn on the picture guard (`guard` `images`), which deletes nude or gory photos, each photo checked using two operations of its monthly quota (nudity and gore). The spam guard (`guard` `spam`: CAS and lols.bot, banning listed accounts) needs no key |
 | `TAVILY_API_KEY` | empty | Free key from <https://app.tavily.com>; without it there is no web search. See [Live data](#live-data) |
 | `FOOTBALL_DATA_TOKEN` | empty | Free key from <https://www.football-data.org/client/register>; without it there is no football tool. See [Live data](#live-data) |

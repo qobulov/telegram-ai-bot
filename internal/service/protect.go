@@ -19,7 +19,7 @@ const (
 	guardTime      = 15 * time.Second
 	guardsMemory   = time.Minute
 	verdictMemory  = 6 * time.Hour
-	maxHostsLooked = 3
+	maxLinksLooked = 3
 	// maxGuardedImage is the largest picture size looked at; the biggest
 	// size Telegram keeps under it is taken.
 	maxGuardedImage = 1 << 20
@@ -28,7 +28,7 @@ const (
 // Guards ask outside services about members, links and pictures.
 type Guards interface {
 	Spammer(ctx context.Context, userID int64) (string, bool, error)
-	MaliciousHost(ctx context.Context, host string) (string, bool, error)
+	MaliciousLink(ctx context.Context, link string) (string, bool, error)
 	UnsafeImage(ctx context.Context, image []byte) (string, bool, error)
 	CanCheckLinks() bool
 	CanCheckImages() bool
@@ -158,30 +158,33 @@ func (s *Service) spammer(ctx context.Context, userID int64) (string, bool) {
 	return source, bad
 }
 
-// maliciousLink is the first link in a message to a host URLhaus lists.
+// maliciousLink is the host of the first link in a message the link
+// services take for malware or phishing, and why.
 func (s *Service) maliciousLink(ctx context.Context, msg *telegram.Message) (string, bool) {
-	for _, host := range linkHosts(msg) {
-		v, ok := s.hostVerdicts.get(host)
+	for _, link := range messageLinks(msg) {
+		v, ok := s.linkVerdicts.get(link.String())
 		if !ok {
-			reason, bad, err := s.opts.Guards.MaliciousHost(ctx, host)
+			reason, bad, err := s.opts.Guards.MaliciousLink(ctx, link.String())
 			if err != nil {
-				s.opts.Logger.Warn("guards: could not ask about a host", "host", host, "error", err)
+				s.opts.Logger.Warn("guards: could not ask about a link", "host", link.Hostname(), "error", err)
 				continue
 			}
 			v = verdict{bad: bad, reason: reason}
-			s.hostVerdicts.set(host, v)
+			s.linkVerdicts.set(link.String(), v)
 		}
 		if v.bad {
-			return host + ", " + v.reason, true
+			return link.Hostname() + ", " + v.reason, true
 		}
 	}
 	return "", false
 }
 
-// linkHosts are the hosts a message links to, each once, at most a few.
-func linkHosts(msg *telegram.Message) []string {
+// messageLinks are the web links in a message, each once, at most a few,
+// their hosts in lower case.
+func messageLinks(msg *telegram.Message) []*url.URL {
 	text, entities := msg.Content()
-	var hosts []string
+	var links []*url.URL
+	seen := map[string]bool{}
 	for _, e := range entities {
 		link := e.URL
 		if e.Type == "url" {
@@ -194,27 +197,20 @@ func linkHosts(msg *telegram.Message) []string {
 			link = "http://" + link
 		}
 		u, err := url.Parse(link)
-		if err != nil || u.Hostname() == "" {
+		if err != nil || u.Hostname() == "" || (u.Scheme != "http" && u.Scheme != "https") {
 			continue
 		}
-		host := strings.ToLower(u.Hostname())
-		if !containsString(hosts, host) {
-			hosts = append(hosts, host)
+		u.Host = strings.ToLower(u.Host)
+		if seen[u.String()] {
+			continue
 		}
-		if len(hosts) == maxHostsLooked {
+		seen[u.String()] = true
+		links = append(links, u)
+		if len(links) == maxLinksLooked {
 			break
 		}
 	}
-	return hosts
-}
-
-func containsString(list []string, s string) bool {
-	for _, item := range list {
-		if item == s {
-			return true
-		}
-	}
-	return false
+	return links
 }
 
 // unsafePicture asks Sightengine about a message's photo, at the biggest
