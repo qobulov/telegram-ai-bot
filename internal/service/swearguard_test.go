@@ -388,3 +388,21 @@ func TestSwearClips(t *testing.T) {
 		t.Errorf("clips = %d, sizes %d and %d", len(swearClips), len(blokkaClip), len(aqliniClip))
 	}
 }
+
+// The judge knows the bot by its character's name, not only by its
+// username, so "Mira jalab" can be seen as aimed at the bot.
+func TestSwearJudgeKnowsTheBotsName(t *testing.T) {
+	f, _ := guardFixture("")
+	judge := &fakeJudge{answer: "NONE"}
+	f.opts.Judge = judge
+
+	f.run(swearFrom(swearerID, "Mira jalab"))
+
+	if len(judge.asked) != 1 {
+		t.Fatalf("judge asked %d times", len(judge.asked))
+	}
+	want := "The group's bot is called Mira, @" + f.opts.Bot.Username + "."
+	if !strings.Contains(judge.asked[0], want) {
+		t.Errorf("judge prompt = %q, want %q", judge.asked[0], want)
+	}
+}

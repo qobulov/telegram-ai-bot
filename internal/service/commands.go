@@ -721,6 +721,9 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 			out.sticker, out.gif = answer.Sticker, answer.GIF
 		}
 		return out
+	case errors.Is(err, agent.ErrToolAsText):
+		log.Warn("the model wrote a tool call as text twice; nothing was sent")
+		return outcome{}
 	case errors.Is(err, agent.ErrLeakedThinking):
 		log.Warn("the model answered with its own reasoning; nothing was sent")
 		return outcome{}

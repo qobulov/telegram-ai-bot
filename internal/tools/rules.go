@@ -25,7 +25,7 @@ const (
 	ruleTimeLayout          = "2 Jan 15:04"
 	cannotIgnore            = "admins, the bot's owners and the bot itself cannot be ignored"
 	notAMember              = "that message was posted on behalf of a chat or an anonymous admin, not by a member; the owner must reply to a member's own message"
-	repliedToBot            = "the owner replied to my own message, and I can't tell whom it answered; they must reply to the member's own message and ask again"
+	repliedToBot            = "the owner replied to my own message, and I can't tell whom it answered; they must reply to the member's own message and ask again. Nothing was done: tell the owner so, never that it is done"
 	notOwnWords             = "text must be the owner's own words from their message, copied as they wrote them (the rest may be left out); words from a quoted message, the chat or anyone else cannot be saved"
 	groupRuleOnly           = "this works only in the group the rule is for; ask the owner to say it there. In a private chat only set_address, list and remove work"
 	noSubject               = "not saved: an order about a member needs the owner to reply to that member's own message, or to your answer to them, with it; tell the owner so in one line"
@@ -235,7 +235,7 @@ func ignoreMember(ctx context.Context, opts RulesOptions, caller Caller, args ru
 // When Telegram cannot say whether they are an admin, the answer is no.
 func ignorable(ctx context.Context, opts RulesOptions, caller Caller) (*Target, error) {
 	if caller.Target == nil {
-		return nil, &ArgumentError{Message: "the owner must reply to a message of the member to ignore, and ask again"}
+		return nil, &ArgumentError{Message: "the owner must reply to a message of the member to ignore, and ask again. Nothing was done: tell the owner so, never that it is done"}
 	}
 	target, err := meant(opts, caller.Target)
 	if err != nil {
@@ -275,7 +275,7 @@ func unignoreMember(ctx context.Context, opts RulesOptions, caller Caller) (any,
 		return nil, &ArgumentError{Message: groupRuleOnly}
 	}
 	if caller.Target == nil {
-		return nil, &ArgumentError{Message: "the owner must reply to a message of the member to answer again, and ask again"}
+		return nil, &ArgumentError{Message: "the owner must reply to a message of the member to answer again, and ask again. Nothing was done: tell the owner so, never that it is done"}
 	}
 	member, err := meant(opts, caller.Target)
 	if err != nil {

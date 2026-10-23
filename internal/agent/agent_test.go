@@ -726,3 +726,40 @@ func TestGIFMarkerIsTakenOut(t *testing.T) {
 		}
 	}
 }
+
+// A tool call written as text is never posted: the model is asked once more,
+// told to call the tool, and when it writes one again nothing is sent.
+func TestToolCallWrittenAsTextIsNotSent(t *testing.T) {
+	f := newFixture(text("[music_search query:Chammak chalo]"), toolCall("c1"), text("Mana."))
+
+	answer, err := f.agent.Reply(context.Background(), request(1, "Chammak chalo mari"))
+	if err != nil || answer.Text != "Mana." {
+		t.Fatalf("answer = %+v, %v; want the tool run and then the words", answer, err)
+	}
+	if len(f.tools.executions) != 1 {
+		t.Errorf("executions = %d, want 1", len(f.tools.executions))
+	}
+	if second := f.model.requests[1].Messages[0].Content; !strings.Contains(second, toolAsTextNote) {
+		t.Errorf("the second request does not tell the model to call the tool: %q", second)
+	}
+	if first := f.model.requests[0].Messages[0].Content; strings.Contains(first, toolAsTextNote) {
+		t.Errorf("the first request already carries the note")
+	}
+
+	for _, content := range []string{"[generate_image prompt:Hirara portrait]", "(calculator expression: 1+1)"} {
+		f := newFixture(text(content))
+		answer, err := f.agent.Reply(context.Background(), request(1, "hm"))
+		if !errors.Is(err, ErrToolAsText) || !errors.Is(err, ErrSilent) {
+			t.Errorf("answer %q: got %+v, err = %v, want ErrToolAsText", content, answer, err)
+		}
+		if f.store.saves != 0 {
+			t.Errorf("answer %q: the tool call text was saved", content)
+		}
+	}
+	for _, content := range []string{"[sticker funny]", "(ha: rost)", "Saber: 2-1-ulti", "[react 🤣]"} {
+		f := newFixture(text(content))
+		if _, err := f.agent.Reply(context.Background(), request(1, "hm")); errors.Is(err, ErrToolAsText) {
+			t.Errorf("answer %q was taken for a tool call", content)
+		}
+	}
+}

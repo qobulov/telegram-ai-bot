@@ -229,7 +229,7 @@ func (s *Service) aimOf(ctx context.Context, msg *telegram.Message, text string)
 	if _, how := s.address(msg); how != triggerNone {
 		about = append(about, "It calls the bot by name.")
 	}
-	prompt := fmt.Sprintf(judgePrompt, s.opts.Bot.Username, strings.Join(about, " "), oneLine(text))
+	prompt := fmt.Sprintf(judgePrompt, s.botNames(), strings.Join(about, " "), oneLine(text))
 	answer, err := s.opts.Judge.Complete(ctx, ai.Request{Messages: []ai.Message{{Role: ai.RoleUser, Content: prompt}}})
 	if err != nil {
 		s.opts.Logger.Warn("swear guard: could not ask the model; leaving it", "chat_id", msg.Chat.ID, "error", err)
@@ -242,6 +242,25 @@ func (s *Service) aimOf(ctx context.Context, msg *telegram.Message, text string)
 		return aimPerson
 	}
 	return aimNobody
+}
+
+// botNames are the names the bot goes by, for the judge: "Maria jalab" is
+// aimed at the bot only if the judge knows that Maria is the bot, not just
+// its username.
+func (s *Service) botNames() string {
+	names := []string{}
+	if s.opts.DisplayName != "" {
+		names = append(names, s.opts.DisplayName)
+	}
+	for _, w := range s.opts.WakeWords {
+		if !strings.EqualFold(w, s.opts.DisplayName) {
+			names = append(names, w)
+		}
+	}
+	if s.opts.Bot.Username != "" {
+		names = append(names, "@"+s.opts.Bot.Username)
+	}
+	return strings.Join(names, ", ")
 }
 
 // swearGuard is the group's swear guard rule, if an owner turned it on.

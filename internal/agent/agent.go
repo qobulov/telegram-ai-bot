@@ -25,6 +25,10 @@ var (
 	// ErrLeakedThinking means the answer was the model's own reasoning. It
 	// is a kind of ErrSilent: nothing is saved or sent.
 	ErrLeakedThinking = fmt.Errorf("agent: the answer was the model's reasoning: %w", ErrSilent)
+	// ErrToolAsText means the model wrote a tool call as text instead of
+	// calling it, again after being told. It is a kind of ErrSilent: the
+	// text would be posted into the chat, so nothing is saved or sent.
+	ErrToolAsText = fmt.Errorf("agent: the model wrote a tool call as text: %w", ErrSilent)
 	// ErrToolLoop means the model kept requesting tools instead of answering.
 	ErrToolLoop = errors.New("agent: model did not produce an answer")
 )
@@ -161,6 +165,9 @@ type turn struct {
 	history   []ai.Message
 	messages  []ai.Message // this turn: user message, tool exchanges, answer
 	toolsUsed int
+	// toolAsText is set once the model wrote a tool call as text, so that
+	// the next request tells it to call the tool instead.
+	toolAsText bool
 }
 
 // run alternates between the model and its tool calls until the model
@@ -179,7 +186,14 @@ func (a *Agent) run(ctx context.Context, t *turn) (Answer, error) {
 			return Answer{}, err
 		}
 		if len(reply.ToolCalls) == 0 {
-			return finish(t, reply)
+			if !writesToolCall(reply.Content, definitions) {
+				return finish(t, reply)
+			}
+			if t.toolAsText {
+				return Answer{}, ErrToolAsText
+			}
+			t.toolAsText = true
+			continue
 		}
 		a.runTools(ctx, t, reply)
 	}
@@ -188,7 +202,11 @@ func (a *Agent) run(ctx context.Context, t *turn) (Answer, error) {
 
 func (a *Agent) prompt(t *turn) []ai.Message {
 	messages := make([]ai.Message, 0, 1+len(t.history)+len(t.messages))
-	messages = append(messages, ai.Message{Role: ai.RoleSystem, Content: a.systemPrompt(t.req)})
+	system := a.systemPrompt(t.req)
+	if t.toolAsText {
+		system += "\n\n" + toolAsTextNote
+	}
+	messages = append(messages, ai.Message{Role: ai.RoleSystem, Content: system})
 	messages = append(messages, t.history...)
 	messages = append(messages, t.messages...)
 	// The first message of the turn is the user's. Context and attachments
@@ -207,6 +225,34 @@ func (a *Agent) systemPrompt(req Request) string {
 		return a.opts.Persona + "\n\n" + a.opts.GroupNote
 	}
 	return a.opts.Persona
+}
+
+// toolAsTextNote is added to the system prompt after the model wrote a tool
+// call as text.
+const toolAsTextNote = `Your last answer wrote a tool call as text, such as "[music_search query:...]", which would be posted into the chat as it is. To use a tool, call it; otherwise answer in words.`
+
+// toolAsText finds an answer that opens with a tool call written as text,
+// "[music_search query:Chammak chalo]" or "(mlbb hero:Saber)", as Gemini
+// sometimes writes one instead of calling the tool.
+var toolAsText = regexp.MustCompile(`^\s*[\[(<]\s*([a-z][a-z0-9_]*)\s+[a-z_]+\s*[:=]`)
+
+// writesToolCall reports an answer that is a tool call written as text: one
+// opening with a call to a tool offered, or to any snake_case name, since a
+// tool turned off here, such as generate_image, is still written that way.
+func writesToolCall(answer string, definitions []ai.ToolDefinition) bool {
+	m := toolAsText.FindStringSubmatch(answer)
+	if m == nil {
+		return false
+	}
+	if strings.Contains(m[1], "_") {
+		return true
+	}
+	for _, d := range definitions {
+		if d.Function.Name == m[1] {
+			return true
+		}
+	}
+	return false
 }
 
 // finish turns the model's final message into the answer and adds it to the
