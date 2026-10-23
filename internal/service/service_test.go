@@ -3747,3 +3747,18 @@ func TestCheckButtonAnswersWithoutWriting(t *testing.T) {
 		t.Errorf("joined: sent %d, answers %+v, edits %v", len(sent), buttons.answers, buttons.edits)
 	}
 }
+
+
+// /help writes the group commands with the bot's own username, so they can
+// be tapped: "/mute@mira_bot", not "/mute@username".
+func TestHelpNamesTheBotsUsername(t *testing.T) {
+	f := newFixture()
+	f.opts.Bot.Username = "mira_bot"
+
+	sent := f.run(textFrom(userID, "/help"))
+
+	expectOneReply(t, sent, "/mute@mira_bot, /unmute@mira_bot")
+	if strings.Contains(sent[0].text, "@username") {
+		t.Errorf("help still says @username: %q", sent[0].text)
+	}
+}
