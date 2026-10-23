@@ -600,3 +600,59 @@ func TestRulesToolWatchesSwearing(t *testing.T) {
 		t.Errorf("stop_watching_swearing = %s, rules %+v", env.Result, store.all())
 	}
 }
+
+type fakeGroupList []storage.GroupSummary
+
+func (f fakeGroupList) Groups(context.Context, time.Time, int) ([]storage.GroupSummary, error) {
+	return f, nil
+}
+
+type fakeMuter struct{ muted map[int64]bool }
+
+func (f *fakeMuter) SetMuted(_ context.Context, chatID int64, muted bool, _ int64) error {
+	f.muted[chatID] = muted
+	return nil
+}
+
+// From a private chat an owner names the group an order is for: "Xz
+// chatiga umuman yozma" mutes the bot in Xz, and an instruction is saved
+// there. A name that fits several groups, or none, does nothing.
+func TestRulesToolActsOnANamedGroupFromPrivate(t *testing.T) {
+	store, muter := &fakeRules{}, &fakeMuter{muted: map[int64]bool{}}
+	const xz, pub = int64(-1004339638864), int64(-1002903357611)
+	registry := mustRegistry(t, RulesTool(RulesOptions{
+		Store: store, Admins: fakeAdmins{}, BotID: rulesBotID, Location: tashkent,
+		Now:    func() time.Time { return rulesNow },
+		Groups: fakeGroupList{{ChatID: xz, Title: "Xz"}, {ChatID: pub, Title: "PUB-Қовоқхона Tursunoff", Username: "pubchat"}, {ChatID: -100777, Title: "Xz fanlar"}},
+		Muter:  muter,
+	}))
+	private := ownerSaying(userID, "Xz chatiga umuman yozma")
+
+	env := rules(registry, private, `{"action":"mute","group":"Xz"}`)
+	if !env.OK || !muter.muted[xz] || !strings.Contains(string(env.Result), `"group":"Xz"`) {
+		t.Fatalf("mute Xz = %+v %s, muted %v", env, env.Result, muter.muted)
+	}
+	if env := rules(registry, private, `{"action":"add_instruction","text":"umuman yozma","group":"@pubchat"}`); !env.OK {
+		t.Fatalf("instruction for @pubchat = %+v", env)
+	}
+	if got := store.all(); len(got) != 1 || got[0].ChatID != pub || got[0].Text != "umuman yozma" {
+		t.Errorf("rules = %+v, want the instruction in PUB", got)
+	}
+	if env := rules(registry, private, `{"action":"unmute","group":"қовоқхона"}`); !env.OK || muter.muted[pub] {
+		t.Errorf("unmute by part of the title = %+v", env)
+	}
+
+	for name, group := range map[string]string{"several": "x", "none": "Afsona"} {
+		before := len(muter.muted)
+		env := rules(registry, private, `{"action":"mute","group":"`+group+`"}`)
+		if env.OK || env.Error.Code != "invalid_arguments" || !strings.Contains(env.Error.Message, "Nothing was done") && !strings.Contains(env.Error.Message, "nothing was done") {
+			t.Errorf("%s: %+v, want a refusal", name, env)
+		}
+		if len(muter.muted) != before {
+			t.Errorf("%s: muted %v", name, muter.muted)
+		}
+	}
+	if env := rules(registry, ownerReplying(userID, bekTarget()), `{"action":"ignore","group":"Xz"}`); env.OK {
+		t.Errorf("ignore from private = %+v, want it to need a reply in the group", env)
+	}
+}

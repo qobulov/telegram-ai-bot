@@ -345,6 +345,8 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 				Admins:   groupMembers{client: bot.Client, botID: bot.User.ID},
 				BotID:    bot.User.ID,
 				Location: cfg.Location,
+				Groups:   store,
+				Muter:    store,
 			}),
 		)
 	}

@@ -1,11 +1,13 @@
 package tools
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -27,7 +29,7 @@ const (
 	notAMember              = "that message was posted on behalf of a chat or an anonymous admin, not by a member; the owner must reply to a member's own message"
 	repliedToBot            = "the owner replied to my own message, and I can't tell whom it answered; they must reply to the member's own message and ask again. Nothing was done: tell the owner so, never that it is done"
 	notOwnWords             = "text must be the owner's own words from their message, copied as they wrote them (the rest may be left out); words from a quoted message, the chat or anyone else cannot be saved"
-	groupRuleOnly           = "this works only in the group the rule is for; ask the owner to say it there. In a private chat only set_address, list and remove work"
+	groupRuleOnly           = "this needs a group: say it in the group, or name the group in group. Nothing was done: tell the owner so, never that it is done"
 	noSubject               = "not saved: an order about a member needs the owner to reply to that member's own message, or to your answer to them, with it, or with just your name within five minutes of giving it; tell the owner so in one line"
 )
 
@@ -73,6 +75,16 @@ type RulesOptions struct {
 	// Location is the time zone of the times the tool reports.
 	Location *time.Location
 	Now      func() time.Time
+	// Groups finds a group the owner names, to give it rules from
+	// elsewhere, and Muter silences the bot in a group; without them,
+	// naming a group and mute do not work.
+	Groups GroupLister
+	Muter  Muter
+}
+
+// Muter turns the bot's silence in a chat on or off.
+type Muter interface {
+	SetMuted(ctx context.Context, chatID int64, muted bool, by int64) error
 }
 
 type rulesArgs struct {
@@ -82,6 +94,9 @@ type rulesArgs struct {
 	ID     int64  `json:"id"`
 	// AboutMember ties an instruction to the member the owner replied to.
 	AboutMember bool `json:"about_member"`
+	// Group names another group the rule is for: its title, @username or
+	// chat id.
+	Group string `json:"group"`
 }
 
 // RulesTool lets an owner give the bot orders that last: they are stored
@@ -103,12 +118,15 @@ func RulesTool(opts RulesOptions) Tool {
 			"ignore: stop answering the member whose message the owner replied to, or, when they replied to your own answer, the member it answered (hours, default 24); never admins or owners. unignore: answer that member again. " +
 			"set_address: how to address the owner who is asking, in every chat (text). " +
 			"watch_swearing: from now on, without you, a member's first insult here gets a warning and the next within a day a 1-hour mute, and a second swear at you within a day a 15-minute mute without warning that tags the group's creator, or the @username in text when the owner names whom to call; an admin, who cannot be muted, gets the warning and then that tag; the creator and owners are left alone. stop_watching_swearing turns it off. " +
+			"mute: stop writing in the group at all, until unmute. " +
 			"list: the rules in force here. remove: delete a rule by its id from list. " +
-			"add_instruction, ignore and unignore work only in a group. Never say a rule is saved unless this tool reported it.",
+			"group: for another group than this chat, such as an order given in a private chat (\"Xz chatiga umuman yozma\" is mute with group Xz): its title, @username or id; ignore, unignore and about_member still need the owner's reply in that group. " +
+			"Never say a rule is saved unless this tool reported it.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["add_instruction", "ignore", "unignore", "set_address", "watch_swearing", "stop_watching_swearing", "list", "remove"]},
+				"action": {"type": "string", "enum": ["add_instruction", "ignore", "unignore", "set_address", "watch_swearing", "stop_watching_swearing", "mute", "unmute", "list", "remove"]},
+				"group": {"type": "string", "description": "Another group the action is for, as the owner named it: its title, @username or id. Leave out for this chat."},
 				"text": {"type": "string", "description": "For add_instruction: the owner's words, copied exactly as they wrote them, at most 300 characters: no rephrasing, translating, added names or fixed spelling; leave out words that are not the order. For set_address: the form of address, at most 40 characters. For watch_swearing: the @username a mute tags, if the owner named one."},
 				"hours": {"type": "integer", "description": "For add_instruction and ignore: how long the rule lasts, 1 to 720."},
 				"id": {"type": "integer", "description": "For remove: the rule's id from list."},
@@ -134,6 +152,23 @@ func runRules(ctx context.Context, opts RulesOptions, raw json.RawMessage) (any,
 	if !ok || !caller.Owner {
 		return nil, errors.New("only the bot's owners may set standing rules")
 	}
+	if strings.TrimSpace(args.Group) == "" || args.Action == "set_address" {
+		return runRule(ctx, opts, caller, args)
+	}
+	group, err := namedGroup(ctx, opts, args.Group)
+	if err != nil {
+		return nil, err
+	}
+	// A reply in this chat says nothing about members of that group.
+	caller.ChatID, caller.Target = group.ChatID, nil
+	out, err := runRule(ctx, opts, caller, args)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"group": group.Title, "result": out}, nil
+}
+
+func runRule(ctx context.Context, opts RulesOptions, caller Caller, args rulesArgs) (any, error) {
 	switch args.Action {
 	case "add_instruction":
 		return addInstruction(ctx, opts, caller, args)
@@ -147,12 +182,14 @@ func runRules(ctx context.Context, opts RulesOptions, raw json.RawMessage) (any,
 		return watchSwearing(ctx, opts, caller, args)
 	case "stop_watching_swearing":
 		return stopWatchingSwearing(ctx, opts, caller)
+	case "mute", "unmute":
+		return muteGroup(ctx, opts, caller, args.Action == "mute")
 	case "list":
 		return listRules(ctx, opts, caller)
 	case "remove":
 		return removeRule(ctx, opts, caller, args)
 	default:
-		return nil, &ArgumentError{Message: "action must be add_instruction, ignore, unignore, set_address, watch_swearing, stop_watching_swearing, list or remove"}
+		return nil, &ArgumentError{Message: "action must be add_instruction, ignore, unignore, set_address, watch_swearing, stop_watching_swearing, mute, unmute, list or remove"}
 	}
 }
 
@@ -366,6 +403,67 @@ func stopWatchingSwearing(ctx context.Context, opts RulesOptions, caller Caller)
 		}
 	}
 	return map[string]bool{"removed": removed}, nil
+}
+
+// muteGroup silences the bot in the group, or lets it speak again, as the
+// /mute and /unmute commands do.
+func muteGroup(ctx context.Context, opts RulesOptions, caller Caller, muted bool) (any, error) {
+	if caller.ChatID >= 0 {
+		return nil, &ArgumentError{Message: groupRuleOnly}
+	}
+	if opts.Muter == nil {
+		return nil, errors.New("muting is not available")
+	}
+	if err := opts.Muter.SetMuted(ctx, caller.ChatID, muted, caller.UserID); err != nil {
+		return nil, err
+	}
+	return map[string]bool{"saved": true, "muted": muted}, nil
+}
+
+// maxGroupsSearched bounds the groups a named group is looked for in.
+const maxGroupsSearched = 200
+
+// namedGroup is the group the owner named: by its id, its @username, its
+// exact title, or the one title that contains the name. Several matches or
+// none act on nothing, and the error names the groups to choose from.
+func namedGroup(ctx context.Context, opts RulesOptions, name string) (storage.GroupSummary, error) {
+	if opts.Groups == nil {
+		return storage.GroupSummary{}, &ArgumentError{Message: groupRuleOnly}
+	}
+	groups, err := opts.Groups.Groups(ctx, opts.Now(), maxGroupsSearched)
+	if err != nil {
+		return storage.GroupSummary{}, err
+	}
+	name = strings.TrimSpace(name)
+	folded := strings.ToLower(strings.TrimPrefix(name, "@"))
+	var exact, partial []storage.GroupSummary
+	for _, g := range groups {
+		title := strings.ToLower(g.Title)
+		switch {
+		case strconv.FormatInt(g.ChatID, 10) == name, g.Username != "" && strings.EqualFold(g.Username, folded), title == folded:
+			exact = append(exact, g)
+		case strings.Contains(title, folded):
+			partial = append(partial, g)
+		}
+	}
+	matches := cmp.Or(len(exact), len(partial))
+	switch {
+	case len(exact) == 1:
+		return exact[0], nil
+	case len(exact) == 0 && len(partial) == 1:
+		return partial[0], nil
+	case matches > 1:
+		return storage.GroupSummary{}, &ArgumentError{Message: "several groups match " + strconv.Quote(name) + ": " + groupTitles(append(exact, partial...)) + "; nothing was done: ask the owner which"}
+	}
+	return storage.GroupSummary{}, &ArgumentError{Message: "I am in no group called " + strconv.Quote(name) + "; my groups: " + groupTitles(groups) + ". Nothing was done: ask the owner which"}
+}
+
+func groupTitles(groups []storage.GroupSummary) string {
+	titles := make([]string, 0, len(groups))
+	for _, g := range groups {
+		titles = append(titles, strconv.Quote(g.Title))
+	}
+	return strings.Join(titles, ", ")
 }
 
 // isUsername reports a Telegram username: 4 to 32 letters, digits and
