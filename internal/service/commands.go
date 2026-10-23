@@ -156,13 +156,24 @@ func (s *Service) deliver(in incoming, out *outcome) int64 {
 	return answerID
 }
 
-// repliedMember is the message of another member the asker replied to, or
-// 0: an answer is never sent as a reply to the bot's own message, the
-// asker's or a service message.
+// repliedMember is the message of another member the asker replied to, or,
+// when they replied to the bot's own answer, the member's message it
+// answered: "undan yilini so'ra" in reply to the bot means that member.
+// It is 0 for the asker's own message, a service message or a member not
+// known, and the answer then goes to the asker.
 func (s *Service) repliedMember(in incoming) int64 {
 	replied := in.msg.ReplyToMessage
-	if !in.group || replied == nil || replied.From == nil || replied.IsService() ||
-		replied.From.ID == s.opts.Bot.ID || replied.From.ID == in.userID {
+	if !in.group || replied == nil || replied.From == nil || replied.IsService() {
+		return 0
+	}
+	if replied.From.ID == s.opts.Bot.ID {
+		member := s.answeredMember(context.Background(), in.scope.ChatID, replied.MessageID)
+		if member == nil || member.UserID == in.userID {
+			return 0
+		}
+		return member.MessageID
+	}
+	if replied.From.ID == in.userID {
 		return 0
 	}
 	return replied.MessageID

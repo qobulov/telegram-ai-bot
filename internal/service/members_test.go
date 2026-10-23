@@ -409,3 +409,18 @@ func TestToThemAnswerRepliesToTheMember(t *testing.T) {
 		})
 	}
 }
+
+// Asked, in reply to the bot's answer, to say something to the member it
+// answered, the bot replies to that member's message.
+func TestToThemAnswerInReplyToTheBotGoesToWhomItAnswered(t *testing.T) {
+	f := newFixture()
+	f.opts.OwnerUsernames = []string{ownerUsername}
+	answersTo29(f)
+	f.replier.answer, f.replier.toReplied = "Nechanchi yilsiz?", true
+
+	sent := f.run(inGroup(fromOwner(replyingTo(groupMessage("Mira, undan yilini so'ra"), botID, "salom Bek"))))
+
+	if len(sent) != 1 || sent[0].replyTo != 28 {
+		t.Errorf("sent = %+v, want one reply to Bek's message 28", sent)
+	}
+}
