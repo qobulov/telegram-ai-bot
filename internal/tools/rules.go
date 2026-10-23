@@ -99,7 +99,7 @@ func RulesTool(opts RulesOptions) Tool {
 	return Tool{
 		Name: "group_rules",
 		Description: "Owners only. Standing rules for the group you are in, kept until they expire, even after /mute or /reset. " +
-			"add_instruction: save an owner's order meant to last, in their own words from this message or their own message it replies to (text; hours, default 168); about_member true when it is about the member whose message the owner replied to, or whom your replied-to answer answered (\"uni\", \"bu odam\", \"shu odamga\"): the tool records who. " +
+			"add_instruction: save an owner's order meant to last, its words copied exactly from this message or their own message it replies to, never rephrased (text; hours, default 168); about_member true when it is about the member whose message the owner replied to, or whom your replied-to answer answered (\"uni\", \"bu odam\", \"shu odamga\"): the tool records who. " +
 			"ignore: stop answering the member whose message the owner replied to, or, when they replied to your own answer, the member it answered (hours, default 24); never admins or owners. unignore: answer that member again. " +
 			"set_address: how to address the owner who is asking, in every chat (text). " +
 			"watch_swearing: from now on, without you, a member's first insult here gets a warning and the next within a day a 1-hour mute, and a second swear at you within a day a 15-minute mute without warning that tags the group's creator, or the @username in text when the owner names whom to call; an admin, who cannot be muted, gets the warning and then that tag; the creator and owners are left alone. stop_watching_swearing turns it off. " +
@@ -109,7 +109,7 @@ func RulesTool(opts RulesOptions) Tool {
 			"type": "object",
 			"properties": {
 				"action": {"type": "string", "enum": ["add_instruction", "ignore", "unignore", "set_address", "watch_swearing", "stop_watching_swearing", "list", "remove"]},
-				"text": {"type": "string", "description": "For add_instruction: the order, at most 300 characters. For set_address: the form of address, at most 40 characters. For watch_swearing: the @username a mute tags, if the owner named one."},
+				"text": {"type": "string", "description": "For add_instruction: the owner's words, copied exactly as they wrote them, at most 300 characters: no rephrasing, translating, added names or fixed spelling; leave out words that are not the order. For set_address: the form of address, at most 40 characters. For watch_swearing: the @username a mute tags, if the owner named one."},
 				"hours": {"type": "integer", "description": "For add_instruction and ignore: how long the rule lasts, 1 to 720."},
 				"id": {"type": "integer", "description": "For remove: the rule's id from list."},
 				"about_member": {"type": "boolean", "description": "For add_instruction: true when the order is about the member the owner replied to."}
