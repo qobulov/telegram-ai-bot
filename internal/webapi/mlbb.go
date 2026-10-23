@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"regexp"
 	"slices"
@@ -204,8 +205,10 @@ type arenaDetail struct {
 			Roles      []string `json:"sortlabel"`
 			Lanes      []string `json:"roadsortlabel"`
 			Story      string   `json:"story"`
-			// Picture is the hero's 500 by 500 portrait.
+			// Picture is the hero's 500 by 500 portrait; Card, its 240 by
+			// 390 card, which new heroes such as Hirara have before one.
 			Picture     string `json:"squareheadbig"`
+			Card        string `json:"smallmap"`
 			SkillGroups []struct {
 				Skills []struct {
 					Name string `json:"skillname"`
@@ -277,7 +280,7 @@ func (a *apis) mlbbHero(ctx context.Context, name, rank string, picture bool) (m
 	hero := detail.Hero.Data
 	note := mlbbNote
 	if picture {
-		note = a.sendHeroPicture(ctx, hero.Picture)
+		note = a.sendHeroPicture(ctx, cmp.Or(hero.Picture, hero.Card))
 	}
 	return mlbbHeroOutput{
 		mlbbRates:    enemies.rates(),
@@ -307,13 +310,13 @@ func (a *apis) mlbbHero(ctx context.Context, name, rank string, picture bool) (m
 func (a *apis) sendHeroPicture(ctx context.Context, link string) string {
 	sink, ok := tools.SinkFrom(ctx)
 	if !ok || link == "" {
-		return mlbbNote + "; there is no picture of this hero to send"
+		return mlbbNote + "; there is no picture of this hero, so none is sent: say so plainly, never as if one were"
 	}
 	data, err := a.patient.get(ctx, call{service: arenaService, url: link, limit: heroPictureLimit})
 	if err != nil {
-		return mlbbNote + "; the picture could not be fetched, say so"
+		return mlbbNote + "; the picture could not be fetched, so none is sent: say so plainly, never as if one were"
 	}
-	sink.Add(tools.Drawing{Data: data, MimeType: "image/jpeg"})
+	sink.Add(tools.Drawing{Data: data, MimeType: http.DetectContentType(data)})
 	return mlbbNote + "; the hero's picture is sent with your answer, which becomes its caption: keep the answer short"
 }
 

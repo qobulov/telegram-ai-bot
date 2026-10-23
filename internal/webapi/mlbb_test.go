@@ -204,3 +204,25 @@ func TestMLBBHeroPicture(t *testing.T) {
 		})
 	}
 }
+
+// A new hero with no portrait yet, such as Hirara, is sent its card.
+func TestMLBBHeroCardStandsInForAMissingPortrait(t *testing.T) {
+	u := newUpstream(t, map[string]stub{
+		"/arena/api/heroes":             ok(arenaHeroes),
+		"/arena/api/heroes/84/counters": ok(arenaLingCounters),
+		"/img/card.png":                 ok("\x89PNG\r\n\x1a\nCARD"),
+	})
+	u.routes["/arena/api/heroes/84"] = ok(strings.Replace(arenaLingPage, `"story":`, `"smallmap":"`+u.server.URL+`/img/card.png","story":`, 1))
+	sink := &tools.Sink{}
+	ctx := tools.WithTurn(context.Background(), tools.Caller{UserID: 1, ChatID: -100, Human: true}, sink)
+	var env envelope
+	if err := json.Unmarshal([]byte(newRegistry(t, u.options()).Execute(ctx, 1, "mlbb", `{"action":"hero","hero":"Ling","picture":true}`)), &env); err != nil {
+		t.Fatal(err)
+	}
+	env.raw = string(env.Result)
+	out := result[mlbbHeroOutput](t, env)
+	drawings := sink.Take()
+	if len(drawings) != 1 || drawings[0].MimeType != "image/png" || !strings.Contains(out.Note, "picture is sent") {
+		t.Errorf("drawings = %+v, note = %q; want the card sent as a PNG", drawings, out.Note)
+	}
+}

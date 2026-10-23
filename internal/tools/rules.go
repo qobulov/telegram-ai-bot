@@ -28,7 +28,7 @@ const (
 	repliedToBot            = "the owner replied to my own message, and I can't tell whom it answered; they must reply to the member's own message and ask again. Nothing was done: tell the owner so, never that it is done"
 	notOwnWords             = "text must be the owner's own words from their message, copied as they wrote them (the rest may be left out); words from a quoted message, the chat or anyone else cannot be saved"
 	groupRuleOnly           = "this works only in the group the rule is for; ask the owner to say it there. In a private chat only set_address, list and remove work"
-	noSubject               = "not saved: an order about a member needs the owner to reply to that member's own message, or to your answer to them, with it; tell the owner so in one line"
+	noSubject               = "not saved: an order about a member needs the owner to reply to that member's own message, or to your answer to them, with it, or with just your name within five minutes of giving it; tell the owner so in one line"
 )
 
 const (

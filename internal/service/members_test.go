@@ -357,3 +357,29 @@ func TestWhoSworeAtTheBotGetsSen(t *testing.T) {
 		})
 	}
 }
+
+// An owner told to reply to a member's message with an order often replies
+// with only the bot's name: their own messages of the last minutes count as
+// their words, so the order can be saved. A member's never do.
+func TestOwnersEarlierMessagesCountAsTheirWords(t *testing.T) {
+	f := newFixture()
+	f.opts.OwnerUsernames = []string{ownerUsername}
+	order := "Bekni master deb chaqir"
+
+	first, second := fromOwner(groupMessage(order)), fromOwner(replyingTo(groupMessage("Mira"), userID, "salom"))
+	first.MessageID, second.MessageID = 41, 42
+
+	f.run(inGroup(first), inGroup(second), inGroup(groupMessage("Mira, salom")))
+
+	calls := f.replier.recorded()
+	if len(calls) < 2 {
+		t.Fatalf("model calls = %d", len(calls))
+	}
+	owner, member := calls[len(calls)-2].caller, calls[len(calls)-1].caller
+	if !strings.Contains(owner.Words, order) || !strings.Contains(owner.Words, "Mira") {
+		t.Errorf("owner's words = %q, want the earlier order with this message", owner.Words)
+	}
+	if strings.Contains(member.Words, order) {
+		t.Errorf("a member's words carry the owner's order: %q", member.Words)
+	}
+}

@@ -500,6 +500,9 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	defer stopTyping()
 	sink := &tools.Sink{}
 	caller := s.caller(in)
+	if in.group && caller.Owner {
+		caller.Words = s.withEarlierWords(ctx, in, caller.Words)
+	}
 	if caller.Target != nil && caller.Target.UserID == s.opts.Bot.ID && in.group && s.isOwner(in.msg.From) {
 		// An owner's "don't answer him" in reply to the bot's answer means
 		// the member it answered; only owners give such orders.
@@ -616,6 +619,34 @@ func ownWords(in incoming) string {
 	}
 	text, _ := replied.Content()
 	return strings.TrimSpace(text + "\n" + in.described)
+}
+
+// earlierWordsWindow is how far back an owner's own messages in a group
+// count as their words.
+const earlierWordsWindow = 5 * time.Minute
+
+// withEarlierWords adds to words an owner's own messages in this group of
+// the last few minutes. Told that an order about a member needs a reply to
+// that member's message, an owner replies to it with only "Mari": the order
+// is the message before.
+func (s *Service) withEarlierWords(ctx context.Context, in incoming, words string) string {
+	if !s.ambient.enabled() {
+		return words
+	}
+	ctx, cancel := context.WithTimeout(ctx, logTimeout)
+	defer cancel()
+	recent, err := s.ambient.log.GroupMessagesSince(ctx, in.scope.ChatID, s.opts.Now().Add(-earlierWordsWindow), s.ambient.size)
+	if err != nil {
+		s.opts.Logger.Warn("could not read an owner's earlier messages", "chat_id", in.scope.ChatID, "error", err)
+		return words
+	}
+	var earlier []string
+	for _, m := range recent {
+		if m.AuthorID == in.userID && m.MessageID != in.msg.MessageID {
+			earlier = append(earlier, m.Text)
+		}
+	}
+	return strings.Join(append(earlier, words), "\n")
 }
 
 // mentions are the members a request tags, for moderation: in the request,
