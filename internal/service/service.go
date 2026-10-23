@@ -253,9 +253,6 @@ type Options struct {
 	// OwnerPresence finds an owner's username among a group's members, to
 	// tell the model whom it may tag there; nil tags no owner.
 	OwnerPresence OwnerPresence
-	// Developer is the username of whoever programmed the bot, named apart
-	// from the owners it belongs to; "" when not told apart.
-	Developer string
 	// QuickAnswers answers a private chat's small talk and common questions
 	// without the model; see faq.go.
 	QuickAnswers bool

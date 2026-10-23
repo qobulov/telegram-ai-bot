@@ -1662,40 +1662,6 @@ func TestRequiredChannel(t *testing.T) {
 	}
 }
 
-// The developer is named apart from the owner the bot belongs to.
-func TestDeveloperIsToldApartFromTheOwner(t *testing.T) {
-	env := validEnv()
-	env["BOT_OWNER_USERNAME"] = "pronium,tursunoffm"
-	env["BOT_DEVELOPER_USERNAME"] = "@Pronium"
-	cfg, err := Load(getenv(env))
-	if err != nil || cfg.Developer != "pronium" {
-		t.Fatalf("developer = %q, %v", cfg.Developer, err)
-	}
-	if !strings.Contains(cfg.PersonaPrompt, "You were programmed by pronium, and you belong to tursunoffm.") {
-		t.Errorf("the persona does not tell them apart")
-	}
-	env["BOT_OWNER_USERNAME"] = "pronium"
-	if cfg, _ := Load(getenv(env)); !strings.Contains(cfg.PersonaPrompt, "You were programmed by pronium, who is also your owner.") {
-		t.Errorf("one person as both: the persona does not say so")
-	}
-	delete(env, "BOT_OWNER_USERNAME")
-	if _, err := Load(getenv(env)); err != nil {
-		t.Errorf("a developer and no owners: %v", err)
-	}
-	env["BOT_DEVELOPER_USERNAME"] = "1688909825"
-	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "not a numeric ID") {
-		t.Errorf("an ID: err = %v, want it rejected", err)
-	}
-	env["BOT_DEVELOPER_USERNAME"] = "a_one,b_two"
-	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "BOT_DEVELOPER_USERNAME") {
-		t.Errorf("two developers: err = %v, want it rejected", err)
-	}
-	delete(env, "BOT_DEVELOPER_USERNAME")
-	if cfg, _ := Load(getenv(env)); strings.Contains(cfg.PersonaPrompt, "programmed by") {
-		t.Errorf("no developer, yet the persona names one")
-	}
-}
-
 func TestActiveMembersLimit(t *testing.T) {
 	cfg, err := Load(getenv(validEnv()))
 	if err != nil || cfg.MinActiveMembers != 0 || cfg.ActiveDays != 3 {

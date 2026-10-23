@@ -47,10 +47,10 @@ func init() {
 			faqPhrases[foldPhrase(p)] = faqPhrase{kind, lang}
 		}
 	}
-	add(faqGreeting, "uz", "salom", "assalomu alaykum", "assalom", "assalomu aleykum", "salom maria", "salom mari", "xayrli kun", "салом", "ассалому алайкум")
+	add(faqGreeting, "uz", "alo", "aloo", "alyo", "alyoo", "salom", "assalomu alaykum", "assalom", "assalomu aleykum", "salom maria", "salom mari", "xayrli kun", "салом", "ассалому алайкум")
 	add(faqGreeting, "ru", "привет", "здравствуйте", "здравствуй", "приветик", "привет мария", "добрый день")
 	add(faqGreeting, "en", "hi", "hello", "hey", "hi maria", "hello maria")
-	add(faqHowAreYou, "uz", "qalaysan", "qalaysiz", "yaxshimisan", "yaxshimisiz", "nima gap", "nima gaplar", "ishlar qalay", "калайсан", "қалайсиз", "нима гап")
+	add(faqHowAreYou, "uz", "qalesan", "qalesiz", "qondaysan", "qondaye", "nma gap", "nma gaplar", "qalaysan", "qalaysiz", "yaxshimisan", "yaxshimisiz", "nima gap", "nima gaplar", "ishlar qalay", "калайсан", "қалайсиз", "нима гап")
 	add(faqHowAreYou, "ru", "как дела", "как ты", "как вы", "как жизнь")
 	add(faqHowAreYou, "en", "how are you", "how are you doing", "whats up", "sup")
 	add(faqThanks, "uz", "rahmat", "raxmat", "katta rahmat", "rahmat maria", "рахмат", "раҳмат")
@@ -61,16 +61,16 @@ func init() {
 	add(faqOkay, "uz", "ok", "okey", "xo'p", "mayli", "tushundim", "ок", "хоп", "майли")
 	add(faqOkay, "ru", "окей", "понял", "поняла", "ясно", "ладно")
 	add(faqOkay, "en", "okay", "got it", "cool", "nice")
-	add(faqName, "uz", "isming nima", "ismingiz nima", "sen kimsan", "siz kimsiz", "исминг нима", "сен кимсан")
+	add(faqName, "uz", "isming nma", "ismin nima", "ismin nma", "san kimsan", "isming nima", "ismingiz nima", "sen kimsan", "siz kimsiz", "исминг нима", "сен кимсан")
 	add(faqName, "ru", "как тебя зовут", "как вас зовут", "ты кто", "кто ты")
 	add(faqName, "en", "whats your name", "what is your name", "who are you")
-	add(faqCreator, "uz", "seni kim yaratgan", "sizni kim yaratgan", "kim yaratgan", "seni kim yasagan", "seni kim dasturlagan", "сени ким яратган")
+	add(faqCreator, "uz", "sani kim yaratgan", "sani kim yasagan", "sani kim qilgan", "seni kim qilgan", "seni kim yaratgan", "sizni kim yaratgan", "kim yaratgan", "seni kim yasagan", "seni kim dasturlagan", "сени ким яратган")
 	add(faqCreator, "ru", "кто тебя создал", "кто вас создал", "кто твой создатель", "кто тебя сделал")
 	add(faqCreator, "en", "who made you", "who created you", "who built you")
-	add(faqOwner, "uz", "egang kim", "egangiz kim", "xo'jayining kim", "xo'jayiningiz kim", "эганг ким")
+	add(faqOwner, "uz", "egan kim", "xojayinin kim", "egang kim", "egangiz kim", "xo'jayining kim", "xo'jayiningiz kim", "эганг ким")
 	add(faqOwner, "ru", "кто твой хозяин", "кто твой владелец", "чей ты бот")
 	add(faqOwner, "en", "who is your owner", "who owns you")
-	add(faqAbilities, "uz", "nima qila olasan", "nimalar qila olasan", "nima qila olasiz", "nimalar qila olasiz", "нима кила оласан", "нималар кила оласан")
+	add(faqAbilities, "uz", "nimala qilolasan", "nimalar qilolasan", "nima qilolasan", "nma qilolasan", "nimala qila olasan", "san nimala qilolasan", "nima qila olasan", "nimalar qila olasan", "nima qila olasiz", "nimalar qila olasiz", "нима кила оласан", "нималар кила оласан")
 	add(faqAbilities, "ru", "что ты умеешь", "что умеешь", "что вы умеете", "что ты можешь")
 	add(faqAbilities, "en", "what can you do", "what do you do")
 }
@@ -173,39 +173,9 @@ func (s *Service) faqText(phrase faqPhrase) string {
 	case faqName:
 		return fmt.Sprintf(pick(textMyName), cmp.Or(s.opts.DisplayName, "Maria"))
 	case faqCreator, faqOwner:
-		return s.makerText(phrase.kind, pick)
+		return pick(textMakersSecret)
 	}
 	return pick(textAbilities)
-}
-
-// makerText says who programmed the bot and whose it is: the developer and
-// the other owners when the developer is told apart, the owners otherwise.
-func (s *Service) makerText(kind faqKind, pick func(localText) string) string {
-	developer := s.opts.Developer
-	owners := s.ownerHandles(developer)
-	switch {
-	case developer != "" && owners == "":
-		return fmt.Sprintf(pick(textProgrammedAndOwned), developer)
-	case developer != "" && kind == faqOwner:
-		return fmt.Sprintf(pick(textOwnedBy), owners, developer)
-	case developer != "":
-		return fmt.Sprintf(pick(textProgrammedBy), developer, owners)
-	case owners != "":
-		return fmt.Sprintf(pick(textMadeBy), owners)
-	}
-	return pick(textMadeByOwners)
-}
-
-// ownerHandles are the owners' usernames but except's, joined for a
-// sentence, without "@": a private chat is no place to tag them.
-func (s *Service) ownerHandles(except string) string {
-	var handles []string
-	for _, u := range s.opts.OwnerUsernames {
-		if u != except {
-			handles = append(handles, u)
-		}
-	}
-	return strings.Join(handles, ", ")
 }
 
 var (
@@ -218,13 +188,9 @@ var (
 		{uz: "Yaxshi, rahmat! O'zingizda nima gaplar?", ru: "Хорошо, спасибо! А у вас как?", en: "Good, thanks! How about you?"},
 		{uz: "Zo'r! Sizdachi?", ru: "Отлично! А у вас?", en: "Great! And you?"},
 	}
-	textMyName             = localText{uz: "Mening ismim %s. 😊", ru: "Меня зовут %s. 😊", en: "My name is %s. 😊"}
-	textMadeBy             = localText{uz: "Meni %s yaratgan.", ru: "Меня создали %s.", en: "I was made by %s."}
-	textProgrammedBy       = localText{uz: "Meni %s dasturlagan, egam esa %s.", ru: "Меня запрограммировал %s, а мой владелец — %s.", en: "I was programmed by %s, and my owner is %s."}
-	textProgrammedAndOwned = localText{uz: "Meni %s dasturlagan, egam ham o'sha.", ru: "Меня запрограммировал %s, он же мой владелец.", en: "I was programmed by %s, who is also my owner."}
-	textOwnedBy            = localText{uz: "Egam — %s. Meni esa %s dasturlagan.", ru: "Мой владелец — %s. А запрограммировал меня %s.", en: "My owner is %s. I was programmed by %s."}
-	textMadeByOwners       = localText{uz: "Meni egalarim yaratgan.", ru: "Меня создали мои владельцы.", en: "My owners made me."}
-	textAbilities          = localText{
+	textMakersSecret = localText{uz: "Bu sir 🤫", ru: "Это секрет 🤫", en: "That's a secret 🤫"}
+	textMyName       = localText{uz: "Mening ismim %s. 😊", ru: "Меня зовут %s. 😊", en: "My name is %s. 😊"}
+	textAbilities    = localText{
 		uz: "Gaplashaman, savollarga javob beraman, valyuta kursi, ob-havo, namoz vaqti, yangiliklar, MLBB qahramonlari, kino va musiqa topaman, rasm, stiker va ovozli xabarlarni tushunaman. Shunchaki yozing!",
 		ru: "Болтаю, отвечаю на вопросы, ищу курсы валют, погоду, время намаза, новости, героев MLBB, фильмы и музыку, понимаю фото, стикеры и голосовые. Просто пишите!",
 		en: "I chat, answer questions, look up exchange rates, weather, prayer times, news, MLBB heroes, films and music, and understand photos, stickers and voice messages. Just write!",

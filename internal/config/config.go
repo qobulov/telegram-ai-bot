@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -130,11 +129,6 @@ type Config struct {
 	// the persona: a username can be given up and taken by someone else, an
 	// ID cannot.
 	OwnerIDs map[int64]bool
-	// Developer is the username, lower case and without @, of whoever
-	// programmed the bot, when that is told apart from whom it belongs to:
-	// asked who made it, the bot names the developer, and the other owners
-	// as its owners. "" when not set.
-	Developer string
 
 	// AllowedBots are the usernames of other bots the bot answers in groups,
 	// lower case; "*" allows any bot. Empty answers no bots.
@@ -226,7 +220,6 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.Location = r.location("GROUP_HISTORY_TIMEZONE", "Asia/Tashkent")
 	cfg.OwnerUsernames = r.usernames("BOT_OWNER_USERNAME")
 	cfg.OwnerIDs = r.ownerIDs("BOT_OWNER_IDS")
-	cfg.Developer = r.developer()
 	if len(cfg.OwnerIDs) > 0 && len(cfg.OwnerUsernames) == 0 {
 		r.fail("BOT_OWNER_IDS", "needs BOT_OWNER_USERNAME, which names the owners in the persona")
 	}
@@ -246,14 +239,6 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	if len(cfg.OwnerUsernames) > 0 {
 		cfg.PersonaPrompt += "\n\n" + strings.ReplaceAll(ownerNote, ownerPlaceholder, nameList(cfg.OwnerUsernames))
-	}
-	if cfg.Developer != "" {
-		owners := slices.DeleteFunc(slices.Clone(cfg.OwnerUsernames), func(u string) bool { return u == cfg.Developer })
-		note := developerNote
-		if len(owners) == 0 {
-			note, owners = developerOwnerNote, []string{cfg.Developer}
-		}
-		cfg.PersonaPrompt += "\n\n" + strings.NewReplacer(developerPlaceholder, cfg.Developer, ownerPlaceholder, nameList(owners)).Replace(note)
 	}
 	cfg.FootballDataToken = r.apiKey("FOOTBALL_DATA_TOKEN")
 	cfg.GiphyAPIKey = r.apiKey("GIPHY_API_KEY")
@@ -551,24 +536,6 @@ func (r *reader) allowedBots(name string) []string {
 		return []string{"*"}
 	}
 	return r.usernames(name)
-}
-
-// developer reads BOT_DEVELOPER_USERNAME: one username, which the bot names
-// as "@" plus it, so a numeric ID, which would be named "@1688909825", is
-// refused.
-func (r *reader) developer() string {
-	names := r.usernames("BOT_DEVELOPER_USERNAME")
-	switch {
-	case len(names) == 0:
-		return ""
-	case len(names) > 1:
-		r.fail("BOT_DEVELOPER_USERNAME", "must be one Telegram username")
-	case names[0][0] >= '0' && names[0][0] <= '9':
-		r.fail("BOT_DEVELOPER_USERNAME", "must be a Telegram username such as pronium, not a numeric ID")
-	default:
-		return names[0]
-	}
-	return ""
 }
 
 // isUsername accepts what Telegram allows: letters, digits and underscores.
