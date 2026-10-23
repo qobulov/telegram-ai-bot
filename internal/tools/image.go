@@ -47,6 +47,10 @@ type Caller struct {
 	// their own message it replies to: their own words, as opposed to
 	// anything quoted from someone else or logged.
 	Words string
+	// Picture is the first picture the model is shown with the message,
+	// its own or the replied one's, for tools that look at it; nil when
+	// there is none.
+	Picture []byte
 }
 
 // Mention is a member tagged in a message: by @username, or, for a member

@@ -694,8 +694,10 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 		// the member it answered; only owners give such orders.
 		caller.Target.Answered = s.answeredMember(ctx, in.scope.ChatID, caller.Target.MessageID)
 	}
+	req := s.request(ctx, in, rules)
+	caller.Picture = firstPicture(req.Attachments)
 	ctx = tools.WithTurn(ctx, caller, sink)
-	answer, err := s.opts.Replier.Reply(ctx, s.request(ctx, in, rules))
+	answer, err := s.opts.Replier.Reply(ctx, req)
 	// A picture drawn before a later failure is still worth sending.
 	drawings := sink.Take()
 	documents := sink.TakeDocuments()

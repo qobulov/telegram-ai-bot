@@ -7,7 +7,7 @@ import (
 
 func TestWolframAnswersWithTheAppIDInAHeader(t *testing.T) {
 	u := newUpstream(t, map[string]stub{
-		"/wolfram/v1/llm-api": ok("Query:\n\"integrate x^2 sin x\"\n\nIndefinite integral:\nintegral x^2 sin(x) dx = 2 x sin(x) - (x^2 - 2) cos(x) + constant\n\nPlot:\nimage: https://public6.wolframalpha.com/files/x.png\nWolfram Language code: Plot[x]\n"),
+		"/wolfram/v1/llm-api":                  ok("Query:\n\"integrate x^2 sin x\"\n\nIndefinite integral:\nintegral x^2 sin(x) dx = 2 x sin(x) - (x^2 - 2) cos(x) + constant\n\nPlot:\nimage: https://public6.wolframalpha.com/files/x.png\nWolfram Language code: Plot[x]\n"),
 		"/wolfram/v1/llm-api?input=qwzx blarg": {status: 501, body: "Wolfram|Alpha did not understand your input"},
 	})
 	opts := u.options()

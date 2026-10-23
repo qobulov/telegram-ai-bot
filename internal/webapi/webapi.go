@@ -106,6 +106,8 @@ type BaseURLs struct {
 	ArXiv             string
 	Datamuse          string
 	Wolfram           string
+	Shikimori         string
+	TraceMoe          string
 	// Wikipedia is a format string with %s for the language code.
 	Wikipedia string
 	// News maps a language (uz, ru), or world- and a language for the
@@ -156,6 +158,8 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.ArXiv = cmp.Or(b.ArXiv, "https://export.arxiv.org")
 	b.Datamuse = cmp.Or(b.Datamuse, "https://api.datamuse.com")
 	b.Wolfram = cmp.Or(b.Wolfram, "https://api.wolframalpha.com")
+	b.Shikimori = cmp.Or(b.Shikimori, "https://shikimori.io")
+	b.TraceMoe = cmp.Or(b.TraceMoe, "https://api.trace.moe")
 	b.Wikipedia = cmp.Or(b.Wikipedia, "https://%s.wikipedia.org")
 	if b.News == nil {
 		b.News = map[string]map[string]string{

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"strings"
@@ -241,6 +242,24 @@ func (s *Service) transcript(ctx context.Context, msg *telegram.Message, m media
 		return strings.TrimSuffix(m.label, ">") + "; no speech>"
 	}
 	return m.label + ` "` + strings.ReplaceAll(words, `"`, "'") + `"`
+}
+
+// firstPicture is the bytes of the first image among parts, for the tools
+// that look at it; nil when there is none.
+func firstPicture(parts []ai.ContentPart) []byte {
+	for _, part := range parts {
+		if part.ImageURL == nil || !strings.HasPrefix(part.ImageURL.URL, "data:image/") {
+			continue
+		}
+		_, encoded, ok := strings.Cut(part.ImageURL.URL, ";base64,")
+		if !ok {
+			continue
+		}
+		if data, err := base64.StdEncoding.DecodeString(encoded); err == nil {
+			return data
+		}
+	}
+	return nil
 }
 
 // withMediaLabel puts the description of a message's media in front of its

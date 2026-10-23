@@ -163,6 +163,8 @@ func (u *upstream) options() Options {
 			ArXiv:             base + "/arxiv",
 			Datamuse:          base + "/datamuse",
 			Wolfram:           base + "/wolfram",
+			Shikimori:         base + "/shikimori",
+			TraceMoe:          base + "/tracemoe",
 			Tavily:            base + "/tavily",
 			TMDB:              base + "/tmdb",
 			YouTube:           base + "/youtube",

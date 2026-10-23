@@ -155,3 +155,12 @@ func TestTextGoesWhenTheFileCannotBeSent(t *testing.T) {
 		t.Errorf("sent = %+v", sent)
 	}
 }
+
+// Tools see the picture the model is shown, such as anime's scene search.
+func TestToolsSeeTheMessagesPicture(t *testing.T) {
+	f := newFixture()
+	f.run(privateWith(func(m *telegram.Message) { m.Photo = photo(); m.Caption = "bu qaysi anime?" }))
+	if got := onlyRequest(t, f).caller.Picture; !bytes.Equal(got, jpegData) {
+		t.Errorf("picture = %q", got)
+	}
+}
