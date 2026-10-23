@@ -196,7 +196,7 @@ func TestGIFOfATopic(t *testing.T) {
 		log  string
 	}{
 		"sent":       {&fakeGIFs{links: []string{"https://g/1.mp4"}}, 1, "<gif pubg>"},
-		"none found": {&fakeGIFs{}, 0, textNoGIF},
+		"none found": {&fakeGIFs{}, 0, textNoGIF.uz},
 		// Asked for, it does not wait out the gap after the last sticker.
 		"right after a sticker": {&fakeGIFs{links: []string{"https://g/1.mp4"}, slotTaken: true}, 1, "<gif pubg>"},
 	} {
@@ -206,7 +206,7 @@ func TestGIFOfATopic(t *testing.T) {
 			f.opts.GIFs, f.opts.AnimationSender, f.opts.MediaSlots = c.gifs, c.gifs, c.gifs
 			f.replier.gif = "pubg"
 			sent := f.run(inGroup(groupMessage("Mira, pubg haqida gif tasha")))
-			if c.want == 0 && (len(sent) != 1 || sent[0].text != textNoGIF) {
+			if c.want == 0 && (len(sent) != 1 || sent[0].text != textNoGIF.uz) {
 				t.Errorf("texts = %+v, want the asker told no GIF was found", sent)
 			}
 			if len(c.gifs.sent) != c.want || len(st.sent) != 0 {

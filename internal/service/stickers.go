@@ -117,8 +117,8 @@ func (s *Service) sendMediaOnce(in incoming, out *outcome) int64 {
 		if claimed {
 			// A GIF of a topic was asked for and none is about it: say so
 			// rather than leave the asker without an answer.
-			out.gif, out.text = "", textNoGIF
-			return s.reply(in, textNoGIF)
+			out.gif, out.text = "", textNoGIF.to(in)
+			return s.reply(in, out.text)
 		}
 		out.gif = ""
 		return 0

@@ -23,7 +23,7 @@ func (s *Service) obeyedIgnoreOrder(ctx context.Context, in incoming) bool {
 		return false
 	}
 	if err := s.saveIgnore(ctx, in, member); err != nil {
-		s.reply(in, textError)
+		s.reply(in, textError.to(in))
 	} else {
 		s.react(in, ignoreOrderReaction)
 	}

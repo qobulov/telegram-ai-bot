@@ -244,6 +244,9 @@ type User struct {
 	IsBot     bool   `json:"is_bot"`
 	Username  string `json:"username"`
 	FirstName string `json:"first_name"`
+	// LanguageCode is the language of the user's Telegram app, as an IETF
+	// tag such as "uz" or "ru-RU"; often missing.
+	LanguageCode string `json:"language_code,omitempty"`
 }
 
 // ChatMember is a user's standing in a chat. Its Can fields count only for

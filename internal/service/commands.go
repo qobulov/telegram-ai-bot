@@ -350,7 +350,7 @@ func (s *Service) rateLimited(in incoming) (notice string, limited bool) {
 		if in.group {
 			return "", true
 		}
-		return textRateLimited, true
+		return textRateLimited.to(in), true
 	case deniedAgain:
 		return "", true
 	}
@@ -493,7 +493,7 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 	case strings.HasPrefix(in.text, "/"):
 		return say(s.runCommand(ctx, in))
 	case utf8.RuneCountInString(in.text) > s.opts.MaxInputChars:
-		return say(fmt.Sprintf(textTooLong, s.opts.MaxInputChars))
+		return say(fmt.Sprintf(textTooLong.to(in), s.opts.MaxInputChars))
 	case s.hasContent(in):
 		return s.ask(ctx, in, rules)
 	case in.group:
@@ -501,7 +501,7 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		// whitespace. Saying so would be one more message in the group.
 		return outcome{}
 	case in.msg.Text == "":
-		return say(textTextOnly(s.canListen())) // a location, a contact or another kind the bot does not read
+		return say(textTextOnly(s.canListen()).to(in)) // a location, a contact or another kind the bot does not read
 	default:
 		return outcome{} // whitespace only
 	}
@@ -597,7 +597,7 @@ func (s *Service) joinedChannels(ctx context.Context, in incoming) (notice outco
 		}
 	}
 	if len(missing) > 0 {
-		return s.joinNotice(missing), false
+		return s.joinNotice(in, missing), false
 	}
 	s.subscribers.set(in.userID, true)
 	return outcome{}, true
@@ -608,25 +608,25 @@ const checkPayload = "check"
 
 // joinNotice asks to join channels, with a button that opens each and one
 // that sends "/start check", which checks again.
-func (s *Service) joinNotice(channels []string) outcome {
+func (s *Service) joinNotice(in incoming, channels []string) outcome {
 	var buttons [][]telegram.Button
 	for i, channel := range channels {
 		link, ok := channelLink(channel)
 		if !ok {
 			continue
 		}
-		label := textJoinButton
+		label := textJoinButton.to(in)
 		if len(channels) > 1 {
-			label = fmt.Sprintf(textJoinButtonN, i+1)
+			label = fmt.Sprintf(textJoinButtonN.to(in), i+1)
 		}
 		buttons = append(buttons, []telegram.Button{{Text: label, URL: link}})
 	}
 	if s.opts.Bot.Username != "" {
-		buttons = append(buttons, []telegram.Button{{Text: textCheckButton, URL: "https://t.me/" + s.opts.Bot.Username + "?start=" + checkPayload}})
+		buttons = append(buttons, []telegram.Button{{Text: textCheckButton.to(in), URL: "https://t.me/" + s.opts.Bot.Username + "?start=" + checkPayload}})
 	}
-	text := textJoinChannel
+	text := textJoinChannel.to(in)
 	if len(channels) > 1 {
-		text = textJoinChannels
+		text = textJoinChannels.to(in)
 	}
 	return outcome{text: text, buttons: buttons}
 }
@@ -639,7 +639,7 @@ func (s *Service) start(ctx context.Context, in incoming) outcome {
 		return notice
 	}
 	if strings.TrimSpace(strings.TrimPrefix(in.text, commandName(in.text))) == checkPayload {
-		return say(textChannelsJoined)
+		return say(textChannelsJoined.to(in))
 	}
 	return say(s.runCommand(ctx, in))
 }
@@ -679,7 +679,7 @@ func (s *Service) takePrivateAnswer(ctx context.Context, in incoming) (reservati
 	}
 	s.opts.Logger.Info("private daily limit reached", "user_id", in.userID, "notified", notify)
 	if notify {
-		return 0, fmt.Sprintf(textDailyLimit, limit, limit, limit), false
+		return 0, fmt.Sprintf(textDailyLimit.to(in), limit), false
 	}
 	return 0, "", false
 }
@@ -893,21 +893,21 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 		return outcome{}
 	case errors.Is(err, ai.ErrTruncated):
 		log.Warn("the model ran out of tokens mid-answer; the fragment was not sent")
-		return say(textCutOff)
+		return say(textCutOff.to(in))
 	case errors.Is(err, agent.ErrDuplicate):
 		log.Info("duplicate update skipped")
 		return outcome{duplicate: true}
 	case ai.IsOverloaded(err):
 		log.Warn("model provider overloaded or over its limits", "error", err)
-		return say(textOverloaded)
+		return say(textOverloaded.to(in))
 	case errors.Is(err, context.DeadlineExceeded):
 		log.Warn("turn timed out")
-		return say(textTimeout)
+		return say(textTimeout.to(in))
 	default:
 		// The error is logged in full but never shown: it can carry provider
 		// or database details the user must not see.
 		log.Error("turn failed", "error", err)
-		return say(textError)
+		return say(textError.to(in))
 	}
 }
 
@@ -1015,7 +1015,7 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 	}
 	switch command {
 	case "/start":
-		return textWelcome
+		return textWelcome.to(in)
 	case "/help":
 		return HelpText(Abilities{Draw: s.opts.ImagesEnabled, Listen: s.canListen(), Football: s.opts.FootballEnabled})
 	case "/about":
@@ -1060,7 +1060,7 @@ func (s *Service) ignore(ctx context.Context, in incoming) string {
 		return refusal
 	}
 	if err := s.saveIgnore(ctx, in, member); err != nil {
-		return textError
+		return textError.to(in)
 	}
 	return fmt.Sprintf(textIgnored, member.Name)
 }
@@ -1093,7 +1093,7 @@ func (s *Service) unignore(ctx context.Context, in incoming) string {
 	removed, err := s.opts.Rules.RemoveIgnore(ctx, in.scope.ChatID, member.UserID)
 	if err != nil {
 		s.opts.Logger.Error("unignore failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
-		return textError
+		return textError.to(in)
 	}
 	if !removed {
 		return fmt.Sprintf(textNotIgnored, member.Name)
@@ -1140,7 +1140,7 @@ func (s *Service) refuseUnignorable(ctx context.Context, in incoming, member *to
 	isAdmin, err := s.opts.Members.IsGroupAdmin(ctx, in.scope.ChatID, member.UserID)
 	if err != nil {
 		s.opts.Logger.Error("group admin check failed", "member_id", member.UserID, "chat_id", in.scope.ChatID, "error", err)
-		return textError
+		return textError.to(in)
 	}
 	if isAdmin {
 		return textCannotIgnore
@@ -1157,7 +1157,7 @@ func (s *Service) reset(ctx context.Context, in incoming) string {
 	}
 	if err := s.opts.Resetter.Reset(ctx, in.scope); err != nil {
 		s.opts.Logger.Error("reset failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
-		return textError
+		return textError.to(in)
 	}
 	s.ambient.clear(in.scope.ChatID)
 	s.opts.Logger.Info("conversation reset", "user_id", in.userID, "chat_id", in.scope.ChatID)
@@ -1176,7 +1176,7 @@ func (s *Service) setMuted(ctx context.Context, in incoming, muted bool) string 
 	}
 	if err := s.opts.Muter.SetMuted(ctx, in.scope.ChatID, muted, in.userID); err != nil {
 		s.opts.Logger.Error("mute change failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
-		return textError
+		return textError.to(in)
 	}
 	s.markMuted(in.scope.ChatID, muted)
 	s.opts.Logger.Info("mute changed", "user_id", in.userID, "chat_id", in.scope.ChatID, "muted", muted)
@@ -1199,7 +1199,7 @@ func (s *Service) refuseUnlessManager(ctx context.Context, in incoming) string {
 	isAdmin, err := s.opts.Members.IsGroupAdmin(ctx, in.scope.ChatID, in.userID)
 	if err != nil {
 		s.opts.Logger.Error("group admin check failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
-		return textError
+		return textError.to(in)
 	}
 	if !isAdmin {
 		return textAdminsOnly

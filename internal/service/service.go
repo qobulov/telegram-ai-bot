@@ -875,7 +875,7 @@ func (s *Service) notifyBusy(in incoming) {
 
 func (s *Service) sendBusyNotices() {
 	for in := range s.notices {
-		s.reply(in, textBusy)
+		s.reply(in, textBusy.to(in))
 	}
 }
 
@@ -883,7 +883,7 @@ func (s *Service) work(queue <-chan incoming) {
 	for in := range queue {
 		if s.closing.Load() {
 			if !s.silenced(in) && !in.unanswered {
-				s.reply(in, textBusy)
+				s.reply(in, textBusy.to(in))
 			}
 			continue
 		}

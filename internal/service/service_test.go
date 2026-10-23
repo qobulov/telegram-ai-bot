@@ -492,7 +492,7 @@ func TestResetFailureShowsGenericError(t *testing.T) {
 
 	sent := f.run(textFrom(userID, "/reset"))
 
-	expectOneReply(t, sent, textError)
+	expectOneReply(t, sent, textError.uz)
 	if strings.Contains(sent[0].text, "10.0.0.5") {
 		t.Errorf("reply leaks the internal error: %q", sent[0].text)
 	}
@@ -537,7 +537,7 @@ func TestAgentErrorShowsGenericError(t *testing.T) {
 
 	sent := f.run(textFrom(userID, "hi"))
 
-	expectOneReply(t, sent, textError)
+	expectOneReply(t, sent, textError.uz)
 	if strings.Contains(sent[0].text, "sk-or-secret") || strings.Contains(sent[0].text, "401") {
 		t.Errorf("reply leaks the internal error: %q", sent[0].text)
 	}
@@ -555,12 +555,12 @@ func TestEmptyAnswerIsSilentInAGroup(t *testing.T) {
 
 	f = newFixture()
 	f.replier.err = fmt.Errorf("agent: %w", ai.ErrEmptyResponse)
-	expectOneReply(t, f.run(textFrom(userID, "hi")), textError)
+	expectOneReply(t, f.run(textFrom(userID, "hi")), textError.uz)
 }
 
 // The bot's own messages are in Uzbek, like the people it talks to.
 func TestErrorTextsAreUzbek(t *testing.T) {
-	for name, text := range map[string]string{"error": textError, "timeout": textTimeout, "busy": textBusy, "rate limited": textRateLimited, "too long": textTooLong} {
+	for name, text := range map[string]string{"error": textError.uz, "timeout": textTimeout.uz, "busy": textBusy.uz, "rate limited": textRateLimited.uz, "too long": textTooLong.uz} {
 		if strings.Contains(text, "Please") || strings.Contains(text, "try again") {
 			t.Errorf("%s text is still English: %q", name, text)
 		}
@@ -571,7 +571,7 @@ func TestAgentTimeoutShowsTimeoutText(t *testing.T) {
 	f := newFixture()
 	f.replier.err = context.DeadlineExceeded
 
-	expectOneReply(t, f.run(textFrom(userID, "hi")), textTimeout)
+	expectOneReply(t, f.run(textFrom(userID, "hi")), textTimeout.uz)
 }
 
 func TestTimeoutReplyIsDeliveredAfterTheTurnDeadline(t *testing.T) {
@@ -579,7 +579,7 @@ func TestTimeoutReplyIsDeliveredAfterTheTurnDeadline(t *testing.T) {
 	f.opts.TurnTimeout = 20 * time.Millisecond
 	f.replier.waitForDeadline = true
 
-	expectOneReply(t, f.run(textFrom(userID, "hi")), textTimeout)
+	expectOneReply(t, f.run(textFrom(userID, "hi")), textTimeout.uz)
 }
 
 func TestDuplicateUpdateIsSilent(t *testing.T) {
@@ -617,7 +617,7 @@ func TestNonTextMessageGetsTextOnlyReply(t *testing.T) {
 
 	sent := f.run(textFrom(userID, "")) // a location or contact has no text
 
-	expectOneReply(t, sent, "Send me text, a photo, a video or a voice message instead.")
+	expectOneReply(t, sent, textTextOnly(true).uz)
 }
 
 // Where the provider cannot hear, the notice offers no voice messages, as
@@ -628,7 +628,7 @@ func TestTextOnlyReplyOffersVoiceOnlyWhereTheBotListens(t *testing.T) {
 
 	sent := f.run(textFrom(userID, ""))
 
-	expectOneReply(t, sent, "Send me text, a photo or a video instead.")
+	expectOneReply(t, sent, textTextOnly(false).uz)
 }
 
 func TestIgnoredUpdates(t *testing.T) {
@@ -675,7 +675,7 @@ func TestRateLimitWarnsOnceThenStaysSilent(t *testing.T) {
 	}
 	warnings := 0
 	for _, msg := range sent {
-		if msg.text == textRateLimited {
+		if msg.text == textRateLimited.uz {
 			warnings++
 		}
 	}
@@ -713,7 +713,7 @@ func TestFullQueueGetsBusyReply(t *testing.T) {
 
 	busy := 0
 	for _, msg := range f.sender.messages() {
-		if msg.text == textBusy {
+		if msg.text == textBusy.uz {
 			busy++
 		}
 	}
@@ -788,7 +788,7 @@ func TestCloseRefusesQueuedUpdatesInsteadOfRunningThem(t *testing.T) {
 		switch msg.text {
 		case "echo: in progress":
 			answered++
-		case textBusy:
+		case textBusy.uz:
 			busy++
 		}
 	}
@@ -1101,7 +1101,7 @@ func TestAdminCheckFailureRefusesTheCommand(t *testing.T) {
 
 	sent := f.run(inGroup(asAdmin(groupMessage("/mute@MyBot"))))
 
-	expectOneReply(t, sent, textError)
+	expectOneReply(t, sent, textError.uz)
 	if len(f.muter.calls) != 0 {
 		t.Errorf("muted although the admin check failed: %+v", f.muter.calls)
 	}
@@ -1117,7 +1117,7 @@ func TestMuteStorageFailureLeavesTheGroupUnmuted(t *testing.T) {
 		inGroup(groupMessage("Mira, still there?")),
 	)
 
-	if len(sent) != 2 || sent[0].text != textError || sent[1].text != "echo: still there?" {
+	if len(sent) != 2 || sent[0].text != textError.uz || sent[1].text != "echo: still there?" {
 		t.Errorf("sent = %+v", sent)
 	}
 }
@@ -1526,8 +1526,8 @@ func TestGroupErrorsAreSentAsReplies(t *testing.T) {
 		err  error
 		want string
 	}{
-		"provider error": {errors.New("openrouter: status 502: upstream sk-or-secret"), textError},
-		"timeout":        {context.DeadlineExceeded, textTimeout},
+		"provider error": {errors.New("openrouter: status 502: upstream sk-or-secret"), textError.uz},
+		"timeout":        {context.DeadlineExceeded, textTimeout.uz},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -1572,7 +1572,7 @@ func TestBusyNoticeInGroupRepliesToTheMessage(t *testing.T) {
 	s.stop()
 
 	for _, msg := range f.sender.messages() {
-		if msg.text == textBusy {
+		if msg.text == textBusy.uz {
 			if msg.chatID != groupID || msg.replyTo != 99 {
 				t.Errorf("busy notice = %+v, want a reply to message 99 in the group", msg)
 			}
@@ -1833,7 +1833,7 @@ func TestOverloadedProviderGetsItsOwnMessage(t *testing.T) {
 
 		sent := f.run(inGroup(groupMessage("Mira, alive?")))
 
-		expectOneReply(t, sent, textOverloaded)
+		expectOneReply(t, sent, textOverloaded.uz)
 		if sent[0].replyTo != 30 {
 			t.Errorf("status %d: the notice does not reply to the message: %+v", status, sent[0])
 		}
@@ -2679,8 +2679,8 @@ func TestMembershipChangesAreRecordedOnTheWebhookPathToo(t *testing.T) {
 }
 
 func TestOverloadReplyIsInUzbek(t *testing.T) {
-	if !strings.Contains(textOverloaded, "daqiqa") {
-		t.Errorf("textOverloaded = %q; the groups speak Uzbek", textOverloaded)
+	if !strings.Contains(textOverloaded.uz, "daqiqa") {
+		t.Errorf("textOverloaded.uz = %q; the groups speak Uzbek", textOverloaded.uz)
 	}
 }
 
@@ -2936,7 +2936,7 @@ func TestIgnoreCommandRefusesAdmins(t *testing.T) {
 		book := &fakeRuleBook{}
 		f.opts.Rules = book
 
-		expectOneReply(t, f.run(commandReplyingTo(requester, bek, "/ignore@MyBot")), textError)
+		expectOneReply(t, f.run(commandReplyingTo(requester, bek, "/ignore@MyBot")), textError.uz)
 		if len(book.saved) != 0 {
 			t.Errorf("saved = %+v; Bek might be an admin", book.saved)
 		}
@@ -3285,7 +3285,7 @@ func TestPrivateDailyLimitNoticeOnceThenSilence(t *testing.T) {
 	if calls := len(f.replier.recorded()); calls != 10 {
 		t.Errorf("model calls = %d, want 10", calls)
 	}
-	notice := fmt.Sprintf(textDailyLimit, 10, 10, 10)
+	notice := fmt.Sprintf(textDailyLimit.uz, 10)
 	if len(sent) != 11 || sent[10].text != notice || sent[9].text != "echo: hi" {
 		t.Errorf("sent = %+v, want 10 answers, then one notice and silence", sent)
 	}
@@ -3369,7 +3369,7 @@ func TestFailedTurnReleasesItsReservation(t *testing.T) {
 		f.opts.TurnTimeout = 20 * time.Millisecond
 		f.replier.waitForDeadline = true
 
-		expectOneReply(t, f.run(textFrom(userID, "hi")), textTimeout)
+		expectOneReply(t, f.run(textFrom(userID, "hi")), textTimeout.uz)
 		if _, released := quota.recorded(); len(released) != 1 {
 			t.Errorf("released = %v; a turn out of time must still give its answer back", released)
 		}
@@ -3516,8 +3516,8 @@ func TestPrivateChatNeedsTheRequiredChannel(t *testing.T) {
 				t.Errorf("model calls = %d, want answered %v", calls, c.answered)
 			}
 			if !c.answered {
-				if len(sent) != 1 || sent[0].text != textJoinChannel || len(sent[0].buttons) != 2 ||
-					sent[0].buttons[0][0].URL != "https://t.me/maria_news" || sent[0].buttons[1][0].Text != textCheckButton {
+				if len(sent) != 1 || sent[0].text != textJoinChannel.uz || len(sent[0].buttons) != 2 ||
+					sent[0].buttons[0][0].URL != "https://t.me/maria_news" || sent[0].buttons[1][0].Text != textCheckButton.uz {
 					t.Errorf("sent = %+v, want the notice to join with its buttons", sent)
 				}
 				if asked, _ := quota.recorded(); len(asked) != 0 {
@@ -3554,7 +3554,7 @@ func TestStartAsksToJoinAndChecks(t *testing.T) {
 
 	sent := f.run(textFrom(userID, "/start"))
 
-	if len(sent) != 1 || sent[0].text != textJoinChannels || len(sent[0].buttons) != 3 {
+	if len(sent) != 1 || sent[0].text != textJoinChannels.uz || len(sent[0].buttons) != 3 {
 		t.Fatalf("sent = %+v, want the notice with two channels and the check", sent)
 	}
 	if b := sent[0].buttons; b[0][0].Text != "1 - kanal" || b[1][0].URL != "https://t.me/maria_music" || b[2][0].URL != "https://t.me/maria_bot?start=check" {
@@ -3566,7 +3566,25 @@ func TestStartAsksToJoinAndChecks(t *testing.T) {
 	check.UpdateID++
 	check.Message.MessageID++
 	sent = f.run(check)
-	if len(sent) != 2 || sent[1].text != textChannelsJoined || len(f.replier.recorded()) != 0 {
+	if len(sent) != 2 || sent[1].text != textChannelsJoined.uz || len(f.replier.recorded()) != 0 {
 		t.Errorf("sent = %+v, model calls %d; want the thanks and no model call", sent, len(f.replier.recorded()))
 	}
+}
+
+// The bot's own messages go in the language of the user's Telegram app:
+// Russian for Russian and its neighbours, English for any other, Uzbek for
+// Uzbek or when Telegram does not say.
+func TestFixedMessagesFollowTheAppLanguage(t *testing.T) {
+	for code, want := range map[string]string{"": "uz", "uz": "uz", "ru": "ru", "ru-RU": "ru", "kk": "ru", "en": "en", "en-GB": "en", "tr": "en"} {
+		if got := appLanguage(&telegram.User{LanguageCode: code}); got != want {
+			t.Errorf("appLanguage(%q) = %q, want %q", code, got, want)
+		}
+	}
+	f := newFixture()
+	update := textFrom(userID, "")
+	update.Message.From.LanguageCode = "ru"
+
+	sent := f.run(update)
+
+	expectOneReply(t, sent, textTextOnly(true).ru)
 }

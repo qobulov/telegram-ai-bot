@@ -328,7 +328,7 @@ func TestWebhookLimitsPrivateChats(t *testing.T) {
 
 	for _, updateID := range []string{"910040", "910041", "910042"} {
 		env.deliver(`{"update_id":`+updateID+`,"message":{"message_id":`+updateID+`,
-			"from":{"id":778001,"is_bot":false,"first_name":"Bek"},"chat":{"id":778001,"type":"private"},"text":"salom"}}`, hookSecret)
+			"from":{"id":778001,"is_bot":false,"first_name":"Bek","language_code":"en"},"chat":{"id":778001,"type":"private"},"text":"salom"}}`, hookSecret)
 	}
 
 	sent := env.apis.messages()
