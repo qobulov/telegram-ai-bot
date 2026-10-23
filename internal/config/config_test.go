@@ -1626,3 +1626,18 @@ func TestReasoningEffort(t *testing.T) {
 		t.Errorf("err = %v, want AI_REASONING_EFFORT refused", err)
 	}
 }
+
+// The bot once told a member she was a year or two older than its owner,
+// whose age it never knew: no personal fact is made up, even in a joke.
+func TestPersonaNeverInventsPersonalFacts(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rule := lineContaining(cfg.PersonaPrompt, "Do not invent personal facts")
+	for _, want := range []string{"your owners", "age, birth year", "not even in a joke or a comparison", "never add a fact that was not"} {
+		if !strings.Contains(rule, want) {
+			t.Errorf("the rule does not contain %q: %q", want, rule)
+		}
+	}
+}
