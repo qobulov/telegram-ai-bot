@@ -280,7 +280,7 @@ func TestOwnerReplyToAMemberNamesTheMember(t *testing.T) {
 			msg.ReplyToMessage = &telegram.Message{MessageID: 29, From: c.replied, Chat: msg.Chat, Text: "hello all"}
 			f.run(inGroup(msg))
 			context := onlyRequest(t, f).req.Context
-			if got := strings.HasSuffix(context, "\n\n"+hint+inEnglish); got != c.want {
+			if got := strings.Contains(context, "\n\n"+hint+"\n\n"); got != c.want {
 				t.Errorf("context ends with the hint = %v, want %v: %q", got, c.want, context)
 			}
 		})
