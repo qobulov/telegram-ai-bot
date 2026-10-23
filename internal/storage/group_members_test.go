@@ -194,3 +194,31 @@ func TestOtherBotsCountsTheBotsStillThere(t *testing.T) {
 		t.Errorf("OtherBots = %d, %v; want 1", n, err)
 	}
 }
+
+// Active members are the people seen writing since then who are still in
+// the group: not bots, not those seen before, not those who left.
+func TestActiveMembersCountsRecentPeople(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	const group = int64(-100700)
+	now := time.Now()
+	for _, m := range []GroupMember{
+		{ChatID: group, UserID: 1, FirstName: "A", LastSeen: now},
+		{ChatID: group, UserID: 2, FirstName: "B", LastSeen: now.Add(-24 * time.Hour)},
+		{ChatID: group, UserID: 3, FirstName: "Old", LastSeen: now.Add(-5 * 24 * time.Hour)},
+		{ChatID: group, UserID: 4, FirstName: "Bot", IsBot: true, LastSeen: now},
+		{ChatID: group, UserID: 5, FirstName: "Gone", Status: "left", LastSeen: now},
+		{ChatID: -100800, UserID: 6, FirstName: "Elsewhere", LastSeen: now},
+	} {
+		if err := store.SeeMember(ctx, m); err != nil {
+			t.Fatal(err)
+		}
+		// SeeMember stamps now; the test dates the earlier sightings.
+		if _, err := store.pool.Exec(ctx, `UPDATE group_members SET last_seen_at = $3 WHERE chat_id = $1 AND user_id = $2`, m.ChatID, m.UserID, m.LastSeen); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if count, err := store.ActiveMembers(ctx, group, now.Add(-3*24*time.Hour)); err != nil || count != 2 {
+		t.Errorf("active = %d, %v; want 2", count, err)
+	}
+}

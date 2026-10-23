@@ -163,6 +163,11 @@ type Config struct {
 	// counted and other bots not; a smaller one is answered only as a
 	// private chat would be. 0 answers groups of any size.
 	MinGroupMembers int
+	// MinActiveMembers is how many people must have written in a group in
+	// the last ActiveDays days for the bot to answer there; in a quieter
+	// group it answers only its owners. 0 answers any group.
+	MinActiveMembers int
+	ActiveDays       int
 }
 
 // IsAdmin reports whether the Telegram user is listed in ADMIN_USER_IDS.
@@ -209,6 +214,8 @@ func Load(getenv func(string) string) (Config, error) {
 		PrivateChats:            r.privateChats(),
 		RequiredChannels:        r.requiredChannels(),
 		MinGroupMembers:         r.integer("GROUP_MIN_MEMBERS", 6, 0),
+		MinActiveMembers:        r.integer("GROUP_MIN_ACTIVE_MEMBERS", 0, 0),
+		ActiveDays:              r.positive("GROUP_ACTIVE_DAYS", 3),
 	}
 	r.chooseProvider(&cfg)
 	cfg.MaxMediaBytes = int64(r.positive("MAX_MEDIA_MB", 5)) << 20

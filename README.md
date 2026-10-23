@@ -220,6 +220,8 @@ in the environment win over the file.
 | `GROUP_RATE_LIMIT_PER_MINUTE` | `6`                            | Answers per group per minute, across all members; past it she is silent. Counted in the database             |
 | `MEMBER_REPLIES_PER_10_MIN`   | `4`                            | Answers each member gets per group in 10 minutes; past it she is silent with them. Counted in the database    |
 | `GROUP_MIN_MEMBERS` | `6` | The smallest group whose members she answers, herself counted and other bots seen there not; a smaller group is treated as a private chat under `PRIVATE_CHATS`. 0 means no minimum |
+| `GROUP_MIN_ACTIVE_MEMBERS` | `0` | How many people must have written in a group in the last `GROUP_ACTIVE_DAYS` days for the bot to answer there; in a quieter group it answers only its owners, silently passing over everyone else. Counted from the members the bot has seen. `0` turns it off |
+| `GROUP_ACTIVE_DAYS` | `3` | The days `GROUP_MIN_ACTIVE_MEMBERS` counts back |
 | `LOG_LEVEL`                   | `info`                         | `debug`, `info`, `warn` or `error`                                                                           |
 | `GEMINI_BASE_URL`             | Google's OpenAI-compatible API | Override for testing or a proxy; `XAI_BASE_URL` likewise for Grok                                            |
 | `TELEGRAM_API_URL`            | `https://api.telegram.org`     | Override for testing or a local Bot API server                                                               |

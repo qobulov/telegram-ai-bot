@@ -18,6 +18,9 @@ const (
 	// subscriberMemory is how long a user found in the required channel is
 	// not asked about again; one who left is answered that long at most.
 	subscriberMemory = 10 * time.Minute
+	// activeMemory is how long a group's count of active members is
+	// trusted.
+	activeMemory = 10 * time.Minute
 	// maxRemembered bounds each cache; past it, the expired are dropped, and
 	// if none is, everything.
 	maxRemembered = 10_000

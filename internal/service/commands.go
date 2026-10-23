@@ -89,6 +89,12 @@ func (s *Service) process(in incoming) {
 		s.passOver(in)
 		return
 	}
+	// A group where too few people wrote lately gets nothing at all, as
+	// the owners asked; only they are answered there.
+	if s.tooQuiet(ctx, in) {
+		s.passOver(in)
+		return
+	}
 	// An owner's order not to answer a member is handled here, in code.
 	if s.obeyedIgnoreOrder(ctx, in) {
 		return
@@ -443,6 +449,32 @@ func (s *Service) isAdminActingOnAMember(in incoming) bool {
 		s.opts.Logger.Warn("group admin check failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
 	}
 	return isAdmin && err == nil
+}
+
+// tooQuiet reports a group where fewer than MinActiveMembers people wrote
+// within ActiveWindow, for a message from anyone but an owner. When the
+// count cannot be read, the group is answered.
+func (s *Service) tooQuiet(ctx context.Context, in incoming) bool {
+	if !in.group || s.opts.MinActiveMembers <= 0 || s.opts.ActiveCounter == nil || s.isOwner(in.msg.From) {
+		return false
+	}
+	count, ok := s.actives.get(in.scope.ChatID)
+	if !ok {
+		ctx, cancel := context.WithTimeout(ctx, logTimeout)
+		defer cancel()
+		var err error
+		count, err = s.opts.ActiveCounter.ActiveMembers(ctx, in.scope.ChatID, s.opts.Now().Add(-s.opts.ActiveWindow))
+		if err != nil {
+			s.opts.Logger.Warn("could not count a group's active members; answering", "chat_id", in.scope.ChatID, "error", err)
+			return false
+		}
+		s.actives.set(in.scope.ChatID, count)
+	}
+	if count < s.opts.MinActiveMembers {
+		s.opts.Logger.Info("group too quiet; not answering", "chat_id", in.scope.ChatID, "active", count)
+		return true
+	}
+	return false
 }
 
 // passOver logs a group message the bot will not answer, as unaddressed

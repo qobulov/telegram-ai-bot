@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"sync"
@@ -446,5 +447,69 @@ func TestToThemHintNamesTheRepliedMember(t *testing.T) {
 	}
 	if strings.Contains(calls[1].req.Context, "[to them]") {
 		t.Errorf("a reply to the bot carries the hint: %q", calls[1].req.Context)
+	}
+}
+
+type fakeActives struct {
+	count int
+	err   error
+	asked int
+}
+
+func (f *fakeActives) ActiveMembers(context.Context, int64, time.Time) (int, error) {
+	f.asked++
+	return f.count, f.err
+}
+
+// A group where fewer than the minimum wrote lately gets nothing, not even
+// a reaction, and no model call; owners are still answered there, and a
+// count that cannot be read lets the message through.
+func TestQuietGroupIsNotAnswered(t *testing.T) {
+	cases := map[string]struct {
+		count    int
+		err      error
+		owner    bool
+		answered bool
+	}{
+		"four active":           {count: 4},
+		"five active":           {count: 5, answered: true},
+		"an owner, four active": {count: 4, owner: true, answered: true},
+		"count fails":           {err: errors.New("db down"), answered: true},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			f.opts.MinActiveMembers, f.opts.ActiveWindow = 5, 72*time.Hour
+			f.opts.ActiveCounter = &fakeActives{count: c.count, err: c.err}
+			msg := groupMessage("Mira, salom")
+			if c.owner {
+				f.opts.OwnerUsernames = []string{ownerUsername}
+				msg = fromOwner(msg)
+			}
+
+			sent := f.run(inGroup(msg))
+
+			if calls := len(f.replier.recorded()); (calls == 1) != c.answered {
+				t.Errorf("model calls = %d, want answered %v", calls, c.answered)
+			}
+			if !c.answered && (len(sent) != 0 || len(f.reactor.recorded()) != 0) {
+				t.Errorf("sent %+v, reactions %+v; want nothing", sent, f.reactor.recorded())
+			}
+		})
+	}
+}
+
+// A group's count is read once for a while, not for every message.
+func TestActiveCountIsReadOnceForAWhile(t *testing.T) {
+	f := newFixture()
+	actives := &fakeActives{count: 9}
+	f.opts.MinActiveMembers, f.opts.ActiveWindow, f.opts.ActiveCounter = 5, 72*time.Hour, actives
+	first, second := groupMessage("Mira, salom"), groupMessage("Mira, qalaysan")
+	second.MessageID = 31
+
+	f.run(inGroup(first), inGroup(second))
+
+	if actives.asked != 1 || len(f.replier.recorded()) != 2 {
+		t.Errorf("asked %d, model calls %d; want one count for two answers", actives.asked, len(f.replier.recorded()))
 	}
 }

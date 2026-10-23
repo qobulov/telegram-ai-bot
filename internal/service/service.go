@@ -76,6 +76,11 @@ type GroupReplyQuota interface {
 	ReleaseGroupReply(ctx context.Context, id int64) error
 }
 
+// ActiveCounter counts the people seen writing in a group lately.
+type ActiveCounter interface {
+	ActiveMembers(ctx context.Context, chatID int64, since time.Time) (int, error)
+}
+
 // ChannelMembers tells whether a user has joined a channel.
 type ChannelMembers interface {
 	ChannelMember(ctx context.Context, channel string, userID int64) (telegram.ChatMember, error)
@@ -145,6 +150,12 @@ type Options struct {
 	// MinGroupMembers is the smallest group whose members are answered as a
 	// group's; a smaller one only as PrivateChats allows. 0 is no minimum.
 	MinGroupMembers int
+	// MinActiveMembers is how many people must have written in a group
+	// within ActiveWindow, as ActiveCounter counts, for the bot to answer
+	// there; in a quieter group only owners are answered. 0 answers any.
+	MinActiveMembers int
+	ActiveWindow     time.Duration
+	ActiveCounter    ActiveCounter
 	// Roster keeps the members seen in each group; nil keeps none.
 	Roster MemberBook
 	Logger *slog.Logger
@@ -321,6 +332,8 @@ type Service struct {
 	members *recently[memberKey, memberName]
 	// subscribers are users lately found in the required channel.
 	subscribers *recently[int64, bool]
+	// actives are groups' counts of active members, lately read.
+	actives *recently[int64, int]
 
 	// typingInterval is how often "typing" is shown again while a turn
 	// runs: typingRefresh, shortened by tests.
@@ -394,6 +407,7 @@ func New(opts Options) *Service {
 		mutes:          newRecently[int64, bool](muteMemory, opts.Now),
 		members:        newRecently[memberKey, memberName](memberMemory, opts.Now),
 		subscribers:    newRecently[int64, bool](subscriberMemory, opts.Now),
+		actives:        newRecently[int64, int](activeMemory, opts.Now),
 		queues:         make([]chan incoming, opts.Workers),
 		notices:        make(chan incoming, noticeQueueSize),
 		transcribing:   make(chan struct{}, backgroundTranscriptions),

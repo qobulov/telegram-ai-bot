@@ -60,6 +60,20 @@ func (s *Store) SeeMember(ctx context.Context, m GroupMember) error {
 	return nil
 }
 
+// ActiveMembers counts the people, not bots, seen writing in a group since
+// then who have not left it or been banned.
+func (s *Store) ActiveMembers(ctx context.Context, chatID int64, since time.Time) (int, error) {
+	var count int
+	err := s.pool.QueryRow(ctx, `
+		SELECT count(*) FROM group_members
+		WHERE chat_id = $1 AND NOT is_bot AND status NOT IN ('left', 'kicked') AND last_seen_at >= $2`,
+		chatID, since).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("storage: count active members: %w", err)
+	}
+	return count, nil
+}
+
 // GroupMembers returns up to limit of the members seen in a group who have
 // not left or been banned, the most recently seen first, and how many such
 // members are known in all.

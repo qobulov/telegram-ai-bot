@@ -1695,3 +1695,15 @@ func TestDeveloperIsToldApartFromTheOwner(t *testing.T) {
 		t.Errorf("no developer, yet the persona names one")
 	}
 }
+
+func TestActiveMembersLimit(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil || cfg.MinActiveMembers != 0 || cfg.ActiveDays != 3 {
+		t.Errorf("defaults = %d in %d days, %v; want off and 3", cfg.MinActiveMembers, cfg.ActiveDays, err)
+	}
+	env := validEnv()
+	env["GROUP_MIN_ACTIVE_MEMBERS"], env["GROUP_ACTIVE_DAYS"] = "5", "2"
+	if cfg, err := Load(getenv(env)); err != nil || cfg.MinActiveMembers != 5 || cfg.ActiveDays != 2 {
+		t.Errorf("set = %d in %d days, %v", cfg.MinActiveMembers, cfg.ActiveDays, err)
+	}
+}
