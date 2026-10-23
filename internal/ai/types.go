@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -61,6 +62,25 @@ type InputAudio struct {
 func ImagePart(mimeType string, data []byte) ContentPart {
 	url := "data:" + mimeType + ";base64," + base64.StdEncoding.EncodeToString(data)
 	return ContentPart{Type: "image_url", ImageURL: &ImageURL{URL: url}}
+}
+
+// PDFMimeType is the type of a PDF inlined by DocumentPart.
+const PDFMimeType = "application/pdf"
+
+// DocumentPart inlines a PDF. Gemini reads it, text and pages alike, from
+// the same kind of part as an image.
+func DocumentPart(data []byte) ContentPart {
+	return ImagePart(PDFMimeType, data)
+}
+
+// TextPart is text sent alongside a message, such as a file's contents.
+func TextPart(text string) ContentPart {
+	return ContentPart{Type: "text", Text: text}
+}
+
+// IsDocument reports a PDF inlined by DocumentPart.
+func (p ContentPart) IsDocument() bool {
+	return p.ImageURL != nil && strings.HasPrefix(p.ImageURL.URL, "data:"+PDFMimeType+";")
 }
 
 // AudioPart inlines audio in the given format.

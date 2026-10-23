@@ -241,28 +241,28 @@ Reply to a member's message and ask me to delete or pin it, to mute or ban its a
 // football.
 var helpAbilities = map[string][6]string{
 	"uz": {
-		"Rasm, stiker va GIF'larni, video va dumaloq videolarning bir kadrini ko'raman.",
-		"Rasm, stiker va GIF'larni, video va dumaloq videolarning bir kadrini ko'raman, ovozli xabarlarni eshitaman.",
+		"Rasm, stiker va GIF'larni, video va dumaloq videolarning bir kadrini ko'raman, PDF, Word va matnli fayllarni o'qiyman.",
+		"Rasm, stiker va GIF'larni, video va dumaloq videolarning bir kadrini ko'raman, ovozli xabarlarni eshitaman, PDF, Word va matnli fayllarni o'qiyman.",
 		"Istalgan joyning vaqtini aytaman, hisoblayman, guruhda so'rovnoma yoki viktorina tuzaman.",
 		"So'rasangiz rasm chizaman, istalgan joyning vaqtini aytaman, hisoblayman, guruhda so'rovnoma yoki viktorina tuzaman.",
-		"Valyuta kursi, ob-havo, namoz vaqtlari, yangiliklar, Vikipediya va kripto narxlarini, Mobile Legends qahramonlari statistikasini topaman, qo'shiq, kino va video qidiraman.",
-		"Valyuta kursi, ob-havo, namoz vaqtlari, yangiliklar, Vikipediya, futbol natijalari va kripto narxlarini, Mobile Legends qahramonlari statistikasini topaman, qo'shiq, kino va video qidiraman.",
+		"Valyuta kursi, ob-havo, namoz vaqtlari, yangiliklar, Vikipediya va kripto narxlarini, Mobile Legends qahramonlari statistikasini topaman, qo'shiq, kino va video qidiraman, havoladagi maqolani o'qib beraman, Qur'on oyatlarini ma'nosi bilan topaman.",
+		"Valyuta kursi, ob-havo, namoz vaqtlari, yangiliklar, Vikipediya, futbol natijalari va kripto narxlarini, Mobile Legends qahramonlari statistikasini topaman, qo'shiq, kino va video qidiraman, havoladagi maqolani o'qib beraman, Qur'on oyatlarini ma'nosi bilan topaman.",
 	},
 	"ru": {
-		"Вижу фото, стикеры и GIF, кадр из видео и кружочков.",
-		"Вижу фото, стикеры и GIF, кадр из видео и кружочков, слушаю голосовые.",
+		"Вижу фото, стикеры и GIF, кадр из видео и кружочков, читаю PDF, Word и текстовые файлы.",
+		"Вижу фото, стикеры и GIF, кадр из видео и кружочков, слушаю голосовые, читаю PDF, Word и текстовые файлы.",
 		"Скажу время в любой точке, посчитаю, сделаю опрос или викторину в группе.",
 		"Нарисую картинку по просьбе, скажу время в любой точке, посчитаю, сделаю опрос или викторину в группе.",
-		"Найду курсы валют, погоду, время намаза, новости, Википедию и цены криптовалют, статистику героев Mobile Legends, песни, фильмы и видео.",
-		"Найду курсы валют, погоду, время намаза, новости, Википедию, результаты футбола и цены криптовалют, статистику героев Mobile Legends, песни, фильмы и видео.",
+		"Найду курсы валют, погоду, время намаза, новости, Википедию и цены криптовалют, статистику героев Mobile Legends, песни, фильмы и видео, прочитаю статью по ссылке, найду аяты Корана с переводом.",
+		"Найду курсы валют, погоду, время намаза, новости, Википедию, результаты футбола и цены криптовалют, статистику героев Mobile Legends, песни, фильмы и видео, прочитаю статью по ссылке, найду аяты Корана с переводом.",
 	},
 	"en": {
-		"I can see photos, stickers and GIFs, and a frame of videos and round videos.",
-		"I can see photos, stickers and GIFs, a frame of videos and round videos, and I listen to voice messages.",
+		"I can see photos, stickers and GIFs, a frame of videos and round videos, and read PDF, Word and text files.",
+		"I can see photos, stickers and GIFs, a frame of videos and round videos; I listen to voice messages and read PDF, Word and text files.",
 		"I can tell the time anywhere, calculate arithmetic, and make a poll or a quiz in a group.",
 		"I can draw a picture when you ask, tell the time anywhere, calculate arithmetic, and make a poll or a quiz in a group.",
-		"I can look up exchange rates, the weather, prayer times, news headlines, Wikipedia and crypto prices, Mobile Legends hero statistics, and find songs, films and videos.",
-		"I can look up exchange rates, the weather, prayer times, news headlines, Wikipedia, football results and crypto prices, Mobile Legends hero statistics, and find songs, films and videos.",
+		"I can look up exchange rates, the weather, prayer times, news headlines, Wikipedia and crypto prices, Mobile Legends hero statistics, find songs, films and videos, read an article from a link, and find Quran verses with their meaning.",
+		"I can look up exchange rates, the weather, prayer times, news headlines, Wikipedia, football results and crypto prices, Mobile Legends hero statistics, find songs, films and videos, read an article from a link, and find Quran verses with their meaning.",
 	},
 }
 

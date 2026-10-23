@@ -95,14 +95,14 @@ func signed(calls []ToolCall) bool {
 }
 
 // forBackup copies the request without what only Gemini understands: audio,
-// whose words are already in the text as a transcript, and the thought
-// signatures on tool calls.
+// whose words are already in the text as a transcript, PDFs, which the
+// text still names, and the thought signatures on tool calls.
 func forBackup(req Request) Request {
 	messages := make([]Message, len(req.Messages))
 	for i, m := range req.Messages {
 		var parts []ContentPart
 		for _, part := range m.Parts {
-			if part.InputAudio == nil {
+			if part.InputAudio == nil && !part.IsDocument() {
 				parts = append(parts, part)
 			}
 		}

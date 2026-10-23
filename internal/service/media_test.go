@@ -439,7 +439,10 @@ func TestMediaLabels(t *testing.T) {
 		}, "<round video 0:08>", "round-thumb"},
 		"document": {func(m *telegram.Message) {
 			m.Document = &telegram.Document{FileID: "doc", FileName: "report [final].pdf"}
-		}, "<file report (final).pdf>", ""},
+		}, "<file report (final).pdf>", "doc"},
+		"file the model cannot read": {func(m *telegram.Message) {
+			m.Document = &telegram.Document{FileID: "zip", FileName: "photos.zip"}
+		}, "<file photos.zip>", ""},
 		"document without a name": {func(m *telegram.Message) {
 			m.Document = &telegram.Document{FileID: "doc"}
 		}, "<file>", ""},

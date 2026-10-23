@@ -228,6 +228,7 @@ type Document struct {
 	FileID   string `json:"file_id"`
 	FileName string `json:"file_name"`
 	MimeType string `json:"mime_type"`
+	FileSize int64  `json:"file_size"`
 }
 
 // Audio is a music file, as opposed to a Voice message.

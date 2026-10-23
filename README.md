@@ -442,7 +442,8 @@ The bot can look at what people send, not only read it.
 | GIF | its first frame |
 | Voice message | its transcript, made by the model from the audio (Gemini only), up to `MAX_VOICE_SECONDS` |
 | Video, round video | its cover frame and length |
-| File, song, poll | its name; the song's performer and title; the poll's question and options |
+| PDF, Word (.docx), text file (.txt, .md, .csv, .json, .log, .srt) | the file itself: a PDF as it is, which Gemini reads page by page; the text of the others, cut to 30,000 characters. Up to `MAX_MEDIA_MB`. The backup model gets only the file's name |
+| Other file, song, poll | its name; the song's performer and title; the poll's question and options |
 
 Locations and contacts are not read; in a private chat the bot says so, in a
 group it stays quiet. A forwarded message is marked with where it came from.
@@ -571,6 +572,8 @@ answer instead of making up a number.
 | `movies` | Films and series: search by title, a title's plot, genres, length, director and cast, and what is trending or popular in a genre | TMDB, with `TMDB_TOKEN`; plots in Russian or English, as TMDB has few Uzbek ones. This product uses the TMDB API but is not endorsed or certified by TMDB |
 | `youtube_search` | YouTube videos: guides, highlights, trailers, full songs, with channel, length, views and a youtu.be link that Telegram plays | YouTube Data API, with `YOUTUBE_API_KEY` (an `AIza…` key restricted to YouTube Data API v3; free: 10,000 units a day, a search costs 101); results cached for 2 hours |
 | `music_search` | Songs by title or artist with their links; a 30-second preview of the first match, named after the song, is sent as audio and is her whole answer | Deezer, keyless; Deezer gives only previews |
+| `quran` | Quran verses by reference (up to 7 at once) with Muhammad Sodiq Muhammad Yusuf's Uzbek translation in Latin script, or Kuliev's Russian or Saheeh International's English; the verse of the day; a surah's facts; a search of the Uzbek meaning | quran.com, keyless; the search uses alquran.cloud, whose Uzbek text is Cyrillic, so a Latin query is written in Cyrillic first; cached for a day |
+| `read_page` | A web page's title and text, cut to 8,000 characters, to summarize a link or answer about it | Jina Reader (r.jina.ai), keyless (about 20 pages a minute); local addresses and Telegram's file links are refused; cached for 30 minutes |
 
 The tools share one HTTP client with short timeouts and a small in-memory
 cache, send `MariaBot/1.0 (+https://t.me/<bot username>)` as the user agent,

@@ -43,10 +43,14 @@ type media struct {
 	// message the provider cannot hear, a file, a song, a poll).
 	fileID string
 	audio  bool
+	// document is the kind of a file the model can read, as documentKind
+	// names it; "" for anything else.
+	document string
 }
 
 // mediaOf describes the media a message carries. Videos are shown by their
-// thumbnail, like a GIF; files, songs and polls only by their label.
+// thumbnail, like a GIF; a PDF, Word or text file is given to read; other
+// files, songs and polls only by their label.
 func (s *Service) mediaOf(msg *telegram.Message) (media, bool) {
 	if msg == nil {
 		return media{}, false
@@ -65,7 +69,7 @@ func (s *Service) mediaOf(msg *telegram.Message) (media, bool) {
 	case msg.VideoNote != nil:
 		return media{label: "<round video " + clock(msg.VideoNote.Duration) + ">", fileID: thumbnailID(msg.VideoNote.Thumbnail)}, true
 	case msg.Document != nil:
-		return media{label: labelWith("<file", oneLine(msg.Document.FileName))}, true
+		return s.documentMedia(msg.Document), true
 	case msg.Audio != nil:
 		return media{label: audioLabel(msg.Audio)}, true
 	case msg.Poll != nil:
@@ -272,6 +276,9 @@ func (s *Service) download(ctx context.Context, in incoming, m media) (ai.Conten
 	if err != nil {
 		s.opts.Logger.Warn("media download failed", "chat_id", in.scope.ChatID, "update_id", in.updateID, "error", err)
 		return ai.ContentPart{}, false
+	}
+	if m.document != "" {
+		return s.documentPart(in, m, data)
 	}
 	// Telegram serves photos as JPEG and stickers as WebP; the bytes say
 	// which, so the declared type does not have to be trusted.

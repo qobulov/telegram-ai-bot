@@ -80,10 +80,10 @@ func TestBadRequestDoesNotGoToTheBackup(t *testing.T) {
 	}
 }
 
-func TestBackupGetsNoAudioAndNoGeminiSignatures(t *testing.T) {
+func TestBackupGetsNoAudioNoPDFAndNoGeminiSignatures(t *testing.T) {
 	primary, backup := &recordingServer{status: 503}, &recordingServer{}
 	req := Request{Messages: []Message{
-		{Role: RoleUser, Content: `<voice message> "salom"`, Parts: []ContentPart{AudioPart("mp3", []byte("x")), ImagePart("image/png", []byte("y"))}},
+		{Role: RoleUser, Content: `<voice message> "salom"`, Parts: []ContentPart{AudioPart("mp3", []byte("x")), ImagePart("image/png", []byte("y")), DocumentPart([]byte("%PDF-1.4")), TextPart("<file a.txt> contents")}},
 		{Role: RoleAssistant, ToolCalls: []ToolCall{{ID: "1", Type: "function", Function: FunctionCall{Name: "f", Arguments: "{}"}, ExtraContent: json.RawMessage(`{"google":{"thought_signature":"abc"}}`)}}},
 		{Role: RoleTool, ToolCallID: "1", Content: "ok"},
 	}}
@@ -92,13 +92,13 @@ func TestBackupGetsNoAudioAndNoGeminiSignatures(t *testing.T) {
 		t.Fatal(err)
 	}
 	sent := backup.requests()[0]
-	if strings.Contains(sent, "input_audio") || strings.Contains(sent, "thought_signature") {
+	if strings.Contains(sent, "input_audio") || strings.Contains(sent, "thought_signature") || strings.Contains(sent, "application/pdf") {
 		t.Errorf("backup request = %s", sent)
 	}
-	if !strings.Contains(sent, "image_url") || !strings.Contains(sent, "salom") {
+	if !strings.Contains(sent, "image_url") || !strings.Contains(sent, "salom") || !strings.Contains(sent, "a.txt") {
 		t.Errorf("backup request lost the picture or the transcript: %s", sent)
 	}
-	if !strings.Contains(string(primary.requests()[0]), "thought_signature") {
+	if !strings.Contains(string(primary.requests()[0]), "thought_signature") || !strings.Contains(string(primary.requests()[0]), "application/pdf") {
 		t.Error("the primary request was changed too")
 	}
 }

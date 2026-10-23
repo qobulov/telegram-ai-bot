@@ -85,6 +85,9 @@ type BaseURLs struct {
 	CatAPI            string
 	Dictionary        string
 	AniList           string
+	QuranCom          string
+	AlQuran           string
+	Jina              string
 	// Wikipedia is a format string with %s for the language code.
 	Wikipedia string
 	// News maps a language (uz, ru), or world- and a language for the
@@ -117,6 +120,9 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.CatAPI = cmp.Or(b.CatAPI, "https://api.thecatapi.com")
 	b.Dictionary = cmp.Or(b.Dictionary, "https://api.dictionaryapi.dev")
 	b.AniList = cmp.Or(b.AniList, "https://graphql.anilist.co")
+	b.QuranCom = cmp.Or(b.QuranCom, "https://api.quran.com")
+	b.AlQuran = cmp.Or(b.AlQuran, "https://api.alquran.cloud")
+	b.Jina = cmp.Or(b.Jina, "https://r.jina.ai")
 	b.Wikipedia = cmp.Or(b.Wikipedia, "https://%s.wikipedia.org")
 	if b.News == nil {
 		b.News = map[string]map[string]string{
@@ -179,6 +185,8 @@ func Tools(opts Options) []tools.Tool {
 		a.catTool(),
 		a.dictionaryTool(),
 		a.animeTool(),
+		a.quranTool(),
+		a.readerTool(),
 	}
 	if a.footballToken != "" {
 		list = append(list, a.footballTool())
