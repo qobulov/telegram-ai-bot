@@ -98,6 +98,10 @@ type BaseURLs struct {
 	GoldAPI           string
 	Lichess           string
 	Jolpica           string
+	MathJS            string
+	Crossref          string
+	ArXiv             string
+	Datamuse          string
 	// Wikipedia is a format string with %s for the language code.
 	Wikipedia string
 	// News maps a language (uz, ru), or world- and a language for the
@@ -143,6 +147,10 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.GoldAPI = cmp.Or(b.GoldAPI, "https://api.gold-api.com")
 	b.Lichess = cmp.Or(b.Lichess, "https://lichess.org")
 	b.Jolpica = cmp.Or(b.Jolpica, "https://api.jolpi.ca")
+	b.MathJS = cmp.Or(b.MathJS, "https://api.mathjs.org")
+	b.Crossref = cmp.Or(b.Crossref, "https://api.crossref.org")
+	b.ArXiv = cmp.Or(b.ArXiv, "https://export.arxiv.org")
+	b.Datamuse = cmp.Or(b.Datamuse, "https://api.datamuse.com")
 	b.Wikipedia = cmp.Or(b.Wikipedia, "https://%s.wikipedia.org")
 	if b.News == nil {
 		b.News = map[string]map[string]string{
@@ -209,6 +217,7 @@ func Tools(opts Options) []tools.Tool {
 		a.readerTool(),
 		a.funTool(),
 		a.moreTool(),
+		a.studyTool(),
 	}
 	if a.footballToken != "" {
 		list = append(list, a.footballTool())
