@@ -12,12 +12,7 @@ import (
 // are in Uzbek, Russian and English, sent in the language of their Telegram
 // app; the owners' and admins' commands answer in English.
 const (
-	textAbout = `An AI chat character for Telegram, written in Go.
-It answers with an AI model (Gemini or Grok), remembers the conversation, and can check the time and do arithmetic.
-Send /reset to delete the conversation history.`
-
 	textResetDone  = "The conversation history here has been deleted."
-	textUnknown    = "I don't know that command. Send /help to see what I can do."
 	textForbidden  = "This command is restricted to administrators."
 	textMuted      = "Fine, I'll be quiet here. An admin can bring me back with /unmute@%s." // the bot's username
 	textUnmuted    = "I'm back."
@@ -66,6 +61,17 @@ func appLanguage(user *telegram.User) string {
 }
 
 var (
+	// textAbout names no model or company: who runs her is a secret.
+	textAbout = localText{
+		uz: "Maria — Telegram uchun AI suhbatdosh. Guruhda gaplashadi, savollarga javob beradi, Mobile Legends, kino, musiqa va boshqa narsalarni topadi.\n/help — buyruqlar va imkoniyatlar\n/reset — suhbat tarixini o'chirish",
+		ru: "Maria — AI-собеседник для Telegram. Болтает в группе, отвечает на вопросы, находит Mobile Legends, фильмы, музыку и многое другое.\n/help — команды и возможности\n/reset — удалить историю разговора",
+		en: "Maria is an AI chat character for Telegram. She chats in groups, answers questions and finds Mobile Legends stats, films, music and more.\n/help — commands and usage\n/reset — delete the conversation history",
+	}
+	textUnknown = localText{
+		uz: "Bunday buyruqni bilmayman. Nima qila olishimni ko'rish uchun /help yuboring.",
+		ru: "Такой команды я не знаю. Отправьте /help, чтобы узнать, что я умею.",
+		en: "I don't know that command. Send /help to see what I can do.",
+	}
 	textWelcome = localText{
 		uz: "Salom! Yozing, gaplashamiz.\n\n/help — buyruqlar va imkoniyatlar",
 		ru: "Привет! Пиши, поболтаем.\n\n/help — команды и возможности",
@@ -162,9 +168,48 @@ func textTextOnly(listen bool) localText {
 	}
 }
 
-// helpText is the help with three blanks, filled by HelpText: the sentences
-// on what she can see, what she can do and what she can look up.
-const helpText = `Talk to me and I will answer, in Uzbek, Russian or English, matching your language.
+// helpTexts are the help in each language, with three blanks filled by
+// HelpTextIn: the sentences on what she can see, what she can do and what
+// she can look up. They name no model or company: who runs her is kept a
+// secret.
+var helpTexts = map[string]string{
+	"uz": `Menga yozing: o'zbek, rus yoki ingliz tilida, siz yozgan tilda javob beraman.
+
+Suhbatimizning oxirgi qismini eslab qolaman. %s %s
+%s
+
+Buyruqlar:
+/start — salomlashish
+/help — shu yordam
+/reset — suhbat tarixini o'chirish
+/about — bot haqida
+
+Guruhda meni ismim bilan chaqiring, @username bilan belgilang yoki xabarimga reply qiling. U yerda buyruqqa username qo'shiladi: /help@username. Guruh men bilan bitta umumiy suhbatda.
+
+Guruh adminlari uchun:
+A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yoki ban qilishni, stiker va GIF yuborishini cheklashni so'rang. Buning uchun o'sha admin huquqi sizda ham, menda ham bo'lishi kerak; men darhol bajaraman.
+/mute@username, /unmute@username — guruhda jim turishim yoki qaytishim
+/ignore@username, /unignore@username — a'zoning xabariga reply qilib: unga 24 soat javob bermayman yoki yana javob beraman
+/reset@username — guruhning men bilan suhbat tarixini o'chirish`,
+	"ru": `Пишите мне: отвечаю на узбекском, русском или английском — на вашем языке.
+
+Я помню недавнюю часть нашего разговора. %s %s
+%s
+
+Команды:
+/start — приветствие
+/help — эта справка
+/reset — удалить историю разговора
+/about — о боте
+
+В группе зовите меня по имени, упоминайте (@username) или отвечайте на моё сообщение. Там к команде добавляется username: /help@username. У группы со мной один общий разговор.
+
+Для админов группы:
+Ответьте на сообщение участника и попросите удалить или закрепить его, замутить или забанить автора, ограничить ему стикеры и GIF. Нужно, чтобы это право было и у вас, и у меня; я делаю это сразу.
+/mute@username, /unmute@username — чтобы я молчала в группе или вернулась
+/ignore@username, /unignore@username — ответом на сообщение участника: не отвечаю ему 24 часа или снова отвечаю
+/reset@username — удалить историю разговора группы со мной`,
+	"en": `Talk to me and I will answer, in Uzbek, Russian or English, matching your language.
 
 I remember the recent part of our conversation. %s %s
 %s
@@ -173,16 +218,47 @@ Commands:
 /start — welcome message
 /help — this help
 /reset — delete the conversation history
-/model — show the AI model in use
 /about — about this bot
 
 In a group, call me by name, mention me (@username) or reply to one of my messages. Commands there need my username, like /help@username. A group shares one conversation with me.
 
 For a group's admins:
-Reply to a message and ask me to delete or pin it, or to mute or ban its author. It takes that admin right, yours and mine, and I act only once you reply yes to my question about it.
+Reply to a member's message and ask me to delete or pin it, to mute or ban its author, or to take away their stickers and GIFs. It takes that admin right, yours and mine, and I do it at once.
 /mute@username, /unmute@username — make me stay quiet in the group, or bring me back
 /ignore@username, /unignore@username — as a reply to a member's message: I stop answering them for 24 hours, or answer them again
-/reset@username — delete the group's conversation with me`
+/reset@username — delete the group's conversation with me`,
+}
+
+// helpAbilities are the sentences HelpTextIn fills the help's blanks with,
+// in each language: what she sees, without and with listening; what she
+// does, without and with drawing; and what she looks up, without and with
+// football.
+var helpAbilities = map[string][6]string{
+	"uz": {
+		"Rasm, stiker va GIF'larni, video va dumaloq videolarning bir kadrini ko'raman.",
+		"Rasm, stiker va GIF'larni, video va dumaloq videolarning bir kadrini ko'raman, ovozli xabarlarni eshitaman.",
+		"Istalgan joyning vaqtini aytaman, hisoblayman, guruhda so'rovnoma yoki viktorina tuzaman.",
+		"So'rasangiz rasm chizaman, istalgan joyning vaqtini aytaman, hisoblayman, guruhda so'rovnoma yoki viktorina tuzaman.",
+		"Valyuta kursi, ob-havo, namoz vaqtlari, yangiliklar, Vikipediya va kripto narxlarini, Mobile Legends qahramonlari statistikasini topaman, qo'shiq, kino va video qidiraman.",
+		"Valyuta kursi, ob-havo, namoz vaqtlari, yangiliklar, Vikipediya, futbol natijalari va kripto narxlarini, Mobile Legends qahramonlari statistikasini topaman, qo'shiq, kino va video qidiraman.",
+	},
+	"ru": {
+		"Вижу фото, стикеры и GIF, кадр из видео и кружочков.",
+		"Вижу фото, стикеры и GIF, кадр из видео и кружочков, слушаю голосовые.",
+		"Скажу время в любой точке, посчитаю, сделаю опрос или викторину в группе.",
+		"Нарисую картинку по просьбе, скажу время в любой точке, посчитаю, сделаю опрос или викторину в группе.",
+		"Найду курсы валют, погоду, время намаза, новости, Википедию и цены криптовалют, статистику героев Mobile Legends, песни, фильмы и видео.",
+		"Найду курсы валют, погоду, время намаза, новости, Википедию, результаты футбола и цены криптовалют, статистику героев Mobile Legends, песни, фильмы и видео.",
+	},
+	"en": {
+		"I can see photos, stickers and GIFs, and a frame of videos and round videos.",
+		"I can see photos, stickers and GIFs, a frame of videos and round videos, and I listen to voice messages.",
+		"I can tell the time anywhere, calculate arithmetic, and make a poll or a quiz in a group.",
+		"I can draw a picture when you ask, tell the time anywhere, calculate arithmetic, and make a poll or a quiz in a group.",
+		"I can look up exchange rates, the weather, prayer times, news headlines, Wikipedia and crypto prices, Mobile Legends hero statistics, and find songs, films and videos.",
+		"I can look up exchange rates, the weather, prayer times, news headlines, Wikipedia, football results and crypto prices, Mobile Legends hero statistics, and find songs, films and videos.",
+	},
+}
 
 // Abilities are what a deployment may lack: drawing needs the image tool,
 // listening needs a provider that hears audio and football needs a
@@ -196,20 +272,23 @@ type Abilities struct {
 }
 
 // HelpText describes the bot's commands and what it can do with these
-// abilities. It is shown by /help and returned to the model by the
-// get_bot_help tool.
+// abilities, in English. It is returned to the model by the get_bot_help
+// tool, which answers in the asker's language.
 func HelpText(abilities Abilities) string {
-	seeing := "I can see photos, stickers and GIFs, and a frame of videos and round videos."
-	if abilities.Listen {
-		seeing = "I can see photos, stickers and GIFs, a frame of videos and round videos, and I listen to voice messages."
+	return HelpTextIn("en", abilities)
+}
+
+// HelpTextIn is the help in lang, "uz", "ru" or "en", as /help sends it.
+func HelpTextIn(lang string, abilities Abilities) string {
+	phrases, ok := helpAbilities[lang]
+	if !ok {
+		lang, phrases = "en", helpAbilities["en"]
 	}
-	skills := "I can tell the time anywhere, calculate arithmetic, and make a poll or a quiz in a group."
-	if abilities.Draw {
-		skills = "I can draw a picture when you ask, tell the time anywhere, calculate arithmetic, and make a poll or a quiz in a group."
+	pick := func(i int, more bool) string {
+		if more {
+			return phrases[i+1]
+		}
+		return phrases[i]
 	}
-	lookups := "I can look up exchange rates, the weather, prayer times, news headlines, Wikipedia and crypto prices, Mobile Legends hero statistics, and find songs."
-	if abilities.Football {
-		lookups = "I can look up exchange rates, the weather, prayer times, news headlines, Wikipedia, football results and crypto prices, Mobile Legends hero statistics, and find songs."
-	}
-	return fmt.Sprintf(helpText, seeing, skills, lookups)
+	return fmt.Sprintf(helpTexts[lang], pick(0, abilities.Listen), pick(2, abilities.Draw), pick(4, abilities.Football))
 }

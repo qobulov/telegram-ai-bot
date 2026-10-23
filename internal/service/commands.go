@@ -1196,10 +1196,14 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 	case "/start":
 		return textWelcome.to(in)
 	case "/help":
-		return HelpText(Abilities{Draw: s.opts.ImagesEnabled, Listen: s.canListen(), Football: s.opts.FootballEnabled})
+		return HelpTextIn(appLanguage(in.msg.From), Abilities{Draw: s.opts.ImagesEnabled, Listen: s.canListen(), Football: s.opts.FootballEnabled})
 	case "/about":
-		return textAbout
+		return textAbout.to(in)
 	case "/model":
+		// Which model runs her is a secret but to her owners.
+		if !s.isOwner(in.msg.From) {
+			return textUnknown.to(in)
+		}
 		return fmt.Sprintf(textModel, s.opts.Model)
 	case "/reset":
 		return s.reset(ctx, in)
@@ -1216,7 +1220,7 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 	case "/import_items":
 		return s.importItems(ctx, in)
 	default:
-		return textUnknown
+		return textUnknown.to(in)
 	}
 }
 
@@ -1289,7 +1293,7 @@ func (s *Service) unignore(ctx context.Context, in incoming) string {
 func (s *Service) ignoreTarget(ctx context.Context, in incoming) (*tools.Target, string) {
 	switch {
 	case s.opts.Rules == nil:
-		return nil, textUnknown
+		return nil, textUnknown.to(in)
 	case !in.group:
 		return nil, textGroupsOnly
 	}

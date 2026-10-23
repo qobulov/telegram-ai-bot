@@ -460,9 +460,9 @@ func TestCommandsReply(t *testing.T) {
 	cases := map[string]string{
 		"/start":       "/help",
 		"/help":        "/reset",
-		"/about":       "Gemini",
-		"/model":       "test/model",
-		"/model@mybot": "test/model",
+		"/about":       "Maria",
+		"/model":       "/help",
+		"/model@mybot": "/help",
 		"/HELP":        "/reset",
 		"/help extra":  "/reset",
 		"/unknown":     "/help",
@@ -478,8 +478,32 @@ func TestCommandsReply(t *testing.T) {
 			if len(f.replier.recorded()) != 0 {
 				t.Error("a command reached the model")
 			}
+			if strings.Contains(sent[0].text, "Gemini") || strings.Contains(sent[0].text, "test/model") {
+				t.Errorf("%s names the model to a member: %q", command, sent[0].text)
+			}
 		})
 	}
+}
+
+// Which model runs the bot is told to its owners only.
+func TestModelCommandIsForOwners(t *testing.T) {
+	f := newFixture()
+	f.opts.OwnerIDs = map[int64]bool{userID: true}
+
+	sent := f.run(textFrom(userID, "/model"))
+
+	expectOneReply(t, sent, "test/model")
+}
+
+// /help and /about go in the language of the asker's Telegram app.
+func TestHelpFollowsTheAppLanguage(t *testing.T) {
+	update := textFrom(userID, "/help")
+	update.Message.From.LanguageCode = "ru"
+	f := newFixture()
+
+	sent := f.run(update)
+
+	expectOneReply(t, sent, "Команды:")
 }
 
 func TestResetClearsOnlyTheSendersHistory(t *testing.T) {
@@ -509,6 +533,7 @@ func TestResetFailureShowsGenericError(t *testing.T) {
 func TestAdminCommandsAreRestricted(t *testing.T) {
 	f := newFixture()
 	f.opts.AdminCommands = map[string]bool{"/model": true}
+	f.opts.OwnerIDs = map[int64]bool{adminID: true}
 
 	sent := f.run(textFrom(userID, "/model"), textFrom(adminID, "/model"))
 
@@ -807,7 +832,7 @@ func TestCloseRefusesQueuedUpdatesInsteadOfRunningThem(t *testing.T) {
 
 func TestHelpTextListsEveryCommand(t *testing.T) {
 	help := HelpText(Abilities{})
-	for _, command := range []string{"/start", "/help", "/reset", "/model", "/about"} {
+	for _, command := range []string{"/start", "/help", "/reset", "/about"} {
 		if !strings.Contains(help, command) {
 			t.Errorf("help text does not mention %s", command)
 		}
@@ -847,7 +872,7 @@ func TestHelpMentionsModerationAndPolls(t *testing.T) {
 		t.Fatalf("help text has no part for group admins:\n%s", help)
 	}
 	for _, want := range []string{
-		"ask me to delete or pin it", "to mute or ban its author", "reply yes to my question",
+		"ask me to delete or pin it", "to mute or ban its author", "take away their stickers and GIFs", "I do it at once",
 		"/mute@username", "/unmute@username", "/ignore@username", "/unignore@username", "/reset@username",
 	} {
 		if !strings.Contains(admins, want) {
@@ -876,10 +901,10 @@ func TestHelpPromisesOnlyWhatTheBotCanDo(t *testing.T) {
 			sent := f.run(textFrom(userID, "/help"))
 
 			expectOneReply(t, sent, "/reset")
-			if got := strings.Contains(sent[0].text, "draw a picture"); got != tc.draw {
+			if got := strings.Contains(sent[0].text, "rasm chizaman"); got != tc.draw {
 				t.Errorf("offers drawing = %t, want %t:\n%s", got, tc.draw, sent[0].text)
 			}
-			if got := strings.Contains(sent[0].text, "voice messages"); got != tc.voice {
+			if got := strings.Contains(sent[0].text, "ovozli xabarlarni eshitaman"); got != tc.voice {
 				t.Errorf("offers listening = %t, want %t:\n%s", got, tc.voice, sent[0].text)
 			}
 		})

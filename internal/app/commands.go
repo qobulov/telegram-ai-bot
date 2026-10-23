@@ -13,18 +13,17 @@ const commandsTimeout = 5 * time.Second
 
 // commandMenus are the commands Telegram lists on "/": in private chats,
 // for a group's members, and for its admins, who can also quiet the bot or
-// have it ignore a member. Owners' commands are left out.
+// have it ignore a member. Owners' commands, /model among them, are left
+// out.
 var commandMenus = map[string][]telegram.BotCommand{
 	telegram.ScopeDefault: {
 		{Command: "start", Description: "Salomlashish"},
 		{Command: "help", Description: "Yordam va buyruqlar"},
 		{Command: "reset", Description: "Suhbat tarixini o'chirish"},
-		{Command: "model", Description: "Ishlatilayotgan AI model"},
 		{Command: "about", Description: "Bot haqida"},
 	},
 	telegram.ScopeAllGroupChats: {
 		{Command: "help", Description: "Yordam va buyruqlar"},
-		{Command: "model", Description: "Ishlatilayotgan AI model"},
 		{Command: "about", Description: "Bot haqida"},
 	},
 	telegram.ScopeAllChatAdmins: {
@@ -34,7 +33,6 @@ var commandMenus = map[string][]telegram.BotCommand{
 		{Command: "ignore", Description: "A'zoga 24 soat javob bermaslik (xabariga reply qiling)"},
 		{Command: "unignore", Description: "A'zoga yana javob berish (xabariga reply qiling)"},
 		{Command: "reset", Description: "Guruh suhbat tarixini o'chirish"},
-		{Command: "model", Description: "Ishlatilayotgan AI model"},
 		{Command: "about", Description: "Bot haqida"},
 	},
 }
