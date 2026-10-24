@@ -189,7 +189,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 	if len(cfg.OwnerUsernames) > 0 && len(cfg.OwnerIDs) == 0 {
 		logger.Warn("BOT_OWNER_IDS is not set: owners are known only by username, which can change hands, so they moderate only with their own admin rights")
 	}
-	available := append(builtinTools(cfg, store, bot, moderation.Tool()), liveDataTools(cfg, bot, store)...)
+	available := append(builtinTools(cfg, store, bot, moderation.Tool()), liveDataTools(cfg, bot)...)
 	registry, err := tools.NewRegistry(cfg.IsAdmin, logger, available...)
 	if err != nil {
 		return nil, err
@@ -253,7 +253,6 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Location:           cfg.Location,
 		OwnerUsernames:     cfg.OwnerUsernames,
 		OwnerPresence:      store,
-		HeroGuesses:        store,
 		OwnerIDs:           cfg.OwnerIDs,
 		AllowedBots:        cfg.AllowedBots,
 		BotReplies:         store,
@@ -388,7 +387,7 @@ func checker(cfg config.Config) *guards.Checker {
 // liveDataTools look things up on public web APIs: rates, weather, prayer
 // times, news, Wikipedia, crypto, and football when a token is set. The
 // user agent gives the bot's t.me link as the contact some APIs ask for.
-func liveDataTools(cfg config.Config, bot Bot, store *storage.Store) []tools.Tool {
+func liveDataTools(cfg config.Config, bot Bot) []tools.Tool {
 	opts := webapi.Options{
 		UserAgent:     "MariaBot/1.0 (+https://t.me/" + bot.User.Username + ")",
 		Location:      cfg.Location,
@@ -398,9 +397,6 @@ func liveDataTools(cfg config.Config, bot Bot, store *storage.Store) []tools.Too
 		TMDBToken:     cfg.TMDBToken,
 		YouTubeKey:    cfg.YouTubeAPIKey,
 		WolframAppID:  cfg.WolframAppID,
-	}
-	if store != nil {
-		opts.HeroGames = store
 	}
 	return webapi.Tools(opts)
 }

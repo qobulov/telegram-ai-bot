@@ -56,9 +56,7 @@ type Options struct {
 	// WolframAppID is a Wolfram|Alpha AppID. Without it there is no
 	// wolfram tool.
 	WolframAppID string
-	// HeroGames keeps "guess the hero"; without it there is no game.
-	HeroGames HeroGames
-	BaseURLs  BaseURLs
+	BaseURLs     BaseURLs
 }
 
 // BaseURLs says where each API lives. Empty fields mean the production
@@ -200,7 +198,6 @@ type apis struct {
 	tmdbToken     string
 	youtubeKey    string
 	wolframAppID  string
-	heroGames     HeroGames
 }
 
 // Tools returns the live-data tools. Football is included only when
@@ -238,9 +235,6 @@ func Tools(opts Options) []tools.Tool {
 	if a.tmdbToken != "" {
 		list = append(list, a.moviesTool())
 	}
-	if a.heroGames != nil {
-		list = append(list, a.heroQuizTool())
-	}
 	if a.youtubeKey != "" {
 		list = append(list, a.youtubeTool())
 	}
@@ -270,7 +264,6 @@ func newAPIs(opts Options) *apis {
 		tmdbToken:     opts.TMDBToken,
 		youtubeKey:    opts.YouTubeKey,
 		wolframAppID:  opts.WolframAppID,
-		heroGames:     opts.HeroGames,
 	}
 }
 

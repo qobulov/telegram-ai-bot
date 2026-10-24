@@ -250,8 +250,6 @@ type Options struct {
 	// join the required channels; without it the button is a link that
 	// sends "/start check".
 	Buttons ButtonAnswerer
-	// HeroGuesses checks guesses in "guess the hero"; nil plays no game.
-	HeroGuesses HeroGuesses
 	// OwnerPresence finds an owner's username among a group's members, to
 	// tell the model whom it may tag there; nil tags no owner.
 	OwnerPresence OwnerPresence
@@ -361,8 +359,6 @@ type Service struct {
 	// ownersHere the owners lately found in each group.
 	actives    *recently[int64, int]
 	ownersHere *recently[int64, []string]
-	// heroRounds are groups' open rounds of "guess the hero", lately read.
-	heroRounds *recently[int64, storage.HeroGame]
 	// guardSets are the guards on in each group, and spamVerdicts and
 	// linkVerdicts what the outside services lately said; see protect.go.
 	guardSets    *recently[int64, guardSet]
@@ -443,7 +439,6 @@ func New(opts Options) *Service {
 		subscribers:    newRecently[int64, bool](subscriberMemory, opts.Now),
 		actives:        newRecently[int64, int](activeMemory, opts.Now),
 		ownersHere:     newRecently[int64, []string](activeMemory, opts.Now),
-		heroRounds:     newRecently[int64, storage.HeroGame](heroMemory, opts.Now),
 		guardSets:      newRecently[int64, guardSet](guardsMemory, opts.Now),
 		spamVerdicts:   newRecently[int64, verdict](verdictMemory, opts.Now),
 		linkVerdicts:   newRecently[string, verdict](verdictMemory, opts.Now),
@@ -680,10 +675,6 @@ func (s *Service) acceptGroup(in incoming) (incoming, bool) {
 		if s.ambient.enabled() {
 			s.remember(in.msg)
 		}
-		return incoming{}, false
-	}
-	// A right guess in "guess the hero" is answered in code.
-	if s.guessedHero(in) {
 		return incoming{}, false
 	}
 	text, how := s.address(in.msg)

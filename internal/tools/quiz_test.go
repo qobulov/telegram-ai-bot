@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -111,4 +112,28 @@ func (f *failAfter) SendPoll(ctx context.Context, poll telegram.OutgoingPoll) (i
 		return 0, &telegram.APIError{Code: 400, Description: "Bad Request: poll refused"}
 	}
 	return f.sender.SendPoll(ctx, poll)
+}
+
+// A student's quiz in a private chat: up to ten questions, with no pacing
+// but the chat's daily limit.
+func TestQuizInAPrivateChat(t *testing.T) {
+	env := newPollEnv(t)
+	var questions []string
+	for i := range 10 {
+		questions = append(questions, fmt.Sprintf(`{"question":"Savol %d","options":["a","b"],"correct":1}`, i+1))
+	}
+	ten := `{"questions":[` + strings.Join(questions, ",") + `]}`
+
+	for update := int64(200); update < 203; update++ {
+		if got := env.quiz(t, memberAsking(memberID, update), ten); !got.OK {
+			t.Fatalf("quiz %d = %+v", update, got)
+		}
+	}
+	if sent := env.sender.sent(); len(sent) != 30 || sent[0].ChatID != memberID || sent[9].Question != "Savol 10" {
+		t.Errorf("sent %d, first %+v", len(sent), sent[0])
+	}
+	eleven := `{"questions":[` + strings.Join(append(questions, questions[0]), ",") + `]}`
+	if got := env.quiz(t, memberAsking(memberID, 300), eleven); got.OK || !strings.Contains(got.Error.Message, "1 to 10") {
+		t.Errorf("eleven questions = %+v", got)
+	}
 }

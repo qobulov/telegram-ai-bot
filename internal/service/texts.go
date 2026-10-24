@@ -143,12 +143,6 @@ var (
 		ru: "Вы ещё не подписались на все каналы. Подпишитесь и нажмите снова.",
 		en: "You haven't joined every channel yet. Join, then tap again.",
 	}
-	// textHeroWon takes the winner's name, the hero and their points.
-	textHeroWon = localText{
-		uz: "🎉 To'g'ri, %s! Bu — %s. +1 ochko (jami %d).",
-		ru: "🎉 Верно, %s! Это — %s. +1 очко (всего %d).",
-		en: "🎉 Right, %s! It's %s. +1 point (%d in all).",
-	}
 	textChannelsJoined = localText{
 		uz: "✅ Rahmat! Endi bemalol yozishingiz mumkin.",
 		ru: "✅ Спасибо! Теперь можете писать.",
@@ -243,24 +237,24 @@ var helpAbilities = map[string][6]string{
 	"uz": {
 		"Rasm, stiker va GIF'larni, video va dumaloq videolarning bir kadrini ko'raman, PDF, Word va matnli fayllarni o'qiyman.",
 		"Rasm, stiker va GIF'larni, video va dumaloq videolarning bir kadrini ko'raman, ovozli xabarlarni eshitaman, PDF, Word va matnli fayllarni o'qiyman.",
-		"Istalgan joyning vaqtini aytaman, hisoblayman, taqdimot (PowerPoint) tayyorlayman, guruhda so'rovnoma yoki viktorina tuzaman.",
-		"So'rasangiz rasm chizaman, istalgan joyning vaqtini aytaman, hisoblayman, taqdimot (PowerPoint) tayyorlayman, guruhda so'rovnoma yoki viktorina tuzaman.",
+		"Istalgan joyning vaqtini aytaman, hisoblayman, taqdimot (PowerPoint) va viktorina tayyorlayman (fayldagi savollaringizdan ham), guruhda so'rovnoma tuzaman.",
+		"So'rasangiz rasm chizaman, istalgan joyning vaqtini aytaman, hisoblayman, taqdimot (PowerPoint) va viktorina tayyorlayman (fayldagi savollaringizdan ham), guruhda so'rovnoma tuzaman.",
 		"Valyuta kursi, ob-havo, namoz vaqtlari, yangiliklar, Vikipediya va kripto narxlarini, Mobile Legends qahramonlari statistikasini topaman, qo'shiq, kino va video qidiraman, havoladagi maqolani o'qib beraman, Qur'on oyatlarini ma'nosi bilan topaman. Viktorina savoli, qiziq fakt, kitob, retsept, oltin narxi, shaxmat va Formula 1 natijalarini ham topaman. O'qish uchun: aniq hisob (hosila, matritsa, birliklar), ilmiy maqolalar va inglizcha sinonimlar.",
 		"Valyuta kursi, ob-havo, namoz vaqtlari, yangiliklar, Vikipediya, futbol natijalari va kripto narxlarini, Mobile Legends qahramonlari statistikasini topaman, qo'shiq, kino va video qidiraman, havoladagi maqolani o'qib beraman, Qur'on oyatlarini ma'nosi bilan topaman. Viktorina savoli, qiziq fakt, kitob, retsept, oltin narxi, shaxmat va Formula 1 natijalarini ham topaman. O'qish uchun: aniq hisob (hosila, matritsa, birliklar), ilmiy maqolalar va inglizcha sinonimlar.",
 	},
 	"ru": {
 		"Вижу фото, стикеры и GIF, кадр из видео и кружочков, читаю PDF, Word и текстовые файлы.",
 		"Вижу фото, стикеры и GIF, кадр из видео и кружочков, слушаю голосовые, читаю PDF, Word и текстовые файлы.",
-		"Скажу время в любой точке, посчитаю, сделаю презентацию (PowerPoint), опрос или викторину в группе.",
-		"Нарисую картинку по просьбе, скажу время в любой точке, посчитаю, сделаю презентацию (PowerPoint), опрос или викторину в группе.",
+		"Скажу время в любой точке, посчитаю, сделаю презентацию (PowerPoint) и викторину (в том числе из ваших вопросов в файле), опрос в группе.",
+		"Нарисую картинку по просьбе, скажу время в любой точке, посчитаю, сделаю презентацию (PowerPoint) и викторину (в том числе из ваших вопросов в файле), опрос в группе.",
 		"Найду курсы валют, погоду, время намаза, новости, Википедию и цены криптовалют, статистику героев Mobile Legends, песни, фильмы и видео, прочитаю статью по ссылке, найду аяты Корана с переводом. А ещё вопрос для викторины, интересный факт, книги, рецепты, цену золота, шахматы и Формулу 1. Для учёбы: точные вычисления (производные, матрицы, единицы), научные статьи и английские синонимы.",
 		"Найду курсы валют, погоду, время намаза, новости, Википедию, результаты футбола и цены криптовалют, статистику героев Mobile Legends, песни, фильмы и видео, прочитаю статью по ссылке, найду аяты Корана с переводом. А ещё вопрос для викторины, интересный факт, книги, рецепты, цену золота, шахматы и Формулу 1. Для учёбы: точные вычисления (производные, матрицы, единицы), научные статьи и английские синонимы.",
 	},
 	"en": {
 		"I can see photos, stickers and GIFs, a frame of videos and round videos, and read PDF, Word and text files.",
 		"I can see photos, stickers and GIFs, a frame of videos and round videos; I listen to voice messages and read PDF, Word and text files.",
-		"I can tell the time anywhere, calculate arithmetic, make a presentation (PowerPoint), and make a poll or a quiz in a group.",
-		"I can draw a picture when you ask, tell the time anywhere, calculate arithmetic, make a presentation (PowerPoint), and make a poll or a quiz in a group.",
+		"I can tell the time anywhere, calculate arithmetic, make a presentation (PowerPoint) and a quiz (from your own questions in a file too), and a poll in a group.",
+		"I can draw a picture when you ask, tell the time anywhere, calculate arithmetic, make a presentation (PowerPoint) and a quiz (from your own questions in a file too), and a poll in a group.",
 		"I can look up exchange rates, the weather, prayer times, news headlines, Wikipedia and crypto prices, Mobile Legends hero statistics, find songs, films and videos, read an article from a link, and find Quran verses with their meaning. Also trivia questions, fun facts, books, recipes, the gold price, chess and Formula 1 results. For study: exact math (derivatives, matrices, units), scholarly papers and English synonyms.",
 		"I can look up exchange rates, the weather, prayer times, news headlines, Wikipedia, football results and crypto prices, Mobile Legends hero statistics, find songs, films and videos, read an article from a link, and find Quran verses with their meaning. Also trivia questions, fun facts, books, recipes, the gold price, chess and Formula 1 results. For study: exact math (derivatives, matrices, units), scholarly papers and English synonyms.",
 	},

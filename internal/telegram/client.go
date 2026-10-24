@@ -712,14 +712,15 @@ type inputPollOption struct {
 }
 
 // SendPoll sends a poll or a quiz and returns the ID of the sent message.
-// Polls are anonymous, so the bot never learns or reveals who voted for
-// what.
+// Polls in groups are anonymous, so the bot never learns or reveals who
+// voted for what; in a private chat the only voter is the person the bot
+// talks to.
 func (c *Client) SendPoll(ctx context.Context, poll OutgoingPoll) (int64, error) {
 	params := sendPollParams{
 		ChatID:                poll.ChatID,
 		Question:              poll.Question,
 		Options:               make([]inputPollOption, 0, len(poll.Options)),
-		IsAnonymous:           true,
+		IsAnonymous:           poll.ChatID < 0,
 		AllowsMultipleAnswers: poll.Multiple,
 	}
 	for _, option := range poll.Options {

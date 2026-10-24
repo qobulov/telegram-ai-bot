@@ -16,7 +16,9 @@ import (
 const actionQuiz = "quiz"
 
 const (
-	maxQuizQuestions = 5
+	// maxQuizQuestions keeps a quiz, with the answer, under Telegram's
+	// 20 messages a minute in a group.
+	maxQuizQuestions = 10
 	// maxExplanationRunes is Telegram's limit for a quiz's explanation.
 	maxExplanationRunes = 200
 	// quizTimeout leaves each question pollTimeout's share.
@@ -38,21 +40,23 @@ type quizQuestion struct {
 	Explanation string   `json:"explanation"`
 }
 
-// QuizTool lets anyone in a group have the bot post a quiz there: up to
-// five questions, each with one right answer that Telegram reveals to whoever
-// answers. Like a poll, it goes to the group the turn is in and is paced.
+// QuizTool lets anyone have the bot post a quiz in the chat they are in:
+// up to ten questions, each with one right answer that Telegram reveals to
+// whoever answers, such as a student's own questions from a file. In a
+// group it is paced like a poll; a private chat has its daily limit.
 func QuizTool(opts PollOptions) Tool {
 	if opts.Now == nil {
 		opts.Now = time.Now
 	}
 	p := polls{opts}
 	return Tool{
-		Name:        "create_quiz",
-		Description: "Post a quiz in this group when someone asks for a quiz, viktorina or test: 1 to 5 questions, each with one right answer, which Telegram shows to whoever answers. Write the questions yourself, on the topic asked, with facts you are sure of. A group gets one quiz every 10 minutes.",
+		Name: "create_quiz",
+		Description: "Post a quiz in this chat when someone asks for a quiz, viktorina or test: 1 to 10 questions, each with one right answer, which Telegram shows to whoever answers. " +
+			"When they send a file or text with questions, take its questions, options and answers as written; otherwise write them yourself, on the topic asked, with facts you are sure of. A group gets one quiz every 10 minutes.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"questions": {"type": "array", "minItems": 1, "maxItems": 5, "items": {
+				"questions": {"type": "array", "minItems": 1, "maxItems": 10, "items": {
 					"type": "object",
 					"properties": {
 						"question": {"type": "string", "description": "1 to 300 characters, in the language of the person asking."},
@@ -67,9 +71,8 @@ func QuizTool(opts PollOptions) Tool {
 			"required": ["questions"],
 			"additionalProperties": false
 		}`),
-		GroupOnly: true,
-		Timeout:   quizTimeout,
-		Run:       p.quiz,
+		Timeout: quizTimeout,
+		Run:     p.quiz,
 	}
 }
 
@@ -81,9 +84,9 @@ func (p polls) quiz(ctx context.Context, raw json.RawMessage) (any, error) {
 	if err := decodeArgs(raw, &args); err != nil {
 		return nil, err
 	}
-	caller, err := pollAsker(ctx)
-	if err != nil {
-		return nil, err
+	caller, ok := CallerFrom(ctx)
+	if !ok || caller.UpdateID == 0 {
+		return nil, &DeniedError{Message: "a quiz can only be made in a chat"}
 	}
 	questions, err := newQuiz(caller, args)
 	if err != nil {
@@ -98,10 +101,7 @@ func (p polls) quiz(ctx context.Context, raw json.RawMessage) (any, error) {
 	if !first {
 		return map[string]any{"already_handled": true, "action": actionQuiz, "note": quizAskedNote}, nil
 	}
-	if err := p.checkPace(ctx, caller.ChatID, actionQuiz); err != nil {
-		if _, tooSoon := err.(*ArgumentError); tooSoon {
-			err = &ArgumentError{Message: quizTooSoon}
-		}
+	if err := p.quizPace(ctx, caller); err != nil {
 		return nil, p.forget(ctx, caller, actionQuiz, err)
 	}
 	for i, question := range questions {
@@ -113,6 +113,19 @@ func (p polls) quiz(ctx context.Context, raw json.RawMessage) (any, error) {
 		}
 	}
 	return map[string]any{"sent": len(questions), "note": quizSentNote}, nil
+}
+
+// quizPace keeps a group to one quiz every pollWindow, as polls are; in a
+// private chat the daily limit on messages paces them.
+func (p polls) quizPace(ctx context.Context, caller Caller) error {
+	if caller.ChatID > 0 {
+		return nil
+	}
+	err := p.checkPace(ctx, caller.ChatID, actionQuiz)
+	if _, tooSoon := err.(*ArgumentError); tooSoon {
+		return &ArgumentError{Message: quizTooSoon}
+	}
+	return err
 }
 
 // newQuiz is the quiz asked for, trimmed and within Telegram's limits. The

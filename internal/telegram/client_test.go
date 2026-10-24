@@ -814,6 +814,18 @@ func TestSendPollSendsOptionObjects(t *testing.T) {
 	}
 }
 
+// A quiz in a private chat is not anonymous: its only voter is the person
+// the bot talks to.
+func TestPrivateQuizIsNotAnonymous(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"message_id":89}}`)
+	if _, err := client.SendPoll(context.Background(), OutgoingPoll{ChatID: 5005, Question: "Q", Options: []string{"a", "b"}, Quiz: true, Correct: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if sent := api.recorded()[0]; sent.params["is_anonymous"] != false || sent.params["type"] != "quiz" || sent.params["correct_option_id"] != float64(1) {
+		t.Errorf("params = %v", sent.params)
+	}
+}
+
 // A poll asked for in a forum topic replies to the request, which keeps it
 // in that topic rather than the General one.
 func TestSendPollRepliesToTheRequest(t *testing.T) {
