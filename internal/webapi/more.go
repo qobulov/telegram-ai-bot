@@ -37,11 +37,11 @@ func (a *apis) moreTool() tools.Tool {
 	return tools.Tool{
 		Name: "more_info",
 		Description: "book: books by title or author; recipe: recipes by the dish's English name, as \"plov\" (no pork or alcohol); gold, silver: world price in USD per ounce and gram; " +
-			"chess_puzzle: Lichess's puzzle of the day; chess_player: a Lichess user's ratings; f1_standings: this Formula 1 season's drivers; f1_last_race: the last race's result.",
+			"chess_puzzle: Lichess's puzzle of the day; chess_player: a Lichess user's ratings; f1_standings: this Formula 1 season's drivers; f1_last_race: the last race's result; launches: the next rocket launches.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["book", "recipe", "gold", "silver", "chess_puzzle", "chess_player", "f1_standings", "f1_last_race"]},
+				"action": {"type": "string", "enum": ["book", "recipe", "gold", "silver", "chess_puzzle", "chess_player", "f1_standings", "f1_last_race", "launches"]},
 				"query": {"type": "string", "description": "For book, recipe and chess_player: what to look for."}
 			},
 			"required": ["action"],
@@ -81,8 +81,10 @@ func (a *apis) more(ctx context.Context, raw json.RawMessage) (any, error) {
 		return a.f1Standings(ctx)
 	case "f1_last_race":
 		return a.f1LastRace(ctx)
+	case "launches":
+		return a.launches(ctx)
 	}
-	return nil, argumentError("action must be book, recipe, gold, silver, chess_puzzle, chess_player, f1_standings or f1_last_race")
+	return nil, argumentError("action must be book, recipe, gold, silver, chess_puzzle, chess_player, f1_standings, f1_last_race or launches")
 }
 
 // cachedJSON reads a JSON answer, keeping it for ttl.
@@ -380,4 +382,64 @@ func (a *apis) f1LastRace(ctx context.Context) (any, error) {
 func isNotFound(err error) bool {
 	var status *statusError
 	return errors.As(err, &status) && status.status == http.StatusNotFound
+}
+
+// --- Rocket launches (Launch Library 2) ---
+
+// maxLaunches is how many of the next launches are told.
+const maxLaunches = 5
+
+type launch struct {
+	Name     string `json:"name"`
+	Time     string `json:"time_utc"`
+	Status   string `json:"status"`
+	Provider string `json:"provider,omitempty"`
+	Place    string `json:"place,omitempty"`
+	Mission  string `json:"mission,omitempty"`
+}
+
+// launches are the next rocket launches. Launch Library allows 15 calls an
+// hour without a key, so its list is kept for an hour; launches already
+// gone by are left out of it.
+func (a *apis) launches(ctx context.Context) (any, error) {
+	var answer struct {
+		Results []struct {
+			Name   string    `json:"name"`
+			Net    time.Time `json:"net"`
+			Status struct {
+				Name string `json:"name"`
+			} `json:"status"`
+			Provider struct {
+				Name string `json:"name"`
+			} `json:"launch_service_provider"`
+			Pad struct {
+				Location struct {
+					Name string `json:"name"`
+				} `json:"location"`
+			} `json:"pad"`
+			Mission *struct {
+				Description string `json:"description"`
+			} `json:"mission"`
+		} `json:"results"`
+	}
+	link := a.urls.LaunchLibrary + "/2.3.0/launches/upcoming/?limit=10"
+	if err := a.cachedJSON(ctx, "Launch Library", link, moreTTL, &answer); err != nil {
+		return nil, err
+	}
+	var out []launch
+	for _, r := range answer.Results {
+		if len(out) == maxLaunches {
+			break
+		}
+		if r.Net.Before(a.now()) {
+			continue
+		}
+		l := launch{Name: cleanText(r.Name, 100), Time: r.Net.UTC().Format("2006-01-02 15:04"), Status: r.Status.Name,
+			Provider: cleanText(r.Provider.Name, 80), Place: cleanText(r.Pad.Location.Name, 80)}
+		if r.Mission != nil {
+			l.Mission = cleanText(r.Mission.Description, 200)
+		}
+		out = append(out, l)
+	}
+	return map[string]any{"launches": out, "source": "Launch Library 2", "note": "Times are UTC: Tashkent is UTC+5. Dates often move."}, nil
 }

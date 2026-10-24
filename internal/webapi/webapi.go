@@ -106,6 +106,9 @@ type BaseURLs struct {
 	Wolfram           string
 	Shikimori         string
 	TraceMoe          string
+	CheapShark        string
+	LaunchLibrary     string
+	OpenDota          string
 	// Wikipedia is a format string with %s for the language code.
 	Wikipedia string
 	// News maps a language (uz, ru), or world- and a language for the
@@ -158,6 +161,9 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.Wolfram = cmp.Or(b.Wolfram, "https://api.wolframalpha.com")
 	b.Shikimori = cmp.Or(b.Shikimori, "https://shikimori.io")
 	b.TraceMoe = cmp.Or(b.TraceMoe, "https://api.trace.moe")
+	b.CheapShark = cmp.Or(b.CheapShark, "https://www.cheapshark.com")
+	b.LaunchLibrary = cmp.Or(b.LaunchLibrary, "https://ll.thespacedevs.com")
+	b.OpenDota = cmp.Or(b.OpenDota, "https://api.opendota.com")
 	b.Wikipedia = cmp.Or(b.Wikipedia, "https://%s.wikipedia.org")
 	if b.News == nil {
 		b.News = map[string]map[string]string{
@@ -225,6 +231,7 @@ func Tools(opts Options) []tools.Tool {
 		a.funTool(),
 		a.moreTool(),
 		a.studyTool(),
+		a.gamesTool(),
 	}
 	if a.footballToken != "" {
 		list = append(list, a.footballTool())

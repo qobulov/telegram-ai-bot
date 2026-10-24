@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -175,6 +176,7 @@ var freeGameGenres = []string{"mmorpg", "shooter", "strategy", "moba", "racing",
 type freeGamesArgs struct {
 	Platform string `json:"platform"`
 	Genre    string `json:"genre"`
+	Deals    bool   `json:"deals"`
 }
 
 type freeGame struct {
@@ -188,12 +190,13 @@ type freeGame struct {
 func (a *apis) freeGamesTool() tools.Tool {
 	return tools.Tool{
 		Name:        "free_games",
-		Description: "Popular free-to-play PC and browser games from FreeToGame, optionally of a genre, with a short description and a link. Use it when someone asks for free games to play.",
+		Description: "Popular free-to-play PC and browser games from FreeToGame, optionally of a genre, with a short description and a link. Use it when someone asks for free games to play; deals: paid PC games on sale on Steam now, from CheapShark, with prices and discounts.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
 				"platform": {"type": "string", "enum": ["pc", "browser", "all"], "description": "Default all."},
-				"genre": {"type": "string", "enum": ["` + strings.Join(freeGameGenres, `", "`) + `"]}
+				"genre": {"type": "string", "enum": ["` + strings.Join(freeGameGenres, `", "`) + `"]},
+				"deals": {"type": "boolean", "description": "Games on sale instead of free ones."}
 			},
 			"additionalProperties": false
 		}`),
@@ -206,6 +209,9 @@ func (a *apis) freeGames(ctx context.Context, raw json.RawMessage) (any, error) 
 	var args freeGamesArgs
 	if err := decodeArgs(raw, &args); err != nil {
 		return nil, err
+	}
+	if args.Deals {
+		return a.gameDeals(ctx)
 	}
 	platform := args.Platform
 	if platform == "" {
@@ -365,4 +371,47 @@ func (a *apis) dictionary(ctx context.Context, raw json.RawMessage) (any, error)
 		return nil, err
 	}
 	return entry, nil
+}
+
+// gameDeal is a paid game on sale, from CheapShark.
+type gameDeal struct {
+	Title      string `json:"title"`
+	Price      string `json:"price_usd"`
+	Normal     string `json:"normal_price_usd"`
+	Savings    string `json:"discount"`
+	Metacritic string `json:"metacritic,omitempty"`
+	Link       string `json:"link"`
+}
+
+// gameDeals are the best-rated deals on Steam right now.
+func (a *apis) gameDeals(ctx context.Context) (any, error) {
+	link := a.urls.CheapShark + "/api/1.0/deals?storeID=1&onSale=1&sortBy=Deal%20Rating&pageSize=" + strconv.Itoa(maxFreeGames)
+	deals, err := remember(a.cache, "deals:"+link, time.Hour, func() ([]gameDeal, error) {
+		var answer []struct {
+			Title      string `json:"title"`
+			DealID     string `json:"dealID"`
+			SalePrice  string `json:"salePrice"`
+			Normal     string `json:"normalPrice"`
+			Savings    string `json:"savings"`
+			Metacritic string `json:"metacriticScore"`
+		}
+		if err := a.patient.getJSON(ctx, call{service: "CheapShark", url: link}, &answer); err != nil {
+			return nil, err
+		}
+		var out []gameDeal
+		for _, d := range answer {
+			savings, _ := strconv.ParseFloat(d.Savings, 64)
+			deal := gameDeal{Title: cleanText(d.Title, 60), Price: d.SalePrice, Normal: d.Normal,
+				Savings: fmt.Sprintf("%.0f%%", savings), Link: "https://www.cheapshark.com/redirect?dealID=" + url.QueryEscape(d.DealID)}
+			if d.Metacritic != "0" {
+				deal.Metacritic = d.Metacritic
+			}
+			out = append(out, deal)
+		}
+		return out, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"deals": deals, "store": "Steam", "source": "CheapShark", "note": "Prices in US dollars; titles are outside data."}, nil
 }
