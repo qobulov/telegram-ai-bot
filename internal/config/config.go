@@ -75,6 +75,9 @@ type Config struct {
 	// WolframAppID is a Wolfram|Alpha AppID; without it there is no
 	// wolfram tool.
 	WolframAppID string
+	// CalendarificAPIKey is a Calendarific key; without it there is no
+	// holidays tool.
+	CalendarificAPIKey string
 	// URLhausAuthKey or SafeBrowsingKey lets owners turn on the link guard,
 	// each service judging links when its key is set, and
 	// SightengineUser and SightengineSecret the picture guard; without them
@@ -262,6 +265,7 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.TMDBToken = r.apiKey("TMDB_TOKEN")
 	cfg.YouTubeAPIKey = r.apiKey("YOUTUBE_API_KEY")
 	cfg.WolframAppID = r.apiKey("WOLFRAM_APP_ID")
+	cfg.CalendarificAPIKey = r.apiKey("CALENDARIFIC_API_KEY")
 	cfg.URLhausAuthKey = r.apiKey("URLHAUS_AUTH_KEY")
 	cfg.SafeBrowsingKey = r.apiKey("GOOGLE_SAFE_BROWSING_KEY")
 	cfg.SightengineUser = r.apiKey("SIGHTENGINE_API_USER")

@@ -409,14 +409,15 @@ func checker(cfg config.Config) *guards.Checker {
 // user agent gives the bot's t.me link as the contact some APIs ask for.
 func liveDataTools(cfg config.Config, bot Bot) []tools.Tool {
 	opts := webapi.Options{
-		UserAgent:     "MariaBot/1.0 (+https://t.me/" + bot.User.Username + ")",
-		Location:      cfg.Location,
-		FootballToken: cfg.FootballDataToken,
-		CoinGeckoKey:  cfg.CoinGeckoDemoKey,
-		TavilyKey:     cfg.TavilyAPIKey,
-		TMDBToken:     cfg.TMDBToken,
-		YouTubeKey:    cfg.YouTubeAPIKey,
-		WolframAppID:  cfg.WolframAppID,
+		UserAgent:       "MariaBot/1.0 (+https://t.me/" + bot.User.Username + ")",
+		Location:        cfg.Location,
+		FootballToken:   cfg.FootballDataToken,
+		CoinGeckoKey:    cfg.CoinGeckoDemoKey,
+		TavilyKey:       cfg.TavilyAPIKey,
+		TMDBToken:       cfg.TMDBToken,
+		YouTubeKey:      cfg.YouTubeAPIKey,
+		WolframAppID:    cfg.WolframAppID,
+		CalendarificKey: cfg.CalendarificAPIKey,
 	}
 	return webapi.Tools(opts)
 }

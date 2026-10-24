@@ -56,7 +56,10 @@ type Options struct {
 	// WolframAppID is a Wolfram|Alpha AppID. Without it there is no
 	// wolfram tool.
 	WolframAppID string
-	BaseURLs     BaseURLs
+	// CalendarificKey is a Calendarific key. Without it there is no
+	// holidays tool.
+	CalendarificKey string
+	BaseURLs        BaseURLs
 }
 
 // BaseURLs says where each API lives. Empty fields mean the production
@@ -104,6 +107,7 @@ type BaseURLs struct {
 	ArXiv             string
 	Datamuse          string
 	Wolfram           string
+	Calendarific      string
 	Shikimori         string
 	TraceMoe          string
 	SteamStore        string
@@ -161,6 +165,7 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.ArXiv = cmp.Or(b.ArXiv, "https://export.arxiv.org")
 	b.Datamuse = cmp.Or(b.Datamuse, "https://api.datamuse.com")
 	b.Wolfram = cmp.Or(b.Wolfram, "https://api.wolframalpha.com")
+	b.Calendarific = cmp.Or(b.Calendarific, "https://calendarific.com")
 	b.Shikimori = cmp.Or(b.Shikimori, "https://shikimori.io")
 	b.TraceMoe = cmp.Or(b.TraceMoe, "https://api.trace.moe")
 	b.SteamStore = cmp.Or(b.SteamStore, "https://store.steampowered.com")
@@ -197,17 +202,18 @@ type apis struct {
 	client *client
 	// patient waits longer, for the web search and the MLBB statistics,
 	// which often take over 3 s.
-	patient       *client
-	cache         *cache
-	urls          BaseURLs
-	location      *time.Location
-	now           func() time.Time
-	footballToken string
-	coinGeckoKey  string
-	tavilyKey     string
-	tmdbToken     string
-	youtubeKey    string
-	wolframAppID  string
+	patient         *client
+	cache           *cache
+	urls            BaseURLs
+	location        *time.Location
+	now             func() time.Time
+	footballToken   string
+	coinGeckoKey    string
+	tavilyKey       string
+	tmdbToken       string
+	youtubeKey      string
+	wolframAppID    string
+	calendarificKey string
 }
 
 // Tools returns the live-data tools. Football is included only when
@@ -252,6 +258,9 @@ func Tools(opts Options) []tools.Tool {
 	if a.wolframAppID != "" {
 		list = append(list, a.wolframTool())
 	}
+	if a.calendarificKey != "" {
+		list = append(list, a.holidaysTool())
+	}
 	return list
 }
 
@@ -263,18 +272,19 @@ func newAPIs(opts Options) *apis {
 		opts.Location = defaultLocation()
 	}
 	return &apis{
-		client:        newClient(opts.HTTPClient, cmp.Or(opts.UserAgent, defaultUserAgent)),
-		patient:       patientClient(opts.HTTPClient, cmp.Or(opts.UserAgent, defaultUserAgent)),
-		cache:         newCache(opts.Now),
-		urls:          opts.BaseURLs.withDefaults(),
-		location:      opts.Location,
-		now:           opts.Now,
-		footballToken: opts.FootballToken,
-		coinGeckoKey:  opts.CoinGeckoKey,
-		tavilyKey:     opts.TavilyKey,
-		tmdbToken:     opts.TMDBToken,
-		youtubeKey:    opts.YouTubeKey,
-		wolframAppID:  opts.WolframAppID,
+		client:          newClient(opts.HTTPClient, cmp.Or(opts.UserAgent, defaultUserAgent)),
+		patient:         patientClient(opts.HTTPClient, cmp.Or(opts.UserAgent, defaultUserAgent)),
+		cache:           newCache(opts.Now),
+		urls:            opts.BaseURLs.withDefaults(),
+		location:        opts.Location,
+		now:             opts.Now,
+		footballToken:   opts.FootballToken,
+		coinGeckoKey:    opts.CoinGeckoKey,
+		tavilyKey:       opts.TavilyKey,
+		tmdbToken:       opts.TMDBToken,
+		youtubeKey:      opts.YouTubeKey,
+		wolframAppID:    opts.WolframAppID,
+		calendarificKey: opts.CalendarificKey,
 	}
 }
 
