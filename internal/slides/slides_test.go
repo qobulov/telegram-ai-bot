@@ -13,20 +13,39 @@ import (
 
 func sampleDeck(theme string) Deck {
 	return Deck{
-		Title:    "O'zbekistonda suv resurslaridan oqilona foydalanish",
-		Subtitle: "Talaba: Aliyev Vali, 2-kurs · Toshkent irrigatsiya instituti",
+		Title:    "Pedagog-psixologning asosiy faoliyat turlari",
+		Subtitle: "Ta'lim muassasasida psixologik xizmatni tashkillashtirish",
+		Author:   "Bajardi: 23-05 guruh talabasi Eshkuziyeva Sabohat",
 		Theme:    theme,
 		Slides: []Slide{
-			{Title: "Muammoning dolzarbligi", Bullets: []string{"Orol dengizi 1960-yildan beri 90% ga qisqardi", "Sug'oriladigan yerlarning 50% dan ortig'i sho'rlangan", "Suv tanqisligi har yili 3–5 km³ ga oshmoqda"}},
-			{Title: "Tomchilatib sug'orish texnologiyasi va uning afzalliklari qishloq xo'jaligida", Bullets: []string{
-				"Suv sarfi an'anaviy usulga nisbatan 40–60% kam",
-				"Hosildorlik 20–30% ga oshadi, chunki o'simlik ildiziga kerakli miqdorda suv va o'g'it yetkaziladi",
-				"Begona o'tlar kamroq o'sadi, mehnat sarfi kamayadi",
-				"Davlat subsidiyasi: xarajatlarning 50% gacha qoplanadi",
-				"Qiyalik yerlarda ham samarali ishlaydi",
-				"Kamchilik: boshlang'ich investitsiya yuqori (gektariga ~1 500–2 500 $)",
+			{Layout: LayoutPoints, Eyebrow: "Psixologik xizmat missiyasi", Title: "Sog'lom ruhiy muhit va shaxs kamoloti", Icon: "🌱", Items: []Item{
+				{Title: "Shaxs rivoji", Text: "O'quvchining qobiliyat va imkoniyatlarini har tomonlama ro'yobga chiqarish"},
+				{Title: "Ruhiy salomatlik", Text: "Ta'lim muhitida qulay psixologik xavfsizlikni ta'minlash"},
+				{Title: "Hamkorlik uchligi", Text: "O'quvchi, pedagog va ota-onalar o'rtasida uyg'un muloqotni yo'lga qo'yish"},
 			}},
-			{Title: "Xulosa", Bullets: []string{"Zamonaviy texnologiyalar & davlat yordami <muhim>", "Har bir fermer suvni tejashga mas'ul"}},
+			{Layout: LayoutCards, Eyebrow: "Qonunchilik va nizomlar", Title: "Faoliyatning me'yoriy-huquqiy asoslari", Intro: "Pedagog-psixolog ish faoliyati davlat qonunlari va vazirlikning ixtisoslashtirilgan nizomlari asosida tartibga solinadi.", Items: []Item{
+				{Title: "«Ta'lim to'g'risida»gi Qonun", Text: "Ta'lim oluvchilarning huquqlari, erkinliklari va ruhiy-jismoniy rivojlanishining davlat kafolatlari."},
+				{Title: "Bolalar huquqlari kafolatlari", Text: "Bolalarni zo'ravonlikdan himoya qilish kafolatlari hamda ta'limning davlat talablari."},
+				{Title: "Psixologik xizmat nizomi", Text: "Vazirlikning sohaviy nizomlari, lavozim yo'riqnomalari va etika qoidalari."},
+			}},
+			{Layout: LayoutGrid, Title: "Faoliyatning oltita asosiy turi", Items: []Item{
+				{Icon: "🩺", Title: "Psixodiagnostika"}, {Icon: "🛡️", Title: "Psixoprofilaktika"}, {Icon: "🧩", Title: "Psixokorreksiya va rivojlantirish"},
+				{Icon: "💬", Title: "Psixologik maslahat"}, {Icon: "🎓", Title: "Psixologik ma'rifat"}, {Icon: "🗂️", Title: "Tashkiliy-metodik ish"},
+			}},
+			{Layout: LayoutSteps, Eyebrow: "Yo'nalish 03 · Tiklash va o'stirish", Title: "Psixokorreksiya va rivojlantiruvchi jarayonlar", Intro: "Normadan chetlashgan xususiyatlarni to'g'rilash va ichki imkoniyatlarni kengaytirish ketma-ketligi:", Items: []Item{
+				{Title: "Maqsadli dastur", Text: "Tashxis xulosalari asosida aniq korreksion reja va mashg'ulot modullarini ishlab chiqish."},
+				{Title: "Individual ish", Text: "Muayyan qiyinchilikka ega o'quvchi bilan yolg'iz, maxsus sessiyalar orqali ruhiy to'siqlarni yechish."},
+				{Title: "Guruhiy trening", Text: "Tengdoshlar davrasida muloqot, diqqat, hissiy barqarorlik va jamoaviy hamkorlikni rivojlantirish."},
+				{Title: "Natijani baholash", Text: "O'tkazilgan mashg'ulotlardan so'ng qayta monitoring qilish va samaradorlikni belgilash."},
+			}},
+			{Layout: LayoutTable, Eyebrow: "Hujjatlar va tashkiliy ishlar", Title: "Ish rejasi va hujjatlarni yuritish", Columns: [2]string{"Hujjat toifasi", "Hujjatlar va vazifasi"}, Note: "Eslatma: barcha xulosa va individual xaritalar maxfiy saqlanadi.", Items: []Item{
+				{Title: "Rejalashtirish", Text: "Yillik istiqbolli reja; choraklik va oylik ish rejalari; xodimlar bilan hamkorlik jadvali."},
+				{Title: "Qayd etish", Text: "Ish jurnali: kundalik faoliyat jurnali va konsultatsiyalar daftari."},
+				{Title: "Maxsus kartoteka", Text: "O'quvchilarning individual psixologik xaritalari va xulosalari."},
+				{Title: "Hisobotlar", Text: "Choraklik va yillik tahliliy hisobotlar; samaradorlikni baholash."},
+			}},
+			{Layout: LayoutStatement, Eyebrow: "Xulosa", Title: "Asosiy g'oya", Intro: "Aniq tashxis — samarali psixologik yordamning boshlang'ich nuqtasidir.", Items: []Item{{Text: "Amaliy psixologiya asoslari"}}},
+			{Layout: LayoutPoints, Title: "Zo'ravonlik & bulling <profilaktika>", Items: []Item{{Title: "Sinflarda", Text: "nizolarni kamaytirish"}, {Text: "Soddalashtirilgan punkt"}}},
 		},
 	}
 }
@@ -64,18 +83,18 @@ func TestBuildWritesAWellFormedPackage(t *testing.T) {
 				}
 			}
 		}
-		for _, name := range []string{"ppt/slides/slide1.xml", "ppt/slides/slide4.xml", "ppt/slides/_rels/slide4.xml.rels"} {
+		for _, name := range []string{"ppt/slides/slide1.xml", "ppt/slides/slide8.xml", "ppt/slides/_rels/slide8.xml.rels"} {
 			if _, ok := parts[name]; !ok {
 				t.Errorf("%s: no %s", theme, name)
 			}
 		}
-		if _, ok := parts["ppt/slides/slide5.xml"]; ok {
+		if _, ok := parts["ppt/slides/slide9.xml"]; ok {
 			t.Errorf("%s: a slide too many", theme)
 		}
-		if !strings.Contains(parts["[Content_Types].xml"], "/ppt/slides/slide4.xml") || strings.Count(parts["ppt/presentation.xml"], "<p:sldId ") != 4 {
+		if !strings.Contains(parts["[Content_Types].xml"], "/ppt/slides/slide8.xml") || strings.Count(parts["ppt/presentation.xml"], "<p:sldId ") != 8 {
 			t.Errorf("%s: the slides are not all listed", theme)
 		}
-		if !strings.Contains(parts["ppt/slides/slide4.xml"], "Zamonaviy texnologiyalar &amp; davlat yordami &lt;muhim&gt;") {
+		if !strings.Contains(parts["ppt/slides/slide8.xml"], "Zo&apos;ravonlik &amp; bulling &lt;profilaktika&gt;") && !strings.Contains(parts["ppt/slides/slide8.xml"], "Zo'ravonlik &amp; bulling &lt;profilaktika&gt;") {
 			t.Errorf("%s: text not escaped", theme)
 		}
 	}
@@ -93,11 +112,13 @@ func TestBuildRefusesEmptyAndHugeDecks(t *testing.T) {
 	}
 }
 
-func TestBulletsShrinkToFit(t *testing.T) {
-	short := []string{"bir", "ikki"}
-	long := []string{strings.Repeat("a", 200), strings.Repeat("b", 200), strings.Repeat("c", 200), strings.Repeat("d", 200)}
-	if bulletSize(short) <= bulletSize(long) {
-		t.Errorf("sizes %d and %d", bulletSize(short), bulletSize(long))
+func TestTextShrinksToFit(t *testing.T) {
+	short, long := []string{"bir", "ikki"}, []string{strings.Repeat("so'z ", 40), strings.Repeat("gap ", 50)}
+	if a, b := fitBlock(short, 4*inch, 3*inch, 22, 12), fitBlock(long, 4*inch, 3*inch, 22, 12); a <= b {
+		t.Errorf("sizes %d and %d", a, b)
+	}
+	if fit("Qisqa sarlavha", 10*inch, 1, 36, 20) != 36 || fit(strings.Repeat("Juda uzun sarlavha ", 8), 10*inch, 2, 36, 20) >= 36 {
+		t.Error("titles do not shrink")
 	}
 }
 

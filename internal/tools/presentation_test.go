@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -28,8 +29,27 @@ func presentationRegistry(t *testing.T, quota *fakeQuota) *Registry {
 	}))
 }
 
-const goodDeck = `{"title":"Suv resurslari","subtitle":"Vali Aliyev","theme":"green","caption":"Mana taqdimotingiz 📊",
-	"slides":[{"title":"Muammo","bullets":["Orol qisqardi","Yerlar sho'rlangan"]},{"title":"Yechim","bullets":["  Tomchilatib   sug'orish ","",  "Subsidiya"]}]}`
+// goodDeck is ten slides after the title, one of each layout and more
+// points.
+var goodSlides = []string{
+	`{"layout":"points","eyebrow":"Kirish","title":"Muammo","intro":"Suv tanqisligi o'sib bormoqda.","icon":"💧","items":[{"title":"Orol","text":"90% qisqardi"},{"title":"Yerlar","text":"sho'rlangan"}]}`,
+	`{"layout":"cards","title":"Asoslar","items":[{"title":"Qonun","text":"Suv to'g'risida"},{"title":"Nizom","text":"Vazirlik"}]}`,
+	`{"layout":"steps","title":"Yechim","items":[{"title":"Reja"},{"title":"Ish"},{"title":"Baholash","text":"natija"}]}`,
+	`{"layout":"grid","title":"Usullar","items":[{"icon":"🌱","title":"Tomchi"},{"title":"Yomg'irlatish"},{"title":"Qayta ishlash"},{"title":"Nazorat"}]}`,
+	`{"layout":"table","title":"Hujjatlar","columns":["Tur","Vazifa"],"items":[{"title":"Reja","text":"yillik"},{"title":"Hisobot","text":"choraklik"}]}`,
+	`{"layout":"statement","title":"G'oya","intro":"Suvni tejash — kelajakni asrash."}`,
+	`{"layout":"points","title":"Fermerlar","items":[{"text":"subsidiya"},{"text":"o'qitish"}]}`,
+	`{"layout":"cards","title":"Natijalar","items":[{"title":"Hosil","text":"+20%"},{"title":"Suv","text":"-40%"}]}`,
+	`{"layout":"statement","title":"Xulosa","intro":"Har bir tomchi muhim.","items":[{"text":"Iqtisodiyot fani"}]}`,
+	`{"layout":"points","title":"Savollar","items":[{"text":"Rahmat"},{"text":"Savollar?"}]}`,
+}
+
+// deckOfSlides is a deck's arguments with these slides.
+func deckOfSlides(slides []string) string {
+	return `{"title":"Suv resurslari","subtitle":"Iqtisodiyot fanidan","author":"Bajardi: Vali Aliyev","theme":"green","caption":"Mana taqdimotingiz 📊","slides":[` + strings.Join(slides, ",") + `]}`
+}
+
+var goodDeck = deckOfSlides(goodSlides)
 
 func makeDeck(registry *Registry, ctx context.Context, args string) envelope {
 	var env envelope
@@ -48,7 +68,7 @@ func TestPresentationIsSentAsTheWholeAnswer(t *testing.T) {
 		t.Fatalf("env = %+v", env)
 	}
 	documents := sink.TakeDocuments()
-	if len(documents) != 1 || documents[0].Name != "Suv resurslari.pptx" {
+	if len(documents) != 1 || documents[0].Name != "Suv resurslari.pptx" || !strings.Contains(string(env.Result), `"slides":11`) {
 		t.Fatalf("documents = %+v", documents)
 	}
 	archive, err := zip.NewReader(bytes.NewReader(documents[0].Data), int64(len(documents[0].Data)))
@@ -77,18 +97,26 @@ func TestPresentationLimits(t *testing.T) {
 	}
 }
 
+// withSlides is goodDeck with its first slide replaced.
+func withSlides(first string) string {
+	return deckOfSlides(append([]string{first}, goodSlides[1:]...))
+}
+
 // A deck that would not fit is sent back to the model to fix, and no
 // presentation of the day is used for it.
 func TestPresentationChecksTheSlides(t *testing.T) {
 	quota := &fakeQuota{}
 	registry := presentationRegistry(t, quota)
 	ctx := WithTurn(context.Background(), Caller{UserID: userID}, &Sink{})
+	short := `{"title":"T","caption":"c","slides":[{"layout":"points","title":"a","items":[{"text":"b"},{"text":"c"}]}]}`
 	for name, tc := range map[string]struct{ args, word string }{
-		"one slide":   {`{"title":"T","caption":"c","slides":[{"title":"a","bullets":["b"]}]}`, "2 to 12"},
-		"no title":    {`{"title":" ","caption":"c","slides":[{"title":"a","bullets":["b"]},{"title":"a","bullets":["b"]}]}`, "title"},
-		"no bullets":  {`{"title":"T","caption":"c","slides":[{"title":"a","bullets":["b"]},{"title":"a","bullets":[" "]}]}`, "slide 2"},
-		"long bullet": {`{"title":"T","caption":"c","slides":[{"title":"a","bullets":["b"]},{"title":"a","bullets":["` + strings.Repeat("x", 221) + `"]}]}`, "shorten"},
-		"no caption":  {`{"title":"T","caption":"","slides":[{"title":"a","bullets":["b"]},{"title":"a","bullets":["b"]}]}`, "caption"},
+		"too few slides":   {short, "9 to 14"},
+		"unknown layout":   {withSlides(`{"layout":"chart","title":"a","items":[{"text":"b"},{"text":"c"}]}`), "layout must be"},
+		"too many cards":   {withSlides(`{"layout":"cards","title":"a","items":[{"text":"1"},{"text":"2"},{"text":"3"},{"text":"4"},{"text":"5"}]}`), "2 to 4 items"},
+		"empty statement":  {withSlides(`{"layout":"statement","title":"a"}`), "statement in intro"},
+		"half a table row": {withSlides(`{"layout":"table","title":"a","items":[{"title":"x"},{"title":"y","text":"z"}]}`), "title and a text"},
+		"long item":        {withSlides(`{"layout":"points","title":"a","items":[{"text":"` + strings.Repeat("x", 241) + `"},{"text":"c"}]}`), "shorten"},
+		"no caption":       {strings.Replace(goodDeck, `"caption":"Mana taqdimotingiz 📊"`, `"caption":""`, 1), "caption"},
 	} {
 		if env := makeDeck(registry, ctx, tc.args); env.OK || env.Error.Code != "invalid_arguments" || !strings.Contains(env.Error.Message, tc.word) {
 			t.Errorf("%s: env = %+v", name, env)
@@ -96,5 +124,33 @@ func TestPresentationChecksTheSlides(t *testing.T) {
 	}
 	if len(quota.limits) != 0 {
 		t.Errorf("a refused deck used the quota: %v", quota.limits)
+	}
+}
+
+// A step's own number is dropped: the slide numbers its steps.
+func TestStepsLoseTheirOwnNumbers(t *testing.T) {
+	slide, err := slideOf(slideArgs{Layout: "steps", Title: "Bosqichlar", Items: []itemArgs{{Title: "1. Murojaat"}, {Title: "2) Tahlil"}, {Title: "2026-yil rejasi"}}})
+	if err != nil || slide.Items[0].Title != "Murojaat" || slide.Items[1].Title != "Tahlil" || slide.Items[2].Title != "2026-yil rejasi" {
+		t.Errorf("items = %+v, %v", slide.Items, err)
+	}
+}
+
+// PRESENTATION_JSON, when set, is make_presentation's arguments as a model
+// wrote them, built into PRESENTATION_OUT to look at.
+func TestBuildFromModelArguments(t *testing.T) {
+	in, out := os.Getenv("PRESENTATION_JSON"), os.Getenv("PRESENTATION_OUT")
+	if in == "" {
+		t.Skip("no PRESENTATION_JSON")
+	}
+	raw, err := os.ReadFile(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sink := &Sink{}
+	if env := makeDeck(presentationRegistry(t, &fakeQuota{}), WithTurn(context.Background(), Caller{UserID: userID}, sink), string(raw)); !env.OK {
+		t.Fatalf("env = %+v", env)
+	}
+	if err := os.WriteFile(out, sink.TakeDocuments()[0].Data, 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
