@@ -49,8 +49,20 @@ var (
 
 // Parse reads the questions in text, without repeats, and counts the
 // blocks that looked like questions but could not be read: no right answer
-// marked, more than one, or too few options.
-func Parse(text string) (questions []Question, broken int) {
+// marked, more than one, or too few options. A test that gives only the
+// right answers is read too, and madeOptions reports that its wrong
+// options were taken from the other answers.
+func Parse(text string) (questions []Question, broken int, madeOptions bool) {
+	questions, broken = parseOptions(text)
+	if answered, unread := parseAnswers(text); len(answered) > len(questions) {
+		return answered, unread, true
+	}
+	return questions, broken, false
+}
+
+// parseOptions reads a test whose questions have their options, the right
+// one marked.
+func parseOptions(text string) (questions []Question, broken int) {
 	seen := map[string]bool{}
 	for i, block := range splitQuestions(text) {
 		q, ok := parseBlock(block, i == 0)

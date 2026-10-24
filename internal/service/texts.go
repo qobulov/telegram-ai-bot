@@ -311,9 +311,14 @@ var (
 		en: "📚 “%s”\n\n✏️ %d questions, %d parts (%d each).\nWhich part shall we start with?",
 	}
 	textQuizBroken = localText{
-		uz: "⚠️ %d ta savolda to'g'ri javob (#) belgilanmagan yoki bir nechta belgilangan, ular tashlab ketildi.",
-		ru: "⚠️ В вопросах (%d) правильный ответ (#) не отмечен или отмечено несколько, они пропущены.",
-		en: "⚠️ %d questions had no right answer (#) marked, or more than one, and were left out.",
+		uz: "⚠️ %d ta savolda to'g'ri javob (#) topilmadi yoki bir nechta belgilangan, ular tashlab ketildi.",
+		ru: "⚠️ Пропущено вопросов: %d. В них не найден правильный ответ (#) или отмечено несколько.",
+		en: "⚠️ Questions left out: %d. Their right answer (#) was not found, or more than one was marked.",
+	}
+	textQuizMadeOptions = localText{
+		uz: "ℹ️ Faylda faqat to'g'ri javoblar bor ekan. Boshqa variantlarni shu testdagi yaqin savollarning javoblaridan oldim.",
+		ru: "ℹ️ В файле только правильные ответы. Остальные варианты взяты из ответов на соседние вопросы этого теста.",
+		en: "ℹ️ The file gives only the right answers. The other options are the answers to nearby questions in this test.",
 	}
 	// textQuizPartButton takes the part and its first and last question.
 	textQuizPartButton = localText{uz: "%d-qism (%d–%d)", ru: "Часть %d (%d–%d)", en: "Part %d (%d–%d)"}

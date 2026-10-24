@@ -81,7 +81,7 @@ func (s *Service) quizFromFile(ctx context.Context, in incoming) (outcome, bool)
 		s.opts.Logger.Warn("could not read a file to look for a test", "user_id", in.userID, "kind", kind, "error", err)
 		return outcome{}, false
 	}
-	questions, broken := quizfile.Parse(text)
+	questions, broken, madeOptions := quizfile.Parse(text)
 	if len(questions) < minQuizQuestions {
 		return outcome{}, false
 	}
@@ -94,8 +94,11 @@ func (s *Service) quizFromFile(ctx context.Context, in incoming) (outcome, bool)
 		s.opts.Logger.Error("could not keep a test", "user_id", in.userID, "error", err)
 		return say(textQuizFailed.to(in)), true
 	}
-	s.opts.Logger.Info("test read from a file", "user_id", in.userID, "test_id", testID, "questions", len(questions), "broken", broken)
+	s.opts.Logger.Info("test read from a file", "user_id", in.userID, "test_id", testID, "questions", len(questions), "broken", broken, "made_options", madeOptions)
 	text = fmt.Sprintf(textQuizParts.to(in), title, len(questions), quizParts(len(questions)), quizPartSize)
+	if madeOptions {
+		text += "\n\n" + textQuizMadeOptions.to(in)
+	}
 	if broken > 0 {
 		text += "\n\n" + fmt.Sprintf(textQuizBroken.to(in), broken)
 	}
