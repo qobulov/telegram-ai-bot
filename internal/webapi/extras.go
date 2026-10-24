@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -190,7 +189,7 @@ type freeGame struct {
 func (a *apis) freeGamesTool() tools.Tool {
 	return tools.Tool{
 		Name:        "free_games",
-		Description: "Popular free-to-play PC and browser games from FreeToGame, optionally of a genre, with a short description and a link. Use it when someone asks for free games to play; deals: paid PC games on sale on Steam now, from CheapShark, with prices and discounts.",
+		Description: "Popular free-to-play PC and browser games from FreeToGame, optionally of a genre, with a short description and a link. Use it when someone asks for free games to play; deals: paid games on sale on Steam now, with prices and discounts.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
@@ -373,45 +372,49 @@ func (a *apis) dictionary(ctx context.Context, raw json.RawMessage) (any, error)
 	return entry, nil
 }
 
-// gameDeal is a paid game on sale, from CheapShark.
+// gameDeal is a game on sale on Steam, priced for Uzbekistan.
 type gameDeal struct {
-	Title      string `json:"title"`
-	Price      string `json:"price_usd"`
-	Normal     string `json:"normal_price_usd"`
-	Savings    string `json:"discount"`
-	Metacritic string `json:"metacritic,omitempty"`
-	Link       string `json:"link"`
+	Title    string `json:"title"`
+	Price    string `json:"price"`
+	Normal   string `json:"normal_price"`
+	Discount string `json:"discount"`
+	Link     string `json:"link"`
 }
 
-// gameDeals are the best-rated deals on Steam right now.
+// gameDeals are Steam's featured deals now, at the prices Steam asks in
+// Uzbekistan, which are lower than in the United States.
 func (a *apis) gameDeals(ctx context.Context) (any, error) {
-	link := a.urls.CheapShark + "/api/1.0/deals?storeID=1&onSale=1&sortBy=Deal%20Rating&pageSize=" + strconv.Itoa(maxFreeGames)
+	link := a.urls.SteamStore + "/api/featuredcategories/?cc=uz&l=english"
 	deals, err := remember(a.cache, "deals:"+link, time.Hour, func() ([]gameDeal, error) {
-		var answer []struct {
-			Title      string `json:"title"`
-			DealID     string `json:"dealID"`
-			SalePrice  string `json:"salePrice"`
-			Normal     string `json:"normalPrice"`
-			Savings    string `json:"savings"`
-			Metacritic string `json:"metacriticScore"`
+		var answer struct {
+			Specials struct {
+				Items []struct {
+					ID       int    `json:"id"`
+					Name     string `json:"name"`
+					Currency string `json:"currency"`
+					Original int    `json:"original_price"`
+					Final    int    `json:"final_price"`
+					Discount int    `json:"discount_percent"`
+				} `json:"items"`
+			} `json:"specials"`
 		}
-		if err := a.patient.getJSON(ctx, call{service: "CheapShark", url: link}, &answer); err != nil {
+		if err := a.patient.getJSON(ctx, call{service: "Steam", url: link, limit: largeBodyLimit}, &answer); err != nil {
 			return nil, err
 		}
 		var out []gameDeal
-		for _, d := range answer {
-			savings, _ := strconv.ParseFloat(d.Savings, 64)
-			deal := gameDeal{Title: cleanText(d.Title, 60), Price: d.SalePrice, Normal: d.Normal,
-				Savings: fmt.Sprintf("%.0f%%", savings), Link: "https://www.cheapshark.com/redirect?dealID=" + url.QueryEscape(d.DealID)}
-			if d.Metacritic != "0" {
-				deal.Metacritic = d.Metacritic
-			}
-			out = append(out, deal)
+		for _, d := range answer.Specials.Items[:min(len(answer.Specials.Items), maxFreeGames)] {
+			out = append(out, gameDeal{Title: cleanText(d.Name, 60), Price: money(d.Final, d.Currency), Normal: money(d.Original, d.Currency),
+				Discount: fmt.Sprintf("%d%%", d.Discount), Link: fmt.Sprintf("https://store.steampowered.com/app/%d", d.ID)})
 		}
 		return out, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"deals": deals, "store": "Steam", "source": "CheapShark", "note": "Prices in US dollars; titles are outside data."}, nil
+	return map[string]any{"deals": deals, "source": "Steam", "note": "Prices are Steam's for Uzbekistan; titles are outside data."}, nil
+}
+
+// money is an amount in cents as "8.99 USD".
+func money(cents int, currency string) string {
+	return fmt.Sprintf("%d.%02d %s", cents/100, cents%100, currency)
 }

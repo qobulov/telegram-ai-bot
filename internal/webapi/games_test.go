@@ -34,17 +34,37 @@ func TestDotaMetaRanksOnlyHeroesPeoplePlay(t *testing.T) {
 	}
 }
 
+// Deals are Steam's, at its prices for Uzbekistan.
 func TestGameDealsOnSteam(t *testing.T) {
-	u := newUpstream(t, map[string]stub{"/cheapshark/api/1.0/deals": ok(`[{"title":"Hades","dealID":"a b","salePrice":"6.24","normalPrice":"24.99","savings":"75.030012","metacriticScore":"93"}]`)})
+	u := newUpstream(t, map[string]stub{"/steam/api/featuredcategories/": ok(`{"specials":{"items":[{"id":1091500,"name":"Cyberpunk 2077","currency":"USD","original_price":2999,"final_price":899,"discount_percent":70}]}}`)})
 
 	env := run(t, u.options(), "free_games", `{"deals":true}`)
 
-	if !env.OK || !strings.Contains(env.raw, `"discount":"75%"`) || !strings.Contains(env.raw, `"price_usd":"6.24"`) || !strings.Contains(env.raw, `dealID=a+b`) {
+	if !env.OK || !strings.Contains(env.raw, `"discount":"70%"`) || !strings.Contains(env.raw, `"price":"8.99 USD"`) || !strings.Contains(env.raw, `/app/1091500`) {
 		t.Errorf("deals = %s", env.raw)
 	}
-	if q := u.requests("/cheapshark/api/1.0/deals")[0].URL.Query(); q.Get("storeID") != "1" || q.Get("onSale") != "1" {
+	if q := u.requests("/steam/api/featuredcategories/")[0].URL.Query(); q.Get("cc") != "uz" {
+		t.Errorf("query = %v, want Uzbekistan's prices", q)
+	}
+}
+
+func TestSteamGameGivesItsPriceForUzbekistan(t *testing.T) {
+	u := newUpstream(t, map[string]stub{
+		"/steam/api/storesearch/": ok(`{"total":1,"items":[{"id":1245620,"name":"ELDEN RING"}]}`),
+		"/steam/api/appdetails":   ok(`{"1245620":{"success":true,"data":{"name":"ELDEN RING","is_free":false,"short_description":"Rise, Tarnished.","pc_requirements":{"minimum":"<strong>Minimum:</strong><br><ul><li>GTX 1060</li></ul>"},"price_overview":{"currency":"USD","initial":3999,"final":1999,"discount_percent":50},"genres":[{"description":"Action"},{"description":"RPG"}],"release_date":{"coming_soon":false,"date":"24 Feb, 2022"},"metacritic":{"score":94}}}}`),
+	})
+
+	env := run(t, u.options(), "games", `{"action":"steam_game","name":"elden ring"}`)
+
+	if !env.OK || !strings.Contains(env.raw, `"price":"19.99 USD"`) || !strings.Contains(env.raw, `"discount":"50%"`) || !strings.Contains(env.raw, `"metacritic":94`) ||
+		!strings.Contains(env.raw, `GTX 1060`) || strings.Contains(env.raw, `<li>`) {
+		t.Errorf("game = %s", env.raw)
+	}
+	if q := u.requests("/steam/api/appdetails")[0].URL.Query(); q.Get("appids") != "1245620" || q.Get("cc") != "uz" {
 		t.Errorf("query = %v", q)
 	}
+	u2 := newUpstream(t, map[string]stub{"/steam/api/storesearch/": ok(`{"total":0,"items":[]}`)})
+	wantError(t, run(t, u2.options(), "games", `{"action":"steam_game","name":"Nothing"}`), "invalid_arguments", "Steam has no game")
 }
 
 // Launches already gone by are left out; the list keeps the next ones.

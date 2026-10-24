@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -14,7 +16,8 @@ import (
 )
 
 // The games tool answers about Dota 2 heroes, from OpenDota, as the mlbb
-// tool does for Mobile Legends.
+// tool does for Mobile Legends, and about any game on Steam, at the prices
+// Steam asks in Uzbekistan.
 
 const (
 	gamesTTL      = 6 * time.Hour
@@ -29,13 +32,14 @@ type gamesArgs struct {
 
 func (a *apis) gamesTool() tools.Tool {
 	return tools.Tool{
-		Name:        "games",
-		Description: "Dota 2. dota_hero: a hero's attribute, roles and public and pro win, pick and ban rates; dota_meta: the heroes winning most and the pros' most picked and banned. Mobile Legends is the mlbb tool's.",
+		Name: "games",
+		Description: "steam_game: a PC game's Steam price in Uzbekistan, discount, genres, release, Metacritic score and minimum PC requirements. " +
+			"dota_hero: a Dota 2 hero's attribute, roles and public and pro win, pick and ban rates; dota_meta: the heroes winning most and the pros' most picked and banned. Mobile Legends is the mlbb tool's.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["dota_hero", "dota_meta"]},
-				"name": {"type": "string", "description": "For dota_hero: its English name, as \"Pudge\"."}
+				"action": {"type": "string", "enum": ["steam_game", "dota_hero", "dota_meta"]},
+				"name": {"type": "string", "description": "The game's or hero's English name, as \"Elden Ring\" or \"Pudge\"."}
 			},
 			"required": ["action"],
 			"additionalProperties": false
@@ -55,6 +59,11 @@ func (a *apis) games(ctx context.Context, raw json.RawMessage) (any, error) {
 		return nil, argumentError("name must be at most %d characters", maxGameQuery)
 	}
 	switch args.Action {
+	case "steam_game":
+		if name == "" {
+			return nil, argumentError("name the game")
+		}
+		return a.steamGame(ctx, name)
 	case "dota_hero":
 		if name == "" {
 			return nil, argumentError("name the hero")
@@ -63,7 +72,94 @@ func (a *apis) games(ctx context.Context, raw json.RawMessage) (any, error) {
 	case "dota_meta":
 		return a.dotaMeta(ctx)
 	}
-	return nil, argumentError("action must be dota_hero or dota_meta")
+	return nil, argumentError("action must be steam_game, dota_hero or dota_meta")
+}
+
+// --- Steam ---
+
+// shownRequirements bounds a game's minimum PC requirements.
+const shownRequirements = 400
+
+// steamGame finds a game on Steam and gives its page, priced for
+// Uzbekistan.
+func (a *apis) steamGame(ctx context.Context, name string) (any, error) {
+	search := a.urls.SteamStore + "/api/storesearch/?cc=uz&l=english&term=" + url.QueryEscape(name)
+	var found struct {
+		Items []struct {
+			ID   int    `json:"id"`
+			Name string `json:"name"`
+		} `json:"items"`
+	}
+	if err := a.cachedJSON(ctx, "Steam", search, gamesTTL, &found); err != nil {
+		return nil, err
+	}
+	if len(found.Items) == 0 {
+		return nil, argumentError("Steam has no game called %q; give its English name", name)
+	}
+	id := found.Items[0].ID
+	details := fmt.Sprintf("%s/api/appdetails?appids=%d&cc=uz&l=english&filters=basic,price_overview,genres,release_date,metacritic", a.urls.SteamStore, id)
+	var answer map[string]struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Name        string `json:"name"`
+			Free        bool   `json:"is_free"`
+			About       string `json:"short_description"`
+			Requirement struct {
+				Minimum string `json:"minimum"`
+			} `json:"pc_requirements"`
+			Price *struct {
+				Currency string `json:"currency"`
+				Initial  int    `json:"initial"`
+				Final    int    `json:"final"`
+				Discount int    `json:"discount_percent"`
+			} `json:"price_overview"`
+			Genres []struct {
+				Name string `json:"description"`
+			} `json:"genres"`
+			Release struct {
+				Soon bool   `json:"coming_soon"`
+				Date string `json:"date"`
+			} `json:"release_date"`
+			Metacritic *struct {
+				Score int `json:"score"`
+			} `json:"metacritic"`
+		} `json:"data"`
+	}
+	if err := a.cachedJSON(ctx, "Steam", details, gamesTTL, &answer); err != nil {
+		return nil, err
+	}
+	page, ok := answer[strconv.Itoa(id)]
+	if !ok || !page.Success {
+		return nil, fmt.Errorf("Steam sent no page for %q", found.Items[0].Name)
+	}
+	g := page.Data
+	out := map[string]any{
+		"game": cleanText(g.Name, 80), "about": cleanText(g.About, 300), "released": g.Release.Date,
+		"link": fmt.Sprintf("https://store.steampowered.com/app/%d", id), "source": "Steam, prices for Uzbekistan",
+	}
+	var genres []string
+	for _, genre := range g.Genres {
+		genres = append(genres, genre.Name)
+	}
+	out["genres"] = genres
+	switch {
+	case g.Free:
+		out["price"] = "free to play"
+	case g.Price != nil:
+		out["price"] = money(g.Price.Final, g.Price.Currency)
+		if g.Price.Discount > 0 {
+			out["normal_price"], out["discount"] = money(g.Price.Initial, g.Price.Currency), fmt.Sprintf("%d%%", g.Price.Discount)
+		}
+	case g.Release.Soon:
+		out["price"] = "not out yet"
+	}
+	if g.Metacritic != nil {
+		out["metacritic"] = g.Metacritic.Score
+	}
+	if minimum := cleanText(g.Requirement.Minimum, shownRequirements); minimum != "" {
+		out["minimum_pc"] = minimum
+	}
+	return out, nil
 }
 
 // --- Dota 2 (OpenDota) ---

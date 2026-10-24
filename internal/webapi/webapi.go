@@ -106,7 +106,7 @@ type BaseURLs struct {
 	Wolfram           string
 	Shikimori         string
 	TraceMoe          string
-	CheapShark        string
+	SteamStore        string
 	LaunchLibrary     string
 	OpenDota          string
 	// Wikipedia is a format string with %s for the language code.
@@ -161,7 +161,7 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.Wolfram = cmp.Or(b.Wolfram, "https://api.wolframalpha.com")
 	b.Shikimori = cmp.Or(b.Shikimori, "https://shikimori.io")
 	b.TraceMoe = cmp.Or(b.TraceMoe, "https://api.trace.moe")
-	b.CheapShark = cmp.Or(b.CheapShark, "https://www.cheapshark.com")
+	b.SteamStore = cmp.Or(b.SteamStore, "https://store.steampowered.com")
 	b.LaunchLibrary = cmp.Or(b.LaunchLibrary, "https://ll.thespacedevs.com")
 	b.OpenDota = cmp.Or(b.OpenDota, "https://api.opendota.com")
 	b.Wikipedia = cmp.Or(b.Wikipedia, "https://%s.wikipedia.org")

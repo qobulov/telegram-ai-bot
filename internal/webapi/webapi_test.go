@@ -165,7 +165,7 @@ func (u *upstream) options() Options {
 			Wolfram:           base + "/wolfram",
 			Shikimori:         base + "/shikimori",
 			TraceMoe:          base + "/tracemoe",
-			CheapShark:        base + "/cheapshark",
+			SteamStore:        base + "/steam",
 			LaunchLibrary:     base + "/ll2",
 			OpenDota:          base + "/opendota",
 			Tavily:            base + "/tavily",
