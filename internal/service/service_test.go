@@ -3784,3 +3784,48 @@ func TestLanguageOfFollowsTheMessage(t *testing.T) {
 		}
 	}
 }
+
+type fakeSkips struct {
+	mu    sync.Mutex
+	skips []storage.Skip
+}
+
+func (f *fakeSkips) NoteSkip(_ context.Context, skip storage.Skip) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.skips = append(f.skips, skip)
+	return nil
+}
+
+func (f *fakeSkips) reasons() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var reasons []string
+	for _, skip := range f.skips {
+		reasons = append(reasons, skip.Reason)
+	}
+	return reasons
+}
+
+// A message addressed to the bot that gets no answer is recorded with why:
+// over the group's quota, or the model too busy. Chatter not addressed to
+// it, and answered messages, are not.
+func TestUnansweredMessagesAreRecordedWithWhy(t *testing.T) {
+	f := newFixture()
+	skips := &fakeSkips{}
+	f.opts.Skips = skips
+	f.opts.GroupReplies = &fakeGroupQuota{}
+	f.opts.GroupRatePerMinute = 1
+
+	f.run(inGroup(groupMessage("just chatting")), inGroup(groupMessage("@MyBot hi", "@MyBot")), inGroup(groupMessage("@MyBot again", "@MyBot")))
+	f.replier.err = &ai.APIError{Status: 429, Message: "quota"}
+	f.opts.GroupRatePerMinute = 5
+	f.run(inGroup(groupMessage("@MyBot once more", "@MyBot")))
+
+	if got := skips.reasons(); !slices.Equal(got, []string{"group_quota", "overloaded"}) {
+		t.Errorf("skips = %q, want group_quota then overloaded", got)
+	}
+	if skip := skips.skips[0]; skip.ChatID == 0 || skip.UserID == 0 || skip.MessageID == 0 {
+		t.Errorf("skip = %+v, want its chat, member and message", skip)
+	}
+}

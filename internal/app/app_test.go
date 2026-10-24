@@ -518,3 +518,49 @@ func TestBotRightsFallsBackToTelegramAndStores(t *testing.T) {
 		})
 	}
 }
+
+// PROMPT_SIZES, when set, logs how big each part of a group turn's request
+// to the model is: the system prompt, the tool definitions and the rest.
+func TestPromptSizes(t *testing.T) {
+	if os.Getenv("PROMPT_SIZES") == "" {
+		t.Skip("no PROMPT_SIZES")
+	}
+	env := startWebhook(t)
+	for _, key := range []string{"WOLFRAM_APP_ID", "TMDB_API_KEY", "FOOTBALL_DATA_TOKEN", "YOUTUBE_API_KEY"} {
+		env.baseEnv[key] = "test"
+	}
+	hook, err := NewWebhook(context.Background(), env.config(t), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatalf("NewWebhook: %v", err)
+	}
+	t.Cleanup(hook.Close)
+	env.hook = hook
+	env.deliver(`{"update_id":910090,"message":{"message_id":910090,"from":{"id":778003,"is_bot":false,"first_name":"Bek"},
+		"chat":{"id":-100778000,"type":"supergroup"},"text":"Mira, salom"}}`, hookSecret)
+
+	env.apis.mu.Lock()
+	defer env.apis.mu.Unlock()
+	var request struct {
+		Messages []json.RawMessage `json:"messages"`
+		Tools    []struct {
+			Function struct {
+				Name        string          `json:"name"`
+				Description string          `json:"description"`
+				Parameters  json.RawMessage `json:"parameters"`
+			} `json:"function"`
+		} `json:"tools"`
+	}
+	if len(env.apis.modelInputs) == 0 || json.Unmarshal([]byte(env.apis.modelInputs[0]), &request) != nil {
+		t.Fatalf("no request: %d", len(env.apis.modelInputs))
+	}
+	tools := 0
+	for _, tool := range request.Tools {
+		size := len(tool.Function.Description) + len(tool.Function.Parameters)
+		tools += size
+		t.Logf("tool %-22s %5d bytes", tool.Function.Name, size)
+	}
+	for i, message := range request.Messages {
+		t.Logf("message %d: %d bytes", i, len(message))
+	}
+	t.Logf("total %d bytes: %d tools (%d bytes), %d messages", len(env.apis.modelInputs[0]), len(request.Tools), tools, len(request.Messages))
+}

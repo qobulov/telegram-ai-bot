@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"reflect"
 	"strings"
@@ -45,7 +46,7 @@ func newTestStore(t *testing.T) *Store {
 	}
 	t.Cleanup(store.Close)
 
-	if _, err := store.pool.Exec(ctx, `DROP TABLE IF EXISTS messages, conversations, users, chats, group_messages, image_generations, bot_replies, groups, broadcasts, group_replies, group_rules, moderation_actions, pending_bans, pending_moderation, private_messages, group_members, owner_notices, user_profiles, bot_stickers, sticker_sends, hero_games, hero_scores, presentations, quiz_tests, quiz_runs, schema_migrations CASCADE`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DROP TABLE IF EXISTS messages, conversations, users, chats, group_messages, image_generations, bot_replies, groups, broadcasts, group_replies, group_rules, moderation_actions, pending_bans, pending_moderation, private_messages, group_members, owner_notices, user_profiles, bot_stickers, sticker_sends, hero_games, hero_scores, presentations, quiz_tests, quiz_runs, skipped_messages, schema_migrations CASCADE`); err != nil {
 		t.Fatalf("drop tables: %v", err)
 	}
 	if _, err := store.Migrate(ctx); err != nil {
@@ -106,7 +107,7 @@ func TestMigrateIsIdempotent(t *testing.T) {
 func TestMigrateReportsAppliedCount(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
-	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, group_messages, image_generations, bot_replies, groups, broadcasts, group_replies, group_rules, moderation_actions, private_messages, group_members, owner_notices, user_profiles, bot_stickers, sticker_sends, hero_games, hero_scores, presentations, quiz_tests, quiz_runs, schema_migrations CASCADE`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, group_messages, image_generations, bot_replies, groups, broadcasts, group_replies, group_rules, moderation_actions, private_messages, group_members, owner_notices, user_profiles, bot_stickers, sticker_sends, hero_games, hero_scores, presentations, quiz_tests, quiz_runs, skipped_messages, schema_migrations CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1160,4 +1161,30 @@ func TestOpenErrorDoesNotLeakPassword(t *testing.T) {
 
 func containsSecret(text string) bool {
 	return strings.Contains(text, "hunter2secret")
+}
+
+// The history's start moves in steps, so that it stays the same over
+// several turns and the prompt's beginning can be cached, and its length
+// stays near the limit.
+func TestHistoryStartMovesInSteps(t *testing.T) {
+	store := newTestStore(t)
+	var firsts []string
+	for i := 1; i <= 20; i++ {
+		mustSave(t, store, alice, int64(i), turn(fmt.Sprintf("q%d", i), fmt.Sprintf("a%d", i)))
+		got := mustHistory(t, store, alice, 20)
+		if total := 2 * i; total >= 15 && (len(got) < 15 || len(got) > 24) {
+			t.Fatalf("after %d messages, history has %d", total, len(got))
+		}
+		firsts = append(firsts, got[0].Content)
+	}
+	changes := 0
+	for i := 1; i < len(firsts); i++ {
+		if firsts[i] != firsts[i-1] {
+			changes++
+		}
+	}
+	// 40 messages in steps of 10: the start moves at most 3 times, not 12.
+	if changes > 3 {
+		t.Errorf("the start changed %d times: %q", changes, firsts)
+	}
 }

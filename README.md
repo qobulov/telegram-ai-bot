@@ -197,7 +197,7 @@ in the environment win over the file.
 | `AI_REASONING_EFFORT`         | `low` (Gemini)                 | How hard Gemini thinks before answering: `none`, `minimal`, `low`, `medium`, `high`, or `default` for the model's own. Thinking is paid as output and takes from `MAX_OUTPUT_TOKENS`; the lite models refuse `none`. Each request logs its tokens as `model usage` |
 | `BOT_DISPLAY_NAME`            | `Maria`                         | The character's name                                                                                         |
 | `PERSONA_PROMPT`              | built-in                       | The character's personality and rules; `{name}` is replaced by the name. See [The character](#the-character) |
-| `MAX_HISTORY_MESSAGES`        | `20`                           | Recent messages sent to the model as context                                                                 |
+| `MAX_HISTORY_MESSAGES`        | `20`                           | Recent messages sent to the model as context: from a quarter fewer to a quarter more, the start moving in steps so the prompt's beginning stays cached |
 | `MAX_TOOL_CALLS_PER_TURN`     | `4`                            | Tool calls allowed while answering one message                                                               |
 | `MAX_CONCURRENT_REQUESTS`     | `10`                           | Number of workers                                                                                            |
 | `USER_RATE_LIMIT_PER_MINUTE`  | `10`                           | Messages each user may send per minute                                                                       |

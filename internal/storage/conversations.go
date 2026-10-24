@@ -56,19 +56,26 @@ type Turn struct {
 	Messages   []ai.Message
 }
 
-// History returns the most recent messages of one conversation, oldest first.
+// History returns the recent messages of one conversation, oldest first:
+// about limit of them, from a quarter fewer to a quarter more. Where it
+// starts moves half of limit at a time, not one message a turn, so that
+// the prompt begins the same way for several turns in a row and the
+// provider can answer its beginning from its cache, which is faster and
+// cheaper. A small limit is kept exactly.
 func (s *Store) History(ctx context.Context, scope Scope, limit int) ([]ai.Message, error) {
+	step := max(limit/2, 1)
+	fewest := max(limit-step/2, 1)
 	rows, err := s.pool.Query(ctx, `
 		SELECT role, content, tool_calls, tool_call_id
 		FROM (
-			SELECT m.id, m.role, m.content, m.tool_calls, m.tool_call_id
+			SELECT m.id, m.role, m.content, m.tool_calls, m.tool_call_id,
+			       row_number() OVER (ORDER BY m.id) AS n, count(*) OVER () AS total
 			FROM messages m
 			JOIN conversations c ON c.id = m.conversation_id
 			WHERE c.chat_id = $1 AND c.user_id IS NOT DISTINCT FROM $2
-			ORDER BY m.id DESC
-			LIMIT $3
-		) recent
-		ORDER BY id`, scope.ChatID, nonZero(scope.UserID), limit)
+		) numbered
+		WHERE n > greatest(total - $3, 0) / $4 * $4
+		ORDER BY id`, scope.ChatID, nonZero(scope.UserID), fewest, step)
 	if err != nil {
 		return nil, fmt.Errorf("storage: load history: %w", err)
 	}
@@ -392,6 +399,9 @@ func (s *Store) Expire(ctx context.Context, maxAge time.Duration) (Expired, erro
 			return err
 		}
 		if _, err = tx.Exec(ctx, `DELETE FROM private_messages WHERE created_at < $1`, cutoff); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(ctx, `DELETE FROM skipped_messages WHERE created_at < $1`, cutoff); err != nil {
 			return err
 		}
 		if _, err = tx.Exec(ctx, `DELETE FROM group_rules WHERE expires_at < now()`); err != nil {

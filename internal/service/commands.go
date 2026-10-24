@@ -24,6 +24,9 @@ import (
 type outcome struct {
 	text     string
 	answerID int64
+	// skipped is why the message got no answer from the model, as
+	// "overloaded", for the skip log; "" when it got one.
+	skipped string
 	// reaction is the emoji the model answered with instead of text. It is
 	// set on the message being answered; no message is sent for it.
 	reaction string
@@ -68,15 +71,18 @@ func (s *Service) process(in incoming) {
 		if _, limited := s.rateLimited(in); !limited {
 			s.react(in, privateReactions[rand.IntN(len(privateReactions))])
 		}
+		s.noteSkip(in, "private_closed")
 		return
 	}
 	// A muted group is ignored, except for the commands that control muting.
 	// This is checked here, in queue order, so that a message sent right
 	// after /unmute is answered and one sent right after /mute is not.
 	if s.silenced(in) {
+		s.noteSkip(in, "muted")
 		return
 	}
 	if in.fromBot && !s.mayAnswerBot(in) {
+		s.noteSkip(in, "bot_quota")
 		return
 	}
 	if notice, limited := s.rateLimited(in); limited {
@@ -84,6 +90,7 @@ func (s *Service) process(in incoming) {
 			s.reply(in, notice)
 		}
 		s.passOver(in)
+		s.noteSkip(in, "flood")
 		return
 	}
 	// A group of fewer than MinGroupMembers is answered only as a private
@@ -94,12 +101,14 @@ func (s *Service) process(in incoming) {
 	if s.isPrivateInDisguise(ctx, in) {
 		s.react(in, overQuotaReaction)
 		s.passOver(in)
+		s.noteSkip(in, "small_group")
 		return
 	}
 	// A group where too few people wrote lately gets nothing at all, as
 	// the owners asked; only they are answered there.
 	if s.tooQuiet(ctx, in) {
 		s.passOver(in)
+		s.noteSkip(in, "quiet_group")
 		return
 	}
 	// An owner's order not to answer a member is handled here, in code.
@@ -119,6 +128,7 @@ func (s *Service) process(in incoming) {
 	// without end.
 	if s.ignored(in, rules) && !s.isManagerCommand(in) {
 		s.passOver(in)
+		s.noteSkip(in, "ignored")
 		return
 	}
 	// Applause is answered with a reaction, which takes nothing from the
@@ -129,6 +139,7 @@ func (s *Service) process(in incoming) {
 	reservation, allowed := s.mayAnswerInGroup(in)
 	if !allowed {
 		s.passOver(in)
+		s.noteSkip(in, "group_quota")
 		return
 	}
 	in.groupReply = reservation
@@ -142,6 +153,24 @@ func (s *Service) process(in incoming) {
 		s.recordSent(out.answerID, sentID)
 	}
 	s.logExchange(in, out)
+	if out.skipped != "" {
+		s.noteSkip(in, out.skipped)
+	}
+}
+
+// noteSkip records that a message addressed to the bot got no answer, and
+// why. It is a record for the owners only: failing to write it is logged
+// and nothing more.
+func (s *Service) noteSkip(in incoming, reason string) {
+	if s.opts.Skips == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
+	defer cancel()
+	err := s.opts.Skips.NoteSkip(ctx, storage.Skip{ChatID: in.scope.ChatID, UserID: in.userID, MessageID: in.msg.MessageID, Reason: reason})
+	if err != nil {
+		s.opts.Logger.Warn("could not record a skipped message", "chat_id", in.scope.ChatID, "reason", reason, "error", err)
+	}
 }
 
 // deliver sends the outcome and returns the ID of the message that carries
@@ -678,7 +707,7 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	}
 	reservation, notice, allowed := s.takePrivateAnswer(ctx, in)
 	if !allowed {
-		return say(notice)
+		return outcome{text: notice, skipped: "private_limit"}
 	}
 	if !in.group {
 		// Only now, so that a voice message past the limit is not
@@ -1071,35 +1100,35 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 		return out
 	case errors.Is(err, agent.ErrToolAsText):
 		log.Warn("the model wrote a tool call as text twice; nothing was sent")
-		return outcome{}
+		return outcome{skipped: "tool_as_text"}
 	case errors.Is(err, agent.ErrLeakedThinking):
 		log.Warn("the model answered with its own reasoning; nothing was sent")
-		return outcome{}
+		return outcome{skipped: "leaked_thinking"}
 	case errors.Is(err, agent.ErrSilent):
 		log.Info("the model chose not to reply")
-		return outcome{}
+		return outcome{skipped: "model_silent"}
 	case in.group && errors.Is(err, ai.ErrEmptyResponse):
 		// Models give back nothing where [silent] was meant, such as after a
 		// second insult; an error message would be worse than silence.
 		log.Warn("the model gave an empty answer; nothing was sent")
-		return outcome{}
+		return outcome{skipped: "model_empty"}
 	case errors.Is(err, ai.ErrTruncated):
 		log.Warn("the model ran out of tokens mid-answer; the fragment was not sent")
-		return say(textCutOff.to(in))
+		return outcome{text: textCutOff.to(in), skipped: "truncated"}
 	case errors.Is(err, agent.ErrDuplicate):
 		log.Info("duplicate update skipped")
 		return outcome{duplicate: true}
 	case ai.IsOverloaded(err):
 		log.Warn("model provider overloaded or over its limits", "error", err)
-		return say(textOverloaded.to(in))
+		return outcome{text: textOverloaded.to(in), skipped: "overloaded"}
 	case errors.Is(err, context.DeadlineExceeded):
 		log.Warn("turn timed out")
-		return say(textTimeout.to(in))
+		return outcome{text: textTimeout.to(in), skipped: "timeout"}
 	default:
 		// The error is logged in full but never shown: it can carry provider
 		// or database details the user must not see.
 		log.Error("turn failed", "error", err)
-		return say(textError.to(in))
+		return outcome{text: textError.to(in), skipped: "error"}
 	}
 }
 

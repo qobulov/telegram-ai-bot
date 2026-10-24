@@ -98,6 +98,11 @@ type ChannelMembers interface {
 	ChannelMember(ctx context.Context, channel string, userID int64) (telegram.ChatMember, error)
 }
 
+// SkipLog records a message addressed to the bot that it did not answer.
+type SkipLog interface {
+	NoteSkip(ctx context.Context, skip storage.Skip) error
+}
+
 // PrivateQuota counts the answers each user gets in private chats in a day.
 // Like GroupReplyQuota it lives in the database, which every instance shares.
 type PrivateQuota interface {
@@ -233,6 +238,9 @@ type Options struct {
 	GroupReplies          GroupReplyQuota
 	GroupRatePerMinute    int
 	MemberRepliesPer10Min int
+	// Skips records the messages addressed to the bot that it did not
+	// answer, and why. Nil records nothing.
+	Skips SkipLog
 	// PrivateQuota counts the answers each user gets in private chats: at
 	// most PrivateDailyLimit a day, from midnight in Location. Owners are not
 	// counted. Nil, or a limit of 0, does not limit.
