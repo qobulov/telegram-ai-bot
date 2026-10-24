@@ -360,6 +360,7 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 				Drafts: store,
 				Sender: groupSender{client: bot.Client},
 			}),
+			tools.BotProfileTool(bot.Client),
 			tools.RulesTool(tools.RulesOptions{
 				Store:    store,
 				Admins:   groupMembers{client: bot.Client, botID: bot.User.ID},

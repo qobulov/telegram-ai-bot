@@ -327,26 +327,31 @@ func (c *Client) upload(ctx context.Context, method string, u upload) (int64, er
 	if err != nil {
 		return 0, fmt.Errorf("telegram %s: encode: %w", method, err)
 	}
+	var sent sentMessage
+	if err := c.postForm(ctx, method, body, contentType, &sent); err != nil {
+		return 0, err
+	}
+	return sent.MessageID, nil
+}
+
+// postForm sends a multipart form to method and decodes its result.
+func (c *Client) postForm(ctx context.Context, method string, body io.Reader, contentType string, result any) error {
 	endpoint := c.opts.BaseURL + "/bot" + c.opts.Token + "/" + method
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, body)
 	if err != nil {
-		return 0, fmt.Errorf("telegram %s: build request", method)
+		return fmt.Errorf("telegram %s: build request", method)
 	}
 	req.Header.Set("Content-Type", contentType)
 	resp, err := c.opts.HTTPClient.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("telegram %s: %w", method, withoutURL(err))
+		return fmt.Errorf("telegram %s: %w", method, withoutURL(err))
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
-		return 0, fmt.Errorf("telegram %s: read response: %w", method, err)
+		return fmt.Errorf("telegram %s: read response: %w", method, err)
 	}
-	var sent sentMessage
-	if err := decode(method, resp.StatusCode, raw, &sent); err != nil {
-		return 0, err
-	}
-	return sent.MessageID, nil
+	return decode(method, resp.StatusCode, raw, result)
 }
 
 func uploadForm(u upload) (io.Reader, string, error) {
