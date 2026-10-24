@@ -88,7 +88,7 @@ const presentationGuide = "Make a PowerPoint presentation (.pptx), sent as your 
 	"Write it in the asker's language and script, with real, accurate content: title slide, then 9 to 14 slides: an overview, the topic's parts, a conclusion. " +
 	"Pick the theme for the topic's mood (nature, health: forest-canopy, botanical-garden; tech: tech-innovation, midnight-galaxy; history, culture: desert-rose, golden-hour, sunset-boulevard; science, business: ocean-depths, arctic-frost, modern-minimalist). " +
 	"Vary layouts, never the same twice in a row: points (2-5 bold terms with a sentence each), split (a section's title on a color block, 2-4 points), cards (2-4), steps (3-4, a sequence), grid (4-6 short tiles with an emoji), table (rows of term and explanation), numbers (2-4 real figures you know to be true, such as years, counts or official statistics, the figure as title and its source in note), statement (one key idea, in intro). " +
-	"Never invent a figure, percentage or result: a teacher will ask where it came from; without real figures, use another layout. " +
+	"Never invent a figure, percentage or result: a teacher will ask where it came from; take a country's figures from study statistics first, and without real figures use another layout. " +
 	"Give most slides an eyebrow (a short section label such as \"YO'NALISH 01 · DIAGNOSTIKA\", never the title again) and an intro sentence. caption is your one-line message with the file."
 
 // PresentationTool lets the model make a PowerPoint file, which is sent as

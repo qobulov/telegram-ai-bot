@@ -78,3 +78,23 @@ func TestEnglishWordsFromDatamuse(t *testing.T) {
 	}
 	wantError(t, run(t, u.options(), "study", `{"action":"antonyms","query":"qwzx"}`), "invalid_arguments", "no antonyms")
 }
+
+func TestStatisticsFromTheWorldBank(t *testing.T) {
+	u := newUpstream(t, map[string]stub{"/worldbank/v2/country/UZ;KZ/indicator/FP.CPI.TOTL.ZG": ok(`[{"page":1},[
+		{"indicator":{"value":"Inflation, consumer prices (annual %)"},"country":{"value":"Uzbekistan"},"date":"2025","value":8.796},
+		{"indicator":{"value":"Inflation, consumer prices (annual %)"},"country":{"value":"Kazakhstan"},"date":"2025","value":null}]]`)})
+
+	env := run(t, u.options(), "study", `{"action":"statistics","query":"uz;kz","indicator":"inflation"}`)
+
+	if !env.OK || !strings.Contains(env.raw, `"country":"Uzbekistan","year":"2025","value":8.796`) || strings.Contains(env.raw, "Kazakhstan") || !strings.Contains(env.raw, `"source":"World Bank"`) {
+		t.Errorf("statistics = %s", env.raw)
+	}
+	for _, args := range []string{
+		`{"action":"statistics","query":"Uzbekistan","indicator":"inflation"}`,
+		`{"action":"statistics","query":"UZ","indicator":"happiness"}`,
+	} {
+		wantError(t, run(t, u.options(), "study", args), "invalid_arguments")
+	}
+	u2 := newUpstream(t, map[string]stub{"/worldbank/v2/country/XX/indicator/SP.POP.TOTL": ok(`[{"page":0},null]`)})
+	wantError(t, run(t, u2.options(), "study", `{"action":"statistics","query":"XX","indicator":"population"}`), "invalid_arguments", "no population figures")
+}

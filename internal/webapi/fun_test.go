@@ -74,3 +74,23 @@ func TestUnfitFactsAreSkipped(t *testing.T) {
 		}
 	}
 }
+
+func TestJokeIsCleanAndTwoPartJokesKeepTheirPunchline(t *testing.T) {
+	u := newUpstream(t, map[string]stub{"/jokeapi/joke/Misc,Programming,Pun,Spooky": ok(`{"error":false,"type":"twopart","setup":"Why do programmers prefer dark mode?","delivery":"Because light attracts bugs."}`)})
+
+	env := run(t, u.options(), "fun", `{"action":"joke"}`)
+
+	if !env.OK || !strings.Contains(env.raw, `"punchline":"Because light attracts bugs."`) {
+		t.Errorf("joke = %s", env.raw)
+	}
+	if q := u.requests("/jokeapi/joke/Misc,Programming,Pun,Spooky")[0].URL.RawQuery; !strings.Contains(q, "safe-mode") || !strings.Contains(q, "religious") || !strings.Contains(q, "political") {
+		t.Errorf("query = %s, want safe mode and the offending kinds left out", q)
+	}
+}
+
+func TestActivityForSomeoneBored(t *testing.T) {
+	u := newUpstream(t, map[string]stub{"/bored/random": ok(`{"activity":"Learn a new recipe","type":"cooking","participants":1,"kidFriendly":true}`)})
+	if env := run(t, u.options(), "fun", `{"action":"activity"}`); !env.OK || !strings.Contains(env.raw, `"activity":"Learn a new recipe"`) {
+		t.Errorf("activity = %s", env.raw)
+	}
+}

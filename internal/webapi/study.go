@@ -7,8 +7,11 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
+	"regexp"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -17,7 +20,8 @@ import (
 )
 
 // The study tool gathers keyless APIs for students under one schema:
-// math.js computes, Crossref and arXiv find papers, Datamuse finds words.
+// math.js computes, Crossref and arXiv find papers, Datamuse finds words,
+// the World Bank gives countries' statistics.
 
 const (
 	studyTTL       = 6 * time.Hour
@@ -29,20 +33,42 @@ const (
 )
 
 type studyArgs struct {
-	Action string `json:"action"`
-	Query  string `json:"query"`
+	Action    string `json:"action"`
+	Query     string `json:"query"`
+	Indicator string `json:"indicator"`
 }
+
+// worldBankIndicators are the World Bank's codes for the statistics asked
+// for most.
+var worldBankIndicators = map[string]string{
+	"population":      "SP.POP.TOTL",
+	"gdp":             "NY.GDP.MKTP.CD",
+	"gdp_per_capita":  "NY.GDP.PCAP.CD",
+	"gdp_growth":      "NY.GDP.MKTP.KD.ZG",
+	"inflation":       "FP.CPI.TOTL.ZG",
+	"unemployment":    "SL.UEM.TOTL.ZS",
+	"life_expectancy": "SP.DYN.LE00.IN",
+	"exports":         "NE.EXP.GNFS.CD",
+	"imports":         "NE.IMP.GNFS.CD",
+	"internet_users":  "IT.NET.USER.ZS",
+	"remittances":     "BX.TRF.PWKR.CD.DT",
+	"urban_share":     "SP.URB.TOTL.IN.ZS",
+}
+
+// countryCodes are one to five ISO country codes, as "UZ" or "UZ;KZ".
+var countryCodes = regexp.MustCompile(`^[A-Za-z]{2,3}(;[A-Za-z]{2,3}){0,4}$`)
 
 func (a *apis) studyTool() tools.Tool {
 	return tools.Tool{
 		Name: "study",
-		Description: "For study: math computes exactly with math.js (\"derivative('x^2+sin(x)','x')\", \"det([1,2;3,4])\", \"5 km to mile\", big numbers; no integrals); use it rather than counting in your head. " +
-			"papers finds scholarly articles (Crossref); arxiv preprints in science and IT, with PDF links; synonyms, antonyms, rhymes and means_like find English words.",
+		Description: "For study: math computes exactly with math.js (\"derivative('x^2','x')\", \"5 km to mile\"; no integrals) rather than in your head. " +
+			"papers: scholarly articles (Crossref); arxiv: preprints with PDFs; synonyms, antonyms, rhymes, means_like: English words; statistics: a country's World Bank figures, for any real figure.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["math", "papers", "arxiv", "synonyms", "antonyms", "rhymes", "means_like"]},
-				"query": {"type": "string", "description": "The math.js expression, the topic in English, or the English word."}
+				"action": {"type": "string", "enum": ["math", "papers", "arxiv", "synonyms", "antonyms", "rhymes", "means_like", "statistics"]},
+				"query": {"type": "string", "description": "The math.js expression, the topic in English, the English word, or for statistics ISO country codes, as \"UZ\" or \"UZ;KZ\"."},
+				"indicator": {"type": "string", "enum": ["` + strings.Join(slices.Sorted(maps.Keys(worldBankIndicators)), `", "`) + `"], "description": "For statistics."}
 			},
 			"required": ["action", "query"],
 			"additionalProperties": false
@@ -74,8 +100,10 @@ func (a *apis) study(ctx context.Context, raw json.RawMessage) (any, error) {
 		return a.arxiv(ctx, query)
 	case "synonyms", "antonyms", "rhymes", "means_like":
 		return a.datamuse(ctx, args.Action, query)
+	case "statistics":
+		return a.worldBank(ctx, query, args.Indicator)
 	}
-	return nil, argumentError("action must be math, papers, arxiv, synonyms, antonyms, rhymes or means_like")
+	return nil, argumentError("action must be math, papers, arxiv, synonyms, antonyms, rhymes, means_like or statistics")
 }
 
 // mathjs evaluates an expression on api.mathjs.org. An expression it
@@ -234,4 +262,55 @@ func (a *apis) datamuse(ctx context.Context, action, word string) (any, error) {
 		return nil, argumentError("Datamuse knows no %s of %q", strings.ReplaceAll(action, "_", " "), word)
 	}
 	return map[string]any{"word": word, action: words, "source": "Datamuse"}, nil
+}
+
+// --- Statistics (World Bank) ---
+
+// statisticYears is how many of the latest years with a figure are given.
+const statisticYears = 5
+
+type statistic struct {
+	Country string  `json:"country"`
+	Year    string  `json:"year"`
+	Value   float64 `json:"value"`
+}
+
+// worldBank gives an indicator's latest figures for up to five countries.
+func (a *apis) worldBank(ctx context.Context, countries, indicator string) (any, error) {
+	code, ok := worldBankIndicators[indicator]
+	if !ok {
+		return nil, argumentError("indicator must be one of %s", strings.Join(slices.Sorted(maps.Keys(worldBankIndicators)), ", "))
+	}
+	if !countryCodes.MatchString(countries) {
+		return nil, argumentError("query must be ISO country codes, as UZ or UZ;KZ")
+	}
+	link := fmt.Sprintf("%s/v2/country/%s/indicator/%s?format=json&mrnev=%d&per_page=50", a.urls.WorldBank, strings.ToUpper(countries), code, statisticYears)
+	var answer []json.RawMessage
+	if err := a.cachedJSON(ctx, "World Bank", link, studyTTL, &answer); err != nil {
+		return nil, err
+	}
+	var rows []struct {
+		Indicator struct {
+			Name string `json:"value"`
+		} `json:"indicator"`
+		Country struct {
+			Name string `json:"value"`
+		} `json:"country"`
+		Date  string   `json:"date"`
+		Value *float64 `json:"value"`
+	}
+	if len(answer) < 2 || json.Unmarshal(answer[1], &rows) != nil || len(rows) == 0 {
+		return nil, argumentError("the World Bank has no %s figures for %s; check the country codes", indicator, countries)
+	}
+	var out []statistic
+	for _, r := range rows {
+		if r.Value != nil {
+			out = append(out, statistic{Country: r.Country.Name, Year: r.Date, Value: *r.Value})
+		}
+	}
+	return map[string]any{
+		"indicator": rows[0].Indicator.Name, "figures": out,
+		"source": "World Bank", "link": "https://data.worldbank.org/indicator/" + code,
+		"note": "Official figures, the latest a year or two old; say the year with each.",
+	}, nil
 }
