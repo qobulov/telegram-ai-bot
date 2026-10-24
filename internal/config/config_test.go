@@ -53,7 +53,7 @@ func TestLoadAppliesDefaults(t *testing.T) {
 		"MaxToolCallsPerTurn":    {cfg.MaxToolCallsPerTurn, 4},
 		"MaxConcurrentRequests":  {cfg.MaxConcurrentRequests, 10},
 		"UserRateLimitPerMinute": {cfg.UserRateLimitPerMinute, 10},
-		"MaxOutputTokens":        {cfg.MaxOutputTokens, 1024},
+		"MaxOutputTokens":        {cfg.MaxOutputTokens, 8192},
 		"MaxInputChars":          {cfg.MaxInputChars, 4000},
 		"RetentionDays":          {cfg.RetentionDays, 1},
 	}

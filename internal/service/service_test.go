@@ -3766,3 +3766,21 @@ func TestHelpNamesTheBotsUsername(t *testing.T) {
 		t.Errorf("help still says @username: %q", sent[0].text)
 	}
 }
+
+// Fixed messages follow the language a message is written in, the app's
+// only when the message does not tell.
+func TestLanguageOfFollowsTheMessage(t *testing.T) {
+	for text, want := range map[string]string{
+		"Педагог- психологнинг асосий фаолият турлари. слайд килиб бер": "uz",
+		"Iqtisodiyot fanidan taqdimot qilib ber":      "uz",
+		"Сделай презентацию по экономике, пожалуйста": "ru",
+		"Make a presentation about economics please":  "en",
+		"ok": "ru",
+		"":   "ru",
+	} {
+		in := incoming{text: text, msg: &telegram.Message{From: &telegram.User{LanguageCode: "ru"}}}
+		if got := languageOf(in); got != want {
+			t.Errorf("languageOf(%q) = %q, want %q", text, got, want)
+		}
+	}
+}

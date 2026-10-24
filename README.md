@@ -193,7 +193,7 @@ in the environment win over the file.
 | `DB_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
 | `TELEGRAM_WEBHOOK_SECRET` | empty | Only for webhook deployments; see [Vercel deployment](#vercel-deployment-webhook) |
 | `CRON_SECRET` | empty | Only on Vercel: protects the daily cleanup endpoint |
-| `MAX_OUTPUT_TOKENS`           | `1024`                         | Longest model reply, in tokens                                                                               |
+| `MAX_OUTPUT_TOKENS`           | `8192`                         | Longest model reply, in tokens, thinking included; a presentation's slides come in one reply, so keep it at 8192 or more |
 | `AI_REASONING_EFFORT`         | `low` (Gemini)                 | How hard Gemini thinks before answering: `none`, `minimal`, `low`, `medium`, `high`, or `default` for the model's own. Thinking is paid as output and takes from `MAX_OUTPUT_TOKENS`; the lite models refuse `none`. Each request logs its tokens as `model usage` |
 | `BOT_DISPLAY_NAME`            | `Maria`                         | The character's name                                                                                         |
 | `PERSONA_PROMPT`              | built-in                       | The character's personality and rules; `{name}` is replaced by the name. See [The character](#the-character) |

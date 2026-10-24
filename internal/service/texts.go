@@ -31,15 +31,41 @@ const (
 // localText is a fixed message in Uzbek, Russian and English.
 type localText struct{ uz, ru, en string }
 
-// to is the text in the language of the Telegram app of whoever wrote in.
+// to is the text in the language of whoever wrote in.
 func (t localText) to(in incoming) string {
-	switch appLanguage(in.msg.From) {
+	switch languageOf(in) {
 	case "ru":
 		return t.ru
 	case "en":
 		return t.en
 	}
 	return t.uz
+}
+
+// languageOf is "uz", "ru" or "en": the language a message is written in,
+// as replyLanguage reads it, or else that of its writer's Telegram app.
+// Many write Uzbek with the app in English or Russian. A word or two does
+// not tell: "ok" is not Uzbek.
+func languageOf(in incoming) string {
+	if len(strings.Fields(in.text)) < 2 {
+		return appLanguage(in.msg.From)
+	}
+	switch language := replyLanguage(in.text); {
+	case strings.HasPrefix(language, "Uzbek"):
+		return "uz"
+	case language == "Russian":
+		return "ru"
+	case language == "English":
+		return "en"
+	case language != "":
+		// Cyrillic with nothing plainly Russian in it, as Uzbek is often
+		// typed without its own letters.
+		if uzbekInCyrillic(in.text) {
+			return "uz"
+		}
+		return "ru"
+	}
+	return appLanguage(in.msg.From)
 }
 
 // appLanguage is "uz", "ru" or "en" for the language of user's Telegram

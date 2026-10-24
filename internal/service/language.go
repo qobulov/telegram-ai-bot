@@ -96,6 +96,17 @@ func isUzbekWord(w string) bool {
 		strings.HasSuffix(w, "man") || strings.HasSuffix(w, "san") || strings.HasSuffix(w, "mi")
 }
 
+// uzbekInCyrillic reports Uzbek typed in Cyrillic without its own letters,
+// as "слайд килиб бер": by its common words and endings.
+func uzbekInCyrillic(text string) bool {
+	for _, w := range strings.FieldsFunc(strings.ToLower(text), func(r rune) bool { return !unicode.IsLetter(r) }) {
+		if uzbekCyrillicWords[w] || strings.HasSuffix(w, "нинг") || strings.HasSuffix(w, "ларни") || strings.HasSuffix(w, "лари") {
+			return true
+		}
+	}
+	return false
+}
+
 // oneApostrophe writes the apostrophes Uzbek is typed with as one.
 func oneApostrophe(r rune) rune {
 	if isApostrophe(r) {
@@ -125,7 +136,10 @@ var (
 	englishWords = wordSet("the", "you", "are", "what", "how", "is", "why", "please", "thanks", "thank", "hello", "hi",
 		"i", "i'm", "me", "my", "your", "this", "that", "it's", "do", "does", "don't", "can", "can't", "could", "would",
 		"should", "will", "have", "and", "but", "not", "to", "of", "for", "with", "in", "we", "they", "he", "she", "one")
-	uzbekWords   = wordSet("nima", "qanday", "rahmat", "salom")
-	russianWords = wordSet("как", "что", "это", "ты", "вы", "я", "не", "да", "нет", "привет", "спасибо", "пожалуйста",
+	uzbekWords = wordSet("nima", "qanday", "rahmat", "salom")
+	// uzbekCyrillicWords are common Uzbek words with no letter of Uzbek's
+	// own, which Russian does not have.
+	uzbekCyrillicWords = wordSet("ва", "бу", "учун", "керак", "килиб", "бер", "беринг", "нима", "кандай", "менга", "билан", "хам", "эмас", "рахмат", "салом")
+	russianWords       = wordSet("как", "что", "это", "ты", "вы", "я", "не", "да", "нет", "привет", "спасибо", "пожалуйста",
 		"где", "когда", "почему", "сегодня")
 )

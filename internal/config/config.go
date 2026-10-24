@@ -200,7 +200,7 @@ func Load(getenv func(string) string) (Config, error) {
 		MaxToolCallsPerTurn:    r.positive("MAX_TOOL_CALLS_PER_TURN", 4),
 		MaxConcurrentRequests:  r.positive("MAX_CONCURRENT_REQUESTS", 10),
 		UserRateLimitPerMinute: r.positive("USER_RATE_LIMIT_PER_MINUTE", 10),
-		MaxOutputTokens:        r.positive("MAX_OUTPUT_TOKENS", 1024),
+		MaxOutputTokens:        r.positive("MAX_OUTPUT_TOKENS", 8192),
 		MaxInputChars:          r.positive("MAX_INPUT_CHARS", 4000),
 		RetentionDays:          r.integer("RETENTION_DAYS", 1, 0),
 

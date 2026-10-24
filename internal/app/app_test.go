@@ -332,7 +332,9 @@ func TestWebhookLimitsPrivateChats(t *testing.T) {
 	}
 
 	sent := env.apis.messages()
-	if len(sent) != 2 || sent[0]["text"] != "webhook answer" || !strings.Contains(sent[1]["text"].(string), "That's today's limit: 1 messages a day.") {
+	if len(sent) != 2 || sent[0]["text"] != "webhook answer" || !strings.Contains(sent[1]["text"].(string), "Bugungi limit tugadi: kuniga 1 ta xabar.") {
+		// The limit is in Uzbek, the message's language, though the app is
+		// in English.
 		t.Errorf("sent = %v, want the answer, then the limit once and silence", sent)
 	}
 	env.apis.mu.Lock()

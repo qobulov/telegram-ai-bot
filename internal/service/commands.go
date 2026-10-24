@@ -1249,7 +1249,7 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 	case "/start":
 		return textWelcome.to(in)
 	case "/help":
-		help := HelpTextIn(appLanguage(in.msg.From), Abilities{Draw: s.opts.ImagesEnabled, Listen: s.canListen(), Football: s.opts.FootballEnabled})
+		help := HelpTextIn(languageOf(in), Abilities{Draw: s.opts.ImagesEnabled, Listen: s.canListen(), Football: s.opts.FootballEnabled})
 		if s.opts.Bot.Username != "" {
 			// The bot's own username makes the group commands tappable.
 			help = strings.ReplaceAll(help, "@username", "@"+s.opts.Bot.Username)
