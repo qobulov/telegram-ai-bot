@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"image"
 	"image/color"
 	"image/png"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"telegram-ai-bot/internal/ai"
 	"telegram-ai-bot/internal/telegram"
 )
 
@@ -18,6 +20,22 @@ type fakeBotAccount struct {
 	calls []string
 	photo []byte
 	err   error
+	// avatar is the current profile photo; nil for none.
+	avatar []byte
+}
+
+func (f *fakeBotAccount) Photo(context.Context) ([]byte, string, bool, error) {
+	return f.avatar, "photo-1", f.avatar != nil, nil
+}
+
+type fakeEyes struct{ looked int }
+
+func (f *fakeEyes) Complete(_ context.Context, req ai.Request) (ai.Message, error) {
+	f.looked++
+	if len(req.Messages) != 1 || len(req.Messages[0].Parts) != 1 {
+		return ai.Message{}, errors.New("no picture")
+	}
+	return ai.Message{Content: "A girl with pink hair, anime style."}, nil
 }
 
 func (f *fakeBotAccount) GetBotProfile(_ context.Context, language string) (telegram.BotProfile, error) {
@@ -51,7 +69,7 @@ func (f *fakeBotAccount) RemoveBotPhoto(context.Context) error {
 
 func botProfile(t *testing.T, account *fakeBotAccount, caller Caller, args string) envelope {
 	t.Helper()
-	registry := mustRegistry(t, BotProfileTool(account))
+	registry := mustRegistry(t, BotProfileTool(BotProfileOptions{Account: account}))
 	var env envelope
 	_ = json.Unmarshal([]byte(registry.Execute(WithTurn(context.Background(), caller, &Sink{}), userID, "bot_profile", args)), &env)
 	return env
@@ -59,11 +77,38 @@ func botProfile(t *testing.T, account *fakeBotAccount, caller Caller, args strin
 
 var botOwner = Caller{UserID: userID, ChatID: userID, Owner: true, UpdateID: 1}
 
-func TestBotProfileIsOnlyForOwners(t *testing.T) {
+// Anyone may see the profile; only owners change it.
+func TestBotProfileIsChangedOnlyByOwners(t *testing.T) {
 	account := &fakeBotAccount{}
-	env := botProfile(t, account, Caller{UserID: userID, ChatID: groupA, UpdateID: 1}, `{"action":"name","text":"Hacked"}`)
+	member := Caller{UserID: userID, ChatID: groupA, UpdateID: 1}
+	env := botProfile(t, account, member, `{"action":"name","text":"Hacked"}`)
 	if env.OK || len(account.calls) != 0 {
 		t.Errorf("a member changed the name: %+v, %q", env, account.calls)
+	}
+	if env := botProfile(t, account, member, `{"action":"show"}`); !env.OK {
+		t.Errorf("a member cannot see the profile: %+v", env)
+	}
+}
+
+// What the profile photo shows is looked at once per photo.
+func TestBotProfileSaysWhatThePhotoShows(t *testing.T) {
+	account, eyes := &fakeBotAccount{avatar: []byte("JPEG")}, &fakeEyes{}
+	registry := mustRegistry(t, BotProfileTool(BotProfileOptions{Account: account, Eyes: eyes}))
+	ctx := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, UpdateID: 1}, &Sink{})
+	for range 2 {
+		var env envelope
+		_ = json.Unmarshal([]byte(registry.Execute(ctx, userID, "bot_profile", `{"action":"show"}`)), &env)
+		if !env.OK || !strings.Contains(string(env.Result), "pink hair") {
+			t.Fatalf("show = %+v", env)
+		}
+	}
+	if eyes.looked != 1 {
+		t.Errorf("the photo was looked at %d times, want once", eyes.looked)
+	}
+
+	account.avatar = nil
+	if env := botProfile(t, account, botOwner, `{"action":"show"}`); !env.OK || !strings.Contains(string(env.Result), `"has":false`) {
+		t.Errorf("show without a photo = %+v", env)
 	}
 }
 

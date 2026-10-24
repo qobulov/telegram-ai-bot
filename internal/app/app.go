@@ -150,6 +150,19 @@ func (b botRights) BotRights(ctx context.Context, chatID int64) ([]string, error
 }
 
 // groupSender posts an owner's confirmed broadcast in a group.
+// botAccount is the bot's own Telegram profile, its photo found by its ID.
+type botAccount struct {
+	*telegram.Client
+	id int64
+}
+
+func (b botAccount) Photo(ctx context.Context) ([]byte, string, bool, error) {
+	return b.ProfilePhoto(ctx, b.id, maxAvatarBytes)
+}
+
+// maxAvatarBytes bounds the profile photo downloaded to be described.
+const maxAvatarBytes = 2 << 20
+
 type groupSender struct {
 	client *telegram.Client
 }
@@ -190,6 +203,10 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		logger.Warn("BOT_OWNER_IDS is not set: owners are known only by username, which can change hands, so they moderate only with their own admin rights")
 	}
 	available := append(builtinTools(cfg, store, bot, moderation.Tool()), liveDataTools(cfg, bot)...)
+	available = append(available, tools.BotProfileTool(tools.BotProfileOptions{
+		Account: botAccount{Client: bot.Client, id: bot.User.ID},
+		Eyes:    stickerLabeller(cfg, logger),
+	}))
 	registry, err := tools.NewRegistry(cfg.IsAdmin, logger, available...)
 	if err != nil {
 		return nil, err
@@ -360,7 +377,6 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 				Drafts: store,
 				Sender: groupSender{client: bot.Client},
 			}),
-			tools.BotProfileTool(bot.Client),
 			tools.RulesTool(tools.RulesOptions{
 				Store:    store,
 				Admins:   groupMembers{client: bot.Client, botID: bot.User.ID},

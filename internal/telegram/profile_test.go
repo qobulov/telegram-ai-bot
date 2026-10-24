@@ -61,3 +61,29 @@ func TestSetBotPhotoUploadsAStaticPhoto(t *testing.T) {
 		t.Errorf("method %q, photo %q, data %q", method, photo, data)
 	}
 }
+
+// The profile photo is downloaded in the size nearest 640 pixels.
+func TestProfilePhotoTakesTheSizeNear640(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/bot" + testToken + "/getUserProfilePhotos":
+			_, _ = io.WriteString(w, `{"ok":true,"result":{"total_count":1,"photos":[[
+				{"file_id":"small","file_unique_id":"u1","width":160,"height":160},
+				{"file_id":"file-1","file_unique_id":"u2","width":640,"height":640},
+				{"file_id":"big","file_unique_id":"u3","width":1280,"height":1280}]]}}`)
+		case "/bot" + testToken + "/getFile":
+			_, _ = io.WriteString(w, `{"ok":true,"result":{"file_id":"file-1","file_size":4,"file_path":"photos/a.jpg"}}`)
+		case "/file/bot" + testToken + "/photos/a.jpg":
+			_, _ = io.WriteString(w, "JPEG")
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	client := NewClient(Options{Token: testToken, BaseURL: server.URL})
+
+	data, id, ok, err := client.ProfilePhoto(context.Background(), 777, 1<<20)
+	if err != nil || !ok || string(data) != "JPEG" || id != "u2" {
+		t.Errorf("photo = %q, %q, %v, %v", data, id, ok, err)
+	}
+}

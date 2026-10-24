@@ -180,10 +180,13 @@ func (o *MessageOrigin) Name() string {
 
 // PhotoSize is one size of a photo, or a thumbnail.
 type PhotoSize struct {
-	FileID   string `json:"file_id"`
-	FileSize int64  `json:"file_size"`
-	Width    int    `json:"width"`
-	Height   int    `json:"height"`
+	FileID string `json:"file_id"`
+	// FileUniqueID is the same for a file however it was sent, and so names
+	// one picture.
+	FileUniqueID string `json:"file_unique_id"`
+	FileSize     int64  `json:"file_size"`
+	Width        int    `json:"width"`
+	Height       int    `json:"height"`
 }
 
 // Sticker is a sticker. A static sticker is a WebP image; animated (Lottie)

@@ -11,13 +11,19 @@ import (
 	"image/jpeg"
 	_ "image/png" // decodes a PNG sent to be the bot's photo
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
+	"telegram-ai-bot/internal/ai"
 	"telegram-ai-bot/internal/telegram"
 )
 
-const botProfileTimeout = 30 * time.Second
+const (
+	botProfileTimeout = 30 * time.Second
+	// avatarPrompt asks the model what the bot's own photo shows.
+	avatarPrompt = "This is your own profile picture on Telegram. In one or two short sentences, in English, say plainly what it shows: who or what, the colours and the style."
+)
 
 // BotAccount is the bot's own Telegram profile.
 type BotAccount interface {
@@ -27,6 +33,21 @@ type BotAccount interface {
 	SetBotDescription(ctx context.Context, description, language string) error
 	SetBotPhoto(ctx context.Context, jpeg []byte) error
 	RemoveBotPhoto(ctx context.Context) error
+	// Photo is the bot's current profile photo and its unique ID; ok is
+	// false when it has none.
+	Photo(ctx context.Context) (data []byte, id string, ok bool, err error)
+}
+
+// Eyes is a model that can look at a picture.
+type Eyes interface {
+	Complete(ctx context.Context, req ai.Request) (ai.Message, error)
+}
+
+// BotProfileOptions configures the bot_profile tool.
+type BotProfileOptions struct {
+	Account BotAccount
+	// Eyes describe the profile photo; nil leaves it undescribed.
+	Eyes Eyes
 }
 
 // botProfileLanguages are the languages a profile text may be set for: ""
@@ -39,14 +60,15 @@ type botProfileArgs struct {
 	Language string `json:"language"`
 }
 
-// BotProfileTool lets an owner change the bot's own Telegram profile: its
-// name, bio, description and photo, for everyone or for one language.
-func BotProfileTool(account BotAccount) Tool {
+// BotProfileTool shows anyone the bot's own Telegram profile, what its
+// photo shows included, and lets an owner change it: its name, bio,
+// description and photo, for everyone or for one language.
+func BotProfileTool(opts BotProfileOptions) Tool {
+	avatars := &avatarDescriptions{eyes: opts.Eyes}
 	return Tool{
 		Name: "bot_profile",
-		Description: "Owners only. Your own Telegram profile. show: name, bio and description in each language. " +
-			"name, bio (profile page, 120 chars), description (empty chat, 512): set text, for language or for all. " +
-			"photo: make the picture in the message your photo. remove_photo. Only when an owner asks.",
+		Description: "Your own Telegram profile. show: your name, bio, description and what your profile photo shows; use it when asked about them. " +
+			"Owners only, when an owner asks: name, bio (120 chars), description (512) set text, for a language or all; photo makes the picture in the message yours; remove_photo.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
@@ -57,28 +79,28 @@ func BotProfileTool(account BotAccount) Tool {
 			"required": ["action"],
 			"additionalProperties": false
 		}`),
-		OwnerOnly: true,
-		Timeout:   botProfileTimeout,
+		Timeout: botProfileTimeout,
 		Run: func(ctx context.Context, raw json.RawMessage) (any, error) {
-			return runBotProfile(ctx, account, raw)
+			return runBotProfile(ctx, opts.Account, avatars, raw)
 		},
 	}
 }
 
-func runBotProfile(ctx context.Context, account BotAccount, raw json.RawMessage) (any, error) {
+func runBotProfile(ctx context.Context, account BotAccount, avatars *avatarDescriptions, raw json.RawMessage) (any, error) {
 	var args botProfileArgs
 	if err := decodeArgs(raw, &args); err != nil {
 		return nil, err
 	}
+	if args.Action == "show" {
+		return showBotProfile(ctx, account, avatars)
+	}
 	caller, ok := CallerFrom(ctx)
 	if !ok || !caller.Owner {
-		return nil, errors.New("only the bot's owners may change its profile")
+		return nil, &ArgumentError{Message: "only your owners may change your profile; say so"}
 	}
 	text := strings.TrimSpace(args.Text)
 	var err error
 	switch args.Action {
-	case "show":
-		return showBotProfile(ctx, account)
 	case "name":
 		err = setProfileText(ctx, account.SetBotName, text, args.Language, telegram.MaxBotName)
 	case "bio":
@@ -102,7 +124,7 @@ func runBotProfile(ctx context.Context, account BotAccount, raw json.RawMessage)
 	return result, nil
 }
 
-func showBotProfile(ctx context.Context, account BotAccount) (any, error) {
+func showBotProfile(ctx context.Context, account BotAccount, avatars *avatarDescriptions) (any, error) {
 	profiles := map[string]telegram.BotProfile{}
 	for _, language := range botProfileLanguages {
 		profile, err := account.GetBotProfile(ctx, language)
@@ -115,7 +137,55 @@ func showBotProfile(ctx context.Context, account BotAccount) (any, error) {
 		}
 		profiles[key] = profile
 	}
-	return profiles, nil
+	return map[string]any{"profile": profiles, "photo": avatars.of(ctx, account)}, nil
+}
+
+// avatarDescriptions are what the bot's profile photos show, by photo, so
+// that each is looked at once.
+type avatarDescriptions struct {
+	eyes Eyes
+	mu   sync.Mutex
+	seen map[string]string
+}
+
+// of is what the bot's current photo shows: "none" without one, and
+// without a description when it cannot be looked at.
+func (a *avatarDescriptions) of(ctx context.Context, account BotAccount) map[string]any {
+	data, id, ok, err := account.Photo(ctx)
+	switch {
+	case err != nil:
+		return map[string]any{"error": "the photo could not be fetched"}
+	case !ok:
+		return map[string]any{"has": false}
+	}
+	photo := map[string]any{"has": true}
+	if shows := a.describe(ctx, id, data); shows != "" {
+		photo["shows"] = shows
+	}
+	return photo
+}
+
+func (a *avatarDescriptions) describe(ctx context.Context, id string, data []byte) string {
+	a.mu.Lock()
+	shows, known := a.seen[id]
+	a.mu.Unlock()
+	if known || a.eyes == nil {
+		return shows
+	}
+	reply, err := a.eyes.Complete(ctx, ai.Request{Messages: []ai.Message{{
+		Role: ai.RoleUser, Content: avatarPrompt, Parts: []ai.ContentPart{ai.ImagePart("image/jpeg", data)},
+	}}})
+	if err != nil {
+		return ""
+	}
+	shows = strings.TrimSpace(reply.Content)
+	a.mu.Lock()
+	if a.seen == nil {
+		a.seen = map[string]string{}
+	}
+	a.seen[id] = shows
+	a.mu.Unlock()
+	return shows
 }
 
 func setProfileText(ctx context.Context, set func(context.Context, string, string) error, text, language string, limit int) error {

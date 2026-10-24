@@ -98,3 +98,44 @@ func (c *Client) RemoveBotPhoto(ctx context.Context) error {
 	var ok bool
 	return c.call(ctx, "removeMyProfilePhoto", struct{}{}, &ok)
 }
+
+// profilePhotoSide is the size a profile photo is downloaded in, near
+// enough to see it and small enough to be quick.
+const profilePhotoSide = 640
+
+// ProfilePhoto downloads a user's current profile photo, the bot's own
+// included, in the size nearest profilePhotoSide, with its unique ID. ok is
+// false when they have none.
+func (c *Client) ProfilePhoto(ctx context.Context, userID, maxBytes int64) (data []byte, id string, ok bool, err error) {
+	var photos struct {
+		Photos [][]PhotoSize `json:"photos"`
+	}
+	params := struct {
+		UserID int64 `json:"user_id"`
+		Limit  int   `json:"limit"`
+	}{userID, 1}
+	if err := c.call(ctx, "getUserProfilePhotos", params, &photos); err != nil {
+		return nil, "", false, err
+	}
+	if len(photos.Photos) == 0 || len(photos.Photos[0]) == 0 {
+		return nil, "", false, nil
+	}
+	best := photos.Photos[0][0]
+	for _, size := range photos.Photos[0] {
+		if distance(size.Width, profilePhotoSide) < distance(best.Width, profilePhotoSide) {
+			best = size
+		}
+	}
+	data, err = c.DownloadFile(ctx, best.FileID, maxBytes)
+	if err != nil {
+		return nil, "", false, err
+	}
+	return data, best.FileUniqueID, true, nil
+}
+
+func distance(a, b int) int {
+	if a > b {
+		return a - b
+	}
+	return b - a
+}
