@@ -605,6 +605,9 @@ func cards(cv *canvas, s Slide) {
 		textRoom = max(textRoom, textHeight(text, inner, textSize)*11/10)
 	}
 	h := min(room, 2*pad+lead+titleRoom+textRoom+inch/10)
+	// Cards shorter than the room stand in its middle, not at its top with
+	// the slide's lower part empty.
+	top += (room - h) / 2
 	for i, item := range s.Items {
 		x := margin + i*(w+gap)
 		cv.shape("roundRect", x, top, w, h, c.card, 0, c.strong)
@@ -664,6 +667,7 @@ func grid(cv *canvas, s Slide) {
 		need = max(need, textHeight(item.Title, inner, size+2)+textHeight(item.Text, inner, size)*11/10)
 	}
 	h := min(room, max(2*pad+need+inch/10, inch*13/10))
+	top += (room - h) * rows / 2
 	for i, item := range s.Items {
 		x := margin + (i%columns)*(w+gap)
 		y := top + (i/columns)*(h+gap)
