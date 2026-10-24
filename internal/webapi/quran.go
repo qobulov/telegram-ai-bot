@@ -35,6 +35,10 @@ const (
 // International.
 var quranTranslations = map[string]int{"uz": 55, "ru": 45, "en": 20}
 
+// quranTranslators name the translations, for the answer to say whose
+// words it quotes.
+var quranTranslators = map[string]string{"uz": "Muhammad Sodiq Muhammad Yusuf", "ru": "Эльмир Кулиев", "en": "Saheeh International"}
+
 // surahVerses is how many verses each surah has, in order.
 var surahVerses = [114]int{7, 286, 200, 176, 120, 165, 206, 75, 129, 109, 123, 111, 43, 52, 99, 128, 111, 110, 98, 135,
 	112, 78, 118, 64, 77, 227, 93, 88, 69, 60, 34, 30, 73, 54, 45, 83, 182, 88, 75, 85, 54, 53, 89, 59, 37, 35, 38, 29, 18, 45,
@@ -186,9 +190,10 @@ func (a *apis) quranVerses(ctx context.Context, surah, from, to int, language st
 		return nil, fmt.Errorf("%s sent no verses", quranComSource)
 	}
 	return map[string]any{
-		"verses": out,
-		"link":   fmt.Sprintf("https://quran.com/%d/%d", surah, from),
-		"source": quranComSource,
+		"verses":     out,
+		"translator": quranTranslators[language],
+		"link":       fmt.Sprintf("https://quran.com/%d/%d", surah, from),
+		"source":     quranComSource,
 	}, nil
 }
 

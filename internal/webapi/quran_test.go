@@ -12,8 +12,9 @@ const quranAlBaqarah = `{"verses":[
 	{"verse_key":"2:256","text_uthmani":"لَآ إِكْرَاهَ","translations":[{"text":"Dinda zo'rlash yo'q."}]}]}`
 
 type quranOut struct {
-	Verses []quranVerse `json:"verses"`
-	Link   string       `json:"link"`
+	Translator string       `json:"translator"`
+	Verses     []quranVerse `json:"verses"`
+	Link       string       `json:"link"`
 }
 
 func TestQuranGivesVersesInTheAskersLanguage(t *testing.T) {
@@ -24,8 +25,8 @@ func TestQuranGivesVersesInTheAskersLanguage(t *testing.T) {
 	if len(out.Verses) != 2 || out.Verses[0].Ref != "2:255" || out.Verses[0].Translation != "Alloh, Undan ozga iloh yo'q." || out.Verses[0].Arabic != "" {
 		t.Errorf("verses = %+v", out.Verses)
 	}
-	if out.Link != "https://quran.com/2/255" {
-		t.Errorf("link = %q", out.Link)
+	if out.Link != "https://quran.com/2/255" || out.Translator != "Muhammad Sodiq Muhammad Yusuf" {
+		t.Errorf("link = %q, translator %q", out.Link, out.Translator)
 	}
 	q := u.requests("/qurancom/api/v4/verses/by_chapter/2")[0].URL.Query()
 	if q.Get("translations") != "55" || q.Get("page") != "6" || q.Get("per_page") != "50" {
