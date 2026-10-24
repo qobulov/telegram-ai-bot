@@ -734,17 +734,23 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	// A picture drawn before a later failure is still worth sending.
 	drawings := sink.Take()
 	documents := sink.TakeDocuments()
-	if !usedAnAnswer(err, drawings) && len(documents) == 0 {
+	var audios []tools.Audio
+	var cards []string
+	if err == nil || errors.Is(err, ai.ErrEmptyResponse) {
+		// A song's preview and an item's card go only with an answer, or
+		// with none: the model, told they are the answer, may write
+		// nothing, and they are still what was asked for.
+		audios, cards = sink.TakeAudios(), sink.TakeStickers()
+	}
+	if !usedAnAnswer(err, drawings) && len(documents)+len(audios)+len(cards) == 0 {
 		s.giveBackAnswer(in, reservation)
 	}
 	out := s.answerOf(in, answer, err, started)
 	out.drawings = drawings
 	out.documents = documents
-	if err == nil {
-		// A song's preview and an item's card go only with an answer that
-		// tells of them.
-		out.audios = sink.TakeAudios()
-		out.cards = sink.TakeStickers()
+	out.audios, out.cards = audios, cards
+	if len(audios)+len(cards) > 0 {
+		out.skipped = ""
 	}
 	return out
 }

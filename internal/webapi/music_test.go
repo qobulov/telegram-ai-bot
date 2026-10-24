@@ -48,6 +48,10 @@ func TestMusicSearchFindsSongsAndSendsAPreview(t *testing.T) {
 	if audios := sink.TakeAudios(); len(audios) != 1 || string(audios[0].Data) != "MP3" || audios[0].Title != "Yurak" || audios[0].Performer != "Shohruhxon" {
 		t.Errorf("audios = %+v", audios)
 	}
+	// The preview is the answer: the turn ends with it.
+	if text, done := sink.Finished(); !done || text != "🎵 Shohruhxon — Yurak" {
+		t.Errorf("finished = %q, %v", text, done)
+	}
 	if q := u.requests("/deezer/search")[0].URL.Query(); q.Get("q") != "Shohruhxon Yurak" || q.Get("limit") != "5" {
 		t.Errorf("query = %v", q)
 	}
@@ -68,6 +72,9 @@ func TestMusicSearchPreviewUnavailable(t *testing.T) {
 	env, sink := musicRun(t, u, `{"query":"Shohruhxon"}`)
 	if out := result[musicOutput](t, env); len(out.Tracks) != 2 || out.Note != noPreviewNote || len(sink.TakeAudios()) != 0 {
 		t.Errorf("output = %+v", out)
+	}
+	if _, done := sink.Finished(); done {
+		t.Error("the turn ended without a song to send")
 	}
 }
 

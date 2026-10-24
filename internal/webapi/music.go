@@ -105,6 +105,9 @@ func (a *apis) music(ctx context.Context, raw json.RawMessage) (any, error) {
 // sendPreview fetches the track's preview into the turn's sink and returns
 // the note that tells the model what its answer is. The preview is fetched
 // here, not by Telegram from its link: a fetched link shows as a file name.
+// The preview is the whole answer, so the turn ends with it: asked again,
+// the model often wrote nothing, and an empty answer sent nothing at all,
+// the song included.
 func (a *apis) sendPreview(ctx context.Context, track deezerTrack) string {
 	sink, ok := tools.SinkFrom(ctx)
 	if !ok {
@@ -115,6 +118,7 @@ func (a *apis) sendPreview(ctx context.Context, track deezerTrack) string {
 		return noPreviewNote
 	}
 	sink.AddAudio(tools.Audio{Data: data, Title: track.Title, Performer: track.Artist.Name})
+	sink.Finish("🎵 " + track.Artist.Name + " — " + track.Title)
 	return previewNote
 }
 

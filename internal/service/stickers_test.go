@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"telegram-ai-bot/internal/ai"
 	"telegram-ai-bot/internal/stickers"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
@@ -350,5 +352,22 @@ func TestMoodReactions(t *testing.T) {
 		if emoji, ok := moodReactions[mood]; !ok || !telegram.IsReactionEmoji(emoji) {
 			t.Errorf("%s: %q is not a reaction Telegram takes", mood, emoji)
 		}
+	}
+}
+
+// A song found during a turn is sent even when the model, told the song is
+// the answer, wrote nothing: "into you x bye mashup mari" got no answer at
+// all, the song it found included.
+func TestSongIsSentAfterAnEmptyAnswer(t *testing.T) {
+	f := newFixture()
+	audio := &fakeAudioSender{}
+	f.opts.AudioSender = audio
+	f.replier.err = fmt.Errorf("agent: %w", ai.ErrEmptyResponse)
+	f.replier.audios = []tools.Audio{{Data: []byte("MP3"), Title: "Into You x Bye", Performer: "VellyCarl"}}
+
+	sent := f.run(inGroup(groupMessage("into you x bye mashup mira")))
+
+	if len(sent) != 0 || len(audio.sent) != 1 || audio.sent[0] != "VellyCarl — Into You x Bye MP3" {
+		t.Errorf("texts %+v, audio %q", sent, audio.sent)
 	}
 }
