@@ -64,7 +64,7 @@ func NewClient(opts Options) *Client {
 // changes to its own membership, which keep its list of groups true, and,
 // where it is an admin, changes to other members', which keep its list of
 // each group's members true.
-var allowedUpdates = []string{"message", "my_chat_member", "chat_member", "callback_query"}
+var allowedUpdates = []string{"message", "my_chat_member", "chat_member", "callback_query", "poll", "poll_answer"}
 
 type getUpdatesParams struct {
 	Offset         int64    `json:"offset"`
@@ -705,6 +705,7 @@ type sendPollParams struct {
 	CorrectOptionID       *int              `json:"correct_option_id,omitempty"`
 	Explanation           string            `json:"explanation,omitempty"`
 	ReplyParameters       *replyParameters  `json:"reply_parameters,omitempty"`
+	OpenPeriod            int               `json:"open_period,omitempty"`
 }
 
 type inputPollOption struct {
@@ -716,12 +717,32 @@ type inputPollOption struct {
 // voted for what; in a private chat the only voter is the person the bot
 // talks to.
 func (c *Client) SendPoll(ctx context.Context, poll OutgoingPoll) (int64, error) {
+	sent, err := c.sendPoll(ctx, poll)
+	return sent.MessageID, err
+}
+
+// SendQuizQuestion sends a poll or a quiz and returns the ID of the poll,
+// by which its answers and its closing come back.
+func (c *Client) SendQuizQuestion(ctx context.Context, poll OutgoingPoll) (string, error) {
+	sent, err := c.sendPoll(ctx, poll)
+	return sent.Poll.ID, err
+}
+
+type sentPoll struct {
+	MessageID int64 `json:"message_id"`
+	Poll      struct {
+		ID string `json:"id"`
+	} `json:"poll"`
+}
+
+func (c *Client) sendPoll(ctx context.Context, poll OutgoingPoll) (sentPoll, error) {
 	params := sendPollParams{
 		ChatID:                poll.ChatID,
 		Question:              poll.Question,
 		Options:               make([]inputPollOption, 0, len(poll.Options)),
 		IsAnonymous:           poll.ChatID < 0,
 		AllowsMultipleAnswers: poll.Multiple,
+		OpenPeriod:            poll.OpenPeriod,
 	}
 	for _, option := range poll.Options {
 		params.Options = append(params.Options, inputPollOption{Text: option})
@@ -733,11 +754,11 @@ func (c *Client) SendPoll(ctx context.Context, poll OutgoingPoll) (int64, error)
 	if poll.ReplyToMessageID != 0 {
 		params.ReplyParameters = &replyParameters{MessageID: poll.ReplyToMessageID, AllowSendingWithoutReply: true}
 	}
-	var sent sentMessage
+	var sent sentPoll
 	if err := c.call(ctx, "sendPoll", params, &sent); err != nil {
-		return 0, err
+		return sentPoll{}, err
 	}
-	return sent.MessageID, nil
+	return sent, nil
 }
 
 type apiResponse struct {

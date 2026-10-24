@@ -300,6 +300,11 @@ type Options struct {
 	// Files sends the files a tool made, such as a presentation; nil sends
 	// none, and the answer's text goes alone.
 	Files FileSender
+	// Quizzes keeps the tests sent as files and their runs, and QuizPolls
+	// asks their questions; with either nil, a test file goes to the model
+	// like any other.
+	Quizzes   QuizStore
+	QuizPolls QuizPoller
 	// Answers tells whom one of the bot's answers in a group answered, so
 	// that "don't answer him", replying to it, means that member; nil means
 	// it is never known.
@@ -359,6 +364,8 @@ type Service struct {
 	// ownersHere the owners lately found in each group.
 	actives    *recently[int64, int]
 	ownersHere *recently[int64, []string]
+	// quizTests are tests lately read, for their runs' questions.
+	quizTests *recently[int64, storage.QuizTest]
 	// guardSets are the guards on in each group, and spamVerdicts and
 	// linkVerdicts what the outside services lately said; see protect.go.
 	guardSets    *recently[int64, guardSet]
@@ -440,6 +447,7 @@ func New(opts Options) *Service {
 		actives:        newRecently[int64, int](activeMemory, opts.Now),
 		ownersHere:     newRecently[int64, []string](activeMemory, opts.Now),
 		guardSets:      newRecently[int64, guardSet](guardsMemory, opts.Now),
+		quizTests:      newRecently[int64, storage.QuizTest](quizTestMemory, opts.Now),
 		spamVerdicts:   newRecently[int64, verdict](verdictMemory, opts.Now),
 		linkVerdicts:   newRecently[string, verdict](verdictMemory, opts.Now),
 		queues:         make([]chan incoming, opts.Workers),
@@ -475,6 +483,9 @@ func (s *Service) Handle(update telegram.Update) {
 		s.pressed(update.CallbackQuery)
 		return
 	}
+	if s.quizPollUpdate(update) {
+		return
+	}
 	in, ok := s.accept(update)
 	if !ok {
 		return
@@ -505,6 +516,9 @@ func (s *Service) HandleNow(update telegram.Update) {
 	}
 	if update.CallbackQuery != nil {
 		s.pressed(update.CallbackQuery)
+		return
+	}
+	if s.quizPollUpdate(update) {
 		return
 	}
 	if in, ok := s.accept(update); ok {

@@ -294,6 +294,8 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		ClipSender:            bot.Client,
 		AudioSender:           bot.Client,
 		Files:                 bot.Client,
+		Quizzes:               store,
+		QuizPolls:             bot.Client,
 		StickerSender:         bot.Client,
 		StickerImporter:       &stickers.Importer{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger), Workers: stickerWorkers, Logger: logger},
 		CardImporter:          &stickers.CardImporter{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger), Workers: stickerWorkers, Logger: logger},

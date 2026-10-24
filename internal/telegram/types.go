@@ -18,6 +18,18 @@ type Update struct {
 	ChatMember   *ChatMemberUpdated `json:"chat_member"`
 	// CallbackQuery is a press of a button under one of the bot's messages.
 	CallbackQuery *CallbackQuery `json:"callback_query"`
+	// Poll is a new state of a poll the bot sent, such as a quiz closing
+	// when its time is up; PollAnswer is someone's answer to a poll the bot
+	// sent that is not anonymous.
+	Poll       *Poll       `json:"poll"`
+	PollAnswer *PollAnswer `json:"poll_answer"`
+}
+
+// PollAnswer is an answer to a poll that is not anonymous.
+type PollAnswer struct {
+	PollID    string `json:"poll_id"`
+	User      *User  `json:"user"`
+	OptionIDs []int  `json:"option_ids"`
 }
 
 // CallbackQuery is a press of a button with callback data: who pressed it,
@@ -241,8 +253,10 @@ type Audio struct {
 
 // Poll is a poll someone posted in a chat.
 type Poll struct {
+	ID       string       `json:"id"`
 	Question string       `json:"question"`
 	Options  []PollOption `json:"options"`
+	IsClosed bool         `json:"is_closed"`
 }
 
 // PollOption is one answer of a Poll.
@@ -486,6 +500,9 @@ type OutgoingPoll struct {
 	// ReplyToMessageID makes the poll a reply to that message, which keeps
 	// it in the message's forum topic. Zero replies to nothing.
 	ReplyToMessageID int64
+	// OpenPeriod closes the poll this many seconds after it is sent, 5 to
+	// 600; zero leaves it open.
+	OpenPeriod int
 }
 
 // APIError is an error returned by the Bot API.

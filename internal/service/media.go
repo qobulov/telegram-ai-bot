@@ -44,7 +44,7 @@ type media struct {
 	// message the provider cannot hear, a file, a song, a poll).
 	fileID string
 	audio  bool
-	// document is the kind of a file the model can read, as documentKind
+	// document is the kind of a file the model can read, as doctext.Kind
 	// names it; "" for anything else.
 	document string
 }

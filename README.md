@@ -552,6 +552,45 @@ every request is refused with `429 You exceeded your current quota`, and the
 bot says drawing is not available right now. Turn on billing for the key in
 Google AI Studio to use it. Each picture is billed by Google.
 
+## Tests from files
+
+A student sends a test as a file (.doc, .docx, .pdf or text) written the way
+Uzbek universities write them (the HEMIS format):
+
+```
+Ishlab chiqarishning qanday turlari mavjud?
+====
+#moddiy va nomoddiy
+====
+barter va tovar
+++++
+Keyingi savol?
+...
+```
+
+The bot reads it in code (`internal/doctext` takes the text out of the
+file, `internal/quizfile` reads the questions), never with the model, so a
+test of hundreds of questions costs no token and no question is reworded.
+It finds the markers anywhere, as text out of a PDF loses its line breaks;
+a `++++` left out before a question ending in `?` or `:` is found; repeated
+questions are dropped; a question with no `#`, or several, is left out and
+counted in the answer. Tests are kept by their questions, so the same file
+sent by another student is the same test and their runs are ranked
+together.
+
+The test is split into parts of 30, offered as buttons. A part starts with
+"Men tayyorman!", then each question is a quiz of its own, open for 30
+seconds, its options shuffled (in the files the right one is often first).
+An answer, or the quiz closing unanswered, scores it once (an atomic update
+by the poll's ID) and sends the next; the bot needs no timer, as Telegram
+closes each quiz and says so (`poll` and `poll_answer` updates, asked for in
+`allowed_updates`). Two questions missed in a row pause the run with a
+button to go on; `/stop` ends it. At the end come the right, wrong and
+missed answers, the time, the place among everyone's first run of the part,
+and buttons to try again or go on to the next part. A question or option
+longer than Telegram allows in a quiz is sent as a message, the quiz then
+having the letters. Private chats only; groups may come later.
+
 ## Presentations
 
 Asked for a presentation, slides or a *taqdimot*, the model calls

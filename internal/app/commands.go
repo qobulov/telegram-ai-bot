@@ -20,6 +20,7 @@ var commandMenus = map[string][]telegram.BotCommand{
 		{Command: "start", Description: "Salomlashish"},
 		{Command: "help", Description: "Yordam va buyruqlar"},
 		{Command: "reset", Description: "Suhbat tarixini o'chirish"},
+		{Command: "stop", Description: "Ishlayotgan testni to'xtatish"},
 		{Command: "about", Description: "Bot haqida"},
 	},
 	telegram.ScopeAllGroupChats: {
