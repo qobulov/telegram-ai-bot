@@ -125,7 +125,7 @@ func RulesTool(opts RulesOptions) Tool {
 			"ignore: stop answering the member whose message the owner replied to, or, when they replied to your own answer, the member it answered (hours, default 24); never admins or owners. unignore: answer that member again. " +
 			"set_address: how to address the owner who is asking, in every chat (text). " +
 			"watch_swearing: from now on, without you, a member's first insult here gets a warning and the next within a day a 1-hour mute, and a second swear at you within a day a 15-minute mute without warning that tags the group's creator, or the @username in text when the owner names whom to call; an admin, who cannot be muted, gets the warning and then that tag; the creator and owners are left alone. stop_watching_swearing turns it off. " +
-			"guard: turn on a guard run in code, without you (guard): spam bans members on the CAS and lols.bot spammer lists, links deletes links to malware and phishing (Google Safe Browsing, URLhaus), images deletes nude or gory pictures (Sightengine); admins and owners are left alone. unguard turns one off. " +
+			"guard: turn on a guard run in code, without you (guard): spam bans members on the CAS and lols.bot spammer lists, links deletes links to malware and phishing (Google Safe Browsing, URLhaus), images deletes nude or gory pictures, stickers and GIFs (Sightengine) from anyone, admins and owners too; spam and links leave admins and owners alone. unguard turns one off. " +
 			"mute: stop writing in the group at all, until unmute. " +
 			"set_welcome: what you say, in code, to everyone who joins the group from now on, the owner's words copied exactly (text), \"{name}\" in it standing for the newcomers' names; remove_welcome: stop. " +
 			"list: the rules in force here. remove: delete a rule by its id from list. " +
@@ -436,7 +436,7 @@ func removeKind(ctx context.Context, opts RulesOptions, caller Caller, kind stri
 var guardNotes = map[string]string{
 	storage.RuleSpamGuard:  "On within a minute, in code: members on the CAS or lols.bot spammer lists are banned when they join or write, and their message deleted. It needs you to be an admin who may ban and delete.",
 	storage.RuleLinkGuard:  "On within a minute, in code: messages linking to malware or phishing, as Google Safe Browsing or URLhaus know them, are deleted. It needs you to be an admin who may delete messages.",
-	storage.RuleImageGuard: "On within a minute, in code: nude or gory pictures are deleted. It needs you to be an admin who may delete messages.",
+	storage.RuleImageGuard: "On within a minute, in code: nude or gory pictures, stickers and GIFs are deleted, admins' and owners' too. It needs you to be an admin who may delete messages.",
 }
 
 // setGuard turns a guard on in the group.

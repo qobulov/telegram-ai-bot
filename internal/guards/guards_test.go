@@ -90,9 +90,11 @@ func TestMaliciousLinkKeepsUnknownAndOfflineHosts(t *testing.T) {
 
 func TestUnsafeImageUploadsThePicture(t *testing.T) {
 	cases := map[string]struct{ answer, want string }{
-		"nude":  {`{"status":"success","nudity":{"sexual_activity":0.01,"erotica":0.92,"context":{}},"gore":{"prob":0.01}}`, "nudity"},
-		"gory":  {`{"status":"success","nudity":{"sexual_activity":0.01},"gore":{"prob":0.88}}`, "gore"},
-		"clean": {`{"status":"success","nudity":{"sexual_activity":0.01,"erotica":0.2},"gore":{"prob":0.02}}`, ""},
+		"nude":     {`{"status":"success","nudity":{"sexual_activity":0.01,"erotica":0.92,"context":{}},"gore":{"prob":0.01}}`, "nudity"},
+		"gory":     {`{"status":"success","nudity":{"sexual_activity":0.01},"gore":{"prob":0.88}}`, "gore"},
+		"clean":    {`{"status":"success","nudity":{"sexual_activity":0.01,"erotica":0.2},"gore":{"prob":0.02}}`, ""},
+		"lingerie": {`{"status":"success","nudity":{"erotica":0.3,"very_suggestive":0.81},"gore":{"prob":0.01}}`, "nudity"},
+		"swimwear": {`{"status":"success","nudity":{"very_suggestive":0.2,"suggestive":0.9,"mildly_suggestive":0.95},"gore":{"prob":0.01}}`, ""},
 	}
 	for name, tc := range cases {
 		c, seen := fakeServices(t, map[string]string{"/se/1.0/check.json": tc.answer})

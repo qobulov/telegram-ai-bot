@@ -374,11 +374,14 @@ type Service struct {
 	ownersHere *recently[int64, []string]
 	// quizTests are tests lately read, for their runs' questions.
 	quizTests *recently[int64, storage.QuizTest]
-	// guardSets are the guards on in each group, and spamVerdicts and
-	// linkVerdicts what the outside services lately said; see protect.go.
+	// guardSets are the guards on in each group, and spamVerdicts,
+	// linkVerdicts and pictureVerdicts what the outside services lately
+	// said; see protect.go.
 	guardSets    *recently[int64, guardSet]
 	spamVerdicts *recently[int64, verdict]
 	linkVerdicts *recently[string, verdict]
+	// pictureVerdicts are keyed by a file's unique ID.
+	pictureVerdicts *recently[string, verdict]
 
 	// typingInterval is how often "typing" is shown again while a turn
 	// runs: typingRefresh, shortened by tests.
@@ -445,23 +448,24 @@ func New(opts Options) *Service {
 		opts.Now = time.Now
 	}
 	s := &Service{
-		opts:           opts,
-		userLimiter:    newLimiter(opts.RatePerMinute),
-		ambient:        newAmbient(opts.ChatLog, opts.AmbientMessages, opts.Location, opts.Logger),
-		muted:          make(map[int64]bool, len(opts.MutedChats)),
-		mutes:          newRecently[int64, bool](muteMemory, opts.Now),
-		members:        newRecently[memberKey, memberName](memberMemory, opts.Now),
-		subscribers:    newRecently[int64, bool](subscriberMemory, opts.Now),
-		actives:        newRecently[int64, int](activeMemory, opts.Now),
-		ownersHere:     newRecently[int64, []string](activeMemory, opts.Now),
-		guardSets:      newRecently[int64, guardSet](guardsMemory, opts.Now),
-		quizTests:      newRecently[int64, storage.QuizTest](quizTestMemory, opts.Now),
-		spamVerdicts:   newRecently[int64, verdict](verdictMemory, opts.Now),
-		linkVerdicts:   newRecently[string, verdict](verdictMemory, opts.Now),
-		queues:         make([]chan incoming, opts.Workers),
-		notices:        make(chan incoming, noticeQueueSize),
-		transcribing:   make(chan struct{}, backgroundTranscriptions),
-		typingInterval: typingRefresh,
+		opts:            opts,
+		userLimiter:     newLimiter(opts.RatePerMinute),
+		ambient:         newAmbient(opts.ChatLog, opts.AmbientMessages, opts.Location, opts.Logger),
+		muted:           make(map[int64]bool, len(opts.MutedChats)),
+		mutes:           newRecently[int64, bool](muteMemory, opts.Now),
+		members:         newRecently[memberKey, memberName](memberMemory, opts.Now),
+		subscribers:     newRecently[int64, bool](subscriberMemory, opts.Now),
+		actives:         newRecently[int64, int](activeMemory, opts.Now),
+		ownersHere:      newRecently[int64, []string](activeMemory, opts.Now),
+		guardSets:       newRecently[int64, guardSet](guardsMemory, opts.Now),
+		quizTests:       newRecently[int64, storage.QuizTest](quizTestMemory, opts.Now),
+		spamVerdicts:    newRecently[int64, verdict](verdictMemory, opts.Now),
+		linkVerdicts:    newRecently[string, verdict](verdictMemory, opts.Now),
+		pictureVerdicts: newRecently[string, verdict](verdictMemory, opts.Now),
+		queues:          make([]chan incoming, opts.Workers),
+		notices:         make(chan incoming, noticeQueueSize),
+		transcribing:    make(chan struct{}, backgroundTranscriptions),
+		typingInterval:  typingRefresh,
 	}
 	for _, chatID := range opts.MutedChats {
 		s.muted[chatID] = true

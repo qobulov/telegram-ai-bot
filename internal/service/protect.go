@@ -12,8 +12,9 @@ import (
 
 // The guards an owner may turn on in a group, run in code with no model:
 // known spammers banned, links to malicious hosts and nude or gory pictures
-// deleted. Admins, owners, bots and posts on behalf of a chat are left
-// alone, and so is a muted group.
+// deleted. The spam and link guards leave admins, owners, bots and posts on
+// behalf of a chat alone; the picture guard spares nobody. A muted group is
+// left alone.
 
 const (
 	guardTime      = 15 * time.Second
@@ -79,17 +80,21 @@ func (s *Service) guardsOn(ctx context.Context, chatID int64) guardSet {
 	return set
 }
 
-// guardable reports a sender the guards look at.
+// guardsReady reports whether the guards can run at all.
+func (s *Service) guardsReady() bool {
+	return s.opts.Guards != nil && s.opts.GroupModerator != nil && s.opts.Rules != nil
+}
+
+// guardable reports a sender the spam and link guards look at.
 func (s *Service) guardable(msg *telegram.Message) bool {
-	return s.opts.Guards != nil && s.opts.GroupModerator != nil && s.opts.Rules != nil &&
-		msg.From != nil && !msg.From.IsBot && msg.SenderChat == nil && !s.isOwner(msg.From)
+	return !msg.From.IsBot && msg.SenderChat == nil && !s.isOwner(msg.From)
 }
 
 // protected acts on a group message a guard catches, and reports whether
 // it did: such a message gets nothing else.
 func (s *Service) protected(in incoming) bool {
 	msg := in.msg
-	if !s.guardable(msg) || len(msg.NewChatMembers) > 0 {
+	if !s.guardsReady() || msg.From == nil || len(msg.NewChatMembers) > 0 {
 		return false
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), guardTime)
@@ -98,21 +103,23 @@ func (s *Service) protected(in incoming) bool {
 	if !set.any() || s.isMutedLately(msg.Chat.ID) {
 		return false
 	}
-	if set.spam {
+	guardable := s.guardable(msg)
+	if guardable && set.spam {
 		if source, bad := s.spammer(ctx, msg.From.ID); bad && !s.isGroupAdmin(ctx, msg) {
 			s.banSpammer(ctx, in, msg.From, source, true)
 			return true
 		}
 	}
-	if set.links {
+	if guardable && set.links {
 		if reason, bad := s.maliciousLink(ctx, msg); bad && !s.isGroupAdmin(ctx, msg) {
 			s.removeGuarded(ctx, in, storage.ActionLinkDelete, mentionOf(msg.From)+", xavfli havola o'chirildi ("+reason+").")
 			return true
 		}
 	}
-	if set.images && len(msg.Photo) > 0 {
-		if reason, bad := s.unsafePicture(ctx, msg); bad && !s.isGroupAdmin(ctx, msg) {
-			s.removeGuarded(ctx, in, storage.ActionImageDelete, mentionOf(msg.From)+", nomaqbul rasm o'chirildi ("+reason+").")
+	// A nude or gory picture goes whoever sent it, owners and admins too.
+	if set.images {
+		if reason, bad := s.unsafePicture(ctx, msg); bad {
+			s.removeGuarded(ctx, in, storage.ActionImageDelete, senderMention(msg)+", nomaqbul rasm o'chirildi ("+reason+").")
 			return true
 		}
 	}
@@ -213,22 +220,17 @@ func messageLinks(msg *telegram.Message) []*url.URL {
 	return links
 }
 
-// unsafePicture asks Sightengine about a message's photo, at the biggest
-// size under maxGuardedImage.
+// unsafePicture asks Sightengine about a message's picture, once per file
+// for verdictMemory: a sticker is sent again and again.
 func (s *Service) unsafePicture(ctx context.Context, msg *telegram.Message) (string, bool) {
-	if s.opts.Media == nil {
+	picture, ok := guardedPicture(msg)
+	if !ok || s.opts.Media == nil {
 		return "", false
 	}
-	fileID := ""
-	for _, size := range msg.Photo {
-		if size.FileSize <= maxGuardedImage {
-			fileID = size.FileID
-		}
+	if v, ok := s.pictureVerdicts.get(picture.FileUniqueID); ok {
+		return v.reason, v.bad
 	}
-	if fileID == "" {
-		return "", false
-	}
-	data, err := s.opts.Media.DownloadFile(ctx, fileID, maxGuardedImage)
+	data, err := s.opts.Media.DownloadFile(ctx, picture.FileID, maxGuardedImage)
 	if err != nil {
 		s.opts.Logger.Warn("guards: could not download a picture", "chat_id", msg.Chat.ID, "error", err)
 		return "", false
@@ -238,7 +240,55 @@ func (s *Service) unsafePicture(ctx context.Context, msg *telegram.Message) (str
 		s.opts.Logger.Warn("guards: could not check a picture", "chat_id", msg.Chat.ID, "error", err)
 		return "", false
 	}
+	s.opts.Logger.Info("guards: picture checked", "chat_id", msg.Chat.ID, "user_id", msg.From.ID, "unsafe", bad, "reason", reason)
+	if picture.FileUniqueID != "" {
+		s.pictureVerdicts.set(picture.FileUniqueID, verdict{bad: bad, reason: reason})
+	}
 	return reason, bad
+}
+
+// guardedPicture is what the picture guard looks at: a photo at the biggest
+// size under maxGuardedImage, a static sticker, a picture sent as a file,
+// or the first frame of a GIF, video or animated sticker.
+func guardedPicture(msg *telegram.Message) (telegram.PhotoSize, bool) {
+	var picture telegram.PhotoSize
+	switch {
+	case len(msg.Photo) > 0:
+		for _, size := range msg.Photo {
+			if size.FileSize <= maxGuardedImage {
+				picture = size
+			}
+		}
+	case msg.Sticker != nil && !msg.Sticker.IsAnimated && !msg.Sticker.IsVideo:
+		picture = telegram.PhotoSize{FileID: msg.Sticker.FileID, FileUniqueID: msg.Sticker.FileUniqueID}
+	case msg.Sticker != nil:
+		picture = thumbnailOf(msg.Sticker.Thumbnail)
+	case msg.Animation != nil: // before Document, which Telegram also sets on a GIF
+		picture = thumbnailOf(msg.Animation.Thumbnail)
+	case msg.Video != nil:
+		picture = thumbnailOf(msg.Video.Thumbnail)
+	case msg.VideoNote != nil:
+		picture = thumbnailOf(msg.VideoNote.Thumbnail)
+	case msg.Document != nil && strings.HasPrefix(msg.Document.MimeType, "image/") && msg.Document.FileSize <= maxGuardedImage:
+		picture = telegram.PhotoSize{FileID: msg.Document.FileID, FileUniqueID: msg.Document.FileUniqueID}
+	}
+	return picture, picture.FileID != ""
+}
+
+func thumbnailOf(thumbnail *telegram.PhotoSize) telegram.PhotoSize {
+	if thumbnail == nil {
+		return telegram.PhotoSize{}
+	}
+	return *thumbnail
+}
+
+// senderMention names who sent a message: the chat it was posted on behalf
+// of, such as an anonymous admin's group, or the member.
+func senderMention(msg *telegram.Message) string {
+	if msg.SenderChat != nil && msg.SenderChat.Title != "" {
+		return msg.SenderChat.Title
+	}
+	return mentionOf(msg.From)
 }
 
 // isGroupAdmin reports a sender who administers the group; when Telegram

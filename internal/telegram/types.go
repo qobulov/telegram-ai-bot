@@ -240,10 +240,11 @@ type VideoNote struct {
 
 // Document is a file sent as a file rather than as a photo or video.
 type Document struct {
-	FileID   string `json:"file_id"`
-	FileName string `json:"file_name"`
-	MimeType string `json:"mime_type"`
-	FileSize int64  `json:"file_size"`
+	FileID       string `json:"file_id"`
+	FileUniqueID string `json:"file_unique_id"`
+	FileName     string `json:"file_name"`
+	MimeType     string `json:"mime_type"`
+	FileSize     int64  `json:"file_size"`
 }
 
 // Audio is a music file, as opposed to a Voice message.

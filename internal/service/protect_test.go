@@ -256,3 +256,62 @@ func TestGuardRulesAreToldToTheModel(t *testing.T) {
 		t.Errorf("lines = %q", lines)
 	}
 }
+
+func TestImageGuardSparesNobody(t *testing.T) {
+	f, guards, moderator := protectFixture(storage.RuleImageGuard)
+	guards.unsafe = "nudity"
+	fromAdmin := messageFrom(guardAdminID, "adm", "")
+	fromAdmin.Photo = []telegram.PhotoSize{{FileID: "photo-small", FileUniqueID: "p1", FileSize: 40 << 10}}
+	fromOwner := messageFrom(9001, ownerUsername, "")
+	fromOwner.MessageID = 31
+	fromOwner.Photo = []telegram.PhotoSize{{FileID: "photo-big", FileUniqueID: "p2", FileSize: 40 << 10}}
+
+	sent := f.run(inGroup(fromAdmin), inGroup(fromOwner))
+
+	if !slices.Equal(moderator.deleted, []int64{30, 31}) || len(sent) != 2 {
+		t.Errorf("deleted %v, sent %+v; want the admin's and the owner's pictures gone", moderator.deleted, sent)
+	}
+}
+
+func TestImageGuardLooksAtStickersFilesAndGIFsOncePerFile(t *testing.T) {
+	f, guards, moderator := protectFixture(storage.RuleImageGuard)
+	guards.unsafe = "nudity"
+	media := f.opts.Media.(*fakeMedia)
+	media.files["doc-image"] = jpegData
+	sticker := messageFrom(5454, "pic", "")
+	sticker.Sticker = &telegram.Sticker{FileID: "sticker", FileUniqueID: "s1"}
+	again := messageFrom(5454, "pic", "")
+	again.MessageID = 31
+	again.Sticker = &telegram.Sticker{FileID: "sticker", FileUniqueID: "s1"}
+	file := messageFrom(5454, "pic", "")
+	file.MessageID = 32
+	file.Document = &telegram.Document{FileID: "doc-image", FileUniqueID: "d1", MimeType: "image/png", FileSize: 10 << 10}
+	gif := messageFrom(5454, "pic", "")
+	gif.MessageID = 33
+	gif.Animation = &telegram.Animation{FileID: "gif", Thumbnail: &telegram.PhotoSize{FileID: "gif-thumb", FileUniqueID: "g1"}}
+	gif.Document = &telegram.Document{FileID: "gif", MimeType: "video/mp4"}
+	pdf := messageFrom(5454, "pic", "")
+	pdf.MessageID = 34
+	pdf.Document = &telegram.Document{FileID: "report", MimeType: "application/pdf"}
+
+	f.run(inGroup(sticker), inGroup(again), inGroup(file), inGroup(gif), inGroup(pdf))
+
+	if !slices.Equal(moderator.deleted, []int64{30, 31, 32, 33}) {
+		t.Errorf("deleted %v, want the sticker twice, the file and the GIF", moderator.deleted)
+	}
+	if want := []string{"sticker", "doc-image", "gif-thumb"}; !slices.Equal(media.downloads, want) || guards.pictures != 3 {
+		t.Errorf("downloads = %v after %d checks, want %v: the sticker once", media.downloads, guards.pictures, want)
+	}
+}
+
+func TestImageGuardKeepsSafePictures(t *testing.T) {
+	f, guards, moderator := protectFixture(storage.RuleImageGuard)
+	msg := messageFrom(guardAdminID, "adm", "")
+	msg.Photo = []telegram.PhotoSize{{FileID: "photo-small", FileUniqueID: "p1", FileSize: 40 << 10}}
+
+	f.run(inGroup(msg))
+
+	if len(moderator.deleted) != 0 || guards.pictures != 1 {
+		t.Errorf("deleted %v after %d checks, want a safe picture kept", moderator.deleted, guards.pictures)
+	}
+}

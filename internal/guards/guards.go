@@ -249,7 +249,7 @@ func (c *Checker) UnsafeImage(ctx context.Context, image []byte) (string, bool, 
 	if answer.Status != "success" {
 		return "", false, fmt.Errorf("guards: Sightengine: %s", answer.Error.Message)
 	}
-	for _, class := range []string{"sexual_activity", "sexual_display", "erotica"} {
+	for _, class := range []string{"sexual_activity", "sexual_display", "erotica", "very_suggestive"} {
 		if score, ok := answer.Nudity[class].(float64); ok && score >= unsafeScore {
 			return "nudity", true, nil
 		}
