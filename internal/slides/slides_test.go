@@ -45,6 +45,16 @@ func sampleDeck(theme string) Deck {
 				{Title: "Hisobotlar", Text: "Choraklik va yillik tahliliy hisobotlar; samaradorlikni baholash."},
 			}},
 			{Layout: LayoutStatement, Eyebrow: "Xulosa", Title: "Asosiy g'oya", Intro: "Aniq tashxis — samarali psixologik yordamning boshlang'ich nuqtasidir.", Items: []Item{{Text: "Amaliy psixologiya asoslari"}}},
+			{Layout: LayoutNumbers, Eyebrow: "Raqamlarda", Title: "Psixologik xizmat bugun", Items: []Item{
+				{Title: "1 200+", Text: "maktablarda pedagog-psixolog lavozimi"},
+				{Title: "87%", Text: "o'quvchilar maslahatdan keyin o'zini yaxshi his qilgan"},
+				{Title: "3×", Text: "erta aniqlangan muammolar tezroq hal bo'ladi"},
+			}},
+			{Layout: LayoutSplit, Eyebrow: "Yo'nalish 02", Title: "Psixoprofilaktika", Intro: "Muammolarni oldindan bartaraf etish: moslashuv, bulling va xavf guruhi bilan ish.", Items: []Item{
+				{Title: "Moslashuv", Text: "1-, 5- va 10-sinflarning yangi muhitga moslashishini qo'llab-quvvatlash."},
+				{Title: "Bulling", Text: "Sinflarda nizolarni kamaytirish va sog'lom munosabatlar muhitini shakllantirish."},
+				{Title: "Xavf guruhi", Text: "Xulqida og'ish bo'lgan bolalar bilan muntazam erta ishlash."},
+			}},
 			{Layout: LayoutPoints, Title: "Zo'ravonlik & bulling <profilaktika>", Items: []Item{{Title: "Sinflarda", Text: "nizolarni kamaytirish"}, {Text: "Soddalashtirilgan punkt"}}},
 		},
 	}
@@ -83,18 +93,18 @@ func TestBuildWritesAWellFormedPackage(t *testing.T) {
 				}
 			}
 		}
-		for _, name := range []string{"ppt/slides/slide1.xml", "ppt/slides/slide8.xml", "ppt/slides/_rels/slide8.xml.rels"} {
+		for _, name := range []string{"ppt/slides/slide1.xml", "ppt/slides/slide10.xml", "ppt/slides/_rels/slide10.xml.rels"} {
 			if _, ok := parts[name]; !ok {
 				t.Errorf("%s: no %s", theme, name)
 			}
 		}
-		if _, ok := parts["ppt/slides/slide9.xml"]; ok {
+		if _, ok := parts["ppt/slides/slide11.xml"]; ok {
 			t.Errorf("%s: a slide too many", theme)
 		}
-		if !strings.Contains(parts["[Content_Types].xml"], "/ppt/slides/slide8.xml") || strings.Count(parts["ppt/presentation.xml"], "<p:sldId ") != 8 {
+		if !strings.Contains(parts["[Content_Types].xml"], "/ppt/slides/slide10.xml") || strings.Count(parts["ppt/presentation.xml"], "<p:sldId ") != 10 {
 			t.Errorf("%s: the slides are not all listed", theme)
 		}
-		if !strings.Contains(parts["ppt/slides/slide8.xml"], "Zo&apos;ravonlik &amp; bulling &lt;profilaktika&gt;") && !strings.Contains(parts["ppt/slides/slide8.xml"], "Zo'ravonlik &amp; bulling &lt;profilaktika&gt;") {
+		if !strings.Contains(parts["ppt/slides/slide10.xml"], "Zo&apos;ravonlik &amp; bulling &lt;profilaktika&gt;") && !strings.Contains(parts["ppt/slides/slide10.xml"], "Zo'ravonlik &amp; bulling &lt;profilaktika&gt;") {
 			t.Errorf("%s: text not escaped", theme)
 		}
 	}

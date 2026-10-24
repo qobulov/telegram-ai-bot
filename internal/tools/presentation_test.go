@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 func (f *fakeQuota) ReservePresentation(ctx context.Context, userID, chatID int64, since time.Time, limit int) (int64, bool, error) {
@@ -41,7 +42,8 @@ var goodSlides = []string{
 	`{"layout":"points","title":"Fermerlar","items":[{"text":"subsidiya"},{"text":"o'qitish"}]}`,
 	`{"layout":"cards","title":"Natijalar","items":[{"title":"Hosil","text":"+20%"},{"title":"Suv","text":"-40%"}]}`,
 	`{"layout":"statement","title":"Xulosa","intro":"Har bir tomchi muhim.","items":[{"text":"Iqtisodiyot fani"}]}`,
-	`{"layout":"points","title":"Savollar","items":[{"text":"Rahmat"},{"text":"Savollar?"}]}`,
+	`{"layout":"numbers","title":"Raqamlar","items":[{"title":"90%","text":"Orol qisqardi"},{"title":"3 km³","text":"yillik tanqislik"}]}`,
+	`{"layout":"split","eyebrow":"Yakun","title":"Savollar","intro":"Rahmat!","items":[{"text":"Savol bering"},{"text":"Fikr bildiring"}]}`,
 }
 
 // deckOfSlides is a deck's arguments with these slides.
@@ -68,8 +70,8 @@ func TestPresentationIsSentAsTheWholeAnswer(t *testing.T) {
 		t.Fatalf("env = %+v", env)
 	}
 	documents := sink.TakeDocuments()
-	if len(documents) != 1 || documents[0].Name != "Suv resurslari.pptx" || !strings.Contains(string(env.Result), `"slides":11`) {
-		t.Fatalf("documents = %+v", documents)
+	if len(documents) != 1 || documents[0].Name != "Suv resurslari.pptx" || !strings.Contains(string(env.Result), `"slides":12`) {
+		t.Fatalf("%d documents, env %s", len(documents), env.Result)
 	}
 	archive, err := zip.NewReader(bytes.NewReader(documents[0].Data), int64(len(documents[0].Data)))
 	if err != nil || len(archive.File) == 0 {
@@ -115,7 +117,7 @@ func TestPresentationChecksTheSlides(t *testing.T) {
 		"too many cards":   {withSlides(`{"layout":"cards","title":"a","items":[{"text":"1"},{"text":"2"},{"text":"3"},{"text":"4"},{"text":"5"}]}`), "2 to 4 items"},
 		"empty statement":  {withSlides(`{"layout":"statement","title":"a"}`), "statement in intro"},
 		"half a table row": {withSlides(`{"layout":"table","title":"a","items":[{"title":"x"},{"title":"y","text":"z"}]}`), "title and a text"},
-		"long item":        {withSlides(`{"layout":"points","title":"a","items":[{"text":"` + strings.Repeat("x", 241) + `"},{"text":"c"}]}`), "shorten"},
+		"split one point":  {withSlides(`{"layout":"split","title":"a","items":[{"text":"b"}]}`), "2 to 4 items"},
 		"no caption":       {strings.Replace(goodDeck, `"caption":"Mana taqdimotingiz 📊"`, `"caption":""`, 1), "caption"},
 	} {
 		if env := makeDeck(registry, ctx, tc.args); env.OK || env.Error.Code != "invalid_arguments" || !strings.Contains(env.Error.Message, tc.word) {
@@ -129,8 +131,8 @@ func TestPresentationChecksTheSlides(t *testing.T) {
 
 // A step's own number is dropped: the slide numbers its steps.
 func TestStepsLoseTheirOwnNumbers(t *testing.T) {
-	slide, err := slideOf(slideArgs{Layout: "steps", Title: "Bosqichlar", Items: []itemArgs{{Title: "1. Murojaat"}, {Title: "2) Tahlil"}, {Title: "2026-yil rejasi"}}})
-	if err != nil || slide.Items[0].Title != "Murojaat" || slide.Items[1].Title != "Tahlil" || slide.Items[2].Title != "2026-yil rejasi" {
+	slide, err := slideOf(slideArgs{Layout: "steps", Title: "Bosqichlar", Items: []itemArgs{{Title: "1. Murojaat"}, {Title: "2) Tahlil"}, {Title: "2026-yil rejasi"}, {Title: "3-bosqich: Betonlash"}}})
+	if err != nil || slide.Items[0].Title != "Murojaat" || slide.Items[1].Title != "Tahlil" || slide.Items[2].Title != "2026-yil rejasi" || slide.Items[3].Title != "Betonlash" {
 		t.Errorf("items = %+v, %v", slide.Items, err)
 	}
 }
@@ -152,5 +154,22 @@ func TestBuildFromModelArguments(t *testing.T) {
 	}
 	if err := os.WriteFile(out, sink.TakeDocuments()[0].Data, 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Text a little too long is cut at a word rather than sent back, and a
+// figure too long to show large makes the slide points.
+func TestLongTextIsCutNotRefused(t *testing.T) {
+	long := strings.Repeat("so'z ", 70)
+	slide, err := slideOf(slideArgs{Layout: "numbers", Title: "Raqamlar", Intro: long,
+		Items: []itemArgs{{Title: "bir yuz yigirma ming", Text: long}, {Title: "2", Text: "y"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slide.Layout != "points" || !strings.HasSuffix(slide.Intro, "…") || utf8.RuneCountInString(slide.Items[0].Text) > 240 || strings.HasSuffix(slide.Items[0].Text, " …") {
+		t.Errorf("slide = %+v", slide)
+	}
+	if got := cut("qisqa", 10); got != "qisqa" {
+		t.Errorf("cut = %q", got)
 	}
 }

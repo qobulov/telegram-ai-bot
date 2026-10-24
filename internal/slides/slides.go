@@ -41,10 +41,16 @@ const (
 	// LayoutStatement is one statement, large, such as a key idea or a
 	// conclusion.
 	LayoutStatement = "statement"
+	// LayoutNumbers is two to four key figures, large, each with what it
+	// counts.
+	LayoutNumbers = "numbers"
+	// LayoutSplit is the title on a block of color filling the left of the
+	// slide, and points on the right.
+	LayoutSplit = "split"
 )
 
 // Layouts are the layouts a slide may have.
-var Layouts = []string{LayoutPoints, LayoutCards, LayoutSteps, LayoutGrid, LayoutTable, LayoutStatement}
+var Layouts = []string{LayoutPoints, LayoutCards, LayoutSteps, LayoutGrid, LayoutTable, LayoutStatement, LayoutNumbers, LayoutSplit}
 
 // Slide is a content slide.
 type Slide struct {
@@ -81,20 +87,35 @@ const (
 	MaxIntroRunes = 260
 )
 
-// palette is a theme's colors, as RGB hex.
+// palette is a theme: its colors as RGB hex, the font of its titles, and
+// whether its title slide is a block of color or a light panel.
 type palette struct {
 	background, title, text, muted, accent, strong, card, tile, line string
+	// block is the color of large blocks, and blockText of text on them.
+	block, blockText string
+	titleFont        string
+	blockTitle       bool
 }
 
+// palettes are a Gamma-like classic and the ten themes of Anthropic's
+// theme-factory skill, their fonts mapped to ones every office has.
 var palettes = map[string]palette{
-	"classic": {background: "E9EEF3", title: "1E2A44", text: "2B3445", muted: "5B6475", accent: "F2B5A4", strong: "2E5D50", card: "FFFFFF", tile: "F2BBAA", line: "C9D2DB"},
-	"navy":    {background: "14213D", title: "FFFFFF", text: "E5E7EB", muted: "A3AEC2", accent: "FCA311", strong: "FCA311", card: "1D2D50", tile: "22335C", line: "33466E"},
-	"green":   {background: "EEF4EF", title: "1E3A2F", text: "26332C", muted: "5E6E64", accent: "8FC1A9", strong: "2E6B4F", card: "FFFFFF", tile: "CFE6D8", line: "C6D8CC"},
-	"rose":    {background: "FBF1EE", title: "4A1F2B", text: "3A2A2E", muted: "7A5F66", accent: "E8A0A8", strong: "9C3D54", card: "FFFFFF", tile: "F6D5D8", line: "E8CDD1"},
+	"classic":           {background: "E9EEF3", title: "1E2A44", text: "2B3445", muted: "5B6475", accent: "F2B5A4", strong: "2E5D50", card: "FFFFFF", tile: "F2BBAA", line: "C9D2DB", block: "1E2A44", blockText: "FFFFFF", titleFont: serif},
+	"ocean-depths":      {background: "1A2332", title: "F1FAEE", text: "DDE7E3", muted: "9DB3B5", accent: "2D8B8B", strong: "A8DADC", card: "223044", tile: "24404A", line: "33465A", block: "2D8B8B", blockText: "F1FAEE", titleFont: sans, blockTitle: true},
+	"sunset-boulevard":  {background: "FFF8F0", title: "264653", text: "2A3B40", muted: "6C7A7D", accent: "E76F51", strong: "E76F51", card: "FFFFFF", tile: "F7DFC4", line: "EAD8C5", block: "264653", blockText: "FFFFFF", titleFont: serif, blockTitle: true},
+	"forest-canopy":     {background: "FAF9F6", title: "2D4A2B", text: "2E352C", muted: "6E7466", accent: "A4AC86", strong: "2D4A2B", card: "FFFFFF", tile: "E3E6D5", line: "D9DCCB", block: "2D4A2B", blockText: "FAF9F6", titleFont: serif, blockTitle: true},
+	"modern-minimalist": {background: "FFFFFF", title: "36454F", text: "36454F", muted: "708090", accent: "708090", strong: "36454F", card: "F5F6F7", tile: "E9ECEE", line: "D3D3D3", block: "36454F", blockText: "FFFFFF", titleFont: sans, blockTitle: true},
+	"golden-hour":       {background: "FBF6EE", title: "4A403A", text: "4A403A", muted: "7D7068", accent: "F4A900", strong: "C1666B", card: "FFFFFF", tile: "F1E4CF", line: "E3D6C1", block: "4A403A", blockText: "FBF6EE", titleFont: sans},
+	"arctic-frost":      {background: "FAFAFA", title: "2E4A70", text: "2F3A48", muted: "6B7A8F", accent: "4A6FA5", strong: "4A6FA5", card: "FFFFFF", tile: "D4E4F7", line: "D5DEE9", block: "4A6FA5", blockText: "FFFFFF", titleFont: sans},
+	"desert-rose":       {background: "F7EFE8", title: "5D2E46", text: "4A3640", muted: "82686F", accent: "D4A5A5", strong: "B87D6D", card: "FFFFFF", tile: "E8D5C4", line: "E2D0C6", block: "5D2E46", blockText: "FFFFFF", titleFont: serif},
+	"tech-innovation":   {background: "1E1E1E", title: "FFFFFF", text: "E6E6E6", muted: "A0A6B0", accent: "00D8F0", strong: "4D94FF", card: "2A2A2A", tile: "23324A", line: "3A3A3A", block: "0066FF", blockText: "FFFFFF", titleFont: sans, blockTitle: true},
+	"botanical-garden":  {background: "F5F3ED", title: "3E6B4C", text: "33402F", muted: "6F7668", accent: "F9A620", strong: "B7472A", card: "FFFFFF", tile: "E2EBDD", line: "DCD8CC", block: "4A7C59", blockText: "FFFFFF", titleFont: serif, blockTitle: true},
+	"midnight-galaxy":   {background: "2B1E3E", title: "E6E6FA", text: "DCD9EC", muted: "A39DBA", accent: "A490C2", strong: "A490C2", card: "352850", tile: "3D3366", line: "4A3E66", block: "4A4E8F", blockText: "E6E6FA", titleFont: sans},
 }
 
-// Themes are the color themes a deck may have.
-var Themes = []string{"classic", "navy", "green", "rose"}
+// Themes are the themes a deck may have; the first is the default.
+var Themes = []string{"classic", "ocean-depths", "sunset-boulevard", "forest-canopy", "modern-minimalist", "golden-hour",
+	"arctic-frost", "desert-rose", "tech-innovation", "botanical-garden", "midnight-galaxy"}
 
 // ErrEmpty reports a deck without a title or slides.
 var ErrEmpty = errors.New("slides: a deck needs a title and at least one slide")
@@ -413,17 +434,28 @@ func titleSlide(deck Deck, c palette) string {
 	cv.shape("ellipse", inch*80/10, inch*42/10, inch*22/10, inch*22/10, c.tile, 85, "")
 	cv.shape("ellipse", inch*112/10, inch*5/10, inch*12/10, inch*12/10, c.title, 25, "")
 	panelW := inch * 82 / 10
-	cv.shape("roundRect", margin, margin, panelW, slideHeight-2*margin, c.card, 80, "")
-	inner := panelW - inch*8/10
+	titleColor, textColor, mutedColor := c.title, c.text, c.muted
 	x := margin + inch*4/10
+	top := margin + inch*4/10
+	if c.blockTitle {
+		// A block of color filling the left of the slide, edge to edge.
+		panelW = inch * 78 / 10
+		cv.shape("rect", 0, 0, panelW, slideHeight, c.block, 0, "")
+		titleColor, textColor, mutedColor = c.blockText, c.blockText, c.blockText
+		x = margin + inch*2/10
+	} else {
+		cv.shape("roundRect", margin, margin, panelW, slideHeight-2*margin, c.card, 80, "")
+	}
+	inner := panelW - inch*8/10
 	titleSize := fit(deck.Title, inner, 4, 54, 30)
-	cv.text(x, margin+inch*4/10, inner, inch*36/10, "b", line(deck.Title, titleSize, c.title, serif, false, "l"))
-	y := margin + inch*41/10
+	cv.text(x, top, inner, inch*36/10, "b", line(deck.Title, titleSize, titleColor, c.titleFont, !c.blockTitle && c.titleFont == sans, "l"))
+	cv.shape("rect", x, top+inch*37/10, inch*12/10, point*5, c.accent, 0, "")
+	y := margin + inch*43/10
 	if subtitle := strings.TrimSpace(deck.Subtitle); subtitle != "" {
-		cv.text(x, y, inner, inch*12/10, "t", line(subtitle, fit(subtitle, inner, 3, 22, 14), c.text, sans, false, "l"))
+		cv.text(x, y, inner, inch*12/10, "t", line(subtitle, fit(subtitle, inner, 3, 22, 14), textColor, sans, false, "l"))
 	}
 	if author := strings.TrimSpace(deck.Author); author != "" {
-		cv.text(x, slideHeight-margin-inch*8/10, inner, inch*5/10, "b", line(author, fit(author, inner, 2, 16, 11), c.muted, sans, false, "l"))
+		cv.text(x, slideHeight-margin-inch*8/10, inner, inch*5/10, "b", line(author, fit(author, inner, 2, 16, 11), mutedColor, sans, false, "l"))
 	}
 	return cv.String()
 }
@@ -439,8 +471,13 @@ func header(cv *canvas, s Slide, x, width int) int {
 	}
 	titleSize := fit(s.Title, width, 2, 36, 24)
 	titleH := linesFor(s.Title, width, titleSize) * titleSize * 13 / 10 * point
-	cv.text(x, y, width, titleH, "t", line(s.Title, titleSize, c.title, serif, false, "l"))
-	y += titleH + inch*2/10
+	cv.text(x, y, width, titleH, "t", line(s.Title, titleSize, c.title, c.titleFont, false, "l"))
+	y += titleH + inch*12/100
+	if s.Layout != LayoutStatement {
+		// A short rule under the title, in the accent color.
+		cv.shape("rect", x, y, inch*9/10, point*4, c.accent, 0, "")
+		y += inch * 18 / 100
+	}
 	if intro := strings.TrimSpace(s.Intro); intro != "" && s.Layout != LayoutStatement {
 		size := fit(intro, width, 2, 18, 14)
 		h := linesFor(intro, width, size) * size * 14 / 10 * point
@@ -461,6 +498,10 @@ func contentSlide(s Slide, number, total int, c palette) string {
 		table(cv, s)
 	case LayoutStatement:
 		statement(cv, s)
+	case LayoutNumbers:
+		numbers(cv, s)
+	case LayoutSplit:
+		split(cv, s)
 	default:
 		points(cv, s)
 	}
@@ -485,25 +526,32 @@ func points(cv *canvas, s Slide) {
 		cv.text(x, y, size, size, "ctr", line(s.Icon, 120, c.title, emoji, false, "ctr"))
 	}
 	top := header(cv, s, margin, width)
-	if len(s.Items) == 0 {
+	pointList(cv, s.Items, margin, top, width, bottom-inch*4/10)
+}
+
+// pointList draws items as points, a dot and a bold term and its text
+// each, in a column width wide from x, between top and end.
+func pointList(cv *canvas, items []Item, x, top, width, end int) {
+	c := cv.colors
+	if len(items) == 0 {
 		return
 	}
-	textX := margin + inch*55/100
+	textX := x + inch*55/100
 	textW := width - inch*55/100
-	slot := (bottom - inch*4/10 - top) / len(s.Items)
+	slot := (end - top) / len(items)
 	var texts []string
-	for _, item := range s.Items {
+	for _, item := range items {
 		texts = append(texts, strings.TrimSpace(item.Title+" "+item.Text))
 	}
-	size := fitBlock(texts, textW, slot*len(s.Items), 22, 13)
-	for i, item := range s.Items {
+	size := fitBlock(texts, textW, slot*len(items), 22, 13)
+	for i, item := range items {
 		y := top + i*slot
 		dot := size * point * 9 / 10
-		cv.shape("ellipse", margin, y+size*point*15/100, dot, dot, c.accent, 0, "")
+		cv.shape("ellipse", x, y+size*point*15/100, dot, dot, c.accent, 0, "")
 		var runs []run
 		if item.Title != "" {
 			title := item.Title
-			if item.Text != "" && !strings.HasSuffix(title, ":") {
+			if item.Text != "" && !strings.HasSuffix(title, ":") && !strings.HasSuffix(title, "…") {
 				title += ":"
 			}
 			runs = append(runs, run{text: title + " ", size: size, color: c.title, font: sans, bold: true})
@@ -562,7 +610,7 @@ func cards(cv *canvas, s Slide) {
 		cv.shape("roundRect", x, top, w, h, c.card, 0, c.strong)
 		y := top + pad
 		if s.Layout == LayoutSteps {
-			cv.text(x+pad, y, inner, inch*4/10, "t", line(fmt.Sprintf("%02d", i+1), 20, c.strong, serif, true, "l"))
+			cv.text(x+pad, y, inner, inch*4/10, "t", line(fmt.Sprintf("%02d", i+1), 20, c.strong, c.titleFont, true, "l"))
 			cv.shape("rect", x+pad, y+inch*5/10, inner, point*2, c.accent, 0, "")
 		} else if item.Icon != "" {
 			cv.text(x+pad, y, inner, inch*6/10, "t", line(item.Icon, 30, c.title, emoji, false, "l"))
@@ -597,30 +645,32 @@ func grid(cv *canvas, s Slide) {
 	room := (bottom - inch*4/10 - top - (rows-1)*gap) / rows
 	pad := inch * 3 / 10
 	inner := w - 2*pad
-	lead := 0
+	// An icon stands left of its tile's text, not above it, which would
+	// leave the text little room.
+	iconW := 0
 	for _, item := range s.Items {
 		if item.Icon != "" {
-			lead = inch * 75 / 100
+			iconW = inch * 7 / 10
 		}
 	}
+	inner -= iconW
 	var all []string
 	for _, item := range s.Items {
 		all = append(all, strings.TrimSpace(item.Title+" "+item.Text))
 	}
-	size := fitEach(all, inner, room-2*pad-lead, 20, 12)
+	size := fitEach(all, inner, room-2*pad, 20, 12)
 	need := 0
 	for _, item := range s.Items {
 		need = max(need, textHeight(item.Title, inner, size+2)+textHeight(item.Text, inner, size)*11/10)
 	}
-	h := min(room, max(2*pad+lead+need+inch/10, inch*15/10))
+	h := min(room, max(2*pad+need+inch/10, inch*13/10))
 	for i, item := range s.Items {
 		x := margin + (i%columns)*(w+gap)
 		y := top + (i/columns)*(h+gap)
 		cv.shape("rect", x, y, w, h, c.tile, 0, "")
 		ty := y + pad
 		if item.Icon != "" {
-			cv.text(x+pad, ty, inner, inch*6/10, "t", line(item.Icon, 30, c.title, emoji, false, "l"))
-			ty += lead
+			cv.text(x+pad, ty, iconW, inch*6/10, "t", line(item.Icon, 28, c.title, emoji, false, "l"))
 		}
 		var paragraphs []paragraph
 		if item.Title != "" {
@@ -631,7 +681,7 @@ func grid(cv *canvas, s Slide) {
 			p.spaceBefore = 4
 			paragraphs = append(paragraphs, p)
 		}
-		cv.text(x+pad, ty, inner, y+h-pad-ty, "t", paragraphs...)
+		cv.text(x+pad+iconW, ty, inner, y+h-pad-ty, "t", paragraphs...)
 	}
 }
 
@@ -681,9 +731,65 @@ func statement(cv *canvas, s Slide) {
 	h := linesFor(text, width, size) * size * 14 / 10 * point
 	y := (slideHeight-h)/2 + inch*4/10
 	cv.shape("rect", x, y-inch*35/100, inch*12/10, point*3, c.accent, 0, "")
-	cv.text(x, y, width, h, "t", paragraph{runs: []run{{text: text, size: size, color: c.title, font: serif}}, align: "l", lineSpacing: 115})
+	cv.text(x, y, width, h, "t", paragraph{runs: []run{{text: text, size: size, color: c.title, font: c.titleFont}}, align: "l", lineSpacing: 115})
 	if len(s.Items) > 0 {
 		by := strings.TrimSpace(s.Items[0].Title + " " + s.Items[0].Text)
 		cv.text(x, y+h+inch*2/10, width, inch*5/10, "t", line("— "+by, 16, c.muted, sans, false, "l"))
 	}
+}
+
+// numbers are two to four key figures side by side, large, each over a
+// rule and what it counts.
+func numbers(cv *canvas, s Slide) {
+	c := cv.colors
+	top := header(cv, s, margin, contentW)
+	n := len(s.Items)
+	if n == 0 {
+		return
+	}
+	gap := inch * 4 / 10
+	w := (contentW - (n-1)*gap) / n
+	var figures, labels []string
+	for _, item := range s.Items {
+		figures, labels = append(figures, item.Title), append(labels, item.Text)
+	}
+	// Bold figures are wider than text: they are fitted to most of the
+	// width, so that none wraps.
+	figureSize := 72
+	for _, figure := range figures {
+		figureSize = min(figureSize, fit(figure, w*3/4, 1, 72, 28))
+	}
+	labelSize := fitEach(labels, w, inch*16/10, 20, 13)
+	y := top + (bottom-inch*4/10-top-inch*35/10)/2
+	for i, item := range s.Items {
+		x := margin + i*(w+gap)
+		cv.text(x, y, w, inch*14/10, "b", line(item.Title, figureSize, c.strong, c.titleFont, true, "l"))
+		cv.shape("rect", x, y+inch*16/10, inch*8/10, point*4, c.accent, 0, "")
+		cv.text(x, y+inch*19/10, w, inch*16/10, "t", paragraph{runs: []run{{text: item.Text, size: labelSize, color: c.text, font: sans}}, align: "l", lineSpacing: 110})
+	}
+}
+
+// split is the title on a block of color filling the left two fifths of
+// the slide, and the points on the right.
+func split(cv *canvas, s Slide) {
+	c := cv.colors
+	blockW := slideWidth * 2 / 5
+	cv.shape("rect", 0, 0, blockW, slideHeight, c.block, 0, "")
+	inner := blockW - 2*margin
+	y := inch * 12 / 10
+	if eyebrow := strings.TrimSpace(s.Eyebrow); eyebrow != "" {
+		cv.text(margin, y, inner, inch*35/100, "t", line(strings.ToUpper(eyebrow), 12, c.blockText, sans, true, "l"))
+		y += inch * 45 / 100
+	}
+	titleSize := fit(s.Title, inner, 4, 36, 22)
+	titleH := linesFor(s.Title, inner, titleSize) * titleSize * 13 / 10 * point
+	cv.text(margin, y, inner, titleH, "t", line(s.Title, titleSize, c.blockText, c.titleFont, false, "l"))
+	y += titleH + inch*15/100
+	cv.shape("rect", margin, y, inch*9/10, point*4, c.accent, 0, "")
+	y += inch * 3 / 10
+	if intro := strings.TrimSpace(s.Intro); intro != "" {
+		cv.text(margin, y, inner, bottom-y, "t", paragraph{runs: []run{{text: intro, size: fit(intro, inner, 6, 18, 13), color: c.blockText, font: sans}}, align: "l", lineSpacing: 115})
+	}
+	x := blockW + margin
+	pointList(cv, s.Items, x, inch*12/10, slideWidth-margin-x, bottom-inch*4/10)
 }

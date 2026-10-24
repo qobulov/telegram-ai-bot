@@ -31,7 +31,12 @@ var itemsPerLayout = map[string][2]int{
 	slides.LayoutGrid:      {4, 6},
 	slides.LayoutTable:     {2, 6},
 	slides.LayoutStatement: {0, 1},
+	slides.LayoutNumbers:   {2, 4},
+	slides.LayoutSplit:     {2, 4},
 }
+
+// maxFigureRunes bounds a key figure, such as "1 200+" or "87%".
+const maxFigureRunes = 14
 
 // PresentationQuota counts presentations per user per day.
 type PresentationQuota interface {
@@ -76,10 +81,13 @@ type itemArgs struct {
 	Text  string `json:"text"`
 }
 
-// presentationGuide is how to write a deck that looks made by a designer.
+// presentationGuide is how to write a deck that looks made by a designer,
+// after Anthropic's pptx skill: a theme chosen for the topic, layouts that
+// vary, and key figures shown large.
 const presentationGuide = "Make a PowerPoint presentation (.pptx), sent as your whole answer, when someone asks for a presentation, slides or taqdimot. " +
 	"Write it in the asker's language and script, with real, accurate content: title slide, then 9 to 14 slides: an overview, the topic's parts, a conclusion. " +
-	"Vary layouts, never the same twice in a row: points (2-5 bold terms with a sentence each), cards (2-4), steps (3-4, a sequence), grid (4-6 short tiles with an emoji), table (rows of term and explanation), statement (one key idea, in intro). " +
+	"Pick the theme for the topic's mood (nature, health: forest-canopy, botanical-garden; tech: tech-innovation, midnight-galaxy; history, culture: desert-rose, golden-hour, sunset-boulevard; science, business: ocean-depths, arctic-frost, modern-minimalist). " +
+	"Vary layouts, never the same twice in a row: points (2-5 bold terms with a sentence each), split (a section's title on a color block, 2-4 points), cards (2-4), steps (3-4, a sequence), grid (4-6 short tiles with an emoji), table (rows of term and explanation), numbers (2-4 key figures, the figure as title), statement (one key idea, in intro). " +
 	"Give most slides an eyebrow (a short section label such as \"YO'NALISH 01 · DIAGNOSTIKA\") and an intro sentence. caption is your one-line message with the file."
 
 // PresentationTool lets the model make a PowerPoint file, which is sent as
@@ -188,16 +196,21 @@ func deckOf(args presentationArgs) (slides.Deck, error) {
 	return deck, nil
 }
 
+// slideOf is a slide as the model wrote it, made to fit: text a little too
+// long is cut at a word, as asking the model again would take as long
+// again. Only a slide that cannot be laid out is an error.
 func slideOf(s slideArgs) (slides.Slide, error) {
-	slide := slides.Slide{Layout: s.Layout, Eyebrow: clean(s.Eyebrow), Title: clean(s.Title), Intro: clean(s.Intro), Icon: clean(s.Icon), Note: clean(s.Note)}
+	slide := slides.Slide{Layout: s.Layout, Eyebrow: cut(s.Eyebrow, maxEyebrowRunes), Title: cut(s.Title, slides.MaxTitleRunes),
+		Intro: cut(s.Intro, slides.MaxIntroRunes), Note: cut(s.Note, maxNoteRunes)}
+	if icon := clean(s.Icon); !tooLong(icon, maxIconRunes) {
+		slide.Icon = icon
+	}
 	limits, ok := itemsPerLayout[s.Layout]
 	switch {
 	case !ok:
 		return slide, fmt.Errorf("layout must be one of %s", strings.Join(slides.Layouts, ", "))
-	case slide.Title == "" || tooLong(slide.Title, slides.MaxTitleRunes):
-		return slide, fmt.Errorf("its title must be 1 to %d characters", slides.MaxTitleRunes)
-	case tooLong(slide.Eyebrow, maxEyebrowRunes) || tooLong(slide.Intro, slides.MaxIntroRunes) || tooLong(slide.Note, maxNoteRunes) || tooLong(slide.Icon, maxIconRunes):
-		return slide, fmt.Errorf("shorten it: eyebrow at most %d characters, intro %d, note %d, icon one emoji", maxEyebrowRunes, slides.MaxIntroRunes, maxNoteRunes)
+	case slide.Title == "":
+		return slide, errors.New("it needs a title")
 	case s.Layout == slides.LayoutStatement && slide.Intro == "":
 		return slide, errors.New("a statement needs its statement in intro")
 	}
@@ -207,7 +220,10 @@ func slideOf(s slideArgs) (slides.Slide, error) {
 		}
 	}
 	for _, it := range s.Items {
-		item := slides.Item{Icon: clean(it.Icon), Title: clean(it.Title), Text: clean(it.Text)}
+		item := slides.Item{Title: cut(it.Title, slides.MaxItemTitle), Text: cut(it.Text, slides.MaxItemText)}
+		if icon := clean(it.Icon); !tooLong(icon, maxIconRunes) {
+			item.Icon = icon
+		}
 		if s.Layout == slides.LayoutSteps {
 			// Steps are numbered on the slide; a number in the title too
 			// would show twice.
@@ -216,11 +232,12 @@ func slideOf(s slideArgs) (slides.Slide, error) {
 		if item.Title == "" && item.Text == "" {
 			continue
 		}
-		if tooLong(item.Title, slides.MaxItemTitle) || tooLong(item.Text, slides.MaxItemText) || tooLong(item.Icon, maxIconRunes) {
-			return slide, fmt.Errorf("an item's title must be at most %d characters and its text %d; split or shorten it", slides.MaxItemTitle, slides.MaxItemText)
-		}
 		if s.Layout == slides.LayoutTable && (item.Title == "" || item.Text == "") {
 			return slide, errors.New("each table row needs a title and a text")
+		}
+		if s.Layout == slides.LayoutNumbers && (item.Title == "" || tooLong(item.Title, maxFigureRunes)) {
+			// Not a figure that shows large: the slide becomes points.
+			slide.Layout = slides.LayoutPoints
 		}
 		slide.Items = append(slide.Items, item)
 	}
@@ -230,8 +247,22 @@ func slideOf(s slideArgs) (slides.Slide, error) {
 	return slide, nil
 }
 
-// stepNumber is a step's own number in front of its title, as "1. " or "2)".
-var stepNumber = regexp.MustCompile(`^\d{1,2}\s*[.):]\s+`)
+// stepNumber is a step's own number in front of its title, as "1. ",
+// "2)" or "3-bosqich:".
+var stepNumber = regexp.MustCompile(`(?i)^(?:\d{1,2}\s*[.):]\s+|\d{1,2}\s*-?\s*(?:bosqich|qadam|step|этап|шаг)\w*\s*[.):]?\s*)`)
+
+// cut is text on one line, cut at a word to at most limit characters.
+func cut(text string, limit int) string {
+	text = clean(text)
+	if !tooLong(text, limit) {
+		return text
+	}
+	runes := []rune(text)[:limit-1]
+	if space := strings.LastIndex(string(runes), " "); space > len(string(runes))/2 {
+		return strings.TrimRight(string(runes)[:space], " ,;:.") + "…"
+	}
+	return string(runes) + "…"
+}
 
 // clean is text on one line, its spaces collapsed.
 func clean(text string) string {
