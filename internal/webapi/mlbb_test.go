@@ -153,10 +153,12 @@ func TestMLBBPlayerNotFound(t *testing.T) {
 		"/isan/nickname/ml":        status(500),
 		"/isan/nickname/ml?zone=2": ok(`{"success":false}`),
 	})
-	for _, args := range []string{`{"action":"player","player_id":"12345","zone":"1"}`, `{"action":"player","player_id":"12345","zone":"2"}`} {
-		if env := run(t, u.options(), "mlbb", args); env.OK || !strings.Contains(env.raw, "no account found") || !strings.Contains(env.raw, "check both") {
-			t.Errorf("%s: %s", args, env.raw)
-		}
+	if env := run(t, u.options(), "mlbb", `{"action":"player","player_id":"12345","zone":"2"}`); env.OK || !strings.Contains(env.raw, "no account found") || !strings.Contains(env.raw, "check both") {
+		t.Errorf("not found: %s", env.raw)
+	}
+	// The lookup being down is not the account missing.
+	if env := run(t, u.options(), "mlbb", `{"action":"player","player_id":"12345","zone":"1"}`); env.OK || strings.Contains(env.raw, "no account found") || !strings.Contains(env.raw, "not working right now") {
+		t.Errorf("lookup down: %s", env.raw)
 	}
 }
 

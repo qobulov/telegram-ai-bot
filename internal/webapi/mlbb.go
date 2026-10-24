@@ -454,7 +454,12 @@ func (a *apis) mlbbPlayer(ctx context.Context, id, zone string) (mlbbPlayerOutpu
 		err := a.client.getJSON(ctx, call{service: "the nickname lookup", url: a.urls.Isan + "/nickname/ml?" + query.Encode()}, &answer)
 		return answer, err
 	})
-	if err != nil || !found.Success || found.Name == "" {
+	if err != nil {
+		// The lookup failing is not the account missing: saying "not found"
+		// would have the player doubt an ID that is right.
+		return mlbbPlayerOutput{}, fmt.Errorf("the nickname lookup is not working right now, so the account could not be checked; say so, and that the ID may well be right")
+	}
+	if !found.Success || found.Name == "" {
 		return mlbbPlayerOutput{}, fmt.Errorf("no account found for %s (%s). %s", id, zone, playerNote)
 	}
 	return mlbbPlayerOutput{
