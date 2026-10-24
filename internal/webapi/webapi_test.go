@@ -168,7 +168,6 @@ func (u *upstream) options() Options {
 			SteamStore:        base + "/steam",
 			WorldBank:         base + "/worldbank",
 			JokeAPI:           base + "/jokeapi",
-			BoredAPI:          base + "/bored",
 			LaunchLibrary:     base + "/ll2",
 			OpenDota:          base + "/opendota",
 			Tavily:            base + "/tavily",

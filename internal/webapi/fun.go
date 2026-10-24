@@ -13,7 +13,7 @@ import (
 
 // The fun tool gathers small keyless APIs under one schema, so that each
 // costs the prompt a word, not a tool: Open Trivia DB, Useless Facts,
-// Advice Slip, ZenQuotes, Dog CEO, JokeAPI and the Bored API.
+// Advice Slip, ZenQuotes, Dog CEO and JokeAPI.
 
 type funArgs struct {
 	Action     string `json:"action"`
@@ -30,12 +30,12 @@ var triviaCategories = map[string]int{
 func (a *apis) funTool() tools.Tool {
 	return tools.Tool{
 		Name: "fun",
-		Description: "Light fun: trivia gives a quiz question with its options and answer (category, difficulty optional; ask it and keep the answer until they guess), fact a random fact, advice a piece of advice, quote a famous quote with its author, dog sends a dog picture, joke a clean joke, activity something to do when bored. " +
+		Description: "Light fun: trivia gives a quiz question with its options and answer (category, difficulty optional; ask it and keep the answer until they guess), fact a random fact, advice a piece of advice, quote a famous quote with its author, dog sends a dog picture, joke a clean joke. " +
 			"They are in English: say them in the asker's language.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["trivia", "fact", "advice", "quote", "dog", "joke", "activity"]},
+				"action": {"type": "string", "enum": ["trivia", "fact", "advice", "quote", "dog", "joke"]},
 				"category": {"type": "string", "enum": ["general", "books", "film", "music", "games", "science", "computers", "math", "sports", "geography", "history", "animals"]},
 				"difficulty": {"type": "string", "enum": ["easy", "medium", "hard"]}
 			},
@@ -64,10 +64,8 @@ func (a *apis) fun(ctx context.Context, raw json.RawMessage) (any, error) {
 		return a.dogPicture(ctx)
 	case "joke":
 		return a.joke(ctx)
-	case "activity":
-		return a.activity(ctx)
 	}
-	return nil, argumentError("action must be trivia, fact, advice, quote, dog, joke or activity")
+	return nil, argumentError("action must be trivia, fact, advice, quote, dog or joke")
 }
 
 func (a *apis) trivia(ctx context.Context, args funArgs) (any, error) {
@@ -212,19 +210,4 @@ func (a *apis) joke(ctx context.Context) (any, error) {
 	}
 	return map[string]any{"joke": cleanText(answer.Joke, 500),
 		"note": "In English: retell it in the asker's language only if it still works there.", "source": "JokeAPI"}, nil
-}
-
-// activity is something to do for someone bored, from the Bored API.
-func (a *apis) activity(ctx context.Context) (any, error) {
-	var answer struct {
-		Activity     string `json:"activity"`
-		Type         string `json:"type"`
-		Participants int    `json:"participants"`
-		KidFriendly  bool   `json:"kidFriendly"`
-	}
-	if err := a.client.getJSON(ctx, call{service: "the Bored API", url: a.urls.BoredAPI + "/random"}, &answer); err != nil {
-		return nil, err
-	}
-	return map[string]any{"activity": cleanText(answer.Activity, 200), "kind": answer.Type, "people": answer.Participants,
-		"note": "Suggest it in the asker's language, fitted to their life.", "source": "Bored API"}, nil
 }

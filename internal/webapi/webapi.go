@@ -109,7 +109,6 @@ type BaseURLs struct {
 	SteamStore        string
 	WorldBank         string
 	JokeAPI           string
-	BoredAPI          string
 	LaunchLibrary     string
 	OpenDota          string
 	// Wikipedia is a format string with %s for the language code.
@@ -167,7 +166,6 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.SteamStore = cmp.Or(b.SteamStore, "https://store.steampowered.com")
 	b.WorldBank = cmp.Or(b.WorldBank, "https://api.worldbank.org")
 	b.JokeAPI = cmp.Or(b.JokeAPI, "https://v2.jokeapi.dev")
-	b.BoredAPI = cmp.Or(b.BoredAPI, "https://bored-api.appbrewery.com")
 	b.LaunchLibrary = cmp.Or(b.LaunchLibrary, "https://ll.thespacedevs.com")
 	b.OpenDota = cmp.Or(b.OpenDota, "https://api.opendota.com")
 	b.Wikipedia = cmp.Or(b.Wikipedia, "https://%s.wikipedia.org")

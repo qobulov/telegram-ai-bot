@@ -87,10 +87,3 @@ func TestJokeIsCleanAndTwoPartJokesKeepTheirPunchline(t *testing.T) {
 		t.Errorf("query = %s, want safe mode and the offending kinds left out", q)
 	}
 }
-
-func TestActivityForSomeoneBored(t *testing.T) {
-	u := newUpstream(t, map[string]stub{"/bored/random": ok(`{"activity":"Learn a new recipe","type":"cooking","participants":1,"kidFriendly":true}`)})
-	if env := run(t, u.options(), "fun", `{"action":"activity"}`); !env.OK || !strings.Contains(env.raw, `"activity":"Learn a new recipe"`) {
-		t.Errorf("activity = %s", env.raw)
-	}
-}
