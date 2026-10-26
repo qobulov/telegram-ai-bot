@@ -104,15 +104,15 @@ func (f *fakeModel) firstRequest() []modelMessage {
 	return f.requests[0]
 }
 
-// calculatorThenAnswer asks for the calculator, then answers with its result.
-func calculatorThenAnswer(t *testing.T) func([]modelMessage) string {
+// helpThenAnswer asks for the bot's help, then answers once it has it.
+func helpThenAnswer(t *testing.T) func([]modelMessage) string {
 	return func(messages []modelMessage) string {
 		last := messages[len(messages)-1]
 		if last.Role != "tool" {
 			return `{"choices":[{"message":{"role":"assistant","content":null,"tool_calls":[
-				{"id":"call_1","type":"function","function":{"name":"calculator","arguments":"{\"expression\":\"2+2\"}"}}]}}]}`
+				{"id":"call_1","type":"function","function":{"name":"get_bot_help","arguments":"{}"}}]}}]}`
 		}
-		if !strings.Contains(last.Content, `"result":4`) {
+		if !strings.Contains(last.Content, `"help"`) {
 			t.Errorf("tool result sent to the model = %s", last.Content)
 		}
 		return `{"choices":[{"message":{"role":"assistant","content":"2+2 = 4"}}]}`
@@ -218,7 +218,7 @@ func (env *e2e) history(t *testing.T, scope storage.Scope) []ai.Message {
 func TestServeAnswersMessageEndToEnd(t *testing.T) {
 	env := startE2E(t, `{"update_id":900001,"message":{"message_id":1,
 		"from":{"id":777001,"is_bot":false},"chat":{"id":777001,"type":"private"},"text":"what is 2+2?"}}`,
-		calculatorThenAnswer(t))
+		helpThenAnswer(t))
 
 	sent := env.waitForSend(t)
 	if sent["text"] != "2+2 = 4" || sent["chat_id"] != float64(e2eUser) {

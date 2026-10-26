@@ -863,14 +863,16 @@ func TestHelpMentionsModerationAndPolls(t *testing.T) {
 	for _, want := range []string{
 		"Uzbek", "Russian", "English",
 		"photos", "stickers", "GIFs", "round videos",
-		"tell the time anywhere", "arithmetic", "make a poll in a group", "Send a test file",
+		"tell the time anywhere", "make a poll in a group", "Send a test file",
 	} {
 		if !strings.Contains(help, want) {
 			t.Errorf("help text does not mention %q", want)
 		}
 	}
-	if strings.Contains(help, "presentation") {
-		t.Error("help still offers presentations, which the bot no longer makes")
+	for _, gone := range []string{"presentation", "arithmetic"} {
+		if strings.Contains(help, gone) {
+			t.Errorf("help still offers %s, which the bot no longer does", gone)
+		}
 	}
 	// The words below were in the help before moderation existed ("/reset —
 	// delete the conversation history", "/mute"), so they are looked for

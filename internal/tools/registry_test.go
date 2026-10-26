@@ -200,21 +200,13 @@ func TestBuiltinToolsRegisterAndValidate(t *testing.T) {
 			t.Errorf("%s has an invalid schema", def.Function.Name)
 		}
 	}
-	for _, want := range []string{"get_current_time", "calculator", "get_bot_help"} {
+	for _, want := range []string{"get_current_time", "get_bot_help"} {
 		if !names[want] {
 			t.Errorf("missing builtin tool %q", want)
 		}
 	}
 
-	env := decodeEnvelope(t, registry.Execute(ctx, userID, "calculator", `{"expression":"2*(3+4)"}`))
-	if !env.OK || !strings.Contains(string(env.Result), `"result":14`) {
-		t.Errorf("calculator = %+v (%s)", env, env.Result)
-	}
-	expectError(t, registry.Execute(ctx, userID, "calculator", `{"expression":"1/0"}`), "invalid_arguments")
-	expectError(t, registry.Execute(ctx, userID, "calculator", `{}`), "invalid_arguments")
-	expectError(t, registry.Execute(ctx, userID, "calculator", `{"expression":"1","code":"rm -rf"}`), "invalid_arguments")
-
-	env = decodeEnvelope(t, registry.Execute(ctx, userID, "get_bot_help", ``))
+	env := decodeEnvelope(t, registry.Execute(ctx, userID, "get_bot_help", ``))
 	if !env.OK || !strings.Contains(string(env.Result), "help text") {
 		t.Errorf("get_bot_help = %+v (%s)", env, env.Result)
 	}

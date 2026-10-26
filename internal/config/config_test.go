@@ -237,7 +237,7 @@ func TestBuiltInPersona(t *testing.T) {
 	if strings.Contains(cfg.PersonaPrompt, "Mira") {
 		t.Error("the built-in persona names the character directly instead of using the configured name")
 	}
-	for _, want := range []string{"slur", "untrusted", "threat", "never claim to be a real human", "calculator", "plain text"} {
+	for _, want := range []string{"slur", "untrusted", "threat", "never claim to be a real human", "plain text"} {
 		if !strings.Contains(strings.ToLower(cfg.PersonaPrompt), want) {
 			t.Errorf("the built-in persona does not mention %q", want)
 		}
@@ -968,27 +968,6 @@ func TestOwnerNoteKeepsMasterAndToolUse(t *testing.T) {
 		if !strings.Contains(cfg.PersonaPrompt, want) {
 			t.Errorf("the owner note does not contain %q", want)
 		}
-	}
-}
-
-func TestBackupProviderDefaultsToGroq(t *testing.T) {
-	cfg, err := Load(getenv(geminiEnv()))
-	if err != nil || cfg.BackupAPIKey != "" {
-		t.Fatalf("without a key: backup = %q, err = %v", cfg.BackupAPIKey, err)
-	}
-	env := geminiEnv()
-	env["BACKUP_API_KEY"] = "gsk-secret"
-	cfg, err = Load(getenv(env))
-	if err != nil {
-		t.Fatalf("Load: %v", err)
-	}
-	if cfg.BackupAPIKey != "gsk-secret" || cfg.BackupBaseURL != "https://api.groq.com/openai/v1" || cfg.BackupModel != "openai/gpt-oss-120b" {
-		t.Errorf("backup = %q %q %q", cfg.BackupAPIKey, cfg.BackupBaseURL, cfg.BackupModel)
-	}
-	env["BACKUP_MODEL"] = "qwen/qwen3.8-27b"
-	env["BACKUP_BASE_URL"] = "https://api.x.ai/v1"
-	if cfg, _ := Load(getenv(env)); cfg.BackupModel != "qwen/qwen3.8-27b" || cfg.BackupBaseURL != "https://api.x.ai/v1" {
-		t.Errorf("override: %q %q", cfg.BackupModel, cfg.BackupBaseURL)
 	}
 }
 

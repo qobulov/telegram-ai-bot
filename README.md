@@ -4,7 +4,7 @@ A Telegram chat character written in Go: a playful, quick-witted group-chat
 regular (called Maria unless you rename her) rather than a neutral assistant.
 She answers through [Google Gemini](https://ai.google.dev), remembers
 conversations in PostgreSQL, and can call a small set of tools that are
-checked in code (current time, calculator, bot help, drawing, polls, a
+checked in code (current time, bot help, drawing, polls, a
 group's admin list, moderation for group admins, and live data: exchange
 rates, weather, prayer times, news headlines, Wikipedia, football and crypto
 prices).
@@ -53,7 +53,7 @@ internal/webhook                HTTP handler for webhook updates, with secret ch
 internal/config                 load .env + environment, validate
 internal/telegram               Bot API client: long polling, sending, message splitting
 internal/ai                     Model client: types, retries, tool-calling format
-internal/tools                  tool registry + time, calculator, help, drawing, polls, admin list, moderation, owners' tools
+internal/tools                  tool registry + time, help, drawing, polls, admin list, moderation, owners' tools
 internal/webapi                 live-data tools: rates, weather, prayer times, news, Wikipedia, football, crypto
 internal/storage                pgx pool, migrations, conversation queries
 internal/storage/migrations     SQL migrations, embedded in the binary
@@ -87,8 +87,7 @@ Design points worth knowing:
   decoded into typed structs, unknown properties are rejected, each run has a
   timeout and an output size limit. Permission to use a tool depends only on
   the Telegram user ID of the sender, never on anything the model or the user
-  writes. The calculator is a hand-written parser; nothing is ever passed to a
-  shell or an interpreter.
+  writes. Nothing is ever passed to a shell or an interpreter.
 - **Tool loop limit.** `MAX_TOOL_CALLS_PER_TURN` counts calls across one
   message. After the limit, further calls are refused, the model is told to
   answer without tools, and the turn fails if it still does not.
@@ -169,9 +168,6 @@ in the environment win over the file.
 | `GEMINI_API_KEY` | one of the two keys | Google Gemini key from <https://aistudio.google.com/apikey>; set this or `XAI_API_KEY`, not both |
 | `GEMINI_MODEL` | `gemini-3.6-flash` | Gemini model ID, used with `GEMINI_API_KEY` |
 | `FALLBACK_MODELS` | Gemini: `gemini-3.5-flash,gemini-flash-latest,gemini-3.5-flash-lite` | Models tried in order when the main one is overloaded, out of quota or does not answer, then once more after a pause; a model out of quota is skipped for 15 minutes, one that did not answer within 20 seconds for 10; `none` turns this off |
-| `BACKUP_API_KEY` | empty | Key for a backup provider, asked when every model of the main one failed; replies that already moved to it stay on it |
-| `BACKUP_BASE_URL` | `https://api.groq.com/openai/v1` | The backup's OpenAI-compatible API (Groq by default). Groq's free tier allows 8,000 tokens a minute, which is one group reply at most: a request with the persona and the group log is 6,000 tokens or more |
-| `BACKUP_MODEL` | `openai/gpt-oss-120b` | The backup's model; it gets voice messages as transcripts only |
 | `XAI_API_KEY` | one of the keys | xAI (Grok) key from <https://console.x.ai>; images yes, voice no |
 | `XAI_MODEL` | `grok-4` | Grok model ID, used with `XAI_API_KEY` |
 | `MAX_MEDIA_MB` | `5` | Largest photo or sticker file downloaded for the model (1 to 20) |
@@ -183,7 +179,6 @@ in the environment win over the file.
 | `YOUTUBE_API_KEY` | empty | YouTube Data API v3 key from Google Cloud Console, not bound to a service account; without it there is no video search |
 | `TMDB_TOKEN` | empty | TMDB API Read Access Token from <https://www.themoviedb.org/settings/api>; without it there is no movies tool |
 | `GOOGLE_SAFE_BROWSING_KEY` | empty | Google Cloud API key restricted to the Safe Browsing API; lets owners turn on the link guard (`group_rules` `guard` `links`), which deletes links Google takes for malware, phishing or unwanted software. Google offers this API for non-commercial use |
-| `WOLFRAM_APP_ID` | empty | Wolfram|Alpha AppID from <https://developer.wolframalpha.com> (free: 2,000 calls a month); adds the `wolfram` tool, which solves equations, integrals, physics and chemistry. It is sent in a header, never in a URL |
 | `CALENDARIFIC_API_KEY` | empty | Calendarific key from <https://calendarific.com> (free plan, monthly limit); adds the `holidays` tool. It is sent in a header, never in a URL |
 | `URLHAUS_AUTH_KEY` | empty | Free Auth-Key from <https://auth.abuse.ch/>; also lets owners turn on the link guard, and with both keys a link is deleted when either service lists it (URLhaus by its host) |
 | `SIGHTENGINE_API_USER`, `SIGHTENGINE_API_SECRET` | empty | From <https://dashboard.sightengine.com/api-credentials>; let owners turn on the picture guard (`guard` `images`), which deletes nude, very suggestive or gory pictures from anyone, admins and owners included: photos, stickers, pictures sent as files and the first frame of GIFs and videos. Each picture is checked once per 6 hours using two operations of its monthly quota (nudity and gore). The spam guard (`guard` `spam`: CAS and lols.bot, banning listed accounts) needs no key |
@@ -310,7 +305,7 @@ Gemini.
 that answered in about 1.5 s in testing; change it any time by setting
 `GEMINI_MODEL` for another one from
 <https://ai.google.dev/gemini-api/docs/models>. Gemini models support the
-tools (time, calculator) and answer within seconds, which matters for the
+tools and answer within seconds, which matters for the
 60-second limit on Vercel. The bot talks to
 Gemini through Google's OpenAI-compatible endpoint, so nothing else changes.
 On Vercel, set `GEMINI_MODEL` (and, if you like, `FALLBACK_MODELS`) under
@@ -326,10 +321,6 @@ starts again with the main model, unless it ran out of quota (skipped for 15
 minutes) or did not answer in time (skipped for 10 minutes, so a slow model
 does not make every reply wait 20 seconds). If every model is busy, the user is told
 the AI is overloaded and to try again in a minute.
-
-When every Gemini model failed and `BACKUP_API_KEY` is set, the request
-goes to the backup provider, Groq by default (see
-[Configuration](#configuration) for its free-tier limit).
 
 If the model rejects a request because it cannot use tools, the bot logs
 `model does not support tool calling; continuing without tools`, answers
@@ -616,8 +607,7 @@ answer instead of making up a number.
 | `quran` | Quran verses by reference (up to 7 at once) with Muhammad Sodiq Muhammad Yusuf's Uzbek translation in Latin script, or Kuliev's Russian or Saheeh International's English; the verse of the day; a surah's facts; a search of the Uzbek meaning | quran.com, keyless; the search uses alquran.cloud, whose Uzbek text is Cyrillic, so a Latin query is written in Cyrillic first; cached for a day |
 | `fun` | One tool for small amusements: a trivia question with shuffled options and its answer (by category and difficulty), a random fact (facts about sex, drink or drugs are skipped), a piece of advice, a famous quote, a dog picture | Open Trivia DB, Useless Facts, Advice Slip, ZenQuotes and Dog CEO, all keyless; gathered under one schema so that they cost the prompt one tool |
 | `more_info` | One tool for more look-ups: books by title or author, recipes by the dish's English name (pork and alcohol left out), the world gold and silver price per ounce and gram, Lichess's daily puzzle and a player's ratings, this Formula 1 season's standings and the last race | Open Library, TheMealDB, gold-api.com, Lichess and Jolpica (the Ergast API's successor), all keyless; cached for an hour, metal prices for 10 minutes |
-| `study` | For students: exact math with math.js (derivatives, matrices, units, big numbers; no integrals), scholarly articles from Crossref with DOI links, arXiv preprints with PDF links, and English synonyms, antonyms, rhymes and words of like meaning | math.js, Crossref, arXiv and Datamuse, all keyless; one schema; papers and words cached for 6 hours |
-| `wolfram` | Exact answers from Wolfram|Alpha's LLM API: equations, integrals, limits, physics and chemistry, statistics, units; plot images and code are dropped from its answer | Only with `WOLFRAM_APP_ID`; cached for 6 hours |
+| `study` | For students: scholarly articles from Crossref with DOI links, arXiv preprints with PDF links, and English synonyms, antonyms, rhymes and words of like meaning | Crossref, arXiv and Datamuse, all keyless; one schema; papers and words cached for 6 hours |
 | `holidays` | A year's holidays and days off from Calendarific, each with the days left until it: all of Uzbekistan's, working Saturdays and Ramadan included; another country's national holidays only. Equinoxes and solstices are dropped | Only with `CALENDARIFIC_API_KEY`; cached for a day |
 | `read_page` | A web page's title and text, cut to 8,000 characters, to summarize a link or answer about it | Jina Reader (r.jina.ai), keyless (about 20 pages a minute); local addresses and Telegram's file links are refused; cached for 30 minutes |
 
@@ -1574,8 +1564,8 @@ Known limits:
 
 - Conversation text is stored unencrypted in PostgreSQL. Use disk encryption
   if that matters for your users.
-- Message text is sent to the model provider (Google, or Groq when the
-  backup answers). Tell your users, and check the provider's data policy.
+- Message text is sent to the model provider, Google. Tell your users, and
+  check the provider's data policy.
 - In a group, anyone who can post can make the bot answer, within the rate
   limits. The answer is visible to the whole group, and it can draw on what
   other members said to the bot there.

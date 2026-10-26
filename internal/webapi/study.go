@@ -5,10 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"maps"
-	"net/http"
 	"net/url"
 	"regexp"
 	"slices"
@@ -20,16 +18,14 @@ import (
 )
 
 // The study tool gathers keyless APIs for students under one schema:
-// math.js computes, Crossref and arXiv find papers, Datamuse finds words,
-// the World Bank gives countries' statistics.
+// Crossref and arXiv find papers, Datamuse finds words, the World Bank
+// gives countries' statistics.
 
 const (
 	studyTTL       = 6 * time.Hour
-	maxExpression  = 300
 	maxStudyQuery  = 120
 	maxPapers      = 5
 	maxRelatedWord = 12
-	mathPrecision  = 14
 )
 
 type studyArgs struct {
@@ -60,14 +56,13 @@ var countryCodes = regexp.MustCompile(`^[A-Za-z]{2,3}(;[A-Za-z]{2,3}){0,4}$`)
 
 func (a *apis) studyTool() tools.Tool {
 	return tools.Tool{
-		Name: "study",
-		Description: "For study: math computes exactly with math.js (\"derivative('x^2','x')\", \"5 km to mile\"; no integrals) rather than in your head. " +
-			"papers: scholarly articles (Crossref); arxiv: preprints with PDFs; synonyms, antonyms, rhymes, means_like: English words; statistics: a country's World Bank figures, for any real figure.",
+		Name:        "study",
+		Description: "For study: papers: scholarly articles (Crossref); arxiv: preprints with PDFs; synonyms, antonyms, rhymes, means_like: English words; statistics: a country's World Bank figures, for any real figure.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["math", "papers", "arxiv", "synonyms", "antonyms", "rhymes", "means_like", "statistics"]},
-				"query": {"type": "string", "description": "The math.js expression, the topic in English, the English word, or for statistics ISO country codes, as \"UZ\" or \"UZ;KZ\"."},
+				"action": {"type": "string", "enum": ["papers", "arxiv", "synonyms", "antonyms", "rhymes", "means_like", "statistics"]},
+				"query": {"type": "string", "description": "The topic in English, the English word, or for statistics ISO country codes, as \"UZ\" or \"UZ;KZ\"."},
 				"indicator": {"type": "string", "enum": ["` + strings.Join(slices.Sorted(maps.Keys(worldBankIndicators)), `", "`) + `"], "description": "For statistics."}
 			},
 			"required": ["action", "query"],
@@ -84,16 +79,10 @@ func (a *apis) study(ctx context.Context, raw json.RawMessage) (any, error) {
 		return nil, err
 	}
 	query := strings.TrimSpace(args.Query)
-	limit := maxStudyQuery
-	if args.Action == "math" {
-		limit = maxExpression
-	}
-	if query == "" || utf8.RuneCountInString(query) > limit {
-		return nil, argumentError("query must be 1 to %d characters", limit)
+	if query == "" || utf8.RuneCountInString(query) > maxStudyQuery {
+		return nil, argumentError("query must be 1 to %d characters", maxStudyQuery)
 	}
 	switch args.Action {
-	case "math":
-		return a.mathjs(ctx, query)
 	case "papers":
 		return a.crossref(ctx, query)
 	case "arxiv":
@@ -103,33 +92,7 @@ func (a *apis) study(ctx context.Context, raw json.RawMessage) (any, error) {
 	case "statistics":
 		return a.worldBank(ctx, query, args.Indicator)
 	}
-	return nil, argumentError("action must be math, papers, arxiv, synonyms, antonyms, rhymes, means_like or statistics")
-}
-
-// mathjs evaluates an expression on api.mathjs.org. An expression it
-// cannot read comes back as an argument error with its own explanation,
-// for the model to fix.
-func (a *apis) mathjs(ctx context.Context, expression string) (any, error) {
-	body, err := json.Marshal(map[string]any{"expr": expression, "precision": mathPrecision})
-	if err != nil {
-		return nil, err
-	}
-	var answer struct {
-		Result *string `json:"result"`
-		Error  string  `json:"error"`
-	}
-	raw, err := a.patient.get(ctx, call{service: "math.js", url: a.urls.MathJS + "/v4/", body: body})
-	var status *statusError
-	if errors.As(err, &status) && status.status == http.StatusBadRequest && json.Unmarshal(status.body, &answer) == nil && answer.Error != "" {
-		return nil, argumentError("math.js could not compute it: %s", cleanText(answer.Error, 200))
-	}
-	if err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal(raw, &answer); err != nil || answer.Result == nil {
-		return nil, fmt.Errorf("math.js sent an answer that could not be read")
-	}
-	return map[string]any{"expression": expression, "result": *answer.Result, "source": "math.js"}, nil
+	return nil, argumentError("action must be papers, arxiv, synonyms, antonyms, rhymes, means_like or statistics")
 }
 
 type paper struct {

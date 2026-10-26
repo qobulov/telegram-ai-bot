@@ -225,11 +225,10 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		ReasoningEffort: cfg.ReasoningEffort,
 		Logger:          logger,
 	})
-	answering := withBackup(cfg, model, logger)
 	router, chat := chatRouting(cfg, logger)
 	assistant := agent.New(agent.Options{
 		Store:        store,
-		Model:        answering,
+		Model:        model,
 		Tools:        registry,
 		Router:       router,
 		ChatModel:    chat,
@@ -414,7 +413,6 @@ func liveDataTools(cfg config.Config, bot Bot) []tools.Tool {
 		TavilyKey:       cfg.TavilyAPIKey,
 		TMDBToken:       cfg.TMDBToken,
 		YouTubeKey:      cfg.YouTubeAPIKey,
-		WolframAppID:    cfg.WolframAppID,
 		CalendarificKey: cfg.CalendarificAPIKey,
 	}
 	return webapi.Tools(opts)
@@ -470,7 +468,7 @@ func swearJudge(cfg config.Config, logger *slog.Logger) *ai.Client {
 // chatRouting is the router of ROUTER_MODEL and the chat model of
 // CHAT_MODEL, both nil without a router. The router gives one word, as the
 // swear judge does; a chat model that fails hands the turn to the main
-// model and its backup.
+// model and its fallbacks.
 func chatRouting(cfg config.Config, logger *slog.Logger) (router, chat agent.Model) {
 	if cfg.RouterModel == "" {
 		return nil, nil
@@ -526,26 +524,6 @@ func stickerLabeller(cfg config.Config, logger *slog.Logger) *ai.Client {
 		AttemptTimeout:  attemptTimeout,
 		Logger:          logger,
 	})
-}
-
-// withBackup puts the backup provider behind the main one when
-// BACKUP_API_KEY is set. Voice messages are still transcribed by the main
-// one only.
-func withBackup(cfg config.Config, model *ai.Client, logger *slog.Logger) agent.Model {
-	if cfg.BackupAPIKey == "" {
-		return model
-	}
-	backup := ai.NewClient(ai.Options{
-		BaseURL:        cfg.BackupBaseURL,
-		APIKey:         cfg.BackupAPIKey,
-		Model:          cfg.BackupModel,
-		MaxTokens:      cfg.MaxOutputTokens,
-		MaxAttempts:    2,
-		HTTPClient:     &http.Client{Timeout: cfg.RequestTimeout},
-		AttemptTimeout: attemptTimeout,
-		Logger:         logger,
-	})
-	return ai.NewChain(model, backup, logger)
 }
 
 // transcriber is the model client when the provider can listen to audio,

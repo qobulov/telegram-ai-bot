@@ -1,5 +1,5 @@
 // Package ai is a client for OpenAI-compatible Chat Completions APIs, such as
-// Gemini's, xAI's and Groq's.
+// Gemini's and xAI's.
 package ai
 
 import (

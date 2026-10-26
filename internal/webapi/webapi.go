@@ -53,9 +53,6 @@ type Options struct {
 	// YouTubeKey is a YouTube Data API key. Without it there is no
 	// youtube_search tool.
 	YouTubeKey string
-	// WolframAppID is a Wolfram|Alpha AppID. Without it there is no
-	// wolfram tool.
-	WolframAppID string
 	// CalendarificKey is a Calendarific key. Without it there is no
 	// holidays tool.
 	CalendarificKey string
@@ -102,11 +99,9 @@ type BaseURLs struct {
 	GoldAPI           string
 	Lichess           string
 	Jolpica           string
-	MathJS            string
 	Crossref          string
 	ArXiv             string
 	Datamuse          string
-	Wolfram           string
 	Calendarific      string
 	Shikimori         string
 	TraceMoe          string
@@ -160,11 +155,9 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.GoldAPI = cmp.Or(b.GoldAPI, "https://api.gold-api.com")
 	b.Lichess = cmp.Or(b.Lichess, "https://lichess.org")
 	b.Jolpica = cmp.Or(b.Jolpica, "https://api.jolpi.ca")
-	b.MathJS = cmp.Or(b.MathJS, "https://api.mathjs.org")
 	b.Crossref = cmp.Or(b.Crossref, "https://api.crossref.org")
 	b.ArXiv = cmp.Or(b.ArXiv, "https://export.arxiv.org")
 	b.Datamuse = cmp.Or(b.Datamuse, "https://api.datamuse.com")
-	b.Wolfram = cmp.Or(b.Wolfram, "https://api.wolframalpha.com")
 	b.Calendarific = cmp.Or(b.Calendarific, "https://calendarific.com")
 	b.Shikimori = cmp.Or(b.Shikimori, "https://shikimori.io")
 	b.TraceMoe = cmp.Or(b.TraceMoe, "https://api.trace.moe")
@@ -212,7 +205,6 @@ type apis struct {
 	tavilyKey       string
 	tmdbToken       string
 	youtubeKey      string
-	wolframAppID    string
 	calendarificKey string
 }
 
@@ -255,9 +247,6 @@ func Tools(opts Options) []tools.Tool {
 	if a.youtubeKey != "" {
 		list = append(list, a.youtubeTool())
 	}
-	if a.wolframAppID != "" {
-		list = append(list, a.wolframTool())
-	}
 	if a.calendarificKey != "" {
 		list = append(list, a.holidaysTool())
 	}
@@ -283,7 +272,6 @@ func newAPIs(opts Options) *apis {
 		tavilyKey:       opts.TavilyKey,
 		tmdbToken:       opts.TMDBToken,
 		youtubeKey:      opts.YouTubeKey,
-		wolframAppID:    opts.WolframAppID,
 		calendarificKey: opts.CalendarificKey,
 	}
 }

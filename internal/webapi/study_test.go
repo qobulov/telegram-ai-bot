@@ -1,37 +1,9 @@
 package webapi
 
 import (
-	"encoding/json"
-	"io"
 	"strings"
 	"testing"
 )
-
-func TestMathIsComputedByMathJS(t *testing.T) {
-	u := newUpstream(t, map[string]stub{"/mathjs/v4/": ok(`{"result":"2 * x + cos(x)","error":null}`)})
-
-	env := run(t, u.options(), "study", `{"action":"math","query":"derivative('x^2+sin(x)','x')"}`)
-
-	if !env.OK || !strings.Contains(env.raw, `"result":"2 * x + cos(x)"`) {
-		t.Fatalf("math = %s", env.raw)
-	}
-	body, _ := io.ReadAll(u.requests("/mathjs/v4/")[0].Body)
-	var sent struct {
-		Expr      string `json:"expr"`
-		Precision int    `json:"precision"`
-	}
-	if err := json.Unmarshal(body, &sent); err != nil || sent.Expr != "derivative('x^2+sin(x)','x')" || sent.Precision != 14 {
-		t.Errorf("sent %s", body)
-	}
-}
-
-// An expression math.js cannot read comes back with its explanation, for
-// the model to fix.
-func TestMathErrorsAreExplained(t *testing.T) {
-	u := newUpstream(t, map[string]stub{"/mathjs/v4/": {status: 400, body: `{"result":null,"error":"Error: Unexpected end of expression (char 4)"}`}})
-	wantError(t, run(t, u.options(), "study", `{"action":"math","query":"1/("}`), "invalid_arguments", "Unexpected end of expression")
-	wantError(t, run(t, u.options(), "study", `{"action":"math","query":"  "}`), "invalid_arguments", "query")
-}
 
 func TestPapersFromCrossref(t *testing.T) {
 	u := newUpstream(t, map[string]stub{"/crossref/works": ok(`{"message":{"items":[

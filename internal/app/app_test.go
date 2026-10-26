@@ -526,7 +526,7 @@ func TestPromptSizes(t *testing.T) {
 		t.Skip("no PROMPT_SIZES")
 	}
 	env := startWebhook(t)
-	for _, key := range []string{"WOLFRAM_APP_ID", "TMDB_API_KEY", "FOOTBALL_DATA_TOKEN", "YOUTUBE_API_KEY"} {
+	for _, key := range []string{"TMDB_API_KEY", "FOOTBALL_DATA_TOKEN", "YOUTUBE_API_KEY"} {
 		env.baseEnv[key] = "test"
 	}
 	hook, err := NewWebhook(context.Background(), env.config(t), slog.New(slog.NewTextHandler(io.Discard, nil)))

@@ -152,7 +152,7 @@ func evalConfig(t *testing.T, key string) config.Config {
 	env := map[string]string{
 		"TELEGRAM_BOT_TOKEN": "1:eval", "GEMINI_API_KEY": key, "DB_POSTGRES_URL": "postgres://eval@localhost/eval",
 		"BOT_OWNER_USERNAME": "pronium,TursunoffM", "BOT_OWNER_IDS": "1688909825,1047217990",
-		"FOOTBALL_DATA_TOKEN": "x", "TAVILY_API_KEY": "x", "TMDB_TOKEN": "x", "YOUTUBE_API_KEY": "x", "WOLFRAM_APP_ID": "x",
+		"FOOTBALL_DATA_TOKEN": "x", "TAVILY_API_KEY": "x", "TMDB_TOKEN": "x", "YOUTUBE_API_KEY": "x",
 		"SIGHTENGINE_API_USER": "x", "SIGHTENGINE_API_SECRET": "x", "GOOGLE_SAFE_BROWSING_KEY": "x",
 		"ROUTER_MODEL": cmp.Or(os.Getenv("ROUTING_EVAL_ROUTER"), "gemini-3.5-flash-lite"), "CHAT_MODEL": os.Getenv("ROUTING_EVAL_CHAT_MODEL"),
 	}
