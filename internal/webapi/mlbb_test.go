@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/draw"
+	"image/png"
 	"net/http"
 	"reflect"
 	"slices"
@@ -489,5 +493,76 @@ func TestSkillTextDropsWikiMarkup(t *testing.T) {
 		if got := skillText(in); got != want {
 			t.Errorf("skillText(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// The first build goes as one PNG, even when its icons will not load; the
+// test server's icons are not https, so they are left blank.
+func TestMLBBBuildSendsOnePicture(t *testing.T) {
+	u := newUpstream(t, map[string]stub{
+		"/arena/api/heroes":                   ok(arenaHeroes),
+		"/arena/api/academy/heroes/84/builds": ok(arenaLingBuilds),
+		"/arena/api/academy/equipment":        ok(arenaItems),
+		"/arena/api/academy/emblems":          ok(arenaEmblems),
+	})
+	sink := &tools.Sink{}
+	ctx := tools.WithTurn(context.Background(), tools.Caller{UserID: 1, ChatID: -100, Human: true}, sink)
+	var env envelope
+	if err := json.Unmarshal([]byte(newRegistry(t, u.options()).Execute(ctx, 1, "mlbb", `{"action":"build","hero":"Ling","lane":"jungle"}`)), &env); err != nil {
+		t.Fatal(err)
+	}
+	env.raw = string(env.Result)
+	out := result[mlbbBuildOutput](t, env)
+	drawings := sink.Take()
+	if len(drawings) != 1 || drawings[0].MimeType != "image/png" || !strings.Contains(out.Note, "one picture") {
+		t.Fatalf("drawings = %d, note = %q", len(drawings), out.Note)
+	}
+	card, err := png.Decode(bytes.NewReader(drawings[0].Data))
+	// Spell, emblem and two talents make the widest row.
+	if err != nil || card.Bounds().Dx() != 2*cardPadding+4*cardCell {
+		t.Errorf("card = %v, %v", card.Bounds(), err)
+	}
+}
+
+func TestDrawBuildCard(t *testing.T) {
+	red := image.NewRGBA(image.Rect(0, 0, 100, 100))
+	draw.Draw(red, red.Bounds(), image.NewUniform(color.RGBA{R: 0xff, A: 0xff}), image.Point{}, draw.Src)
+	data, err := drawBuildCard(buildCard{Title: "Ling · Jungle", Subtitle: "Win rate 58.3%", Rows: []cardRow{
+		{Heading: "Core items", Icons: []cardIcon{{Name: "Berserker's Fury", Picture: red}, {Name: "A name long enough to need two lines and more"}}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	card, err := png.Decode(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	top := cardPadding + cardTitle + cardHeading
+	centre := func(cell int) color.Color {
+		return card.At(cardPadding+cell*cardCell+cardCell/2, top+cardIconSize/2)
+	}
+	if r, g, b, _ := centre(0).RGBA(); r>>8 != 0xff || g != 0 || b != 0 {
+		t.Errorf("the icon's centre is %v, want red", centre(0))
+	}
+	if r, g, b, _ := centre(1).RGBA(); uint8(r>>8) != cardMissing.R || uint8(g>>8) != cardMissing.G || uint8(b>>8) != cardMissing.B {
+		t.Errorf("the missing icon's centre is %v, want the blank colour", centre(1))
+	}
+}
+
+// With MLBBDex, the hero and its main lane come from its list and the
+// academy is asked by name, without Rone Arena's hero list or page.
+func TestMLBBBuildByMLBBDexName(t *testing.T) {
+	u := newUpstream(t, map[string]stub{
+		"/dex/api/v1/heroes":                       ok(`{"data":[{"slug":"chang-e","name":"Chang'e","roles":["Mage"],"lanes":["Mid"]}]}`),
+		"/arena/api/academy/heroes/Chang'e/builds": ok(arenaLingBuilds),
+		"/arena/api/academy/equipment":             ok(arenaItems),
+		"/arena/api/academy/emblems":               ok(arenaEmblems),
+	})
+	out := result[mlbbBuildOutput](t, run(t, u.options(), "mlbb", `{"action":"build","hero":"change"}`))
+	if out.Hero != "Chang'e" || out.Lane != "mid" || len(out.Builds) != 2 {
+		t.Errorf("build = %+v", out)
+	}
+	if n := len(u.requests("/arena/api/heroes")); n != 0 {
+		t.Errorf("Rone Arena's hero list was asked for %d times", n)
 	}
 }

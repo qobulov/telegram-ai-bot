@@ -34,10 +34,9 @@ const (
 	shownSkill      = 240
 	shownTip        = 200
 	mlbbOutputBytes = 6000
-	// mlbbTimeout covers the slowest answer, a cold build: the hero list,
-	// the hero's page for its lane, the builds and the item and talent
-	// names, five requests the API answers in turn, about 2 s each.
-	mlbbTimeout = 15 * time.Second
+	// mlbbTimeout covers the slowest answers, a cold hero or build, when
+	// Rone Arena is busy and takes up to 10 s a request.
+	mlbbTimeout = 20 * time.Second
 	// heroPictureLimit is well above a portrait's 40 KB.
 	heroPictureLimit = 1 << 20
 )
