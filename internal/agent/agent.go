@@ -336,6 +336,12 @@ func finishText(t *turn, answer string) (Answer, error) {
 	if isThinking(answer) {
 		return Answer{}, ErrLeakedThinking
 	}
+	if rest, leaked := afterLeakedPlan(answer); leaked {
+		if !hasWords(rest) {
+			return Answer{}, ErrLeakedThinking
+		}
+		answer = rest
+	}
 	if marker := mediaMarkers.FindStringSubmatch(answer); marker != nil {
 		kind, media := strings.ToLower(marker[1]), strings.Join(strings.Fields(strings.ToLower(marker[2])), " ")
 		answer = tidy(mediaMarkers.ReplaceAllString(answer, " "))
@@ -359,6 +365,25 @@ func finishText(t *turn, answer string) (Answer, error) {
 	}
 	t.messages = append(t.messages, ai.Message{Role: ai.RoleAssistant, Content: answer})
 	return Answer{Text: answer}, nil
+}
+
+// planSentence is a sentence of the plan Gemini sometimes writes, in
+// English, in front of its answer after a tool call: "Let's give a witty,
+// concise answer... Keep it short, one or two sentences.Hozirda...".
+var planSentence = regexp.MustCompile(`(?:Let's|Let me|I should|I need to|I'll|I will|The user|The owner|Keep it)\b[^.!?\n]*[.!?]`)
+
+// planWords are what such a plan talks about, and an answer seldom does.
+var planWords = regexp.MustCompile(`(?i)\b(?:concise|witty|answer|respond|reply|the user|the owner|keep it short|sentences)\b`)
+
+// afterLeakedPlan is the answer written after a leaked plan, and whether
+// answer starts with one: two plan sentences at least, one of them about
+// the answer itself, so that "Let me guess: 4." stays an answer.
+func afterLeakedPlan(answer string) (string, bool) {
+	sentences := planSentence.FindAllStringIndex(answer, -1)
+	if len(sentences) < 2 || sentences[0][0] != 0 || !planWords.MatchString(answer[:sentences[len(sentences)-1][1]]) {
+		return answer, false
+	}
+	return strings.TrimSpace(answer[sentences[len(sentences)-1][1]:]), true
 }
 
 // mediaMarkers finds "[sticker funny]", "[gif facepalm]" and a GIF of a

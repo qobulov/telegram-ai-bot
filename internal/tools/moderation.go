@@ -27,6 +27,16 @@ const (
 	// Telegram allows or forbids together; actionStickers gives them back.
 	actionNoStickers = "no_stickers"
 	actionStickers   = "allow_stickers"
+	// actionGroupNoStickers takes stickers and GIFs away from the whole
+	// group, keeping its other permissions; actionGroupStickers gives them
+	// back.
+	actionGroupNoStickers = "group_no_stickers"
+	actionGroupStickers   = "group_allow_stickers"
+	// actionNoPhotos and the rest do the same for photos.
+	actionNoPhotos      = "no_photos"
+	actionPhotos        = "allow_photos"
+	actionGroupNoPhotos = "group_no_photos"
+	actionGroupPhotos   = "group_allow_photos"
 )
 
 const (
@@ -89,6 +99,13 @@ var neededRight = map[string]string{
 
 	actionNoStickers: telegram.RightRestrictMembers,
 	actionStickers:   telegram.RightRestrictMembers,
+
+	actionGroupNoStickers: telegram.RightRestrictMembers,
+	actionGroupStickers:   telegram.RightRestrictMembers,
+	actionNoPhotos:        telegram.RightRestrictMembers,
+	actionPhotos:          telegram.RightRestrictMembers,
+	actionGroupNoPhotos:   telegram.RightRestrictMembers,
+	actionGroupPhotos:     telegram.RightRestrictMembers,
 }
 
 // rightWords names the rights moderation needs, for refusals.
@@ -120,6 +137,8 @@ type Moderator interface {
 	UnbanChatMember(ctx context.Context, chatID, userID int64) error
 	PinChatMessage(ctx context.Context, chatID, messageID int64) error
 	UnpinChatMessage(ctx context.Context, chatID, messageID int64) error
+	GetChat(ctx context.Context, chatID int64) (telegram.Chat, error)
+	SetChatPermissions(ctx context.Context, chatID int64, permissions telegram.ChatPermissions) error
 }
 
 // ModerationStore keeps the audit of what the bot did for whom.
@@ -199,13 +218,15 @@ func (m *Moderation) Tool() Tool {
 		Description: "Whenever someone in a group asks you to: have something done to the message they replied to. It checks who may ask, which are the group's admins with the right and your owners, and refuses anyone else with the reason. " +
 			"delete: delete that message. mute (minutes, default 60) or unmute: its author. ban or unban: its author. pin or unpin: that message. " +
 			"no_stickers (minutes, default a day) or allow_stickers: take away or give back its author's stickers and GIFs, which Telegram only allows or forbids together; use it, not ban or ignore, when they ask to block someone's stickers. " +
+			"group_no_stickers or group_allow_stickers: take away or give back everyone's stickers and GIFs in the group, keeping its other permissions, when they ask it for all; it needs no reply or tag. " +
+			"no_photos (minutes, default a day) or allow_photos, and group_no_photos or group_allow_photos: the same for photos. A member's other limits stay as they are. " +
 			"For mute, unmute, ban, unban, no_stickers and allow_stickers without such a reply, or replying to their own message, it acts on the one member they tagged with @, once Telegram confirms who that is. " +
 			"It checks everyone's rights and does it at once, with no question, but only when the person's own message asks for it; say it is done only when it reports done.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["delete", "mute", "unmute", "ban", "unban", "pin", "unpin", "no_stickers", "allow_stickers"]},
-				"minutes": {"type": "integer", "description": "For mute: how long, 1 to 10080, default 60. For no_stickers: 1 to 525600, default 1440; the most for \"forever\"."},
+				"action": {"type": "string", "enum": ["delete", "mute", "unmute", "ban", "unban", "pin", "unpin", "no_stickers", "allow_stickers", "group_no_stickers", "group_allow_stickers", "no_photos", "allow_photos", "group_no_photos", "group_allow_photos"]},
+				"minutes": {"type": "integer", "description": "For mute: how long, 1 to 10080, default 60. For no_stickers and no_photos: 1 to 525600, default 1440; the most for \"forever\"."},
 				"reason": {"type": "string", "description": "Optional: why, in a few words."}
 			},
 			"required": ["action"],
@@ -238,7 +259,7 @@ func (m *Moderation) run(ctx context.Context, raw json.RawMessage) (any, error) 
 		return nil, err
 	}
 	if _, known := neededRight[args.Action]; !known {
-		return nil, &ArgumentError{Message: "action must be delete, mute, unmute, ban, unban, pin, unpin, no_stickers or allow_stickers"}
+		return nil, &ArgumentError{Message: "action must be delete, mute, unmute, ban, unban, pin, unpin, no_stickers, allow_stickers, group_no_stickers, group_allow_stickers, no_photos, allow_photos, group_no_photos or group_allow_photos"}
 	}
 	if !askedFor(caller.Words, args.Action) {
 		return nil, &DeniedError{Message: notAsked}
@@ -287,6 +308,9 @@ func notCarriedOut(err error) error {
 // confirms that account. Anything less certain acts on nobody: the person
 // is asked to reply to the member's message instead.
 func (m *Moderation) targetOf(ctx context.Context, caller Caller, action string) (Target, error) {
+	if groupWide(action) {
+		return Target{}, nil
+	}
 	replied := caller.Target
 	ownReply := replied != nil && replied.UserID == caller.UserID
 	switch {
@@ -338,7 +362,17 @@ func (m *Moderation) tagged(ctx context.Context, chatID int64, mention Mention, 
 // onMember reports an action on a member rather than on a message.
 func onMember(action string) bool {
 	switch action {
-	case actionMute, actionUnmute, actionBan, actionUnban, actionNoStickers, actionStickers:
+	case actionMute, actionUnmute, actionBan, actionUnban, actionNoStickers, actionStickers, actionNoPhotos, actionPhotos:
+		return true
+	}
+	return false
+}
+
+// groupWide reports an action on the whole group rather than on a member
+// or a message.
+func groupWide(action string) bool {
+	switch action {
+	case actionGroupNoStickers, actionGroupStickers, actionGroupNoPhotos, actionGroupPhotos:
 		return true
 	}
 	return false
@@ -373,7 +407,7 @@ func (m *Moderation) newOrder(caller Caller, action string, target Target, minut
 	switch action {
 	case actionMute:
 		o.minutes = muteMinutes(minutes)
-	case actionNoStickers:
+	case actionNoStickers, actionNoPhotos:
 		o.minutes = clampMinutes(minutes, defaultNoStickersMinutes, maxNoStickersMinutes)
 	}
 	if o.minutes > 0 {
@@ -409,8 +443,10 @@ func (m *Moderation) check(ctx context.Context, o order) error {
 	if err := m.checkBot(ctx, o.caller.ChatID, right); err != nil {
 		return err
 	}
-	if err := m.checkTarget(ctx, o); err != nil {
-		return err
+	if !groupWide(o.action) {
+		if err := m.checkTarget(ctx, o); err != nil {
+			return err
+		}
 	}
 	return m.checkPace(ctx, o.caller)
 }
@@ -548,10 +584,8 @@ func (m *Moderation) send(ctx context.Context, o order) error {
 		return m.opts.Telegram.RestrictChatMember(ctx, telegram.Restriction{ChatID: chatID, UserID: userID, Permissions: telegram.NoPermissions(), Until: o.until})
 	case actionUnmute:
 		return m.opts.Telegram.RestrictChatMember(ctx, telegram.Restriction{ChatID: chatID, UserID: userID, Permissions: telegram.AllPermissions()})
-	case actionNoStickers:
-		return m.opts.Telegram.RestrictChatMember(ctx, telegram.Restriction{ChatID: chatID, UserID: userID, Permissions: telegram.NoStickers(), Until: o.until})
-	case actionStickers:
-		return m.opts.Telegram.RestrictChatMember(ctx, telegram.Restriction{ChatID: chatID, UserID: userID, Permissions: telegram.AllPermissions()})
+	case actionNoStickers, actionStickers, actionNoPhotos, actionPhotos:
+		return m.setMemberMedia(ctx, o)
 	case actionBan:
 		return m.opts.Telegram.BanChatMember(ctx, chatID, userID)
 	case actionUnban:
@@ -560,8 +594,60 @@ func (m *Moderation) send(ctx context.Context, o order) error {
 		return m.opts.Telegram.PinChatMessage(ctx, chatID, messageID)
 	case actionUnpin:
 		return m.opts.Telegram.UnpinChatMessage(ctx, chatID, messageID)
+	case actionGroupNoStickers, actionGroupStickers, actionGroupNoPhotos, actionGroupPhotos:
+		return m.setGroupMedia(ctx, chatID, o.action)
 	}
 	return fmt.Errorf("moderation: unknown action %q", o.action)
+}
+
+// setMemberMedia takes away or gives back a member's stickers or photos and
+// nothing else: a member already muted or without stickers stays so. Given
+// back, the rest of their restriction keeps its end.
+func (m *Moderation) setMemberMedia(ctx context.Context, o order) error {
+	member, err := m.opts.Members.GetChatMember(ctx, o.caller.ChatID, o.target.UserID)
+	if err != nil {
+		return err
+	}
+	permissions := member.Permissions()
+	allowMedia(&permissions, o.action)
+	until := o.until
+	if o.action == actionStickers || o.action == actionPhotos {
+		until = time.Time{}
+		if member.UntilDate > 0 {
+			until = time.Unix(member.UntilDate, 0)
+		}
+	}
+	return m.opts.Telegram.RestrictChatMember(ctx, telegram.Restriction{ChatID: o.caller.ChatID, UserID: o.target.UserID, Permissions: permissions, Until: until})
+}
+
+// setGroupMedia allows or forbids stickers or photos for the whole group,
+// keeping whatever else its members may or may not do.
+func (m *Moderation) setGroupMedia(ctx context.Context, chatID int64, action string) error {
+	chat, err := m.opts.Telegram.GetChat(ctx, chatID)
+	if err != nil {
+		return err
+	}
+	permissions := telegram.AllPermissions()
+	if chat.Permissions != nil {
+		permissions = *chat.Permissions
+	}
+	allowMedia(&permissions, action)
+	return m.opts.Telegram.SetChatPermissions(ctx, chatID, permissions)
+}
+
+// allowMedia sets the one permission a sticker or photo action is about:
+// stickers and GIFs, which Telegram allows or forbids together, or photos.
+func allowMedia(p *telegram.ChatPermissions, action string) {
+	switch action {
+	case actionNoStickers, actionGroupNoStickers:
+		p.CanSendOtherMessages = false
+	case actionStickers, actionGroupStickers:
+		p.CanSendOtherMessages = true
+	case actionNoPhotos, actionGroupNoPhotos:
+		p.CanSendPhotos = false
+	case actionPhotos, actionGroupPhotos:
+		p.CanSendPhotos = true
+	}
 }
 
 // telegramError is why Telegram did not act, in words safe for the model.
@@ -614,6 +700,18 @@ func (o order) done(until string) chatText {
 		return chatText{"Bajarildi: " + name + " " + until + " gacha stiker va GIF yubora olmaydi.", "Готово: " + name + " не может отправлять стикеры и GIF до " + until + "."}
 	case actionStickers:
 		return chatText{"Bajarildi: " + name + " yana stiker va GIF yubora oladi.", "Готово: " + name + " снова может отправлять стикеры и GIF."}
+	case actionNoPhotos:
+		return chatText{"Bajarildi: " + name + " " + until + " gacha rasm yubora olmaydi.", "Готово: " + name + " не может отправлять фото до " + until + "."}
+	case actionPhotos:
+		return chatText{"Bajarildi: " + name + " yana rasm yubora oladi.", "Готово: " + name + " снова может отправлять фото."}
+	case actionGroupNoPhotos:
+		return chatText{"Bajarildi: guruhda hech kim rasm yubora olmaydi.", "Готово: в группе никто не может отправлять фото."}
+	case actionGroupPhotos:
+		return chatText{"Bajarildi: guruhda yana hamma rasm yubora oladi.", "Готово: в группе снова все могут отправлять фото."}
+	case actionGroupNoStickers:
+		return chatText{"Bajarildi: guruhda hech kim stiker va GIF yubora olmaydi.", "Готово: в группе никто не может отправлять стикеры и GIF."}
+	case actionGroupStickers:
+		return chatText{"Bajarildi: guruhda yana hamma stiker va GIF yubora oladi.", "Готово: в группе снова все могут отправлять стикеры и GIF."}
 	case actionPin:
 		return chatText{"Bajarildi: " + name + " xabari qadaldi.", "Готово: сообщение от " + name + " закреплено."}
 	}
@@ -646,7 +744,14 @@ var actionWords = map[string][]string{
 	// Asking about someone's stickers is enough: the model picks which.
 	actionNoStickers: {"stik", "stic", "стик", "gif", "гиф"},
 	actionStickers:   {"stik", "stic", "стик", "gif", "гиф"},
-	actionUnpin:      {"pin", "qada", "закреп", "откреп"},
+
+	actionGroupNoStickers: {"stik", "stic", "стик", "gif", "гиф"},
+	actionGroupStickers:   {"stik", "stic", "стик", "gif", "гиф"},
+	actionNoPhotos:        photoWords,
+	actionPhotos:          photoWords,
+	actionGroupNoPhotos:   photoWords,
+	actionGroupPhotos:     photoWords,
+	actionUnpin:           {"pin", "qada", "закреп", "откреп"},
 }
 
 var foldApostrophes = strings.NewReplacer("'", "", "ʻ", "", "ʼ", "", "’", "", "‘", "", "`", "")
@@ -654,6 +759,9 @@ var foldApostrophes = strings.NewReplacer("'", "", "ʻ", "", "ʼ", "", "’", ""
 // askedFor reports whether words, what the person asking wrote themselves,
 // ask for action. With no question to confirm, this is what keeps a line
 // in the chat from talking the model into moderating on someone's turn.
+// photoWords ask for something about photos: "rasm", "surat", "фото".
+var photoWords = []string{"rasm", "rasim", "surat", "foto", "photo", "фото", "картин", "расм", "сурат"}
+
 func askedFor(words, action string) bool {
 	folded := foldApostrophes.Replace(strings.ToLower(words)) + " "
 	for _, word := range actionWords[action] {

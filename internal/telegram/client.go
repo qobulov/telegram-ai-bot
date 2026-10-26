@@ -663,6 +663,18 @@ func (c *Client) RestrictChatMember(ctx context.Context, r Restriction) error {
 	return c.call(ctx, "restrictChatMember", params, nil)
 }
 
+// SetChatPermissions sets what every member of a group may do by default.
+func (c *Client) SetChatPermissions(ctx context.Context, chatID int64, permissions ChatPermissions) error {
+	params := chatPermissionsParams{ChatID: chatID, Permissions: permissions, IndependentPermissions: true}
+	return c.call(ctx, "setChatPermissions", params, nil)
+}
+
+type chatPermissionsParams struct {
+	ChatID                 int64           `json:"chat_id"`
+	Permissions            ChatPermissions `json:"permissions"`
+	IndependentPermissions bool            `json:"use_independent_chat_permissions"`
+}
+
 // BanChatMember removes a member from a group. In a supergroup they cannot
 // rejoin until unbanned; in a basic group an invite link still lets them back.
 func (c *Client) BanChatMember(ctx context.Context, chatID, userID int64) error {

@@ -171,7 +171,7 @@ func (s *Service) sworeAtBot(ctx context.Context, in incoming) bool {
 var guardLines = map[string]string{
 	storage.RuleSpamGuard:  "Known spammers (CAS, lols.bot) are banned here in code, not by you.",
 	storage.RuleLinkGuard:  "Links to malware or phishing (Google Safe Browsing, URLhaus) are deleted here in code, not by you.",
-	storage.RuleImageGuard: "Nude or gory pictures, stickers and GIFs are deleted here in code, from anyone, not by you.",
+	storage.RuleImageGuard: "Nude or gory pictures are deleted here in code, from anyone, not by you, even as a sticker, GIF or file; other stickers and GIFs are allowed.",
 }
 
 // ruleLines lists the instructions, then the ignored members. Each is folded

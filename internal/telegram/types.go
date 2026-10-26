@@ -297,6 +297,11 @@ type ChatMember struct {
 	// who they are.
 	IsAnonymous bool `json:"is_anonymous,omitempty"`
 
+	// ChatPermissions are a restricted member's: what they may still send.
+	// can_change_info, can_invite_users, can_pin_messages and
+	// can_manage_topics land in the fields below, which share their names.
+	ChatPermissions
+
 	CanDeleteMessages  bool `json:"can_delete_messages,omitempty"`
 	CanRestrictMembers bool `json:"can_restrict_members,omitempty"`
 	CanPinMessages     bool `json:"can_pin_messages,omitempty"`
@@ -396,6 +401,9 @@ type Chat struct {
 	// Title and Username are set for groups; Username only for public ones.
 	Title    string `json:"title,omitempty"`
 	Username string `json:"username,omitempty"`
+	// Permissions are what members of a group may do by default; getChat
+	// sets them.
+	Permissions *ChatPermissions `json:"permissions,omitempty"`
 }
 
 // Chat types. Channels are not handled by the bot.
@@ -477,6 +485,17 @@ func AllPermissions() ChatPermissions {
 func NoStickers() ChatPermissions {
 	p := AllPermissions()
 	p.CanSendOtherMessages = false
+	return p
+}
+
+// Permissions is what the member may do now: everything unless Telegram
+// has them restricted.
+func (m ChatMember) Permissions() ChatPermissions {
+	if m.Status != "restricted" {
+		return AllPermissions()
+	}
+	p := m.ChatPermissions
+	p.CanChangeInfo, p.CanInviteUsers, p.CanPinMessages, p.CanManageTopics = m.CanChangeInfo, m.CanInviteUsers, m.CanPinMessages, m.CanManageTopics
 	return p
 }
 

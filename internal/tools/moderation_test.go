@@ -56,6 +56,9 @@ type fakeTelegram struct {
 	calls        []string
 	restrictions []telegram.Restriction
 	err          error
+	// groupPermissions are the group's defaults, which getChat gives and
+	// setChatPermissions replaces.
+	groupPermissions *telegram.ChatPermissions
 }
 
 func (f *fakeTelegram) do(method string, chatID, id int64) error {
@@ -90,6 +93,19 @@ func (f *fakeTelegram) PinChatMessage(_ context.Context, chatID, messageID int64
 
 func (f *fakeTelegram) UnpinChatMessage(_ context.Context, chatID, messageID int64) error {
 	return f.do("unpinChatMessage", chatID, messageID)
+}
+
+func (f *fakeTelegram) GetChat(_ context.Context, chatID int64) (telegram.Chat, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return telegram.Chat{ID: chatID, Permissions: f.groupPermissions}, nil
+}
+
+func (f *fakeTelegram) SetChatPermissions(_ context.Context, chatID int64, permissions telegram.ChatPermissions) error {
+	f.mu.Lock()
+	f.groupPermissions = &permissions
+	f.mu.Unlock()
+	return f.do("setChatPermissions", chatID, 0)
 }
 
 func (f *fakeTelegram) made() []string {
@@ -840,4 +856,84 @@ func TestModerateStickersOnlyWhenAsked(t *testing.T) {
 
 	expectRefusal(t, env.moderate(ctx, `{"action":"no_stickers"}`), "forbidden", "does not ask for this")
 	env.nothingActed(t)
+}
+
+// "Block stickers for everyone" takes stickers and GIFs from the whole
+// group and nothing else, with no reply or tag, and gives them back; the
+// picture guard is no substitute for it.
+func TestModerateTakesStickersFromTheWholeGroup(t *testing.T) {
+	env := newModerationEnv(t)
+	noPolls := telegram.AllPermissions()
+	noPolls.CanSendPolls = false
+	env.telegram.groupPermissions = &noPolls
+	ctx := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Owner: true, Human: true, UpdateID: 310, MessageID: 60, Words: "hammaga stiker va gif blokla"}, &Sink{})
+
+	said := env.act(t, ctx, `{"action":"group_no_stickers"}`)
+
+	if want := "Bajarildi: guruhda hech kim stiker va GIF yubora olmaydi."; said != want {
+		t.Errorf("said %q, want %q", said, want)
+	}
+	if p := env.telegram.groupPermissions; p.CanSendOtherMessages || p.CanSendPolls || !p.CanSendMessages || !p.CanSendPhotos {
+		t.Errorf("group permissions = %+v, want only stickers and GIFs taken and polls still off", p)
+	}
+
+	ctx = WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Owner: true, Human: true, UpdateID: 311, MessageID: 61, Words: "hammaga stikerni och"}, &Sink{})
+	if said := env.act(t, ctx, `{"action":"group_allow_stickers"}`); said != "Bajarildi: guruhda yana hamma stiker va GIF yubora oladi." {
+		t.Errorf("said %q", said)
+	}
+	if p := env.telegram.groupPermissions; !p.CanSendOtherMessages || p.CanSendPolls {
+		t.Errorf("group permissions = %+v, want stickers back and polls still off", p)
+	}
+}
+
+// Taking a member's photos leaves their other limits as they are, and
+// giving them back keeps the rest of the restriction and its end: stickers
+// stay taken, and a muted member stays muted.
+func TestModeratePhotosKeepTheMembersOtherLimits(t *testing.T) {
+	env := newModerationEnv(t)
+	noStickers := telegram.NoStickers()
+	stickersEnd := rulesNow.Add(48 * time.Hour)
+	env.chat.set(memberID, telegram.ChatMember{Status: "restricted", StillIn: true, ChatPermissions: noStickers, UntilDate: stickersEnd.Unix(), CanInviteUsers: true})
+	ctx := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Owner: true, Human: true, UpdateID: 320, MessageID: 70, Target: bekTarget(), Words: "rasm tashomasin"}, &Sink{})
+
+	said := env.act(t, ctx, `{"action":"no_photos"}`)
+
+	if want := "Bajarildi: Bek @bek 17.10 15:04 gacha rasm yubora olmaydi."; said != want {
+		t.Errorf("said %q, want %q", said, want)
+	}
+	r := env.telegram.restricted()
+	if p := r[0].Permissions; p.CanSendPhotos || p.CanSendOtherMessages || !p.CanSendMessages || !p.CanInviteUsers {
+		t.Errorf("permissions = %+v, want photos and stickers taken, the rest kept", p)
+	}
+
+	env.chat.set(memberID, telegram.ChatMember{Status: "restricted", StillIn: true, ChatPermissions: r[0].Permissions, UntilDate: stickersEnd.Unix()})
+	ctx = WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Owner: true, Human: true, UpdateID: 321, MessageID: 71, Target: bekTarget(), Words: "rasmini och"}, &Sink{})
+	if said := env.act(t, ctx, `{"action":"allow_photos"}`); said != "Bajarildi: Bek @bek yana rasm yubora oladi." {
+		t.Errorf("said %q", said)
+	}
+	r = env.telegram.restricted()
+	if p := r[1].Permissions; !p.CanSendPhotos || p.CanSendOtherMessages || !r[1].Until.Equal(stickersEnd) {
+		t.Errorf("restriction = %+v, want photos back, stickers still taken until %v", r[1], stickersEnd)
+	}
+
+	env.chat.set(memberID, telegram.ChatMember{Status: "restricted", StillIn: true, ChatPermissions: telegram.NoPermissions()})
+	ctx = WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Owner: true, Human: true, UpdateID: 322, MessageID: 72, Target: bekTarget(), Words: "stikerini ham blokla"}, &Sink{})
+	env.act(t, ctx, `{"action":"no_stickers"}`)
+	if p := env.telegram.restricted()[2].Permissions; p.CanSendMessages {
+		t.Errorf("permissions = %+v, want a muted member to stay muted when their stickers are taken", p)
+	}
+}
+
+func TestModerateTakesPhotosFromTheWholeGroup(t *testing.T) {
+	env := newModerationEnv(t)
+	noStickers := telegram.NoStickers()
+	env.telegram.groupPermissions = &noStickers
+	ctx := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Owner: true, Human: true, UpdateID: 330, MessageID: 80, Words: "hammaga rasm tashashni yop"}, &Sink{})
+
+	if said := env.act(t, ctx, `{"action":"group_no_photos"}`); said != "Bajarildi: guruhda hech kim rasm yubora olmaydi." {
+		t.Errorf("said %q", said)
+	}
+	if p := env.telegram.groupPermissions; p.CanSendPhotos || p.CanSendOtherMessages || !p.CanSendMessages {
+		t.Errorf("group permissions = %+v, want photos taken and stickers still off", p)
+	}
 }

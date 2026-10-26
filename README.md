@@ -857,7 +857,12 @@ check is made in code:
 
 - **Actions:** delete the message; mute its author (an hour unless asked
   otherwise, at most a week; supergroups only) or unmute them; ban them, or
-  unban; pin the message without a notification, or unpin it.
+  unban; pin the message without a notification, or unpin it; take away a
+  member's stickers and GIFs, or photos (a day unless asked otherwise), or
+  the whole group's (`group_no_stickers`, `group_no_photos`: the group's
+  other permissions are kept, and no reply or tag is needed), and give them
+  back. A member's other limits stay: one already muted or without stickers
+  stays so, and what is given back keeps the rest of the restriction's end.
 - **No confirmation:** as the owners asked, the action is done at once,
   with no question to answer. Instead, the person's own message (or their
   voice message's transcript) must ask for it in words, checked in code:
