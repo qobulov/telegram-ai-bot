@@ -1,6 +1,7 @@
 package app
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -26,6 +27,7 @@ import (
 // run, so nothing reaches Telegram or the database. A turn the router
 // sends to the full path is not asked of the main model unless
 // ROUTING_EVAL_FULL=1: that path is today's, whose answer the case holds.
+// ROUTING_EVAL_ROUTER=off measures today's path itself.
 func TestRoutingEval(t *testing.T) {
 	casesPath, key, out := os.Getenv("ROUTING_EVAL_CASES"), os.Getenv("ROUTING_EVAL_KEY"), os.Getenv("ROUTING_EVAL_OUT")
 	if casesPath == "" || key == "" || out == "" {
@@ -152,7 +154,11 @@ func evalConfig(t *testing.T, key string) config.Config {
 		"BOT_OWNER_USERNAME": "pronium,TursunoffM", "BOT_OWNER_IDS": "1688909825,1047217990",
 		"FOOTBALL_DATA_TOKEN": "x", "TAVILY_API_KEY": "x", "TMDB_TOKEN": "x", "YOUTUBE_API_KEY": "x", "WOLFRAM_APP_ID": "x",
 		"SIGHTENGINE_API_USER": "x", "SIGHTENGINE_API_SECRET": "x", "GOOGLE_SAFE_BROWSING_KEY": "x",
-		"ROUTER_MODEL": "gemini-3.5-flash-lite", "CHAT_MODEL": os.Getenv("ROUTING_EVAL_CHAT_MODEL"),
+		"ROUTER_MODEL": cmp.Or(os.Getenv("ROUTING_EVAL_ROUTER"), "gemini-3.5-flash-lite"), "CHAT_MODEL": os.Getenv("ROUTING_EVAL_CHAT_MODEL"),
+	}
+	if env["ROUTER_MODEL"] == "off" {
+		// Today's path, every message to the main model with the tools.
+		env["ROUTER_MODEL"] = ""
 	}
 	cfg, err := config.Load(func(name string) string { return env[name] })
 	if err != nil {

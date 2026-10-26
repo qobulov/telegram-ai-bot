@@ -123,12 +123,21 @@ func blockLines(t *testing.T, block string) []string {
 	if len(lines) < 2 || lines[0] != ambientHeader || lines[len(lines)-1] != ambientFooter {
 		t.Fatalf("block = %q, want the header and footer around the lines", block)
 	}
+	if len(lines) > 2 && !lineTime.MatchString(lines[1]) {
+		t.Errorf("the first line %q does not start with a time", lines[1])
+	}
+	// The lines are read back as "Name: text", whatever the compact form
+	// left out.
 	var out []string
+	var author string
 	for _, line := range lines[1 : len(lines)-1] {
-		if !lineTime.MatchString(line) {
-			t.Errorf("line %q does not start with a time", line)
+		if text, continued := strings.CutPrefix(line, continuedLine); continued {
+			out = append(out, author+": "+text)
+			continue
 		}
-		out = append(out, lineTime.ReplaceAllString(line, ""))
+		line = lineTime.ReplaceAllString(line, "")
+		author, _, _ = strings.Cut(line, ": ")
+		out = append(out, line)
 	}
 	return out
 }
@@ -307,4 +316,28 @@ func TestStoreFailureMeansNoContextNotAnError(t *testing.T) {
 
 func discardLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
+
+// The log leaves out what the line above already says: the time while the
+// minute is the same, and the name while the author is too. No message and
+// no change of minute is lost.
+func TestTheLogLeavesOutWhatTheLineAboveSays(t *testing.T) {
+	a, log := newTestAmbient(10)
+	at := func(clock, author, text string) {
+		hour, minute := int(clock[0]-'0')*10+int(clock[1]-'0'), int(clock[3]-'0')*10+int(clock[4]-'0')
+		log.now = func() time.Time { return time.Date(2026, 10, 14, hour, minute, 0, 0, tashkent) }
+		a.add(groupID, 0, 4242, author, text)
+	}
+	at("10:00", "Ann", "salom")
+	at("10:00", "Ann", "qalaysiz")
+	at("10:00", "Bek", "zo'r")
+	at("10:05", "Bek", "keyin")
+	at("10:05", "Ann", "ha")
+
+	block := a.block(groupID, time.Date(2026, 10, 14, 10, 6, 0, 0, tashkent))
+
+	want := ambientHeader + "\n10:00 Ann: salom\n  qalaysiz\nBek: zo'r\n10:05 Bek: keyin\nAnn: ha\n" + ambientFooter
+	if block != want {
+		t.Errorf("block =\n%s\nwant\n%s", block, want)
+	}
 }

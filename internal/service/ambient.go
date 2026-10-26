@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -31,6 +32,9 @@ const (
 	// only cost tokens and nudge the model to repeat itself.
 	maxOwnLines = 5
 )
+
+// continuedLine starts a line that goes on from the author above it.
+const continuedLine = "  "
 
 // Markers placed around the recent messages in the text given to the model.
 const (
@@ -126,11 +130,11 @@ func (a *ambient) block(chatID int64, now time.Time) string {
 	return ambientHeader + "\n" + strings.Join(lines, "\n") + "\n" + ambientFooter
 }
 
-// fit renders the messages as "15:04 Name: text" lines, dropping the oldest
-// ones that do not fit in maxContextChars, and the bot's own beyond the
-// newest maxOwnLines.
+// fit keeps the newest messages whose "15:04 Name: text" lines fit in
+// maxContextChars, and the bot's own only the newest maxOwnLines, and
+// renders them, oldest first, as compact.
 func (a *ambient) fit(messages []storage.GroupMessage) []string {
-	var lines []string
+	var kept []storage.GroupMessage
 	used, own := 0, 0
 	for i := len(messages) - 1; i >= 0; i-- {
 		m := messages[i]
@@ -146,10 +150,32 @@ func (a *ambient) fit(messages []storage.GroupMessage) []string {
 			break
 		}
 		used += len(line) + 1
-		lines = append(lines, line)
+		kept = append(kept, m)
 	}
-	for i, j := 0, len(lines)-1; i < j; i, j = i+1, j-1 {
-		lines[i], lines[j] = lines[j], lines[i]
+	slices.Reverse(kept)
+	return a.compact(kept)
+}
+
+// compact writes messages as lines without what the line above already
+// says: the time only when the minute changes, and in the same minute the
+// name only when the author does; a further message from the same author
+// in that minute starts with two spaces. The same messages in this form
+// take about a seventh fewer tokens, every one of them paid in full, since
+// the log changes with every message.
+func (a *ambient) compact(messages []storage.GroupMessage) []string {
+	lines := make([]string, len(messages))
+	var lastTime, lastAuthor string
+	for i, m := range messages {
+		at := m.SentAt.In(a.location).Format("15:04")
+		switch {
+		case at != lastTime:
+			lines[i] = at + " " + m.AuthorName + ": " + m.Text
+		case m.AuthorName != lastAuthor:
+			lines[i] = m.AuthorName + ": " + m.Text
+		default:
+			lines[i] = continuedLine + m.Text
+		}
+		lastTime, lastAuthor = at, m.AuthorName
 	}
 	return lines
 }
