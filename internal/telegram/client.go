@@ -675,6 +675,116 @@ type chatPermissionsParams struct {
 	IndependentPermissions bool            `json:"use_independent_chat_permissions"`
 }
 
+// SetChatTitle renames a group.
+func (c *Client) SetChatTitle(ctx context.Context, chatID int64, title string) error {
+	return c.call(ctx, "setChatTitle", chatTextParams{ChatID: chatID, Title: title}, nil)
+}
+
+// SetChatDescription sets a group's description; empty removes it.
+func (c *Client) SetChatDescription(ctx context.Context, chatID int64, description string) error {
+	return c.call(ctx, "setChatDescription", chatTextParams{ChatID: chatID, Description: description}, nil)
+}
+
+type chatTextParams struct {
+	ChatID      int64  `json:"chat_id"`
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description"`
+}
+
+// SetChatPhoto sets a group's photo from a JPEG.
+func (c *Client) SetChatPhoto(ctx context.Context, chatID int64, jpeg []byte) error {
+	body, contentType, err := uploadForm(upload{chatID: chatID, field: "photo", filename: "photo.jpg", data: jpeg})
+	if err != nil {
+		return fmt.Errorf("telegram setChatPhoto: encode: %w", err)
+	}
+	var done bool
+	return c.postForm(ctx, "setChatPhoto", body, contentType, &done)
+}
+
+// DeleteChatPhoto removes a group's photo.
+func (c *Client) DeleteChatPhoto(ctx context.Context, chatID int64) error {
+	return c.call(ctx, "deleteChatPhoto", chatParams{ChatID: chatID}, nil)
+}
+
+// InviteLink asks for a new invite link to a group.
+type InviteLink struct {
+	ChatID int64
+	// Name is shown to admins in the group's list of links.
+	Name string
+	// Expires is when the link stops working; zero means never.
+	Expires time.Time
+}
+
+// CreateChatInviteLink makes a new invite link and returns it.
+func (c *Client) CreateChatInviteLink(ctx context.Context, l InviteLink) (string, error) {
+	params := inviteLinkParams{ChatID: l.ChatID, Name: l.Name}
+	if !l.Expires.IsZero() {
+		params.ExpireDate = l.Expires.Unix()
+	}
+	var link struct {
+		InviteLink string `json:"invite_link"`
+	}
+	if err := c.call(ctx, "createChatInviteLink", params, &link); err != nil {
+		return "", err
+	}
+	return link.InviteLink, nil
+}
+
+type inviteLinkParams struct {
+	ChatID     int64  `json:"chat_id"`
+	Name       string `json:"name,omitempty"`
+	ExpireDate int64  `json:"expire_date,omitempty"`
+}
+
+// RevokeChatInviteLink stops an invite link the bot made from working.
+func (c *Client) RevokeChatInviteLink(ctx context.Context, chatID int64, link string) error {
+	return c.call(ctx, "revokeChatInviteLink", revokeLinkParams{ChatID: chatID, InviteLink: link}, nil)
+}
+
+type revokeLinkParams struct {
+	ChatID     int64  `json:"chat_id"`
+	InviteLink string `json:"invite_link"`
+}
+
+// UnpinAllChatMessages unpins every pinned message of a group.
+func (c *Client) UnpinAllChatMessages(ctx context.Context, chatID int64) error {
+	return c.call(ctx, "unpinAllChatMessages", chatParams{ChatID: chatID}, nil)
+}
+
+// AdminRights are the rights a member is made an admin with; all false
+// takes their adminship away.
+type AdminRights struct {
+	CanDeleteMessages  bool `json:"can_delete_messages"`
+	CanRestrictMembers bool `json:"can_restrict_members"`
+	CanPinMessages     bool `json:"can_pin_messages"`
+	CanInviteUsers     bool `json:"can_invite_users"`
+}
+
+// PromoteChatMember makes a member an admin with rights, or with none, an
+// admin a member again. A bot can only give rights it holds, and take them
+// only from admins it made.
+func (c *Client) PromoteChatMember(ctx context.Context, chatID, userID int64, rights AdminRights) error {
+	return c.call(ctx, "promoteChatMember", promoteParams{ChatID: chatID, UserID: userID, AdminRights: rights}, nil)
+}
+
+type promoteParams struct {
+	ChatID int64 `json:"chat_id"`
+	UserID int64 `json:"user_id"`
+	AdminRights
+}
+
+// SetChatAdministratorCustomTitle sets the title shown for an admin the bot
+// made.
+func (c *Client) SetChatAdministratorCustomTitle(ctx context.Context, chatID, userID int64, title string) error {
+	return c.call(ctx, "setChatAdministratorCustomTitle", customTitleParams{ChatID: chatID, UserID: userID, CustomTitle: title}, nil)
+}
+
+type customTitleParams struct {
+	ChatID      int64  `json:"chat_id"`
+	UserID      int64  `json:"user_id"`
+	CustomTitle string `json:"custom_title"`
+}
+
 // BanChatMember removes a member from a group. In a supergroup they cannot
 // rejoin until unbanned; in a basic group an invite link still lets them back.
 func (c *Client) BanChatMember(ctx context.Context, chatID, userID int64) error {

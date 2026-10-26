@@ -48,6 +48,12 @@ type Config struct {
 	AIBaseURL       string
 	// FallbackModels are tried when the model is overloaded.
 	FallbackModels []string
+	// RouterModel, from ROUTER_MODEL, is a light model that decides which
+	// messages need only words; ChatModel, from CHAT_MODEL, answers those
+	// without the tools, Model when empty. An empty RouterModel sends every
+	// message to Model with the tools.
+	RouterModel string
+	ChatModel   string
 	// AudioInput is true when the provider understands voice messages.
 	AudioInput bool
 	// The backup provider, asked when every model of the main one failed.
@@ -245,6 +251,8 @@ func Load(getenv func(string) string) (Config, error) {
 	if cfg.AIProvider == providerGemini {
 		cfg.ReasoningEffort = r.reasoningEffort("AI_REASONING_EFFORT", "low")
 	}
+	cfg.RouterModel = r.text("ROUTER_MODEL", "")
+	cfg.ChatModel = r.text("CHAT_MODEL", cfg.Model)
 	cfg.ImageModel = r.text("IMAGE_MODEL", "gemini-3.1-flash-image")
 	cfg.ImageBaseURL = strings.TrimSuffix(cfg.AIBaseURL, "/openai")
 	cfg.DailyImageLimit = r.integer("DAILY_IMAGE_LIMIT", 2, 0)

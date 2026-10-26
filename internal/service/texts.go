@@ -214,7 +214,7 @@ Buyruqlar:
 Guruhda meni ismim bilan chaqiring, @username bilan belgilang yoki xabarimga reply qiling. U yerda buyruqqa username qo'shiladi: /help@username. Guruh men bilan bitta umumiy suhbatda.
 
 Guruh adminlari uchun:
-A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yoki ban qilishni, stiker va GIF yoki rasm yuborishini (bir a'zoning yoki hammaning) cheklashni so'rang. Buning uchun o'sha admin huquqi sizda ham, menda ham bo'lishi kerak; men darhol bajaraman.
+A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yoki ban qilishni, stiker va GIF yoki rasm yuborishini cheklashni, admin qilishni so'rang. Guruhning nomi, tavsifi, rasmi, taklif havolasi va kim nima yubora olishini ham o'zgartiraman; "orqaga qaytar" desangiz, oxirgisini qaytaraman. Buning uchun o'sha admin huquqi sizda ham, menda ham bo'lishi kerak; men darhol bajaraman.
 /mute@username, /unmute@username — guruhda jim turishim yoki qaytishim
 /ignore@username, /unignore@username — a'zoning xabariga reply qilib: unga 24 soat javob bermayman yoki yana javob beraman
 /reset@username — guruhning men bilan suhbat tarixini o'chirish`,
@@ -233,7 +233,7 @@ A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yo
 В группе зовите меня по имени, упоминайте (@username) или отвечайте на моё сообщение. Там к команде добавляется username: /help@username. У группы со мной один общий разговор.
 
 Для админов группы:
-Ответьте на сообщение участника и попросите удалить или закрепить его, замутить или забанить автора, ограничить стикеры и GIF или фото ему или всей группе. Нужно, чтобы это право было и у вас, и у меня; я делаю это сразу.
+Ответьте на сообщение участника и попросите удалить или закрепить его, замутить или забанить автора, ограничить ему стикеры и GIF или фото, сделать админом. Ещё меняю название, описание, фото группы, ссылку-приглашение и что можно отправлять; скажите «верни», и я отменю последнее. Нужно, чтобы это право было и у вас, и у меня; я делаю это сразу.
 /mute@username, /unmute@username — чтобы я молчала в группе или вернулась
 /ignore@username, /unignore@username — ответом на сообщение участника: не отвечаю ему 24 часа или снова отвечаю
 /reset@username — удалить историю разговора группы со мной`,
@@ -252,7 +252,7 @@ Commands:
 In a group, call me by name, mention me (@username) or reply to one of my messages. Commands there need my username, like /help@username. A group shares one conversation with me.
 
 For a group's admins:
-Reply to a member's message and ask me to delete or pin it, to mute or ban its author, or to take away their stickers and GIFs or photos, or everyone's. It takes that admin right, yours and mine, and I do it at once.
+Reply to a member's message and ask me to delete or pin it, to mute or ban its author, to take away their stickers and GIFs or photos, or to make them an admin. I also change the group's name, description, photo, invite link and what members may send, and undo the last change when asked. It takes that admin right, yours and mine, and I do it at once.
 /mute@username, /unmute@username — make me stay quiet in the group, or bring me back
 /ignore@username, /unignore@username — as a reply to a member's message: I stop answering them for 24 hours, or answer them again
 /reset@username — delete the group's conversation with me`,

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
@@ -27,16 +28,27 @@ const (
 	// Telegram allows or forbids together; actionStickers gives them back.
 	actionNoStickers = "no_stickers"
 	actionStickers   = "allow_stickers"
-	// actionGroupNoStickers takes stickers and GIFs away from the whole
-	// group, keeping its other permissions; actionGroupStickers gives them
-	// back.
-	actionGroupNoStickers = "group_no_stickers"
-	actionGroupStickers   = "group_allow_stickers"
-	// actionNoPhotos and the rest do the same for photos.
-	actionNoPhotos      = "no_photos"
-	actionPhotos        = "allow_photos"
-	actionGroupNoPhotos = "group_no_photos"
-	actionGroupPhotos   = "group_allow_photos"
+	// actionNoPhotos and actionPhotos do the same for photos.
+	actionNoPhotos = "no_photos"
+	actionPhotos   = "allow_photos"
+	// actionPromote makes a member an admin with the bot's own moderation
+	// rights at most; actionDemote takes that back, and actionAdminTitle
+	// names an admin the bot made.
+	actionPromote    = "promote"
+	actionDemote     = "demote"
+	actionAdminTitle = "admin_title"
+
+	// Actions on the group itself, which need no reply or tag. actionLock
+	// forbids one kind of message to everyone, keeping the group's other
+	// permissions; actionUnlock allows it again.
+	actionSetTitle       = "set_title"
+	actionSetDescription = "set_description"
+	actionSetPhoto       = "set_photo"
+	actionDeletePhoto    = "delete_photo"
+	actionInviteLink     = "invite_link"
+	actionUnpinAll       = "unpin_all"
+	actionLock           = "lock"
+	actionUnlock         = "unlock"
 )
 
 const (
@@ -73,6 +85,7 @@ const (
 	immune         = "I can't do that to admins, my owners, myself, Telegram's service accounts or the person asking"
 	notAsked       = "their own message does not ask for this, so nothing was done; do it only when they ask for it in words, such as \"mute qil\" or \"o'chir\""
 	noAnswer       = "Telegram did not answer, so it may not have been done; try again later"
+	notAnAdmin     = "that member is not an admin I can change: I can only demote or title admins I made myself"
 )
 
 // chatText is something the bot says to a group in its own words, never the
@@ -100,12 +113,22 @@ var neededRight = map[string]string{
 	actionNoStickers: telegram.RightRestrictMembers,
 	actionStickers:   telegram.RightRestrictMembers,
 
-	actionGroupNoStickers: telegram.RightRestrictMembers,
-	actionGroupStickers:   telegram.RightRestrictMembers,
-	actionNoPhotos:        telegram.RightRestrictMembers,
-	actionPhotos:          telegram.RightRestrictMembers,
-	actionGroupNoPhotos:   telegram.RightRestrictMembers,
-	actionGroupPhotos:     telegram.RightRestrictMembers,
+	actionNoPhotos:   telegram.RightRestrictMembers,
+	actionPhotos:     telegram.RightRestrictMembers,
+	actionPromote:    telegram.RightPromoteMembers,
+	actionDemote:     telegram.RightPromoteMembers,
+	actionAdminTitle: telegram.RightPromoteMembers,
+
+	actionSetTitle:       telegram.RightChangeInfo,
+	actionSetDescription: telegram.RightChangeInfo,
+	actionSetPhoto:       telegram.RightChangeInfo,
+	actionDeletePhoto:    telegram.RightChangeInfo,
+	actionInviteLink:     telegram.RightInviteUsers,
+	actionUnpinAll:       telegram.RightPinMessages,
+	actionLock:           telegram.RightRestrictMembers,
+	actionUnlock:         telegram.RightRestrictMembers,
+	// Undo needs the right of the action it puts back.
+	actionUndo: "",
 }
 
 // rightWords names the rights moderation needs, for refusals.
@@ -113,6 +136,9 @@ var rightWords = map[string]string{
 	telegram.RightDeleteMessages:  "delete messages",
 	telegram.RightRestrictMembers: "ban and mute members",
 	telegram.RightPinMessages:     "pin messages",
+	telegram.RightChangeInfo:      "change the group's info",
+	telegram.RightInviteUsers:     "invite users",
+	telegram.RightPromoteMembers:  "add new admins",
 }
 
 // MemberLookup asks Telegram about a member of a chat.
@@ -139,6 +165,17 @@ type Moderator interface {
 	UnpinChatMessage(ctx context.Context, chatID, messageID int64) error
 	GetChat(ctx context.Context, chatID int64) (telegram.Chat, error)
 	SetChatPermissions(ctx context.Context, chatID int64, permissions telegram.ChatPermissions) error
+	SetChatTitle(ctx context.Context, chatID int64, title string) error
+	SetChatDescription(ctx context.Context, chatID int64, description string) error
+	SetChatPhoto(ctx context.Context, chatID int64, jpeg []byte) error
+	DeleteChatPhoto(ctx context.Context, chatID int64) error
+	CreateChatInviteLink(ctx context.Context, l telegram.InviteLink) (string, error)
+	UnpinAllChatMessages(ctx context.Context, chatID int64) error
+	PromoteChatMember(ctx context.Context, chatID, userID int64, rights telegram.AdminRights) error
+	SetChatAdministratorCustomTitle(ctx context.Context, chatID, userID int64, title string) error
+	RevokeChatInviteLink(ctx context.Context, chatID int64, link string) error
+	// DownloadFile fetches an old group photo, to put it back.
+	DownloadFile(ctx context.Context, fileID string, maxBytes int64) ([]byte, error)
 }
 
 // ModerationStore keeps the audit of what the bot did for whom.
@@ -146,6 +183,9 @@ type ModerationStore interface {
 	RecordModeration(ctx context.Context, a storage.ModerationAction) (bool, error)
 	ForgetModeration(ctx context.Context, updateID int64, action string) error
 	ModerationBy(ctx context.Context, requesterID int64, since time.Time) (int, error)
+	SetModerationUndo(ctx context.Context, updateID int64, action string, undo json.RawMessage) error
+	LastUndoable(ctx context.Context, chatID int64) (storage.ModerationAction, bool, error)
+	MarkUndone(ctx context.Context, id int64) (bool, error)
 }
 
 // RightsRecorder stores what Telegram said about the bot in a group.
@@ -183,6 +223,12 @@ type moderationArgs struct {
 	Action  string `json:"action"`
 	Minutes int    `json:"minutes"`
 	Reason  string `json:"reason"`
+	// Text is a new title, description or admin title, or an invite link's
+	// name; Kind is what lock and unlock act on.
+	Text string `json:"text"`
+	Kind string `json:"kind"`
+	// Force puts an action back even after someone changed it by hand.
+	Force bool `json:"force"`
 }
 
 // Moderation lets a group's admins, and the bot's owners, have the bot
@@ -218,15 +264,20 @@ func (m *Moderation) Tool() Tool {
 		Description: "Whenever someone in a group asks you to: have something done to the message they replied to. It checks who may ask, which are the group's admins with the right and your owners, and refuses anyone else with the reason. " +
 			"delete: delete that message. mute (minutes, default 60) or unmute: its author. ban or unban: its author. pin or unpin: that message. " +
 			"no_stickers (minutes, default a day) or allow_stickers: take away or give back its author's stickers and GIFs, which Telegram only allows or forbids together; use it, not ban or ignore, when they ask to block someone's stickers. " +
-			"group_no_stickers or group_allow_stickers: take away or give back everyone's stickers and GIFs in the group, keeping its other permissions, when they ask it for all; it needs no reply or tag. " +
-			"no_photos (minutes, default a day) or allow_photos, and group_no_photos or group_allow_photos: the same for photos. A member's other limits stay as they are. " +
-			"For mute, unmute, ban, unban, no_stickers and allow_stickers without such a reply, or replying to their own message, it acts on the one member they tagged with @, once Telegram confirms who that is. " +
+			"no_photos (minutes, default a day) or allow_photos: the same for photos. A member's other limits stay as they are. " +
+			"promote: make its author an admin, with your own delete, mute and pin rights at most; demote: take that back; admin_title (text, 16 characters at most): the title shown for an admin you made. " +
+			"For the group itself, with no reply or tag: set_title (text), set_description (text, empty to remove), set_photo (the photo in their message), delete_photo, invite_link (a new link; text names it, minutes ends it), unpin_all, and lock or unlock (kind) to forbid or allow one kind of message to everyone, keeping the group's other permissions: when they ask to block stickers or photos for all, it is lock, never a guard. " +
+			"undo: put back the last thing you did here with this tool, whatever it was; a deleted message never comes back. With force only when, told it was changed by hand since, they still want it back. " +
+			"For member actions without such a reply, or replying to their own message, it acts on the one member they tagged with @, once Telegram confirms who that is. " +
 			"It checks everyone's rights and does it at once, with no question, but only when the person's own message asks for it; say it is done only when it reports done.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["delete", "mute", "unmute", "ban", "unban", "pin", "unpin", "no_stickers", "allow_stickers", "group_no_stickers", "group_allow_stickers", "no_photos", "allow_photos", "group_no_photos", "group_allow_photos"]},
-				"minutes": {"type": "integer", "description": "For mute: how long, 1 to 10080, default 60. For no_stickers and no_photos: 1 to 525600, default 1440; the most for \"forever\"."},
+				"action": {"type": "string", "enum": ["delete", "mute", "unmute", "ban", "unban", "pin", "unpin", "no_stickers", "allow_stickers", "no_photos", "allow_photos", "promote", "demote", "admin_title", "set_title", "set_description", "set_photo", "delete_photo", "invite_link", "unpin_all", "lock", "unlock", "undo"]},
+				"minutes": {"type": "integer", "description": "For mute: how long, 1 to 10080, default 60. For no_stickers and no_photos: 1 to 525600, default 1440; the most for \"forever\". For invite_link: when it stops working; none for never."},
+				"text": {"type": "string", "description": "For set_title, set_description and admin_title: the new text, in the words they gave. For invite_link: an optional name."},
+				"force": {"type": "boolean", "description": "For undo: true only when they want it back though it was changed by hand since."},
+				"kind": {"type": "string", "enum": ["messages", "photos", "videos", "stickers", "voice", "files", "music", "polls", "link_previews"], "description": "For lock and unlock: stickers covers GIFs too, voice covers round videos."},
 				"reason": {"type": "string", "description": "Optional: why, in a few words."}
 			},
 			"required": ["action"],
@@ -244,9 +295,14 @@ type order struct {
 	action string
 	target Target
 	reason string
-	// minutes and until are a mute's.
+	// minutes and until are a mute's, a restriction's or a link's.
 	minutes int
 	until   time.Time
+	// text, kind and picture are what an action on the group or an admin
+	// sets.
+	text    string
+	kind    string
+	picture []byte
 }
 
 func (m *Moderation) run(ctx context.Context, raw json.RawMessage) (any, error) {
@@ -259,35 +315,91 @@ func (m *Moderation) run(ctx context.Context, raw json.RawMessage) (any, error) 
 		return nil, err
 	}
 	if _, known := neededRight[args.Action]; !known {
-		return nil, &ArgumentError{Message: "action must be delete, mute, unmute, ban, unban, pin, unpin, no_stickers, allow_stickers, group_no_stickers, group_allow_stickers, no_photos, allow_photos, group_no_photos or group_allow_photos"}
+		return nil, &ArgumentError{Message: "action must be one of the tool's actions"}
 	}
 	if !askedFor(caller.Words, args.Action) {
 		return nil, &DeniedError{Message: notAsked}
+	}
+	if args.Action == actionUndo {
+		return m.undo(ctx, caller, args.Force)
 	}
 	target, err := m.targetOf(ctx, caller, args.Action)
 	if err != nil {
 		return nil, err
 	}
 	o := m.newOrder(caller, args.Action, target, args.Minutes, args.Reason)
+	if err := o.setGroupArgs(args, caller.Picture); err != nil {
+		return nil, err
+	}
 	if err := m.check(ctx, o); err != nil {
 		return nil, err
 	}
 	// The owners want it done at once, with no question to confirm: the
 	// rights were just checked, and the target came from the update.
-	acted, err := m.carryOut(ctx, o)
+	acted, link, err := m.carryOut(ctx, o)
 	if err != nil {
 		return nil, notCarriedOut(err)
 	}
 	if !acted {
 		return map[string]any{"done": true, "note": alreadyDoneNote}, nil
 	}
+	if link != "" {
+		return map[string]any{"done": true, "link": link, "note": linkNote}, nil
+	}
 	return map[string]any{"done": true, "said": m.doneText(o), "note": doneNote}, nil
+}
+
+// Limits Telegram sets on a group's texts.
+const (
+	maxTitleRunes       = 128
+	maxDescriptionRunes = 255
+	maxLinkNameRunes    = 32
+	maxLinkMinutes      = 366 * 24 * 60
+)
+
+// setGroupArgs reads what an action on the group or an admin needs: its
+// text, the kind to lock, or the photo in the message.
+func (o *order) setGroupArgs(args moderationArgs, picture []byte) error {
+	text := strings.TrimSpace(args.Text)
+	switch o.action {
+	case actionSetTitle:
+		if text == "" || utf8.RuneCountInString(text) > maxTitleRunes {
+			return &ArgumentError{Message: fmt.Sprintf("text must be the new title, 1 to %d characters", maxTitleRunes)}
+		}
+	case actionSetDescription:
+		if utf8.RuneCountInString(text) > maxDescriptionRunes {
+			return &ArgumentError{Message: fmt.Sprintf("text must be the new description, at most %d characters", maxDescriptionRunes)}
+		}
+	case actionAdminTitle:
+		if utf8.RuneCountInString(text) > maxAdminTitleRunes {
+			return &ArgumentError{Message: fmt.Sprintf("an admin title has at most %d characters", maxAdminTitleRunes)}
+		}
+	case actionInviteLink:
+		text = cutRunes(text, maxLinkNameRunes)
+	case actionLock, actionUnlock:
+		if _, known := lockKinds[args.Kind]; !known {
+			return &ArgumentError{Message: "kind must be messages, photos, videos, stickers, voice, files, music, polls or link_previews"}
+		}
+		o.kind = args.Kind
+	case actionSetPhoto:
+		if len(picture) == 0 {
+			return &ArgumentError{Message: "there is no photo in the message: ask them to send the photo with the request, or reply to one"}
+		}
+		photo, err := asJPEG(picture)
+		if err != nil {
+			return err
+		}
+		o.picture = photo
+	}
+	o.text = text
+	return nil
 }
 
 // doneNote tells the model how to report an action the tool carried out;
 // alreadyDoneNote, one this message already had done.
 const (
 	doneNote        = "Done. Tell them in one short line, in their language, like the line in said; do not ask anything."
+	linkNote        = "Done. Give them the link exactly as it is, in one short line, in their language."
 	alreadyDoneNote = "This was already done for this message; do not say it again: reply with exactly [silent] unless something else needs an answer."
 )
 
@@ -362,7 +474,8 @@ func (m *Moderation) tagged(ctx context.Context, chatID int64, mention Mention, 
 // onMember reports an action on a member rather than on a message.
 func onMember(action string) bool {
 	switch action {
-	case actionMute, actionUnmute, actionBan, actionUnban, actionNoStickers, actionStickers, actionNoPhotos, actionPhotos:
+	case actionMute, actionUnmute, actionBan, actionUnban, actionNoStickers, actionStickers, actionNoPhotos, actionPhotos,
+		actionPromote, actionDemote, actionAdminTitle:
 		return true
 	}
 	return false
@@ -372,10 +485,15 @@ func onMember(action string) bool {
 // or a message.
 func groupWide(action string) bool {
 	switch action {
-	case actionGroupNoStickers, actionGroupStickers, actionGroupNoPhotos, actionGroupPhotos:
+	case actionSetTitle, actionSetDescription, actionSetPhoto, actionDeletePhoto, actionInviteLink, actionUnpinAll, actionLock, actionUnlock:
 		return true
 	}
 	return false
+}
+
+// onAdmin reports an action on an admin rather than on a member.
+func onAdmin(action string) bool {
+	return action == actionDemote || action == actionAdminTitle
 }
 
 // present reports a member status an action may be taken on: someone in
@@ -409,6 +527,10 @@ func (m *Moderation) newOrder(caller Caller, action string, target Target, minut
 		o.minutes = muteMinutes(minutes)
 	case actionNoStickers, actionNoPhotos:
 		o.minutes = clampMinutes(minutes, defaultNoStickersMinutes, maxNoStickersMinutes)
+	case actionInviteLink:
+		if minutes > 0 {
+			o.minutes = min(minutes, maxLinkMinutes)
+		}
 	}
 	if o.minutes > 0 {
 		o.until = m.opts.Now().Add(time.Duration(o.minutes) * time.Minute)
@@ -498,6 +620,14 @@ func (m *Moderation) checkTarget(ctx context.Context, o order) error {
 	if err != nil {
 		return errLookup
 	}
+	if onAdmin(o.action) {
+		// Telegram lets a bot change only the admins it made; the creator is
+		// never one of them.
+		if member.Status != "administrator" {
+			return &DeniedError{Message: notAnAdmin}
+		}
+		return nil
+	}
 	if member.IsAdmin() {
 		return &DeniedError{Message: immune}
 	}
@@ -532,15 +662,33 @@ func (m *Moderation) checkPace(ctx context.Context, caller Caller) error {
 // update Telegram delivers twice, or a second call in the same turn, acts
 // once. When Telegram refuses, the record is dropped, so that the action may
 // be tried again.
-func (m *Moderation) carryOut(ctx context.Context, o order) (bool, error) {
-	first, err := m.opts.Store.RecordModeration(ctx, o.audit())
+func (m *Moderation) carryOut(ctx context.Context, o order) (bool, string, error) {
+	undo, err := m.snapshot(ctx, o)
+	if err != nil {
+		return false, "", telegramFailure(err)
+	}
+	record := o.audit()
+	record.Undo = undo
+	first, err := m.opts.Store.RecordModeration(ctx, record)
 	if err != nil || !first {
-		return false, err
+		return false, "", err
+	}
+	if o.action == actionInviteLink {
+		link, err := m.opts.Telegram.CreateChatInviteLink(ctx, telegram.InviteLink{ChatID: o.caller.ChatID, Name: o.text, Expires: o.until})
+		if err != nil {
+			return false, "", m.failed(ctx, o, err)
+		}
+		// The link exists either way; without its undo it only cannot be
+		// revoked through undo.
+		if undo, err := json.Marshal(undoState{Link: link}); err == nil {
+			_ = m.opts.Store.SetModerationUndo(ctx, o.caller.UpdateID, o.action, undo)
+		}
+		return true, link, nil
 	}
 	if err := m.send(ctx, o); err != nil {
-		return false, m.failed(ctx, o, err)
+		return false, "", m.failed(ctx, o, err)
 	}
-	return true, nil
+	return true, "", nil
 }
 
 // failed says why o was not carried out, and drops its record when
@@ -594,8 +742,24 @@ func (m *Moderation) send(ctx context.Context, o order) error {
 		return m.opts.Telegram.PinChatMessage(ctx, chatID, messageID)
 	case actionUnpin:
 		return m.opts.Telegram.UnpinChatMessage(ctx, chatID, messageID)
-	case actionGroupNoStickers, actionGroupStickers, actionGroupNoPhotos, actionGroupPhotos:
-		return m.setGroupMedia(ctx, chatID, o.action)
+	case actionPromote:
+		return m.promote(ctx, chatID, userID)
+	case actionDemote:
+		return m.opts.Telegram.PromoteChatMember(ctx, chatID, userID, telegram.AdminRights{})
+	case actionAdminTitle:
+		return m.opts.Telegram.SetChatAdministratorCustomTitle(ctx, chatID, userID, o.text)
+	case actionSetTitle:
+		return m.opts.Telegram.SetChatTitle(ctx, chatID, o.text)
+	case actionSetDescription:
+		return m.opts.Telegram.SetChatDescription(ctx, chatID, o.text)
+	case actionSetPhoto:
+		return m.opts.Telegram.SetChatPhoto(ctx, chatID, o.picture)
+	case actionDeletePhoto:
+		return m.opts.Telegram.DeleteChatPhoto(ctx, chatID)
+	case actionUnpinAll:
+		return m.opts.Telegram.UnpinAllChatMessages(ctx, chatID)
+	case actionLock, actionUnlock:
+		return m.setGroupKind(ctx, chatID, o.kind, o.action == actionUnlock)
 	}
 	return fmt.Errorf("moderation: unknown action %q", o.action)
 }
@@ -620,32 +784,74 @@ func (m *Moderation) setMemberMedia(ctx context.Context, o order) error {
 	return m.opts.Telegram.RestrictChatMember(ctx, telegram.Restriction{ChatID: o.caller.ChatID, UserID: o.target.UserID, Permissions: permissions, Until: until})
 }
 
-// setGroupMedia allows or forbids stickers or photos for the whole group,
+// promote makes a member an admin with the moderation rights the bot itself
+// holds, never the right to make admins: Telegram lets a bot give only its
+// own rights.
+func (m *Moderation) promote(ctx context.Context, chatID, userID int64) error {
+	me, err := m.opts.Members.GetChatMember(ctx, chatID, m.opts.BotID)
+	if err != nil {
+		return err
+	}
+	return m.opts.Telegram.PromoteChatMember(ctx, chatID, userID, telegram.AdminRights{
+		CanDeleteMessages:  me.CanDeleteMessages,
+		CanRestrictMembers: me.CanRestrictMembers,
+		CanPinMessages:     me.CanPinMessages,
+		CanInviteUsers:     me.CanInviteUsers,
+	})
+}
+
+// setGroupKind allows or forbids one kind of message for the whole group,
 // keeping whatever else its members may or may not do.
-func (m *Moderation) setGroupMedia(ctx context.Context, chatID int64, action string) error {
+func (m *Moderation) setGroupKind(ctx context.Context, chatID int64, kind string, allowed bool) error {
 	chat, err := m.opts.Telegram.GetChat(ctx, chatID)
 	if err != nil {
 		return err
 	}
-	permissions := telegram.AllPermissions()
-	if chat.Permissions != nil {
-		permissions = *chat.Permissions
-	}
-	allowMedia(&permissions, action)
+	permissions := groupPermissions(chat)
+	lockKinds[kind].set(&permissions, allowed)
 	return m.opts.Telegram.SetChatPermissions(ctx, chatID, permissions)
+}
+
+// groupPermissions are what a group's members may do by default, or
+// everything when Telegram did not say.
+func groupPermissions(chat telegram.Chat) telegram.ChatPermissions {
+	if chat.Permissions == nil {
+		return telegram.AllPermissions()
+	}
+	return *chat.Permissions
+}
+
+// lockKind is one kind of message lock and unlock act on: the permissions
+// it is, and how the bot names it.
+type lockKind struct {
+	set  func(p *telegram.ChatPermissions, allowed bool)
+	name chatText
+}
+
+var lockKinds = map[string]lockKind{
+	"messages": {func(p *telegram.ChatPermissions, a bool) { p.CanSendMessages = a }, chatText{"xabar yozish", "писать сообщения"}},
+	"photos":   {func(p *telegram.ChatPermissions, a bool) { p.CanSendPhotos = a }, chatText{"rasm yuborish", "отправлять фото"}},
+	"videos":   {func(p *telegram.ChatPermissions, a bool) { p.CanSendVideos = a }, chatText{"video yuborish", "отправлять видео"}},
+	"stickers": {func(p *telegram.ChatPermissions, a bool) { p.CanSendOtherMessages = a }, chatText{"stiker va GIF yuborish", "отправлять стикеры и GIF"}},
+	"voice": {func(p *telegram.ChatPermissions, a bool) { p.CanSendVoiceNotes, p.CanSendVideoNotes = a, a },
+		chatText{"ovozli xabar va dumaloq video yuborish", "отправлять голосовые и кружочки"}},
+	"files":         {func(p *telegram.ChatPermissions, a bool) { p.CanSendDocuments = a }, chatText{"fayl yuborish", "отправлять файлы"}},
+	"music":         {func(p *telegram.ChatPermissions, a bool) { p.CanSendAudios = a }, chatText{"musiqa yuborish", "отправлять музыку"}},
+	"polls":         {func(p *telegram.ChatPermissions, a bool) { p.CanSendPolls = a }, chatText{"so'rovnoma yuborish", "отправлять опросы"}},
+	"link_previews": {func(p *telegram.ChatPermissions, a bool) { p.CanAddWebPagePreviews = a }, chatText{"havolalar ko'rinishi", "превью ссылок"}},
 }
 
 // allowMedia sets the one permission a sticker or photo action is about:
 // stickers and GIFs, which Telegram allows or forbids together, or photos.
 func allowMedia(p *telegram.ChatPermissions, action string) {
 	switch action {
-	case actionNoStickers, actionGroupNoStickers:
+	case actionNoStickers:
 		p.CanSendOtherMessages = false
-	case actionStickers, actionGroupStickers:
+	case actionStickers:
 		p.CanSendOtherMessages = true
-	case actionNoPhotos, actionGroupNoPhotos:
+	case actionNoPhotos:
 		p.CanSendPhotos = false
-	case actionPhotos, actionGroupPhotos:
+	case actionPhotos:
 		p.CanSendPhotos = true
 	}
 }
@@ -704,14 +910,28 @@ func (o order) done(until string) chatText {
 		return chatText{"Bajarildi: " + name + " " + until + " gacha rasm yubora olmaydi.", "Готово: " + name + " не может отправлять фото до " + until + "."}
 	case actionPhotos:
 		return chatText{"Bajarildi: " + name + " yana rasm yubora oladi.", "Готово: " + name + " снова может отправлять фото."}
-	case actionGroupNoPhotos:
-		return chatText{"Bajarildi: guruhda hech kim rasm yubora olmaydi.", "Готово: в группе никто не может отправлять фото."}
-	case actionGroupPhotos:
-		return chatText{"Bajarildi: guruhda yana hamma rasm yubora oladi.", "Готово: в группе снова все могут отправлять фото."}
-	case actionGroupNoStickers:
-		return chatText{"Bajarildi: guruhda hech kim stiker va GIF yubora olmaydi.", "Готово: в группе никто не может отправлять стикеры и GIF."}
-	case actionGroupStickers:
-		return chatText{"Bajarildi: guruhda yana hamma stiker va GIF yubora oladi.", "Готово: в группе снова все могут отправлять стикеры и GIF."}
+	case actionPromote:
+		return chatText{"Bajarildi: " + name + " endi admin.", "Готово: " + name + " теперь админ."}
+	case actionDemote:
+		return chatText{"Bajarildi: " + name + " endi admin emas.", "Готово: " + name + " больше не админ."}
+	case actionAdminTitle:
+		return chatText{"Bajarildi: " + name + " unvoni o'zgardi.", "Готово: у " + name + " новое звание."}
+	case actionSetTitle:
+		return chatText{"Bajarildi: guruh nomi «" + o.text + "» bo'ldi.", "Готово: группа теперь называется «" + o.text + "»."}
+	case actionSetDescription:
+		return chatText{"Bajarildi: guruh tavsifi yangilandi.", "Готово: описание группы обновлено."}
+	case actionSetPhoto:
+		return chatText{"Bajarildi: guruh rasmi yangilandi.", "Готово: фото группы обновлено."}
+	case actionDeletePhoto:
+		return chatText{"Bajarildi: guruh rasmi olib tashlandi.", "Готово: фото группы удалено."}
+	case actionUnpinAll:
+		return chatText{"Bajarildi: hamma qadalgan xabarlar olindi.", "Готово: все закреплённые сообщения откреплены."}
+	case actionLock:
+		kind := lockKinds[o.kind].name
+		return chatText{"Bajarildi: guruhda " + kind.uz + " yopildi.", "Готово: в группе запрещено " + kind.ru + "."}
+	case actionUnlock:
+		kind := lockKinds[o.kind].name
+		return chatText{"Bajarildi: guruhda " + kind.uz + " ochildi.", "Готово: в группе снова можно " + kind.ru + "."}
 	case actionPin:
 		return chatText{"Bajarildi: " + name + " xabari qadaldi.", "Готово: сообщение от " + name + " закреплено."}
 	}
@@ -745,13 +965,22 @@ var actionWords = map[string][]string{
 	actionNoStickers: {"stik", "stic", "стик", "gif", "гиф"},
 	actionStickers:   {"stik", "stic", "стик", "gif", "гиф"},
 
-	actionGroupNoStickers: {"stik", "stic", "стик", "gif", "гиф"},
-	actionGroupStickers:   {"stik", "stic", "стик", "gif", "гиф"},
-	actionNoPhotos:        photoWords,
-	actionPhotos:          photoWords,
-	actionGroupNoPhotos:   photoWords,
-	actionGroupPhotos:     photoWords,
-	actionUnpin:           {"pin", "qada", "закреп", "откреп"},
+	actionNoPhotos:   photoWords,
+	actionPhotos:     photoWords,
+	actionPromote:    adminWords,
+	actionDemote:     adminWords,
+	actionAdminTitle: {"admin", "админ", "unvon", "titul", "титул", "звани", "title", "lavozim", "должн"},
+
+	actionSetTitle:       {"nom", "title", "назв", "имя"},
+	actionSetDescription: {"tavsif", "description", "описан", "bio"},
+	actionSetPhoto:       append([]string{"avatar", "аватар", "ava "}, photoWords...),
+	actionDeletePhoto:    append([]string{"avatar", "аватар", "ava "}, photoWords...),
+	actionInviteLink:     {"link", "havola", "ssilka", "silka", "ссылк", "taklif", "invite"},
+	actionUnpinAll:       {"pin", "qada", "закреп", "откреп"},
+	actionLock:           {"yop", "blok", "taqiq", "chekla", "ochir", "запрет", "закр", "огранич", "lock", "заблок"},
+	actionUndo:           {"qaytar", "orqaga", "ortga", "bekor qil", "undo", "верн", "отмен", "назад"},
+	actionUnlock:         {"och", "ruxsat", "разреш", "откр", "unlock", "разблок"},
+	actionUnpin:          {"pin", "qada", "закреп", "откреп"},
 }
 
 var foldApostrophes = strings.NewReplacer("'", "", "ʻ", "", "ʼ", "", "’", "", "‘", "", "`", "")
@@ -759,6 +988,9 @@ var foldApostrophes = strings.NewReplacer("'", "", "ʻ", "", "ʼ", "", "’", ""
 // askedFor reports whether words, what the person asking wrote themselves,
 // ask for action. With no question to confirm, this is what keeps a line
 // in the chat from talking the model into moderating on someone's turn.
+// adminWords ask for something about adminship: "admin qil", "админка".
+var adminWords = []string{"admin", "админ"}
+
 // photoWords ask for something about photos: "rasm", "surat", "фото".
 var photoWords = []string{"rasm", "rasim", "surat", "foto", "photo", "фото", "картин", "расм", "сурат"}
 

@@ -1700,3 +1700,21 @@ func TestPersonaRefusesInsultsOnRequestAndSexualContent(t *testing.T) {
 		}
 	}
 }
+
+// Routing is off until ROUTER_MODEL names a router; the chat path then
+// answers with the main model, without tools, unless CHAT_MODEL names
+// another.
+func TestRoutingModels(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RouterModel != "" || cfg.ChatModel != cfg.Model {
+		t.Errorf("router %q, chat %q; want no router and the main model %q", cfg.RouterModel, cfg.ChatModel, cfg.Model)
+	}
+	env := validEnv()
+	env["ROUTER_MODEL"], env["CHAT_MODEL"] = "gemini-3.5-flash-lite", "gemini-3.5-flash"
+	if cfg, err = Load(getenv(env)); err != nil || cfg.RouterModel != "gemini-3.5-flash-lite" || cfg.ChatModel != "gemini-3.5-flash" {
+		t.Errorf("router %q, chat %q, %v", cfg.RouterModel, cfg.ChatModel, err)
+	}
+}

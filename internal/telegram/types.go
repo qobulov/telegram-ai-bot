@@ -401,9 +401,17 @@ type Chat struct {
 	// Title and Username are set for groups; Username only for public ones.
 	Title    string `json:"title,omitempty"`
 	Username string `json:"username,omitempty"`
-	// Permissions are what members of a group may do by default; getChat
-	// sets them.
-	Permissions *ChatPermissions `json:"permissions,omitempty"`
+	// getChat alone sets the rest: what members of a group may do by
+	// default, its description, its photo and its latest pinned message.
+	Permissions   *ChatPermissions `json:"permissions,omitempty"`
+	Description   string           `json:"description,omitempty"`
+	Photo         *ChatPhoto       `json:"photo,omitempty"`
+	PinnedMessage *Message         `json:"pinned_message,omitempty"`
+}
+
+// ChatPhoto is a group's photo; BigFileID downloads it at 640×640.
+type ChatPhoto struct {
+	BigFileID string `json:"big_file_id"`
 }
 
 // Chat types. Channels are not handled by the bot.

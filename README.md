@@ -858,11 +858,31 @@ check is made in code:
 - **Actions:** delete the message; mute its author (an hour unless asked
   otherwise, at most a week; supergroups only) or unmute them; ban them, or
   unban; pin the message without a notification, or unpin it; take away a
-  member's stickers and GIFs, or photos (a day unless asked otherwise), or
-  the whole group's (`group_no_stickers`, `group_no_photos`: the group's
-  other permissions are kept, and no reply or tag is needed), and give them
-  back. A member's other limits stay: one already muted or without stickers
-  stays so, and what is given back keeps the rest of the restriction's end.
+  member's stickers and GIFs, or photos (a day unless asked otherwise), and
+  give them back; make a member an admin, with the bot's own delete, mute,
+  pin and invite rights at most (never the right to make admins), take it
+  back or set their title, for admins the bot made. A member's other limits
+  stay: one already muted or without stickers stays so, and what is given
+  back keeps the rest of the restriction's end.
+- **The group itself,** with no reply or tag: rename it, set or clear its
+  description, set its photo from the photo in the request or remove it,
+  make an invite link (named, and ending when asked), unpin everything, and
+  `lock` or `unlock` one kind of message for everyone (messages, photos,
+  videos, stickers and GIFs, voice and round videos, files, music, polls,
+  link previews), keeping the group's other permissions. Each needs its own
+  admin right, the asker's and the bot's: changing the group's info,
+  inviting users, pinning or restricting members.
+- **Undo** ("orqaga qaytar"): every action but a deletion is recorded with
+  what puts it back, read from Telegram just before it is taken
+  (`moderation_actions.undo`). Undo puts back the group's latest such
+  action, once; asked again, the one before. It needs the right the action
+  needed. A name, description or lock someone changed by hand since is not
+  overwritten unless they say so again. A restriction that has ended since
+  is put back as none, never as forever. Deleted messages, and messages the
+  guards deleted, never come back; an unban lets the member rejoin but does
+  not add them; a demoted admin gets back only the rights the bot holds; and
+  undoing "unpin all" pins back only the latest pinned message, the one
+  Telegram reports.
 - **No confirmation:** as the owners asked, the action is done at once,
   with no question to answer. Instead, the person's own message (or their
   voice message's transcript) must ask for it in words, checked in code:

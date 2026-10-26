@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -150,7 +151,7 @@ func TestPollSent(t *testing.T) {
 		t.Errorf("polls = %+v\nwant    [%+v]", polls, want)
 	}
 	wantAudit := storage.ModerationAction{ChatID: groupA, Action: "poll", RequesterID: memberID, UpdateID: 100}
-	if audit := env.audit.recorded(); len(audit) != 1 || audit[0] != wantAudit {
+	if audit := env.audit.recorded(); len(audit) != 1 || !reflect.DeepEqual(plainAudit(audit[0]), wantAudit) {
 		t.Errorf("audit = %+v\nwant    [%+v]", audit, wantAudit)
 	}
 	if len(env.audit.since) != 1 || !env.audit.since[0].Equal(rulesNow.Add(-10*time.Minute)) {

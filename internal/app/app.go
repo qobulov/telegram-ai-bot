@@ -226,10 +226,14 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Logger:          logger,
 	})
 	answering := withBackup(cfg, model, logger)
+	router, chat := chatRouting(cfg, logger)
 	assistant := agent.New(agent.Options{
 		Store:        store,
 		Model:        answering,
 		Tools:        registry,
+		Router:       router,
+		ChatModel:    chat,
+		Name:         cfg.BotDisplayName,
 		Persona:      cfg.PersonaPrompt,
 		GroupNote:    cfg.GroupNote,
 		MaxHistory:   cfg.MaxHistoryMessages,
@@ -461,6 +465,40 @@ func swearJudge(cfg config.Config, logger *slog.Logger) *ai.Client {
 		AttemptTimeout:  attemptTimeout,
 		Logger:          logger,
 	})
+}
+
+// chatRouting is the router of ROUTER_MODEL and the chat model of
+// CHAT_MODEL, both nil without a router. The router gives one word, as the
+// swear judge does; a chat model that fails hands the turn to the main
+// model and its backup.
+func chatRouting(cfg config.Config, logger *slog.Logger) (router, chat agent.Model) {
+	if cfg.RouterModel == "" {
+		return nil, nil
+	}
+	router = ai.NewClient(ai.Options{
+		BaseURL:         cfg.AIBaseURL,
+		APIKey:          cfg.AIAPIKey,
+		Model:           cfg.RouterModel,
+		ReasoningEffort: judgeReasoning(cfg.ReasoningEffort),
+		MaxTokens:       judgeTokens,
+		MaxAttempts:     2,
+		HTTPClient:      &http.Client{Timeout: cfg.RequestTimeout},
+		AttemptTimeout:  attemptTimeout,
+		Logger:          logger,
+	})
+	chat = ai.NewClient(ai.Options{
+		BaseURL:         cfg.AIBaseURL,
+		APIKey:          cfg.AIAPIKey,
+		Model:           cfg.ChatModel,
+		FallbackModels:  cfg.FallbackModels,
+		ReasoningEffort: cfg.ReasoningEffort,
+		MaxTokens:       cfg.MaxOutputTokens,
+		MaxAttempts:     2,
+		HTTPClient:      &http.Client{Timeout: cfg.RequestTimeout},
+		AttemptTimeout:  attemptTimeout,
+		Logger:          logger,
+	})
+	return router, chat
 }
 
 // judgeReasoning is judgeEffort, unless thinking is off or left to the

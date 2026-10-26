@@ -1093,10 +1093,10 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 
 	switch {
 	case err == nil && answer.Reaction != "":
-		log.Info("turn completed with a reaction", "emoji", answer.Reaction)
+		log.Info("turn completed with a reaction", "emoji", answer.Reaction, "route", answer.Route)
 		return outcome{reaction: answer.Reaction, answerID: answer.ID}
 	case err == nil:
-		log.Info("turn completed")
+		log.Info("turn completed", "route", answer.Route)
 		out := outcome{text: s.fitted(in, answer.Text), answerID: answer.ID, toReplied: answer.ToReplied, toName: answer.To}
 		if answer.Text == "" {
 			// A sticker or a GIF is an answer of its own, never one more

@@ -65,11 +65,18 @@ type Tools interface {
 	Execute(ctx context.Context, callerID int64, name, args string) string
 }
 
-// Options configures an Agent. All fields are required.
+// Options configures an Agent. All fields are required but Router,
+// ChatModel and Name, which route banter to a lighter model (see route.go):
+// without Router and ChatModel every turn takes the full path.
 type Options struct {
 	Store Store
 	Model Model
 	Tools Tools
+	// Router answers CHAT or TOOLS for a message, and ChatModel answers the
+	// CHAT ones, without tools. Name is the bot's, for the router.
+	Router    Model
+	ChatModel Model
+	Name      string
 	// Persona is the character's instructions, sent with every request.
 	Persona string
 	// GroupNote is added to Persona for messages from a group.
@@ -137,6 +144,9 @@ type Answer struct {
 	ToReplied bool
 	To        string
 	ID        int64
+	// Route is the path the turn took: RouteFull, RouteChat or
+	// RouteEscalated.
+	Route string
 }
 
 // Reply answers the user's message and saves the whole turn. Nothing is
@@ -197,6 +207,8 @@ type turn struct {
 	// toolAsText is set once the model wrote a tool call as text, so that
 	// the next request tells it to call the tool instead.
 	toolAsText bool
+	// route is the path the turn takes when it is not the chat one.
+	route string
 }
 
 // run alternates between the model and its tool calls until the model
@@ -204,6 +216,19 @@ type turn struct {
 // model is told to stop using tools, and after MaxToolCalls+2 requests the
 // turn fails with ErrToolLoop.
 func (a *Agent) run(ctx context.Context, t *turn) (Answer, error) {
+	if answer, done, err := a.tryChat(ctx, t); done {
+		return answer, err
+	}
+	if t.route == "" {
+		t.route = RouteFull
+	}
+	answer, err := a.runFull(ctx, t)
+	answer.Route = t.route
+	return answer, err
+}
+
+// runFull answers t with the main model and every tool the caller may use.
+func (a *Agent) runFull(ctx context.Context, t *turn) (Answer, error) {
 	definitions := a.opts.Tools.Definitions(ctx, t.req.UserID)
 	for range a.opts.MaxToolCalls + 2 {
 		reply, err := a.opts.Model.Complete(ctx, ai.Request{

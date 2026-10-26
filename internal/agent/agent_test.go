@@ -779,6 +779,7 @@ func TestToThemMarkerAddressesTheRepliedMember(t *testing.T) {
 		f := newFixture(text(content))
 		answer, err := f.agent.Reply(context.Background(), request(1, "Mari, bunga bir nima de"))
 		answer.ID = 0
+		want.Route = RouteFull
 		if err != nil || answer != want {
 			t.Errorf("%q: got %+v, %v; want %+v", content, answer, err, want)
 		}
