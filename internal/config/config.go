@@ -92,9 +92,6 @@ type Config struct {
 	ImageModel      string
 	ImageBaseURL    string
 	DailyImageLimit int
-	// DailyPresentationLimit is how many presentations a user who is not
-	// an owner may get per day; 0 lets only owners have them.
-	DailyPresentationLimit int
 
 	// Media limits: the largest file the bot downloads, and the longest
 	// voice message it listens to.
@@ -251,7 +248,6 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.ImageModel = r.text("IMAGE_MODEL", "gemini-3.1-flash-image")
 	cfg.ImageBaseURL = strings.TrimSuffix(cfg.AIBaseURL, "/openai")
 	cfg.DailyImageLimit = r.integer("DAILY_IMAGE_LIMIT", 2, 0)
-	cfg.DailyPresentationLimit = r.integer("PRESENTATION_DAILY_LIMIT", 3, 0)
 	if cfg.ImagesEnabled {
 		cfg.PersonaPrompt += "\n\n" + imageNote
 	}

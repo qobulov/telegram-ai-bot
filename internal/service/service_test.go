@@ -86,7 +86,7 @@ type fakeReplier struct {
 	audios []tools.Audio
 	// cards are item cards it chooses, as the item card tool would.
 	cards []string
-	// documents are files it makes, as the presentation tool would.
+	// documents are files it makes, as a tool may.
 	documents []tools.Document
 	// answer replaces the echo when set.
 	answer string
@@ -863,11 +863,14 @@ func TestHelpMentionsModerationAndPolls(t *testing.T) {
 	for _, want := range []string{
 		"Uzbek", "Russian", "English",
 		"photos", "stickers", "GIFs", "round videos",
-		"tell the time anywhere", "arithmetic", "a quiz, and a poll in a group", "Send a test file",
+		"tell the time anywhere", "arithmetic", "make a poll in a group", "Send a test file",
 	} {
 		if !strings.Contains(help, want) {
 			t.Errorf("help text does not mention %q", want)
 		}
+	}
+	if strings.Contains(help, "presentation") {
+		t.Error("help still offers presentations, which the bot no longer makes")
 	}
 	// The words below were in the help before moderation existed ("/reset —
 	// delete the conversation history", "/mute"), so they are looked for

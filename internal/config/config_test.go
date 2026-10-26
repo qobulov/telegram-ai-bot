@@ -1066,19 +1066,25 @@ func TestPersonaSwearsBackInKind(t *testing.T) {
 	}
 }
 
-// The owner wants a member who finds fault with the bot answered with
-// "poxuymasmi", alone or with a few dismissive words, and owners answered
-// normally.
-func TestPersonaShrugsOffFaultFinding(t *testing.T) {
+// A member who finds fault with the bot gets a calm line without swearing:
+// "poxuymasmi" answered a plain remark in a polite group. Owners are
+// answered normally.
+func TestPersonaShrugsOffFaultFindingWithoutSwearing(t *testing.T) {
 	cfg, err := Load(getenv(validEnv()))
 	if err != nil {
 		t.Fatal(err)
 	}
 	rule := lineContaining(cfg.PersonaPrompt, "mocks a flaw of yours")
-	for _, want := range []string{`start your answer with "poxuymasmi"`, `"похуймасми"`, `"poxuymasmi, senga chort"`, "never an apology", "still gets its answer", "owners get a normal answer"} {
+	for _, want := range []string{"stay unbothered", "no swear words", "never an apology", "still gets its answer", "owners get a normal answer", `"senda ko'z yo'q-ku"`} {
 		if !strings.Contains(rule, want) {
 			t.Errorf("the fault-finding rule does not contain %q: %q", want, rule)
 		}
+	}
+	if strings.Contains(strings.ToLower(cfg.PersonaPrompt), "poxuy") || strings.Contains(cfg.PersonaPrompt, "похуй") {
+		t.Error(`the persona still asks for "poxuymasmi"`)
+	}
+	if style := lineContaining(cfg.PersonaPrompt, "informal language"); strings.Contains(style, "profanity when appropriate") || !strings.Contains(style, "no swear words of your own") {
+		t.Errorf("the style rule lets the bot swear unprovoked: %q", style)
 	}
 	if swear := lineContaining(cfg.PersonaPrompt, "swears at you"); !strings.Contains(swear, `"иди нахуй" gets "днх" or "pshnx"`) {
 		t.Errorf("Russian swearing does not get днх: %q", swear)

@@ -4,7 +4,7 @@ A Telegram chat character written in Go: a playful, quick-witted group-chat
 regular (called Maria unless you rename her) rather than a neutral assistant.
 She answers through [Google Gemini](https://ai.google.dev), remembers
 conversations in PostgreSQL, and can call a small set of tools that are
-checked in code (current time, calculator, bot help, drawing, polls and quizzes, a
+checked in code (current time, calculator, bot help, drawing, polls, a
 group's admin list, moderation for group admins, and live data: exchange
 rates, weather, prayer times, news headlines, Wikipedia, football and crypto
 prices).
@@ -53,7 +53,7 @@ internal/webhook                HTTP handler for webhook updates, with secret ch
 internal/config                 load .env + environment, validate
 internal/telegram               Bot API client: long polling, sending, message splitting
 internal/ai                     Model client: types, retries, tool-calling format
-internal/tools                  tool registry + time, calculator, help, drawing, polls, quizzes, admin list, moderation, owners' tools
+internal/tools                  tool registry + time, calculator, help, drawing, polls, admin list, moderation, owners' tools
 internal/webapi                 live-data tools: rates, weather, prayer times, news, Wikipedia, football, crypto
 internal/storage                pgx pool, migrations, conversation queries
 internal/storage/migrations     SQL migrations, embedded in the binary
@@ -183,7 +183,6 @@ in the environment win over the file.
 | `YOUTUBE_API_KEY` | empty | YouTube Data API v3 key from Google Cloud Console, not bound to a service account; without it there is no video search |
 | `TMDB_TOKEN` | empty | TMDB API Read Access Token from <https://www.themoviedb.org/settings/api>; without it there is no movies tool |
 | `GOOGLE_SAFE_BROWSING_KEY` | empty | Google Cloud API key restricted to the Safe Browsing API; lets owners turn on the link guard (`group_rules` `guard` `links`), which deletes links Google takes for malware, phishing or unwanted software. Google offers this API for non-commercial use |
-| `PRESENTATION_DAILY_LIMIT` | `3` | Presentations (.pptx) per user per day; owners have no limit; `0` lets only owners have them |
 | `WOLFRAM_APP_ID` | empty | Wolfram|Alpha AppID from <https://developer.wolframalpha.com> (free: 2,000 calls a month); adds the `wolfram` tool, which solves equations, integrals, physics and chemistry. It is sent in a header, never in a URL |
 | `CALENDARIFIC_API_KEY` | empty | Calendarific key from <https://calendarific.com> (free plan, monthly limit); adds the `holidays` tool. It is sent in a header, never in a URL |
 | `URLHAUS_AUTH_KEY` | empty | Free Auth-Key from <https://auth.abuse.ch/>; also lets owners turn on the link guard, and with both keys a link is deleted when either service lists it (URLhaus by its host) |
@@ -194,7 +193,7 @@ in the environment win over the file.
 | `DB_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
 | `TELEGRAM_WEBHOOK_SECRET` | empty | Only for webhook deployments; see [Vercel deployment](#vercel-deployment-webhook) |
 | `CRON_SECRET` | empty | Only on Vercel: protects the daily cleanup endpoint |
-| `MAX_OUTPUT_TOKENS`           | `8192`                         | Longest model reply, in tokens, thinking included; a presentation's slides come in one reply, so keep it at 8192 or more |
+| `MAX_OUTPUT_TOKENS`           | `8192`                         | Longest model reply, in tokens, thinking included |
 | `AI_REASONING_EFFORT`         | `low` (Gemini)                 | How hard Gemini thinks before answering: `none`, `minimal`, `low`, `medium`, `high`, or `default` for the model's own. Thinking is paid as output and takes from `MAX_OUTPUT_TOKENS`; the lite models refuse `none`. Each request logs its tokens as `model usage` |
 | `BOT_DISPLAY_NAME`            | `Maria`                         | The character's name                                                                                         |
 | `PERSONA_PROMPT`              | built-in                       | The character's personality and rules; `{name}` is replaced by the name. See [The character](#the-character) |
@@ -591,19 +590,6 @@ missed answers, the time, the place among everyone's first run of the part,
 and buttons to try again or go on to the next part. A question or option
 longer than Telegram allows in a quiz is sent as a message, the quiz then
 having the letters. Private chats only; groups may come later.
-
-## Presentations
-
-Asked for a presentation, slides or a *taqdimot*, the model calls
-`make_presentation` with a title, a subtitle, a color theme (blue, green,
-purple or dark) and 2 to 12 slides of a title and up to 6 bullet points, in
-the asker's language. The bot writes the .pptx itself (`internal/slides`,
-no library and no Google account: the file opens in PowerPoint, Google
-Slides, Keynote and LibreOffice) and sends it with the model's one-line
-caption. That caption is the whole answer: the tool ends the turn, so the
-slides cost one call to the model, about two ordinary answers' worth of
-tokens. `PRESENTATION_DAILY_LIMIT` (3) bounds them per user and day;
-owners have no limit.
 
 ## Live data
 

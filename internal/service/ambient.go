@@ -16,9 +16,10 @@ const (
 	// maxContextChars bounds the log given to the model with one question,
 	// in bytes, so a busy day does not make every answer slow and costly: at
 	// 24,000 a busy group's prompt reached 25,000 tokens, half of them the
-	// log, which changes with every message and so is never cached; 18,000
-	// still holds two to four hours of a busy group.
-	maxContextChars = 18_000
+	// log, which changes with every message and so is never cached. At
+	// 18,000 it was still the largest part of a prompt paid in full; 10,000
+	// holds about an hour or two of a busy group.
+	maxContextChars = 10_000
 	logTimeout      = 5 * time.Second
 	// ambientWindow is how far back the log given to the model reaches. A
 	// fixed span rather than "since midnight" keeps a conversation that runs

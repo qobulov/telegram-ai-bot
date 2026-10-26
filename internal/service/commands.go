@@ -36,7 +36,7 @@ type outcome struct {
 	audios   []tools.Audio
 	// cards are item cards, stickers by file ID, sent after the answer.
 	cards []string
-	// documents are files a tool made, such as a presentation, sent as the
+	// documents are files a tool made, such as a document, sent as the
 	// answer with its text as their caption.
 	documents []tools.Document
 	// duplicate marks an update that was already answered: Telegram sent it

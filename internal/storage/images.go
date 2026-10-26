@@ -22,18 +22,6 @@ func (s *Store) ReleaseImage(ctx context.Context, id int64) error {
 	return s.releaseDaily(ctx, dailyImages, id)
 }
 
-// ReservePresentation takes one of the user's presentations for the day,
-// as ReserveImage does a picture.
-func (s *Store) ReservePresentation(ctx context.Context, userID, chatID int64, since time.Time, limit int) (int64, bool, error) {
-	return s.reserveDaily(ctx, dailyPresentations, userID, chatID, since, limit)
-}
-
-// ReleasePresentation gives back a reservation whose presentation could not
-// be made.
-func (s *Store) ReleasePresentation(ctx context.Context, id int64) error {
-	return s.releaseDaily(ctx, dailyPresentations, id)
-}
-
 // dailyKind is a table of things made for users and counted per day, and
 // the salt that keeps its locks apart from others and from the migration
 // lock.
@@ -42,10 +30,7 @@ type dailyKind struct {
 	salt  int64
 }
 
-var (
-	dailyImages        = dailyKind{table: "image_generations", salt: 0x494d4147} // "IMAG"
-	dailyPresentations = dailyKind{table: "presentations", salt: 0x50505458}     // "PPTX"
-)
+var dailyImages = dailyKind{table: "image_generations", salt: 0x494d4147} // "IMAG"
 
 func (s *Store) reserveDaily(ctx context.Context, kind dailyKind, userID, chatID int64, since time.Time, limit int) (int64, bool, error) {
 	var id int64

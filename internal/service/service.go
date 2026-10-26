@@ -305,7 +305,7 @@ type Options struct {
 	// without it the first swear is left to the model.
 	ClipSender  ClipSender
 	AudioSender AudioSender
-	// Files sends the files a tool made, such as a presentation; nil sends
+	// Files sends the files a tool made, such as a document; nil sends
 	// none, and the answer's text goes alone.
 	Files FileSender
 	// Quizzes keeps the tests sent as files and their runs, and QuizPolls

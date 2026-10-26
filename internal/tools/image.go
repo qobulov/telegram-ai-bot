@@ -93,7 +93,7 @@ type Audio struct {
 	Title, Performer string
 }
 
-// Document is a file a tool made during a turn, such as a presentation,
+// Document is a file a tool made during a turn, such as a document,
 // sent as the answer.
 type Document struct {
 	Data []byte

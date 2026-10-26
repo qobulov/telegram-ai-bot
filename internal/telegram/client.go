@@ -272,7 +272,7 @@ func (c *Client) SendAudio(ctx context.Context, track Track) (int64, error) {
 	})
 }
 
-// File is a document to upload, such as a presentation, with an optional
+// File is a document to upload, such as a report, with an optional
 // caption.
 type File struct {
 	ChatID           int64
