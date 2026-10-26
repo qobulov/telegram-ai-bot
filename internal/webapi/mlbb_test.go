@@ -1,8 +1,12 @@
 package webapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"net/http"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -103,9 +107,10 @@ func TestMLBBMeta(t *testing.T) {
 func TestMLBBRefusesBadArguments(t *testing.T) {
 	u := newUpstream(t, nil)
 	for args, word := range map[string]string{
-		`{"action":"build"}`:                     "action",
-		`{"action":"meta","rank":"grandmaster"}`: "rank",
-		`{"action":"meta","sort":"kda"}`:         "sort",
+		`{"action":"draft"}`:                            "action",
+		`{"action":"build","hero":"Ling","lane":"top"}`: "lane",
+		`{"action":"meta","rank":"grandmaster"}`:        "rank",
+		`{"action":"meta","sort":"kda"}`:                "sort",
 	} {
 		wantError(t, run(t, u.options(), "mlbb", args), "invalid_arguments", word)
 	}
@@ -226,5 +231,263 @@ func TestMLBBHeroCardStandsInForAMissingPortrait(t *testing.T) {
 	drawings := sink.Take()
 	if len(drawings) != 1 || drawings[0].MimeType != "image/png" || !strings.Contains(out.Note, "picture is sent") {
 		t.Errorf("drawings = %+v, note = %q; want the card sent as a PNG", drawings, out.Note)
+	}
+}
+
+const (
+	dexHeroList = `{"data":[{"slug":"ling","name":"Ling"},{"slug":"guinevere","name":"Guinevere"},{"slug":"yi-sun-shin","name":"Yi Sun-shin"}],"total":3}`
+	// dexGuinevere has a Supreme skin, one priced in diamonds and battle
+	// points, and artwork with a second outfit, a misspelt skin and a new
+	// skin the wiki has not listed yet.
+	dexGuinevere = `{"data":{"slug":"guinevere","name":"Guinevere","release":"2019",
+		"stats":{"hp1":"2468","hp15":"5210","movement_spd":"255","magic_def1":""},
+		"skins":[
+			{"id":"801","name":"Ms. Violet","release":"2019","availability":"Available","rarity":null,"label":null,"price":{"bp":"32000","dm":"599"}},
+			{"id":"8010","name":"Psion of Tomorrow","release":"2022-04-25","availability":"Limited","rarity":"Supreme","label":"Legend","price":{"other":"Obtained via the [[Galactic Starhawk]] event"}},
+			{"id":"8011","name":"Chun-Li","release":"2025-05-24","availability":"Limited","rarity":"Grand","label":"Street Fighter","price":{}}],
+		"illustrations":{"Ms. Violet":"/a.webp","Psion of Tomorow":"/b.webp","Chun-Li":"/c.webp","Chun-Li (Outfit 2)":"/d.webp","Daybreak Halo":"/e.webp"}},
+		"source":{"name":"Mobile Legends Wiki"}}`
+)
+
+func TestMLBBSkins(t *testing.T) {
+	u := newUpstream(t, map[string]stub{
+		"/dex/api/v1/heroes":           ok(dexHeroList),
+		"/dex/api/v1/heroes/guinevere": ok(dexGuinevere),
+	})
+
+	out := result[mlbbSkinsOutput](t, run(t, u.options(), "mlbb", `{"action":"skins","hero":"GUINEVERE"}`))
+
+	want := []mlbbSkin{
+		{Name: "Chun-Li", Tier: "Grand", Released: "2025-05-24", Availability: "Limited", Series: "Street Fighter"},
+		{Name: "Psion of Tomorrow", Tier: "Legend (Supreme)", Released: "2022-04-25", Availability: "Limited", Series: "Legend", Price: "Obtained via the Galactic Starhawk event"},
+		{Name: "Ms. Violet", Released: "2019", Availability: "Available", Price: "599 diamonds or 32000 battle points"},
+	}
+	if !slices.Equal(out.Skins, want) || out.Hero != "Guinevere" {
+		t.Errorf("skins = %+v, want newest first, Supreme named Legend", out.Skins)
+	}
+	if !slices.Equal(out.AlsoInArtwork, []string{"Daybreak Halo"}) {
+		t.Errorf("also in artwork = %q, want the unlisted skin alone, not a second outfit or a typo", out.AlsoInArtwork)
+	}
+	if !strings.Contains(out.Note, "weeks late") || out.Source == "" {
+		t.Errorf("note = %q, source = %q", out.Note, out.Source)
+	}
+}
+
+func TestMLBBSkinsUnknownHero(t *testing.T) {
+	u := newUpstream(t, map[string]stub{"/dex/api/v1/heroes": ok(dexHeroList)})
+	wantError(t, run(t, u.options(), "mlbb", `{"action":"skins","hero":"Guinever"}`), "invalid_arguments", "no MLBB hero")
+	wantError(t, run(t, u.options(), "mlbb", `{"action":"skins"}`), "invalid_arguments", "hero")
+}
+
+// The hero answer adds MLBBDex's release date and base stats, and stands
+// without them when MLBBDex fails.
+func TestMLBBHeroAddsReleaseAndBaseStats(t *testing.T) {
+	routes := map[string]stub{
+		"/arena/api/heroes":              ok(arenaHeroes),
+		"/arena/api/heroes/30/counters":  ok(arenaLingCounters),
+		"/arena/api/heroes/30":           ok(arenaLingPage),
+		"/dex/api/v1/heroes":             ok(dexHeroList),
+		"/dex/api/v1/heroes/yi-sun-shin": ok(strings.Replace(dexGuinevere, `"name":"Guinevere"`, `"name":"Yi Sun-shin"`, 1)),
+	}
+	out := result[mlbbHeroOutput](t, run(t, newUpstream(t, routes).options(), "mlbb", `{"action":"hero","hero":"yi sun shin"}`))
+	if out.Released != "2019" || out.BaseStats["hp15"] != "5210" || len(out.BaseStats) != 3 {
+		t.Errorf("released = %q, base stats = %v, want the empty stat left out", out.Released, out.BaseStats)
+	}
+
+	routes["/dex/api/v1/heroes"] = status(503)
+	out = result[mlbbHeroOutput](t, run(t, newUpstream(t, routes).options(), "mlbb", `{"action":"hero","hero":"yi sun shin"}`))
+	if out.Released != "" || out.BaseStats != nil || out.WinRate == "" {
+		t.Errorf("hero without MLBBDex = %+v", out)
+	}
+}
+
+func TestEditDistance(t *testing.T) {
+	for _, c := range []struct {
+		a, b string
+		want int
+	}{{"", "", 0}, {"galaticvanquisher", "galacticvanquisher", 1}, {"arrowofspring", "arrowofsprings", 1}, {"kitten", "sitting", 3}} {
+		if got := editDistance(c.a, c.b); got != c.want {
+			t.Errorf("editDistance(%q, %q) = %d, want %d", c.a, c.b, got, c.want)
+		}
+	}
+}
+
+const (
+	// arenaLingBuilds names a spell, an emblem, talents and items by ID,
+	// the less used build first; 9999 is an item the list does not know.
+	arenaLingBuilds = `{"code":0,"data":{"records":[{"data":{"heroid":84,"build":[
+		{"battleskill":{"data":{"__data":{"skillname":"Flicker"}}},"emblem":{"data":{"emblemname":"Fighter"}},
+		 "new_rune_skill":[],"equipid":[3002],"build_win_rate":0.5,"build_pick_rate":0.0501},
+		{"battleskill":{"data":{"__data":{"skillname":"Retribution"}}},"emblem":{"data":{"emblemname":"Assassin"}},
+		 "new_rune_skill":[1211,122],"equipid":[3003,3002,9999],"build_win_rate":0.5831,"build_pick_rate":0.3604}]}}]}}`
+	arenaItems   = `{"code":0,"data":{"records":[{"data":{"equipid":3003,"equipname":"Berserker's Fury"}},{"data":{"equipid":3002,"equipname":"Haas' Claws"}}]}}`
+	arenaEmblems = `{"code":0,"data":{"records":[{"data":{"giftid":1211,"emblemskill":{"skillname":"Fatal"}}},{"data":{"giftid":122,"emblemskill":{"skillname":"Seasoned Hunter"}}}]}}`
+)
+
+func TestMLBBBuild(t *testing.T) {
+	u := newUpstream(t, map[string]stub{
+		"/arena/api/heroes":                   ok(arenaHeroes),
+		"/arena/api/heroes/84":                ok(arenaLingPage),
+		"/arena/api/academy/heroes/84/builds": ok(arenaLingBuilds),
+		"/arena/api/academy/equipment":        ok(arenaItems),
+		"/arena/api/academy/emblems":          ok(arenaEmblems),
+	})
+
+	out := result[mlbbBuildOutput](t, run(t, u.options(), "mlbb", `{"action":"build","hero":"ling","rank":"mythic"}`))
+
+	want := mlbbBuild{Spell: "Retribution", Emblem: "Assassin", Talents: []string{"Fatal", "Seasoned Hunter"}, Items: []string{"Berserker's Fury", "Haas' Claws"}, WinRate: "58.3%", PickRate: "36.0%"}
+	if len(out.Builds) != 2 || !reflect.DeepEqual(out.Builds[0], want) || out.Builds[1].Spell != "Flicker" || out.Hero != "Ling" || out.Lane != "jungle" || out.Rank != "mythic" {
+		t.Errorf("build = %+v, want the hero's main lane and the unknown item left out", out)
+	}
+	if q := u.requests("/arena/api/academy/heroes/84/builds")[0].URL.Query(); q.Get("lane") != "jungle" || q.Get("rank") != "mythic" {
+		t.Errorf("query = %v", q)
+	}
+
+	// A lane asked for is used as it is, without the hero's page.
+	u = newUpstream(t, map[string]stub{
+		"/arena/api/heroes":                   ok(arenaHeroes),
+		"/arena/api/academy/heroes/84/builds": ok(`{"code":0,"data":{"records":[]}}`),
+	})
+	if env := run(t, u.options(), "mlbb", `{"action":"build","hero":"Ling","lane":"gold"}`); env.OK || !strings.Contains(env.raw, "no builds") || len(u.requests("/arena/api/heroes/84")) != 0 {
+		t.Errorf("no builds: %s", env.raw)
+	}
+}
+
+func TestMainLane(t *testing.T) {
+	for labels, want := range map[string]string{"Jungling": "jungle", "Gold Lane": "gold", "EXP Lane": "exp", "Mid Lane": "mid", "Roaming": "roam", "": "jungle"} {
+		if got := mainLane([]string{labels, ""}); got != want {
+			t.Errorf("mainLane(%q) = %q, want %q", labels, got, want)
+		}
+	}
+}
+
+// A skin asked for by name is sent as a JPEG, from its artwork; one with
+// no picture leaves the list and says so.
+func TestMLBBSkinPicture(t *testing.T) {
+	var webpPicture bytes.Buffer
+	// The smallest lossless WebP: one white pixel.
+	webpPicture.Write([]byte{0x52, 0x49, 0x46, 0x46, 0x1a, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50, 0x56, 0x50, 0x38, 0x4c,
+		0x0d, 0x00, 0x00, 0x00, 0x2f, 0x00, 0x00, 0x00, 0x10, 0x07, 0x10, 0x11, 0x11, 0x88, 0x88, 0xfe, 0x07, 0x00})
+	for skin, sent := range map[string]bool{"daybreak halo": true, "Lady Crane": false} {
+		u := newUpstream(t, map[string]stub{
+			"/dex/api/v1/heroes":           ok(dexHeroList),
+			"/dex/api/v1/heroes/guinevere": ok(dexGuinevere),
+			"/dex/e.webp":                  ok(webpPicture.String()),
+		})
+		sink := &tools.Sink{}
+		ctx := tools.WithTurn(context.Background(), tools.Caller{UserID: 1, ChatID: -100, Human: true}, sink)
+		var env envelope
+		if err := json.Unmarshal([]byte(newRegistry(t, u.options()).Execute(ctx, 1, "mlbb", `{"action":"skins","hero":"Guinevere","skin":"`+skin+`"}`)), &env); err != nil {
+			t.Fatal(err)
+		}
+		env.raw = string(env.Result)
+		out := result[mlbbSkinsOutput](t, env)
+		drawings := sink.Take()
+		if sent && (len(drawings) != 1 || drawings[0].MimeType != "image/jpeg" || http.DetectContentType(drawings[0].Data) != "image/jpeg" || !strings.Contains(out.Note, "picture is sent")) {
+			t.Errorf("%s: drawings = %d, note = %q; want one JPEG", skin, len(drawings), out.Note)
+		}
+		if !sent && (len(drawings) != 0 || !strings.Contains(out.Note, "No picture") || len(out.Skins) != 3) {
+			t.Errorf("%s: drawings = %d, output = %+v", skin, len(drawings), out)
+		}
+	}
+}
+
+const (
+	dexLingList = `{"data":[{"slug":"ling","name":"Ling","roles":["Assassin"],"lanes":["Jungle"]},
+		{"slug":"tigreal","name":"Tigreal","roles":["Tank"],"lanes":["Roam"]},
+		{"slug":"franco","name":"Franco","roles":["Tank"],"lanes":["Roam"]},
+		{"slug":"miya","name":"Miya","roles":["Marksman"],"lanes":["Gold"]}]}`
+	dexLing = `{"data":{"slug":"ling","name":"Ling","title":"Cloudwalker","roles":["Assassin"],"lanes":["Jungle"],"specialties":["Chase","Burst"],
+		"release":"2019","resource":"Energy","damageType":"Physical","attackType":"Melee","region":"Cadia Riverlands",
+		"ratings":{"offense":8,"durability":4,"abilityEffects":null,"difficulty":9},"stats":{"hp1":"2500"},
+		"skills":[{"name":"Cloud Walker","description":"Ling leaps onto walls."}],
+		"images":{"portrait":"/visuels/ling.webp","skins":{}},
+		"analysis":{"summary":"Assassin des murs.","strengths":["Mobile"],"weaknesses":["Energie"]}}}`
+	// dexRankingsAll has Marcel on too few games to count.
+	dexRankingsAll = `{"data":{"measuredAt":"2026-10-19T09:45:29.833Z","heroes":[
+		{"slug":"ling","name":"Ling","tier":"A","winRate":51.2,"banRate":20.5,"pickRate":1.1,"lowSample":false},
+		{"slug":"marcel","name":"Marcel","tier":"S+","winRate":58.1,"banRate":33.8,"pickRate":0.3,"lowSample":true},
+		{"slug":"miya","name":"Miya","tier":"S","winRate":53.0,"banRate":5.0,"pickRate":2.0,"lowSample":false}]}}`
+)
+
+// The hero's profile is MLBBDex's, its rates of all ranks too; Rone Arena
+// gives only the counters, partners and tips.
+func TestMLBBHeroProfileFromMLBBDex(t *testing.T) {
+	routes := map[string]stub{
+		"/arena/api/heroes":             ok(arenaHeroes),
+		"/arena/api/heroes/84/counters": ok(arenaLingCounters),
+		"/arena/api/heroes/84":          ok(arenaLingPage),
+		"/dex/api/v1/heroes":            ok(dexLingList),
+		"/dex/api/v1/heroes/ling":       ok(dexLing),
+		"/dex/api/v1/rankings":          ok(dexRankingsAll),
+	}
+	out := result[mlbbHeroOutput](t, run(t, newUpstream(t, routes).options(), "mlbb", `{"action":"hero","hero":"Ling"}`))
+
+	if out.Title != "Cloudwalker" || out.DamageType != "Physical" || out.Difficulty != "9/10" || out.Ratings["offense"] != "8/10" || len(out.Ratings) != 2 {
+		t.Errorf("profile = %+v, want MLBBDex's, the null rating left out", out)
+	}
+	if len(out.Skills) != 1 || out.Skills[0].Name != "Cloud Walker" || out.Analysis == nil || out.Analysis.Summary != "Assassin des murs." || !strings.Contains(out.Note, "French") {
+		t.Errorf("skills = %+v, analysis = %+v, note = %q", out.Skills, out.Analysis, out.Note)
+	}
+	if out.mlbbRates != (mlbbRates{Hero: "Ling", WinRate: "51.2%", PickRate: "1.1%", BanRate: "20.5%", Tier: "A"}) || out.RatesMeasured != "2026-10-19" {
+		t.Errorf("rates = %+v measured %q, want MLBBDex's", out.mlbbRates, out.RatesMeasured)
+	}
+	if len(out.CounteredBy) != 1 || out.CounteredBy[0].Hero != "Natalia" || out.Tips.WorksWith == "" || out.Story != "A graceful Finch." {
+		t.Errorf("counters = %+v, tips = %+v, want Rone Arena's", out.CounteredBy, out.Tips)
+	}
+
+	// One rank: MLBBDex does not split its rates, so they are Rone Arena's.
+	u := newUpstream(t, routes)
+	out = result[mlbbHeroOutput](t, run(t, u.options(), "mlbb", `{"action":"hero","hero":"Ling","rank":"mythic"}`))
+	if out.WinRate != "52.8%" || out.Tier != "" || out.RatesMeasured != "" || len(u.requests("/dex/api/v1/rankings")) != 0 {
+		t.Errorf("mythic rates = %+v", out.mlbbRates)
+	}
+
+	// Rone Arena down: the profile stands, and the note says what is missing.
+	routes["/arena/api/heroes/84/counters"] = status(503)
+	out = result[mlbbHeroOutput](t, run(t, newUpstream(t, routes).options(), "mlbb", `{"action":"hero","hero":"Ling"}`))
+	if out.Title != "Cloudwalker" || out.WinRate != "51.2%" || len(out.CounteredBy) != 0 || !strings.Contains(out.Note, "Rone Arena did not answer") {
+		t.Errorf("without Rone Arena = %+v", out)
+	}
+}
+
+func TestMLBBMetaFromMLBBDex(t *testing.T) {
+	u := newUpstream(t, map[string]stub{"/dex/api/v1/rankings": ok(dexRankingsAll), "/arena/api/heroes/rank": ok(arenaRank)})
+
+	out := result[mlbbMetaOutput](t, run(t, u.options(), "mlbb", `{"action":"meta","sort":"win_rate"}`))
+	if len(out.Heroes) != 2 || out.Heroes[0] != (mlbbRates{Hero: "Miya", WinRate: "53.0%", PickRate: "2.0%", BanRate: "5.0%", Tier: "S"}) || out.Measured != "2026-10-19" {
+		t.Errorf("meta = %+v, want Miya first and Marcel, on too few games, left out", out)
+	}
+	if len(u.requests("/arena/api/heroes/rank")) != 0 {
+		t.Error("Rone Arena was asked for the meta of all ranks")
+	}
+	if out := result[mlbbMetaOutput](t, run(t, u.options(), "mlbb", `{"action":"meta","rank":"glory"}`)); out.Heroes[0].Hero != "Masha" || out.Measured != "" {
+		t.Errorf("glory meta = %+v, want Rone Arena's", out)
+	}
+}
+
+func TestMLBBHeroList(t *testing.T) {
+	u := newUpstream(t, map[string]stub{"/dex/api/v1/heroes": ok(dexLingList)})
+
+	out := result[mlbbHeroesOutput](t, run(t, u.options(), "mlbb", `{"action":"heroes","role":"tank","lane":"roam"}`))
+	if !slices.Equal(out.Heroes, []string{"Franco", "Tigreal"}) || out.Count != 2 {
+		t.Errorf("tanks of the roam = %+v", out)
+	}
+	if out := result[mlbbHeroesOutput](t, run(t, u.options(), "mlbb", `{"action":"heroes"}`)); out.Count != 4 {
+		t.Errorf("all heroes = %+v", out)
+	}
+	wantError(t, run(t, u.options(), "mlbb", `{"action":"heroes","role":"Healer"}`), "invalid_arguments", "role")
+}
+
+func TestSkillTextDropsWikiMarkup(t *testing.T) {
+	for in, want := range map[string]string{
+		"Passive: |e Ling's critical chance.": "Passive: Ling's critical chance.",
+		"Use again|e}: Gusion moves back.":    "Use again: Gusion moves back.",
+		"a stack of Prey Mark|mark each time": "a stack of Prey Mark mark each time",
+		"pets and clone | summoned unit":      "pets and clone | summoned unit",
+	} {
+		if got := skillText(in); got != want {
+			t.Errorf("skillText(%q) = %q, want %q", in, got, want)
+		}
 	}
 }

@@ -138,6 +138,7 @@ func (u *upstream) options() Options {
 			CoinGecko:         base + "/coingecko",
 			Deezer:            base + "/deezer",
 			RoneArena:         base + "/arena",
+			MLBBDex:           base + "/dex",
 			Isan:              base + "/isan",
 			USGS:              base + "/usgs",
 			QRServer:          base + "/qr",

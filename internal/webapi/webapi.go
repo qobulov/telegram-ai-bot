@@ -76,6 +76,7 @@ type BaseURLs struct {
 	CoinGecko         string
 	Deezer            string
 	RoneArena         string
+	MLBBDex           string
 	Tavily            string
 	TMDB              string
 	YouTube           string
@@ -132,6 +133,7 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.CoinGecko = cmp.Or(b.CoinGecko, "https://api.coingecko.com")
 	b.Deezer = cmp.Or(b.Deezer, "https://api.deezer.com")
 	b.RoneArena = cmp.Or(b.RoneArena, "https://arena.rone.dev")
+	b.MLBBDex = cmp.Or(b.MLBBDex, "https://mlbbdex.com")
 	b.Tavily = cmp.Or(b.Tavily, "https://api.tavily.com")
 	b.TMDB = cmp.Or(b.TMDB, "https://api.themoviedb.org")
 	b.YouTube = cmp.Or(b.YouTube, "https://www.googleapis.com/youtube/v3")
