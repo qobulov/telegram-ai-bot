@@ -13,7 +13,7 @@ import (
 const (
 	// maxMembersListed bounds the list, the most recently seen first: a
 	// long list costs the model more than it helps.
-	maxMembersListed = 50
+	maxMembersListed = 200
 	// memberEntryBytes is the most a listed member takes besides the texts.
 	memberEntryBytes = 150
 	// membersOutputBytes fits maxMembersListed members, each name at its
@@ -58,7 +58,7 @@ type memberEntry struct {
 	Role     string `json:"role,omitempty"`
 	Owner    bool   `json:"owner,omitempty"`
 	Bot      bool   `json:"bot,omitempty"`
-	LastSeen string `json:"last_seen"`
+	LastSeen string `json:"last_seen,omitempty"`
 }
 
 type membersResult struct {
@@ -102,9 +102,11 @@ func listMembers(ctx context.Context, opts MembersOptions, raw json.RawMessage) 
 	total, _ := opts.Telegram.GetChatMemberCount(ctx, caller.ChatID)
 	admins, adminErr := opts.Telegram.GetChatAdministrators(ctx, caller.ChatID)
 	roles := map[int64]string{}
+	unseen := map[int64]bool{}
 	for _, admin := range admins {
 		if admin.User != nil && !admin.IsAnonymous {
 			roles[admin.User.ID] = admin.Status
+			unseen[admin.User.ID] = true
 		}
 	}
 	location := opts.Location
@@ -124,6 +126,22 @@ func listMembers(ctx context.Context, opts MembersOptions, raw json.RawMessage) 
 			entry.Username = cutRunes("@"+m.Username, maxAdminUsernameRunes)
 		}
 		result.Members = append(result.Members, entry)
+		delete(unseen, m.UserID)
+	}
+	// Admins who never wrote are members all the same, bots such as this one
+	// aside. When the list is cut, one missing from it may be among those
+	// left out, so none is added.
+	for _, admin := range admins {
+		if admin.User == nil || admin.IsAnonymous || admin.User.IsBot || !unseen[admin.User.ID] || known > len(members) || len(result.Members) >= maxMembersListed {
+			continue
+		}
+		entry := memberEntry{Name: cutRunes(strings.TrimSpace(admin.User.FirstName), maxAdminNameRunes), Role: admin.Status,
+			Owner: opts.Owners[admin.User.ID], Bot: admin.User.IsBot}
+		if admin.User.Username != "" {
+			entry.Username = cutRunes("@"+admin.User.Username, maxAdminUsernameRunes)
+		}
+		result.Members = append(result.Members, entry)
+		result.Known++
 	}
 	notes := []string{membersNote}
 	if adminErr != nil {

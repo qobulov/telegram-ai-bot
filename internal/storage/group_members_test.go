@@ -222,3 +222,29 @@ func TestActiveMembersCountsRecentPeople(t *testing.T) {
 		t.Errorf("active = %d, %v; want 2", count, err)
 	}
 }
+
+// A member known from a reply is added as of when they wrote; a known one
+// keeps their status, is seen later only by a later message, and does not
+// count as active for an old one.
+func TestKnowMemberKeepsStatusAndActivity(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	const chat = -100777
+	old := time.Now().Add(-30 * 24 * time.Hour).Truncate(time.Second)
+	if err := store.KnowMember(ctx, GroupMember{ChatID: chat, UserID: 1, FirstName: "Quiet", LastSeen: old}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SeeMember(ctx, GroupMember{ChatID: chat, UserID: 2, FirstName: "Gone", Status: "left"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.KnowMember(ctx, GroupMember{ChatID: chat, UserID: 2, FirstName: "Gone again", LastSeen: old}); err != nil {
+		t.Fatal(err)
+	}
+	members, known, err := store.GroupMembers(ctx, chat, 10)
+	if err != nil || known != 1 || members[0].UserID != 1 || !members[0].LastSeen.Equal(old) || members[0].Status != "member" {
+		t.Fatalf("members = %+v, %d, %v; want Quiet alone, as of a month ago, and Gone still gone", members, known, err)
+	}
+	if active, _ := store.ActiveMembers(ctx, chat, time.Now().Add(-3*24*time.Hour)); active != 0 {
+		t.Errorf("active = %d, want 0: neither wrote lately", active)
+	}
+}

@@ -567,6 +567,7 @@ func (s *Service) recordMembership(change *telegram.ChatMemberUpdated) {
 // them, so this is what the group_members tool reads.
 type MemberBook interface {
 	SeeMember(ctx context.Context, m storage.GroupMember) error
+	KnowMember(ctx context.Context, m storage.GroupMember) error
 }
 
 // recordMember notes another member's change in a group, which Telegram
@@ -579,9 +580,13 @@ func (s *Service) recordMember(change *telegram.ChatMemberUpdated) {
 }
 
 // noteMembers notes the people a group message shows: its sender, who is
-// there, and anyone it says joined or left.
+// there, the sender of the message it replies to, and anyone it says joined
+// or left.
 func (s *Service) noteMembers(msg *telegram.Message) {
 	s.seeMember(msg.Chat.ID, msg.From, "")
+	if replied := msg.ReplyToMessage; replied != nil && replied.SenderChat == nil && replied.Date > 0 {
+		s.knowMember(msg.Chat.ID, replied.From, time.Unix(replied.Date, 0))
+	}
 	for i := range msg.NewChatMembers {
 		s.seeMember(msg.Chat.ID, &msg.NewChatMembers[i], "member")
 	}
@@ -606,6 +611,30 @@ func (s *Service) seeMember(chatID int64, user *telegram.User, status string) {
 	defer cancel()
 	err := s.opts.Roster.SeeMember(ctx, storage.GroupMember{
 		ChatID: chatID, UserID: user.ID, FirstName: user.FirstName, Username: user.Username, IsBot: user.IsBot, Status: status,
+	})
+	if err != nil {
+		s.opts.Logger.Warn("could not record a group member", "chat_id", chatID, "error", err)
+		return
+	}
+	s.members.set(key, name)
+}
+
+// knowMember records a member a message shows without them writing it, as
+// seen when they last wrote, wrote: a member who never writes is otherwise
+// never on the list, nor found by @username. Known already under the same
+// name, they are not written again.
+func (s *Service) knowMember(chatID int64, user *telegram.User, wrote time.Time) {
+	if s.opts.Roster == nil || user == nil || user.ID == s.opts.Bot.ID {
+		return
+	}
+	key, name := memberKey{chatID, user.ID}, memberName{user.FirstName, user.Username}
+	if seen, ok := s.members.get(key); ok && seen == name {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
+	defer cancel()
+	err := s.opts.Roster.KnowMember(ctx, storage.GroupMember{
+		ChatID: chatID, UserID: user.ID, FirstName: user.FirstName, Username: user.Username, IsBot: user.IsBot, LastSeen: wrote,
 	})
 	if err != nil {
 		s.opts.Logger.Warn("could not record a group member", "chat_id", chatID, "error", err)

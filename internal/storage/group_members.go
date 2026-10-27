@@ -62,6 +62,26 @@ func (s *Store) SeeMember(ctx context.Context, m GroupMember) error {
 
 // ActiveMembers counts the people, not bots, seen writing in a group since
 // then who have not left it or been banned.
+// KnowMember notes a member a message shows without them writing it, such
+// as the sender of the message someone replies to, last seen when they wrote
+// that, at m.LastSeen. A new member is added; a known one keeps their status
+// and is seen later only if that is later, so the count of members who
+// wrote lately stays true.
+func (s *Store) KnowMember(ctx context.Context, m GroupMember) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO group_members (chat_id, user_id, first_name, username, is_bot, last_seen_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (chat_id, user_id) DO UPDATE
+		SET first_name = EXCLUDED.first_name,
+		    username = EXCLUDED.username,
+		    last_seen_at = GREATEST(group_members.last_seen_at, EXCLUDED.last_seen_at)`,
+		m.ChatID, m.UserID, m.FirstName, m.Username, m.IsBot, m.LastSeen)
+	if err != nil {
+		return fmt.Errorf("storage: know group member: %w", err)
+	}
+	return nil
+}
+
 func (s *Store) ActiveMembers(ctx context.Context, chatID int64, since time.Time) (int, error) {
 	var count int
 	err := s.pool.QueryRow(ctx, `

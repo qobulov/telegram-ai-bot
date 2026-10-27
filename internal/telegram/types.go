@@ -54,7 +54,9 @@ type ChatMemberUpdated struct {
 // documents and other non-text content; a photo or document may carry a
 // Caption instead.
 type Message struct {
-	MessageID       int64           `json:"message_id"`
+	MessageID int64 `json:"message_id"`
+	// Date is when it was sent, in Unix seconds.
+	Date            int64           `json:"date"`
 	From            *User           `json:"from"`
 	Chat            Chat            `json:"chat"`
 	Text            string          `json:"text"`
