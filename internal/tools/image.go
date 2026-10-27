@@ -100,14 +100,13 @@ type Document struct {
 	Name string
 }
 
-// Sink collects the pictures drawn, the sounds found, the stickers chosen
-// and the files made during one turn, and the answer a tool gave for the
+// Sink collects the pictures drawn, the sounds found and the files made
+// during one turn, and the answer a tool gave for the
 // whole turn. It is safe for concurrent use.
 type Sink struct {
 	mu        sync.Mutex
 	drawings  []Drawing
 	audios    []Audio
-	stickers  []string
 	documents []Document
 	final     string
 }
@@ -141,22 +140,6 @@ func (s *Sink) Finished() (string, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.final, s.final != ""
-}
-
-// AddSticker keeps a sticker, by its file ID, to send with the answer.
-func (s *Sink) AddSticker(fileID string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.stickers = append(s.stickers, fileID)
-}
-
-// TakeStickers returns the stickers kept so far and empties the sink.
-func (s *Sink) TakeStickers() []string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	stickers := s.stickers
-	s.stickers = nil
-	return stickers
 }
 
 // AddAudio keeps a sound to send with the answer.

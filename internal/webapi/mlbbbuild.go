@@ -8,6 +8,7 @@ import (
 	"image"
 	_ "image/jpeg" // icons may come as JPEG
 	_ "image/png"
+	"maps"
 	"net/url"
 	"slices"
 	"strconv"
@@ -21,10 +22,17 @@ const (
 	buildNote = "The builds top players of this rank use on this hero in this lane, from the game's academy, most used first: " +
 		"spell, emblem with its three talents and core items."
 	// buildCardNote: the card shows the first build, with its icons.
-	buildCardNote  = " The first build is sent as one picture with your answer, which becomes its caption: keep the answer short and do not send item cards for it."
-	buildCardsNote = " To show the items, send their cards with mlbb_item_card."
+	buildCardNote = " The first build is sent as one picture with your answer, which becomes its caption: keep the answer short."
 	// iconLimit is well above an icon's 25 KB.
 	iconLimit = 256 << 10
+	// The academy's builds name three core items; the boots and the last two
+	// of a full build of six are the ones most often added in the hottest
+	// guides players write on the academy, when enough of them have six.
+	guidesRead     = 30
+	minGuides      = 5
+	minGuideItems  = 5
+	finishingItems = 2
+	finishNote     = " finish_with: the boots and last items players most often add to this hero, from guides_counted guides on the academy, not from the top players' games."
 )
 
 // mlbbLanes are the lanes the academy keeps builds for.
@@ -46,12 +54,24 @@ type mlbbBuild struct {
 }
 
 type mlbbBuildOutput struct {
-	Hero   string      `json:"hero"`
-	Lane   string      `json:"lane"`
-	Rank   string      `json:"rank"`
-	Builds []mlbbBuild `json:"builds"`
-	Source string      `json:"source"`
-	Note   string      `json:"note"`
+	Hero       string      `json:"hero"`
+	Lane       string      `json:"lane"`
+	Rank       string      `json:"rank"`
+	Builds     []mlbbBuild `json:"builds"`
+	FinishWith []string    `json:"finish_with,omitempty"`
+	Guides     int         `json:"guides_counted,omitempty"`
+	Source     string      `json:"source"`
+	Note       string      `json:"note"`
+}
+
+// arenaGuide is a guide a player wrote on the academy; its first list of
+// items is its build.
+type arenaGuide struct {
+	Data struct {
+		Equips []struct {
+			IDs []int `json:"equip_ids"`
+		} `json:"equips"`
+	} `json:"data"`
 }
 
 type arenaBuilds struct {
@@ -113,8 +133,15 @@ func (a *apis) mlbbBuild(ctx context.Context, name, lane, rank string) (mlbbBuil
 	// for a day, but Rone Arena takes up to 10 s an answer when it is busy.
 	var builds arenaBuilds
 	var items, talents map[int]arenaEntry
-	var buildsErr, itemsErr, talentsErr error
+	var guides []arenaGuide
+	var buildsErr, itemsErr, talentsErr, guidesErr error
 	var wg sync.WaitGroup
+	wg.Go(func() {
+		guides, guidesErr = remember(a.cache, "mlbb:guides:"+hero.path, mlbbHeroesTTL, func() ([]arenaGuide, error) {
+			query := url.Values{"order": {"desc"}, "size": {strconv.Itoa(guidesRead)}}
+			return arenaList[arenaGuide](ctx, a, "/api/academy/heroes/"+hero.path+"/recommended?"+query.Encode())
+		})
+	})
 	wg.Go(func() {
 		builds, buildsErr = remember(a.cache, "mlbb:builds:"+hero.path+":"+hero.lane+":"+rank, mlbbTTL, func() (arenaBuilds, error) {
 			query := url.Values{"lane": {hero.lane}, "rank": {rank}}
@@ -160,8 +187,58 @@ func (a *apis) mlbbBuild(ctx context.Context, name, lane, rank string) (mlbbBuil
 			PickRate: percent(b.PickRate),
 		})
 	}
-	out.Note += a.sendBuildCard(ctx, out, sorted[0], items, talents)
+	// Guides that do not load leave the three core items.
+	var finish []int
+	if guidesErr == nil {
+		finish, out.Guides = finishing(sorted[0].Items, guides, items)
+	}
+	if len(finish) > 0 {
+		out.FinishWith = entryNames(items, finish)
+		out.Note += finishNote
+	}
+	out.Note += a.sendBuildCard(ctx, out, sorted[0], finish, items, talents)
 	return out, nil
+}
+
+// finishing returns the boots and finishingItems other items most often
+// in the guides, besides the core items, and how many guides were counted:
+// those that list at least minGuideItems items. It returns nothing when
+// fewer than minGuides do.
+func finishing(core []int, guides []arenaGuide, items map[int]arenaEntry) ([]int, int) {
+	counts := map[int]int{}
+	counted := 0
+	for _, g := range guides {
+		if len(g.Data.Equips) == 0 || len(g.Data.Equips[0].IDs) < minGuideItems {
+			continue
+		}
+		counted++
+		seen := map[int]bool{}
+		for _, id := range g.Data.Equips[0].IDs {
+			if !seen[id] && items[id].Name != "" && !slices.Contains(core, id) {
+				seen[id] = true
+				counts[id]++
+			}
+		}
+	}
+	if counted < minGuides {
+		return nil, 0
+	}
+	ranked := slices.Collect(maps.Keys(counts))
+	// Most often first; the lower ID breaks a tie, so the answer is stable.
+	slices.SortFunc(ranked, func(x, y int) int { return cmp.Or(cmp.Compare(counts[y], counts[x]), cmp.Compare(x, y)) })
+	var boots, others []int
+	for _, id := range ranked {
+		if isBoots(items[id].Name) {
+			boots = append(boots, id)
+		} else {
+			others = append(others, id)
+		}
+	}
+	return append(boots[:min(len(boots), 1)], others[:min(len(others), finishingItems)]...), counted
+}
+
+func isBoots(item string) bool {
+	return strings.Contains(strings.ToLower(item), "boots")
 }
 
 // buildTarget is the hero a build is asked for: its name, how the
@@ -204,28 +281,35 @@ func (a *apis) buildHero(ctx context.Context, name, lane string) (buildTarget, e
 
 // sendBuildCard draws the first build as one picture into the turn's sink
 // and returns what the note should add about it. An icon that will not load
-// is left blank; a card that cannot be drawn leaves the item cards.
-func (a *apis) sendBuildCard(ctx context.Context, out mlbbBuildOutput, b arenaBuild, items, talents map[int]arenaEntry) string {
+// is left blank; a card that cannot be drawn leaves the answer in words.
+func (a *apis) sendBuildCard(ctx context.Context, out mlbbBuildOutput, b arenaBuild, finish []int, items, talents map[int]arenaEntry) string {
 	sink, ok := tools.SinkFrom(ctx)
 	if !ok {
-		return buildCardsNote
+		return ""
 	}
 	first := out.Builds[0]
 	setup := []arenaEntry{{Name: first.Spell, Icon: b.Spell.Data.Detail.Icon}, {Name: first.Emblem + " emblem", Icon: b.Emblem.Data.Icon}}
 	setup = append(setup, knownEntries(talents, b.Talents)...)
 	core := knownEntries(items, b.Items)
-	icons := a.fetchIcons(ctx, append(slices.Clone(setup), core...))
+	finished := knownEntries(items, finish)
+	icons := a.fetchIcons(ctx, slices.Concat(setup, core, finished))
 	card := buildCard{
 		Title:    fmt.Sprintf("%s · %s · %s", out.Hero, laneTitle(out.Lane), rankTitle(out.Rank)),
 		Subtitle: fmt.Sprintf("Win rate %s · used in %s of builds · %s", first.WinRate, first.PickRate, "MLBB Academy"),
 		Rows: []cardRow{
 			{Heading: "Spell, emblem and talents", Icons: cardIcons(setup, icons[:len(setup)])},
-			{Heading: "Core items", Icons: cardIcons(core, icons[len(setup):])},
+			{Heading: "Core items · top players", Icons: cardIcons(core, icons[len(setup):len(setup)+len(core)])},
 		},
+	}
+	if len(finished) > 0 {
+		card.Rows = append(card.Rows, cardRow{
+			Heading: fmt.Sprintf("Boots and last items · %d player guides", out.Guides),
+			Icons:   cardIcons(finished, icons[len(setup)+len(core):]),
+		})
 	}
 	picture, err := drawBuildCard(card)
 	if err != nil {
-		return buildCardsNote
+		return ""
 	}
 	sink.Add(tools.Drawing{Data: picture, MimeType: "image/png"})
 	return buildCardNote

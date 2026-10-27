@@ -599,7 +599,7 @@ answer instead of making up a number.
 | `wiki_lookup` | Article summaries, "on this day" | Wikipedia (CC BY-SA) |
 | `football` | League tables, the current matchday's matches, top scorers | football-data.org free tier; scores can lag, so "latest", not live |
 | `crypto_price` | Coin prices in dollars and sums | CoinGecko |
-| `mlbb` | Mobile Legends heroes: the meta by win, ban or pick rate; a hero's role, lane, speciality, difficulty, skills and the game's tips, and its rates, counters and partners, with its portrait as a photo when asked, by rank, over the last 7 days; an account's nickname and country from its ID and zone | Rone Arena API, a fan-made, keyless mirror of Moonton's MLBB Academy statistics, cached for 3 hours; api.isan.eu.org for accounts, which answers a wrong ID and its own failure alike. Both unofficial |
+| `mlbb` | Mobile Legends: the meta by win, ban or pick rate; heroes by role and lane; a hero's profile, skills, base stats, rates and tier, with its counters, partners and the game's tips, and its portrait as a photo when asked; the most used build of top players by lane and rank, sent as one picture of its spell, emblem, talents and items, the boots and last two items taken from what the 30 hottest player guides add most; a hero's skins with tier, date and price, and a skin's picture; an account's nickname and country from its ID and zone | MLBBDex (mlbbdex.com, from the Mobile Legends Wiki) first: heroes, profiles, skins and the rates of all ranks, measured about weekly. Rone Arena API, a fan-made, keyless mirror of Moonton's MLBB Academy, for what MLBBDex lacks: rates by rank, counters, partners, tips, builds and player guides, cached for 3 hours, and the profile when MLBBDex is down. api.isan.eu.org for accounts, which answers a wrong ID and its own failure alike. All unofficial |
 | `web_search` | Current facts from the web: an answer and up to five results with their sites, or news of the last 7 days | Tavily, with `TAVILY_API_KEY` (free: 1,000 searches a month); without the key there is no web search |
 | `movies` | Films and series: search by title, a title's plot, genres, length, director and cast, and what is trending or popular in a genre | TMDB, with `TMDB_TOKEN`; plots in Russian or English, as TMDB has few Uzbek ones. This product uses the TMDB API but is not endorsed or certified by TMDB |
 | `youtube_search` | YouTube videos: guides, highlights, trailers, full songs, with channel, length, views and a youtu.be link that Telegram plays | YouTube Data API, with `YOUTUBE_API_KEY` (an `AIza…` key restricted to YouTube Data API v3; free: 10,000 units a day, a search costs 101); results cached for 2 hours |
@@ -939,16 +939,6 @@ but never sent. One request labels what it can in about 40 seconds; sending
 the command again goes on where it stopped, and the reply says how many are
 left. The stickers are kept in `bot_stickers`, and when each chat last got
 one in `sticker_sends`.
-
-A pack of Mobile Legends item cards, stickers that show an item's icon and
-stats, is imported with `/import_items https://t.me/addstickers/name`
-instead. The model reads the item's English name off each card and keeps it
-as the sticker's description, marked `mlbb_item` (`mlbb_item_none` for a
-sticker that is no card), which takes the card out of the moods even when
-`/import_stickers` labelled it first. When someone asks about an item, the
-`mlbb_item_card` tool finds the cards, up to six in one call for a whole
-build, by name or by a part of the name only one card has, and they are sent
-as stickers after a one-line answer, outside the stickers' 30-second gap.
 
 Now and then, about one time in four, she asks for `[gif CATEGORY]` instead.
 With `GIPHY_API_KEY` set, the code searches GIPHY for that mood (rated PG at

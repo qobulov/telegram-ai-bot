@@ -290,9 +290,6 @@ type Options struct {
 	Stickers        StickerPicker
 	StickerSender   StickerSender
 	StickerImporter StickerImporter
-	// CardImporter brings packs of Mobile Legends item cards in for
-	// /import_items; with it nil, none is imported.
-	CardImporter CardImporter
 	// GIFs finds the GIF the model asked for, AnimationSender sends it and
 	// MediaSlots spaces it with the stickers; with any nil, a GIF becomes a
 	// sticker of the same category.

@@ -34,8 +34,6 @@ type outcome struct {
 	// audios the sounds found, such as a song's preview, sent after it.
 	drawings []tools.Drawing
 	audios   []tools.Audio
-	// cards are item cards, stickers by file ID, sent after the answer.
-	cards []string
 	// documents are files a tool made, such as a document, sent as the
 	// answer with its text as their caption.
 	documents []tools.Document
@@ -203,9 +201,6 @@ func (s *Service) deliver(in incoming, out *outcome) int64 {
 	if id := s.sendMedia(in, out); answerID == 0 {
 		answerID = id
 	}
-	if id := s.sendCards(in, out); answerID == 0 {
-		answerID = id
-	}
 	return answerID
 }
 
@@ -295,33 +290,6 @@ func (s *Service) repliedMember(in incoming) int64 {
 		return 0
 	}
 	return replied.MessageID
-}
-
-// sendCards sends the item cards a tool chose, after the answer, and returns
-// the first one's message ID; those that could not be sent are dropped from
-// out, so that the log tells only of what the chat saw.
-func (s *Service) sendCards(in incoming, out *outcome) int64 {
-	if s.opts.StickerSender == nil {
-		out.cards = nil
-		return 0
-	}
-	var firstID int64
-	sent := out.cards[:0]
-	for _, card := range out.cards {
-		ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
-		id, err := s.opts.StickerSender.SendSticker(ctx, in.msg.Chat.ID, card, in.replyTarget())
-		cancel()
-		if err != nil {
-			s.opts.Logger.Warn("could not send an item card", "chat_id", in.msg.Chat.ID, "error", err)
-			continue
-		}
-		sent = append(sent, card)
-		if firstID == 0 {
-			firstID = id
-		}
-	}
-	out.cards = sent
-	return firstID
 }
 
 // sendAudios sends the sounds a tool found and returns the first sent
@@ -451,9 +419,6 @@ func (s *Service) logExchange(in incoming, out outcome) {
 		}
 		if out.gif != "" {
 			answer = strings.TrimSpace(answer + " <gif " + out.gif + ">")
-		}
-		for range out.cards {
-			answer = strings.TrimSpace(answer + " <item card sticker>")
 		}
 		for _, document := range out.documents {
 			answer = strings.TrimSpace(answer + " <file " + document.Name + ">")
@@ -735,21 +700,20 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	drawings := sink.Take()
 	documents := sink.TakeDocuments()
 	var audios []tools.Audio
-	var cards []string
 	if err == nil || errors.Is(err, ai.ErrEmptyResponse) {
-		// A song's preview and an item's card go only with an answer, or
-		// with none: the model, told they are the answer, may write
-		// nothing, and they are still what was asked for.
-		audios, cards = sink.TakeAudios(), sink.TakeStickers()
+		// A song's preview goes only with an answer, or with none: the
+		// model, told it is the answer, may write nothing, and it is still
+		// what was asked for.
+		audios = sink.TakeAudios()
 	}
-	if !usedAnAnswer(err, drawings) && len(documents)+len(audios)+len(cards) == 0 {
+	if !usedAnAnswer(err, drawings) && len(documents)+len(audios) == 0 {
 		s.giveBackAnswer(in, reservation)
 	}
 	out := s.answerOf(in, answer, err, started)
 	out.drawings = drawings
 	out.documents = documents
-	out.audios, out.cards = audios, cards
-	if len(audios)+len(cards) > 0 {
+	out.audios = audios
+	if len(audios) > 0 {
 		out.skipped = ""
 	}
 	return out
@@ -1315,8 +1279,6 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 		return s.unignore(ctx, in)
 	case "/import_stickers":
 		return s.importStickers(ctx, in)
-	case "/import_items":
-		return s.importItems(ctx, in)
 	default:
 		return textUnknown.to(in)
 	}

@@ -319,7 +319,6 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		QuizPolls:             bot.Client,
 		StickerSender:         bot.Client,
 		StickerImporter:       &stickers.Importer{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger), Workers: stickerWorkers, Logger: logger},
-		CardImporter:          &stickers.CardImporter{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger), Workers: stickerWorkers, Logger: logger},
 		Answers:               store,
 	}
 	if cfg.GiphyAPIKey != "" {
@@ -348,7 +347,6 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 	// use these, so they are there with or without owners.
 	builtin = append(builtin, moderate,
 		tools.PollTool(tools.PollOptions{Sender: bot.Client, Store: store}),
-		tools.ItemCardTool(tools.ItemCardOptions{Store: store}),
 		tools.AdminsTool(tools.AdminsOptions{Telegram: bot.Client, BotID: bot.User.ID, Owners: cfg.OwnerIDs}),
 		tools.MembersTool(tools.MembersOptions{Store: store, Telegram: bot.Client, Owners: cfg.OwnerIDs, Location: cfg.Location}),
 		tools.ProfileTool(tools.ProfileOptions{Store: store}),
@@ -624,8 +622,6 @@ func NewCleanup(ctx context.Context, cfg config.Config, logger *slog.Logger) (*C
 		Secret: cfg.CronSecret,
 		Logger: logger,
 		Run: func(ctx context.Context) (any, error) {
-			// The report comes first: the history it counts is then still there.
-			sendDailyReport(ctx, cfg, store, reportSender(cfg, logger), time.Now(), logger)
 			return expire(ctx, cfg, store, logger)
 		},
 	})
@@ -634,12 +630,6 @@ func NewCleanup(ctx context.Context, cfg config.Config, logger *slog.Logger) (*C
 		return nil, err
 	}
 	return &Cleanup{Handler: handler, Close: store.Close}, nil
-}
-
-// reportSender is the Telegram client the daily report goes out with. The
-// cleanup function has no bot of its own, and needs no getMe for this.
-func reportSender(cfg config.Config, logger *slog.Logger) ReportSender {
-	return telegram.NewClient(telegram.Options{Token: cfg.TelegramToken, BaseURL: cfg.TelegramAPIURL, Logger: logger})
 }
 
 // expire applies the retention policy once.

@@ -566,3 +566,28 @@ func TestMLBBBuildByMLBBDexName(t *testing.T) {
 		t.Errorf("Rone Arena's hero list was asked for %d times", n)
 	}
 }
+
+// The boots and the last two items are the ones most guides add besides
+// the core; guides with too few items do not count, and too few guides
+// give nothing.
+func TestFinishing(t *testing.T) {
+	items := map[int]arenaEntry{1: {Name: "Core"}, 2: {Name: "Swift Boots"}, 3: {Name: "Tough Boots"}, 4: {Name: "Malefic Gun"}, 5: {Name: "Sea Halberd"}, 6: {Name: "Rose Gold Meteor"}, 7: {Name: "Immortality"}}
+	guide := func(ids ...int) arenaGuide {
+		var g arenaGuide
+		g.Data.Equips = append(g.Data.Equips, struct {
+			IDs []int `json:"equip_ids"`
+		}{IDs: ids})
+		return g
+	}
+	guides := []arenaGuide{
+		guide(1, 2, 4, 5, 6, 7), guide(1, 2, 4, 5, 6, 7), guide(1, 2, 4, 5, 7, 7),
+		guide(1, 3, 4, 6, 7, 5), guide(1, 2, 4, 6, 5, 3), guide(2, 4),
+	}
+	finish, counted := finishing([]int{1}, guides, items)
+	if !slices.Equal(finish, []int{2, 4, 5}) || counted != 5 {
+		t.Errorf("finishing = %v from %d guides, want Swift Boots, Malefic Gun, Sea Halberd from 5", finish, counted)
+	}
+	if finish, counted := finishing([]int{1}, guides[:4], items); finish != nil || counted != 0 {
+		t.Errorf("four guides gave %v", finish)
+	}
+}

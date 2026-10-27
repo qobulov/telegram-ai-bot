@@ -84,8 +84,6 @@ type fakeReplier struct {
 	// audios the sounds it finds, as the music tool would.
 	draws  int
 	audios []tools.Audio
-	// cards are item cards it chooses, as the item card tool would.
-	cards []string
 	// documents are files it makes, as a tool may.
 	documents []tools.Document
 	// answer replaces the echo when set.
@@ -119,9 +117,6 @@ func (f *fakeReplier) Reply(ctx context.Context, req agent.Request) (agent.Answe
 		}
 		for _, a := range f.audios {
 			sink.AddAudio(a)
-		}
-		for _, c := range f.cards {
-			sink.AddSticker(c)
 		}
 		for _, d := range f.documents {
 			sink.AddDocument(d)
