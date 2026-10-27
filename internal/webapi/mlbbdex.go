@@ -406,11 +406,11 @@ func (a *apis) dexHeroByName(ctx context.Context, name string) (dexHero, error) 
 	if err != nil {
 		return dexHero{}, err
 	}
-	wanted := normalizeName(name)
-	i := slices.IndexFunc(heroes, func(h dexListHero) bool { return normalizeName(h.Name) == wanted })
-	if i < 0 {
-		return dexHero{}, argumentError("no MLBB hero is called %q; give the hero's English name, such as Ling or Yi Sun-shin", name)
+	found, err := matchHero(dexNames(heroes), name)
+	if err != nil {
+		return dexHero{}, err
 	}
+	i := slices.IndexFunc(heroes, func(h dexListHero) bool { return h.Name == found })
 	slug := heroes[i].Slug
 	return remember(a.cache, "mlbbdex:hero:"+slug, mlbbHeroesTTL, func() (dexHero, error) {
 		var answer dexHero
@@ -493,4 +493,12 @@ func orKept[T any](list, kept []T) []T {
 		return kept
 	}
 	return list
+}
+
+func dexNames(heroes []dexListHero) []string {
+	names := make([]string, len(heroes))
+	for i, h := range heroes {
+		names[i] = h.Name
+	}
+	return names
 }

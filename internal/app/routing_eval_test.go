@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -66,9 +67,11 @@ func TestRoutingEval(t *testing.T) {
 			time.Sleep(pause)
 		}
 		store := &evalStore{history: c.history()}
-		a := agent.New(agent.Options{Store: store, Model: main, Tools: evalTools{registry}, Router: router, ChatModel: chat, Name: cfg.BotDisplayName,
+		// ROUTING_EVAL_RUN names tools that only read, such as mlbb, to run.
+		offered := &evalTools{registry: registry, run: strings.Split(os.Getenv("ROUTING_EVAL_RUN"), ",")}
+		a := agent.New(agent.Options{Store: store, Model: main, Tools: offered, Router: router, ChatModel: chat, Name: cfg.BotDisplayName,
 			Persona: cfg.PersonaPrompt, GroupNote: cfg.GroupNote, MaxHistory: 20, MaxToolCalls: cfg.MaxToolCallsPerTurn})
-		caller := tools.Caller{ChatID: -100, UserID: 5000, Human: true, UpdateID: int64(c.ID), Words: c.Text}
+		caller := tools.Caller{ChatID: -100, UserID: 5000, Human: true, UpdateID: int64(c.ID), Words: c.ownWords()}
 		if c.fromOwner() {
 			caller.UserID, caller.Owner = 1688909825, true
 		}
@@ -77,7 +80,7 @@ func TestRoutingEval(t *testing.T) {
 		started := time.Now()
 		answer, err := a.Reply(ctx, agent.Request{Scope: storage.Scope{ChatID: -100}, UserID: caller.UserID, UpdateID: int64(c.ID), Text: c.Text, Context: c.Context, Group: true})
 		r := evalResult{ID: c.ID, Kind: c.Kind, UsedTool: c.UsedTool, Text: c.Text, ProdAnswer: c.ProdAnswer, Route: answer.Route,
-			Answer: answer.Text, Reaction: answer.Reaction, Sticker: answer.Sticker, GIF: answer.GIF, Seconds: time.Since(started).Seconds(), Calls: usage.calls()}
+			Answer: answer.Text, Reaction: answer.Reaction, Sticker: answer.Sticker, GIF: answer.GIF, Seconds: time.Since(started).Seconds(), Calls: usage.calls(), ToolCalls: offered.asked}
 		if err != nil {
 			r.Error = err.Error()
 		}
@@ -114,6 +117,14 @@ func (c evalCase) history() []ai.Message {
 	return messages
 }
 
+// ownWords are the asker's words, as the service gives tools: the last
+// line after the speaker's name, without what they quoted.
+func (c evalCase) ownWords() string {
+	lines := strings.Split(strings.TrimSpace(c.Text), "\n")
+	_, words, _ := strings.Cut(lines[len(lines)-1], ": ")
+	return words
+}
+
 // fromOwner reports a message an owner wrote, by the mark the service puts
 // after their name.
 func (c evalCase) fromOwner() bool {
@@ -134,6 +145,7 @@ type evalResult struct {
 	Sticker    string      `json:"sticker,omitempty"`
 	GIF        string      `json:"gif,omitempty"`
 	Error      string      `json:"error,omitempty"`
+	ToolCalls  []string    `json:"tool_calls,omitempty"`
 	Seconds    float64     `json:"seconds"`
 	Calls      []evalUsage `json:"calls"`
 }
@@ -167,14 +179,26 @@ func evalConfig(t *testing.T, key string) config.Config {
 	return cfg
 }
 
-// evalTools offers the real tools but runs none of them.
-type evalTools struct{ registry *tools.Registry }
+// evalTools offers the real tools and keeps the calls the model asked for.
+// It runs only those named in run, which must only read, such as mlbb.
+type evalTools struct {
+	registry *tools.Registry
+	run      []string
+	mu       sync.Mutex
+	asked    []string
+}
 
-func (e evalTools) Definitions(ctx context.Context, callerID int64) []ai.ToolDefinition {
+func (e *evalTools) Definitions(ctx context.Context, callerID int64) []ai.ToolDefinition {
 	return e.registry.Definitions(ctx, callerID)
 }
 
-func (evalTools) Execute(context.Context, int64, string, string) string {
+func (e *evalTools) Execute(ctx context.Context, callerID int64, name, args string) string {
+	e.mu.Lock()
+	e.asked = append(e.asked, name+" "+args)
+	e.mu.Unlock()
+	if slices.Contains(e.run, name) {
+		return e.registry.Execute(ctx, callerID, name, args)
+	}
 	return `{"ok":false,"error":{"code":"unavailable","message":"The tool did not run in this test."}}`
 }
 

@@ -89,7 +89,7 @@ func TestMLBBHeroNames(t *testing.T) {
 	if env := execute(t, reg, "mlbb", `{"action":"hero","hero":"yi sun shin"}`); !env.OK {
 		t.Errorf("Yi Sun-shin was not found: %s", env.raw)
 	}
-	wantError(t, execute(t, reg, "mlbb", `{"action":"hero","hero":"Lingg"}`), "invalid_arguments", "no MLBB hero")
+	wantError(t, execute(t, reg, "mlbb", `{"action":"hero","hero":"Zhask"}`), "invalid_arguments", "no MLBB hero")
 	if n := len(u.requests("/arena/api/heroes")); n != 1 {
 		t.Errorf("the hero list was asked for %d times, want once", n)
 	}
@@ -111,7 +111,7 @@ func TestMLBBMeta(t *testing.T) {
 func TestMLBBRefusesBadArguments(t *testing.T) {
 	u := newUpstream(t, nil)
 	for args, word := range map[string]string{
-		`{"action":"draft"}`:                            "action",
+		`{"action":"tierlist"}`:                         "action",
 		`{"action":"build","hero":"Ling","lane":"top"}`: "lane",
 		`{"action":"meta","rank":"grandmaster"}`:        "rank",
 		`{"action":"meta","sort":"kda"}`:                "sort",
@@ -279,7 +279,7 @@ func TestMLBBSkins(t *testing.T) {
 
 func TestMLBBSkinsUnknownHero(t *testing.T) {
 	u := newUpstream(t, map[string]stub{"/dex/api/v1/heroes": ok(dexHeroList)})
-	wantError(t, run(t, u.options(), "mlbb", `{"action":"skins","hero":"Guinever"}`), "invalid_arguments", "no MLBB hero")
+	wantError(t, run(t, u.options(), "mlbb", `{"action":"skins","hero":"Gatotkaca"}`), "invalid_arguments", "closest")
 	wantError(t, run(t, u.options(), "mlbb", `{"action":"skins"}`), "invalid_arguments", "hero")
 }
 
@@ -590,4 +590,118 @@ func TestFinishing(t *testing.T) {
 	if finish, counted := finishing([]int{1}, guides[:4], items); finish != nil || counted != 0 {
 		t.Errorf("four guides gave %v", finish)
 	}
+}
+
+// A hero is found in Cyrillic and with a typo, when it alone is that close;
+// a name near two heroes, or near none, finds nothing.
+func TestMatchHero(t *testing.T) {
+	heroes := []string{"Hirara", "Harith", "Ling", "Lylia", "Yi Sun-shin", "Chang'e"}
+	for name, want := range map[string]string{
+		"Hirara": "Hirara", "hirara": "Hirara", "Xirara": "Hirara", "Хирара": "Hirara", "Ҳирара": "Hirara",
+		"Lingg": "Ling", "Линг": "Ling", "yi sun shin": "Yi Sun-shin", "change": "Chang'e", "Чанъэ": "Chang'e", "Hirraa": "Hirara",
+		"Lia": "", "Zask": "",
+	} {
+		got, err := matchHero(heroes, name)
+		if got != want || (want == "" && err == nil) {
+			t.Errorf("matchHero(%q) = %q, %v; want %q", name, got, err, want)
+		}
+	}
+}
+
+func TestHeroesInWords(t *testing.T) {
+	heroes := []string{"Hirara", "Harith", "Helcurt", "Joy", "Ling", "Yi Sun-shin", "Popol and Kupa"}
+	for words, want := range map[string]string{
+		"hiraraga build ber":      "Hirara",
+		"Xirara dedi":             "Hirara",
+		"Хирарани расми борми":    "Hirara",
+		"lingni counter kim":      "Ling",
+		"yi sun shin build":       "Yi Sun-shin",
+		"popol and kupa skin":     "Popol and Kupa",
+		"Ling yoki Harith kuchli": "Harith,Ling",
+		"build ber":               "",
+		"kelinglar o'ynaymiz":     "",
+	} {
+		if got := strings.Join(heroesInWords(heroes, words), ","); got != want {
+			t.Errorf("heroesInWords(%q) = %q, want %q", words, got, want)
+		}
+	}
+}
+
+// The model swapping a hero it does not know for one it does is undone
+// when the asker's own words name one hero alone.
+func TestMLBBUsesTheHeroTheAskerNamed(t *testing.T) {
+	u := newUpstream(t, map[string]stub{
+		"/dex/api/v1/heroes":        ok(`{"data":[{"slug":"hirara","name":"Hirara"},{"slug":"joy","name":"Joy"}]}`),
+		"/dex/api/v1/heroes/hirara": ok(`{"data":{"name":"Hirara","skins":[{"id":"1","name":"Fallen Scarlet","release":"2026-06-17"}]}}`),
+	})
+	ctx := tools.WithTurn(context.Background(), tools.Caller{UserID: 1, ChatID: -100, Human: true, Words: "hiraraga skin bormi"}, &tools.Sink{})
+	var env envelope
+	if err := json.Unmarshal([]byte(newRegistry(t, u.options()).Execute(ctx, 1, "mlbb", `{"action":"skins","hero":"Joy"}`)), &env); err != nil {
+		t.Fatal(err)
+	}
+	env.raw = string(env.Result)
+	out := result[mlbbSkinsOutput](t, env)
+	if out.Hero != "Hirara" || !strings.Contains(out.Note, "names Hirara") {
+		t.Errorf("skins = %+v, want Hirara's and the note saying why", out)
+	}
+	if len(u.requests("/dex/api/v1/heroes/joy")) != 0 {
+		t.Error("Joy was asked for")
+	}
+}
+
+func TestMLBBWinrate(t *testing.T) {
+	for _, c := range []struct {
+		matches         int
+		winRate, target float64
+		want            int
+	}{{500, 48, 55, 78}, {100, 50, 60, 25}, {200, 60, 55, 0}, {10, 0, 50, 10}} {
+		out, err := mlbbWinrate(c.matches, c.winRate, c.target)
+		if err != nil || out.WinsInARow != c.want {
+			t.Errorf("mlbbWinrate(%d, %v, %v) = %d, %v; want %d", c.matches, c.winRate, c.target, out.WinsInARow, err, c.want)
+		}
+	}
+	if _, err := mlbbWinrate(100, 50, 100); err == nil {
+		t.Error("a 100% target was taken; it is never reached")
+	}
+}
+
+func TestMLBBCombo(t *testing.T) {
+	u := newUpstream(t, map[string]stub{
+		"/arena/api/heroes":                 ok(arenaHeroes),
+		"/arena/api/heroes/84/skill-combos": ok(`{"code":0,"data":{"records":[{"data":{"title":"TEAMFIGHT COMBOS","desc":"Ling moves onto the wall with his 1st Skill."}},{"data":{"title":"empty","desc":""}}]}}`),
+	})
+	out := result[mlbbCombosOutput](t, run(t, u.options(), "mlbb", `{"action":"combo","hero":"Ling"}`))
+	if out.Hero != "Ling" || len(out.Combos) != 1 || out.Combos[0].Title != "TEAMFIGHT COMBOS" {
+		t.Errorf("combos = %+v, want the empty one left out", out)
+	}
+}
+
+func TestMLBBItem(t *testing.T) {
+	u := newUpstream(t, map[string]stub{"/dex/api/v1/items": ok(`{"data":[
+		{"name":"Blade of Despair","summary":"Highest Physical Attack","category":"Attack","price":3010,"bonus":"+160 Physical Attack","unique":null,"passive":"Despair: more attack below 50% HP.","active":null,"recipe":["Legion Sword","Legion Sword"],"bestFor":"All heroes"},
+		{"name":"Winter Truncheon","category":"Defense","price":1910}]}`)})
+	out := result[mlbbItemOutput](t, run(t, u.options(), "mlbb", `{"action":"item","item":"blade of despar"}`))
+	if out.Item != "Blade of Despair" || out.Price != 3010 || out.Unique != "" || len(out.Recipe) != 2 || out.Passive == "" {
+		t.Errorf("item = %+v", out)
+	}
+	wantError(t, run(t, u.options(), "mlbb", `{"action":"item","item":"Sword"}`), "invalid_arguments", "no MLBB item")
+}
+
+// A pick that lowers the enemy's win rate leads; one the enemy beats is
+// left out; a teammate's partner counts half; the heroes already picked are
+// never suggested.
+func TestMLBBDraft(t *testing.T) {
+	u := newUpstream(t, map[string]stub{
+		"/arena/api/heroes":                  ok(arenaHeroes),
+		"/arena/api/heroes/84/counters":      ok(arenaLingCounters),
+		"/arena/api/heroes/46/compatibility": ok(`{"code":0,"data":{"records":[{"data":{"main_hero":{"data":{"name":"Odette"}},"sub_hero":[{"heroid":24,"increase_win_rate":0.02},{"heroid":30,"increase_win_rate":0.04}]}}]}}`),
+	})
+	out := result[mlbbDraftOutput](t, run(t, u.options(), "mlbb", `{"action":"draft","enemies":["Ling"],"allies":["Odette"]}`))
+	if len(out.Picks) != 2 || out.Picks[0].Hero != "Natalia" || out.Picks[0].Score != "+5.9%" || out.Picks[1].Hero != "Yi Sun-shin" {
+		t.Fatalf("picks = %+v, want Natalia (counters Ling, good with Odette) then Yi Sun-shin", out.Picks)
+	}
+	if !slices.Equal(out.Picks[0].Why, []string{"counters Ling (+4.9%)", "good with Odette (+2.0%)"}) {
+		t.Errorf("why = %q", out.Picks[0].Why)
+	}
+	wantError(t, run(t, u.options(), "mlbb", `{"action":"draft"}`), "invalid_arguments", "enemies")
 }

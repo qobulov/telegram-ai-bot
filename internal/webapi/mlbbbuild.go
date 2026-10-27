@@ -255,9 +255,8 @@ func (a *apis) buildHero(ctx context.Context, name, lane string) (buildTarget, e
 		return buildTarget{}, argumentError("hero must be a name of at most %d characters", maxHeroName)
 	}
 	if heroes, err := a.dexHeroes(ctx); err == nil {
-		wanted := normalizeName(name)
-		if i := slices.IndexFunc(heroes, func(h dexListHero) bool { return normalizeName(h.Name) == wanted }); i >= 0 {
-			h := heroes[i]
+		if found, err := matchHero(dexNames(heroes), name); err == nil {
+			h := heroes[slices.IndexFunc(heroes, func(h dexListHero) bool { return h.Name == found })]
 			return buildTarget{name: h.Name, path: url.PathEscape(h.Name), lane: cmp.Or(lane, mainLane(h.Lanes))}, nil
 		}
 	}
