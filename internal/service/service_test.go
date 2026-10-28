@@ -825,7 +825,7 @@ func TestHelpMentionsModerationAndPolls(t *testing.T) {
 			t.Errorf("help text does not mention %q", want)
 		}
 	}
-	for _, gone := range []string{"presentation", "arithmetic"} {
+	for _, gone := range []string{"presentation", "arithmetic", "derivatives", "exact math"} {
 		if strings.Contains(help, gone) {
 			t.Errorf("help still offers %s, which the bot no longer does", gone)
 		}
