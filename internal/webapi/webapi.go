@@ -56,7 +56,10 @@ type Options struct {
 	// CalendarificKey is a Calendarific key. Without it there is no
 	// holidays tool.
 	CalendarificKey string
-	BaseURLs        BaseURLs
+	// ImgflipKey is an Imgflip API key. Without it there is no make_meme
+	// tool.
+	ImgflipKey string
+	BaseURLs   BaseURLs
 }
 
 // BaseURLs says where each API lives. Empty fields mean the production
@@ -108,6 +111,7 @@ type BaseURLs struct {
 	TraceMoe          string
 	SteamStore        string
 	SteamAPI          string
+	Imgflip           string
 	WorldBank         string
 	JokeAPI           string
 	LaunchLibrary     string
@@ -166,6 +170,7 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.TraceMoe = cmp.Or(b.TraceMoe, "https://api.trace.moe")
 	b.SteamStore = cmp.Or(b.SteamStore, "https://store.steampowered.com")
 	b.SteamAPI = cmp.Or(b.SteamAPI, "https://api.steampowered.com")
+	b.Imgflip = cmp.Or(b.Imgflip, "https://api.imgflip.com")
 	b.WorldBank = cmp.Or(b.WorldBank, "https://api.worldbank.org")
 	b.JokeAPI = cmp.Or(b.JokeAPI, "https://v2.jokeapi.dev")
 	b.LaunchLibrary = cmp.Or(b.LaunchLibrary, "https://ll.thespacedevs.com")
@@ -210,6 +215,7 @@ type apis struct {
 	tmdbToken       string
 	youtubeKey      string
 	calendarificKey string
+	imgflipKey      string
 }
 
 // Tools returns the live-data tools. Football is included only when
@@ -254,6 +260,9 @@ func Tools(opts Options) []tools.Tool {
 	if a.calendarificKey != "" {
 		list = append(list, a.holidaysTool())
 	}
+	if a.imgflipKey != "" {
+		list = append(list, a.memeTool())
+	}
 	return list
 }
 
@@ -277,6 +286,7 @@ func newAPIs(opts Options) *apis {
 		tmdbToken:       opts.TMDBToken,
 		youtubeKey:      opts.YouTubeKey,
 		calendarificKey: opts.CalendarificKey,
+		imgflipKey:      opts.ImgflipKey,
 	}
 }
 

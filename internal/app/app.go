@@ -438,6 +438,7 @@ func liveDataTools(cfg config.Config, bot Bot) []tools.Tool {
 		TMDBToken:       cfg.TMDBToken,
 		YouTubeKey:      cfg.YouTubeAPIKey,
 		CalendarificKey: cfg.CalendarificAPIKey,
+		ImgflipKey:      cfg.ImgflipAPIKey,
 	}
 	return webapi.Tools(opts)
 }

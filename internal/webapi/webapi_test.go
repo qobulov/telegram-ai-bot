@@ -167,6 +167,7 @@ func (u *upstream) options() Options {
 			TraceMoe:          base + "/tracemoe",
 			SteamStore:        base + "/steam",
 			SteamAPI:          base + "/steamapi",
+			Imgflip:           base + "/imgflip",
 			WorldBank:         base + "/worldbank",
 			JokeAPI:           base + "/jokeapi",
 			LaunchLibrary:     base + "/ll2",
