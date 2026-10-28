@@ -971,8 +971,8 @@ var actionWords = map[string][]string{
 	actionDemote:     adminWords,
 	actionAdminTitle: {"admin", "админ", "unvon", "titul", "титул", "звани", "title", "lavozim", "должн"},
 
-	actionSetTitle:       {"nom", "title", "назв", "имя"},
-	actionSetDescription: {"tavsif", "description", "описан", "bio"},
+	actionSetTitle:       append([]string{"nom", "title", "назв", "имя"}, changeWords...),
+	actionSetDescription: append([]string{"tavsif", "description", "описан", "bio"}, changeWords...),
 	actionSetPhoto:       append([]string{"avatar", "аватар", "ava "}, photoWords...),
 	actionDeletePhoto:    append([]string{"avatar", "аватар", "ava "}, photoWords...),
 	actionInviteLink:     {"link", "havola", "ssilka", "silka", "ссылк", "taklif", "invite"},
@@ -988,6 +988,11 @@ var foldApostrophes = strings.NewReplacer("'", "", "ʻ", "", "ʼ", "", "’", ""
 // askedFor reports whether words, what the person asking wrote themselves,
 // ask for action. With no question to confirm, this is what keeps a line
 // in the chat from talking the model into moderating on someone's turn.
+// changeWords ask to change something without naming it, as an owner
+// answering "o'zgartiraymi?" says "ha change qil Azizbek_Bot": the model
+// knows from the talk what, as it does a member's stickers.
+var changeWords = []string{"ozgartir", "uzgartir", "almashtir", "change", "rename", "поменя", "смени", "измени", "переимен", "ўзгартир", "узгартир"}
+
 // adminWords ask for something about adminship: "admin qil", "админка".
 var adminWords = []string{"admin", "админ"}
 
