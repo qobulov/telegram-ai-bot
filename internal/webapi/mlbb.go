@@ -559,6 +559,15 @@ func heroesInWords(heroes []string, words string) []string {
 	return named
 }
 
+// heroEndings are the Uzbek and Russian endings, in Latin letters, a hero's
+// name takes in a message: "hiraraga", "lingni", "fannyning". Any other
+// rest makes it another word: "so'ramasdan" is not Sora.
+var heroEndings = map[string]bool{
+	"ga": true, "ni": true, "ning": true, "da": true, "dan": true, "dagi": true, "niki": true, "lar": true, "larni": true,
+	"mi": true, "ku": true, "chi": true, "dek": true, "day": true, "ka": true, "na": true,
+	"u": true, "y": true, "a": true, "e": true, "om": true, "oy": true,
+}
+
 func namedIn(tokens []string, name string) bool {
 	for i := range tokens {
 		joined := ""
@@ -567,7 +576,7 @@ func namedIn(tokens []string, name string) bool {
 			switch {
 			case joined == name:
 				return true
-			case j == i && len([]rune(name)) >= 4 && strings.HasPrefix(joined, name):
+			case j == i && len([]rune(name)) >= 4 && strings.HasPrefix(joined, name) && heroEndings[strings.TrimPrefix(joined, name)]:
 				return true
 			case j == i && len([]rune(name)) >= 6 && len([]rune(joined)) >= 6 && editDistance(joined, name) == 1:
 				return true

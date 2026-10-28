@@ -610,7 +610,7 @@ func TestMatchHero(t *testing.T) {
 }
 
 func TestHeroesInWords(t *testing.T) {
-	heroes := []string{"Hirara", "Harith", "Helcurt", "Joy", "Ling", "Yi Sun-shin", "Popol and Kupa"}
+	heroes := []string{"Hirara", "Harith", "Helcurt", "Joy", "Ling", "Yi Sun-shin", "Popol and Kupa", "Sora", "Fanny"}
 	for words, want := range map[string]string{
 		"hiraraga build ber":      "Hirara",
 		"Xirara dedi":             "Hirara",
@@ -620,6 +620,9 @@ func TestHeroesInWords(t *testing.T) {
 		"popol and kupa skin":     "Popol and Kupa",
 		"Ling yoki Harith kuchli": "Harith,Ling",
 		"build ber":               "",
+		"so'ramasdan tashlayver":  "",
+		"sorani skini":            "Sora",
+		"fannyning legasi":        "Fanny",
 		"kelinglar o'ynaymiz":     "",
 	} {
 		if got := strings.Join(heroesInWords(heroes, words), ","); got != want {
