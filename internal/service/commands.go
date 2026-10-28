@@ -27,6 +27,8 @@ type outcome struct {
 	// skipped is why the message got no answer from the model, as
 	// "overloaded", for the skip log; "" when it got one.
 	skipped string
+	// skipDetail is the error behind skipped, for the owners.
+	skipDetail string
 	// reaction is the emoji the model answered with instead of text. It is
 	// set on the message being answered; no message is sent for it.
 	reaction string
@@ -69,18 +71,18 @@ func (s *Service) process(in incoming) {
 		if _, limited := s.rateLimited(in); !limited {
 			s.react(in, privateReactions[rand.IntN(len(privateReactions))])
 		}
-		s.noteSkip(in, "private_closed")
+		s.noteSkip(in, "private_closed", "")
 		return
 	}
 	// A muted group is ignored, except for the commands that control muting.
 	// This is checked here, in queue order, so that a message sent right
 	// after /unmute is answered and one sent right after /mute is not.
 	if s.silenced(in) {
-		s.noteSkip(in, "muted")
+		s.noteSkip(in, "muted", "")
 		return
 	}
 	if in.fromBot && !s.mayAnswerBot(in) {
-		s.noteSkip(in, "bot_quota")
+		s.noteSkip(in, "bot_quota", "")
 		return
 	}
 	if notice, limited := s.rateLimited(in); limited {
@@ -88,7 +90,7 @@ func (s *Service) process(in incoming) {
 			s.reply(in, notice)
 		}
 		s.passOver(in)
-		s.noteSkip(in, "flood")
+		s.noteSkip(in, "flood", "")
 		return
 	}
 	// A group of fewer than MinGroupMembers is answered only as a private
@@ -99,14 +101,14 @@ func (s *Service) process(in incoming) {
 	if s.isPrivateInDisguise(ctx, in) {
 		s.react(in, overQuotaReaction)
 		s.passOver(in)
-		s.noteSkip(in, "small_group")
+		s.noteSkip(in, "small_group", "")
 		return
 	}
 	// A group where too few people wrote lately gets nothing at all, as
 	// the owners asked; only they are answered there.
 	if s.tooQuiet(ctx, in) {
 		s.passOver(in)
-		s.noteSkip(in, "quiet_group")
+		s.noteSkip(in, "quiet_group", "")
 		return
 	}
 	// An owner's order not to answer a member is handled here, in code.
@@ -126,7 +128,7 @@ func (s *Service) process(in incoming) {
 	// without end.
 	if s.ignored(in, rules) && !s.isManagerCommand(in) {
 		s.passOver(in)
-		s.noteSkip(in, "ignored")
+		s.noteSkip(in, "ignored", "")
 		return
 	}
 	// Applause is answered with a reaction, which takes nothing from the
@@ -137,7 +139,7 @@ func (s *Service) process(in incoming) {
 	reservation, allowed := s.mayAnswerInGroup(in)
 	if !allowed {
 		s.passOver(in)
-		s.noteSkip(in, "group_quota")
+		s.noteSkip(in, "group_quota", "")
 		return
 	}
 	in.groupReply = reservation
@@ -152,20 +154,23 @@ func (s *Service) process(in incoming) {
 	}
 	s.logExchange(in, out)
 	if out.skipped != "" {
-		s.noteSkip(in, out.skipped)
+		s.noteSkip(in, out.skipped, out.skipDetail)
 	}
 }
+
+// maxSkipDetail cuts the error kept with a skip: its start says what failed.
+const maxSkipDetail = 500
 
 // noteSkip records that a message addressed to the bot got no answer, and
 // why. It is a record for the owners only: failing to write it is logged
 // and nothing more.
-func (s *Service) noteSkip(in incoming, reason string) {
+func (s *Service) noteSkip(in incoming, reason, detail string) {
 	if s.opts.Skips == nil {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
 	defer cancel()
-	err := s.opts.Skips.NoteSkip(ctx, storage.Skip{ChatID: in.scope.ChatID, UserID: in.userID, MessageID: in.msg.MessageID, Reason: reason})
+	err := s.opts.Skips.NoteSkip(ctx, storage.Skip{ChatID: in.scope.ChatID, UserID: in.userID, MessageID: in.msg.MessageID, Reason: reason, Detail: truncate(detail, maxSkipDetail)})
 	if err != nil {
 		s.opts.Logger.Warn("could not record a skipped message", "chat_id", in.scope.ChatID, "reason", reason, "error", err)
 	}
@@ -1086,15 +1091,15 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 		return outcome{duplicate: true}
 	case ai.IsOverloaded(err):
 		log.Warn("model provider overloaded or over its limits", "error", err)
-		return outcome{text: textOverloaded.to(in), skipped: "overloaded"}
+		return outcome{text: textOverloaded.to(in), skipped: "overloaded", skipDetail: err.Error()}
 	case errors.Is(err, context.DeadlineExceeded):
 		log.Warn("turn timed out")
-		return outcome{text: textTimeout.to(in), skipped: "timeout"}
+		return outcome{text: textTimeout.to(in), skipped: "timeout", skipDetail: err.Error()}
 	default:
 		// The error is logged in full but never shown: it can carry provider
 		// or database details the user must not see.
 		log.Error("turn failed", "error", err)
-		return outcome{text: textError.to(in), skipped: "error"}
+		return outcome{text: textError.to(in), skipped: "error", skipDetail: err.Error()}
 	}
 }
 

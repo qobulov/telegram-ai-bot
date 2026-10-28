@@ -3755,7 +3755,10 @@ func TestUnansweredMessagesAreRecordedWithWhy(t *testing.T) {
 	if got := skips.reasons(); !slices.Equal(got, []string{"group_quota", "overloaded"}) {
 		t.Errorf("skips = %q, want group_quota then overloaded", got)
 	}
-	if skip := skips.skips[0]; skip.ChatID == 0 || skip.UserID == 0 || skip.MessageID == 0 {
-		t.Errorf("skip = %+v, want its chat, member and message", skip)
+	if skip := skips.skips[0]; skip.ChatID == 0 || skip.UserID == 0 || skip.MessageID == 0 || skip.Detail != "" {
+		t.Errorf("skip = %+v, want its chat, member and message, and no error", skip)
+	}
+	if skip := skips.skips[1]; !strings.Contains(skip.Detail, "quota") {
+		t.Errorf("overloaded skip detail = %q, want the provider's error", skip.Detail)
 	}
 }
