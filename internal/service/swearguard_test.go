@@ -195,20 +195,30 @@ func TestSwearGuardHandlesAnUpdateOnce(t *testing.T) {
 
 func TestIsSwearing(t *testing.T) {
 	for text, want := range map[string]bool{
-		"dnx":                           true,
-		"ДНХ":                           true,
-		"Иди нахуй":                     true,
-		"бля, yana yutqazdik":           true,
-		"qoʻtogʻimni ye":                true,
-		"jalablar":                      true,
-		"пиздец":                        true,
-		"Gandonlar":                     true,
-		"Pawolnaxuy":                    true,
-		"Pawolnaххuy":                   true,
-		"pasholnaxuiya":                 true,
-		"o'zing jala":                   true,
-		"kot":                           true,
-		"I am here":                     false,
+		"dnx":                 true,
+		"ДНХ":                 true,
+		"Иди нахуй":           true,
+		"бля, yana yutqazdik": true,
+		"qoʻtogʻimni ye":      true,
+		"jalablar":            true,
+		"пиздец":              true,
+		"Gandonlar":           true,
+		"Pawolnaxuy":          true,
+		"Pawolnaххuy":         true,
+		"pasholnaxuiya":       true,
+		"o'zing jala":         true,
+		"kot":                 true,
+		"I am here":           false,
+		"Уйга заебал":         true,
+		"Кайси долбаеб оберади?":        true,
+		"Нихуя себе":                    true,
+		"Пздц":                          true,
+		"Idinaxuy":                      true,
+		"Выебоны":                       true,
+		"Zaybal buldim anime kurib":     true,
+		"Pulm bolsa auditoriya nax":     true,
+		"Pashole bettan":                true,
+		"самый уебищный бот":            true,
 		"mol bozori":                    false,
 		"xuy-atvori yaxshi odam":        false,
 		"Salom, qalaysizlar?":           false,
@@ -252,11 +262,11 @@ func TestSwearGuardWarnsAnAdminThenTags(t *testing.T) {
 	}
 }
 
-// Swearing as emphasis, aimed at nobody, is left alone, and so is a message
+// A word that only looks like swearing is left alone, and so is a message
 // the model cannot judge: the model answers it if it was asked.
-func TestSwearGuardLeavesSwearingAimedAtNobody(t *testing.T) {
+func TestSwearGuardLeavesWhatIsNoSwearing(t *testing.T) {
 	for name, judge := range map[string]*fakeJudge{
-		"aimed at nobody":   {answer: "NONE"},
+		"no swearing":       {answer: "NONE"},
 		"the model fails":   {err: errors.New("ai: 503")},
 		"an unclear answer": {answer: "maybe"},
 	} {
@@ -273,6 +283,20 @@ func TestSwearGuardLeavesSwearingAimedAtNobody(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// Swearing as an exclamation, aimed at nobody, is warned like an insult:
+// the owners asked for a group without swearing.
+func TestSwearGuardWarnsAnExclamation(t *testing.T) {
+	f, restrictor := guardFixture("")
+	f.opts.Judge = &fakeJudge{answer: "SWEAR"}
+	sent := f.run(swearFrom(swearerID, "бля, yutqazdik"))
+	if len(sent) != 1 || !strings.Contains(sent[0].text, "so'kinish mumkin emas") || len(restrictor.recorded()) != 0 {
+		t.Errorf("sent %+v, restrictions %+v; want one warning", sent, restrictor.recorded())
+	}
+	if calls := f.replier.recorded(); len(calls) != 0 {
+		t.Errorf("model calls = %d, want none for a handled swear", len(calls))
 	}
 }
 
