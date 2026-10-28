@@ -265,6 +265,11 @@ type Options struct {
 	// QuickAnswers answers a private chat's small talk and common questions
 	// without the model; see faq.go.
 	QuickAnswers bool
+	// OwnerMenu is the command menu an owner sees in a group, with the
+	// commands only owners have, which MenuSetter sets the first time they
+	// write there; with either missing owners see the admins' menu.
+	OwnerMenu  []telegram.BotCommand
+	MenuSetter MenuSetter
 	// Reactor sets emoji reactions, the bot's answer to applause and the
 	// model's when it reacts instead of writing; nil means it never reacts.
 	Reactor Reactor
@@ -370,7 +375,9 @@ type Service struct {
 	// ownersHere the owners lately found in each group.
 	actives *recently[int64, int]
 	// settings are groups' owner settings, such as /limit, lately read.
-	settings   *recently[int64, map[string]int]
+	settings *recently[int64, map[string]int]
+	// ownerMenus are the groups and owners whose menu was set lately.
+	ownerMenus *recently[[2]int64, bool]
 	ownersHere *recently[int64, []string]
 	// quizTests are tests lately read, for their runs' questions.
 	quizTests *recently[int64, storage.QuizTest]
@@ -457,6 +464,7 @@ func New(opts Options) *Service {
 		subscribers:     newRecently[int64, bool](subscriberMemory, opts.Now),
 		actives:         newRecently[int64, int](activeMemory, opts.Now),
 		settings:        newRecently[int64, map[string]int](settingsMemory, opts.Now),
+		ownerMenus:      newRecently[[2]int64, bool](ownerMenuMemory, opts.Now),
 		ownersHere:      newRecently[int64, []string](activeMemory, opts.Now),
 		guardSets:       newRecently[int64, guardSet](guardsMemory, opts.Now),
 		quizTests:       newRecently[int64, storage.QuizTest](quizTestMemory, opts.Now),
@@ -675,6 +683,7 @@ func (s *Service) accept(update telegram.Update) (incoming, bool) {
 		return in, true
 	case telegram.ChatTypeGroup, telegram.ChatTypeSupergroup:
 		s.noteMembers(msg)
+		s.showOwnerMenu(msg)
 		in.scope = storage.Scope{ChatID: msg.Chat.ID} // shared by the group
 		in.group = true
 		if len(msg.NewChatMembers) > 0 {

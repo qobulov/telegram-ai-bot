@@ -36,6 +36,13 @@ var commandMenus = map[string][]telegram.BotCommand{
 	},
 }
 
+// ownerMenu is what an owner sees in a group: the admins' menu and the
+// commands only owners have, set for them alone in each group they write in.
+var ownerMenu = append(append([]telegram.BotCommand(nil), commandMenus[telegram.ScopeAllChatAdmins]...),
+	telegram.BotCommand{Command: "limit", Description: "Guruhda daqiqasiga javoblar soni (owner)"},
+	telegram.BotCommand{Command: "active", Description: "Kamida X faol a'zo sharti, yoki off (owner)"},
+)
+
 // CommandSetter sets a command menu.
 type CommandSetter interface {
 	SetMyCommands(ctx context.Context, scope string, commands []telegram.BotCommand) error

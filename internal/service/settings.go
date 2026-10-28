@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"telegram-ai-bot/internal/storage"
+	"telegram-ai-bot/internal/telegram"
 )
 
 // An owner sets, for one group, how many answers a minute the bot gives
@@ -19,7 +20,35 @@ const (
 	settingsMemory = time.Minute
 	maxReplyLimit  = 60
 	maxMinActive   = 1000
+	// ownerMenuMemory is how long an owner's menu in a group counts as set;
+	// Telegram keeps it, so this only spares asking again.
+	ownerMenuMemory = 24 * time.Hour
 )
+
+// MenuSetter sets the command menu one member sees in one group.
+type MenuSetter interface {
+	SetMemberCommands(ctx context.Context, chatID, userID int64, commands []telegram.BotCommand) error
+}
+
+// showOwnerMenu gives an owner who writes in a group the menu with the
+// owners' commands, /limit and /active, there and to them alone. A failure
+// is logged: the commands work typed all the same.
+func (s *Service) showOwnerMenu(msg *telegram.Message) {
+	if len(s.opts.OwnerMenu) == 0 || s.opts.MenuSetter == nil || !s.isOwner(msg.From) {
+		return
+	}
+	key := [2]int64{msg.Chat.ID, msg.From.ID}
+	if _, set := s.ownerMenus.get(key); set {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
+	defer cancel()
+	if err := s.opts.MenuSetter.SetMemberCommands(ctx, msg.Chat.ID, msg.From.ID, s.opts.OwnerMenu); err != nil {
+		s.opts.Logger.Warn("could not set an owner's menu", "chat_id", msg.Chat.ID, "error", err)
+		return
+	}
+	s.ownerMenus.set(key, true)
+}
 
 // settingWords say "back to the default" and "turn it off".
 var (

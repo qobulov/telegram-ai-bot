@@ -1,9 +1,12 @@
 package service
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
+
+	"telegram-ai-bot/internal/telegram"
 )
 
 // An owner's /limit sets the group's answers a minute, which the quota then
@@ -85,5 +88,29 @@ func TestSettingsRefuseABadNumber(t *testing.T) {
 
 	if len(sent) != 1 || !strings.Contains(sent[0].text, "1 dan 60 gacha") || len(rules.all()) != 0 {
 		t.Errorf("sent %+v, rules %+v", sent, rules.all())
+	}
+}
+
+type fakeMenuSetter struct{ calls [][2]int64 }
+
+func (f *fakeMenuSetter) SetMemberCommands(_ context.Context, chatID, userID int64, _ []telegram.BotCommand) error {
+	f.calls = append(f.calls, [2]int64{chatID, userID})
+	return nil
+}
+
+// An owner who writes in a group is given the owners' menu there, once; a
+// member is not.
+func TestOwnerGetsTheOwnersMenuOnce(t *testing.T) {
+	f := newFixture()
+	f.opts.OwnerUsernames = []string{ownerUsername}
+	menus := &fakeMenuSetter{}
+	f.opts.MenuSetter, f.opts.OwnerMenu = menus, []telegram.BotCommand{{Command: "limit", Description: "x"}}
+	second := fromOwner(groupMessage("yana"))
+	second.MessageID = 31
+
+	f.run(inGroup(fromOwner(groupMessage("salom"))), inGroup(second), inGroup(groupMessage("men a'zoman")))
+
+	if len(menus.calls) != 1 || menus.calls[0] != [2]int64{groupID, 9001} {
+		t.Errorf("menus set = %v, want once, for the owner in this group", menus.calls)
 	}
 }

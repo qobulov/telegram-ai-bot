@@ -1157,3 +1157,24 @@ func TestSendQuizQuestionReturnsThePollID(t *testing.T) {
 		t.Errorf("params = %v", sent.params)
 	}
 }
+
+// A menu for one member names the group and the member; the scope for
+// everyone names neither.
+func TestSetMemberCommandsScopesToOneMember(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":true}`)
+
+	if err := client.SetMemberCommands(context.Background(), -100, 9001, []BotCommand{{Command: "limit", Description: "x"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.SetMyCommands(context.Background(), ScopeDefault, nil); err != nil {
+		t.Fatal(err)
+	}
+	member, all := api.recorded()[0], api.recorded()[1]
+	scope, _ := member.params["scope"].(map[string]any)
+	if member.method != "setMyCommands" || scope["type"] != "chat_member" || scope["chat_id"] != float64(-100) || scope["user_id"] != float64(9001) {
+		t.Errorf("member call = %+v", member)
+	}
+	if scope, _ := all.params["scope"].(map[string]any); len(scope) != 1 || scope["type"] != "default" {
+		t.Errorf("default scope = %v, want the type alone", all.params["scope"])
+	}
+}

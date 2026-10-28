@@ -1016,7 +1016,9 @@ const (
 type setMyCommandsParams struct {
 	Commands []BotCommand `json:"commands"`
 	Scope    struct {
-		Type string `json:"type"`
+		Type   string `json:"type"`
+		ChatID int64  `json:"chat_id,omitempty"`
+		UserID int64  `json:"user_id,omitempty"`
 	} `json:"scope"`
 }
 
@@ -1024,6 +1026,15 @@ type setMyCommandsParams struct {
 func (c *Client) SetMyCommands(ctx context.Context, scope string, commands []BotCommand) error {
 	params := setMyCommandsParams{Commands: commands}
 	params.Scope.Type = scope
+	var ok bool
+	return c.call(ctx, "setMyCommands", params, &ok)
+}
+
+// SetMemberCommands sets the command menu one member sees in one group,
+// over every other scope there.
+func (c *Client) SetMemberCommands(ctx context.Context, chatID, userID int64, commands []BotCommand) error {
+	params := setMyCommandsParams{Commands: commands}
+	params.Scope.Type, params.Scope.ChatID, params.Scope.UserID = "chat_member", chatID, userID
 	var ok bool
 	return c.call(ctx, "setMyCommands", params, &ok)
 }
