@@ -968,6 +968,17 @@ not everyone: members who have not written or joined since she started
 keeping it are missing, and she says so. An anonymous admin's messages are
 sent as the group, so they never appear.
 
+### Catching up
+
+Each answer in a group shows her only an hour or two of a busy group's log.
+Asked what was talked about or what someone missed ("nima gaplashdilar",
+"что я пропустил"), she calls the `catch_up` tool, which reads the group's
+log from `group_messages`: from the asker's own previous message, or the
+hours they name, at most 24 and no older than `RETENTION_DAYS` keeps. Each
+message is cut to 200 characters and the newest 32 KB are kept; she recaps
+them in a few lines. Only the group the question is asked in is read, and in
+a private chat the tool is not offered.
+
 ### Limits
 
 - Group answers are cut to `MAX_GROUP_REPLY_LENGTH` so she posts one message.

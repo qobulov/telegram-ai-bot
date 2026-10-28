@@ -56,7 +56,7 @@ func inDevs(text string) telegram.Update {
 func groupHeader(rightsLine string) string {
 	return `[About this chat: the group "Devs (Uz) 'Core'". Now: ` + headerDate + ".\n" +
 		rightsLine + "\n" +
-		"You can reply here, react with one emoji, and use your tools. You cannot see read receipts, who is online or the full member list (group_admins lists the admins, group_members the members you have seen), read other chats or private chats except through your tools, open links, join groups, or remember anything older than the messages below unless a rule says so.]"
+		"You can reply here, react with one emoji, and use your tools. You cannot see read receipts, who is online or the full member list (group_admins lists the admins, group_members the members you have seen, catch_up the day's messages for a recap), read other chats or private chats except through your tools, open links, join groups, or remember anything older than the messages below unless a rule says so.]"
 }
 
 func TestGroupHeader(t *testing.T) {
