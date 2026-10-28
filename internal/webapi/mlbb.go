@@ -516,9 +516,11 @@ func matchName(heroes []string, name, what string) (string, error) {
 }
 
 // heroAsked is the hero the asker named, when their own words name one
-// hero alone and the model asked for another they never named: the model
-// takes heroes newer than it, such as Hirara, for ones it knows. It returns
-// the hero to use and what the note should add.
+// hero alone, newer than the model, and the model asked for another they
+// never named: the model takes heroes newer than it, such as Hirara, for
+// ones it knows. A hero it knows, such as Fanny, is left as asked, so that
+// "Fanny ga counter kim" may still look up Khufra. It returns the hero to
+// use and what the note should add.
 func (a *apis) heroAsked(ctx context.Context, asked string) (string, string) {
 	caller, ok := tools.CallerFrom(ctx)
 	if !ok || caller.Words == "" {
@@ -529,13 +531,22 @@ func (a *apis) heroAsked(ctx context.Context, asked string) (string, string) {
 		return asked, ""
 	}
 	named := heroesInWords(dexNames(heroes), caller.Words)
-	if len(named) != 1 {
+	if len(named) != 1 || !namesNewHero(heroes, named[0], a.now()) {
 		return asked, ""
 	}
 	if found, err := matchHero(dexNames(heroes), asked); err == nil && found == named[0] {
 		return asked, ""
 	}
 	return named[0], fmt.Sprintf("; the asker's message names %s, so this is %s, not %s: answer about %s", named[0], named[0], asked, named[0])
+}
+
+func namesNewHero(heroes []dexListHero, name string, now time.Time) bool {
+	i := slices.IndexFunc(heroes, func(h dexListHero) bool { return h.Name == name })
+	if i < 0 {
+		return false
+	}
+	_, ok := newHero(heroes[i], now)
+	return ok
 }
 
 // heroesInWords are the heroes words name: a word, or two or three in a row

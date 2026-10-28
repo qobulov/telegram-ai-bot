@@ -122,8 +122,8 @@ func NewHeroesNote(ctx context.Context, opts Options, now time.Time) string {
 	}
 	var named []string
 	for _, h := range heroes {
-		released, err := time.Parse("2 January 2006", strings.TrimSpace(h.Release))
-		if err != nil || now.Sub(released) > newHeroesFor || released.After(now) {
+		released, ok := newHero(h, now)
+		if !ok {
 			continue
 		}
 		named = append(named, fmt.Sprintf("%s, %s (%s; %s; skills %s; %s)", cleanText(h.Name, maxHeroName), cleanText(h.Title, maxHeroName),
@@ -135,6 +135,13 @@ func NewHeroesNote(ctx context.Context, opts Options, now time.Time) string {
 	}
 	return "# Mobile Legends heroes newer than you\n\nThe game has heroes released after what you learned: " + strings.Join(named, ", ") +
 		". Never deny one. Asked which hero is like another, even as a joke, weigh these too, by what their skills do: check the likely ones with mlbb hero."
+}
+
+// newHero reports whether h was released within newHeroesFor of now, and
+// when.
+func newHero(h dexListHero, now time.Time) (time.Time, bool) {
+	released, err := time.Parse("2 January 2006", strings.TrimSpace(h.Release))
+	return released, err == nil && now.Sub(released) <= newHeroesFor && !released.After(now)
 }
 
 type dexHero struct {

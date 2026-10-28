@@ -635,7 +635,7 @@ func TestHeroesInWords(t *testing.T) {
 // when the asker's own words name one hero alone.
 func TestMLBBUsesTheHeroTheAskerNamed(t *testing.T) {
 	u := newUpstream(t, map[string]stub{
-		"/dex/api/v1/heroes":        ok(`{"data":[{"slug":"hirara","name":"Hirara"},{"slug":"joy","name":"Joy"}]}`),
+		"/dex/api/v1/heroes":        ok(`{"data":[{"slug":"hirara","name":"Hirara","release":"17 June 2026"},{"slug":"joy","name":"Joy","release":"18 November 2022"}]}`),
 		"/dex/api/v1/heroes/hirara": ok(`{"data":{"name":"Hirara","skins":[{"id":"1","name":"Fallen Scarlet","release":"2026-06-17"}]}}`),
 	})
 	ctx := tools.WithTurn(context.Background(), tools.Caller{UserID: 1, ChatID: -100, Human: true, Words: "hiraraga skin bormi"}, &tools.Sink{})
@@ -650,6 +650,24 @@ func TestMLBBUsesTheHeroTheAskerNamed(t *testing.T) {
 	}
 	if len(u.requests("/dex/api/v1/heroes/joy")) != 0 {
 		t.Error("Joy was asked for")
+	}
+}
+
+// A hero the model knows is left as asked: "joyni counteri" may look up
+// Hirara.
+func TestMLBBKeepsAnotherHeroBesideAKnownOne(t *testing.T) {
+	u := newUpstream(t, map[string]stub{
+		"/dex/api/v1/heroes":        ok(`{"data":[{"slug":"hirara","name":"Hirara","release":"17 June 2026"},{"slug":"joy","name":"Joy","release":"18 November 2022"}]}`),
+		"/dex/api/v1/heroes/hirara": ok(`{"data":{"name":"Hirara","skins":[{"id":"1","name":"Fallen Scarlet","release":"2026-06-17"}]}}`),
+	})
+	ctx := tools.WithTurn(context.Background(), tools.Caller{UserID: 1, ChatID: -100, Human: true, Words: "joyni counteri kim"}, &tools.Sink{})
+	var env envelope
+	if err := json.Unmarshal([]byte(newRegistry(t, u.options()).Execute(ctx, 1, "mlbb", `{"action":"skins","hero":"Hirara"}`)), &env); err != nil {
+		t.Fatal(err)
+	}
+	env.raw = string(env.Result)
+	if out := result[mlbbSkinsOutput](t, env); out.Hero != "Hirara" || strings.Contains(out.Note, "asker's message names") {
+		t.Errorf("skins = %+v, want Hirara's as asked", out)
 	}
 }
 
