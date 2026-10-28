@@ -93,7 +93,7 @@ func TestGetUpdatesParsesTextMessage(t *testing.T) {
 	if sent.method != "getUpdates" || sent.params["offset"] != float64(5) {
 		t.Errorf("call = %+v", sent)
 	}
-	if allowed, _ := sent.params["allowed_updates"].([]any); len(allowed) != 6 || allowed[0] != "message" || allowed[1] != "my_chat_member" || allowed[2] != "chat_member" || allowed[3] != "callback_query" || allowed[4] != "poll" || allowed[5] != "poll_answer" {
+	if allowed, _ := sent.params["allowed_updates"].([]any); len(allowed) != 4 || allowed[0] != "message" || allowed[1] != "my_chat_member" || allowed[2] != "chat_member" || allowed[3] != "callback_query" {
 		t.Errorf("allowed_updates = %v", sent.params["allowed_updates"])
 	}
 }
@@ -405,7 +405,7 @@ func TestSetWebhookRegistersURLWithSecret(t *testing.T) {
 	if sent.method != "setWebhook" || sent.params["url"] != "https://bot.example/api/webhook" || sent.params["secret_token"] != "s3cret" {
 		t.Errorf("call = %+v", sent)
 	}
-	if allowed, _ := sent.params["allowed_updates"].([]any); len(allowed) != 6 || allowed[0] != "message" || allowed[1] != "my_chat_member" || allowed[2] != "chat_member" || allowed[3] != "callback_query" || allowed[4] != "poll" || allowed[5] != "poll_answer" {
+	if allowed, _ := sent.params["allowed_updates"].([]any); len(allowed) != 4 || allowed[0] != "message" || allowed[1] != "my_chat_member" || allowed[2] != "chat_member" || allowed[3] != "callback_query" {
 		t.Errorf("allowed_updates = %v", sent.params["allowed_updates"])
 	}
 }
@@ -1110,18 +1110,18 @@ func TestSendMessageSendsButtons(t *testing.T) {
 	}
 }
 
-// A webhook set before button presses were asked for is set again, at the
-// same address with the secret; one already asking for every kind, or no
-// webhook at all, is left alone.
+// A webhook asking for other kinds than the bot handles, too few or the
+// quizzes' polls, is set again, at the same address with the secret; one
+// asking for exactly them, or no webhook at all, is left alone.
 func TestEnsureAllowedUpdatesSetsAnOldWebhookAgain(t *testing.T) {
 	cases := map[string]struct {
 		info    string
 		changed bool
 	}{
-		"old kinds":      {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member"]}}`, true},
-		"before quizzes": {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query"]}}`, true},
-		"every kind":     {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","poll","poll_answer"]}}`, false},
-		"no webhook":     {`{"ok":true,"result":{"url":""}}`, false},
+		"old kinds":       {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member"]}}`, true},
+		"with quiz polls": {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","poll","poll_answer"]}}`, true},
+		"every kind":      {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query"]}}`, false},
+		"no webhook":      {`{"ok":true,"result":{"url":""}}`, false},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -1143,18 +1143,6 @@ func TestEnsureAllowedUpdatesSetsAnOldWebhookAgain(t *testing.T) {
 				t.Errorf("calls = %+v", calls)
 			}
 		})
-	}
-}
-
-// A timed quiz question closes by itself, and its poll's ID comes back.
-func TestSendQuizQuestionReturnsThePollID(t *testing.T) {
-	client, api := newTestClient(t, `{"ok":true,"result":{"message_id":90,"poll":{"id":"5432","question":"Q","options":[{"text":"a"},{"text":"b"}],"is_closed":false}}}`)
-	id, err := client.SendQuizQuestion(context.Background(), OutgoingPoll{ChatID: 5005, Question: "Q", Options: []string{"a", "b"}, Quiz: true, Correct: 0, OpenPeriod: 30})
-	if err != nil || id != "5432" {
-		t.Fatalf("id = %q, %v", id, err)
-	}
-	if sent := api.recorded()[0]; sent.params["open_period"] != float64(30) {
-		t.Errorf("params = %v", sent.params)
 	}
 }
 

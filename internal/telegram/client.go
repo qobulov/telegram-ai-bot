@@ -64,7 +64,7 @@ func NewClient(opts Options) *Client {
 // changes to its own membership, which keep its list of groups true, and,
 // where it is an admin, changes to other members', which keep its list of
 // each group's members true.
-var allowedUpdates = []string{"message", "my_chat_member", "chat_member", "callback_query", "poll", "poll_answer"}
+var allowedUpdates = []string{"message", "my_chat_member", "chat_member", "callback_query"}
 
 type getUpdatesParams struct {
 	Offset         int64    `json:"offset"`
@@ -125,19 +125,17 @@ func (c *Client) EnsureAllowedUpdates(ctx context.Context, secret string) (chang
 	if err := c.call(ctx, "getWebhookInfo", struct{}{}, &info); err != nil {
 		return false, err
 	}
-	if info.URL == "" || containsAll(info.AllowedUpdates, allowedUpdates) {
+	if info.URL == "" || sameKinds(info.AllowedUpdates, allowedUpdates) {
 		return false, nil
 	}
 	return true, c.SetWebhook(ctx, info.URL, secret)
 }
 
-func containsAll(have, want []string) bool {
-	for _, w := range want {
-		if !slices.Contains(have, w) {
-			return false
-		}
-	}
-	return true
+// sameKinds reports whether have asks for exactly the kinds in want, so
+// that kinds the bot no longer handles, such as the quizzes' polls, stop
+// coming too.
+func sameKinds(have, want []string) bool {
+	return len(have) == len(want) && !slices.ContainsFunc(want, func(w string) bool { return !slices.Contains(have, w) })
 }
 
 type answerCallbackParams struct {
@@ -848,18 +846,8 @@ func (c *Client) SendPoll(ctx context.Context, poll OutgoingPoll) (int64, error)
 	return sent.MessageID, err
 }
 
-// SendQuizQuestion sends a poll or a quiz and returns the ID of the poll,
-// by which its answers and its closing come back.
-func (c *Client) SendQuizQuestion(ctx context.Context, poll OutgoingPoll) (string, error) {
-	sent, err := c.sendPoll(ctx, poll)
-	return sent.Poll.ID, err
-}
-
 type sentPoll struct {
 	MessageID int64 `json:"message_id"`
-	Poll      struct {
-		ID string `json:"id"`
-	} `json:"poll"`
 }
 
 func (c *Client) sendPoll(ctx context.Context, poll OutgoingPoll) (sentPoll, error) {

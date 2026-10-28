@@ -19,7 +19,6 @@ var commandMenus = map[string][]telegram.BotCommand{
 	telegram.ScopeDefault: {
 		{Command: "start", Description: "Salomlashish"},
 		{Command: "help", Description: "Yordam va buyruqlar"},
-		{Command: "stop", Description: "Ishlayotgan testni to'xtatish"},
 		{Command: "about", Description: "Bot haqida"},
 	},
 	telegram.ScopeAllGroupChats: {

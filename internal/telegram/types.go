@@ -18,18 +18,6 @@ type Update struct {
 	ChatMember   *ChatMemberUpdated `json:"chat_member"`
 	// CallbackQuery is a press of a button under one of the bot's messages.
 	CallbackQuery *CallbackQuery `json:"callback_query"`
-	// Poll is a new state of a poll the bot sent, such as a quiz closing
-	// when its time is up; PollAnswer is someone's answer to a poll the bot
-	// sent that is not anonymous.
-	Poll       *Poll       `json:"poll"`
-	PollAnswer *PollAnswer `json:"poll_answer"`
-}
-
-// PollAnswer is an answer to a poll that is not anonymous.
-type PollAnswer struct {
-	PollID    string `json:"poll_id"`
-	User      *User  `json:"user"`
-	OptionIDs []int  `json:"option_ids"`
 }
 
 // CallbackQuery is a press of a button with callback data: who pressed it,

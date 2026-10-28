@@ -25,7 +25,6 @@ var profileTexts = map[string]profileText{
 			"• Valyuta kursi, ob-havo, namoz vaqtlari, yangiliklarni topaman\n" +
 			"• Mobile Legends: qahramonlar, build, skin, counter\n" +
 			"• Qo'shiq, kino va video qidiraman\n" +
-			"• Test faylini guruhda viktorinaga aylantiraman\n" +
 			"• Guruhda moderatsiya: o'chirish, mute, ban\n\n" +
 			"Guruhga qo'shing va ismim bilan chaqiring. /help — barcha imkoniyatlar.",
 	},
@@ -36,7 +35,6 @@ var profileTexts = map[string]profileText{
 			"• Курсы валют, погода, время намаза, новости\n" +
 			"• Mobile Legends: герои, сборки, скины, контрпики\n" +
 			"• Ищу песни, фильмы и видео\n" +
-			"• Превращаю файл с тестом в викторину в группе\n" +
 			"• Модерация группы: удаление, мут, бан\n\n" +
 			"Добавьте меня в группу и позовите по имени. /help — все возможности.",
 	},
@@ -47,7 +45,6 @@ var profileTexts = map[string]profileText{
 			"• Exchange rates, weather, prayer times, news\n" +
 			"• Mobile Legends: heroes, builds, skins, counters\n" +
 			"• I find songs, films and videos\n" +
-			"• I turn a test file into a quiz in a group\n" +
 			"• Group moderation: delete, mute, ban\n\n" +
 			"Add me to a group and call me by name. /help shows everything.",
 	},

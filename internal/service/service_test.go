@@ -444,12 +444,12 @@ func expectOneReply(t *testing.T, sent []sentMessage, want string) {
 func TestCommandsReply(t *testing.T) {
 	cases := map[string]string{
 		"/start":       "/help",
-		"/help":        "/stop",
+		"/help":        "/about",
 		"/about":       "Maria",
 		"/model":       "/help",
 		"/model@mybot": "/help",
-		"/HELP":        "/stop",
-		"/help extra":  "/stop",
+		"/HELP":        "/about",
+		"/help extra":  "/about",
 		"/unknown":     "/help",
 	}
 	for command, want := range cases {
@@ -793,7 +793,7 @@ func TestCloseRefusesQueuedUpdatesInsteadOfRunningThem(t *testing.T) {
 
 func TestHelpTextListsEveryCommand(t *testing.T) {
 	help := HelpText(Abilities{})
-	for _, command := range []string{"/start", "/help", "/stop", "/about"} {
+	for _, command := range []string{"/start", "/help", "/about"} {
 		if !strings.Contains(help, command) {
 			t.Errorf("help text does not mention %s", command)
 		}
@@ -819,13 +819,13 @@ func TestHelpMentionsModerationAndPolls(t *testing.T) {
 	for _, want := range []string{
 		"Uzbek", "Russian", "English",
 		"photos", "stickers", "GIFs", "round videos",
-		"tell the time anywhere", "make a poll in a group", "Send a test file",
+		"tell the time anywhere", "make a poll in a group",
 	} {
 		if !strings.Contains(help, want) {
 			t.Errorf("help text does not mention %q", want)
 		}
 	}
-	for _, gone := range []string{"presentation", "arithmetic", "derivatives", "exact math"} {
+	for _, gone := range []string{"presentation", "arithmetic", "derivatives", "exact math", "test file", "/stop"} {
 		if strings.Contains(help, gone) {
 			t.Errorf("help still offers %s, which the bot no longer does", gone)
 		}
@@ -865,7 +865,7 @@ func TestHelpPromisesOnlyWhatTheBotCanDo(t *testing.T) {
 
 			sent := f.run(textFrom(userID, "/help"))
 
-			expectOneReply(t, sent, "/stop")
+			expectOneReply(t, sent, "/about")
 			if got := strings.Contains(sent[0].text, "rasm chizaman"); got != tc.draw {
 				t.Errorf("offers drawing = %t, want %t:\n%s", got, tc.draw, sent[0].text)
 			}
@@ -1596,7 +1596,7 @@ func TestPostsOnBehalfOfAChatAreIgnored(t *testing.T) {
 func TestPrivateCommandWithNewLine(t *testing.T) {
 	f := newFixture()
 
-	expectOneReply(t, f.run(textFrom(userID, "/help\nplease")), "/stop")
+	expectOneReply(t, f.run(textFrom(userID, "/help\nplease")), "/about")
 }
 
 func TestGroupMessageCannotForgeOtherSpeakersOrMarkers(t *testing.T) {

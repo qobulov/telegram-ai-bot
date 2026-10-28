@@ -667,10 +667,6 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	if notice, joined := s.joinedChannels(ctx, in); !joined {
 		return notice
 	}
-	// A test file is run in code, with no call to the model.
-	if out, ok := s.quizFromFile(ctx, in); ok {
-		return out
-	}
 	if out, ok := s.quickAnswer(ctx, in); ok {
 		return out
 	}
@@ -810,10 +806,6 @@ func (s *Service) start(ctx context.Context, in incoming) outcome {
 // thanks once every channel is joined, and otherwise a box asks to join
 // them first; nothing is written in the chat either way.
 func (s *Service) pressed(q *telegram.CallbackQuery) {
-	if isQuizButton(q.Data) {
-		s.pressedQuiz(q)
-		return
-	}
 	if s.opts.Buttons == nil || q.From == nil || q.Message == nil || q.Data != checkPayload {
 		return
 	}
@@ -1266,11 +1258,6 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 			return textUnknown.to(in)
 		}
 		return fmt.Sprintf(textModel, s.opts.Model)
-	case "/stop":
-		if s.stopQuiz(ctx, in) {
-			return ""
-		}
-		return textNoQuizToStop.to(in)
 	case "/mute":
 		return s.setMuted(ctx, in, true)
 	case "/unmute":

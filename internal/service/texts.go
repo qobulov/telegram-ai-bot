@@ -206,7 +206,6 @@ Suhbatimizning oxirgi qismini eslab qolaman. %s %s
 Buyruqlar:
 /start — salomlashish
 /help — shu yordam
-/stop — ishlayotgan testni to'xtatish
 /about — bot haqida
 
 Guruhda meni ismim bilan chaqiring, @username bilan belgilang yoki xabarimga reply qiling. U yerda buyruqqa username qo'shiladi: /help@username. Guruh men bilan bitta umumiy suhbatda.
@@ -223,7 +222,6 @@ A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yo
 Команды:
 /start — приветствие
 /help — эта справка
-/stop — остановить идущий тест
 /about — о боте
 
 В группе зовите меня по имени, упоминайте (@username) или отвечайте на моё сообщение. Там к команде добавляется username: /help@username. У группы со мной один общий разговор.
@@ -240,7 +238,6 @@ I remember the recent part of our conversation. %s %s
 Commands:
 /start — welcome message
 /help — this help
-/stop — stop a running test
 /about — about this bot
 
 In a group, call me by name, mention me (@username) or reply to one of my messages. Commands there need my username, like /help@username. A group shares one conversation with me.
@@ -259,24 +256,24 @@ var helpAbilities = map[string][6]string{
 	"uz": {
 		"Rasm, stiker va GIF'larni, video va dumaloq videolarning bir kadrini ko'raman, PDF, Word va matnli fayllarni o'qiyman.",
 		"Rasm, stiker va GIF'larni, video va dumaloq videolarning bir kadrini ko'raman, ovozli xabarlarni eshitaman, PDF, Word va matnli fayllarni o'qiyman.",
-		"Istalgan joyning vaqtini aytaman, guruhda so'rovnoma tuzaman. Test faylini (.doc, .docx, .pdf, savollar ==== va ++++ bilan, to'g'ri javob # bilan) yuborsangiz, uni 30 talik qismlarga bo'lib, har savolga 30 soniyali test qilib beraman.",
-		"So'rasangiz rasm chizaman, istalgan joyning vaqtini aytaman, guruhda so'rovnoma tuzaman. Test faylini (.doc, .docx, .pdf, savollar ==== va ++++ bilan, to'g'ri javob # bilan) yuborsangiz, uni 30 talik qismlarga bo'lib, har savolga 30 soniyali test qilib beraman.",
+		"Istalgan joyning vaqtini aytaman, guruhda so'rovnoma tuzaman.",
+		"So'rasangiz rasm chizaman, istalgan joyning vaqtini aytaman, guruhda so'rovnoma tuzaman.",
 		"Valyuta kursi, ob-havo, namoz vaqtlari, yangiliklar, Vikipediya va kripto narxlarini, Mobile Legends qahramonlari statistikasi, build va skinlarini topaman, qo'shiq, kino va video qidiraman, havoladagi maqolani o'qib beraman, Qur'on oyatlarini ma'nosi bilan topaman. Viktorina savoli, qiziq fakt, kitob, retsept, oltin narxi, shaxmat va Formula 1 natijalarini ham topaman. O'qish uchun: ilmiy maqolalar, inglizcha sinonimlar va davlatlar statistikasi.",
 		"Valyuta kursi, ob-havo, namoz vaqtlari, yangiliklar, Vikipediya, futbol natijalari va kripto narxlarini, Mobile Legends qahramonlari statistikasi, build va skinlarini topaman, qo'shiq, kino va video qidiraman, havoladagi maqolani o'qib beraman, Qur'on oyatlarini ma'nosi bilan topaman. Viktorina savoli, qiziq fakt, kitob, retsept, oltin narxi, shaxmat va Formula 1 natijalarini ham topaman. O'qish uchun: ilmiy maqolalar, inglizcha sinonimlar va davlatlar statistikasi.",
 	},
 	"ru": {
 		"Вижу фото, стикеры и GIF, кадр из видео и кружочков, читаю PDF, Word и текстовые файлы.",
 		"Вижу фото, стикеры и GIF, кадр из видео и кружочков, слушаю голосовые, читаю PDF, Word и текстовые файлы.",
-		"Скажу время в любой точке, сделаю опрос в группе. Пришлите файл с тестом (.doc, .docx, .pdf: вопросы через ==== и ++++, верный ответ с #), и я разделю его на части по 30 вопросов по 30 секунд.",
-		"Нарисую картинку по просьбе, скажу время в любой точке, сделаю опрос в группе. Пришлите файл с тестом (.doc, .docx, .pdf: вопросы через ==== и ++++, верный ответ с #), и я разделю его на части по 30 вопросов по 30 секунд.",
+		"Скажу время в любой точке, сделаю опрос в группе.",
+		"Нарисую картинку по просьбе, скажу время в любой точке, сделаю опрос в группе.",
 		"Найду курсы валют, погоду, время намаза, новости, Википедию и цены криптовалют, статистику, сборки и скины героев Mobile Legends, песни, фильмы и видео, прочитаю статью по ссылке, найду аяты Корана с переводом. А ещё вопрос для викторины, интересный факт, книги, рецепты, цену золота, шахматы и Формулу 1. Для учёбы: научные статьи, английские синонимы и статистика стран.",
 		"Найду курсы валют, погоду, время намаза, новости, Википедию, результаты футбола и цены криптовалют, статистику, сборки и скины героев Mobile Legends, песни, фильмы и видео, прочитаю статью по ссылке, найду аяты Корана с переводом. А ещё вопрос для викторины, интересный факт, книги, рецепты, цену золота, шахматы и Формулу 1. Для учёбы: научные статьи, английские синонимы и статистика стран.",
 	},
 	"en": {
 		"I can see photos, stickers and GIFs, a frame of videos and round videos, and read PDF, Word and text files.",
 		"I can see photos, stickers and GIFs, a frame of videos and round videos; I listen to voice messages and read PDF, Word and text files.",
-		"I can tell the time anywhere and make a poll in a group. Send a test file (.doc, .docx, .pdf: questions split by ==== and ++++, the right answer marked #) and I will run it in parts of 30, 30 seconds a question.",
-		"I can draw a picture when you ask, tell the time anywhere and make a poll in a group. Send a test file (.doc, .docx, .pdf: questions split by ==== and ++++, the right answer marked #) and I will run it in parts of 30, 30 seconds a question.",
+		"I can tell the time anywhere and make a poll in a group.",
+		"I can draw a picture when you ask, tell the time anywhere and make a poll in a group.",
 		"I can look up exchange rates, the weather, prayer times, news headlines, Wikipedia and crypto prices, Mobile Legends hero statistics, builds and skins, find songs, films and videos, read an article from a link, and find Quran verses with their meaning. Also trivia questions, fun facts, books, recipes, the gold price, chess and Formula 1 results. For study: scholarly papers, English synonyms and country statistics.",
 		"I can look up exchange rates, the weather, prayer times, news headlines, Wikipedia, football results and crypto prices, Mobile Legends hero statistics, builds and skins, find songs, films and videos, read an article from a link, and find Quran verses with their meaning. Also trivia questions, fun facts, books, recipes, the gold price, chess and Formula 1 results. For study: scholarly papers, English synonyms and country statistics.",
 	},
@@ -314,70 +311,3 @@ func HelpTextIn(lang string, abilities Abilities) string {
 	}
 	return fmt.Sprintf(helpTexts[lang], pick(0, abilities.Listen), pick(2, abilities.Draw), pick(4, abilities.Football))
 }
-
-// The texts of tests sent as files (see quizrun.go).
-var (
-	textQuizUntitled = localText{uz: "Test", ru: "Тест", en: "Test"}
-	textQuizFailed   = localText{
-		uz: "Testni saqlab bo'lmadi. Birozdan keyin faylni qayta yuboring.",
-		ru: "Не удалось сохранить тест. Пришлите файл чуть позже.",
-		en: "The test could not be kept. Send the file again a little later.",
-	}
-	// textQuizParts takes the title, the questions, the parts and their size.
-	textQuizParts = localText{
-		uz: "📚 «%s»\n\n✏️ %d ta savol, %d qism (%d tadan).\nQaysi qismdan boshlaymiz?",
-		ru: "📚 «%s»\n\n✏️ Вопросов: %d, частей: %d (по %d).\nС какой части начнём?",
-		en: "📚 “%s”\n\n✏️ %d questions, %d parts (%d each).\nWhich part shall we start with?",
-	}
-	textQuizBroken = localText{
-		uz: "⚠️ %d ta savolda to'g'ri javob (#) topilmadi yoki bir nechta belgilangan, ular tashlab ketildi.",
-		ru: "⚠️ Пропущено вопросов: %d. В них не найден правильный ответ (#) или отмечено несколько.",
-		en: "⚠️ Questions left out: %d. Their right answer (#) was not found, or more than one was marked.",
-	}
-	textQuizMadeOptions = localText{
-		uz: "ℹ️ Faylda faqat to'g'ri javoblar bor ekan. Boshqa variantlarni shu testdagi yaqin savollarning javoblaridan oldim.",
-		ru: "ℹ️ В файле только правильные ответы. Остальные варианты взяты из ответов на соседние вопросы этого теста.",
-		en: "ℹ️ The file gives only the right answers. The other options are the answers to nearby questions in this test.",
-	}
-	// textQuizPartButton takes the part and its first and last question.
-	textQuizPartButton = localText{uz: "%d-qism (%d–%d)", ru: "Часть %d (%d–%d)", en: "Part %d (%d–%d)"}
-	textQuizGone       = localText{
-		uz: "Bu test topilmadi. Faylni qayta yuboring.",
-		ru: "Этот тест не найден. Пришлите файл снова.",
-		en: "This test was not found. Send the file again.",
-	}
-	// textQuizReady takes the title, the part, its questions and the seconds.
-	textQuizReady = localText{
-		uz: "🎲 «%s», %d-qism\n\n✏️ %d ta savol\n⏱ Har bir savolga %d soniya\n\n🏁 Tayyor bo'lsangiz, tugmani bosing. To'xtatish uchun: /stop",
-		ru: "🎲 «%s», часть %d\n\n✏️ Вопросов: %d\n⏱ На каждый вопрос %d секунд\n\n🏁 Когда будете готовы, нажмите кнопку. Остановить: /stop",
-		en: "🎲 “%s”, part %d\n\n✏️ %d questions\n⏱ %d seconds for each\n\n🏁 Press the button when you are ready. To stop: /stop",
-	}
-	textQuizReadyButton = localText{uz: "Men tayyorman!", ru: "Я готов!", en: "I'm ready!"}
-	textQuizPaused      = localText{
-		uz: "⏸ Ikki savolga javob bo'lmadi, test to'xtatildi. Davom ettirish uchun tugmani bosing.",
-		ru: "⏸ Два вопроса остались без ответа, тест приостановлен. Чтобы продолжить, нажмите кнопку.",
-		en: "⏸ Two questions went unanswered, so the test is paused. Press the button to go on.",
-	}
-	textQuizResumeButton = localText{uz: "▶️ Davom etish", ru: "▶️ Продолжить", en: "▶️ Continue"}
-	textQuizPickLetter   = localText{uz: "To'g'ri javobni tanlang", ru: "Выберите правильный ответ", en: "Pick the right answer"}
-	// textQuizResults takes the title, the part, the answers, the right,
-	// wrong and missed ones, and the minutes and seconds taken.
-	textQuizResults = localText{
-		uz: "🏁 «%s», %d-qism yakunlandi!\n\nSiz %d ta savolga javob berdingiz:\n\n✅ To'g'ri: %d\n❌ Xato: %d\n⌛ Tashlab ketilgan: %d\n⏱ %d daqiqa %d soniya",
-		ru: "🏁 «%s», часть %d завершена!\n\nВы ответили на вопросы: %d\n\n✅ Верно: %d\n❌ Неверно: %d\n⌛ Пропущено: %d\n⏱ %d мин %d сек",
-		en: "🏁 “%s”, part %d is over!\n\nYou answered %d questions:\n\n✅ Right: %d\n❌ Wrong: %d\n⌛ Missed: %d\n⏱ %d min %d s",
-	}
-	// textQuizRank takes how many took the part and the place.
-	textQuizRank = localText{
-		uz: "🏆 %d tadan %d-o'rin. Qayta ishlasangiz, bu o'rin o'zgarmaydi.",
-		ru: "🏆 Из %d участников вы на %d-м месте. Повторные попытки его не меняют.",
-		en: "🏆 Of %d people, you are number %d. Trying again does not change it.",
-	}
-	textQuizAgainButton = localText{uz: "🔁 Qayta urinish", ru: "🔁 Ещё раз", en: "🔁 Try again"}
-	textQuizNextButton  = localText{uz: "➡️ Keyingi qism", ru: "➡️ Следующая часть", en: "➡️ Next part"}
-	textNoQuizToStop    = localText{
-		uz: "Hozir ishlayotgan test yo'q. Test faylini (.doc, .docx, .pdf) yuboring, men uni qismlarga bo'lib beraman.",
-		ru: "Сейчас нет идущего теста. Пришлите файл с тестом (.doc, .docx, .pdf), я разделю его на части.",
-		en: "No test is running. Send a test file (.doc, .docx, .pdf) and I will split it into parts.",
-	}
-)
