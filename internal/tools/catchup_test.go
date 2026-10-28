@@ -54,7 +54,7 @@ func TestCatchUpStartsAfterTheAskersLastMessage(t *testing.T) {
 	log := &fakeGroupLog{messages: []storage.GroupMessage{
 		logged(10, memberID, "Bek", "kecha nima bo'ldi", 5*time.Hour),
 		logged(11, userID, "Ali", "men ketdim", 4*time.Hour),
-		logged(12, memberID, "Bek", "ertaga futbol 18:00 da", 3*time.Hour),
+		logged(12, memberID, "Bek @bek", "(to Ali @ali) ertaga futbol 18:00 da", 3*time.Hour),
 		logged(0, rulesBotID, "You", "zo'r", 3*time.Hour),
 		logged(50, userID, "Ali", "Maria nima gaplashdilar", time.Minute),
 	}}
@@ -62,7 +62,7 @@ func TestCatchUpStartsAfterTheAskersLastMessage(t *testing.T) {
 	if !got.OK || log.asked != groupA {
 		t.Fatalf("got %+v, read chat %d", got, log.asked)
 	}
-	want := []string{"12:04 Bek: ertaga futbol 18:00 da", "12:04 You: zo'r", "15:03 Ali: Maria nima gaplashdilar"}
+	want := []string{"12:04 Bek bek: (to Ali ali) ertaga futbol 18:00 da", "12:04 You: zo'r", "15:03 Ali: Maria nima gaplashdilar"}
 	if strings.Join(result.Messages, "|") != strings.Join(want, "|") || result.From != "16 Oct 12:04" {
 		t.Errorf("result = %+v", result)
 	}

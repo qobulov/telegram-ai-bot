@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"telegram-ai-bot/internal/storage"
@@ -124,15 +125,18 @@ func afterOwnLast(messages []storage.GroupMessage, caller Caller) []storage.Grou
 	return messages
 }
 
-// recap writes messages as "15:04 Name: text", the newest that fit in
-// catchUpBudget once encoded, as JSON writes "<" in six bytes.
+// recap writes messages as "15:04 Name: text", without "@": the log's
+// "Ann @ann" written back into the recap would tag everyone in it. It keeps
+// the newest that fit in catchUpBudget once encoded, as JSON writes "<" in
+// six bytes.
 func recap(messages []storage.GroupMessage, location *time.Location) catchUpResult {
 	if len(messages) == 0 {
 		return catchUpResult{Messages: []string{}, Note: catchUpEmptyNote}
 	}
 	lines := make([]string, len(messages))
 	for i, m := range messages {
-		lines[i] = m.SentAt.In(location).Format(catchUpTimeLayout) + " " + m.AuthorName + ": " + cutRunes(m.Text, catchUpLineRunes)
+		line := m.SentAt.In(location).Format(catchUpTimeLayout) + " " + m.AuthorName + ": " + cutRunes(m.Text, catchUpLineRunes)
+		lines[i] = strings.ReplaceAll(line, "@", "")
 	}
 	size, first := 0, len(lines)
 	for first > 0 {
