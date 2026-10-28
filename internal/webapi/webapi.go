@@ -107,6 +107,7 @@ type BaseURLs struct {
 	Shikimori         string
 	TraceMoe          string
 	SteamStore        string
+	SteamAPI          string
 	WorldBank         string
 	JokeAPI           string
 	LaunchLibrary     string
@@ -164,6 +165,7 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.Shikimori = cmp.Or(b.Shikimori, "https://shikimori.io")
 	b.TraceMoe = cmp.Or(b.TraceMoe, "https://api.trace.moe")
 	b.SteamStore = cmp.Or(b.SteamStore, "https://store.steampowered.com")
+	b.SteamAPI = cmp.Or(b.SteamAPI, "https://api.steampowered.com")
 	b.WorldBank = cmp.Or(b.WorldBank, "https://api.worldbank.org")
 	b.JokeAPI = cmp.Or(b.JokeAPI, "https://v2.jokeapi.dev")
 	b.LaunchLibrary = cmp.Or(b.LaunchLibrary, "https://ll.thespacedevs.com")

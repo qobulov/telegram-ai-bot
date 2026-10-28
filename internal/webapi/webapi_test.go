@@ -166,6 +166,7 @@ func (u *upstream) options() Options {
 			Shikimori:         base + "/shikimori",
 			TraceMoe:          base + "/tracemoe",
 			SteamStore:        base + "/steam",
+			SteamAPI:          base + "/steamapi",
 			WorldBank:         base + "/worldbank",
 			JokeAPI:           base + "/jokeapi",
 			LaunchLibrary:     base + "/ll2",
