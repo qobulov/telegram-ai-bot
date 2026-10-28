@@ -87,6 +87,7 @@ func startWebhook(t *testing.T) *hookEnv {
 	t.Cleanup(modelServer.Close)
 	env.baseEnv = map[string]string{
 		"TELEGRAM_BOT_TOKEN":      "1:test",
+		"MLBB_NEW_HEROES":         "false",
 		"TELEGRAM_API_URL":        telegramServer.URL,
 		"TELEGRAM_WEBHOOK_SECRET": hookSecret,
 		"GEMINI_API_KEY":          "test",

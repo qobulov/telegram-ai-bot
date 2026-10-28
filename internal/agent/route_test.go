@@ -130,3 +130,44 @@ func TestRouterReadsTheRecentConversation(t *testing.T) {
 		t.Error("no history is not (none)")
 	}
 }
+
+// A question about a game's heroes skips the router and takes the full
+// path; words in the quote do not count, only the asker's own.
+func TestGameQuestionsSkipTheRouter(t *testing.T) {
+	for msg, full := range map[string]bool{
+		"Ali: voyd ni uzum market versiyasi mlbb dagi kim": true,
+		"Ali: Хирара легаси борми":                         true,
+		"Ali: dotada kim kuchli":                           true,
+		"[Your earlier message that the user is replying to.]\nMLBB build\n[End of quoted message]\n\nAli: rahmat": false,
+		"Ali: superhero filmi zo'r": false,
+	} {
+		f, router, _ := routedFixture("CHAT", text("chat"), text("full"))
+		req := request(1, msg)
+		req.Group = true
+
+		answer, err := f.agent.Reply(context.Background(), req)
+
+		if err != nil || (answer.Route == RouteFull) != full || (len(router.requests) == 0) != full {
+			t.Errorf("%q: route %q, router asked %d times; want full %v", msg, answer.Route, len(router.requests), full)
+		}
+	}
+}
+
+// A game question carries the reminder to check heroes in the request, but
+// the saved question is the plain text.
+func TestGameQuestionsRemindToCheckHeroes(t *testing.T) {
+	f, _, _ := routedFixture("CHAT", text("chat"), text("full"))
+	req := request(1, "Ali: voyd ni mlbb dagi versiyasi kim")
+	req.Group = true
+
+	if _, err := f.agent.Reply(context.Background(), req); err != nil {
+		t.Fatal(err)
+	}
+	sent := f.model.requests[0].Messages
+	if question := sent[len(sent)-1].Content; !strings.Contains(question, heroCheckNote) {
+		t.Errorf("question sent = %q", question)
+	}
+	if saved := f.store.history[testScope]; len(saved) == 0 || strings.Contains(saved[0].Content, heroCheckNote) {
+		t.Errorf("saved = %+v", saved)
+	}
+}

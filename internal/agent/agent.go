@@ -284,8 +284,16 @@ func (a *Agent) prompt(t *turn) []ai.Message {
 		question.Content = t.req.Context + "\n\n" + question.Content
 	}
 	question.Parts = t.req.Attachments
+	if gameWords.MatchString(ownLine(t.req.Text)) {
+		question.Content += "\n\n" + heroCheckNote
+	}
 	return messages
 }
+
+// heroCheckNote goes with a question about a game's heroes, in that request
+// only: told in the persona alone, the model still named heroes from memory,
+// one of them made up, for a question asked as a joke.
+const heroCheckNote = "[Before you name, deny or compare any game hero in your answer, check it: Mobile Legends heroes with the mlbb tool (hero, or heroes for a list by role), another game's with web_search. Never from memory, even for a joke.]"
 
 func (a *Agent) systemPrompt(req Request) string {
 	if req.Group {

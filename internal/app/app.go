@@ -234,7 +234,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Router:       router,
 		ChatModel:    chat,
 		Name:         cfg.BotDisplayName,
-		Persona:      cfg.PersonaPrompt,
+		Persona:      withNewHeroes(cfg, bot),
 		GroupNote:    cfg.GroupNote,
 		MaxHistory:   cfg.MaxHistoryMessages,
 		MaxToolCalls: cfg.MaxToolCallsPerTurn,
@@ -405,6 +405,25 @@ func checker(cfg config.Config) *guards.Checker {
 		SightengineUser:   cfg.SightengineUser,
 		SightengineSecret: cfg.SightengineSecret,
 	})
+}
+
+// newHeroesWait bounds asking MLBBDex for the newest heroes at start.
+const newHeroesWait = 3 * time.Second
+
+// withNewHeroes is the persona with the Mobile Legends heroes released
+// lately, which the model does not know: it denied Marcel and left him out
+// of comparisons. Without an answer the persona goes as it is.
+func withNewHeroes(cfg config.Config, bot Bot) string {
+	if !cfg.NewHeroes {
+		return cfg.PersonaPrompt
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), newHeroesWait)
+	defer cancel()
+	note := webapi.NewHeroesNote(ctx, webapi.Options{UserAgent: "MariaBot/1.0 (+https://t.me/" + bot.User.Username + ")"}, time.Now())
+	if note == "" {
+		return cfg.PersonaPrompt
+	}
+	return cfg.PersonaPrompt + "\n\n" + note
 }
 
 // liveDataTools look things up on public web APIs: rates, weather, prayer

@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"telegram-ai-bot/internal/tools"
 )
@@ -704,4 +705,24 @@ func TestMLBBDraft(t *testing.T) {
 		t.Errorf("why = %q", out.Picks[0].Why)
 	}
 	wantError(t, run(t, u.options(), "mlbb", `{"action":"draft"}`), "invalid_arguments", "enemies")
+}
+
+// The persona's note names the heroes of the last two years with their
+// roles, and nothing when MLBBDex does not answer.
+func TestNewHeroesNote(t *testing.T) {
+	u := newUpstream(t, map[string]stub{"/dex/api/v1/heroes": ok(`{"data":[
+		{"slug":"marcel","name":"Marcel","title":"Soul Photographer","roles":["Support"],"specialties":["Crowd Control"],"skills":["Platinum Snap","Golden Hour","Golden Hour"],"release":"11 March 2026"},
+		{"slug":"ling","name":"Ling","roles":["Assassin"],"release":"24 November 2019"},
+		{"slug":"future","name":"Future","roles":["Mage"],"release":"1 January 2030"},
+		{"slug":"odd","name":"Odd","roles":["Tank"],"release":"soon"}]}`)})
+	now := time.Date(2026, 10, 28, 12, 0, 0, 0, time.UTC)
+
+	note := NewHeroesNote(context.Background(), u.options(), now)
+
+	if !strings.Contains(note, "Marcel, Soul Photographer (Support; Crowd Control; skills Platinum Snap, Golden Hour; March 2026)") || strings.Contains(note, "Ling") || strings.Contains(note, "Future") || strings.Contains(note, "Odd") {
+		t.Errorf("note = %q", note)
+	}
+	if note := NewHeroesNote(context.Background(), newUpstream(t, nil).options(), now); note != "" {
+		t.Errorf("without MLBBDex: %q", note)
+	}
 }

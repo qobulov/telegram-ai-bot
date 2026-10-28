@@ -58,6 +58,8 @@ func TestRoutingEval(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	persona := withNewHeroes(cfg, bot)
+
 	// ROUTING_EVAL_PAUSE spaces the cases, for a key whose quota counts
 	// requests a minute.
 	pause, _ := time.ParseDuration(os.Getenv("ROUTING_EVAL_PAUSE"))
@@ -70,7 +72,7 @@ func TestRoutingEval(t *testing.T) {
 		// ROUTING_EVAL_RUN names tools that only read, such as mlbb, to run.
 		offered := &evalTools{registry: registry, run: strings.Split(os.Getenv("ROUTING_EVAL_RUN"), ",")}
 		a := agent.New(agent.Options{Store: store, Model: main, Tools: offered, Router: router, ChatModel: chat, Name: cfg.BotDisplayName,
-			Persona: cfg.PersonaPrompt, GroupNote: cfg.GroupNote, MaxHistory: 20, MaxToolCalls: cfg.MaxToolCallsPerTurn})
+			Persona: persona, GroupNote: cfg.GroupNote, MaxHistory: 20, MaxToolCalls: cfg.MaxToolCallsPerTurn})
 		caller := tools.Caller{ChatID: -100, UserID: 5000, Human: true, UpdateID: int64(c.ID), Words: c.ownWords()}
 		if c.fromOwner() {
 			caller.UserID, caller.Owner = 1688909825, true

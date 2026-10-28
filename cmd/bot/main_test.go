@@ -143,6 +143,7 @@ func startE2E(t *testing.T, update string, answer func([]modelMessage) string) *
 	cfg, err := config.Load(func(key string) string {
 		return map[string]string{
 			"TELEGRAM_BOT_TOKEN":      "1:test",
+			"MLBB_NEW_HEROES":         "false",
 			"TELEGRAM_API_URL":        telegramServer.URL,
 			"GEMINI_API_KEY":          "test",
 			"GEMINI_BASE_URL":         modelServer.URL,

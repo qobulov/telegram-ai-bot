@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"golang.org/x/image/webp"
 
@@ -96,10 +97,44 @@ type mlbbHeroesOutput struct {
 }
 
 type dexListHero struct {
-	Slug  string   `json:"slug"`
-	Name  string   `json:"name"`
-	Roles []string `json:"roles"`
-	Lanes []string `json:"lanes"`
+	Slug    string   `json:"slug"`
+	Name    string   `json:"name"`
+	Roles   []string `json:"roles"`
+	Lanes   []string `json:"lanes"`
+	Release string   `json:"release"`
+	// Title, Specialties and Skills tell the newest heroes apart for the
+	// persona's note.
+	Title       string   `json:"title"`
+	Specialties []string `json:"specialties"`
+	Skills      []string `json:"skills"`
+}
+
+// newHeroesFor is how far back a hero counts as newer than the model knows.
+const newHeroesFor = 2 * 365 * 24 * time.Hour
+
+// NewHeroesNote is a part for the persona naming the Mobile Legends heroes
+// released lately, which the model does not know and so denied or left out
+// of comparisons, or "" when MLBBDex does not answer.
+func NewHeroesNote(ctx context.Context, opts Options, now time.Time) string {
+	heroes, err := newAPIs(opts).dexHeroes(ctx)
+	if err != nil {
+		return ""
+	}
+	var named []string
+	for _, h := range heroes {
+		released, err := time.Parse("2 January 2006", strings.TrimSpace(h.Release))
+		if err != nil || now.Sub(released) > newHeroesFor || released.After(now) {
+			continue
+		}
+		named = append(named, fmt.Sprintf("%s, %s (%s; %s; skills %s; %s)", cleanText(h.Name, maxHeroName), cleanText(h.Title, maxHeroName),
+			strings.Join(nonEmpty(h.Roles), "/"), strings.Join(nonEmpty(h.Specialties), ", "),
+			strings.Join(slices.Compact(nonEmpty(h.Skills)), ", "), released.Format("January 2006")))
+	}
+	if len(named) == 0 {
+		return ""
+	}
+	return "# Mobile Legends heroes newer than you\n\nThe game has heroes released after what you learned: " + strings.Join(named, ", ") +
+		". Never deny one. Asked which hero is like another, even as a joke, weigh these too, by what their skills do: check the likely ones with mlbb hero."
 }
 
 type dexHero struct {

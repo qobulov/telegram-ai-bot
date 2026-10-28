@@ -122,6 +122,9 @@ type Config struct {
 	WakeWordTrigger bool
 	MentionTrigger  bool
 	ReplyTrigger    bool
+	// NewHeroes adds the Mobile Legends heroes released lately, from
+	// MLBBDex, to the persona at start; tests turn it off.
+	NewHeroes bool
 	// WakeWords are the names the bot answers to, in lower case.
 	WakeWords []string
 
@@ -211,6 +214,7 @@ func Load(getenv func(string) string) (Config, error) {
 		WakeWordTrigger: r.boolean("ENABLE_WAKE_WORD_TRIGGER", true),
 		MentionTrigger:  r.boolean("ENABLE_USERNAME_MENTION", true),
 		ReplyTrigger:    r.boolean("ENABLE_REPLY_TRIGGER", true),
+		NewHeroes:       r.boolean("MLBB_NEW_HEROES", true),
 
 		AmbientMessages:         r.integer("GROUP_AMBIENT_MESSAGES", 500, 0),
 		MaxGroupReplyChars:      r.positive("MAX_GROUP_REPLY_LENGTH", 4000),
