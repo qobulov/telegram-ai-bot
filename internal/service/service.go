@@ -38,11 +38,6 @@ type Replier interface {
 	Reply(ctx context.Context, req agent.Request) (agent.Answer, error)
 }
 
-// Resetter deletes one conversation's history.
-type Resetter interface {
-	Reset(ctx context.Context, scope storage.Scope) error
-}
-
 // Members answers whether a user administers a group.
 type Members interface {
 	IsGroupAdmin(ctx context.Context, chatID, userID int64) (bool, error)
@@ -129,7 +124,7 @@ type AnswerLog interface {
 }
 
 // RuleBook keeps the owners' standing rules, among them whom not to answer.
-// They live apart from the conversation, so /mute and /reset leave them.
+// They live apart from the conversation, so /mute leaves them.
 type RuleBook interface {
 	GroupRules(ctx context.Context, chatID int64) ([]storage.GroupRule, error)
 	SetGroupRule(ctx context.Context, r storage.GroupRule) (int64, error)
@@ -142,7 +137,6 @@ type RuleBook interface {
 type Options struct {
 	Sender   Sender
 	Replier  Replier
-	Resetter Resetter
 	Recorder Recorder
 	Members  Members
 	Muter    Muter

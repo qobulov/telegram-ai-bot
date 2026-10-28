@@ -12,7 +12,6 @@ import (
 // are in Uzbek, Russian and English, sent in the language of their Telegram
 // app; the owners' and admins' commands answer in English.
 const (
-	textResetDone  = "The conversation history here has been deleted."
 	textForbidden  = "This command is restricted to administrators."
 	textMuted      = "Fine, I'll be quiet here. An admin can bring me back with /unmute@%s." // the bot's username
 	textUnmuted    = "I'm back."
@@ -89,9 +88,9 @@ func appLanguage(user *telegram.User) string {
 var (
 	// textAbout names no model or company: who runs her is a secret.
 	textAbout = localText{
-		uz: "Maria — Telegram uchun AI suhbatdosh. Guruhda gaplashadi, savollarga javob beradi, Mobile Legends, kino, musiqa va boshqa narsalarni topadi.\n/help — buyruqlar va imkoniyatlar\n/reset — suhbat tarixini o'chirish",
-		ru: "Maria — AI-собеседник для Telegram. Болтает в группе, отвечает на вопросы, находит Mobile Legends, фильмы, музыку и многое другое.\n/help — команды и возможности\n/reset — удалить историю разговора",
-		en: "Maria is an AI chat character for Telegram. She chats in groups, answers questions and finds Mobile Legends stats, films, music and more.\n/help — commands and usage\n/reset — delete the conversation history",
+		uz: "Maria — Telegram uchun AI suhbatdosh. Guruhda gaplashadi, savollarga javob beradi, Mobile Legends, kino, musiqa va boshqa narsalarni topadi.\n/help — buyruqlar va imkoniyatlar",
+		ru: "Maria — AI-собеседник для Telegram. Болтает в группе, отвечает на вопросы, находит Mobile Legends, фильмы, музыку и многое другое.\n/help — команды и возможности",
+		en: "Maria is an AI chat character for Telegram. She chats in groups, answers questions and finds Mobile Legends stats, films, music and more.\n/help — commands and usage",
 	}
 	textUnknown = localText{
 		uz: "Bunday buyruqni bilmayman. Nima qila olishimni ko'rish uchun /help yuboring.",
@@ -207,7 +206,6 @@ Suhbatimizning oxirgi qismini eslab qolaman. %s %s
 Buyruqlar:
 /start — salomlashish
 /help — shu yordam
-/reset — suhbat tarixini o'chirish
 /stop — ishlayotgan testni to'xtatish
 /about — bot haqida
 
@@ -216,8 +214,7 @@ Guruhda meni ismim bilan chaqiring, @username bilan belgilang yoki xabarimga rep
 Guruh adminlari uchun:
 A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yoki ban qilishni, stiker va GIF yoki rasm yuborishini cheklashni, admin qilishni so'rang. Guruhning nomi, tavsifi, rasmi, taklif havolasi va kim nima yubora olishini ham o'zgartiraman; "orqaga qaytar" desangiz, oxirgisini qaytaraman. Buning uchun o'sha admin huquqi sizda ham, menda ham bo'lishi kerak; men darhol bajaraman.
 /mute@username, /unmute@username — guruhda jim turishim yoki qaytishim
-/ignore@username, /unignore@username — a'zoning xabariga reply qilib: unga 24 soat javob bermayman yoki yana javob beraman
-/reset@username — guruhning men bilan suhbat tarixini o'chirish`,
+/ignore@username, /unignore@username — a'zoning xabariga reply qilib: unga 24 soat javob bermayman yoki yana javob beraman`,
 	"ru": `Пишите мне: отвечаю на узбекском, русском или английском — на вашем языке.
 
 Я помню недавнюю часть нашего разговора. %s %s
@@ -226,7 +223,6 @@ A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yo
 Команды:
 /start — приветствие
 /help — эта справка
-/reset — удалить историю разговора
 /stop — остановить идущий тест
 /about — о боте
 
@@ -235,8 +231,7 @@ A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yo
 Для админов группы:
 Ответьте на сообщение участника и попросите удалить или закрепить его, замутить или забанить автора, ограничить ему стикеры и GIF или фото, сделать админом. Ещё меняю название, описание, фото группы, ссылку-приглашение и что можно отправлять; скажите «верни», и я отменю последнее. Нужно, чтобы это право было и у вас, и у меня; я делаю это сразу.
 /mute@username, /unmute@username — чтобы я молчала в группе или вернулась
-/ignore@username, /unignore@username — ответом на сообщение участника: не отвечаю ему 24 часа или снова отвечаю
-/reset@username — удалить историю разговора группы со мной`,
+/ignore@username, /unignore@username — ответом на сообщение участника: не отвечаю ему 24 часа или снова отвечаю`,
 	"en": `Talk to me and I will answer, in Uzbek, Russian or English, matching your language.
 
 I remember the recent part of our conversation. %s %s
@@ -245,7 +240,6 @@ I remember the recent part of our conversation. %s %s
 Commands:
 /start — welcome message
 /help — this help
-/reset — delete the conversation history
 /stop — stop a running test
 /about — about this bot
 
@@ -254,8 +248,7 @@ In a group, call me by name, mention me (@username) or reply to one of my messag
 For a group's admins:
 Reply to a member's message and ask me to delete or pin it, to mute or ban its author, to take away their stickers and GIFs or photos, or to make them an admin. I also change the group's name, description, photo, invite link and what members may send, and undo the last change when asked. It takes that admin right, yours and mine, and I do it at once.
 /mute@username, /unmute@username — make me stay quiet in the group, or bring me back
-/ignore@username, /unignore@username — as a reply to a member's message: I stop answering them for 24 hours, or answer them again
-/reset@username — delete the group's conversation with me`,
+/ignore@username, /unignore@username — as a reply to a member's message: I stop answering them for 24 hours, or answer them again`,
 }
 
 // helpAbilities are the sentences HelpTextIn fills the help's blanks with,

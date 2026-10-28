@@ -107,7 +107,7 @@ type rulesArgs struct {
 }
 
 // RulesTool lets an owner give the bot orders that last: they are stored
-// apart from the conversation, so they survive /mute, /reset and the end
+// apart from the conversation, so they survive /mute and the end
 // of the day, and every turn in the group is told them. Whom to ignore is
 // the member the owner replied to, taken from the update: the model cannot
 // name anyone, and admins and owners cannot be ignored.
@@ -120,7 +120,7 @@ func RulesTool(opts RulesOptions) Tool {
 	}
 	return Tool{
 		Name: "group_rules",
-		Description: "Owners only. Standing rules for the group you are in, kept until they expire, even after /mute or /reset. " +
+		Description: "Owners only. Standing rules for the group you are in, kept until they expire, even after /mute. " +
 			"add_instruction: save an owner's order meant to last, its words copied exactly from this message or their own message it replies to, never rephrased (text; hours, default 168); about_member true when it is about the member whose message the owner replied to, or whom your replied-to answer answered (\"uni\", \"bu odam\", \"shu odamga\"): the tool records who. " +
 			"ignore: stop answering the member whose message the owner replied to, or, when they replied to your own answer, the member it answered (hours, default 24); never admins or owners. unignore: answer that member again. " +
 			"set_address: how to address the owner who is asking, in every chat (text). " +

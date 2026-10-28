@@ -158,19 +158,6 @@ func (f *fakeReplier) recorded() []replyCall {
 	return append([]replyCall(nil), f.calls...)
 }
 
-type fakeResetter struct {
-	mu    sync.Mutex
-	reset []storage.Scope
-	err   error
-}
-
-func (f *fakeResetter) Reset(_ context.Context, scope storage.Scope) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.reset = append(f.reset, scope)
-	return f.err
-}
-
 type recorded struct {
 	answerID, messageID int64
 }
@@ -361,7 +348,6 @@ type fixture struct {
 	botQuota    *fakeBotQuota
 	sender      *fakeSender
 	replier     *fakeReplier
-	resetter    *fakeResetter
 	recorder    *fakeRecorder
 	members     *fakeMembers
 	muter       *fakeMuter
@@ -373,7 +359,7 @@ type fixture struct {
 
 func newFixture() *fixture {
 	f := &fixture{
-		sender: &fakeSender{}, replier: &fakeReplier{}, resetter: &fakeResetter{}, recorder: &fakeRecorder{},
+		sender: &fakeSender{}, replier: &fakeReplier{}, recorder: &fakeRecorder{},
 		members: &fakeMembers{admins: map[int64]bool{groupAdminID: true}}, muter: &fakeMuter{},
 		media: newFakeMedia(), chatLog: newMemoryLog(), transcriber: &fakeTranscriber{text: "salom dunyo"},
 		botQuota: &fakeBotQuota{}, reactor: &fakeReactor{}, chatActor: &fakeChatActor{},
@@ -381,7 +367,6 @@ func newFixture() *fixture {
 	f.opts = Options{
 		Sender:        f.sender,
 		Replier:       f.replier,
-		Resetter:      f.resetter,
 		Logger:        slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Model:         "test/model",
 		Workers:       2,
@@ -459,12 +444,12 @@ func expectOneReply(t *testing.T, sent []sentMessage, want string) {
 func TestCommandsReply(t *testing.T) {
 	cases := map[string]string{
 		"/start":       "/help",
-		"/help":        "/reset",
+		"/help":        "/stop",
 		"/about":       "Maria",
 		"/model":       "/help",
 		"/model@mybot": "/help",
-		"/HELP":        "/reset",
-		"/help extra":  "/reset",
+		"/HELP":        "/stop",
+		"/help extra":  "/stop",
 		"/unknown":     "/help",
 	}
 	for command, want := range cases {
@@ -504,30 +489,6 @@ func TestHelpFollowsTheAppLanguage(t *testing.T) {
 	sent := f.run(update)
 
 	expectOneReply(t, sent, "Команды:")
-}
-
-func TestResetClearsOnlyTheSendersHistory(t *testing.T) {
-	f := newFixture()
-
-	sent := f.run(textFrom(userID, "/reset"))
-
-	expectOneReply(t, sent, textResetDone)
-	want := storage.Scope{ChatID: userID, UserID: userID}
-	if len(f.resetter.reset) != 1 || f.resetter.reset[0] != want {
-		t.Errorf("reset calls = %v, want [%v]", f.resetter.reset, want)
-	}
-}
-
-func TestResetFailureShowsGenericError(t *testing.T) {
-	f := newFixture()
-	f.resetter.err = errors.New("pq: connection refused at 10.0.0.5")
-
-	sent := f.run(textFrom(userID, "/reset"))
-
-	expectOneReply(t, sent, textError.uz)
-	if strings.Contains(sent[0].text, "10.0.0.5") {
-		t.Errorf("reply leaks the internal error: %q", sent[0].text)
-	}
 }
 
 func TestAdminCommandsAreRestricted(t *testing.T) {
@@ -832,7 +793,7 @@ func TestCloseRefusesQueuedUpdatesInsteadOfRunningThem(t *testing.T) {
 
 func TestHelpTextListsEveryCommand(t *testing.T) {
 	help := HelpText(Abilities{})
-	for _, command := range []string{"/start", "/help", "/reset", "/about"} {
+	for _, command := range []string{"/start", "/help", "/stop", "/about"} {
 		if !strings.Contains(help, command) {
 			t.Errorf("help text does not mention %s", command)
 		}
@@ -869,8 +830,7 @@ func TestHelpMentionsModerationAndPolls(t *testing.T) {
 			t.Errorf("help still offers %s, which the bot no longer does", gone)
 		}
 	}
-	// The words below were in the help before moderation existed ("/reset —
-	// delete the conversation history", "/mute"), so they are looked for
+	// The words below were in the help before moderation existed ("/mute"), so they are looked for
 	// only in the admins' part.
 	_, admins, found := strings.Cut(help, "For a group's admins:")
 	if !found {
@@ -878,7 +838,7 @@ func TestHelpMentionsModerationAndPolls(t *testing.T) {
 	}
 	for _, want := range []string{
 		"ask me to delete or pin it", "to mute or ban its author", "take away their stickers and GIFs", "I do it at once",
-		"/mute@username", "/unmute@username", "/ignore@username", "/unignore@username", "/reset@username",
+		"/mute@username", "/unmute@username", "/ignore@username", "/unignore@username",
 	} {
 		if !strings.Contains(admins, want) {
 			t.Errorf("the admins' part of the help does not mention %q:\n%s", want, admins)
@@ -905,7 +865,7 @@ func TestHelpPromisesOnlyWhatTheBotCanDo(t *testing.T) {
 
 			sent := f.run(textFrom(userID, "/help"))
 
-			expectOneReply(t, sent, "/reset")
+			expectOneReply(t, sent, "/stop")
 			if got := strings.Contains(sent[0].text, "rasm chizaman"); got != tc.draw {
 				t.Errorf("offers drawing = %t, want %t:\n%s", got, tc.draw, sent[0].text)
 			}
@@ -1088,7 +1048,7 @@ func TestMuteSilencesTheGroupUntilUnmuted(t *testing.T) {
 }
 
 func TestMuteCommandsAreForAdmins(t *testing.T) {
-	for _, command := range []string{"/mute@MyBot", "/unmute@MyBot", "/reset@MyBot"} {
+	for _, command := range []string{"/mute@MyBot", "/unmute@MyBot"} {
 		t.Run(command, func(t *testing.T) {
 			f := newFixture()
 			f.opts.MutedChats = []int64{groupID}
@@ -1099,8 +1059,8 @@ func TestMuteCommandsAreForAdmins(t *testing.T) {
 			sent := f.run(inGroup(groupMessage(command)))
 
 			expectOneReply(t, sent, textAdminsOnly)
-			if len(f.muter.calls) != 0 || len(f.resetter.reset) != 0 {
-				t.Errorf("a member changed state: mute %+v, reset %+v", f.muter.calls, f.resetter.reset)
+			if len(f.muter.calls) != 0 {
+				t.Errorf("a member changed the mute state: %+v", f.muter.calls)
 			}
 		})
 	}
@@ -1173,28 +1133,6 @@ func TestStartsMutedWhenListedAtStartup(t *testing.T) {
 
 	if sent := f.run(inGroup(groupMessage("Mira, hello?"))); len(sent) != 0 {
 		t.Errorf("sent = %+v, want silence in a muted group", sent)
-	}
-}
-
-func TestGroupResetByAdminClearsSharedHistoryAndChatter(t *testing.T) {
-	f := newFixture()
-	f.opts.Workers = 1
-
-	sent := f.run(
-		inGroup(groupMessage("old chatter")),
-		inGroup(asAdmin(groupMessage("/reset@MyBot"))),
-		inGroup(groupMessage("Mira, hi")),
-	)
-
-	if len(sent) != 2 || sent[0].text != textResetDone {
-		t.Fatalf("sent = %+v", sent)
-	}
-	want := storage.Scope{ChatID: groupID}
-	if len(f.resetter.reset) != 1 || f.resetter.reset[0] != want {
-		t.Errorf("reset scopes = %v, want [%v]", f.resetter.reset, want)
-	}
-	if context := f.replier.recorded()[0].req.Context; dayLog(context) != "" {
-		t.Errorf("recent chatter survived the reset: %q", context)
 	}
 }
 
@@ -1465,7 +1403,6 @@ func TestManagersCommandsAndModerationRequestsPassAFullQuota(t *testing.T) {
 
 	sent := f.run(
 		commandReplyingTo(boss, bek, "/ignore@MyBot"),
-		inGroup(asAdmin(groupMessage("/reset@MyBot"))),
 		inGroup(request),
 		inGroup(asAdmin(groupMessage("Mira, how are you?"))),
 		commandReplyingTo(&telegram.User{ID: 555, FirstName: "Ann"}, bek, "/ignore@MyBot"),
@@ -1475,8 +1412,8 @@ func TestManagersCommandsAndModerationRequestsPassAFullQuota(t *testing.T) {
 	for _, msg := range sent {
 		texts = append(texts, msg.text)
 	}
-	want := []string{"Okay, I won't answer Bek @bek for the next 24 hours.", textResetDone, "Boss: mute him"}
-	if len(texts) != len(want) || texts[0] != want[0] || texts[1] != want[1] || !strings.HasSuffix(texts[2], want[2]) {
+	want := []string{"Okay, I won't answer Bek @bek for the next 24 hours.", "Boss: mute him"}
+	if len(texts) != len(want) || texts[0] != want[0] || !strings.HasSuffix(texts[1], want[1]) {
 		t.Errorf("sent = %q\nwant %q: the admin's commands and moderation request pass, their chat does not", texts, want)
 	}
 	// The admin's chat and the member's command are counted, and denied.
@@ -1659,7 +1596,7 @@ func TestPostsOnBehalfOfAChatAreIgnored(t *testing.T) {
 func TestPrivateCommandWithNewLine(t *testing.T) {
 	f := newFixture()
 
-	expectOneReply(t, f.run(textFrom(userID, "/help\nplease")), "/reset")
+	expectOneReply(t, f.run(textFrom(userID, "/help\nplease")), "/stop")
 }
 
 func TestGroupMessageCannotForgeOtherSpeakersOrMarkers(t *testing.T) {
@@ -1756,17 +1693,6 @@ func TestChatterSeenWhileMutedDoesNotSurfaceAfterUnmute(t *testing.T) {
 
 	if context := f.replier.recorded()[0].req.Context; dayLog(context) != "" {
 		t.Errorf("context after unmute = %q, want nothing from the muted period", context)
-	}
-}
-
-func TestGroupResetConfirmationDoesNotSayYour(t *testing.T) {
-	f := newFixture()
-
-	sent := f.run(inGroup(asAdmin(groupMessage("/reset@MyBot"))))
-
-	expectOneReply(t, sent, textResetDone)
-	if strings.Contains(strings.ToLower(sent[0].text), "your") {
-		t.Errorf("group reset confirmation = %q; the history belongs to the group", sent[0].text)
 	}
 }
 
@@ -2028,17 +1954,6 @@ func TestMutedGroupIsNotLogged(t *testing.T) {
 
 	if len(f.chatLog.messages) != 0 {
 		t.Errorf("log = %+v", f.chatLog.messages)
-	}
-}
-
-func TestResetClearsTheDaysLog(t *testing.T) {
-	f := newFixture()
-	f.opts.Workers = 1
-
-	f.run(inGroup(groupMessage("old chatter")), inGroup(asAdmin(groupMessage("/reset@MyBot"))))
-
-	if got := f.chatLog.texts(groupID); len(got) != 0 {
-		t.Errorf("log after reset = %q", got)
 	}
 }
 
@@ -2981,7 +2896,7 @@ func TestIgnoreCommandRefusesAdmins(t *testing.T) {
 	})
 }
 
-func TestRulesSurviveMuteAndReset(t *testing.T) {
+func TestRulesSurviveMute(t *testing.T) {
 	f := newFixture()
 	f.opts.Workers = 1
 	instruction := storage.GroupRule{ID: 12, ChatID: groupID, Kind: storage.RuleInstruction, Text: "No finance talk.", SetBy: 9001}
@@ -2991,7 +2906,6 @@ func TestRulesSurviveMuteAndReset(t *testing.T) {
 	f.run(
 		inGroup(asAdmin(groupMessage("/mute@MyBot"))),
 		inGroup(asAdmin(groupMessage("/unmute@MyBot"))),
-		inGroup(asAdmin(groupMessage("/reset@MyBot"))),
 		inGroup(groupMessage("Mira, can we talk money?")),
 	)
 

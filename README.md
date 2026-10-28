@@ -133,8 +133,8 @@ There are two kinds of conversation, and they are never loaded together:
   stored user message starts with its author's first name, and the author's
   ID and name are also kept in `author_id` and `author_name`.
 
-`/reset` deletes the conversation of the chat it is sent in; its messages go
-with it through `ON DELETE CASCADE`. `telegram_message_id` and
+A conversation's messages are deleted with it through `ON DELETE CASCADE`.
+`telegram_message_id` and
 `reply_to_message_id` record which Telegram message a row corresponds to and
 which one it replied to. `chats` holds the mute setting.
 
@@ -274,7 +274,7 @@ make run
 Send `/start` to your bot in Telegram. Stop the bot with Ctrl+C; it finishes
 the message it is working on before exiting.
 
-Bot commands: `/start`, `/help`, `/reset` (delete the conversation),
+Bot commands: `/start`, `/help`, `/stop`,
 `/model`, `/about`, and in groups `/mute`, `/unmute`, `/ignore` and
 `/unignore`.
 
@@ -494,7 +494,7 @@ answered later from the group log. Each one costs one extra model request.
 Set `BOT_OWNER_USERNAME` to your Telegram username (with or without `@`);
 for several owners, separate them with commas. The bot then knows you made
 it: it is friendly to you, does what you ask in
-the chat within its limits, and lets you use `/mute`, `/unmute`, `/reset`,
+the chat within its limits, and lets you use `/mute`, `/unmute`,
 `/ignore` and `/unignore` in any group, and, once `BOT_OWNER_IDS` is set,
 have it moderate wherever it holds the admin right (see
 [Moderation](#moderation)). In groups every
@@ -682,10 +682,10 @@ keep it from taking over the chat.
 | A command with its username  | `/mute@MyMariaBot`                                       | always on                       |
 
 Each start sets the menu Telegram opens on "/" (`setMyCommands`, in
-`internal/app/commands.go`): `/start`, `/help`, `/reset`, `/model` and
+`internal/app/commands.go`): `/start`, `/help`, `/stop` and
 `/about` in private chats; `/help`, `/model` and `/about` for a group's
-members; and for its admins also `/mute`, `/unmute`, `/ignore`, `/unignore`
-and `/reset`. In a group the menu adds the bot's username itself. A failure is
+members; and for its admins also `/mute`, `/unmute`, `/ignore` and
+`/unignore`. In a group the menu adds the bot's username itself. A failure is
 only logged.
 
 **Calling by name.** A wake word counts when it is a whole word, in any case,
@@ -713,7 +713,7 @@ match "maria" unless you add it:
 word.
 
 **Commands** in a group need the bot's username (`/help@MyMariaBot`). A plain
-`/reset` is ignored, because it may be meant for another bot.
+`/help` is ignored, because it may be meant for another bot.
 
 ### Example
 
@@ -742,12 +742,12 @@ Ann:   anyway, lunch?
   10 hours are given to the model as context, marked as untrusted, with
   times in `GROUP_HISTORY_TIMEZONE`; of her own lines only the last 5,
   shortened. The log is deleted with the rest of the history after
-  `RETENTION_DAYS`, by `/reset`, and when the group is muted. Nothing is
+  `RETENTION_DAYS` and when the group is muted. Nothing is
   logged while a group is muted. Set `GROUP_AMBIENT_MESSAGES=0` to turn the
   log off.
 - **Standing rules:** owners' orders and the ignore list are kept in the
   `group_rules` table until they expire, whatever `RETENTION_DAYS` says; an
-  owner's form of address until it is removed. `/mute` and `/reset` do not
+  owner's form of address until it is removed. `/mute` does not
   touch them.
 - **Moderation:** what she did, and for whom, is kept in the
   `moderation_actions` table until you delete it, including up to 500
@@ -761,22 +761,20 @@ Ann:   anyway, lunch?
 Because a group's conversation is shared, what one member says to her can
 come back in her answer to another member of the same group.
 
-### Muting and resetting
+### Muting and ignoring
 
 | Command       | Who          | Effect                                                                              |
 | ------------- | ------------ | ----------------------------------------------------------------------------------- |
 | `/mute@Bot`   | group admins | She stops reacting in this group, and stops keeping recent messages, until unmuted. |
 | `/unmute@Bot` | group admins | She is back.                                                                        |
-| `/reset@Bot`  | group admins | Deletes the group's conversation and its recent-message buffer.                     |
 | `/ignore@Bot`, as a reply to a member's message | group admins | She does not answer that member, or react to them, for 24 hours. |
 | `/unignore@Bot`, as a reply to a member's message | group admins | She answers them again. |
 
 "Group admins" are the group's owner and administrators as Telegram reports
 them, plus anyone in `ADMIN_USER_IDS` and the bot's owners. The mute setting
-is stored in the database and survives restarts. `/mute` and `/reset` leave
+is stored in the database and survives restarts. `/mute` leaves
 the standing rules alone. Admins, owners and the bot itself cannot be
-ignored. In a private chat `/reset` deletes that user's own conversation and
-needs no special rights.
+ignored.
 
 To keep the bot out of groups altogether, use `/setjoingroups` in @BotFather.
 
@@ -802,8 +800,8 @@ To keep the bot out of groups altogether, use `/setjoingroups` in @BotFather.
 Owners' orders that should last ("don't talk about finance", "don't answer
 Bek", "call me aka") are saved by the owner-only `group_rules` tool, which
 the model calls when an owner gives such an order. They are kept in the
-`group_rules` table, apart from the conversation, so `/mute` and `/reset`
-do not erase them, and every turn in the group is told the ones in force.
+`group_rules` table, apart from the conversation, so `/mute`
+does not erase them, and every turn in the group is told the ones in force.
 
 | Rule | Who sets it, and where | How long |
 |---|---|---|
@@ -1019,7 +1017,7 @@ sent as the group, so they never appear.
   turn) gives its answer back.
   Not counted: owners; other bots, which have their own limit (below);
   reactions to applause; answers to her moderation questions; and `/mute`,
-  `/unmute`, `/ignore`, `/unignore` and `/reset` from those who may use
+  `/unmute`, `/ignore` and `/unignore` from those who may use
   them. Past the quota a group admin is still answered when their message
   replies to another member's, as asking to moderate or ignore them does.
   When the count cannot be read she stays silent and logs a warning.
@@ -1031,8 +1029,8 @@ sent as the group, so they never appear.
   line: line breaks become spaces and square brackets become round ones. A
   private message keeps its lines, but its square brackets become round
   too, so nobody can type the bracketed note that marks the owner.
-- The managing commands (`/mute`, `/unmute`, `/ignore`, `/unignore`,
-  `/reset`) from those who may use them are not held back by the quotas, and
+- The managing commands (`/mute`, `/unmute`, `/ignore`, `/unignore`)
+  from those who may use them are not held back by the quotas, and
   a muted group gets no notices of any kind.
 - Other bots: Telegram delivers another bot's messages only when
   *Bot-to-Bot Communication Mode* is enabled in @BotFather for at least one
@@ -1389,13 +1387,11 @@ private chats) needs, in this order:
    messages*, *Ban users* (for mute and ban) and *Pin messages*. She does
    only what both she and the admin asking may do; leave out a right to keep
    her from using it.
-5. **Clear each group's old conversation**: send `/reset@YourBot` in every
-   group, as an admin or owner. Each turn replays the group's last
-   `MAX_HISTORY_MESSAGES` (20) stored messages whatever their age, and the
-   stored ones are the old put-downs, Latin answers to Cyrillic and "Xo'p
-   bo'ladi, xo'jayin" lines that the rewritten character must not copy.
-   `/reset` deletes the group's conversation and day log; standing rules
-   stay. Waiting for `RETENTION_DAYS` to remove them works too, more slowly.
+5. **Let each group's old conversation expire**: each turn replays the
+   group's last `MAX_HISTORY_MESSAGES` (20) stored messages whatever their
+   age, and the stored ones are the old put-downs, Latin answers to Cyrillic
+   and "Xo'p bo'ladi, xo'jayin" lines that the rewritten character must not
+   copy. `RETENTION_DAYS` removes them; standing rules stay.
 
 Run `set-webhook` again after this update: the bot now asks Telegram for
 `chat_member` updates too, and Telegram keeps sending only the kinds named
@@ -1460,8 +1456,7 @@ sudo -u postgres dropdb tgbot_restore_test
 ```
 
 **Retention.** Messages older than `RETENTION_DAYS` (default 1 day) are deleted
-by an hourly job, or daily by Vercel Cron. A user can delete their own history at any time with
-`/reset`. The counts behind the limits (`image_generations`, `bot_replies`,
+by an hourly job, or daily by Vercel Cron. The counts behind the limits (`image_generations`, `bot_replies`,
 `group_replies`, `private_messages`) hold IDs and times, no message text, and
 are deleted with the history. Standing rules are deleted when they expire. The moderation audit
 (`moderation_actions`) is never deleted automatically; delete
@@ -1517,7 +1512,7 @@ Built in:
       group messages, and group messages and names are folded to one line,
       so that no text can imitate a marker or another speaker in the shared
       history.
-- [x] `/mute`, `/unmute`, `/ignore`, `/unignore` and a group's `/reset` are
+- [x] `/mute`, `/unmute`, `/ignore` and `/unignore` are
       limited to that group's administrators, checked with Telegram, the
       bot's own administrators and its owners.
 - [x] Moderation is checked in code, never by the model: the target is the
@@ -1597,8 +1592,8 @@ Known limits:
 | `telegram polling failed ... 409 Conflict`                | Another copy of the bot is running with the same token, or a webhook is set. Stop the other copy, or call `deleteWebhook`.                                                                                                                                                                    |
 | The bot is silent in a group                              | It answers only when addressed. Check, in order: is the group muted (`/unmute@YourBot` by an admin)? Is privacy mode off, if you call it by name? Was the bot re-added after changing privacy mode? Is the sender an anonymous admin or another bot (ignored by design)? Is the sender on the ignore list, or has the reply quota run out (log line `group reply limit reached`)? |
 | "Maria, ..." gets no answer but `@username` works          | Privacy mode is still on, or the bot was not re-added after it was turned off; see [Groups](#groups). Also check `ENABLE_WAKE_WORD_TRIGGER` and `BOT_WAKE_WORDS`.                                                                                                                             |
-| The bot ignores `/reset` or `/mute` in a group            | Commands in groups need the bot's username: `/mute@YourBot`.                                                                                                                                                                                                                                  |
-| "Only this group's admins can do that"                    | `/mute`, `/unmute`, `/ignore`, `/unignore` and `/reset` in a group are for its admins. Anonymous admins are not recognised; turn "Remain anonymous" off or add your ID to `ADMIN_USER_IDS`.                                                                                                                           |
+| The bot ignores `/mute` in a group                        | Commands in groups need the bot's username: `/mute@YourBot`.                                                                                                                                                                                                                                  |
+| "Only this group's admins can do that"                    | `/mute`, `/unmute`, `/ignore` and `/unignore` in a group are for its admins. Anonymous admins are not recognised; turn "Remain anonymous" off or add your ID to `ADMIN_USER_IDS`.                                                                                                                           |
 | The bot answers messages that only mention the name       | A message that starts or ends with the name counts as a call. The model may stay silent in such cases but does not always. Choose a less common wake word.                                                                                                                                    |
 | The bot is too rude, too tame, or out of character        | That is the model and the prompt. Try another model, or adjust `PERSONA_PROMPT`; see [The character](#the-character).                                                                                                                                                                         |
 | `X is no longer supported; use Y` at startup              | A setting was renamed. Rename it in the environment file.                                                                                                                                                                                                                                     |

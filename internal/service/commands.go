@@ -527,7 +527,7 @@ func (s *Service) mayAnswerInGroup(in incoming) (reservation int64, allowed bool
 }
 
 // managerCommands manage the bot in a group, and are for its admins.
-var managerCommands = map[string]bool{"/mute": true, "/unmute": true, "/ignore": true, "/unignore": true, "/reset": true}
+var managerCommands = map[string]bool{"/mute": true, "/unmute": true, "/ignore": true, "/unignore": true}
 
 // isManagerCommand reports one of managerCommands from someone who may use
 // it. Anyone else's is counted like any other message: it only gets a
@@ -1266,8 +1266,6 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 			return textUnknown.to(in)
 		}
 		return fmt.Sprintf(textModel, s.opts.Model)
-	case "/reset":
-		return s.reset(ctx, in)
 	case "/stop":
 		if s.stopQuiz(ctx, in) {
 			return ""
@@ -1401,22 +1399,6 @@ func (s *Service) refuseUnignorable(ctx context.Context, in incoming, member *to
 		return textCannotIgnore
 	}
 	return ""
-}
-
-// reset deletes the conversation of the chat the command was sent in. In a
-// private chat that is the sender's own. In a group it is the one all
-// members share, so only the group's administrators may do it.
-func (s *Service) reset(ctx context.Context, in incoming) string {
-	if refusal := s.refuseUnlessManager(ctx, in); refusal != "" {
-		return refusal
-	}
-	if err := s.opts.Resetter.Reset(ctx, in.scope); err != nil {
-		s.opts.Logger.Error("reset failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
-		return textError.to(in)
-	}
-	s.ambient.clear(in.scope.ChatID)
-	s.opts.Logger.Info("conversation reset", "user_id", in.userID, "chat_id", in.scope.ChatID)
-	return textResetDone
 }
 
 // setMuted turns the bot off or on in a group. The setting is stored first
