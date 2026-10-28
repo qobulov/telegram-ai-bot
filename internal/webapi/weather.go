@@ -103,7 +103,7 @@ func (a *apis) weatherTool() tools.Tool {
 			"properties": {
 				"city": {"type": "string", "description": "City name in any spelling, e.g. Toshkent, Самарканд, Moscow."},
 				"days": {"type": "integer", "minimum": 1, "maximum": 3, "description": "Days of forecast from today. Default 1."},
-				"include_air": {"type": "boolean", "description": "Also give air quality (US AQI and PM2.5)."}
+				"include_air": {"type": "boolean", "description": "Also give air quality (US AQI and PM2.5): set it whenever someone asks about the air, smog or dust (\"havo iflosmi\", \"havo sifati\", \"smog\", \"чанг\", \"загрязнение воздуха\"), even without asking about the weather."}
 			},
 			"required": ["city"],
 			"additionalProperties": false
