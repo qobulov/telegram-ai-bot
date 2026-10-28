@@ -1398,6 +1398,7 @@ func (s *Service) setMuted(ctx context.Context, in incoming, muted bool) string 
 	if refusal := s.refuseUnlessManager(ctx, in); refusal != "" {
 		return refusal
 	}
+	was := s.isMutedLately(in.scope.ChatID)
 	if err := s.opts.Muter.SetMuted(ctx, in.scope.ChatID, muted, in.userID); err != nil {
 		s.opts.Logger.Error("mute change failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
 		return textError.to(in)
@@ -1405,7 +1406,11 @@ func (s *Service) setMuted(ctx context.Context, in incoming, muted bool) string 
 	s.markMuted(in.scope.ChatID, muted)
 	s.opts.Logger.Info("mute changed", "user_id", in.userID, "chat_id", in.scope.ChatID, "muted", muted)
 	// What was said before or during the mute should not resurface after it.
-	s.ambient.clear(in.scope.ChatID)
+	// A /mute or /unmute that changes nothing keeps the log: owners sent
+	// /unmute to groups that were never muted, and each wiped the day.
+	if was != muted {
+		s.ambient.clear(in.scope.ChatID)
+	}
 	if muted {
 		return fmt.Sprintf(textMuted, s.opts.Bot.Username)
 	}

@@ -1696,6 +1696,22 @@ func TestChatterSeenWhileMutedDoesNotSurfaceAfterUnmute(t *testing.T) {
 	}
 }
 
+// An /unmute in a group that was never muted changes nothing, and so keeps
+// what the group said.
+func TestUnmuteOfAnUnmutedGroupKeepsTheLog(t *testing.T) {
+	f := newFixture()
+	s := New(f.opts)
+	s.ambient.add(groupID, 0, 4242, "Ann", "plans for tonight")
+
+	s.Handle(inGroup(asAdmin(groupMessage("/unmute@MyBot"))))
+	s.Handle(inGroup(groupMessage("Mira, hi")))
+	s.stop()
+
+	if context := f.replier.recorded()[0].req.Context; !strings.Contains(dayLog(context), "plans for tonight") {
+		t.Errorf("context after a needless unmute = %q, want the log kept", context)
+	}
+}
+
 // fakeMuteStore answers mute lookups the way the database would, for the
 // serverless setup where nothing can be cached between requests.
 type fakeMuteStore struct {
