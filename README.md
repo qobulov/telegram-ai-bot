@@ -981,6 +981,18 @@ message is cut to 200 characters and the newest 32 KB are kept; she recaps
 them in a few lines. Only the group the question is asked in is read, and in
 a private chat the tool is not offered.
 
+### Statistics
+
+Asked who is the most active, the group's MVP or how much it wrote ("eng
+faol kim", "guruh MVP si"), she calls the `group_stats` tool: for today
+(since midnight in `GROUP_HISTORY_TIMEZONE`) or the last 7 days, the
+messages in the group's log, how many members wrote, the ten who wrote the
+most (the first is the MVP), the three busiest hours and whom the swear
+guard caught the most. Her own messages are not counted, nor those written
+while she was muted or older than `RETENTION_DAYS`. Members are named by
+first name only, so that the list tags nobody. Only the group the question
+is asked in is counted.
+
 ### Limits
 
 - Group answers are cut to `MAX_GROUP_REPLY_LENGTH` so she posts one message.

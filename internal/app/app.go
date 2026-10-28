@@ -356,6 +356,7 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 		tools.MembersTool(tools.MembersOptions{Store: store, Telegram: bot.Client, Owners: cfg.OwnerIDs, Location: cfg.Location}),
 		tools.ProfileTool(tools.ProfileOptions{Store: store}),
 		tools.CatchUpTool(tools.CatchUpOptions{Store: store, Location: cfg.Location}),
+		tools.GroupStatsTool(tools.GroupStatsOptions{Store: store, BotID: bot.User.ID, Location: cfg.Location}),
 	)
 	// Only owners known by ID can be written to, and only they are.
 	if len(cfg.OwnerIDs) > 0 {
