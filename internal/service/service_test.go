@@ -2771,13 +2771,6 @@ func (f *fakeRuleBook) RemoveIgnore(_ context.Context, chatID, userID int64) (bo
 	return removed, nil
 }
 
-func (f *fakeRuleBook) ClearGroupSetting(_ context.Context, chatID int64, kind string) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.rules = slices.DeleteFunc(f.rules, func(r storage.GroupRule) bool { return r.ChatID == chatID && r.Kind == kind })
-	return nil
-}
-
 func (f *fakeRuleBook) all() []storage.GroupRule {
 	f.mu.Lock()
 	defer f.mu.Unlock()

@@ -574,7 +574,7 @@ func (s *Service) tooQuiet(ctx context.Context, in incoming) bool {
 		ctx, cancel := context.WithTimeout(ctx, logTimeout)
 		defer cancel()
 		var err error
-		count, err = s.opts.ActiveCounter.ActiveMembers(ctx, in.scope.ChatID, s.opts.Now().Add(-s.opts.ActiveWindow))
+		count, err = s.opts.ActiveCounter.ActiveMembers(ctx, in.scope.ChatID, s.opts.Now().Add(-s.activeWindow(ctx, in.scope.ChatID)))
 		if err != nil {
 			s.opts.Logger.Warn("could not count a group's active members; answering", "chat_id", in.scope.ChatID, "error", err)
 			return false
@@ -1229,7 +1229,7 @@ func (s *Service) fitted(in incoming, answer string) string {
 	if !in.group {
 		return answer
 	}
-	return truncateUnits(answer, s.opts.MaxGroupReplyChars)
+	return truncateUnits(answer, s.replyLength(context.Background(), in.scope.ChatID))
 }
 
 // recordSent stores which Telegram message carries the answer. It is
@@ -1283,6 +1283,10 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 		return s.unignore(ctx, in)
 	case "/import_stickers":
 		return s.importStickers(ctx, in)
+	case "/settings":
+		return s.showSettings(ctx, in)
+	case "/set":
+		return s.setSetting(ctx, in)
 	case "/limit":
 		return s.setReplyLimit(ctx, in)
 	case "/active":

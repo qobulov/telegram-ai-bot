@@ -235,6 +235,22 @@ The pool size can be set in the connection string, for example
 `...?sslmode=disable&pool_max_conns=10`. The default is the larger of 4 and
 the number of CPUs.
 
+### Changing settings from Telegram
+
+The owners can change the group, private-chat, picture, trigger, history and
+output settings without a deploy. `/settings` lists them with their values
+and where each comes from; `/set NAME value` changes one and
+`/set NAME default` goes back to the environment's. In a private chat it
+changes the bot's; in a group (`/set@Bot …`) the group's own, for the four
+that may differ by group: `GROUP_RATE_LIMIT_PER_MINUTE`,
+`GROUP_MIN_ACTIVE_MEMBERS`, `GROUP_ACTIVE_DAYS` and `MAX_GROUP_REPLY_LENGTH`.
+`/limit` and `/active` are short for the first two. A value is checked as the
+environment's would be, with an upper bound for the numbers, before it is
+saved in `settings`. A group's change holds at once; the bot's, within a
+minute, as each serverless instance sees the change and rebuilds (long
+polling needs a restart). The list is `config.Settings`; secrets, models and
+keys stay in the environment only.
+
 ## Local setup
 
 You need Go 1.27 or newer and PostgreSQL 14 or newer.

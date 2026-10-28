@@ -70,7 +70,11 @@ func runBot(ctx context.Context) error {
 		return err
 	}
 	defer store.Close()
-	return serve(ctx, cfg, store, newLogger(cfg.LogLevel))
+	logger := newLogger(cfg.LogLevel)
+	// The owners' saved settings hold from the start; a later change needs
+	// a restart here, where a serverless instance picks it up by itself.
+	cfg, _ = app.LoadSettings(ctx, cfg, os.Getenv, store, logger)
+	return serve(ctx, cfg, store, logger)
 }
 
 // runMigrate needs only DB_POSTGRES_URL. Migrations are applied by an operator

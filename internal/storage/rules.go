@@ -30,12 +30,6 @@ const (
 	RuleSpamGuard  = "spam_guard"
 	RuleLinkGuard  = "link_guard"
 	RuleImageGuard = "image_guard"
-	// RuleReplyLimit and RuleMinActive are an owner's settings for one
-	// group, the number in Text: the answers a minute the bot gives there,
-	// and how many members must have written lately for it to answer at all,
-	// 0 for none. Without one the configured default holds.
-	RuleReplyLimit = "reply_limit"
-	RuleMinActive  = "min_active"
 )
 
 // MaxInstructions is how many instructions a group may have in force at
@@ -172,13 +166,4 @@ func nullableTime(t time.Time) any {
 		return nil
 	}
 	return t
-}
-
-// ClearGroupSetting removes a group's setting of kind, so that the default
-// holds there again.
-func (s *Store) ClearGroupSetting(ctx context.Context, chatID int64, kind string) error {
-	if _, err := s.pool.Exec(ctx, `DELETE FROM group_rules WHERE chat_id = $1 AND kind = $2`, chatID, kind); err != nil {
-		return fmt.Errorf("storage: clear group setting: %w", err)
-	}
-	return nil
 }

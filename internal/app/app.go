@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"maps"
 	"net/http"
+	"os"
 	"slices"
 	"strings"
 	"time"
@@ -297,31 +298,36 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Reactor:               bot.Client,
 		OwnerMenu:             ownerMenu,
 		MenuSetter:            bot.Client,
-		ChatActor:             bot.Client,
-		BotRights:             botRights{store: store, members: bot.Client, botID: bot.User.ID, logger: logger},
-		Rules:                 store,
-		Strikes:               store,
-		AdminList:             bot.Client,
-		RequiredChannels:      cfg.RequiredChannels,
-		QuickAnswers:          true,
-		MinActiveMembers:      cfg.MinActiveMembers,
-		ActiveWindow:          time.Duration(cfg.ActiveDays) * 24 * time.Hour,
-		ActiveCounter:         store,
-		Channels:              bot.Client,
-		Buttons:               bot.Client,
-		Restrictor:            bot.Client,
-		Guards:                checker(cfg),
-		GroupModerator:        bot.Client,
-		Judge:                 swearJudge(cfg, logger),
-		Stickers:              store,
-		ClipSender:            bot.Client,
-		AudioSender:           bot.Client,
-		Files:                 bot.Client,
-		Quizzes:               store,
-		QuizPolls:             bot.Client,
-		StickerSender:         bot.Client,
-		StickerImporter:       &stickers.Importer{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger), Workers: stickerWorkers, Logger: logger},
-		Answers:               store,
+		Settings:              store,
+		CheckSetting: func(setting config.Setting, value string) error {
+			return config.CheckSetting(os.Getenv, setting, value)
+		},
+		Getenv:           os.Getenv,
+		ChatActor:        bot.Client,
+		BotRights:        botRights{store: store, members: bot.Client, botID: bot.User.ID, logger: logger},
+		Rules:            store,
+		Strikes:          store,
+		AdminList:        bot.Client,
+		RequiredChannels: cfg.RequiredChannels,
+		QuickAnswers:     true,
+		MinActiveMembers: cfg.MinActiveMembers,
+		ActiveWindow:     time.Duration(cfg.ActiveDays) * 24 * time.Hour,
+		ActiveCounter:    store,
+		Channels:         bot.Client,
+		Buttons:          bot.Client,
+		Restrictor:       bot.Client,
+		Guards:           checker(cfg),
+		GroupModerator:   bot.Client,
+		Judge:            swearJudge(cfg, logger),
+		Stickers:         store,
+		ClipSender:       bot.Client,
+		AudioSender:      bot.Client,
+		Files:            bot.Client,
+		Quizzes:          store,
+		QuizPolls:        bot.Client,
+		StickerSender:    bot.Client,
+		StickerImporter:  &stickers.Importer{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger), Workers: stickerWorkers, Logger: logger},
+		Answers:          store,
 	}
 	if cfg.GiphyAPIKey != "" {
 		opts.GIFs = &gifs.Client{APIKey: cfg.GiphyAPIKey, HTTPClient: &http.Client{Timeout: giphyTimeout}}

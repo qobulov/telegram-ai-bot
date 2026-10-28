@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"telegram-ai-bot/internal/agent"
+	"telegram-ai-bot/internal/config"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 )
@@ -133,7 +134,6 @@ type RuleBook interface {
 	GroupRules(ctx context.Context, chatID int64) ([]storage.GroupRule, error)
 	SetGroupRule(ctx context.Context, r storage.GroupRule) (int64, error)
 	RemoveIgnore(ctx context.Context, chatID, userID int64) (bool, error)
-	ClearGroupSetting(ctx context.Context, chatID int64, kind string) error
 }
 
 // Options configures a Service. A field may be left nil when its comment
@@ -270,6 +270,12 @@ type Options struct {
 	// write there; with either missing owners see the admins' menu.
 	OwnerMenu  []telegram.BotCommand
 	MenuSetter MenuSetter
+	// Settings keeps the owners' settings over the environment's, which
+	// CheckSetting checks before they are saved and Getenv reads; with
+	// Settings nil, /set and /settings do nothing.
+	Settings     SettingsBook
+	CheckSetting func(setting config.Setting, value string) error
+	Getenv       func(name string) string
 	// Reactor sets emoji reactions, the bot's answer to applause and the
 	// model's when it reacts instead of writing; nil means it never reacts.
 	Reactor Reactor
@@ -375,7 +381,7 @@ type Service struct {
 	// ownersHere the owners lately found in each group.
 	actives *recently[int64, int]
 	// settings are groups' owner settings, such as /limit, lately read.
-	settings *recently[int64, map[string]int]
+	settings *recently[int64, map[string]string]
 	// ownerMenus are the groups and owners whose menu was set lately.
 	ownerMenus *recently[[2]int64, bool]
 	ownersHere *recently[int64, []string]
@@ -463,7 +469,7 @@ func New(opts Options) *Service {
 		members:         newRecently[memberKey, memberName](memberMemory, opts.Now),
 		subscribers:     newRecently[int64, bool](subscriberMemory, opts.Now),
 		actives:         newRecently[int64, int](activeMemory, opts.Now),
-		settings:        newRecently[int64, map[string]int](settingsMemory, opts.Now),
+		settings:        newRecently[int64, map[string]string](settingsMemory, opts.Now),
 		ownerMenus:      newRecently[[2]int64, bool](ownerMenuMemory, opts.Now),
 		ownersHere:      newRecently[int64, []string](activeMemory, opts.Now),
 		guardSets:       newRecently[int64, guardSet](guardsMemory, opts.Now),
