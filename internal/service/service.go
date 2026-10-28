@@ -133,6 +133,7 @@ type RuleBook interface {
 	GroupRules(ctx context.Context, chatID int64) ([]storage.GroupRule, error)
 	SetGroupRule(ctx context.Context, r storage.GroupRule) (int64, error)
 	RemoveIgnore(ctx context.Context, chatID, userID int64) (bool, error)
+	ClearGroupSetting(ctx context.Context, chatID int64, kind string) error
 }
 
 // Options configures a Service. A field may be left nil when its comment
@@ -367,7 +368,9 @@ type Service struct {
 	subscribers *recently[int64, bool]
 	// actives are groups' counts of active members, lately read, and
 	// ownersHere the owners lately found in each group.
-	actives    *recently[int64, int]
+	actives *recently[int64, int]
+	// settings are groups' owner settings, such as /limit, lately read.
+	settings   *recently[int64, map[string]int]
 	ownersHere *recently[int64, []string]
 	// quizTests are tests lately read, for their runs' questions.
 	quizTests *recently[int64, storage.QuizTest]
@@ -453,6 +456,7 @@ func New(opts Options) *Service {
 		members:         newRecently[memberKey, memberName](memberMemory, opts.Now),
 		subscribers:     newRecently[int64, bool](subscriberMemory, opts.Now),
 		actives:         newRecently[int64, int](activeMemory, opts.Now),
+		settings:        newRecently[int64, map[string]int](settingsMemory, opts.Now),
 		ownersHere:      newRecently[int64, []string](activeMemory, opts.Now),
 		guardSets:       newRecently[int64, guardSet](guardsMemory, opts.Now),
 		quizTests:       newRecently[int64, storage.QuizTest](quizTestMemory, opts.Now),

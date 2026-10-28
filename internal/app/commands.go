@@ -19,7 +19,6 @@ var commandMenus = map[string][]telegram.BotCommand{
 	telegram.ScopeDefault: {
 		{Command: "start", Description: "Salomlashish"},
 		{Command: "help", Description: "Yordam va buyruqlar"},
-		{Command: "reset", Description: "Suhbat tarixini o'chirish"},
 		{Command: "stop", Description: "Ishlayotgan testni to'xtatish"},
 		{Command: "about", Description: "Bot haqida"},
 	},
@@ -33,7 +32,6 @@ var commandMenus = map[string][]telegram.BotCommand{
 		{Command: "unmute", Description: "Botni yana gapirtirish"},
 		{Command: "ignore", Description: "A'zoga 24 soat javob bermaslik (xabariga reply qiling)"},
 		{Command: "unignore", Description: "A'zoga yana javob berish (xabariga reply qiling)"},
-		{Command: "reset", Description: "Guruh suhbat tarixini o'chirish"},
 		{Command: "about", Description: "Bot haqida"},
 	},
 }

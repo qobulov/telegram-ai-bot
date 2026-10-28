@@ -503,7 +503,7 @@ func (s *Service) mayAnswerInGroup(in incoming) (reservation int64, allowed bool
 	id, ok, err := s.opts.GroupReplies.ReserveGroupReply(ctx, storage.ReplyQuota{
 		ChatID:    in.scope.ChatID,
 		UserID:    in.userID,
-		PerMinute: s.opts.GroupRatePerMinute,
+		PerMinute: s.replyLimit(ctx, in.scope.ChatID),
 		PerMember: s.opts.MemberRepliesPer10Min,
 	})
 	if err != nil {
@@ -562,7 +562,11 @@ func (s *Service) isAdminActingOnAMember(in incoming) bool {
 // within ActiveWindow, for a message from anyone but an owner. When the
 // count cannot be read, the group is answered.
 func (s *Service) tooQuiet(ctx context.Context, in incoming) bool {
-	if !in.group || s.opts.MinActiveMembers <= 0 || s.opts.ActiveCounter == nil || s.isOwner(in.msg.From) {
+	if !in.group || s.opts.ActiveCounter == nil || s.isOwner(in.msg.From) {
+		return false
+	}
+	minimum := s.minActive(ctx, in.scope.ChatID)
+	if minimum <= 0 {
 		return false
 	}
 	count, ok := s.actives.get(in.scope.ChatID)
@@ -577,7 +581,7 @@ func (s *Service) tooQuiet(ctx context.Context, in incoming) bool {
 		}
 		s.actives.set(in.scope.ChatID, count)
 	}
-	if count < s.opts.MinActiveMembers {
+	if count < minimum {
 		s.opts.Logger.Info("group too quiet; not answering", "chat_id", in.scope.ChatID, "active", count)
 		return true
 	}
@@ -1279,6 +1283,10 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 		return s.unignore(ctx, in)
 	case "/import_stickers":
 		return s.importStickers(ctx, in)
+	case "/limit":
+		return s.setReplyLimit(ctx, in)
+	case "/active":
+		return s.setMinActive(ctx, in)
 	default:
 		return textUnknown.to(in)
 	}
