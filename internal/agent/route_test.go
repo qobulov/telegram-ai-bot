@@ -140,6 +140,9 @@ func TestGameQuestionsSkipTheRouter(t *testing.T) {
 		"Ali: dotada kim kuchli":                           true,
 		"[Your earlier message that the user is replying to.]\nMLBB build\n[End of quoted message]\n\nAli: rahmat": false,
 		"Ali: superhero filmi zo'r": false,
+		"[Quoted message from Husniddin that the user is replying to.]\n1586840150 (16698)\n[End of quoted message]\n\nAli: Nikiz nma, mari": true,
+		"Ali: mani id 1159019237(13690) kimligini top": true,
+		"Ali: 2026 (10) yil":                           false,
 	} {
 		f, router, _ := routedFixture("CHAT", text("chat"), text("full"))
 		req := request(1, msg)

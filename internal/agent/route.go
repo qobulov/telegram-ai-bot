@@ -57,6 +57,13 @@ const chatNote = `No tools are offered for this message. If answering it needs a
 // in the eval's groups had them.
 var gameWords = regexp.MustCompile(`(?i)(^|[^\p{L}])(mlbb|млбб|dota|дота|mobile legends|hero|qahramon|қаҳрамон|каҳрамон|skin|скин|build|билд|lega|лега)`)
 
+// playerID is a Mobile Legends account as players write it, its ID and
+// server: "1586840150 (16698)". Asked "nikiz nma" in reply to one, the
+// router took it for small talk and the chat model said it could not look
+// accounts up, which the mlbb tool does; anywhere in the turn, the quoted
+// message too, it goes to the full path.
+var playerID = regexp.MustCompile(`(^|[^\d])\d{6,12}\s*[(\[]\s*\d{3,6}\s*[)\]]`)
+
 // ownLine is the asker's own words: the last line of the turn's text,
 // after the speaker's name, without what they quoted.
 func ownLine(text string) string {
@@ -76,7 +83,7 @@ var toolsMarker = regexp.MustCompile(`(?i)^\s*[\[(<]\s*tools\s*[\])>]\s*$`)
 // leaves the turn to the full path, and marks it escalated once the chat
 // model was asked.
 func (a *Agent) tryChat(ctx context.Context, t *turn) (Answer, bool, error) {
-	if a.opts.Router == nil || a.opts.ChatModel == nil || len(t.req.Attachments) > 0 || gameWords.MatchString(ownLine(t.req.Text)) || !a.wantsChat(ctx, t) {
+	if a.opts.Router == nil || a.opts.ChatModel == nil || len(t.req.Attachments) > 0 || gameWords.MatchString(ownLine(t.req.Text)) || playerID.MatchString(t.req.Text) || !a.wantsChat(ctx, t) {
 		return Answer{}, false, nil
 	}
 	messages := a.prompt(t)
