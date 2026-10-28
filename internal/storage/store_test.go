@@ -107,7 +107,7 @@ func TestMigrateIsIdempotent(t *testing.T) {
 func TestMigrateReportsAppliedCount(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
-	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, group_messages, image_generations, bot_replies, groups, broadcasts, group_replies, group_rules, moderation_actions, private_messages, group_members, owner_notices, user_profiles, bot_stickers, sticker_sends, hero_games, hero_scores, presentations, quiz_tests, quiz_runs, skipped_messages, settings, schema_migrations CASCADE`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, group_messages, image_generations, bot_replies, groups, broadcasts, group_replies, group_rules, moderation_actions, private_messages, group_members, owner_notices, user_profiles, bot_stickers, sticker_sends, hero_games, hero_scores, skipped_messages, settings, schema_migrations CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 
