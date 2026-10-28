@@ -85,7 +85,7 @@ var swearWords = map[string]bool{
 // swearStems are beginnings of words that are swearing in any form:
 // "нахуй", "пиздец", "ебать", "jalablar", "qo'tog'im".
 var swearStems = []string{
-	"хуй", "хуе", "хую", "хуя", "пизд", "ебан", "ебат", "ебал", "ебу", "бляд", "блят",
+	"хуй", "хуе", "хую", "хуя", "пизд", "ебан", "ебат", "ебал", "ебу", "бляд", "блят","бля", "сука", "сучк", "пидр", "пидо", "пидр", "пидо", "жала", "кот", "ко't", "ske",
 	"pawolna", "pasholna", "poshelna", "пошелна", "пашолна",
 	"pizd", "xuyn", "gandon", "гандон", "jalab", "жалаб", "dalbayob", "далбаёб", "далбаеб",
 	"qo'tog", "qotog", "котаг", "қўтоғ", "кўтоғ", "sikay", "sikam", "sikib", "sikdi", "sikvor","bla",
