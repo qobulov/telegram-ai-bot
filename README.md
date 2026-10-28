@@ -688,6 +688,11 @@ members; and for its admins also `/mute`, `/unmute`, `/ignore` and
 `/unignore`. In a group the menu adds the bot's username itself. A failure is
 only logged.
 
+Each start also sets the profile's bio and description (`internal/app/profile.go`),
+in Uzbek for everyone and in Russian and English for those apps, where they differ
+from Telegram's. Change them there, not in @BotFather or through the bot: the next
+start puts them back. Owners can still change the bot's name and photo by asking it.
+
 **Calling by name.** A wake word counts when it is a whole word, in any case,
 and is the first word, the second word, or the last word of the message:
 
