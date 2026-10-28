@@ -286,10 +286,25 @@ func (c *Checker) do(ctx context.Context, method, link string, header http.Heade
 		return fmt.Errorf("guards: %s: %w", req.URL.Host, err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("guards: %s answered %d", req.URL.Host, resp.StatusCode)
+		return fmt.Errorf("guards: %s answered %d%s", req.URL.Host, resp.StatusCode, refusalReason(raw))
 	}
 	if err := json.Unmarshal(raw, into); err != nil {
 		return fmt.Errorf("guards: %s: %w", req.URL.Host, err)
 	}
 	return nil
+}
+
+// refusalReason is the reason a service gave with a refusal, such as
+// Sightengine's "monthly limit reached", which a bare 400 left unknown.
+func refusalReason(raw []byte) string {
+	var answer struct {
+		Error struct {
+			Type    string `json:"type"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(raw, &answer) != nil || answer.Error.Message == "" {
+		return ""
+	}
+	return fmt.Sprintf(": %s (%s)", answer.Error.Message, answer.Error.Type)
 }

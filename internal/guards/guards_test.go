@@ -112,6 +112,21 @@ func TestUnsafeImageUploadsThePicture(t *testing.T) {
 	}
 }
 
+// A 400 says why, as Sightengine answers a picture it will not check with
+// its reason in the body.
+func TestUnsafeImageSaysWhySightengineRefused(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(w, `{"status":"failure","error":{"type":"usage_limit","code":24,"message":"Monthly usage limit reached"}}`)
+	}))
+	t.Cleanup(server.Close)
+	c := New(Options{Sightengine: server.URL, SightengineUser: "u", SightengineSecret: "s"})
+	_, _, err := c.UnsafeImage(context.Background(), []byte("JPEG"))
+	if err == nil || !strings.Contains(err.Error(), "answered 400: Monthly usage limit reached (usage_limit)") {
+		t.Errorf("err = %v", err)
+	}
+}
+
 func TestKeysDecideWhatCanBeChecked(t *testing.T) {
 	if c := New(Options{}); c.CanCheckLinks() || c.CanCheckImages() {
 		t.Error("checks without keys")
