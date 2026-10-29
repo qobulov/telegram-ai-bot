@@ -34,7 +34,7 @@ func (s *Service) keyboardAnswer(ctx context.Context, in incoming) (outcome, boo
 		return outcome{}, false
 	}
 	if pressed(in, keyboardTime) {
-		return say(s.timeNow(in)), true
+		return say(s.timeNow(pressedLanguage(in, keyboardTime))), true
 	}
 	if s.opts.Tools == nil {
 		return outcome{}, false
@@ -48,7 +48,7 @@ func (s *Service) keyboardAnswer(ctx context.Context, in incoming) (outcome, boo
 		keyboardDie: keyboardDie, keyboardMeme: keyboardMeme, keyboardMLBB: keyboardMLBB,
 	} {
 		if pressed(in, button) {
-			return menuQuestion(in, asks)
+			return menuQuestion(pressedLanguage(in, button), asks)
 		}
 	}
 	if req, ok := typedRequestOf(in.text); ok {
@@ -63,7 +63,7 @@ func (s *Service) keyboardAnswer(ctx context.Context, in incoming) (outcome, boo
 func (s *Service) typedAnswer(ctx context.Context, in incoming, req typedRequest) (outcome, bool) {
 	switch req.kind {
 	case "time":
-		return say(s.timeNow(in)), true
+		return say(s.timeNow(languageOf(in))), true
 	case "rate":
 		args, _ := json.Marshal(map[string]string{"code": req.code})
 		return keyboardTool(s, ctx, in, "currency_rate", string(args), rateText)
@@ -72,6 +72,23 @@ func (s *Service) typedAnswer(ctx context.Context, in incoming, req typedRequest
 		return keyboardTool(s, ctx, in, "get_weather", string(args), weatherText)
 	}
 	return outcome{}, false
+}
+
+// pressedLanguage is the language of the button's label that was pressed:
+// a few words such as "😂 Make a meme" are no sure sign of a language, but
+// the label is. A label every language shares, "🎮 MLBB", says nothing,
+// and the user's app does.
+func pressedLanguage(in incoming, button localText) string {
+	var languages []string
+	for language, label := range map[string]string{"uz": button.uz, "ru": button.ru, "en": button.en} {
+		if in.text == label {
+			languages = append(languages, language)
+		}
+	}
+	if len(languages) == 1 {
+		return languages[0]
+	}
+	return appLanguage(in.msg.From)
 }
 
 // pressed reports a message that is button, in any of its languages.
@@ -156,10 +173,11 @@ func weatherText(in incoming, w weatherResult) string {
 	return text
 }
 
-// timeNow is the time where the bot keeps its clock, Tashkent's.
-func (s *Service) timeNow(in incoming) string {
+// timeNow is the time where the bot keeps its clock, Tashkent's, in
+// language.
+func (s *Service) timeNow(language string) string {
 	now := s.opts.Now().In(s.opts.Location)
-	return fmt.Sprintf(textTimeNow.to(in), now.Format("15:04"), weekdayIn(languageOf(in), now.Weekday()), now.Format("02.01.2006"))
+	return fmt.Sprintf(textTimeNow.inLanguage(language), now.Format("15:04"), weekdayIn(language, now.Weekday()), now.Format("02.01.2006"))
 }
 
 // signed writes a temperature with its sign, as forecasts do: +5°, -3°.

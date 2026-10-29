@@ -234,6 +234,9 @@ type Photo struct {
 	// BusinessConnectionID, when set, sends it on behalf of that
 	// connection's business account.
 	BusinessConnectionID string
+	// Keyboard, in a private chat, puts the keyboard back with the picture,
+	// as Outgoing's does.
+	Keyboard [][]string
 }
 
 // SendPhoto uploads a picture and returns the ID of the sent message. A
@@ -252,6 +255,13 @@ func (c *Client) SendPhoto(ctx context.Context, photo Photo) (int64, error) {
 		}
 	}
 	fields["business_connection_id"] = photo.BusinessConnectionID // left out when ""
+	if len(photo.Keyboard) > 0 {
+		encoded, err := json.Marshal(markup(Outgoing{Keyboard: photo.Keyboard}))
+		if err != nil {
+			return 0, fmt.Errorf("telegram sendPhoto: encode: %w", err)
+		}
+		fields["reply_markup"] = string(encoded)
+	}
 	return c.upload(ctx, "sendPhoto", upload{
 		chatID: photo.ChatID, replyTo: photo.ReplyToMessageID, fields: fields,
 		field: "photo", filename: "image.png", data: photo.Data,

@@ -542,6 +542,25 @@ func TestSendPhotoUploadsTheImageAsAReply(t *testing.T) {
 	}
 }
 
+// A picture can bring the keyboard back, as a text can.
+func TestSendPhotoCarriesAKeyboard(t *testing.T) {
+	var markup string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseMultipartForm(1 << 20)
+		markup = r.FormValue("reply_markup")
+		_, _ = io.WriteString(w, `{"ok":true,"result":{"message_id":1}}`)
+	}))
+	defer server.Close()
+	client := NewClient(Options{Token: testToken, BaseURL: server.URL})
+
+	if _, err := client.SendPhoto(context.Background(), Photo{ChatID: 1, Data: []byte("x"), Keyboard: [][]string{{"❓ Yordam"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if want := `{"keyboard":[[{"text":"❓ Yordam"}]],"is_persistent":true,"resize_keyboard":true}`; markup != want {
+		t.Errorf("reply_markup = %s\nwant %s", markup, want)
+	}
+}
+
 func TestSendPhotoCutsLongCaptions(t *testing.T) {
 	var caption string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

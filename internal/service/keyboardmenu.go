@@ -105,34 +105,35 @@ var mlbbChoices = []struct {
 
 var textMLBBMeta = localText{uz: "MLBB: hozirgi meta, eng kuchli qahramonlar", ru: "MLBB: текущая мета, самые сильные герои", en: "MLBB: the current meta, the strongest heroes"}
 
-// menuQuestion answers a button that needs a value with its question.
-func menuQuestion(in incoming, button localText) (outcome, bool) {
+// menuQuestion answers a button that needs a value with its question, in
+// language, the pressed label's.
+func menuQuestion(language string, button localText) (outcome, bool) {
 	switch button {
 	case keyboardRate:
-		return outcome{text: textWhichCurrency.to(in), buttons: choiceRows(rateChoices, "rate", 3, nil)}, true
+		return outcome{text: textWhichCurrency.inLanguage(language), buttons: choiceRows(rateChoices, "rate", 3, nil)}, true
 	case keyboardWeather:
-		other := telegram.Button{Text: textOtherCity.to(in), Data: menuData + "city:"}
-		return outcome{text: textWhichCity.to(in), buttons: choiceRows(cityChoices, "city", 2, &other)}, true
+		other := telegram.Button{Text: textOtherCity.inLanguage(language), Data: menuData + "city:"}
+		return outcome{text: textWhichCity.inLanguage(language), buttons: choiceRows(cityChoices, "city", 2, &other)}, true
 	case keyboardDie:
-		return outcome{text: textWhichGame.to(in), buttons: choiceRows(diceChoices, "dice", 3, nil)}, true
+		return outcome{text: textWhichGame.inLanguage(language), buttons: choiceRows(diceChoices, "dice", 3, nil)}, true
 	case keyboardMeme:
-		return askFor(in, askedRequests["meme"]), true
+		return askFor(language, askedRequests["meme"]), true
 	case keyboardMLBB:
 		var rows [][]telegram.Button
 		for i, c := range mlbbChoices {
 			if i%2 == 0 {
 				rows = append(rows, nil)
 			}
-			rows[len(rows)-1] = append(rows[len(rows)-1], telegram.Button{Text: c.label.to(in), Data: menuData + "ml:" + c.choice})
+			rows[len(rows)-1] = append(rows[len(rows)-1], telegram.Button{Text: c.label.inLanguage(language), Data: menuData + "ml:" + c.choice})
 		}
-		return outcome{text: textMLBBMenu.to(in), buttons: rows}, true
+		return outcome{text: textMLBBMenu.inLanguage(language), buttons: rows}, true
 	}
 	return outcome{}, false
 }
 
-// askFor asks request's question with the reply box open.
-func askFor(in incoming, request askedRequest) outcome {
-	return outcome{text: request.question.to(in), ask: request.hint.to(in)}
+// askFor asks request's question, in language, with the reply box open.
+func askFor(language string, request askedRequest) outcome {
+	return outcome{text: request.question.inLanguage(language), ask: request.hint.inLanguage(language)}
 }
 
 // choiceRows are buttons for choices, perRow to a row, each sending its
@@ -196,7 +197,7 @@ func (s *Service) pressedMenu(q *telegram.CallbackQuery) {
 		if !ok {
 			return
 		}
-		out = askFor(in, request)
+		out = askFor(languageOf(in), request)
 	case "dice":
 		args, _ := json.Marshal(map[string]string{"emoji": choice})
 		var rolled struct{}

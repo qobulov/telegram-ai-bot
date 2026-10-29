@@ -251,3 +251,23 @@ func TestMLBBMenu(t *testing.T) {
 		t.Errorf("model asked %+v", calls)
 	}
 }
+
+// A button is answered in the language of its label, though a few words
+// such as "😂 Make a meme" were taken for Uzbek; and the meme, a picture,
+// brings the keyboard back with it.
+func TestMenusSpeakThePressedLabelsLanguage(t *testing.T) {
+	f := newFixture()
+	withToolRunner(f)
+	f.opts.MemesEnabled = true
+	f.replier.draws = 1
+
+	sent := f.run(textFrom(userID, keyboardMeme.en), textFrom(userID, keyboardMLBB.en))
+	if len(sent) != 2 || sent[0].text != askedRequests["meme"].question.en || sent[1].text != textMLBBMenu.uz {
+		t.Fatalf("sent = %+v; want the English question, and the MLBB menu in the app's language", sent)
+	}
+
+	sent = f.run(replyTo(askedRequests["meme"].question.en, "random"))
+	if last := sent[len(sent)-1]; !last.photo || last.keyboard == nil {
+		t.Errorf("meme = %+v; want a picture with the keyboard", last)
+	}
+}

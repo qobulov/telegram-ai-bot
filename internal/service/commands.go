@@ -396,7 +396,11 @@ func (s *Service) deliverAnswer(in incoming, out *outcome) int64 {
 		if i == 0 {
 			text = caption
 		}
-		if id := s.replyPictures(in, album, text); answerID == 0 {
+		var keyboard [][]string
+		if len(out.drawings) == 1 {
+			keyboard = out.keyboard // an album can carry none
+		}
+		if id := s.replyPictures(in, album, text, keyboard); answerID == 0 {
 			answerID = id
 		}
 	}
@@ -413,13 +417,14 @@ func albums(drawings []tools.Drawing) [][]tools.Drawing {
 }
 
 // replyPictures sends pictures as one album, or one picture alone, with
-// caption, and returns the ID of the message with the caption. When
+// caption, and returns the ID of the message with the caption. keyboard
+// goes with a picture alone; an album carries none. When
 // Telegram refuses the album, such as for one picture it cannot read, they
 // go one by one, so that the others still arrive; when it does not answer,
 // the album may be in the chat, and nothing is sent again.
-func (s *Service) replyPictures(in incoming, drawings []tools.Drawing, caption string) int64 {
+func (s *Service) replyPictures(in incoming, drawings []tools.Drawing, caption string, keyboard [][]string) int64 {
 	if len(drawings) < telegram.MinAlbum {
-		return s.replyPhoto(in, drawings[0], caption)
+		return s.replyPhoto(in, drawings[0], caption, keyboard)
 	}
 	photos := make([][]byte, len(drawings))
 	for i, drawing := range drawings {
@@ -446,14 +451,14 @@ func (s *Service) replyPictures(in incoming, drawings []tools.Drawing, caption s
 		if i == 0 {
 			text = caption
 		}
-		if id := s.replyPhoto(in, drawing, text); firstID == 0 {
+		if id := s.replyPhoto(in, drawing, text, nil); firstID == 0 {
 			firstID = id
 		}
 	}
 	return firstID
 }
 
-func (s *Service) replyPhoto(in incoming, drawing tools.Drawing, caption string) int64 {
+func (s *Service) replyPhoto(in incoming, drawing tools.Drawing, caption string, keyboard [][]string) int64 {
 	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
 	defer cancel()
 	sentID, err := s.opts.Sender.SendPhoto(ctx, telegram.Photo{
@@ -462,6 +467,7 @@ func (s *Service) replyPhoto(in incoming, drawing tools.Drawing, caption string)
 		Data:                 drawing.Data,
 		Caption:              caption,
 		BusinessConnectionID: in.businessConnectionID(),
+		Keyboard:             keyboard,
 	})
 	if err != nil {
 		s.opts.Logger.Error("send photo failed", "chat_id", in.msg.Chat.ID, "error", err)

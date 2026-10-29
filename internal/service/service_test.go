@@ -64,7 +64,7 @@ func (f *fakeSender) SendPhoto(ctx context.Context, photo telegram.Photo) (int64
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.sent = append(f.sent, sentMessage{chatID: photo.ChatID, text: photo.Caption, replyTo: photo.ReplyToMessageID, photo: true, business: photo.BusinessConnectionID})
+	f.sent = append(f.sent, sentMessage{chatID: photo.ChatID, text: photo.Caption, replyTo: photo.ReplyToMessageID, photo: true, business: photo.BusinessConnectionID, keyboard: photo.Keyboard})
 	return int64(1000 + len(f.sent)), nil
 }
 

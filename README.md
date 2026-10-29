@@ -754,7 +754,10 @@ value written in the reply box is known by the question it replies to, so
 nothing is kept between the question and its answer. The answer that ends
 a question brings the keyboard back: the reply box hides it and keeps the
 question's hint ("Masalan: Ling") in the box, which people took to mean
-that a hero's name was still wanted. All of it but the
+that a hero's name was still wanted; a meme, a picture, brings it too (an
+album of several cannot). A question is asked in the language of the label
+pressed, «😂 Make a meme» in English, as a few words are no sure sign of a
+language; «🎮 MLBB», the same in every language, in the user's app's. All of it but the
 meme and Mobile Legends is answered in code (`internal/service/keyboardanswer.go`), with the
 tools run by their registry on the sender's turn, and takes nothing from
 the daily limit, past it too; a tool that fails is said to have failed. The
