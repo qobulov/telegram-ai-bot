@@ -1429,13 +1429,36 @@ func TestManagersCommandsAndModerationRequestsPassAFullQuota(t *testing.T) {
 	for _, msg := range sent {
 		texts = append(texts, msg.text)
 	}
-	want := []string{"Okay, I won't answer Bek @bek for the next 24 hours.", "Boss: mute him"}
-	if len(texts) != len(want) || texts[0] != want[0] || !strings.HasSuffix(texts[1], want[1]) {
-		t.Errorf("sent = %q\nwant %q: the admin's commands and moderation request pass, their chat does not", texts, want)
+	want := []string{"Okay, I won't answer Bek @bek for the next 24 hours.", "Boss: mute him", "echo: how are you?"}
+	if len(texts) != len(want) || texts[0] != want[0] || !strings.HasSuffix(texts[1], want[1]) || texts[2] != want[2] {
+		t.Errorf("sent = %q\nwant %q: the admin's commands, moderation request and chat pass, the member's command does not", texts, want)
 	}
-	// The admin's chat and the member's command are counted, and denied.
-	if asked := quota.asked(); len(asked) != 3 {
-		t.Errorf("quota asked %d times, want 3: the request, the chat and the member's command", len(asked))
+	// The admin's chat is counted again without their own limit; the
+	// member's command is counted, and denied.
+	if asked := quota.asked(); len(asked) != 4 {
+		t.Errorf("quota asked %d times, want 4: the request, the chat twice and the member's command", len(asked))
+	}
+}
+
+// In production an admin spent their answers on a muddled exchange, and
+// their "@mkmillioner8 mute qil 10 min ga" went unanswered. Their own
+// limit no longer holds them; the group's minute still does.
+func TestAnAdminPastTheirOwnLimitIsAnsweredWithinTheGroups(t *testing.T) {
+	f := newFixture()
+	quota := &fakeGroupQuota{}
+	f.opts.GroupReplies = quota
+	f.opts.MemberRepliesPer10Min = 1
+	f.opts.GroupRatePerMinute = 2
+	f.opts.Workers = 1
+
+	sent := f.run(
+		inGroup(asAdmin(groupMessage("Mira, one"))),
+		inGroup(asAdmin(groupMessage("Mira, two"))),
+		inGroup(asAdmin(groupMessage("Mira, three"))),
+	)
+
+	if len(sent) != 2 || sent[0].text != "echo: one" || sent[1].text != "echo: two" {
+		t.Errorf("sent = %+v; want the first two, past the admin's own limit, and not the third, past the group's minute", sent)
 	}
 }
 

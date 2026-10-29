@@ -1286,8 +1286,11 @@ is asked in is counted.
   Not counted: owners; other bots, which have their own limit (below);
   reactions to applause; answers to her moderation questions; and `/mute`,
   `/unmute`, `/ignore` and `/unignore` from those who may use
-  them. Past the quota a group admin is still answered when their message
-  replies to another member's, as asking to moderate or ignore them does.
+  them. A group's admins have no limit of their own: past it they are
+  answered while the group's minute allows, so that an admin's "mute qil"
+  is never lost to answers spent before it; and one whose message replies
+  to another member's, as asking to moderate or ignore them does, is
+  answered past the group's minute too.
   When the count cannot be read she stays silent and logs a warning.
 - The per-user limit, `USER_RATE_LIMIT_PER_MINUTE`, is a flood guard kept in
   memory. In a private chat its first refusal is announced; in a group it

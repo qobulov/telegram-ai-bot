@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand/v2"
 	"net/http"
 	"slices"
@@ -557,23 +558,34 @@ func (s *Service) mayAnswerInGroup(in incoming) (reservation int64, allowed bool
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
 	defer cancel()
-	id, ok, err := s.opts.GroupReplies.ReserveGroupReply(ctx, storage.ReplyQuota{
+	quota := storage.ReplyQuota{
 		ChatID:    in.scope.ChatID,
 		UserID:    in.userID,
 		PerMinute: s.replyLimit(ctx, in.scope.ChatID),
 		PerMember: s.opts.MemberRepliesPer10Min,
-	})
+	}
+	id, ok, err := s.opts.GroupReplies.ReserveGroupReply(ctx, quota)
 	if err != nil {
 		s.opts.Logger.Warn("group reply count failed; staying quiet", "chat_id", in.scope.ChatID, "error", err)
 		return 0, false
 	}
-	switch {
-	case ok:
+	if ok {
 		return id, true
-	case s.isAdminActingOnAMember(in):
-		s.opts.Logger.Info("group reply limit reached, but an admin replied to a member", "chat_id", in.scope.ChatID, "user_id", in.userID)
-		return 0, true
-	case s.onlyTheyRead(ctx, in):
+	}
+	if s.isAdminAsking(ctx, in) {
+		if repliesToAMember(in, s.opts.Bot.ID) {
+			s.opts.Logger.Info("group reply limit reached, but an admin replied to a member", "chat_id", in.scope.ChatID, "user_id", in.userID)
+			return 0, true
+		}
+		// An admin's answers are not counted against them, only the group's
+		// minute: an admin who spent theirs on a muddled exchange had their
+		// "mute qil" itself go unanswered.
+		quota.PerMember = math.MaxInt32
+		if id, ok, err := s.opts.GroupReplies.ReserveGroupReply(ctx, quota); err == nil && ok {
+			return id, true
+		}
+	}
+	if s.onlyTheyRead(ctx, in) {
 		// Nobody else reads a group of two, so there is nobody to flood; the
 		// limit once left someone in distress there unanswered.
 		return 0, true
@@ -598,16 +610,16 @@ func (s *Service) isManagerCommand(in incoming) bool {
 	return s.refuseUnlessManager(ctx, in) == ""
 }
 
-// isAdminActingOnAMember reports a group admin's message that replies to
-// another member's, as asking to moderate or ignore them does. Telegram is
-// asked only then, past the quota.
-func (s *Service) isAdminActingOnAMember(in incoming) bool {
+// repliesToAMember reports a message that replies to another member's, as
+// asking to moderate or ignore them does.
+func repliesToAMember(in incoming, botID int64) bool {
 	replied := in.msg.ReplyToMessage
-	if replied == nil || replied.From == nil || replied.From.ID == s.opts.Bot.ID || replied.From.ID == in.userID {
-		return false
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
-	defer cancel()
+	return replied != nil && replied.From != nil && replied.From.ID != botID && replied.From.ID != in.userID
+}
+
+// isAdminAsking reports a message from one of the group's admins. Telegram
+// is asked only past the quota, and a failed check is no admin.
+func (s *Service) isAdminAsking(ctx context.Context, in incoming) bool {
 	isAdmin, err := s.opts.Members.IsGroupAdmin(ctx, in.scope.ChatID, in.userID)
 	if err != nil {
 		s.opts.Logger.Warn("group admin check failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
