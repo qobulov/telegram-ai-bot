@@ -733,7 +733,14 @@ nothing from the daily limit, past it too: the die is rolled with
 `send_dice`, the dollar's Central Bank rate asked of `currency_rate`, and
 Tashkent's weather of `get_weather`, each run by the tools' registry on the
 sender's turn and written in their language; the time is the bot's clock.
-A tool that fails is said to have failed. The meme's words are the model's,
+A tool that fails is said to have failed. The same plain requests typed in
+words are answered the same way (`internal/service/typedrequest.go`), in a
+private chat: a message that is nothing but a currency's rate ("dollar
+qancha", "evro kursi", "курс рубля"), the weather, of one named place or
+Tashkent ("ob-havo", "Samarqand ob-havosi", "погода"), or the time ("soat
+nechi", "который час"), word by word, five words at most. Anything more, an
+amount to convert, another day, a second question, goes to the model, and so
+does a place the weather does not know. The meme's words are the model's,
 so «😂 Mem yasab ber» is answered as if typed, a turn that calls a tool and
 so is not counted either (below);
 «❓ Yordam» (or «❓ Помощь», «❓ Help») is answered as `/help`, uncounted. A

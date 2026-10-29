@@ -25,7 +25,8 @@ const keyboardTimeout = 20 * time.Second
 // asked of the tools here and written in code, so that they take nothing
 // from the day's answers, which pay for the model. ok is false for any
 // other message, the meme button among them: a meme's words are the
-// model's.
+// model's. A plain request typed in words, "dollar qancha", is answered as
+// its button is (see typedrequest.go).
 func (s *Service) keyboardAnswer(ctx context.Context, in incoming) (outcome, bool) {
 	// A business account's customers have no keyboard: what they write is
 	// theirs, not a button.
@@ -40,11 +41,42 @@ func (s *Service) keyboardAnswer(ctx context.Context, in incoming) (outcome, boo
 	case pressed(in, keyboardDie):
 		return s.rollDie(ctx, in), true
 	case pressed(in, keyboardDollar):
-		return keyboardTool(s, ctx, in, "currency_rate", `{"code":"USD"}`, dollarText), true
+		return orError(in)(keyboardTool(s, ctx, in, "currency_rate", `{"code":"USD"}`, rateText))
 	case pressed(in, keyboardWeather):
-		return keyboardTool(s, ctx, in, "get_weather", `{"city":"Toshkent"}`, weatherText), true
+		return orError(in)(keyboardTool(s, ctx, in, "get_weather", `{"city":"Toshkent"}`, weatherText))
+	}
+	if req, ok := typedRequestOf(in.text); ok {
+		return s.typedAnswer(ctx, in, req)
 	}
 	return outcome{}, false
+}
+
+// typedAnswer answers a plain request typed in words as its button is. A
+// tool that fails, as for a place the weather does not know, leaves it to
+// the model, which may understand what the words meant.
+func (s *Service) typedAnswer(ctx context.Context, in incoming, req typedRequest) (outcome, bool) {
+	switch req.kind {
+	case "time":
+		return say(s.timeNow(in)), true
+	case "rate":
+		args, _ := json.Marshal(map[string]string{"code": req.code})
+		return keyboardTool(s, ctx, in, "currency_rate", string(args), rateText)
+	case "weather":
+		args, _ := json.Marshal(map[string]string{"city": req.city})
+		return keyboardTool(s, ctx, in, "get_weather", string(args), weatherText)
+	}
+	return outcome{}, false
+}
+
+// orError answers a button whose tool failed with the error: a button has
+// no words for the model to try instead.
+func orError(in incoming) func(outcome, bool) (outcome, bool) {
+	return func(out outcome, ok bool) (outcome, bool) {
+		if !ok {
+			return say(textError.to(in)), true
+		}
+		return out, true
+	}
 }
 
 // pressed reports a message that is button, in any of its languages.
@@ -70,14 +102,14 @@ func (s *Service) runTool(ctx context.Context, in incoming, name, args string, o
 	return true
 }
 
-// keyboardTool answers a button with a tool's result, written by write; a
-// failure says something went wrong.
-func keyboardTool[T any](s *Service, ctx context.Context, in incoming, name, args string, write func(incoming, T) string) outcome {
+// keyboardTool answers with a tool's result, written by write; ok is false
+// when the tool failed.
+func keyboardTool[T any](s *Service, ctx context.Context, in incoming, name, args string, write func(incoming, T) string) (outcome, bool) {
 	var result T
 	if !s.runTool(ctx, in, name, args, &result) {
-		return say(textError.to(in))
+		return outcome{}, false
 	}
-	return say(write(in, result))
+	return say(write(in, result)), true
 }
 
 // rollDie rolls 🎲 in the chat; the die is the answer. A refusal, such as
@@ -92,15 +124,16 @@ func (s *Service) rollDie(ctx context.Context, in incoming) outcome {
 	return outcome{}
 }
 
-type dollarResult struct {
+type rateResult struct {
+	Code     string   `json:"code"`
 	RateUZS  float64  `json:"rate_uzs"`
 	Diff     *float64 `json:"diff"`
 	RateDate string   `json:"rate_date"`
 }
 
-// dollarText is the dollar's rate, as the Central Bank gives it.
-func dollarText(in incoming, r dollarResult) string {
-	text := fmt.Sprintf(textDollarRate.to(in), groupDigits(r.RateUZS), r.RateDate)
+// rateText is a currency's rate, as the Central Bank gives it.
+func rateText(in incoming, r rateResult) string {
+	text := fmt.Sprintf(textRate.to(in), r.Code, groupDigits(r.RateUZS), r.RateDate)
 	if r.Diff != nil && *r.Diff != 0 {
 		arrow := "📈 +"
 		if *r.Diff < 0 {
@@ -192,11 +225,11 @@ var weekdays = map[string][7]string{
 }
 
 var (
-	// textDollarRate takes the rate and its date.
-	textDollarRate = localText{
-		uz: "💵 1 dollar = %s so'm (Markaziy bank, %s)",
-		ru: "💵 1 доллар = %s сум (ЦБ Узбекистана, %s)",
-		en: "💵 1 US dollar = %s so'm (Central Bank of Uzbekistan, %s)",
+	// textRate takes the currency's code, its rate and the rate's date.
+	textRate = localText{
+		uz: "💵 1 %s = %s so'm (Markaziy bank, %s)",
+		ru: "💵 1 %s = %s сум (ЦБ Узбекистана, %s)",
+		en: "💵 1 %s = %s so'm (Central Bank of Uzbekistan, %s)",
 	}
 	// textWeatherNow takes the place, the temperature, the conditions and
 	// the wind.
