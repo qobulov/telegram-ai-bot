@@ -724,28 +724,45 @@ In a private chat each user gets `PRIVATE_DAILY_LIMIT` answers a day
 `/start` and `/help` in a private chat bring a small keyboard, in place of the
 phone's own, of her common requests, in the language of the user's app
 (`internal/service/keyboard.go`): «😂 Mem yasab ber» (only when `IMGFLIP_API_KEY`
-gives her the meme tool), «🎲 Zar tashla», «💵 Dollar kursi», «🌤 Toshkent
-ob-havosi», «🕐 Soat nechi?» and «❓ Yordam». Telegram keeps it there, shrunk
-to fit, until it is closed. A button sends its own text, in any of its three
-languages. The die, the dollar, the weather and the time need no model, so
-they are answered in code (`internal/service/keyboardanswer.go`) and take
-nothing from the daily limit, past it too: the die is rolled with
-`send_dice`, the dollar's Central Bank rate asked of `currency_rate`, and
-Tashkent's weather of `get_weather`, each run by the tools' registry on the
-sender's turn and written in their language; the time is the bot's clock.
-A tool that fails is said to have failed. The same plain requests typed in
-words are answered the same way (`internal/service/typedrequest.go`), in a
-private chat: a message that is nothing but a currency's rate ("dollar
-qancha", "evro kursi", "курс рубля"), the weather, of one named place or
-Tashkent ("ob-havo", "Samarqand ob-havosi", "погода"), or the time ("soat
-nechi", "который час"), word by word, five words at most. Anything more, an
-amount to convert, another day, a second question, goes to the model, and so
-does a place the weather does not know. The meme's words are the model's,
-so «😂 Mem yasab ber» is answered as if typed, a turn that calls a tool and
-so is not counted either (below);
-«❓ Yordam» (or «❓ Помощь», «❓ Help») is answered as `/help`, uncounted. A
-group never gets the keyboard, and the buttons' words typed there are just
-words, for the model; so are they in a business account's chats.
+gives her the meme tool), «🎲 Zar tashla», «💵 Valyuta kursi», «🌤 Ob-havo»,
+«🕐 Soat nechi?» and «❓ Yordam». Telegram keeps it there, shrunk to fit,
+until it is closed. A button sends its own text, in any of its three
+languages, and the buttons that need a value ask for it first
+(`internal/service/keyboardmenu.go`):
+
+- «💵 Valyuta kursi» asks which currency, with buttons for USD, EUR, RUB,
+  KZT, CNY and GBP; a press gives its Central Bank rate, with the reply box
+  open for an amount, and the amount written there ("1 500", "2,5") is
+  converted to so'm.
+- «🌤 Ob-havo» asks which city, with buttons for eight of Uzbekistan's and
+  one for another, which opens the reply box for its name; a name the
+  weather does not know is said to be unknown.
+- «🎲 Zar tashla» asks which game: 🎲 🎯 🏀 ⚽ 🎳 or 🎰.
+- «😂 Mem yasab ber» opens the reply box for the meme's topic, which goes to
+  the model as "Shu mavzuda mem yasab ber: …".
+- «🕐 Soat nechi?» is answered at once, by the bot's clock.
+
+A choice comes back as a button's data (`kb:rate:EUR`), handled at once; a
+value written in the reply box is known by the question it replies to, so
+nothing is kept between the question and its answer. All of it but the
+meme is answered in code (`internal/service/keyboardanswer.go`), with the
+tools run by their registry on the sender's turn, and takes nothing from
+the daily limit, past it too; a tool that fails is said to have failed. The
+meme's topic is a turn of the model's that calls a tool, so it is not
+counted either (below). A chat that still has an earlier keyboard,
+«💵 Dollar kursi» or «🌤 Toshkent ob-havosi», gets the same questions.
+«❓ Yordam» (or «❓ Помощь», «❓ Help») is answered as `/help`, uncounted.
+
+The same plain requests typed in words are answered in code too
+(`internal/service/typedrequest.go`), in a private chat: a message that is
+nothing but a currency's rate ("dollar qancha", "evro kursi", "курс
+рубля"), the weather, of one named place or Tashkent ("ob-havo", "Samarqand
+ob-havosi", "погода"), or the time ("soat nechi", "который час"), word by
+word, five words at most. Anything more, an amount to convert, another day,
+a second question, goes to the model, and so does a place the weather does
+not know. A group never gets the keyboard, and the buttons' words typed
+there are just words, for the model; so are they in a business account's
+chats.
 
 An answer in a private chat that congratulates someone, a birthday, a
 holiday, an exam passed ("tabriklayman", "tug'ilgan kuning bilan",

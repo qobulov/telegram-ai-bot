@@ -8,11 +8,12 @@ import (
 
 // A private chat gets a small keyboard of Maria's common requests with
 // /start and /help, in place of the phone's own; Telegram keeps it there.
-// A button sends its text as if typed. The die, the dollar, the weather and
-// the time are answered in code, without the model and the day's limit
-// (see keyboardanswer.go); the meme is answered as typed, by the model,
-// whose words a meme needs. The help button is /help. A group never gets
-// the keyboard: it would cover every member's own.
+// A button sends its text as if typed. The time is answered at once, and
+// the rest first ask for what they need, the currency, the city, the game
+// or the meme's topic (see keyboardmenu.go); all but the meme are then
+// answered in code, without the model and the day's limit (see
+// keyboardanswer.go). The help button is /help. A group never gets the
+// keyboard: it would cover every member's own.
 
 // keyboardRequest is one button: what it says in each language.
 type keyboardRequest struct {
@@ -25,17 +26,21 @@ type keyboardRequest struct {
 var (
 	keyboardMeme    = localText{uz: "😂 Mem yasab ber", ru: "😂 Сделай мем", en: "😂 Make a meme"}
 	keyboardDie     = localText{uz: "🎲 Zar tashla", ru: "🎲 Брось кубик", en: "🎲 Roll a die"}
-	keyboardDollar  = localText{uz: "💵 Dollar kursi", ru: "💵 Курс доллара", en: "💵 Dollar rate"}
-	keyboardWeather = localText{uz: "🌤 Toshkent ob-havosi", ru: "🌤 Погода в Ташкенте", en: "🌤 Weather in Tashkent"}
+	keyboardRate    = localText{uz: "💵 Valyuta kursi", ru: "💵 Курс валют", en: "💵 Exchange rate"}
+	keyboardWeather = localText{uz: "🌤 Ob-havo", ru: "🌤 Погода", en: "🌤 Weather"}
 	keyboardTime    = localText{uz: "🕐 Soat nechi?", ru: "🕐 Который час?", en: "🕐 What time is it?"}
 	// keyboardHelp is answered as /help.
 	keyboardHelp = localText{uz: "❓ Yordam", ru: "❓ Помощь", en: "❓ Help"}
+	// The buttons as an earlier keyboard named them, which a chat keeps
+	// until the keyboard is sent again.
+	keyboardOldDollar  = localText{uz: "💵 Dollar kursi", ru: "💵 Курс доллара", en: "💵 Dollar rate"}
+	keyboardOldWeather = localText{uz: "🌤 Toshkent ob-havosi", ru: "🌤 Погода в Ташкенте", en: "🌤 Weather in Tashkent"}
 )
 
 // keyboardRows are the keyboard's buttons, two to a row.
 var keyboardRows = [][]keyboardRequest{
 	{{text: keyboardMeme, meme: true}, {text: keyboardDie}},
-	{{text: keyboardDollar}, {text: keyboardWeather}},
+	{{text: keyboardRate}, {text: keyboardWeather}},
 	{{text: keyboardTime}, {text: keyboardHelp}},
 }
 

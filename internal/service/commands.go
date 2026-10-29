@@ -50,6 +50,9 @@ type outcome struct {
 	// chat's keyboard, sent with it instead (see keyboard.go).
 	buttons  [][]telegram.Button
 	keyboard [][]string
+	// ask, when set, opens the reply box on the text, with ask as its hint:
+	// the text is a question whose answer comes next (see keyboardmenu.go).
+	ask string
 	// effect is the message effect played over the text, in a private
 	// chat only.
 	effect string
@@ -381,7 +384,7 @@ func (s *Service) deliverAnswer(in incoming, out *outcome) int64 {
 		if out.text == "" {
 			return 0
 		}
-		return s.send(in, telegram.Outgoing{Text: out.text, Buttons: out.buttons, Keyboard: out.keyboard, Effect: out.effect})
+		return s.send(in, telegram.Outgoing{Text: out.text, Buttons: out.buttons, Keyboard: out.keyboard, Ask: out.ask, Effect: out.effect})
 	}
 	caption := out.text
 	if utf8.RuneCountInString(caption) > telegram.CaptionLimit {
@@ -756,6 +759,11 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	if notice, joined := s.joinedChannels(ctx, in); !joined {
 		return notice
 	}
+	if topic, ok := s.memeTopic(in); ok {
+		// The meme's words are the model's: the topic is asked of it as if
+		// typed with the request.
+		in.text = fmt.Sprintf(memeRequest, topic)
+	}
 	if out, ok := s.keyboardAnswer(ctx, in); ok {
 		return out
 	}
@@ -925,6 +933,10 @@ func (s *Service) pressed(q *telegram.CallbackQuery) {
 	}
 	if strings.HasPrefix(q.Data, joinPayload) {
 		s.pressedJoin(q)
+		return
+	}
+	if strings.HasPrefix(q.Data, menuData) {
+		s.pressedMenu(q)
 		return
 	}
 	if q.Data != checkPayload {

@@ -1231,6 +1231,22 @@ func TestSendMessageSendsAKeyboard(t *testing.T) {
 	}
 }
 
+// A question opens the reply box on its message, with a hint, and stays
+// plain text.
+func TestSendMessageAsksForAReply(t *testing.T) {
+	client, api := newTestClient(t, okSent)
+
+	if _, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: "- Qaysi shahar?", Ask: "Masalan: Termiz"}); err != nil {
+		t.Fatalf("SendMessage: %v", err)
+	}
+	sent := api.recorded()[0]
+	markup, _ := json.Marshal(sent.params["reply_markup"])
+	want := `{"force_reply":true,"input_field_placeholder":"Masalan: Termiz"}`
+	if sent.method != "sendMessage" || string(markup) != want {
+		t.Errorf("call %s, reply_markup = %s\nwant %s", sent.method, markup, want)
+	}
+}
+
 // An effect goes with the first message of a long text only, and when
 // Telegram refuses the message with it, the message goes again without.
 func TestSendMessageSendsAnEffect(t *testing.T) {

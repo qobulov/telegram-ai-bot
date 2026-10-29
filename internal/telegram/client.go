@@ -576,12 +576,21 @@ type keyboardButton struct {
 	Text string `json:"text"`
 }
 
+// forceReply opens the reply box on the message, as if the user had chosen
+// to reply to it, with a hint in the box.
+type forceReply struct {
+	ForceReply            bool   `json:"force_reply"`
+	InputFieldPlaceholder string `json:"input_field_placeholder,omitempty"`
+}
+
 // markup is what goes under msg's first message: its buttons, else its
 // keyboard, else nothing.
 func markup(msg Outgoing) any {
 	switch {
 	case len(msg.Buttons) > 0:
 		return &inlineKeyboard{InlineKeyboard: msg.Buttons}
+	case msg.Ask != "":
+		return &forceReply{ForceReply: true, InputFieldPlaceholder: msg.Ask}
 	case len(msg.Keyboard) > 0:
 		rows := make([][]keyboardButton, len(msg.Keyboard))
 		for i, row := range msg.Keyboard {
@@ -615,7 +624,7 @@ type sentMessage struct {
 // (see formatted).
 func (c *Client) SendMessage(ctx context.Context, msg Outgoing) (int64, error) {
 	// A rich message carries no buttons, keyboard or effect.
-	if isRich(msg.Text) && len(msg.Buttons) == 0 && len(msg.Keyboard) == 0 && msg.Effect == "" {
+	if isRich(msg.Text) && len(msg.Buttons) == 0 && len(msg.Keyboard) == 0 && msg.Ask == "" && msg.Effect == "" {
 		id, err := c.sendRich(ctx, msg)
 		var refused *APIError
 		// Telegram answered no, so nothing was sent: the plain message

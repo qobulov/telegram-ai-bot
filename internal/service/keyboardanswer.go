@@ -20,30 +20,36 @@ type ToolRunner interface {
 // keyboardTimeout bounds a keyboard button's tool: a live rate or forecast.
 const keyboardTimeout = 20 * time.Second
 
-// keyboardAnswer answers a press of one of the private keyboard's buttons
-// that needs no model: the die, the dollar, the weather and the time are
-// asked of the tools here and written in code, so that they take nothing
-// from the day's answers, which pay for the model. ok is false for any
-// other message, the meme button among them: a meme's words are the
-// model's. A plain request typed in words, "dollar qancha", is answered as
-// its button is (see typedrequest.go).
+// keyboardAnswer answers the private keyboard in code, so that it takes
+// nothing from the day's answers, which pay for the model: the time at
+// once, a button that needs a value with its question (see
+// keyboardmenu.go), and the reply to such a question with the tool's
+// result. A plain request typed in words, "dollar qancha", is answered as
+// its button would be (see typedrequest.go). ok is false for any other
+// message, a meme's topic among them: a meme's words are the model's.
 func (s *Service) keyboardAnswer(ctx context.Context, in incoming) (outcome, bool) {
 	// A business account's customers have no keyboard: what they write is
 	// theirs, not a button.
 	if in.group || in.businessConnectionID() != "" {
 		return outcome{}, false
 	}
-	switch {
-	case pressed(in, keyboardTime):
+	if pressed(in, keyboardTime) {
 		return say(s.timeNow(in)), true
-	case s.opts.Tools == nil:
+	}
+	if s.opts.Tools == nil {
 		return outcome{}, false
-	case pressed(in, keyboardDie):
-		return s.rollDie(ctx, in), true
-	case pressed(in, keyboardDollar):
-		return orError(in)(keyboardTool(s, ctx, in, "currency_rate", `{"code":"USD"}`, rateText))
-	case pressed(in, keyboardWeather):
-		return orError(in)(keyboardTool(s, ctx, in, "get_weather", `{"city":"Toshkent"}`, weatherText))
+	}
+	if out, ok := s.menuReply(ctx, in); ok {
+		return out, true
+	}
+	for button, asks := range map[localText]localText{
+		keyboardRate: keyboardRate, keyboardOldDollar: keyboardRate,
+		keyboardWeather: keyboardWeather, keyboardOldWeather: keyboardWeather,
+		keyboardDie: keyboardDie, keyboardMeme: keyboardMeme,
+	} {
+		if pressed(in, button) {
+			return menuQuestion(in, asks)
+		}
 	}
 	if req, ok := typedRequestOf(in.text); ok {
 		return s.typedAnswer(ctx, in, req)
@@ -51,9 +57,9 @@ func (s *Service) keyboardAnswer(ctx context.Context, in incoming) (outcome, boo
 	return outcome{}, false
 }
 
-// typedAnswer answers a plain request typed in words as its button is. A
-// tool that fails, as for a place the weather does not know, leaves it to
-// the model, which may understand what the words meant.
+// typedAnswer answers a plain request typed in words as its button would.
+// A tool that fails, as for a place the weather does not know, leaves it
+// to the model, which may understand what the words meant.
 func (s *Service) typedAnswer(ctx context.Context, in incoming, req typedRequest) (outcome, bool) {
 	switch req.kind {
 	case "time":
@@ -66,17 +72,6 @@ func (s *Service) typedAnswer(ctx context.Context, in incoming, req typedRequest
 		return keyboardTool(s, ctx, in, "get_weather", string(args), weatherText)
 	}
 	return outcome{}, false
-}
-
-// orError answers a button whose tool failed with the error: a button has
-// no words for the model to try instead.
-func orError(in incoming) func(outcome, bool) (outcome, bool) {
-	return func(out outcome, ok bool) (outcome, bool) {
-		if !ok {
-			return say(textError.to(in)), true
-		}
-		return out, true
-	}
 }
 
 // pressed reports a message that is button, in any of its languages.
@@ -112,23 +107,13 @@ func keyboardTool[T any](s *Service, ctx context.Context, in incoming, name, arg
 	return say(write(in, result)), true
 }
 
-// rollDie rolls 🎲 in the chat; the die is the answer. A refusal, such as
-// too many rolls, is said.
-func (s *Service) rollDie(ctx context.Context, in incoming) outcome {
-	var rolled struct {
-		Value int `json:"value"`
-	}
-	if !s.runTool(ctx, in, "send_dice", `{"emoji":"🎲"}`, &rolled) {
-		return say(textDieLater.to(in))
-	}
-	return outcome{}
-}
-
 type rateResult struct {
-	Code     string   `json:"code"`
-	RateUZS  float64  `json:"rate_uzs"`
-	Diff     *float64 `json:"diff"`
-	RateDate string   `json:"rate_date"`
+	Code    string  `json:"code"`
+	RateUZS float64 `json:"rate_uzs"`
+	// ConvertedUZS is the amount asked about, in so'm.
+	ConvertedUZS *float64 `json:"converted_uzs"`
+	Diff         *float64 `json:"diff"`
+	RateDate     string   `json:"rate_date"`
 }
 
 // rateText is a currency's rate, as the Central Bank gives it.

@@ -518,6 +518,10 @@ type Outgoing struct {
 	// Effect is the ID of an animation played over the message, such as
 	// EffectParty, which Telegram plays only in private chats.
 	Effect string
+	// Ask, when set, opens the reply box on the message with Ask as its
+	// hint, so that what the user writes next answers it: a question the
+	// bot asks.
+	Ask string
 }
 
 // EffectParty is the 🎉 message effect, one of the few Telegram offers in
