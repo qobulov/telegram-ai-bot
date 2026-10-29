@@ -1718,31 +1718,3 @@ func TestRoutingModels(t *testing.T) {
 		t.Errorf("router %q, chat %q, %v", cfg.RouterModel, cfg.ChatModel, err)
 	}
 }
-
-// Voice answers are off without TTS_MODEL; with it they reach the chat
-// model's endpoint and key unless others are named, and only the formats
-// Telegram plays as a voice message may be asked for.
-func TestSpeechSettings(t *testing.T) {
-	cfg, err := Load(getenv(validEnv()))
-	if err != nil || cfg.SpeechModel != "" {
-		t.Fatalf("default: model %q, %v", cfg.SpeechModel, err)
-	}
-	env := validEnv()
-	env["TTS_MODEL"] = "gpt-4o-mini-tts"
-	cfg, err = Load(getenv(env))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.SpeechBaseURL != cfg.AIBaseURL || cfg.SpeechAPIKey != testKey || cfg.SpeechVoice != "alloy" || cfg.SpeechFormat != "opus" {
-		t.Errorf("defaults = %q %q %q %q", cfg.SpeechBaseURL, cfg.SpeechAPIKey, cfg.SpeechVoice, cfg.SpeechFormat)
-	}
-	env["TTS_BASE_URL"], env["TTS_API_KEY"], env["TTS_VOICE"], env["TTS_FORMAT"] = "https://api.openai.com/v1", "sk-tts", "nova", "MP3"
-	cfg, err = Load(getenv(env))
-	if err != nil || cfg.SpeechBaseURL != "https://api.openai.com/v1" || cfg.SpeechAPIKey != "sk-tts" || cfg.SpeechVoice != "nova" || cfg.SpeechFormat != "mp3" {
-		t.Errorf("set = %q %q %q %q, %v", cfg.SpeechBaseURL, cfg.SpeechAPIKey, cfg.SpeechVoice, cfg.SpeechFormat, err)
-	}
-	env["TTS_FORMAT"] = "wav"
-	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "TTS_FORMAT") {
-		t.Errorf("TTS_FORMAT=wav: %v", err)
-	}
-}

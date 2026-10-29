@@ -54,9 +54,6 @@ type outcome struct {
 	// toName is the member the model named for toReplied, whose latest
 	// message the answer replies to when the asker replied to nobody.
 	toName string
-	// voice sends the text read aloud, as a voice message, as the asker
-	// asked; when it cannot be, the text goes.
-	voice bool
 	// invoice sends the invoice for premium after the text.
 	invoice bool
 }
@@ -194,13 +191,13 @@ func (s *Service) deliver(in incoming, out *outcome) int64 {
 	}
 	if id := s.sendDocuments(in, out); id != 0 {
 		// A file is the answer, its text the caption.
-		out.text, out.drawings, out.sticker, out.gif, out.audios, out.voice = "", nil, "", "", nil, false
+		out.text, out.drawings, out.sticker, out.gif, out.audios = "", nil, "", "", nil
 		return id
 	}
 	if id := s.sendAudios(in, out.audios); id != 0 {
 		// A song asked for is the answer alone, as a sticker is: words with
 		// it only say what it is. Only when it cannot be sent do they go.
-		out.text, out.drawings, out.sticker, out.gif, out.voice = "", nil, "", "", false
+		out.text, out.drawings, out.sticker, out.gif = "", nil, "", ""
 		if out.reaction != "" {
 			s.react(in, out.reaction)
 		}
@@ -365,24 +362,14 @@ func (s *Service) sendAudio(in incoming, audio tools.Audio) int64 {
 }
 
 // deliverAnswer sends the outcome's text, pictures and reaction. Several
-// pictures go as albums, the caption under the first; text asked for by
-// voice goes read aloud when it can, and out.voice is left set only when
-// it did.
+// pictures go as albums, the caption under the first.
 func (s *Service) deliverAnswer(in incoming, out *outcome) int64 {
-	spoken := out.voice
-	out.voice = false
 	if out.reaction != "" {
 		s.react(in, out.reaction)
 	}
 	if len(out.drawings) == 0 {
 		if out.text == "" {
 			return 0
-		}
-		if spoken && len(out.buttons) == 0 {
-			if id := s.sendSpoken(in, out.text); id != 0 {
-				out.voice = true
-				return id
-			}
 		}
 		return s.replyWithButtons(in, out.text, out.buttons)
 	}
@@ -483,9 +470,6 @@ func (s *Service) logExchange(in incoming, out outcome) {
 		}
 		if len(out.drawings) > 0 {
 			answer = "<photo> " + answer
-		}
-		if out.voice {
-			answer = "<voice> " + answer
 		}
 		if out.sticker != "" {
 			answer = strings.TrimSpace(answer + " <sticker " + out.sticker + ">")
@@ -768,10 +752,6 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 		caller.Target.Answered = s.answeredMember(ctx, in.scope.ChatID, caller.Target.MessageID)
 	}
 	req := s.request(ctx, in, rules)
-	voice := s.canSpeak() && wantsVoice(in.described)
-	if voice {
-		req.Context = paragraphs(req.Context, voiceNote)
-	}
 	caller.Picture = firstPicture(req.Attachments)
 	ctx = tools.WithTurn(ctx, caller, sink)
 	answer, err := s.opts.Replier.Reply(ctx, req)
@@ -789,7 +769,6 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 		s.giveBackAnswer(in, reservation)
 	}
 	out := s.answerOf(in, answer, err, started)
-	out.voice = voice && err == nil
 	out.drawings = drawings
 	out.documents = documents
 	out.audios = audios

@@ -329,10 +329,6 @@ type Options struct {
 	// Files sends the files a tool made, such as a document; nil sends
 	// none, and the answer's text goes alone.
 	Files FileSender
-	// Speaker reads an answer aloud and VoiceSender sends it, for whoever
-	// asks to be answered by voice; with either nil, every answer is text.
-	Speaker     Speaker
-	VoiceSender VoiceSender
 	// Inline answers inline queries, "@bot words" typed in any chat; nil
 	// leaves them unanswered.
 	Inline InlineAnswerer

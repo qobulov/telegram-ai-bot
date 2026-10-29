@@ -10,40 +10,6 @@ import (
 	"testing"
 )
 
-func TestSendVoiceUploadsTheSpeechAsAReply(t *testing.T) {
-	var got struct {
-		method, chatID, reply, filename string
-		voice                           []byte
-	}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		got.method = strings.TrimPrefix(r.URL.Path, "/bot"+testToken+"/")
-		if err := r.ParseMultipartForm(1 << 20); err != nil {
-			t.Errorf("not a multipart upload: %v", err)
-		}
-		got.chatID, got.reply = r.FormValue("chat_id"), r.FormValue("reply_parameters")
-		if file, header, err := r.FormFile("voice"); err == nil {
-			got.voice, _ = io.ReadAll(file)
-			got.filename = header.Filename
-		}
-		_, _ = io.WriteString(w, `{"ok":true,"result":{"message_id":55}}`)
-	}))
-	defer server.Close()
-	client := NewClient(Options{Token: testToken, BaseURL: server.URL})
-
-	id, err := client.SendVoice(context.Background(), VoiceNote{ChatID: -100, ReplyToMessageID: 12, Data: []byte("OggS..."), Format: "ogg"})
-	if err != nil || id != 55 {
-		t.Fatalf("id = %d, err = %v", id, err)
-	}
-	if got.method != "sendVoice" || got.chatID != "-100" || string(got.voice) != "OggS..." || got.filename != "voice.ogg" {
-		t.Errorf("request = %+v", got)
-	}
-	if !strings.Contains(got.reply, `"message_id":12`) {
-		t.Errorf("reply_parameters = %q", got.reply)
-	}
-}
-
-// An album names a part for each picture, puts the caption under the
-// first only, and returns the first message's ID.
 func TestSendMediaGroupUploadsEveryPicture(t *testing.T) {
 	var got struct {
 		method, chatID, media, reply string

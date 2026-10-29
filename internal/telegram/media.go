@@ -12,23 +12,6 @@ import (
 	"strings"
 )
 
-// VoiceNote is speech to send as a voice message. Telegram plays OGG/Opus,
-// MP3 and M4A as one; Format, "ogg", "mp3" or "m4a", names the file.
-type VoiceNote struct {
-	ChatID           int64
-	ReplyToMessageID int64
-	Data             []byte
-	Format           string
-}
-
-// SendVoice uploads a voice message and returns the sent message's ID.
-func (c *Client) SendVoice(ctx context.Context, voice VoiceNote) (int64, error) {
-	return c.upload(ctx, "sendVoice", upload{
-		chatID: voice.ChatID, replyTo: voice.ReplyToMessageID,
-		field: "voice", filename: "voice." + voice.Format, data: voice.Data,
-	})
-}
-
 // Album sizes Telegram accepts in one sendMediaGroup.
 const (
 	MinAlbum = 2

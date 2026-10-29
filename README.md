@@ -17,9 +17,8 @@ prices).
 - Group admins can mute her with `/mute`, and have her delete, pin, mute or
   ban by replying to a message and then saying yes to her question; see
   [Groups](#groups).
-- Replies in the chat's language (Uzbek, Russian, English), by voice when
-  asked and a speech model is set, and in any chat through inline mode
-  (`@bot question?`).
+- Replies in the chat's language (Uzbek, Russian, English), and in any chat
+  through inline mode (`@bot question?`).
 - Long polling: no public port, domain or TLS certificate needed.
 - One dependency besides the Go standard library: `pgx` for PostgreSQL.
 - Tests run without Telegram or model provider credentials.
@@ -55,7 +54,7 @@ internal/app                    assembles the bot for either way of running it
 internal/webhook                HTTP handler for webhook updates, with secret check
 internal/config                 load .env + environment, validate
 internal/telegram               Bot API client: long polling, sending, message splitting
-internal/ai                     Model client: types, retries, tool-calling format; speech for voice answers
+internal/ai                     Model client: types, retries, tool-calling format
 internal/tools                  tool registry + time, help, drawing, polls, dice, admin list, moderation, owners' tools
 internal/webapi                 live-data tools: rates, weather, prayer times, news, Wikipedia, football, crypto
 internal/storage                pgx pool, migrations, conversation queries
@@ -185,11 +184,6 @@ in the environment win over the file.
 | `ENABLE_IMAGE_GENERATION` | `true` | Let the bot draw pictures (Gemini only; needs billing on the Gemini key) |
 | `IMAGE_MODEL` | `gemini-3.1-flash-image` | Gemini model that draws |
 | `DAILY_IMAGE_LIMIT` | `2` | Pictures per user per day; owners have no limit; `0` lets only owners draw |
-| `TTS_MODEL` | empty | A text-to-speech model, such as OpenAI's `gpt-4o-mini-tts`; with it, whoever asks to be answered by voice gets a voice message. Empty, every answer is text. See [Voice answers](#voice-answers) |
-| `TTS_BASE_URL` | the chat model's API | An OpenAI-compatible API with `/audio/speech`, such as `https://api.openai.com/v1`. Gemini's OpenAI-compatible API has none, so with Gemini this must be set |
-| `TTS_API_KEY` | the chat model's key | The key for `TTS_BASE_URL`; sent in a header |
-| `TTS_VOICE` | `alloy` | The voice, as the provider names it (OpenAI: `alloy`, `nova`, `coral`, `shimmer`, …) |
-| `TTS_FORMAT` | `opus` | `opus` or `mp3`: the formats Telegram plays as a voice message |
 | `GIPHY_API_KEY` | empty | Key from <https://developers.giphy.com/dashboard/> (API, not SDK); lets her send a GIF now and then instead of a sticker. See [Stickers](#stickers) |
 | `YOUTUBE_API_KEY` | empty | YouTube Data API v3 key from Google Cloud Console, not bound to a service account; without it there is no video search |
 | `TMDB_TOKEN` | empty | TMDB API Read Access Token from <https://www.themoviedb.org/settings/api>; without it there is no movies tool |
@@ -515,33 +509,6 @@ time), with the answer as the caption under the first, instead of one
 message each. An album Telegram refuses, as it does when it cannot read one
 of the pictures, goes picture by picture; one it does not answer may be in
 the chat, and is not sent again.
-
-### Voice answers
-
-With `TTS_MODEL` set, someone who asks to be answered by voice, in a group
-or a private chat ("ovozli javob ber", "ovoz bilan ayt", "голосом ответь",
-"send a voice message", in a voice message too), gets the answer read
-aloud, as a voice message replying to them. Whether they asked is decided
-in code, from their own words, not by the model; the model is then told
-that its answer will be heard, so it writes plain spoken words under 600
-characters. "ovozli xabarni eshit", about someone's voice message, asks for
-none.
-
-The answer is read by the OpenAI-compatible `POST /audio/speech` of
-`TTS_BASE_URL` (OpenAI and OpenRouter have one), in `TTS_FORMAT`; what comes
-back must be OGG/Opus, MP3 or M4A, which Telegram plays as a voice message.
-Gemini's own speech models give WAV only, which Telegram does not play as
-one, and its OpenAI-compatible API has no `/audio/speech`; encoding WAV to
-Opus would take a codec the bot does not have, so with Gemini the speech
-goes through another provider, such as OpenAI with `TTS_BASE_URL=https://api.openai.com/v1`,
-`TTS_API_KEY`, `TTS_MODEL=gpt-4o-mini-tts` and `TTS_VOICE=nova`.
-
-The text goes as usual instead whenever the answer cannot be heard: it is
-longer than 800 characters, the speech fails or is not a voice format,
-Telegram refuses the voice message, or the answer has pictures, a file, a
-song or buttons. The history keeps the text; the group log marks a spoken
-answer `<voice>`. A voice answer is an answer like any other for the
-limits; reading it aloud is paid to the speech provider by the character.
 
 ## The owner
 
