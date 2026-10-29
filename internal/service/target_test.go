@@ -28,3 +28,26 @@ func TestTargetNamesTheChannelAPostIsFrom(t *testing.T) {
 		t.Errorf("forwarded = %+v, as the group = %+v; want no channel", forwarded, asGroup)
 	}
 }
+
+// A replied poll is marked as one, for create_poll to close, and a replied
+// sticker names its pack, for the moderate tool to set; both come from the
+// update, not the model.
+func TestTargetMarksPollsAndStickerPacks(t *testing.T) {
+	f := newFixture()
+	s := New(f.opts)
+	defer s.Close()
+	member := &telegram.User{ID: 42, FirstName: "Ali"}
+
+	poll := s.target(&telegram.Message{MessageID: 40, From: member, Poll: &telegram.Poll{Question: "Osh?"}})
+	sticker := s.target(&telegram.Message{MessageID: 41, From: member, Sticker: &telegram.Sticker{FileID: "s", SetName: "cats_by_x"}})
+	text := s.target(&telegram.Message{MessageID: 42, From: member, Text: "salom"})
+	if poll == nil || !poll.Poll || poll.StickerSet != "" {
+		t.Errorf("poll = %+v", poll)
+	}
+	if sticker == nil || sticker.Poll || sticker.StickerSet != "cats_by_x" {
+		t.Errorf("sticker = %+v", sticker)
+	}
+	if text == nil || text.Poll || text.StickerSet != "" {
+		t.Errorf("text = %+v", text)
+	}
+}

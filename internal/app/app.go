@@ -384,7 +384,7 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 	// Any group's admins, and any member for a poll or the admin list, may
 	// use these, so they are there with or without owners.
 	builtin = append(builtin, moderate,
-		tools.PollTool(tools.PollOptions{Sender: bot.Client, Store: store}),
+		tools.PollTool(tools.PollOptions{Sender: bot.Client, Store: store, Members: bot.Client, BotID: bot.User.ID, OwnersByID: len(cfg.OwnerIDs) > 0}),
 		tools.DiceTool(tools.DiceOptions{Sender: bot.Client, Store: store}),
 		tools.AdminsTool(tools.AdminsOptions{Telegram: bot.Client, BotID: bot.User.ID, Owners: cfg.OwnerIDs}),
 		tools.MembersTool(tools.MembersOptions{Store: store, Telegram: bot.Client, Owners: cfg.OwnerIDs, Location: cfg.Location}),

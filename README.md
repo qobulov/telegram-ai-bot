@@ -679,7 +679,7 @@ In a private chat each user gets `PRIVATE_DAILY_LIMIT` answers a day
 
 `/start` and `/help` in a private chat bring a small keyboard, in place of the
 phone's own, of her common requests, in the language of the user's app
-(`internal/service/keyboard.go`): «😂 Mem yasab ber» (only when `IMGFLIP_*`
+(`internal/service/keyboard.go`): «😂 Mem yasab ber» (only when `IMGFLIP_API_KEY`
 gives her the meme tool), «🎲 Zar tashla», «💵 Dollar kursi», «🌤 Toshkent
 ob-havosi», «🕐 Soat nechi?» and «❓ Yordam». Telegram keeps it there, shrunk
 to fit, until it is closed. A button sends its own text, which is answered as
@@ -1226,8 +1226,19 @@ key allows 100 searches an hour, far more than she sends.
 Anyone in a group can ask her for a poll ("Maria, so'rovnoma qil: plov yoki
 manti?"). She posts an anonymous poll in that group, with 2 to 10 options
 and one or several answers allowed, at most one per group every 10 minutes.
-Polls are counted in `moderation_actions` as `poll`. In a private chat she
-cannot make one.
+Polls are counted in `moderation_actions` as `poll`, with the poll's message
+once sent. In a private chat she cannot make one.
+
+She also closes a poll she made there (`create_poll` with action `stop`,
+Telegram's `stopPoll`) when asked in words ("so'rovnomani yop", "ovoz
+berishni to'xtat", "закрой опрос"): the one replied to, which must be her
+own and still open, or else her latest open one. Only whoever asked for that
+poll, the group's admins, as Telegram says when asked, and owners known by
+`BOT_OWNER_IDS` may; she then gives the final counts, which Telegram also
+shows under the closed poll. Closing is recorded as `poll_stop` with the
+poll's message, so the same update closes once; it counts as no moderation.
+A poll made before this version has no message kept and cannot be closed by
+her.
 
 ### Dice
 

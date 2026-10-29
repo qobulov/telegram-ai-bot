@@ -1151,14 +1151,19 @@ func (s *Service) target(replied *telegram.Message) *tools.Target {
 			Text:      truncate(text, tools.MaxTargetRunes),
 		}
 	}
-	return &tools.Target{
+	target := &tools.Target{
 		MessageID: replied.MessageID,
 		UserID:    replied.From.ID,
 		Name:      plainLabel(replied.From),
 		IsBot:     replied.From.IsBot,
 		Owner:     s.isOwner(replied.From),
 		Text:      truncate(text, tools.MaxTargetRunes),
+		Poll:      replied.Poll != nil,
 	}
+	if replied.Sticker != nil {
+		target.StickerSet = replied.Sticker.SetName
+	}
+	return target
 }
 
 // answerOf turns the agent's answer, or its error, into what is sent back.

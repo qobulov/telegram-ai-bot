@@ -84,6 +84,10 @@ type Target struct {
 	Owner bool
 	// Text is the message's text or caption, at most MaxTargetRunes.
 	Text string
+	// Poll is true for a poll, which create_poll may close if the bot made
+	// it; StickerSet is, for a sticker, the pack it is from.
+	Poll       bool
+	StickerSet string
 	// Answered is, when the message is one of the bot's answers, the member
 	// whose message it answered, if known: whom an owner means by "don't
 	// answer him" in a reply to that answer.
