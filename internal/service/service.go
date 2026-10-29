@@ -407,8 +407,10 @@ type Service struct {
 	pictureVerdicts *recently[string, verdict]
 
 	// typingInterval is how often "typing" is shown again while a turn
-	// runs: typingRefresh, shortened by tests.
+	// runs: typingRefresh, shortened by tests; typingDelay is how long a
+	// turn runs before it is first shown: typingWait, zero in tests.
 	typingInterval time.Duration
+	typingDelay    time.Duration
 	// inlineDeadline bounds the work before an inline answer:
 	// inlineDeadline, shortened by tests.
 	inlineDeadline time.Duration
@@ -497,6 +499,7 @@ func New(opts Options) *Service {
 		transcribing:    make(chan struct{}, backgroundTranscriptions),
 		inlines:         make(chan struct{}, inlineSlots),
 		typingInterval:  typingRefresh,
+		typingDelay:     typingWait,
 		inlineDeadline:  inlineDeadline,
 	}
 	for _, chatID := range opts.MutedChats {
@@ -1136,9 +1139,16 @@ func (s *Service) react(in incoming, emoji string) {
 // Telegram clears it after about 5 seconds.
 const typingRefresh = 4 * time.Second
 
-// showTyping shows "typing" in the chat at once and again every
-// typingInterval, until stop is called or ctx ends: a turn can take many
-// seconds, and without a sign of life people ask again. stop waits for the
+// typingWait is how long a turn runs before "typing" is shown. A quick
+// answer, which is what a reaction instead of words usually is, comes
+// before it: "typing" followed by no text but an emoji looked like a
+// message that went missing.
+const typingWait = 2 * time.Second
+
+// showTyping shows "typing" in the chat once the turn has run typingDelay,
+// and again every typingInterval, until stop is called or ctx ends: a turn
+// can take many seconds, and without a sign of life people ask again. stop
+// waits for the
 // goroutine, so that no "typing" is sent after the answer, where it would
 // hang over a finished reply. Like a reaction, it is a gesture, so failures
 // are only logged at debug level, and not at all once the turn is over: a
@@ -1154,6 +1164,13 @@ func (s *Service) showTyping(ctx context.Context, msg *telegram.Message) (stop f
 	ctx, cancel := context.WithCancel(ctx)
 	var typing sync.WaitGroup
 	typing.Go(func() {
+		wait := time.NewTimer(s.typingDelay)
+		defer wait.Stop()
+		select {
+		case <-ctx.Done():
+			return
+		case <-wait.C:
+		}
 		ticker := time.NewTicker(s.typingInterval)
 		defer ticker.Stop()
 		// The loop condition, not the select, ends it, so that no send starts

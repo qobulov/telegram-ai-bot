@@ -883,7 +883,10 @@ To keep the bot out of groups altogether, use `/setjoingroups` in @BotFather.
   name or `@username` is never applause, and owners always get an answer.
 - The model may itself answer with one emoji reaction or with nothing. The
   history and the group log record a reaction as `You: <reacted 🔥>`.
-- While she is working on an answer the chat shows her as typing.
+- While she is working on an answer the chat shows her as typing, once
+  the answer has taken two seconds: a quicker one, which is what a reaction
+  usually is, comes without it, so "typing" is never followed by an emoji
+  alone.
 - Telegram allows only its own list of reaction emoji; a group can allow
   fewer. A reaction Telegram refuses is logged at debug level and dropped.
 

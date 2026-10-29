@@ -2349,7 +2349,7 @@ func TestTypingShownDuringTurn(t *testing.T) {
 	f.replier.release = make(chan struct{})
 	s := serverless(f, &fakeMuteStore{})
 	defer s.Close()
-	s.typingInterval = testTypingInterval
+	s.typingInterval, s.typingDelay = testTypingInterval, 0
 
 	done := make(chan struct{})
 	go func() {
@@ -2389,6 +2389,7 @@ func TestTypingIsShownInTheTopic(t *testing.T) {
 	inTopic.IsTopicMessage, inTopic.MessageThreadID = true, 7
 	s := serverless(f, &fakeMuteStore{})
 	defer s.Close()
+	s.typingDelay = 0
 
 	done := make(chan struct{})
 	go func() {
@@ -2432,6 +2433,7 @@ func TestAnswerWaitsForTypingInFlight(t *testing.T) {
 	f.replier.release = make(chan struct{})
 	s := serverless(f, &fakeMuteStore{})
 	defer s.Close()
+	s.typingDelay = 0
 
 	done := make(chan struct{})
 	go func() {
@@ -2470,11 +2472,28 @@ func TestTypingCutOffByTheAnswerIsNotLogged(t *testing.T) {
 	f.opts.ChatActor = heldChatActor{}
 	s := serverless(f, &fakeMuteStore{})
 	defer s.Close()
+	s.typingDelay = 0
 
 	s.HandleNow(inGroup(groupMessage("Mira, hi")))
 
 	if strings.Contains(logs.String(), "typing indicator failed") {
 		t.Errorf("stopping typing for the answer was logged as a failure:\n%s", logs.String())
+	}
+}
+
+// A quick answer, often a reaction instead of words, comes before "typing"
+// is shown: "typing" and then only an emoji looked like a lost message.
+func TestQuickAnswerShowsNoTyping(t *testing.T) {
+	f := newFixture()
+	f.replier.reaction = "🤣"
+
+	f.run(inGroup(groupMessage("Mira, haha")))
+
+	if shown := f.chatActor.recorded(); len(shown) != 0 {
+		t.Errorf("chat actions = %+v; a turn quicker than typingWait shows none", shown)
+	}
+	if got := f.reactor.recorded(); len(got) != 1 || got[0].emoji != "🤣" {
+		t.Errorf("reactions = %+v, want the model's 🤣", got)
 	}
 }
 
