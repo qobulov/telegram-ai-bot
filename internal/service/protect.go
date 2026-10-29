@@ -11,7 +11,7 @@ import (
 )
 
 // The guards an owner may turn on in a group, run in code with no model:
-// known spammers banned, links to malicious hosts and nude or gory pictures
+// known spammers banned, links to malicious hosts and nude pictures
 // deleted. The spam and link guards leave admins, owners, bots and posts on
 // behalf of a chat alone; the picture guard spares nobody. A muted group is
 // left alone.
@@ -116,10 +116,13 @@ func (s *Service) protected(in incoming) bool {
 			return true
 		}
 	}
-	// A nude or gory picture goes whoever sent it, owners and admins too.
+	// A nude picture goes whoever sent it, owners and admins too; the
+	// owners' punishment for it spares them.
 	if set.images {
 		if reason, bad := s.unsafePicture(ctx, msg); bad {
-			s.removeGuarded(ctx, in, storage.ActionImageDelete, senderMention(msg)+", nomaqbul rasm o'chirildi ("+reason+").")
+			if s.removeGuarded(ctx, in, storage.ActionImageDelete, senderMention(msg)+", nomaqbul rasm o'chirildi ("+reason+").") && guardable {
+				s.punishPicture(ctx, msg)
+			}
 			return true
 		}
 	}
@@ -322,16 +325,35 @@ func (s *Service) banSpammer(ctx context.Context, in incoming, user *telegram.Us
 	s.postGuard(in.msg, "🚫 "+mentionOf(user)+" spamerlar ro'yxatida ("+source+"), guruhdan chiqarildi.")
 }
 
-// removeGuarded deletes a caught message and says why, once per update.
-func (s *Service) removeGuarded(ctx context.Context, in incoming, action, note string) {
+// removeGuarded deletes a caught message and says why, once per update,
+// and reports whether it did.
+func (s *Service) removeGuarded(ctx context.Context, in incoming, action, note string) bool {
 	if !s.recordGuard(ctx, in, action, in.msg.From.ID) {
-		return
+		return false
 	}
 	if err := s.opts.GroupModerator.DeleteMessage(ctx, in.msg.Chat.ID, in.msg.MessageID); err != nil {
 		s.opts.Logger.Warn("guards: could not delete a message", "chat_id", in.msg.Chat.ID, "action", action, "error", err)
-		return
+		return false
 	}
 	s.postGuard(in.msg, "⚠️ "+note)
+	return true
+}
+
+// punishPicture carries out the owners' punishment for an unsafe picture,
+// when they set one for its sender or for anyone in the group.
+func (s *Service) punishPicture(ctx context.Context, msg *telegram.Message) {
+	rules, err := s.opts.Rules.GroupRules(ctx, msg.Chat.ID)
+	if err != nil {
+		s.opts.Logger.Warn("guards: could not read the rules", "chat_id", msg.Chat.ID, "error", err)
+		return
+	}
+	if _, p, ok := punishmentFor(rules, msg.Chat.ID, msg.From.ID, storage.RulePicturePunishment); ok {
+		role := ""
+		if s.isGroupAdmin(ctx, msg) {
+			role = "administrator"
+		}
+		s.punish(ctx, msg, p, role, "nomaqbul rasm yubordi", "")
+	}
 }
 
 // recordGuard notes what a guard did, for the owners' report, and reports

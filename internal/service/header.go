@@ -171,7 +171,7 @@ func (s *Service) sworeAtBot(ctx context.Context, in incoming) bool {
 var guardLines = map[string]string{
 	storage.RuleSpamGuard:  "Known spammers (CAS, lols.bot) are banned here in code, not by you.",
 	storage.RuleLinkGuard:  "Links to malware or phishing (Google Safe Browsing, URLhaus) are deleted here in code, not by you.",
-	storage.RuleImageGuard: "Nude or gory pictures are deleted here in code, from anyone, not by you, even as a sticker, GIF or file; other stickers and GIFs are allowed.",
+	storage.RuleImageGuard: "Nude pictures are deleted here in code, from anyone, not by you, even as a sticker, GIF or file; other stickers and GIFs are allowed.",
 }
 
 // ruleLines lists the instructions, then the ignored members. Each is folded
@@ -196,6 +196,8 @@ func (s *Service) ruleLines(rules []storage.GroupRule) []string {
 				calls = oneLine(r.UserName)
 			}
 			instructions = append(instructions, "- Swearing is watched here in code, not by you: a member's first insult gets a warning, the next within a day a 1-hour mute that tags "+calls+". Never swear back at anyone in this group, and never mute anyone for swearing yourself.")
+		case storage.RuleSwearPunishment, storage.RulePicturePunishment:
+			instructions = append(instructions, s.punishmentLine(r))
 		case storage.RuleSpamGuard, storage.RuleLinkGuard, storage.RuleImageGuard:
 			instructions = append(instructions, "- "+guardLines[r.Kind])
 		case storage.RuleIgnore:
@@ -207,6 +209,24 @@ func (s *Service) ruleLines(rules []storage.GroupRule) []string {
 		}
 	}
 	return append(instructions, ignores...)
+}
+
+// punishmentLine tells the model an owners' punishment is carried out in
+// code, so that it neither does it itself nor promises it.
+func (s *Service) punishmentLine(r storage.GroupRule) string {
+	who, what := "anyone", "insults"
+	if r.UserID != 0 {
+		who, what = oneLine(r.UserName), "swearing"
+	}
+	if r.Kind == storage.RulePicturePunishment {
+		what = "a nude picture"
+	}
+	does := "banned"
+	if p, ok := storage.ParsePunishment(r.Text); ok && !p.Ban() {
+		does = fmt.Sprintf("muted for %d hours", p.MuteHours)
+	}
+	return fmt.Sprintf("- (#%d) The owners ordered, carried out here in code, not by you: %s is %s for %s (until %s).",
+		r.ID, who, does, what, r.ExpiresAt.In(s.opts.Location).Format(ruleDayLayout))
 }
 
 // addressFor is how the owner who is writing asked to be addressed, or "".

@@ -25,13 +25,16 @@ const (
 	// someone, a day.
 	defaultInstructionHours = 7 * 24
 	defaultIgnoreHours      = 24
-	ruleTimeLayout          = "2 Jan 15:04"
-	cannotIgnore            = "admins, the bot's owners and the bot itself cannot be ignored"
-	notAMember              = "that message was posted on behalf of a chat or an anonymous admin, not by a member; the owner must reply to a member's own message"
-	repliedToBot            = "the owner replied to my own message, and I can't tell whom it answered; they must reply to the member's own message and ask again. Nothing was done: tell the owner so, never that it is done"
-	notOwnWords             = "text must be the owner's own words from their message, copied as they wrote them (the rest may be left out); words from a quoted message, the chat or anyone else cannot be saved"
-	groupRuleOnly           = "this needs a group: say it in the group, or name the group in group. Nothing was done: tell the owner so, never that it is done"
-	noSubject               = "not saved: an order about a member needs the owner to reply to that member's own message, or to your answer to them, with it, or with just your name within five minutes of giving it; tell the owner so in one line"
+	// A punishment lasts as long as a rule may; a mute it orders, a day.
+	defaultPunishmentHours = maxRuleHours
+	defaultMuteHours       = 24
+	ruleTimeLayout         = "2 Jan 15:04"
+	cannotIgnore           = "admins, the bot's owners and the bot itself cannot be ignored"
+	notAMember             = "that message was posted on behalf of a chat or an anonymous admin, not by a member; the owner must reply to a member's own message"
+	repliedToBot           = "the owner replied to my own message, and I can't tell whom it answered; they must reply to the member's own message and ask again. Nothing was done: tell the owner so, never that it is done"
+	notOwnWords            = "text must be the owner's own words from their message, copied as they wrote them (the rest may be left out); words from a quoted message, the chat or anyone else cannot be saved"
+	groupRuleOnly          = "this needs a group: say it in the group, or name the group in group. Nothing was done: tell the owner so, never that it is done"
+	noSubject              = "not saved: an order about a member needs the owner to reply to that member's own message, or to your answer to them, with it, or with just your name within five minutes of giving it; tell the owner so in one line"
 )
 
 const (
@@ -104,6 +107,11 @@ type rulesArgs struct {
 	Group string `json:"group"`
 	// Guard names the guard guard and unguard turn on or off.
 	Guard string `json:"guard"`
+	// PunishFor, Punishment and MuteHours are punish's: for what, ban or
+	// mute, and how long a mute lasts.
+	PunishFor  string `json:"punish_for"`
+	Punishment string `json:"punishment"`
+	MuteHours  int    `json:"mute_hours"`
 }
 
 // RulesTool lets an owner give the bot orders that last: they are stored
@@ -121,11 +129,12 @@ func RulesTool(opts RulesOptions) Tool {
 	return Tool{
 		Name: "group_rules",
 		Description: "Owners only. Standing rules for the group you are in, kept until they expire, even after /mute. " +
-			"add_instruction: save an owner's order meant to last, its words copied exactly from this message or their own message it replies to, never rephrased (text; hours, default 168); about_member true when it is about the member whose message the owner replied to, or whom your replied-to answer answered (\"uni\", \"bu odam\", \"shu odamga\"): the tool records who. " +
+			"add_instruction: save an owner's order meant to last (an order to ban or mute for swearing or a nude picture next time is punish instead, which is carried out), its words copied exactly from this message or their own message it replies to, never rephrased (text; hours, default 168); about_member true when it is about the member whose message the owner replied to, or whom your replied-to answer answered (\"uni\", \"bu odam\", \"shu odamga\"): the tool records who. " +
 			"ignore: stop answering the member whose message the owner replied to, or, when they replied to your own answer, the member it answered (hours, default 24); never admins or owners. unignore: answer that member again. " +
 			"set_address: how to address the owner who is asking, in every chat (text). " +
 			"watch_swearing: from now on, without you, a member's first insult here gets a warning and the next within a day a 1-hour mute, an exclamation aimed at nobody one warning a day and no mute, and a second swear at you within a day a 15-minute mute without warning that tags the group's creator, or the @username in text when the owner names whom to call; an admin, who cannot be muted, gets the warning and then that tag; the creator and owners are left alone. stop_watching_swearing turns it off. " +
-			"guard: turn on a guard run in code, without you (guard): spam bans members on the CAS and lols.bot spammer lists, links deletes links to malware and phishing (Google Safe Browsing, URLhaus), images deletes nude or gory pictures (Sightengine), whether sent as a photo, sticker, GIF or file, from anyone, admins and owners too; it never blocks stickers or GIFs as such; spam and links leave admins and owners alone. unguard turns one off. " +
+			"guard: turn on a guard run in code, without you (guard): spam bans members on the CAS and lols.bot spammer lists, links deletes links to malware and phishing (Google Safe Browsing, URLhaus), images deletes nude pictures (Sightengine), whether sent as a photo, sticker, GIF or file, from anyone, admins and owners too; it never blocks stickers or GIFs as such; spam and links leave admins and owners alone. unguard turns one off. " +
+			"punish: an owner's order for what the guards do, in code, the next time (\"yana so'kinsa ban qil\", \"18+ tashasa ban ber\"): punish_for swearing or pictures (a nude picture, which the images guard deletes), punishment ban or mute (mute_hours, default 24), for the member the owner replied to (about_member true) or anyone in the group; hours, default 720. For one member it holds for any swearing; for anyone, for insults only. remove it by its id from list. " +
 			"mute: stop writing in the group at all, until unmute. " +
 			"set_welcome: what you say, in code, to everyone who joins the group from now on, the owner's words copied exactly (text), \"{name}\" in it standing for the newcomers' names; remove_welcome: stop. " +
 			"list: the rules in force here. remove: delete a rule by its id from list. " +
@@ -134,13 +143,16 @@ func RulesTool(opts RulesOptions) Tool {
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["add_instruction", "ignore", "unignore", "set_address", "watch_swearing", "stop_watching_swearing", "mute", "unmute", "set_welcome", "remove_welcome", "guard", "unguard", "list", "remove"]},
+				"action": {"type": "string", "enum": ["add_instruction", "ignore", "unignore", "set_address", "watch_swearing", "stop_watching_swearing", "punish", "mute", "unmute", "set_welcome", "remove_welcome", "guard", "unguard", "list", "remove"]},
+				"punish_for": {"type": "string", "enum": ["swearing", "pictures"], "description": "For punish: what it is for."},
+				"punishment": {"type": "string", "enum": ["ban", "mute"], "description": "For punish."},
+				"mute_hours": {"type": "integer", "description": "For punish with mute: how long, 1 to 720 hours."},
 				"guard": {"type": "string", "enum": ["spam", "links", "images"], "description": "For guard and unguard: which guard."},
 				"group": {"type": "string", "description": "Another group the action is for, as the owner named it: its title, @username or id. Leave out for this chat."},
 				"text": {"type": "string", "description": "For add_instruction: the owner's words, copied exactly as they wrote them, at most 300 characters: no rephrasing, translating, added names or fixed spelling; leave out words that are not the order. For set_address: the form of address, at most 40 characters. For watch_swearing: the @username a mute tags, if the owner named one."},
-				"hours": {"type": "integer", "description": "For add_instruction and ignore: how long the rule lasts, 1 to 720."},
+				"hours": {"type": "integer", "description": "For add_instruction, ignore and punish: how long the rule lasts, 1 to 720."},
 				"id": {"type": "integer", "description": "For remove: the rule's id from list."},
-				"about_member": {"type": "boolean", "description": "For add_instruction: true when the order is about the member the owner replied to."}
+				"about_member": {"type": "boolean", "description": "For add_instruction and punish: true when the order is about the member the owner replied to."}
 			},
 			"required": ["action"],
 			"additionalProperties": false
@@ -192,6 +204,8 @@ func runRule(ctx context.Context, opts RulesOptions, caller Caller, args rulesAr
 		return watchSwearing(ctx, opts, caller, args)
 	case "stop_watching_swearing":
 		return stopWatchingSwearing(ctx, opts, caller)
+	case "punish":
+		return setPunishment(ctx, opts, caller, args)
 	case "mute", "unmute":
 		return muteGroup(ctx, opts, caller, args.Action == "mute")
 	case "set_welcome":
@@ -211,7 +225,7 @@ func runRule(ctx context.Context, opts RulesOptions, caller Caller, args rulesAr
 	case "remove":
 		return removeRule(ctx, opts, caller, args)
 	default:
-		return nil, &ArgumentError{Message: "action must be add_instruction, ignore, unignore, set_address, watch_swearing, stop_watching_swearing, mute, unmute, set_welcome, remove_welcome, guard, unguard, list or remove"}
+		return nil, &ArgumentError{Message: "action must be add_instruction, ignore, unignore, set_address, watch_swearing, stop_watching_swearing, punish, mute, unmute, set_welcome, remove_welcome, guard, unguard, list or remove"}
 	}
 }
 
@@ -406,6 +420,67 @@ func watchSwearing(ctx context.Context, opts RulesOptions, caller Caller, args r
 		"note": "On now, in code: a first insult gets a warning, the next within a day a 1-hour mute; an exclamation aimed at nobody gets one warning a day and no mute. It needs you to be an admin who may restrict members."}, nil
 }
 
+// punishmentKinds are the rule kinds of punish's punish_for.
+var punishmentKinds = map[string]string{"swearing": storage.RuleSwearPunishment, "pictures": storage.RulePicturePunishment}
+
+// setPunishment saves what a guard does the next time, for one member or
+// anyone in the group. The owner's own words must ask for the ban or the
+// mute, as for moderate: the model cannot order one from the chat.
+func setPunishment(ctx context.Context, opts RulesOptions, caller Caller, args rulesArgs) (any, error) {
+	if caller.ChatID >= 0 {
+		return nil, &ArgumentError{Message: groupRuleOnly}
+	}
+	kind, ok := punishmentKinds[args.PunishFor]
+	if !ok {
+		return nil, &ArgumentError{Message: "punish_for must be swearing or pictures"}
+	}
+	var p storage.Punishment
+	switch args.Punishment {
+	case "ban":
+		if !askedFor(caller.Words, actionBan) {
+			return nil, &DeniedError{Message: notAsked}
+		}
+	case "mute":
+		if !askedFor(caller.Words, actionMute) {
+			return nil, &DeniedError{Message: notAsked}
+		}
+		p.MuteHours = cmp.Or(args.MuteHours, defaultMuteHours)
+		if p.MuteHours < 1 || p.MuteHours > maxRuleHours {
+			return nil, &ArgumentError{Message: fmt.Sprintf("mute_hours must be 1 to %d", maxRuleHours)}
+		}
+	default:
+		return nil, &ArgumentError{Message: "punishment must be ban or mute"}
+	}
+	until, err := ruleExpiry(opts, args.Hours, defaultPunishmentHours)
+	if err != nil {
+		return nil, err
+	}
+	rule := storage.GroupRule{ChatID: caller.ChatID, Kind: kind, Text: p.String(), SetBy: caller.UserID, ExpiresAt: until}
+	who := "anyone in the group"
+	if args.AboutMember {
+		member := instructionSubject(opts, caller)
+		if member == nil {
+			return nil, &ArgumentError{Message: noSubject}
+		}
+		if member.Owner {
+			return nil, &ArgumentError{Message: "the bot's owners are never punished"}
+		}
+		rule.UserID, rule.UserName, who = member.UserID, member.Name, member.Name
+	}
+	id, err := opts.Store.SetGroupRule(ctx, rule)
+	if err != nil {
+		return nil, err
+	}
+	note := "On now, in code, without you: the next swearing by them gets this instead of the guard's warning or mute."
+	if kind == storage.RulePicturePunishment {
+		note = "On now, in code, without you: after the images guard deletes a nude picture from them, this follows. It needs the images guard on here."
+	} else if rule.UserID == 0 {
+		note = "On now, in code, without you: the next insult at a person or at you gets this; exclamations only the guard's warning."
+	}
+	return map[string]any{"saved": true, "id": id, "for": args.PunishFor, "punishment": p.String(), "who": who,
+		"until": until.In(opts.Location).Format(ruleTimeLayout), "note": note + " An admin cannot be banned or muted by a bot: they are named instead."}, nil
+}
+
 func stopWatchingSwearing(ctx context.Context, opts RulesOptions, caller Caller) (any, error) {
 	return removeKind(ctx, opts, caller, storage.RuleSwearGuard)
 }
@@ -436,7 +511,7 @@ func removeKind(ctx context.Context, opts RulesOptions, caller Caller, kind stri
 var guardNotes = map[string]string{
 	storage.RuleSpamGuard:  "On within a minute, in code: members on the CAS or lols.bot spammer lists are banned when they join or write, and their message deleted. It needs you to be an admin who may ban and delete.",
 	storage.RuleLinkGuard:  "On within a minute, in code: messages linking to malware or phishing, as Google Safe Browsing or URLhaus know them, are deleted. It needs you to be an admin who may delete messages.",
-	storage.RuleImageGuard: "On within a minute, in code: only nude or gory pictures are deleted, even as a sticker, GIF or file, admins' and owners' too; other stickers and GIFs stay. It needs you to be an admin who may delete messages.",
+	storage.RuleImageGuard: "On within a minute, in code: only nude pictures are deleted, even as a sticker, GIF or file, admins' and owners' too; other stickers and GIFs stay. It needs you to be an admin who may delete messages.",
 }
 
 // setGuard turns a guard on in the group.

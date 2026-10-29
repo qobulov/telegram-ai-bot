@@ -777,6 +777,7 @@ does not erase them, and every turn in the group is told the ones in force.
 | Ignore a member | an owner replying to that member's message, or to her answer to them, in the group | 24 hours, or 1 to 720 hours if the owner says |
 | Form of address | an owner, for themselves, in any chat; it holds everywhere | until removed |
 | Swear guard | an owner, in the group it is for ("so'kinganlarni avtomatik mute qil", optionally "@Bakxtyorvch ni chaqir"); one per group | until turned off |
+| Punishment | an owner, in the group, for swearing or nude pictures: in reply to a member ("bu bola yana so'kinsa ban qil") or for anyone ("18+ tashasa 3 soat mute qil"); one per member and kind | 30 days, or the hours given |
 
 The swear guard runs in code, asking the model only one thing. In a group
 where it is on, every message from a member is checked against a list of
@@ -806,6 +807,18 @@ update delivered twice is handled once. Muting needs her to be an admin who may
 restrict members; without that right the notice says so and still tags.
 "Maria, endi so'kinishni kuzatma" turns it off. She cannot watch a chat
 herself, and says so rather than promise to.
+
+An owner's punishment (`group_rules` `punish`, kinds `swear_punishment` and
+`picture_punishment`, "ban" or "mute:<hours>" in text) is carried out in code
+too, so it holds whether or not anyone talks to her: words alone, kept as an
+instruction, reached only the model, which never sees a message not meant
+for it. One set for a member, by replying to their message, holds for any
+swearing of theirs, exclamations too, in place of the guard's warning or
+mute, and works with the swear guard off; one for anyone in the group holds
+for insults only. A picture punishment follows the picture guard deleting a
+nude picture, so it needs that guard on. The owner's own words must ask for
+the ban or the mute, as with moderation. Owners are never punished, and an
+admin, whom no bot can ban or mute, is named instead.
 
 Owners can ask her to list the rules and remove one by its number. Group
 admins and owners can also ignore a member for 24 hours with `/ignore@Bot`

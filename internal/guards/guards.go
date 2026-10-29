@@ -210,8 +210,7 @@ func (c *Checker) urlhausHost(ctx context.Context, host string) (string, bool, e
 	return "", false, nil
 }
 
-// unsafeScore is the probability above which a picture is taken as nude or
-// gory.
+// unsafeScore is the probability above which a picture is taken as nude.
 const unsafeScore = 0.7
 
 // UnsafeImage reports whether Sightengine sees nudity in a picture. Each

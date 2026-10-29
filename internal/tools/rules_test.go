@@ -707,3 +707,51 @@ func TestRulesToolTurnsGuardsOnAndOff(t *testing.T) {
 		t.Errorf("unguard = %+v, rules %+v", env, store.all())
 	}
 }
+
+// ownerPunishing is an owner's turn replying to target, if any, with words.
+func ownerPunishing(target *Target, words string) context.Context {
+	return WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Owner: true, Human: true, UpdateID: 1, MessageID: 30, Target: target, Words: words}, &Sink{})
+}
+
+// "Bu bola yana so'kinsa ban qil" in reply to a member is kept as a ban for
+// their swearing; "18+ tashasa 3 soat mute qil" for anyone's pictures.
+func TestRulesToolSavesAPunishment(t *testing.T) {
+	store := &fakeRules{}
+	registry := rulesRegistry(t, store, fakeAdmins{})
+
+	env := rules(registry, ownerPunishing(bekTarget(), "bu bola yana so'kinsa ban qil"), `{"action":"punish","punish_for":"swearing","punishment":"ban","about_member":true}`)
+	if !env.OK || !strings.Contains(string(env.Result), `"who":"Bek @bek"`) {
+		t.Fatalf("punish = %+v %s", env, env.Result)
+	}
+	env = rules(registry, ownerPunishing(nil, "18+ tashasa 3 soat mute qil"), `{"action":"punish","punish_for":"pictures","punishment":"mute","mute_hours":3}`)
+	if !env.OK {
+		t.Fatalf("punish pictures = %+v", env)
+	}
+	got := store.all()
+	if len(got) != 2 || got[0].Kind != storage.RuleSwearPunishment || got[0].UserID != memberID || got[0].Text != "ban" ||
+		!got[0].ExpiresAt.Equal(rulesNow.Add(maxRuleHours*time.Hour)) || got[1].Kind != storage.RulePicturePunishment || got[1].UserID != 0 || got[1].Text != "mute:3" {
+		t.Errorf("rules = %+v", got)
+	}
+}
+
+func TestRulesToolPunishmentNeedsTheOwnersWords(t *testing.T) {
+	store := &fakeRules{}
+	registry := rulesRegistry(t, store, fakeAdmins{})
+	for words, args := range map[string]string{
+		"bu bola yomon":                  `{"action":"punish","punish_for":"swearing","punishment":"ban","about_member":true}`,
+		"yana so'kinsa ban qil":          `{"action":"punish","punish_for":"swearing","punishment":"mute","about_member":true}`,
+		"yana so'kinsa mute qil":         `{"action":"punish","punish_for":"swearing","punishment":"mute","mute_hours":721}`,
+		"yana so'kinsa ban qil, iltimos": `{"action":"punish","punish_for":"spam","punishment":"ban"}`,
+	} {
+		if env := rules(registry, ownerPunishing(bekTarget(), words), args); env.OK {
+			t.Errorf("%q, %s: saved", words, args)
+		}
+	}
+	owner := &Target{MessageID: 29, UserID: memberID, Name: "Boss", Owner: true}
+	if env := rules(registry, ownerPunishing(owner, "yana so'kinsa ban qil"), `{"action":"punish","punish_for":"swearing","punishment":"ban","about_member":true}`); env.OK {
+		t.Errorf("an owner was given a punishment: %s", env.Result)
+	}
+	if got := store.all(); len(got) != 0 {
+		t.Errorf("rules = %+v", got)
+	}
+}

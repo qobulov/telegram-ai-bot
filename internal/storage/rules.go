@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -25,12 +27,45 @@ const (
 	// owner's words; "{name}" in it is the newcomers' names.
 	RuleWelcome = "welcome"
 	// RuleSpamGuard bans members known as spammers, RuleLinkGuard deletes
-	// links to malicious hosts and RuleImageGuard nude or gory pictures, in
+	// links to malicious hosts and RuleImageGuard nude pictures, in
 	// one group, in code.
 	RuleSpamGuard  = "spam_guard"
 	RuleLinkGuard  = "link_guard"
 	RuleImageGuard = "image_guard"
+	// RuleSwearPunishment and RulePicturePunishment are an owner's order
+	// for what the swear or picture guard does to a member, or, without a
+	// UserID, to anyone: Text is a Punishment.
+	RuleSwearPunishment   = "swear_punishment"
+	RulePicturePunishment = "picture_punishment"
 )
+
+// Punishment is what a punishment rule does: a ban, or a mute of MuteHours.
+type Punishment struct {
+	MuteHours int
+}
+
+// Ban reports a ban rather than a mute.
+func (p Punishment) Ban() bool { return p.MuteHours == 0 }
+
+// String is how a punishment is kept in a rule's text.
+func (p Punishment) String() string {
+	if p.Ban() {
+		return "ban"
+	}
+	return "mute:" + strconv.Itoa(p.MuteHours)
+}
+
+// ParsePunishment reads a punishment rule's text.
+func ParsePunishment(text string) (Punishment, bool) {
+	if text == "ban" {
+		return Punishment{}, true
+	}
+	hours, err := strconv.Atoi(strings.TrimPrefix(text, "mute:"))
+	if !strings.HasPrefix(text, "mute:") || err != nil || hours < 1 {
+		return Punishment{}, false
+	}
+	return Punishment{MuteHours: hours}, true
+}
 
 // MaxInstructions is how many instructions a group may have in force at
 // once. Every one of them is sent with every turn there.

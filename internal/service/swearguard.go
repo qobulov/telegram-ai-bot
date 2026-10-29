@@ -140,8 +140,14 @@ func (s *Service) guardedSwearing(msg *telegram.Message, updateID int64) bool {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), swearGuardTime)
 	defer cancel()
-	guard, on := s.swearGuard(ctx, msg.Chat.ID)
-	if !on || s.isMuted(msg.Chat.ID) {
+	rules, err := s.opts.Rules.GroupRules(ctx, msg.Chat.ID)
+	if err != nil {
+		s.opts.Logger.Warn("swear guard: could not read the rules", "chat_id", msg.Chat.ID, "error", err)
+		return false
+	}
+	guard, on := swearGuardIn(rules, msg.Chat.ID)
+	ordered, punishment, punished := punishmentFor(rules, msg.Chat.ID, msg.From.ID, storage.RuleSwearPunishment)
+	if (!on && !punished) || s.isMuted(msg.Chat.ID) {
 		return false
 	}
 	admins, err := s.opts.AdminList.GetChatAdministrators(ctx, msg.Chat.ID)
@@ -169,12 +175,21 @@ func (s *Service) guardedSwearing(msg *telegram.Message, updateID int64) bool {
 	if !s.recordStrike(ctx, msg, updateID, action) {
 		return true
 	}
+	caller := swearCaller(guard, admins)
+	// The owners' own order goes first: one for this member holds for any
+	// swearing, one for anyone in the group for insults alone.
+	if punished && (ordered.UserID != 0 || target != aimExclamation) {
+		s.punish(ctx, msg, punishment, role, "yana so'kindi", caller)
+		return true
+	}
+	if !on {
+		return false
+	}
 	strikes, err := s.opts.Strikes.SwearStrikes(ctx, msg.Chat.ID, msg.From.ID, action, s.opts.Now().Add(-swearWindow))
 	if err != nil {
 		s.opts.Logger.Warn("swear guard: could not count strikes; leaving it", "chat_id", msg.Chat.ID, "error", err)
 		return false
 	}
-	caller := swearCaller(guard, admins)
 	switch target {
 	case aimBot:
 		return s.guardedSwearingAtBot(ctx, msg, strikes, role, caller)
@@ -290,13 +305,9 @@ func (s *Service) botNames() string {
 	return strings.Join(names, ", ")
 }
 
-// swearGuard is the group's swear guard rule, if an owner turned it on.
-func (s *Service) swearGuard(ctx context.Context, chatID int64) (storage.GroupRule, bool) {
-	rules, err := s.opts.Rules.GroupRules(ctx, chatID)
-	if err != nil {
-		s.opts.Logger.Warn("swear guard: could not read the rules", "chat_id", chatID, "error", err)
-		return storage.GroupRule{}, false
-	}
+// swearGuardIn is the group's swear guard rule among rules, if an owner
+// turned it on.
+func swearGuardIn(rules []storage.GroupRule, chatID int64) (storage.GroupRule, bool) {
 	for _, r := range rules {
 		if r.Kind == storage.RuleSwearGuard && r.ChatID == chatID {
 			return r, true
