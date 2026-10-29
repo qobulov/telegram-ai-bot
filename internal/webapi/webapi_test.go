@@ -278,7 +278,7 @@ func wantFits(t *testing.T, env envelope, limit int) {
 
 func TestToolsHaveStrictSchemas(t *testing.T) {
 	opts := newUpstream(t, nil).options()
-	opts.FootballToken = "token"
+	opts.FootballToken, opts.Pins = "token", &fakePins{}
 	for _, tool := range Tools(opts) {
 		var schema struct {
 			Type                 string `json:"type"`
@@ -302,7 +302,7 @@ func TestToolsHaveStrictSchemas(t *testing.T) {
 
 func TestToolsRejectUnknownArguments(t *testing.T) {
 	opts := newUpstream(t, nil).options()
-	opts.FootballToken = "token"
+	opts.FootballToken, opts.Pins = "token", &fakePins{}
 	registry := newRegistry(t, opts)
 	for _, tool := range Tools(opts) {
 		wantError(t, execute(t, registry, tool.Name, `{"surprise":1}`), "invalid_arguments")

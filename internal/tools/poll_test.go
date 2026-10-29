@@ -15,11 +15,32 @@ import (
 	"telegram-ai-bot/internal/telegram"
 )
 
-// fakePollSender records the polls it is asked to post.
+// fakePollSender records the polls it is asked to post, and to close.
 type fakePollSender struct {
 	mu    sync.Mutex
 	polls []telegram.OutgoingPoll
 	err   error
+	// stopped are the messages of the polls closed; stopErr makes closing
+	// fail.
+	stopped []int64
+	stopErr error
+}
+
+func (f *fakePollSender) StopPoll(_ context.Context, _, messageID int64) (telegram.Poll, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.stopped = append(f.stopped, messageID)
+	if f.stopErr != nil {
+		return telegram.Poll{}, f.stopErr
+	}
+	return telegram.Poll{Question: "Lunch?", IsClosed: true, TotalVoterCount: 5,
+		Options: []telegram.PollOption{{Text: "Plov", VoterCount: 4}, {Text: "Lagman", VoterCount: 1}}}, nil
+}
+
+func (f *fakePollSender) closed() []int64 {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]int64(nil), f.stopped...)
 }
 
 func (f *fakePollSender) SendPoll(_ context.Context, poll telegram.OutgoingPoll) (int64, error) {
@@ -92,6 +113,36 @@ func (f *fakePollAudit) ChatModeration(_ context.Context, chatID int64, action s
 	return count, nil
 }
 
+func (f *fakePollAudit) SetModerationMessage(_ context.Context, updateID int64, action string, messageID int64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i, r := range f.records {
+		if r.action.UpdateID == updateID && r.action.Action == action {
+			f.records[i].action.TargetMessageID = messageID
+		}
+	}
+	return nil
+}
+
+// OpenPoll is the store's query: the latest sent poll of the chat, or the
+// one in messageID, with no record of closing it.
+func (f *fakePollAudit) OpenPoll(_ context.Context, chatID, messageID int64) (storage.ModerationAction, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i := len(f.records) - 1; i >= 0; i-- {
+		poll := f.records[i].action
+		if poll.ChatID != chatID || poll.Action != actionPoll || poll.TargetMessageID == 0 || (messageID != 0 && poll.TargetMessageID != messageID) {
+			continue
+		}
+		if !slices.ContainsFunc(f.records, func(r pollRecord) bool {
+			return r.action.ChatID == chatID && r.action.Action == actionPollStop && r.action.TargetMessageID == poll.TargetMessageID
+		}) {
+			return poll, true, nil
+		}
+	}
+	return storage.ModerationAction{}, false, nil
+}
+
 func (f *fakePollAudit) recorded() []storage.ModerationAction {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -105,6 +156,7 @@ func (f *fakePollAudit) recorded() []storage.ModerationAction {
 type pollEnv struct {
 	sender   *fakePollSender
 	audit    *fakePollAudit
+	chat     *fakeChat
 	now      time.Time
 	opts     PollOptions
 	registry *Registry
@@ -112,9 +164,9 @@ type pollEnv struct {
 
 func newPollEnv(t *testing.T) *pollEnv {
 	t.Helper()
-	env := &pollEnv{sender: &fakePollSender{}, now: rulesNow}
+	env := &pollEnv{sender: &fakePollSender{}, now: rulesNow, chat: &fakeChat{members: map[int64]telegram.ChatMember{}, failing: map[int64]bool{}}}
 	env.audit = &fakePollAudit{now: env.clock}
-	env.opts = PollOptions{Sender: env.sender, Store: env.audit, Now: env.clock}
+	env.opts = PollOptions{Sender: env.sender, Store: env.audit, Members: env.chat, BotID: rulesBotID, OwnersByID: true, Now: env.clock}
 	env.registry = mustRegistry(t, PollTool(env.opts))
 	return env
 }
@@ -150,7 +202,7 @@ func TestPollSent(t *testing.T) {
 		!slices.Equal(polls[0].Options, want.Options) || polls[0].Multiple != want.Multiple || polls[0].ReplyToMessageID != 60 {
 		t.Errorf("polls = %+v\nwant    [%+v]", polls, want)
 	}
-	wantAudit := storage.ModerationAction{ChatID: groupA, Action: "poll", RequesterID: memberID, UpdateID: 100}
+	wantAudit := storage.ModerationAction{ChatID: groupA, Action: "poll", RequesterID: memberID, TargetMessageID: 901, UpdateID: 100}
 	if audit := env.audit.recorded(); len(audit) != 1 || !reflect.DeepEqual(plainAudit(audit[0]), wantAudit) {
 		t.Errorf("audit = %+v\nwant    [%+v]", audit, wantAudit)
 	}
@@ -380,5 +432,112 @@ func TestPollHidesStoreErrors(t *testing.T) {
 	}
 	if polls := env.sender.sent(); len(polls) != 0 {
 		t.Errorf("polls = %+v, want none", polls)
+	}
+}
+
+// stopping is userID's turn in groupA, in update updateID, saying words and
+// replying to target.
+func stopping(updateID int64, words string, target *Target) context.Context {
+	return WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: updateID, MessageID: 61, Target: target, Words: words}, &Sink{})
+}
+
+// pollMessage is the bot's poll in message id.
+func pollMessage(id int64) *Target {
+	return &Target{MessageID: id, UserID: rulesBotID, IsBot: true, Poll: true}
+}
+
+// The poll sent is kept with its message, and whoever asked for it closes
+// it, the latest without a reply, and hears the counts; it cannot be closed
+// twice, and a second delivery of the same update closes nothing.
+func TestPollStoppedByItsAsker(t *testing.T) {
+	env := newPollEnv(t)
+	if got := env.poll(memberAsking(groupA, 100), lunchPoll); !got.OK {
+		t.Fatalf("create_poll = %+v", got)
+	}
+	if audit := env.audit.recorded(); len(audit) != 1 || audit[0].TargetMessageID != 901 {
+		t.Fatalf("audit = %+v, want the poll's message kept", audit)
+	}
+	asker := WithTurn(context.Background(), Caller{UserID: memberID, ChatID: groupA, Human: true, UpdateID: 101, MessageID: 62, Words: "Mari so'rovnomani yop"}, &Sink{})
+
+	got := env.poll(asker, `{"action":"stop"}`)
+
+	want := `{"note":"` + pollStopNote + `","question":"Lunch?","results":[{"option":"Plov","votes":4},{"option":"Lagman","votes":1}],"stopped":true,"voters":5}`
+	if !got.OK || string(got.Result) != want {
+		t.Errorf("stop = %+v %s\nwant %s", got, got.Result, want)
+	}
+	if closed := env.sender.closed(); !slices.Equal(closed, []int64{901}) {
+		t.Errorf("closed = %v, want the poll's message", closed)
+	}
+	// Delivered again, the update finds the poll closed.
+	expectRefusal(t, env.poll(asker, `{"action":"stop"}`), "forbidden", noOpenPoll)
+	again := WithTurn(context.Background(), Caller{UserID: memberID, ChatID: groupA, Human: true, UpdateID: 102, MessageID: 63, Words: "yop"}, &Sink{})
+	expectRefusal(t, env.poll(again, `{"action":"stop"}`), "forbidden", noOpenPoll)
+	if closed := env.sender.closed(); len(closed) != 1 {
+		t.Errorf("closed = %v, want once", closed)
+	}
+}
+
+// Someone else's poll is closed only by an admin or an owner known by ID,
+// and only when their words ask; a reply picks the poll, which must be the
+// bot's and open.
+func TestPollStopIsCheckedAndPicksTheRepliedPoll(t *testing.T) {
+	env := newPollEnv(t)
+	env.poll(memberAsking(groupA, 100), lunchPoll)
+	env.now = rulesNow.Add(11 * time.Minute)
+	env.poll(memberAsking(groupA, 110), lunchPoll)
+
+	expectRefusal(t, env.poll(stopping(120, "yop", nil), `{"action":"stop"}`), "forbidden", notPollsAsker)
+	expectRefusal(t, env.poll(stopping(121, "natija qani", nil), `{"action":"stop"}`), "forbidden", notAskedToStop)
+	members := &Target{MessageID: 55, UserID: memberID, Poll: true}
+	expectRefusal(t, env.poll(stopping(122, "yop", members), `{"action":"stop"}`), "forbidden", repliedNotOpen)
+	expectRefusal(t, env.poll(stopping(123, "yop", pollMessage(999)), `{"action":"stop"}`), "forbidden", repliedNotOpen)
+	env.chat.failing[userID] = true
+	expectRefusal(t, env.poll(stopping(124, "yop", nil), `{"action":"stop"}`), "execution_failed", "could not ask Telegram")
+	if closed := env.sender.closed(); len(closed) != 0 {
+		t.Fatalf("closed = %v, want none", closed)
+	}
+
+	env.chat.failing[userID] = false
+	env.chat.set(userID, admin())
+	if got := env.poll(stopping(125, "birinchisini yop", pollMessage(901)), `{"action":"stop"}`); !got.OK {
+		t.Fatalf("admin's stop = %+v", got)
+	}
+	owner := WithTurn(context.Background(), Caller{UserID: adminID, ChatID: groupA, Owner: true, Human: true, UpdateID: 126, Words: "закрой опрос"}, &Sink{})
+	if got := env.poll(owner, `{"action":"stop"}`); !got.OK {
+		t.Fatalf("owner's stop = %+v", got)
+	}
+	if closed := env.sender.closed(); !slices.Equal(closed, []int64{901, 902}) {
+		t.Errorf("closed = %v, want the replied poll, then the latest", closed)
+	}
+}
+
+// A poll Telegram closed already stays closed; any other failure lets the
+// same update try again.
+func TestPollStopFailures(t *testing.T) {
+	env := newPollEnv(t)
+	env.poll(memberAsking(groupA, 100), lunchPoll)
+	asker := WithTurn(context.Background(), Caller{UserID: memberID, ChatID: groupA, Human: true, UpdateID: 101, Words: "tugat"}, &Sink{})
+
+	env.sender.stopErr = errors.New("dial tcp: i/o timeout")
+	if got := env.poll(asker, `{"action":"stop"}`); got.OK || got.Error.Code != "execution_failed" {
+		t.Errorf("unanswered stop = %+v", got)
+	}
+	env.sender.stopErr = &telegram.APIError{Code: 400, Description: "Bad Request: poll has already been closed"}
+	if got := env.poll(asker, `{"action":"stop"}`); !got.OK || !strings.Contains(string(got.Result), pollStoppedOff) {
+		t.Errorf("stop of a closed poll = %+v %s", got, got.Result)
+	}
+	if _, open, _ := env.audit.OpenPoll(context.Background(), groupA, 0); open {
+		t.Error("a poll Telegram closed is still open")
+	}
+}
+
+// An unknown action is refused; create is the default and may be named.
+func TestPollActionIsChecked(t *testing.T) {
+	env := newPollEnv(t)
+	if got := env.poll(memberAsking(groupA, 100), `{"action":"close"}`); got.OK || got.Error.Code != "invalid_arguments" {
+		t.Errorf("unknown action = %+v", got)
+	}
+	if got := env.poll(memberAsking(groupA, 101), `{"action":"create","question":"Q?","options":["a","b"]}`); !got.OK {
+		t.Errorf("create = %+v", got)
 	}
 }

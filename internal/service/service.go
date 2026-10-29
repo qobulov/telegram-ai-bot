@@ -314,6 +314,9 @@ type Options struct {
 	// requests are left to the groups' admins. See joins.go.
 	Joins    JoinBook
 	JoinGate JoinGate
+	// Boosts keeps the boosts given to groups, each thanked for once; nil
+	// thanks for none.
+	Boosts BoostBook
 	// Stickers picks the sticker the model asked for, StickerSender sends
 	// it, and StickerImporter brings packs in for /import_stickers; with any
 	// nil, no sticker is sent or imported.
@@ -368,6 +371,9 @@ type Options struct {
 	Business           BusinessBook
 	BusinessLookup     BusinessLookup
 	BusinessDailyLimit int
+	// MemesEnabled is true when the model has the make_meme tool; the
+	// private chats' keyboard offers a meme only then.
+	MemesEnabled bool
 }
 
 // Service processes updates on a fixed pool of workers.
@@ -601,8 +607,8 @@ func (s *Service) HandleNow(update telegram.Update) {
 // handledApart handles, at once and off the workers, an update that is no
 // message to answer, and reports whether update was one: a change of
 // membership, a button press, an edited message, which only the guards
-// look at, a request to join a group, or a business account connecting
-// the bot.
+// look at, a request to join a group, a business account connecting
+// the bot, or a boost, which is thanked for.
 func (s *Service) handledApart(update telegram.Update) bool {
 	switch {
 	case update.MyChatMember != nil:
@@ -617,6 +623,8 @@ func (s *Service) handledApart(update telegram.Update) bool {
 		s.requestedJoin(update.ChatJoinRequest)
 	case update.BusinessConnection != nil:
 		s.recordBusinessConnection(update.BusinessConnection)
+	case update.ChatBoost != nil:
+		s.thankBoost(update.ChatBoost)
 	default:
 		return false
 	}
@@ -1145,15 +1153,17 @@ func (s *Service) reply(in incoming, text string) int64 {
 
 // replyWithButtons is reply with link buttons under the text.
 func (s *Service) replyWithButtons(in incoming, text string, buttons [][]telegram.Button) int64 {
+	return s.send(in, telegram.Outgoing{Text: text, Buttons: buttons})
+}
+
+// send is reply with whatever else msg carries, such as a keyboard. It goes
+// to the chat the message came from, as its reply where answers are.
+func (s *Service) send(in incoming, msg telegram.Outgoing) int64 {
 	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
 	defer cancel()
-	sentID, err := s.opts.Sender.SendMessage(ctx, telegram.Outgoing{
-		ChatID:               in.msg.Chat.ID,
-		Text:                 text,
-		ReplyToMessageID:     in.replyTarget(),
-		Buttons:              buttons,
-		BusinessConnectionID: in.businessConnectionID(),
-	})
+	msg.ChatID, msg.ReplyToMessageID = in.msg.Chat.ID, in.replyTarget()
+	msg.BusinessConnectionID = in.businessConnectionID()
+	sentID, err := s.opts.Sender.SendMessage(ctx, msg)
 	if err != nil {
 		s.opts.Logger.Error("send message failed", "chat_id", in.msg.Chat.ID, "error", err)
 		return 0

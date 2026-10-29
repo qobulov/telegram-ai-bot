@@ -83,6 +83,45 @@ func TestModerationAuditIsIdempotent(t *testing.T) {
 	}
 }
 
+// The open poll is the latest the bot sent in the chat and did not close,
+// or the one in a given message; one never sent, closed or in another chat
+// is none. Closing counts as no moderation.
+func TestOpenPollIsTheLatestNotClosed(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	mustRecord(t, store, ModerationAction{ChatID: group, Action: ActionPoll, RequesterID: alice, UpdateID: 601})
+	mustRecord(t, store, ModerationAction{ChatID: group, Action: ActionPoll, RequesterID: bob, UpdateID: 602})
+	mustRecord(t, store, ModerationAction{ChatID: group, Action: ActionPoll, RequesterID: bob, UpdateID: 603})
+	mustRecord(t, store, ModerationAction{ChatID: otherGroup, Action: ActionPoll, RequesterID: bob, UpdateID: 604})
+	for update, message := range map[int64]int64{601: 70, 602: 71, 604: 90} {
+		if err := store.SetModerationMessage(ctx, update, ActionPoll, message); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// 603 was never sent, so 602's poll is the latest.
+	poll, found, err := store.OpenPoll(ctx, group, 0)
+	if err != nil || !found || poll.TargetMessageID != 71 || poll.RequesterID != bob || poll.UpdateID != 602 {
+		t.Fatalf("OpenPoll = %+v, %v, %v", poll, found, err)
+	}
+	if poll, found, _ := store.OpenPoll(ctx, group, 70); !found || poll.RequesterID != alice {
+		t.Errorf("OpenPoll(70) = %+v, %v", poll, found)
+	}
+	if _, found, _ := store.OpenPoll(ctx, group, 90); found {
+		t.Error("another chat's poll was found")
+	}
+	mustRecord(t, store, ModerationAction{ChatID: group, Action: ActionPollStop, RequesterID: bob, TargetMessageID: 71, UpdateID: 605})
+	if poll, found, _ := store.OpenPoll(ctx, group, 0); !found || poll.TargetMessageID != 70 {
+		t.Errorf("after closing 71, OpenPoll = %+v, %v; want 70", poll, found)
+	}
+	if _, found, _ := store.OpenPoll(ctx, group, 71); found {
+		t.Error("a closed poll is still open")
+	}
+	if n, _ := store.ModerationBy(ctx, bob, time.Now().Add(-time.Minute)); n != 0 {
+		t.Errorf("ModerationBy(bob) = %d, want 0: polls and closing them are no moderation", n)
+	}
+}
+
 // The swear guard counts one member's caught swears in one chat, recent
 // ones only, and a redelivered update once.
 func TestSwearStrikesCountOneMembersRecentSwears(t *testing.T) {

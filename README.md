@@ -146,6 +146,7 @@ business_replies(id PK, connection_id, chat_id, created_at)
 business_checklists(connection_id -> business_connections, chat_id,
                     message_id, title, tasks jsonb, sent_at,
                     PK (connection_id, chat_id, message_id))
+group_boosts(chat_id, boost_id, created_at, PK (chat_id, boost_id))
 schema_migrations(version PK, applied_at)
 ```
 
@@ -649,6 +650,7 @@ answer instead of making up a number.
 | --- | --- | --- |
 | `currency_rate` | Exchange rates in so'm, gold and silver per gram | Central Bank of Uzbekistan (cbu.uz), official rates; gold and silver are an approximate world price from currency-api (jsDelivr mirror as a fallback) |
 | `get_weather` | Current weather, up to 3 days of forecast, air quality | Open-Meteo (CC BY 4.0), MET Norway as a fallback; places from GeoNames (CC BY 4.0). She says which place it matched |
+| `send_location` | Where a town, city, district or region is ("Samarqand qayerda", "Xiva lokatsiyasini tashla", "где находится Бухара"), sent as a pin on the map (`sendVenue`) under its name, with its coordinates as the address, to the chat the turn is in: in a group as a reply to the request, which keeps it in a forum topic. Found the way `get_weather` finds places, so only settlements and areas: never a street, shop or building, nor a pin guessed from memory. Asking for a location or a map ("lokatsiya", "xaritada", "где находится") skips the router | GeoNames places (CC BY 4.0), then the Open-Meteo geocoder |
 | `prayer_times` | Prayer and Ramadan times | Aladhan; approximate, the Muslim Board of Uzbekistan (muslim.uz) is official |
 | `news_headlines` | Latest headlines in Uzbek or Russian; with `world`, world news in Uzbek (Cyrillic), Russian or English | RSS feeds of kun.uz, gazeta.uz, uza.uz and daryo.uz, and of BBC O'zbek, BBC Russian and BBC World; headlines and links only |
 | `wiki_lookup` | Article summaries, "on this day" | Wikipedia (CC BY-SA) |
@@ -703,6 +705,27 @@ In a private chat each user gets `PRIVATE_DAILY_LIMIT` answers a day
   the limit guards the model's cost, and one answer too many disturbs
   nobody else.
 - `0` turns the limit off.
+
+### Keyboard and message effects
+
+`/start` and `/help` in a private chat bring a small keyboard, in place of the
+phone's own, of her common requests, in the language of the user's app
+(`internal/service/keyboard.go`): «😂 Mem yasab ber» (only when `IMGFLIP_API_KEY`
+gives her the meme tool), «🎲 Zar tashla», «💵 Dollar kursi», «🌤 Toshkent
+ob-havosi», «🕐 Soat nechi?» and «❓ Yordam». Telegram keeps it there, shrunk
+to fit, until it is closed. A button sends its own text, which is answered as
+if typed, by the model, and counted in the daily limit like any message; only
+«❓ Yordam» (or «❓ Помощь», «❓ Help») is answered as `/help`, uncounted. A
+group never gets the keyboard, and a help button's words typed there are just
+words.
+
+An answer in a private chat that congratulates someone, a birthday, a
+holiday, an exam passed ("tabriklayman", "tug'ilgan kuning bilan",
+"muborak", "поздравляю", "happy birthday"), comes with Telegram's 🎉
+message effect. The words decide, in code: the model never names an effect,
+so it can never ask for one Telegram does not have. Telegram plays effects
+only in private chats, so groups never get one, and a message Telegram
+refuses with its effect is sent again without it.
 
 ## Inline mode
 
@@ -917,6 +940,15 @@ Each start sets the menu Telegram opens on "/" (`setMyCommands`, in
 members; and for its admins also `/mute`, `/unmute`, `/ignore` and
 `/unignore`. In a group the menu adds the bot's username itself. A failure is
 only logged.
+
+Each start also sets the admin rights she asks for when someone makes her an
+admin (`setMyDefaultAdministratorRights`, `groupAdminRights` and
+`channelAdminRights` in the same file), which Telegram's dialog then shows
+ticked: in groups the ones her features use, *Delete messages*, *Ban users*,
+*Pin messages*, *Invite users*, *Manage topics*, *Change group info* and *Add
+new admins*; in channels *Post messages* and *Edit messages*, for the owners'
+broadcasts. Whoever adds her can still untick any of them, and she only ever
+uses a right both she and the admin asking hold. A failure is only logged.
 
 Each start also sets the profile's bio and description (`internal/app/profile.go`),
 in Uzbek for everyone and in Russian and English for those apps, where they differ
@@ -1188,6 +1220,16 @@ check is made in code:
   link previews), keeping the group's other permissions. Each needs its own
   admin right, the asker's and the bot's: changing the group's info,
   inviting users, pinning or restricting members.
+- **The group's sticker pack** (`set_sticker_set`, `delete_sticker_set`,
+  Telegram's `setChatStickerSet` and `deleteChatStickerSet`): replying to a
+  sticker, "shu stikerlarni guruhga qo'y" gives the group that sticker's
+  pack, which every member may then use there; the pack comes from the
+  sticker in the update, never from a name the model gives. "stikerpakni
+  olib tashla" takes it away. Both need *change the group's info*, the
+  asker's and the bot's, words about stickers or a pack ("stiker",
+  "paket", "стикерпак"), and a group Telegram lets have one: she asks
+  `getChat` first and, where `can_set_sticker_set` is false (only large
+  enough supergroups may), says so. Undo puts the old pack back, or none.
 - **Invite links:** a new link may also admit only a number of people (1 to
   99999) or make each who opens it ask the admins to approve them; Telegram
   does not combine the two, so asking for both is refused with that reason.
@@ -1411,13 +1453,36 @@ and its refusal, with how long to wait, is passed on. The owner who makes
 the set should have started a private chat with the bot first: Telegram
 may refuse to make a set for a user the bot has never talked to.
 
+### Boosts
+
+When someone boosts a group where she is an admin, Telegram sends her a
+`chat_boost` update, and she thanks them there, in code, without the model:
+"Rahmat, Ali, guruhga boost berganingiz uchun! 🚀", in Russian or English for
+an app in those languages, and without a name for a boost Telegram names no
+one for. Each boost is thanked once: its ID is noted in `group_boosts` (the
+group and the boost's ID, nothing about who gave it) before she speaks, as
+Telegram sends a boost again when it changes, such as when it is renewed.
+When it cannot be noted, or the bot is muted there, she says nothing. A boost
+taken away gets no word, so she does not ask for `removed_chat_boost`.
+
 ### Polls
 
 Anyone in a group can ask her for a poll ("Maria, so'rovnoma qil: plov yoki
 manti?"). She posts an anonymous poll in that group, with 2 to 10 options
 and one or several answers allowed, at most one per group every 10 minutes.
-Polls are counted in `moderation_actions` as `poll`. In a private chat she
-cannot make one.
+Polls are counted in `moderation_actions` as `poll`, with the poll's message
+once sent. In a private chat she cannot make one.
+
+She also closes a poll she made there (`create_poll` with action `stop`,
+Telegram's `stopPoll`) when asked in words ("so'rovnomani yop", "ovoz
+berishni to'xtat", "закрой опрос"): the one replied to, which must be her
+own and still open, or else her latest open one. Only whoever asked for that
+poll, the group's admins, as Telegram says when asked, and owners known by
+`BOT_OWNER_IDS` may; she then gives the final counts, which Telegram also
+shows under the closed poll. Closing is recorded as `poll_stop` with the
+poll's message, so the same update closes once; it counts as no moderation.
+A poll made before this version has no message kept and cannot be closed by
+her.
 
 ### Dice
 
@@ -1975,6 +2040,19 @@ Sightengine cannot, CAS's key, the `join_captcha` tool) need:
    to messages and managing stories. She writes to them with what she may
    do; `/business` shows it again, and `/business on` starts her answering
    customers, which is off at first.
+
+The keyboard, effects, closing polls, sticker packs, boosts and map pins
+update needs:
+
+1. **Apply migration 0044 before deploying** (`make migrate`, as above): it
+   adds the `group_boosts` table and changes nothing else. The new version
+   refuses to start without it.
+2. **Deploy.** The function sees that the webhook asks for fewer kinds of
+   update than the bot handles and sets it again with `chat_boost`, as
+   above. Each start also sets the admin rights she asks for and the menus.
+3. Telegram sends boosts only where she is an admin; a group's sticker pack
+   needs *Change group info*, and Telegram allows one only in large enough
+   supergroups. Polls made before this version cannot be closed by her.
 
 ### Daily cleanup
 

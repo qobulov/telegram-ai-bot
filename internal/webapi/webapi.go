@@ -59,7 +59,10 @@ type Options struct {
 	// ImgflipKey is an Imgflip API key. Without it there is no make_meme
 	// tool.
 	ImgflipKey string
-	BaseURLs   BaseURLs
+	// Pins sends the send_location tool's pins. Without it there is no
+	// send_location tool.
+	Pins     PinSender
+	BaseURLs BaseURLs
 }
 
 // BaseURLs says where each API lives. Empty fields mean the production
@@ -216,6 +219,7 @@ type apis struct {
 	youtubeKey      string
 	calendarificKey string
 	imgflipKey      string
+	pins            PinSender
 }
 
 // Tools returns the live-data tools. Football is included only when
@@ -263,6 +267,9 @@ func Tools(opts Options) []tools.Tool {
 	if a.imgflipKey != "" {
 		list = append(list, a.memeTool())
 	}
+	if a.pins != nil {
+		list = append(list, a.locationTool())
+	}
 	return list
 }
 
@@ -287,6 +294,7 @@ func newAPIs(opts Options) *apis {
 		youtubeKey:      opts.YouTubeKey,
 		calendarificKey: opts.CalendarificKey,
 		imgflipKey:      opts.ImgflipKey,
+		pins:            opts.Pins,
 	}
 }
 

@@ -47,6 +47,53 @@ type CommandSetter interface {
 	SetMyCommands(ctx context.Context, scope string, commands []telegram.BotCommand) error
 }
 
+// groupAdminRights are the rights the bot asks for when made a group's
+// admin, the ones its features use: delete for deleting, purge and the
+// guards; restrict for mutes, bans, locks and the swear guard; pin; invite
+// for invite links and join requests; topics for forum_topic; change info
+// for the group's name, description, photo and sticker pack; and promote,
+// for making admins. Whoever adds the bot may untick any of them.
+var groupAdminRights = telegram.AdministratorRights{
+	CanManageChat:      true,
+	CanDeleteMessages:  true,
+	CanRestrictMembers: true,
+	CanPinMessages:     true,
+	CanInviteUsers:     true,
+	CanManageTopics:    true,
+	CanChangeInfo:      true,
+	CanPromoteMembers:  true,
+}
+
+// channelAdminRights are what the bot asks for in a channel: to post and
+// edit there, for the owners' broadcasts. Being an admin at all also lets
+// it see who joined a channel required in private chats.
+var channelAdminRights = telegram.AdministratorRights{
+	CanManageChat:   true,
+	CanPostMessages: true,
+	CanEditMessages: true,
+}
+
+// RightsSetter sets the admin rights the bot asks for.
+type RightsSetter interface {
+	SetMyDefaultAdministratorRights(ctx context.Context, rights telegram.AdministratorRights, forChannels bool) error
+}
+
+// SetAdminRights sets the rights the bot asks for in groups and in
+// channels, logging a failure, as SetCommandMenus does.
+func SetAdminRights(ctx context.Context, setter RightsSetter, logger *slog.Logger) {
+	ctx, cancel := context.WithTimeout(ctx, commandsTimeout)
+	defer cancel()
+	for _, forChannels := range []bool{false, true} {
+		rights := groupAdminRights
+		if forChannels {
+			rights = channelAdminRights
+		}
+		if err := setter.SetMyDefaultAdministratorRights(ctx, rights, forChannels); err != nil {
+			logger.Warn("could not set the admin rights the bot asks for", "channels", forChannels, "error", err)
+		}
+	}
+}
+
 // SetCommandMenus sets the menus, logging a failure: the bot works without
 // them, and the next start tries again.
 func SetCommandMenus(ctx context.Context, setter CommandSetter, logger *slog.Logger) {

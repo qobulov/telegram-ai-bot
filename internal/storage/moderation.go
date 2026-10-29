@@ -71,6 +71,46 @@ func (s *Store) SetModerationUndo(ctx context.Context, updateID int64, action st
 	return nil
 }
 
+// SetModerationMessage keeps the message an action recorded earlier made,
+// such as a poll's, known only once Telegram has sent it.
+func (s *Store) SetModerationMessage(ctx context.Context, updateID int64, action string, messageID int64) error {
+	_, err := s.pool.Exec(ctx, `UPDATE moderation_actions SET target_message_id = $3 WHERE update_id = $1 AND action = $2`, updateID, action, messageID)
+	if err != nil {
+		return fmt.Errorf("storage: set moderation message: %w", err)
+	}
+	return nil
+}
+
+// Polls are recorded as ActionPoll, with the poll's message once sent, and
+// closing one as ActionPollStop, with the same message.
+const (
+	ActionPoll     = "poll"
+	ActionPollStop = "poll_stop"
+)
+
+// OpenPoll is the record of a poll the bot made in a chat and has not
+// closed: the one in message messageID, or the latest when it is 0. found
+// is false when there is none.
+func (s *Store) OpenPoll(ctx context.Context, chatID, messageID int64) (a ModerationAction, found bool, err error) {
+	err = s.pool.QueryRow(ctx, `
+		SELECT p.id, p.chat_id, p.action, p.requester_id, p.target_message_id, p.update_id
+		FROM moderation_actions p
+		WHERE p.chat_id = $1 AND p.action = 'poll' AND p.target_message_id IS NOT NULL
+		  AND ($2 = 0 OR p.target_message_id = $2)
+		  AND NOT EXISTS (
+			SELECT 1 FROM moderation_actions s
+			WHERE s.chat_id = p.chat_id AND s.action = 'poll_stop' AND s.target_message_id = p.target_message_id)
+		ORDER BY p.id DESC LIMIT 1`, chatID, messageID).
+		Scan(&a.ID, &a.ChatID, &a.Action, &a.RequesterID, &a.TargetMessageID, &a.UpdateID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ModerationAction{}, false, nil
+	}
+	if err != nil {
+		return ModerationAction{}, false, fmt.Errorf("storage: read open poll: %w", err)
+	}
+	return a, true, nil
+}
+
 // LastUndoable is the latest action in a chat that can still be undone,
 // and whether there is one.
 func (s *Store) LastUndoable(ctx context.Context, chatID int64) (ModerationAction, bool, error) {
@@ -137,12 +177,13 @@ func nullJSON(raw json.RawMessage) any {
 }
 
 // ModerationBy counts the actions taken for a person since a moment, in
-// every group. Polls and dice rolls are not moderation and are left out.
+// every group. Polls, closing them, and dice rolls are not moderation and
+// are left out.
 func (s *Store) ModerationBy(ctx context.Context, requesterID int64, since time.Time) (int, error) {
 	var count int
 	err := s.pool.QueryRow(ctx, `
 		SELECT count(*) FROM moderation_actions
-		WHERE requester_id = $1 AND created_at >= $2 AND action NOT IN ('poll', 'dice')`, requesterID, since).Scan(&count)
+		WHERE requester_id = $1 AND created_at >= $2 AND action NOT IN ('poll', 'poll_stop', 'dice')`, requesterID, since).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("storage: count moderation: %w", err)
 	}
