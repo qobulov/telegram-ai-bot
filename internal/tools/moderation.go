@@ -52,6 +52,10 @@ const (
 	actionUnpinAll       = "unpin_all"
 	actionLock           = "lock"
 	actionUnlock         = "unlock"
+	// actionSetStickerSet gives the group the pack of the sticker the asker
+	// replied to; actionDeleteStickerSet takes the group's pack away.
+	actionSetStickerSet    = "set_sticker_set"
+	actionDeleteStickerSet = "delete_sticker_set"
 )
 
 const (
@@ -128,16 +132,18 @@ var neededRight = map[string]string{
 	actionDemote:     telegram.RightPromoteMembers,
 	actionAdminTitle: telegram.RightPromoteMembers,
 
-	actionSetTitle:       telegram.RightChangeInfo,
-	actionSetDescription: telegram.RightChangeInfo,
-	actionSetPhoto:       telegram.RightChangeInfo,
-	actionDeletePhoto:    telegram.RightChangeInfo,
-	actionInviteLink:     telegram.RightInviteUsers,
-	actionRevokeLink:     telegram.RightInviteUsers,
-	actionEditLink:       telegram.RightInviteUsers,
-	actionUnpinAll:       telegram.RightPinMessages,
-	actionLock:           telegram.RightRestrictMembers,
-	actionUnlock:         telegram.RightRestrictMembers,
+	actionSetTitle:         telegram.RightChangeInfo,
+	actionSetDescription:   telegram.RightChangeInfo,
+	actionSetPhoto:         telegram.RightChangeInfo,
+	actionDeletePhoto:      telegram.RightChangeInfo,
+	actionSetStickerSet:    telegram.RightChangeInfo,
+	actionDeleteStickerSet: telegram.RightChangeInfo,
+	actionInviteLink:       telegram.RightInviteUsers,
+	actionRevokeLink:       telegram.RightInviteUsers,
+	actionEditLink:         telegram.RightInviteUsers,
+	actionUnpinAll:         telegram.RightPinMessages,
+	actionLock:             telegram.RightRestrictMembers,
+	actionUnlock:           telegram.RightRestrictMembers,
 	// Undo needs the right of the action it puts back.
 	actionUndo: "",
 }
@@ -188,6 +194,8 @@ type Moderator interface {
 	SetChatDescription(ctx context.Context, chatID int64, description string) error
 	SetChatPhoto(ctx context.Context, chatID int64, jpeg []byte) error
 	DeleteChatPhoto(ctx context.Context, chatID int64) error
+	SetChatStickerSet(ctx context.Context, chatID int64, name string) error
+	DeleteChatStickerSet(ctx context.Context, chatID int64) error
 	CreateChatInviteLink(ctx context.Context, l telegram.InviteLink) (string, error)
 	UnpinAllChatMessages(ctx context.Context, chatID int64) error
 	PromoteChatMember(ctx context.Context, chatID, userID int64, rights telegram.AdminRights) error
@@ -304,7 +312,7 @@ func (m *Moderation) Tool() Tool {
 			"promote: make its author an admin, with your own delete, mute and pin rights at most; demote: take that back; admin_title (text, 16 characters at most): the title shown for an admin you made. " +
 			"purge (minutes, default 60, at most 2880): delete every message its author wrote here in the last minutes, as far as your log of the group has them, when they ask to clear out or delete all of someone's messages; it cannot be undone. " +
 			"A message posted on behalf of a channel can only be deleted, pinned, or banned or unbanned, which bans the channel from posting here. " +
-			"For the group itself, with no reply or tag: set_title (text), set_description (text, empty to remove), set_photo (the photo in their message), delete_photo, invite_link (a new link; text names it, minutes ends it), unpin_all, and lock or unlock (kind) to forbid or allow one kind of message to everyone, keeping the group's other permissions: when they ask to block stickers or photos for all, it is lock, never a guard. " +
+			"For the group itself, with no reply or tag: set_title (text), set_description (text, empty to remove), set_photo (the photo in their message), delete_photo, set_sticker_set (the pack of the sticker they replied to, as the group's pack every member may use) or delete_sticker_set, invite_link (a new link; text names it, minutes ends it), unpin_all, and lock or unlock (kind) to forbid or allow one kind of message to everyone, keeping the group's other permissions: when they ask to block stickers or photos for all, it is lock, never a guard. " +
 			"An invite_link may let only member_limit people join, or with join_request make each ask the admins to approve them, never both. revoke_link stops a link you made from working, and edit_link changes its text, minutes, member_limit (0 for none) or join_request; both act on link, or without it on the latest link you made here. " +
 			"undo: put back the last thing you did here with this tool, whatever it was; a deleted message never comes back. With force only when, told it was changed by hand since, they still want it back. " +
 			"For member actions without such a reply, or replying to their own message, it acts on the one member they tagged with @, once Telegram confirms who that is; when they named the member without a tag (\"Azamatni mute qil\"), pass member: never ask them to tag or reply instead. " +
@@ -312,7 +320,7 @@ func (m *Moderation) Tool() Tool {
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["delete", "purge", "mute", "unmute", "ban", "unban", "pin", "unpin", "no_stickers", "allow_stickers", "no_photos", "allow_photos", "promote", "demote", "admin_title", "set_title", "set_description", "set_photo", "delete_photo", "invite_link", "revoke_link", "edit_link", "unpin_all", "lock", "unlock", "undo"]},
+				"action": {"type": "string", "enum": ["delete", "purge", "mute", "unmute", "ban", "unban", "pin", "unpin", "no_stickers", "allow_stickers", "no_photos", "allow_photos", "promote", "demote", "admin_title", "set_title", "set_description", "set_photo", "delete_photo", "set_sticker_set", "delete_sticker_set", "invite_link", "revoke_link", "edit_link", "unpin_all", "lock", "unlock", "undo"]},
 				"minutes": {"type": "integer", "description": "For mute: how long, 1 to 10080, default 60. For purge: how far back, 1 to 2880, default 60. For no_stickers and no_photos: 1 to 525600, default 1440; the most for \"forever\". For invite_link: when it stops working; none for never."},
 				"text": {"type": "string", "description": "For set_title, set_description and admin_title: the new text, in the words they gave. For invite_link: an optional name."},
 				"force": {"type": "boolean", "description": "For undo: true only when they want it back though it was changed by hand since."},
@@ -441,8 +449,36 @@ func (o *order) setGroupArgs(args moderationArgs, picture []byte) error {
 			return err
 		}
 		o.picture = photo
+	case actionSetStickerSet:
+		// The pack comes from the update, as a member does: the sticker
+		// replied to, never a name the model gives.
+		if o.caller.Target == nil || o.caller.Target.StickerSet == "" {
+			return &ArgumentError{Message: noStickerPack}
+		}
+		text = o.caller.Target.StickerSet
 	}
 	o.text = text
+	return nil
+}
+
+const (
+	noStickerPack = "there is no sticker pack to set: ask them to reply with the request to a sticker from the pack they want"
+	noPackHere    = "Telegram does not let this group have a sticker pack: it allows one only in supergroups big enough, which this one is not yet"
+)
+
+// checkStickerPack asks Telegram whether the group may have a sticker pack
+// at all, which it allows only in large enough supergroups.
+func (m *Moderation) checkStickerPack(ctx context.Context, o order) error {
+	if o.action != actionSetStickerSet && o.action != actionDeleteStickerSet {
+		return nil
+	}
+	chat, err := m.opts.Telegram.GetChat(ctx, o.caller.ChatID)
+	if err != nil {
+		return errLookup
+	}
+	if !chat.CanSetStickerSet {
+		return &DeniedError{Message: noPackHere}
+	}
 	return nil
 }
 
@@ -630,7 +666,8 @@ func onMember(action string) bool {
 // or a message.
 func groupWide(action string) bool {
 	switch action {
-	case actionSetTitle, actionSetDescription, actionSetPhoto, actionDeletePhoto, actionInviteLink, actionRevokeLink, actionEditLink, actionUnpinAll, actionLock, actionUnlock:
+	case actionSetTitle, actionSetDescription, actionSetPhoto, actionDeletePhoto, actionInviteLink, actionRevokeLink, actionEditLink, actionUnpinAll, actionLock, actionUnlock,
+		actionSetStickerSet, actionDeleteStickerSet:
 		return true
 	}
 	return false
@@ -719,6 +756,9 @@ func (m *Moderation) check(ctx context.Context, o order) error {
 		if err := m.checkTarget(ctx, o); err != nil {
 			return err
 		}
+	}
+	if err := m.checkStickerPack(ctx, o); err != nil {
+		return err
 	}
 	return m.checkPace(ctx, o.caller)
 }
@@ -918,6 +958,10 @@ func (m *Moderation) send(ctx context.Context, o order) error {
 		return m.opts.Telegram.SetChatPhoto(ctx, chatID, o.picture)
 	case actionDeletePhoto:
 		return m.opts.Telegram.DeleteChatPhoto(ctx, chatID)
+	case actionSetStickerSet:
+		return m.opts.Telegram.SetChatStickerSet(ctx, chatID, o.text)
+	case actionDeleteStickerSet:
+		return m.opts.Telegram.DeleteChatStickerSet(ctx, chatID)
 	case actionUnpinAll:
 		return m.opts.Telegram.UnpinAllChatMessages(ctx, chatID)
 	case actionLock, actionUnlock:
@@ -1094,6 +1138,10 @@ func (o order) done(until string) chatText {
 		return chatText{"Bajarildi: guruh rasmi yangilandi.", "Готово: фото группы обновлено."}
 	case actionDeletePhoto:
 		return chatText{"Bajarildi: guruh rasmi olib tashlandi.", "Готово: фото группы удалено."}
+	case actionSetStickerSet:
+		return chatText{"Bajarildi: guruhning stiker to'plami endi «" + o.text + "».", "Готово: стикерпак группы теперь «" + o.text + "»."}
+	case actionDeleteStickerSet:
+		return chatText{"Bajarildi: guruhning stiker to'plami olib tashlandi.", "Готово: стикерпак группы убран."}
 	case actionUnpinAll:
 		return chatText{"Bajarildi: hamma qadalgan xabarlar olindi.", "Готово: все закреплённые сообщения откреплены."}
 	case actionLock:
@@ -1145,18 +1193,20 @@ var actionWords = map[string][]string{
 	actionDemote:     adminWords,
 	actionAdminTitle: {"admin", "админ", "unvon", "titul", "титул", "звани", "title", "lavozim", "должн"},
 
-	actionSetTitle:       append([]string{"nom", "title", "назв", "имя"}, changeWords...),
-	actionSetDescription: append([]string{"tavsif", "description", "описан", "bio"}, changeWords...),
-	actionSetPhoto:       append([]string{"avatar", "аватар", "ava "}, photoWords...),
-	actionDeletePhoto:    append([]string{"avatar", "аватар", "ava "}, photoWords...),
-	actionInviteLink:     linkWords,
-	actionRevokeLink:     linkWords,
-	actionEditLink:       linkWords,
-	actionUnpinAll:       {"pin", "qada", "закреп", "откреп"},
-	actionLock:           {"yop", "blok", "taqiq", "chekla", "ochir", "запрет", "закр", "огранич", "lock", "заблок"},
-	actionUndo:           {"qaytar", "orqaga", "ortga", "bekor qil", "undo", "верн", "отмен", "назад"},
-	actionUnlock:         {"och", "ruxsat", "разреш", "откр", "unlock", "разблок"},
-	actionUnpin:          {"pin", "qada", "закреп", "откреп"},
+	actionSetTitle:         append([]string{"nom", "title", "назв", "имя"}, changeWords...),
+	actionSetDescription:   append([]string{"tavsif", "description", "описан", "bio"}, changeWords...),
+	actionSetPhoto:         append([]string{"avatar", "аватар", "ava "}, photoWords...),
+	actionDeletePhoto:      append([]string{"avatar", "аватар", "ava "}, photoWords...),
+	actionSetStickerSet:    stickerPackWords,
+	actionDeleteStickerSet: stickerPackWords,
+	actionInviteLink:       linkWords,
+	actionRevokeLink:       linkWords,
+	actionEditLink:         linkWords,
+	actionUnpinAll:         {"pin", "qada", "закреп", "откреп"},
+	actionLock:             {"yop", "blok", "taqiq", "chekla", "ochir", "запрет", "закр", "огранич", "lock", "заблок"},
+	actionUndo:             {"qaytar", "orqaga", "ortga", "bekor qil", "undo", "верн", "отмен", "назад"},
+	actionUnlock:           {"och", "ruxsat", "разреш", "откр", "unlock", "разблок"},
+	actionUnpin:            {"pin", "qada", "закреп", "откреп"},
 }
 
 var foldApostrophes = strings.NewReplacer("'", "", "ʻ", "", "ʼ", "", "’", "", "‘", "", "`", "")
@@ -1171,6 +1221,10 @@ var changeWords = []string{"ozgartir", "uzgartir", "almashtir", "change", "renam
 
 // adminWords ask for something about adminship: "admin qil", "админка".
 var adminWords = []string{"admin", "админ"}
+
+// stickerPackWords ask for something about the group's sticker pack:
+// "stiker paket", "shu stikerlarni guruhga qo'y", "стикерпак".
+var stickerPackWords = []string{"stik", "stic", "стик", "pack", "paket", "пак", "набор", "toplam"}
 
 // photoWords ask for something about photos: "rasm", "surat", "фото".
 var photoWords = []string{"rasm", "rasim", "surat", "foto", "photo", "фото", "картин", "расм", "сурат"}

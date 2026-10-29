@@ -40,6 +40,8 @@ type undoState struct {
 	Rights           *telegram.AdminRights     `json:"rights,omitempty"`
 	Link             string                    `json:"link,omitempty"`
 	MessageID        int64                     `json:"message_id,omitempty"`
+	// StickerSet is the group's sticker pack before, "" for none.
+	StickerSet *string `json:"sticker_set,omitempty"`
 }
 
 // snapshot is what will put o back, read before o is taken; nil when o
@@ -51,7 +53,8 @@ func (m *Moderation) snapshot(ctx context.Context, o order) (json.RawMessage, er
 	switch o.action {
 	case actionDelete, actionPurge:
 		return nil, nil
-	case actionSetTitle, actionSetDescription, actionSetPhoto, actionDeletePhoto, actionLock, actionUnlock, actionUnpinAll:
+	case actionSetTitle, actionSetDescription, actionSetPhoto, actionDeletePhoto, actionLock, actionUnlock, actionUnpinAll,
+		actionSetStickerSet, actionDeleteStickerSet:
 		chat, err := m.opts.Telegram.GetChat(ctx, chatID)
 		if err != nil {
 			return nil, err
@@ -77,6 +80,8 @@ func (m *Moderation) snapshot(ctx context.Context, o order) (json.RawMessage, er
 				return nil, nil
 			}
 			state.MessageID = chat.PinnedMessage.MessageID
+		case actionSetStickerSet, actionDeleteStickerSet:
+			state.StickerSet = &chat.StickerSetName
 		}
 	case actionMute, actionUnmute, actionNoStickers, actionStickers, actionNoPhotos, actionPhotos, actionDemote, actionAdminTitle:
 		member, err := m.opts.Members.GetChatMember(ctx, chatID, o.target.UserID)
@@ -190,6 +195,11 @@ func (m *Moderation) putBack(ctx context.Context, last storage.ModerationAction,
 		return tg.SetChatPhoto(ctx, chatID, photo)
 	case actionLock, actionUnlock:
 		return tg.SetChatPermissions(ctx, chatID, *state.Permissions)
+	case actionSetStickerSet, actionDeleteStickerSet:
+		if *state.StickerSet == "" {
+			return tg.DeleteChatStickerSet(ctx, chatID)
+		}
+		return tg.SetChatStickerSet(ctx, chatID, *state.StickerSet)
 	case actionUnpinAll:
 		return tg.PinChatMessage(ctx, chatID, state.MessageID)
 	case actionInviteLink:
@@ -268,6 +278,8 @@ func undoneText(last storage.ModerationAction, state undoState) chatText {
 		return chatText{"Bajarildi: guruh rasmi qaytarildi.", "Готово: фото группы возвращено."}
 	case actionLock, actionUnlock:
 		return chatText{"Bajarildi: guruh ruxsatlari avvalgi holiga qaytdi.", "Готово: права в группе снова как раньше."}
+	case actionSetStickerSet, actionDeleteStickerSet:
+		return chatText{"Bajarildi: guruhning stiker to'plami avvalgi holiga qaytdi.", "Готово: стикерпак группы снова как раньше."}
 	case actionUnpinAll, actionUnpin:
 		return chatText{"Bajarildi: xabar yana qadaldi.", "Готово: сообщение снова закреплено."}
 	case actionInviteLink:

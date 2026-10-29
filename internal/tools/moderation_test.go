@@ -168,6 +168,20 @@ func (f *fakeTelegram) DeleteChatPhoto(_ context.Context, chatID int64) error {
 	return f.do("deleteChatPhoto", chatID, 0)
 }
 
+func (f *fakeTelegram) SetChatStickerSet(_ context.Context, chatID int64, name string) error {
+	f.mu.Lock()
+	f.chat.StickerSetName = name
+	f.mu.Unlock()
+	return f.do("setChatStickerSet "+name, chatID, 0)
+}
+
+func (f *fakeTelegram) DeleteChatStickerSet(_ context.Context, chatID int64) error {
+	f.mu.Lock()
+	f.chat.StickerSetName = ""
+	f.mu.Unlock()
+	return f.do("deleteChatStickerSet", chatID, 0)
+}
+
 func (f *fakeTelegram) RevokeChatInviteLink(_ context.Context, chatID int64, link string) error {
 	return f.do("revokeChatInviteLink "+link, chatID, 0)
 }
@@ -1165,6 +1179,36 @@ func TestModerateSetsTheGroupPhotoFromTheMessage(t *testing.T) {
 	env.act(t, ctx, `{"action":"set_photo"}`)
 	if calls := env.telegram.made(); len(calls) != 1 || calls[0] != fmt.Sprintf("setChatPhoto %d bytes %s", picture.Len(), inGroupA) {
 		t.Errorf("calls = %q", calls)
+	}
+}
+
+// The group's sticker pack is the pack of the sticker replied to, set only
+// where Telegram allows one and when asked in words; undo puts the old
+// pack back, and removing it is undone too.
+func TestModerateSetsTheGroupStickerPack(t *testing.T) {
+	env := groupAdminEnv(t)
+	sticker := &Target{MessageID: 77, UserID: memberID, Name: "Bek", StickerSet: "cats_by_x"}
+	ctx := func(updateID int64, words string, target *Target) context.Context {
+		return WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: updateID, MessageID: updateID, Target: target, Words: words}, &Sink{})
+	}
+
+	expectRefusal(t, env.moderate(ctx(440, "shu stikerlarni guruhga qo'y", sticker), `{"action":"set_sticker_set"}`), "forbidden", "supergroups big enough")
+	env.telegram.chat.CanSetStickerSet, env.telegram.chat.StickerSetName = true, "old_pack"
+	if got := env.moderate(ctx(441, "shu stikerlarni guruhga qo'y", &Target{MessageID: 78, UserID: memberID, Text: "salom"}), `{"action":"set_sticker_set"}`); got.OK || got.Error.Code != "invalid_arguments" {
+		t.Errorf("no sticker replied to = %+v", got)
+	}
+	expectRefusal(t, env.moderate(ctx(442, "salom", sticker), `{"action":"set_sticker_set"}`), "forbidden", "does not ask")
+	env.nothingActed(t)
+
+	if said := env.act(t, ctx(443, "shu stiker paketni guruhga qo'y", sticker), `{"action":"set_sticker_set"}`); said != "Bajarildi: guruhning stiker to'plami endi «cats_by_x»." {
+		t.Errorf("said %q", said)
+	}
+	env.act(t, ctx(444, "orqaga qaytar", nil), `{"action":"undo"}`)
+	env.act(t, ctx(445, "guruh stikerpakini olib tashla", nil), `{"action":"delete_sticker_set"}`)
+	env.act(t, ctx(446, "qaytar", nil), `{"action":"undo"}`)
+	want := []string{"setChatStickerSet cats_by_x " + inGroupA, "setChatStickerSet old_pack " + inGroupA, "deleteChatStickerSet " + inGroupA, "setChatStickerSet old_pack " + inGroupA}
+	if got := env.telegram.made(); !slices.Equal(got, want) {
+		t.Errorf("calls = %q, want %q", got, want)
 	}
 }
 

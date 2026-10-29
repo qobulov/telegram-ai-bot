@@ -1051,6 +1051,16 @@ check is made in code:
   link previews), keeping the group's other permissions. Each needs its own
   admin right, the asker's and the bot's: changing the group's info,
   inviting users, pinning or restricting members.
+- **The group's sticker pack** (`set_sticker_set`, `delete_sticker_set`,
+  Telegram's `setChatStickerSet` and `deleteChatStickerSet`): replying to a
+  sticker, "shu stikerlarni guruhga qo'y" gives the group that sticker's
+  pack, which every member may then use there; the pack comes from the
+  sticker in the update, never from a name the model gives. "stikerpakni
+  olib tashla" takes it away. Both need *change the group's info*, the
+  asker's and the bot's, words about stickers or a pack ("stiker",
+  "paket", "стикерпак"), and a group Telegram lets have one: she asks
+  `getChat` first and, where `can_set_sticker_set` is false (only large
+  enough supergroups may), says so. Undo puts the old pack back, or none.
 - **Invite links:** a new link may also admit only a number of people (1 to
   99999) or make each who opens it ask the admins to approve them; Telegram
   does not combine the two, so asking for both is refused with that reason.
