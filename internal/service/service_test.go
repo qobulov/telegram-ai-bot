@@ -3195,6 +3195,9 @@ type fakePrivateQuota struct {
 	used     int
 	refused  bool
 	err      error
+	// premium gives the user the quota's premium limit, as the store does
+	// while their premium lasts.
+	premium bool
 }
 
 func (f *fakePrivateQuota) ReservePrivateMessage(_ context.Context, q storage.DailyQuota) (int64, bool, bool, error) {
@@ -3204,7 +3207,7 @@ func (f *fakePrivateQuota) ReservePrivateMessage(_ context.Context, q storage.Da
 	switch {
 	case f.err != nil:
 		return 0, false, false, f.err
-	case f.used < q.Limit:
+	case f.used < q.Limit || (f.premium && f.used < q.PremiumLimit):
 		f.used++
 		return int64(500 + len(f.asked)), true, false, nil
 	}

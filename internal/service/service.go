@@ -241,6 +241,15 @@ type Options struct {
 	// counted. Nil, or a limit of 0, does not limit.
 	PrivateQuota      PrivateQuota
 	PrivateDailyLimit int
+	// Payments and Premium sell premium in private chats, PremiumPrice
+	// Telegram Stars for PremiumDays days of PremiumDailyLimit answers a
+	// day; see premium.go. With either nil, or a price of 0, none is sold,
+	// though premium bought before still counts while Premium is set.
+	Payments          Payments
+	Premium           PremiumBook
+	PremiumPrice      int
+	PremiumDays       int
+	PremiumDailyLimit int
 	// PrivateChats is whom private chats are answered for: "off" nobody,
 	// "owners" the owners only; anything else, everyone.
 	PrivateChats string
@@ -496,6 +505,9 @@ func (s *Service) Handle(update telegram.Update) {
 		s.pressed(update.CallbackQuery)
 		return
 	}
+	if s.paymentUpdate(update) {
+		return
+	}
 	in, ok := s.accept(update)
 	if !ok {
 		return
@@ -526,6 +538,9 @@ func (s *Service) HandleNow(update telegram.Update) {
 	}
 	if update.CallbackQuery != nil {
 		s.pressed(update.CallbackQuery)
+		return
+	}
+	if s.paymentUpdate(update) {
 		return
 	}
 	if in, ok := s.accept(update); ok {

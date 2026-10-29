@@ -116,6 +116,9 @@ image_generations(id PK, user_id, chat_id, created_at)
 bot_replies(id PK, chat_id, bot_id, created_at)
 group_replies(id PK, chat_id, user_id, created_at)
 private_messages(id PK, user_id, denied, created_at)
+star_payments(charge_id PK, user_id, first_name, username, stars, days,
+              paid_at, refunded_at)
+premium_users(user_id PK, until)
 broadcasts(id PK, owner_id, update_id, text, chat_ids bigint[],
            created_at, sent_at)
 group_rules(id PK, chat_id (0 for every group), kind, user_id, user_name,
@@ -199,6 +202,9 @@ in the environment win over the file.
 | `USER_RATE_LIMIT_PER_MINUTE`  | `10`                           | Messages each user may send per minute                                                                       |
 | `REQUIRED_CHANNEL` | — | Channels, each its `@username` or `-100` ID, separated by commas, that a user must have joined to be answered in a private chat; others get a button for each and a «✅ Tasdiqlash» button that sends `/start check` to check again. Owners need not join. The bot must be an admin of the channel to check: until it is, nobody but the owners is answered; when Telegram does not answer at all, the message is |
 | `PRIVATE_DAILY_LIMIT` | `10` | Answers each user gets per day in private chats, from midnight in `GROUP_HISTORY_TIMEZONE`; the next message gets one notice, later ones nothing. Owners have no limit (admins do); commands and failed turns are not counted; `0` turns it off. Counted in the database |
+| `PREMIUM_PRICE_STARS` | `0` | Price of [premium](#premium) in Telegram Stars; `0` sells none. Off by default, so that no deploy starts taking money unasked |
+| `PREMIUM_DAYS` | `30` | Days one purchase of premium lasts; buying again before it ends adds them to its end |
+| `PREMIUM_DAILY_LIMIT` | `50` | Answers a day in private chats while premium lasts; premium is sold only when this is above `PRIVATE_DAILY_LIMIT` |
 | `PRIVATE_CHATS` | `on` | Whom she answers in private chats: `on` everyone, `owners` the owners only, `off` nobody, so that she works in groups only. A private message that is not answered gets only a friendly reaction picked at random in code, never a notice, and the model is not asked. A group smaller than `GROUP_MIN_MEMBERS` counts as a private chat here, so that a small group cannot get around it; there, someone who is not answered gets only a 👀 reaction, and no call is made to the model, not even to transcribe a voice message. With `off`, owners cannot use private-chat tools such as broadcasts either |
 | `REQUEST_TIMEOUT_SECONDS`     | `45`                           | Time budget for answering one message                                                                        |
 | `MAX_INPUT_CHARS`             | `4000`                         | Longest user message accepted                                                                                |
@@ -238,8 +244,8 @@ the number of CPUs.
 
 ### Changing settings from Telegram
 
-The owners can change the group, private-chat, picture, trigger, history and
-output settings without a deploy. `/settings` lists them with their values
+The owners can change the group, private-chat, premium, picture, trigger,
+history and output settings without a deploy. `/settings` lists them with their values
 and where each comes from; `/set NAME value` changes one and
 `/set NAME default` goes back to the environment's. In a private chat it
 changes the bot's; in a group (`/set@Bot …`) the group's own, for the four
@@ -276,8 +282,9 @@ Send `/start` to your bot in Telegram. Stop the bot with Ctrl+C; it finishes
 the message it is working on before exiting.
 
 Bot commands: `/start`, `/help`,
-`/model`, `/about`, and in groups `/mute`, `/unmute`, `/ignore` and
-`/unignore`.
+`/model`, `/about`, `/premium`, `/paysupport`, for owners `/payments` and
+`/refund`, and
+in groups `/mute`, `/unmute`, `/ignore` and `/unignore`.
 
 ## Tests
 
@@ -626,6 +633,50 @@ In a private chat each user gets `PRIVATE_DAILY_LIMIT` answers a day
   the limit guards the model's cost, and one answer too many disturbs
   nobody else.
 - `0` turns the limit off.
+
+### Premium
+
+Users can buy a higher limit with Telegram Stars (currency `XTR`, no payment
+provider): `PREMIUM_PRICE_STARS` Stars for `PREMIUM_DAYS` days of
+`PREMIUM_DAILY_LIMIT` answers a day. It is sold only while the price is
+above 0, `PRIVATE_DAILY_LIMIT` is on and `PREMIUM_DAILY_LIMIT` is above it;
+all three can be changed with `/set`.
+
+- **The offer.** `/premium` in a private chat says what premium gives, or
+  until when the sender has it, and sends the invoice (`sendInvoice`), whose
+  Pay button opens Telegram's payment. The day's one notice that the limit
+  is reached carries the same offer and invoice, so it comes once a day at
+  most and only when it is wanted; someone who has premium is told the
+  premium limit and offered nothing. In a group `/premium` points to the
+  private chat.
+- **The check.** Before taking the money Telegram asks the bot
+  (`pre_checkout_query`), which must answer within 10 seconds. The answer is
+  made from the invoice's payload alone, `premium:<user ID>:<days>:<price>`:
+  yes when it is the plan on sale now, in Stars, paid by the user it was made
+  out to; otherwise no, with the reason shown to the payer (an invoice from
+  before the price or the days changed, or one forwarded from someone else).
+- **The payment.** Telegram then posts a `successful_payment` service
+  message. The payment is stored in `star_payments` by its
+  `telegram_payment_charge_id`, so a payment delivered twice counts once, and
+  its days are added to `premium_users.until`: to the end of a premium that
+  still lasts, from now otherwise. The payer is thanked with the end date.
+  This works even with `PRIVATE_CHATS=off`: the money moved either way. A
+  payment that does not match its invoice is kept with 0 days, for a refund,
+  and logged as an error; one that cannot be stored is logged with its
+  charge ID, and the payer told that the owners will sort it out.
+- **The limit.** While `until` is in the future the daily limit is
+  `PREMIUM_DAILY_LIMIT`, looked up in the same transaction that counts the
+  answers. Premium already bought still counts if sales are turned off.
+- **Owners.** `/payments` in a private chat lists the last 20 payments with
+  the payer, Stars, days and whether they were refunded. `/refund <user ID>`
+  or `/refund @username` gives the user's latest payment back
+  (`refundStarPayment`) and ends their premium at once; a payment Telegram
+  had already given back is only recorded. A refund Telegram reports by
+  itself (`refunded_payment`) ends the premium too. Nobody else can use
+  either command, and neither works in a group.
+- `/paysupport`, which Telegram asks of every bot taking Stars, tells
+  users to write to the owners, by their usernames, about a payment.
+- Payments are never deleted by the daily cleanup.
 
 ## Groups
 
@@ -1417,6 +1468,23 @@ Run `set-webhook` again after this update: the bot now asks Telegram for
 when the webhook was last set. Until then the member list still fills from
 messages, joins and leaves.
 
+### Deploying premium
+
+1. **Apply migration 0038 before deploying**: `make migrate` with
+   `DB_POSTGRES_URL` pointing at the production database. It adds
+   `star_payments` and `premium_users` and changes nothing else; the new
+   version refuses to start on the old schema.
+2. **Set in Vercel** `PREMIUM_PRICE_STARS` to the price (for example `100`),
+   and `PREMIUM_DAYS` and `PREMIUM_DAILY_LIMIT` to change their defaults of
+   30 and 50. Without a price nothing is sold; the price can also be set
+   later with `/set PREMIUM_PRICE_STARS 100`.
+3. **Deploy.** The bot now also asks Telegram for `pre_checkout_query`
+   updates, without which no payment goes through. Each cold start compares
+   the webhook's update kinds with the bot's and sets the webhook again when
+   they differ (the log says `webhook set again to receive every update kind
+   the bot handles`); to do it at once, run
+   `go run ./cmd/bot set-webhook https://YOUR-APP.vercel.app/api/webhook`.
+
 ### Daily cleanup
 
 `vercel.json` schedules a Vercel Cron job that calls `/api/cleanup` every
@@ -1558,6 +1626,10 @@ Built in:
       and polls are counted in the database, so they hold with several
       instances; per-user flood guard;
       fixed number of workers; bounded queues.
+- [x] Payments are judged in code, never by the model: Telegram's check
+      before a payment and the payment itself are compared with the plan on
+      sale and the payer's ID from Telegram, and a payment counts once by its
+      charge ID. Only owners see or refund payments, in a private chat.
 - [x] Only registered tools run. No shell, no `eval`, no model-written SQL.
 - [x] Tool permissions and restricted commands are checked in code against
       the ID of the user who sent the message. A prompt cannot grant them.
@@ -1626,6 +1698,7 @@ Known limits:
 | "That took too long to answer"                            | The model was slower than `REQUEST_TIMEOUT_SECONDS`. Raise it or use a faster model.                                                                                                                                                                                                          |
 | Wrong time or wrong arithmetic                            | The model has no tool support and is guessing. Look for `model does not support tool calling` in the log and see [Choosing a model](#choosing-a-model). The time is given in `GROUP_HISTORY_TIMEZONE` unless another zone is asked for.                                                     |
 | "You're sending messages too quickly"                     | Per-user rate limit, announced in private chats only. Raise `USER_RATE_LIMIT_PER_MINUTE` if it is too strict.                                                                                                                                                                                 |
+| A payment fails after Pay is tapped                       | Telegram got no answer to its check before the payment: the webhook was set before the bot asked for `pre_checkout_query`. Redeploy, or run `set-webhook` again. `payment refused before it was made` in the log is the bot saying no, with the reason. |
 | "That's today's limit", then silence, in a private chat   | The private daily limit: the log shows `private daily limit reached`. Raise `PRIVATE_DAILY_LIMIT`, or `0` to turn it off; owners are never limited. `private message count failed; answering anyway` means the database could not be asked. |
 | "I'm handling a lot of messages right now"                | Worker queues are full. Raise `MAX_CONCURRENT_REQUESTS`, and `pool_max_conns` to match.                                                                                                                                                                                                       |
 | The bot forgot the conversation                           | History is limited to `MAX_HISTORY_MESSAGES`, and idle conversations are deleted after `RETENTION_DAYS`.                                                                                                                                                                                      |
