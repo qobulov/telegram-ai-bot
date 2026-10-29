@@ -751,7 +751,10 @@ languages, and the buttons that need a value ask for it first
 
 A choice comes back as a button's data (`kb:rate:EUR`), handled at once; a
 value written in the reply box is known by the question it replies to, so
-nothing is kept between the question and its answer. All of it but the
+nothing is kept between the question and its answer. The answer that ends
+a question brings the keyboard back: the reply box hides it and keeps the
+question's hint ("Masalan: Ling") in the box, which people took to mean
+that a hero's name was still wanted. All of it but the
 meme and Mobile Legends is answered in code (`internal/service/keyboardanswer.go`), with the
 tools run by their registry on the sender's turn, and takes nothing from
 the daily limit, past it too; a tool that fails is said to have failed. The

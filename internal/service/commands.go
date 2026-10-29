@@ -759,10 +759,11 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	if notice, joined := s.joinedChannels(ctx, in); !joined {
 		return notice
 	}
+	fromMenu := false
 	if request, ok := s.askedRequestOf(in); ok {
 		// An answer to a menu's question, a meme's topic or a hero's name,
 		// is the model's: it is asked as if typed with the request.
-		in.text = request
+		in.text, fromMenu = request, true
 	}
 	if out, ok := s.keyboardAnswer(ctx, in); ok {
 		return out
@@ -823,6 +824,9 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	out.audios = audios
 	if len(audios) > 0 {
 		out.skipped = ""
+	}
+	if fromMenu {
+		out = s.withMenuBack(in, out)
 	}
 	return out
 }

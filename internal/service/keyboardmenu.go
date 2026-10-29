@@ -206,9 +206,23 @@ func (s *Service) pressedMenu(q *telegram.CallbackQuery) {
 	default:
 		return
 	}
-	if out.text != "" {
-		s.send(in, telegram.Outgoing{Text: out.text, Ask: out.ask})
+	if out.ask == "" {
+		out = s.withMenuBack(in, out)
 	}
+	if out.text != "" {
+		s.send(in, telegram.Outgoing{Text: out.text, Ask: out.ask, Keyboard: out.keyboard})
+	}
+}
+
+// withMenuBack puts the keyboard back with the answer that ends a menu's
+// question: asking opened the reply box, which hides the keyboard and keeps
+// the question's hint in the box, and people took the hint to mean that a
+// hero's name was still wanted.
+func (s *Service) withMenuBack(in incoming, out outcome) outcome {
+	if !in.group && len(out.buttons) == 0 && out.ask == "" {
+		out.keyboard = s.keyboard(in)
+	}
+	return out
 }
 
 // menuReply answers a reply to one of the menus' questions: an amount to
@@ -227,10 +241,10 @@ func (s *Service) menuReply(ctx context.Context, in incoming) (outcome, bool) {
 			return outcome{}, false
 		}
 		args, _ := json.Marshal(map[string]any{"code": code[1], "amount": amount})
-		return orFailed(in, textError)(keyboardTool(s, ctx, in, "currency_rate", string(args), conversionText(amount))), true
+		return s.withMenuBack(in, orFailed(in, textError)(keyboardTool(s, ctx, in, "currency_rate", string(args), conversionText(amount)))), true
 	case holdsText(asked.Text, textCityPrompt):
 		args, _ := json.Marshal(map[string]string{"city": strings.TrimSpace(in.text)})
-		return orFailed(in, textCityUnknown)(keyboardTool(s, ctx, in, "get_weather", string(args), weatherText)), true
+		return s.withMenuBack(in, orFailed(in, textCityUnknown)(keyboardTool(s, ctx, in, "get_weather", string(args), weatherText))), true
 	}
 	return outcome{}, false
 }

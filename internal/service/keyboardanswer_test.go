@@ -145,7 +145,20 @@ func TestMenusAnswerTheirChoicesAndReplies(t *testing.T) {
 	if rate := find("💵 1 USD"); !strings.Contains(rate.text, textAmountPrompt.uz) || rate.ask != "100" {
 		t.Errorf("rate = %+v", rate)
 	}
-	find("💵 1500 USD = 19 125 750,00 so'm (Markaziy bank, 29.10.2026)")
+	// An answer that ends a question puts the keyboard back, which the
+	// reply box hid.
+	if converted := find("💵 1500 USD = 19 125 750,00 so'm (Markaziy bank, 29.10.2026)"); converted.keyboard == nil {
+		t.Errorf("the conversion came without the keyboard")
+	}
+	memeAnswered := false
+	for _, m := range sent {
+		if strings.Contains(m.text, fmt.Sprintf(askedRequests["meme"].request.uz, "dushanba ertalab")) {
+			memeAnswered = m.keyboard != nil
+		}
+	}
+	if !memeAnswered {
+		t.Errorf("the meme's answer came without the keyboard")
+	}
 	if prompt := find(textCityPrompt.uz); prompt.ask == "" {
 		t.Errorf("city prompt = %+v", prompt)
 	}
