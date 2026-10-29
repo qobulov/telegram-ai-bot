@@ -156,6 +156,30 @@ func TestGameQuestionsSkipTheRouter(t *testing.T) {
 	}
 }
 
+// Asking for a place on the map skips the router and takes the full path,
+// where send_location is; "where are you" stays small talk for the router.
+func TestMapRequestsSkipTheRouter(t *testing.T) {
+	for msg, full := range map[string]bool{
+		"Ali: Xivaning lokatsiyasini tashla":    true,
+		"Ali: Nukusni xaritada ko'rsat":         true,
+		"Ali: где находится Бухара":             true,
+		"Ali: Chust qayerda joylashgan":         true,
+		"Ali: скинь локацию Самарканда":         true,
+		"Ali: Mari qayerdasan":                  false,
+		"Ali: bugun kayfiyat qalay, aytchi-chi": false,
+	} {
+		f, router, _ := routedFixture("CHAT", text("chat"), text("full"))
+		req := request(1, msg)
+		req.Group = true
+
+		answer, err := f.agent.Reply(context.Background(), req)
+
+		if err != nil || (answer.Route == RouteFull) != full || (len(router.requests) == 0) != full {
+			t.Errorf("%q: route %q, router asked %d times; want full %v", msg, answer.Route, len(router.requests), full)
+		}
+	}
+}
+
 // A game question carries the reminder to check heroes in the request, but
 // the saved question is the plain text.
 func TestGameQuestionsRemindToCheckHeroes(t *testing.T) {

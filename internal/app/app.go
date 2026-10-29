@@ -188,6 +188,20 @@ func (g groupSender) CopyToChat(ctx context.Context, chatID, fromChatID, message
 	return err
 }
 
+// pinSender sends the send_location tool's pins as venues: a pin on the
+// map with the place's name over it.
+type pinSender struct {
+	client *telegram.Client
+}
+
+func (p pinSender) SendPin(ctx context.Context, pin webapi.Pin) error {
+	_, err := p.client.SendVenue(ctx, telegram.Venue{
+		ChatID: pin.ChatID, ReplyToMessageID: pin.ReplyToMessageID,
+		Latitude: pin.Lat, Longitude: pin.Lon, Title: pin.Title, Address: pin.Address,
+	})
+	return err
+}
+
 // membershipError reports the bot having been removed, or the group having
 // gone, as tools.ErrNotInGroup.
 func membershipError(err error) error {
@@ -463,8 +477,9 @@ func withNewHeroes(cfg config.Config, bot Bot) string {
 }
 
 // liveDataTools look things up on public web APIs: rates, weather, prayer
-// times, news, Wikipedia, crypto, and football when a token is set. The
-// user agent gives the bot's t.me link as the contact some APIs ask for.
+// times, news, Wikipedia, crypto, and football when a token is set, and
+// send places as pins on the map. The user agent gives the bot's t.me link
+// as the contact some APIs ask for.
 func liveDataTools(cfg config.Config, bot Bot) []tools.Tool {
 	opts := webapi.Options{
 		UserAgent:       "MariaBot/1.0 (+https://t.me/" + bot.User.Username + ")",
@@ -476,6 +491,7 @@ func liveDataTools(cfg config.Config, bot Bot) []tools.Tool {
 		YouTubeKey:      cfg.YouTubeAPIKey,
 		CalendarificKey: cfg.CalendarificAPIKey,
 		ImgflipKey:      cfg.ImgflipAPIKey,
+		Pins:            pinSender{client: bot.Client},
 	}
 	return webapi.Tools(opts)
 }

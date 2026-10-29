@@ -621,6 +621,7 @@ answer instead of making up a number.
 | --- | --- | --- |
 | `currency_rate` | Exchange rates in so'm, gold and silver per gram | Central Bank of Uzbekistan (cbu.uz), official rates; gold and silver are an approximate world price from currency-api (jsDelivr mirror as a fallback) |
 | `get_weather` | Current weather, up to 3 days of forecast, air quality | Open-Meteo (CC BY 4.0), MET Norway as a fallback; places from GeoNames (CC BY 4.0). She says which place it matched |
+| `send_location` | Where a town, city, district or region is ("Samarqand qayerda", "Xiva lokatsiyasini tashla", "где находится Бухара"), sent as a pin on the map (`sendVenue`) under its name, with its coordinates as the address, to the chat the turn is in: in a group as a reply to the request, which keeps it in a forum topic. Found the way `get_weather` finds places, so only settlements and areas: never a street, shop or building, nor a pin guessed from memory. Asking for a location or a map ("lokatsiya", "xaritada", "где находится") skips the router | GeoNames places (CC BY 4.0), then the Open-Meteo geocoder |
 | `prayer_times` | Prayer and Ramadan times | Aladhan; approximate, the Muslim Board of Uzbekistan (muslim.uz) is official |
 | `news_headlines` | Latest headlines in Uzbek or Russian; with `world`, world news in Uzbek (Cyrillic), Russian or English | RSS feeds of kun.uz, gazeta.uz, uza.uz and daryo.uz, and of BBC O'zbek, BBC Russian and BBC World; headlines and links only |
 | `wiki_lookup` | Article summaries, "on this day" | Wikipedia (CC BY-SA) |
