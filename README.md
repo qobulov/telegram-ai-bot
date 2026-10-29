@@ -719,11 +719,18 @@ phone's own, of her common requests, in the language of the user's app
 (`internal/service/keyboard.go`): «😂 Mem yasab ber» (only when `IMGFLIP_API_KEY`
 gives her the meme tool), «🎲 Zar tashla», «💵 Dollar kursi», «🌤 Toshkent
 ob-havosi», «🕐 Soat nechi?» and «❓ Yordam». Telegram keeps it there, shrunk
-to fit, until it is closed. A button sends its own text, which is answered as
-if typed, by the model, and counted in the daily limit like any message; only
+to fit, until it is closed. A button sends its own text, in any of its three
+languages. The die, the dollar, the weather and the time need no model, so
+they are answered in code (`internal/service/keyboardanswer.go`) and take
+nothing from the daily limit, past it too: the die is rolled with
+`send_dice`, the dollar's Central Bank rate asked of `currency_rate`, and
+Tashkent's weather of `get_weather`, each run by the tools' registry on the
+sender's turn and written in their language; the time is the bot's clock.
+A tool that fails is said to have failed. The meme's words are the model's,
+so «😂 Mem yasab ber» is answered as if typed and counted like any message;
 «❓ Yordam» (or «❓ Помощь», «❓ Help») is answered as `/help`, uncounted. A
-group never gets the keyboard, and a help button's words typed there are just
-words.
+group never gets the keyboard, and the buttons' words typed there are just
+words, for the model; so are they in a business account's chats.
 
 An answer in a private chat that congratulates someone, a birthday, a
 holiday, an exam passed ("tabriklayman", "tug'ilgan kuning bilan",

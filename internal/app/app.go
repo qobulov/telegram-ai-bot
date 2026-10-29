@@ -293,6 +293,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 	opts := service.Options{
 		Sender:          bot.Client,
 		Replier:         assistant,
+		Tools:           registry,
 		Recorder:        store,
 		Members:         groupMembers{client: bot.Client, botID: bot.User.ID},
 		Groups:          store,

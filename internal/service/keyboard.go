@@ -1,7 +1,6 @@
 package service
 
 import (
-	"slices"
 	"strings"
 
 	"telegram-ai-bot/internal/telegram"
@@ -9,10 +8,11 @@ import (
 
 // A private chat gets a small keyboard of Maria's common requests with
 // /start and /help, in place of the phone's own; Telegram keeps it there.
-// A button sends its text as if typed, and it is answered as typed: by the
-// model, which the words ask for a meme, a die, the dollar or the weather.
-// Only the help button is a command. A group never gets the keyboard: it
-// would cover every member's own.
+// A button sends its text as if typed. The die, the dollar, the weather and
+// the time are answered in code, without the model and the day's limit
+// (see keyboardanswer.go); the meme is answered as typed, by the model,
+// whose words a meme needs. The help button is /help. A group never gets
+// the keyboard: it would cover every member's own.
 
 // keyboardRequest is one button: what it says in each language.
 type keyboardRequest struct {
@@ -21,23 +21,22 @@ type keyboardRequest struct {
 	meme bool
 }
 
-// keyboardHelp is the help button, answered as /help in any language.
-var keyboardHelp = localText{uz: "❓ Yordam", ru: "❓ Помощь", en: "❓ Help"}
+// The buttons, each answered by what it says in any of its languages.
+var (
+	keyboardMeme    = localText{uz: "😂 Mem yasab ber", ru: "😂 Сделай мем", en: "😂 Make a meme"}
+	keyboardDie     = localText{uz: "🎲 Zar tashla", ru: "🎲 Брось кубик", en: "🎲 Roll a die"}
+	keyboardDollar  = localText{uz: "💵 Dollar kursi", ru: "💵 Курс доллара", en: "💵 Dollar rate"}
+	keyboardWeather = localText{uz: "🌤 Toshkent ob-havosi", ru: "🌤 Погода в Ташкенте", en: "🌤 Weather in Tashkent"}
+	keyboardTime    = localText{uz: "🕐 Soat nechi?", ru: "🕐 Который час?", en: "🕐 What time is it?"}
+	// keyboardHelp is answered as /help.
+	keyboardHelp = localText{uz: "❓ Yordam", ru: "❓ Помощь", en: "❓ Help"}
+)
 
 // keyboardRows are the keyboard's buttons, two to a row.
 var keyboardRows = [][]keyboardRequest{
-	{
-		{text: localText{uz: "😂 Mem yasab ber", ru: "😂 Сделай мем", en: "😂 Make a meme"}, meme: true},
-		{text: localText{uz: "🎲 Zar tashla", ru: "🎲 Брось кубик", en: "🎲 Roll a die"}},
-	},
-	{
-		{text: localText{uz: "💵 Dollar kursi", ru: "💵 Курс доллара", en: "💵 Dollar rate"}},
-		{text: localText{uz: "🌤 Toshkent ob-havosi", ru: "🌤 Погода в Ташкенте", en: "🌤 Weather in Tashkent"}},
-	},
-	{
-		{text: localText{uz: "🕐 Soat nechi?", ru: "🕐 Который час?", en: "🕐 What time is it?"}},
-		{text: keyboardHelp},
-	},
+	{{text: keyboardMeme, meme: true}, {text: keyboardDie}},
+	{{text: keyboardDollar}, {text: keyboardWeather}},
+	{{text: keyboardTime}, {text: keyboardHelp}},
 }
 
 // keyboard is the keyboard for whoever wrote in, in their language, without
@@ -74,7 +73,7 @@ func (s *Service) withKeyboard(in incoming, out outcome) outcome {
 // pressedHelp reports a private message that is the help button, in any of
 // its languages.
 func pressedHelp(in incoming) bool {
-	return !in.group && slices.Contains([]string{keyboardHelp.uz, keyboardHelp.ru, keyboardHelp.en}, in.text)
+	return !in.group && pressed(in, keyboardHelp)
 }
 
 // celebrationWords are what an answer that congratulates someone says, as

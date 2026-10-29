@@ -338,6 +338,9 @@ type Options struct {
 	// Files sends the files a tool made, such as a document; nil sends
 	// none, and the answer's text goes alone.
 	Files FileSender
+	// Tools runs the model's tools for the private keyboard's buttons that
+	// need no model; nil leaves every button to the model.
+	Tools ToolRunner
 	// Inline answers inline queries, "@bot words" typed in any chat; nil
 	// leaves them unanswered.
 	Inline InlineAnswerer
