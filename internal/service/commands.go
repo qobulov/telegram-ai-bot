@@ -759,10 +759,10 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	if notice, joined := s.joinedChannels(ctx, in); !joined {
 		return notice
 	}
-	if topic, ok := s.memeTopic(in); ok {
-		// The meme's words are the model's: the topic is asked of it as if
-		// typed with the request.
-		in.text = fmt.Sprintf(memeRequest, topic)
+	if request, ok := s.askedRequestOf(in); ok {
+		// An answer to a menu's question, a meme's topic or a hero's name,
+		// is the model's: it is asked as if typed with the request.
+		in.text = request
 	}
 	if out, ok := s.keyboardAnswer(ctx, in); ok {
 		return out

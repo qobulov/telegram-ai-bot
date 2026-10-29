@@ -29,6 +29,7 @@ var (
 	keyboardRate    = localText{uz: "💵 Valyuta kursi", ru: "💵 Курс валют", en: "💵 Exchange rate"}
 	keyboardWeather = localText{uz: "🌤 Ob-havo", ru: "🌤 Погода", en: "🌤 Weather"}
 	keyboardTime    = localText{uz: "🕐 Soat nechi?", ru: "🕐 Который час?", en: "🕐 What time is it?"}
+	keyboardMLBB    = localText{uz: "🎮 MLBB", ru: "🎮 MLBB", en: "🎮 MLBB"}
 	// keyboardHelp is answered as /help.
 	keyboardHelp = localText{uz: "❓ Yordam", ru: "❓ Помощь", en: "❓ Help"}
 	// The buttons as an earlier keyboard named them, which a chat keeps
@@ -41,7 +42,8 @@ var (
 var keyboardRows = [][]keyboardRequest{
 	{{text: keyboardMeme, meme: true}, {text: keyboardDie}},
 	{{text: keyboardRate}, {text: keyboardWeather}},
-	{{text: keyboardTime}, {text: keyboardHelp}},
+	{{text: keyboardMLBB}, {text: keyboardTime}},
+	{{text: keyboardHelp}},
 }
 
 // keyboard is the keyboard for whoever wrote in, in their language, without

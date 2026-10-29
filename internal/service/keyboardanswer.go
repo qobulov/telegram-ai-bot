@@ -45,7 +45,7 @@ func (s *Service) keyboardAnswer(ctx context.Context, in incoming) (outcome, boo
 	for button, asks := range map[localText]localText{
 		keyboardRate: keyboardRate, keyboardOldDollar: keyboardRate,
 		keyboardWeather: keyboardWeather, keyboardOldWeather: keyboardWeather,
-		keyboardDie: keyboardDie, keyboardMeme: keyboardMeme,
+		keyboardDie: keyboardDie, keyboardMeme: keyboardMeme, keyboardMLBB: keyboardMLBB,
 	} {
 		if pressed(in, button) {
 			return menuQuestion(in, asks)

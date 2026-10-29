@@ -725,7 +725,7 @@ In a private chat each user gets `PRIVATE_DAILY_LIMIT` answers a day
 phone's own, of her common requests, in the language of the user's app
 (`internal/service/keyboard.go`): «😂 Mem yasab ber» (only when `IMGFLIP_API_KEY`
 gives her the meme tool), «🎲 Zar tashla», «💵 Valyuta kursi», «🌤 Ob-havo»,
-«🕐 Soat nechi?» and «❓ Yordam». Telegram keeps it there, shrunk to fit,
+«🎮 MLBB», «🕐 Soat nechi?» and «❓ Yordam». Telegram keeps it there, shrunk to fit,
 until it is closed. A button sends its own text, in any of its three
 languages, and the buttons that need a value ask for it first
 (`internal/service/keyboardmenu.go`):
@@ -740,16 +740,23 @@ languages, and the buttons that need a value ask for it first
 - «🎲 Zar tashla» asks which game: 🎲 🎯 🏀 ⚽ 🎳 or 🎰.
 - «😂 Mem yasab ber» opens the reply box for the meme's topic, which goes to
   the model as "Shu mavzuda mem yasab ber: …".
+- «🎮 MLBB» opens a menu of Mobile Legends: 🔥 Meta, 🦸 Qahramon, 🛠 Build,
+  ⚔️ Kontr-pik, 👕 Skinlar, 🎯 Draft, 📈 Win rate and 🆔 O'yinchi. The meta
+  is asked of the model at once, as if written in reply to the menu (its own
+  update, the press standing in for its ID); the rest open the reply box
+  for the hero, the enemy's picks, the matches and win rates, or the
+  player's ID and zone, and the answer goes to the model with the request
+  ("MLBB: Ling uchun eng yaxshi build"), which the `mlbb` tool answers.
 - «🕐 Soat nechi?» is answered at once, by the bot's clock.
 
 A choice comes back as a button's data (`kb:rate:EUR`), handled at once; a
 value written in the reply box is known by the question it replies to, so
 nothing is kept between the question and its answer. All of it but the
-meme is answered in code (`internal/service/keyboardanswer.go`), with the
+meme and Mobile Legends is answered in code (`internal/service/keyboardanswer.go`), with the
 tools run by their registry on the sender's turn, and takes nothing from
 the daily limit, past it too; a tool that fails is said to have failed. The
-meme's topic is a turn of the model's that calls a tool, so it is not
-counted either (below). A chat that still has an earlier keyboard,
+meme's topic and a Mobile Legends request are turns of the model's that
+call a tool, so they are not counted either (below). A chat that still has an earlier keyboard,
 «💵 Dollar kursi» or «🌤 Toshkent ob-havosi», gets the same questions.
 «❓ Yordam» (or «❓ Помощь», «❓ Help») is answered as `/help`, uncounted.
 

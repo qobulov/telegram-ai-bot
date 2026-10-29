@@ -77,7 +77,7 @@ func TestKeyboardButtonsAskForTheirValue(t *testing.T) {
 	if sent[3].text != textWhichGame.uz || sent[3].buttons[0][1].Data != "kb:dice:🎯" {
 		t.Errorf("die = %+v", sent[3])
 	}
-	if sent[4].text != textMemeTopic.uz || sent[4].ask == "" {
+	if sent[4].text != askedRequests["meme"].question.uz || sent[4].ask == "" {
 		t.Errorf("meme = %+v", sent[4])
 	}
 	if sent[5].text != textWhichCurrency.uz {
@@ -119,7 +119,7 @@ func TestMenusAnswerTheirChoicesAndReplies(t *testing.T) {
 		menuPress(2, "kb:city:"),
 		replyTo(textCityPrompt.uz, "Termiz"),
 		menuPress(3, "kb:dice:🎯"),
-		replyTo(textMemeTopic.uz, "dushanba ertalab"),
+		replyTo(askedRequests["meme"].question.uz, "dushanba ertalab"),
 	)
 
 	// Presses are handled at once and messages in turn, so the order is
@@ -150,7 +150,7 @@ func TestMenusAnswerTheirChoicesAndReplies(t *testing.T) {
 		t.Errorf("city prompt = %+v", prompt)
 	}
 	find("🌤 Toshkent: hozir")
-	if calls := f.replier.recorded(); len(calls) != 1 || !strings.Contains(calls[0].text, fmt.Sprintf(memeRequest, "dushanba ertalab")) {
+	if calls := f.replier.recorded(); len(calls) != 1 || !strings.Contains(calls[0].text, fmt.Sprintf(askedRequests["meme"].request.uz, "dushanba ertalab")) {
 		t.Errorf("model asked %+v; want the meme's topic", calls)
 	}
 	if len(buttons.answers) != 3 {
@@ -210,5 +210,31 @@ func TestToolsTakeNothingFromTheLimit(t *testing.T) {
 	}
 	if req := f.replier.recorded(); !req[len(req)-1].req.ToolsOnly {
 		t.Errorf("the turn past the limit was not for tools only")
+	}
+}
+
+// Mobile Legends has its own menu: the meta is asked of the model at once,
+// and the rest ask for the hero or the ID first, the answer going to the
+// model with the request.
+func TestMLBBMenu(t *testing.T) {
+	f := newFixture()
+	withToolRunner(f)
+	f.opts.Buttons = &fakeButtons{}
+
+	sent := f.run(textFrom(userID, keyboardMLBB.uz))
+	if len(sent) != 1 || sent[0].text != textMLBBMenu.uz || len(sent[0].buttons) != 4 || sent[0].buttons[0][0].Data != "kb:ml:meta" {
+		t.Fatalf("menu = %+v", sent)
+	}
+
+	sent = f.run(menuPress(1, "kb:ml:build"))
+	if len(sent) != 2 || sent[1].text != askedRequests["build"].question.uz || sent[1].ask == "" {
+		t.Fatalf("build's question = %+v", sent)
+	}
+	f.run(replyTo(askedRequests["build"].question.uz, "Ling"))
+	f.run(menuPress(2, "kb:ml:meta"))
+
+	calls := f.replier.recorded()
+	if len(calls) != 2 || !strings.Contains(calls[0].text, "MLBB: Ling uchun eng yaxshi build") || !strings.Contains(calls[1].text, textMLBBMeta.uz) {
+		t.Errorf("model asked %+v", calls)
 	}
 }

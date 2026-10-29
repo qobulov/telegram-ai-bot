@@ -22,10 +22,10 @@ func TestStartAndHelpBringTheKeyboard(t *testing.T) {
 	if len(sent) != 4 {
 		t.Fatalf("sent = %+v", sent)
 	}
-	if got := sent[0].keyboard; len(got) != 3 || got[0][0] != "😂 Mem yasab ber" || got[2][1] != "❓ Yordam" {
+	if got := sent[0].keyboard; len(got) != 4 || got[0][0] != "😂 Mem yasab ber" || got[2][0] != "🎮 MLBB" || got[3][0] != "❓ Yordam" {
 		t.Errorf("/start keyboard = %q", got)
 	}
-	if got := sent[1].keyboard; len(got) != 3 || got[2][1] != "❓ Помощь" {
+	if got := sent[1].keyboard; len(got) != 4 || got[3][0] != "❓ Помощь" {
 		t.Errorf("Russian /help keyboard = %q", got)
 	}
 	if sent[2].keyboard != nil || sent[3].keyboard != nil {
@@ -34,7 +34,7 @@ func TestStartAndHelpBringTheKeyboard(t *testing.T) {
 
 	f = newFixture()
 	sent = f.run(textFrom(userID, "/start"))
-	if got := sent[0].keyboard; len(got) != 3 || len(got[0]) != 1 || got[0][0] != "🎲 Zar tashla" {
+	if got := sent[0].keyboard; len(got) != 4 || len(got[0]) != 1 || got[0][0] != "🎲 Zar tashla" {
 		t.Errorf("keyboard without memes = %q", got)
 	}
 }
@@ -66,12 +66,19 @@ func TestKeyboardButtonsAreAnsweredAsTyped(t *testing.T) {
 	}
 }
 
-// Every button fits Telegram, and no two say the same.
+// Every button fits Telegram, and no two say the same; one may say the
+// same in every language, as "🎮 MLBB" does.
 func TestKeyboardLabelsAreDistinct(t *testing.T) {
 	var labels []string
 	for _, row := range keyboardRows {
 		for _, button := range row {
+			var own []string
 			for _, label := range []string{button.text.uz, button.text.ru, button.text.en} {
+				if !slices.Contains(own, label) {
+					own = append(own, label)
+				}
+			}
+			for _, label := range own {
 				if label == "" || slices.Contains(labels, label) {
 					t.Errorf("label %q is empty or used twice", label)
 				}
