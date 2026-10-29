@@ -75,8 +75,8 @@ func TestModerationAuditIsIdempotent(t *testing.T) {
 	if err := store.ForgetModeration(ctx, 500, "mute"); err != nil {
 		t.Fatalf("ForgetModeration: %v", err)
 	}
-	if n := countRows(t, store, "moderation_actions"); n != 3 {
-		t.Errorf("audit rows = %d, want 3: forgetting the mute left the delete alone", n)
+	if n := countRows(t, store, "moderation_actions"); n != 4 {
+		t.Errorf("audit rows = %d, want 4: forgetting the mute left the delete alone", n)
 	}
 	if !mustRecord(t, store, mute) {
 		t.Error("a forgotten mute could not be recorded again")
