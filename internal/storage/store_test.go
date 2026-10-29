@@ -46,7 +46,7 @@ func newTestStore(t *testing.T) *Store {
 	}
 	t.Cleanup(store.Close)
 
-	if _, err := store.pool.Exec(ctx, `DROP TABLE IF EXISTS messages, conversations, users, chats, group_messages, image_generations, bot_replies, groups, broadcasts, group_replies, group_rules, moderation_actions, pending_bans, pending_moderation, private_messages, group_members, owner_notices, user_profiles, bot_stickers, sticker_sends, hero_games, hero_scores, presentations, quiz_tests, quiz_runs, skipped_messages, settings, channels, star_payments, premium_users, join_requests, own_sticker_sets, sticker_uploads, schema_migrations CASCADE`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DROP TABLE IF EXISTS messages, conversations, users, chats, group_messages, image_generations, bot_replies, groups, broadcasts, group_replies, group_rules, moderation_actions, pending_bans, pending_moderation, private_messages, group_members, owner_notices, user_profiles, bot_stickers, sticker_sends, hero_games, hero_scores, presentations, quiz_tests, quiz_runs, skipped_messages, settings, channels, star_payments, premium_users, join_requests, own_sticker_sets, sticker_uploads, picture_verdicts, schema_migrations CASCADE`); err != nil {
 		t.Fatalf("drop tables: %v", err)
 	}
 	if _, err := store.Migrate(ctx); err != nil {
@@ -107,7 +107,7 @@ func TestMigrateIsIdempotent(t *testing.T) {
 func TestMigrateReportsAppliedCount(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
-	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, group_messages, image_generations, bot_replies, groups, broadcasts, group_replies, group_rules, moderation_actions, private_messages, group_members, owner_notices, user_profiles, bot_stickers, sticker_sends, hero_games, hero_scores, skipped_messages, settings, channels, star_payments, premium_users, join_requests, own_sticker_sets, sticker_uploads, schema_migrations CASCADE`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, group_messages, image_generations, bot_replies, groups, broadcasts, group_replies, group_rules, moderation_actions, private_messages, group_members, owner_notices, user_profiles, bot_stickers, sticker_sends, hero_games, hero_scores, skipped_messages, settings, channels, star_payments, premium_users, join_requests, own_sticker_sets, sticker_uploads, picture_verdicts, schema_migrations CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 

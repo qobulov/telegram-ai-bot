@@ -96,6 +96,16 @@ func (m groupMembers) IsGroupCreator(ctx context.Context, chatID, userID int64) 
 	return member.Status == "creator", nil
 }
 
+// HoldsRight reports whether a member holds an admin right in a group,
+// for the join check its admins who may invite users may turn on and off.
+func (m groupMembers) HoldsRight(ctx context.Context, chatID, userID int64, right string) (bool, error) {
+	member, err := m.client.GetChatMember(ctx, chatID, userID)
+	if err != nil {
+		return false, err
+	}
+	return member.Has(right), nil
+}
+
 // Membership asks Telegram about the bot in a group, for the owners'
 // bot_database tool: its status and admin rights, and for a group it is in,
 // the member count and current title.
@@ -348,6 +358,8 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Restrictor:       bot.Client,
 		Guards:           checker(cfg),
 		GroupModerator:   bot.Client,
+		PictureJudge:     pictureJudge(cfg, logger),
+		PictureVerdicts:  store,
 		Judge:            swearJudge(cfg, logger),
 		Sworn:            store,
 		Joins:            store,
@@ -394,6 +406,7 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 		tools.CatchUpTool(tools.CatchUpOptions{Store: store, Location: cfg.Location}),
 		tools.GroupStatsTool(tools.GroupStatsOptions{Store: store, BotID: bot.User.ID, Location: cfg.Location}),
 		tools.PunishmentsTool(tools.PunishmentsOptions{Store: store, Creators: groupMembers{client: bot.Client, botID: bot.User.ID}, BotID: bot.User.ID, Location: cfg.Location}),
+		tools.JoinCaptchaTool(tools.JoinCaptchaOptions{Store: store, Rights: groupMembers{client: bot.Client, botID: bot.User.ID}}),
 	)
 	// Only owners known by ID can be written to, and only they are.
 	if len(cfg.OwnerIDs) > 0 {
@@ -425,8 +438,10 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 				Groups:   store,
 				Muter:    store,
 
-				CanCheckLinks:  checker(cfg).CanCheckLinks(),
-				CanCheckImages: checker(cfg).CanCheckImages(),
+				CanCheckLinks: checker(cfg).CanCheckLinks(),
+				// The bot's own model judges what Sightengine cannot, or
+				// every picture without its keys.
+				CanCheckImages: true,
 			}),
 		)
 	}
@@ -441,6 +456,35 @@ func checker(cfg config.Config) *guards.Checker {
 		SafeBrowsingKey:   cfg.SafeBrowsingKey,
 		SightengineUser:   cfg.SightengineUser,
 		SightengineSecret: cfg.SightengineSecret,
+		CASKey:            cfg.CASKey,
+	})
+}
+
+// pictureJudgeTokens is room for the picture judge's one word and its
+// thinking: Gemini thinks about a picture even at low effort.
+const pictureJudgeTokens = 1024
+
+// pictureJudge is the model asked whether a picture is nude when
+// Sightengine cannot say: ROUTER_MODEL, a light and cheap one, when it is
+// set, with the main model and its fallbacks behind it when it is busy;
+// the main model otherwise. A one-word answer, so it thinks little.
+// Gemini's light models see pictures as the main ones do.
+func pictureJudge(cfg config.Config, logger *slog.Logger) *ai.Client {
+	model, fallbacks := cfg.Model, cfg.FallbackModels
+	if cfg.RouterModel != "" {
+		model, fallbacks = cfg.RouterModel, append([]string{cfg.Model}, cfg.FallbackModels...)
+	}
+	return ai.NewClient(ai.Options{
+		BaseURL:         cfg.AIBaseURL,
+		APIKey:          cfg.AIAPIKey,
+		Model:           model,
+		FallbackModels:  fallbacks,
+		ReasoningEffort: judgeReasoning(cfg.ReasoningEffort),
+		MaxTokens:       pictureJudgeTokens,
+		MaxAttempts:     2,
+		HTTPClient:      &http.Client{Timeout: cfg.RequestTimeout},
+		AttemptTimeout:  attemptTimeout,
+		Logger:          logger,
 	})
 }
 

@@ -298,6 +298,12 @@ type Options struct {
 	// owner may turn on in a group; with either nil they never act.
 	Guards         Guards
 	GroupModerator GroupModerator
+	// PictureJudge is the model asked whether a picture is nude when
+	// Sightengine cannot say; nil leaves such a picture unjudged.
+	// PictureVerdicts keeps every picture's verdict for good; nil keeps
+	// them for verdictMemory, in this instance only.
+	PictureJudge    PictureJudge
+	PictureVerdicts PictureVerdicts
 	// Judge is the model asked whom a message the guard caught is aimed at.
 	Judge InsultJudge
 	// Sworn tells whether the swear guard caught a message already, so that
@@ -405,6 +411,9 @@ type Service struct {
 	linkVerdicts *recently[string, verdict]
 	// pictureVerdicts are keyed by a file's unique ID.
 	pictureVerdicts *recently[string, verdict]
+	// resting are the outside services lately failed, by name, which are
+	// not asked again for a while.
+	resting *recently[string, bool]
 
 	// typingInterval is how often "typing" is shown again while a turn
 	// runs: typingRefresh, shortened by tests; typingDelay is how long a
@@ -494,6 +503,7 @@ func New(opts Options) *Service {
 		spamVerdicts:    newRecently[int64, verdict](verdictMemory, opts.Now),
 		linkVerdicts:    newRecently[string, verdict](verdictMemory, opts.Now),
 		pictureVerdicts: newRecently[string, verdict](verdictMemory, opts.Now),
+		resting:         newRecently[string, bool](serviceRest, opts.Now),
 		queues:          make([]chan incoming, opts.Workers),
 		notices:         make(chan incoming, noticeQueueSize),
 		transcribing:    make(chan struct{}, backgroundTranscriptions),
