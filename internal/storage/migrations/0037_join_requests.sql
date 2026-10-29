@@ -13,3 +13,10 @@ CREATE TABLE join_requests (
 
 -- Finding the requests whose time is up.
 CREATE INDEX join_requests_expires_at_idx ON join_requests (expires_at);
+
+-- The owners' guard that sends the button, one group at a time: without it
+-- the group's join requests are left to its admins.
+ALTER TABLE group_rules DROP CONSTRAINT group_rules_kind_check;
+ALTER TABLE group_rules ADD CONSTRAINT group_rules_kind_check
+    CHECK (kind IN ('instruction', 'ignore', 'address', 'swear_guard', 'welcome', 'spam_guard', 'link_guard', 'image_guard',
+                    'reply_limit', 'min_active', 'swear_punishment', 'picture_punishment', 'join_captcha'));

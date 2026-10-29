@@ -669,7 +669,7 @@ func NewCleanup(ctx context.Context, cfg config.Config, logger *slog.Logger) (*C
 		Secret: cfg.CronSecret,
 		Logger: logger,
 		Run: func(ctx context.Context) (any, error) {
-			if _, err := service.DeclineLateJoins(ctx, store, client, time.Now(), logger); err != nil {
+			if _, err := service.DeclineLateJoins(ctx, store, client, store, time.Now(), logger); err != nil {
 				logger.Warn("could not decline the late join requests", "error", err)
 			}
 			return expire(ctx, cfg, store, logger)

@@ -58,6 +58,19 @@ func TestJoinRequestsAreKeptOnceAndTakenOnce(t *testing.T) {
 	}
 }
 
+// The joins guard is a rule kind the database takes.
+func TestJoinCaptchaIsAGroupRule(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	if _, err := store.SetGroupRule(ctx, GroupRule{ChatID: -1, Kind: RuleJoinCaptcha, SetBy: 7}); err != nil {
+		t.Fatalf("SetGroupRule: %v", err)
+	}
+	rules, err := store.GroupRules(ctx, -1)
+	if err != nil || len(rules) != 1 || rules[0].Kind != RuleJoinCaptcha {
+		t.Errorf("rules = %+v %v", rules, err)
+	}
+}
+
 // Purge finds one member's logged messages in a group since a moment, each
 // once, and nobody else's.
 func TestAuthorMessageIDsAreOneMembersSince(t *testing.T) {

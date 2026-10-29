@@ -110,17 +110,37 @@ func (*failingSender) SendMessage(context.Context, telegram.Outgoing) (int64, er
 
 const joinerID = int64(5005)
 
-// joinFixture is a group whose bot may invite users, with a clock that
-// tests move.
-func joinFixture() (*fixture, *fakeJoinBook, *fakeJoinGate, *fakeButtons, *time.Time) {
+// joinFixture is a group with the guards of kinds on, the joins guard
+// unless kinds name others, whose bot may invite users, with a clock that
+// tests move; spammerID is on CAS.
+func joinFixture(kinds ...string) (*fixture, *fakeJoinBook, *fakeJoinGate, *fakeButtons, *time.Time) {
 	f := newFixture()
 	book := &fakeJoinBook{requests: map[[2]int64]storage.JoinRequest{}}
 	gate := &fakeJoinGate{bot: telegram.ChatMember{Status: "administrator", CanInviteUsers: true}}
 	buttons := &fakeButtons{}
 	now := time.Date(2026, 10, 29, 12, 0, 0, 0, time.UTC)
+	if len(kinds) == 0 {
+		kinds = []string{storage.RuleJoinCaptcha}
+	}
+	var rules []storage.GroupRule
+	for i, kind := range kinds {
+		rules = append(rules, storage.GroupRule{ID: int64(i + 1), ChatID: groupID, Kind: kind})
+	}
+	f.opts.Rules = &fakeRuleBook{rules: rules}
+	f.opts.Guards = &fakeGuards{spammers: map[int64]string{spammerID: "CAS"}, badHosts: map[string]string{}}
 	f.opts.Joins, f.opts.JoinGate, f.opts.Buttons = book, gate, buttons
 	f.opts.Now = func() time.Time { return now }
 	return f, book, gate, buttons, &now
+}
+
+// turnOffJoins removes the joins guard, as unguard does, and moves the clock
+// past the minute the guards are remembered.
+func turnOffJoins(f *fixture, now *time.Time) {
+	book := f.opts.Rules.(*fakeRuleBook)
+	book.mu.Lock()
+	book.rules = slices.DeleteFunc(book.rules, func(r storage.GroupRule) bool { return r.Kind == storage.RuleJoinCaptcha })
+	book.mu.Unlock()
+	*now = now.Add(2 * time.Minute)
 }
 
 func joinRequest(userID int64, language string) telegram.Update {
@@ -164,21 +184,52 @@ func TestJoinRequestGetsAButtonInPrivate(t *testing.T) {
 	}
 }
 
-func TestJoinRequestFromAKnownSpammerIsDeclinedAtOnce(t *testing.T) {
-	f, book, gate, _, _ := joinFixture()
-	f.opts.Guards = &fakeGuards{spammers: map[int64]string{spammerID: "CAS"}}
+// With the spam guard on, a known spammer is declined at once, whether or
+// not the joins guard is on; anyone else gets the button only with it.
+func TestJoinRequestFromAKnownSpammerIsDeclinedWhereTheSpamGuardIsOn(t *testing.T) {
+	for name, kinds := range map[string][]string{
+		"both guards":     {storage.RuleSpamGuard, storage.RuleJoinCaptcha},
+		"spam guard only": {storage.RuleSpamGuard},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f, book, gate, _, _ := joinFixture(kinds...)
 
-	sent := f.run(joinRequest(spammerID, ""))
+			sent := f.run(joinRequest(spammerID, ""))
 
-	if _, declined := gate.answered(); len(sent) != 0 || !slices.Equal(declined, []int64{spammerID}) || len(book.waiting()) != 0 {
-		t.Errorf("sent %+v, declined %v, waiting %+v; want only a decline", sent, declined, book.waiting())
+			if _, declined := gate.answered(); len(sent) != 0 || !slices.Equal(declined, []int64{spammerID}) || len(book.waiting()) != 0 {
+				t.Errorf("sent %+v, declined %v, waiting %+v; want only a decline", sent, declined, book.waiting())
+			}
+		})
+	}
+
+	f, book, gate, _, _ := joinFixture(storage.RuleSpamGuard)
+	sent := f.run(joinRequest(joinerID, ""))
+	if approved, declined := gate.answered(); len(sent)+len(approved)+len(declined)+len(book.waiting()) != 0 {
+		t.Errorf("with the spam guard only, a clean requester got sent %+v, approved %v, declined %v; want them left to the admins", sent, approved, declined)
 	}
 }
 
-// Without the right to invite users, or in a muted group, the bot leaves
-// the requests to the admins.
+// With the joins guard alone, a spammer is not looked up: the spam guard
+// decides that, and the button stops spam bots anyway.
+func TestJoinsGuardAloneSendsEveryoneTheButton(t *testing.T) {
+	f, book, gate, _, _ := joinFixture()
+
+	sent := f.run(joinRequest(spammerID, ""))
+
+	if _, declined := gate.answered(); len(sent) != 1 || len(declined) != 0 || len(book.waiting()) != 1 {
+		t.Errorf("sent %+v, declined %v; want the button", sent, declined)
+	}
+}
+
+// Without the joins guard, in a group whose admins vet requests by hand, a
+// button anyone could press would let people past them: the bot does
+// nothing; nor without the right to invite users, nor in a muted group.
 func TestJoinRequestsAreLeftAloneWhenTheBotMayNotAnswer(t *testing.T) {
 	cases := map[string]func(*fixture, *fakeJoinGate){
+		"no guard": func(f *fixture, _ *fakeJoinGate) { f.opts.Rules = &fakeRuleBook{} },
+		"other guard": func(f *fixture, _ *fakeJoinGate) {
+			f.opts.Rules = &fakeRuleBook{rules: []storage.GroupRule{{ChatID: groupID, Kind: storage.RuleImageGuard}}}
+		},
 		"no right":    func(_ *fixture, g *fakeJoinGate) { g.bot = telegram.ChatMember{Status: "administrator"} },
 		"not admin":   func(_ *fixture, g *fakeJoinGate) { g.bot = telegram.ChatMember{Status: "member"} },
 		"muted group": func(f *fixture, _ *fakeJoinGate) { f.opts.MutedChats = []int64{groupID} },
@@ -306,17 +357,51 @@ func TestLateJoinRequestsAreDeclinedBySweeps(t *testing.T) {
 	}
 }
 
-func TestDeclineLateJoinsLeavesRequestsInTime(t *testing.T) {
+// A late request of a group whose joins guard is off since, or whose rules
+// cannot be read, is dropped undeclined; one still in time is kept.
+func TestDeclineLateJoinsLeavesRequestsInTimeAndUnguardedGroups(t *testing.T) {
+	const otherGroup = int64(-1009876)
 	now := time.Now()
 	book := &fakeJoinBook{requests: map[[2]int64]storage.JoinRequest{
-		{groupID, 1}: {ChatID: groupID, UserID: 1, Expires: now.Add(-time.Second)},
-		{groupID, 2}: {ChatID: groupID, UserID: 2, Expires: now.Add(time.Minute)},
+		{groupID, 1}:    {ChatID: groupID, UserID: 1, Expires: now.Add(-time.Second)},
+		{groupID, 2}:    {ChatID: groupID, UserID: 2, Expires: now.Add(time.Minute)},
+		{otherGroup, 3}: {ChatID: otherGroup, UserID: 3, Expires: now.Add(-time.Second)},
 	}}
 	gate := &fakeJoinGate{}
+	rules := &fakeRuleBook{rules: []storage.GroupRule{{ChatID: groupID, Kind: storage.RuleJoinCaptcha}}}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	declined, err := DeclineLateJoins(context.Background(), book, gate, now, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	declined, err := DeclineLateJoins(context.Background(), book, gate, rules, now, logger)
 
 	if _, who := gate.answered(); err != nil || declined != 1 || !slices.Equal(who, []int64{1}) || len(book.waiting()) != 1 {
 		t.Errorf("declined %d (%v) %v, waiting %+v", declined, who, err, book.waiting())
+	}
+
+	book.requests[[2]int64{groupID, 4}] = storage.JoinRequest{ChatID: groupID, UserID: 4, Expires: now.Add(-time.Second)}
+	rules.err = errors.New("database down")
+	if declined, _ := DeclineLateJoins(context.Background(), book, gate, rules, now, logger); declined != 0 {
+		t.Errorf("declined %d without the rules, want none", declined)
+	}
+}
+
+// A guard turned off between the request and the press hands the request
+// back to the admins: the press lets nobody in, and no sweep declines it.
+func TestTurningTheJoinsGuardOffLeavesWaitingRequestsToTheAdmins(t *testing.T) {
+	f, _, gate, buttons, now := joinFixture()
+	s := New(f.opts)
+	defer s.Close()
+	s.HandleNow(joinRequest(joinerID, ""))
+	s.HandleNow(joinRequest(joinerID+1, ""))
+	turnOffJoins(f, now)
+
+	s.HandleNow(joinPress(joinerID, joinData))
+	*now = now.Add(20 * time.Minute)
+	s.DeclineLateJoins(context.Background())
+
+	if approved, declined := gate.answered(); len(approved)+len(declined) != 0 {
+		t.Errorf("approved %v, declined %v; want both left to the admins", approved, declined)
+	}
+	if !slices.Equal(buttons.edits, []string{textAdmitGone.uz}) {
+		t.Errorf("edits = %q", buttons.edits)
 	}
 }

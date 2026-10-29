@@ -779,6 +779,7 @@ does not erase them, and every turn in the group is told the ones in force.
 | Ignore a member | an owner replying to that member's message, or to her answer to them, in the group | 24 hours, or 1 to 720 hours if the owner says |
 | Form of address | an owner, for themselves, in any chat; it holds everywhere | until removed |
 | Swear guard | an owner, in the group it is for ("so'kinganlarni avtomatik mute qil", optionally "@Bakxtyorvch ni chaqir"); one per group | until turned off |
+| Spam, link, picture and joins guards | an owner, in the group it is for (`guard` `spam`, `links`, `images` or `joins`; see [Join requests](#join-requests) for the last) | until turned off |
 | Punishment | an owner or the group's creator, in the group, for swearing or nude pictures: in reply to a member ("bu bola yana so'kinsa ban qil") or for anyone ("18+ tashasa 3 soat mute qil"); one per member and kind | 30 days, or the hours given |
 
 The swear guard runs in code, asking the model only one thing. In a group
@@ -962,11 +963,20 @@ it done; she then says so in one short line, like "Bajarildi: Bek @bek
 A group whose admins approve new members, or an invite link made to ask
 for approval, sends her every request to join (`chat_join_request`
 updates), where she is an admin with the right to invite users; nowhere
-else does Telegram send them. She answers them in code, with no model:
+else does Telegram send them. She answers them only where an owner turned
+the joins guard on (`group_rules` `guard` `joins`, kept as a `join_captcha`
+rule, "Maria, guruhga qo'shilmoqchi bo'lganlarni tekshir"; `unguard`
+`joins` turns it off). Elsewhere the group's admins vet the requests by
+hand, and a button any requester could press would let them approve
+themselves past those admins, so she does nothing with them; the only
+exception is the spam guard. The guards are owners' orders, as all of
+`group_rules` is: a group's admins ask an owner. She answers them in code,
+with no model:
 
-- A requester the spam lists (CAS, lols.bot) know as a spammer is declined
-  at once (`declineChatJoinRequest`).
-- Anyone else gets a private message, in the language of their Telegram
+- Where the spam guard is on, a requester the spam lists (CAS, lols.bot)
+  know as a spammer is declined at once (`declineChatJoinRequest`), with
+  the joins guard on or not.
+- Where the joins guard is on, anyone else gets a private message, in the language of their Telegram
   app, with one button, "Men odamman ✅" ("Я человек ✅", "I'm human ✅"),
   sent to the private chat Telegram names with the request: she may write
   there for a few minutes though they never started her. Pressing it within
@@ -989,11 +999,13 @@ else does Telegram send them. She answers them in code, with no model:
   muted group, and in a group where she lacks the right to invite users,
   asked of Telegram with each request. An admin who answers a request by
   hand first wins: her later approval or decline is refused by Telegram and
-  dropped.
+  dropped. A request still waiting when the joins guard is turned off goes
+  back to the admins: its button then lets nobody in, and it is not
+  declined.
 
-Turn on *Approve new members* in the group (or make invite links with
-*Request admin approval*) and give her *Invite users via link*; turning
-either off returns the requests to the admins.
+Turn the joins guard on, turn on *Approve new members* in the group (or
+make invite links with *Request admin approval*) and give her *Invite users
+via link*; turning any of them off returns the requests to the admins.
 
 ### Stickers
 
@@ -1494,16 +1506,20 @@ messages, joins and leaves.
 The edited messages, join requests and purge update needs:
 
 1. **Apply migration 0037 before deploying** (`make migrate`, as above): it
-   adds the `join_requests` table and changes nothing else. The new version
-   refuses to start without it.
+   adds the `join_requests` table and lets `group_rules` hold the
+   `join_captcha` kind, and changes nothing else. The new version refuses to
+   start without it.
 2. **Deploy.** The function, when it starts, sees that the webhook asks for
    fewer kinds of update than the bot handles and sets it again with
    `edited_message` and `chat_join_request`, keeping its address and
    secret (logged as "webhook set again to receive every update kind the
    bot handles"). Running `go run ./cmd/bot set-webhook https://YOUR-APP.vercel.app/api/webhook`
    does the same by hand.
-3. **In each group that should check join requests**, give her *Invite
-   users via link* and turn on *Approve new members*. Purge needs *Delete
+3. **In each group that should check join requests**, an owner turns the
+   joins guard on ("Maria, guruhga qo'shilmoqchi bo'lganlarni tekshir"),
+   and the group gives her *Invite users via link* and turns on *Approve new
+   members*. Until then she leaves every group's requests alone, but for
+   declining known spammers where the spam guard is on. Purge needs *Delete
    messages*, which she has for deletions already.
 
 ### Daily cleanup

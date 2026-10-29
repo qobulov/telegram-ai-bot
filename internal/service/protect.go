@@ -41,9 +41,11 @@ type GroupModerator interface {
 	BanChatMember(ctx context.Context, chatID, userID int64) error
 }
 
-// guardSet are the guards on in a group.
-type guardSet struct{ spam, links, images bool }
+// guardSet are the guards on in a group; joins answers its join requests
+// (see joins.go) and has nothing to do with its messages.
+type guardSet struct{ spam, links, images, joins bool }
 
+// any reports a guard on that looks at the group's messages.
 func (g guardSet) any() bool { return g.spam || g.links || g.images }
 
 // verdict is an outside service's answer kept a while: bad, and why.
@@ -74,6 +76,8 @@ func (s *Service) guardsOn(ctx context.Context, chatID int64) guardSet {
 			set.links = s.opts.Guards.CanCheckLinks()
 		case storage.RuleImageGuard:
 			set.images = s.opts.Guards.CanCheckImages()
+		case storage.RuleJoinCaptcha:
+			set.joins = true
 		}
 	}
 	s.guardSets.set(chatID, set)

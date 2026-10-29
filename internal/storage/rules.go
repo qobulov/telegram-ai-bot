@@ -32,6 +32,9 @@ const (
 	RuleSpamGuard  = "spam_guard"
 	RuleLinkGuard  = "link_guard"
 	RuleImageGuard = "image_guard"
+	// RuleJoinCaptcha has the requests to join one group answered with a
+	// button in private, in code; without it they are left to the admins.
+	RuleJoinCaptcha = "join_captcha"
 	// RuleSwearPunishment and RulePicturePunishment are an owner's order
 	// for what the swear or picture guard does to a member, or, without a
 	// UserID, to anyone: Text is a Punishment.
