@@ -110,3 +110,32 @@ func TestKeyboardWordsInAGroupAreTheModels(t *testing.T) {
 		t.Errorf("tools %q, model %d; want the model alone", runner.recorded(), len(f.replier.recorded()))
 	}
 }
+
+// Tools take nothing from the day's limit: a turn that used one is given
+// back, and past the limit a question in words is still answered when a
+// tool answers it, while talk gets the limit's notice.
+func TestToolsTakeNothingFromTheLimit(t *testing.T) {
+	f := newFixture()
+	quota := withPrivateLimit(f, 1)
+	f.replier.toolsUsed = 1
+	sent := f.run(textFrom(userID, "dollar qancha"), textFrom(userID, "evro qancha"))
+	if _, released := quota.recorded(); len(sent) != 2 || len(released) != 2 {
+		t.Fatalf("sent = %+v, released %v; want both answered and given back", sent, released)
+	}
+
+	f.replier.toolsUsed = 0
+	f.run(textFrom(userID, "salom")) // the day's one answer of talk
+	sent = f.run(textFrom(userID, "nima gap"))
+	if len(sent) != 4 || !strings.HasPrefix(sent[3].text, "Bugungi limit tugadi") {
+		t.Errorf("sent = %+v; want the notice past the limit", sent)
+	}
+
+	f.replier.toolsUsed = 1
+	sent = f.run(textFrom(userID, "rubl qancha"))
+	if len(sent) != 5 || sent[4].text != "echo: rubl qancha" {
+		t.Errorf("sent = %+v; want the tool's answer past the limit", sent)
+	}
+	if req := f.replier.recorded(); !req[len(req)-1].req.ToolsOnly {
+		t.Errorf("the turn past the limit was not for tools only")
+	}
+}

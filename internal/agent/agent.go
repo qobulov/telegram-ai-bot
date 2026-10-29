@@ -35,6 +35,10 @@ var (
 	// ErrNeedsTools means an inline question needs a tool to answer, which
 	// inline answers do not have.
 	ErrNeedsTools = errors.New("agent: the question needs a tool, and inline answers have none")
+	// ErrNotATool means a turn that could be answered only with tools,
+	// one past the day's limit, needed none: nothing is saved, and the
+	// caller says the limit is reached.
+	ErrNotATool = errors.New("agent: a turn for tools only needed none")
 )
 
 // SilentMarker is the answer the model gives to stay silent.
@@ -126,6 +130,10 @@ type Request struct {
 	// Fixed, when set, is the answer, decided without the model: the turn
 	// is only saved, which keeps the history and answers an update once.
 	Fixed *Answer
+	// ToolsOnly is a turn past the day's limit, which only a tool may
+	// answer: a question the router finds is talk, or one the model answers
+	// without a tool, ends in ErrNotATool.
+	ToolsOnly bool
 	// Inline marks a question typed in inline mode, "@bot words" in any
 	// chat. Its asker posts the answer as their own message, in a chat the
 	// bot cannot read, so it is answered on its own: without history or
@@ -155,6 +163,8 @@ type Answer struct {
 	// Route is the path the turn took: RouteFull, RouteChat or
 	// RouteEscalated.
 	Route string
+	// ToolsUsed is how many tools the turn called.
+	ToolsUsed int
 }
 
 // Reply answers the user's message and saves the whole turn. Nothing is
@@ -227,6 +237,9 @@ type turn struct {
 // model is told to stop using tools, and after MaxToolCalls+2 requests the
 // turn fails with ErrToolLoop.
 func (a *Agent) run(ctx context.Context, t *turn) (Answer, error) {
+	if t.req.ToolsOnly {
+		return a.runToolsOnly(ctx, t)
+	}
 	if answer, done, err := a.tryChat(ctx, t); done {
 		return answer, err
 	}
@@ -235,6 +248,24 @@ func (a *Agent) run(ctx context.Context, t *turn) (Answer, error) {
 	}
 	answer, err := a.runFull(ctx, t)
 	answer.Route = t.route
+	answer.ToolsUsed = t.toolsUsed
+	return answer, err
+}
+
+// runToolsOnly answers a turn past the day's limit only when a tool does:
+// talk, as the router finds it, never reaches the main model, and an
+// answer the main model gives without a tool is dropped.
+func (a *Agent) runToolsOnly(ctx context.Context, t *turn) (Answer, error) {
+	if a.opts.Router != nil && a.wantsChat(ctx, t) {
+		return Answer{}, ErrNotATool
+	}
+	t.route = RouteFull
+	answer, err := a.runFull(ctx, t)
+	if err == nil && t.toolsUsed == 0 {
+		return Answer{}, ErrNotATool
+	}
+	answer.Route = t.route
+	answer.ToolsUsed = t.toolsUsed
 	return answer, err
 }
 

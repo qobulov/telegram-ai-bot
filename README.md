@@ -698,10 +698,17 @@ In a private chat each user gets `PRIVATE_DAILY_LIMIT` answers a day
   twice (it counts once), and a turn that failed with an error (the model
   overloaded, out of time, or any other error), unless she drew a picture
   before the error: the picture is still sent, and counted.
-- The first message past the limit gets one notice, in Uzbek, Russian and
-  English; later ones that day get nothing, but while premium is sold, a
-  line pointing to `/premium` at most once an hour. A voice message past
-  the limit is not even transcribed.
+- The limit is for talk with the model; tools take nothing from it. A turn
+  that called a tool (a rate, the weather, a search, a meme, a picture...)
+  is given back once it is answered. Past the limit, a message in words
+  alone is still a turn, for tools only (`agent.Request.ToolsOnly`): the
+  router, a cheap call, sends talk straight to the limit's notice, and an
+  answer the main model gives without a tool is dropped, unsaved, for the
+  notice too. A picture or a voice message past the limit is neither seen
+  nor transcribed. Each tool keeps its own limits, as drawing does.
+- The first message past the limit that is not a tool's gets one notice, in
+  Uzbek, Russian and English; later ones that day get nothing, but while
+  premium is sold, a line pointing to `/premium` at most once an hour.
 - Owners have no limit. Everyone else has, the administrators in
   `ADMIN_USER_IDS` included. Groups are not affected; they have their own
   [limits](#limits).
@@ -727,7 +734,8 @@ nothing from the daily limit, past it too: the die is rolled with
 Tashkent's weather of `get_weather`, each run by the tools' registry on the
 sender's turn and written in their language; the time is the bot's clock.
 A tool that fails is said to have failed. The meme's words are the model's,
-so «😂 Mem yasab ber» is answered as if typed and counted like any message;
+so «😂 Mem yasab ber» is answered as if typed, a turn that calls a tool and
+so is not counted either (below);
 «❓ Yordam» (or «❓ Помощь», «❓ Help») is answered as `/help`, uncounted. A
 group never gets the keyboard, and the buttons' words typed there are just
 words, for the model; so are they in a business account's chats.

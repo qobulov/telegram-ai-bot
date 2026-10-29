@@ -198,3 +198,34 @@ func TestGameQuestionsRemindToCheckHeroes(t *testing.T) {
 		t.Errorf("saved = %+v", saved)
 	}
 }
+
+// Past the day's limit only a tool may answer: talk ends at the router,
+// before the main model, and an answer the main model gives without a tool
+// is dropped; neither is saved. One that calls a tool is answered, and
+// says how many it called.
+func TestToolsOnlyTurnsAnswerOnlyWithATool(t *testing.T) {
+	f, _, chat := routedFixture("CHAT", text("chat"), text("main"))
+	req := request(1, "nima gap")
+	req.ToolsOnly = true
+	if _, err := f.agent.Reply(context.Background(), req); !errors.Is(err, ErrNotATool) {
+		t.Errorf("talk: %v, want ErrNotATool", err)
+	}
+	if len(f.model.requests)+len(chat.requests) != 0 || len(f.store.history[testScope]) != 0 {
+		t.Errorf("talk reached a model or was saved")
+	}
+
+	f, _, _ = routedFixture("TOOLS", text("chat"), text("main, without a tool"))
+	req = request(2, "dollar qancha")
+	req.ToolsOnly = true
+	if _, err := f.agent.Reply(context.Background(), req); !errors.Is(err, ErrNotATool) || len(f.store.history[testScope]) != 0 {
+		t.Errorf("no tool: %v, saved %d", err, len(f.store.history[testScope]))
+	}
+
+	f, _, _ = routedFixture("TOOLS", text("chat"), toolCall("c1"), text("12 750 so'm"))
+	req = request(3, "dollar qancha")
+	req.ToolsOnly = true
+	answer, err := f.agent.Reply(context.Background(), req)
+	if err != nil || answer.Text != "12 750 so'm" || answer.ToolsUsed != 1 {
+		t.Errorf("with a tool: %+v, %v", answer, err)
+	}
+}

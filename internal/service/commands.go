@@ -763,7 +763,8 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 		return out
 	}
 	reservation, notify, allowed := s.takePrivateAnswer(ctx, in)
-	if !allowed {
+	pastLimit := !allowed
+	if pastLimit && !s.toolsPastLimit(in) {
 		return s.limitReached(ctx, in, notify)
 	}
 	if !in.group {
@@ -785,6 +786,7 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 		caller.Target.Answered = s.answeredMember(ctx, in.scope.ChatID, caller.Target.MessageID)
 	}
 	req := s.request(ctx, in, rules)
+	req.ToolsOnly = pastLimit
 	caller.Picture = firstPicture(req.Attachments)
 	ctx = tools.WithTurn(ctx, caller, sink)
 	answer, err := s.opts.Replier.Reply(ctx, req)
@@ -798,7 +800,13 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 		// what was asked for.
 		audios = sink.TakeAudios()
 	}
-	if !usedAnAnswer(err, drawings) && len(documents)+len(audios) == 0 {
+	if pastLimit && errors.Is(err, agent.ErrNotATool) {
+		return s.limitReached(ctx, in, notify)
+	}
+	freeTools := reservation != 0 && answer.ToolsUsed > 0
+	if freeTools || (!usedAnAnswer(err, drawings) && len(documents)+len(audios) == 0) {
+		// A turn that used a tool is given back as well: the day's limit
+		// is for talk with the model, and tools take nothing from it.
 		s.giveBackAnswer(in, reservation)
 	}
 	out := s.answerOf(in, answer, err, started)
@@ -809,6 +817,14 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 		out.skipped = ""
 	}
 	return out
+}
+
+// toolsPastLimit reports a private message past the day's limit that may
+// still be answered with a tool: one in words alone, as a picture or a
+// voice message would need the model to see or hear it first.
+func (s *Service) toolsPastLimit(in incoming) bool {
+	_, media := s.mediaOf(in.msg)
+	return !in.group && !media && in.text != ""
 }
 
 // joinedChannels reports whether the sender of a private message may be
