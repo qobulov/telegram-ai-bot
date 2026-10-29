@@ -18,6 +18,9 @@ type Update struct {
 	ChatMember   *ChatMemberUpdated `json:"chat_member"`
 	// CallbackQuery is a press of a button under one of the bot's messages.
 	CallbackQuery *CallbackQuery `json:"callback_query"`
+	// InlineQuery is someone typing "@bot words" in a chat, for the bot to
+	// answer with something to post.
+	InlineQuery *InlineQuery `json:"inline_query"`
 }
 
 // CallbackQuery is a press of a button with callback data: who pressed it,

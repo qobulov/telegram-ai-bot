@@ -30,12 +30,16 @@ type sentMessage struct {
 	text    string
 	replyTo int64
 	photo   bool
+	// album is how many pictures an album had; 0 for any other message.
+	album   int
 	buttons [][]telegram.Button
 }
 
 type fakeSender struct {
 	mu   sync.Mutex
 	sent []sentMessage
+	// albumErr makes SendMediaGroup fail.
+	albumErr error
 }
 
 func (f *fakeSender) SendMessage(ctx context.Context, msg telegram.Outgoing) (int64, error) {
@@ -55,6 +59,19 @@ func (f *fakeSender) SendPhoto(ctx context.Context, photo telegram.Photo) (int64
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.sent = append(f.sent, sentMessage{chatID: photo.ChatID, text: photo.Caption, replyTo: photo.ReplyToMessageID, photo: true})
+	return int64(1000 + len(f.sent)), nil
+}
+
+func (f *fakeSender) SendMediaGroup(ctx context.Context, album telegram.Album) (int64, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.albumErr != nil {
+		return 0, f.albumErr
+	}
+	f.sent = append(f.sent, sentMessage{chatID: album.ChatID, text: album.Caption, replyTo: album.ReplyToMessageID, photo: true, album: len(album.Photos)})
 	return int64(1000 + len(f.sent)), nil
 }
 

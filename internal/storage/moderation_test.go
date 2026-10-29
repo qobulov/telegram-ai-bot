@@ -35,6 +35,7 @@ func TestModerationAuditIsIdempotent(t *testing.T) {
 	ban := ModerationAction{ChatID: group, Action: "ban", RequesterID: alice, TargetUserID: bob, UpdateID: 502}
 	mustRecord(t, store, ban)
 	mustRecord(t, store, ModerationAction{ChatID: group, Action: "poll", RequesterID: alice, UpdateID: 501})
+	mustRecord(t, store, ModerationAction{ChatID: group, Action: "dice", RequesterID: alice, UpdateID: 503})
 
 	var (
 		text            string
@@ -55,7 +56,7 @@ func TestModerationAuditIsIdempotent(t *testing.T) {
 
 	since := time.Now().Add(-10 * time.Minute)
 	if n, err := store.ModerationBy(ctx, alice, since); err != nil || n != 3 {
-		t.Errorf("ModerationBy(alice) = %d, %v; want 3, polls left out", n, err)
+		t.Errorf("ModerationBy(alice) = %d, %v; want 3, polls and dice left out", n, err)
 	}
 	if n, _ := store.ModerationBy(ctx, bob, since); n != 0 {
 		t.Errorf("ModerationBy(bob) = %d, want 0", n)

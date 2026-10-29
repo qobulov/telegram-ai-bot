@@ -94,6 +94,17 @@ type Config struct {
 	ImageBaseURL    string
 	DailyImageLimit int
 
+	// Voice answers: SpeechModel, from TTS_MODEL, reads an answer aloud when
+	// someone asks to be answered by voice; empty, every answer is text. The
+	// model is reached at SpeechBaseURL with SpeechAPIKey, an
+	// OpenAI-compatible /audio/speech, which default to the chat model's;
+	// SpeechVoice is the voice, SpeechFormat "opus" or "mp3".
+	SpeechModel   string
+	SpeechBaseURL string
+	SpeechAPIKey  string
+	SpeechVoice   string
+	SpeechFormat  string
+
 	// Media limits: the largest file the bot downloads, and the longest
 	// voice message it listens to.
 	MaxMediaBytes   int64
@@ -273,6 +284,7 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.SafeBrowsingKey = r.apiKey("GOOGLE_SAFE_BROWSING_KEY")
 	cfg.SightengineUser = r.apiKey("SIGHTENGINE_API_USER")
 	cfg.SightengineSecret = r.apiKey("SIGHTENGINE_API_SECRET")
+	r.speech(&cfg)
 	cfg.WakeWords = r.wakeWords(cfg)
 	r.checkRemovedVariables()
 	r.checkGroupSettings(cfg)
@@ -432,6 +444,28 @@ func (r *reader) chooseProvider(cfg *Config) {
 		cfg.FallbackModels = r.fallbackModels(p.fallbacks)
 	default:
 		r.fail(chosen[0].keyVar, "and "+chosen[1].keyVar+" are both set; keep only one, for the provider you want to use")
+	}
+}
+
+// speech reads the voice answers' settings. They are read only with
+// TTS_MODEL set: without it there are no voice answers to configure.
+// Telegram plays OGG/Opus and MP3 as voice messages, not WAV, so only those
+// two formats may be asked for.
+func (r *reader) speech(cfg *Config) {
+	cfg.SpeechModel = r.text("TTS_MODEL", "")
+	if cfg.SpeechModel == "" {
+		return
+	}
+	cfg.SpeechBaseURL = r.text("TTS_BASE_URL", cfg.AIBaseURL)
+	cfg.SpeechAPIKey = r.apiKey("TTS_API_KEY")
+	if cfg.SpeechAPIKey == "" {
+		cfg.SpeechAPIKey = cfg.AIAPIKey
+	}
+	cfg.SpeechVoice = r.text("TTS_VOICE", "alloy")
+	switch cfg.SpeechFormat = strings.ToLower(r.text("TTS_FORMAT", "opus")); cfg.SpeechFormat {
+	case "opus", "mp3":
+	default:
+		r.fail("TTS_FORMAT", "must be opus or mp3: Telegram plays no other as a voice message")
 	}
 }
 

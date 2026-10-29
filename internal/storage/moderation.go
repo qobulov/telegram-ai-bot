@@ -12,7 +12,7 @@ import (
 
 // ModerationAction is one thing the bot did in a group for someone, kept as
 // an audit: who had it delete, mute, ban or pin what, and when. Polls are
-// recorded here too, so that one chat gets few of them.
+// recorded here too, and dice rolls, so that one chat gets few of them.
 type ModerationAction struct {
 	// ID is set on an action read back, such as the one to undo.
 	ID          int64
@@ -117,12 +117,12 @@ func nullJSON(raw json.RawMessage) any {
 }
 
 // ModerationBy counts the actions taken for a person since a moment, in
-// every group. Polls are not moderation and are left out.
+// every group. Polls and dice rolls are not moderation and are left out.
 func (s *Store) ModerationBy(ctx context.Context, requesterID int64, since time.Time) (int, error) {
 	var count int
 	err := s.pool.QueryRow(ctx, `
 		SELECT count(*) FROM moderation_actions
-		WHERE requester_id = $1 AND created_at >= $2 AND action <> 'poll'`, requesterID, since).Scan(&count)
+		WHERE requester_id = $1 AND created_at >= $2 AND action NOT IN ('poll', 'dice')`, requesterID, since).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("storage: count moderation: %w", err)
 	}

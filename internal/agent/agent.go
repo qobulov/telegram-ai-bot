@@ -32,6 +32,9 @@ var (
 	ErrToolAsText = fmt.Errorf("agent: the model wrote a tool call as text: %w", ErrSilent)
 	// ErrToolLoop means the model kept requesting tools instead of answering.
 	ErrToolLoop = errors.New("agent: model did not produce an answer")
+	// ErrNeedsTools means an inline question needs a tool to answer, which
+	// inline answers do not have.
+	ErrNeedsTools = errors.New("agent: the question needs a tool, and inline answers have none")
 )
 
 // SilentMarker is the answer the model gives to stay silent.
@@ -123,6 +126,11 @@ type Request struct {
 	// Fixed, when set, is the answer, decided without the model: the turn
 	// is only saved, which keeps the history and answers an update once.
 	Fixed *Answer
+	// Inline marks a question typed in inline mode, "@bot words" in any
+	// chat. Its asker posts the answer as their own message, in a chat the
+	// bot cannot read, so it is answered on its own: without history or
+	// tools, and saved nowhere.
+	Inline bool
 }
 
 // Answer is the assistant's reply. ID identifies the stored answer.
@@ -152,6 +160,9 @@ type Answer struct {
 // Reply answers the user's message and saves the whole turn. Nothing is
 // saved when the turn fails.
 func (a *Agent) Reply(ctx context.Context, req Request) (Answer, error) {
+	if req.Inline {
+		return a.answerInline(ctx, req)
+	}
 	processed, err := a.opts.Store.UpdateProcessed(ctx, req.UpdateID)
 	if err != nil {
 		return Answer{}, err

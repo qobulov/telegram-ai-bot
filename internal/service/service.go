@@ -31,6 +31,7 @@ const (
 type Sender interface {
 	SendMessage(ctx context.Context, msg telegram.Outgoing) (messageID int64, err error)
 	SendPhoto(ctx context.Context, photo telegram.Photo) (messageID int64, err error)
+	SendMediaGroup(ctx context.Context, album telegram.Album) (messageID int64, err error)
 }
 
 // Replier answers a user's message.
@@ -311,6 +312,13 @@ type Options struct {
 	// Files sends the files a tool made, such as a document; nil sends
 	// none, and the answer's text goes alone.
 	Files FileSender
+	// Speaker reads an answer aloud and VoiceSender sends it, for whoever
+	// asks to be answered by voice; with either nil, every answer is text.
+	Speaker     Speaker
+	VoiceSender VoiceSender
+	// Inline answers inline queries, "@bot words" typed in any chat; nil
+	// leaves them unanswered.
+	Inline InlineAnswerer
 	// Answers tells whom one of the bot's answers in a group answered, so
 	// that "don't answer him", replying to it, means that member; nil means
 	// it is never known.
@@ -356,7 +364,9 @@ type Service struct {
 	// while polling; transcribing bounds how many run at once.
 	background   sync.WaitGroup
 	transcribing chan struct{}
-	notifier     sync.WaitGroup
+	// inlines bounds the inline queries answered at once while polling.
+	inlines  chan struct{}
+	notifier sync.WaitGroup
 
 	mutedMu sync.RWMutex
 	muted   map[int64]bool
@@ -386,6 +396,9 @@ type Service struct {
 	// typingInterval is how often "typing" is shown again while a turn
 	// runs: typingRefresh, shortened by tests.
 	typingInterval time.Duration
+	// inlineDeadline bounds the work before an inline answer:
+	// inlineDeadline, shortened by tests.
+	inlineDeadline time.Duration
 }
 
 // incoming is an accepted update, reduced to what handling it needs.
@@ -466,7 +479,9 @@ func New(opts Options) *Service {
 		queues:          make([]chan incoming, opts.Workers),
 		notices:         make(chan incoming, noticeQueueSize),
 		transcribing:    make(chan struct{}, backgroundTranscriptions),
+		inlines:         make(chan struct{}, inlineSlots),
 		typingInterval:  typingRefresh,
+		inlineDeadline:  inlineDeadline,
 	}
 	for _, chatID := range opts.MutedChats {
 		s.muted[chatID] = true
@@ -494,6 +509,10 @@ func (s *Service) Handle(update telegram.Update) {
 	}
 	if update.CallbackQuery != nil {
 		s.pressed(update.CallbackQuery)
+		return
+	}
+	if update.InlineQuery != nil {
+		s.handleInline(update.InlineQuery)
 		return
 	}
 	in, ok := s.accept(update)
@@ -526,6 +545,10 @@ func (s *Service) HandleNow(update telegram.Update) {
 	}
 	if update.CallbackQuery != nil {
 		s.pressed(update.CallbackQuery)
+		return
+	}
+	if update.InlineQuery != nil {
+		s.answerInline(update.InlineQuery)
 		return
 	}
 	if in, ok := s.accept(update); ok {

@@ -54,6 +54,9 @@ type outcome struct {
 	// toName is the member the model named for toReplied, whose latest
 	// message the answer replies to when the asker replied to nobody.
 	toName string
+	// voice sends the text read aloud, as a voice message, as the asker
+	// asked; when it cannot be, the text goes.
+	voice bool
 }
 
 func say(text string) outcome { return outcome{text: text} }
@@ -189,20 +192,20 @@ func (s *Service) deliver(in incoming, out *outcome) int64 {
 	}
 	if id := s.sendDocuments(in, out); id != 0 {
 		// A file is the answer, its text the caption.
-		out.text, out.drawings, out.sticker, out.gif, out.audios = "", nil, "", "", nil
+		out.text, out.drawings, out.sticker, out.gif, out.audios, out.voice = "", nil, "", "", nil, false
 		return id
 	}
 	if id := s.sendAudios(in, out.audios); id != 0 {
 		// A song asked for is the answer alone, as a sticker is: words with
 		// it only say what it is. Only when it cannot be sent do they go.
-		out.text, out.drawings, out.sticker, out.gif = "", nil, "", ""
+		out.text, out.drawings, out.sticker, out.gif, out.voice = "", nil, "", "", false
 		if out.reaction != "" {
 			s.react(in, out.reaction)
 		}
 		return id
 	}
 	out.audios = nil
-	answerID := s.deliverAnswer(in, *out)
+	answerID := s.deliverAnswer(in, out)
 	if id := s.sendMedia(in, out); answerID == 0 {
 		answerID = id
 	}
@@ -356,14 +359,25 @@ func (s *Service) sendAudio(in incoming, audio tools.Audio) int64 {
 	return id
 }
 
-// deliverAnswer sends the outcome's text, pictures and reaction.
-func (s *Service) deliverAnswer(in incoming, out outcome) int64 {
+// deliverAnswer sends the outcome's text, pictures and reaction. Several
+// pictures go as albums, the caption under the first; text asked for by
+// voice goes read aloud when it can, and out.voice is left set only when
+// it did.
+func (s *Service) deliverAnswer(in incoming, out *outcome) int64 {
+	spoken := out.voice
+	out.voice = false
 	if out.reaction != "" {
 		s.react(in, out.reaction)
 	}
 	if len(out.drawings) == 0 {
 		if out.text == "" {
 			return 0
+		}
+		if spoken && len(out.buttons) == 0 {
+			if id := s.sendSpoken(in, out.text); id != 0 {
+				out.voice = true
+				return id
+			}
 		}
 		return s.replyWithButtons(in, out.text, out.buttons)
 	}
@@ -372,12 +386,12 @@ func (s *Service) deliverAnswer(in incoming, out outcome) int64 {
 		caption = ""
 	}
 	var answerID int64
-	for i, drawing := range out.drawings {
+	for i, album := range albums(out.drawings) {
 		text := ""
 		if i == 0 {
 			text = caption
 		}
-		if id := s.replyPhoto(in, drawing, text); answerID == 0 {
+		if id := s.replyPictures(in, album, text); answerID == 0 {
 			answerID = id
 		}
 	}
@@ -385,6 +399,52 @@ func (s *Service) deliverAnswer(in incoming, out outcome) int64 {
 		answerID = s.reply(in, out.text)
 	}
 	return answerID
+}
+
+// albums splits pictures into the albums Telegram takes, of at most
+// telegram.MaxAlbum each; a last one of a single picture goes alone.
+func albums(drawings []tools.Drawing) [][]tools.Drawing {
+	return slices.Collect(slices.Chunk(drawings, telegram.MaxAlbum))
+}
+
+// replyPictures sends pictures as one album, or one picture alone, with
+// caption, and returns the ID of the message with the caption. When
+// Telegram refuses the album, such as for one picture it cannot read, they
+// go one by one, so that the others still arrive; when it does not answer,
+// the album may be in the chat, and nothing is sent again.
+func (s *Service) replyPictures(in incoming, drawings []tools.Drawing, caption string) int64 {
+	if len(drawings) < telegram.MinAlbum {
+		return s.replyPhoto(in, drawings[0], caption)
+	}
+	photos := make([][]byte, len(drawings))
+	for i, drawing := range drawings {
+		photos[i] = drawing.Data
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
+	defer cancel()
+	sentID, err := s.opts.Sender.SendMediaGroup(ctx, telegram.Album{
+		ChatID: in.msg.Chat.ID, ReplyToMessageID: in.replyTarget(), Photos: photos, Caption: caption,
+	})
+	var refused *telegram.APIError
+	switch {
+	case err == nil:
+		return sentID
+	case !errors.As(err, &refused) || refused.Code >= http.StatusInternalServerError:
+		s.opts.Logger.Error("send album failed", "chat_id", in.msg.Chat.ID, "error", err)
+		return 0
+	}
+	s.opts.Logger.Warn("Telegram refused an album; sending its pictures one by one", "chat_id", in.msg.Chat.ID, "error", err)
+	var firstID int64
+	for i, drawing := range drawings {
+		text := ""
+		if i == 0 {
+			text = caption
+		}
+		if id := s.replyPhoto(in, drawing, text); firstID == 0 {
+			firstID = id
+		}
+	}
+	return firstID
 }
 
 func (s *Service) replyPhoto(in incoming, drawing tools.Drawing, caption string) int64 {
@@ -418,6 +478,9 @@ func (s *Service) logExchange(in incoming, out outcome) {
 		}
 		if len(out.drawings) > 0 {
 			answer = "<photo> " + answer
+		}
+		if out.voice {
+			answer = "<voice> " + answer
 		}
 		if out.sticker != "" {
 			answer = strings.TrimSpace(answer + " <sticker " + out.sticker + ">")
@@ -698,6 +761,10 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 		caller.Target.Answered = s.answeredMember(ctx, in.scope.ChatID, caller.Target.MessageID)
 	}
 	req := s.request(ctx, in, rules)
+	voice := s.canSpeak() && wantsVoice(in.described)
+	if voice {
+		req.Context = paragraphs(req.Context, voiceNote)
+	}
 	caller.Picture = firstPicture(req.Attachments)
 	ctx = tools.WithTurn(ctx, caller, sink)
 	answer, err := s.opts.Replier.Reply(ctx, req)
@@ -715,6 +782,7 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 		s.giveBackAnswer(in, reservation)
 	}
 	out := s.answerOf(in, answer, err, started)
+	out.voice = voice && err == nil
 	out.drawings = drawings
 	out.documents = documents
 	out.audios = audios

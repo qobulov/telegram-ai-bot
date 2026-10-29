@@ -336,6 +336,10 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		StickerSender:    bot.Client,
 		StickerImporter:  &stickers.Importer{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger), Workers: stickerWorkers, Logger: logger},
 		Answers:          store,
+		Inline:           bot.Client,
+	}
+	if cfg.SpeechModel != "" {
+		opts.Speaker, opts.VoiceSender = speaker(cfg), bot.Client
 	}
 	if cfg.GiphyAPIKey != "" {
 		opts.GIFs = &gifs.Client{APIKey: cfg.GiphyAPIKey, HTTPClient: &http.Client{Timeout: giphyTimeout}}
@@ -363,6 +367,7 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 	// use these, so they are there with or without owners.
 	builtin = append(builtin, moderate,
 		tools.PollTool(tools.PollOptions{Sender: bot.Client, Store: store}),
+		tools.DiceTool(tools.DiceOptions{Sender: bot.Client, Store: store}),
 		tools.AdminsTool(tools.AdminsOptions{Telegram: bot.Client, BotID: bot.User.ID, Owners: cfg.OwnerIDs}),
 		tools.MembersTool(tools.MembersOptions{Store: store, Telegram: bot.Client, Owners: cfg.OwnerIDs, Location: cfg.Location}),
 		tools.ProfileTool(tools.ProfileOptions{Store: store}),
@@ -560,6 +565,18 @@ func stickerLabeller(cfg config.Config, logger *slog.Logger) *ai.Client {
 		HTTPClient:      &http.Client{Timeout: cfg.RequestTimeout},
 		AttemptTimeout:  attemptTimeout,
 		Logger:          logger,
+	})
+}
+
+// speaker reads answers aloud with TTS_MODEL, for voice answers.
+func speaker(cfg config.Config) *ai.SpeechClient {
+	return ai.NewSpeechClient(ai.SpeechOptions{
+		BaseURL:    cfg.SpeechBaseURL,
+		APIKey:     cfg.SpeechAPIKey,
+		Model:      cfg.SpeechModel,
+		Voice:      cfg.SpeechVoice,
+		Format:     cfg.SpeechFormat,
+		HTTPClient: &http.Client{Timeout: cfg.RequestTimeout},
 	})
 }
 

@@ -4,7 +4,7 @@ A Telegram chat character written in Go: a playful, quick-witted group-chat
 regular (called Maria unless you rename her) rather than a neutral assistant.
 She answers through [Google Gemini](https://ai.google.dev), remembers
 conversations in PostgreSQL, and can call a small set of tools that are
-checked in code (current time, bot help, drawing, polls, a
+checked in code (current time, bot help, drawing, polls, dice, a
 group's admin list, moderation for group admins, and live data: exchange
 rates, weather, prayer times, news headlines, Wikipedia, football and crypto
 prices).
@@ -17,7 +17,9 @@ prices).
 - Group admins can mute her with `/mute`, and have her delete, pin, mute or
   ban by replying to a message and then saying yes to her question; see
   [Groups](#groups).
-- Replies in the chat's language (Uzbek, Russian, English).
+- Replies in the chat's language (Uzbek, Russian, English), by voice when
+  asked and a speech model is set, and in any chat through inline mode
+  (`@bot question?`).
 - Long polling: no public port, domain or TLS certificate needed.
 - One dependency besides the Go standard library: `pgx` for PostgreSQL.
 - Tests run without Telegram or model provider credentials.
@@ -34,14 +36,15 @@ prices).
 8. [Drawing pictures](#drawing-pictures)
 9. [Live data](#live-data)
 10. [Daily limit in private chats](#daily-limit-in-private-chats)
-11. [Groups](#groups)
-12. [VPS deployment (systemd)](#vps-deployment-systemd)
-13. [Docker Compose deployment (optional)](#docker-compose-deployment-optional)
-14. [Vercel deployment (webhook)](#vercel-deployment-webhook)
-15. [Backup and restore](#backup-and-restore)
-16. [Long polling and webhooks](#long-polling-and-webhooks)
-17. [Security checklist](#security-checklist)
-18. [Troubleshooting](#troubleshooting)
+11. [Inline mode](#inline-mode)
+12. [Groups](#groups)
+13. [VPS deployment (systemd)](#vps-deployment-systemd)
+14. [Docker Compose deployment (optional)](#docker-compose-deployment-optional)
+15. [Vercel deployment (webhook)](#vercel-deployment-webhook)
+16. [Backup and restore](#backup-and-restore)
+17. [Long polling and webhooks](#long-polling-and-webhooks)
+18. [Security checklist](#security-checklist)
+19. [Troubleshooting](#troubleshooting)
 
 ## Architecture
 
@@ -52,8 +55,8 @@ internal/app                    assembles the bot for either way of running it
 internal/webhook                HTTP handler for webhook updates, with secret check
 internal/config                 load .env + environment, validate
 internal/telegram               Bot API client: long polling, sending, message splitting
-internal/ai                     Model client: types, retries, tool-calling format
-internal/tools                  tool registry + time, help, drawing, polls, admin list, moderation, owners' tools
+internal/ai                     Model client: types, retries, tool-calling format; speech for voice answers
+internal/tools                  tool registry + time, help, drawing, polls, dice, admin list, moderation, owners' tools
 internal/webapi                 live-data tools: rates, weather, prayer times, news, Wikipedia, football, crypto
 internal/storage                pgx pool, migrations, conversation queries
 internal/storage/migrations     SQL migrations, embedded in the binary
@@ -175,6 +178,11 @@ in the environment win over the file.
 | `ENABLE_IMAGE_GENERATION` | `true` | Let the bot draw pictures (Gemini only; needs billing on the Gemini key) |
 | `IMAGE_MODEL` | `gemini-3.1-flash-image` | Gemini model that draws |
 | `DAILY_IMAGE_LIMIT` | `2` | Pictures per user per day; owners have no limit; `0` lets only owners draw |
+| `TTS_MODEL` | empty | A text-to-speech model, such as OpenAI's `gpt-4o-mini-tts`; with it, whoever asks to be answered by voice gets a voice message. Empty, every answer is text. See [Voice answers](#voice-answers) |
+| `TTS_BASE_URL` | the chat model's API | An OpenAI-compatible API with `/audio/speech`, such as `https://api.openai.com/v1`. Gemini's OpenAI-compatible API has none, so with Gemini this must be set |
+| `TTS_API_KEY` | the chat model's key | The key for `TTS_BASE_URL`; sent in a header |
+| `TTS_VOICE` | `alloy` | The voice, as the provider names it (OpenAI: `alloy`, `nova`, `coral`, `shimmer`, …) |
+| `TTS_FORMAT` | `opus` | `opus` or `mp3`: the formats Telegram plays as a voice message |
 | `GIPHY_API_KEY` | empty | Key from <https://developers.giphy.com/dashboard/> (API, not SDK); lets her send a GIF now and then instead of a sticker. See [Stickers](#stickers) |
 | `YOUTUBE_API_KEY` | empty | YouTube Data API v3 key from Google Cloud Console, not bound to a service account; without it there is no video search |
 | `TMDB_TOKEN` | empty | TMDB API Read Access Token from <https://www.themoviedb.org/settings/api>; without it there is no movies tool |
@@ -490,6 +498,40 @@ every voice message is transcribed as it arrives, even when it does not
 address the bot, so that "what did he say?" or "write it as text" can be
 answered later from the group log. Each one costs one extra model request.
 
+Several pictures in one answer, such as two heroes' portraits or a picture
+drawn twice, go as one album (Telegram's `sendMediaGroup`, up to 10 a
+time), with the answer as the caption under the first, instead of one
+message each. An album Telegram refuses, as it does when it cannot read one
+of the pictures, goes picture by picture; one it does not answer may be in
+the chat, and is not sent again.
+
+### Voice answers
+
+With `TTS_MODEL` set, someone who asks to be answered by voice, in a group
+or a private chat ("ovozli javob ber", "ovoz bilan ayt", "голосом ответь",
+"send a voice message", in a voice message too), gets the answer read
+aloud, as a voice message replying to them. Whether they asked is decided
+in code, from their own words, not by the model; the model is then told
+that its answer will be heard, so it writes plain spoken words under 600
+characters. "ovozli xabarni eshit", about someone's voice message, asks for
+none.
+
+The answer is read by the OpenAI-compatible `POST /audio/speech` of
+`TTS_BASE_URL` (OpenAI and OpenRouter have one), in `TTS_FORMAT`; what comes
+back must be OGG/Opus, MP3 or M4A, which Telegram plays as a voice message.
+Gemini's own speech models give WAV only, which Telegram does not play as
+one, and its OpenAI-compatible API has no `/audio/speech`; encoding WAV to
+Opus would take a codec the bot does not have, so with Gemini the speech
+goes through another provider, such as OpenAI with `TTS_BASE_URL=https://api.openai.com/v1`,
+`TTS_API_KEY`, `TTS_MODEL=gpt-4o-mini-tts` and `TTS_VOICE=nova`.
+
+The text goes as usual instead whenever the answer cannot be heard: it is
+longer than 800 characters, the speech fails or is not a voice format,
+Telegram refuses the voice message, or the answer has pictures, a file, a
+song or buttons. The history keeps the text; the group log marks a spoken
+answer `<voice>`. A voice answer is an answer like any other for the
+limits; reading it aloud is paid to the speech provider by the character.
+
 ## The owner
 
 Set `BOT_OWNER_USERNAME` to your Telegram username (with or without `@`);
@@ -626,6 +668,38 @@ In a private chat each user gets `PRIVATE_DAILY_LIMIT` answers a day
   the limit guards the model's cost, and one answer too many disturbs
   nobody else.
 - `0` turns the limit off.
+
+## Inline mode
+
+Typed in any chat, `@MariaBot qanday qilib plov pishiriladi?` shows one
+result, Maria's answer, which the asker taps to post it there as their own
+message ("via @MariaBot"). Telegram gives the bot the words and the asker,
+never the chat.
+
+- **Turn it on** in [@BotFather](https://t.me/BotFather): `/setinline`,
+  choose the bot, and give the placeholder shown in the input field, such
+  as `savol bering…`. Until then Telegram sends no inline queries.
+- **A question must end** in `?`, `!`, `.` or `…` to be answered. The app
+  sends a query at nearly every keystroke; answering each would spend a
+  model call, and one of the asker's daily answers, on every unfinished
+  word. Until then, and for an empty query, the result is a hint.
+- **It is a private chat's turn, without the chat**: the same daily answers
+  (`PRIVATE_DAILY_LIMIT`, owners unlimited; past them the result says so),
+  `PRIVATE_CHATS` and `REQUIRED_CHANNEL` apply, and the flood guard. The
+  persona and the owner's notice are the same, but there is no history, no
+  tools and nothing is saved: the light chat model (`CHAT_MODEL`, the main
+  model without `ROUTER_MODEL`) answers alone, told that its answer is
+  posted by the asker in a chat it cannot see. A question that needs a tool,
+  such as the weather or a rate, gets a result saying to ask in a private
+  chat.
+- **Telegram waits about ten seconds.** The checks and the answer get 7
+  seconds; past them, or when the model fails, the result says to try
+  again. An answer is kept by Telegram for 30 seconds, for that person only
+  (`is_personal`); a failure is not kept, so trying again asks again.
+- Inline queries come only when the bot asks Telegram for them
+  (`inline_query` in `allowed_updates`): long polling asks on every
+  request, and the webhook function sets the webhook again at its first
+  start after this update when the kinds differ, as `set-webhook` does.
 
 ## Groups
 
@@ -962,6 +1036,19 @@ manti?"). She posts an anonymous poll in that group, with 2 to 10 options
 and one or several answers allowed, at most one per group every 10 minutes.
 Polls are counted in `moderation_actions` as `poll`. In a private chat she
 cannot make one.
+
+### Dice
+
+Asked to roll, throw or play ("Maria, zar tashla", "kubik ot", "бросай
+кубик", "o'ynaymiz"), in a group or a private chat, she has Telegram roll
+one of its animated dice with the `send_dice` tool: 🎲 a die, 🎯 darts, 🏀
+basketball, ⚽ football, 🎳 bowling or 🎰 the slot machine. Telegram draws
+the value, not the model nor the asker; the tool gives it back, with what
+it means (a bullseye, a goal, a strike, the slot's three reels and whether
+they won), and she comments in a line. One roll per message, and a chat
+gets 3 rolls every 5 minutes, so a game cannot flood a group. Rolls are
+counted in `moderation_actions` as `dice`, which, like polls, do not count
+as anyone's moderation.
 
 ### Admins
 
@@ -1329,7 +1416,7 @@ accepts the Go version in `go.mod`; if the build fails on that, lower the
 |---|---|---|
 | The last 10 hours of group messages as context | from the `group_messages` table | the same |
 | Mute state | cached in memory | read from the database for each addressed group message |
-| Group reply quotas, replies to bots, moderation and poll limits | in the database | the same |
+| Group reply quotas, replies to bots, moderation, poll and dice limits | in the database | the same |
 | Per-user flood guard | exact | per instance only, so much weaker; do not rely on it |
 | Order of messages in a group | one at a time, in order | concurrent requests are not ordered |
 | Retention cleanup (`RETENTION_DAYS`) | hourly | daily, by Vercel Cron at 03:00 UTC |
