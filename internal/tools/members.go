@@ -75,7 +75,8 @@ func MembersTool(opts MembersOptions) Tool {
 	return Tool{
 		Name: "group_members",
 		Description: "List the members you have seen in this group, the admins among them marked, with how many members the group has. " +
-			"Use it when someone asks who is in the group, who the regular members are or how many members there are; group_admins lists only the admins.",
+			"Use it when someone asks who is in the group, who the regular members are or how many members there are; group_admins lists only the admins. " +
+			"Use it too when asked to call, wake or tag members (\"uyg'ot\", \"chaqir\", \"teg qil\") whose @username is not in front of you: tag them by the @username listed here; a member listed without one cannot be tagged, so say so.",
 		Schema:         json.RawMessage(`{"type": "object", "properties": {}, "additionalProperties": false}`),
 		GroupOnly:      true,
 		MaxOutputBytes: membersOutputBytes,
