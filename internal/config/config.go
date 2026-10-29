@@ -80,13 +80,16 @@ type Config struct {
 	// tool.
 	ImgflipAPIKey string
 	// URLhausAuthKey or SafeBrowsingKey lets owners turn on the link guard,
-	// each service judging links when its key is set, and
-	// SightengineUser and SightengineSecret the picture guard; without them
-	// those guards are refused. The spam guard needs no key.
+	// each service judging links when its key is set; without either it is
+	// refused. SightengineUser and SightengineSecret let Sightengine judge
+	// the picture guard's pictures before the bot's own model. The spam
+	// guard needs no key: lols.bot answers without one, and CASKey, a
+	// Combot API key, adds CAS, which answers nobody without one.
 	URLhausAuthKey    string
 	SafeBrowsingKey   string
 	SightengineUser   string
 	SightengineSecret string
+	CASKey            string
 
 	// Image generation, Gemini only. Owners have no daily limit.
 	ImagesEnabled   bool
@@ -283,6 +286,7 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.SafeBrowsingKey = r.apiKey("GOOGLE_SAFE_BROWSING_KEY")
 	cfg.SightengineUser = r.apiKey("SIGHTENGINE_API_USER")
 	cfg.SightengineSecret = r.apiKey("SIGHTENGINE_API_SECRET")
+	cfg.CASKey = r.apiKey("CAS_API_KEY")
 	cfg.WakeWords = r.wakeWords(cfg)
 	r.checkRemovedVariables()
 	r.checkGroupSettings(cfg)

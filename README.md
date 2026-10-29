@@ -132,6 +132,7 @@ moderation_actions(id PK, chat_id, action, requester_id, target_user_id,
                    update_id, created_at, UNIQUE (update_id, action))
 join_requests(chat_id, user_id, user_chat_id, expires_at, created_at,
               PK (chat_id, user_id))
+picture_verdicts(file_unique_id PK, unsafe, reason, judge, created_at)
 schema_migrations(version PK, applied_at)
 ```
 
@@ -191,7 +192,8 @@ in the environment win over the file.
 | `CALENDARIFIC_API_KEY` | empty | Calendarific key from <https://calendarific.com> (free plan, monthly limit); adds the `holidays` tool. It is sent in a header, never in a URL |
 | `IMGFLIP_API_KEY` | empty | Imgflip API key from <https://imgflip.com/api> (free, a Bearer key); adds the `make_meme` tool |
 | `URLHAUS_AUTH_KEY` | empty | Free Auth-Key from <https://auth.abuse.ch/>; also lets owners turn on the link guard, and with both keys a link is deleted when either service lists it (URLhaus by its host) |
-| `SIGHTENGINE_API_USER`, `SIGHTENGINE_API_SECRET` | empty | From <https://dashboard.sightengine.com/api-credentials>; let owners turn on the picture guard (`guard` `images`), which deletes nude, very suggestive or gory pictures from anyone, admins and owners included: photos, stickers, pictures sent as files and the first frame of GIFs and videos. Each picture is checked once per 6 hours using one operation of its monthly quota (nudity only: with gore too, the guarded groups' two hundred pictures a day spent the free plan's month in days). The spam guard (`guard` `spam`: CAS and lols.bot, banning listed accounts) needs no key |
+| `SIGHTENGINE_API_USER`, `SIGHTENGINE_API_SECRET` | empty | From <https://dashboard.sightengine.com/api-credentials>; let Sightengine judge the picture guard's pictures (`guard` `images`, which deletes nude or very suggestive pictures from anyone, admins and owners included: photos, stickers, pictures sent as files and the first frame of GIFs and videos), one operation of its monthly quota each (nudity only: with gore too, the guarded groups' two hundred pictures a day spent the free plan's month in days). Without them, or when Sightengine fails (its free plan answers `400: 30-day usage limit reached` once the month is spent), the bot's own model judges instead; see [Picture guard](#picture-guard). The guard needs neither |
+| `CAS_API_KEY` | empty | Combot API key, from <https://combot.org> (sign in with Telegram, *Settings*, *API key*; *Reset API key* makes one), sent as a Bearer header. CAS now answers nobody without one: every question was `401 API key required`. With it the spam guard (`guard` `spam`) asks CAS and lols.bot; without it lols.bot alone, which needs no key. lols.bot is asked from its own records (`quick`, a third faster), and once more when it drops the connection, as it now and then reset one; a list that cannot answer is logged and the member left alone |
 | `TAVILY_API_KEY` | empty | Free key from <https://app.tavily.com>; without it there is no web search. See [Live data](#live-data) |
 | `FOOTBALL_DATA_TOKEN` | empty | Free key from <https://www.football-data.org/client/register>; without it there is no football tool. See [Live data](#live-data) |
 | `COINGECKO_DEMO_KEY` | empty | Optional CoinGecko demo key from <https://www.coingecko.com/en/api>; without it crypto prices share CoinGecko's keyless quota |
@@ -904,7 +906,7 @@ does not erase them, and every turn in the group is told the ones in force.
 | Ignore a member | an owner replying to that member's message, or to her answer to them, in the group | 24 hours, or 1 to 720 hours if the owner says |
 | Form of address | an owner, for themselves, in any chat; it holds everywhere | until removed |
 | Swear guard | an owner, in the group it is for ("so'kinganlarni avtomatik mute qil", optionally "@Bakxtyorvch ni chaqir"); one per group | until turned off |
-| Spam, link, picture and joins guards | an owner, in the group it is for (`guard` `spam`, `links`, `images` or `joins`; see [Join requests](#join-requests) for the last) | until turned off |
+| Spam, link, picture and joins guards | an owner, in the group it is for (`guard` `spam`, `links`, `images` or `joins`; see [Join requests](#join-requests) for the last); the joins guard also the group's creator and its admins who may invite users, through the `join_captcha` tool | until turned off |
 | Punishment | an owner or the group's creator, in the group, for swearing or nude pictures: in reply to a member ("bu bola yana so'kinsa ban qil") or for anyone ("18+ tashasa 3 soat mute qil"); one per member and kind | 30 days, or the hours given |
 
 The swear guard runs in code, asking the model only one thing. In a group
@@ -974,6 +976,30 @@ that member's message ("Maria, bunga javob berma", "javob qaytarma",
 ignored for 24 hours, exactly as with `/ignore`, and she reacts 👌 to the
 order. Any other wording, a question such as "nega javob bermading?", or an
 order about someone who cannot be ignored goes to the model as before.
+
+### Picture guard
+
+Where the picture guard is on, every picture is judged in code once ever,
+by Telegram's `file_unique_id`, which is the same for a file in every
+chat: the verdict is kept in `picture_verdicts` (migration 0040), so a
+sticker or meme sent again, in any group, on any instance or after a
+restart, is never sent anywhere a second time, and the last 6 hours' are
+also remembered in each instance's memory to spare the database. A new
+picture goes to Sightengine when its keys are set. When they are not, or
+Sightengine fails (out of its free plan's month it answers
+`400: 30-day usage limit reached` for days), the bot's own model is shown
+the picture with a short prompt and answers one word, `NUDE` or `SAFE`,
+drawing Sightengine's line: nudity, sex and a pose or outfit meant to
+arouse, photographed or drawn, are deleted; swimwear, a kiss or a cartoon
+are not. It is `ROUTER_MODEL` when that is set (light and cheap, with the
+main model and its fallbacks behind it when it is busy), else the main
+model, with 1024 tokens and low thinking. After Sightengine fails it is
+not asked for an hour, in that instance, and the model judges alone. A
+picture neither can judge (the model down, blocked or answering something
+else) is left alone and not kept, so that it is judged when it comes
+again: the guard never deletes on a guess. Each verdict is logged as
+`guards: picture checked` with `judge=sightengine` or `judge=model`, and
+kept with its judge.
 
 ### Moderation
 
@@ -1114,15 +1140,12 @@ it done; she then says so in one short line, like "Bajarildi: Bek @bek
 A group whose admins approve new members, or an invite link made to ask
 for approval, sends her every request to join (`chat_join_request`
 updates), where she is an admin with the right to invite users; nowhere
-else does Telegram send them. She answers them only where an owner turned
-the joins guard on (`group_rules` `guard` `joins`, kept as a `join_captcha`
-rule, "Maria, guruhga qo'shilmoqchi bo'lganlarni tekshir"; `unguard`
-`joins` turns it off). Elsewhere the group's admins vet the requests by
-hand, and a button any requester could press would let them approve
-themselves past those admins, so she does nothing with them; the only
-exception is the spam guard. The guards are owners' orders, as all of
-`group_rules` is: a group's admins ask an owner. She answers them in code,
-with no model:
+else does Telegram send them. She answers them only where the joins guard
+is on (a `join_captcha` rule, "Maria, guruhga qo'shilmoqchi bo'lganlarni
+tekshir"). Elsewhere the group's admins vet the requests by hand, and a
+button any requester could press would let them approve themselves past
+those admins, so she does nothing with them; the only exception is the
+spam guard. She answers them in code, with no model:
 
 - Where the spam guard is on, a requester the spam lists (CAS, lols.bot)
   know as a spammer is declined at once (`declineChatJoinRequest`), with
@@ -1153,6 +1176,21 @@ with no model:
   dropped. A request still waiting when the joins guard is turned off goes
   back to the admins: its button then lets nobody in, and it is not
   declined.
+
+Since the joins guard takes the requests from the admins who answer them,
+those admins may hand them over or take them back themselves: the
+`join_captcha` tool turns it on (`on`) or off (`off`) and says whether it
+is on (`status`) for the bot's owners, the group's creator and its admins
+who may invite users, asked of Telegram (`getChatMember`) at that moment;
+an admin without that right, a member, or anyone when Telegram cannot say,
+is refused. The asker's own words must be about the join check ("kapcha",
+"captcha", "qo'shilish", "so'rov", "tekshir", "заявки", "вступление",
+"проверка") and, to turn it off, ask for that ("o'chir", "kerak emas",
+"yo'q qil", "выключи", "убери", "off"), as with moderation, so a line in
+the chat cannot talk her into it. It touches the group's own joins guard
+and nothing else. The owners still turn it, and the other guards, on and
+off through `group_rules` (`guard` `joins`, `unguard` `joins`), which only
+they may use.
 
 Turn the joins guard on, turn on *Approve new members* in the group (or
 make invite links with *Request admin approval*) and give her *Invite users
@@ -1714,6 +1752,19 @@ The edited messages, join requests and purge update needs:
    members*. Until then she leaves every group's requests alone, but for
    declining known spammers where the spam guard is on. Purge needs *Delete
    messages*, which she has for deletions already.
+
+The guard fixes (pictures judged once ever and by the model when
+Sightengine cannot, CAS's key, the `join_captcha` tool) need:
+
+1. **Apply migration 0040 before deploying** (`make migrate`, as above): it
+   adds the `picture_verdicts` table and changes nothing else. The new
+   version refuses to start without it.
+2. **Set in Vercel** `CAS_API_KEY` to the Combot API key (see
+   [Configuration](#configuration)) for the spam guard to ask CAS again;
+   without it lols.bot alone answers, and the `401` warnings stop. The
+   Sightengine keys may stay: Sightengine judges again when its month comes
+   round, and the model meanwhile.
+3. **Deploy.** No new kind of update is asked for.
 
 ### Daily cleanup
 

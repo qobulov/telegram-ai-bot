@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -36,18 +37,18 @@ func fakeServices(t *testing.T, answers map[string]string) (*Checker, *http.Requ
 	return New(Options{
 		CAS: server.URL + "/cas", Lols: server.URL + "/lols", URLhaus: server.URL + "/urlhaus", Sightengine: server.URL + "/se",
 		SafeBrowsing: server.URL + "/sb",
-		URLhausKey:   "uh-key", SightengineUser: "se-user", SightengineSecret: "se-secret",
+		URLhausKey:   "uh-key", SightengineUser: "se-user", SightengineSecret: "se-secret", CASKey: "cas-key",
 	}), seen
 }
 
 func TestSpammerChecksBothLists(t *testing.T) {
 	c, _ := fakeServices(t, map[string]string{
-		"/cas/check?user_id=1": `{"ok":true,"result":{"offenses":3}}`,
-		"/cas/check?user_id=2": `{"ok":false,"description":"Record not found."}`,
-		"/lols/account?id=2":   `{"ok":true,"user_id":2,"banned":true}`,
-		"/cas/check?user_id=3": `{"ok":false,"description":"Record not found."}`,
-		"/lols/account?id=3":   `{"ok":true,"user_id":3,"banned":false}`,
-		"/lols/account?id=4":   `{"ok":true,"user_id":4,"banned":false}`,
+		"/cas/check?user_id=1":     `{"ok":true,"result":{"offenses":3}}`,
+		"/cas/check?user_id=2":     `{"ok":false,"description":"Record not found."}`,
+		"/lols/account?id=2&quick": `{"ok":true,"user_id":2,"banned":true}`,
+		"/cas/check?user_id=3":     `{"ok":false,"description":"Record not found."}`,
+		"/lols/account?id=3&quick": `{"ok":true,"user_id":3,"banned":false}`,
+		"/lols/account?id=4&quick": `{"ok":true,"user_id":4,"banned":false}`,
 	})
 	for id, want := range map[int64]string{1: "CAS", 2: "lols.bot", 3: "", 4: ""} {
 		source, bad, err := c.Spammer(context.Background(), id)
@@ -57,6 +58,69 @@ func TestSpammerChecksBothLists(t *testing.T) {
 	}
 	if _, _, err := c.Spammer(context.Background(), 5); err == nil {
 		t.Error("both lists failing was taken for a clean account")
+	}
+}
+
+// CAS answers only with its key, sent in a header; without the key it is
+// not asked, and lols.bot alone answers.
+func TestSpammerAsksCASWithItsKeyOnly(t *testing.T) {
+	c, seen := fakeServices(t, map[string]string{"/cas/check?user_id=1": `{"ok":true,"result":{"offenses":3}}`})
+	if source, bad, err := c.Spammer(context.Background(), 1); err != nil || !bad || source != "CAS" {
+		t.Fatalf("Spammer = %q, %v, %v", source, bad, err)
+	}
+	if seen.Header.Get("Authorization") != "Bearer cas-key" || strings.Contains(seen.URL.String(), "cas-key") {
+		t.Errorf("the key was not sent in the header alone: %v %v", seen.URL, seen.Header)
+	}
+
+	c, seen = fakeServices(t, map[string]string{
+		"/cas/check?user_id=1":     `{"ok":true,"result":{"offenses":3}}`,
+		"/lols/account?id=1&quick": `{"ok":true,"user_id":1,"banned":false}`,
+	})
+	c.opts.CASKey = ""
+	if source, bad, err := c.Spammer(context.Background(), 1); err != nil || bad {
+		t.Errorf("without the key = %q, %v, %v; want lols.bot's clean answer", source, bad, err)
+	}
+	if seen.URL.Path != "/lols/account" {
+		t.Errorf("last asked %v, want only lols.bot", seen.URL)
+	}
+
+	c, _ = fakeServices(t, nil)
+	c.opts.CASKey = ""
+	if _, _, err := c.Spammer(context.Background(), 1); err == nil {
+		t.Error("lols.bot failing alone, with CAS not asked, was taken for a clean account")
+	}
+}
+
+// A 401 says why, as CAS answers a question without a key.
+func TestSpammerSaysWhyCASRefused(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = io.WriteString(w, `{"ok":false,"error_code":401,"description":"API key required"}`)
+	}))
+	t.Cleanup(server.Close)
+	c := New(Options{CAS: server.URL, Lols: server.URL, CASKey: "old"})
+	_, _, err := c.Spammer(context.Background(), 1)
+	if err == nil || !strings.Contains(err.Error(), "answered 401: API key required") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+// A connection lols.bot drops is asked once more.
+func TestSpammerAsksLolsAgainWhenItDropsTheConnection(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if calls.Add(1) == 1 {
+			conn, _, _ := w.(http.Hijacker).Hijack()
+			_ = conn.Close()
+			return
+		}
+		_, _ = io.WriteString(w, `{"ok":true,"user_id":7,"banned":true}`)
+	}))
+	t.Cleanup(server.Close)
+	c := New(Options{Lols: server.URL})
+	source, bad, err := c.Spammer(context.Background(), 7)
+	if err != nil || !bad || source != "lols.bot" || calls.Load() != 2 {
+		t.Errorf("Spammer = %q, %v, %v after %d calls", source, bad, err, calls.Load())
 	}
 }
 
