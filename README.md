@@ -988,6 +988,11 @@ not everyone: members who have not written or joined since she started
 keeping it are missing, and she says so. An anonymous admin's messages are
 sent as the group, so they never appear.
 
+Asked to call or tag someone, she looks their @username up there. A member
+without one is listed with a tag, `[Name](tg://user?id=123)`; written in her
+answer, the telegram client sends it as their name linked to their ID (a
+`text_link` entity), which Telegram shows as a mention and tells them of.
+
 ### Catching up
 
 Each answer in a group shows her only an hour or two of a busy group's log.

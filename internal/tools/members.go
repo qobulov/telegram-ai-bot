@@ -16,9 +16,13 @@ const (
 	maxMembersListed = 200
 	// memberEntryBytes is the most a listed member takes besides the texts.
 	memberEntryBytes = 150
+	// memberTagBytes is the most a tag takes besides its name: the link to
+	// an ID of up to 19 digits.
+	memberTagBytes = 50
 	// membersOutputBytes fits maxMembersListed members, each name at its
-	// longest and cut with "…", and the notes.
-	membersOutputBytes = maxMembersListed*((maxAdminNameRunes+maxAdminUsernameRunes+2)*maxEncodedRuneBytes+memberEntryBytes) + 1500
+	// longest and cut with "…", written twice for a member tagged by it, and
+	// the notes.
+	membersOutputBytes = maxMembersListed*((2*maxAdminNameRunes+maxAdminUsernameRunes+2)*maxEncodedRuneBytes+memberEntryBytes+memberTagBytes) + 1500
 	memberTimeLayout   = "2 Jan 15:04"
 )
 
@@ -59,6 +63,9 @@ type memberEntry struct {
 	Owner    bool   `json:"owner,omitempty"`
 	Bot      bool   `json:"bot,omitempty"`
 	LastSeen string `json:"last_seen,omitempty"`
+	// Tag tags a member without a @username: written as it is, it becomes
+	// their name, linked so that Telegram tells them.
+	Tag string `json:"tag,omitempty"`
 }
 
 type membersResult struct {
@@ -66,6 +73,17 @@ type membersResult struct {
 	Total   int           `json:"total,omitempty"`
 	Members []memberEntry `json:"members"`
 	Note    string        `json:"note"`
+}
+
+// memberTag is how the model tags a member without a @username: the
+// telegram client sends it as their name linked to their ID. Brackets in
+// the name would end the link early, so they are dropped.
+func memberTag(name string, userID int64) string {
+	name = strings.NewReplacer("[", "", "]", "", "\n", " ").Replace(name)
+	if strings.TrimSpace(name) == "" {
+		name = "member"
+	}
+	return fmt.Sprintf("[%s](tg://user?id=%d)", name, userID)
 }
 
 // MembersTool lets anyone in a group ask who is in it. The Bot API cannot
@@ -76,7 +94,7 @@ func MembersTool(opts MembersOptions) Tool {
 		Name: "group_members",
 		Description: "List the members you have seen in this group, the admins among them marked, with how many members the group has. " +
 			"Use it when someone asks who is in the group, who the regular members are or how many members there are; group_admins lists only the admins. " +
-			"Use it too when asked to call, wake or tag members (\"uyg'ot\", \"chaqir\", \"teg qil\") whose @username is not in front of you: tag them by the @username listed here; a member listed without one cannot be tagged, so say so.",
+			"Use it too when asked to call, wake or tag members (\"uyg'ot\", \"chaqir\", \"teg qil\") whose @username is not in front of you: tag them by the @username listed here; a member without one is tagged by writing their tag exactly as listed, such as [Mayor](tg://user?id=123): it shows as their name and tells them.",
 		Schema:         json.RawMessage(`{"type": "object", "properties": {}, "additionalProperties": false}`),
 		GroupOnly:      true,
 		MaxOutputBytes: membersOutputBytes,
@@ -125,6 +143,8 @@ func listMembers(ctx context.Context, opts MembersOptions, raw json.RawMessage) 
 		}
 		if m.Username != "" {
 			entry.Username = cutRunes("@"+m.Username, maxAdminUsernameRunes)
+		} else if !m.IsBot {
+			entry.Tag = memberTag(entry.Name, m.UserID)
 		}
 		result.Members = append(result.Members, entry)
 		delete(unseen, m.UserID)
