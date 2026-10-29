@@ -22,6 +22,7 @@ var (
 	keyboardWeather = localText{uz: "🌤 Ob-havo", ru: "🌤 Погода", en: "🌤 Weather"}
 	keyboardTime    = localText{uz: "🕐 Soat nechi?", ru: "🕐 Который час?", en: "🕐 What time is it?"}
 	keyboardMLBB    = localText{uz: "🎮 MLBB", ru: "🎮 MLBB", en: "🎮 MLBB"}
+	keyboardMore    = localText{uz: "📋 Ko'proq", ru: "📋 Ещё", en: "📋 More"}
 	// keyboardHelp is answered as /help.
 	keyboardHelp = localText{uz: "❓ Yordam", ru: "❓ Помощь", en: "❓ Help"}
 	// The buttons as an earlier keyboard named them, which a chat keeps
@@ -35,7 +36,8 @@ var (
 var keyboardRows = [][]localText{
 	{keyboardRate, keyboardWeather},
 	{keyboardMLBB, keyboardDie},
-	{keyboardTime, keyboardHelp},
+	{keyboardTime, keyboardMore},
+	{keyboardHelp},
 }
 
 // keyboard is the keyboard for whoever wrote in, in their language.

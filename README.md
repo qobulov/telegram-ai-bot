@@ -724,7 +724,7 @@ In a private chat each user gets `PRIVATE_DAILY_LIMIT` answers a day
 `/start` and `/help` in a private chat bring a small keyboard, in place of the
 phone's own, of her common requests, in the language of the user's app
 (`internal/service/keyboard.go`): «💵 Valyuta kursi», «🌤 Ob-havo», «🎮 MLBB»,
-«🎲 Zar tashla», «🕐 Soat nechi?» and «❓ Yordam». A meme has no button, which
+«🎲 Zar tashla», «🕐 Soat nechi?», «📋 Ko'proq» and «❓ Yordam». A meme has no button, which
 the owners took off: it is asked for in words, as before. Telegram keeps it there, shrunk to fit,
 until it is closed. A button sends its own text, in any of its three
 languages, and the buttons that need a value ask for it first
@@ -750,6 +750,17 @@ languages, and the buttons that need a value ask for it first
   skin's place in it, as a skin's name may not fit), and the one pressed
   comes as its picture, captioned with its name, tier and price.
 - «🕐 Soat nechi?» is answered at once, by the bot's clock.
+- «📋 Ko'proq» opens the rest of her tools by section
+  (`internal/service/moremenu.go`): 🕌 Din (prayer times, the Quran),
+  📰 Yangiliklar (Uzbekistan's, the world's), 🎬 Ko'ngilochar (films, anime,
+  music, YouTube, a cat, trivia, a fun fact), ⚽ Sport (the table, matches and
+  top scorers of six leagues), 🕹 O'yinlar (Tarozi, free games, a Steam
+  price), 📚 O'qish (Wikipedia, an English word, synonyms, papers) and
+  🛠 Foydali (a QR code, a drawing, a place on the map, holidays, crypto,
+  earthquakes, a web search). An item asks the model at once, asks for its
+  value first (a city, a title, a word, as the menus' other questions do),
+  or offers choices, the leagues; the model answers with the item's tool, so
+  none of it takes from the daily limit, and a drawing keeps its own.
 
 A choice comes back as a button's data (`kb:rate:EUR`), handled at once; a
 value written in the reply box is known by the question it replies to, so

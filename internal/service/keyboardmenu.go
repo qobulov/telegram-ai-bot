@@ -113,6 +113,8 @@ func menuQuestion(language string, button localText) (outcome, bool) {
 		return outcome{text: textWhichCity.inLanguage(language), buttons: choiceRows(cityChoices, "city", 2, &other)}, true
 	case keyboardDie:
 		return outcome{text: textWhichGame.inLanguage(language), buttons: choiceRows(diceChoices, "dice", 3, nil)}, true
+	case keyboardMore:
+		return moreMenu(language), true
 	case keyboardMLBB:
 		var rows [][]telegram.Button
 		for i, c := range mlbbChoices {
@@ -199,6 +201,11 @@ func (s *Service) pressedMenu(q *telegram.CallbackQuery) {
 	case "skin":
 		s.sendSkin(ctx, in, choice)
 		return
+	case "more", "item", "pick":
+		var ok bool
+		if out, ok = s.pressedMore(q, in, kind, choice); !ok {
+			return
+		}
 	case "dice":
 		args, _ := json.Marshal(map[string]string{"emoji": choice})
 		var rolled struct{}
@@ -212,7 +219,7 @@ func (s *Service) pressedMenu(q *telegram.CallbackQuery) {
 		out = s.withMenuBack(in, out)
 	}
 	if out.text != "" {
-		s.send(in, telegram.Outgoing{Text: out.text, Ask: out.ask, Keyboard: out.keyboard})
+		s.send(in, telegram.Outgoing{Text: out.text, Buttons: out.buttons, Ask: out.ask, Keyboard: out.keyboard})
 	}
 }
 

@@ -22,10 +22,10 @@ func TestStartAndHelpBringTheKeyboard(t *testing.T) {
 	if len(sent) != 4 {
 		t.Fatalf("sent = %+v", sent)
 	}
-	if got := sent[0].keyboard; len(got) != 3 || got[0][0] != "💵 Valyuta kursi" || got[1][0] != "🎮 MLBB" || got[2][1] != "❓ Yordam" || strings.Contains(fmt.Sprint(got), "Mem") {
+	if got := sent[0].keyboard; len(got) != 4 || got[0][0] != "💵 Valyuta kursi" || got[1][0] != "🎮 MLBB" || got[2][1] != "📋 Ko'proq" || got[3][0] != "❓ Yordam" || strings.Contains(fmt.Sprint(got), "Mem") {
 		t.Errorf("/start keyboard = %q", got)
 	}
-	if got := sent[1].keyboard; len(got) != 3 || got[2][1] != "❓ Помощь" {
+	if got := sent[1].keyboard; len(got) != 4 || got[3][0] != "❓ Помощь" {
 		t.Errorf("Russian /help keyboard = %q", got)
 	}
 	if sent[2].keyboard != nil || sent[3].keyboard != nil {

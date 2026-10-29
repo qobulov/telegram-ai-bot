@@ -301,3 +301,66 @@ func TestSkinsAreChosenAndShown(t *testing.T) {
 		t.Errorf("unknown hero = %+v", last)
 	}
 }
+
+// «📋 Ko'proq» lists the sections, a section its items; an item without a
+// value asks the model at once, one with choices offers them, and one with
+// a question asks it, its answer going to the model with the request.
+func TestMoreMenu(t *testing.T) {
+	f := newFixture()
+	withToolRunner(f)
+	f.opts.Buttons = &fakeButtons{}
+
+	sent := f.run(textFrom(userID, keyboardMore.uz))
+	if len(sent) != 1 || sent[0].text != textMoreMenu.uz || len(sent[0].buttons) != 4 || sent[0].buttons[0][0].Data != "kb:more:faith" {
+		t.Fatalf("sections = %+v", sent)
+	}
+	sent = f.run(menuPress(1, "kb:more:sport"))
+	if last := sent[len(sent)-1]; len(last.buttons) != 2 || last.buttons[0][0].Data != "kb:item:table" {
+		t.Fatalf("sport = %+v", last)
+	}
+	sent = f.run(menuPress(2, "kb:item:table"))
+	if last := sent[len(sent)-1]; len(last.buttons) != 3 || last.buttons[0][1].Data != "kb:pick:table:1" {
+		t.Fatalf("leagues = %+v", last)
+	}
+	f.run(menuPress(3, "kb:pick:table:1"))
+	f.run(menuPress(4, "kb:item:cat"))
+	sent = f.run(menuPress(5, "kb:item:movie"))
+	if last := sent[len(sent)-1]; last.text != askedRequests["movie"].question.uz || last.ask == "" {
+		t.Fatalf("film's question = %+v", last)
+	}
+	f.run(replyTo(askedRequests["movie"].question.uz, "Interstellar"))
+
+	var asked []string
+	for _, c := range f.replier.recorded() {
+		asked = append(asked, c.text)
+	}
+	joined := strings.Join(asked, "|")
+	for _, want := range []string{"Futbol: La Liga turnir jadvali", "Mushuk rasmini yubor", "Kino: Interstellar haqida ma'lumot"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("model asked %q; want %q among them", asked, want)
+		}
+	}
+}
+
+// No two questions of the menus are the same, or an answer would go to
+// the wrong request.
+func TestMenuQuestionsAreDistinct(t *testing.T) {
+	seen := map[string]string{}
+	for key, request := range askedRequests {
+		for _, q := range []string{request.question.uz, request.question.ru, request.question.en} {
+			if other, ok := seen[q]; ok || q == "" {
+				t.Errorf("%s and %s ask %q", key, other, q)
+			}
+			seen[q] = key
+		}
+	}
+	// An answer is known by the question it replies to holding it, so no
+	// question may hold another.
+	for q, key := range seen {
+		for other, otherKey := range seen {
+			if q != other && strings.Contains(q, other) {
+				t.Errorf("%s's %q holds %s's %q", key, q, otherKey, other)
+			}
+		}
+	}
+}
