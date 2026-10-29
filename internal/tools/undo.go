@@ -49,7 +49,7 @@ func (m *Moderation) snapshot(ctx context.Context, o order) (json.RawMessage, er
 	var state undoState
 	chatID := o.caller.ChatID
 	switch o.action {
-	case actionDelete:
+	case actionDelete, actionPurge:
 		return nil, nil
 	case actionSetTitle, actionSetDescription, actionSetPhoto, actionDeletePhoto, actionLock, actionUnlock, actionUnpinAll:
 		chat, err := m.opts.Telegram.GetChat(ctx, chatID)
@@ -145,7 +145,7 @@ func (m *Moderation) undo(ctx context.Context, caller Caller, force bool) (any, 
 	if _, err := m.opts.Store.MarkUndone(ctx, last.ID); err != nil {
 		return nil, internal(err)
 	}
-	return map[string]any{"done": true, "said": undoneText(last.Action, state).String(), "note": doneNote}, nil
+	return map[string]any{"done": true, "said": undoneText(last, state).String(), "note": doneNote}, nil
 }
 
 // changedSince reports whether the group's title, description or
@@ -197,8 +197,14 @@ func (m *Moderation) putBack(ctx context.Context, last storage.ModerationAction,
 	case actionMute, actionUnmute, actionNoStickers, actionStickers, actionNoPhotos, actionPhotos:
 		return tg.RestrictChatMember(ctx, m.restrictionBefore(chatID, userID, state))
 	case actionBan:
+		if isChannel(userID) {
+			return tg.UnbanChatSenderChat(ctx, chatID, userID)
+		}
 		return tg.UnbanChatMember(ctx, chatID, userID)
 	case actionUnban:
+		if isChannel(userID) {
+			return tg.BanChatSenderChat(ctx, chatID, userID)
+		}
 		return tg.BanChatMember(ctx, chatID, userID)
 	case actionPin:
 		return tg.UnpinChatMessage(ctx, chatID, messageID)
@@ -238,8 +244,21 @@ func (m *Moderation) restrictionBefore(chatID, userID int64, state undoState) te
 	return r
 }
 
+// isChannel reports a target recorded by a channel's chat ID: users' IDs
+// are positive, chats' negative.
+func isChannel(targetID int64) bool { return targetID < 0 }
+
 // undoneText says, for the chat, what undo put back.
-func undoneText(action string, state undoState) chatText {
+func undoneText(last storage.ModerationAction, state undoState) chatText {
+	action := last.Action
+	if isChannel(last.TargetUserID) {
+		switch action {
+		case actionBan:
+			return chatText{"Bajarildi: kanal nomidan yana yozish mumkin.", "Готово: от имени канала снова можно писать."}
+		case actionUnban:
+			return chatText{"Bajarildi: kanal nomidan yana yozib bo'lmaydi.", "Готово: от имени канала снова нельзя писать."}
+		}
+	}
 	switch action {
 	case actionSetTitle:
 		return chatText{"Bajarildi: guruh nomi yana «" + *state.Title + "».", "Готово: группа снова называется «" + *state.Title + "»."}

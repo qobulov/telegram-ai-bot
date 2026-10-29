@@ -12,10 +12,12 @@ import (
 // Update is one incoming event: a message, or a change to the bot's own or
 // another member's membership in a chat. Each kind the update is not is nil.
 type Update struct {
-	UpdateID     int64              `json:"update_id"`
-	Message      *Message           `json:"message"`
-	MyChatMember *ChatMemberUpdated `json:"my_chat_member"`
-	ChatMember   *ChatMemberUpdated `json:"chat_member"`
+	UpdateID int64    `json:"update_id"`
+	Message  *Message `json:"message"`
+	// EditedMessage is the new version of a message someone edited.
+	EditedMessage *Message           `json:"edited_message"`
+	MyChatMember  *ChatMemberUpdated `json:"my_chat_member"`
+	ChatMember    *ChatMemberUpdated `json:"chat_member"`
 	// CallbackQuery is a press of a button under one of the bot's messages.
 	CallbackQuery *CallbackQuery `json:"callback_query"`
 	// InlineQuery is someone typing "@bot words" in a chat, for the bot to
@@ -24,6 +26,20 @@ type Update struct {
 	// PreCheckoutQuery is Telegram asking, before it takes a payment for
 	// one of the bot's invoices, whether to go ahead.
 	PreCheckoutQuery *PreCheckoutQuery `json:"pre_checkout_query"`
+	// ChatJoinRequest is someone asking to join a group whose admins approve
+	// new members. Telegram sends it only where the bot may invite users.
+	ChatJoinRequest *ChatJoinRequest `json:"chat_join_request"`
+}
+
+// ChatJoinRequest is a request to join a group: who asks, and the private
+// chat with them, which the bot may write to for a few minutes though they
+// never started it.
+type ChatJoinRequest struct {
+	Chat       Chat  `json:"chat"`
+	From       *User `json:"from"`
+	UserChatID int64 `json:"user_chat_id"`
+	// Date is when they asked, in Unix seconds.
+	Date int64 `json:"date"`
 }
 
 // CallbackQuery is a press of a button with callback data: who pressed it,
@@ -423,7 +439,8 @@ type ChatPhoto struct {
 }
 
 // Chat types. A channel's posts are not handled by the bot; only its
-// standing there is recorded, for its owners' broadcasts.
+// standing there is recorded, for its owners' broadcasts. In a group a
+// message may be posted on behalf of one.
 const (
 	ChatTypePrivate    = "private"
 	ChatTypeGroup      = "group"

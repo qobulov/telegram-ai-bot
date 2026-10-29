@@ -169,9 +169,10 @@ func (s *Service) sworeAtBot(ctx context.Context, in incoming) bool {
 
 // guardLines tell the model what a guard on in the group does without it.
 var guardLines = map[string]string{
-	storage.RuleSpamGuard:  "Known spammers (CAS, lols.bot) are banned here in code, not by you.",
-	storage.RuleLinkGuard:  "Links to malware or phishing (Google Safe Browsing, URLhaus) are deleted here in code, not by you.",
-	storage.RuleImageGuard: "Nude pictures are deleted here in code, from anyone, not by you, even as a sticker, GIF or file; other stickers and GIFs are allowed.",
+	storage.RuleSpamGuard:   "Known spammers (CAS, lols.bot) are banned here in code, not by you.",
+	storage.RuleLinkGuard:   "Links to malware or phishing (Google Safe Browsing, URLhaus) are deleted here in code, not by you.",
+	storage.RuleImageGuard:  "Nude pictures are deleted here in code, from anyone, not by you, even as a sticker, GIF or file; other stickers and GIFs are allowed.",
+	storage.RuleJoinCaptcha: "People asking to join are sent a button in private, in code, not by you: pressed within 10 minutes it lets them in, and otherwise they are declined.",
 }
 
 // ruleLines lists the instructions, then the ignored members. Each is folded
@@ -198,7 +199,7 @@ func (s *Service) ruleLines(rules []storage.GroupRule) []string {
 			instructions = append(instructions, "- Swearing is watched here in code, not by you: a member's first insult gets a warning, the next within a day a 1-hour mute that tags "+calls+". Never swear back at anyone in this group, and never mute anyone for swearing yourself.")
 		case storage.RuleSwearPunishment, storage.RulePicturePunishment:
 			instructions = append(instructions, s.punishmentLine(r))
-		case storage.RuleSpamGuard, storage.RuleLinkGuard, storage.RuleImageGuard:
+		case storage.RuleSpamGuard, storage.RuleLinkGuard, storage.RuleImageGuard, storage.RuleJoinCaptcha:
 			instructions = append(instructions, "- "+guardLines[r.Kind])
 		case storage.RuleIgnore:
 			line := "- Do not answer " + oneLine(r.UserName)

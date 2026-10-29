@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -90,6 +91,9 @@ const (
 	notAsked       = "their own message does not ask for this, so nothing was done; do it only when they ask for it in words, such as \"mute qil\" or \"o'chir\""
 	noAnswer       = "Telegram did not answer, so it may not have been done; try again later"
 	notAnAdmin     = "that member is not an admin I can change: I can only demote or title admins I made myself"
+	// A channel is no member: it can be banned from posting here, and its
+	// posts deleted or pinned, but nothing else.
+	onChannel = "that message was posted on behalf of a channel, not by a member: I can only delete or pin it, or ban the channel from posting here and unban it; muting, stickers, photos, adminship and purge are for members"
 )
 
 // chatText is something the bot says to a group in its own words, never the
@@ -113,6 +117,7 @@ var neededRight = map[string]string{
 	actionUnban:  telegram.RightRestrictMembers,
 	actionPin:    telegram.RightPinMessages,
 	actionUnpin:  telegram.RightPinMessages,
+	actionPurge:  telegram.RightDeleteMessages,
 
 	actionNoStickers: telegram.RightRestrictMembers,
 	actionStickers:   telegram.RightRestrictMembers,
@@ -168,6 +173,13 @@ type Moderator interface {
 	RestrictChatMember(ctx context.Context, r telegram.Restriction) error
 	BanChatMember(ctx context.Context, chatID, userID int64) error
 	UnbanChatMember(ctx context.Context, chatID, userID int64) error
+	// BanChatSenderChat and UnbanChatSenderChat ban a channel from posting
+	// in a group on its own behalf, and let it again.
+	BanChatSenderChat(ctx context.Context, chatID, senderChatID int64) error
+	UnbanChatSenderChat(ctx context.Context, chatID, senderChatID int64) error
+	// DeleteMessages deletes up to telegram.MaxDeletedAtOnce messages, for
+	// purge.
+	DeleteMessages(ctx context.Context, chatID int64, messageIDs []int64) error
 	PinChatMessage(ctx context.Context, chatID, messageID int64) error
 	UnpinChatMessage(ctx context.Context, chatID, messageID int64) error
 	GetChat(ctx context.Context, chatID int64) (telegram.Chat, error)
@@ -231,6 +243,9 @@ type ModerationOptions struct {
 	// Links finds the invite links the bot made, to revoke or edit them;
 	// without it neither can be done.
 	Links InviteLinks
+	// Messages finds a member's messages in the group's log, for purge;
+	// without it purge is refused.
+	Messages MessageLog
 }
 
 type moderationArgs struct {
@@ -287,6 +302,8 @@ func (m *Moderation) Tool() Tool {
 			"no_stickers (minutes, default a day) or allow_stickers: take away or give back its author's stickers and GIFs, which Telegram only allows or forbids together; use it, not ban or ignore, when they ask to block someone's stickers. " +
 			"no_photos (minutes, default a day) or allow_photos: the same for photos. A member's other limits stay as they are. " +
 			"promote: make its author an admin, with your own delete, mute and pin rights at most; demote: take that back; admin_title (text, 16 characters at most): the title shown for an admin you made. " +
+			"purge (minutes, default 60, at most 2880): delete every message its author wrote here in the last minutes, as far as your log of the group has them, when they ask to clear out or delete all of someone's messages; it cannot be undone. " +
+			"A message posted on behalf of a channel can only be deleted, pinned, or banned or unbanned, which bans the channel from posting here. " +
 			"For the group itself, with no reply or tag: set_title (text), set_description (text, empty to remove), set_photo (the photo in their message), delete_photo, invite_link (a new link; text names it, minutes ends it), unpin_all, and lock or unlock (kind) to forbid or allow one kind of message to everyone, keeping the group's other permissions: when they ask to block stickers or photos for all, it is lock, never a guard. " +
 			"An invite_link may let only member_limit people join, or with join_request make each ask the admins to approve them, never both. revoke_link stops a link you made from working, and edit_link changes its text, minutes, member_limit (0 for none) or join_request; both act on link, or without it on the latest link you made here. " +
 			"undo: put back the last thing you did here with this tool, whatever it was; a deleted message never comes back. With force only when, told it was changed by hand since, they still want it back. " +
@@ -295,8 +312,8 @@ func (m *Moderation) Tool() Tool {
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["delete", "mute", "unmute", "ban", "unban", "pin", "unpin", "no_stickers", "allow_stickers", "no_photos", "allow_photos", "promote", "demote", "admin_title", "set_title", "set_description", "set_photo", "delete_photo", "invite_link", "revoke_link", "edit_link", "unpin_all", "lock", "unlock", "undo"]},
-				"minutes": {"type": "integer", "description": "For mute: how long, 1 to 10080, default 60. For no_stickers and no_photos: 1 to 525600, default 1440; the most for \"forever\". For invite_link: when it stops working; none for never."},
+				"action": {"type": "string", "enum": ["delete", "purge", "mute", "unmute", "ban", "unban", "pin", "unpin", "no_stickers", "allow_stickers", "no_photos", "allow_photos", "promote", "demote", "admin_title", "set_title", "set_description", "set_photo", "delete_photo", "invite_link", "revoke_link", "edit_link", "unpin_all", "lock", "unlock", "undo"]},
+				"minutes": {"type": "integer", "description": "For mute: how long, 1 to 10080, default 60. For purge: how far back, 1 to 2880, default 60. For no_stickers and no_photos: 1 to 525600, default 1440; the most for \"forever\". For invite_link: when it stops working; none for never."},
 				"text": {"type": "string", "description": "For set_title, set_description and admin_title: the new text, in the words they gave. For invite_link: an optional name."},
 				"force": {"type": "boolean", "description": "For undo: true only when they want it back though it was changed by hand since."},
 				"kind": {"type": "string", "enum": ["messages", "photos", "videos", "stickers", "voice", "files", "music", "polls", "link_previews"], "description": "For lock and unlock: stickers covers GIFs too, voice covers round videos."},
@@ -364,6 +381,9 @@ func (m *Moderation) run(ctx context.Context, raw json.RawMessage) (any, error) 
 	}
 	if onInviteLink(o.action) {
 		return m.runLink(ctx, o)
+	}
+	if o.action == actionPurge {
+		return m.purge(ctx, o)
 	}
 	// The owners want it done at once, with no question to confirm: the
 	// rights were just checked, and the target came from the update.
@@ -600,7 +620,7 @@ func namedBy(words []string, name string) bool {
 func onMember(action string) bool {
 	switch action {
 	case actionMute, actionUnmute, actionBan, actionUnban, actionNoStickers, actionStickers, actionNoPhotos, actionPhotos,
-		actionPromote, actionDemote, actionAdminTitle:
+		actionPromote, actionDemote, actionAdminTitle, actionPurge:
 		return true
 	}
 	return false
@@ -622,13 +642,14 @@ func onAdmin(action string) bool {
 }
 
 // present reports a member status an action may be taken on: someone in
-// the group, or for unban someone who was in it.
+// the group, or for unban someone who was in it, as for purge, which most
+// often clears out a spammer just banned.
 func present(status, action string) bool {
 	switch status {
 	case "creator", "administrator", "member", "restricted":
 		return true
 	case "kicked", "left":
-		return action == actionUnban
+		return action == actionUnban || action == actionPurge
 	}
 	return false
 }
@@ -656,6 +677,10 @@ func (m *Moderation) newOrder(caller Caller, action string, target Target, minut
 		if minutes > 0 {
 			o.minutes = min(minutes, maxLinkMinutes)
 		}
+	case actionPurge:
+		// How far back, not how long: purge has no end.
+		o.minutes = clampMinutes(minutes, defaultPurgeMinutes, maxPurgeMinutes)
+		return o
 	}
 	if o.minutes > 0 {
 		o.until = m.opts.Now().Add(time.Duration(o.minutes) * time.Minute)
@@ -733,7 +758,14 @@ func (m *Moderation) checkBot(ctx context.Context, chatID int64, right string) e
 // accounts, the bot's owners known by ID and the group's admins. The bot and the person
 // asking may have their own messages deleted, pinned or unpinned, but never
 // mute or ban themselves.
+//
+// A channel's post is the channel's, not the account Telegram posts it as:
+// it may be deleted or pinned, and the channel banned, but no member's
+// action fits a channel.
 func (m *Moderation) checkTarget(ctx context.Context, o order) error {
+	if o.target.ChannelID != 0 {
+		return channelOnly(o.action)
+	}
 	userID := o.target.UserID
 	if userID == m.opts.BotID || userID == o.caller.UserID {
 		return ownMessageOnly(o.action)
@@ -767,6 +799,15 @@ func ownMessageOnly(action string) error {
 		return nil
 	}
 	return &DeniedError{Message: immune}
+}
+
+// channelOnly allows the actions that fit a channel's post.
+func channelOnly(action string) error {
+	switch action {
+	case actionDelete, actionPin, actionUnpin, actionBan, actionUnban:
+		return nil
+	}
+	return &DeniedError{Message: onChannel}
 }
 
 // checkPace allows maxActions per actionWindow per person, counted in the
@@ -823,11 +864,13 @@ func (m *Moderation) failed(ctx context.Context, o order, sendErr error) error {
 }
 
 // audit is the record of o. The text of a deleted message is kept, since
-// the chat no longer has it; other actions keep no text.
+// the chat no longer has it; other actions keep no text. A channel is
+// recorded as the target by its chat ID, which, unlike a user's, is
+// negative: undo tells them apart by it.
 func (o order) audit() storage.ModerationAction {
 	a := storage.ModerationAction{
 		ChatID: o.caller.ChatID, Action: o.action, RequesterID: o.caller.UserID,
-		TargetUserID: o.target.UserID, TargetMessageID: o.target.MessageID,
+		TargetUserID: cmp.Or(o.target.ChannelID, o.target.UserID), TargetMessageID: o.target.MessageID,
 		Minutes: o.minutes, Reason: o.reason, UpdateID: o.caller.UpdateID,
 	}
 	if o.action == actionDelete {
@@ -848,8 +891,14 @@ func (m *Moderation) send(ctx context.Context, o order) error {
 	case actionNoStickers, actionStickers, actionNoPhotos, actionPhotos:
 		return m.setMemberMedia(ctx, o)
 	case actionBan:
+		if channel := o.target.ChannelID; channel != 0 {
+			return m.opts.Telegram.BanChatSenderChat(ctx, chatID, channel)
+		}
 		return m.opts.Telegram.BanChatMember(ctx, chatID, userID)
 	case actionUnban:
+		if channel := o.target.ChannelID; channel != 0 {
+			return m.opts.Telegram.UnbanChatSenderChat(ctx, chatID, channel)
+		}
 		return m.opts.Telegram.UnbanChatMember(ctx, chatID, userID)
 	case actionPin:
 		return m.opts.Telegram.PinChatMessage(ctx, chatID, messageID)
@@ -1004,6 +1053,14 @@ func (m *Moderation) doneText(o order) string {
 // done says what o did, given when a mute ends.
 func (o order) done(until string) chatText {
 	name := o.target.Name
+	if o.target.ChannelID != 0 {
+		switch o.action {
+		case actionBan:
+			return chatText{"Bajarildi: endi «" + name + "» kanali nomidan bu guruhda yozib bo'lmaydi.", "Готово: от имени канала «" + name + "» больше нельзя писать в этой группе."}
+		case actionUnban:
+			return chatText{"Bajarildi: «" + name + "» kanali nomidan yana yozish mumkin.", "Готово: от имени канала «" + name + "» снова можно писать."}
+		}
+	}
 	switch o.action {
 	case actionDelete:
 		return chatText{"Bajarildi: " + name + " xabari o'chirildi.", "Готово: сообщение от " + name + " удалено."}
@@ -1074,6 +1131,10 @@ var actionWords = map[string][]string{
 	actionBan:    {"ban", "бан", "blok", "chiqar", "hayda", "kick", "кик", "выгн", "выкин", "заблок"},
 	actionUnban:  {"ban", "бан", "blok", "qaytar", "верн", "разблок"},
 	actionPin:    {"pin", "qada", "закреп"},
+	// Deleting one message is not clearing out them all: "tozala",
+	// "hammasini o'chir", "очисти", "удали все".
+	actionPurge: {"tozala", "hammasini ochir", "barchasini ochir", "hammasini del", "xabarlarini ochir", "hamma xabar", "barcha xabar",
+		"очист", "удали все", "удали всё", "удалить все", "удалить всё", "удали его сообщения", "purge", "clear", "clean"},
 	// Asking about someone's stickers is enough: the model picks which.
 	actionNoStickers: {"stik", "stic", "стик", "gif", "гиф"},
 	actionStickers:   {"stik", "stic", "стик", "gif", "гиф"},

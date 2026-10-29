@@ -60,6 +60,8 @@ type fakeTelegram struct {
 	calls        []string
 	restrictions []telegram.Restriction
 	err          error
+	// failAfter is how many deleteMessages batches succeed before err.
+	failAfter int
 	// groupPermissions are the group's defaults, which getChat gives and
 	// setChatPermissions replaces; chat is the rest getChat gives, kept up
 	// to date by the calls that change it.
@@ -78,6 +80,26 @@ func (f *fakeTelegram) do(method string, chatID, id int64) error {
 
 func (f *fakeTelegram) DeleteMessage(_ context.Context, chatID, messageID int64) error {
 	return f.do("deleteMessage", chatID, messageID)
+}
+
+// DeleteMessages is noted with the batch's first ID and its size.
+func (f *fakeTelegram) DeleteMessages(_ context.Context, chatID int64, messageIDs []int64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, fmt.Sprintf("deleteMessages %d %d+%d", chatID, messageIDs[0], len(messageIDs)))
+	if f.failAfter > 0 {
+		f.failAfter--
+		return nil
+	}
+	return f.err
+}
+
+func (f *fakeTelegram) BanChatSenderChat(_ context.Context, chatID, senderChatID int64) error {
+	return f.do("banChatSenderChat", chatID, senderChatID)
+}
+
+func (f *fakeTelegram) UnbanChatSenderChat(_ context.Context, chatID, senderChatID int64) error {
+	return f.do("unbanChatSenderChat", chatID, senderChatID)
 }
 
 func (f *fakeTelegram) RestrictChatMember(_ context.Context, r telegram.Restriction) error {

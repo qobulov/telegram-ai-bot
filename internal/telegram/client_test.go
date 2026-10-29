@@ -93,8 +93,8 @@ func TestGetUpdatesParsesTextMessage(t *testing.T) {
 	if sent.method != "getUpdates" || sent.params["offset"] != float64(5) {
 		t.Errorf("call = %+v", sent)
 	}
-	if allowed, _ := sent.params["allowed_updates"].([]any); len(allowed) != 6 || allowed[0] != "message" || allowed[1] != "my_chat_member" || allowed[2] != "chat_member" || allowed[3] != "callback_query" || allowed[4] != "inline_query" || allowed[5] != "pre_checkout_query" {
-		t.Errorf("allowed_updates = %v", sent.params["allowed_updates"])
+	if allowed := sent.params["allowed_updates"]; !reflect.DeepEqual(allowed, everyKind) {
+		t.Errorf("allowed_updates = %v, want %v", allowed, everyKind)
 	}
 }
 
@@ -405,8 +405,8 @@ func TestSetWebhookRegistersURLWithSecret(t *testing.T) {
 	if sent.method != "setWebhook" || sent.params["url"] != "https://bot.example/api/webhook" || sent.params["secret_token"] != "s3cret" {
 		t.Errorf("call = %+v", sent)
 	}
-	if allowed, _ := sent.params["allowed_updates"].([]any); len(allowed) != 6 || allowed[0] != "message" || allowed[1] != "my_chat_member" || allowed[2] != "chat_member" || allowed[3] != "callback_query" || allowed[4] != "inline_query" || allowed[5] != "pre_checkout_query" {
-		t.Errorf("allowed_updates = %v", sent.params["allowed_updates"])
+	if allowed := sent.params["allowed_updates"]; !reflect.DeepEqual(allowed, everyKind) {
+		t.Errorf("allowed_updates = %v, want %v", allowed, everyKind)
 	}
 }
 
@@ -1222,12 +1222,12 @@ func TestEnsureAllowedUpdatesSetsAnOldWebhookAgain(t *testing.T) {
 		info    string
 		changed bool
 	}{
-		"old kinds":                  {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member"]}}`, true},
-		"with quiz polls":            {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","poll","poll_answer"]}}`, true},
-		"before inline and payments": {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query"]}}`, true},
-		"without payments":           {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","inline_query"]}}`, true},
-		"every kind":                 {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","inline_query","pre_checkout_query"]}}`, false},
-		"no webhook":                 {`{"ok":true,"result":{"url":""}}`, false},
+		"old kinds":       {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member"]}}`, true},
+		"with quiz polls": {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","poll","poll_answer"]}}`, true},
+		"before inline":   {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query"]}}`, true},
+		"before edits":    {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","inline_query","pre_checkout_query"]}}`, true},
+		"every kind":      {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","inline_query","pre_checkout_query","edited_message","chat_join_request"]}}`, false},
+		"no webhook":      {`{"ok":true,"result":{"url":""}}`, false},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

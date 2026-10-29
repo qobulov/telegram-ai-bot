@@ -257,6 +257,16 @@ func TestGuardRulesAreToldToTheModel(t *testing.T) {
 	}
 }
 
+func TestJoinsGuardIsToldToTheModel(t *testing.T) {
+	f, _ := guardFixture("")
+	s := New(f.opts)
+	defer s.Close()
+	lines := s.ruleLines([]storage.GroupRule{{ChatID: groupID, Kind: storage.RuleJoinCaptcha}})
+	if len(lines) != 1 || !strings.Contains(lines[0], "asking to join") || !strings.Contains(lines[0], "not by you") {
+		t.Errorf("lines = %q", lines)
+	}
+}
+
 func TestImageGuardSparesNobody(t *testing.T) {
 	f, guards, moderator := protectFixture(storage.RuleImageGuard)
 	guards.unsafe = "nudity"

@@ -707,3 +707,21 @@ func TestRulesToolTurnsGuardsOnAndOff(t *testing.T) {
 		t.Errorf("unguard = %+v, rules %+v", env, store.all())
 	}
 }
+
+// The joins guard is turned on and off like the others, and needs no key.
+func TestRulesToolTurnsTheJoinsGuardOnAndOff(t *testing.T) {
+	store := &fakeRules{}
+	registry := mustRegistry(t, RulesTool(RulesOptions{Store: store, BotID: rulesBotID}))
+	ctx := ownerSaying(groupA, "Mari, guruhga kirmoqchi bo'lganlarni tekshir")
+
+	env := rules(registry, ctx, `{"action":"guard","guard":"joins"}`)
+	if !env.OK || !strings.Contains(string(env.Result), "invite users") {
+		t.Fatalf("guard joins = %+v %s", env, env.Result)
+	}
+	if got := store.all(); len(got) != 1 || got[0].Kind != storage.RuleJoinCaptcha || got[0].ChatID != groupA {
+		t.Fatalf("rules = %+v", got)
+	}
+	if env := rules(registry, ctx, `{"action":"unguard","guard":"joins"}`); !env.OK || len(store.all()) != 0 {
+		t.Errorf("unguard joins = %+v, rules %+v", env, store.all())
+	}
+}

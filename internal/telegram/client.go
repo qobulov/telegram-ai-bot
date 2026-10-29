@@ -65,8 +65,10 @@ func NewClient(opts Options) *Client {
 // where it is an admin, changes to other members', which keep its list of
 // each group's members true, button presses, inline queries, which
 // Telegram sends only once inline mode is on in @BotFather, and the check
-// before a payment for premium, without which Telegram takes none.
-var allowedUpdates = []string{"message", "my_chat_member", "chat_member", "callback_query", "inline_query", "pre_checkout_query"}
+// before a payment for premium, without which Telegram takes none. Edited
+// messages are guarded as new ones are, and join requests are answered
+// with a button to press.
+var allowedUpdates = []string{"message", "my_chat_member", "chat_member", "callback_query", "inline_query", "pre_checkout_query", "edited_message", "chat_join_request"}
 
 type getUpdatesParams struct {
 	Offset         int64    `json:"offset"`

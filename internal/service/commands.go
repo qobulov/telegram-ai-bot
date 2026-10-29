@@ -884,9 +884,17 @@ func (s *Service) start(ctx context.Context, in incoming) outcome {
 
 // pressed answers a press of the check button: the notice becomes the
 // thanks once every channel is joined, and otherwise a box asks to join
-// them first; nothing is written in the chat either way.
+// them first; nothing is written in the chat either way. A press of the
+// button under a join request is pressedJoin's.
 func (s *Service) pressed(q *telegram.CallbackQuery) {
-	if s.opts.Buttons == nil || q.From == nil || q.Message == nil || q.Data != checkPayload {
+	if s.opts.Buttons == nil || q.From == nil || q.Message == nil {
+		return
+	}
+	if strings.HasPrefix(q.Data, joinPayload) {
+		s.pressedJoin(q)
+		return
+	}
+	if q.Data != checkPayload {
 		return
 	}
 	in := incoming{
@@ -1125,11 +1133,25 @@ func (s *Service) answeredMember(ctx context.Context, chatID, botMessageID int64
 // whom such a tool acts on. A service message is none: its author is whoever
 // made something happen, not the member it is about. A member's message the
 // bot cannot read, such as a contact or a location, is one.
+//
+// A message posted on behalf of a channel names the channel too, which the
+// moderate tool bans rather than the account Telegram posts it as. One the
+// group posts as itself, an anonymous admin's, and a post forwarded from the
+// linked channel by Telegram itself, name no channel.
 func (s *Service) target(replied *telegram.Message) *tools.Target {
 	if replied == nil || replied.From == nil || replied.IsService() {
 		return nil
 	}
 	text, _ := replied.Content()
+	if channel := replied.SenderChat; channel != nil && channel.Type == telegram.ChatTypeChannel && !replied.IsAutomaticForward {
+		return &tools.Target{
+			MessageID: replied.MessageID,
+			UserID:    replied.From.ID,
+			ChannelID: channel.ID,
+			Name:      withUsername(authorLabel(channel.Title), channel.Username),
+			Text:      truncate(text, tools.MaxTargetRunes),
+		}
+	}
 	return &tools.Target{
 		MessageID: replied.MessageID,
 		UserID:    replied.From.ID,

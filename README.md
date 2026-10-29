@@ -131,6 +131,8 @@ group_rules(id PK, chat_id (0 for every group), kind, user_id, user_name,
 moderation_actions(id PK, chat_id, action, requester_id, target_user_id,
                    target_message_id, target_text, minutes, reason,
                    update_id, created_at, UNIQUE (update_id, action))
+join_requests(chat_id, user_id, user_chat_id, expires_at, created_at,
+              PK (chat_id, user_id))
 schema_migrations(version PK, applied_at)
 ```
 
@@ -932,6 +934,7 @@ does not erase them, and every turn in the group is told the ones in force.
 | Ignore a member | an owner replying to that member's message, or to her answer to them, in the group | 24 hours, or 1 to 720 hours if the owner says |
 | Form of address | an owner, for themselves, in any chat; it holds everywhere | until removed |
 | Swear guard | an owner, in the group it is for ("so'kinganlarni avtomatik mute qil", optionally "@Bakxtyorvch ni chaqir"); one per group | until turned off |
+| Spam, link, picture and joins guards | an owner, in the group it is for (`guard` `spam`, `links`, `images` or `joins`; see [Join requests](#join-requests) for the last) | until turned off |
 | Punishment | an owner or the group's creator, in the group, for swearing or nude pictures: in reply to a member ("bu bola yana so'kinsa ban qil") or for anyone ("18+ tashasa 3 soat mute qil"); one per member and kind | 30 days, or the hours given |
 
 The swear guard runs in code, asking the model only one thing. In a group
@@ -962,6 +965,15 @@ update delivered twice is handled once. Muting needs her to be an admin who may
 restrict members; without that right the notice says so and still tags.
 "Maria, endi so'kinishni kuzatma" turns it off. She cannot watch a chat
 herself, and says so rather than promise to.
+
+An edited message is checked again, by this guard and by the spam, link and
+picture guards, as a new one would be (`edited_message` updates): a member
+who edits a swear into a message, a malicious link, or a nude picture in
+place of the first one, is warned, muted or has the message deleted all the
+same. An edit of a message the swear guard already caught is no second
+swear: fixing a typo in an insult does not mute. Nothing else is done with
+an edit: the model never answers one, even one that calls her, it takes
+nothing from the reply quotas, and the group log keeps the first version.
 
 A punishment from an owner or the group's creator (the `punishments` tool,
 kinds `swear_punishment` and
@@ -1000,7 +1012,10 @@ A group's admins can have her act on a message by replying to it and asking
 model calls the `moderate` tool, which is offered in groups only, and every
 check is made in code:
 
-- **Actions:** delete the message; mute its author (an hour unless asked
+- **Actions:** delete the message; purge, which deletes every message its
+  author wrote in the group in the last hour, or the minutes asked for, two
+  days at most, since Telegram deletes nothing older ("Maria, buning
+  hammasini o'chir", "tozala", "очисти", "удали все"); mute its author (an hour unless asked
   otherwise, at most a week; supergroups only) or unmute them; ban them, or
   unban; pin the message without a notification, or unpin it; take away a
   member's stickers and GIFs, or photos (a day unless asked otherwise), and
@@ -1009,6 +1024,25 @@ check is made in code:
   back or set their title, for admins the bot made. A member's other limits
   stay: one already muted or without stickers stays so, and what is given
   back keeps the rest of the restriction's end.
+- **Purge** finds the messages in the group log (`group_messages`, by
+  author and message ID), as the Bot API cannot list a chat's messages: with
+  the log off it is refused, and what the log never saw, such as messages
+  the guards deleted, is not purged. The message replied to goes too,
+  however old. Telegram is asked to delete them a hundred at a time
+  (`deleteMessages`), at most a thousand in one purge; it skips those it no
+  longer has. A member who left or was banned can still be purged, which is
+  how a spammer just banned is cleared out. It is one action in the audit,
+  with the minutes and the number of messages, and like a deletion it can
+  never be undone.
+- **Posts on behalf of a channel** (a member writing as their channel; not
+  the group posting as itself, as anonymous admins do, nor the linked
+  channel's posts Telegram forwards): ban and unban act on the channel,
+  with `banChatSenderChat` and `unbanChatSenderChat`, so that whoever runs it
+  can no longer post as it in the group, under any account; the post itself
+  may be deleted or pinned. Muting, stickers, photos, adminship and purge are
+  for members, and are refused for a channel's post with that reason. The
+  audit records the channel by its chat ID, and undo puts a channel's ban
+  back as it does a member's.
 - **The group itself,** with no reply or tag: rename it, set or clear its
   description, set its photo from the photo in the request or remove it,
   make an invite link (named, and ending when asked), unpin everything, and
@@ -1043,7 +1077,7 @@ check is made in code:
   and say what to do ("yop", "och", "o'chir", "yashir"). Topic actions are
   audited and counted like the others, as `topic_close` and so on, but undo
   does not put them back: a closed topic is reopened by asking.
-- **Undo** ("orqaga qaytar"): every action but a deletion is recorded with
+- **Undo** ("orqaga qaytar"): every action but a deletion or a purge is recorded with
   what puts it back, read from Telegram just before it is taken
   (`moderation_actions.undo`). Undo puts back the group's latest such
   action, once; asked again, the one before. It needs the right the action
@@ -1058,7 +1092,8 @@ check is made in code:
   with no question to answer. Instead, the person's own message (or their
   voice message's transcript) must ask for it in words, checked in code:
   "o'chir", "mute qil", "jim qil", "ban", "blokla", "pin qil", "заблокируй",
-  "закрепи" and the like. A text in the chat or a quoted message can talk
+  "закрепи" and the like; a purge needs words for all of them, "o'chir"
+  alone deleting one message. A text in the chat or a quoted message can talk
   the model into calling the tool on someone's turn, but nothing is done
   unless that person asked for it themselves.
 - **Target:** the message the person replied to, as Telegram delivered it.
@@ -1079,8 +1114,8 @@ check is made in code:
 - **Who may ask:** a bot owner recognised by `BOT_OWNER_IDS` (not by
   username alone), or the group's creator or an administrator
   who holds the matching right, as Telegram reports it at that moment:
-  *delete messages* for delete; *ban users* for mute, unmute, ban and
-  unban; *pin messages* for pin and unpin.
+  *delete messages* for delete and purge; *ban users* for mute, unmute, ban
+  and unban; *pin messages* for pin and unpin.
 - **Her rights:** she needs the same right herself, checked with Telegram
   each time. The model is told those of her rights in each group that a tool
   uses (delete, ban and mute, pin) so that it does not
@@ -1088,7 +1123,8 @@ check is made in code:
 - **Never a target:** the person asking (they may still have their own
   message deleted or pinned), the bot itself (its own messages may be
   deleted or pinned), the bot's owners recognised by `BOT_OWNER_IDS`, the
-  group's admins, and Telegram's service accounts.
+  group's admins, and Telegram's service accounts (a channel's post, which
+  Telegram sends as one of them, is the channel's; see above).
 - **Limits:** at most 10 actions per person in 10 minutes. When Telegram
   cannot say who may do what, nothing is done.
 - **Once only:** each action is recorded in `moderation_actions` under the
@@ -1102,6 +1138,55 @@ She is told to use the tool only when an admin or owner asks, never on her
 own initiative, and to say an action was done only when the tool reports
 it done; she then says so in one short line, like "Bajarildi: Bek @bek
 15:04 gacha yoza olmaydi".
+
+### Join requests
+
+A group whose admins approve new members, or an invite link made to ask
+for approval, sends her every request to join (`chat_join_request`
+updates), where she is an admin with the right to invite users; nowhere
+else does Telegram send them. She answers them only where an owner turned
+the joins guard on (`group_rules` `guard` `joins`, kept as a `join_captcha`
+rule, "Maria, guruhga qo'shilmoqchi bo'lganlarni tekshir"; `unguard`
+`joins` turns it off). Elsewhere the group's admins vet the requests by
+hand, and a button any requester could press would let them approve
+themselves past those admins, so she does nothing with them; the only
+exception is the spam guard. The guards are owners' orders, as all of
+`group_rules` is: a group's admins ask an owner. She answers them in code,
+with no model:
+
+- Where the spam guard is on, a requester the spam lists (CAS, lols.bot)
+  know as a spammer is declined at once (`declineChatJoinRequest`), with
+  the joins guard on or not.
+- Where the joins guard is on, anyone else gets a private message, in the language of their Telegram
+  app, with one button, "Men odamman ✅" ("Я человек ✅", "I'm human ✅"),
+  sent to the private chat Telegram names with the request: she may write
+  there for a few minutes though they never started her. Pressing it within
+  10 minutes lets them in (`approveChatJoinRequest`), and the message says
+  so; the person comes from Telegram's report of the press, never from the
+  button, so nobody else can press it for them. Spam bots asking to join
+  never press it.
+- A request not pressed in time is declined. Waiting requests are kept in
+  `join_requests` (migration 0037) and taken once, by the press or by the
+  decline, so that a request is answered once. On a server the polling
+  command declines late ones every minute; on Vercel, where nothing runs
+  between requests, every update the webhook handles looks for them, at
+  most once a minute per instance, and the daily cleanup declines any no
+  update noticed. In a quiet stretch a late request may so wait longer than
+  10 minutes; a press after its time declines it then.
+- When the private message cannot be sent (the requester's privacy
+  settings, or Telegram's minutes having passed), she leaves the request to
+  the group's admins, as it was before her: declining people because she
+  could not reach them would turn away real ones. She leaves them too in a
+  muted group, and in a group where she lacks the right to invite users,
+  asked of Telegram with each request. An admin who answers a request by
+  hand first wins: her later approval or decline is refused by Telegram and
+  dropped. A request still waiting when the joins guard is turned off goes
+  back to the admins: its button then lets nobody in, and it is not
+  declined.
+
+Turn the joins guard on, turn on *Approve new members* in the group (or
+make invite links with *Request admin approval*) and give her *Invite users
+via link*; turning any of them off returns the requests to the admins.
 
 ### Stickers
 
@@ -1527,6 +1612,7 @@ accepts the Go version in `go.mod`; if the build fails on that, lower the
 | Per-user flood guard | exact | per instance only, so much weaker; do not rely on it |
 | Order of messages in a group | one at a time, in order | concurrent requests are not ordered |
 | Retention cleanup (`RETENTION_DAYS`) | hourly | daily, by Vercel Cron at 03:00 UTC |
+| Declining join requests not pressed in 10 minutes | every minute | by the next update the webhook handles, at most once a minute per instance, and the daily cleanup |
 | Time per message | `REQUEST_TIMEOUT_SECONDS` | must fit in the function's 60 seconds |
 
 With BotFather privacy mode off, every group message invokes the function,
@@ -1612,7 +1698,7 @@ when the webhook was last set. Until then the member list still fills from
 messages, joins and leaves.
 
 The forum topics, invite link limits and channel broadcasts need migration
-0040 (the `channels` table and two columns of `broadcasts`) applied with
+0039 (the `channels` table and two columns of `broadcasts`) applied with
 `make migrate` before deploying; the new version refuses to start on the old
 schema. They ask Telegram for no new kind of update, so the webhook needs no
 `set-webhook`. Give Maria *Manage topics* in forum groups where she should
@@ -1637,10 +1723,31 @@ channel as an admin with *Post messages* for broadcasts to reach it.
    `go run ./cmd/bot set-webhook https://YOUR-APP.vercel.app/api/webhook`.
 4. **For gifts**, set `BOT_OWNER_IDS`, and have Stars on the bot's balance.
 
+The edited messages, join requests and purge update needs:
+
+1. **Apply migration 0037 before deploying** (`make migrate`, as above): it
+   adds the `join_requests` table and lets `group_rules` hold the
+   `join_captcha` kind, and changes nothing else. The new version refuses to
+   start without it.
+2. **Deploy.** The function, when it starts, sees that the webhook asks for
+   fewer kinds of update than the bot handles and sets it again with
+   `edited_message` and `chat_join_request`, keeping its address and
+   secret (logged as "webhook set again to receive every update kind the
+   bot handles"). Running `go run ./cmd/bot set-webhook https://YOUR-APP.vercel.app/api/webhook`
+   does the same by hand.
+3. **In each group that should check join requests**, an owner turns the
+   joins guard on ("Maria, guruhga qo'shilmoqchi bo'lganlarni tekshir"),
+   and the group gives her *Invite users via link* and turns on *Approve new
+   members*. Until then she leaves every group's requests alone, but for
+   declining known spammers where the spam guard is on. Purge needs *Delete
+   messages*, which she has for deletions already.
+
 ### Daily cleanup
 
 `vercel.json` schedules a Vercel Cron job that calls `/api/cleanup` every
-day at 03:00 UTC. It deletes chat history older than `RETENTION_DAYS`
+day at 03:00 UTC. It declines the join requests whose button was not
+pressed in time and that no update noticed (see
+[Join requests](#join-requests)), and deletes chat history older than `RETENTION_DAYS`
 (default 1 day) and conversations left empty; group mute settings are kept.
 Vercel sends `CRON_SECRET` with the call, and the endpoint refuses any
 request without it, so nobody else can trigger it. Without `CRON_SECRET`
