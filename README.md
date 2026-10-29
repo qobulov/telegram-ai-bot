@@ -2042,7 +2042,7 @@ schema. They ask Telegram for no new kind of update, so the webhook needs no
 act on topics (and *Delete messages* to delete one), and add her to a
 channel as an admin with *Post messages* for broadcasts to reach it.
 
-Her own sticker set needs migration 0043 (`own_sticker_sets` and
+Her own sticker set needs migration 0042 (`own_sticker_sets` and
 `sticker_uploads`) applied with `make migrate` before deploying; it changes
 nothing that exists, and needs no `set-webhook` or new setting. The owner
 who will make the set should write to the bot in private once before
@@ -2123,7 +2123,7 @@ Sightengine cannot, CAS's key, the `join_captcha` tool) need:
 The keyboard, effects, closing polls, sticker packs, boosts and map pins
 update needs:
 
-1. **Apply migration 0044 before deploying** (`make migrate`, as above): it
+1. **Apply migration 0043 before deploying** (`make migrate`, as above): it
    adds the `group_boosts` table and changes nothing else. The new version
    refuses to start without it.
 2. **Deploy.** The function sees that the webhook asks for fewer kinds of
