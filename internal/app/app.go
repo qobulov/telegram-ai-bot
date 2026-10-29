@@ -309,6 +309,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Transcriber:        transcriber(cfg, model),
 		ImagesEnabled:      cfg.ImagesEnabled,
 		FootballEnabled:    cfg.FootballDataToken != "",
+		MemesEnabled:       cfg.ImgflipAPIKey != "",
 
 		GroupReplies:          store,
 		GroupRatePerMinute:    cfg.GroupRateLimitPerMinute,

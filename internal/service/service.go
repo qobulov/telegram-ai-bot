@@ -352,6 +352,9 @@ type Options struct {
 	// FootballEnabled is true when the model has the football tool; /help
 	// offers football results only then.
 	FootballEnabled bool
+	// MemesEnabled is true when the model has the make_meme tool; the
+	// private chats' keyboard offers a meme only then.
+	MemesEnabled bool
 }
 
 // Service processes updates on a fixed pool of workers.
@@ -1106,14 +1109,16 @@ func (s *Service) reply(in incoming, text string) int64 {
 
 // replyWithButtons is reply with link buttons under the text.
 func (s *Service) replyWithButtons(in incoming, text string, buttons [][]telegram.Button) int64 {
+	return s.send(in, telegram.Outgoing{Text: text, Buttons: buttons})
+}
+
+// send is reply with whatever else msg carries, such as a keyboard. It goes
+// to the chat the message came from, as its reply where answers are.
+func (s *Service) send(in incoming, msg telegram.Outgoing) int64 {
 	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
 	defer cancel()
-	sentID, err := s.opts.Sender.SendMessage(ctx, telegram.Outgoing{
-		ChatID:           in.msg.Chat.ID,
-		Text:             text,
-		ReplyToMessageID: in.replyTarget(),
-		Buttons:          buttons,
-	})
+	msg.ChatID, msg.ReplyToMessageID = in.msg.Chat.ID, in.replyTarget()
+	sentID, err := s.opts.Sender.SendMessage(ctx, msg)
 	if err != nil {
 		s.opts.Logger.Error("send message failed", "chat_id", in.msg.Chat.ID, "error", err)
 		return 0

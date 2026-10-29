@@ -46,8 +46,13 @@ type outcome struct {
 	// sticker is the category of sticker the model asked to send after the
 	// text, or alone; "" for none. gif is the same for a GIF.
 	sticker, gif string
-	// buttons are link buttons under the text.
-	buttons [][]telegram.Button
+	// buttons are link buttons under the text; keyboard is the private
+	// chat's keyboard, sent with it instead (see keyboard.go).
+	buttons  [][]telegram.Button
+	keyboard [][]string
+	// effect is the message effect played over the text, in a private
+	// chat only.
+	effect string
 	// toReplied sends the answer as a reply to the member's message the
 	// asker replied to, as the model chose for an answer that speaks to
 	// them.
@@ -372,7 +377,7 @@ func (s *Service) deliverAnswer(in incoming, out *outcome) int64 {
 		if out.text == "" {
 			return 0
 		}
-		return s.replyWithButtons(in, out.text, out.buttons)
+		return s.send(in, telegram.Outgoing{Text: out.text, Buttons: out.buttons, Keyboard: out.keyboard, Effect: out.effect})
 	}
 	caption := out.text
 	if utf8.RuneCountInString(caption) > telegram.CaptionLimit {
@@ -699,13 +704,16 @@ func (s *Service) ignored(in incoming, rules []storage.GroupRule) bool {
 // respond decides what to send back. An empty outcome sends nothing. rules
 // are the standing rules loaded for this turn.
 func (s *Service) respond(ctx context.Context, in incoming, rules []storage.GroupRule) outcome {
+	if pressedHelp(in) {
+		in.text = "/help"
+	}
 	switch {
 	case !in.group && commandName(in.text) == "/start" && len(s.opts.RequiredChannels) > 0:
-		return s.start(ctx, in)
+		return s.withKeyboard(in, s.start(ctx, in))
 	case commandName(in.text) == "/premium":
 		return s.premiumCommand(ctx, in)
 	case strings.HasPrefix(in.text, "/"):
-		return say(s.runCommand(ctx, in))
+		return s.withKeyboard(in, say(s.runCommand(ctx, in)))
 	case utf8.RuneCountInString(in.text) > s.opts.MaxInputChars:
 		return say(fmt.Sprintf(textTooLong.to(in), s.opts.MaxInputChars))
 	case s.hasContent(in):
@@ -1164,7 +1172,7 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 		return outcome{reaction: answer.Reaction, answerID: answer.ID}
 	case err == nil:
 		log.Info("turn completed", "route", answer.Route)
-		out := outcome{text: s.fitted(in, answer.Text), answerID: answer.ID, toReplied: answer.ToReplied, toName: answer.To}
+		out := outcome{text: s.fitted(in, answer.Text), answerID: answer.ID, toReplied: answer.ToReplied, toName: answer.To, effect: effectFor(in, answer.Text)}
 		if answer.Text == "" {
 			// A sticker or a GIF is an answer of its own, never one more
 			// message after the words.

@@ -675,6 +675,27 @@ In a private chat each user gets `PRIVATE_DAILY_LIMIT` answers a day
   nobody else.
 - `0` turns the limit off.
 
+### Keyboard and message effects
+
+`/start` and `/help` in a private chat bring a small keyboard, in place of the
+phone's own, of her common requests, in the language of the user's app
+(`internal/service/keyboard.go`): «😂 Mem yasab ber» (only when `IMGFLIP_*`
+gives her the meme tool), «🎲 Zar tashla», «💵 Dollar kursi», «🌤 Toshkent
+ob-havosi», «🕐 Soat nechi?» and «❓ Yordam». Telegram keeps it there, shrunk
+to fit, until it is closed. A button sends its own text, which is answered as
+if typed, by the model, and counted in the daily limit like any message; only
+«❓ Yordam» (or «❓ Помощь», «❓ Help») is answered as `/help`, uncounted. A
+group never gets the keyboard, and a help button's words typed there are just
+words.
+
+An answer in a private chat that congratulates someone, a birthday, a
+holiday, an exam passed ("tabriklayman", "tug'ilgan kuning bilan",
+"muborak", "поздравляю", "happy birthday"), comes with Telegram's 🎉
+message effect. The words decide, in code: the model never names an effect,
+so it can never ask for one Telegram does not have. Telegram plays effects
+only in private chats, so groups never get one, and a message Telegram
+refuses with its effect is sent again without it.
+
 ## Inline mode
 
 Typed in any chat, `@MariaBot qanday qilib plov pishiriladi?` shows one

@@ -33,6 +33,9 @@ type sentMessage struct {
 	// album is how many pictures an album had; 0 for any other message.
 	album   int
 	buttons [][]telegram.Button
+	// keyboard and effect are a text message's.
+	keyboard [][]string
+	effect   string
 }
 
 type fakeSender struct {
@@ -48,7 +51,7 @@ func (f *fakeSender) SendMessage(ctx context.Context, msg telegram.Outgoing) (in
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.sent = append(f.sent, sentMessage{chatID: msg.ChatID, text: msg.Text, replyTo: msg.ReplyToMessageID, buttons: msg.Buttons})
+	f.sent = append(f.sent, sentMessage{chatID: msg.ChatID, text: msg.Text, replyTo: msg.ReplyToMessageID, buttons: msg.Buttons, keyboard: msg.Keyboard, effect: msg.Effect})
 	return int64(1000 + len(f.sent)), nil
 }
 
