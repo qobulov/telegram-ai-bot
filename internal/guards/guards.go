@@ -1,7 +1,7 @@
 // Package guards asks outside services whether a member, a link or a
 // picture is to be kept out of a group: spam lists of Telegram accounts
 // (CAS, lols.bot), malicious links (Google Safe Browsing, URLhaus) and
-// nudity and gore in pictures (Sightengine). They answer only; the service acts.
+// nudity in pictures (Sightengine). They answer only; the service acts.
 package guards
 
 import (
@@ -214,13 +214,15 @@ func (c *Checker) urlhausHost(ctx context.Context, host string) (string, bool, e
 // gory.
 const unsafeScore = 0.7
 
-// UnsafeImage reports whether Sightengine sees nudity or gore in a picture,
-// and what. The picture is uploaded: a Telegram file link would give away
-// the bot's token.
+// UnsafeImage reports whether Sightengine sees nudity in a picture. Each
+// model is an operation of the plan, and with gore checked too the guarded
+// groups' two hundred pictures a day spent the free plan's month in days.
+// The picture is uploaded: a Telegram file link would give away the bot's
+// token.
 func (c *Checker) UnsafeImage(ctx context.Context, image []byte) (string, bool, error) {
 	var body bytes.Buffer
 	form := multipart.NewWriter(&body)
-	_ = form.WriteField("models", "nudity-2.1,gore-2.0")
+	_ = form.WriteField("models", "nudity-2.1")
 	_ = form.WriteField("api_user", c.opts.SightengineUser)
 	_ = form.WriteField("api_secret", c.opts.SightengineSecret)
 	part, err := form.CreateFormFile("media", "image.jpg")
@@ -239,9 +241,6 @@ func (c *Checker) UnsafeImage(ctx context.Context, image []byte) (string, bool, 
 			Message string `json:"message"`
 		} `json:"error"`
 		Nudity map[string]any `json:"nudity"`
-		Gore   struct {
-			Prob float64 `json:"prob"`
-		} `json:"gore"`
 	}
 	if err := c.postJSON(ctx, c.opts.Sightengine+"/1.0/check.json", http.Header{"Content-Type": {form.FormDataContentType()}}, &body, &answer); err != nil {
 		return "", false, err
@@ -253,9 +252,6 @@ func (c *Checker) UnsafeImage(ctx context.Context, image []byte) (string, bool, 
 		if score, ok := answer.Nudity[class].(float64); ok && score >= unsafeScore {
 			return "nudity", true, nil
 		}
-	}
-	if answer.Gore.Prob >= unsafeScore {
-		return "gore", true, nil
 	}
 	return "", false, nil
 }

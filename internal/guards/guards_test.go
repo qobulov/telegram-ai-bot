@@ -91,7 +91,7 @@ func TestMaliciousLinkKeepsUnknownAndOfflineHosts(t *testing.T) {
 func TestUnsafeImageUploadsThePicture(t *testing.T) {
 	cases := map[string]struct{ answer, want string }{
 		"nude":     {`{"status":"success","nudity":{"sexual_activity":0.01,"erotica":0.92,"context":{}},"gore":{"prob":0.01}}`, "nudity"},
-		"gory":     {`{"status":"success","nudity":{"sexual_activity":0.01},"gore":{"prob":0.88}}`, "gore"},
+		"gory":     {`{"status":"success","nudity":{"sexual_activity":0.01},"gore":{"prob":0.88}}`, ""},
 		"clean":    {`{"status":"success","nudity":{"sexual_activity":0.01,"erotica":0.2},"gore":{"prob":0.02}}`, ""},
 		"lingerie": {`{"status":"success","nudity":{"erotica":0.3,"very_suggestive":0.81},"gore":{"prob":0.01}}`, "nudity"},
 		"swimwear": {`{"status":"success","nudity":{"very_suggestive":0.2,"suggestive":0.9,"mildly_suggestive":0.95},"gore":{"prob":0.01}}`, ""},
@@ -102,7 +102,7 @@ func TestUnsafeImageUploadsThePicture(t *testing.T) {
 		if err != nil || reason != tc.want || bad != (tc.want != "") {
 			t.Errorf("%s: %q, %v, %v", name, reason, bad, err)
 		}
-		if seen.MultipartForm == nil || seen.FormValue("api_user") != "se-user" || seen.FormValue("models") != "nudity-2.1,gore-2.0" || len(seen.MultipartForm.File["media"]) != 1 {
+		if seen.MultipartForm == nil || seen.FormValue("api_user") != "se-user" || seen.FormValue("models") != "nudity-2.1" || len(seen.MultipartForm.File["media"]) != 1 {
 			t.Errorf("%s: the picture was not uploaded with the keys", name)
 		}
 	}
