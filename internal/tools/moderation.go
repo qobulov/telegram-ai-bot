@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"telegram-ai-bot/internal/storage"
@@ -80,6 +82,8 @@ const (
 	noReplyTarget = "reply to the message of the member you mean, or tag that one member with @ in the request"
 	// Tags that do not name one member Telegram vouches for act on nobody.
 	manyMentions   = "more than one member is tagged; reply to the message of the one you mean, or tag only that member"
+	unnamedMember  = "their own message does not name that member, or I have not seen a member here by that name; name them by the @username or first name group_members lists, or ask them to reply to the member's message"
+	manyNamed      = "more than one member here goes by that name; ask them to tag the one they mean with @ or reply to their message"
 	unknownMention = "I have not seen that @username in this group, so I can't tell who it is; reply to one of their own messages instead"
 	unsureMention  = "Telegram did not confirm that the tagged account is a member here under that name, so nothing was done; reply to one of their own messages instead"
 	immune         = "I can't do that to admins, my owners, myself, Telegram's service accounts or the person asking"
@@ -217,6 +221,9 @@ type ModerationOptions struct {
 	// tagged members; without it only tags that carry an ID work.
 	Owners    map[int64]bool
 	Usernames UsernameLookup
+	// Roster finds a member the asker named by first name or username,
+	// without a tag; without it only replies and tags name a member.
+	Roster MemberLister
 }
 
 type moderationArgs struct {
@@ -229,6 +236,8 @@ type moderationArgs struct {
 	Kind string `json:"kind"`
 	// Force puts an action back even after someone changed it by hand.
 	Force bool `json:"force"`
+	// Member is who the asker named, without a reply or a tag.
+	Member string `json:"member"`
 }
 
 // Moderation lets a group's admins, and the bot's owners, have the bot
@@ -268,7 +277,7 @@ func (m *Moderation) Tool() Tool {
 			"promote: make its author an admin, with your own delete, mute and pin rights at most; demote: take that back; admin_title (text, 16 characters at most): the title shown for an admin you made. " +
 			"For the group itself, with no reply or tag: set_title (text), set_description (text, empty to remove), set_photo (the photo in their message), delete_photo, invite_link (a new link; text names it, minutes ends it), unpin_all, and lock or unlock (kind) to forbid or allow one kind of message to everyone, keeping the group's other permissions: when they ask to block stickers or photos for all, it is lock, never a guard. " +
 			"undo: put back the last thing you did here with this tool, whatever it was; a deleted message never comes back. With force only when, told it was changed by hand since, they still want it back. " +
-			"For member actions without such a reply, or replying to their own message, it acts on the one member they tagged with @, once Telegram confirms who that is. " +
+			"For member actions without such a reply, or replying to their own message, it acts on the one member they tagged with @, once Telegram confirms who that is; when they named the member without a tag (\"Azamatni mute qil\"), pass member: never ask them to tag or reply instead. " +
 			"It checks everyone's rights and does it at once, with no question, but only when the person's own message asks for it; say it is done only when it reports done.",
 		Schema: json.RawMessage(`{
 			"type": "object",
@@ -278,7 +287,8 @@ func (m *Moderation) Tool() Tool {
 				"text": {"type": "string", "description": "For set_title, set_description and admin_title: the new text, in the words they gave. For invite_link: an optional name."},
 				"force": {"type": "boolean", "description": "For undo: true only when they want it back though it was changed by hand since."},
 				"kind": {"type": "string", "enum": ["messages", "photos", "videos", "stickers", "voice", "files", "music", "polls", "link_previews"], "description": "For lock and unlock: stickers covers GIFs too, voice covers round videos."},
-				"reason": {"type": "string", "description": "Optional: why, in a few words."}
+				"reason": {"type": "string", "description": "Optional: why, in a few words."},
+				"member": {"type": "string", "description": "For an action on a member they named without a reply or a tag: that member's first name or @username, as they wrote it or group_members lists it."}
 			},
 			"required": ["action"],
 			"additionalProperties": false
@@ -323,7 +333,7 @@ func (m *Moderation) run(ctx context.Context, raw json.RawMessage) (any, error) 
 	if args.Action == actionUndo {
 		return m.undo(ctx, caller, args.Force)
 	}
-	target, err := m.targetOf(ctx, caller, args.Action)
+	target, err := m.targetOf(ctx, caller, args.Action, args.Member)
 	if err != nil {
 		return nil, err
 	}
@@ -416,25 +426,29 @@ func notCarriedOut(err error) error {
 // targetOf is what an order acts on. A reply to someone else's message
 // names that message and its author. Without a reply, or with a reply to
 // their own message, which is how a member who tagged someone often asks,
-// an action on a member names the one member they tagged, once Telegram
-// confirms that account. Anything less certain acts on nobody: the person
-// is asked to reply to the member's message instead.
-func (m *Moderation) targetOf(ctx context.Context, caller Caller, action string) (Target, error) {
+// an action on a member names the one member they tagged, or else the one
+// they named in words, once Telegram confirms that account. Anything less
+// certain acts on nobody: the person is asked to reply to the member's
+// message instead.
+func (m *Moderation) targetOf(ctx context.Context, caller Caller, action, member string) (Target, error) {
 	if groupWide(action) {
 		return Target{}, nil
 	}
 	replied := caller.Target
 	ownReply := replied != nil && replied.UserID == caller.UserID
+	named := len(caller.Mentions) > 0 || member != ""
 	switch {
-	case replied != nil && (!ownReply || !onMember(action) || len(caller.Mentions) == 0):
+	case replied != nil && (!ownReply || !onMember(action) || !named):
 		// Acting on oneself is refused when the order is checked.
 		return *replied, nil
-	case !onMember(action) || len(caller.Mentions) == 0:
+	case !onMember(action) || !named:
 		return Target{}, &DeniedError{Message: noReplyTarget}
 	case len(caller.Mentions) > 1:
 		return Target{}, &DeniedError{Message: manyMentions}
+	case len(caller.Mentions) == 1:
+		return m.tagged(ctx, caller.ChatID, caller.Mentions[0], action)
 	}
-	return m.tagged(ctx, caller.ChatID, caller.Mentions[0], action)
+	return m.named(ctx, caller, member, action)
 }
 
 // tagged is the member a tag names, as Telegram knows them now: the ID a
@@ -469,6 +483,96 @@ func (m *Moderation) tagged(ctx context.Context, chatID int64, mention Mention, 
 		name = strings.TrimSpace(name + " @" + user.Username)
 	}
 	return Target{UserID: userID, Name: name, IsBot: user.IsBot, Owner: m.opts.Owners[userID]}, nil
+}
+
+// named is the member the asker named in words, without a tag: the one
+// member seen here whose first name or username is member. The model only
+// picks among the asker's words: their own message must name that member,
+// and a first name must be no other seen member's, or nobody is acted on.
+func (m *Moderation) named(ctx context.Context, caller Caller, member, action string) (Target, error) {
+	if m.opts.Roster == nil {
+		return Target{}, &DeniedError{Message: noReplyTarget}
+	}
+	members, _, err := m.opts.Roster.GroupMembers(ctx, caller.ChatID, maxMembersListed)
+	if err != nil {
+		return Target{}, internal(err)
+	}
+	var found []storage.GroupMember
+	for _, seen := range members {
+		if goesBy(seen, member) {
+			found = append(found, seen)
+		}
+	}
+	if len(found) > 1 {
+		return Target{}, &DeniedError{Message: manyNamed}
+	}
+	if len(found) == 0 {
+		return Target{}, &DeniedError{Message: unnamedMember}
+	}
+	chosen := found[0]
+	words := wordsOf(caller.Words)
+	if chosen.Username == "" || !slices.Contains(words, strings.ToLower(chosen.Username)) {
+		first := firstName(chosen.FirstName)
+		if !namedBy(words, first) {
+			return Target{}, &DeniedError{Message: unnamedMember}
+		}
+		for _, seen := range members {
+			if seen.UserID != chosen.UserID && strings.EqualFold(firstName(seen.FirstName), first) {
+				return Target{}, &DeniedError{Message: manyNamed}
+			}
+		}
+	}
+	return m.tagged(ctx, caller.ChatID, Mention{UserID: chosen.UserID}, action)
+}
+
+// minNameRunes is the shortest first name taken from someone's words: a
+// shorter one is part of too many other words.
+const minNameRunes = 3
+
+// nameEndings are what Uzbek and Russian add to a name in a sentence:
+// "Azamatni", "Azamatga", "Азамата".
+var nameEndings = []string{"", "ni", "ning", "ga", "ka", "qa", "da", "dan", "jon", "a", "u", "а", "у", "е", "ом"}
+
+// goesBy reports whether member is a seen member's username, first name or
+// the first word of it.
+func goesBy(seen storage.GroupMember, member string) bool {
+	member = strings.TrimPrefix(strings.TrimSpace(member), "@")
+	if member == "" {
+		return false
+	}
+	return strings.EqualFold(seen.Username, member) || strings.EqualFold(seen.FirstName, member) ||
+		strings.EqualFold(firstName(seen.FirstName), member)
+}
+
+// firstName is the first word of a first name: "Azamat" of "Azamat 아자마트".
+func firstName(name string) string {
+	if words := wordsOf(name); len(words) > 0 {
+		return words[0]
+	}
+	return ""
+}
+
+// wordsOf is text in lower case, split into words of letters and digits;
+// an underscore stays, as usernames have it.
+func wordsOf(text string) []string {
+	return strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_'
+	})
+}
+
+// namedBy reports whether one of words is name, as it is or with an ending
+// a sentence gives it.
+func namedBy(words []string, name string) bool {
+	name = strings.ToLower(name)
+	if utf8.RuneCountInString(name) < minNameRunes {
+		return false
+	}
+	for _, word := range words {
+		if ending, ok := strings.CutPrefix(word, name); ok && slices.Contains(nameEndings, ending) {
+			return true
+		}
+	}
+	return false
 }
 
 // onMember reports an action on a member rather than on a message.

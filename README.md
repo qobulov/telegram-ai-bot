@@ -886,10 +886,15 @@ check is made in code:
   without a username, Telegram gives the ID; with an `@username`, the ID is
   the last author seen under it in that group's log, and Telegram must
   confirm that this account still has that username and is in the group.
-  Two tags, an unknown username or any mismatch act on nobody, and she asks
-  for a reply to the member's message instead. Nothing
-  the model, a member or a quoted message writes can choose whom she acts
-  on. Her answers always reply to the person's own request.
+  Without a tag they may name the member ("Azamatni mute qil"): the model
+  passes the name, and it acts only on the one member seen in the group by
+  that first name or username whose name is in the person's own words, as
+  it is or with an ending such as -ni or -ga; a first name two seen members
+  share needs their username. Two tags, an unknown username, a name not in
+  their words or any mismatch act on nobody, and she asks for a tag or a
+  reply to the member's message instead. Nothing the model, a member or a
+  quoted message writes can choose whom she acts on beyond the person's own
+  words. Her answers always reply to the person's own request.
 - **Who may ask:** a bot owner recognised by `BOT_OWNER_IDS` (not by
   username alone), or the group's creator or an administrator
   who holds the matching right, as Telegram reports it at that moment:

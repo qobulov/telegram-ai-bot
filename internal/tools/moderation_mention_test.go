@@ -153,3 +153,81 @@ func TestTagsDoNotChangeWhichMessageIsDeleted(t *testing.T) {
 		t.Errorf("calls = %q, want the own message 49 deleted", calls)
 	}
 }
+
+const azamatID = int64(7007)
+
+// namingEnv is mentionEnv where the bot has seen Azamat, without a tag in
+// the request, among others.
+func namingEnv(t *testing.T, seen ...storage.GroupMember) *moderationEnv {
+	t.Helper()
+	env := mentionEnv(t)
+	env.chat.set(azamatID, telegram.ChatMember{Status: "restricted", User: &telegram.User{ID: azamatID, FirstName: "Azamat 아자마트", Username: "mkmillioner8"}})
+	roster := append([]storage.GroupMember{
+		{ChatID: groupA, UserID: saidID, FirstName: "Said", Username: "said_05"},
+		{ChatID: groupA, UserID: azamatID, FirstName: "Azamat 아자마트", Username: "mkmillioner8"},
+	}, seen...)
+	env.opts.Roster = &fakeRoster{members: roster}
+	env.moderation = NewModeration(env.opts)
+	env.registry = mustRegistry(t, env.moderation.Tool())
+	return env
+}
+
+// sayingAs is userID's turn, replying to target (or to nothing), in words.
+func sayingAs(target *Target, words string) context.Context {
+	return WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: 100, MessageID: 50, Target: target, Words: words}, &Sink{})
+}
+
+// In production "Unda azamatni mute qil 15 min ga" was answered with a
+// request to tag @mkmillioner8, whom the bot itself had found.
+func TestMuteAMemberNamedInWords(t *testing.T) {
+	for _, member := range []string{"Azamat", "@mkmillioner8", "azamat 아자마트"} {
+		t.Run(member, func(t *testing.T) {
+			env := namingEnv(t)
+			said := env.act(t, sayingAs(nil, "Unda azamatni mute qil 15 min ga"), `{"action":"mute","minutes":15,"member":"`+member+`"}`)
+			if !strings.Contains(said, "@mkmillioner8") {
+				t.Errorf("said %q; it must name Azamat", said)
+			}
+			env.mutedOnly(t, azamatID)
+		})
+	}
+	env := namingEnv(t)
+	env.act(t, sayingAs(ownMessage(), "mkmillioner8 ni mute qil"), `{"action":"mute","member":"mkmillioner8"}`)
+	env.mutedOnly(t, azamatID)
+}
+
+func TestNamesThatFitNobodyOrManyActOnNobody(t *testing.T) {
+	cases := map[string]struct {
+		words, member string
+		seen          []storage.GroupMember
+		want          string
+	}{
+		// The model cannot pick someone the asker did not name.
+		"not in their words":      {words: "Saidni mute qil", member: "Azamat", want: unnamedMember},
+		"a longer name":           {words: "Azamatbekni mute qil", member: "Azamat", want: unnamedMember},
+		"nobody seen by the name": {words: "Jasurni mute qil", member: "Jasur", want: unnamedMember},
+		"two Azamats": {words: "Azamatni mute qil", member: "Azamat", want: manyNamed,
+			seen: []storage.GroupMember{{ChatID: groupA, UserID: 8008, FirstName: "Azamat"}}},
+		"two first names Azamat": {words: "Azamatni mute qil", member: "@mkmillioner8", want: manyNamed,
+			seen: []storage.GroupMember{{ChatID: groupA, UserID: 8008, FirstName: "Azamat Q"}}},
+		"a name too short": {words: "Alini mute qil", member: "Al", want: unnamedMember,
+			seen: []storage.GroupMember{{ChatID: groupA, UserID: 8008, FirstName: "Al"}}},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			env := namingEnv(t, c.seen...)
+			got := env.moderate(sayingAs(nil, c.words), `{"action":"mute","member":"`+c.member+`"}`)
+			if got.OK || !strings.Contains(got.Error.Message, c.want) {
+				t.Errorf("moderate = %+v, want refused with %q", got, c.want)
+			}
+			env.nothingActed(t)
+		})
+	}
+}
+
+// Two members of the same first name are told apart by a username in the
+// asker's words.
+func TestAUsernameTellsNamesakesApart(t *testing.T) {
+	env := namingEnv(t, storage.GroupMember{ChatID: groupA, UserID: 8008, FirstName: "Azamat"})
+	env.act(t, sayingAs(nil, "Azamat mkmillioner8 ni mute qil"), `{"action":"mute","member":"mkmillioner8"}`)
+	env.mutedOnly(t, azamatID)
+}
