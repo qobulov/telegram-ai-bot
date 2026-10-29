@@ -215,7 +215,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		logger.Warn("BOT_OWNER_IDS is not set: owners are known only by username, which can change hands, so they moderate only with their own admin rights")
 	}
 	available := append(builtinTools(cfg, store, bot, moderation.Tool()), liveDataTools(cfg, bot)...)
-	available = append(available, tools.BotProfileTool(tools.BotProfileOptions{
+	available = append(available, moderation.TopicsTool(bot.Client), tools.BotProfileTool(tools.BotProfileOptions{
 		Account: botAccount{Client: bot.Client, id: bot.User.ID},
 		Eyes:    stickerLabeller(cfg, logger),
 	}))

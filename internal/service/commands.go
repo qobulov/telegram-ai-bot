@@ -923,7 +923,22 @@ func (s *Service) caller(in incoming) tools.Caller {
 		Target:    s.target(in.msg.ReplyToMessage),
 		Mentions:  s.mentions(in),
 		Words:     ownWords(in),
+		Forum:     in.msg.Chat.IsForum,
+		TopicID:   topicOf(in.msg),
 	}
+}
+
+// topicOf is the forum topic msg was written in, or else that of the
+// message it replies to; zero in the General topic. Outside a forum a reply
+// carries a message_thread_id too, the reply chain's, which is no topic.
+func topicOf(msg *telegram.Message) int64 {
+	switch replied := msg.ReplyToMessage; {
+	case msg.IsTopicMessage:
+		return msg.MessageThreadID
+	case replied != nil && replied.IsTopicMessage:
+		return replied.MessageThreadID
+	}
+	return 0
 }
 
 // ownWords is what the caller wrote: the message being answered, and their

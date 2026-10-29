@@ -143,6 +143,7 @@ var rightWords = map[string]string{
 	telegram.RightChangeInfo:      "change the group's info",
 	telegram.RightInviteUsers:     "invite users",
 	telegram.RightPromoteMembers:  "add new admins",
+	telegram.RightManageTopics:    "manage topics",
 }
 
 // MemberLookup asks Telegram about a member of a chat.
@@ -1104,8 +1105,14 @@ var adminWords = []string{"admin", "админ"}
 var photoWords = []string{"rasm", "rasim", "surat", "foto", "photo", "фото", "картин", "расм", "сурат"}
 
 func askedFor(words, action string) bool {
+	return says(words, actionWords[action])
+}
+
+// says reports whether words, folded to lower case without apostrophes,
+// hold one of list.
+func says(words string, list []string) bool {
 	folded := foldApostrophes.Replace(strings.ToLower(words)) + " "
-	for _, word := range actionWords[action] {
+	for _, word := range list {
 		if strings.Contains(folded, word) {
 			return true
 		}

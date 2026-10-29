@@ -862,6 +862,18 @@ check is made in code:
   link previews), keeping the group's other permissions. Each needs its own
   admin right, the asker's and the bot's: changing the group's info,
   inviting users, pinning or restricting members.
+- **Forum topics,** in a group with topics, through the separate
+  `forum_topic` tool: create a topic (named, its icon in one of Telegram's
+  six colours when asked), rename, close, reopen or delete the topic the
+  request was written in (or that of the message it replies to, as Telegram
+  says in the update: never one the model names), and hide or show the
+  General topic. A request in General acts only on General itself. The
+  asker and the bot both need *manage topics*, and *delete messages* too to
+  delete a topic, which takes every message in it; the asker's words must
+  name a topic ("mavzu", "topic", "тема", or "General" to hide or show it)
+  and say what to do ("yop", "och", "o'chir", "yashir"). Topic actions are
+  audited and counted like the others, as `topic_close` and so on, but undo
+  does not put them back: a closed topic is reopened by asking.
 - **Undo** ("orqaga qaytar"): every action but a deletion is recorded with
   what puts it back, read from Telegram just before it is taken
   (`moderation_actions.undo`). Undo puts back the group's latest such

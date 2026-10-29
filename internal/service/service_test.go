@@ -3056,6 +3056,37 @@ func TestIgnoreCommandOnTheBotsAnswerIgnoresWhomItAnswered(t *testing.T) {
 	}
 }
 
+// Tools learn the forum topic a request was written in from the update: its
+// own topic, the implicit reply to the topic's first message dropped, or
+// that of the message it replies to. A reply chain outside a forum, which
+// Telegram also numbers, is no topic.
+func TestTurnTellsToolsTheForumTopic(t *testing.T) {
+	f := newFixture()
+	forum := telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup, IsForum: true}
+	inTopic := groupMessage("@MyBot mavzuni yop", "@MyBot")
+	inTopic.Chat, inTopic.IsTopicMessage, inTopic.MessageThreadID = forum, true, 7
+	inTopic.ReplyToMessage = &telegram.Message{MessageID: 7, From: &telegram.User{ID: 5}, Service: "forum_topic_created"}
+	inGeneral := groupMessage("@MyBot General'ni yashir", "@MyBot")
+	inGeneral.Chat = forum
+	replyChain := replyingTo(groupMessage("@MyBot yop", "@MyBot"), 5, "salom")
+	replyChain.MessageThreadID = 29
+
+	f.run(inGroup(inTopic), inGroup(inGeneral), inGroup(replyChain))
+
+	calls := f.replier.recorded()
+	if len(calls) != 3 {
+		t.Fatalf("model calls = %d, want 3", len(calls))
+	}
+	for i, want := range []tools.Caller{{Forum: true, TopicID: 7}, {Forum: true}, {}} {
+		if got := calls[i].caller; got.Forum != want.Forum || got.TopicID != want.TopicID {
+			t.Errorf("call %d: forum %v, topic %d; want %v, %d", i, got.Forum, got.TopicID, want.Forum, want.TopicID)
+		}
+	}
+	if calls[0].caller.Target != nil {
+		t.Errorf("target = %+v; the topic's first message is no reply", calls[0].caller.Target)
+	}
+}
+
 // A service message names as its author whoever caused it: "Ann added
 // Spammer" comes from Ann, "Boss pinned a message" from Boss. Acting on
 // that author would hit the wrong person, so such a message is no target.

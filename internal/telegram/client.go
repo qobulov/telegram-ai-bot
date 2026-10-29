@@ -820,6 +820,60 @@ func (c *Client) UnpinChatMessage(ctx context.Context, chatID, messageID int64) 
 	return c.call(ctx, "unpinChatMessage", messageParams{ChatID: chatID, MessageID: messageID}, nil)
 }
 
+type forumTopicParams struct {
+	ChatID          int64  `json:"chat_id"`
+	MessageThreadID int64  `json:"message_thread_id,omitempty"`
+	Name            string `json:"name,omitempty"`
+	IconColor       int    `json:"icon_color,omitempty"`
+}
+
+type forumTopic struct {
+	MessageThreadID int64 `json:"message_thread_id"`
+}
+
+// CreateForumTopic opens a topic in a forum supergroup, its icon in one of
+// the colours Telegram allows (zero leaves the choice to Telegram), and
+// returns its ID: the message_thread_id of the messages in it.
+func (c *Client) CreateForumTopic(ctx context.Context, chatID int64, name string, iconColor int) (int64, error) {
+	var topic forumTopic
+	if err := c.call(ctx, "createForumTopic", forumTopicParams{ChatID: chatID, Name: name, IconColor: iconColor}, &topic); err != nil {
+		return 0, err
+	}
+	return topic.MessageThreadID, nil
+}
+
+// EditForumTopic renames a topic. Its icon, not sent, stays as it is.
+func (c *Client) EditForumTopic(ctx context.Context, chatID, threadID int64, name string) error {
+	return c.call(ctx, "editForumTopic", forumTopicParams{ChatID: chatID, MessageThreadID: threadID, Name: name}, nil)
+}
+
+// CloseForumTopic closes a topic: only admins can write in it until it is
+// reopened.
+func (c *Client) CloseForumTopic(ctx context.Context, chatID, threadID int64) error {
+	return c.call(ctx, "closeForumTopic", forumTopicParams{ChatID: chatID, MessageThreadID: threadID}, nil)
+}
+
+// ReopenForumTopic opens a closed topic again.
+func (c *Client) ReopenForumTopic(ctx context.Context, chatID, threadID int64) error {
+	return c.call(ctx, "reopenForumTopic", forumTopicParams{ChatID: chatID, MessageThreadID: threadID}, nil)
+}
+
+// DeleteForumTopic deletes a topic with every message in it.
+func (c *Client) DeleteForumTopic(ctx context.Context, chatID, threadID int64) error {
+	return c.call(ctx, "deleteForumTopic", forumTopicParams{ChatID: chatID, MessageThreadID: threadID}, nil)
+}
+
+// HideGeneralForumTopic hides a forum's General topic, which Telegram also
+// closes when it is open.
+func (c *Client) HideGeneralForumTopic(ctx context.Context, chatID int64) error {
+	return c.call(ctx, "hideGeneralForumTopic", chatParams{ChatID: chatID}, nil)
+}
+
+// UnhideGeneralForumTopic shows a forum's General topic again.
+func (c *Client) UnhideGeneralForumTopic(ctx context.Context, chatID int64) error {
+	return c.call(ctx, "unhideGeneralForumTopic", chatParams{ChatID: chatID}, nil)
+}
+
 type sendPollParams struct {
 	ChatID                int64             `json:"chat_id"`
 	Question              string            `json:"question"`

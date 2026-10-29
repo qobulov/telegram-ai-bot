@@ -391,6 +391,8 @@ type Chat struct {
 	// Title and Username are set for groups; Username only for public ones.
 	Title    string `json:"title,omitempty"`
 	Username string `json:"username,omitempty"`
+	// IsForum marks a supergroup whose messages are kept in topics.
+	IsForum bool `json:"is_forum,omitempty"`
 	// getChat alone sets the rest: what members of a group may do by
 	// default, its description, its photo and its latest pinned message.
 	Permissions   *ChatPermissions `json:"permissions,omitempty"`
