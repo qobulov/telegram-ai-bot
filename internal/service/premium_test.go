@@ -167,6 +167,52 @@ func TestLimitNoticeOffersPremiumOnce(t *testing.T) {
 	}
 }
 
+// After the day's notice, a sender past the limit is pointed to /premium
+// at most once an hour: one who missed the notice saw only a reaction.
+func TestPastTheLimitPremiumIsRemindedHourly(t *testing.T) {
+	f := newFixture()
+	withPremium(f)
+	now := premiumNow
+	f.opts.Now = func() time.Time { return now }
+	s := serverless(f, &fakeMuteStore{})
+	defer s.Close()
+	say := func(text string) {
+		s.HandleNow(textFrom(userID, text))
+	}
+
+	say("hi")
+	say("again")
+	say("still")
+	now = now.Add(premiumNudgeEvery + time.Minute)
+	say("later")
+	say("and later")
+
+	sent := f.sender.messages()
+	if len(sent) != 3 || sent[2].text != textPremiumNudge.uz {
+		t.Errorf("sent = %+v; want the answer, the notice, then one reminder an hour on", sent)
+	}
+}
+
+// Without premium on sale there is nothing to point to.
+func TestNoReminderWithoutPremium(t *testing.T) {
+	f := newFixture()
+	withPremium(f)
+	f.opts.PremiumPrice = 0
+	now := premiumNow
+	f.opts.Now = func() time.Time { return now }
+	s := serverless(f, &fakeMuteStore{})
+	defer s.Close()
+
+	s.HandleNow(textFrom(userID, "hi"))
+	s.HandleNow(textFrom(userID, "again"))
+	now = now.Add(2 * premiumNudgeEvery)
+	s.HandleNow(textFrom(userID, "later"))
+
+	if sent := f.sender.messages(); len(sent) != 2 {
+		t.Errorf("sent = %+v; want the answer and the plain notice only", sent)
+	}
+}
+
 // Without a price nothing is sold: the notice is the plain one, and
 // /premium says so.
 func TestNoPremiumWithoutAPrice(t *testing.T) {

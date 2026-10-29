@@ -435,6 +435,9 @@ type Service struct {
 	linkVerdicts *recently[string, verdict]
 	// pictureVerdicts are keyed by a file's unique ID.
 	pictureVerdicts *recently[string, verdict]
+	// premiumNudges are the senders past the day's limit reminded of
+	// /premium within the last premiumNudgeEvery.
+	premiumNudges *recently[int64, bool]
 	// resting are the outside services lately failed, by name, which are
 	// not asked again for a while.
 	resting *recently[string, bool]
@@ -539,6 +542,7 @@ func New(opts Options) *Service {
 		spamVerdicts:    newRecently[int64, verdict](verdictMemory, opts.Now),
 		linkVerdicts:    newRecently[string, verdict](verdictMemory, opts.Now),
 		pictureVerdicts: newRecently[string, verdict](verdictMemory, opts.Now),
+		premiumNudges:   newRecently[int64, bool](premiumNudgeEvery, opts.Now),
 		resting:         newRecently[string, bool](serviceRest, opts.Now),
 		queues:          make([]chan incoming, opts.Workers),
 		notices:         make(chan incoming, noticeQueueSize),

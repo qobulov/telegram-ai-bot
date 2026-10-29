@@ -128,12 +128,23 @@ func (s *Service) hasPremium(ctx context.Context, userID int64) (until time.Time
 	return until, until.After(s.opts.Now())
 }
 
+// premiumNudgeEvery is how often a sender past the day's limit is reminded
+// of /premium after the day's notice: someone who missed the notice saw
+// only a reaction, and never learned there was a way to write on.
+const premiumNudgeEvery = time.Hour
+
 // limitReached is the answer to a private message past the day's limit:
 // the day's one notice, offering premium with an invoice to a sender who
-// has none while it is sold, and nothing after it.
+// has none while it is sold; after it, while premium is sold, a line
+// pointing to /premium at most every premiumNudgeEvery, and else nothing.
 func (s *Service) limitReached(ctx context.Context, in incoming, notify bool) outcome {
 	out := outcome{skipped: "private_limit"}
 	if !notify {
+		if s.sellsPremium() && s.nudgeDue(in.userID) {
+			if _, ok := s.hasPremium(ctx, in.userID); !ok {
+				out.text = textPremiumNudge.to(in)
+			}
+		}
 		return out
 	}
 	if _, ok := s.hasPremium(ctx, in.userID); ok {
@@ -144,8 +155,20 @@ func (s *Service) limitReached(ctx context.Context, in incoming, notify bool) ou
 	if s.sellsPremium() {
 		out.text += "\n\n" + s.premiumOffer(in)
 		out.invoice = true
+		s.premiumNudges.set(in.userID, true)
 	}
 	return out
+}
+
+// nudgeDue reports whether a sender may be reminded of /premium now, and
+// counts the reminder if so. It is kept in this instance's memory, so on
+// serverless hosting another instance may remind them sooner.
+func (s *Service) nudgeDue(userID int64) bool {
+	if _, reminded := s.premiumNudges.get(userID); reminded {
+		return false
+	}
+	s.premiumNudges.set(userID, true)
+	return true
 }
 
 // premiumOffer says what premium gives and costs.
@@ -427,6 +450,12 @@ var (
 	}
 	// textPremiumLabel takes the days.
 	textPremiumLabel = localText{uz: "Premium, %d kun", ru: "Premium, %d дней", en: "Premium, %d days"}
+	// textPremiumNudge reminds a sender past the day's limit of premium.
+	textPremiumNudge = localText{
+		uz: "Bugungi limit tugadi. Ko'proq yozish uchun /premium ni bosing.",
+		ru: "Лимит на сегодня исчерпан. Чтобы писать больше, нажмите /premium.",
+		en: "Today's limit is used up. Tap /premium to write more.",
+	}
 	// textPremiumOffer takes the days, the premium limit and the price.
 	textPremiumOffer = localText{
 		uz: "⭐ Premium: %d kun davomida kuniga %d ta xabar, %d Stars. To'lash uchun pastdagi tugmani bosing.",
