@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"telegram-ai-bot/internal/telegram"
+	"telegram-ai-bot/internal/tools"
 )
 
 // fakeToolRunner answers each tool with a fixed envelope and records what
@@ -20,10 +21,13 @@ type fakeToolRunner struct {
 	asked   []string
 }
 
-func (f *fakeToolRunner) Execute(_ context.Context, _ int64, name, args string) string {
+func (f *fakeToolRunner) Execute(ctx context.Context, _ int64, name, args string) string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.asked = append(f.asked, name+" "+args)
+	if sink, ok := tools.SinkFrom(ctx); ok && name == "mlbb" && strings.Contains(args, `"skin":`) {
+		sink.Add(tools.Drawing{Data: []byte("JPEG"), MimeType: "image/jpeg"}) // as the tool sends a skin
+	}
 	if answer, ok := f.answers[name]; ok {
 		return answer
 	}
@@ -261,8 +265,39 @@ func TestMenusSpeakThePressedLabelsLanguage(t *testing.T) {
 		t.Fatalf("sent = %+v; want the English question, and the MLBB menu in the app's language", sent)
 	}
 
-	sent = f.run(replyTo(askedRequests["skins"].question.en, "Alpha"))
+	sent = f.run(replyTo(askedRequests["build"].question.en, "Alpha"))
 	if last := sent[len(sent)-1]; !last.photo || last.keyboard == nil {
 		t.Errorf("answer = %+v; want a picture with the keyboard", last)
+	}
+}
+
+// A hero's skins are buttons, and the one pressed comes as its picture,
+// named, without the model: the list had been the model's text.
+func TestSkinsAreChosenAndShown(t *testing.T) {
+	f := newFixture()
+	runner := withToolRunner(f)
+	runner.answers["mlbb"] = `{"ok":true,"result":{"hero":"Kagura","skins":[{"name":"Onmyouji Master","tier":"Epic","price":"599 olmos"},{"name":"Cherry Witch","tier":"Special"},{"name":"Flower Season"}]}}`
+	f.opts.Buttons = &fakeButtons{}
+
+	sent := f.run(replyTo(skinsQuestion.question.uz, "kagura"))
+	if len(sent) != 1 || sent[0].text != "👕 Kagura: qaysi skin?" || len(sent[0].buttons) != 2 || sent[0].buttons[0][1].Data != "kb:skin:Kagura:1" {
+		t.Fatalf("choices = %+v", sent)
+	}
+
+	sent = f.run(menuPress(1, "kb:skin:Kagura:1"))
+	if last := sent[len(sent)-1]; !last.photo || last.text != "Kagura — Cherry Witch (Special)" || last.keyboard == nil {
+		t.Errorf("skin = %+v; want its picture, named, with the keyboard", last)
+	}
+	if asked := runner.recorded(); !strings.Contains(asked[len(asked)-1], `"skin":"Cherry Witch"`) {
+		t.Errorf("tools asked = %q", asked)
+	}
+	if len(f.replier.recorded()) != 0 {
+		t.Errorf("the model was asked")
+	}
+
+	delete(runner.answers, "mlbb")
+	sent = f.run(replyTo(skinsQuestion.question.uz, "Nobody"))
+	if last := sent[len(sent)-1]; last.text != textHeroUnknown.uz {
+		t.Errorf("unknown hero = %+v", last)
 	}
 }

@@ -11,6 +11,7 @@ import (
 
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
+	"telegram-ai-bot/internal/tools"
 )
 
 // The keyboard's buttons that need a value ask for it before answering:
@@ -57,11 +58,6 @@ var askedRequests = map[string]askedRequest{
 		hint:     heroHint,
 		request:  localText{uz: "MLBB: %s ga qarshi kimni olish kerak?", ru: "MLBB: кого брать против %s?", en: "MLBB: who counters %s?"},
 	},
-	"skins": {
-		question: localText{uz: "👕 Qaysi qahramonning skinlari?", ru: "👕 Скины какого героя?", en: "👕 Which hero's skins?"},
-		hint:     heroHint,
-		request:  localText{uz: "MLBB: %s skinlari", ru: "MLBB: скины %s", en: "MLBB: %s's skins"},
-	},
 	"draft": {
 		question: localText{uz: "🎯 Dushman jamoa kimlarni oldi? Vergul bilan yozing.", ru: "🎯 Кого взяли враги? Через запятую.", en: "🎯 Whom did the enemy pick? Separate with commas."},
 		hint:     localText{uz: "Masalan: Ling, Tigreal", ru: "Например: Ling, Tigreal", en: "For example: Ling, Tigreal"},
@@ -80,6 +76,13 @@ var askedRequests = map[string]askedRequest{
 }
 
 var heroHint = localText{uz: "Masalan: Ling", ru: "Например: Ling", en: "For example: Ling"}
+
+// skinsQuestion asks whose skins: the answer is answered in code, with the
+// hero's skins to choose from and the chosen one's picture.
+var skinsQuestion = askedRequest{
+	question: localText{uz: "👕 Qaysi qahramonning skinlari?", ru: "👕 Скины какого героя?", en: "👕 Which hero's skins?"},
+	hint:     heroHint,
+}
 
 // mlbbChoices are the Mobile Legends menu's buttons, by the choice each
 // sends. meta asks nothing: it is asked of the model at once.
@@ -186,10 +189,16 @@ func (s *Service) pressedMenu(q *telegram.CallbackQuery) {
 			return
 		}
 		request, ok := askedRequests[choice]
+		if choice == "skins" {
+			request, ok = skinsQuestion, true
+		}
 		if !ok {
 			return
 		}
 		out = askFor(languageOf(in), request)
+	case "skin":
+		s.sendSkin(ctx, in, choice)
+		return
 	case "dice":
 		args, _ := json.Marshal(map[string]string{"emoji": choice})
 		var rolled struct{}
@@ -235,6 +244,8 @@ func (s *Service) menuReply(ctx context.Context, in incoming) (outcome, bool) {
 		}
 		args, _ := json.Marshal(map[string]any{"code": code[1], "amount": amount})
 		return s.withMenuBack(in, orFailed(in, textError)(keyboardTool(s, ctx, in, "currency_rate", string(args), conversionText(amount)))), true
+	case holdsText(asked.Text, skinsQuestion.question):
+		return s.skinChoices(ctx, in, strings.TrimSpace(in.text)), true
 	case holdsText(asked.Text, textCityPrompt):
 		args, _ := json.Marshal(map[string]string{"city": strings.TrimSpace(in.text)})
 		return s.withMenuBack(in, orFailed(in, textCityUnknown)(keyboardTool(s, ctx, in, "get_weather", string(args), weatherText))), true
@@ -272,6 +283,95 @@ func (s *Service) askAsTyped(q *telegram.CallbackQuery, text string) {
 		return
 	}
 	s.Handle(update)
+}
+
+// heroSkins is what the mlbb tool lists of a hero's skins.
+type heroSkins struct {
+	Hero  string `json:"hero"`
+	Skins []struct {
+		Name  string `json:"name"`
+		Tier  string `json:"tier"`
+		Price string `json:"price"`
+	} `json:"skins"`
+}
+
+// skins lists a hero's skins, the newest first, as the mlbb tool does;
+// ok is false for a hero it does not know.
+func (s *Service) skins(ctx context.Context, in incoming, hero string) (heroSkins, bool) {
+	args, _ := json.Marshal(map[string]string{"action": "skins", "hero": hero})
+	var list heroSkins
+	ok := s.runTool(ctx, in, "mlbb", string(args), &list)
+	return list, ok && len(list.Skins) > 0
+}
+
+// skinChoices answers a hero's name with a button for each of its skins.
+// A button carries the hero and the skin's place in the list, as a skin's
+// name may not fit in its data; the list is asked for again on the press.
+func (s *Service) skinChoices(ctx context.Context, in incoming, hero string) outcome {
+	list, ok := s.skins(ctx, in, hero)
+	if !ok {
+		return s.withMenuBack(in, say(textHeroUnknown.to(in)))
+	}
+	var rows [][]telegram.Button
+	for i, skin := range list.Skins {
+		data := fmt.Sprintf("%sskin:%s:%d", menuData, list.Hero, i)
+		if len(data) > maxButtonData {
+			continue
+		}
+		if i%2 == 0 || len(rows) == 0 {
+			rows = append(rows, nil)
+		}
+		rows[len(rows)-1] = append(rows[len(rows)-1], telegram.Button{Text: skin.Name, Data: data})
+	}
+	return outcome{text: fmt.Sprintf(textWhichSkin.to(in), list.Hero), buttons: rows}
+}
+
+// maxButtonData is the most a button's data holds, in bytes.
+const maxButtonData = 64
+
+// sendSkin sends the picture of the skin a button chose, "Kagura:3", with
+// its name, tier and price, and the keyboard back.
+func (s *Service) sendSkin(ctx context.Context, in incoming, choice string) {
+	cut := strings.LastIndex(choice, ":")
+	place, err := strconv.Atoi(choice[cut+1:])
+	if cut < 0 || err != nil {
+		return
+	}
+	hero := choice[:cut]
+	list, ok := s.skins(ctx, in, hero)
+	if !ok || place < 0 || place >= len(list.Skins) {
+		s.send(in, telegram.Outgoing{Text: textHeroUnknown.to(in), Keyboard: s.keyboard(in)})
+		return
+	}
+	skin := list.Skins[place]
+	caption := list.Hero + " — " + skin.Name
+	if details := strings.Join(nonEmpty(skin.Tier, skin.Price), ", "); details != "" {
+		caption += " (" + details + ")"
+	}
+	args, _ := json.Marshal(map[string]string{"action": "skins", "hero": list.Hero, "skin": skin.Name})
+	sink := &tools.Sink{}
+	var shown heroSkins
+	if !s.runToolInto(ctx, in, "mlbb", string(args), &shown, sink) {
+		s.send(in, telegram.Outgoing{Text: textError.to(in), Keyboard: s.keyboard(in)})
+		return
+	}
+	pictures := sink.Take()
+	if len(pictures) == 0 {
+		s.send(in, telegram.Outgoing{Text: caption + "\n" + textNoSkinPicture.to(in), Keyboard: s.keyboard(in)})
+		return
+	}
+	s.replyPhoto(in, pictures[0], caption, s.keyboard(in))
+}
+
+// nonEmpty is texts without the empty ones.
+func nonEmpty(texts ...string) []string {
+	var kept []string
+	for _, t := range texts {
+		if t != "" {
+			kept = append(kept, t)
+		}
+	}
+	return kept
 }
 
 // orFailed answers with failed when the tool failed.
@@ -344,5 +444,13 @@ var (
 		en: "I couldn't find that city. Try writing it another way.",
 	}
 	textWhichGame = localText{uz: "Qaysi o'yin?", ru: "Какая игра?", en: "Which game?"}
-	textMLBBMenu  = localText{uz: "🎮 Mobile Legends: nima kerak?", ru: "🎮 Mobile Legends: что нужно?", en: "🎮 Mobile Legends: what do you need?"}
+	// textWhichSkin takes the hero's name.
+	textWhichSkin   = localText{uz: "👕 %s: qaysi skin?", ru: "👕 %s: какой скин?", en: "👕 %s: which skin?"}
+	textHeroUnknown = localText{
+		uz: "Bunday qahramonni topa olmadim. Nomini boshqacha yozib ko'ring.",
+		ru: "Не нашла такого героя. Попробуйте написать имя иначе.",
+		en: "I couldn't find that hero. Try writing the name another way.",
+	}
+	textNoSkinPicture = localText{uz: "Bu skinning rasmi topilmadi.", ru: "Картинку этого скина не нашла.", en: "I couldn't find this skin's picture."}
+	textMLBBMenu      = localText{uz: "🎮 Mobile Legends: nima kerak?", ru: "🎮 Mobile Legends: что нужно?", en: "🎮 Mobile Legends: what do you need?"}
 )

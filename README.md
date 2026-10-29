@@ -745,6 +745,10 @@ languages, and the buttons that need a value ask for it first
   for the hero, the enemy's picks, the matches and win rates, or the
   player's ID and zone, and the answer goes to the model with the request
   ("MLBB: Ling uchun eng yaxshi build"), which the `mlbb` tool answers.
+  Skins are answered in code: the hero's name brings a button for each of
+  its skins, newest first (the `mlbb` tool's list, its data the hero and the
+  skin's place in it, as a skin's name may not fit), and the one pressed
+  comes as its picture, captioned with its name, tier and price.
 - «🕐 Soat nechi?» is answered at once, by the bot's clock.
 
 A choice comes back as a button's data (`kb:rate:EUR`), handled at once; a

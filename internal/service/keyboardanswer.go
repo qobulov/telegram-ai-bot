@@ -99,9 +99,14 @@ func pressed(in incoming, button localText) bool {
 // runTool runs a tool on the sender's turn and decodes its result into
 // out, reporting whether it succeeded.
 func (s *Service) runTool(ctx context.Context, in incoming, name, args string, out any) bool {
+	return s.runToolInto(ctx, in, name, args, out, &tools.Sink{})
+}
+
+// runToolInto is runTool with the sink the tool puts its pictures in.
+func (s *Service) runToolInto(ctx context.Context, in incoming, name, args string, out any, sink *tools.Sink) bool {
 	ctx, cancel := context.WithTimeout(ctx, keyboardTimeout)
 	defer cancel()
-	ctx = tools.WithTurn(ctx, s.caller(in), &tools.Sink{})
+	ctx = tools.WithTurn(ctx, s.caller(in), sink)
 	var envelope struct {
 		OK     bool            `json:"ok"`
 		Result json.RawMessage `json:"result"`
