@@ -808,6 +808,36 @@ func TestChatAndMemberMethodsSendExactParams(t *testing.T) {
 	}
 }
 
+// A new link sends only the limits it has; an edit sends every one, so that
+// a limit taken away is gone.
+func TestInviteLinksSendTheirLimits(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"invite_link":"https://t.me/+abc"}}`)
+	ctx := context.Background()
+	ends := time.Unix(1800000000, 0)
+
+	link, err := client.CreateChatInviteLink(ctx, InviteLink{ChatID: -100123, Name: "reklama", Expires: ends, MemberLimit: 50})
+	if err != nil || link != "https://t.me/+abc" {
+		t.Fatalf("CreateChatInviteLink = %q, %v", link, err)
+	}
+	if _, err := client.CreateChatInviteLink(ctx, InviteLink{ChatID: -100123, JoinRequest: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.EditChatInviteLink(ctx, "https://t.me/+abc", InviteLink{ChatID: -100123, JoinRequest: true}); err != nil {
+		t.Fatal(err)
+	}
+	calls := api.recorded()
+	wants := []call{
+		{"createChatInviteLink", map[string]any{"chat_id": float64(-100123), "name": "reklama", "expire_date": float64(1800000000), "member_limit": float64(50)}},
+		{"createChatInviteLink", map[string]any{"chat_id": float64(-100123), "creates_join_request": true}},
+		{"editChatInviteLink", map[string]any{"chat_id": float64(-100123), "invite_link": "https://t.me/+abc", "name": "", "expire_date": float64(0), "member_limit": float64(0), "creates_join_request": true}},
+	}
+	for i, want := range wants {
+		if calls[i].method != want.method || !reflect.DeepEqual(calls[i].params, want.params) {
+			t.Errorf("call %d = %+v, want %+v", i, calls[i], want)
+		}
+	}
+}
+
 // A new topic is named and coloured as asked, and its ID, the thread its
 // messages carry, comes back.
 func TestCreateForumTopicReturnsTheTopic(t *testing.T) {

@@ -711,11 +711,17 @@ type InviteLink struct {
 	Name string
 	// Expires is when the link stops working; zero means never.
 	Expires time.Time
+	// MemberLimit is how many people may join through it, 1 to 99999; zero
+	// means any number.
+	MemberLimit int
+	// JoinRequest makes each person who opens it ask the admins to approve
+	// them. Telegram does not combine it with a MemberLimit.
+	JoinRequest bool
 }
 
 // CreateChatInviteLink makes a new invite link and returns it.
 func (c *Client) CreateChatInviteLink(ctx context.Context, l InviteLink) (string, error) {
-	params := inviteLinkParams{ChatID: l.ChatID, Name: l.Name}
+	params := inviteLinkParams{ChatID: l.ChatID, Name: l.Name, MemberLimit: l.MemberLimit, JoinRequest: l.JoinRequest}
 	if !l.Expires.IsZero() {
 		params.ExpireDate = l.Expires.Unix()
 	}
@@ -729,9 +735,32 @@ func (c *Client) CreateChatInviteLink(ctx context.Context, l InviteLink) (string
 }
 
 type inviteLinkParams struct {
-	ChatID     int64  `json:"chat_id"`
-	Name       string `json:"name,omitempty"`
-	ExpireDate int64  `json:"expire_date,omitempty"`
+	ChatID      int64  `json:"chat_id"`
+	Name        string `json:"name,omitempty"`
+	ExpireDate  int64  `json:"expire_date,omitempty"`
+	MemberLimit int    `json:"member_limit,omitempty"`
+	JoinRequest bool   `json:"creates_join_request,omitempty"`
+}
+
+// EditChatInviteLink gives an invite link the bot made the name and limits
+// of l, all of them: Telegram sets each anew, and one left out is none.
+func (c *Client) EditChatInviteLink(ctx context.Context, link string, l InviteLink) error {
+	params := editInviteLinkParams{ChatID: l.ChatID, InviteLink: link, Name: l.Name, MemberLimit: l.MemberLimit, JoinRequest: l.JoinRequest}
+	if !l.Expires.IsZero() {
+		params.ExpireDate = l.Expires.Unix()
+	}
+	return c.call(ctx, "editChatInviteLink", params, nil)
+}
+
+// editInviteLinkParams sends every field, zero included, so that an edit
+// means exactly what it says whatever Telegram assumes for a missing one.
+type editInviteLinkParams struct {
+	ChatID      int64  `json:"chat_id"`
+	InviteLink  string `json:"invite_link"`
+	Name        string `json:"name"`
+	ExpireDate  int64  `json:"expire_date"`
+	MemberLimit int    `json:"member_limit"`
+	JoinRequest bool   `json:"creates_join_request"`
 }
 
 // RevokeChatInviteLink stops an invite link the bot made from working.

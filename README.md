@@ -862,6 +862,20 @@ check is made in code:
   link previews), keeping the group's other permissions. Each needs its own
   admin right, the asker's and the bot's: changing the group's info,
   inviting users, pinning or restricting members.
+- **Invite links:** a new link may also admit only a number of people (1 to
+  99999) or make each who opens it ask the admins to approve them; Telegram
+  does not combine the two, so asking for both is refused with that reason.
+  `revoke_link` stops a link she made from working and `edit_link` changes
+  its name, end, member limit (0 removes it) or approval: the link the asker
+  gives, or else the latest she made in that group. She acts only on links
+  she made there, found in `moderation_actions` (the link and its limits are
+  kept in the record's `undo`), never on the group's other links; the
+  asker's words must name a link and say to revoke it ("bekor qil",
+  "o'chir", "отзови") or what to change ("20 kishiga chekla", "tasdiq bilan
+  qil"). Telegram sets every limit anew in an edit, so she sends the link's
+  own limits with the one changed, and an end once set can be moved but not
+  taken away. Undo revokes the latest link she made, edited or not; a
+  revoked link is never revoked again.
 - **Forum topics,** in a group with topics, through the separate
   `forum_topic` tool: create a topic (named, its icon in one of Telegram's
   six colours when asked), rename, close, reopen or delete the topic the
