@@ -590,6 +590,22 @@ func (c *Client) sendChunk(ctx context.Context, params sendMessageParams) (int64
 	}
 }
 
+type copyMessageParams struct {
+	ChatID     int64 `json:"chat_id"`
+	FromChatID int64 `json:"from_chat_id"`
+	MessageID  int64 `json:"message_id"`
+}
+
+// CopyMessage sends a copy of a message, of any kind, to a chat, without the
+// "forwarded from" line, and returns the copy's ID.
+func (c *Client) CopyMessage(ctx context.Context, chatID, fromChatID, messageID int64) (int64, error) {
+	var sent sentMessage
+	if err := c.call(ctx, "copyMessage", copyMessageParams{ChatID: chatID, FromChatID: fromChatID, MessageID: messageID}, &sent); err != nil {
+		return 0, err
+	}
+	return sent.MessageID, nil
+}
+
 type reactionParams struct {
 	ChatID    int64          `json:"chat_id"`
 	MessageID int64          `json:"message_id"`

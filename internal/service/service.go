@@ -533,21 +533,31 @@ func (s *Service) HandleNow(update telegram.Update) {
 	}
 }
 
-// GroupRegistry keeps the list of groups the bot is in.
+// GroupRegistry keeps the list of groups the bot is in, and of channels it
+// is an admin of.
 type GroupRegistry interface {
 	RecordGroup(ctx context.Context, g storage.GroupStatus) error
+	RecordChannel(ctx context.Context, c storage.GroupStatus) error
 }
 
 // recordMembership notes the bot being added to, promoted in or removed from
-// a group, so its owners' list of groups stays true even for quiet groups.
+// a group or a channel, so its owners' lists stay true even for quiet groups,
+// and for channels, whose posts the bot never hears.
 func (s *Service) recordMembership(change *telegram.ChatMemberUpdated) {
-	isGroup := change.Chat.Type == telegram.ChatTypeGroup || change.Chat.Type == telegram.ChatTypeSupergroup
-	if s.opts.Groups == nil || !isGroup {
+	if s.opts.Groups == nil {
+		return
+	}
+	record := s.opts.Groups.RecordGroup
+	switch change.Chat.Type {
+	case telegram.ChatTypeGroup, telegram.ChatTypeSupergroup:
+	case telegram.ChatTypeChannel:
+		record = s.opts.Groups.RecordChannel
+	default:
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
 	defer cancel()
-	err := s.opts.Groups.RecordGroup(ctx, storage.GroupStatus{
+	err := record(ctx, storage.GroupStatus{
 		ChatID:    change.Chat.ID,
 		Title:     change.Chat.Title,
 		Username:  change.Chat.Username,
@@ -555,10 +565,10 @@ func (s *Service) recordMembership(change *telegram.ChatMemberUpdated) {
 		Rights:    change.NewChatMember.Rights(),
 	})
 	if err != nil {
-		s.opts.Logger.Warn("could not record group membership", "chat_id", change.Chat.ID, "error", err)
+		s.opts.Logger.Warn("could not record membership", "chat_id", change.Chat.ID, "type", change.Chat.Type, "error", err)
 		return
 	}
-	s.opts.Logger.Info("bot membership changed", "chat_id", change.Chat.ID, "status", change.NewChatMember.Status)
+	s.opts.Logger.Info("bot membership changed", "chat_id", change.Chat.ID, "type", change.Chat.Type, "status", change.NewChatMember.Status)
 }
 
 // MemberBook keeps the members seen in each group. The Bot API cannot list

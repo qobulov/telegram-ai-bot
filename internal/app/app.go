@@ -160,7 +160,6 @@ func (b botRights) BotRights(ctx context.Context, chatID int64) ([]string, error
 	return rights, nil
 }
 
-// groupSender posts an owner's confirmed broadcast in a group.
 // botAccount is the bot's own Telegram profile, its photo found by its ID.
 type botAccount struct {
 	*telegram.Client
@@ -174,12 +173,18 @@ func (b botAccount) Photo(ctx context.Context) ([]byte, string, bool, error) {
 // maxAvatarBytes bounds the profile photo downloaded to be described.
 const maxAvatarBytes = 2 << 20
 
+// groupSender posts an owner's confirmed broadcast in a group or a channel.
 type groupSender struct {
 	client *telegram.Client
 }
 
 func (g groupSender) SendToGroup(ctx context.Context, chatID int64, text string) error {
 	_, err := g.client.SendMessage(ctx, telegram.Outgoing{ChatID: chatID, Text: text})
+	return err
+}
+
+func (g groupSender) CopyToChat(ctx context.Context, chatID, fromChatID, messageID int64) error {
+	_, err := g.client.CopyMessage(ctx, chatID, fromChatID, messageID)
 	return err
 }
 
@@ -388,9 +393,10 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 				Location: cfg.Location,
 			}),
 			tools.BroadcastTool(tools.BroadcastOptions{
-				Groups: store,
-				Drafts: store,
-				Sender: groupSender{client: bot.Client},
+				Groups:   store,
+				Channels: store,
+				Drafts:   store,
+				Sender:   groupSender{client: bot.Client},
 			}),
 			tools.RulesTool(tools.RulesOptions{
 				Store:    store,

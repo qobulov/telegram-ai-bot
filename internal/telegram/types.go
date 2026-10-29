@@ -299,6 +299,8 @@ type ChatMember struct {
 	CanChangeInfo      bool `json:"can_change_info,omitempty"`
 	CanInviteUsers     bool `json:"can_invite_users,omitempty"`
 	CanManageTopics    bool `json:"can_manage_topics,omitempty"`
+	// CanPostMessages is a channel admin's right to post there.
+	CanPostMessages bool `json:"can_post_messages,omitempty"`
 }
 
 // Admin rights, named as in the Bot API. Moderation checks that both the
@@ -311,6 +313,8 @@ const (
 	RightChangeInfo      = "can_change_info"
 	RightInviteUsers     = "can_invite_users"
 	RightManageTopics    = "can_manage_topics"
+	// RightPostMessages exists in channels only.
+	RightPostMessages = "can_post_messages"
 )
 
 // adminRight ties a right's Bot API name to the field that holds it.
@@ -329,6 +333,7 @@ var adminRights = []adminRight{
 	{RightChangeInfo, func(m ChatMember) bool { return m.CanChangeInfo }},
 	{RightInviteUsers, func(m ChatMember) bool { return m.CanInviteUsers }},
 	{RightManageTopics, func(m ChatMember) bool { return m.CanManageTopics }},
+	{RightPostMessages, func(m ChatMember) bool { return m.CanPostMessages }},
 }
 
 // Has reports whether the member holds an admin right. Anyone who is not
@@ -406,11 +411,13 @@ type ChatPhoto struct {
 	BigFileID string `json:"big_file_id"`
 }
 
-// Chat types. Channels are not handled by the bot.
+// Chat types. A channel's posts are not handled by the bot; only its
+// standing there is recorded, for its owners' broadcasts.
 const (
 	ChatTypePrivate    = "private"
 	ChatTypeGroup      = "group"
 	ChatTypeSupergroup = "supergroup"
+	ChatTypeChannel    = "channel"
 )
 
 // Outgoing is a text message to send.

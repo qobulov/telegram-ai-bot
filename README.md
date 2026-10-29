@@ -117,7 +117,9 @@ bot_replies(id PK, chat_id, bot_id, created_at)
 group_replies(id PK, chat_id, user_id, created_at)
 private_messages(id PK, user_id, denied, created_at)
 broadcasts(id PK, owner_id, update_id, text, chat_ids bigint[],
-           created_at, sent_at)
+           copy_chat_id, copy_message_id, created_at, sent_at)
+channels(chat_id PK, title, username, bot_status, bot_rights jsonb,
+         first_seen_at, last_seen_at)
 group_rules(id PK, chat_id (0 for every group), kind, user_id, user_name,
             text, set_by, created_at, expires_at)
 moderation_actions(id PK, chat_id, action, requester_id, target_user_id,
@@ -533,13 +535,28 @@ the owner says yes in a later message, within 10 minutes. The code refuses a
 confirmation made in the same message as the draft, so the model cannot send
 on its own.
 
+A broadcast goes to every group the bot is in unless the owner says
+otherwise: to its channels instead ("kanallarga yoz"), to both, or to the
+groups and channels they pick (`targets` lists them with their IDs). A
+channel counts only while the bot is an admin there with the right to post
+messages. Instead of text, an owner may reply to a message (a photo, a
+video, a post, in the private chat or a group) and ask for it to be sent
+("shuni hamma guruhlarga yubor"): it is copied as it is, with Telegram's
+`copyMessage`, so it carries no "forwarded from" line, after the same yes.
+Neither the text nor a copied message may call or tag someone to summon
+them.
+
 Groups are recorded when the bot is added, promoted or removed (Telegram's
 `my_chat_member` updates) and from the messages it logs. Telegram has no way
 to list a bot's groups, so a group the bot joined before this, where nobody
 has written since, is not known. After upgrading, run `set-webhook` again so
 Telegram starts sending `my_chat_member`. The
 `groups` table keeps only each group's name and is not expired; messages
-still are.
+still are. Channels come only from `my_chat_member` (the bot never asks for
+channel posts) and are kept apart, in `channels`, so that the overview, the
+statistics and `bot_database groups` stay about groups; a channel the bot
+was made an admin of before this upgrade is recorded once its rights change,
+for example by removing and adding it again.
 
 ## Drawing pictures
 
@@ -1442,6 +1459,14 @@ Run `set-webhook` again after this update: the bot now asks Telegram for
 `chat_member` updates too, and Telegram keeps sending only the kinds named
 when the webhook was last set. Until then the member list still fills from
 messages, joins and leaves.
+
+The forum topics, invite link limits and channel broadcasts need migration
+0040 (the `channels` table and two columns of `broadcasts`) applied with
+`make migrate` before deploying; the new version refuses to start on the old
+schema. They ask Telegram for no new kind of update, so the webhook needs no
+`set-webhook`. Give Maria *Manage topics* in forum groups where she should
+act on topics (and *Delete messages* to delete one), and add her to a
+channel as an admin with *Post messages* for broadcasts to reach it.
 
 ### Daily cleanup
 
