@@ -435,6 +435,27 @@ func TestPrivateDailyLimit(t *testing.T) {
 	}
 }
 
+// Premium is sold only once a price is set; its days and limit have
+// defaults and must be positive.
+func TestPremium(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil || cfg.PremiumPrice != 0 || cfg.PremiumDays != 30 || cfg.PremiumDailyLimit != 50 {
+		t.Fatalf("defaults = %d stars, %d days, %d a day, %v; want 0, 30, 50", cfg.PremiumPrice, cfg.PremiumDays, cfg.PremiumDailyLimit, err)
+	}
+	env := validEnv()
+	env["PREMIUM_PRICE_STARS"], env["PREMIUM_DAYS"], env["PREMIUM_DAILY_LIMIT"] = "150", "7", "100"
+	if cfg, err := Load(getenv(env)); err != nil || cfg.PremiumPrice != 150 || cfg.PremiumDays != 7 || cfg.PremiumDailyLimit != 100 {
+		t.Errorf("set = %d, %d, %d, %v; want 150, 7, 100", cfg.PremiumPrice, cfg.PremiumDays, cfg.PremiumDailyLimit, err)
+	}
+	for name, bad := range map[string]string{"PREMIUM_PRICE_STARS": "-1", "PREMIUM_DAYS": "0", "PREMIUM_DAILY_LIMIT": "lots"} {
+		env := validEnv()
+		env[name] = bad
+		if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), name) {
+			t.Errorf("%s=%s: err = %v, want it refused", name, bad, err)
+		}
+	}
+}
+
 func TestWebhookSecret(t *testing.T) {
 	cfg, err := Load(getenv(validEnv()))
 	if err != nil || cfg.WebhookSecret != "" {

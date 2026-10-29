@@ -21,6 +21,9 @@ type Update struct {
 	// InlineQuery is someone typing "@bot words" in a chat, for the bot to
 	// answer with something to post.
 	InlineQuery *InlineQuery `json:"inline_query"`
+	// PreCheckoutQuery is Telegram asking, before it takes a payment for
+	// one of the bot's invoices, whether to go ahead.
+	PreCheckoutQuery *PreCheckoutQuery `json:"pre_checkout_query"`
 }
 
 // CallbackQuery is a press of a button with callback data: who pressed it,
@@ -79,6 +82,11 @@ type Message struct {
 	// its kind, such as "pinned_message" (see serviceKinds), and "" for a
 	// message someone wrote. Only the kind is kept.
 	Service string `json:"-"`
+	// SuccessfulPayment is set on the service message saying a user paid
+	// one of the bot's invoices, and RefundedPayment on the one saying a
+	// payment was given back.
+	SuccessfulPayment *SuccessfulPayment `json:"successful_payment"`
+	RefundedPayment   *RefundedPayment   `json:"refunded_payment"`
 
 	// Media. At most one of these is set on a message, except that Telegram
 	// also sets Document on a GIF, for clients that predate Animation.

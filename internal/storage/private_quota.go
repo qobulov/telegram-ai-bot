@@ -9,11 +9,13 @@ import (
 )
 
 // DailyQuota asks for one of a user's answers in private chats on the day
-// that began at Since. Limit answers are allowed in a day.
+// that began at Since. Limit answers are allowed in a day, or PremiumLimit
+// while the user's premium lasts; 0 means premium changes nothing.
 type DailyQuota struct {
-	UserID int64
-	Since  time.Time
-	Limit  int
+	UserID       int64
+	Since        time.Time
+	Limit        int
+	PremiumLimit int
 }
 
 // ReservePrivateMessage takes one of the user's answers for the day, and
@@ -27,8 +29,12 @@ func (s *Store) ReservePrivateMessage(ctx context.Context, q DailyQuota) (id int
 		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, q.UserID^0x50524956); err != nil { // "PRIV"
 			return err
 		}
+		limit, err := dailyLimit(ctx, tx, q)
+		if err != nil {
+			return err
+		}
 		var used, refused int
-		err := tx.QueryRow(ctx, `
+		err = tx.QueryRow(ctx, `
 			SELECT count(*) FILTER (WHERE NOT denied), count(*) FILTER (WHERE denied)
 			FROM private_messages
 			WHERE user_id = $1 AND created_at >= $2`,
@@ -36,7 +42,7 @@ func (s *Store) ReservePrivateMessage(ctx context.Context, q DailyQuota) (id int
 		switch {
 		case err != nil:
 			return err
-		case used < q.Limit:
+		case used < limit:
 			allowed = true
 			return tx.QueryRow(ctx, `INSERT INTO private_messages (user_id) VALUES ($1) RETURNING id`, q.UserID).Scan(&id)
 		case refused > 0:
@@ -58,4 +64,19 @@ func (s *Store) ReleasePrivateMessage(ctx context.Context, id int64) error {
 		return fmt.Errorf("storage: release private message: %w", err)
 	}
 	return nil
+}
+
+// dailyLimit is the quota's limit for the user: PremiumLimit while their
+// premium lasts, Limit otherwise. Asked in the reservation's transaction, a
+// premium bought a moment ago counts at once.
+func dailyLimit(ctx context.Context, tx pgx.Tx, q DailyQuota) (int, error) {
+	if q.PremiumLimit <= 0 {
+		return q.Limit, nil
+	}
+	var premium bool
+	err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM premium_users WHERE user_id = $1 AND until > now())`, q.UserID).Scan(&premium)
+	if err != nil || !premium {
+		return q.Limit, err
+	}
+	return q.PremiumLimit, nil
 }

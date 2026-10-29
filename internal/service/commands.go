@@ -57,6 +57,8 @@ type outcome struct {
 	// voice sends the text read aloud, as a voice message, as the asker
 	// asked; when it cannot be, the text goes.
 	voice bool
+	// invoice sends the invoice for premium after the text.
+	invoice bool
 }
 
 func say(text string) outcome { return outcome{text: text} }
@@ -206,6 +208,9 @@ func (s *Service) deliver(in incoming, out *outcome) int64 {
 	}
 	out.audios = nil
 	answerID := s.deliverAnswer(in, out)
+	if out.invoice {
+		s.sendInvoice(in)
+	}
 	if id := s.sendMedia(in, out); answerID == 0 {
 		answerID = id
 	}
@@ -701,6 +706,8 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 	switch {
 	case !in.group && commandName(in.text) == "/start" && len(s.opts.RequiredChannels) > 0:
 		return s.start(ctx, in)
+	case commandName(in.text) == "/premium":
+		return s.premiumCommand(ctx, in)
 	case strings.HasPrefix(in.text, "/"):
 		return say(s.runCommand(ctx, in))
 	case utf8.RuneCountInString(in.text) > s.opts.MaxInputChars:
@@ -738,9 +745,9 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	if out, ok := s.quickAnswer(ctx, in); ok {
 		return out
 	}
-	reservation, notice, allowed := s.takePrivateAnswer(ctx, in)
+	reservation, notify, allowed := s.takePrivateAnswer(ctx, in)
 	if !allowed {
-		return outcome{text: notice, skipped: "private_limit"}
+		return s.limitReached(ctx, in, notify)
 	}
 	if !in.group {
 		// Only now, so that a voice message past the limit is not
@@ -913,35 +920,34 @@ func channelLink(channel string) (string, bool) {
 
 // takePrivateAnswer takes one of the sender's answers for the day in a
 // private chat, from the quota kept in the database, and returns the
-// reservation to give back if the turn uses none. When the day's answers are
-// used up it returns allowed false and the notice to send: the limit the
-// first time that day, nothing after. Owners are not counted. When the count
+// reservation to give back if the turn uses none. The limit is the premium
+// one while the sender's premium lasts. When the day's answers are used up
+// it returns allowed false, and notify true the first time that day, for
+// the notice (see limitReached). Owners are not counted. When the count
 // cannot be read the sender is answered anyway: the limit guards the cost,
 // and unlike a group's quota, one answer too many disturbs nobody else.
-func (s *Service) takePrivateAnswer(ctx context.Context, in incoming) (reservation int64, notice string, allowed bool) {
+func (s *Service) takePrivateAnswer(ctx context.Context, in incoming) (reservation int64, notify, allowed bool) {
 	limit := s.opts.PrivateDailyLimit
 	if in.group || s.opts.PrivateQuota == nil || limit <= 0 || s.isOwner(in.msg.From) {
-		return 0, "", true
+		return 0, false, true
 	}
 	ctx, cancel := context.WithTimeout(ctx, logTimeout)
 	defer cancel()
 	id, allowed, notify, err := s.opts.PrivateQuota.ReservePrivateMessage(ctx, storage.DailyQuota{
-		UserID: in.userID,
-		Since:  startOfDay(s.opts.Now(), s.opts.Location),
-		Limit:  limit,
+		UserID:       in.userID,
+		Since:        startOfDay(s.opts.Now(), s.opts.Location),
+		Limit:        limit,
+		PremiumLimit: s.premiumLimit(),
 	})
 	switch {
 	case err != nil:
 		s.opts.Logger.Warn("private message count failed; answering anyway", "user_id", in.userID, "error", err)
-		return 0, "", true
+		return 0, false, true
 	case allowed:
-		return id, "", true
+		return id, false, true
 	}
 	s.opts.Logger.Info("private daily limit reached", "user_id", in.userID, "notified", notify)
-	if notify {
-		return 0, fmt.Sprintf(textDailyLimit.to(in), limit), false
-	}
-	return 0, "", false
+	return 0, notify, false
 }
 
 // giveBackAnswer gives back the answer a turn that used none took: from the
@@ -1364,6 +1370,12 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 		return s.setReplyLimit(ctx, in)
 	case "/active":
 		return s.setMinActive(ctx, in)
+	case "/payments":
+		return s.showPayments(ctx, in)
+	case "/refund":
+		return s.refund(ctx, in)
+	case "/paysupport":
+		return s.paySupport(in)
 	default:
 		return textUnknown.to(in)
 	}

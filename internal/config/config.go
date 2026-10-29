@@ -175,6 +175,13 @@ type Config struct {
 	// a day, from midnight in Location; owners have no limit and 0 turns it
 	// off.
 	PrivateDailyLimit int
+	// PremiumPrice is what premium costs in Telegram Stars: PremiumDays days
+	// of PremiumDailyLimit answers a day in private chats instead of
+	// PrivateDailyLimit. 0, the default, sells none, so that a deploy never
+	// starts taking money the owners did not ask for.
+	PremiumPrice      int
+	PremiumDays       int
+	PremiumDailyLimit int
 	// PrivateChats is whom the bot answers in private chats: "on" everyone,
 	// "owners" its owners only, "off" nobody, which keeps it to groups.
 	PrivateChats string
@@ -235,6 +242,9 @@ func Load(getenv func(string) string) (Config, error) {
 		GroupRateLimitPerMinute: r.positive("GROUP_RATE_LIMIT_PER_MINUTE", 6),
 		MemberRepliesPer10Min:   r.positive("MEMBER_REPLIES_PER_10_MIN", 4),
 		PrivateDailyLimit:       r.integer("PRIVATE_DAILY_LIMIT", 10, 0),
+		PremiumPrice:            r.integer("PREMIUM_PRICE_STARS", 0, 0),
+		PremiumDays:             r.positive("PREMIUM_DAYS", 30),
+		PremiumDailyLimit:       r.positive("PREMIUM_DAILY_LIMIT", 50),
 		PrivateChats:            r.privateChats(),
 		RequiredChannels:        r.requiredChannels(),
 		MinGroupMembers:         r.integer("GROUP_MIN_MEMBERS", 6, 0),
