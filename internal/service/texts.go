@@ -32,7 +32,13 @@ type localText struct{ uz, ru, en string }
 
 // to is the text in the language of whoever wrote in.
 func (t localText) to(in incoming) string {
-	switch languageOf(in) {
+	return t.inLanguage(languageOf(in))
+}
+
+// inLanguage is the text in language, "uz", "ru" or "en"; Uzbek for any
+// other.
+func (t localText) inLanguage(language string) string {
+	switch language {
 	case "ru":
 		return t.ru
 	case "en":

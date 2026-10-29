@@ -132,6 +132,7 @@ moderation_actions(id PK, chat_id, action, requester_id, target_user_id,
                    update_id, created_at, UNIQUE (update_id, action))
 join_requests(chat_id, user_id, user_chat_id, expires_at, created_at,
               PK (chat_id, user_id))
+group_boosts(chat_id, boost_id, created_at, PK (chat_id, boost_id))
 schema_migrations(version PK, applied_at)
 ```
 
@@ -1231,6 +1232,18 @@ such as `[gif pubg]`, and GIPHY is searched for those words; a topic has no
 sticker to fall back on, so when it fails nothing is sent. GIPHY's free
 key allows 100 searches an hour, far more than she sends.
 
+### Boosts
+
+When someone boosts a group where she is an admin, Telegram sends her a
+`chat_boost` update, and she thanks them there, in code, without the model:
+"Rahmat, Ali, guruhga boost berganingiz uchun! 🚀", in Russian or English for
+an app in those languages, and without a name for a boost Telegram names no
+one for. Each boost is thanked once: its ID is noted in `group_boosts` (the
+group and the boost's ID, nothing about who gave it) before she speaks, as
+Telegram sends a boost again when it changes, such as when it is renewed.
+When it cannot be noted, or the bot is muted there, she says nothing. A boost
+taken away gets no word, so she does not ask for `removed_chat_boost`.
+
 ### Polls
 
 Anyone in a group can ask her for a poll ("Maria, so'rovnoma qil: plov yoki
@@ -1765,6 +1778,19 @@ The edited messages, join requests and purge update needs:
    members*. Until then she leaves every group's requests alone, but for
    declining known spammers where the spam guard is on. Purge needs *Delete
    messages*, which she has for deletions already.
+
+The keyboard, effects, closing polls, sticker packs, boosts and map pins
+update needs:
+
+1. **Apply migration 0044 before deploying** (`make migrate`, as above): it
+   adds the `group_boosts` table and changes nothing else. The new version
+   refuses to start without it.
+2. **Deploy.** The function sees that the webhook asks for fewer kinds of
+   update than the bot handles and sets it again with `chat_boost`, as
+   above. Each start also sets the admin rights she asks for and the menus.
+3. Telegram sends boosts only where she is an admin; a group's sticker pack
+   needs *Change group info*, and Telegram allows one only in large enough
+   supergroups. Polls made before this version cannot be closed by her.
 
 ### Daily cleanup
 

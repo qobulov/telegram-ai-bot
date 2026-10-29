@@ -308,6 +308,9 @@ type Options struct {
 	// requests are left to the groups' admins. See joins.go.
 	Joins    JoinBook
 	JoinGate JoinGate
+	// Boosts keeps the boosts given to groups, each thanked for once; nil
+	// thanks for none.
+	Boosts BoostBook
 	// Stickers picks the sticker the model asked for, StickerSender sends
 	// it, and StickerImporter brings packs in for /import_stickers; with any
 	// nil, no sticker is sent or imported.
@@ -572,7 +575,7 @@ func (s *Service) HandleNow(update telegram.Update) {
 // handledApart handles, at once and off the workers, an update that is no
 // message to answer, and reports whether update was one: a change of
 // membership, a button press, an edited message, which only the guards
-// look at, or a request to join a group.
+// look at, a request to join a group, or a boost, which is thanked for.
 func (s *Service) handledApart(update telegram.Update) bool {
 	switch {
 	case update.MyChatMember != nil:
@@ -585,6 +588,8 @@ func (s *Service) handledApart(update telegram.Update) bool {
 		s.guardEdited(update)
 	case update.ChatJoinRequest != nil:
 		s.requestedJoin(update.ChatJoinRequest)
+	case update.ChatBoost != nil:
+		s.thankBoost(update.ChatBoost)
 	default:
 		return false
 	}

@@ -350,6 +350,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Sworn:            store,
 		Joins:            store,
 		JoinGate:         bot.Client,
+		Boosts:           store,
 		Stickers:         store,
 		ClipSender:       bot.Client,
 		AudioSender:      bot.Client,
