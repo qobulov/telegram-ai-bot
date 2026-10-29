@@ -225,7 +225,7 @@ func (s *Service) punishmentLine(r storage.GroupRule) string {
 	if p, ok := storage.ParsePunishment(r.Text); ok && !p.Ban() {
 		does = fmt.Sprintf("muted for %d hours", p.MuteHours)
 	}
-	return fmt.Sprintf("- (#%d) The owners ordered, carried out here in code, not by you: %s is %s for %s (until %s).",
+	return fmt.Sprintf("- (#%d) Ordered by the owners or the group's creator, carried out here in code, not by you: %s is %s for %s (until %s).",
 		r.ID, who, does, what, r.ExpiresAt.In(s.opts.Location).Format(ruleDayLayout))
 }
 

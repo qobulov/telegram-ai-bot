@@ -86,6 +86,16 @@ func (m groupMembers) IsGroupAdmin(ctx context.Context, chatID, userID int64) (b
 	return member.IsAdmin(), nil
 }
 
+// IsGroupCreator reports whether a member created a group, for the
+// punishments a group's creator may set.
+func (m groupMembers) IsGroupCreator(ctx context.Context, chatID, userID int64) (bool, error) {
+	member, err := m.client.GetChatMember(ctx, chatID, userID)
+	if err != nil {
+		return false, err
+	}
+	return member.Status == "creator", nil
+}
+
 // Membership asks Telegram about the bot in a group, for the owners'
 // bot_database tool: its status and admin rights, and for a group it is in,
 // the member count and current title.
@@ -357,6 +367,7 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 		tools.ProfileTool(tools.ProfileOptions{Store: store}),
 		tools.CatchUpTool(tools.CatchUpOptions{Store: store, Location: cfg.Location}),
 		tools.GroupStatsTool(tools.GroupStatsOptions{Store: store, BotID: bot.User.ID, Location: cfg.Location}),
+		tools.PunishmentsTool(tools.PunishmentsOptions{Store: store, Creators: groupMembers{client: bot.Client, botID: bot.User.ID}, BotID: bot.User.ID, Location: cfg.Location}),
 	)
 	// Only owners known by ID can be written to, and only they are.
 	if len(cfg.OwnerIDs) > 0 {

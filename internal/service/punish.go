@@ -9,7 +9,7 @@ import (
 	"telegram-ai-bot/internal/telegram"
 )
 
-// punishmentFor is the owners' punishment of kind for a member in a group:
+// punishmentFor is the owners' or the group creator's punishment of kind for a member in a group:
 // the one set for them, or else the group's for anyone. ok is false when
 // there is none, or its text cannot be read.
 func punishmentFor(rules []storage.GroupRule, chatID, userID int64, kind string) (rule storage.GroupRule, p storage.Punishment, ok bool) {
@@ -32,7 +32,7 @@ func punishmentFor(rules []storage.GroupRule, chatID, userID int64, kind string)
 func (s *Service) punish(ctx context.Context, msg *telegram.Message, p storage.Punishment, role, why, caller string) {
 	who := mentionOf(msg.From) + " " + why
 	if role != "" {
-		s.postGuard(msg, withCaller(who+"; egalarning buyrug'i bilan jazolanishi kerak edi, lekin u admin.", caller))
+		s.postGuard(msg, withCaller(who+"; buyruqqa ko'ra jazolanishi kerak edi, lekin u admin.", caller))
 		return
 	}
 	var err error
@@ -42,7 +42,7 @@ func (s *Service) punish(ctx context.Context, msg *telegram.Message, p storage.P
 			return
 		}
 		err = s.opts.GroupModerator.BanChatMember(ctx, msg.Chat.ID, msg.From.ID)
-		text = "🚫 " + who + ", egalarning buyrug'i bilan guruhdan chiqarildi."
+		text = "🚫 " + who + ", buyruqqa ko'ra guruhdan chiqarildi."
 	} else {
 		if s.opts.Restrictor == nil {
 			return
@@ -51,11 +51,11 @@ func (s *Service) punish(ctx context.Context, msg *telegram.Message, p storage.P
 			ChatID: msg.Chat.ID, UserID: msg.From.ID, Permissions: telegram.NoPermissions(),
 			Until: s.opts.Now().Add(time.Duration(p.MuteHours) * time.Hour),
 		})
-		text = fmt.Sprintf("🔇 %s, egalarning buyrug'i bilan %d soat yozolmaydi.", who, p.MuteHours)
+		text = fmt.Sprintf("🔇 %s, buyruqqa ko'ra %d soat yozolmaydi.", who, p.MuteHours)
 	}
 	if err != nil {
 		s.opts.Logger.Warn("guards: could not carry out a punishment", "chat_id", msg.Chat.ID, "user_id", msg.From.ID, "punishment", p.String(), "error", err)
-		text = withCaller(who+"; egalarning buyrug'ini bajara olmadim: menda bu huquq yo'q.", caller)
+		text = withCaller(who+"; buyruqni bajara olmadim: menda bu huquq yo'q.", caller)
 	}
 	s.postGuard(msg, text)
 }
