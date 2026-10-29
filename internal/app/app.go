@@ -18,6 +18,7 @@ import (
 	"telegram-ai-bot/internal/ai"
 	"telegram-ai-bot/internal/config"
 	"telegram-ai-bot/internal/cron"
+	"telegram-ai-bot/internal/game"
 	"telegram-ai-bot/internal/gifs"
 	"telegram-ai-bot/internal/guards"
 	"telegram-ai-bot/internal/service"
@@ -362,6 +363,10 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		opts.GIFs = &gifs.Client{APIKey: cfg.GiphyAPIKey, HTTPClient: &http.Client{Timeout: giphyTimeout}}
 		opts.AnimationSender, opts.MediaSlots = bot.Client, store
 	}
+	if g := newGame(cfg); g != nil {
+		opts.StatsURL = statsPage(cfg)
+		opts.Game, opts.GameTable = g, bot.Client
+	}
 	if mode.Serverless {
 		opts.Workers, opts.QueueSize = 0, 0
 		opts.MutedChats = nil
@@ -375,10 +380,13 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 // moderate is made by the caller, which also hands its confirmations to the
 // service.
 func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate tools.Tool) []tools.Tool {
-	help := service.HelpText(service.Abilities{Draw: cfg.ImagesEnabled, Listen: cfg.AudioInput, Football: cfg.FootballDataToken != ""})
+	help := service.HelpText(service.Abilities{Draw: cfg.ImagesEnabled, Listen: cfg.AudioInput, Football: cfg.FootballDataToken != "", Pages: cfg.WebAppURL != ""})
 	builtin := tools.Builtin(help, cfg.Location)
 	if cfg.ImagesEnabled {
 		builtin = append(builtin, imageTool(cfg, store))
+	}
+	if cfg.WebAppURL != "" {
+		builtin = append(builtin, tools.GameTool(tools.GameOptions{Sender: bot.Client, Store: store, ShortName: game.ShortName}))
 	}
 	// Any group's admins, and any member for a poll or the admin list, may
 	// use these, so they are there with or without owners.
@@ -633,7 +641,8 @@ func newWebhook(ctx context.Context, cfg config.Config, store *storage.Store, lo
 	if err != nil {
 		return nil, err
 	}
-	SetCommandMenus(ctx, bot.Client, logger)
+	SetCommandMenus(ctx, bot.Client, cfg.WebAppURL != "", logger)
+	SetMenuApp(ctx, bot.Client, cfg, logger)
 	SetProfileTexts(ctx, bot.Client, logger)
 	if changed, err := bot.Client.EnsureAllowedUpdates(ctx, cfg.WebhookSecret); err != nil {
 		logger.Warn("could not check the webhook's update kinds", "error", err)

@@ -128,6 +128,28 @@ var cleanup = &lazy{name: "cleanup", build: func(ctx context.Context, cfg config
 	return job.Handler, job.Close, nil
 }}
 
+var stats = &lazy{name: "stats", build: func(ctx context.Context, cfg config.Config, logger *slog.Logger) (http.Handler, func(), error) {
+	endpoint, err := app.NewStats(ctx, cfg, logger)
+	if err != nil {
+		return nil, nil, err
+	}
+	return endpoint.Handler, endpoint.Close, nil
+}}
+
+var games = &lazy{name: "game", build: func(_ context.Context, cfg config.Config, logger *slog.Logger) (http.Handler, func(), error) {
+	endpoint, err := app.NewGame(cfg, logger)
+	if err != nil {
+		return nil, nil, err
+	}
+	return endpoint.Handler, endpoint.Close, nil
+}}
+
+// Stats answers the group dashboard Mini App.
+func Stats(w http.ResponseWriter, r *http.Request) { stats.serve(w, r) }
+
+// Game deals and scores plays of the game.
+func Game(w http.ResponseWriter, r *http.Request) { games.serve(w, r) }
+
 // Webhook receives Telegram updates.
 func Webhook(w http.ResponseWriter, r *http.Request) { webhook.serve(w, r) }
 

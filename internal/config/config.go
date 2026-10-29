@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -187,6 +188,11 @@ type Config struct {
 	// group it answers only its owners. 0 answers any group.
 	MinActiveMembers int
 	ActiveDays       int
+	// WebAppURL is where this project's pages are served, from WEBAPP_URL,
+	// such as "https://maria.vercel.app", without the trailing slash: the
+	// group dashboard Mini App at /stats/ and the game at /game/. Empty
+	// turns both off.
+	WebAppURL string
 }
 
 // IsAdmin reports whether the Telegram user is listed in ADMIN_USER_IDS.
@@ -284,6 +290,7 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.SightengineUser = r.apiKey("SIGHTENGINE_API_USER")
 	cfg.SightengineSecret = r.apiKey("SIGHTENGINE_API_SECRET")
 	cfg.WakeWords = r.wakeWords(cfg)
+	cfg.WebAppURL = r.webAppURL("WEBAPP_URL")
 	r.checkRemovedVariables()
 	r.checkGroupSettings(cfg)
 	if err := errors.Join(r.errs...); err != nil {
@@ -525,6 +532,22 @@ func (r *reader) cronSecret(name string) string {
 		return ""
 	}
 	return secret
+}
+
+// webAppURL reads the optional address of the project's pages. Telegram
+// opens Mini Apps and games over HTTPS only, and the pages' paths are put
+// after it, so it is an origin and maybe a path, without a query.
+func (r *reader) webAppURL(name string) string {
+	value := strings.TrimRight(r.value(name), "/")
+	if value == "" {
+		return ""
+	}
+	u, err := url.Parse(value)
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+		r.fail(name, "must be an https:// address without a query, such as https://maria.vercel.app")
+		return ""
+	}
+	return value
 }
 
 func notSecretChar(char rune) bool {

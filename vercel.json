@@ -11,6 +11,12 @@
     },
     "api/cleanup.go": {
       "maxDuration": 60
+    },
+    "api/stats.go": {
+      "maxDuration": 15
+    },
+    "api/game.go": {
+      "maxDuration": 15
     }
   },
   "crons": [

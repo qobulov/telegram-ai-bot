@@ -43,12 +43,16 @@ type ChatJoinRequest struct {
 }
 
 // CallbackQuery is a press of a button with callback data: who pressed it,
-// under which message, and the button's data.
+// under which message, and the button's data. A press of a game's Play
+// button has the game's short name instead of data, and, for a game sent in
+// inline mode, the inline message's ID instead of the message.
 type CallbackQuery struct {
-	ID      string   `json:"id"`
-	From    *User    `json:"from"`
-	Message *Message `json:"message"`
-	Data    string   `json:"data"`
+	ID              string   `json:"id"`
+	From            *User    `json:"from"`
+	Message         *Message `json:"message"`
+	InlineMessageID string   `json:"inline_message_id"`
+	Data            string   `json:"data"`
+	GameShortName   string   `json:"game_short_name"`
 }
 
 // ChatMemberUpdated reports that the bot, or another member, was added to,
@@ -460,11 +464,14 @@ type Outgoing struct {
 }
 
 // Button is a button under a message that opens a link, or, with Data,
-// tells the bot it was pressed without writing anything in the chat.
+// tells the bot it was pressed without writing anything in the chat, or,
+// with WebApp, opens a Mini App, which Telegram allows in private chats
+// only.
 type Button struct {
-	Text string `json:"text"`
-	URL  string `json:"url,omitempty"`
-	Data string `json:"callback_data,omitempty"`
+	Text   string      `json:"text"`
+	URL    string      `json:"url,omitempty"`
+	Data   string      `json:"callback_data,omitempty"`
+	WebApp *WebAppInfo `json:"web_app,omitempty"`
 }
 
 // ChatPermissions is what a member may do in a group. Every field is always

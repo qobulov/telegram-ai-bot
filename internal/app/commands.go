@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"log/slog"
+	"slices"
 	"time"
 
 	"telegram-ai-bot/internal/telegram"
@@ -47,13 +48,25 @@ type CommandSetter interface {
 	SetMyCommands(ctx context.Context, scope string, commands []telegram.BotCommand) error
 }
 
-// SetCommandMenus sets the menus, logging a failure: the bot works without
-// them, and the next start tries again.
-func SetCommandMenus(ctx context.Context, setter CommandSetter, logger *slog.Logger) {
+// pageCommands open the dashboard and send the game, in every menu while
+// WEBAPP_URL serves them.
+var pageCommands = []telegram.BotCommand{
+	{Command: "stats", Description: "Guruh statistikasi"},
+	{Command: "game", Description: "Tarozi o'yini"},
+}
+
+// SetCommandMenus sets the menus, with the pages' commands when pages is
+// set, logging a failure: the bot works without them, and the next start
+// tries again.
+func SetCommandMenus(ctx context.Context, setter CommandSetter, pages bool, logger *slog.Logger) {
 	ctx, cancel := context.WithTimeout(ctx, commandsTimeout)
 	defer cancel()
 	for _, scope := range []string{telegram.ScopeDefault, telegram.ScopeAllGroupChats, telegram.ScopeAllChatAdmins} {
-		if err := setter.SetMyCommands(ctx, scope, commandMenus[scope]); err != nil {
+		menu := commandMenus[scope]
+		if pages {
+			menu = append(slices.Clip(menu), pageCommands...)
+		}
+		if err := setter.SetMyCommands(ctx, scope, menu); err != nil {
 			logger.Warn("could not set the command menu", "scope", scope, "error", err)
 		}
 	}

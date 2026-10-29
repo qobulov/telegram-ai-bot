@@ -90,7 +90,7 @@ func groupStats(ctx context.Context, opts GroupStatsOptions, raw json.RawMessage
 		return nil, &DeniedError{Message: statsNotInAGroup}
 	}
 	location := opts.location()
-	since, err := statsSince(args.Period, opts.now().In(location))
+	since, err := StatsSince(args.Period, opts.now().In(location))
 	if err != nil {
 		return nil, err
 	}
@@ -110,8 +110,10 @@ func groupStats(ctx context.Context, opts GroupStatsOptions, raw json.RawMessage
 	}, nil
 }
 
-// statsSince is when a period starts: today's midnight, or a week ago.
-func statsSince(period string, now time.Time) (time.Time, error) {
+// StatsSince is when a period of the group's statistics starts: "today",
+// the default, at today's midnight, or "week" a week ago. The dashboard
+// counts the same periods.
+func StatsSince(period string, now time.Time) (time.Time, error) {
 	switch period {
 	case "", "today":
 		return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()), nil

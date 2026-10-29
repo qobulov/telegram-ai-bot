@@ -629,6 +629,26 @@ func TestCronSecret(t *testing.T) {
 	}
 }
 
+// The pages' address is off by default, loses a trailing slash, and must be
+// HTTPS, which Telegram opens Mini Apps and games over.
+func TestWebAppURL(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil || cfg.WebAppURL != "" {
+		t.Fatalf("default: %q, %v", cfg.WebAppURL, err)
+	}
+	env := validEnv()
+	env["WEBAPP_URL"] = "https://maria.vercel.app/"
+	if cfg, err := Load(getenv(env)); err != nil || cfg.WebAppURL != "https://maria.vercel.app" {
+		t.Errorf("WebAppURL = %q, err = %v", cfg.WebAppURL, err)
+	}
+	for _, bad := range []string{"http://maria.vercel.app", "maria.vercel.app", "https://maria.vercel.app/?a=1", "https://u:p@maria.vercel.app", "https:///x"} {
+		env["WEBAPP_URL"] = bad
+		if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "WEBAPP_URL") {
+			t.Errorf("%q: err = %v, want WEBAPP_URL refused", bad, err)
+		}
+	}
+}
+
 func TestGeminiFallbackModels(t *testing.T) {
 	cfg, err := Load(getenv(geminiEnv()))
 	if err != nil {

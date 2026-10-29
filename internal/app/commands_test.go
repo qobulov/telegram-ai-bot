@@ -29,7 +29,7 @@ func (f *fakeCommandSetter) SetMyCommands(_ context.Context, scope string, comma
 // command is one Telegram accepts.
 func TestSetCommandMenus(t *testing.T) {
 	setter := &fakeCommandSetter{}
-	SetCommandMenus(context.Background(), setter, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	SetCommandMenus(context.Background(), setter, false, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	if len(setter.set) != 3 {
 		t.Fatalf("menus = %v, want private chats, groups and admins", setter.set)
@@ -54,10 +54,28 @@ func TestSetCommandMenus(t *testing.T) {
 	}
 }
 
+// With the pages served, every menu offers /stats and /game; without, none.
+func TestSetCommandMenusWithPages(t *testing.T) {
+	for _, pages := range []bool{false, true} {
+		setter := &fakeCommandSetter{}
+		SetCommandMenus(context.Background(), setter, pages, slog.New(slog.NewTextHandler(io.Discard, nil)))
+		for scope, commands := range setter.set {
+			has := slices.ContainsFunc(commands, func(c telegram.BotCommand) bool { return c.Command == "stats" }) &&
+				slices.ContainsFunc(commands, func(c telegram.BotCommand) bool { return c.Command == "game" })
+			if has != pages {
+				t.Errorf("pages %t: %s menu %v", pages, scope, commands)
+			}
+		}
+	}
+	if slices.ContainsFunc(commandMenus[telegram.ScopeDefault], func(c telegram.BotCommand) bool { return c.Command == "stats" }) {
+		t.Error("the page commands were added to the menus themselves")
+	}
+}
+
 // A failure is logged and does not stop the start.
 func TestSetCommandMenusFailure(t *testing.T) {
 	setter := &fakeCommandSetter{err: errors.New("telegram is down")}
-	SetCommandMenus(context.Background(), setter, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	SetCommandMenus(context.Background(), setter, false, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if len(setter.set) != 3 {
 		t.Errorf("tried %d menus, want all three despite the failures", len(setter.set))
 	}

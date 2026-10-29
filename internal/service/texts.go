@@ -193,10 +193,10 @@ func textTextOnly(listen bool) localText {
 	}
 }
 
-// helpTexts are the help in each language, with three blanks filled by
+// helpTexts are the help in each language, with four blanks filled by
 // HelpTextIn: the sentences on what she can see, what she can do and what
-// she can look up. They name no model or company: who runs her is kept a
-// secret.
+// she can look up, and the commands of the pages when they are on. They
+// name no model or company: who runs her is kept a secret.
 var helpTexts = map[string]string{
 	"uz": `Menga yozing: o'zbek, rus yoki ingliz tilida, siz yozgan tilda javob beraman.
 
@@ -206,7 +206,7 @@ Suhbatimizning oxirgi qismini eslab qolaman. %s %s
 Buyruqlar:
 /start — salomlashish
 /help — shu yordam
-/about — bot haqida
+/about — bot haqida%s
 
 Guruhda meni ismim bilan chaqiring, @username bilan belgilang yoki xabarimga reply qiling. U yerda buyruqqa username qo'shiladi: /help@username. Guruh men bilan bitta umumiy suhbatda.
 
@@ -222,7 +222,7 @@ A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yo
 Команды:
 /start — приветствие
 /help — эта справка
-/about — о боте
+/about — о боте%s
 
 В группе зовите меня по имени, упоминайте (@username) или отвечайте на моё сообщение. Там к команде добавляется username: /help@username. У группы со мной один общий разговор.
 
@@ -238,7 +238,7 @@ I remember the recent part of our conversation. %s %s
 Commands:
 /start — welcome message
 /help — this help
-/about — about this bot
+/about — about this bot%s
 
 In a group, call me by name, mention me (@username) or reply to one of my messages. Commands there need my username, like /help@username. A group shares one conversation with me.
 
@@ -283,11 +283,21 @@ var helpAbilities = map[string][6]string{
 // listening needs a provider that hears audio and football needs a
 // football-data.org token. The help names only those present, because
 // get_bot_help hands it to the model, which would otherwise promise a
-// picture, a transcript or a score it cannot give.
+// picture, a transcript or a score it cannot give. Pages needs WEBAPP_URL,
+// where the dashboard and the game are served.
 type Abilities struct {
 	Draw     bool
 	Listen   bool
 	Football bool
+	Pages    bool
+}
+
+// helpPages are the commands of the dashboard and the game, in each
+// language, listed after /about when they are on.
+var helpPages = map[string]string{
+	"uz": "\n/stats — guruh statistikasi\n/game — Tarozi o'yini",
+	"ru": "\n/stats — статистика группы\n/game — игра «Tarozi»",
+	"en": "\n/stats — the group's statistics\n/game — the Tarozi game",
 }
 
 // HelpText describes the bot's commands and what it can do with these
@@ -309,5 +319,9 @@ func HelpTextIn(lang string, abilities Abilities) string {
 		}
 		return phrases[i]
 	}
-	return fmt.Sprintf(helpTexts[lang], pick(0, abilities.Listen), pick(2, abilities.Draw), pick(4, abilities.Football))
+	pages := ""
+	if abilities.Pages {
+		pages = helpPages[lang]
+	}
+	return fmt.Sprintf(helpTexts[lang], pick(0, abilities.Listen), pick(2, abilities.Draw), pick(4, abilities.Football), pages)
 }

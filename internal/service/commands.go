@@ -704,6 +704,10 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.start(ctx, in)
 	case commandName(in.text) == "/premium":
 		return s.premiumCommand(ctx, in)
+	case commandName(in.text) == "/stats":
+		return s.statsCommand(in)
+	case commandName(in.text) == "/game":
+		return s.gameCommand(ctx, in)
 	case strings.HasPrefix(in.text, "/"):
 		return say(s.runCommand(ctx, in))
 	case utf8.RuneCountInString(in.text) > s.opts.MaxInputChars:
@@ -876,8 +880,13 @@ func (s *Service) start(ctx context.Context, in incoming) outcome {
 // pressed answers a press of the check button: the notice becomes the
 // thanks once every channel is joined, and otherwise a box asks to join
 // them first; nothing is written in the chat either way. A press of the
-// button under a join request is pressedJoin's.
+// button under a join request is pressedJoin's, and of a game's Play button
+// pressedGame's.
 func (s *Service) pressed(q *telegram.CallbackQuery) {
+	if q.GameShortName != "" {
+		s.pressedGame(q)
+		return
+	}
 	if s.opts.Buttons == nil || q.From == nil || q.Message == nil {
 		return
 	}
@@ -1351,7 +1360,7 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 	case "/start":
 		return textWelcome.to(in)
 	case "/help":
-		help := HelpTextIn(languageOf(in), Abilities{Draw: s.opts.ImagesEnabled, Listen: s.canListen(), Football: s.opts.FootballEnabled})
+		help := HelpTextIn(languageOf(in), Abilities{Draw: s.opts.ImagesEnabled, Listen: s.canListen(), Football: s.opts.FootballEnabled, Pages: s.opts.StatsURL != ""})
 		if s.opts.Bot.Username != "" {
 			// The bot's own username makes the group commands tappable.
 			help = strings.ReplaceAll(help, "@username", "@"+s.opts.Bot.Username)
