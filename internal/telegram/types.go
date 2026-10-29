@@ -29,6 +29,12 @@ type Update struct {
 	// ChatJoinRequest is someone asking to join a group whose admins approve
 	// new members. Telegram sends it only where the bot may invite users.
 	ChatJoinRequest *ChatJoinRequest `json:"chat_join_request"`
+	// BusinessConnection is a Telegram Business account connecting the bot
+	// as its chatbot, changing what it may do, or disconnecting it.
+	BusinessConnection *BusinessConnection `json:"business_connection"`
+	// BusinessMessage is a message in a chat of a connected business
+	// account: one a customer wrote to it, or one its owner wrote there.
+	BusinessMessage *Message `json:"business_message"`
 }
 
 // ChatJoinRequest is a request to join a group: who asks, and the private
@@ -90,6 +96,12 @@ type Message struct {
 	IsAutomaticForward bool `json:"is_automatic_forward"`
 	// ForwardOrigin says where a forwarded message first came from.
 	ForwardOrigin *MessageOrigin `json:"forward_origin"`
+	// BusinessConnectionID is, for a message in a chat of a business
+	// account, the connection it came through, which an answer is sent on.
+	BusinessConnectionID string `json:"business_connection_id"`
+	// SenderBusinessBot is the bot that sent a business account's message
+	// on its behalf, when a bot did.
+	SenderBusinessBot *User `json:"sender_business_bot"`
 
 	// Service messages: members who joined or left. They carry no text.
 	NewChatMembers []User `json:"new_chat_members"`
@@ -425,6 +437,8 @@ type Chat struct {
 	// Title and Username are set for groups; Username only for public ones.
 	Title    string `json:"title,omitempty"`
 	Username string `json:"username,omitempty"`
+	// FirstName is, for a private chat, the other person's first name.
+	FirstName string `json:"first_name,omitempty"`
 	// IsForum marks a supergroup whose messages are kept in topics.
 	IsForum bool `json:"is_forum,omitempty"`
 	// getChat alone sets the rest: what members of a group may do by
@@ -459,6 +473,9 @@ type Outgoing struct {
 	ReplyToMessageID int64
 	// Buttons are link buttons under the message, in rows.
 	Buttons [][]Button
+	// BusinessConnectionID, when set, sends the message on behalf of the
+	// business account of that connection, into one of its chats.
+	BusinessConnectionID string
 }
 
 // Button is a button under a message that opens a link, or, with Data,

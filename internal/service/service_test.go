@@ -33,6 +33,8 @@ type sentMessage struct {
 	// album is how many pictures an album had; 0 for any other message.
 	album   int
 	buttons [][]telegram.Button
+	// business is the business connection it was sent through, if any.
+	business string
 }
 
 type fakeSender struct {
@@ -48,7 +50,7 @@ func (f *fakeSender) SendMessage(ctx context.Context, msg telegram.Outgoing) (in
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.sent = append(f.sent, sentMessage{chatID: msg.ChatID, text: msg.Text, replyTo: msg.ReplyToMessageID, buttons: msg.Buttons})
+	f.sent = append(f.sent, sentMessage{chatID: msg.ChatID, text: msg.Text, replyTo: msg.ReplyToMessageID, buttons: msg.Buttons, business: msg.BusinessConnectionID})
 	return int64(1000 + len(f.sent)), nil
 }
 
@@ -58,7 +60,7 @@ func (f *fakeSender) SendPhoto(ctx context.Context, photo telegram.Photo) (int64
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.sent = append(f.sent, sentMessage{chatID: photo.ChatID, text: photo.Caption, replyTo: photo.ReplyToMessageID, photo: true})
+	f.sent = append(f.sent, sentMessage{chatID: photo.ChatID, text: photo.Caption, replyTo: photo.ReplyToMessageID, photo: true, business: photo.BusinessConnectionID})
 	return int64(1000 + len(f.sent)), nil
 }
 
@@ -71,7 +73,7 @@ func (f *fakeSender) SendMediaGroup(ctx context.Context, album telegram.Album) (
 	if f.albumErr != nil {
 		return 0, f.albumErr
 	}
-	f.sent = append(f.sent, sentMessage{chatID: album.ChatID, text: album.Caption, replyTo: album.ReplyToMessageID, photo: true, album: len(album.Photos)})
+	f.sent = append(f.sent, sentMessage{chatID: album.ChatID, text: album.Caption, replyTo: album.ReplyToMessageID, photo: true, album: len(album.Photos), business: album.BusinessConnectionID})
 	return int64(1000 + len(f.sent)), nil
 }
 

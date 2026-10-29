@@ -58,6 +58,10 @@ type Caller struct {
 	// of the message it replies to; zero in the General topic and outside
 	// forums.
 	TopicID int64
+	// Business is true when the turn answers a customer in a chat of an
+	// owner's Telegram Business account: what the bot sends there goes on
+	// the account's behalf, and ChatID is the customer's chat with it.
+	Business bool
 }
 
 // Mention is a member tagged in a message: by @username, or, for a member
@@ -176,6 +180,16 @@ func (s *Sink) Add(d Drawing) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.drawings = append(s.drawings, d)
+}
+
+// LastDrawing is the picture drawn last so far, left in the sink.
+func (s *Sink) LastDrawing() (Drawing, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.drawings) == 0 {
+		return Drawing{}, false
+	}
+	return s.drawings[len(s.drawings)-1], true
 }
 
 // Take returns the pictures drawn so far and empties the sink.

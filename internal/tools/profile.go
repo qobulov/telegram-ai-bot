@@ -68,6 +68,7 @@ func ProfileTool(opts ProfileOptions) Tool {
 			"required": ["action"],
 			"additionalProperties": false
 		}`),
+		NoBusiness: true,
 		Run: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			return changeProfile(ctx, opts, raw)
 		},

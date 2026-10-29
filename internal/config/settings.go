@@ -31,6 +31,7 @@ var Settings = []Setting{
 	{Name: "PREMIUM_PRICE_STARS", Max: 10000, About: "premium narxi, Telegram Stars'da (0 sotilmaydi)"},
 	{Name: "PREMIUM_DAYS", Max: 365, About: "premium necha kun amal qiladi"},
 	{Name: "PREMIUM_DAILY_LIMIT", Max: 10000, About: "premiumda shaxsiy chatda kuniga javoblar"},
+	{Name: "BUSINESS_DAILY_LIMIT", Max: 10000, About: "biznes akkauntda har bir mijozga kuniga javoblar (0 cheksiz)"},
 	{Name: "USER_RATE_LIMIT_PER_MINUTE", Max: 120, About: "bir odamga daqiqasiga javoblar"},
 	{Name: "DAILY_IMAGE_LIMIT", Max: 100, About: "kuniga rasm chizish (0 o'chiq)"},
 	{Name: "ENABLE_IMAGE_GENERATION", About: "rasm chizish: true yoki false"},

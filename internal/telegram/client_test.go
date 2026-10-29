@@ -1226,7 +1226,8 @@ func TestEnsureAllowedUpdatesSetsAnOldWebhookAgain(t *testing.T) {
 		"with quiz polls": {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","poll","poll_answer"]}}`, true},
 		"before inline":   {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query"]}}`, true},
 		"before edits":    {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","inline_query","pre_checkout_query"]}}`, true},
-		"every kind":      {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","inline_query","pre_checkout_query","edited_message","chat_join_request"]}}`, false},
+		"before business": {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","inline_query","pre_checkout_query","edited_message","chat_join_request"]}}`, true},
+		"every kind":      {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","inline_query","pre_checkout_query","edited_message","chat_join_request","business_connection","business_message"]}}`, false},
 		"no webhook":      {`{"ok":true,"result":{"url":""}}`, false},
 	}
 	for name, c := range cases {

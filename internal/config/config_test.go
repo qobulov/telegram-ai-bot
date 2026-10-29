@@ -414,6 +414,22 @@ func TestLoadGroupLimits(t *testing.T) {
 	}
 }
 
+func TestBusinessDailyLimit(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil || cfg.BusinessDailyLimit != 30 {
+		t.Fatalf("default = %d, err = %v; want 30", cfg.BusinessDailyLimit, err)
+	}
+	env := validEnv()
+	env["BUSINESS_DAILY_LIMIT"] = "0"
+	if cfg, err := Load(getenv(env)); err != nil || cfg.BusinessDailyLimit != 0 {
+		t.Errorf("BUSINESS_DAILY_LIMIT=0: %d, %v; want it off", cfg.BusinessDailyLimit, err)
+	}
+	env["BUSINESS_DAILY_LIMIT"] = "-1"
+	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "BUSINESS_DAILY_LIMIT") {
+		t.Errorf("BUSINESS_DAILY_LIMIT=-1: err = %v, want it refused", err)
+	}
+}
+
 func TestPrivateDailyLimit(t *testing.T) {
 	cfg, err := Load(getenv(validEnv()))
 	if err != nil || cfg.PrivateDailyLimit != 10 {
