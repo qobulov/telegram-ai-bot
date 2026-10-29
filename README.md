@@ -783,12 +783,13 @@ where it is on, every message from a member is checked against a list of
 swear words (dnx, pshnx, нахуй, бля, qo'tog', jalab, jala, kot, ske and the
 like; words that mostly mean something harmless, such as "am" or "mol", are
 left out). Only a message the list catches goes to the model, which answers
-in one word what it is: a swear at the bot, other swearing, or no swearing
-at all, as "кот" for a cat or "blan" for bilan. Swearing as an exclamation
-("бля, yutqazdik", "pzds") counts like an insult: in a week of one group,
-the exclamations left alone were most of its swearing. A message the model
-cannot judge is left alone. A member's first swear gets a reply warning
-them; the next one within 24 hours mutes them for an hour.
+in one word what it is: a swear at the bot, at a person, an exclamation
+aimed at nobody, or no swearing at all, as "кот" for a cat or "blan" for
+bilan. An exclamation ("бля, yutqazdik", "pzds") gets one warning a day and
+never a mute (action `swear_word`): muted for them, members were unmuted
+within minutes by the admin the guard calls. A message the model cannot
+judge is left alone. A member's first insult at a person gets a reply
+warning them; the next one within 24 hours mutes them for an hour.
 A swear at the bot gets no warning: the first is answered with one of the
 owners' two clips, chosen at random and embedded in the binary
 (`internal/service/clips`; both go as GIFs),

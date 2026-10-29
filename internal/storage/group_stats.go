@@ -50,9 +50,9 @@ func (s *Store) GroupStats(ctx context.Context, chatID, botID int64, since time.
 	if stats.Swearers, err = s.authorCounts(ctx, `
 		SELECT a.target_user_id, coalesce(nullif(m.first_name, ''), m.username, ''), count(*) FROM moderation_actions a
 		LEFT JOIN group_members m ON m.chat_id = a.chat_id AND m.user_id = a.target_user_id
-		WHERE a.chat_id = $1 AND a.created_at >= $2 AND a.action IN ($3, $4) AND a.target_user_id IS NOT NULL
-		GROUP BY a.target_user_id, m.first_name, m.username ORDER BY count(*) DESC, a.target_user_id LIMIT $5`,
-		chatID, since, ActionSwear, ActionSwearAtBot, limit); err != nil {
+		WHERE a.chat_id = $1 AND a.created_at >= $2 AND a.action IN ($3, $4, $5) AND a.target_user_id IS NOT NULL
+		GROUP BY a.target_user_id, m.first_name, m.username ORDER BY count(*) DESC, a.target_user_id LIMIT $6`,
+		chatID, since, ActionSwear, ActionSwearAtBot, ActionSwearWord, limit); err != nil {
 		return GroupStats{}, err
 	}
 	rows, err := s.pool.Query(ctx, `

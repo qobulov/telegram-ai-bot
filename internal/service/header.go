@@ -195,7 +195,7 @@ func (s *Service) ruleLines(rules []storage.GroupRule) []string {
 			if r.UserName != "" {
 				calls = oneLine(r.UserName)
 			}
-			instructions = append(instructions, "- Swearing is watched here in code, not by you: a member's first swear gets a warning, the next within a day a 1-hour mute that tags "+calls+". Never swear back at anyone in this group, and never mute anyone for swearing yourself.")
+			instructions = append(instructions, "- Swearing is watched here in code, not by you: a member's first insult gets a warning, the next within a day a 1-hour mute that tags "+calls+". Never swear back at anyone in this group, and never mute anyone for swearing yourself.")
 		case storage.RuleSpamGuard, storage.RuleLinkGuard, storage.RuleImageGuard:
 			instructions = append(instructions, "- "+guardLines[r.Kind])
 		case storage.RuleIgnore:

@@ -286,17 +286,27 @@ func TestSwearGuardLeavesWhatIsNoSwearing(t *testing.T) {
 	}
 }
 
-// Swearing as an exclamation, aimed at nobody, is warned like an insult:
-// the owners asked for a group without swearing.
-func TestSwearGuardWarnsAnExclamation(t *testing.T) {
+// Swearing as an exclamation, aimed at nobody, gets the day's one warning
+// and never a mute: the admin the guard calls unmuted every "bla".
+func TestSwearGuardWarnsAnExclamationOnceAndNeverMutes(t *testing.T) {
 	f, restrictor := guardFixture("")
-	f.opts.Judge = &fakeJudge{answer: "SWEAR"}
-	sent := f.run(swearFrom(swearerID, "бля, yutqazdik"))
-	if len(sent) != 1 || !strings.Contains(sent[0].text, "so'kinish mumkin emas") || len(restrictor.recorded()) != 0 {
-		t.Errorf("sent %+v, restrictions %+v; want one warning", sent, restrictor.recorded())
+	f.opts.Judge = &fakeJudge{answer: "EXCLAIM"}
+	sent := f.run(swearFrom(swearerID, "бля, yutqazdik"), swearFrom(swearerID, "pzds"), swearFrom(swearerID, "bla"))
+	if len(sent) != 1 || !strings.Contains(sent[0].text, "so'kinmaylik") || len(restrictor.recorded()) != 0 {
+		t.Errorf("sent %+v, restrictions %+v; want one warning and no mute", sent, restrictor.recorded())
 	}
-	if calls := f.replier.recorded(); len(calls) != 0 {
-		t.Errorf("model calls = %d, want none for a handled swear", len(calls))
+}
+
+// An exclamation does not count towards the mute for insults.
+func TestSwearGuardKeepsExclamationsApartFromInsults(t *testing.T) {
+	f, restrictor := guardFixture("")
+	judge := &fakeJudge{answer: "EXCLAIM"}
+	f.opts.Judge = judge
+	f.run(swearFrom(swearerID, "бля"))
+	judge.answer = "PERSON"
+	sent := f.run(swearFrom(swearerID, "sen jalab"))
+	if last := sent[len(sent)-1]; len(restrictor.recorded()) != 0 || !strings.Contains(last.text, "1 soat yozolmaysiz") {
+		t.Errorf("sent %+v, restrictions %+v; want the first insult's warning", sent, restrictor.recorded())
 	}
 }
 

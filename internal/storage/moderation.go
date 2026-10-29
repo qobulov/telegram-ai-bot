@@ -130,10 +130,12 @@ func (s *Store) ModerationBy(ctx context.Context, requesterID int64, since time.
 }
 
 // The swears the swear guard caught, recorded like any other moderation:
-// ActionSwear insults a person, ActionSwearAtBot the bot itself.
+// ActionSwear insults a person, ActionSwearAtBot the bot itself and
+// ActionSwearWord is an exclamation aimed at nobody.
 const (
 	ActionSwear      = "swear"
 	ActionSwearAtBot = "swear_bot"
+	ActionSwearWord  = "swear_word"
 )
 
 // What the guards an owner may turn on did: banned a known spammer, deleted
