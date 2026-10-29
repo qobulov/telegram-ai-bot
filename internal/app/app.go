@@ -231,6 +231,9 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 	if len(cfg.OwnerIDs) > 0 {
 		available = append(available, tools.GiftTool(tools.GiftOptions{Shop: bot.Client, Members: moderation, BotID: bot.User.ID}))
 	}
+	if len(cfg.OwnerUsernames) > 0 {
+		available = append(available, stickerSetTool(cfg, store, bot, logger))
+	}
 	registry, err := tools.NewRegistry(cfg.IsAdmin, logger, available...)
 	if err != nil {
 		return nil, err
@@ -490,6 +493,24 @@ func imageTool(cfg config.Config, store *storage.Store) tools.Tool {
 		DailyLimit: cfg.DailyImageLimit,
 		Location:   cfg.Location,
 	})
+}
+
+// stickerSetTool lets owners fill the bot's own sticker set. It draws with
+// the image model when drawing is on, and the stickers it adds are looked
+// at as an imported pack's are, so that she sends them too.
+func stickerSetTool(cfg config.Config, store *storage.Store, bot Bot, logger *slog.Logger) tools.Tool {
+	opts := tools.StickerSetOptions{
+		Telegram:    bot.Client,
+		Store:       store,
+		Learner:     &stickers.Importer{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger), Workers: 1, Logger: logger},
+		BotUsername: bot.User.Username,
+		Title:       cfg.BotDisplayName,
+		Location:    cfg.Location,
+	}
+	if cfg.ImagesEnabled {
+		opts.Drawer = ai.NewImageClient(ai.ImageOptions{BaseURL: cfg.ImageBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.ImageModel})
+	}
+	return tools.StickerSetTool(opts)
 }
 
 // giphyTimeout bounds a GIF search: a GIF that is late is not worth the wait.

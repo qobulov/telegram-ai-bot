@@ -1150,6 +1150,7 @@ func (s *Service) target(replied *telegram.Message) *tools.Target {
 		IsBot:     replied.From.IsBot,
 		Owner:     s.isOwner(replied.From),
 		Text:      truncate(text, tools.MaxTargetRunes),
+		Sticker:   replied.Sticker,
 	}
 }
 

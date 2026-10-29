@@ -359,7 +359,11 @@ func (c *Client) postForm(ctx context.Context, method string, body io.Reader, co
 func uploadForm(u upload) (io.Reader, string, error) {
 	var body bytes.Buffer
 	form := multipart.NewWriter(&body)
-	fields := map[string]string{"chat_id": strconv.FormatInt(u.chatID, 10)}
+	// A sticker's file is uploaded for a user, in no chat.
+	fields := map[string]string{}
+	if u.chatID != 0 {
+		fields["chat_id"] = strconv.FormatInt(u.chatID, 10)
+	}
 	for name, value := range u.fields {
 		if value != "" {
 			fields[name] = value

@@ -217,6 +217,8 @@ type Sticker struct {
 	IsVideo      bool       `json:"is_video"`
 	FileSize     int64      `json:"file_size"`
 	Thumbnail    *PhotoSize `json:"thumbnail"`
+	// SetName is the pack it is from; "" for a sticker of none.
+	SetName string `json:"set_name"`
 }
 
 // StickerSet is a sticker pack.

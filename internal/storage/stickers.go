@@ -185,3 +185,54 @@ func (s *Store) PickSticker(ctx context.Context, chatID int64, category string, 
 	}
 	return fileID, nil
 }
+
+// ForgetSticker drops a sticker, such as one taken out of the bot's own
+// set, so that it is never sent again.
+func (s *Store) ForgetSticker(ctx context.Context, fileUniqueID string) error {
+	if _, err := s.pool.Exec(ctx, `DELETE FROM bot_stickers WHERE file_unique_id = $1`, fileUniqueID); err != nil {
+		return fmt.Errorf("storage: forget sticker: %w", err)
+	}
+	return nil
+}
+
+// ErrNoStickerSet means the bot has not made its own sticker set yet.
+var ErrNoStickerSet = errors.New("storage: no sticker set of the bot's own")
+
+// OwnStickerSetOwner is the user the bot's sticker set name belongs to on
+// Telegram, or ErrNoStickerSet when the set was not made.
+func (s *Store) OwnStickerSetOwner(ctx context.Context, name string) (int64, error) {
+	var ownerID int64
+	err := s.pool.QueryRow(ctx, `SELECT owner_id FROM own_sticker_sets WHERE name = $1`, name).Scan(&ownerID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, ErrNoStickerSet
+	}
+	if err != nil {
+		return 0, fmt.Errorf("storage: own sticker set: %w", err)
+	}
+	return ownerID, nil
+}
+
+// SaveOwnStickerSet remembers that the set name belongs to ownerID. A set
+// already remembered keeps its owner: Telegram never changes it.
+func (s *Store) SaveOwnStickerSet(ctx context.Context, name string, ownerID int64) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO own_sticker_sets (name, owner_id) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING`, name, ownerID)
+	if err != nil {
+		return fmt.Errorf("storage: save own sticker set: %w", err)
+	}
+	return nil
+}
+
+var dailyStickers = dailyKind{table: "sticker_uploads", salt: 0x5354434b} // "STCK"
+
+// ReserveStickerUpload takes one of the user's stickers for the day, as
+// ReserveImage takes a picture.
+func (s *Store) ReserveStickerUpload(ctx context.Context, userID, chatID int64, since time.Time, limit int) (int64, bool, error) {
+	return s.reserveDaily(ctx, dailyStickers, userID, chatID, since, limit)
+}
+
+// ReleaseStickerUpload gives back a reservation whose sticker was not
+// added.
+func (s *Store) ReleaseStickerUpload(ctx context.Context, id int64) error {
+	return s.releaseDaily(ctx, dailyStickers, id)
+}

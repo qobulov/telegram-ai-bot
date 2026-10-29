@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"telegram-ai-bot/internal/ai"
+	"telegram-ai-bot/internal/telegram"
 )
 
 const (
@@ -84,6 +85,9 @@ type Target struct {
 	Owner bool
 	// Text is the message's text or caption, at most MaxTargetRunes.
 	Text string
+	// Sticker is the message's sticker, or nil: the one an owner means by
+	// "take this out of the set".
+	Sticker *telegram.Sticker
 	// Answered is, when the message is one of the bot's answers, the member
 	// whose message it answered, if known: whom an owner means by "don't
 	// answer him" in a reply to that answer.

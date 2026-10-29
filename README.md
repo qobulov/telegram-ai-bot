@@ -132,6 +132,8 @@ moderation_actions(id PK, chat_id, action, requester_id, target_user_id,
                    update_id, created_at, UNIQUE (update_id, action))
 join_requests(chat_id, user_id, user_chat_id, expires_at, created_at,
               PK (chat_id, user_id))
+own_sticker_sets(name PK, owner_id, created_at)
+sticker_uploads(id PK, user_id, chat_id, created_at)
 schema_migrations(version PK, applied_at)
 ```
 
@@ -545,6 +547,10 @@ which it looks up with the owner-only `bot_database` tool:
 - `messages`: today's messages of one group. Another group's messages are
   given only in a private chat with the owner, so they never land in a
   different group.
+
+Owners can make photos, and pictures she draws, stickers in her own sticker
+set with the owner-only `sticker_set` tool ("Maria, shuni stiker qil"); see
+[Her own sticker set](#her-own-sticker-set).
 
 Owners can have the bot send a member a Telegram gift, bought with the
 bot's own Stars, with the owner-only `send_gift` tool ("Maria, unga sovg'a
@@ -1191,6 +1197,47 @@ such as `[gif pubg]`, and GIPHY is searched for those words; a topic has no
 sticker to fall back on, so when it fails nothing is sent. GIPHY's free
 key allows 100 searches an hour, far more than she sends.
 
+#### Her own sticker set
+
+Owners fill a sticker set of her own from the chat, with the owner-only
+`sticker_set` tool, offered when `BOT_OWNER_USERNAME` is set and refused in
+code to anyone else. The set is
+`https://t.me/addstickers/maria_by_<bot username>`, one per bot, so a test
+bot sharing the database has its own; its first title is
+`BOT_DISPLAY_NAME`.
+
+- `add`: "Maria, shuni stiker qil" with a photo, or in reply to one (a
+  static sticker of another pack works too), makes that picture a sticker;
+  "Maria, mushuk stikerini chizib qo'sh" has it drawn first by
+  `IMAGE_MODEL`, when drawing is on, on a plain white background that is
+  then cut away from the edges in. The model gives 1 to 3 emoji for the
+  sticker's mood (each checked in code to be one emoji, 20 at most). The
+  picture is resized in Go to 512 pixels on its longer side and written as
+  a PNG of at most 512 KB, with fewer colours when a photo's detail would
+  make it larger, as Telegram requires of a static sticker. It is uploaded
+  with `uploadStickerFile`; the first sticker makes the set
+  (`createNewStickerSet`) as the asking owner's, and every later one is
+  added (`addStickerToSet`) as that same owner, whoever asks, because
+  Telegram lets only the set's owner add to it. That owner is kept in
+  `own_sticker_sets`; should the row be lost, the next sticker finds the
+  name taken and is added to the set as the asking owner. The new sticker
+  is then sent to the chat in reply, with the set's link as the answer, and
+  the model looks at it as at an imported pack's stickers, so that she
+  sends it too; one not looked at in time is looked at with the next.
+- `remove`: in reply to one of the set's stickers, takes it out
+  (`deleteStickerFromSet`) and drops it from `bot_stickers`. A sticker of
+  another pack is refused.
+- `title`: renames the set (`setStickerSetTitle`, 1 to 64 characters), once
+  it is made.
+- `link`: the set's link, title and number of stickers.
+
+Each owner adds at most 20 stickers a day, counted in `sticker_uploads`
+from midnight in `GROUP_HISTORY_TIMEZONE`; a sticker that fails is not
+counted. Telegram holds 120 stickers in a static set and paces additions,
+and its refusal, with how long to wait, is passed on. The owner who makes
+the set should have started a private chat with the bot first: Telegram
+may refuse to make a set for a user the bot has never talked to.
+
 ### Polls
 
 Anyone in a group can ask her for a poll ("Maria, so'rovnoma qil: plov yoki
@@ -1677,6 +1724,12 @@ schema. They ask Telegram for no new kind of update, so the webhook needs no
 `set-webhook`. Give Maria *Manage topics* in forum groups where she should
 act on topics (and *Delete messages* to delete one), and add her to a
 channel as an admin with *Post messages* for broadcasts to reach it.
+
+Her own sticker set needs migration 0043 (`own_sticker_sets` and
+`sticker_uploads`) applied with `make migrate` before deploying; it changes
+nothing that exists, and needs no `set-webhook` or new setting. The owner
+who will make the set should write to the bot in private once before
+asking for the first sticker.
 
 ### Deploying premium and gifts
 

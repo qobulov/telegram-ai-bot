@@ -3274,6 +3274,21 @@ func TestUnreadableMemberMessageIsATarget(t *testing.T) {
 	}
 }
 
+// The sticker a request replies to reaches the tools, for an owner's
+// "take this out of the set".
+func TestARepliedStickerIsInTheTarget(t *testing.T) {
+	f := newFixture()
+	sticker := &telegram.Sticker{FileID: "f9", FileUniqueID: "u9", Emoji: "😂", SetName: "maria_by_mybot"}
+	request := groupMessage("Mira, shuni o'chir")
+	request.ReplyToMessage = &telegram.Message{MessageID: 29, From: &telegram.User{ID: 666, FirstName: "Ali"}, Sticker: sticker}
+
+	f.run(inGroup(request))
+
+	if calls := f.replier.recorded(); len(calls) != 1 || calls[0].caller.Target == nil || calls[0].caller.Target.Sticker != sticker {
+		t.Errorf("model calls = %+v, want the replied sticker in the target", calls)
+	}
+}
+
 // The tools are told the person's own words, apart from the message they
 // replied to: an owner's lasting order must be in them.
 func TestTurnTellsToolsTheSendersOwnWords(t *testing.T) {

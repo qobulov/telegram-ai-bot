@@ -104,3 +104,66 @@ func TestStickersAndGIFsShareTheGap(t *testing.T) {
 		t.Errorf("a sticker right after a GIF: %v, want ErrNoSticker", err)
 	}
 }
+
+// The bot's own set keeps the owner who made it, and a forgotten sticker
+// is never sent again.
+func TestOwnStickerSetKeepsItsOwner(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	const name = "maria_by_mariabot"
+	if _, err := store.OwnStickerSetOwner(ctx, name); !errors.Is(err, ErrNoStickerSet) {
+		t.Fatalf("before it is made: %v, want ErrNoStickerSet", err)
+	}
+	if err := store.SaveOwnStickerSet(ctx, name, 42); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveOwnStickerSet(ctx, name, 43); err != nil {
+		t.Fatal(err)
+	}
+	if owner, err := store.OwnStickerSetOwner(ctx, name); err != nil || owner != 42 {
+		t.Errorf("owner = %d, %v; want the first, 42", owner, err)
+	}
+	if _, err := store.OwnStickerSetOwner(ctx, "maria_by_testbot"); !errors.Is(err, ErrNoStickerSet) {
+		t.Errorf("another bot's set: %v, want ErrNoStickerSet", err)
+	}
+
+	if _, err := store.SaveStickers(ctx, []PackSticker{{FileUniqueID: "u1", FileID: "f1", Pack: name}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.LabelSticker(ctx, "u1", []string{"funny"}, "cat", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.ForgetSticker(ctx, "u1"); err != nil {
+		t.Fatal(err)
+	}
+	if has, err := store.HasStickers(ctx); err != nil || has {
+		t.Errorf("a forgotten sticker is still there: %v, %v", has, err)
+	}
+}
+
+// Each owner adds a number of stickers a day; one that failed is given
+// back.
+func TestStickerUploadsAreCountedPerDay(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	today := time.Now().Add(-time.Hour)
+	first, ok, err := store.ReserveStickerUpload(ctx, 42, 42, today, 2)
+	if err != nil || !ok {
+		t.Fatalf("first: %v, %v", ok, err)
+	}
+	if _, ok, _ := store.ReserveStickerUpload(ctx, 42, group, today, 2); !ok {
+		t.Fatal("second refused")
+	}
+	if _, ok, _ := store.ReserveStickerUpload(ctx, 42, 42, today, 2); ok {
+		t.Error("a third within the limit of two")
+	}
+	if _, ok, _ := store.ReserveStickerUpload(ctx, 43, 43, today, 2); !ok {
+		t.Error("another owner was refused")
+	}
+	if err := store.ReleaseStickerUpload(ctx, first); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, _ := store.ReserveStickerUpload(ctx, 42, 42, today, 2); !ok {
+		t.Error("a released sticker was not given back")
+	}
+}
