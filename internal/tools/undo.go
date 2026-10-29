@@ -43,12 +43,13 @@ type undoState struct {
 }
 
 // snapshot is what will put o back, read before o is taken; nil when o
-// cannot be undone. An invite link's is known only once it exists.
+// cannot be undone. An invite link's is known only once it exists, and
+// runLink keeps it (see linkState).
 func (m *Moderation) snapshot(ctx context.Context, o order) (json.RawMessage, error) {
 	var state undoState
 	chatID := o.caller.ChatID
 	switch o.action {
-	case actionDelete, actionInviteLink:
+	case actionDelete:
 		return nil, nil
 	case actionSetTitle, actionSetDescription, actionSetPhoto, actionDeletePhoto, actionLock, actionUnlock, actionUnpinAll:
 		chat, err := m.opts.Telegram.GetChat(ctx, chatID)

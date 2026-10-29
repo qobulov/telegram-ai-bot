@@ -51,6 +51,12 @@ type Caller struct {
 	// its own or the replied one's, for tools that look at it; nil when
 	// there is none.
 	Picture []byte
+	// Forum is true in a supergroup whose messages are kept in topics.
+	Forum bool
+	// TopicID is the forum topic the request was written in, or else that
+	// of the message it replies to; zero in the General topic and outside
+	// forums.
+	TopicID int64
 }
 
 // Mention is a member tagged in a message: by @username, or, for a member

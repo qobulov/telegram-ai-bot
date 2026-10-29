@@ -128,6 +128,8 @@ var neededRight = map[string]string{
 	actionSetPhoto:       telegram.RightChangeInfo,
 	actionDeletePhoto:    telegram.RightChangeInfo,
 	actionInviteLink:     telegram.RightInviteUsers,
+	actionRevokeLink:     telegram.RightInviteUsers,
+	actionEditLink:       telegram.RightInviteUsers,
 	actionUnpinAll:       telegram.RightPinMessages,
 	actionLock:           telegram.RightRestrictMembers,
 	actionUnlock:         telegram.RightRestrictMembers,
@@ -143,6 +145,7 @@ var rightWords = map[string]string{
 	telegram.RightChangeInfo:      "change the group's info",
 	telegram.RightInviteUsers:     "invite users",
 	telegram.RightPromoteMembers:  "add new admins",
+	telegram.RightManageTopics:    "manage topics",
 }
 
 // MemberLookup asks Telegram about a member of a chat.
@@ -178,6 +181,7 @@ type Moderator interface {
 	PromoteChatMember(ctx context.Context, chatID, userID int64, rights telegram.AdminRights) error
 	SetChatAdministratorCustomTitle(ctx context.Context, chatID, userID int64, title string) error
 	RevokeChatInviteLink(ctx context.Context, chatID int64, link string) error
+	EditChatInviteLink(ctx context.Context, link string, l telegram.InviteLink) error
 	// DownloadFile fetches an old group photo, to put it back.
 	DownloadFile(ctx context.Context, fileID string, maxBytes int64) ([]byte, error)
 }
@@ -224,6 +228,9 @@ type ModerationOptions struct {
 	// Roster finds a member the asker named by first name or username,
 	// without a tag; without it only replies and tags name a member.
 	Roster MemberLister
+	// Links finds the invite links the bot made, to revoke or edit them;
+	// without it neither can be done.
+	Links InviteLinks
 }
 
 type moderationArgs struct {
@@ -238,6 +245,11 @@ type moderationArgs struct {
 	Force bool `json:"force"`
 	// Member is who the asker named, without a reply or a tag.
 	Member string `json:"member"`
+	// MemberLimit, JoinRequest and Link are an invite link's: see
+	// inviteRequest.
+	MemberLimit *int   `json:"member_limit"`
+	JoinRequest *bool  `json:"join_request"`
+	Link        string `json:"link"`
 }
 
 // Moderation lets a group's admins, and the bot's owners, have the bot
@@ -276,19 +288,23 @@ func (m *Moderation) Tool() Tool {
 			"no_photos (minutes, default a day) or allow_photos: the same for photos. A member's other limits stay as they are. " +
 			"promote: make its author an admin, with your own delete, mute and pin rights at most; demote: take that back; admin_title (text, 16 characters at most): the title shown for an admin you made. " +
 			"For the group itself, with no reply or tag: set_title (text), set_description (text, empty to remove), set_photo (the photo in their message), delete_photo, invite_link (a new link; text names it, minutes ends it), unpin_all, and lock or unlock (kind) to forbid or allow one kind of message to everyone, keeping the group's other permissions: when they ask to block stickers or photos for all, it is lock, never a guard. " +
+			"An invite_link may let only member_limit people join, or with join_request make each ask the admins to approve them, never both. revoke_link stops a link you made from working, and edit_link changes its text, minutes, member_limit (0 for none) or join_request; both act on link, or without it on the latest link you made here. " +
 			"undo: put back the last thing you did here with this tool, whatever it was; a deleted message never comes back. With force only when, told it was changed by hand since, they still want it back. " +
 			"For member actions without such a reply, or replying to their own message, it acts on the one member they tagged with @, once Telegram confirms who that is; when they named the member without a tag (\"Azamatni mute qil\"), pass member: never ask them to tag or reply instead. " +
 			"It checks everyone's rights and does it at once, with no question, but only when the person's own message asks for it; say it is done only when it reports done.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["delete", "mute", "unmute", "ban", "unban", "pin", "unpin", "no_stickers", "allow_stickers", "no_photos", "allow_photos", "promote", "demote", "admin_title", "set_title", "set_description", "set_photo", "delete_photo", "invite_link", "unpin_all", "lock", "unlock", "undo"]},
+				"action": {"type": "string", "enum": ["delete", "mute", "unmute", "ban", "unban", "pin", "unpin", "no_stickers", "allow_stickers", "no_photos", "allow_photos", "promote", "demote", "admin_title", "set_title", "set_description", "set_photo", "delete_photo", "invite_link", "revoke_link", "edit_link", "unpin_all", "lock", "unlock", "undo"]},
 				"minutes": {"type": "integer", "description": "For mute: how long, 1 to 10080, default 60. For no_stickers and no_photos: 1 to 525600, default 1440; the most for \"forever\". For invite_link: when it stops working; none for never."},
 				"text": {"type": "string", "description": "For set_title, set_description and admin_title: the new text, in the words they gave. For invite_link: an optional name."},
 				"force": {"type": "boolean", "description": "For undo: true only when they want it back though it was changed by hand since."},
 				"kind": {"type": "string", "enum": ["messages", "photos", "videos", "stickers", "voice", "files", "music", "polls", "link_previews"], "description": "For lock and unlock: stickers covers GIFs too, voice covers round videos."},
 				"reason": {"type": "string", "description": "Optional: why, in a few words."},
-				"member": {"type": "string", "description": "For an action on a member they named without a reply or a tag: that member's first name or @username, as they wrote it or group_members lists it."}
+				"member": {"type": "string", "description": "For an action on a member they named without a reply or a tag: that member's first name or @username, as they wrote it or group_members lists it."},
+				"member_limit": {"type": "integer", "description": "For invite_link and edit_link: how many people may join through it, 1 to 99999; for edit_link 0 removes the limit."},
+				"join_request": {"type": "boolean", "description": "For invite_link and edit_link: true when each person who opens it must be approved by the admins."},
+				"link": {"type": "string", "description": "For revoke_link and edit_link: the link they mean, as they wrote it; omit for the latest you made here."}
 			},
 			"required": ["action"],
 			"additionalProperties": false
@@ -313,6 +329,8 @@ type order struct {
 	text    string
 	kind    string
 	picture []byte
+	// invite is what an invite link action asks for besides its name.
+	invite inviteRequest
 }
 
 func (m *Moderation) run(ctx context.Context, raw json.RawMessage) (any, error) {
@@ -344,17 +362,17 @@ func (m *Moderation) run(ctx context.Context, raw json.RawMessage) (any, error) 
 	if err := m.check(ctx, o); err != nil {
 		return nil, err
 	}
+	if onInviteLink(o.action) {
+		return m.runLink(ctx, o)
+	}
 	// The owners want it done at once, with no question to confirm: the
 	// rights were just checked, and the target came from the update.
-	acted, link, err := m.carryOut(ctx, o)
+	acted, err := m.carryOut(ctx, o)
 	if err != nil {
 		return nil, notCarriedOut(err)
 	}
 	if !acted {
 		return map[string]any{"done": true, "note": alreadyDoneNote}, nil
-	}
-	if link != "" {
-		return map[string]any{"done": true, "link": link, "note": linkNote}, nil
 	}
 	return map[string]any{"done": true, "said": m.doneText(o), "note": doneNote}, nil
 }
@@ -384,8 +402,11 @@ func (o *order) setGroupArgs(args moderationArgs, picture []byte) error {
 		if utf8.RuneCountInString(text) > maxAdminTitleRunes {
 			return &ArgumentError{Message: fmt.Sprintf("an admin title has at most %d characters", maxAdminTitleRunes)}
 		}
-	case actionInviteLink:
+	case actionInviteLink, actionRevokeLink, actionEditLink:
 		text = cutRunes(text, maxLinkNameRunes)
+		if err := o.setLinkArgs(args); err != nil {
+			return err
+		}
 	case actionLock, actionUnlock:
 		if _, known := lockKinds[args.Kind]; !known {
 			return &ArgumentError{Message: "kind must be messages, photos, videos, stickers, voice, files, music, polls or link_previews"}
@@ -589,7 +610,7 @@ func onMember(action string) bool {
 // or a message.
 func groupWide(action string) bool {
 	switch action {
-	case actionSetTitle, actionSetDescription, actionSetPhoto, actionDeletePhoto, actionInviteLink, actionUnpinAll, actionLock, actionUnlock:
+	case actionSetTitle, actionSetDescription, actionSetPhoto, actionDeletePhoto, actionInviteLink, actionRevokeLink, actionEditLink, actionUnpinAll, actionLock, actionUnlock:
 		return true
 	}
 	return false
@@ -631,7 +652,7 @@ func (m *Moderation) newOrder(caller Caller, action string, target Target, minut
 		o.minutes = muteMinutes(minutes)
 	case actionNoStickers, actionNoPhotos:
 		o.minutes = clampMinutes(minutes, defaultNoStickersMinutes, maxNoStickersMinutes)
-	case actionInviteLink:
+	case actionInviteLink, actionEditLink:
 		if minutes > 0 {
 			o.minutes = min(minutes, maxLinkMinutes)
 		}
@@ -766,33 +787,21 @@ func (m *Moderation) checkPace(ctx context.Context, caller Caller) error {
 // update Telegram delivers twice, or a second call in the same turn, acts
 // once. When Telegram refuses, the record is dropped, so that the action may
 // be tried again.
-func (m *Moderation) carryOut(ctx context.Context, o order) (bool, string, error) {
+func (m *Moderation) carryOut(ctx context.Context, o order) (bool, error) {
 	undo, err := m.snapshot(ctx, o)
 	if err != nil {
-		return false, "", telegramFailure(err)
+		return false, telegramFailure(err)
 	}
 	record := o.audit()
 	record.Undo = undo
 	first, err := m.opts.Store.RecordModeration(ctx, record)
 	if err != nil || !first {
-		return false, "", err
-	}
-	if o.action == actionInviteLink {
-		link, err := m.opts.Telegram.CreateChatInviteLink(ctx, telegram.InviteLink{ChatID: o.caller.ChatID, Name: o.text, Expires: o.until})
-		if err != nil {
-			return false, "", m.failed(ctx, o, err)
-		}
-		// The link exists either way; without its undo it only cannot be
-		// revoked through undo.
-		if undo, err := json.Marshal(undoState{Link: link}); err == nil {
-			_ = m.opts.Store.SetModerationUndo(ctx, o.caller.UpdateID, o.action, undo)
-		}
-		return true, link, nil
+		return false, err
 	}
 	if err := m.send(ctx, o); err != nil {
-		return false, "", m.failed(ctx, o, err)
+		return false, m.failed(ctx, o, err)
 	}
-	return true, "", nil
+	return true, nil
 }
 
 // failed says why o was not carried out, and drops its record when
@@ -1079,7 +1088,9 @@ var actionWords = map[string][]string{
 	actionSetDescription: append([]string{"tavsif", "description", "описан", "bio"}, changeWords...),
 	actionSetPhoto:       append([]string{"avatar", "аватар", "ava "}, photoWords...),
 	actionDeletePhoto:    append([]string{"avatar", "аватар", "ava "}, photoWords...),
-	actionInviteLink:     {"link", "havola", "ssilka", "silka", "ссылк", "taklif", "invite"},
+	actionInviteLink:     linkWords,
+	actionRevokeLink:     linkWords,
+	actionEditLink:       linkWords,
 	actionUnpinAll:       {"pin", "qada", "закреп", "откреп"},
 	actionLock:           {"yop", "blok", "taqiq", "chekla", "ochir", "запрет", "закр", "огранич", "lock", "заблок"},
 	actionUndo:           {"qaytar", "orqaga", "ortga", "bekor qil", "undo", "верн", "отмен", "назад"},
@@ -1104,8 +1115,14 @@ var adminWords = []string{"admin", "админ"}
 var photoWords = []string{"rasm", "rasim", "surat", "foto", "photo", "фото", "картин", "расм", "сурат"}
 
 func askedFor(words, action string) bool {
+	return says(words, actionWords[action])
+}
+
+// says reports whether words, folded to lower case without apostrophes,
+// hold one of list.
+func says(words string, list []string) bool {
 	folded := foldApostrophes.Replace(strings.ToLower(words)) + " "
-	for _, word := range actionWords[action] {
+	for _, word := range list {
 		if strings.Contains(folded, word) {
 			return true
 		}

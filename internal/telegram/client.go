@@ -591,6 +591,22 @@ func (c *Client) sendChunk(ctx context.Context, params sendMessageParams) (int64
 	}
 }
 
+type copyMessageParams struct {
+	ChatID     int64 `json:"chat_id"`
+	FromChatID int64 `json:"from_chat_id"`
+	MessageID  int64 `json:"message_id"`
+}
+
+// CopyMessage sends a copy of a message, of any kind, to a chat, without the
+// "forwarded from" line, and returns the copy's ID.
+func (c *Client) CopyMessage(ctx context.Context, chatID, fromChatID, messageID int64) (int64, error) {
+	var sent sentMessage
+	if err := c.call(ctx, "copyMessage", copyMessageParams{ChatID: chatID, FromChatID: fromChatID, MessageID: messageID}, &sent); err != nil {
+		return 0, err
+	}
+	return sent.MessageID, nil
+}
+
 type reactionParams struct {
 	ChatID    int64          `json:"chat_id"`
 	MessageID int64          `json:"message_id"`
@@ -712,11 +728,17 @@ type InviteLink struct {
 	Name string
 	// Expires is when the link stops working; zero means never.
 	Expires time.Time
+	// MemberLimit is how many people may join through it, 1 to 99999; zero
+	// means any number.
+	MemberLimit int
+	// JoinRequest makes each person who opens it ask the admins to approve
+	// them. Telegram does not combine it with a MemberLimit.
+	JoinRequest bool
 }
 
 // CreateChatInviteLink makes a new invite link and returns it.
 func (c *Client) CreateChatInviteLink(ctx context.Context, l InviteLink) (string, error) {
-	params := inviteLinkParams{ChatID: l.ChatID, Name: l.Name}
+	params := inviteLinkParams{ChatID: l.ChatID, Name: l.Name, MemberLimit: l.MemberLimit, JoinRequest: l.JoinRequest}
 	if !l.Expires.IsZero() {
 		params.ExpireDate = l.Expires.Unix()
 	}
@@ -730,9 +752,32 @@ func (c *Client) CreateChatInviteLink(ctx context.Context, l InviteLink) (string
 }
 
 type inviteLinkParams struct {
-	ChatID     int64  `json:"chat_id"`
-	Name       string `json:"name,omitempty"`
-	ExpireDate int64  `json:"expire_date,omitempty"`
+	ChatID      int64  `json:"chat_id"`
+	Name        string `json:"name,omitempty"`
+	ExpireDate  int64  `json:"expire_date,omitempty"`
+	MemberLimit int    `json:"member_limit,omitempty"`
+	JoinRequest bool   `json:"creates_join_request,omitempty"`
+}
+
+// EditChatInviteLink gives an invite link the bot made the name and limits
+// of l, all of them: Telegram sets each anew, and one left out is none.
+func (c *Client) EditChatInviteLink(ctx context.Context, link string, l InviteLink) error {
+	params := editInviteLinkParams{ChatID: l.ChatID, InviteLink: link, Name: l.Name, MemberLimit: l.MemberLimit, JoinRequest: l.JoinRequest}
+	if !l.Expires.IsZero() {
+		params.ExpireDate = l.Expires.Unix()
+	}
+	return c.call(ctx, "editChatInviteLink", params, nil)
+}
+
+// editInviteLinkParams sends every field, zero included, so that an edit
+// means exactly what it says whatever Telegram assumes for a missing one.
+type editInviteLinkParams struct {
+	ChatID      int64  `json:"chat_id"`
+	InviteLink  string `json:"invite_link"`
+	Name        string `json:"name"`
+	ExpireDate  int64  `json:"expire_date"`
+	MemberLimit int    `json:"member_limit"`
+	JoinRequest bool   `json:"creates_join_request"`
 }
 
 // RevokeChatInviteLink stops an invite link the bot made from working.
@@ -819,6 +864,60 @@ func (c *Client) PinChatMessage(ctx context.Context, chatID, messageID int64) er
 // UnpinChatMessage unpins one pinned message.
 func (c *Client) UnpinChatMessage(ctx context.Context, chatID, messageID int64) error {
 	return c.call(ctx, "unpinChatMessage", messageParams{ChatID: chatID, MessageID: messageID}, nil)
+}
+
+type forumTopicParams struct {
+	ChatID          int64  `json:"chat_id"`
+	MessageThreadID int64  `json:"message_thread_id,omitempty"`
+	Name            string `json:"name,omitempty"`
+	IconColor       int    `json:"icon_color,omitempty"`
+}
+
+type forumTopic struct {
+	MessageThreadID int64 `json:"message_thread_id"`
+}
+
+// CreateForumTopic opens a topic in a forum supergroup, its icon in one of
+// the colours Telegram allows (zero leaves the choice to Telegram), and
+// returns its ID: the message_thread_id of the messages in it.
+func (c *Client) CreateForumTopic(ctx context.Context, chatID int64, name string, iconColor int) (int64, error) {
+	var topic forumTopic
+	if err := c.call(ctx, "createForumTopic", forumTopicParams{ChatID: chatID, Name: name, IconColor: iconColor}, &topic); err != nil {
+		return 0, err
+	}
+	return topic.MessageThreadID, nil
+}
+
+// EditForumTopic renames a topic. Its icon, not sent, stays as it is.
+func (c *Client) EditForumTopic(ctx context.Context, chatID, threadID int64, name string) error {
+	return c.call(ctx, "editForumTopic", forumTopicParams{ChatID: chatID, MessageThreadID: threadID, Name: name}, nil)
+}
+
+// CloseForumTopic closes a topic: only admins can write in it until it is
+// reopened.
+func (c *Client) CloseForumTopic(ctx context.Context, chatID, threadID int64) error {
+	return c.call(ctx, "closeForumTopic", forumTopicParams{ChatID: chatID, MessageThreadID: threadID}, nil)
+}
+
+// ReopenForumTopic opens a closed topic again.
+func (c *Client) ReopenForumTopic(ctx context.Context, chatID, threadID int64) error {
+	return c.call(ctx, "reopenForumTopic", forumTopicParams{ChatID: chatID, MessageThreadID: threadID}, nil)
+}
+
+// DeleteForumTopic deletes a topic with every message in it.
+func (c *Client) DeleteForumTopic(ctx context.Context, chatID, threadID int64) error {
+	return c.call(ctx, "deleteForumTopic", forumTopicParams{ChatID: chatID, MessageThreadID: threadID}, nil)
+}
+
+// HideGeneralForumTopic hides a forum's General topic, which Telegram also
+// closes when it is open.
+func (c *Client) HideGeneralForumTopic(ctx context.Context, chatID int64) error {
+	return c.call(ctx, "hideGeneralForumTopic", chatParams{ChatID: chatID}, nil)
+}
+
+// UnhideGeneralForumTopic shows a forum's General topic again.
+func (c *Client) UnhideGeneralForumTopic(ctx context.Context, chatID int64) error {
+	return c.call(ctx, "unhideGeneralForumTopic", chatParams{ChatID: chatID}, nil)
 }
 
 type sendPollParams struct {

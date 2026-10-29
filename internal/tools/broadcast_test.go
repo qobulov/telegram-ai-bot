@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"telegram-ai-bot/internal/storage"
+	"telegram-ai-bot/internal/telegram"
 )
 
 type fakeDrafts struct {
@@ -60,6 +62,119 @@ func (f *fakeGroupSender) SendToGroup(_ context.Context, chatID int64, text stri
 	}
 	f.sent[chatID] = text
 	return nil
+}
+
+// CopyToChat records a copy as "copy of <message> from <chat>".
+func (f *fakeGroupSender) CopyToChat(ctx context.Context, chatID, fromChatID, messageID int64) error {
+	return f.SendToGroup(ctx, chatID, fmt.Sprintf("copy of %d from %d", messageID, fromChatID))
+}
+
+// fakeChannels lists the channel News, where the bot may post, Quiet,
+// where it may not, and Gone, which removed it.
+type fakeChannels struct{}
+
+const (
+	channelNews  = int64(-1009001)
+	channelQuiet = int64(-1009002)
+	channelGone  = int64(-1009003)
+)
+
+func (fakeChannels) Channels(context.Context, int) ([]storage.ChannelSummary, error) {
+	post := []string{telegram.RightPostMessages}
+	return []storage.ChannelSummary{
+		{ChatID: channelNews, Title: "News", BotStatus: "administrator", Rights: post},
+		{ChatID: channelQuiet, Title: "Quiet", BotStatus: "administrator", Rights: []string{telegram.RightInviteUsers}},
+		{ChatID: channelGone, Title: "Gone", BotStatus: "kicked", Rights: post},
+	}, nil
+}
+
+func channelRegistry(t *testing.T, drafts *fakeDrafts, sender *fakeGroupSender) *Registry {
+	t.Helper()
+	return mustRegistry(t, BroadcastTool(BroadcastOptions{Groups: &groupsWithStatus{}, Channels: fakeChannels{}, Drafts: drafts, Sender: sender}))
+}
+
+// Channels are posted in only when asked, and only where the bot is an
+// admin who may post; chat_ids may pick groups and channels alike.
+func TestBroadcastPostsInChannelsWhenAsked(t *testing.T) {
+	drafts, sender := &fakeDrafts{}, &fakeGroupSender{}
+	registry := channelRegistry(t, drafts, sender)
+
+	env := broadcast(registry, ownerTurn(userID, 1), `{"action":"targets"}`)
+	if !env.OK || !strings.Contains(string(env.Result), `"channels":[{"chat_id":-1009001,"name":"News"}]`) || strings.Contains(string(env.Result), "Quiet") {
+		t.Errorf("targets = %s", env.Result)
+	}
+	if env := broadcast(registry, ownerTurn(userID, 2), `{"action":"prepare","text":"Yangilik!"}`); !env.OK || strings.Contains(string(env.Result), "News") {
+		t.Errorf("a plain broadcast = %s; want the groups only", env.Result)
+	}
+	if env := broadcast(registry, ownerTurn(userID, 3), `{"action":"prepare","text":"Yangilik!","to":"channels"}`); !env.OK || !strings.Contains(string(env.Result), `"channels":["News"]`) {
+		t.Fatalf("to channels = %s", env.Result)
+	}
+	if env := broadcast(registry, ownerTurn(userID, 4), `{"action":"confirm"}`); !env.OK || len(sender.sent) != 1 || sender.sent[channelNews] != "Yangilik!" {
+		t.Errorf("confirm = %+v, sent = %+v", env, sender.sent)
+	}
+
+	broadcast(registry, ownerTurn(userID, 5), `{"action":"prepare","text":"hi","chat_ids":[-100111,-1009001]}`)
+	broadcast(registry, ownerTurn(userID, 6), `{"action":"confirm"}`)
+	if sender.sent[groupA] != "hi" || sender.sent[channelNews] != "hi" {
+		t.Errorf("sent = %+v, want Devs and News", sender.sent)
+	}
+	for _, args := range []string{
+		`{"action":"prepare","text":"hi","chat_ids":[-1009002]}`,
+		`{"action":"prepare","text":"hi","to":"everywhere"}`,
+	} {
+		if env := broadcast(registry, ownerTurn(userID, 7), args); env.OK || env.Error.Code != "invalid_arguments" {
+			t.Errorf("%s = %+v", args, env)
+		}
+	}
+	both := broadcast(registry, ownerTurn(userID, 8), `{"action":"prepare","text":"hi","to":"both"}`)
+	if !both.OK || !strings.Contains(string(both.Result), "Devs") || !strings.Contains(string(both.Result), "News") {
+		t.Errorf("to both = %s", both.Result)
+	}
+}
+
+// Without channels to post in, asking for them says why.
+func TestBroadcastToChannelsNeedsOne(t *testing.T) {
+	registry := broadcastRegistry(t, &fakeDrafts{}, &fakeGroupSender{})
+	if env := broadcast(registry, ownerTurn(userID, 1), `{"action":"prepare","text":"hi","to":"channels"}`); env.OK || !strings.Contains(env.Error.Message, "right to post messages") {
+		t.Errorf("prepare = %+v", env)
+	}
+}
+
+// With copy, the message the owner replied to is posted as it is, after
+// their yes like any broadcast; it too may not call anyone.
+func TestBroadcastCopiesTheRepliedMessage(t *testing.T) {
+	drafts, sender := &fakeDrafts{}, &fakeGroupSender{}
+	registry := channelRegistry(t, drafts, sender)
+	replying := func(updateID int64, target *Target) context.Context {
+		return WithTurn(context.Background(), Caller{UserID: userID, ChatID: userID, Owner: true, UpdateID: updateID, Target: target}, &Sink{})
+	}
+	post := &Target{MessageID: 31, UserID: userID, Text: "Turnir posteri"}
+
+	env := broadcast(registry, replying(1, post), `{"action":"prepare","copy":true,"to":"both"}`)
+	if !env.OK || !strings.Contains(string(env.Result), "replied to") || strings.Contains(string(env.Result), `"text"`) {
+		t.Fatalf("prepare = %s", env.Result)
+	}
+	if len(sender.sent) != 0 {
+		t.Fatalf("sent before confirmation: %+v", sender.sent)
+	}
+	broadcast(registry, replying(2, nil), `{"action":"confirm"}`)
+	want := fmt.Sprintf("copy of 31 from %d", userID)
+	if sender.sent[groupA] != want || sender.sent[groupC] != want || sender.sent[channelNews] != want {
+		t.Errorf("sent = %+v, want the message copied everywhere", sender.sent)
+	}
+
+	for _, c := range []struct {
+		target *Target
+		args   string
+	}{
+		{nil, `{"action":"prepare","copy":true}`},
+		{post, `{"action":"prepare","copy":true,"text":"hi"}`},
+		{&Target{MessageID: 32, Text: "@pronium sizni @tursunoffm chaqiryapti"}, `{"action":"prepare","copy":true}`},
+	} {
+		if env := broadcast(registry, replying(3, c.target), c.args); env.OK || env.Error.Code != "invalid_arguments" {
+			t.Errorf("%s with %+v = %+v, want refused", c.args, c.target, env)
+		}
+	}
 }
 
 // groupsWithStatus is a database where the bot is admin in groupA, was

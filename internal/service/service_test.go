@@ -2609,6 +2609,7 @@ func TestLoggedGroupMessagesCarryTheGroupsName(t *testing.T) {
 type fakeGroups struct {
 	mu       sync.Mutex
 	recorded []storage.GroupStatus
+	channels []storage.GroupStatus
 }
 
 func (f *fakeGroups) RecordGroup(_ context.Context, g storage.GroupStatus) error {
@@ -2616,6 +2617,32 @@ func (f *fakeGroups) RecordGroup(_ context.Context, g storage.GroupStatus) error
 	defer f.mu.Unlock()
 	f.recorded = append(f.recorded, g)
 	return nil
+}
+
+func (f *fakeGroups) RecordChannel(_ context.Context, c storage.GroupStatus) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.channels = append(f.channels, c)
+	return nil
+}
+
+// A channel the bot is made an admin of is recorded apart from the groups,
+// with its right to post, for the owners' broadcasts.
+func TestBeingMadeAChannelAdminIsRecorded(t *testing.T) {
+	f := newFixture()
+	groups := &fakeGroups{}
+	f.opts.Groups = groups
+	news := telegram.Chat{ID: -1009001, Type: telegram.ChatTypeChannel, Title: "News"}
+
+	sent := f.run(memberChange(news, telegram.ChatMember{Status: "administrator", CanPostMessages: true}))
+
+	want := []storage.GroupStatus{{ChatID: -1009001, Title: "News", BotStatus: "administrator", Rights: []string{telegram.RightPostMessages}}}
+	if !reflect.DeepEqual(groups.channels, want) || len(groups.recorded) != 0 {
+		t.Errorf("channels = %+v, groups = %+v; want %+v and no group", groups.channels, groups.recorded, want)
+	}
+	if len(sent) != 0 {
+		t.Errorf("sent = %+v", sent)
+	}
 }
 
 func membershipChange(chat telegram.Chat, status string) telegram.Update {
@@ -3070,6 +3097,37 @@ func TestIgnoreCommandOnTheBotsAnswerIgnoresWhomItAnswered(t *testing.T) {
 				t.Errorf("saved = %+v, want nothing", saved)
 			}
 		})
+	}
+}
+
+// Tools learn the forum topic a request was written in from the update: its
+// own topic, the implicit reply to the topic's first message dropped, or
+// that of the message it replies to. A reply chain outside a forum, which
+// Telegram also numbers, is no topic.
+func TestTurnTellsToolsTheForumTopic(t *testing.T) {
+	f := newFixture()
+	forum := telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup, IsForum: true}
+	inTopic := groupMessage("@MyBot mavzuni yop", "@MyBot")
+	inTopic.Chat, inTopic.IsTopicMessage, inTopic.MessageThreadID = forum, true, 7
+	inTopic.ReplyToMessage = &telegram.Message{MessageID: 7, From: &telegram.User{ID: 5}, Service: "forum_topic_created"}
+	inGeneral := groupMessage("@MyBot General'ni yashir", "@MyBot")
+	inGeneral.Chat = forum
+	replyChain := replyingTo(groupMessage("@MyBot yop", "@MyBot"), 5, "salom")
+	replyChain.MessageThreadID = 29
+
+	f.run(inGroup(inTopic), inGroup(inGeneral), inGroup(replyChain))
+
+	calls := f.replier.recorded()
+	if len(calls) != 3 {
+		t.Fatalf("model calls = %d, want 3", len(calls))
+	}
+	for i, want := range []tools.Caller{{Forum: true, TopicID: 7}, {Forum: true}, {}} {
+		if got := calls[i].caller; got.Forum != want.Forum || got.TopicID != want.TopicID {
+			t.Errorf("call %d: forum %v, topic %d; want %v, %d", i, got.Forum, got.TopicID, want.Forum, want.TopicID)
+		}
+	}
+	if calls[0].caller.Target != nil {
+		t.Errorf("target = %+v; the topic's first message is no reply", calls[0].caller.Target)
 	}
 }
 

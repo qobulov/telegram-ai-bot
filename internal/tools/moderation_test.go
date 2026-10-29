@@ -65,6 +65,8 @@ type fakeTelegram struct {
 	// to date by the calls that change it.
 	groupPermissions *telegram.ChatPermissions
 	chat             telegram.Chat
+	// invites are the invite links asked for, made or edited.
+	invites []telegram.InviteLink
 }
 
 func (f *fakeTelegram) do(method string, chatID, id int64) error {
@@ -154,10 +156,20 @@ func (f *fakeTelegram) DownloadFile(_ context.Context, fileID string, _ int64) (
 }
 
 func (f *fakeTelegram) CreateChatInviteLink(_ context.Context, l telegram.InviteLink) (string, error) {
+	f.mu.Lock()
+	f.invites = append(f.invites, l)
+	f.mu.Unlock()
 	if err := f.do("createChatInviteLink "+l.Name, l.ChatID, l.Expires.Unix()); err != nil {
 		return "", err
 	}
 	return "https://t.me/+abc", nil
+}
+
+func (f *fakeTelegram) EditChatInviteLink(_ context.Context, link string, l telegram.InviteLink) error {
+	f.mu.Lock()
+	f.invites = append(f.invites, l)
+	f.mu.Unlock()
+	return f.do("editChatInviteLink "+link, l.ChatID, 0)
 }
 
 func (f *fakeTelegram) UnpinAllChatMessages(_ context.Context, chatID int64) error {

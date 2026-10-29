@@ -50,3 +50,39 @@ func TestModerationUndoIsFoundLatestFirstAndMarkedOnce(t *testing.T) {
 		t.Errorf("after SetModerationUndo, last = %+v %v", last, found)
 	}
 }
+
+// The bot's links are found by link, or the latest without one; a revoked
+// link, another chat's or one not yet made is not.
+func TestInviteLinkFindsTheBotsOwnLinks(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	for _, a := range []ModerationAction{
+		{ChatID: -1, Action: "invite_link", RequesterID: 7, UpdateID: 1, Undo: json.RawMessage(`{"link":"https://t.me/+old","member_limit":5}`)},
+		{ChatID: -1, Action: "invite_link", RequesterID: 7, UpdateID: 2, Undo: json.RawMessage(`{"link":"https://t.me/+new"}`)},
+		{ChatID: -1, Action: "invite_link", RequesterID: 7, UpdateID: 3},
+		{ChatID: -1, Action: "set_title", RequesterID: 7, UpdateID: 4, Undo: json.RawMessage(`{"title":"Old"}`)},
+		{ChatID: -2, Action: "invite_link", RequesterID: 7, UpdateID: 5, Undo: json.RawMessage(`{"link":"https://t.me/+other"}`)},
+	} {
+		if _, err := store.RecordModeration(ctx, a); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	latest, found, err := store.InviteLink(ctx, -1, "")
+	if err != nil || !found || latest.UpdateID != 2 {
+		t.Fatalf("latest = %+v %v %v, want the newer link", latest, found, err)
+	}
+	old, found, err := store.InviteLink(ctx, -1, "https://t.me/+old")
+	if err != nil || !found || old.UpdateID != 1 || len(old.Undo) == 0 {
+		t.Fatalf("old = %+v %v %v", old, found, err)
+	}
+	if _, found, _ := store.InviteLink(ctx, -1, "https://t.me/+other"); found {
+		t.Error("another chat's link was found")
+	}
+	if _, err := store.MarkUndone(ctx, latest.ID); err != nil {
+		t.Fatal(err)
+	}
+	if again, found, _ := store.InviteLink(ctx, -1, ""); !found || again.UpdateID != 1 {
+		t.Errorf("after a revoke, latest = %+v %v, want the older link", again, found)
+	}
+}

@@ -160,7 +160,6 @@ func (b botRights) BotRights(ctx context.Context, chatID int64) ([]string, error
 	return rights, nil
 }
 
-// groupSender posts an owner's confirmed broadcast in a group.
 // botAccount is the bot's own Telegram profile, its photo found by its ID.
 type botAccount struct {
 	*telegram.Client
@@ -174,12 +173,18 @@ func (b botAccount) Photo(ctx context.Context) ([]byte, string, bool, error) {
 // maxAvatarBytes bounds the profile photo downloaded to be described.
 const maxAvatarBytes = 2 << 20
 
+// groupSender posts an owner's confirmed broadcast in a group or a channel.
 type groupSender struct {
 	client *telegram.Client
 }
 
 func (g groupSender) SendToGroup(ctx context.Context, chatID int64, text string) error {
 	_, err := g.client.SendMessage(ctx, telegram.Outgoing{ChatID: chatID, Text: text})
+	return err
+}
+
+func (g groupSender) CopyToChat(ctx context.Context, chatID, fromChatID, messageID int64) error {
+	_, err := g.client.CopyMessage(ctx, chatID, fromChatID, messageID)
 	return err
 }
 
@@ -210,12 +215,13 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Owners:     cfg.OwnerIDs,
 		Usernames:  store,
 		Roster:     store,
+		Links:      store,
 	})
 	if len(cfg.OwnerUsernames) > 0 && len(cfg.OwnerIDs) == 0 {
 		logger.Warn("BOT_OWNER_IDS is not set: owners are known only by username, which can change hands, so they moderate only with their own admin rights")
 	}
 	available := append(builtinTools(cfg, store, bot, moderation.Tool()), liveDataTools(cfg, bot)...)
-	available = append(available, tools.BotProfileTool(tools.BotProfileOptions{
+	available = append(available, moderation.TopicsTool(bot.Client), tools.BotProfileTool(tools.BotProfileOptions{
 		Account: botAccount{Client: bot.Client, id: bot.User.ID},
 		Eyes:    stickerLabeller(cfg, logger),
 	}))
@@ -392,9 +398,10 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 				Location: cfg.Location,
 			}),
 			tools.BroadcastTool(tools.BroadcastOptions{
-				Groups: store,
-				Drafts: store,
-				Sender: groupSender{client: bot.Client},
+				Groups:   store,
+				Channels: store,
+				Drafts:   store,
+				Sender:   groupSender{client: bot.Client},
 			}),
 			tools.RulesTool(tools.RulesOptions{
 				Store:    store,

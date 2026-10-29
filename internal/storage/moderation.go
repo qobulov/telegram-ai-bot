@@ -97,6 +97,26 @@ func (s *Store) LastUndoable(ctx context.Context, chatID int64) (ModerationActio
 	return a, true, nil
 }
 
+// InviteLink is the record of an invite link the bot made in a chat and has
+// not revoked, with the link in its undo: the one given, or the latest when
+// link is "". found is false when there is none.
+func (s *Store) InviteLink(ctx context.Context, chatID int64, link string) (a ModerationAction, found bool, err error) {
+	err = s.pool.QueryRow(ctx, `
+		SELECT id, chat_id, action, requester_id, update_id, undo
+		FROM moderation_actions
+		WHERE chat_id = $1 AND action = 'invite_link' AND undo ? 'link' AND undone_at IS NULL
+		  AND ($2 = '' OR undo->>'link' = $2)
+		ORDER BY id DESC LIMIT 1`, chatID, link).
+		Scan(&a.ID, &a.ChatID, &a.Action, &a.RequesterID, &a.UpdateID, &a.Undo)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ModerationAction{}, false, nil
+	}
+	if err != nil {
+		return ModerationAction{}, false, fmt.Errorf("storage: read invite link: %w", err)
+	}
+	return a, true, nil
+}
+
 // MarkUndone marks an action put back, and reports whether this call did:
 // an undo asked twice puts it back once.
 func (s *Store) MarkUndone(ctx context.Context, id int64) (bool, error) {

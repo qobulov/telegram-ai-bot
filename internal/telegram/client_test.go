@@ -761,6 +761,37 @@ func TestChatAndMemberMethodsSendExactParams(t *testing.T) {
 			call:   func(c *Client) error { return c.UnpinChatMessage(ctx, -100123, 30) },
 			want:   map[string]any{"chat_id": float64(-100123), "message_id": float64(30)},
 		},
+		{
+			// No icon: the topic keeps the one it has.
+			method: "editForumTopic",
+			call:   func(c *Client) error { return c.EditForumTopic(ctx, -100123, 7, "Turnir") },
+			want:   map[string]any{"chat_id": float64(-100123), "message_thread_id": float64(7), "name": "Turnir"},
+		},
+		{
+			method: "closeForumTopic",
+			call:   func(c *Client) error { return c.CloseForumTopic(ctx, -100123, 7) },
+			want:   map[string]any{"chat_id": float64(-100123), "message_thread_id": float64(7)},
+		},
+		{
+			method: "reopenForumTopic",
+			call:   func(c *Client) error { return c.ReopenForumTopic(ctx, -100123, 7) },
+			want:   map[string]any{"chat_id": float64(-100123), "message_thread_id": float64(7)},
+		},
+		{
+			method: "deleteForumTopic",
+			call:   func(c *Client) error { return c.DeleteForumTopic(ctx, -100123, 7) },
+			want:   map[string]any{"chat_id": float64(-100123), "message_thread_id": float64(7)},
+		},
+		{
+			method: "hideGeneralForumTopic",
+			call:   func(c *Client) error { return c.HideGeneralForumTopic(ctx, -100123) },
+			want:   map[string]any{"chat_id": float64(-100123)},
+		},
+		{
+			method: "unhideGeneralForumTopic",
+			call:   func(c *Client) error { return c.UnhideGeneralForumTopic(ctx, -100123) },
+			want:   map[string]any{"chat_id": float64(-100123)},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.method, func(t *testing.T) {
@@ -774,6 +805,74 @@ func TestChatAndMemberMethodsSendExactParams(t *testing.T) {
 				t.Errorf("call = %+v, want %s %v", sent, tt.method, tt.want)
 			}
 		})
+	}
+}
+
+func TestCopyMessageNamesTheOriginal(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"message_id":99}}`)
+
+	id, err := client.CopyMessage(context.Background(), -100123, 5005, 31)
+	if err != nil || id != 99 {
+		t.Fatalf("CopyMessage = %d, %v", id, err)
+	}
+	want := map[string]any{"chat_id": float64(-100123), "from_chat_id": float64(5005), "message_id": float64(31)}
+	if sent := api.recorded()[0]; sent.method != "copyMessage" || !reflect.DeepEqual(sent.params, want) {
+		t.Errorf("call = %+v, want copyMessage %v", sent, want)
+	}
+}
+
+// A new link sends only the limits it has; an edit sends every one, so that
+// a limit taken away is gone.
+func TestInviteLinksSendTheirLimits(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"invite_link":"https://t.me/+abc"}}`)
+	ctx := context.Background()
+	ends := time.Unix(1800000000, 0)
+
+	link, err := client.CreateChatInviteLink(ctx, InviteLink{ChatID: -100123, Name: "reklama", Expires: ends, MemberLimit: 50})
+	if err != nil || link != "https://t.me/+abc" {
+		t.Fatalf("CreateChatInviteLink = %q, %v", link, err)
+	}
+	if _, err := client.CreateChatInviteLink(ctx, InviteLink{ChatID: -100123, JoinRequest: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.EditChatInviteLink(ctx, "https://t.me/+abc", InviteLink{ChatID: -100123, JoinRequest: true}); err != nil {
+		t.Fatal(err)
+	}
+	calls := api.recorded()
+	wants := []call{
+		{"createChatInviteLink", map[string]any{"chat_id": float64(-100123), "name": "reklama", "expire_date": float64(1800000000), "member_limit": float64(50)}},
+		{"createChatInviteLink", map[string]any{"chat_id": float64(-100123), "creates_join_request": true}},
+		{"editChatInviteLink", map[string]any{"chat_id": float64(-100123), "invite_link": "https://t.me/+abc", "name": "", "expire_date": float64(0), "member_limit": float64(0), "creates_join_request": true}},
+	}
+	for i, want := range wants {
+		if calls[i].method != want.method || !reflect.DeepEqual(calls[i].params, want.params) {
+			t.Errorf("call %d = %+v, want %+v", i, calls[i], want)
+		}
+	}
+}
+
+// A new topic is named and coloured as asked, and its ID, the thread its
+// messages carry, comes back.
+func TestCreateForumTopicReturnsTheTopic(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"message_thread_id":42,"name":"Turnir","icon_color":7322096}}`)
+
+	threadID, err := client.CreateForumTopic(context.Background(), -100123, "Turnir", 7322096)
+	if err != nil || threadID != 42 {
+		t.Fatalf("CreateForumTopic = %d, %v", threadID, err)
+	}
+	want := map[string]any{"chat_id": float64(-100123), "name": "Turnir", "icon_color": float64(7322096)}
+	if sent := api.recorded()[0]; sent.method != "createForumTopic" || !reflect.DeepEqual(sent.params, want) {
+		t.Errorf("call = %+v, want createForumTopic %v", sent, want)
+	}
+}
+
+func TestChatIsForumIsDecoded(t *testing.T) {
+	var msg Message
+	if err := json.Unmarshal([]byte(`{"message_id":1,"chat":{"id":-100123,"type":"supergroup","is_forum":true},"message_thread_id":7,"is_topic_message":true}`), &msg); err != nil {
+		t.Fatal(err)
+	}
+	if !msg.Chat.IsForum || msg.MessageThreadID != 7 || !msg.IsTopicMessage {
+		t.Errorf("message = %+v", msg)
 	}
 }
 
@@ -864,11 +963,16 @@ func TestChatMemberRightsDecoded(t *testing.T) {
 	}
 
 	creator := decode(`{"status":"creator","user":{"id":5}}`)
-	if !creator.Has(RightRestrictMembers) || len(creator.Rights()) != 7 {
+	if !creator.Has(RightRestrictMembers) || len(creator.Rights()) != 8 {
 		t.Errorf("creator Has(restrict) = %v, Rights() = %v; a creator holds every right", creator.Has(RightRestrictMembers), creator.Rights())
 	}
 	if creator.Has("can_fly") {
 		t.Error("creator holds a right that does not exist")
+	}
+
+	channelAdmin := decode(`{"status":"administrator","user":{"id":777,"is_bot":true},"can_post_messages":true,"can_edit_messages":true}`)
+	if got := channelAdmin.Rights(); !reflect.DeepEqual(got, []string{RightPostMessages}) || !channelAdmin.Has(RightPostMessages) {
+		t.Errorf("channel administrator Rights() = %v, want the right to post", got)
 	}
 
 	if member := decode(`{"status":"member","user":{"id":42}}`); member.Rights() != nil {
