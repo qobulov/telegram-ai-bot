@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"slices"
@@ -23,6 +24,12 @@ const (
 	memeFont = "Noto Sans"
 	// memeTemplatesListed is how many template names a refusal offers.
 	memeTemplatesListed = 40
+	// memeRecentKept is how many of a chat's latest templates are not used
+	// again there unless the asker names one: the model, left to itself,
+	// drew Drake ten times in nineteen memes.
+	memeRecentKept = 4
+	// memeRecentTTL is how long a chat's latest templates are remembered.
+	memeRecentTTL = 7 * 24 * time.Hour
 )
 
 type memeArgs struct {
@@ -40,8 +47,13 @@ func (a *apis) memeTool() tools.Tool {
 	return tools.Tool{
 		Name: "make_meme",
 		Description: "Make a meme from one of Imgflip's hundred popular templates and send it as a picture. Use it when someone asks for a meme (\"mem qil\", \"мем сделай\"). " +
-			"Pick the template that fits the joke when none is named. texts go in the template's boxes in Imgflip's order, mostly top to bottom: Drake Hotline Bling: what is rejected, then what is preferred; " +
-			"Distracted Boyfriend: the other woman, the boyfriend, the girlfriend; Two Buttons: the two buttons, then the one sweating. Write them in the asker's language and script, short.",
+			"Pick the template that fits this joke best, from the whole range, not the same few: a template used in this chat's last few memes is refused unless the asker named it, with others offered. " +
+			"texts go in the template's boxes in Imgflip's order, mostly top to bottom. Some, with their boxes: Drake Hotline Bling: rejected, preferred; Distracted Boyfriend: the other woman, the boyfriend, the girlfriend; " +
+			"Two Buttons: the two buttons, the one sweating; Expanding Brain: four ideas, each \"smarter\"; Gru's Plan: four steps, the last one the bad surprise; Left Exit 12 Off Ramp: the straight road, the exit, the car; " +
+			"Batman Slapping Robin: Robin's line, Batman's; Woman Yelling At Cat: her accusation, the cat's reply; UNO Draw 25 Cards: the card's demand, the one who draws 25; Is This A Pigeon: the man, the butterfly, the wrong guess; " +
+			"Tuxedo Winnie The Pooh: the plain way, the fancy way; Epic Handshake: one side, the other, what they share; Change My Mind: the claim; Mocking Spongebob: the line mocked, then mocked; " +
+			"Running Away Balloon, Bike Fall, Panik Kalm Panik, Anakin Padme 4 Panel, They're The Same Picture, Hide the Pain Harold, Sad Pablo Escobar, Waiting Skeleton, Disaster Girl, Monkey Puppet, Always Has Been, Roll Safe Think About It, One Does Not Simply, Buff Doge vs. Cheems and more. " +
+			"Write the texts in the asker's language and script, short.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
@@ -81,6 +93,11 @@ func (a *apis) makeMeme(ctx context.Context, raw json.RawMessage) (any, error) {
 	if len(args.Texts) == 0 || len(args.Texts) > template.BoxCount {
 		return nil, argumentError("%s takes 1 to %d texts", template.Name, template.BoxCount)
 	}
+	caller, _ := tools.CallerFrom(ctx)
+	recent := a.recentMemes(caller.ChatID)
+	if slices.Contains(recent, template.ID) && !namesTemplate(caller.Words, template) {
+		return nil, argumentError("%s was used in one of this chat's last memes; pick another that fits, such as: %s", template.Name, freshMemeTemplates(templates, recent))
+	}
 	link, err := a.captionMeme(ctx, template, args.Texts)
 	if err != nil {
 		return nil, err
@@ -94,6 +111,7 @@ func (a *apis) makeMeme(ctx context.Context, raw json.RawMessage) (any, error) {
 		return nil, err
 	}
 	sink.Add(tools.Drawing{Data: data, MimeType: http.DetectContentType(data)})
+	a.rememberMeme(caller.ChatID, recent, template.ID)
 	return map[string]any{"sent": true, "template": template.Name, "note": pictureSentNote}, nil
 }
 
@@ -137,6 +155,50 @@ func memeTemplateNames(templates []memeTemplate) string {
 	names := make([]string, 0, memeTemplatesListed)
 	for _, t := range templates[:min(len(templates), memeTemplatesListed)] {
 		names = append(names, t.Name)
+	}
+	return strings.Join(names, ", ")
+}
+
+// recentMemes are the IDs of the templates of a chat's latest memes, the
+// latest last, as this instance remembers them.
+func (a *apis) recentMemes(chatID int64) []string {
+	recent, _ := a.cache.get(memeRecentKey(chatID))
+	ids, _ := recent.([]string)
+	return ids
+}
+
+// rememberMeme adds id to a chat's latest templates. The cached slice is
+// shared, so a new one is stored.
+func (a *apis) rememberMeme(chatID int64, recent []string, id string) {
+	latest := append(slices.Clone(recent), id)
+	a.cache.put(memeRecentKey(chatID), latest[max(0, len(latest)-memeRecentKept):], memeRecentTTL)
+}
+
+func memeRecentKey(chatID int64) string { return fmt.Sprintf("imgflip:recent:%d", chatID) }
+
+// namesTemplate reports whether the asker's own words name template, by its
+// name or its first word, such as "drake": then it is what they want.
+func namesTemplate(words string, template memeTemplate) bool {
+	words = strings.ToLower(words)
+	name := strings.ToLower(template.Name)
+	first, _, _ := strings.Cut(name, " ")
+	return strings.Contains(words, name) || (utf8.RuneCountInString(first) >= 4 && strings.Contains(words, first))
+}
+
+// freshMemeTemplates names the popular templates not among recent, from a
+// random place in the list, so that a refusal does not always offer the
+// same few, with how many texts each takes.
+func freshMemeTemplates(templates []memeTemplate, recent []string) string {
+	var names []string
+	start := rand.IntN(len(templates))
+	for i := range templates {
+		t := templates[(start+i)%len(templates)]
+		if !slices.Contains(recent, t.ID) {
+			names = append(names, fmt.Sprintf("%s (%d)", t.Name, t.BoxCount))
+		}
+		if len(names) == memeTemplatesListed/2 {
+			break
+		}
 	}
 	return strings.Join(names, ", ")
 }

@@ -89,3 +89,35 @@ func TestMakeMemeNeedsAKey(t *testing.T) {
 		}
 	}
 }
+
+// Left to itself the model drew Drake ten times in nineteen memes: a
+// template used in a chat's last memes is refused there, with others
+// offered, unless the asker names it.
+func TestMakeMemeVariesTheTemplate(t *testing.T) {
+	u := newUpstream(t, map[string]stub{
+		"/imgflip/get_memes":   ok(memeTemplatesJSON),
+		"/imgflip/meme/b4.jpg": ok("\xff\xd8\xffJPEG"),
+	})
+	u.routes["/imgflip/caption_image"] = ok(`{"success":true,"data":{"url":"` + u.server.URL + `/imgflip/meme/b4.jpg"}}`)
+	opts := u.options()
+	opts.ImgflipKey = "imgflip-test-key"
+	registry := newRegistry(t, opts)
+	meme := func(chatID int64, words, args string) string {
+		ctx := tools.WithTurn(context.Background(), tools.Caller{UserID: 1, ChatID: chatID, Human: true, Words: words}, &tools.Sink{})
+		return registry.Execute(ctx, 1, "make_meme", args)
+	}
+	drake := `{"template":"Drake","texts":["a","b"]}`
+
+	if out := meme(-100, "mem qil", drake); !strings.Contains(out, `"sent":true`) {
+		t.Fatalf("first meme: %s", out)
+	}
+	if out := meme(-100, "yana mem qil", drake); strings.Contains(out, `"sent":true`) || !strings.Contains(out, "Distracted Boyfriend (3)") || strings.Contains(out, "such as: Drake") {
+		t.Errorf("Drake again: %s; want it refused, Distracted Boyfriend offered", out)
+	}
+	if out := meme(-100, "drake mem qil", drake); !strings.Contains(out, `"sent":true`) {
+		t.Errorf("Drake asked for by name: %s; want it made", out)
+	}
+	if out := meme(-200, "mem qil", drake); !strings.Contains(out, `"sent":true`) {
+		t.Errorf("Drake in another chat: %s; want it made", out)
+	}
+}
