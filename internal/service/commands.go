@@ -767,7 +767,7 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	}
 	fromMenu := false
 	if request, ok := s.askedRequestOf(in); ok {
-		// An answer to a menu's question, a meme's topic or a hero's name,
+		// An answer to a menu's question, such as a hero's name,
 		// is the model's: it is asked as if typed with the request.
 		in.text, fromMenu = request, true
 	}

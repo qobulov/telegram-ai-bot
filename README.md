@@ -723,9 +723,9 @@ In a private chat each user gets `PRIVATE_DAILY_LIMIT` answers a day
 
 `/start` and `/help` in a private chat bring a small keyboard, in place of the
 phone's own, of her common requests, in the language of the user's app
-(`internal/service/keyboard.go`): «😂 Mem yasab ber» (only when `IMGFLIP_API_KEY`
-gives her the meme tool), «🎲 Zar tashla», «💵 Valyuta kursi», «🌤 Ob-havo»,
-«🎮 MLBB», «🕐 Soat nechi?» and «❓ Yordam». Telegram keeps it there, shrunk to fit,
+(`internal/service/keyboard.go`): «💵 Valyuta kursi», «🌤 Ob-havo», «🎮 MLBB»,
+«🎲 Zar tashla», «🕐 Soat nechi?» and «❓ Yordam». A meme has no button, which
+the owners took off: it is asked for in words, as before. Telegram keeps it there, shrunk to fit,
 until it is closed. A button sends its own text, in any of its three
 languages, and the buttons that need a value ask for it first
 (`internal/service/keyboardmenu.go`):
@@ -738,8 +738,6 @@ languages, and the buttons that need a value ask for it first
   one for another, which opens the reply box for its name; a name the
   weather does not know is said to be unknown.
 - «🎲 Zar tashla» asks which game: 🎲 🎯 🏀 ⚽ 🎳 or 🎰.
-- «😂 Mem yasab ber» opens the reply box for the meme's topic, which goes to
-  the model as "Shu mavzuda mem yasab ber: …".
 - «🎮 MLBB» opens a menu of Mobile Legends: 🔥 Meta, 🦸 Qahramon, 🛠 Build,
   ⚔️ Kontr-pik, 👕 Skinlar, 🎯 Draft, 📈 Win rate and 🆔 O'yinchi. The meta
   is asked of the model at once, as if written in reply to the menu (its own
@@ -754,15 +752,15 @@ value written in the reply box is known by the question it replies to, so
 nothing is kept between the question and its answer. The answer that ends
 a question brings the keyboard back: the reply box hides it and keeps the
 question's hint ("Masalan: Ling") in the box, which people took to mean
-that a hero's name was still wanted; a meme, a picture, brings it too (an
-album of several cannot). A question is asked in the language of the label
-pressed, «😂 Make a meme» in English, as a few words are no sure sign of a
-language; «🎮 MLBB», the same in every language, in the user's app's. All of it but the
-meme and Mobile Legends is answered in code (`internal/service/keyboardanswer.go`), with the
+that a hero's name was still wanted; a picture, such as a skin, brings it
+too (an album of several cannot). A question is asked in the language of
+the label pressed, «🎲 Roll a die» in English, as a few words are no sure
+sign of a language; «🎮 MLBB», the same in every language, in the user's app's. All of it but
+Mobile Legends is answered in code (`internal/service/keyboardanswer.go`), with the
 tools run by their registry on the sender's turn, and takes nothing from
-the daily limit, past it too; a tool that fails is said to have failed. The
-meme's topic and a Mobile Legends request are turns of the model's that
-call a tool, so they are not counted either (below). A chat that still has an earlier keyboard,
+the daily limit, past it too; a tool that fails is said to have failed. A
+Mobile Legends request is a turn of the model's that calls a tool, so it is
+not counted either (below). A chat that still has an earlier keyboard,
 «💵 Dollar kursi» or «🌤 Toshkent ob-havosi», gets the same questions.
 «❓ Yordam» (or «❓ Помощь», «❓ Help») is answered as `/help`, uncounted.
 

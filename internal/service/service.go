@@ -382,9 +382,6 @@ type Options struct {
 	Business           BusinessBook
 	BusinessLookup     BusinessLookup
 	BusinessDailyLimit int
-	// MemesEnabled is true when the model has the make_meme tool; the
-	// private chats' keyboard offers a meme only then.
-	MemesEnabled bool
 }
 
 // Service processes updates on a fixed pool of workers.

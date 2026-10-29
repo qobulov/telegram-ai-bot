@@ -15,8 +15,7 @@ import (
 
 // The keyboard's buttons that need a value ask for it before answering:
 // the currency, then an amount to convert; the city; the game of the die;
-// the meme's topic; and for Mobile Legends what of it, then the hero or
-// the ID it needs. A choice among a few is a row of buttons under the
+// and for Mobile Legends what of it, then the hero or the ID it needs. A choice among a few is a row of buttons under the
 // question, whose press comes back as menuData; anything else is asked
 // with the reply box open on the question, and the answer is recognised
 // by the question it replies to, so that nothing is kept between the two.
@@ -33,7 +32,7 @@ var (
 )
 
 // askedRequest is a question whose answer the model takes, as a request
-// written with it: the meme's topic, a hero's name.
+// written with it: a hero's name.
 type askedRequest struct {
 	question, hint localText
 	// request takes the answer.
@@ -43,11 +42,6 @@ type askedRequest struct {
 // askedRequests are the questions whose answers go to the model, by the
 // menu choice that asks them.
 var askedRequests = map[string]askedRequest{
-	"meme": {
-		question: localText{uz: "😂 Mem nima haqida bo'lsin? Mavzuni yozing.", ru: "😂 О чём сделать мем? Напишите тему.", en: "😂 What should the meme be about? Write the topic."},
-		hint:     localText{uz: "Masalan: dushanba ertalab", ru: "Например: утро понедельника", en: "For example: Monday morning"},
-		request:  localText{uz: "Shu mavzuda mem yasab ber: %s", ru: "Сделай мем на тему: %s", en: "Make a meme about: %s"},
-	},
 	"hero": {
 		question: localText{uz: "🦸 Qaysi qahramon? Nomini yozing.", ru: "🦸 Какой герой? Напишите имя.", en: "🦸 Which hero? Write the name."},
 		hint:     heroHint,
@@ -116,8 +110,6 @@ func menuQuestion(language string, button localText) (outcome, bool) {
 		return outcome{text: textWhichCity.inLanguage(language), buttons: choiceRows(cityChoices, "city", 2, &other)}, true
 	case keyboardDie:
 		return outcome{text: textWhichGame.inLanguage(language), buttons: choiceRows(diceChoices, "dice", 3, nil)}, true
-	case keyboardMeme:
-		return askFor(language, askedRequests["meme"]), true
 	case keyboardMLBB:
 		var rows [][]telegram.Button
 		for i, c := range mlbbChoices {

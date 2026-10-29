@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -9,11 +10,10 @@ import (
 )
 
 // /start and /help bring the keyboard to a private chat, in the app's
-// language, with the meme button only where memes can be made; other
+// language, without a meme button, which the owners took off; other
 // answers leave the keyboard as it is.
 func TestStartAndHelpBringTheKeyboard(t *testing.T) {
 	f := newFixture()
-	f.opts.MemesEnabled = true
 	russian := textFrom(userID, "/help")
 	russian.Message.From.LanguageCode = "ru"
 
@@ -22,21 +22,16 @@ func TestStartAndHelpBringTheKeyboard(t *testing.T) {
 	if len(sent) != 4 {
 		t.Fatalf("sent = %+v", sent)
 	}
-	if got := sent[0].keyboard; len(got) != 4 || got[0][0] != "😂 Mem yasab ber" || got[2][0] != "🎮 MLBB" || got[3][0] != "❓ Yordam" {
+	if got := sent[0].keyboard; len(got) != 3 || got[0][0] != "💵 Valyuta kursi" || got[1][0] != "🎮 MLBB" || got[2][1] != "❓ Yordam" || strings.Contains(fmt.Sprint(got), "Mem") {
 		t.Errorf("/start keyboard = %q", got)
 	}
-	if got := sent[1].keyboard; len(got) != 4 || got[3][0] != "❓ Помощь" {
+	if got := sent[1].keyboard; len(got) != 3 || got[2][1] != "❓ Помощь" {
 		t.Errorf("Russian /help keyboard = %q", got)
 	}
 	if sent[2].keyboard != nil || sent[3].keyboard != nil {
 		t.Errorf("/about and an answer carry a keyboard: %q, %q", sent[2].keyboard, sent[3].keyboard)
 	}
 
-	f = newFixture()
-	sent = f.run(textFrom(userID, "/start"))
-	if got := sent[0].keyboard; len(got) != 4 || len(got[0]) != 1 || got[0][0] != "🎲 Zar tashla" {
-		t.Errorf("keyboard without memes = %q", got)
-	}
 }
 
 // A group never gets the keyboard, not even with /help.
@@ -73,7 +68,7 @@ func TestKeyboardLabelsAreDistinct(t *testing.T) {
 	for _, row := range keyboardRows {
 		for _, button := range row {
 			var own []string
-			for _, label := range []string{button.text.uz, button.text.ru, button.text.en} {
+			for _, label := range []string{button.uz, button.ru, button.en} {
 				if !slices.Contains(own, label) {
 					own = append(own, label)
 				}

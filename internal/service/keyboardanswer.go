@@ -26,7 +26,7 @@ const keyboardTimeout = 20 * time.Second
 // keyboardmenu.go), and the reply to such a question with the tool's
 // result. A plain request typed in words, "dollar qancha", is answered as
 // its button would be (see typedrequest.go). ok is false for any other
-// message, a meme's topic among them: a meme's words are the model's.
+// message, a Mobile Legends request among them: its words are the model's.
 func (s *Service) keyboardAnswer(ctx context.Context, in incoming) (outcome, bool) {
 	// A business account's customers have no keyboard: what they write is
 	// theirs, not a button.
@@ -45,7 +45,7 @@ func (s *Service) keyboardAnswer(ctx context.Context, in incoming) (outcome, boo
 	for button, asks := range map[localText]localText{
 		keyboardRate: keyboardRate, keyboardOldDollar: keyboardRate,
 		keyboardWeather: keyboardWeather, keyboardOldWeather: keyboardWeather,
-		keyboardDie: keyboardDie, keyboardMeme: keyboardMeme, keyboardMLBB: keyboardMLBB,
+		keyboardDie: keyboardDie, keyboardMLBB: keyboardMLBB,
 	} {
 		if pressed(in, button) {
 			return menuQuestion(pressedLanguage(in, button), asks)
@@ -75,7 +75,7 @@ func (s *Service) typedAnswer(ctx context.Context, in incoming, req typedRequest
 }
 
 // pressedLanguage is the language of the button's label that was pressed:
-// a few words such as "😂 Make a meme" are no sure sign of a language, but
+// a few words such as "🎲 Roll a die" are no sure sign of a language, but
 // the label is. A label every language shares, "🎮 MLBB", says nothing,
 // and the user's app does.
 func pressedLanguage(in incoming, button localText) string {

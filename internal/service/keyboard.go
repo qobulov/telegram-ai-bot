@@ -10,21 +10,13 @@ import (
 // /start and /help, in place of the phone's own; Telegram keeps it there.
 // A button sends its text as if typed. The time is answered at once, and
 // the rest first ask for what they need, the currency, the city, the game
-// or the meme's topic (see keyboardmenu.go); all but the meme are then
-// answered in code, without the model and the day's limit (see
+// or what of Mobile Legends (see keyboardmenu.go); all but Mobile Legends
+// are then answered in code, without the model and the day's limit (see
 // keyboardanswer.go). The help button is /help. A group never gets the
 // keyboard: it would cover every member's own.
 
-// keyboardRequest is one button: what it says in each language.
-type keyboardRequest struct {
-	text localText
-	// meme marks the button that needs the make_meme tool.
-	meme bool
-}
-
 // The buttons, each answered by what it says in any of its languages.
 var (
-	keyboardMeme    = localText{uz: "😂 Mem yasab ber", ru: "😂 Сделай мем", en: "😂 Make a meme"}
 	keyboardDie     = localText{uz: "🎲 Zar tashla", ru: "🎲 Брось кубик", en: "🎲 Roll a die"}
 	keyboardRate    = localText{uz: "💵 Valyuta kursi", ru: "💵 Курс валют", en: "💵 Exchange rate"}
 	keyboardWeather = localText{uz: "🌤 Ob-havo", ru: "🌤 Погода", en: "🌤 Weather"}
@@ -38,26 +30,21 @@ var (
 	keyboardOldWeather = localText{uz: "🌤 Toshkent ob-havosi", ru: "🌤 Погода в Ташкенте", en: "🌤 Weather in Tashkent"}
 )
 
-// keyboardRows are the keyboard's buttons, two to a row.
-var keyboardRows = [][]keyboardRequest{
-	{{text: keyboardMeme, meme: true}, {text: keyboardDie}},
-	{{text: keyboardRate}, {text: keyboardWeather}},
-	{{text: keyboardMLBB}, {text: keyboardTime}},
-	{{text: keyboardHelp}},
+// keyboardRows are the keyboard's buttons, two to a row. A meme is asked
+// for in words: the owners took its button off.
+var keyboardRows = [][]localText{
+	{keyboardRate, keyboardWeather},
+	{keyboardMLBB, keyboardDie},
+	{keyboardTime, keyboardHelp},
 }
 
-// keyboard is the keyboard for whoever wrote in, in their language, without
-// the meme button when there is no meme tool: a button that cannot be
-// answered is worse than none.
+// keyboard is the keyboard for whoever wrote in, in their language.
 func (s *Service) keyboard(in incoming) [][]string {
 	var rows [][]string
 	for _, row := range keyboardRows {
 		var labels []string
 		for _, button := range row {
-			if button.meme && !s.opts.MemesEnabled {
-				continue
-			}
-			labels = append(labels, button.text.to(in))
+			labels = append(labels, button.to(in))
 		}
 		rows = append(rows, labels)
 	}

@@ -61,11 +61,10 @@ func TestKeyboardButtonsAskForTheirValue(t *testing.T) {
 		textFrom(userID, keyboardRate.uz),
 		textFrom(userID, keyboardWeather.ru),
 		textFrom(userID, keyboardDie.uz),
-		textFrom(userID, keyboardMeme.uz),
 		textFrom(userID, keyboardOldDollar.uz),
 	)
 
-	if len(sent) != 6 || sent[0].text != "🕐 It is 21:05 in Tashkent, Thursday, 29.10.2026." {
+	if len(sent) != 5 || sent[0].text != "🕐 It is 21:05 in Tashkent, Thursday, 29.10.2026." {
 		t.Fatalf("sent = %+v", sent)
 	}
 	if sent[1].text != textWhichCurrency.uz || len(sent[1].buttons) != 2 || sent[1].buttons[0][0].Data != "kb:rate:USD" {
@@ -77,11 +76,8 @@ func TestKeyboardButtonsAskForTheirValue(t *testing.T) {
 	if sent[3].text != textWhichGame.uz || sent[3].buttons[0][1].Data != "kb:dice:🎯" {
 		t.Errorf("die = %+v", sent[3])
 	}
-	if sent[4].text != askedRequests["meme"].question.uz || sent[4].ask == "" {
-		t.Errorf("meme = %+v", sent[4])
-	}
-	if sent[5].text != textWhichCurrency.uz {
-		t.Errorf("the old dollar button = %+v", sent[5])
+	if sent[4].text != textWhichCurrency.uz {
+		t.Errorf("the old dollar button = %+v", sent[4])
 	}
 	if asked, _ := quota.recorded(); len(asked) != 0 || len(f.replier.recorded()) != 0 {
 		t.Errorf("limit asked %d times, model %d", len(asked), len(f.replier.recorded()))
@@ -119,7 +115,7 @@ func TestMenusAnswerTheirChoicesAndReplies(t *testing.T) {
 		menuPress(2, "kb:city:"),
 		replyTo(textCityPrompt.uz, "Termiz"),
 		menuPress(3, "kb:dice:🎯"),
-		replyTo(askedRequests["meme"].question.uz, "dushanba ertalab"),
+		replyTo(askedRequests["hero"].question.uz, "Ling"),
 	)
 
 	// Presses are handled at once and messages in turn, so the order is
@@ -152,19 +148,19 @@ func TestMenusAnswerTheirChoicesAndReplies(t *testing.T) {
 	}
 	memeAnswered := false
 	for _, m := range sent {
-		if strings.Contains(m.text, fmt.Sprintf(askedRequests["meme"].request.uz, "dushanba ertalab")) {
+		if strings.Contains(m.text, fmt.Sprintf(askedRequests["hero"].request.uz, "Ling")) {
 			memeAnswered = m.keyboard != nil
 		}
 	}
 	if !memeAnswered {
-		t.Errorf("the meme's answer came without the keyboard")
+		t.Errorf("the hero's answer came without the keyboard")
 	}
 	if prompt := find(textCityPrompt.uz); prompt.ask == "" {
 		t.Errorf("city prompt = %+v", prompt)
 	}
 	find("🌤 Toshkent: hozir")
-	if calls := f.replier.recorded(); len(calls) != 1 || !strings.Contains(calls[0].text, fmt.Sprintf(askedRequests["meme"].request.uz, "dushanba ertalab")) {
-		t.Errorf("model asked %+v; want the meme's topic", calls)
+	if calls := f.replier.recorded(); len(calls) != 1 || !strings.Contains(calls[0].text, fmt.Sprintf(askedRequests["hero"].request.uz, "Ling")) {
+		t.Errorf("model asked %+v; want the hero's request", calls)
 	}
 	if len(buttons.answers) != 3 {
 		t.Errorf("presses answered %d times, want 3", len(buttons.answers))
@@ -253,21 +249,20 @@ func TestMLBBMenu(t *testing.T) {
 }
 
 // A button is answered in the language of its label, though a few words
-// such as "😂 Make a meme" were taken for Uzbek; and the meme, a picture,
-// brings the keyboard back with it.
+// such as "🎲 Roll a die" may be taken for Uzbek; and a picture answering
+// a question brings the keyboard back with it.
 func TestMenusSpeakThePressedLabelsLanguage(t *testing.T) {
 	f := newFixture()
 	withToolRunner(f)
-	f.opts.MemesEnabled = true
 	f.replier.draws = 1
 
-	sent := f.run(textFrom(userID, keyboardMeme.en), textFrom(userID, keyboardMLBB.en))
-	if len(sent) != 2 || sent[0].text != askedRequests["meme"].question.en || sent[1].text != textMLBBMenu.uz {
+	sent := f.run(textFrom(userID, keyboardDie.en), textFrom(userID, keyboardMLBB.en))
+	if len(sent) != 2 || sent[0].text != textWhichGame.en || sent[1].text != textMLBBMenu.uz {
 		t.Fatalf("sent = %+v; want the English question, and the MLBB menu in the app's language", sent)
 	}
 
-	sent = f.run(replyTo(askedRequests["meme"].question.en, "random"))
+	sent = f.run(replyTo(askedRequests["skins"].question.en, "Alpha"))
 	if last := sent[len(sent)-1]; !last.photo || last.keyboard == nil {
-		t.Errorf("meme = %+v; want a picture with the keyboard", last)
+		t.Errorf("answer = %+v; want a picture with the keyboard", last)
 	}
 }
