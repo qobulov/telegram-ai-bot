@@ -20,7 +20,9 @@ type Exchange struct {
 // ExchangesElsewhere returns up to limit of the person's most recent
 // exchanges with the bot since since, in any chat but chatID, oldest first.
 // Only their own messages and the answers to them are read: what anyone
-// else said in those chats is not.
+// else said in those chats is not. A business account's chats with its
+// customers, kept under the account's owner, are no one's elsewhere: they
+// stay apart from both the customer's and the owner's chats with the bot.
 func (s *Store) ExchangesElsewhere(ctx context.Context, userID, chatID int64, since time.Time, limit int) ([]Exchange, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT chat_id, title, asked, answer, created_at FROM (
@@ -37,6 +39,7 @@ func (s *Store) ExchangesElsewhere(ctx context.Context, userID, chatID int64, si
 			) a ON q.telegram_message_id IS NOT NULL
 			WHERE q.role = 'user' AND c.chat_id <> $2 AND q.created_at >= $3
 			  AND (q.author_id = $1 OR c.user_id = $1)
+			  AND NOT (c.chat_id > 0 AND c.user_id IS DISTINCT FROM c.chat_id)
 			ORDER BY q.id DESC
 			LIMIT $4
 		) recent

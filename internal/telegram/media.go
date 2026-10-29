@@ -25,6 +25,9 @@ type Album struct {
 	ReplyToMessageID int64
 	Photos           [][]byte
 	Caption          string
+	// BusinessConnectionID, when set, sends it on behalf of that
+	// connection's business account.
+	BusinessConnectionID string
 }
 
 type inputMediaPhoto struct {
@@ -75,6 +78,9 @@ func albumForm(album Album) (io.Reader, string, error) {
 			return nil, "", err
 		}
 		fields["reply_parameters"] = string(encoded)
+	}
+	if album.BusinessConnectionID != "" {
+		fields["business_connection_id"] = album.BusinessConnectionID
 	}
 	var body bytes.Buffer
 	form := multipart.NewWriter(&body)

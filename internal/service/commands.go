@@ -65,6 +65,10 @@ func say(text string) outcome { return outcome{text: text} }
 // context rather than the polling one, so that a shutdown lets the turn in
 // progress finish instead of cutting it off.
 func (s *Service) process(in incoming) {
+	if in.business != nil {
+		s.processBusiness(in)
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), s.opts.TurnTimeout)
 	defer cancel()
 
@@ -417,6 +421,7 @@ func (s *Service) replyPictures(in incoming, drawings []tools.Drawing, caption s
 	defer cancel()
 	sentID, err := s.opts.Sender.SendMediaGroup(ctx, telegram.Album{
 		ChatID: in.msg.Chat.ID, ReplyToMessageID: in.replyTarget(), Photos: photos, Caption: caption,
+		BusinessConnectionID: in.businessConnectionID(),
 	})
 	var refused *telegram.APIError
 	switch {
@@ -444,10 +449,11 @@ func (s *Service) replyPhoto(in incoming, drawing tools.Drawing, caption string)
 	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
 	defer cancel()
 	sentID, err := s.opts.Sender.SendPhoto(ctx, telegram.Photo{
-		ChatID:           in.msg.Chat.ID,
-		ReplyToMessageID: in.replyTarget(),
-		Data:             drawing.Data,
-		Caption:          caption,
+		ChatID:               in.msg.Chat.ID,
+		ReplyToMessageID:     in.replyTarget(),
+		Data:                 drawing.Data,
+		Caption:              caption,
+		BusinessConnectionID: in.businessConnectionID(),
 	})
 	if err != nil {
 		s.opts.Logger.Error("send photo failed", "chat_id", in.msg.Chat.ID, "error", err)
@@ -1389,6 +1395,8 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 		return s.refund(ctx, in)
 	case "/paysupport":
 		return s.paySupport(in)
+	case "/business":
+		return s.businessCommand(ctx, in)
 	default:
 		return textUnknown.to(in)
 	}

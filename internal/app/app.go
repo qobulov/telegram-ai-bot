@@ -357,6 +357,10 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		StickerImporter:  &stickers.Importer{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger), Workers: stickerWorkers, Logger: logger},
 		Answers:          store,
 		Inline:           bot.Client,
+
+		Business:           store,
+		BusinessLookup:     bot.Client,
+		BusinessDailyLimit: cfg.BusinessDailyLimit,
 	}
 	if cfg.GiphyAPIKey != "" {
 		opts.GIFs = &gifs.Client{APIKey: cfg.GiphyAPIKey, HTTPClient: &http.Client{Timeout: giphyTimeout}}
@@ -392,14 +396,19 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 		tools.GroupStatsTool(tools.GroupStatsOptions{Store: store, BotID: bot.User.ID, Location: cfg.Location}),
 		tools.PunishmentsTool(tools.PunishmentsOptions{Store: store, Creators: groupMembers{client: bot.Client, botID: bot.User.ID}, BotID: bot.User.ID, Location: cfg.Location}),
 	)
-	// Only owners known by ID can be written to, and only they are.
+	// Only owners known by ID can be written to, and only they are. Only
+	// their business accounts are used, too: the account speaks for whoever
+	// holds it.
 	if len(cfg.OwnerIDs) > 0 {
 		builtin = append(builtin, tools.NotifyOwnerTool(tools.NotifyOptions{
 			Quota:    store,
 			Telegram: bot.Client,
 			Owners:   slices.Sorted(maps.Keys(cfg.OwnerIDs)),
 			Location: cfg.Location,
-		}))
+		}),
+			tools.StoryTool(tools.StoryOptions{Accounts: store, Poster: bot.Client}),
+			tools.ChecklistTool(tools.ChecklistOptions{Accounts: store, Sender: bot.Client, Location: cfg.Location}),
+		)
 	}
 	if len(cfg.OwnerUsernames) > 0 {
 		builtin = append(builtin,

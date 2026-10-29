@@ -67,8 +67,9 @@ func NewClient(opts Options) *Client {
 // Telegram sends only once inline mode is on in @BotFather, and the check
 // before a payment for premium, without which Telegram takes none. Edited
 // messages are guarded as new ones are, and join requests are answered
-// with a button to press.
-var allowedUpdates = []string{"message", "my_chat_member", "chat_member", "callback_query", "inline_query", "pre_checkout_query", "edited_message", "chat_join_request"}
+// with a button to press. A Telegram Business account connecting the bot,
+// and its chats' messages, are what the bot answers customers from.
+var allowedUpdates = []string{"message", "my_chat_member", "chat_member", "callback_query", "inline_query", "pre_checkout_query", "edited_message", "chat_join_request", "business_connection", "business_message"}
 
 type getUpdatesParams struct {
 	Offset         int64    `json:"offset"`
@@ -230,6 +231,9 @@ type Photo struct {
 	ReplyToMessageID int64
 	Data             []byte
 	Caption          string
+	// BusinessConnectionID, when set, sends it on behalf of that
+	// connection's business account.
+	BusinessConnectionID string
 }
 
 // SendPhoto uploads a picture and returns the ID of the sent message. A
@@ -247,6 +251,7 @@ func (c *Client) SendPhoto(ctx context.Context, photo Photo) (int64, error) {
 			fields["caption_entities"] = string(encoded)
 		}
 	}
+	fields["business_connection_id"] = photo.BusinessConnectionID // left out when ""
 	return c.upload(ctx, "sendPhoto", upload{
 		chatID: photo.ChatID, replyTo: photo.ReplyToMessageID, fields: fields,
 		field: "photo", filename: "image.png", data: photo.Data,
@@ -511,11 +516,12 @@ func (c *Client) SendAnimation(ctx context.Context, chatID int64, animation stri
 }
 
 type sendMessageParams struct {
-	ChatID          int64            `json:"chat_id"`
-	Text            string           `json:"text"`
-	Entities        []messageEntity  `json:"entities,omitempty"`
-	ReplyParameters *replyParameters `json:"reply_parameters,omitempty"`
-	ReplyMarkup     *inlineKeyboard  `json:"reply_markup,omitempty"`
+	BusinessConnectionID string           `json:"business_connection_id,omitempty"`
+	ChatID               int64            `json:"chat_id"`
+	Text                 string           `json:"text"`
+	Entities             []messageEntity  `json:"entities,omitempty"`
+	ReplyParameters      *replyParameters `json:"reply_parameters,omitempty"`
+	ReplyMarkup          *inlineKeyboard  `json:"reply_markup,omitempty"`
 }
 
 type inlineKeyboard struct {
@@ -562,7 +568,7 @@ func (c *Client) SendMessage(ctx context.Context, msg Outgoing) (int64, error) {
 			continue
 		}
 		text, entities := formatted(chunk)
-		id, err := c.sendChunk(ctx, sendMessageParams{ChatID: msg.ChatID, Text: text, Entities: entities, ReplyParameters: reply, ReplyMarkup: buttons})
+		id, err := c.sendChunk(ctx, sendMessageParams{BusinessConnectionID: msg.BusinessConnectionID, ChatID: msg.ChatID, Text: text, Entities: entities, ReplyParameters: reply, ReplyMarkup: buttons})
 		if err != nil {
 			return firstID, err
 		}
@@ -1070,9 +1076,10 @@ func sleep(ctx context.Context, d time.Duration) error {
 }
 
 type sendRichMessageParams struct {
-	ChatID          int64            `json:"chat_id"`
-	RichMessage     inputRichMessage `json:"rich_message"`
-	ReplyParameters *replyParameters `json:"reply_parameters,omitempty"`
+	BusinessConnectionID string           `json:"business_connection_id,omitempty"`
+	ChatID               int64            `json:"chat_id"`
+	RichMessage          inputRichMessage `json:"rich_message"`
+	ReplyParameters      *replyParameters `json:"reply_parameters,omitempty"`
 }
 
 type inputRichMessage struct {
@@ -1083,7 +1090,7 @@ type inputRichMessage struct {
 // Markdown, whole: a rich message holds far more than an ordinary one.
 func (c *Client) sendRich(ctx context.Context, msg Outgoing) (int64, error) {
 	var sent sentMessage
-	params := sendRichMessageParams{ChatID: msg.ChatID, RichMessage: inputRichMessage{Markdown: msg.Text}, ReplyParameters: replyTo(msg.ReplyToMessageID)}
+	params := sendRichMessageParams{BusinessConnectionID: msg.BusinessConnectionID, ChatID: msg.ChatID, RichMessage: inputRichMessage{Markdown: msg.Text}, ReplyParameters: replyTo(msg.ReplyToMessageID)}
 	if err := c.call(ctx, "sendRichMessage", params, &sent); err != nil {
 		return 0, err
 	}

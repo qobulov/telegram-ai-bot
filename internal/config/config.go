@@ -171,6 +171,10 @@ type Config struct {
 	PremiumPrice      int
 	PremiumDays       int
 	PremiumDailyLimit int
+	// BusinessDailyLimit caps the answers each customer of an owner's
+	// Telegram Business account gets in a day, from midnight in Location;
+	// 0 turns it off.
+	BusinessDailyLimit int
 	// PrivateChats is whom the bot answers in private chats: "on" everyone,
 	// "owners" its owners only, "off" nobody, which keeps it to groups.
 	PrivateChats string
@@ -234,6 +238,7 @@ func Load(getenv func(string) string) (Config, error) {
 		PremiumPrice:            r.integer("PREMIUM_PRICE_STARS", 0, 0),
 		PremiumDays:             r.positive("PREMIUM_DAYS", 30),
 		PremiumDailyLimit:       r.positive("PREMIUM_DAILY_LIMIT", 50),
+		BusinessDailyLimit:      r.integer("BUSINESS_DAILY_LIMIT", 30, 0),
 		PrivateChats:            r.privateChats(),
 		RequiredChannels:        r.requiredChannels(),
 		MinGroupMembers:         r.integer("GROUP_MIN_MEMBERS", 6, 0),

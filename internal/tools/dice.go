@@ -75,8 +75,9 @@ func DiceTool(opts DiceOptions) Tool {
 			},
 			"additionalProperties": false
 		}`),
-		Timeout: diceTimeout,
-		Run:     d.run,
+		Timeout:    diceTimeout,
+		NoBusiness: true,
+		Run:        d.run,
 	}
 }
 

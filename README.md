@@ -36,14 +36,15 @@ prices).
 9. [Live data](#live-data)
 10. [Daily limit in private chats](#daily-limit-in-private-chats)
 11. [Inline mode](#inline-mode)
-12. [Groups](#groups)
-13. [VPS deployment (systemd)](#vps-deployment-systemd)
-14. [Docker Compose deployment (optional)](#docker-compose-deployment-optional)
-15. [Vercel deployment (webhook)](#vercel-deployment-webhook)
-16. [Backup and restore](#backup-and-restore)
-17. [Long polling and webhooks](#long-polling-and-webhooks)
-18. [Security checklist](#security-checklist)
-19. [Troubleshooting](#troubleshooting)
+12. [Telegram Business](#telegram-business)
+13. [Groups](#groups)
+14. [VPS deployment (systemd)](#vps-deployment-systemd)
+15. [Docker Compose deployment (optional)](#docker-compose-deployment-optional)
+16. [Vercel deployment (webhook)](#vercel-deployment-webhook)
+17. [Backup and restore](#backup-and-restore)
+18. [Long polling and webhooks](#long-polling-and-webhooks)
+19. [Security checklist](#security-checklist)
+20. [Troubleshooting](#troubleshooting)
 
 ## Architecture
 
@@ -132,6 +133,16 @@ moderation_actions(id PK, chat_id, action, requester_id, target_user_id,
                    update_id, created_at, UNIQUE (update_id, action))
 join_requests(chat_id, user_id, user_chat_id, expires_at, created_at,
               PK (chat_id, user_id))
+business_connections(id PK, user_id, user_chat_id, first_name, username,
+                     can_reply, can_manage_stories, enabled, refused,
+                     auto_reply, connected_at, updated_at)
+business_chats(connection_id -> business_connections, chat_id, first_name,
+               username, last_message_at, owner_wrote_at,
+               PK (connection_id, chat_id))
+business_replies(id PK, connection_id, chat_id, created_at)
+business_checklists(connection_id -> business_connections, chat_id,
+                    message_id, title, tasks jsonb, sent_at,
+                    PK (connection_id, chat_id, message_id))
 schema_migrations(version PK, applied_at)
 ```
 
@@ -141,6 +152,11 @@ There are two kinds of conversation, and they are never loaded together:
 - **Group:** one per group, shared by its members (`user_id` is NULL). Each
   stored user message starts with its author's first name, and the author's
   ID and name are also kept in `author_id` and `author_name`.
+- **Business:** one per customer of an owner's
+  [business account](#telegram-business): `chat_id` is the customer's chat
+  with the account, which is the customer's ID, and `user_id` the owner's.
+  It is never the customer's own private chat with the bot, whose `user_id`
+  is the customer's.
 
 A conversation's messages are deleted with it through `ON DELETE CASCADE`.
 `telegram_message_id` and
@@ -211,6 +227,7 @@ in the environment win over the file.
 | `PREMIUM_PRICE_STARS` | `0` | Price of [premium](#premium) in Telegram Stars; `0` sells none. Off by default, so that no deploy starts taking money unasked |
 | `PREMIUM_DAYS` | `30` | Days one purchase of premium lasts; buying again before it ends adds them to its end |
 | `PREMIUM_DAILY_LIMIT` | `50` | Answers a day in private chats while premium lasts; premium is sold only when this is above `PRIVATE_DAILY_LIMIT` |
+| `BUSINESS_DAILY_LIMIT` | `30` | Answers each customer gets per day from an owner's [business account](#telegram-business), from midnight in `GROUP_HISTORY_TIMEZONE`; past it, nothing, not even a notice. Failed turns are not counted; `0` turns it off. Counted in the database |
 | `PRIVATE_CHATS` | `on` | Whom she answers in private chats: `on` everyone, `owners` the owners only, `off` nobody, so that she works in groups only. A private message that is not answered gets only a friendly reaction picked at random in code, never a notice, and the model is not asked. A group smaller than `GROUP_MIN_MEMBERS` counts as a private chat here, so that a small group cannot get around it; there, someone who is not answered gets only a 👀 reaction, and no call is made to the model, not even to transcribe a voice message. With `off`, owners cannot use private-chat tools such as broadcasts either |
 | `REQUEST_TIMEOUT_SECONDS`     | `45`                           | Time budget for answering one message                                                                        |
 | `MAX_INPUT_CHARS`             | `4000`                         | Longest user message accepted                                                                                |
@@ -535,6 +552,10 @@ by moderation; the bot logs a warning at startup.
 Owners can give the bot orders that last, with the owner-only `group_rules`
 tool; see [Standing rules and the ignore list](#standing-rules-and-the-ignore-list).
 
+An owner with Telegram Premium can connect the bot to their own account as
+its chatbot, for it to answer their customers, post their stories and send
+them checklists; see [Telegram Business](#telegram-business).
+
 Owners can also ask the bot about its own data ("Maria, nechta guruhdasan?"),
 which it looks up with the owner-only `bot_database` tool:
 
@@ -750,6 +771,118 @@ all three can be changed with `/set`.
 - `/paysupport`, which Telegram asks of every bot taking Stars, tells
   users to write to the owners, by their usernames, about a payment.
 - Payments are never deleted by the daily cleanup.
+
+## Telegram Business
+
+An owner with Telegram Premium can connect Maria to their own account as
+its chatbot. She then answers the customers who write to that account, on
+its behalf, and, asked in her private chat, posts the account's stories and
+sends its customers checklists.
+
+**Connecting her.** In Telegram: Settings → Telegram Business → Chatbots,
+add the bot by its `@username`, choose which chats it may answer (all
+private chats, or some, with exceptions), and in its settings turn on
+replying to messages and, for stories, managing stories. Telegram reports
+the connection (`business_connection`); Maria records it in
+`business_connections` and tells the owner, in her private chat, what she
+may do there and what she lacks. Disconnecting her, or changing what she may
+do, is reported and recorded the same way.
+
+- **Owners only.** Only an account whose user is in `BOT_OWNER_IDS` is
+  used: the account speaks for whoever holds it, and a username can change
+  hands, so `BOT_OWNER_USERNAME` alone is not enough. Anyone else's
+  connection is recorded with `refused`, logged (`a business account that is
+  none of the owners' connected the bot; ignoring it`), and never answered
+  through.
+- **A connection she has no record of**, as one made before this version,
+  is asked of Telegram (`getBusinessConnection`) at its first message, and
+  recorded.
+
+**Answering customers.** A customer's message to the account comes as a
+`business_message`, in the account's private chat with them. Maria answers
+it as she answers a private chat, with the persona, the conversation's
+history and the tools, and sends the answer with the connection's
+`business_connection_id`, so that it comes from the account. Each turn
+tells the model whose account it speaks for: to be the owner's warm, brief
+assistant, and to leave prices, orders, payments, meetings and anything
+else only the owner can promise to the owner. Every message there, the
+owner's too, is noted in `business_chats`, the customer's name and when the
+owner last wrote.
+
+- **Never the owner.** The owner's own messages in the chat are never
+  answered, nor messages a bot sent for the account (her own answers among
+  them, which Telegram also reports), another bot's, a service message, or
+  another owner's: owners talk to her in her own chat. When the owner wrote
+  in a customer's chat in the last 15 minutes she leaves it to them: two
+  answering at once, she without knowing what the owner said, would be
+  worse than either alone.
+- **Only where she may.** Telegram sends her only the chats the owner gave
+  her, and she answers only while the connection is enabled, lets her
+  reply (Telegram allows it in chats with an incoming message in the last
+  24 hours) and the owner has auto-reply on.
+- **Apart from her own chats.** The conversation is kept under the owner
+  (see [Database schema](#database-schema)), never mixed with the
+  customer's own private chat with Maria, and the turn has none of that
+  chat's extras: no owners' notice or standing rules, no profile, no talks
+  in other chats. The tools that send to the chat themselves, as the bot
+  rather than the account, or keep what they learn of the person for their
+  own chats (`send_dice`, `my_profile`) are not offered (`NoBusiness`), nor,
+  as ever, the group and owner tools.
+- **Words and pictures only.** Text and pictures (drawings, memes, albums)
+  go through the account. A reaction, sticker, GIF, file or song does not,
+  and an answer that is only one of those sends nothing; the model is told
+  so. A command such as `/help` is only text for the model: the bot's
+  commands are for its own chats.
+- **Limits, silently.** The flood guard (`USER_RATE_LIMIT_PER_MINUTE`)
+  applies, and each customer gets `BUSINESS_DAILY_LIMIT` answers a day
+  (default 30), counted per customer chat in `business_replies`. No notice
+  ever goes to a customer from the owner's account: past a limit, when the
+  workers are busy, or when the turn fails (an error, a timeout, an
+  overloaded model), she sends nothing, and the failed turn's answer is
+  given back. Skips are recorded as in other chats (`business_limit`,
+  `flood`).
+- **No typing, no read marks.** She does not show "typing" or mark
+  messages read in the account.
+
+**/business**, in an owner's private chat with her, shows their business
+account: whether it is connected, whether she may reply, whether auto-reply
+is on, and whether she may post stories, or how to connect her when it is
+not. `/business off` stops her answering its customers, `/business on`
+starts her again; it holds for all the owner's connections, and a new
+connection takes the owner's last choice. For anyone else, or in a group,
+it is an unknown command.
+
+**Stories.** "Maria, buni storyga joyla" with a photo, or in reply to one,
+or "chizib storyga qo'y", has the owner-only `post_story` tool post a story
+on the owner's business account (`postStory`, which needs *manage stories*).
+The picture is the one drawn or made in the same turn (`generate_image`,
+`make_meme`), or else the photo the owner sent or replied to; a sticker
+works too. Telegram takes a story only as a new 1080×1920 upload of at most
+10 MB, so the picture is fitted whole in the middle, on itself blown up to
+cover the story and darkened, and sent as a JPEG. An optional caption, up to
+2048 characters, and how long it stays up, 6, 12, 24 (the default) or 48
+hours. It works only for an owner, only in their private chat with her, and
+only on their own account, the connection recorded for their ID; the model
+names no account.
+
+**Checklists.** Telegram lets bots send checklists only on behalf of a
+business account. The owner-only `business_checklist` tool, in the owner's
+private chat:
+
+- `chats` lists the customer chats she has seen through the account, the
+  latest first.
+- `send` sends a checklist, a title (up to 255 characters) and 1 to 30
+  tasks (up to 100 each), into a customer's chat (`sendChecklist`), named by
+  the customer's first name, `@username` or chat ID; a name two customers
+  share needs the ID. Both the owner and the customer can tick its tasks
+  and add more. It is kept in `business_checklists`.
+- `edit` replaces the title and tasks of the last checklist she sent into
+  that chat (`editMessageChecklist`). Bots cannot tick tasks: the owner and
+  the customer do that in the chat.
+
+Like an answer, a checklist can go only to a chat with an incoming message
+in the last 24 hours, and needs the right to reply; Telegram's refusal is
+passed to the owner.
 
 ## Groups
 
@@ -1715,6 +1848,27 @@ The edited messages, join requests and purge update needs:
    declining known spammers where the spam guard is on. Purge needs *Delete
    messages*, which she has for deletions already.
 
+### Deploying Telegram Business
+
+1. **Apply migration 0041 before deploying** (`make migrate`, as above). It
+   adds `business_connections`, `business_chats`, `business_replies` and
+   `business_checklists` and changes nothing else; the new version refuses
+   to start without it.
+2. **Set `BOT_OWNER_IDS`** in Vercel if it is not set: only those owners'
+   business accounts are used. `BUSINESS_DAILY_LIMIT` defaults to 30.
+3. **Deploy.** The bot now also asks Telegram for `business_connection` and
+   `business_message` updates. The function sets the webhook again at its
+   first start when the kinds differ (logged as "webhook set again to
+   receive every update kind the bot handles"); `go run ./cmd/bot
+   set-webhook https://YOUR-APP.vercel.app/api/webhook` does it at once.
+   Long polling asks for them on every request.
+4. **In @BotFather**, open the bot's settings and turn on *Business Mode*;
+   without it Telegram does not offer the bot as a chatbot.
+5. **Each owner with Telegram Premium** connects her: Settings → Telegram
+   Business → Chatbots, add the bot, choose the chats, and turn on replying
+   to messages and managing stories. She writes to them with what she may
+   do; `/business` shows it again.
+
 ### Daily cleanup
 
 `vercel.json` schedules a Vercel Cron job that calls `/api/cleanup` every
@@ -1935,6 +2089,7 @@ Known limits:
 | "You're sending messages too quickly"                     | Per-user rate limit, announced in private chats only. Raise `USER_RATE_LIMIT_PER_MINUTE` if it is too strict.                                                                                                                                                                                 |
 | A payment fails after Pay is tapped                       | Telegram got no answer to its check before the payment: the webhook was set before the bot asked for `pre_checkout_query`. Redeploy, or run `set-webhook` again. `payment refused before it was made` in the log is the bot saying no, with the reason. |
 | "That's today's limit", then silence, in a private chat   | The private daily limit: the log shows `private daily limit reached`. Raise `PRIVATE_DAILY_LIMIT`, or `0` to turn it off; owners are never limited. `private message count failed; answering anyway` means the database could not be asked. |
+| Customers of a business account get no answer             | `/business` in the owner's private chat says what is missing: no connection, no right to reply, or auto-reply off. The owner must be in `BOT_OWNER_IDS` (the log shows `a business account that is none of the owners' connected the bot`); the chat must be one the owner gave her; she leaves a chat to the owner for 15 minutes after they write there; past `BUSINESS_DAILY_LIMIT` she is silent (`business daily limit reached`). No `business_message` at all: the webhook predates the update kinds; redeploy or run `set-webhook`. |
 | "I'm handling a lot of messages right now"                | Worker queues are full. Raise `MAX_CONCURRENT_REQUESTS`, and `pool_max_conns` to match.                                                                                                                                                                                                       |
 | The bot forgot the conversation                           | History is limited to `MAX_HISTORY_MESSAGES`, and idle conversations are deleted after `RETENTION_DAYS`.                                                                                                                                                                                      |
 | Service will not start under systemd                      | `journalctl -u telegram-ai-agent -n 50`. Check the environment file's owner and mode, and that it has no quotes around values.                                                                                                                                                                |

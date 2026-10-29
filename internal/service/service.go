@@ -352,6 +352,16 @@ type Options struct {
 	// FootballEnabled is true when the model has the football tool; /help
 	// offers football results only then.
 	FootballEnabled bool
+
+	// Business keeps the owners' Telegram Business accounts, and
+	// BusinessLookup asks Telegram about one the bot has no record of; with
+	// Business nil, business updates are ignored and /business is unknown.
+	// BusinessDailyLimit is how many answers each customer of a business
+	// account gets in a day, from midnight in Location; 0 does not limit.
+	// See business.go.
+	Business           BusinessBook
+	BusinessLookup     BusinessLookup
+	BusinessDailyLimit int
 }
 
 // Service processes updates on a fixed pool of workers.
@@ -449,6 +459,18 @@ type incoming struct {
 	// one being handled: a member's message the asker replied to, when the
 	// answer speaks to that member.
 	replyTo int64
+	// business is, for a customer's message to an owner's business account,
+	// that account, on whose behalf the answer is sent; nil elsewhere.
+	business *businessChat
+}
+
+// businessConnectionID is the business connection answers are sent
+// through, or "" outside a business chat.
+func (in incoming) businessConnectionID() string {
+	if in.business == nil {
+		return ""
+	}
+	return in.business.connectionID
 }
 
 // replyTarget is the message an answer should reply to: the original message
@@ -569,7 +591,8 @@ func (s *Service) HandleNow(update telegram.Update) {
 // handledApart handles, at once and off the workers, an update that is no
 // message to answer, and reports whether update was one: a change of
 // membership, a button press, an edited message, which only the guards
-// look at, or a request to join a group.
+// look at, a request to join a group, or a business account connecting
+// the bot.
 func (s *Service) handledApart(update telegram.Update) bool {
 	switch {
 	case update.MyChatMember != nil:
@@ -582,6 +605,8 @@ func (s *Service) handledApart(update telegram.Update) bool {
 		s.guardEdited(update)
 	case update.ChatJoinRequest != nil:
 		s.requestedJoin(update.ChatJoinRequest)
+	case update.BusinessConnection != nil:
+		s.recordBusinessConnection(update.BusinessConnection)
 	default:
 		return false
 	}
@@ -710,6 +735,9 @@ func (s *Service) knowMember(chatID int64, user *telegram.User, wrote time.Time)
 // a group, addressed to the bot. The sender's ID from the update is the
 // identity used for permissions from here on.
 func (s *Service) accept(update telegram.Update) (incoming, bool) {
+	if update.BusinessMessage != nil {
+		return s.acceptBusiness(update)
+	}
 	msg := update.Message
 	if msg == nil || msg.From == nil || !s.acceptsSender(msg) {
 		return incoming{}, false
@@ -1047,9 +1075,10 @@ func (s *Service) markMuted(chatID int64, muted bool) {
 
 // notifyBusy queues a "busy" reply without blocking the polling loop. If even
 // that queue is full the notice is dropped: the bot is overloaded. A message
-// that would not be answered anyway gets none.
+// that would not be answered anyway gets none, nor does a business
+// account's customer, who is never sent a notice from it.
 func (s *Service) notifyBusy(in incoming) {
-	if s.silenced(in) || in.unanswered {
+	if s.silenced(in) || in.unanswered || in.business != nil {
 		return
 	}
 	select {
@@ -1067,7 +1096,7 @@ func (s *Service) sendBusyNotices() {
 func (s *Service) work(queue <-chan incoming) {
 	for in := range queue {
 		if s.closing.Load() {
-			if !s.silenced(in) && !in.unanswered {
+			if !s.silenced(in) && !in.unanswered && in.business == nil {
 				s.reply(in, textBusy.to(in))
 			}
 			continue
@@ -1109,10 +1138,11 @@ func (s *Service) replyWithButtons(in incoming, text string, buttons [][]telegra
 	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
 	defer cancel()
 	sentID, err := s.opts.Sender.SendMessage(ctx, telegram.Outgoing{
-		ChatID:           in.msg.Chat.ID,
-		Text:             text,
-		ReplyToMessageID: in.replyTarget(),
-		Buttons:          buttons,
+		ChatID:               in.msg.Chat.ID,
+		Text:                 text,
+		ReplyToMessageID:     in.replyTarget(),
+		Buttons:              buttons,
+		BusinessConnectionID: in.businessConnectionID(),
 	})
 	if err != nil {
 		s.opts.Logger.Error("send message failed", "chat_id", in.msg.Chat.ID, "error", err)
