@@ -775,6 +775,15 @@ members; and for its admins also `/mute`, `/unmute`, `/ignore` and
 `/unignore`. In a group the menu adds the bot's username itself. A failure is
 only logged.
 
+Each start also sets the admin rights she asks for when someone makes her an
+admin (`setMyDefaultAdministratorRights`, `groupAdminRights` and
+`channelAdminRights` in the same file), which Telegram's dialog then shows
+ticked: in groups the ones her features use, *Delete messages*, *Ban users*,
+*Pin messages*, *Invite users*, *Manage topics*, *Change group info* and *Add
+new admins*; in channels *Post messages* and *Edit messages*, for the owners'
+broadcasts. Whoever adds her can still untick any of them, and she only ever
+uses a right both she and the admin asking hold. A failure is only logged.
+
 Each start also sets the profile's bio and description (`internal/app/profile.go`),
 in Uzbek for everyone and in Russian and English for those apps, where they differ
 from Telegram's. Change them there, not in @BotFather or through the bot: the next

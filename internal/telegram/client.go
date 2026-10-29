@@ -66,9 +66,11 @@ func NewClient(opts Options) *Client {
 // each group's members true, button presses, inline queries, which
 // Telegram sends only once inline mode is on in @BotFather, and the check
 // before a payment for premium, without which Telegram takes none. Edited
-// messages are guarded as new ones are, and join requests are answered
-// with a button to press.
-var allowedUpdates = []string{"message", "my_chat_member", "chat_member", "callback_query", "inline_query", "pre_checkout_query", "edited_message", "chat_join_request"}
+// messages are guarded as new ones are, join requests are answered with a
+// button to press, and boosts, sent where the bot is an admin, with
+// thanks. A boost taken away gets no word, so removed_chat_boost is not
+// asked for.
+var allowedUpdates = []string{"message", "my_chat_member", "chat_member", "callback_query", "inline_query", "pre_checkout_query", "edited_message", "chat_join_request", "chat_boost"}
 
 type getUpdatesParams struct {
 	Offset         int64    `json:"offset"`
@@ -510,16 +512,78 @@ func (c *Client) SendAnimation(ctx context.Context, chatID int64, animation stri
 	return sent.MessageID, nil
 }
 
+// Venue is a place to send as a pin on the map, under its name.
+type Venue struct {
+	ChatID           int64
+	ReplyToMessageID int64
+	Latitude         float64
+	Longitude        float64
+	Title            string
+	Address          string
+}
+
+type sendVenueParams struct {
+	ChatID          int64            `json:"chat_id"`
+	Latitude        float64          `json:"latitude"`
+	Longitude       float64          `json:"longitude"`
+	Title           string           `json:"title"`
+	Address         string           `json:"address"`
+	ReplyParameters *replyParameters `json:"reply_parameters,omitempty"`
+}
+
+// SendVenue sends a pin on the map with the place's name and address, and
+// returns the sent message's ID.
+func (c *Client) SendVenue(ctx context.Context, v Venue) (int64, error) {
+	var sent sentMessage
+	params := sendVenueParams{ChatID: v.ChatID, Latitude: v.Latitude, Longitude: v.Longitude, Title: v.Title, Address: v.Address, ReplyParameters: replyTo(v.ReplyToMessageID)}
+	if err := c.call(ctx, "sendVenue", params, &sent); err != nil {
+		return 0, err
+	}
+	return sent.MessageID, nil
+}
+
 type sendMessageParams struct {
 	ChatID          int64            `json:"chat_id"`
 	Text            string           `json:"text"`
 	Entities        []messageEntity  `json:"entities,omitempty"`
 	ReplyParameters *replyParameters `json:"reply_parameters,omitempty"`
-	ReplyMarkup     *inlineKeyboard  `json:"reply_markup,omitempty"`
+	// ReplyMarkup is an *inlineKeyboard or a *replyKeyboard.
+	ReplyMarkup     any    `json:"reply_markup,omitempty"`
+	MessageEffectID string `json:"message_effect_id,omitempty"`
 }
 
 type inlineKeyboard struct {
 	InlineKeyboard [][]Button `json:"inline_keyboard"`
+}
+
+// replyKeyboard replaces the phone's keyboard with buttons that send their
+// text. It stays until another replaces it, shrunk to fit the buttons.
+type replyKeyboard struct {
+	Keyboard       [][]keyboardButton `json:"keyboard"`
+	IsPersistent   bool               `json:"is_persistent"`
+	ResizeKeyboard bool               `json:"resize_keyboard"`
+}
+
+type keyboardButton struct {
+	Text string `json:"text"`
+}
+
+// markup is what goes under msg's first message: its buttons, else its
+// keyboard, else nothing.
+func markup(msg Outgoing) any {
+	switch {
+	case len(msg.Buttons) > 0:
+		return &inlineKeyboard{InlineKeyboard: msg.Buttons}
+	case len(msg.Keyboard) > 0:
+		rows := make([][]keyboardButton, len(msg.Keyboard))
+		for i, row := range msg.Keyboard {
+			for _, text := range row {
+				rows[i] = append(rows[i], keyboardButton{Text: text})
+			}
+		}
+		return &replyKeyboard{Keyboard: rows, IsPersistent: true, ResizeKeyboard: true}
+	}
+	return nil
 }
 
 type replyParameters struct {
@@ -542,7 +606,8 @@ type sentMessage struct {
 // never make the send fail; its bold, code and bullets become entities
 // (see formatted).
 func (c *Client) SendMessage(ctx context.Context, msg Outgoing) (int64, error) {
-	if isRich(msg.Text) && len(msg.Buttons) == 0 {
+	// A rich message carries no buttons, keyboard or effect.
+	if isRich(msg.Text) && len(msg.Buttons) == 0 && len(msg.Keyboard) == 0 && msg.Effect == "" {
 		id, err := c.sendRich(ctx, msg)
 		var refused *APIError
 		// Telegram answered no, so nothing was sent: the plain message
@@ -552,26 +617,35 @@ func (c *Client) SendMessage(ctx context.Context, msg Outgoing) (int64, error) {
 		}
 	}
 	var firstID int64
-	reply := replyTo(msg.ReplyToMessageID)
-	var buttons *inlineKeyboard
-	if len(msg.Buttons) > 0 {
-		buttons = &inlineKeyboard{InlineKeyboard: msg.Buttons}
-	}
+	reply, buttons, effect := replyTo(msg.ReplyToMessageID), markup(msg), msg.Effect
 	for _, chunk := range Split(msg.Text, MessageLimit) {
 		if strings.TrimSpace(chunk) == "" {
 			continue
 		}
 		text, entities := formatted(chunk)
-		id, err := c.sendChunk(ctx, sendMessageParams{ChatID: msg.ChatID, Text: text, Entities: entities, ReplyParameters: reply, ReplyMarkup: buttons})
+		id, err := c.sendChunk(ctx, sendMessageParams{ChatID: msg.ChatID, Text: text, Entities: entities, ReplyParameters: reply, ReplyMarkup: buttons, MessageEffectID: effect})
 		if err != nil {
 			return firstID, err
 		}
 		if firstID == 0 {
 			firstID = id
 		}
-		reply, buttons = nil, nil
+		reply, buttons, effect = nil, nil, ""
 	}
 	return firstID, nil
+}
+
+// sendChunk sends one message, and sends it again without its effect when
+// Telegram refuses it with one: an effect is a flourish, which Telegram
+// plays only in private chats and only from the list it keeps.
+func (c *Client) sendChunk(ctx context.Context, params sendMessageParams) (int64, error) {
+	id, err := c.sendWithRetry(ctx, params)
+	var refused *APIError
+	if params.MessageEffectID != "" && errors.As(err, &refused) && refused.Code == http.StatusBadRequest {
+		params.MessageEffectID = ""
+		return c.sendWithRetry(ctx, params)
+	}
+	return id, err
 }
 
 func replyTo(messageID int64) *replyParameters {
@@ -581,7 +655,7 @@ func replyTo(messageID int64) *replyParameters {
 	return &replyParameters{MessageID: messageID, AllowSendingWithoutReply: true}
 }
 
-func (c *Client) sendChunk(ctx context.Context, params sendMessageParams) (int64, error) {
+func (c *Client) sendWithRetry(ctx context.Context, params sendMessageParams) (int64, error) {
 	for attempt := 1; ; attempt++ {
 		var sent sentMessage
 		err := c.call(ctx, "sendMessage", params, &sent)
@@ -722,6 +796,23 @@ func (c *Client) SetChatPhoto(ctx context.Context, chatID int64, jpeg []byte) er
 // DeleteChatPhoto removes a group's photo.
 func (c *Client) DeleteChatPhoto(ctx context.Context, chatID int64) error {
 	return c.call(ctx, "deleteChatPhoto", chatParams{ChatID: chatID}, nil)
+}
+
+type stickerSetNameParams struct {
+	ChatID         int64  `json:"chat_id"`
+	StickerSetName string `json:"sticker_set_name"`
+}
+
+// SetChatStickerSet gives a supergroup a sticker pack, by its name, that
+// every member may use there. Telegram allows it only where getChat says
+// CanSetStickerSet.
+func (c *Client) SetChatStickerSet(ctx context.Context, chatID int64, name string) error {
+	return c.call(ctx, "setChatStickerSet", stickerSetNameParams{ChatID: chatID, StickerSetName: name}, nil)
+}
+
+// DeleteChatStickerSet takes a supergroup's sticker pack away.
+func (c *Client) DeleteChatStickerSet(ctx context.Context, chatID int64) error {
+	return c.call(ctx, "deleteChatStickerSet", chatParams{ChatID: chatID}, nil)
 }
 
 // InviteLink asks for a new invite link to a group.
@@ -979,6 +1070,16 @@ func (c *Client) sendPoll(ctx context.Context, poll OutgoingPoll) (sentPoll, err
 	return sent, nil
 }
 
+// StopPoll closes a poll the bot sent, by its message's ID, and returns it
+// with its final counts.
+func (c *Client) StopPoll(ctx context.Context, chatID, messageID int64) (Poll, error) {
+	var poll Poll
+	if err := c.call(ctx, "stopPoll", messageParams{ChatID: chatID, MessageID: messageID}, &poll); err != nil {
+		return Poll{}, err
+	}
+	return poll, nil
+}
+
 type apiResponse struct {
 	OK          bool            `json:"ok"`
 	Result      json.RawMessage `json:"result"`
@@ -1119,6 +1220,39 @@ func (c *Client) SetMyCommands(ctx context.Context, scope string, commands []Bot
 	params.Scope.Type = scope
 	var ok bool
 	return c.call(ctx, "setMyCommands", params, &ok)
+}
+
+// AdministratorRights are the rights the bot asks for when someone makes it
+// an admin of a group or a channel, ticked in Telegram's dialog for them to
+// confirm. Every field is sent: Telegram needs them all, false included.
+type AdministratorRights struct {
+	IsAnonymous         bool `json:"is_anonymous"`
+	CanManageChat       bool `json:"can_manage_chat"`
+	CanDeleteMessages   bool `json:"can_delete_messages"`
+	CanManageVideoChats bool `json:"can_manage_video_chats"`
+	CanRestrictMembers  bool `json:"can_restrict_members"`
+	CanPromoteMembers   bool `json:"can_promote_members"`
+	CanChangeInfo       bool `json:"can_change_info"`
+	CanInviteUsers      bool `json:"can_invite_users"`
+	CanPostStories      bool `json:"can_post_stories"`
+	CanEditStories      bool `json:"can_edit_stories"`
+	CanDeleteStories    bool `json:"can_delete_stories"`
+	CanPostMessages     bool `json:"can_post_messages"`
+	CanEditMessages     bool `json:"can_edit_messages"`
+	CanPinMessages      bool `json:"can_pin_messages"`
+	CanManageTopics     bool `json:"can_manage_topics"`
+}
+
+type defaultRightsParams struct {
+	Rights      AdministratorRights `json:"rights"`
+	ForChannels bool                `json:"for_channels"`
+}
+
+// SetMyDefaultAdministratorRights sets the rights the bot asks for when made
+// an admin of a group, or with forChannels of a channel.
+func (c *Client) SetMyDefaultAdministratorRights(ctx context.Context, rights AdministratorRights, forChannels bool) error {
+	var ok bool
+	return c.call(ctx, "setMyDefaultAdministratorRights", defaultRightsParams{Rights: rights, ForChannels: forChannels}, &ok)
 }
 
 // SetMemberCommands sets the command menu one member sees in one group,

@@ -117,6 +117,7 @@ func serve(ctx context.Context, cfg config.Config, store *storage.Store, logger 
 		return err
 	}
 	app.SetCommandMenus(ctx, bot.Client, logger)
+	app.SetAdminRights(ctx, bot.Client, logger)
 	app.SetProfileTexts(ctx, bot.Client, logger)
 	svc, err := app.NewService(cfg, store, bot, app.Mode{MutedChats: mutedChats}, logger)
 	if err != nil {

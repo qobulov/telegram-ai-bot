@@ -8,7 +8,7 @@ import (
 
 // everyKind is allowed_updates as Telegram is sent it: every kind of update
 // the bot handles, in order.
-var everyKind = []any{"message", "my_chat_member", "chat_member", "callback_query", "inline_query", "pre_checkout_query", "edited_message", "chat_join_request"}
+var everyKind = []any{"message", "my_chat_member", "chat_member", "callback_query", "inline_query", "pre_checkout_query", "edited_message", "chat_join_request", "chat_boost"}
 
 func TestSecurityMethodsSendExactParams(t *testing.T) {
 	ctx := context.Background()

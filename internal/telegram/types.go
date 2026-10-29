@@ -29,6 +29,30 @@ type Update struct {
 	// ChatJoinRequest is someone asking to join a group whose admins approve
 	// new members. Telegram sends it only where the bot may invite users.
 	ChatJoinRequest *ChatJoinRequest `json:"chat_join_request"`
+	// ChatBoost is a boost added to, or changed in, a chat where the bot
+	// is an admin.
+	ChatBoost *ChatBoostUpdated `json:"chat_boost"`
+}
+
+// ChatBoostUpdated is a boost given to a chat, or one given before that
+// changed, such as by being renewed: Telegram sends one boost again then.
+type ChatBoostUpdated struct {
+	Chat  Chat      `json:"chat"`
+	Boost ChatBoost `json:"boost"`
+}
+
+// ChatBoost is one boost. Its ID tells a new boost from one sent again.
+type ChatBoost struct {
+	BoostID string          `json:"boost_id"`
+	Source  ChatBoostSource `json:"source"`
+}
+
+// ChatBoostSource is where a boost came from: "premium", a member's own;
+// "gift_code" or "giveaway", one given to them. User is who holds it, and
+// is nil for a giveaway nobody won.
+type ChatBoostSource struct {
+	Source string `json:"source"`
+	User   *User  `json:"user"`
 }
 
 // ChatJoinRequest is a request to join a group: who asks, and the private
@@ -211,12 +235,14 @@ type PhotoSize struct {
 type Sticker struct {
 	FileID string `json:"file_id"`
 	// FileUniqueID stays the same for a sticker, unlike FileID.
-	FileUniqueID string     `json:"file_unique_id"`
-	Emoji        string     `json:"emoji"`
-	IsAnimated   bool       `json:"is_animated"`
-	IsVideo      bool       `json:"is_video"`
-	FileSize     int64      `json:"file_size"`
-	Thumbnail    *PhotoSize `json:"thumbnail"`
+	FileUniqueID string `json:"file_unique_id"`
+	Emoji        string `json:"emoji"`
+	// SetName is the pack the sticker is from; empty for one in no pack.
+	SetName    string     `json:"set_name"`
+	IsAnimated bool       `json:"is_animated"`
+	IsVideo    bool       `json:"is_video"`
+	FileSize   int64      `json:"file_size"`
+	Thumbnail  *PhotoSize `json:"thumbnail"`
 }
 
 // StickerSet is a sticker pack.
@@ -278,11 +304,15 @@ type Poll struct {
 	Question string       `json:"question"`
 	Options  []PollOption `json:"options"`
 	IsClosed bool         `json:"is_closed"`
+	// TotalVoterCount is how many people voted, each once however many
+	// answers they picked.
+	TotalVoterCount int `json:"total_voter_count"`
 }
 
-// PollOption is one answer of a Poll.
+// PollOption is one answer of a Poll, with the votes it has.
 type PollOption struct {
-	Text string `json:"text"`
+	Text       string `json:"text"`
+	VoterCount int    `json:"voter_count"`
 }
 
 // User is a Telegram account: the sender of a message, or the bot itself.
@@ -426,11 +456,14 @@ type Chat struct {
 	// IsForum marks a supergroup whose messages are kept in topics.
 	IsForum bool `json:"is_forum,omitempty"`
 	// getChat alone sets the rest: what members of a group may do by
-	// default, its description, its photo and its latest pinned message.
-	Permissions   *ChatPermissions `json:"permissions,omitempty"`
-	Description   string           `json:"description,omitempty"`
-	Photo         *ChatPhoto       `json:"photo,omitempty"`
-	PinnedMessage *Message         `json:"pinned_message,omitempty"`
+	// default, its description, its photo, its latest pinned message, and
+	// its sticker pack and whether the bot may set one.
+	Permissions      *ChatPermissions `json:"permissions,omitempty"`
+	Description      string           `json:"description,omitempty"`
+	Photo            *ChatPhoto       `json:"photo,omitempty"`
+	PinnedMessage    *Message         `json:"pinned_message,omitempty"`
+	StickerSetName   string           `json:"sticker_set_name,omitempty"`
+	CanSetStickerSet bool             `json:"can_set_sticker_set,omitempty"`
 }
 
 // ChatPhoto is a group's photo; BigFileID downloads it at 640×640.
@@ -457,7 +490,18 @@ type Outgoing struct {
 	ReplyToMessageID int64
 	// Buttons are link buttons under the message, in rows.
 	Buttons [][]Button
+	// Keyboard, in a private chat, puts buttons in rows in place of the
+	// phone's keyboard, each sending its own text as if typed; it stays
+	// after the message. A message has Buttons or Keyboard, not both.
+	Keyboard [][]string
+	// Effect is the ID of an animation played over the message, such as
+	// EffectParty, which Telegram plays only in private chats.
+	Effect string
 }
+
+// EffectParty is the 🎉 message effect, one of the few Telegram offers in
+// every private chat. A message whose effect Telegram refuses goes without.
+const EffectParty = "5046509860389126442"
 
 // Button is a button under a message that opens a link, or, with Data,
 // tells the bot it was pressed without writing anything in the chat.

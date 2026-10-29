@@ -63,6 +63,44 @@ func TestSetCommandMenusFailure(t *testing.T) {
 	}
 }
 
+type fakeRightsSetter struct {
+	set map[bool]telegram.AdministratorRights
+	err error
+}
+
+func (f *fakeRightsSetter) SetMyDefaultAdministratorRights(_ context.Context, rights telegram.AdministratorRights, forChannels bool) error {
+	if f.set == nil {
+		f.set = map[bool]telegram.AdministratorRights{}
+	}
+	f.set[forChannels] = rights
+	return f.err
+}
+
+// Every right a group action needs is asked for, as the moderation and
+// topics tools name them, and nothing to hide or post as the group; a
+// channel gets posting and editing. A failure stops neither.
+func TestSetAdminRights(t *testing.T) {
+	setter := &fakeRightsSetter{err: errors.New("telegram is down")}
+	SetAdminRights(context.Background(), setter, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	group, channel := setter.set[false], setter.set[true]
+	asked := telegram.ChatMember{Status: "administrator", CanDeleteMessages: group.CanDeleteMessages, CanRestrictMembers: group.CanRestrictMembers,
+		CanPinMessages: group.CanPinMessages, CanPromoteMembers: group.CanPromoteMembers, CanChangeInfo: group.CanChangeInfo,
+		CanInviteUsers: group.CanInviteUsers, CanManageTopics: group.CanManageTopics}
+	for _, right := range []string{telegram.RightDeleteMessages, telegram.RightRestrictMembers, telegram.RightPinMessages, telegram.RightPromoteMembers,
+		telegram.RightChangeInfo, telegram.RightInviteUsers, telegram.RightManageTopics} {
+		if !asked.Has(right) {
+			t.Errorf("groups: %s is not asked for", right)
+		}
+	}
+	if group.IsAnonymous || group.CanPostMessages || group.CanManageVideoChats {
+		t.Errorf("groups: %+v asks for more than the bot uses", group)
+	}
+	if len(setter.set) != 2 || !channel.CanPostMessages || !channel.CanEditMessages || channel.CanDeleteMessages || channel.CanPromoteMembers {
+		t.Errorf("channels: %+v", channel)
+	}
+}
+
 // The swear judge thinks little whatever answers do: at medium its
 // thinking filled its few tokens and cut its one word off.
 func TestSwearJudgeThinksLittle(t *testing.T) {

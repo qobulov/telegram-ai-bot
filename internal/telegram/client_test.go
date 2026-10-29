@@ -1214,6 +1214,135 @@ func TestSendMessageSendsButtons(t *testing.T) {
 	}
 }
 
+// A keyboard replaces the phone's own, stays, and fits its buttons; it
+// keeps a rich-looking text plain, as buttons do.
+func TestSendMessageSendsAKeyboard(t *testing.T) {
+	client, api := newTestClient(t, okSent)
+	keyboard := [][]string{{"😂 Mem", "🕐 Soat nechi?"}, {"❓ Yordam"}}
+
+	if _, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: "- salom", Keyboard: keyboard}); err != nil {
+		t.Fatalf("SendMessage: %v", err)
+	}
+	sent := api.recorded()[0]
+	markup, _ := json.Marshal(sent.params["reply_markup"])
+	want := `{"is_persistent":true,"keyboard":[[{"text":"😂 Mem"},{"text":"🕐 Soat nechi?"}],[{"text":"❓ Yordam"}]],"resize_keyboard":true}`
+	if sent.method != "sendMessage" || string(markup) != want {
+		t.Errorf("call %s, reply_markup = %s\nwant %s", sent.method, markup, want)
+	}
+}
+
+// An effect goes with the first message of a long text only, and when
+// Telegram refuses the message with it, the message goes again without.
+func TestSendMessageSendsAnEffect(t *testing.T) {
+	client, api := newTestClient(t, okSent)
+	text := strings.Repeat("a", MessageLimit) + " " + strings.Repeat("b", 10)
+	if _, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: text, Effect: EffectParty}); err != nil {
+		t.Fatal(err)
+	}
+	calls := api.recorded()
+	if len(calls) != 2 || calls[0].params["message_effect_id"] != EffectParty || calls[1].params["message_effect_id"] != nil {
+		t.Errorf("effects = %v, %v; want only the first", calls[0].params["message_effect_id"], calls[1].params["message_effect_id"])
+	}
+
+	client, api = newTestClient(t, `{"ok":false,"error_code":400,"description":"Bad Request: EFFECT_ID_INVALID"}`, okSent)
+	id, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: "Tabriklayman!", Effect: "1"})
+	calls = api.recorded()
+	if err != nil || id != 1 || len(calls) != 2 || calls[1].params["message_effect_id"] != nil || calls[1].params["text"] != "Tabriklayman!" {
+		t.Errorf("id %d, %v; calls = %+v", id, err, calls)
+	}
+}
+
+// A refusal of a message without an effect is not sent again.
+func TestSendMessageWithoutEffectIsNotSentAgain(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":false,"error_code":400,"description":"Bad Request: chat not found"}`)
+	if _, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: "salom"}); err == nil || len(api.recorded()) != 1 {
+		t.Errorf("err = %v after %d calls", err, len(api.recorded()))
+	}
+}
+
+// The rights asked for go with every field, false ones too, and say
+// whether they are a channel's.
+func TestSetMyDefaultAdministratorRightsSendsEveryRight(t *testing.T) {
+	client, api := newTestClient(t, okTrue)
+	if err := client.SetMyDefaultAdministratorRights(context.Background(), AdministratorRights{CanPostMessages: true}, true); err != nil {
+		t.Fatal(err)
+	}
+	sent := api.recorded()[0]
+	rights, _ := sent.params["rights"].(map[string]any)
+	if sent.method != "setMyDefaultAdministratorRights" || sent.params["for_channels"] != true || len(rights) != 15 || rights["can_post_messages"] != true || rights["can_delete_messages"] != false {
+		t.Errorf("call = %+v", sent)
+	}
+}
+
+// Closing a poll names its message, and its counts come back.
+func TestStopPollReturnsTheCounts(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"id":"p1","question":"Osh?","is_closed":true,"total_voter_count":5,
+		"options":[{"text":"ha","voter_count":4},{"text":"yo'q","voter_count":1}]}}`)
+
+	poll, err := client.StopPoll(context.Background(), -100123, 88)
+	if err != nil || !poll.IsClosed || poll.TotalVoterCount != 5 || len(poll.Options) != 2 || poll.Options[0].VoterCount != 4 {
+		t.Fatalf("poll = %+v, %v", poll, err)
+	}
+	want := map[string]any{"chat_id": float64(-100123), "message_id": float64(88)}
+	if sent := api.recorded()[0]; sent.method != "stopPoll" || !reflect.DeepEqual(sent.params, want) {
+		t.Errorf("call = %+v, want stopPoll %v", sent, want)
+	}
+}
+
+func TestStickerSetMethodsSendExactParams(t *testing.T) {
+	client, api := newTestClient(t, okTrue)
+	ctx := context.Background()
+	if err := client.SetChatStickerSet(ctx, -100123, "cats_by_bot"); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.DeleteChatStickerSet(ctx, -100123); err != nil {
+		t.Fatal(err)
+	}
+	set, remove := api.recorded()[0], api.recorded()[1]
+	if want := map[string]any{"chat_id": float64(-100123), "sticker_set_name": "cats_by_bot"}; set.method != "setChatStickerSet" || !reflect.DeepEqual(set.params, want) {
+		t.Errorf("set = %+v, want %v", set, want)
+	}
+	if want := map[string]any{"chat_id": float64(-100123)}; remove.method != "deleteChatStickerSet" || !reflect.DeepEqual(remove.params, want) {
+		t.Errorf("delete = %+v, want %v", remove, want)
+	}
+}
+
+func TestSendVenueSendsThePlace(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"message_id":91}}`)
+	id, err := client.SendVenue(context.Background(), Venue{ChatID: -100123, ReplyToMessageID: 60, Latitude: 39.6546, Longitude: 66.9644, Title: "Samarqand", Address: "O'zbekiston"})
+	if err != nil || id != 91 {
+		t.Fatalf("id = %d, %v", id, err)
+	}
+	want := map[string]any{"chat_id": float64(-100123), "latitude": 39.6546, "longitude": 66.9644, "title": "Samarqand", "address": "O'zbekiston",
+		"reply_parameters": map[string]any{"message_id": float64(60), "allow_sending_without_reply": true}}
+	if sent := api.recorded()[0]; sent.method != "sendVenue" || !reflect.DeepEqual(sent.params, want) {
+		t.Errorf("call = %+v, want sendVenue %v", sent, want)
+	}
+}
+
+// A boost comes with its chat, its ID and who gave it; a group's sticker
+// pack and a sticker's with theirs.
+func TestBoostAndStickerSetsAreDecoded(t *testing.T) {
+	client, _ := newTestClient(t, `{"ok":true,"result":[{"update_id":9,"chat_boost":{"chat":{"id":-100123,"type":"supergroup"},
+		"boost":{"boost_id":"b1","add_date":1,"expiration_date":2,"source":{"source":"premium","user":{"id":7,"first_name":"Ali"}}}}},
+		{"update_id":10,"message":{"message_id":3,"chat":{"id":-100123,"type":"supergroup"},"sticker":{"file_id":"s","set_name":"cats"}}}]}`)
+	updates, err := client.GetUpdates(context.Background(), 0, 0)
+	if err != nil || len(updates) != 2 {
+		t.Fatalf("updates = %+v, %v", updates, err)
+	}
+	boost := updates[0].ChatBoost
+	if boost == nil || boost.Chat.ID != -100123 || boost.Boost.BoostID != "b1" || boost.Boost.Source.Source != "premium" || boost.Boost.Source.User == nil || boost.Boost.Source.User.ID != 7 {
+		t.Errorf("boost = %+v", boost)
+	}
+	if s := updates[1].Message.Sticker; s == nil || s.SetName != "cats" {
+		t.Errorf("sticker = %+v", s)
+	}
+	var chat Chat
+	if err := json.Unmarshal([]byte(`{"id":-100123,"type":"supergroup","sticker_set_name":"cats","can_set_sticker_set":true}`), &chat); err != nil || chat.StickerSetName != "cats" || !chat.CanSetStickerSet {
+		t.Errorf("chat = %+v, %v", chat, err)
+	}
+}
+
 // A webhook asking for other kinds than the bot handles, too few or the
 // quizzes' polls, is set again, at the same address with the secret; one
 // asking for exactly them, or no webhook at all, is left alone.
@@ -1226,7 +1355,8 @@ func TestEnsureAllowedUpdatesSetsAnOldWebhookAgain(t *testing.T) {
 		"with quiz polls": {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","poll","poll_answer"]}}`, true},
 		"before inline":   {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query"]}}`, true},
 		"before edits":    {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","inline_query","pre_checkout_query"]}}`, true},
-		"every kind":      {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","inline_query","pre_checkout_query","edited_message","chat_join_request"]}}`, false},
+		"before boosts":   {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","inline_query","pre_checkout_query","edited_message","chat_join_request"]}}`, true},
+		"every kind":      {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","inline_query","pre_checkout_query","edited_message","chat_join_request","chat_boost"]}}`, false},
 		"no webhook":      {`{"ok":true,"result":{"url":""}}`, false},
 	}
 	for name, c := range cases {

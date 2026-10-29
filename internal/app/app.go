@@ -634,6 +634,7 @@ func newWebhook(ctx context.Context, cfg config.Config, store *storage.Store, lo
 		return nil, err
 	}
 	SetCommandMenus(ctx, bot.Client, logger)
+	SetAdminRights(ctx, bot.Client, logger)
 	SetProfileTexts(ctx, bot.Client, logger)
 	if changed, err := bot.Client.EnsureAllowedUpdates(ctx, cfg.WebhookSecret); err != nil {
 		logger.Warn("could not check the webhook's update kinds", "error", err)
