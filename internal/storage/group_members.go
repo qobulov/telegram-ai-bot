@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // GroupMember is a member the bot has seen in a group.
@@ -121,4 +123,35 @@ func (s *Store) GroupMembers(ctx context.Context, chatID int64, limit int) ([]Gr
 		return nil, 0, fmt.Errorf("storage: group members: %w", err)
 	}
 	return members, total, nil
+}
+
+// MemberGroup is a group a member was seen in.
+type MemberGroup struct {
+	ChatID int64
+	Title  string
+}
+
+// MemberGroups are up to limit groups a user was seen in and has not left,
+// where the bot has not left either, the most recently seen first: the
+// groups the dashboard offers them. The list may be stale, so the one they
+// open is asked about at Telegram again.
+func (s *Store) MemberGroups(ctx context.Context, userID int64, limit int) ([]MemberGroup, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT m.chat_id, g.title FROM group_members m
+		JOIN groups g ON g.chat_id = m.chat_id
+		WHERE m.user_id = $1 AND m.status NOT IN ('left', 'kicked') AND coalesce(g.bot_status, '') NOT IN ('left', 'kicked')
+		ORDER BY m.last_seen_at DESC, m.chat_id
+		LIMIT $2`, userID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("storage: member groups: %w", err)
+	}
+	groups, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (MemberGroup, error) {
+		var g MemberGroup
+		err := row.Scan(&g.ChatID, &g.Title)
+		return g, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("storage: member groups: %w", err)
+	}
+	return groups, nil
 }

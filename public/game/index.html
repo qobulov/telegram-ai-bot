@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>Tarozi</title>
+  <script src="https://telegram.org/js/games.js" defer></script>
+  <link rel="stylesheet" href="game.css">
+</head>
+<body>
+  <main id="game">
+    <section id="intro" class="screen">
+      <h1 class="logo">Tarozi <span aria-hidden="true">⚖️</span></h1>
+      <p class="lead" data-t="lead"></p>
+      <ol class="rules">
+        <li data-t="rule1"></li>
+        <li data-t="rule2"></li>
+        <li data-t="rule3"></li>
+      </ol>
+      <button type="button" class="primary" id="play" data-t="play"></button>
+      <p class="message" id="introMessage" aria-live="polite"></p>
+      <section class="table-card" id="introTable" hidden>
+        <h2 data-t="table"></h2>
+        <ol class="table" id="introRows"></ol>
+      </section>
+    </section>
+
+    <section id="countdown" class="screen center" hidden>
+      <p class="count" id="count" aria-live="assertive">3</p>
+    </section>
+
+    <section id="board" class="screen" hidden>
+      <div class="hud">
+        <div class="hud-item"><span class="hud-label" data-t="score"></span><span class="hud-value" id="score">0</span></div>
+        <div class="timer" aria-hidden="true"><span id="timer"></span></div>
+        <div class="hud-item right"><span class="hud-label" data-t="streak"></span><span class="hud-value" id="streak">0</span></div>
+      </div>
+
+      <div class="prices" id="prices" aria-live="polite">
+        <p class="prices-title" data-t="prices"></p>
+        <ul class="price-list" id="priceList"></ul>
+      </div>
+
+      <div class="scale" id="scale" data-tilt="none" aria-hidden="true">
+        <div class="beam"><span class="pivot"></span></div>
+        <div class="pans">
+          <div class="pan" id="leftPan"></div>
+          <div class="pan" id="rightPan"></div>
+        </div>
+        <div class="post"></div>
+      </div>
+      <p class="sr" id="weighing" aria-live="polite"></p>
+
+      <div class="answers" role="group">
+        <button type="button" data-answer="L"><span aria-hidden="true">⬇︎</span> <span data-t="left"></span></button>
+        <button type="button" data-answer="E"><span aria-hidden="true">=</span> <span data-t="even"></span></button>
+        <button type="button" data-answer="R"><span data-t="right"></span> <span aria-hidden="true">⬇︎</span></button>
+      </div>
+    </section>
+
+    <section id="result" class="screen" hidden>
+      <p class="eyebrow" data-t="over"></p>
+      <p class="final" id="final">0</p>
+      <p class="message" id="resultMessage" aria-live="polite"></p>
+      <section class="table-card" id="resultTable" hidden>
+        <h2 data-t="table"></h2>
+        <ol class="table" id="resultRows"></ol>
+      </section>
+      <div class="actions">
+        <button type="button" class="primary" id="again" data-t="again"></button>
+        <button type="button" id="share" data-t="share"></button>
+      </div>
+    </section>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>

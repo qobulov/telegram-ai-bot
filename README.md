@@ -51,7 +51,11 @@ prices).
 ```text
 cmd/bot/main.go                 long-polling command; migrate and webhook subcommands
 api/webhook.go                  serverless function that receives updates by webhook
+api/stats.go, api/game.go       serverless functions behind the dashboard and the game
+public/stats, public/game       static pages: the group dashboard Mini App and the Tarozi game
 internal/app                    assembles the bot for either way of running it
+internal/miniapp                the dashboard's API: Telegram init data check, membership check, statistics
+internal/game                   the Tarozi game: signed sessions, dealing rounds, scoring plays
 internal/webhook                HTTP handler for webhook updates, with secret check
 internal/config                 load .env + environment, validate
 internal/telegram               Bot API client: long polling, sending, message splitting
@@ -219,6 +223,7 @@ in the environment win over the file.
 | `DB_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
 | `TELEGRAM_WEBHOOK_SECRET` | empty | Only for webhook deployments; see [Vercel deployment](#vercel-deployment-webhook) |
 | `CRON_SECRET` | empty | Only on Vercel: protects the daily cleanup endpoint |
+| `WEBAPP_URL` | empty | The Vercel deployment's `https://` address, such as `https://maria.vercel.app`, where `public/` is served: turns on the [dashboard](#dashboard-mini-app) (`/stats`, the private chats' menu button) and [the game](#the-game-tarozi) (`/game`, the `send_game` tool). Empty turns both off |
 | `MAX_OUTPUT_TOKENS`           | `8192`                         | Longest model reply, in tokens, thinking included |
 | `AI_REASONING_EFFORT`         | `low` (Gemini)                 | How hard Gemini thinks before answering: `none`, `minimal`, `low`, `medium`, `high`, or `default` for the model's own. Thinking is paid as output and takes from `MAX_OUTPUT_TOKENS`; the lite models refuse `none`. Each request logs its tokens as `model usage` |
 | `BOT_DISPLAY_NAME`            | `Maria`                         | The character's name                                                                                         |
@@ -310,8 +315,8 @@ Send `/start` to your bot in Telegram. Stop the bot with Ctrl+C; it finishes
 the message it is working on before exiting.
 
 Bot commands: `/start`, `/help`,
-`/model`, `/about`, `/premium`, `/paysupport`, for owners `/payments` and
-`/refund`, and
+`/model`, `/about`, `/premium`, `/paysupport`, with `WEBAPP_URL` set
+`/stats` and `/game`, for owners `/payments` and `/refund`, and
 in groups `/mute`, `/unmute`, `/ignore` and `/unignore`.
 
 ## Tests
@@ -1555,6 +1560,79 @@ while she was muted or older than `RETENTION_DAYS`. Members are named by
 first name only, so that the list tags nobody. Only the group the question
 is asked in is counted.
 
+### Dashboard (Mini App)
+
+With `WEBAPP_URL` set, the same numbers are a page: a Telegram Mini App
+served from `public/stats/`, with the messages per hour of the day (in
+`GROUP_HISTORY_TIMEZONE`), the busiest hour, the ten who wrote the most,
+which of the group's guards are on (swearing, spam, links, pictures,
+joins) and whom the swear guard caught the most, for today or the last 7
+days. It follows the user's Telegram theme, light or dark, and speaks
+Uzbek, or Russian to a Russian Telegram app.
+
+- **In a group** `/stats` answers with a button that opens it. Telegram lets
+  a Mini App button (`web_app`) be used in private chats only, so in a group
+  the button is a link to the bot's main Mini App,
+  `https://t.me/<bot>?startapp=g<group ID without the minus>`, which opens
+  it inside Telegram with the group in `start_param`.
+- **In a private chat** `/stats` answers with a Mini App button, and the
+  menu button of every private chat opens it too (`setChatMenuButton`, set at
+  each start while `WEBAPP_URL` is set; without it the button is left as
+  it is). Opened without a group, it lists the groups the user was seen in
+  (`group_members`) that the bot has not left, to pick one.
+
+The page asks `/api/stats` for the numbers, sending the init data Telegram
+gave it. The function believes nothing else:
+
+- it checks the init data's `hash` as Telegram prescribes (HMAC-SHA256 with
+  the key `HMAC-SHA256("WebAppData", bot token)`) and refuses data signed
+  more than an hour ago, so the user's ID is Telegram's, never the page's;
+- the group comes from the link or the page, which anyone can write, so it
+  then asks Telegram (`getChatMember`) whether that user is in that group,
+  and shows nothing to anyone who is not, or when Telegram will not say;
+- only the group asked about is counted, with the `group_stats` tool's
+  queries.
+
+Members are shown by the name the group log has for them, with their
+@username; only the group's own members can see it.
+
+### The game: Tarozi
+
+With `WEBAPP_URL` set, `/game`, in a group or a private chat, posts the
+bot's own game with `sendGame`, and so does the `send_game` tool when
+someone asks to play a game ("o'yin o'ynaymiz", "скинь игру"; dice stay
+with `send_dice`), once per message and twice per chat in 10 minutes,
+counted in `moderation_actions` as `game`.
+
+Tarozi is a bazaar scale. A price board gives four fruits a weight from 1
+to 9 each, and changes every 6 weighings; each weighing puts fruits on the
+two pans, one to four on each as the play goes on, and the player says
+which pan goes down, or that they balance. A play lasts 40 seconds; a right
+answer is 10 points and 2 more for each right one before it in a row (at
+most 10 more), a wrong one takes 5 off. The page is `public/game/`, plain
+HTML, and follows the device's light or dark mode.
+
+Telegram keeps the scores: each game message has its own table, which it
+shows under the message, and the page shows it too (`getGameHighScores`).
+The score is not taken from the page:
+
+- A press of Play reaches the bot as a callback query, answered with the
+  page's address and a **session token** the bot signed (HMAC-SHA256, its
+  key made from the bot token) naming the player, the game message and the
+  time; it opens plays for an hour.
+- Each play is **dealt by the server** from a fresh random seed (`start`),
+  and comes with a run token that holds the seed and the start time.
+- The page sends back only the **answers and when each was given**
+  (`finish`); the server deals the same rounds from the seed and **counts
+  the score itself**. It refuses a play with answers under 300 ms apart,
+  after the 40 seconds, more than were dealt, or spread over more time than
+  the server saw pass since the start, and run tokens older than 10
+  minutes. Then it sets the score on the session's game message for the
+  session's player (`setGameScore`; Telegram keeps each player's best).
+
+A bot can still answer as fast as the limits allow, but not faster, and
+cannot name its score, another player or another message.
+
 ### Limits
 
 - Group answers are cut to `MAX_GROUP_REPLY_LENGTH` so she posts one message.
@@ -1872,6 +1950,7 @@ accepts the Go version in `go.mod`; if the build fails on that, lower the
 | Retention cleanup (`RETENTION_DAYS`) | hourly | daily, by Vercel Cron at 03:00 UTC |
 | Declining join requests not pressed in 10 minutes | every minute | by the next update the webhook handles, at most once a minute per instance, and the daily cleanup |
 | Time per message | `REQUEST_TIMEOUT_SECONDS` | must fit in the function's 60 seconds |
+| Dashboard and game pages and their APIs (`WEBAPP_URL`) | served by a Vercel deployment of this project, which may run beside the polling bot: they need only the bot token and the database | served by the same deployment |
 
 With BotFather privacy mode off, every group message invokes the function,
 including the ones the bot ignores. Ignored messages return at once and
@@ -2054,6 +2133,30 @@ update needs:
    needs *Change group info*, and Telegram allows one only in large enough
    supergroups. Polls made before this version cannot be closed by her.
 
+### Deploying the dashboard and the game
+
+They need no migration and no new kind of update.
+
+1. **Deploy**, then **set `WEBAPP_URL`** in Vercel to the deployment's
+   production address, for example `https://maria.vercel.app` (no trailing
+   path), and deploy again. Check the pages: `https://YOUR-APP.vercel.app/stats/`
+   says it opens inside Telegram, and `/game/` asks for `/game`.
+2. **The dashboard, in @BotFather:** `/mybots` → the bot → *Bot Settings* →
+   *Configure Mini App* → *Enable Mini App*, and send
+   `https://YOUR-APP.vercel.app/stats/` as its URL. This is the bot's main
+   Mini App, which the groups' `t.me/<bot>?startapp=…` links open. The menu
+   button of private chats is set by the bot itself at each start.
+3. **The game, in @BotFather:** `/newgame` → the bot → accept the terms →
+   a title (`Tarozi`), a short description, a 640×360 photo (and optionally
+   a GIF) → the short name **`tarozi`**, exactly, which the bot sends the
+   game by. No URL is asked for: the bot gives `https://YOUR-APP.vercel.app/game/`
+   with each press of Play.
+4. Send `/stats` and `/game` in a group and in a private chat.
+
+Until step 2 the group links open nothing; until step 3 `/game` answers
+that something went wrong, and `send_game` tells the model the short name
+is unknown.
+
 ### Daily cleanup
 
 `vercel.json` schedules a Vercel Cron job that calls `/api/cleanup` every
@@ -2153,6 +2256,11 @@ Built in:
 - [x] Tokens, API keys, the database URL and message text are never logged.
       The bot token is stripped from network errors before they are logged.
 - [x] Users see fixed, generic error messages; details go to the log.
+- [x] The dashboard's API takes the user only from Telegram's signed init
+      data (checked with the bot token, at most an hour old) and shows a
+      group only to whom `getChatMember` says is in it. The game's API
+      sets a score only for the player and message in a session the bot
+      signed, and counts the score itself from the answers.
 - [x] All SQL is parameterized. The model cannot produce SQL that is run.
 - [x] Every query on a conversation is keyed by the chat and user IDs taken
       from the update, never by an ID in message text.

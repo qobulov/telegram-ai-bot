@@ -820,6 +820,15 @@ func TestHelpTextListsEveryCommand(t *testing.T) {
 			t.Errorf("help text does not mention %s", command)
 		}
 	}
+	if strings.Contains(help, "/stats") || strings.Contains(help, "/game") {
+		t.Errorf("help offers the pages without them: %q", help)
+	}
+	for _, lang := range []string{"uz", "ru", "en"} {
+		help := HelpTextIn(lang, Abilities{Pages: true})
+		if !strings.Contains(help, "/stats — ") || !strings.Contains(help, "/game — ") || strings.Contains(help, "%!") {
+			t.Errorf("%s help with the pages = %q", lang, help)
+		}
+	}
 }
 
 func TestHelpListsLiveDataAndFootballOnlyWhenConfigured(t *testing.T) {

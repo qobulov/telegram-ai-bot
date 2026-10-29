@@ -348,6 +348,14 @@ type Options struct {
 	// MaxGroupReplyChars is the longest answer posted in a group, in UTF-16
 	// code units as Telegram counts them.
 	MaxGroupReplyChars int
+	// StatsURL is the page of the group dashboard Mini App, which /stats
+	// opens; "" makes /stats an unknown command. See webapp.go.
+	StatsURL string
+	// Game makes the page the game's Play button opens, and GameTable sends
+	// the game for /game and answers the press; with either nil there is
+	// no game.
+	Game      GameLinks
+	GameTable GameTable
 
 	// MaxMediaBytes is the largest file downloaded for the model to see.
 	MaxMediaBytes int64
