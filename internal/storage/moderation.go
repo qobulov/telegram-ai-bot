@@ -160,6 +160,22 @@ func (s *Store) SwearStrikes(ctx context.Context, chatID, userID int64, action s
 	return count, nil
 }
 
+// SwornIn reports whether the swear guard already caught one message, in
+// any of its versions: an edit of a message it warned about is not a second
+// swear.
+func (s *Store) SwornIn(ctx context.Context, chatID, messageID int64) (bool, error) {
+	var caught bool
+	err := s.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM moderation_actions
+			WHERE chat_id = $1 AND target_message_id = $2 AND action IN ($3, $4, $5))`,
+		chatID, messageID, ActionSwear, ActionSwearAtBot, ActionSwearWord).Scan(&caught)
+	if err != nil {
+		return false, fmt.Errorf("storage: find a caught swear: %w", err)
+	}
+	return caught, nil
+}
+
 // ChatModeration counts a chat's actions of one kind since a moment.
 func (s *Store) ChatModeration(ctx context.Context, chatID int64, action string, since time.Time) (int, error) {
 	var count int

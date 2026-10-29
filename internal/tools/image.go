@@ -67,7 +67,11 @@ const MaxTargetRunes = 500
 type Target struct {
 	MessageID int64
 	UserID    int64
-	// Name is the author's first name and @username.
+	// ChannelID is, for a message posted on behalf of a channel, that
+	// channel's chat ID; UserID is then the account Telegram posts such
+	// messages as, which moderation never acts on.
+	ChannelID int64
+	// Name is the author's first name and @username, or a channel's title.
 	Name  string
 	IsBot bool
 	// Owner is true when the author is one of the bot's owners.

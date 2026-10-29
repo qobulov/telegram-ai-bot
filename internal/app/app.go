@@ -210,6 +210,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Owners:     cfg.OwnerIDs,
 		Usernames:  store,
 		Roster:     store,
+		Messages:   store,
 	})
 	if len(cfg.OwnerUsernames) > 0 && len(cfg.OwnerIDs) == 0 {
 		logger.Warn("BOT_OWNER_IDS is not set: owners are known only by username, which can change hands, so they moderate only with their own admin rights")
@@ -329,6 +330,9 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Guards:           checker(cfg),
 		GroupModerator:   bot.Client,
 		Judge:            swearJudge(cfg, logger),
+		Sworn:            store,
+		Joins:            store,
+		JoinGate:         bot.Client,
 		Stickers:         store,
 		ClipSender:       bot.Client,
 		AudioSender:      bot.Client,
@@ -649,7 +653,9 @@ type Cleanup struct {
 }
 
 // NewCleanup builds the scheduled-cleanup endpoint. Each authorised call
-// deletes messages older than RETENTION_DAYS and reports what it removed.
+// declines the join requests whose button was not pressed in time, which
+// the webhook's updates did not notice, deletes messages older than
+// RETENTION_DAYS, and reports what it removed.
 func NewCleanup(ctx context.Context, cfg config.Config, logger *slog.Logger) (*Cleanup, error) {
 	if cfg.CronSecret == "" {
 		return nil, errors.New("CRON_SECRET is required for the cleanup endpoint")
@@ -658,10 +664,14 @@ func NewCleanup(ctx context.Context, cfg config.Config, logger *slog.Logger) (*C
 	if err != nil {
 		return nil, err
 	}
+	client := telegram.NewClient(telegram.Options{Token: cfg.TelegramToken, BaseURL: cfg.TelegramAPIURL, Logger: logger})
 	handler, err := cron.NewHandler(cron.Options{
 		Secret: cfg.CronSecret,
 		Logger: logger,
 		Run: func(ctx context.Context) (any, error) {
+			if _, err := service.DeclineLateJoins(ctx, store, client, time.Now(), logger); err != nil {
+				logger.Warn("could not decline the late join requests", "error", err)
+			}
 			return expire(ctx, cfg, store, logger)
 		},
 	})

@@ -23,6 +23,7 @@ import (
 
 	"telegram-ai-bot/internal/app"
 	"telegram-ai-bot/internal/config"
+	"telegram-ai-bot/internal/service"
 	"telegram-ai-bot/internal/storage"
 )
 
@@ -126,7 +127,7 @@ func serve(ctx context.Context, cfg config.Config, store *storage.Store, logger 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	var background sync.WaitGroup
-	background.Go(func() { maintain(ctx, cfg, store, logger) })
+	background.Go(func() { maintain(ctx, cfg, store, svc, logger) })
 
 	logger.Info("bot started", "username", bot.User.Username, "name", cfg.BotDisplayName,
 		"model", cfg.Model, "workers", cfg.MaxConcurrentRequests, "muted_groups", len(mutedChats))
@@ -184,9 +185,10 @@ func runDeleteWebhook(ctx context.Context) error {
 	return nil
 }
 
-// maintain runs until ctx is cancelled: it checks that the database is
-// reachable every minute and applies the retention policy every hour.
-func maintain(ctx context.Context, cfg config.Config, store *storage.Store, logger *slog.Logger) {
+// maintain runs until ctx is cancelled: every minute it checks that the
+// database is reachable and declines the join requests whose button was not
+// pressed in time, and every hour it applies the retention policy.
+func maintain(ctx context.Context, cfg config.Config, store *storage.Store, svc *service.Service, logger *slog.Logger) {
 	health := time.NewTicker(healthCheckInterval)
 	defer health.Stop()
 	retention := time.NewTicker(retentionInterval)
@@ -201,6 +203,7 @@ func maintain(ctx context.Context, cfg config.Config, store *storage.Store, logg
 			if err := store.Ping(ctx); err != nil && ctx.Err() == nil {
 				logger.Error("database health check failed", "error", err)
 			}
+			svc.DeclineLateJoins(ctx)
 		case <-retention.C:
 			applyRetention(ctx, cfg, store, logger)
 		}

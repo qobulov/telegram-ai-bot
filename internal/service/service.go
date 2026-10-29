@@ -290,6 +290,14 @@ type Options struct {
 	GroupModerator GroupModerator
 	// Judge is the model asked whom a message the guard caught is aimed at.
 	Judge InsultJudge
+	// Sworn tells whether the swear guard caught a message already, so that
+	// editing it is no second swear; nil counts every edit that swears.
+	Sworn SwearRecord
+	// Joins keeps the requests to join a group that wait for their button,
+	// and JoinGate answers them; with either nil, or Buttons nil, join
+	// requests are left to the groups' admins. See joins.go.
+	Joins    JoinBook
+	JoinGate JoinGate
 	// Stickers picks the sticker the model asked for, StickerSender sends
 	// it, and StickerImporter brings packs in for /import_stickers; with any
 	// nil, no sticker is sent or imported.
@@ -386,6 +394,9 @@ type Service struct {
 	// typingInterval is how often "typing" is shown again while a turn
 	// runs: typingRefresh, shortened by tests.
 	typingInterval time.Duration
+	// joinSweep is when this instance last declined late join requests, in
+	// Unix seconds.
+	joinSweep atomic.Int64
 }
 
 // incoming is an accepted update, reduced to what handling it needs.
@@ -484,16 +495,7 @@ func New(opts Options) *Service {
 // the bot should not react to are dropped here. Handle must not be called
 // after Close.
 func (s *Service) Handle(update telegram.Update) {
-	if update.MyChatMember != nil {
-		s.recordMembership(update.MyChatMember)
-		return
-	}
-	if update.ChatMember != nil {
-		s.recordMember(update.ChatMember)
-		return
-	}
-	if update.CallbackQuery != nil {
-		s.pressed(update.CallbackQuery)
+	if s.handledApart(update) {
 		return
 	}
 	in, ok := s.accept(update)
@@ -516,21 +518,37 @@ func (s *Service) Handle(update telegram.Update) {
 // serverless hosting. Unlike Handle it does not use the workers, so it gives
 // no ordering between updates that arrive at the same time.
 func (s *Service) HandleNow(update telegram.Update) {
-	if update.MyChatMember != nil {
-		s.recordMembership(update.MyChatMember)
-		return
-	}
-	if update.ChatMember != nil {
-		s.recordMember(update.ChatMember)
-		return
-	}
-	if update.CallbackQuery != nil {
-		s.pressed(update.CallbackQuery)
+	// Nothing runs between updates here, so they are what notice that a
+	// join request's time is up.
+	defer s.sweepJoins()
+	if s.handledApart(update) {
 		return
 	}
 	if in, ok := s.accept(update); ok {
 		s.process(in)
 	}
+}
+
+// handledApart handles, at once and off the workers, an update that is no
+// message to answer, and reports whether update was one: a change of
+// membership, a button press, an edited message, which only the guards
+// look at, or a request to join a group.
+func (s *Service) handledApart(update telegram.Update) bool {
+	switch {
+	case update.MyChatMember != nil:
+		s.recordMembership(update.MyChatMember)
+	case update.ChatMember != nil:
+		s.recordMember(update.ChatMember)
+	case update.CallbackQuery != nil:
+		s.pressed(update.CallbackQuery)
+	case update.EditedMessage != nil:
+		s.guardEdited(update)
+	case update.ChatJoinRequest != nil:
+		s.requestedJoin(update.ChatJoinRequest)
+	default:
+		return false
+	}
+	return true
 }
 
 // GroupRegistry keeps the list of groups the bot is in.
