@@ -219,6 +219,11 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Account: botAccount{Client: bot.Client, id: bot.User.ID},
 		Eyes:    stickerLabeller(cfg, logger),
 	}))
+	// Gifts spend the bot's Stars, so only owners known by ID may send them:
+	// a username can change hands.
+	if len(cfg.OwnerIDs) > 0 {
+		available = append(available, tools.GiftTool(tools.GiftOptions{Shop: bot.Client, Members: moderation, BotID: bot.User.ID}))
+	}
 	registry, err := tools.NewRegistry(cfg.IsAdmin, logger, available...)
 	if err != nil {
 		return nil, err

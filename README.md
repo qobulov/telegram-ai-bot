@@ -533,6 +533,19 @@ which it looks up with the owner-only `bot_database` tool:
   given only in a private chat with the owner, so they never land in a
   different group.
 
+Owners can have the bot send a member a Telegram gift, bought with the
+bot's own Stars, with the owner-only `send_gift` tool ("Maria, unga sovg'a
+yubor"), offered only when `BOT_OWNER_IDS` is set: it spends money, and a
+username can change hands. `list` gives the gifts on sale with their price
+and the bot's Stars balance (`getAvailableGifts`, `getMyStarBalance`);
+`send` sends one (`sendGift`) with an optional text of up to 128 characters.
+It goes, in a group, to the member the owner replied to or tagged with @,
+confirmed with Telegram as the `moderate` tool confirms a tag, never to a
+user the model names; the owner's own words must ask for a gift ("sovg'a",
+"подарок", "gift"); and the balance is checked first, so a gift it cannot
+pay for is refused with how many Stars are missing. Stars reach the balance
+from premium and can be bought for the bot in @BotFather.
+
 Owners can also have the bot post in its groups ("Maria, guruhlarga master
 qaytdi deb yoz") with the owner-only `send_to_groups` tool. It works in two
 steps: the bot first shows the exact text and the groups, and sends only after
@@ -1468,7 +1481,7 @@ Run `set-webhook` again after this update: the bot now asks Telegram for
 when the webhook was last set. Until then the member list still fills from
 messages, joins and leaves.
 
-### Deploying premium
+### Deploying premium and gifts
 
 1. **Apply migration 0038 before deploying**: `make migrate` with
    `DB_POSTGRES_URL` pointing at the production database. It adds
@@ -1484,6 +1497,7 @@ messages, joins and leaves.
    they differ (the log says `webhook set again to receive every update kind
    the bot handles`); to do it at once, run
    `go run ./cmd/bot set-webhook https://YOUR-APP.vercel.app/api/webhook`.
+4. **For gifts**, set `BOT_OWNER_IDS`, and have Stars on the bot's balance.
 
 ### Daily cleanup
 
@@ -1630,6 +1644,9 @@ Built in:
       before a payment and the payment itself are compared with the plan on
       sale and the payer's ID from Telegram, and a payment counts once by its
       charge ID. Only owners see or refund payments, in a private chat.
+- [x] Gifts spend the bot's Stars only for owners known by ID, for the
+      member replied to or tagged, taken from the update, when the owner's
+      own words ask for a gift, and after the balance is checked.
 - [x] Only registered tools run. No shell, no `eval`, no model-written SQL.
 - [x] Tool permissions and restricted commands are checked in code against
       the ID of the user who sent the message. A prompt cannot grant them.
