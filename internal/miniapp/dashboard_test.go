@@ -3,7 +3,6 @@ package miniapp
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -19,8 +18,8 @@ import (
 
 const (
 	choyxona = int64(-1001234567890)
-	member   = int64(42)
-	stranger = int64(77)
+	owner    = int64(42)
+	member   = int64(77)
 )
 
 type fakeStore struct {
@@ -33,7 +32,7 @@ func (f *fakeStore) GroupStats(_ context.Context, chatID, botID int64, since tim
 	f.since = since
 	stats := storage.GroupStats{
 		Messages: 5, Members: 2,
-		Top:      []storage.AuthorCount{{UserID: member, Name: "Ali @ali", Count: 4}, {UserID: 9, Name: "Bek", Count: 1}},
+		Top:      []storage.AuthorCount{{UserID: owner, Name: "Ali @ali", Count: 4}, {UserID: 9, Name: "Bek", Count: 1}},
 		Swearers: []storage.AuthorCount{{UserID: 9, Name: "Bek", Count: 2}},
 	}
 	stats.Hours[13] = 5
@@ -49,28 +48,14 @@ func (f *fakeStore) GroupRules(_ context.Context, chatID int64) ([]storage.Group
 	}, nil
 }
 
-func (f *fakeStore) MemberGroups(_ context.Context, userID int64, limit int) ([]storage.MemberGroup, error) {
-	if userID != member {
-		return nil, nil
-	}
-	return []storage.MemberGroup{{ChatID: choyxona, Title: "Choyxona"}}, nil
+func (f *fakeStore) Groups(_ context.Context, since time.Time, limit int) ([]storage.GroupSummary, error) {
+	return []storage.GroupSummary{
+		{ChatID: choyxona, Title: "Choyxona", BotStatus: "administrator"},
+		{ChatID: -1009, Title: "Old", BotStatus: "left"},
+	}, nil
 }
 
-type fakeTelegram struct {
-	asked []int64
-	err   error
-}
-
-func (f *fakeTelegram) GetChatMember(_ context.Context, chatID, userID int64) (telegram.ChatMember, error) {
-	f.asked = append(f.asked, userID)
-	if f.err != nil {
-		return telegram.ChatMember{}, f.err
-	}
-	if chatID == choyxona && userID == member {
-		return telegram.ChatMember{Status: "member"}, nil
-	}
-	return telegram.ChatMember{Status: "left"}, nil
-}
+type fakeTelegram struct{}
 
 func (f *fakeTelegram) GetChat(_ context.Context, chatID int64) (telegram.Chat, error) {
 	return telegram.Chat{ID: chatID, Title: "Choyxona"}, nil
@@ -90,7 +75,7 @@ func newDashboardEnv(t *testing.T) *dashboardEnv {
 		t.Fatal(err)
 	}
 	env.handler, err = NewHandler(Options{
-		BotToken: testToken, BotID: 4242, Store: env.store, Telegram: env.telegram,
+		BotToken: testToken, BotID: 4242, Store: env.store, Telegram: env.telegram, Owners: map[int64]bool{owner: true},
 		Location: tashkent, Now: func() time.Time { return testNow },
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
@@ -115,12 +100,12 @@ func (env *dashboardEnv) post(t *testing.T, body any) (int, map[string]any) {
 	return rec.Code, got
 }
 
-// Opened from a group's link, a member sees that group's numbers, its
-// guards and its title; Telegram was asked about them first.
-func TestDashboardShowsTheGroupToAMember(t *testing.T) {
+// Opened from a group's link, an owner sees that group's numbers, its
+// guards and its title.
+func TestDashboardShowsTheGroupToAnOwner(t *testing.T) {
 	env := newDashboardEnv(t)
 
-	status, got := env.post(t, request{InitData: openedBy(member, testNow, GroupParam(choyxona)), Period: "week"})
+	status, got := env.post(t, request{InitData: openedBy(owner, testNow, GroupParam(choyxona)), Period: "week"})
 
 	if status != http.StatusOK {
 		t.Fatalf("status %d: %v", status, got)
@@ -141,56 +126,41 @@ func TestDashboardShowsTheGroupToAMember(t *testing.T) {
 	if hours := got["hours"].([]any); len(hours) != 24 || hours[13] != float64(5) {
 		t.Errorf("hours = %v", hours)
 	}
-	if len(env.telegram.asked) != 1 || env.telegram.asked[0] != member {
-		t.Errorf("Telegram asked about %v, want the member", env.telegram.asked)
-	}
 	if !env.store.since.Equal(testNow.Add(-7 * 24 * time.Hour)) {
 		t.Errorf("since = %v, want a week ago", env.store.since)
 	}
 }
 
-// Someone not in the group sees nothing of it, whatever the link says, and
-// nothing is counted for them.
-func TestDashboardRefusesWhoIsNotInTheGroup(t *testing.T) {
+// The dashboard names who writes and swears most, so only the bot's owners
+// see it: a member of the group, with its link or naming it, sees nothing,
+// and nothing is counted for them.
+func TestDashboardRefusesWhoIsNoOwner(t *testing.T) {
 	env := newDashboardEnv(t)
 
-	status, got := env.post(t, request{InitData: openedBy(stranger, testNow, ""), Group: GroupParam(choyxona)})
-
-	if status != http.StatusForbidden || got["error"] != "not_member" {
-		t.Errorf("status %d, %v; want 403 not_member", status, got)
+	for _, body := range []request{
+		{InitData: openedBy(member, testNow, GroupParam(choyxona))},
+		{InitData: openedBy(member, testNow, ""), Group: GroupParam(choyxona)},
+		{InitData: openedBy(member, testNow, "")},
+	} {
+		if status, got := env.post(t, body); status != http.StatusForbidden || got["error"] != "not_owner" {
+			t.Errorf("status %d, %v; want 403 not_owner", status, got)
+		}
 	}
 	if len(env.store.statsFor) != 0 {
-		t.Errorf("counted %v for a stranger", env.store.statsFor)
+		t.Errorf("counted %v for a member", env.store.statsFor)
 	}
 }
 
-// When Telegram refuses to say, as for a group the bot left, nobody gets
-// in; when it does not answer, the page is told to try later.
-func TestDashboardWhenTelegramWillNotSay(t *testing.T) {
-	env := newDashboardEnv(t)
-	env.telegram.err = &telegram.APIError{Code: 400, Description: "Bad Request: chat not found"}
-	if status, got := env.post(t, request{InitData: openedBy(member, testNow, GroupParam(choyxona))}); status != http.StatusForbidden || got["error"] != "not_member" {
-		t.Errorf("refused: %d %v", status, got)
-	}
-	env.telegram.err = errors.New("timeout")
-	if status, got := env.post(t, request{InitData: openedBy(member, testNow, GroupParam(choyxona))}); status != http.StatusBadGateway || got["error"] != "unavailable" {
-		t.Errorf("no answer: %d %v", status, got)
-	}
-}
-
-// Opened from the private chat, without a group, the member's groups are
-// offered.
-func TestDashboardListsTheMembersGroups(t *testing.T) {
+// Opened from the private chat, without a group, the bot's groups are
+// offered, not those it has left.
+func TestDashboardListsTheBotsGroups(t *testing.T) {
 	env := newDashboardEnv(t)
 
-	status, got := env.post(t, request{InitData: openedBy(member, testNow, "")})
+	status, got := env.post(t, request{InitData: openedBy(owner, testNow, "")})
 
 	want := []any{map[string]any{"group": GroupParam(choyxona), "title": "Choyxona"}}
 	if status != http.StatusOK || !reflect.DeepEqual(got["groups"], want) {
 		t.Errorf("status %d, %v; want %v", status, got, want)
-	}
-	if _, got := env.post(t, request{InitData: openedBy(stranger, testNow, "")}); !reflect.DeepEqual(got["groups"], []any{}) {
-		t.Errorf("stranger's groups = %v, want none", got["groups"])
 	}
 }
 
@@ -201,10 +171,10 @@ func TestDashboardRefusesBadRequests(t *testing.T) {
 		status int
 		code   string
 	}{
-		"forged":     {request{InitData: strings.Replace(openedBy(member, testNow, ""), "auth_date=", "auth_date=1", 1)}, http.StatusUnauthorized, "unauthorized"},
-		"expired":    {request{InitData: openedBy(member, testNow.Add(-2*time.Hour), "")}, http.StatusUnauthorized, "expired"},
-		"bad group":  {request{InitData: openedBy(member, testNow, ""), Group: "-100123"}, http.StatusBadRequest, "bad_request"},
-		"bad period": {request{InitData: openedBy(member, testNow, GroupParam(choyxona)), Period: "year"}, http.StatusBadRequest, "bad_request"},
+		"forged":     {request{InitData: strings.Replace(openedBy(owner, testNow, ""), "auth_date=", "auth_date=1", 1)}, http.StatusUnauthorized, "unauthorized"},
+		"expired":    {request{InitData: openedBy(owner, testNow.Add(-2*time.Hour), "")}, http.StatusUnauthorized, "expired"},
+		"bad group":  {request{InitData: openedBy(owner, testNow, ""), Group: "-100123"}, http.StatusBadRequest, "bad_request"},
+		"bad period": {request{InitData: openedBy(owner, testNow, GroupParam(choyxona)), Period: "year"}, http.StatusBadRequest, "bad_request"},
 		"not json":   {"[", http.StatusBadRequest, "bad_request"},
 	}
 	for name, c := range cases {

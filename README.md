@@ -1570,16 +1570,22 @@ joins) and whom the swear guard caught the most, for today or the last 7
 days. It follows the user's Telegram theme, light or dark, and speaks
 Uzbek, or Russian to a Russian Telegram app.
 
-- **In a group** `/stats` answers with a button that opens it. Telegram lets
+It is for the bot's owners known by `BOT_OWNER_IDS` alone: it names who
+writes and who swears most, which a group's members are not to see. To
+anyone else `/stats` is an unknown command, and it is in no command menu
+or `/help`.
+
+- **In a group** an owner's `/stats` answers with a button that opens it. Telegram lets
   a Mini App button (`web_app`) be used in private chats only, so in a group
   the button is a link to the bot's main Mini App,
   `https://t.me/<bot>?startapp=g<group ID without the minus>`, which opens
   it inside Telegram with the group in `start_param`.
-- **In a private chat** `/stats` answers with a Mini App button, and the
-  menu button of every private chat opens it too (`setChatMenuButton`, set at
-  each start while `WEBAPP_URL` is set; without it the button is left as
-  it is). Opened without a group, it lists the groups the user was seen in
-  (`group_members`) that the bot has not left, to pick one.
+- **In a private chat** an owner's `/stats` answers with a Mini App
+  button, and the menu button of each owner's private chat opens it too
+  (`setChatMenuButton` for that chat, set at each start while `WEBAPP_URL`
+  is set, when everyone else's is put back to the commands; without it the
+  buttons are left as they are). Opened without a group, it lists the
+  groups the bot is in, to pick one.
 
 The page asks `/api/stats` for the numbers, sending the init data Telegram
 gave it. The function believes nothing else:
@@ -1587,14 +1593,13 @@ gave it. The function believes nothing else:
 - it checks the init data's `hash` as Telegram prescribes (HMAC-SHA256 with
   the key `HMAC-SHA256("WebAppData", bot token)`) and refuses data signed
   more than an hour ago, so the user's ID is Telegram's, never the page's;
-- the group comes from the link or the page, which anyone can write, so it
-  then asks Telegram (`getChatMember`) whether that user is in that group,
-  and shows nothing to anyone who is not, or when Telegram will not say;
+- it shows nothing to anyone but the owners, whatever the link or the page
+  names (`not_owner`);
 - only the group asked about is counted, with the `group_stats` tool's
   queries.
 
 Members are shown by the name the group log has for them, with their
-@username; only the group's own members can see it.
+@username; only the owners can see it.
 
 ### The game: Tarozi
 
@@ -2145,13 +2150,14 @@ They need no migration and no new kind of update.
    *Configure Mini App* → *Enable Mini App*, and send
    `https://YOUR-APP.vercel.app/stats/` as its URL. This is the bot's main
    Mini App, which the groups' `t.me/<bot>?startapp=…` links open. The menu
-   button of private chats is set by the bot itself at each start.
+   button of the owners' private chats is set by the bot itself at each
+   start.
 3. **The game, in @BotFather:** `/newgame` → the bot → accept the terms →
    a title (`Tarozi`), a short description, a 640×360 photo (and optionally
    a GIF) → the short name **`tarozi`**, exactly, which the bot sends the
    game by. No URL is asked for: the bot gives `https://YOUR-APP.vercel.app/game/`
    with each press of Play.
-4. Send `/stats` and `/game` in a group and in a private chat.
+4. As an owner, send `/stats` and `/game` in a group and in a private chat.
 
 Until step 2 the group links open nothing; until step 3 `/game` answers
 that something went wrong, and `send_game` tells the model the short name
@@ -2257,8 +2263,8 @@ Built in:
       The bot token is stripped from network errors before they are logged.
 - [x] Users see fixed, generic error messages; details go to the log.
 - [x] The dashboard's API takes the user only from Telegram's signed init
-      data (checked with the bot token, at most an hour old) and shows a
-      group only to whom `getChatMember` says is in it. The game's API
+      data (checked with the bot token, at most an hour old) and shows
+      nothing to anyone but the owners known by `BOT_OWNER_IDS`. The game's API
       sets a score only for the player and message in a session the bot
       signed, and counts the score itself from the answers.
 - [x] All SQL is parameterized. The model cannot produce SQL that is run.

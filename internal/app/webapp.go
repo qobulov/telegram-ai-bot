@@ -41,13 +41,15 @@ func newGame(cfg config.Config) *game.Game {
 
 // MenuAppSetter sets what the private chats' menu button opens.
 type MenuAppSetter interface {
-	SetMenuWebApp(ctx context.Context, text, url string) error
+	SetMenuWebApp(ctx context.Context, chatID int64, text, url string) error
+	SetMenuCommands(ctx context.Context) error
 }
 
-// SetMenuApp makes the private chats' menu button open the dashboard while
-// WEBAPP_URL is set, logging a failure: the /stats button opens it too.
-// Without it the button is left as it is, so that one set in @BotFather
-// stays.
+// SetMenuApp makes the menu button of the owners' private chats open the
+// dashboard while WEBAPP_URL is set, and puts everyone else's back to the
+// commands, as an earlier version opened it for all. It logs a failure:
+// /stats opens the dashboard too. Without WEBAPP_URL the buttons are left
+// as they are, so that one set in @BotFather stays.
 func SetMenuApp(ctx context.Context, setter MenuAppSetter, cfg config.Config, logger *slog.Logger) {
 	page := statsPage(cfg)
 	if page == "" {
@@ -55,8 +57,13 @@ func SetMenuApp(ctx context.Context, setter MenuAppSetter, cfg config.Config, lo
 	}
 	ctx, cancel := context.WithTimeout(ctx, commandsTimeout)
 	defer cancel()
-	if err := setter.SetMenuWebApp(ctx, menuAppText, page); err != nil {
-		logger.Warn("could not set the menu button to the dashboard", "error", err)
+	if err := setter.SetMenuCommands(ctx); err != nil {
+		logger.Warn("could not put the menu button back to the commands", "error", err)
+	}
+	for ownerID := range cfg.OwnerIDs {
+		if err := setter.SetMenuWebApp(ctx, ownerID, menuAppText, page); err != nil {
+			logger.Warn("could not set an owner's menu button to the dashboard", "user_id", ownerID, "error", err)
+		}
 	}
 }
 
@@ -102,6 +109,7 @@ func newStats(ctx context.Context, cfg config.Config, store *storage.Store, logg
 		BotID:    bot.User.ID,
 		Store:    store,
 		Telegram: bot.Client,
+		Owners:   cfg.OwnerIDs,
 		Location: cfg.Location,
 		Logger:   logger,
 	})

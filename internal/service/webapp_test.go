@@ -16,10 +16,11 @@ import (
 
 const statsPage = "https://maria.example/stats/"
 
-// In a private chat /stats opens the dashboard in a Mini App button.
+// In an owner's private chat /stats opens the dashboard in a Mini App
+// button.
 func TestStatsInPrivateOpensTheMiniApp(t *testing.T) {
 	f := newFixture()
-	f.opts.StatsURL = statsPage
+	f.opts.StatsURL, f.opts.OwnerIDs = statsPage, map[int64]bool{userID: true}
 
 	sent := f.run(textFrom(userID, "/stats"))
 
@@ -32,13 +33,14 @@ func TestStatsInPrivateOpensTheMiniApp(t *testing.T) {
 	}
 }
 
-// A group cannot have a Mini App button, so there /stats links to the
-// bot's main Mini App, naming the group.
+// A group cannot have a Mini App button, so there an owner's /stats links
+// to the bot's main Mini App, naming the group.
 func TestStatsInAGroupLinksToTheMiniApp(t *testing.T) {
 	f := newFixture()
-	f.opts.StatsURL = statsPage
+	msg := groupMessage("/stats@MyBot")
+	f.opts.StatsURL, f.opts.OwnerIDs = statsPage, map[int64]bool{msg.From.ID: true}
 
-	sent := f.run(inGroup(groupMessage("/stats@MyBot")))
+	sent := f.run(inGroup(msg))
 
 	if len(sent) != 1 || len(sent[0].buttons) != 1 {
 		t.Fatalf("sent = %+v", sent)
@@ -48,22 +50,35 @@ func TestStatsInAGroupLinksToTheMiniApp(t *testing.T) {
 	if button.URL != want || button.WebApp != nil {
 		t.Errorf("button = %+v, want a link to %s", button, want)
 	}
-	if !strings.Contains(sent[0].text, "a'zolari") {
+	if !strings.Contains(sent[0].text, "bot egalari") {
 		t.Errorf("text = %q", sent[0].text)
 	}
 }
 
-// ADMIN_COMMANDS can keep them for administrators, as any command.
-func TestStatsAndGameCanBeAdminsOnly(t *testing.T) {
+// The dashboard names who swears most, so /stats is the owners' alone: to
+// anyone else, an admin of the group too, it is an unknown command.
+func TestStatsIsTheOwnersAlone(t *testing.T) {
+	f := newFixture()
+	f.opts.StatsURL, f.opts.OwnerIDs = statsPage, map[int64]bool{userID + 1: true}
+
+	sent := f.run(textFrom(userID, "/stats"), inGroup(asAdmin(groupMessage("/stats@MyBot"))))
+
+	if len(sent) != 2 || len(sent[0].buttons)+len(sent[1].buttons) != 0 || !strings.Contains(sent[0].text, "bilmayman") {
+		t.Errorf("sent = %+v; want both unknown", sent)
+	}
+}
+
+// ADMIN_COMMANDS can keep /game for administrators, as any command.
+func TestGameCanBeAdminsOnly(t *testing.T) {
 	f := newFixture()
 	table := &fakeGameTable{}
-	f.opts.StatsURL, f.opts.Game, f.opts.GameTable = statsPage, fakeGameLinks{}, table
-	f.opts.AdminCommands = map[string]bool{"/stats": true, "/game": true}
+	f.opts.Game, f.opts.GameTable = fakeGameLinks{}, table
+	f.opts.AdminCommands = map[string]bool{"/game": true}
 
-	sent := f.run(textFrom(userID, "/stats"), textFrom(userID, "/game"))
+	sent := f.run(textFrom(userID, "/game"))
 
-	if len(sent) != 2 || sent[0].text != textForbidden || sent[1].text != textForbidden || len(table.games) != 0 {
-		t.Errorf("sent = %+v, games %+v; want both refused", sent, table.games)
+	if len(sent) != 1 || sent[0].text != textForbidden || len(table.games) != 0 {
+		t.Errorf("sent = %+v, games %+v; want it refused", sent, table.games)
 	}
 }
 

@@ -298,12 +298,12 @@ type Abilities struct {
 	Pages    bool
 }
 
-// helpPages are the commands of the dashboard and the game, in each
-// language, listed after /about when they are on.
+// helpPages is the game's command, in each language, listed after /about
+// when the pages are on. /stats, for the owners alone, is not listed.
 var helpPages = map[string]string{
-	"uz": "\n/stats — guruh statistikasi\n/game — Tarozi o'yini",
-	"ru": "\n/stats — статистика группы\n/game — игра «Tarozi»",
-	"en": "\n/stats — the group's statistics\n/game — the Tarozi game",
+	"uz": "\n/game — Tarozi o'yini",
+	"ru": "\n/game — игра «Tarozi»",
+	"en": "\n/game — the Tarozi game",
 }
 
 // HelpText describes the bot's commands and what it can do with these

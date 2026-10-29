@@ -30,21 +30,20 @@ const (
 )
 
 // Store reads what the dashboard shows: a group's statistics and guards,
-// and the groups a user was seen in.
+// and the groups the bot is in.
 type Store interface {
 	GroupStats(ctx context.Context, chatID, botID int64, since time.Time, timeZone string, limit int) (storage.GroupStats, error)
 	GroupRules(ctx context.Context, chatID int64) ([]storage.GroupRule, error)
-	MemberGroups(ctx context.Context, userID int64, limit int) ([]storage.MemberGroup, error)
+	Groups(ctx context.Context, since time.Time, limit int) ([]storage.GroupSummary, error)
 }
 
-// Telegram says who is in a group, and what it is called.
+// Telegram says what a group is called.
 type Telegram interface {
-	GetChatMember(ctx context.Context, chatID, userID int64) (telegram.ChatMember, error)
 	GetChat(ctx context.Context, chatID int64) (telegram.Chat, error)
 }
 
 // Options configures the dashboard's handler. All but Now and Logger are
-// required.
+// required; without Owners nobody is let in.
 type Options struct {
 	// BotToken is what Telegram signs init data with.
 	BotToken string
@@ -52,6 +51,10 @@ type Options struct {
 	BotID    int64
 	Store    Store
 	Telegram Telegram
+	// Owners are the bot's owners by Telegram ID, the only ones shown the
+	// dashboard: it names who writes and who swears most, which the
+	// groups' members are not to see.
+	Owners map[int64]bool
 	// Location is the time zone of "today" and of the hours.
 	Location *time.Location
 	Now      func() time.Time
@@ -81,7 +84,7 @@ func NewHandler(opts Options) (http.Handler, error) {
 
 // request is what the page sends: its init data, as Telegram gave it, and
 // the group and period it shows. Without a group, the one in the link that
-// opened the app is shown, and without that, the user's groups are listed.
+// opened the app is shown, and without that, the bot's groups are listed.
 type request struct {
 	InitData string `json:"init_data"`
 	Group    string `json:"group"`
@@ -126,7 +129,7 @@ var (
 	errBadRequest  = failure{http.StatusBadRequest, "bad_request"}
 	errForged      = failure{http.StatusUnauthorized, "unauthorized"}
 	errStale       = failure{http.StatusUnauthorized, "expired"}
-	errNotMember   = failure{http.StatusForbidden, "not_member"}
+	errNotOwner    = failure{http.StatusForbidden, "not_owner"}
 	errUnavailable = failure{http.StatusBadGateway, "unavailable"}
 )
 
@@ -155,42 +158,44 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 	case err != nil:
 		return nil, errForged
 	}
+	if !h.opts.Owners[opened.User.ID] {
+		return nil, errNotOwner
+	}
 	param := cmp.Or(req.Group, opened.StartParam)
 	if param == "" {
-		return h.groups(r.Context(), opened.User)
+		return h.groups(r.Context())
 	}
 	chatID, ok := ParseGroupParam(param)
 	if !ok {
 		return nil, errBadRequest
 	}
-	return h.dashboard(r.Context(), opened.User, chatID, req.Period)
+	return h.dashboard(r.Context(), chatID, req.Period)
 }
 
-// groups lists the groups the user was seen in, to choose from.
-func (h *handler) groups(ctx context.Context, user User) (any, failure) {
-	groups, err := h.opts.Store.MemberGroups(ctx, user.ID, groupsListed)
+// groups lists the groups the bot is in, to choose from, the most
+// recently active first.
+func (h *handler) groups(ctx context.Context) (any, failure) {
+	groups, err := h.opts.Store.Groups(ctx, h.opts.Now(), groupsListed)
 	if err != nil {
-		h.opts.Logger.Error("dashboard could not list the groups", "user_id", user.ID, "error", err)
+		h.opts.Logger.Error("dashboard could not list the groups", "error", err)
 		return nil, errUnavailable
 	}
 	list := groupList{Groups: []groupLink{}}
 	for _, g := range groups {
+		if g.BotStatus == "left" || g.BotStatus == "kicked" {
+			continue
+		}
 		list.Groups = append(list.Groups, groupLink{Group: GroupParam(g.ChatID), Title: g.Title})
 	}
 	return list, failure{}
 }
 
-// dashboard is one group's statistics, for a member of it only: Telegram
-// is asked, as the list of groups may be stale and the group came from the
-// page.
-func (h *handler) dashboard(ctx context.Context, user User, chatID int64, period string) (any, failure) {
+// dashboard is one group's statistics, for an owner.
+func (h *handler) dashboard(ctx context.Context, chatID int64, period string) (any, failure) {
 	now := h.opts.Now().In(h.opts.Location)
 	since, err := tools.StatsSince(period, now)
 	if err != nil {
 		return nil, errBadRequest
-	}
-	if fail := h.checkMember(ctx, chatID, user.ID); fail != (failure{}) {
-		return nil, fail
 	}
 	stats, err := h.opts.Store.GroupStats(ctx, chatID, h.opts.BotID, since, h.opts.Location.String(), listed)
 	if err != nil {
@@ -218,24 +223,6 @@ func (h *handler) dashboard(ctx context.Context, user User, chatID int64, period
 		Swearers: entries(stats.Swearers),
 		Guards:   guardsOn(rules, chatID),
 	}, failure{}
-}
-
-// checkMember lets through a member of the group, an admin or its creator,
-// or one restricted but still in it. Telegram refusing to say, as it does
-// for a group the bot left, lets nobody through.
-func (h *handler) checkMember(ctx context.Context, chatID, userID int64) failure {
-	member, err := h.opts.Telegram.GetChatMember(ctx, chatID, userID)
-	var refused *telegram.APIError
-	switch {
-	case errors.As(err, &refused) && refused.Code < http.StatusInternalServerError:
-		return errNotMember
-	case err != nil:
-		h.opts.Logger.Warn("dashboard could not check a member", "chat_id", chatID, "user_id", userID, "error", err)
-		return errUnavailable
-	case !member.Subscribed():
-		return errNotMember
-	}
-	return failure{}
 }
 
 // guardNames are the guards an owner may turn on in a group, by the rule

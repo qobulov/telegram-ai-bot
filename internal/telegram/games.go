@@ -93,19 +93,20 @@ type menuButton struct {
 }
 
 type setChatMenuButtonParams struct {
+	ChatID     int64      `json:"chat_id,omitempty"`
 	MenuButton menuButton `json:"menu_button"`
 }
 
-// SetMenuWebApp makes the menu button of every private chat with the bot
+// SetMenuWebApp makes the menu button of one private chat with the bot
 // open a Mini App, labelled text. Telegram has such a button in private
 // chats only.
-func (c *Client) SetMenuWebApp(ctx context.Context, text, url string) error {
-	params := setChatMenuButtonParams{MenuButton: menuButton{Type: "web_app", Text: text, WebApp: &WebAppInfo{URL: url}}}
+func (c *Client) SetMenuWebApp(ctx context.Context, chatID int64, text, url string) error {
+	params := setChatMenuButtonParams{ChatID: chatID, MenuButton: menuButton{Type: "web_app", Text: text, WebApp: &WebAppInfo{URL: url}}}
 	return c.call(ctx, "setChatMenuButton", params, nil)
 }
 
-// SetMenuCommands puts the menu button of private chats back to the list
-// of commands.
+// SetMenuCommands puts the default menu button of private chats back to
+// the list of commands.
 func (c *Client) SetMenuCommands(ctx context.Context) error {
 	return c.call(ctx, "setChatMenuButton", setChatMenuButtonParams{MenuButton: menuButton{Type: "commands"}}, nil)
 }

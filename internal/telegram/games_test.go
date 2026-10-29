@@ -88,14 +88,14 @@ func TestGetGameHighScoresSendsExactParams(t *testing.T) {
 func TestSetMenuWebAppSendsExactParams(t *testing.T) {
 	client, api := newTestClient(t, okTrue, okTrue)
 
-	if err := client.SetMenuWebApp(context.Background(), "Statistika", "https://example.com/stats/"); err != nil {
+	if err := client.SetMenuWebApp(context.Background(), 42, "Statistika", "https://example.com/stats/"); err != nil {
 		t.Fatal(err)
 	}
 	if err := client.SetMenuCommands(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	calls := api.recorded()
-	want := map[string]any{"menu_button": map[string]any{"type": "web_app", "text": "Statistika", "web_app": map[string]any{"url": "https://example.com/stats/"}}}
+	want := map[string]any{"chat_id": float64(42), "menu_button": map[string]any{"type": "web_app", "text": "Statistika", "web_app": map[string]any{"url": "https://example.com/stats/"}}}
 	if calls[0].method != "setChatMenuButton" || !reflect.DeepEqual(calls[0].params, want) {
 		t.Errorf("call = %+v, want setChatMenuButton %v", calls[0], want)
 	}

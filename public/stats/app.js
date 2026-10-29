@@ -1,6 +1,7 @@
 // The group dashboard. Everything it shows comes from /api/stats, which
 // trusts nothing but the init data Telegram signed: the page only says which
-// group and period to show, and the server checks the viewer is a member.
+// group and period to show, and the server checks the viewer is one of the
+// bot's owners.
 "use strict";
 
 (function () {
@@ -9,7 +10,7 @@
 
   const texts = {
     uz: {
-      eyebrow: "Statistika", groups: "Guruhlaringiz", messages: "xabar", members: "a'zo yozdi",
+      eyebrow: "Statistika", groups: "Guruhlar", messages: "xabar", members: "a'zo yozdi",
       peak: "eng qizg'in soat", hours: "Soatlar bo'yicha xabarlar", top: "Eng faol a'zolar",
       guards: "Himoyalar", swearers: "Eng ko'p so'kinganlar", today: "Bugun", week: "7 kun",
       chooseTitle: "Qaysi guruh?", noGroups: "Siz bilan birga bo'lgan guruhni topmadim. Guruhda /stats yozing.",
@@ -20,11 +21,11 @@
       note: "Botning o'z xabarlari, u jim bo'lgan vaqtdagi va saqlanish muddatidan eski xabarlar sanalmaydi.",
       outside: "Bu sahifa Telegram ichida ochiladi. Botga /stats yozing.",
       expired: "Sahifa eskirdi. Uni qaytadan oching.", unauthorized: "Telegram tasdiqlamadi. Sahifani bot orqali qaytadan oching.",
-      notMember: "Bu guruh statistikasini faqat uning a'zolari ko'radi.",
+      notOwner: "Statistikani faqat bot egalari ko'radi.",
       unavailable: "Hozir ma'lumot olib bo'lmadi.", retry: "Qayta urinish", close: "Yopish", back: "Orqaga",
     },
     ru: {
-      eyebrow: "Статистика", groups: "Ваши группы", messages: "сообщений", members: "писали",
+      eyebrow: "Статистика", groups: "Группы", messages: "сообщений", members: "писали",
       peak: "самый активный час", hours: "Сообщения по часам", top: "Самые активные",
       guards: "Защиты", swearers: "Больше всех ругались", today: "Сегодня", week: "7 дней",
       chooseTitle: "Какая группа?", noGroups: "Не нашла общих с вами групп. Напишите /stats в группе.",
@@ -35,7 +36,7 @@
       note: "Не считаются сообщения самого бота, написанные пока он молчал и старше срока хранения.",
       outside: "Эта страница открывается внутри Telegram. Напишите боту /stats.",
       expired: "Страница устарела. Откройте её заново.", unauthorized: "Telegram не подтвердил вход. Откройте страницу через бота.",
-      notMember: "Статистику группы видят только её участники.",
+      notOwner: "Статистику видят только владельцы бота.",
       unavailable: "Сейчас не удалось получить данные.", retry: "Повторить", close: "Закрыть", back: "Назад",
     },
   };
@@ -105,7 +106,7 @@
   }
 
   function failed(code) {
-    const message = { expired: t.expired, unauthorized: t.unauthorized, not_member: t.notMember }[code] || t.unavailable;
+    const message = { expired: t.expired, unauthorized: t.unauthorized, not_owner: t.notOwner }[code] || t.unavailable;
     const retry = code === "unavailable" || !code;
     showState(message, retry ? { label: t.retry, run: load } : { label: t.close, run: () => tg.close() });
   }

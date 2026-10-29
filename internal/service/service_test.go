@@ -825,7 +825,7 @@ func TestHelpTextListsEveryCommand(t *testing.T) {
 	}
 	for _, lang := range []string{"uz", "ru", "en"} {
 		help := HelpTextIn(lang, Abilities{Pages: true})
-		if !strings.Contains(help, "/stats — ") || !strings.Contains(help, "/game — ") || strings.Contains(help, "%!") {
+		if strings.Contains(help, "/stats") || !strings.Contains(help, "/game — ") || strings.Contains(help, "%!") {
 			t.Errorf("%s help with the pages = %q", lang, help)
 		}
 	}

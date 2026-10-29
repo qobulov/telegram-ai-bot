@@ -95,10 +95,9 @@ func SetAdminRights(ctx context.Context, setter RightsSetter, logger *slog.Logge
 	}
 }
 
-// pageCommands open the dashboard and send the game, in every menu while
-// WEBAPP_URL serves them.
+// pageCommands send the game, in every menu while WEBAPP_URL serves it.
+// /stats, for the owners alone, is in no menu.
 var pageCommands = []telegram.BotCommand{
-	{Command: "stats", Description: "Guruh statistikasi"},
 	{Command: "game", Description: "Tarozi o'yini"},
 }
 

@@ -54,20 +54,21 @@ func TestSetCommandMenus(t *testing.T) {
 	}
 }
 
-// With the pages served, every menu offers /stats and /game; without, none.
+// With the pages served, every menu offers /game; without, none. /stats,
+// for the owners alone, is in no menu.
 func TestSetCommandMenusWithPages(t *testing.T) {
 	for _, pages := range []bool{false, true} {
 		setter := &fakeCommandSetter{}
 		SetCommandMenus(context.Background(), setter, pages, slog.New(slog.NewTextHandler(io.Discard, nil)))
 		for scope, commands := range setter.set {
-			has := slices.ContainsFunc(commands, func(c telegram.BotCommand) bool { return c.Command == "stats" }) &&
-				slices.ContainsFunc(commands, func(c telegram.BotCommand) bool { return c.Command == "game" })
-			if has != pages {
+			has := slices.ContainsFunc(commands, func(c telegram.BotCommand) bool { return c.Command == "game" })
+			stats := slices.ContainsFunc(commands, func(c telegram.BotCommand) bool { return c.Command == "stats" })
+			if has != pages || stats {
 				t.Errorf("pages %t: %s menu %v", pages, scope, commands)
 			}
 		}
 	}
-	if slices.ContainsFunc(commandMenus[telegram.ScopeDefault], func(c telegram.BotCommand) bool { return c.Command == "stats" }) {
+	if slices.ContainsFunc(commandMenus[telegram.ScopeDefault], func(c telegram.BotCommand) bool { return c.Command == "game" }) {
 		t.Error("the page commands were added to the menus themselves")
 	}
 }

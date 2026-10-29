@@ -21,29 +21,28 @@ type GameTable interface {
 
 var (
 	textStatsPrivate = localText{
-		uz: "Guruhlaringiz statistikasi: kim ko'p yozadi, qaysi soatlarda gap qizg'in, qaysi himoyalar yoqilgan.",
-		ru: "Статистика ваших групп: кто пишет больше всех, в какие часы самый разговор, какие защиты включены.",
-		en: "Your groups' statistics: who writes the most, the busiest hours, which guards are on.",
+		uz: "Guruhlar statistikasi: kim ko'p yozadi, kim ko'p so'kinadi, qaysi soatlarda gap qizg'in, qaysi himoyalar yoqilgan.",
+		ru: "Статистика групп: кто пишет больше всех, кто больше ругается, в какие часы самый разговор, какие защиты включены.",
+		en: "The groups' statistics: who writes and who swears the most, the busiest hours, which guards are on.",
 	}
 	textStatsGroup = localText{
-		uz: "Guruh statistikasi: kim ko'p yozadi, qaysi soatlarda gap qizg'in, qaysi himoyalar yoqilgan. Faqat shu guruh a'zolari ko'ra oladi.",
-		ru: "Статистика группы: кто пишет больше всех, в какие часы самый разговор, какие защиты включены. Видят только участники этой группы.",
-		en: "This group's statistics: who writes the most, the busiest hours, which guards are on. Only its members can see them.",
+		uz: "Guruh statistikasi. Faqat bot egalari ko'ra oladi.",
+		ru: "Статистика группы. Видят только владельцы бота.",
+		en: "This group's statistics. Only the bot's owners can see them.",
 	}
 	textStatsButton = localText{uz: "📊 Statistikani ochish", ru: "📊 Открыть статистику", en: "📊 Open the statistics"}
 )
 
-// statsCommand answers /stats with a button that opens the dashboard. In a
-// private chat it is a Mini App button, which lists the user's groups. A
-// group cannot have one, so there it is a link to the bot's main Mini App
-// with the group in its startapp parameter; the dashboard shows the group
-// only to whom Telegram says is in it.
+// statsCommand answers /stats, for the bot's owners known by ID alone,
+// with a button that opens the dashboard; to anyone else it is an unknown
+// command, as the dashboard names who swears most. In a private chat it is
+// a Mini App button, which lists the bot's groups. A group cannot have
+// one, so there it is a link to the bot's main Mini App with the group in
+// its startapp parameter; the dashboard checks again that an owner opened
+// it.
 func (s *Service) statsCommand(in incoming) outcome {
-	if s.opts.StatsURL == "" || s.opts.Bot.Username == "" {
+	if s.opts.StatsURL == "" || s.opts.Bot.Username == "" || !s.opts.OwnerIDs[in.userID] {
 		return say(textUnknown.to(in))
-	}
-	if s.restricted(in) {
-		return say(textForbidden)
 	}
 	if !in.group {
 		button := telegram.Button{Text: textStatsButton.to(in), WebApp: &telegram.WebAppInfo{URL: s.opts.StatsURL}}

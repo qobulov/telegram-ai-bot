@@ -223,48 +223,6 @@ func TestActiveMembersCountsRecentPeople(t *testing.T) {
 	}
 }
 
-// The dashboard offers a user the groups they are still in, where the bot
-// is too, the latest seen first.
-func TestMemberGroupsAreTheOnesStillShared(t *testing.T) {
-	store := newTestStore(t)
-	ctx := context.Background()
-	const leftGroup, botGone = int64(-1007777777777), int64(-1006666666666)
-	for _, g := range []GroupStatus{
-		{ChatID: group, Title: "Choyxona", BotStatus: "administrator"},
-		{ChatID: otherGroup, Title: "Kitobxonlar", BotStatus: "member"},
-		{ChatID: leftGroup, Title: "Left", BotStatus: "member"},
-		{ChatID: botGone, Title: "Bot gone", BotStatus: "kicked"},
-	} {
-		if err := store.RecordGroup(ctx, g); err != nil {
-			t.Fatalf("RecordGroup: %v", err)
-		}
-	}
-	now := time.Now()
-	for _, m := range []GroupMember{
-		{ChatID: group, UserID: alice, FirstName: "Ann", LastSeen: now},
-		{ChatID: otherGroup, UserID: alice, FirstName: "Ann", LastSeen: now.Add(-time.Hour)},
-		{ChatID: leftGroup, UserID: alice, FirstName: "Ann", Status: "left", LastSeen: now},
-		{ChatID: botGone, UserID: alice, FirstName: "Ann", LastSeen: now},
-		{ChatID: group, UserID: bob, FirstName: "Bek", LastSeen: now},
-	} {
-		if err := store.SeeMember(ctx, m); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := store.pool.Exec(ctx, `UPDATE group_members SET last_seen_at = $3 WHERE chat_id = $1 AND user_id = $2`, m.ChatID, m.UserID, m.LastSeen); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	groups, err := store.MemberGroups(ctx, alice, 10)
-	if err != nil {
-		t.Fatalf("MemberGroups: %v", err)
-	}
-	want := []MemberGroup{{ChatID: group, Title: "Choyxona"}, {ChatID: otherGroup, Title: "Kitobxonlar"}}
-	if len(groups) != 2 || groups[0] != want[0] || groups[1] != want[1] {
-		t.Errorf("groups = %+v, want %+v", groups, want)
-	}
-}
-
 // A member known from a reply is added as of when they wrote; a known one
 // keeps their status, is seen later only by a later message, and does not
 // count as active for an old one.

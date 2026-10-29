@@ -23,26 +23,32 @@ import (
 
 type fakeMenuSetter struct {
 	text, url string
-	calls     int
+	chats     []int64
+	defaults  int
 }
 
-func (f *fakeMenuSetter) SetMenuWebApp(_ context.Context, text, url string) error {
-	f.calls++
+func (f *fakeMenuSetter) SetMenuWebApp(_ context.Context, chatID int64, text, url string) error {
+	f.chats = append(f.chats, chatID)
 	f.text, f.url = text, url
 	return nil
 }
 
-// The menu button opens the dashboard while the pages are served, and is
-// left alone otherwise.
+func (f *fakeMenuSetter) SetMenuCommands(context.Context) error {
+	f.defaults++
+	return nil
+}
+
+// While the pages are served, only the owners' menu button opens the
+// dashboard, everyone else's the commands; otherwise they are left alone.
 func TestSetMenuApp(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	setter := &fakeMenuSetter{}
-	SetMenuApp(context.Background(), setter, config.Config{}, logger)
-	if setter.calls != 0 {
+	SetMenuApp(context.Background(), setter, config.Config{OwnerIDs: map[int64]bool{7: true}}, logger)
+	if len(setter.chats) != 0 || setter.defaults != 0 {
 		t.Errorf("set without WEBAPP_URL: %+v", setter)
 	}
-	SetMenuApp(context.Background(), setter, config.Config{WebAppURL: "https://maria.example"}, logger)
-	if setter.calls != 1 || setter.url != "https://maria.example/stats/" || setter.text == "" {
+	SetMenuApp(context.Background(), setter, config.Config{WebAppURL: "https://maria.example", OwnerIDs: map[int64]bool{7: true}}, logger)
+	if setter.defaults != 1 || len(setter.chats) != 1 || setter.chats[0] != 7 || setter.url != "https://maria.example/stats/" || setter.text == "" {
 		t.Errorf("menu = %+v", setter)
 	}
 }
