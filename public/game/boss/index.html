@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#160c2c">
+  <title>Dev jangi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Russo+One&display=swap" rel="stylesheet">
+  <script src="https://telegram.org/js/games.js" defer></script>
+  <link rel="stylesheet" href="boss.css">
+</head>
+<body>
+  <canvas id="scene" aria-hidden="true"></canvas>
+  <main id="app">
+    <header class="top">
+      <div class="boss-title"><span class="level" id="level">1</span><span id="bossName"></span></div>
+      <div class="hp" aria-hidden="true"><i class="trail" id="hpTrail"></i><i class="fill" id="hpFill"></i><span id="hpText"></span></div>
+      <div class="row">
+        <span class="coins" id="coins">💰 0</span>
+        <button type="button" class="board-toggle" id="boardToggle"><span data-t="table"></span> ▾</button>
+      </div>
+      <ol class="board" id="board" hidden></ol>
+    </header>
+
+    <p class="hint" id="hint" data-t="hint"></p>
+    <p class="message" id="message" aria-live="polite"></p>
+
+    <section class="upgrades">
+      <button type="button" class="card" data-item="sword">
+        <span class="icon">🗡</span><b data-t="sword"></b><span class="lvl" id="swordLvl"></span>
+        <small id="swordNext"></small><span class="cost" id="swordCost"></span>
+      </button>
+      <button type="button" class="card" data-item="crit">
+        <span class="icon">⚡</span><b data-t="crit"></b><span class="lvl" id="critLvl"></span>
+        <small id="critNext"></small><span class="cost" id="critCost"></span>
+      </button>
+      <button type="button" class="card" data-item="helper">
+        <span class="icon">🏹</span><b data-t="helper"></b><span class="lvl" id="helperLvl"></span>
+        <small id="helperNext"></small><span class="cost" id="helperCost"></span>
+      </button>
+    </section>
+
+    <section class="victory" id="victory" hidden>
+      <p class="victory-title" id="victoryTitle"></p>
+      <p class="victory-reward" id="victoryReward"></p>
+      <ol class="victory-list" id="victoryList"></ol>
+      <div class="actions">
+        <button type="button" class="primary" id="next" data-t="next"></button>
+        <button type="button" id="share" data-t="share"></button>
+      </div>
+    </section>
+  </main>
+  <script src="crit.js"></script>
+  <script src="boss.js"></script>
+</body>
+</html>

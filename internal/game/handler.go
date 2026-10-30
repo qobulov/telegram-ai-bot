@@ -46,8 +46,10 @@ type request struct {
 	Run     string `json:"run"`
 	Answers string `json:"answers"`
 	Times   []int  `json:"times"`
-	// Turns and Ticks are a play of Kosmik ilon's, for finish.
+	// Turns and Ticks are a play of Kosmik ilon's, for finish; Taps and
+	// Ticks one of Uchar gilam's.
 	Turns []int `json:"turns"`
+	Taps  []int `json:"taps"`
 	Ticks int   `json:"ticks"`
 }
 
@@ -60,6 +62,11 @@ type started struct {
 type startedIlon struct {
 	Run string `json:"run"`
 	IlonPlay
+}
+
+type startedGilam struct {
+	Run string `json:"run"`
+	GilamPlay
 }
 
 type finished struct {
@@ -120,12 +127,23 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 }
 
 func (h *handler) start(req request) (any, failure) {
-	if s, err := h.game.session(req.Session); err == nil && s.Game == IlonShortName {
+	s, err := h.game.session(req.Session)
+	if err != nil {
+		return nil, errToken
+	}
+	switch s.Game {
+	case IlonShortName:
 		run, play, err := h.game.StartIlon(req.Session)
 		if err != nil {
 			return nil, errToken
 		}
 		return startedIlon{Run: run, IlonPlay: play}, failure{}
+	case GilamShortName:
+		run, play, err := h.game.StartGilam(req.Session)
+		if err != nil {
+			return nil, errToken
+		}
+		return startedGilam{Run: run, GilamPlay: play}, failure{}
 	}
 	run, dealt, err := h.game.Start(req.Session)
 	if err != nil {
@@ -139,9 +157,12 @@ func (h *handler) start(req request) (any, failure) {
 func (h *handler) finish(ctx context.Context, req request) (any, failure) {
 	var result Result
 	var err error
-	if req.Ticks > 0 {
+	switch h.game.runGame(req.Run) {
+	case IlonShortName:
 		result, err = h.game.FinishIlon(req.Run, req.Turns, req.Ticks)
-	} else {
+	case GilamShortName:
+		result, err = h.game.FinishGilam(req.Run, req.Taps, req.Ticks)
+	default:
 		result, err = h.game.Finish(req.Run, req.Answers, req.Times)
 	}
 	switch {

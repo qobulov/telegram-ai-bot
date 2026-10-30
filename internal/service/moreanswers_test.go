@@ -187,10 +187,10 @@ func TestMoreItemsAnswerWithTheirTools(t *testing.T) {
 	}
 }
 
-// Tarozi and Kosmik ilon are each the game's own message; nothing else is
+// Each game, Tarozi to Dev jangi, is the game's own message; nothing else is
 // sent with it.
 func TestGamesAreTheGameAlone(t *testing.T) {
-	for _, name := range []string{"tarozi", "ilon"} {
+	for _, name := range []string{"tarozi", "ilon", "gilam", "boss"} {
 		f := newFixture()
 		runner := withToolRunner(f)
 		runner.answers["send_game"] = succeeded(`{"sent":true}`)

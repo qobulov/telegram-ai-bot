@@ -104,6 +104,8 @@ func SetAdminRights(ctx context.Context, setter RightsSetter, logger *slog.Logge
 var pageCommands = []telegram.BotCommand{
 	{Command: "game", Description: "Tarozi o'yini"},
 	{Command: "ilon", Description: "Kosmik ilon o'yini"},
+	{Command: "gilam", Description: "Uchar gilam o'yini"},
+	{Command: "boss", Description: "Dev jangi (guruh bilan)"},
 	{Command: "shashka", Description: "Shashka (PvP, reyting)"},
 }
 

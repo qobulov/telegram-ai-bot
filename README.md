@@ -51,13 +51,15 @@ prices).
 ```text
 cmd/bot/main.go                 long-polling command; migrate and webhook subcommands
 api/webhook.go                  serverless function that receives updates by webhook
-api/stats.go, api/game.go       serverless functions behind the dashboard and the game
+api/stats.go, api/game.go       serverless functions behind the dashboard and the games
+api/raid.go                     serverless function behind Dev jangi, the boss raid
 api/shashka.go                  serverless function behind the draughts Mini App
-public/stats, public/game       static pages: the group dashboard Mini App, the Tarozi game and Kosmik ilon (game/ilon)
+public/stats, public/game       static pages: the group dashboard Mini App, Tarozi, and under game/ Kosmik ilon, Uchar gilam and Dev jangi
 public/shashka                  static page: the draughts Mini App
 internal/app                    assembles the bot for either way of running it
 internal/miniapp                the dashboard's API: Telegram init data check, membership check, statistics
-internal/game                   the games Tarozi and Kosmik ilon: signed sessions, dealing plays, scoring them
+internal/game                   the games Tarozi, Kosmik ilon and Uchar gilam: signed sessions, dealing plays, scoring them
+internal/raid                   Dev jangi, the boss raid: a chat's shared boss, hits counted on the server, upgrades, kill announcements
 internal/dooz                   dooz (noughts and crosses): the board, its encoding in buttons, the bot's moves
 internal/shashka                Russian draughts: the rules, the position's encoding, the bot's search
 internal/shashkaapp             the draughts Mini App's API: init data check, invites, the queue, moves, clocks, ratings
@@ -162,6 +164,10 @@ shashka_games(id PK, kind, level, white_id, black_id, position, status, last_pat
               captured, version, invite_code UNIQUE, rated, deadline, winner,
               reason, white_change, black_change, created_at, updated_at)
 shashka_queue(user_id PK, rating, joined_at)
+raid_bosses(chat_id PK, level, hp, max_hp, updated_at)
+raid_members(chat_id, user_id, name, level, damage, total, scored_at, updated_at,
+             PK (chat_id, user_id))
+raid_heroes(user_id PK, coins, sword, crit, helper, seed, taps, last_hit, updated_at)
 schema_migrations(version PK, applied_at)
 ```
 
@@ -234,7 +240,7 @@ in the environment win over the file.
 | `DB_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
 | `TELEGRAM_WEBHOOK_SECRET` | empty | Only for webhook deployments; see [Vercel deployment](#vercel-deployment-webhook) |
 | `CRON_SECRET` | empty | Only on Vercel: protects the daily cleanup endpoint |
-| `WEBAPP_URL` | empty | The Vercel deployment's `https://` address, such as `https://maria.vercel.app`, where `public/` is served: turns on the [dashboard](#dashboard-mini-app) (`/stats`, the private chats' menu button) and the games [Tarozi](#the-game-tarozi) and [Kosmik ilon](#kosmik-ilon) (`/game`, `/ilon`, the `send_game` tool). Empty turns them off |
+| `WEBAPP_URL` | empty | The Vercel deployment's `https://` address, such as `https://maria.vercel.app`, where `public/` is served: turns on the [dashboard](#dashboard-mini-app) (`/stats`, the private chats' menu button) and the games [Tarozi](#the-game-tarozi), [Kosmik ilon](#kosmik-ilon), [Uchar gilam](#uchar-gilam) and [Dev jangi](#dev-jangi) (`/game`, `/ilon`, `/gilam`, `/boss`, the `send_game` tool). Empty turns them off |
 | `MAX_OUTPUT_TOKENS`           | `8192`                         | Longest model reply, in tokens, thinking included |
 | `AI_REASONING_EFFORT`         | `low` (Gemini)                 | How hard Gemini thinks before answering: `none`, `minimal`, `low`, `medium`, `high`, or `default` for the model's own. Thinking is paid as output and takes from `MAX_OUTPUT_TOKENS`; the lite models refuse `none`. Each request logs its tokens as `model usage` |
 | `CHAT_REASONING_EFFORT` | `minimal` | How hard the chat model thinks before a reply in words alone (Gemini): `none`, `minimal`, `low`, `medium`, `high` or `default`. At `low` it spent 500 to 800 thinking tokens, seconds, on a one-line joke |
@@ -328,7 +334,7 @@ the message it is working on before exiting.
 
 Bot commands: `/start`, `/help`,
 `/model`, `/about`, `/premium`, `/paysupport`, with `WEBAPP_URL` set
-`/stats`, `/game` and `/ilon`, for owners `/payments` and `/refund`, and
+`/stats`, `/game`, `/ilon`, `/gilam` and `/boss`, for owners `/payments` and `/refund`, and
 in groups `/mute`, `/unmute`, `/ignore` and `/unignore`.
 
 ## Tests
@@ -779,7 +785,7 @@ languages, and the buttons that need a value ask for it first
   (`internal/service/moremenu.go`): 🕌 Din (prayer times, the Quran),
   📰 Yangiliklar (Uzbekistan's, the world's), 🎬 Ko'ngilochar (films, anime,
   music, YouTube, a cat, trivia, a fun fact), ⚽ Sport (the table, matches and
-  top scorers of six leagues), 🕹 O'yinlar (Shashka, Dooz, Kosmik ilon, Tarozi, free games, a Steam
+  top scorers of six leagues), 🕹 O'yinlar (Shashka, Dooz, Dev jangi, Kosmik ilon, Uchar gilam, Tarozi, free games, a Steam
   price), 📚 O'qish (Wikipedia, an English word, synonyms, papers) and
   🛠 Foydali (a QR code, a drawing, a place on the map, holidays, crypto,
   earthquakes, a web search). An item is answered at once, asks for its
@@ -790,7 +796,7 @@ languages, and the buttons that need a value ask for it first
   language and the data as the tool gives it (an English fact, a Russian
   headline): the top entries with their links, a picture for the cat, a QR
   code or a drawing, the song's preview before its links, the pin and then
-  the place's name, the game itself for Kosmik ilon and Tarozi, and a trivia question with
+  the place's name, the game itself for the bot's own games, and a trivia question with
   its answer a few lines below its options. What a tool did not find, a
   service that is down, a quiet week of earthquakes and a drawing past its
   own daily limit are each said plainly. None of it takes from the daily
@@ -1785,6 +1791,46 @@ faster than the page lets a person. A test plays whole games with an
 autopilot and has `node` score them with `sim.js`, which must match the
 server's score to the point.
 
+### Uchar gilam
+
+`/gilam` posts the third game, and `send_game` takes it by name. A flying
+carpet over Samarkand at night (`public/game/gilam/`,
+`internal/game/gilam.go`): each tap lifts it, and it falls between; minarets
+rise from the ground and storm clouds hang from the sky, a gap between each
+pair. A gap passed is 10 points times the level; a coin in it 5 times the
+level; one gap in eight holds a Humo feather, which saves the carpet from
+its next crash. Every 10 gaps the carpet flies quicker and the gaps narrow,
+and the level's sky changes. It is played in ticks of 20 ms with whole
+numbers only, a 360 by 640 field in sixteenths: the page sends the ticks it
+was tapped in and how many went by, and the server plays them again from
+the play's seed (`sim.js` and the Go are the same rules, which a test
+checks with `node`); a play sent sooner than its ticks last is refused.
+
+### Dev jangi
+
+`/boss` posts the boss raid: everyone in a chat hits one giant together
+(`public/game/boss/`, `internal/raid`, `api/raid.go`). Each tap is a blow
+of the hero's sword, now and then a critical one of three times the
+damage; Barchinoy, once hired, shoots arrows for every second the player
+keeps hitting. The page shows each blow's number at once, the other
+members' blows as they come in, and the chat's table of damage on this boss.
+The hit that takes the last HP kills it: everyone who hit it gets coins,
+some for being there and more for their share, the bot tells the group who
+hit it most (in a private chat the player fights alone), and the next
+level's boss, half as strong again, takes its place. Five bosses are taken in
+turn: Ko'k dev, Qizil dev, Bir ko'zli dev, Ajdar and Qora dev. Coins buy the
+upgrades: the sword's damage, the share of critical blows, and Barchinoy.
+Telegram's table under the message shows each member's damage in all.
+
+The server counts it all (`raid_bosses`, `raid_members`, `raid_heroes`,
+migration 45). The page sends only how many times it was tapped; the server
+counts no more taps than 12 a second since the player's last hit, at most
+two seconds' worth and a few more, and works out their damage itself.
+Which taps are critical is a hash of the hero's seed and the tap's number,
+which the page counts the same way (`crit.js`, checked against the Go by a
+test), so the numbers it shows are the ones counted. A hit changes the boss
+with its row locked, so of many hits at once only one kills it.
+
 ### Shashka (draughts Mini App)
 
 With `WEBAPP_URL` set, `/shashka` opens Russian draughts, played against
@@ -2355,7 +2401,7 @@ update needs:
 
 ### Deploying the dashboard and the game
 
-They need no migration and no new kind of update.
+They need no new kind of update; Dev jangi needs migration 45.
 
 1. **Deploy**, then **set `WEBAPP_URL`** in Vercel to the deployment's
    production address, for example `https://maria.vercel.app` (no trailing
@@ -2370,15 +2416,16 @@ They need no migration and no new kind of update.
 3. **The games, in @BotFather:** `/newgame` → the bot → accept the terms →
    a title (`Tarozi`), a short description, a 640×360 photo (and optionally
    a GIF) → the short name **`tarozi`**, exactly, which the bot sends the
-   game by. Then `/newgame` again for the second: title `Kosmik ilon`, short
-   name **`ilon`**. No URL is asked for: the bot gives
-   `https://YOUR-APP.vercel.app/game/` and `/game/ilon/` with each press of
-   Play.
-4. As an owner, send `/stats`, `/game` and `/ilon` in a group and in a
-   private chat.
+   game by. Then `/newgame` again for each of the others: title `Kosmik
+   ilon`, short name **`ilon`**; `Uchar gilam`, **`gilam`**; `Dev jangi`,
+   **`boss`**. No URL is asked for: the bot gives
+   `https://YOUR-APP.vercel.app/game/` and `/game/ilon/`, `/game/gilam/`,
+   `/game/boss/` with each press of Play. Dev jangi needs migration 45.
+4. As an owner, send `/stats`, `/game`, `/ilon`, `/gilam` and `/boss` in a
+   group and in a private chat.
 
-Until step 2 the group links open nothing; until step 3 `/game` and `/ilon`
-answer that something went wrong, and `send_game` tells the model the short
+Until step 2 the group links open nothing; until step 3 a game's command
+answers that something went wrong, and `send_game` tells the model the short
 name is unknown.
 
 ### Daily cleanup

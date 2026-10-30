@@ -53,7 +53,7 @@ func (s *Service) statsCommand(in incoming) outcome {
 	return outcome{text: textStatsGroup.to(in), buttons: [][]telegram.Button{{{Text: textStatsButton.to(in), URL: link}}}}
 }
 
-// gameCommand answers /game and /ilon with the game itself, which Telegram
+// gameCommand answers /game, /ilon, /gilam and /boss with the game itself, which Telegram
 // shows with its Play button and table of scores.
 func (s *Service) gameCommand(ctx context.Context, in incoming, shortName string) outcome {
 	if s.opts.Game == nil || s.opts.GameTable == nil {
@@ -82,7 +82,7 @@ func (s *Service) pressedGame(q *telegram.CallbackQuery) {
 	if s.opts.Game == nil || s.opts.GameTable == nil || q.From == nil {
 		return
 	}
-	player := game.Player{UserID: q.From.ID, InlineMessageID: q.InlineMessageID}
+	player := game.Player{UserID: q.From.ID, Name: q.From.FirstName, InlineMessageID: q.InlineMessageID}
 	if q.Message != nil {
 		player.ChatID, player.MessageID = q.Message.Chat.ID, q.Message.MessageID
 	}

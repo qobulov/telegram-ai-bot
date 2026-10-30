@@ -126,23 +126,23 @@ func (f *fakeGameTable) AnswerGameCallback(_ context.Context, id, url string) er
 type fakeGameLinks struct{}
 
 func (fakeGameLinks) PlayURL(shortName string, p game.Player) (string, bool) {
-	page := map[string]string{game.ShortName: "game/", game.IlonShortName: "game/ilon/"}[shortName]
+	page := map[string]string{game.ShortName: "game/", game.IlonShortName: "game/ilon/", game.GilamShortName: "game/gilam/", game.BossShortName: "game/boss/"}[shortName]
 	return fmt.Sprintf("https://maria.example/%s?for=%d,%d,%d,%s", page, p.UserID, p.ChatID, p.MessageID, p.InlineMessageID), page != ""
 }
 
-// /game posts Tarozi and /ilon Kosmik ilon, as a reply in a group, and
-// nothing more is written.
+// /game posts Tarozi, /ilon Kosmik ilon, /gilam Uchar gilam and /boss Dev
+// jangi, as a reply in a group, and nothing more is written.
 func TestGameCommandSendsTheGame(t *testing.T) {
 	f := newFixture()
 	table := &fakeGameTable{}
 	f.opts.Game, f.opts.GameTable = fakeGameLinks{}, table
 
-	sent := f.run(inGroup(groupMessage("/game@MyBot")), textFrom(userID, "/game"), textFrom(userID, "/ilon"))
+	sent := f.run(inGroup(groupMessage("/game@MyBot")), textFrom(userID, "/game"), textFrom(userID, "/ilon"), textFrom(userID, "/gilam"), textFrom(userID, "/boss"))
 
 	if len(sent) != 0 {
 		t.Errorf("sent %+v besides the game", sent)
 	}
-	for _, want := range []sentGame{{groupID, 30, game.ShortName}, {userID, 0, game.ShortName}, {userID, 0, game.IlonShortName}} {
+	for _, want := range []sentGame{{groupID, 30, game.ShortName}, {userID, 0, game.ShortName}, {userID, 0, game.IlonShortName}, {userID, 0, game.GilamShortName}, {userID, 0, game.BossShortName}} {
 		if !slices.Contains(table.games, want) {
 			t.Errorf("games = %+v, want %+v among them", table.games, want)
 		}

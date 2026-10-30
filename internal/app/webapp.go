@@ -9,6 +9,7 @@ import (
 	"telegram-ai-bot/internal/config"
 	"telegram-ai-bot/internal/game"
 	"telegram-ai-bot/internal/miniapp"
+	"telegram-ai-bot/internal/raid"
 	"telegram-ai-bot/internal/shashkaapp"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
@@ -135,6 +136,27 @@ func NewGame(cfg config.Config, logger *slog.Logger) (*Endpoint, error) {
 	}
 	client := telegram.NewClient(telegram.Options{Token: cfg.TelegramToken, BaseURL: cfg.TelegramAPIURL, Logger: logger})
 	return &Endpoint{Handler: g.Handler(client, logger), Close: func() {}}, nil
+}
+
+// NewRaid builds Dev jangi's API: it keeps the bosses and heroes in the
+// database, opens its page with the sessions the game's Play presses get,
+// and sets scores and tells groups of their kills through Telegram.
+func NewRaid(ctx context.Context, cfg config.Config, logger *slog.Logger) (*Endpoint, error) {
+	sessions := newGame(cfg)
+	if sessions == nil {
+		return nil, errNoPages
+	}
+	store, err := storage.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return nil, err
+	}
+	if err := store.CheckSchema(ctx); err != nil {
+		store.Close()
+		return nil, err
+	}
+	client := telegram.NewClient(telegram.Options{Token: cfg.TelegramToken, BaseURL: cfg.TelegramAPIURL, Logger: logger})
+	handler := raid.NewHandler(raid.Options{Sessions: sessions, Store: store, Telegram: client, Logger: logger})
+	return &Endpoint{Handler: handler, Close: store.Close}, nil
 }
 
 // NewShashka builds the draughts Mini App's API: it keeps the games and
