@@ -734,6 +734,8 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.statsCommand(in)
 	case commandName(in.text) == "/game":
 		return s.gameCommand(ctx, in)
+	case commandName(in.text) == "/dooz":
+		return s.doozCommand(in)
 	case strings.HasPrefix(in.text, "/"):
 		return s.withKeyboard(in, say(s.runCommand(ctx, in)))
 	case utf8.RuneCountInString(in.text) > s.opts.MaxInputChars:
@@ -934,8 +936,8 @@ func (s *Service) start(ctx context.Context, in incoming) outcome {
 // pressed answers a press of the check button: the notice becomes the
 // thanks once every channel is joined, and otherwise a box asks to join
 // them first; nothing is written in the chat either way. A press of the
-// button under a join request is pressedJoin's, and of a game's Play button
-// pressedGame's.
+// button under a join request is pressedJoin's, of a game's Play button
+// pressedGame's, and of a dooz game's pressedDooz's.
 func (s *Service) pressed(q *telegram.CallbackQuery) {
 	if q.GameShortName != "" {
 		s.pressedGame(q)
@@ -950,6 +952,10 @@ func (s *Service) pressed(q *telegram.CallbackQuery) {
 	}
 	if strings.HasPrefix(q.Data, menuData) {
 		s.pressedMenu(q)
+		return
+	}
+	if strings.HasPrefix(q.Data, doozData) {
+		s.pressedDooz(q)
 		return
 	}
 	if q.Data != checkPayload {

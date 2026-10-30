@@ -242,7 +242,7 @@ func navigates(kind, choice string) bool {
 		return true
 	case "item":
 		item, ok := findItem(choice)
-		return ok && (len(item.choices) > 0 || item.ask != nil)
+		return ok && (len(item.choices) > 0 || item.ask != nil || item.key == "dooz")
 	case "ml":
 		return choice != "meta"
 	case "city":

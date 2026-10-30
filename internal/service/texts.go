@@ -212,7 +212,8 @@ Suhbatimizning oxirgi qismini eslab qolaman. %s %s
 Buyruqlar:
 /start — salomlashish
 /help — shu yordam
-/about — bot haqida%s
+/about — bot haqida
+/dooz — Dooz (X-O): guruhda do'stingiz bilan yoki men bilan%s
 
 Guruhda meni ismim bilan chaqiring, @username bilan belgilang yoki xabarimga reply qiling. U yerda buyruqqa username qo'shiladi: /help@username. Guruh men bilan bitta umumiy suhbatda.
 
@@ -228,7 +229,8 @@ A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yo
 Команды:
 /start — приветствие
 /help — эта справка
-/about — о боте%s
+/about — о боте
+/dooz — крестики-нолики: с другом в группе или со мной%s
 
 В группе зовите меня по имени, упоминайте (@username) или отвечайте на моё сообщение. Там к команде добавляется username: /help@username. У группы со мной один общий разговор.
 
@@ -244,7 +246,8 @@ I remember the recent part of our conversation. %s %s
 Commands:
 /start — welcome message
 /help — this help
-/about — about this bot%s
+/about — about this bot
+/dooz — tic-tac-toe: with a friend in a group, or with me%s
 
 In a group, call me by name, mention me (@username) or reply to one of my messages. Commands there need my username, like /help@username. A group shares one conversation with me.
 

@@ -21,10 +21,12 @@ var commandMenus = map[string][]telegram.BotCommand{
 		{Command: "start", Description: "Salomlashish"},
 		{Command: "help", Description: "Yordam va buyruqlar"},
 		{Command: "about", Description: "Bot haqida"},
+		{Command: "dooz", Description: "Dooz (X-O) o'yini"},
 	},
 	telegram.ScopeAllGroupChats: {
 		{Command: "help", Description: "Yordam va buyruqlar"},
 		{Command: "about", Description: "Bot haqida"},
+		{Command: "dooz", Description: "Dooz (X-O) o'yini"},
 	},
 	telegram.ScopeAllChatAdmins: {
 		{Command: "help", Description: "Yordam va buyruqlar"},
@@ -33,6 +35,7 @@ var commandMenus = map[string][]telegram.BotCommand{
 		{Command: "ignore", Description: "A'zoga 24 soat javob bermaslik (xabariga reply qiling)"},
 		{Command: "unignore", Description: "A'zoga yana javob berish (xabariga reply qiling)"},
 		{Command: "about", Description: "Bot haqida"},
+		{Command: "dooz", Description: "Dooz (X-O) o'yini"},
 	},
 }
 

@@ -56,6 +56,7 @@ public/stats, public/game       static pages: the group dashboard Mini App and t
 internal/app                    assembles the bot for either way of running it
 internal/miniapp                the dashboard's API: Telegram init data check, membership check, statistics
 internal/game                   the Tarozi game: signed sessions, dealing rounds, scoring plays
+internal/dooz                   dooz (noughts and crosses): the board, its encoding in buttons, the bot's moves
 internal/webhook                HTTP handler for webhook updates, with secret check
 internal/config                 load .env + environment, validate
 internal/telegram               Bot API client: long polling, sending, message splitting
@@ -768,7 +769,7 @@ languages, and the buttons that need a value ask for it first
   (`internal/service/moremenu.go`): 🕌 Din (prayer times, the Quran),
   📰 Yangiliklar (Uzbekistan's, the world's), 🎬 Ko'ngilochar (films, anime,
   music, YouTube, a cat, trivia, a fun fact), ⚽ Sport (the table, matches and
-  top scorers of six leagues), 🕹 O'yinlar (Tarozi, free games, a Steam
+  top scorers of six leagues), 🕹 O'yinlar (Dooz, Tarozi, free games, a Steam
   price), 📚 O'qish (Wikipedia, an English word, synonyms, papers) and
   🛠 Foydali (a QR code, a drawing, a place on the map, holidays, crypto,
   earthquakes, a web search). An item is answered at once, asks for its
@@ -1742,6 +1743,32 @@ The score is not taken from the page:
 
 A bot can still answer as fast as the limits allow, but not faster, and
 cannot name its score, another player or another message.
+
+### Dooz
+
+`/dooz` is noughts and crosses, played on nine buttons under one message,
+with no model and no limit (`internal/service/dooz.go`,
+`internal/dooz`).
+
+- In a group it opens a game for whoever sent it: «⚔️ Qo'shilish» lets
+  any other member take ⭕, «🤖 Maria bilan» lets the opener play the bot
+  instead, at the medium level.
+- In a private chat, and from «📋 Ko'proq» → 🕹 O'yinlar, it offers the
+  bot's levels: 😊 Oson takes a win it sees and blocks half the time,
+  🙂 O'rta takes and blocks wins and plays a third of its other moves at
+  random, 😈 Qiyin never loses (a full game-tree search).
+- Each press edits the message: the board, whose turn it is, the winner
+  with the winning line marked, or a draw. A press out of turn, on a taken
+  cell or by someone not in the game gets a box saying so and changes
+  nothing. «🔁 Yana o'ynash» starts the next game: the players change
+  marks, so whoever moved second starts, and the series' score is shown.
+
+Nothing is stored: the board, the two players' IDs, the level and the
+score are in each button's data (at most 50 of its 64 bytes), and the
+players' names in the message's first line, «❌ Ali  ⚔️  ⭕ Vali», which
+the next press reads back. Since anyone can send a button's data, it is
+checked as it is decoded: a board no game could reach, the same person on
+both sides or a bot game without the bot is refused.
 
 ### Limits
 
