@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 )
 
@@ -22,20 +23,28 @@ type Scores interface {
 	GetGameHighScores(ctx context.Context, game telegram.GameMessage) ([]telegram.GameHighScore, error)
 }
 
+// Records keeps the scored plays in the bot's own database too, each
+// player's by game and chat.
+type Records interface {
+	RecordGameScore(ctx context.Context, score storage.GameScore) error
+}
+
 type handler struct {
-	game   *Game
-	scores Scores
-	logger *slog.Logger
+	game    *Game
+	scores  Scores
+	records Records
+	logger  *slog.Logger
 }
 
 // Handler serves the pages' requests: "start" deals a play for a session,
-// of the game it is for, "finish" scores one and sets the score, and
-// "table" is the game message's table of scores.
-func (g *Game) Handler(scores Scores, logger *slog.Logger) http.Handler {
+// of the game it is for, "finish" scores one, sets the score and records
+// it, when records is not nil, and "table" is the game message's table of
+// scores.
+func (g *Game) Handler(scores Scores, records Records, logger *slog.Logger) http.Handler {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &handler{game: g, scores: scores, logger: logger}
+	return &handler{game: g, scores: scores, records: records, logger: logger}
 }
 
 type request struct {
@@ -153,11 +162,12 @@ func (h *handler) start(req request) (any, failure) {
 }
 
 // finish scores a play and sets the score on the game message, where
-// Telegram keeps each player's best; the table follows.
+// Telegram keeps each player's best, then records it; the table follows.
 func (h *handler) finish(ctx context.Context, req request) (any, failure) {
 	var result Result
 	var err error
-	switch h.game.runGame(req.Run) {
+	name := h.game.runGame(req.Run)
+	switch name {
 	case IlonShortName:
 		result, err = h.game.FinishIlon(req.Run, req.Turns, req.Ticks)
 	case OtinchiShortName:
@@ -181,12 +191,29 @@ func (h *handler) finish(ctx context.Context, req request) (any, failure) {
 		h.logger.Error("could not set a game score", "user_id", result.Player.UserID, "error", err)
 		return nil, errUnavailable
 	}
+	h.record(ctx, name, result)
 	table, err := h.rows(ctx, result.Player)
 	if err != nil {
 		// The score is set; only the table is missing.
 		h.logger.Warn("could not read the game's scores", "user_id", result.Player.UserID, "error", err)
 	}
 	return finished{Score: result.Score, Improved: improved, Table: table}, failure{}
+}
+
+// record keeps a scored play in the database; Telegram has the score
+// already, so a failure is only logged. Tarozi's runs name no game.
+func (h *handler) record(ctx context.Context, name string, result Result) {
+	if h.records == nil {
+		return
+	}
+	if name == "" {
+		name = ShortName
+	}
+	p := result.Player
+	score := storage.GameScore{Game: name, ChatID: p.ChatID, UserID: p.UserID, Name: p.Name, Score: result.Score, At: h.game.now()}
+	if err := h.records.RecordGameScore(ctx, score); err != nil {
+		h.logger.Warn("could not record a game score", "user_id", p.UserID, "error", err)
+	}
 }
 
 func (h *handler) table(ctx context.Context, req request) (any, failure) {

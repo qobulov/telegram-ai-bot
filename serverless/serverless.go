@@ -136,8 +136,8 @@ var stats = &lazy{name: "stats", build: func(ctx context.Context, cfg config.Con
 	return endpoint.Handler, endpoint.Close, nil
 }}
 
-var games = &lazy{name: "game", build: func(_ context.Context, cfg config.Config, logger *slog.Logger) (http.Handler, func(), error) {
-	endpoint, err := app.NewGame(cfg, logger)
+var games = &lazy{name: "game", build: func(ctx context.Context, cfg config.Config, logger *slog.Logger) (http.Handler, func(), error) {
+	endpoint, err := app.NewGame(ctx, cfg, logger)
 	if err != nil {
 		return nil, nil, err
 	}

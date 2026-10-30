@@ -127,15 +127,28 @@ func newStats(ctx context.Context, cfg config.Config, store *storage.Store, logg
 	})
 }
 
-// NewGame builds the game's API. Telegram keeps the scores, so it needs no
-// database.
-func NewGame(cfg config.Config, logger *slog.Logger) (*Endpoint, error) {
-	g := newGame(cfg)
-	if g == nil {
+// NewGame builds the games' API: Telegram keeps each game message's
+// scores, and the database each player's in each game and chat.
+func NewGame(ctx context.Context, cfg config.Config, logger *slog.Logger) (*Endpoint, error) {
+	if newGame(cfg) == nil {
 		return nil, errNoPages
 	}
+	store, err := storage.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return nil, err
+	}
+	if err := store.CheckSchema(ctx); err != nil {
+		store.Close()
+		return nil, err
+	}
+	return &Endpoint{Handler: gameHandler(cfg, store, logger), Close: store.Close}, nil
+}
+
+// gameHandler is the games' API for the pages WEBAPP_URL serves, recording
+// the plays in records when it is not nil.
+func gameHandler(cfg config.Config, records game.Records, logger *slog.Logger) http.Handler {
 	client := telegram.NewClient(telegram.Options{Token: cfg.TelegramToken, BaseURL: cfg.TelegramAPIURL, Logger: logger})
-	return &Endpoint{Handler: g.Handler(client, logger), Close: func() {}}, nil
+	return newGame(cfg).Handler(client, records, logger)
 }
 
 // NewRaid builds Dev jangi's API: it keeps the bosses and heroes in the

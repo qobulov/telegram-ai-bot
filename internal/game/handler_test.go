@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 )
 
@@ -37,6 +38,19 @@ func (f *fakeScores) GetGameHighScores(_ context.Context, game telegram.GameMess
 	}, nil
 }
 
+type fakeRecords struct {
+	got []storage.GameScore
+	err error
+}
+
+func (f *fakeRecords) RecordGameScore(_ context.Context, score storage.GameScore) error {
+	if f.err != nil {
+		return f.err
+	}
+	f.got = append(f.got, score)
+	return nil
+}
+
 func post(t *testing.T, h http.Handler, body any) (int, map[string]any) {
 	t.Helper()
 	raw, _ := json.Marshal(body)
@@ -55,7 +69,7 @@ func post(t *testing.T, h http.Handler, body any) (int, map[string]any) {
 func TestHandlerPlaysAGame(t *testing.T) {
 	g, c := newTestGame()
 	scores := &fakeScores{}
-	h := g.Handler(scores, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	h := g.Handler(scores, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	session := sessionOf(t, playURL(t, g, ShortName, player))
 
 	status, start := post(t, h, request{Action: "start", Session: session})
@@ -94,7 +108,7 @@ func TestHandlerPlaysAGame(t *testing.T) {
 func TestHandlerRefusesWhatIsNotAPlay(t *testing.T) {
 	g, _ := newTestGame()
 	scores := &fakeScores{}
-	h := g.Handler(scores, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	h := g.Handler(scores, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	session := sessionOf(t, playURL(t, g, ShortName, player))
 	_, start := post(t, h, request{Action: "start", Session: session})
 	run := start["run"].(string)
@@ -127,7 +141,7 @@ func TestHandlerRefusesWhatIsNotAPlay(t *testing.T) {
 // When Telegram does not take the score, the page is told to try again.
 func TestHandlerWhenTheScoreIsNotSet(t *testing.T) {
 	g, c := newTestGame()
-	h := g.Handler(&fakeScores{err: errors.New("timeout")}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	h := g.Handler(&fakeScores{err: errors.New("timeout")}, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	run, dealt, _ := g.Start(sessionOf(t, playURL(t, g, ShortName, player)))
 	answers, times := rightAnswers(dealt, 1)
 	c.now = c.now.Add(2 * time.Second)
@@ -142,7 +156,7 @@ func TestHandlerWhenTheScoreIsNotSet(t *testing.T) {
 func TestHandlerSetsNoZero(t *testing.T) {
 	g, c := newTestGame()
 	scores := &fakeScores{}
-	h := g.Handler(scores, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	h := g.Handler(scores, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	run, _, _ := g.Start(sessionOf(t, playURL(t, g, ShortName, player)))
 	c.now = c.now.Add(time.Second)
 
@@ -151,5 +165,52 @@ func TestHandlerSetsNoZero(t *testing.T) {
 	}
 	if len(scores.set) != 0 {
 		t.Errorf("set %+v", scores.set)
+	}
+}
+
+// Each play scored is recorded under its game, for the session's player in
+// their chat; one Telegram does not take is not, and one the database does
+// not take is the player's all the same.
+func TestHandlerRecordsThePlays(t *testing.T) {
+	g, c := newTestGame()
+	records := &fakeRecords{}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	h := g.Handler(&fakeScores{}, records, logger)
+	named := player
+	named.Name = "Bek"
+
+	run, dealt, _ := g.Start(sessionOf(t, playURL(t, g, ShortName, named)))
+	answers, times := rightAnswers(dealt, 3)
+	c.now = c.now.Add(5 * time.Second)
+	if status, got := post(t, h, request{Action: "finish", Run: run, Answers: answers, Times: times}); status != http.StatusOK {
+		t.Fatalf("Tarozi: %d %v", status, got)
+	}
+	run, play, _ := g.StartOtinchi(sessionOf(t, playURL(t, g, OtinchiShortName, named)))
+	sides, chops, want := woodcutter(play.Seed, 20, 200)
+	c.now = c.now.Add(time.Duration(chops[len(chops)-1])*time.Millisecond + time.Second)
+	if status, got := post(t, h, request{Action: "finish", Run: run, Sides: sides, Times: chops}); status != http.StatusOK {
+		t.Fatalf("O'tinchi: %d %v", status, got)
+	}
+	if len(records.got) != 2 {
+		t.Fatalf("recorded %+v", records.got)
+	}
+	tarozi, otinchi := records.got[0], records.got[1]
+	if tarozi.Game != ShortName || tarozi.Score != 36 || tarozi.UserID != 42 || tarozi.ChatID != -100123 || tarozi.Name != "Bek" {
+		t.Errorf("Tarozi's play: %+v", tarozi)
+	}
+	if otinchi.Game != OtinchiShortName || otinchi.Score != want || !otinchi.At.Equal(c.now) {
+		t.Errorf("O'tinchi's play: %+v, want %d at %v", otinchi, want, c.now)
+	}
+
+	run, dealt, _ = g.Start(sessionOf(t, playURL(t, g, ShortName, named)))
+	answers, times = rightAnswers(dealt, 1)
+	c.now = c.now.Add(2 * time.Second)
+	refused := g.Handler(&fakeScores{err: errors.New("timeout")}, records, logger)
+	if status, _ := post(t, refused, request{Action: "finish", Run: run, Answers: answers, Times: times}); status != http.StatusBadGateway || len(records.got) != 2 {
+		t.Errorf("a score Telegram refused: %d, recorded %d", status, len(records.got))
+	}
+	records.err = errors.New("database down")
+	if status, got := post(t, h, request{Action: "finish", Run: run, Answers: answers, Times: times}); status != http.StatusOK || got["score"].(float64) <= 0 {
+		t.Errorf("a play the database refused: %d %v", status, got)
 	}
 }

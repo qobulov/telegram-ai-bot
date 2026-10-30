@@ -55,7 +55,7 @@ func TestSetMenuApp(t *testing.T) {
 
 // Without WEBAPP_URL the pages' functions refuse to start, naming it.
 func TestPagesNeedTheirAddress(t *testing.T) {
-	if _, err := NewGame(config.Config{TelegramToken: "1:test"}, slog.Default()); !errors.Is(err, errNoPages) {
+	if _, err := NewGame(context.Background(), config.Config{TelegramToken: "1:test"}, slog.Default()); !errors.Is(err, errNoPages) {
 		t.Errorf("NewGame: %v", err)
 	}
 	if _, err := NewStats(context.Background(), config.Config{TelegramToken: "1:test"}, slog.Default()); !errors.Is(err, errNoPages) || !strings.Contains(err.Error(), "WEBAPP_URL") {
@@ -67,10 +67,7 @@ func TestPagesNeedTheirAddress(t *testing.T) {
 // the webhook's service made with the same token.
 func TestGameEndpointDealsAPlay(t *testing.T) {
 	cfg := config.Config{TelegramToken: "1:test", TelegramAPIURL: "http://127.0.0.1:1", WebAppURL: "https://maria.example"}
-	endpoint, err := NewGame(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	if err != nil {
-		t.Fatal(err)
-	}
+	handler := gameHandler(cfg, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	for _, play := range []struct{ game, path, dealt string }{
 		{game.ShortName, "/game/", `"rounds":[`},
 		{game.IlonShortName, "/game/ilon/", `"rules":{`},
@@ -83,7 +80,7 @@ func TestGameEndpointDealsAPlay(t *testing.T) {
 		}
 		body := `{"action":"start","session":"` + link.Query().Get("s") + `"}`
 		resp := httptest.NewRecorder()
-		endpoint.Handler.ServeHTTP(resp, httptest.NewRequest(http.MethodPost, "/api/game", strings.NewReader(body)))
+		handler.ServeHTTP(resp, httptest.NewRequest(http.MethodPost, "/api/game", strings.NewReader(body)))
 		if resp.Code != http.StatusOK || !strings.Contains(resp.Body.String(), play.dealt) {
 			t.Errorf("%s start: %d %s", play.game, resp.Code, resp.Body.String())
 		}

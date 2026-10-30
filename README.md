@@ -1760,6 +1760,12 @@ The score is not taken from the page:
   minutes. Then it sets the score on the session's game message for the
   session's player (`setGameScore`; Telegram keeps each player's best).
 
+The bot keeps the scores too, for tables of its own: each play scored of
+Tarozi, Kosmik ilon and O'tinchi counts in the player's row of
+`game_scores` for that game and chat (migration 48), with their best and
+when it was made, their last score and how many plays they scored. A
+play the database does not take is still set on Telegram.
+
 A bot can still answer as fast as the limits allow, but not faster, and
 cannot name its score, another player or another message.
 
@@ -2425,7 +2431,8 @@ update needs:
 
 ### Deploying the dashboard and the game
 
-They need no new kind of update; Dev jangi needs migrations 45 to 47.
+They need no new kind of update; Dev jangi needs migrations 45 to 47, the
+games' own table of scores migration 48.
 
 1. **Deploy**, then **set `WEBAPP_URL`** in Vercel to the deployment's
    production address, for example `https://maria.vercel.app` (no trailing
@@ -2444,7 +2451,8 @@ They need no new kind of update; Dev jangi needs migrations 45 to 47.
    ilon`, short name **`ilon`**; `O'tinchi`, **`otinchi`**; `Dev jangi`,
    **`boss`**. No URL is asked for: the bot gives
    `https://YOUR-APP.vercel.app/game/` and `/game/ilon/`, `/game/otinchi/`,
-   `/game/boss/` with each press of Play. Dev jangi needs migrations 45 to 47.
+   `/game/boss/` with each press of Play. Dev jangi needs migrations 45 to 47
+   and the games' scores migration 48.
 4. As an owner, send `/stats`, `/game`, `/ilon`, `/otinchi` and `/boss` in a
    group and in a private chat.
 
