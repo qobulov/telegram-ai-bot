@@ -36,6 +36,8 @@ type Store interface {
 	RaidState(ctx context.Context, chatID, userID int64, rules storage.RaidRules, seed uint32, top int) (storage.RaidBoss, storage.RaidHero, storage.RaidMember, []storage.RaidMember, error)
 	HitRaid(ctx context.Context, chatID, userID int64, name string, taps int, now time.Time, rules storage.RaidRules, seed uint32) (storage.RaidHit, error)
 	UpgradeRaidHero(ctx context.Context, userID int64, item string, cost func(level int) int64, most int, seed uint32) (storage.RaidHero, error)
+	ChangeRaidHero(ctx context.Context, userID int64, seed uint32, change func(hero *storage.RaidHero) error) (storage.RaidHero, error)
+	RaidRanks(ctx context.Context, chatID, userID int64, level, limit int) (levelRank, totalRank int, top []storage.RaidMember, err error)
 }
 
 // Telegram sets a member's score on their game message, and tells a
@@ -79,6 +81,8 @@ type request struct {
 	Action  string `json:"action"`
 	Taps    int    `json:"taps"`
 	Item    string `json:"item"`
+	Skill   string `json:"skill"`
+	Quest   int    `json:"quest"`
 }
 
 type failure struct {
@@ -92,6 +96,10 @@ var (
 	errSession     = failure{http.StatusUnauthorized, "session"}
 	errCoins       = failure{http.StatusConflict, "coins"}
 	errMax         = failure{http.StatusConflict, "max"}
+	errCooldown    = failure{http.StatusConflict, "cooldown"}
+	errNoHelper    = failure{http.StatusConflict, "no_helper"}
+	errNotDone     = failure{http.StatusConflict, "not_done"}
+	errClaimed     = failure{http.StatusConflict, "claimed"}
 	errUnavailable = failure{http.StatusBadGateway, "unavailable"}
 )
 
@@ -126,6 +134,10 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return h.hit(r.Context(), player, req.Taps)
 	case "upgrade":
 		return h.upgrade(r.Context(), player, req.Item)
+	case "skill":
+		return h.change(r.Context(), player, UseSkill(req.Skill, h.Now()))
+	case "claim":
+		return h.change(r.Context(), player, Claim(req.Quest, h.Now()))
 	}
 	return nil, errBadRequest
 }
@@ -136,9 +148,24 @@ func (h *handler) state(ctx context.Context, p game.Player) (any, failure) {
 		h.Logger.Error("could not read a raid", "user_id", p.UserID, "error", err)
 		return nil, errUnavailable
 	}
+	levelRank, totalRank, topTotal, err := h.Store.RaidRanks(ctx, chatOf(p), p.UserID, boss.Level, topSize)
+	if err != nil {
+		h.Logger.Error("could not read a raid's ranks", "user_id", p.UserID, "error", err)
+		return nil, errUnavailable
+	}
+	now := h.Now()
+	var gift int64
+	if !hero.StreakDay.Equal(Day(now)) {
+		if hero, err = h.Store.ChangeRaidHero(ctx, p.UserID, h.Seed(), Daily(now, &gift)); err != nil {
+			h.Logger.Error("could not give a raid's daily gift", "user_id", p.UserID, "error", err)
+			return nil, errUnavailable
+		}
+	}
 	return map[string]any{
-		"boss": bossView(boss), "hero": heroView(hero), "me": memberView(me),
-		"top": topView(top, p.UserID), "taps_per_second": TapsPerSecond, "crit_times": critTimes,
+		"boss": bossView(boss), "hero": heroView(hero, now), "me": memberView(me), "gift": gift,
+		"top": topView(top, p.UserID), "top_total": topView(topTotal, p.UserID),
+		"rank":            map[string]int{"level": levelRank, "total": totalRank},
+		"taps_per_second": TapsPerSecond, "crit_times": critTimes,
 	}, failure{}
 }
 
@@ -158,7 +185,7 @@ func (h *handler) hit(ctx context.Context, p game.Player, taps int) (any, failur
 		}
 	}
 	view := map[string]any{
-		"boss": bossView(hit.Boss), "hero": heroView(hit.Hero), "me": memberView(hit.Member),
+		"boss": bossView(hit.Boss), "hero": heroView(hit.Hero, h.Now()), "me": memberView(hit.Member),
 		"counted": hit.Counted, "damage": hit.Damage,
 	}
 	if hit.Killed != nil {
@@ -184,7 +211,29 @@ func (h *handler) upgrade(ctx context.Context, p game.Player, item string) (any,
 		h.Logger.Error("could not upgrade a raid hero", "user_id", p.UserID, "error", err)
 		return nil, errUnavailable
 	}
-	return map[string]any{"hero": heroView(hero)}, failure{}
+	return map[string]any{"hero": heroView(hero, h.Now())}, failure{}
+}
+
+// change makes a change to the player's hero, a skill used or a quest's
+// reward taken, and gives the hero after it.
+func (h *handler) change(ctx context.Context, p game.Player, change func(*storage.RaidHero) error) (any, failure) {
+	hero, err := h.Store.ChangeRaidHero(ctx, p.UserID, h.Seed(), change)
+	switch {
+	case errors.Is(err, ErrCooldown):
+		return nil, errCooldown
+	case errors.Is(err, ErrNoHelper):
+		return nil, errNoHelper
+	case errors.Is(err, ErrNotDone):
+		return nil, errNotDone
+	case errors.Is(err, ErrClaimed):
+		return nil, errClaimed
+	case errors.Is(err, ErrNoSkill), errors.Is(err, ErrNoQuest):
+		return nil, errBadRequest
+	case err != nil:
+		h.Logger.Error("could not change a raid hero", "user_id", p.UserID, "error", err)
+		return nil, errUnavailable
+	}
+	return map[string]any{"hero": heroView(hero, h.Now())}, failure{}
 }
 
 // announce tells the group its boss was killed, by whom, and what comes
@@ -210,7 +259,7 @@ func (h *handler) announce(ctx context.Context, chatID int64, kill storage.RaidK
 }
 
 // bossNames are the bosses, taken in turn by level.
-var bossNames = [Kinds]string{"Ko'k dev", "Qizil dev", "Bir ko'zli dev", "Ajdar", "Qora dev"}
+var bossNames = [Kinds]string{"Ko'k dev", "Qizil dev", "Bir ko'zli dev", "Ajdar", "Muz devi", "Tosh dev", "Yalmog'iz kampir", "Qora dev"}
 
 func kind(level int) int {
 	return (level - 1) % Kinds
@@ -230,11 +279,28 @@ func message(p game.Player) telegram.GameMessage {
 }
 
 func bossView(b storage.RaidBoss) map[string]any {
-	return map[string]any{"level": b.Level, "hp": b.HP, "max_hp": b.MaxHP, "kind": kind(b.Level)}
+	return map[string]any{"level": b.Level, "hp": b.HP, "max_hp": b.MaxHP, "kind": kind(b.Level), "chief": Chief(b.Level)}
 }
 
-func heroView(h storage.RaidHero) map[string]any {
+// heroView is the hero as the page shows it at now: skills by how long
+// until each is ready and how long each lasts, in milliseconds, so that
+// the page's clock does not matter, and the day's quests.
+func heroView(h storage.RaidHero, now time.Time) map[string]any {
+	left := func(t time.Time) int64 { return max(t.Sub(now).Milliseconds(), 0) }
+	quests := make([]map[string]any, len(Quests))
+	for i, q := range Quests {
+		quests[i] = map[string]any{
+			"key": q.Key, "goal": q.Goal, "progress": min(QuestProgress(h, i, now), q.Goal),
+			"reward": QuestReward(h, i), "claimed": QuestClaimed(h, i, now),
+		}
+	}
 	return map[string]any{
+		"skills": map[string]any{
+			"storm": map[string]int64{"ready_in": left(h.StormReady), "active_for": left(h.StormUntil), "times": stormTimes},
+			"fire":  map[string]int64{"ready_in": left(h.FireReady), "left": int64(h.FireLeft)},
+			"rain":  map[string]int64{"ready_in": left(h.RainReady), "active_for": left(h.RainUntil), "times": rainTimes},
+		},
+		"quests": quests, "streak": h.Streak,
 		"coins": h.Coins, "sword": h.Sword, "crit": h.Crit, "helper": h.Helper, "seed": h.Seed, "taps": h.Taps,
 		"tap_damage": TapDamage(h.Sword), "crit_chance": CritChance(h.Crit), "helper_dps": HelperDPS(h.Helper),
 		"next": map[string]any{
@@ -246,13 +312,13 @@ func heroView(h storage.RaidHero) map[string]any {
 }
 
 func memberView(m storage.RaidMember) map[string]any {
-	return map[string]any{"damage": m.Damage, "total": m.Total}
+	return map[string]any{"damage": m.Damage, "total": m.Total, "title": Title(m.Total)}
 }
 
 func topView(top []storage.RaidMember, userID int64) []map[string]any {
 	rows := make([]map[string]any, 0, len(top))
 	for _, m := range top {
-		rows = append(rows, map[string]any{"id": m.UserID, "name": m.Name, "damage": m.Damage, "me": m.UserID == userID})
+		rows = append(rows, map[string]any{"id": m.UserID, "name": m.Name, "damage": m.Damage, "total": m.Total, "title": Title(m.Total), "me": m.UserID == userID})
 	}
 	return rows
 }

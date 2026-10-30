@@ -46,11 +46,11 @@ type request struct {
 	Run     string `json:"run"`
 	Answers string `json:"answers"`
 	Times   []int  `json:"times"`
-	// Turns and Ticks are a play of Kosmik ilon's, for finish; Taps and
-	// Ticks one of Uchar gilam's.
-	Turns []int `json:"turns"`
-	Taps  []int `json:"taps"`
-	Ticks int   `json:"ticks"`
+	// Turns and Ticks are a play of Kosmik ilon's, for finish; Sides and
+	// Times one of O'tinchi's.
+	Turns []int  `json:"turns"`
+	Ticks int    `json:"ticks"`
+	Sides string `json:"sides"`
 }
 
 type started struct {
@@ -64,9 +64,9 @@ type startedIlon struct {
 	IlonPlay
 }
 
-type startedGilam struct {
+type startedOtinchi struct {
 	Run string `json:"run"`
-	GilamPlay
+	OtinchiPlay
 }
 
 type finished struct {
@@ -138,12 +138,12 @@ func (h *handler) start(req request) (any, failure) {
 			return nil, errToken
 		}
 		return startedIlon{Run: run, IlonPlay: play}, failure{}
-	case GilamShortName:
-		run, play, err := h.game.StartGilam(req.Session)
+	case OtinchiShortName:
+		run, play, err := h.game.StartOtinchi(req.Session)
 		if err != nil {
 			return nil, errToken
 		}
-		return startedGilam{Run: run, GilamPlay: play}, failure{}
+		return startedOtinchi{Run: run, OtinchiPlay: play}, failure{}
 	}
 	run, dealt, err := h.game.Start(req.Session)
 	if err != nil {
@@ -160,8 +160,8 @@ func (h *handler) finish(ctx context.Context, req request) (any, failure) {
 	switch h.game.runGame(req.Run) {
 	case IlonShortName:
 		result, err = h.game.FinishIlon(req.Run, req.Turns, req.Ticks)
-	case GilamShortName:
-		result, err = h.game.FinishGilam(req.Run, req.Taps, req.Ticks)
+	case OtinchiShortName:
+		result, err = h.game.FinishOtinchi(req.Run, req.Sides, req.Times)
 	default:
 		result, err = h.game.Finish(req.Run, req.Answers, req.Times)
 	}

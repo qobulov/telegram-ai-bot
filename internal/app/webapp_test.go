@@ -74,7 +74,7 @@ func TestGameEndpointDealsAPlay(t *testing.T) {
 	for _, play := range []struct{ game, path, dealt string }{
 		{game.ShortName, "/game/", `"rounds":[`},
 		{game.IlonShortName, "/game/ilon/", `"rules":{`},
-		{game.GilamShortName, "/game/gilam/", `"flap":`},
+		{game.OtinchiShortName, "/game/otinchi/", `"drain_cap":`},
 	} {
 		page, _ := newGame(cfg).PlayURL(play.game, game.Player{UserID: hookUser, ChatID: hookGroup, MessageID: 5})
 		link, err := url.Parse(page)

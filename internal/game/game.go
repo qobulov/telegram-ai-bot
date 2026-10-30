@@ -2,8 +2,8 @@
 // puts fruits on the two pans of a bazaar scale, each fruit's weight on the
 // price board, which changes every few rounds, and the player says, against
 // the clock, which pan goes down, or that they balance. Kosmik ilon, in
-// ilon.go, is a snake in space, and Uchar gilam, in gilam.go, a flying
-// carpet over Samarkand.
+// ilon.go, is a snake in space, and O'tinchi, in otinchi.go, a woodcutter
+// at an old plane tree.
 //
 // The pages in public/game draw them; this package deals the plays and
 // scores them. A score is never taken from a page: the page sends what the
@@ -35,12 +35,12 @@ const ShortName = "tarozi"
 // opens its page with a session.
 const BossShortName = "boss"
 
-// IlonPath, GilamPath and BossPath are where Kosmik ilon's, Uchar gilam's
+// IlonPath, OtinchiPath and BossPath are where Kosmik ilon's, O'tinchi's
 // and Dev jangi's pages are, under Tarozi's.
 const (
-	IlonPath  = "ilon/"
-	GilamPath = "gilam/"
-	BossPath  = "boss/"
+	IlonPath    = "ilon/"
+	OtinchiPath = "otinchi/"
+	BossPath    = "boss/"
 )
 
 const (
@@ -139,8 +139,8 @@ func (g *Game) PlayURL(shortName string, p Player) (link string, ok bool) {
 		shortName = ""
 	case IlonShortName:
 		page += IlonPath
-	case GilamShortName:
-		page += GilamPath
+	case OtinchiShortName:
+		page += OtinchiPath
 	case BossShortName:
 		page += BossPath
 	default:

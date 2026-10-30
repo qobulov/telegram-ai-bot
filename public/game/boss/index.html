@@ -16,17 +16,31 @@
   <canvas id="scene" aria-hidden="true"></canvas>
   <main id="app">
     <header class="top">
-      <div class="boss-title"><span class="level" id="level">1</span><span id="bossName"></span></div>
+      <div class="boss-title"><span class="level" id="level">1</span><span id="bossName"></span><span class="chief" id="chief" hidden data-t="chief"></span></div>
       <div class="hp" aria-hidden="true"><i class="trail" id="hpTrail"></i><i class="fill" id="hpFill"></i><span id="hpText"></span></div>
       <div class="row">
         <span class="coins" id="coins">💰 0</span>
+        <button type="button" class="rank" id="rank" hidden></button>
+        <button type="button" class="quests-toggle" id="questsToggle">📜<span class="dot" id="questsDot" hidden></span></button>
         <button type="button" class="board-toggle" id="boardToggle"><span data-t="table"></span> ▾</button>
       </div>
-      <ol class="board" id="board" hidden></ol>
+      <div class="board" id="board" hidden>
+        <div class="board-tabs">
+          <button type="button" class="on" data-b="level" data-t="thisBoss"></button>
+          <button type="button" data-b="total" data-t="allTime"></button>
+        </div>
+        <ol id="boardList"></ol>
+      </div>
     </header>
 
     <p class="hint" id="hint" data-t="hint"></p>
     <p class="message" id="message" aria-live="polite"></p>
+
+    <section class="skills">
+      <button type="button" class="skill" data-skill="storm"><span class="ring"></span><span class="icon">🌪</span><b data-t="storm"></b><small id="stormInfo"></small></button>
+      <button type="button" class="skill" data-skill="fire"><span class="ring"></span><span class="icon">🔥</span><b data-t="fire"></b><small id="fireInfo"></small></button>
+      <button type="button" class="skill" data-skill="rain"><span class="ring"></span><span class="icon">🏹</span><b data-t="rain"></b><small id="rainInfo"></small></button>
+    </section>
 
     <section class="upgrades">
       <button type="button" class="card" data-item="sword">
@@ -43,6 +57,17 @@
       </button>
     </section>
 
+    <section class="sheet" id="quests" hidden>
+      <div class="sheet-card">
+        <p class="sheet-title"><span data-t="quests"></span><button type="button" class="close" id="questsClose">✕</button></p>
+        <p class="streak" id="streak"></p>
+        <ol class="quest-list" id="questList"></ol>
+        <p class="small" data-t="questsReset"></p>
+      </div>
+    </section>
+
+    <div class="toast" id="toast" hidden></div>
+
     <section class="victory" id="victory" hidden>
       <p class="victory-title" id="victoryTitle"></p>
       <p class="victory-reward" id="victoryReward"></p>
@@ -54,6 +79,7 @@
     </section>
   </main>
   <script src="crit.js"></script>
+  <script src="skins.js"></script>
   <script src="boss.js"></script>
 </body>
 </html>

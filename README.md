@@ -54,11 +54,11 @@ api/webhook.go                  serverless function that receives updates by web
 api/stats.go, api/game.go       serverless functions behind the dashboard and the games
 api/raid.go                     serverless function behind Dev jangi, the boss raid
 api/shashka.go                  serverless function behind the draughts Mini App
-public/stats, public/game       static pages: the group dashboard Mini App, Tarozi, and under game/ Kosmik ilon, Uchar gilam and Dev jangi
+public/stats, public/game       static pages: the group dashboard Mini App, Tarozi, and under game/ Kosmik ilon, O'tinchi and Dev jangi
 public/shashka                  static page: the draughts Mini App
 internal/app                    assembles the bot for either way of running it
 internal/miniapp                the dashboard's API: Telegram init data check, membership check, statistics
-internal/game                   the games Tarozi, Kosmik ilon and Uchar gilam: signed sessions, dealing plays, scoring them
+internal/game                   the games Tarozi, Kosmik ilon and O'tinchi: signed sessions, dealing plays, scoring them
 internal/raid                   Dev jangi, the boss raid: a chat's shared boss, hits counted on the server, upgrades, kill announcements
 internal/dooz                   dooz (noughts and crosses): the board, its encoding in buttons, the bot's moves
 internal/shashka                Russian draughts: the rules, the position's encoding, the bot's search
@@ -167,7 +167,10 @@ shashka_queue(user_id PK, rating, joined_at)
 raid_bosses(chat_id PK, level, hp, max_hp, updated_at)
 raid_members(chat_id, user_id, name, level, damage, total, scored_at, updated_at,
              PK (chat_id, user_id))
-raid_heroes(user_id PK, coins, sword, crit, helper, seed, taps, last_hit, updated_at)
+raid_heroes(user_id PK, coins, sword, crit, helper, seed, taps, last_hit,
+            storm_until, storm_ready, fire_left, fire_ready, rain_until, rain_ready,
+            quest_day, quest_taps, quest_kills, quest_skills, quest_claimed,
+            streak, streak_day, updated_at)
 schema_migrations(version PK, applied_at)
 ```
 
@@ -240,7 +243,7 @@ in the environment win over the file.
 | `DB_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
 | `TELEGRAM_WEBHOOK_SECRET` | empty | Only for webhook deployments; see [Vercel deployment](#vercel-deployment-webhook) |
 | `CRON_SECRET` | empty | Only on Vercel: protects the daily cleanup endpoint |
-| `WEBAPP_URL` | empty | The Vercel deployment's `https://` address, such as `https://maria.vercel.app`, where `public/` is served: turns on the [dashboard](#dashboard-mini-app) (`/stats`, the private chats' menu button) and the games [Tarozi](#the-game-tarozi), [Kosmik ilon](#kosmik-ilon), [Uchar gilam](#uchar-gilam) and [Dev jangi](#dev-jangi) (`/game`, `/ilon`, `/gilam`, `/boss`, the `send_game` tool). Empty turns them off |
+| `WEBAPP_URL` | empty | The Vercel deployment's `https://` address, such as `https://maria.vercel.app`, where `public/` is served: turns on the [dashboard](#dashboard-mini-app) (`/stats`, the private chats' menu button) and the games [Tarozi](#the-game-tarozi), [Kosmik ilon](#kosmik-ilon), [O'tinchi](#otinchi) and [Dev jangi](#dev-jangi) (`/game`, `/ilon`, `/otinchi`, `/boss`, the `send_game` tool). Empty turns them off |
 | `MAX_OUTPUT_TOKENS`           | `8192`                         | Longest model reply, in tokens, thinking included |
 | `AI_REASONING_EFFORT`         | `low` (Gemini)                 | How hard Gemini thinks before answering: `none`, `minimal`, `low`, `medium`, `high`, or `default` for the model's own. Thinking is paid as output and takes from `MAX_OUTPUT_TOKENS`; the lite models refuse `none`. Each request logs its tokens as `model usage` |
 | `CHAT_REASONING_EFFORT` | `minimal` | How hard the chat model thinks before a reply in words alone (Gemini): `none`, `minimal`, `low`, `medium`, `high` or `default`. At `low` it spent 500 to 800 thinking tokens, seconds, on a one-line joke |
@@ -334,7 +337,7 @@ the message it is working on before exiting.
 
 Bot commands: `/start`, `/help`,
 `/model`, `/about`, `/premium`, `/paysupport`, with `WEBAPP_URL` set
-`/stats`, `/game`, `/ilon`, `/gilam` and `/boss`, for owners `/payments` and `/refund`, and
+`/stats`, `/game`, `/ilon`, `/otinchi` and `/boss`, for owners `/payments` and `/refund`, and
 in groups `/mute`, `/unmute`, `/ignore` and `/unignore`.
 
 ## Tests
@@ -785,7 +788,7 @@ languages, and the buttons that need a value ask for it first
   (`internal/service/moremenu.go`): 🕌 Din (prayer times, the Quran),
   📰 Yangiliklar (Uzbekistan's, the world's), 🎬 Ko'ngilochar (films, anime,
   music, YouTube, a cat, trivia, a fun fact), ⚽ Sport (the table, matches and
-  top scorers of six leagues), 🕹 O'yinlar (Shashka, Dooz, Dev jangi, Kosmik ilon, Uchar gilam, Tarozi, free games, a Steam
+  top scorers of six leagues), 🕹 O'yinlar (Shashka, Dooz, Dev jangi, Kosmik ilon, O'tinchi, Tarozi, free games, a Steam
   price), 📚 O'qish (Wikipedia, an English word, synonyms, papers) and
   🛠 Foydali (a QR code, a drawing, a place on the map, holidays, crypto,
   earthquakes, a web search). An item is answered at once, asks for its
@@ -1791,20 +1794,23 @@ faster than the page lets a person. A test plays whole games with an
 autopilot and has `node` score them with `sim.js`, which must match the
 server's score to the point.
 
-### Uchar gilam
+### O'tinchi
 
-`/gilam` posts the third game, and `send_game` takes it by name. A flying
-carpet over Samarkand at night (`public/game/gilam/`,
-`internal/game/gilam.go`): each tap lifts it, and it falls between; minarets
-rise from the ground and storm clouds hang from the sky, a gap between each
-pair. A gap passed is 10 points times the level; a coin in it 5 times the
-level; one gap in eight holds a Humo feather, which saves the carpet from
-its next crash. Every 10 gaps the carpet flies quicker and the gaps narrow,
-and the level's sky changes. It is played in ticks of 20 ms with whole
-numbers only, a 360 by 640 field in sixteenths: the page sends the ticks it
-was tapped in and how many went by, and the server plays them again from
-the play's seed (`sim.js` and the Go are the same rules, which a test
-checks with `node`); a play sent sooner than its ticks last is refused.
+`/otinchi` posts the woodcutter, and `send_game` takes it by name: an old
+plane tree in a mahalla (`public/game/otinchi/`, `internal/game/otinchi.go`).
+A tap on the left or right half of the screen chops the trunk's lowest
+piece from that side, and the trunk comes down a piece; branches grow from
+the pieces, and the woodcutter must not step into one nor stand under one
+as it comes down. A time bar runs down, faster as more is chopped (twice
+as fast from the 300th piece), and each chop fills it a little, less as
+more is chopped; a golden piece is worth 5. The season changes every 50
+pieces, from spring's blossom to winter's snow. A branch is never followed
+by one on the other side, which no woodcutter could pass. The page sends
+the side of each chop and when it was made; the server chops them again
+on the trunk the play's seed grows (`sim.js` and the Go are the same rules,
+which a test checks with `node`), refusing chops less than 70 ms apart,
+chops after the time ran out or after the branch that ended the play, and a
+play sent sooner than its chops took.
 
 ### Dev jangi
 
@@ -1817,13 +1823,30 @@ members' blows as they come in, and the chat's table of damage on this boss.
 The hit that takes the last HP kills it: everyone who hit it gets coins,
 some for being there and more for their share, the bot tells the group who
 hit it most (in a private chat the player fights alone), and the next
-level's boss, half as strong again, takes its place. Five bosses are taken in
-turn: Ko'k dev, Qizil dev, Bir ko'zli dev, Ajdar and Qora dev. Coins buy the
-upgrades: the sword's damage, the share of critical blows, and Barchinoy.
-Telegram's table under the message shows each member's damage in all.
+level's boss takes its place: a third stronger each level, and stronger for
+each member who hit lately (in the last day, up to 30), so that a small
+group's boss is a small group's to kill. Eight bosses are taken in turn,
+each drawn in its own way under its own sky (public/game/boss/skins.js): Ko'k
+dev, Qizil dev, Bir ko'zli dev, Ajdar, Muz devi, Tosh dev, Yalmog'iz kampir and
+Qora dev; every fifth is a chief (👑), thrice as strong and as rewarding. Coins buy the upgrades: the sword's
+damage, the share of critical blows, and Barchinoy.
+
+Three skills, each ready again after a while: 🌪 Bo'ron zarbasi makes blows
+five times as strong for 5 seconds (every 45), 🔥 Olovli qilich makes the
+next 10 blows critical (every 60), 🏹 O'qlar yomg'iri makes Barchinoy's
+arrows ten times as strong for 3 seconds (every 40). Three daily quests,
+the same for everyone and new each midnight in Uzbekistan: hit 300 times,
+help kill a boss, use a skill 3 times; each gives coins once done, more as
+the sword grows. The first visit of a day gives a gift that grows with the
+streak of days, up to the seventh. The page shows the player's place among
+the chat's members, on this boss and in all, and their title by damage in
+all: Yangi jangchi, Botir (10 thousand), Bahodir (100 thousand), Pahlavon
+(a million), Qahramon (10 million) and Alpomish (100 million). Telegram's
+table under the message shows each member's damage in all.
 
 The server counts it all (`raid_bosses`, `raid_members`, `raid_heroes`,
-migration 45). The page sends only how many times it was tapped; the server
+migrations 45 and 46): skills are used, quests claimed and the daily gift
+given on the server, which keeps when each skill is ready. The page sends only how many times it was tapped; the server
 counts no more taps than 12 a second since the player's last hit, at most
 two seconds' worth and a few more, and works out their damage itself.
 Which taps are critical is a hash of the hero's seed and the tap's number,
@@ -2401,7 +2424,7 @@ update needs:
 
 ### Deploying the dashboard and the game
 
-They need no new kind of update; Dev jangi needs migration 45.
+They need no new kind of update; Dev jangi needs migrations 45 and 46.
 
 1. **Deploy**, then **set `WEBAPP_URL`** in Vercel to the deployment's
    production address, for example `https://maria.vercel.app` (no trailing
@@ -2417,11 +2440,11 @@ They need no new kind of update; Dev jangi needs migration 45.
    a title (`Tarozi`), a short description, a 640×360 photo (and optionally
    a GIF) → the short name **`tarozi`**, exactly, which the bot sends the
    game by. Then `/newgame` again for each of the others: title `Kosmik
-   ilon`, short name **`ilon`**; `Uchar gilam`, **`gilam`**; `Dev jangi`,
+   ilon`, short name **`ilon`**; `O'tinchi`, **`otinchi`**; `Dev jangi`,
    **`boss`**. No URL is asked for: the bot gives
-   `https://YOUR-APP.vercel.app/game/` and `/game/ilon/`, `/game/gilam/`,
-   `/game/boss/` with each press of Play. Dev jangi needs migration 45.
-4. As an owner, send `/stats`, `/game`, `/ilon`, `/gilam` and `/boss` in a
+   `https://YOUR-APP.vercel.app/game/` and `/game/ilon/`, `/game/otinchi/`,
+   `/game/boss/` with each press of Play. Dev jangi needs migrations 45 and 46.
+4. As an owner, send `/stats`, `/game`, `/ilon`, `/otinchi` and `/boss` in a
    group and in a private chat.
 
 Until step 2 the group links open nothing; until step 3 a game's command

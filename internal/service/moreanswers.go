@@ -26,7 +26,7 @@ func init() {
 		"movie": movieAnswer, "anime": animeAnswer, "song": songAnswer, "youtube": youtubeAnswer,
 		"cat": catAnswer, "trivia": triviaAnswer, "fact": factAnswer,
 		"table": tableAnswer, "matches": matchesAnswer, "scorers": scorersAnswer,
-		"tarozi": gameAnswer("tarozi"), "ilon": gameAnswer("ilon"), "gilam": gameAnswer("gilam"), "boss": gameAnswer("boss"), "free_games": freeGamesAnswer, "steam": steamAnswer,
+		"tarozi": gameAnswer("tarozi"), "ilon": gameAnswer("ilon"), "otinchi": gameAnswer("otinchi"), "boss": gameAnswer("boss"), "free_games": freeGamesAnswer, "steam": steamAnswer,
 		"wiki": wikiAnswer, "english": englishAnswer, "synonyms": synonymsAnswer, "papers": papersAnswer,
 		"qr": qrAnswer, "draw": drawAnswer, "place": placeAnswer, "holidays": holidaysAnswer,
 		"crypto": cryptoAnswer, "quakes": quakesAnswer, "search": searchAnswer,

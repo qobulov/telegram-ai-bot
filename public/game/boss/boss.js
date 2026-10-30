@@ -9,9 +9,15 @@
 
   const texts = {
     uz: {
-      names: ["Ko'k dev", "Qizil dev", "Bir ko'zli dev", "Ajdar", "Qora dev"],
+      names: ["Ko'k dev", "Qizil dev", "Bir ko'zli dev", "Ajdar", "Muz devi", "Tosh dev", "Yalmog'iz kampir", "Qora dev"],
       hint: "Devni bosib uring! Guruhdagilar ham siz bilan uradi",
-      table: "Zarbalar", sword: "Qilich", crit: "Krit", helper: "Barchinoy",
+      chief: "BOSH DEV", storm: "Bo'ron", fire: "Olov", rain: "Yomg'ir", ready: "Tayyor!", needHelper: "Barchinoy kerak",
+      stormOn: "Bo'ron zarbasi! ×5", fireOn: "Olovli qilich! 10 krit", rainOn: "O'qlar yomg'iri! ×10",
+      quests: "Kundalik vazifalar", questsReset: "Vazifalar har kuni yarim tunda yangilanadi.",
+      questNames: ["300 marta ur", "1 ta dev yiqitishda qatnash", "Mahoratni 3 marta ishlat"], claim: "Olish", claimed: "Olindi ✓",
+      streak: (n) => `🔥 ${n} kun ketma-ket`, gift: (n, s) => `🎁 Kunlik sovg'a: +${n} 💰<br><small>🔥 ${s}-kun ketma-ket</small>`, got: (n) => `+${n} 💰`,
+      table: "Reyting", thisBoss: "Shu dev", allTime: "Umumiy", place: (n) => `${n}-o'rin`,
+      titles: ["Yangi jangchi", "Botir", "Bahodir", "Pahlavon", "Qahramon", "Alpomish"], sword: "Qilich", crit: "Krit", helper: "Barchinoy",
       lvl: (n) => `${n}-daraja`, hired: "yollanmagan",
       swordNext: (a, b) => `zarba ${a} → ${b}`, critNext: (a, b) => `${a}% → ${b}%`, helperNext: (a, b) => `${a}/s → ${b}/s`,
       max: "Eng yuqori", killed: (name) => `${name} yengildi!`, reward: (n) => `+${n} 💰 sizga`,
@@ -22,9 +28,15 @@
       unavailable: "Aloqa uzildi, qayta urinyapmiz…",
     },
     ru: {
-      names: ["Синий дэв", "Красный дэв", "Одноглазый дэв", "Аждар", "Чёрный дэв"],
+      names: ["Синий дэв", "Красный дэв", "Одноглазый дэв", "Аждар", "Ледяной дэв", "Каменный дэв", "Ялмогиз-кампир", "Чёрный дэв"],
       hint: "Бейте дэва! Группа бьёт вместе с вами",
-      table: "Удары", sword: "Меч", crit: "Крит", helper: "Барчиной",
+      chief: "ГЛАВНЫЙ", storm: "Буря", fire: "Огонь", rain: "Ливень", ready: "Готово!", needHelper: "Нужна Барчиной",
+      stormOn: "Удар бури! ×5", fireOn: "Огненный меч! 10 критов", rainOn: "Ливень стрел! ×10",
+      quests: "Ежедневные задания", questsReset: "Задания обновляются каждую полночь.",
+      questNames: ["Ударить 300 раз", "Помочь победить 1 дэва", "Применить умение 3 раза"], claim: "Забрать", claimed: "Получено ✓",
+      streak: (n) => `🔥 ${n} дн. подряд`, gift: (n, s) => `🎁 Ежедневный подарок: +${n} 💰<br><small>🔥 ${s}-й день подряд</small>`, got: (n) => `+${n} 💰`,
+      table: "Рейтинг", thisBoss: "Этот дэв", allTime: "Всего", place: (n) => `${n}-е место`,
+      titles: ["Новобранец", "Батыр", "Богатырь", "Пахлавон", "Герой", "Алпамыш"], sword: "Меч", crit: "Крит", helper: "Барчиной",
       lvl: (n) => `ур. ${n}`, hired: "не нанята",
       swordNext: (a, b) => `удар ${a} → ${b}`, critNext: (a, b) => `${a}% → ${b}%`, helperNext: (a, b) => `${a}/с → ${b}/с`,
       max: "Максимум", killed: (name) => `${name} повержен!`, reward: (n) => `+${n} 💰 вам`,
@@ -35,9 +47,15 @@
       unavailable: "Связь прервалась, пробуем снова…",
     },
     en: {
-      names: ["Blue giant", "Red giant", "One-eyed giant", "Ajdar the dragon", "Black giant"],
+      names: ["Blue giant", "Red giant", "One-eyed giant", "Ajdar the dragon", "Ice giant", "Stone giant", "The witch Yalmog'iz", "Black giant"],
       hint: "Tap the giant! Your group hits it with you",
-      table: "Damage", sword: "Sword", crit: "Crit", helper: "Barchinoy",
+      chief: "CHIEF", storm: "Storm", fire: "Fire", rain: "Rain", ready: "Ready!", needHelper: "Needs Barchinoy",
+      stormOn: "Storm strike! ×5", fireOn: "Fiery sword! 10 crits", rainOn: "Rain of arrows! ×10",
+      quests: "Daily quests", questsReset: "Quests renew every midnight.",
+      questNames: ["Hit 300 times", "Help defeat 1 giant", "Use a skill 3 times"], claim: "Claim", claimed: "Claimed ✓",
+      streak: (n) => `🔥 ${n} ${n === 1 ? "day" : "days"} in a row`, gift: (n, s) => `🎁 Daily gift: +${n} 💰<br><small>🔥 day ${s} in a row</small>`, got: (n) => `+${n} 💰`,
+      table: "Ranking", thisBoss: "This giant", allTime: "All time", place: (n) => `#${n}`,
+      titles: ["Recruit", "Brave", "Warrior", "Champion", "Hero", "Alpomish"], sword: "Sword", crit: "Crit", helper: "Barchinoy",
       lvl: (n) => `level ${n}`, hired: "not hired",
       swordNext: (a, b) => `blow ${a} → ${b}`, critNext: (a, b) => `${a}% → ${b}%`, helperNext: (a, b) => `${a}/s → ${b}/s`,
       max: "Maxed", killed: (name) => `${name} defeated!`, reward: (n) => `+${n} 💰 for you`,
@@ -54,15 +72,8 @@
   for (const node of document.querySelectorAll("[data-t]")) node.textContent = t[node.dataset.t];
 
   const session = new URLSearchParams(location.search).get("s") || "";
+  const TITLE_ICONS = ["🪖", "🛡", "⚔️", "🏅", "👑", "🌟"];
   const NAME_COLORS = ["#7fd6ff", "#ff9be0", "#b4ff8a", "#ffb36b", "#c9a6ff", "#7fffd4", "#ffd27f"];
-  // The bosses: body colour, the sky behind them, and what sets each apart.
-  const KINDS = [
-    { body: "#3b6cff", dark: "#2142b8", sky: ["#1b1446", "#3d2a6e", "#e58a5f"], horns: 2 },
-    { body: "#e0384d", dark: "#9c1a2c", sky: ["#2a0c1c", "#5c1a2c", "#ff9a5a"], horns: 4, beard: true },
-    { body: "#8f5ad6", dark: "#5e3399", sky: ["#0d1a2c", "#20385a", "#6fc7c0"], horns: 1, cyclops: true },
-    { body: "#3fae58", dark: "#21753a", sky: ["#0b1e14", "#1e4a30", "#e6c35a"], horns: 0, dragon: true },
-    { body: "#2a2638", dark: "#121018", sky: ["#09060f", "#2a1236", "#c0392b"], horns: 2, crown: true },
-  ];
 
   const fmt = (n) => n >= 1e9 ? (n / 1e9).toFixed(2) + "B" : n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e4 ? Math.floor(n / 1e3) + "k" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(Math.round(n));
   const colorOf = (id) => NAME_COLORS[Math.abs(Number(id)) % NAME_COLORS.length];
@@ -80,7 +91,13 @@
     return data;
   }
 
-  let boss = null, hero = null, top = [], tapsPerSecond = 12, critTimes = 3;
+  let boss = null, hero = null, top = [], topTotal = [], rank = { level: 0, total: 0 }, myTitle = 0, boardMode = "level";
+  let tapsPerSecond = 12, critTimes = 3;
+  // skills is when, by this page's clock, each skill is ready and lasts
+  // until; fireLeft is the fiery blows left, counted here as they are
+  // struck.
+  const skills = { storm: { readyAt: 0, until: 0, times: 5 }, fire: { readyAt: 0 }, rain: { readyAt: 0, until: 0, times: 10 } };
+  let fireLeft = 0;
   let pending = 0, pendingDamage = 0, inflight = 0, inflightDamage = 0, sending = false, lastSend = 0, polled = 0;
   const seen = new Map();
   const tapTimes = [];
@@ -94,8 +111,29 @@
       boss = data.boss;
       shownLevel = boss.level;
     }
-    if (data.me) myDamage = data.me.damage;
-    if (data.hero) hero = data.hero;
+    if (data.me) {
+      myDamage = data.me.damage;
+      if (data.me.title > myTitle && myTitle !== null && hero) titleUp(data.me.title);
+      myTitle = data.me.title;
+    }
+    if (data.top_total) topTotal = data.top_total;
+    if (data.rank) rank = data.rank;
+    if (data.hero) {
+      hero = data.hero;
+      // A reply to a hit sent before a skill was used may come after it:
+      // the times it gives only ever move a skill's times on.
+      const now = performance.now(), sk = hero.skills;
+      const later = (was, ms) => Math.max(was, ms > 0 ? now + ms : 0);
+      skills.storm.readyAt = later(skills.storm.readyAt, sk.storm.ready_in);
+      skills.storm.until = later(skills.storm.until, sk.storm.active_for);
+      skills.storm.times = sk.storm.times;
+      skills.fire.readyAt = later(skills.fire.readyAt, sk.fire.ready_in);
+      skills.rain.readyAt = later(skills.rain.readyAt, sk.rain.ready_in);
+      skills.rain.until = later(skills.rain.until, sk.rain.active_for);
+      skills.rain.times = sk.rain.times;
+      if (data.top && pending === 0 && inflight === 0 && !sending) fireLeft = sk.fire.left;
+    }
+    if (data.gift > 0 && hero) toast(t.gift(fmt(data.gift), hero.streak), 3500);
     if (data.top) {
       for (const row of data.top) {
         const before = seen.get(row.id);
@@ -186,8 +224,15 @@
     if (tapTimes.length >= tapsPerSecond) return; // the server would not count it
     tapTimes.push(now);
     const index = hero.taps + inflight + pending;
-    const crit = critical(hero.seed, index, hero.crit_chance);
-    const damage = hero.tap_damage * (crit ? critTimes : 1);
+    let crit;
+    if (fireLeft > 0) {
+      fireLeft -= 1;
+      crit = true;
+    } else {
+      crit = critical(hero.seed, index, hero.crit_chance);
+    }
+    const storm = performance.now() < skills.storm.until;
+    const damage = hero.tap_damage * (crit ? critTimes : 1) * (storm ? skills.storm.times : 1);
     pending += 1;
     pendingDamage += damage;
     $("hint").hidden = true;
@@ -201,6 +246,117 @@
     if (navigator.vibrate) navigator.vibrate(crit ? 25 : 8);
     hud();
   }
+
+  // ---------- skills and quests ----------
+
+  async function useSkill(skill) {
+    if (!hero || victoryOpen) return;
+    const now = performance.now();
+    if (skill === "rain" && hero.helper === 0) {
+      message(t.needHelper);
+      setTimeout(() => message(""), 1500);
+      return;
+    }
+    if (now < skills[skill].readyAt) return;
+    await flush();
+    try {
+      apply(await api({ action: "skill", skill }));
+      if (skill === "fire") fireLeft = hero.skills.fire.left;
+      const said = { storm: t.stormOn, fire: t.fireOn, rain: t.rainOn }[skill];
+      textPop(W / 2, bossY() - bossRadius() - 20, said, skill === "rain" ? "#7fd6ff" : "#ffb34a", 26);
+      burst(bossX(), bossY(), skill === "rain" ? "#7fd6ff" : "#ff8a3d", 50, 8);
+      fx.shake = 0.8;
+      if (skill === "rain") {
+        for (let i = 0; i < 14; i++) {
+          setTimeout(() => {
+            const from = archerAt();
+            arrows.push({ x: from[0], y: from[1], tx: bossX() + (Math.random() - 0.5) * 120, ty: bossY() + (Math.random() - 0.5) * 100, k: 0, silent: true });
+          }, i * 180);
+        }
+      }
+      if (navigator.vibrate) navigator.vibrate([20, 30, 40]);
+      hud();
+    } catch (error) {
+      if (error.message !== "cooldown") failed(error);
+    }
+  }
+
+  function skillsHud() {
+    if (!hero) return;
+    const now = performance.now();
+    const every = { storm: 45000, fire: 60000, rain: 40000 };
+    for (const button of document.querySelectorAll(".skill")) {
+      const name = button.dataset.skill, sk = skills[name];
+      const wait = Math.max(0, sk.readyAt - now);
+      const active = name === "fire" ? fireLeft > 0 : now < sk.until;
+      const off = name === "rain" && hero.helper === 0;
+      button.classList.toggle("active", active);
+      button.classList.toggle("ready", !wait && !active && !off);
+      button.classList.toggle("off", off);
+      button.style.setProperty("--cool", `${Math.min(100, (wait / every[name]) * 100)}%`);
+      $(`${name}Info`).textContent = off ? t.needHelper : active ? (name === "fire" ? `🔥 ${fireLeft}` : `${Math.ceil((sk.until - now) / 1000)}s`) : wait ? `${Math.ceil(wait / 1000)}s` : t.ready;
+    }
+  }
+
+  let questsShown = "";
+  function questsHud() {
+    if (!hero) return;
+    let can = 0;
+    for (const q of hero.quests) if (q.progress >= q.goal && !q.claimed) can += 1;
+    $("questsDot").hidden = can === 0;
+    // Drawn again only when they changed, so that a press of a button is
+    // not lost to the list being drawn under it.
+    const shown = JSON.stringify([hero.quests, hero.streak]);
+    if (shown === questsShown) return;
+    questsShown = shown;
+    const list = $("questList");
+    list.textContent = "";
+    hero.quests.forEach((q, i) => {
+      const done = q.progress >= q.goal;
+      const li = document.createElement("li");
+      const name = document.createElement("span");
+      name.textContent = `${t.questNames[i]} · ${q.progress}/${q.goal}`;
+      const bar = document.createElement("span");
+      bar.className = "bar";
+      bar.innerHTML = `<i style="width:${(q.progress / q.goal) * 100}%"></i>`;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = q.claimed ? t.claimed : `${t.claim} +${fmt(q.reward)} 💰`;
+      button.disabled = q.claimed || !done;
+      if (done && !q.claimed) button.className = "can";
+      button.addEventListener("click", () => claim(i, button));
+      li.append(name, button, bar);
+      list.append(li);
+    });
+    $("streak").textContent = hero.streak ? t.streak(hero.streak) : "";
+  }
+
+  async function claim(i, button) {
+    button.disabled = true;
+    try {
+      const before = hero.coins;
+      apply(await api({ action: "claim", quest: i }));
+      toast(t.got(fmt(hero.coins - before)), 1600);
+      if (navigator.vibrate) navigator.vibrate(20);
+    } catch (error) {
+      failed(error);
+    }
+    questsHud();
+  }
+
+  let toastTimer = 0;
+  function toast(html, ms) {
+    const box = $("toast");
+    box.innerHTML = html;
+    box.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { box.hidden = true; }, ms);
+  }
+
+  for (const button of document.querySelectorAll(".skill")) button.addEventListener("click", () => useSkill(button.dataset.skill));
+  $("questsToggle").addEventListener("click", () => { questsHud(); $("quests").hidden = false; });
+  $("questsClose").addEventListener("click", () => { $("quests").hidden = true; });
+  $("quests").addEventListener("click", (e) => { if (e.target.id === "quests") $("quests").hidden = true; });
 
   // ---------- what others and Barchinoy do ----------
 
@@ -228,7 +384,7 @@
   function victory(kill) {
     victoryOpen = true;
     fx.shake = 1.5;
-    for (let i = 0; i < 4; i++) setTimeout(() => burst(bossX(), bossY(), ["#ffcf4a", "#ff4d5e", "#ffffff", KINDS[kill.kind].body][i], 60, 10), i * 140);
+    for (let i = 0; i < 4; i++) setTimeout(() => burst(bossX(), bossY(), ["#ffcf4a", "#ff4d5e", "#ffffff", BossSkins.skies[kill.kind][2]][i], 60, 10), i * 140);
     if (navigator.vibrate) navigator.vibrate([60, 40, 60, 40, 160]);
     $("victoryTitle").textContent = t.killed(t.names[kill.kind]);
     $("victoryReward").textContent = t.reward(fmt(kill.reward));
@@ -253,7 +409,7 @@
   // it, as a victory with the coins it brought them and who hit it most as
   // last seen; to anyone else, as a word.
   function killedByOthers(data) {
-    const level = data.boss.level - 1, kind = (level - 1) % 5;
+    const level = data.boss.level - 1, kind = (level - 1) % BossSkins.count;
     if (myDamage > 0 && hero && data.hero) {
       const fighters = top.map((row) => ({ name: row.name, damage: row.me ? Math.max(row.damage, myDamage) : row.damage, reward: null, me: row.me }));
       victory({ level, kind, reward: Math.max(0, data.hero.coins - hero.coins), fighters });
@@ -262,6 +418,15 @@
     message(t.others(t.names[kind]));
     setTimeout(() => message(""), 3000);
     newBoss();
+  }
+
+  function titleUp(title) {
+    textPop(W / 2, H * 0.3, `${TITLE_ICONS[title]} ${t.titles[title]}!`, "#ffcf4a", 28);
+    burst(W / 2, H * 0.3, "#ffcf4a", 40, 7);
+    const chip = $("rank");
+    chip.classList.remove("up");
+    void chip.offsetWidth;
+    chip.classList.add("up");
   }
 
   function newBoss() {
@@ -286,6 +451,8 @@
     const kind = boss.kind;
     $("level").textContent = boss.level;
     $("bossName").textContent = t.names[kind];
+    $("chief").hidden = !boss.chief;
+    questsHud();
     const hp = Math.max(0, boss.hp - inflightDamage - pendingDamage);
     const share = Math.max(0, Math.min(1, hp / boss.max_hp));
     $("hpFill").style.width = `${share * 100}%`;
@@ -311,12 +478,18 @@
     card("sword", hero.sword, t.swordNext(fmt(hero.tap_damage), fmt(hero.next.tap_damage)));
     card("crit", hero.crit, t.critNext(hero.crit_chance, hero.next.crit_chance));
     card("helper", hero.helper, t.helperNext(fmt(hero.helper_dps), fmt(hero.next.helper_dps)));
-    const board = $("board");
+    const chip = $("rank");
+    const place = boardMode === "total" ? rank.total : rank.level || rank.total;
+    chip.hidden = false;
+    chip.textContent = `${TITLE_ICONS[myTitle]} ${t.titles[myTitle]}${place ? " · 🏆 " + t.place(place) : ""}`;
+    const rows = boardMode === "total" ? topTotal : top;
+    const board = $("boardList");
     board.textContent = "";
-    top.forEach((row, i) => {
+    rows.forEach((row, i) => {
       const li = document.createElement("li");
       if (row.me) li.className = "me";
-      for (const [cls, text] of [["pos", i + 1], ["name", row.name || "?"], ["dmg", fmt(row.damage)]]) {
+      const value = boardMode === "total" ? row.total : row.damage;
+      for (const [cls, text] of [["pos", i + 1], ["name", `${TITLE_ICONS[row.title || 0]} ${row.name || "?"}`], ["dmg", fmt(value)]]) {
         const span = document.createElement("span");
         span.className = cls;
         span.textContent = text;
@@ -327,6 +500,14 @@
   }
 
   $("boardToggle").addEventListener("click", () => { $("board").hidden = !$("board").hidden; });
+  $("rank").addEventListener("click", () => { $("board").hidden = false; });
+  for (const tab of document.querySelectorAll(".board-tabs button")) {
+    tab.addEventListener("click", () => {
+      boardMode = tab.dataset.b;
+      for (const other of document.querySelectorAll(".board-tabs button")) other.classList.toggle("on", other === tab);
+      hud();
+    });
+  }
   for (const card of document.querySelectorAll(".card")) card.addEventListener("click", () => upgrade(card.dataset.item, card));
 
   // ---------- the scene ----------
@@ -349,7 +530,7 @@
     peaks = [0, 1].map((layer) => Array.from({ length: 9 }, (_, i) => ({ x: i / 8, h: 0.12 + rnd() * (layer ? 0.1 : 0.2) })));
   }
 
-  const cardsTop = () => document.querySelector(".upgrades").getBoundingClientRect().top;
+  const cardsTop = () => document.querySelector(".skills").getBoundingClientRect().top;
   const groundY = () => cardsTop() - 18;
   const bossRadius = () => Math.max(40, Math.min(W * 0.36, (groundY() - 150) * 0.42, 170));
   const bossX = () => W / 2;
@@ -380,11 +561,11 @@
   }
 
   function drawSky(kind, now) {
-    const k = KINDS[kind];
+    const sky = BossSkins.skies[kind];
     const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, k.sky[0]);
-    g.addColorStop(0.6, k.sky[1]);
-    g.addColorStop(1, k.sky[2]);
+    g.addColorStop(0, sky[0]);
+    g.addColorStop(0.6, sky[1]);
+    g.addColorStop(1, sky[2]);
     ctx.fillStyle = g;
     ctx.fillRect(-40, -40, W + 80, H + 80);
     const gy = groundY();
@@ -408,178 +589,33 @@
     }
   }
 
-  // drawBoss draws the boss of kind at (x, y), s its size, white when it is
-  // hit, red-eyed and steaming when nearly dead.
+  // drawBoss draws the boss of kind at (x, y), s its size (skins.js draws
+  // it about 100 across), red-eyed and angrier when nearly dead. A hit turns
+  // it white: it is drawn on a layer of its own, which is whitened, so that
+  // the sky behind it is not.
+  const layer = document.createElement("canvas");
+  const layerCtx = layer.getContext("2d");
   function drawBoss(kind, x, y, s, now, flash, rage) {
-    const k = KINDS[kind];
-    const breathe = Math.sin(now / 420) * 3;
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.scale(s, s);
-    ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
-    ctx.beginPath();
-    ctx.ellipse(0, 96, 88, 14, 0, 0, Math.PI * 2);
-    ctx.fill();
-    const body = flash ? "#ffffff" : k.body, dark = flash ? "#ffffff" : k.dark;
-    if (k.dragon) {
-      const flap = Math.sin(now / 260) * 0.25;
-      for (const side of [-1, 1]) {
-        ctx.save();
-        ctx.scale(side, 1);
-        ctx.rotate(-flap);
-        ctx.fillStyle = flash ? "#ffffff" : "#1d5c2e";
-        ctx.beginPath();
-        ctx.moveTo(40, -10);
-        ctx.quadraticCurveTo(120, -110, 170, -60);
-        ctx.lineTo(140, -40);
-        ctx.lineTo(150, -10);
-        ctx.lineTo(118, 0);
-        ctx.lineTo(120, 26);
-        ctx.quadraticCurveTo(80, 10, 40, 20);
-        ctx.fill();
-        ctx.restore();
-      }
+    if (!flash) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(s, s);
+      BossSkins.draw(ctx, kind, now, rage);
+      ctx.restore();
+      return;
     }
-    ctx.fillStyle = dark;
-    ctx.beginPath();
-    ctx.ellipse(-36, 72, 22, 28, 0, 0, Math.PI * 2);
-    ctx.ellipse(36, 72, 22, 28, 0, 0, Math.PI * 2);
-    ctx.fill();
-    const g = ctx.createRadialGradient(-20, -20 + breathe, 10, 0, 10 + breathe, 90);
-    g.addColorStop(0, flash ? "#ffffff" : lighten(k.body));
-    g.addColorStop(1, body);
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.ellipse(0, 10 + breathe, 72, 76, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = body;
-    ctx.beginPath();
-    ctx.ellipse(-78, 22 + breathe, 19, 42, -0.3, 0, Math.PI * 2);
-    ctx.ellipse(78, 22 + breathe, 19, 42, 0.3, 0, Math.PI * 2);
-    ctx.fill();
-    if (k.dragon) {
-      ctx.fillStyle = flash ? "#ffffff" : "#e6c35a";
-      for (let i = -2; i <= 2; i++) {
-        ctx.beginPath();
-        ctx.moveTo(i * 18 - 8, -60 + breathe + Math.abs(i) * 6);
-        ctx.lineTo(i * 18, -84 + breathe + Math.abs(i) * 6);
-        ctx.lineTo(i * 18 + 8, -60 + breathe + Math.abs(i) * 6);
-        ctx.fill();
-      }
-    }
-    ctx.fillStyle = flash ? "#ffffff" : "#f3e2c0";
-    const horns = k.horns;
-    const hornAt = [[], [0], [-1, 1], [], [-1.4, -0.6, 0.6, 1.4]][horns];
-    for (const h of hornAt) {
-      const hx = h * 30;
-      ctx.beginPath();
-      ctx.moveTo(hx - 12, -54 + breathe);
-      ctx.lineTo(hx * 1.4 + (h === 0 ? 0 : Math.sign(h) * 10), -108 + breathe + Math.abs(h) * (horns > 2 ? 12 : 0));
-      ctx.lineTo(hx + 12, -60 + breathe);
-      ctx.fill();
-    }
-    if (k.crown) {
-      ctx.fillStyle = flash ? "#ffffff" : "#ffcf4a";
-      ctx.beginPath();
-      ctx.moveTo(-34, -62 + breathe);
-      for (let i = 0; i < 5; i++) {
-        ctx.lineTo(-34 + i * 17, -88 + breathe);
-        ctx.lineTo(-25 + i * 17, -70 + breathe);
-      }
-      ctx.lineTo(34, -62 + breathe);
-      ctx.fill();
-      ctx.fillStyle = "#d6264a";
-      ctx.beginPath();
-      ctx.arc(0, -72 + breathe, 4, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    const eyeY = -12 + breathe;
-    const pupil = rage ? "#ff2a3a" : k.crown ? "#ffcf4a" : "#1a0c00";
-    if (k.cyclops) {
-      ctx.fillStyle = "#ffffff";
-      ctx.beginPath();
-      ctx.ellipse(0, eyeY, 26, 22, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = pupil;
-      ctx.beginPath();
-      ctx.arc(Math.sin(now / 700) * 8, eyeY + 2, 10, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      ctx.fillStyle = k.crown ? "#2b0a0a" : "#ffffff";
-      ctx.beginPath();
-      ctx.ellipse(-25, eyeY, 15, 12, 0, 0, Math.PI * 2);
-      ctx.ellipse(25, eyeY, 15, 12, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = pupil;
-      if (k.crown || rage) {
-        ctx.shadowColor = pupil;
-        ctx.shadowBlur = 14;
-      }
-      ctx.beginPath();
-      ctx.arc(-23, eyeY + 2, 6, 0, Math.PI * 2);
-      ctx.arc(23, eyeY + 2, 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-    }
-    ctx.strokeStyle = "#1a0c00";
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.moveTo(-44, -34 + breathe);
-    ctx.lineTo(-10, -26 + breathe + (rage ? 6 : 0));
-    ctx.moveTo(44, -34 + breathe);
-    ctx.lineTo(10, -26 + breathe + (rage ? 6 : 0));
-    ctx.stroke();
-    if (k.dragon) {
-      ctx.fillStyle = flash ? "#ffffff" : "#2f8a46";
-      ctx.beginPath();
-      ctx.ellipse(0, 26 + breathe, 34, 22, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#0b2a14";
-      ctx.beginPath();
-      ctx.arc(-10, 20 + breathe, 3, 0, Math.PI * 2);
-      ctx.arc(10, 20 + breathe, 3, 0, Math.PI * 2);
-      ctx.fill();
-      if (Math.sin(now / 900) > 0.7) {
-        const fl = ctx.createLinearGradient(0, 40, 0, 110);
-        fl.addColorStop(0, "#fff3a0");
-        fl.addColorStop(1, "rgba(255, 80, 20, 0)");
-        ctx.fillStyle = fl;
-        ctx.beginPath();
-        ctx.moveTo(-14, 42 + breathe);
-        ctx.quadraticCurveTo(0, 120 + Math.sin(now / 50) * 8, 14, 42 + breathe);
-        ctx.fill();
-      }
-    } else {
-      ctx.fillStyle = "#3a0a10";
-      ctx.beginPath();
-      ctx.ellipse(0, 26 + breathe, 32, 14 + (rage ? 8 : 0), 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(-22, 14 + breathe, 9, 11);
-      ctx.fillRect(13, 14 + breathe, 9, 11);
-    }
-    if (k.beard) {
-      ctx.fillStyle = flash ? "#ffffff" : "#5a0a14";
-      ctx.beginPath();
-      ctx.moveTo(-34, 38 + breathe);
-      ctx.quadraticCurveTo(0, 110 + breathe, 34, 38 + breathe);
-      ctx.fill();
-    }
-    if (rage) {
-      for (const side of [-1, 1]) {
-        ctx.fillStyle = `rgba(255, 255, 255, ${0.25 + 0.2 * Math.sin(now / 90 + side)})`;
-        ctx.beginPath();
-        ctx.arc(side * (60 + Math.sin(now / 120) * 6), -70 - ((now / 8) % 30), 8, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-    ctx.restore();
-  }
-
-  function lighten(hex) {
-    const n = parseInt(hex.slice(1), 16);
-    const c = (s) => Math.min(255, ((n >> s) & 255) + 60);
-    return `rgb(${c(16)}, ${c(8)}, ${c(0)})`;
+    const half = 190, size = Math.ceil(half * 2 * s * dpr);
+    if (layer.width !== size) layer.width = layer.height = size;
+    layerCtx.setTransform(1, 0, 0, 1, 0, 0);
+    layerCtx.clearRect(0, 0, size, size);
+    layerCtx.setTransform(s * dpr, 0, 0, s * dpr, half * s * dpr, half * s * dpr);
+    BossSkins.draw(layerCtx, kind, now, rage);
+    layerCtx.setTransform(1, 0, 0, 1, 0, 0);
+    layerCtx.globalCompositeOperation = "source-atop";
+    layerCtx.fillStyle = "rgba(255, 255, 255, 0.85)";
+    layerCtx.fillRect(0, 0, size, size);
+    layerCtx.globalCompositeOperation = "source-over";
+    ctx.drawImage(layer, x - half * s, y - half * s, half * 2 * s, half * 2 * s);
   }
 
   function drawHero(x, y, s, face, swing, robe, now, archer) {
@@ -762,7 +798,7 @@
     const kind = boss ? boss.kind : 0;
     drawSky(kind, now);
     if (boss) {
-      const r = bossRadius(), s = r / 90;
+      const s = Math.min(bossRadius() / 90, (W / 2 - 4) / BossSkins.reach[kind]);
       const hp = Math.max(0, boss.hp - inflightDamage - pendingDamage);
       const rage = hp / boss.max_hp < 0.3;
       const x = bossX() + (rage ? Math.sin(now / 40) * 2 : 0);
@@ -786,7 +822,12 @@
         drawHero(W * 0.84, gy - 50, 1.15, -1, (arrowClock / 700), "#7a2a6a", now, true);
       }
     }
+    if (performance.now() < skills.storm.until) {
+      ctx.fillStyle = `rgba(255, 120, 40, ${0.08 + 0.05 * Math.sin(now / 80)})`;
+      ctx.fillRect(-20, -20, W + 40, H + 40);
+    }
     drawEffects(dt);
+    skillsHud();
     requestAnimationFrame(frame);
   }
 

@@ -50,7 +50,7 @@ func newGameEnv(t *testing.T) *gameEnv {
 	t.Helper()
 	env := &gameEnv{sender: &fakeGameSender{}, now: rulesNow}
 	env.audit = &fakePollAudit{now: func() time.Time { return env.now }}
-	env.registry = mustRegistry(t, GameTool(GameOptions{Sender: env.sender, Store: env.audit, Games: []string{"tarozi", "ilon", "gilam", "boss"}, Now: func() time.Time { return env.now }}))
+	env.registry = mustRegistry(t, GameTool(GameOptions{Sender: env.sender, Store: env.audit, Games: []string{"tarozi", "ilon", "otinchi", "boss"}, Now: func() time.Time { return env.now }}))
 	return env
 }
 

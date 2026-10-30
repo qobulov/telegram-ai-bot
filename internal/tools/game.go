@@ -34,10 +34,10 @@ const (
 
 // gameAbout says what each of the bot's games is, by its short name.
 var gameAbout = map[string]string{
-	"tarozi": "Tarozi, fruits on a bazaar scale, 40 seconds to say which pan goes down",
-	"ilon":   "Kosmik ilon, a snake in space that eats planets and grows, with levels of walls, bonuses and ever quicker moves",
-	"gilam":  "Uchar gilam, a flying carpet over Samarkand at night, tapped up through gaps between minarets and storm clouds, picking up coins",
-	"boss":   "Dev jangi, a boss raid: the whole chat taps one giant together, with damage numbers, critical blows, upgrades, and the bot announcing who hit it most",
+	"tarozi":  "Tarozi, fruits on a bazaar scale, 40 seconds to say which pan goes down",
+	"ilon":    "Kosmik ilon, a snake in space that eats planets and grows, with levels of walls, bonuses and ever quicker moves",
+	"otinchi": "O'tinchi, a woodcutter chopping an old plane tree from left or right against the clock, dodging its branches, golden pieces worth five",
+	"boss":    "Dev jangi, a boss raid: the whole chat taps one giant together, with damage numbers, critical blows, upgrades, and the bot announcing who hit it most",
 }
 
 var gameTooSoon = fmt.Sprintf("this chat got %d games in the last %d minutes; the one sent is still there to play", gameLimit, int(gameWindow.Minutes()))
@@ -59,7 +59,7 @@ type GameOptions struct {
 }
 
 // GameTool lets anyone have the bot post one of its games in the chat the
-// turn is in, as /game, /ilon, /gilam and /boss do: the members play it inside Telegram,
+// turn is in, as /game, /ilon, /otinchi and /boss do: the members play it inside Telegram,
 // and their scores are kept on the message.
 func GameTool(opts GameOptions) Tool {
 	if opts.Now == nil {
@@ -81,7 +81,7 @@ func GameTool(opts GameOptions) Tool {
 	return Tool{
 		Name: "send_game",
 		Description: "Post one of your own games in this chat when someone wants to play a game with you or the group, or asks for one to pass the time " +
-			"(\"o'yin o'ynaymiz\", \"o'yin tashla\", \"ilon o'ynaymiz\", \"gilam o'ynaymiz\", \"dev uramiz\", \"boss\", \"давай поиграем в игру\", \"скинь игру\"); scores are kept under the message. " +
+			"(\"o'yin o'ynaymiz\", \"o'yin tashla\", \"ilon o'ynaymiz\", \"daraxt chopamiz\", \"dev uramiz\", \"boss\", \"давай поиграем в игру\", \"скинь игру\"); scores are kept under the message. " +
 			"For dice, darts or a slot machine use send_dice instead. One per message; a chat gets 2 every 10 minutes.",
 		Schema:  schema,
 		Timeout: gameTimeout,

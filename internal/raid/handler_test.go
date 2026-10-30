@@ -19,6 +19,7 @@ import (
 
 // fakeStore answers as told and keeps what it was asked.
 type fakeStore struct {
+	hero     storage.RaidHero
 	hit      storage.RaidHit
 	upgrade  error
 	hitChats []int64
@@ -26,7 +27,8 @@ type fakeStore struct {
 }
 
 func (f *fakeStore) RaidState(_ context.Context, chatID, userID int64, _ storage.RaidRules, seed uint32, _ int) (storage.RaidBoss, storage.RaidHero, storage.RaidMember, []storage.RaidMember, error) {
-	return storage.RaidBoss{ChatID: chatID, Level: 3, HP: 50, MaxHP: 100}, storage.RaidHero{UserID: userID, Sword: 1, Seed: seed},
+	f.hero.UserID, f.hero.Seed = userID, seed
+	return storage.RaidBoss{ChatID: chatID, Level: 3, HP: 50, MaxHP: 100}, f.hero,
 		storage.RaidMember{UserID: userID}, []storage.RaidMember{{UserID: userID, Name: "Bek", Damage: 40}}, nil
 }
 
@@ -34,6 +36,20 @@ func (f *fakeStore) HitRaid(_ context.Context, chatID, _ int64, _ string, taps i
 	f.hitChats = append(f.hitChats, chatID)
 	f.taps = append(f.taps, taps)
 	return f.hit, nil
+}
+
+func (f *fakeStore) RaidRanks(context.Context, int64, int64, int, int) (int, int, []storage.RaidMember, error) {
+	return 2, 3, []storage.RaidMember{{UserID: 9, Name: "Ali", Total: 2_000_000}, {UserID: 7, Name: "Bek", Total: 50_000}}, nil
+}
+
+func (f *fakeStore) ChangeRaidHero(_ context.Context, userID int64, seed uint32, change func(*storage.RaidHero) error) (storage.RaidHero, error) {
+	h := f.hero
+	h.UserID, h.Seed = userID, seed
+	if err := change(&h); err != nil {
+		return storage.RaidHero{}, err
+	}
+	f.hero = h
+	return h, nil
 }
 
 func (f *fakeStore) UpgradeRaidHero(context.Context, int64, string, func(int) int64, int, uint32) (storage.RaidHero, error) {
@@ -64,7 +80,7 @@ type fixture struct {
 }
 
 func newFixture() *fixture {
-	f := &fixture{games: game.New("1:test", "https://example.com/game/", nil), store: &fakeStore{}, telegram: &fakeTelegram{}}
+	f := &fixture{games: game.New("1:test", "https://example.com/game/", nil), store: &fakeStore{hero: storage.RaidHero{Sword: 1}}, telegram: &fakeTelegram{}}
 	f.handler = NewHandler(Options{
 		Sessions: f.games, Store: f.store, Telegram: f.telegram,
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Seed: func() uint32 { return 42 },
@@ -107,6 +123,12 @@ func TestRaidWantsItsOwnSession(t *testing.T) {
 	hero, _ := out["hero"].(map[string]any)
 	if code != http.StatusOK || boss["level"] != 3.0 || boss["kind"] != 2.0 || hero["seed"] != 42.0 || hero["tap_damage"] != 5.0 {
 		t.Fatalf("state = %d %v", code, out)
+	}
+	rank, _ := out["rank"].(map[string]any)
+	total, _ := out["top_total"].([]any)
+	first, _ := total[0].(map[string]any)
+	if rank["level"] != 2.0 || rank["total"] != 3.0 || len(total) != 2 || first["title"] != 3.0 {
+		t.Errorf("ranks = %v, top in all = %v", rank, total)
 	}
 }
 
@@ -171,5 +193,34 @@ func TestUpgradeRefusals(t *testing.T) {
 	f.store.upgrade = nil
 	if code, out := f.post(t, map[string]any{"session": session, "action": "upgrade", "item": "sword"}); code != http.StatusOK || out["hero"] == nil {
 		t.Errorf("an upgrade: %d %v", code, out)
+	}
+}
+
+// A skill used and a quest claimed change the hero; one not ready, or not
+// done, is refused; the day's first visit brings the daily gift.
+func TestSkillsQuestsAndTheDailyGift(t *testing.T) {
+	f := newFixture()
+	session := f.session(t, game.BossShortName, member)
+	code, out := f.post(t, map[string]any{"session": session, "action": "state"})
+	if code != http.StatusOK || out["gift"] != 50.0 {
+		t.Fatalf("the first visit: %d gift %v", code, out["gift"])
+	}
+	if _, out := f.post(t, map[string]any{"session": session, "action": "state"}); out["gift"] != 0.0 {
+		t.Errorf("the second visit brought a gift of %v", out["gift"])
+	}
+	code, out = f.post(t, map[string]any{"session": session, "action": "skill", "skill": "storm"})
+	skills, _ := out["hero"].(map[string]any)["skills"].(map[string]any)
+	storm, _ := skills["storm"].(map[string]any)
+	if code != http.StatusOK || storm["active_for"].(float64) <= 0 || storm["ready_in"].(float64) <= 0 {
+		t.Fatalf("the storm: %d %v", code, out)
+	}
+	if code, out := f.post(t, map[string]any{"session": session, "action": "skill", "skill": "storm"}); code != http.StatusConflict || out["error"] != "cooldown" {
+		t.Errorf("the storm again: %d %v", code, out)
+	}
+	if code, out := f.post(t, map[string]any{"session": session, "action": "skill", "skill": "rain"}); out["error"] != "no_helper" {
+		t.Errorf("rain without Barchinoy: %d %v", code, out)
+	}
+	if code, out := f.post(t, map[string]any{"session": session, "action": "claim", "quest": 2}); out["error"] != "not_done" {
+		t.Errorf("an undone quest: %d %v", code, out)
 	}
 }
