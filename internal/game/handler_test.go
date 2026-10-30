@@ -39,8 +39,10 @@ func (f *fakeScores) GetGameHighScores(_ context.Context, game telegram.GameMess
 }
 
 type fakeRecords struct {
-	got []storage.GameScore
-	err error
+	got      []storage.GameScore
+	err      error
+	tableErr error
+	asked    []string
 }
 
 func (f *fakeRecords) RecordGameScore(_ context.Context, score storage.GameScore) error {
@@ -49,6 +51,14 @@ func (f *fakeRecords) RecordGameScore(_ context.Context, score storage.GameScore
 	}
 	f.got = append(f.got, score)
 	return nil
+}
+
+func (f *fakeRecords) GameTable(_ context.Context, game string, userID int64, limit int) ([]storage.GameRank, error) {
+	f.asked = append(f.asked, game)
+	if f.tableErr != nil {
+		return nil, f.tableErr
+	}
+	return []storage.GameRank{{Position: 1, UserID: 9, Name: "Vali", Best: 900}, {Position: limit + 2, UserID: userID, Name: "Bek", Best: 5}}, nil
 }
 
 func post(t *testing.T, h http.Handler, body any) (int, map[string]any) {
@@ -212,5 +222,33 @@ func TestHandlerRecordsThePlays(t *testing.T) {
 	records.err = errors.New("database down")
 	if status, got := post(t, h, request{Action: "finish", Run: run, Answers: answers, Times: times}); status != http.StatusOK || got["score"].(float64) <= 0 {
 		t.Errorf("a play the database refused: %d %v", status, got)
+	}
+}
+
+// The table comes from the records across all chats, for the session's
+// game, the player's row marked; when they fail it is Telegram's.
+func TestHandlerTableFromTheRecords(t *testing.T) {
+	g, _ := newTestGame()
+	records := &fakeRecords{}
+	h := g.Handler(&fakeScores{}, records, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	session := sessionOf(t, playURL(t, g, OtinchiShortName, player))
+
+	status, got := post(t, h, request{Action: "table", Session: session})
+	table, _ := got["table"].([]any)
+	if status != http.StatusOK || len(table) != 2 || len(records.asked) != 1 || records.asked[0] != OtinchiShortName {
+		t.Fatalf("table: %d %v, asked %v", status, got, records.asked)
+	}
+	first, mine := table[0].(map[string]any), table[1].(map[string]any)
+	if first["name"] != "Vali" || first["score"] != 900.0 || first["me"] != false || mine["position"] != float64(tableSize+2) || mine["me"] != true {
+		t.Errorf("table = %v", table)
+	}
+	if _, got := post(t, h, request{Action: "table", Session: sessionOf(t, playURL(t, g, ShortName, player))}); records.asked[1] != ShortName {
+		t.Errorf("Tarozi's table asked for %v: %v", records.asked, got)
+	}
+
+	records.tableErr = errors.New("unreachable")
+	_, got = post(t, h, request{Action: "table", Session: session})
+	if table, _ := got["table"].([]any); len(table) != 2 || table[0].(map[string]any)["name"] != "Ali" {
+		t.Errorf("Telegram's table = %v", got)
 	}
 }

@@ -1743,7 +1743,9 @@ most 10 more), a wrong one takes 5 off. The page is `public/game/`, plain
 HTML, and follows the device's light or dark mode.
 
 Telegram keeps the scores: each game message has its own table, which it
-shows under the message, and the page shows it too (`getGameHighScores`).
+shows under the message. The page shows the bot's own table instead, from
+the database across all chats (below), and Telegram's only when the
+database cannot be read (`getGameHighScores`).
 The score is not taken from the page:
 
 - A press of Play reaches the bot as a callback query, answered with the
@@ -1764,7 +1766,10 @@ The bot keeps the scores too, for tables of its own: each play scored of
 Tarozi, Kosmik ilon and O'tinchi counts in the player's row of
 `game_scores` for that game and chat (migration 48), with their best and
 when it was made, their last score and how many plays they scored. A
-play the database does not take is still set on Telegram.
+play the database does not take is still set on Telegram. The page's
+table is made from it: the first 10 players of the game by their best in
+any chat, ties sharing a place, and the player's own row under them when
+they are further down.
 
 A bot can still answer as fast as the limits allow, but not faster, and
 cannot name its score, another player or another message.

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // GameScore is a play of one of the bot's games scored: which game, whose
@@ -35,4 +37,45 @@ func (s *Store) RecordGameScore(ctx context.Context, g GameScore) error {
 		return fmt.Errorf("storage: record game score: %w", err)
 	}
 	return nil
+}
+
+// GameRank is a player's place in a game's table, by their best in any
+// chat.
+type GameRank struct {
+	Position int
+	UserID   int64
+	Name     string
+	Best     int
+}
+
+// GameTable is a game's table across all chats: the first limit players
+// by their best, the earlier best first of a tie, and userID's row after
+// them when they are further down. Players who tie share a position.
+func (s *Store) GameTable(ctx context.Context, game string, userID int64, limit int) ([]GameRank, error) {
+	rows, err := s.pool.Query(ctx, `
+		WITH bests AS (
+			SELECT DISTINCT ON (user_id) user_id, name, best, best_at
+			FROM game_scores WHERE game = $1
+			ORDER BY user_id, best DESC, best_at
+		), ranked AS (
+			SELECT user_id, name, best,
+				rank() OVER (ORDER BY best DESC) AS position,
+				row_number() OVER (ORDER BY best DESC, best_at, user_id) AS n
+			FROM bests
+		)
+		SELECT position, user_id, name, best FROM ranked
+		WHERE n <= $2 OR user_id = $3 ORDER BY n`,
+		game, limit, userID)
+	if err != nil {
+		return nil, fmt.Errorf("storage: game table: %w", err)
+	}
+	table, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (GameRank, error) {
+		var r GameRank
+		err := row.Scan(&r.Position, &r.UserID, &r.Name, &r.Best)
+		return r, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("storage: game table: %w", err)
+	}
+	return table, nil
 }

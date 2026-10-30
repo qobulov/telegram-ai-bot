@@ -24,10 +24,16 @@ type Scores interface {
 }
 
 // Records keeps the scored plays in the bot's own database too, each
-// player's by game and chat.
+// player's by game and chat, and makes each game's table across all chats
+// from them.
 type Records interface {
 	RecordGameScore(ctx context.Context, score storage.GameScore) error
+	GameTable(ctx context.Context, game string, userID int64, limit int) ([]storage.GameRank, error)
 }
+
+// tableSize is how many players a game's table from the records shows,
+// before the player's own row.
+const tableSize = 10
 
 type handler struct {
 	game    *Game
@@ -38,8 +44,8 @@ type handler struct {
 
 // Handler serves the pages' requests: "start" deals a play for a session,
 // of the game it is for, "finish" scores one, sets the score and records
-// it, when records is not nil, and "table" is the game message's table of
-// scores.
+// it, and "table" is the game's table: from records across all chats, or
+// when records is nil or fails, the game message's from Telegram.
 func (g *Game) Handler(scores Scores, records Records, logger *slog.Logger) http.Handler {
 	if logger == nil {
 		logger = slog.Default()
@@ -166,7 +172,7 @@ func (h *handler) start(req request) (any, failure) {
 func (h *handler) finish(ctx context.Context, req request) (any, failure) {
 	var result Result
 	var err error
-	name := h.game.runGame(req.Run)
+	name := gameName(h.game.runGame(req.Run))
 	switch name {
 	case IlonShortName:
 		result, err = h.game.FinishIlon(req.Run, req.Turns, req.Ticks)
@@ -192,7 +198,7 @@ func (h *handler) finish(ctx context.Context, req request) (any, failure) {
 		return nil, errUnavailable
 	}
 	h.record(ctx, name, result)
-	table, err := h.rows(ctx, result.Player)
+	table, err := h.rows(ctx, name, result.Player)
 	if err != nil {
 		// The score is set; only the table is missing.
 		h.logger.Warn("could not read the game's scores", "user_id", result.Player.UserID, "error", err)
@@ -200,14 +206,19 @@ func (h *handler) finish(ctx context.Context, req request) (any, failure) {
 	return finished{Score: result.Score, Improved: improved, Table: table}, failure{}
 }
 
+// gameName is the short name of a run's game: Tarozi's runs name none.
+func gameName(name string) string {
+	if name == "" {
+		return ShortName
+	}
+	return name
+}
+
 // record keeps a scored play in the database; Telegram has the score
-// already, so a failure is only logged. Tarozi's runs name no game.
+// already, so a failure is only logged.
 func (h *handler) record(ctx context.Context, name string, result Result) {
 	if h.records == nil {
 		return
-	}
-	if name == "" {
-		name = ShortName
 	}
 	p := result.Player
 	score := storage.GameScore{Game: name, ChatID: p.ChatID, UserID: p.UserID, Name: p.Name, Score: result.Score, At: h.game.now()}
@@ -217,11 +228,11 @@ func (h *handler) record(ctx context.Context, name string, result Result) {
 }
 
 func (h *handler) table(ctx context.Context, req request) (any, failure) {
-	player, err := h.game.Player(req.Session)
+	player, name, err := h.game.Session(req.Session)
 	if err != nil {
 		return nil, errToken
 	}
-	table, err := h.rows(ctx, player)
+	table, err := h.rows(ctx, name, player)
 	if err != nil {
 		h.logger.Warn("could not read the game's scores", "user_id", player.UserID, "error", err)
 		return nil, errUnavailable
@@ -229,7 +240,20 @@ func (h *handler) table(ctx context.Context, req request) (any, failure) {
 	return map[string][]row{"table": table}, failure{}
 }
 
-func (h *handler) rows(ctx context.Context, player Player) ([]row, error) {
+// rows is the game's table for the player: from the records, or the game
+// message's from Telegram when there are none or they fail.
+func (h *handler) rows(ctx context.Context, name string, player Player) ([]row, error) {
+	if h.records != nil {
+		ranks, err := h.records.GameTable(ctx, name, player.UserID, tableSize)
+		if err == nil {
+			table := make([]row, 0, len(ranks))
+			for _, r := range ranks {
+				table = append(table, row{Position: r.Position, Name: r.Name, Score: r.Best, Me: r.UserID == player.UserID})
+			}
+			return table, nil
+		}
+		h.logger.Warn("could not read the game's table", "game", name, "error", err)
+	}
 	scores, err := h.scores.GetGameHighScores(ctx, message(player))
 	if err != nil {
 		return []row{}, err
