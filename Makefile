@@ -1,6 +1,6 @@
 BINARY := bin/telegram-ai-agent
 
-.PHONY: build run migrate test race vet fmt check docker clean
+.PHONY: build run migrate test race vet fmt check docker codemap clean
 
 ## build: compile the bot into bin/
 build:
@@ -37,6 +37,10 @@ check: vet race
 ## docker: build the container image
 docker:
 	docker build -t telegram-ai-agent .
+
+## codemap: build graphify-out/explorer.html, the code's map, from graphify's graph
+codemap:
+	python3 docs/codemap/build.py
 
 clean:
 	rm -rf bin

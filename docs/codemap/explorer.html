@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Maria kod xaritasi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f3efe6; --bg2:#e9e3d6; --panel:#fffcf5; --ink:#1c1a15; --muted:#6c665a; --line:#d9d1c1;
+  --accent:#c2410c; --edge:#8a8170; --halo:.18; --stars:0;
+  --entry:#b45309; --wiring:#6d28d9; --core:#c2410c; --tools:#0f766e;
+  --data:#1d4ed8; --telegram:#0369a1; --games:#be185d; --docs:#4d7c0f;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#060a14; --bg2:#0c1324; --panel:#0c1426; --ink:#e7ebf5; --muted:#8a94ab; --line:#1c2742;
+    --accent:#ff8a3d; --edge:#56658c; --halo:.45; --stars:1;
+    --entry:#fbbf24; --wiring:#a78bfa; --core:#ff7a45; --tools:#2dd4bf;
+    --data:#60a5fa; --telegram:#38bdf8; --games:#f472b6; --docs:#a3e635;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#060a14; --bg2:#0c1324; --panel:#0c1426; --ink:#e7ebf5; --muted:#8a94ab; --line:#1c2742;
+  --accent:#ff8a3d; --edge:#56658c; --halo:.45; --stars:1;
+  --entry:#fbbf24; --wiring:#a78bfa; --core:#ff7a45; --tools:#2dd4bf;
+  --data:#60a5fa; --telegram:#38bdf8; --games:#f472b6; --docs:#a3e635;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;display:grid;grid-template-rows:auto 1fr;background:var(--bg);color:var(--ink);
+  font:14px/1.45 'Space Grotesk',system-ui,sans-serif;overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px}
+header{display:flex;gap:10px 14px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);
+  background:var(--panel);flex-wrap:wrap;position:relative;z-index:5}
+.brand{display:flex;align-items:baseline;gap:8px;margin-right:4px}
+.brand b{font-size:17px;letter-spacing:-.01em}
+.brand span{color:var(--muted);font-size:12px}
+#crumbs{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:13px;min-width:0}
+#crumbs button{background:none;border:0;padding:2px 4px;border-radius:6px;color:var(--ink)}
+#crumbs button:hover{background:var(--bg2)}
+#crumbs i{font-style:normal;opacity:.5}
+.spacer{flex:1}
+.search{position:relative;width:min(320px,100%)}
+.search input{width:100%;padding:8px 12px 8px 32px;border-radius:10px;border:1px solid var(--line);
+  background:var(--bg);color:var(--ink);font:inherit;outline:none}
+.search input:focus{border-color:var(--accent)}
+.search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:.5}
+#results{position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--panel);border:1px solid var(--line);
+  border-radius:12px;box-shadow:0 18px 40px rgba(0,0,0,.25);max-height:360px;overflow:auto;display:none;z-index:20}
+#results button{display:block;width:100%;text-align:left;background:none;border:0;padding:8px 12px;border-bottom:1px solid var(--line)}
+#results button:last-child{border-bottom:0}
+#results button.on,#results button:hover{background:var(--bg2)}
+#results small{display:block;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--bg);
+  border-radius:999px;padding:6px 12px;font-size:13px;white-space:nowrap}
+.pill.on{border-color:var(--accent);color:var(--accent)}
+.pill:hover{border-color:var(--muted)}
+#pathPill{display:none}
+#pathPill.show{display:inline-flex}
+main{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 380px;min-height:0}
+#stage{position:relative;min-width:0;min-height:0;overflow:hidden;
+  background:radial-gradient(1200px 700px at 50% 45%,var(--bg2),var(--bg) 70%)}
+#stars{position:absolute;inset:0;opacity:var(--stars);pointer-events:none;transition:opacity .4s}
+svg#map{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+aside{border-left:1px solid var(--line);background:var(--panel);overflow:auto;padding:18px 18px 40px;min-height:0}
+@media (max-width:860px){
+  body{overflow:auto}
+  main{grid-template-columns:1fr;grid-template-rows:62vh auto}
+  aside{border-left:0;border-top:1px solid var(--line)}
+  .search{order:5;width:100%}
+}
+#legend{position:absolute;left:16px;bottom:16px;display:flex;flex-direction:column;gap:4px;
+  background:color-mix(in srgb,var(--panel) 85%,transparent);border:1px solid var(--line);border-radius:12px;padding:10px 12px;
+  backdrop-filter:blur(6px);font-size:12px;max-width:calc(100% - 32px)}
+#legend button{display:flex;align-items:center;gap:8px;background:none;border:0;padding:2px 4px;border-radius:6px;text-align:left}
+#legend button:hover{background:var(--bg2)}
+#legend button.off{opacity:.35}
+.dot{width:10px;height:10px;border-radius:50%;flex:none;box-shadow:0 0 10px currentColor}
+#note{position:absolute;right:16px;bottom:16px;font-size:12px;color:var(--muted);text-align:right;pointer-events:none;max-width:60%}
+#tip{position:fixed;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  padding:7px 10px;font-size:12px;box-shadow:0 10px 30px rgba(0,0,0,.3);display:none;z-index:30;max-width:320px}
+#tip small{color:var(--muted);display:block}
+/* svg */
+.link{fill:none;stroke-linecap:round;opacity:.28;transition:opacity .2s}
+.link.dim{opacity:.04}
+.link.hot{opacity:.95}
+.flow{stroke-dasharray:3 7;animation:flow 1.1s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-20}}
+.orb{cursor:pointer;transition:opacity .2s}
+.orb.dim{opacity:.18}
+.orb .halo{opacity:var(--halo)}
+.lbl{font-size:12px;fill:var(--ink);paint-order:stroke;stroke:var(--bg);stroke-width:4px;stroke-linejoin:round;pointer-events:none}
+.lbl.sm{font-size:10px;fill:var(--muted)}
+.layerLbl{font-size:11px;letter-spacing:.14em;text-transform:uppercase;fill:var(--muted);opacity:.55;pointer-events:none}
+.sym{cursor:pointer;stroke:var(--bg);stroke-width:1.2px;transition:opacity .2s}
+.sym.dim{opacity:.12}
+.sym.sel{stroke:var(--ink);stroke-width:2.5px}
+.fileLbl{font-size:11px;font-family:'JetBrains Mono',monospace;fill:var(--muted);paint-order:stroke;stroke:var(--bg);stroke-width:4px;pointer-events:none}
+.pulse{fill:none;stroke-width:2;animation:pulse 2.2s ease-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes pulse{from{transform:scale(1);opacity:.8}to{transform:scale(2.4);opacity:0}}
+.fade{animation:fade .45s ease both}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion: reduce){.flow,.pulse,.fade{animation:none}}
+/* panel */
+aside h2{margin:4px 0 2px;font-size:22px;letter-spacing:-.02em;line-height:1.15;word-break:break-word}
+aside h3{margin:22px 0 8px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+aside p{margin:8px 0;color:var(--ink)}
+.kind{display:inline-block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:999px;
+  border:1px solid currentColor;margin-bottom:6px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
+.stat{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px}
+.stat b{display:block;font-size:20px;letter-spacing:-.02em}
+.stat span{font-size:11px;color:var(--muted)}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.btn{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 12px;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.list{display:flex;flex-direction:column;gap:2px}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;background:none;border:0;
+  padding:6px 8px;border-radius:8px;text-align:left;width:100%}
+.row:hover{background:var(--bg2)}
+.row .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row small{color:var(--muted)}
+.row .sub{display:block;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar{height:4px;border-radius:2px;margin-top:4px;opacity:.8}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12px;background:var(--bg);display:inline-flex;gap:6px;align-items:center}
+button.chip:hover{border-color:var(--muted)}
+blockquote{margin:10px 0;padding:10px 12px;border-left:3px solid var(--accent);background:var(--bg);border-radius:0 10px 10px 0;color:var(--ink)}
+.muted{color:var(--muted)}
+.tour{border:1px solid var(--accent);border-radius:14px;padding:14px;background:color-mix(in srgb,var(--accent) 7%,var(--panel))}
+.tour .step{font-size:12px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase}
+details{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0;background:var(--bg)}
+details summary{cursor:pointer;font-weight:500}
+kbd{font-family:'JetBrains Mono',monospace;font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 5px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><b>Maria · kod xaritasi</b><span id="meta"></span></div>
+  <nav id="crumbs"></nav>
+  <div class="spacer"></div>
+  <span class="pill" id="pathPill"></span>
+  <button class="pill on" id="testsBtn" title="Test fayllaridagi belgilarni ko'rsatish yoki yashirish">Testlar yashirin</button>
+  <button class="pill" id="tourBtn">▶ Xabar sayohati</button>
+  <button class="pill" id="themeBtn" title="Mavzu">◐</button>
+  <div class="search">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="q" placeholder="Funksiya, tur yoki paket qidiring…  ( / )" autocomplete="off" spellcheck="false">
+    <div id="results"></div>
+  </div>
+</header>
+<main>
+  <div id="stage">
+    <div id="stars"></div>
+    <svg id="map"></svg>
+    <div id="legend"></div>
+    <div id="note"></div>
+  </div>
+  <aside id="panel"></aside>
+</main>
+<div id="tip"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script>
+const D = /*__DATA__*/null;
+const N = D.nodes, P = D.pkgs, F = D.files;
+const KIND = {f:'funksiya', m:'metod', t:'tur', d:"g'oya", x:'fayl'};
+const REL_OUT = ['chaqiradi', 'ishlatadi', 'metodi', 'ichida', 'amalga oshiradi', "g'oyaviy bog'liq"];
+const REL_IN = ['chaqiriladi', 'ishlatiladi', 'egasi', 'ichida', 'amalga oshiriladi', "g'oyaviy bog'liq"];
+const FILE_COLORS = ['#ff7a45','#2dd4bf','#60a5fa','#f472b6','#a3e635','#fbbf24','#a78bfa','#38bdf8','#fb7185','#34d399','#f59e0b','#c084fc','#94a3b8','#4ade80'];
+const ANCHOR = {entry:[.13,.52], wiring:[.3,.28], core:[.5,.5], telegram:[.72,.22], data:[.74,.78], tools:[.84,.5], games:[.4,.8], docs:[.3,.12]};
+const TOUR = [
+  ['api', "1. Telegram eshikni taqillatadi", "Har bir xabar Vercel'dagi <span class=mono>/api/webhook</span> ga POST bo'lib keladi. <span class=mono>api/</span> alohida modul, shuning uchun ichki paketlarni o'zi import qila olmaydi va ishni serverless'ga topshiradi."],
+  ['serverless', "2. Bot bir marta yig'iladi", "Lazy builder botni birinchi so'rovda yig'adi. Avval bazadagi migratsiya versiyasini tekshiradi: sxema eskirgan bo'lsa, webhook 503 qaytaradi. Shuning uchun yangi migratsiyali kod push qilinishidan oldin make migrate qilinadi."],
+  ['internal/app', "3. Qismlar ulanadi", "app store, agent, tool'lar, menyular va Mini App'larni bitta Service'ga yig'adi. Long polling (cmd/bot) ham, webhook ham shu yig'uvchini ishlatadi."],
+  ['internal/webhook', "4. Maxfiy kalit tekshiriladi", "Secret token mos kelmasa, update tashlab yuboriladi. Mos kelsa, Service'ga beriladi."],
+  ['internal/service', "5. Miya qaror qiladi", "Bot uchun eng katta paket. Avval guard'lar ishlaydi: so'kinish, spam, link, rasm, captcha. Keyin limitlar, buyruqlar va menyular. Menyu javoblarining aksariyati kodda yoziladi, ularga model umuman kerak emas."],
+  ['internal/agent', "6. Model bilan suhbat", "Oddiy savol agentga o'tadi. Agent tarixni yuklaydi, modeldan so'raydi, model so'ragan tool'larni bajaradi va natijani saqlaydi."],
+  ['internal/ai', "7. Gemini javob beradi", "OpenAI-mos Chat Completions mijozi so'rovni modelga yuboradi."],
+  ['internal/tools', "8. Tool'lar ishga tushadi", "Registry model so'ragan har bir chaqiruvni tekshiradi. Moderatsiya kabi xavfli amallarda huquqlar kodda tekshiriladi, modelga ishonilmaydi."],
+  ['internal/webapi', "9. Jonli ma'lumot", "Valyuta, ob-havo, namoz, futbol, kripto, MLBB. Har bir natija manbasini aytadi, begona matn \"untrusted\" deb belgilanadi."],
+  ['internal/storage', "10. Hammasi yoziladi", "Postgres: suhbatlar, guruhlar, kvotalar, o'yinlar va Elo reyting. Har bir so'rov foydalanuvchi ID'si bilan cheklangan."],
+  ['internal/telegram', "11. Javob qaytadi", "Bot API mijozi javobni, stikerni, rasmni yoki o'yin tugmasini chatga yuboradi."],
+];
+
+const out = N.map(() => []), inn = N.map(() => []);
+for (let k = 0; k < D.edges.length; k += 3) {
+  const s = D.edges[k], t = D.edges[k + 1], r = D.edges[k + 2];
+  out[s].push([t, r]); inn[t].push([s, r]);
+}
+const pkgByName = Object.fromEntries(P.map((p, i) => [p.id, i]));
+const state = {view: 'galaxy', pkg: null, sym: null, hideTests: true, layersOff: new Set(), pathA: null, pathB: null, tour: -1};
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const layerOf = i => P[N[i][1]].layer;
+const fileName = f => F[f].split('/').pop();
+const where = i => `${F[N[i][2]]}${N[i][3] ? ':' + N[i][3] : ''}`;
+const visible = i => N[i][6] !== 'x' && !(state.hideTests && N[i][4]);
+const pkgSize = p => state.hideTests ? p.n - p.tests : p.n;
+
+const stage = $('#stage');
+const svg = d3.select('#map');
+const root = svg.append('g');
+const zoom = d3.zoom().scaleExtent([0.15, 6]).on('zoom', e => root.attr('transform', e.transform));
+svg.call(zoom).on('dblclick.zoom', null);
+let sim = null, galaxyNodes = [];
+
+/* ---------- chrome ---------- */
+function stars() {
+  const r = stage.getBoundingClientRect(), dots = [];
+  for (let k = 0; k < 220; k++) {
+    const a = Math.random();
+    dots.push(`${(Math.random() * r.width) | 0}px ${(Math.random() * r.height) | 0}px 0 ${a > .97 ? 1 : 0}px rgba(220,230,255,${(.15 + a * .6).toFixed(2)})`);
+  }
+  $('#stars').style.boxShadow = dots.join(',');
+  $('#stars').style.width = $('#stars').style.height = '1px';
+}
+function legend() {
+  $('#legend').innerHTML = Object.entries(D.layers).map(([k, name]) =>
+    `<button data-l="${k}" class="${state.layersOff.has(k) ? 'off' : ''}"><span class="dot" style="background:var(--${k});color:var(--${k})"></span>${esc(name)}</button>`).join('');
+  $('#legend').querySelectorAll('button').forEach(b => b.onclick = () => {
+    const k = b.dataset.l;
+    state.layersOff.has(k) ? state.layersOff.delete(k) : state.layersOff.add(k);
+    legend(); if (state.view === 'galaxy') applyLayerFilter();
+  });
+  $('#legend').style.display = state.view === 'galaxy' ? 'flex' : 'none';
+}
+function crumbs() {
+  const c = [`<button data-go="g">✦ Galaktika</button>`];
+  if (state.pkg !== null && state.view !== 'galaxy') c.push(`<i>›</i><button data-go="p">${esc(P[state.pkg].name)}</button>`);
+  if (state.view === 'ego') c.push(`<i>›</i><span>${esc(N[state.sym][0])}</span>`);
+  if (state.view === 'path') c.push(`<i>›</i><span>Yo'l</span>`);
+  $('#crumbs').innerHTML = c.join('');
+  $('#crumbs').querySelector('[data-go=g]').onclick = () => { stopTour(); galaxy(); homePanel(); };
+  const p = $('#crumbs').querySelector('[data-go=p]');
+  if (p) p.onclick = () => { packageView(state.pkg); pkgPanel(state.pkg); };
+  legend();
+}
+function note(html) { $('#note').innerHTML = html || ''; }
+const tip = $('#tip');
+function showTip(e, html) { tip.innerHTML = html; tip.style.display = 'block'; moveTip(e); }
+function moveTip(e) {
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  tip.style.left = Math.min(e.clientX + 14, innerWidth - w - 8) + 'px';
+  tip.style.top = Math.min(e.clientY + 14, innerHeight - h - 8) + 'px';
+}
+function hideTip() { tip.style.display = 'none'; }
+function clear() {
+  if (sim) sim.stop();
+  sim = null; root.selectAll('*').remove(); hideTip(); note('');
+  svg.call(zoom.transform, d3.zoomIdentity);
+}
+function size() { const r = stage.getBoundingClientRect(); return [r.width, r.height]; }
+function defs() {
+  const d = root.append('defs');
+  Object.keys(D.layers).forEach(k => {
+    const g = d.append('radialGradient').attr('id', 'orb-' + k).attr('cx', '35%').attr('cy', '30%');
+    g.append('stop').attr('offset', '0%').attr('stop-color', '#fff').attr('stop-opacity', .85);
+    g.append('stop').attr('offset', '38%').style('stop-color', `var(--${k})`);
+    g.append('stop').attr('offset', '100%').style('stop-color', `var(--${k})`).attr('stop-opacity', .75);
+  });
+  d.append('filter').attr('id', 'blur').attr('x', '-50%').attr('y', '-50%').attr('width', '200%').attr('height', '200%')
+    .append('feGaussianBlur').attr('stdDeviation', 8);
+  d.append('marker').attr('id', 'arrow').attr('viewBox', '0 0 10 10').attr('refX', 9).attr('refY', 5)
+    .attr('markerWidth', 7).attr('markerHeight', 7).attr('orient', 'auto-start-reverse')
+    .append('path').attr('d', 'M0,0L10,5L0,10z').style('fill', 'var(--edge)');
+}
+const curve = (sx, sy, tx, ty, bend = .16) => {
+  const dx = tx - sx, dy = ty - sy;
+  return `M${sx},${sy}Q${(sx + tx) / 2 - dy * bend},${(sy + ty) / 2 + dx * bend} ${tx},${ty}`;
+};
+
+/* ---------- galaxy ---------- */
+let gLinks, gOrbs;
+function galaxy() {
+  state.view = 'galaxy'; state.pkg = null; crumbs(); clear(); defs();
+  const [W, H] = size();
+  const old = Object.fromEntries(galaxyNodes.map(n => [n.i, n]));
+  galaxyNodes = P.map((p, i) => ({
+    i, p, r: 7 + Math.sqrt(Math.max(pkgSize(p), 1)) * 1.15,
+    x: old[i] ? old[i].x : ANCHOR[p.layer][0] * W + (Math.random() - .5) * 60,
+    y: old[i] ? old[i].y : ANCHOR[p.layer][1] * H + (Math.random() - .5) * 60,
+  })).filter(n => pkgSize(n.p) > 0);
+  const present = new Set(galaxyNodes.map(n => n.i));
+  const byI = Object.fromEntries(galaxyNodes.map(n => [n.i, n]));
+  const links = D.links.map(([s, t, a, b]) => ({s, t, w: state.hideTests ? b : a}))
+    .filter(l => l.w > 0 && present.has(l.s) && present.has(l.t))
+    .map(l => ({...l, source: byI[l.s], target: byI[l.t]}));
+  const maxW = d3.max(links, l => l.w) || 1;
+
+  root.append('g').selectAll('text').data(Object.entries(D.layers)).join('text')
+    .attr('class', 'layerLbl').attr('text-anchor', 'middle')
+    .attr('x', d => ANCHOR[d[0]][0] * W).attr('y', d => ANCHOR[d[0]][1] * H - 70).text(d => d[1]);
+
+  gLinks = root.append('g').selectAll('path').data(links).join('path')
+    .attr('class', 'link').attr('stroke-width', l => .7 + 4 * Math.sqrt(l.w / maxW))
+    .style('stroke', l => `var(--${l.source.p.layer})`);
+
+  gOrbs = root.append('g').selectAll('g').data(galaxyNodes).join('g').attr('class', 'orb')
+    .on('mouseenter', (e, d) => { focusPkg(d.i); showTip(e, pkgTip(d.i)); })
+    .on('mousemove', moveTip)
+    .on('mouseleave', () => { hideTip(); focusPkg(state.tour >= 0 ? pkgByName[TOUR[state.tour][0]] : null); })
+    .on('click', (e, d) => { stopTour(); pkgPanel(d.i); })
+    .on('dblclick', (e, d) => { stopTour(); packageView(d.i); pkgPanel(d.i); })
+    .call(d3.drag()
+      .on('start', (e, d) => { if (!e.active) sim.alphaTarget(.2).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y; })
+      .on('end', (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = d.fy = null; }));
+  gOrbs.append('circle').attr('class', 'halo').attr('r', d => d.r * 1.6).style('fill', d => `var(--${d.p.layer})`).attr('filter', 'url(#blur)');
+  gOrbs.append('circle').attr('r', d => d.r).attr('fill', d => `url(#orb-${d.p.layer})`);
+  gOrbs.append('text').attr('class', 'lbl').attr('text-anchor', 'middle').attr('dy', d => d.r + 15).text(d => d.p.name);
+  gOrbs.append('text').attr('class', 'lbl sm').attr('text-anchor', 'middle').attr('dy', d => d.r + 28)
+    .text(d => d.r > 16 ? pkgSize(d.p).toLocaleString('uz') + ' belgi' : '');
+
+  sim = d3.forceSimulation(galaxyNodes)
+    .force('x', d3.forceX(d => ANCHOR[d.p.layer][0] * W).strength(.2))
+    .force('y', d3.forceY(d => ANCHOR[d.p.layer][1] * H).strength(.2))
+    .force('charge', d3.forceManyBody().strength(-180))
+    .force('collide', d3.forceCollide(d => d.r + 18))
+    .force('link', d3.forceLink(links).strength(l => .012 * Math.log1p(l.w)).distance(150))
+    .on('tick', () => {
+      for (const d of galaxyNodes) {
+        d.x = Math.max(d.r + 50, Math.min(W - d.r - 50, d.x));
+        d.y = Math.max(d.r + 24, Math.min(H - d.r - 40, d.y));
+      }
+      gLinks.attr('d', l => curve(l.source.x, l.source.y, l.target.x, l.target.y));
+      gOrbs.attr('transform', d => `translate(${d.x},${d.y})`);
+    });
+  if (old && Object.keys(old).length) sim.alpha(.3);
+  applyLayerFilter();
+  note(`Shar o'lchami: belgilar soni · chiziq: chaqiruv va ishlatishlar soni, oqim yo'nalishi chaqiruvchidan chaqiriluvchiga<br>Ikki marta bosing: paketning ichiga kirasiz · sudrab joyini o'zgartirish mumkin`);
+}
+function applyLayerFilter() {
+  if (!gOrbs) return;
+  const off = d => state.layersOff.has(d.p.layer);
+  gOrbs.style('display', d => off(d) ? 'none' : null);
+  gLinks.style('display', l => off(l.source) || off(l.target) ? 'none' : null);
+}
+function focusPkg(i) {
+  if (!gLinks || state.view !== 'galaxy') return;
+  if (i === null || i === undefined) {
+    gLinks.classed('dim', false).classed('hot', false).classed('flow', false);
+    gOrbs.classed('dim', false); return;
+  }
+  const near = new Set([i]);
+  gLinks.each(l => { if (l.s === i) near.add(l.t); if (l.t === i) near.add(l.s); });
+  gLinks.classed('hot', l => l.s === i || l.t === i).classed('flow', l => l.s === i || l.t === i)
+    .classed('dim', l => l.s !== i && l.t !== i);
+  gOrbs.classed('dim', d => !near.has(d.i));
+}
+function pkgTip(i) {
+  const p = P[i];
+  return `<b>${esc(p.name)}</b><small>${esc(D.layers[p.layer])} · ${pkgSize(p)} belgi · ${p.files} fayl</small>${p.desc ? esc(p.desc) : ''}`;
+}
+
+/* ---------- package ---------- */
+const LIMIT = 170;
+function packageView(pi) {
+  state.view = 'package'; state.pkg = pi; crumbs(); clear(); defs();
+  const [W, H] = size();
+  let mem = N.map((_, i) => i).filter(i => N[i][1] === pi && visible(i)).sort((a, b) => N[b][5] - N[a][5]);
+  const total = mem.length; mem = mem.slice(0, LIMIT);
+  const set = new Set(mem);
+  const fileCount = d3.rollup(mem, v => v.length, i => N[i][2]);
+  const filesSorted = [...fileCount.keys()].sort((a, b) => fileCount.get(b) - fileCount.get(a));
+  const color = d3.scaleOrdinal(filesSorted, FILE_COLORS);
+  const R = Math.min(W, H) * (filesSorted.length > 1 ? .32 : 0);
+  const anchor = Object.fromEntries(filesSorted.map((f, k) => {
+    const a = k / filesSorted.length * Math.PI * 2 - Math.PI / 2;
+    return [f, [W / 2 + Math.cos(a) * R * (k % 2 ? .78 : 1), H / 2 + Math.sin(a) * R * (k % 2 ? .78 : 1)]];
+  }));
+  const nodes = mem.map(i => ({i, f: N[i][2], r: 3 + Math.min(15, Math.sqrt(N[i][5]) * .9),
+    x: anchor[N[i][2]][0] + (Math.random() - .5) * 50, y: anchor[N[i][2]][1] + (Math.random() - .5) * 50}));
+  const byI = Object.fromEntries(nodes.map(n => [n.i, n]));
+  const links = [];
+  for (const s of mem) for (const [t, r] of out[s]) if (set.has(t) && r !== 3) links.push({source: byI[s], target: byI[t], r});
+  const labelled = new Set(mem.slice(0, 28));
+
+  const link = root.append('g').selectAll('path').data(links).join('path').attr('class', 'link')
+    .attr('stroke-width', 1).style('stroke', 'var(--edge)');
+  const fileLbl = root.append('g').selectAll('text').data(filesSorted.slice(0, 14)).join('text').attr('class', 'fileLbl')
+    .attr('text-anchor', 'middle').text(f => fileName(f));
+  const dot = root.append('g').selectAll('circle').data(nodes).join('circle').attr('class', 'sym fade')
+    .attr('r', d => d.r).style('fill', d => color(d.f))
+    .on('mouseenter', (e, d) => { hi(d.i); showTip(e, symTip(d.i)); })
+    .on('mousemove', moveTip)
+    .on('mouseleave', () => { hideTip(); hi(state.sym !== null && set.has(state.sym) ? state.sym : null); })
+    .on('click', (e, d) => { state.sym = d.i; hi(d.i); symPanel(d.i); })
+    .on('dblclick', (e, d) => ego(d.i));
+  const lbl = root.append('g').selectAll('text').data(nodes.filter(n => labelled.has(n.i))).join('text')
+    .attr('class', 'lbl').attr('font-size', 11).attr('text-anchor', 'middle').text(d => N[d.i][0]);
+
+  function hi(i) {
+    if (i === null) { dot.classed('dim', false).classed('sel', false); link.classed('dim', false).classed('hot', false).classed('flow', false); lbl.style('opacity', null); return; }
+    const near = new Set([i]);
+    links.forEach(l => { if (l.source.i === i) near.add(l.target.i); if (l.target.i === i) near.add(l.source.i); });
+    dot.classed('dim', d => !near.has(d.i)).classed('sel', d => d.i === i);
+    link.classed('hot', l => l.source.i === i || l.target.i === i).classed('flow', l => l.source.i === i || l.target.i === i)
+      .classed('dim', l => l.source.i !== i && l.target.i !== i);
+    lbl.style('opacity', d => near.has(d.i) ? 1 : .15);
+  }
+  packageView.highlightFile = f => {
+    dot.classed('dim', d => f !== null && d.f !== f).classed('sel', false);
+    link.classed('dim', l => f !== null && (l.source.f !== f || l.target.f !== f));
+  };
+  packageView.color = color;
+  packageView.files = filesSorted;
+
+  sim = d3.forceSimulation(nodes)
+    .force('x', d3.forceX(d => anchor[d.f][0]).strength(.09))
+    .force('y', d3.forceY(d => anchor[d.f][1]).strength(.09))
+    .force('charge', d3.forceManyBody().strength(-34))
+    .force('collide', d3.forceCollide(d => d.r + 2))
+    .force('link', d3.forceLink(links).distance(34).strength(.18))
+    .on('tick', () => {
+      link.attr('d', l => curve(l.source.x, l.source.y, l.target.x, l.target.y, .1));
+      for (const d of nodes) { d.x = Math.max(d.r + 30, Math.min(W - d.r - 30, d.x)); d.y = Math.max(d.r + 24, Math.min(H - d.r - 30, d.y)); }
+      dot.attr('cx', d => d.x).attr('cy', d => d.y);
+      lbl.attr('x', d => d.x).attr('y', d => d.y - d.r - 4);
+      fileLbl.each(function (f) {
+        const ns = nodes.filter(n => n.f === f);
+        d3.select(this).attr('x', d3.mean(ns, n => n.x)).attr('y', d3.max(ns, n => n.y) + 18);
+      });
+    });
+  note(`${P[pi].id} · eng bog'langan ${mem.length} / ${total} belgi · rang = fayl<br>Bosing: tafsilot · ikki marta bosing: belgini markazga qo'yish`);
+}
+
+/* ---------- ego ---------- */
+function ego(i) {
+  state.view = 'ego'; state.sym = i; state.pkg = N[i][1]; crumbs(); clear(); defs();
+  const [W, H] = size();
+  const pick = (list, idx) => {
+    const seen = new Map();
+    for (const e of list) { const j = e[0]; if (j === i || e[1] === 3 || !(visible(j) || !visible(i))) continue; if (!seen.has(j)) seen.set(j, e[1]); }
+    return [...seen.entries()].sort((a, b) => N[b[0]][5] - N[a[0]][5]);
+  };
+  const callers = pick(inn[i]), callees = pick(out[i]);
+  const cap = Math.max(6, Math.floor((H - 80) / 30));
+  const L = callers.slice(0, cap), Rr = callees.slice(0, cap);
+  const cx = W / 2, cy = H / 2, lx = Math.max(150, W * .2), rx = Math.min(W - 150, W * .8);
+  const col = (arr, x) => arr.map(([j, r], k) => ({j, r, x, y: cy + (k - (arr.length - 1) / 2) * Math.min(34, (H - 90) / Math.max(arr.length, 1))}));
+  const left = col(L, lx), right = col(Rr, rx);
+  const g = root.append('g').attr('class', 'fade');
+  const bez = (x1, y1, x2, y2) => `M${x1},${y1}C${(x1 + x2) / 2},${y1} ${(x1 + x2) / 2},${y2} ${x2},${y2}`;
+  g.append('g').selectAll('path').data(left).join('path').attr('class', 'link hot flow').attr('stroke-width', 1.6)
+    .style('stroke', d => `var(--${layerOf(d.j)})`).attr('d', d => bez(d.x + 8, d.y, cx - 26, cy));
+  g.append('g').selectAll('path').data(right).join('path').attr('class', 'link hot flow').attr('stroke-width', 1.6)
+    .style('stroke', d => `var(--${layerOf(i)})`).attr('d', d => bez(cx + 26, cy, d.x - 8, d.y));
+  const side = (data, anchor, dx) => {
+    const s = g.append('g').selectAll('g').data(data).join('g').attr('class', 'orb').attr('transform', d => `translate(${d.x},${d.y})`)
+      .on('mouseenter', (e, d) => showTip(e, symTip(d.j) + `<small>${dx < 0 ? REL_IN[d.r] : REL_OUT[d.r]}</small>`))
+      .on('mousemove', moveTip).on('mouseleave', hideTip)
+      .on('click', (e, d) => { ego(d.j); symPanel(d.j); });
+    s.append('circle').attr('r', 7).attr('fill', d => `url(#orb-${layerOf(d.j)})`);
+    s.append('text').attr('class', 'lbl').attr('x', dx).attr('dy', 4).attr('text-anchor', anchor).text(d => N[d.j][0]);
+    s.append('text').attr('class', 'lbl sm').attr('x', dx).attr('dy', 16).attr('text-anchor', anchor).text(d => P[N[d.j][1]].name + ' · ' + fileName(N[d.j][2]));
+  };
+  side(left, 'end', -14); side(right, 'start', 14);
+  const c = g.append('g').attr('transform', `translate(${cx},${cy})`);
+  c.append('circle').attr('class', 'halo').attr('r', 40).style('fill', `var(--${layerOf(i)})`).attr('filter', 'url(#blur)').style('opacity', 'var(--halo)');
+  c.append('circle').attr('class', 'pulse').attr('r', 22).style('stroke', `var(--${layerOf(i)})`);
+  c.append('circle').attr('r', 22).attr('fill', `url(#orb-${layerOf(i)})`);
+  c.append('text').attr('class', 'lbl').attr('font-size', 16).attr('font-weight', 600).attr('text-anchor', 'middle').attr('dy', 46).text(N[i][0]);
+  c.append('text').attr('class', 'lbl sm').attr('text-anchor', 'middle').attr('dy', 62).text(where(i));
+  const hd = (x, t) => g.append('text').attr('class', 'layerLbl').attr('x', x).attr('y', 34).attr('text-anchor', 'middle').text(t);
+  hd(lx, `← kim chaqiradi / ishlatadi (${callers.length})`); hd(rx, `nimani chaqiradi / ishlatadi (${callees.length}) →`);
+  if (!callers.length) g.append('text').attr('class', 'lbl sm').attr('x', lx).attr('y', cy).attr('text-anchor', 'middle').text('hech kim chaqirmaydi');
+  if (!callees.length) g.append('text').attr('class', 'lbl sm').attr('x', rx).attr('y', cy).attr('text-anchor', 'middle').text("tashqariga bog'lanish yo'q");
+  const more = [callers.length - L.length, callees.length - Rr.length];
+  note(`Oqim chapdan o'ngga: chaqiruvchi → ${esc(N[i][0])} → chaqiriluvchi${more[0] > 0 || more[1] > 0 ? `<br>Ko'rsatilmagan: chapda ${Math.max(0, more[0])}, o'ngda ${Math.max(0, more[1])} (to'liq ro'yxat o'ng panelda)` : ''}<br>Istalgan belgini bosing: markaz unga ko'chadi`);
+}
+
+/* ---------- path ---------- */
+function findPath(a, b) {
+  const prev = new Map([[a, null]]), q = [a];
+  const ok = j => j === b || (N[j][6] !== 'x' && !(state.hideTests && N[j][4]));
+  while (q.length) {
+    const n = q.shift();
+    if (n === b) break;
+    for (const [t, r] of out[n]) if (r !== 3 && !prev.has(t) && ok(t)) { prev.set(t, [n, r, true]); q.push(t); }
+    for (const [s, r] of inn[n]) if (r !== 3 && !prev.has(s) && ok(s)) { prev.set(s, [n, r, false]); q.push(s); }
+  }
+  if (!prev.has(b)) return null;
+  const path = [];
+  for (let n = b; n !== null; n = prev.get(n) ? prev.get(n)[0] : null) path.unshift([n, prev.get(n)]);
+  return path;
+}
+function pathView() {
+  const path = findPath(state.pathA, state.pathB);
+  state.view = 'path'; crumbs(); clear(); defs();
+  const [W, H] = size();
+  if (!path) {
+    root.append('text').attr('class', 'lbl').attr('x', W / 2).attr('y', H / 2).attr('text-anchor', 'middle')
+      .text(state.hideTests ? "Yo'l topilmadi. Testlarni ko'rsatib yana urinib ko'ring." : "Bu ikki belgi orasida yo'l yo'q.");
+    pathPanel(null); return;
+  }
+  const per = Math.max(2, Math.min(path.length, Math.floor((W - 120) / 190)));
+  const rows = Math.ceil(path.length / per), gapX = (W - 160) / Math.max(per - 1, 1), gapY = Math.min(150, (H - 120) / Math.max(rows, 1));
+  const pts = path.map(([n], k) => {
+    const row = Math.floor(k / per), c = k % per, colI = row % 2 ? per - 1 - c : c;
+    return {n, x: 80 + (per === 1 ? (W - 160) / 2 : colI * gapX), y: H / 2 - (rows - 1) * gapY / 2 + row * gapY};
+  });
+  const g = root.append('g').attr('class', 'fade');
+  for (let k = 1; k < pts.length; k++) {
+    const [, info] = path[k], a = pts[k - 1], b = pts[k], fwd = info[2];
+    const [s, t] = fwd ? [a, b] : [b, a];
+    const dx = t.x - s.x, dy = t.y - s.y, len = Math.hypot(dx, dy) || 1, pad = 16;
+    g.append('path').attr('class', 'link hot flow').attr('stroke-width', 2).style('stroke', `var(--${layerOf(s.n)})`)
+      .attr('marker-end', 'url(#arrow)')
+      .attr('d', `M${s.x + dx / len * pad},${s.y + dy / len * pad}L${t.x - dx / len * pad},${t.y - dy / len * pad}`);
+    g.append('text').attr('class', 'lbl sm').attr('text-anchor', 'middle').attr('x', (a.x + b.x) / 2).attr('y', (a.y + b.y) / 2 - 8)
+      .text(REL_OUT[info[1]]);
+  }
+  const s = g.append('g').selectAll('g').data(pts).join('g').attr('class', 'orb').attr('transform', d => `translate(${d.x},${d.y})`)
+    .on('mouseenter', (e, d) => showTip(e, symTip(d.n))).on('mousemove', moveTip).on('mouseleave', hideTip)
+    .on('click', (e, d) => { ego(d.n); symPanel(d.n); });
+  s.append('circle').attr('r', (d, k) => k === 0 || k === pts.length - 1 ? 13 : 9).attr('fill', d => `url(#orb-${layerOf(d.n)})`);
+  s.append('text').attr('class', 'lbl').attr('text-anchor', 'middle').attr('dy', 30).text(d => N[d.n][0]);
+  s.append('text').attr('class', 'lbl sm').attr('text-anchor', 'middle').attr('dy', 43).text(d => P[N[d.n][1]].name);
+  note(`${path.length - 1} qadam · strelka chaqiruv yo'nalishini ko'rsatadi`);
+  pathPanel(path);
+}
+function setPath(which, i) {
+  state[which] = i; pathPill();
+  if (state.pathA !== null && state.pathB !== null) pathView(); else symPanel(i);
+}
+function pathPill() {
+  const pill = $('#pathPill');
+  if (state.pathA === null && state.pathB === null) { pill.classList.remove('show'); return; }
+  pill.classList.add('show');
+  pill.innerHTML = `Yo'l: <b>${state.pathA !== null ? esc(N[state.pathA][0]) : '?'}</b> → <b>${state.pathB !== null ? esc(N[state.pathB][0]) : '?'}</b> <button class="chip" id="pathClear">✕</button>`;
+  $('#pathClear').onclick = () => { state.pathA = state.pathB = null; pathPill(); };
+}
+
+/* ---------- panels ---------- */
+const panel = $('#panel');
+function symTip(i) {
+  const n = N[i];
+  return `<b>${esc(n[0])}</b><small>${KIND[n[6]]} · ${esc(where(i))}</small><small>${inn[i].length} kiruvchi · ${out[i].length} chiquvchi bog'lanish</small>`;
+}
+function row(label, sub, val, max, color, attrs) {
+  return `<button class="row" ${attrs}><span><span class="t">${esc(label)}</span>${sub ? `<small class="sub">${esc(sub)}</small>` : ''}
+    ${max ? `<div class="bar" style="width:${Math.max(4, val / max * 100)}%;background:${color}"></div>` : ''}</span><small>${val}</small></button>`;
+}
+function bindRows(scope) {
+  scope.querySelectorAll('[data-sym]').forEach(b => b.onclick = () => { const i = +b.dataset.sym; ego(i); symPanel(i); });
+  scope.querySelectorAll('[data-pkg]').forEach(b => b.onclick = () => {
+    const i = +b.dataset.pkg;
+    if (state.view === 'galaxy') { pkgPanel(i); focusPkg(i); } else { packageView(i); pkgPanel(i); }
+  });
+  scope.querySelectorAll('[data-enter]').forEach(b => b.onclick = () => { packageView(+b.dataset.enter); pkgPanel(+b.dataset.enter); });
+}
+function topSymbols(filter, k) {
+  return N.map((_, i) => i).filter(i => visible(i) && N[i][6] !== 'd' && filter(i)).sort((a, b) => N[b][5] - N[a][5]).slice(0, k);
+}
+function homePanel() {
+  const totalVis = N.filter((_, i) => visible(i)).length;
+  const gods = topSymbols(() => true, 12), maxG = N[gods[0]][5];
+  const layers = Object.entries(D.layers).map(([k, name]) => {
+    const ps = P.filter(p => p.layer === k), n = d3.sum(ps, pkgSize);
+    return {k, name, n, ps};
+  }).sort((a, b) => b.n - a.n);
+  const maxL = layers[0].n;
+  panel.innerHTML = `
+    <span class="kind" style="color:var(--accent)">bilim grafi</span>
+    <h2>Maria qanday tuzilgan</h2>
+    <p class="muted">telegram-ai-bot reposidagi har bir funksiya, tur, fayl va hujjatdagi g'oya, hamda ularning bir-birini qanday chaqirishi. graphify yasagan, commit <span class="mono">${esc(D.commit)}</span>.</p>
+    <div class="stats">
+      <div class="stat"><b>${totalVis.toLocaleString('uz')}</b><span>belgi${state.hideTests ? ' (testsiz)' : ''}</span></div>
+      <div class="stat"><b>${(D.edges.length / 3).toLocaleString('uz')}</b><span>bog'lanish</span></div>
+      <div class="stat"><b>${P.length}</b><span>paket</span></div>
+    </div>
+    <div class="btns"><button class="btn primary" id="startTour">▶ Xabar sayohati</button><button class="btn" id="egoMain">Webhook'dan boshlash</button></div>
+    <h3>Qatlamlar</h3>
+    <div class="list">${layers.map(l => row(l.name, l.ps.map(p => p.name).join(', '), l.n, maxL, `var(--${l.k})`, `data-layer="${l.k}"`)).join('')}</div>
+    <h3>Markaziy tugunlar</h3>
+    <p class="muted" style="margin-top:0">Eng ko'p bog'langan belgilar${state.hideTests ? ', testlarsiz' : ''}.</p>
+    <div class="list">${gods.map(i => row(N[i][0], P[N[i][1]].name + ' · ' + fileName(N[i][2]), N[i][5], maxG, `var(--${layerOf(i)})`, `data-sym="${i}"`)).join('')}</div>
+    <h3>Katta g'oyalar</h3>
+    <p class="muted" style="margin-top:0">README va dizayn hujjatlarida birga tilga olingan tushunchalar guruhlari.</p>
+    ${D.hyper.map(h => `<details><summary>${esc(h.label)}</summary><div class="list" style="margin-top:6px">${h.nodes.map(i => row(N[i][0], N[i][7] ? N[i][7].slice(0, 90) + '…' : F[N[i][2]], '', 0, '', `data-sym="${i}"`)).join('')}</div></details>`).join('')}
+    <h3>Boshqaruv</h3>
+    <p class="muted"><kbd>/</kbd> qidiruv · g'ildirak bilan kattalashtirish · sudrab surish · shar ustiga olib boring: bog'lanishlar oqadi</p>`;
+  $('#startTour').onclick = startTour;
+  const wh = N.findIndex(n => n[0] === 'Webhook()' && F[n[2]] === 'serverless/serverless.go');
+  $('#egoMain').onclick = () => { const i = wh >= 0 ? wh : topSymbols(() => true, 1)[0]; ego(i); symPanel(i); };
+  panel.querySelectorAll('[data-layer]').forEach(b => b.onclick = () => {
+    const k = b.dataset.layer;
+    state.layersOff = new Set(Object.keys(D.layers).filter(x => x !== k));
+    if (state.view !== 'galaxy') galaxy(); else { legend(); applyLayerFilter(); }
+  });
+  bindRows(panel);
+  panel.scrollTop = 0;
+}
+function pkgPanel(pi) {
+  const p = P[pi];
+  const agg = (fromOut) => {
+    const m = new Map();
+    D.links.forEach(([s, t, a, b]) => {
+      const w = state.hideTests ? b : a;
+      if (!w) return;
+      if (fromOut && s === pi) m.set(t, w);
+      if (!fromOut && t === pi) m.set(s, w);
+    });
+    return [...m.entries()].sort((x, y) => y[1] - x[1]).slice(0, 8);
+  };
+  const uses = agg(true), usedBy = agg(false);
+  const maxU = Math.max(1, ...uses.map(x => x[1]), ...usedBy.map(x => x[1]));
+  const syms = topSymbols(i => N[i][1] === pi, 10), maxS = syms.length ? N[syms[0]][5] : 1;
+  const docs = N.map((_, i) => i).filter(i => N[i][1] === pi && N[i][6] === 'd').sort((a, b) => N[b][5] - N[a][5]).slice(0, 12);
+  const fc = d3.rollups(N.map((_, i) => i).filter(i => N[i][1] === pi && visible(i)), v => v.length, i => N[i][2]).sort((a, b) => b[1] - a[1]);
+  const inPkg = state.view === 'package' && state.pkg === pi;
+  panel.innerHTML = `
+    <span class="kind" style="color:var(--${p.layer})">${esc(D.layers[p.layer])}</span>
+    <h2>${esc(p.name)}</h2>
+    <div class="mono muted">${esc(p.id)}</div>
+    ${p.desc ? `<p>${esc(p.desc)}</p>` : ''}
+    <div class="stats">
+      <div class="stat"><b>${pkgSize(p)}</b><span>belgi</span></div>
+      <div class="stat"><b>${p.files}</b><span>fayl</span></div>
+      <div class="stat"><b>${p.n ? Math.round(p.tests / p.n * 100) : 0}%</b><span>testlarda</span></div>
+    </div>
+    ${inPkg ? '' : `<div class="btns"><button class="btn primary" data-enter="${pi}">Ichiga kirish →</button></div>`}
+    ${uses.length ? `<h3>Kimga tayanadi</h3><div class="list">${uses.map(([j, w]) => row(P[j].name, D.layers[P[j].layer], w, maxU, `var(--${P[j].layer})`, `data-pkg="${j}"`)).join('')}</div>` : ''}
+    ${usedBy.length ? `<h3>Unga kim tayanadi</h3><div class="list">${usedBy.map(([j, w]) => row(P[j].name, D.layers[P[j].layer], w, maxU, `var(--${P[j].layer})`, `data-pkg="${j}"`)).join('')}</div>` : ''}
+    ${syms.length ? `<h3>Eng bog'langan belgilar</h3><div class="list">${syms.map(i => row(N[i][0], fileName(N[i][2]) + (N[i][3] ? ':' + N[i][3] : ''), N[i][5], maxS, `var(--${p.layer})`, `data-sym="${i}"`)).join('')}</div>` : ''}
+    ${docs.length ? `<h3>G'oyalar</h3><div class="list">${docs.map(i => row(N[i][0], N[i][7] ? N[i][7].slice(0, 110) + '…' : '', N[i][5], 0, '', `data-sym="${i}"`)).join('')}</div>` : ''}
+    <h3>Fayllar</h3>
+    <div class="chips">${fc.slice(0, 40).map(([f, n]) => {
+      const c = inPkg && packageView.files.includes(f) ? packageView.color(f) : 'var(--muted)';
+      return `<button class="chip" data-file="${f}"><span class="dot" style="background:${c};color:${c};box-shadow:none;width:8px;height:8px"></span>${esc(fileName(f))} <span class="muted">${n}</span></button>`;
+    }).join('')}</div>
+    ${inPkg ? `<p class="muted">Fayl ustiga olib boring: grafda faqat uning belgilari yonadi.</p>` : ''}`;
+  bindRows(panel);
+  panel.querySelectorAll('[data-file]').forEach(b => {
+    const f = +b.dataset.file;
+    b.onmouseenter = () => inPkg && packageView.highlightFile(f);
+    b.onmouseleave = () => inPkg && packageView.highlightFile(null);
+    b.onclick = () => {
+      if (!inPkg) { packageView(pi); pkgPanel(pi); return; }
+      const best = topSymbols(i => N[i][2] === f, 1)[0];
+      if (best !== undefined) symPanel(best);
+    };
+  });
+  panel.scrollTop = 0;
+}
+function symPanel(i) {
+  const n = N[i];
+  const group = (list, names) => {
+    const m = new Map();
+    for (const [j, r] of list) { if (r === 3 || j === i) continue; if (!m.has(r)) m.set(r, new Set()); m.get(r).add(j); }
+    return [...m.entries()].map(([r, s]) => [names[r], [...s].sort((a, b) => N[b][5] - N[a][5])]);
+  };
+  const block = (title, groups) => groups.length ? `<h3>${title}</h3>` + groups.map(([name, js]) =>
+    `<p class="muted" style="margin:10px 0 2px">${esc(name)} · ${js.length}</p><div class="list">${js.slice(0, 25).map(j =>
+      row(N[j][0], P[N[j][1]].name + ' · ' + fileName(N[j][2]) + (N[j][4] ? ' · test' : ''), N[j][5], 0, '', `data-sym="${j}"`)).join('')}
+      ${js.length > 25 ? `<p class="muted">… yana ${js.length - 25} ta</p>` : ''}</div>`).join('') : '';
+  const file = inn[i].find(([j, r]) => r === 3 && N[j][6] === 'x');
+  panel.innerHTML = `
+    <span class="kind" style="color:var(--${layerOf(i)})">${KIND[n[6]]}${n[4] ? ' · test' : ''}</span>
+    <h2>${esc(n[0])}</h2>
+    <div class="mono muted">${esc(where(i))}</div>
+    ${n[7] ? `<blockquote>${esc(n[7])}</blockquote>` : ''}
+    <div class="stats">
+      <div class="stat"><b>${inn[i].filter(e => e[1] !== 3).length}</b><span>kiruvchi</span></div>
+      <div class="stat"><b>${out[i].filter(e => e[1] !== 3).length}</b><span>chiquvchi</span></div>
+      <div class="stat"><b>${n[5]}</b><span>jami</span></div>
+    </div>
+    <div class="btns">
+      ${state.view === 'ego' && state.sym === i ? '' : `<button class="btn primary" id="toEgo">Markazga qo'yish</button>`}
+      <button class="btn" data-pkg="${n[1]}">◉ ${esc(P[n[1]].name)}</button>
+      <button class="btn" id="pa">Yo'l: shu yerdan</button>
+      <button class="btn" id="pb">Yo'l: shu yergacha</button>
+    </div>
+    ${block("Nimani chaqiradi / ishlatadi", group(out[i], REL_OUT))}
+    ${block("Kim chaqiradi / ishlatadi", group(inn[i], REL_IN))}
+    ${file ? '' : ''}`;
+  const toEgo = $('#toEgo'); if (toEgo) toEgo.onclick = () => { ego(i); symPanel(i); };
+  $('#pa').onclick = () => setPath('pathA', i);
+  $('#pb').onclick = () => setPath('pathB', i);
+  bindRows(panel);
+  panel.scrollTop = 0;
+}
+function pathPanel(path) {
+  panel.innerHTML = `<span class="kind" style="color:var(--accent)">eng qisqa yo'l</span>
+    <h2>${esc(N[state.pathA][0])} → ${esc(N[state.pathB][0])}</h2>
+    ${path ? `<p class="muted">${path.length - 1} qadam. Bog'lanish yo'nalishiga qaramay qidiriladi, strelka esa haqiqiy chaqiruv tomonini ko'rsatadi.</p>
+      <div class="list">${path.map(([j, info], k) => row(`${k + 1}. ${N[j][0]}`, (info ? (info[2] ? '← ' : '→ ') + (info[2] ? REL_OUT[info[1]] : REL_IN[info[1]]) + ' · ' : '') + P[N[j][1]].name, '', 0, '', `data-sym="${j}"`)).join('')}</div>`
+      : `<p>Yo'l topilmadi.</p>`}
+    <div class="btns"><button class="btn" id="swap">⇄ Teskari</button><button class="btn" id="tests2">${state.hideTests ? "Testlar bilan qidirish" : 'Testlarsiz qidirish'}</button></div>`;
+  $('#swap').onclick = () => { [state.pathA, state.pathB] = [state.pathB, state.pathA]; pathPill(); pathView(); };
+  $('#tests2').onclick = () => { toggleTests(); };
+  bindRows(panel);
+}
+
+/* ---------- tour ---------- */
+function startTour() { if (state.view !== 'galaxy') galaxy(); state.layersOff.clear(); legend(); applyLayerFilter(); setTimeout(() => tourStep(0), state.view === 'galaxy' && sim && sim.alpha() < .2 ? 0 : 700); }
+function stopTour() { if (state.tour >= 0) { state.tour = -1; $('#tourBtn').classList.remove('on'); } }
+function tourStep(k) {
+  state.tour = k; $('#tourBtn').classList.add('on');
+  const [id, title, text] = TOUR[k], pi = pkgByName[id];
+  const nd = galaxyNodes.find(n => n.i === pi);
+  focusPkg(pi);
+  if (nd) {
+    const [W, H] = size(), s = 1.5;
+    svg.transition().duration(900).call(zoom.transform, d3.zoomIdentity.translate(W / 2 - nd.x * s, H / 2 - nd.y * s).scale(s));
+  }
+  const p = P[pi];
+  panel.innerHTML = `<div class="tour fade">
+      <div class="step">Xabar sayohati · ${k + 1} / ${TOUR.length}</div>
+      <h2 style="margin-top:6px">${title.replace(/^\d+\.\s*/, '')}</h2>
+      <div class="mono muted">${esc(p.id)}</div>
+      <p>${text}</p>
+      <div class="btns">
+        <button class="btn" id="tPrev" ${k === 0 ? 'disabled' : ''}>← Oldingi</button>
+        <button class="btn primary" id="tNext">${k === TOUR.length - 1 ? 'Tugatish ✓' : 'Keyingi →'}</button>
+        <button class="btn" data-enter="${pi}">Ichiga kirish</button>
+      </div>
+    </div>
+    <h3>Bu bosqichning eng bog'langan belgilari</h3>
+    <div class="list">${topSymbols(i => N[i][1] === pi, 6).map(i => row(N[i][0], fileName(N[i][2]), N[i][5], 0, '', `data-sym="${i}"`)).join('')}</div>`;
+  $('#tPrev').onclick = () => k > 0 && tourStep(k - 1);
+  $('#tNext').onclick = () => {
+    if (k < TOUR.length - 1) tourStep(k + 1);
+    else { stopTour(); focusPkg(null); svg.transition().duration(900).call(zoom.transform, d3.zoomIdentity); homePanel(); }
+  };
+  panel.querySelectorAll('[data-sym],[data-enter]').forEach(b => b.addEventListener('click', stopTour));
+  bindRows(panel);
+}
+
+/* ---------- search ---------- */
+const q = $('#q'), res = $('#results');
+let hits = [], cur = 0;
+q.oninput = () => {
+  const s = q.value.trim().toLowerCase().replace(/^\./, '');
+  if (s.length < 2) { res.style.display = 'none'; return; }
+  const pk = P.map((p, i) => ({p: i, score: p.id.toLowerCase().includes(s) ? (p.name.toLowerCase().startsWith(s) ? 3 : 1) : 0})).filter(x => x.score);
+  const sy = [];
+  for (let i = 0; i < N.length; i++) {
+    const l = N[i][0].toLowerCase().replace(/^\./, '').replace(/\(\)$/, '');
+    if (N[i][6] === 'x' || (state.hideTests && N[i][4])) continue;
+    const k = l === s ? 3 : l.startsWith(s) ? 2 : l.includes(s) ? 1 : 0;
+    if (k) sy.push({i, score: k * 1000 + Math.min(N[i][5], 999)});
+  }
+  sy.sort((a, b) => b.score - a.score);
+  hits = [...pk.sort((a, b) => b.score - a.score).slice(0, 3), ...sy.slice(0, 12)]; cur = 0;
+  res.innerHTML = hits.length ? hits.map((h, k) => h.p !== undefined
+    ? `<button data-k="${k}">◉ ${esc(P[h.p].name)}<small>paket · ${esc(P[h.p].id)}</small></button>`
+    : `<button data-k="${k}">${esc(N[h.i][0])}<small>${KIND[N[h.i][6]]} · ${esc(where(h.i))}</small></button>`).join('')
+    : `<button disabled>Hech narsa topilmadi</button>`;
+  res.style.display = 'block'; mark();
+  res.querySelectorAll('[data-k]').forEach(b => b.onmousedown = e => { e.preventDefault(); choose(+b.dataset.k); });
+};
+function mark() { res.querySelectorAll('[data-k]').forEach((b, k) => b.classList.toggle('on', k === cur)); }
+function choose(k) {
+  const h = hits[k]; if (!h) return;
+  res.style.display = 'none'; q.blur(); stopTour();
+  if (h.p !== undefined) { packageView(h.p); pkgPanel(h.p); } else { ego(h.i); symPanel(h.i); }
+}
+q.onkeydown = e => {
+  if (e.key === 'ArrowDown') { cur = Math.min(cur + 1, hits.length - 1); mark(); e.preventDefault(); }
+  else if (e.key === 'ArrowUp') { cur = Math.max(cur - 1, 0); mark(); e.preventDefault(); }
+  else if (e.key === 'Enter') choose(cur);
+  else if (e.key === 'Escape') { res.style.display = 'none'; q.blur(); }
+};
+q.onblur = () => setTimeout(() => res.style.display = 'none', 150);
+document.addEventListener('keydown', e => { if (e.key === '/' && document.activeElement !== q) { e.preventDefault(); q.focus(); q.select(); } });
+
+/* ---------- toggles ---------- */
+function rerender() {
+  if (state.view === 'galaxy') { galaxy(); if (state.tour < 0) homePanel(); }
+  else if (state.view === 'package') { packageView(state.pkg); pkgPanel(state.pkg); }
+  else if (state.view === 'ego') { ego(state.sym); symPanel(state.sym); }
+  else if (state.view === 'path') pathView();
+}
+function toggleTests() {
+  state.hideTests = !state.hideTests;
+  const b = $('#testsBtn'); b.classList.toggle('on', state.hideTests); b.textContent = state.hideTests ? 'Testlar yashirin' : "Testlar ko'rinadi";
+  rerender();
+}
+$('#testsBtn').onclick = toggleTests;
+$('#tourBtn').onclick = () => state.tour >= 0 ? (stopTour(), focusPkg(null), homePanel()) : startTour();
+$('#themeBtn').onclick = () => {
+  const r = document.documentElement, dark = getComputedStyle(r).getPropertyValue('--stars').trim() === '1';
+  r.dataset.theme = dark ? 'light' : 'dark';
+};
+let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { stars(); rerender(); }, 200); });
+
+$('#meta').textContent = `${N.length.toLocaleString('uz')} tugun · commit ${D.commit}`;
+stars(); galaxy(); homePanel();
+</script>
+</body>
+</html>

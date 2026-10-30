@@ -71,6 +71,7 @@ internal/storage                pgx pool, migrations, conversation queries
 internal/storage/migrations     SQL migrations, embedded in the binary
 internal/agent                  one conversation turn and the tool-calling loop
 internal/service                update dispatch: commands, rate limit, worker pool
+docs/codemap                    a map of the code to explore in a browser (make codemap, from graphify's graph)
 ```
 
 How one message travels through the bot:
