@@ -25,8 +25,14 @@ func (f *fakeToolRunner) Execute(ctx context.Context, _ int64, name, args string
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.asked = append(f.asked, name+" "+args)
-	if sink, ok := tools.SinkFrom(ctx); ok && name == "mlbb" && mlbbPictured(args) {
-		sink.Add(tools.Drawing{Data: []byte("JPEG"), MimeType: "image/jpeg"}) // as the tool sends a skin, a build or a portrait
+	// As the tools that make pictures or find songs put them in the sink.
+	if sink, ok := tools.SinkFrom(ctx); ok {
+		switch {
+		case name == "mlbb" && mlbbPictured(args), name == "cat_picture", name == "qr_code", name == "generate_image":
+			sink.Add(tools.Drawing{Data: []byte("JPEG"), MimeType: "image/jpeg"})
+		case name == "music_search":
+			sink.AddAudio(tools.Audio{Data: []byte("MP3"), Title: "Yurak", Performer: "Shohruhxon"})
+		}
 	}
 	if answer, ok := f.answers[name]; ok {
 		return answer
@@ -292,12 +298,12 @@ func TestSkinsAreChosenAndShown(t *testing.T) {
 
 // «📋 Ko'proq» lists the sections, and the menus moved through change in
 // place, each with a way back: a section its items, an item with choices
-// its choices. An item without a value asks the model at once, a choice
-// does too, and an item with a question asks it, its answer going to the
-// model with the request; a press that fetches says so at once.
+// its choices. An item without a value is answered at once, a choice
+// too, and an item with a question asks it, its answer answered in code
+// (see moreanswers_test.go); a press that fetches says so at once.
 func TestMoreMenu(t *testing.T) {
 	f := newFixture()
-	withToolRunner(f)
+	runner := withToolRunner(f)
 	buttons := &fakeButtons{}
 	f.opts.Buttons = buttons
 
@@ -328,15 +334,14 @@ func TestMoreMenu(t *testing.T) {
 	}
 	f.run(replyTo(askedRequests["movie"].question.uz, "Interstellar"))
 
-	var asked []string
-	for _, c := range f.replier.recorded() {
-		asked = append(asked, c.text)
-	}
-	joined := strings.Join(asked, "|")
-	for _, want := range []string{"Futbol: La Liga turnir jadvali", "Mushuk rasmini yubor", "Kino: Interstellar haqida ma'lumot"} {
+	joined := strings.Join(runner.recorded(), "|")
+	for _, want := range []string{`football {"action":"table","competition":"La Liga"}`, "cat_picture {}", `movies {"action":"search","lang":"ru","query":"Interstellar"}`} {
 		if !strings.Contains(joined, want) {
-			t.Errorf("model asked %q; want %q among them", asked, want)
+			t.Errorf("tools asked %q; want %q among them", runner.recorded(), want)
 		}
+	}
+	if calls := f.replier.recorded(); len(calls) != 0 {
+		t.Errorf("the model was asked %+v", calls)
 	}
 	working := 0
 	for _, a := range buttons.answers {
