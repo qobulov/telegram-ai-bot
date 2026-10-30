@@ -53,6 +53,9 @@ type outcome struct {
 	// ask, when set, opens the reply box on the text, with ask as its hint:
 	// the text is a question whose answer comes next (see keyboardmenu.go).
 	ask string
+	// replace, for a menu's press, puts the text and buttons in place of the
+	// menu pressed.
+	replace bool
 	// effect is the message effect played over the text, in a private
 	// chat only.
 	effect string

@@ -88,6 +88,7 @@ type ActiveCounter interface {
 type ButtonAnswerer interface {
 	AnswerCallbackQuery(ctx context.Context, id, text string, alert bool) error
 	EditMessageText(ctx context.Context, chatID, messageID int64, text string) error
+	EditMessageMenu(ctx context.Context, chatID, messageID int64, text string, buttons [][]telegram.Button) error
 }
 
 // ChannelMembers tells whether a user has joined a channel.

@@ -165,10 +165,19 @@ func (s *Service) pressedMenu(q *telegram.CallbackQuery) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), keyboardTimeout)
 	defer cancel()
-	if err := s.opts.Buttons.AnswerCallbackQuery(ctx, q.ID, "", false); err != nil {
+	kind, choice, _ := strings.Cut(strings.TrimPrefix(q.Data, menuData), ":")
+	// A press that only moves through the menus is answered silently; one
+	// that fetches something says so at once, as the answer takes a moment.
+	toast := textWorking.to(in)
+	if navigates(kind, choice) {
+		toast = ""
+	}
+	if err := s.opts.Buttons.AnswerCallbackQuery(ctx, q.ID, toast, false); err != nil {
 		s.opts.Logger.Debug("could not answer a menu press", "user_id", in.userID, "error", err)
 	}
-	kind, choice, _ := strings.Cut(strings.TrimPrefix(q.Data, menuData), ":")
+	if toast != "" {
+		s.showTypingOnce(ctx, in)
+	}
 	var out outcome
 	switch kind {
 	case "rate":
@@ -215,11 +224,47 @@ func (s *Service) pressedMenu(q *telegram.CallbackQuery) {
 	default:
 		return
 	}
+	if out.replace {
+		// A menu moved through changes in place, so the chat does not fill
+		// with menus; should Telegram refuse, it is sent anew.
+		if err := s.opts.Buttons.EditMessageMenu(ctx, in.msg.Chat.ID, in.msg.MessageID, out.text, out.buttons); err == nil {
+			return
+		}
+	}
 	if out.ask == "" {
 		out = s.withMenuBack(in, out)
 	}
 	if out.text != "" {
 		s.send(in, telegram.Outgoing{Text: out.text, Buttons: out.buttons, Ask: out.ask, Keyboard: out.keyboard})
+	}
+}
+
+// navigates reports a press that fetches nothing: one that moves through
+// the menus, a section, an item's choices or back, or that only asks for a
+// value, a hero's name or another city.
+func navigates(kind, choice string) bool {
+	switch kind {
+	case "more":
+		return true
+	case "item":
+		item, ok := findItem(choice)
+		return ok && (len(item.choices) > 0 || item.ask != nil)
+	case "ml":
+		return choice != "meta"
+	case "city":
+		return choice == ""
+	}
+	return false
+}
+
+// showTypingOnce shows "typing" while a press is answered, once: it fetches
+// in a second or two, under Telegram's five.
+func (s *Service) showTypingOnce(ctx context.Context, in incoming) {
+	if s.opts.ChatActor == nil {
+		return
+	}
+	if err := s.opts.ChatActor.SendChatAction(ctx, in.msg.Chat.ID, 0, "typing"); err != nil {
+		s.opts.Logger.Debug("typing indicator failed", "chat_id", in.msg.Chat.ID, "error", err)
 	}
 }
 
@@ -459,5 +504,6 @@ var (
 		en: "I couldn't find that hero. Try writing the name another way.",
 	}
 	textNoSkinPicture = localText{uz: "Bu skinning rasmi topilmadi.", ru: "Картинку этого скина не нашла.", en: "I couldn't find this skin's picture."}
+	textWorking       = localText{uz: "⏳ Bir soniya...", ru: "⏳ Секунду...", en: "⏳ One moment..."}
 	textMLBBMenu      = localText{uz: "🎮 Mobile Legends: nima kerak?", ru: "🎮 Mobile Legends: что нужно?", en: "🎮 Mobile Legends: what do you need?"}
 )

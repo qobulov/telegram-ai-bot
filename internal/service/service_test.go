@@ -3795,6 +3795,7 @@ type fakeButtons struct {
 	mu      sync.Mutex
 	answers []pressAnswer
 	edits   []string
+	menus   [][][]telegram.Button
 }
 
 func (f *fakeButtons) AnswerCallbackQuery(_ context.Context, id, text string, alert bool) error {
@@ -3809,6 +3810,20 @@ func (f *fakeButtons) EditMessageText(_ context.Context, _, _ int64, text string
 	defer f.mu.Unlock()
 	f.edits = append(f.edits, text)
 	return nil
+}
+
+func (f *fakeButtons) EditMessageMenu(_ context.Context, _, _ int64, text string, buttons [][]telegram.Button) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.edits = append(f.edits, text)
+	f.menus = append(f.menus, buttons)
+	return nil
+}
+
+func (f *fakeButtons) recordedMenus() ([]string, [][][]telegram.Button) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.edits...), append([][][]telegram.Button(nil), f.menus...)
 }
 
 // The check button tells the bot it was pressed, writing nothing in the

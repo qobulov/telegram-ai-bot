@@ -173,6 +173,11 @@ func (s *Service) pressedMore(q *telegram.CallbackQuery, in incoming, kind, choi
 	language := languageOf(in)
 	switch kind {
 	case "more":
+		if choice == "" {
+			out := moreMenu(language)
+			out.replace = true
+			return out, true
+		}
 		section, ok := findSection(choice)
 		if !ok {
 			return outcome{}, false
@@ -181,7 +186,8 @@ func (s *Service) pressedMore(q *telegram.CallbackQuery, in incoming, kind, choi
 		for _, item := range section.items {
 			buttons = append(buttons, telegram.Button{Text: item.label.inLanguage(language), Data: menuData + "item:" + item.key})
 		}
-		return outcome{text: section.label.inLanguage(language), buttons: inRows(buttons, 2)}, true
+		rows := append(inRows(buttons, 2), []telegram.Button{backButton(language, "more:")})
+		return outcome{text: section.label.inLanguage(language), buttons: rows, replace: true}, true
 	case "item":
 		item, ok := findItem(choice)
 		switch {
@@ -194,7 +200,8 @@ func (s *Service) pressedMore(q *telegram.CallbackQuery, in incoming, kind, choi
 			for i, c := range item.choices {
 				buttons = append(buttons, telegram.Button{Text: c, Data: fmt.Sprintf("%spick:%s:%d", menuData, item.key, i)})
 			}
-			return outcome{text: item.label.inLanguage(language), buttons: inRows(buttons, 2)}, true
+			rows := append(inRows(buttons, 2), []telegram.Button{backButton(language, "more:"+sectionOf(item.key))})
+			return outcome{text: item.label.inLanguage(language), buttons: rows, replace: true}, true
 		}
 		s.askAsTyped(q, item.request.inLanguage(language))
 		return outcome{}, true
@@ -209,6 +216,25 @@ func (s *Service) pressedMore(q *telegram.CallbackQuery, in incoming, kind, choi
 		return outcome{}, true
 	}
 	return outcome{}, false
+}
+
+// backButton goes back to the menu data names, in language.
+func backButton(language, data string) telegram.Button {
+	return telegram.Button{Text: textBack.inLanguage(language), Data: menuData + data}
+}
+
+var textBack = lt("⬅️ Orqaga", "⬅️ Назад", "⬅️ Back")
+
+// sectionOf is the key of the section an item is in.
+func sectionOf(itemKey string) string {
+	for _, section := range moreSections {
+		for _, item := range section.items {
+			if item.key == itemKey {
+				return section.key
+			}
+		}
+	}
+	return ""
 }
 
 func findSection(key string) (moreSection, bool) {

@@ -765,7 +765,12 @@ languages, and the buttons that need a value ask for it first
 
 A choice comes back as a button's data (`kb:rate:EUR`), handled at once; a
 value written in the reply box is known by the question it replies to, so
-nothing is kept between the question and its answer. The answer that ends
+nothing is kept between the question and its answer. Menus moved through,
+«📋 Ko'proq»'s sections and an item's choices, change in place
+(`editMessageText` with the new buttons) with «⬅️ Orqaga» back, so the
+chat does not fill with menus; a press that fetches something is answered
+at once with «⏳ Bir soniya...» and "typing", while one that only moves or
+asks for a value is answered silently. The answer that ends
 a question brings the keyboard back: the reply box hides it and keeps the
 question's hint ("Masalan: Ling") in the box, which people took to mean
 that a hero's name was still wanted; a picture, such as a skin, brings it

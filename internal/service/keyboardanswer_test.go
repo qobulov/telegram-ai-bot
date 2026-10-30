@@ -302,29 +302,39 @@ func TestSkinsAreChosenAndShown(t *testing.T) {
 	}
 }
 
-// «📋 Ko'proq» lists the sections, a section its items; an item without a
-// value asks the model at once, one with choices offers them, and one with
-// a question asks it, its answer going to the model with the request.
+// «📋 Ko'proq» lists the sections, and the menus moved through change in
+// place, each with a way back: a section its items, an item with choices
+// its choices. An item without a value asks the model at once, a choice
+// does too, and an item with a question asks it, its answer going to the
+// model with the request; a press that fetches says so at once.
 func TestMoreMenu(t *testing.T) {
 	f := newFixture()
 	withToolRunner(f)
-	f.opts.Buttons = &fakeButtons{}
+	buttons := &fakeButtons{}
+	f.opts.Buttons = buttons
 
 	sent := f.run(textFrom(userID, keyboardMore.uz))
 	if len(sent) != 1 || sent[0].text != textMoreMenu.uz || len(sent[0].buttons) != 4 || sent[0].buttons[0][0].Data != "kb:more:faith" {
 		t.Fatalf("sections = %+v", sent)
 	}
-	sent = f.run(menuPress(1, "kb:more:sport"))
-	if last := sent[len(sent)-1]; len(last.buttons) != 2 || last.buttons[0][0].Data != "kb:item:table" {
-		t.Fatalf("sport = %+v", last)
+	f.run(menuPress(1, "kb:more:sport"), menuPress(2, "kb:item:table"), menuPress(3, "kb:more:"))
+	edits, menus := buttons.recordedMenus()
+	if len(edits) != 3 || edits[0] != "⚽ Sport" || edits[2] != textMoreMenu.uz {
+		t.Fatalf("edits = %q", edits)
 	}
-	sent = f.run(menuPress(2, "kb:item:table"))
-	if last := sent[len(sent)-1]; len(last.buttons) != 3 || last.buttons[0][1].Data != "kb:pick:table:1" {
-		t.Fatalf("leagues = %+v", last)
+	if back := menus[0][len(menus[0])-1][0]; back.Data != "kb:more:" || back.Text != textBack.uz {
+		t.Errorf("sport's way back = %+v", back)
 	}
-	f.run(menuPress(3, "kb:pick:table:1"))
-	f.run(menuPress(4, "kb:item:cat"))
-	sent = f.run(menuPress(5, "kb:item:movie"))
+	if leagues := menus[1]; leagues[0][1].Data != "kb:pick:table:1" || leagues[len(leagues)-1][0].Data != "kb:more:sport" {
+		t.Errorf("leagues = %+v", leagues)
+	}
+	if sent := f.sender.messages(); len(sent) != 1 {
+		t.Errorf("moving through the menus sent %d messages, want none", len(sent)-1)
+	}
+
+	f.run(menuPress(4, "kb:pick:table:1"))
+	f.run(menuPress(5, "kb:item:cat"))
+	sent = f.run(menuPress(6, "kb:item:movie"))
 	if last := sent[len(sent)-1]; last.text != askedRequests["movie"].question.uz || last.ask == "" {
 		t.Fatalf("film's question = %+v", last)
 	}
@@ -339,6 +349,15 @@ func TestMoreMenu(t *testing.T) {
 		if !strings.Contains(joined, want) {
 			t.Errorf("model asked %q; want %q among them", asked, want)
 		}
+	}
+	working := 0
+	for _, a := range buttons.answers {
+		if a.text == textWorking.uz {
+			working++
+		}
+	}
+	if working != 2 {
+		t.Errorf("presses answered %+v; want the league and the cat, not the film's question, to say it is working", buttons.answers)
 	}
 }
 

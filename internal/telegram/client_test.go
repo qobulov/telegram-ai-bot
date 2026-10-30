@@ -765,6 +765,15 @@ func TestChatAndMemberMethodsSendExactParams(t *testing.T) {
 			want:   map[string]any{"chat_id": float64(-100123), "message_thread_id": float64(7), "action": "typing"},
 		},
 		{
+			// A menu changes in place, its buttons with it.
+			method: "editMessageText",
+			call: func(c *Client) error {
+				return c.EditMessageMenu(ctx, 42, 70, "⚽ Sport", [][]Button{{{Text: "⬅️", Data: "kb:more:"}}})
+			},
+			want: map[string]any{"chat_id": float64(42), "message_id": float64(70), "text": "⚽ Sport",
+				"reply_markup": map[string]any{"inline_keyboard": []any{[]any{map[string]any{"text": "⬅️", "callback_data": "kb:more:"}}}}},
+		},
+		{
 			method: "setChatMemberTag",
 			call:   func(c *Client) error { return c.SetChatMemberTag(ctx, -100123, 42, "Pro") },
 			want:   map[string]any{"chat_id": float64(-100123), "user_id": float64(42), "tag": "Pro"},

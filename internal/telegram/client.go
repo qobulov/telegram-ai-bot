@@ -167,6 +167,24 @@ func (c *Client) EditMessageText(ctx context.Context, chatID, messageID int64, t
 	return c.call(ctx, "editMessageText", editMessageTextParams{ChatID: chatID, MessageID: messageID, Text: text}, nil)
 }
 
+type editMessageMenuParams struct {
+	ChatID      int64           `json:"chat_id"`
+	MessageID   int64           `json:"message_id"`
+	Text        string          `json:"text"`
+	ReplyMarkup *inlineKeyboard `json:"reply_markup,omitempty"`
+}
+
+// EditMessageMenu replaces one of the bot's messages with text and the
+// buttons under it, so that a menu changes in place instead of filling the
+// chat.
+func (c *Client) EditMessageMenu(ctx context.Context, chatID, messageID int64, text string, buttons [][]Button) error {
+	params := editMessageMenuParams{ChatID: chatID, MessageID: messageID, Text: text}
+	if len(buttons) > 0 {
+		params.ReplyMarkup = &inlineKeyboard{InlineKeyboard: buttons}
+	}
+	return c.call(ctx, "editMessageText", params, nil)
+}
+
 // DeleteWebhook removes the webhook, so that long polling works again.
 func (c *Client) DeleteWebhook(ctx context.Context) error {
 	return c.call(ctx, "deleteWebhook", struct{}{}, nil)
