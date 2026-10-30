@@ -906,7 +906,7 @@ func (s *Service) logMessage(msg *telegram.Message) {
 // logFrom adds a message from a member, or from an allowed bot, to the
 // group's log, as text: the one place where the log's member lines are made.
 func (s *Service) logFrom(msg *telegram.Message, text string) {
-	s.ambient.addMessage(msg, s.label(msg.From), s.logText(msg, text))
+	s.ambient.addMessage(msg, s.taggedLabel(msg.From, msg.SenderTag), s.logText(msg, text))
 }
 
 // logText is how a message is written in the log. A reply first says whom it
@@ -996,7 +996,16 @@ const (
 // [owner] after an owner's. authorLabel strips square brackets from names,
 // so nobody else can carry the mark.
 func (s *Service) label(user *telegram.User) string {
+	return s.taggedLabel(user, "")
+}
+
+// taggedLabel is label with the tag the group shows by the sender's name,
+// a member's tag or an admin's title, in «»: "Ali @ali «Pro»".
+func (s *Service) taggedLabel(user *telegram.User, tag string) string {
 	label := withUsername(authorLabel(user.FirstName), user.Username)
+	if tag = memberTagLabel(tag); tag != "" {
+		label += " «" + tag + "»"
+	}
 	switch {
 	case s.isOwner(user):
 		label += ownerMark
@@ -1004,6 +1013,17 @@ func (s *Service) label(user *telegram.User) string {
 		label += botMark
 	}
 	return label
+}
+
+// memberTagLabel is a sender's tag as a label carries it: on one line,
+// without the brackets of a mark or the guillemets around it, and no
+// longer than Telegram allows.
+func memberTagLabel(tag string) string {
+	tag = strings.Join(strings.Fields(strings.NewReplacer("[", "", "]", "", "«", "", "»", "").Replace(tag)), " ")
+	if runes := []rune(tag); len(runes) > 16 {
+		tag = string(runes[:16])
+	}
+	return tag
 }
 
 // unlabel undoes label for a name stored with a turn: the name without its

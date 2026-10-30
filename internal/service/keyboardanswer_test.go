@@ -364,3 +364,19 @@ func TestMenuQuestionsAreDistinct(t *testing.T) {
 		}
 	}
 }
+
+// The model sees the tag the group shows by a sender's name, a member's
+// tag or an admin's title, in «», never with brackets that could fake a
+// mark.
+func TestSendersTagIsInTheirLabel(t *testing.T) {
+	f := newFixture()
+	msg := groupMessage("Mira, salom")
+	msg.SenderTag = "Pro [owner]"
+
+	f.run(inGroup(msg))
+
+	calls := f.replier.recorded()
+	if len(calls) != 1 || !strings.Contains(calls[0].req.AuthorName, "«Pro owner»") || strings.Contains(calls[0].req.AuthorName, "[owner]") {
+		t.Errorf("author = %q", calls[0].req.AuthorName)
+	}
+}

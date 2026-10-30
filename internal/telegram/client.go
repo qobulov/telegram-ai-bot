@@ -938,6 +938,19 @@ type promoteParams struct {
 	AdminRights
 }
 
+type memberTagParams struct {
+	ChatID int64  `json:"chat_id"`
+	UserID int64  `json:"user_id"`
+	Tag    string `json:"tag"`
+}
+
+// SetChatMemberTag sets the tag shown by a regular member's name, 0 to 16
+// characters without emoji; an empty one takes it off. It needs the
+// can_manage_tags right.
+func (c *Client) SetChatMemberTag(ctx context.Context, chatID, userID int64, tag string) error {
+	return c.call(ctx, "setChatMemberTag", memberTagParams{ChatID: chatID, UserID: userID, Tag: tag}, nil)
+}
+
 // SetChatAdministratorCustomTitle sets the title shown for an admin the bot
 // made.
 func (c *Client) SetChatAdministratorCustomTitle(ctx context.Context, chatID, userID int64, title string) error {
@@ -1269,6 +1282,7 @@ type AdministratorRights struct {
 	CanEditMessages     bool `json:"can_edit_messages"`
 	CanPinMessages      bool `json:"can_pin_messages"`
 	CanManageTopics     bool `json:"can_manage_topics"`
+	CanManageTags       bool `json:"can_manage_tags"`
 }
 
 type defaultRightsParams struct {

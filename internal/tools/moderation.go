@@ -40,6 +40,9 @@ const (
 	actionPromote    = "promote"
 	actionDemote     = "demote"
 	actionAdminTitle = "admin_title"
+	// actionMemberTag sets the tag shown by a regular member's name, or
+	// takes it off with no text.
+	actionMemberTag = "member_tag"
 
 	// Actions on the group itself, which need no reply or tag. actionLock
 	// forbids one kind of message to everyone, keeping the group's other
@@ -131,6 +134,7 @@ var neededRight = map[string]string{
 	actionPromote:    telegram.RightPromoteMembers,
 	actionDemote:     telegram.RightPromoteMembers,
 	actionAdminTitle: telegram.RightPromoteMembers,
+	actionMemberTag:  telegram.RightManageTags,
 
 	actionSetTitle:         telegram.RightChangeInfo,
 	actionSetDescription:   telegram.RightChangeInfo,
@@ -204,6 +208,7 @@ type Moderator interface {
 	EditChatInviteLink(ctx context.Context, link string, l telegram.InviteLink) error
 	// DownloadFile fetches an old group photo, to put it back.
 	DownloadFile(ctx context.Context, fileID string, maxBytes int64) ([]byte, error)
+	SetChatMemberTag(ctx context.Context, chatID, userID int64, tag string) error
 }
 
 // ModerationStore keeps the audit of what the bot did for whom.
@@ -309,7 +314,7 @@ func (m *Moderation) Tool() Tool {
 			"delete: delete that message. mute (minutes, default 60) or unmute: its author. ban or unban: its author. pin or unpin: that message. " +
 			"no_stickers (minutes, default a day) or allow_stickers: take away or give back its author's stickers and GIFs, which Telegram only allows or forbids together; use it, not ban or ignore, when they ask to block someone's stickers. " +
 			"no_photos (minutes, default a day) or allow_photos: the same for photos. A member's other limits stay as they are. " +
-			"promote: make its author an admin, with your own delete, mute and pin rights at most; demote: take that back; admin_title (text, 16 characters at most): the title shown for an admin you made. " +
+			"promote: make its author an admin, with your own delete, mute and pin rights at most; demote: take that back; admin_title (text, 16 characters at most): the title shown for an admin you made; member_tag (text, 16 characters at most, no emoji; empty takes it off): the tag shown by a regular member's name. " +
 			"purge (minutes, default 60, at most 2880): delete every message its author wrote here in the last minutes, as far as your log of the group has them, when they ask to clear out or delete all of someone's messages; it cannot be undone. " +
 			"A message posted on behalf of a channel can only be deleted, pinned, or banned or unbanned, which bans the channel from posting here. " +
 			"For the group itself, with no reply or tag: set_title (text), set_description (text, empty to remove), set_photo (the photo in their message), delete_photo, set_sticker_set (the pack of the sticker they replied to, as the group's pack every member may use) or delete_sticker_set, invite_link (a new link; text names it, minutes ends it), unpin_all, and lock or unlock (kind) to forbid or allow one kind of message to everyone, keeping the group's other permissions: when they ask to block stickers or photos for all, it is lock, never a guard. " +
@@ -320,9 +325,9 @@ func (m *Moderation) Tool() Tool {
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["delete", "purge", "mute", "unmute", "ban", "unban", "pin", "unpin", "no_stickers", "allow_stickers", "no_photos", "allow_photos", "promote", "demote", "admin_title", "set_title", "set_description", "set_photo", "delete_photo", "set_sticker_set", "delete_sticker_set", "invite_link", "revoke_link", "edit_link", "unpin_all", "lock", "unlock", "undo"]},
+				"action": {"type": "string", "enum": ["delete", "purge", "mute", "unmute", "ban", "unban", "pin", "unpin", "no_stickers", "allow_stickers", "no_photos", "allow_photos", "promote", "demote", "admin_title", "member_tag", "set_title", "set_description", "set_photo", "delete_photo", "set_sticker_set", "delete_sticker_set", "invite_link", "revoke_link", "edit_link", "unpin_all", "lock", "unlock", "undo"]},
 				"minutes": {"type": "integer", "description": "For mute: how long, 1 to 10080, default 60. For purge: how far back, 1 to 2880, default 60. For no_stickers and no_photos: 1 to 525600, default 1440; the most for \"forever\". For invite_link: when it stops working; none for never."},
-				"text": {"type": "string", "description": "For set_title, set_description and admin_title: the new text, in the words they gave. For invite_link: an optional name."},
+				"text": {"type": "string", "description": "For set_title, set_description, admin_title and member_tag: the new text, in the words they gave. For invite_link: an optional name."},
 				"force": {"type": "boolean", "description": "For undo: true only when they want it back though it was changed by hand since."},
 				"kind": {"type": "string", "enum": ["messages", "photos", "videos", "stickers", "voice", "files", "music", "polls", "link_previews"], "description": "For lock and unlock: stickers covers GIFs too, voice covers round videos."},
 				"reason": {"type": "string", "description": "Optional: why, in a few words."},
@@ -429,6 +434,10 @@ func (o *order) setGroupArgs(args moderationArgs, picture []byte) error {
 	case actionAdminTitle:
 		if utf8.RuneCountInString(text) > maxAdminTitleRunes {
 			return &ArgumentError{Message: fmt.Sprintf("an admin title has at most %d characters", maxAdminTitleRunes)}
+		}
+	case actionMemberTag:
+		if utf8.RuneCountInString(text) > maxMemberTagRunes || hasEmoji(text) {
+			return &ArgumentError{Message: fmt.Sprintf("a member's tag has at most %d characters and no emoji", maxMemberTagRunes)}
 		}
 	case actionInviteLink, actionRevokeLink, actionEditLink:
 		text = cutRunes(text, maxLinkNameRunes)
@@ -652,11 +661,24 @@ func namedBy(words []string, name string) bool {
 	return false
 }
 
+// maxMemberTagRunes is the longest tag Telegram shows by a member's name.
+const maxMemberTagRunes = 16
+
+// hasEmoji reports an emoji, which Telegram refuses in a member's tag.
+func hasEmoji(text string) bool {
+	for _, r := range text {
+		if r >= 0x1F000 || (r >= 0x2600 && r <= 0x27BF) || r == 0xFE0F || r == 0x200D {
+			return true
+		}
+	}
+	return false
+}
+
 // onMember reports an action on a member rather than on a message.
 func onMember(action string) bool {
 	switch action {
 	case actionMute, actionUnmute, actionBan, actionUnban, actionNoStickers, actionStickers, actionNoPhotos, actionPhotos,
-		actionPromote, actionDemote, actionAdminTitle, actionPurge:
+		actionPromote, actionDemote, actionAdminTitle, actionMemberTag, actionPurge:
 		return true
 	}
 	return false
@@ -950,6 +972,8 @@ func (m *Moderation) send(ctx context.Context, o order) error {
 		return m.opts.Telegram.PromoteChatMember(ctx, chatID, userID, telegram.AdminRights{})
 	case actionAdminTitle:
 		return m.opts.Telegram.SetChatAdministratorCustomTitle(ctx, chatID, userID, o.text)
+	case actionMemberTag:
+		return m.opts.Telegram.SetChatMemberTag(ctx, chatID, userID, o.text)
 	case actionSetTitle:
 		return m.opts.Telegram.SetChatTitle(ctx, chatID, o.text)
 	case actionSetDescription:
@@ -1130,6 +1154,11 @@ func (o order) done(until string) chatText {
 		return chatText{"Bajarildi: " + name + " endi admin emas.", "Готово: " + name + " больше не админ."}
 	case actionAdminTitle:
 		return chatText{"Bajarildi: " + name + " unvoni o'zgardi.", "Готово: у " + name + " новое звание."}
+	case actionMemberTag:
+		if o.text == "" {
+			return chatText{"Bajarildi: " + name + " tegi olib tashlandi.", "Готово: у " + name + " больше нет тега."}
+		}
+		return chatText{"Bajarildi: " + name + " tegi «" + o.text + "» bo'ldi.", "Готово: у " + name + " теперь тег «" + o.text + "»."}
 	case actionSetTitle:
 		return chatText{"Bajarildi: guruh nomi «" + o.text + "» bo'ldi.", "Готово: группа теперь называется «" + o.text + "»."}
 	case actionSetDescription:
@@ -1192,6 +1221,7 @@ var actionWords = map[string][]string{
 	actionPromote:    adminWords,
 	actionDemote:     adminWords,
 	actionAdminTitle: {"admin", "админ", "unvon", "titul", "титул", "звани", "title", "lavozim", "должн"},
+	actionMemberTag:  {"teg", "tag", "тег", "metka", "метк", "yorliq", "ярлык"},
 
 	actionSetTitle:         append([]string{"nom", "title", "назв", "имя"}, changeWords...),
 	actionSetDescription:   append([]string{"tavsif", "description", "описан", "bio"}, changeWords...),

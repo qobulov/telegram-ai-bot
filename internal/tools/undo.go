@@ -37,9 +37,11 @@ type undoState struct {
 	AfterPermissions *telegram.ChatPermissions `json:"after_permissions,omitempty"`
 	Until            int64                     `json:"until,omitempty"`
 	AdminTitle       *string                   `json:"admin_title,omitempty"`
-	Rights           *telegram.AdminRights     `json:"rights,omitempty"`
-	Link             string                    `json:"link,omitempty"`
-	MessageID        int64                     `json:"message_id,omitempty"`
+	// MemberTag is a member's tag before, "" for none.
+	MemberTag *string               `json:"member_tag,omitempty"`
+	Rights    *telegram.AdminRights `json:"rights,omitempty"`
+	Link      string                `json:"link,omitempty"`
+	MessageID int64                 `json:"message_id,omitempty"`
 	// StickerSet is the group's sticker pack before, "" for none.
 	StickerSet *string `json:"sticker_set,omitempty"`
 }
@@ -83,7 +85,7 @@ func (m *Moderation) snapshot(ctx context.Context, o order) (json.RawMessage, er
 		case actionSetStickerSet, actionDeleteStickerSet:
 			state.StickerSet = &chat.StickerSetName
 		}
-	case actionMute, actionUnmute, actionNoStickers, actionStickers, actionNoPhotos, actionPhotos, actionDemote, actionAdminTitle:
+	case actionMute, actionUnmute, actionNoStickers, actionStickers, actionNoPhotos, actionPhotos, actionDemote, actionAdminTitle, actionMemberTag:
 		member, err := m.opts.Members.GetChatMember(ctx, chatID, o.target.UserID)
 		if err != nil {
 			return nil, err
@@ -94,6 +96,8 @@ func (m *Moderation) snapshot(ctx context.Context, o order) (json.RawMessage, er
 				CanPinMessages: member.CanPinMessages, CanInviteUsers: member.CanInviteUsers}
 		case actionAdminTitle:
 			state.AdminTitle = &member.CustomTitle
+		case actionMemberTag:
+			state.MemberTag = &member.Tag
 		default:
 			permissions := member.Permissions()
 			state.Permissions, state.Until = &permissions, member.UntilDate
@@ -236,6 +240,8 @@ func (m *Moderation) putBack(ctx context.Context, last storage.ModerationAction,
 		})
 	case actionAdminTitle:
 		return tg.SetChatAdministratorCustomTitle(ctx, chatID, userID, *state.AdminTitle)
+	case actionMemberTag:
+		return tg.SetChatMemberTag(ctx, chatID, userID, *state.MemberTag)
 	}
 	return nil
 }
@@ -296,6 +302,8 @@ func undoneText(last storage.ModerationAction, state undoState) chatText {
 		return chatText{"Bajarildi: a'zo yana admin.", "Готово: участник снова админ."}
 	case actionAdminTitle:
 		return chatText{"Bajarildi: admin unvoni qaytarildi.", "Готово: звание админа возвращено."}
+	case actionMemberTag:
+		return chatText{"Bajarildi: a'zoning tegi qaytarildi.", "Готово: тег участника возвращён."}
 	}
 	return chatText{"Bajarildi: a'zoning cheklovlari avvalgi holiga qaytdi.", "Готово: ограничения участника снова как раньше."}
 }

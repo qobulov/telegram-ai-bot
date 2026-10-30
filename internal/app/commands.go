@@ -52,8 +52,8 @@ type CommandSetter interface {
 // admin, the ones its features use: delete for deleting, purge and the
 // guards; restrict for mutes, bans, locks and the swear guard; pin; invite
 // for invite links and join requests; topics for forum_topic; change info
-// for the group's name, description, photo and sticker pack; and promote,
-// for making admins. Whoever adds the bot may untick any of them.
+// for the group's name, description, photo and sticker pack; tags for
+// member_tag; and promote, for making admins. Whoever adds the bot may untick any of them.
 var groupAdminRights = telegram.AdministratorRights{
 	CanManageChat:      true,
 	CanDeleteMessages:  true,
@@ -63,6 +63,7 @@ var groupAdminRights = telegram.AdministratorRights{
 	CanManageTopics:    true,
 	CanChangeInfo:      true,
 	CanPromoteMembers:  true,
+	CanManageTags:      true,
 }
 
 // channelAdminRights are what the bot asks for in a channel: to post and

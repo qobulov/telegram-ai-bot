@@ -765,6 +765,17 @@ func TestChatAndMemberMethodsSendExactParams(t *testing.T) {
 			want:   map[string]any{"chat_id": float64(-100123), "message_thread_id": float64(7), "action": "typing"},
 		},
 		{
+			method: "setChatMemberTag",
+			call:   func(c *Client) error { return c.SetChatMemberTag(ctx, -100123, 42, "Pro") },
+			want:   map[string]any{"chat_id": float64(-100123), "user_id": float64(42), "tag": "Pro"},
+		},
+		{
+			// An empty tag is sent, which takes the member's off.
+			method: "setChatMemberTag",
+			call:   func(c *Client) error { return c.SetChatMemberTag(ctx, -100123, 42, "") },
+			want:   map[string]any{"chat_id": float64(-100123), "user_id": float64(42), "tag": ""},
+		},
+		{
 			method: "deleteMessage",
 			call:   func(c *Client) error { return c.DeleteMessage(ctx, -100123, 30) },
 			want:   map[string]any{"chat_id": float64(-100123), "message_id": float64(30)},
@@ -982,7 +993,7 @@ func TestChatMemberRightsDecoded(t *testing.T) {
 	}
 
 	creator := decode(`{"status":"creator","user":{"id":5}}`)
-	if !creator.Has(RightRestrictMembers) || len(creator.Rights()) != 8 {
+	if !creator.Has(RightRestrictMembers) || len(creator.Rights()) != 9 {
 		t.Errorf("creator Has(restrict) = %v, Rights() = %v; a creator holds every right", creator.Has(RightRestrictMembers), creator.Rights())
 	}
 	if creator.Has("can_fly") {
@@ -1304,7 +1315,7 @@ func TestSetMyDefaultAdministratorRightsSendsEveryRight(t *testing.T) {
 	}
 	sent := api.recorded()[0]
 	rights, _ := sent.params["rights"].(map[string]any)
-	if sent.method != "setMyDefaultAdministratorRights" || sent.params["for_channels"] != true || len(rights) != 15 || rights["can_post_messages"] != true || rights["can_delete_messages"] != false {
+	if sent.method != "setMyDefaultAdministratorRights" || sent.params["for_channels"] != true || len(rights) != 16 || rights["can_post_messages"] != true || rights["can_delete_messages"] != false {
 		t.Errorf("call = %+v", sent)
 	}
 }

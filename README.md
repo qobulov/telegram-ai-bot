@@ -1318,6 +1318,14 @@ check is made in code:
   own limits with the one changed, and an end once set can be moved but not
   taken away. Undo revokes the latest link she made, edited or not; a
   revoked link is never revoked again.
+- **Member tags** (Bot API 9.5): `member_tag` sets the tag Telegram shows
+  by a regular member's name, 16 characters at most and no emoji, or takes it
+  off with no text (`setChatMemberTag`), the member replied to, tagged or
+  named, for those holding *manage tags*, and the bot too, which asks for it
+  when made an admin. The asker's words must name a tag ("teg", "tag",
+  "тег"); undo puts the old tag back. The model also sees each sender's tag
+  (`sender_tag`, a member's tag or an admin's title) in their label, in
+  «»: "Ali @ali «Pro»", brackets taken out so no tag can fake a mark.
 - **Forum topics,** in a group with topics, through the separate
   `forum_topic` tool: create a topic (named, its icon in one of Telegram's
   six colours when asked), rename, close, reopen or delete the topic the

@@ -1294,7 +1294,7 @@ func (s *Service) request(ctx context.Context, in incoming, rules []storage.Grou
 	}
 	var notice, log string
 	if in.group {
-		req.AuthorName = s.label(in.msg.From)
+		req.AuthorName = s.taggedLabel(in.msg.From, in.msg.SenderTag)
 		req.Text = req.AuthorName + ": " + oneLine(req.Text)
 		log = s.ambient.block(in.scope.ChatID, s.opts.Now())
 	} else {

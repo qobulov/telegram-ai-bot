@@ -110,6 +110,9 @@ type Message struct {
 	// ReplyToMessage is the message this one replies to, if any. In a forum
 	// topic it may be only the topic's first message; see
 	// ImplicitTopicReply.
+	// SenderTag is the sender's tag, or an admin's title, as the group shows
+	// it by their name; supergroups only.
+	SenderTag      string   `json:"sender_tag,omitempty"`
 	ReplyToMessage *Message `json:"reply_to_message"`
 	// MessageThreadID is, for a message in a forum topic, the topic: the ID
 	// of the service message that created it.
@@ -356,6 +359,8 @@ type ChatMember struct {
 	// CustomTitle is an admin's title in the group, shown instead of
 	// "admin".
 	CustomTitle string `json:"custom_title,omitempty"`
+	// Tag is a regular or restricted member's tag, shown by their name.
+	Tag string `json:"tag,omitempty"`
 	// IsAnonymous is true for an admin who posts in the group's name, hiding
 	// who they are.
 	IsAnonymous bool `json:"is_anonymous,omitempty"`
@@ -372,6 +377,7 @@ type ChatMember struct {
 	CanChangeInfo      bool `json:"can_change_info,omitempty"`
 	CanInviteUsers     bool `json:"can_invite_users,omitempty"`
 	CanManageTopics    bool `json:"can_manage_topics,omitempty"`
+	CanManageTags      bool `json:"can_manage_tags,omitempty"`
 	// CanPostMessages is a channel admin's right to post there.
 	CanPostMessages bool `json:"can_post_messages,omitempty"`
 }
@@ -386,6 +392,7 @@ const (
 	RightChangeInfo      = "can_change_info"
 	RightInviteUsers     = "can_invite_users"
 	RightManageTopics    = "can_manage_topics"
+	RightManageTags      = "can_manage_tags"
 	// RightPostMessages exists in channels only.
 	RightPostMessages = "can_post_messages"
 )
@@ -406,6 +413,7 @@ var adminRights = []adminRight{
 	{RightChangeInfo, func(m ChatMember) bool { return m.CanChangeInfo }},
 	{RightInviteUsers, func(m ChatMember) bool { return m.CanInviteUsers }},
 	{RightManageTopics, func(m ChatMember) bool { return m.CanManageTopics }},
+	{RightManageTags, func(m ChatMember) bool { return m.CanManageTags }},
 	{RightPostMessages, func(m ChatMember) bool { return m.CanPostMessages }},
 }
 

@@ -220,6 +220,10 @@ func (f *fakeTelegram) SetChatAdministratorCustomTitle(_ context.Context, chatID
 	return f.do("setChatAdministratorCustomTitle "+title, chatID, userID)
 }
 
+func (f *fakeTelegram) SetChatMemberTag(_ context.Context, chatID, userID int64, tag string) error {
+	return f.do("setChatMemberTag "+tag, chatID, userID)
+}
+
 func (f *fakeTelegram) made() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -373,6 +377,8 @@ func admin(rights ...string) telegram.ChatMember {
 			member.CanInviteUsers = true
 		case telegram.RightPromoteMembers:
 			member.CanPromoteMembers = true
+		case telegram.RightManageTags:
+			member.CanManageTags = true
 		}
 	}
 	return member
@@ -1278,5 +1284,45 @@ func TestModeratePromotesAndDemotes(t *testing.T) {
 	calls := env.telegram.made()
 	if calls[1] != fmt.Sprintf("promoteChatMember %+v %d %d", telegram.AdminRights{}, groupA, memberID) || calls[2] != fmt.Sprintf("setChatAdministratorCustomTitle Moderator %d %d", groupA, memberID) {
 		t.Errorf("calls = %q", calls)
+	}
+}
+
+// A regular member's tag is set by those holding the tags right, the bot
+// too; an emoji or a tag too long is refused, an empty one takes it off,
+// and undo puts the old one back.
+func TestModerateSetsAMembersTag(t *testing.T) {
+	env := newModerationEnv(t)
+	all := append([]string{telegram.RightManageTags}, moderationRights...)
+	env.chat.set(rulesBotID, admin(all...))
+	env.chat.set(userID, admin(all...))
+	env.chat.set(memberID, telegram.ChatMember{Status: "member", Tag: "Yangi", User: &telegram.User{ID: memberID, FirstName: "Bek", Username: "bek"}})
+	turn := func(id int64, words string) context.Context {
+		return WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: id, MessageID: id, Target: bekTarget(), Words: words}, &Sink{})
+	}
+
+	if said := env.act(t, turn(450, "bunga Pro tegini qo'y"), `{"action":"member_tag","text":"Pro"}`); said != "Bajarildi: Bek @bek tegi «Pro» bo'ldi." {
+		t.Errorf("said %q", said)
+	}
+	for _, args := range []string{`{"action":"member_tag","text":"🔥 Pro"}`, `{"action":"member_tag","text":"` + strings.Repeat("a", 17) + `"}`} {
+		if got := env.moderate(turn(451, "tegini o'zgartir"), args); got.OK || !strings.Contains(got.Error.Message, "no emoji") {
+			t.Errorf("%s = %+v", args, got)
+		}
+	}
+	if said := env.act(t, turn(452, "tegini olib tashla"), `{"action":"member_tag","text":""}`); !strings.Contains(said, "olib tashlandi") {
+		t.Errorf("said %q", said)
+	}
+	env.act(t, turn(453, "orqaga qaytar"), `{"action":"undo"}`)
+	want := []string{
+		fmt.Sprintf("setChatMemberTag Pro %d %d", groupA, memberID),
+		fmt.Sprintf("setChatMemberTag  %d %d", groupA, memberID),
+		fmt.Sprintf("setChatMemberTag Yangi %d %d", groupA, memberID),
+	}
+	if calls := env.telegram.made(); !slices.Equal(calls, want) {
+		t.Errorf("calls = %q\nwant %q", calls, want)
+	}
+
+	env.chat.set(userID, admin(moderationRights...))
+	if got := env.moderate(turn(454, "tegini Pro qil"), `{"action":"member_tag","text":"Pro"}`); got.OK {
+		t.Errorf("an admin without the tags right = %+v", got)
 	}
 }
