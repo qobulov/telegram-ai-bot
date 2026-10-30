@@ -45,8 +45,12 @@ type Config struct {
 	// minimal, low, medium or high, from AI_REASONING_EFFORT; "" leaves it
 	// to the model. Thinking is paid as output, so it defaults to low.
 	ReasoningEffort string
-	AIAPIKey        string
-	AIBaseURL       string
+	// ChatReasoningEffort, from CHAT_REASONING_EFFORT, is how hard the chat
+	// model thinks before a reply in words alone: minimal by default, as
+	// "low" spent 500 to 800 thinking tokens, seconds, on a one-line joke.
+	ChatReasoningEffort string
+	AIAPIKey            string
+	AIBaseURL           string
 	// FallbackModels are tried when the model is overloaded.
 	FallbackModels []string
 	// RouterModel, from ROUTER_MODEL, is a light model that decides which
@@ -273,6 +277,7 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.ImagesEnabled = cfg.AIProvider == providerGemini && r.boolean("ENABLE_IMAGE_GENERATION", true)
 	if cfg.AIProvider == providerGemini {
 		cfg.ReasoningEffort = r.reasoningEffort("AI_REASONING_EFFORT", "low")
+		cfg.ChatReasoningEffort = r.reasoningEffort("CHAT_REASONING_EFFORT", "minimal")
 	}
 	cfg.RouterModel = r.text("ROUTER_MODEL", "")
 	cfg.ChatModel = r.text("CHAT_MODEL", cfg.Model)

@@ -1669,6 +1669,23 @@ func TestReasoningEffort(t *testing.T) {
 	}
 }
 
+// A reply in words alone thinks minimally by default: at low it thought
+// 500 to 800 tokens, seconds, over a one-line joke.
+func TestChatReasoningEffort(t *testing.T) {
+	if cfg, err := Load(getenv(geminiEnv())); err != nil || cfg.ChatReasoningEffort != "minimal" || cfg.ReasoningEffort != "low" {
+		t.Errorf("default chat %q, main %q, err %v", cfg.ChatReasoningEffort, cfg.ReasoningEffort, err)
+	}
+	env := geminiEnv()
+	env["CHAT_REASONING_EFFORT"] = "low"
+	if cfg, err := Load(getenv(env)); err != nil || cfg.ChatReasoningEffort != "low" {
+		t.Errorf("set: %q, %v", cfg.ChatReasoningEffort, err)
+	}
+	env["CHAT_REASONING_EFFORT"] = "max"
+	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "CHAT_REASONING_EFFORT") {
+		t.Errorf("err = %v, want CHAT_REASONING_EFFORT refused", err)
+	}
+}
+
 // The bot once told a member she was a year or two older than its owner,
 // whose age it never knew: no personal fact is made up, even in a joke.
 func TestPersonaNeverInventsPersonalFacts(t *testing.T) {

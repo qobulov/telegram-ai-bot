@@ -649,7 +649,7 @@ func chatRouting(cfg config.Config, logger *slog.Logger) (router, chat agent.Mod
 		APIKey:          cfg.AIAPIKey,
 		Model:           cfg.ChatModel,
 		FallbackModels:  cfg.FallbackModels,
-		ReasoningEffort: cfg.ReasoningEffort,
+		ReasoningEffort: cfg.ChatReasoningEffort,
 		MaxTokens:       cfg.MaxOutputTokens,
 		MaxAttempts:     2,
 		HTTPClient:      &http.Client{Timeout: cfg.RequestTimeout},
