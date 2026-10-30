@@ -758,10 +758,19 @@ languages, and the buttons that need a value ask for it first
   top scorers of six leagues), 🕹 O'yinlar (Tarozi, free games, a Steam
   price), 📚 O'qish (Wikipedia, an English word, synonyms, papers) and
   🛠 Foydali (a QR code, a drawing, a place on the map, holidays, crypto,
-  earthquakes, a web search). An item asks the model at once, asks for its
+  earthquakes, a web search). An item is answered at once, asks for its
   value first (a city, a title, a word, as the menus' other questions do),
-  or offers choices, the leagues; the model answers with the item's tool, so
-  none of it takes from the daily limit, and a drawing keeps its own.
+  or offers choices, the leagues. Every item is answered in code, never by
+  the model (`internal/service/moreanswers.go`): its tool runs on the
+  sender's turn and its result is written there, labels in the user's
+  language and the data as the tool gives it (an English fact, a Russian
+  headline): the top entries with their links, a picture for the cat, a QR
+  code or a drawing, the song's preview before its links, the pin and then
+  the place's name, the game itself for Tarozi, and a trivia question with
+  its answer a few lines below its options. What a tool did not find, a
+  service that is down, a quiet week of earthquakes and a drawing past its
+  own daily limit are each said plainly. None of it takes from the daily
+  limit.
 
 A choice comes back as a button's data (`kb:rate:EUR`), handled at once; a
 value written in the reply box is known by the question it replies to, so

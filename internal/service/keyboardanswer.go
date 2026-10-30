@@ -1,6 +1,7 @@
 package service
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -18,7 +19,12 @@ type ToolRunner interface {
 }
 
 // keyboardTimeout bounds a keyboard button's tool: a live rate or forecast.
-const keyboardTimeout = 20 * time.Second
+// drawTimeout bounds a picture drawn from the menu, which the image model
+// takes longer to make: the tool itself allows 50 s.
+const (
+	keyboardTimeout = 20 * time.Second
+	drawTimeout     = 60 * time.Second
+)
 
 // keyboardAnswer answers the private keyboard in code, so that it takes
 // nothing from the day's answers, which pay for the model: the time at
@@ -104,19 +110,42 @@ func (s *Service) runTool(ctx context.Context, in incoming, name, args string, o
 
 // runToolInto is runTool with the sink the tool puts its pictures in.
 func (s *Service) runToolInto(ctx context.Context, in incoming, name, args string, out any, sink *tools.Sink) bool {
-	ctx, cancel := context.WithTimeout(ctx, keyboardTimeout)
+	return s.toolFailure(ctx, in, name, args, out, sink) == ""
+}
+
+// toolFailure runs a tool as runToolInto does and says why it failed: the
+// registry's code, such as "invalid_arguments" for what it did not find or
+// "daily_limit", or "unreadable"; "" when it succeeded. An answer written
+// in code tells a search that found nothing from a service that is down.
+func (s *Service) toolFailure(ctx context.Context, in incoming, name, args string, out any, sink *tools.Sink) string {
+	timeout := keyboardTimeout
+	if name == "generate_image" {
+		timeout = drawTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	ctx = tools.WithTurn(ctx, s.caller(in), sink)
 	var envelope struct {
 		OK     bool            `json:"ok"`
 		Result json.RawMessage `json:"result"`
+		Error  struct {
+			Code string `json:"code"`
+		} `json:"error"`
 	}
 	raw := s.opts.Tools.Execute(ctx, in.userID, name, args)
-	if json.Unmarshal([]byte(raw), &envelope) != nil || !envelope.OK || json.Unmarshal(envelope.Result, out) != nil {
-		s.opts.Logger.Warn("a keyboard button's tool failed", "tool", name, "user_id", in.userID, "result", truncateLog(raw))
-		return false
+	failure := ""
+	switch {
+	case json.Unmarshal([]byte(raw), &envelope) != nil:
+		failure = "unreadable"
+	case !envelope.OK:
+		failure = cmp.Or(envelope.Error.Code, "failed")
+	case json.Unmarshal(envelope.Result, out) != nil:
+		failure = "unreadable"
 	}
-	return true
+	if failure != "" {
+		s.opts.Logger.Warn("a keyboard button's tool failed", "tool", name, "user_id", in.userID, "result", truncateLog(raw))
+	}
+	return failure
 }
 
 // keyboardTool answers with a tool's result, written by write; ok is false
