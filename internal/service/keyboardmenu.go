@@ -33,45 +33,41 @@ var (
 )
 
 // askedRequest is a question whose answer the model takes, as a request
-// written with it: a hero's name.
+// written with it: a film's title. A question answered in code, as the
+// Mobile Legends menu's are (see mlbbanswers.go), has no request.
 type askedRequest struct {
 	question, hint localText
 	// request takes the answer.
 	request localText
 }
 
-// askedRequests are the questions whose answers go to the model, by the
-// menu choice that asks them.
+// askedRequests are the menus' questions, by the menu choice that asks
+// them: their answers go to codeAnswers by the same key, or else to the
+// model.
 var askedRequests = map[string]askedRequest{
 	"hero": {
 		question: localText{uz: "🦸 Qaysi qahramon? Nomini yozing.", ru: "🦸 Какой герой? Напишите имя.", en: "🦸 Which hero? Write the name."},
 		hint:     heroHint,
-		request:  localText{uz: "MLBB: %s qahramoni haqida ma'lumot ber", ru: "MLBB: расскажи о герое %s", en: "MLBB: tell me about the hero %s"},
 	},
 	"build": {
 		question: localText{uz: "🛠 Qaysi qahramonga build kerak?", ru: "🛠 Для какого героя сборка?", en: "🛠 A build for which hero?"},
 		hint:     heroHint,
-		request:  localText{uz: "MLBB: %s uchun eng yaxshi build", ru: "MLBB: лучшая сборка на %s", en: "MLBB: the best build for %s"},
 	},
 	"counter": {
 		question: localText{uz: "⚔️ Qaysi qahramonga qarshi pik kerak?", ru: "⚔️ Против какого героя нужен пик?", en: "⚔️ A pick against which hero?"},
 		hint:     heroHint,
-		request:  localText{uz: "MLBB: %s ga qarshi kimni olish kerak?", ru: "MLBB: кого брать против %s?", en: "MLBB: who counters %s?"},
 	},
 	"draft": {
 		question: localText{uz: "🎯 Dushman jamoa kimlarni oldi? Vergul bilan yozing.", ru: "🎯 Кого взяли враги? Через запятую.", en: "🎯 Whom did the enemy pick? Separate with commas."},
 		hint:     localText{uz: "Masalan: Ling, Tigreal", ru: "Например: Ling, Tigreal", en: "For example: Ling, Tigreal"},
-		request:  localText{uz: "MLBB draft: dushman jamoa oldi: %s. Men kimni olay?", ru: "MLBB драфт: враги взяли: %s. Кого мне взять?", en: "MLBB draft: the enemy picked %s. Whom should I pick?"},
 	},
 	"winrate": {
 		question: localText{uz: "📈 O'yinlar soni, hozirgi win rate va kerakli win rate'ni yozing.", ru: "📈 Напишите число матчей, текущий винрейт и нужный.", en: "📈 Write your matches, your win rate and the one you want."},
 		hint:     localText{uz: "Masalan: 500 48 60", ru: "Например: 500 48 60", en: "For example: 500 48 60"},
-		request:  localText{uz: "MLBB: o'yinlar soni, hozirgi win rate va kerakli win rate: %s. Ketma-ket nechta yutish kerak?", ru: "MLBB: матчей, текущий и нужный винрейт: %s. Сколько побед подряд нужно?", en: "MLBB: matches, current and wanted win rate: %s. How many wins in a row do I need?"},
 	},
 	"player": {
 		question: localText{uz: "🆔 O'yinchi ID va zonasini yozing.", ru: "🆔 Напишите ID игрока и зону.", en: "🆔 Write the player's ID and zone."},
 		hint:     localText{uz: "Masalan: 1407157025 (15832)", ru: "Например: 1407157025 (15832)", en: "For example: 1407157025 (15832)"},
-		request:  localText{uz: "MLBB o'yinchi: %s", ru: "MLBB игрок: %s", en: "MLBB player: %s"},
 	},
 }
 
@@ -85,7 +81,7 @@ var skinsQuestion = askedRequest{
 }
 
 // mlbbChoices are the Mobile Legends menu's buttons, by the choice each
-// sends. meta asks nothing: it is asked of the model at once.
+// sends. meta asks nothing: it is answered at once.
 var mlbbChoices = []struct {
 	choice string
 	label  localText
@@ -99,8 +95,6 @@ var mlbbChoices = []struct {
 	{"winrate", localText{uz: "📈 Win rate", ru: "📈 Винрейт", en: "📈 Win rate"}},
 	{"player", localText{uz: "🆔 O'yinchi", ru: "🆔 Игрок", en: "🆔 Player"}},
 }
-
-var textMLBBMeta = localText{uz: "MLBB: hozirgi meta, eng kuchli qahramonlar", ru: "MLBB: текущая мета, самые сильные герои", en: "MLBB: the current meta, the strongest heroes"}
 
 // menuQuestion answers a button that needs a value with its question, in
 // language, the pressed label's.
@@ -195,13 +189,9 @@ func (s *Service) pressedMenu(q *telegram.CallbackQuery) {
 		args, _ := json.Marshal(map[string]string{"city": choice})
 		out = orFailed(in, textError)(keyboardTool(s, ctx, in, "get_weather", string(args), weatherText))
 	case "ml":
-		if answer, inCode := codeAnswers[choice]; inCode && choice == "meta" {
-			out = answer(ctx, s, in, "")
-			break
-		}
 		if choice == "meta" {
-			s.askAsTyped(q, textMLBBMeta.to(in))
-			return
+			out = codeAnswers["meta"](ctx, s, in, "")
+			break
 		}
 		request, ok := askedRequests[choice]
 		if choice == "skins" {
@@ -336,7 +326,7 @@ func (s *Service) askedRequestOf(in incoming) (string, bool) {
 
 // askAsTyped handles text as if the one who pressed a menu's button had
 // written it in reply to the menu: a choice that needs the model and no
-// value, such as the meta. It is its own update, the press standing in for
+// value, such as an item of «📋 Ko'proq». It is its own update, the press standing in for
 // its ID, handled as the press was: at once on serverless hosting, else
 // by the workers.
 func (s *Service) askAsTyped(q *telegram.CallbackQuery, text string) {

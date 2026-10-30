@@ -25,13 +25,19 @@ func (f *fakeToolRunner) Execute(ctx context.Context, _ int64, name, args string
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.asked = append(f.asked, name+" "+args)
-	if sink, ok := tools.SinkFrom(ctx); ok && name == "mlbb" && strings.Contains(args, `"skin":`) {
-		sink.Add(tools.Drawing{Data: []byte("JPEG"), MimeType: "image/jpeg"}) // as the tool sends a skin
+	if sink, ok := tools.SinkFrom(ctx); ok && name == "mlbb" && mlbbPictured(args) {
+		sink.Add(tools.Drawing{Data: []byte("JPEG"), MimeType: "image/jpeg"}) // as the tool sends a skin, a build or a portrait
 	}
 	if answer, ok := f.answers[name]; ok {
 		return answer
 	}
 	return `{"ok":false,"error":{"code":"unknown_tool","message":"no"}}`
+}
+
+// mlbbPictured reports the mlbb calls whose tool sends a picture: a skin,
+// a build or a hero's portrait.
+func mlbbPictured(args string) bool {
+	return strings.Contains(args, `"skin":`) || strings.Contains(args, `"action":"build"`) || strings.Contains(args, `"picture":true`)
 }
 
 func (f *fakeToolRunner) recorded() []string {
@@ -105,8 +111,7 @@ func replyTo(question, text string) telegram.Update {
 }
 
 // A choice is answered, and a rate asks for an amount to convert; the
-// answers to the questions are answered in code too, and the meme's topic
-// goes to the model.
+// answers to the questions are answered in code too, without the model.
 func TestMenusAnswerTheirChoicesAndReplies(t *testing.T) {
 	f := newFixture()
 	runner := withToolRunner(f)
@@ -119,7 +124,6 @@ func TestMenusAnswerTheirChoicesAndReplies(t *testing.T) {
 		menuPress(2, "kb:city:"),
 		replyTo(textCityPrompt.uz, "Termiz"),
 		menuPress(3, "kb:dice:🎯"),
-		replyTo(askedRequests["hero"].question.uz, "Ling"),
 	)
 
 	// Presses are handled at once and messages in turn, so the order is
@@ -130,7 +134,7 @@ func TestMenusAnswerTheirChoicesAndReplies(t *testing.T) {
 	if !slices.Equal(asked, want) {
 		t.Errorf("tools asked = %q\nwant %q", asked, want)
 	}
-	if len(sent) != 5 {
+	if len(sent) != 4 {
 		t.Fatalf("sent = %+v", sent)
 	}
 	find := func(prefix string) sentMessage {
@@ -150,21 +154,12 @@ func TestMenusAnswerTheirChoicesAndReplies(t *testing.T) {
 	if converted := find("💵 1500 USD = 19 125 750,00 so'm (Markaziy bank, 29.10.2026)"); converted.keyboard == nil {
 		t.Errorf("the conversion came without the keyboard")
 	}
-	memeAnswered := false
-	for _, m := range sent {
-		if strings.Contains(m.text, fmt.Sprintf(askedRequests["hero"].request.uz, "Ling")) {
-			memeAnswered = m.keyboard != nil
-		}
-	}
-	if !memeAnswered {
-		t.Errorf("the hero's answer came without the keyboard")
-	}
 	if prompt := find(textCityPrompt.uz); prompt.ask == "" {
 		t.Errorf("city prompt = %+v", prompt)
 	}
 	find("🌤 Toshkent: hozir")
-	if calls := f.replier.recorded(); len(calls) != 1 || !strings.Contains(calls[0].text, fmt.Sprintf(askedRequests["hero"].request.uz, "Ling")) {
-		t.Errorf("model asked %+v; want the hero's request", calls)
+	if calls := f.replier.recorded(); len(calls) != 0 {
+		t.Errorf("model asked %+v", calls)
 	}
 	if len(buttons.answers) != 3 {
 		t.Errorf("presses answered %d times, want 3", len(buttons.answers))
@@ -226,9 +221,9 @@ func TestToolsTakeNothingFromTheLimit(t *testing.T) {
 	}
 }
 
-// Mobile Legends has its own menu: the meta is asked of the model at once,
-// and the rest ask for the hero or the ID first, the answer going to the
-// model with the request.
+// Mobile Legends has its own menu: the meta is answered at once, and the
+// rest ask for the hero or the ID first (mlbbanswers_test.go has the
+// answers).
 func TestMLBBMenu(t *testing.T) {
 	f := newFixture()
 	withToolRunner(f)
@@ -243,13 +238,6 @@ func TestMLBBMenu(t *testing.T) {
 	if len(sent) != 2 || sent[1].text != askedRequests["build"].question.uz || sent[1].ask == "" {
 		t.Fatalf("build's question = %+v", sent)
 	}
-	f.run(replyTo(askedRequests["build"].question.uz, "Ling"))
-	f.run(menuPress(2, "kb:ml:meta"))
-
-	calls := f.replier.recorded()
-	if len(calls) != 2 || !strings.Contains(calls[0].text, "MLBB: Ling uchun eng yaxshi build") || !strings.Contains(calls[1].text, textMLBBMeta.uz) {
-		t.Errorf("model asked %+v", calls)
-	}
 }
 
 // A button is answered in the language of its label, though a few words
@@ -257,8 +245,8 @@ func TestMLBBMenu(t *testing.T) {
 // a question brings the keyboard back with it.
 func TestMenusSpeakThePressedLabelsLanguage(t *testing.T) {
 	f := newFixture()
-	withToolRunner(f)
-	f.replier.draws = 1
+	runner := withToolRunner(f)
+	runner.answers["mlbb"] = mlbbBuildJSON
 
 	sent := f.run(textFrom(userID, keyboardDie.en), textFrom(userID, keyboardMLBB.en))
 	if len(sent) != 2 || sent[0].text != textWhichGame.en || sent[1].text != textMLBBMenu.uz {

@@ -740,13 +740,26 @@ languages, and the buttons that need a value ask for it first
   weather does not know is said to be unknown.
 - «🎲 Zar tashla» asks which game: 🎲 🎯 🏀 ⚽ 🎳 or 🎰.
 - «🎮 MLBB» opens a menu of Mobile Legends: 🔥 Meta, 🦸 Qahramon, 🛠 Build,
-  ⚔️ Kontr-pik, 👕 Skinlar, 🎯 Draft, 📈 Win rate and 🆔 O'yinchi. The meta
-  is asked of the model at once, as if written in reply to the menu (its own
-  update, the press standing in for its ID); the rest open the reply box
-  for the hero, the enemy's picks, the matches and win rates, or the
-  player's ID and zone, and the answer goes to the model with the request
-  ("MLBB: Ling uchun eng yaxshi build"), which the `mlbb` tool answers.
-  Skins are answered in code: the hero's name brings a button for each of
+  ⚔️ Kontr-pik, 👕 Skinlar, 🎯 Draft, 📈 Win rate and 🆔 O'yinchi, all
+  answered in code, without the model (`internal/service/mlbbanswers.go`):
+  the `mlbb` tool is run on the sender's turn and its result written out,
+  labels in the user's language and the game's names as they come. The meta
+  is answered at once, the top heroes with their win, pick and ban rates and
+  tier; the rest open the reply box for the hero, the enemy's picks, the
+  matches and win rates, or the player's ID and zone. A hero is a short
+  profile under its portrait: roles, lanes, rates, difficulty, skills, whom
+  it beats, who beats it and its partners. A build is the tool's picture of
+  the top players' build, captioned with its lane and win rate, and written
+  out should the picture not be drawn. A counter pick lists the five heroes
+  that lower the hero's win rate most, by how much. A draft takes the
+  enemy's one to five heroes written with commas and gives the best picks
+  with their reasons. Win rate takes three numbers ("500 48 60", "500, 48%,
+  60%", "48,5" too) and says how many wins in a row reach the one wanted.
+  A player takes the ID and the zone, "1407157025 (15832)" or apart, and
+  asks for the zone when it is missing. Numbers that cannot be read are
+  answered with how to write them; an unknown hero, a missing account or a
+  failed tool, with a short message saying so.
+  Skins are answered in code too: the hero's name brings a button for each of
   its skins, newest first (the `mlbb` tool's list, its data the hero and the
   skin's place in it, as a skin's name may not fit), and the one pressed
   comes as its picture, captioned with its name, tier and price.
