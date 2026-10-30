@@ -195,6 +195,10 @@ func (s *Service) pressedMenu(q *telegram.CallbackQuery) {
 		args, _ := json.Marshal(map[string]string{"city": choice})
 		out = orFailed(in, textError)(keyboardTool(s, ctx, in, "get_weather", string(args), weatherText))
 	case "ml":
+		if answer, inCode := codeAnswers[choice]; inCode && choice == "meta" {
+			out = answer(ctx, s, in, "")
+			break
+		}
 		if choice == "meta" {
 			s.askAsTyped(q, textMLBBMeta.to(in))
 			return
@@ -212,7 +216,7 @@ func (s *Service) pressedMenu(q *telegram.CallbackQuery) {
 		return
 	case "more", "item", "pick":
 		var ok bool
-		if out, ok = s.pressedMore(q, in, kind, choice); !ok {
+		if out, ok = s.pressedMore(ctx, q, in, kind, choice); !ok {
 			return
 		}
 	case "dice":
@@ -234,8 +238,8 @@ func (s *Service) pressedMenu(q *telegram.CallbackQuery) {
 	if out.ask == "" {
 		out = s.withMenuBack(in, out)
 	}
-	if out.text != "" {
-		s.send(in, telegram.Outgoing{Text: out.text, Buttons: out.buttons, Ask: out.ask, Keyboard: out.keyboard})
+	if out.text != "" || len(out.drawings)+len(out.audios) > 0 {
+		s.deliver(in, &out)
 	}
 }
 
@@ -302,6 +306,12 @@ func (s *Service) menuReply(ctx context.Context, in incoming) (outcome, bool) {
 		args, _ := json.Marshal(map[string]string{"city": strings.TrimSpace(in.text)})
 		return s.withMenuBack(in, orFailed(in, textCityUnknown)(keyboardTool(s, ctx, in, "get_weather", string(args), weatherText))), true
 	}
+	value := strings.TrimSpace(in.text)
+	for key, request := range askedRequests {
+		if answer, inCode := codeAnswers[key]; inCode && value != "" && holdsText(asked.Text, request.question) {
+			return s.withMenuBack(in, answer(ctx, s, in, value)), true
+		}
+	}
 	return outcome{}, false
 }
 
@@ -313,7 +323,10 @@ func (s *Service) askedRequestOf(in incoming) (string, bool) {
 	if in.group || value == "" || asked == nil || asked.From == nil || asked.From.ID != s.opts.Bot.ID {
 		return "", false
 	}
-	for _, request := range askedRequests {
+	for key, request := range askedRequests {
+		if _, inCode := codeAnswers[key]; inCode {
+			continue // menuReply answers it
+		}
 		if holdsText(asked.Text, request.question) {
 			return fmt.Sprintf(request.request.to(in), value), true
 		}

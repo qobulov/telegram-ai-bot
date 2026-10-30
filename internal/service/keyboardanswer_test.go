@@ -399,3 +399,49 @@ func TestSendersTagIsInTheirLabel(t *testing.T) {
 		t.Errorf("author = %q", calls[0].req.AuthorName)
 	}
 }
+
+// withCodeAnswer answers key in code for one test, saying what it got.
+func withCodeAnswer(t *testing.T, key string) {
+	t.Helper()
+	before, had := codeAnswers[key]
+	codeAnswers[key] = func(_ context.Context, _ *Service, _ incoming, value string) outcome {
+		return say("code " + key + ": " + value)
+	}
+	t.Cleanup(func() {
+		if had {
+			codeAnswers[key] = before
+		} else {
+			delete(codeAnswers, key)
+		}
+	})
+}
+
+// A request with a code answer never reaches the model: an item without a
+// value, a choice, a reply to a question, and the meta.
+func TestCodeAnswersSkipTheModel(t *testing.T) {
+	for _, key := range []string{"cat", "table", "hero", "meta"} {
+		withCodeAnswer(t, key)
+	}
+	f := newFixture()
+	withToolRunner(f)
+	f.opts.Buttons = &fakeButtons{}
+
+	sent := f.run(menuPress(1, "kb:item:cat"))
+	sent = append(sent, f.run(menuPress(2, "kb:pick:table:1"))...)
+	sent = append(sent, f.run(menuPress(3, "kb:ml:meta"))...)
+	sent = append(sent, f.run(replyTo(askedRequests["hero"].question.uz, "Ling"))...)
+
+	var texts []string
+	for _, m := range sent {
+		texts = append(texts, m.text)
+	}
+	joined := strings.Join(texts, "|")
+	for _, want := range []string{"code cat: ", "code table: La Liga", "code meta: ", "code hero: Ling"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("sent %q; want %q", texts, want)
+		}
+	}
+	if calls := f.replier.recorded(); len(calls) != 0 {
+		t.Errorf("the model was asked %+v", calls)
+	}
+}

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -169,7 +170,7 @@ func moreMenu(language string) outcome {
 // pressedMore answers a press in «📋 Ko'proq»: a section lists its items;
 // an item asks, offers its choices, or asks the model at once; a choice
 // asks the model.
-func (s *Service) pressedMore(q *telegram.CallbackQuery, in incoming, kind, choice string) (outcome, bool) {
+func (s *Service) pressedMore(ctx context.Context, q *telegram.CallbackQuery, in incoming, kind, choice string) (outcome, bool) {
 	language := languageOf(in)
 	switch kind {
 	case "more":
@@ -203,6 +204,9 @@ func (s *Service) pressedMore(q *telegram.CallbackQuery, in incoming, kind, choi
 			rows := append(inRows(buttons, 2), []telegram.Button{backButton(language, "more:"+sectionOf(item.key))})
 			return outcome{text: item.label.inLanguage(language), buttons: rows, replace: true}, true
 		}
+		if answer, inCode := codeAnswers[item.key]; inCode {
+			return answer(ctx, s, in, ""), true
+		}
 		s.askAsTyped(q, item.request.inLanguage(language))
 		return outcome{}, true
 	case "pick":
@@ -211,6 +215,9 @@ func (s *Service) pressedMore(q *telegram.CallbackQuery, in incoming, kind, choi
 		var i int
 		if _, err := fmt.Sscan(place, &i); err != nil || !ok || i < 0 || i >= len(item.choices) {
 			return outcome{}, false
+		}
+		if answer, inCode := codeAnswers[item.key]; inCode {
+			return answer(ctx, s, in, item.choices[i]), true
 		}
 		s.askAsTyped(q, fmt.Sprintf(item.request.inLanguage(language), item.choices[i]))
 		return outcome{}, true
