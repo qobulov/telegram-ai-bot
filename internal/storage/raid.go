@@ -25,7 +25,6 @@ type RaidHero struct {
 	Coins   int64
 	Sword   int
 	Crit    int
-	Helper  int
 	Seed    uint32
 	Taps    int64
 	LastHit time.Time
@@ -34,7 +33,6 @@ type RaidHero struct {
 	StormUntil, StormReady time.Time
 	FireLeft               int
 	FireReady              time.Time
-	RainUntil, RainReady   time.Time
 	// QuestDay is the day the quest counts are for; QuestClaimed has a bit
 	// for each quest whose reward was taken.
 	QuestDay                           time.Time
@@ -290,14 +288,14 @@ func (s *Store) ChangeRaidHero(ctx context.Context, userID int64, seed uint32, c
 	return hero, nil
 }
 
-// UpgradeRaidHero raises one of the hero's upgrades, "sword", "crit" or
-// "helper", by a level for what cost says the next level costs, below most.
+// UpgradeRaidHero raises one of the hero's upgrades, "sword" or "crit", by
+// a level for what cost says the next level costs, below most.
 func (s *Store) UpgradeRaidHero(ctx context.Context, userID int64, item string, cost func(level int) int64, most int, seed uint32) (RaidHero, error) {
-	if _, ok := map[string]bool{"sword": true, "crit": true, "helper": true}[item]; !ok {
+	if _, ok := map[string]bool{"sword": true, "crit": true}[item]; !ok {
 		return RaidHero{}, fmt.Errorf("storage: no raid upgrade %q", item)
 	}
 	return s.ChangeRaidHero(ctx, userID, seed, func(hero *RaidHero) error {
-		level := map[string]*int{"sword": &hero.Sword, "crit": &hero.Crit, "helper": &hero.Helper}[item]
+		level := map[string]*int{"sword": &hero.Sword, "crit": &hero.Crit}[item]
 		if *level >= most {
 			return ErrRaidMax
 		}
@@ -355,8 +353,8 @@ func raidBoss(ctx context.Context, tx pgx.Tx, chatID int64, rules RaidRules, loc
 	return b, tx.QueryRow(ctx, query, chatID).Scan(&b.Level, &b.HP, &b.MaxHP)
 }
 
-const raidHeroColumns = `coins, sword, crit, helper, seed, taps, last_hit,
-	storm_until, storm_ready, fire_left, fire_ready, rain_until, rain_ready,
+const raidHeroColumns = `coins, sword, crit, seed, taps, last_hit,
+	storm_until, storm_ready, fire_left, fire_ready,
 	quest_day, quest_taps, quest_kills, quest_skills, quest_claimed, streak, streak_day`
 
 // raidHero is the player's hero, a new one with seed made if there is
@@ -371,9 +369,9 @@ func raidHero(ctx context.Context, tx pgx.Tx, userID int64, seed uint32, lock bo
 		query += ` FOR UPDATE`
 	}
 	var storedSeed int64
-	var lastHit, stormUntil, stormReady, fireReady, rainUntil, rainReady, questDay, streakDay *time.Time
-	if err := tx.QueryRow(ctx, query, userID).Scan(&h.Coins, &h.Sword, &h.Crit, &h.Helper, &storedSeed, &h.Taps, &lastHit,
-		&stormUntil, &stormReady, &h.FireLeft, &fireReady, &rainUntil, &rainReady,
+	var lastHit, stormUntil, stormReady, fireReady, questDay, streakDay *time.Time
+	if err := tx.QueryRow(ctx, query, userID).Scan(&h.Coins, &h.Sword, &h.Crit, &storedSeed, &h.Taps, &lastHit,
+		&stormUntil, &stormReady, &h.FireLeft, &fireReady,
 		&questDay, &h.QuestTaps, &h.QuestKills, &h.QuestSkills, &h.QuestClaimed, &h.Streak, &streakDay); err != nil {
 		return RaidHero{}, err
 	}
@@ -382,7 +380,7 @@ func raidHero(ctx context.Context, tx pgx.Tx, userID int64, seed uint32, lock bo
 		from *time.Time
 		to   *time.Time
 	}{{lastHit, &h.LastHit}, {stormUntil, &h.StormUntil}, {stormReady, &h.StormReady}, {fireReady, &h.FireReady},
-		{rainUntil, &h.RainUntil}, {rainReady, &h.RainReady}, {questDay, &h.QuestDay}, {streakDay, &h.StreakDay}} {
+		{questDay, &h.QuestDay}, {streakDay, &h.StreakDay}} {
 		if t.from != nil {
 			*t.to = *t.from
 		}
@@ -393,14 +391,13 @@ func raidHero(ctx context.Context, tx pgx.Tx, userID int64, seed uint32, lock bo
 // saveRaidHero writes what can change of a hero.
 func saveRaidHero(ctx context.Context, tx pgx.Tx, h RaidHero) error {
 	_, err := tx.Exec(ctx, `
-		UPDATE raid_heroes SET coins = $2, sword = $3, crit = $4, helper = $5, taps = $6, last_hit = $7,
-			storm_until = $8, storm_ready = $9, fire_left = $10, fire_ready = $11, rain_until = $12, rain_ready = $13,
-			quest_day = $14, quest_taps = $15, quest_kills = $16, quest_skills = $17, quest_claimed = $18,
-			streak = $19, streak_day = $20, updated_at = now()
+		UPDATE raid_heroes SET coins = $2, sword = $3, crit = $4, taps = $5, last_hit = $6,
+			storm_until = $7, storm_ready = $8, fire_left = $9, fire_ready = $10,
+			quest_day = $11, quest_taps = $12, quest_kills = $13, quest_skills = $14, quest_claimed = $15,
+			streak = $16, streak_day = $17, updated_at = now()
 		WHERE user_id = $1`,
-		h.UserID, h.Coins, h.Sword, h.Crit, h.Helper, h.Taps, timeOrNull(h.LastHit),
+		h.UserID, h.Coins, h.Sword, h.Crit, h.Taps, timeOrNull(h.LastHit),
 		timeOrNull(h.StormUntil), timeOrNull(h.StormReady), h.FireLeft, timeOrNull(h.FireReady),
-		timeOrNull(h.RainUntil), timeOrNull(h.RainReady),
 		timeOrNull(h.QuestDay), h.QuestTaps, h.QuestKills, h.QuestSkills, h.QuestClaimed, h.Streak, timeOrNull(h.StreakDay))
 	return err
 }

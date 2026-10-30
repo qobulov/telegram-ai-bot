@@ -14,8 +14,7 @@ import (
 )
 
 // Taps count up to what a person taps in the time since the last hit, at
-// most two seconds' worth and a few more; Barchinoy's arrows add for the
-// time too.
+// most two seconds' worth and a few more.
 func TestStrikeCountsWhatAPersonTaps(t *testing.T) {
 	hero := storage.RaidHero{Sword: 1, Crit: 0, Seed: 12345}
 	for _, tc := range []struct {
@@ -34,9 +33,8 @@ func TestStrikeCountsWhatAPersonTaps(t *testing.T) {
 			t.Errorf("%d taps after %v counted %d, want %d", tc.taps, tc.since, counted, tc.want)
 		}
 	}
-	hero.Helper = 1
-	if _, damage := Strike(&hero, 0, time.Second, time.Now()); damage != HelperDPS(1) {
-		t.Errorf("Barchinoy alone did %d in a second, want %d", damage, HelperDPS(1))
+	if _, damage := Strike(&hero, 0, time.Second, time.Now()); damage != 0 {
+		t.Errorf("no taps did %d", damage)
 	}
 }
 
@@ -76,7 +74,7 @@ func TestRulesGrow(t *testing.T) {
 		if MaxHP(level, 5) <= MaxHP(level, 1) {
 			t.Fatalf("level %d's boss is no stronger for five members than for one", level)
 		}
-		for _, item := range []string{"sword", "crit", "helper"} {
+		for _, item := range []string{"sword", "crit"} {
 			if level < Most(item) && Cost(item, level+1) <= Cost(item, level) {
 				t.Fatalf("%s at %d costs no more than at %d", item, level+1, level)
 			}
@@ -141,12 +139,12 @@ func TestTitles(t *testing.T) {
 }
 
 // Bo'ron zarbasi multiplies blows while it lasts, Olovli qilich makes the
-// next ten critical, O'qlar yomg'iri multiplies the arrows; each is ready
-// again only after its time, and counts in the day's quests.
+// next ten critical; each is ready again only after its time, and counts
+// in the day's quests.
 func TestSkills(t *testing.T) {
 	now := time.Date(2026, 10, 30, 12, 0, 0, 0, time.UTC)
-	hero := storage.RaidHero{Sword: 1, Helper: 1, Seed: 5}
-	for _, skill := range []string{"storm", "fire", "rain"} {
+	hero := storage.RaidHero{Sword: 1, Seed: 5}
+	for _, skill := range []string{"storm", "fire"} {
 		if err := UseSkill(skill, now)(&hero); err != nil {
 			t.Fatalf("%s: %v", skill, err)
 		}
@@ -154,23 +152,22 @@ func TestSkills(t *testing.T) {
 			t.Errorf("%s used again a second later: %v", skill, err)
 		}
 	}
-	if hero.QuestSkills != 3 || hero.FireLeft != fireTaps {
+	if hero.QuestSkills != 2 || hero.FireLeft != fireTaps {
 		t.Fatalf("after the skills: %+v", hero)
 	}
 	counted, damage := Strike(&hero, 4, time.Second, now.Add(time.Second))
-	want := 4*TapDamage(1)*critTimes*stormTimes + HelperDPS(1)*rainTimes
+	want := 4 * TapDamage(1) * critTimes * stormTimes
 	if counted != 4 || damage != want || hero.FireLeft != fireTaps-4 || hero.QuestTaps != 4 {
-		t.Errorf("a hit in all three did %d of %d taps, want %d; %+v", damage, counted, want, hero)
+		t.Errorf("a hit in both did %d of %d taps, want %d; %+v", damage, counted, want, hero)
 	}
 	_, after := Strike(&hero, 1, time.Second, now.Add(stormFor+skillGrace+time.Second))
-	if after != TapDamage(1)*critTimes+HelperDPS(1) {
-		t.Errorf("after the storm and the rain a fiery blow did %d", after)
+	if after != TapDamage(1)*critTimes {
+		t.Errorf("after the storm a fiery blow did %d", after)
 	}
-	if err := UseSkill("rain", now)(&storage.RaidHero{}); !errors.Is(err, ErrNoHelper) {
-		t.Errorf("rain without Barchinoy: %v", err)
-	}
-	if err := UseSkill("magic", now)(&hero); !errors.Is(err, ErrNoSkill) {
-		t.Errorf("an unknown skill: %v", err)
+	for _, skill := range []string{"rain", "magic"} {
+		if err := UseSkill(skill, now)(&hero); !errors.Is(err, ErrNoSkill) {
+			t.Errorf("%s: %v", skill, err)
+		}
 	}
 }
 

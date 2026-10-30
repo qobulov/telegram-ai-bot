@@ -9,17 +9,18 @@
 
   const texts = {
     uz: {
+      you: "Siz",
       names: ["Ko'k dev", "Qizil dev", "Bir ko'zli dev", "Ajdar", "Muz devi", "Tosh dev", "Yalmog'iz kampir", "Qora dev"],
       hint: "Devni bosib uring! Guruhdagilar ham siz bilan uradi",
-      chief: "BOSH DEV", storm: "Bo'ron", fire: "Olov", rain: "Yomg'ir", ready: "Tayyor!", needHelper: "Barchinoy kerak",
-      stormOn: "Bo'ron zarbasi! ×5", fireOn: "Olovli qilich! 10 krit", rainOn: "O'qlar yomg'iri! ×10",
+      chief: "BOSH DEV", storm: "Bo'ron", fire: "Olov", ready: "Tayyor!",
+      stormOn: "Bo'ron zarbasi! ×5", fireOn: "Olovli qilich! 10 krit",
       quests: "Kundalik vazifalar", questsReset: "Vazifalar har kuni yarim tunda yangilanadi.",
       questNames: ["300 marta ur", "1 ta dev yiqitishda qatnash", "Mahoratni 3 marta ishlat"], claim: "Olish", claimed: "Olindi ✓",
       streak: (n) => `🔥 ${n} kun ketma-ket`, gift: (n, s) => `🎁 Kunlik sovg'a: +${n} 💰<br><small>🔥 ${s}-kun ketma-ket</small>`, got: (n) => `+${n} 💰`,
       table: "Reyting", thisBoss: "Shu dev", allTime: "Umumiy", place: (n) => `${n}-o'rin`,
-      titles: ["Yangi jangchi", "Botir", "Bahodir", "Pahlavon", "Qahramon", "Alpomish"], sword: "Qilich", crit: "Krit", helper: "Barchinoy",
-      lvl: (n) => `${n}-daraja`, hired: "yollanmagan",
-      swordNext: (a, b) => `zarba ${a} → ${b}`, critNext: (a, b) => `${a}% → ${b}%`, helperNext: (a, b) => `${a}/s → ${b}/s`,
+      titles: ["Yangi jangchi", "Botir", "Bahodir", "Pahlavon", "Qahramon", "Alpomish"], sword: "Qilich", crit: "Krit",
+      lvl: (n) => `${n}-daraja`,
+      swordNext: (a, b) => `zarba ${a} → ${b}`, critNext: (a, b) => `${a}% → ${b}%`,
       max: "Eng yuqori", killed: (name) => `${name} yengildi!`, reward: (n) => `+${n} 💰 sizga`,
       next: "Keyingi dev", share: "Ulashish", others: (name) => `${name} guruh bilan yengildi!`,
       poor: "Tanga yetmaydi", upgraded: "Kuchaydi!", rage: "Dev g'azabda!",
@@ -28,17 +29,18 @@
       unavailable: "Aloqa uzildi, qayta urinyapmiz…",
     },
     ru: {
+      you: "Вы",
       names: ["Синий дэв", "Красный дэв", "Одноглазый дэв", "Аждар", "Ледяной дэв", "Каменный дэв", "Ялмогиз-кампир", "Чёрный дэв"],
       hint: "Бейте дэва! Группа бьёт вместе с вами",
-      chief: "ГЛАВНЫЙ", storm: "Буря", fire: "Огонь", rain: "Ливень", ready: "Готово!", needHelper: "Нужна Барчиной",
-      stormOn: "Удар бури! ×5", fireOn: "Огненный меч! 10 критов", rainOn: "Ливень стрел! ×10",
+      chief: "ГЛАВНЫЙ", storm: "Буря", fire: "Огонь", ready: "Готово!",
+      stormOn: "Удар бури! ×5", fireOn: "Огненный меч! 10 критов",
       quests: "Ежедневные задания", questsReset: "Задания обновляются каждую полночь.",
       questNames: ["Ударить 300 раз", "Помочь победить 1 дэва", "Применить умение 3 раза"], claim: "Забрать", claimed: "Получено ✓",
       streak: (n) => `🔥 ${n} дн. подряд`, gift: (n, s) => `🎁 Ежедневный подарок: +${n} 💰<br><small>🔥 ${s}-й день подряд</small>`, got: (n) => `+${n} 💰`,
       table: "Рейтинг", thisBoss: "Этот дэв", allTime: "Всего", place: (n) => `${n}-е место`,
-      titles: ["Новобранец", "Батыр", "Богатырь", "Пахлавон", "Герой", "Алпамыш"], sword: "Меч", crit: "Крит", helper: "Барчиной",
-      lvl: (n) => `ур. ${n}`, hired: "не нанята",
-      swordNext: (a, b) => `удар ${a} → ${b}`, critNext: (a, b) => `${a}% → ${b}%`, helperNext: (a, b) => `${a}/с → ${b}/с`,
+      titles: ["Новобранец", "Батыр", "Богатырь", "Пахлавон", "Герой", "Алпамыш"], sword: "Меч", crit: "Крит",
+      lvl: (n) => `ур. ${n}`,
+      swordNext: (a, b) => `удар ${a} → ${b}`, critNext: (a, b) => `${a}% → ${b}%`,
       max: "Максимум", killed: (name) => `${name} повержен!`, reward: (n) => `+${n} 💰 вам`,
       next: "Следующий дэв", share: "Поделиться", others: (name) => `${name} повержен группой!`,
       poor: "Не хватает монет", upgraded: "Сильнее!", rage: "Дэв в ярости!",
@@ -47,17 +49,18 @@
       unavailable: "Связь прервалась, пробуем снова…",
     },
     en: {
+      you: "You",
       names: ["Blue giant", "Red giant", "One-eyed giant", "Ajdar the dragon", "Ice giant", "Stone giant", "The witch Yalmog'iz", "Black giant"],
       hint: "Tap the giant! Your group hits it with you",
-      chief: "CHIEF", storm: "Storm", fire: "Fire", rain: "Rain", ready: "Ready!", needHelper: "Needs Barchinoy",
-      stormOn: "Storm strike! ×5", fireOn: "Fiery sword! 10 crits", rainOn: "Rain of arrows! ×10",
+      chief: "CHIEF", storm: "Storm", fire: "Fire", ready: "Ready!",
+      stormOn: "Storm strike! ×5", fireOn: "Fiery sword! 10 crits",
       quests: "Daily quests", questsReset: "Quests renew every midnight.",
       questNames: ["Hit 300 times", "Help defeat 1 giant", "Use a skill 3 times"], claim: "Claim", claimed: "Claimed ✓",
       streak: (n) => `🔥 ${n} ${n === 1 ? "day" : "days"} in a row`, gift: (n, s) => `🎁 Daily gift: +${n} 💰<br><small>🔥 day ${s} in a row</small>`, got: (n) => `+${n} 💰`,
       table: "Ranking", thisBoss: "This giant", allTime: "All time", place: (n) => `#${n}`,
-      titles: ["Recruit", "Brave", "Warrior", "Champion", "Hero", "Alpomish"], sword: "Sword", crit: "Crit", helper: "Barchinoy",
-      lvl: (n) => `level ${n}`, hired: "not hired",
-      swordNext: (a, b) => `blow ${a} → ${b}`, critNext: (a, b) => `${a}% → ${b}%`, helperNext: (a, b) => `${a}/s → ${b}/s`,
+      titles: ["Recruit", "Brave", "Warrior", "Champion", "Hero", "Alpomish"], sword: "Sword", crit: "Crit",
+      lvl: (n) => `level ${n}`,
+      swordNext: (a, b) => `blow ${a} → ${b}`, critNext: (a, b) => `${a}% → ${b}%`,
       max: "Maxed", killed: (name) => `${name} defeated!`, reward: (n) => `+${n} 💰 for you`,
       next: "Next giant", share: "Share", others: (name) => `${name} defeated by the group!`,
       poor: "Not enough coins", upgraded: "Stronger!", rage: "The giant is enraged!",
@@ -96,9 +99,9 @@
   // skills is when, by this page's clock, each skill is ready and lasts
   // until; fireLeft is the fiery blows left, counted here as they are
   // struck.
-  const skills = { storm: { readyAt: 0, until: 0, times: 5 }, fire: { readyAt: 0 }, rain: { readyAt: 0, until: 0, times: 10 } };
+  const skills = { storm: { readyAt: 0, until: 0, times: 5 }, fire: { readyAt: 0 } };
   let fireLeft = 0;
-  let pending = 0, pendingDamage = 0, inflight = 0, inflightDamage = 0, sending = false, lastSend = 0, polled = 0;
+  let pending = 0, pendingDamage = 0, inflight = 0, inflightDamage = 0, sending = false, polled = 0;
   const seen = new Map();
   const tapTimes = [];
   let shownLevel = 0, entrance = 1, victoryOpen = false, myDamage = 0;
@@ -128,9 +131,6 @@
       skills.storm.until = later(skills.storm.until, sk.storm.active_for);
       skills.storm.times = sk.storm.times;
       skills.fire.readyAt = later(skills.fire.readyAt, sk.fire.ready_in);
-      skills.rain.readyAt = later(skills.rain.readyAt, sk.rain.ready_in);
-      skills.rain.until = later(skills.rain.until, sk.rain.active_for);
-      skills.rain.times = sk.rain.times;
       if (data.top && pending === 0 && inflight === 0 && !sending) fireLeft = sk.fire.left;
     }
     if (data.gift > 0 && hero) toast(t.gift(fmt(data.gift), hero.streak), 3500);
@@ -159,19 +159,14 @@
 
   async function flush() {
     if (sending || !hero || !boss) return;
-    const now = performance.now();
-    const helperDue = hero.helper > 0 && now - lastSend > 2000 && !document.hidden;
-    if (pending === 0 && !helperDue) return;
+    if (pending === 0) return;
     sending = true;
-    lastSend = now;
     inflight = pending;
     inflightDamage = pendingDamage;
     pending = 0;
     pendingDamage = 0;
     try {
       const data = await api({ action: "hit", taps: inflight });
-      const arrows = data.damage - inflightDamage;
-      if (hero.helper > 0 && arrows > 0) arrowsHit(arrows);
       inflight = 0;
       inflightDamage = 0;
       apply(data);
@@ -252,28 +247,14 @@
   async function useSkill(skill) {
     if (!hero || victoryOpen) return;
     const now = performance.now();
-    if (skill === "rain" && hero.helper === 0) {
-      message(t.needHelper);
-      setTimeout(() => message(""), 1500);
-      return;
-    }
     if (now < skills[skill].readyAt) return;
     await flush();
     try {
       apply(await api({ action: "skill", skill }));
       if (skill === "fire") fireLeft = hero.skills.fire.left;
-      const said = { storm: t.stormOn, fire: t.fireOn, rain: t.rainOn }[skill];
-      textPop(W / 2, bossY() - bossRadius() - 20, said, skill === "rain" ? "#7fd6ff" : "#ffb34a", 26);
-      burst(bossX(), bossY(), skill === "rain" ? "#7fd6ff" : "#ff8a3d", 50, 8);
+      textPop(W / 2, bossY() - bossRadius() - 20, skill === "fire" ? t.fireOn : t.stormOn, "#ffb34a", 26);
+      burst(bossX(), bossY(), "#ff8a3d", 50, 8);
       fx.shake = 0.8;
-      if (skill === "rain") {
-        for (let i = 0; i < 14; i++) {
-          setTimeout(() => {
-            const from = archerAt();
-            arrows.push({ x: from[0], y: from[1], tx: bossX() + (Math.random() - 0.5) * 120, ty: bossY() + (Math.random() - 0.5) * 100, k: 0, silent: true });
-          }, i * 180);
-        }
-      }
       if (navigator.vibrate) navigator.vibrate([20, 30, 40]);
       hud();
     } catch (error) {
@@ -284,17 +265,15 @@
   function skillsHud() {
     if (!hero) return;
     const now = performance.now();
-    const every = { storm: 45000, fire: 60000, rain: 40000 };
+    const every = { storm: 45000, fire: 60000 };
     for (const button of document.querySelectorAll(".skill")) {
       const name = button.dataset.skill, sk = skills[name];
       const wait = Math.max(0, sk.readyAt - now);
       const active = name === "fire" ? fireLeft > 0 : now < sk.until;
-      const off = name === "rain" && hero.helper === 0;
       button.classList.toggle("active", active);
-      button.classList.toggle("ready", !wait && !active && !off);
-      button.classList.toggle("off", off);
+      button.classList.toggle("ready", !wait && !active);
       button.style.setProperty("--cool", `${Math.min(100, (wait / every[name]) * 100)}%`);
-      $(`${name}Info`).textContent = off ? t.needHelper : active ? (name === "fire" ? `🔥 ${fireLeft}` : `${Math.ceil((sk.until - now) / 1000)}s`) : wait ? `${Math.ceil(wait / 1000)}s` : t.ready;
+      $(`${name}Info`).textContent = active ? (name === "fire" ? `🔥 ${fireLeft}` : `${Math.ceil((sk.until - now) / 1000)}s`) : wait ? `${Math.ceil(wait / 1000)}s` : t.ready;
     }
   }
 
@@ -358,7 +337,13 @@
   $("questsClose").addEventListener("click", () => { $("quests").hidden = true; });
   $("quests").addEventListener("click", (e) => { if (e.target.id === "quests") $("quests").hidden = true; });
 
-  // ---------- what others and Barchinoy do ----------
+  // ---------- what others do ----------
+
+  // The others who fight this boss stand by you, up to three of them, and
+  // swing as their blows come in.
+  const swings = new Map();
+  const fighters = () => top.filter((row) => !row.me).slice(0, 3);
+  const fighterAt = (i) => [W * (0.43 + i * 0.22), groundY() - 66 - (i % 2) * 8];
 
   function othersHit(row, damage) {
     const parts = Math.min(4, Math.max(1, Math.round(damage / Math.max(hero ? hero.tap_damage * 3 : 50, 1))));
@@ -370,13 +355,9 @@
         nums.push({ x, y, vy: -1.4, vx: 0, text: `${row.name} −${fmt(damage / parts)}`, color: colorOf(row.id), size: 14, life: 1 });
         burst(x, y, colorOf(row.id), 6, 3);
         fx.flash = Math.max(fx.flash, 40);
+        swings.set(row.id, 1);
       }, (i * 2200) / parts + Math.random() * 300);
     }
-  }
-
-  function arrowsHit(damage) {
-    const from = archerAt();
-    arrows.push({ x: from[0], y: from[1], tx: bossX() + (Math.random() - 0.5) * 60, ty: bossY() + (Math.random() - 0.5) * 60, k: 0, damage });
   }
 
   // ---------- victory ----------
@@ -468,7 +449,7 @@
     const have = hero.coins + pending + inflight;
     const card = (item, level, next) => {
       const el = document.querySelector(`.card[data-item="${item}"]`);
-      $(`${item}Lvl`).textContent = item === "helper" && hero.helper === 0 ? t.hired : t.lvl(level);
+      $(`${item}Lvl`).textContent = t.lvl(level);
       $(`${item}Next`).textContent = next;
       $(`${item}Cost`).textContent = hero.max[item] ? t.max : `${fmt(hero.costs[item])} 💰`;
       el.classList.toggle("max", hero.max[item]);
@@ -477,7 +458,6 @@
     };
     card("sword", hero.sword, t.swordNext(fmt(hero.tap_damage), fmt(hero.next.tap_damage)));
     card("crit", hero.crit, t.critNext(hero.crit_chance, hero.next.crit_chance));
-    card("helper", hero.helper, t.helperNext(fmt(hero.helper_dps), fmt(hero.next.helper_dps)));
     const chip = $("rank");
     const place = boardMode === "total" ? rank.total : rank.level || rank.total;
     chip.hidden = false;
@@ -515,7 +495,7 @@
   const canvas = $("scene");
   const ctx = canvas.getContext("2d");
   let W = 0, H = 0, dpr = 1;
-  let nums = [], parts = [], arrows = [], slashes = [];
+  let nums = [], parts = [], slashes = [];
   const fx = { flash: 0, squash: 0, shake: 0, swing: 0 };
   let peaks = [];
 
@@ -535,7 +515,6 @@
   const bossRadius = () => Math.max(40, Math.min(W * 0.36, (groundY() - 150) * 0.42, 170));
   const bossX = () => W / 2;
   const bossY = () => 130 + (groundY() - 130) * 0.48;
-  const archerAt = () => [W * 0.84, groundY() - 30];
 
   function damageNumber(x, y, value, crit) {
     nums.push({
@@ -618,7 +597,18 @@
     ctx.drawImage(layer, x - half * s, y - half * s, half * 2 * s, half * 2 * s);
   }
 
-  function drawHero(x, y, s, face, swing, robe, now, archer) {
+  function nameTag(name, x, y, color) {
+    const text = name.length > 9 ? name.slice(0, 8) + "…" : name;
+    ctx.font = "700 12px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.6)";
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y);
+  }
+
+  function drawHero(x, y, s, face, swing, robe, now) {
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(s * face, s);
@@ -649,59 +639,37 @@
     ctx.beginPath();
     ctx.arc(0, -24 + b, 11, 0, Math.PI * 2);
     ctx.fill();
-    if (archer) {
-      ctx.fillStyle = "#3a1a0a";
-      ctx.beginPath();
-      ctx.arc(-2, -30 + b, 12, Math.PI, 0);
-      ctx.fill();
-      ctx.fillRect(-14, -30 + b, 6, 22);
-      ctx.fillStyle = "#d6264a";
-      ctx.fillRect(-12, -36 + b, 24, 4);
-      ctx.strokeStyle = "#a0662a";
+    ctx.fillStyle = "#f6f1e6";
+    ctx.beginPath();
+    ctx.ellipse(0, -32 + b, 13, 8, 0, Math.PI, 0);
+    ctx.fill();
+    ctx.fillStyle = "#2fd4c4";
+    ctx.fillRect(-13, -33 + b, 26, 3);
+    ctx.save();
+    ctx.translate(12, 2 + b);
+    ctx.rotate(-1.1 + swing * 2.4);
+    ctx.fillStyle = "#8a5a2a";
+    ctx.fillRect(-3, -4, 6, 12);
+    ctx.fillStyle = "#ffcf4a";
+    ctx.fillRect(-9, -6, 18, 4);
+    const sg = ctx.createLinearGradient(0, -6, 0, -54);
+    sg.addColorStop(0, "#d8e4f0");
+    sg.addColorStop(1, "#ffffff");
+    ctx.fillStyle = sg;
+    ctx.beginPath();
+    ctx.moveTo(-4, -6);
+    ctx.lineTo(4, -6);
+    ctx.quadraticCurveTo(6, -40, 0, -56);
+    ctx.quadraticCurveTo(-3, -40, -4, -6);
+    ctx.fill();
+    if (swing > 0.2) {
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(14, -2 + b, 22, -1.3, 1.3);
+      ctx.arc(0, 0, 52, -1.8, -1.1);
       ctx.stroke();
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(14 + Math.cos(-1.3) * 22, -2 + b + Math.sin(-1.3) * 22);
-      ctx.lineTo(14 - swing * 10, -2 + b);
-      ctx.lineTo(14 + Math.cos(1.3) * 22, -2 + b + Math.sin(1.3) * 22);
-      ctx.stroke();
-    } else {
-      ctx.fillStyle = "#f6f1e6";
-      ctx.beginPath();
-      ctx.ellipse(0, -32 + b, 13, 8, 0, Math.PI, 0);
-      ctx.fill();
-      ctx.fillStyle = "#2fd4c4";
-      ctx.fillRect(-13, -33 + b, 26, 3);
-      ctx.save();
-      ctx.translate(12, 2 + b);
-      ctx.rotate(-1.1 + swing * 2.4);
-      ctx.fillStyle = "#8a5a2a";
-      ctx.fillRect(-3, -4, 6, 12);
-      ctx.fillStyle = "#ffcf4a";
-      ctx.fillRect(-9, -6, 18, 4);
-      const sg = ctx.createLinearGradient(0, -6, 0, -54);
-      sg.addColorStop(0, "#d8e4f0");
-      sg.addColorStop(1, "#ffffff");
-      ctx.fillStyle = sg;
-      ctx.beginPath();
-      ctx.moveTo(-4, -6);
-      ctx.lineTo(4, -6);
-      ctx.quadraticCurveTo(6, -40, 0, -56);
-      ctx.quadraticCurveTo(-3, -40, -4, -6);
-      ctx.fill();
-      if (swing > 0.2) {
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(0, 0, 52, -1.8, -1.1);
-        ctx.stroke();
-      }
-      ctx.restore();
     }
+    ctx.restore();
     ctx.fillStyle = "#1a0c00";
     ctx.beginPath();
     ctx.arc(5, -25 + b, 2, 0, Math.PI * 2);
@@ -742,25 +710,6 @@
       ctx.stroke();
       ctx.restore();
     }
-    for (const a of arrows) {
-      a.k += dt / 380;
-      const x = a.x + (a.tx - a.x) * Math.min(1, a.k), y = a.y + (a.ty - a.y) * Math.min(1, a.k) - Math.sin(Math.min(1, a.k) * Math.PI) * 50;
-      if (a.k >= 1 && !a.done) {
-        a.done = true;
-        if (a.silent) continue;
-        nums.push({ x: a.tx, y: a.ty, vy: -1.2, vx: 0, text: `🏹 −${fmt(a.damage)}`, color: "#7fd6ff", size: 16, life: 1 });
-        burst(a.tx, a.ty, "#7fd6ff", 8, 3);
-      }
-      if (!a.done) {
-        ctx.strokeStyle = "#f3e2c0";
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + 14, y + 4);
-        ctx.stroke();
-      }
-    }
-    arrows = arrows.filter((a) => !a.done);
     for (const n of nums) {
       n.y += n.vy * dt * 0.06;
       n.x += n.vx * dt * 0.06;
@@ -782,7 +731,7 @@
     ctx.globalAlpha = 1;
   }
 
-  let last = performance.now(), arrowClock = 0;
+  let last = performance.now();
   function frame(now) {
     const dt = Math.min(50, now - last);
     last = now;
@@ -811,16 +760,14 @@
       if (!victoryOpen) drawBoss(kind, x, y, s, now, fx.flash > 0, rage);
       ctx.restore();
       const gy = groundY();
-      drawHero(W * 0.2, gy - 50, 1.25, 1, fx.swing, "#1d2c7a", now, false);
-      if (hero && hero.helper > 0) {
-        arrowClock += dt;
-        if (arrowClock > 700 && !victoryOpen) {
-          arrowClock = 0;
-          const from = archerAt();
-          arrows.push({ x: from[0], y: from[1], tx: bossX() + (Math.random() - 0.5) * 80, ty: bossY() + (Math.random() - 0.5) * 80, k: 0, done: false, silent: true });
-        }
-        drawHero(W * 0.84, gy - 50, 1.15, -1, (arrowClock / 700), "#7a2a6a", now, true);
-      }
+      fighters().forEach((row, i) => {
+        const [fx2, fy] = fighterAt(i), swing = swings.get(row.id) || 0;
+        swings.set(row.id, Math.max(0, swing - dt / 200));
+        drawHero(fx2, fy, 0.95, fx2 < bossX() ? 1 : -1, swing, colorOf(row.id), now);
+        nameTag(row.name, fx2, fy + 62, "#fff");
+      });
+      drawHero(W * 0.18, gy - 68, 1.15, 1, fx.swing, "#1d2c7a", now);
+      nameTag(t.you, W * 0.18, gy - 68 + 72, "#ffcf4a");
     }
     if (performance.now() < skills.storm.until) {
       ctx.fillStyle = `rgba(255, 120, 40, ${0.08 + 0.05 * Math.sin(now / 80)})`;

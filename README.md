@@ -1817,9 +1817,9 @@ play sent sooner than its chops took.
 `/boss` posts the boss raid: everyone in a chat hits one giant together
 (`public/game/boss/`, `internal/raid`, `api/raid.go`). Each tap is a blow
 of the hero's sword, now and then a critical one of three times the
-damage; Barchinoy, once hired, shoots arrows for every second the player
-keeps hitting. The page shows each blow's number at once, the other
-members' blows as they come in, and the chat's table of damage on this boss.
+damage. The page shows each blow's number at once, the members who fight
+this boss standing by the player with their names, each swinging as their
+blows come in, and the chat's table of damage on this boss.
 The hit that takes the last HP kills it: everyone who hit it gets coins,
 some for being there and more for their share, the bot tells the group who
 hit it most (in a private chat the player fights alone), and the next
@@ -1828,13 +1828,14 @@ each member who hit lately (in the last day, up to 30), so that a small
 group's boss is a small group's to kill. Eight bosses are taken in turn,
 each drawn in its own way under its own sky (public/game/boss/skins.js): Ko'k
 dev, Qizil dev, Bir ko'zli dev, Ajdar, Muz devi, Tosh dev, Yalmog'iz kampir and
-Qora dev; every fifth is a chief (👑), thrice as strong and as rewarding. Coins buy the upgrades: the sword's
-damage, the share of critical blows, and Barchinoy.
+Qora dev; every fifth is a chief (👑), thrice as strong and as rewarding.
+Coins buy the upgrades: the sword's damage and the share of critical blows.
+Barchinoy the archer was an upgrade too until migration 47, which took her
+away and gave each hero back the coins they had paid for her.
 
-Three skills, each ready again after a while: 🌪 Bo'ron zarbasi makes blows
+Two skills, each ready again after a while: 🌪 Bo'ron zarbasi makes blows
 five times as strong for 5 seconds (every 45), 🔥 Olovli qilich makes the
-next 10 blows critical (every 60), 🏹 O'qlar yomg'iri makes Barchinoy's
-arrows ten times as strong for 3 seconds (every 40). Three daily quests,
+next 10 blows critical (every 60). Three daily quests,
 the same for everyone and new each midnight in Uzbekistan: hit 300 times,
 help kill a boss, use a skill 3 times; each gives coins once done, more as
 the sword grows. The first visit of a day gives a gift that grows with the
@@ -1845,7 +1846,7 @@ all: Yangi jangchi, Botir (10 thousand), Bahodir (100 thousand), Pahlavon
 table under the message shows each member's damage in all.
 
 The server counts it all (`raid_bosses`, `raid_members`, `raid_heroes`,
-migrations 45 and 46): skills are used, quests claimed and the daily gift
+migrations 45 to 47): skills are used, quests claimed and the daily gift
 given on the server, which keeps when each skill is ready. The page sends only how many times it was tapped; the server
 counts no more taps than 12 a second since the player's last hit, at most
 two seconds' worth and a few more, and works out their damage itself.
@@ -2424,7 +2425,7 @@ update needs:
 
 ### Deploying the dashboard and the game
 
-They need no new kind of update; Dev jangi needs migrations 45 and 46.
+They need no new kind of update; Dev jangi needs migrations 45 to 47.
 
 1. **Deploy**, then **set `WEBAPP_URL`** in Vercel to the deployment's
    production address, for example `https://maria.vercel.app` (no trailing
@@ -2439,11 +2440,11 @@ They need no new kind of update; Dev jangi needs migrations 45 and 46.
 3. **The games, in @BotFather:** `/newgame` → the bot → accept the terms →
    a title (`Tarozi`), a short description, a 640×360 photo (and optionally
    a GIF) → the short name **`tarozi`**, exactly, which the bot sends the
-   game by. Then `/newgame` again for each of the others: title `Kosmik
+   game by. Each game's photo and description are in docs/botfather/. Then `/newgame` again for each of the others: title `Kosmik
    ilon`, short name **`ilon`**; `O'tinchi`, **`otinchi`**; `Dev jangi`,
    **`boss`**. No URL is asked for: the bot gives
    `https://YOUR-APP.vercel.app/game/` and `/game/ilon/`, `/game/otinchi/`,
-   `/game/boss/` with each press of Play. Dev jangi needs migrations 45 and 46.
+   `/game/boss/` with each press of Play. Dev jangi needs migrations 45 to 47.
 4. As an owner, send `/stats`, `/game`, `/ilon`, `/otinchi` and `/boss` in a
    group and in a private chat.
 

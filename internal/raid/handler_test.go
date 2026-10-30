@@ -217,8 +217,8 @@ func TestSkillsQuestsAndTheDailyGift(t *testing.T) {
 	if code, out := f.post(t, map[string]any{"session": session, "action": "skill", "skill": "storm"}); code != http.StatusConflict || out["error"] != "cooldown" {
 		t.Errorf("the storm again: %d %v", code, out)
 	}
-	if code, out := f.post(t, map[string]any{"session": session, "action": "skill", "skill": "rain"}); out["error"] != "no_helper" {
-		t.Errorf("rain without Barchinoy: %d %v", code, out)
+	if code, out := f.post(t, map[string]any{"session": session, "action": "upgrade", "item": "helper"}); code != http.StatusBadRequest {
+		t.Errorf("an upgrade there is no more: %d %v", code, out)
 	}
 	if code, out := f.post(t, map[string]any{"session": session, "action": "claim", "quest": 2}); out["error"] != "not_done" {
 		t.Errorf("an undone quest: %d %v", code, out)

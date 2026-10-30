@@ -97,7 +97,6 @@ var (
 	errCoins       = failure{http.StatusConflict, "coins"}
 	errMax         = failure{http.StatusConflict, "max"}
 	errCooldown    = failure{http.StatusConflict, "cooldown"}
-	errNoHelper    = failure{http.StatusConflict, "no_helper"}
 	errNotDone     = failure{http.StatusConflict, "not_done"}
 	errClaimed     = failure{http.StatusConflict, "claimed"}
 	errUnavailable = failure{http.StatusBadGateway, "unavailable"}
@@ -221,8 +220,6 @@ func (h *handler) change(ctx context.Context, p game.Player, change func(*storag
 	switch {
 	case errors.Is(err, ErrCooldown):
 		return nil, errCooldown
-	case errors.Is(err, ErrNoHelper):
-		return nil, errNoHelper
 	case errors.Is(err, ErrNotDone):
 		return nil, errNotDone
 	case errors.Is(err, ErrClaimed):
@@ -298,16 +295,15 @@ func heroView(h storage.RaidHero, now time.Time) map[string]any {
 		"skills": map[string]any{
 			"storm": map[string]int64{"ready_in": left(h.StormReady), "active_for": left(h.StormUntil), "times": stormTimes},
 			"fire":  map[string]int64{"ready_in": left(h.FireReady), "left": int64(h.FireLeft)},
-			"rain":  map[string]int64{"ready_in": left(h.RainReady), "active_for": left(h.RainUntil), "times": rainTimes},
 		},
 		"quests": quests, "streak": h.Streak,
-		"coins": h.Coins, "sword": h.Sword, "crit": h.Crit, "helper": h.Helper, "seed": h.Seed, "taps": h.Taps,
-		"tap_damage": TapDamage(h.Sword), "crit_chance": CritChance(h.Crit), "helper_dps": HelperDPS(h.Helper),
+		"coins": h.Coins, "sword": h.Sword, "crit": h.Crit, "seed": h.Seed, "taps": h.Taps,
+		"tap_damage": TapDamage(h.Sword), "crit_chance": CritChance(h.Crit),
 		"next": map[string]any{
-			"tap_damage": TapDamage(h.Sword + 1), "crit_chance": CritChance(h.Crit + 1), "helper_dps": HelperDPS(h.Helper + 1),
+			"tap_damage": TapDamage(h.Sword + 1), "crit_chance": CritChance(h.Crit + 1),
 		},
-		"costs": map[string]int64{"sword": Cost("sword", h.Sword), "crit": Cost("crit", h.Crit), "helper": Cost("helper", h.Helper)},
-		"max":   map[string]bool{"sword": h.Sword >= maxSword, "crit": h.Crit >= maxCrit, "helper": h.Helper >= maxHelper},
+		"costs": map[string]int64{"sword": Cost("sword", h.Sword), "crit": Cost("crit", h.Crit)},
+		"max":   map[string]bool{"sword": h.Sword >= maxSword, "crit": h.Crit >= maxCrit},
 	}
 }
 

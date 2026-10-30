@@ -2,8 +2,8 @@
 // chat hit one boss together from its Telegram game message, each tap a
 // sword's blow, now and then a critical one, and the hit that takes its
 // last HP kills it, rewards everyone who hit it, and brings the next,
-// stronger one. Coins buy upgrades: a sharper sword, more critical blows,
-// and Barchinoy, who shoots arrows at the boss while the player hits it.
+// stronger one. Coins buy upgrades: a sharper sword and more critical
+// blows.
 //
 // The page in public/game/boss draws it and sends how many times it was
 // tapped; the server counts what the taps did, no more of them than a
@@ -29,9 +29,8 @@ const (
 	// A critical blow does critTimes a blow's damage.
 	critTimes = 3
 	// The upgrades' highest levels.
-	maxSword  = 60
-	maxCrit   = 15
-	maxHelper = 40
+	maxSword = 60
+	maxCrit  = 15
 	// ScoreEvery is how often a member's total is set as their Telegram
 	// score.
 	ScoreEvery = 30 * time.Second
@@ -72,15 +71,6 @@ func CritChance(crit int) int {
 	return 5 + 3*crit
 }
 
-// HelperDPS is what Barchinoy's arrows do a second at level, 0 before she
-// is hired.
-func HelperDPS(helper int) int64 {
-	if helper == 0 {
-		return 0
-	}
-	return int64(math.Round(3 * math.Pow(1.45, float64(helper-1))))
-}
-
 // Cost is the coins the next level of an upgrade at level costs, at most
 // maxCost.
 func Cost(item string, level int) int64 {
@@ -90,8 +80,6 @@ func Cost(item string, level int) int64 {
 		cost = 20 * math.Pow(1.6, float64(level-1))
 	case "crit":
 		cost = 50 * math.Pow(2, float64(level))
-	case "helper":
-		cost = 80 * math.Pow(1.7, float64(level))
 	default:
 		return maxCost
 	}
@@ -103,7 +91,7 @@ const maxCost = 1e15
 
 // Most is an upgrade's highest level.
 func Most(item string) int {
-	return map[string]int{"sword": maxSword, "crit": maxCrit, "helper": maxHelper}[item]
+	return map[string]int{"sword": maxSword, "crit": maxCrit}[item]
 }
 
 // Critical reports whether a hero's tap is a critical blow: a hash of
@@ -120,9 +108,8 @@ func Critical(seed uint32, tap int64, chance int) bool {
 }
 
 // Strike is what a hero's taps do at now since their last hit: the taps
-// counted, and their damage with Barchinoy's arrows for the time. Olovli
-// qilich makes its blows critical, Bo'ron zarbasi multiplies the blows
-// while it lasts and O'qlar yomg'iri the arrows; the taps count in the
+// counted and their damage. Olovli qilich makes its blows critical and
+// Bo'ron zarbasi multiplies them while it lasts; the taps count in the
 // day's quests.
 func Strike(hero *storage.RaidHero, taps int, since time.Duration, now time.Time) (int, int64) {
 	hero.OnDay(Day(now))
@@ -144,12 +131,8 @@ func Strike(hero *storage.RaidHero, taps int, since time.Duration, now time.Time
 		}
 		damage += d
 	}
-	arrows := HelperDPS(hero.Helper) * int64(since) / int64(time.Second)
-	if now.Before(hero.RainUntil.Add(skillGrace)) {
-		arrows *= rainTimes
-	}
 	hero.QuestTaps += counted
-	return counted, damage + arrows
+	return counted, damage
 }
 
 // Reward is the coins one who hit a killed boss with damage gets: some for
@@ -192,8 +175,8 @@ func Day(now time.Time) time.Time {
 }
 
 // The skills: Bo'ron zarbasi multiplies blows for a while, Olovli qilich
-// makes the next blows critical, O'qlar yomg'iri multiplies Barchinoy's
-// arrows for a while. Each is ready again some time after it was used.
+// makes the next blows critical. Each is ready again some time after it
+// was used.
 // skillGrace lets a hit sent just after a skill ended still count it, as
 // the page sends its taps in batches.
 const (
@@ -202,15 +185,11 @@ const (
 	stormTimes = 5
 	fireTaps   = 10
 	fireEvery  = 60 * time.Second
-	rainFor    = 3 * time.Second
-	rainEvery  = 40 * time.Second
-	rainTimes  = 10
 	skillGrace = time.Second
 )
 
 var (
 	ErrCooldown = errors.New("raid: the skill is not ready")
-	ErrNoHelper = errors.New("raid: Barchinoy is not hired")
 	ErrNoSkill  = errors.New("raid: no such skill")
 	ErrNoQuest  = errors.New("raid: no such quest")
 	ErrNotDone  = errors.New("raid: the quest is not done")
@@ -232,14 +211,6 @@ func UseSkill(skill string, now time.Time) func(*storage.RaidHero) error {
 				return ErrCooldown
 			}
 			h.FireLeft, h.FireReady = fireTaps, now.Add(fireEvery)
-		case "rain":
-			if h.Helper == 0 {
-				return ErrNoHelper
-			}
-			if now.Before(h.RainReady) {
-				return ErrCooldown
-			}
-			h.RainUntil, h.RainReady = now.Add(rainFor), now.Add(rainEvery)
 		default:
 			return ErrNoSkill
 		}
