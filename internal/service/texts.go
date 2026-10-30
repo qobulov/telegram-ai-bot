@@ -304,9 +304,9 @@ type Abilities struct {
 // helpPages are the games' commands, in each language, listed after /about
 // when the pages are on. /stats, for the owners alone, is not listed.
 var helpPages = map[string]string{
-	"uz": "\n/game — Tarozi o'yini\n/shashka — shashka: tasodifiy raqib, do'st yoki men bilan, reyting bilan",
-	"ru": "\n/game — игра «Tarozi»\n/shashka — шашки: со случайным соперником, другом или со мной, с рейтингом",
-	"en": "\n/game — the Tarozi game\n/shashka — draughts: a random opponent, a friend or me, with ratings",
+	"uz": "\n/game — Tarozi o'yini\n/ilon — Kosmik ilon o'yini\n/shashka — shashka: tasodifiy raqib, do'st yoki men bilan, reyting bilan",
+	"ru": "\n/game — игра «Tarozi»\n/ilon — игра «Космическая змейка»\n/shashka — шашки: со случайным соперником, другом или со мной, с рейтингом",
+	"en": "\n/game — the Tarozi game\n/ilon — the space snake game\n/shashka — draughts: a random opponent, a friend or me, with ratings",
 }
 
 // HelpText describes the bot's commands and what it can do with these

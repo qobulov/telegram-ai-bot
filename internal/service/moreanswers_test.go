@@ -187,17 +187,20 @@ func TestMoreItemsAnswerWithTheirTools(t *testing.T) {
 	}
 }
 
-// Tarozi is the game's own message; nothing else is sent with it.
-func TestTaroziIsTheGameAlone(t *testing.T) {
-	f := newFixture()
-	runner := withToolRunner(f)
-	runner.answers["send_game"] = succeeded(`{"sent":true}`)
-	f.opts.Buttons = &fakeButtons{}
+// Tarozi and Kosmik ilon are each the game's own message; nothing else is
+// sent with it.
+func TestGamesAreTheGameAlone(t *testing.T) {
+	for _, name := range []string{"tarozi", "ilon"} {
+		f := newFixture()
+		runner := withToolRunner(f)
+		runner.answers["send_game"] = succeeded(`{"sent":true}`)
+		f.opts.Buttons = &fakeButtons{}
 
-	sent := f.run(useItem(t, "tarozi", ""))
+		sent := f.run(useItem(t, name, ""))
 
-	if asked := runner.recorded(); len(sent) != 0 || len(asked) != 1 || asked[0] != "send_game {}" {
-		t.Errorf("sent = %+v, tools asked %q; want the game alone", sent, asked)
+		if asked := runner.recorded(); len(sent) != 0 || len(asked) != 1 || asked[0] != `send_game {"game":"`+name+`"}` {
+			t.Errorf("%s: sent = %+v, tools asked %q; want the game alone", name, sent, asked)
+		}
 	}
 }
 

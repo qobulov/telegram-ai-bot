@@ -95,6 +95,8 @@ var moreSections = []moreSection{
 			request: lt("Shashka o'ynaymiz", "Сыграем в шашки", "Let's play draughts")},
 		{key: "dooz", label: lt("❌⭕ Dooz", "❌⭕ Крестики-нолики", "❌⭕ Tic-tac-toe"),
 			request: lt("Dooz o'ynaymiz", "Сыграем в крестики-нолики", "Let's play tic-tac-toe")},
+		{key: "ilon", label: lt("🐍 Kosmik ilon", "🐍 Космическая змейка", "🐍 Space snake"),
+			request: lt("Kosmik ilon o'yinini yubor", "Пришли игру «Космическая змейка»", "Send the space snake game")},
 		{key: "tarozi", label: lt("⚖️ Tarozi", "⚖️ Tarozi", "⚖️ Tarozi"),
 			request: lt("Tarozi o'yinini yubor", "Пришли игру Tarozi", "Send the Tarozi game")},
 		{key: "free_games", label: lt("🆓 Bepul o'yinlar", "🆓 Бесплатные игры", "🆓 Free games"),

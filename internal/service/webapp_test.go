@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -124,22 +125,24 @@ func (f *fakeGameTable) AnswerGameCallback(_ context.Context, id, url string) er
 
 type fakeGameLinks struct{}
 
-func (fakeGameLinks) PlayURL(p game.Player) string {
-	return fmt.Sprintf("https://maria.example/game/?for=%d,%d,%d,%s", p.UserID, p.ChatID, p.MessageID, p.InlineMessageID)
+func (fakeGameLinks) PlayURL(shortName string, p game.Player) (string, bool) {
+	page := map[string]string{game.ShortName: "game/", game.IlonShortName: "game/ilon/"}[shortName]
+	return fmt.Sprintf("https://maria.example/%s?for=%d,%d,%d,%s", page, p.UserID, p.ChatID, p.MessageID, p.InlineMessageID), page != ""
 }
 
-// /game posts the game, as a reply in a group, and writes nothing more.
+// /game posts Tarozi and /ilon Kosmik ilon, as a reply in a group, and
+// nothing more is written.
 func TestGameCommandSendsTheGame(t *testing.T) {
 	f := newFixture()
 	table := &fakeGameTable{}
 	f.opts.Game, f.opts.GameTable = fakeGameLinks{}, table
 
-	sent := f.run(inGroup(groupMessage("/game@MyBot")), textFrom(userID, "/game"))
+	sent := f.run(inGroup(groupMessage("/game@MyBot")), textFrom(userID, "/game"), textFrom(userID, "/ilon"))
 
 	if len(sent) != 0 {
 		t.Errorf("sent %+v besides the game", sent)
 	}
-	for _, want := range []sentGame{{groupID, 30, game.ShortName}, {userID, 0, game.ShortName}} {
+	for _, want := range []sentGame{{groupID, 30, game.ShortName}, {userID, 0, game.ShortName}, {userID, 0, game.IlonShortName}} {
 		if !slices.Contains(table.games, want) {
 			t.Errorf("games = %+v, want %+v among them", table.games, want)
 		}
@@ -174,6 +177,7 @@ func TestPlayPressOpensTheGameForThePresser(t *testing.T) {
 		press("1", game.ShortName, bek, gameMessage, ""),
 		press("2", game.ShortName, bek, nil, "inl"),
 		press("3", "other", bek, gameMessage, ""),
+		press("4", game.IlonShortName, bek, gameMessage, ""),
 	)
 
 	if len(sent) != 0 {
@@ -182,8 +186,9 @@ func TestPlayPressOpensTheGameForThePresser(t *testing.T) {
 	want := map[string]string{
 		"1": fmt.Sprintf("https://maria.example/game/?for=%d,%d,500,", userID, groupID),
 		"2": fmt.Sprintf("https://maria.example/game/?for=%d,0,0,inl", userID),
+		"4": fmt.Sprintf("https://maria.example/game/ilon/?for=%d,%d,500,", userID, groupID),
 	}
-	if len(table.answers) != 2 || table.answers["1"] != want["1"] || table.answers["2"] != want["2"] {
+	if !maps.Equal(table.answers, want) {
 		t.Errorf("answers = %v, want %v", table.answers, want)
 	}
 }

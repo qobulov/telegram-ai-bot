@@ -53,11 +53,11 @@ cmd/bot/main.go                 long-polling command; migrate and webhook subcom
 api/webhook.go                  serverless function that receives updates by webhook
 api/stats.go, api/game.go       serverless functions behind the dashboard and the game
 api/shashka.go                  serverless function behind the draughts Mini App
-public/stats, public/game       static pages: the group dashboard Mini App and the Tarozi game
+public/stats, public/game       static pages: the group dashboard Mini App, the Tarozi game and Kosmik ilon (game/ilon)
 public/shashka                  static page: the draughts Mini App
 internal/app                    assembles the bot for either way of running it
 internal/miniapp                the dashboard's API: Telegram init data check, membership check, statistics
-internal/game                   the Tarozi game: signed sessions, dealing rounds, scoring plays
+internal/game                   the games Tarozi and Kosmik ilon: signed sessions, dealing plays, scoring them
 internal/dooz                   dooz (noughts and crosses): the board, its encoding in buttons, the bot's moves
 internal/shashka                Russian draughts: the rules, the position's encoding, the bot's search
 internal/shashkaapp             the draughts Mini App's API: init data check, invites, the queue, moves, clocks, ratings
@@ -233,7 +233,7 @@ in the environment win over the file.
 | `DB_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
 | `TELEGRAM_WEBHOOK_SECRET` | empty | Only for webhook deployments; see [Vercel deployment](#vercel-deployment-webhook) |
 | `CRON_SECRET` | empty | Only on Vercel: protects the daily cleanup endpoint |
-| `WEBAPP_URL` | empty | The Vercel deployment's `https://` address, such as `https://maria.vercel.app`, where `public/` is served: turns on the [dashboard](#dashboard-mini-app) (`/stats`, the private chats' menu button) and [the game](#the-game-tarozi) (`/game`, the `send_game` tool). Empty turns both off |
+| `WEBAPP_URL` | empty | The Vercel deployment's `https://` address, such as `https://maria.vercel.app`, where `public/` is served: turns on the [dashboard](#dashboard-mini-app) (`/stats`, the private chats' menu button) and the games [Tarozi](#the-game-tarozi) and [Kosmik ilon](#kosmik-ilon) (`/game`, `/ilon`, the `send_game` tool). Empty turns them off |
 | `MAX_OUTPUT_TOKENS`           | `8192`                         | Longest model reply, in tokens, thinking included |
 | `AI_REASONING_EFFORT`         | `low` (Gemini)                 | How hard Gemini thinks before answering: `none`, `minimal`, `low`, `medium`, `high`, or `default` for the model's own. Thinking is paid as output and takes from `MAX_OUTPUT_TOKENS`; the lite models refuse `none`. Each request logs its tokens as `model usage` |
 | `CHAT_REASONING_EFFORT` | `minimal` | How hard the chat model thinks before a reply in words alone (Gemini): `none`, `minimal`, `low`, `medium`, `high` or `default`. At `low` it spent 500 to 800 thinking tokens, seconds, on a one-line joke |
@@ -327,7 +327,7 @@ the message it is working on before exiting.
 
 Bot commands: `/start`, `/help`,
 `/model`, `/about`, `/premium`, `/paysupport`, with `WEBAPP_URL` set
-`/stats` and `/game`, for owners `/payments` and `/refund`, and
+`/stats`, `/game` and `/ilon`, for owners `/payments` and `/refund`, and
 in groups `/mute`, `/unmute`, `/ignore` and `/unignore`.
 
 ## Tests
@@ -778,7 +778,7 @@ languages, and the buttons that need a value ask for it first
   (`internal/service/moremenu.go`): 🕌 Din (prayer times, the Quran),
   📰 Yangiliklar (Uzbekistan's, the world's), 🎬 Ko'ngilochar (films, anime,
   music, YouTube, a cat, trivia, a fun fact), ⚽ Sport (the table, matches and
-  top scorers of six leagues), 🕹 O'yinlar (Shashka, Dooz, Tarozi, free games, a Steam
+  top scorers of six leagues), 🕹 O'yinlar (Shashka, Dooz, Kosmik ilon, Tarozi, free games, a Steam
   price), 📚 O'qish (Wikipedia, an English word, synonyms, papers) and
   🛠 Foydali (a QR code, a drawing, a place on the map, holidays, crypto,
   earthquakes, a web search). An item is answered at once, asks for its
@@ -789,7 +789,7 @@ languages, and the buttons that need a value ask for it first
   language and the data as the tool gives it (an English fact, a Russian
   headline): the top entries with their links, a picture for the cat, a QR
   code or a drawing, the song's preview before its links, the pin and then
-  the place's name, the game itself for Tarozi, and a trivia question with
+  the place's name, the game itself for Kosmik ilon and Tarozi, and a trivia question with
   its answer a few lines below its options. What a tool did not find, a
   service that is down, a quiet week of earthquakes and a drawing past its
   own daily limit are each said plainly. None of it takes from the daily
@@ -1753,6 +1753,37 @@ The score is not taken from the page:
 A bot can still answer as fast as the limits allow, but not faster, and
 cannot name its score, another player or another message.
 
+### Kosmik ilon
+
+`/ilon` posts the bot's second game the same way, and `send_game` takes it
+when asked by name ("ilon o'ynaymiz"; Tarozi when no game is named). It is a
+snake in space (`public/game/ilon/`, `internal/game/ilon.go`): the field,
+15 by 21, wraps at its edges; the snake moves a cell a tick, turned by a
+swipe or the arrow keys, and grows by two for each planet it eats. A planet
+is 10 points times the level, twice or three times that when eaten within
+30 ticks of the one before (the combo). Every 10 planets it reaches the
+next level, 100 points times the level it leaves: the snake starts again
+from three cells, on another of six fields of walls, and each tick is 14 ms
+quicker, from 150 ms to 60 ms. After a planet, one time in three, a bonus
+shows for 50 ticks: a star of 50 points times the level, an ice clock that
+makes the next 60 ticks half as long again, or a ghost that lets the snake
+pass through walls and itself for 40 ticks. Running into a wall or itself
+ends the play.
+
+It shares Tarozi's sessions, its `/api/game` and its scoring rule: the
+session and run tokens name which game they are for, and a play of one
+cannot be started or finished as the other's. `start` gives the play's
+seed and the rules, walls and timings included; the page plays them in
+`sim.js` and sends back only its **turns, each with its tick, and how many
+ticks went by**. The server plays the turns again from the seed with the
+same rules in Go and **counts the score itself**; it refuses turns out of
+order, after the end, or a play whose snake did not crash in its last tick.
+The ticks' lengths say how long the play took at the least, and a play sent
+in sooner than that after its start is refused, so it cannot be played
+faster than the page lets a person. A test plays whole games with an
+autopilot and has `node` score them with `sim.js`, which must match the
+server's score to the point.
+
 ### Shashka (draughts Mini App)
 
 With `WEBAPP_URL` set, `/shashka` opens Russian draughts, played against
@@ -2335,16 +2366,19 @@ They need no migration and no new kind of update.
    Mini App, which the groups' `t.me/<bot>?startapp=…` links open. The menu
    button of the owners' private chats is set by the bot itself at each
    start.
-3. **The game, in @BotFather:** `/newgame` → the bot → accept the terms →
+3. **The games, in @BotFather:** `/newgame` → the bot → accept the terms →
    a title (`Tarozi`), a short description, a 640×360 photo (and optionally
    a GIF) → the short name **`tarozi`**, exactly, which the bot sends the
-   game by. No URL is asked for: the bot gives `https://YOUR-APP.vercel.app/game/`
-   with each press of Play.
-4. As an owner, send `/stats` and `/game` in a group and in a private chat.
+   game by. Then `/newgame` again for the second: title `Kosmik ilon`, short
+   name **`ilon`**. No URL is asked for: the bot gives
+   `https://YOUR-APP.vercel.app/game/` and `/game/ilon/` with each press of
+   Play.
+4. As an owner, send `/stats`, `/game` and `/ilon` in a group and in a
+   private chat.
 
-Until step 2 the group links open nothing; until step 3 `/game` answers
-that something went wrong, and `send_game` tells the model the short name
-is unknown.
+Until step 2 the group links open nothing; until step 3 `/game` and `/ilon`
+answer that something went wrong, and `send_game` tells the model the short
+name is unknown.
 
 ### Daily cleanup
 

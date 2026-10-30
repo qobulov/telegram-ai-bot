@@ -71,15 +71,21 @@ func TestGameEndpointDealsAPlay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	link, err := url.Parse(newGame(cfg).PlayURL(game.Player{UserID: hookUser, ChatID: hookGroup, MessageID: 5}))
-	if err != nil || link.Path != "/game/" {
-		t.Fatalf("link %v, %v", link, err)
-	}
-	body := `{"action":"start","session":"` + link.Query().Get("s") + `"}`
-	resp := httptest.NewRecorder()
-	endpoint.Handler.ServeHTTP(resp, httptest.NewRequest(http.MethodPost, "/api/game", strings.NewReader(body)))
-	if resp.Code != http.StatusOK || !strings.Contains(resp.Body.String(), `"rounds":[`) {
-		t.Errorf("start: %d %s", resp.Code, resp.Body.String())
+	for _, play := range []struct{ game, path, dealt string }{
+		{game.ShortName, "/game/", `"rounds":[`},
+		{game.IlonShortName, "/game/ilon/", `"rules":{`},
+	} {
+		page, _ := newGame(cfg).PlayURL(play.game, game.Player{UserID: hookUser, ChatID: hookGroup, MessageID: 5})
+		link, err := url.Parse(page)
+		if err != nil || link.Path != play.path {
+			t.Fatalf("%s: link %v, %v", play.game, link, err)
+		}
+		body := `{"action":"start","session":"` + link.Query().Get("s") + `"}`
+		resp := httptest.NewRecorder()
+		endpoint.Handler.ServeHTTP(resp, httptest.NewRequest(http.MethodPost, "/api/game", strings.NewReader(body)))
+		if resp.Code != http.StatusOK || !strings.Contains(resp.Body.String(), play.dealt) {
+			t.Errorf("%s start: %d %s", play.game, resp.Code, resp.Body.String())
+		}
 	}
 }
 

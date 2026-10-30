@@ -15,6 +15,7 @@ import (
 
 	"telegram-ai-bot/internal/agent"
 	"telegram-ai-bot/internal/ai"
+	"telegram-ai-bot/internal/game"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 	"telegram-ai-bot/internal/tools"
@@ -738,7 +739,9 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 	case commandName(in.text) == "/stats":
 		return s.statsCommand(in)
 	case commandName(in.text) == "/game":
-		return s.gameCommand(ctx, in)
+		return s.gameCommand(ctx, in, game.ShortName)
+	case commandName(in.text) == "/ilon":
+		return s.gameCommand(ctx, in, game.IlonShortName)
 	case commandName(in.text) == "/dooz":
 		return s.doozCommand(in)
 	case commandName(in.text) == "/shashka":

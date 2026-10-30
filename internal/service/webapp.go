@@ -8,9 +8,10 @@ import (
 	"telegram-ai-bot/internal/telegram"
 )
 
-// GameLinks makes the page a press of the game's Play button opens.
+// GameLinks makes the page a press of a game's Play button opens; ok is
+// false for a game that has none.
 type GameLinks interface {
-	PlayURL(p game.Player) string
+	PlayURL(shortName string, p game.Player) (link string, ok bool)
 }
 
 // GameTable sends the game and answers a press of its Play button.
@@ -52,17 +53,17 @@ func (s *Service) statsCommand(in incoming) outcome {
 	return outcome{text: textStatsGroup.to(in), buttons: [][]telegram.Button{{{Text: textStatsButton.to(in), URL: link}}}}
 }
 
-// gameCommand answers /game with the game itself, which Telegram shows with
-// its Play button and table of scores.
-func (s *Service) gameCommand(ctx context.Context, in incoming) outcome {
+// gameCommand answers /game and /ilon with the game itself, which Telegram
+// shows with its Play button and table of scores.
+func (s *Service) gameCommand(ctx context.Context, in incoming, shortName string) outcome {
 	if s.opts.Game == nil || s.opts.GameTable == nil {
 		return say(textUnknown.to(in))
 	}
 	if s.restricted(in) {
 		return say(textForbidden)
 	}
-	if _, err := s.opts.GameTable.SendGame(ctx, in.msg.Chat.ID, game.ShortName, in.replyTarget()); err != nil {
-		s.opts.Logger.Error("could not send the game", "chat_id", in.msg.Chat.ID, "error", err)
+	if _, err := s.opts.GameTable.SendGame(ctx, in.msg.Chat.ID, shortName, in.replyTarget()); err != nil {
+		s.opts.Logger.Error("could not send the game", "game", shortName, "chat_id", in.msg.Chat.ID, "error", err)
 		return say(textError.to(in))
 	}
 	return outcome{}
@@ -78,16 +79,20 @@ func (s *Service) restricted(in incoming) bool {
 // session for them on that game message: what the page sends with their
 // score, which is set there.
 func (s *Service) pressedGame(q *telegram.CallbackQuery) {
-	if s.opts.Game == nil || s.opts.GameTable == nil || q.From == nil || q.GameShortName != game.ShortName {
+	if s.opts.Game == nil || s.opts.GameTable == nil || q.From == nil {
 		return
 	}
 	player := game.Player{UserID: q.From.ID, InlineMessageID: q.InlineMessageID}
 	if q.Message != nil {
 		player.ChatID, player.MessageID = q.Message.Chat.ID, q.Message.MessageID
 	}
+	link, ok := s.opts.Game.PlayURL(q.GameShortName, player)
+	if !ok {
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
 	defer cancel()
-	if err := s.opts.GameTable.AnswerGameCallback(ctx, q.ID, s.opts.Game.PlayURL(player)); err != nil {
+	if err := s.opts.GameTable.AnswerGameCallback(ctx, q.ID, link); err != nil {
 		s.opts.Logger.Warn("could not open the game", "user_id", q.From.ID, "error", err)
 	}
 }

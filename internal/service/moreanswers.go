@@ -26,7 +26,7 @@ func init() {
 		"movie": movieAnswer, "anime": animeAnswer, "song": songAnswer, "youtube": youtubeAnswer,
 		"cat": catAnswer, "trivia": triviaAnswer, "fact": factAnswer,
 		"table": tableAnswer, "matches": matchesAnswer, "scorers": scorersAnswer,
-		"tarozi": taroziAnswer, "free_games": freeGamesAnswer, "steam": steamAnswer,
+		"tarozi": gameAnswer("tarozi"), "ilon": gameAnswer("ilon"), "free_games": freeGamesAnswer, "steam": steamAnswer,
 		"wiki": wikiAnswer, "english": englishAnswer, "synonyms": synonymsAnswer, "papers": papersAnswer,
 		"qr": qrAnswer, "draw": drawAnswer, "place": placeAnswer, "holidays": holidaysAnswer,
 		"crypto": cryptoAnswer, "quakes": quakesAnswer, "search": searchAnswer,
@@ -636,17 +636,22 @@ func competitionHeading(in incoming, competition, group string, day int) string 
 
 // --- Games ---
 
-// taroziAnswer posts the game, which is the answer by itself: its message
-// has the Play button.
-func taroziAnswer(ctx context.Context, s *Service, in incoming, _ string) outcome {
-	var sent struct{}
-	switch _, failure := s.itemResult(ctx, in, "send_game", struct{}{}, &sent); failure {
-	case "":
-		return outcome{}
-	case "invalid_arguments":
-		return say(textGameTooSoon.to(in)) // two games in ten minutes
+// gameAnswer posts the game named, which is the answer by itself: its
+// message has the Play button.
+func gameAnswer(name string) codeAnswer {
+	return func(ctx context.Context, s *Service, in incoming, _ string) outcome {
+		var sent struct{}
+		args := struct {
+			Game string `json:"game"`
+		}{name}
+		switch _, failure := s.itemResult(ctx, in, "send_game", args, &sent); failure {
+		case "":
+			return outcome{}
+		case "invalid_arguments":
+			return say(textGameTooSoon.to(in)) // two games in ten minutes
+		}
+		return say(textGameLater.to(in))
 	}
-	return say(textGameLater.to(in))
 }
 
 type freeGames struct {

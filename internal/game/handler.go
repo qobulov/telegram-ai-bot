@@ -11,8 +11,9 @@ import (
 	"telegram-ai-bot/internal/telegram"
 )
 
-// maxBodyBytes bounds a request: a play's answers are a few kilobytes.
-const maxBodyBytes = 32 << 10
+// maxBodyBytes bounds a request: a play of Tarozi's answers are a few
+// kilobytes, a long one of Kosmik ilon's turns some tens.
+const maxBodyBytes = 256 << 10
 
 // Scores keeps the game's scores, which Telegram holds on each game
 // message.
@@ -27,9 +28,9 @@ type handler struct {
 	logger *slog.Logger
 }
 
-// Handler serves the page's requests: "start" deals a play for a session,
-// "finish" scores one and sets the score, and "table" is the game
-// message's table of scores.
+// Handler serves the pages' requests: "start" deals a play for a session,
+// of the game it is for, "finish" scores one and sets the score, and
+// "table" is the game message's table of scores.
 func (g *Game) Handler(scores Scores, logger *slog.Logger) http.Handler {
 	if logger == nil {
 		logger = slog.Default()
@@ -45,12 +46,20 @@ type request struct {
 	Run     string `json:"run"`
 	Answers string `json:"answers"`
 	Times   []int  `json:"times"`
+	// Turns and Ticks are a play of Kosmik ilon's, for finish.
+	Turns []int `json:"turns"`
+	Ticks int   `json:"ticks"`
 }
 
 type started struct {
 	Run     string  `json:"run"`
 	Seconds int     `json:"seconds"`
 	Rounds  []Round `json:"rounds"`
+}
+
+type startedIlon struct {
+	Run string `json:"run"`
+	IlonPlay
 }
 
 type finished struct {
@@ -111,6 +120,13 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 }
 
 func (h *handler) start(req request) (any, failure) {
+	if s, err := h.game.session(req.Session); err == nil && s.Game == IlonShortName {
+		run, play, err := h.game.StartIlon(req.Session)
+		if err != nil {
+			return nil, errToken
+		}
+		return startedIlon{Run: run, IlonPlay: play}, failure{}
+	}
 	run, dealt, err := h.game.Start(req.Session)
 	if err != nil {
 		return nil, errToken
@@ -121,7 +137,13 @@ func (h *handler) start(req request) (any, failure) {
 // finish scores a play and sets the score on the game message, where
 // Telegram keeps each player's best; the table follows.
 func (h *handler) finish(ctx context.Context, req request) (any, failure) {
-	result, err := h.game.Finish(req.Run, req.Answers, req.Times)
+	var result Result
+	var err error
+	if req.Ticks > 0 {
+		result, err = h.game.FinishIlon(req.Run, req.Turns, req.Ticks)
+	} else {
+		result, err = h.game.Finish(req.Run, req.Answers, req.Times)
+	}
 	switch {
 	case errors.Is(err, ErrToken):
 		return nil, errToken

@@ -1,13 +1,14 @@
-// Package game is Tarozi, the bot's own HTML5 game, played in Telegram:
-// fruits are put on the two pans of a bazaar scale, each fruit's weight is
-// on the price board, which changes every few rounds, and the player says,
-// against the clock, which pan goes down, or that they balance.
+// Package game is the bot's own HTML5 games, played in Telegram. Tarozi
+// puts fruits on the two pans of a bazaar scale, each fruit's weight on the
+// price board, which changes every few rounds, and the player says, against
+// the clock, which pan goes down, or that they balance. Kosmik ilon, in
+// ilon.go, is a snake in space.
 //
-// The page in public/game draws it; this package deals the rounds and
-// scores them. A score is never taken from the page: the page sends the
-// answers and when it gave each, and the server, which dealt the rounds,
-// counts them, so a player can only cheat by answering faster than a
-// person could, which the timing limits refuse.
+// The pages in public/game draw them; this package deals the plays and
+// scores them. A score is never taken from a page: the page sends what the
+// player did and when, and the server, which dealt the play, counts it, so
+// a player can only cheat by playing faster than a person could, which the
+// timing limits refuse.
 package game
 
 import (
@@ -24,9 +25,12 @@ import (
 	"time"
 )
 
-// ShortName is the game's short name, as it must be registered with
+// ShortName is Tarozi's short name, as it must be registered with
 // @BotFather's /newgame.
 const ShortName = "tarozi"
+
+// IlonPath is where Kosmik ilon's page is, under Tarozi's.
+const IlonPath = "ilon/"
 
 const (
 	// Seconds is how long a play lasts.
@@ -81,16 +85,19 @@ func New(botToken, pageURL string, now func() time.Time) *Game {
 	return &Game{secret: mac([]byte("TaroziSessions"), []byte(botToken)), page: pageURL, now: now}
 }
 
-// session is what a Play press opens the page with: the player, and when.
+// session is what a Play press opens the page with: the player, which
+// game, "" for Tarozi, and when.
 type session struct {
 	Player
-	Issued int64 `json:"t"`
+	Game   string `json:"g,omitempty"`
+	Issued int64  `json:"t"`
 }
 
 // run is one play: the session's player, when it started, in Unix
 // milliseconds, and the seed its rounds were dealt from.
 type run struct {
 	Player
+	Game    string `json:"g,omitempty"`
 	Started int64  `json:"t"`
 	Seed    uint64 `json:"s"`
 }
@@ -110,9 +117,20 @@ var (
 	ErrImplausible = errors.New("game: implausible answers")
 )
 
-// PlayURL is the page a player's press of Play opens, with their session.
-func (g *Game) PlayURL(p Player) string {
-	return g.page + "?s=" + url.QueryEscape(g.sign(kindSession, session{Player: p, Issued: g.now().Unix()}))
+// PlayURL is the page a player's press of shortName's Play opens, with
+// their session; ok is false for a game that is not this package's.
+func (g *Game) PlayURL(shortName string, p Player) (link string, ok bool) {
+	page := g.page
+	switch shortName {
+	case ShortName:
+		shortName = ""
+	case IlonShortName:
+		page += IlonPath
+	default:
+		return "", false
+	}
+	token := g.sign(kindSession, session{Player: p, Game: shortName, Issued: g.now().Unix()})
+	return page + "?s=" + url.QueryEscape(token), true
 }
 
 // Round is one weighing: the price board, as each fruit kind and its
@@ -145,22 +163,28 @@ func (r Round) weigh(pan []int) int {
 
 // Player is whom a current session is for.
 func (g *Game) Player(sessionToken string) (Player, error) {
-	var s session
-	if !g.verify(kindSession, sessionToken, &s) || g.now().Sub(time.Unix(s.Issued, 0)) > sessionAge {
-		return Player{}, ErrToken
-	}
-	return s.Player, nil
+	s, err := g.session(sessionToken)
+	return s.Player, err
 }
 
-// Start begins a play for a session: its rounds, and the run token the
-// answers are sent in with. Each play is dealt afresh, so that rounds
-// learnt by heart are of no use.
-func (g *Game) Start(sessionToken string) (string, []Round, error) {
-	player, err := g.Player(sessionToken)
-	if err != nil {
-		return "", nil, err
+// session reads a current session.
+func (g *Game) session(token string) (session, error) {
+	var s session
+	if !g.verify(kindSession, token, &s) || g.now().Sub(time.Unix(s.Issued, 0)) > sessionAge {
+		return session{}, ErrToken
 	}
-	r := run{Player: player, Started: g.now().UnixMilli(), Seed: newSeed()}
+	return s, nil
+}
+
+// Start begins a play of Tarozi for a session: its rounds, and the run
+// token the answers are sent in with. Each play is dealt afresh, so that
+// rounds learnt by heart are of no use.
+func (g *Game) Start(sessionToken string) (string, []Round, error) {
+	s, err := g.session(sessionToken)
+	if err != nil || s.Game != "" {
+		return "", nil, ErrToken
+	}
+	r := run{Player: s.Player, Started: g.now().UnixMilli(), Seed: newSeed()}
 	return g.sign(kindRun, r), deal(r.Seed), nil
 }
 
@@ -173,13 +197,9 @@ type Result struct {
 // Finish scores a play's answers, one letter each, L, R or E, given at
 // times, in milliseconds since its first round showed.
 func (g *Game) Finish(runToken, answers string, times []int) (Result, error) {
-	var r run
-	if !g.verify(kindRun, runToken, &r) {
-		return Result{}, ErrToken
-	}
-	elapsed := g.now().Sub(time.UnixMilli(r.Started))
-	if elapsed > runAge {
-		return Result{}, ErrToken
+	r, elapsed, err := g.run(runToken, "", runAge)
+	if err != nil {
+		return Result{}, err
 	}
 	if len(times) > 0 && time.Duration(times[len(times)-1])*time.Millisecond > elapsed+skew {
 		// The page says it took longer than the server saw pass.
@@ -217,6 +237,20 @@ func Score(dealt []Round, answers string, times []int) (int, error) {
 		}
 	}
 	return score, nil
+}
+
+// run reads a run token of game that started at most age ago, and how
+// long ago it did.
+func (g *Game) run(token, game string, age time.Duration) (run, time.Duration, error) {
+	var r run
+	if !g.verify(kindRun, token, &r) || r.Game != game {
+		return run{}, 0, ErrToken
+	}
+	elapsed := g.now().Sub(time.UnixMilli(r.Started))
+	if elapsed > age {
+		return run{}, 0, ErrToken
+	}
+	return r, elapsed, nil
 }
 
 // deal makes a play's rounds from its seed, the same each time.

@@ -56,7 +56,7 @@ func TestHandlerPlaysAGame(t *testing.T) {
 	g, c := newTestGame()
 	scores := &fakeScores{}
 	h := g.Handler(scores, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	session := sessionOf(t, g.PlayURL(player))
+	session := sessionOf(t, playURL(t, g, ShortName, player))
 
 	status, start := post(t, h, request{Action: "start", Session: session})
 	if status != http.StatusOK || start["seconds"] != float64(Seconds) || len(start["rounds"].([]any)) != rounds {
@@ -95,7 +95,7 @@ func TestHandlerRefusesWhatIsNotAPlay(t *testing.T) {
 	g, _ := newTestGame()
 	scores := &fakeScores{}
 	h := g.Handler(scores, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	session := sessionOf(t, g.PlayURL(player))
+	session := sessionOf(t, playURL(t, g, ShortName, player))
 	_, start := post(t, h, request{Action: "start", Session: session})
 	run := start["run"].(string)
 
@@ -128,7 +128,7 @@ func TestHandlerRefusesWhatIsNotAPlay(t *testing.T) {
 func TestHandlerWhenTheScoreIsNotSet(t *testing.T) {
 	g, c := newTestGame()
 	h := g.Handler(&fakeScores{err: errors.New("timeout")}, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	run, dealt, _ := g.Start(sessionOf(t, g.PlayURL(player)))
+	run, dealt, _ := g.Start(sessionOf(t, playURL(t, g, ShortName, player)))
 	answers, times := rightAnswers(dealt, 1)
 	c.now = c.now.Add(2 * time.Second)
 
@@ -143,7 +143,7 @@ func TestHandlerSetsNoZero(t *testing.T) {
 	g, c := newTestGame()
 	scores := &fakeScores{}
 	h := g.Handler(scores, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	run, _, _ := g.Start(sessionOf(t, g.PlayURL(player)))
+	run, _, _ := g.Start(sessionOf(t, playURL(t, g, ShortName, player)))
 	c.now = c.now.Add(time.Second)
 
 	if status, got := post(t, h, request{Action: "finish", Run: run}); status != http.StatusOK || got["score"] != float64(0) || got["improved"] != false {

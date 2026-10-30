@@ -26,10 +26,20 @@ func newTestGame() (*Game, *clock) {
 func sessionOf(t *testing.T, link string) string {
 	t.Helper()
 	u, err := url.Parse(link)
-	if err != nil || !strings.HasPrefix(link, "https://example.com/game/?s=") {
+	if err != nil || !strings.HasPrefix(link, "https://example.com/game/") || u.Query().Get("s") == "" {
 		t.Fatalf("link %q", link)
 	}
 	return u.Query().Get("s")
+}
+
+// playURL is the page a press of shortName's Play opens for player.
+func playURL(t *testing.T, g *Game, shortName string, player Player) string {
+	t.Helper()
+	link, ok := g.PlayURL(shortName, player)
+	if !ok {
+		t.Fatalf("no page for %q", shortName)
+	}
+	return link
 }
 
 // rightAnswers are the answers to rounds, and times a person could give
@@ -46,7 +56,7 @@ func rightAnswers(dealt []Round, n int) (string, []int) {
 
 func TestAPlayIsDealtScoredAndForThePlayer(t *testing.T) {
 	g, c := newTestGame()
-	run, dealt, err := g.Start(sessionOf(t, g.PlayURL(player)))
+	run, dealt, err := g.Start(sessionOf(t, playURL(t, g, ShortName, player)))
 	if err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -70,7 +80,7 @@ func TestAPlayIsDealtScoredAndForThePlayer(t *testing.T) {
 // are dealt, which is how the server scores what it dealt.
 func TestEachPlayIsDealtAfresh(t *testing.T) {
 	g, _ := newTestGame()
-	session := sessionOf(t, g.PlayURL(player))
+	session := sessionOf(t, playURL(t, g, ShortName, player))
 	_, first, _ := g.Start(session)
 	_, second, _ := g.Start(session)
 	if reflect.DeepEqual(first, second) {
@@ -143,7 +153,7 @@ func TestScore(t *testing.T) {
 // page's times cannot be stretched to answer slowly at leisure.
 func TestFinishRefusesTimeThatDidNotPass(t *testing.T) {
 	g, c := newTestGame()
-	run, dealt, _ := g.Start(sessionOf(t, g.PlayURL(player)))
+	run, dealt, _ := g.Start(sessionOf(t, playURL(t, g, ShortName, player)))
 	answers, times := rightAnswers(dealt, 30)
 	c.now = c.now.Add(10 * time.Second)
 
@@ -154,7 +164,7 @@ func TestFinishRefusesTimeThatDidNotPass(t *testing.T) {
 
 func TestTokensAreThisServersAndCurrent(t *testing.T) {
 	g, c := newTestGame()
-	session := sessionOf(t, g.PlayURL(player))
+	session := sessionOf(t, playURL(t, g, ShortName, player))
 	run, _, _ := g.Start(session)
 	other := New("999:other", "https://example.com/game/", c.Now)
 
