@@ -103,6 +103,7 @@ func SetAdminRights(ctx context.Context, setter RightsSetter, logger *slog.Logge
 // /stats, for the owners alone, is in no menu.
 var pageCommands = []telegram.BotCommand{
 	{Command: "game", Description: "Tarozi o'yini"},
+	{Command: "shashka", Description: "Shashka (PvP, reyting)"},
 }
 
 // SetCommandMenus sets the menus, with the pages' commands when pages is

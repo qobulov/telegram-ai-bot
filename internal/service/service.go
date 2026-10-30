@@ -14,6 +14,7 @@ import (
 
 	"telegram-ai-bot/internal/agent"
 	"telegram-ai-bot/internal/config"
+	"telegram-ai-bot/internal/shashkaapp"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 )
@@ -360,6 +361,11 @@ type Options struct {
 	// no game.
 	Game      GameLinks
 	GameTable GameTable
+	// ShashkaURL is the page of the draughts Mini App, which /shashka
+	// opens, and ShashkaInvites keeps the invites /shashka makes in a
+	// group; with either unset there is no /shashka. See shashka.go.
+	ShashkaURL     string
+	ShashkaInvites shashkaapp.InviteMaker
 
 	// MaxMediaBytes is the largest file downloaded for the model to see.
 	MaxMediaBytes int64

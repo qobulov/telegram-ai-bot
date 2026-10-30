@@ -52,11 +52,15 @@ prices).
 cmd/bot/main.go                 long-polling command; migrate and webhook subcommands
 api/webhook.go                  serverless function that receives updates by webhook
 api/stats.go, api/game.go       serverless functions behind the dashboard and the game
+api/shashka.go                  serverless function behind the draughts Mini App
 public/stats, public/game       static pages: the group dashboard Mini App and the Tarozi game
+public/shashka                  static page: the draughts Mini App
 internal/app                    assembles the bot for either way of running it
 internal/miniapp                the dashboard's API: Telegram init data check, membership check, statistics
 internal/game                   the Tarozi game: signed sessions, dealing rounds, scoring plays
 internal/dooz                   dooz (noughts and crosses): the board, its encoding in buttons, the bot's moves
+internal/shashka                Russian draughts: the rules, the position's encoding, the bot's search
+internal/shashkaapp             the draughts Mini App's API: init data check, invites, the queue, moves, clocks, ratings
 internal/webhook                HTTP handler for webhook updates, with secret check
 internal/config                 load .env + environment, validate
 internal/telegram               Bot API client: long polling, sending, message splitting
@@ -152,6 +156,11 @@ business_checklists(connection_id -> business_connections, chat_id,
                     message_id, title, tasks jsonb, sent_at,
                     PK (connection_id, chat_id, message_id))
 group_boosts(chat_id, boost_id, created_at, PK (chat_id, boost_id))
+shashka_players(user_id PK, name, language, rating, wins, losses, draws, updated_at)
+shashka_games(id PK, kind, level, white_id, black_id, position, status, last_path,
+              captured, version, invite_code UNIQUE, rated, deadline, winner,
+              reason, white_change, black_change, created_at, updated_at)
+shashka_queue(user_id PK, rating, joined_at)
 schema_migrations(version PK, applied_at)
 ```
 
@@ -769,7 +778,7 @@ languages, and the buttons that need a value ask for it first
   (`internal/service/moremenu.go`): 🕌 Din (prayer times, the Quran),
   📰 Yangiliklar (Uzbekistan's, the world's), 🎬 Ko'ngilochar (films, anime,
   music, YouTube, a cat, trivia, a fun fact), ⚽ Sport (the table, matches and
-  top scorers of six leagues), 🕹 O'yinlar (Dooz, Tarozi, free games, a Steam
+  top scorers of six leagues), 🕹 O'yinlar (Shashka, Dooz, Tarozi, free games, a Steam
   price), 📚 O'qish (Wikipedia, an English word, synonyms, papers) and
   🛠 Foydali (a QR code, a drawing, a place on the map, holidays, crypto,
   earthquakes, a web search). An item is answered at once, asks for its
@@ -1743,6 +1752,48 @@ The score is not taken from the page:
 
 A bot can still answer as fast as the limits allow, but not faster, and
 cannot name its score, another player or another message.
+
+### Shashka (draughts Mini App)
+
+With `WEBAPP_URL` set, `/shashka` opens Russian draughts, played against
+people or the bot in a Mini App (`public/shashka`, `internal/shashkaapp`,
+`internal/shashka`), with no model and no limit. Nothing needs setting up in
+@BotFather.
+
+- **Opening it.** In a private chat `/shashka`, and «📋 Ko'proq» →
+  🕹 O'yinlar → ♟ Shashka, answer with the Mini App's button. A group cannot
+  have one, so there `/shashka` makes the sender's invite and posts it with
+  «⚔️ Qabul qilish», a link to `https://t.me/<bot>?start=sh_<code>`: the bot's
+  private chat answers that `/start` with the button into the game, for
+  whoever takes it and for the sender too, who sees their invite waiting.
+- **Opponents.** ⚔️ Raqib topish pairs the player with someone else asking,
+  the nearest in rating first (a wait lapses unless the page asks again
+  within 10 seconds, which it does every 2.5); 👥 Do'stni chaqirish makes an
+  invite whose link the page shares, and the inviter is told in their
+  private chat when it is taken; 🤖 Maria bilan plays the bot at 😊 Oson,
+  🙂 O'rta or 😈 Qiyin (an alpha-beta search to depth 2, 4 or 7, the last
+  capped at 150,000 nodes, about 40 ms).
+- **Rules.** Russian draughts: men capture backwards too, capturing is a
+  must but any capture may be chosen, a capture is taken to its end, a man
+  crowned mid-capture goes on as a king, kings fly, and pieces taken are
+  lifted only after the move (the Turkish strike). A side with no move
+  loses; 15 moves each of kings alone without a capture is a draw. The
+  server checks every move against the rules and sends the page the legal
+  ones, which is all the page knows of them.
+- **Clock and ratings.** Against a person each move has 90 seconds, and the
+  side whose time runs out loses when the game is next looked at. Games
+  against people move both ratings by Elo (K = 32, from 1200) and count in
+  the players' records; 🏆 Reyting lists the best 20. Games against the bot
+  count in neither.
+
+Each action the page sends carries the init data Telegram signed, checked
+as the dashboard's is, which alone says who plays. A move names the
+game's version it was made on and is saved only at that version, so two
+requests at once cannot both move; pairing holds one advisory lock. A
+player has one game at a time: a new one takes back their invite and gives
+up a game against the bot, but not a game against a person, which is shown
+instead. Games over and invites no one took are deleted after 30 days by
+the daily cleanup.
 
 ### Dooz
 

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>Shashka</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="shashka.css">
+</head>
+<body>
+  <main id="app">
+    <section id="notice" class="screen center">
+      <div class="spinner" id="noticeSpinner" aria-hidden="true"></div>
+      <p class="notice-text" id="noticeText" aria-live="polite"></p>
+      <button type="button" class="primary" id="noticeRetry" hidden></button>
+    </section>
+
+    <section id="lobby" class="screen" hidden>
+      <header class="brand">
+        <span class="brand-mark" aria-hidden="true"><span class="pc w"></span><span class="pc b k"></span></span>
+        <div>
+          <h1 data-t="title"></h1>
+          <p class="hint" data-t="tagline"></p>
+        </div>
+      </header>
+
+      <section class="card profile">
+        <p class="profile-name" id="meName"></p>
+        <div class="profile-row">
+          <div class="profile-rating"><span class="big" id="meRating">—</span><span class="label" data-t="rating"></span></div>
+          <dl class="record">
+            <div><dt data-t="wins"></dt><dd id="meWins">0</dd></div>
+            <div><dt data-t="losses"></dt><dd id="meLosses">0</dd></div>
+            <div><dt data-t="draws"></dt><dd id="meDraws">0</dd></div>
+          </dl>
+        </div>
+      </section>
+
+      <nav class="menu">
+        <button type="button" class="primary" id="findBtn" data-t="find"></button>
+        <button type="button" id="inviteBtn" data-t="invite"></button>
+        <button type="button" id="botBtn" data-t="bot"></button>
+        <button type="button" id="topBtn" data-t="leaderboard"></button>
+      </nav>
+    </section>
+
+    <section id="levels" class="screen" hidden>
+      <button type="button" class="back-inline" data-back data-t="back"></button>
+      <h2 class="screen-title" data-t="chooseLevel"></h2>
+      <div class="levels">
+        <button type="button" data-level="1"><span class="level-name"></span><span class="level-hint"></span></button>
+        <button type="button" data-level="2"><span class="level-name"></span><span class="level-hint"></span></button>
+        <button type="button" data-level="3"><span class="level-name"></span><span class="level-hint"></span></button>
+      </div>
+    </section>
+
+    <section id="top" class="screen" hidden>
+      <button type="button" class="back-inline" data-back data-t="back"></button>
+      <h2 class="screen-title" data-t="topTitle"></h2>
+      <section class="card">
+        <ol class="ranks" id="topList"></ol>
+      </section>
+    </section>
+
+    <section id="searching" class="screen center" hidden>
+      <div class="hop" aria-hidden="true"><span class="pc w"></span><span class="pc b"></span><span class="pc w"></span></div>
+      <p class="big-text" data-t="searching"></p>
+      <p class="elapsed" id="searchElapsed">0:00</p>
+      <button type="button" id="searchCancel" data-t="cancel"></button>
+    </section>
+
+    <section id="waiting" class="screen center" hidden>
+      <span class="brand-mark large" aria-hidden="true"><span class="pc w"></span><span class="pc b"></span></span>
+      <p class="big-text" data-t="inviteTitle"></p>
+      <p class="hint centered" data-t="inviteHint"></p>
+      <p class="link-box" id="inviteLink"></p>
+      <div class="stack">
+        <button type="button" class="primary" id="shareBtn" data-t="share"></button>
+        <button type="button" id="copyBtn" data-t="copy"></button>
+        <button type="button" class="text" id="inviteCancel" data-t="cancel"></button>
+      </div>
+    </section>
+
+    <section id="game" class="screen game" hidden>
+      <div class="bar" id="oppBar">
+        <span class="chip pc"></span>
+        <span class="who"><span class="who-name"></span><span class="who-sub"></span></span>
+        <span class="clock"></span>
+      </div>
+      <div class="board-frame">
+        <div class="board" id="board"></div>
+      </div>
+      <div class="bar" id="myBar">
+        <span class="chip pc"></span>
+        <span class="who"><span class="who-name"></span><span class="who-sub"></span></span>
+        <span class="clock"></span>
+      </div>
+      <p class="status" id="status" aria-live="polite"></p>
+      <button type="button" class="text danger" id="resignBtn" data-t="resign"></button>
+
+      <div class="result" id="result" hidden>
+        <div class="result-card" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+          <p class="result-title" id="resultTitle"></p>
+          <p class="result-reason" id="resultReason"></p>
+          <p class="result-change" id="resultChange" hidden></p>
+          <div class="actions">
+            <button type="button" class="primary" id="againBtn" data-t="again"></button>
+            <button type="button" id="homeBtn" data-t="home"></button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <script src="shashka.js"></script>
+</body>
+</html>

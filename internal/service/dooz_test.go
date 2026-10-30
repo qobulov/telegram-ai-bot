@@ -1,10 +1,12 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 
+	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 )
 
@@ -159,5 +161,43 @@ func TestDoozRefusesAForgedGame(t *testing.T) {
 	s.Handle(doozPlayer(1, me, private, "", "dz:4:xxxx_____:0:0:h:0:0"))
 	if edits, _ := buttons.recordedMenus(); len(edits) != 0 || buttons.answers[0].text != textDoozOver.uz {
 		t.Fatalf("a forged game was played: %q, %+v", edits, buttons.answers)
+	}
+}
+
+// fakeInvites keeps the invites /shashka makes.
+type fakeInvites struct{ made []storage.ShashkaGame }
+
+func (f *fakeInvites) CreateShashkaGame(_ context.Context, g storage.ShashkaGame) (storage.ShashkaGame, error) {
+	g.ID = int64(len(f.made) + 1)
+	f.made = append(f.made, g)
+	return g, nil
+}
+
+// /shashka in a group makes the sender's invite, whose link opens the bot's
+// private chat, which answers it with the Mini App's button into that game;
+// in a private chat /shashka is the button.
+func TestShashkaIsOpenedFromAGroupAndAPrivateChat(t *testing.T) {
+	f := newFixture()
+	invites := &fakeInvites{}
+	f.opts.ShashkaURL, f.opts.ShashkaInvites = "https://example.app/shashka/", invites
+
+	sent := f.run(inGroup(groupMessage("/shashka@MyBot")))
+	if len(invites.made) != 1 || invites.made[0].WhiteID != userID || invites.made[0].Status != storage.ShashkaWaiting || invites.made[0].InviteCode == "" {
+		t.Fatalf("invites made: %+v", invites.made)
+	}
+	code := invites.made[0].InviteCode
+	if len(sent) != 1 || !strings.Contains(sent[0].text, "Bek") || len(sent[0].buttons) != 1 || sent[0].buttons[0][0].URL != "https://t.me/MyBot?start=sh_"+code {
+		t.Fatalf("/shashka in the group sent %+v", sent)
+	}
+
+	sent = f.run(textFrom(userID, "/start sh_"+code), textFrom(userID, "/shashka"))
+	if len(sent) != 3 {
+		t.Fatalf("sent %d messages, want the invite's and the private chat's buttons", len(sent))
+	}
+	for i, page := range []string{"https://example.app/shashka/?join=" + code, "https://example.app/shashka/"} {
+		button := sent[1+i].buttons[0][0]
+		if button.WebApp == nil || button.WebApp.URL != page {
+			t.Errorf("message %d's button is %+v, want the Mini App at %s", i, button, page)
+		}
 	}
 }

@@ -725,6 +725,11 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 	if pressedHelp(in) {
 		in.text = "/help"
 	}
+	if commandName(in.text) == "/start" {
+		if out, ok := s.startShashka(in); ok {
+			return out
+		}
+	}
 	switch {
 	case !in.group && commandName(in.text) == "/start" && len(s.opts.RequiredChannels) > 0:
 		return s.withKeyboard(in, s.start(ctx, in))
@@ -736,6 +741,8 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.gameCommand(ctx, in)
 	case commandName(in.text) == "/dooz":
 		return s.doozCommand(in)
+	case commandName(in.text) == "/shashka":
+		return s.shashkaCommand(ctx, in)
 	case strings.HasPrefix(in.text, "/"):
 		return s.withKeyboard(in, say(s.runCommand(ctx, in)))
 	case utf8.RuneCountInString(in.text) > s.opts.MaxInputChars:

@@ -144,6 +144,17 @@ var games = &lazy{name: "game", build: func(_ context.Context, cfg config.Config
 	return endpoint.Handler, endpoint.Close, nil
 }}
 
+var shashkas = &lazy{name: "shashka", build: func(ctx context.Context, cfg config.Config, logger *slog.Logger) (http.Handler, func(), error) {
+	endpoint, err := app.NewShashka(ctx, cfg, logger)
+	if err != nil {
+		return nil, nil, err
+	}
+	return endpoint.Handler, endpoint.Close, nil
+}}
+
+// Shashka answers the draughts Mini App.
+func Shashka(w http.ResponseWriter, r *http.Request) { shashkas.serve(w, r) }
+
 // Stats answers the group dashboard Mini App.
 func Stats(w http.ResponseWriter, r *http.Request) { stats.serve(w, r) }
 

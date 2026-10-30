@@ -401,6 +401,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 	if g := newGame(cfg); g != nil {
 		opts.StatsURL = statsPage(cfg)
 		opts.Game, opts.GameTable = g, bot.Client
+		opts.ShashkaURL, opts.ShashkaInvites = ShashkaPage(cfg), store
 	}
 	if mode.Serverless {
 		opts.Workers, opts.QueueSize = 0, 0
@@ -803,8 +804,17 @@ func NewCleanup(ctx context.Context, cfg config.Config, logger *slog.Logger) (*C
 	return &Cleanup{Handler: handler, Close: store.Close}, nil
 }
 
-// expire applies the retention policy once.
+// shashkaKeep is how long a draughts game over, or an invite no one took,
+// is kept, whatever the retention of the chats.
+const shashkaKeep = 30 * 24 * time.Hour
+
+// expire applies the retention policy once, and deletes old draughts games.
 func expire(ctx context.Context, cfg config.Config, store *storage.Store, logger *slog.Logger) (storage.Expired, error) {
+	if deleted, err := store.DeleteOldShashkaGames(ctx, time.Now().Add(-shashkaKeep)); err != nil {
+		logger.Warn("could not delete old shashka games", "error", err)
+	} else if deleted > 0 {
+		logger.Info("old shashka games deleted", "games", deleted)
+	}
 	if cfg.RetentionDays == 0 {
 		return storage.Expired{}, nil
 	}

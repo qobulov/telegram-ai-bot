@@ -17,6 +17,9 @@
     },
     "api/game.go": {
       "maxDuration": 15
+    },
+    "api/shashka.go": {
+      "maxDuration": 15
     }
   },
   "crons": [

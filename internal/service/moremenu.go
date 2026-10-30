@@ -91,6 +91,8 @@ var moreSections = []moreSection{
 			request: lt("Futbol: %s to'purarlari", "Футбол: бомбардиры, %s", "Football: %s top scorers")},
 	}},
 	{key: "games", label: lt("🕹 O'yinlar", "🕹 Игры", "🕹 Games"), items: []moreItem{
+		{key: "shashka", label: lt("♟ Shashka", "♟ Шашки", "♟ Draughts"),
+			request: lt("Shashka o'ynaymiz", "Сыграем в шашки", "Let's play draughts")},
 		{key: "dooz", label: lt("❌⭕ Dooz", "❌⭕ Крестики-нолики", "❌⭕ Tic-tac-toe"),
 			request: lt("Dooz o'ynaymiz", "Сыграем в крестики-нолики", "Let's play tic-tac-toe")},
 		{key: "tarozi", label: lt("⚖️ Tarozi", "⚖️ Tarozi", "⚖️ Tarozi"),
