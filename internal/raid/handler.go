@@ -29,6 +29,7 @@ const topSize = 8
 // Sessions reads the session a press of Play opened the page with.
 type Sessions interface {
 	Session(token string) (game.Player, string, error)
+	AvatarPath(userID int64) string
 }
 
 // Store keeps the raids.
@@ -162,7 +163,7 @@ func (h *handler) state(ctx context.Context, p game.Player) (any, failure) {
 	}
 	return map[string]any{
 		"boss": bossView(boss), "hero": heroView(hero, now), "me": memberView(me), "gift": gift,
-		"top": topView(top, p.UserID), "top_total": topView(topTotal, p.UserID),
+		"top": h.topView(top, p.UserID), "top_total": h.topView(topTotal, p.UserID), "avatar": h.Sessions.AvatarPath(p.UserID),
 		"rank":            map[string]int{"level": levelRank, "total": totalRank},
 		"taps_per_second": TapsPerSecond, "crit_times": critTimes,
 	}, failure{}
@@ -311,10 +312,11 @@ func memberView(m storage.RaidMember) map[string]any {
 	return map[string]any{"damage": m.Damage, "total": m.Total, "title": Title(m.Total)}
 }
 
-func topView(top []storage.RaidMember, userID int64) []map[string]any {
+func (h *handler) topView(top []storage.RaidMember, userID int64) []map[string]any {
 	rows := make([]map[string]any, 0, len(top))
 	for _, m := range top {
-		rows = append(rows, map[string]any{"id": m.UserID, "name": m.Name, "damage": m.Damage, "total": m.Total, "title": Title(m.Total), "me": m.UserID == userID})
+		rows = append(rows, map[string]any{"id": m.UserID, "name": m.Name, "damage": m.Damage, "total": m.Total, "title": Title(m.Total), "me": m.UserID == userID,
+			"avatar": h.Sessions.AvatarPath(m.UserID)})
 	}
 	return rows
 }

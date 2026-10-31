@@ -415,3 +415,5 @@ button.primary {
 @media (prefers-reduced-motion: reduce) {
   .logo-big, .banner, .count.tick, .hud-value.pop { animation: none; }
 }
+
+.ava { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 6px; border-radius: 50%; object-fit: cover; vertical-align: middle; font-size: 11px; font-weight: 800; background: rgba(127, 127, 127, 0.3); color: inherit; flex: none; }

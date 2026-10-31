@@ -254,6 +254,51 @@
     ctx.beginPath();
     ctx.ellipse(W / 2, gy + 2, w * 0.62, h * 0.14, 0, 0, Math.PI * 2);
     ctx.fill();
+    if (!play.over) drawGuides(now);
+  }
+
+  // drawGuides marks where the next chop is dangerous, a branch in reach or
+  // the one coming down, and for the first chops shows the sides to tap.
+  function drawGuides(now) {
+    const game = play.game, w = trunkW(), h = pieceH(), gy = groundY();
+    const spot = (side) => W / 2 + (side === OtinchiGame.LEFT ? -1 : 1) * (w / 2 + h * 0.62);
+    const danger = new Set([game.tree.at(game.chops)[0], game.tree.at(game.chops + 1)[0]]);
+    danger.delete(OtinchiGame.NONE);
+    for (const side of danger) {
+      ctx.fillStyle = `rgba(224, 52, 36, ${0.45 + 0.15 * Math.sin(now / 120)})`;
+      ctx.beginPath();
+      ctx.ellipse(spot(side), gy + 4, h * 0.6, h * 0.18, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = `${Math.round(h * 0.5)}px system-ui`;
+      ctx.textAlign = "center";
+      ctx.fillText("⚠️", spot(side), gy + h * 0.55);
+    }
+    if (game.chops >= 3) return;
+    ctx.save();
+    ctx.globalAlpha = 0.55 + 0.25 * Math.sin(now / 200);
+    ctx.fillStyle = "#fff";
+    ctx.strokeStyle = "rgba(107, 58, 20, 0.8)";
+    ctx.lineWidth = 4;
+    ctx.font = `bold ${Math.round(h * 0.9)}px system-ui`;
+    ctx.textAlign = "center";
+    for (const [x, arrow] of [[W * 0.14, "◀"], [W * 0.86, "▶"]]) {
+      ctx.strokeText(arrow, x, gy - h * 1.6);
+      ctx.fillText(arrow, x, gy - h * 1.6);
+    }
+    ctx.restore();
+  }
+
+  // drawRings draws a ring where each tap landed.
+  function drawRings(dt) {
+    for (const ring of fx.rings || []) {
+      ring.life -= dt / 320;
+      ctx.strokeStyle = `rgba(255, 255, 255, ${Math.max(0, ring.life) * 0.8})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(ring.x, ring.y, 14 + (1 - ring.life) * 26, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (fx.rings) fx.rings = fx.rings.filter((ring) => ring.life > 0);
   }
 
   // drawCutter draws the woodcutter in a do'ppi and a striped chopon, by
@@ -398,8 +443,8 @@
     $("play").disabled = $("again").disabled = true;
     try {
       const dealt = await api({ action: "start", session });
-      play = { run: dealt.run, rules: dealt.rules, game: new OtinchiGame(dealt.seed, dealt.rules), t0: null, sides: "", times: [], over: null, dead: 0 };
-      Object.assign(fx, { drop: 0, swing: 0, shake: 0, logs: [], parts: [], floats: [] });
+      play = { run: dealt.run, rules: dealt.rules, game: new OtinchiGame(dealt.seed, dealt.rules), t0: null, sides: "", times: [], over: null, dead: 0, warned: false };
+      Object.assign(fx, { drop: 0, swing: 0, shake: 0, logs: [], parts: [], floats: [], rings: [] });
       show("game");
       $("tapHint").hidden = false;
       $("score").textContent = "0";
@@ -430,6 +475,9 @@
     play.times.push(at);
     $("tapHint").hidden = true;
     fx.swing = 1;
+    const timebar = $("timebar");
+    timebar.classList.add("fill");
+    setTimeout(() => timebar.classList.remove("fill"), 90);
     const w = trunkW(), h = pieceH(), gy = groundY();
     if (result.result === "branch" && result.stepped) {
       end("branch");
@@ -501,6 +549,22 @@
     }
   }
 
+  // avatarOf is a player's photo beside their name, or their initial when
+  // they have none or hide it.
+  function avatarOf(url, name) {
+    const initial = document.createElement("span");
+    initial.className = "ava";
+    initial.textContent = (name || "?").trim().slice(0, 1).toUpperCase() || "?";
+    if (!url) return initial;
+    const img = new Image();
+    img.className = "ava";
+    img.alt = "";
+    img.decoding = "async";
+    img.onerror = () => img.replaceWith(initial);
+    img.src = url;
+    return img;
+  }
+
   function fillTable(cardId, listId, rows) {
     const list = $(listId);
     list.textContent = "";
@@ -510,7 +574,8 @@
       for (const [cls, text] of [["pos", row.position], ["name", row.name], ["pts", row.score]]) {
         const span = document.createElement("span");
         span.className = cls;
-        span.textContent = text;
+        if (cls === "name") span.append(avatarOf(row.avatar, row.name));
+        span.append(text);
         item.append(span);
       }
       list.append(item);
@@ -525,6 +590,7 @@
   addEventListener("pointerdown", (e) => {
     if ($("game").hidden || (e.target instanceof Element && e.target.closest("button"))) return;
     e.preventDefault();
+    if (play && !play.over && !reduced) (fx.rings ||= []).push({ x: e.clientX, y: e.clientY, life: 1 });
     chop(e.clientX < W / 2 ? OtinchiGame.LEFT : OtinchiGame.RIGHT);
   });
   addEventListener("keydown", (e) => {
@@ -562,15 +628,25 @@
         const bar = $("time");
         bar.style.width = `${share * 100}%`;
         bar.className = share > 0.5 ? "ok" : share > 0.25 ? "mid" : "";
+        $("secs").textContent = `${(Math.max(0, left) / 1000).toFixed(1)} s`;
+        const low = share <= 0.25;
+        $("timebar").classList.toggle("low", low);
+        if (low && !play.warned && navigator.vibrate) navigator.vibrate(30);
+        play.warned = low;
       } else if (play.t0 === null) {
         $("time").style.width = `${(game.left / play.rules.most_ms) * 100}%`;
         $("time").className = "ok";
+        $("secs").textContent = `${(game.left / 1000).toFixed(1)} s`;
+        $("timebar").classList.remove("low");
+      } else {
+        $("timebar").classList.remove("low");
       }
       drawCutter(game.side, fx.swing, play.over ? play.dead : 0, now);
     } else {
       drawCutter(OtinchiGame.LEFT, (Math.sin(now / 300) + 1) / 2, 0, now);
     }
     drawEffects(dt);
+    drawRings(dt);
     requestAnimationFrame(frame);
   }
 

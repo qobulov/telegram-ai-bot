@@ -116,8 +116,12 @@ button.primary {
 }
 .score.pop { animation: pop 0.18s ease; }
 @keyframes pop { 50% { transform: scale(1.15); } }
-.timebar { width: 76%; height: 18px; border-radius: 10px; background: rgba(60, 30, 10, 0.55); border: 3px solid #fff; overflow: hidden; box-shadow: 0 3px 0 rgba(60, 30, 10, 0.35); }
-.timebar i { display: block; height: 100%; width: 80%; background: linear-gradient(180deg, #ff8a5a, #e0442a); transition: width 0.08s linear; }
+.timebar { position: relative; width: 84%; height: 26px; border-radius: 14px; background: rgba(60, 30, 10, 0.55); border: 3px solid #fff; overflow: hidden; box-shadow: 0 3px 0 rgba(60, 30, 10, 0.35); }
+.timebar i { display: block; height: 100%; width: 80%; background: linear-gradient(180deg, #ff8a5a, #e0442a); transition: width 0.08s linear, filter 0.15s; }
+.timebar span { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--display); font-size: 15px; color: #fff; text-shadow: 0 1px 2px rgba(60, 30, 10, 0.8); font-variant-numeric: tabular-nums; }
+.timebar.fill i { filter: brightness(1.35); transition: none; }
+.timebar.low { animation: low 0.5s ease-in-out infinite; border-color: #ffd0c4; }
+@keyframes low { 50% { transform: scale(1.04); box-shadow: 0 0 18px rgba(224, 68, 42, 0.8); } }
 .timebar i.ok { background: linear-gradient(180deg, #8de06a, #3fa53a); }
 .timebar i.mid { background: linear-gradient(180deg, #ffd45a, #f0a020); }
 .season { margin: 0; font-weight: 700; font-size: 13px; padding: 3px 12px; border-radius: 999px; background: var(--card); }
@@ -136,5 +140,7 @@ button.primary {
 .actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 
 @media (prefers-reduced-motion: reduce) {
-  .score.pop, .tap-hint, .banner { animation: none; }
+  .score.pop, .tap-hint, .banner, .timebar.low { animation: none; }
 }
+
+.ava { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 6px; border-radius: 50%; object-fit: cover; vertical-align: middle; font-size: 11px; font-weight: 800; background: rgba(127, 127, 127, 0.3); color: inherit; flex: none; }

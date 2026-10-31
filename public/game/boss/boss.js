@@ -94,6 +94,7 @@
     return data;
   }
 
+  let myAvatar = "";
   let boss = null, hero = null, top = [], topTotal = [], rank = { level: 0, total: 0 }, myTitle = 0, boardMode = "level";
   let tapsPerSecond = 12, critTimes = 3;
   // skills is when, by this page's clock, each skill is ready and lasts
@@ -120,6 +121,7 @@
       myTitle = data.me.title;
     }
     if (data.top_total) topTotal = data.top_total;
+    if (data.avatar) myAvatar = data.avatar;
     if (data.rank) rank = data.rank;
     if (data.hero) {
       hero = data.hero;
@@ -472,7 +474,8 @@
       for (const [cls, text] of [["pos", i + 1], ["name", `${TITLE_ICONS[row.title || 0]} ${row.name || "?"}`], ["dmg", fmt(value)]]) {
         const span = document.createElement("span");
         span.className = cls;
-        span.textContent = text;
+        if (cls === "name") span.append(avatarOf(row.avatar, row.name));
+        span.append(text);
         li.append(span);
       }
       board.append(li);
@@ -595,6 +598,54 @@
     layerCtx.fillRect(0, 0, size, size);
     layerCtx.globalCompositeOperation = "source-over";
     ctx.drawImage(layer, x - half * s, y - half * s, half * 2 * s, half * 2 * s);
+  }
+
+  // avatarOf is a player's photo beside their name, or their initial when
+  // they have none or hide it.
+  function avatarOf(url, name) {
+    const initial = document.createElement("span");
+    initial.className = "ava";
+    initial.textContent = (name || "?").trim().slice(0, 1).toUpperCase() || "?";
+    if (!url) return initial;
+    const img = new Image();
+    img.className = "ava";
+    img.alt = "";
+    img.decoding = "async";
+    img.onerror = () => img.replaceWith(initial);
+    img.src = url;
+    return img;
+  }
+
+  // photos are the players' pictures for the canvas, each loaded once; a
+  // player without one keeps the drawn face.
+  const photos = new Map();
+  function photo(url) {
+    if (!url) return null;
+    let img = photos.get(url);
+    if (!img) {
+      img = new Image();
+      img.src = url;
+      photos.set(url, img);
+    }
+    return img.complete && img.naturalWidth > 0 ? img : null;
+  }
+
+  // drawPhoto puts a player's photo over the face of the hero drawn at
+  // (x, y), s their size, in a white ring.
+  function drawPhoto(url, x, y, s, now) {
+    const img = photo(url);
+    if (!img) return;
+    const cy = y + (-24 + Math.sin(now / 250) * 2) * s, r = 12 * s;
+    ctx.save();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(x, cy, r + 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x, cy, r, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(img, x - r, cy - r, r * 2, r * 2);
+    ctx.restore();
   }
 
   function nameTag(name, x, y, color) {
@@ -764,9 +815,11 @@
         const [fx2, fy] = fighterAt(i), swing = swings.get(row.id) || 0;
         swings.set(row.id, Math.max(0, swing - dt / 200));
         drawHero(fx2, fy, 0.95, fx2 < bossX() ? 1 : -1, swing, colorOf(row.id), now);
+        drawPhoto(row.avatar, fx2, fy, 0.95, now);
         nameTag(row.name, fx2, fy + 62, "#fff");
       });
       drawHero(W * 0.18, gy - 68, 1.15, 1, fx.swing, "#1d2c7a", now);
+      drawPhoto(myAvatar, W * 0.18, gy - 68, 1.15, now);
       nameTag(t.you, W * 0.18, gy - 68 + 72, "#ffcf4a");
     }
     if (performance.now() < skills.storm.until) {

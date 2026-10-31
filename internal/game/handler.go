@@ -16,11 +16,12 @@ import (
 // kilobytes, a long one of Kosmik ilon's turns some tens.
 const maxBodyBytes = 256 << 10
 
-// Scores keeps the game's scores, which Telegram holds on each game
-// message.
-type Scores interface {
+// Telegram keeps the game's scores on each game message, and has the
+// players' photos.
+type Telegram interface {
 	SetGameScore(ctx context.Context, game telegram.GameMessage, score int) (improved bool, err error)
 	GetGameHighScores(ctx context.Context, game telegram.GameMessage) ([]telegram.GameHighScore, error)
+	Avatar(ctx context.Context, userID, maxBytes int64) (data []byte, ok bool, err error)
 }
 
 // Records keeps the scored plays in the bot's own database too, each
@@ -36,21 +37,22 @@ type Records interface {
 const tableSize = 10
 
 type handler struct {
-	game    *Game
-	scores  Scores
-	records Records
-	logger  *slog.Logger
+	game     *Game
+	telegram Telegram
+	records  Records
+	logger   *slog.Logger
 }
 
 // Handler serves the pages' requests: "start" deals a play for a session,
 // of the game it is for, "finish" scores one, sets the score and records
 // it, and "table" is the game's table: from records across all chats, or
-// when records is nil or fails, the game message's from Telegram.
-func (g *Game) Handler(scores Scores, records Records, logger *slog.Logger) http.Handler {
+// when records is nil or fails, the game message's from Telegram. A GET
+// with an avatar token is that player's photo.
+func (g *Game) Handler(tg Telegram, records Records, logger *slog.Logger) http.Handler {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &handler{game: g, scores: scores, records: records, logger: logger}
+	return &handler{game: g, telegram: tg, records: records, logger: logger}
 }
 
 type request struct {
@@ -95,6 +97,7 @@ type row struct {
 	Name     string `json:"name"`
 	Score    int    `json:"score"`
 	Me       bool   `json:"me"`
+	Avatar   string `json:"avatar"`
 }
 
 type failure struct {
@@ -111,6 +114,10 @@ var (
 )
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet && r.URL.Query().Has("avatar") {
+		h.avatar(w, r)
+		return
+	}
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "application/json")
 	result, fail := h.serve(r)
@@ -191,7 +198,7 @@ func (h *handler) finish(ctx context.Context, req request) (any, failure) {
 	improved := false
 	if result.Score > 0 {
 		// A 0 would only put the player at the bottom of the table.
-		improved, err = h.scores.SetGameScore(ctx, message(result.Player), result.Score)
+		improved, err = h.telegram.SetGameScore(ctx, message(result.Player), result.Score)
 	}
 	if err != nil {
 		h.logger.Error("could not set a game score", "user_id", result.Player.UserID, "error", err)
@@ -248,19 +255,19 @@ func (h *handler) rows(ctx context.Context, name string, player Player) ([]row, 
 		if err == nil {
 			table := make([]row, 0, len(ranks))
 			for _, r := range ranks {
-				table = append(table, row{Position: r.Position, Name: r.Name, Score: r.Best, Me: r.UserID == player.UserID})
+				table = append(table, row{Position: r.Position, Name: r.Name, Score: r.Best, Me: r.UserID == player.UserID, Avatar: h.game.AvatarPath(r.UserID)})
 			}
 			return table, nil
 		}
 		h.logger.Warn("could not read the game's table", "game", name, "error", err)
 	}
-	scores, err := h.scores.GetGameHighScores(ctx, message(player))
+	scores, err := h.telegram.GetGameHighScores(ctx, message(player))
 	if err != nil {
 		return []row{}, err
 	}
 	table := make([]row, 0, len(scores))
 	for _, s := range scores {
-		table = append(table, row{Position: s.Position, Name: s.User.FirstName, Score: s.Score, Me: s.User.ID == player.UserID})
+		table = append(table, row{Position: s.Position, Name: s.User.FirstName, Score: s.Score, Me: s.User.ID == player.UserID, Avatar: h.game.AvatarPath(s.User.ID)})
 	}
 	return table, nil
 }

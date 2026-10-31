@@ -233,6 +233,22 @@
     }
   }
 
+  // avatarOf is a player's photo beside their name, or their initial when
+  // they have none or hide it.
+  function avatarOf(url, name) {
+    const initial = document.createElement("span");
+    initial.className = "ava";
+    initial.textContent = (name || "?").trim().slice(0, 1).toUpperCase() || "?";
+    if (!url) return initial;
+    const img = new Image();
+    img.className = "ava";
+    img.alt = "";
+    img.decoding = "async";
+    img.onerror = () => img.replaceWith(initial);
+    img.src = url;
+    return img;
+  }
+
   function renderTable(card, rows, table) {
     rows.replaceChildren();
     if (!table || table.length === 0) {
@@ -247,7 +263,7 @@
       place.textContent = row.position;
       const name = document.createElement("span");
       name.className = "name";
-      name.textContent = row.name;
+      name.append(avatarOf(row.avatar, row.name), row.name);
       const score = document.createElement("span");
       score.textContent = row.score;
       item.append(place, name, score);

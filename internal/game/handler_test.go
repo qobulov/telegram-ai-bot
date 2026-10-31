@@ -31,6 +31,16 @@ func (f *fakeScores) SetGameScore(_ context.Context, game telegram.GameMessage, 
 	return true, nil
 }
 
+func (f *fakeScores) Avatar(_ context.Context, userID, _ int64) ([]byte, bool, error) {
+	if f.err != nil {
+		return nil, false, f.err
+	}
+	if userID == 42 {
+		return []byte("\xff\xd8\xff\xe0 a photo"), true, nil
+	}
+	return nil, false, nil
+}
+
 func (f *fakeScores) GetGameHighScores(_ context.Context, game telegram.GameMessage) ([]telegram.GameHighScore, error) {
 	return []telegram.GameHighScore{
 		{Position: 1, User: telegram.User{ID: 7, FirstName: "Ali"}, Score: 300},
@@ -250,5 +260,36 @@ func TestHandlerTableFromTheRecords(t *testing.T) {
 	_, got = post(t, h, request{Action: "table", Session: session})
 	if table, _ := got["table"].([]any); len(table) != 2 || table[0].(map[string]any)["name"] != "Ali" {
 		t.Errorf("Telegram's table = %v", got)
+	}
+}
+
+// A row of the table carries its player's photo address; the address gives
+// the photo, kept a day, a player without one a 404, and a forged or old
+// address nothing.
+func TestHandlerServesAvatars(t *testing.T) {
+	g, c := newTestGame()
+	h := g.Handler(&fakeScores{}, &fakeRecords{}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	_, got := post(t, h, request{Action: "table", Session: sessionOf(t, playURL(t, g, OtinchiShortName, player))})
+	mine := got["table"].([]any)[1].(map[string]any)["avatar"].(string)
+	if !strings.HasPrefix(mine, "/api/game?avatar=") {
+		t.Fatalf("avatar = %q", mine)
+	}
+	get := func(path string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		return rec
+	}
+	if rec := get(mine); rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/jpeg" || !strings.Contains(rec.Header().Get("Cache-Control"), "max-age=86400") {
+		t.Errorf("my photo: %d %v", rec.Code, rec.Header())
+	}
+	if rec := get(g.AvatarPath(9)); rec.Code != http.StatusNotFound {
+		t.Errorf("no photo: %d", rec.Code)
+	}
+	if rec := get(mine + "x"); rec.Code != http.StatusUnauthorized {
+		t.Errorf("forged: %d", rec.Code)
+	}
+	c.now = c.now.Add(72 * time.Hour)
+	if rec := get(mine); rec.Code != http.StatusUnauthorized {
+		t.Errorf("three days on: %d", rec.Code)
 	}
 }

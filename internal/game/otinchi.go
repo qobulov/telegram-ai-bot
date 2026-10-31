@@ -21,11 +21,11 @@ const OtinchiShortName = "otinchi"
 // score, refuses chops quicker than a hand makes them or after the time ran
 // out, and wants the play to have taken as long as its chops did.
 const (
-	otinchiStartMs    = 5000
-	otinchiMostMs     = 6000
-	otinchiFirstBonus = 400
-	otinchiLeastBonus = 200
-	otinchiDrainCap   = 300
+	otinchiStartMs    = 7000
+	otinchiMostMs     = 8000
+	otinchiFirstBonus = 500
+	otinchiLeastBonus = 260
+	otinchiDrainCap   = 500
 	otinchiMinGap     = 70
 	otinchiGolden     = 5
 	otinchiSafe       = 3

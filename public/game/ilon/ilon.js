@@ -673,6 +673,22 @@
     requestAnimationFrame(step);
   }
 
+  // avatarOf is a player's photo beside their name, or their initial when
+  // they have none or hide it.
+  function avatarOf(url, name) {
+    const initial = document.createElement("span");
+    initial.className = "ava";
+    initial.textContent = (name || "?").trim().slice(0, 1).toUpperCase() || "?";
+    if (!url) return initial;
+    const img = new Image();
+    img.className = "ava";
+    img.alt = "";
+    img.decoding = "async";
+    img.onerror = () => img.replaceWith(initial);
+    img.src = url;
+    return img;
+  }
+
   function fillTable(cardId, listId, rows) {
     const list = $(listId);
     list.textContent = "";
@@ -682,7 +698,8 @@
       for (const [cls, text] of [["pos", row.position], ["name", row.name], ["pts", row.score]]) {
         const span = document.createElement("span");
         span.className = cls;
-        span.textContent = text;
+        if (cls === "name") span.append(avatarOf(row.avatar, row.name));
+        span.append(text);
         item.append(span);
       }
       list.append(item);

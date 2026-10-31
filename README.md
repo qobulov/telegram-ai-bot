@@ -1771,6 +1771,15 @@ table is made from it: the first 10 players of the game by their best in
 any chat, ties sharing a place, and the player's own row under them when
 they are further down.
 
+The tables and Dev jangi show the players' profile photos: each row the
+server lists carries the address of its player's photo at
+`/api/game?avatar=`, signed for that player and good until the end of the
+next day. The server fetches the photo from Telegram in its small size and
+serves it, kept a day by browsers and Vercel's cache, so Telegram's file
+address, which holds the bot's token, never reaches a page. A player
+without a photo, or who shows it only to their contacts, keeps their
+initial.
+
 A bot can still answer as fast as the limits allow, but not faster, and
 cannot name its score, another player or another message.
 

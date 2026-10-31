@@ -290,3 +290,5 @@ button.primary {
 @media (prefers-reduced-motion: reduce) {
   .coins.pop, .card.shake, .victory-title, .victory-reward { animation: none; }
 }
+
+.ava { display: inline-grid; place-items: center; width: 20px; height: 20px; margin-right: 6px; border-radius: 50%; object-fit: cover; vertical-align: middle; font-size: 11px; font-weight: 800; background: rgba(127, 127, 127, 0.3); color: inherit; flex: none; }
