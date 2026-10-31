@@ -754,6 +754,8 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.doozCommand(in)
 	case commandName(in.text) == "/shashka":
 		return s.shashkaCommand(ctx, in)
+	case commandName(in.text) == "/elon" && !in.group && s.opts.Tools != nil && s.isOwner(in.msg.From):
+		return s.announceCommand(ctx, in)
 	case strings.HasPrefix(in.text, "/"):
 		return s.withKeyboard(in, say(s.runCommand(ctx, in)))
 	case utf8.RuneCountInString(in.text) > s.opts.MaxInputChars:

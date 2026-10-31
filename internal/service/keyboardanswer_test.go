@@ -438,3 +438,38 @@ func TestCodeAnswersSkipTheModel(t *testing.T) {
 		t.Errorf("the model was asked %+v", calls)
 	}
 }
+
+// An owner's /elon runs send_to_groups without the model: in reply to a
+// video it drafts the video under the words as its caption, "/elon ha"
+// sends it; a member's /elon is no command of theirs.
+func TestOwnersAnnounceWithoutTheModel(t *testing.T) {
+	f := newFixture()
+	f.opts.OwnerUsernames = []string{ownerUsername}
+	runner := withToolRunner(f)
+	runner.answers["send_to_groups"] = `{"ok":true,"result":{"draft":true,"groups":["Devs","Pub"],"caption":"Akkaunt: 150$"}}`
+	owner := func(text string) telegram.Update {
+		update := textFrom(9001, text)
+		update.Message.From.Username = "Pronium"
+		return update
+	}
+	video := owner("/elon Akkaunt: 150$")
+	video.Message.ReplyToMessage = &telegram.Message{MessageID: 1642, Chat: video.Message.Chat, Video: &telegram.Video{FileID: "v"}}
+
+	sent := f.run(video, owner("/elon ha"), textFrom(userID, "/elon hi"))
+
+	asked := runner.recorded()
+	if len(asked) != 2 || asked[0] != `send_to_groups {"action":"prepare","copy":true,"text":"Akkaunt: 150$"}` || asked[1] != `send_to_groups {"action":"confirm"}` {
+		t.Fatalf("asked %q", asked)
+	}
+	var drafted, refused bool
+	for _, m := range sent {
+		drafted = drafted || (m.chatID == 9001 && strings.Contains(m.text, "2 ta guruhga ketadi: Devs, Pub"))
+		refused = refused || (m.chatID == userID && strings.Contains(m.text, "don't know that command"))
+	}
+	if !drafted || !refused {
+		t.Errorf("sent %+v", sent)
+	}
+	if calls := len(f.replier.recorded()); calls > 1 {
+		t.Errorf("the model was asked %d times; only the member's message is its", calls)
+	}
+}
