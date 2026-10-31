@@ -22,7 +22,7 @@ import (
 // mute; one who
 // swears at the bot gets no warning, and the second time a quarter of an
 // hour's mute, or, when that cannot be done, silence. A mute tags the
-// group's creator or whom the owner named.
+// group's creator or whom the owner named. The group's admins may swear.
 const (
 	swearWindow    = 24 * time.Hour
 	swearMute      = time.Hour
@@ -125,10 +125,8 @@ var apostrophes = strings.NewReplacer("ʻ", "'", "ʼ", "'", "’", "'", "‘", "
 // the swear guard on, and reports whether it did: the message then gets no
 // answer from the model, which would only swear back. A first swear at the
 // bot is not handled: it goes on to the model, which is told not to swear
-// back. An admin is warned too, but Telegram does not let an admin be muted,
-// so a second insult tags whom a mute would, and a second swear at the bot
-// gets silence. The creator, owners, bots and posts on behalf of a chat are
-// left alone, and so is a muted group.
+// back. The group's admins, as the owners asked, the owners, bots and posts
+// on behalf of a chat are left alone, and so is a muted group.
 func (s *Service) guardedSwearing(msg *telegram.Message, updateID int64) bool {
 	if s.opts.Strikes == nil || s.opts.Rules == nil || s.opts.AdminList == nil || s.opts.Restrictor == nil || s.opts.Judge == nil ||
 		msg.From == nil || msg.From.IsBot || msg.SenderChat != nil || msg.ForwardOrigin != nil || s.isOwner(msg.From) {
@@ -155,8 +153,8 @@ func (s *Service) guardedSwearing(msg *telegram.Message, updateID int64) bool {
 		s.opts.Logger.Warn("swear guard: could not list the admins; leaving it", "chat_id", msg.Chat.ID, "error", err)
 		return false
 	}
-	role := roleOf(admins, msg.From.ID)
-	if role == "creator" {
+	if roleOf(admins, msg.From.ID) != "" {
+		// The creator and every admin may swear: the owners asked so.
 		return false
 	}
 	target := s.aimOf(ctx, msg, text)
@@ -179,7 +177,7 @@ func (s *Service) guardedSwearing(msg *telegram.Message, updateID int64) bool {
 	// The owners' own order goes first: one for this member holds for any
 	// swearing, one for anyone in the group for insults alone.
 	if punished && (ordered.UserID != 0 || target != aimExclamation) {
-		s.punish(ctx, msg, punishment, role, "yana so'kindi", caller)
+		s.punish(ctx, msg, punishment, "", "yana so'kindi", caller)
 		return true
 	}
 	if !on {
@@ -192,21 +190,15 @@ func (s *Service) guardedSwearing(msg *telegram.Message, updateID int64) bool {
 	}
 	switch target {
 	case aimBot:
-		return s.guardedSwearingAtBot(ctx, msg, strikes, role, caller)
+		return s.guardedSwearingAtBot(ctx, msg, strikes, caller)
 	case aimExclamation:
 		return s.guardedExclamation(msg, strikes)
 	}
-	lang, who := guardLanguage(msg), mentionOf(msg.From)
-	switch {
-	case strikes <= 1 && role != "":
-		s.postGuard(msg, fmt.Sprintf(textSwearAdminWarned.inLanguage(lang), who))
-	case strikes <= 1:
-		s.postGuard(msg, fmt.Sprintf(textSwearWarned.inLanguage(lang), who))
-	case role != "":
-		s.postGuard(msg, fmt.Sprintf(textSwearAdminAgain.inLanguage(lang), who)+calling(lang, textLookAtIt, caller))
-	default:
-		s.muteSwearer(ctx, msg, caller)
+	if strikes <= 1 {
+		s.postGuard(msg, fmt.Sprintf(textSwearWarned.inLanguage(guardLanguage(msg)), mentionOf(msg.From)))
+		return true
 	}
+	s.muteSwearer(ctx, msg, caller)
 	return true
 }
 
@@ -222,17 +214,14 @@ func (s *Service) guardedExclamation(msg *telegram.Message, strikes int) bool {
 
 // guardedSwearingAtBot handles a swear at the bot, as the owners asked: no
 // warning but one of the swear clips, and the second time a quarter of an
-// hour's mute with a clip, or silence when the swearer is an admin or the
-// mute fails. Without clips the first swear is left to the model.
-func (s *Service) guardedSwearingAtBot(ctx context.Context, msg *telegram.Message, strikes int, role, caller string) bool {
+// hour's mute with a clip, or silence when the mute fails. Without clips
+// the first swear is left to the model.
+func (s *Service) guardedSwearingAtBot(ctx context.Context, msg *telegram.Message, strikes int, caller string) bool {
 	if strikes <= 1 {
 		if s.opts.ClipSender == nil {
 			return false
 		}
 		s.replyWithClip(ctx, msg)
-		return true
-	}
-	if role != "" {
 		return true
 	}
 	err := s.opts.Restrictor.RestrictChatMember(ctx, telegram.Restriction{
@@ -347,16 +336,6 @@ var (
 		uz: "%s, guruhda so'kinish mumkin emas. Bu ogohlantirish: yana so'kinsangiz, 1 soat yozolmaysiz.",
 		ru: "%s, в группе нельзя материться. Это предупреждение: ещё раз — и час не сможете писать.",
 		en: "%s, no swearing in the group. This is a warning: swear again and you can't write for an hour.",
-	}
-	textSwearAdminWarned = localText{
-		uz: "%s, guruhda so'kinish mumkin emas, adminlar uchun ham. Bu ogohlantirish.",
-		ru: "%s, в группе нельзя материться, даже админам. Это предупреждение.",
-		en: "%s, no swearing in the group, admins included. This is a warning.",
-	}
-	textSwearAdminAgain = localText{
-		uz: "%s yana so'kindi; u admin, uni yozolmaydigan qila olmayman.",
-		ru: "%s снова матерится; это админ, запретить ему писать я не могу.",
-		en: "%s swore again; they're an admin, so I can't stop them writing.",
 	}
 	textExclaimWarned = localText{
 		uz: "%s, guruhda so'kinmaylik. Bu ogohlantirish.",

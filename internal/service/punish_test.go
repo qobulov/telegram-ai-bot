@@ -78,14 +78,20 @@ func TestAGroupsPunishmentSparesExclamations(t *testing.T) {
 	}
 }
 
-// Telegram lets no bot ban an admin: the admin is named instead.
-func TestAPunishedAdminIsNamed(t *testing.T) {
+// An admin may swear, as the owners asked: a punishment ordered for them
+// is not carried out, and nothing is said.
+func TestAnAdminIsNotPunishedForSwearing(t *testing.T) {
 	f, _, moderator := punishing(true, swearPunishment(guardAdminID, "ban"))
 
 	sent := f.run(swearFrom(guardAdminID, "dnx"))
 
-	if len(moderator.banned) != 0 || len(sent) != 1 || !strings.Contains(sent[0].text, "u admin") {
-		t.Errorf("banned %v, sent %+v", moderator.banned, sent)
+	if len(moderator.banned) != 0 {
+		t.Errorf("banned %v", moderator.banned)
+	}
+	for _, m := range sent {
+		if strings.Contains(m.text, "admin") || strings.Contains(m.text, "so'kin") {
+			t.Errorf("an admin's swear got %q", m.text)
+		}
 	}
 }
 

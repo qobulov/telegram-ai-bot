@@ -243,19 +243,17 @@ func TestRulesHeaderSaysSwearingIsWatched(t *testing.T) {
 	}
 }
 
-// In production most of a group's swearers were admins, whom the guard left
-// alone. Telegram does not let an admin be muted, so an admin is warned, and
-// the next swear tags whom a mute would.
-func TestSwearGuardWarnsAnAdminThenTags(t *testing.T) {
+// The owners asked that the group's admins may swear: the guard neither
+// warns nor tags nor restricts them.
+func TestSwearGuardLeavesAdminsAlone(t *testing.T) {
 	f, restrictor := guardFixture("@Bakxtyorvch")
 
 	sent := f.run(swearFrom(guardAdminID, "dnx"), swearFrom(guardAdminID, "jala"))
 
-	if len(sent) != 2 || !strings.Contains(sent[0].text, "adminlar uchun ham") {
-		t.Fatalf("sent = %+v", sent)
-	}
-	if !strings.Contains(sent[1].text, "u admin") || !strings.HasSuffix(sent[1].text, "@Bakxtyorvch, qarab qo'ying.") {
-		t.Errorf("second notice = %q", sent[1].text)
+	for _, m := range sent {
+		if strings.Contains(m.text, "so'kin") || strings.Contains(m.text, "Bakxtyorvch") {
+			t.Errorf("an admin's swear got %q", m.text)
+		}
 	}
 	if done := restrictor.recorded(); len(done) != 0 {
 		t.Errorf("an admin was restricted: %+v", done)

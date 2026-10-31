@@ -1257,9 +1257,9 @@ owners' two clips, chosen at random and embedded in the binary
 and the second within 24 hours mutes them for 15 minutes, with a clip, or,
 when she cannot mute (an admin, or no right to), gets silence.
 A mute notice tags the @username the owner named, or else the group's
-creator. Telegram does not let an admin be muted, so an admin who insults a
-person is warned the same way and the next insult only tags that person.
-The creator, owners and bots are never touched, forwarded messages are not
+creator. The group's admins may swear, as the owners asked: the guard
+neither warns nor tags them, and a punishment ordered for one is not
+carried out for swearing. The creator, owners and bots are never touched, forwarded messages are not
 checked, and a message the guard handled is not answered by the model. Each
 caught insult is kept in `moderation_actions` (action `swear`, or
 `swear_bot` for one at the bot), which is how the count is kept and how an
