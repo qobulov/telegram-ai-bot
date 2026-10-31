@@ -228,6 +228,10 @@ type turn struct {
 	// toolAsText is set once the model wrote a tool call as text, so that
 	// the next request tells it to call the tool instead.
 	toolAsText bool
+	// askedAgain is set once the model answered nothing and was asked
+	// again; emptyReason is why it stopped, as the provider said.
+	askedAgain  bool
+	emptyReason string
 	// route is the path the turn takes when it is not the chat one.
 	route string
 }
@@ -282,6 +286,15 @@ func (a *Agent) runFull(ctx context.Context, t *turn) (Answer, error) {
 			return Answer{}, err
 		}
 		if len(reply.ToolCalls) == 0 {
+			if strings.TrimSpace(reply.Content) == "" {
+				// Gemini now and then answers nothing at all, in a second;
+				// asked once more, it mostly answers.
+				t.emptyReason = reply.FinishReason
+				if !t.askedAgain {
+					t.askedAgain = true
+					continue
+				}
+			}
 			if !writesToolCall(reply.Content, definitions) {
 				return finish(t, reply)
 			}
@@ -401,9 +414,18 @@ func cutToThem(answer string) (rest, to string, found bool) {
 	return strings.TrimSpace(answer[len(m[0]):]), strings.TrimSpace(m[1]), true
 }
 
+// emptyAnswer is ErrEmptyResponse, with why the model stopped when the
+// provider said.
+func emptyAnswer(t *turn) error {
+	if t.emptyReason == "" {
+		return ai.ErrEmptyResponse
+	}
+	return fmt.Errorf("%w (finish reason %s)", ai.ErrEmptyResponse, t.emptyReason)
+}
+
 func finishText(t *turn, answer string) (Answer, error) {
 	if answer == "" {
-		return Answer{}, ai.ErrEmptyResponse
+		return Answer{}, emptyAnswer(t)
 	}
 	if isSilent(answer) {
 		return Answer{}, ErrSilent

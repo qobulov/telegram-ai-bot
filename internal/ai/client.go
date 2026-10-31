@@ -398,6 +398,7 @@ func decodeReply(raw []byte) (Message, error) {
 		return Message{}, ErrTruncated
 	}
 	msg.Role = RoleAssistant
+	msg.FinishReason = parsed.Choices[0].FinishReason
 	return msg, nil
 }
 

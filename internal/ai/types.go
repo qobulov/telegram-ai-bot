@@ -37,6 +37,9 @@ type Message struct {
 	// Parts are images or audio sent along with Content. They are only ever
 	// part of a request: they are not stored, and never come back in a reply.
 	Parts []ContentPart `json:"-"`
+	// FinishReason is why the model stopped, as the provider says, in a
+	// reply only: what an empty one is told by.
+	FinishReason string `json:"-"`
 }
 
 // ContentPart is one piece of a multimodal message.

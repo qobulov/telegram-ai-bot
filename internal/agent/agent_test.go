@@ -265,15 +265,29 @@ func TestReplySavesNothingWhenModelFails(t *testing.T) {
 
 func TestReplyRejectsEmptyAnswer(t *testing.T) {
 	for _, content := range []string{"", "  \n"} {
-		f := newFixture(text(content))
+		f := newFixture(ai.Message{Role: ai.RoleAssistant, Content: content, FinishReason: "stop"})
 
 		_, err := f.agent.Reply(context.Background(), request(1, "hi"))
-		if !errors.Is(err, ai.ErrEmptyResponse) {
-			t.Errorf("content %q: err = %v, want ErrEmptyResponse", content, err)
+		if !errors.Is(err, ai.ErrEmptyResponse) || !strings.Contains(err.Error(), "finish reason stop") {
+			t.Errorf("content %q: err = %v, want ErrEmptyResponse and why", content, err)
+		}
+		if len(f.model.requests) != 2 {
+			t.Errorf("content %q: asked %d times, want twice", content, len(f.model.requests))
 		}
 		if f.store.saves != 0 {
 			t.Errorf("content %q: an empty turn was saved", content)
 		}
+	}
+}
+
+// A model that answers nothing is asked once more, and its answer then is
+// the turn's.
+func TestReplyAsksAgainAfterAnEmptyAnswer(t *testing.T) {
+	f := newFixture(text(""), text("Salom!"))
+
+	answer, err := f.agent.Reply(context.Background(), request(1, "hi"))
+	if err != nil || answer.Text != "Salom!" || len(f.model.requests) != 2 {
+		t.Fatalf("answer = %+v, %v after %d requests", answer, err, len(f.model.requests))
 	}
 }
 
