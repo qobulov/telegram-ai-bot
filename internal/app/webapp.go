@@ -9,6 +9,7 @@ import (
 	"telegram-ai-bot/internal/config"
 	"telegram-ai-bot/internal/game"
 	"telegram-ai-bot/internal/mafia"
+	"telegram-ai-bot/internal/maydon"
 	"telegram-ai-bot/internal/miniapp"
 	"telegram-ai-bot/internal/raid"
 	"telegram-ai-bot/internal/shashkaapp"
@@ -191,6 +192,28 @@ func NewMafia(ctx context.Context, cfg config.Config, logger *slog.Logger) (*End
 	}
 	client := telegram.NewClient(telegram.Options{Token: cfg.TelegramToken, BaseURL: cfg.TelegramAPIURL, Logger: logger})
 	handler := mafia.NewHandler(mafia.Options{Sessions: sessions, Store: store, Telegram: client, Logger: logger})
+	return &Endpoint{Handler: handler, Close: store.Close}, nil
+}
+
+// NewMaydon builds Maydon's API: it keeps each group's room in the
+// database, opens its page with the sessions the game's Play presses get,
+// reads the fighters' Dev jangi levels, tells the group how the battle goes
+// and pays the winners in Dev jangi's coins.
+func NewMaydon(ctx context.Context, cfg config.Config, logger *slog.Logger) (*Endpoint, error) {
+	sessions := newGame(cfg)
+	if sessions == nil {
+		return nil, errNoPages
+	}
+	store, err := storage.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return nil, err
+	}
+	if err := store.CheckSchema(ctx); err != nil {
+		store.Close()
+		return nil, err
+	}
+	client := telegram.NewClient(telegram.Options{Token: cfg.TelegramToken, BaseURL: cfg.TelegramAPIURL, Logger: logger})
+	handler := maydon.NewHandler(maydon.Options{Sessions: sessions, Store: store, Telegram: client, Logger: logger})
 	return &Endpoint{Handler: handler, Close: store.Close}, nil
 }
 

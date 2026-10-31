@@ -26,6 +26,9 @@
     },
     "api/mafia.go": {
       "maxDuration": 15
+    },
+    "api/maydon.go": {
+      "maxDuration": 15
     }
   },
   "crons": [

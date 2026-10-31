@@ -45,3 +45,26 @@ func TestChangeMafiaGame(t *testing.T) {
 		}
 	}
 }
+
+// A chat's room keeps what a change gives back; a player's levels are their
+// hero's, or the first ones when they have none.
+func TestChangeMaydonRoomAndLevels(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	if err := store.ChangeMaydonRoom(ctx, -7, func([]byte) ([]byte, error) { return []byte(`{"phase": "lobby"}`), nil }); err != nil {
+		t.Fatal(err)
+	}
+	var seen string
+	if err := store.ChangeMaydonRoom(ctx, -7, func(state []byte) ([]byte, error) { seen = string(state); return state, nil }); err != nil || seen != `{"phase": "lobby"}` {
+		t.Fatalf("kept %q, %v", seen, err)
+	}
+	if sword, crit, err := store.RaidLevels(ctx, alice); err != nil || sword != 1 || crit != 0 {
+		t.Errorf("no hero: %d %d %v", sword, crit, err)
+	}
+	if _, err := store.ChangeRaidHero(ctx, alice, 9, func(h *RaidHero) error { h.Sword, h.Crit = 12, 5; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if sword, crit, err := store.RaidLevels(ctx, alice); err != nil || sword != 12 || crit != 5 {
+		t.Errorf("a hero: %d %d %v", sword, crit, err)
+	}
+}

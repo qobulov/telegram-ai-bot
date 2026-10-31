@@ -168,6 +168,17 @@ var mafias = &lazy{name: "mafia", build: func(ctx context.Context, cfg config.Co
 	return endpoint.Handler, endpoint.Close, nil
 }}
 
+var maydons = &lazy{name: "maydon", build: func(ctx context.Context, cfg config.Config, logger *slog.Logger) (http.Handler, func(), error) {
+	endpoint, err := app.NewMaydon(ctx, cfg, logger)
+	if err != nil {
+		return nil, nil, err
+	}
+	return endpoint.Handler, endpoint.Close, nil
+}}
+
+// Maydon answers the Maydon team battle.
+func Maydon(w http.ResponseWriter, r *http.Request) { maydons.serve(w, r) }
+
 // Mafia answers the Mafia game.
 func Mafia(w http.ResponseWriter, r *http.Request) { mafias.serve(w, r) }
 

@@ -40,6 +40,11 @@ const BossShortName = "boss"
 // opens its page with a session.
 const MafiaShortName = "mafiya"
 
+// MaydonShortName is Maydon's short name, as it must be registered with
+// @BotFather's /newgame. Its battles are internal/maydon's: this package
+// only opens its page with a session.
+const MaydonShortName = "maydon"
+
 // IlonPath, OtinchiPath and BossPath are where Kosmik ilon's, O'tinchi's
 // and Dev jangi's pages are, under Tarozi's.
 const (
@@ -47,6 +52,7 @@ const (
 	OtinchiPath = "otinchi/"
 	BossPath    = "boss/"
 	MafiaPath   = "mafiya/"
+	MaydonPath  = "maydon/"
 )
 
 const (
@@ -151,6 +157,8 @@ func (g *Game) PlayURL(shortName string, p Player) (link string, ok bool) {
 		page += BossPath
 	case MafiaShortName:
 		page += MafiaPath
+	case MaydonShortName:
+		page += MaydonPath
 	default:
 		return "", false
 	}

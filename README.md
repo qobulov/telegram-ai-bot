@@ -1904,6 +1904,35 @@ checks found. A phase ends when its time is up (45 seconds for a night,
 when everyone who acts has acted or voted; the pages ask every two
 seconds.
 
+### Maydon
+
+`/maydon` posts Maydon, a team battle of a group, one against one up to
+five against five (`public/game/maydon/`, `internal/maydon`,
+`api/maydon.go`; its short name with @BotFather is `maydon`). Members press
+Play, pick a class — warrior, archer, mage or healer — and join; any of them
+starts the battle once two have joined. The sides are split by power, the
+strongest left joining the weaker side, and each fighter's strength comes
+from their Dev jangi levels: 3% more blows a sword level, 1% more life a
+level of either, 5% critical blows and 2% more a crit level.
+
+In the 90-second battle each player taps a foe to target it (a healer may
+target a friend) and strikes as their attack comes round: a blow within
+450 ms of it is a precise one, half as strong again, and one before it
+slips and puts it off. A skill fires when the energy is full, a block takes
+70% of each blow for a second and a half, and a fallen fighter comes back
+once, eight seconds later, with 60% of their life. A fighter whose player
+does nothing strikes by itself three seconds after their attack comes
+round, weaker, so that no side plays one short. A side wins when the other
+has fallen for good, or when the time is up with more of its life left;
+the bot tells the group the winner and the best fighter, and each winner
+gets 100 of Dev jangi's coins. Members who did not join watch the battle.
+
+The server plays the battle: each group's room is a row of `maydon_rooms`
+(migration 50), and each request, changed with the row locked, plays it on
+to the moment it came in steps of 50 ms, its randomness kept in the room,
+then does what the player asked; a page asks twice a second and gets the
+hits since its last to draw.
+
 ### Shashka (draughts Mini App)
 
 With `WEBAPP_URL` set, `/shashka` opens Russian draughts, played against
@@ -2475,7 +2504,8 @@ update needs:
 ### Deploying the dashboard and the game
 
 They need no new kind of update; Dev jangi needs migrations 45 to 47, the
-games' own table of scores migration 48, Mafia migration 49.
+games' own table of scores migration 48, Mafia migration 49, Maydon
+migration 50.
 
 1. **Deploy**, then **set `WEBAPP_URL`** in Vercel to the deployment's
    production address, for example `https://maria.vercel.app` (no trailing
@@ -2496,7 +2526,8 @@ games' own table of scores migration 48, Mafia migration 49.
    `https://YOUR-APP.vercel.app/game/` and `/game/ilon/`, `/game/otinchi/`,
    `/game/boss/` with each press of Play. Dev jangi needs migrations 45 to 47
    and the games' scores migration 48, Mafia (`mafiya`, at
-   `/game/mafiya/`) migration 49.
+   `/game/mafiya/`) migration 49, Maydon (`maydon`, at `/game/maydon/`)
+   migration 50.
 4. As an owner, send `/stats`, `/game`, `/ilon`, `/otinchi` and `/boss` in a
    group and in a private chat.
 

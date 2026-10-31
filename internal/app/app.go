@@ -422,7 +422,7 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 		builtin = append(builtin, imageTool(cfg, store))
 	}
 	if cfg.WebAppURL != "" {
-		builtin = append(builtin, tools.GameTool(tools.GameOptions{Sender: bot.Client, Store: store, Games: []string{game.ShortName, game.IlonShortName, game.OtinchiShortName, game.BossShortName, game.MafiaShortName}}))
+		builtin = append(builtin, tools.GameTool(tools.GameOptions{Sender: bot.Client, Store: store, Games: []string{game.ShortName, game.IlonShortName, game.OtinchiShortName, game.BossShortName, game.MafiaShortName, game.MaydonShortName}}))
 	}
 	// Any group's admins, and any member for a poll or the admin list, may
 	// use these, so they are there with or without owners.
