@@ -10,18 +10,24 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Lilita+One&display=swap" rel="stylesheet">
   <script src="https://telegram.org/js/games.js" defer></script>
-  <link rel="stylesheet" href="mafia.css">
+  <link rel="stylesheet" href="mafia.css?v=3">
 </head>
 <body>
   <canvas class="stars" id="stars" aria-hidden="true"></canvas>
   <main id="app">
-    <header class="top"><h1>🎭 Mafia</h1><span class="pill" id="phase">…</span><span class="timer" id="timer"></span></header>
+    <header class="top"><h1 id="title">🎭 Mafia</h1><button class="role" id="role" type="button" hidden></button><span class="pill" id="phase">…</span><span class="timer" id="timer"></span></header>
+    <div class="progress" aria-hidden="true"><i id="progress"></i></div>
     <div class="grid" id="grid"></div>
     <section class="center" id="center"></section>
+    <section class="feed" id="feed" hidden aria-live="polite"></section>
+    <form class="chatbox" id="chatbox" hidden>
+      <div class="chips" id="chips"></div>
+      <div class="row"><input id="chatline" maxlength="200" autocomplete="off" enterkeyhint="send" placeholder="Xabar yozing…"><button class="btn main" type="submit" aria-label="Yuborish">➤</button></div>
+    </form>
     <p class="message" id="message" aria-live="polite"></p>
     <section class="bar" id="bar"></section>
   </main>
   <div class="overlay" id="overlay" hidden></div>
-  <script src="mafia.js"></script>
+  <script src="mafia.js?v=3"></script>
 </body>
 </html>

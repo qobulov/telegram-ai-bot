@@ -27,7 +27,8 @@
     block: { prompt: "Kimning uyiga borasiz?", hint: "U bu kecha qobiliyatini ishlata olmaydi", verb: "💋" },
     maniac: { prompt: "Bu kecha kimni o'ldirasiz?", hint: "Hech kim bilmaydi", verb: "🔪", danger: true },
   };
-  const MARKS = { mafia: "🤵 mafiya!", town: "✅ tinch", commissar: "🕵️‍♂️ komissar!", not: "komissar emas" };
+  const MARKS = { mafia: "🤵 mafiya!", town: "✅ mafiya emas", commissar: "🕵️‍♂️ komissar!", not: "komissar emas" };
+  const WINNERS = { town: "🏛 Tinch aholi yutdi!", mafia: "🩸 Mafiya yutdi!", solo: "🦹‍♂️ Manyak yutdi!", none: "🤝 Hech kim yutmadi" };
   const ERRORS = {
     group: "Mafia guruhda o'ynaladi: o'yinni guruhga yuboring (/mafia).",
     session: "O'yin havolasi eskirdi. Telegram'da «Play» ni qaytadan bosing.",
@@ -40,10 +41,23 @@
     repeating: "Bir kishini ketma-ket ikki kecha davolab bo'lmaydi.",
     no_act: "Rolingiz buni qila olmaydi.",
     unavailable: "Aloqa bo'lmadi, qayta urinib ko'ring.",
+    no_words: "So'nggi so'z vaqti o'tdi.",
+    words: "So'nggi so'z 1 dan 200 belgigacha bo'lsin.",
+    chat_closed: "Hozir chat sizga yopiq.",
+    line: "Xabar 1 dan 200 belgigacha bo'lsin.",
+    too_fast: "Biroz sekinroq 🙂",
+    room: "Chat almashdi (faza o'zgardi) — xabar yuborilmadi.",
+  };
+  // CHIPS are the quick lines of each room and phase.
+  const CHIPS = {
+    lobby: ["Boshlaymizmi? 🎭", "Yana kim bor? 👥", "Tayyorman ✅"],
+    mafia: ["Kimni tanlaymiz? 🔪", "Men tanladim ✅", "Komissar kim bo'lishi mumkin? 🕵️‍♂️"],
+    town: ["Men tinch aholiman 😇", "Komissar, gapir! 🕵️‍♂️", "Kim shubhali? 🤔"],
+    over: ["Yaxshi o'yin edi 🤝", "Yana bir o'yin? 🎭"],
   };
 
   let state = null, ends = 0, picked = null, busy = false, overlaySeq = null, cardFor = null, fatal = "";
-  let shownNews = null, closing = 0;
+  let shownNews = null, closing = 0, draft = "", heardTo = "";
 
   // ---------- server ----------
 
@@ -62,19 +76,27 @@
     return data;
   }
 
+  // send asks the server for one of the player's moves and reports whether
+  // it was taken.
   async function send(action, extra) {
-    if (busy) return;
+    if (busy) return false;
     busy = true;
     message("");
     try {
       await api(action, extra);
+      return true;
     } catch (error) {
       if (error.message === "group" || error.message === "session") fatal = ERRORS[error.message];
       message(ERRORS[error.message] || ERRORS.unavailable);
       render();
+      return false;
     } finally {
       busy = false;
     }
+  }
+
+  function buzz(pattern) {
+    try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (error) { /* no vibration here */ }
   }
 
   async function poll() {
@@ -102,10 +124,14 @@
     // verdict's as the night does. What a page opens on is only listed.
     const news = JSON.stringify(view.news || []);
     if (!before) shownNews = news;
+    const died = before && before.me && before.me.alive && me.joined && me.alive === false;
     if (playing && me.role && cardFor !== game && !shown(game)) { cardFor = game; showCard(me); }
     else if (before && before.seq !== view.seq && view.phase === "over") showEnd(view);
+    else if (died && me.can_speak) showDeath(view);
     else if (news !== shownNews && (view.phase === "day" || view.phase === "night") && (view.news || []).length) showNews(view);
     shownNews = news;
+    if (died) buzz([200, 80, 200]);
+    else if (before && before.phase !== view.phase && playing) buzz(me.pending && me.pending.length ? [40, 60, 40] : 25);
     render();
   }
 
@@ -135,13 +161,15 @@
     return close;
   }
 
-  function showCard(me) {
-    const close = overlay(`<div><div class="card" id="card"><div class="inner">
+  // showCard deals the player's role face down, to be turned over; open
+  // shows it turned already, as the role button does.
+  function showCard(me, open) {
+    const close = overlay(`<div><div class="card${open ? " open" : ""}" id="card"><div class="inner">
       <div class="face back">🎭<br>Rolingiz<div style="font-size:14px;font-family:system-ui;margin-top:10px;color:#cbbfe6">ochish uchun bosing</div></div>
       <div class="face front ${esc(me.team || "town")}"><div class="big">${esc((me.role_name || "").split(" ")[0])}</div><h2>${esc((me.role_name || "").split(" ").slice(1).join(" "))}</h2>
       <div class="team">${TEAMS[me.team] || ""}</div><p>${ABOUT[me.role] || ""}</p></div>
     </div></div><div class="hint">Rolingizni hech kimga ko'rsatmang 🤫</div>
-    <div class="row" style="margin-top:12px"><button class="btn main" data-close hidden>Tushundim</button></div></div>`);
+    <div class="row" style="margin-top:12px"><button class="btn main" data-close ${open ? "" : "hidden"}>Tushundim</button></div></div>`);
     const card = $("card");
     card.addEventListener("click", () => {
       card.classList.add("open");
@@ -157,14 +185,28 @@
     closing = setTimeout(close, 8000);
   }
 
+  // showDeath tells a player they fell, and asks for their last word.
+  function showDeath(view) {
+    const voted = view.phase === "night";
+    overlay(`<div class="announce"><div class="big">${voted ? "⚖️" : "💀"}</div><h2>${voted ? "Sizni shahardan chiqarishdi" : "Sizni o'ldirishdi"}</h2>
+      <p>So'nggi so'zingizni yozing — bot uni guruhga yuboradi. Faqat bir marta.</p>${speakForm(view)}
+      <div class="row" style="margin-top:8px"><button class="btn" data-close>Keyinroq</button></div></div>`);
+  }
+
+  function speakForm(view) {
+    const most = view.max_words || 200;
+    return `<div class="speak"><textarea class="words" rows="3" maxlength="${most}" placeholder="Masalan: Bek — mafiya, ishonmang!">${esc(draft)}</textarea>
+      <div class="row"><span class="count">${[...draft].length}/${most}</span><button class="btn main" data-speak>🕯 Guruhga yuborish</button></div></div>`;
+  }
+
   function showEnd(view) {
     if (overlaySeq === view.seq) return;
     overlaySeq = view.seq;
     const me = view.me || {};
     const won = me.team && me.team === view.winner;
-    const title = { town: "🏛 Tinch aholi yutdi!", mafia: "🩸 Mafiya yutdi!", solo: "🦹‍♂️ Manyak yutdi!" }[view.winner] || "O'yin tugadi";
+    const title = WINNERS[view.winner] || "O'yin tugadi";
     overlay(`<div class="announce"><h2>${title}</h2>
-      <p>${me.joined ? (won ? "🏆 Siz g'oliblar safidasiz! Dev jangi tangasi berildi." : "😤 Bu safar yutqazdingiz") : ""}</p>
+      <p>${me.joined ? (won ? "🏆 Siz g'oliblar safidasiz! Dev jangi tangasi berildi." : view.winner === "none" ? "Durang: hamma halok bo'ldi." : "😤 Bu safar yutqazdingiz") : ""}</p>
       <table>${(view.players || []).map((p) => `<tr class="${p.alive ? "" : "dead"}${isMe(p) ? " me" : ""}"><td>${p.alive ? "" : "💀 "}${esc(p.name)}</td><td>${esc(p.role_name || "")}</td></tr>`).join("")}</table>
       <div class="row"><button class="btn main" data-close>Yopish</button></div></div>`);
   }
@@ -198,25 +240,83 @@
 
   function render() {
     const phase = state ? state.phase : "";
+    const me = (state && state.me) || {};
+    const roleShown = Boolean(me.role) && ["night", "day", "vote"].includes(phase);
+    $("role").hidden = !roleShown;
+    $("title").hidden = roleShown;
+    if (roleShown) $("role").textContent = me.role_name;
     document.body.className = phase === "day" || phase === "vote" ? "day" : "";
     $("phase").textContent = !state ? "…" : { "": "Xona yo'q", lobby: `Xona · ${state.players.length}/${state.max_players}`, night: `🌙 ${state.day}-tun`, day: `☀️ ${state.day}-kun`, vote: "🗳 Ovoz", over: "🏁 Tugadi" }[phase];
     renderGrid();
     renderCenter();
+    renderChat();
     renderBar();
+  }
+
+  // renderChat shows the chat this player may read, redrawn only when a
+  // line came or the room changed, kept at its end when it was there; the
+  // box to write in shows while a room is open to them.
+  function renderChat() {
+    const feed = $("feed"), box = $("chatbox");
+    const me = (state && state.me) || {};
+    const lines = (state && state.chat) || [];
+    const room = fatal ? "" : me.room || "";
+    feed.hidden = !state || fatal || (!room && !lines.length);
+    box.hidden = !room;
+    box.classList.toggle("mafia", room === "mafia");
+    // The notes take the room the chat leaves; without a chat, all of it.
+    $("center").style.flex = feed.hidden ? "1 1 auto" : "0 1 auto";
+    if (feed.hidden) return;
+    const key = `${room}|${lines.length ? lines[lines.length - 1].id : 0}|${lines.length}`;
+    if (key !== heardTo) {
+      const atEnd = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 40;
+      heardTo = key;
+      const title = room === "mafia" ? `<div class="room mafia">🤵 Mafiya chati — faqat sheriklaringiz ko'radi</div>` : `<div class="room">💬 O'yinchilar chati</div>`;
+      const body = lines.length ? lines.map((l) => `<div class="ln${l.room === "mafia" ? " mafia" : ""}${l.from === myId() ? " mine" : ""}"><b style="color:${colorOf(l.from)}">${esc(l.name)}</b>${esc(l.text)}</div>`).join("")
+        : `<div class="empty">${room === "mafia" ? "Sheriklaringiz bilan kelishib oling 🤫" : "Hali hech kim yozmadi"}</div>`;
+      feed.innerHTML = title + body;
+      if (atEnd || lines.length && lines[lines.length - 1].from === myId()) feed.scrollTop = feed.scrollHeight;
+    }
+    const chips = room === "mafia" ? CHIPS.mafia : state.phase === "lobby" ? CHIPS.lobby : state.phase === "over" ? CHIPS.over : CHIPS.town;
+    const chipsKey = chips.join("|");
+    if ($("chips").dataset.k !== chipsKey) {
+      $("chips").dataset.k = chipsKey;
+      $("chips").innerHTML = chips.map((c) => `<button type="button" data-chip="${esc(c)}">${esc(c)}</button>`).join("");
+    }
+  }
+
+  // sayLine sends a line to the room the page shows; typed is true for
+  // the box's own words, cleared once sent, and false for a quick line.
+  async function sayLine(text, typed) {
+    text = text.trim();
+    if (!text) return;
+    const room = state && state.me && state.me.room;
+    if (await send("chat", { text, room }) && typed) $("chatline").value = "";
   }
 
   function renderGrid() {
     if (!state) { $("grid").innerHTML = ""; return; }
     const act = pendingAct();
+    const me = state.me || {};
     const good = act && ["heal", "check", "find"].includes(act.act);
-    $("grid").innerHTML = (state.players || []).map((p) => {
+    const verb = act ? (ACTS[act.act] || {}).verb : state.phase === "vote" ? "🗳" : "";
+    const picking = Boolean(act) || (state.phase === "vote" && me.alive);
+    $("grid").classList.toggle("picking", picking);
+    const tiles = (state.players || []).map((p) => {
       const tag = p.role_name ? esc(p.role_name) : p.mark ? MARKS[p.mark] || "" : "";
       const votes = state.votes && state.votes[p.id];
-      const knives = state.me && state.me.picks && state.me.picks[p.id];
+      const knives = me.picks && me.picks[p.id];
       const badge = votes ? `<span class="badge">🗳${votes}</span>` : knives ? `<span class="badge">🔪${knives}</span>` : "";
-      const cls = ["p", isMe(p) ? "me" : "", pickable(p) ? "pick" : "", picked === p.id ? "chosen" : "", picked === p.id && good ? "good" : "", p.alive ? "" : "dead"].join(" ");
-      return `<div class="${cls}" data-id="${p.id}">${badge}${p.alive ? "" : '<span class="mark">💀</span>'}${avatar(p)}<div class="nm">${isMe(p) ? "Siz" : esc(p.name)}</div><div class="tag">${tag}</div></div>`;
-    }).join("");
+      const chosen = picked === p.id;
+      const cls = ["p", isMe(p) ? "me" : "", pickable(p) ? "pick" : "", chosen ? "chosen" : "", chosen && good ? "good" : "",
+        state.phase === "vote" && me.voted === p.id ? "voted" : "", p.alive ? "" : "dead"].join(" ");
+      const corner = chosen && verb ? `<span class="verb">${verb}</span>` : p.alive ? "" : '<span class="mark">💀</span>';
+      return `<div class="${cls}" data-id="${p.id}">${badge}${corner}${avatar(p)}<div class="nm">${isMe(p) ? "Siz" : esc(p.name)}</div><div class="tag">${tag}</div>${p.words ? '<span class="said">🕯</span>' : ""}</div>`;
+    });
+    if (state.phase === "lobby") {
+      for (let i = state.players.length; i < state.min_players; i++) tiles.push(`<div class="p empty"><div class="ava">?</div><div class="nm">Bo'sh o'rin</div><div class="tag"></div></div>`);
+    }
+    $("grid").innerHTML = tiles.join("");
   }
 
   function renderCenter() {
@@ -227,19 +327,24 @@
       const me = state.me || {};
       if (state.phase === "over" && state.winner) {
         const won = me.team && me.team === state.winner;
-        notes.push(`<div class="note secret"><b>${{ town: "🏛 Tinch aholi yutdi!", mafia: "🩸 Mafiya yutdi!", solo: "🦹‍♂️ Manyak yutdi!" }[state.winner]}</b>${me.joined ? (won ? " Siz g'oliblar safidasiz 🏆" : " Bu safar yutqazdingiz.") : ""}</div>`);
+        notes.push(`<div class="note secret"><b>${WINNERS[state.winner] || "O'yin tugadi"}</b>${me.joined ? (won ? " Siz g'oliblar safidasiz 🏆" : state.winner === "none" ? "" : " Bu safar yutqazdingiz.") : ""}</div>`);
       }
       if (state.phase === "" || state.phase === "lobby" || state.phase === "over") {
-        notes.push(`<div class="note">🎭 <b>Mafia</b> — guruh bilan o'ynaladi. Har kim yashirin rol oladi: Don va mafiya, komissar, shifokor, putana, manyak, omadli va tinch aholi. Tunda rollar shu sahifada harakat qiladi, kunduzi guruh chatida bahslashib, ovoz bilan bir kishini chiqarasiz.</div>`);
+        notes.push(`<div class="note">🎭 <b>Mafia</b> — guruh bilan o'ynaladi. Har kim yashirin rol oladi: Don va mafiya, komissar, shifokor, putana, manyak, omadli va tinch aholi. Tunda rollar shu sahifada harakat qiladi (mafiya o'z yashirin chatida kelishadi), kunduzi shu yerdagi chatda yoki guruhda bahslashib, ovoz bilan bir kishini chiqarasiz.</div>`);
         notes.push(`<div class="note">👥 ${state.min_players}–${state.max_players} kishi. G'oliblarga Dev jangi tangasi beriladi 💰</div>`);
       }
-      if (state.phase === "day") notes.push(`<div class="note">💬 Bahs <b>guruh chatida</b>: Telegram'ga qaytib, kim mafiya ekanini aniqlang. Ovoz berish vaqt tugagach shu sahifada ochiladi.</div>`);
-      for (const n of state.news || []) if (state.phase !== "lobby" && state.phase !== "") notes.push(`<div class="note">${esc(n)}</div>`);
+      if (state.phase === "night" && !pendingAct()) notes.push(`<div class="note calm"><div class="big">🌙</div><b>Shahar uxlayapti…</b><small>Rollar tanlov qilmoqda. Tong otishini kuting.</small></div>`);
+      if (state.phase === "day") notes.push(`<div class="note">💬 Bahslashing: kim mafiya? Pastdagi chatda yoki guruhda yozing. Ovoz berish vaqt tugagach shu sahifada ochiladi.</div>`);
+      if ((state.news || []).length && state.phase !== "lobby" && state.phase !== "") notes.push(`<div class="note news">${state.news.map((n) => `<p>${esc(n)}</p>`).join("")}</div>`);
+      for (const p of (state.players || []).filter((p) => p.words)) notes.push(`<div class="note words">🕯 <b>${esc(p.name)}</b>ning so'nggi so'zi: <q>${esc(p.words)}</q></div>`);
       const marks = (state.players || []).filter((p) => p.mark);
       if (marks.length) notes.push(`<div class="note secret">🔎 Tekshiruvlaringiz: ${marks.map((p) => `<b>${esc(p.name)}</b> — ${MARKS[p.mark]}`).join(", ")}</div>`);
-      if (me.joined && me.alive === false && state.phase !== "over" && state.phase !== "lobby") notes.push(`<div class="note">👻 Siz o'yindan chiqdingiz. O'yinni kuzatishingiz mumkin, lekin guruhda rollarni oshkor qilmang.</div>`);
+      if (me.joined && me.alive === false && state.phase !== "over" && state.phase !== "lobby") {
+        notes.push(`<div class="note">👻 Siz o'yindan chiqdingiz. ${me.muted ? "🔇 O'yin tugaguncha guruhda yoza olmaysiz — so'nggi so'zni shu sahifadan yuboring." : "O'yinni kuzating, lekin guruhda tiriklarga maslahat bermang."}</div>`);
+      }
     }
     $("center").innerHTML = notes.join("");
+    $("center").hidden = notes.length === 0;
   }
 
   function renderBar() {
@@ -247,17 +352,26 @@
     if (fatal || !state) { b.innerHTML = ""; return; }
     const me = state.me || {};
     const phase = state.phase;
-    if (phase === "" || phase === "over" || (phase === "lobby" && !me.joined)) {
+    if (phase === "over" && me.can_speak) {
+      if (b.contains(document.activeElement) && document.activeElement.classList.contains("words")) return;
+      b.innerHTML = `<div class="prompt">🕯 So'nggi so'zingiz<small>O'yin tugadi, lekin aytib qolishingiz mumkin</small></div>${speakForm(state)}`;
+    } else if (phase === "" || phase === "over" || (phase === "lobby" && !me.joined)) {
       const label = phase === "lobby" ? "🙋 Qo'shilish" : "🎭 Yangi o'yin ochish";
       b.innerHTML = `<div class="row"><button class="btn main" data-do="join">${label}</button></div>`;
     } else if (phase === "lobby") {
       const enough = state.players.length >= state.min_players;
-      b.innerHTML = `<div class="prompt">${enough ? "Hamma tayyor bo'lsa — boshlang!" : `Yana ${state.min_players - state.players.length} kishi kerak`}<small>Guruhdagilar o'yindagi «Play» ni bosib qo'shiladi</small></div>
+      const closes = Math.max(0, Math.ceil((ends - Date.now()) / 60000));
+      b.innerHTML = `<div class="prompt">${enough ? "Hamma tayyor bo'lsa — boshlang!" : `Yana ${state.min_players - state.players.length} kishi kerak`}<small>Guruhdagilar o'yindagi «Play» ni bosib qo'shiladi · xona ${closes} daqiqada yopiladi</small></div>
         <div class="row"><button class="btn" data-do="leave">Chiqish</button><button class="btn main" data-do="start" ${enough ? "" : "disabled"}>🎭 Boshlash</button></div>`;
     } else if (!me.joined) {
       b.innerHTML = `<div class="prompt">👀 O'yin ketmoqda<small>Keyingi o'yinga qo'shilishingiz mumkin</small></div>`;
+    } else if (me.can_speak) {
+      // Typing must not be wiped by the next poll's redraw.
+      if (b.contains(document.activeElement) && document.activeElement.classList.contains("words")) return;
+      b.innerHTML = `<div class="prompt">🕯 So'nggi so'zingiz<small>Bot uni guruhga yuboradi, faqat bir marta</small></div>${speakForm(state)}`;
     } else if (!me.alive) {
-      b.innerHTML = `<div class="prompt">👻 Siz o'yindan chiqdingiz<small>O'yin oxirigacha kuzatishingiz mumkin</small></div>`;
+      const said = (state.players || []).some((p) => isMe(p) && p.words);
+      b.innerHTML = `<div class="prompt">👻 Siz o'yindan chiqdingiz<small>${said ? "So'nggi so'zingiz guruhga yuborildi" : "O'yin oxirigacha kuzatishingiz mumkin"}</small></div>`;
     } else if (phase === "night") {
       const act = pendingAct();
       if (act) {
@@ -267,7 +381,7 @@
           <div class="row"><button class="btn ${a.danger ? "red" : "main"}" data-do="act" ${target ? "" : "disabled"}>Tasdiqlash</button></div>`;
       } else b.innerHTML = `<div class="prompt">😴 ${(me.pending || []).length === 0 && me.role && !["tinch", "omadli"].includes(me.role) ? "Tanlovingiz qabul qilindi" : "Siz uxlayapsiz…"}<small>Tong otishini kuting</small></div>`;
     } else if (phase === "day") {
-      b.innerHTML = `<div class="prompt">☀️ Bahs guruh chatida<small>Ovoz berish birozdan keyin boshlanadi</small></div>`;
+      b.innerHTML = `<div class="prompt">☀️ Bahs vaqti<small>Yuqoridagi chatda yozing · ovoz berish birozdan keyin</small></div>`;
     } else if (phase === "vote") {
       const voted = me.voted ? state.players.find((p) => p.id === me.voted) : null;
       const target = picked !== null ? state.players.find((p) => p.id === picked) : null;
@@ -275,6 +389,31 @@
         <div class="row"><button class="btn red" data-do="vote" ${target ? "" : "disabled"}>Ovoz berish</button></div>`;
     }
   }
+
+  $("role").addEventListener("click", () => { if (state && state.me && state.me.role) showCard(state.me, true); });
+  $("chatbox").addEventListener("submit", (e) => { e.preventDefault(); sayLine($("chatline").value, true); });
+  $("chips").addEventListener("click", (e) => { const chip = e.target.closest("[data-chip]"); if (chip) sayLine(chip.dataset.chip, false); });
+
+  // The last word, from the bar or the overlay: what is typed is kept
+  // between redraws, and counted.
+  document.addEventListener("input", (e) => {
+    if (!e.target.classList.contains("words")) return;
+    draft = e.target.value;
+    const count = e.target.closest(".speak").querySelector(".count");
+    if (count) count.textContent = `${[...draft].length}/${(state && state.max_words) || 200}`;
+  });
+  document.addEventListener("click", async (e) => {
+    const button = e.target.closest("[data-speak]");
+    if (!button) return;
+    const words = button.closest(".speak").querySelector(".words").value.trim();
+    if (!words) { message(ERRORS.words); return; }
+    if (await send("speak", { words })) {
+      draft = "";
+      $("overlay").hidden = true;
+      message("");
+      render();
+    }
+  });
 
   $("grid").addEventListener("click", (e) => {
     const el = e.target.closest(".p.pick");
@@ -300,6 +439,10 @@
     const left = Math.max(0, Math.ceil((ends - Date.now()) / 1000));
     $("timer").textContent = timed && state.phase !== "lobby" ? `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : "";
     $("timer").classList.toggle("low", timed && left <= 5);
+    const share = timed && state.phase !== "lobby" && state.phase_ms ? Math.max(0, Math.min(1, (ends - Date.now()) / state.phase_ms)) : 0;
+    $("progress").style.width = `${share * 100}%`;
+    $("progress").parentElement.style.visibility = timed && state.phase !== "lobby" ? "visible" : "hidden";
+    $("progress").classList.toggle("low", share > 0 && left <= 5);
     if (timed && left === 0 && !asked) { asked = true; poll().finally(() => { asked = false; }); }
   }, 250);
   setInterval(poll, 2000);

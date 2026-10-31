@@ -127,7 +127,13 @@ func (a *Agent) tryChat(ctx context.Context, t *turn) (Answer, bool, error) {
 	messages := a.prompt(t)
 	messages[0].Content += "\n\n" + chatNote
 	reply, err := a.opts.ChatModel.Complete(ctx, ai.Request{Messages: messages})
-	if err != nil || toolsMarker.MatchString(reply.Content) || writesToolCall(reply.Content, nil) {
+	empty := err == nil && strings.TrimSpace(reply.Content) == ""
+	if empty && ai.Blocked(reply.FinishReason) {
+		// The full path would be refused the same words.
+		t.emptyReason = reply.FinishReason
+		return Answer{}, true, emptyAnswer(t)
+	}
+	if err != nil || empty || toolsMarker.MatchString(reply.Content) || writesToolCall(reply.Content, nil) {
 		t.route = RouteEscalated
 		return Answer{}, false, nil
 	}

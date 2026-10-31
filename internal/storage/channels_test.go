@@ -35,3 +35,23 @@ func TestRecordChannelKeepsTheBotsStanding(t *testing.T) {
 		t.Errorf("groups = %+v, err = %v; a channel is no group", groups, err)
 	}
 }
+
+// Private chats are the users who wrote to the bot in private, once each,
+// most recently first; a group's conversation is none.
+func TestPrivateChats(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	for _, sql := range []string{
+		`INSERT INTO users (telegram_id) VALUES (11), (12)`,
+		`INSERT INTO conversations (chat_id, user_id, updated_at) VALUES (11, 11, now() - interval '2 days'), (-100500, 12, now())`,
+		`INSERT INTO private_messages (user_id, created_at) VALUES (13, now() - interval '1 day'), (11, now() - interval '3 days')`,
+	} {
+		if _, err := store.pool.Exec(ctx, sql); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ids, err := store.PrivateChats(ctx, 10)
+	if err != nil || !reflect.DeepEqual(ids, []int64{13, 11}) {
+		t.Errorf("private chats = %v, %v; want 13 then 11", ids, err)
+	}
+}

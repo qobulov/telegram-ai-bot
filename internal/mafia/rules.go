@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // Phase is where a game is.
@@ -40,6 +41,20 @@ const (
 	dayFor     = 75 * time.Second
 	voteFor    = 40 * time.Second
 	lobbyFor   = 20 * time.Minute
+	// MaxWords is the longest last word a fallen player may leave.
+	MaxWords = 200
+	// MaxLine is the longest line of the page's chat, keptLines how many
+	// lines a game keeps, and lineGap how soon a player may write again.
+	MaxLine   = 200
+	keptLines = 60
+	lineGap   = time.Second
+)
+
+// The page's chat rooms: the town's, open by day to everyone in the game,
+// and the mafia's, open at night to its members only.
+const (
+	RoomTown  = "town"
+	RoomMafia = "mafia"
 )
 
 // The roles.
@@ -57,11 +72,13 @@ const (
 // Team is a side that can win.
 type Team string
 
-// The sides: the town, the mafia, and the maniac alone.
+// The sides: the town, the mafia, and the maniac alone; Nobody wins when
+// no one is left.
 const (
-	Town  Team = "town"
-	Mafia Team = "mafia"
-	Solo  Team = "solo"
+	Town   Team = "town"
+	Mafia  Team = "mafia"
+	Solo   Team = "solo"
+	Nobody Team = "none"
 )
 
 // The night's acts: the mafia's kill, the Don's search for the commissar,
@@ -97,23 +114,45 @@ var (
 	ErrNoAct     = errors.New("mafia: the role cannot do that")
 	ErrTarget    = errors.New("mafia: not a target for that")
 	ErrRepeating = errors.New("mafia: the doctor cured them last night")
+	ErrNoWords   = errors.New("mafia: no last word to say now")
+	ErrWords     = errors.New("mafia: a last word is 1 to MaxWords letters")
+	ErrChat      = errors.New("mafia: the chat is closed to the player now")
+	ErrLine      = errors.New("mafia: a line is 1 to MaxLine letters")
+	ErrTooFast   = errors.New("mafia: the player wrote a moment ago")
+	ErrRoom      = errors.New("mafia: the chat open to the player changed")
 )
 
-// Player is one who plays: their role, whether they are still in, and for
-// the lucky one whether their luck is still to come.
+// Line is one line of the page's chat: who wrote it, in which room, and
+// when, in Unix milliseconds.
+type Line struct {
+	ID   int    `json:"id"`
+	From int64  `json:"from"`
+	Name string `json:"name"`
+	Text string `json:"text"`
+	Room string `json:"room"`
+	At   int64  `json:"at"`
+}
+
+// Player is one who plays: their role, whether they are still in, for the
+// lucky one whether their luck is still to come, the last word they left
+// when they fell, and whether the bot has kept them from writing in the
+// group since, till the game ends.
 type Player struct {
 	ID    int64  `json:"id"`
 	Name  string `json:"name"`
 	Role  string `json:"role,omitempty"`
 	Alive bool   `json:"alive"`
 	Luck  bool   `json:"luck,omitempty"`
+	Words string `json:"words,omitempty"`
+	Muted bool   `json:"muted,omitempty"`
 }
 
 // Game is a chat's game as it is kept: the phase and when it ends, the
 // players in the order they joined, the night's acts as act → player →
 // target, the vote as voter → target, each checker's findings, whom the
-// doctor cured last, and what the last night or vote brought. Seq counts
-// the phases and Round the games started, for the pages.
+// doctor cured last, what the last night or vote brought, and who fell in
+// it, who may still leave a last word. Seq counts the phases and Round the
+// games started, for the pages.
 type Game struct {
 	Round   int                        `json:"round"`
 	Phase   Phase                      `json:"phase"`
@@ -126,15 +165,25 @@ type Game struct {
 	Known   map[int64]map[int64]string `json:"known,omitempty"`
 	Cured   int64                      `json:"cured,omitempty"`
 	News    []string                   `json:"news,omitempty"`
+	Fallen  []int64                    `json:"fallen,omitempty"`
+	Chat    []Line                     `json:"chat,omitempty"`
+	Lines   int                        `json:"lines,omitempty"`
 	Winner  Team                       `json:"winner,omitempty"`
+	// Unruly is set once the bot found it may not keep the fallen from
+	// writing in the group, so that the group is told so once a game.
+	Unruly bool `json:"unruly,omitempty"`
 }
 
 // Event is what happened when a game moved on, for the group: the news to
-// tell it, and when the game ended, the side that won and its players.
+// tell it; who fell while the game goes on, to be kept from writing in the
+// group till it ends; and when it ended, the side that won, its players,
+// and who is to write again.
 type Event struct {
 	Text    string
+	Fallen  []Player
 	Winner  Team
 	Winners []int64
+	Unmute  []int64
 }
 
 // TeamOf is a role's side.
@@ -220,7 +269,7 @@ func (g *Game) Start(id int64, now time.Time, intn func(n int) int) error {
 	for i := range g.Players {
 		g.Players[i].Role, g.Players[i].Alive, g.Players[i].Luck = roles[i], true, roles[i] == Lucky
 	}
-	g.Day, g.News, g.Cured = 1, nil, 0
+	g.Day, g.News, g.Cured, g.Fallen, g.Chat = 1, nil, 0, nil, nil
 	g.Round++
 	g.Acts, g.Known = map[string]map[int64]int64{}, map[int64]map[int64]string{}
 	g.next(Night, now, nightFor)
@@ -323,6 +372,93 @@ func (g *Game) Vote(id, target int64) error {
 	return nil
 }
 
+// RoomOf is the chat room a player may write in now, "" for none: the
+// mafia's at night for its members, the town's by day and in the lobby
+// and after the end for everyone in the game, never for the fallen while
+// the game goes on.
+func (g *Game) RoomOf(id int64) string {
+	p := g.player(id)
+	switch {
+	case p == nil:
+		return ""
+	case g.Phase == Lobby || g.Phase == Over:
+		return RoomTown
+	case !p.Alive:
+		return ""
+	case g.Phase == Night && TeamOf(p.Role) == Mafia:
+		return RoomMafia
+	case g.Phase == Day || g.Phase == Vote:
+		return RoomTown
+	}
+	return ""
+}
+
+// Say adds a player's line to room, which must be the chat room open to
+// them now: a line the mafia wrote at night must not reach the town
+// because the day began as it was sent. A game keeps its latest keptLines.
+func (g *Game) Say(id int64, room, text string, now time.Time) error {
+	text = strings.Join(strings.Fields(text), " ")
+	switch open := g.RoomOf(id); {
+	case open == "":
+		return ErrChat
+	case room != open:
+		return ErrRoom
+	case text == "" || utf8.RuneCountInString(text) > MaxLine:
+		return ErrLine
+	}
+	for i := len(g.Chat) - 1; i >= 0; i-- {
+		if g.Chat[i].From == id {
+			if now.Sub(time.UnixMilli(g.Chat[i].At)) < lineGap {
+				return ErrTooFast
+			}
+			break
+		}
+	}
+	g.Lines++
+	g.Chat = append(g.Chat, Line{ID: g.Lines, From: id, Name: g.player(id).Name, Text: text, Room: room, At: now.UnixMilli()})
+	if len(g.Chat) > keptLines {
+		g.Chat = g.Chat[len(g.Chat)-keptLines:]
+	}
+	return nil
+}
+
+// Heard is the chat lines a player may read: the town's for anyone, the
+// mafia's for its members only.
+func (g *Game) Heard(id int64) []Line {
+	p := g.player(id)
+	mafia := p != nil && TeamOf(p.Role) == Mafia
+	heard := []Line{}
+	for _, l := range g.Chat {
+		if l.Room == RoomTown || mafia {
+			heard = append(heard, l)
+		}
+	}
+	return heard
+}
+
+// CanSpeak reports whether a player fell in the last night or vote and has
+// not left their last word yet.
+func (g *Game) CanSpeak(id int64) bool {
+	p := g.player(id)
+	return p != nil && !p.Alive && p.Words == "" && slices.Contains(g.Fallen, id)
+}
+
+// Speak is a fallen player's last word, once, until the next night or vote
+// is played out, even after the game ended; it gives what the group is to
+// be told.
+func (g *Game) Speak(id int64, words string) (Event, error) {
+	words = strings.Join(strings.Fields(words), " ")
+	switch {
+	case !g.CanSpeak(id):
+		return Event{}, ErrNoWords
+	case words == "" || utf8.RuneCountInString(words) > MaxWords:
+		return Event{}, ErrWords
+	}
+	p := g.player(id)
+	p.Words = words
+	return Event{Text: fmt.Sprintf("🕯 %s so'nggi so'zini aytdi:\n«%s»", p.Name, words)}, nil
+}
+
 // Advance moves the game on as far as now allows: a night ends when its
 // time is up or everyone who acts has acted, a day when its time is up, a
 // vote when its time is up or everyone has voted. It gives what the group
@@ -404,6 +540,7 @@ func (g *Game) dawn(now time.Time) []Event {
 		}
 	}
 	var news []string
+	g.Fallen = nil
 	seen := map[int64]bool{}
 	for _, t := range []*Player{victim, g.pick(actManiac, free(g.actor(Maniac)))} {
 		if t == nil || seen[t.ID] {
@@ -418,6 +555,7 @@ func (g *Game) dawn(now time.Time) []Event {
 			news = append(news, "🍀 Kimgadir omad kulib boqdi — hujumdan omon qoldi!")
 		default:
 			t.Alive = false
+			g.Fallen = append(g.Fallen, t.ID)
 			news = append(news, fmt.Sprintf("💀 %s o'ldirildi. U %s edi.", t.Name, RoleName(t.Role)))
 		}
 	}
@@ -430,8 +568,18 @@ func (g *Game) dawn(now time.Time) []Event {
 	if end := g.end(); end != nil {
 		return append(events, *end)
 	}
+	events[0].Fallen = g.fallen()
 	g.next(Day, now, dayFor)
 	return append(events, Event{Text: "☀️ Bahslashing: kim mafiya? Ovoz berish birozdan keyin boshlanadi."})
+}
+
+// fallen is the players who fell in the night or vote just played out.
+func (g *Game) fallen() []Player {
+	var fell []Player
+	for _, id := range g.Fallen {
+		fell = append(fell, *g.player(id))
+	}
+	return fell
 }
 
 // pick is whom a player picked for an act this night, nil for no one.
@@ -480,11 +628,13 @@ func (g *Game) verdict(now time.Time) []Event {
 			tie = true
 		}
 	}
+	g.Fallen = nil
 	if most == 0 || tie {
 		g.News = []string{"⚖️ Ovozlar teng bo'ldi — bugun hech kim chiqarilmadi."}
 	} else {
 		p := g.player(top)
 		p.Alive = false
+		g.Fallen = []int64{top}
 		g.News = []string{fmt.Sprintf("⚖️ %s %d ta ovoz bilan shahardan chiqarildi. U %s edi.", p.Name, most, RoleName(p.Role))}
 	}
 	g.Votes = map[int64]int64{}
@@ -492,6 +642,7 @@ func (g *Game) verdict(now time.Time) []Event {
 	if end := g.end(); end != nil {
 		return append(events, *end)
 	}
+	events[0].Fallen = g.fallen()
 	g.Day++
 	g.next(Night, now, nightFor)
 	return append(events, Event{Text: fmt.Sprintf("🌙 %d-tun. Shahar uxlaydi, rollar uyg'onadi…", g.Day)})
@@ -499,7 +650,8 @@ func (g *Game) verdict(now time.Time) []Event {
 
 // end ends the game when a side has won: the town when no killer is left,
 // the maniac when they are left with at most one other and no mafia, the
-// mafia when they are as many as the rest and the maniac is gone.
+// mafia when they are as many as the rest and the maniac is gone; and no
+// one when the last of them fell together.
 func (g *Game) end() *Event {
 	live := g.alive()
 	mafia, maniac := 0, false
@@ -512,6 +664,8 @@ func (g *Game) end() *Event {
 		}
 	}
 	switch {
+	case len(live) == 0:
+		g.Winner = Nobody
 	case mafia == 0 && !maniac:
 		g.Winner = Town
 	case maniac && mafia == 0 && len(live) <= 2:
@@ -523,8 +677,13 @@ func (g *Game) end() *Event {
 	}
 	g.Phase = Over
 	g.Seq++
-	var winners []int64
-	lines := []string{map[Team]string{Town: "🏛 Tinch aholi yutdi!", Mafia: "🩸 Mafiya yutdi!", Solo: "🦹‍♂️ Manyak yutdi!"}[g.Winner], "", "Rollar:"}
+	var winners, unmute []int64
+	for _, p := range g.Players {
+		if p.Muted {
+			unmute = append(unmute, p.ID)
+		}
+	}
+	lines := []string{map[Team]string{Town: "🏛 Tinch aholi yutdi!", Mafia: "🩸 Mafiya yutdi!", Solo: "🦹‍♂️ Manyak yutdi!", Nobody: "🤝 Hech kim yutmadi: shaharda tirik odam qolmadi."}[g.Winner], "", "Rollar:"}
 	for _, p := range g.Players {
 		if TeamOf(p.Role) == g.Winner {
 			winners = append(winners, p.ID)
@@ -535,5 +694,5 @@ func (g *Game) end() *Event {
 		}
 		lines = append(lines, fmt.Sprintf("%s — %s%s", p.Name, RoleName(p.Role), mark))
 	}
-	return &Event{Text: strings.Join(lines, "\n"), Winner: g.Winner, Winners: winners}
+	return &Event{Text: strings.Join(lines, "\n"), Winner: g.Winner, Winners: winners, Unmute: unmute}
 }

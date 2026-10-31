@@ -852,3 +852,26 @@ func TestLeakedPlanIsCutFromTheAnswer(t *testing.T) {
 		}
 	}
 }
+
+// When the provider's filter refuses a turn with a picture, the turn is
+// asked again without it; refused words are not asked again, and the
+// error says the filter refused them.
+func TestFilteredTurns(t *testing.T) {
+	blocked := ai.Message{Role: ai.RoleAssistant, FinishReason: "content_filter: PROHIBITED_CONTENT"}
+	f := newFixture(blocked, text("Tavsif tayyor"))
+	req := request(1, "Bek: <video> shunga tavsif yoz")
+	req.Attachments = []ai.ContentPart{ai.ImagePart("image/jpeg", []byte{1, 2, 3})}
+	answer, err := f.agent.Reply(context.Background(), req)
+	if err != nil || answer.Text != "Tavsif tayyor" || len(f.model.requests) != 2 {
+		t.Fatalf("answer = %+v, %v after %d requests", answer, err, len(f.model.requests))
+	}
+	if again := f.model.requests[1].Messages[1]; len(again.Parts) != 0 || !strings.Contains(again.Content, "could not be shown") {
+		t.Errorf("asked again with %+v", again)
+	}
+
+	words := newFixture(blocked)
+	_, err = words.agent.Reply(context.Background(), request(2, "Bek: so'z"))
+	if !errors.Is(err, ai.ErrBlocked) || !errors.Is(err, ai.ErrEmptyResponse) || len(words.model.requests) != 1 {
+		t.Errorf("refused words: %v after %d requests", err, len(words.model.requests))
+	}
+}

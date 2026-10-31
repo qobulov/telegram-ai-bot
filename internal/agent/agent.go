@@ -229,9 +229,12 @@ type turn struct {
 	// the next request tells it to call the tool instead.
 	toolAsText bool
 	// askedAgain is set once the model answered nothing and was asked
-	// again; emptyReason is why it stopped, as the provider said.
+	// again; emptyReason is why it stopped, as the provider said; and
+	// noPictures once the provider's filter refused the turn with its
+	// pictures, which are then left out.
 	askedAgain  bool
 	emptyReason string
+	noPictures  bool
 	// route is the path the turn takes when it is not the chat one.
 	route string
 }
@@ -287,10 +290,17 @@ func (a *Agent) runFull(ctx context.Context, t *turn) (Answer, error) {
 		}
 		if len(reply.ToolCalls) == 0 {
 			if strings.TrimSpace(reply.Content) == "" {
-				// Gemini now and then answers nothing at all, in a second;
-				// asked once more, it mostly answers.
 				t.emptyReason = reply.FinishReason
-				if !t.askedAgain {
+				blocked := ai.Blocked(reply.FinishReason)
+				if blocked && len(t.req.Attachments) > 0 && !t.noPictures {
+					// A picture is likelier than words to be what the
+					// filter refused: ask again without it.
+					t.noPictures = true
+					continue
+				}
+				if !blocked && !t.askedAgain {
+					// Gemini now and then answers nothing at all, in a
+					// second; asked once more, it mostly answers.
 					t.askedAgain = true
 					continue
 				}
@@ -339,11 +349,19 @@ func (a *Agent) prompt(t *turn) []ai.Message {
 		question.Content = t.req.Context + "\n\n" + question.Content
 	}
 	question.Parts = t.req.Attachments
+	if t.noPictures {
+		question.Parts = nil
+		question.Content += "\n\n" + noPicturesNote
+	}
 	if gameWords.MatchString(ownLine(t.req.Text)) {
 		question.Content += "\n\n" + heroCheckNote
 	}
 	return messages
 }
+
+// noPicturesNote goes with a question asked again without its pictures,
+// which the provider's filter refused.
+const noPicturesNote = "(The picture or video with this message could not be shown to you. Answer from the words and the conversation, and do not say you cannot see it unless it matters.)"
 
 // heroCheckNote goes with a question about a game's heroes, in that request
 // only: told in the persona alone, the model still named heroes from memory,
@@ -419,6 +437,9 @@ func cutToThem(answer string) (rest, to string, found bool) {
 func emptyAnswer(t *turn) error {
 	if t.emptyReason == "" {
 		return ai.ErrEmptyResponse
+	}
+	if ai.Blocked(t.emptyReason) {
+		return fmt.Errorf("%w: %w (finish reason %s)", ai.ErrEmptyResponse, ai.ErrBlocked, t.emptyReason)
 	}
 	return fmt.Errorf("%w (finish reason %s)", ai.ErrEmptyResponse, t.emptyReason)
 }

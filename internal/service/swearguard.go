@@ -196,17 +196,14 @@ func (s *Service) guardedSwearing(msg *telegram.Message, updateID int64) bool {
 	case aimExclamation:
 		return s.guardedExclamation(msg, strikes)
 	}
+	lang, who := guardLanguage(msg), mentionOf(msg.From)
 	switch {
 	case strikes <= 1 && role != "":
-		s.postGuard(msg, mentionOf(msg.From)+", guruhda so'kinish mumkin emas, adminlar uchun ham. Bu ogohlantirish.")
+		s.postGuard(msg, fmt.Sprintf(textSwearAdminWarned.inLanguage(lang), who))
 	case strikes <= 1:
-		s.postGuard(msg, mentionOf(msg.From)+", guruhda so'kinish mumkin emas. Bu ogohlantirish: yana so'kinsangiz, 1 soat yozolmaysiz.")
+		s.postGuard(msg, fmt.Sprintf(textSwearWarned.inLanguage(lang), who))
 	case role != "":
-		text := mentionOf(msg.From) + " yana so'kindi; u admin, uni yozolmaydigan qila olmayman."
-		if caller != "" {
-			text += " " + caller + ", qarab qo'ying."
-		}
-		s.postGuard(msg, text)
+		s.postGuard(msg, fmt.Sprintf(textSwearAdminAgain.inLanguage(lang), who)+calling(lang, textLookAtIt, caller))
 	default:
 		s.muteSwearer(ctx, msg, caller)
 	}
@@ -219,7 +216,7 @@ func (s *Service) guardedExclamation(msg *telegram.Message, strikes int) bool {
 	if strikes > 1 {
 		return false
 	}
-	s.postGuard(msg, mentionOf(msg.From)+", guruhda so'kinmaylik. Bu ogohlantirish.")
+	s.postGuard(msg, fmt.Sprintf(textExclaimWarned.inLanguage(guardLanguage(msg)), mentionOf(msg.From)))
 	return true
 }
 
@@ -245,11 +242,8 @@ func (s *Service) guardedSwearingAtBot(ctx context.Context, msg *telegram.Messag
 		s.opts.Logger.Warn("swear guard: mute for swearing at the bot failed; staying quiet", "chat_id", msg.Chat.ID, "user_id", msg.From.ID, "error", err)
 		return true
 	}
-	text := mentionOf(msg.From) + " menga so'kingani uchun 15 daqiqa yozolmaydi."
-	if caller != "" {
-		text += " " + caller + ", xabaringiz bo'lsin."
-	}
-	s.postGuard(msg, text)
+	lang := guardLanguage(msg)
+	s.postGuard(msg, fmt.Sprintf(textSworeAtBot.inLanguage(lang), mentionOf(msg.From))+calling(lang, textForYourInfo, caller))
 	s.replyWithClip(ctx, msg)
 	return true
 }
@@ -321,21 +315,72 @@ func (s *Service) muteSwearer(ctx context.Context, msg *telegram.Message, caller
 	err := s.opts.Restrictor.RestrictChatMember(ctx, telegram.Restriction{
 		ChatID: msg.Chat.ID, UserID: msg.From.ID, Permissions: telegram.NoPermissions(), Until: s.opts.Now().Add(swearMute),
 	})
-	var text string
+	lang := guardLanguage(msg)
+	text := fmt.Sprintf(textSwearMuted.inLanguage(lang), who) + calling(lang, textForYourInfo, caller)
 	if err != nil {
 		s.opts.Logger.Warn("swear guard: mute failed", "chat_id", msg.Chat.ID, "user_id", msg.From.ID, "error", err)
-		text = who + " yana so'kindi, lekin uni yozolmaydigan qila olmadim: menda a'zolarni cheklash huquqi yo'q."
-		if caller != "" {
-			text += " " + caller + ", qarab qo'ying."
-		}
-	} else {
-		text = who + " so'kingani uchun 1 soat yozolmaydi."
-		if caller != "" {
-			text += " " + caller + ", xabaringiz bo'lsin."
-		}
+		text = fmt.Sprintf(textSwearMuteFailed.inLanguage(lang), who) + calling(lang, textLookAtIt, caller)
 	}
 	s.postGuard(msg, text)
 }
+
+// guardLanguage is the language to warn a swearer in: their message's, or
+// their Telegram app's for a word or two, as the bot's other texts are.
+func guardLanguage(msg *telegram.Message) string {
+	text, _ := msg.Content()
+	return languageOf(incoming{text: text, msg: msg})
+}
+
+// calling is the call to whom the guard tags, in lang, or nothing when
+// there is no one.
+func calling(lang string, call localText, caller string) string {
+	if caller == "" {
+		return ""
+	}
+	return " " + fmt.Sprintf(call.inLanguage(lang), caller)
+}
+
+// The swear guard's texts, each with the swearer's tag; textLookAtIt and
+// textForYourInfo call whom it tags.
+var (
+	textSwearWarned = localText{
+		uz: "%s, guruhda so'kinish mumkin emas. Bu ogohlantirish: yana so'kinsangiz, 1 soat yozolmaysiz.",
+		ru: "%s, в группе нельзя материться. Это предупреждение: ещё раз — и час не сможете писать.",
+		en: "%s, no swearing in the group. This is a warning: swear again and you can't write for an hour.",
+	}
+	textSwearAdminWarned = localText{
+		uz: "%s, guruhda so'kinish mumkin emas, adminlar uchun ham. Bu ogohlantirish.",
+		ru: "%s, в группе нельзя материться, даже админам. Это предупреждение.",
+		en: "%s, no swearing in the group, admins included. This is a warning.",
+	}
+	textSwearAdminAgain = localText{
+		uz: "%s yana so'kindi; u admin, uni yozolmaydigan qila olmayman.",
+		ru: "%s снова матерится; это админ, запретить ему писать я не могу.",
+		en: "%s swore again; they're an admin, so I can't stop them writing.",
+	}
+	textExclaimWarned = localText{
+		uz: "%s, guruhda so'kinmaylik. Bu ogohlantirish.",
+		ru: "%s, давайте без мата в группе. Это предупреждение.",
+		en: "%s, let's keep the group free of swearing. This is a warning.",
+	}
+	textSwearMuted = localText{
+		uz: "%s so'kingani uchun 1 soat yozolmaydi.",
+		ru: "%s не сможет писать час за мат.",
+		en: "%s can't write for an hour for swearing.",
+	}
+	textSwearMuteFailed = localText{
+		uz: "%s yana so'kindi, lekin uni yozolmaydigan qila olmadim: menda a'zolarni cheklash huquqi yo'q.",
+		ru: "%s снова матерится, но запретить писать я не смогла: у меня нет права ограничивать участников.",
+		en: "%s swore again, but I couldn't stop them writing: I don't have the right to restrict members.",
+	}
+	textSworeAtBot = localText{
+		uz: "%s menga so'kingani uchun 15 daqiqa yozolmaydi.",
+		ru: "%s не сможет писать 15 минут за мат в мой адрес.",
+		en: "%s can't write for 15 minutes for swearing at me.",
+	}
+	textLookAtIt    = localText{uz: "%s, qarab qo'ying.", ru: "%s, посмотрите, пожалуйста.", en: "%s, please take a look."}
+	textForYourInfo = localText{uz: "%s, xabaringiz bo'lsin.", ru: "%s, к вашему сведению.", en: "%s, for your information."}
+)
 
 // recordStrike notes a swear the guard caught, and reports whether it is
 // new: the same update is not.

@@ -3,6 +3,7 @@ package mafia
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -45,11 +46,38 @@ func (f *fakeStore) AddRaidCoins(_ context.Context, users []int64, coins int64) 
 	return nil
 }
 
-type fakeTelegram struct{ sent []string }
+// fakeTelegram records what the group is told and whom the bot restricts:
+// "mute 3" or "unmute 3". Members are "member" unless statuses says
+// otherwise; with refuse, the bot may restrict no one.
+type fakeTelegram struct {
+	sent       []string
+	restricted []string
+	statuses   map[int64]string
+	refuse     bool
+}
 
 func (f *fakeTelegram) SendMessage(_ context.Context, m telegram.Outgoing) (int64, error) {
 	f.sent = append(f.sent, m.Text)
 	return 1, nil
+}
+
+func (f *fakeTelegram) GetChatMember(_ context.Context, _, userID int64) (telegram.ChatMember, error) {
+	if status, ok := f.statuses[userID]; ok {
+		return telegram.ChatMember{Status: status}, nil
+	}
+	return telegram.ChatMember{Status: "member"}, nil
+}
+
+func (f *fakeTelegram) RestrictChatMember(_ context.Context, r telegram.Restriction) error {
+	if f.refuse {
+		return &telegram.APIError{Code: 400, Description: "Bad Request: not enough rights to restrict/unrestrict chat member"}
+	}
+	what := "unmute"
+	if r.Permissions == telegram.NoPermissions() {
+		what = "mute"
+	}
+	f.restricted = append(f.restricted, fmt.Sprintf("%s %d", what, r.UserID))
+	return nil
 }
 
 const group = int64(-100500)
@@ -229,6 +257,157 @@ func TestHandlerKeepsTheGameBetweenRequests(t *testing.T) {
 		p := row.(map[string]any)
 		if int64(p["id"].(float64)) == byRole[Don] && p["mark"] != "mafia" {
 			t.Errorf("the commissar's check of the Don: %v", p)
+		}
+	}
+}
+
+// The night's victim leaves a last word: the group is told it, every page
+// shows it, and it cannot be said twice.
+func TestHandlerTellsTheLastWord(t *testing.T) {
+	f := newFixture()
+	sessions := map[int64]string{}
+	for id := int64(1); id <= 5; id++ {
+		sessions[id] = f.session(t, id, group)
+		f.post(t, map[string]any{"session": sessions[id], "action": "join"})
+	}
+	f.post(t, map[string]any{"session": sessions[1], "action": "start"})
+	var g Game
+	_ = json.Unmarshal(f.store.games[group], &g)
+	byRole := map[string]int64{}
+	for _, p := range g.Players {
+		byRole[p.Role] = p.ID
+	}
+	victim := byRole[Commissar]
+	f.post(t, map[string]any{"session": sessions[byRole[Don]], "action": "act", "act": actKill, "target": victim})
+	f.now = f.now.Add(nightFor)
+	_, view := f.post(t, map[string]any{"session": sessions[victim], "action": "state"})
+	if me := view["me"].(map[string]any); me["can_speak"] != true || view["max_words"] != float64(MaxWords) {
+		t.Fatalf("the victim's page: %v", view)
+	}
+	code, view := f.post(t, map[string]any{"session": sessions[victim], "action": "speak", "words": "Don — mafiya!"})
+	if code != http.StatusOK || !strings.Contains(f.tg.sent[len(f.tg.sent)-1], "«Don — mafiya!»") {
+		t.Fatalf("speak: %d, told %q", code, f.tg.sent)
+	}
+	for _, row := range view["players"].([]any) {
+		if p := row.(map[string]any); int64(p["id"].(float64)) == victim && p["words"] != "Don — mafiya!" {
+			t.Errorf("the word on the page: %v", p)
+		}
+	}
+	if code, got := f.post(t, map[string]any{"session": sessions[victim], "action": "speak", "words": "yana"}); code != http.StatusConflict || got["error"] != "no_words" {
+		t.Errorf("spoke twice: %d %v", code, got)
+	}
+}
+
+// The fallen are kept from writing in the group till the game ends, but
+// not admins; the end lets those it muted write again. A bot that may not
+// restrict says so once a game.
+func TestHandlerMutesTheFallenTillTheEnd(t *testing.T) {
+	f := newFixture()
+	sessions := map[int64]string{}
+	for id := int64(1); id <= 5; id++ {
+		sessions[id] = f.session(t, id, group)
+		f.post(t, map[string]any{"session": sessions[id], "action": "join"})
+	}
+	f.post(t, map[string]any{"session": sessions[1], "action": "start"})
+	var g Game
+	_ = json.Unmarshal(f.store.games[group], &g)
+	byRole := map[string]int64{}
+	for _, p := range g.Players {
+		byRole[p.Role] = p.ID
+	}
+	admin := byRole[Doctor]
+	f.tg.statuses = map[int64]string{admin: "administrator"}
+	f.post(t, map[string]any{"session": sessions[byRole[Don]], "action": "act", "act": actKill, "target": byRole[Commissar]})
+	f.now = f.now.Add(nightFor)
+	f.post(t, map[string]any{"session": sessions[1], "action": "state"})
+	if want := fmt.Sprintf("mute %d", byRole[Commissar]); len(f.tg.restricted) != 1 || f.tg.restricted[0] != want {
+		t.Fatalf("after the night restricted %v, want %s", f.tg.restricted, want)
+	}
+	if told := strings.Join(f.tg.sent, "\n"); !strings.Contains(told, "o'yin tugaguncha guruhda yoza olmaydi") {
+		t.Errorf("the group was told %q", told)
+	}
+	_ = json.Unmarshal(f.store.games[group], &g)
+	if !g.player(byRole[Commissar]).Muted {
+		t.Error("the mute is not noted in the game")
+	}
+
+	// The doctor, an admin, is voted out; then the Don, which ends it.
+	f.now = f.now.Add(dayFor)
+	for id, s := range sessions {
+		if id != byRole[Commissar] && id != admin {
+			f.post(t, map[string]any{"session": s, "action": "vote", "target": admin})
+		}
+	}
+	f.now = f.now.Add(voteFor)
+	f.post(t, map[string]any{"session": sessions[1], "action": "state"})
+	if len(f.tg.restricted) != 1 {
+		t.Fatalf("an admin was restricted: %v", f.tg.restricted)
+	}
+	f.now = f.now.Add(nightFor)
+	f.post(t, map[string]any{"session": sessions[1], "action": "state"})
+	f.now = f.now.Add(dayFor)
+	f.post(t, map[string]any{"session": sessions[1], "action": "state"})
+	for id, s := range sessions {
+		if id != byRole[Commissar] && id != admin && id != byRole[Don] {
+			f.post(t, map[string]any{"session": s, "action": "vote", "target": byRole[Don]})
+		}
+	}
+	f.post(t, map[string]any{"session": sessions[byRole[Don]], "action": "vote", "target": byRole[Citizen]})
+	_ = json.Unmarshal(f.store.games[group], &g)
+	if g.Phase != Over {
+		t.Fatalf("the game goes on: %s, %v", g.Phase, f.tg.sent[len(f.tg.sent)-1])
+	}
+	if want := fmt.Sprintf("unmute %d", byRole[Commissar]); f.tg.restricted[len(f.tg.restricted)-1] != want || len(f.tg.restricted) != 2 {
+		t.Errorf("at the end restricted %v, want the commissar let write again only", f.tg.restricted)
+	}
+
+	refused := newFixture()
+	refused.tg.refuse = true
+	for id := int64(1); id <= 5; id++ {
+		sessions[id] = refused.session(t, id, group)
+		refused.post(t, map[string]any{"session": sessions[id], "action": "join"})
+	}
+	refused.post(t, map[string]any{"session": sessions[1], "action": "start"})
+	refused.post(t, map[string]any{"session": sessions[byRole[Don]], "action": "act", "act": actKill, "target": byRole[Commissar]})
+	refused.now = refused.now.Add(nightFor)
+	refused.post(t, map[string]any{"session": sessions[1], "action": "state"})
+	refused.now = refused.now.Add(dayFor)
+	refused.post(t, map[string]any{"session": sessions[1], "action": "state"})
+	for id, s := range sessions {
+		if id != byRole[Commissar] {
+			refused.post(t, map[string]any{"session": s, "action": "vote", "target": byRole[Doctor]})
+		}
+	}
+	if warnings := strings.Count(strings.Join(refused.tg.sent, "\n"), "huquqini bering"); warnings != 1 {
+		t.Errorf("after two deaths warned %d times, want once: %q", warnings, refused.tg.sent)
+	}
+}
+
+// A page writes in the chat open to its player, and every page that may
+// read it gets the line; a closed chat is refused.
+func TestHandlerChat(t *testing.T) {
+	f := newFixture()
+	sessions := map[int64]string{}
+	for id := int64(1); id <= 5; id++ {
+		sessions[id] = f.session(t, id, group)
+		f.post(t, map[string]any{"session": sessions[id], "action": "join"})
+	}
+	if code, got := f.post(t, map[string]any{"session": sessions[2], "action": "chat", "room": RoomTown, "text": "tez boshlaylik"}); code != http.StatusOK || got["me"].(map[string]any)["room"] != RoomTown {
+		t.Fatalf("lobby chat: %d %v", code, got)
+	}
+	_, view := f.post(t, map[string]any{"session": sessions[4], "action": "state"})
+	if chat := view["chat"].([]any); len(chat) != 1 || chat[0].(map[string]any)["text"] != "tez boshlaylik" {
+		t.Errorf("the lobby heard %v", view["chat"])
+	}
+	f.post(t, map[string]any{"session": sessions[1], "action": "start"})
+	var g Game
+	_ = json.Unmarshal(f.store.games[group], &g)
+	for _, p := range g.Players {
+		if TeamOf(p.Role) != Mafia {
+			if code, got := f.post(t, map[string]any{"session": sessions[p.ID], "action": "chat", "room": RoomTown, "text": "salom"}); code != http.StatusConflict || got["error"] != "chat_closed" {
+				t.Errorf("a townsman wrote at night: %d %v", code, got)
+			}
+			break
 		}
 	}
 }

@@ -585,6 +585,30 @@ func TestEmptyAnswerIsSilentInAGroup(t *testing.T) {
 	expectOneReply(t, f.run(textFrom(userID, "hi")), textError.uz)
 }
 
+// A turn the provider's filter refused says so in a private chat, and to
+// an owner how to post an announcement with /elon; a group hears nothing.
+func TestBlockedTurnSaysWhy(t *testing.T) {
+	blocked := fmt.Errorf("agent: %w: %w (finish reason content_filter)", ai.ErrEmptyResponse, ai.ErrBlocked)
+	f := newFixture()
+	f.replier.err = blocked
+	expectOneReply(t, f.run(textFrom(userID, "hi")), textBlocked.uz)
+
+	f = newFixture()
+	f.opts.OwnerUsernames = []string{ownerUsername}
+	f.replier.err = blocked
+	owner := textFrom(9001, "e'lon ber")
+	owner.Message.From.Username = "Pronium"
+	if sent := f.run(owner); len(sent) != 1 || !strings.Contains(sent[0].text, "/elon hammaga") {
+		t.Errorf("the owner was told %+v", sent)
+	}
+
+	f = newFixture()
+	f.replier.err = blocked
+	if sent := f.run(inGroup(groupMessage("Mira, e'lon"))); len(sent) != 0 {
+		t.Errorf("a group was told %+v", sent)
+	}
+}
+
 // The bot's own messages are in Uzbek, like the people it talks to.
 func TestErrorTextsAreUzbek(t *testing.T) {
 	for name, text := range map[string]string{"error": textError.uz, "timeout": textTimeout.uz, "busy": textBusy.uz, "rate limited": textRateLimited.uz, "too long": textTooLong.uz} {

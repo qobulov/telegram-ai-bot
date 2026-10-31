@@ -268,3 +268,108 @@ func TestWinners(t *testing.T) {
 		}
 	})
 }
+
+// Who falls at night or by the vote may leave one last word until the next
+// night or vote is played out; the living, the spared and the long dead may
+// not, and the word is one line of at most MaxWords letters.
+func TestLastWords(t *testing.T) {
+	g := playing(Don, Commissar, Doctor, Citizen, Citizen, Mafioso)
+	must(t, g.Act(1, actKill, 2))
+	must(t, g.Act(1, actFind, 5))
+	must(t, g.Act(6, actKill, 2))
+	must(t, g.Act(2, actCheck, 1))
+	must(t, g.Act(3, actHeal, 3))
+	g.Advance(t0)
+	if g.Phase != Day || alive(g, 2) || !g.CanSpeak(2) || g.CanSpeak(3) {
+		t.Fatalf("after the night: %s, fallen %v", g.Phase, g.Fallen)
+	}
+	if _, err := g.Speak(3, "men tirikman"); !errors.Is(err, ErrNoWords) {
+		t.Errorf("the living spoke: %v", err)
+	}
+	if _, err := g.Speak(2, strings.Repeat("a", MaxWords+1)); !errors.Is(err, ErrWords) {
+		t.Errorf("a long word: %v", err)
+	}
+	if _, err := g.Speak(2, "  \n "); !errors.Is(err, ErrWords) {
+		t.Errorf("an empty word: %v", err)
+	}
+	said, err := g.Speak(2, "A  —\nmafiya!")
+	if err != nil || said.Text != "🕯 B so'nggi so'zini aytdi:\n«A — mafiya!»" || g.player(2).Words != "A — mafiya!" {
+		t.Fatalf("said %q, %v", said.Text, err)
+	}
+	if _, err := g.Speak(2, "yana"); !errors.Is(err, ErrNoWords) {
+		t.Errorf("spoke twice: %v", err)
+	}
+
+	g.Advance(t0.Add(dayFor))
+	for _, voter := range []int64{3, 4, 5, 6} {
+		must(t, g.Vote(voter, 1))
+	}
+	g.Advance(t0.Add(dayFor + voteFor))
+	if !g.CanSpeak(1) || g.CanSpeak(2) {
+		t.Errorf("after the vote, fallen %v", g.Fallen)
+	}
+}
+
+// When the last of them fall together, as the Don and the maniac killing
+// each other, no one wins and no one is paid.
+func TestNoOneWinsWhenAllFall(t *testing.T) {
+	g := playing(Don, Maniac, Citizen, Citizen, Citizen)
+	for i := 2; i < 5; i++ {
+		g.Players[i].Alive = false
+	}
+	must(t, g.Act(1, actKill, 2))
+	must(t, g.Act(1, actFind, 2))
+	must(t, g.Act(2, actManiac, 1))
+	events := g.Advance(t0)
+	end := events[len(events)-1]
+	if g.Phase != Over || g.Winner != Nobody || len(end.Winners) != 0 || !strings.Contains(end.Text, "Hech kim yutmadi") {
+		t.Errorf("all fell: %s, winner %q, paid %v, told %q", g.Phase, g.Winner, end.Winners, end.Text)
+	}
+}
+
+// At night only the mafia write, and only they read it; by day everyone
+// alive writes and everyone reads; the fallen are silent till the end; a
+// player waits a moment between lines; a game keeps its latest lines.
+func TestChat(t *testing.T) {
+	g := playing(Don, Commissar, Doctor, Citizen, Citizen, Mafioso)
+	must(t, g.Say(1, RoomMafia, "  Kimni   o'ldiramiz? ", t0))
+	must(t, g.Say(6, RoomMafia, "B ni", t0))
+	if err := g.Say(2, RoomTown, "salom", t0); !errors.Is(err, ErrChat) {
+		t.Errorf("the commissar wrote at night: %v", err)
+	}
+	if err := g.Say(1, RoomMafia, "yana", t0.Add(lineGap/2)); !errors.Is(err, ErrTooFast) {
+		t.Errorf("wrote twice at once: %v", err)
+	}
+	if err := g.Say(1, RoomMafia, strings.Repeat("a", MaxLine+1), t0.Add(lineGap)); !errors.Is(err, ErrLine) {
+		t.Errorf("a long line: %v", err)
+	}
+	if heard := g.Heard(2); len(heard) != 0 {
+		t.Errorf("the commissar heard the mafia: %+v", heard)
+	}
+	if heard := g.Heard(6); len(heard) != 2 || heard[0].Text != "Kimni o'ldiramiz?" || heard[0].Room != RoomMafia {
+		t.Errorf("the mafia heard %+v", heard)
+	}
+
+	must(t, g.Act(1, actKill, 4))
+	must(t, g.Act(1, actFind, 2))
+	must(t, g.Act(6, actKill, 4))
+	must(t, g.Act(2, actCheck, 1))
+	must(t, g.Act(3, actHeal, 3))
+	g.Advance(t0)
+	if err := g.Say(1, RoomMafia, "endi kim?", t0.Add(time.Second)); !errors.Is(err, ErrRoom) {
+		t.Errorf("a night line reached the day: %v", err)
+	}
+	must(t, g.Say(2, RoomTown, "A mafiya!", t0.Add(time.Second)))
+	if err := g.Say(4, RoomTown, "men o'ldim", t0.Add(time.Second)); !errors.Is(err, ErrChat) {
+		t.Errorf("the fallen wrote: %v", err)
+	}
+	if heard := g.Heard(5); len(heard) != 1 || heard[0].Name != "B" {
+		t.Errorf("a citizen heard %+v", heard)
+	}
+	for i := range keptLines + 5 {
+		must(t, g.Say(3, RoomTown, "gap", t0.Add(time.Duration(i+2)*lineGap)))
+	}
+	if len(g.Chat) != keptLines || g.Chat[len(g.Chat)-1].ID != g.Lines {
+		t.Errorf("kept %d lines, the last %d of %d", len(g.Chat), g.Chat[len(g.Chat)-1].ID, g.Lines)
+	}
+}

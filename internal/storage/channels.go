@@ -59,3 +59,26 @@ func (s *Store) Channels(ctx context.Context, limit int) ([]ChannelSummary, erro
 	}
 	return channels, nil
 }
+
+// PrivateChats returns up to limit users who wrote to the bot in its
+// private chat, most recently first: whom a broadcast to private chats
+// can reach, as a bot may not write first to anyone else.
+func (s *Store) PrivateChats(ctx context.Context, limit int) ([]int64, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT id FROM (
+			SELECT chat_id AS id, updated_at AS seen FROM conversations WHERE chat_id > 0
+			UNION ALL
+			SELECT user_id, created_at FROM private_messages
+		) wrote
+		GROUP BY id
+		ORDER BY max(seen) DESC
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("storage: read private chats: %w", err)
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+	if err != nil {
+		return nil, fmt.Errorf("storage: read private chats: %w", err)
+	}
+	return ids, nil
+}

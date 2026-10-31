@@ -22,6 +22,15 @@ const (
 // ErrEmptyResponse means the provider answered without any usable message.
 var ErrEmptyResponse = errors.New("ai: empty response")
 
+// ErrBlocked is an empty answer the provider gave because its content
+// filter refused the request; asked again unchanged, it refuses again.
+var ErrBlocked = errors.New("ai: the provider's filter refused the request")
+
+// Blocked reports a finish reason that is the provider's content filter.
+func Blocked(finishReason string) bool {
+	return strings.HasPrefix(finishReason, "content_filter")
+}
+
 // ErrTruncated is a reply the model ran out of tokens in before it was done:
 // a fragment of words, or of a tool call written out as words, that must not
 // be sent. Asking again would end the same way.

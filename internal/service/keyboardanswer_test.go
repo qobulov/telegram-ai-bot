@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"telegram-ai-bot/internal/ai"
 	"telegram-ai-bot/internal/telegram"
 	"telegram-ai-bot/internal/tools"
 )
@@ -458,7 +459,7 @@ func TestOwnersAnnounceWithoutTheModel(t *testing.T) {
 	sent := f.run(video, owner("/elon ha"), textFrom(userID, "/elon hi"))
 
 	asked := runner.recorded()
-	if len(asked) != 2 || asked[0] != `send_to_groups {"action":"prepare","copy":true,"text":"Akkaunt: 150$"}` || asked[1] != `send_to_groups {"action":"confirm"}` {
+	if len(asked) != 2 || asked[0] != `send_to_groups {"action":"prepare","copy":true,"text":"Akkaunt: 150$","to":"groups"}` || asked[1] != `send_to_groups {"action":"confirm"}` {
 		t.Fatalf("asked %q", asked)
 	}
 	var drafted, refused bool
@@ -471,5 +472,141 @@ func TestOwnersAnnounceWithoutTheModel(t *testing.T) {
 	}
 	if calls := len(f.replier.recorded()); calls > 1 {
 		t.Errorf("the model was asked %d times; only the member's message is its", calls)
+	}
+}
+
+// The first word of /elon says whom it is for; any other word is the text.
+func TestAnnouncementAudience(t *testing.T) {
+	for words, want := range map[string][2]string{
+		"hammaga Akkaunt 150$":  {"all", "Akkaunt 150$"},
+		"Lichkaga yangilik bor": {"users", "yangilik bor"},
+		"Akkaunt sotiladi":      {"groups", "Akkaunt sotiladi"},
+		"hammaga":               {"all", ""},
+	} {
+		if to, rest := audienceOf(words); to != want[0] || rest != want[1] {
+			t.Errorf("%q: %q %q, want %q", words, to, rest, want)
+		}
+	}
+}
+
+// fakeWriter writes the announcement it is given, recording the notes.
+type fakeWriter struct {
+	mu    sync.Mutex
+	notes []string
+	reply ai.Message
+}
+
+func (f *fakeWriter) Complete(_ context.Context, req ai.Request) (ai.Message, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.notes = append(f.notes, req.Messages[len(req.Messages)-1].Content)
+	return f.reply, nil
+}
+
+// When the provider refuses an owner's request for an announcement, a
+// model asked only to write it does, and the draft for the groups and
+// private chats the words name comes with buttons; Send posts it, putting
+// the outcome in place of the buttons. Words that ask for no announcement
+// are pointed to /elon.
+func TestBlockedAnnouncementIsWrittenApart(t *testing.T) {
+	f := newFixture()
+	f.opts.OwnerUsernames = []string{ownerUsername}
+	f.replier.err = fmt.Errorf("agent: %w: %w", ai.ErrEmptyResponse, ai.ErrBlocked)
+	writer := &fakeWriter{reply: ai.Message{Content: "🎮 **Akkaunt sotiladi**\n• Narxi: 150$"}}
+	buttons := &fakeButtons{}
+	f.opts.Writer, f.opts.Buttons = writer, buttons
+	runner := withToolRunner(f)
+	runner.answers["send_to_groups"] = `{"ok":true,"result":{"draft":true,"groups":["Devs"],"private_chats":20,"caption":"x"}}`
+	owner := func(text string) telegram.Update {
+		update := textFrom(9001, text)
+		update.Message.From.Username = "Pronium"
+		return update
+	}
+	ask := owner("barcha guruhga va lichkaga e'lon ber 150$")
+	ask.Message.ReplyToMessage = &telegram.Message{MessageID: 1642, Chat: ask.Message.Chat, Video: &telegram.Video{FileID: "v"}}
+
+	sent := f.run(ask)
+
+	asked := runner.recorded()
+	if len(asked) != 1 || asked[0] != `send_to_groups {"action":"prepare","copy":true,"text":"🎮 Akkaunt sotiladi\n• Narxi: 150$","to":"all"}` {
+		t.Fatalf("asked %q", asked)
+	}
+	if len(writer.notes) != 1 || !strings.Contains(writer.notes[0], "e'lon ber 150$") {
+		t.Errorf("the writer was given %q", writer.notes)
+	}
+	if len(sent) != 1 || !strings.Contains(sent[0].text, "20 ta lichkaga") || len(sent[0].buttons) != 1 || sent[0].buttons[0][0].Data != announceData+"ok" {
+		t.Fatalf("sent %+v", sent)
+	}
+
+	runner.answers["send_to_groups"] = `{"ok":true,"result":{"sent":21,"failed":[]}}`
+	press := telegram.Update{UpdateID: 990, CallbackQuery: &telegram.CallbackQuery{
+		ID: "p1", From: &telegram.User{ID: 9001, Username: "Pronium"}, Data: announceData + "ok",
+		Message: &telegram.Message{MessageID: 80, Text: "preview", Chat: telegram.Chat{ID: 9001, Type: telegram.ChatTypePrivate}},
+	}}
+	f.run(press)
+	if asked := runner.recorded(); len(asked) != 2 || asked[1] != `send_to_groups {"action":"confirm"}` {
+		t.Errorf("after Send asked %q", asked)
+	}
+	if edits, menus := buttons.recordedMenus(); len(edits) != 1 || !strings.Contains(edits[0], "21 ta guruhga yuborildi") || menus[0] != nil {
+		t.Errorf("the preview became %q", edits)
+	}
+
+	if sent := f.run(owner("salom, qalaysan")); sent[len(sent)-1].text != textBlockedOwner.uz || len(writer.notes) != 1 {
+		t.Errorf("blocked small talk: %+v", sent)
+	}
+}
+
+// An owner's photo or video with an ad's caption is offered for posting in
+// code, the model never asked: a choice drafts it for the groups and
+// private chats, copied as it is without a second preview, and Send posts
+// it. A member's, or an owner's photo with no ad in its caption, is the
+// model's.
+func TestOwnersAdsAreOfferedWithoutTheModel(t *testing.T) {
+	f := newFixture()
+	f.opts.OwnerUsernames = []string{ownerUsername}
+	buttons := &fakeButtons{}
+	f.opts.Buttons = buttons
+	runner := withToolRunner(f)
+	runner.answers["send_to_groups"] = `{"ok":true,"result":{"draft":true,"groups":["Devs","Pub"],"private_chats":26}}`
+	ad := textFrom(9001, "")
+	ad.Message.From.Username = "Pronium"
+	ad.Message.Text, ad.Message.Caption, ad.Message.Video = "", "MLBB akk sotiladi, Mega collector 3, 150$", &telegram.Video{FileID: "v"}
+
+	sent := f.run(ad)
+
+	if len(sent) != 1 || sent[0].text != textAdOffer.uz || len(sent[0].buttons) != 2 || len(f.replier.recorded()) != 0 {
+		t.Fatalf("sent %+v, model asked %d times", sent, len(f.replier.recorded()))
+	}
+	everyone := sent[0].buttons[0][1].Data
+	press := func(id, data string) telegram.Update {
+		nextUpdateID++
+		return telegram.Update{UpdateID: nextUpdateID, CallbackQuery: &telegram.CallbackQuery{
+			ID: id, From: &telegram.User{ID: 9001, Username: "Pronium"}, Data: data,
+			Message: &telegram.Message{MessageID: 81, Text: "📢", Chat: telegram.Chat{ID: 9001, Type: telegram.ChatTypePrivate}},
+		}}
+	}
+	f.run(press("p1", everyone))
+	want := `send_to_groups {"action":"prepare","copy":true,"preview":false,"to":"all"}`
+	if asked := runner.recorded(); len(asked) != 1 || asked[0] != want {
+		t.Fatalf("asked %q, want %s", asked, want)
+	}
+	edits, menus := buttons.recordedMenus()
+	if len(edits) != 1 || !strings.Contains(edits[0], "2 ta guruhga ketadi") || !strings.Contains(edits[0], "26 ta lichkaga") || menus[0][0][0].Data != announceData+"ok" {
+		t.Fatalf("the choice became %q, %+v", edits, menus)
+	}
+	runner.answers["send_to_groups"] = `{"ok":true,"result":{"sent":28,"failed":[]}}`
+	f.run(press("p2", announceData+"ok"))
+	if asked := runner.recorded(); len(asked) != 2 || asked[1] != `send_to_groups {"action":"confirm"}` {
+		t.Errorf("after Send asked %q", asked)
+	}
+
+	member := textFrom(userID, "")
+	member.Message.Text, member.Message.Caption, member.Message.Video = "", "akk 150$", &telegram.Video{FileID: "v"}
+	plain := textFrom(9001, "")
+	plain.Message.From.Username = "Pronium"
+	plain.Message.Text, plain.Message.Caption, plain.Message.Photo = "", "qanday chiqibdi?", []telegram.PhotoSize{{FileID: "p"}}
+	f.run(member, plain)
+	if calls := len(f.replier.recorded()); calls != 2 {
+		t.Errorf("the model was asked %d times; the member's and the plain photo are its", calls)
 	}
 }

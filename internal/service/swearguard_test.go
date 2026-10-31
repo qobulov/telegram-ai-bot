@@ -440,3 +440,23 @@ func TestSwearJudgeKnowsTheBotsName(t *testing.T) {
 		t.Errorf("judge prompt = %q, want %q", judge.asked[0], want)
 	}
 }
+
+// The guard warns and mutes in the swearer's language: their message's,
+// or their app's for a word or two.
+func TestSwearGuardSpeaksTheSwearersLanguage(t *testing.T) {
+	f, _ := guardFixture("")
+	sent := f.run(swearFrom(swearerID, "блять опять проиграли сегодня"), swearFrom(swearerID, "да пошли вы нахуй все"))
+	if len(sent) != 2 || !strings.HasPrefix(sent[0].text, "@ali_s, в группе нельзя материться") {
+		t.Fatalf("sent = %+v, want a Russian warning", sent)
+	}
+	if want := "@ali_s не сможет писать час за мат. @boss, к вашему сведению."; sent[1].text != want {
+		t.Errorf("mute notice = %q, want %q", sent[1].text, want)
+	}
+
+	f, _ = guardFixture("")
+	short := swearFrom(swearerID, "dnx")
+	short.Message.From.LanguageCode = "en"
+	if sent := f.run(short); len(sent) != 1 || !strings.HasPrefix(sent[0].text, "@ali_s, no swearing in the group") {
+		t.Errorf("sent = %+v, want an English warning", sent)
+	}
+}

@@ -756,6 +756,8 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.shashkaCommand(ctx, in)
 	case commandName(in.text) == "/elon" && !in.group && s.opts.Tools != nil && s.isOwner(in.msg.From):
 		return s.announceCommand(ctx, in)
+	case !in.group && s.opts.Tools != nil && s.opts.Buttons != nil && s.isOwner(in.msg.From) && isAd(in.msg):
+		return offerAd(in, in.msg)
 	case strings.HasPrefix(in.text, "/"):
 		return s.withKeyboard(in, say(s.runCommand(ctx, in)))
 	case utf8.RuneCountInString(in.text) > s.opts.MaxInputChars:
@@ -830,6 +832,14 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	caller.Picture = firstPicture(req.Attachments)
 	ctx = tools.WithTurn(ctx, caller, sink)
 	answer, err := s.opts.Replier.Reply(ctx, req)
+	if errors.Is(err, ai.ErrBlocked) && !in.group && caller.Owner {
+		// What the provider refused may still be an announcement, which
+		// the owner can have without the main model.
+		if out, ok := s.announceForBlocked(ctx, in); ok {
+			s.giveBackAnswer(in, reservation)
+			return out
+		}
+	}
 	// A picture drawn before a later failure is still worth sending.
 	drawings := sink.Take()
 	documents := sink.TakeDocuments()
@@ -976,6 +986,14 @@ func (s *Service) pressed(q *telegram.CallbackQuery) {
 	}
 	if strings.HasPrefix(q.Data, doozData) {
 		s.pressedDooz(q)
+		return
+	}
+	if strings.HasPrefix(q.Data, announceData) {
+		s.pressedAnnounce(q)
+		return
+	}
+	if strings.HasPrefix(q.Data, adData) {
+		s.pressedAd(q)
 		return
 	}
 	if q.Data != checkPayload {
@@ -1284,6 +1302,15 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 		// second insult; an error message would be worse than silence.
 		log.Warn("the model gave an empty answer; nothing was sent")
 		return outcome{skipped: "model_empty"}
+	case errors.Is(err, ai.ErrBlocked):
+		// The provider's filter, not a failure: saying so, and to an owner
+		// how to post an announcement without the model, beats "try again".
+		log.Warn("the model provider's filter refused the turn", "error", err)
+		text := textBlocked.to(in)
+		if s.isOwner(in.msg.From) {
+			text = textBlockedOwner.to(in)
+		}
+		return outcome{text: text, skipped: "blocked", skipDetail: err.Error()}
 	case errors.Is(err, ai.ErrTruncated):
 		log.Warn("the model ran out of tokens mid-answer; the fragment was not sent")
 		return outcome{text: textCutOff.to(in), skipped: "truncated"}

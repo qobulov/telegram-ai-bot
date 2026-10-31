@@ -311,3 +311,36 @@ func TestBroadcastRefusesSummons(t *testing.T) {
 		}
 	}
 }
+
+// privateChats are the users 501 and 502 and the owner, who wrote to the
+// bot in private.
+type privateChats struct{}
+
+func (privateChats) PrivateChats(context.Context, int) ([]int64, error) {
+	return []int64{501, userID, 502}, nil
+}
+
+// With users, a broadcast goes to the private chats of everyone who wrote
+// to the bot but the owner; with all, to the groups as well. A user who
+// blocked the bot is counted, not named.
+func TestBroadcastReachesPrivateChats(t *testing.T) {
+	drafts, sender := &fakeDrafts{}, &fakeGroupSender{fail: map[int64]bool{502: true}}
+	registry := mustRegistry(t, BroadcastTool(BroadcastOptions{Groups: &groupsWithStatus{}, Private: privateChats{}, Drafts: drafts, Sender: sender}))
+
+	env := broadcast(registry, ownerTurn(userID, 1), `{"action":"prepare","text":"Salom!","to":"users"}`)
+	if !env.OK || !strings.Contains(string(env.Result), `"private_chats":2`) || !strings.Contains(string(env.Result), `"groups":[]`) {
+		t.Fatalf("to users = %s", env.Result)
+	}
+	env = broadcast(registry, ownerTurn(userID, 2), `{"action":"confirm"}`)
+	if !env.OK || !strings.Contains(string(env.Result), `"sent":1`) || !strings.Contains(string(env.Result), `"private_unreached":1`) {
+		t.Errorf("confirm = %s", env.Result)
+	}
+	if sender.sent[501] != "Salom!" || sender.sent[userID] != "" || sender.sent[groupA] != "" {
+		t.Errorf("sent = %+v, want only user 501", sender.sent)
+	}
+
+	env = broadcast(registry, ownerTurn(userID, 3), `{"action":"prepare","text":"Hammaga!","to":"all"}`)
+	if !env.OK || !strings.Contains(string(env.Result), `"groups":["Devs","Pub"]`) || !strings.Contains(string(env.Result), `"private_chats":2`) {
+		t.Errorf("to all = %s", env.Result)
+	}
+}

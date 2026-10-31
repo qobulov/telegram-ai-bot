@@ -630,8 +630,39 @@ messages. Instead of text, an owner may reply to a message (a photo, a
 video, a post, in the private chat or a group) and ask for it to be sent
 ("shuni hamma guruhlarga yubor"): it is copied as it is, with Telegram's
 `copyMessage`, so it carries no "forwarded from" line, after the same yes.
-Neither the text nor a copied message may call or tag someone to summon
-them.
+With text too, the copy goes under that text as its new caption (a
+description for a video), and the owner first gets the post in their private
+chat as a preview. Neither the text nor a copied message may call or tag
+someone to summon them.
+
+A broadcast can also go to the private chats of everyone who wrote to the
+bot in private ("hammaning lichkasiga yubor": `to` is `users`, or `all` for
+the groups, channels and private chats together), up to 200 of the most
+recent, leaving out the owner; a bot may not write first to anyone else.
+Users who blocked the bot are counted, not named.
+
+An owner's photo or video sent to the bot in private with an ad's caption
+(a price, "akk", "sotiladi", a skin…) is taken in code, the model never
+asked: the bot answers with where to post it (the groups, everyone, private
+chats only, or not at all), then with where the draft goes and Send and
+Drop buttons; the post is copied as it is, caption and all. An owner's
+photo or video the provider's filter refused is offered the same way.
+
+The owners' `/elon` does the same in code, without the model, whose
+provider may refuse a sale's words or a video's picture: `/elon <text>` for
+the groups, `/elon hammaga <text>` for the groups and private chats,
+`/elon lichkaga <text>` for private chats only, in reply to a photo or a
+video for it under the text; the preview comes first, then `/elon ha`
+sends it and `/elon bekor` drops it. When the provider's filter refuses a
+turn that has a picture, the turn is asked again without it; when it
+refuses the words, a private chat is told so, and an owner how to post with
+`/elon`, instead of "try again". An owner's refused words that ask for an
+announcement ("e'lon", "guruhlarga", "lichkaga", "hammaga"…) are taken
+apart from the main model: the same model, told nothing but to write an
+announcement, writes it from the owner's last few messages, it is drafted
+for the groups, or the private chats too when the words name them, under the
+replied photo or video if any, and the preview comes with Send and Drop
+buttons.
 
 Groups are recorded when the bot is added, promoted or removed (Telegram's
 `my_chat_member` updates) and from the messages it logs. Telegram has no way
@@ -1230,6 +1261,9 @@ caught insult is kept in `moderation_actions` (action `swear`, or
 `swear_bot` for one at the bot), which is how the count is kept and how an
 update delivered twice is handled once. Muting needs her to be an admin who may
 restrict members; without that right the notice says so and still tags.
+Its warnings and notices are in the swearer's language, Uzbek, Russian or
+English: their message's, or their Telegram app's for a word or two, as the
+bot's other texts are.
 "Maria, endi so'kinishni kuzatma" turns it off. She cannot watch a chat
 herself, and says so rather than promise to.
 
@@ -1890,7 +1924,20 @@ nights running), the courtesan keeps one from acting, the maniac kills.
 The night is played out in that order: the courtesan's visit first, then
 the cure, the checks, the kills and the lucky one's luck, which saves them
 once. By day the group argues in its own chat, and then votes on the page;
-the most votes put a player out, a tie no one. The bot tells the group
+the most votes put a player out, a tie no one. Whoever falls, at night or
+by the vote, may leave one last word of up to 200 letters on their page,
+until the next night or vote is played out, and the bot posts it in the
+group. The page has a chat of its own: at night the mafia's, which only
+its members write in and read, to agree on the victim; by day, in the
+lobby and after the end, the town's, which everyone in the game reads and
+the living write in. A line names the room it was written for and is
+refused if that room closed as it was sent, so a night's line never
+reaches the day. The game keeps the latest 60 lines of up to 200 letters,
+one a second from each player. The fallen may not write in the group till the game ends: the bot
+restricts them, when it is an admin with the right to restrict members,
+leaving out admins and members someone restricted already, and lets those
+it restricted write again at the end; a restriction lasts an hour at
+most, should a game be left unfinished. The bot tells the group
 each morning and verdict, with the roles of the dead; the town wins when
 no killer is left, the mafia when they are as many as the rest, the
 maniac when left with one other. The winners get 150 of Dev jangi's coins
