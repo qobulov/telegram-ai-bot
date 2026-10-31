@@ -16,6 +16,8 @@ import (
 
 const (
 	maxBroadcastRunes = 4000
+	// maxCaptionRunes is the most Telegram puts under a photo or a video.
+	maxCaptionRunes = 1024
 	// broadcastMaxAge is how long a draft waits for the owner's yes.
 	broadcastMaxAge  = 10 * time.Minute
 	broadcastTimeout = 30 * time.Second
@@ -39,10 +41,10 @@ type ChannelLister interface {
 }
 
 // GroupSender posts a message in a group or a channel: text, or a copy of
-// a message from another chat.
+// a message from another chat, under a new caption when one is given.
 type GroupSender interface {
 	SendToGroup(ctx context.Context, chatID int64, text string) error
-	CopyToChat(ctx context.Context, chatID, fromChatID, messageID int64) error
+	CopyToChat(ctx context.Context, chatID, fromChatID, messageID int64, caption string) error
 }
 
 // BroadcastOptions configures the send_to_groups tool. Channels is
@@ -61,8 +63,8 @@ type broadcastArgs struct {
 	// To is where a broadcast without chat_ids goes: broadcastGroups,
 	// broadcastChannels or broadcastBoth.
 	To string `json:"to"`
-	// Copy posts the message the owner replied to, as it is, instead of
-	// Text.
+	// Copy posts the message the owner replied to instead of Text, which is
+	// then its new caption, if given.
 	Copy bool `json:"copy"`
 }
 
@@ -82,7 +84,7 @@ func BroadcastTool(opts BroadcastOptions) Tool {
 		Name: "send_to_groups",
 		Description: "Owners only. Post a message in the bot's groups, or in the channels where it is an admin who may post. " +
 			"targets: list the groups and channels it can post in, with their chat_ids. " +
-			"prepare: save the text, or with copy the message the owner replied to, posted as it is (a photo, a video, a post), and optionally to (groups by default, channels, or both) or chat_ids from targets; then show the owner the exact text, or say it is their replied message, and the groups and channels, and ask them to confirm. Nothing is sent yet. " +
+			"prepare: save the text, or with copy the message the owner replied to (a photo, a video, a post), posted as it is or, with text too, under that text as its new caption (a description for a video), and optionally to (groups by default, channels, or both) or chat_ids from targets; a copy is first sent to the owner's private chat as a preview. Then show the owner the exact text, or say it is their replied message and its caption, and the groups and channels, and ask them to confirm. Nothing is sent to the groups yet. " +
 			"confirm: send it, only after the owner said yes in a new message. cancel: drop the draft. " +
 			"It is for announcements: a message that calls or pings a person (\"@pronium sizni @tursunoffm chaqiryapti\") is refused, as it would tag them in every group; tell the owner to write to that person directly. " +
 			"Never say a message was sent unless confirm reported it.",
@@ -90,8 +92,8 @@ func BroadcastTool(opts BroadcastOptions) Tool {
 			"type": "object",
 			"properties": {
 				"action": {"type": "string", "enum": ["targets", "prepare", "confirm", "cancel"]},
-				"text": {"type": "string", "description": "For prepare: the exact message to post, in the owner's language. Omit with copy."},
-				"copy": {"type": "boolean", "description": "For prepare: true to post the message the owner replied to, as it is, instead of text."},
+				"text": {"type": "string", "description": "For prepare: the exact message to post, in the owner's language; with copy, the new caption under the replied photo or video (at most 1024 characters), or omit it to keep the message as it is."},
+				"copy": {"type": "boolean", "description": "For prepare: true to post the message the owner replied to instead of a text message."},
 				"to": {"type": "string", "enum": ["groups", "channels", "both"], "description": "For prepare without chat_ids: every group (the default), every channel, or both."},
 				"chat_ids": {"type": "array", "items": {"type": "integer"}, "description": "For prepare: only these groups and channels, from targets."}
 			},
@@ -176,21 +178,39 @@ func prepareBroadcast(ctx context.Context, opts BroadcastOptions, caller Caller,
 	if err := opts.Drafts.SaveBroadcast(ctx, draft); err != nil {
 		return nil, err
 	}
+	if draft.CopyMessageID != 0 {
+		return copyDraftResult(ctx, opts, caller, draft, groups, channels), nil
+	}
 	result := map[string]any{
 		"draft":  true,
 		"groups": groups,
+		"text":   draft.Text,
 		"note":   "Nothing is sent yet. Show the owner this exact text and these groups and ask them to confirm. Call confirm only after they say yes in their next message.",
 	}
 	if len(channels) > 0 {
 		result["channels"] = channels
 	}
-	if draft.CopyMessageID != 0 {
-		result["copy"] = "the message the owner replied to, posted as it is"
-		result["note"] = "Nothing is sent yet. Tell the owner the message they replied to will be posted as it is in these groups and channels, and ask them to confirm. Call confirm only after they say yes in their next message."
-	} else {
-		result["text"] = draft.Text
-	}
 	return result, nil
+}
+
+// copyDraftResult sends the owner a preview of a copy, in their private
+// chat, so they see the post as the groups will, and says what was drafted.
+func copyDraftResult(ctx context.Context, opts BroadcastOptions, caller Caller, draft storage.Broadcast, groups, channels []string) map[string]any {
+	result := map[string]any{"draft": true, "groups": groups, "copy": "the message the owner replied to, posted as it is"}
+	if len(channels) > 0 {
+		result["channels"] = channels
+	}
+	if draft.Text != "" {
+		result["copy"] = "the message the owner replied to, under the new caption"
+		result["caption"] = draft.Text
+	}
+	note := "Nothing is sent to the groups yet. A preview of the post was sent to the owner's private chat. Tell them so, in one line, with the groups and channels, and ask them to confirm. Call confirm only after they say yes in their next message."
+	if err := post(ctx, opts.Sender, caller.UserID, draft); err != nil {
+		result["preview_error"] = err.Error()
+		note = "Nothing is sent to the groups yet. The preview could not be sent; tell the owner why, from preview_error. If the replied message is text, which takes no caption, prepare a text broadcast instead."
+	}
+	result["note"] = note
+	return result
 }
 
 // newDraft is the owner's message to post: their text, or with copy the
@@ -200,14 +220,14 @@ func newDraft(caller Caller, args broadcastArgs) (storage.Broadcast, error) {
 	text := strings.TrimSpace(args.Text)
 	if args.Copy {
 		switch {
-		case text != "":
-			return storage.Broadcast{}, &ArgumentError{Message: "give either text or copy, not both"}
 		case caller.Target == nil:
 			return storage.Broadcast{}, &ArgumentError{Message: "copy posts the message the owner replied to, and they replied to none: ask them to reply to it with the request"}
-		case summons(caller.Target.Text):
+		case len([]rune(text)) > maxCaptionRunes:
+			return storage.Broadcast{}, &ArgumentError{Message: fmt.Sprintf("a caption is at most %d characters", maxCaptionRunes)}
+		case summons(caller.Target.Text), summons(text):
 			return storage.Broadcast{}, &ArgumentError{Message: notASummons}
 		}
-		draft.CopyChatID, draft.CopyMessageID = caller.ChatID, caller.Target.MessageID
+		draft.Text, draft.CopyChatID, draft.CopyMessageID = text, caller.ChatID, caller.Target.MessageID
 		return draft, nil
 	}
 	if text == "" || len([]rune(text)) > maxBroadcastRunes {
@@ -313,10 +333,11 @@ func confirmBroadcast(ctx context.Context, opts BroadcastOptions, caller Caller)
 	return map[string]any{"sent": sent, "failed": failed}, nil
 }
 
-// post sends draft to one chat: its text, or a copy of its message.
+// post sends draft to one chat: its text, or a copy of its message under
+// its text as the caption, if it has one.
 func post(ctx context.Context, sender GroupSender, chatID int64, draft storage.Broadcast) error {
 	if draft.CopyMessageID != 0 {
-		return sender.CopyToChat(ctx, chatID, draft.CopyChatID, draft.CopyMessageID)
+		return sender.CopyToChat(ctx, chatID, draft.CopyChatID, draft.CopyMessageID, draft.Text)
 	}
 	return sender.SendToGroup(ctx, chatID, draft.Text)
 }

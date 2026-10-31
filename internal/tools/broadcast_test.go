@@ -64,9 +64,14 @@ func (f *fakeGroupSender) SendToGroup(_ context.Context, chatID int64, text stri
 	return nil
 }
 
-// CopyToChat records a copy as "copy of <message> from <chat>".
-func (f *fakeGroupSender) CopyToChat(ctx context.Context, chatID, fromChatID, messageID int64) error {
-	return f.SendToGroup(ctx, chatID, fmt.Sprintf("copy of %d from %d", messageID, fromChatID))
+// CopyToChat records a copy as "copy of <message> from <chat>", and its
+// new caption after a colon.
+func (f *fakeGroupSender) CopyToChat(ctx context.Context, chatID, fromChatID, messageID int64, caption string) error {
+	copied := fmt.Sprintf("copy of %d from %d", messageID, fromChatID)
+	if caption != "" {
+		copied += ": " + caption
+	}
+	return f.SendToGroup(ctx, chatID, copied)
 }
 
 // fakeChannels lists the channel News, where the bot may post, Quiet,
@@ -140,8 +145,9 @@ func TestBroadcastToChannelsNeedsOne(t *testing.T) {
 	}
 }
 
-// With copy, the message the owner replied to is posted as it is, after
-// their yes like any broadcast; it too may not call anyone.
+// With copy, the message the owner replied to is posted as it is, or under
+// a new caption, after their yes like any broadcast, the owner seeing it
+// first in their private chat; it too may not call anyone.
 func TestBroadcastCopiesTheRepliedMessage(t *testing.T) {
 	drafts, sender := &fakeDrafts{}, &fakeGroupSender{}
 	registry := channelRegistry(t, drafts, sender)
@@ -151,16 +157,26 @@ func TestBroadcastCopiesTheRepliedMessage(t *testing.T) {
 	post := &Target{MessageID: 31, UserID: userID, Text: "Turnir posteri"}
 
 	env := broadcast(registry, replying(1, post), `{"action":"prepare","copy":true,"to":"both"}`)
-	if !env.OK || !strings.Contains(string(env.Result), "replied to") || strings.Contains(string(env.Result), `"text"`) {
+	want := fmt.Sprintf("copy of 31 from %d", userID)
+	if !env.OK || !strings.Contains(string(env.Result), "replied to") || strings.Contains(string(env.Result), `"caption"`) {
 		t.Fatalf("prepare = %s", env.Result)
 	}
-	if len(sender.sent) != 0 {
-		t.Fatalf("sent before confirmation: %+v", sender.sent)
+	if len(sender.sent) != 1 || sender.sent[userID] != want {
+		t.Fatalf("before confirmation sent %+v, want only the owner's preview", sender.sent)
 	}
 	broadcast(registry, replying(2, nil), `{"action":"confirm"}`)
-	want := fmt.Sprintf("copy of 31 from %d", userID)
 	if sender.sent[groupA] != want || sender.sent[groupC] != want || sender.sent[channelNews] != want {
 		t.Errorf("sent = %+v, want the message copied everywhere", sender.sent)
+	}
+
+	env = broadcast(registry, replying(3, post), `{"action":"prepare","copy":true,"text":"Akkaunt sotiladi: 150$"}`)
+	captioned := want + ": Akkaunt sotiladi: 150$"
+	if !env.OK || !strings.Contains(string(env.Result), `"caption":"Akkaunt sotiladi: 150$"`) || sender.sent[userID] != captioned {
+		t.Fatalf("prepare with a caption = %s, preview %q", env.Result, sender.sent[userID])
+	}
+	broadcast(registry, replying(4, nil), `{"action":"confirm"}`)
+	if sender.sent[groupA] != captioned || sender.sent[groupC] != captioned {
+		t.Errorf("sent = %+v, want the message under its new caption", sender.sent)
 	}
 
 	for _, c := range []struct {
@@ -168,10 +184,11 @@ func TestBroadcastCopiesTheRepliedMessage(t *testing.T) {
 		args   string
 	}{
 		{nil, `{"action":"prepare","copy":true}`},
-		{post, `{"action":"prepare","copy":true,"text":"hi"}`},
+		{post, `{"action":"prepare","copy":true,"text":"` + strings.Repeat("a", maxCaptionRunes+1) + `"}`},
+		{post, `{"action":"prepare","copy":true,"text":"@pronium sizni @tursunoffm chaqiryapti"}`},
 		{&Target{MessageID: 32, Text: "@pronium sizni @tursunoffm chaqiryapti"}, `{"action":"prepare","copy":true}`},
 	} {
-		if env := broadcast(registry, replying(3, c.target), c.args); env.OK || env.Error.Code != "invalid_arguments" {
+		if env := broadcast(registry, replying(5, c.target), c.args); env.OK || env.Error.Code != "invalid_arguments" {
 			t.Errorf("%s with %+v = %+v, want refused", c.args, c.target, env)
 		}
 	}

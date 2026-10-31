@@ -20,8 +20,8 @@ type Broadcast struct {
 	UpdateID int64
 	Text     string
 	ChatIDs  []int64
-	// CopyChatID and CopyMessageID are the message to copy instead of Text,
-	// and the chat it is in; zero for text.
+	// CopyChatID and CopyMessageID are the message to copy, and the chat it
+	// is in; zero for text. Text is then the copy's new caption, or empty.
 	CopyChatID, CopyMessageID int64
 }
 

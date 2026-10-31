@@ -850,7 +850,7 @@ func TestChatAndMemberMethodsSendExactParams(t *testing.T) {
 func TestCopyMessageNamesTheOriginal(t *testing.T) {
 	client, api := newTestClient(t, `{"ok":true,"result":{"message_id":99}}`)
 
-	id, err := client.CopyMessage(context.Background(), -100123, 5005, 31)
+	id, err := client.CopyMessage(context.Background(), -100123, 5005, 31, "")
 	if err != nil || id != 99 {
 		t.Fatalf("CopyMessage = %d, %v", id, err)
 	}

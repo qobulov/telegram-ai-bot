@@ -194,8 +194,8 @@ func (g groupSender) SendToGroup(ctx context.Context, chatID int64, text string)
 	return err
 }
 
-func (g groupSender) CopyToChat(ctx context.Context, chatID, fromChatID, messageID int64) error {
-	_, err := g.client.CopyMessage(ctx, chatID, fromChatID, messageID)
+func (g groupSender) CopyToChat(ctx context.Context, chatID, fromChatID, messageID int64, caption string) error {
+	_, err := g.client.CopyMessage(ctx, chatID, fromChatID, messageID, caption)
 	return err
 }
 
