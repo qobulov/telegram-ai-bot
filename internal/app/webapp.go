@@ -8,6 +8,7 @@ import (
 
 	"telegram-ai-bot/internal/config"
 	"telegram-ai-bot/internal/game"
+	"telegram-ai-bot/internal/mafia"
 	"telegram-ai-bot/internal/miniapp"
 	"telegram-ai-bot/internal/raid"
 	"telegram-ai-bot/internal/shashkaapp"
@@ -169,6 +170,27 @@ func NewRaid(ctx context.Context, cfg config.Config, logger *slog.Logger) (*Endp
 	}
 	client := telegram.NewClient(telegram.Options{Token: cfg.TelegramToken, BaseURL: cfg.TelegramAPIURL, Logger: logger})
 	handler := raid.NewHandler(raid.Options{Sessions: sessions, Store: store, Telegram: client, Logger: logger})
+	return &Endpoint{Handler: handler, Close: store.Close}, nil
+}
+
+// NewMafia builds Mafia's API: it keeps each group's game in the database,
+// opens its page with the sessions the game's Play presses get, tells the
+// group how the game goes and pays the winners in Dev jangi's coins.
+func NewMafia(ctx context.Context, cfg config.Config, logger *slog.Logger) (*Endpoint, error) {
+	sessions := newGame(cfg)
+	if sessions == nil {
+		return nil, errNoPages
+	}
+	store, err := storage.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return nil, err
+	}
+	if err := store.CheckSchema(ctx); err != nil {
+		store.Close()
+		return nil, err
+	}
+	client := telegram.NewClient(telegram.Options{Token: cfg.TelegramToken, BaseURL: cfg.TelegramAPIURL, Logger: logger})
+	handler := mafia.NewHandler(mafia.Options{Sessions: sessions, Store: store, Telegram: client, Logger: logger})
 	return &Endpoint{Handler: handler, Close: store.Close}, nil
 }
 

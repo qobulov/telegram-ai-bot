@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0e0a1f">
+  <title>Mafia</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lilita+One&display=swap" rel="stylesheet">
+  <script src="https://telegram.org/js/games.js" defer></script>
+  <link rel="stylesheet" href="mafia.css">
+</head>
+<body>
+  <canvas class="stars" id="stars" aria-hidden="true"></canvas>
+  <main id="app">
+    <header class="top"><h1>🎭 Mafia</h1><span class="pill" id="phase">…</span><span class="timer" id="timer"></span></header>
+    <div class="grid" id="grid"></div>
+    <section class="center" id="center"></section>
+    <p class="message" id="message" aria-live="polite"></p>
+    <section class="bar" id="bar"></section>
+  </main>
+  <div class="overlay" id="overlay" hidden></div>
+  <script src="mafia.js"></script>
+</body>
+</html>

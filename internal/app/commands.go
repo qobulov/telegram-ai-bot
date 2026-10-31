@@ -106,6 +106,7 @@ var pageCommands = []telegram.BotCommand{
 	{Command: "ilon", Description: "Kosmik ilon o'yini"},
 	{Command: "otinchi", Description: "O'tinchi o'yini"},
 	{Command: "boss", Description: "Dev jangi (guruh bilan)"},
+	{Command: "mafia", Description: "Mafia (guruh bilan, 5+ kishi)"},
 	{Command: "shashka", Description: "Shashka (PvP, reyting)"},
 }
 

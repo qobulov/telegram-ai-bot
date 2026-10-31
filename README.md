@@ -1875,6 +1875,35 @@ which the page counts the same way (`crit.js`, checked against the Go by a
 test), so the numbers it shows are the ones counted. A hit changes the boss
 with its row locked, so of many hits at once only one kills it.
 
+### Mafia
+
+`/mafia` posts Mafia, played by a group of 5 to 20 (`public/game/mafiya/`,
+`internal/mafia`, `api/mafia.go`; its short name with @BotFather is
+`mafiya`). Members press Play and join the room; any of them starts it
+once five have joined. Each gets a secret role, which only their page
+shows: the Don and the mafia, who see each other, the commissar, the
+doctor, the courtesan, the maniac, the lucky one and citizens, dealt by
+the number of players. At night the roles act on the page: the mafia pick
+a victim (the Don's word is the last), the Don looks for the commissar,
+the commissar checks a player, the doctor cures one (not the same two
+nights running), the courtesan keeps one from acting, the maniac kills.
+The night is played out in that order: the courtesan's visit first, then
+the cure, the checks, the kills and the lucky one's luck, which saves them
+once. By day the group argues in its own chat, and then votes on the page;
+the most votes put a player out, a tie no one. The bot tells the group
+each morning and verdict, with the roles of the dead; the town wins when
+no killer is left, the mafia when they are as many as the rest, the
+maniac when left with one other. The winners get 150 of Dev jangi's coins
+each, the maniac 300.
+
+The server keeps each group's game as one row of `mafia_games` (migration
+49), changed with the row locked, and gives each page only what its
+player may see: their role, their partners', the dead's and what their
+checks found. A phase ends when its time is up (45 seconds for a night,
+75 for a day, 40 for a vote), on the first request after it, or sooner
+when everyone who acts has acted or voted; the pages ask every two
+seconds.
+
 ### Shashka (draughts Mini App)
 
 With `WEBAPP_URL` set, `/shashka` opens Russian draughts, played against
@@ -2446,7 +2475,7 @@ update needs:
 ### Deploying the dashboard and the game
 
 They need no new kind of update; Dev jangi needs migrations 45 to 47, the
-games' own table of scores migration 48.
+games' own table of scores migration 48, Mafia migration 49.
 
 1. **Deploy**, then **set `WEBAPP_URL`** in Vercel to the deployment's
    production address, for example `https://maria.vercel.app` (no trailing
@@ -2466,7 +2495,8 @@ games' own table of scores migration 48.
    **`boss`**. No URL is asked for: the bot gives
    `https://YOUR-APP.vercel.app/game/` and `/game/ilon/`, `/game/otinchi/`,
    `/game/boss/` with each press of Play. Dev jangi needs migrations 45 to 47
-   and the games' scores migration 48.
+   and the games' scores migration 48, Mafia (`mafiya`, at
+   `/game/mafiya/`) migration 49.
 4. As an owner, send `/stats`, `/game`, `/ilon`, `/otinchi` and `/boss` in a
    group and in a private chat.
 

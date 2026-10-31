@@ -304,9 +304,9 @@ type Abilities struct {
 // helpPages are the games' commands, in each language, listed after /about
 // when the pages are on. /stats, for the owners alone, is not listed.
 var helpPages = map[string]string{
-	"uz": "\n/game — Tarozi o'yini\n/ilon — Kosmik ilon o'yini\n/otinchi — O'tinchi: daraxtni chop, shoxlardan qoch\n/boss — Dev jangi: guruh bilan birga devni uring\n/shashka — shashka: tasodifiy raqib, do'st yoki men bilan, reyting bilan",
-	"ru": "\n/game — игра «Tarozi»\n/ilon — игра «Космическая змейка»\n/otinchi — «Дровосек»: руби дерево, уворачивайся от веток\n/boss — «Битва с дэвом»: бейте дэва всей группой\n/shashka — шашки: со случайным соперником, другом или со мной, с рейтингом",
-	"en": "\n/game — the Tarozi game\n/ilon — the space snake game\n/otinchi — the woodcutter: chop the tree, dodge the branches\n/boss — the boss raid: hit the giant with the whole group\n/shashka — draughts: a random opponent, a friend or me, with ratings",
+	"uz": "\n/game — Tarozi o'yini\n/ilon — Kosmik ilon o'yini\n/otinchi — O'tinchi: daraxtni chop, shoxlardan qoch\n/boss — Dev jangi: guruh bilan birga devni uring\n/mafia — Mafia: guruh bilan, yashirin rollar, 5+ kishi\n/shashka — shashka: tasodifiy raqib, do'st yoki men bilan, reyting bilan",
+	"ru": "\n/game — игра «Tarozi»\n/ilon — игра «Космическая змейка»\n/otinchi — «Дровосек»: руби дерево, уворачивайся от веток\n/boss — «Битва с дэвом»: бейте дэва всей группой\n/mafia — «Мафия»: всей группой, тайные роли, от 5 человек\n/shashka — шашки: со случайным соперником, другом или со мной, с рейтингом",
+	"en": "\n/game — the Tarozi game\n/ilon — the space snake game\n/otinchi — the woodcutter: chop the tree, dodge the branches\n/boss — the boss raid: hit the giant with the whole group\n/mafia — Mafia: with the group, secret roles, 5 or more\n/shashka — draughts: a random opponent, a friend or me, with ratings",
 }
 
 // HelpText describes the bot's commands and what it can do with these

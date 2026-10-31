@@ -97,6 +97,8 @@ var moreSections = []moreSection{
 			request: lt("Dooz o'ynaymiz", "Сыграем в крестики-нолики", "Let's play tic-tac-toe")},
 		{key: "boss", label: lt("👹 Dev jangi", "👹 Битва с дэвом", "👹 Boss raid"),
 			request: lt("Dev jangi o'yinini yubor", "Пришли игру «Битва с дэвом»", "Send the boss raid game")},
+		{key: "mafiya", label: lt("🎭 Mafia", "🎭 Мафия", "🎭 Mafia"),
+			request: lt("Mafia o'yinini yubor", "Пришли игру «Мафия»", "Send the Mafia game")},
 		{key: "ilon", label: lt("🐍 Kosmik ilon", "🐍 Космическая змейка", "🐍 Space snake"),
 			request: lt("Kosmik ilon o'yinini yubor", "Пришли игру «Космическая змейка»", "Send the space snake game")},
 		{key: "otinchi", label: lt("🪓 O'tinchi", "🪓 Дровосек", "🪓 Woodcutter"),

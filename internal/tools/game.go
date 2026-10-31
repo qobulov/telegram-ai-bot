@@ -38,6 +38,7 @@ var gameAbout = map[string]string{
 	"ilon":    "Kosmik ilon, a snake in space that eats planets and grows, with levels of walls, bonuses and ever quicker moves",
 	"otinchi": "O'tinchi, a woodcutter chopping an old plane tree from left or right against the clock, dodging its branches, golden pieces worth five",
 	"boss":    "Dev jangi, a boss raid: the whole chat taps one giant together, with damage numbers, critical blows, upgrades, and the bot announcing who hit it most",
+	"mafiya":  "Mafia, for a group of five or more: secret roles (mafia, Don, commissar, doctor, courtesan, maniac, lucky one, citizens), night acts on the page, the day's argument in the chat and a vote, the bot telling the group each morning",
 }
 
 var gameTooSoon = fmt.Sprintf("this chat got %d games in the last %d minutes; the one sent is still there to play", gameLimit, int(gameWindow.Minutes()))

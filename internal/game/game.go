@@ -35,12 +35,18 @@ const ShortName = "tarozi"
 // opens its page with a session.
 const BossShortName = "boss"
 
+// MafiaShortName is Mafia's short name, as it is registered with
+// @BotFather's /newgame. Its plays are internal/mafia's: this package only
+// opens its page with a session.
+const MafiaShortName = "mafiya"
+
 // IlonPath, OtinchiPath and BossPath are where Kosmik ilon's, O'tinchi's
 // and Dev jangi's pages are, under Tarozi's.
 const (
 	IlonPath    = "ilon/"
 	OtinchiPath = "otinchi/"
 	BossPath    = "boss/"
+	MafiaPath   = "mafiya/"
 )
 
 const (
@@ -143,6 +149,8 @@ func (g *Game) PlayURL(shortName string, p Player) (link string, ok bool) {
 		page += OtinchiPath
 	case BossShortName:
 		page += BossPath
+	case MafiaShortName:
+		page += MafiaPath
 	default:
 		return "", false
 	}

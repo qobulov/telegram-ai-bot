@@ -23,6 +23,9 @@
     },
     "api/raid.go": {
       "maxDuration": 15
+    },
+    "api/mafia.go": {
+      "maxDuration": 15
     }
   },
   "crons": [

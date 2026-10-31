@@ -12,6 +12,7 @@ tartibi README'ning Mini App va o'yinlar bo'limida.
 | ![](otinchi.png) | O'tinchi | `otinchi` | `/otinchi` |
 | ![](dev-jangi.png) | Dev jangi | `boss` | `/boss` |
 | ![](maydon.png) | Maydon *(tayyorlanmoqda)* | `maydon` | `/maydon` |
+| ![](mafia.png) | Mafia | `mafiya` | `/mafia` |
 
 ## Tavsiflar
 
@@ -34,5 +35,9 @@ tartibi README'ning Mini App va o'yinlar bo'limida.
 **Maydon** — `maydon.png` *(o'yin hali botga qo'shilmagan)*
 
 > Guruh bilan jamoa jangi! Sinf va joyingizni tanlang, aniq zarba bering, mahoratni o'z vaqtida ishlating. 1v1 dan 10v10 gacha, kuchingiz Dev jangi darajasidan.
+
+**Mafia** — `mafia.png`, qisqa nomi `mafiya`
+
+> Shahar uxlaydi, mafiya uyg'onadi! Yashirin rolingizni oling: Don, Komissar, Shifokor, Manyak… Tunda harakat qiling, kunduzi bahslashib mafiyani toping. Guruh bilan 5 kishidan.
 
 Rasmni o'zgartirish yoki tavsifni yangilash uchun: `/mygames` → o'yin → *Edit*.
