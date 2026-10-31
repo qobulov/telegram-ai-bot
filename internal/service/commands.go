@@ -756,6 +756,10 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.shashkaCommand(ctx, in)
 	case commandName(in.text) == "/elon" && !in.group && s.opts.Tools != nil && s.isOwner(in.msg.From):
 		return s.announceCommand(ctx, in)
+	case !in.group && s.opts.Tools != nil && s.opts.Buttons != nil && s.isOwner(in.msg.From) && pressed(in, keyboardAd):
+		return askForAd(in)
+	case !in.group && s.opts.Tools != nil && s.opts.Buttons != nil && s.isOwner(in.msg.From) && answersAdPrompt(in):
+		return adOrAskAgain(in)
 	case !in.group && s.opts.Tools != nil && s.opts.Buttons != nil && s.isOwner(in.msg.From) && isAd(in.msg):
 		return offerAd(in, in.msg)
 	case strings.HasPrefix(in.text, "/"):

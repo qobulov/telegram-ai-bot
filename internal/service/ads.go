@@ -31,6 +31,30 @@ func isAd(msg *telegram.Message) bool {
 	return media && caption != "" && !strings.HasPrefix(caption, "/") && adWords.MatchString(caption)
 }
 
+// askForAd answers the ad button: the reply box opens on the question, and
+// the photo or video sent in reply is taken as the ad, whatever its caption.
+func askForAd(in incoming) outcome {
+	return outcome{text: textAdPrompt.to(in), ask: textAdHint.to(in)}
+}
+
+// answersAdPrompt reports a message replying to the ad button's question.
+func answersAdPrompt(in incoming) bool {
+	replied := in.msg.ReplyToMessage
+	if replied == nil || replied.From == nil || !replied.From.IsBot {
+		return false
+	}
+	return replied.Text == textAdPrompt.uz || replied.Text == textAdPrompt.ru || replied.Text == textAdPrompt.en
+}
+
+// adOrAskAgain offers an owner's ad for posting, or asks again for a photo
+// or a video when the reply to the question has neither.
+func adOrAskAgain(in incoming) outcome {
+	if len(in.msg.Photo) == 0 && in.msg.Video == nil {
+		return outcome{text: textAdNeedsMedia.to(in), ask: textAdHint.to(in)}
+	}
+	return offerAd(in, in.msg)
+}
+
 // offerAd answers an owner's ad with where it may be posted; nothing is
 // drafted until they choose.
 func offerAd(in incoming, ad *telegram.Message) outcome {
@@ -107,6 +131,17 @@ func (s *Service) draftAd(ctx context.Context, in incoming, data string) (string
 }
 
 var (
+	textAdPrompt = localText{
+		uz: "📢 Reklama uchun rasm yoki videoni tavsifi bilan (narxi, @tegingiz) shu xabarga javob qilib yuboring.",
+		ru: "📢 Пришлите фото или видео для рекламы с подписью (цена, ваш @тег) ответом на это сообщение.",
+		en: "📢 Send the ad's photo or video with its caption (the price, your @tag) in reply to this message.",
+	}
+	textAdHint       = localText{uz: "Rasm yoki video + tavsif", ru: "Фото или видео + подпись", en: "Photo or video + caption"}
+	textAdNeedsMedia = localText{
+		uz: "Reklama uchun rasm yoki video kerak: uni tavsifi bilan yuboring.",
+		ru: "Для рекламы нужно фото или видео: пришлите его с подписью.",
+		en: "An ad needs a photo or a video: send it with its caption.",
+	}
 	textAdOffer = localText{
 		uz: "📢 Shu reklamani e'lon qilaymi? Qayerga?",
 		ru: "📢 Разослать это объявление? Куда?",

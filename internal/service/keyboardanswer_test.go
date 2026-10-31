@@ -610,3 +610,49 @@ func TestOwnersAdsAreOfferedWithoutTheModel(t *testing.T) {
 		t.Errorf("the model was asked %d times; the member's and the plain photo are its", calls)
 	}
 }
+
+// An owner's keyboard has the ad button only; it asks for the ad, and a
+// photo or video sent in reply is offered for posting whatever its
+// caption; a reply with neither is asked again. A member keeps the full
+// keyboard.
+func TestOwnersKeyboardAsksForAnAd(t *testing.T) {
+	f := newFixture()
+	f.opts.OwnerUsernames = []string{ownerUsername}
+	f.opts.Buttons = &fakeButtons{}
+	withToolRunner(f)
+	owner := func(text string) telegram.Update {
+		update := textFrom(9001, text)
+		update.Message.From.Username = "Pronium"
+		return update
+	}
+
+	sent := f.run(owner("/start"))
+	if last := sent[len(sent)-1]; len(last.keyboard) != 1 || len(last.keyboard[0]) != 1 || last.keyboard[0][0] != keyboardAd.uz {
+		t.Fatalf("the owner's keyboard = %+v", last.keyboard)
+	}
+	sent = f.run(textFrom(userID, "/start"))
+	if last := sent[len(sent)-1]; len(last.keyboard) < 3 {
+		t.Errorf("a member's keyboard = %+v", last.keyboard)
+	}
+
+	sent = f.run(owner(keyboardAd.uz))
+	if last := sent[len(sent)-1]; last.text != textAdPrompt.uz || last.ask == "" {
+		t.Fatalf("the ad button = %+v", last)
+	}
+	question := &telegram.Message{MessageID: 77, From: &telegram.User{ID: botID, IsBot: true}, Text: textAdPrompt.uz}
+	video := owner("")
+	video.Message.Text, video.Message.Caption, video.Message.Video, video.Message.ReplyToMessage = "", "zo'r akk", &telegram.Video{FileID: "v"}, question
+	sent = f.run(video)
+	if last := sent[len(sent)-1]; last.text != textAdOffer.uz || len(last.buttons) != 2 {
+		t.Errorf("the video in reply = %+v", last)
+	}
+	words := owner("rasm keyin")
+	words.Message.ReplyToMessage = question
+	sent = f.run(words)
+	if last := sent[len(sent)-1]; last.text != textAdNeedsMedia.uz || last.ask == "" {
+		t.Errorf("words in reply = %+v", last)
+	}
+	if calls := len(f.replier.recorded()); calls != 0 {
+		t.Errorf("the model was asked %d times", calls)
+	}
+}

@@ -556,7 +556,7 @@ func TestSendPhotoCarriesAKeyboard(t *testing.T) {
 	if _, err := client.SendPhoto(context.Background(), Photo{ChatID: 1, Data: []byte("x"), Keyboard: [][]string{{"❓ Yordam"}}}); err != nil {
 		t.Fatal(err)
 	}
-	if want := `{"keyboard":[[{"text":"❓ Yordam"}]],"is_persistent":true,"resize_keyboard":true}`; markup != want {
+	if want := `{"keyboard":[[{"text":"❓ Yordam"}]],"resize_keyboard":true}`; markup != want {
 		t.Errorf("reply_markup = %s\nwant %s", markup, want)
 	}
 }
@@ -1264,7 +1264,7 @@ func TestSendMessageSendsAKeyboard(t *testing.T) {
 	}
 	sent := api.recorded()[0]
 	markup, _ := json.Marshal(sent.params["reply_markup"])
-	want := `{"is_persistent":true,"keyboard":[[{"text":"😂 Mem"},{"text":"🕐 Soat nechi?"}],[{"text":"❓ Yordam"}]],"resize_keyboard":true}`
+	want := `{"keyboard":[[{"text":"😂 Mem"},{"text":"🕐 Soat nechi?"}],[{"text":"❓ Yordam"}]],"resize_keyboard":true}`
 	if sent.method != "sendMessage" || string(markup) != want {
 		t.Errorf("call %s, reply_markup = %s\nwant %s", sent.method, markup, want)
 	}

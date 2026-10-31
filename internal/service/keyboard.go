@@ -25,6 +25,8 @@ var (
 	keyboardMore    = localText{uz: "📋 Ko'proq", ru: "📋 Ещё", en: "📋 More"}
 	// keyboardHelp is answered as /help.
 	keyboardHelp = localText{uz: "❓ Yordam", ru: "❓ Помощь", en: "❓ Help"}
+	// keyboardAd is the owners' only button: it asks for an ad to post.
+	keyboardAd = localText{uz: "📢 Reklama berish", ru: "📢 Дать рекламу", en: "📢 Post an ad"}
 	// The buttons as an earlier keyboard named them, which a chat keeps
 	// until the keyboard is sent again.
 	keyboardOldDollar  = localText{uz: "💵 Dollar kursi", ru: "💵 Курс доллара", en: "💵 Dollar rate"}
@@ -40,8 +42,12 @@ var keyboardRows = [][]localText{
 	{keyboardHelp},
 }
 
-// keyboard is the keyboard for whoever wrote in, in their language.
+// keyboard is the keyboard for whoever wrote in, in their language; the
+// owners', who post ads and ask the rest in words, has the ad button only.
 func (s *Service) keyboard(in incoming) [][]string {
+	if s.isOwner(in.msg.From) && s.opts.Tools != nil && s.opts.Buttons != nil {
+		return [][]string{{keyboardAd.to(in)}}
+	}
 	var rows [][]string
 	for _, row := range keyboardRows {
 		var labels []string

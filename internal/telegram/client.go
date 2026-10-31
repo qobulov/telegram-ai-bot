@@ -593,10 +593,11 @@ type inlineKeyboard struct {
 }
 
 // replyKeyboard replaces the phone's keyboard with buttons that send their
-// text. It stays until another replaces it, shrunk to fit the buttons.
+// text. It stays until another replaces it, shrunk to fit the buttons; not
+// being persistent, the user can hide it and open it again with the
+// keyboard icon Telegram puts in the message box.
 type replyKeyboard struct {
 	Keyboard       [][]keyboardButton `json:"keyboard"`
-	IsPersistent   bool               `json:"is_persistent"`
 	ResizeKeyboard bool               `json:"resize_keyboard"`
 }
 
@@ -626,7 +627,7 @@ func markup(msg Outgoing) any {
 				rows[i] = append(rows[i], keyboardButton{Text: text})
 			}
 		}
-		return &replyKeyboard{Keyboard: rows, IsPersistent: true, ResizeKeyboard: true}
+		return &replyKeyboard{Keyboard: rows, ResizeKeyboard: true}
 	}
 	return nil
 }

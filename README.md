@@ -641,6 +641,9 @@ the groups, channels and private chats together), up to 200 of the most
 recent, leaving out the owner; a bot may not write first to anyone else.
 Users who blocked the bot are counted, not named.
 
+An owner's keyboard has one button, «📢 Reklama berish»: it asks for the ad,
+opening the reply box, and the photo or video sent in reply is taken as the
+ad whatever its caption (a reply with neither is asked again).
 An owner's photo or video sent to the bot in private with an ad's caption
 (a price, "akk", "sotiladi", a skin…) is taken in code, the model never
 asked: the bot answers with where to post it (the groups, everyone, private
@@ -778,7 +781,8 @@ phone's own, of her common requests, in the language of the user's app
 (`internal/service/keyboard.go`): «💵 Valyuta kursi», «🌤 Ob-havo», «🎮 MLBB»,
 «🎲 Zar tashla», «🕐 Soat nechi?», «📋 Ko'proq» and «❓ Yordam». A meme has no button, which
 the owners took off: it is asked for in words, as before. Telegram keeps it there, shrunk to fit,
-until it is closed. A button sends its own text, in any of its three
+until it is closed; it is not persistent, so the user can hide it and open
+it again with the keyboard icon Telegram shows in the message box. A button sends its own text, in any of its three
 languages, and the buttons that need a value ask for it first
 (`internal/service/keyboardmenu.go`):
 
