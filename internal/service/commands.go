@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"math/rand/v2"
 	"net/http"
 	"slices"
@@ -567,12 +566,13 @@ const overQuotaReaction = "👀"
 // message in a group that already has too many. When the count cannot be
 // read it stays silent, like mayAnswerBot.
 //
-// Owners are not counted, other bots have their own quota, and the
-// commands that manage the bot always pass for those who may use them: they
-// have to work precisely when the group is flooding the bot. So does a
-// group admin's message, past the quota, that replies to another member's:
-// that is how moderation and ignoring are asked for. A message with nothing
-// the bot can read is not counted either: respond sends no answer to it.
+// Owners are not counted; admins are, like anyone, as the owners asked;
+// other bots have their own quota. The commands that manage the bot always
+// pass for those who may use them: they have to work precisely when the
+// group is flooding the bot. So does a group admin's message, past the
+// quota, that replies to another member's: that is how moderation and
+// ignoring are asked for. A message with nothing the bot can read is not
+// counted either: respond sends no answer to it.
 //
 // It also returns the answer taken, to give back if the turn answers
 // nothing; 0 when none was taken.
@@ -596,18 +596,9 @@ func (s *Service) mayAnswerInGroup(in incoming) (reservation int64, allowed bool
 	if ok {
 		return id, true
 	}
-	if s.isAdminAsking(ctx, in) {
-		if repliesToAMember(in, s.opts.Bot.ID) {
-			s.opts.Logger.Info("group reply limit reached, but an admin replied to a member", "chat_id", in.scope.ChatID, "user_id", in.userID)
-			return 0, true
-		}
-		// An admin's answers are not counted against them, only the group's
-		// minute: an admin who spent theirs on a muddled exchange had their
-		// "mute qil" itself go unanswered.
-		quota.PerMember = math.MaxInt32
-		if id, ok, err := s.opts.GroupReplies.ReserveGroupReply(ctx, quota); err == nil && ok {
-			return id, true
-		}
+	if repliesToAMember(in, s.opts.Bot.ID) && s.isAdminAsking(ctx, in) {
+		s.opts.Logger.Info("group reply limit reached, but an admin replied to a member", "chat_id", in.scope.ChatID, "user_id", in.userID)
+		return 0, true
 	}
 	if s.onlyTheyRead(ctx, in) {
 		// Nobody else reads a group of two, so there is nobody to flood; the
