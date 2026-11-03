@@ -1,7 +1,8 @@
-"""Builds graphify-out/explorer.html, a map of the code to explore in a
-browser, from the graph graphify made of the repository (/graphify writes
-graphify-out/graph.json). The page is explorer.html beside this file, with
-the graph written into it; it loads d3 from cdnjs and needs nothing else.
+"""Builds docs/codemap/index.html, a map of the code to explore in a
+browser, from the graph graphify made of the repository (graphify update .
+writes graphify-out/graph.json). The page is explorer.html beside this file,
+with the graph written into it; it loads d3 from cdnjs and needs nothing
+else, so GitHub Pages serves it as it is.
 
 Run it from anywhere: python3 docs/codemap/build.py (or make codemap).
 """
@@ -25,7 +26,7 @@ LAYERS = {
     "tools": ("Tool'lar va tashqi API", ["internal/tools", "internal/webapi", "internal/webapi/internal/genplaces", "internal/webapi/internal/placename", "internal/guards", "internal/gifs", "internal/stickers", "internal/doctext", "internal/doctext/testdata"]),
     "data": ("Saqlash", ["internal/storage"]),
     "telegram": ("Telegram API", ["internal/telegram"]),
-    "games": ("O'yinlar va Mini App", ["internal/game", "internal/dooz", "internal/shashka", "internal/shashkaapp", "internal/miniapp", "public/game", "public/shashka", "public/stats"]),
+    "games": ("O'yinlar va Mini App", ["internal/game", "internal/mafia", "internal/maydon", "internal/raid", "internal/dooz", "internal/shashka", "internal/shashkaapp", "internal/miniapp", "public/game", "public/shashka", "public/stats"]),
     "docs": ("Hujjatlar va g'oyalar", ["(root) README.md", "docs/superpowers/specs", "docs/superpowers/plans"]),
 }
 LAYER_OF = {p: k for k, (_, ps) in LAYERS.items() for p in ps}
@@ -162,6 +163,6 @@ data = {
 }
 blob = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
 html = TEMPLATE.read_text().replace("/*__DATA__*/null", blob)
-(ROOT / "graphify-out/explorer.html").write_text(html)
+TEMPLATE.with_name("index.html").write_text(html)
 print(f"{len(out_nodes)} nodes, {len(edges)} edges, {len(pkgs)} packages, {len(data['links'])} package links, "
       f"{len(html) / 1e6:.2f} MB")

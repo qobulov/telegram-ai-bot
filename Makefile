@@ -38,8 +38,9 @@ check: vet race
 docker:
 	docker build -t telegram-ai-agent .
 
-## codemap: build graphify-out/explorer.html, the code's map, from graphify's graph
+## codemap: rebuild graphify's graph and docs/codemap/index.html, the code's map served on GitHub Pages
 codemap:
+	graphify update .
 	python3 docs/codemap/build.py
 
 clean:

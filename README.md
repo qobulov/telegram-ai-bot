@@ -76,6 +76,67 @@ internal/service                update dispatch: commands, rate limit, worker po
 docs/codemap                    a map of the code to explore in a browser (make codemap, from graphify's graph)
 ```
 
+How the packages use each other; [the code map](https://qobulov.github.io/telegram-ai-bot/codemap/)
+shows every file and function, searchable:
+
+```mermaid
+flowchart TD
+  subgraph entry["Entry points"]
+    api["api/ · Vercel functions<br/>webhook, game, mafia, raid, cleanup"]
+    cmd["cmd/bot · long polling"]
+  end
+
+  app["internal/app<br/>wires everything"]
+
+  subgraph core["Conversation"]
+    service["internal/service<br/>commands, ads, announcements, guards"]
+    agent["internal/agent<br/>model loop, tool calls"]
+    ai["internal/ai<br/>Gemini client"]
+  end
+
+  subgraph abilities["Abilities"]
+    tools["internal/tools<br/>moderate, send_to_groups, leave_chat…"]
+    webapi["internal/webapi<br/>mlbb, weather, currency, football…"]
+    stickers["internal/stickers"]
+  end
+
+  subgraph games["Games & mini apps"]
+    game["internal/game"]
+    mafia["mafia"]
+    maydon["maydon"]
+    raid["raid"]
+    shashka["shashkaapp"]
+    miniapp["miniapp"]
+  end
+
+  subgraph infra["Infrastructure"]
+    telegram["internal/telegram<br/>Bot API client"]
+    storage[("internal/storage<br/>Neon Postgres")]
+  end
+
+  api --> app
+  cmd --> app
+  app --> service
+  app --> games
+  app --> webapi
+  service --> agent
+  agent --> ai
+  agent --> tools
+  webapi --> tools
+  tools --> stickers
+  mafia --> game
+  maydon --> game
+  raid --> game
+  shashka --> miniapp
+  service --> games
+  service --> storage
+  tools --> storage
+  game --> storage
+  service --> telegram
+  tools --> telegram
+  game --> telegram
+```
+
 How one message travels through the bot:
 
 1. `telegram` long-polls `getUpdates` and passes each update to `service`.
