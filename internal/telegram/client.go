@@ -816,6 +816,11 @@ type chatPermissionsParams struct {
 	IndependentPermissions bool            `json:"use_independent_chat_permissions"`
 }
 
+// LeaveChat makes the bot leave a group or a channel.
+func (c *Client) LeaveChat(ctx context.Context, chatID int64) error {
+	return c.call(ctx, "leaveChat", chatParams{ChatID: chatID}, nil)
+}
+
 // SetChatTitle renames a group.
 func (c *Client) SetChatTitle(ctx context.Context, chatID int64, title string) error {
 	return c.call(ctx, "setChatTitle", chatTextParams{ChatID: chatID, Title: title}, nil)

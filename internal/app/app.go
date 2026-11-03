@@ -194,6 +194,10 @@ func (g groupSender) SendToGroup(ctx context.Context, chatID int64, text string)
 	return err
 }
 
+func (g groupSender) LeaveChat(ctx context.Context, chatID int64) error {
+	return g.client.LeaveChat(ctx, chatID)
+}
+
 func (g groupSender) CopyToChat(ctx context.Context, chatID, fromChatID, messageID int64, caption string) error {
 	_, err := g.client.CopyMessage(ctx, chatID, fromChatID, messageID, caption)
 	return err
@@ -466,6 +470,11 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 				Private:  store,
 				Drafts:   store,
 				Sender:   groupSender{client: bot.Client},
+			}),
+			tools.LeaveTool(tools.LeaveOptions{
+				Groups:   store,
+				Channels: store,
+				Telegram: groupSender{client: bot.Client},
 			}),
 			tools.RulesTool(tools.RulesOptions{
 				Store:    store,

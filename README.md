@@ -667,6 +667,13 @@ for the groups, or the private chats too when the words name them, under the
 replied photo or video if any, and the preview comes with Send and Drop
 buttons.
 
+Owners can also have her leave a group or a channel with the owner-only
+`leave_chat` tool: "bu guruhdan chiqib ket" in the group itself, where she
+says goodbye before she goes and writes nothing after, or "X guruhdan
+chiq" from anywhere, for a group she is in or a channel where she is an
+admin (`targets` lists them). The owner's own words must ask her to leave
+(chiq, ket, leave, выйди…), so the model cannot leave on its own.
+
 Groups are recorded when the bot is added, promoted or removed (Telegram's
 `my_chat_member` updates) and from the messages it logs. Telegram has no way
 to list a bot's groups, so a group the bot joined before this, where nobody
