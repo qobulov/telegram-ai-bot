@@ -71,6 +71,15 @@ func patientClient(base *http.Client, userAgent string) *client {
 	return newClient(base, userAgent)
 }
 
+// songClient is newClient for uploading a sound to recognise, waiting
+// songUploadTimeout.
+func songClient(base *http.Client, userAgent string) *client {
+	if base == nil {
+		base = defaultHTTPClient(songUploadTimeout)
+	}
+	return newClient(base, userAgent)
+}
+
 // defaultHTTPClient gives up after timeout, and on headers a second before.
 func defaultHTTPClient(timeout time.Duration) *http.Client {
 	return &http.Client{

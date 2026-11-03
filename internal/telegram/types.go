@@ -291,6 +291,7 @@ type Video struct {
 	FileID    string     `json:"file_id"`
 	Duration  int        `json:"duration"` // seconds
 	Thumbnail *PhotoSize `json:"thumbnail"`
+	FileSize  int64      `json:"file_size"`
 }
 
 // VideoNote is a round video message.
@@ -298,6 +299,7 @@ type VideoNote struct {
 	FileID    string     `json:"file_id"`
 	Duration  int        `json:"duration"` // seconds
 	Thumbnail *PhotoSize `json:"thumbnail"`
+	FileSize  int64      `json:"file_size"`
 }
 
 // Document is a file sent as a file rather than as a photo or video.
@@ -315,6 +317,7 @@ type Audio struct {
 	Duration  int    `json:"duration"` // seconds
 	Title     string `json:"title"`
 	Performer string `json:"performer"`
+	FileSize  int64  `json:"file_size"`
 }
 
 // Poll is a poll someone posted in a chat.

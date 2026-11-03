@@ -250,7 +250,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 	if len(cfg.OwnerUsernames) > 0 && len(cfg.OwnerIDs) == 0 {
 		logger.Warn("BOT_OWNER_IDS is not set: owners are known only by username, which can change hands, so they moderate only with their own admin rights")
 	}
-	available := append(builtinTools(cfg, store, bot, moderation.Tool()), liveDataTools(cfg, bot)...)
+	available := append(builtinTools(cfg, store, bot, moderation.Tool()), liveDataTools(cfg, store, bot)...)
 	available = append(available, moderation.TopicsTool(bot.Client), tools.BotProfileTool(tools.BotProfileOptions{
 		Account: botAccount{Client: bot.Client, id: bot.User.ID},
 		Eyes:    stickerLabeller(cfg, logger),
@@ -554,10 +554,11 @@ func withNewHeroes(cfg config.Config, bot Bot) string {
 }
 
 // liveDataTools look things up on public web APIs: rates, weather, prayer
-// times, news, Wikipedia, crypto, and football when a token is set, and
-// send places as pins on the map. The user agent gives the bot's t.me link
-// as the contact some APIs ask for.
-func liveDataTools(cfg config.Config, bot Bot) []tools.Tool {
+// times, news, Wikipedia, crypto, and football when a token is set, send
+// places as pins on the map, and recognise songs, counted in the database,
+// when a RapidAPI key is set. The user agent gives the bot's t.me link as
+// the contact some APIs ask for.
+func liveDataTools(cfg config.Config, store *storage.Store, bot Bot) []tools.Tool {
 	opts := webapi.Options{
 		UserAgent:       "MariaBot/1.0 (+https://t.me/" + bot.User.Username + ")",
 		Location:        cfg.Location,
@@ -569,6 +570,9 @@ func liveDataTools(cfg config.Config, bot Bot) []tools.Tool {
 		CalendarificKey: cfg.CalendarificAPIKey,
 		ImgflipKey:      cfg.ImgflipAPIKey,
 		Pins:            pinSender{client: bot.Client},
+		ShazamKey:       cfg.RapidAPIKey,
+		Files:           bot.Client,
+		SongQuota:       store,
 	}
 	return webapi.Tools(opts)
 }

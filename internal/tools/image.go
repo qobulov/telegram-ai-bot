@@ -52,6 +52,10 @@ type Caller struct {
 	// its own or the replied one's, for tools that look at it; nil when
 	// there is none.
 	Picture []byte
+	// Sound is the message's voice message, audio, video or round video, or
+	// else the replied one's, for tools that listen to it; nil when there is
+	// none. Only its file is named: it is downloaded when a tool asks.
+	Sound *Sound
 	// Forum is true in a supergroup whose messages are kept in topics.
 	Forum bool
 	// TopicID is the forum topic the request was written in, or else that
@@ -62,6 +66,13 @@ type Caller struct {
 	// owner's Telegram Business account: what the bot sends there goes on
 	// the account's behalf, and ChatID is the customer's chat with it.
 	Business bool
+}
+
+// Sound is a Telegram file with sound in it. Size is zero when Telegram did
+// not say.
+type Sound struct {
+	FileID string
+	Size   int64
 }
 
 // Mention is a member tagged in a message: by @username, or, for a member

@@ -22,6 +22,17 @@ func (s *Store) ReleaseImage(ctx context.Context, id int64) error {
 	return s.releaseDaily(ctx, dailyImages, id)
 }
 
+// ReserveSong takes one of the user's song recognitions for the day, as
+// ReserveImage takes a picture.
+func (s *Store) ReserveSong(ctx context.Context, userID, chatID int64, since time.Time, limit int) (int64, bool, error) {
+	return s.reserveDaily(ctx, dailySongs, userID, chatID, since, limit)
+}
+
+// ReleaseSong gives back a reservation whose song could not be recognised.
+func (s *Store) ReleaseSong(ctx context.Context, id int64) error {
+	return s.releaseDaily(ctx, dailySongs, id)
+}
+
 // dailyKind is a table of things made for users and counted per day, and
 // the salt that keeps its locks apart from others and from the migration
 // lock.
@@ -30,7 +41,10 @@ type dailyKind struct {
 	salt  int64
 }
 
-var dailyImages = dailyKind{table: "image_generations", salt: 0x494d4147} // "IMAG"
+var (
+	dailyImages = dailyKind{table: "image_generations", salt: 0x494d4147} // "IMAG"
+	dailySongs  = dailyKind{table: "song_recognitions", salt: 0x534f4e47} // "SONG"
+)
 
 func (s *Store) reserveDaily(ctx context.Context, kind dailyKind, userID, chatID int64, since time.Time, limit int) (int64, bool, error) {
 	var id int64

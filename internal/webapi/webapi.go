@@ -63,7 +63,14 @@ type Options struct {
 	ImgflipKey string
 	// Pins sends the send_location tool's pins. Without it there is no
 	// send_location tool.
-	Pins     PinSender
+	Pins PinSender
+	// ShazamKey is a RapidAPI key subscribed to the Shazam Song Recognition
+	// API, Files downloads the sound sent to the bot and SongQuota counts
+	// recognitions. Without all three there is no recognize_song tool.
+	ShazamKey string
+	Files     FileFetcher
+	SongQuota SongQuota
+
 	BaseURLs BaseURLs
 }
 
@@ -121,6 +128,7 @@ type BaseURLs struct {
 	JokeAPI           string
 	LaunchLibrary     string
 	OpenDota          string
+	Shazam            string
 	// Wikipedia is a format string with %s for the language code.
 	Wikipedia string
 	// News maps a language (uz, ru), or world- and a language for the
@@ -180,6 +188,7 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.JokeAPI = cmp.Or(b.JokeAPI, "https://v2.jokeapi.dev")
 	b.LaunchLibrary = cmp.Or(b.LaunchLibrary, "https://ll.thespacedevs.com")
 	b.OpenDota = cmp.Or(b.OpenDota, "https://api.opendota.com")
+	b.Shazam = cmp.Or(b.Shazam, "https://shazam-song-recognition-api.p.rapidapi.com")
 	b.Wikipedia = cmp.Or(b.Wikipedia, "https://%s.wikipedia.org")
 	if b.News == nil {
 		b.News = map[string]map[string]string{
@@ -222,6 +231,12 @@ type apis struct {
 	calendarificKey string
 	imgflipKey      string
 	pins            PinSender
+	// songs uploads sounds for recognition, which takes longer than patient
+	// waits.
+	songs     *client
+	shazamKey string
+	files     FileFetcher
+	songQuota SongQuota
 }
 
 // Tools returns the live-data tools. Football is included only when
@@ -272,6 +287,9 @@ func Tools(opts Options) []tools.Tool {
 	if a.pins != nil {
 		list = append(list, a.locationTool())
 	}
+	if a.shazamKey != "" && a.files != nil && a.songQuota != nil {
+		list = append(list, a.songTool())
+	}
 	return list
 }
 
@@ -297,6 +315,10 @@ func newAPIs(opts Options) *apis {
 		calendarificKey: opts.CalendarificKey,
 		imgflipKey:      opts.ImgflipKey,
 		pins:            opts.Pins,
+		songs:           songClient(opts.HTTPClient, cmp.Or(opts.UserAgent, defaultUserAgent)),
+		shazamKey:       opts.ShazamKey,
+		files:           opts.Files,
+		songQuota:       opts.SongQuota,
 	}
 }
 

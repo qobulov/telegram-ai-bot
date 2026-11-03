@@ -1,6 +1,7 @@
 package service
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -1102,6 +1103,7 @@ func (s *Service) caller(in incoming) tools.Caller {
 		Target:    s.target(in.msg.ReplyToMessage),
 		Mentions:  s.mentions(in),
 		Words:     ownWords(in),
+		Sound:     cmp.Or(soundOf(in.msg), soundOf(in.msg.ReplyToMessage)),
 		Forum:     in.msg.Chat.IsForum,
 		TopicID:   topicOf(in.msg),
 	}
