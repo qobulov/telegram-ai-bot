@@ -59,22 +59,22 @@ var (
 )
 
 type mlbbArgs struct {
-	Action   string   `json:"action"`
-	Hero     string   `json:"hero"`
-	Picture  bool     `json:"picture"`
-	Skin     string   `json:"skin"`
-	Lane     string   `json:"lane"`
-	Role     string   `json:"role"`
-	Item     string   `json:"item"`
-	Enemies  []string `json:"enemies"`
-	Allies   []string `json:"allies"`
-	Matches  int      `json:"matches"`
-	WinRate  float64  `json:"win_rate"`
-	Target   float64  `json:"target_win_rate"`
-	PlayerID string   `json:"player_id"`
-	Zone     string   `json:"zone"`
-	Rank     string   `json:"rank"`
-	Sort     string   `json:"sort"`
+	Action   string    `json:"action"`
+	Hero     string    `json:"hero"`
+	Picture  looseBool `json:"picture"`
+	Skin     string    `json:"skin"`
+	Lane     string    `json:"lane"`
+	Role     string    `json:"role"`
+	Item     string    `json:"item"`
+	Enemies  []string  `json:"enemies"`
+	Allies   []string  `json:"allies"`
+	Matches  int       `json:"matches"`
+	WinRate  float64   `json:"win_rate"`
+	Target   float64   `json:"target_win_rate"`
+	PlayerID string    `json:"player_id"`
+	Zone     string    `json:"zone"`
+	Rank     string    `json:"rank"`
+	Sort     string    `json:"sort"`
 }
 
 type mlbbRates struct {
@@ -223,7 +223,7 @@ func (a *apis) mlbbAction(ctx context.Context, args mlbbArgs, rank string) (any,
 	case "heroes":
 		return a.mlbbHeroList(ctx, args.Role, args.Lane)
 	case "hero":
-		return a.mlbbHero(ctx, args.Hero, rank, args.Picture)
+		return a.mlbbHero(ctx, args.Hero, rank, bool(args.Picture))
 	case "build":
 		return a.mlbbBuild(ctx, args.Hero, args.Lane, rank)
 	case "skins":

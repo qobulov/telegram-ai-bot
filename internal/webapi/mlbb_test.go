@@ -747,3 +747,18 @@ func TestNewHeroesNote(t *testing.T) {
 		t.Errorf("without MLBBDex: %q", note)
 	}
 }
+
+// The model now and then quotes a boolean; "true" is taken as true, and
+// anything else than true or false still fails the call.
+func TestLooseBool(t *testing.T) {
+	for raw, want := range map[string]bool{`true`: true, `"true"`: true, `false`: false, `"false"`: false} {
+		var got looseBool
+		if err := json.Unmarshal([]byte(raw), &got); err != nil || bool(got) != want {
+			t.Errorf("%s = %v, %v; want %v", raw, got, err, want)
+		}
+	}
+	var b looseBool
+	if err := json.Unmarshal([]byte(`"yes please"`), &b); err == nil {
+		t.Error(`"yes please" was taken as a boolean`)
+	}
+}

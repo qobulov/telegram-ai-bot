@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"telegram-ai-bot/internal/tools"
@@ -336,6 +338,20 @@ func decodeArgs(raw json.RawMessage, into any) error {
 	if err := decoder.Decode(into); err != nil {
 		return argumentError("arguments do not match the tool's schema: %v", err)
 	}
+	return nil
+}
+
+// looseBool is a boolean argument that also takes "true" and "false" as
+// strings: the model now and then quotes them, and the call should not fail
+// for it.
+type looseBool bool
+
+func (b *looseBool) UnmarshalJSON(data []byte) error {
+	value, err := strconv.ParseBool(strings.Trim(string(data), `"`))
+	if err != nil {
+		return fmt.Errorf("want true or false, not %s", data)
+	}
+	*b = looseBool(value)
 	return nil
 }
 
