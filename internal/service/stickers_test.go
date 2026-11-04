@@ -353,3 +353,23 @@ func TestSongIsSentAfterAnEmptyAnswer(t *testing.T) {
 		t.Errorf("texts %+v, audio %q", sent, audio.sent)
 	}
 }
+
+// A recognised song's preview comes after the answer and leaves it whole:
+// the cover, its caption and the link buttons under them.
+func TestAudioAfterTheAnswerLeavesTheAnswer(t *testing.T) {
+	f := newFixture()
+	audio := &fakeAudioSender{}
+	f.opts.AudioSender = audio
+	f.replier.draws = 1
+	f.replier.buttons = [][]telegram.Button{{{Text: "Deezer", URL: "https://www.deezer.com/track/9"}}}
+	f.replier.audios = []tools.Audio{{Data: []byte("MP3"), Title: "Rondo", Performer: "Kempff", AfterAnswer: true}}
+
+	sent := f.run(textFrom(userID, "which song"))
+
+	if len(sent) != 1 || !sent[0].photo || sent[0].text != "echo: which song" || len(sent[0].buttons) != 1 {
+		t.Errorf("sent = %+v", sent)
+	}
+	if len(audio.sent) != 1 || audio.sent[0] != "Kempff — Rondo MP3" {
+		t.Errorf("audio = %q", audio.sent)
+	}
+}

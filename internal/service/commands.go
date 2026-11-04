@@ -211,7 +211,8 @@ func (s *Service) deliver(in incoming, out *outcome) int64 {
 		out.text, out.drawings, out.sticker, out.gif, out.audios = "", nil, "", "", nil
 		return id
 	}
-	if id := s.sendAudios(in, out.audios); id != 0 {
+	alone, after := audiosByPlace(out.audios)
+	if id := s.sendAudios(in, alone); id != 0 {
 		// A song asked for is the answer alone, as a sticker is: words with
 		// it only say what it is. Only when it cannot be sent do they go.
 		out.text, out.drawings, out.sticker, out.gif = "", nil, "", ""
@@ -220,8 +221,11 @@ func (s *Service) deliver(in incoming, out *outcome) int64 {
 		}
 		return id
 	}
-	out.audios = nil
+	out.audios = after
 	answerID := s.deliverAnswer(in, out)
+	if id := s.sendAudios(in, after); answerID == 0 {
+		answerID = id
+	}
 	if out.invoice {
 		s.sendInvoice(in)
 	}
@@ -229,6 +233,19 @@ func (s *Service) deliver(in incoming, out *outcome) int64 {
 		answerID = id
 	}
 	return answerID
+}
+
+// audiosByPlace parts the sounds that are the answer from those sent after
+// it.
+func audiosByPlace(audios []tools.Audio) (alone, after []tools.Audio) {
+	for _, audio := range audios {
+		if audio.AfterAnswer {
+			after = append(after, audio)
+		} else {
+			alone = append(alone, audio)
+		}
+	}
+	return alone, after
 }
 
 // namedWindow is how far back the group log is searched for the latest
@@ -400,11 +417,12 @@ func (s *Service) deliverAnswer(in incoming, out *outcome) int64 {
 		if i == 0 {
 			text = caption
 		}
+		var buttons [][]telegram.Button
 		var keyboard [][]string
 		if len(out.drawings) == 1 {
-			keyboard = out.keyboard // an album can carry none
+			buttons, keyboard = out.buttons, out.keyboard // an album can carry none
 		}
-		if id := s.replyPictures(in, album, text, keyboard); answerID == 0 {
+		if id := s.replyPictures(in, album, text, buttons, keyboard); answerID == 0 {
 			answerID = id
 		}
 	}
@@ -421,14 +439,14 @@ func albums(drawings []tools.Drawing) [][]tools.Drawing {
 }
 
 // replyPictures sends pictures as one album, or one picture alone, with
-// caption, and returns the ID of the message with the caption. keyboard
-// goes with a picture alone; an album carries none. When
+// caption, and returns the ID of the message with the caption. buttons and
+// keyboard go with a picture alone; an album carries none. When
 // Telegram refuses the album, such as for one picture it cannot read, they
 // go one by one, so that the others still arrive; when it does not answer,
 // the album may be in the chat, and nothing is sent again.
-func (s *Service) replyPictures(in incoming, drawings []tools.Drawing, caption string, keyboard [][]string) int64 {
+func (s *Service) replyPictures(in incoming, drawings []tools.Drawing, caption string, buttons [][]telegram.Button, keyboard [][]string) int64 {
 	if len(drawings) < telegram.MinAlbum {
-		return s.replyPhoto(in, drawings[0], caption, keyboard)
+		return s.replyPhoto(in, drawings[0], caption, buttons, keyboard)
 	}
 	photos := make([][]byte, len(drawings))
 	for i, drawing := range drawings {
@@ -455,14 +473,14 @@ func (s *Service) replyPictures(in incoming, drawings []tools.Drawing, caption s
 		if i == 0 {
 			text = caption
 		}
-		if id := s.replyPhoto(in, drawing, text, nil); firstID == 0 {
+		if id := s.replyPhoto(in, drawing, text, nil, nil); firstID == 0 {
 			firstID = id
 		}
 	}
 	return firstID
 }
 
-func (s *Service) replyPhoto(in incoming, drawing tools.Drawing, caption string, keyboard [][]string) int64 {
+func (s *Service) replyPhoto(in incoming, drawing tools.Drawing, caption string, buttons [][]telegram.Button, keyboard [][]string) int64 {
 	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
 	defer cancel()
 	sentID, err := s.opts.Sender.SendPhoto(ctx, telegram.Photo{
@@ -471,6 +489,7 @@ func (s *Service) replyPhoto(in incoming, drawing tools.Drawing, caption string,
 		Data:                 drawing.Data,
 		Caption:              caption,
 		BusinessConnectionID: in.businessConnectionID(),
+		Buttons:              buttons,
 		Keyboard:             keyboard,
 	})
 	if err != nil {
@@ -859,6 +878,9 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	out.drawings = drawings
 	out.documents = documents
 	out.audios = audios
+	if err == nil {
+		out.buttons = sink.Buttons()
+	}
 	if len(audios) > 0 {
 		out.skipped = ""
 	}

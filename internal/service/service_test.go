@@ -64,7 +64,7 @@ func (f *fakeSender) SendPhoto(ctx context.Context, photo telegram.Photo) (int64
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.sent = append(f.sent, sentMessage{chatID: photo.ChatID, text: photo.Caption, replyTo: photo.ReplyToMessageID, photo: true, business: photo.BusinessConnectionID, keyboard: photo.Keyboard})
+	f.sent = append(f.sent, sentMessage{chatID: photo.ChatID, text: photo.Caption, replyTo: photo.ReplyToMessageID, photo: true, business: photo.BusinessConnectionID, keyboard: photo.Keyboard, buttons: photo.Buttons})
 	return int64(1000 + len(f.sent)), nil
 }
 
@@ -107,6 +107,8 @@ type fakeReplier struct {
 	// audios the sounds it finds, as the music tool would.
 	draws  int
 	audios []tools.Audio
+	// buttons are the link buttons it sets under the answer.
+	buttons [][]telegram.Button
 	// documents are files it makes, as a tool may.
 	documents []tools.Document
 	// answer replaces the echo when set.
@@ -147,6 +149,9 @@ func (f *fakeReplier) Reply(ctx context.Context, req agent.Request) (agent.Answe
 		call.hadSink = true
 		for range f.draws {
 			sink.Add(tools.Drawing{Data: []byte("PNG"), MimeType: "image/png"})
+		}
+		if f.buttons != nil {
+			sink.SetButtons(f.buttons)
 		}
 		for _, a := range f.audios {
 			sink.AddAudio(a)

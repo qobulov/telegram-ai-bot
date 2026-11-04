@@ -415,7 +415,7 @@ func (s *Service) sendSkin(ctx context.Context, in incoming, choice string) {
 		s.send(in, telegram.Outgoing{Text: caption + "\n" + textNoSkinPicture.to(in), Keyboard: s.keyboard(in)})
 		return
 	}
-	s.replyPhoto(in, pictures[0], caption, s.keyboard(in))
+	s.replyPhoto(in, pictures[0], caption, nil, s.keyboard(in))
 }
 
 // nonEmpty is texts without the empty ones.

@@ -252,8 +252,10 @@ type Photo struct {
 	// BusinessConnectionID, when set, sends it on behalf of that
 	// connection's business account.
 	BusinessConnectionID string
+	// Buttons are link buttons under the picture.
+	Buttons [][]Button
 	// Keyboard, in a private chat, puts the keyboard back with the picture,
-	// as Outgoing's does.
+	// as Outgoing's does. A picture has Buttons or Keyboard, not both.
 	Keyboard [][]string
 }
 
@@ -273,8 +275,8 @@ func (c *Client) SendPhoto(ctx context.Context, photo Photo) (int64, error) {
 		}
 	}
 	fields["business_connection_id"] = photo.BusinessConnectionID // left out when ""
-	if len(photo.Keyboard) > 0 {
-		encoded, err := json.Marshal(markup(Outgoing{Keyboard: photo.Keyboard}))
+	if len(photo.Buttons)+len(photo.Keyboard) > 0 {
+		encoded, err := json.Marshal(markup(Outgoing{Buttons: photo.Buttons, Keyboard: photo.Keyboard}))
 		if err != nil {
 			return 0, fmt.Errorf("telegram sendPhoto: encode: %w", err)
 		}

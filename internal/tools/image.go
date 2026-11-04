@@ -124,6 +124,9 @@ type Drawing struct {
 type Audio struct {
 	Data             []byte
 	Title, Performer string
+	// AfterAnswer sends it after the answer, which is then sent too; else
+	// it is the answer, sent alone.
+	AfterAnswer bool
 }
 
 // Document is a file a tool made during a turn, such as a document,
@@ -142,6 +145,21 @@ type Sink struct {
 	audios    []Audio
 	documents []Document
 	final     string
+	buttons   [][]telegram.Button
+}
+
+// SetButtons keeps link buttons to go under the answer.
+func (s *Sink) SetButtons(buttons [][]telegram.Button) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.buttons = buttons
+}
+
+// Buttons returns the link buttons a tool set for the answer.
+func (s *Sink) Buttons() [][]telegram.Button {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buttons
 }
 
 // AddDocument keeps a file to send as the answer.

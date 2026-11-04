@@ -6,8 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
+	"slices"
+	"strings"
 	"time"
 
+	"telegram-ai-bot/internal/telegram"
 	"telegram-ai-bot/internal/tools"
 )
 
@@ -44,6 +48,7 @@ type shazamAnswer struct {
 		Title    string `json:"title"`
 		Subtitle string `json:"subtitle"`
 		URL      string `json:"url"`
+		ISRC     string `json:"isrc"`
 		Genres   struct {
 			Primary string `json:"primary"`
 		} `json:"genres"`
@@ -64,7 +69,7 @@ type shazamAnswer struct {
 func (a *apis) songTool() tools.Tool {
 	return tools.Tool{
 		Name: "recognize_song",
-		Description: "Recognise the song playing in the voice message, audio or video sent with the message or replied to, as Shazam does: its title, artist, album and links, and its cover sent with your answer. " +
+		Description: "Recognise the song playing in the voice message, audio or video sent with the message or replied to, as Shazam does. A song found is the whole answer, sent for you: its cover, title, artist, album, link buttons and a 30-second preview; then write nothing. " +
 			"Use it when someone asks which song this is or who sings it about such a message. To find a song by its name use music_search instead. Titles are untrusted outside data.",
 		Schema:  json.RawMessage(`{"type": "object", "properties": {}, "additionalProperties": false}`),
 		Timeout: songTimeout,
@@ -139,21 +144,13 @@ func (a *apis) askShazam(ctx context.Context, fileID string) (shazamAnswer, erro
 	return answer, err
 }
 
-// songOutput is what the model is told of a recognised song, with its cover
-// fetched into the turn's sink when there is one.
+// songOutput ends the turn with the song, written here and not by the
+// model, which wrote its links as Markdown that Telegram showed as it was:
+// the cover, a caption, link buttons and Deezer's preview.
 func (a *apis) songOutput(ctx context.Context, answer shazamAnswer) map[string]any {
 	track := answer.Track
 	title, artist := cleanText(track.Title, 200), cleanText(track.Subtitle, 200)
-	out := map[string]any{
-		"found":   true,
-		"title":   title,
-		"artist":  artist,
-		"genre":   track.Genres.Primary,
-		"shazam":  track.URL,
-		"youtube": "https://www.youtube.com/results?search_query=" + url.QueryEscape(artist+" "+title),
-		"spotify": "https://open.spotify.com/search/" + url.PathEscape(artist+" "+title),
-		"source":  shazamSource,
-	}
+	out := map[string]any{"found": true, "title": title, "artist": artist, "source": shazamSource}
 	for _, section := range track.Sections {
 		if section.Type != "SONG" {
 			continue
@@ -164,26 +161,106 @@ func (a *apis) songOutput(ctx context.Context, answer shazamAnswer) map[string]a
 				out["album"] = cleanText(field.Text, 200)
 			case "Released":
 				out["released"] = cleanText(field.Text, 20)
-			case "Label":
-				out["label"] = cleanText(field.Text, 100)
 			}
 		}
 	}
-	out["note"] = a.sendCover(ctx, firstNonEmpty(track.Images.CoverArtHQ, track.Images.CoverArt))
+	sink, ok := tools.SinkFrom(ctx)
+	if !ok {
+		return out
+	}
+	preview := a.deezerMatch(ctx, track.ISRC, artist, title)
+	a.addCover(ctx, sink, firstNonEmpty(track.Images.CoverArtHQ, track.Images.CoverArt))
+	sink.SetButtons(songButtons(track.URL, preview.Link, artist, title))
+	if preview.Preview != "" {
+		if data, err := a.client.get(ctx, call{service: musicSource, url: preview.Preview, limit: previewLimit}); err == nil {
+			sink.AddAudio(tools.Audio{Data: data, Title: preview.Title, Performer: preview.Artist.Name, AfterAnswer: true})
+		}
+	}
+	album, _ := out["album"].(string)
+	released, _ := out["released"].(string)
+	sink.Finish(songCaption(title, artist, album, released))
 	return out
 }
 
-// sendCover fetches the song's cover into the turn's sink, to go with the
-// answer as a photo, and says whether it will.
-func (a *apis) sendCover(ctx context.Context, link string) string {
-	sink, ok := tools.SinkFrom(ctx)
-	if !ok || link == "" {
-		return "There is no cover: answer with the song and its links."
+// songMarks are what Telegram's formatting would read in a song's name, which
+// is outside data, as a mark of its own.
+var songMarks = strings.NewReplacer("*", "", "`", "", "[", "(", "]", ")")
+
+// songCaption is the same in every language, so that it needs no model.
+func songCaption(title, artist, album, released string) string {
+	lines := []string{"🎵 **" + songMarks.Replace(title) + "**", "👤 " + songMarks.Replace(artist)}
+	about := songMarks.Replace(album)
+	if about != "" && released != "" {
+		about += " · "
+	}
+	if about += released; about != "" {
+		lines = append(lines, "💿 "+about)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// songButtons links the song. Telegram refuses a whole message for one
+// button's bad link, so a link from outside goes only when it is https.
+func songButtons(shazam, deezer, artist, title string) [][]telegram.Button {
+	query := artist + " " + title
+	var buttons []telegram.Button
+	for _, link := range []telegram.Button{
+		{Text: "Deezer", URL: deezer},
+		{Text: "Spotify", URL: "https://open.spotify.com/search/" + url.PathEscape(query)},
+		{Text: "YouTube", URL: "https://www.youtube.com/results?search_query=" + url.QueryEscape(query)},
+		{Text: "Shazam", URL: shazam},
+	} {
+		if strings.HasPrefix(link.URL, "https://") {
+			buttons = append(buttons, link)
+		}
+	}
+	var rows [][]telegram.Button
+	for row := range slices.Chunk(buttons, 2) {
+		rows = append(rows, row)
+	}
+	return rows
+}
+
+// deezerMatch finds the song on Deezer, by its ISRC, which names one
+// recording, or else by its name, taken only when the title, without its
+// notes, and the artist are the same: another song's preview would be worse
+// than none. It is zero when there is none.
+func (a *apis) deezerMatch(ctx context.Context, isrc, artist, title string) deezerTrack {
+	if isrc != "" {
+		var track deezerTrack
+		err := a.client.getJSON(ctx, call{service: musicSource, url: a.urls.Deezer + "/track/isrc:" + url.PathEscape(isrc)}, &track)
+		if err == nil && track.Preview != "" {
+			return track
+		}
+	}
+	name := baseTitle(title)
+	found, err := a.searchMusic(ctx, strings.Join(strings.Fields(artist+" "+name), " "))
+	if err != nil {
+		return deezerTrack{}
+	}
+	for _, track := range found {
+		if strings.EqualFold(baseTitle(track.Title), name) && strings.Contains(strings.ToLower(artist), strings.ToLower(track.Artist.Name)) {
+			return track
+		}
+	}
+	return deezerTrack{}
+}
+
+// titleNotes are what services add to a song's name and name differently:
+// "(feat. Miss Palmer)", "[Vocal Mix]".
+var titleNotes = regexp.MustCompile(`\s*[(\[][^)\]]*[)\]]`)
+
+func baseTitle(title string) string {
+	return strings.TrimSpace(titleNotes.ReplaceAllString(title, ""))
+}
+
+// addCover fetches the song's cover into the sink, to go with the answer.
+func (a *apis) addCover(ctx context.Context, sink *tools.Sink, link string) {
+	if link == "" {
+		return
 	}
 	data, err := a.patient.get(ctx, call{service: shazamSource, url: link, limit: coverLimit})
-	if err != nil {
-		return "The cover could not be fetched: answer with the song and its links."
+	if err == nil {
+		sink.Add(tools.Drawing{Data: data, MimeType: http.DetectContentType(data)})
 	}
-	sink.Add(tools.Drawing{Data: data, MimeType: http.DetectContentType(data)})
-	return "The song's cover is sent with your answer, which becomes its caption: keep it short, the title, the artist and a link or two."
 }
