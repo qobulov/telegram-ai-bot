@@ -58,6 +58,19 @@ func TestSetGameScoreSendsExactParams(t *testing.T) {
 	}
 }
 
+// A forced score is sent with force, which lets it be lower than the one
+// there.
+func TestForceGameScoreSendsForce(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":true}`)
+	changed, err := client.ForceGameScore(context.Background(), GameMessage{UserID: 42, ChatID: -1, MessageID: 2}, 9)
+	if err != nil || !changed {
+		t.Fatalf("ForceGameScore = %v, %v", changed, err)
+	}
+	if sent := api.recorded()[0]; sent.method != "setGameScore" || sent.params["force"] != true || sent.params["score"] != float64(9) {
+		t.Errorf("call = %+v", sent)
+	}
+}
+
 // A score no better than the player's best is no error: Telegram keeps the
 // best.
 func TestSetGameScoreNotBetterIsNoError(t *testing.T) {

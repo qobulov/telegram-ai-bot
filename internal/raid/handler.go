@@ -44,7 +44,10 @@ type Store interface {
 // Telegram sets a member's score on their game message, and tells a
 // group its boss was killed.
 type Telegram interface {
-	SetGameScore(ctx context.Context, game telegram.GameMessage, score int) (improved bool, err error)
+	// ForceGameScore sets a score lower than the one there too: a total
+	// only grows unless a recalculation corrected it, as migration 54 did
+	// to totals Telegram's tables still showed.
+	ForceGameScore(ctx context.Context, game telegram.GameMessage, score int) (changed bool, err error)
 	SendMessage(ctx context.Context, msg telegram.Outgoing) (int64, error)
 }
 
@@ -187,7 +190,7 @@ func (h *handler) hit(ctx context.Context, p game.Player, taps int, solo bool) (
 	}
 	if hit.ScoreDue && chatID == chatOf(p) {
 		score := int(min(hit.Member.Total, math.MaxInt32))
-		if _, err := h.Telegram.SetGameScore(ctx, message(p), score); err != nil {
+		if _, err := h.Telegram.ForceGameScore(ctx, message(p), score); err != nil {
 			h.Logger.Warn("could not set a raid score", "user_id", p.UserID, "error", err)
 		}
 	}

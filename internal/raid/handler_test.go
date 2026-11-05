@@ -62,7 +62,7 @@ type fakeTelegram struct {
 	sent   []telegram.Outgoing
 }
 
-func (f *fakeTelegram) SetGameScore(_ context.Context, _ telegram.GameMessage, score int) (bool, error) {
+func (f *fakeTelegram) ForceGameScore(_ context.Context, _ telegram.GameMessage, score int) (bool, error) {
 	f.scores = append(f.scores, score)
 	return true, nil
 }

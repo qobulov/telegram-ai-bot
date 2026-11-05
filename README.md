@@ -2002,7 +2002,10 @@ hero, its coins, upgrades, skills and quests are the same in both.
 Migration 54 recalculated the game once, as the owners asked: totals no
 sword could reach set to what the taps do on average, every boss set back
 to the level its active members can kill, and the coins of the player paid
-most while kills paid a fourth of a level cut to a tenth of one.
+most while kills paid a fourth of a level cut to a tenth of one. Telegram's
+tables under the games' messages keep a score unless it is forced, so Dev
+jangi sets its scores with force: a corrected total takes the old one's
+place on a message the next time its player hits from it.
 
 Two skills: 💪 Kuch, the buff, makes blows three times as strong for 12
 seconds (every 50), and ⚡ Ulti, the ultimate, is charged by 300 taps and makes

@@ -49,7 +49,8 @@ type GameMessage struct {
 
 type setGameScoreParams struct {
 	GameMessage
-	Score int `json:"score"`
+	Score int  `json:"score"`
+	Force bool `json:"force,omitempty"`
 }
 
 // SetGameScore records a player's score on a game message, which Telegram
@@ -57,6 +58,18 @@ type setGameScoreParams struct {
 // out, and reported as improved false rather than as an error.
 func (c *Client) SetGameScore(ctx context.Context, game GameMessage, score int) (improved bool, err error) {
 	err = c.call(ctx, "setGameScore", setGameScoreParams{GameMessage: game, Score: score}, nil)
+	var refused *APIError
+	if errors.As(err, &refused) && strings.Contains(refused.Description, "BOT_SCORE_NOT_MODIFIED") {
+		return false, nil
+	}
+	return err == nil, err
+}
+
+// ForceGameScore sets a player's score on a game message even when it is
+// lower than the one there: for a score that only grows unless it was
+// corrected, such as Dev jangi's damage in all.
+func (c *Client) ForceGameScore(ctx context.Context, game GameMessage, score int) (changed bool, err error) {
+	err = c.call(ctx, "setGameScore", setGameScoreParams{GameMessage: game, Score: score, Force: true}, nil)
 	var refused *APIError
 	if errors.As(err, &refused) && strings.Contains(refused.Description, "BOT_SCORE_NOT_MODIFIED") {
 		return false, nil
