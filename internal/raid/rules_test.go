@@ -214,17 +214,17 @@ func TestDailyStreak(t *testing.T) {
 	}
 }
 
-// A kill is worth a part of the hitter's sword's next level, 5% for being
-// there and up to 20% more for the whole boss, so that a strong sword is not
-// left with a five-hundredth of a level a kill; a weak one keeps what the
-// boss's level gave.
+// A kill is worth a part of the hitter's sword's next level, 1% for being
+// there and up to 5% more for the whole boss, so that a strong sword is not
+// left with a five-hundredth of a level a kill, nor buys one with every
+// chief; a weak one keeps what the boss's level gave.
 func TestRewardFollowsTheSword(t *testing.T) {
 	next := Cost("sword", 22)
-	if got := Reward(42, 0, 100, 22); got != int64(math.Round(float64(next)*0.05)) {
-		t.Errorf("being there = %d; want 5%% of %d", got, next)
+	if got := Reward(41, 0, 100, 22); got != int64(math.Round(float64(next)*0.01)) {
+		t.Errorf("being there = %d; want 1%% of %d", got, next)
 	}
-	if got := Reward(42, 100, 100, 22); got != int64(math.Round(float64(next)*0.25)) {
-		t.Errorf("the whole boss = %d; want 25%% of %d", got, next)
+	if got := Reward(41, 100, 100, 22); got != int64(math.Round(float64(next)*0.06)) {
+		t.Errorf("the whole boss = %d; want 6%% of %d", got, next)
 	}
 	if got, old := Reward(42, 50, 100, 1), int64(20*42+100*42/2); got != old {
 		t.Errorf("a first sword = %d; want the level's %d", got, old)

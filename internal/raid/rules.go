@@ -152,10 +152,13 @@ func Reward(level int, damage, maxHP int64, sword int) int64 {
 }
 
 // rewardFloor is the part of their sword's next level everyone who hit a
-// killed boss gets, and rewardShare the most more for their share of it.
+// killed boss gets, and rewardShare the most more for their share of it: a
+// boss killed alone is 6% of a level, about seventeen for one. They were 5%
+// and 20% until the strongest player bought a level with nearly every
+// chief.
 const (
-	rewardFloor = 0.05
-	rewardShare = 0.20
+	rewardFloor = 0.01
+	rewardShare = 0.05
 )
 
 // titles are the damage in all that earns each title, from Yangi jangchi

@@ -1949,7 +1949,7 @@ damage. The page shows each blow's number at once, the members who fight
 this boss standing by the player with their names, each swinging as their
 blows come in, and the chat's table of damage on this boss.
 The hit that takes the last HP kills it: everyone who hit it gets coins,
-5% of their own sword's next level for being there and up to 20% more for
+1% of their own sword's next level for being there and up to 5% more for
 their share, never less than the boss's level alone gave, so that a few
 kills buy a level however far a player is, the bot tells the group who
 hit it most (in a private chat the player fights alone), and the next
