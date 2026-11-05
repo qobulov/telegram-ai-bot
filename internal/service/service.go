@@ -248,8 +248,16 @@ type Options struct {
 	// Telegram Stars for PremiumDays days of PremiumDailyLimit answers a
 	// day; see premium.go. With either nil, or a price of 0, none is sold,
 	// though premium bought before still counts while Premium is set.
-	Payments          Payments
-	Premium           PremiumBook
+	Payments Payments
+	Premium  PremiumBook
+	// Cards keeps Kartalar, the anime card collection (/karta, /kartalarim,
+	// /kartatop), whose catalog comes from AniList at CardsAPI, empty for
+	// AniList's own address. Nil turns it off.
+	Cards    CardBook
+	CardsAPI string
+	// CardsURL is the page of Kartalar's Mini App, which /kartalar and the
+	// collection's button open; "" for none.
+	CardsURL          string
 	PremiumPrice      int
 	PremiumDays       int
 	PremiumDailyLimit int

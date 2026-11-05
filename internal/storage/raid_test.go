@@ -196,7 +196,7 @@ func TestChangeRaidHero(t *testing.T) {
 	at := time.Now().Truncate(time.Second)
 	day := testRaidRules.Day(at)
 	hero, err := store.ChangeRaidHero(ctx, alice, 9, func(h *RaidHero) error {
-		h.StormUntil, h.FireLeft, h.FireReady = at, 7, at.Add(time.Minute)
+		h.BuffUntil, h.BuffReady, h.UltCharge, h.UltArmed = at, at.Add(time.Minute), 7, true
 		h.QuestDay, h.QuestSkills, h.QuestClaimed, h.Streak, h.StreakDay = day, 2, 5, 3, day
 		h.Coins = 40
 		return nil
@@ -209,7 +209,7 @@ func TestChangeRaidHero(t *testing.T) {
 		t.Fatalf("a refused change = %v", err)
 	}
 	_, saved, _, _, _ := store.RaidState(ctx, raidChat, alice, testRaidRules, 9, 5)
-	if !saved.StormUntil.Equal(at) || saved.FireLeft != 7 || !saved.FireReady.Equal(at.Add(time.Minute)) || saved.Coins != 40 ||
+	if !saved.BuffUntil.Equal(at) || !saved.BuffReady.Equal(at.Add(time.Minute)) || saved.UltCharge != 7 || !saved.UltArmed || saved.Coins != 40 ||
 		!saved.QuestDay.Equal(day) || saved.QuestSkills != 2 || saved.QuestClaimed != 5 || saved.Streak != 3 || !saved.StreakDay.Equal(day) {
 		t.Errorf("saved %+v, changed %+v", saved, hero)
 	}

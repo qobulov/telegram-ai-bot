@@ -231,14 +231,18 @@ func TestSkillsQuestsAndTheDailyGift(t *testing.T) {
 	if _, out := f.post(t, map[string]any{"session": session, "action": "state"}); out["gift"] != 0.0 {
 		t.Errorf("the second visit brought a gift of %v", out["gift"])
 	}
-	code, out = f.post(t, map[string]any{"session": session, "action": "skill", "skill": "storm"})
+	code, out = f.post(t, map[string]any{"session": session, "action": "skill", "skill": "buff"})
 	skills, _ := out["hero"].(map[string]any)["skills"].(map[string]any)
-	storm, _ := skills["storm"].(map[string]any)
-	if code != http.StatusOK || storm["active_for"].(float64) <= 0 || storm["ready_in"].(float64) <= 0 {
-		t.Fatalf("the storm: %d %v", code, out)
+	buff, _ := skills["buff"].(map[string]any)
+	ult, _ := skills["ult"].(map[string]any)
+	if code != http.StatusOK || buff["active_for"].(float64) <= 0 || buff["ready_in"].(float64) <= 0 || ult["need"] != 300.0 || ult["armed"] != false {
+		t.Fatalf("Kuch: %d %v", code, out)
 	}
-	if code, out := f.post(t, map[string]any{"session": session, "action": "skill", "skill": "storm"}); code != http.StatusConflict || out["error"] != "cooldown" {
-		t.Errorf("the storm again: %d %v", code, out)
+	if code, out := f.post(t, map[string]any{"session": session, "action": "skill", "skill": "buff"}); code != http.StatusConflict || out["error"] != "cooldown" {
+		t.Errorf("Kuch again: %d %v", code, out)
+	}
+	if code, out := f.post(t, map[string]any{"session": session, "action": "skill", "skill": "ult"}); code != http.StatusConflict || out["error"] != "cooldown" {
+		t.Errorf("Ulti uncharged: %d %v", code, out)
 	}
 	if code, out := f.post(t, map[string]any{"session": session, "action": "upgrade", "item": "helper"}); code != http.StatusBadRequest {
 		t.Errorf("an upgrade there is no more: %d %v", code, out)

@@ -15,6 +15,9 @@
     "api/stats.go": {
       "maxDuration": 15
     },
+    "api/cards.go": {
+      "maxDuration": 30
+    },
     "api/game.go": {
       "maxDuration": 15
     },

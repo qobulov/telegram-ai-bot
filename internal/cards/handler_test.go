@@ -1,0 +1,139 @@
+package cards
+
+import (
+	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"sort"
+	"strings"
+	"testing"
+	"time"
+
+	"telegram-ai-bot/internal/storage"
+)
+
+const testToken = "123:test-token"
+
+// signedInit is init data for user signed as Telegram signs it.
+func signedInit(user int64, at time.Time) string {
+	values := url.Values{"user": {fmt.Sprintf(`{"id":%d,"first_name":"Bek"}`, user)}, "auth_date": {fmt.Sprint(at.Unix())}}
+	keys := make([]string, 0, len(values))
+	for k := range values {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	lines := make([]string, len(keys))
+	for i, k := range keys {
+		lines[i] = k + "=" + values.Get(k)
+	}
+	secret := hmac.New(sha256.New, []byte("WebAppData"))
+	secret.Write([]byte(testToken))
+	mac := hmac.New(sha256.New, secret.Sum(nil))
+	mac.Write([]byte(strings.Join(lines, "\n")))
+	values.Set("hash", hex.EncodeToString(mac.Sum(nil)))
+	return values.Encode()
+}
+
+// fakeStore has two cards; the player holds the first.
+type fakeStore struct {
+	last  time.Time
+	draws int
+}
+
+var (
+	heldCard   = storage.Card{ID: 1, Name: "Gojo", Anime: "JJK", ImageURL: "https://img/1.png", Rarity: 4, Attack: 5000, Health: 18000, Value: 5000}
+	lockedCard = storage.Card{ID: 2, Name: "Levi", Anime: "AoT", ImageURL: "https://img/2.png", Rarity: 0, Value: 100}
+)
+
+func (f *fakeStore) CardCatalogSize(context.Context) (int, error)          { return CatalogSize, nil }
+func (f *fakeStore) SaveCardCatalog(context.Context, []storage.Card) error { return nil }
+func (f *fakeStore) CardCatalog(context.Context) ([]storage.Card, error) {
+	return []storage.Card{heldCard, lockedCard}, nil
+}
+func (f *fakeStore) OwnedCards(context.Context, int64, int) ([]storage.OwnedCard, error) {
+	return []storage.OwnedCard{{Card: heldCard, Count: 2}}, nil
+}
+func (f *fakeStore) CardPlayerOf(context.Context, int64) (storage.CardPlayer, time.Time, error) {
+	return storage.CardPlayer{Points: 10000, Cards: 1}, f.last, nil
+}
+func (f *fakeStore) CardTop(context.Context, int) ([]storage.CardPlayer, error) {
+	return []storage.CardPlayer{{UserID: 7, Name: "Bek", Points: 10000, Cards: 1}}, nil
+}
+func (f *fakeStore) DrawCard(_ context.Context, _ int64, _ string, _ int, every time.Duration, now time.Time) (storage.CardDraw, error) {
+	if !f.last.IsZero() && now.Sub(f.last) < every {
+		return storage.CardDraw{}, &storage.CardWaitError{Wait: every - now.Sub(f.last)}
+	}
+	f.last, f.draws = now, f.draws+1
+	return storage.CardDraw{Card: heldCard, Count: 3, Points: 15000}, nil
+}
+
+func post(t *testing.T, h http.Handler, initData, action string) (int, map[string]any) {
+	t.Helper()
+	body, _ := json.Marshal(map[string]string{"init_data": initData, "action": action})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/cards", strings.NewReader(string(body))))
+	var out map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &out)
+	return rec.Code, out
+}
+
+// Init data not signed with the bot's token, or a day old, opens nothing.
+func TestCardsAppWantsSignedInitData(t *testing.T) {
+	now := time.Now()
+	h := NewHandler(Options{BotToken: testToken, Store: &fakeStore{}, Now: func() time.Time { return now }})
+	if code, out := post(t, h, strings.Replace(signedInit(7, now), "Bek", "Bob", 1), "state"); code != http.StatusUnauthorized || out["error"] != "forged" {
+		t.Errorf("forged = %d %v", code, out)
+	}
+	if code, out := post(t, h, signedInit(7, now.Add(-25*time.Hour)), "state"); code != http.StatusUnauthorized || out["error"] != "stale" {
+		t.Errorf("stale = %d %v", code, out)
+	}
+	if code, _ := post(t, h, signedInit(7, now), "steal"); code != http.StatusBadRequest {
+		t.Errorf("an unknown action = %d", code)
+	}
+}
+
+// The state names only the cards held: one not held is its rarity alone.
+func TestCardsAppHidesCardsNotHeld(t *testing.T) {
+	now := time.Now()
+	store := &fakeStore{last: now.Add(-20 * time.Minute)}
+	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }})
+	code, out := post(t, h, signedInit(7, now), "state")
+	views, _ := out["cards"].([]any)
+	if code != http.StatusOK || len(views) != 2 || out["held"] != 1.0 || out["points"] != 10000.0 || out["next_in"] != float64((40*time.Minute).Milliseconds()) {
+		t.Fatalf("state = %d %v", code, out)
+	}
+	held, locked := views[0].(map[string]any), views[1].(map[string]any)
+	if held["name"] != "Gojo" || held["image"] != "https://img/1.png" || held["count"] != 2.0 {
+		t.Errorf("held = %v", held)
+	}
+	if _, named := locked["name"]; named || locked["image"] != nil || locked["rarity"] != 0.0 {
+		t.Errorf("a card not held shows %v", locked)
+	}
+}
+
+// A player draws once an hour; an owner whenever they like.
+func TestCardsAppDrawsOnceAnHour(t *testing.T) {
+	now := time.Now()
+	store := &fakeStore{}
+	h := NewHandler(Options{BotToken: testToken, Store: store, Owners: map[int64]bool{1: true}, Now: func() time.Time { return now }, Roll: func() Rarity { return Mythic }})
+	code, out := post(t, h, signedInit(7, now), "draw")
+	card, _ := out["card"].(map[string]any)
+	if code != http.StatusOK || card["name"] != "Gojo" || out["points"] != 15000.0 || out["next_in"] != float64(Every.Milliseconds()) {
+		t.Fatalf("draw = %d %v", code, out)
+	}
+	if _, out := post(t, h, signedInit(7, now), "draw"); out["wait"] != float64(Every.Milliseconds()) {
+		t.Errorf("a second draw = %v", out)
+	}
+	if code, out := post(t, h, signedInit(1, now), "draw"); code != http.StatusOK || out["card"] == nil || store.draws != 2 {
+		t.Errorf("an owner's draw = %d %v", code, out)
+	}
+	if _, out := post(t, h, signedInit(7, now), "top"); len(out["top"].([]any)) != 1 || out["top"].([]any)[0].(map[string]any)["me"] != true {
+		t.Errorf("top = %v", out)
+	}
+}

@@ -136,6 +136,14 @@ var stats = &lazy{name: "stats", build: func(ctx context.Context, cfg config.Con
 	return endpoint.Handler, endpoint.Close, nil
 }}
 
+var cardApps = &lazy{name: "cards", build: func(ctx context.Context, cfg config.Config, logger *slog.Logger) (http.Handler, func(), error) {
+	endpoint, err := app.NewCards(ctx, cfg, logger)
+	if err != nil {
+		return nil, nil, err
+	}
+	return endpoint.Handler, endpoint.Close, nil
+}}
+
 var games = &lazy{name: "game", build: func(ctx context.Context, cfg config.Config, logger *slog.Logger) (http.Handler, func(), error) {
 	endpoint, err := app.NewGame(ctx, cfg, logger)
 	if err != nil {
@@ -187,6 +195,9 @@ func Raid(w http.ResponseWriter, r *http.Request) { raids.serve(w, r) }
 
 // Shashka answers the draughts Mini App.
 func Shashka(w http.ResponseWriter, r *http.Request) { shashkas.serve(w, r) }
+
+// Cards answers the Kartalar Mini App.
+func Cards(w http.ResponseWriter, r *http.Request) { cardApps.serve(w, r) }
 
 // Stats answers the group dashboard Mini App.
 func Stats(w http.ResponseWriter, r *http.Request) { stats.serve(w, r) }

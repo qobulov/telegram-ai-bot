@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Russo+One&display=swap" rel="stylesheet">
   <script src="https://telegram.org/js/games.js" defer></script>
-  <link rel="stylesheet" href="boss.css?v=3">
+  <link rel="stylesheet" href="boss.css?v=4">
 </head>
 <body>
   <canvas id="scene" aria-hidden="true"></canvas>
@@ -35,6 +35,11 @@
 
     <p class="message" id="message" aria-live="polite"></p>
 
+
+    <section class="skills">
+      <button type="button" class="skill" data-skill="buff"><span class="ring"></span><span class="icon">💪</span><b data-t="buff"></b><small id="buffInfo"></small></button>
+      <button type="button" class="skill" data-skill="ult"><span class="ring"></span><span class="icon">⚡</span><b data-t="ult"></b><small id="ultInfo"></small></button>
+    </section>
 
     <section class="upgrades">
       <button type="button" class="card" data-item="sword">
@@ -66,8 +71,8 @@
       </div>
     </section>
   </main>
-  <script src="crit.js?v=3"></script>
-  <script src="skins.js?v=3"></script>
-  <script src="boss.js?v=3"></script>
+  <script src="crit.js?v=4"></script>
+  <script src="skins.js?v=4"></script>
+  <script src="boss.js?v=4"></script>
 </body>
 </html>

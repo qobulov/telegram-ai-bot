@@ -108,29 +108,31 @@ func Critical(seed uint32, tap int64, chance int) bool {
 }
 
 // Strike is what a hero's taps do at now since their last hit: the taps
-// counted and their damage. Olovli qilich makes its blows critical and
-// Bo'ron zarbasi multiplies them while it lasts; the taps count in the
-// day's quests.
+// counted and their damage. An armed Ulti is the first blow, Kuch
+// multiplies every blow while it lasts, and the taps charge Ulti and count
+// in the day's quests.
 func Strike(hero *storage.RaidHero, taps int, since time.Duration, now time.Time) (int, int64) {
 	hero.OnDay(Day(now))
 	since = min(max(since, 0), maxSince)
 	counted := min(max(taps, 0), int(since*TapsPerSecond/time.Second)+tapBurst)
 	blow, chance := TapDamage(hero.Sword), CritChance(hero.Crit)
-	storm := now.Before(hero.StormUntil.Add(skillGrace))
+	buff := now.Before(hero.BuffUntil.Add(skillGrace))
 	var damage int64
 	for i := range int64(counted) {
 		d := blow
-		if hero.FireLeft > 0 {
-			hero.FireLeft--
-			d *= critTimes
-		} else if Critical(hero.Seed, hero.Taps+i, chance) {
+		if i == 0 && hero.UltArmed {
+			hero.UltArmed = false
+			d *= ultTimes
+		}
+		if Critical(hero.Seed, hero.Taps+i, chance) {
 			d *= critTimes
 		}
-		if storm {
-			d *= stormTimes
+		if buff {
+			d *= buffTimes
 		}
 		damage += d
 	}
+	hero.UltCharge = min(hero.UltCharge+counted, ultTaps)
 	hero.QuestTaps += counted
 	return counted, damage
 }
@@ -190,26 +192,27 @@ func Day(now time.Time) time.Time {
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
-// The skills: Bo'ron zarbasi multiplies blows for a while, Olovli qilich
-// makes the next blows critical. Each is ready again some time after it
-// was used.
+// The skills: Kuch, the buff, multiplies blows for a while and is ready
+// again some time after it was used; Ulti, the ultimate, is charged by
+// taps and makes the next blow a hundred.
 // skillGrace lets a hit sent just after a skill ended still count it, as
 // the page sends its taps in batches.
 const (
-	stormFor   = 5 * time.Second
-	stormEvery = 45 * time.Second
-	stormTimes = 5
-	fireTaps   = 10
-	fireEvery  = 60 * time.Second
+	buffFor    = 12 * time.Second
+	buffEvery  = 50 * time.Second
+	buffTimes  = 3
+	ultTaps    = 300
+	ultTimes   = 100
 	skillGrace = time.Second
 )
 
 var (
-	ErrCooldown = errors.New("raid: the skill is not ready")
-	ErrNoSkill  = errors.New("raid: no such skill")
-	ErrNoQuest  = errors.New("raid: no such quest")
-	ErrNotDone  = errors.New("raid: the quest is not done")
-	ErrClaimed  = errors.New("raid: the quest's reward was taken")
+	ErrCooldown  = errors.New("raid: the skill is not ready")
+	ErrUncharged = errors.New("raid: the ultimate is not charged")
+	ErrNoSkill   = errors.New("raid: no such skill")
+	ErrNoQuest   = errors.New("raid: no such quest")
+	ErrNotDone   = errors.New("raid: the quest is not done")
+	ErrClaimed   = errors.New("raid: the quest's reward was taken")
 )
 
 // UseSkill is the change using skill at now makes to a hero; it counts in
@@ -217,16 +220,16 @@ var (
 func UseSkill(skill string, now time.Time) func(*storage.RaidHero) error {
 	return func(h *storage.RaidHero) error {
 		switch skill {
-		case "storm":
-			if now.Before(h.StormReady) {
+		case "buff":
+			if now.Before(h.BuffReady) {
 				return ErrCooldown
 			}
-			h.StormUntil, h.StormReady = now.Add(stormFor), now.Add(stormEvery)
-		case "fire":
-			if now.Before(h.FireReady) {
-				return ErrCooldown
+			h.BuffUntil, h.BuffReady = now.Add(buffFor), now.Add(buffEvery)
+		case "ult":
+			if h.UltCharge < ultTaps || h.UltArmed {
+				return ErrUncharged
 			}
-			h.FireLeft, h.FireReady = fireTaps, now.Add(fireEvery)
+			h.UltCharge, h.UltArmed = 0, true
 		default:
 			return ErrNoSkill
 		}

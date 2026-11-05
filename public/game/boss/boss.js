@@ -13,8 +13,8 @@
       names: ["Ko'k dev", "Qizil dev", "Bir ko'zli dev", "Ajdar", "Muz devi", "Tosh dev", "Yalmog'iz kampir", "Qora dev"],
       hint: "Devni bosib uring! Guruhdagilar ham siz bilan uradi",
       toSolo: "🧍 Mening devim", toGroup: "👥 Guruh devi",
-      chief: "BOSH DEV", storm: "Bo'ron", fire: "Olov", ready: "Tayyor!",
-      stormOn: "Bo'ron zarbasi! ×5", fireOn: "Olovli qilich! 10 krit",
+      chief: "BOSH DEV", buff: "Kuch", ult: "Ulti", ready: "Tayyor!",
+      buffOn: "Kuch! ×3", ultOn: "ULTI tayyor! Uring!",
       quests: "Kundalik vazifalar", questsReset: "Vazifalar har kuni yarim tunda yangilanadi.",
       questNames: ["300 marta ur", "1 ta dev yiqitishda qatnash", "Mahoratni 3 marta ishlat"], claim: "Olish", claimed: "Olindi ✓",
       streak: (n) => `🔥 ${n} kun ketma-ket`, gift: (n, s) => `🎁 Kunlik sovg'a: +${n} 💰<br><small>🔥 ${s}-kun ketma-ket</small>`, got: (n) => `+${n} 💰`,
@@ -33,8 +33,8 @@
       names: ["Синий дэв", "Красный дэв", "Одноглазый дэв", "Аждар", "Ледяной дэв", "Каменный дэв", "Ялмогиз-кампир", "Чёрный дэв"],
       hint: "Бейте дэва! Группа бьёт вместе с вами",
       toSolo: "🧍 Мой босс", toGroup: "👥 Босс группы",
-      chief: "ГЛАВНЫЙ", storm: "Буря", fire: "Огонь", ready: "Готово!",
-      stormOn: "Удар бури! ×5", fireOn: "Огненный меч! 10 критов",
+      chief: "ГЛАВНЫЙ", buff: "Сила", ult: "Ульта", ready: "Готово!",
+      buffOn: "Сила! ×3", ultOn: "УЛЬТА готова! Бейте!",
       quests: "Ежедневные задания", questsReset: "Задания обновляются каждую полночь.",
       questNames: ["Ударить 300 раз", "Помочь победить 1 дэва", "Применить умение 3 раза"], claim: "Забрать", claimed: "Получено ✓",
       streak: (n) => `🔥 ${n} дн. подряд`, gift: (n, s) => `🎁 Ежедневный подарок: +${n} 💰<br><small>🔥 ${s}-й день подряд</small>`, got: (n) => `+${n} 💰`,
@@ -53,8 +53,8 @@
       names: ["Blue giant", "Red giant", "One-eyed giant", "Ajdar the dragon", "Ice giant", "Stone giant", "The witch Yalmog'iz", "Black giant"],
       hint: "Tap the giant! Your group hits it with you",
       toSolo: "🧍 My boss", toGroup: "👥 Group boss",
-      chief: "CHIEF", storm: "Storm", fire: "Fire", ready: "Ready!",
-      stormOn: "Storm strike! ×5", fireOn: "Fiery sword! 10 crits",
+      chief: "CHIEF", buff: "Power", ult: "Ultimate", ready: "Ready!",
+      buffOn: "Power! ×3", ultOn: "ULTIMATE ready! Strike!",
       quests: "Daily quests", questsReset: "Quests renew every midnight.",
       questNames: ["Hit 300 times", "Help defeat 1 giant", "Use a skill 3 times"], claim: "Claim", claimed: "Claimed ✓",
       streak: (n) => `🔥 ${n} ${n === 1 ? "day" : "days"} in a row`, gift: (n, s) => `🎁 Daily gift: +${n} 💰<br><small>🔥 day ${s} in a row</small>`, got: (n) => `+${n} 💰`,
@@ -102,11 +102,10 @@
   let myAvatar = "";
   let boss = null, hero = null, top = [], topTotal = [], rank = { level: 0, total: 0 }, myTitle = 0, boardMode = "level";
   let tapsPerSecond = 12, critTimes = 3;
-  // skills is when, by this page's clock, each skill is ready and lasts
-  // until; fireLeft is the fiery blows left, counted here as they are
-  // struck.
-  const skills = { storm: { readyAt: 0, until: 0, times: 5 }, fire: { readyAt: 0 } };
-  let fireLeft = 0;
+  // skills is when, by this page's clock, Kuch is ready and lasts until,
+  // and Ulti's charge from the server's count and whether the next blow is
+  // it, which the page spends as it strikes it.
+  const skills = { buff: { readyAt: 0, until: 0, times: 3, every: 50000 }, ult: { charge: 0, need: 300, armed: false, times: 100 } };
   let pending = 0, pendingDamage = 0, inflight = 0, inflightDamage = 0, sending = false, polled = 0;
   const seen = new Map();
   const tapTimes = [];
@@ -134,11 +133,14 @@
       // the times it gives only ever move a skill's times on.
       const now = performance.now(), sk = hero.skills;
       const later = (was, ms) => Math.max(was, ms > 0 ? now + ms : 0);
-      skills.storm.readyAt = later(skills.storm.readyAt, sk.storm.ready_in);
-      skills.storm.until = later(skills.storm.until, sk.storm.active_for);
-      skills.storm.times = sk.storm.times;
-      skills.fire.readyAt = later(skills.fire.readyAt, sk.fire.ready_in);
-      if (data.top && pending === 0 && inflight === 0 && !sending) fireLeft = sk.fire.left;
+      skills.buff.readyAt = later(skills.buff.readyAt, sk.buff.ready_in);
+      skills.buff.until = later(skills.buff.until, sk.buff.active_for);
+      skills.buff.times = sk.buff.times;
+      skills.buff.every = sk.buff.every;
+      Object.assign(skills.ult, { charge: sk.ult.charge, need: sk.ult.need, times: sk.ult.times });
+      // Armed only by the server's word when no blow is on its way: one
+      // struck here may have spent it.
+      if (pending === 0 && inflight === 0 && !sending) skills.ult.armed = sk.ult.armed;
     }
     if (data.gift > 0 && hero) toast(t.gift(fmt(data.gift), hero.streak), 3500);
     if (data.top) {
@@ -230,15 +232,20 @@
     if (tapTimes.length >= tapsPerSecond) return; // the server would not count it
     tapTimes.push(now);
     const index = hero.taps + inflight + pending;
-    let crit;
-    if (fireLeft > 0) {
-      fireLeft -= 1;
-      crit = true;
-    } else {
-      crit = critical(hero.seed, index, hero.crit_chance);
+    // The server strikes an armed Ulti with the first blow of a batch: one
+    // in a batch already waiting would be its second, so it waits here.
+    const ult = skills.ult.armed && pending === 0;
+    if (skills.ult.armed && !ult) return;
+    if (ult) skills.ult.armed = false;
+    const crit = critical(hero.seed, index, hero.crit_chance);
+    const buffed = performance.now() < skills.buff.until;
+    const damage = hero.tap_damage * (ult ? skills.ult.times : 1) * (crit ? critTimes : 1) * (buffed ? skills.buff.times : 1);
+    if (ult) {
+      burst(x, y, "#8ae0ff", 70, 10);
+      fx.shake = 1.4;
+      if (navigator.vibrate) navigator.vibrate([30, 40, 60]);
+      setTimeout(flush, 0);
     }
-    const storm = performance.now() < skills.storm.until;
-    const damage = hero.tap_damage * (crit ? critTimes : 1) * (storm ? skills.storm.times : 1);
     pending += 1;
     pendingDamage += damage;
     damageNumber(x, y - 10, damage, crit);
@@ -254,13 +261,47 @@
 
   // ---------- skills and quests ----------
 
-  // SKILL_QUEST, using a skill, is not shown: the page has no skills.
-  const SKILL_QUEST = 2;
+  async function useSkill(skill) {
+    if (!hero || victoryOpen) return;
+    const now = performance.now();
+    if (skill === "buff" && now < skills.buff.readyAt) return;
+    if (skill === "ult" && (skills.ult.armed || skills.ult.charge + pending + inflight < skills.ult.need)) return;
+    await flush();
+    try {
+      apply(await api({ action: "skill", skill }));
+      if (skill === "ult") skills.ult.armed = true;
+      textPop(W / 2, bossY() - bossRadius() - 20, skill === "ult" ? t.ultOn : t.buffOn, skill === "ult" ? "#8ae0ff" : "#ffb34a", 26);
+      burst(bossX(), bossY(), skill === "ult" ? "#8ae0ff" : "#ff8a3d", 50, 8);
+      fx.shake = 0.8;
+      if (navigator.vibrate) navigator.vibrate([20, 30, 40]);
+      hud();
+    } catch (error) {
+      if (error.message !== "cooldown") failed(error);
+    }
+  }
+
+  function skillsHud() {
+    if (!hero) return;
+    const now = performance.now();
+    const buff = skills.buff, wait = Math.max(0, buff.readyAt - now), active = now < buff.until;
+    const buffButton = document.querySelector('.skill[data-skill="buff"]');
+    buffButton.classList.toggle("active", active);
+    buffButton.classList.toggle("ready", !wait && !active);
+    buffButton.style.setProperty("--cool", `${Math.min(100, (wait / buff.every) * 100)}%`);
+    $("buffInfo").textContent = active ? `${Math.ceil((buff.until - now) / 1000)}s` : wait ? `${Math.ceil(wait / 1000)}s` : t.ready;
+    const ult = skills.ult, charge = Math.min(ult.need, ult.charge + pending + inflight);
+    const ultButton = document.querySelector('.skill[data-skill="ult"]');
+    ultButton.classList.toggle("active", ult.armed);
+    ultButton.classList.toggle("ready", !ult.armed && charge >= ult.need);
+    ultButton.style.setProperty("--cool", `${100 - Math.round((charge / ult.need) * 100)}%`);
+    $("ultInfo").textContent = ult.armed ? "⚡ ×" + ult.times : charge >= ult.need ? t.ready : `${Math.floor((charge / ult.need) * 100)}%`;
+  }
+
   let questsShown = "";
   function questsHud() {
     if (!hero) return;
     let can = 0;
-    hero.quests.forEach((q, i) => { if (i !== SKILL_QUEST && q.progress >= q.goal && !q.claimed) can += 1; });
+    for (const q of hero.quests) if (q.progress >= q.goal && !q.claimed) can += 1;
     $("questsDot").hidden = can === 0;
     // Drawn again only when they changed, so that a press of a button is
     // not lost to the list being drawn under it.
@@ -270,7 +311,6 @@
     const list = $("questList");
     list.textContent = "";
     hero.quests.forEach((q, i) => {
-      if (i === SKILL_QUEST) return;
       const done = q.progress >= q.goal;
       const li = document.createElement("li");
       const name = document.createElement("span");
@@ -494,6 +534,7 @@
     });
   }
   for (const card of document.querySelectorAll(".card")) card.addEventListener("click", () => upgrade(card.dataset.item, card));
+  for (const button of document.querySelectorAll(".skill")) button.addEventListener("click", () => useSkill(button.dataset.skill));
 
   // ---------- the scene ----------
 
@@ -515,7 +556,7 @@
     peaks = [0, 1].map((layer) => Array.from({ length: 9 }, (_, i) => ({ x: i / 8, h: 0.12 + rnd() * (layer ? 0.1 : 0.2) })));
   }
 
-  const cardsTop = () => document.querySelector(".upgrades").getBoundingClientRect().top;
+  const cardsTop = () => document.querySelector(".skills").getBoundingClientRect().top;
   const groundY = () => cardsTop() - 18;
   const bossRadius = () => Math.max(40, Math.min(W * 0.36, (groundY() - 150) * 0.42, 170));
   const bossX = () => W / 2;
@@ -824,11 +865,12 @@
       drawPhoto(myAvatar, W * 0.18, gy - 68, 1.15, now);
       nameTag(t.you, W * 0.18, gy - 68 + 72, "#ffcf4a");
     }
-    if (performance.now() < skills.storm.until) {
+    if (performance.now() < skills.buff.until) {
       ctx.fillStyle = `rgba(255, 120, 40, ${0.08 + 0.05 * Math.sin(now / 80)})`;
       ctx.fillRect(-20, -20, W + 40, H + 40);
     }
     drawEffects(dt);
+    skillsHud();
     requestAnimationFrame(frame);
   }
 

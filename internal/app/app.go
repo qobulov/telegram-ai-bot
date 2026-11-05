@@ -351,6 +351,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		PrivateDailyLimit:     cfg.PrivateDailyLimit,
 		Payments:              bot.Client,
 		Premium:               store,
+		Cards:                 store,
 		PremiumPrice:          cfg.PremiumPrice,
 		PremiumDays:           cfg.PremiumDays,
 		PremiumDailyLimit:     cfg.PremiumDailyLimit,
@@ -406,6 +407,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 	}
 	if g := newGame(cfg); g != nil {
 		opts.StatsURL = statsPage(cfg)
+		opts.CardsURL = cardsPage(cfg)
 		opts.Game, opts.GameTable = g, bot.Client
 		opts.ShashkaURL, opts.ShashkaInvites = ShashkaPage(cfg), store
 	}

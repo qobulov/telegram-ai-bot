@@ -73,6 +73,8 @@ internal/storage                pgx pool, migrations, conversation queries
 internal/storage/migrations     SQL migrations, embedded in the binary
 internal/agent                  one conversation turn and the tool-calling loop
 internal/service                update dispatch: commands, rate limit, worker pool
+internal/cards                  Kartalar, the anime card collection: rarities and odds, AniList's catalog, the Mini App's API
+public/kartalar                 static page: the Kartalar Mini App
 docs/codemap                    a map of the code to explore in a browser (make codemap, from graphify's graph)
 ```
 
@@ -1940,6 +1942,32 @@ which a test checks with `node`), refusing chops less than 70 ms apart,
 chops after the time ran out or after the branch that ended the play, and a
 play sent sooner than its chops took.
 
+### Kartalar
+
+`/karta` draws an anime card, one an hour (owners have no wait; in a private
+chat the word "karta" does too). The cards are AniList's 200 most loved
+characters, fetched the first time a card is drawn (`internal/cards`, kept in
+`card_catalog`, migration 52), the most loved the rarest: 15 👑 Mifik, 30 🔥
+Afsonaviy, 45 💜 Epik, 60 🔷 Noyob and 50 ⚪ Oddiy. A draw first draws a
+rarity, by odds of 1.5%, 6.5%, 14%, 28% and 50%, then a card of it at random,
+sent as the character's picture with its anime, attack and health, the same
+each time for the same character, and the points it is worth (5000, 2000,
+800, 300 or 100), which add up, a card drawn again too. `/kartalarim` shows
+how many of each rarity's cards the player holds as buttons that list them,
+pressed only by that player; `/kartatop` is the table of points. The
+pictures are the characters' AniList pictures, the studios' art.
+
+`/kartalar` opens the same as a Mini App (`public/kartalar/`, served by
+`api/cards.go` from `internal/cards`): the collection shelf by shelf, the
+rarest first, the cards held with their pictures and the rest as locked
+cards folded into one row each, a search through the cards held, a card
+opened large with its numbers, drawing a card that turns over with a
+countdown to the next, and the table. The player is the one Telegram's
+signed init data names, and a card not held reaches the page as its rarity
+alone. In a group its button links to the private chat (`/start
+kartalar`), as Telegram opens Mini App buttons only there; the collection's
+message carries it too.
+
 ### Dev jangi
 
 `/boss` posts the boss raid: everyone in a chat hits one giant together
@@ -1970,12 +1998,11 @@ coins; «👥 Guruh devi» turns back. The choice is kept for their next game. A
 boss fought alone sets no score in the group and is announced to no one; the
 hero, its coins, upgrades, skills and quests are the same in both.
 
-The page no longer shows the skills below, the hint, the upgrades' next
-values or a second ranking button, which crowded it: the server still
-counts the skills, and the daily quest to use them is left off the page.
-Two skills, each ready again after a while: 🌪 Bo'ron zarbasi makes blows
-five times as strong for 5 seconds (every 45), 🔥 Olovli qilich makes the
-next 10 blows critical (every 60). Three daily quests,
+Two skills: 💪 Kuch, the buff, makes blows three times as strong for 12
+seconds (every 50), and ⚡ Ulti, the ultimate, is charged by 300 taps and makes
+the next blow a hundred times, a critical one too when it falls so (migration
+53 keeps its charge). They took the place of Bo'ron zarbasi and Olovli qilich.
+Three daily quests,
 the same for everyone and new each midnight in Uzbekistan: hit 300 times,
 help kill a boss, use a skill 3 times; each gives coins once done, more as
 the sword grows. The first visit of a day gives a gift that grows with the

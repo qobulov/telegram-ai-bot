@@ -206,7 +206,7 @@ button.primary {
 .upgrades {
   width: 100%;
   max-width: 520px;
-  margin: auto auto 0;
+  margin: 0 auto;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;

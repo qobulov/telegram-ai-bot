@@ -22,11 +22,19 @@ var commandMenus = map[string][]telegram.BotCommand{
 		{Command: "help", Description: "Yordam va buyruqlar"},
 		{Command: "about", Description: "Bot haqida"},
 		{Command: "dooz", Description: "Dooz (X-O) o'yini"},
+		{Command: "karta", Description: "Anime karta olish (soatiga 1 ta)"},
+		{Command: "kartalarim", Description: "Kartalar kolleksiyam"},
+		{Command: "kartalar", Description: "Kartalar ilovasi (Mini App)"},
+		{Command: "kartatop", Description: "Kartalar reytingi"},
 	},
 	telegram.ScopeAllGroupChats: {
 		{Command: "help", Description: "Yordam va buyruqlar"},
 		{Command: "about", Description: "Bot haqida"},
 		{Command: "dooz", Description: "Dooz (X-O) o'yini"},
+		{Command: "karta", Description: "Anime karta olish (soatiga 1 ta)"},
+		{Command: "kartalarim", Description: "Kartalar kolleksiyam"},
+		{Command: "kartalar", Description: "Kartalar ilovasi (Mini App)"},
+		{Command: "kartatop", Description: "Kartalar reytingi"},
 	},
 	telegram.ScopeAllChatAdmins: {
 		{Command: "help", Description: "Yordam va buyruqlar"},
@@ -36,6 +44,10 @@ var commandMenus = map[string][]telegram.BotCommand{
 		{Command: "unignore", Description: "A'zoga yana javob berish (xabariga reply qiling)"},
 		{Command: "about", Description: "Bot haqida"},
 		{Command: "dooz", Description: "Dooz (X-O) o'yini"},
+		{Command: "karta", Description: "Anime karta olish (soatiga 1 ta)"},
+		{Command: "kartalarim", Description: "Kartalar kolleksiyam"},
+		{Command: "kartalar", Description: "Kartalar ilovasi (Mini App)"},
+		{Command: "kartatop", Description: "Kartalar reytingi"},
 	},
 }
 

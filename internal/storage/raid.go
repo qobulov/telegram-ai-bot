@@ -28,11 +28,12 @@ type RaidHero struct {
 	Seed    uint32
 	Taps    int64
 	LastHit time.Time
-	// The skills: when each lasts until, or how many blows it has left,
-	// and when each can be used again.
-	StormUntil, StormReady time.Time
-	FireLeft               int
-	FireReady              time.Time
+	// The skills: when Kuch, the buff, lasts until and can be used again,
+	// kept in the columns of Bo'ron zarbasi, the buff before it; the taps
+	// towards Ulti, the ultimate, and whether the next blow is it.
+	BuffUntil, BuffReady time.Time
+	UltCharge            int
+	UltArmed             bool
 	// QuestDay is the day the quest counts are for; QuestClaimed has a bit
 	// for each quest whose reward was taken.
 	QuestDay                           time.Time
@@ -364,7 +365,7 @@ func raidBoss(ctx context.Context, tx pgx.Tx, chatID int64, rules RaidRules, loc
 }
 
 const raidHeroColumns = `coins, sword, crit, seed, taps, last_hit,
-	storm_until, storm_ready, fire_left, fire_ready,
+	storm_until, storm_ready, ult_charge, ult_armed,
 	quest_day, quest_taps, quest_kills, quest_skills, quest_claimed, streak, streak_day`
 
 // raidHero is the player's hero, a new one with seed made if there is
@@ -379,9 +380,9 @@ func raidHero(ctx context.Context, tx pgx.Tx, userID int64, seed uint32, lock bo
 		query += ` FOR UPDATE`
 	}
 	var storedSeed int64
-	var lastHit, stormUntil, stormReady, fireReady, questDay, streakDay *time.Time
+	var lastHit, buffUntil, buffReady, questDay, streakDay *time.Time
 	if err := tx.QueryRow(ctx, query, userID).Scan(&h.Coins, &h.Sword, &h.Crit, &storedSeed, &h.Taps, &lastHit,
-		&stormUntil, &stormReady, &h.FireLeft, &fireReady,
+		&buffUntil, &buffReady, &h.UltCharge, &h.UltArmed,
 		&questDay, &h.QuestTaps, &h.QuestKills, &h.QuestSkills, &h.QuestClaimed, &h.Streak, &streakDay); err != nil {
 		return RaidHero{}, err
 	}
@@ -389,7 +390,7 @@ func raidHero(ctx context.Context, tx pgx.Tx, userID int64, seed uint32, lock bo
 	for _, t := range []struct {
 		from *time.Time
 		to   *time.Time
-	}{{lastHit, &h.LastHit}, {stormUntil, &h.StormUntil}, {stormReady, &h.StormReady}, {fireReady, &h.FireReady},
+	}{{lastHit, &h.LastHit}, {buffUntil, &h.BuffUntil}, {buffReady, &h.BuffReady},
 		{questDay, &h.QuestDay}, {streakDay, &h.StreakDay}} {
 		if t.from != nil {
 			*t.to = *t.from
@@ -402,12 +403,12 @@ func raidHero(ctx context.Context, tx pgx.Tx, userID int64, seed uint32, lock bo
 func saveRaidHero(ctx context.Context, tx pgx.Tx, h RaidHero) error {
 	_, err := tx.Exec(ctx, `
 		UPDATE raid_heroes SET coins = $2, sword = $3, crit = $4, taps = $5, last_hit = $6,
-			storm_until = $7, storm_ready = $8, fire_left = $9, fire_ready = $10,
+			storm_until = $7, storm_ready = $8, ult_charge = $9, ult_armed = $10,
 			quest_day = $11, quest_taps = $12, quest_kills = $13, quest_skills = $14, quest_claimed = $15,
 			streak = $16, streak_day = $17, updated_at = now()
 		WHERE user_id = $1`,
 		h.UserID, h.Coins, h.Sword, h.Crit, h.Taps, timeOrNull(h.LastHit),
-		timeOrNull(h.StormUntil), timeOrNull(h.StormReady), h.FireLeft, timeOrNull(h.FireReady),
+		timeOrNull(h.BuffUntil), timeOrNull(h.BuffReady), h.UltCharge, h.UltArmed,
 		timeOrNull(h.QuestDay), h.QuestTaps, h.QuestKills, h.QuestSkills, h.QuestClaimed, h.Streak, timeOrNull(h.StreakDay))
 	return err
 }

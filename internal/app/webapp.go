@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"telegram-ai-bot/internal/cards"
 	"telegram-ai-bot/internal/config"
 	"telegram-ai-bot/internal/game"
 	"telegram-ai-bot/internal/mafia"
@@ -23,7 +24,34 @@ const (
 	statsPath   = "/stats/"
 	gamePath    = "/game/"
 	shashkaPath = "/shashka/"
+	cardsPath   = "/kartalar/"
 )
+
+// cardsPage is the Kartalar Mini App's page, "" when WEBAPP_URL is not set.
+func cardsPage(cfg config.Config) string {
+	if cfg.WebAppURL == "" {
+		return ""
+	}
+	return cfg.WebAppURL + cardsPath
+}
+
+// NewCards builds the Kartalar Mini App's API: the player's collection,
+// draws and the table, kept in the database.
+func NewCards(ctx context.Context, cfg config.Config, logger *slog.Logger) (*Endpoint, error) {
+	if cfg.WebAppURL == "" {
+		return nil, errNoPages
+	}
+	store, err := storage.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return nil, err
+	}
+	if err := store.CheckSchema(ctx); err != nil {
+		store.Close()
+		return nil, err
+	}
+	handler := cards.NewHandler(cards.Options{BotToken: cfg.TelegramToken, Store: store, Owners: cfg.OwnerIDs, Logger: logger})
+	return &Endpoint{Handler: handler, Close: store.Close}, nil
+}
 
 // ShashkaPage is the draughts Mini App's page, "" when WEBAPP_URL is not
 // set.

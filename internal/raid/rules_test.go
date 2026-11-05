@@ -138,33 +138,60 @@ func TestTitles(t *testing.T) {
 	}
 }
 
-// Bo'ron zarbasi multiplies blows while it lasts, Olovli qilich makes the
-// next ten critical; each is ready again only after its time, and counts
-// in the day's quests.
+// Kuch makes every blow three times for 12 seconds and is ready again 50
+// seconds after; Ulti is charged by 300 taps, and makes the next blow a
+// hundred times; both count in the day's quests.
 func TestSkills(t *testing.T) {
 	now := time.Date(2026, 10, 30, 12, 0, 0, 0, time.UTC)
-	hero := storage.RaidHero{Sword: 1, Seed: 5}
-	for _, skill := range []string{"storm", "fire"} {
-		if err := UseSkill(skill, now)(&hero); err != nil {
-			t.Fatalf("%s: %v", skill, err)
+	hero := storage.RaidHero{Sword: 1, Seed: 5, Crit: 0}
+	if err := UseSkill("ult", now)(&hero); !errors.Is(err, ErrUncharged) {
+		t.Fatalf("Ulti uncharged: %v", err)
+	}
+	if err := UseSkill("buff", now)(&hero); err != nil {
+		t.Fatal(err)
+	}
+	if err := UseSkill("buff", now.Add(time.Second))(&hero); !errors.Is(err, ErrCooldown) {
+		t.Errorf("Kuch again a second later: %v", err)
+	}
+	plain := func(h storage.RaidHero, taps int) int64 {
+		var d int64
+		for i := range int64(taps) {
+			b := TapDamage(h.Sword)
+			if Critical(h.Seed, h.Taps+i, CritChance(h.Crit)) {
+				b *= critTimes
+			}
+			d += b
 		}
-		if err := UseSkill(skill, now.Add(time.Second))(&hero); !errors.Is(err, ErrCooldown) {
-			t.Errorf("%s used again a second later: %v", skill, err)
-		}
+		return d
 	}
-	if hero.QuestSkills != 2 || hero.FireLeft != fireTaps {
-		t.Fatalf("after the skills: %+v", hero)
+	want := plain(hero, 4) * buffTimes
+	if counted, damage := Strike(&hero, 4, time.Second, now.Add(time.Second)); counted != 4 || damage != want || hero.UltCharge != 4 {
+		t.Errorf("a hit under Kuch did %d of %d taps, want %d; %+v", damage, counted, want, hero)
 	}
-	counted, damage := Strike(&hero, 4, time.Second, now.Add(time.Second))
-	want := 4 * TapDamage(1) * critTimes * stormTimes
-	if counted != 4 || damage != want || hero.FireLeft != fireTaps-4 || hero.QuestTaps != 4 {
-		t.Errorf("a hit in both did %d of %d taps, want %d; %+v", damage, counted, want, hero)
+	hero.Taps += 4
+
+	hero.UltCharge = ultTaps
+	if err := UseSkill("ult", now)(&hero); err != nil || !hero.UltArmed || hero.UltCharge != 0 {
+		t.Fatalf("Ulti: %v %+v", err, hero)
 	}
-	_, after := Strike(&hero, 1, time.Second, now.Add(stormFor+skillGrace+time.Second))
-	if after != TapDamage(1)*critTimes {
-		t.Errorf("after the storm a fiery blow did %d", after)
+	if err := UseSkill("ult", now)(&hero); !errors.Is(err, ErrUncharged) {
+		t.Errorf("Ulti twice: %v", err)
 	}
-	for _, skill := range []string{"rain", "magic"} {
+	later := now.Add(buffFor + skillGrace + time.Second)
+	first := TapDamage(1) * ultTimes
+	if Critical(hero.Seed, hero.Taps, CritChance(hero.Crit)) {
+		first *= critTimes
+	}
+	before := hero
+	before.Taps++
+	want = first + plain(before, 1)
+	if _, damage := Strike(&hero, 2, time.Second, later); damage != want || hero.UltArmed || hero.UltCharge != 2 {
+		t.Errorf("Ulti's blow = %d, want %d; %+v", damage, want, hero)
+	}
+	if hero.QuestSkills != 2 {
+		t.Errorf("skills counted = %d", hero.QuestSkills)
+	}
+	for _, skill := range []string{"storm", "fire", "magic"} {
 		if err := UseSkill(skill, now)(&hero); !errors.Is(err, ErrNoSkill) {
 			t.Errorf("%s: %v", skill, err)
 		}

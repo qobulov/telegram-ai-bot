@@ -226,7 +226,7 @@ func (h *handler) upgrade(ctx context.Context, p game.Player, item string) (any,
 func (h *handler) change(ctx context.Context, p game.Player, change func(*storage.RaidHero) error) (any, failure) {
 	hero, err := h.Store.ChangeRaidHero(ctx, p.UserID, h.Seed(), change)
 	switch {
-	case errors.Is(err, ErrCooldown):
+	case errors.Is(err, ErrCooldown), errors.Is(err, ErrUncharged):
 		return nil, errCooldown
 	case errors.Is(err, ErrNotDone):
 		return nil, errNotDone
@@ -311,8 +311,8 @@ func heroView(h storage.RaidHero, now time.Time) map[string]any {
 	}
 	return map[string]any{
 		"skills": map[string]any{
-			"storm": map[string]int64{"ready_in": left(h.StormReady), "active_for": left(h.StormUntil), "times": stormTimes},
-			"fire":  map[string]int64{"ready_in": left(h.FireReady), "left": int64(h.FireLeft)},
+			"buff": map[string]int64{"ready_in": left(h.BuffReady), "active_for": left(h.BuffUntil), "times": buffTimes, "every": buffEvery.Milliseconds()},
+			"ult":  map[string]any{"charge": h.UltCharge, "need": ultTaps, "armed": h.UltArmed, "times": ultTimes},
 		},
 		"quests": quests, "streak": h.Streak,
 		"coins": h.Coins, "sword": h.Sword, "crit": h.Crit, "seed": h.Seed, "taps": h.Taps,
