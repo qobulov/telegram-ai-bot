@@ -30,8 +30,6 @@ type Store interface {
 type Options struct {
 	BotToken string
 	Store    Store
-	// Owners draw without waiting, as in the chats.
-	Owners map[int64]bool
 	// HTTPClient, AniList and PokeWallet fill the catalog the first time;
 	// nil and "" mean a short-timeout client and the services' own
 	// addresses. Without PokeWalletKey there are no trading cards.
@@ -221,13 +219,13 @@ func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
 	}
 	return map[string]any{
 		"cards": views, "points": player.Points, "held": len(owned),
-		"next_in": h.wait(user, last).Milliseconds(), "every": Every.Milliseconds(),
+		"next_in": h.wait(last).Milliseconds(), "every": Every.Milliseconds(),
 	}, failure{}
 }
 
 // wait is how long until the player may draw again.
-func (h *handler) wait(user miniapp.User, last time.Time) time.Duration {
-	if h.Owners[user.ID] || last.IsZero() {
+func (h *handler) wait(last time.Time) time.Duration {
+	if last.IsZero() {
 		return 0
 	}
 	return max(0, Every-h.Now().Sub(last))
@@ -238,11 +236,7 @@ func (h *handler) draw(ctx context.Context, user miniapp.User) (any, failure) {
 		h.Logger.Error("could not fill the card catalog", "error", err)
 		return nil, errUnavailable
 	}
-	every := Every
-	if h.Owners[user.ID] {
-		every = 0
-	}
-	draw, err := h.Store.DrawCard(ctx, user.ID, name(user), int(h.Roll()), every, h.Now())
+	draw, err := h.Store.DrawCard(ctx, user.ID, name(user), int(h.Roll()), Every, h.Now())
 	var wait *storage.CardWaitError
 	switch {
 	case errors.As(err, &wait):
@@ -252,7 +246,7 @@ func (h *handler) draw(ctx context.Context, user miniapp.User) (any, failure) {
 		return nil, errUnavailable
 	}
 	return map[string]any{
-		"card": h.held(draw.Card, draw.Count), "new": draw.New, "points": draw.Points, "next_in": every.Milliseconds(),
+		"card": h.held(draw.Card, draw.Count), "new": draw.New, "points": draw.Points, "next_in": Every.Milliseconds(),
 	}, failure{}
 }
 

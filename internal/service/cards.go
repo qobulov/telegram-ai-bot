@@ -85,11 +85,7 @@ func (s *Service) drawCard(ctx context.Context, in incoming) outcome {
 		s.opts.Logger.Error("could not fill the card catalog", "error", err)
 		return say(textCardsUnavailable.to(in))
 	}
-	every := cards.Every
-	if s.isOwner(in.msg.From) {
-		every = 0
-	}
-	draw, err := s.opts.Cards.DrawCard(ctx, in.userID, doozName(in.msg.From), int(cards.RollRandom()), every, time.Now())
+	draw, err := s.opts.Cards.DrawCard(ctx, in.userID, doozName(in.msg.From), int(cards.RollRandom()), cards.Every, time.Now())
 	var wait *storage.CardWaitError
 	switch {
 	case errors.As(err, &wait):

@@ -1945,8 +1945,8 @@ play sent sooner than its chops took.
 
 ### Kartalar
 
-`/karta` draws an anime card, one an hour (owners have no wait; in a private
-chat the word "karta" does too). The cards are AniList's 200 most loved
+`/karta` draws an anime card, one an hour, owners' too (in a private chat
+the word "karta" does too). The cards are AniList's 200 most loved
 characters, fetched the first time a card is drawn (`internal/cards`, kept in
 `card_catalog`, migration 52), the most loved the rarest: 15 👑 Mifik, 30 🔥
 Afsonaviy, 45 💜 Epik, 60 🔷 Noyob and 50 ⚪ Oddiy. A draw first draws a

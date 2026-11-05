@@ -68,7 +68,7 @@ func (f *fakeCards) OwnedCards(_ context.Context, userID int64, rarity int) ([]s
 }
 
 // A card is drawn with its picture and its numbers under it, once an hour:
-// the next asks to wait, and an owner never does.
+// the next asks to wait, an owner's like anyone's.
 func TestCardIsDrawnOnceAnHour(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("\x89PNG card")) }))
 	defer server.Close()
@@ -90,10 +90,10 @@ func TestCardIsDrawnOnceAnHour(t *testing.T) {
 		t.Errorf("second draw = %+v, want to wait", sent)
 	}
 	f.opts.OwnerIDs = map[int64]bool{userID: true}
-	if sent = f.run(textFrom(userID, "/karta")); len(sent) != 3 || !sent[2].photo || !strings.Contains(sent[2].text, "×2") {
-		t.Errorf("an owner's draw = %+v", sent)
+	if sent = f.run(textFrom(userID, "/karta")); len(sent) != 3 || sent[2].photo || !strings.Contains(sent[2].text, "⏳") {
+		t.Errorf("an owner's draw = %+v, want to wait", sent)
 	}
-	if book.everys[len(book.everys)-1] != 0 {
+	if book.everys[len(book.everys)-1] != time.Hour {
 		t.Errorf("an owner waited %v", book.everys[len(book.everys)-1])
 	}
 }

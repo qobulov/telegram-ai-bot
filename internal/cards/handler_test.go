@@ -121,11 +121,11 @@ func TestCardsAppHidesCardsNotHeld(t *testing.T) {
 	}
 }
 
-// A player draws once an hour; an owner whenever they like.
+// A player draws once an hour, an owner like anyone.
 func TestCardsAppDrawsOnceAnHour(t *testing.T) {
 	now := time.Now()
 	store := &fakeStore{}
-	h := NewHandler(Options{BotToken: testToken, Store: store, Owners: map[int64]bool{1: true}, Now: func() time.Time { return now }, Roll: func() Rarity { return Mythic }})
+	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }, Roll: func() Rarity { return Mythic }})
 	code, out := post(t, h, signedInit(7, now), "draw")
 	card, _ := out["card"].(map[string]any)
 	if code != http.StatusOK || card["name"] != "Gojo" || out["points"] != 15000.0 || out["next_in"] != float64(Every.Milliseconds()) {
@@ -134,8 +134,8 @@ func TestCardsAppDrawsOnceAnHour(t *testing.T) {
 	if _, out := post(t, h, signedInit(7, now), "draw"); out["wait"] != float64(Every.Milliseconds()) {
 		t.Errorf("a second draw = %v", out)
 	}
-	if code, out := post(t, h, signedInit(1, now), "draw"); code != http.StatusOK || out["card"] == nil || store.draws != 2 {
-		t.Errorf("an owner's draw = %d %v", code, out)
+	if store.draws != 1 {
+		t.Errorf("draws = %d", store.draws)
 	}
 	if _, out := post(t, h, signedInit(7, now), "top"); len(out["top"].([]any)) != 1 || out["top"].([]any)[0].(map[string]any)["me"] != true {
 		t.Errorf("top = %v", out)
