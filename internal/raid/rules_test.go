@@ -241,34 +241,53 @@ func TestDailyStreak(t *testing.T) {
 	}
 }
 
-// A kill is worth a part of the hitter's sword's next level, 1% for being
-// there and up to 5% more for the whole boss, so that a strong sword is not
-// left with a five-hundredth of a level a kill, nor buys one with every
-// chief; a weak one keeps what the boss's level gave.
-func TestRewardFollowsTheSword(t *testing.T) {
-	next := Cost("sword", 22)
-	if got := Reward(41, 0, 100, 22); got != int64(math.Round(float64(next)*0.01)) {
-		t.Errorf("being there = %d; want 1%% of %d", got, next)
+// A kill pays by the boss and the work, not the sword: the same damage pays
+// the same at any sword, so that those behind climb faster; the weak keep what
+// the boss's level gave, and one tap does not take the part for being there.
+func TestRewardFollowsTheBoss(t *testing.T) {
+	const hp = 1_000_000_000
+	whole := purse(41) // the sword expected at 41 is 31
+	if want := float64(Cost("sword", 31)); whole != want {
+		t.Fatalf("purse(41) = %v; want %v", whole, want)
 	}
-	if got := Reward(41, 100, 100, 22); got != int64(math.Round(float64(next)*0.06)) {
-		t.Errorf("the whole boss = %d; want 6%% of %d", got, next)
+	if got, want := Reward(41, hp, hp, 25), int64(math.Round(whole*0.05)); got != want {
+		t.Errorf("the whole boss = %d; want 5%% of the purse, %d", got, want)
 	}
-	if got, old := Reward(42, 50, 100, 1), int64(20*42+100*42/2); got != old {
-		t.Errorf("a first sword = %d; want the level's %d", got, old)
+	blows := TapDamage(25) * fullBlows
+	if got, want := Reward(41, blows, hp, 25), int64(math.Round(whole*(0.02+0.03*float64(blows)/hp))); got != want {
+		t.Errorf("being there = %d; want %d", got, want)
 	}
-	if Reward(42, 500, 100, 22) != Reward(42, 100, 100, 22) {
+	if one, full := Reward(41, TapDamage(25), hp, 25), Reward(41, blows, hp, 25); one*10 > full {
+		t.Errorf("one tap = %d of %d for being there", one, full)
+	}
+	if Reward(41, hp, hp, 40) != Reward(41, hp, hp, 10) {
+		t.Error("the same damage pays differently by the sword")
+	}
+	if got, old := Reward(12, 50, 100, 1), int64(20*12+100*12/2); got != old {
+		t.Errorf("a low boss = %d; want the level's %d", got, old)
+	}
+	if Reward(42, 2*hp, hp, 22) != Reward(42, hp, hp, 22) {
 		t.Error("damage past the boss's HP earns more")
-	}
-	// Past 30 a kill pays less of a level, 3% less a level, never under 15%.
-	for sword, want := range map[int]float64{30: 1, 40: 0.7, 50: 0.4, 58: 0.16, 59: 0.15} {
-		if got := taper(sword); math.Abs(got-want) > 1e-9 {
-			t.Errorf("taper(%d) = %v; want %v", sword, got, want)
-		}
-	}
-	if got, want := Reward(41, 100, 100, 50), int64(math.Round(float64(Cost("sword", 50))*0.06*0.4)); got != want {
-		t.Errorf("a whole boss at sword 50 = %d; want %d", got, want)
 	}
 	if got, level := Reward(41, 100, 100, maxSword), int64(20*41+100*41); got != level {
 		t.Errorf("a sword at its highest = %d; want the level's %d", got, level)
+	}
+}
+
+// The kill that paid 392475, 13206, 2121 and 2115: the strongest still earns
+// the most, but no longer 185 times the rest.
+func TestRewardNarrowsAKillsGap(t *testing.T) {
+	hp := MaxHP(35, 19)
+	fighters := []struct {
+		damage int64
+		sword  int
+	}{{386_080_000, 26}, {76_160_000, 21}, {1_020_000, 17}, {764_000, 9}}
+	var got []int64
+	for _, f := range fighters {
+		got = append(got, Reward(35, f.damage, hp, f.sword))
+	}
+	t.Logf("rewards = %v", got)
+	if got[0] <= got[1] || got[1] <= got[2] || got[0] > 3*got[3] {
+		t.Errorf("rewards = %v", got)
 	}
 }

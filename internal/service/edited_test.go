@@ -44,7 +44,7 @@ func TestImageGuardCatchesAPictureSwappedInByAnEdit(t *testing.T) {
 func TestSwearGuardCatchesASwearEditedIn(t *testing.T) {
 	f, _ := guardFixture("")
 
-	sent := f.run(edited(swearFrom(swearerID, "Mira, o'zing qo'tog'im").Message))
+	sent := f.run(edited(swearFrom(swearerID, "o'zing qo'tog'im").Message))
 
 	if len(sent) != 1 || !strings.HasPrefix(sent[0].text, "@ali_s, guruhda so'kinish mumkin emas") || sent[0].replyTo != 30 {
 		t.Fatalf("sent = %+v, want a warning on the edited message", sent)

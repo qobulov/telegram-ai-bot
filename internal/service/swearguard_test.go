@@ -99,7 +99,6 @@ func guardFixture(tag string) (*fixture, *fakeRestrictor) {
 	f.opts.OwnerUsernames = []string{ownerUsername}
 	f.opts.Rules = &fakeRuleBook{rules: []storage.GroupRule{{ID: 1, ChatID: groupID, Kind: storage.RuleSwearGuard, UserName: tag, SetBy: 9001}}}
 	f.opts.Strikes = &fakeStrikes{}
-	f.opts.Judge = &fakeJudge{answer: "PERSON"}
 	f.opts.Restrictor = restrictor
 	f.opts.AdminList = fakeAdminList{admins: []telegram.ChatMember{
 		{Status: "creator", User: &telegram.User{ID: creatorID, FirstName: "Boss", Username: "boss"}},
@@ -118,7 +117,7 @@ func TestSwearGuardWarnsThenMutesAndTagsTheCreator(t *testing.T) {
 	f, restrictor := guardFixture("")
 	start := time.Now()
 
-	sent := f.run(swearFrom(swearerID, "bugun yana yutqazdik dnx"), swearFrom(swearerID, "o'zing qo'tog'im"))
+	sent := f.run(swearFrom(swearerID, "sen bugun yana yutqazding dnx"), swearFrom(swearerID, "o'zing qo'tog'im"))
 
 	if len(sent) != 2 {
 		t.Fatalf("sent = %+v, want a warning and a mute notice", sent)
@@ -147,13 +146,13 @@ func TestSwearGuardTagsWhomTheOwnerNamed(t *testing.T) {
 	f, restrictor := guardFixture("@Bakxtyorvch")
 	restrictor.err = errors.New("not enough rights")
 
-	sent := f.run(swearFrom(swearerID, "Maria dnx"), swearFrom(swearerID, "нахуй"))
+	sent := f.run(swearFrom(swearerID, "sen dnx"), swearFrom(swearerID, "o'zing qo'tog'im"))
 
 	if len(sent) != 2 || !strings.Contains(sent[1].text, "qila olmadim") || !strings.HasSuffix(sent[1].text, "@Bakxtyorvch, qarab qo'ying.") {
 		t.Errorf("sent = %+v", sent)
 	}
 	if len(f.replier.recorded()) != 0 {
-		t.Error("a swear at Maria was answered by the model")
+		t.Error("an insult was answered by the model")
 	}
 }
 
@@ -207,6 +206,30 @@ func TestIsSwearing(t *testing.T) {
 		"Pawolnaххuy":         true,
 		"pasholnaxuiya":       true,
 		"o'zing jala":         true,
+		"blan oynaymiz":       false,
+		"Ybanmisan":           true,
+		"поxуй нет, похуй":    true,
+		"ахуел совсем":        true,
+		"ебашь их":            true,
+		"Jalap":               true,
+		"siksin":              true,
+		"qotagam":             true,
+		"haromi":              true,
+		"Poxuy":               true,
+		"пшлнх":               true,
+		"pwnx":                true,
+		"котя милая":          false,
+		"блан кетдик":         false,
+		"siklop oynadim":      false,
+		"sekin yur, sikin":    false,
+		"жалко его":           false,
+		"tvarog yedim":        false,
+		"харам иш":            false,
+		"похоже на правду":    false,
+		"себе купил":          false,
+		"huquq va huy-atvor":  false,
+		"haromni yemang":      false,
+		"Bla":                 true,
 		"kot":                 true,
 		"I am here":           false,
 		"Уйга заебал":         true,
@@ -260,27 +283,41 @@ func TestSwearGuardLeavesAdminsAlone(t *testing.T) {
 	}
 }
 
-// A word that only looks like swearing is left alone, and so is a message
-// the model cannot judge: the model answers it if it was asked.
+// A word that only begins like swearing is left alone: no model looks again.
 func TestSwearGuardLeavesWhatIsNoSwearing(t *testing.T) {
-	for name, judge := range map[string]*fakeJudge{
-		"no swearing":       {answer: "NONE"},
-		"the model fails":   {err: errors.New("ai: 503")},
-		"an unclear answer": {answer: "maybe"},
+	for _, text := range []string{"blan oynaymiz", "black skin", "kotardi yukni", "котлета вкусная", "skelet", "жалал ака"} {
+		f, restrictor := guardFixture("")
+		if sent := f.run(swearFrom(swearerID, text)); len(sent) != 0 || len(restrictor.recorded()) != 0 {
+			t.Errorf("%q: sent %+v, restrictions %+v", text, sent, restrictor.recorded())
+		}
+	}
+}
+
+// Where a message points says whom it is aimed at, as the owners want the
+// guard to work without the model.
+func TestSwearGuardAimsWithoutTheModel(t *testing.T) {
+	f, _ := guardFixture("")
+	if f.opts.Judge != nil {
+		t.Fatal("the guard's fixture has a judge")
+	}
+	reply := swearFrom(swearerID, "dnx").Message
+	reply.ReplyToMessage = groupMessage("salom")
+	s := New(f.opts)
+	defer s.stop()
+	for name, c := range map[string]struct {
+		msg   *telegram.Message
+		toBot bool
+		want  aim
+	}{
+		"to the bot": {swearFrom(swearerID, "dnx").Message, true, aimBot},
+		"a reply":    {reply, false, aimPerson},
+		"a tag":      {swearFrom(swearerID, "@ali dnx").Message, false, aimPerson},
+		"you":        {swearFrom(swearerID, "o'zing jalab").Message, false, aimPerson},
+		"to nobody":  {swearFrom(swearerID, "bla yutqazdik").Message, false, aimExclamation},
 	} {
-		t.Run(name, func(t *testing.T) {
-			f, restrictor := guardFixture("")
-			f.opts.Judge = judge
-			sent := f.run(swearFrom(swearerID, "Mira, давай хуярить, ps 5 olish kerak"), swearFrom(swearerID, "Mira, давай хуярить"))
-			if len(restrictor.recorded()) != 0 || len(f.replier.recorded()) != 2 {
-				t.Errorf("restrictions %+v, model calls %d; want none and 2", restrictor.recorded(), len(f.replier.recorded()))
-			}
-			for _, m := range sent {
-				if strings.Contains(m.text, "so'kinish mumkin emas") {
-					t.Errorf("warned: %q", m.text)
-				}
-			}
-		})
+		if got := s.aimOf(c.msg, c.msg.Text, c.toBot); got != c.want {
+			t.Errorf("%s: aim = %d, want %d", name, got, c.want)
+		}
 	}
 }
 
@@ -288,7 +325,6 @@ func TestSwearGuardLeavesWhatIsNoSwearing(t *testing.T) {
 // and never a mute: the admin the guard calls unmuted every "bla".
 func TestSwearGuardWarnsAnExclamationOnceAndNeverMutes(t *testing.T) {
 	f, restrictor := guardFixture("")
-	f.opts.Judge = &fakeJudge{answer: "EXCLAIM"}
 	sent := f.run(swearFrom(swearerID, "бля, yutqazdik"), swearFrom(swearerID, "pzds"), swearFrom(swearerID, "bla"))
 	if len(sent) != 1 || !strings.Contains(sent[0].text, "so'kinmaylik") || len(restrictor.recorded()) != 0 {
 		t.Errorf("sent %+v, restrictions %+v; want one warning and no mute", sent, restrictor.recorded())
@@ -298,10 +334,7 @@ func TestSwearGuardWarnsAnExclamationOnceAndNeverMutes(t *testing.T) {
 // An exclamation does not count towards the mute for insults.
 func TestSwearGuardKeepsExclamationsApartFromInsults(t *testing.T) {
 	f, restrictor := guardFixture("")
-	judge := &fakeJudge{answer: "EXCLAIM"}
-	f.opts.Judge = judge
 	f.run(swearFrom(swearerID, "бля"))
-	judge.answer = "PERSON"
 	sent := f.run(swearFrom(swearerID, "sen jalab"))
 	if last := sent[len(sent)-1]; len(restrictor.recorded()) != 0 || !strings.Contains(last.text, "1 soat yozolmaysiz") {
 		t.Errorf("sent %+v, restrictions %+v; want the first insult's warning", sent, restrictor.recorded())
@@ -312,7 +345,6 @@ func TestSwearGuardKeepsExclamationsApartFromInsults(t *testing.T) {
 // 15-minute mute; when she cannot mute, she stays quiet.
 func TestSwearGuardMutesTheSecondSwearAtTheBot(t *testing.T) {
 	f, restrictor := guardFixture("@Bakxtyorvch")
-	f.opts.Judge = &fakeJudge{answer: "BOT"}
 	start := time.Now()
 
 	sent := f.run(swearFrom(swearerID, "Mira dnx"), swearFrom(swearerID, "Mira jalab"))
@@ -345,7 +377,6 @@ func TestSwearGuardStaysQuietWhenItCannotMuteForTheBot(t *testing.T) {
 	}{"an admin": {guardAdminID, false}, "the mute fails": {swearerID, true}} {
 		t.Run(name, func(t *testing.T) {
 			f, restrictor := guardFixture("")
-			f.opts.Judge = &fakeJudge{answer: "BOT"}
 			if c.failing {
 				restrictor.err = errors.New("not enough rights")
 			}
@@ -390,7 +421,6 @@ func (f *fakeClipSender) SendClip(_ context.Context, clip telegram.Clip) (int64,
 // model's answer, and the second swear gets the mute and a clip.
 func TestSwearGuardAnswersASwearAtTheBotWithAClip(t *testing.T) {
 	f, restrictor := guardFixture("")
-	f.opts.Judge = &fakeJudge{answer: "BOT"}
 	clips := &fakeClipSender{}
 	f.opts.ClipSender = clips
 
@@ -424,7 +454,7 @@ func TestSwearClips(t *testing.T) {
 // The judge knows the bot by its character's name, not only by its
 // username, so "Mira jalab" can be seen as aimed at the bot.
 func TestSwearJudgeKnowsTheBotsName(t *testing.T) {
-	f, _ := guardFixture("")
+	f, _, _ := punishing(false, swearPunishment(swearerID, "mute:1"))
 	judge := &fakeJudge{answer: "NONE"}
 	f.opts.Judge = judge
 
@@ -433,7 +463,7 @@ func TestSwearJudgeKnowsTheBotsName(t *testing.T) {
 	if len(judge.asked) != 1 {
 		t.Fatalf("judge asked %d times", len(judge.asked))
 	}
-	want := "The group's bot is called Mira, @" + f.opts.Bot.Username + "."
+	want := "called Mira, @" + f.opts.Bot.Username + ","
 	if !strings.Contains(judge.asked[0], want) {
 		t.Errorf("judge prompt = %q, want %q", judge.asked[0], want)
 	}
@@ -443,7 +473,7 @@ func TestSwearJudgeKnowsTheBotsName(t *testing.T) {
 // or their app's for a word or two.
 func TestSwearGuardSpeaksTheSwearersLanguage(t *testing.T) {
 	f, _ := guardFixture("")
-	sent := f.run(swearFrom(swearerID, "блять опять проиграли сегодня"), swearFrom(swearerID, "да пошли вы нахуй все"))
+	sent := f.run(swearFrom(swearerID, "ты блять опять проиграл сегодня"), swearFrom(swearerID, "да пошли вы нахуй все"))
 	if len(sent) != 2 || !strings.HasPrefix(sent[0].text, "@ali_s, в группе нельзя материться") {
 		t.Fatalf("sent = %+v, want a Russian warning", sent)
 	}
@@ -454,7 +484,7 @@ func TestSwearGuardSpeaksTheSwearersLanguage(t *testing.T) {
 	f, _ = guardFixture("")
 	short := swearFrom(swearerID, "dnx")
 	short.Message.From.LanguageCode = "en"
-	if sent := f.run(short); len(sent) != 1 || !strings.HasPrefix(sent[0].text, "@ali_s, no swearing in the group") {
+	if sent := f.run(short); len(sent) != 1 || !strings.HasPrefix(sent[0].text, "@ali_s, let's keep the group free") {
 		t.Errorf("sent = %+v, want an English warning", sent)
 	}
 }

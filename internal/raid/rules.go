@@ -77,17 +77,24 @@ func Cost(item string, level int) int64 {
 	var cost float64
 	switch item {
 	case "sword":
-		cost = 20 * math.Pow(1.6, float64(level-1))
+		cost = 20 * math.Pow(swordGrowth, float64(level-1))
 	case "crit":
-		cost = 50 * math.Pow(2, float64(level))
+		cost = 50 * math.Pow(critGrowth, float64(level))
 	default:
 		return maxCost
 	}
 	return int64(math.Round(min(cost, maxCost)))
 }
 
-// maxCost is the most an upgrade costs, well within an int64.
-const maxCost = 1e15
+// maxCost is the most an upgrade costs, well within an int64. swordGrowth and
+// critGrowth are how much dearer each level is: gentler than they were, 1.6 and
+// 2, when a sword five levels ahead of its boss took 500 kills a level. Migration
+// 56 keeps the part of a level the coins saved at those prices were.
+const (
+	maxCost     = 1e15
+	swordGrowth = 1.5
+	critGrowth  = 1.7
+)
 
 // Most is an upgrade's highest level.
 func Most(item string) int {
@@ -138,19 +145,18 @@ func Strike(hero *storage.RaidHero, taps int, since time.Duration, now time.Time
 }
 
 // Reward is the coins one with a sword at sword who hit a killed boss with
-// damage gets: a part of their sword's next level for being there, and more
-// for their share of it, so that a few kills buy a level however far they
-// are; never less than the boss's level alone gave, and a chief's thrice.
-// The reward was the level's alone until a sword's price, growing 1.6 times
-// a level, left kills worth a five-hundredth of a level.
+// damage gets: a part of the boss's purse for being there, and more for their
+// share of it, never less than the boss's level alone gave, and a chief's
+// thrice. It follows the boss and not the sword, so that the same work pays the
+// same: a level comes quickly to one behind the boss and slowly to one ahead.
+// It followed the sword until a kill paid its strongest hitter 185 times the
+// others' and those behind could not catch up.
 func Reward(level int, damage, maxHP int64, sword int) int64 {
 	reward := int64(20*level) + int64(100*level)*damage/max(maxHP, 1)
 	// A sword at its highest has no next level to save for: its coins would
 	// grow by trillions with nothing to buy.
 	if sword < maxSword {
-		share := float64(min(max(damage, 0), max(maxHP, 1))) / float64(max(maxHP, 1))
-		next := float64(Cost("sword", max(sword, 1)))
-		reward = max(reward, int64(math.Round(next*(rewardFloor+rewardShare*share)*taper(sword))))
+		reward = max(reward, int64(math.Round(purse(level)*part(damage, maxHP, sword))))
 	}
 	if Chief(level) {
 		reward *= chiefTimes
@@ -158,28 +164,32 @@ func Reward(level int, damage, maxHP int64, sword int) int64 {
 	return reward
 }
 
-// taper is how much of a kill's part of a level a sword at sword gets: all
-// of it up to taperFrom, then 3% less a level, never under taperLeast, so
-// that the strongest climb their last levels slowly: at 58 a level took a
-// few chiefs.
-func taper(sword int) float64 {
-	return max(taperLeast, 1-taperStep*float64(max(sword-taperFrom, 0)))
+// purse is what a boss's kill is reckoned from: the price of the next level of
+// the sword expected against it.
+func purse(level int) float64 {
+	expected := int(math.Round(float64(level) * expectedSword))
+	return float64(Cost("sword", min(max(expected, 1), maxSword)))
 }
 
-const (
-	taperFrom  = 30
-	taperStep  = 0.03
-	taperLeast = 0.15
-)
+// part is how much of the purse a hitter gets. The part for being there is
+// earned by fullBlows blows, so that one tap in passing does not take it.
+func part(damage, maxHP int64, sword int) float64 {
+	damage = max(damage, 0)
+	share := float64(min(damage, max(maxHP, 1))) / float64(max(maxHP, 1))
+	blows := float64(damage) / float64(TapDamage(max(sword, 1)))
+	return rewardFloor*min(blows/fullBlows, 1) + rewardShare*share
+}
 
-// rewardFloor is the part of their sword's next level everyone who hit a
-// killed boss gets, and rewardShare the most more for their share of it: a
-// boss killed alone is 6% of a level, about seventeen for one. They were 5%
-// and 20% until the strongest player bought a level with nearly every
-// chief.
+// expectedSword is the sword expected of a boss per its level. rewardFloor is
+// the part of the purse for being there and rewardShare the most more for a
+// share of the damage. A simulation of a real group's months with these prices
+// chose them: at 0.7 a boss stood for weeks, at 0.8 the swords were at their
+// highest within three months.
 const (
-	rewardFloor = 0.01
-	rewardShare = 0.05
+	expectedSword = 0.75
+	rewardFloor   = 0.02
+	rewardShare   = 0.03
+	fullBlows     = 30
 )
 
 // titles are the damage in all that earns each title, from Yangi jangchi

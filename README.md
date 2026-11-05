@@ -1312,17 +1312,16 @@ does not erase them, and every turn in the group is told the ones in force.
 | Spam, link, picture and joins guards | an owner, in the group it is for (`guard` `spam`, `links`, `images` or `joins`; see [Join requests](#join-requests) for the last); the joins guard also the group's creator and its admins who may invite users, through the `join_captcha` tool | until turned off |
 | Punishment | an owner or the group's creator, in the group, for swearing or nude pictures: in reply to a member ("bu bola yana so'kinsa ban qil") or for anyone ("18+ tashasa 3 soat mute qil"); one per member and kind | 30 days, or the hours given |
 
-The swear guard runs in code, asking the model only one thing. In a group
-where it is on, every message from a member is checked against a list of
-swear words (dnx, pshnx, нахуй, бля, qo'tog', jalab, jala, kot, ske and the
-like; words that mostly mean something harmless, such as "am" or "mol", are
-left out). Only a message the list catches goes to the model, which answers
-in one word what it is: a swear at the bot, at a person, an exclamation
-aimed at nobody, or no swearing at all, as "кот" for a cat or "blan" for
-bilan. An exclamation ("бля, yutqazdik", "pzds") gets one warning a day and
-never a mute (action `swear_word`): muted for them, members were unmuted
-within minutes by the admin the guard calls. A message the model cannot
-judge is left alone. A member's first insult at a person gets a reply
+The swear guard runs in code, with no model. In a group where it is on, every
+message from a member is checked against a list of swear words (dnx, pshnx,
+нахуй, бля, qo'tog', jalab, jala, kot, ske and the like; words that mostly mean
+something harmless, such as "am" or "mol", and beginnings of ordinary words, such
+as "bla" of "blan", are left out). Where the message points says whom it is aimed
+at: the bot when it replies to it or calls it by name, a person when it replies
+to one, tags one or says "you" ("sen", "ты"), and otherwise nobody. An exclamation
+("бля, yutqazdik", "pzds") gets one warning a day and never a mute (action
+`swear_word`): muted for them, members were unmuted within minutes by the admin
+the guard calls. A member's first insult at a person gets a reply
 warning them; the next one within 24 hours mutes them for an hour.
 A swear at the bot gets no warning: the first is answered with one of the
 owners' two clips, chosen at random and embedded in the binary
@@ -1358,10 +1357,11 @@ kinds `swear_punishment` and
 `picture_punishment`, "ban" or "mute:<hours>" in text) is carried out in code
 too, so it holds whether or not anyone talks to her: words alone, kept as an
 instruction, reached only the model, which never sees a message not meant
-for it. One set for a member, by replying to their message, holds for any
-swearing of theirs, exclamations too, in place of the guard's warning or
-mute, and works with the swear guard off; one for anyone in the group holds
-for insults only. A picture punishment follows the picture guard deleting a
+for it. It is for swearing at the bot alone: the model is asked about a message
+that replies to the bot or calls it by name, from a member it is set for (by
+replying to their message) or, set for anyone, from any member, and only a swear
+it finds aimed at the bot is punished, in place of the guard's warning or mute.
+It works with the swear guard off; swearing at others is left to that guard. A picture punishment follows the picture guard deleting a
 nude picture, so it needs that guard on. The creator is checked with Telegram
 (`getChatMember`) each time; admins cannot set one. The asker's own words
 must ask for the ban or the mute, as with moderation. Owners are never punished, and an
@@ -1989,10 +1989,12 @@ damage. The page shows each blow's number at once, the members who fight
 this boss standing by the player with their names, each swinging as their
 blows come in, and the chat's table of damage on this boss.
 The hit that takes the last HP kills it: everyone who hit it gets coins,
-1% of their own sword's next level for being there and up to 5% more for
-their share, less of it past a sword of 30, 3% less a level down to 15%, never less than
-the boss's level alone gave, and only that once the sword is at its highest, with nothing left to buy, so that a few
-kills buy a level however far a player is, the bot tells the group who
+reckoned from the boss and not their sword: the price of the sword expected
+at its level (75% of the level), 2% of it for being there, earned by 30 blows,
+and up to 3% more for their share, never less than the boss's level alone gave,
+and only that once the sword is at its highest, so that the same work pays the
+same and a level comes quickly to one behind the boss and slowly to one ahead,
+the bot tells the group who
 hit it most (in a private chat the player fights alone), and the next
 level's boss takes its place: a third stronger each level, and stronger for
 each member who hit lately (in the last day, up to 30), so that a small
@@ -2000,7 +2002,9 @@ group's boss is a small group's to kill. Eight bosses are taken in turn,
 each drawn in its own way under its own sky (public/game/boss/skins.js): Ko'k
 dev, Qizil dev, Bir ko'zli dev, Ajdar, Muz devi, Tosh dev, Yalmog'iz kampir and
 Qora dev; every fifth is a chief (👑), thrice as strong and as rewarding.
-Coins buy the upgrades: the sword's damage and the share of critical blows.
+Coins buy the upgrades, each level of the sword 1.5 times the last and of the
+critical blows 1.7 times (migration 56 keeps the part of a level saved coins were):
+the sword's damage and the share of critical blows.
 Barchinoy the archer was an upgrade too until migration 47, which took her
 away and gave each hero back the coins they had paid for her.
 

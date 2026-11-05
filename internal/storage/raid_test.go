@@ -215,6 +215,30 @@ func TestChangeRaidHero(t *testing.T) {
 	}
 }
 
+// Migration 56 keeps coins the same part of a sword's next level at its new
+// price: the strongest lose the most, and the first sword nothing.
+func TestRaidPricesMigration(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	prices, err := migrationFiles.ReadFile("migrations/0056_raid_prices.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{
+		`INSERT INTO raid_heroes (user_id, seed, sword, coins) VALUES (1, 1, 1, 500), (2, 2, 26, 1338250)`,
+		string(prices),
+	} {
+		if _, err := store.pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var first, strong int64
+	err = store.pool.QueryRow(ctx, `SELECT (SELECT coins FROM raid_heroes WHERE user_id = 1), (SELECT coins FROM raid_heroes WHERE user_id = 2)`).Scan(&first, &strong)
+	if err != nil || first != 500 || strong != 266575 {
+		t.Errorf("coins = %d and %d, %v", first, strong, err)
+	}
+}
+
 // Migration 54 sets a total no sword could reach to what the taps do on
 // average, the boss back to the level its active members can kill, which
 // they start afresh, and Patrick's coins to a tenth of his sword's next

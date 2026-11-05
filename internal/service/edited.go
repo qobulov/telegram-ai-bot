@@ -42,8 +42,7 @@ func (s *Service) guardEdited(update telegram.Update) {
 // already: the warning or mute it got stands, and a typo fixed is no new
 // strike. When the record cannot be read, the edit is left alone.
 func (s *Service) sworeAlready(msg *telegram.Message) bool {
-	text, _ := msg.Content()
-	if s.opts.Sworn == nil || !isSwearing(text) {
+	if s.opts.Sworn == nil {
 		return false
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)

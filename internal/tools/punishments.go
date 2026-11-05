@@ -60,7 +60,7 @@ func PunishmentsTool(opts PunishmentsOptions) Tool {
 	return Tool{
 		Name: "punishments",
 		Description: "The bot's owners and this group's creator only. What the guards do the next time, in code, without you (\"yana so'kinsa ban qil\", \"18+ tashasa ban ber\"). " +
-			"set: punish_for swearing or pictures (a nude picture, which the images guard deletes), punishment ban or mute (mute_hours, default 24), for the member the asker replied to (about_member true) or anyone in the group; hours, default 720. For one member it holds for any swearing; for anyone, for insults only. " +
+			"set: punish_for swearing or pictures (a nude picture, which the images guard deletes), punishment ban or mute (mute_hours, default 24), for the member the asker replied to (about_member true) or anyone in the group; hours, default 720. Swearing means swearing at you, the bot, in a message to you: swearing at others is not punished. " +
 			"list: the punishments here; remove: one by its id from list. Never say one is set unless this tool reported it.",
 		Schema: json.RawMessage(`{
 			"type": "object",
@@ -158,11 +158,11 @@ func setPunishment(ctx context.Context, opts PunishmentsOptions, caller Caller, 
 	if err != nil {
 		return nil, err
 	}
-	note := "On now, in code, without you: the next swearing by them gets this instead of the guard's warning or mute."
+	note := "On now, in code, without you: the next swearing by them at you, the bot, gets this instead of the guard's warning or mute; swearing at others does not."
 	if kind == storage.RulePicturePunishment {
 		note = "On now, in code, without you: after the images guard deletes a nude picture from them, this follows. It needs the images guard on here."
 	} else if rule.UserID == 0 {
-		note = "On now, in code, without you: the next insult at a person or at you gets this; exclamations only the guard's warning."
+		note = "On now, in code, without you: the next swearing at you, the bot, gets this; swearing at others does not."
 	}
 	return map[string]any{"saved": true, "id": id, "for": args.PunishFor, "punishment": p.String(), "who": who,
 		"until": until.In(opts.Location).Format(ruleTimeLayout), "note": note + " An admin cannot be banned or muted by a bot: they are named instead."}, nil

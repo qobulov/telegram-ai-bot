@@ -215,9 +215,9 @@ func (s *Service) ruleLines(rules []storage.GroupRule) []string {
 // punishmentLine tells the model an owners' punishment is carried out in
 // code, so that it neither does it itself nor promises it.
 func (s *Service) punishmentLine(r storage.GroupRule) string {
-	who, what := "anyone", "insults"
+	who, what := "anyone", "swearing at you"
 	if r.UserID != 0 {
-		who, what = oneLine(r.UserName), "swearing"
+		who = oneLine(r.UserName)
 	}
 	if r.Kind == storage.RulePicturePunishment {
 		what = "a nude picture"

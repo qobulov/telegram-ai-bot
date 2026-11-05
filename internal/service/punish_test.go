@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -27,13 +28,13 @@ func swearPunishment(userID int64, text string) storage.GroupRule {
 	return storage.GroupRule{ID: 9, ChatID: groupID, Kind: storage.RuleSwearPunishment, UserID: userID, Text: text, ExpiresAt: time.Now().Add(time.Hour)}
 }
 
-// "Bu bola yana so'kinsa ban qil": the member's next swear, even an
-// exclamation, bans them instead of the guard's warning.
-func TestAMembersPunishmentBansTheirNextSwear(t *testing.T) {
+// "Bu bola yana so'kinsa ban qil": the member's next swear at the bot bans
+// them instead of the guard's warning.
+func TestAMembersPunishmentBansASwearAtTheBot(t *testing.T) {
 	f, restrictor, moderator := punishing(true, swearPunishment(swearerID, "ban"))
-	f.opts.Judge = &fakeJudge{answer: "EXCLAIM"}
+	f.opts.Judge = &fakeJudge{answer: "BOT"}
 
-	sent := f.run(swearFrom(swearerID, "bla yutqazdik"))
+	sent := f.run(swearFrom(swearerID, "Mira, o'zing qo'tog'im"))
 
 	if !slices.Equal(moderator.banned, []int64{swearerID}) || len(restrictor.recorded()) != 0 {
 		t.Fatalf("banned %v, restricted %+v", moderator.banned, restrictor.recorded())
@@ -47,9 +48,10 @@ func TestAMembersPunishmentBansTheirNextSwear(t *testing.T) {
 // as the owner said.
 func TestAPunishmentMutesWithoutTheGuard(t *testing.T) {
 	f, restrictor, moderator := punishing(false, swearPunishment(swearerID, "mute:3"))
+	f.opts.Judge = &fakeJudge{answer: "BOT"}
 	start := time.Now()
 
-	sent := f.run(swearFrom(swearerID, "o'zing qo'tog'im"))
+	sent := f.run(swearFrom(swearerID, "Mira, o'zing qo'tog'im"))
 
 	done := restrictor.recorded()
 	if len(done) != 1 || len(moderator.banned) != 0 || done[0].Until.Sub(start) < 3*time.Hour-time.Minute || done[0].Until.Sub(start) > 3*time.Hour+time.Minute {
@@ -60,21 +62,80 @@ func TestAPunishmentMutesWithoutTheGuard(t *testing.T) {
 	}
 }
 
-// One for anyone in the group is for insults: an exclamation gets the
-// guard's warning, and another member's punishment is not theirs.
-func TestAGroupsPunishmentSparesExclamations(t *testing.T) {
-	f, restrictor, moderator := punishing(true, swearPunishment(0, "ban"), swearPunishment(guardAdminID+1, "mute:1"))
-	f.opts.Judge = &fakeJudge{answer: "EXCLAIM"}
-
-	sent := f.run(swearFrom(swearerID, "бля"))
-
-	if len(moderator.banned) != 0 || len(restrictor.recorded()) != 0 || len(sent) != 1 || !strings.Contains(sent[0].text, "so'kinmaylik") {
-		t.Fatalf("banned %v, restricted %+v, sent %+v; want the warning", moderator.banned, restrictor.recorded(), sent)
+// Swearing at a person or at nobody is not what a punishment is for, and the
+// model is not asked about it: with the guard on it gets the guard's warning.
+func TestAPunishmentIsOnlyForSwearingAtTheBot(t *testing.T) {
+	for _, order := range []int64{swearerID, 0} {
+		for text, warning := range map[string]string{"bla yutqazdik": "so'kinmaylik", "o'zing jalab": "so'kinish mumkin emas"} {
+			f, restrictor, moderator := punishing(true, swearPunishment(order, "ban"), swearPunishment(guardAdminID+1, "mute:1"))
+			judge := &fakeJudge{answer: "BOT"}
+			f.opts.Judge = judge
+			sent := f.run(swearFrom(swearerID, text))
+			if len(moderator.banned) != 0 || len(restrictor.recorded()) != 0 || len(judge.asked) != 0 || len(sent) != 1 || !strings.Contains(sent[0].text, warning) {
+				t.Errorf("%s: banned %v, restricted %+v, asked %d, sent %+v; want the warning", text, moderator.banned, restrictor.recorded(), len(judge.asked), sent)
+			}
+		}
 	}
-	f.opts.Judge = &fakeJudge{answer: "PERSON"}
-	f.run(swearFrom(swearerID, "sen jalab"))
-	if !slices.Equal(moderator.banned, []int64{swearerID}) {
-		t.Errorf("banned %v after an insult, want the swearer", moderator.banned)
+}
+
+// The chat this was written for: under "mute if they swear again", a member
+// answers the bot's own message with a swear no list had. The mute falls in
+// code, its notice tells the group, and the model, which said it had muted them
+// when nothing had, is not asked.
+func TestASwearInReplyToTheBotIsMuted(t *testing.T) {
+	f, restrictor, _ := punishing(false, swearPunishment(swearerID, "mute:24"))
+	f.opts.Judge = &fakeJudge{answer: "BOT"}
+	update := swearFrom(swearerID, "Ybanmisan")
+	update.Message.ReplyToMessage = &telegram.Message{MessageID: 29, From: &telegram.User{ID: f.opts.Bot.ID, IsBot: true}, Chat: update.Message.Chat, Text: "Bajarildi, master."}
+
+	sent := f.run(update)
+
+	if done := restrictor.recorded(); len(done) != 1 || done[0].UserID != swearerID {
+		t.Fatalf("restrictions = %+v, want the swearer muted", done)
+	}
+	if len(sent) != 1 || !strings.Contains(sent[0].text, "24 soat yozolmaydi") {
+		t.Errorf("sent = %+v, want the mute notice", sent)
+	}
+	if calls := f.replier.recorded(); len(calls) != 0 {
+		t.Errorf("model calls = %d, want none", len(calls))
+	}
+}
+
+// The model finds a swear at the bot, in a spelling no list has, and only a
+// message to the bot from a member under an order is asked about, with the
+// guard off; what it calls no swearing at the bot, or cannot judge, punishes
+// no one.
+func TestAPunishmentAsksTheModelOnlyAboutMessagesToTheBot(t *testing.T) {
+	judged := func(judge *fakeJudge, from int64, text string) []telegram.Restriction {
+		f, restrictor, _ := punishing(false, swearPunishment(swearerID, "mute:24"))
+		f.opts.Judge = judge
+		f.run(swearFrom(from, text))
+		return restrictor.recorded()
+	}
+	if got := judged(&fakeJudge{answer: "BOT"}, swearerID, "Mira, ybanmisan"); len(got) != 1 {
+		t.Errorf("restrictions = %+v, want the ordered mute", got)
+	}
+	for name, c := range map[string]struct {
+		from int64
+		text string
+	}{
+		"another member": {swearerID + 1, "Mira, ybanmisan"},
+		"not to the bot": {swearerID, "ybanmisan"},
+		"no words":       {swearerID, " "},
+	} {
+		judge := &fakeJudge{answer: "BOT"}
+		if got := judged(judge, c.from, c.text); len(got) != 0 || len(judge.asked) != 0 {
+			t.Errorf("%s: restrictions %+v, asked %d", name, got, len(judge.asked))
+		}
+	}
+	for name, judge := range map[string]*fakeJudge{
+		"no swearing":  {answer: "NONE"},
+		"at a person":  {answer: "PERSON"},
+		"model failed": {err: errors.New("ai: 503")},
+	} {
+		if got := judged(judge, swearerID, "Mira, arzimaydi"); len(got) != 0 {
+			t.Errorf("%s: restrictions = %+v", name, got)
+		}
 	}
 }
 
