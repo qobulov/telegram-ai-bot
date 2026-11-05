@@ -2016,8 +2016,10 @@ sword could reach set to what the taps do on average, every boss set back
 to the level its active members can kill, and the coins of the player paid
 most while kills paid a fourth of a level cut to a tenth of one. Telegram's
 tables under the games' messages keep a score unless it is forced, so Dev
-jangi sets its scores with force: a corrected total takes the old one's
-place on a message the next time its player hits from it.
+jangi sets its scores with force, and also when its page opens: a corrected
+total takes the old one's place on a message the next time its player opens
+the game from it. The bot keeps no list of its game messages, so they cannot
+all be corrected at once.
 
 Two skills: 💪 Kuch, the buff, makes blows three times as strong for 12
 seconds (every 50), and ⚡ Ulti, the ultimate, is charged by 300 taps and makes

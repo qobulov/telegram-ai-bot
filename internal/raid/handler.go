@@ -90,6 +90,9 @@ type request struct {
 	// Solo, from a group's game, fights the player's own boss in place of
 	// the group's.
 	Solo bool `json:"solo"`
+	// Opened marks a page's first state: its player's score is set on the
+	// game's message then, without waiting for a hit.
+	Opened bool `json:"opened"`
 }
 
 type failure struct {
@@ -135,7 +138,7 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 	}
 	switch req.Action {
 	case "state":
-		return h.state(r.Context(), player, req.Solo)
+		return h.state(r.Context(), player, req.Solo, req.Opened)
 	case "hit":
 		return h.hit(r.Context(), player, req.Taps, req.Solo)
 	case "upgrade":
@@ -148,7 +151,7 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 	return nil, errBadRequest
 }
 
-func (h *handler) state(ctx context.Context, p game.Player, solo bool) (any, failure) {
+func (h *handler) state(ctx context.Context, p game.Player, solo, opened bool) (any, failure) {
 	chatID := arena(p, solo)
 	boss, hero, me, top, err := h.Store.RaidState(ctx, chatID, p.UserID, Rules, h.Seed(), topSize)
 	if err != nil {
@@ -159,6 +162,9 @@ func (h *handler) state(ctx context.Context, p game.Player, solo bool) (any, fai
 	if err != nil {
 		h.Logger.Error("could not read a raid's ranks", "user_id", p.UserID, "error", err)
 		return nil, errUnavailable
+	}
+	if opened && !solo {
+		h.setScore(ctx, p, me.Total)
 	}
 	now := h.Now()
 	var gift int64
@@ -189,10 +195,7 @@ func (h *handler) hit(ctx context.Context, p game.Player, taps int, solo bool) (
 		return nil, errUnavailable
 	}
 	if hit.ScoreDue && chatID == chatOf(p) {
-		score := int(min(hit.Member.Total, math.MaxInt32))
-		if _, err := h.Telegram.ForceGameScore(ctx, message(p), score); err != nil {
-			h.Logger.Warn("could not set a raid score", "user_id", p.UserID, "error", err)
-		}
+		h.setScore(ctx, p, hit.Member.Total)
 	}
 	view := map[string]any{
 		"boss": bossView(hit.Boss), "hero": heroView(hit.Hero, h.Now()), "me": memberView(hit.Member),
@@ -205,6 +208,18 @@ func (h *handler) hit(ctx context.Context, p game.Player, taps int, solo bool) (
 		}
 	}
 	return view, failure{}
+}
+
+// setScore sets the member's total as their score on the game's message, a
+// lower one too, which is how a corrected total replaces the old one. A
+// failure keeps nothing from going on. One who never hit has no score to show.
+func (h *handler) setScore(ctx context.Context, p game.Player, total int64) {
+	if total <= 0 {
+		return
+	}
+	if _, err := h.Telegram.ForceGameScore(ctx, message(p), int(min(total, math.MaxInt32))); err != nil {
+		h.Logger.Warn("could not set a raid score", "user_id", p.UserID, "error", err)
+	}
 }
 
 func (h *handler) upgrade(ctx context.Context, p game.Player, item string) (any, failure) {

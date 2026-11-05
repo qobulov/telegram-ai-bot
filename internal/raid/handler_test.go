@@ -24,12 +24,13 @@ type fakeStore struct {
 	upgrade  error
 	hitChats []int64
 	taps     []int
+	total    int64
 }
 
 func (f *fakeStore) RaidState(_ context.Context, chatID, userID int64, _ storage.RaidRules, seed uint32, _ int) (storage.RaidBoss, storage.RaidHero, storage.RaidMember, []storage.RaidMember, error) {
 	f.hero.UserID, f.hero.Seed = userID, seed
 	return storage.RaidBoss{ChatID: chatID, Level: 3, HP: 50, MaxHP: 100}, f.hero,
-		storage.RaidMember{UserID: userID}, []storage.RaidMember{{UserID: userID, Name: "Bek", Damage: 40}}, nil
+		storage.RaidMember{UserID: userID, Total: f.total}, []storage.RaidMember{{UserID: userID, Name: "Bek", Damage: 40}}, nil
 }
 
 func (f *fakeStore) HitRaid(_ context.Context, chatID, _ int64, _ string, taps int, _ time.Time, _ storage.RaidRules, _ uint32) (storage.RaidHit, error) {
@@ -198,6 +199,30 @@ func TestSoloFightsTheirOwnBoss(t *testing.T) {
 	}
 	if f.store.hitChats[0] != member.UserID || len(f.telegram.scores) != 0 || len(f.telegram.sent) != 0 {
 		t.Errorf("hit chat %d, scores %v, sent %+v", f.store.hitChats[0], f.telegram.scores, f.telegram.sent)
+	}
+}
+
+// A page's first state sets its player's score, so that a corrected total
+// replaces the old one on opening the game; its polls, a boss fought alone
+// and one who never hit set none.
+func TestOpeningSetsTheScore(t *testing.T) {
+	f := newFixture()
+	session := f.session(t, game.BossShortName, member)
+	f.store.total = 142120572
+	for _, body := range []map[string]any{
+		{"session": session, "action": "state"},
+		{"session": session, "action": "state", "opened": true, "solo": true},
+	} {
+		if code, _ := f.post(t, body); code != http.StatusOK || len(f.telegram.scores) != 0 {
+			t.Fatalf("%v = %d, scores %v", body, code, f.telegram.scores)
+		}
+	}
+	if code, _ := f.post(t, map[string]any{"session": session, "action": "state", "opened": true}); code != http.StatusOK || len(f.telegram.scores) != 1 || f.telegram.scores[0] != 142120572 {
+		t.Errorf("opened = %d, scores %v", code, f.telegram.scores)
+	}
+	f.store.total = 0
+	if f.post(t, map[string]any{"session": session, "action": "state", "opened": true}); len(f.telegram.scores) != 1 {
+		t.Errorf("no hits set a score: %v", f.telegram.scores)
 	}
 }
 

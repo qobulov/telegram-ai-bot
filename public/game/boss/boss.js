@@ -160,11 +160,14 @@
     hud();
   }
 
+  let hasOpened = false;
   async function poll() {
     if (sending || victoryOpen || document.hidden) return;
     polled = performance.now();
     try {
-      apply(await api({ action: "state" }));
+      // The first tells the server the page opened, to set the score once.
+      apply(await api({ action: "state", opened: !hasOpened }));
+      hasOpened = true;
     } catch (error) {
       failed(error);
     }
