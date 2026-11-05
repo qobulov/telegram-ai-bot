@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -21,6 +22,8 @@ type Card struct {
 	Attack     int
 	Health     int
 	Value      int
+	// Collection is what it is a card of: "anime", "pokemon"…
+	Collection string
 }
 
 // CardDraw is what a draw gave: the card, whether the player had none of
@@ -56,13 +59,39 @@ type CardWaitError struct{ Wait time.Duration }
 func (e *CardWaitError) Error() string { return ErrCardWait.Error() }
 func (e *CardWaitError) Unwrap() error { return ErrCardWait }
 
-// CardCatalogSize counts the cards there are.
-func (s *Store) CardCatalogSize(ctx context.Context) (int, error) {
-	var n int
-	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM card_catalog`).Scan(&n); err != nil {
-		return 0, fmt.Errorf("storage: count cards: %w", err)
+// CardCollections counts the cards of each collection there is.
+func (s *Store) CardCollections(ctx context.Context) (map[string]int, error) {
+	rows, err := s.pool.Query(ctx, `SELECT collection, count(*) FROM card_catalog GROUP BY collection`)
+	if err != nil {
+		return nil, fmt.Errorf("storage: count cards: %w", err)
 	}
-	return n, nil
+	defer rows.Close()
+	sizes := map[string]int{}
+	for rows.Next() {
+		var collection string
+		var n int
+		if err := rows.Scan(&collection, &n); err != nil {
+			return nil, fmt.Errorf("storage: count cards: %w", err)
+		}
+		sizes[collection] = n
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("storage: count cards: %w", err)
+	}
+	return sizes, nil
+}
+
+// CardImage is the link of a card's picture, "" for no such card.
+func (s *Store) CardImage(ctx context.Context, id int64) (string, error) {
+	var link string
+	err := s.pool.QueryRow(ctx, `SELECT image_url FROM card_catalog WHERE id = $1`, id).Scan(&link)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("storage: read a card's picture: %w", err)
+	}
+	return link, nil
 }
 
 // SaveCardCatalog adds the cards, and updates those there are: a card held
@@ -71,12 +100,12 @@ func (s *Store) SaveCardCatalog(ctx context.Context, cards []Card) error {
 	batch := &pgx.Batch{}
 	for _, c := range cards {
 		batch.Queue(`
-			INSERT INTO card_catalog (id, name, anime, image_url, favourites, rarity, attack, health, value)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			INSERT INTO card_catalog (id, name, anime, image_url, favourites, rarity, attack, health, value, collection)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, anime = EXCLUDED.anime, image_url = EXCLUDED.image_url,
 				favourites = EXCLUDED.favourites, rarity = EXCLUDED.rarity, attack = EXCLUDED.attack,
-				health = EXCLUDED.health, value = EXCLUDED.value, updated_at = now()`,
-			c.ID, c.Name, c.Anime, c.ImageURL, c.Favourites, c.Rarity, c.Attack, c.Health, c.Value)
+				health = EXCLUDED.health, value = EXCLUDED.value, collection = EXCLUDED.collection, updated_at = now()`,
+			c.ID, c.Name, c.Anime, c.ImageURL, c.Favourites, c.Rarity, c.Attack, c.Health, c.Value, cmp.Or(c.Collection, "anime"))
 	}
 	if err := s.pool.SendBatch(ctx, batch).Close(); err != nil {
 		return fmt.Errorf("storage: save cards: %w", err)
@@ -105,9 +134,9 @@ func (s *Store) DrawCard(ctx context.Context, userID int64, name string, rarity 
 		}
 		c := &draw.Card
 		err := tx.QueryRow(ctx, `
-			SELECT id, name, anime, image_url, favourites, rarity, attack, health, value
+			SELECT id, name, anime, image_url, favourites, rarity, attack, health, value, collection
 			FROM card_catalog WHERE rarity = $1 ORDER BY random() LIMIT 1`, rarity).
-			Scan(&c.ID, &c.Name, &c.Anime, &c.ImageURL, &c.Favourites, &c.Rarity, &c.Attack, &c.Health, &c.Value)
+			Scan(&c.ID, &c.Name, &c.Anime, &c.ImageURL, &c.Favourites, &c.Rarity, &c.Attack, &c.Health, &c.Value, &c.Collection)
 		if err != nil {
 			return err
 		}
@@ -170,7 +199,7 @@ func (s *Store) CardCounts(ctx context.Context, userID int64) (total, owned map[
 // is negative, the rarest and most loved first.
 func (s *Store) OwnedCards(ctx context.Context, userID int64, rarity int) ([]OwnedCard, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT c.id, c.name, c.anime, c.image_url, c.favourites, c.rarity, c.attack, c.health, c.value, o.count
+		SELECT c.id, c.name, c.anime, c.image_url, c.favourites, c.rarity, c.attack, c.health, c.value, c.collection, o.count
 		FROM card_owned o JOIN card_catalog c ON c.id = o.card_id
 		WHERE o.user_id = $1 AND ($2 < 0 OR c.rarity = $2)
 		ORDER BY c.rarity DESC, c.favourites DESC`, userID, rarity)
@@ -179,7 +208,7 @@ func (s *Store) OwnedCards(ctx context.Context, userID int64, rarity int) ([]Own
 	}
 	cards, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (OwnedCard, error) {
 		var o OwnedCard
-		err := row.Scan(&o.ID, &o.Name, &o.Anime, &o.ImageURL, &o.Favourites, &o.Rarity, &o.Attack, &o.Health, &o.Value, &o.Count)
+		err := row.Scan(&o.ID, &o.Name, &o.Anime, &o.ImageURL, &o.Favourites, &o.Rarity, &o.Attack, &o.Health, &o.Value, &o.Collection, &o.Count)
 		return o, err
 	})
 	if err != nil {
@@ -210,14 +239,14 @@ func (s *Store) CardTop(ctx context.Context, limit int) ([]CardPlayer, error) {
 // CardCatalog is every card, the rarest and most loved first.
 func (s *Store) CardCatalog(ctx context.Context) ([]Card, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, name, anime, image_url, favourites, rarity, attack, health, value
+		SELECT id, name, anime, image_url, favourites, rarity, attack, health, value, collection
 		FROM card_catalog ORDER BY rarity DESC, favourites DESC`)
 	if err != nil {
 		return nil, fmt.Errorf("storage: read the card catalog: %w", err)
 	}
 	catalog, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (Card, error) {
 		var c Card
-		err := row.Scan(&c.ID, &c.Name, &c.Anime, &c.ImageURL, &c.Favourites, &c.Rarity, &c.Attack, &c.Health, &c.Value)
+		err := row.Scan(&c.ID, &c.Name, &c.Anime, &c.ImageURL, &c.Favourites, &c.Rarity, &c.Attack, &c.Health, &c.Value, &c.Collection)
 		return c, err
 	})
 	if err != nil {

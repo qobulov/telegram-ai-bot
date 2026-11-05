@@ -17,7 +17,7 @@
       none: "Hech narsa topilmadi", noTop: "Hali hech kim karta olmagan",
       noTelegram: "Ilovani Telegram'da oching: botga /kartalar yozing.", stale: "Ilova eskirdi, uni qayta oching.",
       unavailable: "Aloqa uzildi, birozdan keyin urinib ko'ring.",
-      pointsLabel: "ochko", loading: "Kartalar yuklanmoqda…",
+      allSets: "Hammasi", pointsLabel: "ochko", loading: "Kartalar yuklanmoqda…",
       welcomeTitle: "Kolleksiyangiz bo'sh", welcomeText: "Har soatda bitta tasodifiy anime karta oling va hammasini to'plang.",
       welcomeButton: "Birinchi kartani olish", seeCollection: "Kolleksiyada ko'rish →",
       locked: (r, o) => `🔒 Bu ${r.toLowerCase()} karta hali yopiq. Uning tushish ehtimoli: ${o}.`,
@@ -32,7 +32,7 @@
       none: "Ничего не найдено", noTop: "Ещё никто не получил карту",
       noTelegram: "Откройте приложение в Telegram: напишите боту /kartalar.", stale: "Приложение устарело, откройте его снова.",
       unavailable: "Нет связи, попробуйте чуть позже.",
-      pointsLabel: "очки", loading: "Загружаем карты…",
+      allSets: "Все", pointsLabel: "очки", loading: "Загружаем карты…",
       welcomeTitle: "Коллекция пуста", welcomeText: "Каждый час получайте случайную аниме-карту и соберите все.",
       welcomeButton: "Получить первую карту", seeCollection: "Посмотреть в коллекции →",
       locked: (r, o) => `🔒 Эта карта (${r.toLowerCase()}) ещё закрыта. Шанс выпадения: ${o}.`,
@@ -47,7 +47,7 @@
       none: "Nothing found", noTop: "Nobody has drawn a card yet",
       noTelegram: "Open the app in Telegram: send /kartalar to the bot.", stale: "The app is out of date; open it again.",
       unavailable: "No connection; try again in a bit.",
-      pointsLabel: "points", loading: "Loading the cards…",
+      allSets: "All", pointsLabel: "points", loading: "Loading the cards…",
       welcomeTitle: "Your collection is empty", welcomeText: "Draw a random anime card every hour and collect them all.",
       welcomeButton: "Draw your first card", seeCollection: "See it in the collection →",
       locked: (r, o) => `🔒 This ${r.toLowerCase()} card is still locked. Its odds: ${o}.`,
@@ -60,12 +60,14 @@
   for (const node of document.querySelectorAll("[data-t]")) node.textContent = t[node.dataset.t];
   $("search").placeholder = t.search;
 
+  // The collections, in the order the page lists them.
+  const SETS = [["anime", "🎌 Anime"], ["pokemon", "⚡ Pokémon"], ["onepiece", "🏴‍☠️ One Piece"], ["dragonball", "🐉 Dragon Ball"], ["yugioh", "🃏 Yu-Gi-Oh!"], ["digimon", "🦖 Digimon"]];
   const COLORS = ["var(--r0)", "var(--r1)", "var(--r2)", "var(--r3)", "var(--r4)"];
   const ODDS = ["50%", "28%", "14%", "6.5%", "1.5%"];
   const spaced = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
   const haptic = (kind) => { try { tg.HapticFeedback.impactOccurred(kind); } catch (_) { /* outside Telegram */ } };
 
-  let cards = [], points = 0, nextAt = 0, drawing = false, query = "", opened = "";
+  let cards = [], points = 0, nextAt = 0, drawing = false, query = "", opened = "", chosenSet = "";
 
   // ---------- server ----------
 
@@ -115,6 +117,7 @@
     $("total").textContent = cards.length;
     $("progress").style.width = `${cards.length ? (held / cards.length) * 100 : 0}%`;
     $("welcome").hidden = held > 0;
+    setChips();
   }
 
   function cardTile(card) {
@@ -148,13 +151,39 @@
     return tile;
   }
 
+  function setChips() {
+    const root = $("sets");
+    root.textContent = "";
+    const chip = (name, label, list) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = name === chosenSet ? "on" : "";
+      button.setAttribute("aria-pressed", name === chosenSet);
+      button.textContent = label;
+      const count = document.createElement("small");
+      count.textContent = `${list.filter((c) => c.count > 0).length}/${list.length}`;
+      button.append(count);
+      button.addEventListener("click", () => {
+        chosenSet = name;
+        setChips();
+        shelves();
+        haptic("light");
+      });
+      root.append(button);
+    };
+    const known = SETS.filter(([name]) => cards.some((c) => c.set === name));
+    root.hidden = known.length < 2;
+    chip("", t.allSets, cards);
+    for (const [name, label] of known) chip(name, label, cards.filter((c) => c.set === name));
+  }
+
   function shelves() {
     const root = $("shelves");
     root.textContent = "";
     const q = query.trim().toLowerCase();
     let shown = 0;
     for (let rarity = 4; rarity >= 0; rarity--) {
-      const all = cards.filter((c) => c.rarity === rarity);
+      const all = cards.filter((c) => c.rarity === rarity && (!chosenSet || c.set === chosenSet));
       const held = all.filter((c) => c.count > 0);
       // A search looks through the cards held; their names are all the page knows.
       // Not held, a shelf shows a row of locked cards at most, the last one

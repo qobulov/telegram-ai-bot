@@ -5,15 +5,18 @@
 package cards
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
+	"log/slog"
 	"math/rand/v2"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"telegram-ai-bot/internal/storage"
@@ -94,7 +97,7 @@ func Card(id int64, name, anime, image string, favourites, rank int) storage.Car
 	r := OfRank(rank)
 	rl := rules[r]
 	return storage.Card{
-		ID: id, Name: name, Anime: anime, ImageURL: image, Favourites: favourites, Rarity: int(r), Value: rl.value,
+		ID: id, Name: name, Anime: anime, ImageURL: image, Favourites: favourites, Rarity: int(r), Value: rl.value, Collection: "anime",
 		Attack: rounded(between(id, "attack", rl.attackLeast, rl.attackMost)),
 		Health: rounded(between(id, "health", rl.healthLeast, rl.healthMost)),
 	}
@@ -112,26 +115,118 @@ func rounded(n int) int { return (n + 5) / 10 * 10 }
 
 // CatalogStore keeps the catalog of cards.
 type CatalogStore interface {
-	CardCatalogSize(ctx context.Context) (int, error)
+	CardCollections(ctx context.Context) (map[string]int, error)
 	SaveCardCatalog(ctx context.Context, cards []storage.Card) error
 }
 
 // DefaultAniList is AniList's GraphQL API.
 const DefaultAniList = "https://graphql.anilist.co"
 
-// EnsureCatalog asks AniList at baseURL for the cards the first time, and
-// when the catalog has fewer than it should.
-func EnsureCatalog(ctx context.Context, store CatalogStore, client *http.Client, baseURL string) error {
-	size, err := store.CardCatalogSize(ctx)
-	if err != nil || size >= CatalogSize {
-		return err
-	}
-	catalog, err := FetchCatalog(ctx, client, baseURL)
+// retryTrading is how long after a failed try PokéWallet is asked again: every
+// draw asking a service that is down would be slow and spend its limit.
+const retryTrading = 10 * time.Minute
+
+// Catalog fills the catalog of cards. Its zero addresses mean the services'
+// own, and without Key there are no trading cards.
+type Catalog struct {
+	Store      CatalogStore
+	Client     *http.Client
+	AniList    string
+	PokeWallet string
+	Key        string
+	Logger     *slog.Logger
+
+	mu    sync.Mutex
+	tried time.Time
+}
+
+func (c *Catalog) pokeWallet() string { return cmp.Or(c.PokeWallet, DefaultPokeWallet) }
+
+// Ensure asks for the collections the catalog does not have yet. Only the
+// anime cards it cannot do without: trading cards that cannot be had are
+// logged and tried again later, and the game goes on without them.
+func (c *Catalog) Ensure(ctx context.Context) error {
+	sizes, err := c.Store.CardCollections(ctx)
 	if err != nil {
 		return err
 	}
-	return store.SaveCardCatalog(ctx, catalog)
+	if sizes["anime"] < CatalogSize {
+		catalog, err := FetchCatalog(ctx, c.Client, cmp.Or(c.AniList, DefaultAniList))
+		if err != nil {
+			return err
+		}
+		if err := c.Store.SaveCardCatalog(ctx, catalog); err != nil {
+			return err
+		}
+	}
+	if c.Key == "" || !c.mayTry(sizes) {
+		return nil
+	}
+	for _, set := range tradingSets {
+		if sizes[set.Collection] > 0 {
+			continue
+		}
+		cards, err := fetchSet(ctx, c.Client, c.pokeWallet(), c.Key, set)
+		if err == nil {
+			err = c.Store.SaveCardCatalog(ctx, cards)
+		}
+		if err != nil && c.Logger != nil {
+			c.Logger.Warn("could not fill a card collection", "collection", set.Collection, "error", err)
+		}
+	}
+	return nil
 }
+
+// mayTry reports that a set is missing and none was tried lately.
+func (c *Catalog) mayTry(sizes map[string]int) bool {
+	missing := false
+	for _, set := range tradingSets {
+		missing = missing || sizes[set.Collection] == 0
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !missing || time.Since(c.tried) < retryTrading {
+		return false
+	}
+	c.tried = time.Now()
+	return true
+}
+
+// FetchPicture is a card's picture. The key goes only to PokéWallet.
+func (c *Catalog) FetchPicture(ctx context.Context, link string) ([]byte, string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	if c.Proxied(link) {
+		req.Header.Set("X-API-Key", c.Key)
+	}
+	resp, err := c.Client.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("cards: fetch a picture: %w", withoutURL(err))
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, "", fmt.Errorf("cards: fetch a picture: status %d", resp.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, pictureLimit+1))
+	if err != nil {
+		return nil, "", err
+	}
+	if len(data) > pictureLimit {
+		return nil, "", errors.New("cards: picture too large")
+	}
+	return data, resp.Header.Get("Content-Type"), nil
+}
+
+// Proxied reports a picture that wants the key, which a page must get through
+// the bot's server.
+func (c *Catalog) Proxied(link string) bool {
+	return strings.HasPrefix(link, c.pokeWallet()+"/")
+}
+
+// pictureLimit bounds a card's picture.
+const pictureLimit = 3 << 20
 
 // errAniList is AniList answering with an error.
 var errAniList = errors.New("cards: AniList refused")

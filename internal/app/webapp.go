@@ -49,7 +49,7 @@ func NewCards(ctx context.Context, cfg config.Config, logger *slog.Logger) (*End
 		store.Close()
 		return nil, err
 	}
-	handler := cards.NewHandler(cards.Options{BotToken: cfg.TelegramToken, Store: store, Owners: cfg.OwnerIDs, Logger: logger})
+	handler := cards.NewHandler(cards.Options{BotToken: cfg.TelegramToken, Store: store, Owners: cfg.OwnerIDs, PokeWalletKey: cfg.PokeWalletAPIKey, Logger: logger})
 	return &Endpoint{Handler: handler, Close: store.Close}, nil
 }
 

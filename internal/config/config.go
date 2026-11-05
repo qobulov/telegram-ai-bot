@@ -87,6 +87,9 @@ type Config struct {
 	// RapidAPIKey is a RapidAPI key subscribed to the Shazam Song
 	// Recognition API; without it there is no song recognition.
 	RapidAPIKey string
+	// PokeWalletAPIKey is a PokéWallet key; without it Kartalar has no
+	// trading cards.
+	PokeWalletAPIKey string
 	// URLhausAuthKey or SafeBrowsingKey lets owners turn on the link guard,
 	// each service judging links when its key is set; without either it is
 	// refused. SightengineUser and SightengineSecret let Sightengine judge
@@ -302,6 +305,7 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.CalendarificAPIKey = r.apiKey("CALENDARIFIC_API_KEY")
 	cfg.ImgflipAPIKey = r.apiKey("IMGFLIP_API_KEY")
 	cfg.RapidAPIKey = r.apiKey("RAPIDAPI_KEY")
+	cfg.PokeWalletAPIKey = r.apiKey("POKEWALLET_API_KEY")
 	cfg.URLhausAuthKey = r.apiKey("URLHAUS_AUTH_KEY")
 	cfg.SafeBrowsingKey = r.apiKey("GOOGLE_SAFE_BROWSING_KEY")
 	cfg.SightengineUser = r.apiKey("SIGHTENGINE_API_USER")

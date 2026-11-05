@@ -352,6 +352,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Payments:              bot.Client,
 		Premium:               store,
 		Cards:                 store,
+		CardsKey:              cfg.PokeWalletAPIKey,
 		PremiumPrice:          cfg.PremiumPrice,
 		PremiumDays:           cfg.PremiumDays,
 		PremiumDailyLimit:     cfg.PremiumDailyLimit,

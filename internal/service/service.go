@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"telegram-ai-bot/internal/agent"
+	"telegram-ai-bot/internal/cards"
 	"telegram-ai-bot/internal/config"
 	"telegram-ai-bot/internal/shashkaapp"
 	"telegram-ai-bot/internal/storage"
@@ -257,7 +258,11 @@ type Options struct {
 	CardsAPI string
 	// CardsURL is the page of Kartalar's Mini App, which /kartalar and the
 	// collection's button open; "" for none.
-	CardsURL          string
+	CardsURL string
+	// CardsKey is a PokéWallet key, without which there are no trading
+	// cards, at CardsPokeWallet, empty for its own address.
+	CardsKey          string
+	CardsPokeWallet   string
 	PremiumPrice      int
 	PremiumDays       int
 	PremiumDailyLimit int
@@ -416,6 +421,10 @@ type Options struct {
 // In groups only messages addressed to the bot are queued. The others are
 // at most remembered briefly, in memory, as context for the next answer.
 type Service struct {
+	// cardsCatalog fills Kartalar's catalog, made once by cardCatalog.
+	cardsOnce    sync.Once
+	cardsCatalog *cards.Catalog
+
 	opts        Options
 	userLimiter *limiter
 	ambient     *ambient

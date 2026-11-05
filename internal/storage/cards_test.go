@@ -23,8 +23,14 @@ func TestCardsAreDrawnAndCollected(t *testing.T) {
 	if err := store.SaveCardCatalog(ctx, catalog); err != nil {
 		t.Fatalf("saving the catalog again: %v", err)
 	}
-	if n, err := store.CardCatalogSize(ctx); err != nil || n != 2 {
-		t.Fatalf("catalog size = %d, %v", n, err)
+	if sizes, err := store.CardCollections(ctx); err != nil || sizes["anime"] != 2 {
+		t.Fatalf("collections = %v, %v", sizes, err)
+	}
+	if link, err := store.CardImage(ctx, 1); err != nil || link != "https://img/1.png" {
+		t.Fatalf("picture = %q, %v", link, err)
+	}
+	if link, err := store.CardImage(ctx, 99); err != nil || link != "" {
+		t.Fatalf("no such card's picture = %q, %v", link, err)
 	}
 
 	now := time.Now()

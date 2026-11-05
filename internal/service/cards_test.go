@@ -30,7 +30,9 @@ func newFakeCards(picture string) *fakeCards {
 	}
 }
 
-func (f *fakeCards) CardCatalogSize(context.Context) (int, error)               { return 200, nil }
+func (f *fakeCards) CardCollections(context.Context) (map[string]int, error) {
+	return map[string]int{"anime": 200}, nil
+}
 func (f *fakeCards) SaveCardCatalog(context.Context, []storage.Card) error      { return nil }
 func (f *fakeCards) CardTop(context.Context, int) ([]storage.CardPlayer, error) { return nil, nil }
 

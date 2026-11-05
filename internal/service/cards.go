@@ -1,11 +1,9 @@
 package service
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -20,8 +18,7 @@ import (
 // CardBook keeps Kartalar: the catalog of cards, the players' draws and
 // their collections.
 type CardBook interface {
-	CardCatalogSize(ctx context.Context) (int, error)
-	SaveCardCatalog(ctx context.Context, cards []storage.Card) error
+	cards.CatalogStore
 	DrawCard(ctx context.Context, userID int64, name string, rarity int, every time.Duration, now time.Time) (storage.CardDraw, error)
 	CardCounts(ctx context.Context, userID int64) (total, owned map[int]int, points int64, err error)
 	OwnedCards(ctx context.Context, userID int64, rarity int) ([]storage.OwnedCard, error)
@@ -37,8 +34,6 @@ const (
 	// cardsTimeout covers filling the catalog the first time, the draw and
 	// fetching the card's picture.
 	cardsTimeout = 25 * time.Second
-	// cardPictureLimit bounds a card's picture.
-	cardPictureLimit = 3 << 20
 	// cardsShown is the most cards one list shows.
 	cardsShown = 40
 	// cardTopSize is the players the table shows.
@@ -47,6 +42,15 @@ const (
 
 // cardsHTTP fetches the catalog from AniList and the cards' pictures.
 var cardsHTTP = &http.Client{Timeout: 10 * time.Second}
+
+// cardCatalog is the catalog of cards, made once: it remembers when it last
+// asked PokéWallet.
+func (s *Service) cardCatalog() *cards.Catalog {
+	s.cardsOnce.Do(func() {
+		s.cardsCatalog = &cards.Catalog{Store: s.opts.Cards, Client: cardsHTTP, AniList: s.opts.CardsAPI, PokeWallet: s.opts.CardsPokeWallet, Key: s.opts.CardsKey, Logger: s.opts.Logger}
+	})
+	return s.cardsCatalog
+}
 
 // rarityNames are the rarities' emoji and names, the most common first.
 var rarityNames = []localText{
@@ -76,7 +80,8 @@ func isCardDraw(in incoming) bool {
 func (s *Service) drawCard(ctx context.Context, in incoming) outcome {
 	ctx, cancel := context.WithTimeout(ctx, cardsTimeout)
 	defer cancel()
-	if err := cards.EnsureCatalog(ctx, s.opts.Cards, cardsHTTP, cmp.Or(s.opts.CardsAPI, cards.DefaultAniList)); err != nil {
+	catalog := s.cardCatalog()
+	if err := catalog.Ensure(ctx); err != nil {
 		s.opts.Logger.Error("could not fill the card catalog", "error", err)
 		return say(textCardsUnavailable.to(in))
 	}
@@ -94,35 +99,12 @@ func (s *Service) drawCard(ctx context.Context, in incoming) outcome {
 		return say(textCardsUnavailable.to(in))
 	}
 	out := say(cardCaption(in, draw))
-	if picture, err := fetchCardPicture(ctx, draw.Card.ImageURL); err == nil {
+	if picture, _, err := catalog.FetchPicture(ctx, draw.Card.ImageURL); err == nil {
 		out.drawings = []tools.Drawing{{Data: picture, MimeType: http.DetectContentType(picture)}}
 	} else {
 		s.opts.Logger.Warn("could not fetch a card's picture", "card", draw.Card.ID, "error", err)
 	}
 	return out
-}
-
-func fetchCardPicture(ctx context.Context, link string) ([]byte, error) {
-	if !strings.HasPrefix(link, "https://") && !strings.HasPrefix(link, "http://127.0.0.1") {
-		return nil, fmt.Errorf("no picture link: %q", link)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := cardsHTTP.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("picture: status %d", resp.StatusCode)
-	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, cardPictureLimit+1))
-	if err != nil || len(data) > cardPictureLimit {
-		return nil, cmp.Or(err, errors.New("picture too large"))
-	}
-	return data, nil
 }
 
 // cardCaption is a drawn card: its name and anime, numbers, rarity and the
