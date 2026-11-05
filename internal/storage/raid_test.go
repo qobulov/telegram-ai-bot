@@ -19,7 +19,7 @@ var testRaidRules = RaidRules{
 		counted := min(taps, 5)
 		return counted, int64(counted) * 10 * int64(hero.Sword)
 	},
-	Reward: func(level int, damage, maxHP int64) int64 { return damage },
+	Reward: func(level int, damage, maxHP int64, sword int) int64 { return damage * int64(sword) },
 	Day: func(now time.Time) time.Time {
 		return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	},
@@ -53,6 +53,10 @@ func TestRaidBossIsHitAndKilledTogether(t *testing.T) {
 		t.Fatalf("top = %+v", top)
 	}
 
+	// Alice's sword is better by the kill: her reward follows it.
+	if _, err := store.pool.Exec(ctx, `UPDATE raid_heroes SET sword = 3 WHERE user_id = $1`, alice); err != nil {
+		t.Fatal(err)
+	}
 	hit, err = store.HitRaid(ctx, raidChat, bob, "Bob", 5, now.Add(2*time.Second), testRaidRules, 11)
 	if err != nil || hit.Killed == nil || hit.Damage != 20 {
 		t.Fatalf("the killing hit = %+v, %v; it does only the 20 HP left", hit, err)
@@ -61,14 +65,14 @@ func TestRaidBossIsHitAndKilledTogether(t *testing.T) {
 		t.Fatalf("after the kill the boss is %+v and Bob's damage %d", hit.Boss, hit.Member.Damage)
 	}
 	fighters := hit.Killed.Fighters
-	if len(fighters) != 2 || fighters[0].UserID != bob || fighters[0].Damage != 60 || fighters[0].Reward != 60 || fighters[1].Reward != 40 {
+	if len(fighters) != 2 || fighters[0].UserID != bob || fighters[0].Damage != 60 || fighters[0].Reward != 60 || fighters[1].Reward != 40*3 {
 		t.Fatalf("fighters = %+v", fighters)
 	}
 	if hit.Hero.Coins != 4+5+60 {
 		t.Errorf("Bob's coins = %d, want his taps and his reward", hit.Hero.Coins)
 	}
 	_, hero, me, top, _ = store.RaidState(ctx, raidChat, alice, testRaidRules, 7, 5)
-	if hero.Coins != 4+40 || me.Damage != 0 || me.Total != 40 || len(top) != 0 {
+	if hero.Coins != 4+40*3 || me.Damage != 0 || me.Total != 40 || len(top) != 0 {
 		t.Errorf("Alice after the kill: hero %+v, member %+v, top %+v", hero, me, top)
 	}
 }

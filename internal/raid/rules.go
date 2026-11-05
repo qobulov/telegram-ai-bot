@@ -135,15 +135,28 @@ func Strike(hero *storage.RaidHero, taps int, since time.Duration, now time.Time
 	return counted, damage
 }
 
-// Reward is the coins one who hit a killed boss with damage gets: some for
-// being there, and more for their share of it; a chief's thrice.
-func Reward(level int, damage, maxHP int64) int64 {
-	reward := int64(20*level) + int64(100*level)*damage/max(maxHP, 1)
+// Reward is the coins one with a sword at sword who hit a killed boss with
+// damage gets: a part of their sword's next level for being there, and more
+// for their share of it, so that a few kills buy a level however far they
+// are; never less than the boss's level alone gave, and a chief's thrice.
+// The reward was the level's alone until a sword's price, growing 1.6 times
+// a level, left kills worth a five-hundredth of a level.
+func Reward(level int, damage, maxHP int64, sword int) int64 {
+	share := float64(min(max(damage, 0), max(maxHP, 1))) / float64(max(maxHP, 1))
+	next := float64(Cost("sword", max(sword, 1)))
+	reward := max(int64(20*level)+int64(100*level)*damage/max(maxHP, 1), int64(math.Round(next*(rewardFloor+rewardShare*share))))
 	if Chief(level) {
 		reward *= chiefTimes
 	}
 	return reward
 }
+
+// rewardFloor is the part of their sword's next level everyone who hit a
+// killed boss gets, and rewardShare the most more for their share of it.
+const (
+	rewardFloor = 0.05
+	rewardShare = 0.20
+)
 
 // titles are the damage in all that earns each title, from Yangi jangchi
 // to Alpomish.

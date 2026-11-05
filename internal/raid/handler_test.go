@@ -178,6 +178,29 @@ func TestKillIsNotAnnouncedAlone(t *testing.T) {
 	}
 }
 
+// From a group's game a player may fight their own boss: the one of their
+// private chat, which sets no score in the group and is told to no one.
+func TestSoloFightsTheirOwnBoss(t *testing.T) {
+	f := newFixture()
+	session := f.session(t, game.BossShortName, member)
+	code, out := f.post(t, map[string]any{"session": session, "action": "state", "solo": true})
+	boss, _ := out["boss"].(map[string]any)
+	if code != http.StatusOK || out["group"] != true || out["solo"] != true || boss == nil {
+		t.Fatalf("state = %d %v", code, out)
+	}
+	if code, out := f.post(t, map[string]any{"session": session, "action": "state"}); code != http.StatusOK || out["solo"] != false || out["group"] != true {
+		t.Fatalf("group state = %d %v", code, out)
+	}
+
+	f.store.hit = storage.RaidHit{Member: storage.RaidMember{Total: 99}, ScoreDue: true, Killed: &storage.RaidKill{Level: 1}}
+	if code, _ := f.post(t, map[string]any{"session": session, "action": "hit", "taps": 2, "solo": true}); code != http.StatusOK {
+		t.Fatalf("hit = %d", code)
+	}
+	if f.store.hitChats[0] != member.UserID || len(f.telegram.scores) != 0 || len(f.telegram.sent) != 0 {
+		t.Errorf("hit chat %d, scores %v, sent %+v", f.store.hitChats[0], f.telegram.scores, f.telegram.sent)
+	}
+}
+
 // An upgrade without the coins, or of something that is not one, is
 // refused.
 func TestUpgradeRefusals(t *testing.T) {

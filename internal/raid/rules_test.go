@@ -80,8 +80,8 @@ func TestRulesGrow(t *testing.T) {
 			}
 		}
 	}
-	if MaxHP(10, 2) != int64(math.Round(1500*math.Pow(1.32, 9)*1.4*3)) || Reward(10, 0, 1) != 3*Reward(9, 0, 1)*10/9 {
-		t.Errorf("a chief's HP %d and reward %d are not thrice", MaxHP(10, 2), Reward(10, 0, 1))
+	if MaxHP(10, 2) != int64(math.Round(1500*math.Pow(1.32, 9)*1.4*3)) || Reward(10, 0, 1, 1) != 3*Reward(9, 0, 1, 1)*10/9 {
+		t.Errorf("a chief's HP %d and reward %d are not thrice", MaxHP(10, 2), Reward(10, 0, 1, 1))
 	}
 	if MaxHP(500, 1000) != MaxHP(120, mostActive) || MaxHP(1, 0) != MaxHP(1, 1) {
 		t.Errorf("the bounds on level and members are not kept")
@@ -211,5 +211,25 @@ func TestDailyStreak(t *testing.T) {
 	}
 	if want := []int64{50, 0, 100, 150, 50}; !slices.Equal(gifts, want) || hero.Streak != 1 {
 		t.Errorf("gifts = %v, streak %d; want %v and a streak started over", gifts, hero.Streak, want)
+	}
+}
+
+// A kill is worth a part of the hitter's sword's next level, 5% for being
+// there and up to 20% more for the whole boss, so that a strong sword is not
+// left with a five-hundredth of a level a kill; a weak one keeps what the
+// boss's level gave.
+func TestRewardFollowsTheSword(t *testing.T) {
+	next := Cost("sword", 22)
+	if got := Reward(42, 0, 100, 22); got != int64(math.Round(float64(next)*0.05)) {
+		t.Errorf("being there = %d; want 5%% of %d", got, next)
+	}
+	if got := Reward(42, 100, 100, 22); got != int64(math.Round(float64(next)*0.25)) {
+		t.Errorf("the whole boss = %d; want 25%% of %d", got, next)
+	}
+	if got, old := Reward(42, 50, 100, 1), int64(20*42+100*42/2); got != old {
+		t.Errorf("a first sword = %d; want the level's %d", got, old)
+	}
+	if Reward(42, 500, 100, 22) != Reward(42, 100, 100, 22) {
+		t.Error("damage past the boss's HP earns more")
 	}
 }

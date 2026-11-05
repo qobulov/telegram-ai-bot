@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Russo+One&display=swap" rel="stylesheet">
   <script src="https://telegram.org/js/games.js" defer></script>
-  <link rel="stylesheet" href="boss.css">
+  <link rel="stylesheet" href="boss.css?v=3">
 </head>
 <body>
   <canvas id="scene" aria-hidden="true"></canvas>
@@ -20,9 +20,9 @@
       <div class="hp" aria-hidden="true"><i class="trail" id="hpTrail"></i><i class="fill" id="hpFill"></i><span id="hpText"></span></div>
       <div class="row">
         <span class="coins" id="coins">💰 0</span>
+        <button type="button" class="arena-toggle" id="arenaToggle" hidden></button>
         <button type="button" class="rank" id="rank" hidden></button>
         <button type="button" class="quests-toggle" id="questsToggle">📜<span class="dot" id="questsDot" hidden></span></button>
-        <button type="button" class="board-toggle" id="boardToggle"><span data-t="table"></span> ▾</button>
       </div>
       <div class="board" id="board" hidden>
         <div class="board-tabs">
@@ -33,22 +33,15 @@
       </div>
     </header>
 
-    <p class="hint" id="hint" data-t="hint"></p>
     <p class="message" id="message" aria-live="polite"></p>
 
-    <section class="skills">
-      <button type="button" class="skill" data-skill="storm"><span class="ring"></span><span class="icon">🌪</span><b data-t="storm"></b><small id="stormInfo"></small></button>
-      <button type="button" class="skill" data-skill="fire"><span class="ring"></span><span class="icon">🔥</span><b data-t="fire"></b><small id="fireInfo"></small></button>
-    </section>
 
     <section class="upgrades">
       <button type="button" class="card" data-item="sword">
-        <span class="icon">🗡</span><b data-t="sword"></b><span class="lvl" id="swordLvl"></span>
-        <small id="swordNext"></small><span class="cost" id="swordCost"></span>
+        <span class="icon">🗡</span><b data-t="sword"></b><span class="lvl" id="swordLvl"></span><span class="cost" id="swordCost"></span>
       </button>
       <button type="button" class="card" data-item="crit">
-        <span class="icon">⚡</span><b data-t="crit"></b><span class="lvl" id="critLvl"></span>
-        <small id="critNext"></small><span class="cost" id="critCost"></span>
+        <span class="icon">⚡</span><b data-t="crit"></b><span class="lvl" id="critLvl"></span><span class="cost" id="critCost"></span>
       </button>
     </section>
 
@@ -73,8 +66,8 @@
       </div>
     </section>
   </main>
-  <script src="crit.js"></script>
-  <script src="skins.js"></script>
-  <script src="boss.js"></script>
+  <script src="crit.js?v=3"></script>
+  <script src="skins.js?v=3"></script>
+  <script src="boss.js?v=3"></script>
 </body>
 </html>

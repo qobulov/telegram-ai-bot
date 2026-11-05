@@ -81,9 +81,9 @@ type RaidRules struct {
 	// last hit: how many of the taps count, and their damage. It may spend
 	// the hero's skills and count the taps in their quests.
 	Strike func(hero *RaidHero, taps int, since time.Duration, now time.Time) (counted int, damage int64)
-	// Reward is the coins one who hit a killed boss of level with damage
-	// gets.
-	Reward func(level int, damage, maxHP int64) int64
+	// Reward is the coins one with a sword at sword who hit a killed boss
+	// of level with damage gets.
+	Reward func(level int, damage, maxHP int64, sword int) int64
 	// Day is the day now is in, for the quests.
 	Day func(now time.Time) time.Time
 	// ScoreEvery is how often a member's total is due as their Telegram
@@ -227,20 +227,30 @@ func (s *Store) HitRaid(ctx context.Context, chatID, userID int64, name string, 
 // saved after, is rewarded in hitter.
 func killRaidBoss(ctx context.Context, tx pgx.Tx, boss RaidBoss, rules RaidRules, hitter *RaidHero, now time.Time) (*RaidKill, error) {
 	rows, err := tx.Query(ctx, `
-		SELECT user_id, name, damage, total FROM raid_members
-		WHERE chat_id = $1 AND level = $2 AND damage > 0 ORDER BY damage DESC, user_id`, boss.ChatID, boss.Level)
+		SELECT m.user_id, m.name, m.damage, m.total, coalesce(h.sword, 1) FROM raid_members m
+		LEFT JOIN raid_heroes h ON h.user_id = m.user_id
+		WHERE m.chat_id = $1 AND m.level = $2 AND m.damage > 0 ORDER BY m.damage DESC, m.user_id`, boss.ChatID, boss.Level)
 	if err != nil {
 		return nil, err
 	}
-	members, err := pgx.CollectRows(rows, scanRaidMember)
+	swords := map[int64]int{}
+	members, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (RaidMember, error) {
+		var m RaidMember
+		var sword int
+		err := row.Scan(&m.UserID, &m.Name, &m.Damage, &m.Total, &sword)
+		swords[m.UserID] = sword
+		return m, err
+	})
 	if err != nil {
 		return nil, err
 	}
+	// The hitter's row is locked and may hold a level bought since.
+	swords[hitter.UserID] = hitter.Sword
 	day := rules.Day(now)
 	kill := &RaidKill{Level: boss.Level, MaxHP: boss.MaxHP}
 	ids, rewards := make([]int64, 0, len(members)), make([]int64, 0, len(members))
 	for _, m := range members {
-		reward := rules.Reward(boss.Level, m.Damage, boss.MaxHP)
+		reward := rules.Reward(boss.Level, m.Damage, boss.MaxHP, swords[m.UserID])
 		kill.Fighters = append(kill.Fighters, RaidFighter{RaidMember: m, Reward: reward})
 		if m.UserID == hitter.UserID {
 			hitter.Coins += reward

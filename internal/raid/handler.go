@@ -84,6 +84,9 @@ type request struct {
 	Item    string `json:"item"`
 	Skill   string `json:"skill"`
 	Quest   int    `json:"quest"`
+	// Solo, from a group's game, fights the player's own boss in place of
+	// the group's.
+	Solo bool `json:"solo"`
 }
 
 type failure struct {
@@ -129,9 +132,9 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 	}
 	switch req.Action {
 	case "state":
-		return h.state(r.Context(), player)
+		return h.state(r.Context(), player, req.Solo)
 	case "hit":
-		return h.hit(r.Context(), player, req.Taps)
+		return h.hit(r.Context(), player, req.Taps, req.Solo)
 	case "upgrade":
 		return h.upgrade(r.Context(), player, req.Item)
 	case "skill":
@@ -142,13 +145,14 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 	return nil, errBadRequest
 }
 
-func (h *handler) state(ctx context.Context, p game.Player) (any, failure) {
-	boss, hero, me, top, err := h.Store.RaidState(ctx, chatOf(p), p.UserID, Rules, h.Seed(), topSize)
+func (h *handler) state(ctx context.Context, p game.Player, solo bool) (any, failure) {
+	chatID := arena(p, solo)
+	boss, hero, me, top, err := h.Store.RaidState(ctx, chatID, p.UserID, Rules, h.Seed(), topSize)
 	if err != nil {
 		h.Logger.Error("could not read a raid", "user_id", p.UserID, "error", err)
 		return nil, errUnavailable
 	}
-	levelRank, totalRank, topTotal, err := h.Store.RaidRanks(ctx, chatOf(p), p.UserID, boss.Level, topSize)
+	levelRank, totalRank, topTotal, err := h.Store.RaidRanks(ctx, chatID, p.UserID, boss.Level, topSize)
 	if err != nil {
 		h.Logger.Error("could not read a raid's ranks", "user_id", p.UserID, "error", err)
 		return nil, errUnavailable
@@ -166,19 +170,22 @@ func (h *handler) state(ctx context.Context, p game.Player) (any, failure) {
 		"top": h.topView(top, p.UserID), "top_total": h.topView(topTotal, p.UserID), "avatar": h.Sessions.AvatarPath(p.UserID),
 		"rank":            map[string]int{"level": levelRank, "total": totalRank},
 		"taps_per_second": TapsPerSecond, "crit_times": critTimes,
+		"group": chatOf(p) < 0, "solo": chatID == p.UserID,
 	}, failure{}
 }
 
 // hit counts the taps, then sets the member's total as their Telegram
 // score when it is due and tells a group its boss was killed; neither
-// keeps the hit from counting if Telegram fails.
-func (h *handler) hit(ctx context.Context, p game.Player, taps int) (any, failure) {
-	hit, err := h.Store.HitRaid(ctx, chatOf(p), p.UserID, p.Name, taps, h.Now(), Rules, h.Seed())
+// keeps the hit from counting if Telegram fails. A boss fought alone from a
+// group's game sets no score there: the group's table is for its boss.
+func (h *handler) hit(ctx context.Context, p game.Player, taps int, solo bool) (any, failure) {
+	chatID := arena(p, solo)
+	hit, err := h.Store.HitRaid(ctx, chatID, p.UserID, p.Name, taps, h.Now(), Rules, h.Seed())
 	if err != nil {
 		h.Logger.Error("could not count a raid hit", "user_id", p.UserID, "error", err)
 		return nil, errUnavailable
 	}
-	if hit.ScoreDue {
+	if hit.ScoreDue && chatID == chatOf(p) {
 		score := int(min(hit.Member.Total, math.MaxInt32))
 		if _, err := h.Telegram.SetGameScore(ctx, message(p), score); err != nil {
 			h.Logger.Warn("could not set a raid score", "user_id", p.UserID, "error", err)
@@ -190,8 +197,8 @@ func (h *handler) hit(ctx context.Context, p game.Player, taps int) (any, failur
 	}
 	if hit.Killed != nil {
 		view["killed"] = killView(*hit.Killed, p.UserID)
-		if chatOf(p) < 0 {
-			h.announce(ctx, chatOf(p), *hit.Killed)
+		if chatID < 0 {
+			h.announce(ctx, chatID, *hit.Killed)
 		}
 	}
 	return view, failure{}
@@ -270,6 +277,16 @@ func chatOf(p game.Player) int64 {
 		return p.ChatID
 	}
 	return p.UserID
+}
+
+// arena is the chat whose boss the player hits: their own when they ask
+// for it, else the game's chat's. A player's own boss is kept as their
+// private chat's, the same one they fight from the bot's chat.
+func arena(p game.Player, solo bool) int64 {
+	if solo {
+		return p.UserID
+	}
+	return chatOf(p)
 }
 
 func message(p game.Player) telegram.GameMessage {

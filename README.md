@@ -1949,7 +1949,9 @@ damage. The page shows each blow's number at once, the members who fight
 this boss standing by the player with their names, each swinging as their
 blows come in, and the chat's table of damage on this boss.
 The hit that takes the last HP kills it: everyone who hit it gets coins,
-some for being there and more for their share, the bot tells the group who
+5% of their own sword's next level for being there and up to 20% more for
+their share, never less than the boss's level alone gave, so that a few
+kills buy a level however far a player is, the bot tells the group who
 hit it most (in a private chat the player fights alone), and the next
 level's boss takes its place: a third stronger each level, and stronger for
 each member who hit lately (in the last day, up to 30), so that a small
@@ -1961,6 +1963,16 @@ Coins buy the upgrades: the sword's damage and the share of critical blows.
 Barchinoy the archer was an upgrade too until migration 47, which took her
 away and gave each hero back the coins they had paid for her.
 
+From a group's game the «🧍 Mening devim» button turns to the player's own
+boss, the one their private chat with the bot keeps, sized to them alone, so
+that a member too weak for the group's giant still kills bosses and earns
+coins; «👥 Guruh devi» turns back. The choice is kept for their next game. A
+boss fought alone sets no score in the group and is announced to no one; the
+hero, its coins, upgrades, skills and quests are the same in both.
+
+The page no longer shows the skills below, the hint, the upgrades' next
+values or a second ranking button, which crowded it: the server still
+counts the skills, and the daily quest to use them is left off the page.
 Two skills, each ready again after a while: 🌪 Bo'ron zarbasi makes blows
 five times as strong for 5 seconds (every 45), 🔥 Olovli qilich makes the
 next 10 blows critical (every 60). Three daily quests,

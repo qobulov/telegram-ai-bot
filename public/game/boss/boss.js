@@ -12,6 +12,7 @@
       you: "Siz",
       names: ["Ko'k dev", "Qizil dev", "Bir ko'zli dev", "Ajdar", "Muz devi", "Tosh dev", "Yalmog'iz kampir", "Qora dev"],
       hint: "Devni bosib uring! Guruhdagilar ham siz bilan uradi",
+      toSolo: "🧍 Mening devim", toGroup: "👥 Guruh devi",
       chief: "BOSH DEV", storm: "Bo'ron", fire: "Olov", ready: "Tayyor!",
       stormOn: "Bo'ron zarbasi! ×5", fireOn: "Olovli qilich! 10 krit",
       quests: "Kundalik vazifalar", questsReset: "Vazifalar har kuni yarim tunda yangilanadi.",
@@ -20,7 +21,6 @@
       table: "Reyting", thisBoss: "Shu dev", allTime: "Umumiy", place: (n) => `${n}-o'rin`,
       titles: ["Yangi jangchi", "Botir", "Bahodir", "Pahlavon", "Qahramon", "Alpomish"], sword: "Qilich", crit: "Krit",
       lvl: (n) => `${n}-daraja`,
-      swordNext: (a, b) => `zarba ${a} → ${b}`, critNext: (a, b) => `${a}% → ${b}%`,
       max: "Eng yuqori", killed: (name) => `${name} yengildi!`, reward: (n) => `+${n} 💰 sizga`,
       next: "Keyingi dev", share: "Ulashish", others: (name) => `${name} guruh bilan yengildi!`,
       poor: "Tanga yetmaydi", upgraded: "Kuchaydi!", rage: "Dev g'azabda!",
@@ -32,6 +32,7 @@
       you: "Вы",
       names: ["Синий дэв", "Красный дэв", "Одноглазый дэв", "Аждар", "Ледяной дэв", "Каменный дэв", "Ялмогиз-кампир", "Чёрный дэв"],
       hint: "Бейте дэва! Группа бьёт вместе с вами",
+      toSolo: "🧍 Мой босс", toGroup: "👥 Босс группы",
       chief: "ГЛАВНЫЙ", storm: "Буря", fire: "Огонь", ready: "Готово!",
       stormOn: "Удар бури! ×5", fireOn: "Огненный меч! 10 критов",
       quests: "Ежедневные задания", questsReset: "Задания обновляются каждую полночь.",
@@ -40,7 +41,6 @@
       table: "Рейтинг", thisBoss: "Этот дэв", allTime: "Всего", place: (n) => `${n}-е место`,
       titles: ["Новобранец", "Батыр", "Богатырь", "Пахлавон", "Герой", "Алпамыш"], sword: "Меч", crit: "Крит",
       lvl: (n) => `ур. ${n}`,
-      swordNext: (a, b) => `удар ${a} → ${b}`, critNext: (a, b) => `${a}% → ${b}%`,
       max: "Максимум", killed: (name) => `${name} повержен!`, reward: (n) => `+${n} 💰 вам`,
       next: "Следующий дэв", share: "Поделиться", others: (name) => `${name} повержен группой!`,
       poor: "Не хватает монет", upgraded: "Сильнее!", rage: "Дэв в ярости!",
@@ -52,6 +52,7 @@
       you: "You",
       names: ["Blue giant", "Red giant", "One-eyed giant", "Ajdar the dragon", "Ice giant", "Stone giant", "The witch Yalmog'iz", "Black giant"],
       hint: "Tap the giant! Your group hits it with you",
+      toSolo: "🧍 My boss", toGroup: "👥 Group boss",
       chief: "CHIEF", storm: "Storm", fire: "Fire", ready: "Ready!",
       stormOn: "Storm strike! ×5", fireOn: "Fiery sword! 10 crits",
       quests: "Daily quests", questsReset: "Quests renew every midnight.",
@@ -60,7 +61,6 @@
       table: "Ranking", thisBoss: "This giant", allTime: "All time", place: (n) => `#${n}`,
       titles: ["Recruit", "Brave", "Warrior", "Champion", "Hero", "Alpomish"], sword: "Sword", crit: "Crit",
       lvl: (n) => `level ${n}`,
-      swordNext: (a, b) => `blow ${a} → ${b}`, critNext: (a, b) => `${a}% → ${b}%`,
       max: "Maxed", killed: (name) => `${name} defeated!`, reward: (n) => `+${n} 💰 for you`,
       next: "Next giant", share: "Share", others: (name) => `${name} defeated by the group!`,
       poor: "Not enough coins", upgraded: "Stronger!", rage: "The giant is enraged!",
@@ -87,12 +87,17 @@
     const response = await fetch("/api/raid", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session, ...body }),
+      body: JSON.stringify({ session, solo, ...body }),
     });
     const data = await response.json().catch(() => ({ error: "unavailable" }));
     if (!response.ok || data.error) throw new Error(data.error || "unavailable");
     return data;
   }
+
+  // solo fights the player's own boss from a group's game; the choice is
+  // kept for their next game.
+  let solo = false, inGroup = false;
+  try { solo = localStorage.getItem("raid-solo") === "1"; } catch (_) { /* storage off */ }
 
   let myAvatar = "";
   let boss = null, hero = null, top = [], topTotal = [], rank = { level: 0, total: 0 }, myTitle = 0, boardMode = "level";
@@ -143,6 +148,10 @@
         seen.set(row.id, row.damage);
       }
       top = data.top;
+    }
+    if (data.group !== undefined) {
+      inGroup = data.group;
+      arenaHud();
     }
     if (data.taps_per_second) tapsPerSecond = data.taps_per_second;
     if (data.crit_times) critTimes = data.crit_times;
@@ -232,7 +241,6 @@
     const damage = hero.tap_damage * (crit ? critTimes : 1) * (storm ? skills.storm.times : 1);
     pending += 1;
     pendingDamage += damage;
-    $("hint").hidden = true;
     damageNumber(x, y - 10, damage, crit);
     burst(x, y, crit ? "#ffcf4a" : "#ffffff", crit ? 22 : 10, crit ? 6 : 4);
     if (crit) slash(x, y);
@@ -246,44 +254,13 @@
 
   // ---------- skills and quests ----------
 
-  async function useSkill(skill) {
-    if (!hero || victoryOpen) return;
-    const now = performance.now();
-    if (now < skills[skill].readyAt) return;
-    await flush();
-    try {
-      apply(await api({ action: "skill", skill }));
-      if (skill === "fire") fireLeft = hero.skills.fire.left;
-      textPop(W / 2, bossY() - bossRadius() - 20, skill === "fire" ? t.fireOn : t.stormOn, "#ffb34a", 26);
-      burst(bossX(), bossY(), "#ff8a3d", 50, 8);
-      fx.shake = 0.8;
-      if (navigator.vibrate) navigator.vibrate([20, 30, 40]);
-      hud();
-    } catch (error) {
-      if (error.message !== "cooldown") failed(error);
-    }
-  }
-
-  function skillsHud() {
-    if (!hero) return;
-    const now = performance.now();
-    const every = { storm: 45000, fire: 60000 };
-    for (const button of document.querySelectorAll(".skill")) {
-      const name = button.dataset.skill, sk = skills[name];
-      const wait = Math.max(0, sk.readyAt - now);
-      const active = name === "fire" ? fireLeft > 0 : now < sk.until;
-      button.classList.toggle("active", active);
-      button.classList.toggle("ready", !wait && !active);
-      button.style.setProperty("--cool", `${Math.min(100, (wait / every[name]) * 100)}%`);
-      $(`${name}Info`).textContent = active ? (name === "fire" ? `🔥 ${fireLeft}` : `${Math.ceil((sk.until - now) / 1000)}s`) : wait ? `${Math.ceil(wait / 1000)}s` : t.ready;
-    }
-  }
-
+  // SKILL_QUEST, using a skill, is not shown: the page has no skills.
+  const SKILL_QUEST = 2;
   let questsShown = "";
   function questsHud() {
     if (!hero) return;
     let can = 0;
-    for (const q of hero.quests) if (q.progress >= q.goal && !q.claimed) can += 1;
+    hero.quests.forEach((q, i) => { if (i !== SKILL_QUEST && q.progress >= q.goal && !q.claimed) can += 1; });
     $("questsDot").hidden = can === 0;
     // Drawn again only when they changed, so that a press of a button is
     // not lost to the list being drawn under it.
@@ -293,6 +270,7 @@
     const list = $("questList");
     list.textContent = "";
     hero.quests.forEach((q, i) => {
+      if (i === SKILL_QUEST) return;
       const done = q.progress >= q.goal;
       const li = document.createElement("li");
       const name = document.createElement("span");
@@ -334,7 +312,6 @@
     toastTimer = setTimeout(() => { box.hidden = true; }, ms);
   }
 
-  for (const button of document.querySelectorAll(".skill")) button.addEventListener("click", () => useSkill(button.dataset.skill));
   $("questsToggle").addEventListener("click", () => { questsHud(); $("quests").hidden = false; });
   $("questsClose").addEventListener("click", () => { $("quests").hidden = true; });
   $("quests").addEventListener("click", (e) => { if (e.target.id === "quests") $("quests").hidden = true; });
@@ -412,6 +389,33 @@
     chip.classList.add("up");
   }
 
+  function arenaHud() {
+    const toggle = $("arenaToggle");
+    toggle.hidden = !inGroup;
+    toggle.textContent = solo ? t.toGroup : t.toSolo;
+  }
+
+  // switchArena sends the taps struck at this boss first: they count
+  // against it, not the next one.
+  async function switchArena() {
+    if (sending || !boss) return;
+    await flush();
+    if (pending > 0 || inflight > 0) return;
+    solo = !solo;
+    try { localStorage.setItem("raid-solo", solo ? "1" : "0"); } catch (_) { /* storage off */ }
+    boss = null;
+    top = [];
+    topTotal = [];
+    rank = { level: 0, total: 0 };
+    shownLevel = 0;
+    myDamage = 0;
+    newBoss();
+    arenaHud();
+    await poll();
+  }
+
+  $("arenaToggle").addEventListener("click", switchArena);
+
   function newBoss() {
     entrance = 1;
     seen.clear();
@@ -449,21 +453,20 @@
       $("coins").classList.add("pop");
     }
     const have = hero.coins + pending + inflight;
-    const card = (item, level, next) => {
+    const card = (item, level) => {
       const el = document.querySelector(`.card[data-item="${item}"]`);
       $(`${item}Lvl`).textContent = t.lvl(level);
-      $(`${item}Next`).textContent = next;
       $(`${item}Cost`).textContent = hero.max[item] ? t.max : `${fmt(hero.costs[item])} 💰`;
       el.classList.toggle("max", hero.max[item]);
       el.classList.toggle("poor", !hero.max[item] && have < hero.costs[item]);
       el.classList.toggle("ready", !hero.max[item] && have >= hero.costs[item]);
     };
-    card("sword", hero.sword, t.swordNext(fmt(hero.tap_damage), fmt(hero.next.tap_damage)));
-    card("crit", hero.crit, t.critNext(hero.crit_chance, hero.next.crit_chance));
+    card("sword", hero.sword);
+    card("crit", hero.crit);
     const chip = $("rank");
     const place = boardMode === "total" ? rank.total : rank.level || rank.total;
     chip.hidden = false;
-    chip.textContent = `${TITLE_ICONS[myTitle]} ${t.titles[myTitle]}${place ? " · 🏆 " + t.place(place) : ""}`;
+    chip.textContent = `🏆 ${place ? t.place(place) : t.table} ▾`;
     const rows = boardMode === "total" ? topTotal : top;
     const board = $("boardList");
     board.textContent = "";
@@ -482,8 +485,7 @@
     });
   }
 
-  $("boardToggle").addEventListener("click", () => { $("board").hidden = !$("board").hidden; });
-  $("rank").addEventListener("click", () => { $("board").hidden = false; });
+  $("rank").addEventListener("click", () => { $("board").hidden = !$("board").hidden; });
   for (const tab of document.querySelectorAll(".board-tabs button")) {
     tab.addEventListener("click", () => {
       boardMode = tab.dataset.b;
@@ -513,7 +515,7 @@
     peaks = [0, 1].map((layer) => Array.from({ length: 9 }, (_, i) => ({ x: i / 8, h: 0.12 + rnd() * (layer ? 0.1 : 0.2) })));
   }
 
-  const cardsTop = () => document.querySelector(".skills").getBoundingClientRect().top;
+  const cardsTop = () => document.querySelector(".upgrades").getBoundingClientRect().top;
   const groundY = () => cardsTop() - 18;
   const bossRadius = () => Math.max(40, Math.min(W * 0.36, (groundY() - 150) * 0.42, 170));
   const bossX = () => W / 2;
@@ -827,7 +829,6 @@
       ctx.fillRect(-20, -20, W + 40, H + 40);
     }
     drawEffects(dt);
-    skillsHud();
     requestAnimationFrame(frame);
   }
 
