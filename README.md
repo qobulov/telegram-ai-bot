@@ -1978,7 +1978,8 @@ this boss standing by the player with their names, each swinging as their
 blows come in, and the chat's table of damage on this boss.
 The hit that takes the last HP kills it: everyone who hit it gets coins,
 1% of their own sword's next level for being there and up to 5% more for
-their share, never less than the boss's level alone gave, so that a few
+their share, less of it past a sword of 30, 3% less a level down to 15%, never less than
+the boss's level alone gave, and only that once the sword is at its highest, with nothing left to buy, so that a few
 kills buy a level however far a player is, the bot tells the group who
 hit it most (in a private chat the player fights alone), and the next
 level's boss takes its place: a third stronger each level, and stronger for
@@ -1997,6 +1998,11 @@ that a member too weak for the group's giant still kills bosses and earns
 coins; «👥 Guruh devi» turns back. The choice is kept for their next game. A
 boss fought alone sets no score in the group and is announced to no one; the
 hero, its coins, upgrades, skills and quests are the same in both.
+
+Migration 54 recalculated the game once, as the owners asked: totals no
+sword could reach set to what the taps do on average, every boss set back
+to the level its active members can kill, and the coins of the player paid
+most while kills paid a fourth of a level cut to a tenth of one.
 
 Two skills: 💪 Kuch, the buff, makes blows three times as strong for 12
 seconds (every 50), and ⚡ Ulti, the ultimate, is charged by 300 taps and makes

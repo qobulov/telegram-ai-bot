@@ -259,4 +259,16 @@ func TestRewardFollowsTheSword(t *testing.T) {
 	if Reward(42, 500, 100, 22) != Reward(42, 100, 100, 22) {
 		t.Error("damage past the boss's HP earns more")
 	}
+	// Past 30 a kill pays less of a level, 3% less a level, never under 15%.
+	for sword, want := range map[int]float64{30: 1, 40: 0.7, 50: 0.4, 58: 0.16, 59: 0.15} {
+		if got := taper(sword); math.Abs(got-want) > 1e-9 {
+			t.Errorf("taper(%d) = %v; want %v", sword, got, want)
+		}
+	}
+	if got, want := Reward(41, 100, 100, 50), int64(math.Round(float64(Cost("sword", 50))*0.06*0.4)); got != want {
+		t.Errorf("a whole boss at sword 50 = %d; want %d", got, want)
+	}
+	if got, level := Reward(41, 100, 100, maxSword), int64(20*41+100*41); got != level {
+		t.Errorf("a sword at its highest = %d; want the level's %d", got, level)
+	}
 }

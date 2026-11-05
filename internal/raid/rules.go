@@ -144,14 +144,33 @@ func Strike(hero *storage.RaidHero, taps int, since time.Duration, now time.Time
 // The reward was the level's alone until a sword's price, growing 1.6 times
 // a level, left kills worth a five-hundredth of a level.
 func Reward(level int, damage, maxHP int64, sword int) int64 {
-	share := float64(min(max(damage, 0), max(maxHP, 1))) / float64(max(maxHP, 1))
-	next := float64(Cost("sword", max(sword, 1)))
-	reward := max(int64(20*level)+int64(100*level)*damage/max(maxHP, 1), int64(math.Round(next*(rewardFloor+rewardShare*share))))
+	reward := int64(20*level) + int64(100*level)*damage/max(maxHP, 1)
+	// A sword at its highest has no next level to save for: its coins would
+	// grow by trillions with nothing to buy.
+	if sword < maxSword {
+		share := float64(min(max(damage, 0), max(maxHP, 1))) / float64(max(maxHP, 1))
+		next := float64(Cost("sword", max(sword, 1)))
+		reward = max(reward, int64(math.Round(next*(rewardFloor+rewardShare*share)*taper(sword))))
+	}
 	if Chief(level) {
 		reward *= chiefTimes
 	}
 	return reward
 }
+
+// taper is how much of a kill's part of a level a sword at sword gets: all
+// of it up to taperFrom, then 3% less a level, never under taperLeast, so
+// that the strongest climb their last levels slowly: at 58 a level took a
+// few chiefs.
+func taper(sword int) float64 {
+	return max(taperLeast, 1-taperStep*float64(max(sword-taperFrom, 0)))
+}
+
+const (
+	taperFrom  = 30
+	taperStep  = 0.03
+	taperLeast = 0.15
+)
 
 // rewardFloor is the part of their sword's next level everyone who hit a
 // killed boss gets, and rewardShare the most more for their share of it: a

@@ -214,3 +214,54 @@ func TestChangeRaidHero(t *testing.T) {
 		t.Errorf("saved %+v, changed %+v", saved, hero)
 	}
 }
+
+// Migration 54 sets a total no sword could reach to what the taps do on
+// average, the boss back to the level its active members can kill, which
+// they start afresh, and Patrick's coins to a tenth of his sword's next
+// level; a total that could be reached is kept.
+func TestRaidRecalculateMigration(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	recalculate, err := migrationFiles.ReadFile("migrations/0054_raid_recalculate.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const patrick = 862862027
+	for _, q := range []string{
+		`INSERT INTO raid_heroes (user_id, seed, sword, crit, coins, taps) VALUES
+			(1, 1, 22, 15, 261224, 12133), (862862027, 2, 58, 15, 7246756405316, 70071), (3, 3, 20, 12, 14152, 36661)`,
+		`INSERT INTO raid_members (chat_id, user_id, name, level, damage, total) VALUES
+			(-100, 1, 'owner', 68, 35142, 99996563953848), (-100, 862862027, 'Patrick', 68, 14941564498, 2138043371981),
+			(-100, 3, 'Kafka', 68, 5000, 300000000)`,
+		`INSERT INTO raid_bosses (chat_id, level, hp, max_hp) VALUES (-100, 68, 452274748421, 467216312919)`,
+		string(recalculate),
+	} {
+		if _, err := store.pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	totals := map[int64]int64{}
+	rows, _ := store.pool.Query(ctx, `SELECT user_id, total, level, damage FROM raid_members`)
+	for rows.Next() {
+		var id, total int64
+		var level, damage int
+		if err := rows.Scan(&id, &total, &level, &damage); err != nil {
+			t.Fatal(err)
+		}
+		totals[id] = total
+		if level >= 68 || damage != 0 {
+			t.Errorf("member %d at level %d with damage %d after the boss was set back", id, level, damage)
+		}
+	}
+	if totals[1] != 142120572 || totals[patrick] != 2138043371981 || totals[3] != 300000000 {
+		t.Errorf("totals = %v", totals)
+	}
+	var level int
+	var hp, maxHP, coins int64
+	if err := store.pool.QueryRow(ctx, `SELECT level, hp, max_hp FROM raid_bosses WHERE chat_id = -100`).Scan(&level, &hp, &maxHP); err != nil || level >= 68 || level < 20 || hp != maxHP {
+		t.Errorf("boss = level %d, %d/%d, %v", level, hp, maxHP, err)
+	}
+	if err := store.pool.QueryRow(ctx, `SELECT coins FROM raid_heroes WHERE user_id = $1`, patrick).Scan(&coins); err != nil || coins >= 1_000_000_000_000 || coins < 800_000_000_000 {
+		t.Errorf("Patrick's coins = %d, %v", coins, err)
+	}
+}

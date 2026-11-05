@@ -41,3 +41,19 @@ tartibi README'ning Mini App va o'yinlar bo'limida.
 > Shahar uxlaydi, mafiya uyg'onadi! Yashirin rolingizni oling: Don, Komissar, Shifokor, Manyak… Tunda harakat qiling, kunduzi bahslashib mafiyani toping. Guruh bilan 5 kishidan.
 
 Rasmni o'zgartirish yoki tavsifni yangilash uchun: `/mygames` → o'yin → *Edit*.
+
+## Kartalar (Mini App)
+
+Kartalar o'yin emas, Mini App: @BotFather'da `/newapp` bilan ro'yxatdan
+o'tkaziladi. Bot uni `/kartalar` bilan tugma orqali ochadi, shuning uchun bu
+ixtiyoriy; ro'yxatdan o'tgach esa `t.me/<bot>/kartalar` havolasi bilan ham
+ochiladi.
+
+| Rasm | Nom | Qisqa nom | URL |
+|---|---|---|---|
+| ![](kartalar.png) | Kartalar | `kartalar` | `WEBAPP_URL` + `/kartalar/` |
+
+**Tavsif** — `kartalar.png`
+
+> Anime qahramonlari kartalarini yig'ing! Har soatda yangi karta oling: oddiydan mifikkacha 200 ta karta, kolleksiya va reyting.
+
