@@ -875,3 +875,24 @@ func TestFilteredTurns(t *testing.T) {
 		t.Errorf("refused words: %v after %d requests", err, len(words.model.requests))
 	}
 }
+
+// An answer in Uzbek Cyrillic to a question in Uzbek Latin is turned into
+// Latin before it is sent and saved; a Russian one is left as it is.
+func TestLatinScriptTurnsUzbekCyrillicAnswersIntoLatin(t *testing.T) {
+	f := newFixture(text("Ҳа, бугун ҳаво яхши"))
+	req := request(1, "bugun havo qanday?")
+	req.LatinScript = true
+	answer, err := f.agent.Reply(context.Background(), req)
+	if err != nil || answer.Text != "Ha, bugun havo yaxshi" {
+		t.Fatalf("answer = %q, %v", answer.Text, err)
+	}
+	if saved := f.store.history[testScope]; saved[len(saved)-1].Content != "Ha, bugun havo yaxshi" {
+		t.Errorf("saved %q, want the Latin answer", saved[len(saved)-1].Content)
+	}
+
+	f = newFixture(text("Да, сегодня хорошая погода"))
+	req.LatinScript = true
+	if answer, err := f.agent.Reply(context.Background(), req); err != nil || answer.Text != "Да, сегодня хорошая погода" {
+		t.Errorf("a Russian answer = %q, %v; want it as it is", answer.Text, err)
+	}
+}

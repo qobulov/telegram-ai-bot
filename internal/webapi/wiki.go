@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
 
 	"telegram-ai-bot/internal/tools"
+	"telegram-ai-bot/internal/uzscript"
 )
 
 const (
@@ -104,7 +104,7 @@ func (a *apis) wikiSummary(ctx context.Context, query, lang string) (wikiSummary
 	for _, try := range wikiFallbacks[lang] {
 		search := query
 		if try == "uz" && hasCyrillic(query) {
-			search = latinize(query)
+			search = uzscript.Latin(query)
 		}
 		page, err := a.wikiSearch(ctx, try, search)
 		if err != nil {
@@ -237,49 +237,4 @@ func isPictureNote(note string) bool {
 		}
 	}
 	return strings.Contains(note, "pictured")
-}
-
-// latinize writes Uzbek Cyrillic in the Latin alphabet Uzbek Wikipedia
-// uses. Other characters pass through.
-func latinize(text string) string {
-	var b strings.Builder
-	var previous rune
-	for _, r := range text {
-		lower := unicode.ToLower(r)
-		latin, found := cyrillicToLatin[lower]
-		switch {
-		case !found:
-			latin = string(r)
-		case lower == 'е' && startsSyllable(previous):
-			latin = "ye"
-		}
-		if found && r != lower {
-			latin = capitalize(latin)
-		}
-		b.WriteString(latin)
-		previous = r
-	}
-	return b.String()
-}
-
-// startsSyllable reports whether е after previous is said "ye": at the
-// start of a word, or after a vowel or a sign.
-func startsSyllable(previous rune) bool {
-	return !unicode.IsLetter(previous) || strings.ContainsRune("аеёиоуэюяўъь", unicode.ToLower(previous))
-}
-
-func capitalize(text string) string {
-	runes := []rune(text)
-	if len(runes) > 0 {
-		runes[0] = unicode.ToUpper(runes[0])
-	}
-	return string(runes)
-}
-
-var cyrillicToLatin = map[rune]string{
-	'а': "a", 'б': "b", 'в': "v", 'г': "g", 'д': "d", 'е': "e", 'ё': "yo", 'ж': "j", 'з': "z",
-	'и': "i", 'й': "y", 'к': "k", 'л': "l", 'м': "m", 'н': "n", 'о': "o", 'п': "p", 'р': "r",
-	'с': "s", 'т': "t", 'у': "u", 'ф': "f", 'х': "x", 'ц': "ts", 'ч': "ch", 'ш': "sh", 'щ': "sh",
-	'ъ': "ʼ", 'ь': "", 'ы': "i", 'э': "e", 'ю': "yu", 'я': "ya",
-	'ў': "oʻ", 'қ': "q", 'ғ': "gʻ", 'ҳ': "h",
 }

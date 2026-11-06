@@ -15,6 +15,7 @@ import (
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 	"telegram-ai-bot/internal/tools"
+	"telegram-ai-bot/internal/uzscript"
 )
 
 var (
@@ -126,6 +127,12 @@ type Request struct {
 	// Fixed, when set, is the answer, decided without the model: the turn
 	// is only saved, which keeps the history and answers an update once.
 	Fixed *Answer
+	// LatinScript marks a question written in Uzbek in the Latin alphabet:
+	// an answer the model writes in Uzbek Cyrillic, as it now and then does
+	// in a group that writes Cyrillic, is turned into Latin before it is
+	// saved, so that it neither reaches the asker nor pulls later answers
+	// to Cyrillic.
+	LatinScript bool
 	// Inline marks a question typed in inline mode, "@bot words" in any
 	// chat. Its asker posts the answer as their own message, in a chat the
 	// bot cannot read, so it is answered on its own: without history or
@@ -452,6 +459,9 @@ func finishText(t *turn, answer string) (Answer, error) {
 		// A marker among words would be posted as text, so it is dropped:
 		// the words are what the model wanted to say.
 		answer = words
+	}
+	if t.req.LatinScript && uzscript.IsUzbekCyrillic(answer) {
+		answer = uzscript.Latin(answer)
 	}
 	t.messages = append(t.messages, ai.Message{Role: ai.RoleAssistant, Content: answer})
 	return Answer{Text: answer}, nil

@@ -1385,6 +1385,7 @@ func (s *Service) request(ctx context.Context, in incoming, rules []storage.Grou
 			notice = ownerNotice
 		}
 	}
+	req.LatinScript = replyLanguage(in.text) == latinUzbek
 	req.Context = paragraphs(s.chatHeader(ctx, in), s.rulesHeader(rules, in), s.profileLine(ctx, in, rules), notice, s.talksElsewhere(ctx, in), log, s.noStickersHint(ctx), s.ownerReplyHint(in), s.toThemHint(in), s.ownersHereLine(ctx, in), languageHint(in.text))
 	replied := in.msg.ReplyToMessage
 	if replied != nil {

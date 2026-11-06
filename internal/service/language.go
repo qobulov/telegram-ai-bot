@@ -11,7 +11,13 @@ import (
 // message has too few letters to tell. The persona asks the same, but the
 // model drifted into the language of the chat around the message.
 func languageHint(text string) string {
-	if language := replyLanguage(text); language != "" {
+	language := replyLanguage(text)
+	switch language {
+	case "":
+	case latinUzbek:
+		// The model drifted to Cyrillic in groups that write it.
+		return "[Answer in " + language + ", as they wrote, even where the chat or your earlier answers use Cyrillic.]"
+	default:
 		return "[Answer in " + language + ".]"
 	}
 	return ""
@@ -49,8 +55,11 @@ func replyLanguage(text string) string {
 	case looksEnglish(words):
 		return "English"
 	}
-	return "Uzbek, in Latin script"
+	return latinUzbek
 }
+
+// latinUzbek is replyLanguage's word for Uzbek in the Latin alphabet.
+const latinUzbek = "Uzbek, in Latin script"
 
 // mostlyCyrillic reports more Cyrillic words than Latin ones, and tie when
 // there are as many of each.
