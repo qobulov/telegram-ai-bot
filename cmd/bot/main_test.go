@@ -56,8 +56,12 @@ func (f *fakeTelegram) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&params)
 		f.sent <- params
 		_, _ = io.WriteString(w, `{"ok":true,"result":{"message_id":501}}`)
-	default:
+	case strings.HasSuffix(r.URL.Path, "/getUpdates"):
 		f.serveUpdates(w)
+	default:
+		// The calls the bot makes as it starts, such as setting its
+		// profile, must not take the one update meant for getUpdates.
+		_, _ = io.WriteString(w, `{"ok":true,"result":true}`)
 	}
 }
 

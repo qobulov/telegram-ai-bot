@@ -105,10 +105,13 @@ func signedInitData(token string, userID int64, startParam string) string {
 }
 
 // The dashboard's function, against the database and a Telegram that says
-// the user is a member, counts the group named in the link.
-func TestStatsEndpointShowsAMembersGroup(t *testing.T) {
+// the user is a member, counts the group named in the link for an owner,
+// and shows it to nobody else.
+func TestStatsEndpointShowsAGroupToOwners(t *testing.T) {
 	env := startWebhook(t)
 	env.baseEnv["WEBAPP_URL"] = "https://maria.example"
+	env.baseEnv["BOT_OWNER_IDS"] = strconv.FormatInt(hookUser, 10)
+	env.baseEnv["BOT_OWNER_USERNAME"] = "bek_owner"
 	env.deliver(groupUpdate("920001", "salom hammaga"), hookSecret)
 
 	endpoint, err := NewStats(context.Background(), env.config(t), slog.New(slog.NewTextHandler(io.Discard, nil)))
@@ -121,6 +124,12 @@ func TestStatsEndpointShowsAMembersGroup(t *testing.T) {
 	endpoint.Handler.ServeHTTP(resp, httptest.NewRequest(http.MethodPost, "/api/stats", strings.NewReader(body)))
 	if resp.Code != http.StatusOK || !strings.Contains(resp.Body.String(), `"messages":`) || !strings.Contains(resp.Body.String(), `"hours":[`) {
 		t.Errorf("stats: %d %s", resp.Code, resp.Body.String())
+	}
+	member := `{"init_data":"` + signedInitData("1:test", hookUser+1, miniapp.GroupParam(hookGroup)) + `"}`
+	resp = httptest.NewRecorder()
+	endpoint.Handler.ServeHTTP(resp, httptest.NewRequest(http.MethodPost, "/api/stats", strings.NewReader(member)))
+	if resp.Code != http.StatusForbidden {
+		t.Errorf("stats for a member who is no owner: %d %s, want 403", resp.Code, resp.Body.String())
 	}
 
 	forged := `{"init_data":"` + signedInitData("2:other", hookUser, miniapp.GroupParam(hookGroup)) + `"}`
