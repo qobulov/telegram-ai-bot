@@ -47,16 +47,6 @@ func (f *fakeBotAccount) SetBotName(_ context.Context, name, language string) er
 	return f.err
 }
 
-func (f *fakeBotAccount) SetBotBio(_ context.Context, bio, language string) error {
-	f.calls = append(f.calls, "bio "+language+": "+bio)
-	return f.err
-}
-
-func (f *fakeBotAccount) SetBotDescription(_ context.Context, description, language string) error {
-	f.calls = append(f.calls, "description "+language+": "+description)
-	return f.err
-}
-
 func (f *fakeBotAccount) SetBotPhoto(_ context.Context, jpeg []byte) error {
 	f.photo = jpeg
 	return f.err
@@ -116,15 +106,13 @@ func TestBotProfileSetsTextsPerLanguage(t *testing.T) {
 	account := &fakeBotAccount{}
 	for _, args := range []string{
 		`{"action":"name","text":" Maria ✨ "}`,
-		`{"action":"bio","text":"MLBB, kino va musiqa","language":"uz"}`,
-		`{"action":"description","text":"Привет!","language":"ru"}`,
 		`{"action":"remove_photo"}`,
 	} {
 		if env := botProfile(t, account, botOwner, args); !env.OK {
 			t.Fatalf("%s: %+v", args, env)
 		}
 	}
-	want := []string{"name : Maria ✨", "bio uz: MLBB, kino va musiqa", "description ru: Привет!", "remove photo"}
+	want := []string{"name : Maria ✨", "remove photo"}
 	if strings.Join(account.calls, "|") != strings.Join(want, "|") {
 		t.Errorf("calls = %q", account.calls)
 	}
@@ -136,7 +124,8 @@ func TestBotProfileSetsTextsPerLanguage(t *testing.T) {
 func TestBotProfileChecksTheText(t *testing.T) {
 	account := &fakeBotAccount{}
 	for _, args := range []string{
-		`{"action":"bio","text":"` + strings.Repeat("x", 121) + `"}`,
+		`{"action":"name","text":"` + strings.Repeat("x", 65) + `"}`,
+		`{"action":"bio","text":"Maria"}`,
 		`{"action":"name","text":""}`,
 	} {
 		if env := botProfile(t, account, botOwner, args); env.OK || env.Error.Code != "invalid_arguments" {

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"maps"
 	"net/http"
+	"os"
 	"slices"
 	"strings"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"telegram-ai-bot/internal/ai"
 	"telegram-ai-bot/internal/config"
 	"telegram-ai-bot/internal/cron"
+	"telegram-ai-bot/internal/game"
 	"telegram-ai-bot/internal/gifs"
 	"telegram-ai-bot/internal/guards"
 	"telegram-ai-bot/internal/service"
@@ -85,6 +87,26 @@ func (m groupMembers) IsGroupAdmin(ctx context.Context, chatID, userID int64) (b
 	return member.IsAdmin(), nil
 }
 
+// IsGroupCreator reports whether a member created a group, for the
+// punishments a group's creator may set.
+func (m groupMembers) IsGroupCreator(ctx context.Context, chatID, userID int64) (bool, error) {
+	member, err := m.client.GetChatMember(ctx, chatID, userID)
+	if err != nil {
+		return false, err
+	}
+	return member.Status == "creator", nil
+}
+
+// HoldsRight reports whether a member holds an admin right in a group,
+// for the join check its admins who may invite users may turn on and off.
+func (m groupMembers) HoldsRight(ctx context.Context, chatID, userID int64, right string) (bool, error) {
+	member, err := m.client.GetChatMember(ctx, chatID, userID)
+	if err != nil {
+		return false, err
+	}
+	return member.Has(right), nil
+}
+
 // Membership asks Telegram about the bot in a group, for the owners'
 // bot_database tool: its status and admin rights, and for a group it is in,
 // the member count and current title.
@@ -149,7 +171,6 @@ func (b botRights) BotRights(ctx context.Context, chatID int64) ([]string, error
 	return rights, nil
 }
 
-// groupSender posts an owner's confirmed broadcast in a group.
 // botAccount is the bot's own Telegram profile, its photo found by its ID.
 type botAccount struct {
 	*telegram.Client
@@ -163,12 +184,36 @@ func (b botAccount) Photo(ctx context.Context) ([]byte, string, bool, error) {
 // maxAvatarBytes bounds the profile photo downloaded to be described.
 const maxAvatarBytes = 2 << 20
 
+// groupSender posts an owner's confirmed broadcast in a group or a channel.
 type groupSender struct {
 	client *telegram.Client
 }
 
 func (g groupSender) SendToGroup(ctx context.Context, chatID int64, text string) error {
 	_, err := g.client.SendMessage(ctx, telegram.Outgoing{ChatID: chatID, Text: text})
+	return err
+}
+
+func (g groupSender) LeaveChat(ctx context.Context, chatID int64) error {
+	return g.client.LeaveChat(ctx, chatID)
+}
+
+func (g groupSender) CopyToChat(ctx context.Context, chatID, fromChatID, messageID int64, caption string) error {
+	_, err := g.client.CopyMessage(ctx, chatID, fromChatID, messageID, caption)
+	return err
+}
+
+// pinSender sends the send_location tool's pins as venues: a pin on the
+// map with the place's name over it.
+type pinSender struct {
+	client *telegram.Client
+}
+
+func (p pinSender) SendPin(ctx context.Context, pin webapi.Pin) error {
+	_, err := p.client.SendVenue(ctx, telegram.Venue{
+		ChatID: pin.ChatID, ReplyToMessageID: pin.ReplyToMessageID,
+		Latitude: pin.Lat, Longitude: pin.Lon, Title: pin.Title, Address: pin.Address,
+	})
 	return err
 }
 
@@ -198,15 +243,26 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		OwnersByID: len(cfg.OwnerIDs) > 0,
 		Owners:     cfg.OwnerIDs,
 		Usernames:  store,
+		Roster:     store,
+		Links:      store,
+		Messages:   store,
 	})
 	if len(cfg.OwnerUsernames) > 0 && len(cfg.OwnerIDs) == 0 {
 		logger.Warn("BOT_OWNER_IDS is not set: owners are known only by username, which can change hands, so they moderate only with their own admin rights")
 	}
-	available := append(builtinTools(cfg, store, bot, moderation.Tool()), liveDataTools(cfg, bot)...)
-	available = append(available, tools.BotProfileTool(tools.BotProfileOptions{
+	available := append(builtinTools(cfg, store, bot, moderation.Tool()), liveDataTools(cfg, store, bot)...)
+	available = append(available, moderation.TopicsTool(bot.Client), tools.BotProfileTool(tools.BotProfileOptions{
 		Account: botAccount{Client: bot.Client, id: bot.User.ID},
 		Eyes:    stickerLabeller(cfg, logger),
 	}))
+	// Gifts spend the bot's Stars, so only owners known by ID may send them:
+	// a username can change hands.
+	if len(cfg.OwnerIDs) > 0 {
+		available = append(available, tools.GiftTool(tools.GiftOptions{Shop: bot.Client, Members: moderation, BotID: bot.User.ID}))
+	}
+	if len(cfg.OwnerUsernames) > 0 {
+		available = append(available, stickerSetTool(cfg, store, bot, logger))
+	}
 	registry, err := tools.NewRegistry(cfg.IsAdmin, logger, available...)
 	if err != nil {
 		return nil, err
@@ -225,12 +281,15 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		ReasoningEffort: cfg.ReasoningEffort,
 		Logger:          logger,
 	})
-	answering := withBackup(cfg, model, logger)
+	router, chat := chatRouting(cfg, logger)
 	assistant := agent.New(agent.Options{
 		Store:        store,
-		Model:        answering,
+		Model:        model,
 		Tools:        registry,
-		Persona:      cfg.PersonaPrompt,
+		Router:       router,
+		ChatModel:    chat,
+		Name:         cfg.BotDisplayName,
+		Persona:      withNewHeroes(cfg, bot),
 		GroupNote:    cfg.GroupNote,
 		MaxHistory:   cfg.MaxHistoryMessages,
 		MaxToolCalls: cfg.MaxToolCallsPerTurn,
@@ -238,7 +297,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 	opts := service.Options{
 		Sender:          bot.Client,
 		Replier:         assistant,
-		Resetter:        store,
+		Tools:           registry,
 		Recorder:        store,
 		Members:         groupMembers{client: bot.Client, botID: bot.User.ID},
 		Groups:          store,
@@ -290,38 +349,68 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Skips:                 store,
 		PrivateQuota:          store,
 		PrivateDailyLimit:     cfg.PrivateDailyLimit,
+		Payments:              bot.Client,
+		Premium:               store,
+		Cards:                 store,
+		CardsKey:              cfg.PokeWalletAPIKey,
+		PremiumPrice:          cfg.PremiumPrice,
+		PremiumDays:           cfg.PremiumDays,
+		PremiumDailyLimit:     cfg.PremiumDailyLimit,
 		PrivateChats:          cfg.PrivateChats,
 		Reactor:               bot.Client,
-		ChatActor:             bot.Client,
-		BotRights:             botRights{store: store, members: bot.Client, botID: bot.User.ID, logger: logger},
-		Rules:                 store,
-		Strikes:               store,
-		AdminList:             bot.Client,
-		RequiredChannels:      cfg.RequiredChannels,
-		QuickAnswers:          true,
-		MinActiveMembers:      cfg.MinActiveMembers,
-		ActiveWindow:          time.Duration(cfg.ActiveDays) * 24 * time.Hour,
-		ActiveCounter:         store,
-		Channels:              bot.Client,
-		Buttons:               bot.Client,
-		Restrictor:            bot.Client,
-		Guards:                checker(cfg),
-		GroupModerator:        bot.Client,
-		Judge:                 swearJudge(cfg, logger),
-		Stickers:              store,
-		ClipSender:            bot.Client,
-		AudioSender:           bot.Client,
-		Files:                 bot.Client,
-		Quizzes:               store,
-		QuizPolls:             bot.Client,
-		StickerSender:         bot.Client,
-		StickerImporter:       &stickers.Importer{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger), Workers: stickerWorkers, Logger: logger},
-		CardImporter:          &stickers.CardImporter{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger), Workers: stickerWorkers, Logger: logger},
-		Answers:               store,
+		OwnerMenu:             ownerMenu,
+		MenuSetter:            bot.Client,
+		Settings:              store,
+		CheckSetting: func(setting config.Setting, value string) error {
+			return config.CheckSetting(os.Getenv, setting, value)
+		},
+		Getenv:           os.Getenv,
+		ChatActor:        bot.Client,
+		BotRights:        botRights{store: store, members: bot.Client, botID: bot.User.ID, logger: logger},
+		Rules:            store,
+		Strikes:          store,
+		AdminList:        bot.Client,
+		RequiredChannels: cfg.RequiredChannels,
+		QuickAnswers:     true,
+		MinActiveMembers: cfg.MinActiveMembers,
+		ActiveWindow:     time.Duration(cfg.ActiveDays) * 24 * time.Hour,
+		ActiveCounter:    store,
+		Channels:         bot.Client,
+		Buttons:          bot.Client,
+		Restrictor:       bot.Client,
+		Guards:           checker(cfg),
+		GroupModerator:   bot.Client,
+		PictureJudge:     pictureJudge(cfg, logger),
+		PictureVerdicts:  store,
+		Judge:            swearJudge(cfg, logger),
+		Writer:           announcementWriter(cfg, logger),
+		Recent:           store,
+		Sworn:            store,
+		Joins:            store,
+		JoinGate:         bot.Client,
+		Boosts:           store,
+		Stickers:         store,
+		ClipSender:       bot.Client,
+		AudioSender:      bot.Client,
+		Files:            bot.Client,
+		StickerSender:    bot.Client,
+		StickerImporter:  &stickers.Importer{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger), Workers: stickerWorkers, Logger: logger},
+		Answers:          store,
+		Inline:           bot.Client,
+
+		Business:           store,
+		BusinessLookup:     bot.Client,
+		BusinessDailyLimit: cfg.BusinessDailyLimit,
 	}
 	if cfg.GiphyAPIKey != "" {
 		opts.GIFs = &gifs.Client{APIKey: cfg.GiphyAPIKey, HTTPClient: &http.Client{Timeout: giphyTimeout}}
 		opts.AnimationSender, opts.MediaSlots = bot.Client, store
+	}
+	if g := newGame(cfg); g != nil {
+		opts.StatsURL = statsPage(cfg)
+		opts.CardsURL = cardsPage(cfg)
+		opts.Game, opts.GameTable = g, bot.Client
+		opts.ShashkaURL, opts.ShashkaInvites = ShashkaPage(cfg), store
 	}
 	if mode.Serverless {
 		opts.Workers, opts.QueueSize = 0, 0
@@ -336,34 +425,40 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 // moderate is made by the caller, which also hands its confirmations to the
 // service.
 func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate tools.Tool) []tools.Tool {
-	help := service.HelpText(service.Abilities{Draw: cfg.ImagesEnabled, Listen: cfg.AudioInput, Football: cfg.FootballDataToken != ""})
+	help := service.HelpText(service.Abilities{Draw: cfg.ImagesEnabled, Listen: cfg.AudioInput, Football: cfg.FootballDataToken != "", Pages: cfg.WebAppURL != ""})
 	builtin := tools.Builtin(help, cfg.Location)
 	if cfg.ImagesEnabled {
 		builtin = append(builtin, imageTool(cfg, store))
 	}
-	builtin = append(builtin, tools.PresentationTool(tools.PresentationOptions{
-		Quota:      store,
-		DailyLimit: cfg.DailyPresentationLimit,
-		Location:   cfg.Location,
-	}))
+	if cfg.WebAppURL != "" {
+		builtin = append(builtin, tools.GameTool(tools.GameOptions{Sender: bot.Client, Store: store, Games: []string{game.ShortName, game.IlonShortName, game.OtinchiShortName, game.BossShortName, game.MafiaShortName, game.MaydonShortName}}))
+	}
 	// Any group's admins, and any member for a poll or the admin list, may
 	// use these, so they are there with or without owners.
 	builtin = append(builtin, moderate,
-		tools.PollTool(tools.PollOptions{Sender: bot.Client, Store: store}),
-		tools.QuizTool(tools.PollOptions{Sender: bot.Client, Store: store}),
-		tools.ItemCardTool(tools.ItemCardOptions{Store: store}),
+		tools.PollTool(tools.PollOptions{Sender: bot.Client, Store: store, Members: bot.Client, BotID: bot.User.ID, OwnersByID: len(cfg.OwnerIDs) > 0}),
+		tools.DiceTool(tools.DiceOptions{Sender: bot.Client, Store: store}),
 		tools.AdminsTool(tools.AdminsOptions{Telegram: bot.Client, BotID: bot.User.ID, Owners: cfg.OwnerIDs}),
 		tools.MembersTool(tools.MembersOptions{Store: store, Telegram: bot.Client, Owners: cfg.OwnerIDs, Location: cfg.Location}),
 		tools.ProfileTool(tools.ProfileOptions{Store: store}),
+		tools.CatchUpTool(tools.CatchUpOptions{Store: store, Location: cfg.Location}),
+		tools.GroupStatsTool(tools.GroupStatsOptions{Store: store, BotID: bot.User.ID, Location: cfg.Location}),
+		tools.PunishmentsTool(tools.PunishmentsOptions{Store: store, Creators: groupMembers{client: bot.Client, botID: bot.User.ID}, BotID: bot.User.ID, Location: cfg.Location}),
+		tools.JoinCaptchaTool(tools.JoinCaptchaOptions{Store: store, Rights: groupMembers{client: bot.Client, botID: bot.User.ID}}),
 	)
-	// Only owners known by ID can be written to, and only they are.
+	// Only owners known by ID can be written to, and only they are. Only
+	// their business accounts are used, too: the account speaks for whoever
+	// holds it.
 	if len(cfg.OwnerIDs) > 0 {
 		builtin = append(builtin, tools.NotifyOwnerTool(tools.NotifyOptions{
 			Quota:    store,
 			Telegram: bot.Client,
 			Owners:   slices.Sorted(maps.Keys(cfg.OwnerIDs)),
 			Location: cfg.Location,
-		}))
+		}),
+			tools.StoryTool(tools.StoryOptions{Accounts: store, Poster: bot.Client}),
+			tools.ChecklistTool(tools.ChecklistOptions{Accounts: store, Sender: bot.Client, Location: cfg.Location}),
+		)
 	}
 	if len(cfg.OwnerUsernames) > 0 {
 		builtin = append(builtin,
@@ -373,9 +468,16 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 				Location: cfg.Location,
 			}),
 			tools.BroadcastTool(tools.BroadcastOptions{
-				Groups: store,
-				Drafts: store,
-				Sender: groupSender{client: bot.Client},
+				Groups:   store,
+				Channels: store,
+				Private:  store,
+				Drafts:   store,
+				Sender:   groupSender{client: bot.Client},
+			}),
+			tools.LeaveTool(tools.LeaveOptions{
+				Groups:   store,
+				Channels: store,
+				Telegram: groupSender{client: bot.Client},
 			}),
 			tools.RulesTool(tools.RulesOptions{
 				Store:    store,
@@ -385,8 +487,10 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 				Groups:   store,
 				Muter:    store,
 
-				CanCheckLinks:  checker(cfg).CanCheckLinks(),
-				CanCheckImages: checker(cfg).CanCheckImages(),
+				CanCheckLinks: checker(cfg).CanCheckLinks(),
+				// The bot's own model judges what Sightengine cannot, or
+				// every picture without its keys.
+				CanCheckImages: true,
 			}),
 		)
 	}
@@ -401,22 +505,77 @@ func checker(cfg config.Config) *guards.Checker {
 		SafeBrowsingKey:   cfg.SafeBrowsingKey,
 		SightengineUser:   cfg.SightengineUser,
 		SightengineSecret: cfg.SightengineSecret,
+		CASKey:            cfg.CASKey,
 	})
 }
 
+// pictureJudgeTokens is room for the picture judge's one word and its
+// thinking: Gemini thinks about a picture even at low effort.
+const pictureJudgeTokens = 1024
+
+// pictureJudge is the model asked whether a picture is nude when
+// Sightengine cannot say: ROUTER_MODEL, a light and cheap one, when it is
+// set, with the main model and its fallbacks behind it when it is busy;
+// the main model otherwise. A one-word answer, so it thinks little.
+// Gemini's light models see pictures as the main ones do.
+func pictureJudge(cfg config.Config, logger *slog.Logger) *ai.Client {
+	model, fallbacks := cfg.Model, cfg.FallbackModels
+	if cfg.RouterModel != "" {
+		model, fallbacks = cfg.RouterModel, append([]string{cfg.Model}, cfg.FallbackModels...)
+	}
+	return ai.NewClient(ai.Options{
+		BaseURL:         cfg.AIBaseURL,
+		APIKey:          cfg.AIAPIKey,
+		Model:           model,
+		FallbackModels:  fallbacks,
+		ReasoningEffort: judgeReasoning(cfg.ReasoningEffort),
+		MaxTokens:       pictureJudgeTokens,
+		MaxAttempts:     2,
+		HTTPClient:      &http.Client{Timeout: cfg.RequestTimeout},
+		AttemptTimeout:  attemptTimeout,
+		Logger:          logger,
+	})
+}
+
+// newHeroesWait bounds asking MLBBDex for the newest heroes at start.
+const newHeroesWait = 3 * time.Second
+
+// withNewHeroes is the persona with the Mobile Legends heroes released
+// lately, which the model does not know: it denied Marcel and left him out
+// of comparisons. Without an answer the persona goes as it is.
+func withNewHeroes(cfg config.Config, bot Bot) string {
+	if !cfg.NewHeroes {
+		return cfg.PersonaPrompt
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), newHeroesWait)
+	defer cancel()
+	note := webapi.NewHeroesNote(ctx, webapi.Options{UserAgent: "MariaBot/1.0 (+https://t.me/" + bot.User.Username + ")"}, time.Now())
+	if note == "" {
+		return cfg.PersonaPrompt
+	}
+	return cfg.PersonaPrompt + "\n\n" + note
+}
+
 // liveDataTools look things up on public web APIs: rates, weather, prayer
-// times, news, Wikipedia, crypto, and football when a token is set. The
-// user agent gives the bot's t.me link as the contact some APIs ask for.
-func liveDataTools(cfg config.Config, bot Bot) []tools.Tool {
+// times, news, Wikipedia, crypto, and football when a token is set, send
+// places as pins on the map, and recognise songs, counted in the database,
+// when a RapidAPI key is set. The user agent gives the bot's t.me link as
+// the contact some APIs ask for.
+func liveDataTools(cfg config.Config, store *storage.Store, bot Bot) []tools.Tool {
 	opts := webapi.Options{
-		UserAgent:     "MariaBot/1.0 (+https://t.me/" + bot.User.Username + ")",
-		Location:      cfg.Location,
-		FootballToken: cfg.FootballDataToken,
-		CoinGeckoKey:  cfg.CoinGeckoDemoKey,
-		TavilyKey:     cfg.TavilyAPIKey,
-		TMDBToken:     cfg.TMDBToken,
-		YouTubeKey:    cfg.YouTubeAPIKey,
-		WolframAppID:  cfg.WolframAppID,
+		UserAgent:       "MariaBot/1.0 (+https://t.me/" + bot.User.Username + ")",
+		Location:        cfg.Location,
+		FootballToken:   cfg.FootballDataToken,
+		CoinGeckoKey:    cfg.CoinGeckoDemoKey,
+		TavilyKey:       cfg.TavilyAPIKey,
+		TMDBToken:       cfg.TMDBToken,
+		YouTubeKey:      cfg.YouTubeAPIKey,
+		CalendarificKey: cfg.CalendarificAPIKey,
+		ImgflipKey:      cfg.ImgflipAPIKey,
+		Pins:            pinSender{client: bot.Client},
+		ShazamKey:       cfg.RapidAPIKey,
+		Files:           bot.Client,
+		SongQuota:       store,
 	}
 	return webapi.Tools(opts)
 }
@@ -433,6 +592,24 @@ func imageTool(cfg config.Config, store *storage.Store) tools.Tool {
 		DailyLimit: cfg.DailyImageLimit,
 		Location:   cfg.Location,
 	})
+}
+
+// stickerSetTool lets owners fill the bot's own sticker set. It draws with
+// the image model when drawing is on, and the stickers it adds are looked
+// at as an imported pack's are, so that she sends them too.
+func stickerSetTool(cfg config.Config, store *storage.Store, bot Bot, logger *slog.Logger) tools.Tool {
+	opts := tools.StickerSetOptions{
+		Telegram:    bot.Client,
+		Store:       store,
+		Learner:     &stickers.Importer{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger), Workers: 1, Logger: logger},
+		BotUsername: bot.User.Username,
+		Title:       cfg.BotDisplayName,
+		Location:    cfg.Location,
+	}
+	if cfg.ImagesEnabled {
+		opts.Drawer = ai.NewImageClient(ai.ImageOptions{BaseURL: cfg.ImageBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.ImageModel})
+	}
+	return tools.StickerSetTool(opts)
 }
 
 // giphyTimeout bounds a GIF search: a GIF that is late is not worth the wait.
@@ -468,6 +645,62 @@ func swearJudge(cfg config.Config, logger *slog.Logger) *ai.Client {
 	})
 }
 
+// announcementWriter is the model that writes an owner's announcement
+// when the main model's provider refused the turn: the main model, asked
+// with no persona and no picture, a few hundred words at most.
+func announcementWriter(cfg config.Config, logger *slog.Logger) *ai.Client {
+	return ai.NewClient(ai.Options{
+		BaseURL:         cfg.AIBaseURL,
+		APIKey:          cfg.AIAPIKey,
+		Model:           cfg.Model,
+		FallbackModels:  cfg.FallbackModels,
+		ReasoningEffort: judgeReasoning(cfg.ReasoningEffort),
+		MaxTokens:       writerTokens,
+		MaxAttempts:     2,
+		HTTPClient:      &http.Client{Timeout: cfg.RequestTimeout},
+		AttemptTimeout:  attemptTimeout,
+		Logger:          logger,
+	})
+}
+
+// writerTokens bounds an announcement the writer writes, 600 letters and
+// what thinking it does.
+const writerTokens = 1536
+
+// chatRouting is the router of ROUTER_MODEL and the chat model of
+// CHAT_MODEL, both nil without a router. The router gives one word, as the
+// swear judge does; a chat model that fails hands the turn to the main
+// model and its fallbacks.
+func chatRouting(cfg config.Config, logger *slog.Logger) (router, chat agent.Model) {
+	if cfg.RouterModel == "" {
+		return nil, nil
+	}
+	router = ai.NewClient(ai.Options{
+		BaseURL:         cfg.AIBaseURL,
+		APIKey:          cfg.AIAPIKey,
+		Model:           cfg.RouterModel,
+		ReasoningEffort: judgeReasoning(cfg.ReasoningEffort),
+		MaxTokens:       judgeTokens,
+		MaxAttempts:     2,
+		HTTPClient:      &http.Client{Timeout: cfg.RequestTimeout},
+		AttemptTimeout:  attemptTimeout,
+		Logger:          logger,
+	})
+	chat = ai.NewClient(ai.Options{
+		BaseURL:         cfg.AIBaseURL,
+		APIKey:          cfg.AIAPIKey,
+		Model:           cfg.ChatModel,
+		FallbackModels:  cfg.FallbackModels,
+		ReasoningEffort: cfg.ChatReasoningEffort,
+		MaxTokens:       cfg.MaxOutputTokens,
+		MaxAttempts:     2,
+		HTTPClient:      &http.Client{Timeout: cfg.RequestTimeout},
+		AttemptTimeout:  attemptTimeout,
+		Logger:          logger,
+	})
+	return router, chat
+}
+
 // judgeReasoning is judgeEffort, unless thinking is off or left to the
 // model's default: the judge never thinks more than answers do.
 func judgeReasoning(effort string) string {
@@ -493,26 +726,6 @@ func stickerLabeller(cfg config.Config, logger *slog.Logger) *ai.Client {
 		AttemptTimeout:  attemptTimeout,
 		Logger:          logger,
 	})
-}
-
-// withBackup puts the backup provider behind the main one when
-// BACKUP_API_KEY is set. Voice messages are still transcribed by the main
-// one only.
-func withBackup(cfg config.Config, model *ai.Client, logger *slog.Logger) agent.Model {
-	if cfg.BackupAPIKey == "" {
-		return model
-	}
-	backup := ai.NewClient(ai.Options{
-		BaseURL:        cfg.BackupBaseURL,
-		APIKey:         cfg.BackupAPIKey,
-		Model:          cfg.BackupModel,
-		MaxTokens:      cfg.MaxOutputTokens,
-		MaxAttempts:    2,
-		HTTPClient:     &http.Client{Timeout: cfg.RequestTimeout},
-		AttemptTimeout: attemptTimeout,
-		Logger:         logger,
-	})
-	return ai.NewChain(model, backup, logger)
 }
 
 // transcriber is the model client when the provider can listen to audio,
@@ -562,7 +775,10 @@ func newWebhook(ctx context.Context, cfg config.Config, store *storage.Store, lo
 	if err != nil {
 		return nil, err
 	}
-	SetCommandMenus(ctx, bot.Client, logger)
+	SetCommandMenus(ctx, bot.Client, cfg.WebAppURL != "", logger)
+	SetMenuApp(ctx, bot.Client, cfg, logger)
+	SetAdminRights(ctx, bot.Client, logger)
+	SetProfileTexts(ctx, bot.Client, logger)
 	if changed, err := bot.Client.EnsureAllowedUpdates(ctx, cfg.WebhookSecret); err != nil {
 		logger.Warn("could not check the webhook's update kinds", "error", err)
 	} else if changed {
@@ -600,7 +816,9 @@ type Cleanup struct {
 }
 
 // NewCleanup builds the scheduled-cleanup endpoint. Each authorised call
-// deletes messages older than RETENTION_DAYS and reports what it removed.
+// declines the join requests whose button was not pressed in time, which
+// the webhook's updates did not notice, deletes messages older than
+// RETENTION_DAYS, and reports what it removed.
 func NewCleanup(ctx context.Context, cfg config.Config, logger *slog.Logger) (*Cleanup, error) {
 	if cfg.CronSecret == "" {
 		return nil, errors.New("CRON_SECRET is required for the cleanup endpoint")
@@ -609,12 +827,14 @@ func NewCleanup(ctx context.Context, cfg config.Config, logger *slog.Logger) (*C
 	if err != nil {
 		return nil, err
 	}
+	client := telegram.NewClient(telegram.Options{Token: cfg.TelegramToken, BaseURL: cfg.TelegramAPIURL, Logger: logger})
 	handler, err := cron.NewHandler(cron.Options{
 		Secret: cfg.CronSecret,
 		Logger: logger,
 		Run: func(ctx context.Context) (any, error) {
-			// The report comes first: the history it counts is then still there.
-			sendDailyReport(ctx, cfg, store, reportSender(cfg, logger), time.Now(), logger)
+			if _, err := service.DeclineLateJoins(ctx, store, client, store, time.Now(), logger); err != nil {
+				logger.Warn("could not decline the late join requests", "error", err)
+			}
 			return expire(ctx, cfg, store, logger)
 		},
 	})
@@ -625,14 +845,17 @@ func NewCleanup(ctx context.Context, cfg config.Config, logger *slog.Logger) (*C
 	return &Cleanup{Handler: handler, Close: store.Close}, nil
 }
 
-// reportSender is the Telegram client the daily report goes out with. The
-// cleanup function has no bot of its own, and needs no getMe for this.
-func reportSender(cfg config.Config, logger *slog.Logger) ReportSender {
-	return telegram.NewClient(telegram.Options{Token: cfg.TelegramToken, BaseURL: cfg.TelegramAPIURL, Logger: logger})
-}
+// shashkaKeep is how long a draughts game over, or an invite no one took,
+// is kept, whatever the retention of the chats.
+const shashkaKeep = 30 * 24 * time.Hour
 
-// expire applies the retention policy once.
+// expire applies the retention policy once, and deletes old draughts games.
 func expire(ctx context.Context, cfg config.Config, store *storage.Store, logger *slog.Logger) (storage.Expired, error) {
+	if deleted, err := store.DeleteOldShashkaGames(ctx, time.Now().Add(-shashkaKeep)); err != nil {
+		logger.Warn("could not delete old shashka games", "error", err)
+	} else if deleted > 0 {
+		logger.Info("old shashka games deleted", "games", deleted)
+	}
 	if cfg.RetentionDays == 0 {
 		return storage.Expired{}, nil
 	}

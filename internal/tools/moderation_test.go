@@ -1,10 +1,14 @@
 package tools
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	"image/jpeg"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -58,6 +62,15 @@ type fakeTelegram struct {
 	err          error
 	// failing is a method refused even when err is nil.
 	failing string
+	// failAfter is how many deleteMessages batches succeed before err.
+	failAfter int
+	// groupPermissions are the group's defaults, which getChat gives and
+	// setChatPermissions replaces; chat is the rest getChat gives, kept up
+	// to date by the calls that change it.
+	groupPermissions *telegram.ChatPermissions
+	chat             telegram.Chat
+	// invites are the invite links asked for, made or edited.
+	invites []telegram.InviteLink
 }
 
 func (f *fakeTelegram) do(method string, chatID, id int64) error {
@@ -72,6 +85,26 @@ func (f *fakeTelegram) do(method string, chatID, id int64) error {
 
 func (f *fakeTelegram) DeleteMessage(_ context.Context, chatID, messageID int64) error {
 	return f.do("deleteMessage", chatID, messageID)
+}
+
+// DeleteMessages is noted with the batch's first ID and its size.
+func (f *fakeTelegram) DeleteMessages(_ context.Context, chatID int64, messageIDs []int64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, fmt.Sprintf("deleteMessages %d %d+%d", chatID, messageIDs[0], len(messageIDs)))
+	if f.failAfter > 0 {
+		f.failAfter--
+		return nil
+	}
+	return f.err
+}
+
+func (f *fakeTelegram) BanChatSenderChat(_ context.Context, chatID, senderChatID int64) error {
+	return f.do("banChatSenderChat", chatID, senderChatID)
+}
+
+func (f *fakeTelegram) UnbanChatSenderChat(_ context.Context, chatID, senderChatID int64) error {
+	return f.do("unbanChatSenderChat", chatID, senderChatID)
 }
 
 func (f *fakeTelegram) RestrictChatMember(_ context.Context, r telegram.Restriction) error {
@@ -97,6 +130,105 @@ func (f *fakeTelegram) UnpinChatMessage(_ context.Context, chatID, messageID int
 	return f.do("unpinChatMessage", chatID, messageID)
 }
 
+func (f *fakeTelegram) GetChat(_ context.Context, chatID int64) (telegram.Chat, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	chat := f.chat
+	chat.ID, chat.Permissions = chatID, f.groupPermissions
+	return chat, nil
+}
+
+func (f *fakeTelegram) SetChatPermissions(_ context.Context, chatID int64, permissions telegram.ChatPermissions) error {
+	f.mu.Lock()
+	f.groupPermissions = &permissions
+	f.mu.Unlock()
+	return f.do("setChatPermissions", chatID, 0)
+}
+
+func (f *fakeTelegram) SetChatTitle(_ context.Context, chatID int64, title string) error {
+	f.mu.Lock()
+	f.chat.Title = title
+	f.mu.Unlock()
+	return f.do("setChatTitle "+title, chatID, 0)
+}
+
+func (f *fakeTelegram) SetChatDescription(_ context.Context, chatID int64, description string) error {
+	f.mu.Lock()
+	f.chat.Description = description
+	f.mu.Unlock()
+	return f.do("setChatDescription "+description, chatID, 0)
+}
+
+func (f *fakeTelegram) SetChatPhoto(_ context.Context, chatID int64, jpeg []byte) error {
+	f.mu.Lock()
+	f.chat.Photo = &telegram.ChatPhoto{BigFileID: fmt.Sprintf("photo-%d", len(jpeg))}
+	f.mu.Unlock()
+	return f.do(fmt.Sprintf("setChatPhoto %d bytes", len(jpeg)), chatID, 0)
+}
+
+func (f *fakeTelegram) DeleteChatPhoto(_ context.Context, chatID int64) error {
+	f.mu.Lock()
+	f.chat.Photo = nil
+	f.mu.Unlock()
+	return f.do("deleteChatPhoto", chatID, 0)
+}
+
+func (f *fakeTelegram) SetChatStickerSet(_ context.Context, chatID int64, name string) error {
+	f.mu.Lock()
+	f.chat.StickerSetName = name
+	f.mu.Unlock()
+	return f.do("setChatStickerSet "+name, chatID, 0)
+}
+
+func (f *fakeTelegram) DeleteChatStickerSet(_ context.Context, chatID int64) error {
+	f.mu.Lock()
+	f.chat.StickerSetName = ""
+	f.mu.Unlock()
+	return f.do("deleteChatStickerSet", chatID, 0)
+}
+
+func (f *fakeTelegram) RevokeChatInviteLink(_ context.Context, chatID int64, link string) error {
+	return f.do("revokeChatInviteLink "+link, chatID, 0)
+}
+
+// DownloadFile gives back three bytes for any file, as a photo's.
+func (f *fakeTelegram) DownloadFile(_ context.Context, fileID string, _ int64) ([]byte, error) {
+	return []byte("old"), f.do("downloadFile "+fileID, 0, 0)
+}
+
+func (f *fakeTelegram) CreateChatInviteLink(_ context.Context, l telegram.InviteLink) (string, error) {
+	f.mu.Lock()
+	f.invites = append(f.invites, l)
+	f.mu.Unlock()
+	if err := f.do("createChatInviteLink "+l.Name, l.ChatID, l.Expires.Unix()); err != nil {
+		return "", err
+	}
+	return "https://t.me/+abc", nil
+}
+
+func (f *fakeTelegram) EditChatInviteLink(_ context.Context, link string, l telegram.InviteLink) error {
+	f.mu.Lock()
+	f.invites = append(f.invites, l)
+	f.mu.Unlock()
+	return f.do("editChatInviteLink "+link, l.ChatID, 0)
+}
+
+func (f *fakeTelegram) UnpinAllChatMessages(_ context.Context, chatID int64) error {
+	return f.do("unpinAllChatMessages", chatID, 0)
+}
+
+func (f *fakeTelegram) PromoteChatMember(_ context.Context, chatID, userID int64, rights telegram.AdminRights) error {
+	return f.do(fmt.Sprintf("promoteChatMember %+v", rights), chatID, userID)
+}
+
+func (f *fakeTelegram) SetChatAdministratorCustomTitle(_ context.Context, chatID, userID int64, title string) error {
+	return f.do("setChatAdministratorCustomTitle "+title, chatID, userID)
+}
+
+func (f *fakeTelegram) SetChatMemberTag(_ context.Context, chatID, userID int64, tag string) error {
+	return f.do("setChatMemberTag "+tag, chatID, userID)
+}
+
 func (f *fakeTelegram) made() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -114,6 +246,9 @@ func (f *fakeTelegram) restricted() []telegram.Restriction {
 type fakeAudit struct {
 	mu      sync.Mutex
 	actions []storage.ModerationAction
+	// lastID numbers the records; undone are those put back.
+	lastID int64
+	undone map[int64]bool
 	// since is what the tool asked the store for.
 	since []time.Time
 	// forgetErr makes ForgetModeration fail and keep the record; countErr
@@ -129,7 +264,51 @@ func (f *fakeAudit) RecordModeration(_ context.Context, a storage.ModerationActi
 	}) {
 		return false, nil
 	}
+	f.lastID++
+	a.ID = f.lastID
 	f.actions = append(f.actions, a)
+	return true, nil
+}
+
+// plainAudit is a record without what the store adds or undo keeps, to
+// compare with what a test expects.
+func plainAudit(a storage.ModerationAction) storage.ModerationAction {
+	a.ID, a.Undo = 0, nil
+	return a
+}
+
+func (f *fakeAudit) SetModerationUndo(_ context.Context, updateID int64, action string, undo json.RawMessage) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i, a := range f.actions {
+		if a.UpdateID == updateID && a.Action == action {
+			f.actions[i].Undo = undo
+		}
+	}
+	return nil
+}
+
+func (f *fakeAudit) LastUndoable(_ context.Context, chatID int64) (storage.ModerationAction, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i := len(f.actions) - 1; i >= 0; i-- {
+		if a := f.actions[i]; a.ChatID == chatID && len(a.Undo) > 0 && !f.undone[a.ID] {
+			return a, true, nil
+		}
+	}
+	return storage.ModerationAction{}, false, nil
+}
+
+func (f *fakeAudit) MarkUndone(_ context.Context, id int64) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.undone == nil {
+		f.undone = map[int64]bool{}
+	}
+	if f.undone[id] {
+		return false, nil
+	}
+	f.undone[id] = true
 	return true, nil
 }
 
@@ -197,6 +376,14 @@ func admin(rights ...string) telegram.ChatMember {
 			member.CanRestrictMembers = true
 		case telegram.RightPinMessages:
 			member.CanPinMessages = true
+		case telegram.RightChangeInfo:
+			member.CanChangeInfo = true
+		case telegram.RightInviteUsers:
+			member.CanInviteUsers = true
+		case telegram.RightPromoteMembers:
+			member.CanPromoteMembers = true
+		case telegram.RightManageTags:
+			member.CanManageTags = true
 		}
 	}
 	return member
@@ -323,7 +510,7 @@ func TestModerateActsAtOnce(t *testing.T) {
 		t.Errorf("restriction = %+v, want Bek muted for a week", r)
 	}
 	wantAudit := storage.ModerationAction{ChatID: groupA, Action: "mute", RequesterID: userID, TargetUserID: memberID, TargetMessageID: 29, Minutes: 10080, Reason: "spam", UpdateID: 100}
-	if got := env.audit.recorded(); len(got) != 1 || got[0] != wantAudit {
+	if got := env.audit.recorded(); len(got) != 1 || !reflect.DeepEqual(plainAudit(got[0]), wantAudit) {
 		t.Errorf("audit = %+v\nwant    [%+v]", got, wantAudit)
 	}
 	if saved, want := env.rights.all(), fmt.Sprintf("%d administrator %v", groupA, moderationRights); len(saved) != 1 || saved[0] != want {
@@ -361,6 +548,11 @@ func TestModerateActsOnlyWhenAskedInWords(t *testing.T) {
 		{"mutedan chiqar", "unmute", true},
 		{"salom", "mute", false},
 		{"pin qil", "delete", false},
+		{"ha change qil Azizbek_Bot", "set_title", true},
+		{"o'zgartirvor", "set_description", true},
+		{"поменяй на Чат", "set_title", true},
+		{"mari", "set_title", false},
+		{"ha change qil", "ban", false},
 	}
 	for _, c := range cases {
 		if got := askedFor(c.words, c.action); got != c.want {
@@ -870,5 +1062,298 @@ func TestModerateKickRemovesAndLetsThemBack(t *testing.T) {
 	got := env.moderate(kicking(), `{"action":"kick"}`)
 	if got.OK || !strings.Contains(got.Error.Message, "could not be lifted") {
 		t.Errorf("kick with the unban refused = %+v", got)
+	}
+}
+
+// "Block stickers for everyone" takes stickers and GIFs from the whole
+// group and nothing else, with no reply or tag, and gives them back; the
+// picture guard is no substitute for it.
+func TestModerateLocksStickersForTheWholeGroup(t *testing.T) {
+	env := newModerationEnv(t)
+	noPolls := telegram.AllPermissions()
+	noPolls.CanSendPolls = false
+	env.telegram.groupPermissions = &noPolls
+	ctx := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Owner: true, Human: true, UpdateID: 310, MessageID: 60, Words: "hammaga stiker va gif blokla"}, &Sink{})
+
+	said := env.act(t, ctx, `{"action":"lock","kind":"stickers"}`)
+
+	if want := "Bajarildi: guruhda stiker va GIF yuborish yopildi."; said != want {
+		t.Errorf("said %q, want %q", said, want)
+	}
+	if p := env.telegram.groupPermissions; p.CanSendOtherMessages || p.CanSendPolls || !p.CanSendMessages || !p.CanSendPhotos {
+		t.Errorf("group permissions = %+v, want only stickers and GIFs taken and polls still off", p)
+	}
+
+	ctx = WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Owner: true, Human: true, UpdateID: 311, MessageID: 61, Words: "hammaga stikerni och"}, &Sink{})
+	if said := env.act(t, ctx, `{"action":"unlock","kind":"stickers"}`); said != "Bajarildi: guruhda stiker va GIF yuborish ochildi." {
+		t.Errorf("said %q", said)
+	}
+	if p := env.telegram.groupPermissions; !p.CanSendOtherMessages || p.CanSendPolls {
+		t.Errorf("group permissions = %+v, want stickers back and polls still off", p)
+	}
+}
+
+// Taking a member's photos leaves their other limits as they are, and
+// giving them back keeps the rest of the restriction and its end: stickers
+// stay taken, and a muted member stays muted.
+func TestModeratePhotosKeepTheMembersOtherLimits(t *testing.T) {
+	env := newModerationEnv(t)
+	noStickers := telegram.NoStickers()
+	stickersEnd := rulesNow.Add(48 * time.Hour)
+	env.chat.set(memberID, telegram.ChatMember{Status: "restricted", StillIn: true, ChatPermissions: noStickers, UntilDate: stickersEnd.Unix(), CanInviteUsers: true})
+	ctx := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Owner: true, Human: true, UpdateID: 320, MessageID: 70, Target: bekTarget(), Words: "rasm tashomasin"}, &Sink{})
+
+	said := env.act(t, ctx, `{"action":"no_photos"}`)
+
+	if want := "Bajarildi: Bek @bek 17.10 15:04 gacha rasm yubora olmaydi."; said != want {
+		t.Errorf("said %q, want %q", said, want)
+	}
+	r := env.telegram.restricted()
+	if p := r[0].Permissions; p.CanSendPhotos || p.CanSendOtherMessages || !p.CanSendMessages || !p.CanInviteUsers {
+		t.Errorf("permissions = %+v, want photos and stickers taken, the rest kept", p)
+	}
+
+	env.chat.set(memberID, telegram.ChatMember{Status: "restricted", StillIn: true, ChatPermissions: r[0].Permissions, UntilDate: stickersEnd.Unix()})
+	ctx = WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Owner: true, Human: true, UpdateID: 321, MessageID: 71, Target: bekTarget(), Words: "rasmini och"}, &Sink{})
+	if said := env.act(t, ctx, `{"action":"allow_photos"}`); said != "Bajarildi: Bek @bek yana rasm yubora oladi." {
+		t.Errorf("said %q", said)
+	}
+	r = env.telegram.restricted()
+	if p := r[1].Permissions; !p.CanSendPhotos || p.CanSendOtherMessages || !r[1].Until.Equal(stickersEnd) {
+		t.Errorf("restriction = %+v, want photos back, stickers still taken until %v", r[1], stickersEnd)
+	}
+
+	env.chat.set(memberID, telegram.ChatMember{Status: "restricted", StillIn: true, ChatPermissions: telegram.NoPermissions()})
+	ctx = WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Owner: true, Human: true, UpdateID: 322, MessageID: 72, Target: bekTarget(), Words: "stikerini ham blokla"}, &Sink{})
+	env.act(t, ctx, `{"action":"no_stickers"}`)
+	if p := env.telegram.restricted()[2].Permissions; p.CanSendMessages {
+		t.Errorf("permissions = %+v, want a muted member to stay muted when their stickers are taken", p)
+	}
+}
+
+func TestModerateLocksPhotosForTheWholeGroup(t *testing.T) {
+	env := newModerationEnv(t)
+	noStickers := telegram.NoStickers()
+	env.telegram.groupPermissions = &noStickers
+	ctx := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Owner: true, Human: true, UpdateID: 330, MessageID: 80, Words: "hammaga rasm tashashni yop"}, &Sink{})
+
+	if said := env.act(t, ctx, `{"action":"lock","kind":"photos"}`); said != "Bajarildi: guruhda rasm yuborish yopildi." {
+		t.Errorf("said %q", said)
+	}
+	if p := env.telegram.groupPermissions; p.CanSendPhotos || p.CanSendOtherMessages || !p.CanSendMessages {
+		t.Errorf("group permissions = %+v, want photos taken and stickers still off", p)
+	}
+}
+
+// groupAdminEnv is newModerationEnv where the bot and the person asking
+// also hold the rights the group's own settings need.
+func groupAdminEnv(t *testing.T) *moderationEnv {
+	env := newModerationEnv(t)
+	all := append([]string{telegram.RightChangeInfo, telegram.RightInviteUsers, telegram.RightPromoteMembers}, moderationRights...)
+	env.chat.set(rulesBotID, admin(all...))
+	env.chat.set(userID, admin(all...))
+	return env
+}
+
+// inGroupA ends a recorded call that names groupA and no one in it.
+var inGroupA = fmt.Sprintf("%d 0", groupA)
+
+func groupTurn(updateID int64, words string) context.Context {
+	return WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: updateID, MessageID: updateID, Words: words}, &Sink{})
+}
+
+// The group's name, description, photo, pins and invite links are set with
+// no reply or tag, each only when the asker's words ask for it.
+func TestModerateEditsTheGroup(t *testing.T) {
+	env := groupAdminEnv(t)
+
+	if said := env.act(t, groupTurn(400, "guruh nomini BS Chat qil"), `{"action":"set_title","text":"BS Chat"}`); said != "Bajarildi: guruh nomi «BS Chat» bo'ldi." {
+		t.Errorf("said %q", said)
+	}
+	env.act(t, groupTurn(401, "tavsifini yangila"), `{"action":"set_description","text":"MLBB chat"}`)
+	env.act(t, groupTurn(402, "guruh rasmini olib tashla"), `{"action":"delete_photo"}`)
+	env.act(t, groupTurn(403, "hamma pinlarni ol"), `{"action":"unpin_all"}`)
+	want := []string{"setChatTitle BS Chat " + inGroupA, "setChatDescription MLBB chat " + inGroupA, "deleteChatPhoto " + inGroupA, "unpinAllChatMessages " + inGroupA}
+	if got := env.telegram.made(); !slices.Equal(got, want) {
+		t.Errorf("calls = %q, want %q", got, want)
+	}
+
+	got := env.moderate(groupTurn(404, "taklif havolasi ber"), `{"action":"invite_link","text":"reklama","minutes":60}`)
+	var link struct {
+		Link string `json:"link"`
+	}
+	if !got.OK || json.Unmarshal(got.Result, &link) != nil || link.Link != "https://t.me/+abc" {
+		t.Errorf("invite_link = %+v %s", got, got.Result)
+	}
+	if calls := env.telegram.made(); calls[len(calls)-1] != fmt.Sprintf("createChatInviteLink reklama %d %d", groupA, rulesNow.Add(time.Hour).Unix()) {
+		t.Errorf("last call = %q, want a named link ending in an hour", calls[len(calls)-1])
+	}
+
+	before := len(env.telegram.made())
+	if got := env.moderate(groupTurn(405, "salom qalaysan"), `{"action":"set_title","text":"Spam"}`); got.OK {
+		t.Errorf("a title was set without being asked: %s", got.Result)
+	}
+	if got := env.moderate(groupTurn(406, "guruh nomini o'zgartir"), `{"action":"set_title","text":""}`); got.OK || got.Error.Code != "invalid_arguments" {
+		t.Errorf("an empty title = %+v", got)
+	}
+	if len(env.telegram.made()) != before {
+		t.Errorf("Telegram was asked: %q", env.telegram.made()[before:])
+	}
+}
+
+// The group photo is the one in the asker's message, sent as a JPEG.
+func TestModerateSetsTheGroupPhotoFromTheMessage(t *testing.T) {
+	env := groupAdminEnv(t)
+	if got := env.moderate(groupTurn(410, "shu rasmni guruhga qo'y"), `{"action":"set_photo"}`); got.OK || got.Error.Code != "invalid_arguments" {
+		t.Errorf("no photo in the message = %+v", got)
+	}
+
+	var picture bytes.Buffer
+	if err := jpeg.Encode(&picture, image.NewRGBA(image.Rect(0, 0, 8, 8)), nil); err != nil {
+		t.Fatal(err)
+	}
+	ctx := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: 411, MessageID: 411, Words: "shu rasmni guruhga qo'y", Picture: picture.Bytes()}, &Sink{})
+	env.act(t, ctx, `{"action":"set_photo"}`)
+	if calls := env.telegram.made(); len(calls) != 1 || calls[0] != fmt.Sprintf("setChatPhoto %d bytes %s", picture.Len(), inGroupA) {
+		t.Errorf("calls = %q", calls)
+	}
+}
+
+// The group's sticker pack is the pack of the sticker replied to, set only
+// where Telegram allows one and when asked in words; undo puts the old
+// pack back, and removing it is undone too.
+func TestModerateSetsTheGroupStickerPack(t *testing.T) {
+	env := groupAdminEnv(t)
+	sticker := &Target{MessageID: 77, UserID: memberID, Name: "Bek", StickerSet: "cats_by_x"}
+	ctx := func(updateID int64, words string, target *Target) context.Context {
+		return WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: updateID, MessageID: updateID, Target: target, Words: words}, &Sink{})
+	}
+
+	expectRefusal(t, env.moderate(ctx(440, "shu stikerlarni guruhga qo'y", sticker), `{"action":"set_sticker_set"}`), "forbidden", "supergroups big enough")
+	env.telegram.chat.CanSetStickerSet, env.telegram.chat.StickerSetName = true, "old_pack"
+	if got := env.moderate(ctx(441, "shu stikerlarni guruhga qo'y", &Target{MessageID: 78, UserID: memberID, Text: "salom"}), `{"action":"set_sticker_set"}`); got.OK || got.Error.Code != "invalid_arguments" {
+		t.Errorf("no sticker replied to = %+v", got)
+	}
+	expectRefusal(t, env.moderate(ctx(442, "salom", sticker), `{"action":"set_sticker_set"}`), "forbidden", "does not ask")
+	env.nothingActed(t)
+
+	if said := env.act(t, ctx(443, "shu stiker paketni guruhga qo'y", sticker), `{"action":"set_sticker_set"}`); said != "Bajarildi: guruhning stiker to'plami endi «cats_by_x»." {
+		t.Errorf("said %q", said)
+	}
+	env.act(t, ctx(444, "orqaga qaytar", nil), `{"action":"undo"}`)
+	env.act(t, ctx(445, "guruh stikerpakini olib tashla", nil), `{"action":"delete_sticker_set"}`)
+	env.act(t, ctx(446, "qaytar", nil), `{"action":"undo"}`)
+	want := []string{"setChatStickerSet cats_by_x " + inGroupA, "setChatStickerSet old_pack " + inGroupA, "deleteChatStickerSet " + inGroupA, "setChatStickerSet old_pack " + inGroupA}
+	if got := env.telegram.made(); !slices.Equal(got, want) {
+		t.Errorf("calls = %q, want %q", got, want)
+	}
+}
+
+// Group settings need their own right: an admin who may only delete and
+// mute cannot rename the group, and neither can the bot without it.
+func TestModerateGroupEditsNeedTheRight(t *testing.T) {
+	env := newModerationEnv(t)
+	env.chat.set(rulesBotID, admin(telegram.RightChangeInfo))
+	ctx := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: 420, MessageID: 420, Words: "guruh nomini Test qil"}, &Sink{})
+	if got := env.moderate(ctx, `{"action":"set_title","text":"Test"}`); got.OK || !strings.Contains(got.Error.Message, "change") {
+		t.Errorf("an admin without the right = %+v", got)
+	}
+
+	env = newModerationEnv(t)
+	env.chat.set(userID, admin(telegram.RightChangeInfo))
+	if got := env.moderate(ctx, `{"action":"set_title","text":"Test"}`); got.OK || !strings.Contains(got.Error.Message, "I don't have the right") {
+		t.Errorf("a bot without the right = %+v", got)
+	}
+	env.nothingActed(t)
+}
+
+// Locking one kind keeps every other permission the group had.
+func TestModerateLocksOneKindAndKeepsTheRest(t *testing.T) {
+	env := groupAdminEnv(t)
+	noPolls := telegram.AllPermissions()
+	noPolls.CanSendPolls = false
+	env.telegram.groupPermissions = &noPolls
+
+	if said := env.act(t, groupTurn(430, "guruhda yozishni yop"), `{"action":"lock","kind":"messages"}`); said != "Bajarildi: guruhda xabar yozish yopildi." {
+		t.Errorf("said %q", said)
+	}
+	if p := env.telegram.groupPermissions; p.CanSendMessages || p.CanSendPolls || !p.CanSendPhotos || !p.CanSendVoiceNotes {
+		t.Errorf("permissions = %+v, want only messages locked, polls still off", p)
+	}
+	env.act(t, groupTurn(431, "ovozli xabarni yop"), `{"action":"lock","kind":"voice"}`)
+	if p := env.telegram.groupPermissions; p.CanSendVoiceNotes || p.CanSendVideoNotes || p.CanSendMessages {
+		t.Errorf("permissions = %+v, want voice and round videos locked too", p)
+	}
+	if got := env.moderate(groupTurn(432, "yop"), `{"action":"lock","kind":"everything"}`); got.OK || got.Error.Code != "invalid_arguments" {
+		t.Errorf("an unknown kind = %+v", got)
+	}
+}
+
+// A member is made an admin with the bot's own moderation rights at most,
+// never the right to make admins; only admins the bot can change are
+// demoted or titled.
+func TestModeratePromotesAndDemotes(t *testing.T) {
+	env := groupAdminEnv(t)
+	ctx := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: 440, MessageID: 440, Target: bekTarget(), Words: "buni admin qil"}, &Sink{})
+
+	if said := env.act(t, ctx, `{"action":"promote"}`); said != "Bajarildi: Bek @bek endi admin." {
+		t.Errorf("said %q", said)
+	}
+	rights := telegram.AdminRights{CanDeleteMessages: true, CanRestrictMembers: true, CanPinMessages: true, CanInviteUsers: true}
+	if calls := env.telegram.made(); len(calls) != 1 || calls[0] != fmt.Sprintf("promoteChatMember %+v %d %d", rights, groupA, memberID) {
+		t.Errorf("calls = %q", calls)
+	}
+
+	ctx = WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: 441, MessageID: 441, Target: bekTarget(), Words: "adminlikdan ol"}, &Sink{})
+	if got := env.moderate(ctx, `{"action":"demote"}`); got.OK || !strings.Contains(got.Error.Message, "not an admin") {
+		t.Errorf("demoting a plain member = %+v", got)
+	}
+	env.chat.set(memberID, admin(telegram.RightDeleteMessages))
+	env.act(t, ctx, `{"action":"demote"}`)
+	ctx = WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: 442, MessageID: 442, Target: bekTarget(), Words: "unvonini Moderator qil"}, &Sink{})
+	env.act(t, ctx, `{"action":"admin_title","text":"Moderator"}`)
+	calls := env.telegram.made()
+	if calls[1] != fmt.Sprintf("promoteChatMember %+v %d %d", telegram.AdminRights{}, groupA, memberID) || calls[2] != fmt.Sprintf("setChatAdministratorCustomTitle Moderator %d %d", groupA, memberID) {
+		t.Errorf("calls = %q", calls)
+	}
+}
+
+// A regular member's tag is set by those holding the tags right, the bot
+// too; an emoji or a tag too long is refused, an empty one takes it off,
+// and undo puts the old one back.
+func TestModerateSetsAMembersTag(t *testing.T) {
+	env := newModerationEnv(t)
+	all := append([]string{telegram.RightManageTags}, moderationRights...)
+	env.chat.set(rulesBotID, admin(all...))
+	env.chat.set(userID, admin(all...))
+	env.chat.set(memberID, telegram.ChatMember{Status: "member", Tag: "Yangi", User: &telegram.User{ID: memberID, FirstName: "Bek", Username: "bek"}})
+	turn := func(id int64, words string) context.Context {
+		return WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: id, MessageID: id, Target: bekTarget(), Words: words}, &Sink{})
+	}
+
+	if said := env.act(t, turn(450, "bunga Pro tegini qo'y"), `{"action":"member_tag","text":"Pro"}`); said != "Bajarildi: Bek @bek tegi «Pro» bo'ldi." {
+		t.Errorf("said %q", said)
+	}
+	for _, args := range []string{`{"action":"member_tag","text":"🔥 Pro"}`, `{"action":"member_tag","text":"` + strings.Repeat("a", 17) + `"}`} {
+		if got := env.moderate(turn(451, "tegini o'zgartir"), args); got.OK || !strings.Contains(got.Error.Message, "no emoji") {
+			t.Errorf("%s = %+v", args, got)
+		}
+	}
+	if said := env.act(t, turn(452, "tegini olib tashla"), `{"action":"member_tag","text":""}`); !strings.Contains(said, "olib tashlandi") {
+		t.Errorf("said %q", said)
+	}
+	env.act(t, turn(453, "orqaga qaytar"), `{"action":"undo"}`)
+	want := []string{
+		fmt.Sprintf("setChatMemberTag Pro %d %d", groupA, memberID),
+		fmt.Sprintf("setChatMemberTag  %d %d", groupA, memberID),
+		fmt.Sprintf("setChatMemberTag Yangi %d %d", groupA, memberID),
+	}
+	if calls := env.telegram.made(); !slices.Equal(calls, want) {
+		t.Errorf("calls = %q\nwant %q", calls, want)
+	}
+
+	env.chat.set(userID, admin(moderationRights...))
+	if got := env.moderate(turn(454, "tegini Pro qil"), `{"action":"member_tag","text":"Pro"}`); got.OK {
+		t.Errorf("an admin without the tags right = %+v", got)
 	}
 }

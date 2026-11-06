@@ -265,15 +265,29 @@ func TestReplySavesNothingWhenModelFails(t *testing.T) {
 
 func TestReplyRejectsEmptyAnswer(t *testing.T) {
 	for _, content := range []string{"", "  \n"} {
-		f := newFixture(text(content))
+		f := newFixture(ai.Message{Role: ai.RoleAssistant, Content: content, FinishReason: "stop"})
 
 		_, err := f.agent.Reply(context.Background(), request(1, "hi"))
-		if !errors.Is(err, ai.ErrEmptyResponse) {
-			t.Errorf("content %q: err = %v, want ErrEmptyResponse", content, err)
+		if !errors.Is(err, ai.ErrEmptyResponse) || !strings.Contains(err.Error(), "finish reason stop") {
+			t.Errorf("content %q: err = %v, want ErrEmptyResponse and why", content, err)
+		}
+		if len(f.model.requests) != 2 {
+			t.Errorf("content %q: asked %d times, want twice", content, len(f.model.requests))
 		}
 		if f.store.saves != 0 {
 			t.Errorf("content %q: an empty turn was saved", content)
 		}
+	}
+}
+
+// A model that answers nothing is asked once more, and its answer then is
+// the turn's.
+func TestReplyAsksAgainAfterAnEmptyAnswer(t *testing.T) {
+	f := newFixture(text(""), text("Salom!"))
+
+	answer, err := f.agent.Reply(context.Background(), request(1, "hi"))
+	if err != nil || answer.Text != "Salom!" || len(f.model.requests) != 2 {
+		t.Fatalf("answer = %+v, %v after %d requests", answer, err, len(f.model.requests))
 	}
 }
 
@@ -779,6 +793,7 @@ func TestToThemMarkerAddressesTheRepliedMember(t *testing.T) {
 		f := newFixture(text(content))
 		answer, err := f.agent.Reply(context.Background(), request(1, "Mari, bunga bir nima de"))
 		answer.ID = 0
+		want.Route = RouteFull
 		if err != nil || answer != want {
 			t.Errorf("%q: got %+v, %v; want %+v", content, answer, err, want)
 		}
@@ -809,5 +824,54 @@ func TestFixedAnswerIsSavedWithoutTheModel(t *testing.T) {
 	}
 	if _, err := f.agent.Reply(context.Background(), req); !errors.Is(err, ErrDuplicate) {
 		t.Errorf("redelivered: err = %v, want ErrDuplicate", err)
+	}
+}
+
+// In production Gemini once sent its plan, in English, in front of its
+// answer after two web searches. The plan is cut and the answer sent; a
+// plan with no answer after it is not sent at all, and an English answer
+// that only starts like a plan stays whole.
+func TestLeakedPlanIsCutFromTheAnswer(t *testing.T) {
+	leaked := `Let's check if there's any specific undisputed action king like GTA or CoD or Elden Ring. In general, Elden Ring, GTA, and Call of Duty series dominate. Let's give a witty, smart, concise answer addressing the owner as "jonim".
+"Hozirgi paytda o'yin janriga qarab turlicha, jonim." Keep it short, one or two sentences.Hozirda janriga qarab turlicha, lekin Call of Duty va Elden Ring oldingi qatorlarda, jonim.`
+	f := newFixture(text(leaked))
+	answer, err := f.agent.Reply(context.Background(), request(1, "hozirda ekshn o'yinlarda qaysi 1-o'rinda"))
+	if want := "Hozirda janriga qarab turlicha, lekin Call of Duty va Elden Ring oldingi qatorlarda, jonim."; err != nil || answer.Text != want {
+		t.Errorf("got %+v, err = %v, want %q", answer, err, want)
+	}
+
+	f = newFixture(text("Let's answer briefly. Keep it short, one or two sentences."))
+	if _, err := f.agent.Reply(context.Background(), request(1, "hm")); !errors.Is(err, ErrLeakedThinking) {
+		t.Errorf("a plan with no answer: err = %v, want ErrLeakedThinking", err)
+	}
+
+	for _, content := range []string{"Let me guess: 4. The calculator felt unemployed.", "Let's go! I'll bring snacks."} {
+		f := newFixture(text(content))
+		if answer, err := f.agent.Reply(context.Background(), request(1, "hm")); err != nil || answer.Text != content {
+			t.Errorf("answer %q: got %+v, err = %v; an ordinary answer is sent whole", content, answer, err)
+		}
+	}
+}
+
+// When the provider's filter refuses a turn with a picture, the turn is
+// asked again without it; refused words are not asked again, and the
+// error says the filter refused them.
+func TestFilteredTurns(t *testing.T) {
+	blocked := ai.Message{Role: ai.RoleAssistant, FinishReason: "content_filter: PROHIBITED_CONTENT"}
+	f := newFixture(blocked, text("Tavsif tayyor"))
+	req := request(1, "Bek: <video> shunga tavsif yoz")
+	req.Attachments = []ai.ContentPart{ai.ImagePart("image/jpeg", []byte{1, 2, 3})}
+	answer, err := f.agent.Reply(context.Background(), req)
+	if err != nil || answer.Text != "Tavsif tayyor" || len(f.model.requests) != 2 {
+		t.Fatalf("answer = %+v, %v after %d requests", answer, err, len(f.model.requests))
+	}
+	if again := f.model.requests[1].Messages[1]; len(again.Parts) != 0 || !strings.Contains(again.Content, "could not be shown") {
+		t.Errorf("asked again with %+v", again)
+	}
+
+	words := newFixture(blocked)
+	_, err = words.agent.Reply(context.Background(), request(2, "Bek: so'z"))
+	if !errors.Is(err, ai.ErrBlocked) || !errors.Is(err, ai.ErrEmptyResponse) || len(words.model.requests) != 1 {
+		t.Errorf("refused words: %v after %d requests", err, len(words.model.requests))
 	}
 }

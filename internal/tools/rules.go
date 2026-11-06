@@ -107,7 +107,7 @@ type rulesArgs struct {
 }
 
 // RulesTool lets an owner give the bot orders that last: they are stored
-// apart from the conversation, so they survive /mute, /reset and the end
+// apart from the conversation, so they survive /mute and the end
 // of the day, and every turn in the group is told them. Whom to ignore is
 // the member the owner replied to, taken from the update: the model cannot
 // name anyone, and admins and owners cannot be ignored.
@@ -120,12 +120,12 @@ func RulesTool(opts RulesOptions) Tool {
 	}
 	return Tool{
 		Name: "group_rules",
-		Description: "Owners only. Standing rules for the group you are in, kept until they expire, even after /mute or /reset. " +
-			"add_instruction: save an owner's order meant to last, its words copied exactly from this message or their own message it replies to, never rephrased (text; hours, default 168); about_member true when it is about the member whose message the owner replied to, or whom your replied-to answer answered (\"uni\", \"bu odam\", \"shu odamga\"): the tool records who. " +
+		Description: "Owners only. Standing rules for the group you are in, kept until they expire, even after /mute. " +
+			"add_instruction: save an owner's order meant to last (an order to ban or mute for swearing or a nude picture next time is the punishments tool's instead, which is carried out), its words copied exactly from this message or their own message it replies to, never rephrased (text; hours, default 168); about_member true when it is about the member whose message the owner replied to, or whom your replied-to answer answered (\"uni\", \"bu odam\", \"shu odamga\"): the tool records who. " +
 			"ignore: stop answering the member whose message the owner replied to, or, when they replied to your own answer, the member it answered (hours, default 24); never admins or owners. unignore: answer that member again. " +
 			"set_address: how to address the owner who is asking, in every chat (text). " +
-			"watch_swearing: from now on, without you, a member's first insult here gets a warning and the next within a day a 1-hour mute, and a second swear at you within a day a 15-minute mute without warning that tags the group's creator, or the @username in text when the owner names whom to call; an admin, who cannot be muted, gets the warning and then that tag; the creator and owners are left alone. stop_watching_swearing turns it off. " +
-			"guard: turn on a guard run in code, without you (guard): spam bans members on the CAS and lols.bot spammer lists, links deletes links to malware and phishing (Google Safe Browsing, URLhaus), images deletes nude or gory pictures (Sightengine), flood mutes for 10 minutes a member sending 6 messages within 10 seconds; admins and owners are left alone. unguard turns one off. " +
+			"watch_swearing: from now on, without you, a member's first insult here gets a warning and the next within a day a 1-hour mute, an exclamation aimed at nobody one warning a day and no mute, and a second swear at you within a day a 15-minute mute without warning that tags the group's creator, or the @username in text when the owner names whom to call; an admin, who cannot be muted, gets the warning and then that tag; the creator and owners are left alone. stop_watching_swearing turns it off. " +
+			"guard: turn on a guard run in code, without you (guard): spam bans members on the CAS and lols.bot spammer lists, links deletes links to malware and phishing (Google Safe Browsing, URLhaus), images deletes nude pictures (Sightengine, or a model where it cannot judge), whether sent as a photo, sticker, GIF or file, from anyone, admins and owners too; it never blocks stickers or GIFs as such; spam and links leave admins and owners alone; joins sends everyone who asks to join the group a button in private, letting them in when pressed within 10 minutes and declining them otherwise; flood mutes for 10 minutes a member sending 6 messages within 10 seconds, admins and owners left alone. unguard turns one off. " +
 			"mute: stop writing in the group at all, until unmute. " +
 			"set_welcome: what you say, in code, to everyone who joins the group from now on, the owner's words copied exactly (text), \"{name}\" in it standing for the newcomers' names; remove_welcome: stop. " +
 			"list: the rules in force here. remove: delete a rule by its id from list. " +
@@ -135,7 +135,7 @@ func RulesTool(opts RulesOptions) Tool {
 			"type": "object",
 			"properties": {
 				"action": {"type": "string", "enum": ["add_instruction", "ignore", "unignore", "set_address", "watch_swearing", "stop_watching_swearing", "mute", "unmute", "set_welcome", "remove_welcome", "guard", "unguard", "list", "remove"]},
-				"guard": {"type": "string", "enum": ["spam", "links", "images", "flood"], "description": "For guard and unguard: which guard."},
+				"guard": {"type": "string", "enum": ["spam", "links", "images", "joins", "flood"], "description": "For guard and unguard: which guard."},
 				"group": {"type": "string", "description": "Another group the action is for, as the owner named it: its title, @username or id. Leave out for this chat."},
 				"text": {"type": "string", "description": "For add_instruction: the owner's words, copied exactly as they wrote them, at most 300 characters: no rephrasing, translating, added names or fixed spelling; leave out words that are not the order. For set_address: the form of address, at most 40 characters. For watch_swearing: the @username a mute tags, if the owner named one."},
 				"hours": {"type": "integer", "description": "For add_instruction and ignore: how long the rule lasts, 1 to 720."},
@@ -235,7 +235,7 @@ func addInstruction(ctx context.Context, opts RulesOptions, caller Caller, args 
 	if args.AboutMember {
 		// Saved without whom it is about, "uni ustoz deb chaqir" would mean
 		// nothing to any later turn.
-		if subject = instructionSubject(opts, caller); subject == nil {
+		if subject = instructionSubject(opts.BotID, caller); subject == nil {
 			return nil, &ArgumentError{Message: noSubject}
 		}
 		rule.UserID, rule.UserName = subject.UserID, subject.Name
@@ -257,12 +257,12 @@ func addInstruction(ctx context.Context, opts RulesOptions, caller Caller, args 
 // instructionSubject is the member an owner's order is about: the author of
 // the message they replied to, or the member the bot's replied-to answer
 // answered. It is nil when that is the owner, the bot or no member at all.
-func instructionSubject(opts RulesOptions, caller Caller) *Target {
+func instructionSubject(botID int64, caller Caller) *Target {
 	if caller.Target == nil {
 		return nil
 	}
-	member, err := meant(opts, caller.Target)
-	if err != nil || member.UserID == caller.UserID || member.UserID == opts.BotID || isTelegramAccount(member.UserID) {
+	member, err := meant(botID, caller.Target)
+	if err != nil || member.UserID == caller.UserID || member.UserID == botID || isTelegramAccount(member.UserID) {
 		return nil
 	}
 	return member
@@ -296,7 +296,7 @@ func ignorable(ctx context.Context, opts RulesOptions, caller Caller) (*Target, 
 	if caller.Target == nil {
 		return nil, &ArgumentError{Message: "the owner must reply to a message of the member to ignore, and ask again. Nothing was done: tell the owner so, never that it is done"}
 	}
-	target, err := meant(opts, caller.Target)
+	target, err := meant(opts.BotID, caller.Target)
 	if err != nil {
 		return nil, err
 	}
@@ -336,7 +336,7 @@ func unignoreMember(ctx context.Context, opts RulesOptions, caller Caller) (any,
 	if caller.Target == nil {
 		return nil, &ArgumentError{Message: "the owner must reply to a message of the member to answer again, and ask again. Nothing was done: tell the owner so, never that it is done"}
 	}
-	member, err := meant(opts, caller.Target)
+	member, err := meant(opts.BotID, caller.Target)
 	if err != nil {
 		return nil, err
 	}
@@ -349,8 +349,8 @@ func unignoreMember(ctx context.Context, opts RulesOptions, caller Caller) (any,
 
 // meant is the member an owner means by the message they replied to: its
 // author, or for one of the bot's own answers, the member it answered.
-func meant(opts RulesOptions, target *Target) (*Target, error) {
-	if target.UserID != opts.BotID {
+func meant(botID int64, target *Target) (*Target, error) {
+	if target.UserID != botID {
 		return target, nil
 	}
 	if target.Answered == nil {
@@ -403,7 +403,7 @@ func watchSwearing(ctx context.Context, opts RulesOptions, caller Caller, args r
 		calls = "the group's creator"
 	}
 	return map[string]any{"saved": true, "id": id, "mute_tags": calls,
-		"note": "On now, in code: a first swear gets a warning, the next within a day a 1-hour mute. It needs you to be an admin who may restrict members."}, nil
+		"note": "On now, in code: a first insult gets a warning, the next within a day a 1-hour mute; an exclamation aimed at nobody gets one warning a day and no mute. It needs you to be an admin who may restrict members."}, nil
 }
 
 func stopWatchingSwearing(ctx context.Context, opts RulesOptions, caller Caller) (any, error) {
@@ -434,10 +434,11 @@ func removeKind(ctx context.Context, opts RulesOptions, caller Caller, kind stri
 
 // guardNotes say what each guard does once it is on.
 var guardNotes = map[string]string{
-	storage.RuleSpamGuard:  "On within a minute, in code: members on the CAS or lols.bot spammer lists are banned when they join or write, and their message deleted. It needs you to be an admin who may ban and delete.",
-	storage.RuleLinkGuard:  "On within a minute, in code: messages linking to malware or phishing, as Google Safe Browsing or URLhaus know them, are deleted. It needs you to be an admin who may delete messages.",
-	storage.RuleImageGuard: "On within a minute, in code: nude or gory pictures are deleted. It needs you to be an admin who may delete messages.",
-	storage.RuleFloodGuard: "On within a minute, in code: a member who sends 6 messages within 10 seconds is muted for 10 minutes and the message deleted. It needs you to be an admin who may delete messages and restrict members.",
+	storage.RuleSpamGuard:   "On within a minute, in code: members on the CAS or lols.bot spammer lists are banned when they join or write, and their message deleted. It needs you to be an admin who may ban and delete.",
+	storage.RuleLinkGuard:   "On within a minute, in code: messages linking to malware or phishing, as Google Safe Browsing or URLhaus know them, are deleted. It needs you to be an admin who may delete messages.",
+	storage.RuleImageGuard:  "On within a minute, in code: only nude pictures are deleted, even as a sticker, GIF or file, admins' and owners' too; other stickers and GIFs stay. It needs you to be an admin who may delete messages.",
+	storage.RuleJoinCaptcha: "On within a minute, in code: everyone who asks to join gets a button in a private message; pressed within 10 minutes it lets them in, and otherwise they are declined. It needs the group to approve new members, and you to be an admin who may invite users.",
+	storage.RuleFloodGuard:  "On within a minute, in code: a member who sends 6 messages within 10 seconds is muted for 10 minutes and the message deleted. It needs you to be an admin who may delete messages and restrict members.",
 }
 
 // setGuard turns a guard on in the group.
@@ -472,10 +473,12 @@ func guardKind(opts RulesOptions, guard string, on bool) (string, error) {
 			return "", errors.New("the picture guard needs SIGHTENGINE_API_USER and SIGHTENGINE_API_SECRET, which are not set: nothing was done; tell the owner so")
 		}
 		return storage.RuleImageGuard, nil
+	case "joins":
+		return storage.RuleJoinCaptcha, nil
 	case "flood":
 		return storage.RuleFloodGuard, nil
 	}
-	return "", &ArgumentError{Message: "guard must be spam, links, images or flood"}
+	return "", &ArgumentError{Message: "guard must be spam, links, images, joins or flood"}
 }
 
 // setWelcome keeps the group's welcome for new members, in the owner's own

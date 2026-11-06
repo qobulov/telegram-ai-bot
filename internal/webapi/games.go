@@ -20,7 +20,9 @@ import (
 // Steam asks in Uzbekistan.
 
 const (
-	gamesTTL      = 6 * time.Hour
+	gamesTTL = 6 * time.Hour
+	// playersTTL keeps a game's player count: it is "right now".
+	playersTTL    = 10 * time.Minute
 	maxGameQuery  = 40
 	maxMetaHeroes = 8
 )
@@ -33,7 +35,7 @@ type gamesArgs struct {
 func (a *apis) gamesTool() tools.Tool {
 	return tools.Tool{
 		Name: "games",
-		Description: "steam_game: a PC game's Steam price in Uzbekistan, discount, genres, release, Metacritic score and minimum PC requirements. " +
+		Description: "steam_game: a PC game's Steam price in Uzbekistan, discount, genres, release, Metacritic score, minimum PC requirements and how many play it on Steam right now. " +
 			"dota_hero: a Dota 2 hero's attribute, roles and public and pro win, pick and ban rates; dota_meta: the heroes winning most and the pros' most picked and banned. Mobile Legends is the mlbb tool's.",
 		Schema: json.RawMessage(`{
 			"type": "object",
@@ -159,7 +161,32 @@ func (a *apis) steamGame(ctx context.Context, name string) (any, error) {
 	if minimum := cleanText(g.Requirement.Minimum, shownRequirements); minimum != "" {
 		out["minimum_pc"] = minimum
 	}
+	if players, ok := a.playersNow(ctx, id); ok {
+		out["playing_now_on_steam"] = players
+	}
 	return out, nil
+}
+
+// playersNow is how many play a game on Steam right now. The rest of the
+// game's page stands without it, so a failure only leaves it out.
+func (a *apis) playersNow(ctx context.Context, id int) (int, bool) {
+	link := fmt.Sprintf("%s/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?appid=%d", a.urls.SteamAPI, id)
+	players, err := remember(a.cache, "steam-players:"+strconv.Itoa(id), playersTTL, func() (int, error) {
+		var answer struct {
+			Response struct {
+				Players int `json:"player_count"`
+				Result  int `json:"result"`
+			} `json:"response"`
+		}
+		if err := a.client.getJSON(ctx, call{service: "Steam", url: link}, &answer); err != nil {
+			return 0, err
+		}
+		if answer.Response.Result != 1 {
+			return 0, fmt.Errorf("Steam has no player count for app %d", id)
+		}
+		return answer.Response.Players, nil
+	})
+	return players, err == nil
 }
 
 // --- Dota 2 (OpenDota) ---

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0b0a14">
+  <title>Kartalar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Manrope:wght@500;600;800&display=swap" rel="stylesheet">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="style.css?v=4">
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <header class="top">
+    <div class="brand">
+      <span class="seal" aria-hidden="true">札</span>
+      <div>
+        <h1 data-t="title">Kartalar</h1>
+        <p class="sub"><b id="held">0</b>/<span id="total">0</span> · <span data-t="collected">to'plandi</span></p>
+        <div class="progress" aria-hidden="true"><i id="progress"></i></div>
+      </div>
+    </div>
+    <div class="points"><span aria-hidden="true">💠</span><div><b id="points">0</b><small data-t="pointsLabel"></small></div></div>
+  </header>
+
+  <p class="notice" id="notice" hidden></p>
+
+  <main>
+    <div class="loading" id="loading" aria-busy="true">
+      <p data-t="loading"></p>
+      <div class="grid"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    </div>
+
+    <section class="tab" id="tab-collection" hidden>
+      <div class="welcome" id="welcome" hidden>
+        <span class="welcome-mark" aria-hidden="true">🎴</span>
+        <b data-t="welcomeTitle"></b>
+        <p data-t="welcomeText"></p>
+        <button type="button" class="draw" id="welcomeDraw" data-t="welcomeButton"></button>
+      </div>
+      <label class="search">
+        <span aria-hidden="true">⌕</span>
+        <input id="search" type="search" autocomplete="off" data-ph="search">
+      </label>
+      <div class="sets" id="sets" role="group"></div>
+      <div id="shelves"></div>
+    </section>
+
+    <section class="tab" id="tab-draw" hidden>
+      <div class="stage">
+        <div class="deck" id="deck">
+          <div class="flip" id="flip">
+            <div class="face back"><span class="back-mark">札</span></div>
+            <div class="face front" id="front"></div>
+          </div>
+        </div>
+        <p class="result" id="result" aria-live="polite"></p>
+        <div id="drawnStats"></div>
+        <button type="button" class="draw" id="draw"><span id="drawLabel"></span></button>
+        <p class="timer" id="timer"></p>
+        <button type="button" class="link" id="seeCollection" data-t="seeCollection" hidden></button>
+        <ul class="odds" id="odds"></ul>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-top" hidden>
+      <ol class="table" id="table"></ol>
+    </section>
+  </main>
+
+  <nav class="nav">
+    <button type="button" class="on" data-tab="collection"><span aria-hidden="true">🎴</span><b data-t="collection"></b></button>
+    <button type="button" data-tab="draw"><span aria-hidden="true">✨</span><b data-t="draw"></b><i class="dot" id="readyDot" hidden></i></button>
+    <button type="button" data-tab="top"><span aria-hidden="true">🏆</span><b data-t="top"></b></button>
+  </nav>
+
+  <div class="sheet" id="sheet" hidden>
+    <button type="button" class="close" id="sheetClose" aria-label="✕">✕</button>
+    <div class="sheet-card" id="sheetCard" role="dialog" aria-modal="true"></div>
+  </div>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <script src="app.js?v=4"></script>
+</body>
+</html>

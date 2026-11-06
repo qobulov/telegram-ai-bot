@@ -60,6 +60,27 @@ func TestOnlyTheNewestFreshDraftCanBeConfirmed(t *testing.T) {
 	}
 }
 
+// A draft that copies a message keeps which one; a text draft has none.
+func TestBroadcastKeepsTheMessageToCopy(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	draft := Broadcast{OwnerID: owner, UpdateID: 1, ChatIDs: []int64{group, -1001}, CopyChatID: owner, CopyMessageID: 31}
+	if err := store.SaveBroadcast(ctx, draft); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.ConfirmBroadcast(ctx, owner, 2, time.Minute)
+	if err != nil || !reflect.DeepEqual(got, Broadcast{OwnerID: owner, UpdateID: 1, Text: "", ChatIDs: draft.ChatIDs, CopyChatID: owner, CopyMessageID: 31}) {
+		t.Fatalf("confirmed = %+v, err = %v", got, err)
+	}
+
+	if err := store.SaveBroadcast(ctx, Broadcast{OwnerID: owner, UpdateID: 3, Text: "x", ChatIDs: []int64{group}}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := store.ConfirmBroadcast(ctx, owner, 4, time.Minute); err != nil || got.CopyChatID != 0 || got.CopyMessageID != 0 {
+		t.Errorf("a text draft = %+v, err = %v", got, err)
+	}
+}
+
 func TestCancelBroadcastDropsTheDraft(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()

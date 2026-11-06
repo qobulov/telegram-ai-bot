@@ -524,3 +524,31 @@ func TestGroupMediaIsLoggedByKind(t *testing.T) {
 		t.Errorf("downloaded = %v; media nobody showed the bot is never fetched", got)
 	}
 }
+
+// A voice message, a song, a video, a round video and an audio or video
+// file can be listened to; a GIF, a photo and other files cannot.
+func TestSoundOf(t *testing.T) {
+	cases := []struct {
+		msg  *telegram.Message
+		want string
+	}{
+		{&telegram.Message{Voice: &telegram.Voice{FileID: "voice"}}, "voice"},
+		{&telegram.Message{Audio: &telegram.Audio{FileID: "song"}}, "song"},
+		{&telegram.Message{Video: &telegram.Video{FileID: "video"}}, "video"},
+		{&telegram.Message{VideoNote: &telegram.VideoNote{FileID: "round"}}, "round"},
+		{&telegram.Message{Document: &telegram.Document{FileID: "mp3", MimeType: "audio/mpeg"}}, "mp3"},
+		{&telegram.Message{Document: &telegram.Document{FileID: "pdf", MimeType: "application/pdf"}}, ""},
+		{&telegram.Message{Animation: &telegram.Animation{}, Document: &telegram.Document{FileID: "gif", MimeType: "video/mp4"}}, ""},
+		{&telegram.Message{Photo: []telegram.PhotoSize{{FileID: "photo"}}}, ""},
+		{nil, ""},
+	}
+	for _, c := range cases {
+		got := ""
+		if sound := soundOf(c.msg); sound != nil {
+			got = sound.FileID
+		}
+		if got != c.want {
+			t.Errorf("soundOf(%+v) = %q; want %q", c.msg, got, c.want)
+		}
+	}
+}

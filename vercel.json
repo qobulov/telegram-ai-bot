@@ -11,6 +11,27 @@
     },
     "api/cleanup.go": {
       "maxDuration": 60
+    },
+    "api/stats.go": {
+      "maxDuration": 15
+    },
+    "api/cards.go": {
+      "maxDuration": 30
+    },
+    "api/game.go": {
+      "maxDuration": 15
+    },
+    "api/shashka.go": {
+      "maxDuration": 15
+    },
+    "api/raid.go": {
+      "maxDuration": 15
+    },
+    "api/mafia.go": {
+      "maxDuration": 15
+    },
+    "api/maydon.go": {
+      "maxDuration": 15
     }
   },
   "crons": [

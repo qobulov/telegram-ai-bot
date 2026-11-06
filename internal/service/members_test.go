@@ -26,6 +26,11 @@ func (f *fakeRoster) SeeMember(_ context.Context, m storage.GroupMember) error {
 	return nil
 }
 
+func (f *fakeRoster) KnowMember(ctx context.Context, m storage.GroupMember) error {
+	m.Status = "known"
+	return f.SeeMember(ctx, m)
+}
+
 func (f *fakeRoster) all() []storage.GroupMember {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -66,6 +71,31 @@ func TestMembersAreNotedFromWhatTheGroupShows(t *testing.T) {
 	}
 	if got := roster.all(); !slices.Equal(got, want) {
 		t.Errorf("noted %+v\nwant  %+v", got, want)
+	}
+}
+
+// The sender of a message someone replies to is a member too, last seen
+// when they wrote it, not now; a post sent as a channel names nobody.
+func TestMembersAreKnownFromReplies(t *testing.T) {
+	f := newFixture()
+	roster := &fakeRoster{}
+	f.opts.Roster = roster
+
+	reply := groupMessage("rostmi?")
+	reply.ReplyToMessage = &telegram.Message{MessageID: 5, Date: 1_700_000_000, From: &telegram.User{ID: 7007, FirstName: "Quiet"}, Chat: reply.Chat}
+	fromChannel := groupMessage("ha")
+	fromChannel.ReplyToMessage = &telegram.Message{MessageID: 6, Date: 1_700_000_000, From: &telegram.User{ID: 136817688, FirstName: "Channel"},
+		SenderChat: &telegram.Chat{ID: -1009, Type: "channel"}, Chat: fromChannel.Chat}
+
+	f.run(inGroup(reply), inGroup(fromChannel))
+
+	got := roster.all()
+	i := slices.IndexFunc(got, func(m storage.GroupMember) bool { return m.UserID == 7007 })
+	if i < 0 || got[i].Status != "known" || !got[i].LastSeen.Equal(time.Unix(1_700_000_000, 0)) || got[i].ChatID != groupID {
+		t.Errorf("noted %+v, want Quiet known as of when they wrote", got)
+	}
+	if slices.ContainsFunc(got, func(m storage.GroupMember) bool { return m.UserID == 136817688 }) {
+		t.Errorf("the channel's post named a member: %+v", got)
 	}
 }
 

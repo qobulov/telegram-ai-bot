@@ -237,7 +237,7 @@ func TestBuiltInPersona(t *testing.T) {
 	if strings.Contains(cfg.PersonaPrompt, "Mira") {
 		t.Error("the built-in persona names the character directly instead of using the configured name")
 	}
-	for _, want := range []string{"slur", "untrusted", "threat", "never claim to be a real human", "calculator", "plain text"} {
+	for _, want := range []string{"slur", "untrusted", "threat", "never claim to be a real human", "plain text"} {
 		if !strings.Contains(strings.ToLower(cfg.PersonaPrompt), want) {
 			t.Errorf("the built-in persona does not mention %q", want)
 		}
@@ -414,6 +414,22 @@ func TestLoadGroupLimits(t *testing.T) {
 	}
 }
 
+func TestBusinessDailyLimit(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil || cfg.BusinessDailyLimit != 30 {
+		t.Fatalf("default = %d, err = %v; want 30", cfg.BusinessDailyLimit, err)
+	}
+	env := validEnv()
+	env["BUSINESS_DAILY_LIMIT"] = "0"
+	if cfg, err := Load(getenv(env)); err != nil || cfg.BusinessDailyLimit != 0 {
+		t.Errorf("BUSINESS_DAILY_LIMIT=0: %d, %v; want it off", cfg.BusinessDailyLimit, err)
+	}
+	env["BUSINESS_DAILY_LIMIT"] = "-1"
+	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "BUSINESS_DAILY_LIMIT") {
+		t.Errorf("BUSINESS_DAILY_LIMIT=-1: err = %v, want it refused", err)
+	}
+}
+
 func TestPrivateDailyLimit(t *testing.T) {
 	cfg, err := Load(getenv(validEnv()))
 	if err != nil || cfg.PrivateDailyLimit != 10 {
@@ -431,6 +447,27 @@ func TestPrivateDailyLimit(t *testing.T) {
 		env["PRIVATE_DAILY_LIMIT"] = bad
 		if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "PRIVATE_DAILY_LIMIT") {
 			t.Errorf("PRIVATE_DAILY_LIMIT=%s: err = %v, want it refused", bad, err)
+		}
+	}
+}
+
+// Premium is sold only once a price is set; its days and limit have
+// defaults and must be positive.
+func TestPremium(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil || cfg.PremiumPrice != 0 || cfg.PremiumDays != 30 || cfg.PremiumDailyLimit != 50 {
+		t.Fatalf("defaults = %d stars, %d days, %d a day, %v; want 0, 30, 50", cfg.PremiumPrice, cfg.PremiumDays, cfg.PremiumDailyLimit, err)
+	}
+	env := validEnv()
+	env["PREMIUM_PRICE_STARS"], env["PREMIUM_DAYS"], env["PREMIUM_DAILY_LIMIT"] = "150", "7", "100"
+	if cfg, err := Load(getenv(env)); err != nil || cfg.PremiumPrice != 150 || cfg.PremiumDays != 7 || cfg.PremiumDailyLimit != 100 {
+		t.Errorf("set = %d, %d, %d, %v; want 150, 7, 100", cfg.PremiumPrice, cfg.PremiumDays, cfg.PremiumDailyLimit, err)
+	}
+	for name, bad := range map[string]string{"PREMIUM_PRICE_STARS": "-1", "PREMIUM_DAYS": "0", "PREMIUM_DAILY_LIMIT": "lots"} {
+		env := validEnv()
+		env[name] = bad
+		if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), name) {
+			t.Errorf("%s=%s: err = %v, want it refused", name, bad, err)
 		}
 	}
 }
@@ -605,6 +642,26 @@ func TestCronSecret(t *testing.T) {
 	env["CRON_SECRET"] = "short"
 	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "CRON_SECRET") || strings.Contains(err.Error(), "short") {
 		t.Errorf("short secret: err = %v, want it rejected without repeating it", err)
+	}
+}
+
+// The pages' address is off by default, loses a trailing slash, and must be
+// HTTPS, which Telegram opens Mini Apps and games over.
+func TestWebAppURL(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil || cfg.WebAppURL != "" {
+		t.Fatalf("default: %q, %v", cfg.WebAppURL, err)
+	}
+	env := validEnv()
+	env["WEBAPP_URL"] = "https://maria.vercel.app/"
+	if cfg, err := Load(getenv(env)); err != nil || cfg.WebAppURL != "https://maria.vercel.app" {
+		t.Errorf("WebAppURL = %q, err = %v", cfg.WebAppURL, err)
+	}
+	for _, bad := range []string{"http://maria.vercel.app", "maria.vercel.app", "https://maria.vercel.app/?a=1", "https://u:p@maria.vercel.app", "https:///x"} {
+		env["WEBAPP_URL"] = bad
+		if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "WEBAPP_URL") {
+			t.Errorf("%q: err = %v, want WEBAPP_URL refused", bad, err)
+		}
 	}
 }
 
@@ -971,27 +1028,6 @@ func TestOwnerNoteKeepsMasterAndToolUse(t *testing.T) {
 	}
 }
 
-func TestBackupProviderDefaultsToGroq(t *testing.T) {
-	cfg, err := Load(getenv(geminiEnv()))
-	if err != nil || cfg.BackupAPIKey != "" {
-		t.Fatalf("without a key: backup = %q, err = %v", cfg.BackupAPIKey, err)
-	}
-	env := geminiEnv()
-	env["BACKUP_API_KEY"] = "gsk-secret"
-	cfg, err = Load(getenv(env))
-	if err != nil {
-		t.Fatalf("Load: %v", err)
-	}
-	if cfg.BackupAPIKey != "gsk-secret" || cfg.BackupBaseURL != "https://api.groq.com/openai/v1" || cfg.BackupModel != "openai/gpt-oss-120b" {
-		t.Errorf("backup = %q %q %q", cfg.BackupAPIKey, cfg.BackupBaseURL, cfg.BackupModel)
-	}
-	env["BACKUP_MODEL"] = "qwen/qwen3.8-27b"
-	env["BACKUP_BASE_URL"] = "https://api.x.ai/v1"
-	if cfg, _ := Load(getenv(env)); cfg.BackupModel != "qwen/qwen3.8-27b" || cfg.BackupBaseURL != "https://api.x.ai/v1" {
-		t.Errorf("override: %q %q", cfg.BackupModel, cfg.BackupBaseURL)
-	}
-}
-
 func TestLiveDataKeysAreOptional(t *testing.T) {
 	cfg, err := Load(getenv(geminiEnv()))
 	if err != nil {
@@ -1066,19 +1102,25 @@ func TestPersonaSwearsBackInKind(t *testing.T) {
 	}
 }
 
-// The owner wants a member who finds fault with the bot answered with
-// "poxuymasmi", alone or with a few dismissive words, and owners answered
-// normally.
-func TestPersonaShrugsOffFaultFinding(t *testing.T) {
+// A member who finds fault with the bot gets a calm line without swearing:
+// "poxuymasmi" answered a plain remark in a polite group. Owners are
+// answered normally.
+func TestPersonaShrugsOffFaultFindingWithoutSwearing(t *testing.T) {
 	cfg, err := Load(getenv(validEnv()))
 	if err != nil {
 		t.Fatal(err)
 	}
 	rule := lineContaining(cfg.PersonaPrompt, "mocks a flaw of yours")
-	for _, want := range []string{`start your answer with "poxuymasmi"`, `"похуймасми"`, `"poxuymasmi, senga chort"`, "never an apology", "still gets its answer", "owners get a normal answer"} {
+	for _, want := range []string{"stay unbothered", "no swear words", "never an apology", "still gets its answer", "owners get a normal answer", `"senda ko'z yo'q-ku"`} {
 		if !strings.Contains(rule, want) {
 			t.Errorf("the fault-finding rule does not contain %q: %q", want, rule)
 		}
+	}
+	if strings.Contains(strings.ToLower(cfg.PersonaPrompt), "poxuy") || strings.Contains(cfg.PersonaPrompt, "похуй") {
+		t.Error(`the persona still asks for "poxuymasmi"`)
+	}
+	if style := lineContaining(cfg.PersonaPrompt, "informal language"); strings.Contains(style, "profanity when appropriate") || !strings.Contains(style, "no swear words of your own") {
+		t.Errorf("the style rule lets the bot swear unprovoked: %q", style)
 	}
 	if swear := lineContaining(cfg.PersonaPrompt, "swears at you"); !strings.Contains(swear, `"иди нахуй" gets "днх" or "pshnx"`) {
 		t.Errorf("Russian swearing does not get днх: %q", swear)
@@ -1137,7 +1179,7 @@ func TestGroupNoteExplainsModeration(t *testing.T) {
 	for _, want := range []string{
 		"# Moderation",
 		"with the moderate tool",
-		"Whenever someone asks you to do one of these, call moderate, on the message they replied to or on the one member they tagged with @",
+		"Whenever someone asks you to do one of these, call moderate, on the message they replied to, on the one member they tagged with @, or on the one they named (member)",
 		"never decide yourself that a tag or a username cannot work",
 		"If the tool refuses, tell them its reason in one short line",
 		"never answer [silent]",
@@ -1627,6 +1669,23 @@ func TestReasoningEffort(t *testing.T) {
 	}
 }
 
+// A reply in words alone thinks minimally by default: at low it thought
+// 500 to 800 tokens, seconds, over a one-line joke.
+func TestChatReasoningEffort(t *testing.T) {
+	if cfg, err := Load(getenv(geminiEnv())); err != nil || cfg.ChatReasoningEffort != "minimal" || cfg.ReasoningEffort != "low" {
+		t.Errorf("default chat %q, main %q, err %v", cfg.ChatReasoningEffort, cfg.ReasoningEffort, err)
+	}
+	env := geminiEnv()
+	env["CHAT_REASONING_EFFORT"] = "low"
+	if cfg, err := Load(getenv(env)); err != nil || cfg.ChatReasoningEffort != "low" {
+		t.Errorf("set: %q, %v", cfg.ChatReasoningEffort, err)
+	}
+	env["CHAT_REASONING_EFFORT"] = "max"
+	if _, err := Load(getenv(env)); err == nil || !strings.Contains(err.Error(), "CHAT_REASONING_EFFORT") {
+		t.Errorf("err = %v, want CHAT_REASONING_EFFORT refused", err)
+	}
+}
+
 // The bot once told a member she was a year or two older than its owner,
 // whose age it never knew: no personal fact is made up, even in a joke.
 func TestPersonaNeverInventsPersonalFacts(t *testing.T) {
@@ -1692,5 +1751,23 @@ func TestPersonaRefusesInsultsOnRequestAndSexualContent(t *testing.T) {
 		if !strings.Contains(sexual, want) {
 			t.Errorf("the sexual content rule does not contain %q: %q", want, sexual)
 		}
+	}
+}
+
+// Routing is off until ROUTER_MODEL names a router; the chat path then
+// answers with the main model, without tools, unless CHAT_MODEL names
+// another.
+func TestRoutingModels(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RouterModel != "" || cfg.ChatModel != cfg.Model {
+		t.Errorf("router %q, chat %q; want no router and the main model %q", cfg.RouterModel, cfg.ChatModel, cfg.Model)
+	}
+	env := validEnv()
+	env["ROUTER_MODEL"], env["CHAT_MODEL"] = "gemini-3.5-flash-lite", "gemini-3.5-flash"
+	if cfg, err = Load(getenv(env)); err != nil || cfg.RouterModel != "gemini-3.5-flash-lite" || cfg.ChatModel != "gemini-3.5-flash" {
+		t.Errorf("router %q, chat %q, %v", cfg.RouterModel, cfg.ChatModel, err)
 	}
 }

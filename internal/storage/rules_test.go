@@ -188,3 +188,41 @@ func TestGuardsAreOnePerGroup(t *testing.T) {
 		t.Errorf("rules = %+v, want one of each guard", rules)
 	}
 }
+
+func TestPunishmentsAreKeptPerMemberAndKind(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	for _, r := range []GroupRule{
+		{ChatID: group, Kind: RuleSwearPunishment, UserID: alice, UserName: "Alice", Text: "ban", SetBy: bob},
+		{ChatID: group, Kind: RulePicturePunishment, UserID: alice, UserName: "Alice", Text: "mute:3", SetBy: bob},
+		{ChatID: group, Kind: RuleSwearPunishment, UserID: alice, UserName: "Alice", Text: "mute:24", SetBy: bob},
+	} {
+		if _, err := store.SetGroupRule(ctx, r); err != nil {
+			t.Fatalf("SetGroupRule %s: %v", r.Kind, err)
+		}
+	}
+	rules, err := store.GroupRules(ctx, group)
+	if err != nil {
+		t.Fatal(err)
+	}
+	texts := map[string]string{}
+	for _, r := range rules {
+		texts[r.Kind] = r.Text
+	}
+	if len(rules) != 2 || texts[RuleSwearPunishment] != "mute:24" || texts[RulePicturePunishment] != "mute:3" {
+		t.Errorf("rules = %+v, want the newer swear punishment and the picture one", rules)
+	}
+}
+
+func TestPunishmentText(t *testing.T) {
+	for text, want := range map[string]Punishment{"ban": {}, "mute:3": {MuteHours: 3}} {
+		if got, ok := ParsePunishment(text); !ok || got != want || got.String() != text {
+			t.Errorf("ParsePunishment(%q) = %+v, %v", text, got, ok)
+		}
+	}
+	for _, text := range []string{"", "kick", "mute:", "mute:0", "mute:x"} {
+		if _, ok := ParsePunishment(text); ok {
+			t.Errorf("ParsePunishment(%q) took it", text)
+		}
+	}
+}

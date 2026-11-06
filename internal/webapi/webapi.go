@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"telegram-ai-bot/internal/tools"
@@ -53,10 +55,23 @@ type Options struct {
 	// YouTubeKey is a YouTube Data API key. Without it there is no
 	// youtube_search tool.
 	YouTubeKey string
-	// WolframAppID is a Wolfram|Alpha AppID. Without it there is no
-	// wolfram tool.
-	WolframAppID string
-	BaseURLs     BaseURLs
+	// CalendarificKey is a Calendarific key. Without it there is no
+	// holidays tool.
+	CalendarificKey string
+	// ImgflipKey is an Imgflip API key. Without it there is no make_meme
+	// tool.
+	ImgflipKey string
+	// Pins sends the send_location tool's pins. Without it there is no
+	// send_location tool.
+	Pins PinSender
+	// ShazamKey is a RapidAPI key subscribed to the Shazam Song Recognition
+	// API, Files downloads the sound sent to the bot and SongQuota counts
+	// recognitions. Without all three there is no recognize_song tool.
+	ShazamKey string
+	Files     FileFetcher
+	SongQuota SongQuota
+
+	BaseURLs BaseURLs
 }
 
 // BaseURLs says where each API lives. Empty fields mean the production
@@ -76,6 +91,7 @@ type BaseURLs struct {
 	CoinGecko         string
 	Deezer            string
 	RoneArena         string
+	MLBBDex           string
 	Tavily            string
 	TMDB              string
 	YouTube           string
@@ -99,18 +115,20 @@ type BaseURLs struct {
 	GoldAPI           string
 	Lichess           string
 	Jolpica           string
-	MathJS            string
 	Crossref          string
 	ArXiv             string
 	Datamuse          string
-	Wolfram           string
+	Calendarific      string
 	Shikimori         string
 	TraceMoe          string
 	SteamStore        string
+	SteamAPI          string
+	Imgflip           string
 	WorldBank         string
 	JokeAPI           string
 	LaunchLibrary     string
 	OpenDota          string
+	Shazam            string
 	// Wikipedia is a format string with %s for the language code.
 	Wikipedia string
 	// News maps a language (uz, ru), or world- and a language for the
@@ -133,6 +151,7 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.CoinGecko = cmp.Or(b.CoinGecko, "https://api.coingecko.com")
 	b.Deezer = cmp.Or(b.Deezer, "https://api.deezer.com")
 	b.RoneArena = cmp.Or(b.RoneArena, "https://arena.rone.dev")
+	b.MLBBDex = cmp.Or(b.MLBBDex, "https://mlbbdex.com")
 	b.Tavily = cmp.Or(b.Tavily, "https://api.tavily.com")
 	b.TMDB = cmp.Or(b.TMDB, "https://api.themoviedb.org")
 	b.YouTube = cmp.Or(b.YouTube, "https://www.googleapis.com/youtube/v3")
@@ -156,18 +175,20 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.GoldAPI = cmp.Or(b.GoldAPI, "https://api.gold-api.com")
 	b.Lichess = cmp.Or(b.Lichess, "https://lichess.org")
 	b.Jolpica = cmp.Or(b.Jolpica, "https://api.jolpi.ca")
-	b.MathJS = cmp.Or(b.MathJS, "https://api.mathjs.org")
 	b.Crossref = cmp.Or(b.Crossref, "https://api.crossref.org")
 	b.ArXiv = cmp.Or(b.ArXiv, "https://export.arxiv.org")
 	b.Datamuse = cmp.Or(b.Datamuse, "https://api.datamuse.com")
-	b.Wolfram = cmp.Or(b.Wolfram, "https://api.wolframalpha.com")
+	b.Calendarific = cmp.Or(b.Calendarific, "https://calendarific.com")
 	b.Shikimori = cmp.Or(b.Shikimori, "https://shikimori.io")
 	b.TraceMoe = cmp.Or(b.TraceMoe, "https://api.trace.moe")
 	b.SteamStore = cmp.Or(b.SteamStore, "https://store.steampowered.com")
+	b.SteamAPI = cmp.Or(b.SteamAPI, "https://api.steampowered.com")
+	b.Imgflip = cmp.Or(b.Imgflip, "https://api.imgflip.com")
 	b.WorldBank = cmp.Or(b.WorldBank, "https://api.worldbank.org")
 	b.JokeAPI = cmp.Or(b.JokeAPI, "https://v2.jokeapi.dev")
 	b.LaunchLibrary = cmp.Or(b.LaunchLibrary, "https://ll.thespacedevs.com")
 	b.OpenDota = cmp.Or(b.OpenDota, "https://api.opendota.com")
+	b.Shazam = cmp.Or(b.Shazam, "https://shazam-song-recognition-api.p.rapidapi.com")
 	b.Wikipedia = cmp.Or(b.Wikipedia, "https://%s.wikipedia.org")
 	if b.News == nil {
 		b.News = map[string]map[string]string{
@@ -197,17 +218,25 @@ type apis struct {
 	client *client
 	// patient waits longer, for the web search and the MLBB statistics,
 	// which often take over 3 s.
-	patient       *client
-	cache         *cache
-	urls          BaseURLs
-	location      *time.Location
-	now           func() time.Time
-	footballToken string
-	coinGeckoKey  string
-	tavilyKey     string
-	tmdbToken     string
-	youtubeKey    string
-	wolframAppID  string
+	patient         *client
+	cache           *cache
+	urls            BaseURLs
+	location        *time.Location
+	now             func() time.Time
+	footballToken   string
+	coinGeckoKey    string
+	tavilyKey       string
+	tmdbToken       string
+	youtubeKey      string
+	calendarificKey string
+	imgflipKey      string
+	pins            PinSender
+	// songs uploads sounds for recognition, which takes longer than patient
+	// waits.
+	songs     *client
+	shazamKey string
+	files     FileFetcher
+	songQuota SongQuota
 }
 
 // Tools returns the live-data tools. Football is included only when
@@ -249,8 +278,17 @@ func Tools(opts Options) []tools.Tool {
 	if a.youtubeKey != "" {
 		list = append(list, a.youtubeTool())
 	}
-	if a.wolframAppID != "" {
-		list = append(list, a.wolframTool())
+	if a.calendarificKey != "" {
+		list = append(list, a.holidaysTool())
+	}
+	if a.imgflipKey != "" {
+		list = append(list, a.memeTool())
+	}
+	if a.pins != nil {
+		list = append(list, a.locationTool())
+	}
+	if a.shazamKey != "" && a.files != nil && a.songQuota != nil {
+		list = append(list, a.songTool())
 	}
 	return list
 }
@@ -263,18 +301,24 @@ func newAPIs(opts Options) *apis {
 		opts.Location = defaultLocation()
 	}
 	return &apis{
-		client:        newClient(opts.HTTPClient, cmp.Or(opts.UserAgent, defaultUserAgent)),
-		patient:       patientClient(opts.HTTPClient, cmp.Or(opts.UserAgent, defaultUserAgent)),
-		cache:         newCache(opts.Now),
-		urls:          opts.BaseURLs.withDefaults(),
-		location:      opts.Location,
-		now:           opts.Now,
-		footballToken: opts.FootballToken,
-		coinGeckoKey:  opts.CoinGeckoKey,
-		tavilyKey:     opts.TavilyKey,
-		tmdbToken:     opts.TMDBToken,
-		youtubeKey:    opts.YouTubeKey,
-		wolframAppID:  opts.WolframAppID,
+		client:          newClient(opts.HTTPClient, cmp.Or(opts.UserAgent, defaultUserAgent)),
+		patient:         patientClient(opts.HTTPClient, cmp.Or(opts.UserAgent, defaultUserAgent)),
+		cache:           newCache(opts.Now),
+		urls:            opts.BaseURLs.withDefaults(),
+		location:        opts.Location,
+		now:             opts.Now,
+		footballToken:   opts.FootballToken,
+		coinGeckoKey:    opts.CoinGeckoKey,
+		tavilyKey:       opts.TavilyKey,
+		tmdbToken:       opts.TMDBToken,
+		youtubeKey:      opts.YouTubeKey,
+		calendarificKey: opts.CalendarificKey,
+		imgflipKey:      opts.ImgflipKey,
+		pins:            opts.Pins,
+		songs:           songClient(opts.HTTPClient, cmp.Or(opts.UserAgent, defaultUserAgent)),
+		shazamKey:       opts.ShazamKey,
+		files:           opts.Files,
+		songQuota:       opts.SongQuota,
 	}
 }
 
@@ -316,6 +360,20 @@ func decodeArgs(raw json.RawMessage, into any) error {
 	if err := decoder.Decode(into); err != nil {
 		return argumentError("arguments do not match the tool's schema: %v", err)
 	}
+	return nil
+}
+
+// looseBool is a boolean argument that also takes "true" and "false" as
+// strings: the model now and then quotes them, and the call should not fail
+// for it.
+type looseBool bool
+
+func (b *looseBool) UnmarshalJSON(data []byte) error {
+	value, err := strconv.ParseBool(strings.Trim(string(data), `"`))
+	if err != nil {
+		return fmt.Errorf("want true or false, not %s", data)
+	}
+	*b = looseBool(value)
 	return nil
 }
 

@@ -24,7 +24,7 @@ const (
 	// groupAbilities tells the model, every group turn, what it can and
 	// cannot do. Without it the model claimed things it has no means to do
 	// or know: messages "sent to all groups", groups "joined", photos "seen".
-	groupAbilities = "You can reply here, react with one emoji, and use your tools. You cannot see read receipts, who is online or the full member list (group_admins lists the admins, group_members the members you have seen), read other chats or private chats except through your tools, open links, join groups, or remember anything older than the messages below unless a rule says so."
+	groupAbilities = "You can reply here, react with one emoji, and use your tools. You cannot see read receipts, who is online or the full member list (group_admins lists the admins, group_members the members you have seen, catch_up the day's messages for a recap, group_stats who wrote the most), read other chats or private chats except through your tools, open links, join groups, or remember anything older than the messages below unless a rule says so."
 	rightsUnknown  = "Your admin rights here are unknown."
 	notAnAdmin     = "You are not an admin here."
 	// noToolRights is said of a bot that is an admin, but holds none of the
@@ -169,10 +169,11 @@ func (s *Service) sworeAtBot(ctx context.Context, in incoming) bool {
 
 // guardLines tell the model what a guard on in the group does without it.
 var guardLines = map[string]string{
-	storage.RuleSpamGuard:  "Known spammers (CAS, lols.bot) are banned here in code, not by you.",
-	storage.RuleLinkGuard:  "Links to malware or phishing (Google Safe Browsing, URLhaus) are deleted here in code, not by you.",
-	storage.RuleImageGuard: "Nude or gory pictures are deleted here in code, not by you.",
-	storage.RuleFloodGuard: "A member who floods the group, sending many messages within seconds, is muted here for 10 minutes in code, not by you.",
+	storage.RuleSpamGuard:   "Known spammers (CAS, lols.bot) are banned here in code, not by you.",
+	storage.RuleLinkGuard:   "Links to malware or phishing (Google Safe Browsing, URLhaus) are deleted here in code, not by you.",
+	storage.RuleImageGuard:  "Nude pictures are deleted here in code, from anyone, not by you, even as a sticker, GIF or file; other stickers and GIFs are allowed.",
+	storage.RuleJoinCaptcha: "People asking to join are sent a button in private, in code, not by you: pressed within 10 minutes it lets them in, and otherwise they are declined.",
+	storage.RuleFloodGuard:  "A member who floods the group, sending many messages within seconds, is muted here for 10 minutes in code, not by you.",
 }
 
 // ruleLines lists the instructions, then the ignored members. Each is folded
@@ -196,8 +197,10 @@ func (s *Service) ruleLines(rules []storage.GroupRule) []string {
 			if r.UserName != "" {
 				calls = oneLine(r.UserName)
 			}
-			instructions = append(instructions, "- Swearing is watched here in code, not by you: a member's first swear gets a warning, the next within a day a 1-hour mute that tags "+calls+". Never swear back at anyone in this group, and never mute anyone for swearing yourself.")
-		case storage.RuleSpamGuard, storage.RuleLinkGuard, storage.RuleImageGuard, storage.RuleFloodGuard:
+			instructions = append(instructions, "- Swearing is watched here in code, not by you: a member's first insult gets a warning, the next within a day a 1-hour mute that tags "+calls+". Never swear back at anyone in this group, and never mute anyone for swearing yourself.")
+		case storage.RuleSwearPunishment, storage.RulePicturePunishment:
+			instructions = append(instructions, s.punishmentLine(r))
+		case storage.RuleSpamGuard, storage.RuleLinkGuard, storage.RuleImageGuard, storage.RuleJoinCaptcha, storage.RuleFloodGuard:
 			instructions = append(instructions, "- "+guardLines[r.Kind])
 		case storage.RuleIgnore:
 			line := "- Do not answer " + oneLine(r.UserName)
@@ -208,6 +211,24 @@ func (s *Service) ruleLines(rules []storage.GroupRule) []string {
 		}
 	}
 	return append(instructions, ignores...)
+}
+
+// punishmentLine tells the model an owners' punishment is carried out in
+// code, so that it neither does it itself nor promises it.
+func (s *Service) punishmentLine(r storage.GroupRule) string {
+	who, what := "anyone", "swearing at you"
+	if r.UserID != 0 {
+		who = oneLine(r.UserName)
+	}
+	if r.Kind == storage.RulePicturePunishment {
+		what = "a nude picture"
+	}
+	does := "banned"
+	if p, ok := storage.ParsePunishment(r.Text); ok && !p.Ban() {
+		does = fmt.Sprintf("muted for %d hours", p.MuteHours)
+	}
+	return fmt.Sprintf("- (#%d) Ordered by the owners or the group's creator, carried out here in code, not by you: %s is %s for %s (until %s).",
+		r.ID, who, does, what, r.ExpiresAt.In(s.opts.Location).Format(ruleDayLayout))
 }
 
 // addressFor is how the owner who is writing asked to be addressed, or "".

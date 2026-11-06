@@ -1,6 +1,7 @@
 package service
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 
 	"telegram-ai-bot/internal/agent"
 	"telegram-ai-bot/internal/ai"
+	"telegram-ai-bot/internal/game"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 	"telegram-ai-bot/internal/tools"
@@ -27,6 +29,8 @@ type outcome struct {
 	// skipped is why the message got no answer from the model, as
 	// "overloaded", for the skip log; "" when it got one.
 	skipped string
+	// skipDetail is the error behind skipped, for the owners.
+	skipDetail string
 	// reaction is the emoji the model answered with instead of text. It is
 	// set on the message being answered; no message is sent for it.
 	reaction string
@@ -34,9 +38,7 @@ type outcome struct {
 	// audios the sounds found, such as a song's preview, sent after it.
 	drawings []tools.Drawing
 	audios   []tools.Audio
-	// cards are item cards, stickers by file ID, sent after the answer.
-	cards []string
-	// documents are files a tool made, such as a presentation, sent as the
+	// documents are files a tool made, such as a document, sent as the
 	// answer with its text as their caption.
 	documents []tools.Document
 	// duplicate marks an update that was already answered: Telegram sent it
@@ -45,8 +47,19 @@ type outcome struct {
 	// sticker is the category of sticker the model asked to send after the
 	// text, or alone; "" for none. gif is the same for a GIF.
 	sticker, gif string
-	// buttons are link buttons under the text.
-	buttons [][]telegram.Button
+	// buttons are link buttons under the text; keyboard is the private
+	// chat's keyboard, sent with it instead (see keyboard.go).
+	buttons  [][]telegram.Button
+	keyboard [][]string
+	// ask, when set, opens the reply box on the text, with ask as its hint:
+	// the text is a question whose answer comes next (see keyboardmenu.go).
+	ask string
+	// replace, for a menu's press, puts the text and buttons in place of the
+	// menu pressed.
+	replace bool
+	// effect is the message effect played over the text, in a private
+	// chat only.
+	effect string
 	// toReplied sends the answer as a reply to the member's message the
 	// asker replied to, as the model chose for an answer that speaks to
 	// them.
@@ -54,6 +67,8 @@ type outcome struct {
 	// toName is the member the model named for toReplied, whose latest
 	// message the answer replies to when the asker replied to nobody.
 	toName string
+	// invoice sends the invoice for premium after the text.
+	invoice bool
 }
 
 func say(text string) outcome { return outcome{text: text} }
@@ -62,6 +77,10 @@ func say(text string) outcome { return outcome{text: text} }
 // context rather than the polling one, so that a shutdown lets the turn in
 // progress finish instead of cutting it off.
 func (s *Service) process(in incoming) {
+	if in.business != nil {
+		s.processBusiness(in)
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), s.opts.TurnTimeout)
 	defer cancel()
 
@@ -71,18 +90,18 @@ func (s *Service) process(in incoming) {
 		if _, limited := s.rateLimited(in); !limited {
 			s.react(in, privateReactions[rand.IntN(len(privateReactions))])
 		}
-		s.noteSkip(in, "private_closed")
+		s.noteSkip(in, "private_closed", "")
 		return
 	}
 	// A muted group is ignored, except for the commands that control muting.
 	// This is checked here, in queue order, so that a message sent right
 	// after /unmute is answered and one sent right after /mute is not.
 	if s.silenced(in) {
-		s.noteSkip(in, "muted")
+		s.noteSkip(in, "muted", "")
 		return
 	}
 	if in.fromBot && !s.mayAnswerBot(in) {
-		s.noteSkip(in, "bot_quota")
+		s.noteSkip(in, "bot_quota", "")
 		return
 	}
 	if notice, limited := s.rateLimited(in); limited {
@@ -90,7 +109,7 @@ func (s *Service) process(in incoming) {
 			s.reply(in, notice)
 		}
 		s.passOver(in)
-		s.noteSkip(in, "flood")
+		s.noteSkip(in, "flood", "")
 		return
 	}
 	// A group of fewer than MinGroupMembers is answered only as a private
@@ -101,14 +120,14 @@ func (s *Service) process(in incoming) {
 	if s.isPrivateInDisguise(ctx, in) {
 		s.react(in, overQuotaReaction)
 		s.passOver(in)
-		s.noteSkip(in, "small_group")
+		s.noteSkip(in, "small_group", "")
 		return
 	}
 	// A group where too few people wrote lately gets nothing at all, as
 	// the owners asked; only they are answered there.
 	if s.tooQuiet(ctx, in) {
 		s.passOver(in)
-		s.noteSkip(in, "quiet_group")
+		s.noteSkip(in, "quiet_group", "")
 		return
 	}
 	// An owner's order not to answer a member is handled here, in code.
@@ -128,7 +147,7 @@ func (s *Service) process(in incoming) {
 	// without end.
 	if s.ignored(in, rules) && !s.isManagerCommand(in) {
 		s.passOver(in)
-		s.noteSkip(in, "ignored")
+		s.noteSkip(in, "ignored", "")
 		return
 	}
 	// Applause is answered with a reaction, which takes nothing from the
@@ -139,7 +158,7 @@ func (s *Service) process(in incoming) {
 	reservation, allowed := s.mayAnswerInGroup(in)
 	if !allowed {
 		s.passOver(in)
-		s.noteSkip(in, "group_quota")
+		s.noteSkip(in, "group_quota", "")
 		return
 	}
 	in.groupReply = reservation
@@ -154,20 +173,23 @@ func (s *Service) process(in incoming) {
 	}
 	s.logExchange(in, out)
 	if out.skipped != "" {
-		s.noteSkip(in, out.skipped)
+		s.noteSkip(in, out.skipped, out.skipDetail)
 	}
 }
+
+// maxSkipDetail cuts the error kept with a skip: its start says what failed.
+const maxSkipDetail = 500
 
 // noteSkip records that a message addressed to the bot got no answer, and
 // why. It is a record for the owners only: failing to write it is logged
 // and nothing more.
-func (s *Service) noteSkip(in incoming, reason string) {
+func (s *Service) noteSkip(in incoming, reason, detail string) {
 	if s.opts.Skips == nil {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
 	defer cancel()
-	err := s.opts.Skips.NoteSkip(ctx, storage.Skip{ChatID: in.scope.ChatID, UserID: in.userID, MessageID: in.msg.MessageID, Reason: reason})
+	err := s.opts.Skips.NoteSkip(ctx, storage.Skip{ChatID: in.scope.ChatID, UserID: in.userID, MessageID: in.msg.MessageID, Reason: reason, Detail: truncate(detail, maxSkipDetail)})
 	if err != nil {
 		s.opts.Logger.Warn("could not record a skipped message", "chat_id", in.scope.ChatID, "reason", reason, "error", err)
 	}
@@ -189,7 +211,8 @@ func (s *Service) deliver(in incoming, out *outcome) int64 {
 		out.text, out.drawings, out.sticker, out.gif, out.audios = "", nil, "", "", nil
 		return id
 	}
-	if id := s.sendAudios(in, out.audios); id != 0 {
+	alone, after := audiosByPlace(out.audios)
+	if id := s.sendAudios(in, alone); id != 0 {
 		// A song asked for is the answer alone, as a sticker is: words with
 		// it only say what it is. Only when it cannot be sent do they go.
 		out.text, out.drawings, out.sticker, out.gif = "", nil, "", ""
@@ -198,15 +221,31 @@ func (s *Service) deliver(in incoming, out *outcome) int64 {
 		}
 		return id
 	}
-	out.audios = nil
-	answerID := s.deliverAnswer(in, *out)
+	out.audios = after
+	answerID := s.deliverAnswer(in, out)
+	if id := s.sendAudios(in, after); answerID == 0 {
+		answerID = id
+	}
+	if out.invoice {
+		s.sendInvoice(in)
+	}
 	if id := s.sendMedia(in, out); answerID == 0 {
 		answerID = id
 	}
-	if id := s.sendCards(in, out); answerID == 0 {
-		answerID = id
-	}
 	return answerID
+}
+
+// audiosByPlace parts the sounds that are the answer from those sent after
+// it.
+func audiosByPlace(audios []tools.Audio) (alone, after []tools.Audio) {
+	for _, audio := range audios {
+		if audio.AfterAnswer {
+			after = append(after, audio)
+		} else {
+			alone = append(alone, audio)
+		}
+	}
+	return alone, after
 }
 
 // namedWindow is how far back the group log is searched for the latest
@@ -297,33 +336,6 @@ func (s *Service) repliedMember(in incoming) int64 {
 	return replied.MessageID
 }
 
-// sendCards sends the item cards a tool chose, after the answer, and returns
-// the first one's message ID; those that could not be sent are dropped from
-// out, so that the log tells only of what the chat saw.
-func (s *Service) sendCards(in incoming, out *outcome) int64 {
-	if s.opts.StickerSender == nil {
-		out.cards = nil
-		return 0
-	}
-	var firstID int64
-	sent := out.cards[:0]
-	for _, card := range out.cards {
-		ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
-		id, err := s.opts.StickerSender.SendSticker(ctx, in.msg.Chat.ID, card, in.replyTarget())
-		cancel()
-		if err != nil {
-			s.opts.Logger.Warn("could not send an item card", "chat_id", in.msg.Chat.ID, "error", err)
-			continue
-		}
-		sent = append(sent, card)
-		if firstID == 0 {
-			firstID = id
-		}
-	}
-	out.cards = sent
-	return firstID
-}
-
 // sendAudios sends the sounds a tool found and returns the first sent
 // message's ID, or 0 when none could be sent.
 func (s *Service) sendAudios(in incoming, audios []tools.Audio) int64 {
@@ -383,8 +395,9 @@ func (s *Service) sendAudio(in incoming, audio tools.Audio) int64 {
 	return id
 }
 
-// deliverAnswer sends the outcome's text, pictures and reaction.
-func (s *Service) deliverAnswer(in incoming, out outcome) int64 {
+// deliverAnswer sends the outcome's text, pictures and reaction. Several
+// pictures go as albums, the caption under the first.
+func (s *Service) deliverAnswer(in incoming, out *outcome) int64 {
 	if out.reaction != "" {
 		s.react(in, out.reaction)
 	}
@@ -392,19 +405,24 @@ func (s *Service) deliverAnswer(in incoming, out outcome) int64 {
 		if out.text == "" {
 			return 0
 		}
-		return s.replyWithButtons(in, out.text, out.buttons)
+		return s.send(in, telegram.Outgoing{Text: out.text, Buttons: out.buttons, Keyboard: out.keyboard, Ask: out.ask, Effect: out.effect})
 	}
 	caption := out.text
 	if utf8.RuneCountInString(caption) > telegram.CaptionLimit {
 		caption = ""
 	}
 	var answerID int64
-	for i, drawing := range out.drawings {
+	for i, album := range albums(out.drawings) {
 		text := ""
 		if i == 0 {
 			text = caption
 		}
-		if id := s.replyPhoto(in, drawing, text); answerID == 0 {
+		var buttons [][]telegram.Button
+		var keyboard [][]string
+		if len(out.drawings) == 1 {
+			buttons, keyboard = out.buttons, out.keyboard // an album can carry none
+		}
+		if id := s.replyPictures(in, album, text, buttons, keyboard); answerID == 0 {
 			answerID = id
 		}
 	}
@@ -414,14 +432,65 @@ func (s *Service) deliverAnswer(in incoming, out outcome) int64 {
 	return answerID
 }
 
-func (s *Service) replyPhoto(in incoming, drawing tools.Drawing, caption string) int64 {
+// albums splits pictures into the albums Telegram takes, of at most
+// telegram.MaxAlbum each; a last one of a single picture goes alone.
+func albums(drawings []tools.Drawing) [][]tools.Drawing {
+	return slices.Collect(slices.Chunk(drawings, telegram.MaxAlbum))
+}
+
+// replyPictures sends pictures as one album, or one picture alone, with
+// caption, and returns the ID of the message with the caption. buttons and
+// keyboard go with a picture alone; an album carries none. When
+// Telegram refuses the album, such as for one picture it cannot read, they
+// go one by one, so that the others still arrive; when it does not answer,
+// the album may be in the chat, and nothing is sent again.
+func (s *Service) replyPictures(in incoming, drawings []tools.Drawing, caption string, buttons [][]telegram.Button, keyboard [][]string) int64 {
+	if len(drawings) < telegram.MinAlbum {
+		return s.replyPhoto(in, drawings[0], caption, buttons, keyboard)
+	}
+	photos := make([][]byte, len(drawings))
+	for i, drawing := range drawings {
+		photos[i] = drawing.Data
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
+	defer cancel()
+	sentID, err := s.opts.Sender.SendMediaGroup(ctx, telegram.Album{
+		ChatID: in.msg.Chat.ID, ReplyToMessageID: in.replyTarget(), Photos: photos, Caption: caption,
+		BusinessConnectionID: in.businessConnectionID(),
+	})
+	var refused *telegram.APIError
+	switch {
+	case err == nil:
+		return sentID
+	case !errors.As(err, &refused) || refused.Code >= http.StatusInternalServerError:
+		s.opts.Logger.Error("send album failed", "chat_id", in.msg.Chat.ID, "error", err)
+		return 0
+	}
+	s.opts.Logger.Warn("Telegram refused an album; sending its pictures one by one", "chat_id", in.msg.Chat.ID, "error", err)
+	var firstID int64
+	for i, drawing := range drawings {
+		text := ""
+		if i == 0 {
+			text = caption
+		}
+		if id := s.replyPhoto(in, drawing, text, nil, nil); firstID == 0 {
+			firstID = id
+		}
+	}
+	return firstID
+}
+
+func (s *Service) replyPhoto(in incoming, drawing tools.Drawing, caption string, buttons [][]telegram.Button, keyboard [][]string) int64 {
 	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
 	defer cancel()
 	sentID, err := s.opts.Sender.SendPhoto(ctx, telegram.Photo{
-		ChatID:           in.msg.Chat.ID,
-		ReplyToMessageID: in.replyTarget(),
-		Data:             drawing.Data,
-		Caption:          caption,
+		ChatID:               in.msg.Chat.ID,
+		ReplyToMessageID:     in.replyTarget(),
+		Data:                 drawing.Data,
+		Caption:              caption,
+		BusinessConnectionID: in.businessConnectionID(),
+		Buttons:              buttons,
+		Keyboard:             keyboard,
 	})
 	if err != nil {
 		s.opts.Logger.Error("send photo failed", "chat_id", in.msg.Chat.ID, "error", err)
@@ -451,9 +520,6 @@ func (s *Service) logExchange(in incoming, out outcome) {
 		}
 		if out.gif != "" {
 			answer = strings.TrimSpace(answer + " <gif " + out.gif + ">")
-		}
-		for range out.cards {
-			answer = strings.TrimSpace(answer + " <item card sticker>")
 		}
 		for _, document := range out.documents {
 			answer = strings.TrimSpace(answer + " <file " + document.Name + ">")
@@ -520,12 +586,13 @@ const overQuotaReaction = "👀"
 // message in a group that already has too many. When the count cannot be
 // read it stays silent, like mayAnswerBot.
 //
-// Owners are not counted, other bots have their own quota, and the
-// commands that manage the bot always pass for those who may use them: they
-// have to work precisely when the group is flooding the bot. So does a
-// group admin's message, past the quota, that replies to another member's:
-// that is how moderation and ignoring are asked for. A message with nothing
-// the bot can read is not counted either: respond sends no answer to it.
+// Owners are not counted; admins are, like anyone, as the owners asked;
+// other bots have their own quota. The commands that manage the bot always
+// pass for those who may use them: they have to work precisely when the
+// group is flooding the bot. So does a group admin's message, past the
+// quota, that replies to another member's: that is how moderation and
+// ignoring are asked for. A message with nothing the bot can read is not
+// counted either: respond sends no answer to it.
 //
 // It also returns the answer taken, to give back if the turn answers
 // nothing; 0 when none was taken.
@@ -535,23 +602,25 @@ func (s *Service) mayAnswerInGroup(in incoming) (reservation int64, allowed bool
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
 	defer cancel()
-	id, ok, err := s.opts.GroupReplies.ReserveGroupReply(ctx, storage.ReplyQuota{
+	quota := storage.ReplyQuota{
 		ChatID:    in.scope.ChatID,
 		UserID:    in.userID,
-		PerMinute: s.opts.GroupRatePerMinute,
+		PerMinute: s.replyLimit(ctx, in.scope.ChatID),
 		PerMember: s.opts.MemberRepliesPer10Min,
-	})
+	}
+	id, ok, err := s.opts.GroupReplies.ReserveGroupReply(ctx, quota)
 	if err != nil {
 		s.opts.Logger.Warn("group reply count failed; staying quiet", "chat_id", in.scope.ChatID, "error", err)
 		return 0, false
 	}
-	switch {
-	case ok:
+	if ok {
 		return id, true
-	case s.isAdminActingOnAMember(in):
+	}
+	if repliesToAMember(in, s.opts.Bot.ID) && s.isAdminAsking(ctx, in) {
 		s.opts.Logger.Info("group reply limit reached, but an admin replied to a member", "chat_id", in.scope.ChatID, "user_id", in.userID)
 		return 0, true
-	case s.onlyTheyRead(ctx, in):
+	}
+	if s.onlyTheyRead(ctx, in) {
 		// Nobody else reads a group of two, so there is nobody to flood; the
 		// limit once left someone in distress there unanswered.
 		return 0, true
@@ -562,7 +631,7 @@ func (s *Service) mayAnswerInGroup(in incoming) (reservation int64, allowed bool
 }
 
 // managerCommands manage the bot in a group, and are for its admins.
-var managerCommands = map[string]bool{"/mute": true, "/unmute": true, "/ignore": true, "/unignore": true, "/reset": true}
+var managerCommands = map[string]bool{"/mute": true, "/unmute": true, "/ignore": true, "/unignore": true}
 
 // isManagerCommand reports one of managerCommands from someone who may use
 // it. Anyone else's is counted like any other message: it only gets a
@@ -576,16 +645,16 @@ func (s *Service) isManagerCommand(in incoming) bool {
 	return s.refuseUnlessManager(ctx, in) == ""
 }
 
-// isAdminActingOnAMember reports a group admin's message that replies to
-// another member's, as asking to moderate or ignore them does. Telegram is
-// asked only then, past the quota.
-func (s *Service) isAdminActingOnAMember(in incoming) bool {
+// repliesToAMember reports a message that replies to another member's, as
+// asking to moderate or ignore them does.
+func repliesToAMember(in incoming, botID int64) bool {
 	replied := in.msg.ReplyToMessage
-	if replied == nil || replied.From == nil || replied.From.ID == s.opts.Bot.ID || replied.From.ID == in.userID {
-		return false
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
-	defer cancel()
+	return replied != nil && replied.From != nil && replied.From.ID != botID && replied.From.ID != in.userID
+}
+
+// isAdminAsking reports a message from one of the group's admins. Telegram
+// is asked only past the quota, and a failed check is no admin.
+func (s *Service) isAdminAsking(ctx context.Context, in incoming) bool {
 	isAdmin, err := s.opts.Members.IsGroupAdmin(ctx, in.scope.ChatID, in.userID)
 	if err != nil {
 		s.opts.Logger.Warn("group admin check failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
@@ -597,7 +666,11 @@ func (s *Service) isAdminActingOnAMember(in incoming) bool {
 // within ActiveWindow, for a message from anyone but an owner. When the
 // count cannot be read, the group is answered.
 func (s *Service) tooQuiet(ctx context.Context, in incoming) bool {
-	if !in.group || s.opts.MinActiveMembers <= 0 || s.opts.ActiveCounter == nil || s.isOwner(in.msg.From) {
+	if !in.group || s.opts.ActiveCounter == nil || s.isOwner(in.msg.From) {
+		return false
+	}
+	minimum := s.minActive(ctx, in.scope.ChatID)
+	if minimum <= 0 {
 		return false
 	}
 	count, ok := s.actives.get(in.scope.ChatID)
@@ -605,14 +678,14 @@ func (s *Service) tooQuiet(ctx context.Context, in incoming) bool {
 		ctx, cancel := context.WithTimeout(ctx, logTimeout)
 		defer cancel()
 		var err error
-		count, err = s.opts.ActiveCounter.ActiveMembers(ctx, in.scope.ChatID, s.opts.Now().Add(-s.opts.ActiveWindow))
+		count, err = s.opts.ActiveCounter.ActiveMembers(ctx, in.scope.ChatID, s.opts.Now().Add(-s.activeWindow(ctx, in.scope.ChatID)))
 		if err != nil {
 			s.opts.Logger.Warn("could not count a group's active members; answering", "chat_id", in.scope.ChatID, "error", err)
 			return false
 		}
 		s.actives.set(in.scope.ChatID, count)
 	}
-	if count < s.opts.MinActiveMembers {
+	if count < minimum {
 		s.opts.Logger.Info("group too quiet; not answering", "chat_id", in.scope.ChatID, "active", count)
 		return true
 	}
@@ -661,11 +734,58 @@ func (s *Service) ignored(in incoming, rules []storage.GroupRule) bool {
 // respond decides what to send back. An empty outcome sends nothing. rules
 // are the standing rules loaded for this turn.
 func (s *Service) respond(ctx context.Context, in incoming, rules []storage.GroupRule) outcome {
+	if pressedHelp(in) {
+		in.text = "/help"
+	}
+	if commandName(in.text) == "/start" {
+		if out, ok := s.startShashka(in); ok {
+			return out
+		}
+		if out, ok := s.startCards(in); ok {
+			return out
+		}
+	}
 	switch {
 	case !in.group && commandName(in.text) == "/start" && len(s.opts.RequiredChannels) > 0:
-		return s.start(ctx, in)
+		return s.withKeyboard(in, s.start(ctx, in))
+	case commandName(in.text) == "/premium":
+		return s.premiumCommand(ctx, in)
+	case commandName(in.text) == "/stats":
+		return s.statsCommand(in)
+	case commandName(in.text) == "/game":
+		return s.gameCommand(ctx, in, game.ShortName)
+	case commandName(in.text) == "/ilon":
+		return s.gameCommand(ctx, in, game.IlonShortName)
+	case commandName(in.text) == "/otinchi":
+		return s.gameCommand(ctx, in, game.OtinchiShortName)
+	case commandName(in.text) == "/boss":
+		return s.gameCommand(ctx, in, game.BossShortName)
+	case commandName(in.text) == "/mafia":
+		return s.gameCommand(ctx, in, game.MafiaShortName)
+	case commandName(in.text) == "/maydon":
+		return s.gameCommand(ctx, in, game.MaydonShortName)
+	case commandName(in.text) == "/dooz":
+		return s.doozCommand(in)
+	case commandName(in.text) == "/shashka":
+		return s.shashkaCommand(ctx, in)
+	case s.opts.Cards != nil && isCardDraw(in):
+		return s.drawCard(ctx, in)
+	case s.opts.Cards != nil && s.opts.Buttons != nil && commandName(in.text) == "/kartalarim":
+		return s.cardCollection(ctx, in)
+	case s.opts.Cards != nil && s.opts.CardsURL != "" && commandName(in.text) == "/kartalar":
+		return outcome{text: textCardsApp.to(in), buttons: s.cardsAppButton(in)}
+	case s.opts.Cards != nil && commandName(in.text) == "/kartatop":
+		return s.cardTop(ctx, in)
+	case commandName(in.text) == "/elon" && !in.group && s.opts.Tools != nil && s.isOwner(in.msg.From):
+		return s.announceCommand(ctx, in)
+	case !in.group && s.opts.Tools != nil && s.opts.Buttons != nil && s.isOwner(in.msg.From) && pressed(in, keyboardAd):
+		return askForAd(in)
+	case !in.group && s.opts.Tools != nil && s.opts.Buttons != nil && s.isOwner(in.msg.From) && answersAdPrompt(in):
+		return adOrAskAgain(in)
+	case !in.group && s.opts.Tools != nil && s.opts.Buttons != nil && s.isOwner(in.msg.From) && isAd(in.msg):
+		return offerAd(in, in.msg)
 	case strings.HasPrefix(in.text, "/"):
-		return say(s.runCommand(ctx, in))
+		return s.withKeyboard(in, say(s.runCommand(ctx, in)))
 	case utf8.RuneCountInString(in.text) > s.opts.MaxInputChars:
 		return say(fmt.Sprintf(textTooLong.to(in), s.opts.MaxInputChars))
 	case s.hasContent(in):
@@ -698,16 +818,22 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	if notice, joined := s.joinedChannels(ctx, in); !joined {
 		return notice
 	}
-	// A test file is run in code, with no call to the model.
-	if out, ok := s.quizFromFile(ctx, in); ok {
+	fromMenu := false
+	if request, ok := s.askedRequestOf(in); ok {
+		// An answer to a menu's question, such as a hero's name,
+		// is the model's: it is asked as if typed with the request.
+		in.text, fromMenu = request, true
+	}
+	if out, ok := s.keyboardAnswer(ctx, in); ok {
 		return out
 	}
 	if out, ok := s.quickAnswer(ctx, in); ok {
 		return out
 	}
-	reservation, notice, allowed := s.takePrivateAnswer(ctx, in)
-	if !allowed {
-		return outcome{text: notice, skipped: "private_limit"}
+	reservation, notify, allowed := s.takePrivateAnswer(ctx, in)
+	pastLimit := !allowed
+	if pastLimit && !s.toolsPastLimit(in) {
+		return s.limitReached(ctx, in, notify)
 	}
 	if !in.group {
 		// Only now, so that a voice message past the limit is not
@@ -728,31 +854,59 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 		caller.Target.Answered = s.answeredMember(ctx, in.scope.ChatID, caller.Target.MessageID)
 	}
 	req := s.request(ctx, in, rules)
+	req.ToolsOnly = pastLimit
 	caller.Picture = firstPicture(req.Attachments)
 	ctx = tools.WithTurn(ctx, caller, sink)
 	answer, err := s.opts.Replier.Reply(ctx, req)
+	if errors.Is(err, ai.ErrBlocked) && !in.group && caller.Owner {
+		// What the provider refused may still be an announcement, which
+		// the owner can have without the main model.
+		if out, ok := s.announceForBlocked(ctx, in); ok {
+			s.giveBackAnswer(in, reservation)
+			return out
+		}
+	}
 	// A picture drawn before a later failure is still worth sending.
 	drawings := sink.Take()
 	documents := sink.TakeDocuments()
 	var audios []tools.Audio
-	var cards []string
 	if err == nil || errors.Is(err, ai.ErrEmptyResponse) {
-		// A song's preview and an item's card go only with an answer, or
-		// with none: the model, told they are the answer, may write
-		// nothing, and they are still what was asked for.
-		audios, cards = sink.TakeAudios(), sink.TakeStickers()
+		// A song's preview goes only with an answer, or with none: the
+		// model, told it is the answer, may write nothing, and it is still
+		// what was asked for.
+		audios = sink.TakeAudios()
 	}
-	if !usedAnAnswer(err, drawings) && len(documents)+len(audios)+len(cards) == 0 {
+	if pastLimit && errors.Is(err, agent.ErrNotATool) {
+		return s.limitReached(ctx, in, notify)
+	}
+	freeTools := reservation != 0 && answer.ToolsUsed > 0
+	if freeTools || (!usedAnAnswer(err, drawings) && len(documents)+len(audios) == 0) {
+		// A turn that used a tool is given back as well: the day's limit
+		// is for talk with the model, and tools take nothing from it.
 		s.giveBackAnswer(in, reservation)
 	}
 	out := s.answerOf(in, answer, err, started)
 	out.drawings = drawings
 	out.documents = documents
-	out.audios, out.cards = audios, cards
-	if len(audios)+len(cards) > 0 {
+	out.audios = audios
+	if err == nil {
+		out.buttons = sink.Buttons()
+	}
+	if len(audios) > 0 {
 		out.skipped = ""
 	}
+	if fromMenu {
+		out = s.withMenuBack(in, out)
+	}
 	return out
+}
+
+// toolsPastLimit reports a private message past the day's limit that may
+// still be answered with a tool: one in words alone, as a picture or a
+// voice message would need the model to see or hear it first.
+func (s *Service) toolsPastLimit(in incoming) bool {
+	_, media := s.mediaOf(in.msg)
+	return !in.group && !media && in.text != ""
 }
 
 // joinedChannels reports whether the sender of a private message may be
@@ -840,13 +994,42 @@ func (s *Service) start(ctx context.Context, in incoming) outcome {
 
 // pressed answers a press of the check button: the notice becomes the
 // thanks once every channel is joined, and otherwise a box asks to join
-// them first; nothing is written in the chat either way.
+// them first; nothing is written in the chat either way. A press of the
+// button under a join request is pressedJoin's, of a game's Play button
+// pressedGame's, and of a dooz game's pressedDooz's.
 func (s *Service) pressed(q *telegram.CallbackQuery) {
-	if isQuizButton(q.Data) {
-		s.pressedQuiz(q)
+	if q.GameShortName != "" {
+		s.pressedGame(q)
 		return
 	}
-	if s.opts.Buttons == nil || q.From == nil || q.Message == nil || q.Data != checkPayload {
+	if s.opts.Buttons == nil || q.From == nil || q.Message == nil {
+		return
+	}
+	if strings.HasPrefix(q.Data, joinPayload) {
+		s.pressedJoin(q)
+		return
+	}
+	if strings.HasPrefix(q.Data, menuData) {
+		s.pressedMenu(q)
+		return
+	}
+	if strings.HasPrefix(q.Data, doozData) {
+		s.pressedDooz(q)
+		return
+	}
+	if strings.HasPrefix(q.Data, announceData) {
+		s.pressedAnnounce(q)
+		return
+	}
+	if strings.HasPrefix(q.Data, adData) {
+		s.pressedAd(q)
+		return
+	}
+	if strings.HasPrefix(q.Data, cardData) {
+		s.pressedCards(q)
+		return
+	}
+	if q.Data != checkPayload {
 		return
 	}
 	in := incoming{
@@ -880,35 +1063,34 @@ func channelLink(channel string) (string, bool) {
 
 // takePrivateAnswer takes one of the sender's answers for the day in a
 // private chat, from the quota kept in the database, and returns the
-// reservation to give back if the turn uses none. When the day's answers are
-// used up it returns allowed false and the notice to send: the limit the
-// first time that day, nothing after. Owners are not counted. When the count
+// reservation to give back if the turn uses none. The limit is the premium
+// one while the sender's premium lasts. When the day's answers are used up
+// it returns allowed false, and notify true the first time that day, for
+// the notice (see limitReached). Owners are not counted. When the count
 // cannot be read the sender is answered anyway: the limit guards the cost,
 // and unlike a group's quota, one answer too many disturbs nobody else.
-func (s *Service) takePrivateAnswer(ctx context.Context, in incoming) (reservation int64, notice string, allowed bool) {
+func (s *Service) takePrivateAnswer(ctx context.Context, in incoming) (reservation int64, notify, allowed bool) {
 	limit := s.opts.PrivateDailyLimit
 	if in.group || s.opts.PrivateQuota == nil || limit <= 0 || s.isOwner(in.msg.From) {
-		return 0, "", true
+		return 0, false, true
 	}
 	ctx, cancel := context.WithTimeout(ctx, logTimeout)
 	defer cancel()
 	id, allowed, notify, err := s.opts.PrivateQuota.ReservePrivateMessage(ctx, storage.DailyQuota{
-		UserID: in.userID,
-		Since:  startOfDay(s.opts.Now(), s.opts.Location),
-		Limit:  limit,
+		UserID:       in.userID,
+		Since:        startOfDay(s.opts.Now(), s.opts.Location),
+		Limit:        limit,
+		PremiumLimit: s.premiumLimit(),
 	})
 	switch {
 	case err != nil:
 		s.opts.Logger.Warn("private message count failed; answering anyway", "user_id", in.userID, "error", err)
-		return 0, "", true
+		return 0, false, true
 	case allowed:
-		return id, "", true
+		return id, false, true
 	}
 	s.opts.Logger.Info("private daily limit reached", "user_id", in.userID, "notified", notify)
-	if notify {
-		return 0, fmt.Sprintf(textDailyLimit.to(in), limit), false
-	}
-	return 0, "", false
+	return 0, notify, false
 }
 
 // giveBackAnswer gives back the answer a turn that used none took: from the
@@ -958,7 +1140,23 @@ func (s *Service) caller(in incoming) tools.Caller {
 		Target:    s.target(in.msg.ReplyToMessage),
 		Mentions:  s.mentions(in),
 		Words:     ownWords(in),
+		Sound:     cmp.Or(soundOf(in.msg), soundOf(in.msg.ReplyToMessage)),
+		Forum:     in.msg.Chat.IsForum,
+		TopicID:   topicOf(in.msg),
 	}
+}
+
+// topicOf is the forum topic msg was written in, or else that of the
+// message it replies to; zero in the General topic. Outside a forum a reply
+// carries a message_thread_id too, the reply chain's, which is no topic.
+func topicOf(msg *telegram.Message) int64 {
+	switch replied := msg.ReplyToMessage; {
+	case msg.IsTopicMessage:
+		return msg.MessageThreadID
+	case replied != nil && replied.IsTopicMessage:
+		return replied.MessageThreadID
+	}
+	return 0
 }
 
 // ownWords is what the caller wrote: the message being answered, and their
@@ -1071,19 +1269,39 @@ func (s *Service) answeredMember(ctx context.Context, chatID, botMessageID int64
 // whom such a tool acts on. A service message is none: its author is whoever
 // made something happen, not the member it is about. A member's message the
 // bot cannot read, such as a contact or a location, is one.
+//
+// A message posted on behalf of a channel names the channel too, which the
+// moderate tool bans rather than the account Telegram posts it as. One the
+// group posts as itself, an anonymous admin's, and a post forwarded from the
+// linked channel by Telegram itself, name no channel.
 func (s *Service) target(replied *telegram.Message) *tools.Target {
 	if replied == nil || replied.From == nil || replied.IsService() {
 		return nil
 	}
 	text, _ := replied.Content()
-	return &tools.Target{
+	if channel := replied.SenderChat; channel != nil && channel.Type == telegram.ChatTypeChannel && !replied.IsAutomaticForward {
+		return &tools.Target{
+			MessageID: replied.MessageID,
+			UserID:    replied.From.ID,
+			ChannelID: channel.ID,
+			Name:      withUsername(authorLabel(channel.Title), channel.Username),
+			Text:      truncate(text, tools.MaxTargetRunes),
+		}
+	}
+	target := &tools.Target{
 		MessageID: replied.MessageID,
 		UserID:    replied.From.ID,
 		Name:      plainLabel(replied.From),
 		IsBot:     replied.From.IsBot,
 		Owner:     s.isOwner(replied.From),
 		Text:      truncate(text, tools.MaxTargetRunes),
+		Sticker:   replied.Sticker,
+		Poll:      replied.Poll != nil,
 	}
+	if replied.Sticker != nil {
+		target.StickerSet = replied.Sticker.SetName
+	}
+	return target
 }
 
 // answerOf turns the agent's answer, or its error, into what is sent back.
@@ -1093,11 +1311,11 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 
 	switch {
 	case err == nil && answer.Reaction != "":
-		log.Info("turn completed with a reaction", "emoji", answer.Reaction)
+		log.Info("turn completed with a reaction", "emoji", answer.Reaction, "route", answer.Route)
 		return outcome{reaction: answer.Reaction, answerID: answer.ID}
 	case err == nil:
-		log.Info("turn completed")
-		out := outcome{text: s.fitted(in, answer.Text), answerID: answer.ID, toReplied: answer.ToReplied, toName: answer.To}
+		log.Info("turn completed", "route", answer.Route)
+		out := outcome{text: s.fitted(in, answer.Text), answerID: answer.ID, toReplied: answer.ToReplied, toName: answer.To, effect: effectFor(in, answer.Text)}
 		if answer.Text == "" {
 			// A sticker or a GIF is an answer of its own, never one more
 			// message after the words.
@@ -1118,6 +1336,15 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 		// second insult; an error message would be worse than silence.
 		log.Warn("the model gave an empty answer; nothing was sent")
 		return outcome{skipped: "model_empty"}
+	case errors.Is(err, ai.ErrBlocked):
+		// The provider's filter, not a failure: saying so, and to an owner
+		// how to post an announcement without the model, beats "try again".
+		log.Warn("the model provider's filter refused the turn", "error", err)
+		text := textBlocked.to(in)
+		if s.isOwner(in.msg.From) {
+			text = textBlockedOwner.to(in)
+		}
+		return outcome{text: text, skipped: "blocked", skipDetail: err.Error()}
 	case errors.Is(err, ai.ErrTruncated):
 		log.Warn("the model ran out of tokens mid-answer; the fragment was not sent")
 		return outcome{text: textCutOff.to(in), skipped: "truncated"}
@@ -1126,15 +1353,15 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 		return outcome{duplicate: true}
 	case ai.IsOverloaded(err):
 		log.Warn("model provider overloaded or over its limits", "error", err)
-		return outcome{text: textOverloaded.to(in), skipped: "overloaded"}
+		return outcome{text: textOverloaded.to(in), skipped: "overloaded", skipDetail: err.Error()}
 	case errors.Is(err, context.DeadlineExceeded):
 		log.Warn("turn timed out")
-		return outcome{text: textTimeout.to(in), skipped: "timeout"}
+		return outcome{text: textTimeout.to(in), skipped: "timeout", skipDetail: err.Error()}
 	default:
 		// The error is logged in full but never shown: it can carry provider
 		// or database details the user must not see.
 		log.Error("turn failed", "error", err)
-		return outcome{text: textError.to(in), skipped: "error"}
+		return outcome{text: textError.to(in), skipped: "error", skipDetail: err.Error()}
 	}
 }
 
@@ -1157,7 +1384,7 @@ func (s *Service) request(ctx context.Context, in incoming, rules []storage.Grou
 	}
 	var notice, log string
 	if in.group {
-		req.AuthorName = s.label(in.msg.From)
+		req.AuthorName = s.taggedLabel(in.msg.From, in.msg.SenderTag)
 		req.Text = req.AuthorName + ": " + oneLine(req.Text)
 		log = s.ambient.block(in.scope.ChatID, s.opts.Now())
 	} else {
@@ -1261,7 +1488,7 @@ func (s *Service) fitted(in incoming, answer string) string {
 	if !in.group {
 		return answer
 	}
-	return truncateUnits(answer, s.opts.MaxGroupReplyChars)
+	return truncateUnits(answer, s.replyLength(context.Background(), in.scope.ChatID))
 }
 
 // recordSent stores which Telegram message carries the answer. It is
@@ -1284,7 +1511,7 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 	case "/start":
 		return textWelcome.to(in)
 	case "/help":
-		help := HelpTextIn(languageOf(in), Abilities{Draw: s.opts.ImagesEnabled, Listen: s.canListen(), Football: s.opts.FootballEnabled})
+		help := HelpTextIn(languageOf(in), Abilities{Draw: s.opts.ImagesEnabled, Listen: s.canListen(), Football: s.opts.FootballEnabled, Pages: s.opts.StatsURL != ""})
 		if s.opts.Bot.Username != "" {
 			// The bot's own username makes the group commands tappable.
 			help = strings.ReplaceAll(help, "@username", "@"+s.opts.Bot.Username)
@@ -1298,13 +1525,6 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 			return textUnknown.to(in)
 		}
 		return fmt.Sprintf(textModel, s.opts.Model)
-	case "/reset":
-		return s.reset(ctx, in)
-	case "/stop":
-		if s.stopQuiz(ctx, in) {
-			return ""
-		}
-		return textNoQuizToStop.to(in)
 	case "/mute":
 		return s.setMuted(ctx, in, true)
 	case "/unmute":
@@ -1315,8 +1535,22 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 		return s.unignore(ctx, in)
 	case "/import_stickers":
 		return s.importStickers(ctx, in)
-	case "/import_items":
-		return s.importItems(ctx, in)
+	case "/settings":
+		return s.showSettings(ctx, in)
+	case "/set":
+		return s.setSetting(ctx, in)
+	case "/limit":
+		return s.setReplyLimit(ctx, in)
+	case "/active":
+		return s.setMinActive(ctx, in)
+	case "/payments":
+		return s.showPayments(ctx, in)
+	case "/refund":
+		return s.refund(ctx, in)
+	case "/paysupport":
+		return s.paySupport(in)
+	case "/business":
+		return s.businessCommand(ctx, in)
 	default:
 		return textUnknown.to(in)
 	}
@@ -1429,22 +1663,6 @@ func (s *Service) refuseUnignorable(ctx context.Context, in incoming, member *to
 	return ""
 }
 
-// reset deletes the conversation of the chat the command was sent in. In a
-// private chat that is the sender's own. In a group it is the one all
-// members share, so only the group's administrators may do it.
-func (s *Service) reset(ctx context.Context, in incoming) string {
-	if refusal := s.refuseUnlessManager(ctx, in); refusal != "" {
-		return refusal
-	}
-	if err := s.opts.Resetter.Reset(ctx, in.scope); err != nil {
-		s.opts.Logger.Error("reset failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
-		return textError.to(in)
-	}
-	s.ambient.clear(in.scope.ChatID)
-	s.opts.Logger.Info("conversation reset", "user_id", in.userID, "chat_id", in.scope.ChatID)
-	return textResetDone
-}
-
 // setMuted turns the bot off or on in a group. The setting is stored first
 // and applied only if that worked, so memory never disagrees with what a
 // restart would load.
@@ -1455,6 +1673,7 @@ func (s *Service) setMuted(ctx context.Context, in incoming, muted bool) string 
 	if refusal := s.refuseUnlessManager(ctx, in); refusal != "" {
 		return refusal
 	}
+	was := s.isMutedLately(in.scope.ChatID)
 	if err := s.opts.Muter.SetMuted(ctx, in.scope.ChatID, muted, in.userID); err != nil {
 		s.opts.Logger.Error("mute change failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
 		return textError.to(in)
@@ -1462,7 +1681,11 @@ func (s *Service) setMuted(ctx context.Context, in incoming, muted bool) string 
 	s.markMuted(in.scope.ChatID, muted)
 	s.opts.Logger.Info("mute changed", "user_id", in.userID, "chat_id", in.scope.ChatID, "muted", muted)
 	// What was said before or during the mute should not resurface after it.
-	s.ambient.clear(in.scope.ChatID)
+	// A /mute or /unmute that changes nothing keeps the log: owners sent
+	// /unmute to groups that were never muted, and each wiped the day.
+	if was != muted {
+		s.ambient.clear(in.scope.ChatID)
+	}
 	if muted {
 		return fmt.Sprintf(textMuted, s.opts.Bot.Username)
 	}

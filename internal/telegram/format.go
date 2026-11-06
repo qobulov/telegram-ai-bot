@@ -13,6 +13,8 @@ type messageEntity struct {
 	Type   string `json:"type"`
 	Offset int    `json:"offset"`
 	Length int    `json:"length"`
+	// URL is a text_link's, such as tg://user?id=, which tags that member.
+	URL string `json:"url,omitempty"`
 }
 
 // RichLimit is the most characters a rich message holds.
@@ -28,8 +30,9 @@ func isRich(text string) bool {
 }
 
 var (
-	// inlineMarks are **bold** and `code` within one line.
-	inlineMarks = regexp.MustCompile("\\*\\*([^*\\n]+?)\\*\\*|`([^`\\n]+)`")
+	// inlineMarks are **bold**, `code` and [name](tg://user?id=123), a tag
+	// of a member without a @username, within one line.
+	inlineMarks = regexp.MustCompile("\\*\\*([^*\\n]+?)\\*\\*|`([^`\\n]+)`|\\[([^\\]\\n]{1,64})\\]\\(tg://user\\?id=([0-9]{1,15})\\)")
 	// bulletMarks are "* " and "- " starting a line, which become "• ".
 	bulletMarks = regexp.MustCompile(`(?m)^[ \t]*[*-][ \t]+`)
 	// headingMarks are "## Title" lines, which become bold lines.
@@ -37,7 +40,8 @@ var (
 )
 
 // formatted turns the little Markdown a model writes into plain text and
-// the entities that show it: **bold**, `code`, headings as bold lines and
+// the entities that show it: **bold**, `code`, a [name](tg://user?id=)
+// tag, headings as bold lines and
 // "* " bullets as "• ". Entities are computed, not parsed by Telegram, so
 // a stray or unmatched mark stays as text and can never make a send fail.
 func formatted(text string) (string, []messageEntity) {
@@ -50,12 +54,15 @@ func formatted(text string) (string, []messageEntity) {
 		before := text[last:m[0]]
 		b.WriteString(before)
 		offset += utf16Len(before)
-		kind, start, end := "bold", m[2], m[3]
-		if start < 0 {
+		kind, start, end, link := "bold", m[2], m[3], ""
+		switch {
+		case m[4] >= 0:
 			kind, start, end = "code", m[4], m[5]
+		case m[6] >= 0:
+			kind, start, end, link = "text_link", m[6], m[7], "tg://user?id="+text[m[8]:m[9]]
 		}
 		inner := text[start:end]
-		entities = append(entities, messageEntity{Type: kind, Offset: offset, Length: utf16Len(inner)})
+		entities = append(entities, messageEntity{Type: kind, Offset: offset, Length: utf16Len(inner), URL: link})
 		b.WriteString(inner)
 		offset += utf16Len(inner)
 		last = m[1]

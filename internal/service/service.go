@@ -13,6 +13,9 @@ import (
 	"time"
 
 	"telegram-ai-bot/internal/agent"
+	"telegram-ai-bot/internal/cards"
+	"telegram-ai-bot/internal/config"
+	"telegram-ai-bot/internal/shashkaapp"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 )
@@ -30,16 +33,12 @@ const (
 type Sender interface {
 	SendMessage(ctx context.Context, msg telegram.Outgoing) (messageID int64, err error)
 	SendPhoto(ctx context.Context, photo telegram.Photo) (messageID int64, err error)
+	SendMediaGroup(ctx context.Context, album telegram.Album) (messageID int64, err error)
 }
 
 // Replier answers a user's message.
 type Replier interface {
 	Reply(ctx context.Context, req agent.Request) (agent.Answer, error)
-}
-
-// Resetter deletes one conversation's history.
-type Resetter interface {
-	Reset(ctx context.Context, scope storage.Scope) error
 }
 
 // Members answers whether a user administers a group.
@@ -91,6 +90,7 @@ type ActiveCounter interface {
 type ButtonAnswerer interface {
 	AnswerCallbackQuery(ctx context.Context, id, text string, alert bool) error
 	EditMessageText(ctx context.Context, chatID, messageID int64, text string) error
+	EditMessageMenu(ctx context.Context, chatID, messageID int64, text string, buttons [][]telegram.Button) error
 }
 
 // ChannelMembers tells whether a user has joined a channel.
@@ -128,7 +128,7 @@ type AnswerLog interface {
 }
 
 // RuleBook keeps the owners' standing rules, among them whom not to answer.
-// They live apart from the conversation, so /mute and /reset leave them.
+// They live apart from the conversation, so /mute leaves them.
 type RuleBook interface {
 	GroupRules(ctx context.Context, chatID int64) ([]storage.GroupRule, error)
 	SetGroupRule(ctx context.Context, r storage.GroupRule) (int64, error)
@@ -141,7 +141,6 @@ type RuleBook interface {
 type Options struct {
 	Sender   Sender
 	Replier  Replier
-	Resetter Resetter
 	Recorder Recorder
 	Members  Members
 	Muter    Muter
@@ -246,6 +245,27 @@ type Options struct {
 	// counted. Nil, or a limit of 0, does not limit.
 	PrivateQuota      PrivateQuota
 	PrivateDailyLimit int
+	// Payments and Premium sell premium in private chats, PremiumPrice
+	// Telegram Stars for PremiumDays days of PremiumDailyLimit answers a
+	// day; see premium.go. With either nil, or a price of 0, none is sold,
+	// though premium bought before still counts while Premium is set.
+	Payments Payments
+	Premium  PremiumBook
+	// Cards keeps Kartalar, the anime card collection (/karta, /kartalarim,
+	// /kartatop), whose catalog comes from AniList at CardsAPI, empty for
+	// AniList's own address. Nil turns it off.
+	Cards    CardBook
+	CardsAPI string
+	// CardsURL is the page of Kartalar's Mini App, which /kartalar and the
+	// collection's button open; "" for none.
+	CardsURL string
+	// CardsKey is a PokéWallet key, without which there are no trading
+	// cards, at CardsPokeWallet, empty for its own address.
+	CardsKey          string
+	CardsPokeWallet   string
+	PremiumPrice      int
+	PremiumDays       int
+	PremiumDailyLimit int
 	// PrivateChats is whom private chats are answered for: "off" nobody,
 	// "owners" the owners only; anything else, everyone.
 	PrivateChats string
@@ -264,6 +284,17 @@ type Options struct {
 	// QuickAnswers answers a private chat's small talk and common questions
 	// without the model; see faq.go.
 	QuickAnswers bool
+	// OwnerMenu is the command menu an owner sees in a group, with the
+	// commands only owners have, which MenuSetter sets the first time they
+	// write there; with either missing owners see the admins' menu.
+	OwnerMenu  []telegram.BotCommand
+	MenuSetter MenuSetter
+	// Settings keeps the owners' settings over the environment's, which
+	// CheckSetting checks before they are saved and Getenv reads; with
+	// Settings nil, /set and /settings do nothing.
+	Settings     SettingsBook
+	CheckSetting func(setting config.Setting, value string) error
+	Getenv       func(name string) string
 	// Reactor sets emoji reactions, the bot's answer to applause and the
 	// model's when it reacts instead of writing; nil means it never reacts.
 	Reactor Reactor
@@ -282,17 +313,36 @@ type Options struct {
 	// owner may turn on in a group; with either nil they never act.
 	Guards         Guards
 	GroupModerator GroupModerator
+	// PictureJudge is the model asked whether a picture is nude when
+	// Sightengine cannot say; nil leaves such a picture unjudged.
+	// PictureVerdicts keeps every picture's verdict for good; nil keeps
+	// them for verdictMemory, in this instance only.
+	PictureJudge    PictureJudge
+	PictureVerdicts PictureVerdicts
 	// Judge is the model asked whom a message the guard caught is aimed at.
 	Judge InsultJudge
+	// Writer writes an owner's announcement, from their recent words, when
+	// the main model's provider refused the turn that asked for it; Recent
+	// gives those words. Without either, the owner is pointed to /elon.
+	Writer AnnouncementWriter
+	Recent RecentMessages
+	// Sworn tells whether the swear guard caught a message already, so that
+	// editing it is no second swear; nil counts every edit that swears.
+	Sworn SwearRecord
+	// Joins keeps the requests to join a group that wait for their button,
+	// and JoinGate answers them; with either nil, or Buttons nil, join
+	// requests are left to the groups' admins. See joins.go.
+	Joins    JoinBook
+	JoinGate JoinGate
+	// Boosts keeps the boosts given to groups, each thanked for once; nil
+	// thanks for none.
+	Boosts BoostBook
 	// Stickers picks the sticker the model asked for, StickerSender sends
 	// it, and StickerImporter brings packs in for /import_stickers; with any
 	// nil, no sticker is sent or imported.
 	Stickers        StickerPicker
 	StickerSender   StickerSender
 	StickerImporter StickerImporter
-	// CardImporter brings packs of Mobile Legends item cards in for
-	// /import_items; with it nil, none is imported.
-	CardImporter CardImporter
 	// GIFs finds the GIF the model asked for, AnimationSender sends it and
 	// MediaSlots spaces it with the stickers; with any nil, a GIF becomes a
 	// sticker of the same category.
@@ -305,14 +355,15 @@ type Options struct {
 	// without it the first swear is left to the model.
 	ClipSender  ClipSender
 	AudioSender AudioSender
-	// Files sends the files a tool made, such as a presentation; nil sends
+	// Files sends the files a tool made, such as a document; nil sends
 	// none, and the answer's text goes alone.
 	Files FileSender
-	// Quizzes keeps the tests sent as files and their runs, and QuizPolls
-	// asks their questions; with either nil, a test file goes to the model
-	// like any other.
-	Quizzes   QuizStore
-	QuizPolls QuizPoller
+	// Tools runs the model's tools for the private keyboard's buttons that
+	// need no model; nil leaves every button to the model.
+	Tools ToolRunner
+	// Inline answers inline queries, "@bot words" typed in any chat; nil
+	// leaves them unanswered.
+	Inline InlineAnswerer
 	// Answers tells whom one of the bot's answers in a group answered, so
 	// that "don't answer him", replying to it, means that member; nil means
 	// it is never known.
@@ -320,6 +371,19 @@ type Options struct {
 	// MaxGroupReplyChars is the longest answer posted in a group, in UTF-16
 	// code units as Telegram counts them.
 	MaxGroupReplyChars int
+	// StatsURL is the page of the group dashboard Mini App, which /stats
+	// opens; "" makes /stats an unknown command. See webapp.go.
+	StatsURL string
+	// Game makes the page the game's Play button opens, and GameTable sends
+	// the game for /game and answers the press; with either nil there is
+	// no game.
+	Game      GameLinks
+	GameTable GameTable
+	// ShashkaURL is the page of the draughts Mini App, which /shashka
+	// opens, and ShashkaInvites keeps the invites /shashka makes in a
+	// group; with either unset there is no /shashka. See shashka.go.
+	ShashkaURL     string
+	ShashkaInvites shashkaapp.InviteMaker
 
 	// MaxMediaBytes is the largest file downloaded for the model to see.
 	MaxMediaBytes int64
@@ -333,6 +397,16 @@ type Options struct {
 	// FootballEnabled is true when the model has the football tool; /help
 	// offers football results only then.
 	FootballEnabled bool
+
+	// Business keeps the owners' Telegram Business accounts, and
+	// BusinessLookup asks Telegram about one the bot has no record of; with
+	// Business nil, business updates are ignored and /business is unknown.
+	// BusinessDailyLimit is how many answers each customer of a business
+	// account gets in a day, from midnight in Location; 0 does not limit.
+	// See business.go.
+	Business           BusinessBook
+	BusinessLookup     BusinessLookup
+	BusinessDailyLimit int
 }
 
 // Service processes updates on a fixed pool of workers.
@@ -347,6 +421,10 @@ type Options struct {
 // In groups only messages addressed to the bot are queued. The others are
 // at most remembered briefly, in memory, as context for the next answer.
 type Service struct {
+	// cardsCatalog fills Kartalar's catalog, made once by cardCatalog.
+	cardsOnce    sync.Once
+	cardsCatalog *cards.Catalog
+
 	opts        Options
 	userLimiter *limiter
 	ambient     *ambient
@@ -358,7 +436,9 @@ type Service struct {
 	// while polling; transcribing bounds how many run at once.
 	background   sync.WaitGroup
 	transcribing chan struct{}
-	notifier     sync.WaitGroup
+	// inlines bounds the inline queries answered at once while polling.
+	inlines  chan struct{}
+	notifier sync.WaitGroup
 
 	mutedMu sync.RWMutex
 	muted   map[int64]bool
@@ -370,19 +450,38 @@ type Service struct {
 	subscribers *recently[int64, bool]
 	// actives are groups' counts of active members, lately read, and
 	// ownersHere the owners lately found in each group.
-	actives    *recently[int64, int]
+	actives *recently[int64, int]
+	// settings are groups' owner settings, such as /limit, lately read.
+	settings *recently[int64, map[string]string]
+	// ownerMenus are the groups and owners whose menu was set lately.
+	ownerMenus *recently[[2]int64, bool]
 	ownersHere *recently[int64, []string]
-	// quizTests are tests lately read, for their runs' questions.
-	quizTests *recently[int64, storage.QuizTest]
-	// guardSets are the guards on in each group, and spamVerdicts and
-	// linkVerdicts what the outside services lately said; see protect.go.
+	// guardSets are the guards on in each group, and spamVerdicts,
+	// linkVerdicts and pictureVerdicts what the outside services lately
+	// said; see protect.go.
 	guardSets    *recently[int64, guardSet]
 	spamVerdicts *recently[int64, verdict]
 	linkVerdicts *recently[string, verdict]
+	// pictureVerdicts are keyed by a file's unique ID.
+	pictureVerdicts *recently[string, verdict]
+	// premiumNudges are the senders past the day's limit reminded of
+	// /premium within the last premiumNudgeEvery.
+	premiumNudges *recently[int64, bool]
+	// resting are the outside services lately failed, by name, which are
+	// not asked again for a while.
+	resting *recently[string, bool]
 
 	// typingInterval is how often "typing" is shown again while a turn
-	// runs: typingRefresh, shortened by tests.
+	// runs: typingRefresh, shortened by tests; typingDelay is how long a
+	// turn runs before it is first shown: typingWait, zero in tests.
 	typingInterval time.Duration
+	typingDelay    time.Duration
+	// inlineDeadline bounds the work before an inline answer:
+	// inlineDeadline, shortened by tests.
+	inlineDeadline time.Duration
+	// joinSweep is when this instance last declined late join requests, in
+	// Unix seconds.
+	joinSweep atomic.Int64
 }
 
 // incoming is an accepted update, reduced to what handling it needs.
@@ -415,6 +514,18 @@ type incoming struct {
 	// one being handled: a member's message the asker replied to, when the
 	// answer speaks to that member.
 	replyTo int64
+	// business is, for a customer's message to an owner's business account,
+	// that account, on whose behalf the answer is sent; nil elsewhere.
+	business *businessChat
+}
+
+// businessConnectionID is the business connection answers are sent
+// through, or "" outside a business chat.
+func (in incoming) businessConnectionID() string {
+	if in.business == nil {
+		return ""
+	}
+	return in.business.connectionID
 }
 
 // replyTarget is the message an answer should reply to: the original message
@@ -445,23 +556,30 @@ func New(opts Options) *Service {
 		opts.Now = time.Now
 	}
 	s := &Service{
-		opts:           opts,
-		userLimiter:    newLimiter(opts.RatePerMinute),
-		ambient:        newAmbient(opts.ChatLog, opts.AmbientMessages, opts.Location, opts.Logger),
-		muted:          make(map[int64]bool, len(opts.MutedChats)),
-		mutes:          newRecently[int64, bool](muteMemory, opts.Now),
-		members:        newRecently[memberKey, memberName](memberMemory, opts.Now),
-		subscribers:    newRecently[int64, bool](subscriberMemory, opts.Now),
-		actives:        newRecently[int64, int](activeMemory, opts.Now),
-		ownersHere:     newRecently[int64, []string](activeMemory, opts.Now),
-		guardSets:      newRecently[int64, guardSet](guardsMemory, opts.Now),
-		quizTests:      newRecently[int64, storage.QuizTest](quizTestMemory, opts.Now),
-		spamVerdicts:   newRecently[int64, verdict](verdictMemory, opts.Now),
-		linkVerdicts:   newRecently[string, verdict](verdictMemory, opts.Now),
-		queues:         make([]chan incoming, opts.Workers),
-		notices:        make(chan incoming, noticeQueueSize),
-		transcribing:   make(chan struct{}, backgroundTranscriptions),
-		typingInterval: typingRefresh,
+		opts:            opts,
+		userLimiter:     newLimiter(opts.RatePerMinute),
+		ambient:         newAmbient(opts.ChatLog, opts.AmbientMessages, opts.Location, opts.Logger),
+		muted:           make(map[int64]bool, len(opts.MutedChats)),
+		mutes:           newRecently[int64, bool](muteMemory, opts.Now),
+		members:         newRecently[memberKey, memberName](memberMemory, opts.Now),
+		subscribers:     newRecently[int64, bool](subscriberMemory, opts.Now),
+		actives:         newRecently[int64, int](activeMemory, opts.Now),
+		settings:        newRecently[int64, map[string]string](settingsMemory, opts.Now),
+		ownerMenus:      newRecently[[2]int64, bool](ownerMenuMemory, opts.Now),
+		ownersHere:      newRecently[int64, []string](activeMemory, opts.Now),
+		guardSets:       newRecently[int64, guardSet](guardsMemory, opts.Now),
+		spamVerdicts:    newRecently[int64, verdict](verdictMemory, opts.Now),
+		linkVerdicts:    newRecently[string, verdict](verdictMemory, opts.Now),
+		pictureVerdicts: newRecently[string, verdict](verdictMemory, opts.Now),
+		premiumNudges:   newRecently[int64, bool](premiumNudgeEvery, opts.Now),
+		resting:         newRecently[string, bool](serviceRest, opts.Now),
+		queues:          make([]chan incoming, opts.Workers),
+		notices:         make(chan incoming, noticeQueueSize),
+		transcribing:    make(chan struct{}, backgroundTranscriptions),
+		inlines:         make(chan struct{}, inlineSlots),
+		typingInterval:  typingRefresh,
+		typingDelay:     typingWait,
+		inlineDeadline:  inlineDeadline,
 	}
 	for _, chatID := range opts.MutedChats {
 		s.muted[chatID] = true
@@ -479,19 +597,14 @@ func New(opts Options) *Service {
 // the bot should not react to are dropped here. Handle must not be called
 // after Close.
 func (s *Service) Handle(update telegram.Update) {
-	if update.MyChatMember != nil {
-		s.recordMembership(update.MyChatMember)
+	if s.handledApart(update) {
 		return
 	}
-	if update.ChatMember != nil {
-		s.recordMember(update.ChatMember)
+	if update.InlineQuery != nil {
+		s.handleInline(update.InlineQuery)
 		return
 	}
-	if update.CallbackQuery != nil {
-		s.pressed(update.CallbackQuery)
-		return
-	}
-	if s.quizPollUpdate(update) {
+	if s.paymentUpdate(update) {
 		return
 	}
 	in, ok := s.accept(update)
@@ -514,19 +627,17 @@ func (s *Service) Handle(update telegram.Update) {
 // serverless hosting. Unlike Handle it does not use the workers, so it gives
 // no ordering between updates that arrive at the same time.
 func (s *Service) HandleNow(update telegram.Update) {
-	if update.MyChatMember != nil {
-		s.recordMembership(update.MyChatMember)
+	// Nothing runs between updates here, so they are what notice that a
+	// join request's time is up.
+	defer s.sweepJoins()
+	if s.handledApart(update) {
 		return
 	}
-	if update.ChatMember != nil {
-		s.recordMember(update.ChatMember)
+	if update.InlineQuery != nil {
+		s.answerInline(update.InlineQuery)
 		return
 	}
-	if update.CallbackQuery != nil {
-		s.pressed(update.CallbackQuery)
-		return
-	}
-	if s.quizPollUpdate(update) {
+	if s.paymentUpdate(update) {
 		return
 	}
 	if in, ok := s.accept(update); ok {
@@ -534,21 +645,58 @@ func (s *Service) HandleNow(update telegram.Update) {
 	}
 }
 
-// GroupRegistry keeps the list of groups the bot is in.
+// handledApart handles, at once and off the workers, an update that is no
+// message to answer, and reports whether update was one: a change of
+// membership, a button press, an edited message, which only the guards
+// look at, a request to join a group, a business account connecting
+// the bot, or a boost, which is thanked for.
+func (s *Service) handledApart(update telegram.Update) bool {
+	switch {
+	case update.MyChatMember != nil:
+		s.recordMembership(update.MyChatMember)
+	case update.ChatMember != nil:
+		s.recordMember(update.ChatMember)
+	case update.CallbackQuery != nil:
+		s.pressed(update.CallbackQuery)
+	case update.EditedMessage != nil:
+		s.guardEdited(update)
+	case update.ChatJoinRequest != nil:
+		s.requestedJoin(update.ChatJoinRequest)
+	case update.BusinessConnection != nil:
+		s.recordBusinessConnection(update.BusinessConnection)
+	case update.ChatBoost != nil:
+		s.thankBoost(update.ChatBoost)
+	default:
+		return false
+	}
+	return true
+}
+
+// GroupRegistry keeps the list of groups the bot is in, and of channels it
+// is an admin of.
 type GroupRegistry interface {
 	RecordGroup(ctx context.Context, g storage.GroupStatus) error
+	RecordChannel(ctx context.Context, c storage.GroupStatus) error
 }
 
 // recordMembership notes the bot being added to, promoted in or removed from
-// a group, so its owners' list of groups stays true even for quiet groups.
+// a group or a channel, so its owners' lists stay true even for quiet groups,
+// and for channels, whose posts the bot never hears.
 func (s *Service) recordMembership(change *telegram.ChatMemberUpdated) {
-	isGroup := change.Chat.Type == telegram.ChatTypeGroup || change.Chat.Type == telegram.ChatTypeSupergroup
-	if s.opts.Groups == nil || !isGroup {
+	if s.opts.Groups == nil {
+		return
+	}
+	record := s.opts.Groups.RecordGroup
+	switch change.Chat.Type {
+	case telegram.ChatTypeGroup, telegram.ChatTypeSupergroup:
+	case telegram.ChatTypeChannel:
+		record = s.opts.Groups.RecordChannel
+	default:
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
 	defer cancel()
-	err := s.opts.Groups.RecordGroup(ctx, storage.GroupStatus{
+	err := record(ctx, storage.GroupStatus{
 		ChatID:    change.Chat.ID,
 		Title:     change.Chat.Title,
 		Username:  change.Chat.Username,
@@ -556,16 +704,17 @@ func (s *Service) recordMembership(change *telegram.ChatMemberUpdated) {
 		Rights:    change.NewChatMember.Rights(),
 	})
 	if err != nil {
-		s.opts.Logger.Warn("could not record group membership", "chat_id", change.Chat.ID, "error", err)
+		s.opts.Logger.Warn("could not record membership", "chat_id", change.Chat.ID, "type", change.Chat.Type, "error", err)
 		return
 	}
-	s.opts.Logger.Info("bot membership changed", "chat_id", change.Chat.ID, "status", change.NewChatMember.Status)
+	s.opts.Logger.Info("bot membership changed", "chat_id", change.Chat.ID, "type", change.Chat.Type, "status", change.NewChatMember.Status)
 }
 
 // MemberBook keeps the members seen in each group. The Bot API cannot list
 // them, so this is what the group_members tool reads.
 type MemberBook interface {
 	SeeMember(ctx context.Context, m storage.GroupMember) error
+	KnowMember(ctx context.Context, m storage.GroupMember) error
 }
 
 // recordMember notes another member's change in a group, which Telegram
@@ -578,9 +727,13 @@ func (s *Service) recordMember(change *telegram.ChatMemberUpdated) {
 }
 
 // noteMembers notes the people a group message shows: its sender, who is
-// there, and anyone it says joined or left.
+// there, the sender of the message it replies to, and anyone it says joined
+// or left.
 func (s *Service) noteMembers(msg *telegram.Message) {
 	s.seeMember(msg.Chat.ID, msg.From, "")
+	if replied := msg.ReplyToMessage; replied != nil && replied.SenderChat == nil && replied.Date > 0 {
+		s.knowMember(msg.Chat.ID, replied.From, time.Unix(replied.Date, 0))
+	}
 	for i := range msg.NewChatMembers {
 		s.seeMember(msg.Chat.ID, &msg.NewChatMembers[i], "member")
 	}
@@ -613,10 +766,37 @@ func (s *Service) seeMember(chatID int64, user *telegram.User, status string) {
 	s.members.set(key, name)
 }
 
+// knowMember records a member a message shows without them writing it, as
+// seen when they last wrote, wrote: a member who never writes is otherwise
+// never on the list, nor found by @username. Known already under the same
+// name, they are not written again.
+func (s *Service) knowMember(chatID int64, user *telegram.User, wrote time.Time) {
+	if s.opts.Roster == nil || user == nil || user.ID == s.opts.Bot.ID {
+		return
+	}
+	key, name := memberKey{chatID, user.ID}, memberName{user.FirstName, user.Username}
+	if seen, ok := s.members.get(key); ok && seen == name {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
+	defer cancel()
+	err := s.opts.Roster.KnowMember(ctx, storage.GroupMember{
+		ChatID: chatID, UserID: user.ID, FirstName: user.FirstName, Username: user.Username, IsBot: user.IsBot, LastSeen: wrote,
+	})
+	if err != nil {
+		s.opts.Logger.Warn("could not record a group member", "chat_id", chatID, "error", err)
+		return
+	}
+	s.members.set(key, name)
+}
+
 // accept keeps messages from a person, sent either in a private chat or, in
 // a group, addressed to the bot. The sender's ID from the update is the
 // identity used for permissions from here on.
 func (s *Service) accept(update telegram.Update) (incoming, bool) {
+	if update.BusinessMessage != nil {
+		return s.acceptBusiness(update)
+	}
 	msg := update.Message
 	if msg == nil || msg.From == nil || !s.acceptsSender(msg) {
 		return incoming{}, false
@@ -641,6 +821,7 @@ func (s *Service) accept(update telegram.Update) (incoming, bool) {
 		return in, true
 	case telegram.ChatTypeGroup, telegram.ChatTypeSupergroup:
 		s.noteMembers(msg)
+		s.showOwnerMenu(msg)
 		in.scope = storage.Scope{ChatID: msg.Chat.ID} // shared by the group
 		in.group = true
 		if len(msg.NewChatMembers) > 0 {
@@ -754,7 +935,7 @@ func (s *Service) logMessage(msg *telegram.Message) {
 // logFrom adds a message from a member, or from an allowed bot, to the
 // group's log, as text: the one place where the log's member lines are made.
 func (s *Service) logFrom(msg *telegram.Message, text string) {
-	s.ambient.addMessage(msg, s.label(msg.From), s.logText(msg, text))
+	s.ambient.addMessage(msg, s.taggedLabel(msg.From, msg.SenderTag), s.logText(msg, text))
 }
 
 // logText is how a message is written in the log. A reply first says whom it
@@ -844,7 +1025,16 @@ const (
 // [owner] after an owner's. authorLabel strips square brackets from names,
 // so nobody else can carry the mark.
 func (s *Service) label(user *telegram.User) string {
+	return s.taggedLabel(user, "")
+}
+
+// taggedLabel is label with the tag the group shows by the sender's name,
+// a member's tag or an admin's title, in «»: "Ali @ali «Pro»".
+func (s *Service) taggedLabel(user *telegram.User, tag string) string {
 	label := withUsername(authorLabel(user.FirstName), user.Username)
+	if tag = memberTagLabel(tag); tag != "" {
+		label += " «" + tag + "»"
+	}
 	switch {
 	case s.isOwner(user):
 		label += ownerMark
@@ -852,6 +1042,17 @@ func (s *Service) label(user *telegram.User) string {
 		label += botMark
 	}
 	return label
+}
+
+// memberTagLabel is a sender's tag as a label carries it: on one line,
+// without the brackets of a mark or the guillemets around it, and no
+// longer than Telegram allows.
+func memberTagLabel(tag string) string {
+	tag = strings.Join(strings.Fields(strings.NewReplacer("[", "", "]", "", "«", "", "»", "").Replace(tag)), " ")
+	if runes := []rune(tag); len(runes) > 16 {
+		tag = string(runes[:16])
+	}
+	return tag
 }
 
 // unlabel undoes label for a name stored with a turn: the name without its
@@ -953,9 +1154,10 @@ func (s *Service) markMuted(chatID int64, muted bool) {
 
 // notifyBusy queues a "busy" reply without blocking the polling loop. If even
 // that queue is full the notice is dropped: the bot is overloaded. A message
-// that would not be answered anyway gets none.
+// that would not be answered anyway gets none, nor does a business
+// account's customer, who is never sent a notice from it.
 func (s *Service) notifyBusy(in incoming) {
-	if s.silenced(in) || in.unanswered {
+	if s.silenced(in) || in.unanswered || in.business != nil {
 		return
 	}
 	select {
@@ -973,7 +1175,7 @@ func (s *Service) sendBusyNotices() {
 func (s *Service) work(queue <-chan incoming) {
 	for in := range queue {
 		if s.closing.Load() {
-			if !s.silenced(in) && !in.unanswered {
+			if !s.silenced(in) && !in.unanswered && in.business == nil {
 				s.reply(in, textBusy.to(in))
 			}
 			continue
@@ -1012,14 +1214,17 @@ func (s *Service) reply(in incoming, text string) int64 {
 
 // replyWithButtons is reply with link buttons under the text.
 func (s *Service) replyWithButtons(in incoming, text string, buttons [][]telegram.Button) int64 {
+	return s.send(in, telegram.Outgoing{Text: text, Buttons: buttons})
+}
+
+// send is reply with whatever else msg carries, such as a keyboard. It goes
+// to the chat the message came from, as its reply where answers are.
+func (s *Service) send(in incoming, msg telegram.Outgoing) int64 {
 	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
 	defer cancel()
-	sentID, err := s.opts.Sender.SendMessage(ctx, telegram.Outgoing{
-		ChatID:           in.msg.Chat.ID,
-		Text:             text,
-		ReplyToMessageID: in.replyTarget(),
-		Buttons:          buttons,
-	})
+	msg.ChatID, msg.ReplyToMessageID = in.msg.Chat.ID, in.replyTarget()
+	msg.BusinessConnectionID = in.businessConnectionID()
+	sentID, err := s.opts.Sender.SendMessage(ctx, msg)
 	if err != nil {
 		s.opts.Logger.Error("send message failed", "chat_id", in.msg.Chat.ID, "error", err)
 		return 0
@@ -1045,9 +1250,16 @@ func (s *Service) react(in incoming, emoji string) {
 // Telegram clears it after about 5 seconds.
 const typingRefresh = 4 * time.Second
 
-// showTyping shows "typing" in the chat at once and again every
-// typingInterval, until stop is called or ctx ends: a turn can take many
-// seconds, and without a sign of life people ask again. stop waits for the
+// typingWait is how long a turn runs before "typing" is shown. A quick
+// answer, which is what a reaction instead of words usually is, comes
+// before it: "typing" followed by no text but an emoji looked like a
+// message that went missing.
+const typingWait = 2 * time.Second
+
+// showTyping shows "typing" in the chat once the turn has run typingDelay,
+// and again every typingInterval, until stop is called or ctx ends: a turn
+// can take many seconds, and without a sign of life people ask again. stop
+// waits for the
 // goroutine, so that no "typing" is sent after the answer, where it would
 // hang over a finished reply. Like a reaction, it is a gesture, so failures
 // are only logged at debug level, and not at all once the turn is over: a
@@ -1063,6 +1275,13 @@ func (s *Service) showTyping(ctx context.Context, msg *telegram.Message) (stop f
 	ctx, cancel := context.WithCancel(ctx)
 	var typing sync.WaitGroup
 	typing.Go(func() {
+		wait := time.NewTimer(s.typingDelay)
+		defer wait.Stop()
+		select {
+		case <-ctx.Done():
+			return
+		case <-wait.C:
+		}
 		ticker := time.NewTicker(s.typingInterval)
 		defer ticker.Stop()
 		// The loop condition, not the select, ends it, so that no send starts

@@ -22,16 +22,15 @@ func (s *Store) ReleaseImage(ctx context.Context, id int64) error {
 	return s.releaseDaily(ctx, dailyImages, id)
 }
 
-// ReservePresentation takes one of the user's presentations for the day,
-// as ReserveImage does a picture.
-func (s *Store) ReservePresentation(ctx context.Context, userID, chatID int64, since time.Time, limit int) (int64, bool, error) {
-	return s.reserveDaily(ctx, dailyPresentations, userID, chatID, since, limit)
+// ReserveSong takes one of the user's song recognitions for the day, as
+// ReserveImage takes a picture.
+func (s *Store) ReserveSong(ctx context.Context, userID, chatID int64, since time.Time, limit int) (int64, bool, error) {
+	return s.reserveDaily(ctx, dailySongs, userID, chatID, since, limit)
 }
 
-// ReleasePresentation gives back a reservation whose presentation could not
-// be made.
-func (s *Store) ReleasePresentation(ctx context.Context, id int64) error {
-	return s.releaseDaily(ctx, dailyPresentations, id)
+// ReleaseSong gives back a reservation whose song could not be recognised.
+func (s *Store) ReleaseSong(ctx context.Context, id int64) error {
+	return s.releaseDaily(ctx, dailySongs, id)
 }
 
 // dailyKind is a table of things made for users and counted per day, and
@@ -43,8 +42,8 @@ type dailyKind struct {
 }
 
 var (
-	dailyImages        = dailyKind{table: "image_generations", salt: 0x494d4147} // "IMAG"
-	dailyPresentations = dailyKind{table: "presentations", salt: 0x50505458}     // "PPTX"
+	dailyImages = dailyKind{table: "image_generations", salt: 0x494d4147} // "IMAG"
+	dailySongs  = dailyKind{table: "song_recognitions", salt: 0x534f4e47} // "SONG"
 )
 
 func (s *Store) reserveDaily(ctx context.Context, kind dailyKind, userID, chatID int64, since time.Time, limit int) (int64, bool, error) {

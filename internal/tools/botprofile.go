@@ -29,8 +29,6 @@ const (
 type BotAccount interface {
 	GetBotProfile(ctx context.Context, language string) (telegram.BotProfile, error)
 	SetBotName(ctx context.Context, name, language string) error
-	SetBotBio(ctx context.Context, bio, language string) error
-	SetBotDescription(ctx context.Context, description, language string) error
 	SetBotPhoto(ctx context.Context, jpeg []byte) error
 	RemoveBotPhoto(ctx context.Context) error
 	// Photo is the bot's current profile photo and its unique ID; ok is
@@ -61,19 +59,20 @@ type botProfileArgs struct {
 }
 
 // BotProfileTool shows anyone the bot's own Telegram profile, what its
-// photo shows included, and lets an owner change it: its name, bio,
-// description and photo, for everyone or for one language.
+// photo shows included, and lets an owner change its name and photo. The
+// bio and description are set at each start from the app's own texts, so
+// they are not offered here.
 func BotProfileTool(opts BotProfileOptions) Tool {
 	avatars := &avatarDescriptions{eyes: opts.Eyes}
 	return Tool{
 		Name: "bot_profile",
 		Description: "Your own Telegram profile. show: your name, bio, description and what your profile photo shows; use it when asked about them. " +
-			"Owners only, when an owner asks: name, bio (120 chars), description (512) set text, for a language or all; photo makes the picture in the message yours; remove_photo.",
+			"Owners only, when an owner asks: name sets your name, for a language or all; photo makes the picture in the message yours; remove_photo. The bio and description are fixed in code: say an owner's developer changes them.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["show", "name", "bio", "description", "photo", "remove_photo"]},
-				"text": {"type": "string", "description": "The new text, exactly as the owner gave it; empty removes that language's own."},
+				"action": {"type": "string", "enum": ["show", "name", "photo", "remove_photo"]},
+				"text": {"type": "string", "description": "The new name, exactly as the owner gave it; empty removes that language's own."},
 				"language": {"type": "string", "enum": ["", "uz", "ru", "en"], "description": "Only for people whose Telegram is in this language; empty for everyone."}
 			},
 			"required": ["action"],
@@ -103,16 +102,12 @@ func runBotProfile(ctx context.Context, account BotAccount, avatars *avatarDescr
 	switch args.Action {
 	case "name":
 		err = setProfileText(ctx, account.SetBotName, text, args.Language, telegram.MaxBotName)
-	case "bio":
-		err = setProfileText(ctx, account.SetBotBio, text, args.Language, telegram.MaxBotBio)
-	case "description":
-		err = setProfileText(ctx, account.SetBotDescription, text, args.Language, telegram.MaxBotDescription)
 	case "photo":
 		err = setBotPhoto(ctx, account, caller.Picture)
 	case "remove_photo":
 		err = account.RemoveBotPhoto(ctx)
 	default:
-		return nil, &ArgumentError{Message: "action must be show, name, bio, description, photo or remove_photo"}
+		return nil, &ArgumentError{Message: "action must be show, name, photo or remove_photo"}
 	}
 	if err != nil {
 		return nil, refused(err)

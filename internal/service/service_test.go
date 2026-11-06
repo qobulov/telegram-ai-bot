@@ -30,12 +30,22 @@ type sentMessage struct {
 	text    string
 	replyTo int64
 	photo   bool
+	// album is how many pictures an album had; 0 for any other message.
+	album   int
 	buttons [][]telegram.Button
+	// business is the business connection it was sent through, if any.
+	business string
+	// keyboard, ask and effect are a text message's.
+	keyboard [][]string
+	ask      string
+	effect   string
 }
 
 type fakeSender struct {
 	mu   sync.Mutex
 	sent []sentMessage
+	// albumErr makes SendMediaGroup fail.
+	albumErr error
 }
 
 func (f *fakeSender) SendMessage(ctx context.Context, msg telegram.Outgoing) (int64, error) {
@@ -44,7 +54,7 @@ func (f *fakeSender) SendMessage(ctx context.Context, msg telegram.Outgoing) (in
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.sent = append(f.sent, sentMessage{chatID: msg.ChatID, text: msg.Text, replyTo: msg.ReplyToMessageID, buttons: msg.Buttons})
+	f.sent = append(f.sent, sentMessage{chatID: msg.ChatID, text: msg.Text, replyTo: msg.ReplyToMessageID, buttons: msg.Buttons, business: msg.BusinessConnectionID, keyboard: msg.Keyboard, ask: msg.Ask, effect: msg.Effect})
 	return int64(1000 + len(f.sent)), nil
 }
 
@@ -54,7 +64,20 @@ func (f *fakeSender) SendPhoto(ctx context.Context, photo telegram.Photo) (int64
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.sent = append(f.sent, sentMessage{chatID: photo.ChatID, text: photo.Caption, replyTo: photo.ReplyToMessageID, photo: true})
+	f.sent = append(f.sent, sentMessage{chatID: photo.ChatID, text: photo.Caption, replyTo: photo.ReplyToMessageID, photo: true, business: photo.BusinessConnectionID, keyboard: photo.Keyboard, buttons: photo.Buttons})
+	return int64(1000 + len(f.sent)), nil
+}
+
+func (f *fakeSender) SendMediaGroup(ctx context.Context, album telegram.Album) (int64, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.albumErr != nil {
+		return 0, f.albumErr
+	}
+	f.sent = append(f.sent, sentMessage{chatID: album.ChatID, text: album.Caption, replyTo: album.ReplyToMessageID, photo: true, album: len(album.Photos), business: album.BusinessConnectionID})
 	return int64(1000 + len(f.sent)), nil
 }
 
@@ -84,9 +107,9 @@ type fakeReplier struct {
 	// audios the sounds it finds, as the music tool would.
 	draws  int
 	audios []tools.Audio
-	// cards are item cards it chooses, as the item card tool would.
-	cards []string
-	// documents are files it makes, as the presentation tool would.
+	// buttons are the link buttons it sets under the answer.
+	buttons [][]telegram.Button
+	// documents are files it makes, as a tool may.
 	documents []tools.Document
 	// answer replaces the echo when set.
 	answer string
@@ -100,9 +123,19 @@ type fakeReplier struct {
 	// and to with the member named, as for "[to James]".
 	toReplied bool
 	to        string
+	// toolsUsed is how many tools the turn calls. A turn for tools only
+	// that calls none ends in ErrNotATool, before the model, as the
+	// agent's router ends talk.
+	toolsUsed int
 }
 
 func (f *fakeReplier) Reply(ctx context.Context, req agent.Request) (agent.Answer, error) {
+	f.mu.Lock()
+	notATool := req.ToolsOnly && f.toolsUsed == 0
+	f.mu.Unlock()
+	if notATool {
+		return agent.Answer{}, agent.ErrNotATool
+	}
 	if req.Fixed != nil {
 		// Saved as the agent would, with no model call to record.
 		answer := *req.Fixed
@@ -117,11 +150,11 @@ func (f *fakeReplier) Reply(ctx context.Context, req agent.Request) (agent.Answe
 		for range f.draws {
 			sink.Add(tools.Drawing{Data: []byte("PNG"), MimeType: "image/png"})
 		}
+		if f.buttons != nil {
+			sink.SetButtons(f.buttons)
+		}
 		for _, a := range f.audios {
 			sink.AddAudio(a)
-		}
-		for _, c := range f.cards {
-			sink.AddSticker(c)
 		}
 		for _, d := range f.documents {
 			sink.AddDocument(d)
@@ -152,28 +185,15 @@ func (f *fakeReplier) Reply(ctx context.Context, req agent.Request) (agent.Answe
 		return agent.Answer{Text: f.answer, Sticker: f.sticker, GIF: f.gif, ID: 9001}, nil
 	}
 	if f.answer != "" {
-		return agent.Answer{Text: f.answer, ToReplied: f.toReplied, To: f.to, ID: 9001}, nil
+		return agent.Answer{Text: f.answer, ToReplied: f.toReplied, To: f.to, ID: 9001, ToolsUsed: f.toolsUsed}, nil
 	}
-	return agent.Answer{Text: "echo: " + strings.TrimPrefix(text, req.AuthorName+": "), ID: 9001}, nil
+	return agent.Answer{Text: "echo: " + strings.TrimPrefix(text, req.AuthorName+": "), ID: 9001, ToolsUsed: f.toolsUsed}, nil
 }
 
 func (f *fakeReplier) recorded() []replyCall {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([]replyCall(nil), f.calls...)
-}
-
-type fakeResetter struct {
-	mu    sync.Mutex
-	reset []storage.Scope
-	err   error
-}
-
-func (f *fakeResetter) Reset(_ context.Context, scope storage.Scope) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.reset = append(f.reset, scope)
-	return f.err
 }
 
 type recorded struct {
@@ -366,7 +386,6 @@ type fixture struct {
 	botQuota    *fakeBotQuota
 	sender      *fakeSender
 	replier     *fakeReplier
-	resetter    *fakeResetter
 	recorder    *fakeRecorder
 	members     *fakeMembers
 	muter       *fakeMuter
@@ -378,7 +397,7 @@ type fixture struct {
 
 func newFixture() *fixture {
 	f := &fixture{
-		sender: &fakeSender{}, replier: &fakeReplier{}, resetter: &fakeResetter{}, recorder: &fakeRecorder{},
+		sender: &fakeSender{}, replier: &fakeReplier{}, recorder: &fakeRecorder{},
 		members: &fakeMembers{admins: map[int64]bool{groupAdminID: true}}, muter: &fakeMuter{},
 		media: newFakeMedia(), chatLog: newMemoryLog(), transcriber: &fakeTranscriber{text: "salom dunyo"},
 		botQuota: &fakeBotQuota{}, reactor: &fakeReactor{}, chatActor: &fakeChatActor{},
@@ -386,7 +405,6 @@ func newFixture() *fixture {
 	f.opts = Options{
 		Sender:        f.sender,
 		Replier:       f.replier,
-		Resetter:      f.resetter,
 		Logger:        slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Model:         "test/model",
 		Workers:       2,
@@ -464,12 +482,12 @@ func expectOneReply(t *testing.T, sent []sentMessage, want string) {
 func TestCommandsReply(t *testing.T) {
 	cases := map[string]string{
 		"/start":       "/help",
-		"/help":        "/reset",
+		"/help":        "/about",
 		"/about":       "Maria",
 		"/model":       "/help",
 		"/model@mybot": "/help",
-		"/HELP":        "/reset",
-		"/help extra":  "/reset",
+		"/HELP":        "/about",
+		"/help extra":  "/about",
 		"/unknown":     "/help",
 	}
 	for command, want := range cases {
@@ -509,30 +527,6 @@ func TestHelpFollowsTheAppLanguage(t *testing.T) {
 	sent := f.run(update)
 
 	expectOneReply(t, sent, "Команды:")
-}
-
-func TestResetClearsOnlyTheSendersHistory(t *testing.T) {
-	f := newFixture()
-
-	sent := f.run(textFrom(userID, "/reset"))
-
-	expectOneReply(t, sent, textResetDone)
-	want := storage.Scope{ChatID: userID, UserID: userID}
-	if len(f.resetter.reset) != 1 || f.resetter.reset[0] != want {
-		t.Errorf("reset calls = %v, want [%v]", f.resetter.reset, want)
-	}
-}
-
-func TestResetFailureShowsGenericError(t *testing.T) {
-	f := newFixture()
-	f.resetter.err = errors.New("pq: connection refused at 10.0.0.5")
-
-	sent := f.run(textFrom(userID, "/reset"))
-
-	expectOneReply(t, sent, textError.uz)
-	if strings.Contains(sent[0].text, "10.0.0.5") {
-		t.Errorf("reply leaks the internal error: %q", sent[0].text)
-	}
 }
 
 func TestAdminCommandsAreRestricted(t *testing.T) {
@@ -594,6 +588,30 @@ func TestEmptyAnswerIsSilentInAGroup(t *testing.T) {
 	f = newFixture()
 	f.replier.err = fmt.Errorf("agent: %w", ai.ErrEmptyResponse)
 	expectOneReply(t, f.run(textFrom(userID, "hi")), textError.uz)
+}
+
+// A turn the provider's filter refused says so in a private chat, and to
+// an owner how to post an announcement with /elon; a group hears nothing.
+func TestBlockedTurnSaysWhy(t *testing.T) {
+	blocked := fmt.Errorf("agent: %w: %w (finish reason content_filter)", ai.ErrEmptyResponse, ai.ErrBlocked)
+	f := newFixture()
+	f.replier.err = blocked
+	expectOneReply(t, f.run(textFrom(userID, "hi")), textBlocked.uz)
+
+	f = newFixture()
+	f.opts.OwnerUsernames = []string{ownerUsername}
+	f.replier.err = blocked
+	owner := textFrom(9001, "e'lon ber")
+	owner.Message.From.Username = "Pronium"
+	if sent := f.run(owner); len(sent) != 1 || !strings.Contains(sent[0].text, "/elon hammaga") {
+		t.Errorf("the owner was told %+v", sent)
+	}
+
+	f = newFixture()
+	f.replier.err = blocked
+	if sent := f.run(inGroup(groupMessage("Mira, e'lon"))); len(sent) != 0 {
+		t.Errorf("a group was told %+v", sent)
+	}
 }
 
 // The bot's own messages are in Uzbek, like the people it talks to.
@@ -837,9 +855,18 @@ func TestCloseRefusesQueuedUpdatesInsteadOfRunningThem(t *testing.T) {
 
 func TestHelpTextListsEveryCommand(t *testing.T) {
 	help := HelpText(Abilities{})
-	for _, command := range []string{"/start", "/help", "/reset", "/about"} {
+	for _, command := range []string{"/start", "/help", "/about"} {
 		if !strings.Contains(help, command) {
 			t.Errorf("help text does not mention %s", command)
+		}
+	}
+	if strings.Contains(help, "/stats") || strings.Contains(help, "/game") {
+		t.Errorf("help offers the pages without them: %q", help)
+	}
+	for _, lang := range []string{"uz", "ru", "en"} {
+		help := HelpTextIn(lang, Abilities{Pages: true})
+		if strings.Contains(help, "/stats") || !strings.Contains(help, "/game — ") || strings.Contains(help, "%!") {
+			t.Errorf("%s help with the pages = %q", lang, help)
 		}
 	}
 }
@@ -863,14 +890,18 @@ func TestHelpMentionsModerationAndPolls(t *testing.T) {
 	for _, want := range []string{
 		"Uzbek", "Russian", "English",
 		"photos", "stickers", "GIFs", "round videos",
-		"tell the time anywhere", "arithmetic", "a quiz, and a poll in a group", "Send a test file",
+		"tell the time anywhere", "make a poll in a group",
 	} {
 		if !strings.Contains(help, want) {
 			t.Errorf("help text does not mention %q", want)
 		}
 	}
-	// The words below were in the help before moderation existed ("/reset —
-	// delete the conversation history", "/mute"), so they are looked for
+	for _, gone := range []string{"presentation", "arithmetic", "derivatives", "exact math", "test file", "/stop"} {
+		if strings.Contains(help, gone) {
+			t.Errorf("help still offers %s, which the bot no longer does", gone)
+		}
+	}
+	// The words below were in the help before moderation existed ("/mute"), so they are looked for
 	// only in the admins' part.
 	_, admins, found := strings.Cut(help, "For a group's admins:")
 	if !found {
@@ -878,7 +909,7 @@ func TestHelpMentionsModerationAndPolls(t *testing.T) {
 	}
 	for _, want := range []string{
 		"ask me to delete or pin it", "to mute or ban its author", "take away their stickers and GIFs", "I do it at once",
-		"/mute@username", "/unmute@username", "/ignore@username", "/unignore@username", "/reset@username",
+		"/mute@username", "/unmute@username", "/ignore@username", "/unignore@username",
 	} {
 		if !strings.Contains(admins, want) {
 			t.Errorf("the admins' part of the help does not mention %q:\n%s", want, admins)
@@ -905,7 +936,7 @@ func TestHelpPromisesOnlyWhatTheBotCanDo(t *testing.T) {
 
 			sent := f.run(textFrom(userID, "/help"))
 
-			expectOneReply(t, sent, "/reset")
+			expectOneReply(t, sent, "/about")
 			if got := strings.Contains(sent[0].text, "rasm chizaman"); got != tc.draw {
 				t.Errorf("offers drawing = %t, want %t:\n%s", got, tc.draw, sent[0].text)
 			}
@@ -1088,7 +1119,7 @@ func TestMuteSilencesTheGroupUntilUnmuted(t *testing.T) {
 }
 
 func TestMuteCommandsAreForAdmins(t *testing.T) {
-	for _, command := range []string{"/mute@MyBot", "/unmute@MyBot", "/reset@MyBot"} {
+	for _, command := range []string{"/mute@MyBot", "/unmute@MyBot"} {
 		t.Run(command, func(t *testing.T) {
 			f := newFixture()
 			f.opts.MutedChats = []int64{groupID}
@@ -1099,8 +1130,8 @@ func TestMuteCommandsAreForAdmins(t *testing.T) {
 			sent := f.run(inGroup(groupMessage(command)))
 
 			expectOneReply(t, sent, textAdminsOnly)
-			if len(f.muter.calls) != 0 || len(f.resetter.reset) != 0 {
-				t.Errorf("a member changed state: mute %+v, reset %+v", f.muter.calls, f.resetter.reset)
+			if len(f.muter.calls) != 0 {
+				t.Errorf("a member changed the mute state: %+v", f.muter.calls)
 			}
 		})
 	}
@@ -1173,28 +1204,6 @@ func TestStartsMutedWhenListedAtStartup(t *testing.T) {
 
 	if sent := f.run(inGroup(groupMessage("Mira, hello?"))); len(sent) != 0 {
 		t.Errorf("sent = %+v, want silence in a muted group", sent)
-	}
-}
-
-func TestGroupResetByAdminClearsSharedHistoryAndChatter(t *testing.T) {
-	f := newFixture()
-	f.opts.Workers = 1
-
-	sent := f.run(
-		inGroup(groupMessage("old chatter")),
-		inGroup(asAdmin(groupMessage("/reset@MyBot"))),
-		inGroup(groupMessage("Mira, hi")),
-	)
-
-	if len(sent) != 2 || sent[0].text != textResetDone {
-		t.Fatalf("sent = %+v", sent)
-	}
-	want := storage.Scope{ChatID: groupID}
-	if len(f.resetter.reset) != 1 || f.resetter.reset[0] != want {
-		t.Errorf("reset scopes = %v, want [%v]", f.resetter.reset, want)
-	}
-	if context := f.replier.recorded()[0].req.Context; dayLog(context) != "" {
-		t.Errorf("recent chatter survived the reset: %q", context)
 	}
 }
 
@@ -1465,7 +1474,6 @@ func TestManagersCommandsAndModerationRequestsPassAFullQuota(t *testing.T) {
 
 	sent := f.run(
 		commandReplyingTo(boss, bek, "/ignore@MyBot"),
-		inGroup(asAdmin(groupMessage("/reset@MyBot"))),
 		inGroup(request),
 		inGroup(asAdmin(groupMessage("Mira, how are you?"))),
 		commandReplyingTo(&telegram.User{ID: 555, FirstName: "Ann"}, bek, "/ignore@MyBot"),
@@ -1475,13 +1483,35 @@ func TestManagersCommandsAndModerationRequestsPassAFullQuota(t *testing.T) {
 	for _, msg := range sent {
 		texts = append(texts, msg.text)
 	}
-	want := []string{"Okay, I won't answer Bek @bek for the next 24 hours.", textResetDone, "Boss: mute him"}
-	if len(texts) != len(want) || texts[0] != want[0] || texts[1] != want[1] || !strings.HasSuffix(texts[2], want[2]) {
-		t.Errorf("sent = %q\nwant %q: the admin's commands and moderation request pass, their chat does not", texts, want)
+	want := []string{"Okay, I won't answer Bek @bek for the next 24 hours.", "Boss: mute him"}
+	if len(texts) != len(want) || texts[0] != want[0] || !strings.HasSuffix(texts[1], want[1]) {
+		t.Errorf("sent = %q\nwant %q: the admin's command and moderation request pass; their chat and the member's command do not", texts, want)
 	}
-	// The admin's chat and the member's command are counted, and denied.
+	// The admin's chat is counted like anyone's, and denied; so is the
+	// member's command.
 	if asked := quota.asked(); len(asked) != 3 {
 		t.Errorf("quota asked %d times, want 3: the request, the chat and the member's command", len(asked))
+	}
+}
+
+// The owners asked that admins have the limits too: an admin past their
+// own limit is not answered, unless they reply to a member to moderate.
+func TestAnAdminHasTheirOwnLimitToo(t *testing.T) {
+	f := newFixture()
+	quota := &fakeGroupQuota{}
+	f.opts.GroupReplies = quota
+	f.opts.MemberRepliesPer10Min = 1
+	f.opts.GroupRatePerMinute = 2
+	f.opts.Workers = 1
+
+	sent := f.run(
+		inGroup(asAdmin(groupMessage("Mira, one"))),
+		inGroup(asAdmin(groupMessage("Mira, two"))),
+		inGroup(asAdmin(groupMessage("Mira, three"))),
+	)
+
+	if len(sent) != 1 || sent[0].text != "echo: one" {
+		t.Errorf("sent = %+v; want the first only, within the admin's own limit", sent)
 	}
 }
 
@@ -1659,7 +1689,7 @@ func TestPostsOnBehalfOfAChatAreIgnored(t *testing.T) {
 func TestPrivateCommandWithNewLine(t *testing.T) {
 	f := newFixture()
 
-	expectOneReply(t, f.run(textFrom(userID, "/help\nplease")), "/reset")
+	expectOneReply(t, f.run(textFrom(userID, "/help\nplease")), "/about")
 }
 
 func TestGroupMessageCannotForgeOtherSpeakersOrMarkers(t *testing.T) {
@@ -1759,14 +1789,19 @@ func TestChatterSeenWhileMutedDoesNotSurfaceAfterUnmute(t *testing.T) {
 	}
 }
 
-func TestGroupResetConfirmationDoesNotSayYour(t *testing.T) {
+// An /unmute in a group that was never muted changes nothing, and so keeps
+// what the group said.
+func TestUnmuteOfAnUnmutedGroupKeepsTheLog(t *testing.T) {
 	f := newFixture()
+	s := New(f.opts)
+	s.ambient.add(groupID, 0, 4242, "Ann", "plans for tonight")
 
-	sent := f.run(inGroup(asAdmin(groupMessage("/reset@MyBot"))))
+	s.Handle(inGroup(asAdmin(groupMessage("/unmute@MyBot"))))
+	s.Handle(inGroup(groupMessage("Mira, hi")))
+	s.stop()
 
-	expectOneReply(t, sent, textResetDone)
-	if strings.Contains(strings.ToLower(sent[0].text), "your") {
-		t.Errorf("group reset confirmation = %q; the history belongs to the group", sent[0].text)
+	if context := f.replier.recorded()[0].req.Context; !strings.Contains(dayLog(context), "plans for tonight") {
+		t.Errorf("context after a needless unmute = %q, want the log kept", context)
 	}
 }
 
@@ -2028,17 +2063,6 @@ func TestMutedGroupIsNotLogged(t *testing.T) {
 
 	if len(f.chatLog.messages) != 0 {
 		t.Errorf("log = %+v", f.chatLog.messages)
-	}
-}
-
-func TestResetClearsTheDaysLog(t *testing.T) {
-	f := newFixture()
-	f.opts.Workers = 1
-
-	f.run(inGroup(groupMessage("old chatter")), inGroup(asAdmin(groupMessage("/reset@MyBot"))))
-
-	if got := f.chatLog.texts(groupID); len(got) != 0 {
-		t.Errorf("log after reset = %q", got)
 	}
 }
 
@@ -2401,7 +2425,7 @@ func TestTypingShownDuringTurn(t *testing.T) {
 	f.replier.release = make(chan struct{})
 	s := serverless(f, &fakeMuteStore{})
 	defer s.Close()
-	s.typingInterval = testTypingInterval
+	s.typingInterval, s.typingDelay = testTypingInterval, 0
 
 	done := make(chan struct{})
 	go func() {
@@ -2441,6 +2465,7 @@ func TestTypingIsShownInTheTopic(t *testing.T) {
 	inTopic.IsTopicMessage, inTopic.MessageThreadID = true, 7
 	s := serverless(f, &fakeMuteStore{})
 	defer s.Close()
+	s.typingDelay = 0
 
 	done := make(chan struct{})
 	go func() {
@@ -2484,6 +2509,7 @@ func TestAnswerWaitsForTypingInFlight(t *testing.T) {
 	f.replier.release = make(chan struct{})
 	s := serverless(f, &fakeMuteStore{})
 	defer s.Close()
+	s.typingDelay = 0
 
 	done := make(chan struct{})
 	go func() {
@@ -2522,11 +2548,28 @@ func TestTypingCutOffByTheAnswerIsNotLogged(t *testing.T) {
 	f.opts.ChatActor = heldChatActor{}
 	s := serverless(f, &fakeMuteStore{})
 	defer s.Close()
+	s.typingDelay = 0
 
 	s.HandleNow(inGroup(groupMessage("Mira, hi")))
 
 	if strings.Contains(logs.String(), "typing indicator failed") {
 		t.Errorf("stopping typing for the answer was logged as a failure:\n%s", logs.String())
+	}
+}
+
+// A quick answer, often a reaction instead of words, comes before "typing"
+// is shown: "typing" and then only an emoji looked like a lost message.
+func TestQuickAnswerShowsNoTyping(t *testing.T) {
+	f := newFixture()
+	f.replier.reaction = "🤣"
+
+	f.run(inGroup(groupMessage("Mira, haha")))
+
+	if shown := f.chatActor.recorded(); len(shown) != 0 {
+		t.Errorf("chat actions = %+v; a turn quicker than typingWait shows none", shown)
+	}
+	if got := f.reactor.recorded(); len(got) != 1 || got[0].emoji != "🤣" {
+		t.Errorf("reactions = %+v, want the model's 🤣", got)
 	}
 }
 
@@ -2661,6 +2704,7 @@ func TestLoggedGroupMessagesCarryTheGroupsName(t *testing.T) {
 type fakeGroups struct {
 	mu       sync.Mutex
 	recorded []storage.GroupStatus
+	channels []storage.GroupStatus
 }
 
 func (f *fakeGroups) RecordGroup(_ context.Context, g storage.GroupStatus) error {
@@ -2668,6 +2712,32 @@ func (f *fakeGroups) RecordGroup(_ context.Context, g storage.GroupStatus) error
 	defer f.mu.Unlock()
 	f.recorded = append(f.recorded, g)
 	return nil
+}
+
+func (f *fakeGroups) RecordChannel(_ context.Context, c storage.GroupStatus) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.channels = append(f.channels, c)
+	return nil
+}
+
+// A channel the bot is made an admin of is recorded apart from the groups,
+// with its right to post, for the owners' broadcasts.
+func TestBeingMadeAChannelAdminIsRecorded(t *testing.T) {
+	f := newFixture()
+	groups := &fakeGroups{}
+	f.opts.Groups = groups
+	news := telegram.Chat{ID: -1009001, Type: telegram.ChatTypeChannel, Title: "News"}
+
+	sent := f.run(memberChange(news, telegram.ChatMember{Status: "administrator", CanPostMessages: true}))
+
+	want := []storage.GroupStatus{{ChatID: -1009001, Title: "News", BotStatus: "administrator", Rights: []string{telegram.RightPostMessages}}}
+	if !reflect.DeepEqual(groups.channels, want) || len(groups.recorded) != 0 {
+		t.Errorf("channels = %+v, groups = %+v; want %+v and no group", groups.channels, groups.recorded, want)
+	}
+	if len(sent) != 0 {
+		t.Errorf("sent = %+v", sent)
+	}
 }
 
 func membershipChange(chat telegram.Chat, status string) telegram.Update {
@@ -2981,7 +3051,7 @@ func TestIgnoreCommandRefusesAdmins(t *testing.T) {
 	})
 }
 
-func TestRulesSurviveMuteAndReset(t *testing.T) {
+func TestRulesSurviveMute(t *testing.T) {
 	f := newFixture()
 	f.opts.Workers = 1
 	instruction := storage.GroupRule{ID: 12, ChatID: groupID, Kind: storage.RuleInstruction, Text: "No finance talk.", SetBy: 9001}
@@ -2991,7 +3061,6 @@ func TestRulesSurviveMuteAndReset(t *testing.T) {
 	f.run(
 		inGroup(asAdmin(groupMessage("/mute@MyBot"))),
 		inGroup(asAdmin(groupMessage("/unmute@MyBot"))),
-		inGroup(asAdmin(groupMessage("/reset@MyBot"))),
 		inGroup(groupMessage("Mira, can we talk money?")),
 	)
 
@@ -3126,6 +3195,37 @@ func TestIgnoreCommandOnTheBotsAnswerIgnoresWhomItAnswered(t *testing.T) {
 	}
 }
 
+// Tools learn the forum topic a request was written in from the update: its
+// own topic, the implicit reply to the topic's first message dropped, or
+// that of the message it replies to. A reply chain outside a forum, which
+// Telegram also numbers, is no topic.
+func TestTurnTellsToolsTheForumTopic(t *testing.T) {
+	f := newFixture()
+	forum := telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup, IsForum: true}
+	inTopic := groupMessage("@MyBot mavzuni yop", "@MyBot")
+	inTopic.Chat, inTopic.IsTopicMessage, inTopic.MessageThreadID = forum, true, 7
+	inTopic.ReplyToMessage = &telegram.Message{MessageID: 7, From: &telegram.User{ID: 5}, Service: "forum_topic_created"}
+	inGeneral := groupMessage("@MyBot General'ni yashir", "@MyBot")
+	inGeneral.Chat = forum
+	replyChain := replyingTo(groupMessage("@MyBot yop", "@MyBot"), 5, "salom")
+	replyChain.MessageThreadID = 29
+
+	f.run(inGroup(inTopic), inGroup(inGeneral), inGroup(replyChain))
+
+	calls := f.replier.recorded()
+	if len(calls) != 3 {
+		t.Fatalf("model calls = %d, want 3", len(calls))
+	}
+	for i, want := range []tools.Caller{{Forum: true, TopicID: 7}, {Forum: true}, {}} {
+		if got := calls[i].caller; got.Forum != want.Forum || got.TopicID != want.TopicID {
+			t.Errorf("call %d: forum %v, topic %d; want %v, %d", i, got.Forum, got.TopicID, want.Forum, want.TopicID)
+		}
+	}
+	if calls[0].caller.Target != nil {
+		t.Errorf("target = %+v; the topic's first message is no reply", calls[0].caller.Target)
+	}
+}
+
 // A service message names as its author whoever caused it: "Ann added
 // Spammer" comes from Ann, "Boss pinned a message" from Boss. Acting on
 // that author would hit the wrong person, so such a message is no target.
@@ -3227,6 +3327,21 @@ func TestUnreadableMemberMessageIsATarget(t *testing.T) {
 	}
 }
 
+// The sticker a request replies to reaches the tools, for an owner's
+// "take this out of the set".
+func TestARepliedStickerIsInTheTarget(t *testing.T) {
+	f := newFixture()
+	sticker := &telegram.Sticker{FileID: "f9", FileUniqueID: "u9", Emoji: "😂", SetName: "maria_by_mybot"}
+	request := groupMessage("Mira, shuni o'chir")
+	request.ReplyToMessage = &telegram.Message{MessageID: 29, From: &telegram.User{ID: 666, FirstName: "Ali"}, Sticker: sticker}
+
+	f.run(inGroup(request))
+
+	if calls := f.replier.recorded(); len(calls) != 1 || calls[0].caller.Target == nil || calls[0].caller.Target.Sticker != sticker {
+		t.Errorf("model calls = %+v, want the replied sticker in the target", calls)
+	}
+}
+
 // The tools are told the person's own words, apart from the message they
 // replied to: an owner's lasting order must be in them.
 func TestTurnTellsToolsTheSendersOwnWords(t *testing.T) {
@@ -3265,6 +3380,9 @@ type fakePrivateQuota struct {
 	used     int
 	refused  bool
 	err      error
+	// premium gives the user the quota's premium limit, as the store does
+	// while their premium lasts.
+	premium bool
 }
 
 func (f *fakePrivateQuota) ReservePrivateMessage(_ context.Context, q storage.DailyQuota) (int64, bool, bool, error) {
@@ -3274,7 +3392,7 @@ func (f *fakePrivateQuota) ReservePrivateMessage(_ context.Context, q storage.Da
 	switch {
 	case f.err != nil:
 		return 0, false, false, f.err
-	case f.used < q.Limit:
+	case f.used < q.Limit || (f.premium && f.used < q.PremiumLimit):
 		f.used++
 		return int64(500 + len(f.asked)), true, false, nil
 	}
@@ -3705,6 +3823,7 @@ type fakeButtons struct {
 	mu      sync.Mutex
 	answers []pressAnswer
 	edits   []string
+	menus   [][][]telegram.Button
 }
 
 func (f *fakeButtons) AnswerCallbackQuery(_ context.Context, id, text string, alert bool) error {
@@ -3719,6 +3838,20 @@ func (f *fakeButtons) EditMessageText(_ context.Context, _, _ int64, text string
 	defer f.mu.Unlock()
 	f.edits = append(f.edits, text)
 	return nil
+}
+
+func (f *fakeButtons) EditMessageMenu(_ context.Context, _, _ int64, text string, buttons [][]telegram.Button) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.edits = append(f.edits, text)
+	f.menus = append(f.menus, buttons)
+	return nil
+}
+
+func (f *fakeButtons) recordedMenus() ([]string, [][][]telegram.Button) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.edits...), append([][][]telegram.Button(nil), f.menus...)
 }
 
 // The check button tells the bot it was pressed, writing nothing in the
@@ -3825,7 +3958,10 @@ func TestUnansweredMessagesAreRecordedWithWhy(t *testing.T) {
 	if got := skips.reasons(); !slices.Equal(got, []string{"group_quota", "overloaded"}) {
 		t.Errorf("skips = %q, want group_quota then overloaded", got)
 	}
-	if skip := skips.skips[0]; skip.ChatID == 0 || skip.UserID == 0 || skip.MessageID == 0 {
-		t.Errorf("skip = %+v, want its chat, member and message", skip)
+	if skip := skips.skips[0]; skip.ChatID == 0 || skip.UserID == 0 || skip.MessageID == 0 || skip.Detail != "" {
+		t.Errorf("skip = %+v, want its chat, member and message, and no error", skip)
+	}
+	if skip := skips.skips[1]; !strings.Contains(skip.Detail, "quota") {
+		t.Errorf("overloaded skip detail = %q, want the provider's error", skip.Detail)
 	}
 }

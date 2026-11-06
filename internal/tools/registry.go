@@ -45,6 +45,12 @@ type Tool struct {
 	// GroupOnly offers the tool only in a group's turns, as the turn's
 	// Caller says.
 	GroupOnly bool
+	// NoBusiness keeps the tool out of the turns answering a customer of an
+	// owner's business account: it sends to the chat itself, as the bot
+	// rather than as the account, or keeps what it learns of the person for
+	// their own chats with the bot, which business chats are kept apart
+	// from.
+	NoBusiness bool
 	// MaxOutputBytes bounds the result. Zero means maxOutputBytes.
 	MaxOutputBytes int
 	// Timeout bounds one execution. Zero means defaultTimeout.
@@ -204,6 +210,8 @@ func (r *Registry) refusal(ctx context.Context, tool Tool, callerID int64) strin
 		return "this tool is restricted to administrators or owners"
 	case tool.GroupOnly && !(inTurn && caller.ChatID < 0):
 		return "this tool works only in a group"
+	case tool.NoBusiness && inTurn && caller.Business:
+		return "this tool does not work in a business chat"
 	}
 	return ""
 }

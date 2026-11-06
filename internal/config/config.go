@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -44,17 +45,22 @@ type Config struct {
 	// minimal, low, medium or high, from AI_REASONING_EFFORT; "" leaves it
 	// to the model. Thinking is paid as output, so it defaults to low.
 	ReasoningEffort string
-	AIAPIKey        string
-	AIBaseURL       string
+	// ChatReasoningEffort, from CHAT_REASONING_EFFORT, is how hard the chat
+	// model thinks before a reply in words alone: minimal by default, as
+	// "low" spent 500 to 800 thinking tokens, seconds, on a one-line joke.
+	ChatReasoningEffort string
+	AIAPIKey            string
+	AIBaseURL           string
 	// FallbackModels are tried when the model is overloaded.
 	FallbackModels []string
+	// RouterModel, from ROUTER_MODEL, is a light model that decides which
+	// messages need only words; ChatModel, from CHAT_MODEL, answers those
+	// without the tools, Model when empty. An empty RouterModel sends every
+	// message to Model with the tools.
+	RouterModel string
+	ChatModel   string
 	// AudioInput is true when the provider understands voice messages.
 	AudioInput bool
-	// The backup provider, asked when every model of the main one failed.
-	// Empty BackupAPIKey means none.
-	BackupAPIKey  string
-	BackupBaseURL string
-	BackupModel   string
 
 	// Keys for the live-data tools, both optional: without FootballDataToken
 	// there is no football tool, and without CoinGeckoDemoKey crypto prices
@@ -72,26 +78,35 @@ type Config struct {
 	// YouTubeAPIKey is a YouTube Data API key; without it there is no
 	// video search.
 	YouTubeAPIKey string
-	// WolframAppID is a Wolfram|Alpha AppID; without it there is no
-	// wolfram tool.
-	WolframAppID string
+	// CalendarificAPIKey is a Calendarific key; without it there is no
+	// holidays tool.
+	CalendarificAPIKey string
+	// ImgflipAPIKey is an Imgflip API key; without it there is no meme
+	// tool.
+	ImgflipAPIKey string
+	// RapidAPIKey is a RapidAPI key subscribed to the Shazam Song
+	// Recognition API; without it there is no song recognition.
+	RapidAPIKey string
+	// PokeWalletAPIKey is a PokéWallet key; without it Kartalar has no
+	// trading cards.
+	PokeWalletAPIKey string
 	// URLhausAuthKey or SafeBrowsingKey lets owners turn on the link guard,
-	// each service judging links when its key is set, and
-	// SightengineUser and SightengineSecret the picture guard; without them
-	// those guards are refused. The spam guard needs no key.
+	// each service judging links when its key is set; without either it is
+	// refused. SightengineUser and SightengineSecret let Sightengine judge
+	// the picture guard's pictures before the bot's own model. The spam
+	// guard needs no key: lols.bot answers without one, and CASKey, a
+	// Combot API key, adds CAS, which answers nobody without one.
 	URLhausAuthKey    string
 	SafeBrowsingKey   string
 	SightengineUser   string
 	SightengineSecret string
+	CASKey            string
 
 	// Image generation, Gemini only. Owners have no daily limit.
 	ImagesEnabled   bool
 	ImageModel      string
 	ImageBaseURL    string
 	DailyImageLimit int
-	// DailyPresentationLimit is how many presentations a user who is not
-	// an owner may get per day; 0 lets only owners have them.
-	DailyPresentationLimit int
 
 	// Media limits: the largest file the bot downloads, and the longest
 	// voice message it listens to.
@@ -124,6 +139,9 @@ type Config struct {
 	WakeWordTrigger bool
 	MentionTrigger  bool
 	ReplyTrigger    bool
+	// NewHeroes adds the Mobile Legends heroes released lately, from
+	// MLBBDex, to the persona at start; tests turn it off.
+	NewHeroes bool
 	// WakeWords are the names the bot answers to, in lower case.
 	WakeWords []string
 
@@ -160,6 +178,17 @@ type Config struct {
 	// a day, from midnight in Location; owners have no limit and 0 turns it
 	// off.
 	PrivateDailyLimit int
+	// PremiumPrice is what premium costs in Telegram Stars: PremiumDays days
+	// of PremiumDailyLimit answers a day in private chats instead of
+	// PrivateDailyLimit. 0, the default, sells none, so that a deploy never
+	// starts taking money the owners did not ask for.
+	PremiumPrice      int
+	PremiumDays       int
+	PremiumDailyLimit int
+	// BusinessDailyLimit caps the answers each customer of an owner's
+	// Telegram Business account gets in a day, from midnight in Location;
+	// 0 turns it off.
+	BusinessDailyLimit int
 	// PrivateChats is whom the bot answers in private chats: "on" everyone,
 	// "owners" its owners only, "off" nobody, which keeps it to groups.
 	PrivateChats string
@@ -176,6 +205,11 @@ type Config struct {
 	// group it answers only its owners. 0 answers any group.
 	MinActiveMembers int
 	ActiveDays       int
+	// WebAppURL is where this project's pages are served, from WEBAPP_URL,
+	// such as "https://maria.vercel.app", without the trailing slash: the
+	// group dashboard Mini App at /stats/ and the game at /game/. Empty
+	// turns both off.
+	WebAppURL string
 }
 
 // IsAdmin reports whether the Telegram user is listed in ADMIN_USER_IDS.
@@ -213,12 +247,17 @@ func Load(getenv func(string) string) (Config, error) {
 		WakeWordTrigger: r.boolean("ENABLE_WAKE_WORD_TRIGGER", true),
 		MentionTrigger:  r.boolean("ENABLE_USERNAME_MENTION", true),
 		ReplyTrigger:    r.boolean("ENABLE_REPLY_TRIGGER", true),
+		NewHeroes:       r.boolean("MLBB_NEW_HEROES", true),
 
 		AmbientMessages:         r.integer("GROUP_AMBIENT_MESSAGES", 500, 0),
 		MaxGroupReplyChars:      r.positive("MAX_GROUP_REPLY_LENGTH", 4000),
 		GroupRateLimitPerMinute: r.positive("GROUP_RATE_LIMIT_PER_MINUTE", 6),
 		MemberRepliesPer10Min:   r.positive("MEMBER_REPLIES_PER_10_MIN", 4),
 		PrivateDailyLimit:       r.integer("PRIVATE_DAILY_LIMIT", 10, 0),
+		PremiumPrice:            r.integer("PREMIUM_PRICE_STARS", 0, 0),
+		PremiumDays:             r.positive("PREMIUM_DAYS", 30),
+		PremiumDailyLimit:       r.positive("PREMIUM_DAILY_LIMIT", 50),
+		BusinessDailyLimit:      r.integer("BUSINESS_DAILY_LIMIT", 30, 0),
 		PrivateChats:            r.privateChats(),
 		RequiredChannels:        r.requiredChannels(),
 		MinGroupMembers:         r.integer("GROUP_MIN_MEMBERS", 6, 0),
@@ -244,11 +283,13 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.ImagesEnabled = cfg.AIProvider == providerGemini && r.boolean("ENABLE_IMAGE_GENERATION", true)
 	if cfg.AIProvider == providerGemini {
 		cfg.ReasoningEffort = r.reasoningEffort("AI_REASONING_EFFORT", "low")
+		cfg.ChatReasoningEffort = r.reasoningEffort("CHAT_REASONING_EFFORT", "minimal")
 	}
+	cfg.RouterModel = r.text("ROUTER_MODEL", "")
+	cfg.ChatModel = r.text("CHAT_MODEL", cfg.Model)
 	cfg.ImageModel = r.text("IMAGE_MODEL", "gemini-3.1-flash-image")
 	cfg.ImageBaseURL = strings.TrimSuffix(cfg.AIBaseURL, "/openai")
 	cfg.DailyImageLimit = r.integer("DAILY_IMAGE_LIMIT", 2, 0)
-	cfg.DailyPresentationLimit = r.integer("PRESENTATION_DAILY_LIMIT", 3, 0)
 	if cfg.ImagesEnabled {
 		cfg.PersonaPrompt += "\n\n" + imageNote
 	}
@@ -261,12 +302,17 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.TavilyAPIKey = r.apiKey("TAVILY_API_KEY")
 	cfg.TMDBToken = r.apiKey("TMDB_TOKEN")
 	cfg.YouTubeAPIKey = r.apiKey("YOUTUBE_API_KEY")
-	cfg.WolframAppID = r.apiKey("WOLFRAM_APP_ID")
+	cfg.CalendarificAPIKey = r.apiKey("CALENDARIFIC_API_KEY")
+	cfg.ImgflipAPIKey = r.apiKey("IMGFLIP_API_KEY")
+	cfg.RapidAPIKey = r.apiKey("RAPIDAPI_KEY")
+	cfg.PokeWalletAPIKey = r.apiKey("POKEWALLET_API_KEY")
 	cfg.URLhausAuthKey = r.apiKey("URLHAUS_AUTH_KEY")
 	cfg.SafeBrowsingKey = r.apiKey("GOOGLE_SAFE_BROWSING_KEY")
 	cfg.SightengineUser = r.apiKey("SIGHTENGINE_API_USER")
 	cfg.SightengineSecret = r.apiKey("SIGHTENGINE_API_SECRET")
+	cfg.CASKey = r.apiKey("CAS_API_KEY")
 	cfg.WakeWords = r.wakeWords(cfg)
+	cfg.WebAppURL = r.webAppURL("WEBAPP_URL")
 	r.checkRemovedVariables()
 	r.checkGroupSettings(cfg)
 	if err := errors.Join(r.errs...); err != nil {
@@ -371,10 +417,6 @@ const (
 	providerXAI    = "xai"
 
 	telegramDownloadLimit = 20 << 20
-
-	// The backup provider defaults to Groq, which has a free tier.
-	defaultBackupBaseURL = "https://api.groq.com/openai/v1"
-	defaultBackupModel   = "openai/gpt-oss-120b"
 )
 
 // provider describes one model provider. All are reached through the
@@ -427,9 +469,6 @@ func (r *reader) chooseProvider(cfg *Config) {
 		cfg.AIBaseURL = r.text(p.baseURLVar, p.baseURL)
 		cfg.Model = r.text(p.modelVar, p.model)
 		cfg.FallbackModels = r.fallbackModels(p.fallbacks)
-		cfg.BackupAPIKey = r.value("BACKUP_API_KEY")
-		cfg.BackupBaseURL = r.text("BACKUP_BASE_URL", defaultBackupBaseURL)
-		cfg.BackupModel = r.text("BACKUP_MODEL", defaultBackupModel)
 	default:
 		r.fail(chosen[0].keyVar, "and "+chosen[1].keyVar+" are both set; keep only one, for the provider you want to use")
 	}
@@ -515,6 +554,22 @@ func (r *reader) cronSecret(name string) string {
 		return ""
 	}
 	return secret
+}
+
+// webAppURL reads the optional address of the project's pages. Telegram
+// opens Mini Apps and games over HTTPS only, and the pages' paths are put
+// after it, so it is an origin and maybe a path, without a query.
+func (r *reader) webAppURL(name string) string {
+	value := strings.TrimRight(r.value(name), "/")
+	if value == "" {
+		return ""
+	}
+	u, err := url.Parse(value)
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+		r.fail(name, "must be an https:// address without a query, such as https://maria.vercel.app")
+		return ""
+	}
+	return value
 }
 
 func notSecretChar(char rune) bool {

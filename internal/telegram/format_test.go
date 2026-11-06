@@ -17,14 +17,17 @@ func TestFormattedMarksBoldCodeHeadingsAndBullets(t *testing.T) {
 		entities []messageEntity
 	}{
 		"plain":   {"Salom, senpai", "Salom, senpai", nil},
-		"bold":    {"**Ling**: 52.8% win", "Ling: 52.8% win", []messageEntity{{"bold", 0, 4}}},
-		"code":    {"ID `1407157025`", "ID 1407157025", []messageEntity{{"code", 3, 10}}},
-		"bullets": {"Meta:\n* **Masha** 60%\n- Marcel", "Meta:\n• Masha 60%\n• Marcel", []messageEntity{{"bold", 8, 5}}},
-		"heading": {"## Ling\nAssassin", "Ling\nAssassin", []messageEntity{{"bold", 0, 4}}},
+		"bold":    {"**Ling**: 52.8% win", "Ling: 52.8% win", []messageEntity{{"bold", 0, 4, ""}}},
+		"code":    {"ID `1407157025`", "ID 1407157025", []messageEntity{{"code", 3, 10, ""}}},
+		"bullets": {"Meta:\n* **Masha** 60%\n- Marcel", "Meta:\n• Masha 60%\n• Marcel", []messageEntity{{"bold", 8, 5, ""}}},
+		"heading": {"## Ling\nAssassin", "Ling\nAssassin", []messageEntity{{"bold", 0, 4, ""}}},
 		// An emoji is two UTF-16 units, as Telegram counts offsets.
-		"emoji":     {"🔥 **Fanny**", "🔥 Fanny", []messageEntity{{"bold", 3, 5}}},
+		"emoji":     {"🔥 **Fanny**", "🔥 Fanny", []messageEntity{{"bold", 3, 5, ""}}},
 		"unmatched": {"2 ** 3 = 8, *ok*", "2 ** 3 = 8, *ok*", nil},
 		"two lines": {"**a\nb**", "**a\nb**", nil},
+		// A member without a @username is tagged by a link to their ID.
+		"tag":       {"[無敵•мᴀʏoʀ](tg://user?id=5539888451), tur!", "無敵•мᴀʏoʀ, tur!", []messageEntity{{"text_link", 0, 8, "tg://user?id=5539888451"}}},
+		"not a tag": {"[ko'r](https://t.me/x) [a](tg://user?id=x)", "[ko'r](https://t.me/x) [a](tg://user?id=x)", nil},
 	} {
 		text, entities := formatted(c.in)
 		if text != c.text || !reflect.DeepEqual(entities, c.entities) {

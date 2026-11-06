@@ -93,8 +93,8 @@ func TestGetUpdatesParsesTextMessage(t *testing.T) {
 	if sent.method != "getUpdates" || sent.params["offset"] != float64(5) {
 		t.Errorf("call = %+v", sent)
 	}
-	if allowed, _ := sent.params["allowed_updates"].([]any); len(allowed) != 6 || allowed[0] != "message" || allowed[1] != "my_chat_member" || allowed[2] != "chat_member" || allowed[3] != "callback_query" || allowed[4] != "poll" || allowed[5] != "poll_answer" {
-		t.Errorf("allowed_updates = %v", sent.params["allowed_updates"])
+	if allowed := sent.params["allowed_updates"]; !reflect.DeepEqual(allowed, everyKind) {
+		t.Errorf("allowed_updates = %v, want %v", allowed, everyKind)
 	}
 }
 
@@ -405,8 +405,8 @@ func TestSetWebhookRegistersURLWithSecret(t *testing.T) {
 	if sent.method != "setWebhook" || sent.params["url"] != "https://bot.example/api/webhook" || sent.params["secret_token"] != "s3cret" {
 		t.Errorf("call = %+v", sent)
 	}
-	if allowed, _ := sent.params["allowed_updates"].([]any); len(allowed) != 6 || allowed[0] != "message" || allowed[1] != "my_chat_member" || allowed[2] != "chat_member" || allowed[3] != "callback_query" || allowed[4] != "poll" || allowed[5] != "poll_answer" {
-		t.Errorf("allowed_updates = %v", sent.params["allowed_updates"])
+	if allowed := sent.params["allowed_updates"]; !reflect.DeepEqual(allowed, everyKind) {
+		t.Errorf("allowed_updates = %v, want %v", allowed, everyKind)
 	}
 }
 
@@ -539,6 +539,44 @@ func TestSendPhotoUploadsTheImageAsAReply(t *testing.T) {
 	}
 	if !strings.Contains(got.reply, `"message_id":30`) {
 		t.Errorf("reply_parameters = %q", got.reply)
+	}
+}
+
+// A picture can bring the keyboard back, as a text can.
+func TestSendPhotoCarriesAKeyboard(t *testing.T) {
+	var markup string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseMultipartForm(1 << 20)
+		markup = r.FormValue("reply_markup")
+		_, _ = io.WriteString(w, `{"ok":true,"result":{"message_id":1}}`)
+	}))
+	defer server.Close()
+	client := NewClient(Options{Token: testToken, BaseURL: server.URL})
+
+	if _, err := client.SendPhoto(context.Background(), Photo{ChatID: 1, Data: []byte("x"), Keyboard: [][]string{{"❓ Yordam"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if want := `{"keyboard":[[{"text":"❓ Yordam"}]],"resize_keyboard":true}`; markup != want {
+		t.Errorf("reply_markup = %s\nwant %s", markup, want)
+	}
+}
+
+func TestSendPhotoCarriesLinkButtons(t *testing.T) {
+	var markup string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseMultipartForm(1 << 20)
+		markup = r.FormValue("reply_markup")
+		_, _ = io.WriteString(w, `{"ok":true,"result":{"message_id":1}}`)
+	}))
+	defer server.Close()
+	client := NewClient(Options{Token: testToken, BaseURL: server.URL})
+
+	buttons := [][]Button{{{Text: "Deezer", URL: "https://www.deezer.com/track/9"}}}
+	if _, err := client.SendPhoto(context.Background(), Photo{ChatID: 1, Data: []byte("x"), Buttons: buttons}); err != nil {
+		t.Fatal(err)
+	}
+	if want := `{"inline_keyboard":[[{"text":"Deezer","url":"https://www.deezer.com/track/9"}]]}`; markup != want {
+		t.Errorf("reply_markup = %s\nwant %s", markup, want)
 	}
 }
 
@@ -746,6 +784,26 @@ func TestChatAndMemberMethodsSendExactParams(t *testing.T) {
 			want:   map[string]any{"chat_id": float64(-100123), "message_thread_id": float64(7), "action": "typing"},
 		},
 		{
+			// A menu changes in place, its buttons with it.
+			method: "editMessageText",
+			call: func(c *Client) error {
+				return c.EditMessageMenu(ctx, 42, 70, "⚽ Sport", [][]Button{{{Text: "⬅️", Data: "kb:more:"}}})
+			},
+			want: map[string]any{"chat_id": float64(42), "message_id": float64(70), "text": "⚽ Sport",
+				"reply_markup": map[string]any{"inline_keyboard": []any{[]any{map[string]any{"text": "⬅️", "callback_data": "kb:more:"}}}}},
+		},
+		{
+			method: "setChatMemberTag",
+			call:   func(c *Client) error { return c.SetChatMemberTag(ctx, -100123, 42, "Pro") },
+			want:   map[string]any{"chat_id": float64(-100123), "user_id": float64(42), "tag": "Pro"},
+		},
+		{
+			// An empty tag is sent, which takes the member's off.
+			method: "setChatMemberTag",
+			call:   func(c *Client) error { return c.SetChatMemberTag(ctx, -100123, 42, "") },
+			want:   map[string]any{"chat_id": float64(-100123), "user_id": float64(42), "tag": ""},
+		},
+		{
 			method: "deleteMessage",
 			call:   func(c *Client) error { return c.DeleteMessage(ctx, -100123, 30) },
 			want:   map[string]any{"chat_id": float64(-100123), "message_id": float64(30)},
@@ -761,6 +819,37 @@ func TestChatAndMemberMethodsSendExactParams(t *testing.T) {
 			call:   func(c *Client) error { return c.UnpinChatMessage(ctx, -100123, 30) },
 			want:   map[string]any{"chat_id": float64(-100123), "message_id": float64(30)},
 		},
+		{
+			// No icon: the topic keeps the one it has.
+			method: "editForumTopic",
+			call:   func(c *Client) error { return c.EditForumTopic(ctx, -100123, 7, "Turnir") },
+			want:   map[string]any{"chat_id": float64(-100123), "message_thread_id": float64(7), "name": "Turnir"},
+		},
+		{
+			method: "closeForumTopic",
+			call:   func(c *Client) error { return c.CloseForumTopic(ctx, -100123, 7) },
+			want:   map[string]any{"chat_id": float64(-100123), "message_thread_id": float64(7)},
+		},
+		{
+			method: "reopenForumTopic",
+			call:   func(c *Client) error { return c.ReopenForumTopic(ctx, -100123, 7) },
+			want:   map[string]any{"chat_id": float64(-100123), "message_thread_id": float64(7)},
+		},
+		{
+			method: "deleteForumTopic",
+			call:   func(c *Client) error { return c.DeleteForumTopic(ctx, -100123, 7) },
+			want:   map[string]any{"chat_id": float64(-100123), "message_thread_id": float64(7)},
+		},
+		{
+			method: "hideGeneralForumTopic",
+			call:   func(c *Client) error { return c.HideGeneralForumTopic(ctx, -100123) },
+			want:   map[string]any{"chat_id": float64(-100123)},
+		},
+		{
+			method: "unhideGeneralForumTopic",
+			call:   func(c *Client) error { return c.UnhideGeneralForumTopic(ctx, -100123) },
+			want:   map[string]any{"chat_id": float64(-100123)},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.method, func(t *testing.T) {
@@ -774,6 +863,74 @@ func TestChatAndMemberMethodsSendExactParams(t *testing.T) {
 				t.Errorf("call = %+v, want %s %v", sent, tt.method, tt.want)
 			}
 		})
+	}
+}
+
+func TestCopyMessageNamesTheOriginal(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"message_id":99}}`)
+
+	id, err := client.CopyMessage(context.Background(), -100123, 5005, 31, "")
+	if err != nil || id != 99 {
+		t.Fatalf("CopyMessage = %d, %v", id, err)
+	}
+	want := map[string]any{"chat_id": float64(-100123), "from_chat_id": float64(5005), "message_id": float64(31)}
+	if sent := api.recorded()[0]; sent.method != "copyMessage" || !reflect.DeepEqual(sent.params, want) {
+		t.Errorf("call = %+v, want copyMessage %v", sent, want)
+	}
+}
+
+// A new link sends only the limits it has; an edit sends every one, so that
+// a limit taken away is gone.
+func TestInviteLinksSendTheirLimits(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"invite_link":"https://t.me/+abc"}}`)
+	ctx := context.Background()
+	ends := time.Unix(1800000000, 0)
+
+	link, err := client.CreateChatInviteLink(ctx, InviteLink{ChatID: -100123, Name: "reklama", Expires: ends, MemberLimit: 50})
+	if err != nil || link != "https://t.me/+abc" {
+		t.Fatalf("CreateChatInviteLink = %q, %v", link, err)
+	}
+	if _, err := client.CreateChatInviteLink(ctx, InviteLink{ChatID: -100123, JoinRequest: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.EditChatInviteLink(ctx, "https://t.me/+abc", InviteLink{ChatID: -100123, JoinRequest: true}); err != nil {
+		t.Fatal(err)
+	}
+	calls := api.recorded()
+	wants := []call{
+		{"createChatInviteLink", map[string]any{"chat_id": float64(-100123), "name": "reklama", "expire_date": float64(1800000000), "member_limit": float64(50)}},
+		{"createChatInviteLink", map[string]any{"chat_id": float64(-100123), "creates_join_request": true}},
+		{"editChatInviteLink", map[string]any{"chat_id": float64(-100123), "invite_link": "https://t.me/+abc", "name": "", "expire_date": float64(0), "member_limit": float64(0), "creates_join_request": true}},
+	}
+	for i, want := range wants {
+		if calls[i].method != want.method || !reflect.DeepEqual(calls[i].params, want.params) {
+			t.Errorf("call %d = %+v, want %+v", i, calls[i], want)
+		}
+	}
+}
+
+// A new topic is named and coloured as asked, and its ID, the thread its
+// messages carry, comes back.
+func TestCreateForumTopicReturnsTheTopic(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"message_thread_id":42,"name":"Turnir","icon_color":7322096}}`)
+
+	threadID, err := client.CreateForumTopic(context.Background(), -100123, "Turnir", 7322096)
+	if err != nil || threadID != 42 {
+		t.Fatalf("CreateForumTopic = %d, %v", threadID, err)
+	}
+	want := map[string]any{"chat_id": float64(-100123), "name": "Turnir", "icon_color": float64(7322096)}
+	if sent := api.recorded()[0]; sent.method != "createForumTopic" || !reflect.DeepEqual(sent.params, want) {
+		t.Errorf("call = %+v, want createForumTopic %v", sent, want)
+	}
+}
+
+func TestChatIsForumIsDecoded(t *testing.T) {
+	var msg Message
+	if err := json.Unmarshal([]byte(`{"message_id":1,"chat":{"id":-100123,"type":"supergroup","is_forum":true},"message_thread_id":7,"is_topic_message":true}`), &msg); err != nil {
+		t.Fatal(err)
+	}
+	if !msg.Chat.IsForum || msg.MessageThreadID != 7 || !msg.IsTopicMessage {
+		t.Errorf("message = %+v", msg)
 	}
 }
 
@@ -864,11 +1021,16 @@ func TestChatMemberRightsDecoded(t *testing.T) {
 	}
 
 	creator := decode(`{"status":"creator","user":{"id":5}}`)
-	if !creator.Has(RightRestrictMembers) || len(creator.Rights()) != 7 {
+	if !creator.Has(RightRestrictMembers) || len(creator.Rights()) != 9 {
 		t.Errorf("creator Has(restrict) = %v, Rights() = %v; a creator holds every right", creator.Has(RightRestrictMembers), creator.Rights())
 	}
 	if creator.Has("can_fly") {
 		t.Error("creator holds a right that does not exist")
+	}
+
+	channelAdmin := decode(`{"status":"administrator","user":{"id":777,"is_bot":true},"can_post_messages":true,"can_edit_messages":true}`)
+	if got := channelAdmin.Rights(); !reflect.DeepEqual(got, []string{RightPostMessages}) || !channelAdmin.Has(RightPostMessages) {
+		t.Errorf("channel administrator Rights() = %v, want the right to post", got)
 	}
 
 	if member := decode(`{"status":"member","user":{"id":42}}`); member.Rights() != nil {
@@ -1110,18 +1272,167 @@ func TestSendMessageSendsButtons(t *testing.T) {
 	}
 }
 
-// A webhook set before button presses were asked for is set again, at the
-// same address with the secret; one already asking for every kind, or no
-// webhook at all, is left alone.
+// A keyboard replaces the phone's own, stays, and fits its buttons; it
+// keeps a rich-looking text plain, as buttons do.
+func TestSendMessageSendsAKeyboard(t *testing.T) {
+	client, api := newTestClient(t, okSent)
+	keyboard := [][]string{{"😂 Mem", "🕐 Soat nechi?"}, {"❓ Yordam"}}
+
+	if _, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: "- salom", Keyboard: keyboard}); err != nil {
+		t.Fatalf("SendMessage: %v", err)
+	}
+	sent := api.recorded()[0]
+	markup, _ := json.Marshal(sent.params["reply_markup"])
+	want := `{"keyboard":[[{"text":"😂 Mem"},{"text":"🕐 Soat nechi?"}],[{"text":"❓ Yordam"}]],"resize_keyboard":true}`
+	if sent.method != "sendMessage" || string(markup) != want {
+		t.Errorf("call %s, reply_markup = %s\nwant %s", sent.method, markup, want)
+	}
+}
+
+// A question opens the reply box on its message, with a hint, and stays
+// plain text.
+func TestSendMessageAsksForAReply(t *testing.T) {
+	client, api := newTestClient(t, okSent)
+
+	if _, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: "- Qaysi shahar?", Ask: "Masalan: Termiz"}); err != nil {
+		t.Fatalf("SendMessage: %v", err)
+	}
+	sent := api.recorded()[0]
+	markup, _ := json.Marshal(sent.params["reply_markup"])
+	want := `{"force_reply":true,"input_field_placeholder":"Masalan: Termiz"}`
+	if sent.method != "sendMessage" || string(markup) != want {
+		t.Errorf("call %s, reply_markup = %s\nwant %s", sent.method, markup, want)
+	}
+}
+
+// An effect goes with the first message of a long text only, and when
+// Telegram refuses the message with it, the message goes again without.
+func TestSendMessageSendsAnEffect(t *testing.T) {
+	client, api := newTestClient(t, okSent)
+	text := strings.Repeat("a", MessageLimit) + " " + strings.Repeat("b", 10)
+	if _, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: text, Effect: EffectParty}); err != nil {
+		t.Fatal(err)
+	}
+	calls := api.recorded()
+	if len(calls) != 2 || calls[0].params["message_effect_id"] != EffectParty || calls[1].params["message_effect_id"] != nil {
+		t.Errorf("effects = %v, %v; want only the first", calls[0].params["message_effect_id"], calls[1].params["message_effect_id"])
+	}
+
+	client, api = newTestClient(t, `{"ok":false,"error_code":400,"description":"Bad Request: EFFECT_ID_INVALID"}`, okSent)
+	id, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: "Tabriklayman!", Effect: "1"})
+	calls = api.recorded()
+	if err != nil || id != 1 || len(calls) != 2 || calls[1].params["message_effect_id"] != nil || calls[1].params["text"] != "Tabriklayman!" {
+		t.Errorf("id %d, %v; calls = %+v", id, err, calls)
+	}
+}
+
+// A refusal of a message without an effect is not sent again.
+func TestSendMessageWithoutEffectIsNotSentAgain(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":false,"error_code":400,"description":"Bad Request: chat not found"}`)
+	if _, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: "salom"}); err == nil || len(api.recorded()) != 1 {
+		t.Errorf("err = %v after %d calls", err, len(api.recorded()))
+	}
+}
+
+// The rights asked for go with every field, false ones too, and say
+// whether they are a channel's.
+func TestSetMyDefaultAdministratorRightsSendsEveryRight(t *testing.T) {
+	client, api := newTestClient(t, okTrue)
+	if err := client.SetMyDefaultAdministratorRights(context.Background(), AdministratorRights{CanPostMessages: true}, true); err != nil {
+		t.Fatal(err)
+	}
+	sent := api.recorded()[0]
+	rights, _ := sent.params["rights"].(map[string]any)
+	if sent.method != "setMyDefaultAdministratorRights" || sent.params["for_channels"] != true || len(rights) != 16 || rights["can_post_messages"] != true || rights["can_delete_messages"] != false {
+		t.Errorf("call = %+v", sent)
+	}
+}
+
+// Closing a poll names its message, and its counts come back.
+func TestStopPollReturnsTheCounts(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"id":"p1","question":"Osh?","is_closed":true,"total_voter_count":5,
+		"options":[{"text":"ha","voter_count":4},{"text":"yo'q","voter_count":1}]}}`)
+
+	poll, err := client.StopPoll(context.Background(), -100123, 88)
+	if err != nil || !poll.IsClosed || poll.TotalVoterCount != 5 || len(poll.Options) != 2 || poll.Options[0].VoterCount != 4 {
+		t.Fatalf("poll = %+v, %v", poll, err)
+	}
+	want := map[string]any{"chat_id": float64(-100123), "message_id": float64(88)}
+	if sent := api.recorded()[0]; sent.method != "stopPoll" || !reflect.DeepEqual(sent.params, want) {
+		t.Errorf("call = %+v, want stopPoll %v", sent, want)
+	}
+}
+
+func TestStickerSetMethodsSendExactParams(t *testing.T) {
+	client, api := newTestClient(t, okTrue)
+	ctx := context.Background()
+	if err := client.SetChatStickerSet(ctx, -100123, "cats_by_bot"); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.DeleteChatStickerSet(ctx, -100123); err != nil {
+		t.Fatal(err)
+	}
+	set, remove := api.recorded()[0], api.recorded()[1]
+	if want := map[string]any{"chat_id": float64(-100123), "sticker_set_name": "cats_by_bot"}; set.method != "setChatStickerSet" || !reflect.DeepEqual(set.params, want) {
+		t.Errorf("set = %+v, want %v", set, want)
+	}
+	if want := map[string]any{"chat_id": float64(-100123)}; remove.method != "deleteChatStickerSet" || !reflect.DeepEqual(remove.params, want) {
+		t.Errorf("delete = %+v, want %v", remove, want)
+	}
+}
+
+func TestSendVenueSendsThePlace(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":{"message_id":91}}`)
+	id, err := client.SendVenue(context.Background(), Venue{ChatID: -100123, ReplyToMessageID: 60, Latitude: 39.6546, Longitude: 66.9644, Title: "Samarqand", Address: "O'zbekiston"})
+	if err != nil || id != 91 {
+		t.Fatalf("id = %d, %v", id, err)
+	}
+	want := map[string]any{"chat_id": float64(-100123), "latitude": 39.6546, "longitude": 66.9644, "title": "Samarqand", "address": "O'zbekiston",
+		"reply_parameters": map[string]any{"message_id": float64(60), "allow_sending_without_reply": true}}
+	if sent := api.recorded()[0]; sent.method != "sendVenue" || !reflect.DeepEqual(sent.params, want) {
+		t.Errorf("call = %+v, want sendVenue %v", sent, want)
+	}
+}
+
+// A boost comes with its chat, its ID and who gave it; a group's sticker
+// pack and a sticker's with theirs.
+func TestBoostAndStickerSetsAreDecoded(t *testing.T) {
+	client, _ := newTestClient(t, `{"ok":true,"result":[{"update_id":9,"chat_boost":{"chat":{"id":-100123,"type":"supergroup"},
+		"boost":{"boost_id":"b1","add_date":1,"expiration_date":2,"source":{"source":"premium","user":{"id":7,"first_name":"Ali"}}}}},
+		{"update_id":10,"message":{"message_id":3,"chat":{"id":-100123,"type":"supergroup"},"sticker":{"file_id":"s","set_name":"cats"}}}]}`)
+	updates, err := client.GetUpdates(context.Background(), 0, 0)
+	if err != nil || len(updates) != 2 {
+		t.Fatalf("updates = %+v, %v", updates, err)
+	}
+	boost := updates[0].ChatBoost
+	if boost == nil || boost.Chat.ID != -100123 || boost.Boost.BoostID != "b1" || boost.Boost.Source.Source != "premium" || boost.Boost.Source.User == nil || boost.Boost.Source.User.ID != 7 {
+		t.Errorf("boost = %+v", boost)
+	}
+	if s := updates[1].Message.Sticker; s == nil || s.SetName != "cats" {
+		t.Errorf("sticker = %+v", s)
+	}
+	var chat Chat
+	if err := json.Unmarshal([]byte(`{"id":-100123,"type":"supergroup","sticker_set_name":"cats","can_set_sticker_set":true}`), &chat); err != nil || chat.StickerSetName != "cats" || !chat.CanSetStickerSet {
+		t.Errorf("chat = %+v, %v", chat, err)
+	}
+}
+
+// A webhook asking for other kinds than the bot handles, too few or the
+// quizzes' polls, is set again, at the same address with the secret; one
+// asking for exactly them, or no webhook at all, is left alone.
 func TestEnsureAllowedUpdatesSetsAnOldWebhookAgain(t *testing.T) {
 	cases := map[string]struct {
 		info    string
 		changed bool
 	}{
-		"old kinds":      {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member"]}}`, true},
-		"before quizzes": {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query"]}}`, true},
-		"every kind":     {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","poll","poll_answer"]}}`, false},
-		"no webhook":     {`{"ok":true,"result":{"url":""}}`, false},
+		"old kinds":       {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member"]}}`, true},
+		"with quiz polls": {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","poll","poll_answer"]}}`, true},
+		"before inline":   {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query"]}}`, true},
+		"before edits":    {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","inline_query","pre_checkout_query"]}}`, true},
+		"before business": {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","inline_query","pre_checkout_query","edited_message","chat_join_request"]}}`, true},
+		"before boosts":   {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","inline_query","pre_checkout_query","edited_message","chat_join_request","business_connection","business_message"]}}`, true},
+		"every kind":      {`{"ok":true,"result":{"url":"https://bot.example/api/webhook","allowed_updates":["message","my_chat_member","chat_member","callback_query","inline_query","pre_checkout_query","edited_message","chat_join_request","business_connection","business_message","chat_boost"]}}`, false},
+		"no webhook":      {`{"ok":true,"result":{"url":""}}`, false},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -1146,14 +1457,23 @@ func TestEnsureAllowedUpdatesSetsAnOldWebhookAgain(t *testing.T) {
 	}
 }
 
-// A timed quiz question closes by itself, and its poll's ID comes back.
-func TestSendQuizQuestionReturnsThePollID(t *testing.T) {
-	client, api := newTestClient(t, `{"ok":true,"result":{"message_id":90,"poll":{"id":"5432","question":"Q","options":[{"text":"a"},{"text":"b"}],"is_closed":false}}}`)
-	id, err := client.SendQuizQuestion(context.Background(), OutgoingPoll{ChatID: 5005, Question: "Q", Options: []string{"a", "b"}, Quiz: true, Correct: 0, OpenPeriod: 30})
-	if err != nil || id != "5432" {
-		t.Fatalf("id = %q, %v", id, err)
+// A menu for one member names the group and the member; the scope for
+// everyone names neither.
+func TestSetMemberCommandsScopesToOneMember(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":true}`)
+
+	if err := client.SetMemberCommands(context.Background(), -100, 9001, []BotCommand{{Command: "limit", Description: "x"}}); err != nil {
+		t.Fatal(err)
 	}
-	if sent := api.recorded()[0]; sent.params["open_period"] != float64(30) {
-		t.Errorf("params = %v", sent.params)
+	if err := client.SetMyCommands(context.Background(), ScopeDefault, nil); err != nil {
+		t.Fatal(err)
+	}
+	member, all := api.recorded()[0], api.recorded()[1]
+	scope, _ := member.params["scope"].(map[string]any)
+	if member.method != "setMyCommands" || scope["type"] != "chat_member" || scope["chat_id"] != float64(-100) || scope["user_id"] != float64(9001) {
+		t.Errorf("member call = %+v", member)
+	}
+	if scope, _ := all.params["scope"].(map[string]any); len(scope) != 1 || scope["type"] != "default" {
+		t.Errorf("default scope = %v, want the type alone", all.params["scope"])
 	}
 }

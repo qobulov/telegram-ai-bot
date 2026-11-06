@@ -32,6 +32,13 @@ var (
 	ErrToolAsText = fmt.Errorf("agent: the model wrote a tool call as text: %w", ErrSilent)
 	// ErrToolLoop means the model kept requesting tools instead of answering.
 	ErrToolLoop = errors.New("agent: model did not produce an answer")
+	// ErrNeedsTools means an inline question needs a tool to answer, which
+	// inline answers do not have.
+	ErrNeedsTools = errors.New("agent: the question needs a tool, and inline answers have none")
+	// ErrNotATool means a turn that could be answered only with tools,
+	// one past the day's limit, needed none: nothing is saved, and the
+	// caller says the limit is reached.
+	ErrNotATool = errors.New("agent: a turn for tools only needed none")
 )
 
 // SilentMarker is the answer the model gives to stay silent.
@@ -65,11 +72,18 @@ type Tools interface {
 	Execute(ctx context.Context, callerID int64, name, args string) string
 }
 
-// Options configures an Agent. All fields are required.
+// Options configures an Agent. All fields are required but Router,
+// ChatModel and Name, which route banter to a lighter model (see route.go):
+// without Router and ChatModel every turn takes the full path.
 type Options struct {
 	Store Store
 	Model Model
 	Tools Tools
+	// Router answers CHAT or TOOLS for a message, and ChatModel answers the
+	// CHAT ones, without tools. Name is the bot's, for the router.
+	Router    Model
+	ChatModel Model
+	Name      string
 	// Persona is the character's instructions, sent with every request.
 	Persona string
 	// GroupNote is added to Persona for messages from a group.
@@ -116,6 +130,15 @@ type Request struct {
 	// Fixed, when set, is the answer, decided without the model: the turn
 	// is only saved, which keeps the history and answers an update once.
 	Fixed *Answer
+	// ToolsOnly is a turn past the day's limit, which only a tool may
+	// answer: a question the router finds is talk, or one the model answers
+	// without a tool, ends in ErrNotATool.
+	ToolsOnly bool
+	// Inline marks a question typed in inline mode, "@bot words" in any
+	// chat. Its asker posts the answer as their own message, in a chat the
+	// bot cannot read, so it is answered on its own: without history or
+	// tools, and saved nowhere.
+	Inline bool
 }
 
 // Answer is the assistant's reply. ID identifies the stored answer.
@@ -137,11 +160,19 @@ type Answer struct {
 	ToReplied bool
 	To        string
 	ID        int64
+	// Route is the path the turn took: RouteFull, RouteChat or
+	// RouteEscalated.
+	Route string
+	// ToolsUsed is how many tools the turn called.
+	ToolsUsed int
 }
 
 // Reply answers the user's message and saves the whole turn. Nothing is
 // saved when the turn fails.
 func (a *Agent) Reply(ctx context.Context, req Request) (Answer, error) {
+	if req.Inline {
+		return a.answerInline(ctx, req)
+	}
 	processed, err := a.opts.Store.UpdateProcessed(ctx, req.UpdateID)
 	if err != nil {
 		return Answer{}, err
@@ -197,6 +228,15 @@ type turn struct {
 	// toolAsText is set once the model wrote a tool call as text, so that
 	// the next request tells it to call the tool instead.
 	toolAsText bool
+	// askedAgain is set once the model answered nothing and was asked
+	// again; emptyReason is why it stopped, as the provider said; and
+	// noPictures once the provider's filter refused the turn with its
+	// pictures, which are then left out.
+	askedAgain  bool
+	emptyReason string
+	noPictures  bool
+	// route is the path the turn takes when it is not the chat one.
+	route string
 }
 
 // run alternates between the model and its tool calls until the model
@@ -204,6 +244,40 @@ type turn struct {
 // model is told to stop using tools, and after MaxToolCalls+2 requests the
 // turn fails with ErrToolLoop.
 func (a *Agent) run(ctx context.Context, t *turn) (Answer, error) {
+	if t.req.ToolsOnly {
+		return a.runToolsOnly(ctx, t)
+	}
+	if answer, done, err := a.tryChat(ctx, t); done {
+		return answer, err
+	}
+	if t.route == "" {
+		t.route = RouteFull
+	}
+	answer, err := a.runFull(ctx, t)
+	answer.Route = t.route
+	answer.ToolsUsed = t.toolsUsed
+	return answer, err
+}
+
+// runToolsOnly answers a turn past the day's limit only when a tool does:
+// talk, as the router finds it, never reaches the main model, and an
+// answer the main model gives without a tool is dropped.
+func (a *Agent) runToolsOnly(ctx context.Context, t *turn) (Answer, error) {
+	if a.opts.Router != nil && a.wantsChat(ctx, t) {
+		return Answer{}, ErrNotATool
+	}
+	t.route = RouteFull
+	answer, err := a.runFull(ctx, t)
+	if err == nil && t.toolsUsed == 0 {
+		return Answer{}, ErrNotATool
+	}
+	answer.Route = t.route
+	answer.ToolsUsed = t.toolsUsed
+	return answer, err
+}
+
+// runFull answers t with the main model and every tool the caller may use.
+func (a *Agent) runFull(ctx context.Context, t *turn) (Answer, error) {
 	definitions := a.opts.Tools.Definitions(ctx, t.req.UserID)
 	for range a.opts.MaxToolCalls + 2 {
 		reply, err := a.opts.Model.Complete(ctx, ai.Request{
@@ -215,6 +289,22 @@ func (a *Agent) run(ctx context.Context, t *turn) (Answer, error) {
 			return Answer{}, err
 		}
 		if len(reply.ToolCalls) == 0 {
+			if strings.TrimSpace(reply.Content) == "" {
+				t.emptyReason = reply.FinishReason
+				blocked := ai.Blocked(reply.FinishReason)
+				if blocked && len(t.req.Attachments) > 0 && !t.noPictures {
+					// A picture is likelier than words to be what the
+					// filter refused: ask again without it.
+					t.noPictures = true
+					continue
+				}
+				if !blocked && !t.askedAgain {
+					// Gemini now and then answers nothing at all, in a
+					// second; asked once more, it mostly answers.
+					t.askedAgain = true
+					continue
+				}
+			}
 			if !writesToolCall(reply.Content, definitions) {
 				return finish(t, reply)
 			}
@@ -259,8 +349,24 @@ func (a *Agent) prompt(t *turn) []ai.Message {
 		question.Content = t.req.Context + "\n\n" + question.Content
 	}
 	question.Parts = t.req.Attachments
+	if t.noPictures {
+		question.Parts = nil
+		question.Content += "\n\n" + noPicturesNote
+	}
+	if gameWords.MatchString(ownLine(t.req.Text)) {
+		question.Content += "\n\n" + heroCheckNote
+	}
 	return messages
 }
+
+// noPicturesNote goes with a question asked again without its pictures,
+// which the provider's filter refused.
+const noPicturesNote = "(The picture or video with this message could not be shown to you. Answer from the words and the conversation, and do not say you cannot see it unless it matters.)"
+
+// heroCheckNote goes with a question about a game's heroes, in that request
+// only: told in the persona alone, the model still named heroes from memory,
+// one of them made up, for a question asked as a joke.
+const heroCheckNote = "[Before you name, deny or compare any game hero in your answer, check it: Mobile Legends heroes with the mlbb tool (hero, or heroes for a list by role), another game's with web_search. Never from memory, even for a joke.]"
 
 func (a *Agent) systemPrompt(req Request) string {
 	if req.Group {
@@ -326,15 +432,33 @@ func cutToThem(answer string) (rest, to string, found bool) {
 	return strings.TrimSpace(answer[len(m[0]):]), strings.TrimSpace(m[1]), true
 }
 
+// emptyAnswer is ErrEmptyResponse, with why the model stopped when the
+// provider said.
+func emptyAnswer(t *turn) error {
+	if t.emptyReason == "" {
+		return ai.ErrEmptyResponse
+	}
+	if ai.Blocked(t.emptyReason) {
+		return fmt.Errorf("%w: %w (finish reason %s)", ai.ErrEmptyResponse, ai.ErrBlocked, t.emptyReason)
+	}
+	return fmt.Errorf("%w (finish reason %s)", ai.ErrEmptyResponse, t.emptyReason)
+}
+
 func finishText(t *turn, answer string) (Answer, error) {
 	if answer == "" {
-		return Answer{}, ai.ErrEmptyResponse
+		return Answer{}, emptyAnswer(t)
 	}
 	if isSilent(answer) {
 		return Answer{}, ErrSilent
 	}
 	if isThinking(answer) {
 		return Answer{}, ErrLeakedThinking
+	}
+	if rest, leaked := afterLeakedPlan(answer); leaked {
+		if !hasWords(rest) {
+			return Answer{}, ErrLeakedThinking
+		}
+		answer = rest
 	}
 	if marker := mediaMarkers.FindStringSubmatch(answer); marker != nil {
 		kind, media := strings.ToLower(marker[1]), strings.Join(strings.Fields(strings.ToLower(marker[2])), " ")
@@ -359,6 +483,25 @@ func finishText(t *turn, answer string) (Answer, error) {
 	}
 	t.messages = append(t.messages, ai.Message{Role: ai.RoleAssistant, Content: answer})
 	return Answer{Text: answer}, nil
+}
+
+// planSentence is a sentence of the plan Gemini sometimes writes, in
+// English, in front of its answer after a tool call: "Let's give a witty,
+// concise answer... Keep it short, one or two sentences.Hozirda...".
+var planSentence = regexp.MustCompile(`(?:Let's|Let me|I should|I need to|I'll|I will|The user|The owner|Keep it)\b[^.!?\n]*[.!?]`)
+
+// planWords are what such a plan talks about, and an answer seldom does.
+var planWords = regexp.MustCompile(`(?i)\b(?:concise|witty|answer|respond|reply|the user|the owner|keep it short|sentences)\b`)
+
+// afterLeakedPlan is the answer written after a leaked plan, and whether
+// answer starts with one: two plan sentences at least, one of them about
+// the answer itself, so that "Let me guess: 4." stays an answer.
+func afterLeakedPlan(answer string) (string, bool) {
+	sentences := planSentence.FindAllStringIndex(answer, -1)
+	if len(sentences) < 2 || sentences[0][0] != 0 || !planWords.MatchString(answer[:sentences[len(sentences)-1][1]]) {
+		return answer, false
+	}
+	return strings.TrimSpace(answer[sentences[len(sentences)-1][1]:]), true
 }
 
 // mediaMarkers finds "[sticker funny]", "[gif facepalm]" and a GIF of a

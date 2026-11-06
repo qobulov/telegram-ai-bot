@@ -1,5 +1,5 @@
 // Package ai is a client for OpenAI-compatible Chat Completions APIs, such as
-// Gemini's, xAI's and Groq's.
+// Gemini's and xAI's.
 package ai
 
 import (
@@ -22,6 +22,15 @@ const (
 // ErrEmptyResponse means the provider answered without any usable message.
 var ErrEmptyResponse = errors.New("ai: empty response")
 
+// ErrBlocked is an empty answer the provider gave because its content
+// filter refused the request; asked again unchanged, it refuses again.
+var ErrBlocked = errors.New("ai: the provider's filter refused the request")
+
+// Blocked reports a finish reason that is the provider's content filter.
+func Blocked(finishReason string) bool {
+	return strings.HasPrefix(finishReason, "content_filter")
+}
+
 // ErrTruncated is a reply the model ran out of tokens in before it was done:
 // a fragment of words, or of a tool call written out as words, that must not
 // be sent. Asking again would end the same way.
@@ -37,6 +46,9 @@ type Message struct {
 	// Parts are images or audio sent along with Content. They are only ever
 	// part of a request: they are not stored, and never come back in a reply.
 	Parts []ContentPart `json:"-"`
+	// FinishReason is why the model stopped, as the provider says, in a
+	// reply only: what an empty one is told by.
+	FinishReason string `json:"-"`
 }
 
 // ContentPart is one piece of a multimodal message.

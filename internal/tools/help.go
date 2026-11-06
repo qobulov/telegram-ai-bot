@@ -13,7 +13,6 @@ import (
 func Builtin(helpText string, location *time.Location) []Tool {
 	return []Tool{
 		currentTimeTool(location),
-		calculatorTool(),
 		helpTool(helpText),
 	}
 }

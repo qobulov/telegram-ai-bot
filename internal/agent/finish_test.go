@@ -9,7 +9,7 @@ import (
 	"telegram-ai-bot/internal/tools"
 )
 
-// finishingTools ends the turn from its tool, as make_presentation does.
+// finishingTools ends the turn from its tool, as music_search does.
 type finishingTools struct{ fakeTools }
 
 func (f *finishingTools) Execute(ctx context.Context, callerID int64, name, args string) string {

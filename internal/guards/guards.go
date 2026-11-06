@@ -1,7 +1,7 @@
 // Package guards asks outside services whether a member, a link or a
 // picture is to be kept out of a group: spam lists of Telegram accounts
-// (CAS, lols.bot), malicious links (Google Safe Browsing, URLhaus) and
-// nudity and gore in pictures (Sightengine). They answer only; the service acts.
+// (lols.bot, and CAS with its key), malicious links (Google Safe Browsing, URLhaus) and
+// nudity in pictures (Sightengine). They answer only; the service acts.
 package guards
 
 import (
@@ -29,6 +29,7 @@ const (
 type Options struct {
 	HTTPClient        *http.Client
 	CAS, Lols         string
+	CASKey            string
 	URLhaus           string
 	URLhausKey        string
 	SafeBrowsing      string
@@ -76,28 +77,73 @@ func (c *Checker) CanCheckImages() bool {
 	return c.opts.SightengineUser != "" && c.opts.SightengineSecret != ""
 }
 
-// Spammer reports whether a Telegram account is on a spam list, and which.
-// One list failing does not hide the other's answer.
+// Spammer reports whether a Telegram account is on a spam list, and which:
+// lols.bot always, CAS when its key is set. One list failing does not hide
+// the other's answer.
 func (c *Checker) Spammer(ctx context.Context, userID int64) (string, bool, error) {
-	var cas struct {
-		OK bool `json:"ok"`
+	var errs []error
+	if c.opts.CASKey != "" {
+		listed, err := c.casListed(ctx, userID)
+		if listed {
+			return "CAS", true, nil
+		}
+		if err != nil {
+			errs = append(errs, err)
+		}
 	}
-	casErr := c.getJSON(ctx, c.opts.CAS+"/check?user_id="+strconv.FormatInt(userID, 10), nil, &cas)
-	if casErr == nil && cas.OK {
-		return "CAS", true, nil
-	}
-	var lols struct {
-		OK     bool `json:"ok"`
-		Banned bool `json:"banned"`
-	}
-	lolsErr := c.getJSON(ctx, c.opts.Lols+"/account?id="+strconv.FormatInt(userID, 10), nil, &lols)
-	if lolsErr == nil && lols.Banned {
+	listed, err := c.lolsListed(ctx, userID)
+	if listed {
 		return "lols.bot", true, nil
 	}
-	if casErr != nil && lolsErr != nil {
-		return "", false, fmt.Errorf("guards: spam lists: %w; %w", casErr, lolsErr)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 && len(errs) == c.spamLists() {
+		return "", false, fmt.Errorf("guards: spam lists: %w", errors.Join(errs...))
 	}
 	return "", false, nil
+}
+
+// spamLists is how many spam lists are asked.
+func (c *Checker) spamLists() int {
+	if c.opts.CASKey != "" {
+		return 2
+	}
+	return 1
+}
+
+// casListed asks CAS, which now answers only with a Combot API key:
+// without one every question was a 401 "API key required". The key goes in
+// a header, so that it is in no URL an error or a log could show.
+func (c *Checker) casListed(ctx context.Context, userID int64) (bool, error) {
+	var answer struct {
+		OK bool `json:"ok"`
+	}
+	header := http.Header{"Authorization": {"Bearer " + c.opts.CASKey}}
+	err := c.getJSON(ctx, c.opts.CAS+"/check?user_id="+strconv.FormatInt(userID, 10), header, &answer)
+	return err == nil && answer.OK, err
+}
+
+// lolsListed asks lols.bot from its own records only ("quick"), a third
+// faster than a full lookup. A connection it drops is asked once more: it
+// now and then reset one, and the member went unchecked.
+func (c *Checker) lolsListed(ctx context.Context, userID int64) (bool, error) {
+	var answer struct {
+		Banned bool `json:"banned"`
+	}
+	link := c.opts.Lols + "/account?id=" + strconv.FormatInt(userID, 10) + "&quick"
+	err := c.getJSON(ctx, link, nil, &answer)
+	if dropped(ctx, err) {
+		err = c.getJSON(ctx, link, nil, &answer)
+	}
+	return err == nil && answer.Banned, err
+}
+
+// dropped reports a request that failed on the way rather than with an
+// answer, while there is still time to ask again.
+func dropped(ctx context.Context, err error) bool {
+	var transport *url.Error
+	return err != nil && ctx.Err() == nil && errors.As(err, &transport)
 }
 
 // MaliciousLink reports whether a link is to malware, phishing or unwanted
@@ -210,17 +256,18 @@ func (c *Checker) urlhausHost(ctx context.Context, host string) (string, bool, e
 	return "", false, nil
 }
 
-// unsafeScore is the probability above which a picture is taken as nude or
-// gory.
+// unsafeScore is the probability above which a picture is taken as nude.
 const unsafeScore = 0.7
 
-// UnsafeImage reports whether Sightengine sees nudity or gore in a picture,
-// and what. The picture is uploaded: a Telegram file link would give away
-// the bot's token.
+// UnsafeImage reports whether Sightengine sees nudity in a picture. Each
+// model is an operation of the plan, and with gore checked too the guarded
+// groups' two hundred pictures a day spent the free plan's month in days.
+// The picture is uploaded: a Telegram file link would give away the bot's
+// token.
 func (c *Checker) UnsafeImage(ctx context.Context, image []byte) (string, bool, error) {
 	var body bytes.Buffer
 	form := multipart.NewWriter(&body)
-	_ = form.WriteField("models", "nudity-2.1,gore-2.0")
+	_ = form.WriteField("models", "nudity-2.1")
 	_ = form.WriteField("api_user", c.opts.SightengineUser)
 	_ = form.WriteField("api_secret", c.opts.SightengineSecret)
 	part, err := form.CreateFormFile("media", "image.jpg")
@@ -239,9 +286,6 @@ func (c *Checker) UnsafeImage(ctx context.Context, image []byte) (string, bool, 
 			Message string `json:"message"`
 		} `json:"error"`
 		Nudity map[string]any `json:"nudity"`
-		Gore   struct {
-			Prob float64 `json:"prob"`
-		} `json:"gore"`
 	}
 	if err := c.postJSON(ctx, c.opts.Sightengine+"/1.0/check.json", http.Header{"Content-Type": {form.FormDataContentType()}}, &body, &answer); err != nil {
 		return "", false, err
@@ -249,13 +293,10 @@ func (c *Checker) UnsafeImage(ctx context.Context, image []byte) (string, bool, 
 	if answer.Status != "success" {
 		return "", false, fmt.Errorf("guards: Sightengine: %s", answer.Error.Message)
 	}
-	for _, class := range []string{"sexual_activity", "sexual_display", "erotica"} {
+	for _, class := range []string{"sexual_activity", "sexual_display", "erotica", "very_suggestive"} {
 		if score, ok := answer.Nudity[class].(float64); ok && score >= unsafeScore {
 			return "nudity", true, nil
 		}
-	}
-	if answer.Gore.Prob >= unsafeScore {
-		return "gore", true, nil
 	}
 	return "", false, nil
 }
@@ -286,10 +327,32 @@ func (c *Checker) do(ctx context.Context, method, link string, header http.Heade
 		return fmt.Errorf("guards: %s: %w", req.URL.Host, err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("guards: %s answered %d", req.URL.Host, resp.StatusCode)
+		return fmt.Errorf("guards: %s answered %d%s", req.URL.Host, resp.StatusCode, refusalReason(raw))
 	}
 	if err := json.Unmarshal(raw, into); err != nil {
 		return fmt.Errorf("guards: %s: %w", req.URL.Host, err)
 	}
 	return nil
+}
+
+// refusalReason is the reason a service gave with a refusal, such as
+// Sightengine's "monthly limit reached" or CAS's "API key required", which
+// a bare 400 or 401 left unknown.
+func refusalReason(raw []byte) string {
+	var answer struct {
+		Error struct {
+			Type    string `json:"type"`
+			Message string `json:"message"`
+		} `json:"error"`
+		Description string `json:"description"`
+	}
+	switch {
+	case json.Unmarshal(raw, &answer) != nil:
+		return ""
+	case answer.Error.Message != "":
+		return fmt.Sprintf(": %s (%s)", answer.Error.Message, answer.Error.Type)
+	case answer.Description != "":
+		return ": " + answer.Description
+	}
+	return ""
 }

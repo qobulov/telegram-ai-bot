@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>Guruh statistikasi</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="app" aria-live="polite">
+    <header class="head">
+      <div>
+        <p class="eyebrow" id="eyebrow">Statistika</p>
+        <h1 id="title">…</h1>
+      </div>
+      <div class="period" id="period" role="group" hidden>
+        <button type="button" data-period="today" aria-pressed="true">Bugun</button>
+        <button type="button" data-period="week" aria-pressed="false">7 kun</button>
+      </div>
+    </header>
+
+    <section id="state" class="state" hidden></section>
+
+    <section id="groups" class="card" hidden>
+      <h2 data-t="groups">Guruhlaringiz</h2>
+      <ul class="groups" id="groupList"></ul>
+    </section>
+
+    <div id="dashboard" hidden>
+      <section class="tiles">
+        <div class="tile"><span class="tile-value" id="messages">0</span><span class="tile-label" data-t="messages">xabar</span></div>
+        <div class="tile"><span class="tile-value" id="members">0</span><span class="tile-label" data-t="members">a'zo yozdi</span></div>
+        <div class="tile"><span class="tile-value" id="peak">—</span><span class="tile-label" data-t="peak">eng qizg'in soat</span></div>
+      </section>
+
+      <section class="card">
+        <h2 data-t="hours">Soatlar bo'yicha xabarlar</h2>
+        <div class="hours" id="hours" role="img"></div>
+        <div class="axis" aria-hidden="true"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div>
+        <p class="tip" id="hourTip" aria-live="polite"></p>
+      </section>
+
+      <section class="card">
+        <h2 data-t="top">Eng faol a'zolar</h2>
+        <ol class="ranks" id="top"></ol>
+      </section>
+
+      <section class="card">
+        <h2 data-t="guards">Himoyalar</h2>
+        <ul class="guards" id="guards"></ul>
+      </section>
+
+      <section class="card">
+        <h2 data-t="swearers">Eng ko'p so'kinganlar</h2>
+        <ol class="ranks swear" id="swearers"></ol>
+      </section>
+
+      <p class="note" id="note"></p>
+    </div>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -12,33 +12,77 @@ import (
 // Update is one incoming event: a message, or a change to the bot's own or
 // another member's membership in a chat. Each kind the update is not is nil.
 type Update struct {
-	UpdateID     int64              `json:"update_id"`
-	Message      *Message           `json:"message"`
-	MyChatMember *ChatMemberUpdated `json:"my_chat_member"`
-	ChatMember   *ChatMemberUpdated `json:"chat_member"`
+	UpdateID int64    `json:"update_id"`
+	Message  *Message `json:"message"`
+	// EditedMessage is the new version of a message someone edited.
+	EditedMessage *Message           `json:"edited_message"`
+	MyChatMember  *ChatMemberUpdated `json:"my_chat_member"`
+	ChatMember    *ChatMemberUpdated `json:"chat_member"`
 	// CallbackQuery is a press of a button under one of the bot's messages.
 	CallbackQuery *CallbackQuery `json:"callback_query"`
-	// Poll is a new state of a poll the bot sent, such as a quiz closing
-	// when its time is up; PollAnswer is someone's answer to a poll the bot
-	// sent that is not anonymous.
-	Poll       *Poll       `json:"poll"`
-	PollAnswer *PollAnswer `json:"poll_answer"`
+	// InlineQuery is someone typing "@bot words" in a chat, for the bot to
+	// answer with something to post.
+	InlineQuery *InlineQuery `json:"inline_query"`
+	// PreCheckoutQuery is Telegram asking, before it takes a payment for
+	// one of the bot's invoices, whether to go ahead.
+	PreCheckoutQuery *PreCheckoutQuery `json:"pre_checkout_query"`
+	// ChatJoinRequest is someone asking to join a group whose admins approve
+	// new members. Telegram sends it only where the bot may invite users.
+	ChatJoinRequest *ChatJoinRequest `json:"chat_join_request"`
+	// BusinessConnection is a Telegram Business account connecting the bot
+	// as its chatbot, changing what it may do, or disconnecting it.
+	BusinessConnection *BusinessConnection `json:"business_connection"`
+	// BusinessMessage is a message in a chat of a connected business
+	// account: one a customer wrote to it, or one its owner wrote there.
+	BusinessMessage *Message `json:"business_message"`
+	// ChatBoost is a boost added to, or changed in, a chat where the bot
+	// is an admin.
+	ChatBoost *ChatBoostUpdated `json:"chat_boost"`
 }
 
-// PollAnswer is an answer to a poll that is not anonymous.
-type PollAnswer struct {
-	PollID    string `json:"poll_id"`
-	User      *User  `json:"user"`
-	OptionIDs []int  `json:"option_ids"`
+// ChatBoostUpdated is a boost given to a chat, or one given before that
+// changed, such as by being renewed: Telegram sends one boost again then.
+type ChatBoostUpdated struct {
+	Chat  Chat      `json:"chat"`
+	Boost ChatBoost `json:"boost"`
+}
+
+// ChatBoost is one boost. Its ID tells a new boost from one sent again.
+type ChatBoost struct {
+	BoostID string          `json:"boost_id"`
+	Source  ChatBoostSource `json:"source"`
+}
+
+// ChatBoostSource is where a boost came from: "premium", a member's own;
+// "gift_code" or "giveaway", one given to them. User is who holds it, and
+// is nil for a giveaway nobody won.
+type ChatBoostSource struct {
+	Source string `json:"source"`
+	User   *User  `json:"user"`
+}
+
+// ChatJoinRequest is a request to join a group: who asks, and the private
+// chat with them, which the bot may write to for a few minutes though they
+// never started it.
+type ChatJoinRequest struct {
+	Chat       Chat  `json:"chat"`
+	From       *User `json:"from"`
+	UserChatID int64 `json:"user_chat_id"`
+	// Date is when they asked, in Unix seconds.
+	Date int64 `json:"date"`
 }
 
 // CallbackQuery is a press of a button with callback data: who pressed it,
-// under which message, and the button's data.
+// under which message, and the button's data. A press of a game's Play
+// button has the game's short name instead of data, and, for a game sent in
+// inline mode, the inline message's ID instead of the message.
 type CallbackQuery struct {
-	ID      string   `json:"id"`
-	From    *User    `json:"from"`
-	Message *Message `json:"message"`
-	Data    string   `json:"data"`
+	ID              string   `json:"id"`
+	From            *User    `json:"from"`
+	Message         *Message `json:"message"`
+	InlineMessageID string   `json:"inline_message_id"`
+	Data            string   `json:"data"`
+	GameShortName   string   `json:"game_short_name"`
 }
 
 // ChatMemberUpdated reports that the bot, or another member, was added to,
@@ -54,7 +98,9 @@ type ChatMemberUpdated struct {
 // documents and other non-text content; a photo or document may carry a
 // Caption instead.
 type Message struct {
-	MessageID       int64           `json:"message_id"`
+	MessageID int64 `json:"message_id"`
+	// Date is when it was sent, in Unix seconds.
+	Date            int64           `json:"date"`
 	From            *User           `json:"from"`
 	Chat            Chat            `json:"chat"`
 	Text            string          `json:"text"`
@@ -64,6 +110,9 @@ type Message struct {
 	// ReplyToMessage is the message this one replies to, if any. In a forum
 	// topic it may be only the topic's first message; see
 	// ImplicitTopicReply.
+	// SenderTag is the sender's tag, or an admin's title, as the group shows
+	// it by their name; supergroups only.
+	SenderTag      string   `json:"sender_tag,omitempty"`
 	ReplyToMessage *Message `json:"reply_to_message"`
 	// MessageThreadID is, for a message in a forum topic, the topic: the ID
 	// of the service message that created it.
@@ -78,6 +127,12 @@ type Message struct {
 	IsAutomaticForward bool `json:"is_automatic_forward"`
 	// ForwardOrigin says where a forwarded message first came from.
 	ForwardOrigin *MessageOrigin `json:"forward_origin"`
+	// BusinessConnectionID is, for a message in a chat of a business
+	// account, the connection it came through, which an answer is sent on.
+	BusinessConnectionID string `json:"business_connection_id"`
+	// SenderBusinessBot is the bot that sent a business account's message
+	// on its behalf, when a bot did.
+	SenderBusinessBot *User `json:"sender_business_bot"`
 
 	// Service messages: members who joined or left. They carry no text.
 	NewChatMembers []User `json:"new_chat_members"`
@@ -86,6 +141,11 @@ type Message struct {
 	// its kind, such as "pinned_message" (see serviceKinds), and "" for a
 	// message someone wrote. Only the kind is kept.
 	Service string `json:"-"`
+	// SuccessfulPayment is set on the service message saying a user paid
+	// one of the bot's invoices, and RefundedPayment on the one saying a
+	// payment was given back.
+	SuccessfulPayment *SuccessfulPayment `json:"successful_payment"`
+	RefundedPayment   *RefundedPayment   `json:"refunded_payment"`
 
 	// Media. At most one of these is set on a message, except that Telegram
 	// also sets Document on a GIF, for clients that predate Animation.
@@ -194,12 +254,14 @@ type PhotoSize struct {
 type Sticker struct {
 	FileID string `json:"file_id"`
 	// FileUniqueID stays the same for a sticker, unlike FileID.
-	FileUniqueID string     `json:"file_unique_id"`
-	Emoji        string     `json:"emoji"`
-	IsAnimated   bool       `json:"is_animated"`
-	IsVideo      bool       `json:"is_video"`
-	FileSize     int64      `json:"file_size"`
-	Thumbnail    *PhotoSize `json:"thumbnail"`
+	FileUniqueID string `json:"file_unique_id"`
+	Emoji        string `json:"emoji"`
+	// SetName is the pack the sticker is from; empty for one in no pack.
+	SetName    string     `json:"set_name"`
+	IsAnimated bool       `json:"is_animated"`
+	IsVideo    bool       `json:"is_video"`
+	FileSize   int64      `json:"file_size"`
+	Thumbnail  *PhotoSize `json:"thumbnail"`
 }
 
 // StickerSet is a sticker pack.
@@ -229,6 +291,7 @@ type Video struct {
 	FileID    string     `json:"file_id"`
 	Duration  int        `json:"duration"` // seconds
 	Thumbnail *PhotoSize `json:"thumbnail"`
+	FileSize  int64      `json:"file_size"`
 }
 
 // VideoNote is a round video message.
@@ -236,14 +299,16 @@ type VideoNote struct {
 	FileID    string     `json:"file_id"`
 	Duration  int        `json:"duration"` // seconds
 	Thumbnail *PhotoSize `json:"thumbnail"`
+	FileSize  int64      `json:"file_size"`
 }
 
 // Document is a file sent as a file rather than as a photo or video.
 type Document struct {
-	FileID   string `json:"file_id"`
-	FileName string `json:"file_name"`
-	MimeType string `json:"mime_type"`
-	FileSize int64  `json:"file_size"`
+	FileID       string `json:"file_id"`
+	FileUniqueID string `json:"file_unique_id"`
+	FileName     string `json:"file_name"`
+	MimeType     string `json:"mime_type"`
+	FileSize     int64  `json:"file_size"`
 }
 
 // Audio is a music file, as opposed to a Voice message.
@@ -252,6 +317,7 @@ type Audio struct {
 	Duration  int    `json:"duration"` // seconds
 	Title     string `json:"title"`
 	Performer string `json:"performer"`
+	FileSize  int64  `json:"file_size"`
 }
 
 // Poll is a poll someone posted in a chat.
@@ -260,11 +326,15 @@ type Poll struct {
 	Question string       `json:"question"`
 	Options  []PollOption `json:"options"`
 	IsClosed bool         `json:"is_closed"`
+	// TotalVoterCount is how many people voted, each once however many
+	// answers they picked.
+	TotalVoterCount int `json:"total_voter_count"`
 }
 
-// PollOption is one answer of a Poll.
+// PollOption is one answer of a Poll, with the votes it has.
 type PollOption struct {
-	Text string `json:"text"`
+	Text       string `json:"text"`
+	VoterCount int    `json:"voter_count"`
 }
 
 // User is a Telegram account: the sender of a message, or the bot itself.
@@ -292,9 +362,16 @@ type ChatMember struct {
 	// CustomTitle is an admin's title in the group, shown instead of
 	// "admin".
 	CustomTitle string `json:"custom_title,omitempty"`
+	// Tag is a regular or restricted member's tag, shown by their name.
+	Tag string `json:"tag,omitempty"`
 	// IsAnonymous is true for an admin who posts in the group's name, hiding
 	// who they are.
 	IsAnonymous bool `json:"is_anonymous,omitempty"`
+
+	// ChatPermissions are a restricted member's: what they may still send.
+	// can_change_info, can_invite_users, can_pin_messages and
+	// can_manage_topics land in the fields below, which share their names.
+	ChatPermissions
 
 	CanDeleteMessages  bool `json:"can_delete_messages,omitempty"`
 	CanRestrictMembers bool `json:"can_restrict_members,omitempty"`
@@ -303,6 +380,9 @@ type ChatMember struct {
 	CanChangeInfo      bool `json:"can_change_info,omitempty"`
 	CanInviteUsers     bool `json:"can_invite_users,omitempty"`
 	CanManageTopics    bool `json:"can_manage_topics,omitempty"`
+	CanManageTags      bool `json:"can_manage_tags,omitempty"`
+	// CanPostMessages is a channel admin's right to post there.
+	CanPostMessages bool `json:"can_post_messages,omitempty"`
 }
 
 // Admin rights, named as in the Bot API. Moderation checks that both the
@@ -315,6 +395,9 @@ const (
 	RightChangeInfo      = "can_change_info"
 	RightInviteUsers     = "can_invite_users"
 	RightManageTopics    = "can_manage_topics"
+	RightManageTags      = "can_manage_tags"
+	// RightPostMessages exists in channels only.
+	RightPostMessages = "can_post_messages"
 )
 
 // adminRight ties a right's Bot API name to the field that holds it.
@@ -333,6 +416,8 @@ var adminRights = []adminRight{
 	{RightChangeInfo, func(m ChatMember) bool { return m.CanChangeInfo }},
 	{RightInviteUsers, func(m ChatMember) bool { return m.CanInviteUsers }},
 	{RightManageTopics, func(m ChatMember) bool { return m.CanManageTopics }},
+	{RightManageTags, func(m ChatMember) bool { return m.CanManageTags }},
+	{RightPostMessages, func(m ChatMember) bool { return m.CanPostMessages }},
 }
 
 // Has reports whether the member holds an admin right. Anyone who is not
@@ -395,13 +480,34 @@ type Chat struct {
 	// Title and Username are set for groups; Username only for public ones.
 	Title    string `json:"title,omitempty"`
 	Username string `json:"username,omitempty"`
+	// FirstName is, for a private chat, the other person's first name.
+	FirstName string `json:"first_name,omitempty"`
+	// IsForum marks a supergroup whose messages are kept in topics.
+	IsForum bool `json:"is_forum,omitempty"`
+	// getChat alone sets the rest: what members of a group may do by
+	// default, its description, its photo, its latest pinned message, and
+	// its sticker pack and whether the bot may set one.
+	Permissions      *ChatPermissions `json:"permissions,omitempty"`
+	Description      string           `json:"description,omitempty"`
+	Photo            *ChatPhoto       `json:"photo,omitempty"`
+	PinnedMessage    *Message         `json:"pinned_message,omitempty"`
+	StickerSetName   string           `json:"sticker_set_name,omitempty"`
+	CanSetStickerSet bool             `json:"can_set_sticker_set,omitempty"`
 }
 
-// Chat types. Channels are not handled by the bot.
+// ChatPhoto is a group's photo; BigFileID downloads it at 640×640.
+type ChatPhoto struct {
+	BigFileID string `json:"big_file_id"`
+}
+
+// Chat types. A channel's posts are not handled by the bot; only its
+// standing there is recorded, for its owners' broadcasts. In a group a
+// message may be posted on behalf of one.
 const (
 	ChatTypePrivate    = "private"
 	ChatTypeGroup      = "group"
 	ChatTypeSupergroup = "supergroup"
+	ChatTypeChannel    = "channel"
 )
 
 // Outgoing is a text message to send.
@@ -413,14 +519,35 @@ type Outgoing struct {
 	ReplyToMessageID int64
 	// Buttons are link buttons under the message, in rows.
 	Buttons [][]Button
+	// BusinessConnectionID, when set, sends the message on behalf of the
+	// business account of that connection, into one of its chats.
+	BusinessConnectionID string
+	// Keyboard, in a private chat, puts buttons in rows in place of the
+	// phone's keyboard, each sending its own text as if typed; it stays
+	// after the message. A message has Buttons or Keyboard, not both.
+	Keyboard [][]string
+	// Effect is the ID of an animation played over the message, such as
+	// EffectParty, which Telegram plays only in private chats.
+	Effect string
+	// Ask, when set, opens the reply box on the message with Ask as its
+	// hint, so that what the user writes next answers it: a question the
+	// bot asks.
+	Ask string
 }
 
+// EffectParty is the 🎉 message effect, one of the few Telegram offers in
+// every private chat. A message whose effect Telegram refuses goes without.
+const EffectParty = "5046509860389126442"
+
 // Button is a button under a message that opens a link, or, with Data,
-// tells the bot it was pressed without writing anything in the chat.
+// tells the bot it was pressed without writing anything in the chat, or,
+// with WebApp, opens a Mini App, which Telegram allows in private chats
+// only.
 type Button struct {
-	Text string `json:"text"`
-	URL  string `json:"url,omitempty"`
-	Data string `json:"callback_data,omitempty"`
+	Text   string      `json:"text"`
+	URL    string      `json:"url,omitempty"`
+	Data   string      `json:"callback_data,omitempty"`
+	WebApp *WebAppInfo `json:"web_app,omitempty"`
 }
 
 // ChatPermissions is what a member may do in a group. Every field is always
@@ -476,6 +603,17 @@ func AllPermissions() ChatPermissions {
 func NoStickers() ChatPermissions {
 	p := AllPermissions()
 	p.CanSendOtherMessages = false
+	return p
+}
+
+// Permissions is what the member may do now: everything unless Telegram
+// has them restricted.
+func (m ChatMember) Permissions() ChatPermissions {
+	if m.Status != "restricted" {
+		return AllPermissions()
+	}
+	p := m.ChatPermissions
+	p.CanChangeInfo, p.CanInviteUsers, p.CanPinMessages, p.CanManageTopics = m.CanChangeInfo, m.CanInviteUsers, m.CanPinMessages, m.CanManageTopics
 	return p
 }
 

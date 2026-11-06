@@ -13,12 +13,16 @@ import (
 const (
 	// maxMembersListed bounds the list, the most recently seen first: a
 	// long list costs the model more than it helps.
-	maxMembersListed = 50
+	maxMembersListed = 200
 	// memberEntryBytes is the most a listed member takes besides the texts.
 	memberEntryBytes = 150
+	// memberTagBytes is the most a tag takes besides its name: the link to
+	// an ID of up to 19 digits.
+	memberTagBytes = 50
 	// membersOutputBytes fits maxMembersListed members, each name at its
-	// longest and cut with "…", and the notes.
-	membersOutputBytes = maxMembersListed*((maxAdminNameRunes+maxAdminUsernameRunes+2)*maxEncodedRuneBytes+memberEntryBytes) + 1500
+	// longest and cut with "…", written twice for a member tagged by it, and
+	// the notes.
+	membersOutputBytes = maxMembersListed*((2*maxAdminNameRunes+maxAdminUsernameRunes+2)*maxEncodedRuneBytes+memberEntryBytes+memberTagBytes) + 1500
 	memberTimeLayout   = "2 Jan 15:04"
 )
 
@@ -58,7 +62,10 @@ type memberEntry struct {
 	Role     string `json:"role,omitempty"`
 	Owner    bool   `json:"owner,omitempty"`
 	Bot      bool   `json:"bot,omitempty"`
-	LastSeen string `json:"last_seen"`
+	LastSeen string `json:"last_seen,omitempty"`
+	// Tag tags a member without a @username: written as it is, it becomes
+	// their name, linked so that Telegram tells them.
+	Tag string `json:"tag,omitempty"`
 }
 
 type membersResult struct {
@@ -68,6 +75,17 @@ type membersResult struct {
 	Note    string        `json:"note"`
 }
 
+// memberTag is how the model tags a member without a @username: the
+// telegram client sends it as their name linked to their ID. Brackets in
+// the name would end the link early, so they are dropped.
+func memberTag(name string, userID int64) string {
+	name = strings.NewReplacer("[", "", "]", "", "\n", " ").Replace(name)
+	if strings.TrimSpace(name) == "" {
+		name = "member"
+	}
+	return fmt.Sprintf("[%s](tg://user?id=%d)", name, userID)
+}
+
 // MembersTool lets anyone in a group ask who is in it. The Bot API cannot
 // list a group's members, so the bot keeps the list of those it has seen;
 // the group is the one the turn is in, never one the model names.
@@ -75,7 +93,8 @@ func MembersTool(opts MembersOptions) Tool {
 	return Tool{
 		Name: "group_members",
 		Description: "List the members you have seen in this group, the admins among them marked, with how many members the group has. " +
-			"Use it when someone asks who is in the group, who the regular members are or how many members there are; group_admins lists only the admins.",
+			"Use it when someone asks who is in the group, who the regular members are or how many members there are; group_admins lists only the admins. " +
+			"Use it too when asked to call, wake or tag members (\"uyg'ot\", \"chaqir\", \"teg qil\") whose @username is not in front of you: tag them by the @username listed here; a member without one is tagged by writing their tag exactly as listed, such as [Mayor](tg://user?id=123): it shows as their name and tells them.",
 		Schema:         json.RawMessage(`{"type": "object", "properties": {}, "additionalProperties": false}`),
 		GroupOnly:      true,
 		MaxOutputBytes: membersOutputBytes,
@@ -102,9 +121,11 @@ func listMembers(ctx context.Context, opts MembersOptions, raw json.RawMessage) 
 	total, _ := opts.Telegram.GetChatMemberCount(ctx, caller.ChatID)
 	admins, adminErr := opts.Telegram.GetChatAdministrators(ctx, caller.ChatID)
 	roles := map[int64]string{}
+	unseen := map[int64]bool{}
 	for _, admin := range admins {
 		if admin.User != nil && !admin.IsAnonymous {
 			roles[admin.User.ID] = admin.Status
+			unseen[admin.User.ID] = true
 		}
 	}
 	location := opts.Location
@@ -122,8 +143,26 @@ func listMembers(ctx context.Context, opts MembersOptions, raw json.RawMessage) 
 		}
 		if m.Username != "" {
 			entry.Username = cutRunes("@"+m.Username, maxAdminUsernameRunes)
+		} else if !m.IsBot {
+			entry.Tag = memberTag(entry.Name, m.UserID)
 		}
 		result.Members = append(result.Members, entry)
+		delete(unseen, m.UserID)
+	}
+	// Admins who never wrote are members all the same, bots such as this one
+	// aside. When the list is cut, one missing from it may be among those
+	// left out, so none is added.
+	for _, admin := range admins {
+		if admin.User == nil || admin.IsAnonymous || admin.User.IsBot || !unseen[admin.User.ID] || known > len(members) || len(result.Members) >= maxMembersListed {
+			continue
+		}
+		entry := memberEntry{Name: cutRunes(strings.TrimSpace(admin.User.FirstName), maxAdminNameRunes), Role: admin.Status,
+			Owner: opts.Owners[admin.User.ID], Bot: admin.User.IsBot}
+		if admin.User.Username != "" {
+			entry.Username = cutRunes("@"+admin.User.Username, maxAdminUsernameRunes)
+		}
+		result.Members = append(result.Members, entry)
+		result.Known++
 	}
 	notes := []string{membersNote}
 	if adminErr != nil {

@@ -4,7 +4,7 @@ A Telegram chat character written in Go: a playful, quick-witted group-chat
 regular (called Maria unless you rename her) rather than a neutral assistant.
 She answers through [Google Gemini](https://ai.google.dev), remembers
 conversations in PostgreSQL, and can call a small set of tools that are
-checked in code (current time, calculator, bot help, drawing, polls and quizzes, a
+checked in code (current time, bot help, drawing, polls, dice, a
 group's admin list, moderation for group admins, and live data: exchange
 rates, weather, prayer times, news headlines, Wikipedia, football and crypto
 prices).
@@ -17,7 +17,8 @@ prices).
 - Group admins can mute her with `/mute`, and have her delete, pin, mute or
   ban by replying to a message and then saying yes to her question; see
   [Groups](#groups).
-- Replies in the chat's language (Uzbek, Russian, English).
+- Replies in the chat's language (Uzbek, Russian, English), and in any chat
+  through inline mode (`@bot question?`).
 - Long polling: no public port, domain or TLS certificate needed.
 - One dependency besides the Go standard library: `pgx` for PostgreSQL.
 - Tests run without Telegram or model provider credentials.
@@ -34,31 +35,108 @@ prices).
 8. [Drawing pictures](#drawing-pictures)
 9. [Live data](#live-data)
 10. [Daily limit in private chats](#daily-limit-in-private-chats)
-11. [Groups](#groups)
-12. [VPS deployment (systemd)](#vps-deployment-systemd)
-13. [Docker Compose deployment (optional)](#docker-compose-deployment-optional)
-14. [Vercel deployment (webhook)](#vercel-deployment-webhook)
-15. [Backup and restore](#backup-and-restore)
-16. [Long polling and webhooks](#long-polling-and-webhooks)
-17. [Security checklist](#security-checklist)
-18. [Troubleshooting](#troubleshooting)
+11. [Inline mode](#inline-mode)
+12. [Telegram Business](#telegram-business)
+13. [Groups](#groups)
+14. [VPS deployment (systemd)](#vps-deployment-systemd)
+15. [Docker Compose deployment (optional)](#docker-compose-deployment-optional)
+16. [Vercel deployment (webhook)](#vercel-deployment-webhook)
+17. [Backup and restore](#backup-and-restore)
+18. [Long polling and webhooks](#long-polling-and-webhooks)
+19. [Security checklist](#security-checklist)
+20. [Troubleshooting](#troubleshooting)
 
 ## Architecture
 
 ```text
 cmd/bot/main.go                 long-polling command; migrate and webhook subcommands
 api/webhook.go                  serverless function that receives updates by webhook
+api/stats.go, api/game.go       serverless functions behind the dashboard and the games
+api/raid.go                     serverless function behind Dev jangi, the boss raid
+api/shashka.go                  serverless function behind the draughts Mini App
+public/stats, public/game       static pages: the group dashboard Mini App, Tarozi, and under game/ Kosmik ilon, O'tinchi and Dev jangi
+public/shashka                  static page: the draughts Mini App
 internal/app                    assembles the bot for either way of running it
+internal/miniapp                the dashboard's API: Telegram init data check, membership check, statistics
+internal/game                   the games Tarozi, Kosmik ilon and O'tinchi: signed sessions, dealing plays, scoring them
+internal/raid                   Dev jangi, the boss raid: a chat's shared boss, hits counted on the server, upgrades, kill announcements
+internal/dooz                   dooz (noughts and crosses): the board, its encoding in buttons, the bot's moves
+internal/shashka                Russian draughts: the rules, the position's encoding, the bot's search
+internal/shashkaapp             the draughts Mini App's API: init data check, invites, the queue, moves, clocks, ratings
 internal/webhook                HTTP handler for webhook updates, with secret check
 internal/config                 load .env + environment, validate
 internal/telegram               Bot API client: long polling, sending, message splitting
 internal/ai                     Model client: types, retries, tool-calling format
-internal/tools                  tool registry + time, calculator, help, drawing, polls, quizzes, admin list, moderation, owners' tools
+internal/tools                  tool registry + time, help, drawing, polls, dice, admin list, moderation, owners' tools
 internal/webapi                 live-data tools: rates, weather, prayer times, news, Wikipedia, football, crypto
 internal/storage                pgx pool, migrations, conversation queries
 internal/storage/migrations     SQL migrations, embedded in the binary
 internal/agent                  one conversation turn and the tool-calling loop
 internal/service                update dispatch: commands, rate limit, worker pool
+internal/cards                  Kartalar, the anime card collection: rarities and odds, AniList's catalog, the Mini App's API
+public/kartalar                 static page: the Kartalar Mini App
+docs/codemap                    a map of the code to explore in a browser (make codemap, from graphify's graph)
+```
+
+How the packages use each other; [the code map](https://qobulov.github.io/telegram-ai-bot/codemap/)
+shows every file and function, searchable:
+
+```mermaid
+flowchart TD
+  subgraph entry["Entry points"]
+    api["api/ · Vercel functions<br/>webhook, game, mafia, raid, cleanup"]
+    cmd["cmd/bot · long polling"]
+  end
+
+  app["internal/app<br/>wires everything"]
+
+  subgraph core["Conversation"]
+    service["internal/service<br/>commands, ads, announcements, guards"]
+    agent["internal/agent<br/>model loop, tool calls"]
+    ai["internal/ai<br/>Gemini client"]
+  end
+
+  subgraph abilities["Abilities"]
+    tools["internal/tools<br/>moderate, send_to_groups, leave_chat…"]
+    webapi["internal/webapi<br/>mlbb, weather, currency, football…"]
+    stickers["internal/stickers"]
+  end
+
+  subgraph games["Games & mini apps"]
+    game["internal/game"]
+    mafia["mafia"]
+    maydon["maydon"]
+    raid["raid"]
+    shashka["shashkaapp"]
+    miniapp["miniapp"]
+  end
+
+  subgraph infra["Infrastructure"]
+    telegram["internal/telegram<br/>Bot API client"]
+    storage[("internal/storage<br/>Neon Postgres")]
+  end
+
+  api --> app
+  cmd --> app
+  app --> service
+  app --> games
+  app --> webapi
+  service --> agent
+  agent --> ai
+  agent --> tools
+  webapi --> tools
+  tools --> stickers
+  mafia --> game
+  maydon --> game
+  raid --> game
+  shashka --> miniapp
+  service --> games
+  service --> storage
+  tools --> storage
+  game --> storage
+  service --> telegram
+  tools --> telegram
+  game --> telegram
 ```
 
 How one message travels through the bot:
@@ -87,8 +165,7 @@ Design points worth knowing:
   decoded into typed structs, unknown properties are rejected, each run has a
   timeout and an output size limit. Permission to use a tool depends only on
   the Telegram user ID of the sender, never on anything the model or the user
-  writes. The calculator is a hand-written parser; nothing is ever passed to a
-  shell or an interpreter.
+  writes. Nothing is ever passed to a shell or an interpreter.
 - **Tool loop limit.** `MAX_TOOL_CALLS_PER_TURN` counts calls across one
   message. After the limit, further calls are refused, the model is told to
   answer without tools, and the turn fails if it still does not.
@@ -117,13 +194,46 @@ image_generations(id PK, user_id, chat_id, created_at)
 bot_replies(id PK, chat_id, bot_id, created_at)
 group_replies(id PK, chat_id, user_id, created_at)
 private_messages(id PK, user_id, denied, created_at)
+star_payments(charge_id PK, user_id, first_name, username, stars, days,
+              paid_at, refunded_at)
+premium_users(user_id PK, until)
 broadcasts(id PK, owner_id, update_id, text, chat_ids bigint[],
-           created_at, sent_at)
+           copy_chat_id, copy_message_id, created_at, sent_at)
+channels(chat_id PK, title, username, bot_status, bot_rights jsonb,
+         first_seen_at, last_seen_at)
 group_rules(id PK, chat_id (0 for every group), kind, user_id, user_name,
             text, set_by, created_at, expires_at)
 moderation_actions(id PK, chat_id, action, requester_id, target_user_id,
                    target_message_id, target_text, minutes, reason,
                    update_id, created_at, UNIQUE (update_id, action))
+join_requests(chat_id, user_id, user_chat_id, expires_at, created_at,
+              PK (chat_id, user_id))
+own_sticker_sets(name PK, owner_id, created_at)
+sticker_uploads(id PK, user_id, chat_id, created_at)
+picture_verdicts(file_unique_id PK, unsafe, reason, judge, created_at)
+business_connections(id PK, user_id, user_chat_id, first_name, username,
+                     can_reply, can_manage_stories, enabled, refused,
+                     auto_reply, connected_at, updated_at)
+business_chats(connection_id -> business_connections, chat_id, first_name,
+               username, last_message_at, owner_wrote_at,
+               PK (connection_id, chat_id))
+business_replies(id PK, connection_id, chat_id, created_at)
+business_checklists(connection_id -> business_connections, chat_id,
+                    message_id, title, tasks jsonb, sent_at,
+                    PK (connection_id, chat_id, message_id))
+group_boosts(chat_id, boost_id, created_at, PK (chat_id, boost_id))
+shashka_players(user_id PK, name, language, rating, wins, losses, draws, updated_at)
+shashka_games(id PK, kind, level, white_id, black_id, position, status, last_path,
+              captured, version, invite_code UNIQUE, rated, deadline, winner,
+              reason, white_change, black_change, created_at, updated_at)
+shashka_queue(user_id PK, rating, joined_at)
+raid_bosses(chat_id PK, level, hp, max_hp, updated_at)
+raid_members(chat_id, user_id, name, level, damage, total, scored_at, updated_at,
+             PK (chat_id, user_id))
+raid_heroes(user_id PK, coins, sword, crit, helper, seed, taps, last_hit,
+            storm_until, storm_ready, fire_left, fire_ready, rain_until, rain_ready,
+            quest_day, quest_taps, quest_kills, quest_skills, quest_claimed,
+            streak, streak_day, updated_at)
 schema_migrations(version PK, applied_at)
 ```
 
@@ -133,9 +243,14 @@ There are two kinds of conversation, and they are never loaded together:
 - **Group:** one per group, shared by its members (`user_id` is NULL). Each
   stored user message starts with its author's first name, and the author's
   ID and name are also kept in `author_id` and `author_name`.
+- **Business:** one per customer of an owner's
+  [business account](#telegram-business): `chat_id` is the customer's chat
+  with the account, which is the customer's ID, and `user_id` the owner's.
+  It is never the customer's own private chat with the bot, whose `user_id`
+  is the customer's.
 
-`/reset` deletes the conversation of the chat it is sent in; its messages go
-with it through `ON DELETE CASCADE`. `telegram_message_id` and
+A conversation's messages are deleted with it through `ON DELETE CASCADE`.
+`telegram_message_id` and
 `reply_to_message_id` record which Telegram message a row corresponds to and
 which one it replied to. `chats` holds the mute setting.
 
@@ -169,9 +284,6 @@ in the environment win over the file.
 | `GEMINI_API_KEY` | one of the two keys | Google Gemini key from <https://aistudio.google.com/apikey>; set this or `XAI_API_KEY`, not both |
 | `GEMINI_MODEL` | `gemini-3.6-flash` | Gemini model ID, used with `GEMINI_API_KEY` |
 | `FALLBACK_MODELS` | Gemini: `gemini-3.5-flash,gemini-flash-latest,gemini-3.5-flash-lite` | Models tried in order when the main one is overloaded, out of quota or does not answer, then once more after a pause; a model out of quota is skipped for 15 minutes, one that did not answer within 20 seconds for 10; `none` turns this off |
-| `BACKUP_API_KEY` | empty | Key for a backup provider, asked when every model of the main one failed; replies that already moved to it stay on it |
-| `BACKUP_BASE_URL` | `https://api.groq.com/openai/v1` | The backup's OpenAI-compatible API (Groq by default). Groq's free tier allows 8,000 tokens a minute, which is one group reply at most: a request with the persona and the group log is 6,000 tokens or more |
-| `BACKUP_MODEL` | `openai/gpt-oss-120b` | The backup's model; it gets voice messages as transcripts only |
 | `XAI_API_KEY` | one of the keys | xAI (Grok) key from <https://console.x.ai>; images yes, voice no |
 | `XAI_MODEL` | `grok-4` | Grok model ID, used with `XAI_API_KEY` |
 | `MAX_MEDIA_MB` | `5` | Largest photo or sticker file downloaded for the model (1 to 20) |
@@ -183,18 +295,23 @@ in the environment win over the file.
 | `YOUTUBE_API_KEY` | empty | YouTube Data API v3 key from Google Cloud Console, not bound to a service account; without it there is no video search |
 | `TMDB_TOKEN` | empty | TMDB API Read Access Token from <https://www.themoviedb.org/settings/api>; without it there is no movies tool |
 | `GOOGLE_SAFE_BROWSING_KEY` | empty | Google Cloud API key restricted to the Safe Browsing API; lets owners turn on the link guard (`group_rules` `guard` `links`), which deletes links Google takes for malware, phishing or unwanted software. Google offers this API for non-commercial use |
-| `PRESENTATION_DAILY_LIMIT` | `3` | Presentations (.pptx) per user per day; owners have no limit; `0` lets only owners have them |
-| `WOLFRAM_APP_ID` | empty | Wolfram|Alpha AppID from <https://developer.wolframalpha.com> (free: 2,000 calls a month); adds the `wolfram` tool, which solves equations, integrals, physics and chemistry. It is sent in a header, never in a URL |
+| `CALENDARIFIC_API_KEY` | empty | Calendarific key from <https://calendarific.com> (free plan, monthly limit); adds the `holidays` tool. It is sent in a header, never in a URL |
+| `IMGFLIP_API_KEY` | empty | Imgflip API key from <https://imgflip.com/api> (free, a Bearer key); adds the `make_meme` tool |
+| `POKEWALLET_API_KEY` | empty | [PokéWallet](https://pokewallet.io/api-docs) key (free plan: 100 requests an hour, 1000 a day); adds the trading card collections to Kartalar |
+| `RAPIDAPI_KEY` | empty | RapidAPI key subscribed to the [Shazam Song Recognition API](https://rapidapi.com/dashydata-dashydata-default/api/shazam-song-recognition-api) (the free plan allows 2500 a month, a hard limit); adds the `recognize_song` tool |
 | `URLHAUS_AUTH_KEY` | empty | Free Auth-Key from <https://auth.abuse.ch/>; also lets owners turn on the link guard, and with both keys a link is deleted when either service lists it (URLhaus by its host) |
-| `SIGHTENGINE_API_USER`, `SIGHTENGINE_API_SECRET` | empty | From <https://dashboard.sightengine.com/api-credentials>; let owners turn on the picture guard (`guard` `images`), which deletes nude or gory photos, each photo checked using two operations of its monthly quota (nudity and gore). The spam guard (`guard` `spam`: CAS and lols.bot, banning listed accounts) needs no key |
+| `SIGHTENGINE_API_USER`, `SIGHTENGINE_API_SECRET` | empty | From <https://dashboard.sightengine.com/api-credentials>; let Sightengine judge the picture guard's pictures (`guard` `images`, which deletes nude or very suggestive pictures from anyone, admins and owners included: photos, stickers, pictures sent as files and the first frame of GIFs and videos), one operation of its monthly quota each (nudity only: with gore too, the guarded groups' two hundred pictures a day spent the free plan's month in days). Without them, or when Sightengine fails (its free plan answers `400: 30-day usage limit reached` once the month is spent), the bot's own model judges instead; see [Picture guard](#picture-guard). The guard needs neither |
+| `CAS_API_KEY` | empty | Combot API key, from <https://combot.org> (sign in with Telegram, *Settings*, *API key*; *Reset API key* makes one), sent as a Bearer header. CAS now answers nobody without one: every question was `401 API key required`. With it the spam guard (`guard` `spam`) asks CAS and lols.bot; without it lols.bot alone, which needs no key. lols.bot is asked from its own records (`quick`, a third faster), and once more when it drops the connection, as it now and then reset one; a list that cannot answer is logged and the member left alone |
 | `TAVILY_API_KEY` | empty | Free key from <https://app.tavily.com>; without it there is no web search. See [Live data](#live-data) |
 | `FOOTBALL_DATA_TOKEN` | empty | Free key from <https://www.football-data.org/client/register>; without it there is no football tool. See [Live data](#live-data) |
 | `COINGECKO_DEMO_KEY` | empty | Optional CoinGecko demo key from <https://www.coingecko.com/en/api>; without it crypto prices share CoinGecko's keyless quota |
 | `DB_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
 | `TELEGRAM_WEBHOOK_SECRET` | empty | Only for webhook deployments; see [Vercel deployment](#vercel-deployment-webhook) |
 | `CRON_SECRET` | empty | Only on Vercel: protects the daily cleanup endpoint |
-| `MAX_OUTPUT_TOKENS`           | `8192`                         | Longest model reply, in tokens, thinking included; a presentation's slides come in one reply, so keep it at 8192 or more |
+| `WEBAPP_URL` | empty | The Vercel deployment's `https://` address, such as `https://maria.vercel.app`, where `public/` is served: turns on the [dashboard](#dashboard-mini-app) (`/stats`, the private chats' menu button) and the games [Tarozi](#the-game-tarozi), [Kosmik ilon](#kosmik-ilon), [O'tinchi](#otinchi) and [Dev jangi](#dev-jangi) (`/game`, `/ilon`, `/otinchi`, `/boss`, the `send_game` tool). Empty turns them off |
+| `MAX_OUTPUT_TOKENS`           | `8192`                         | Longest model reply, in tokens, thinking included |
 | `AI_REASONING_EFFORT`         | `low` (Gemini)                 | How hard Gemini thinks before answering: `none`, `minimal`, `low`, `medium`, `high`, or `default` for the model's own. Thinking is paid as output and takes from `MAX_OUTPUT_TOKENS`; the lite models refuse `none`. Each request logs its tokens as `model usage` |
+| `CHAT_REASONING_EFFORT` | `minimal` | How hard the chat model thinks before a reply in words alone (Gemini): `none`, `minimal`, `low`, `medium`, `high` or `default`. At `low` it spent 500 to 800 thinking tokens, seconds, on a one-line joke |
 | `BOT_DISPLAY_NAME`            | `Maria`                         | The character's name                                                                                         |
 | `PERSONA_PROMPT`              | built-in                       | The character's personality and rules; `{name}` is replaced by the name. See [The character](#the-character) |
 | `MAX_HISTORY_MESSAGES`        | `20`                           | Recent messages sent to the model as context: from a quarter fewer to a quarter more, the start moving in steps so the prompt's beginning stays cached |
@@ -203,6 +320,10 @@ in the environment win over the file.
 | `USER_RATE_LIMIT_PER_MINUTE`  | `10`                           | Messages each user may send per minute                                                                       |
 | `REQUIRED_CHANNEL` | — | Channels, each its `@username` or `-100` ID, separated by commas, that a user must have joined to be answered in a private chat; others get a button for each and a «✅ Tasdiqlash» button that sends `/start check` to check again. Owners need not join. The bot must be an admin of the channel to check: until it is, nobody but the owners is answered; when Telegram does not answer at all, the message is |
 | `PRIVATE_DAILY_LIMIT` | `10` | Answers each user gets per day in private chats, from midnight in `GROUP_HISTORY_TIMEZONE`; the next message gets one notice, later ones nothing. Owners have no limit (admins do); commands and failed turns are not counted; `0` turns it off. Counted in the database |
+| `PREMIUM_PRICE_STARS` | `0` | Price of [premium](#premium) in Telegram Stars; `0` sells none. Off by default, so that no deploy starts taking money unasked |
+| `PREMIUM_DAYS` | `30` | Days one purchase of premium lasts; buying again before it ends adds them to its end |
+| `PREMIUM_DAILY_LIMIT` | `50` | Answers a day in private chats while premium lasts; premium is sold only when this is above `PRIVATE_DAILY_LIMIT` |
+| `BUSINESS_DAILY_LIMIT` | `30` | Answers each customer gets per day from an owner's [business account](#telegram-business), from midnight in `GROUP_HISTORY_TIMEZONE`; past it, nothing, not even a notice. Failed turns are not counted; `0` turns it off. Counted in the database |
 | `PRIVATE_CHATS` | `on` | Whom she answers in private chats: `on` everyone, `owners` the owners only, `off` nobody, so that she works in groups only. A private message that is not answered gets only a friendly reaction picked at random in code, never a notice, and the model is not asked. A group smaller than `GROUP_MIN_MEMBERS` counts as a private chat here, so that a small group cannot get around it; there, someone who is not answered gets only a 👀 reaction, and no call is made to the model, not even to transcribe a voice message. With `off`, owners cannot use private-chat tools such as broadcasts either |
 | `REQUEST_TIMEOUT_SECONDS`     | `45`                           | Time budget for answering one message                                                                        |
 | `MAX_INPUT_CHARS`             | `4000`                         | Longest user message accepted                                                                                |
@@ -240,6 +361,22 @@ The pool size can be set in the connection string, for example
 `...?sslmode=disable&pool_max_conns=10`. The default is the larger of 4 and
 the number of CPUs.
 
+### Changing settings from Telegram
+
+The owners can change the group, private-chat, premium, picture, trigger,
+history and output settings without a deploy. `/settings` lists them with their values
+and where each comes from; `/set NAME value` changes one and
+`/set NAME default` goes back to the environment's. In a private chat it
+changes the bot's; in a group (`/set@Bot …`) the group's own, for the four
+that may differ by group: `GROUP_RATE_LIMIT_PER_MINUTE`,
+`GROUP_MIN_ACTIVE_MEMBERS`, `GROUP_ACTIVE_DAYS` and `MAX_GROUP_REPLY_LENGTH`.
+`/limit` and `/active` are short for the first two. A value is checked as the
+environment's would be, with an upper bound for the numbers, before it is
+saved in `settings`. A group's change holds at once; the bot's, within a
+minute, as each serverless instance sees the change and rebuilds (long
+polling needs a restart). The list is `config.Settings`; secrets, models and
+keys stay in the environment only.
+
 ## Local setup
 
 You need Go 1.27 or newer and PostgreSQL 14 or newer.
@@ -263,9 +400,10 @@ make run
 Send `/start` to your bot in Telegram. Stop the bot with Ctrl+C; it finishes
 the message it is working on before exiting.
 
-Bot commands: `/start`, `/help`, `/reset` (delete the conversation),
-`/model`, `/about`, and in groups `/mute`, `/unmute`, `/ignore` and
-`/unignore`.
+Bot commands: `/start`, `/help`,
+`/model`, `/about`, `/premium`, `/paysupport`, with `WEBAPP_URL` set
+`/stats`, `/game`, `/ilon`, `/otinchi` and `/boss`, for owners `/payments` and `/refund`, and
+in groups `/mute`, `/unmute`, `/ignore` and `/unignore`.
 
 ## Tests
 
@@ -310,7 +448,7 @@ Gemini.
 that answered in about 1.5 s in testing; change it any time by setting
 `GEMINI_MODEL` for another one from
 <https://ai.google.dev/gemini-api/docs/models>. Gemini models support the
-tools (time, calculator) and answer within seconds, which matters for the
+tools and answer within seconds, which matters for the
 60-second limit on Vercel. The bot talks to
 Gemini through Google's OpenAI-compatible endpoint, so nothing else changes.
 On Vercel, set `GEMINI_MODEL` (and, if you like, `FALLBACK_MODELS`) under
@@ -326,10 +464,6 @@ starts again with the main model, unless it ran out of quota (skipped for 15
 minutes) or did not answer in time (skipped for 10 minutes, so a slow model
 does not make every reply wait 20 seconds). If every model is busy, the user is told
 the AI is overloaded and to try again in a minute.
-
-When every Gemini model failed and `BACKUP_API_KEY` is set, the request
-goes to the backup provider, Groq by default (see
-[Configuration](#configuration) for its free-tier limit).
 
 If the model rejects a request because it cannot use tools, the bot logs
 `model does not support tool calling; continuing without tools`, answers
@@ -482,12 +616,19 @@ every voice message is transcribed as it arrives, even when it does not
 address the bot, so that "what did he say?" or "write it as text" can be
 answered later from the group log. Each one costs one extra model request.
 
+Several pictures in one answer, such as two heroes' portraits or a picture
+drawn twice, go as one album (Telegram's `sendMediaGroup`, up to 10 a
+time), with the answer as the caption under the first, instead of one
+message each. An album Telegram refuses, as it does when it cannot read one
+of the pictures, goes picture by picture; one it does not answer may be in
+the chat, and is not sent again.
+
 ## The owner
 
 Set `BOT_OWNER_USERNAME` to your Telegram username (with or without `@`);
 for several owners, separate them with commas. The bot then knows you made
 it: it is friendly to you, does what you ask in
-the chat within its limits, and lets you use `/mute`, `/unmute`, `/reset`,
+the chat within its limits, and lets you use `/mute`, `/unmute`,
 `/ignore` and `/unignore` in any group, and, once `BOT_OWNER_IDS` is set,
 have it moderate wherever it holds the admin right (see
 [Moderation](#moderation)). In groups every
@@ -507,6 +648,10 @@ by moderation; the bot logs a warning at startup.
 Owners can give the bot orders that last, with the owner-only `group_rules`
 tool; see [Standing rules and the ignore list](#standing-rules-and-the-ignore-list).
 
+An owner with Telegram Premium can connect the bot to their own account as
+its chatbot, for it to answer their customers, post their stories and send
+them checklists; see [Telegram Business](#telegram-business).
+
 Owners can also ask the bot about its own data ("Maria, nechta guruhdasan?"),
 which it looks up with the owner-only `bot_database` tool:
 
@@ -518,6 +663,23 @@ which it looks up with the owner-only `bot_database` tool:
   given only in a private chat with the owner, so they never land in a
   different group.
 
+Owners can make photos, and pictures she draws, stickers in her own sticker
+set with the owner-only `sticker_set` tool ("Maria, shuni stiker qil"); see
+[Her own sticker set](#her-own-sticker-set).
+
+Owners can have the bot send a member a Telegram gift, bought with the
+bot's own Stars, with the owner-only `send_gift` tool ("Maria, unga sovg'a
+yubor"), offered only when `BOT_OWNER_IDS` is set: it spends money, and a
+username can change hands. `list` gives the gifts on sale with their price
+and the bot's Stars balance (`getAvailableGifts`, `getMyStarBalance`);
+`send` sends one (`sendGift`) with an optional text of up to 128 characters.
+It goes, in a group, to the member the owner replied to or tagged with @,
+confirmed with Telegram as the `moderate` tool confirms a tag, never to a
+user the model names; the owner's own words must ask for a gift ("sovg'a",
+"подарок", "gift"); and the balance is checked first, so a gift it cannot
+pay for is refused with how many Stars are missing. Stars reach the balance
+from premium and can be bought for the bot in @BotFather.
+
 Owners can also have the bot post in its groups ("Maria, guruhlarga master
 qaytdi deb yoz") with the owner-only `send_to_groups` tool. It works in two
 steps: the bot first shows the exact text and the groups, and sends only after
@@ -525,13 +687,69 @@ the owner says yes in a later message, within 10 minutes. The code refuses a
 confirmation made in the same message as the draft, so the model cannot send
 on its own.
 
+A broadcast goes to every group the bot is in unless the owner says
+otherwise: to its channels instead ("kanallarga yoz"), to both, or to the
+groups and channels they pick (`targets` lists them with their IDs). A
+channel counts only while the bot is an admin there with the right to post
+messages. Instead of text, an owner may reply to a message (a photo, a
+video, a post, in the private chat or a group) and ask for it to be sent
+("shuni hamma guruhlarga yubor"): it is copied as it is, with Telegram's
+`copyMessage`, so it carries no "forwarded from" line, after the same yes.
+With text too, the copy goes under that text as its new caption (a
+description for a video), and the owner first gets the post in their private
+chat as a preview. Neither the text nor a copied message may call or tag
+someone to summon them.
+
+A broadcast can also go to the private chats of everyone who wrote to the
+bot in private ("hammaning lichkasiga yubor": `to` is `users`, or `all` for
+the groups, channels and private chats together), up to 200 of the most
+recent, leaving out the owner; a bot may not write first to anyone else.
+Users who blocked the bot are counted, not named.
+
+An owner's keyboard has one button, «📢 Reklama berish»: it asks for the ad,
+opening the reply box, and the photo or video sent in reply is taken as the
+ad whatever its caption (a reply with neither is asked again).
+An owner's photo or video sent to the bot in private with an ad's caption
+(a price, "akk", "sotiladi", a skin…) is taken in code, the model never
+asked: the bot answers with where to post it (the groups, everyone, private
+chats only, or not at all), then with where the draft goes and Send and
+Drop buttons; the post is copied as it is, caption and all. An owner's
+photo or video the provider's filter refused is offered the same way.
+
+The owners' `/elon` does the same in code, without the model, whose
+provider may refuse a sale's words or a video's picture: `/elon <text>` for
+the groups, `/elon hammaga <text>` for the groups and private chats,
+`/elon lichkaga <text>` for private chats only, in reply to a photo or a
+video for it under the text; the preview comes first, then `/elon ha`
+sends it and `/elon bekor` drops it. When the provider's filter refuses a
+turn that has a picture, the turn is asked again without it; when it
+refuses the words, a private chat is told so, and an owner how to post with
+`/elon`, instead of "try again". An owner's refused words that ask for an
+announcement ("e'lon", "guruhlarga", "lichkaga", "hammaga"…) are taken
+apart from the main model: the same model, told nothing but to write an
+announcement, writes it from the owner's last few messages, it is drafted
+for the groups, or the private chats too when the words name them, under the
+replied photo or video if any, and the preview comes with Send and Drop
+buttons.
+
+Owners can also have her leave a group or a channel with the owner-only
+`leave_chat` tool: "bu guruhdan chiqib ket" in the group itself, where she
+says goodbye before she goes and writes nothing after, or "X guruhdan
+chiq" from anywhere, for a group she is in or a channel where she is an
+admin (`targets` lists them). The owner's own words must ask her to leave
+(chiq, ket, leave, выйди…), so the model cannot leave on its own.
+
 Groups are recorded when the bot is added, promoted or removed (Telegram's
 `my_chat_member` updates) and from the messages it logs. Telegram has no way
 to list a bot's groups, so a group the bot joined before this, where nobody
 has written since, is not known. After upgrading, run `set-webhook` again so
 Telegram starts sending `my_chat_member`. The
 `groups` table keeps only each group's name and is not expired; messages
-still are.
+still are. Channels come only from `my_chat_member` (the bot never asks for
+channel posts) and are kept apart, in `channels`, so that the overview, the
+statistics and `bot_database groups` stay about groups; a channel the bot
+was made an admin of before this upgrade is recorded once its rights change,
+for example by removing and adding it again.
 
 ## Drawing pictures
 
@@ -552,58 +770,6 @@ every request is refused with `429 You exceeded your current quota`, and the
 bot says drawing is not available right now. Turn on billing for the key in
 Google AI Studio to use it. Each picture is billed by Google.
 
-## Tests from files
-
-A student sends a test as a file (.doc, .docx, .pdf or text) written the way
-Uzbek universities write them (the HEMIS format):
-
-```
-Ishlab chiqarishning qanday turlari mavjud?
-====
-#moddiy va nomoddiy
-====
-barter va tovar
-++++
-Keyingi savol?
-...
-```
-
-The bot reads it in code (`internal/doctext` takes the text out of the
-file, `internal/quizfile` reads the questions), never with the model, so a
-test of hundreds of questions costs no token and no question is reworded.
-It finds the markers anywhere, as text out of a PDF loses its line breaks;
-a `++++` left out before a question ending in `?` or `:` is found; repeated
-questions are dropped; a question with no `#`, or several, is left out and
-counted in the answer. Tests are kept by their questions, so the same file
-sent by another student is the same test and their runs are ranked
-together.
-
-The test is split into parts of 30, offered as buttons. A part starts with
-"Men tayyorman!", then each question is a quiz of its own, open for 30
-seconds, its options shuffled (in the files the right one is often first).
-An answer, or the quiz closing unanswered, scores it once (an atomic update
-by the poll's ID) and sends the next; the bot needs no timer, as Telegram
-closes each quiz and says so (`poll` and `poll_answer` updates, asked for in
-`allowed_updates`). Two questions missed in a row pause the run with a
-button to go on; `/stop` ends it. At the end come the right, wrong and
-missed answers, the time, the place among everyone's first run of the part,
-and buttons to try again or go on to the next part. A question or option
-longer than Telegram allows in a quiz is sent as a message, the quiz then
-having the letters. Private chats only; groups may come later.
-
-## Presentations
-
-Asked for a presentation, slides or a *taqdimot*, the model calls
-`make_presentation` with a title, a subtitle, a color theme (blue, green,
-purple or dark) and 2 to 12 slides of a title and up to 6 bullet points, in
-the asker's language. The bot writes the .pptx itself (`internal/slides`,
-no library and no Google account: the file opens in PowerPoint, Google
-Slides, Keynote and LibreOffice) and sends it with the model's one-line
-caption. That caption is the whole answer: the tool ends the turn, so the
-slides cost one call to the model, about two ordinary answers' worth of
-tokens. `PRESENTATION_DAILY_LIMIT` (3) bounds them per user and day;
-owners have no limit.
-
 ## Live data
 
 Seven tools look things up on public web APIs, so she does not guess numbers.
@@ -616,12 +782,13 @@ answer instead of making up a number.
 | --- | --- | --- |
 | `currency_rate` | Exchange rates in so'm, gold and silver per gram | Central Bank of Uzbekistan (cbu.uz), official rates; gold and silver are an approximate world price from currency-api (jsDelivr mirror as a fallback) |
 | `get_weather` | Current weather, up to 3 days of forecast, air quality | Open-Meteo (CC BY 4.0), MET Norway as a fallback; places from GeoNames (CC BY 4.0). She says which place it matched |
+| `send_location` | Where a town, city, district or region is ("Samarqand qayerda", "Xiva lokatsiyasini tashla", "где находится Бухара"), sent as a pin on the map (`sendVenue`) under its name, with its coordinates as the address, to the chat the turn is in: in a group as a reply to the request, which keeps it in a forum topic. Found the way `get_weather` finds places, so only settlements and areas: never a street, shop or building, nor a pin guessed from memory. Asking for a location or a map ("lokatsiya", "xaritada", "где находится") skips the router | GeoNames places (CC BY 4.0), then the Open-Meteo geocoder |
 | `prayer_times` | Prayer and Ramadan times | Aladhan; approximate, the Muslim Board of Uzbekistan (muslim.uz) is official |
 | `news_headlines` | Latest headlines in Uzbek or Russian; with `world`, world news in Uzbek (Cyrillic), Russian or English | RSS feeds of kun.uz, gazeta.uz, uza.uz and daryo.uz, and of BBC O'zbek, BBC Russian and BBC World; headlines and links only |
 | `wiki_lookup` | Article summaries, "on this day" | Wikipedia (CC BY-SA) |
 | `football` | League tables, the current matchday's matches, top scorers | football-data.org free tier; scores can lag, so "latest", not live |
 | `crypto_price` | Coin prices in dollars and sums | CoinGecko |
-| `mlbb` | Mobile Legends heroes: the meta by win, ban or pick rate; a hero's role, lane, speciality, difficulty, skills and the game's tips, and its rates, counters and partners, with its portrait as a photo when asked, by rank, over the last 7 days; an account's nickname and country from its ID and zone | Rone Arena API, a fan-made, keyless mirror of Moonton's MLBB Academy statistics, cached for 3 hours; api.isan.eu.org for accounts, which answers a wrong ID and its own failure alike. Both unofficial |
+| `mlbb` | Mobile Legends: the meta by win, ban or pick rate; heroes by role and lane; a hero's profile, skills, base stats, rates and tier, with its counters, partners and the game's tips, and its portrait as a photo when asked; the most used build of top players by lane and rank, sent as one picture of its spell, emblem, talents and items, the boots and last two items taken from what the 30 hottest player guides add most; a hero's skins with tier, date and price, and a skin's picture; an account's nickname and country from its ID and zone | MLBBDex (mlbbdex.com, from the Mobile Legends Wiki) first: heroes, profiles, skins and the rates of all ranks, measured about weekly. Rone Arena API, a fan-made, keyless mirror of Moonton's MLBB Academy, for what MLBBDex lacks: rates by rank, counters, partners, tips, builds and player guides, cached for 3 hours, and the profile when MLBBDex is down. api.isan.eu.org for accounts, which answers a wrong ID and its own failure alike. All unofficial |
 | `web_search` | Current facts from the web: an answer and up to five results with their sites, or news of the last 7 days | Tavily, with `TAVILY_API_KEY` (free: 1,000 searches a month); without the key there is no web search |
 | `movies` | Films and series: search by title, a title's plot, genres, length, director and cast, and what is trending or popular in a genre | TMDB, with `TMDB_TOKEN`; plots in Russian or English, as TMDB has few Uzbek ones. This product uses the TMDB API but is not endorsed or certified by TMDB |
 | `youtube_search` | YouTube videos: guides, highlights, trailers, full songs, with channel, length, views and a youtu.be link that Telegram plays | YouTube Data API, with `YOUTUBE_API_KEY` (an `AIza…` key restricted to YouTube Data API v3; free: 10,000 units a day, a search costs 101); results cached for 2 hours |
@@ -629,8 +796,10 @@ answer instead of making up a number.
 | `quran` | Quran verses by reference (up to 7 at once) with Muhammad Sodiq Muhammad Yusuf's Uzbek translation in Latin script, or Kuliev's Russian or Saheeh International's English; the verse of the day; a surah's facts; a search of the Uzbek meaning | quran.com, keyless; the search uses alquran.cloud, whose Uzbek text is Cyrillic, so a Latin query is written in Cyrillic first; cached for a day |
 | `fun` | One tool for small amusements: a trivia question with shuffled options and its answer (by category and difficulty), a random fact (facts about sex, drink or drugs are skipped), a piece of advice, a famous quote, a dog picture | Open Trivia DB, Useless Facts, Advice Slip, ZenQuotes and Dog CEO, all keyless; gathered under one schema so that they cost the prompt one tool |
 | `more_info` | One tool for more look-ups: books by title or author, recipes by the dish's English name (pork and alcohol left out), the world gold and silver price per ounce and gram, Lichess's daily puzzle and a player's ratings, this Formula 1 season's standings and the last race | Open Library, TheMealDB, gold-api.com, Lichess and Jolpica (the Ergast API's successor), all keyless; cached for an hour, metal prices for 10 minutes |
-| `study` | For students: exact math with math.js (derivatives, matrices, units, big numbers; no integrals), scholarly articles from Crossref with DOI links, arXiv preprints with PDF links, and English synonyms, antonyms, rhymes and words of like meaning | math.js, Crossref, arXiv and Datamuse, all keyless; one schema; papers and words cached for 6 hours |
-| `wolfram` | Exact answers from Wolfram|Alpha's LLM API: equations, integrals, limits, physics and chemistry, statistics, units; plot images and code are dropped from its answer | Only with `WOLFRAM_APP_ID`; cached for 6 hours |
+| `study` | For students: scholarly articles from Crossref with DOI links, arXiv preprints with PDF links, and English synonyms, antonyms, rhymes and words of like meaning | Crossref, arXiv and Datamuse, all keyless; one schema; papers and words cached for 6 hours |
+| `holidays` | A year's holidays and days off from Calendarific, each with the days left until it: all of Uzbekistan's, working Saturdays and Ramadan included; another country's national holidays only. Equinoxes and solstices are dropped | Only with `CALENDARIFIC_API_KEY`; cached for a day |
+| `make_meme` | A meme from one of Imgflip's hundred popular templates (Drake, Distracted Boyfriend, Two Buttons...), the texts in Noto Sans so that Cyrillic shows, sent as a picture. A template used in a chat's last four memes is refused there, with others offered, unless the asker names it, so the model does not draw the same few (it drew Drake in ten of nineteen). Only templates: a member's own photo would become a public template on a free plan. Needs `IMGFLIP_API_KEY` |
+| `recognize_song` | Which song is playing in a voice message, audio, video or round video, sent with the question or replied to, as Shazam finds it. A song found is the whole answer, written in code and not by the model: the cover with the title, artist, album and year, link buttons to Deezer, Spotify, YouTube and Shazam, then Deezer's 30-second preview, found by the recording's ISRC or else by a search whose title and artist are the same. The file itself is uploaded, never a Telegram link with the bot's token. Five a day each, owners unlimited (`song_recognitions`); a song not found still counts, a failed request does not. Files over 20 MB, more than a bot may download, are refused. Needs `RAPIDAPI_KEY` |
 | `read_page` | A web page's title and text, cut to 8,000 characters, to summarize a link or answer about it | Jina Reader (r.jina.ai), keyless (about 20 pages a minute); local addresses and Telegram's file links are refused; cached for 30 minutes |
 
 The tools share one HTTP client with short timeouts and a small in-memory
@@ -657,9 +826,17 @@ In a private chat each user gets `PRIVATE_DAILY_LIMIT` answers a day
   twice (it counts once), and a turn that failed with an error (the model
   overloaded, out of time, or any other error), unless she drew a picture
   before the error: the picture is still sent, and counted.
-- The first message past the limit gets one notice, in Uzbek, Russian and
-  English; later ones that day get nothing. A voice message past the limit is
-  not even transcribed.
+- The limit is for talk with the model; tools take nothing from it. A turn
+  that called a tool (a rate, the weather, a search, a meme, a picture...)
+  is given back once it is answered. Past the limit, a message in words
+  alone is still a turn, for tools only (`agent.Request.ToolsOnly`): the
+  router, a cheap call, sends talk straight to the limit's notice, and an
+  answer the main model gives without a tool is dropped, unsaved, for the
+  notice too. A picture or a voice message past the limit is neither seen
+  nor transcribed. Each tool keeps its own limits, as drawing does.
+- The first message past the limit that is not a tool's gets one notice, in
+  Uzbek, Russian and English; later ones that day get nothing, but while
+  premium is sold, a line pointing to `/premium` at most once an hour.
 - Owners have no limit. Everyone else has, the administrators in
   `ADMIN_USER_IDS` included. Groups are not affected; they have their own
   [limits](#limits).
@@ -669,6 +846,306 @@ In a private chat each user gets `PRIVATE_DAILY_LIMIT` answers a day
   the limit guards the model's cost, and one answer too many disturbs
   nobody else.
 - `0` turns the limit off.
+
+### Keyboard and message effects
+
+`/start` and `/help` in a private chat bring a small keyboard, in place of the
+phone's own, of her common requests, in the language of the user's app
+(`internal/service/keyboard.go`): «💵 Valyuta kursi», «🌤 Ob-havo», «🎮 MLBB»,
+«🎲 Zar tashla», «🕐 Soat nechi?», «📋 Ko'proq» and «❓ Yordam». A meme has no button, which
+the owners took off: it is asked for in words, as before. Telegram keeps it there, shrunk to fit,
+until it is closed; it is not persistent, so the user can hide it and open
+it again with the keyboard icon Telegram shows in the message box. A button sends its own text, in any of its three
+languages, and the buttons that need a value ask for it first
+(`internal/service/keyboardmenu.go`):
+
+- «💵 Valyuta kursi» asks which currency, with buttons for USD, EUR, RUB,
+  KZT, CNY and GBP; a press gives its Central Bank rate, with the reply box
+  open for an amount, and the amount written there ("1 500", "2,5") is
+  converted to so'm.
+- «🌤 Ob-havo» asks which city, with buttons for eight of Uzbekistan's and
+  one for another, which opens the reply box for its name; a name the
+  weather does not know is said to be unknown.
+- «🎲 Zar tashla» asks which game: 🎲 🎯 🏀 ⚽ 🎳 or 🎰.
+- «🎮 MLBB» opens a menu of Mobile Legends: 🔥 Meta, 🦸 Qahramon, 🛠 Build,
+  ⚔️ Kontr-pik, 👕 Skinlar, 🎯 Draft, 📈 Win rate and 🆔 O'yinchi, all
+  answered in code, without the model (`internal/service/mlbbanswers.go`):
+  the `mlbb` tool is run on the sender's turn and its result written out,
+  labels in the user's language and the game's names as they come. The meta
+  is answered at once, the top heroes with their win, pick and ban rates and
+  tier; the rest open the reply box for the hero, the enemy's picks, the
+  matches and win rates, or the player's ID and zone. A hero is a short
+  profile under its portrait: roles, lanes, rates, difficulty, skills, whom
+  it beats, who beats it and its partners. A build is the tool's picture of
+  the top players' build, captioned with its lane and win rate, and written
+  out should the picture not be drawn. A counter pick lists the five heroes
+  that lower the hero's win rate most, by how much. A draft takes the
+  enemy's one to five heroes written with commas and gives the best picks
+  with their reasons. Win rate takes three numbers ("500 48 60", "500, 48%,
+  60%", "48,5" too) and says how many wins in a row reach the one wanted.
+  A player takes the ID and the zone, "1407157025 (15832)" or apart, and
+  asks for the zone when it is missing. Numbers that cannot be read are
+  answered with how to write them; an unknown hero, a missing account or a
+  failed tool, with a short message saying so.
+  Skins are answered in code too: the hero's name brings a button for each of
+  its skins, newest first (the `mlbb` tool's list, its data the hero and the
+  skin's place in it, as a skin's name may not fit), and the one pressed
+  comes as its picture, captioned with its name, tier and price.
+- «🕐 Soat nechi?» is answered at once, by the bot's clock.
+- «📋 Ko'proq» opens the rest of her tools by section
+  (`internal/service/moremenu.go`): 🕌 Din (prayer times, the Quran),
+  📰 Yangiliklar (Uzbekistan's, the world's), 🎬 Ko'ngilochar (films, anime,
+  music, YouTube, a cat, trivia, a fun fact), ⚽ Sport (the table, matches and
+  top scorers of six leagues), 🕹 O'yinlar (Shashka, Dooz, Dev jangi, Kosmik ilon, O'tinchi, Tarozi, free games, a Steam
+  price), 📚 O'qish (Wikipedia, an English word, synonyms, papers) and
+  🛠 Foydali (a QR code, a drawing, a place on the map, holidays, crypto,
+  earthquakes, a web search). An item is answered at once, asks for its
+  value first (a city, a title, a word, as the menus' other questions do),
+  or offers choices, the leagues. Every item is answered in code, never by
+  the model (`internal/service/moreanswers.go`): its tool runs on the
+  sender's turn and its result is written there, labels in the user's
+  language and the data as the tool gives it (an English fact, a Russian
+  headline): the top entries with their links, a picture for the cat, a QR
+  code or a drawing, the song's preview before its links, the pin and then
+  the place's name, the game itself for the bot's own games, and a trivia question with
+  its answer a few lines below its options. What a tool did not find, a
+  service that is down, a quiet week of earthquakes and a drawing past its
+  own daily limit are each said plainly. None of it takes from the daily
+  limit.
+
+A choice comes back as a button's data (`kb:rate:EUR`), handled at once; a
+value written in the reply box is known by the question it replies to, so
+nothing is kept between the question and its answer. Menus moved through,
+«📋 Ko'proq»'s sections and an item's choices, change in place
+(`editMessageText` with the new buttons) with «⬅️ Orqaga» back, so the
+chat does not fill with menus; a press that fetches something is answered
+at once with «⏳ Bir soniya...» and "typing", while one that only moves or
+asks for a value is answered silently. The answer that ends
+a question brings the keyboard back: the reply box hides it and keeps the
+question's hint ("Masalan: Ling") in the box, which people took to mean
+that a hero's name was still wanted; a picture, such as a skin, brings it
+too (an album of several cannot). A question is asked in the language of
+the label pressed, «🎲 Roll a die» in English, as a few words are no sure
+sign of a language; «🎮 MLBB», the same in every language, in the user's app's. All of it,
+Mobile Legends and «📋 Ko'proq» too, is answered in code
+(`internal/service/keyboardanswer.go`, `mlbbanswers.go`, `moreanswers.go`), with the
+tools run by their registry on the sender's turn, and takes nothing from
+the daily limit, past it too; a tool that fails is said to have failed. Only a
+picture to draw still asks a model, the image one. A chat that still has an earlier keyboard,
+«💵 Dollar kursi» or «🌤 Toshkent ob-havosi», gets the same questions.
+«❓ Yordam» (or «❓ Помощь», «❓ Help») is answered as `/help`, uncounted.
+
+The same plain requests typed in words are answered in code too
+(`internal/service/typedrequest.go`), in a private chat: a message that is
+nothing but a currency's rate ("dollar qancha", "evro kursi", "курс
+рубля"), the weather, of one named place or Tashkent ("ob-havo", "Samarqand
+ob-havosi", "погода"), or the time ("soat nechi", "который час"), word by
+word, five words at most. Anything more, an amount to convert, another day,
+a second question, goes to the model, and so does a place the weather does
+not know. A group never gets the keyboard, and the buttons' words typed
+there are just words, for the model; so are they in a business account's
+chats.
+
+An answer in a private chat that congratulates someone, a birthday, a
+holiday, an exam passed ("tabriklayman", "tug'ilgan kuning bilan",
+"muborak", "поздравляю", "happy birthday"), comes with Telegram's 🎉
+message effect. The words decide, in code: the model never names an effect,
+so it can never ask for one Telegram does not have. Telegram plays effects
+only in private chats, so groups never get one, and a message Telegram
+refuses with its effect is sent again without it.
+
+## Inline mode
+
+Typed in any chat, `@MariaBot qanday qilib plov pishiriladi?` shows one
+result, Maria's answer, which the asker taps to post it there as their own
+message ("via @MariaBot"). Telegram gives the bot the words and the asker,
+never the chat.
+
+- **Turn it on** in [@BotFather](https://t.me/BotFather): `/setinline`,
+  choose the bot, and give the placeholder shown in the input field, such
+  as `savol bering…`. Until then Telegram sends no inline queries.
+- **A question must end** in `?`, `!`, `.` or `…` to be answered. The app
+  sends a query at nearly every keystroke; answering each would spend a
+  model call, and one of the asker's daily answers, on every unfinished
+  word. Until then, and for an empty query, the result is a hint.
+- **It is a private chat's turn, without the chat**: the same daily answers
+  (`PRIVATE_DAILY_LIMIT`, owners unlimited; past them the result says so),
+  `PRIVATE_CHATS` and `REQUIRED_CHANNEL` apply, and the flood guard. The
+  persona and the owner's notice are the same, but there is no history, no
+  tools and nothing is saved: the light chat model (`CHAT_MODEL`, the main
+  model without `ROUTER_MODEL`) answers alone, told that its answer is
+  posted by the asker in a chat it cannot see. A question that needs a tool,
+  such as the weather or a rate, gets a result saying to ask in a private
+  chat.
+- **Telegram waits about ten seconds.** The checks and the answer get 7
+  seconds; past them, or when the model fails, the result says to try
+  again. An answer is kept by Telegram for 30 seconds, for that person only
+  (`is_personal`); a failure is not kept, so trying again asks again.
+- Inline queries come only when the bot asks Telegram for them
+  (`inline_query` in `allowed_updates`): long polling asks on every
+  request, and the webhook function sets the webhook again at its first
+  start after this update when the kinds differ, as `set-webhook` does.
+
+### Premium
+
+Users can buy a higher limit with Telegram Stars (currency `XTR`, no payment
+provider): `PREMIUM_PRICE_STARS` Stars for `PREMIUM_DAYS` days of
+`PREMIUM_DAILY_LIMIT` answers a day. It is sold only while the price is
+above 0, `PRIVATE_DAILY_LIMIT` is on and `PREMIUM_DAILY_LIMIT` is above it;
+all three can be changed with `/set`.
+
+- **The offer.** `/premium` in a private chat says what premium gives, or
+  until when the sender has it, and sends the invoice (`sendInvoice`), whose
+  Pay button opens Telegram's payment. The day's one notice that the limit
+  is reached carries the same offer and invoice, so it comes once a day at
+  most and only when it is wanted; someone who has premium is told the
+  premium limit and offered nothing. After it, a sender without premium
+  who writes on is reminded "Bugungi limit tugadi. Ko'proq yozish uchun
+  /premium ni bosing." at most once an hour (counted in each instance's
+  memory), as one who missed the notice saw only a reaction. In a group `/premium` points to the
+  private chat.
+- **The check.** Before taking the money Telegram asks the bot
+  (`pre_checkout_query`), which must answer within 10 seconds. The answer is
+  made from the invoice's payload alone, `premium:<user ID>:<days>:<price>`:
+  yes when it is the plan on sale now, in Stars, paid by the user it was made
+  out to; otherwise no, with the reason shown to the payer (an invoice from
+  before the price or the days changed, or one forwarded from someone else).
+- **The payment.** Telegram then posts a `successful_payment` service
+  message. The payment is stored in `star_payments` by its
+  `telegram_payment_charge_id`, so a payment delivered twice counts once, and
+  its days are added to `premium_users.until`: to the end of a premium that
+  still lasts, from now otherwise. The payer is thanked with the end date.
+  This works even with `PRIVATE_CHATS=off`: the money moved either way. A
+  payment that does not match its invoice is kept with 0 days, for a refund,
+  and logged as an error; one that cannot be stored is logged with its
+  charge ID, and the payer told that the owners will sort it out.
+- **The limit.** While `until` is in the future the daily limit is
+  `PREMIUM_DAILY_LIMIT`, looked up in the same transaction that counts the
+  answers. Premium already bought still counts if sales are turned off.
+- **Owners.** `/payments` in a private chat lists the last 20 payments with
+  the payer, Stars, days and whether they were refunded. `/refund <user ID>`
+  or `/refund @username` gives the user's latest payment back
+  (`refundStarPayment`) and ends their premium at once; a payment Telegram
+  had already given back is only recorded. A refund Telegram reports by
+  itself (`refunded_payment`) ends the premium too. Nobody else can use
+  either command, and neither works in a group.
+- `/paysupport`, which Telegram asks of every bot taking Stars, tells
+  users to write to the owners, by their usernames, about a payment.
+- Payments are never deleted by the daily cleanup.
+
+## Telegram Business
+
+An owner with Telegram Premium can connect Maria to their own account as
+its chatbot. She then answers the customers who write to that account, on
+its behalf, and, asked in her private chat, posts the account's stories and
+sends its customers checklists.
+
+**Connecting her.** In Telegram: Settings → Telegram Business → Chatbots,
+add the bot by its `@username`, choose which chats it may answer (all
+private chats, or some, with exceptions), and in its settings turn on
+replying to messages and, for stories, managing stories. Telegram reports
+the connection (`business_connection`); Maria records it in
+`business_connections` and tells the owner, in her private chat, what she
+may do there and what she lacks. Disconnecting her, or changing what she may
+do, is reported and recorded the same way.
+
+- **Owners only.** Only an account whose user is in `BOT_OWNER_IDS` is
+  used: the account speaks for whoever holds it, and a username can change
+  hands, so `BOT_OWNER_USERNAME` alone is not enough. Anyone else's
+  connection is recorded with `refused`, logged (`a business account that is
+  none of the owners' connected the bot; ignoring it`), and never answered
+  through.
+- **A connection she has no record of**, as one made before this version,
+  is asked of Telegram (`getBusinessConnection`) at its first message, and
+  recorded.
+
+**Answering customers.** A customer's message to the account comes as a
+`business_message`, in the account's private chat with them. Maria answers
+it as she answers a private chat, with the persona, the conversation's
+history and the tools, and sends the answer with the connection's
+`business_connection_id`, so that it comes from the account. Each turn
+tells the model whose account it speaks for: to be the owner's warm, brief
+assistant, and to leave prices, orders, payments, meetings and anything
+else only the owner can promise to the owner. Every message there, the
+owner's too, is noted in `business_chats`, the customer's name and when the
+owner last wrote.
+
+- **Never the owner.** The owner's own messages in the chat are never
+  answered, nor messages a bot sent for the account (her own answers among
+  them, which Telegram also reports), another bot's, a service message, or
+  another owner's: owners talk to her in her own chat. When the owner wrote
+  in a customer's chat in the last 15 minutes she leaves it to them: two
+  answering at once, she without knowing what the owner said, would be
+  worse than either alone.
+- **Only where she may.** Telegram sends her only the chats the owner gave
+  her, and she answers only while the connection is enabled, lets her
+  reply (Telegram allows it in chats with an incoming message in the last
+  24 hours) and the owner has auto-reply on.
+- **Apart from her own chats.** The conversation is kept under the owner
+  (see [Database schema](#database-schema)), never mixed with the
+  customer's own private chat with Maria, and the turn has none of that
+  chat's extras: no owners' notice or standing rules, no profile, no talks
+  in other chats. The tools that send to the chat themselves, as the bot
+  rather than the account, or keep what they learn of the person for their
+  own chats (`send_dice`, `my_profile`) are not offered (`NoBusiness`), nor,
+  as ever, the group and owner tools.
+- **Words and pictures only.** Text and pictures (drawings, memes, albums)
+  go through the account. A reaction, sticker, GIF, file or song does not,
+  and an answer that is only one of those sends nothing; the model is told
+  so. A command such as `/help` is only text for the model: the bot's
+  commands are for its own chats.
+- **Limits, silently.** The flood guard (`USER_RATE_LIMIT_PER_MINUTE`)
+  applies, and each customer gets `BUSINESS_DAILY_LIMIT` answers a day
+  (default 30), counted per customer chat in `business_replies`. No notice
+  ever goes to a customer from the owner's account: past a limit, when the
+  workers are busy, or when the turn fails (an error, a timeout, an
+  overloaded model), she sends nothing, and the failed turn's answer is
+  given back. Skips are recorded as in other chats (`business_limit`,
+  `flood`).
+- **No typing, no read marks.** She does not show "typing" or mark
+  messages read in the account.
+
+**/business**, in an owner's private chat with her, shows their business
+account: whether it is connected, whether she may reply, whether auto-reply
+is on, and whether she may post stories, or how to connect her when it is
+not. `/business off` stops her answering its customers, `/business on`
+starts her; it holds for all the owner's connections, and a new
+connection takes the owner's last choice. An owner's first connection has
+auto-reply off: she would speak for them to people they know, so she
+answers nobody until they say `/business on`. For anyone else, or in a group,
+it is an unknown command.
+
+**Stories.** "Maria, buni storyga joyla" with a photo, or in reply to one,
+or "chizib storyga qo'y", has the owner-only `post_story` tool post a story
+on the owner's business account (`postStory`, which needs *manage stories*).
+The picture is the one drawn or made in the same turn (`generate_image`,
+`make_meme`), or else the photo the owner sent or replied to; a sticker
+works too. Telegram takes a story only as a new 1080×1920 upload of at most
+10 MB, so the picture is fitted whole in the middle, on itself blown up to
+cover the story and darkened, and sent as a JPEG. An optional caption, up to
+2048 characters, and how long it stays up, 6, 12, 24 (the default) or 48
+hours. It works only for an owner, only in their private chat with her, and
+only on their own account, the connection recorded for their ID; the model
+names no account.
+
+**Checklists.** Telegram lets bots send checklists only on behalf of a
+business account. The owner-only `business_checklist` tool, in the owner's
+private chat:
+
+- `chats` lists the customer chats she has seen through the account, the
+  latest first.
+- `send` sends a checklist, a title (up to 255 characters) and 1 to 30
+  tasks (up to 100 each), into a customer's chat (`sendChecklist`), named by
+  the customer's first name, `@username` or chat ID; a name two customers
+  share needs the ID. Both the owner and the customer can tick its tasks
+  and add more. It is kept in `business_checklists`.
+- `edit` replaces the title and tasks of the last checklist she sent into
+  that chat (`editMessageChecklist`). Bots cannot tick tasks: the owner and
+  the customer do that in the chat.
+
+Like an answer, a checklist can go only to a chat with an incoming message
+in the last 24 hours, and needs the right to reply; Telegram's refusal is
+passed to the owner.
 
 ## Groups
 
@@ -688,11 +1165,25 @@ keep it from taking over the chat.
 | A command with its username  | `/mute@MyMariaBot`                                       | always on                       |
 
 Each start sets the menu Telegram opens on "/" (`setMyCommands`, in
-`internal/app/commands.go`): `/start`, `/help`, `/reset`, `/model` and
+`internal/app/commands.go`): `/start`, `/help` and
 `/about` in private chats; `/help`, `/model` and `/about` for a group's
-members; and for its admins also `/mute`, `/unmute`, `/ignore`, `/unignore`
-and `/reset`. In a group the menu adds the bot's username itself. A failure is
+members; and for its admins also `/mute`, `/unmute`, `/ignore` and
+`/unignore`. In a group the menu adds the bot's username itself. A failure is
 only logged.
+
+Each start also sets the admin rights she asks for when someone makes her an
+admin (`setMyDefaultAdministratorRights`, `groupAdminRights` and
+`channelAdminRights` in the same file), which Telegram's dialog then shows
+ticked: in groups the ones her features use, *Delete messages*, *Ban users*,
+*Pin messages*, *Invite users*, *Manage topics*, *Change group info* and *Add
+new admins*; in channels *Post messages* and *Edit messages*, for the owners'
+broadcasts. Whoever adds her can still untick any of them, and she only ever
+uses a right both she and the admin asking hold. A failure is only logged.
+
+Each start also sets the profile's bio and description (`internal/app/profile.go`),
+in Uzbek for everyone and in Russian and English for those apps, where they differ
+from Telegram's. Change them there, not in @BotFather or through the bot: the next
+start puts them back. Owners can still change the bot's name and photo by asking it.
 
 **Calling by name.** A wake word counts when it is a whole word, in any case,
 and is the first word, the second word, or the last word of the message:
@@ -719,7 +1210,7 @@ match "maria" unless you add it:
 word.
 
 **Commands** in a group need the bot's username (`/help@MyMariaBot`). A plain
-`/reset` is ignored, because it may be meant for another bot.
+`/help` is ignored, because it may be meant for another bot.
 
 ### Example
 
@@ -748,12 +1239,12 @@ Ann:   anyway, lunch?
   10 hours are given to the model as context, marked as untrusted, with
   times in `GROUP_HISTORY_TIMEZONE`; of her own lines only the last 5,
   shortened. The log is deleted with the rest of the history after
-  `RETENTION_DAYS`, by `/reset`, and when the group is muted. Nothing is
+  `RETENTION_DAYS` and when the group is muted. Nothing is
   logged while a group is muted. Set `GROUP_AMBIENT_MESSAGES=0` to turn the
   log off.
 - **Standing rules:** owners' orders and the ignore list are kept in the
   `group_rules` table until they expire, whatever `RETENTION_DAYS` says; an
-  owner's form of address until it is removed. `/mute` and `/reset` do not
+  owner's form of address until it is removed. `/mute` does not
   touch them.
 - **Moderation:** what she did, and for whom, is kept in the
   `moderation_actions` table until you delete it, including up to 500
@@ -767,22 +1258,20 @@ Ann:   anyway, lunch?
 Because a group's conversation is shared, what one member says to her can
 come back in her answer to another member of the same group.
 
-### Muting and resetting
+### Muting and ignoring
 
 | Command       | Who          | Effect                                                                              |
 | ------------- | ------------ | ----------------------------------------------------------------------------------- |
 | `/mute@Bot`   | group admins | She stops reacting in this group, and stops keeping recent messages, until unmuted. |
 | `/unmute@Bot` | group admins | She is back.                                                                        |
-| `/reset@Bot`  | group admins | Deletes the group's conversation and its recent-message buffer.                     |
 | `/ignore@Bot`, as a reply to a member's message | group admins | She does not answer that member, or react to them, for 24 hours. |
 | `/unignore@Bot`, as a reply to a member's message | group admins | She answers them again. |
 
 "Group admins" are the group's owner and administrators as Telegram reports
 them, plus anyone in `ADMIN_USER_IDS` and the bot's owners. The mute setting
-is stored in the database and survives restarts. `/mute` and `/reset` leave
+is stored in the database and survives restarts. `/mute` leaves
 the standing rules alone. Admins, owners and the bot itself cannot be
-ignored. In a private chat `/reset` deletes that user's own conversation and
-needs no special rights.
+ignored.
 
 To keep the bot out of groups altogether, use `/setjoingroups` in @BotFather.
 
@@ -799,7 +1288,10 @@ To keep the bot out of groups altogether, use `/setjoingroups` in @BotFather.
   name or `@username` is never applause, and owners always get an answer.
 - The model may itself answer with one emoji reaction or with nothing. The
   history and the group log record a reaction as `You: <reacted 🔥>`.
-- While she is working on an answer the chat shows her as typing.
+- While she is working on an answer the chat shows her as typing, once
+  the answer has taken two seconds: a quicker one, which is what a reaction
+  usually is, comes without it, so "typing" is never followed by an emoji
+  alone.
 - Telegram allows only its own list of reaction emoji; a group can allow
   fewer. A reaction Telegram refuses is logged at debug level and dropped.
 
@@ -808,8 +1300,8 @@ To keep the bot out of groups altogether, use `/setjoingroups` in @BotFather.
 Owners' orders that should last ("don't talk about finance", "don't answer
 Bek", "call me aka") are saved by the owner-only `group_rules` tool, which
 the model calls when an owner gives such an order. They are kept in the
-`group_rules` table, apart from the conversation, so `/mute` and `/reset`
-do not erase them, and every turn in the group is told the ones in force.
+`group_rules` table, apart from the conversation, so `/mute`
+does not erase them, and every turn in the group is told the ones in force.
 
 | Rule | Who sets it, and where | How long |
 |---|---|---|
@@ -817,32 +1309,63 @@ do not erase them, and every turn in the group is told the ones in force.
 | Ignore a member | an owner replying to that member's message, or to her answer to them, in the group | 24 hours, or 1 to 720 hours if the owner says |
 | Form of address | an owner, for themselves, in any chat; it holds everywhere | until removed |
 | Swear guard | an owner, in the group it is for ("so'kinganlarni avtomatik mute qil", optionally "@Bakxtyorvch ni chaqir"); one per group | until turned off |
+| Spam, link, picture and joins guards | an owner, in the group it is for (`guard` `spam`, `links`, `images` or `joins`; see [Join requests](#join-requests) for the last); the joins guard also the group's creator and its admins who may invite users, through the `join_captcha` tool | until turned off |
+| Punishment | an owner or the group's creator, in the group, for swearing or nude pictures: in reply to a member ("bu bola yana so'kinsa ban qil") or for anyone ("18+ tashasa 3 soat mute qil"); one per member and kind | 30 days, or the hours given |
 
-The swear guard runs in code, asking the model only one thing. In a group
-where it is on, every message from a member is checked against a list of
-swear words (dnx, pshnx, нахуй, бля, qo'tog', jalab, jala, kot, ske and the
-like; words that mostly mean something harmless, such as "am" or "mol", are
-left out). Only a message the list catches goes to the model, which answers
-in one word whom it is aimed at: the bot, a person, or nobody. Swearing aimed
-at nobody ("давай хуярить", "бля, yutqazdik") is left alone, and so is a
-message the model cannot judge. A member's first insult at a person gets a
-reply warning them; the next one within 24 hours mutes them for an hour.
+The swear guard runs in code, with no model. In a group where it is on, every
+message from a member is checked against a list of swear words (dnx, pshnx,
+нахуй, бля, qo'tog', jalab, jala, kot, ske and the like; words that mostly mean
+something harmless, such as "am" or "mol", and beginnings of ordinary words, such
+as "bla" of "blan", are left out). Where the message points says whom it is aimed
+at: the bot when it replies to it or calls it by name, a person when it replies
+to one, tags one or says "you" ("sen", "ты"), and otherwise nobody. An exclamation
+("бля, yutqazdik", "pzds") gets one warning a day and never a mute (action
+`swear_word`): muted for them, members were unmuted within minutes by the admin
+the guard calls. A member's first insult at a person gets a reply
+warning them; the next one within 24 hours mutes them for an hour.
 A swear at the bot gets no warning: the first is answered with one of the
 owners' two clips, chosen at random and embedded in the binary
 (`internal/service/clips`; both go as GIFs),
 and the second within 24 hours mutes them for 15 minutes, with a clip, or,
 when she cannot mute (an admin, or no right to), gets silence.
 A mute notice tags the @username the owner named, or else the group's
-creator. Telegram does not let an admin be muted, so an admin who insults a
-person is warned the same way and the next insult only tags that person.
-The creator, owners and bots are never touched, forwarded messages are not
+creator. The group's admins may swear, as the owners asked: the guard
+neither warns nor tags them, and a punishment ordered for one is not
+carried out for swearing. The creator, owners and bots are never touched, forwarded messages are not
 checked, and a message the guard handled is not answered by the model. Each
 caught insult is kept in `moderation_actions` (action `swear`, or
 `swear_bot` for one at the bot), which is how the count is kept and how an
 update delivered twice is handled once. Muting needs her to be an admin who may
 restrict members; without that right the notice says so and still tags.
+Its warnings and notices are in the swearer's language, Uzbek, Russian or
+English: their message's, or their Telegram app's for a word or two, as the
+bot's other texts are.
 "Maria, endi so'kinishni kuzatma" turns it off. She cannot watch a chat
 herself, and says so rather than promise to.
+
+An edited message is checked again, by this guard and by the spam, link and
+picture guards, as a new one would be (`edited_message` updates): a member
+who edits a swear into a message, a malicious link, or a nude picture in
+place of the first one, is warned, muted or has the message deleted all the
+same. An edit of a message the swear guard already caught is no second
+swear: fixing a typo in an insult does not mute. Nothing else is done with
+an edit: the model never answers one, even one that calls her, it takes
+nothing from the reply quotas, and the group log keeps the first version.
+
+A punishment from an owner or the group's creator (the `punishments` tool,
+kinds `swear_punishment` and
+`picture_punishment`, "ban" or "mute:<hours>" in text) is carried out in code
+too, so it holds whether or not anyone talks to her: words alone, kept as an
+instruction, reached only the model, which never sees a message not meant
+for it. It is for swearing at the bot alone: the model is asked about a message
+that replies to the bot or calls it by name, from a member it is set for (by
+replying to their message) or, set for anyone, from any member, and only a swear
+it finds aimed at the bot is punished, in place of the guard's warning or mute.
+It works with the swear guard off; swearing at others is left to that guard. A picture punishment follows the picture guard deleting a
+nude picture, so it needs that guard on. The creator is checked with Telegram
+(`getChatMember`) each time; admins cannot set one. The asker's own words
+must ask for the ban or the mute, as with moderation. Owners are never punished, and an
+admin, whom no bot can ban or mute, is named instead.
 
 Owners can ask her to list the rules and remove one by its number. Group
 admins and owners can also ignore a member for 24 hours with `/ignore@Bot`
@@ -860,6 +1383,30 @@ ignored for 24 hours, exactly as with `/ignore`, and she reacts 👌 to the
 order. Any other wording, a question such as "nega javob bermading?", or an
 order about someone who cannot be ignored goes to the model as before.
 
+### Picture guard
+
+Where the picture guard is on, every picture is judged in code once ever,
+by Telegram's `file_unique_id`, which is the same for a file in every
+chat: the verdict is kept in `picture_verdicts` (migration 0040), so a
+sticker or meme sent again, in any group, on any instance or after a
+restart, is never sent anywhere a second time, and the last 6 hours' are
+also remembered in each instance's memory to spare the database. A new
+picture goes to Sightengine when its keys are set. When they are not, or
+Sightengine fails (out of its free plan's month it answers
+`400: 30-day usage limit reached` for days), the bot's own model is shown
+the picture with a short prompt and answers one word, `NUDE` or `SAFE`,
+drawing Sightengine's line: nudity, sex and a pose or outfit meant to
+arouse, photographed or drawn, are deleted; swimwear, a kiss or a cartoon
+are not. It is `ROUTER_MODEL` when that is set (light and cheap, with the
+main model and its fallbacks behind it when it is busy), else the main
+model, with 1024 tokens and low thinking. After Sightengine fails it is
+not asked for an hour, in that instance, and the model judges alone. A
+picture neither can judge (the model down, blocked or answering something
+else) is left alone and not kept, so that it is judged when it comes
+again: the guard never deletes on a guess. Each verdict is logged as
+`guards: picture checked` with `judge=sightengine` or `judge=model`, and
+kept with its judge.
+
 ### Moderation
 
 A group's admins can have her act on a message by replying to it and asking
@@ -867,14 +1414,106 @@ A group's admins can have her act on a message by replying to it and asking
 model calls the `moderate` tool, which is offered in groups only, and every
 check is made in code:
 
-- **Actions:** delete the message; mute its author (an hour unless asked
+- **Actions:** delete the message; purge, which deletes every message its
+  author wrote in the group in the last hour, or the minutes asked for, two
+  days at most, since Telegram deletes nothing older ("Maria, buning
+  hammasini o'chir", "tozala", "очисти", "удали все"); mute its author (an hour unless asked
   otherwise, at most a week; supergroups only) or unmute them; ban them, or
-  unban; pin the message without a notification, or unpin it.
+  unban; pin the message without a notification, or unpin it; take away a
+  member's stickers and GIFs, or photos (a day unless asked otherwise), and
+  give them back; make a member an admin, with the bot's own delete, mute,
+  pin and invite rights at most (never the right to make admins), take it
+  back or set their title, for admins the bot made. A member's other limits
+  stay: one already muted or without stickers stays so, and what is given
+  back keeps the rest of the restriction's end.
+- **Purge** finds the messages in the group log (`group_messages`, by
+  author and message ID), as the Bot API cannot list a chat's messages: with
+  the log off it is refused, and what the log never saw, such as messages
+  the guards deleted, is not purged. The message replied to goes too,
+  however old. Telegram is asked to delete them a hundred at a time
+  (`deleteMessages`), at most a thousand in one purge; it skips those it no
+  longer has. A member who left or was banned can still be purged, which is
+  how a spammer just banned is cleared out. It is one action in the audit,
+  with the minutes and the number of messages, and like a deletion it can
+  never be undone.
+- **Posts on behalf of a channel** (a member writing as their channel; not
+  the group posting as itself, as anonymous admins do, nor the linked
+  channel's posts Telegram forwards): ban and unban act on the channel,
+  with `banChatSenderChat` and `unbanChatSenderChat`, so that whoever runs it
+  can no longer post as it in the group, under any account; the post itself
+  may be deleted or pinned. Muting, stickers, photos, adminship and purge are
+  for members, and are refused for a channel's post with that reason. The
+  audit records the channel by its chat ID, and undo puts a channel's ban
+  back as it does a member's.
+- **The group itself,** with no reply or tag: rename it, set or clear its
+  description, set its photo from the photo in the request or remove it,
+  make an invite link (named, and ending when asked), unpin everything, and
+  `lock` or `unlock` one kind of message for everyone (messages, photos,
+  videos, stickers and GIFs, voice and round videos, files, music, polls,
+  link previews), keeping the group's other permissions. Each needs its own
+  admin right, the asker's and the bot's: changing the group's info,
+  inviting users, pinning or restricting members.
+- **The group's sticker pack** (`set_sticker_set`, `delete_sticker_set`,
+  Telegram's `setChatStickerSet` and `deleteChatStickerSet`): replying to a
+  sticker, "shu stikerlarni guruhga qo'y" gives the group that sticker's
+  pack, which every member may then use there; the pack comes from the
+  sticker in the update, never from a name the model gives. "stikerpakni
+  olib tashla" takes it away. Both need *change the group's info*, the
+  asker's and the bot's, words about stickers or a pack ("stiker",
+  "paket", "стикерпак"), and a group Telegram lets have one: she asks
+  `getChat` first and, where `can_set_sticker_set` is false (only large
+  enough supergroups may), says so. Undo puts the old pack back, or none.
+- **Invite links:** a new link may also admit only a number of people (1 to
+  99999) or make each who opens it ask the admins to approve them; Telegram
+  does not combine the two, so asking for both is refused with that reason.
+  `revoke_link` stops a link she made from working and `edit_link` changes
+  its name, end, member limit (0 removes it) or approval: the link the asker
+  gives, or else the latest she made in that group. She acts only on links
+  she made there, found in `moderation_actions` (the link and its limits are
+  kept in the record's `undo`), never on the group's other links; the
+  asker's words must name a link and say to revoke it ("bekor qil",
+  "o'chir", "отзови") or what to change ("20 kishiga chekla", "tasdiq bilan
+  qil"). Telegram sets every limit anew in an edit, so she sends the link's
+  own limits with the one changed, and an end once set can be moved but not
+  taken away. Undo revokes the latest link she made, edited or not; a
+  revoked link is never revoked again.
+- **Member tags** (Bot API 9.5): `member_tag` sets the tag Telegram shows
+  by a regular member's name, 16 characters at most and no emoji, or takes it
+  off with no text (`setChatMemberTag`), the member replied to, tagged or
+  named, for those holding *manage tags*, and the bot too, which asks for it
+  when made an admin. The asker's words must name a tag ("teg", "tag",
+  "тег"); undo puts the old tag back. The model also sees each sender's tag
+  (`sender_tag`, a member's tag or an admin's title) in their label, in
+  «»: "Ali @ali «Pro»", brackets taken out so no tag can fake a mark.
+- **Forum topics,** in a group with topics, through the separate
+  `forum_topic` tool: create a topic (named, its icon in one of Telegram's
+  six colours when asked), rename, close, reopen or delete the topic the
+  request was written in (or that of the message it replies to, as Telegram
+  says in the update: never one the model names), and hide or show the
+  General topic. A request in General acts only on General itself. The
+  asker and the bot both need *manage topics*, and *delete messages* too to
+  delete a topic, which takes every message in it; the asker's words must
+  name a topic ("mavzu", "topic", "тема", or "General" to hide or show it)
+  and say what to do ("yop", "och", "o'chir", "yashir"). Topic actions are
+  audited and counted like the others, as `topic_close` and so on, but undo
+  does not put them back: a closed topic is reopened by asking.
+- **Undo** ("orqaga qaytar"): every action but a deletion or a purge is recorded with
+  what puts it back, read from Telegram just before it is taken
+  (`moderation_actions.undo`). Undo puts back the group's latest such
+  action, once; asked again, the one before. It needs the right the action
+  needed. A name, description or lock someone changed by hand since is not
+  overwritten unless they say so again. A restriction that has ended since
+  is put back as none, never as forever. Deleted messages, and messages the
+  guards deleted, never come back; an unban lets the member rejoin but does
+  not add them; a demoted admin gets back only the rights the bot holds; and
+  undoing "unpin all" pins back only the latest pinned message, the one
+  Telegram reports.
 - **No confirmation:** as the owners asked, the action is done at once,
   with no question to answer. Instead, the person's own message (or their
   voice message's transcript) must ask for it in words, checked in code:
   "o'chir", "mute qil", "jim qil", "ban", "blokla", "pin qil", "заблокируй",
-  "закрепи" and the like. A text in the chat or a quoted message can talk
+  "закрепи" and the like; a purge needs words for all of them, "o'chir"
+  alone deleting one message. A text in the chat or a quoted message can talk
   the model into calling the tool on someone's turn, but nothing is done
   unless that person asked for it themselves.
 - **Target:** the message the person replied to, as Telegram delivered it.
@@ -883,15 +1522,20 @@ check is made in code:
   without a username, Telegram gives the ID; with an `@username`, the ID is
   the last author seen under it in that group's log, and Telegram must
   confirm that this account still has that username and is in the group.
-  Two tags, an unknown username or any mismatch act on nobody, and she asks
-  for a reply to the member's message instead. Nothing
-  the model, a member or a quoted message writes can choose whom she acts
-  on. Her answers always reply to the person's own request.
+  Without a tag they may name the member ("Azamatni mute qil"): the model
+  passes the name, and it acts only on the one member seen in the group by
+  that first name or username whose name is in the person's own words, as
+  it is or with an ending such as -ni or -ga; a first name two seen members
+  share needs their username. Two tags, an unknown username, a name not in
+  their words or any mismatch act on nobody, and she asks for a tag or a
+  reply to the member's message instead. Nothing the model, a member or a
+  quoted message writes can choose whom she acts on beyond the person's own
+  words. Her answers always reply to the person's own request.
 - **Who may ask:** a bot owner recognised by `BOT_OWNER_IDS` (not by
   username alone), or the group's creator or an administrator
   who holds the matching right, as Telegram reports it at that moment:
-  *delete messages* for delete; *ban users* for mute, unmute, ban and
-  unban; *pin messages* for pin and unpin.
+  *delete messages* for delete and purge; *ban users* for mute, unmute, ban
+  and unban; *pin messages* for pin and unpin.
 - **Her rights:** she needs the same right herself, checked with Telegram
   each time. The model is told those of her rights in each group that a tool
   uses (delete, ban and mute, pin) so that it does not
@@ -899,7 +1543,8 @@ check is made in code:
 - **Never a target:** the person asking (they may still have their own
   message deleted or pinned), the bot itself (its own messages may be
   deleted or pinned), the bot's owners recognised by `BOT_OWNER_IDS`, the
-  group's admins, and Telegram's service accounts.
+  group's admins, and Telegram's service accounts (a channel's post, which
+  Telegram sends as one of them, is the channel's; see above).
 - **Limits:** at most 10 actions per person in 10 minutes. When Telegram
   cannot say who may do what, nothing is done.
 - **Once only:** each action is recorded in `moderation_actions` under the
@@ -913,6 +1558,67 @@ She is told to use the tool only when an admin or owner asks, never on her
 own initiative, and to say an action was done only when the tool reports
 it done; she then says so in one short line, like "Bajarildi: Bek @bek
 15:04 gacha yoza olmaydi".
+
+### Join requests
+
+A group whose admins approve new members, or an invite link made to ask
+for approval, sends her every request to join (`chat_join_request`
+updates), where she is an admin with the right to invite users; nowhere
+else does Telegram send them. She answers them only where the joins guard
+is on (a `join_captcha` rule, "Maria, guruhga qo'shilmoqchi bo'lganlarni
+tekshir"). Elsewhere the group's admins vet the requests by hand, and a
+button any requester could press would let them approve themselves past
+those admins, so she does nothing with them; the only exception is the
+spam guard. She answers them in code, with no model:
+
+- Where the spam guard is on, a requester the spam lists (CAS, lols.bot)
+  know as a spammer is declined at once (`declineChatJoinRequest`), with
+  the joins guard on or not.
+- Where the joins guard is on, anyone else gets a private message, in the language of their Telegram
+  app, with one button, "Men odamman ✅" ("Я человек ✅", "I'm human ✅"),
+  sent to the private chat Telegram names with the request: she may write
+  there for a few minutes though they never started her. Pressing it within
+  10 minutes lets them in (`approveChatJoinRequest`), and the message says
+  so; the person comes from Telegram's report of the press, never from the
+  button, so nobody else can press it for them. Spam bots asking to join
+  never press it.
+- A request not pressed in time is declined. Waiting requests are kept in
+  `join_requests` (migration 0037) and taken once, by the press or by the
+  decline, so that a request is answered once. On a server the polling
+  command declines late ones every minute; on Vercel, where nothing runs
+  between requests, every update the webhook handles looks for them, at
+  most once a minute per instance, and the daily cleanup declines any no
+  update noticed. In a quiet stretch a late request may so wait longer than
+  10 minutes; a press after its time declines it then.
+- When the private message cannot be sent (the requester's privacy
+  settings, or Telegram's minutes having passed), she leaves the request to
+  the group's admins, as it was before her: declining people because she
+  could not reach them would turn away real ones. She leaves them too in a
+  muted group, and in a group where she lacks the right to invite users,
+  asked of Telegram with each request. An admin who answers a request by
+  hand first wins: her later approval or decline is refused by Telegram and
+  dropped. A request still waiting when the joins guard is turned off goes
+  back to the admins: its button then lets nobody in, and it is not
+  declined.
+
+Since the joins guard takes the requests from the admins who answer them,
+those admins may hand them over or take them back themselves: the
+`join_captcha` tool turns it on (`on`) or off (`off`) and says whether it
+is on (`status`) for the bot's owners, the group's creator and its admins
+who may invite users, asked of Telegram (`getChatMember`) at that moment;
+an admin without that right, a member, or anyone when Telegram cannot say,
+is refused. The asker's own words must be about the join check ("kapcha",
+"captcha", "qo'shilish", "so'rov", "tekshir", "заявки", "вступление",
+"проверка") and, to turn it off, ask for that ("o'chir", "kerak emas",
+"yo'q qil", "выключи", "убери", "off"), as with moderation, so a line in
+the chat cannot talk her into it. It touches the group's own joins guard
+and nothing else. The owners still turn it, and the other guards, on and
+off through `group_rules` (`guard` `joins`, `unguard` `joins`), which only
+they may use.
+
+Turn the joins guard on, turn on *Approve new members* in the group (or
+make invite links with *Request admin approval*) and give her *Invite users
+via link*; turning any of them off returns the requests to the admins.
 
 ### Stickers
 
@@ -937,16 +1643,6 @@ the command again goes on where it stopped, and the reply says how many are
 left. The stickers are kept in `bot_stickers`, and when each chat last got
 one in `sticker_sends`.
 
-A pack of Mobile Legends item cards, stickers that show an item's icon and
-stats, is imported with `/import_items https://t.me/addstickers/name`
-instead. The model reads the item's English name off each card and keeps it
-as the sticker's description, marked `mlbb_item` (`mlbb_item_none` for a
-sticker that is no card), which takes the card out of the moods even when
-`/import_stickers` labelled it first. When someone asks about an item, the
-`mlbb_item_card` tool finds the cards, up to six in one call for a whole
-build, by name or by a part of the name only one card has, and they are sent
-as stickers after a one-line answer, outside the stickers' 30-second gap.
-
 Now and then, about one time in four, she asks for `[gif CATEGORY]` instead.
 With `GIPHY_API_KEY` set, the code searches GIPHY for that mood (rated PG at
 most), picks one of the first ten at random and sends it; the GIF and the
@@ -957,13 +1653,90 @@ such as `[gif pubg]`, and GIPHY is searched for those words; a topic has no
 sticker to fall back on, so when it fails nothing is sent. GIPHY's free
 key allows 100 searches an hour, far more than she sends.
 
+#### Her own sticker set
+
+Owners fill a sticker set of her own from the chat, with the owner-only
+`sticker_set` tool, offered when `BOT_OWNER_USERNAME` is set and refused in
+code to anyone else. The set is
+`https://t.me/addstickers/maria_by_<bot username>`, one per bot, so a test
+bot sharing the database has its own; its first title is
+`BOT_DISPLAY_NAME`.
+
+- `add`: "Maria, shuni stiker qil" with a photo, or in reply to one (a
+  static sticker of another pack works too), makes that picture a sticker;
+  "Maria, mushuk stikerini chizib qo'sh" has it drawn first by
+  `IMAGE_MODEL`, when drawing is on, on a plain white background that is
+  then cut away from the edges in. The model gives 1 to 3 emoji for the
+  sticker's mood (each checked in code to be one emoji, 20 at most). The
+  picture is resized in Go to 512 pixels on its longer side and written as
+  a PNG of at most 512 KB, with fewer colours when a photo's detail would
+  make it larger, as Telegram requires of a static sticker. It is uploaded
+  with `uploadStickerFile`; the first sticker makes the set
+  (`createNewStickerSet`) as the asking owner's, and every later one is
+  added (`addStickerToSet`) as that same owner, whoever asks, because
+  Telegram lets only the set's owner add to it. That owner is kept in
+  `own_sticker_sets`; should the row be lost, the next sticker finds the
+  name taken and is added to the set as the asking owner. The new sticker
+  is then sent to the chat in reply, with the set's link as the answer, and
+  the model looks at it as at an imported pack's stickers, so that she
+  sends it too; one not looked at in time is looked at with the next.
+- `remove`: in reply to one of the set's stickers, takes it out
+  (`deleteStickerFromSet`) and drops it from `bot_stickers`. A sticker of
+  another pack is refused.
+- `title`: renames the set (`setStickerSetTitle`, 1 to 64 characters), once
+  it is made.
+- `link`: the set's link, title and number of stickers.
+
+Each owner adds at most 20 stickers a day, counted in `sticker_uploads`
+from midnight in `GROUP_HISTORY_TIMEZONE`; a sticker that fails is not
+counted. Telegram holds 120 stickers in a static set and paces additions,
+and its refusal, with how long to wait, is passed on. The owner who makes
+the set should have started a private chat with the bot first: Telegram
+may refuse to make a set for a user the bot has never talked to.
+
+### Boosts
+
+When someone boosts a group where she is an admin, Telegram sends her a
+`chat_boost` update, and she thanks them there, in code, without the model:
+"Rahmat, Ali, guruhga boost berganingiz uchun! 🚀", in Russian or English for
+an app in those languages, and without a name for a boost Telegram names no
+one for. Each boost is thanked once: its ID is noted in `group_boosts` (the
+group and the boost's ID, nothing about who gave it) before she speaks, as
+Telegram sends a boost again when it changes, such as when it is renewed.
+When it cannot be noted, or the bot is muted there, she says nothing. A boost
+taken away gets no word, so she does not ask for `removed_chat_boost`.
+
 ### Polls
 
 Anyone in a group can ask her for a poll ("Maria, so'rovnoma qil: plov yoki
 manti?"). She posts an anonymous poll in that group, with 2 to 10 options
 and one or several answers allowed, at most one per group every 10 minutes.
-Polls are counted in `moderation_actions` as `poll`. In a private chat she
-cannot make one.
+Polls are counted in `moderation_actions` as `poll`, with the poll's message
+once sent. In a private chat she cannot make one.
+
+She also closes a poll she made there (`create_poll` with action `stop`,
+Telegram's `stopPoll`) when asked in words ("so'rovnomani yop", "ovoz
+berishni to'xtat", "закрой опрос"): the one replied to, which must be her
+own and still open, or else her latest open one. Only whoever asked for that
+poll, the group's admins, as Telegram says when asked, and owners known by
+`BOT_OWNER_IDS` may; she then gives the final counts, which Telegram also
+shows under the closed poll. Closing is recorded as `poll_stop` with the
+poll's message, so the same update closes once; it counts as no moderation.
+A poll made before this version has no message kept and cannot be closed by
+her.
+
+### Dice
+
+Asked to roll, throw or play ("Maria, zar tashla", "kubik ot", "бросай
+кубик", "o'ynaymiz"), in a group or a private chat, she has Telegram roll
+one of its animated dice with the `send_dice` tool: 🎲 a die, 🎯 darts, 🏀
+basketball, ⚽ football, 🎳 bowling or 🎰 the slot machine. Telegram draws
+the value, not the model nor the asker; the tool gives it back, with what
+it means (a bullseye, a goal, a strike, the slot's three reels and whether
+they won), and she comments in a line. One roll per message, and a chat
+gets 3 rolls every 5 minutes, so a game cannot flood a group. Rolls are
+counted in `moderation_actions` as `dice`, which, like polls, do not count
+as anyone's moderation.
 
 ### Admins
 
@@ -995,6 +1768,427 @@ not everyone: members who have not written or joined since she started
 keeping it are missing, and she says so. An anonymous admin's messages are
 sent as the group, so they never appear.
 
+Asked to call or tag someone, she looks their @username up there. A member
+without one is listed with a tag, `[Name](tg://user?id=123)`; written in her
+answer, the telegram client sends it as their name linked to their ID (a
+`text_link` entity), which Telegram shows as a mention and tells them of.
+
+### Catching up
+
+Each answer in a group shows her only an hour or two of a busy group's log.
+Asked what was talked about or what someone missed ("nima gaplashdilar",
+"что я пропустил"), she calls the `catch_up` tool, which reads the group's
+log from `group_messages`: from the asker's own previous message, or the
+hours they name, at most 24 and no older than `RETENTION_DAYS` keeps. Each
+message is cut to 200 characters and the newest 32 KB are kept; she recaps
+them in a few lines. Only the group the question is asked in is read, and in
+a private chat the tool is not offered.
+
+### Statistics
+
+Asked who is the most active, the group's MVP or how much it wrote ("eng
+faol kim", "guruh MVP si"), she calls the `group_stats` tool: for today
+(since midnight in `GROUP_HISTORY_TIMEZONE`) or the last 7 days, the
+messages in the group's log, how many members wrote, the ten who wrote the
+most (the first is the MVP), the three busiest hours and whom the swear
+guard caught the most. Her own messages are not counted, nor those written
+while she was muted or older than `RETENTION_DAYS`. Members are named by
+first name only, so that the list tags nobody. Only the group the question
+is asked in is counted.
+
+### Dashboard (Mini App)
+
+With `WEBAPP_URL` set, the same numbers are a page: a Telegram Mini App
+served from `public/stats/`, with the messages per hour of the day (in
+`GROUP_HISTORY_TIMEZONE`), the busiest hour, the ten who wrote the most,
+which of the group's guards are on (swearing, spam, links, pictures,
+joins) and whom the swear guard caught the most, for today or the last 7
+days. It follows the user's Telegram theme, light or dark, and speaks
+Uzbek, or Russian to a Russian Telegram app.
+
+It is for the bot's owners known by `BOT_OWNER_IDS` alone: it names who
+writes and who swears most, which a group's members are not to see. To
+anyone else `/stats` is an unknown command, and it is in no command menu
+or `/help`.
+
+- **In a group** an owner's `/stats` answers with a button that opens it. Telegram lets
+  a Mini App button (`web_app`) be used in private chats only, so in a group
+  the button is a link to the bot's main Mini App,
+  `https://t.me/<bot>?startapp=g<group ID without the minus>`, which opens
+  it inside Telegram with the group in `start_param`.
+- **In a private chat** an owner's `/stats` answers with a Mini App
+  button, and the menu button of each owner's private chat opens it too
+  (`setChatMenuButton` for that chat, set at each start while `WEBAPP_URL`
+  is set, when everyone else's is put back to the commands; without it the
+  buttons are left as they are). Opened without a group, it lists the
+  groups the bot is in, to pick one.
+
+The page asks `/api/stats` for the numbers, sending the init data Telegram
+gave it. The function believes nothing else:
+
+- it checks the init data's `hash` as Telegram prescribes (HMAC-SHA256 with
+  the key `HMAC-SHA256("WebAppData", bot token)`) and refuses data signed
+  more than an hour ago, so the user's ID is Telegram's, never the page's;
+- it shows nothing to anyone but the owners, whatever the link or the page
+  names (`not_owner`);
+- only the group asked about is counted, with the `group_stats` tool's
+  queries.
+
+Members are shown by the name the group log has for them, with their
+@username; only the owners can see it.
+
+### The game: Tarozi
+
+With `WEBAPP_URL` set, `/game`, in a group or a private chat, posts the
+bot's own game with `sendGame`, and so does the `send_game` tool when
+someone asks to play a game ("o'yin o'ynaymiz", "скинь игру"; dice stay
+with `send_dice`), once per message and twice per chat in 10 minutes,
+counted in `moderation_actions` as `game`.
+
+Tarozi is a bazaar scale. A price board gives four fruits a weight from 1
+to 9 each, and changes every 6 weighings; each weighing puts fruits on the
+two pans, one to four on each as the play goes on, and the player says
+which pan goes down, or that they balance. A play lasts 40 seconds; a right
+answer is 10 points and 2 more for each right one before it in a row (at
+most 10 more), a wrong one takes 5 off. The page is `public/game/`, plain
+HTML, and follows the device's light or dark mode.
+
+Telegram keeps the scores: each game message has its own table, which it
+shows under the message. The page shows the bot's own table instead, from
+the database across all chats (below), and Telegram's only when the
+database cannot be read (`getGameHighScores`).
+The score is not taken from the page:
+
+- A press of Play reaches the bot as a callback query, answered with the
+  page's address and a **session token** the bot signed (HMAC-SHA256, its
+  key made from the bot token) naming the player, the game message and the
+  time; it opens plays for an hour.
+- Each play is **dealt by the server** from a fresh random seed (`start`),
+  and comes with a run token that holds the seed and the start time.
+- The page sends back only the **answers and when each was given**
+  (`finish`); the server deals the same rounds from the seed and **counts
+  the score itself**. It refuses a play with answers under 300 ms apart,
+  after the 40 seconds, more than were dealt, or spread over more time than
+  the server saw pass since the start, and run tokens older than 10
+  minutes. Then it sets the score on the session's game message for the
+  session's player (`setGameScore`; Telegram keeps each player's best).
+
+The bot keeps the scores too, for tables of its own: each play scored of
+Tarozi, Kosmik ilon and O'tinchi counts in the player's row of
+`game_scores` for that game and chat (migration 48), with their best and
+when it was made, their last score and how many plays they scored. A
+play the database does not take is still set on Telegram. The page's
+table is made from it: the first 10 players of the game by their best in
+any chat, ties sharing a place, and the player's own row under them when
+they are further down.
+
+The tables and Dev jangi show the players' profile photos: each row the
+server lists carries the address of its player's photo at
+`/api/game?avatar=`, signed for that player and good until the end of the
+next day. The server fetches the photo from Telegram in its small size and
+serves it, kept a day by browsers and Vercel's cache, so Telegram's file
+address, which holds the bot's token, never reaches a page. A player
+without a photo, or who shows it only to their contacts, keeps their
+initial.
+
+A bot can still answer as fast as the limits allow, but not faster, and
+cannot name its score, another player or another message.
+
+### Kosmik ilon
+
+`/ilon` posts the bot's second game the same way, and `send_game` takes it
+when asked by name ("ilon o'ynaymiz"; Tarozi when no game is named). It is a
+snake in space (`public/game/ilon/`, `internal/game/ilon.go`): the field,
+15 by 21, wraps at its edges; the snake moves a cell a tick, turned by a
+swipe or the arrow keys, and grows by two for each planet it eats. A planet
+is 10 points times the level, twice or three times that when eaten within
+30 ticks of the one before (the combo). Every 10 planets it reaches the
+next level, 100 points times the level it leaves: the snake starts again
+from three cells, on another of six fields of walls, and each tick is 14 ms
+quicker, from 150 ms to 60 ms. After a planet, one time in three, a bonus
+shows for 50 ticks: a star of 50 points times the level, an ice clock that
+makes the next 60 ticks half as long again, or a ghost that lets the snake
+pass through walls and itself for 40 ticks. Running into a wall or itself
+ends the play.
+
+It shares Tarozi's sessions, its `/api/game` and its scoring rule: the
+session and run tokens name which game they are for, and a play of one
+cannot be started or finished as the other's. `start` gives the play's
+seed and the rules, walls and timings included; the page plays them in
+`sim.js` and sends back only its **turns, each with its tick, and how many
+ticks went by**. The server plays the turns again from the seed with the
+same rules in Go and **counts the score itself**; it refuses turns out of
+order, after the end, or a play whose snake did not crash in its last tick.
+The ticks' lengths say how long the play took at the least, and a play sent
+in sooner than that after its start is refused, so it cannot be played
+faster than the page lets a person. A test plays whole games with an
+autopilot and has `node` score them with `sim.js`, which must match the
+server's score to the point.
+
+### O'tinchi
+
+`/otinchi` posts the woodcutter, and `send_game` takes it by name: an old
+plane tree in a mahalla (`public/game/otinchi/`, `internal/game/otinchi.go`).
+A tap on the left or right half of the screen chops the trunk's lowest
+piece from that side, and the trunk comes down a piece; branches grow from
+the pieces, and the woodcutter must not step into one nor stand under one
+as it comes down. A time bar runs down, faster as more is chopped (twice
+as fast from the 300th piece), and each chop fills it a little, less as
+more is chopped; a golden piece is worth 5. The season changes every 50
+pieces, from spring's blossom to winter's snow. A branch is never followed
+by one on the other side, which no woodcutter could pass. The page sends
+the side of each chop and when it was made; the server chops them again
+on the trunk the play's seed grows (`sim.js` and the Go are the same rules,
+which a test checks with `node`), refusing chops less than 70 ms apart,
+chops after the time ran out or after the branch that ended the play, and a
+play sent sooner than its chops took.
+
+### Kartalar
+
+`/karta` draws an anime card, one an hour, owners' too (in a private chat
+the word "karta" does too). The cards are AniList's 200 most loved
+characters, fetched the first time a card is drawn (`internal/cards`, kept in
+`card_catalog`, migration 52), the most loved the rarest: 15 👑 Mifik, 30 🔥
+Afsonaviy, 45 💜 Epik, 60 🔷 Noyob and 50 ⚪ Oddiy. A draw first draws a
+rarity, by odds of 1.5%, 6.5%, 14%, 28% and 50%, then a card of it at random,
+sent as the character's picture with its anime, attack and health, the same
+each time for the same character, and the points it is worth (5000, 2000,
+800, 300 or 100), which add up, a card drawn again too. `/kartalarim` shows
+how many of each rarity's cards the player holds as buttons that list them,
+pressed only by that player; `/kartatop` is the table of points. The
+pictures are the characters' AniList pictures, the studios' art.
+
+With `POKEWALLET_API_KEY` trading cards join them, a collection of up to a
+hundred from one English set each of Pokémon, One Piece, Dragon Ball,
+Yu-Gi-Oh! and Digimon (`internal/cards/pokewallet.go`, migration 55), their
+rarities taken as Kartalar's five and promos and the like left out. A draw
+draws from them all. If PokéWallet cannot be had the game goes on with what
+it has and asks again ten minutes later. Its pictures want the key too, so
+the Mini App gets them from `/api/cards?image=<id>`, which the CDN keeps:
+the free plan allows 1000 requests a day. The pictures are the games'
+publishers' art, and PokéWallet's terms name unapproved bots among what they
+forbid, which reads as meant for its site.
+
+`/kartalar` opens the same as a Mini App (`public/kartalar/`, served by
+`api/cards.go` from `internal/cards`): the collection shelf by shelf, the
+rarest first, the cards held with their pictures and the rest as locked
+cards folded into one row each, a search through the cards held, a card
+opened large with its numbers, drawing a card that turns over with a
+countdown to the next, and the table. The player is the one Telegram's
+signed init data names, and a card not held reaches the page as its rarity
+alone. In a group its button links to the private chat (`/start
+kartalar`), as Telegram opens Mini App buttons only there; the collection's
+message carries it too.
+
+### Dev jangi
+
+`/boss` posts the boss raid: everyone in a chat hits one giant together
+(`public/game/boss/`, `internal/raid`, `api/raid.go`). Each tap is a blow
+of the hero's sword, now and then a critical one of three times the
+damage. The page shows each blow's number at once, the members who fight
+this boss standing by the player with their names, each swinging as their
+blows come in, and the chat's table of damage on this boss.
+The hit that takes the last HP kills it: everyone who hit it gets coins,
+reckoned from the boss and not their sword: the price of the sword expected
+at its level (60% of the level), 2% of it for being there, earned by 30 blows,
+and up to 3% more for their share, at most their own next level (a chief thrice
+that), never less than the boss's level alone gave,
+and only that once the sword is at its highest, so that the same work pays the
+same and a level comes quickly to one behind the boss and slowly to one ahead,
+the bot tells the group who
+hit it most (in a private chat the player fights alone), and the next
+level's boss takes its place: a third stronger each level, and stronger for
+each member who hit lately (in the last day, up to 30), so that a small
+group's boss is a small group's to kill. Eight bosses are taken in turn,
+each drawn in its own way under its own sky (public/game/boss/skins.js): Ko'k
+dev, Qizil dev, Bir ko'zli dev, Ajdar, Muz devi, Tosh dev, Yalmog'iz kampir and
+Qora dev; every fifth is a chief (👑), thrice as strong and as rewarding.
+Migration 57 started the raid again for everyone. Telegram keeps a game's table for good, so each opening of the game brings down the scores on it that no total in the chat backs. Coins buy the upgrades, each level of the sword 1.5 times the last and of the
+critical blows 1.7 times (migration 56 keeps the part of a level saved coins were):
+the sword's damage and the share of critical blows.
+Barchinoy the archer was an upgrade too until migration 47, which took her
+away and gave each hero back the coins they had paid for her.
+
+From a group's game the «🧍 Mening devim» button turns to the player's own
+boss, the one their private chat with the bot keeps, sized to them alone, so
+that a member too weak for the group's giant still kills bosses and earns
+coins; «👥 Guruh devi» turns back. The choice is kept for their next game. A
+boss fought alone sets no score in the group and is announced to no one; the
+hero, its coins, upgrades, skills and quests are the same in both.
+
+Migration 54 recalculated the game once, as the owners asked: totals no
+sword could reach set to what the taps do on average, every boss set back
+to the level its active members can kill, and the coins of the player paid
+most while kills paid a fourth of a level cut to a tenth of one. Telegram's
+tables under the games' messages keep a score unless it is forced, so Dev
+jangi sets its scores with force, and also when its page opens: a corrected
+total takes the old one's place on a message the next time its player opens
+the game from it. The bot keeps no list of its game messages, so they cannot
+all be corrected at once.
+
+Two skills: 💪 Kuch, the buff, makes blows three times as strong for 12
+seconds (every 50), and ⚡ Ulti, the ultimate, is charged by 300 taps and makes
+the next blow a hundred times, a critical one too when it falls so (migration
+53 keeps its charge). They took the place of Bo'ron zarbasi and Olovli qilich.
+Three daily quests,
+the same for everyone and new each midnight in Uzbekistan: hit 300 times,
+help kill a boss, use a skill 3 times; each gives coins once done, more as
+the sword grows. The first visit of a day gives a gift that grows with the
+streak of days, up to the seventh. The page shows the player's place among
+the chat's members, on this boss and in all, and their title by damage in
+all: Yangi jangchi, Botir (10 thousand), Bahodir (100 thousand), Pahlavon
+(a million), Qahramon (10 million) and Alpomish (100 million). Telegram's
+table under the message shows each member's damage in all.
+
+The server counts it all (`raid_bosses`, `raid_members`, `raid_heroes`,
+migrations 45 to 47): skills are used, quests claimed and the daily gift
+given on the server, which keeps when each skill is ready. The page sends only how many times it was tapped; the server
+counts no more taps than 12 a second since the player's last hit, at most
+two seconds' worth and a few more, and works out their damage itself.
+Which taps are critical is a hash of the hero's seed and the tap's number,
+which the page counts the same way (`crit.js`, checked against the Go by a
+test), so the numbers it shows are the ones counted. A hit changes the boss
+with its row locked, so of many hits at once only one kills it.
+
+### Mafia
+
+`/mafia` posts Mafia, played by a group of 5 to 20 (`public/game/mafiya/`,
+`internal/mafia`, `api/mafia.go`; its short name with @BotFather is
+`mafiya`). Members press Play and join the room; any of them starts it
+once five have joined. Each gets a secret role, which only their page
+shows: the Don and the mafia, who see each other, the commissar, the
+doctor, the courtesan, the maniac, the lucky one and citizens, dealt by
+the number of players. At night the roles act on the page: the mafia pick
+a victim (the Don's word is the last), the Don looks for the commissar,
+the commissar checks a player, the doctor cures one (not the same two
+nights running), the courtesan keeps one from acting, the maniac kills.
+The night is played out in that order: the courtesan's visit first, then
+the cure, the checks, the kills and the lucky one's luck, which saves them
+once. By day the group argues in its own chat, and then votes on the page;
+the most votes put a player out, a tie no one. Whoever falls, at night or
+by the vote, may leave one last word of up to 200 letters on their page,
+until the next night or vote is played out, and the bot posts it in the
+group. The page has a chat of its own: at night the mafia's, which only
+its members write in and read, to agree on the victim; by day, in the
+lobby and after the end, the town's, which everyone in the game reads and
+the living write in. A line names the room it was written for and is
+refused if that room closed as it was sent, so a night's line never
+reaches the day. The game keeps the latest 60 lines of up to 200 letters,
+one a second from each player. The fallen may not write in the group till the game ends: the bot
+restricts them, when it is an admin with the right to restrict members,
+leaving out admins and members someone restricted already, and lets those
+it restricted write again at the end; a restriction lasts an hour at
+most, should a game be left unfinished. The bot tells the group
+each morning and verdict, with the roles of the dead; the town wins when
+no killer is left, the mafia when they are as many as the rest, the
+maniac when left with one other. The winners get 150 of Dev jangi's coins
+each, the maniac 300.
+
+The server keeps each group's game as one row of `mafia_games` (migration
+49), changed with the row locked, and gives each page only what its
+player may see: their role, their partners', the dead's and what their
+checks found. A phase ends when its time is up (45 seconds for a night,
+75 for a day, 40 for a vote), on the first request after it, or sooner
+when everyone who acts has acted or voted; the pages ask every two
+seconds.
+
+### Maydon
+
+`/maydon` posts Maydon, a team battle of a group, one against one up to
+five against five (`public/game/maydon/`, `internal/maydon`,
+`api/maydon.go`; its short name with @BotFather is `maydon`). Members press
+Play, pick a class — warrior, archer, mage or healer — and join; any of them
+starts the battle once two have joined. The sides are split by power, the
+strongest left joining the weaker side, and each fighter's strength comes
+from their Dev jangi levels: 3% more blows a sword level, 1% more life a
+level of either, 5% critical blows and 2% more a crit level.
+
+In the 90-second battle each player taps a foe to target it (a healer may
+target a friend) and strikes as their attack comes round: a blow within
+450 ms of it is a precise one, half as strong again, and one before it
+slips and puts it off. A skill fires when the energy is full, a block takes
+70% of each blow for a second and a half, and a fallen fighter comes back
+once, eight seconds later, with 60% of their life. A fighter whose player
+does nothing strikes by itself three seconds after their attack comes
+round, weaker, so that no side plays one short. A side wins when the other
+has fallen for good, or when the time is up with more of its life left;
+the bot tells the group the winner and the best fighter, and each winner
+gets 100 of Dev jangi's coins. Members who did not join watch the battle.
+
+The server plays the battle: each group's room is a row of `maydon_rooms`
+(migration 50), and each request, changed with the row locked, plays it on
+to the moment it came in steps of 50 ms, its randomness kept in the room,
+then does what the player asked; a page asks twice a second and gets the
+hits since its last to draw.
+
+### Shashka (draughts Mini App)
+
+With `WEBAPP_URL` set, `/shashka` opens Russian draughts, played against
+people or the bot in a Mini App (`public/shashka`, `internal/shashkaapp`,
+`internal/shashka`), with no model and no limit. Nothing needs setting up in
+@BotFather.
+
+- **Opening it.** In a private chat `/shashka`, and «📋 Ko'proq» →
+  🕹 O'yinlar → ♟ Shashka, answer with the Mini App's button. A group cannot
+  have one, so there `/shashka` makes the sender's invite and posts it with
+  «⚔️ Qabul qilish», a link to `https://t.me/<bot>?start=sh_<code>`: the bot's
+  private chat answers that `/start` with the button into the game, for
+  whoever takes it and for the sender too, who sees their invite waiting.
+- **Opponents.** ⚔️ Raqib topish pairs the player with someone else asking,
+  the nearest in rating first (a wait lapses unless the page asks again
+  within 10 seconds, which it does every 2.5); 👥 Do'stni chaqirish makes an
+  invite whose link the page shares, and the inviter is told in their
+  private chat when it is taken; 🤖 Maria bilan plays the bot at 😊 Oson,
+  🙂 O'rta or 😈 Qiyin (an alpha-beta search to depth 2, 4 or 7, the last
+  capped at 150,000 nodes, about 40 ms).
+- **Rules.** Russian draughts: men capture backwards too, capturing is a
+  must but any capture may be chosen, a capture is taken to its end, a man
+  crowned mid-capture goes on as a king, kings fly, and pieces taken are
+  lifted only after the move (the Turkish strike). A side with no move
+  loses; 15 moves each of kings alone without a capture is a draw. The
+  server checks every move against the rules and sends the page the legal
+  ones, which is all the page knows of them.
+- **Clock and ratings.** Against a person each move has 90 seconds, and the
+  side whose time runs out loses when the game is next looked at. Games
+  against people move both ratings by Elo (K = 32, from 1200) and count in
+  the players' records; 🏆 Reyting lists the best 20. Games against the bot
+  count in neither.
+
+Each action the page sends carries the init data Telegram signed, checked
+as the dashboard's is, which alone says who plays. A move names the
+game's version it was made on and is saved only at that version, so two
+requests at once cannot both move; pairing holds one advisory lock. A
+player has one game at a time: a new one takes back their invite and gives
+up a game against the bot, but not a game against a person, which is shown
+instead. Games over and invites no one took are deleted after 30 days by
+the daily cleanup.
+
+### Dooz
+
+`/dooz` is noughts and crosses, played on nine buttons under one message,
+with no model and no limit (`internal/service/dooz.go`,
+`internal/dooz`).
+
+- In a group it opens a game for whoever sent it: «⚔️ Qo'shilish» lets
+  any other member take ⭕, «🤖 Maria bilan» lets the opener play the bot
+  instead, at the medium level.
+- In a private chat, and from «📋 Ko'proq» → 🕹 O'yinlar, it offers the
+  bot's levels: 😊 Oson takes a win it sees and blocks half the time,
+  🙂 O'rta takes and blocks wins and plays a third of its other moves at
+  random, 😈 Qiyin never loses (a full game-tree search).
+- Each press edits the message: the board, whose turn it is, the winner
+  with the winning line marked, or a draw. A press out of turn, on a taken
+  cell or by someone not in the game gets a box saying so and changes
+  nothing. «🔁 Yana o'ynash» starts the next game: the players change
+  marks, so whoever moved second starts, and the series' score is shown.
+
+Nothing is stored: the board, the two players' IDs, the level and the
+score are in each button's data (at most 50 of its 64 bytes), and the
+players' names in the message's first line, «❌ Ali  ⚔️  ⭕ Vali», which
+the next press reads back. Since anyone can send a button's data, it is
+checked as it is decoded: a board no game could reach, the same person on
+both sides or a bot game without the bot is refused.
+
 ### Limits
 
 - Group answers are cut to `MAX_GROUP_REPLY_LENGTH` so she posts one message.
@@ -1010,9 +2204,10 @@ sent as the group, so they never appear.
   turn) gives its answer back.
   Not counted: owners; other bots, which have their own limit (below);
   reactions to applause; answers to her moderation questions; and `/mute`,
-  `/unmute`, `/ignore`, `/unignore` and `/reset` from those who may use
-  them. Past the quota a group admin is still answered when their message
-  replies to another member's, as asking to moderate or ignore them does.
+  `/unmute`, `/ignore` and `/unignore` from those who may use them. A
+  group's admins are counted like anyone, their own limit too, as the
+  owners asked; but an admin's message that replies to another member's, as
+  asking to moderate or ignore them does, is answered past the limits.
   When the count cannot be read she stays silent and logs a warning.
 - The per-user limit, `USER_RATE_LIMIT_PER_MINUTE`, is a flood guard kept in
   memory. In a private chat its first refusal is announced; in a group it
@@ -1022,8 +2217,8 @@ sent as the group, so they never appear.
   line: line breaks become spaces and square brackets become round ones. A
   private message keeps its lines, but its square brackets become round
   too, so nobody can type the bracketed note that marks the owner.
-- The managing commands (`/mute`, `/unmute`, `/ignore`, `/unignore`,
-  `/reset`) from those who may use them are not held back by the quotas, and
+- The managing commands (`/mute`, `/unmute`, `/ignore`, `/unignore`)
+  from those who may use them are not held back by the quotas, and
   a muted group gets no notices of any kind.
 - Other bots: Telegram delivers another bot's messages only when
   *Bot-to-Bot Communication Mode* is enabled in @BotFather for at least one
@@ -1303,11 +2498,13 @@ accepts the Go version in `go.mod`; if the build fails on that, lower the
 |---|---|---|
 | The last 10 hours of group messages as context | from the `group_messages` table | the same |
 | Mute state | cached in memory | read from the database for each addressed group message |
-| Group reply quotas, replies to bots, moderation and poll limits | in the database | the same |
+| Group reply quotas, replies to bots, moderation, poll and dice limits | in the database | the same |
 | Per-user flood guard | exact | per instance only, so much weaker; do not rely on it |
 | Order of messages in a group | one at a time, in order | concurrent requests are not ordered |
 | Retention cleanup (`RETENTION_DAYS`) | hourly | daily, by Vercel Cron at 03:00 UTC |
+| Declining join requests not pressed in 10 minutes | every minute | by the next update the webhook handles, at most once a minute per instance, and the daily cleanup |
 | Time per message | `REQUEST_TIMEOUT_SECONDS` | must fit in the function's 60 seconds |
+| Dashboard and game pages and their APIs (`WEBAPP_URL`) | served by a Vercel deployment of this project, which may run beside the polling bot: they need only the bot token and the database | served by the same deployment |
 
 With BotFather privacy mode off, every group message invokes the function,
 including the ones the bot ignores. Ignored messages return at once and
@@ -1380,23 +2577,156 @@ private chats) needs, in this order:
    messages*, *Ban users* (for mute and ban) and *Pin messages*. She does
    only what both she and the admin asking may do; leave out a right to keep
    her from using it.
-5. **Clear each group's old conversation**: send `/reset@YourBot` in every
-   group, as an admin or owner. Each turn replays the group's last
-   `MAX_HISTORY_MESSAGES` (20) stored messages whatever their age, and the
-   stored ones are the old put-downs, Latin answers to Cyrillic and "Xo'p
-   bo'ladi, xo'jayin" lines that the rewritten character must not copy.
-   `/reset` deletes the group's conversation and day log; standing rules
-   stay. Waiting for `RETENTION_DAYS` to remove them works too, more slowly.
+5. **Let each group's old conversation expire**: each turn replays the
+   group's last `MAX_HISTORY_MESSAGES` (20) stored messages whatever their
+   age, and the stored ones are the old put-downs, Latin answers to Cyrillic
+   and "Xo'p bo'ladi, xo'jayin" lines that the rewritten character must not
+   copy. `RETENTION_DAYS` removes them; standing rules stay.
 
 Run `set-webhook` again after this update: the bot now asks Telegram for
 `chat_member` updates too, and Telegram keeps sending only the kinds named
 when the webhook was last set. Until then the member list still fills from
 messages, joins and leaves.
 
+The forum topics, invite link limits and channel broadcasts need migration
+0039 (the `channels` table and two columns of `broadcasts`) applied with
+`make migrate` before deploying; the new version refuses to start on the old
+schema. They ask Telegram for no new kind of update, so the webhook needs no
+`set-webhook`. Give Maria *Manage topics* in forum groups where she should
+act on topics (and *Delete messages* to delete one), and add her to a
+channel as an admin with *Post messages* for broadcasts to reach it.
+
+Her own sticker set needs migration 0042 (`own_sticker_sets` and
+`sticker_uploads`) applied with `make migrate` before deploying; it changes
+nothing that exists, and needs no `set-webhook` or new setting. The owner
+who will make the set should write to the bot in private once before
+asking for the first sticker.
+
+### Deploying premium and gifts
+
+1. **Apply migration 0038 before deploying**: `make migrate` with
+   `DB_POSTGRES_URL` pointing at the production database. It adds
+   `star_payments` and `premium_users` and changes nothing else; the new
+   version refuses to start on the old schema.
+2. **Set in Vercel** `PREMIUM_PRICE_STARS` to the price (for example `100`),
+   and `PREMIUM_DAYS` and `PREMIUM_DAILY_LIMIT` to change their defaults of
+   30 and 50. Without a price nothing is sold; the price can also be set
+   later with `/set PREMIUM_PRICE_STARS 100`.
+3. **Deploy.** The bot now also asks Telegram for `pre_checkout_query`
+   updates, without which no payment goes through. Each cold start compares
+   the webhook's update kinds with the bot's and sets the webhook again when
+   they differ (the log says `webhook set again to receive every update kind
+   the bot handles`); to do it at once, run
+   `go run ./cmd/bot set-webhook https://YOUR-APP.vercel.app/api/webhook`.
+4. **For gifts**, set `BOT_OWNER_IDS`, and have Stars on the bot's balance.
+
+The edited messages, join requests and purge update needs:
+
+1. **Apply migration 0037 before deploying** (`make migrate`, as above): it
+   adds the `join_requests` table and lets `group_rules` hold the
+   `join_captcha` kind, and changes nothing else. The new version refuses to
+   start without it.
+2. **Deploy.** The function, when it starts, sees that the webhook asks for
+   fewer kinds of update than the bot handles and sets it again with
+   `edited_message` and `chat_join_request`, keeping its address and
+   secret (logged as "webhook set again to receive every update kind the
+   bot handles"). Running `go run ./cmd/bot set-webhook https://YOUR-APP.vercel.app/api/webhook`
+   does the same by hand.
+3. **In each group that should check join requests**, an owner turns the
+   joins guard on ("Maria, guruhga qo'shilmoqchi bo'lganlarni tekshir"),
+   and the group gives her *Invite users via link* and turns on *Approve new
+   members*. Until then she leaves every group's requests alone, but for
+   declining known spammers where the spam guard is on. Purge needs *Delete
+   messages*, which she has for deletions already.
+
+The guard fixes (pictures judged once ever and by the model when
+Sightengine cannot, CAS's key, the `join_captcha` tool) need:
+
+1. **Apply migration 0040 before deploying** (`make migrate`, as above): it
+   adds the `picture_verdicts` table and changes nothing else. The new
+   version refuses to start without it.
+2. **Set in Vercel** `CAS_API_KEY` to the Combot API key (see
+   [Configuration](#configuration)) for the spam guard to ask CAS again;
+   without it lols.bot alone answers, and the `401` warnings stop. The
+   Sightengine keys may stay: Sightengine judges again when its month comes
+   round, and the model meanwhile.
+3. **Deploy.** No new kind of update is asked for.
+
+### Deploying Telegram Business
+
+1. **Apply migration 0041 before deploying** (`make migrate`, as above). It
+   adds `business_connections`, `business_chats`, `business_replies` and
+   `business_checklists` and changes nothing else; the new version refuses
+   to start without it.
+2. **Set `BOT_OWNER_IDS`** in Vercel if it is not set: only those owners'
+   business accounts are used. `BUSINESS_DAILY_LIMIT` defaults to 30.
+3. **Deploy.** The bot now also asks Telegram for `business_connection` and
+   `business_message` updates. The function sets the webhook again at its
+   first start when the kinds differ (logged as "webhook set again to
+   receive every update kind the bot handles"); `go run ./cmd/bot
+   set-webhook https://YOUR-APP.vercel.app/api/webhook` does it at once.
+   Long polling asks for them on every request.
+4. **In @BotFather**, open the bot's settings and turn on *Business Mode*;
+   without it Telegram does not offer the bot as a chatbot.
+5. **Each owner with Telegram Premium** connects her: Settings → Telegram
+   Business → Chatbots, add the bot, choose the chats, and turn on replying
+   to messages and managing stories. She writes to them with what she may
+   do; `/business` shows it again, and `/business on` starts her answering
+   customers, which is off at first.
+
+The keyboard, effects, closing polls, sticker packs, boosts and map pins
+update needs:
+
+1. **Apply migration 0043 before deploying** (`make migrate`, as above): it
+   adds the `group_boosts` table and changes nothing else. The new version
+   refuses to start without it.
+2. **Deploy.** The function sees that the webhook asks for fewer kinds of
+   update than the bot handles and sets it again with `chat_boost`, as
+   above. Each start also sets the admin rights she asks for and the menus.
+3. Telegram sends boosts only where she is an admin; a group's sticker pack
+   needs *Change group info*, and Telegram allows one only in large enough
+   supergroups. Polls made before this version cannot be closed by her.
+
+### Deploying the dashboard and the game
+
+They need no new kind of update; Dev jangi needs migrations 45 to 47, the
+games' own table of scores migration 48, Mafia migration 49, Maydon
+migration 50.
+
+1. **Deploy**, then **set `WEBAPP_URL`** in Vercel to the deployment's
+   production address, for example `https://maria.vercel.app` (no trailing
+   path), and deploy again. Check the pages: `https://YOUR-APP.vercel.app/stats/`
+   says it opens inside Telegram, and `/game/` asks for `/game`.
+2. **The dashboard, in @BotFather:** `/mybots` → the bot → *Bot Settings* →
+   *Configure Mini App* → *Enable Mini App*, and send
+   `https://YOUR-APP.vercel.app/stats/` as its URL. This is the bot's main
+   Mini App, which the groups' `t.me/<bot>?startapp=…` links open. The menu
+   button of the owners' private chats is set by the bot itself at each
+   start.
+3. **The games, in @BotFather:** `/newgame` → the bot → accept the terms →
+   a title (`Tarozi`), a short description, a 640×360 photo (and optionally
+   a GIF) → the short name **`tarozi`**, exactly, which the bot sends the
+   game by. Each game's photo and description are in docs/botfather/. Then `/newgame` again for each of the others: title `Kosmik
+   ilon`, short name **`ilon`**; `O'tinchi`, **`otinchi`**; `Dev jangi`,
+   **`boss`**. No URL is asked for: the bot gives
+   `https://YOUR-APP.vercel.app/game/` and `/game/ilon/`, `/game/otinchi/`,
+   `/game/boss/` with each press of Play. Dev jangi needs migrations 45 to 47
+   and the games' scores migration 48, Mafia (`mafiya`, at
+   `/game/mafiya/`) migration 49, Maydon (`maydon`, at `/game/maydon/`)
+   migration 50.
+4. As an owner, send `/stats`, `/game`, `/ilon`, `/otinchi` and `/boss` in a
+   group and in a private chat.
+
+Until step 2 the group links open nothing; until step 3 a game's command
+answers that something went wrong, and `send_game` tells the model the short
+name is unknown.
+
 ### Daily cleanup
 
 `vercel.json` schedules a Vercel Cron job that calls `/api/cleanup` every
-day at 03:00 UTC. It deletes chat history older than `RETENTION_DAYS`
+day at 03:00 UTC. It declines the join requests whose button was not
+pressed in time and that no update noticed (see
+[Join requests](#join-requests)), and deletes chat history older than `RETENTION_DAYS`
 (default 1 day) and conversations left empty; group mute settings are kept.
 Vercel sends `CRON_SECRET` with the call, and the endpoint refuses any
 request without it, so nobody else can trigger it. Without `CRON_SECRET`
@@ -1451,8 +2781,7 @@ sudo -u postgres dropdb tgbot_restore_test
 ```
 
 **Retention.** Messages older than `RETENTION_DAYS` (default 1 day) are deleted
-by an hourly job, or daily by Vercel Cron. A user can delete their own history at any time with
-`/reset`. The counts behind the limits (`image_generations`, `bot_replies`,
+by an hourly job, or daily by Vercel Cron. The counts behind the limits (`image_generations`, `bot_replies`,
 `group_replies`, `private_messages`) hold IDs and times, no message text, and
 are deleted with the history. Standing rules are deleted when they expire. The moderation audit
 (`moderation_actions`) is never deleted automatically; delete
@@ -1491,6 +2820,11 @@ Built in:
 - [x] Tokens, API keys, the database URL and message text are never logged.
       The bot token is stripped from network errors before they are logged.
 - [x] Users see fixed, generic error messages; details go to the log.
+- [x] The dashboard's API takes the user only from Telegram's signed init
+      data (checked with the bot token, at most an hour old) and shows
+      nothing to anyone but the owners known by `BOT_OWNER_IDS`. The game's API
+      sets a score only for the player and message in a session the bot
+      signed, and counts the score itself from the answers.
 - [x] All SQL is parameterized. The model cannot produce SQL that is run.
 - [x] Every query on a conversation is keyed by the chat and user IDs taken
       from the update, never by an ID in message text.
@@ -1508,7 +2842,7 @@ Built in:
       group messages, and group messages and names are folded to one line,
       so that no text can imitate a marker or another speaker in the shared
       history.
-- [x] `/mute`, `/unmute`, `/ignore`, `/unignore` and a group's `/reset` are
+- [x] `/mute`, `/unmute`, `/ignore` and `/unignore` are
       limited to that group's administrators, checked with Telegram, the
       bot's own administrators and its owners.
 - [x] Moderation is checked in code, never by the model: the target is the
@@ -1535,6 +2869,13 @@ Built in:
       and polls are counted in the database, so they hold with several
       instances; per-user flood guard;
       fixed number of workers; bounded queues.
+- [x] Payments are judged in code, never by the model: Telegram's check
+      before a payment and the payment itself are compared with the plan on
+      sale and the payer's ID from Telegram, and a payment counts once by its
+      charge ID. Only owners see or refund payments, in a private chat.
+- [x] Gifts spend the bot's Stars only for owners known by ID, for the
+      member replied to or tagged, taken from the update, when the owner's
+      own words ask for a gift, and after the balance is checked.
 - [x] Only registered tools run. No shell, no `eval`, no model-written SQL.
 - [x] Tool permissions and restricted commands are checked in code against
       the ID of the user who sent the message. A prompt cannot grant them.
@@ -1561,8 +2902,8 @@ Known limits:
 
 - Conversation text is stored unencrypted in PostgreSQL. Use disk encryption
   if that matters for your users.
-- Message text is sent to the model provider (Google, or Groq when the
-  backup answers). Tell your users, and check the provider's data policy.
+- Message text is sent to the model provider, Google. Tell your users, and
+  check the provider's data policy.
 - In a group, anyone who can post can make the bot answer, within the rate
   limits. The answer is visible to the whole group, and it can draw on what
   other members said to the bot there.
@@ -1588,8 +2929,8 @@ Known limits:
 | `telegram polling failed ... 409 Conflict`                | Another copy of the bot is running with the same token, or a webhook is set. Stop the other copy, or call `deleteWebhook`.                                                                                                                                                                    |
 | The bot is silent in a group                              | It answers only when addressed. Check, in order: is the group muted (`/unmute@YourBot` by an admin)? Is privacy mode off, if you call it by name? Was the bot re-added after changing privacy mode? Is the sender an anonymous admin or another bot (ignored by design)? Is the sender on the ignore list, or has the reply quota run out (log line `group reply limit reached`)? |
 | "Maria, ..." gets no answer but `@username` works          | Privacy mode is still on, or the bot was not re-added after it was turned off; see [Groups](#groups). Also check `ENABLE_WAKE_WORD_TRIGGER` and `BOT_WAKE_WORDS`.                                                                                                                             |
-| The bot ignores `/reset` or `/mute` in a group            | Commands in groups need the bot's username: `/mute@YourBot`.                                                                                                                                                                                                                                  |
-| "Only this group's admins can do that"                    | `/mute`, `/unmute`, `/ignore`, `/unignore` and `/reset` in a group are for its admins. Anonymous admins are not recognised; turn "Remain anonymous" off or add your ID to `ADMIN_USER_IDS`.                                                                                                                           |
+| The bot ignores `/mute` in a group                        | Commands in groups need the bot's username: `/mute@YourBot`.                                                                                                                                                                                                                                  |
+| "Only this group's admins can do that"                    | `/mute`, `/unmute`, `/ignore` and `/unignore` in a group are for its admins. Anonymous admins are not recognised; turn "Remain anonymous" off or add your ID to `ADMIN_USER_IDS`.                                                                                                                           |
 | The bot answers messages that only mention the name       | A message that starts or ends with the name counts as a call. The model may stay silent in such cases but does not always. Choose a less common wake word.                                                                                                                                    |
 | The bot is too rude, too tame, or out of character        | That is the model and the prompt. Try another model, or adjust `PERSONA_PROMPT`; see [The character](#the-character).                                                                                                                                                                         |
 | `X is no longer supported; use Y` at startup              | A setting was renamed. Rename it in the environment file.                                                                                                                                                                                                                                     |
@@ -1603,7 +2944,9 @@ Known limits:
 | "That took too long to answer"                            | The model was slower than `REQUEST_TIMEOUT_SECONDS`. Raise it or use a faster model.                                                                                                                                                                                                          |
 | Wrong time or wrong arithmetic                            | The model has no tool support and is guessing. Look for `model does not support tool calling` in the log and see [Choosing a model](#choosing-a-model). The time is given in `GROUP_HISTORY_TIMEZONE` unless another zone is asked for.                                                     |
 | "You're sending messages too quickly"                     | Per-user rate limit, announced in private chats only. Raise `USER_RATE_LIMIT_PER_MINUTE` if it is too strict.                                                                                                                                                                                 |
+| A payment fails after Pay is tapped                       | Telegram got no answer to its check before the payment: the webhook was set before the bot asked for `pre_checkout_query`. Redeploy, or run `set-webhook` again. `payment refused before it was made` in the log is the bot saying no, with the reason. |
 | "That's today's limit", then silence, in a private chat   | The private daily limit: the log shows `private daily limit reached`. Raise `PRIVATE_DAILY_LIMIT`, or `0` to turn it off; owners are never limited. `private message count failed; answering anyway` means the database could not be asked. |
+| Customers of a business account get no answer             | `/business` in the owner's private chat says what is missing: no connection, no right to reply, or auto-reply off. The owner must be in `BOT_OWNER_IDS` (the log shows `a business account that is none of the owners' connected the bot`); the chat must be one the owner gave her; she leaves a chat to the owner for 15 minutes after they write there; past `BUSINESS_DAILY_LIMIT` she is silent (`business daily limit reached`). No `business_message` at all: the webhook predates the update kinds; redeploy or run `set-webhook`. |
 | "I'm handling a lot of messages right now"                | Worker queues are full. Raise `MAX_CONCURRENT_REQUESTS`, and `pool_max_conns` to match.                                                                                                                                                                                                       |
 | The bot forgot the conversation                           | History is limited to `MAX_HISTORY_MESSAGES`, and idle conversations are deleted after `RETENTION_DAYS`.                                                                                                                                                                                      |
 | Service will not start under systemd                      | `journalctl -u telegram-ai-agent -n 50`. Check the environment file's owner and mode, and that it has no quotes around values.                                                                                                                                                                |

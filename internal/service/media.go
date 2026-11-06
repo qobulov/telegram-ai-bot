@@ -10,6 +10,7 @@ import (
 
 	"telegram-ai-bot/internal/ai"
 	"telegram-ai-bot/internal/telegram"
+	"telegram-ai-bot/internal/tools"
 )
 
 const (
@@ -78,6 +79,29 @@ func (s *Service) mediaOf(msg *telegram.Message) (media, bool) {
 	default:
 		return media{}, false
 	}
+}
+
+// soundOf is the file of a message's voice message, audio, video, round
+// video, or audio or video file, for the tools that listen to it; nil for
+// anything else, a GIF among them, which has no sound.
+func soundOf(msg *telegram.Message) *tools.Sound {
+	if msg == nil {
+		return nil
+	}
+	switch document := msg.Document; {
+	case msg.Voice != nil:
+		return &tools.Sound{FileID: msg.Voice.FileID, Size: msg.Voice.FileSize}
+	case msg.Audio != nil:
+		return &tools.Sound{FileID: msg.Audio.FileID, Size: msg.Audio.FileSize}
+	case msg.Video != nil:
+		return &tools.Sound{FileID: msg.Video.FileID, Size: msg.Video.FileSize}
+	case msg.VideoNote != nil:
+		return &tools.Sound{FileID: msg.VideoNote.FileID, Size: msg.VideoNote.FileSize}
+	case msg.Animation == nil && document != nil &&
+		(strings.HasPrefix(document.MimeType, "audio/") || strings.HasPrefix(document.MimeType, "video/")):
+		return &tools.Sound{FileID: document.FileID, Size: document.FileSize}
+	}
+	return nil
 }
 
 // clock writes a duration as a player shows it: "0:08", "1:05", "1:02:05".

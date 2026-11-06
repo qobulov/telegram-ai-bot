@@ -2,6 +2,7 @@ package webapi
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -45,8 +46,10 @@ type call struct {
 	header http.Header
 	// limit bounds the body. Zero means defaultBodyLimit.
 	limit int64
-	// body, when set, makes the call a POST of this JSON.
-	body []byte
+	// body, when set, makes the call a POST of this JSON, or of
+	// contentType when that is set.
+	body        []byte
+	contentType string
 }
 
 // newClient wraps base, or a client with short timeouts when base is nil,
@@ -64,6 +67,15 @@ func newClient(base *http.Client, userAgent string) *client {
 func patientClient(base *http.Client, userAgent string) *client {
 	if base == nil {
 		base = defaultHTTPClient(patientTimeout)
+	}
+	return newClient(base, userAgent)
+}
+
+// songClient is newClient for uploading a sound to recognise, waiting
+// songUploadTimeout.
+func songClient(base *http.Client, userAgent string) *client {
+	if base == nil {
+		base = defaultHTTPClient(songUploadTimeout)
 	}
 	return newClient(base, userAgent)
 }
@@ -111,7 +123,7 @@ func (c *client) get(ctx context.Context, cl call) ([]byte, error) {
 		return nil, fmt.Errorf("%s could not be asked", cl.service)
 	}
 	if cl.body != nil {
-		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Type", cmp.Or(cl.contentType, "application/json"))
 	}
 	for name, values := range cl.header {
 		req.Header[name] = values

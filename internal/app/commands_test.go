@@ -29,7 +29,7 @@ func (f *fakeCommandSetter) SetMyCommands(_ context.Context, scope string, comma
 // command is one Telegram accepts.
 func TestSetCommandMenus(t *testing.T) {
 	setter := &fakeCommandSetter{}
-	SetCommandMenus(context.Background(), setter, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	SetCommandMenus(context.Background(), setter, false, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	if len(setter.set) != 3 {
 		t.Fatalf("menus = %v, want private chats, groups and admins", setter.set)
@@ -54,12 +54,69 @@ func TestSetCommandMenus(t *testing.T) {
 	}
 }
 
+// With the pages served, every menu offers /game; without, none. /stats,
+// for the owners alone, is in no menu.
+func TestSetCommandMenusWithPages(t *testing.T) {
+	for _, pages := range []bool{false, true} {
+		setter := &fakeCommandSetter{}
+		SetCommandMenus(context.Background(), setter, pages, slog.New(slog.NewTextHandler(io.Discard, nil)))
+		for scope, commands := range setter.set {
+			has := slices.ContainsFunc(commands, func(c telegram.BotCommand) bool { return c.Command == "game" })
+			stats := slices.ContainsFunc(commands, func(c telegram.BotCommand) bool { return c.Command == "stats" })
+			if has != pages || stats {
+				t.Errorf("pages %t: %s menu %v", pages, scope, commands)
+			}
+		}
+	}
+	if slices.ContainsFunc(commandMenus[telegram.ScopeDefault], func(c telegram.BotCommand) bool { return c.Command == "game" }) {
+		t.Error("the page commands were added to the menus themselves")
+	}
+}
+
 // A failure is logged and does not stop the start.
 func TestSetCommandMenusFailure(t *testing.T) {
 	setter := &fakeCommandSetter{err: errors.New("telegram is down")}
-	SetCommandMenus(context.Background(), setter, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	SetCommandMenus(context.Background(), setter, false, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if len(setter.set) != 3 {
 		t.Errorf("tried %d menus, want all three despite the failures", len(setter.set))
+	}
+}
+
+type fakeRightsSetter struct {
+	set map[bool]telegram.AdministratorRights
+	err error
+}
+
+func (f *fakeRightsSetter) SetMyDefaultAdministratorRights(_ context.Context, rights telegram.AdministratorRights, forChannels bool) error {
+	if f.set == nil {
+		f.set = map[bool]telegram.AdministratorRights{}
+	}
+	f.set[forChannels] = rights
+	return f.err
+}
+
+// Every right a group action needs is asked for, as the moderation and
+// topics tools name them, and nothing to hide or post as the group; a
+// channel gets posting and editing. A failure stops neither.
+func TestSetAdminRights(t *testing.T) {
+	setter := &fakeRightsSetter{err: errors.New("telegram is down")}
+	SetAdminRights(context.Background(), setter, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	group, channel := setter.set[false], setter.set[true]
+	asked := telegram.ChatMember{Status: "administrator", CanDeleteMessages: group.CanDeleteMessages, CanRestrictMembers: group.CanRestrictMembers,
+		CanPinMessages: group.CanPinMessages, CanPromoteMembers: group.CanPromoteMembers, CanChangeInfo: group.CanChangeInfo,
+		CanInviteUsers: group.CanInviteUsers, CanManageTopics: group.CanManageTopics}
+	for _, right := range []string{telegram.RightDeleteMessages, telegram.RightRestrictMembers, telegram.RightPinMessages, telegram.RightPromoteMembers,
+		telegram.RightChangeInfo, telegram.RightInviteUsers, telegram.RightManageTopics} {
+		if !asked.Has(right) {
+			t.Errorf("groups: %s is not asked for", right)
+		}
+	}
+	if group.IsAnonymous || group.CanPostMessages || group.CanManageVideoChats {
+		t.Errorf("groups: %+v asks for more than the bot uses", group)
+	}
+	if len(setter.set) != 2 || !channel.CanPostMessages || !channel.CanEditMessages || channel.CanDeleteMessages || channel.CanPromoteMembers {
+		t.Errorf("channels: %+v", channel)
 	}
 }
 

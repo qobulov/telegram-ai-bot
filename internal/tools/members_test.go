@@ -47,6 +47,7 @@ type memberList struct {
 		Owner    bool   `json:"owner"`
 		Bot      bool   `json:"bot"`
 		LastSeen string `json:"last_seen"`
+		Tag      string `json:"tag"`
 	} `json:"members"`
 	Note string `json:"note"`
 }
@@ -74,7 +75,7 @@ func TestMembersListsWhoWasSeenWithAdminsAndOwnersMarked(t *testing.T) {
 	roster := &fakeRoster{
 		members: []storage.GroupMember{seen(userID, "Ali", "ali"), seen(memberID, "Bek", "bek"), seen(7007, "Said", ""), {ChatID: groupA, UserID: 8008, FirstName: "Helper", IsBot: true, Status: "member", LastSeen: rulesNow}},
 		count:   42,
-		admins:  []telegram.ChatMember{listedAdmin("creator", telegram.User{ID: memberID}), listedAdmin("administrator", telegram.User{ID: rulesBotID})},
+		admins:  []telegram.ChatMember{listedAdmin("creator", telegram.User{ID: memberID}), listedAdmin("administrator", telegram.User{ID: rulesBotID, IsBot: true})},
 	}
 	got, list := askMembers(t, roster, asking(100, nil))
 	if !got.OK || list.Known != 4 || list.Total != 42 || len(list.Members) != 4 {
@@ -129,5 +130,34 @@ func TestMembersRefusals(t *testing.T) {
 	private := WithTurn(context.Background(), Caller{UserID: userID, ChatID: userID, Human: true, UpdateID: 100, MessageID: 50}, &Sink{})
 	if got, _ := askMembers(t, &fakeRoster{}, private); got.OK {
 		t.Errorf("private chat = %+v, want refused", got)
+	}
+}
+
+// An admin who never wrote is listed all the same, with their role.
+func TestMembersListsAdminsWhoNeverWrote(t *testing.T) {
+	roster := &fakeRoster{
+		members: []storage.GroupMember{seen(memberID, "Bek", "bek")},
+		admins:  []telegram.ChatMember{listedAdmin("creator", telegram.User{ID: 7007, FirstName: "Silent", Username: "silent"})},
+	}
+	got, list := askMembers(t, roster, asking(100, nil))
+	if !got.OK || list.Known != 2 || len(list.Members) != 2 || list.Members[1].Name != "Silent" || list.Members[1].Role != "creator" || list.Members[1].LastSeen != "" {
+		t.Errorf("group_members = %+v %s", got, got.Result)
+	}
+}
+
+// A member without a @username gets a tag the reply turns into their name,
+// linked so that Telegram tells them; one with a @username needs none.
+func TestMembersWithoutAUsernameGetATag(t *testing.T) {
+	roster := &fakeRoster{members: []storage.GroupMember{seen(memberID, "無敵•[MAYOR]", ""), seen(7007, "Ali", "ali")}}
+	_, list := askMembers(t, roster, asking(100, nil))
+	if len(list.Members) != 2 {
+		t.Fatalf("members = %+v", list.Members)
+	}
+	var tags []string
+	for _, m := range list.Members {
+		tags = append(tags, m.Tag)
+	}
+	if tags[0] != "[無敵•MAYOR](tg://user?id=5005)" || tags[1] != "" {
+		t.Errorf("tags = %q", tags)
 	}
 }

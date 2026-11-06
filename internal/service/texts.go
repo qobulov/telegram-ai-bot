@@ -12,7 +12,6 @@ import (
 // are in Uzbek, Russian and English, sent in the language of their Telegram
 // app; the owners' and admins' commands answer in English.
 const (
-	textResetDone  = "The conversation history here has been deleted."
 	textForbidden  = "This command is restricted to administrators."
 	textMuted      = "Fine, I'll be quiet here. An admin can bring me back with /unmute@%s." // the bot's username
 	textUnmuted    = "I'm back."
@@ -33,7 +32,13 @@ type localText struct{ uz, ru, en string }
 
 // to is the text in the language of whoever wrote in.
 func (t localText) to(in incoming) string {
-	switch languageOf(in) {
+	return t.inLanguage(languageOf(in))
+}
+
+// inLanguage is the text in language, "uz", "ru" or "en"; Uzbek for any
+// other.
+func (t localText) inLanguage(language string) string {
+	switch language {
 	case "ru":
 		return t.ru
 	case "en":
@@ -89,9 +94,9 @@ func appLanguage(user *telegram.User) string {
 var (
 	// textAbout names no model or company: who runs her is a secret.
 	textAbout = localText{
-		uz: "Maria — Telegram uchun AI suhbatdosh. Guruhda gaplashadi, savollarga javob beradi, Mobile Legends, kino, musiqa va boshqa narsalarni topadi.\n/help — buyruqlar va imkoniyatlar\n/reset — suhbat tarixini o'chirish",
-		ru: "Maria — AI-собеседник для Telegram. Болтает в группе, отвечает на вопросы, находит Mobile Legends, фильмы, музыку и многое другое.\n/help — команды и возможности\n/reset — удалить историю разговора",
-		en: "Maria is an AI chat character for Telegram. She chats in groups, answers questions and finds Mobile Legends stats, films, music and more.\n/help — commands and usage\n/reset — delete the conversation history",
+		uz: "Maria — Telegram uchun AI suhbatdosh. Guruhda gaplashadi, savollarga javob beradi, Mobile Legends, kino, musiqa va boshqa narsalarni topadi.\n/help — buyruqlar va imkoniyatlar",
+		ru: "Maria — AI-собеседник для Telegram. Болтает в группе, отвечает на вопросы, находит Mobile Legends, фильмы, музыку и многое другое.\n/help — команды и возможности",
+		en: "Maria is an AI chat character for Telegram. She chats in groups, answers questions and finds Mobile Legends stats, films, music and more.\n/help — commands and usage",
 	}
 	textUnknown = localText{
 		uz: "Bunday buyruqni bilmayman. Nima qila olishimni ko'rish uchun /help yuboring.",
@@ -122,6 +127,18 @@ var (
 		uz: "Hozir juda band ekanman, bir daqiqadan keyin qayta yozing.",
 		ru: "Сейчас я очень занята, напишите через минуту.",
 		en: "I'm very busy right now, write again in a minute.",
+	}
+	// textBlocked answers a message the model provider's filter refused;
+	// textBlockedOwner tells an owner how to post an announcement anyway.
+	textBlocked = localText{
+		uz: "🚫 Bu xabarga javob bera olmayman: model uni taqiqlangan kontent deb to'xtatdi. Boshqacha yozib ko'ring.",
+		ru: "🚫 Не могу ответить на это: модель остановила запрос как запрещённый контент. Попробуйте написать иначе.",
+		en: "🚫 I can't answer this: the model stopped it as prohibited content. Try putting it another way.",
+	}
+	textBlockedOwner = localText{
+		uz: "🚫 Gemini bu so'rovni taqiqlangan kontent deb to'xtatdi, javob yoza olmadim. E'lon bo'lsa, o'zim yuboraman: videoga reply qilib /elon hammaga <tavsif> (yoki faqat guruhlarga: /elon <tavsif>).",
+		ru: "🚫 Gemini остановил запрос как запрещённый контент, я не смогла ответить. Если это объявление, отправлю сама: ответом на видео /elon всем <описание> (или только в группы: /elon <описание>).",
+		en: "🚫 Gemini stopped this as prohibited content, so I couldn't answer. For an announcement, I'll post it myself: in reply to the video, /elon everyone <caption> (or groups only: /elon <caption>).",
 	}
 	textError = localText{
 		uz: "Nimadir xato ketdi, birozdan keyin qayta yozing.",
@@ -194,10 +211,10 @@ func textTextOnly(listen bool) localText {
 	}
 }
 
-// helpTexts are the help in each language, with three blanks filled by
+// helpTexts are the help in each language, with four blanks filled by
 // HelpTextIn: the sentences on what she can see, what she can do and what
-// she can look up. They name no model or company: who runs her is kept a
-// secret.
+// she can look up, and the commands of the pages when they are on. They
+// name no model or company: who runs her is kept a secret.
 var helpTexts = map[string]string{
 	"uz": `Menga yozing: o'zbek, rus yoki ingliz tilida, siz yozgan tilda javob beraman.
 
@@ -207,17 +224,15 @@ Suhbatimizning oxirgi qismini eslab qolaman. %s %s
 Buyruqlar:
 /start — salomlashish
 /help — shu yordam
-/reset — suhbat tarixini o'chirish
-/stop — ishlayotgan testni to'xtatish
 /about — bot haqida
+/dooz — Dooz (X-O): guruhda do'stingiz bilan yoki men bilan%s
 
 Guruhda meni ismim bilan chaqiring, @username bilan belgilang yoki xabarimga reply qiling. U yerda buyruqqa username qo'shiladi: /help@username. Guruh men bilan bitta umumiy suhbatda.
 
 Guruh adminlari uchun:
-A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yoki ban qilishni, stiker va GIF yuborishini cheklashni so'rang. Buning uchun o'sha admin huquqi sizda ham, menda ham bo'lishi kerak; men darhol bajaraman.
+A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yoki ban qilishni, stiker va GIF yoki rasm yuborishini cheklashni, admin qilishni so'rang. Guruhning nomi, tavsifi, rasmi, stiker to'plami, taklif havolasi va kim nima yubora olishini ham o'zgartiraman; "orqaga qaytar" desangiz, oxirgisini qaytaraman. Buning uchun o'sha admin huquqi sizda ham, menda ham bo'lishi kerak; men darhol bajaraman.
 /mute@username, /unmute@username — guruhda jim turishim yoki qaytishim
-/ignore@username, /unignore@username — a'zoning xabariga reply qilib: unga 24 soat javob bermayman yoki yana javob beraman
-/reset@username — guruhning men bilan suhbat tarixini o'chirish`,
+/ignore@username, /unignore@username — a'zoning xabariga reply qilib: unga 24 soat javob bermayman yoki yana javob beraman`,
 	"ru": `Пишите мне: отвечаю на узбекском, русском или английском — на вашем языке.
 
 Я помню недавнюю часть нашего разговора. %s %s
@@ -226,17 +241,15 @@ A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yo
 Команды:
 /start — приветствие
 /help — эта справка
-/reset — удалить историю разговора
-/stop — остановить идущий тест
 /about — о боте
+/dooz — крестики-нолики: с другом в группе или со мной%s
 
 В группе зовите меня по имени, упоминайте (@username) или отвечайте на моё сообщение. Там к команде добавляется username: /help@username. У группы со мной один общий разговор.
 
 Для админов группы:
-Ответьте на сообщение участника и попросите удалить или закрепить его, замутить или забанить автора, ограничить ему стикеры и GIF. Нужно, чтобы это право было и у вас, и у меня; я делаю это сразу.
+Ответьте на сообщение участника и попросите удалить или закрепить его, замутить или забанить автора, ограничить ему стикеры и GIF или фото, сделать админом. Ещё меняю название, описание, фото группы, её стикерпак, ссылку-приглашение и что можно отправлять; скажите «верни», и я отменю последнее. Нужно, чтобы это право было и у вас, и у меня; я делаю это сразу.
 /mute@username, /unmute@username — чтобы я молчала в группе или вернулась
-/ignore@username, /unignore@username — ответом на сообщение участника: не отвечаю ему 24 часа или снова отвечаю
-/reset@username — удалить историю разговора группы со мной`,
+/ignore@username, /unignore@username — ответом на сообщение участника: не отвечаю ему 24 часа или снова отвечаю`,
 	"en": `Talk to me and I will answer, in Uzbek, Russian or English, matching your language.
 
 I remember the recent part of our conversation. %s %s
@@ -245,17 +258,15 @@ I remember the recent part of our conversation. %s %s
 Commands:
 /start — welcome message
 /help — this help
-/reset — delete the conversation history
-/stop — stop a running test
 /about — about this bot
+/dooz — tic-tac-toe: with a friend in a group, or with me%s
 
 In a group, call me by name, mention me (@username) or reply to one of my messages. Commands there need my username, like /help@username. A group shares one conversation with me.
 
 For a group's admins:
-Reply to a member's message and ask me to delete or pin it, to mute or ban its author, or to take away their stickers and GIFs. It takes that admin right, yours and mine, and I do it at once.
+Reply to a member's message and ask me to delete or pin it, to mute or ban its author, to take away their stickers and GIFs or photos, or to make them an admin. I also change the group's name, description, photo, sticker pack, invite link and what members may send, and undo the last change when asked. It takes that admin right, yours and mine, and I do it at once.
 /mute@username, /unmute@username — make me stay quiet in the group, or bring me back
-/ignore@username, /unignore@username — as a reply to a member's message: I stop answering them for 24 hours, or answer them again
-/reset@username — delete the group's conversation with me`,
+/ignore@username, /unignore@username — as a reply to a member's message: I stop answering them for 24 hours, or answer them again`,
 }
 
 // helpAbilities are the sentences HelpTextIn fills the help's blanks with,
@@ -266,26 +277,26 @@ var helpAbilities = map[string][6]string{
 	"uz": {
 		"Rasm, stiker va GIF'larni, video va dumaloq videolarning bir kadrini ko'raman, PDF, Word va matnli fayllarni o'qiyman.",
 		"Rasm, stiker va GIF'larni, video va dumaloq videolarning bir kadrini ko'raman, ovozli xabarlarni eshitaman, PDF, Word va matnli fayllarni o'qiyman.",
-		"Istalgan joyning vaqtini aytaman, hisoblayman, taqdimot (PowerPoint) va viktorina tayyorlayman, guruhda so'rovnoma tuzaman. Test faylini (.doc, .docx, .pdf, savollar ==== va ++++ bilan, to'g'ri javob # bilan) yuborsangiz, uni 30 talik qismlarga bo'lib, har savolga 30 soniyali test qilib beraman.",
-		"So'rasangiz rasm chizaman, istalgan joyning vaqtini aytaman, hisoblayman, taqdimot (PowerPoint) va viktorina tayyorlayman, guruhda so'rovnoma tuzaman. Test faylini (.doc, .docx, .pdf, savollar ==== va ++++ bilan, to'g'ri javob # bilan) yuborsangiz, uni 30 talik qismlarga bo'lib, har savolga 30 soniyali test qilib beraman.",
-		"Valyuta kursi, ob-havo, namoz vaqtlari, yangiliklar, Vikipediya va kripto narxlarini, Mobile Legends qahramonlari statistikasini topaman, qo'shiq, kino va video qidiraman, havoladagi maqolani o'qib beraman, Qur'on oyatlarini ma'nosi bilan topaman. Viktorina savoli, qiziq fakt, kitob, retsept, oltin narxi, shaxmat va Formula 1 natijalarini ham topaman. O'qish uchun: aniq hisob (hosila, matritsa, birliklar), ilmiy maqolalar va inglizcha sinonimlar.",
-		"Valyuta kursi, ob-havo, namoz vaqtlari, yangiliklar, Vikipediya, futbol natijalari va kripto narxlarini, Mobile Legends qahramonlari statistikasini topaman, qo'shiq, kino va video qidiraman, havoladagi maqolani o'qib beraman, Qur'on oyatlarini ma'nosi bilan topaman. Viktorina savoli, qiziq fakt, kitob, retsept, oltin narxi, shaxmat va Formula 1 natijalarini ham topaman. O'qish uchun: aniq hisob (hosila, matritsa, birliklar), ilmiy maqolalar va inglizcha sinonimlar.",
+		"Istalgan joyning vaqtini aytaman, guruhda so'rovnoma tuzaman va o'tkazib yuborgan suhbatingizni qisqacha aytib beraman, guruhning eng faollarini aytaman.",
+		"So'rasangiz rasm chizaman, istalgan joyning vaqtini aytaman, guruhda so'rovnoma tuzaman va o'tkazib yuborgan suhbatingizni qisqacha aytib beraman, guruhning eng faollarini aytaman.",
+		"Valyuta kursi, ob-havo va havo sifati, namoz vaqtlari, yangiliklar, Vikipediya va kripto narxlarini, Mobile Legends qahramonlari statistikasi, build va skinlarini topaman, qo'shiq, kino va video qidiraman, havoladagi maqolani o'qib beraman, Qur'on oyatlarini ma'nosi bilan topaman. Viktorina savoli, qiziq fakt, kitob, retsept, oltin narxi, shaxmat va Formula 1 natijalarini ham topaman. O'qish uchun: ilmiy maqolalar, inglizcha sinonimlar va davlatlar statistikasi.",
+		"Valyuta kursi, ob-havo va havo sifati, namoz vaqtlari, yangiliklar, Vikipediya, futbol natijalari va kripto narxlarini, Mobile Legends qahramonlari statistikasi, build va skinlarini topaman, qo'shiq, kino va video qidiraman, havoladagi maqolani o'qib beraman, Qur'on oyatlarini ma'nosi bilan topaman. Viktorina savoli, qiziq fakt, kitob, retsept, oltin narxi, shaxmat va Formula 1 natijalarini ham topaman. O'qish uchun: ilmiy maqolalar, inglizcha sinonimlar va davlatlar statistikasi.",
 	},
 	"ru": {
 		"Вижу фото, стикеры и GIF, кадр из видео и кружочков, читаю PDF, Word и текстовые файлы.",
 		"Вижу фото, стикеры и GIF, кадр из видео и кружочков, слушаю голосовые, читаю PDF, Word и текстовые файлы.",
-		"Скажу время в любой точке, посчитаю, сделаю презентацию (PowerPoint) и викторину, опрос в группе. Пришлите файл с тестом (.doc, .docx, .pdf: вопросы через ==== и ++++, верный ответ с #), и я разделю его на части по 30 вопросов по 30 секунд.",
-		"Нарисую картинку по просьбе, скажу время в любой точке, посчитаю, сделаю презентацию (PowerPoint) и викторину, опрос в группе. Пришлите файл с тестом (.doc, .docx, .pdf: вопросы через ==== и ++++, верный ответ с #), и я разделю его на части по 30 вопросов по 30 секунд.",
-		"Найду курсы валют, погоду, время намаза, новости, Википедию и цены криптовалют, статистику героев Mobile Legends, песни, фильмы и видео, прочитаю статью по ссылке, найду аяты Корана с переводом. А ещё вопрос для викторины, интересный факт, книги, рецепты, цену золота, шахматы и Формулу 1. Для учёбы: точные вычисления (производные, матрицы, единицы), научные статьи и английские синонимы.",
-		"Найду курсы валют, погоду, время намаза, новости, Википедию, результаты футбола и цены криптовалют, статистику героев Mobile Legends, песни, фильмы и видео, прочитаю статью по ссылке, найду аяты Корана с переводом. А ещё вопрос для викторины, интересный факт, книги, рецепты, цену золота, шахматы и Формулу 1. Для учёбы: точные вычисления (производные, матрицы, единицы), научные статьи и английские синонимы.",
+		"Скажу время в любой точке, сделаю опрос в группе и кратко перескажу, о чём там говорили без вас, и назову самых активных.",
+		"Нарисую картинку по просьбе, скажу время в любой точке, сделаю опрос в группе и кратко перескажу, о чём там говорили без вас, и назову самых активных.",
+		"Найду курсы валют, погоду и качество воздуха, время намаза, новости, Википедию и цены криптовалют, статистику, сборки и скины героев Mobile Legends, песни, фильмы и видео, прочитаю статью по ссылке, найду аяты Корана с переводом. А ещё вопрос для викторины, интересный факт, книги, рецепты, цену золота, шахматы и Формулу 1. Для учёбы: научные статьи, английские синонимы и статистика стран.",
+		"Найду курсы валют, погоду и качество воздуха, время намаза, новости, Википедию, результаты футбола и цены криптовалют, статистику, сборки и скины героев Mobile Legends, песни, фильмы и видео, прочитаю статью по ссылке, найду аяты Корана с переводом. А ещё вопрос для викторины, интересный факт, книги, рецепты, цену золота, шахматы и Формулу 1. Для учёбы: научные статьи, английские синонимы и статистика стран.",
 	},
 	"en": {
 		"I can see photos, stickers and GIFs, a frame of videos and round videos, and read PDF, Word and text files.",
 		"I can see photos, stickers and GIFs, a frame of videos and round videos; I listen to voice messages and read PDF, Word and text files.",
-		"I can tell the time anywhere, calculate arithmetic, make a presentation (PowerPoint) and a quiz, and a poll in a group. Send a test file (.doc, .docx, .pdf: questions split by ==== and ++++, the right answer marked #) and I will run it in parts of 30, 30 seconds a question.",
-		"I can draw a picture when you ask, tell the time anywhere, calculate arithmetic, make a presentation (PowerPoint) and a quiz, and a poll in a group. Send a test file (.doc, .docx, .pdf: questions split by ==== and ++++, the right answer marked #) and I will run it in parts of 30, 30 seconds a question.",
-		"I can look up exchange rates, the weather, prayer times, news headlines, Wikipedia and crypto prices, Mobile Legends hero statistics, find songs, films and videos, read an article from a link, and find Quran verses with their meaning. Also trivia questions, fun facts, books, recipes, the gold price, chess and Formula 1 results. For study: exact math (derivatives, matrices, units), scholarly papers and English synonyms.",
-		"I can look up exchange rates, the weather, prayer times, news headlines, Wikipedia, football results and crypto prices, Mobile Legends hero statistics, find songs, films and videos, read an article from a link, and find Quran verses with their meaning. Also trivia questions, fun facts, books, recipes, the gold price, chess and Formula 1 results. For study: exact math (derivatives, matrices, units), scholarly papers and English synonyms.",
+		"I can tell the time anywhere and make a poll in a group, recap what you missed there and name its most active members.",
+		"I can draw a picture when you ask, tell the time anywhere and make a poll in a group, recap what you missed there and name its most active members.",
+		"I can look up exchange rates, the weather and air quality, prayer times, news headlines, Wikipedia and crypto prices, Mobile Legends hero statistics, builds and skins, find songs, films and videos, read an article from a link, and find Quran verses with their meaning. Also trivia questions, fun facts, books, recipes, the gold price, chess and Formula 1 results. For study: scholarly papers, English synonyms and country statistics.",
+		"I can look up exchange rates, the weather and air quality, prayer times, news headlines, Wikipedia, football results and crypto prices, Mobile Legends hero statistics, builds and skins, find songs, films and videos, read an article from a link, and find Quran verses with their meaning. Also trivia questions, fun facts, books, recipes, the gold price, chess and Formula 1 results. For study: scholarly papers, English synonyms and country statistics.",
 	},
 }
 
@@ -293,11 +304,21 @@ var helpAbilities = map[string][6]string{
 // listening needs a provider that hears audio and football needs a
 // football-data.org token. The help names only those present, because
 // get_bot_help hands it to the model, which would otherwise promise a
-// picture, a transcript or a score it cannot give.
+// picture, a transcript or a score it cannot give. Pages needs WEBAPP_URL,
+// where the dashboard and the game are served.
 type Abilities struct {
 	Draw     bool
 	Listen   bool
 	Football bool
+	Pages    bool
+}
+
+// helpPages are the games' commands, in each language, listed after /about
+// when the pages are on. /stats, for the owners alone, is not listed.
+var helpPages = map[string]string{
+	"uz": "\n/game — Tarozi o'yini\n/ilon — Kosmik ilon o'yini\n/otinchi — O'tinchi: daraxtni chop, shoxlardan qoch\n/boss — Dev jangi: guruh bilan birga devni uring\n/mafia — Mafia: guruh bilan, yashirin rollar, 5+ kishi\n/maydon — Maydon: jamoa jangi, 1v1 dan 5v5 gacha\n/shashka — shashka: tasodifiy raqib, do'st yoki men bilan, reyting bilan",
+	"ru": "\n/game — игра «Tarozi»\n/ilon — игра «Космическая змейка»\n/otinchi — «Дровосек»: руби дерево, уворачивайся от веток\n/boss — «Битва с дэвом»: бейте дэва всей группой\n/mafia — «Мафия»: всей группой, тайные роли, от 5 человек\n/maydon — «Майдон»: командный бой, от 1 на 1 до 5 на 5\n/shashka — шашки: со случайным соперником, другом или со мной, с рейтингом",
+	"en": "\n/game — the Tarozi game\n/ilon — the space snake game\n/otinchi — the woodcutter: chop the tree, dodge the branches\n/boss — the boss raid: hit the giant with the whole group\n/mafia — Mafia: with the group, secret roles, 5 or more\n/maydon — Maydon: a team battle, one on one up to five on five\n/shashka — draughts: a random opponent, a friend or me, with ratings",
 }
 
 // HelpText describes the bot's commands and what it can do with these
@@ -319,72 +340,9 @@ func HelpTextIn(lang string, abilities Abilities) string {
 		}
 		return phrases[i]
 	}
-	return fmt.Sprintf(helpTexts[lang], pick(0, abilities.Listen), pick(2, abilities.Draw), pick(4, abilities.Football))
+	pages := ""
+	if abilities.Pages {
+		pages = helpPages[lang]
+	}
+	return fmt.Sprintf(helpTexts[lang], pick(0, abilities.Listen), pick(2, abilities.Draw), pick(4, abilities.Football), pages)
 }
-
-// The texts of tests sent as files (see quizrun.go).
-var (
-	textQuizUntitled = localText{uz: "Test", ru: "Тест", en: "Test"}
-	textQuizFailed   = localText{
-		uz: "Testni saqlab bo'lmadi. Birozdan keyin faylni qayta yuboring.",
-		ru: "Не удалось сохранить тест. Пришлите файл чуть позже.",
-		en: "The test could not be kept. Send the file again a little later.",
-	}
-	// textQuizParts takes the title, the questions, the parts and their size.
-	textQuizParts = localText{
-		uz: "📚 «%s»\n\n✏️ %d ta savol, %d qism (%d tadan).\nQaysi qismdan boshlaymiz?",
-		ru: "📚 «%s»\n\n✏️ Вопросов: %d, частей: %d (по %d).\nС какой части начнём?",
-		en: "📚 “%s”\n\n✏️ %d questions, %d parts (%d each).\nWhich part shall we start with?",
-	}
-	textQuizBroken = localText{
-		uz: "⚠️ %d ta savolda to'g'ri javob (#) topilmadi yoki bir nechta belgilangan, ular tashlab ketildi.",
-		ru: "⚠️ Пропущено вопросов: %d. В них не найден правильный ответ (#) или отмечено несколько.",
-		en: "⚠️ Questions left out: %d. Their right answer (#) was not found, or more than one was marked.",
-	}
-	textQuizMadeOptions = localText{
-		uz: "ℹ️ Faylda faqat to'g'ri javoblar bor ekan. Boshqa variantlarni shu testdagi yaqin savollarning javoblaridan oldim.",
-		ru: "ℹ️ В файле только правильные ответы. Остальные варианты взяты из ответов на соседние вопросы этого теста.",
-		en: "ℹ️ The file gives only the right answers. The other options are the answers to nearby questions in this test.",
-	}
-	// textQuizPartButton takes the part and its first and last question.
-	textQuizPartButton = localText{uz: "%d-qism (%d–%d)", ru: "Часть %d (%d–%d)", en: "Part %d (%d–%d)"}
-	textQuizGone       = localText{
-		uz: "Bu test topilmadi. Faylni qayta yuboring.",
-		ru: "Этот тест не найден. Пришлите файл снова.",
-		en: "This test was not found. Send the file again.",
-	}
-	// textQuizReady takes the title, the part, its questions and the seconds.
-	textQuizReady = localText{
-		uz: "🎲 «%s», %d-qism\n\n✏️ %d ta savol\n⏱ Har bir savolga %d soniya\n\n🏁 Tayyor bo'lsangiz, tugmani bosing. To'xtatish uchun: /stop",
-		ru: "🎲 «%s», часть %d\n\n✏️ Вопросов: %d\n⏱ На каждый вопрос %d секунд\n\n🏁 Когда будете готовы, нажмите кнопку. Остановить: /stop",
-		en: "🎲 “%s”, part %d\n\n✏️ %d questions\n⏱ %d seconds for each\n\n🏁 Press the button when you are ready. To stop: /stop",
-	}
-	textQuizReadyButton = localText{uz: "Men tayyorman!", ru: "Я готов!", en: "I'm ready!"}
-	textQuizPaused      = localText{
-		uz: "⏸ Ikki savolga javob bo'lmadi, test to'xtatildi. Davom ettirish uchun tugmani bosing.",
-		ru: "⏸ Два вопроса остались без ответа, тест приостановлен. Чтобы продолжить, нажмите кнопку.",
-		en: "⏸ Two questions went unanswered, so the test is paused. Press the button to go on.",
-	}
-	textQuizResumeButton = localText{uz: "▶️ Davom etish", ru: "▶️ Продолжить", en: "▶️ Continue"}
-	textQuizPickLetter   = localText{uz: "To'g'ri javobni tanlang", ru: "Выберите правильный ответ", en: "Pick the right answer"}
-	// textQuizResults takes the title, the part, the answers, the right,
-	// wrong and missed ones, and the minutes and seconds taken.
-	textQuizResults = localText{
-		uz: "🏁 «%s», %d-qism yakunlandi!\n\nSiz %d ta savolga javob berdingiz:\n\n✅ To'g'ri: %d\n❌ Xato: %d\n⌛ Tashlab ketilgan: %d\n⏱ %d daqiqa %d soniya",
-		ru: "🏁 «%s», часть %d завершена!\n\nВы ответили на вопросы: %d\n\n✅ Верно: %d\n❌ Неверно: %d\n⌛ Пропущено: %d\n⏱ %d мин %d сек",
-		en: "🏁 “%s”, part %d is over!\n\nYou answered %d questions:\n\n✅ Right: %d\n❌ Wrong: %d\n⌛ Missed: %d\n⏱ %d min %d s",
-	}
-	// textQuizRank takes how many took the part and the place.
-	textQuizRank = localText{
-		uz: "🏆 %d tadan %d-o'rin. Qayta ishlasangiz, bu o'rin o'zgarmaydi.",
-		ru: "🏆 Из %d участников вы на %d-м месте. Повторные попытки его не меняют.",
-		en: "🏆 Of %d people, you are number %d. Trying again does not change it.",
-	}
-	textQuizAgainButton = localText{uz: "🔁 Qayta urinish", ru: "🔁 Ещё раз", en: "🔁 Try again"}
-	textQuizNextButton  = localText{uz: "➡️ Keyingi qism", ru: "➡️ Следующая часть", en: "➡️ Next part"}
-	textNoQuizToStop    = localText{
-		uz: "Hozir ishlayotgan test yo'q. Test faylini (.doc, .docx, .pdf) yuboring, men uni qismlarga bo'lib beraman.",
-		ru: "Сейчас нет идущего теста. Пришлите файл с тестом (.doc, .docx, .pdf), я разделю его на части.",
-		en: "No test is running. Send a test file (.doc, .docx, .pdf) and I will split it into parts.",
-	}
-)

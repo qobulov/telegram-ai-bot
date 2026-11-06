@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#050816">
+  <title>Kosmik ilon</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&display=swap" rel="stylesheet">
+  <script src="https://telegram.org/js/games.js" defer></script>
+  <link rel="stylesheet" href="ilon.css">
+</head>
+<body>
+  <canvas id="sky" aria-hidden="true"></canvas>
+  <main id="app">
+    <section id="intro" class="screen">
+      <div class="logo" aria-label="Kosmik ilon">
+        <span class="logo-small">KOSMIK</span>
+        <span class="logo-big">ILON</span>
+      </div>
+      <p class="lead" data-t="lead"></p>
+      <ul class="rules">
+        <li><span class="ico swipe" aria-hidden="true"></span><span data-t="rule1"></span></li>
+        <li><span class="ico planet" aria-hidden="true"></span><span data-t="rule2"></span></li>
+        <li><span class="ico combo" aria-hidden="true">×3</span><span data-t="rule3"></span></li>
+        <li><span class="ico portal" aria-hidden="true"></span><span data-t="rule4"></span></li>
+      </ul>
+      <div class="bonuses">
+        <div class="bonus-card"><span class="ico star" aria-hidden="true"></span><b data-t="starName"></b><small data-t="starAbout"></small></div>
+        <div class="bonus-card"><span class="ico slow" aria-hidden="true"></span><b data-t="slowName"></b><small data-t="slowAbout"></small></div>
+        <div class="bonus-card"><span class="ico ghost" aria-hidden="true"></span><b data-t="ghostName"></b><small data-t="ghostAbout"></small></div>
+      </div>
+      <button type="button" class="primary" id="play" data-t="play"></button>
+      <p class="message" id="introMessage" aria-live="polite"></p>
+      <section class="table-card" id="introTable" hidden>
+        <h2 data-t="table"></h2>
+        <ol class="table" id="introRows"></ol>
+      </section>
+    </section>
+
+    <section id="game" class="screen" hidden>
+      <header class="hud">
+        <div class="hud-cell">
+          <span class="hud-label" data-t="score"></span>
+          <span class="hud-value" id="score">0</span>
+        </div>
+        <div class="hud-cell center">
+          <span class="hud-label"><span data-t="level"></span> <b id="level">1</b></span>
+          <div class="progress" id="progress" aria-hidden="true"></div>
+        </div>
+        <div class="hud-cell right">
+          <button type="button" class="icon-button" id="pauseButton" aria-label="Pauza">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg>
+          </button>
+        </div>
+      </header>
+      <div class="effects" id="effects" aria-live="polite"></div>
+      <div class="stage" id="stage">
+        <canvas id="board"></canvas>
+        <div class="banner" id="banner" hidden></div>
+        <div class="count" id="count" hidden></div>
+        <div class="overlay" id="pause" hidden>
+          <p class="overlay-title" data-t="paused"></p>
+          <button type="button" class="primary" id="resume" data-t="resume"></button>
+        </div>
+      </div>
+      <p class="hint" data-t="hint"></p>
+    </section>
+
+    <section id="result" class="screen" hidden>
+      <p class="eyebrow" data-t="over"></p>
+      <p class="final" id="final">0</p>
+      <p class="summary" id="summary"></p>
+      <p class="message" id="resultMessage" aria-live="polite"></p>
+      <section class="table-card" id="resultTable" hidden>
+        <h2 data-t="table"></h2>
+        <ol class="table" id="resultRows"></ol>
+      </section>
+      <div class="actions">
+        <button type="button" class="primary" id="again" data-t="again"></button>
+        <button type="button" id="share" data-t="share"></button>
+      </div>
+    </section>
+  </main>
+  <script src="sim.js"></script>
+  <script src="ilon.js"></script>
+</body>
+</html>

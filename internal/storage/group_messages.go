@@ -79,6 +79,28 @@ func (s *Store) GroupMessagesSince(ctx context.Context, chatID int64, since time
 	return messages, nil
 }
 
+// AuthorMessageIDs returns the Telegram IDs of up to limit messages one
+// member wrote in a group at or after since, as the log has them, oldest
+// first: what purge deletes. The bot's own lines have no ID and are none.
+func (s *Store) AuthorMessageIDs(ctx context.Context, chatID, authorID int64, since time.Time, limit int) ([]int64, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT message_id FROM (
+			SELECT DISTINCT message_id FROM group_messages
+			WHERE chat_id = $1 AND author_id = $2 AND created_at >= $3 AND message_id IS NOT NULL
+			ORDER BY message_id DESC
+			LIMIT $4
+		) newest
+		ORDER BY message_id`, chatID, authorID, since, limit)
+	if err != nil {
+		return nil, fmt.Errorf("storage: read an author's message IDs: %w", err)
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+	if err != nil {
+		return nil, fmt.Errorf("storage: read an author's message IDs: %w", err)
+	}
+	return ids, nil
+}
+
 // ClearGroupMessages deletes a group's logged messages.
 func (s *Store) ClearGroupMessages(ctx context.Context, chatID int64) error {
 	if _, err := s.pool.Exec(ctx, `DELETE FROM group_messages WHERE chat_id = $1`, chatID); err != nil {

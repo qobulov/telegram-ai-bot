@@ -13,8 +13,12 @@ import (
 	"telegram-ai-bot/internal/telegram"
 )
 
-// actionPoll is how a poll is recorded in the moderation audit.
-const actionPoll = "poll"
+// actionPoll is how a poll is recorded in the moderation audit, and
+// actionPollStop closing one.
+const (
+	actionPoll     = storage.ActionPoll
+	actionPollStop = storage.ActionPollStop
+)
 
 const (
 	// Telegram's limits for a poll.
@@ -42,11 +46,32 @@ const (
 	// delivered the update again, or the model asked for two polls. The
 	// first may still be on its way, so this says nothing of how it went.
 	pollAskedNote = "This message already asked for a poll, so no other was made; a group gets one poll every 10 minutes. Don't say whether the first worked."
+
+	noOpenPoll     = "there is no open poll I made in this group to close"
+	repliedNotOpen = "the poll they replied to is not an open poll I made here: I can only close my own, while they are open"
+	notAskedToStop = "their own message does not ask to close a poll, so nothing was done"
+	notPollsAsker  = "only whoever asked for this poll, the group's admins or my owners can close it"
+	pollStoppedOff = "Telegram says this poll is closed already."
+	pollStopNote   = "The poll is closed, and Telegram shows its results in the chat. Give the counts in one or two short lines, in their language."
+	pollStopAsked  = "This message already closed a poll; don't say it again: reply with exactly [silent] unless something else needs an answer."
 )
 
-// PollSender posts a poll in a chat.
+// stopWords are what a person asking to close a poll says, folded as says
+// folds them: "so'rovnomani yop", "ovoz berishni to'xtat", "закрой опрос".
+var stopWords = []string{"yop", "toxtat", "tugat", "yakun", "stop", "close", "закр", "останов", "заверш", "хватит", "ёп", "тўхтат"}
+
+// PollSender posts a poll in a chat, and closes one it posted.
 type PollSender interface {
 	SendPoll(ctx context.Context, poll telegram.OutgoingPoll) (int64, error)
+	StopPoll(ctx context.Context, chatID, messageID int64) (telegram.Poll, error)
+}
+
+// PollBook is the audit polls are counted in, which also keeps each poll's
+// message, to close it later.
+type PollBook interface {
+	PollCounter
+	SetModerationMessage(ctx context.Context, updateID int64, action string, messageID int64) error
+	OpenPoll(ctx context.Context, chatID, messageID int64) (storage.ModerationAction, bool, error)
 }
 
 // PollCounter keeps the polls the bot posted, or may have posted, in the
@@ -58,22 +83,32 @@ type PollCounter interface {
 	ChatModeration(ctx context.Context, chatID int64, action string, since time.Time) (int, error)
 }
 
-// PollOptions configures the create_poll tool. Sender and Store are
-// required.
+// PollOptions configures the create_poll tool. Sender, Store, Members and
+// BotID are required.
 type PollOptions struct {
 	Sender PollSender
-	Store  PollCounter
-	Now    func() time.Time
+	Store  PollBook
+	// Members tells who administers the group, for closing a poll someone
+	// else asked for.
+	Members MemberLookup
+	BotID   int64
+	// OwnersByID is true when the owners are known by their Telegram ID:
+	// only then may an owner close anyone's poll, as in moderation.
+	OwnersByID bool
+	Now        func() time.Time
 }
 
 type pollArgs struct {
+	Action   string   `json:"action"`
 	Question string   `json:"question"`
 	Options  []string `json:"options"`
 	Multiple bool     `json:"multiple"`
 }
 
-// PollTool lets anyone in a group have the bot post an anonymous poll there.
-// The poll goes to the group the turn is in, never one the model names.
+// PollTool lets anyone in a group have the bot post an anonymous poll there,
+// and whoever asked for one, the group's admins or the owners close it.
+// The poll goes to the group the turn is in, never one the model names, and
+// only a poll the bot made there is closed.
 func PollTool(opts PollOptions) Tool {
 	if opts.Now == nil {
 		opts.Now = time.Now
@@ -82,15 +117,16 @@ func PollTool(opts PollOptions) Tool {
 	return Tool{
 		Name: "create_poll",
 		Description: "Post an anonymous poll in this group when someone asks for a poll or a vote. Anyone here may ask; a group gets one poll every 10 minutes. " +
-			"The poll appears in the chat by itself, so don't repeat its question or options: reply in one short line at most.",
+			"The poll appears in the chat by itself, so don't repeat its question or options: reply in one short line at most. " +
+			"action stop closes a poll you made here, the one they replied to or else your latest, when they ask to close or end it (\"so'rovnomani yop\", \"закрой опрос\"), and gives its final counts; only whoever asked for that poll, the group's admins or your owners may.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"question": {"type": "string", "description": "The question, 1 to 300 characters, in the language of the person asking."},
-				"options": {"type": "array", "items": {"type": "string"}, "minItems": 2, "maxItems": 10, "description": "2 to 10 different answers, each 1 to 100 characters."},
-				"multiple": {"type": "boolean", "description": "Whether a voter may pick more than one answer. Default false."}
+				"action": {"type": "string", "enum": ["create", "stop"], "description": "create (the default) posts a poll; stop closes one and needs nothing else."},
+				"question": {"type": "string", "description": "For create: the question, 1 to 300 characters, in the language of the person asking."},
+				"options": {"type": "array", "items": {"type": "string"}, "minItems": 2, "maxItems": 10, "description": "For create: 2 to 10 different answers, each 1 to 100 characters."},
+				"multiple": {"type": "boolean", "description": "For create: whether a voter may pick more than one answer. Default false."}
 			},
-			"required": ["question", "options"],
 			"additionalProperties": false
 		}`),
 		GroupOnly: true,
@@ -118,6 +154,13 @@ func (p polls) run(ctx context.Context, raw json.RawMessage) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	switch args.Action {
+	case "stop":
+		return p.stop(ctx, caller)
+	case "", "create":
+	default:
+		return nil, &ArgumentError{Message: "action must be create or stop"}
+	}
 	poll, err := newPoll(caller, args)
 	if err != nil {
 		return nil, err
@@ -134,10 +177,104 @@ func (p polls) run(ctx context.Context, raw json.RawMessage) (any, error) {
 	if err := p.checkPace(ctx, caller.ChatID, actionPoll); err != nil {
 		return nil, p.forget(ctx, caller, actionPoll, err)
 	}
-	if _, err := p.Sender.SendPoll(ctx, poll); err != nil {
+	sentID, err := p.Sender.SendPoll(ctx, poll)
+	if err != nil {
 		return nil, p.notSent(ctx, caller, actionPoll, err)
 	}
+	// Keeping its message only lets the poll be closed later; the poll is
+	// in the chat either way.
+	_ = p.Store.SetModerationMessage(context.WithoutCancel(ctx), caller.UpdateID, actionPoll, sentID)
 	return map[string]any{"sent": true, "note": pollSentNote}, nil
+}
+
+// pollResult is one answer of a closed poll and its votes.
+type pollResult struct {
+	Option string `json:"option"`
+	Votes  int    `json:"votes"`
+}
+
+// stop closes a poll the bot made in the caller's group: the one they
+// replied to, or else the latest still open. Like moderation, it is done
+// only when their own words ask, and only for whoever asked for the poll,
+// an admin of the group or an owner. The record comes first, as a poll's
+// does, so an update delivered twice closes once.
+func (p polls) stop(ctx context.Context, caller Caller) (any, error) {
+	if !caller.Human {
+		return nil, &DeniedError{Message: notPollsAsker}
+	}
+	if !says(caller.Words, stopWords) {
+		return nil, &DeniedError{Message: notAskedToStop}
+	}
+	poll, err := p.pollToStop(ctx, caller)
+	if err != nil {
+		return nil, err
+	}
+	if err := p.mayStop(ctx, caller, poll); err != nil {
+		return nil, err
+	}
+	first, err := p.Store.RecordModeration(ctx, storage.ModerationAction{
+		ChatID: caller.ChatID, Action: actionPollStop, RequesterID: caller.UserID, TargetMessageID: poll.TargetMessageID, UpdateID: caller.UpdateID,
+	})
+	if err != nil {
+		return nil, internal(err)
+	}
+	if !first {
+		return map[string]any{"already_handled": true, "note": pollStopAsked}, nil
+	}
+	closed, err := p.Sender.StopPoll(ctx, caller.ChatID, poll.TargetMessageID)
+	if refusal, refused := telegramRefusal(err); refused && strings.Contains(refusal.Description, "already been closed") {
+		// Closed by Telegram's own timer or by hand: the record stays true.
+		return map[string]any{"stopped": true, "note": pollStoppedOff}, nil
+	}
+	if err != nil {
+		// Closing twice does no harm, so whatever Telegram said, it may be
+		// asked again.
+		return nil, p.forget(ctx, caller, actionPollStop, telegramFailure(err))
+	}
+	results := make([]pollResult, 0, len(closed.Options))
+	for _, option := range closed.Options {
+		results = append(results, pollResult{Option: option.Text, Votes: option.VoterCount})
+	}
+	return map[string]any{"stopped": true, "question": closed.Question, "results": results, "voters": closed.TotalVoterCount, "note": pollStopNote}, nil
+}
+
+// pollToStop is the poll the caller means: the one they replied to, which
+// must be an open poll of the bot's here, or else the latest open one.
+func (p polls) pollToStop(ctx context.Context, caller Caller) (storage.ModerationAction, error) {
+	var messageID int64
+	if t := caller.Target; t != nil && t.Poll {
+		if t.UserID != p.BotID {
+			return storage.ModerationAction{}, &DeniedError{Message: repliedNotOpen}
+		}
+		messageID = t.MessageID
+	}
+	poll, found, err := p.Store.OpenPoll(ctx, caller.ChatID, messageID)
+	switch {
+	case err != nil:
+		return storage.ModerationAction{}, internal(err)
+	case !found && messageID != 0:
+		return storage.ModerationAction{}, &DeniedError{Message: repliedNotOpen}
+	case !found:
+		return storage.ModerationAction{}, &DeniedError{Message: noOpenPoll}
+	}
+	return poll, nil
+}
+
+// mayStop lets whoever asked for the poll close it, an owner known by ID
+// any poll, and anyone else only when Telegram says they administer the
+// group. When Telegram cannot say, the answer is no.
+func (p polls) mayStop(ctx context.Context, caller Caller, poll storage.ModerationAction) error {
+	if poll.RequesterID == caller.UserID || (caller.Owner && p.OwnersByID) {
+		return nil
+	}
+	member, err := p.Members.GetChatMember(ctx, caller.ChatID, caller.UserID)
+	if err != nil {
+		return errLookup
+	}
+	if !member.IsAdmin() {
+		return &DeniedError{Message: notPollsAsker}
+	}
+	return nil
 }
 
 // pollAsker is who the turn is for, if anyone in a group: a person or an

@@ -1,13 +1,17 @@
 package service
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"log/slog"
 	"net/url"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
 
+	"telegram-ai-bot/internal/ai"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 )
@@ -19,6 +23,7 @@ type fakeGuards struct {
 	spammers map[int64]string
 	badHosts map[string]string
 	unsafe   string
+	imageErr error
 	links    bool
 	images   bool
 	asked    []int64
@@ -51,7 +56,54 @@ func (f *fakeGuards) UnsafeImage(context.Context, []byte) (string, bool, error) 
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.pictures++
+	if f.imageErr != nil {
+		return "", false, f.imageErr
+	}
 	return f.unsafe, f.unsafe != "", nil
+}
+
+// fakePictureJudge is the model looking at pictures, answering one word.
+type fakePictureJudge struct {
+	mu     sync.Mutex
+	answer string
+	err    error
+	// seen are the MIME types of the pictures it was shown.
+	seen []string
+}
+
+func (f *fakePictureJudge) Complete(_ context.Context, req ai.Request) (ai.Message, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, part := range req.Messages[0].Parts {
+		mime, _, _ := strings.Cut(strings.TrimPrefix(part.ImageURL.URL, "data:"), ";")
+		f.seen = append(f.seen, mime)
+	}
+	return ai.Message{Role: ai.RoleAssistant, Content: f.answer}, f.err
+}
+
+// fakePictureVerdicts is the store of pictures' verdicts.
+type fakePictureVerdicts struct {
+	mu   sync.Mutex
+	kept map[string]storage.PictureVerdict
+}
+
+func (f *fakePictureVerdicts) PictureVerdict(_ context.Context, id string) (storage.PictureVerdict, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	v, ok := f.kept[id]
+	return v, ok, nil
+}
+
+func (f *fakePictureVerdicts) SavePictureVerdict(_ context.Context, v storage.PictureVerdict) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.kept == nil {
+		f.kept = map[string]storage.PictureVerdict{}
+	}
+	if _, ok := f.kept[v.FileUniqueID]; !ok {
+		f.kept[v.FileUniqueID] = v
+	}
+	return nil
 }
 
 func (f *fakeGuards) CanCheckLinks() bool  { return f.links }
@@ -302,5 +354,180 @@ func TestFloodGuardLeavesOrdinaryWritingAndAdminsAlone(t *testing.T) {
 
 	if sent := f.run(updates...); len(sent) != 0 || len(moderator.deleted) != 0 {
 		t.Errorf("sent %+v, deleted %v; want nothing done", sent, moderator.deleted)
+	}
+}
+
+func TestJoinsGuardIsToldToTheModel(t *testing.T) {
+	f, _ := guardFixture("")
+	s := New(f.opts)
+	defer s.Close()
+	lines := s.ruleLines([]storage.GroupRule{{ChatID: groupID, Kind: storage.RuleJoinCaptcha}})
+	if len(lines) != 1 || !strings.Contains(lines[0], "asking to join") || !strings.Contains(lines[0], "not by you") {
+		t.Errorf("lines = %q", lines)
+	}
+}
+
+func TestImageGuardSparesNobody(t *testing.T) {
+	f, guards, moderator := protectFixture(storage.RuleImageGuard)
+	guards.unsafe = "nudity"
+	fromAdmin := messageFrom(guardAdminID, "adm", "")
+	fromAdmin.Photo = []telegram.PhotoSize{{FileID: "photo-small", FileUniqueID: "p1", FileSize: 40 << 10}}
+	fromOwner := messageFrom(9001, ownerUsername, "")
+	fromOwner.MessageID = 31
+	fromOwner.Photo = []telegram.PhotoSize{{FileID: "photo-big", FileUniqueID: "p2", FileSize: 40 << 10}}
+
+	sent := f.run(inGroup(fromAdmin), inGroup(fromOwner))
+
+	if !slices.Equal(moderator.deleted, []int64{30, 31}) || len(sent) != 2 {
+		t.Errorf("deleted %v, sent %+v; want the admin's and the owner's pictures gone", moderator.deleted, sent)
+	}
+}
+
+func TestImageGuardLooksAtStickersFilesAndGIFsOncePerFile(t *testing.T) {
+	f, guards, moderator := protectFixture(storage.RuleImageGuard)
+	guards.unsafe = "nudity"
+	media := f.opts.Media.(*fakeMedia)
+	media.files["doc-image"] = jpegData
+	sticker := messageFrom(5454, "pic", "")
+	sticker.Sticker = &telegram.Sticker{FileID: "sticker", FileUniqueID: "s1"}
+	again := messageFrom(5454, "pic", "")
+	again.MessageID = 31
+	again.Sticker = &telegram.Sticker{FileID: "sticker", FileUniqueID: "s1"}
+	file := messageFrom(5454, "pic", "")
+	file.MessageID = 32
+	file.Document = &telegram.Document{FileID: "doc-image", FileUniqueID: "d1", MimeType: "image/png", FileSize: 10 << 10}
+	gif := messageFrom(5454, "pic", "")
+	gif.MessageID = 33
+	gif.Animation = &telegram.Animation{FileID: "gif", Thumbnail: &telegram.PhotoSize{FileID: "gif-thumb", FileUniqueID: "g1"}}
+	gif.Document = &telegram.Document{FileID: "gif", MimeType: "video/mp4"}
+	pdf := messageFrom(5454, "pic", "")
+	pdf.MessageID = 34
+	pdf.Document = &telegram.Document{FileID: "report", MimeType: "application/pdf"}
+
+	f.run(inGroup(sticker), inGroup(again), inGroup(file), inGroup(gif), inGroup(pdf))
+
+	if !slices.Equal(moderator.deleted, []int64{30, 31, 32, 33}) {
+		t.Errorf("deleted %v, want the sticker twice, the file and the GIF", moderator.deleted)
+	}
+	if want := []string{"sticker", "doc-image", "gif-thumb"}; !slices.Equal(media.downloads, want) || guards.pictures != 3 {
+		t.Errorf("downloads = %v after %d checks, want %v: the sticker once", media.downloads, guards.pictures, want)
+	}
+}
+
+func TestImageGuardKeepsSafePictures(t *testing.T) {
+	f, guards, moderator := protectFixture(storage.RuleImageGuard)
+	msg := messageFrom(guardAdminID, "adm", "")
+	msg.Photo = []telegram.PhotoSize{{FileID: "photo-small", FileUniqueID: "p1", FileSize: 40 << 10}}
+
+	f.run(inGroup(msg))
+
+	if len(moderator.deleted) != 0 || guards.pictures != 1 {
+		t.Errorf("deleted %v after %d checks, want a safe picture kept", moderator.deleted, guards.pictures)
+	}
+}
+
+// photoFrom is a member's photo with the given unique file ID.
+func photoFrom(messageID int64, fileUniqueID string) telegram.Update {
+	msg := messageFrom(5454, "pic", "")
+	msg.MessageID = messageID
+	msg.Photo = []telegram.PhotoSize{{FileID: "photo-small", FileUniqueID: fileUniqueID, FileSize: 40 << 10}}
+	return inGroup(msg)
+}
+
+// Sightengine out of its month's quota hands the picture to the model,
+// which is shown the picture and judges it; Sightengine is then let rest,
+// and the logs say who judged.
+func TestImageGuardAsksTheModelWhenSightengineFails(t *testing.T) {
+	f, guards, moderator := protectFixture(storage.RuleImageGuard)
+	guards.imageErr = errors.New("guards: api.sightengine.com answered 400: 30-day usage limit reached (usage_limit)")
+	judge := &fakePictureJudge{answer: "NUDE"}
+	f.opts.PictureJudge = judge
+	var logs bytes.Buffer
+	f.opts.Logger = slog.New(slog.NewTextHandler(&logs, nil))
+
+	sent := f.run(photoFrom(30, "p1"), photoFrom(31, "p2"))
+
+	if len(sent) != 2 || !strings.Contains(sent[0].text, "nomaqbul rasm o'chirildi (nudity)") {
+		t.Fatalf("sent = %+v", sent)
+	}
+	if !slices.Equal(moderator.deleted, []int64{30, 31}) {
+		t.Errorf("deleted %v, want both pictures", moderator.deleted)
+	}
+	if guards.pictures != 1 || !slices.Equal(judge.seen, []string{"image/jpeg", "image/jpeg"}) {
+		t.Errorf("Sightengine asked %d times, the model shown %v; want Sightengine once, then the model alone", guards.pictures, judge.seen)
+	}
+	if !strings.Contains(logs.String(), "Sightengine could not check a picture") || strings.Count(logs.String(), "judge=model") != 2 {
+		t.Errorf("logs do not say who judged:\n%s", logs.String())
+	}
+}
+
+// Without Sightengine's keys the model alone judges, and the picture guard
+// runs.
+func TestImageGuardRunsOnTheModelAlone(t *testing.T) {
+	f, guards, moderator := protectFixture(storage.RuleImageGuard)
+	guards.images = false
+	f.opts.PictureJudge = &fakePictureJudge{answer: "SAFE"}
+
+	f.run(photoFrom(30, "p1"))
+	if len(moderator.deleted) != 0 || guards.pictures != 0 {
+		t.Errorf("a safe picture: deleted %v, Sightengine asked %d times", moderator.deleted, guards.pictures)
+	}
+
+	f, guards, moderator = protectFixture(storage.RuleImageGuard)
+	guards.images = false
+	f.opts.PictureJudge = &fakePictureJudge{answer: "nude."}
+	f.run(photoFrom(30, "p1"))
+	if !slices.Equal(moderator.deleted, []int64{30}) {
+		t.Errorf("a nude picture: deleted %v", moderator.deleted)
+	}
+}
+
+// A picture judged once, by anyone, on any instance, is never sent again:
+// its verdict is kept for good, and read before anything is downloaded.
+func TestImageGuardKeepsVerdictsForGood(t *testing.T) {
+	f, guards, moderator := protectFixture(storage.RuleImageGuard)
+	media := f.opts.Media.(*fakeMedia)
+	book := &fakePictureVerdicts{kept: map[string]storage.PictureVerdict{
+		"known-bad": {FileUniqueID: "known-bad", Unsafe: true, Reason: "nudity", Judge: storage.JudgeModel},
+	}}
+	f.opts.PictureVerdicts = book
+
+	sent := f.run(photoFrom(30, "known-bad"), photoFrom(31, "new"))
+
+	if len(sent) != 1 || !slices.Equal(moderator.deleted, []int64{30}) {
+		t.Errorf("sent %+v, deleted %v; want the known nude picture deleted", sent, moderator.deleted)
+	}
+	if guards.pictures != 1 || len(media.downloads) != 1 {
+		t.Errorf("Sightengine asked %d times after %v; want only the new picture", guards.pictures, media.downloads)
+	}
+	if got := book.kept["new"]; got != (storage.PictureVerdict{FileUniqueID: "new", Judge: storage.JudgeSightengine}) {
+		t.Errorf("kept = %+v, want the new picture's safe verdict by Sightengine", got)
+	}
+
+	// A new instance, with nothing in memory, reads it from the store.
+	f.run(photoFrom(32, "new"))
+	if guards.pictures != 1 {
+		t.Errorf("a kept picture was asked about again: %d questions", guards.pictures)
+	}
+}
+
+// When neither can say, the picture stays and nothing is kept, so that it
+// is judged when it is sent again.
+func TestImageGuardLeavesAPictureNobodyCouldJudge(t *testing.T) {
+	for name, judge := range map[string]*fakePictureJudge{
+		"model down":     {err: errors.New("503")},
+		"no clear word":  {answer: "I cannot help with that."},
+		"blocked answer": {answer: ""},
+	} {
+		f, guards, moderator := protectFixture(storage.RuleImageGuard)
+		guards.imageErr = errors.New("quota")
+		book := &fakePictureVerdicts{}
+		f.opts.PictureJudge, f.opts.PictureVerdicts = judge, book
+
+		f.run(photoFrom(30, "p1"))
+
+		if len(moderator.deleted) != 0 || len(book.kept) != 0 {
+			t.Errorf("%s: deleted %v, kept %v", name, moderator.deleted, book.kept)
+		}
 	}
 }

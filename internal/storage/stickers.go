@@ -186,72 +186,53 @@ func (s *Store) PickSticker(ctx context.Context, chatID int64, category string, 
 	return fileID, nil
 }
 
-// A sticker that is a Mobile Legends item's card is marked ItemCard, and
-// its description is the item's name; one looked at and found to be no
-// item's card is marked NotItemCard. Neither is a mood, so the moods never
-// pick a card.
-const (
-	ItemCard    = "mlbb_item"
-	NotItemCard = "mlbb_item_none"
-)
-
-// ItemCardSticker is an item's card and the item's name.
-type ItemCardSticker struct {
-	FileID, Name string
+// ForgetSticker drops a sticker, such as one taken out of the bot's own
+// set, so that it is never sent again.
+func (s *Store) ForgetSticker(ctx context.Context, fileUniqueID string) error {
+	if _, err := s.pool.Exec(ctx, `DELETE FROM bot_stickers WHERE file_unique_id = $1`, fileUniqueID); err != nil {
+		return fmt.Errorf("storage: forget sticker: %w", err)
+	}
+	return nil
 }
 
-// UnnamedCards are a pack's stickers not yet looked at as item cards.
-func (s *Store) UnnamedCards(ctx context.Context, pack string) ([]PackSticker, error) {
-	rows, err := s.pool.Query(ctx, `
-		SELECT file_unique_id, file_id, pack, emoji, image_file_id
-		FROM bot_stickers WHERE pack = $1 AND NOT (categories && $2::text[]) ORDER BY file_unique_id`,
-		pack, []string{ItemCard, NotItemCard})
-	if err != nil {
-		return nil, fmt.Errorf("storage: unnamed cards: %w", err)
+// ErrNoStickerSet means the bot has not made its own sticker set yet.
+var ErrNoStickerSet = errors.New("storage: no sticker set of the bot's own")
+
+// OwnStickerSetOwner is the user the bot's sticker set name belongs to on
+// Telegram, or ErrNoStickerSet when the set was not made.
+func (s *Store) OwnStickerSetOwner(ctx context.Context, name string) (int64, error) {
+	var ownerID int64
+	err := s.pool.QueryRow(ctx, `SELECT owner_id FROM own_sticker_sets WHERE name = $1`, name).Scan(&ownerID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, ErrNoStickerSet
 	}
-	stickers, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (PackSticker, error) {
-		var st PackSticker
-		err := row.Scan(&st.FileUniqueID, &st.FileID, &st.Pack, &st.Emoji, &st.ImageFileID)
-		return st, err
-	})
 	if err != nil {
-		return nil, fmt.Errorf("storage: unnamed cards: %w", err)
+		return 0, fmt.Errorf("storage: own sticker set: %w", err)
 	}
-	return stickers, nil
+	return ownerID, nil
 }
 
-// CardCount is how far a pack of item cards has come: its stickers, those
-// looked at, and those that are an item's card.
-type CardCount struct {
-	Total, Looked, Named int
+// SaveOwnStickerSet remembers that the set name belongs to ownerID. A set
+// already remembered keeps its owner: Telegram never changes it.
+func (s *Store) SaveOwnStickerSet(ctx context.Context, name string, ownerID int64) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO own_sticker_sets (name, owner_id) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING`, name, ownerID)
+	if err != nil {
+		return fmt.Errorf("storage: save own sticker set: %w", err)
+	}
+	return nil
 }
 
-// PackCards counts a pack's item cards.
-func (s *Store) PackCards(ctx context.Context, pack string) (CardCount, error) {
-	var c CardCount
-	err := s.pool.QueryRow(ctx, `
-		SELECT count(*), count(*) FILTER (WHERE categories && $2::text[]), count(*) FILTER (WHERE $3 = ANY(categories) AND enabled)
-		FROM bot_stickers WHERE pack = $1`, pack, []string{ItemCard, NotItemCard}, ItemCard).Scan(&c.Total, &c.Looked, &c.Named)
-	if err != nil {
-		return CardCount{}, fmt.Errorf("storage: count cards: %w", err)
-	}
-	return c, nil
+var dailyStickers = dailyKind{table: "sticker_uploads", salt: 0x5354434b} // "STCK"
+
+// ReserveStickerUpload takes one of the user's stickers for the day, as
+// ReserveImage takes a picture.
+func (s *Store) ReserveStickerUpload(ctx context.Context, userID, chatID int64, since time.Time, limit int) (int64, bool, error) {
+	return s.reserveDaily(ctx, dailyStickers, userID, chatID, since, limit)
 }
 
-// ItemCards are every item's card, by name.
-func (s *Store) ItemCards(ctx context.Context) ([]ItemCardSticker, error) {
-	rows, err := s.pool.Query(ctx, `
-		SELECT file_id, description FROM bot_stickers WHERE $1 = ANY(categories) AND enabled ORDER BY description`, ItemCard)
-	if err != nil {
-		return nil, fmt.Errorf("storage: item cards: %w", err)
-	}
-	cards, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (ItemCardSticker, error) {
-		var c ItemCardSticker
-		err := row.Scan(&c.FileID, &c.Name)
-		return c, err
-	})
-	if err != nil {
-		return nil, fmt.Errorf("storage: item cards: %w", err)
-	}
-	return cards, nil
+// ReleaseStickerUpload gives back a reservation whose sticker was not
+// added.
+func (s *Store) ReleaseStickerUpload(ctx context.Context, id int64) error {
+	return s.releaseDaily(ctx, dailyStickers, id)
 }

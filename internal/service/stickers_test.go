@@ -302,24 +302,6 @@ func TestSongIsTheAnswerAlone(t *testing.T) {
 	}
 }
 
-// An item's card goes after the short answer that tells of it, outside the
-// gap that spaces the bot's own stickers, and the log notes it.
-func TestItemCardFollowsTheAnswer(t *testing.T) {
-	f := newFixture()
-	st := withStickers(f)
-	f.replier.answer = "Mana Athena's Shield"
-	f.replier.cards = []string{"card-athena"}
-
-	sent := f.run(inGroup(groupMessage("Mira, Athena's Shield nima beradi?")))
-
-	if len(sent) != 1 || len(st.sent) != 1 || st.sent[0] != "card-athena" {
-		t.Errorf("texts %+v, stickers %q", sent, st.sent)
-	}
-	if log := strings.Join(f.chatLog.texts(groupID), "\n"); !strings.Contains(log, "<item card sticker>") {
-		t.Errorf("log = %q", log)
-	}
-}
-
 // A sticker that was the whole answer and is held back by the gap becomes
 // a reaction of its mood; one asked for is not held back.
 func TestStickerWithinTheGap(t *testing.T) {
@@ -369,5 +351,25 @@ func TestSongIsSentAfterAnEmptyAnswer(t *testing.T) {
 
 	if len(sent) != 0 || len(audio.sent) != 1 || audio.sent[0] != "VellyCarl — Into You x Bye MP3" {
 		t.Errorf("texts %+v, audio %q", sent, audio.sent)
+	}
+}
+
+// A recognised song's preview comes after the answer and leaves it whole:
+// the cover, its caption and the link buttons under them.
+func TestAudioAfterTheAnswerLeavesTheAnswer(t *testing.T) {
+	f := newFixture()
+	audio := &fakeAudioSender{}
+	f.opts.AudioSender = audio
+	f.replier.draws = 1
+	f.replier.buttons = [][]telegram.Button{{{Text: "Deezer", URL: "https://www.deezer.com/track/9"}}}
+	f.replier.audios = []tools.Audio{{Data: []byte("MP3"), Title: "Rondo", Performer: "Kempff", AfterAnswer: true}}
+
+	sent := f.run(textFrom(userID, "which song"))
+
+	if len(sent) != 1 || !sent[0].photo || sent[0].text != "echo: which song" || len(sent[0].buttons) != 1 {
+		t.Errorf("sent = %+v", sent)
+	}
+	if len(audio.sent) != 1 || audio.sent[0] != "Kempff — Rondo MP3" {
+		t.Errorf("audio = %q", audio.sent)
 	}
 }

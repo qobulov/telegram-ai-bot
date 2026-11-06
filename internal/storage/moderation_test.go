@@ -35,6 +35,7 @@ func TestModerationAuditIsIdempotent(t *testing.T) {
 	ban := ModerationAction{ChatID: group, Action: "ban", RequesterID: alice, TargetUserID: bob, UpdateID: 502}
 	mustRecord(t, store, ban)
 	mustRecord(t, store, ModerationAction{ChatID: group, Action: "poll", RequesterID: alice, UpdateID: 501})
+	mustRecord(t, store, ModerationAction{ChatID: group, Action: "dice", RequesterID: alice, UpdateID: 503})
 
 	var (
 		text            string
@@ -55,7 +56,7 @@ func TestModerationAuditIsIdempotent(t *testing.T) {
 
 	since := time.Now().Add(-10 * time.Minute)
 	if n, err := store.ModerationBy(ctx, alice, since); err != nil || n != 3 {
-		t.Errorf("ModerationBy(alice) = %d, %v; want 3, polls left out", n, err)
+		t.Errorf("ModerationBy(alice) = %d, %v; want 3, polls and dice left out", n, err)
 	}
 	if n, _ := store.ModerationBy(ctx, bob, since); n != 0 {
 		t.Errorf("ModerationBy(bob) = %d, want 0", n)
@@ -74,11 +75,50 @@ func TestModerationAuditIsIdempotent(t *testing.T) {
 	if err := store.ForgetModeration(ctx, 500, "mute"); err != nil {
 		t.Fatalf("ForgetModeration: %v", err)
 	}
-	if n := countRows(t, store, "moderation_actions"); n != 3 {
-		t.Errorf("audit rows = %d, want 3: forgetting the mute left the delete alone", n)
+	if n := countRows(t, store, "moderation_actions"); n != 4 {
+		t.Errorf("audit rows = %d, want 4: forgetting the mute left the delete alone", n)
 	}
 	if !mustRecord(t, store, mute) {
 		t.Error("a forgotten mute could not be recorded again")
+	}
+}
+
+// The open poll is the latest the bot sent in the chat and did not close,
+// or the one in a given message; one never sent, closed or in another chat
+// is none. Closing counts as no moderation.
+func TestOpenPollIsTheLatestNotClosed(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	mustRecord(t, store, ModerationAction{ChatID: group, Action: ActionPoll, RequesterID: alice, UpdateID: 601})
+	mustRecord(t, store, ModerationAction{ChatID: group, Action: ActionPoll, RequesterID: bob, UpdateID: 602})
+	mustRecord(t, store, ModerationAction{ChatID: group, Action: ActionPoll, RequesterID: bob, UpdateID: 603})
+	mustRecord(t, store, ModerationAction{ChatID: otherGroup, Action: ActionPoll, RequesterID: bob, UpdateID: 604})
+	for update, message := range map[int64]int64{601: 70, 602: 71, 604: 90} {
+		if err := store.SetModerationMessage(ctx, update, ActionPoll, message); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// 603 was never sent, so 602's poll is the latest.
+	poll, found, err := store.OpenPoll(ctx, group, 0)
+	if err != nil || !found || poll.TargetMessageID != 71 || poll.RequesterID != bob || poll.UpdateID != 602 {
+		t.Fatalf("OpenPoll = %+v, %v, %v", poll, found, err)
+	}
+	if poll, found, _ := store.OpenPoll(ctx, group, 70); !found || poll.RequesterID != alice {
+		t.Errorf("OpenPoll(70) = %+v, %v", poll, found)
+	}
+	if _, found, _ := store.OpenPoll(ctx, group, 90); found {
+		t.Error("another chat's poll was found")
+	}
+	mustRecord(t, store, ModerationAction{ChatID: group, Action: ActionPollStop, RequesterID: bob, TargetMessageID: 71, UpdateID: 605})
+	if poll, found, _ := store.OpenPoll(ctx, group, 0); !found || poll.TargetMessageID != 70 {
+		t.Errorf("after closing 71, OpenPoll = %+v, %v; want 70", poll, found)
+	}
+	if _, found, _ := store.OpenPoll(ctx, group, 71); found {
+		t.Error("a closed poll is still open")
+	}
+	if n, _ := store.ModerationBy(ctx, bob, time.Now().Add(-time.Minute)); n != 0 {
+		t.Errorf("ModerationBy(bob) = %d, want 0: polls and closing them are no moderation", n)
 	}
 }
 

@@ -1,0 +1,308 @@
+package raid
+
+import (
+	"encoding/json"
+	"errors"
+	"math"
+	"os/exec"
+	"path/filepath"
+	"slices"
+	"testing"
+	"time"
+
+	"telegram-ai-bot/internal/storage"
+)
+
+// Taps count up to what a person taps in the time since the last hit, at
+// most two seconds' worth and a few more.
+func TestStrikeCountsWhatAPersonTaps(t *testing.T) {
+	hero := storage.RaidHero{Sword: 1, Crit: 0, Seed: 12345}
+	for _, tc := range []struct {
+		taps  int
+		since time.Duration
+		want  int
+	}{
+		{3, time.Second, 3},
+		{50, 500 * time.Millisecond, TapsPerSecond/2 + tapBurst},
+		{50, time.Hour, 2*TapsPerSecond + tapBurst},
+		{50, -time.Second, tapBurst},
+		{-5, time.Second, 0},
+	} {
+		h := hero
+		if counted, _ := Strike(&h, tc.taps, tc.since, time.Now()); counted != tc.want {
+			t.Errorf("%d taps after %v counted %d, want %d", tc.taps, tc.since, counted, tc.want)
+		}
+	}
+	if _, damage := Strike(&hero, 0, time.Second, time.Now()); damage != 0 {
+		t.Errorf("no taps did %d", damage)
+	}
+}
+
+// About the chance's share of taps are critical, each three blows' damage.
+func TestCriticalBlows(t *testing.T) {
+	hero := storage.RaidHero{Sword: 5, Crit: 5, Seed: 987654321}
+	crits := 0
+	for tap := range int64(10000) {
+		if Critical(hero.Seed, tap, CritChance(hero.Crit)) {
+			crits++
+		}
+	}
+	if crits < 1800 || crits > 2200 {
+		t.Errorf("%d of 10000 taps critical at %d%%", crits, CritChance(hero.Crit))
+	}
+	_, damage := Strike(&hero, 4, time.Second, time.Now())
+	var want int64
+	for tap := range int64(4) {
+		blow := TapDamage(5)
+		if Critical(hero.Seed, tap, CritChance(5)) {
+			blow *= critTimes
+		}
+		want += blow
+	}
+	if damage != want {
+		t.Errorf("4 taps did %d, want %d", damage, want)
+	}
+}
+
+// Bosses grow with each level and with the chat's active members, chiefs
+// thrice; upgrades cost more each level.
+func TestRulesGrow(t *testing.T) {
+	for level := 1; level < 60; level++ {
+		if !Chief(level+1) && !Chief(level) && MaxHP(level+1, 3) <= MaxHP(level, 3) {
+			t.Fatalf("level %d's boss is no stronger than level %d's", level+1, level)
+		}
+		if MaxHP(level, 5) <= MaxHP(level, 1) {
+			t.Fatalf("level %d's boss is no stronger for five members than for one", level)
+		}
+		for _, item := range []string{"sword", "crit"} {
+			if level < Most(item) && Cost(item, level+1) <= Cost(item, level) {
+				t.Fatalf("%s at %d costs no more than at %d", item, level+1, level)
+			}
+		}
+	}
+	if MaxHP(10, 2) != int64(math.Round(1500*math.Pow(1.32, 9)*1.4*3)) || Reward(10, 0, 1, 1) != 3*Reward(9, 0, 1, 1)*10/9 {
+		t.Errorf("a chief's HP %d and reward %d are not thrice", MaxHP(10, 2), Reward(10, 0, 1, 1))
+	}
+	if MaxHP(500, 1000) != MaxHP(120, mostActive) || MaxHP(1, 0) != MaxHP(1, 1) {
+		t.Errorf("the bounds on level and members are not kept")
+	}
+}
+
+// The page's crit.js says the same taps are critical as the server.
+func TestPageCountsCriticalBlowsAsTheServer(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is not installed")
+	}
+	type tap struct {
+		Seed   uint32 `json:"seed"`
+		Tap    int64  `json:"tap"`
+		Chance int    `json:"chance"`
+	}
+	var taps []tap
+	var want []bool
+	for _, seed := range []uint32{1, 7, 123456789, 4294967295} {
+		for _, n := range []int64{0, 1, 2, 99, 12345, 4294967295, 4294967296, 1 << 40} {
+			taps = append(taps, tap{seed, n, 35})
+			want = append(want, Critical(seed, n, 35))
+		}
+	}
+	input, _ := json.Marshal(taps)
+	crit, _ := filepath.Abs("../../public/game/boss/crit.js")
+	script := `const critical = require(process.argv[1]);
+console.log(JSON.stringify(JSON.parse(process.argv[2]).map(t => critical(t.seed, t.tap, t.chance))));`
+	out, err := exec.Command(node, "-e", script, crit, string(input)).CombinedOutput()
+	if err != nil {
+		t.Fatalf("node: %v\n%s", err, out)
+	}
+	var got []bool
+	if err := json.Unmarshal(out, &got); err != nil || len(got) != len(want) {
+		t.Fatalf("node said %s", out)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("seed %d tap %d: the page says %v, the server %v", taps[i].Seed, taps[i].Tap, got[i], want[i])
+		}
+	}
+}
+
+// Titles come with damage in all, Alpomish's at a hundred million.
+func TestTitles(t *testing.T) {
+	for _, tc := range []struct {
+		total int64
+		want  int
+	}{{0, 0}, {9_999, 0}, {10_000, 1}, {999_999, 2}, {1_000_000, 3}, {5e8, 5}} {
+		if got := Title(tc.total); got != tc.want {
+			t.Errorf("Title(%d) = %d, want %d", tc.total, got, tc.want)
+		}
+	}
+}
+
+// Kuch makes every blow three times for 12 seconds and is ready again 50
+// seconds after; Ulti is charged by 300 taps, and makes the next blow a
+// hundred times; both count in the day's quests.
+func TestSkills(t *testing.T) {
+	now := time.Date(2026, 10, 30, 12, 0, 0, 0, time.UTC)
+	hero := storage.RaidHero{Sword: 1, Seed: 5, Crit: 0}
+	if err := UseSkill("ult", now)(&hero); !errors.Is(err, ErrUncharged) {
+		t.Fatalf("Ulti uncharged: %v", err)
+	}
+	if err := UseSkill("buff", now)(&hero); err != nil {
+		t.Fatal(err)
+	}
+	if err := UseSkill("buff", now.Add(time.Second))(&hero); !errors.Is(err, ErrCooldown) {
+		t.Errorf("Kuch again a second later: %v", err)
+	}
+	plain := func(h storage.RaidHero, taps int) int64 {
+		var d int64
+		for i := range int64(taps) {
+			b := TapDamage(h.Sword)
+			if Critical(h.Seed, h.Taps+i, CritChance(h.Crit)) {
+				b *= critTimes
+			}
+			d += b
+		}
+		return d
+	}
+	want := plain(hero, 4) * buffTimes
+	if counted, damage := Strike(&hero, 4, time.Second, now.Add(time.Second)); counted != 4 || damage != want || hero.UltCharge != 4 {
+		t.Errorf("a hit under Kuch did %d of %d taps, want %d; %+v", damage, counted, want, hero)
+	}
+	hero.Taps += 4
+
+	hero.UltCharge = ultTaps
+	if err := UseSkill("ult", now)(&hero); err != nil || !hero.UltArmed || hero.UltCharge != 0 {
+		t.Fatalf("Ulti: %v %+v", err, hero)
+	}
+	if err := UseSkill("ult", now)(&hero); !errors.Is(err, ErrUncharged) {
+		t.Errorf("Ulti twice: %v", err)
+	}
+	later := now.Add(buffFor + skillGrace + time.Second)
+	first := TapDamage(1) * ultTimes
+	if Critical(hero.Seed, hero.Taps, CritChance(hero.Crit)) {
+		first *= critTimes
+	}
+	before := hero
+	before.Taps++
+	want = first + plain(before, 1)
+	if _, damage := Strike(&hero, 2, time.Second, later); damage != want || hero.UltArmed || hero.UltCharge != 2 {
+		t.Errorf("Ulti's blow = %d, want %d; %+v", damage, want, hero)
+	}
+	if hero.QuestSkills != 2 {
+		t.Errorf("skills counted = %d", hero.QuestSkills)
+	}
+	for _, skill := range []string{"storm", "fire", "magic"} {
+		if err := UseSkill(skill, now)(&hero); !errors.Is(err, ErrNoSkill) {
+			t.Errorf("%s: %v", skill, err)
+		}
+	}
+}
+
+// A quest's reward is taken once, when it is done, and the quests start
+// over the next day in Uzbekistan.
+func TestQuests(t *testing.T) {
+	now := time.Date(2026, 10, 30, 18, 0, 0, 0, time.UTC) // 23:00 in Tashkent
+	hero := storage.RaidHero{Sword: 5}
+	if err := Claim(0, now)(&hero); !errors.Is(err, ErrNotDone) {
+		t.Fatalf("an undone quest: %v", err)
+	}
+	hero.OnDay(Day(now))
+	hero.QuestTaps = 300
+	if err := Claim(0, now)(&hero); err != nil || hero.Coins != 150*2 {
+		t.Fatalf("claiming the taps quest: %v, coins %d", err, hero.Coins)
+	}
+	if err := Claim(0, now)(&hero); !errors.Is(err, ErrClaimed) {
+		t.Errorf("claimed twice: %v", err)
+	}
+	tomorrow := now.Add(2 * time.Hour) // past midnight in Tashkent
+	if QuestProgress(hero, 0, tomorrow) != 0 || QuestClaimed(hero, 0, tomorrow) {
+		t.Errorf("the next day's quests did not start over")
+	}
+	if err := Claim(7, now)(&hero); !errors.Is(err, ErrNoQuest) {
+		t.Errorf("an unknown quest: %v", err)
+	}
+}
+
+// The daily gift comes once a day and grows with a streak of days, which
+// a day missed starts over.
+func TestDailyStreak(t *testing.T) {
+	day := time.Date(2026, 10, 30, 9, 0, 0, 0, time.UTC)
+	hero := storage.RaidHero{Sword: 1}
+	var gifts []int64
+	for _, at := range []time.Time{day, day.Add(time.Hour), day.AddDate(0, 0, 1), day.AddDate(0, 0, 2), day.AddDate(0, 0, 4)} {
+		var gift int64
+		if err := Daily(at, &gift)(&hero); err != nil {
+			t.Fatal(err)
+		}
+		gifts = append(gifts, gift)
+	}
+	if want := []int64{50, 0, 100, 150, 50}; !slices.Equal(gifts, want) || hero.Streak != 1 {
+		t.Errorf("gifts = %v, streak %d; want %v and a streak started over", gifts, hero.Streak, want)
+	}
+}
+
+// A kill pays by the boss and the work, not the sword: the same damage pays
+// the same at any sword, so that those behind climb faster; the weak keep what
+// the boss's level gave, and one tap does not take the part for being there.
+func TestRewardFollowsTheBoss(t *testing.T) {
+	const hp = 1_000_000_000
+	whole := purse(41) // the sword expected at 41 is 25
+	if want := float64(Cost("sword", 25)); whole != want {
+		t.Fatalf("purse(41) = %v; want %v", whole, want)
+	}
+	if got, want := Reward(41, hp, hp, 25), int64(math.Round(whole*0.05)); got != want {
+		t.Errorf("the whole boss = %d; want 5%% of the purse, %d", got, want)
+	}
+	blows := TapDamage(25) * fullBlows
+	if got, want := Reward(41, blows, hp, 25), int64(math.Round(whole*(0.02+0.03*float64(blows)/hp))); got != want {
+		t.Errorf("being there = %d; want %d", got, want)
+	}
+	if one, full := Reward(41, TapDamage(25), hp, 25), Reward(41, blows, hp, 25); one*5 > full {
+		t.Errorf("one tap = %d of %d for being there", one, full)
+	}
+	if Reward(41, hp, hp, 40) != Reward(41, hp, hp, 25) {
+		t.Error("the same damage pays differently by the sword")
+	}
+	if got, most := Reward(41, TapDamage(15)*fullBlows, hp, 15), Cost("sword", 15); got != most {
+		t.Errorf("a sword far behind the boss = %d; want one level, %d", got, most)
+	}
+	if got, old := Reward(12, 50, 100, 1), int64(20*12+100*12/2); got != old {
+		t.Errorf("a low boss = %d; want the level's %d", got, old)
+	}
+	if Reward(42, 2*hp, hp, 22) != Reward(42, hp, hp, 22) {
+		t.Error("damage past the boss's HP earns more")
+	}
+	if got, level := Reward(41, 100, 100, maxSword), int64(20*41+100*41); got != level {
+		t.Errorf("a sword at its highest = %d; want the level's %d", got, level)
+	}
+}
+
+// The kill that paid 392475, 13206, 2121 and 2115: the strongest still earns
+// the most, but no longer 185 times the rest.
+func TestRewardNarrowsAKillsGap(t *testing.T) {
+	hp := MaxHP(35, 19)
+	fighters := []struct {
+		damage int64
+		sword  int
+	}{{386_080_000, 26}, {76_160_000, 21}, {1_020_000, 17}, {764_000, 9}}
+	var got []int64
+	for _, f := range fighters {
+		got = append(got, Reward(35, f.damage, hp, f.sword))
+	}
+	t.Logf("rewards = %v", got)
+	if got[0] <= got[1] || got[1] <= got[2] || got[0] > 6*got[3] {
+		t.Errorf("rewards = %v", got)
+	}
+}
+
+// A purse grows slower than a boss's HP: were it faster, as it was, each kill
+// would make the next pay more for less work.
+func TestAPurseGrowsSlowerThanTheBoss(t *testing.T) {
+	for _, level := range []int{20, 40, 60, 80} {
+		purseGrowth := purse(level+10) / purse(level)
+		hpGrowth := float64(MaxHP(level+11, 1)) / float64(MaxHP(level+1, 1))
+		if purseGrowth >= hpGrowth {
+			t.Errorf("from level %d: the purse grows %.1f times, the HP %.1f", level, purseGrowth, hpGrowth)
+		}
+	}
+}

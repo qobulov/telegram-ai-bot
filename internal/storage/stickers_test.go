@@ -105,42 +105,65 @@ func TestStickersAndGIFsShareTheGap(t *testing.T) {
 	}
 }
 
-// A pack's stickers are named as item cards one by one; the cards are found
-// by name, the stickers that are no card are not, and neither is ever a mood.
-func TestItemCards(t *testing.T) {
+// The bot's own set keeps the owner who made it, and a forgotten sticker
+// is never sent again.
+func TestOwnStickerSetKeepsItsOwner(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
-	if _, err := store.SaveStickers(ctx, []PackSticker{
-		{FileUniqueID: "ua", FileID: "fa", Pack: "items", ImageFileID: "ia"},
-		{FileUniqueID: "ub", FileID: "fb", Pack: "items", ImageFileID: "ib"},
-		{FileUniqueID: "uc", FileID: "fc", Pack: "items", ImageFileID: "ic"},
-	}); err != nil {
+	const name = "maria_by_mariabot"
+	if _, err := store.OwnStickerSetOwner(ctx, name); !errors.Is(err, ErrNoStickerSet) {
+		t.Fatalf("before it is made: %v, want ErrNoStickerSet", err)
+	}
+	if err := store.SaveOwnStickerSet(ctx, name, 42); err != nil {
 		t.Fatal(err)
 	}
-	// A card the mood labeller saw first is named all the same.
-	if err := store.LabelSticker(ctx, "ua", []string{"funny"}, "item stats", true); err != nil {
+	if err := store.SaveOwnStickerSet(ctx, name, 43); err != nil {
 		t.Fatal(err)
 	}
-	unnamed, err := store.UnnamedCards(ctx, "items")
-	if err != nil || len(unnamed) != 3 {
-		t.Fatalf("unnamed = %+v, err = %v", unnamed, err)
+	if owner, err := store.OwnStickerSetOwner(ctx, name); err != nil || owner != 42 {
+		t.Errorf("owner = %d, %v; want the first, 42", owner, err)
 	}
-	if err := store.LabelSticker(ctx, "ua", []string{ItemCard}, "Athena's Shield", true); err != nil {
+	if _, err := store.OwnStickerSetOwner(ctx, "maria_by_testbot"); !errors.Is(err, ErrNoStickerSet) {
+		t.Errorf("another bot's set: %v, want ErrNoStickerSet", err)
+	}
+
+	if _, err := store.SaveStickers(ctx, []PackSticker{{FileUniqueID: "u1", FileID: "f1", Pack: name}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.LabelSticker(ctx, "ub", []string{NotItemCard}, "", false); err != nil {
+	if err := store.LabelSticker(ctx, "u1", []string{"funny"}, "cat", true); err != nil {
 		t.Fatal(err)
 	}
-	if unnamed, _ := store.UnnamedCards(ctx, "items"); len(unnamed) != 1 || unnamed[0].FileUniqueID != "uc" {
-		t.Errorf("unnamed = %+v, want only uc", unnamed)
+	if err := store.ForgetSticker(ctx, "u1"); err != nil {
+		t.Fatal(err)
 	}
-	if c, err := store.PackCards(ctx, "items"); err != nil || c != (CardCount{Total: 3, Looked: 2, Named: 1}) {
-		t.Errorf("count = %+v, err = %v", c, err)
+	if has, err := store.HasStickers(ctx); err != nil || has {
+		t.Errorf("a forgotten sticker is still there: %v, %v", has, err)
 	}
-	if cards, err := store.ItemCards(ctx); err != nil || len(cards) != 1 || cards[0] != (ItemCardSticker{FileID: "fa", Name: "Athena's Shield"}) {
-		t.Errorf("cards = %+v, err = %v", cards, err)
+}
+
+// Each owner adds a number of stickers a day; one that failed is given
+// back.
+func TestStickerUploadsAreCountedPerDay(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	today := time.Now().Add(-time.Hour)
+	first, ok, err := store.ReserveStickerUpload(ctx, 42, 42, today, 2)
+	if err != nil || !ok {
+		t.Fatalf("first: %v, %v", ok, err)
 	}
-	if id, _ := store.PickSticker(ctx, -1, "funny", 0); id != "" {
-		t.Errorf("a card was picked for a mood: %q", id)
+	if _, ok, _ := store.ReserveStickerUpload(ctx, 42, group, today, 2); !ok {
+		t.Fatal("second refused")
+	}
+	if _, ok, _ := store.ReserveStickerUpload(ctx, 42, 42, today, 2); ok {
+		t.Error("a third within the limit of two")
+	}
+	if _, ok, _ := store.ReserveStickerUpload(ctx, 43, 43, today, 2); !ok {
+		t.Error("another owner was refused")
+	}
+	if err := store.ReleaseStickerUpload(ctx, first); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, _ := store.ReserveStickerUpload(ctx, 42, 42, today, 2); !ok {
+		t.Error("a released sticker was not given back")
 	}
 }

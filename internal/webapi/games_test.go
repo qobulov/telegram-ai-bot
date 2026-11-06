@@ -56,12 +56,21 @@ func TestSteamGameGivesItsPriceForUzbekistan(t *testing.T) {
 
 	env := run(t, u.options(), "games", `{"action":"steam_game","name":"elden ring"}`)
 
-	if !env.OK || !strings.Contains(env.raw, `"price":"19.99 USD"`) || !strings.Contains(env.raw, `"discount":"50%"`) || !strings.Contains(env.raw, `"metacritic":94`) ||
+	// Without the player count the page still stands.
+	if !env.OK || strings.Contains(env.raw, "playing_now") || !strings.Contains(env.raw, `"price":"19.99 USD"`) || !strings.Contains(env.raw, `"discount":"50%"`) || !strings.Contains(env.raw, `"metacritic":94`) ||
 		!strings.Contains(env.raw, `GTX 1060`) || strings.Contains(env.raw, `<li>`) {
 		t.Errorf("game = %s", env.raw)
 	}
 	if q := u.requests("/steam/api/appdetails")[0].URL.Query(); q.Get("appids") != "1245620" || q.Get("cc") != "uz" {
 		t.Errorf("query = %v", q)
+	}
+	playing := newUpstream(t, map[string]stub{
+		"/steam/api/storesearch/":                                 ok(`{"total":1,"items":[{"id":1245620,"name":"ELDEN RING"}]}`),
+		"/steam/api/appdetails":                                   ok(`{"1245620":{"success":true,"data":{"name":"ELDEN RING","is_free":false}}}`),
+		"/steamapi/ISteamUserStats/GetNumberOfCurrentPlayers/v1/": ok(`{"response":{"player_count":51230,"result":1}}`),
+	})
+	if env := run(t, playing.options(), "games", `{"action":"steam_game","name":"elden ring"}`); !strings.Contains(env.raw, `"playing_now_on_steam":51230`) {
+		t.Errorf("game with players = %s", env.raw)
 	}
 	u2 := newUpstream(t, map[string]stub{"/steam/api/storesearch/": ok(`{"total":0,"items":[]}`)})
 	wantError(t, run(t, u2.options(), "games", `{"action":"steam_game","name":"Nothing"}`), "invalid_arguments", "Steam has no game")

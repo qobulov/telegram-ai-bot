@@ -5,13 +5,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"telegram-ai-bot/internal/tools"
 )
@@ -33,7 +36,9 @@ const (
 	shownSkill      = 240
 	shownTip        = 200
 	mlbbOutputBytes = 6000
-	mlbbTimeout     = 9 * time.Second
+	// mlbbTimeout covers the slowest answers, a cold hero or build, when
+	// Rone Arena is busy and takes up to 10 s a request.
+	mlbbTimeout = 20 * time.Second
 	// heroPictureLimit is well above a portrait's 40 KB.
 	heroPictureLimit = 1 << 20
 )
@@ -50,16 +55,26 @@ var (
 	playerZone = regexp.MustCompile(`^[0-9]{1,6}$`)
 	mlbbRanks  = []string{"all", "epic", "legend", "mythic", "honor", "glory"}
 	mlbbSorts  = []string{"win_rate", "ban_rate", "pick_rate"}
+	mlbbRoles  = []string{"Tank", "Fighter", "Assassin", "Mage", "Marksman", "Support"}
 )
 
 type mlbbArgs struct {
-	Action   string `json:"action"`
-	Hero     string `json:"hero"`
-	Picture  bool   `json:"picture"`
-	PlayerID string `json:"player_id"`
-	Zone     string `json:"zone"`
-	Rank     string `json:"rank"`
-	Sort     string `json:"sort"`
+	Action   string    `json:"action"`
+	Hero     string    `json:"hero"`
+	Picture  looseBool `json:"picture"`
+	Skin     string    `json:"skin"`
+	Lane     string    `json:"lane"`
+	Role     string    `json:"role"`
+	Item     string    `json:"item"`
+	Enemies  []string  `json:"enemies"`
+	Allies   []string  `json:"allies"`
+	Matches  int       `json:"matches"`
+	WinRate  float64   `json:"win_rate"`
+	Target   float64   `json:"target_win_rate"`
+	PlayerID string    `json:"player_id"`
+	Zone     string    `json:"zone"`
+	Rank     string    `json:"rank"`
+	Sort     string    `json:"sort"`
 }
 
 type mlbbRates struct {
@@ -67,6 +82,8 @@ type mlbbRates struct {
 	WinRate  string `json:"win_rate"`
 	PickRate string `json:"pick_rate"`
 	BanRate  string `json:"ban_rate"`
+	// Tier is MLBBDex's own, from its rates.
+	Tier string `json:"tier,omitempty"`
 }
 
 // mlbbMatchup is another hero and how the asked hero's win rate changes
@@ -79,6 +96,7 @@ type mlbbMatchup struct {
 type mlbbMetaOutput struct {
 	Rank     string      `json:"rank"`
 	SortedBy string      `json:"sorted_by"`
+	Measured string      `json:"measured,omitempty"`
 	Heroes   []mlbbRates `json:"heroes"`
 	Source   string      `json:"source"`
 	Note     string      `json:"note"`
@@ -98,35 +116,59 @@ type mlbbTips struct {
 	WeakAgainst   string `json:"weak_against,omitempty"`
 }
 
+// mlbbHeroOutput is a hero's profile from MLBBDex, and from Rone Arena what
+// MLBBDex lacks: counters, partners, the game's tips, its story and rates
+// by rank. Rone Arena gives the profile too when MLBBDex does not answer.
 type mlbbHeroOutput struct {
 	mlbbRates
-	Roles         []string      `json:"roles"`
-	Lanes         []string      `json:"lanes"`
-	Specialities  []string      `json:"specialities"`
-	Difficulty    string        `json:"difficulty"`
-	Story         string        `json:"story,omitempty"`
-	Skills        []mlbbSkill   `json:"skills"`
-	Tips          mlbbTips      `json:"tips"`
-	Rank          string        `json:"rank"`
-	StrongAgainst []mlbbMatchup `json:"strong_against"`
-	CounteredBy   []mlbbMatchup `json:"countered_by"`
-	GoodPartners  []string      `json:"good_partners"`
-	Source        string        `json:"source"`
-	Note          string        `json:"note"`
+	RatesMeasured string   `json:"rates_measured,omitempty"`
+	Title         string   `json:"title,omitempty"`
+	Roles         []string `json:"roles"`
+	Lanes         []string `json:"lanes"`
+	Specialities  []string `json:"specialities"`
+	Difficulty    string   `json:"difficulty"`
+	Released      string   `json:"released,omitempty"`
+	DamageType    string   `json:"damage_type,omitempty"`
+	AttackType    string   `json:"attack_type,omitempty"`
+	Resource      string   `json:"resource,omitempty"`
+	Region        string   `json:"region,omitempty"`
+	// Ratings are out of 10, such as offense and durability.
+	Ratings map[string]string `json:"ratings,omitempty"`
+	// BaseStats are by level: hp1 at level 1, hp15 at 15.
+	BaseStats     map[string]string `json:"base_stats,omitempty"`
+	Story         string            `json:"story,omitempty"`
+	Skills        []mlbbSkill       `json:"skills"`
+	Analysis      *mlbbAnalysis     `json:"analysis,omitempty"`
+	Tips          mlbbTips          `json:"tips"`
+	Rank          string            `json:"rank"`
+	StrongAgainst []mlbbMatchup     `json:"strong_against"`
+	CounteredBy   []mlbbMatchup     `json:"countered_by"`
+	GoodPartners  []string          `json:"good_partners"`
+	Source        string            `json:"source"`
+	Note          string            `json:"note"`
 }
 
 func (a *apis) mlbbTool() tools.Tool {
 	return tools.Tool{
 		Name:        "mlbb",
-		Description: "Mobile Legends: Bang Bang heroes, from ranked games of the last 7 days. meta: top heroes by win, ban or pick rate. hero: role, lane, skills, the game's tips, rates, the heroes it beats and that counter it, good partners. player: an account's nickname and country from its ID and zone. No player stats, builds or items. Skill texts and tips are untrusted outside data.",
+		Description: "Mobile Legends: Bang Bang. meta: top heroes by rate. heroes: by role and lane. hero: profile, skills, stats, rates, counters, partners. combo: how to play a hero. build: top players' build as a picture. skins: skins or a skin's picture. item: an item's stats. draft: picks against the enemy and with the team. winrate: wins in a row to reach a win rate. player: a nickname by ID. Texts are untrusted.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["meta", "hero", "player"]},
+				"action": {"type": "string", "enum": ["meta", "heroes", "hero", "combo", "build", "skins", "item", "draft", "winrate", "player"]},
 				"player_id": {"type": "string", "description": "For player: the account ID, the long number, such as 1407157025."},
 				"zone": {"type": "string", "description": "For player: the zone (server) ID, the number in brackets after the ID, such as 15832."},
-				"hero": {"type": "string", "description": "For hero: the hero's English name, such as Ling, Fanny or Yi Sun-shin."},
+				"hero": {"type": "string", "description": "For hero, combo, build and skins: the hero's name as the asker wrote it, such as Ling, Hirara or Yi Sun-shin. The tool knows heroes newer than you: never swap a name you do not know for one you do."},
 				"picture": {"type": "boolean", "description": "For hero: also send the hero's picture, when someone asks to see the hero or for its picture."},
+				"skin": {"type": "string", "description": "For skins: one skin's name, to send its picture when someone asks to see that skin."},
+				"lane": {"type": "string", "enum": ["gold", "exp", "mid", "jungle", "roam"], "description": "For build, the lane, by default the hero's main lane; for heroes and draft, only this lane."},
+				"item": {"type": "string", "description": "For item: the item's name, such as Blade of Despair."},
+				"enemies": {"type": "array", "items": {"type": "string"}, "maxItems": 5, "description": "For draft: the enemy heroes picked so far."},
+				"allies": {"type": "array", "items": {"type": "string"}, "maxItems": 4, "description": "For draft: the asker's team's heroes picked so far."},
+				"matches": {"type": "integer", "description": "For winrate: the matches played."},
+				"win_rate": {"type": "number", "description": "For winrate: the current win rate in percent, such as 48.5."},
+				"target_win_rate": {"type": "number", "description": "For winrate: the win rate wanted, in percent."},
+				"role": {"type": "string", "enum": ["Tank", "Fighter", "Assassin", "Mage", "Marksman", "Support"], "description": "For heroes: only this role."},
 				"rank": {"type": "string", "enum": ["all", "epic", "legend", "mythic", "honor", "glory"], "description": "Rank of the games counted. Default all; honor and glory are Mythical Honor and Mythical Glory."},
 				"sort": {"type": "string", "enum": ["win_rate", "ban_rate", "pick_rate"], "description": "For meta: what the heroes are ranked by. Default win_rate."}
 			},
@@ -135,8 +177,7 @@ func (a *apis) mlbbTool() tools.Tool {
 		}`),
 		Run:            a.mlbb,
 		MaxOutputBytes: mlbbOutputBytes,
-		// A cold hero answer is the hero list, then two requests.
-		Timeout: mlbbTimeout,
+		Timeout:        mlbbTimeout,
 	}
 }
 
@@ -149,6 +190,29 @@ func (a *apis) mlbb(ctx context.Context, raw json.RawMessage) (any, error) {
 	if !slices.Contains(mlbbRanks, rank) {
 		return nil, argumentError("rank must be one of %v", mlbbRanks)
 	}
+	note := ""
+	if args.Hero != "" && slices.Contains([]string{"hero", "combo", "build", "skins"}, args.Action) {
+		args.Hero, note = a.heroAsked(ctx, args.Hero)
+	}
+	out, err := a.mlbbAction(ctx, args, rank)
+	if err != nil || note == "" {
+		return out, err
+	}
+	switch o := out.(type) {
+	case mlbbHeroOutput:
+		o.Note += note
+		return o, nil
+	case mlbbBuildOutput:
+		o.Note += note
+		return o, nil
+	case mlbbSkinsOutput:
+		o.Note += note
+		return o, nil
+	}
+	return out, nil
+}
+
+func (a *apis) mlbbAction(ctx context.Context, args mlbbArgs, rank string) (any, error) {
 	switch args.Action {
 	case "meta":
 		sort := cmp.Or(args.Sort, "win_rate")
@@ -156,12 +220,26 @@ func (a *apis) mlbb(ctx context.Context, raw json.RawMessage) (any, error) {
 			return nil, argumentError("sort must be one of %v", mlbbSorts)
 		}
 		return a.mlbbMeta(ctx, rank, sort)
+	case "heroes":
+		return a.mlbbHeroList(ctx, args.Role, args.Lane)
 	case "hero":
-		return a.mlbbHero(ctx, args.Hero, rank, args.Picture)
+		return a.mlbbHero(ctx, args.Hero, rank, bool(args.Picture))
+	case "build":
+		return a.mlbbBuild(ctx, args.Hero, args.Lane, rank)
+	case "skins":
+		return a.mlbbSkins(ctx, args.Hero, args.Skin)
+	case "combo":
+		return a.mlbbCombos(ctx, args.Hero)
+	case "item":
+		return a.mlbbItem(ctx, args.Item)
+	case "draft":
+		return a.mlbbDraft(ctx, args.Enemies, args.Allies, args.Lane, rank)
+	case "winrate":
+		return mlbbWinrate(args.Matches, args.WinRate, args.Target)
 	case "player":
 		return a.mlbbPlayer(ctx, args.PlayerID, args.Zone)
 	default:
-		return nil, argumentError("action must be meta, hero or player")
+		return nil, argumentError("action must be meta, heroes, hero, combo, build, skins, item, draft, winrate or player")
 	}
 }
 
@@ -241,7 +319,15 @@ func (s arenaStats) rates() mlbbRates {
 	return mlbbRates{Hero: s.Hero.Data.Name, WinRate: percent(s.WinRate), PickRate: percent(s.PickRate), BanRate: percent(s.BanRate)}
 }
 
+// mlbbMeta gives the top heroes from MLBBDex's rankings, which count every
+// rank, and from Rone Arena for one rank, which MLBBDex does not split, or
+// when MLBBDex does not answer.
 func (a *apis) mlbbMeta(ctx context.Context, rank, sort string) (mlbbMetaOutput, error) {
+	if rank == "all" {
+		if out, err := a.dexMeta(ctx, sort); err == nil {
+			return out, nil
+		}
+	}
 	stats, err := remember(a.cache, "mlbb:meta:"+rank+":"+sort, mlbbTTL, func() ([]arenaStats, error) {
 		query := url.Values{"days": {mlbbDays}, "rank": {rank}, "sort_field": {sort}, "sort_order": {"desc"}, "size": {strconv.Itoa(mlbbMetaHeroes)}}
 		return arenaList[arenaStats](ctx, a, "/api/heroes/rank?"+query.Encode())
@@ -265,23 +351,53 @@ func (a *apis) mlbbHero(ctx context.Context, name, rank string, picture bool) (m
 	if err != nil {
 		return mlbbHeroOutput{}, err
 	}
-	// Two requests, not three: the API answers one connection's requests
-	// in turn, and a third would wait past the client's timeout.
+	// Two requests to Rone Arena, not three: the API answers one
+	// connection's requests in turn, and a third would wait past the
+	// client's timeout. MLBBDex is another host.
 	var enemies arenaStats
 	var detail arenaDetail
-	var enemiesErr, detailErr error
+	var profile dexHero
+	var rankings dexRankings
+	var enemiesErr, detailErr, profileErr, rankingsErr error
 	var wg sync.WaitGroup
 	wg.Go(func() { enemies, enemiesErr = a.arenaCounters(ctx, id, rank) })
 	wg.Go(func() { detail, detailErr = a.arenaDetail(ctx, id) })
+	wg.Go(func() { profile, profileErr = a.dexHeroByName(ctx, names[id]) })
+	rankingsErr = errNotAsked
+	if rank == "all" {
+		wg.Go(func() { rankings, rankingsErr = a.dexRankings(ctx) })
+	}
 	wg.Wait()
-	if err := cmp.Or(enemiesErr, detailErr); err != nil {
-		return mlbbHeroOutput{}, err
+	roneErr := cmp.Or(enemiesErr, detailErr)
+	if roneErr != nil && profileErr != nil {
+		return mlbbHeroOutput{}, roneErr
 	}
-	hero := detail.Hero.Data
-	note := mlbbNote
+	out := mlbbHeroOutput{Rank: rank, Source: mlbbSource, Note: mlbbNote}
+	if roneErr == nil {
+		out = roneHero(names, enemies, detail, rank)
+	} else {
+		out.Note += "; Rone Arena did not answer, so the rates by rank, counters, partners and tips are missing: say so if asked"
+	}
+	if profileErr == nil {
+		applyDexProfile(&out, profile)
+		out.Source = dexSource + "; " + mlbbSource
+	}
+	if rates, measured, ok := rankings.find(names[id]); rankingsErr == nil && ok {
+		out.mlbbRates, out.RatesMeasured = rates, measured
+		out.Note += "; win, pick and ban rates and the tier are MLBBDex's, measured on rates_measured"
+	}
+	if out.Hero == "" {
+		out.Hero = names[id]
+	}
 	if picture {
-		note = a.sendHeroPicture(ctx, cmp.Or(hero.Picture, hero.Card))
+		out.Note = a.sendHeroPicture(ctx, out.Note, profile.Data.Images.Portrait, cmp.Or(detail.Hero.Data.Picture, detail.Hero.Data.Card))
 	}
+	return out, nil
+}
+
+// roneHero is the hero as Rone Arena gives it.
+func roneHero(names map[int]string, enemies arenaStats, detail arenaDetail, rank string) mlbbHeroOutput {
+	hero := detail.Hero.Data
 	return mlbbHeroOutput{
 		mlbbRates:    enemies.rates(),
 		Roles:        nonEmpty(hero.Roles),
@@ -300,24 +416,34 @@ func (a *apis) mlbbHero(ctx context.Context, name, rank string, picture bool) (m
 		CounteredBy:   matchups(names, enemies.Lowering),
 		GoodPartners:  heroNames(names, detail.Relation.Assist.Heroes),
 		Source:        mlbbSource,
-		Note:          note,
-	}, nil
+		Note:          mlbbNote,
+	}
 }
 
 // sendHeroPicture fetches the hero's picture into the turn's sink, to go
-// with the answer as a photo, and returns the note that says whether it
-// will.
-func (a *apis) sendHeroPicture(ctx context.Context, link string) string {
+// with the answer as a photo: MLBBDex's portrait, else Rone Arena's
+// picture. It returns note with whether it will.
+func (a *apis) sendHeroPicture(ctx context.Context, note, dexPath, roneLink string) string {
 	sink, ok := tools.SinkFrom(ctx)
-	if !ok || link == "" {
-		return mlbbNote + "; there is no picture of this hero, so none is sent: say so plainly, never as if one were"
+	if !ok || (dexPath == "" && roneLink == "") {
+		return note + "; there is no picture of this hero, so none is sent: say so plainly, never as if one were"
 	}
-	data, err := a.patient.get(ctx, call{service: arenaService, url: link, limit: heroPictureLimit})
+	var data []byte
+	err := errNotAsked
+	if strings.HasPrefix(dexPath, "/") {
+		data, err = a.patient.get(ctx, call{service: dexService, url: a.urls.MLBBDex + dexPath, limit: heroPictureLimit})
+		if err == nil {
+			data, err = asJPEG(data)
+		}
+	}
+	if err != nil && roneLink != "" {
+		data, err = a.patient.get(ctx, call{service: arenaService, url: roneLink, limit: heroPictureLimit})
+	}
 	if err != nil {
-		return mlbbNote + "; the picture could not be fetched, so none is sent: say so plainly, never as if one were"
+		return note + "; the picture could not be fetched, so none is sent: say so plainly, never as if one were"
 	}
 	sink.Add(tools.Drawing{Data: data, MimeType: http.DetectContentType(data)})
-	return mlbbNote + "; the hero's picture is sent with your answer, which becomes its caption: keep the answer short"
+	return note + "; the hero's picture is sent with your answer, which becomes its caption: keep the answer short"
 }
 
 // mlbbHeroes maps every hero's ID to its English name.
@@ -335,19 +461,154 @@ func (a *apis) mlbbHeroes(ctx context.Context) (map[int]string, error) {
 	})
 }
 
-// findHero returns the ID of the hero called name, however it is spaced,
-// hyphenated or capitalised: "yi sun shin" finds Yi Sun-shin.
+// findHero returns the ID of the hero called name, found as matchHero
+// finds it.
 func findHero(names map[int]string, name string) (int, error) {
-	if name == "" || len([]rune(name)) > maxHeroName {
-		return 0, argumentError("hero must be a name of at most %d characters", maxHeroName)
+	hero, err := matchHero(slices.Collect(maps.Values(names)), name)
+	if err != nil {
+		return 0, err
 	}
-	wanted := normalizeName(name)
-	for id, hero := range names {
-		if normalizeName(hero) == wanted {
+	for id, n := range names {
+		if n == hero {
 			return id, nil
 		}
 	}
-	return 0, argumentError("no MLBB hero is called %q; give the hero's English name, such as Ling or Yi Sun-shin", name)
+	return 0, argumentError("no MLBB hero is called %q", name)
+}
+
+// heroTypos is how many letters a name of more than five may be off and
+// still find its hero, when no other is as close: "Xirara" finds Hirara.
+// A shorter name may be one letter off.
+const heroTypos = 2
+
+// matchHero returns the hero of heroes that name means, as matchName
+// finds it.
+func matchHero(heroes []string, name string) (string, error) {
+	return matchName(heroes, name, "hero")
+}
+
+// matchName returns the one of names that name means, however it is
+// spaced, hyphenated, capitalised or written in Cyrillic ("Хирара"), or with
+// a typo when one alone is that close. The error, about an MLBB what, names
+// the closest.
+func matchName(heroes []string, name, what string) (string, error) {
+	if name == "" || len([]rune(name)) > maxHeroName {
+		return "", argumentError("%s must be a name of at most %d characters", what, maxHeroName)
+	}
+	wanted := latinName(normalizeName(name))
+	distance := make(map[string]int, len(heroes))
+	for _, hero := range heroes {
+		distance[hero] = editDistance(wanted, latinName(normalizeName(hero)))
+		if distance[hero] == 0 {
+			return hero, nil
+		}
+	}
+	ranked := slices.Clone(heroes)
+	slices.SortStableFunc(ranked, func(x, y string) int { return cmp.Or(cmp.Compare(distance[x], distance[y]), strings.Compare(x, y)) })
+	allowed := 1
+	if len([]rune(wanted)) > 5 {
+		allowed = heroTypos
+	}
+	if len(ranked) > 0 && distance[ranked[0]] <= allowed && (len(ranked) == 1 || distance[ranked[1]] > distance[ranked[0]]) {
+		return ranked[0], nil
+	}
+	return "", argumentError("no MLBB %s is called %q; the closest are %s. Give the name as the asker wrote it, never one you guess", what, name, strings.Join(ranked[:min(len(ranked), 3)], ", "))
+}
+
+// heroAsked is the hero the asker named, when their own words name one
+// hero alone, newer than the model, and the model asked for another they
+// never named: the model takes heroes newer than it, such as Hirara, for
+// ones it knows. A hero it knows, such as Fanny, is left as asked, so that
+// "Fanny ga counter kim" may still look up Khufra. It returns the hero to
+// use and what the note should add.
+func (a *apis) heroAsked(ctx context.Context, asked string) (string, string) {
+	caller, ok := tools.CallerFrom(ctx)
+	if !ok || caller.Words == "" {
+		return asked, ""
+	}
+	heroes, err := a.dexHeroes(ctx)
+	if err != nil {
+		return asked, ""
+	}
+	named := heroesInWords(dexNames(heroes), caller.Words)
+	if len(named) != 1 || !namesNewHero(heroes, named[0], a.now()) {
+		return asked, ""
+	}
+	if found, err := matchHero(dexNames(heroes), asked); err == nil && found == named[0] {
+		return asked, ""
+	}
+	return named[0], fmt.Sprintf("; the asker's message names %s, so this is %s, not %s: answer about %s", named[0], named[0], asked, named[0])
+}
+
+func namesNewHero(heroes []dexListHero, name string, now time.Time) bool {
+	i := slices.IndexFunc(heroes, func(h dexListHero) bool { return h.Name == name })
+	if i < 0 {
+		return false
+	}
+	_, ok := newHero(heroes[i], now)
+	return ok
+}
+
+// heroesInWords are the heroes words name: a word, or two or three in a row
+// for a name such as Yi Sun-shin, that is a hero's name, starts with one
+// of four letters or more, as Uzbek endings do ("hiraraga", "lingni"), or
+// is one typo off a name of six letters or more ("Xirara").
+func heroesInWords(heroes []string, words string) []string {
+	tokens := strings.FieldsFunc(strings.ToLower(words), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && !isApostrophe(r)
+	})
+	for i, t := range tokens {
+		tokens[i] = latinName(normalizeName(t))
+	}
+	var named []string
+	for _, hero := range heroes {
+		name := latinName(normalizeName(hero))
+		if name != "" && namedIn(tokens, name) {
+			named = append(named, hero)
+		}
+	}
+	return named
+}
+
+// heroEndings are the Uzbek and Russian endings, in Latin letters, a hero's
+// name takes in a message: "hiraraga", "lingni", "fannyning". Any other
+// rest makes it another word: "so'ramasdan" is not Sora.
+var heroEndings = map[string]bool{
+	"ga": true, "ni": true, "ning": true, "da": true, "dan": true, "dagi": true, "niki": true, "lar": true, "larni": true,
+	"mi": true, "ku": true, "chi": true, "dek": true, "day": true, "ka": true, "na": true,
+	"u": true, "y": true, "a": true, "e": true, "om": true, "oy": true,
+}
+
+func namedIn(tokens []string, name string) bool {
+	for i := range tokens {
+		joined := ""
+		for j := i; j < min(len(tokens), i+3); j++ {
+			joined += tokens[j]
+			switch {
+			case joined == name:
+				return true
+			case j == i && len([]rune(name)) >= 4 && strings.HasPrefix(joined, name) && heroEndings[strings.TrimPrefix(joined, name)]:
+				return true
+			case j == i && len([]rune(name)) >= 6 && len([]rune(joined)) >= 6 && editDistance(joined, name) == 1:
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// cyrillicLetters spell Russian and Uzbek Cyrillic in Latin letters, so
+// that "Хирара" and "Ҳирара" find Hirara.
+var cyrillicLetters = strings.NewReplacer(
+	"а", "a", "б", "b", "в", "v", "г", "g", "д", "d", "е", "e", "ж", "j", "з", "z", "и", "i", "й", "y",
+	"к", "k", "л", "l", "м", "m", "н", "n", "о", "o", "п", "p", "р", "r", "с", "s", "т", "t", "у", "u",
+	"ф", "f", "х", "h", "ц", "ts", "ч", "ch", "ш", "sh", "щ", "sh", "ъ", "", "ы", "i", "ь", "", "э", "e",
+	"ю", "yu", "я", "ya", "ў", "o", "қ", "q", "ғ", "g", "ҳ", "h",
+)
+
+// latinName is a normalised name in Latin letters.
+func latinName(name string) string {
+	return cyrillicLetters.Replace(name)
 }
 
 func (a *apis) arenaCounters(ctx context.Context, id int, rank string) (arenaStats, error) {

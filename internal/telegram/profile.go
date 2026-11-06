@@ -100,13 +100,30 @@ func (c *Client) RemoveBotPhoto(ctx context.Context) error {
 }
 
 // profilePhotoSide is the size a profile photo is downloaded in, near
-// enough to see it and small enough to be quick.
-const profilePhotoSide = 640
+// enough to see it and small enough to be quick; avatarSide the size one
+// is shown in beside a name.
+const (
+	profilePhotoSide = 640
+	avatarSide       = 160
+)
 
 // ProfilePhoto downloads a user's current profile photo, the bot's own
 // included, in the size nearest profilePhotoSide, with its unique ID. ok is
 // false when they have none.
 func (c *Client) ProfilePhoto(ctx context.Context, userID, maxBytes int64) (data []byte, id string, ok bool, err error) {
+	return c.profilePhoto(ctx, userID, profilePhotoSide, maxBytes)
+}
+
+// Avatar downloads a user's current profile photo small, to show beside
+// their name. ok is false when they have none, or hide it from the bot.
+func (c *Client) Avatar(ctx context.Context, userID, maxBytes int64) (data []byte, ok bool, err error) {
+	data, _, ok, err = c.profilePhoto(ctx, userID, avatarSide, maxBytes)
+	return data, ok, err
+}
+
+// profilePhoto downloads a user's current profile photo in the size nearest
+// side, with its unique ID.
+func (c *Client) profilePhoto(ctx context.Context, userID int64, side int, maxBytes int64) (data []byte, id string, ok bool, err error) {
 	var photos struct {
 		Photos [][]PhotoSize `json:"photos"`
 	}
@@ -122,7 +139,7 @@ func (c *Client) ProfilePhoto(ctx context.Context, userID, maxBytes int64) (data
 	}
 	best := photos.Photos[0][0]
 	for _, size := range photos.Photos[0] {
-		if distance(size.Width, profilePhotoSide) < distance(best.Width, profilePhotoSide) {
+		if distance(size.Width, side) < distance(best.Width, side) {
 			best = size
 		}
 	}

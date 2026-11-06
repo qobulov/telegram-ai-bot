@@ -138,6 +138,7 @@ func (u *upstream) options() Options {
 			CoinGecko:         base + "/coingecko",
 			Deezer:            base + "/deezer",
 			RoneArena:         base + "/arena",
+			MLBBDex:           base + "/dex",
 			Isan:              base + "/isan",
 			USGS:              base + "/usgs",
 			QRServer:          base + "/qr",
@@ -158,14 +159,15 @@ func (u *upstream) options() Options {
 			GoldAPI:           base + "/gold",
 			Lichess:           base + "/lichess",
 			Jolpica:           base + "/jolpica",
-			MathJS:            base + "/mathjs",
 			Crossref:          base + "/crossref",
 			ArXiv:             base + "/arxiv",
 			Datamuse:          base + "/datamuse",
-			Wolfram:           base + "/wolfram",
+			Calendarific:      base + "/calendarific",
 			Shikimori:         base + "/shikimori",
 			TraceMoe:          base + "/tracemoe",
 			SteamStore:        base + "/steam",
+			SteamAPI:          base + "/steamapi",
+			Imgflip:           base + "/imgflip",
 			WorldBank:         base + "/worldbank",
 			JokeAPI:           base + "/jokeapi",
 			LaunchLibrary:     base + "/ll2",
@@ -276,7 +278,7 @@ func wantFits(t *testing.T, env envelope, limit int) {
 
 func TestToolsHaveStrictSchemas(t *testing.T) {
 	opts := newUpstream(t, nil).options()
-	opts.FootballToken = "token"
+	opts.FootballToken, opts.Pins = "token", &fakePins{}
 	for _, tool := range Tools(opts) {
 		var schema struct {
 			Type                 string `json:"type"`
@@ -300,7 +302,7 @@ func TestToolsHaveStrictSchemas(t *testing.T) {
 
 func TestToolsRejectUnknownArguments(t *testing.T) {
 	opts := newUpstream(t, nil).options()
-	opts.FootballToken = "token"
+	opts.FootballToken, opts.Pins = "token", &fakePins{}
 	registry := newRegistry(t, opts)
 	for _, tool := range Tools(opts) {
 		wantError(t, execute(t, registry, tool.Name, `{"surprise":1}`), "invalid_arguments")
