@@ -320,6 +320,27 @@ func (s *Store) UpgradeRaidHero(ctx context.Context, userID int64, item string, 
 	})
 }
 
+// RaidTotals are the damage in all of those of userIDs who hit in the chat.
+func (s *Store) RaidTotals(ctx context.Context, chatID int64, userIDs []int64) (map[int64]int64, error) {
+	rows, err := s.pool.Query(ctx, `SELECT user_id, total FROM raid_members WHERE chat_id = $1 AND user_id = ANY($2)`, chatID, userIDs)
+	if err != nil {
+		return nil, fmt.Errorf("storage: raid totals: %w", err)
+	}
+	defer rows.Close()
+	totals := make(map[int64]int64, len(userIDs))
+	for rows.Next() {
+		var id, total int64
+		if err := rows.Scan(&id, &total); err != nil {
+			return nil, fmt.Errorf("storage: raid totals: %w", err)
+		}
+		totals[id] = total
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("storage: raid totals: %w", err)
+	}
+	return totals, nil
+}
+
 // RaidRanks is where the player stands in their chat's raid: their place
 // by damage on its boss at level, and by damage in all, 0 before they hit,
 // and the chat's limit members with the most damage in all.

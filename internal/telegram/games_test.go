@@ -71,6 +71,22 @@ func TestForceGameScoreSendsForce(t *testing.T) {
 	}
 }
 
+// A correction is forced and leaves the message alone, and one that changes
+// nothing is no error.
+func TestCorrectGameScore(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":true}`)
+	if err := client.CorrectGameScore(context.Background(), GameMessage{UserID: 42, ChatID: -1, MessageID: 2}, 0); err != nil {
+		t.Fatal(err)
+	}
+	if sent := api.recorded()[0]; sent.method != "setGameScore" || sent.params["force"] != true || sent.params["disable_edit_message"] != true || sent.params["score"] != float64(0) {
+		t.Errorf("call = %+v", sent)
+	}
+	client, _ = newTestClient(t, `{"ok":false,"error_code":400,"description":"Bad Request: BOT_SCORE_NOT_MODIFIED"}`)
+	if err := client.CorrectGameScore(context.Background(), GameMessage{UserID: 42, ChatID: -1, MessageID: 2}, 0); err != nil {
+		t.Errorf("no change = %v", err)
+	}
+}
+
 // A score no better than the player's best is no error: Telegram keeps the
 // best.
 func TestSetGameScoreNotBetterIsNoError(t *testing.T) {

@@ -39,6 +39,7 @@ type Store interface {
 	UpgradeRaidHero(ctx context.Context, userID int64, item string, cost func(level int) int64, most int, seed uint32) (storage.RaidHero, error)
 	ChangeRaidHero(ctx context.Context, userID int64, seed uint32, change func(hero *storage.RaidHero) error) (storage.RaidHero, error)
 	RaidRanks(ctx context.Context, chatID, userID int64, level, limit int) (levelRank, totalRank int, top []storage.RaidMember, err error)
+	RaidTotals(ctx context.Context, chatID int64, userIDs []int64) (map[int64]int64, error)
 }
 
 // Telegram sets a member's score on their game message, and tells a
@@ -48,6 +49,10 @@ type Telegram interface {
 	// only grows unless a recalculation corrected it, as migration 54 did
 	// to totals Telegram's tables still showed.
 	ForceGameScore(ctx context.Context, game telegram.GameMessage, score int) (changed bool, err error)
+	// CorrectGameScore does so without touching the message, for a table's
+	// many rows at once; GetGameHighScores reads the table around a player.
+	CorrectGameScore(ctx context.Context, game telegram.GameMessage, score int) error
+	GetGameHighScores(ctx context.Context, game telegram.GameMessage) ([]telegram.GameHighScore, error)
 	SendMessage(ctx context.Context, msg telegram.Outgoing) (int64, error)
 }
 
@@ -166,6 +171,9 @@ func (h *handler) state(ctx context.Context, p game.Player, solo, opened bool) (
 	if opened && !solo {
 		h.setScore(ctx, p, me.Total)
 	}
+	if opened {
+		h.correctTable(ctx, p)
+	}
 	now := h.Now()
 	var gift int64
 	if !hero.StreakDay.Equal(Day(now)) {
@@ -221,6 +229,55 @@ func (h *handler) setScore(ctx context.Context, p game.Player, total int64) {
 		h.Logger.Warn("could not set a raid score", "user_id", p.UserID, "error", err)
 	}
 }
+
+// correctTable brings down the scores on the game's table that no total in the
+// chat backs, which Telegram keeps for good: a recalculation or a reset leaves
+// them there, for players who may never come back, and no bot can empty a table.
+// Telegram shows the top of it and the player's neighbours, so that each round
+// bares the next rows; a score is never above its total otherwise. A failure
+// keeps nothing from going on, and the next player to open it goes on from there.
+func (h *handler) correctTable(ctx context.Context, p game.Player) {
+	if p.ChatID == 0 {
+		return
+	}
+	for range tableRounds {
+		rows, err := h.Telegram.GetGameHighScores(ctx, message(p))
+		if err != nil {
+			h.Logger.Warn("could not read a raid's table", "chat_id", p.ChatID, "error", err)
+			return
+		}
+		ids := make([]int64, len(rows))
+		for i, row := range rows {
+			ids[i] = row.User.ID
+		}
+		totals, err := h.Store.RaidTotals(ctx, p.ChatID, ids)
+		if err != nil {
+			h.Logger.Warn("could not read a raid's totals", "chat_id", p.ChatID, "error", err)
+			return
+		}
+		corrected := false
+		for _, row := range rows {
+			total := int(min(totals[row.User.ID], math.MaxInt32))
+			if row.Score <= total {
+				continue
+			}
+			target := message(p)
+			target.UserID = row.User.ID
+			if err := h.Telegram.CorrectGameScore(ctx, target, total); err != nil {
+				h.Logger.Warn("could not correct a raid score", "chat_id", p.ChatID, "user_id", row.User.ID, "error", err)
+				return
+			}
+			corrected = true
+		}
+		if !corrected {
+			return
+		}
+	}
+}
+
+// tableRounds is how many times one opening reads a table: a table of twenty
+// takes about seven, and whoever opens it next goes on.
+const tableRounds = 10
 
 func (h *handler) upgrade(ctx context.Context, p game.Player, item string) (any, failure) {
 	if Most(item) == 0 {

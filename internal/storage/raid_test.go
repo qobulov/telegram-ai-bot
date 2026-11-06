@@ -215,6 +215,19 @@ func TestChangeRaidHero(t *testing.T) {
 	}
 }
 
+// RaidTotals gives the totals of those who hit in the chat, and of nobody else.
+func TestRaidTotals(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	if _, err := store.pool.Exec(ctx, `INSERT INTO raid_members (chat_id, user_id, name, level, damage, total) VALUES (-100, 1, 'A', 1, 0, 50), (-200, 2, 'B', 1, 0, 70)`); err != nil {
+		t.Fatal(err)
+	}
+	totals, err := store.RaidTotals(ctx, -100, []int64{1, 2, 3})
+	if err != nil || len(totals) != 1 || totals[1] != 50 {
+		t.Errorf("totals = %v, %v", totals, err)
+	}
+}
+
 // Migration 57 starts the raid again for everyone: a hero comes back at the
 // first sword with no coins, and the chat's boss at the first level.
 func TestRaidResetMigration(t *testing.T) {

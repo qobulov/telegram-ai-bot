@@ -2003,7 +2003,7 @@ group's boss is a small group's to kill. Eight bosses are taken in turn,
 each drawn in its own way under its own sky (public/game/boss/skins.js): Ko'k
 dev, Qizil dev, Bir ko'zli dev, Ajdar, Muz devi, Tosh dev, Yalmog'iz kampir and
 Qora dev; every fifth is a chief (👑), thrice as strong and as rewarding.
-Migration 57 started the raid again for everyone. Coins buy the upgrades, each level of the sword 1.5 times the last and of the
+Migration 57 started the raid again for everyone. Telegram keeps a game's table for good, so each opening of the game brings down the scores on it that no total in the chat backs. Coins buy the upgrades, each level of the sword 1.5 times the last and of the
 critical blows 1.7 times (migration 56 keeps the part of a level saved coins were):
 the sword's damage and the share of critical blows.
 Barchinoy the archer was an upgrade too until migration 47, which took her

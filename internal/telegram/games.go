@@ -51,6 +51,9 @@ type setGameScoreParams struct {
 	GameMessage
 	Score int  `json:"score"`
 	Force bool `json:"force,omitempty"`
+	// DisableEdit leaves the game's message as it is: an edit of each of a
+	// table's rows would run into Telegram's limit on a group's messages.
+	DisableEdit bool `json:"disable_edit_message,omitempty"`
 }
 
 // SetGameScore records a player's score on a game message, which Telegram
@@ -75,6 +78,17 @@ func (c *Client) ForceGameScore(ctx context.Context, game GameMessage, score int
 		return false, nil
 	}
 	return err == nil, err
+}
+
+// CorrectGameScore sets another player's score on a game message, lower too,
+// without editing the message.
+func (c *Client) CorrectGameScore(ctx context.Context, game GameMessage, score int) error {
+	err := c.call(ctx, "setGameScore", setGameScoreParams{GameMessage: game, Score: score, Force: true, DisableEdit: true}, nil)
+	var refused *APIError
+	if errors.As(err, &refused) && strings.Contains(refused.Description, "BOT_SCORE_NOT_MODIFIED") {
+		return nil
+	}
+	return err
 }
 
 // GameHighScore is one row of a game's table.

@@ -3,11 +3,15 @@ package raid
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +23,7 @@ import (
 
 // fakeStore answers as told and keeps what it was asked.
 type fakeStore struct {
+	totals   map[int64]int64
 	hero     storage.RaidHero
 	hit      storage.RaidHit
 	upgrade  error
@@ -37,6 +42,10 @@ func (f *fakeStore) HitRaid(_ context.Context, chatID, _ int64, _ string, taps i
 	f.hitChats = append(f.hitChats, chatID)
 	f.taps = append(f.taps, taps)
 	return f.hit, nil
+}
+
+func (f *fakeStore) RaidTotals(context.Context, int64, []int64) (map[int64]int64, error) {
+	return f.totals, nil
 }
 
 func (f *fakeStore) RaidRanks(context.Context, int64, int64, int, int) (int, int, []storage.RaidMember, error) {
@@ -61,6 +70,32 @@ func (f *fakeStore) UpgradeRaidHero(context.Context, int64, string, func(int) in
 type fakeTelegram struct {
 	scores []int
 	sent   []telegram.Outgoing
+	table  map[int64]int // the game's table, by player
+	wrong  error
+}
+
+// CorrectGameScore changes a row of the table.
+func (f *fakeTelegram) CorrectGameScore(_ context.Context, g telegram.GameMessage, score int) error {
+	if f.wrong != nil {
+		return f.wrong
+	}
+	f.table[g.UserID] = score
+	return nil
+}
+
+// GetGameHighScores gives the top three, as Telegram does, and the player's
+// row.
+func (f *fakeTelegram) GetGameHighScores(_ context.Context, g telegram.GameMessage) ([]telegram.GameHighScore, error) {
+	var rows []telegram.GameHighScore
+	for id, score := range f.table {
+		rows = append(rows, telegram.GameHighScore{User: telegram.User{ID: id}, Score: score})
+	}
+	sort.Slice(rows, func(i, j int) bool { return rows[i].Score > rows[j].Score })
+	top := rows[:min(3, len(rows))]
+	if score, ok := f.table[g.UserID]; ok && !slices.ContainsFunc(top, func(r telegram.GameHighScore) bool { return r.User.ID == g.UserID }) {
+		top = append(top[:len(top):len(top)], telegram.GameHighScore{User: telegram.User{ID: g.UserID}, Score: score})
+	}
+	return top, nil
 }
 
 func (f *fakeTelegram) ForceGameScore(_ context.Context, _ telegram.GameMessage, score int) (bool, error) {
@@ -274,5 +309,35 @@ func TestSkillsQuestsAndTheDailyGift(t *testing.T) {
 	}
 	if code, out := f.post(t, map[string]any{"session": session, "action": "claim", "quest": 2}); out["error"] != "not_done" {
 		t.Errorf("an undone quest: %d %v", code, out)
+	}
+}
+
+// Opening the game brings down every score no total backs, the reset's old ones
+// for players who never come back, whichever rows Telegram shows first; what a
+// total backs stays, and so does the rest when Telegram refuses.
+func TestOpeningCorrectsTheTable(t *testing.T) {
+	stale := func() map[int64]int {
+		table := map[int64]int{9: 300_000, 10: 2147483647, 11: 951293583, 12: 156176959, 13: 54979253, 14: 8417671, 15: 8000226, 16: 4848934}
+		table[member.UserID] = 70
+		return table
+	}
+	f := newFixture()
+	f.telegram.table = stale()
+	f.store.totals = map[int64]int64{9: 300_000, member.UserID: 70}
+	session := f.session(t, game.BossShortName, member)
+
+	if code, _ := f.post(t, map[string]any{"session": session, "action": "state", "opened": true, "solo": true}); code != http.StatusOK {
+		t.Fatalf("state = %d", code)
+	}
+	want := map[int64]int{9: 300_000, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0, member.UserID: 70}
+	if !maps.Equal(f.telegram.table, want) {
+		t.Errorf("table = %v; want %v", f.telegram.table, want)
+	}
+
+	f = newFixture()
+	f.telegram.table, f.telegram.wrong = stale(), errors.New("telegram: 429")
+	f.store.totals = map[int64]int64{}
+	if code, _ := f.post(t, map[string]any{"session": f.session(t, game.BossShortName, member), "action": "state", "opened": true}); code != http.StatusOK {
+		t.Errorf("a refused correction = %d", code)
 	}
 }
