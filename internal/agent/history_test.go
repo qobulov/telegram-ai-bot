@@ -2,7 +2,9 @@ package agent
 
 import (
 	"reflect"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"telegram-ai-bot/internal/ai"
 )
@@ -68,5 +70,30 @@ func TestSanitize(t *testing.T) {
 				t.Errorf("sanitize = %+v\nwant       %+v", got, tc.want)
 			}
 		})
+	}
+}
+
+// A long tool result is cut in the history, the same way each time, and a
+// short one is kept whole.
+func TestSanitizeCutsLongToolResults(t *testing.T) {
+	long := result("x")
+	long.Content = strings.Repeat("ж", maxHistoryResultRunes+500)
+	short := result("y")
+	history := []ai.Message{user("q"), toolCall("x"), long, text("a"), user("q2"), toolCall("y"), short, text("b")}
+
+	got := sanitize(history)
+
+	cut := got[2].Content
+	if utf8.RuneCountInString(cut) != maxHistoryResultRunes+utf8.RuneCountInString(cutResultNote) || !strings.HasSuffix(cut, cutResultNote) {
+		t.Errorf("long result kept %d runes", utf8.RuneCountInString(cut))
+	}
+	if got[6].Content != "{}" {
+		t.Errorf("short result = %q", got[6].Content)
+	}
+	if again := sanitize(history); again[2].Content != cut {
+		t.Error("the cut differs from one load to the next, which would break the cache")
+	}
+	if history[2].Content == cut {
+		t.Error("the stored message itself was changed")
 	}
 }
