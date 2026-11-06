@@ -33,12 +33,7 @@ const ShortName = "tarozi"
 // BossShortName is Dev jangi's short name, as it must be registered with
 // @BotFather's /newgame. Its plays are internal/raid's: this package only
 // opens its page with a session.
-const BossShortName = "devjangi"
-
-// OldBossShortName is the name Dev jangi had: Telegram keeps a game's table for
-// good and no bot can empty it, so that the raid's reset took a new name. The
-// messages already sent still open the game by it.
-const OldBossShortName = "boss"
+const BossShortName = "boss"
 
 // MafiaShortName is Mafia's short name, as it is registered with
 // @BotFather's /newgame. Its plays are internal/mafia's: this package only
@@ -158,7 +153,7 @@ func (g *Game) PlayURL(shortName string, p Player) (link string, ok bool) {
 		page += IlonPath
 	case OtinchiShortName:
 		page += OtinchiPath
-	case BossShortName, OldBossShortName:
+	case BossShortName:
 		page += BossPath
 	case MafiaShortName:
 		page += MafiaPath

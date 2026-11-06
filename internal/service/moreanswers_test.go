@@ -190,7 +190,7 @@ func TestMoreItemsAnswerWithTheirTools(t *testing.T) {
 // Each game, Tarozi to Dev jangi, is the game's own message; nothing else is
 // sent with it.
 func TestGamesAreTheGameAlone(t *testing.T) {
-	for name, short := range map[string]string{"tarozi": "tarozi", "ilon": "ilon", "otinchi": "otinchi", "boss": "devjangi"} {
+	for _, name := range []string{"tarozi", "ilon", "otinchi", "boss"} {
 		f := newFixture()
 		runner := withToolRunner(f)
 		runner.answers["send_game"] = succeeded(`{"sent":true}`)
@@ -198,7 +198,7 @@ func TestGamesAreTheGameAlone(t *testing.T) {
 
 		sent := f.run(useItem(t, name, ""))
 
-		if asked := runner.recorded(); len(sent) != 0 || len(asked) != 1 || asked[0] != `send_game {"game":"`+short+`"}` {
+		if asked := runner.recorded(); len(sent) != 0 || len(asked) != 1 || asked[0] != `send_game {"game":"`+name+`"}` {
 			t.Errorf("%s: sent = %+v, tools asked %q; want the game alone", name, sent, asked)
 		}
 	}

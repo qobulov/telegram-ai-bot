@@ -2708,8 +2708,7 @@ migration 50.
    a GIF) → the short name **`tarozi`**, exactly, which the bot sends the
    game by. Each game's photo and description are in docs/botfather/. Then `/newgame` again for each of the others: title `Kosmik
    ilon`, short name **`ilon`**; `O'tinchi`, **`otinchi`**; `Dev jangi`,
-   **`devjangi`** (it was `boss` until its reset, as Telegram keeps a game's table
-   for good; messages sent under that name still play). No URL is asked for: the bot gives
+   **`boss`**. No URL is asked for: the bot gives
    `https://YOUR-APP.vercel.app/game/` and `/game/ilon/`, `/game/otinchi/`,
    `/game/boss/` with each press of Play. Dev jangi needs migrations 45 to 47
    and the games' scores migration 48, Mafia (`mafiya`, at

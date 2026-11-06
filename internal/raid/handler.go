@@ -133,7 +133,7 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return nil, errBadRequest
 	}
 	player, name, err := h.Sessions.Session(req.Session)
-	if err != nil || (name != game.BossShortName && name != game.OldBossShortName) {
+	if err != nil || name != game.BossShortName {
 		return nil, errSession
 	}
 	switch req.Action {

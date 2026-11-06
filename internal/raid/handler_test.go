@@ -276,12 +276,3 @@ func TestSkillsQuestsAndTheDailyGift(t *testing.T) {
 		t.Errorf("an undone quest: %d %v", code, out)
 	}
 }
-
-// A message sent before Dev jangi took its new name still plays.
-func TestAnOldMessageStillPlays(t *testing.T) {
-	f := newFixture()
-	code, _ := f.post(t, map[string]any{"session": f.session(t, game.OldBossShortName, member), "action": "state"})
-	if code != http.StatusOK {
-		t.Errorf("state = %d", code)
-	}
-}
