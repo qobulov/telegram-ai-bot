@@ -1357,3 +1357,12 @@ func TestModerateSetsAMembersTag(t *testing.T) {
 		t.Errorf("an admin without the tags right = %+v", got)
 	}
 }
+
+// A kick cannot be undone by the bot, so it is not kept as undoable.
+func TestKickIsNotUndoable(t *testing.T) {
+	env := newModerationEnv(t)
+	state, err := env.moderation.snapshot(context.Background(), order{caller: Caller{ChatID: groupA}, action: actionKick, target: Target{UserID: memberID}})
+	if err != nil || state != nil {
+		t.Errorf("snapshot = %s, %v; want none", state, err)
+	}
+}

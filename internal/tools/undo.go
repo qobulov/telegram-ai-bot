@@ -53,7 +53,9 @@ func (m *Moderation) snapshot(ctx context.Context, o order) (json.RawMessage, er
 	var state undoState
 	chatID := o.caller.ChatID
 	switch o.action {
-	case actionDelete, actionPurge:
+	// A kicked member is not brought back by the bot: they join again
+	// through a link.
+	case actionDelete, actionPurge, actionKick:
 		return nil, nil
 	case actionSetTitle, actionSetDescription, actionSetPhoto, actionDeletePhoto, actionLock, actionUnlock, actionUnpinAll,
 		actionSetStickerSet, actionDeleteStickerSet:
