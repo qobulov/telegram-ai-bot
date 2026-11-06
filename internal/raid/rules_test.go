@@ -246,8 +246,8 @@ func TestDailyStreak(t *testing.T) {
 // the boss's level gave, and one tap does not take the part for being there.
 func TestRewardFollowsTheBoss(t *testing.T) {
 	const hp = 1_000_000_000
-	whole := purse(41) // the sword expected at 41 is 31
-	if want := float64(Cost("sword", 31)); whole != want {
+	whole := purse(41) // the sword expected at 41 is 25
+	if want := float64(Cost("sword", 25)); whole != want {
 		t.Fatalf("purse(41) = %v; want %v", whole, want)
 	}
 	if got, want := Reward(41, hp, hp, 25), int64(math.Round(whole*0.05)); got != want {
@@ -257,11 +257,14 @@ func TestRewardFollowsTheBoss(t *testing.T) {
 	if got, want := Reward(41, blows, hp, 25), int64(math.Round(whole*(0.02+0.03*float64(blows)/hp))); got != want {
 		t.Errorf("being there = %d; want %d", got, want)
 	}
-	if one, full := Reward(41, TapDamage(25), hp, 25), Reward(41, blows, hp, 25); one*10 > full {
+	if one, full := Reward(41, TapDamage(25), hp, 25), Reward(41, blows, hp, 25); one*5 > full {
 		t.Errorf("one tap = %d of %d for being there", one, full)
 	}
-	if Reward(41, hp, hp, 40) != Reward(41, hp, hp, 10) {
+	if Reward(41, hp, hp, 40) != Reward(41, hp, hp, 25) {
 		t.Error("the same damage pays differently by the sword")
+	}
+	if got, most := Reward(41, TapDamage(15)*fullBlows, hp, 15), Cost("sword", 15); got != most {
+		t.Errorf("a sword far behind the boss = %d; want one level, %d", got, most)
 	}
 	if got, old := Reward(12, 50, 100, 1), int64(20*12+100*12/2); got != old {
 		t.Errorf("a low boss = %d; want the level's %d", got, old)
@@ -287,7 +290,19 @@ func TestRewardNarrowsAKillsGap(t *testing.T) {
 		got = append(got, Reward(35, f.damage, hp, f.sword))
 	}
 	t.Logf("rewards = %v", got)
-	if got[0] <= got[1] || got[1] <= got[2] || got[0] > 3*got[3] {
+	if got[0] <= got[1] || got[1] <= got[2] || got[0] > 6*got[3] {
 		t.Errorf("rewards = %v", got)
+	}
+}
+
+// A purse grows slower than a boss's HP: were it faster, as it was, each kill
+// would make the next pay more for less work.
+func TestAPurseGrowsSlowerThanTheBoss(t *testing.T) {
+	for _, level := range []int{20, 40, 60, 80} {
+		purseGrowth := purse(level+10) / purse(level)
+		hpGrowth := float64(MaxHP(level+11, 1)) / float64(MaxHP(level+1, 1))
+		if purseGrowth >= hpGrowth {
+			t.Errorf("from level %d: the purse grows %.1f times, the HP %.1f", level, purseGrowth, hpGrowth)
+		}
 	}
 }

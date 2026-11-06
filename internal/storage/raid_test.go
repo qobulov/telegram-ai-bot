@@ -215,6 +215,36 @@ func TestChangeRaidHero(t *testing.T) {
 	}
 }
 
+// Migration 57 starts the raid again for everyone: a hero comes back at the
+// first sword with no coins, and the chat's boss at the first level.
+func TestRaidResetMigration(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	reset, err := migrationFiles.ReadFile("migrations/0057_raid_reset.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{
+		`INSERT INTO raid_heroes (user_id, seed, sword, crit, coins, taps) VALUES (1, 1, 58, 15, 4078017770, 70908)`,
+		`INSERT INTO raid_members (chat_id, user_id, name, level, damage, total) VALUES (-100, 1, 'Patrick', 50, 5, 2668437798373)`,
+		`INSERT INTO raid_bosses (chat_id, level, hp, max_hp) VALUES (-100, 50, 40856084606, 41518341254)`,
+		string(reset),
+	} {
+		if _, err := store.pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var left int
+	err = store.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM raid_heroes) + (SELECT count(*) FROM raid_members) + (SELECT count(*) FROM raid_bosses)`).Scan(&left)
+	if err != nil || left != 0 {
+		t.Fatalf("rows left = %d, %v", left, err)
+	}
+	boss, hero, _, _, err := store.RaidState(ctx, -100, 1, testRaidRules, 7, 5)
+	if err != nil || boss.Level != 1 || hero.Sword != 1 || hero.Coins != 0 {
+		t.Errorf("after the reset: boss %+v, hero %+v, %v", boss, hero, err)
+	}
+}
+
 // Migration 56 keeps coins the same part of a sword's next level at its new
 // price: the strongest lose the most, and the first sword nothing.
 func TestRaidPricesMigration(t *testing.T) {

@@ -1990,8 +1990,9 @@ this boss standing by the player with their names, each swinging as their
 blows come in, and the chat's table of damage on this boss.
 The hit that takes the last HP kills it: everyone who hit it gets coins,
 reckoned from the boss and not their sword: the price of the sword expected
-at its level (75% of the level), 2% of it for being there, earned by 30 blows,
-and up to 3% more for their share, never less than the boss's level alone gave,
+at its level (60% of the level), 2% of it for being there, earned by 30 blows,
+and up to 3% more for their share, at most their own next level (a chief thrice
+that), never less than the boss's level alone gave,
 and only that once the sword is at its highest, so that the same work pays the
 same and a level comes quickly to one behind the boss and slowly to one ahead,
 the bot tells the group who
@@ -2002,7 +2003,7 @@ group's boss is a small group's to kill. Eight bosses are taken in turn,
 each drawn in its own way under its own sky (public/game/boss/skins.js): Ko'k
 dev, Qizil dev, Bir ko'zli dev, Ajdar, Muz devi, Tosh dev, Yalmog'iz kampir and
 Qora dev; every fifth is a chief (👑), thrice as strong and as rewarding.
-Coins buy the upgrades, each level of the sword 1.5 times the last and of the
+Migration 57 started the raid again for everyone. Coins buy the upgrades, each level of the sword 1.5 times the last and of the
 critical blows 1.7 times (migration 56 keeps the part of a level saved coins were):
 the sword's damage and the share of critical blows.
 Barchinoy the archer was an upgrade too until migration 47, which took her

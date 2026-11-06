@@ -156,7 +156,8 @@ func Reward(level int, damage, maxHP int64, sword int) int64 {
 	// A sword at its highest has no next level to save for: its coins would
 	// grow by trillions with nothing to buy.
 	if sword < maxSword {
-		reward = max(reward, int64(math.Round(purse(level)*part(damage, maxHP, sword))))
+		pay := min(purse(level)*part(damage, maxHP, sword), float64(Cost("sword", max(sword, 1)))*mostPerKill)
+		reward = max(reward, int64(math.Round(pay)))
 	}
 	if Chief(level) {
 		reward *= chiefTimes
@@ -180,16 +181,20 @@ func part(damage, maxHP int64, sword int) float64 {
 	return rewardFloor*min(blows/fullBlows, 1) + rewardShare*share
 }
 
-// expectedSword is the sword expected of a boss per its level. rewardFloor is
-// the part of the purse for being there and rewardShare the most more for a
-// share of the damage. A simulation of a real group's months with these prices
-// chose them: at 0.7 a boss stood for weeks, at 0.8 the swords were at their
-// highest within three months.
+// expectedSword is the sword expected of a boss per its level: at 0.6 a purse
+// grows slower than a boss's HP, 1.28 times a level to its 1.32, so that kills
+// slow down as coins grow. At 0.75 it outgrew the HP, and in a night the
+// strongest player's few blows took a group's boss up 13 levels and a member's
+// sword from 21 to 33. rewardFloor is the part of the purse for being there and
+// rewardShare the most more for a share of the damage. mostPerKill is the most
+// of their next level a kill pays, before a chief's thrice, however far they
+// are behind the boss.
 const (
-	expectedSword = 0.75
+	expectedSword = 0.6
 	rewardFloor   = 0.02
 	rewardShare   = 0.03
 	fullBlows     = 30
+	mostPerKill   = 1.0
 )
 
 // titles are the damage in all that earns each title, from Yangi jangchi
