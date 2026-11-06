@@ -12,7 +12,7 @@ import (
 
 // The guards an owner may turn on in a group, run in code with no model:
 // known spammers banned, links to malicious hosts and nude or gory pictures
-// deleted. Admins, owners, bots and posts on behalf of a chat are left
+// deleted, a member flooding the group muted. Admins, owners, bots and posts on behalf of a chat are left
 // alone, and so is a muted group.
 
 const (
@@ -23,6 +23,13 @@ const (
 	// maxGuardedImage is the largest picture size looked at; the biggest
 	// size Telegram keeps under it is taken.
 	maxGuardedImage = 1 << 20
+	// A member who sends floodMessages within floodWindow, the message at
+	// hand included, is flooding: muted for floodMute. floodLogLimit bounds
+	// the group log read to count them.
+	floodMessages = 6
+	floodWindow   = 10 * time.Second
+	floodMute     = 10 * time.Minute
+	floodLogLimit = 60
 )
 
 // Guards ask outside services about members, links and pictures.
@@ -41,9 +48,9 @@ type GroupModerator interface {
 }
 
 // guardSet are the guards on in a group.
-type guardSet struct{ spam, links, images bool }
+type guardSet struct{ spam, links, images, flood bool }
 
-func (g guardSet) any() bool { return g.spam || g.links || g.images }
+func (g guardSet) any() bool { return g.spam || g.links || g.images || g.flood }
 
 // verdict is an outside service's answer kept a while: bad, and why.
 type verdict struct {
@@ -73,6 +80,8 @@ func (s *Service) guardsOn(ctx context.Context, chatID int64) guardSet {
 			set.links = s.opts.Guards.CanCheckLinks()
 		case storage.RuleImageGuard:
 			set.images = s.opts.Guards.CanCheckImages()
+		case storage.RuleFloodGuard:
+			set.flood = s.ambient.enabled() && s.opts.Restrictor != nil
 		}
 	}
 	s.guardSets.set(chatID, set)
@@ -103,6 +112,10 @@ func (s *Service) protected(in incoming) bool {
 			s.banSpammer(ctx, in, msg.From, source, true)
 			return true
 		}
+	}
+	if set.flood && s.flooding(ctx, msg) && !s.isGroupAdmin(ctx, msg) {
+		s.muteFlooder(ctx, in)
+		return true
 	}
 	if set.links {
 		if reason, bad := s.maliciousLink(ctx, msg); bad && !s.isGroupAdmin(ctx, msg) {
@@ -300,4 +313,48 @@ func (s *Service) recordGuard(ctx context.Context, in incoming, action string, u
 		return true
 	}
 	return first
+}
+
+// flooding reports a member who sent floodMessages or more within
+// floodWindow, the message at hand included, as the group log counts them.
+func (s *Service) flooding(ctx context.Context, msg *telegram.Message) bool {
+	recent, err := s.ambient.log.GroupMessagesSince(ctx, msg.Chat.ID, s.opts.Now().Add(-floodWindow), floodLogLimit)
+	if err != nil {
+		s.opts.Logger.Warn("guards: could not read the group log for flooding", "chat_id", msg.Chat.ID, "error", err)
+		return false
+	}
+	count := 1
+	for _, m := range recent {
+		if m.AuthorID == msg.From.ID {
+			count++
+		}
+	}
+	return count >= floodMessages
+}
+
+// muteFlooder deletes a flooding member's message and mutes them for
+// floodMute, saying so once: their messages already on the way are only
+// deleted.
+func (s *Service) muteFlooder(ctx context.Context, in incoming) {
+	msg := in.msg
+	if err := s.opts.GroupModerator.DeleteMessage(ctx, msg.Chat.ID, msg.MessageID); err != nil {
+		s.opts.Logger.Warn("guards: could not delete a flooding message", "chat_id", msg.Chat.ID, "error", err)
+	}
+	if s.opts.Strikes != nil {
+		muted, err := s.opts.Strikes.SwearStrikes(ctx, msg.Chat.ID, msg.From.ID, storage.ActionFloodMute, s.opts.Now().Add(-floodMute))
+		if err == nil && muted > 0 {
+			return
+		}
+	}
+	if !s.recordGuard(ctx, in, storage.ActionFloodMute, msg.From.ID) {
+		return
+	}
+	err := s.opts.Restrictor.RestrictChatMember(ctx, telegram.Restriction{
+		ChatID: msg.Chat.ID, UserID: msg.From.ID, Permissions: telegram.NoPermissions(), Until: s.opts.Now().Add(floodMute),
+	})
+	if err != nil {
+		s.opts.Logger.Warn("guards: could not mute a flooding member", "chat_id", msg.Chat.ID, "error", err)
+		return
+	}
+	s.postGuard(msg, "⚠️ "+mentionOf(msg.From)+" juda tez-tez yozgani uchun (flood) 10 daqiqa yozolmaydi.")
 }

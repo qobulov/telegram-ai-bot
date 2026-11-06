@@ -77,6 +77,7 @@ const (
 	ActionSpamBan     = "spam_ban"
 	ActionLinkDelete  = "link_delete"
 	ActionImageDelete = "image_delete"
+	ActionFloodMute   = "flood_mute"
 )
 
 // SwearStrikes counts the swears of one kind the swear guard caught from one

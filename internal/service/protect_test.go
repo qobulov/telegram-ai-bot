@@ -256,3 +256,51 @@ func TestGuardRulesAreToldToTheModel(t *testing.T) {
 		t.Errorf("lines = %q", lines)
 	}
 }
+
+const flooderID = int64(7707)
+
+// A member who sends six messages within ten seconds is muted for ten
+// minutes, once; their messages still on the way are only deleted.
+func TestFloodGuardMutesAMemberWhoFloods(t *testing.T) {
+	f, _, moderator := protectFixture(storage.RuleFloodGuard)
+	restrictor := f.opts.Restrictor.(*fakeRestrictor)
+	var updates []telegram.Update
+	for i := range 7 {
+		msg := messageFrom(flooderID, "tez", "xabar")
+		msg.MessageID = int64(100 + i)
+		updates = append(updates, inGroup(msg))
+	}
+
+	sent := f.run(updates...)
+
+	if want := "⚠️ @tez juda tez-tez yozgani uchun (flood) 10 daqiqa yozolmaydi."; len(sent) != 1 || sent[0].text != want {
+		t.Fatalf("sent = %+v, want one %q", sent, want)
+	}
+	// The sixth message is the flood: it and the seventh are deleted.
+	if !slices.Equal(moderator.deleted, []int64{105, 106}) {
+		t.Errorf("deleted %v, want the sixth and seventh", moderator.deleted)
+	}
+	if len(restrictor.done) != 1 || restrictor.done[0].UserID != flooderID || restrictor.done[0].Permissions != telegram.NoPermissions() {
+		t.Errorf("restrictions = %+v, want one mute", restrictor.done)
+	}
+}
+
+// Writing at a person's pace is no flood, and admins may write as they will.
+func TestFloodGuardLeavesOrdinaryWritingAndAdminsAlone(t *testing.T) {
+	f, _, moderator := protectFixture(storage.RuleFloodGuard)
+	var updates []telegram.Update
+	for i := range 5 {
+		msg := messageFrom(flooderID, "tez", "xabar")
+		msg.MessageID = int64(100 + i)
+		updates = append(updates, inGroup(msg))
+	}
+	for i := range 8 {
+		msg := messageFrom(guardAdminID, "adm", "e'lon")
+		msg.MessageID = int64(200 + i)
+		updates = append(updates, inGroup(msg))
+	}
+
+	if sent := f.run(updates...); len(sent) != 0 || len(moderator.deleted) != 0 {
+		t.Errorf("sent %+v, deleted %v; want nothing done", sent, moderator.deleted)
+	}
+}

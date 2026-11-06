@@ -172,6 +172,7 @@ var guardLines = map[string]string{
 	storage.RuleSpamGuard:  "Known spammers (CAS, lols.bot) are banned here in code, not by you.",
 	storage.RuleLinkGuard:  "Links to malware or phishing (Google Safe Browsing, URLhaus) are deleted here in code, not by you.",
 	storage.RuleImageGuard: "Nude or gory pictures are deleted here in code, not by you.",
+	storage.RuleFloodGuard: "A member who floods the group, sending many messages within seconds, is muted here for 10 minutes in code, not by you.",
 }
 
 // ruleLines lists the instructions, then the ignored members. Each is folded
@@ -196,7 +197,7 @@ func (s *Service) ruleLines(rules []storage.GroupRule) []string {
 				calls = oneLine(r.UserName)
 			}
 			instructions = append(instructions, "- Swearing is watched here in code, not by you: a member's first swear gets a warning, the next within a day a 1-hour mute that tags "+calls+". Never swear back at anyone in this group, and never mute anyone for swearing yourself.")
-		case storage.RuleSpamGuard, storage.RuleLinkGuard, storage.RuleImageGuard:
+		case storage.RuleSpamGuard, storage.RuleLinkGuard, storage.RuleImageGuard, storage.RuleFloodGuard:
 			instructions = append(instructions, "- "+guardLines[r.Kind])
 		case storage.RuleIgnore:
 			line := "- Do not answer " + oneLine(r.UserName)

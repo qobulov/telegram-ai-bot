@@ -56,12 +56,17 @@ type fakeTelegram struct {
 	calls        []string
 	restrictions []telegram.Restriction
 	err          error
+	// failing is a method refused even when err is nil.
+	failing string
 }
 
 func (f *fakeTelegram) do(method string, chatID, id int64) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, fmt.Sprintf("%s %d %d", method, chatID, id))
+	if method == f.failing {
+		return &telegram.APIError{Code: 400, Description: "Bad Request: refused"}
+	}
 	return f.err
 }
 
@@ -745,7 +750,7 @@ func TestModerateChecksItsArguments(t *testing.T) {
 	env := newModerationEnv(t)
 	for _, args := range []string{
 		`{}`,
-		`{"action":"kick"}`,
+		`{"action":"warn"}`,
 		// Nothing waits for a confirmation any more, so there is nothing to
 		// cancel or confirm.
 		`{"action":"cancel"}`,
@@ -840,4 +845,30 @@ func TestModerateStickersOnlyWhenAsked(t *testing.T) {
 
 	expectRefusal(t, env.moderate(ctx, `{"action":"no_stickers"}`), "forbidden", "does not ask for this")
 	env.nothingActed(t)
+}
+
+// A kick is a ban lifted at once: the member is out and may come back.
+func TestModerateKickRemovesAndLetsThemBack(t *testing.T) {
+	kicking := func() context.Context {
+		return WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: 100, MessageID: 50, Target: bekTarget(), Words: "Maria, buni guruhdan chiqar"}, &Sink{})
+	}
+	env := newModerationEnv(t)
+
+	said := env.act(t, kicking(), `{"action":"kick"}`)
+
+	if said != "Bajarildi: Bek @bek guruhdan chiqarildi, qayta qo'shilishi mumkin." {
+		t.Errorf("said = %q", said)
+	}
+	if calls := env.telegram.made(); len(calls) != 2 || calls[0] != "banChatMember -100111 5005" || calls[1] != "unbanChatMember -100111 5005" {
+		t.Errorf("calls = %q, want a ban, then its lifting", calls)
+	}
+
+	// A ban that cannot be lifted leaves them out for good: whoever asked
+	// is told so.
+	env = newModerationEnv(t)
+	env.telegram.failing = "unbanChatMember"
+	got := env.moderate(kicking(), `{"action":"kick"}`)
+	if got.OK || !strings.Contains(got.Error.Message, "could not be lifted") {
+		t.Errorf("kick with the unban refused = %+v", got)
+	}
 }

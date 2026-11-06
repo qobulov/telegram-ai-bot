@@ -707,3 +707,17 @@ func TestRulesToolTurnsGuardsOnAndOff(t *testing.T) {
 		t.Errorf("unguard = %+v, rules %+v", env, store.all())
 	}
 }
+
+func TestRulesToolTurnsTheFloodGuardOn(t *testing.T) {
+	store := &fakeRules{}
+	registry := mustRegistry(t, RulesTool(RulesOptions{Store: store, BotID: rulesBotID}))
+
+	env := rules(registry, ownerSaying(groupA, "Mari, flood qilganlarni mute qil"), `{"action":"guard","guard":"flood"}`)
+
+	if !env.OK || !strings.Contains(string(env.Result), "6 messages within 10 seconds") {
+		t.Fatalf("guard flood = %+v %s", env, env.Result)
+	}
+	if got := store.all(); len(got) != 1 || got[0].Kind != storage.RuleFloodGuard {
+		t.Errorf("rules = %+v", got)
+	}
+}

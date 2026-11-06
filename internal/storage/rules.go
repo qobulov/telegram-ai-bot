@@ -30,6 +30,9 @@ const (
 	RuleSpamGuard  = "spam_guard"
 	RuleLinkGuard  = "link_guard"
 	RuleImageGuard = "image_guard"
+	// RuleFloodGuard mutes a member of one group who sends many messages
+	// within seconds, in code.
+	RuleFloodGuard = "flood_guard"
 )
 
 // MaxInstructions is how many instructions a group may have in force at

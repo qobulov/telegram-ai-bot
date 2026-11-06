@@ -21,8 +21,10 @@ const (
 	actionUnmute = "unmute"
 	actionBan    = "ban"
 	actionUnban  = "unban"
-	actionPin    = "pin"
-	actionUnpin  = "unpin"
+	// actionKick removes a member who may come back: a ban lifted at once.
+	actionKick  = "kick"
+	actionPin   = "pin"
+	actionUnpin = "unpin"
 	// actionNoStickers takes away a member's stickers and GIFs, which
 	// Telegram allows or forbids together; actionStickers gives them back.
 	actionNoStickers = "no_stickers"
@@ -84,6 +86,7 @@ var neededRight = map[string]string{
 	actionUnmute: telegram.RightRestrictMembers,
 	actionBan:    telegram.RightRestrictMembers,
 	actionUnban:  telegram.RightRestrictMembers,
+	actionKick:   telegram.RightRestrictMembers,
 	actionPin:    telegram.RightPinMessages,
 	actionUnpin:  telegram.RightPinMessages,
 
@@ -197,14 +200,14 @@ func (m *Moderation) Tool() Tool {
 	return Tool{
 		Name: "moderate",
 		Description: "Whenever someone in a group asks you to: have something done to the message they replied to. It checks who may ask, which are the group's admins with the right and your owners, and refuses anyone else with the reason. " +
-			"delete: delete that message. mute (minutes, default 60) or unmute: its author. ban or unban: its author. pin or unpin: that message. " +
+			"delete: delete that message. mute (minutes, default 60) or unmute: its author. ban or unban: its author. kick: remove its author, who may join again. pin or unpin: that message. " +
 			"no_stickers (minutes, default a day) or allow_stickers: take away or give back its author's stickers and GIFs, which Telegram only allows or forbids together; use it, not ban or ignore, when they ask to block someone's stickers. " +
-			"For mute, unmute, ban, unban, no_stickers and allow_stickers without such a reply, or replying to their own message, it acts on the one member they tagged with @, once Telegram confirms who that is. " +
+			"For mute, unmute, ban, unban, kick, no_stickers and allow_stickers without such a reply, or replying to their own message, it acts on the one member they tagged with @, once Telegram confirms who that is. " +
 			"It checks everyone's rights and does it at once, with no question, but only when the person's own message asks for it; say it is done only when it reports done.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["delete", "mute", "unmute", "ban", "unban", "pin", "unpin", "no_stickers", "allow_stickers"]},
+				"action": {"type": "string", "enum": ["delete", "mute", "unmute", "ban", "unban", "kick", "pin", "unpin", "no_stickers", "allow_stickers"]},
 				"minutes": {"type": "integer", "description": "For mute: how long, 1 to 10080, default 60. For no_stickers: 1 to 525600, default 1440; the most for \"forever\"."},
 				"reason": {"type": "string", "description": "Optional: why, in a few words."}
 			},
@@ -238,7 +241,7 @@ func (m *Moderation) run(ctx context.Context, raw json.RawMessage) (any, error) 
 		return nil, err
 	}
 	if _, known := neededRight[args.Action]; !known {
-		return nil, &ArgumentError{Message: "action must be delete, mute, unmute, ban, unban, pin, unpin, no_stickers or allow_stickers"}
+		return nil, &ArgumentError{Message: "action must be delete, mute, unmute, ban, unban, kick, pin, unpin, no_stickers or allow_stickers"}
 	}
 	if !askedFor(caller.Words, args.Action) {
 		return nil, &DeniedError{Message: notAsked}
@@ -338,7 +341,7 @@ func (m *Moderation) tagged(ctx context.Context, chatID int64, mention Mention, 
 // onMember reports an action on a member rather than on a message.
 func onMember(action string) bool {
 	switch action {
-	case actionMute, actionUnmute, actionBan, actionUnban, actionNoStickers, actionStickers:
+	case actionMute, actionUnmute, actionBan, actionUnban, actionKick, actionNoStickers, actionStickers:
 		return true
 	}
 	return false
@@ -556,6 +559,16 @@ func (m *Moderation) send(ctx context.Context, o order) error {
 		return m.opts.Telegram.BanChatMember(ctx, chatID, userID)
 	case actionUnban:
 		return m.opts.Telegram.UnbanChatMember(ctx, chatID, userID)
+	case actionKick:
+		if err := m.opts.Telegram.BanChatMember(ctx, chatID, userID); err != nil {
+			return err
+		}
+		if err := m.opts.Telegram.UnbanChatMember(ctx, chatID, userID); err != nil {
+			// Removed but still banned: the person asking has to know, or
+			// the member could never come back.
+			return &telegramError{"they were removed, but the ban that removed them could not be lifted, so they cannot join again; unban them"}
+		}
+		return nil
 	case actionPin:
 		return m.opts.Telegram.PinChatMessage(ctx, chatID, messageID)
 	case actionUnpin:
@@ -574,6 +587,10 @@ func (e *telegramError) Error() string { return e.message }
 // telegramFailure tells why nothing was done, in Telegram's words when it
 // gave a reason.
 func telegramFailure(err error) error {
+	var said *telegramError
+	if errors.As(err, &said) {
+		return said
+	}
 	if refusal, ok := telegramRefusal(err); ok {
 		return &telegramError{"Telegram refused: " + refusal.Description}
 	}
@@ -610,6 +627,8 @@ func (o order) done(until string) chatText {
 		return chatText{"Bajarildi: " + name + " bloklandi.", "Готово: " + name + " забанен(а)."}
 	case actionUnban:
 		return chatText{"Bajarildi: " + name + " blokdan chiqarildi va qayta qo'shila oladi.", "Готово: " + name + " разбанен(а) и может вернуться."}
+	case actionKick:
+		return chatText{"Bajarildi: " + name + " guruhdan chiqarildi, qayta qo'shilishi mumkin.", "Готово: " + name + " удалён(а) из группы и может вернуться."}
 	case actionNoStickers:
 		return chatText{"Bajarildi: " + name + " " + until + " gacha stiker va GIF yubora olmaydi.", "Готово: " + name + " не может отправлять стикеры и GIF до " + until + "."}
 	case actionStickers:
@@ -642,6 +661,7 @@ var actionWords = map[string][]string{
 	actionUnmute: {"mute", "мут", "мют", "ovozsiz", "yozsin", "yoza olsin", "ochib qoy", "ochvor", "разреш"},
 	actionBan:    {"ban", "бан", "blok", "chiqar", "hayda", "kick", "кик", "выгн", "выкин", "заблок"},
 	actionUnban:  {"ban", "бан", "blok", "qaytar", "верн", "разблок"},
+	actionKick:   {"kick", "кик", "chiqar", "hayda", "выгн", "выкин", "удали из"},
 	actionPin:    {"pin", "qada", "закреп"},
 	// Asking about someone's stickers is enough: the model picks which.
 	actionNoStickers: {"stik", "stic", "стик", "gif", "гиф"},
