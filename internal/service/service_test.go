@@ -123,19 +123,11 @@ type fakeReplier struct {
 	// and to with the member named, as for "[to James]".
 	toReplied bool
 	to        string
-	// toolsUsed is how many tools the turn calls. A turn for tools only
-	// that calls none ends in ErrNotATool, before the model, as the
-	// agent's router ends talk.
+	// toolsUsed is how many tools the turn calls.
 	toolsUsed int
 }
 
 func (f *fakeReplier) Reply(ctx context.Context, req agent.Request) (agent.Answer, error) {
-	f.mu.Lock()
-	notATool := req.ToolsOnly && f.toolsUsed == 0
-	f.mu.Unlock()
-	if notATool {
-		return agent.Answer{}, agent.ErrNotATool
-	}
 	if req.Fixed != nil {
 		// Saved as the agent would, with no model call to record.
 		answer := *req.Fixed

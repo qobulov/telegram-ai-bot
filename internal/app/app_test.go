@@ -340,11 +340,9 @@ func TestWebhookLimitsPrivateChats(t *testing.T) {
 	}
 	env.apis.mu.Lock()
 	defer env.apis.mu.Unlock()
-	// Past the limit, a question in words is still a turn for tools only:
-	// the model is asked, and a reply that used no tool is dropped for the
-	// notice, as the second and third messages show.
-	if len(env.apis.modelInputs) != 3 {
-		t.Errorf("model calls = %d, want 3", len(env.apis.modelInputs))
+	// Past the limit no model is asked at all.
+	if len(env.apis.modelInputs) != 1 {
+		t.Errorf("model calls = %d, want 1", len(env.apis.modelInputs))
 	}
 }
 

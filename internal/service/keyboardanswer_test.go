@@ -200,8 +200,8 @@ func TestKeyboardWordsInAGroupAreTheModels(t *testing.T) {
 }
 
 // Tools take nothing from the day's limit: a turn that used one is given
-// back, and past the limit a question in words is still answered when a
-// tool answers it, while talk gets the limit's notice.
+// back. Past the limit, though, nothing reaches the model: the notice is
+// given once.
 func TestToolsTakeNothingFromTheLimit(t *testing.T) {
 	f := newFixture()
 	quota := withPrivateLimit(f, 1)
@@ -218,13 +218,13 @@ func TestToolsTakeNothingFromTheLimit(t *testing.T) {
 		t.Errorf("sent = %+v; want the notice past the limit", sent)
 	}
 
+	// Past the limit no model is asked, not even for a tool: the notice
+	// was given once, and nothing more is sent.
+	asked := len(f.replier.recorded())
 	f.replier.toolsUsed = 1
 	sent = f.run(textFrom(userID, "rubl qancha"))
-	if len(sent) != 5 || sent[4].text != "echo: rubl qancha" {
-		t.Errorf("sent = %+v; want the tool's answer past the limit", sent)
-	}
-	if req := f.replier.recorded(); !req[len(req)-1].req.ToolsOnly {
-		t.Errorf("the turn past the limit was not for tools only")
+	if len(sent) != 4 || len(f.replier.recorded()) != asked {
+		t.Errorf("sent = %+v, model asked %d more times; want nothing past the limit", sent, len(f.replier.recorded())-asked)
 	}
 }
 
