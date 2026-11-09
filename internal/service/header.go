@@ -227,8 +227,8 @@ func (s *Service) punishmentLine(r storage.GroupRule) string {
 	if p, ok := storage.ParsePunishment(r.Text); ok && !p.Ban() {
 		does = fmt.Sprintf("muted for %d hours", p.MuteHours)
 	}
-	return fmt.Sprintf("- (#%d) Ordered by the owners or the group's creator, carried out here in code, not by you: %s is %s for %s (until %s).",
-		r.ID, who, does, what, r.ExpiresAt.In(s.opts.Location).Format(ruleDayLayout))
+	return fmt.Sprintf("- (#%d) Ordered by the owners or the group's creator, carried out here in code, not by you: if %s commits %s, they will be %s. It is a warning in force until %s, not a punishment done: nobody is muted or banned by it now, so never say they are.",
+		r.ID, who, what, does, r.ExpiresAt.In(s.opts.Location).Format(ruleDayLayout))
 }
 
 // addressFor is how the owner who is writing asked to be addressed, or "".

@@ -488,3 +488,16 @@ func TestSwearGuardSpeaksTheSwearersLanguage(t *testing.T) {
 		t.Errorf("sent = %+v, want an English warning", sent)
 	}
 }
+
+// A punishment is told to the model as a warning in force, so that it does not
+// say the member is muted when nobody is.
+func TestPunishmentLineIsAWarningNotADoneMute(t *testing.T) {
+	s := New(newFixture().opts)
+	defer s.stop()
+	line := s.punishmentLine(storage.GroupRule{ID: 25, ChatID: groupID, Kind: storage.RuleSwearPunishment, UserID: swearerID, UserName: "Umarov", Text: "mute:24", ExpiresAt: time.Now().Add(time.Hour)})
+	for _, want := range []string{"if Umarov commits swearing at you", "muted for 24 hours", "nobody is muted or banned by it now"} {
+		if !strings.Contains(line, want) {
+			t.Errorf("line = %q, want %q", line, want)
+		}
+	}
+}
