@@ -116,7 +116,8 @@ func (s *Store) SaveCardCatalog(ctx context.Context, cards []Card) error {
 // DrawCard gives the player a card of rarity, at random, unless they drew
 // one less than every ago, when it returns a *CardWaitError; every of 0
 // never waits. The player's row is locked, so that two draws at once are
-// two draws, the second waiting its turn.
+// two draws, the second waiting its turn. A player who turned on the card
+// reminders gets the next one scheduled, every after now.
 func (s *Store) DrawCard(ctx context.Context, userID int64, name string, rarity int, every time.Duration, now time.Time) (CardDraw, error) {
 	var draw CardDraw
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
@@ -151,10 +152,25 @@ func (s *Store) DrawCard(ctx context.Context, userID int64, name string, rarity 
 		if draw.New {
 			newCard = 1
 		}
-		return tx.QueryRow(ctx, `
+		if err := tx.QueryRow(ctx, `
 			UPDATE card_players SET name = coalesce(nullif($5, ''), name), points = points + $2,
 				cards = cards + $3, draws = draws + 1, last_draw_at = $4
-			WHERE user_id = $1 RETURNING points`, userID, c.Value, newCard, now, name).Scan(&draw.Points)
+			WHERE user_id = $1 RETURNING points`, userID, c.Value, newCard, now, name).Scan(&draw.Points); err != nil {
+			return err
+		}
+		if every <= 0 {
+			return nil
+		}
+		// A player who asked to be reminded of every card is reminded of
+		// the next one, in place of the reminder this draw made stale.
+		_, err = tx.Exec(ctx, `
+			INSERT INTO reminders (chat_id, user_id, user_name, kind, language, due_at)
+			SELECT remind_chat_id, user_id, name, 'card', remind_language, $2
+			FROM card_players WHERE user_id = $1 AND remind_chat_id IS NOT NULL
+			ON CONFLICT (user_id) WHERE kind = 'card' AND claimed_at IS NULL DO UPDATE SET
+				chat_id = EXCLUDED.chat_id, user_name = EXCLUDED.user_name, message_id = 0,
+				language = EXCLUDED.language, due_at = EXCLUDED.due_at`, userID, now.Add(every))
+		return err
 	})
 	var wait *CardWaitError
 	if errors.As(err, &wait) {

@@ -34,17 +34,18 @@ prices).
 7. [Photos, stickers, GIFs and voice messages](#photos-stickers-gifs-and-voice-messages)
 8. [Drawing pictures](#drawing-pictures)
 9. [Live data](#live-data)
-10. [Daily limit in private chats](#daily-limit-in-private-chats)
-11. [Inline mode](#inline-mode)
-12. [Telegram Business](#telegram-business)
-13. [Groups](#groups)
-14. [VPS deployment (systemd)](#vps-deployment-systemd)
-15. [Docker Compose deployment (optional)](#docker-compose-deployment-optional)
-16. [Vercel deployment (webhook)](#vercel-deployment-webhook)
-17. [Backup and restore](#backup-and-restore)
-18. [Long polling and webhooks](#long-polling-and-webhooks)
-19. [Security checklist](#security-checklist)
-20. [Troubleshooting](#troubleshooting)
+10. [Reminders](#reminders)
+11. [Daily limit in private chats](#daily-limit-in-private-chats)
+12. [Inline mode](#inline-mode)
+13. [Telegram Business](#telegram-business)
+14. [Groups](#groups)
+15. [VPS deployment (systemd)](#vps-deployment-systemd)
+16. [Docker Compose deployment (optional)](#docker-compose-deployment-optional)
+17. [Vercel deployment (webhook)](#vercel-deployment-webhook)
+18. [Backup and restore](#backup-and-restore)
+19. [Long polling and webhooks](#long-polling-and-webhooks)
+20. [Security checklist](#security-checklist)
+21. [Troubleshooting](#troubleshooting)
 
 ## Architecture
 
@@ -230,6 +231,9 @@ shashka_queue(user_id PK, rating, joined_at)
 raid_bosses(chat_id PK, level, hp, max_hp, updated_at)
 raid_members(chat_id, user_id, name, level, damage, total, scored_at, updated_at,
              PK (chat_id, user_id))
+reminders(id PK, chat_id, user_id, user_name, message_id, kind, text,
+          language, due_at, created_at, attempts, claimed_at, sent_at,
+          outcome)
 raid_heroes(user_id PK, coins, sword, crit, helper, seed, taps, last_hit,
             storm_until, storm_ready, fire_left, fire_ready, rain_until, rain_ready,
             quest_day, quest_taps, quest_kills, quest_skills, quest_claimed,
@@ -307,7 +311,7 @@ in the environment win over the file.
 | `COINGECKO_DEMO_KEY` | empty | Optional CoinGecko demo key from <https://www.coingecko.com/en/api>; without it crypto prices share CoinGecko's keyless quota |
 | `DB_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
 | `TELEGRAM_WEBHOOK_SECRET` | empty | Only for webhook deployments; see [Vercel deployment](#vercel-deployment-webhook) |
-| `CRON_SECRET` | empty | Only on Vercel: protects the daily cleanup endpoint |
+| `CRON_SECRET` | empty | Only on Vercel: protects the daily cleanup endpoint and the reminders endpoint |
 | `WEBAPP_URL` | empty | The Vercel deployment's `https://` address, such as `https://maria.vercel.app`, where `public/` is served: turns on the [dashboard](#dashboard-mini-app) (`/stats`, the private chats' menu button) and the games [Tarozi](#the-game-tarozi), [Kosmik ilon](#kosmik-ilon), [O'tinchi](#otinchi) and [Dev jangi](#dev-jangi) (`/game`, `/ilon`, `/otinchi`, `/boss`, the `send_game` tool). Empty turns them off |
 | `MAX_OUTPUT_TOKENS`           | `8192`                         | Longest model reply, in tokens, thinking included |
 | `AI_REASONING_EFFORT`         | `low` (Gemini)                 | How hard Gemini thinks before answering: `none`, `minimal`, `low`, `medium`, `high`, or `default` for the model's own. Thinking is paid as output and takes from `MAX_OUTPUT_TOKENS`; the lite models refuse `none`. Each request logs its tokens as `model usage` |
@@ -814,6 +818,99 @@ Telegram renders with large headings and real lists; if Telegram refuses it,
 it goes as ordinary text. Ordinary messages are sent without a parse mode: the
 code turns `**bold**` and `` `code` `` into entities itself, so a stray mark
 stays as text and never makes a send fail.
+
+## Reminders
+
+Anyone may ask Maria to remind them of something later, in a private chat
+or in a group (`internal/tools/reminders.go`, the `reminders` tool):
+
+- "Maria, 10 daqiqadan keyin suv ichishni eslat", "1 soatdan keyin ayt":
+  minutes from now.
+- "soat 18:00 da uchrashuvni eslat": the next 18:00, today or tomorrow.
+- "ertaga 9 da dars borligini eslat": a date and time; the model reads
+  "ertaga" from the date at the top of its prompt.
+- "eslatmalarim", "qanday eslatmalarim bor?": the ones waiting; "2-sini
+  bekor qil": cancels one.
+- "karta ochish vaqti kelganda eslat": a reminder at the player's next
+  [Kartalar](#kartalar) draw, their last draw and an hour after, with the
+  Mini App's button; one who may open a card now is told so. "har safar
+  eslat" turns on a reminder after every card: each draw, from `/karta`
+  or the Mini App, schedules the next one (`DrawCard`, kept on
+  `card_players.remind_chat_id`), until "karta eslatmasini o'chir". It is
+  off by default.
+
+What is checked in code, not left to the model: the time is minutes from
+now (1 to 43200) or a local clock time, read in `GROUP_HISTORY_TIMEZONE`
+(Asia/Tashkent by default); a date and time already past is refused, a
+clock time already past today means tomorrow, and nothing is set more than
+30 days ahead. A member may have 20 reminders waiting and a group 50, and
+a player one card reminder. Each sees and cancels only their own, in the
+chat they set them in. The reminder's words are at most 500 characters,
+and tags of other members in them become bare names: a reminder tags only
+the member it is for. A business chat's customers are not offered it.
+
+A reminder is sent where it was asked: in a private chat to the user, in a
+group to the group, as a reply to the message that asked for it and tagging
+the member by ID (`internal/reminders`). A card reminder is not sent when
+the player drew a card since it was set, so that no card may be opened
+yet. A reminder is claimed by the call that sends it (`UPDATE ... WHERE id
+IN (SELECT ... FOR UPDATE SKIP LOCKED)`), never claimed again, so calls that
+overlap send it at most once. A send Telegram refuses for good (the bot
+blocked, removed from the group, the chat gone) is recorded as failed and
+does not hold up the others; one it refuses for now (429, 5xx) is tried
+again a minute later, three times at most; one with no answer from
+Telegram is not sent again, as it may have gone out. Reminders done with
+are deleted by the daily cleanup a week later (migration 60).
+
+### Who sends them
+
+- **Long polling (`cmd/bot`, VPS, Docker):** the bot checks every minute by
+  itself. Nothing to set up.
+- **Vercel:** a function runs only when it is called, and Vercel Cron on the
+  free plan runs once a day, so a free outside scheduler,
+  [cron-job.org](https://cron-job.org), calls `/api/reminders` every
+  minute. Each call sends what is due and answers a summary:
+
+  ```json
+  {"sent":1,"skipped":0,"failed":0,"retried":0}
+  ```
+
+  It is authenticated like the cleanup: `GET` with
+  `Authorization: Bearer <CRON_SECRET>`; anything else gets `401`, and
+  without `CRON_SECRET` in the project the function answers `503`.
+
+### Setting up cron-job.org
+
+1. Sign up at [cron-job.org](https://cron-job.org) (free) and choose
+   *Create cronjob*.
+2. **URL:** `https://YOUR-APP.vercel.app/api/reminders` (the production
+   domain, not a preview one, which Vercel's deployment protection may
+   hide behind a login).
+3. **Execution schedule:** every minute (`* * * * *`).
+4. **Advanced → Request method:** `GET`. **Headers:** add one, key
+   `Authorization`, value `Bearer ` followed by the project's `CRON_SECRET`
+   (the same value set in Vercel; `openssl rand -hex 32` if it is not set
+   yet).
+5. **Timeout:** the default 30 seconds is enough; a call takes at most
+   about 13. Turn on *notify on failure* to hear when it stops working.
+6. Save, then *Test run*: it should answer `200` with the JSON above.
+   cron-job.org's history lists every call and its answer.
+
+### Testing it by hand
+
+```bash
+# refused: no secret
+curl -i https://YOUR-APP.vercel.app/api/reminders
+# HTTP/2 401
+
+# sends what is due and answers the summary
+curl -i -H "Authorization: Bearer $CRON_SECRET" https://YOUR-APP.vercel.app/api/reminders
+# HTTP/2 200
+# {"sent":0,"skipped":0,"failed":0,"retried":0}
+```
+
+To see one arrive, ask the bot "1 daqiqadan keyin test deb eslat", wait a
+minute, and call it again (or let cron-job.org).
 
 ## Daily limit in private chats
 
@@ -1980,6 +2077,10 @@ alone. In a group its button links to the private chat (`/start
 kartalar`), as Telegram opens Mini App buttons only there; the collection's
 message carries it too.
 
+"Karta ochish vaqti kelganda eslat" has Maria remind the player when their
+next card may be opened, and "har safar eslat" after every card; see
+[Reminders](#reminders).
+
 ### Dev jangi
 
 `/boss` posts the boss raid: everyone in a chat hits one giant together
@@ -2735,6 +2836,13 @@ set in the project the endpoint answers `503` and nothing is deleted.
 Runs and their results are listed in the Vercel dashboard under the
 project's *Cron Jobs* settings, where a run can also be started by hand.
 
+### Reminders every minute
+
+`/api/reminders` sends the reminders that are due; Vercel Cron cannot call
+it every minute on the free plan, so cron-job.org does. See
+[Reminders](#reminders) for what it does and how to set it up, with the
+same `CRON_SECRET`.
+
 ### Security of the webhook
 
 The URL is public, so anyone can send it requests. The function accepts an
@@ -2876,6 +2984,11 @@ Built in:
 - [x] Gifts spend the bot's Stars only for owners known by ID, for the
       member replied to or tagged, taken from the update, when the owner's
       own words ask for a gift, and after the balance is checked.
+- [x] Reminders are checked in code: times past or over 30 days ahead are
+      refused, 20 may wait per member and 50 per group, a member sees and
+      cancels only their own in that chat, and a reminder tags only its
+      member. `/api/reminders` needs `CRON_SECRET`, and a reminder claimed
+      is never claimed again, so it is sent at most once.
 - [x] Only registered tools run. No shell, no `eval`, no model-written SQL.
 - [x] Tool permissions and restricted commands are checked in code against
       the ID of the user who sent the message. A prompt cannot grant them.

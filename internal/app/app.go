@@ -16,11 +16,13 @@ import (
 
 	"telegram-ai-bot/internal/agent"
 	"telegram-ai-bot/internal/ai"
+	"telegram-ai-bot/internal/cards"
 	"telegram-ai-bot/internal/config"
 	"telegram-ai-bot/internal/cron"
 	"telegram-ai-bot/internal/game"
 	"telegram-ai-bot/internal/gifs"
 	"telegram-ai-bot/internal/guards"
+	"telegram-ai-bot/internal/reminders"
 	"telegram-ai-bot/internal/service"
 	"telegram-ai-bot/internal/stickers"
 	"telegram-ai-bot/internal/storage"
@@ -445,6 +447,7 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 		tools.GroupStatsTool(tools.GroupStatsOptions{Store: store, BotID: bot.User.ID, Location: cfg.Location}),
 		tools.PunishmentsTool(tools.PunishmentsOptions{Store: store, Creators: groupMembers{client: bot.Client, botID: bot.User.ID}, BotID: bot.User.ID, Location: cfg.Location}),
 		tools.JoinCaptchaTool(tools.JoinCaptchaOptions{Store: store, Rights: groupMembers{client: bot.Client, botID: bot.User.ID}}),
+		tools.RemindersTool(tools.RemindersOptions{Store: store, CardEvery: cards.Every, Location: cfg.Location}),
 	)
 	// Only owners known by ID can be written to, and only they are. Only
 	// their business accounts are used, too: the account speaks for whoever
@@ -845,16 +848,92 @@ func NewCleanup(ctx context.Context, cfg config.Config, logger *slog.Logger) (*C
 	return &Cleanup{Handler: handler, Close: store.Close}, nil
 }
 
+// Reminders is the endpoint an outside scheduler, cron-job.org on Vercel's
+// free plan, calls every minute to send the reminders that are due.
+type Reminders struct {
+	Handler http.Handler
+	// Close releases the database pool.
+	Close func()
+}
+
+// NewReminders builds the reminders endpoint. It is authenticated as the
+// cleanup is, with CRON_SECRET, and each authorised call sends the
+// reminders due and reports how many went out.
+func NewReminders(ctx context.Context, cfg config.Config, logger *slog.Logger) (*Reminders, error) {
+	if cfg.CronSecret == "" {
+		return nil, errors.New("CRON_SECRET is required for the reminders endpoint")
+	}
+	store, err := storage.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return nil, err
+	}
+	if err := store.CheckSchema(ctx); err != nil {
+		store.Close()
+		return nil, err
+	}
+	bot, err := Connect(ctx, cfg, logger)
+	if err != nil {
+		store.Close()
+		return nil, err
+	}
+	handler, err := RemindersHandler(cfg.CronSecret, ReminderJob(cfg, store, bot, logger), logger)
+	if err != nil {
+		store.Close()
+		return nil, err
+	}
+	return &Reminders{Handler: handler, Close: store.Close}, nil
+}
+
+// RemindersHandler answers a call with the secret by running job, and
+// refuses one without it.
+func RemindersHandler(secret string, job func(ctx context.Context) (reminders.Summary, error), logger *slog.Logger) (http.Handler, error) {
+	return cron.NewHandler(cron.Options{
+		Secret: secret,
+		Logger: logger,
+		Run:    func(ctx context.Context) (any, error) { return job(ctx) },
+	})
+}
+
+// ReminderJob sends the reminders that are due, for the endpoint and for
+// the long-polling command's ticker alike.
+func ReminderJob(cfg config.Config, store *storage.Store, bot Bot, logger *slog.Logger) func(ctx context.Context) (reminders.Summary, error) {
+	opts := reminders.Options{
+		Store:       store,
+		Sender:      bot.Client,
+		CardsURL:    cardsPage(cfg),
+		BotUsername: bot.User.Username,
+		CardEvery:   cards.Every,
+		Logger:      logger,
+	}
+	return func(ctx context.Context) (reminders.Summary, error) {
+		summary, err := reminders.Fire(ctx, opts)
+		if summary != (reminders.Summary{}) {
+			logger.Info("reminders sent", "sent", summary.Sent, "skipped", summary.Skipped, "failed", summary.Failed, "retried", summary.Retried)
+		}
+		return summary, err
+	}
+}
+
+// reminderKeep is how long a reminder is kept once it was sent, skipped
+// or failed.
+const reminderKeep = 7 * 24 * time.Hour
+
 // shashkaKeep is how long a draughts game over, or an invite no one took,
 // is kept, whatever the retention of the chats.
 const shashkaKeep = 30 * 24 * time.Hour
 
-// expire applies the retention policy once, and deletes old draughts games.
+// expire applies the retention policy once, and deletes old draughts games
+// and the reminders done with.
 func expire(ctx context.Context, cfg config.Config, store *storage.Store, logger *slog.Logger) (storage.Expired, error) {
 	if deleted, err := store.DeleteOldShashkaGames(ctx, time.Now().Add(-shashkaKeep)); err != nil {
 		logger.Warn("could not delete old shashka games", "error", err)
 	} else if deleted > 0 {
 		logger.Info("old shashka games deleted", "games", deleted)
+	}
+	if deleted, err := store.DeleteOldReminders(ctx, time.Now().Add(-reminderKeep)); err != nil {
+		logger.Warn("could not delete old reminders", "error", err)
+	} else if deleted > 0 {
+		logger.Info("old reminders deleted", "reminders", deleted)
 	}
 	if cfg.RetentionDays == 0 {
 		return storage.Expired{}, nil

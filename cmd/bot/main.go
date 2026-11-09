@@ -23,12 +23,14 @@ import (
 
 	"telegram-ai-bot/internal/app"
 	"telegram-ai-bot/internal/config"
+	"telegram-ai-bot/internal/reminders"
 	"telegram-ai-bot/internal/service"
 	"telegram-ai-bot/internal/storage"
 )
 
 const (
 	healthCheckInterval = time.Minute
+	reminderInterval    = time.Minute
 	retentionInterval   = time.Hour
 	dayDuration         = 24 * time.Hour
 )
@@ -130,6 +132,7 @@ func serve(ctx context.Context, cfg config.Config, store *storage.Store, logger 
 	defer cancel()
 	var background sync.WaitGroup
 	background.Go(func() { maintain(ctx, cfg, store, svc, logger) })
+	background.Go(func() { remind(ctx, app.ReminderJob(cfg, store, bot, logger), logger) })
 
 	logger.Info("bot started", "username", bot.User.Username, "name", cfg.BotDisplayName,
 		"model", cfg.Model, "workers", cfg.MaxConcurrentRequests, "muted_groups", len(mutedChats))
@@ -208,6 +211,23 @@ func maintain(ctx context.Context, cfg config.Config, store *storage.Store, svc 
 			svc.DeclineLateJoins(ctx)
 		case <-retention.C:
 			applyRetention(ctx, cfg, store, logger)
+		}
+	}
+}
+
+// remind sends the reminders that are due, every minute until ctx is
+// cancelled: what cron-job.org's calls to /api/reminders do on Vercel.
+func remind(ctx context.Context, job func(context.Context) (reminders.Summary, error), logger *slog.Logger) {
+	ticker := time.NewTicker(reminderInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if _, err := job(ctx); err != nil && ctx.Err() == nil {
+				logger.Error("could not send the reminders", "error", err)
+			}
 		}
 	}
 }
