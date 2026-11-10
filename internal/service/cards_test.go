@@ -23,13 +23,76 @@ type fakeCards struct {
 	held   map[int64]int
 	everys []time.Duration
 	top    []storage.CardPlayer
+	shards map[int64]int
+	melted map[int64]int
+	duels  map[int64]bool
 }
 
 func newFakeCards(picture string) *fakeCards {
 	return &fakeCards{
 		card: storage.Card{ID: 1, Name: "Gojo *Satoru*", Anime: "Jujutsu Kaisen", ImageURL: picture, Rarity: 4, Attack: 5130, Health: 18020, Value: 5000},
 		last: map[int64]time.Time{}, held: map[int64]int{},
+		shards: map[int64]int{}, melted: map[int64]int{}, duels: map[int64]bool{},
 	}
+}
+
+func (f *fakeCards) CardPlayerOf(_ context.Context, userID int64) (storage.CardPlayer, time.Time, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return storage.CardPlayer{UserID: userID, Name: "Bek", Cards: f.held[userID]}, f.last[userID], nil
+}
+
+// spare is the copies of the one card the player may melt.
+func (f *fakeCards) spare(userID int64) int { return max(0, f.held[userID]-1-f.melted[userID]) }
+
+func (f *fakeCards) CardWallet(_ context.Context, userID int64) (int, map[int]int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.shards[userID], map[int]int{f.card.Rarity: f.spare(userID)}, nil
+}
+
+func (f *fakeCards) MeltCards(_ context.Context, userID int64, rates []int) (int, int, int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := f.spare(userID)
+	f.melted[userID] += n
+	f.shards[userID] += n * rates[f.card.Rarity]
+	return n, n * rates[f.card.Rarity], f.shards[userID], nil
+}
+
+func (f *fakeCards) ExtraCard(_ context.Context, userID int64, _ string, _ storage.CardRoll, cost int) (storage.CardDraw, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.shards[userID] < cost {
+		return storage.CardDraw{}, &storage.ShardsError{Have: f.shards[userID], Need: cost}
+	}
+	f.shards[userID] -= cost
+	f.held[userID]++
+	return storage.CardDraw{Card: f.card, Count: f.held[userID], Shards: f.shards[userID]}, nil
+}
+
+func (f *fakeCards) DuelTeam(_ context.Context, userID int64, _ int) ([]storage.Card, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.held[userID] == 0 {
+		return nil, nil
+	}
+	return []storage.Card{f.card}, nil
+}
+
+func (f *fakeCards) ResolveDuel(_ context.Context, _, messageID, winner, loser int64, stake int) (int, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.duels[messageID] {
+		return 0, false, nil
+	}
+	f.duels[messageID] = true
+	moved := min(stake, f.shards[loser])
+	if winner != 0 {
+		f.shards[loser] -= moved
+		f.shards[winner] += moved
+	}
+	return moved, true, nil
 }
 
 func (f *fakeCards) CardCollections(context.Context) (map[string]int, error) {
@@ -250,5 +313,71 @@ func TestCardCaptionShowsTheSureCards(t *testing.T) {
 	draw.Guaranteed, draw.SinceLegendary, draw.SinceMythic = false, 12, 70
 	if caption = cardCaption(in, draw); strings.Contains(caption, "✨") || !strings.Contains(caption, "🔥 18 · 👑 30") {
 		t.Errorf("a card's caption:\n%s", caption)
+	}
+}
+
+// Spare copies melt into shards, which draw a card out of turn.
+func TestShardsMeltAndBuyACard(t *testing.T) {
+	f := newFixture()
+	book := newFakeCards("")
+	f.opts.Cards = book
+	book.held[userID] = 2
+
+	if sent := f.run(textFrom(userID, "/parcha")); len(sent) != 1 || !strings.Contains(sent[0].text, "1 ta takror karta → +50 💎") {
+		t.Fatalf("wallet = %+v", sent)
+	}
+	if sent := f.run(textFrom(userID, "/qoshimcha")); len(sent) != 2 || !strings.Contains(sent[1].text, "Kerak: 15, sizda: 0") {
+		t.Fatalf("an extra card for no shards = %+v", sent)
+	}
+	if sent := f.run(textFrom(userID, "/parchala")); len(sent) != 3 || !strings.Contains(sent[2].text, "+50 💎 (jami 50)") {
+		t.Fatalf("melt = %+v", sent)
+	}
+	if sent := f.run(textFrom(userID, "/qoshimcha")); len(sent) != 4 || !strings.Contains(sent[3].text, "💎 -15 (qoldi 35)") {
+		t.Errorf("an extra card = %+v", sent)
+	}
+}
+
+// A duel in a group is accepted by anyone but its challenger, fought once
+// however often it is pressed, and moves the stake to the winner.
+func TestDuelIsFoughtOnce(t *testing.T) {
+	f := newFixture()
+	buttons := &fakeButtons{}
+	f.opts.Buttons = buttons
+	book := newFakeCards("")
+	f.opts.Cards = book
+	const rival = userID + 1
+	book.held[userID], book.held[rival] = 1, 1
+	book.shards[userID], book.shards[rival] = 10, 10
+
+	if sent := f.run(textFrom(userID, "/duel")); len(sent) != 1 || !strings.Contains(sent[0].text, "guruhda") {
+		t.Fatalf("a duel in private = %+v", sent)
+	}
+	if sent := f.run(inGroup(groupMessage("/duel 20"))); len(sent) != 2 || !strings.Contains(sent[1].text, "Kerak: 20, sizda: 10") {
+		t.Fatalf("a duel for more shards than held = %+v", sent)
+	}
+	all := f.run(inGroup(groupMessage("/duel 5")))
+	if len(all) != 3 || len(all[2].buttons) != 1 || !strings.Contains(all[2].text, "Tikish: 5") {
+		t.Fatalf("challenge = %+v", all)
+	}
+	sent := all[2:]
+	accept := sent[0].buttons[0][0].Data
+	group := telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup}
+	s := New(f.opts)
+	defer s.stop()
+	s.Handle(doozPlayer(1, &telegram.User{ID: userID, FirstName: "Bek"}, group, sent[0].text, accept))
+	if edits, _ := buttons.recordedMenus(); len(edits) != 0 || !strings.Contains(buttons.answers[0].text, "O'z duelingizni") {
+		t.Fatalf("the challenger's own press = %q, %+v", edits, buttons.answers)
+	}
+	s.Handle(doozPlayer(2, &telegram.User{ID: rival, FirstName: "Vali"}, group, sent[0].text, accept))
+	s.Handle(doozPlayer(3, &telegram.User{ID: rival, FirstName: "Vali"}, group, sent[0].text, accept))
+	edits, _ := buttons.recordedMenus()
+	if len(edits) != 1 || !strings.Contains(edits[0], "G'olib") || !strings.Contains(edits[0], "💎 +5") {
+		t.Fatalf("duel = %q", edits)
+	}
+	if book.shards[userID]+book.shards[rival] != 20 || (book.shards[userID] != 15 && book.shards[rival] != 15) {
+		t.Errorf("shards after = %d and %d", book.shards[userID], book.shards[rival])
+	}
+	if !strings.Contains(buttons.answers[2].text, "tugagan") {
+		t.Errorf("the second press = %+v", buttons.answers[2])
 	}
 }

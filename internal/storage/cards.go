@@ -38,6 +38,8 @@ type CardDraw struct {
 	Guaranteed     bool
 	SinceLegendary int
 	SinceMythic    int
+	// Shards are the player's 💎 shards after it.
+	Shards int
 }
 
 // CardRoll picks a draw's rarity from the player's draws in a row since
@@ -174,9 +176,10 @@ func (s *Store) FillCardSet(ctx context.Context, collection string, version int,
 		}
 		for old, kept := range merges {
 			if _, err := tx.Exec(ctx, `
-				INSERT INTO card_owned (user_id, card_id, count, first_at)
-				SELECT user_id, $2, count, first_at FROM card_owned WHERE card_id = $1
+				INSERT INTO card_owned (user_id, card_id, count, melted, first_at)
+				SELECT user_id, $2, count, melted, first_at FROM card_owned WHERE card_id = $1
 				ON CONFLICT (user_id, card_id) DO UPDATE SET count = card_owned.count + EXCLUDED.count,
+					melted = card_owned.melted + EXCLUDED.melted,
 					first_at = least(card_owned.first_at, EXCLUDED.first_at)`, old, kept); err != nil {
 				return err
 			}
@@ -212,49 +215,17 @@ func (s *Store) FillCardSet(ctx context.Context, collection string, version int,
 func (s *Store) DrawCard(ctx context.Context, userID int64, name string, roll CardRoll, every time.Duration, now time.Time) (CardDraw, error) {
 	var draw CardDraw
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO card_players (user_id, name) VALUES ($1, $2)
-			ON CONFLICT (user_id) DO NOTHING`, userID, name); err != nil {
-			return err
-		}
-		var last *time.Time
-		var sinceLegendary, sinceMythic int
-		if err := tx.QueryRow(ctx, `SELECT last_draw_at, since_legendary, since_mythic FROM card_players WHERE user_id = $1 FOR UPDATE`, userID).
-			Scan(&last, &sinceLegendary, &sinceMythic); err != nil {
-			return err
-		}
-		if last != nil && every > 0 && now.Sub(*last) < every {
-			return &CardWaitError{Wait: every - now.Sub(*last)}
-		}
-		rarity, guaranteed := roll(sinceLegendary, sinceMythic)
-		draw.Guaranteed = guaranteed
-		c := &draw.Card
-		err := tx.QueryRow(ctx, `
-			SELECT id, name, anime, image_url, favourites, rarity, attack, health, value, collection
-			FROM card_catalog WHERE rarity = $1 ORDER BY random() LIMIT 1`, rarity).
-			Scan(&c.ID, &c.Name, &c.Anime, &c.ImageURL, &c.Favourites, &c.Rarity, &c.Attack, &c.Health, &c.Value, &c.Collection)
+		player, err := lockCardPlayer(ctx, tx, userID, name)
 		if err != nil {
 			return err
 		}
-		if err := tx.QueryRow(ctx, `
-			INSERT INTO card_owned (user_id, card_id) VALUES ($1, $2)
-			ON CONFLICT (user_id, card_id) DO UPDATE SET count = card_owned.count + 1
-			RETURNING count`, userID, c.ID).Scan(&draw.Count); err != nil {
+		if player.last != nil && every > 0 && now.Sub(*player.last) < every {
+			return &CardWaitError{Wait: every - now.Sub(*player.last)}
+		}
+		if draw, err = giveCard(ctx, tx, userID, name, roll, player); err != nil {
 			return err
 		}
-		draw.New = draw.Count == 1
-		newCard := 0
-		if draw.New {
-			newCard = 1
-		}
-		if err := tx.QueryRow(ctx, `
-			UPDATE card_players SET name = coalesce(nullif($5, ''), name), points = points + $2,
-				cards = cards + $3, draws = draws + 1, last_draw_at = $4,
-				since_legendary = CASE WHEN $6 THEN 0 ELSE since_legendary + 1 END,
-				since_mythic = CASE WHEN $7 THEN 0 ELSE since_mythic + 1 END
-			WHERE user_id = $1 RETURNING points, since_legendary, since_mythic`,
-			userID, c.Value, newCard, now, name, c.Rarity >= legendaryRarity, c.Rarity >= mythicRarity).
-			Scan(&draw.Points, &draw.SinceLegendary, &draw.SinceMythic); err != nil {
+		if _, err := tx.Exec(ctx, `UPDATE card_players SET last_draw_at = $2 WHERE user_id = $1`, userID, now); err != nil {
 			return err
 		}
 		if every <= 0 {
@@ -279,6 +250,63 @@ func (s *Store) DrawCard(ctx context.Context, userID int64, name string, roll Ca
 		return CardDraw{}, fmt.Errorf("storage: draw a card: %w", err)
 	}
 	return draw, nil
+}
+
+// cardPlayerRow is a player's row as a draw reads it, locked.
+type cardPlayerRow struct {
+	last                        *time.Time
+	sinceLegendary, sinceMythic int
+	shards                      int
+}
+
+// lockCardPlayer makes the player's row if there is none and locks it, so
+// that two draws at once are two draws, the second waiting its turn.
+func lockCardPlayer(ctx context.Context, tx pgx.Tx, userID int64, name string) (cardPlayerRow, error) {
+	var p cardPlayerRow
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO card_players (user_id, name) VALUES ($1, $2)
+		ON CONFLICT (user_id) DO NOTHING`, userID, name); err != nil {
+		return p, err
+	}
+	err := tx.QueryRow(ctx, `SELECT last_draw_at, since_legendary, since_mythic, shards FROM card_players WHERE user_id = $1 FOR UPDATE`, userID).
+		Scan(&p.last, &p.sinceLegendary, &p.sinceMythic, &p.shards)
+	return p, err
+}
+
+// giveCard gives the player a card of the rarity roll picks, at random, and
+// counts it in their points, cards and wait for a rare card.
+func giveCard(ctx context.Context, tx pgx.Tx, userID int64, name string, roll CardRoll, player cardPlayerRow) (CardDraw, error) {
+	var draw CardDraw
+	rarity, guaranteed := roll(player.sinceLegendary, player.sinceMythic)
+	draw.Guaranteed = guaranteed
+	c := &draw.Card
+	err := tx.QueryRow(ctx, `
+		SELECT id, name, anime, image_url, favourites, rarity, attack, health, value, collection
+		FROM card_catalog WHERE rarity = $1 ORDER BY random() LIMIT 1`, rarity).
+		Scan(&c.ID, &c.Name, &c.Anime, &c.ImageURL, &c.Favourites, &c.Rarity, &c.Attack, &c.Health, &c.Value, &c.Collection)
+	if err != nil {
+		return draw, err
+	}
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO card_owned (user_id, card_id) VALUES ($1, $2)
+		ON CONFLICT (user_id, card_id) DO UPDATE SET count = card_owned.count + 1
+		RETURNING count`, userID, c.ID).Scan(&draw.Count); err != nil {
+		return draw, err
+	}
+	draw.New = draw.Count == 1
+	newCard := 0
+	if draw.New {
+		newCard = 1
+	}
+	err = tx.QueryRow(ctx, `
+		UPDATE card_players SET name = coalesce(nullif($4, ''), name), points = points + $2,
+			cards = cards + $3, draws = draws + 1,
+			since_legendary = CASE WHEN $5 THEN 0 ELSE since_legendary + 1 END,
+			since_mythic = CASE WHEN $6 THEN 0 ELSE since_mythic + 1 END
+		WHERE user_id = $1 RETURNING points, since_legendary, since_mythic, shards`,
+		userID, c.Value, newCard, name, c.Rarity >= legendaryRarity, c.Rarity >= mythicRarity).
+		Scan(&draw.Points, &draw.SinceLegendary, &draw.SinceMythic, &draw.Shards)
+	return draw, err
 }
 
 // CardCounts gives, for each rarity, how many cards there are and how

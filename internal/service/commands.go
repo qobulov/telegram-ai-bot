@@ -604,12 +604,12 @@ func (s *Service) mayAnswerInGroup(in incoming) (reservation int64, allowed bool
 }
 
 // selfLimited are the commands with limits of their own, which the group's
-// quota of answers does not count: a card an hour, two games a chat in ten
+// quota of answers does not count: a card an hour, or for shards, two games a chat in ten
 // minutes. Counted with the bot's talk, they went unanswered where it talked
 // much, a third of what the quota stopped. What they say when their own limit
 // holds is counted, or only reacted to, so that pressing them cannot flood.
 var selfLimited = map[string]bool{
-	"/karta": true, "/boss": true, "/ilon": true, "/otinchi": true, "/maydon": true, "/game": true, "/mafia": true,
+	"/karta": true, "/qoshimcha": true, "/boss": true, "/ilon": true, "/otinchi": true, "/maydon": true, "/game": true, "/mafia": true,
 }
 
 // reserveGroupReply takes one of the group's answers for the message, or
@@ -791,6 +791,14 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return outcome{text: textCardsApp.to(in), buttons: s.cardsAppButton(in)}
 	case s.opts.Cards != nil && commandName(in.text) == "/kartatop":
 		return s.cardTop(ctx, in)
+	case s.opts.Cards != nil && commandName(in.text) == "/parcha":
+		return s.cardWallet(ctx, in)
+	case s.opts.Cards != nil && commandName(in.text) == "/parchala":
+		return s.meltCards(ctx, in)
+	case s.opts.Cards != nil && commandName(in.text) == "/qoshimcha":
+		return s.extraCard(ctx, in)
+	case s.opts.Cards != nil && s.opts.Buttons != nil && commandName(in.text) == "/duel":
+		return s.duelCommand(ctx, in)
 	case commandName(in.text) == "/elon" && !in.group && s.opts.Tools != nil && s.isOwner(in.msg.From):
 		return s.announceCommand(ctx, in)
 	case !in.group && s.opts.Tools != nil && s.opts.Buttons != nil && s.isOwner(in.msg.From) && pressed(in, keyboardAd):
@@ -1027,6 +1035,10 @@ func (s *Service) pressed(q *telegram.CallbackQuery) {
 	}
 	if strings.HasPrefix(q.Data, adData) {
 		s.pressedAd(q)
+		return
+	}
+	if strings.HasPrefix(q.Data, duelData) {
+		s.pressedDuel(q)
 		return
 	}
 	if strings.HasPrefix(q.Data, cardData) {

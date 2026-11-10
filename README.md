@@ -1307,7 +1307,7 @@ match "maria" unless you add it:
 word.
 
 **Commands** in a group need the bot's username (`/help@MyMariaBot`). A plain
-`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/karta`, `/kartalarim`, `/kartatop`, `/kartalar`, `/boss`, `/ilon`, `/otinchi`, `/maydon`, `/shashka` and `/dooz`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username.
+`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/karta`, `/kartalarim`, `/kartatop`, `/kartalar`, `/parcha`, `/parchala`, `/qoshimcha`, `/duel`, `/boss`, `/ilon`, `/otinchi`, `/maydon`, `/shashka` and `/dooz`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username.
 
 ### Example
 
@@ -2056,7 +2056,20 @@ better is one, and their 100th without a Mythic is one, the draw saying so and
 each card telling in how many draws the next sure ones are, in the chat and the
 Mini App (`since_legendary` and `since_mythic` on `card_players`, migration
 62, which counted a player holding no such card from their first draw), as 412
-draws by the odds alone had brought no Mythic. `/kartalarim` shows
+draws by the odds alone had brought no Mythic. A card drawn again gave only
+points, so its spare copies melt into 💎 shards (`/parchala`: 1, 3, 8, 20 or
+50 by rarity), the copies still held and counted in the points so that melting
+costs no place on the table (`card_owned.melted`, migration 63); `/parcha`
+shows the shards, what melting would give and what they buy. `/qoshimcha`
+draws a card out of turn for 15 shards, the hourly card left where it was.
+`/duel [stake]` in a group calls a member out, the one replied to or anyone,
+for up to 100 shards: whoever presses its button accepts, each side's three
+strongest cards by attack and health fight one against one, the card that
+beats the other in fewer hits, each a little stronger or weaker by luck,
+taking the round, and the winner of more rounds takes the stake of the
+loser's shards, or all they have; the challenger or the one called out may
+call it off, and `card_duels` keeps each duel's message so that it is settled
+once however often it is pressed. `/kartalarim` shows
 how many of each rarity's cards the player holds as buttons that list them,
 pressed only by that player; `/kartatop` is the table of points. The
 pictures are the characters' AniList pictures, the studios' art.

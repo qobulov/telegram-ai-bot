@@ -23,6 +23,12 @@ type CardBook interface {
 	CardCounts(ctx context.Context, userID int64) (total, owned map[int]int, points int64, err error)
 	OwnedCards(ctx context.Context, userID int64, rarity int) ([]storage.OwnedCard, error)
 	CardTop(ctx context.Context, limit int) ([]storage.CardPlayer, error)
+	CardPlayerOf(ctx context.Context, userID int64) (storage.CardPlayer, time.Time, error)
+	CardWallet(ctx context.Context, userID int64) (shards int, spares map[int]int, err error)
+	MeltCards(ctx context.Context, userID int64, rates []int) (melted, gained, shards int, err error)
+	ExtraCard(ctx context.Context, userID int64, name string, roll storage.CardRoll, cost int) (storage.CardDraw, error)
+	DuelTeam(ctx context.Context, userID int64, n int) ([]storage.Card, error)
+	ResolveDuel(ctx context.Context, chatID, messageID, winner, loser int64, stake int) (moved int, settled bool, err error)
 }
 
 const (
@@ -105,11 +111,16 @@ func (s *Service) drawCard(ctx context.Context, in incoming) outcome {
 		s.opts.Logger.Error("could not draw a card", "user_id", in.userID, "error", err)
 		return say(textCardsUnavailable.to(in))
 	}
-	out := say(cardCaption(in, draw))
-	if picture, _, err := catalog.FetchPicture(ctx, draw.Card.ImageURL); err == nil {
+	return s.withPicture(ctx, say(cardCaption(in, draw)), draw.Card)
+}
+
+// withPicture adds the card's picture to out, which goes without it when
+// the picture cannot be had.
+func (s *Service) withPicture(ctx context.Context, out outcome, card storage.Card) outcome {
+	if picture, _, err := s.cardCatalog().FetchPicture(ctx, card.ImageURL); err == nil {
 		out.drawings = []tools.Drawing{{Data: picture, MimeType: http.DetectContentType(picture)}}
 	} else {
-		s.opts.Logger.Warn("could not fetch a card's picture", "card", draw.Card.ID, "error", err)
+		s.opts.Logger.Warn("could not fetch a card's picture", "card", card.ID, "error", err)
 	}
 	return out
 }
@@ -343,7 +354,7 @@ var (
 	textCardHealth     = localText{uz: "❤️ Sog'liq: %s", ru: "❤️ Здоровье: %s", en: "❤️ Health: %s"}
 	textCardPoints     = localText{uz: "💠 +%s ochko (jami %s)", ru: "💠 +%s очков (всего %s)", en: "💠 +%s points (%s in all)"}
 	textCardNew        = localText{uz: "🆕 Yangi karta!", ru: "🆕 Новая карта!", en: "🆕 A new card!"}
-	textCardAgain      = localText{uz: "🔁 Sizda endi ×%d", ru: "🔁 Теперь у вас ×%d", en: "🔁 You now have ×%d"}
+	textCardAgain      = localText{uz: "🔁 Sizda endi ×%d · ♻️ /parcha", ru: "🔁 Теперь у вас ×%d · ♻️ /parcha", en: "🔁 You now have ×%d · ♻️ /parcha"}
 	textCardGuaranteed = localText{uz: "✨ Kafolatlangan karta!", ru: "✨ Гарантированная карта!", en: "✨ A guaranteed card!"}
 	textCardPity       = localText{
 		uz: "🎯 Kafolat: 🔥 %d · 👑 %d kartadan keyin",
@@ -353,9 +364,9 @@ var (
 	textCardAll        = localText{uz: "🗂 Hammasi - %d/%d", ru: "🗂 Все - %d/%d", en: "🗂 All - %d/%d"}
 	textCardAllTitle   = localText{uz: "🗂 Barcha kartalaringiz", ru: "🗂 Все ваши карты", en: "🗂 All your cards"}
 	textCardCollection = localText{
-		uz: "🎴 %s, qaysi kartalarni ko'rasiz?\n💠 Ochko: %s",
-		ru: "🎴 %s, какие карты посмотреть?\n💠 Очки: %s",
-		en: "🎴 %s, which cards do you want to see?\n💠 Points: %s",
+		uz: "🎴 %s, qaysi kartalarni ko'rasiz?\n💠 Ochko: %s\n💎 Parcha va duel: /parcha",
+		ru: "🎴 %s, какие карты посмотреть?\n💠 Очки: %s\n💎 Осколки и дуэль: /parcha",
+		en: "🎴 %s, which cards do you want to see?\n💠 Points: %s\n💎 Shards and duels: /parcha",
 	}
 	textCardNotYours = localText{
 		uz: "Bu sizning kolleksiyangiz emas: o'zingiznikini /kartalarim bilan oching.",
