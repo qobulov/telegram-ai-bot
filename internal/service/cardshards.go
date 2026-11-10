@@ -250,32 +250,51 @@ func cardPlayerName(name string) string {
 	return truncate(strings.TrimSpace(cardMarks.Replace(name)), cardNameLength)
 }
 
-// duelReport is a fought duel: each round's cards and hits, and who won what.
+// duelSides mark the challenger and the one who took the duel.
+var duelSides = [2]string{"🔴", "🔵"}
+
+// duelReport is a fought duel: each round's cards and hits, the winner of
+// each marked, the score, and who won what.
 func duelReport(in incoming, names [2]string, rounds []cards.DuelRound, winner, moved int) string {
-	lines := []string{fmt.Sprintf("⚔️ **%s** vs **%s**", names[0], names[1]), ""}
+	lines := []string{fmt.Sprintf("⚔️ %s **%s**  🆚  %s **%s**", duelSides[0], names[0], duelSides[1], names[1])}
+	won := [2]int{}
 	for i, r := range rounds {
-		lines = append(lines, fmt.Sprintf("%d. %s ⚔ %s → %s", i+1, duelCard(in, r, 0), duelCard(in, r, 1), names[r.Won]))
+		won[r.Won]++
+		lines = append(lines, "", fmt.Sprintf(textDuelRound.to(in), i+1))
+		for side := range 2 {
+			lines = append(lines, duelSides[side]+" "+duelCard(in, r, side))
+		}
 	}
-	lines = append(lines, "", fmt.Sprintf(textDuelWinner.to(in), names[winner]))
+	score := fmt.Sprintf(textDuelScore.to(in), duelSides[0], won[0], won[1], duelSides[1])
+	if won[0] == won[1] {
+		score += " 🎲"
+	}
+	lines = append(lines, "", "━━━━━━━━━━━━", score, fmt.Sprintf(textDuelWinner.to(in), names[winner]))
 	if moved > 0 {
 		lines = append(lines, fmt.Sprintf(textDuelWon.to(in), moved, names[1-winner]))
 	}
 	return strings.Join(lines, "\n")
 }
 
-// duelCard is one side's card in a round: its rarity's emoji, its name and
-// the hits it needed, or a dash for none.
+// duelCard is one side's card in a round: its rarity's emoji, its name, the
+// hits it needed and a tick if it won, a die if luck settled it.
 func duelCard(in incoming, r cards.DuelRound, side int) string {
 	c := r.Cards[side]
 	if c.ID == 0 {
-		return "—"
+		return textDuelNoCard.to(in)
 	}
 	mark := strings.Fields(rarityNames[c.Rarity].to(in))[0]
-	name := cardPlayerName(c.Name)
-	if r.Hits[side] == 0 {
-		return mark + " " + name
+	text := mark + " " + cardPlayerName(c.Name)
+	if r.Hits[side] > 0 {
+		text += " — " + fmt.Sprintf(textDuelHits.to(in), r.Hits[side])
 	}
-	return fmt.Sprintf("%s %s (%d)", mark, name, r.Hits[side])
+	if r.Won == side {
+		text += " ✅"
+		if r.Hits[0] == r.Hits[1] && r.Hits[0] > 0 {
+			text += "🎲"
+		}
+	}
+	return text
 }
 
 var (
@@ -318,6 +337,10 @@ var (
 	textDuelNotYours  = localText{uz: "Bu duel sizga emas.", ru: "Эта дуэль не для вас.", en: "This duel is not yours."}
 	textDuelOwn       = localText{uz: "O'z duelingizni qabul qila olmaysiz.", ru: "Свою дуэль принять нельзя.", en: "You cannot take your own duel."}
 	textDuelCalledOff = localText{uz: "❌ Duel bekor qilindi (%s).", ru: "❌ Дуэль отменена (%s).", en: "❌ The duel was called off (%s)."}
+	textDuelRound     = localText{uz: "**%d-raund**", ru: "**Раунд %d**", en: "**Round %d**"}
+	textDuelHits      = localText{uz: "%d zarba", ru: "ударов: %d", en: "%d hits"}
+	textDuelNoCard    = localText{uz: "— karta yo'q", ru: "— нет карты", en: "— no card"}
+	textDuelScore     = localText{uz: "📊 Hisob: %s %d : %d %s", ru: "📊 Счёт: %s %d : %d %s", en: "📊 Score: %s %d : %d %s"}
 	textDuelWinner    = localText{uz: "🏆 G'olib: **%s**!", ru: "🏆 Победитель: **%s**!", en: "🏆 The winner: **%s**!"}
 	textDuelWon       = localText{uz: "💎 +%d (%s dan)", ru: "💎 +%d (от %s)", en: "💎 +%d (from %s)"}
 )
