@@ -19,7 +19,7 @@ import (
 // their collections.
 type CardBook interface {
 	cards.CatalogStore
-	DrawCard(ctx context.Context, userID int64, name string, rarity int, every time.Duration, now time.Time) (storage.CardDraw, error)
+	DrawCard(ctx context.Context, userID int64, name string, roll storage.CardRoll, every time.Duration, now time.Time) (storage.CardDraw, error)
 	CardCounts(ctx context.Context, userID int64) (total, owned map[int]int, points int64, err error)
 	OwnedCards(ctx context.Context, userID int64, rarity int) ([]storage.OwnedCard, error)
 	CardTop(ctx context.Context, limit int) ([]storage.CardPlayer, error)
@@ -38,6 +38,10 @@ const (
 	cardsShown = 40
 	// cardTopSize is the players the table shows.
 	cardTopSize = 10
+	// cardRankSize is the players read to find the asker's place below the
+	// table; cardNameLength bounds a name, as decorated ones broke the rows.
+	cardRankSize   = 1000
+	cardNameLength = 22
 )
 
 // cardsHTTP fetches the catalog from AniList and the cards' pictures.
@@ -85,10 +89,17 @@ func (s *Service) drawCard(ctx context.Context, in incoming) outcome {
 		s.opts.Logger.Error("could not fill the card catalog", "error", err)
 		return say(textCardsUnavailable.to(in))
 	}
-	draw, err := s.opts.Cards.DrawCard(ctx, in.userID, doozName(in.msg.From), int(cards.RollRandom()), cards.Every, time.Now())
+	draw, err := s.opts.Cards.DrawCard(ctx, in.userID, doozName(in.msg.From), cards.WithPity(cards.RollRandom), cards.Every, time.Now())
 	var wait *storage.CardWaitError
 	switch {
 	case errors.As(err, &wait):
+		// A draw does not count in the group's quota, but being told to wait
+		// does, or pressing /karta would flood the group.
+		if in.group && !s.isOwner(in.msg.From) && s.opts.GroupReplies != nil {
+			if _, ok := s.reserveGroupReply(in); !ok {
+				return outcome{}
+			}
+		}
 		return say(fmt.Sprintf(textCardWait.to(in), max(1, int(wait.Wait.Round(time.Minute).Minutes()))))
 	case err != nil:
 		s.opts.Logger.Error("could not draw a card", "user_id", in.userID, "error", err)
@@ -103,8 +114,8 @@ func (s *Service) drawCard(ctx context.Context, in incoming) outcome {
 	return out
 }
 
-// cardCaption is a drawn card: its name and anime, numbers, rarity and the
-// points it gave.
+// cardCaption is a drawn card: its name and anime, numbers, rarity, the
+// points it gave, and in how many draws a Legendary and a Mythic are sure.
 func cardCaption(in incoming, draw storage.CardDraw) string {
 	c := draw.Card
 	lines := []string{rarityNames[c.Rarity].to(in) + " **" + cardMarks.Replace(c.Name) + "**"}
@@ -121,6 +132,11 @@ func cardCaption(in incoming, draw storage.CardDraw) string {
 	} else {
 		lines = append(lines, fmt.Sprintf(textCardAgain.to(in), draw.Count))
 	}
+	if draw.Guaranteed {
+		lines = append(lines, textCardGuaranteed.to(in))
+	}
+	legendary, mythic := cards.PityIn(draw)
+	lines = append(lines, fmt.Sprintf(textCardPity.to(in), legendary, mythic))
 	return strings.Join(lines, "\n")
 }
 
@@ -270,7 +286,7 @@ func (s *Service) startCards(in incoming) (outcome, bool) {
 
 // cardTop answers /kartatop: the players with the most points.
 func (s *Service) cardTop(ctx context.Context, in incoming) outcome {
-	top, err := s.opts.Cards.CardTop(ctx, cardTopSize)
+	top, err := s.opts.Cards.CardTop(ctx, cardRankSize)
 	if err != nil {
 		s.opts.Logger.Error("could not read the card table", "error", err)
 		return say(textCardsUnavailable.to(in))
@@ -280,14 +296,36 @@ func (s *Service) cardTop(ctx context.Context, in incoming) outcome {
 	}
 	medals := []string{"🥇", "🥈", "🥉"}
 	lines := []string{textCardTopTitle.to(in), ""}
+	mine := -1
 	for i, p := range top {
+		if p.UserID == in.userID {
+			mine = i
+		}
+		if i >= cardTopSize {
+			continue
+		}
 		place := fmt.Sprintf("%d.", i+1)
 		if i < len(medals) {
 			place = medals[i]
 		}
-		lines = append(lines, fmt.Sprintf(textCardTopRow.to(in), place, cardMarks.Replace(p.Name), spaced(p.Points), p.Cards))
+		name := truncate(strings.TrimSpace(cardMarks.Replace(p.Name)), cardNameLength)
+		if i < len(medals) {
+			name = "**" + name + "**"
+		}
+		row := fmt.Sprintf(textCardTopRow.to(in), place, name, spaced(p.Points), p.Cards)
+		if i == mine {
+			row += textCardTopYou.to(in)
+		}
+		lines = append(lines, row)
+		if i == len(medals)-1 && len(top) > len(medals) {
+			lines = append(lines, "")
+		}
 	}
-	return say(strings.Join(lines, "\n"))
+	if mine >= cardTopSize {
+		lines = append(lines, "", fmt.Sprintf(textCardTopMine.to(in), mine+1, spaced(top[mine].Points), top[mine].Cards))
+	}
+	lines = append(lines, "", textCardTopHint.to(in))
+	return outcome{text: strings.Join(lines, "\n"), buttons: s.cardsAppButton(in)}
 }
 
 var (
@@ -306,6 +344,12 @@ var (
 	textCardPoints     = localText{uz: "💠 +%s ochko (jami %s)", ru: "💠 +%s очков (всего %s)", en: "💠 +%s points (%s in all)"}
 	textCardNew        = localText{uz: "🆕 Yangi karta!", ru: "🆕 Новая карта!", en: "🆕 A new card!"}
 	textCardAgain      = localText{uz: "🔁 Sizda endi ×%d", ru: "🔁 Теперь у вас ×%d", en: "🔁 You now have ×%d"}
+	textCardGuaranteed = localText{uz: "✨ Kafolatlangan karta!", ru: "✨ Гарантированная карта!", en: "✨ A guaranteed card!"}
+	textCardPity       = localText{
+		uz: "🎯 Kafolat: 🔥 %d · 👑 %d kartadan keyin",
+		ru: "🎯 Гарантия: 🔥 через %d · 👑 через %d карт",
+		en: "🎯 Sure: 🔥 in %d · 👑 in %d cards",
+	}
 	textCardAll        = localText{uz: "🗂 Hammasi - %d/%d", ru: "🗂 Все - %d/%d", en: "🗂 All - %d/%d"}
 	textCardAllTitle   = localText{uz: "🗂 Barcha kartalaringiz", ru: "🗂 Все ваши карты", en: "🗂 All your cards"}
 	textCardCollection = localText{
@@ -322,7 +366,10 @@ var (
 	textCardNone     = localText{uz: "Hali bunday karta yo'q. Olish: /karta", ru: "Таких карт пока нет. Получить: /karta", en: "No such cards yet. Draw one: /karta"}
 	textCardBack     = localText{uz: "⬅️ Orqaga", ru: "⬅️ Назад", en: "⬅️ Back"}
 	textCardTopTitle = localText{uz: "🏆 **Kartalar reytingi**", ru: "🏆 **Рейтинг карт**", en: "🏆 **Card ranking**"}
-	textCardTopRow   = localText{uz: "%s %s — %s ochko, %d karta", ru: "%s %s — %s очков, %d карт", en: "%s %s — %s points, %d cards"}
+	textCardTopRow   = localText{uz: "%s %s\n      💠 %s · 🎴 %d", ru: "%s %s\n      💠 %s · 🎴 %d", en: "%s %s\n      💠 %s · 🎴 %d"}
+	textCardTopYou   = localText{uz: "  ← siz", ru: "  ← вы", en: "  ← you"}
+	textCardTopMine  = localText{uz: "📍 Siz: %d-o'rin · 💠 %s · 🎴 %d", ru: "📍 Вы: %d-е место · 💠 %s · 🎴 %d", en: "📍 You: #%d · 💠 %s · 🎴 %d"}
+	textCardTopHint  = localText{uz: "💠 ochko · 🎴 kartalar · yangi karta: /karta", ru: "💠 очки · 🎴 карты · новая карта: /karta", en: "💠 points · 🎴 cards · a new card: /karta"}
 	textCardsApp     = localText{
 		uz: "🎴 Kartalar ilovasi: kolleksiyangiz, karta olish va reyting bir joyda.",
 		ru: "🎴 Приложение карт: коллекция, получение карт и рейтинг в одном месте.",

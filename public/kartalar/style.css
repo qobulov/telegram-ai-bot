@@ -178,7 +178,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .front .plate b { display: block; font: 700 15px/1.2 Unbounded, sans-serif; }
 .front .plate small { color: var(--muted); font-size: 12px; }
 .rarity { color: var(--c); font: 700 11px Unbounded, sans-serif; letter-spacing: 0.1em; text-transform: uppercase; }
-.result { min-height: 24px; margin: 0 0 12px; text-align: center; font-weight: 800; color: var(--gold); }
+.result { min-height: 24px; margin: 0 0 12px; text-align: center; font-weight: 800; color: var(--gold); white-space: pre-line; line-height: 1.5; }
 .draw {
   width: min(100%, 320px); min-height: 54px; border: 0; border-radius: 16px; cursor: pointer;
   font: 700 16px Unbounded, sans-serif; letter-spacing: 0.04em; color: var(--ink);

@@ -155,7 +155,7 @@ func TestCardRemindersFollowDraws(t *testing.T) {
 	}
 	now := time.Now().Truncate(time.Second)
 
-	if _, err := store.DrawCard(ctx, alice, "Alice", 0, time.Hour, now); err != nil {
+	if _, err := store.DrawCard(ctx, alice, "Alice", rarity(0), time.Hour, now); err != nil {
 		t.Fatal(err)
 	}
 	if waiting, _ := store.WaitingReminders(ctx, alice, alice); len(waiting) != 0 {
@@ -179,7 +179,7 @@ func TestCardRemindersFollowDraws(t *testing.T) {
 		t.Fatalf("auto chat = %d, %v", chat, err)
 	}
 	next := now.Add(time.Hour)
-	if _, err := store.DrawCard(ctx, alice, "Alice", 0, time.Hour, next); err != nil {
+	if _, err := store.DrawCard(ctx, alice, "Alice", rarity(0), time.Hour, next); err != nil {
 		t.Fatal(err)
 	}
 	if waiting, _ := store.WaitingReminders(ctx, alice, alice); len(waiting) != 0 {

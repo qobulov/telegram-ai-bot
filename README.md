@@ -1307,7 +1307,7 @@ match "maria" unless you add it:
 word.
 
 **Commands** in a group need the bot's username (`/help@MyMariaBot`). A plain
-`/help` is ignored, because it may be meant for another bot.
+`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/karta`, `/kartalarim`, `/kartatop`, `/kartalar`, `/boss`, `/ilon`, `/otinchi`, `/maydon`, `/shashka` and `/dooz`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username.
 
 ### Example
 
@@ -2050,7 +2050,13 @@ Afsonaviy, 45 💜 Epik, 60 🔷 Noyob and 50 ⚪ Oddiy. A draw first draws a
 rarity, by odds of 1.5%, 6.5%, 14%, 28% and 50%, then a card of it at random,
 sent as the character's picture with its anime, attack and health, the same
 each time for the same character, and the points it is worth (5000, 2000,
-800, 300 or 100), which add up, a card drawn again too. `/kartalarim` shows
+800, 300 or 100), which add up, a card drawn again too. A long wait ends in a
+rare card for sure: a player's 30th draw in a row without a Legendary or
+better is one, and their 100th without a Mythic is one, the draw saying so and
+each card telling in how many draws the next sure ones are, in the chat and the
+Mini App (`since_legendary` and `since_mythic` on `card_players`, migration
+62, which counted a player holding no such card from their first draw), as 412
+draws by the odds alone had brought no Mythic. `/kartalarim` shows
 how many of each rarity's cards the player holds as buttons that list them,
 pressed only by that player; `/kartatop` is the table of points. The
 pictures are the characters' AniList pictures, the studios' art.
@@ -2336,7 +2342,7 @@ both sides or a bot game without the bot is refused.
   The conversation, the mute setting and the standing rules from before the
   upgrade no longer apply.
 - In forum-style supergroups she answers in the topic of the message she
-  replies to. This was not tested against a real forum.
+  replies to. This was not tested against a real forum. The commands with limits of their own are not counted: `/karta` (a card an hour) and the games, `/boss`, `/ilon`, `/otinchi`, `/maydon`, `/game` and `/mafia`, which in a group go through `send_game`'s two games a chat in ten minutes, one too soon getting only 👀; being told to wait for a card is counted, so that pressing it cannot flood the group.
 
 ### BotFather privacy mode
 

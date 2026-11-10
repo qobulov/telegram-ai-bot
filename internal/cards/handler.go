@@ -21,7 +21,7 @@ type Store interface {
 	CardCatalog(ctx context.Context) ([]storage.Card, error)
 	OwnedCards(ctx context.Context, userID int64, rarity int) ([]storage.OwnedCard, error)
 	CardPlayerOf(ctx context.Context, userID int64) (storage.CardPlayer, time.Time, error)
-	DrawCard(ctx context.Context, userID int64, name string, rarity int, every time.Duration, now time.Time) (storage.CardDraw, error)
+	DrawCard(ctx context.Context, userID int64, name string, roll storage.CardRoll, every time.Duration, now time.Time) (storage.CardDraw, error)
 	CardTop(ctx context.Context, limit int) ([]storage.CardPlayer, error)
 	CardImage(ctx context.Context, id int64) (string, error)
 }
@@ -236,7 +236,7 @@ func (h *handler) draw(ctx context.Context, user miniapp.User) (any, failure) {
 		h.Logger.Error("could not fill the card catalog", "error", err)
 		return nil, errUnavailable
 	}
-	draw, err := h.Store.DrawCard(ctx, user.ID, name(user), int(h.Roll()), Every, h.Now())
+	draw, err := h.Store.DrawCard(ctx, user.ID, name(user), WithPity(h.Roll), Every, h.Now())
 	var wait *storage.CardWaitError
 	switch {
 	case errors.As(err, &wait):
@@ -245,8 +245,10 @@ func (h *handler) draw(ctx context.Context, user miniapp.User) (any, failure) {
 		h.Logger.Error("could not draw a card", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
 	}
+	legendaryIn, mythicIn := PityIn(draw)
 	return map[string]any{
 		"card": h.held(draw.Card, draw.Count), "new": draw.New, "points": draw.Points, "next_in": Every.Milliseconds(),
+		"guaranteed": draw.Guaranteed, "legendary_in": legendaryIn, "mythic_in": mythicIn,
 	}, failure{}
 }
 

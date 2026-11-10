@@ -76,6 +76,37 @@ func RollRandom() Rarity {
 	return Roll(rand.IntN(1000))
 }
 
+// LegendaryPity and MythicPity are the draws in a row that bring a player
+// no Legendary or better, and no Mythic, the last of which is one for sure:
+// by the odds alone 412 draws had brought no Mythic, which players took for
+// there being none to draw.
+const (
+	LegendaryPity = 30
+	MythicPity    = 100
+)
+
+// WithPity draws a rarity by roll, raised to Mythic on a player's
+// MythicPity-th draw in a row without one, and to Legendary on their
+// LegendaryPity-th without one or better.
+func WithPity(roll func() Rarity) storage.CardRoll {
+	return func(sinceLegendary, sinceMythic int) (int, bool) {
+		r := roll()
+		switch {
+		case r < Mythic && sinceMythic+1 >= MythicPity:
+			return int(Mythic), true
+		case r < Legendary && sinceLegendary+1 >= LegendaryPity:
+			return int(Legendary), true
+		}
+		return int(r), false
+	}
+}
+
+// PityIn is in how many draws a player's next sure Legendary and Mythic
+// are, after the draw that left them these counts.
+func PityIn(draw storage.CardDraw) (legendary, mythic int) {
+	return LegendaryPity - draw.SinceLegendary, MythicPity - draw.SinceMythic
+}
+
 // OfRank is the rarity of the card at rank among the most loved, from 0.
 func OfRank(rank int) Rarity {
 	for _, r := range []Rarity{Mythic, Legendary, Epic, Rare} {

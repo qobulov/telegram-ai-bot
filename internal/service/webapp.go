@@ -62,12 +62,31 @@ func (s *Service) gameCommand(ctx context.Context, in incoming, shortName string
 	if s.restricted(in) {
 		return say(textForbidden)
 	}
+	// In a group the game goes through the send_game tool, which allows a chat
+	// two games in ten minutes: the command does not count in the group's
+	// quota, and another game too soon gets only a reaction.
+	if in.group && s.opts.Tools != nil {
+		var sent struct{}
+		switch _, failure := s.itemResult(ctx, in, "send_game", struct {
+			Game string `json:"game"`
+		}{shortName}, &sent); failure {
+		case "":
+			return outcome{}
+		case "invalid_arguments":
+			return outcome{reaction: gameTooSoonReaction}
+		}
+		return say(textGameLater.to(in))
+	}
 	if _, err := s.opts.GameTable.SendGame(ctx, in.msg.Chat.ID, shortName, in.replyTarget()); err != nil {
 		s.opts.Logger.Error("could not send the game", "game", shortName, "chat_id", in.msg.Chat.ID, "error", err)
 		return say(textError.to(in))
 	}
 	return outcome{}
 }
+
+// gameTooSoonReaction answers a game asked for too soon after the last two:
+// Telegram takes only a few emoji as reactions, and no hourglass.
+const gameTooSoonReaction = overQuotaReaction
 
 // restricted reports a command ADMIN_COMMANDS keeps for administrators,
 // sent by someone else, as runCommand refuses it.

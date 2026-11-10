@@ -34,20 +34,32 @@ func TestCardsAreDrawnAndCollected(t *testing.T) {
 	}
 
 	now := time.Now()
-	draw, err := store.DrawCard(ctx, alice, "Alice", 4, time.Hour, now)
+	draw, err := store.DrawCard(ctx, alice, "Alice", rarity(4), time.Hour, now)
 	if err != nil || draw.Card.ID != 1 || !draw.New || draw.Count != 1 || draw.Points != 5000 {
 		t.Fatalf("first draw = %+v, %v", draw, err)
 	}
-	_, err = store.DrawCard(ctx, alice, "Alice", 0, time.Hour, now.Add(10*time.Minute))
+	_, err = store.DrawCard(ctx, alice, "Alice", rarity(0), time.Hour, now.Add(10*time.Minute))
 	var wait *CardWaitError
 	if !errors.As(err, &wait) || wait.Wait.Round(time.Second) != 50*time.Minute {
 		t.Fatalf("a draw ten minutes later = %v, want a 50-minute wait", err)
 	}
-	if draw, err = store.DrawCard(ctx, alice, "Alice", 4, time.Hour, now.Add(time.Hour)); err != nil || draw.New || draw.Count != 2 || draw.Points != 10000 {
+	if draw, err = store.DrawCard(ctx, alice, "Alice", rarity(4), time.Hour, now.Add(time.Hour)); err != nil || draw.New || draw.Count != 2 || draw.Points != 10000 {
 		t.Fatalf("the same card again = %+v, %v", draw, err)
 	}
-	if draw, err = store.DrawCard(ctx, bob, "Bob", 0, 0, now); err != nil || draw.Card.ID != 2 || draw.Points != 100 {
+	if draw, err = store.DrawCard(ctx, bob, "Bob", rarity(0), 0, now); err != nil || draw.Card.ID != 2 || draw.Points != 100 {
 		t.Fatalf("Bob's draw = %+v, %v", draw, err)
+	}
+	if draw.SinceLegendary != 1 || draw.SinceMythic != 1 {
+		t.Errorf("after a common card Bob waited %d and %d draws, want 1 and 1", draw.SinceLegendary, draw.SinceMythic)
+	}
+	// The roll is told the wait, and a Mythic ends both.
+	var told [2]int
+	draw, err = store.DrawCard(ctx, bob, "Bob", func(legendary, mythic int) (int, bool) {
+		told = [2]int{legendary, mythic}
+		return 4, true
+	}, 0, now)
+	if err != nil || told != [2]int{1, 1} || !draw.Guaranteed || draw.SinceLegendary != 0 || draw.SinceMythic != 0 {
+		t.Errorf("Bob's sure Mythic = %+v, told %v, %v", draw, told, err)
 	}
 
 	total, owned, points, err := store.CardCounts(ctx, alice)
@@ -100,3 +112,6 @@ func TestFillCardSet(t *testing.T) {
 		t.Errorf("versions = %v, %v", versions, err)
 	}
 }
+
+// rarity is a roll that always picks r.
+func rarity(r int) CardRoll { return func(int, int) (int, bool) { return r, false } }

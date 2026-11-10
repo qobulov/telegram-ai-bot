@@ -27,13 +27,30 @@ type Card struct {
 }
 
 // CardDraw is what a draw gave: the card, whether the player had none of
-// it before, how many they hold now and their points after it.
+// it before, how many they hold now and their points after it; whether the
+// draw's roll was raised by the player's long wait for a rare card, and the
+// draws in a row since their last Legendary or better and last Mythic.
 type CardDraw struct {
-	Card   Card
-	New    bool
-	Count  int
-	Points int64
+	Card           Card
+	New            bool
+	Count          int
+	Points         int64
+	Guaranteed     bool
+	SinceLegendary int
+	SinceMythic    int
 }
+
+// CardRoll picks a draw's rarity from the player's draws in a row since
+// their last Legendary or better and last Mythic, and reports a rarity it
+// raised for them.
+type CardRoll func(sinceLegendary, sinceMythic int) (rarity int, guaranteed bool)
+
+// Rarities as the catalog numbers them, which a draw counts the player's
+// wait for a rare card by.
+const (
+	legendaryRarity = 3
+	mythicRarity    = 4
+)
 
 // OwnedCard is a card a player holds, and how many of it.
 type OwnedCard struct {
@@ -187,12 +204,12 @@ func (s *Store) FillCardSet(ctx context.Context, collection string, version int,
 	return nil
 }
 
-// DrawCard gives the player a card of rarity, at random, unless they drew
-// one less than every ago, when it returns a *CardWaitError; every of 0
-// never waits. The player's row is locked, so that two draws at once are
+// DrawCard gives the player a card of the rarity roll picks, at random,
+// unless they drew one less than every ago, when it returns a
+// *CardWaitError; every of 0 never waits. The player's row is locked, so that two draws at once are
 // two draws, the second waiting its turn. A player who turned on the card
 // reminders gets the next one scheduled, every after now.
-func (s *Store) DrawCard(ctx context.Context, userID int64, name string, rarity int, every time.Duration, now time.Time) (CardDraw, error) {
+func (s *Store) DrawCard(ctx context.Context, userID int64, name string, roll CardRoll, every time.Duration, now time.Time) (CardDraw, error) {
 	var draw CardDraw
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `
@@ -201,12 +218,16 @@ func (s *Store) DrawCard(ctx context.Context, userID int64, name string, rarity 
 			return err
 		}
 		var last *time.Time
-		if err := tx.QueryRow(ctx, `SELECT last_draw_at FROM card_players WHERE user_id = $1 FOR UPDATE`, userID).Scan(&last); err != nil {
+		var sinceLegendary, sinceMythic int
+		if err := tx.QueryRow(ctx, `SELECT last_draw_at, since_legendary, since_mythic FROM card_players WHERE user_id = $1 FOR UPDATE`, userID).
+			Scan(&last, &sinceLegendary, &sinceMythic); err != nil {
 			return err
 		}
 		if last != nil && every > 0 && now.Sub(*last) < every {
 			return &CardWaitError{Wait: every - now.Sub(*last)}
 		}
+		rarity, guaranteed := roll(sinceLegendary, sinceMythic)
+		draw.Guaranteed = guaranteed
 		c := &draw.Card
 		err := tx.QueryRow(ctx, `
 			SELECT id, name, anime, image_url, favourites, rarity, attack, health, value, collection
@@ -228,8 +249,12 @@ func (s *Store) DrawCard(ctx context.Context, userID int64, name string, rarity 
 		}
 		if err := tx.QueryRow(ctx, `
 			UPDATE card_players SET name = coalesce(nullif($5, ''), name), points = points + $2,
-				cards = cards + $3, draws = draws + 1, last_draw_at = $4
-			WHERE user_id = $1 RETURNING points`, userID, c.Value, newCard, now, name).Scan(&draw.Points); err != nil {
+				cards = cards + $3, draws = draws + 1, last_draw_at = $4,
+				since_legendary = CASE WHEN $6 THEN 0 ELSE since_legendary + 1 END,
+				since_mythic = CASE WHEN $7 THEN 0 ELSE since_mythic + 1 END
+			WHERE user_id = $1 RETURNING points, since_legendary, since_mythic`,
+			userID, c.Value, newCard, now, name, c.Rarity >= legendaryRarity, c.Rarity >= mythicRarity).
+			Scan(&draw.Points, &draw.SinceLegendary, &draw.SinceMythic); err != nil {
 			return err
 		}
 		if every <= 0 {

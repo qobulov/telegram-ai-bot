@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"telegram-ai-bot/internal/storage"
 )
 
 // The odds add up to a thousand draws, the rarest least often, and the
@@ -72,5 +74,34 @@ func TestFetchCatalog(t *testing.T) {
 	}
 	if catalog[0].Name != "Hero 1" || catalog[0].Anime != "Romaji" || catalog[2].ID != 4 || catalog[0].Rarity != int(Mythic) || catalog[CatalogSize-1].Rarity != int(Common) {
 		t.Errorf("first cards = %+v %+v %+v", catalog[0], catalog[2], catalog[CatalogSize-1])
+	}
+}
+
+// A long wait for a rare card ends in one: the 30th draw without a Legendary
+// or better is one, the 100th without a Mythic is one, and a roll better
+// than the sure one is kept.
+func TestWithPity(t *testing.T) {
+	common := WithPity(func() Rarity { return Common })
+	for _, tc := range []struct {
+		sinceLegendary, sinceMythic int
+		want                        Rarity
+		sure                        bool
+	}{
+		{0, 0, Common, false},
+		{LegendaryPity - 2, 50, Common, false},
+		{LegendaryPity - 1, 50, Legendary, true},
+		{5, MythicPity - 1, Mythic, true},
+		{LegendaryPity - 1, MythicPity - 1, Mythic, true},
+	} {
+		r, sure := common(tc.sinceLegendary, tc.sinceMythic)
+		if Rarity(r) != tc.want || sure != tc.sure {
+			t.Errorf("after %d and %d draws: %d, %v; want %d, %v", tc.sinceLegendary, tc.sinceMythic, r, sure, tc.want, tc.sure)
+		}
+	}
+	if r, sure := WithPity(func() Rarity { return Mythic })(LegendaryPity-1, 0); Rarity(r) != Mythic || sure {
+		t.Errorf("a Mythic roll on a sure Legendary = %d, %v", r, sure)
+	}
+	if l, m := PityIn(storage.CardDraw{SinceLegendary: 4, SinceMythic: 40}); l != LegendaryPity-4 || m != MythicPity-40 {
+		t.Errorf("PityIn = %d, %d", l, m)
 	}
 }

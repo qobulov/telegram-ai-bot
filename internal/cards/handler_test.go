@@ -83,7 +83,7 @@ func (f *fakeStore) CardPlayerOf(context.Context, int64) (storage.CardPlayer, ti
 func (f *fakeStore) CardTop(context.Context, int) ([]storage.CardPlayer, error) {
 	return []storage.CardPlayer{{UserID: 7, Name: "Bek", Points: 10000, Cards: 1}}, nil
 }
-func (f *fakeStore) DrawCard(_ context.Context, _ int64, _ string, _ int, every time.Duration, now time.Time) (storage.CardDraw, error) {
+func (f *fakeStore) DrawCard(_ context.Context, _ int64, _ string, _ storage.CardRoll, every time.Duration, now time.Time) (storage.CardDraw, error) {
 	if !f.last.IsZero() && now.Sub(f.last) < every {
 		return storage.CardDraw{}, &storage.CardWaitError{Wait: every - now.Sub(f.last)}
 	}

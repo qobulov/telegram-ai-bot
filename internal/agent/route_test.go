@@ -198,3 +198,26 @@ func TestGameQuestionsRemindToCheckHeroes(t *testing.T) {
 		t.Errorf("saved = %+v", saved)
 	}
 }
+
+// Asking to be reminded skips the router and takes the full path, where the
+// reminders tool is: the chat model, given "hop eslatib tur", promised to
+// remind and set nothing.
+func TestReminderRequestsSkipTheRouter(t *testing.T) {
+	for msg, full := range map[string]bool{
+		"Ali: hop eslatib tur":                true,
+		"Ali: Манга хам эслат":                true,
+		"Ali: напомни через 10 минут":         true,
+		"Ali: remind me at 9":                 true,
+		"Ali: ertaga uchrashamiz, xayrli tun": false,
+	} {
+		f, router, _ := routedFixture("CHAT", text("chat"), text("full"))
+		req := request(1, msg)
+		req.Group = true
+
+		answer, err := f.agent.Reply(context.Background(), req)
+
+		if err != nil || (answer.Route == RouteFull) != full || (len(router.requests) == 0) != full {
+			t.Errorf("%q: route %q, router asked %d times; want full %v", msg, answer.Route, len(router.requests), full)
+		}
+	}
+}

@@ -597,9 +597,24 @@ const overQuotaReaction = "👀"
 // It also returns the answer taken, to give back if the turn answers
 // nothing; 0 when none was taken.
 func (s *Service) mayAnswerInGroup(in incoming) (reservation int64, allowed bool) {
-	if !in.group || in.fromBot || s.opts.GroupReplies == nil || s.isOwner(in.msg.From) || !s.hasContent(in) || s.isManagerCommand(in) {
+	if !in.group || in.fromBot || s.opts.GroupReplies == nil || s.isOwner(in.msg.From) || !s.hasContent(in) || s.isManagerCommand(in) || selfLimited[commandName(in.text)] {
 		return 0, true
 	}
+	return s.reserveGroupReply(in)
+}
+
+// selfLimited are the commands with limits of their own, which the group's
+// quota of answers does not count: a card an hour, two games a chat in ten
+// minutes. Counted with the bot's talk, they went unanswered where it talked
+// much, a third of what the quota stopped. What they say when their own limit
+// holds is counted, or only reacted to, so that pressing them cannot flood.
+var selfLimited = map[string]bool{
+	"/karta": true, "/boss": true, "/ilon": true, "/otinchi": true, "/maydon": true, "/game": true, "/mafia": true,
+}
+
+// reserveGroupReply takes one of the group's answers for the message, or
+// reacts to it when there is none left.
+func (s *Service) reserveGroupReply(in incoming) (reservation int64, allowed bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
 	defer cancel()
 	quota := storage.ReplyQuota{
