@@ -26,13 +26,7 @@ func (s *Service) cardWallet(ctx context.Context, in incoming) outcome {
 		s.opts.Logger.Error("could not read a player's shards", "user_id", in.userID, "error", err)
 		return say(textCardsUnavailable.to(in))
 	}
-	copies, worth := 0, 0
-	for rarity, n := range spares {
-		copies += n
-		if rarity >= 0 && rarity < len(cards.ShardRates) {
-			worth += n * cards.ShardRates[rarity]
-		}
-	}
+	copies, worth := cards.SpareWorth(spares)
 	lines := []string{fmt.Sprintf(textShardsTitle.to(in), doozName(in.msg.From), shards), ""}
 	if copies > 0 {
 		lines = append(lines, fmt.Sprintf(textShardsMelt.to(in), copies, worth))

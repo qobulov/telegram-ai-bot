@@ -1262,10 +1262,14 @@ keep it from taking over the chat.
 | A command with its username  | `/mute@MyMariaBot`                                       | always on                       |
 
 Each start sets the menu Telegram opens on "/" (`setMyCommands`, in
-`internal/app/commands.go`): `/start`, `/help` and
-`/about` in private chats; `/help`, `/model` and `/about` for a group's
-members; and for its admins also `/mute`, `/unmute`, `/ignore` and
-`/unignore`. In a group the menu adds the bot's username itself. A failure is
+`internal/app/commands.go`), kept short as 22 commands crowded it:
+`/start`, `/help`, `/karta`, `/kartalar` and `/oyinlar` in private chats; the
+same but `/start` for a group's members; and for its admins also `/mute`,
+`/unmute`, `/ignore` and `/unignore`. `/oyinlar` lists every game and
+Kartalar's commands to tap, the page games only while `WEBAPP_URL` serves
+them, and the Mini App holds the collection, the table and the shards (melting
+and a card out of turn); every command left out of the menu is answered all
+the same. In a group the menu adds the bot's username itself. A failure is
 only logged.
 
 Each start also sets the admin rights she asks for when someone makes her an

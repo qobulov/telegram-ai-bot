@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"log/slog"
-	"slices"
 	"time"
 
 	"telegram-ai-bot/internal/telegram"
@@ -15,26 +14,23 @@ const commandsTimeout = 5 * time.Second
 // commandMenus are the commands Telegram lists on "/": in private chats,
 // for a group's members, and for its admins, who can also quiet the bot or
 // have it ignore a member. Owners' commands, /model among them, are left
-// out.
+// out, and so are the games' and Kartalar's many: 22 commands crowded the
+// menu, so it keeps the card of the hour, the Mini App that holds the
+// collection, the table and the shards, and /oyinlar, which lists every game
+// to tap. The rest are answered all the same.
 var commandMenus = map[string][]telegram.BotCommand{
 	telegram.ScopeDefault: {
 		{Command: "start", Description: "Salomlashish"},
 		{Command: "help", Description: "Yordam va buyruqlar"},
-		{Command: "about", Description: "Bot haqida"},
-		{Command: "dooz", Description: "Dooz (X-O) o'yini"},
 		{Command: "karta", Description: "Anime karta olish (soatiga 1 ta)"},
-		{Command: "kartalarim", Description: "Kartalar kolleksiyam"},
-		{Command: "kartalar", Description: "Kartalar ilovasi (Mini App)"},
-		{Command: "kartatop", Description: "Kartalar reytingi"},
+		{Command: "kartalar", Description: "Kartalar ilovasi: kolleksiya, reyting, parcha"},
+		{Command: "oyinlar", Description: "Barcha o'yinlar"},
 	},
 	telegram.ScopeAllGroupChats: {
 		{Command: "help", Description: "Yordam va buyruqlar"},
-		{Command: "about", Description: "Bot haqida"},
-		{Command: "dooz", Description: "Dooz (X-O) o'yini"},
 		{Command: "karta", Description: "Anime karta olish (soatiga 1 ta)"},
-		{Command: "kartalarim", Description: "Kartalar kolleksiyam"},
-		{Command: "kartalar", Description: "Kartalar ilovasi (Mini App)"},
-		{Command: "kartatop", Description: "Kartalar reytingi"},
+		{Command: "kartalar", Description: "Kartalar ilovasi: kolleksiya, reyting, parcha"},
+		{Command: "oyinlar", Description: "Barcha o'yinlar"},
 	},
 	telegram.ScopeAllChatAdmins: {
 		{Command: "help", Description: "Yordam va buyruqlar"},
@@ -42,12 +38,9 @@ var commandMenus = map[string][]telegram.BotCommand{
 		{Command: "unmute", Description: "Botni yana gapirtirish"},
 		{Command: "ignore", Description: "A'zoga 24 soat javob bermaslik (xabariga reply qiling)"},
 		{Command: "unignore", Description: "A'zoga yana javob berish (xabariga reply qiling)"},
-		{Command: "about", Description: "Bot haqida"},
-		{Command: "dooz", Description: "Dooz (X-O) o'yini"},
 		{Command: "karta", Description: "Anime karta olish (soatiga 1 ta)"},
-		{Command: "kartalarim", Description: "Kartalar kolleksiyam"},
-		{Command: "kartalar", Description: "Kartalar ilovasi (Mini App)"},
-		{Command: "kartatop", Description: "Kartalar reytingi"},
+		{Command: "kartalar", Description: "Kartalar ilovasi: kolleksiya, reyting, parcha"},
+		{Command: "oyinlar", Description: "Barcha o'yinlar"},
 	},
 }
 
@@ -111,30 +104,13 @@ func SetAdminRights(ctx context.Context, setter RightsSetter, logger *slog.Logge
 	}
 }
 
-// pageCommands send the game, in every menu while WEBAPP_URL serves it.
-// /stats, for the owners alone, is in no menu.
-var pageCommands = []telegram.BotCommand{
-	{Command: "game", Description: "Tarozi o'yini"},
-	{Command: "ilon", Description: "Kosmik ilon o'yini"},
-	{Command: "otinchi", Description: "O'tinchi o'yini"},
-	{Command: "boss", Description: "Dev jangi (guruh bilan)"},
-	{Command: "mafia", Description: "Mafia (guruh bilan, 5+ kishi)"},
-	{Command: "maydon", Description: "Maydon: jamoa jangi (5v5 gacha)"},
-	{Command: "shashka", Description: "Shashka (PvP, reyting)"},
-}
-
-// SetCommandMenus sets the menus, with the pages' commands when pages is
-// set, logging a failure: the bot works without them, and the next start
-// tries again.
-func SetCommandMenus(ctx context.Context, setter CommandSetter, pages bool, logger *slog.Logger) {
+// SetCommandMenus sets the menus, logging a failure: the bot works without
+// them, and the next start tries again.
+func SetCommandMenus(ctx context.Context, setter CommandSetter, logger *slog.Logger) {
 	ctx, cancel := context.WithTimeout(ctx, commandsTimeout)
 	defer cancel()
 	for _, scope := range []string{telegram.ScopeDefault, telegram.ScopeAllGroupChats, telegram.ScopeAllChatAdmins} {
-		menu := commandMenus[scope]
-		if pages {
-			menu = append(slices.Clip(menu), pageCommands...)
-		}
-		if err := setter.SetMyCommands(ctx, scope, menu); err != nil {
+		if err := setter.SetMyCommands(ctx, scope, commandMenus[scope]); err != nil {
 			logger.Warn("could not set the command menu", "scope", scope, "error", err)
 		}
 	}

@@ -48,6 +48,7 @@ type fakeStore struct {
 	last     time.Time
 	draws    int
 	images   map[int64]string
+	shards   int
 }
 
 var (
@@ -89,6 +90,22 @@ func (f *fakeStore) DrawCard(_ context.Context, _ int64, _ string, _ storage.Car
 	}
 	f.last, f.draws = now, f.draws+1
 	return storage.CardDraw{Card: heldCard, Count: 3, Points: 15000}, nil
+}
+
+func (f *fakeStore) CardWallet(context.Context, int64) (int, map[int]int, error) {
+	return f.shards, map[int]int{0: 2, 4: 1}, nil
+}
+func (f *fakeStore) MeltCards(_ context.Context, _ int64, rates []int) (int, int, int, error) {
+	gained := 2*rates[0] + rates[4]
+	f.shards += gained
+	return 3, gained, f.shards, nil
+}
+func (f *fakeStore) ExtraCard(_ context.Context, _ int64, _ string, _ storage.CardRoll, cost int) (storage.CardDraw, error) {
+	if f.shards < cost {
+		return storage.CardDraw{}, &storage.ShardsError{Have: f.shards, Need: cost}
+	}
+	f.shards -= cost
+	return storage.CardDraw{Card: heldCard, Count: 4, Points: 20000, Shards: f.shards}, nil
 }
 
 func post(t *testing.T, h http.Handler, initData, action string) (int, map[string]any) {
@@ -316,5 +333,27 @@ func TestProxiedPictureLinkCarriesTheVersion(t *testing.T) {
 	view := h.held(storage.Card{ID: -5, ImageURL: "https://wallet/images/pk_1?size=high"}, 1)
 	if want := "/api/cards?image=-5&v=" + strconv.Itoa(setsVersion); view.Image != want {
 		t.Errorf("image = %q, want %q", view.Image, want)
+	}
+}
+
+// The page shows the player's shards and what their spares melt into, melts
+// them, and draws a card out of turn for shards, saying how few when it
+// cannot.
+func TestShardsInTheMiniApp(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	store := &fakeStore{}
+	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }})
+	initData := signedInit(7, now)
+	if code, out := post(t, h, initData, "state"); code != 200 || out["spare"] != 3.0 || out["spare_worth"] != 52.0 || out["extra_cost"] != float64(ExtraCost) {
+		t.Fatalf("state = %d %v", code, out)
+	}
+	if code, out := post(t, h, initData, "extra"); code != 200 || out["need"] != float64(ExtraCost) || out["have"] != 0.0 {
+		t.Fatalf("an extra card for no shards = %d %v", code, out)
+	}
+	if code, out := post(t, h, initData, "melt"); code != 200 || out["gained"] != 52.0 || out["shards"] != 52.0 {
+		t.Fatalf("melt = %d %v", code, out)
+	}
+	if code, out := post(t, h, initData, "extra"); code != 200 || out["shards"] != float64(52-ExtraCost) || out["card"] == nil {
+		t.Errorf("an extra card = %d %v", code, out)
 	}
 }

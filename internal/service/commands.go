@@ -779,6 +779,8 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.gameCommand(ctx, in, game.MafiaShortName)
 	case commandName(in.text) == "/maydon":
 		return s.gameCommand(ctx, in, game.MaydonShortName)
+	case commandName(in.text) == "/oyinlar":
+		return s.gamesMenu(in)
 	case commandName(in.text) == "/dooz":
 		return s.doozCommand(in)
 	case commandName(in.text) == "/shashka":

@@ -84,6 +84,34 @@ func (s *Service) gameCommand(ctx context.Context, in incoming, shortName string
 	return outcome{}
 }
 
+// gamesMenu answers /oyinlar: every game, as commands to tap, which the
+// menu no longer lists one by one.
+func (s *Service) gamesMenu(in incoming) outcome {
+	lang := languageOf(in)
+	text := textGamesTitle.to(in) + "\n" + textGamesDooz.to(in)
+	if s.opts.Game != nil && s.opts.GameTable != nil {
+		text += helpPages[lang]
+	}
+	if s.opts.Cards != nil {
+		text += "\n\n" + textGamesCards.to(in)
+	}
+	return say(text)
+}
+
+var (
+	textGamesTitle = localText{uz: "🎮 **O'yinlar** — bosing va o'ynang:", ru: "🎮 **Игры** — нажмите и играйте:", en: "🎮 **Games** — tap one to play:"}
+	textGamesDooz  = localText{
+		uz: "/dooz — Dooz (X-O): do'stingiz yoki men bilan",
+		ru: "/dooz — крестики-нолики: с другом или со мной",
+		en: "/dooz — tic-tac-toe: with a friend or with me",
+	}
+	textGamesCards = localText{
+		uz: "🎴 Kartalar: /karta · /kartalar (ilova) · /kartatop · /parcha · /duel",
+		ru: "🎴 Карты: /karta · /kartalar (приложение) · /kartatop · /parcha · /duel",
+		en: "🎴 Cards: /karta · /kartalar (the app) · /kartatop · /parcha · /duel",
+	}
+)
+
 // gameTooSoonReaction answers a game asked for too soon after the last two:
 // Telegram takes only a few emoji as reactions, and no hourglass.
 const gameTooSoonReaction = overQuotaReaction

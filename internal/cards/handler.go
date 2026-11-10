@@ -24,6 +24,9 @@ type Store interface {
 	DrawCard(ctx context.Context, userID int64, name string, roll storage.CardRoll, every time.Duration, now time.Time) (storage.CardDraw, error)
 	CardTop(ctx context.Context, limit int) ([]storage.CardPlayer, error)
 	CardImage(ctx context.Context, id int64) (string, error)
+	CardWallet(ctx context.Context, userID int64) (shards int, spares map[int]int, err error)
+	MeltCards(ctx context.Context, userID int64, rates []int) (melted, gained, shards int, err error)
+	ExtraCard(ctx context.Context, userID int64, name string, roll storage.CardRoll, cost int) (storage.CardDraw, error)
 }
 
 // Options configures the Mini App's API.
@@ -133,6 +136,10 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return h.draw(ctx, opened.User)
 	case "top":
 		return h.top(ctx, opened.User)
+	case "melt":
+		return h.melt(ctx, opened.User)
+	case "extra":
+		return h.extra(ctx, opened.User)
 	}
 	return nil, errBadRequest
 }
@@ -217,9 +224,16 @@ func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
 		h.Logger.Error("could not read a card player", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
 	}
+	shards, spares, err := h.Store.CardWallet(ctx, user.ID)
+	if err != nil {
+		h.Logger.Error("could not read a player's shards", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
+	spare, worth := SpareWorth(spares)
 	return map[string]any{
 		"cards": views, "points": player.Points, "held": len(owned),
 		"next_in": h.wait(last).Milliseconds(), "every": Every.Milliseconds(),
+		"shards": shards, "spare": spare, "spare_worth": worth, "extra_cost": ExtraCost,
 	}, failure{}
 }
 
@@ -248,6 +262,38 @@ func (h *handler) draw(ctx context.Context, user miniapp.User) (any, failure) {
 	legendaryIn, mythicIn := PityIn(draw)
 	return map[string]any{
 		"card": h.held(draw.Card, draw.Count), "new": draw.New, "points": draw.Points, "next_in": Every.Milliseconds(),
+		"guaranteed": draw.Guaranteed, "legendary_in": legendaryIn, "mythic_in": mythicIn,
+	}, failure{}
+}
+
+// melt melts the player's spare copies into shards.
+func (h *handler) melt(ctx context.Context, user miniapp.User) (any, failure) {
+	melted, gained, shards, err := h.Store.MeltCards(ctx, user.ID, ShardRates)
+	if err != nil {
+		h.Logger.Error("could not melt cards", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
+	return map[string]any{"melted": melted, "gained": gained, "shards": shards}, failure{}
+}
+
+// extra draws a card out of turn for shards, or says how few the player has.
+func (h *handler) extra(ctx context.Context, user miniapp.User) (any, failure) {
+	if err := h.catalog.Ensure(ctx); err != nil {
+		h.Logger.Error("could not fill the card catalog", "error", err)
+		return nil, errUnavailable
+	}
+	draw, err := h.Store.ExtraCard(ctx, user.ID, name(user), WithPity(h.Roll), ExtraCost)
+	var few *storage.ShardsError
+	switch {
+	case errors.As(err, &few):
+		return map[string]any{"need": few.Need, "have": few.Have}, failure{}
+	case err != nil:
+		h.Logger.Error("could not draw a card for shards", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
+	legendaryIn, mythicIn := PityIn(draw)
+	return map[string]any{
+		"card": h.held(draw.Card, draw.Count), "new": draw.New, "points": draw.Points, "shards": draw.Shards,
 		"guaranteed": draw.Guaranteed, "legendary_in": legendaryIn, "mythic_in": mythicIn,
 	}, failure{}
 }

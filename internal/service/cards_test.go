@@ -381,3 +381,19 @@ func TestDuelIsFoughtOnce(t *testing.T) {
 		t.Errorf("the second press = %+v", buttons.answers[2])
 	}
 }
+
+// /oyinlar lists every game to tap, in a private chat and plain in a group,
+// the page games only when they are served.
+func TestGamesMenuListsTheGames(t *testing.T) {
+	f := newFixture()
+	f.opts.Cards = newFakeCards("")
+	sent := f.run(textFrom(userID, "/oyinlar"))
+	if len(sent) != 1 || !strings.Contains(sent[0].text, "/dooz") || strings.Contains(sent[0].text, "/boss") || !strings.Contains(sent[0].text, "/duel") {
+		t.Fatalf("games without pages = %+v", sent)
+	}
+	f.opts.Game, f.opts.GameTable = fakeGameLinks{}, &fakeGameTable{}
+	sent = f.run(inGroup(groupMessage("/oyinlar")))
+	if len(sent) != 2 || !strings.Contains(sent[1].text, "/boss") || !strings.Contains(sent[1].text, "/shashka") {
+		t.Errorf("games in a group = %+v", sent)
+	}
+}

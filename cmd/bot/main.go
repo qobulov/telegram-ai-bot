@@ -118,7 +118,7 @@ func serve(ctx context.Context, cfg config.Config, store *storage.Store, logger 
 	if err != nil {
 		return err
 	}
-	app.SetCommandMenus(ctx, bot.Client, cfg.WebAppURL != "", logger)
+	app.SetCommandMenus(ctx, bot.Client, logger)
 	app.SetMenuApp(ctx, bot.Client, cfg, logger)
 	app.SetAdminRights(ctx, bot.Client, logger)
 	app.SetProfileTexts(ctx, bot.Client, logger)

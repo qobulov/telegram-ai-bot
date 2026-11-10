@@ -12,6 +12,7 @@
       title: "Kartalar", collected: "to'plandi", collection: "Kolleksiya", draw: "Olish", top: "Reyting",
       search: "Kartani qidirish", rarities: ["Oddiy", "Noyob", "Epik", "Afsonaviy", "Mifik"],
       drawNow: "Karta olish", drawing: "Ochilmoqda…", next: (t) => `Keyingi karta: ${t}`, ready: "Karta tayyor!",
+      shardsTitle: "parcha", melt: (n, w) => `♻️ Parchalash: ${n} ta → +${w} 💎`, noSpare: "♻️ Takror karta yo'q", extra: (c) => `🎴 Qo'shimcha karta · ${c} 💎`, fewShards: (n, h) => `💎 Kerak: ${n}, sizda: ${h}`, melted: (n, g) => `♻️ ${n} ta karta → +${g} 💎`, shardsHint: "Takror kartalar parchaga aylanadi, ochko kamaymaydi. Duel: guruhda /duel",
       fresh: "🆕 Yangi karta!", sure: "✨ Kafolatlangan karta!", pity: (l, m) => `🎯 Kafolat: 🔥 ${l} · 👑 ${m} kartadan keyin`, again: (n) => `🔁 Sizda endi ×${n}`, plus: (n) => `+${n} ochko`,
       attack: "Hujum", health: "Sog'liq", value: "Ochko", cards: (n) => `${n} karta`, pts: "ochko",
       none: "Hech narsa topilmadi", noTop: "Hali hech kim karta olmagan",
@@ -27,6 +28,7 @@
       title: "Карты", collected: "собрано", collection: "Коллекция", draw: "Получить", top: "Рейтинг",
       search: "Поиск по картам", rarities: ["Обычная", "Редкая", "Эпическая", "Легендарная", "Мифическая"],
       drawNow: "Получить карту", drawing: "Открываем…", next: (t) => `Следующая карта: ${t}`, ready: "Карта готова!",
+      shardsTitle: "осколков", melt: (n, w) => `♻️ Расплавить: ${n} → +${w} 💎`, noSpare: "♻️ Повторных карт нет", extra: (c) => `🎴 Карта вне очереди · ${c} 💎`, fewShards: (n, h) => `💎 Нужно: ${n}, у вас: ${h}`, melted: (n, g) => `♻️ ${n} карт → +${g} 💎`, shardsHint: "Повторы становятся осколками, очки не уменьшаются. Дуэль: /duel в группе",
       fresh: "🆕 Новая карта!", sure: "✨ Гарантированная карта!", pity: (l, m) => `🎯 Гарантия: 🔥 через ${l} · 👑 через ${m} карт`, again: (n) => `🔁 Теперь у вас ×${n}`, plus: (n) => `+${n} очков`,
       attack: "Атака", health: "Здоровье", value: "Очки", cards: (n) => `${n} карт`, pts: "очков",
       none: "Ничего не найдено", noTop: "Ещё никто не получил карту",
@@ -42,6 +44,7 @@
       title: "Cards", collected: "collected", collection: "Collection", draw: "Draw", top: "Ranking",
       search: "Search cards", rarities: ["Common", "Rare", "Epic", "Legendary", "Mythic"],
       drawNow: "Draw a card", drawing: "Opening…", next: (t) => `Next card in ${t}`, ready: "A card is ready!",
+      shardsTitle: "shards", melt: (n, w) => `♻️ Melt: ${n} → +${w} 💎`, noSpare: "♻️ No spare cards", extra: (c) => `🎴 A card out of turn · ${c} 💎`, fewShards: (n, h) => `💎 It takes ${n}, you have ${h}`, melted: (n, g) => `♻️ ${n} cards → +${g} 💎`, shardsHint: "Spares melt into shards; your points stay. Duels: /duel in a group",
       fresh: "🆕 A new card!", sure: "✨ A guaranteed card!", pity: (l, m) => `🎯 Sure: 🔥 in ${l} · 👑 in ${m} cards`, again: (n) => `🔁 You now have ×${n}`, plus: (n) => `+${n} points`,
       attack: "Attack", health: "Health", value: "Points", cards: (n) => `${n} cards`, pts: "points",
       none: "Nothing found", noTop: "Nobody has drawn a card yet",
@@ -68,6 +71,7 @@
   const haptic = (kind) => { try { tg.HapticFeedback.impactOccurred(kind); } catch (_) { /* outside Telegram */ } };
 
   let cards = [], points = 0, nextAt = 0, drawing = false, query = "", opened = "", chosenSet = "";
+  let shards = 0, spare = 0, spareWorth = 0, extraCost = 15;
 
   // ---------- server ----------
 
@@ -94,6 +98,11 @@
       cards = data.cards;
       points = data.points;
       nextAt = Date.now() + data.next_in;
+      shards = data.shards || 0;
+      spare = data.spare || 0;
+      spareWorth = data.spare_worth || 0;
+      extraCost = data.extra_cost || extraCost;
+      shardsPanel();
       notice(null);
       $("loading").hidden = true;
       header();
@@ -289,13 +298,48 @@
     const wait = Math.max(0, nextAt - Date.now());
     $("draw").disabled = drawing || wait > 0;
     $("drawLabel").textContent = drawing ? t.drawing : wait > 0 ? t.wait(clock(wait)) : t.drawNow;
-    $("timer").textContent = wait > 0 ? t.next(clock(wait)) : cards.length ? t.ready : "";
+    // The button counts down; the line below it only says a card is ready.
+    $("timer").textContent = wait > 0 || !cards.length ? "" : t.ready;
     $("readyDot").hidden = !cards.length || wait > 0 || drawing || opened === "draw";
   }
   setInterval(drawButton, 1000);
 
-  $("draw").addEventListener("click", async () => {
-    if (drawing || Date.now() < nextAt) return;
+  // ---------- shards ----------
+
+  function shardsPanel() {
+    $("shardCount").textContent = spaced(shards);
+    $("melt").textContent = spare ? t.melt(spare, spareWorth) : t.noSpare;
+    $("melt").disabled = drawing || !spare;
+    $("extra").textContent = t.extra(extraCost);
+    $("extra").disabled = drawing || shards < extraCost;
+  }
+
+  $("melt").addEventListener("click", async () => {
+    if (drawing || !spare) return;
+    $("melt").disabled = true;
+    try {
+      const data = await api("melt");
+      shards = data.shards;
+      spare = 0;
+      spareWorth = 0;
+      haptic("light");
+      if (data.melted) toast(t.melted(data.melted, data.gained));
+    } catch (error) {
+      notice(error);
+    } finally {
+      shardsPanel();
+    }
+  });
+
+  $("extra").addEventListener("click", () => reveal("extra"));
+
+  $("draw").addEventListener("click", () => {
+    if (Date.now() >= nextAt) reveal("draw");
+  });
+
+  // reveal draws a card, the hourly one or one for shards, and turns it.
+  async function reveal(action) {
+    if (drawing) return;
     drawing = true;
     const flip = $("flip");
     flip.classList.remove("shown");
@@ -306,9 +350,10 @@
     drawButton();
     haptic("medium");
     try {
-      const data = await api("draw");
-      if (data.wait) {
-        nextAt = Date.now() + data.wait;
+      const data = await api(action);
+      if (data.wait || data.need) {
+        if (data.wait) nextAt = Date.now() + data.wait;
+        if (data.need) { shards = data.have; toast(t.fewShards(data.need, data.have)); }
         flip.classList.remove("shuffle");
         return;
       }
@@ -333,7 +378,9 @@
       lastDrawn = card.id;
       $("seeCollection").hidden = false;
       points = data.points;
-      nextAt = Date.now() + data.next_in;
+      if (data.next_in) nextAt = Date.now() + data.next_in;
+      if (data.shards !== undefined) shards = data.shards;
+      if (card.count > 1) { spare += 1; spareWorth += [1, 3, 8, 20, 50][card.rarity] || 0; }
       const i = cards.findIndex((c) => c.id === card.id);
       if (i >= 0) cards[i] = card;
       header();
@@ -344,8 +391,9 @@
     } finally {
       drawing = false;
       drawButton();
+      shardsPanel();
     }
-  });
+  }
 
   // The deck itself is pressed as often as the button: it draws too.
   $("deck").addEventListener("click", () => { if (!$("draw").disabled) $("draw").click(); });
