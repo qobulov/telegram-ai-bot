@@ -180,7 +180,7 @@ type cardView struct {
 func (h *handler) held(c storage.Card, count int) cardView {
 	image := c.ImageURL
 	if h.catalog.Proxied(image) {
-		image = "/api/cards?image=" + strconv.FormatInt(c.ID, 10)
+		image = "/api/cards?image=" + strconv.FormatInt(c.ID, 10) + "&v=" + strconv.Itoa(setsVersion)
 	}
 	return cardView{ID: c.ID, Rarity: c.Rarity, Set: c.Collection, Name: c.Name, Anime: c.Anime, Image: image, Attack: c.Attack, Health: c.Health, Value: c.Value, Count: count}
 }

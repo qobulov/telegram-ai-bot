@@ -33,7 +33,12 @@ func newFakeCards(picture string) *fakeCards {
 func (f *fakeCards) CardCollections(context.Context) (map[string]int, error) {
 	return map[string]int{"anime": 200}, nil
 }
-func (f *fakeCards) SaveCardCatalog(context.Context, []storage.Card) error      { return nil }
+func (f *fakeCards) SaveCardCatalog(context.Context, []storage.Card) error   { return nil }
+func (f *fakeCards) CardSetVersions(context.Context) (map[string]int, error) { return nil, nil }
+func (f *fakeCards) CardCatalog(context.Context) ([]storage.Card, error)     { return nil, nil }
+func (f *fakeCards) FillCardSet(context.Context, string, int, []storage.Card, map[int64]int64) error {
+	return nil
+}
 func (f *fakeCards) CardTop(context.Context, int) ([]storage.CardPlayer, error) { return nil, nil }
 
 func (f *fakeCards) DrawCard(_ context.Context, userID int64, _ string, _ int, every time.Duration, now time.Time) (storage.CardDraw, error) {

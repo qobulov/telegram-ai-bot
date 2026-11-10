@@ -117,6 +117,9 @@ func rounded(n int) int { return (n + 5) / 10 * 10 }
 type CatalogStore interface {
 	CardCollections(ctx context.Context) (map[string]int, error)
 	SaveCardCatalog(ctx context.Context, cards []storage.Card) error
+	CardSetVersions(ctx context.Context) (map[string]int, error)
+	CardCatalog(ctx context.Context) ([]storage.Card, error)
+	FillCardSet(ctx context.Context, collection string, version int, cards []storage.Card, merges map[int64]int64) error
 }
 
 // DefaultAniList is AniList's GraphQL API.
@@ -142,7 +145,8 @@ type Catalog struct {
 
 func (c *Catalog) pokeWallet() string { return cmp.Or(c.PokeWallet, DefaultPokeWallet) }
 
-// Ensure asks for the collections the catalog does not have yet. Only the
+// Ensure asks for the collections the catalog does not have yet, and for the
+// trading ones an older setsVersion filled, adding what it missed. Only the
 // anime cards it cannot do without: trading cards that cannot be had are
 // logged and tried again later, and the game goes on without them.
 func (c *Catalog) Ensure(ctx context.Context) error {
@@ -159,17 +163,21 @@ func (c *Catalog) Ensure(ctx context.Context) error {
 			return err
 		}
 	}
-	if c.Key == "" || !c.mayTry(sizes) {
+	if c.Key == "" {
+		return nil
+	}
+	versions, err := c.Store.CardSetVersions(ctx)
+	if err != nil {
+		return err
+	}
+	if !c.mayTry(versions) {
 		return nil
 	}
 	for _, set := range tradingSets {
-		if sizes[set.Collection] > 0 {
+		if versions[set.Collection] >= setsVersion {
 			continue
 		}
-		cards, err := fetchSet(ctx, c.Client, c.pokeWallet(), c.Key, set)
-		if err == nil {
-			err = c.Store.SaveCardCatalog(ctx, cards)
-		}
+		err := c.fillSet(ctx, set)
 		if err != nil && c.Logger != nil {
 			c.Logger.Warn("could not fill a card collection", "collection", set.Collection, "error", err)
 		}
@@ -177,11 +185,46 @@ func (c *Catalog) Ensure(ctx context.Context) error {
 	return nil
 }
 
-// mayTry reports that a set is missing and none was tried lately.
-func (c *Catalog) mayTry(sizes map[string]int) bool {
+// fillSet reads a set again and makes the collection its cards, an older
+// reading's art variants of a character merged into the one kept.
+func (c *Catalog) fillSet(ctx context.Context, set tradingSet) error {
+	cards, err := fetchSet(ctx, c.Client, c.pokeWallet(), c.Key, set)
+	if err != nil {
+		return err
+	}
+	held, err := c.Store.CardCatalog(ctx)
+	if err != nil {
+		return err
+	}
+	return c.Store.FillCardSet(ctx, set.Collection, setsVersion, cards, variantsOf(held, cards, set.Collection))
+}
+
+// variantsOf maps each card of the collection the new reading left out to the
+// card it kept of the same character and rarity, if there is one.
+func variantsOf(held, cards []storage.Card, collection string) map[int64]int64 {
+	kept := map[string]int64{}
+	reading := map[int64]bool{}
+	for _, c := range cards {
+		kept[fmt.Sprint(c.Rarity, character(c.Name))] = c.ID
+		reading[c.ID] = true
+	}
+	merges := map[int64]int64{}
+	for _, h := range held {
+		if h.Collection != collection || reading[h.ID] {
+			continue
+		}
+		if id, ok := kept[fmt.Sprint(h.Rarity, character(h.Name))]; ok {
+			merges[h.ID] = id
+		}
+	}
+	return merges
+}
+
+// mayTry reports that a set is missing or old and none was tried lately.
+func (c *Catalog) mayTry(versions map[string]int) bool {
 	missing := false
 	for _, set := range tradingSets {
-		missing = missing || sizes[set.Collection] == 0
+		missing = missing || versions[set.Collection] < setsVersion
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()

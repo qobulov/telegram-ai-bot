@@ -2059,7 +2059,7 @@ With `POKEWALLET_API_KEY` trading cards join them, a collection of up to a
 hundred from one English set each of Pokémon, One Piece, Dragon Ball,
 Yu-Gi-Oh! and Digimon (`internal/cards/pokewallet.go`, migration 55), their
 rarities taken as Kartalar's five and promos and the like left out. A draw
-draws from them all. If PokéWallet cannot be had the game goes on with what
+draws from them all. A set is read to its last page, and art variants of one character (Alternate Art, Parallel) take one place in a rarity, and Yu-Gi-Oh!'s Rare is Kartalar's Rare; a collection an older reading filled is read again once, its cards set to the new reading (pictures at 600 by 838, the Mini App's links carrying the version so that the CDN does not keep the old ones), an older variant's holders moved to the card kept, the counts added, and every player's cards and points counted again (migration 61 notes the version in `card_sets`). If PokéWallet cannot be had the game goes on with what
 it has and asks again ten minutes later. Its pictures want the key too, so
 the Mini App gets them from `/api/cards?image=<id>`, which the CDN keeps:
 the free plan allows 1000 requests a day. The pictures are the games'

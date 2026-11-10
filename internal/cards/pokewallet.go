@@ -47,6 +47,21 @@ var tradingRarities = map[string]Rarity{
 	"Special Illustration Rare": Mythic, "Secret Rare": Mythic, "SEC": Mythic, "Hyper Rare": Mythic,
 }
 
+// setRarities are a game's own rarities where they are not tradingRarities':
+// Yu-Gi-Oh!'s Rare is its second, so that it had no Rare cards.
+var setRarities = map[string]map[string]Rarity{
+	"yugioh": {"Rare": Rare, "R": Rare, "Super Rare": Epic, "SR": Epic, "Ultra Rare": Legendary, "UR": Legendary},
+}
+
+// rarityOf is a card's rarity in Kartalar, by its game's.
+func rarityOf(collection, rarity string) (Rarity, bool) {
+	if r, ok := setRarities[collection][rarity]; ok {
+		return r, true
+	}
+	r, ok := tradingRarities[rarity]
+	return r, ok
+}
+
 // setQuota is how many cards of each rarity one set gives at most, a hundred
 // in all, so that a set's many commons do not fill it.
 var setQuota = map[Rarity]int{Mythic: 8, Legendary: 15, Epic: 22, Rare: 25, Common: 30}
@@ -84,45 +99,93 @@ func tradingID(id string) int64 {
 	return -int64(h.Sum64()>>1) - 1
 }
 
-// fetchSet is a set's cards, by rarity up to its quota.
-func fetchSet(ctx context.Context, client *http.Client, baseURL, key string, set tradingSet) ([]storage.Card, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+set.Prefix+"/sets/"+url.PathEscape(set.SetID)+"?limit=200", nil)
+// setsVersion is the version of how a set is read: 2 reads all its pages, as
+// the first read only the first 200 cards and missed the Pokémon set's best,
+// takes one card per character and rarity, as its art variants filled whole
+// rarities with one character, gives Yu-Gi-Oh! its Rare cards, and takes the
+// pictures at 600 by 838, as the 200 by 280 ones looked blurred on a phone.
+const setsVersion = 2
+
+// maxSetPages bounds the pages of a set read, PokéWallet counting each.
+const maxSetPages = 5
+
+// setPage is one page of a set's cards.
+type setPage struct {
+	Set struct {
+		Name string `json:"name"`
+	} `json:"set"`
+	Cards      []tradingCard `json:"cards"`
+	Data       []tradingCard `json:"data"` // One Piece's
+	Pagination struct {
+		TotalPages int `json:"total_pages"`
+	} `json:"pagination"`
+}
+
+// fetchSetPage asks for one page of a set.
+func fetchSetPage(ctx context.Context, client *http.Client, baseURL, key string, set tradingSet, page int) (setPage, error) {
+	var answer setPage
+	link := fmt.Sprintf("%s%s/sets/%s?limit=200&page=%d", baseURL, set.Prefix, url.PathEscape(set.SetID), page)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
 	if err != nil {
-		return nil, err
+		return answer, err
 	}
 	req.Header.Set("X-API-Key", key)
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("cards: ask PokéWallet: %w", withoutURL(err))
+		return answer, fmt.Errorf("cards: ask PokéWallet: %w", withoutURL(err))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("cards: PokéWallet refused %s: status %d", set.Collection, resp.StatusCode)
-	}
-	var answer struct {
-		Set struct {
-			Name string `json:"name"`
-		} `json:"set"`
-		Cards []tradingCard `json:"cards"`
-		Data  []tradingCard `json:"data"` // One Piece's
+		return answer, fmt.Errorf("cards: PokéWallet refused %s: status %d", set.Collection, resp.StatusCode)
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 8<<20)).Decode(&answer); err != nil {
-		return nil, fmt.Errorf("cards: read PokéWallet: %w", err)
+		return answer, fmt.Errorf("cards: read PokéWallet: %w", err)
+	}
+	return answer, nil
+}
+
+// variant is the end of a card's name that tells its art from another's:
+// "Shanks (Parallel) (Manga) (Alternate Art)", "Mew ex (151 Metal Card)".
+var variant = regexp.MustCompile(`(\s*\([^)]*\))+$`)
+
+// character is the character a card's name is of.
+func character(name string) string {
+	return strings.ToLower(strings.TrimSpace(variant.ReplaceAllString(name, "")))
+}
+
+// fetchSet is a set's cards, all its pages, by rarity up to its quota and one
+// per character and rarity.
+func fetchSet(ctx context.Context, client *http.Client, baseURL, key string, set tradingSet) ([]storage.Card, error) {
+	first, err := fetchSetPage(ctx, client, baseURL, key, set, 1)
+	if err != nil {
+		return nil, err
+	}
+	all := append(first.Cards, first.Data...)
+	for page := 2; page <= min(first.Pagination.TotalPages, maxSetPages); page++ {
+		next, err := fetchSetPage(ctx, client, baseURL, key, set, page)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, append(next.Cards, next.Data...)...)
 	}
 	taken := map[Rarity]int{}
+	seen := map[string]bool{}
 	var cards []storage.Card
-	for _, c := range append(answer.Cards, answer.Data...) {
+	for _, c := range all {
 		name, rarity, productType := c.fields()
-		r, known := tradingRarities[rarity]
-		if !known || productType != "card" || taken[r] == setQuota[r] {
+		r, known := rarityOf(set.Collection, rarity)
+		name = strings.TrimSpace(tradingName.ReplaceAllString(name, ""))
+		who := fmt.Sprint(r, character(name))
+		if !known || productType != "card" || taken[r] == setQuota[r] || seen[who] {
 			continue
 		}
 		taken[r]++
+		seen[who] = true
 		id := tradingID(c.ID)
 		rl := rules[r]
 		cards = append(cards, storage.Card{
-			ID: id, Name: strings.TrimSpace(tradingName.ReplaceAllString(name, "")), Anime: set.Title + " · " + answer.Set.Name,
-			ImageURL: baseURL + set.ImagePrefix + "/images/" + url.PathEscape(c.ID) + "?size=low", Rarity: int(r), Value: rl.value, Collection: set.Collection,
+			ID: id, Name: name, Anime: set.Title + " · " + first.Set.Name,
+			ImageURL: baseURL + set.ImagePrefix + "/images/" + url.PathEscape(c.ID) + "?size=high", Rarity: int(r), Value: rl.value, Collection: set.Collection,
 			Attack: rounded(between(id, "attack", rl.attackLeast, rl.attackMost)),
 			Health: rounded(between(id, "health", rl.healthLeast, rl.healthMost)),
 		})
