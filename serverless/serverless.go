@@ -117,7 +117,7 @@ var webhook = &lazy{name: "webhook", build: func(ctx context.Context, cfg config
 		return nil, nil, err
 	}
 	logger.Info("webhook ready", "username", hook.Bot.User.Username, "name", cfg.BotDisplayName, "model", cfg.Model)
-	return hook.Handler, hook.Close, nil
+	return app.WithDueWork(hook.Handler, hook.DueWork, time.Minute, logger), hook.Close, nil
 }}
 
 var cleanup = &lazy{name: "cleanup", build: func(ctx context.Context, cfg config.Config, logger *slog.Logger) (http.Handler, func(), error) {

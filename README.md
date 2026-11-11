@@ -879,6 +879,12 @@ are deleted by the daily cleanup a week later (migration 60).
   `Authorization: Bearer <CRON_SECRET>`; anything else gets `401`, and
   without `CRON_SECRET` in the project the function answers `503`.
 
+  The webhook does the same work beside the updates it receives, at most
+  once a minute on each instance, so cards and reminders go out while
+  people write to the bot even without cron-job.org; the scheduler keeps
+  them on time when the chats are quiet. Overlapping runs send each one
+  once.
+
 ### Setting up cron-job.org
 
 1. Sign up at [cron-job.org](https://cron-job.org) (free) and choose
@@ -892,7 +898,7 @@ are deleted by the daily cleanup a week later (migration 60).
    (the same value set in Vercel; `openssl rand -hex 32` if it is not set
    yet).
 5. **Timeout:** the default 30 seconds is enough; a call takes at most
-   about 13. Turn on *notify on failure* to hear when it stops working.
+   about 20. Turn on *notify on failure* to hear when it stops working.
 6. Save, then *Test run*: it should answer `200` with the JSON above.
    cron-job.org's history lists every call and its answer.
 

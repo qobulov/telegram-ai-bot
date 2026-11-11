@@ -745,6 +745,10 @@ type Webhook struct {
 	Handler http.Handler
 	// Bot is the account updates are handled as.
 	Bot Bot
+	// DueWork opens the auto opener's cards and sends the reminders that
+	// are due, as the reminders endpoint does; WithDueWork runs it beside
+	// the updates.
+	DueWork func(ctx context.Context) (reminders.Summary, error)
 	// Close releases the database pool. A serverless function never calls
 	// it; tests and other hosts do.
 	Close func()
@@ -798,6 +802,7 @@ func newWebhook(ctx context.Context, cfg config.Config, store *storage.Store, lo
 	return &Webhook{
 		Handler: handler,
 		Bot:     bot,
+		DueWork: ReminderJob(cfg, store, bot, logger),
 		Close: func() {
 			svc.Close()
 			store.Close()
