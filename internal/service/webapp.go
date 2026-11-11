@@ -106,9 +106,9 @@ var (
 		en: "/dooz — tic-tac-toe: with a friend or with me",
 	}
 	textGamesCards = localText{
-		uz: "🎴 Kartalar: /karta · /kartalar (ilova) · /kartatop · /parcha · /duel",
-		ru: "🎴 Карты: /karta · /kartalar (приложение) · /kartatop · /parcha · /duel",
-		en: "🎴 Cards: /karta · /kartalar (the app) · /kartatop · /parcha · /duel",
+		uz: "🎴 Kartalar: /karta · /kartalar (ilova) · /kartatop · /kristal · /duel",
+		ru: "🎴 Карты: /karta · /kartalar (приложение) · /kartatop · /kristal · /duel",
+		en: "🎴 Cards: /karta · /kartalar (the app) · /kartatop · /kristal · /duel",
 	}
 )
 

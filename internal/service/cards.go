@@ -99,13 +99,6 @@ func (s *Service) drawCard(ctx context.Context, in incoming) outcome {
 	var wait *storage.CardWaitError
 	switch {
 	case errors.As(err, &wait):
-		// A draw does not count in the group's quota, but being told to wait
-		// does, or pressing /karta would flood the group.
-		if in.group && !s.isOwner(in.msg.From) && s.opts.GroupReplies != nil {
-			if _, ok := s.reserveGroupReply(in); !ok {
-				return outcome{}
-			}
-		}
 		return say(fmt.Sprintf(textCardWait.to(in), max(1, int(wait.Wait.Round(time.Minute).Minutes()))))
 	case err != nil:
 		s.opts.Logger.Error("could not draw a card", "user_id", in.userID, "error", err)
@@ -354,7 +347,7 @@ var (
 	textCardHealth     = localText{uz: "❤️ Sog'liq: %s", ru: "❤️ Здоровье: %s", en: "❤️ Health: %s"}
 	textCardPoints     = localText{uz: "💠 +%s ochko (jami %s)", ru: "💠 +%s очков (всего %s)", en: "💠 +%s points (%s in all)"}
 	textCardNew        = localText{uz: "🆕 Yangi karta!", ru: "🆕 Новая карта!", en: "🆕 A new card!"}
-	textCardAgain      = localText{uz: "🔁 Sizda endi ×%d · ♻️ /parcha", ru: "🔁 Теперь у вас ×%d · ♻️ /parcha", en: "🔁 You now have ×%d · ♻️ /parcha"}
+	textCardAgain      = localText{uz: "🔁 Sizda endi ×%d · ♻️ /eritish", ru: "🔁 Теперь у вас ×%d · ♻️ /eritish", en: "🔁 You now have ×%d · ♻️ /eritish"}
 	textCardGuaranteed = localText{uz: "✨ Kafolatlangan karta!", ru: "✨ Гарантированная карта!", en: "✨ A guaranteed card!"}
 	textCardPity       = localText{
 		uz: "🎯 Kafolat: 🔥 %d · 👑 %d kartadan keyin",
@@ -364,9 +357,9 @@ var (
 	textCardAll        = localText{uz: "🗂 Hammasi - %d/%d", ru: "🗂 Все - %d/%d", en: "🗂 All - %d/%d"}
 	textCardAllTitle   = localText{uz: "🗂 Barcha kartalaringiz", ru: "🗂 Все ваши карты", en: "🗂 All your cards"}
 	textCardCollection = localText{
-		uz: "🎴 %s, qaysi kartalarni ko'rasiz?\n💠 Ochko: %s\n💎 Parcha va duel: /parcha",
-		ru: "🎴 %s, какие карты посмотреть?\n💠 Очки: %s\n💎 Осколки и дуэль: /parcha",
-		en: "🎴 %s, which cards do you want to see?\n💠 Points: %s\n💎 Shards and duels: /parcha",
+		uz: "🎴 %s, qaysi kartalarni ko'rasiz?\n💠 Ochko: %s\n💎 Kristal va duel: /kristal",
+		ru: "🎴 %s, какие карты посмотреть?\n💠 Очки: %s\n💎 Кристаллы и дуэль: /kristal",
+		en: "🎴 %s, which cards do you want to see?\n💠 Points: %s\n💎 Crystals and duels: /kristal",
 	}
 	textCardNotYours = localText{
 		uz: "Bu sizning kolleksiyangiz emas: o'zingiznikini /kartalarim bilan oching.",

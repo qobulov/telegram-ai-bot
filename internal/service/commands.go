@@ -597,19 +597,19 @@ const overQuotaReaction = "👀"
 // It also returns the answer taken, to give back if the turn answers
 // nothing; 0 when none was taken.
 func (s *Service) mayAnswerInGroup(in incoming) (reservation int64, allowed bool) {
-	if !in.group || in.fromBot || s.opts.GroupReplies == nil || s.isOwner(in.msg.From) || !s.hasContent(in) || s.isManagerCommand(in) || selfLimited[commandName(in.text)] {
+	if !in.group || in.fromBot || s.opts.GroupReplies == nil || s.isOwner(in.msg.From) || !s.hasContent(in) || s.isManagerCommand(in) || isCommand(in.text) {
 		return 0, true
 	}
 	return s.reserveGroupReply(in)
 }
 
-// selfLimited are the commands with limits of their own, which the group's
-// quota of answers does not count: a card an hour, or for shards, two games a chat in ten
-// minutes. Counted with the bot's talk, they went unanswered where it talked
-// much, a third of what the quota stopped. What they say when their own limit
-// holds is counted, or only reacted to, so that pressing them cannot flood.
-var selfLimited = map[string]bool{
-	"/karta": true, "/qoshimcha": true, "/boss": true, "/ilon": true, "/otinchi": true, "/maydon": true, "/game": true, "/mafia": true,
+// isCommand reports a command, which the group's quota of answers does not
+// count: the quota is for the model's talk, and a command never asks the
+// model, an unknown one only saying so. Counted with that talk, /kartalarim
+// went unanswered to a member who had talked with the bot that hour. The
+// flood guard still holds for commands, as for anything.
+func isCommand(text string) bool {
+	return strings.HasPrefix(strings.TrimSpace(text), "/")
 }
 
 // reserveGroupReply takes one of the group's answers for the message, or
@@ -793,9 +793,9 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return outcome{text: textCardsApp.to(in), buttons: s.cardsAppButton(in)}
 	case s.opts.Cards != nil && commandName(in.text) == "/kartatop":
 		return s.cardTop(ctx, in)
-	case s.opts.Cards != nil && commandName(in.text) == "/parcha":
+	case s.opts.Cards != nil && commandName(in.text) == "/kristal":
 		return s.cardWallet(ctx, in)
-	case s.opts.Cards != nil && commandName(in.text) == "/parchala":
+	case s.opts.Cards != nil && commandName(in.text) == "/eritish":
 		return s.meltCards(ctx, in)
 	case s.opts.Cards != nil && commandName(in.text) == "/qoshimcha":
 		return s.extraCard(ctx, in)

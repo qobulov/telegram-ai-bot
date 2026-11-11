@@ -18,7 +18,7 @@ import (
 // off; target 0 is anyone.
 const duelData = "kd:"
 
-// cardWallet answers /parcha: the player's shards, the spare copies they may
+// cardWallet answers /kristal: the player's shards, the spare copies they may
 // melt and what shards buy.
 func (s *Service) cardWallet(ctx context.Context, in incoming) outcome {
 	shards, spares, err := s.opts.Cards.CardWallet(ctx, in.userID)
@@ -37,7 +37,7 @@ func (s *Service) cardWallet(ctx context.Context, in incoming) outcome {
 	return say(strings.Join(lines, "\n"))
 }
 
-// meltCards answers /parchala: the player's spare copies melted into shards.
+// meltCards answers /eritish: the player's spare copies melted into shards.
 func (s *Service) meltCards(ctx context.Context, in incoming) outcome {
 	melted, gained, shards, err := s.opts.Cards.MeltCards(ctx, in.userID, cards.ShardRates)
 	if err != nil {
@@ -62,13 +62,6 @@ func (s *Service) extraCard(ctx context.Context, in incoming) outcome {
 	var few *storage.ShardsError
 	switch {
 	case errors.As(err, &few):
-		// Like being told to wait for a card, being told of too few shards
-		// counts in the group's quota, or pressing /qoshimcha would flood it.
-		if in.group && !s.isOwner(in.msg.From) && s.opts.GroupReplies != nil {
-			if _, ok := s.reserveGroupReply(in); !ok {
-				return outcome{}
-			}
-		}
 		return say(fmt.Sprintf(textShardsTooFew.to(in), few.Need, few.Have))
 	case err != nil:
 		s.opts.Logger.Error("could not draw a card for shards", "user_id", in.userID, "error", err)
@@ -298,9 +291,9 @@ func duelCard(in incoming, r cards.DuelRound, side int) string {
 }
 
 var (
-	textShardsTitle    = localText{uz: "💎 %s, parchalaringiz: **%d**", ru: "💎 %s, ваши осколки: **%d**", en: "💎 %s, your shards: **%d**"}
-	textShardsMelt     = localText{uz: "♻️ %d ta takror karta → +%d 💎: /parchala", ru: "♻️ %d повторных карт → +%d 💎: /parchala", en: "♻️ %d spare cards → +%d 💎: /parchala"}
-	textShardsNoSpares = localText{uz: "♻️ Parchalash uchun takror karta yo'q.", ru: "♻️ Повторных карт для осколков нет.", en: "♻️ No spare cards to melt."}
+	textShardsTitle    = localText{uz: "💎 %s, kristallaringiz: **%d**", ru: "💎 %s, ваши кристаллы: **%d**", en: "💎 %s, your crystals: **%d**"}
+	textShardsMelt     = localText{uz: "♻️ %d ta takror karta → +%d 💎: /eritish", ru: "♻️ %d повторных карт → +%d 💎: /eritish", en: "♻️ %d spare cards → +%d 💎: /eritish"}
+	textShardsNoSpares = localText{uz: "♻️ Kristalga aylantirish uchun takror karta yo'q.", ru: "♻️ Повторных карт для кристаллов нет.", en: "♻️ No spare cards to melt."}
 	textShardsExtra    = localText{uz: "🎴 Navbatdan tashqari karta: %d 💎 — /qoshimcha", ru: "🎴 Карта вне очереди: %d 💎 — /qoshimcha", en: "🎴 A card out of turn: %d 💎 — /qoshimcha"}
 	textShardsDuel     = localText{
 		uz: "⚔️ Duel: /duel 10 — xabarga javob qilib yoki hammaga",
@@ -313,11 +306,11 @@ var (
 		en: "A spare: ⚪1 · 🔷3 · 💜8 · 🔥20 · 👑50 💎. Points and ranking stay.",
 	}
 	textShardsMelted = localText{
-		uz: "♻️ %d ta takror karta parchalandi: +%d 💎 (jami %d). Ochkolaringiz o'zgarmadi.",
-		ru: "♻️ %d повторных карт стали осколками: +%d 💎 (всего %d). Очки не изменились.",
+		uz: "♻️ %d ta takror karta kristalga aylandi: +%d 💎 (jami %d). Ochkolaringiz o'zgarmadi.",
+		ru: "♻️ %d повторных карт стали кристаллами: +%d 💎 (всего %d). Очки не изменились.",
 		en: "♻️ %d spare cards melted: +%d 💎 (%d in all). Your points stay.",
 	}
-	textShardsTooFew = localText{uz: "💎 Kerak: %d, sizda: %d. Parcha: /parcha", ru: "💎 Нужно: %d, у вас: %d. Осколки: /parcha", en: "💎 It takes %d, you have %d. Shards: /parcha"}
+	textShardsTooFew = localText{uz: "💎 Kerak: %d, sizda: %d. Kristal: /kristal", ru: "💎 Нужно: %d, у вас: %d. Кристаллы: /kristal", en: "💎 It takes %d, you have %d. Crystals: /kristal"}
 	textShardsSpent  = localText{uz: "💎 -%d (qoldi %d)", ru: "💎 -%d (осталось %d)", en: "💎 -%d (%d left)"}
 
 	textDuelGroupOnly = localText{uz: "⚔️ Duel guruhda o'ynaladi.", ru: "⚔️ Дуэль играют в группе.", en: "⚔️ Duels are fought in a group."}

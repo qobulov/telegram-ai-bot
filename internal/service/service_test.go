@@ -1427,7 +1427,9 @@ func TestGroupTurnThatAnswersNothingGivesItsAnswerBack(t *testing.T) {
 	}
 }
 
-func TestMembersMuteAttemptsAreCounted(t *testing.T) {
+// A member's /mute is refused, each time: commands take none of the group's
+// quota, which is for the model's talk, and the flood guard bounds them.
+func TestMembersMuteAttemptsAreRefused(t *testing.T) {
 	f := newFixture()
 	quota := &fakeGroupQuota{}
 	f.opts.GroupReplies = quota
@@ -1440,8 +1442,8 @@ func TestMembersMuteAttemptsAreCounted(t *testing.T) {
 		inGroup(groupMessage("/mute@MyBot")),
 	)
 
-	if len(sent) != 2 || sent[0].text != textAdminsOnly || len(quota.asked()) != 3 {
-		t.Errorf("sent = %+v, quota asked %d times; a member's /mute is only refused, and the refusals are counted",
+	if len(sent) != 3 || sent[0].text != textAdminsOnly || len(quota.asked()) != 0 {
+		t.Errorf("sent = %+v, quota asked %d times; a member's /mute is only refused, and the refusals are not counted",
 			sent, len(quota.asked()))
 	}
 	if len(f.muter.calls) != 0 {
@@ -1475,14 +1477,14 @@ func TestManagersCommandsAndModerationRequestsPassAFullQuota(t *testing.T) {
 	for _, msg := range sent {
 		texts = append(texts, msg.text)
 	}
-	want := []string{"Okay, I won't answer Bek @bek for the next 24 hours.", "Boss: mute him"}
-	if len(texts) != len(want) || texts[0] != want[0] || !strings.HasSuffix(texts[1], want[1]) {
-		t.Errorf("sent = %q\nwant %q: the admin's command and moderation request pass; their chat and the member's command do not", texts, want)
+	want := []string{"Okay, I won't answer Bek @bek for the next 24 hours.", "Boss: mute him", textAdminsOnly}
+	if len(texts) != len(want) || texts[0] != want[0] || !strings.HasSuffix(texts[1], want[1]) || texts[2] != want[2] {
+		t.Errorf("sent = %q\nwant %q: the admin's command and moderation request pass, their chat does not, and the member's command is refused", texts, want)
 	}
-	// The admin's chat is counted like anyone's, and denied; so is the
-	// member's command.
-	if asked := quota.asked(); len(asked) != 3 {
-		t.Errorf("quota asked %d times, want 3: the request, the chat and the member's command", len(asked))
+	// The admin's chat is counted like anyone's, and denied; commands are
+	// not counted.
+	if asked := quota.asked(); len(asked) != 2 {
+		t.Errorf("quota asked %d times, want 2: the request and the chat", len(asked))
 	}
 }
 

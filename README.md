@@ -1311,7 +1311,7 @@ match "maria" unless you add it:
 word.
 
 **Commands** in a group need the bot's username (`/help@MyMariaBot`). A plain
-`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/karta`, `/kartalarim`, `/kartatop`, `/kartalar`, `/parcha`, `/parchala`, `/qoshimcha`, `/duel`, `/boss`, `/ilon`, `/otinchi`, `/maydon`, `/shashka` and `/dooz`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username.
+`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/karta`, `/kartalarim`, `/kartatop`, `/kartalar`, `/kristal`, `/eritish`, `/qoshimcha`, `/duel`, `/boss`, `/ilon`, `/otinchi`, `/maydon`, `/shashka` and `/dooz`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username.
 
 ### Example
 
@@ -2067,9 +2067,9 @@ Mini App (`since_legendary` and `since_mythic` on `card_players`, migration
 draws by the odds alone had brought no Mythic. In the Mini App a Mythic card glows: a rainbow foil runs over it, its gold
 glow breathes, it sparkles, and in the large view it leans with the finger or
 the phone, in CSS alone. A card drawn again gave only
-points, so its spare copies melt into 💎 shards (`/parchala`: 1, 3, 8, 20 or
+points, so its spare copies melt into 💎 crystals (`/eritish`: 1, 3, 8, 20 or
 50 by rarity), the copies still held and counted in the points so that melting
-costs no place on the table (`card_owned.melted`, migration 63); `/parcha`
+costs no place on the table (`card_owned.melted`, migration 63); `/kristal`
 shows the shards, what melting would give and what they buy. `/qoshimcha`
 draws a card out of turn for 15 shards, the hourly card left where it was.
 `/duel [stake]` in a group calls a member out, the one replied to or anyone,
@@ -2365,7 +2365,7 @@ both sides or a bot game without the bot is refused.
   The conversation, the mute setting and the standing rules from before the
   upgrade no longer apply.
 - In forum-style supergroups she answers in the topic of the message she
-  replies to. This was not tested against a real forum. The commands with limits of their own are not counted: `/karta` (a card an hour) and the games, `/boss`, `/ilon`, `/otinchi`, `/maydon`, `/game` and `/mafia`, which in a group go through `send_game`'s two games a chat in ten minutes, one too soon getting only 👀; being told to wait for a card is counted, so that pressing it cannot flood the group.
+  replies to. This was not tested against a real forum. No command is counted, the quota being for the model's talk: a command never asks the model, so `/kartalarim`, `/karta` and its wait, the games and the rest are always answered, the flood guard still bounding them, and the games in a group keep `send_game`'s two a chat in ten minutes, one too soon getting only 👀.
 
 ### BotFather privacy mode
 

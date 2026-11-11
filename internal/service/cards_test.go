@@ -252,9 +252,8 @@ func TestCardTopShowsTheAskersPlace(t *testing.T) {
 	}
 }
 
-// /karta is not counted in the group's quota, as it has its own limit: a
-// member out of answers still draws. Being told to wait is counted, so that
-// pressing it cannot flood the group.
+// /karta is not counted in the group's quota, which is for the model's talk:
+// a member out of answers still draws, and is still told to wait.
 func TestCardDrawsTakeNoGroupQuota(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("\x89PNG")) }))
 	defer server.Close()
@@ -269,8 +268,8 @@ func TestCardDrawsTakeNoGroupQuota(t *testing.T) {
 	if len(sent) != 2 || !sent[1].photo {
 		t.Fatalf("sent = %+v, want the answer and then the card", sent)
 	}
-	if sent = f.run(inGroup(groupMessage("/karta"))); len(sent) != 2 {
-		t.Errorf("a wait over the quota sent %+v, want nothing more", sent[2:])
+	if sent = f.run(inGroup(groupMessage("/karta"))); len(sent) != 3 || !strings.Contains(sent[2].text, "⏳") {
+		t.Errorf("a wait over the quota sent %+v, want the wait", sent)
 	}
 }
 
@@ -323,13 +322,13 @@ func TestShardsMeltAndBuyACard(t *testing.T) {
 	f.opts.Cards = book
 	book.held[userID] = 2
 
-	if sent := f.run(textFrom(userID, "/parcha")); len(sent) != 1 || !strings.Contains(sent[0].text, "1 ta takror karta → +50 💎") {
+	if sent := f.run(textFrom(userID, "/kristal")); len(sent) != 1 || !strings.Contains(sent[0].text, "1 ta takror karta → +50 💎") {
 		t.Fatalf("wallet = %+v", sent)
 	}
 	if sent := f.run(textFrom(userID, "/qoshimcha")); len(sent) != 2 || !strings.Contains(sent[1].text, "Kerak: 15, sizda: 0") {
 		t.Fatalf("an extra card for no shards = %+v", sent)
 	}
-	if sent := f.run(textFrom(userID, "/parchala")); len(sent) != 3 || !strings.Contains(sent[2].text, "+50 💎 (jami 50)") {
+	if sent := f.run(textFrom(userID, "/eritish")); len(sent) != 3 || !strings.Contains(sent[2].text, "+50 💎 (jami 50)") {
 		t.Fatalf("melt = %+v", sent)
 	}
 	if sent := f.run(textFrom(userID, "/qoshimcha")); len(sent) != 4 || !strings.Contains(sent[3].text, "💎 -15 (qoldi 35)") {
