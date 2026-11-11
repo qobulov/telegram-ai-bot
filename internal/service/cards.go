@@ -29,6 +29,7 @@ type CardBook interface {
 	ExtraCard(ctx context.Context, userID int64, name string, roll storage.CardRoll, cost int) (storage.CardDraw, error)
 	DuelTeam(ctx context.Context, userID int64, n int) ([]storage.Card, error)
 	ResolveDuel(ctx context.Context, chatID, messageID, winner, loser int64, stake int) (moved int, settled bool, err error)
+	ToggleCardAuto(ctx context.Context, userID int64, name, language string) (bool, error)
 }
 
 const (
@@ -104,7 +105,7 @@ func (s *Service) drawCard(ctx context.Context, in incoming) outcome {
 		s.opts.Logger.Error("could not draw a card", "user_id", in.userID, "error", err)
 		return say(textCardsUnavailable.to(in))
 	}
-	return s.withPicture(ctx, say(cardCaption(in, draw)), draw.Card)
+	return s.withPicture(ctx, say(cardCaption(languageOf(in), draw)), draw.Card)
 }
 
 // withPicture adds the card's picture to out, which goes without it when
@@ -120,27 +121,27 @@ func (s *Service) withPicture(ctx context.Context, out outcome, card storage.Car
 
 // cardCaption is a drawn card: its name and anime, numbers, rarity, the
 // points it gave, and in how many draws a Legendary and a Mythic are sure.
-func cardCaption(in incoming, draw storage.CardDraw) string {
+func cardCaption(language string, draw storage.CardDraw) string {
 	c := draw.Card
-	lines := []string{rarityNames[c.Rarity].to(in) + " **" + cardMarks.Replace(c.Name) + "**"}
+	lines := []string{rarityNames[c.Rarity].inLanguage(language) + " **" + cardMarks.Replace(c.Name) + "**"}
 	if c.Anime != "" {
 		lines = append(lines, "🎬 "+cardMarks.Replace(c.Anime))
 	}
 	lines = append(lines, "",
-		fmt.Sprintf(textCardAttack.to(in), spaced(int64(c.Attack))),
-		fmt.Sprintf(textCardHealth.to(in), spaced(int64(c.Health))),
+		fmt.Sprintf(textCardAttack.inLanguage(language), spaced(int64(c.Attack))),
+		fmt.Sprintf(textCardHealth.inLanguage(language), spaced(int64(c.Health))),
 		"",
-		fmt.Sprintf(textCardPoints.to(in), spaced(int64(c.Value)), spaced(draw.Points)))
+		fmt.Sprintf(textCardPoints.inLanguage(language), spaced(int64(c.Value)), spaced(draw.Points)))
 	if draw.New {
-		lines = append(lines, textCardNew.to(in))
+		lines = append(lines, textCardNew.inLanguage(language))
 	} else {
-		lines = append(lines, fmt.Sprintf(textCardAgain.to(in), draw.Count))
+		lines = append(lines, fmt.Sprintf(textCardAgain.inLanguage(language), draw.Count))
 	}
 	if draw.Guaranteed {
-		lines = append(lines, textCardGuaranteed.to(in))
+		lines = append(lines, textCardGuaranteed.inLanguage(language))
 	}
 	legendary, mythic := cards.PityIn(draw)
-	lines = append(lines, fmt.Sprintf(textCardPity.to(in), legendary, mythic))
+	lines = append(lines, fmt.Sprintf(textCardPity.inLanguage(language), legendary, mythic))
 	return strings.Join(lines, "\n")
 }
 

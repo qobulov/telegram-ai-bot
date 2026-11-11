@@ -533,6 +533,8 @@ type Outgoing struct {
 	// hint, so that what the user writes next answers it: a question the
 	// bot asks.
 	Ask string
+	// Silent sends it without a sound.
+	Silent bool
 }
 
 // EffectParty is the 🎉 message effect, one of the few Telegram offers in

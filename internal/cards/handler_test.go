@@ -49,6 +49,8 @@ type fakeStore struct {
 	draws    int
 	images   map[int64]string
 	shards   int
+	auto     bool
+	autoLang string
 }
 
 var (
@@ -79,7 +81,7 @@ func (f *fakeStore) OwnedCards(context.Context, int64, int) ([]storage.OwnedCard
 	return []storage.OwnedCard{{Card: heldCard, Count: 2}}, nil
 }
 func (f *fakeStore) CardPlayerOf(context.Context, int64) (storage.CardPlayer, time.Time, error) {
-	return storage.CardPlayer{Points: 10000, Cards: 1}, f.last, nil
+	return storage.CardPlayer{Points: 10000, Cards: 1, Auto: f.auto}, f.last, nil
 }
 func (f *fakeStore) CardTop(context.Context, int) ([]storage.CardPlayer, error) {
 	return []storage.CardPlayer{{UserID: 7, Name: "Bek", Points: 10000, Cards: 1}}, nil
@@ -106,6 +108,11 @@ func (f *fakeStore) ExtraCard(_ context.Context, _ int64, _ string, _ storage.Ca
 	}
 	f.shards -= cost
 	return storage.CardDraw{Card: heldCard, Count: 4, Points: 20000, Shards: f.shards}, nil
+}
+
+func (f *fakeStore) SetCardAuto(_ context.Context, _ int64, _ string, on bool, language string) error {
+	f.auto, f.autoLang = on, language
+	return nil
 }
 
 func post(t *testing.T, h http.Handler, initData, action string) (int, map[string]any) {
@@ -355,5 +362,42 @@ func TestShardsInTheMiniApp(t *testing.T) {
 	}
 	if code, out := post(t, h, initData, "extra"); code != 200 || out["shards"] != float64(52-ExtraCost) || out["card"] == nil {
 		t.Errorf("an extra card = %d %v", code, out)
+	}
+}
+
+// The Mini App's switch turns the auto opener on and off, in the player's
+// language, and the state shows where it is.
+func TestTheAutoOpenerSwitch(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	store := &fakeStore{}
+	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }})
+	initData := signedInit(7, now)
+	turn := func(on bool) (int, map[string]any) {
+		body, _ := json.Marshal(map[string]any{"init_data": initData, "action": "auto", "on": on})
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/cards", strings.NewReader(string(body))))
+		var out map[string]any
+		_ = json.Unmarshal(rec.Body.Bytes(), &out)
+		return rec.Code, out
+	}
+	if _, out := post(t, h, initData, "state"); out["auto"] != false {
+		t.Fatalf("state = %v", out)
+	}
+	if code, out := turn(true); code != 200 || out["auto"] != true || !store.auto || store.autoLang != "uz" {
+		t.Fatalf("on = %d %v, stored %v %q", code, out, store.auto, store.autoLang)
+	}
+	if _, out := post(t, h, initData, "state"); out["auto"] != true {
+		t.Errorf("state after on = %v", out)
+	}
+	if code, out := turn(false); code != 200 || out["auto"] != false || store.auto {
+		t.Errorf("off = %d %v", code, out)
+	}
+}
+
+func TestAppLanguage(t *testing.T) {
+	for code, want := range map[string]string{"": "uz", "uz": "uz", "ru": "ru", "uk-UA": "ru", "en": "en", "de": "en"} {
+		if got := appLanguage(code); got != want {
+			t.Errorf("appLanguage(%q) = %q, want %q", code, got, want)
+		}
 	}
 }

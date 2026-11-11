@@ -12,6 +12,7 @@
       title: "Kartalar", collected: "to'plandi", collection: "Kolleksiya", draw: "Olish", top: "Reyting",
       search: "Kartani qidirish", rarities: ["Oddiy", "Noyob", "Epik", "Afsonaviy", "Mifik"],
       drawNow: "Karta olish", drawing: "Ochilmoqda…", next: (t) => `Keyingi karta: ${t}`, ready: "Karta tayyor!",
+      autoTitle: "🤖 Avto-ochish", autoHint: "Karta tayyor bo'lishi bilan o'zi ochilib, shaxsiy chatga ovozsiz keladi", autoOn: "🤖 Avto-ochish yoqildi", autoOff: "⏸ Avto-ochish o'chirildi",
       shardsTitle: "kristal", melt: (n, w) => `♻️ Kristalga aylantirish: ${n} ta → +${w} 💎`, noSpare: "♻️ Takror karta yo'q", extra: (c) => `🎴 Qo'shimcha karta · ${c} 💎`, fewShards: (n, h) => `💎 Kerak: ${n}, sizda: ${h}`, melted: (n, g) => `♻️ ${n} ta karta → +${g} 💎`, shardsHint: "Takror kartalar kristalga aylanadi, ochko kamaymaydi. Duel: guruhda /duel",
       fresh: "🆕 Yangi karta!", sure: "✨ Kafolatlangan karta!", pity: (l, m) => `🎯 Kafolat: {3} ${l} · {4} ${m} kartadan keyin`, again: (n) => `🔁 Sizda endi ×${n}`, plus: (n) => `+${n} ochko`,
       attack: "Hujum", health: "Sog'liq", value: "Ochko", cards: (n) => `${n} karta`, pts: "ochko",
@@ -28,6 +29,7 @@
       title: "Карты", collected: "собрано", collection: "Коллекция", draw: "Получить", top: "Рейтинг",
       search: "Поиск по картам", rarities: ["Обычная", "Редкая", "Эпическая", "Легендарная", "Мифическая"],
       drawNow: "Получить карту", drawing: "Открываем…", next: (t) => `Следующая карта: ${t}`, ready: "Карта готова!",
+      autoTitle: "🤖 Автооткрытие", autoHint: "Карта откроется сама, как только будет готова, и придёт в личку без звука", autoOn: "🤖 Автооткрытие включено", autoOff: "⏸ Автооткрытие выключено",
       shardsTitle: "кристаллов", melt: (n, w) => `♻️ Расплавить: ${n} → +${w} 💎`, noSpare: "♻️ Повторных карт нет", extra: (c) => `🎴 Карта вне очереди · ${c} 💎`, fewShards: (n, h) => `💎 Нужно: ${n}, у вас: ${h}`, melted: (n, g) => `♻️ ${n} карт → +${g} 💎`, shardsHint: "Повторы становятся кристаллами, очки не уменьшаются. Дуэль: /duel в группе",
       fresh: "🆕 Новая карта!", sure: "✨ Гарантированная карта!", pity: (l, m) => `🎯 Гарантия: {3} через ${l} · {4} через ${m} карт`, again: (n) => `🔁 Теперь у вас ×${n}`, plus: (n) => `+${n} очков`,
       attack: "Атака", health: "Здоровье", value: "Очки", cards: (n) => `${n} карт`, pts: "очков",
@@ -44,6 +46,7 @@
       title: "Cards", collected: "collected", collection: "Collection", draw: "Draw", top: "Ranking",
       search: "Search cards", rarities: ["Common", "Rare", "Epic", "Legendary", "Mythic"],
       drawNow: "Draw a card", drawing: "Opening…", next: (t) => `Next card in ${t}`, ready: "A card is ready!",
+      autoTitle: "🤖 Auto opener", autoHint: "Each card opens itself when it is ready and comes to your private chat quietly", autoOn: "🤖 Auto opener on", autoOff: "⏸ Auto opener off",
       shardsTitle: "crystals", melt: (n, w) => `♻️ Melt: ${n} → +${w} 💎`, noSpare: "♻️ No spare cards", extra: (c) => `🎴 A card out of turn · ${c} 💎`, fewShards: (n, h) => `💎 It takes ${n}, you have ${h}`, melted: (n, g) => `♻️ ${n} cards → +${g} 💎`, shardsHint: "Spares melt into crystals; your points stay. Duels: /duel in a group",
       fresh: "🆕 A new card!", sure: "✨ A guaranteed card!", pity: (l, m) => `🎯 Sure: {3} in ${l} · {4} in ${m} cards`, again: (n) => `🔁 You now have ×${n}`, plus: (n) => `+${n} points`,
       attack: "Attack", health: "Health", value: "Points", cards: (n) => `${n} cards`, pts: "points",
@@ -71,15 +74,15 @@
   const haptic = (kind) => { try { tg.HapticFeedback.impactOccurred(kind); } catch (_) { /* outside Telegram */ } };
 
   let cards = [], points = 0, nextAt = 0, drawing = false, query = "", opened = "", chosenSet = "";
-  let shards = 0, spare = 0, spareWorth = 0, extraCost = 15;
+  let shards = 0, spare = 0, spareWorth = 0, extraCost = 15, autoOn = false;
 
   // ---------- server ----------
 
-  async function api(action) {
+  async function api(action, extra) {
     const response = await fetch("/api/cards", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ init_data: tg.initData, action }),
+      body: JSON.stringify({ init_data: tg.initData, action, ...extra }),
     });
     const data = await response.json().catch(() => ({ error: "unavailable" }));
     if (!response.ok || data.error) throw new Error(data.error || "unavailable");
@@ -102,6 +105,8 @@
       spare = data.spare || 0;
       spareWorth = data.spare_worth || 0;
       extraCost = data.extra_cost || extraCost;
+      autoOn = !!data.auto;
+      autoSwitch();
       shardsPanel();
       notice(null);
       $("loading").hidden = true;
@@ -391,6 +396,31 @@
   });
 
   $("extra").addEventListener("click", () => reveal("extra"));
+
+  // ---------- auto opener ----------
+
+  function autoSwitch() {
+    $("auto").setAttribute("aria-checked", String(autoOn));
+  }
+
+  let autoBusy = false;
+  $("auto").addEventListener("click", async () => {
+    if (autoBusy) return;
+    autoBusy = true;
+    autoOn = !autoOn;
+    autoSwitch();
+    try {
+      const data = await api("auto", { on: autoOn });
+      autoOn = !!data.auto;
+      toast(autoOn ? t.autoOn : t.autoOff);
+    } catch (error) {
+      autoOn = !autoOn;
+      notice(error);
+    } finally {
+      autoBusy = false;
+      autoSwitch();
+    }
+  });
 
   $("draw").addEventListener("click", () => {
     if (Date.now() >= nextAt) reveal("draw");

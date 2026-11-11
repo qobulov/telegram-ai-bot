@@ -67,7 +67,7 @@ func (s *Service) extraCard(ctx context.Context, in incoming) outcome {
 		s.opts.Logger.Error("could not draw a card for shards", "user_id", in.userID, "error", err)
 		return say(textCardsUnavailable.to(in))
 	}
-	caption := cardCaption(in, draw) + "\n" + fmt.Sprintf(textShardsSpent.to(in), cards.ExtraCost, draw.Shards)
+	caption := cardCaption(languageOf(in), draw) + "\n" + fmt.Sprintf(textShardsSpent.to(in), cards.ExtraCost, draw.Shards)
 	return s.withPicture(ctx, say(caption), draw.Card)
 }
 

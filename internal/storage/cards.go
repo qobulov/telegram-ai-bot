@@ -66,6 +66,9 @@ type CardPlayer struct {
 	Name   string
 	Points int64
 	Cards  int
+	// Auto is whether the auto opener opens their cards; only
+	// CardPlayerOf reads it.
+	Auto bool
 }
 
 // ErrCardWait is returned by DrawCard when the player drew too lately: the
@@ -404,8 +407,8 @@ func (s *Store) CardCatalog(ctx context.Context) ([]Card, error) {
 func (s *Store) CardPlayerOf(ctx context.Context, userID int64) (CardPlayer, time.Time, error) {
 	p := CardPlayer{UserID: userID}
 	var last *time.Time
-	err := s.pool.QueryRow(ctx, `SELECT name, points, cards, last_draw_at FROM card_players WHERE user_id = $1`, userID).
-		Scan(&p.Name, &p.Points, &p.Cards, &last)
+	err := s.pool.QueryRow(ctx, `SELECT name, points, cards, last_draw_at, auto_draw FROM card_players WHERE user_id = $1`, userID).
+		Scan(&p.Name, &p.Points, &p.Cards, &last, &p.Auto)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return p, time.Time{}, nil
 	}

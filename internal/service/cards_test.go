@@ -26,6 +26,7 @@ type fakeCards struct {
 	shards map[int64]int
 	melted map[int64]int
 	duels  map[int64]bool
+	auto   map[int64]bool
 }
 
 func newFakeCards(picture string) *fakeCards {
@@ -93,6 +94,16 @@ func (f *fakeCards) ResolveDuel(_ context.Context, _, messageID, winner, loser i
 		f.shards[winner] += moved
 	}
 	return moved, true, nil
+}
+
+func (f *fakeCards) ToggleCardAuto(_ context.Context, userID int64, _, _ string) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.auto == nil {
+		f.auto = map[int64]bool{}
+	}
+	f.auto[userID] = !f.auto[userID]
+	return f.auto[userID], nil
 }
 
 func (f *fakeCards) CardCollections(context.Context) (map[string]int, error) {
@@ -305,12 +316,12 @@ func TestGameCommandKeepsTheGamesLimitInAGroup(t *testing.T) {
 func TestCardCaptionShowsTheSureCards(t *testing.T) {
 	in := incoming{msg: &telegram.Message{From: &telegram.User{ID: 1, FirstName: "Bek"}}, text: "/karta"}
 	draw := storage.CardDraw{Card: storage.Card{Name: "Gojo", Rarity: 4, Value: 5000}, New: true, Count: 1, Points: 5000, Guaranteed: true, SinceLegendary: 0, SinceMythic: 0}
-	caption := cardCaption(in, draw)
+	caption := cardCaption(languageOf(in), draw)
 	if !strings.Contains(caption, "✨ Kafolatlangan karta!") || !strings.Contains(caption, "🔥 30 · 👑 100") {
 		t.Errorf("a sure Mythic's caption:\n%s", caption)
 	}
 	draw.Guaranteed, draw.SinceLegendary, draw.SinceMythic = false, 12, 70
-	if caption = cardCaption(in, draw); strings.Contains(caption, "✨") || !strings.Contains(caption, "🔥 18 · 👑 30") {
+	if caption = cardCaption(languageOf(in), draw); strings.Contains(caption, "✨") || !strings.Contains(caption, "🔥 18 · 👑 30") {
 		t.Errorf("a card's caption:\n%s", caption)
 	}
 }

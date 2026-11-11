@@ -257,6 +257,8 @@ type Photo struct {
 	// Keyboard, in a private chat, puts the keyboard back with the picture,
 	// as Outgoing's does. A picture has Buttons or Keyboard, not both.
 	Keyboard [][]string
+	// Silent sends it without a sound, as a card opened for the player.
+	Silent bool
 }
 
 // SendPhoto uploads a picture and returns the ID of the sent message. A
@@ -275,6 +277,9 @@ func (c *Client) SendPhoto(ctx context.Context, photo Photo) (int64, error) {
 		}
 	}
 	fields["business_connection_id"] = photo.BusinessConnectionID // left out when ""
+	if photo.Silent {
+		fields["disable_notification"] = "true"
+	}
 	if len(photo.Buttons)+len(photo.Keyboard) > 0 {
 		encoded, err := json.Marshal(markup(Outgoing{Buttons: photo.Buttons, Keyboard: photo.Keyboard}))
 		if err != nil {
@@ -586,8 +591,9 @@ type sendMessageParams struct {
 	Entities             []messageEntity  `json:"entities,omitempty"`
 	ReplyParameters      *replyParameters `json:"reply_parameters,omitempty"`
 	// ReplyMarkup is an *inlineKeyboard or a *replyKeyboard.
-	ReplyMarkup     any    `json:"reply_markup,omitempty"`
-	MessageEffectID string `json:"message_effect_id,omitempty"`
+	ReplyMarkup         any    `json:"reply_markup,omitempty"`
+	MessageEffectID     string `json:"message_effect_id,omitempty"`
+	DisableNotification bool   `json:"disable_notification,omitempty"`
 }
 
 type inlineKeyboard struct {
@@ -655,7 +661,7 @@ type sentMessage struct {
 // (see formatted).
 func (c *Client) SendMessage(ctx context.Context, msg Outgoing) (int64, error) {
 	// A rich message carries no buttons, keyboard or effect.
-	if isRich(msg.Text) && len(msg.Buttons) == 0 && len(msg.Keyboard) == 0 && msg.Ask == "" && msg.Effect == "" {
+	if isRich(msg.Text) && len(msg.Buttons) == 0 && len(msg.Keyboard) == 0 && msg.Ask == "" && msg.Effect == "" && !msg.Silent {
 		id, err := c.sendRich(ctx, msg)
 		var refused *APIError
 		// Telegram answered no, so nothing was sent: the plain message
@@ -671,7 +677,7 @@ func (c *Client) SendMessage(ctx context.Context, msg Outgoing) (int64, error) {
 			continue
 		}
 		text, entities := formatted(chunk)
-		id, err := c.sendChunk(ctx, sendMessageParams{BusinessConnectionID: msg.BusinessConnectionID, ChatID: msg.ChatID, Text: text, Entities: entities, ReplyParameters: reply, ReplyMarkup: buttons, MessageEffectID: effect})
+		id, err := c.sendChunk(ctx, sendMessageParams{BusinessConnectionID: msg.BusinessConnectionID, ChatID: msg.ChatID, Text: text, Entities: entities, ReplyParameters: reply, ReplyMarkup: buttons, MessageEffectID: effect, DisableNotification: msg.Silent})
 		if err != nil {
 			return firstID, err
 		}

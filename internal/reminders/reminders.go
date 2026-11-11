@@ -22,8 +22,9 @@ const (
 	// batch is how many reminders one claim takes.
 	batch = 25
 	// budget is how long a call keeps sending, so that with one send
-	// after it the call ends inside the function's maxDuration of 15
-	// seconds; what is left waits for the next minute.
+	// after it, and the cards the auto opener opened before it, the call
+	// ends inside the function's maxDuration of 30 seconds; what is left
+	// waits for the next minute.
 	budget = 8 * time.Second
 	// sendTimeout bounds one message to Telegram.
 	sendTimeout = 5 * time.Second
@@ -65,6 +66,8 @@ type Options struct {
 
 // Summary is what one call did, as the endpoint answers it.
 type Summary struct {
+	// Opened is the cards the auto opener opened before the reminders.
+	Opened  int `json:"opened"`
 	Sent    int `json:"sent"`
 	Skipped int `json:"skipped"`
 	Failed  int `json:"failed"`

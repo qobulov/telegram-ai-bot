@@ -872,7 +872,7 @@ are deleted by the daily cleanup a week later (migration 60).
   minute. Each call sends what is due and answers a summary:
 
   ```json
-  {"sent":1,"skipped":0,"failed":0,"retried":0}
+  {"opened":0,"sent":1,"skipped":0,"failed":0,"retried":0}
   ```
 
   It is authenticated like the cleanup: `GET` with
@@ -1311,7 +1311,7 @@ match "maria" unless you add it:
 word.
 
 **Commands** in a group need the bot's username (`/help@MyMariaBot`). A plain
-`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/karta`, `/kartalarim`, `/kartatop`, `/kartalar`, `/kristal`, `/eritish`, `/qoshimcha`, `/duel`, `/boss`, `/ilon`, `/otinchi`, `/maydon`, `/shashka` and `/dooz`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username.
+`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/karta`, `/kartalarim`, `/kartatop`, `/kartalar`, `/kristal`, `/eritish`, `/avto`, `/qoshimcha`, `/duel`, `/boss`, `/ilon`, `/otinchi`, `/maydon`, `/shashka` and `/dooz`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username.
 
 ### Example
 
@@ -2072,6 +2072,16 @@ points, so its spare copies melt into 💎 crystals (`/eritish`: 1, 3, 8, 20 or
 costs no place on the table (`card_owned.melted`, migration 63); `/kristal`
 shows the shards, what melting would give and what they buy. `/qoshimcha`
 draws a card out of turn for 15 shards, the hourly card left where it was.
+`/avto`, or the switch on the Mini App's draw tab (`auto`), turns on a player's auto opener, or off again, each player for
+themselves and free (`card_players.auto_draw`, migration 65): each minute's
+call to `/api/reminders`, or the long-polling ticker, first opens the card of
+every player with it on whose card is ready, and sends it to their private
+chat without a sound, with the Mini App's button, in the language they turned
+it on in. The draw checks the hour again under the player's lock, so that
+overlapping calls open one card; a player the bot may not write to (blocked,
+never started) keeps the card and has the opener turned off. A card reminder
+of a card it opened is skipped as too soon. The endpoint's `opened` counts
+them.
 `/duel [stake]` in a group calls a member out, the one replied to or anyone,
 for up to 100 shards: whoever presses its button accepts, each side's three
 strongest cards by attack and health fight one against one, the card that

@@ -1477,3 +1477,29 @@ func TestSetMemberCommandsScopesToOneMember(t *testing.T) {
 		t.Errorf("default scope = %v, want the type alone", all.params["scope"])
 	}
 }
+
+// A silent picture and message are sent without a sound.
+func TestSilentSendsDisableTheNotification(t *testing.T) {
+	var photo, message string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/sendPhoto") {
+			_ = r.ParseMultipartForm(1 << 20)
+			photo = r.FormValue("disable_notification")
+		} else {
+			body, _ := io.ReadAll(r.Body)
+			message = string(body)
+		}
+		_, _ = io.WriteString(w, `{"ok":true,"result":{"message_id":1}}`)
+	}))
+	defer server.Close()
+	client := NewClient(Options{Token: testToken, BaseURL: server.URL})
+	if _, err := client.SendPhoto(context.Background(), Photo{ChatID: 1, Data: []byte("PNG"), Silent: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.SendMessage(context.Background(), Outgoing{ChatID: 1, Text: "hi", Silent: true}); err != nil {
+		t.Fatal(err)
+	}
+	if photo != "true" || !strings.Contains(message, `"disable_notification":true`) {
+		t.Errorf("photo %q, message %s", photo, message)
+	}
+}

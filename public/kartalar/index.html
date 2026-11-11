@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Manrope:wght@500;600;800&display=swap" rel="stylesheet">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="style.css?v=11">
+  <link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
   <div class="grain" aria-hidden="true"></div>
@@ -62,6 +62,10 @@
         <button type="button" class="draw" id="draw"><span id="drawLabel"></span></button>
         <p class="timer" id="timer"></p>
         <button type="button" class="link" id="seeCollection" data-t="seeCollection" hidden></button>
+        <div class="auto">
+          <span class="auto-text"><b id="autoLabel" data-t="autoTitle"></b><small data-t="autoHint"></small></span>
+          <button type="button" class="switch" id="auto" role="switch" aria-checked="false" aria-labelledby="autoLabel"><span></span></button>
+        </div>
         <div class="shards" id="shards">
           <div class="shards-head"><b>💎 <span id="shardCount">0</span></b><span data-t="shardsTitle"></span></div>
           <div class="shards-actions">
@@ -92,6 +96,6 @@
 
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=12"></script>
 </body>
 </html>

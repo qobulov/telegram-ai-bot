@@ -44,7 +44,7 @@ func TestRemindersEndpointNeedsTheSecret(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+secret)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
-	if body := strings.TrimSpace(rec.Body.String()); rec.Code != http.StatusOK || runs != 1 || body != `{"sent":2,"skipped":0,"failed":1,"retried":0}` {
+	if body := strings.TrimSpace(rec.Body.String()); rec.Code != http.StatusOK || runs != 1 || body != `{"opened":0,"sent":2,"skipped":0,"failed":1,"retried":0}` {
 		t.Errorf("with the secret: status %d, runs %d, body %s", rec.Code, runs, body)
 	}
 

@@ -905,10 +905,24 @@ func ReminderJob(cfg config.Config, store *storage.Store, bot Bot, logger *slog.
 		CardEvery:   cards.Every,
 		Logger:      logger,
 	}
+	auto := service.CardAutoOptions{
+		Store:    store,
+		Sender:   bot.Client,
+		Pictures: &cards.Catalog{Client: &http.Client{Timeout: 5 * time.Second}, Key: cfg.PokeWalletAPIKey},
+		CardsURL: cardsPage(cfg),
+		Logger:   logger,
+	}
 	return func(ctx context.Context) (reminders.Summary, error) {
+		// Cards are opened first, so that a reminder of a card just opened
+		// is skipped as too soon.
+		opened, err := service.OpenDueCards(ctx, auto)
+		if err != nil {
+			logger.Error("could not open the due cards", "error", err)
+		}
 		summary, err := reminders.Fire(ctx, opts)
+		summary.Opened = opened
 		if summary != (reminders.Summary{}) {
-			logger.Info("reminders sent", "sent", summary.Sent, "skipped", summary.Skipped, "failed", summary.Failed, "retried", summary.Retried)
+			logger.Info("reminders sent", "opened", summary.Opened, "sent", summary.Sent, "skipped", summary.Skipped, "failed", summary.Failed, "retried", summary.Retried)
 		}
 		return summary, err
 	}
