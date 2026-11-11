@@ -114,13 +114,14 @@ func (s *Store) CardImage(ctx context.Context, id int64) (string, error) {
 }
 
 // SaveCardCatalog adds the cards, and updates those there are: a card held
-// is never taken away.
+// is never taken away. A card with a picture of its own in card_pictures,
+// a sharper one chosen by hand, keeps it over the picture given.
 func (s *Store) SaveCardCatalog(ctx context.Context, cards []Card) error {
 	batch := &pgx.Batch{}
 	for _, c := range cards {
 		batch.Queue(`
 			INSERT INTO card_catalog (id, name, anime, image_url, favourites, rarity, attack, health, value, collection)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+			VALUES ($1, $2, $3, coalesce((SELECT image_url FROM card_pictures WHERE card_id = $1), $4), $5, $6, $7, $8, $9, $10)
 			ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, anime = EXCLUDED.anime, image_url = EXCLUDED.image_url,
 				favourites = EXCLUDED.favourites, rarity = EXCLUDED.rarity, attack = EXCLUDED.attack,
 				health = EXCLUDED.health, value = EXCLUDED.value, collection = EXCLUDED.collection, updated_at = now()`,

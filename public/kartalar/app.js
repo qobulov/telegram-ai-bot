@@ -13,7 +13,7 @@
       search: "Kartani qidirish", rarities: ["Oddiy", "Noyob", "Epik", "Afsonaviy", "Mifik"],
       drawNow: "Karta olish", drawing: "Ochilmoqda…", next: (t) => `Keyingi karta: ${t}`, ready: "Karta tayyor!",
       shardsTitle: "parcha", melt: (n, w) => `♻️ Parchalash: ${n} ta → +${w} 💎`, noSpare: "♻️ Takror karta yo'q", extra: (c) => `🎴 Qo'shimcha karta · ${c} 💎`, fewShards: (n, h) => `💎 Kerak: ${n}, sizda: ${h}`, melted: (n, g) => `♻️ ${n} ta karta → +${g} 💎`, shardsHint: "Takror kartalar parchaga aylanadi, ochko kamaymaydi. Duel: guruhda /duel",
-      fresh: "🆕 Yangi karta!", sure: "✨ Kafolatlangan karta!", pity: (l, m) => `🎯 Kafolat: 🔥 ${l} · 👑 ${m} kartadan keyin`, again: (n) => `🔁 Sizda endi ×${n}`, plus: (n) => `+${n} ochko`,
+      fresh: "🆕 Yangi karta!", sure: "✨ Kafolatlangan karta!", pity: (l, m) => `🎯 Kafolat: {3} ${l} · {4} ${m} kartadan keyin`, again: (n) => `🔁 Sizda endi ×${n}`, plus: (n) => `+${n} ochko`,
       attack: "Hujum", health: "Sog'liq", value: "Ochko", cards: (n) => `${n} karta`, pts: "ochko",
       none: "Hech narsa topilmadi", noTop: "Hali hech kim karta olmagan",
       noTelegram: "Ilovani Telegram'da oching: botga /kartalar yozing.", stale: "Ilova eskirdi, uni qayta oching.",
@@ -29,7 +29,7 @@
       search: "Поиск по картам", rarities: ["Обычная", "Редкая", "Эпическая", "Легендарная", "Мифическая"],
       drawNow: "Получить карту", drawing: "Открываем…", next: (t) => `Следующая карта: ${t}`, ready: "Карта готова!",
       shardsTitle: "осколков", melt: (n, w) => `♻️ Расплавить: ${n} → +${w} 💎`, noSpare: "♻️ Повторных карт нет", extra: (c) => `🎴 Карта вне очереди · ${c} 💎`, fewShards: (n, h) => `💎 Нужно: ${n}, у вас: ${h}`, melted: (n, g) => `♻️ ${n} карт → +${g} 💎`, shardsHint: "Повторы становятся осколками, очки не уменьшаются. Дуэль: /duel в группе",
-      fresh: "🆕 Новая карта!", sure: "✨ Гарантированная карта!", pity: (l, m) => `🎯 Гарантия: 🔥 через ${l} · 👑 через ${m} карт`, again: (n) => `🔁 Теперь у вас ×${n}`, plus: (n) => `+${n} очков`,
+      fresh: "🆕 Новая карта!", sure: "✨ Гарантированная карта!", pity: (l, m) => `🎯 Гарантия: {3} через ${l} · {4} через ${m} карт`, again: (n) => `🔁 Теперь у вас ×${n}`, plus: (n) => `+${n} очков`,
       attack: "Атака", health: "Здоровье", value: "Очки", cards: (n) => `${n} карт`, pts: "очков",
       none: "Ничего не найдено", noTop: "Ещё никто не получил карту",
       noTelegram: "Откройте приложение в Telegram: напишите боту /kartalar.", stale: "Приложение устарело, откройте его снова.",
@@ -45,7 +45,7 @@
       search: "Search cards", rarities: ["Common", "Rare", "Epic", "Legendary", "Mythic"],
       drawNow: "Draw a card", drawing: "Opening…", next: (t) => `Next card in ${t}`, ready: "A card is ready!",
       shardsTitle: "shards", melt: (n, w) => `♻️ Melt: ${n} → +${w} 💎`, noSpare: "♻️ No spare cards", extra: (c) => `🎴 A card out of turn · ${c} 💎`, fewShards: (n, h) => `💎 It takes ${n}, you have ${h}`, melted: (n, g) => `♻️ ${n} cards → +${g} 💎`, shardsHint: "Spares melt into shards; your points stay. Duels: /duel in a group",
-      fresh: "🆕 A new card!", sure: "✨ A guaranteed card!", pity: (l, m) => `🎯 Sure: 🔥 in ${l} · 👑 in ${m} cards`, again: (n) => `🔁 You now have ×${n}`, plus: (n) => `+${n} points`,
+      fresh: "🆕 A new card!", sure: "✨ A guaranteed card!", pity: (l, m) => `🎯 Sure: {3} in ${l} · {4} in ${m} cards`, again: (n) => `🔁 You now have ×${n}`, plus: (n) => `+${n} points`,
       attack: "Attack", health: "Health", value: "Points", cards: (n) => `${n} cards`, pts: "points",
       none: "Nothing found", noTop: "Nobody has drawn a card yet",
       noTelegram: "Open the app in Telegram: send /kartalar to the bot.", stale: "The app is out of date; open it again.",
@@ -129,6 +129,33 @@
     setChips();
   }
 
+  // Each rarity's icon, drawn in its colour, in place of an emoji, which
+  // every phone draws its own way.
+  const TIER_ICONS = [
+    '<circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2.6"/><circle cx="12" cy="12" r="3"/>',
+    '<path d="M12 2l8 10-8 10-8-10z"/><path d="M12 2v20M4 12h16" fill="none" stroke="rgba(0,0,0,.28)" stroke-width="1.2"/>',
+    '<path d="M7 3h10l4 6-9 12L3 9z"/><path d="M3 9h18M9 3l3 6 3-6M12 9v12" fill="none" stroke="rgba(0,0,0,.3)" stroke-width="1.2"/>',
+    '<path d="M12 2c1 4 6 6 6 12a6 6 0 0 1-12 0c0-3 2-5 3-6 0 2 1 3 2 3 0-4-1-6 1-9z"/><path d="M12 13c.5 2 3 3 3 5.5a3 3 0 0 1-6 0c0-1.5 1-2.5 1.5-3 .2 1 .8 1.5 1.5 1.5 0-2-.5-3 0-4z" fill="rgba(255,240,200,.75)"/>',
+    '<path d="M3 8l4.5 4L12 4l4.5 8L21 8l-2 10H5z"/><rect x="5" y="19.5" width="14" height="2.2" rx="1.1"/><circle cx="12" cy="13.5" r="1.6" fill="rgba(0,0,0,.3)"/>',
+  ];
+  function tierIcon(rarity) {
+    const icon = document.createElement("span");
+    icon.className = "ti";
+    icon.style.setProperty("--c", COLORS[rarity]);
+    icon.setAttribute("aria-hidden", "true");
+    icon.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor">${TIER_ICONS[rarity]}</svg>`;
+    return icon;
+  }
+  // withTiers is text with each {n} in it drawn as rarity n's icon.
+  function withTiers(text) {
+    const parts = text.split(/\{(\d)\}/);
+    return parts.map((part, i) => (i % 2 ? tierIcon(Number(part)) : document.createTextNode(part)));
+  }
+
+  // A Mythic card's dress over its picture: the glint, the gold frame, the
+  // crown and two sparkles; the large view adds two more and rising motes.
+  const MYTHIC_DRESS = '<i class="glint"></i><i class="frame"></i><span class="crest" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 8l4.5 4L12 4l4.5 8L21 8l-2 10H5z"/><rect x="5" y="19.5" width="14" height="2.2" rx="1.1"/></svg></span><em class="spark"></em><em class="spark"></em>';
+
   function cardTile(card) {
     const tile = document.createElement("button");
     tile.type = "button";
@@ -151,6 +178,7 @@
     name.className = "name";
     name.textContent = card.name;
     tile.append(img, name);
+    if (card.rarity === 4) tile.insertAdjacentHTML("beforeend", MYTHIC_DRESS);
     if (card.count > 1) {
       const count = document.createElement("span");
       count.className = "count";
@@ -207,7 +235,7 @@
       shelf.className = "shelf";
       shelf.style.setProperty("--c", COLORS[rarity]);
       shelf.innerHTML = `<div class="shelf-head"><h2></h2><span>${held.length} <i>/ ${all.length}</i></span></div><div class="shelf-bar"><i style="width:${(held.length / all.length) * 100}%"></i></div><div class="grid"></div>`;
-      shelf.querySelector("h2").textContent = t.rarities[rarity];
+      shelf.querySelector("h2").replaceChildren(tierIcon(rarity), t.rarities[rarity]);
       const grid = shelf.querySelector(".grid");
       for (const card of list) grid.append(cardTile(card));
       const rest = q ? 0 : locked - teaser;
@@ -239,23 +267,18 @@
     plate.className = "plate";
     const rarity = document.createElement("span");
     rarity.className = "rarity";
-    rarity.textContent = t.rarities[card.rarity];
+    rarity.replaceChildren(tierIcon(card.rarity), t.rarities[card.rarity]);
     const name = document.createElement("b");
     name.textContent = card.name;
     const anime = document.createElement("small");
     anime.textContent = card.anime;
     plate.append(rarity, name, anime);
     front.append(img);
+    front.append(plate);
     if (card.rarity === 4) {
       front.classList.add("mythic");
-      const holo = document.createElement("div");
-      holo.className = "holo";
-      const sparks = document.createElement("div");
-      sparks.className = "sparks";
-      sparks.innerHTML = "<i></i>".repeat(6);
-      front.append(holo, sparks);
+      front.insertAdjacentHTML("beforeend", MYTHIC_DRESS + '<em class="spark"></em><em class="spark"></em><div class="motes">' + "<i></i>".repeat(6) + "</div>");
     }
-    front.append(plate);
     return front;
   }
 
@@ -282,14 +305,14 @@
     haptic("light");
   }
   // A Mythic card in the large view leans toward the finger, or as the
-  // phone is tilted, its foil sliding with it; any other card stays flat.
+  // phone is tilted, its glint sliding with it; any other card stays flat.
   let tilted = null;
   function lean(x, y) {
     if (!tilted) return;
     tilted.classList.add("tilting");
     tilted.style.setProperty("--tx", (x * 14).toFixed(1) + "deg");
     tilted.style.setProperty("--ty", (-y * 14).toFixed(1) + "deg");
-    tilted.style.setProperty("--hx", (50 + x * 60).toFixed(0) + "%");
+    tilted.style.setProperty("--hx", (34 + x * 60).toFixed(0) + "%");
   }
   function tilt(sheet, on) {
     tilted = on ? sheet : null;
@@ -405,11 +428,11 @@
       flip.classList.remove("shuffle");
       flip.classList.add("shown");
       haptic(card.rarity >= 3 ? "heavy" : "light");
-      $("result").textContent = [
+      $("result").replaceChildren(...withTiers([
         data.guaranteed ? t.sure : "",
         `${data.new ? t.fresh : t.again(card.count)} · ${t.plus(spaced(card.value))}`,
         data.legendary_in ? t.pity(data.legendary_in, data.mythic_in) : "",
-      ].filter(Boolean).join("\n");
+      ].filter(Boolean).join("\n")));
       $("drawnStats").replaceChildren(statsOf(card));
       lastDrawn = card.id;
       $("seeCollection").hidden = false;
@@ -448,7 +471,7 @@
     const li = document.createElement("li");
     li.style.setProperty("--c", COLORS[rarity]);
     li.innerHTML = `<b></b> ${ODDS[rarity]}`;
-    li.querySelector("b").textContent = t.rarities[rarity];
+    li.querySelector("b").replaceChildren(tierIcon(rarity), t.rarities[rarity]);
     odds.append(li);
   }
 

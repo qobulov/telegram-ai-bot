@@ -17,6 +17,10 @@ func TestCardsAreDrawnAndCollected(t *testing.T) {
 		{ID: 1, Name: "Gojo", Anime: "JJK", ImageURL: "https://img/1.png", Favourites: 900, Rarity: 4, Attack: 5000, Health: 18000, Value: 5000},
 		{ID: 2, Name: "Levi", Anime: "AoT", ImageURL: "https://img/2.png", Favourites: 800, Rarity: 0, Attack: 400, Health: 1500, Value: 100},
 	}
+	// The pictures migration 64 chose are for the real catalog's cards.
+	if _, err := store.pool.Exec(ctx, `DELETE FROM card_pictures`); err != nil {
+		t.Fatal(err)
+	}
 	if err := store.SaveCardCatalog(ctx, catalog); err != nil {
 		t.Fatal(err)
 	}
@@ -25,6 +29,16 @@ func TestCardsAreDrawnAndCollected(t *testing.T) {
 	}
 	if sizes, err := store.CardCollections(ctx); err != nil || sizes["anime"] != 2 {
 		t.Fatalf("collections = %v, %v", sizes, err)
+	}
+	// A picture chosen by hand outlasts the catalog's being saved again.
+	if _, err := store.pool.Exec(ctx, `INSERT INTO card_pictures (card_id, image_url) VALUES (2, 'https://cdn.myanimelist.net/levi.jpg')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveCardCatalog(ctx, catalog); err != nil {
+		t.Fatal(err)
+	}
+	if link, err := store.CardImage(ctx, 2); err != nil || link != "https://cdn.myanimelist.net/levi.jpg" {
+		t.Fatalf("the chosen picture = %q, %v", link, err)
 	}
 	if link, err := store.CardImage(ctx, 1); err != nil || link != "https://img/1.png" {
 		t.Fatalf("picture = %q, %v", link, err)

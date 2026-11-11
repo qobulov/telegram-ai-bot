@@ -2052,7 +2052,11 @@ characters, fetched the first time a card is drawn (`internal/cards`, kept in
 `card_catalog`, migration 52), the most loved the rarest: 15 👑 Mifik, 30 🔥
 Afsonaviy, 45 💜 Epik, 60 🔷 Noyob and 50 ⚪ Oddiy. A draw first draws a
 rarity, by odds of 1.5%, 6.5%, 14%, 28% and 50%, then a card of it at random,
-sent as the character's picture with its anime, attack and health, the same
+sent as the character's picture (AniList's, or for 138 anime characters a
+sharper one from MyAnimeList, 450 by 700, chosen by hand and kept in
+`card_pictures`, migration 64, which a refresh of the catalog keeps; the
+characters, their rarity and the table stay AniList's) with its anime, attack
+and health, the same
 each time for the same character, and the points it is worth (5000, 2000,
 800, 300 or 100), which add up, a card drawn again too. A long wait ends in a
 rare card for sure: a player's 30th draw in a row without a Legendary or
