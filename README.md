@@ -2060,7 +2060,9 @@ better is one, and their 100th without a Mythic is one, the draw saying so and
 each card telling in how many draws the next sure ones are, in the chat and the
 Mini App (`since_legendary` and `since_mythic` on `card_players`, migration
 62, which counted a player holding no such card from their first draw), as 412
-draws by the odds alone had brought no Mythic. A card drawn again gave only
+draws by the odds alone had brought no Mythic. In the Mini App a Mythic card glows: a rainbow foil runs over it, its gold
+glow breathes, it sparkles, and in the large view it leans with the finger or
+the phone, in CSS alone. A card drawn again gave only
 points, so its spare copies melt into 💎 shards (`/parchala`: 1, 3, 8, 20 or
 50 by rarity), the copies still held and counted in the points so that melting
 costs no place on the table (`card_owned.melted`, migration 63); `/parcha`

@@ -239,6 +239,41 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 
 [hidden] { display: none !important; }
 
+/* Mythic: a rainbow foil that runs over the card, a gold glow that breathes,
+   sparkles, and in the large view a tilt that follows the finger or phone. */
+.card.mythic { animation: mythic-glow 2.6s ease-in-out infinite; }
+.card.mythic::before {
+  opacity: 0.5;
+  background: linear-gradient(115deg, transparent 22%, #ff6fb1 34%, #ffd25a 42%, #6dffcf 50%, #6fb4ff 58%, #c07bff 66%, transparent 78%) 0 0 / 300% 100%;
+  animation: holo 3.6s linear infinite;
+}
+.front.mythic { animation: mythic-glow 2.6s ease-in-out infinite; }
+.front.mythic .holo {
+  position: absolute; inset: 0; pointer-events: none; mix-blend-mode: color-dodge; opacity: 0.42;
+  background: linear-gradient(115deg, transparent 18%, #ff6fb1 32%, #ffd25a 41%, #6dffcf 50%, #6fb4ff 59%, #c07bff 68%, transparent 82%) var(--hx, 0%) 0 / 300% 100%;
+  animation: holo 4.5s linear infinite;
+}
+.tilting .front.mythic .holo { animation: none; transition: background-position 0.15s; }
+.front.mythic .sparks i {
+  position: absolute; width: 14px; height: 14px; pointer-events: none; opacity: 0;
+  background: #fff6d6; filter: drop-shadow(0 0 6px #ffd25a);
+  clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+  animation: twinkle 2.4s ease-in-out infinite;
+}
+.front.mythic .sparks i:nth-child(1) { left: 12%; top: 10%; }
+.front.mythic .sparks i:nth-child(2) { left: 80%; top: 18%; animation-delay: 0.6s; width: 10px; height: 10px; }
+.front.mythic .sparks i:nth-child(3) { left: 22%; top: 58%; animation-delay: 1.2s; }
+.front.mythic .sparks i:nth-child(4) { left: 74%; top: 52%; animation-delay: 1.8s; width: 18px; height: 18px; }
+.front.mythic .sparks i:nth-child(5) { left: 50%; top: 30%; animation-delay: 0.9s; width: 9px; height: 9px; }
+.front.mythic .sparks i:nth-child(6) { left: 86%; top: 72%; animation-delay: 1.5s; }
+.sheet-card { transform: perspective(900px) rotateX(var(--ty, 0deg)) rotateY(var(--tx, 0deg)); transition: transform 0.15s; }
+@keyframes holo { from { background-position: 150% 0; } to { background-position: -150% 0; } }
+@keyframes mythic-glow {
+  0%, 100% { box-shadow: 0 0 0 2px var(--c) inset, 0 0 22px color-mix(in srgb, var(--c) 35%, transparent); }
+  50% { box-shadow: 0 0 0 2px var(--c) inset, 0 0 46px color-mix(in srgb, var(--c) 75%, transparent); }
+}
+@keyframes twinkle { 0%, 100% { opacity: 0; transform: scale(0.3) rotate(0deg); } 50% { opacity: 1; transform: scale(1) rotate(45deg); } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }

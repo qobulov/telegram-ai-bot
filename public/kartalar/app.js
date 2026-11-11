@@ -142,6 +142,7 @@
       return tile;
     }
     if (card.rarity >= 3) tile.classList.add("foil");
+    if (card.rarity === 4) tile.classList.add("mythic");
     const img = new Image();
     img.loading = "lazy";
     img.alt = "";
@@ -244,7 +245,17 @@
     const anime = document.createElement("small");
     anime.textContent = card.anime;
     plate.append(rarity, name, anime);
-    front.append(img, plate);
+    front.append(img);
+    if (card.rarity === 4) {
+      front.classList.add("mythic");
+      const holo = document.createElement("div");
+      holo.className = "holo";
+      const sparks = document.createElement("div");
+      sparks.className = "sparks";
+      sparks.innerHTML = "<i></i>".repeat(6);
+      front.append(holo, sparks);
+    }
+    front.append(plate);
     return front;
   }
 
@@ -265,11 +276,36 @@
     const sheet = $("sheetCard");
     sheet.textContent = "";
     sheet.append(face(card), statsOf(card));
+    tilt(sheet, card.rarity === 4);
     $("sheet").hidden = false;
     try { tg.BackButton.show(); } catch (_) { /* older clients */ }
     haptic("light");
   }
+  // A Mythic card in the large view leans toward the finger, or as the
+  // phone is tilted, its foil sliding with it; any other card stays flat.
+  let tilted = null;
+  function lean(x, y) {
+    if (!tilted) return;
+    tilted.classList.add("tilting");
+    tilted.style.setProperty("--tx", (x * 14).toFixed(1) + "deg");
+    tilted.style.setProperty("--ty", (-y * 14).toFixed(1) + "deg");
+    tilted.style.setProperty("--hx", (50 + x * 60).toFixed(0) + "%");
+  }
+  function tilt(sheet, on) {
+    tilted = on ? sheet : null;
+    sheet.classList.remove("tilting");
+    for (const v of ["--tx", "--ty", "--hx"]) sheet.style.removeProperty(v);
+  }
+  $("sheetCard").addEventListener("pointermove", (e) => {
+    const box = e.currentTarget.getBoundingClientRect();
+    lean((e.clientX - box.left) / box.width * 2 - 1, (e.clientY - box.top) / box.height * 2 - 1);
+  });
+  window.addEventListener("deviceorientation", (e) => {
+    if (e.gamma == null || e.beta == null) return;
+    lean(Math.max(-1, Math.min(1, e.gamma / 30)), Math.max(-1, Math.min(1, (e.beta - 45) / 30)));
+  });
   function closeSheet() {
+    tilted = null;
     $("sheet").hidden = true;
     try { tg.BackButton.hide(); } catch (_) { /* older clients */ }
   }
