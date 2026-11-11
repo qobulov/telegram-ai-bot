@@ -105,10 +105,11 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 }
 .card.foil::before {
   content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; mix-blend-mode: color-dodge; opacity: 0.35;
-  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.7) 45%, var(--c) 52%, transparent 65%) 0 0 / 250% 100%;
+  inset: 0 auto 0 0; width: 250%; will-change: transform;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.7) 45%, var(--c) 52%, transparent 65%);
   animation: sheen 4.5s ease-in-out infinite;
 }
-@keyframes sheen { 0%, 100% { background-position: 120% 0; } 50% { background-position: -20% 0; } }
+@keyframes sheen { 0%, 100% { transform: translateX(-60%); } 50% { transform: translateX(0); } }
 .card.locked {
   cursor: default; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
   background:
@@ -259,11 +260,14 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
    gold and a crown. In the large view gold motes rise and the glint follows
    the finger or the phone's tilt. */
 @property --spin { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+/* In the grid, where many show at once, only transforms and opacity move,
+   which the GPU runs without painting again: the frame and the glow stand
+   still, and the light runs round the frame of the large card alone. */
 .card.mythic, .front.mythic {
   outline: none;
   box-shadow: 0 0 0 1px rgba(255, 214, 110, 0.35), 0 10px 26px rgba(0, 0, 0, 0.55), 0 0 22px rgba(255, 200, 80, 0.22);
-  animation: aura 3.2s ease-in-out infinite;
 }
+.front.mythic { animation: aura 3.2s ease-in-out infinite; }
 .card.mythic::before, .front.mythic::after { content: none; }
 .mythic .frame {
   position: absolute; inset: 0; z-index: 3; padding: 2.5px; border-radius: inherit; pointer-events: none;
@@ -273,9 +277,8 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
-  animation: spin 5s linear infinite;
 }
-.front.mythic .frame { padding: 3.5px; }
+.front.mythic .frame { padding: 3.5px; animation: spin 5s linear infinite; }
 .mythic .glint {
   position: absolute; inset: 0; z-index: 1; overflow: hidden; border-radius: inherit; pointer-events: none;
   box-shadow: inset 0 0 18px rgba(255, 205, 100, 0.35);
@@ -283,8 +286,9 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .mythic .glint::before {
   content: ""; position: absolute; top: -25%; bottom: -25%; width: 32%; left: -60%; transform: skewX(-18deg);
   background: linear-gradient(90deg, transparent, rgba(255, 246, 214, 0.55) 50%, transparent);
-  mix-blend-mode: screen; animation: glint 5.5s ease-in-out infinite;
+  will-change: transform; animation: glint 5.5s ease-in-out infinite;
 }
+.front.mythic .glint::before { mix-blend-mode: screen; }
 .tilting .front.mythic .glint::before { animation: none; left: var(--hx, 50%); transition: left 0.12s; }
 .card.mythic .name {
   z-index: 2; color: #ffe39a; text-shadow: 0 1px 3px #000, 0 0 10px rgba(255, 200, 80, 0.45);
@@ -321,7 +325,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .mythic .motes i:nth-child(6) { left: 90%; animation-delay: 1.9s; width: 3px; height: 3px; }
 .sheet-card { transform: perspective(900px) rotateX(var(--ty, 0deg)) rotateY(var(--tx, 0deg)); transition: transform 0.15s; }
 @keyframes spin { to { --spin: 360deg; } }
-@keyframes glint { 0%, 60% { left: -60%; } 82%, 100% { left: 130%; } }
+@keyframes glint { 0%, 60% { transform: translateX(0) skewX(-18deg); } 82%, 100% { transform: translateX(600%) skewX(-18deg); } }
 @keyframes aura {
   0%, 100% { box-shadow: 0 0 0 1px rgba(255, 214, 110, 0.35), 0 10px 26px rgba(0, 0, 0, 0.55), 0 0 18px rgba(255, 200, 80, 0.18); }
   50% { box-shadow: 0 0 0 1px rgba(255, 214, 110, 0.5), 0 10px 26px rgba(0, 0, 0, 0.55), 0 0 34px rgba(255, 200, 80, 0.42); }
