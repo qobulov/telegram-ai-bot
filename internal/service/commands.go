@@ -803,6 +803,10 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.extraCard(ctx, in)
 	case s.opts.Cards != nil && s.opts.Buttons != nil && commandName(in.text) == "/duel":
 		return s.duelCommand(ctx, in)
+	case s.opts.Cards != nil && commandName(in.text) == "/sovga":
+		return s.giveCardCommand(ctx, in)
+	case s.opts.Cards != nil && s.opts.Buttons != nil && commandName(in.text) == "/almash":
+		return s.tradeCardCommand(ctx, in)
 	case commandName(in.text) == "/elon" && !in.group && s.opts.Tools != nil && s.isOwner(in.msg.From):
 		return s.announceCommand(ctx, in)
 	case !in.group && s.opts.Tools != nil && s.opts.Buttons != nil && s.isOwner(in.msg.From) && pressed(in, keyboardAd):
@@ -1043,6 +1047,10 @@ func (s *Service) pressed(q *telegram.CallbackQuery) {
 	}
 	if strings.HasPrefix(q.Data, duelData) {
 		s.pressedDuel(q)
+		return
+	}
+	if strings.HasPrefix(q.Data, tradeData) {
+		s.pressedTrade(q)
 		return
 	}
 	if strings.HasPrefix(q.Data, cardData) {

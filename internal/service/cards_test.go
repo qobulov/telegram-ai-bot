@@ -27,6 +27,9 @@ type fakeCards struct {
 	melted map[int64]int
 	duels  map[int64]bool
 	auto   map[int64]bool
+	named  map[int64][]storage.Card
+	given  map[int64]int
+	trades []*fakeTrade
 }
 
 func newFakeCards(picture string) *fakeCards {
@@ -34,6 +37,7 @@ func newFakeCards(picture string) *fakeCards {
 		card: storage.Card{ID: 1, Name: "Gojo *Satoru*", Anime: "Jujutsu Kaisen", ImageURL: picture, Rarity: 4, Attack: 5130, Health: 18020, Value: 5000},
 		last: map[int64]time.Time{}, held: map[int64]int{},
 		shards: map[int64]int{}, melted: map[int64]int{}, duels: map[int64]bool{},
+		named: map[int64][]storage.Card{}, given: map[int64]int{},
 	}
 }
 
@@ -94,6 +98,93 @@ func (f *fakeCards) ResolveDuel(_ context.Context, _, messageID, winner, loser i
 		f.shards[winner] += moved
 	}
 	return moved, true, nil
+}
+
+// trades are the fake's trades, by ID; named are the cards each player
+// holds by name, which gifts and trades move.
+type fakeTrade struct {
+	from, to   int64
+	give, take storage.Card
+	open       bool
+}
+
+func (f *fakeCards) HeldCardsNamed(_ context.Context, userID int64, name string, limit int) ([]storage.Card, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var found []storage.Card
+	for _, c := range f.named[userID] {
+		if strings.Contains(strings.ToLower(c.Name), strings.ToLower(name)) && len(found) < limit {
+			found = append(found, c)
+		}
+	}
+	return found, nil
+}
+
+// moveNamed moves the card from one player to the other, false when the
+// first does not hold it.
+func (f *fakeCards) moveNamed(from, to, cardID int64) bool {
+	for i, c := range f.named[from] {
+		if c.ID == cardID {
+			f.named[from] = append(f.named[from][:i:i], f.named[from][i+1:]...)
+			f.named[to] = append(f.named[to], c)
+			return true
+		}
+	}
+	return false
+}
+
+func (f *fakeCards) GiveCard(_ context.Context, _, from, to, cardID int64, rules storage.CardTradeRules) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	switch {
+	case f.held[to] == 0:
+		return storage.ErrCardNoPlayer
+	case f.given[from] >= rules.Limit:
+		return &storage.CardGiveLimitError{UserID: from}
+	case !f.moveNamed(from, to, cardID):
+		return storage.ErrCardNotHeld
+	}
+	f.given[from]++
+	return nil
+}
+
+func (f *fakeCards) OfferCardTrade(_ context.Context, _, from, to, give, take int64, _ time.Time) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	card := func(user, id int64) storage.Card {
+		for _, c := range f.named[user] {
+			if c.ID == id {
+				return c
+			}
+		}
+		return storage.Card{}
+	}
+	f.trades = append(f.trades, &fakeTrade{from: from, to: to, give: card(from, give), take: card(to, take), open: true})
+	return int64(len(f.trades)), nil
+}
+
+func (f *fakeCards) AcceptCardTrade(_ context.Context, id, by int64, _ storage.CardTradeRules) (storage.CardTrade, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if id < 1 || int(id) > len(f.trades) || !f.trades[id-1].open || f.trades[id-1].to != by {
+		return storage.CardTrade{}, storage.ErrCardTradeOver
+	}
+	tr := f.trades[id-1]
+	if !f.moveNamed(tr.from, tr.to, tr.give.ID) || !f.moveNamed(tr.to, tr.from, tr.take.ID) {
+		return storage.CardTrade{}, storage.ErrCardNotHeld
+	}
+	tr.open = false
+	return storage.CardTrade{ID: id, From: tr.from, To: tr.to, Give: tr.give, Take: tr.take}, nil
+}
+
+func (f *fakeCards) CallOffCardTrade(_ context.Context, id, by int64) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if id < 1 || int(id) > len(f.trades) || !f.trades[id-1].open || (by != f.trades[id-1].from && by != f.trades[id-1].to) {
+		return false, nil
+	}
+	f.trades[id-1].open = false
+	return true, nil
 }
 
 func (f *fakeCards) ToggleCardAuto(_ context.Context, userID int64, _, _ string) (bool, error) {
