@@ -82,9 +82,9 @@ func (s *Store) MeltCards(ctx context.Context, userID int64, rates []int) (melte
 }
 
 // ExtraCard gives the player a card out of turn for cost shards, as
-// DrawCard does but leaving their hourly card where it was; with too few it
-// returns a *ShardsError.
-func (s *Store) ExtraCard(ctx context.Context, userID int64, name string, roll CardRoll, cost int) (CardDraw, error) {
+// DrawCard does but leaving their hourly card where it was, of collection or
+// of any when it is ""; with too few it returns a *ShardsError.
+func (s *Store) ExtraCard(ctx context.Context, userID int64, name, collection string, roll CardRoll, cost int) (CardDraw, error) {
 	var draw CardDraw
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		player, err := lockCardPlayer(ctx, tx, userID, name)
@@ -94,7 +94,7 @@ func (s *Store) ExtraCard(ctx context.Context, userID int64, name string, roll C
 		if player.shards < cost {
 			return &ShardsError{Have: player.shards, Need: cost}
 		}
-		if draw, err = giveCard(ctx, tx, userID, name, roll, player); err != nil {
+		if draw, err = giveCard(ctx, tx, userID, name, collection, roll, player); err != nil {
 			return err
 		}
 		return tx.QueryRow(ctx, `UPDATE card_players SET shards = shards - $2 WHERE user_id = $1 RETURNING shards`, userID, cost).Scan(&draw.Shards)

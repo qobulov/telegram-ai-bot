@@ -1,6 +1,7 @@
 package cards
 
 import (
+	"cmp"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -106,12 +107,14 @@ func (f *fakeStore) MeltCards(_ context.Context, _ int64, rates []int) (int, int
 	f.shards += gained
 	return 3, gained, f.shards, nil
 }
-func (f *fakeStore) ExtraCard(_ context.Context, _ int64, _ string, _ storage.CardRoll, cost int) (storage.CardDraw, error) {
+func (f *fakeStore) ExtraCard(_ context.Context, _ int64, _, collection string, _ storage.CardRoll, cost int) (storage.CardDraw, error) {
 	if f.shards < cost {
 		return storage.CardDraw{}, &storage.ShardsError{Have: f.shards, Need: cost}
 	}
 	f.shards -= cost
-	return storage.CardDraw{Card: heldCard, Count: 4, Points: 20000, Shards: f.shards}, nil
+	card := heldCard
+	card.Collection = cmp.Or(collection, card.Collection)
+	return storage.CardDraw{Card: card, Count: 4, Points: 20000, Shards: f.shards}, nil
 }
 
 func (f *fakeStore) SetCardAuto(_ context.Context, _ int64, _ string, on bool, language string) error {
@@ -424,6 +427,22 @@ func TestShardsInTheMiniApp(t *testing.T) {
 	}
 	if code, out := post(t, h, initData, "extra"); code != 200 || out["shards"] != float64(52-ExtraCost) || out["card"] == nil {
 		t.Errorf("an extra card = %d %v", code, out)
+	}
+	buy := func(set string) (int, map[string]any) {
+		body, _ := json.Marshal(map[string]any{"init_data": initData, "action": "extra", "set": set})
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/cards", strings.NewReader(string(body))))
+		var out map[string]any
+		_ = json.Unmarshal(rec.Body.Bytes(), &out)
+		return rec.Code, out
+	}
+	code, out := buy("pokemon")
+	card, _ := out["card"].(map[string]any)
+	if code != 200 || out["shards"] != float64(52-ExtraCost-SetCost) || card["set"] != "pokemon" {
+		t.Errorf("a Pokémon card from the shop = %d %v", code, out)
+	}
+	if code, _ := buy("marvel"); code != http.StatusBadRequest {
+		t.Errorf("a collection there is none of = %d", code)
 	}
 }
 

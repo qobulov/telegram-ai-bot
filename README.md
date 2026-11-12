@@ -2080,8 +2080,10 @@ points, so its spare copies melt into 💎 crystals in the Mini App's draw tab
 counted in the points so that melting costs no place on the table
 (`card_owned.melted`, migration 63); the melt is asked once more, listing
 each card's spares and the crystals they make, as melted copies can no
-longer be given. An extra card out of turn costs 15 crystals, the hourly card
-left where it was. Crystals live in the Mini App alone: the bot has no
+longer be given. The Mini App's 🛍 shop tab holds the crystals and sells cards
+for them: one of any collection for 15, or one of a collection the player
+picks for 20 (`extra` with `set`), by the usual odds and sure cards, the
+hourly card left where it was. Crystals live in the Mini App alone: the bot has no
 commands for them.
 `/avto`, or the switch on the Mini App's draw tab (`auto`), turns on a player's auto opener, or off again, each player for
 themselves and free (`card_players.auto_draw`, migration 65): each minute's

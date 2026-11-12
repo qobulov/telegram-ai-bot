@@ -26,7 +26,7 @@ type Store interface {
 	CardImage(ctx context.Context, id int64) (string, error)
 	CardWallet(ctx context.Context, userID int64) (shards int, spares map[int]int, err error)
 	MeltCards(ctx context.Context, userID int64, rates []int) (melted, gained, shards int, err error)
-	ExtraCard(ctx context.Context, userID int64, name string, roll storage.CardRoll, cost int) (storage.CardDraw, error)
+	ExtraCard(ctx context.Context, userID int64, name, collection string, roll storage.CardRoll, cost int) (storage.CardDraw, error)
 	SetCardAuto(ctx context.Context, userID int64, name string, on bool, language string) error
 	CardPlayersNamed(ctx context.Context, name string, except int64, limit int) ([]storage.CardPlayer, error)
 	GiveCard(ctx context.Context, chatID, from, to, cardID int64, rules storage.CardTradeRules) error
@@ -119,6 +119,8 @@ type request struct {
 	// taken or called off, for "take" and "unoffer".
 	Want  int64 `json:"want"`
 	Offer int64 `json:"offer"`
+	// Set is the collection a card is bought from, for "extra"; "" is any.
+	Set string `json:"set"`
 }
 
 type failure struct {
@@ -176,7 +178,7 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 	case "melt":
 		return h.melt(ctx, opened.User)
 	case "extra":
-		return h.extra(ctx, opened.User)
+		return h.extra(ctx, opened.User, req.Set)
 	case "auto":
 		return h.auto(ctx, opened.User, req.On)
 	case "players":
@@ -290,7 +292,7 @@ func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
 	return map[string]any{
 		"cards": views, "points": player.Points, "held": len(owned),
 		"next_in": h.wait(last).Milliseconds(), "every": Every.Milliseconds(),
-		"shards": shards, "spare": spare, "spare_worth": worth, "extra_cost": ExtraCost,
+		"shards": shards, "spare": spare, "spare_worth": worth, "extra_cost": ExtraCost, "set_cost": SetCost,
 		"auto": player.Auto,
 	}, failure{}
 }
@@ -357,13 +359,21 @@ func (h *handler) melt(ctx context.Context, user miniapp.User) (any, failure) {
 	return map[string]any{"melted": melted, "gained": gained, "shards": shards}, failure{}
 }
 
-// extra draws a card out of turn for shards, or says how few the player has.
-func (h *handler) extra(ctx context.Context, user miniapp.User) (any, failure) {
+// extra draws a card out of turn for shards, of the collection set or of
+// any when it is "", or says how few the player has.
+func (h *handler) extra(ctx context.Context, user miniapp.User, set string) (any, failure) {
+	cost := ExtraCost
+	if set != "" {
+		if !IsCollection(set) {
+			return nil, errBadRequest
+		}
+		cost = SetCost
+	}
 	if err := h.catalog.Ensure(ctx); err != nil {
 		h.Logger.Error("could not fill the card catalog", "error", err)
 		return nil, errUnavailable
 	}
-	draw, err := h.Store.ExtraCard(ctx, user.ID, name(user), WithPity(h.Roll), ExtraCost)
+	draw, err := h.Store.ExtraCard(ctx, user.ID, name(user), set, WithPity(h.Roll), cost)
 	var few *storage.ShardsError
 	switch {
 	case errors.As(err, &few):

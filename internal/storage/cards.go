@@ -231,7 +231,7 @@ func (s *Store) DrawCard(ctx context.Context, userID int64, name string, roll Ca
 		if player.last != nil && every > 0 && now.Sub(*player.last) < every {
 			return &CardWaitError{Wait: every - now.Sub(*player.last)}
 		}
-		if draw, err = giveCard(ctx, tx, userID, name, roll, player); err != nil {
+		if draw, err = giveCard(ctx, tx, userID, name, "", roll, player); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE card_players SET last_draw_at = $2 WHERE user_id = $1`, userID, now); err != nil {
@@ -282,16 +282,17 @@ func lockCardPlayer(ctx context.Context, tx pgx.Tx, userID int64, name string) (
 	return p, err
 }
 
-// giveCard gives the player a card of the rarity roll picks, at random, and
-// counts it in their points, cards and wait for a rare card.
-func giveCard(ctx context.Context, tx pgx.Tx, userID int64, name string, roll CardRoll, player cardPlayerRow) (CardDraw, error) {
+// giveCard gives the player a card of the rarity roll picks, at random, of
+// collection or of any when it is "", and counts it in their points, cards
+// and wait for a rare card.
+func giveCard(ctx context.Context, tx pgx.Tx, userID int64, name, collection string, roll CardRoll, player cardPlayerRow) (CardDraw, error) {
 	var draw CardDraw
 	rarity, guaranteed := roll(player.sinceLegendary, player.sinceMythic)
 	draw.Guaranteed = guaranteed
 	c := &draw.Card
 	err := tx.QueryRow(ctx, `
 		SELECT id, name, anime, image_url, favourites, rarity, attack, health, value, collection
-		FROM card_catalog WHERE rarity = $1 ORDER BY random() LIMIT 1`, rarity).
+		FROM card_catalog WHERE rarity = $1 AND ($2 = '' OR collection = $2) ORDER BY random() LIMIT 1`, rarity, collection).
 		Scan(&c.ID, &c.Name, &c.Anime, &c.ImageURL, &c.Favourites, &c.Rarity, &c.Attack, &c.Health, &c.Value, &c.Collection)
 	if err != nil {
 		return draw, err

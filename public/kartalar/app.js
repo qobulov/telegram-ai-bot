@@ -13,7 +13,7 @@
       search: "Kartani qidirish", rarities: ["Oddiy", "Noyob", "Epik", "Afsonaviy", "Mifik"],
       drawNow: "Karta olish", drawing: "Ochilmoqda…", next: (t) => `Keyingi karta: ${t}`, ready: "Karta tayyor!",
       autoTitle: "🤖 Avto-ochish", autoHint: "Karta tayyor bo'lishi bilan o'zi ochilib, shaxsiy chatga ovozsiz keladi", autoOn: "🤖 Avto-ochish yoqildi", autoOff: "⏸ Avto-ochish o'chirildi",
-      shardsTitle: "Kristallar", melt: (n, w) => `♻️ ${n} ta takrorni aylantirish → +${w} 💎`, noSpare: "♻️ Aylantirish uchun takror karta yo'q", extra: (c) => `🎴 Qo'shimcha karta · ${c} 💎`, extraNeed: (n) => `🎴 Qo'shimcha karta uchun yana ${n} 💎 kerak`, fewShards: (n, h) => `💎 Kerak: ${n}, sizda: ${h}`, melted: (n, g) => `♻️ ${n} ta karta → +${g} 💎`, shardsHint: "Takror kartalar kristalga aylanadi, ochko va reyting kamaymaydi. Kristal bilan qo'shimcha karta oling yoki duelda tiking.", ratesLabel: "1 ta takror:", meltTitle: "Kristalga aylantirish", meltWarn: "Bu nusxalarni keyin sovg'a qilib bo'lmaydi. Har kartaning bittasi kolleksiyada qoladi.", meltDo: (w) => `♻️ Aylantirish · +${w} 💎`, cancel: "Bekor qilish",
+      shardsTitle: "Kristallar", melt: (n, w) => `♻️ ${n} ta takrorni aylantirish → +${w} 💎`, noSpare: "♻️ Aylantirish uchun takror karta yo'q", fewShards: (n, h) => `💎 Kerak: ${n}, sizda: ${h}`, melted: (n, g) => `♻️ ${n} ta karta → +${g} 💎`, shardsHint: "Takror kartalar kristalga aylanadi, ochko va reyting kamaymaydi. Kristal bilan pastda karta sotib oling yoki duelda tiking.", ratesLabel: "1 ta takror:", meltTitle: "Kristalga aylantirish", meltWarn: "Bu nusxalarni keyin sovg'a qilib bo'lmaydi. Har kartaning bittasi kolleksiyada qoladi.", meltDo: (w) => `♻️ Aylantirish · +${w} 💎`, cancel: "Bekor qilish",
       fresh: "🆕 Yangi karta!", sure: "✨ Kafolatlangan karta!", pity: (l, m) => `{3} Afsonaviy — ${l} kartadan keyin aniq\n{4} Mifik — ${m} kartadan keyin aniq`, again: (n) => `🔁 Sizda endi ×${n}`, plus: (n) => `+${n} ochko`,
       attack: "Hujum", health: "Jon", value: "Ochko", cards: (n) => `${n} karta`, pts: "ochko",
       none: "Hech narsa topilmadi", noTop: "Hali hech kim karta olmagan",
@@ -27,6 +27,7 @@
       gift: "🎁 Sovg'a qilish", giftSearch: "Ism yoki @username", giftHint: (n) => `Karta ochkolari bilan birga o'tadi. Kuniga ${n} tagacha.`,
       giftTo: (name) => `🎁 ${name}ga yuborish`, giftSent: (card, name) => `🎁 ${card} → ${name}`, giftNone: "Bunday o'yinchi topilmadi",
       giftLimit: (n) => `⏳ Kuniga ${n} ta karta berish mumkin. Ertaga yana.`, giftNoPlayer: "Bu o'yinchi hali karta ochmagan", giftGone: "Bu karta endi sizda yo'q", back: "← Orqaga",
+      shop: "Do'kon", shopTitle: "Karta sotib olish", shopHint: "Yoqqan kategoriyani tanlang: undan tasodifiy karta chiqadi, daraja ehtimollari va kafolat odatdagidek.", anySet: "🎲 Istalgan", packCards: (n) => `${n} ta karta`, needMore: (n) => `yana ${n} 💎`,
       market: "Bozor", newOffer: "➕ Taklif qo'yish", filterAll: "Hammasi", filterCan: "Bera olaman", filterMine: "Mening",
       gives: "Beradi", wants: "Xohlaydi", swap: "🔄 Almashish", noCard: "Sizda yo'q", remove: "✕ Olib tashlash", marketEmpty: "Hozircha taklif yo'q",
       marketHint: (n) => `Kartangizni qo'ying va evaziga kerakli kartani tanlang. Kimda o'sha karta bo'lsa, almashadi. ${n} tagacha taklif, 7 kun turadi.`,
@@ -40,7 +41,7 @@
       search: "Поиск по картам", rarities: ["Обычная", "Редкая", "Эпическая", "Легендарная", "Мифическая"],
       drawNow: "Получить карту", drawing: "Открываем…", next: (t) => `Следующая карта: ${t}`, ready: "Карта готова!",
       autoTitle: "🤖 Автооткрытие", autoHint: "Карта откроется сама, как только будет готова, и придёт в личку без звука", autoOn: "🤖 Автооткрытие включено", autoOff: "⏸ Автооткрытие выключено",
-      shardsTitle: "Кристаллы", melt: (n, w) => `♻️ Расплавить повторы: ${n} → +${w} 💎`, noSpare: "♻️ Повторных карт нет", extra: (c) => `🎴 Карта вне очереди · ${c} 💎`, extraNeed: (n) => `🎴 Для карты вне очереди нужно ещё ${n} 💎`, fewShards: (n, h) => `💎 Нужно: ${n}, у вас: ${h}`, melted: (n, g) => `♻️ ${n} карт → +${g} 💎`, shardsHint: "Повторы становятся кристаллами, очки и рейтинг не уменьшаются. За кристаллы — карта вне очереди или ставка в дуэли.", ratesLabel: "1 повтор:", meltTitle: "Расплавить в кристаллы", meltWarn: "Эти копии потом нельзя будет подарить. По одной карте каждого вида останется в коллекции.", meltDo: (w) => `♻️ Расплавить · +${w} 💎`, cancel: "Отмена",
+      shardsTitle: "Кристаллы", melt: (n, w) => `♻️ Расплавить повторы: ${n} → +${w} 💎`, noSpare: "♻️ Повторных карт нет", fewShards: (n, h) => `💎 Нужно: ${n}, у вас: ${h}`, melted: (n, g) => `♻️ ${n} карт → +${g} 💎`, shardsHint: "Повторы становятся кристаллами, очки и рейтинг не уменьшаются. За кристаллы — карты ниже или ставка в дуэли.", ratesLabel: "1 повтор:", meltTitle: "Расплавить в кристаллы", meltWarn: "Эти копии потом нельзя будет подарить. По одной карте каждого вида останется в коллекции.", meltDo: (w) => `♻️ Расплавить · +${w} 💎`, cancel: "Отмена",
       fresh: "🆕 Новая карта!", sure: "✨ Гарантированная карта!", pity: (l, m) => `{3} Легендарная — точно через ${l} карт\n{4} Мифическая — точно через ${m} карт`, again: (n) => `🔁 Теперь у вас ×${n}`, plus: (n) => `+${n} очков`,
       attack: "Атака", health: "Жизнь", value: "Очки", cards: (n) => `${n} карт`, pts: "очков",
       none: "Ничего не найдено", noTop: "Ещё никто не получил карту",
@@ -54,6 +55,7 @@
       gift: "🎁 Подарить", giftSearch: "Имя или @username", giftHint: (n) => `Карта переходит вместе с очками. До ${n} в день.`,
       giftTo: (name) => `🎁 Отправить: ${name}`, giftSent: (card, name) => `🎁 ${card} → ${name}`, giftNone: "Игрок не найден",
       giftLimit: (n) => `⏳ В день можно отдать ${n} карт. Завтра снова.`, giftNoPlayer: "Этот игрок ещё не открыл ни одной карты", giftGone: "Этой карты у вас уже нет", back: "← Назад",
+      shop: "Магазин", shopTitle: "Купить карту", shopHint: "Выберите категорию: из неё выпадет случайная карта, шансы и гарантия как обычно.", anySet: "🎲 Любая", packCards: (n) => `${n} карт`, needMore: (n) => `ещё ${n} 💎`,
       market: "Рынок", newOffer: "➕ Выставить", filterAll: "Все", filterCan: "Могу дать", filterMine: "Мои",
       gives: "Отдаёт", wants: "Хочет", swap: "🔄 Обменять", noCard: "Нет у вас", remove: "✕ Снять", marketEmpty: "Пока предложений нет",
       marketHint: (n) => `Выставьте свою карту и выберите, какую хотите взамен. У кого она есть — обменяется. До ${n} предложений, 7 дней.`,
@@ -67,7 +69,7 @@
       search: "Search cards", rarities: ["Common", "Rare", "Epic", "Legendary", "Mythic"],
       drawNow: "Draw a card", drawing: "Opening…", next: (t) => `Next card in ${t}`, ready: "A card is ready!",
       autoTitle: "🤖 Auto opener", autoHint: "Each card opens itself when it is ready and comes to your private chat quietly", autoOn: "🤖 Auto opener on", autoOff: "⏸ Auto opener off",
-      shardsTitle: "Crystals", melt: (n, w) => `♻️ Melt ${n} spares → +${w} 💎`, noSpare: "♻️ No spare cards to melt", extra: (c) => `🎴 An extra card · ${c} 💎`, extraNeed: (n) => `🎴 ${n} more 💎 for an extra card`, fewShards: (n, h) => `💎 It takes ${n}, you have ${h}`, melted: (n, g) => `♻️ ${n} cards → +${g} 💎`, shardsHint: "Spares melt into crystals; your points and ranking stay. Crystals buy an extra card or a duel's stake.", ratesLabel: "1 spare:", meltTitle: "Melt into crystals", meltWarn: "These copies cannot be given afterwards. One of each card stays in your collection.", meltDo: (w) => `♻️ Melt · +${w} 💎`, cancel: "Cancel",
+      shardsTitle: "Crystals", melt: (n, w) => `♻️ Melt ${n} spares → +${w} 💎`, noSpare: "♻️ No spare cards to melt", fewShards: (n, h) => `💎 It takes ${n}, you have ${h}`, melted: (n, g) => `♻️ ${n} cards → +${g} 💎`, shardsHint: "Spares melt into crystals; your points and ranking stay. Crystals buy the cards below or a duel's stake.", ratesLabel: "1 spare:", meltTitle: "Melt into crystals", meltWarn: "These copies cannot be given afterwards. One of each card stays in your collection.", meltDo: (w) => `♻️ Melt · +${w} 💎`, cancel: "Cancel",
       fresh: "🆕 A new card!", sure: "✨ A guaranteed card!", pity: (l, m) => `{3} Legendary — sure in ${l} cards\n{4} Mythic — sure in ${m} cards`, again: (n) => `🔁 You now have ×${n}`, plus: (n) => `+${n} points`,
       attack: "Attack", health: "Life", value: "Points", cards: (n) => `${n} cards`, pts: "points",
       none: "Nothing found", noTop: "Nobody has drawn a card yet",
@@ -81,6 +83,7 @@
       gift: "🎁 Give", giftSearch: "Name or @username", giftHint: (n) => `The card goes with its points. Up to ${n} a day.`,
       giftTo: (name) => `🎁 Send to ${name}`, giftSent: (card, name) => `🎁 ${card} → ${name}`, giftNone: "No such player",
       giftLimit: (n) => `⏳ You may give ${n} cards a day. Again tomorrow.`, giftNoPlayer: "This player has not opened a card yet", giftGone: "You no longer have this card", back: "← Back",
+      shop: "Shop", shopTitle: "Buy a card", shopHint: "Pick a category: a random card of it comes out, by the usual odds and sure cards.", anySet: "🎲 Any", packCards: (n) => `${n} cards`, needMore: (n) => `${n} more 💎`,
       market: "Market", newOffer: "➕ Make an offer", filterAll: "All", filterCan: "I can give", filterMine: "Mine",
       gives: "Gives", wants: "Wants", swap: "🔄 Trade", noCard: "You lack it", remove: "✕ Take down", marketEmpty: "No offers yet",
       marketHint: (n) => `Put up a card and pick the one you want for it. Whoever holds it can trade. Up to ${n} offers, for 7 days.`,
@@ -104,7 +107,7 @@
   const haptic = (kind) => { try { tg.HapticFeedback.impactOccurred(kind); } catch (_) { /* outside Telegram */ } };
 
   let cards = [], points = 0, nextAt = 0, drawing = false, query = "", opened = "", chosenSet = "";
-  let shards = 0, spare = 0, spareWorth = 0, extraCost = 15, autoOn = false;
+  let shards = 0, spare = 0, spareWorth = 0, extraCost = 15, setCost = 20, autoOn = false, buying = false;
 
   // ---------- server ----------
 
@@ -147,6 +150,7 @@
     spare = data.spare || 0;
     spareWorth = data.spare_worth || 0;
     extraCost = data.extra_cost || extraCost;
+    setCost = data.set_cost || setCost;
     autoOn = !!data.auto;
     autoSwitch();
     shardsPanel();
@@ -500,8 +504,7 @@
     $("shardCount").textContent = spaced(shards);
     $("melt").textContent = spare ? t.melt(spare, spareWorth) : t.noSpare;
     $("melt").disabled = drawing || !spare;
-    $("extra").textContent = shards >= extraCost ? t.extra(extraCost) : t.extraNeed(extraCost - shards);
-    $("extra").disabled = drawing || shards < extraCost;
+    packs();
   }
 
   // The melt is asked once more, with what goes: the spare copies, by card,
@@ -545,7 +548,54 @@
     showPanel(panel);
   });
 
-  $("extra").addEventListener("click", () => reveal("extra"));
+  // ---------- shop ----------
+
+  // packs are the cards on sale: one of any collection, and one of each
+  // collection there are cards of, for crystals.
+  function packs() {
+    const root = $("packs");
+    root.textContent = "";
+    const known = SETS.filter(([name]) => cards.some((c) => c.set === name));
+    const offer = [["", t.anySet, cards.length, extraCost], ...known.map(([name, label]) => [name, label, cards.filter((c) => c.set === name).length, setCost])];
+    for (const [set, label, count, cost] of offer) {
+      const pack = document.createElement("button");
+      pack.type = "button";
+      pack.className = "pack";
+      pack.disabled = buying || shards < cost;
+      pack.innerHTML = "<b></b><small></small><span></span>";
+      pack.querySelector("b").textContent = label;
+      pack.querySelector("small").textContent = t.packCards(count);
+      pack.querySelector("span").textContent = shards >= cost ? `💎 ${cost}` : t.needMore(cost - shards);
+      pack.addEventListener("click", () => buy(set));
+      root.append(pack);
+    }
+  }
+
+  // buy draws a card for crystals, of the collection set or of any, and
+  // shows it large.
+  async function buy(set) {
+    if (buying) return;
+    buying = true;
+    packs();
+    haptic("medium");
+    try {
+      const data = await api("extra", set ? { set } : {});
+      if (data.need) {
+        toast(t.fewShards(data.need, data.have));
+        return;
+      }
+      applyState(await api("state"));
+      const card = cards.find((c) => c.id === data.card.id) || data.card;
+      open(card);
+      toast(`${data.new ? t.fresh : t.again(data.card.count)} · ${t.plus(spaced(data.card.value))}`);
+      haptic(data.card.rarity >= 3 ? "heavy" : "light");
+    } catch (error) {
+      notice(error);
+    } finally {
+      buying = false;
+      packs();
+    }
+  }
 
   // ---------- auto opener ----------
 
@@ -878,7 +928,7 @@
   function showTab(tab) {
     opened = tab;
     for (const button of document.querySelectorAll(".nav button")) button.classList.toggle("on", button.dataset.tab === tab);
-    for (const name of ["collection", "draw", "market", "top"]) $(`tab-${name}`).hidden = name !== tab;
+    for (const name of ["collection", "draw", "market", "shop", "top"]) $(`tab-${name}`).hidden = name !== tab;
     if (tab === "top") ranking();
     if (tab === "market") market();
     drawButton();
