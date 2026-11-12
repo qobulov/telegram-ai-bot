@@ -123,25 +123,26 @@ func (s *Service) withPicture(ctx context.Context, out outcome, card storage.Car
 // points it gave, and in how many draws a Legendary and a Mythic are sure.
 func cardCaption(language string, draw storage.CardDraw) string {
 	c := draw.Card
-	lines := []string{rarityNames[c.Rarity].inLanguage(language) + " **" + cardMarks.Replace(c.Name) + "**"}
+	emoji, rarity, _ := strings.Cut(rarityNames[c.Rarity].inLanguage(language), " ")
+	about := rarity
 	if c.Anime != "" {
-		lines = append(lines, "🎬 "+cardMarks.Replace(c.Anime))
+		about += " · " + cardMarks.Replace(c.Anime)
 	}
-	lines = append(lines, "",
-		fmt.Sprintf(textCardAttack.inLanguage(language), spaced(int64(c.Attack))),
-		fmt.Sprintf(textCardHealth.inLanguage(language), spaced(int64(c.Health))),
-		"",
-		fmt.Sprintf(textCardPoints.inLanguage(language), spaced(int64(c.Value)), spaced(draw.Points)))
+	lines := []string{emoji + " **" + cardMarks.Replace(c.Name) + "**", about, "",
+		fmt.Sprintf(textCardStats.inLanguage(language), spaced(int64(c.Attack)), spaced(int64(c.Health))), ""}
 	if draw.New {
-		lines = append(lines, textCardNew.inLanguage(language))
+		lines = append(lines, fmt.Sprintf(textCardNew.inLanguage(language), spaced(int64(c.Value))))
 	} else {
-		lines = append(lines, fmt.Sprintf(textCardAgain.inLanguage(language), draw.Count))
+		lines = append(lines, fmt.Sprintf(textCardAgain.inLanguage(language), draw.Count, spaced(int64(c.Value))))
 	}
+	lines = append(lines, fmt.Sprintf(textCardTotal.inLanguage(language), spaced(draw.Points)))
 	if draw.Guaranteed {
 		lines = append(lines, textCardGuaranteed.inLanguage(language))
 	}
 	legendary, mythic := cards.PityIn(draw)
-	lines = append(lines, fmt.Sprintf(textCardPity.inLanguage(language), legendary, mythic))
+	lines = append(lines, "",
+		fmt.Sprintf(textCardPity.inLanguage(language), rarityNames[cards.Legendary].inLanguage(language), legendary),
+		fmt.Sprintf(textCardPity.inLanguage(language), rarityNames[cards.Mythic].inLanguage(language), mythic))
 	return strings.Join(lines, "\n")
 }
 
@@ -344,16 +345,16 @@ var (
 		ru: "⏳ Следующая карта через %d мин. Коллекция: /kartalarim",
 		en: "⏳ Your next card in %d min. Collection: /kartalarim",
 	}
-	textCardAttack     = localText{uz: "🗡 Hujum: %s", ru: "🗡 Атака: %s", en: "🗡 Attack: %s"}
-	textCardHealth     = localText{uz: "❤️ Sog'liq: %s", ru: "❤️ Здоровье: %s", en: "❤️ Health: %s"}
-	textCardPoints     = localText{uz: "💠 +%s ochko (jami %s)", ru: "💠 +%s очков (всего %s)", en: "💠 +%s points (%s in all)"}
-	textCardNew        = localText{uz: "🆕 Yangi karta!", ru: "🆕 Новая карта!", en: "🆕 A new card!"}
-	textCardAgain      = localText{uz: "🔁 Sizda endi ×%d · ♻️ /eritish", ru: "🔁 Теперь у вас ×%d · ♻️ /eritish", en: "🔁 You now have ×%d · ♻️ /eritish"}
+	textCardStats      = localText{uz: "⚔️ Hujum %s · ❤️ Jon %s", ru: "⚔️ Атака %s · ❤️ Жизнь %s", en: "⚔️ Attack %s · ❤️ Life %s"}
+	textCardNew        = localText{uz: "🆕 Yangi karta · +%s ochko", ru: "🆕 Новая карта · +%s очков", en: "🆕 New card · +%s points"}
+	textCardAgain      = localText{uz: "🔁 Takror, endi ×%d · +%s ochko · ♻️ /eritish", ru: "🔁 Повтор, теперь ×%d · +%s очков · ♻️ /eritish", en: "🔁 Again, now ×%d · +%s points · ♻️ /eritish"}
+	textCardTotal      = localText{uz: "💠 Jami: %s ochko", ru: "💠 Всего: %s очков", en: "💠 Total: %s points"}
 	textCardGuaranteed = localText{uz: "✨ Kafolatlangan karta!", ru: "✨ Гарантированная карта!", en: "✨ A guaranteed card!"}
-	textCardPity       = localText{
-		uz: "🎯 Kafolat: 🔥 %d · 👑 %d kartadan keyin",
-		ru: "🎯 Гарантия: 🔥 через %d · 👑 через %d карт",
-		en: "🎯 Sure: 🔥 in %d · 👑 in %d cards",
+	// textCardPity says in how many cards a rarity is sure, one line each.
+	textCardPity = localText{
+		uz: "%s — %d kartadan keyin aniq",
+		ru: "%s — точно через %d карт",
+		en: "%s — sure in %d cards",
 	}
 	textCardAll        = localText{uz: "🗂 Hammasi - %d/%d", ru: "🗂 Все - %d/%d", en: "🗂 All - %d/%d"}
 	textCardAllTitle   = localText{uz: "🗂 Barcha kartalaringiz", ru: "🗂 Все ваши карты", en: "🗂 All your cards"}

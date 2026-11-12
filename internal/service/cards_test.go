@@ -317,11 +317,11 @@ func TestCardCaptionShowsTheSureCards(t *testing.T) {
 	in := incoming{msg: &telegram.Message{From: &telegram.User{ID: 1, FirstName: "Bek"}}, text: "/karta"}
 	draw := storage.CardDraw{Card: storage.Card{Name: "Gojo", Rarity: 4, Value: 5000}, New: true, Count: 1, Points: 5000, Guaranteed: true, SinceLegendary: 0, SinceMythic: 0}
 	caption := cardCaption(languageOf(in), draw)
-	if !strings.Contains(caption, "✨ Kafolatlangan karta!") || !strings.Contains(caption, "🔥 30 · 👑 100") {
+	if !strings.Contains(caption, "✨ Kafolatlangan karta!") || !strings.Contains(caption, "🔥 Afsonaviy — 30 kartadan") || !strings.Contains(caption, "👑 Mifik — 100 kartadan") {
 		t.Errorf("a sure Mythic's caption:\n%s", caption)
 	}
 	draw.Guaranteed, draw.SinceLegendary, draw.SinceMythic = false, 12, 70
-	if caption = cardCaption(languageOf(in), draw); strings.Contains(caption, "✨") || !strings.Contains(caption, "🔥 18 · 👑 30") {
+	if caption = cardCaption(languageOf(in), draw); strings.Contains(caption, "✨") || !strings.Contains(caption, "🔥 Afsonaviy — 18 kartadan") || !strings.Contains(caption, "👑 Mifik — 30 kartadan") {
 		t.Errorf("a card's caption:\n%s", caption)
 	}
 }
