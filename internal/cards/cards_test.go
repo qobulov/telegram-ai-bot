@@ -12,7 +12,8 @@ import (
 )
 
 // The odds add up to a thousand draws, the rarest least often, and the
-// catalog's 200 cards are parted 15, 30, 45, 60 and 50 by how loved they are.
+// catalog's cards are parted 15, 30, 45, 60 and the rest by how loved they
+// are.
 func TestRarityRules(t *testing.T) {
 	drawn := map[Rarity]int{}
 	for n := range 1000 {
@@ -25,7 +26,7 @@ func TestRarityRules(t *testing.T) {
 	for rank := range CatalogSize {
 		held[OfRank(rank)]++
 	}
-	if held[Mythic] != 15 || held[Legendary] != 30 || held[Epic] != 45 || held[Rare] != 60 || held[Common] != 50 {
+	if held[Mythic] != 15 || held[Legendary] != 30 || held[Epic] != 45 || held[Rare] != 60 || held[Common] != CatalogSize-150 {
 		t.Errorf("catalog = %v", held)
 	}
 	if OfRank(0) != Mythic || OfRank(CatalogSize-1) != Common {
@@ -69,7 +70,7 @@ func TestFetchCatalog(t *testing.T) {
 	defer server.Close()
 
 	catalog, err := FetchCatalog(context.Background(), server.Client(), server.URL)
-	if err != nil || len(catalog) != CatalogSize || pages != 5 {
+	if err != nil || len(catalog) != CatalogSize || pages != (CatalogSize+49)/50+1 {
 		t.Fatalf("catalog of %d in %d pages, %v", len(catalog), pages, err)
 	}
 	if catalog[0].Name != "Hero 1" || catalog[0].Anime != "Romaji" || catalog[2].ID != 4 || catalog[0].Rarity != int(Mythic) || catalog[CatalogSize-1].Rarity != int(Common) {
@@ -103,5 +104,60 @@ func TestWithPity(t *testing.T) {
 	}
 	if l, m := PityIn(storage.CardDraw{SinceLegendary: 4, SinceMythic: 40}); l != LegendaryPity-4 || m != MythicPity-40 {
 		t.Errorf("PityIn = %d, %d", l, m)
+	}
+}
+
+// catalogBook is a catalog of anime cards alone, which records what is
+// saved to it.
+type catalogBook struct {
+	held  []storage.Card
+	saved []storage.Card
+}
+
+func (b *catalogBook) CardCollections(context.Context) (map[string]int, error) {
+	return map[string]int{"anime": len(b.held)}, nil
+}
+func (b *catalogBook) SaveCardCatalog(_ context.Context, cards []storage.Card) error {
+	b.saved = append(b.saved, cards...)
+	return nil
+}
+func (b *catalogBook) CardSetVersions(context.Context) (map[string]int, error) { return nil, nil }
+func (b *catalogBook) CardCatalog(context.Context) ([]storage.Card, error)     { return b.held, nil }
+func (b *catalogBook) FillCardSet(context.Context, string, int, []storage.Card, map[int64]int64) error {
+	return nil
+}
+
+// A larger catalog adds the characters it lacks and leaves the cards there
+// are as players hold them, however AniList's ranks moved.
+func TestEnsureAddsOnlyNewCards(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Variables struct{ Page, PerPage int } `json:"variables"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		var characters []map[string]any
+		for i := range req.Variables.PerPage {
+			id := (req.Variables.Page-1)*req.Variables.PerPage + i + 1
+			characters = append(characters, map[string]any{
+				"id": id, "name": map[string]string{"full": fmt.Sprintf("Hero %d", id)}, "image": map[string]string{"large": "https://img/x.png"},
+				"favourites": 100000 - id, "media": map[string]any{"nodes": []any{}},
+			})
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"Page": map[string]any{"characters": characters}}})
+	}))
+	defer server.Close()
+	kept := storage.Card{ID: 1, Name: "Hero 1", Rarity: int(Legendary), Collection: "anime"}
+	book := &catalogBook{held: []storage.Card{kept}}
+	catalog := &Catalog{Store: book, Client: server.Client(), AniList: server.URL}
+	if err := catalog.Ensure(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(book.saved) != CatalogSize-1 {
+		t.Fatalf("saved %d cards, want %d", len(book.saved), CatalogSize-1)
+	}
+	for _, c := range book.saved {
+		if c.ID == kept.ID {
+			t.Fatalf("the card there was saved again: %+v", c)
+		}
 	}
 }

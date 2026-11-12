@@ -69,6 +69,9 @@ type CardPlayer struct {
 	// Auto is whether the auto opener opens their cards; only
 	// CardPlayerOf reads it.
 	Auto bool
+	// Username is their @username without the @; only CardPlayersNamed
+	// reads it.
+	Username string
 }
 
 // ErrCardWait is returned by DrawCard when the player drew too lately: the

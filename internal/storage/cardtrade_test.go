@@ -47,6 +47,12 @@ func TestCardsPassBetweenPlayers(t *testing.T) {
 	if players, _ = store.CardPlayersNamed(ctx, "ali", 2, 10); len(players) != 1 || players[0].UserID != 1 {
 		t.Errorf("players named ali = %+v", players)
 	}
+	if _, err := store.pool.Exec(ctx, `INSERT INTO group_members (chat_id, user_id, first_name, username) VALUES (-100, 2, 'Bob', 'bobby_k')`); err != nil {
+		t.Fatal(err)
+	}
+	if players, _ = store.CardPlayersNamed(ctx, "@BOBBY", 1, 10); len(players) != 1 || players[0].Username != "bobby_k" {
+		t.Errorf("players by @username = %+v", players)
+	}
 
 	// A spare Levi: Alice keeps two, one melted; Bob has two now.
 	if err := store.GiveCard(ctx, -100, 1, 2, 20, rules); err != nil {

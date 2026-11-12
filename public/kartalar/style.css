@@ -268,7 +268,10 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .gift input:focus { border-color: var(--gold); }
 .gift-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; max-height: 40vh; overflow-y: auto; }
 .gift-list button { width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--lacquer); color: var(--text); font: 700 15px Manrope, sans-serif; text-align: left; cursor: pointer; }
-.gift-list button b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gift-list button span { display: grid; min-width: 0; }
+.gift-list button b, .gift-list button i { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gift-list button i { color: var(--muted); font: 600 12px Manrope, sans-serif; font-style: normal; }
+.gift-list button i:empty { display: none; }
 .gift-list button small { flex: none; color: var(--muted); font-weight: 600; font-size: 12px; }
 .gift-list button[aria-pressed="true"] { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; background: color-mix(in srgb, var(--gold) 12%, var(--lacquer)); }
 .gift-empty { padding: 12px; color: var(--muted); text-align: center; font-size: 14px; }

@@ -39,8 +39,9 @@ var Rarities = []Rarity{Common, Rare, Epic, Legendary, Mythic}
 // Every is how often a player may draw a card.
 const Every = time.Hour
 
-// CatalogSize is how many of AniList's most loved characters are cards.
-const CatalogSize = 200
+// CatalogSize is how many of AniList's most loved characters are cards: the
+// rarities take the first 200 by rank, and the rest are Common.
+const CatalogSize = 500
 
 // rule is what one rarity is: how many cards of the catalog have it, the
 // most loved first, its odds in a thousand draws, the points it is worth
@@ -190,7 +191,11 @@ func (c *Catalog) Ensure(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if err := c.Store.SaveCardCatalog(ctx, catalog); err != nil {
+		fresh, err := c.newCards(ctx, catalog)
+		if err != nil {
+			return err
+		}
+		if err := c.Store.SaveCardCatalog(ctx, fresh); err != nil {
 			return err
 		}
 	}
@@ -297,6 +302,26 @@ func (c *Catalog) FetchPicture(ctx context.Context, link string) ([]byte, string
 // the bot's server.
 func (c *Catalog) Proxied(link string) bool {
 	return strings.HasPrefix(link, c.pokeWallet()+"/")
+}
+
+// newCards are the cards of catalog not in the store yet: a card there keeps
+// its rarity and numbers, as players hold it, however AniList's ranks moved.
+func (c *Catalog) newCards(ctx context.Context, catalog []storage.Card) ([]storage.Card, error) {
+	held, err := c.Store.CardCatalog(ctx)
+	if err != nil {
+		return nil, err
+	}
+	known := make(map[int64]bool, len(held))
+	for _, card := range held {
+		known[card.ID] = true
+	}
+	var fresh []storage.Card
+	for _, card := range catalog {
+		if !known[card.ID] {
+			fresh = append(fresh, card)
+		}
+	}
+	return fresh, nil
 }
 
 // pictureLimit bounds a card's picture.

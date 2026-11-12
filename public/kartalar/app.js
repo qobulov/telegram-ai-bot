@@ -24,7 +24,7 @@
       welcomeButton: "Birinchi kartani olish", seeCollection: "Kolleksiyada ko'rish →",
       locked: (r, o) => `🔒 Bu ${r.toLowerCase()} karta hali yopiq. Uning tushish ehtimoli: ${o}.`,
       wait: (time) => `⏳ ${time}`,
-      gift: "🎁 Sovg'a qilish", giftSearch: "O'yinchi ismini yozing", giftHint: (n) => `Karta ochkolari bilan birga o'tadi. Kuniga ${n} tagacha.`,
+      gift: "🎁 Sovg'a qilish", giftSearch: "Ism yoki @username", giftHint: (n) => `Karta ochkolari bilan birga o'tadi. Kuniga ${n} tagacha.`,
       giftTo: (name) => `🎁 ${name}ga yuborish`, giftSent: (card, name) => `🎁 ${card} → ${name}`, giftNone: "Bunday o'yinchi topilmadi",
       giftLimit: (n) => `⏳ Kuniga ${n} ta karta berish mumkin. Ertaga yana.`, giftNoPlayer: "Bu o'yinchi hali karta ochmagan", giftGone: "Bu karta endi sizda yo'q", back: "← Orqaga",
     },
@@ -44,7 +44,7 @@
       welcomeButton: "Получить первую карту", seeCollection: "Посмотреть в коллекции →",
       locked: (r, o) => `🔒 Эта карта (${r.toLowerCase()}) ещё закрыта. Шанс выпадения: ${o}.`,
       wait: (time) => `⏳ ${time}`,
-      gift: "🎁 Подарить", giftSearch: "Введите имя игрока", giftHint: (n) => `Карта переходит вместе с очками. До ${n} в день.`,
+      gift: "🎁 Подарить", giftSearch: "Имя или @username", giftHint: (n) => `Карта переходит вместе с очками. До ${n} в день.`,
       giftTo: (name) => `🎁 Отправить: ${name}`, giftSent: (card, name) => `🎁 ${card} → ${name}`, giftNone: "Игрок не найден",
       giftLimit: (n) => `⏳ В день можно отдать ${n} карт. Завтра снова.`, giftNoPlayer: "Этот игрок ещё не открыл ни одной карты", giftGone: "Этой карты у вас уже нет", back: "← Назад",
     },
@@ -64,7 +64,7 @@
       welcomeButton: "Draw your first card", seeCollection: "See it in the collection →",
       locked: (r, o) => `🔒 This ${r.toLowerCase()} card is still locked. Its odds: ${o}.`,
       wait: (time) => `⏳ ${time}`,
-      gift: "🎁 Give", giftSearch: "Type a player's name", giftHint: (n) => `The card goes with its points. Up to ${n} a day.`,
+      gift: "🎁 Give", giftSearch: "Name or @username", giftHint: (n) => `The card goes with its points. Up to ${n} a day.`,
       giftTo: (name) => `🎁 Send to ${name}`, giftSent: (card, name) => `🎁 ${card} → ${name}`, giftNone: "No such player",
       giftLimit: (n) => `⏳ You may give ${n} cards a day. Again tomorrow.`, giftNoPlayer: "This player has not opened a card yet", giftGone: "You no longer have this card", back: "← Back",
     },
@@ -394,8 +394,9 @@
           const li = document.createElement("li");
           const pick = document.createElement("button");
           pick.type = "button";
-          pick.innerHTML = "<b></b><small></small>";
+          pick.innerHTML = "<span><b></b><i></i></span><small></small>";
           pick.querySelector("b").textContent = player.name || "?";
+          pick.querySelector("i").textContent = player.username ? "@" + player.username : "";
           pick.querySelector("small").textContent = t.cards(player.cards);
           pick.setAttribute("aria-pressed", String(chosen && chosen.id === player.id));
           pick.addEventListener("click", () => {

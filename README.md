@@ -2053,10 +2053,12 @@ play sent sooner than its chops took.
 ### Kartalar
 
 `/karta` draws an anime card, one an hour, owners' too (in a private chat
-the word "karta" does too). The cards are AniList's 200 most loved
+the word "karta" does too). The cards are AniList's 500 most loved
 characters, fetched the first time a card is drawn (`internal/cards`, kept in
 `card_catalog`, migration 52), the most loved the rarest: 15 👑 Mifik, 30 🔥
-Afsonaviy, 45 💜 Epik, 60 🔷 Noyob and 50 ⚪ Oddiy. A draw first draws a
+Afsonaviy, 45 💜 Epik, 60 🔷 Noyob and the other 350 ⚪ Oddiy. A larger
+catalog adds only the characters it lacks: a card there keeps its rarity and
+numbers, as players hold it, however AniList's ranks have moved. A draw first draws a
 rarity, by odds of 1.5%, 6.5%, 14%, 28% and 50%, then a card of it at random,
 sent as the character's picture (AniList's, or for 138 anime characters a
 sharper one from MyAnimeList, 450 by 700, chosen by hand and kept in
@@ -2099,7 +2101,8 @@ the stake of the loser's shards, or all they have; the challenger or the one cal
 call it off, and `card_duels` keeps each duel's message so that it is settled
 once however often it is pressed. Cards pass between players (migration 66, `card_trades`). In the Mini
 App a card's large view has 🎁 Give: it searches the players who have opened
-a card by name, the most points first (`players`), and gives the one picked
+a card by name or @username (the one a group last saw), the most points
+first (`players`), and gives the one picked
 a copy at once (`gift`), the bot telling them in their private chat who gave
 it. In a group, replying to a member, `/almash Levi = Gojo` offers one of the
 sender's cards for one of theirs, done when that member presses ✅ (either

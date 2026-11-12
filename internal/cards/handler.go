@@ -380,7 +380,7 @@ func (h *handler) players(ctx context.Context, user miniapp.User, query string) 
 	}
 	rows := make([]map[string]any, len(found))
 	for i, p := range found {
-		rows[i] = map[string]any{"id": p.UserID, "name": p.Name, "cards": p.Cards, "points": p.Points}
+		rows[i] = map[string]any{"id": p.UserID, "name": p.Name, "username": p.Username, "cards": p.Cards, "points": p.Points}
 	}
 	return map[string]any{"players": rows}, failure{}
 }

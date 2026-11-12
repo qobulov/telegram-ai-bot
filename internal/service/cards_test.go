@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"telegram-ai-bot/internal/cards"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 )
@@ -182,7 +183,7 @@ func (f *fakeCards) ToggleCardAuto(_ context.Context, userID int64, _, _ string)
 }
 
 func (f *fakeCards) CardCollections(context.Context) (map[string]int, error) {
-	return map[string]int{"anime": 200}, nil
+	return map[string]int{"anime": cards.CatalogSize}, nil
 }
 func (f *fakeCards) SaveCardCatalog(context.Context, []storage.Card) error   { return nil }
 func (f *fakeCards) CardSetVersions(context.Context) (map[string]int, error) { return nil, nil }
