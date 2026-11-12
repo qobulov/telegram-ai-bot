@@ -60,7 +60,11 @@ func (s *Service) duelCommand(ctx context.Context, in incoming) outcome {
 		targetID = target.ID
 		text = fmt.Sprintf(textDuelTo.to(in), doozName(in.msg.From), doozName(target))
 	}
-	text += "\n\n" + duelTeamLine(in, duelSides[0], team) + "\n" + fmt.Sprintf(textDuelStakeLine.to(in), stake) + "\n\n" + textDuelRules.to(in)
+	stakeLine := textDuelFriendly.to(in)
+	if stake > 0 {
+		stakeLine = fmt.Sprintf(textDuelStakeLine.to(in), stake)
+	}
+	text += "\n\n" + duelTeamLine(in, duelSides[0], team) + "\n" + stakeLine + "\n\n" + textDuelRules.to(in)
 	data := strconv.FormatInt(in.userID, 36) + ":" + strconv.FormatInt(targetID, 36) + ":" + strconv.Itoa(stake)
 	return outcome{text: text, buttons: [][]telegram.Button{{
 		{Text: textDuelAccept.to(in), Data: duelData + "a:" + data},
@@ -231,6 +235,7 @@ var (
 	textDuelOpen      = localText{uz: "⚔️ **%s** duelga chaqiradi! Kim qabul qiladi?", ru: "⚔️ **%s** вызывает на дуэль! Кто примет?", en: "⚔️ **%s** calls for a duel! Who takes it?"}
 	textDuelTo        = localText{uz: "⚔️ **%s** → **%s**: duelga chaqiraman!", ru: "⚔️ **%s** → **%s**: вызываю на дуэль!", en: "⚔️ **%s** → **%s**: I call you to a duel!"}
 	textDuelStakeLine = localText{uz: "💎 Tikish: %d", ru: "💎 Ставка: %d", en: "💎 Stake: %d"}
+	textDuelFriendly  = localText{uz: "🤝 Tikishsiz, do'stona duel", ru: "🤝 Без ставки, дружеская дуэль", en: "🤝 No stake, a friendly duel"}
 	textDuelRules     = localText{
 		uz: "📜 Qoida: har kimning eng kuchli 3 kartasi jamoa bo'ladi. Kuch = hujum + jon. Kuchi ko'p jamoaning yutish imkoni ko'proq, lekin kuchsizi ham yutishi mumkin.",
 		ru: "📜 Правило: 3 сильнейшие карты каждого — его команда. Сила = атака + жизнь. У сильной команды шанс выше, но слабая тоже может победить.",
