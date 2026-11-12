@@ -15,9 +15,9 @@ func toMember(text string, member *telegram.User) telegram.Update {
 	return inGroup(msg)
 }
 
-// /sovga gives a card to the member replied to, named in part when only one
-// matches; /almash offers a trade only that member may accept, once.
-func TestCardsAreGivenAndTraded(t *testing.T) {
+// /almash offers the member replied to a trade of cards named in part, one
+// only they may accept, once.
+func TestCardsAreTraded(t *testing.T) {
 	f := newFixture()
 	buttons := &fakeButtons{}
 	f.opts.Buttons = buttons
@@ -33,29 +33,23 @@ func TestCardsAreGivenAndTraded(t *testing.T) {
 	}
 	last := func(sent []sentMessage) sentMessage { return sent[len(sent)-1] }
 
-	if sent := f.run(textFrom(userID, "/sovga Levi")); !strings.Contains(last(sent).text, "guruhda") {
-		t.Fatalf("a gift in private = %+v", sent)
+	if sent := f.run(textFrom(userID, "/almash Levi = Gojo")); !strings.Contains(last(sent).text, "guruhda") || !strings.Contains(last(sent).text, "/kartalar") {
+		t.Fatalf("a trade in private = %+v", sent)
 	}
-	if sent := f.run(inGroup(groupMessage("/sovga Levi"))); !strings.Contains(last(sent).text, "javob qilib") {
-		t.Fatalf("a gift to no one = %+v", sent)
+	if sent := f.run(inGroup(groupMessage("/almash Levi = Gojo"))); !strings.Contains(last(sent).text, "javob qilib") {
+		t.Fatalf("a trade with no one = %+v", sent)
 	}
-	if sent := f.run(toMember("/sovga u", vali)); !strings.Contains(last(sent).text, "Qaysi biri") || !strings.Contains(last(sent).text, "Naruto Uzumaki") {
+	if sent := f.run(toMember("/almash u = Levi", vali)); !strings.Contains(last(sent).text, "Qaysi biri") || !strings.Contains(last(sent).text, "Naruto Uzumaki") {
 		t.Fatalf("a name of two cards = %+v", last(sent))
 	}
-	if sent := f.run(toMember("/sovga Sasuke", vali)); !strings.Contains(last(sent).text, "«Sasuke» degan karta yo'q") {
+	if sent := f.run(toMember("/almash Sasuke = Levi", vali)); !strings.Contains(last(sent).text, "«Sasuke» degan karta yo'q") {
 		t.Fatalf("a card not held = %+v", last(sent))
 	}
-	sent := f.run(toMember("/sovga levi", vali))
-	if got := last(sent).text; !strings.Contains(got, "🎁 Bek → 🔥 **Levi** → Vali") || !strings.Contains(got, "+1 000 ochko") {
-		t.Fatalf("gift = %q", got)
-	}
-	if len(book.named[rival]) != 1 || book.named[rival][0].Name != "Levi" {
-		t.Fatalf("Vali holds %+v", book.named[rival])
-	}
+	book.named[rival] = []storage.Card{{ID: 40, Name: "Levi Ackerman", Rarity: 3, Value: 1000}}
 
-	sent = f.run(toMember("/almash Gojo = Levi", vali))
+	sent := f.run(toMember("/almash Gojo = Levi", vali))
 	offer := last(sent)
-	if len(offer.buttons) != 1 || !strings.Contains(offer.text, "Beradi: 👑 **Gojo Satoru**") || !strings.Contains(offer.text, "Oladi: 🔥 **Levi**") {
+	if len(offer.buttons) != 1 || !strings.Contains(offer.text, "Beradi: 👑 **Gojo Satoru**") || !strings.Contains(offer.text, "Oladi: 🔥 **Levi Ackerman**") {
 		t.Fatalf("offer = %+v", offer)
 	}
 	accept := offer.buttons[0][0].Data

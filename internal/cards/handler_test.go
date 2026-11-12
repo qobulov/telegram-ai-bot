@@ -51,6 +51,8 @@ type fakeStore struct {
 	shards   int
 	auto     bool
 	autoLang string
+	gifts    []int64 // the card, then the player, of each gift
+	giftErr  error
 }
 
 var (
@@ -112,6 +114,24 @@ func (f *fakeStore) ExtraCard(_ context.Context, _ int64, _ string, _ storage.Ca
 
 func (f *fakeStore) SetCardAuto(_ context.Context, _ int64, _ string, on bool, language string) error {
 	f.auto, f.autoLang = on, language
+	return nil
+}
+
+func (f *fakeStore) CardPlayersNamed(_ context.Context, name string, except int64, _ int) ([]storage.CardPlayer, error) {
+	var found []storage.CardPlayer
+	for _, p := range []storage.CardPlayer{{UserID: 7, Name: "Bek", Cards: 3}, {UserID: 8, Name: "Vali", Cards: 1}} {
+		if p.UserID != except && strings.Contains(strings.ToLower(p.Name), strings.ToLower(name)) {
+			found = append(found, p)
+		}
+	}
+	return found, nil
+}
+
+func (f *fakeStore) GiveCard(_ context.Context, _, _, to, cardID int64, _ storage.CardTradeRules) error {
+	if f.giftErr != nil {
+		return f.giftErr
+	}
+	f.gifts = append(f.gifts, cardID, to)
 	return nil
 }
 
@@ -399,5 +419,48 @@ func TestAppLanguage(t *testing.T) {
 		if got := appLanguage(code); got != want {
 			t.Errorf("appLanguage(%q) = %q, want %q", code, got, want)
 		}
+	}
+}
+
+// The player finds whom to give a card among the others, gives it, and the
+// one given it is told; a gift refused says why.
+func TestACardIsGiven(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	store := &fakeStore{}
+	var told []string
+	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now },
+		Notify: func(_ context.Context, userID int64, text string) error {
+			told = append(told, fmt.Sprint(userID, ": ", text))
+			return nil
+		}})
+	initData := signedInit(7, now)
+	call := func(fields map[string]any) (int, map[string]any) {
+		fields["init_data"] = initData
+		body, _ := json.Marshal(fields)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/cards", strings.NewReader(string(body))))
+		var out map[string]any
+		_ = json.Unmarshal(rec.Body.Bytes(), &out)
+		return rec.Code, out
+	}
+	_, out := call(map[string]any{"action": "players", "query": ""})
+	if players, _ := out["players"].([]any); len(players) != 1 || players[0].(map[string]any)["name"] != "Vali" {
+		t.Fatalf("players but the giver = %v", out)
+	}
+	if code, out := call(map[string]any{"action": "gift", "card": 1, "to": 8}); code != 200 || out["cards"] == nil {
+		t.Fatalf("gift = %d %v", code, out)
+	}
+	if len(store.gifts) != 2 || store.gifts[0] != 1 || store.gifts[1] != 8 {
+		t.Errorf("gifts = %v", store.gifts)
+	}
+	if len(told) != 1 || !strings.HasPrefix(told[0], "8: 🎁") || !strings.Contains(told[0], "**Gojo**") {
+		t.Errorf("told = %q", told)
+	}
+	if code, _ := call(map[string]any{"action": "gift", "card": 1, "to": 7}); code != http.StatusBadRequest {
+		t.Errorf("a gift to oneself = %d", code)
+	}
+	store.giftErr = &storage.CardGiveLimitError{UserID: 7}
+	if _, out := call(map[string]any{"action": "gift", "card": 1, "to": 8}); out["refused"] != "limit" {
+		t.Errorf("at the limit = %v", out)
 	}
 }

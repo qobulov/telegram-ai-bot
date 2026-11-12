@@ -49,7 +49,12 @@ func NewCards(ctx context.Context, cfg config.Config, logger *slog.Logger) (*End
 		store.Close()
 		return nil, err
 	}
-	handler := cards.NewHandler(cards.Options{BotToken: cfg.TelegramToken, Store: store, PokeWalletKey: cfg.PokeWalletAPIKey, Logger: logger})
+	client := telegram.NewClient(telegram.Options{Token: cfg.TelegramToken, BaseURL: cfg.TelegramAPIURL, Logger: logger})
+	notify := func(ctx context.Context, userID int64, text string) error {
+		_, err := client.SendMessage(ctx, telegram.Outgoing{ChatID: userID, Text: text})
+		return err
+	}
+	handler := cards.NewHandler(cards.Options{BotToken: cfg.TelegramToken, Store: store, PokeWalletKey: cfg.PokeWalletAPIKey, Logger: logger, Notify: notify})
 	return &Endpoint{Handler: handler, Close: store.Close}, nil
 }
 

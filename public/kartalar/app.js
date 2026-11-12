@@ -24,6 +24,9 @@
       welcomeButton: "Birinchi kartani olish", seeCollection: "Kolleksiyada ko'rish →",
       locked: (r, o) => `🔒 Bu ${r.toLowerCase()} karta hali yopiq. Uning tushish ehtimoli: ${o}.`,
       wait: (time) => `⏳ ${time}`,
+      gift: "🎁 Sovg'a qilish", giftSearch: "O'yinchi ismini yozing", giftHint: (n) => `Karta ochkolari bilan birga o'tadi. Kuniga ${n} tagacha.`,
+      giftTo: (name) => `🎁 ${name}ga yuborish`, giftSent: (card, name) => `🎁 ${card} → ${name}`, giftNone: "Bunday o'yinchi topilmadi",
+      giftLimit: (n) => `⏳ Kuniga ${n} ta karta berish mumkin. Ertaga yana.`, giftNoPlayer: "Bu o'yinchi hali karta ochmagan", giftGone: "Bu karta endi sizda yo'q", back: "← Orqaga",
     },
     ru: {
       title: "Карты", collected: "собрано", collection: "Коллекция", draw: "Получить", top: "Рейтинг",
@@ -41,6 +44,9 @@
       welcomeButton: "Получить первую карту", seeCollection: "Посмотреть в коллекции →",
       locked: (r, o) => `🔒 Эта карта (${r.toLowerCase()}) ещё закрыта. Шанс выпадения: ${o}.`,
       wait: (time) => `⏳ ${time}`,
+      gift: "🎁 Подарить", giftSearch: "Введите имя игрока", giftHint: (n) => `Карта переходит вместе с очками. До ${n} в день.`,
+      giftTo: (name) => `🎁 Отправить: ${name}`, giftSent: (card, name) => `🎁 ${card} → ${name}`, giftNone: "Игрок не найден",
+      giftLimit: (n) => `⏳ В день можно отдать ${n} карт. Завтра снова.`, giftNoPlayer: "Этот игрок ещё не открыл ни одной карты", giftGone: "Этой карты у вас уже нет", back: "← Назад",
     },
     en: {
       title: "Cards", collected: "collected", collection: "Collection", draw: "Draw", top: "Ranking",
@@ -58,6 +64,9 @@
       welcomeButton: "Draw your first card", seeCollection: "See it in the collection →",
       locked: (r, o) => `🔒 This ${r.toLowerCase()} card is still locked. Its odds: ${o}.`,
       wait: (time) => `⏳ ${time}`,
+      gift: "🎁 Give", giftSearch: "Type a player's name", giftHint: (n) => `The card goes with its points. Up to ${n} a day.`,
+      giftTo: (name) => `🎁 Send to ${name}`, giftSent: (card, name) => `🎁 ${card} → ${name}`, giftNone: "No such player",
+      giftLimit: (n) => `⏳ You may give ${n} cards a day. Again tomorrow.`, giftNoPlayer: "This player has not opened a card yet", giftGone: "You no longer have this card", back: "← Back",
     },
   };
   const language = ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code) || "uz").slice(0, 2);
@@ -97,22 +106,8 @@
 
   async function load() {
     try {
-      const data = await api("state");
-      cards = data.cards;
-      points = data.points;
-      nextAt = Date.now() + data.next_in;
-      shards = data.shards || 0;
-      spare = data.spare || 0;
-      spareWorth = data.spare_worth || 0;
-      extraCost = data.extra_cost || extraCost;
-      autoOn = !!data.auto;
-      autoSwitch();
-      shardsPanel();
-      notice(null);
+      applyState(await api("state"));
       $("loading").hidden = true;
-      header();
-      shelves();
-      drawButton();
       // A newcomer starts at the draw; anyone else at their collection.
       if (!opened) showTab(cards.some((c) => c.count > 0) ? "collection" : "draw");
     } catch (error) {
@@ -120,6 +115,24 @@
       if (!opened) showTab("collection");
       notice(error);
     }
+  }
+
+  // applyState shows what the server says the player holds.
+  function applyState(data) {
+    cards = data.cards;
+    points = data.points;
+    nextAt = Date.now() + data.next_in;
+    shards = data.shards || 0;
+    spare = data.spare || 0;
+    spareWorth = data.spare_worth || 0;
+    extraCost = data.extra_cost || extraCost;
+    autoOn = !!data.auto;
+    autoSwitch();
+    shardsPanel();
+    notice(null);
+    header();
+    shelves();
+    drawButton();
   }
 
   // ---------- header and collection ----------
@@ -303,7 +316,13 @@
   function open(card) {
     const sheet = $("sheetCard");
     sheet.textContent = "";
-    sheet.append(face(card), statsOf(card));
+    sheet.classList.remove("giving");
+    const give = document.createElement("button");
+    give.type = "button";
+    give.className = "ghost gift-open";
+    give.textContent = t.gift;
+    give.addEventListener("click", (event) => { event.stopPropagation(); giftPanel(card); });
+    sheet.append(face(card), statsOf(card), give);
     tilt(sheet, card.rarity === 4);
     $("sheet").hidden = false;
     try { tg.BackButton.show(); } catch (_) { /* older clients */ }
@@ -339,6 +358,83 @@
   }
   $("sheet").addEventListener("click", closeSheet);
   try { tg.BackButton.onClick(closeSheet); } catch (_) { /* older clients */ }
+
+  // ---------- giving a card ----------
+
+  // giftPanel takes the large card's place with a search for the player to
+  // give it to, a list to pick from, and the button that sends it.
+  function giftPanel(card) {
+    const sheet = $("sheetCard");
+    tilt(sheet, false);
+    sheet.classList.add("giving");
+    const panel = document.createElement("div");
+    panel.className = "gift";
+    panel.addEventListener("click", (event) => event.stopPropagation());
+    panel.innerHTML = `<div class="gift-head"><img alt=""><span><small></small><b></b></span></div><input type="search" autocomplete="off" enterkeyhint="search"><ul class="gift-list"></ul><p class="gift-hint"></p><button type="button" class="draw gift-send" disabled></button><button type="button" class="link gift-back"></button>`;
+    panel.querySelector(".gift-head img").src = card.image;
+    panel.querySelector(".gift-head small").replaceChildren(tierIcon(card.rarity), t.rarities[card.rarity]);
+    panel.querySelector(".gift-head b").textContent = card.name;
+    const input = panel.querySelector("input");
+    input.placeholder = t.giftSearch;
+    panel.querySelector(".gift-hint").textContent = t.giftHint(5);
+    const send = panel.querySelector(".gift-send");
+    send.textContent = t.gift;
+    panel.querySelector(".gift-back").textContent = t.back;
+    panel.querySelector(".gift-back").addEventListener("click", () => open(card));
+    let chosen = null, timer = 0, asked = 0;
+    const list = panel.querySelector(".gift-list");
+    async function search() {
+      const mine = ++asked;
+      try {
+        const data = await api("players", { query: input.value });
+        if (mine !== asked) return;
+        list.textContent = "";
+        if (!data.players.length) list.innerHTML = `<li class="gift-empty">${t.giftNone}</li>`;
+        for (const player of data.players) {
+          const li = document.createElement("li");
+          const pick = document.createElement("button");
+          pick.type = "button";
+          pick.innerHTML = "<b></b><small></small>";
+          pick.querySelector("b").textContent = player.name || "?";
+          pick.querySelector("small").textContent = t.cards(player.cards);
+          pick.setAttribute("aria-pressed", String(chosen && chosen.id === player.id));
+          pick.addEventListener("click", () => {
+            chosen = player;
+            for (const other of list.querySelectorAll("button")) other.setAttribute("aria-pressed", String(other === pick));
+            send.textContent = t.giftTo(player.name || "?");
+            send.disabled = false;
+            haptic("light");
+          });
+          li.append(pick);
+          list.append(li);
+        }
+      } catch (error) {
+        notice(error);
+      }
+    }
+    input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(search, 250); });
+    send.addEventListener("click", async () => {
+      if (!chosen) return;
+      send.disabled = true;
+      try {
+        const data = await api("gift", { card: card.id, to: chosen.id });
+        if (data.refused) {
+          toast(data.refused === "limit" ? t.giftLimit(data.limit) : data.refused === "no_player" ? t.giftNoPlayer : t.giftGone);
+          send.disabled = false;
+          return;
+        }
+        applyState(data);
+        closeSheet();
+        toast(t.giftSent(card.name, chosen.name || "?"));
+        haptic("medium");
+      } catch (error) {
+        send.disabled = false;
+        notice(error);
+      }
+    });
+    sheet.append(panel);
+    search();
+  }
 
   let toastTimer = 0;
   function toast(text) {

@@ -253,6 +253,29 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .stats b { font: 700 14px Unbounded, sans-serif; }
 @keyframes rise { from { opacity: 0; transform: translateY(24px) scale(0.96); } }
 
+/* giving a card: the large card makes way for a search and a list of players */
+.sheet { overflow-y: auto; }
+.gift-open { width: 100%; margin-top: 10px; }
+.sheet-card.giving > .face, .sheet-card.giving > .stats, .sheet-card.giving > .gift-open { display: none; }
+.sheet-card.giving { transform: none; }
+.gift { padding: 14px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+.gift-head { display: flex; align-items: center; gap: 12px; }
+.gift-head img { width: 52px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 8px; }
+.gift-head span { display: grid; gap: 2px; min-width: 0; }
+.gift-head small { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; }
+.gift-head b { font: 700 16px Unbounded, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gift input { width: 100%; min-height: 44px; margin-top: 12px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--lacquer); color: var(--text); font: 600 16px Manrope, sans-serif; outline: 0; }
+.gift input:focus { border-color: var(--gold); }
+.gift-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; max-height: 40vh; overflow-y: auto; }
+.gift-list button { width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--lacquer); color: var(--text); font: 700 15px Manrope, sans-serif; text-align: left; cursor: pointer; }
+.gift-list button b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gift-list button small { flex: none; color: var(--muted); font-weight: 600; font-size: 12px; }
+.gift-list button[aria-pressed="true"] { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; background: color-mix(in srgb, var(--gold) 12%, var(--lacquer)); }
+.gift-empty { padding: 12px; color: var(--muted); text-align: center; font-size: 14px; }
+.gift-hint { margin: 10px 0 0; color: var(--muted); font-size: 12px; text-align: center; }
+.gift-send { width: 100%; margin-top: 12px; }
+.gift-back { display: block; margin: 8px auto 0; }
+
 [hidden] { display: none !important; }
 
 /* Mythic: the picture is left as it is; a gold frame with a light running

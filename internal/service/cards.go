@@ -31,7 +31,6 @@ type CardBook interface {
 	ResolveDuel(ctx context.Context, chatID, messageID, winner, loser int64, stake int) (moved int, settled bool, err error)
 	ToggleCardAuto(ctx context.Context, userID int64, name, language string) (bool, error)
 	HeldCardsNamed(ctx context.Context, userID int64, name string, limit int) ([]storage.Card, error)
-	GiveCard(ctx context.Context, chatID, from, to, cardID int64, rules storage.CardTradeRules) error
 	OfferCardTrade(ctx context.Context, chatID, from, to, give, take int64, now time.Time) (int64, error)
 	AcceptCardTrade(ctx context.Context, id, by int64, rules storage.CardTradeRules) (storage.CardTrade, error)
 	CallOffCardTrade(ctx context.Context, id, by int64) (bool, error)

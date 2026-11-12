@@ -1317,7 +1317,7 @@ match "maria" unless you add it:
 word.
 
 **Commands** in a group need the bot's username (`/help@MyMariaBot`). A plain
-`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/karta`, `/kartalarim`, `/kartatop`, `/kartalar`, `/kristal`, `/eritish`, `/avto`, `/qoshimcha`, `/duel`, `/sovga`, `/almash`, `/boss`, `/ilon`, `/otinchi`, `/maydon`, `/shashka` and `/dooz`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username.
+`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/karta`, `/kartalarim`, `/kartatop`, `/kartalar`, `/kristal`, `/eritish`, `/avto`, `/qoshimcha`, `/duel`, `/almash`, `/boss`, `/ilon`, `/otinchi`, `/maydon`, `/shashka` and `/dooz`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username.
 
 ### Example
 
@@ -2097,17 +2097,18 @@ the power is a 67% chance). The challenge shows the challenger's team and
 power, the result both teams, their power and chance, and the winner takes
 the stake of the loser's shards, or all they have; the challenger or the one called out may
 call it off, and `card_duels` keeps each duel's message so that it is settled
-once however often it is pressed. Cards pass between players in a group,
-replying to the member they are for (migration 66, `card_trades`):
-`/sovga Levi` gives a copy of the sender's card at once, and
-`/almash Levi = Gojo` offers one of the sender's cards for one of theirs, done
-when that member presses ✅ (either may press ❌), once, within a day. A name
-need be only part of the card's, when one card matches; else the answer lists
-those that do. Any card may pass, the last copy too, which leaves the
-collection (its melted copies, gone to shards, with it), and its points pass
-with it. A player gives at most 5 cards a day, gifts and trades together, and
-only to a player who has opened a card, so that a second account cannot feed a
-first one. `/kartalarim` shows
+once however often it is pressed. Cards pass between players (migration 66, `card_trades`). In the Mini
+App a card's large view has 🎁 Give: it searches the players who have opened
+a card by name, the most points first (`players`), and gives the one picked
+a copy at once (`gift`), the bot telling them in their private chat who gave
+it. In a group, replying to a member, `/almash Levi = Gojo` offers one of the
+sender's cards for one of theirs, done when that member presses ✅ (either
+may press ❌), once, within a day; a name need be only part of the card's,
+when one card matches, else the answer lists those that do. Any card may
+pass, the last copy too, which leaves the collection (its melted copies, gone
+to shards, with it), and its points pass with it. A player gives at most 5
+cards a day, gifts and trades together, and only to a player who has opened a
+card, so that a second account cannot feed a first one. `/kartalarim` shows
 how many of each rarity's cards the player holds as buttons that list them,
 pressed only by that player; `/kartatop` is the table of points. The
 pictures are the characters' AniList pictures, the studios' art.

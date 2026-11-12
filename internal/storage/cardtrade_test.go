@@ -40,6 +40,14 @@ func TestCardsPassBetweenPlayers(t *testing.T) {
 		t.Errorf("a %% matched %+v", found)
 	}
 
+	players, err := store.CardPlayersNamed(ctx, "", 1, 10)
+	if err != nil || len(players) != 1 || players[0].Name != "Bob" {
+		t.Fatalf("players but Alice, who have drawn = %+v, %v", players, err)
+	}
+	if players, _ = store.CardPlayersNamed(ctx, "ali", 2, 10); len(players) != 1 || players[0].UserID != 1 {
+		t.Errorf("players named ali = %+v", players)
+	}
+
 	// A spare Levi: Alice keeps two, one melted; Bob has two now.
 	if err := store.GiveCard(ctx, -100, 1, 2, 20, rules); err != nil {
 		t.Fatal(err)

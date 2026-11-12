@@ -63,6 +63,28 @@ func (s *Store) HeldCardsNamed(ctx context.Context, userID int64, name string, l
 	return cards, nil
 }
 
+// CardPlayersNamed are the players whose name holds name, in any case, who
+// have opened a card, all but except, the most points first; at most limit.
+// An empty name finds them all.
+func (s *Store) CardPlayersNamed(ctx context.Context, name string, except int64, limit int) ([]CardPlayer, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT user_id, name, points, cards FROM card_players
+		WHERE draws > 0 AND user_id <> $1 AND name ILIKE $2
+		ORDER BY points DESC, user_id LIMIT $3`, except, "%"+likeMarks.Replace(strings.TrimSpace(name))+"%", limit)
+	if err != nil {
+		return nil, fmt.Errorf("storage: find card players: %w", err)
+	}
+	players, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (CardPlayer, error) {
+		var p CardPlayer
+		err := row.Scan(&p.UserID, &p.Name, &p.Points, &p.Cards)
+		return p, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("storage: find card players: %w", err)
+	}
+	return players, nil
+}
+
 // likeMarks are what ILIKE would read in a name as other than itself.
 var likeMarks = strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`)
 

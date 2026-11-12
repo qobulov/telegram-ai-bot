@@ -28,6 +28,8 @@ type Store interface {
 	MeltCards(ctx context.Context, userID int64, rates []int) (melted, gained, shards int, err error)
 	ExtraCard(ctx context.Context, userID int64, name string, roll storage.CardRoll, cost int) (storage.CardDraw, error)
 	SetCardAuto(ctx context.Context, userID int64, name string, on bool, language string) error
+	CardPlayersNamed(ctx context.Context, name string, except int64, limit int) ([]storage.CardPlayer, error)
+	GiveCard(ctx context.Context, chatID, from, to, cardID int64, rules storage.CardTradeRules) error
 }
 
 // Options configures the Mini App's API.
@@ -45,6 +47,9 @@ type Options struct {
 	Now           func() time.Time
 	// Roll draws a rarity; nil draws by the odds.
 	Roll func() Rarity
+	// Notify tells a player in their private chat of a card given them;
+	// nil tells no one.
+	Notify func(ctx context.Context, userID int64, text string) error
 }
 
 const (
@@ -53,6 +58,13 @@ const (
 	initDataAge  = 24 * time.Hour
 	maxBodyBytes = 16 << 10
 	topSize      = 20
+	// playersShown is the most players a search for whom to give a card
+	// lists.
+	playersShown = 10
+	// GiveLimit is how many cards a player may give a day, so that a
+	// second account cannot feed a first one its cards; GiveDay is that day.
+	GiveLimit = 5
+	GiveDay   = 24 * time.Hour
 )
 
 type handler struct {
@@ -85,6 +97,11 @@ type request struct {
 	Action   string `json:"action"`
 	// On is the auto opener's switch, for "auto".
 	On bool `json:"on"`
+	// Query is the name searched for, for "players"; Card and To are the
+	// card given and the player it is given to, for "gift".
+	Query string `json:"query"`
+	Card  int64  `json:"card"`
+	To    int64  `json:"to"`
 }
 
 type failure struct {
@@ -145,6 +162,10 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return h.extra(ctx, opened.User)
 	case "auto":
 		return h.auto(ctx, opened.User, req.On)
+	case "players":
+		return h.players(ctx, opened.User, req.Query)
+	case "gift":
+		return h.gift(ctx, opened.User, req.Card, req.To)
 	}
 	return nil, errBadRequest
 }
@@ -347,4 +368,72 @@ func name(user miniapp.User) string {
 		return first
 	}
 	return user.Username
+}
+
+// players are those the player may give a card to whose name holds query:
+// any who have opened a card but themselves, the most points first.
+func (h *handler) players(ctx context.Context, user miniapp.User, query string) (any, failure) {
+	found, err := h.Store.CardPlayersNamed(ctx, query, user.ID, playersShown)
+	if err != nil {
+		h.Logger.Error("could not find card players", "error", err)
+		return nil, errUnavailable
+	}
+	rows := make([]map[string]any, len(found))
+	for i, p := range found {
+		rows[i] = map[string]any{"id": p.UserID, "name": p.Name, "cards": p.Cards, "points": p.Points}
+	}
+	return map[string]any{"players": rows}, failure{}
+}
+
+// gift gives a copy of the player's card to another, with its points, and
+// tells them. A gift refused says why: "limit", "no_player" or "not_held".
+func (h *handler) gift(ctx context.Context, user miniapp.User, cardID, to int64) (any, failure) {
+	if cardID == 0 || to == 0 || to == user.ID {
+		return nil, errBadRequest
+	}
+	err := h.Store.GiveCard(ctx, 0, user.ID, to, cardID, storage.CardTradeRules{Limit: GiveLimit, Day: GiveDay, Now: h.Now()})
+	var limit *storage.CardGiveLimitError
+	switch {
+	case errors.As(err, &limit):
+		return map[string]any{"refused": "limit", "limit": GiveLimit}, failure{}
+	case errors.Is(err, storage.ErrCardNoPlayer):
+		return map[string]any{"refused": "no_player"}, failure{}
+	case errors.Is(err, storage.ErrCardNotHeld):
+		return map[string]any{"refused": "not_held"}, failure{}
+	case err != nil:
+		h.Logger.Error("could not give a card", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
+	h.tellGift(ctx, user, cardID, to)
+	return h.state(ctx, user)
+}
+
+// tellGift tells the player given a card who gave it, in the giver's
+// language; a message that does not go out is only logged.
+func (h *handler) tellGift(ctx context.Context, user miniapp.User, cardID, to int64) {
+	if h.Notify == nil {
+		return
+	}
+	card := ""
+	if owned, err := h.Store.OwnedCards(ctx, to, -1); err == nil {
+		for _, c := range owned {
+			if c.ID == cardID {
+				card = c.Name
+			}
+		}
+	}
+	text := strings.NewReplacer("{who}", giftMarks.Replace(name(user)), "{card}", giftMarks.Replace(card)).
+		Replace(giftTexts[appLanguage(user.Language)])
+	if err := h.Notify(ctx, to, text); err != nil {
+		h.Logger.Info("could not tell a player of a gift", "user_id", to, "error", err)
+	}
+}
+
+// giftMarks are what Telegram's formatting would read in a name as a mark.
+var giftMarks = strings.NewReplacer("*", "", "`", "", "[", "(", "]", ")")
+
+var giftTexts = map[string]string{
+	"uz": "🎁 {who} sizga karta sovg'a qildi: **{card}**!\nKolleksiyangiz: /kartalar",
+	"ru": "🎁 {who} подарил вам карту: **{card}**!\nВаша коллекция: /kartalar",
+	"en": "🎁 {who} gave you a card: **{card}**!\nYour collection: /kartalar",
 }

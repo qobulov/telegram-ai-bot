@@ -28,7 +28,6 @@ type fakeCards struct {
 	duels  map[int64]bool
 	auto   map[int64]bool
 	named  map[int64][]storage.Card
-	given  map[int64]int
 	trades []*fakeTrade
 }
 
@@ -37,7 +36,7 @@ func newFakeCards(picture string) *fakeCards {
 		card: storage.Card{ID: 1, Name: "Gojo *Satoru*", Anime: "Jujutsu Kaisen", ImageURL: picture, Rarity: 4, Attack: 5130, Health: 18020, Value: 5000},
 		last: map[int64]time.Time{}, held: map[int64]int{},
 		shards: map[int64]int{}, melted: map[int64]int{}, duels: map[int64]bool{},
-		named: map[int64][]storage.Card{}, given: map[int64]int{},
+		named: map[int64][]storage.Card{},
 	}
 }
 
@@ -131,21 +130,6 @@ func (f *fakeCards) moveNamed(from, to, cardID int64) bool {
 		}
 	}
 	return false
-}
-
-func (f *fakeCards) GiveCard(_ context.Context, _, from, to, cardID int64, rules storage.CardTradeRules) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	switch {
-	case f.held[to] == 0:
-		return storage.ErrCardNoPlayer
-	case f.given[from] >= rules.Limit:
-		return &storage.CardGiveLimitError{UserID: from}
-	case !f.moveNamed(from, to, cardID):
-		return storage.ErrCardNotHeld
-	}
-	f.given[from]++
-	return nil
 }
 
 func (f *fakeCards) OfferCardTrade(_ context.Context, _, from, to, give, take int64, _ time.Time) (int64, error) {

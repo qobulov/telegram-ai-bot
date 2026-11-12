@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"telegram-ai-bot/internal/cards"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 )
@@ -16,11 +17,11 @@ const (
 	// tradeData starts the callback data of a trade's buttons:
 	// tradeData+"a:<trade>:<target>" accepts it and "x:…" calls it off.
 	tradeData = "kt:"
-	// cardGiveLimit is how many cards a player may give a day, so that a
-	// second account cannot feed a first one its cards.
-	cardGiveLimit = 5
+	// cardGiveLimit is how many cards a player may give a day, trades and
+	// the Mini App's gifts together, as the Mini App counts them.
+	cardGiveLimit = cards.GiveLimit
 	// cardTradeDay is the day that limit counts and an offer stays open.
-	cardTradeDay = 24 * time.Hour
+	cardTradeDay = cards.GiveDay
 	// cardsMatched is the most cards a name finds before it asks which.
 	cardsMatched = 6
 )
@@ -28,29 +29,6 @@ const (
 // tradeRules are the limits of passing cards, as of now.
 func tradeRules() storage.CardTradeRules {
 	return storage.CardTradeRules{Limit: cardGiveLimit, Day: cardTradeDay, Now: time.Now()}
-}
-
-// giveCardCommand answers /sovga <card> in a group, replying to the member
-// the card is for: it gives them a copy of the sender's card at once, with
-// its points.
-func (s *Service) giveCardCommand(ctx context.Context, in incoming) outcome {
-	target, refusal := tradeTarget(in)
-	if refusal != "" {
-		return say(refusal)
-	}
-	name := commandArgument(in.text)
-	if name == "" {
-		return say(textGiveUsage.to(in))
-	}
-	card, refusal := s.heldCard(ctx, in, in.userID, name, textCardNotMine)
-	if refusal != "" {
-		return say(refusal)
-	}
-	err := s.opts.Cards.GiveCard(ctx, in.msg.Chat.ID, in.userID, target.ID, card.ID, tradeRules())
-	if refusal := s.tradeRefusal(in, err, target); refusal != "" {
-		return say(refusal)
-	}
-	return say(fmt.Sprintf(textGiveDone.to(in), tradeName(in.msg.From), cardLabel(in, card), tradeName(target), spaced(int64(card.Value))))
 }
 
 // tradeCardCommand answers /almash <my card> = <their card> in a group,
@@ -219,19 +197,14 @@ func tradeName(user *telegram.User) string { return cardMarks.Replace(doozName(u
 
 var (
 	textTradeGroupOnly = localText{
-		uz: "🎁 Karta guruhda yuboriladi: kimga bermoqchi bo'lsangiz, o'sha odamning xabariga javob qilib yozing.",
-		ru: "🎁 Карты передаются в группе: ответьте на сообщение того, кому хотите отдать.",
-		en: "🎁 Cards are passed in a group: reply to a message of the member they are for.",
+		uz: "🔄 Almashish guruhda bo'ladi: kim bilan almashmoqchi bo'lsangiz, o'sha odamning xabariga javob qilib yozing. Sovg'a qilish: /kartalar ilovasida kartani bosing.",
+		ru: "🔄 Обмен — в группе: ответьте на сообщение того, с кем хотите обменяться. Подарить карту: нажмите на неё в приложении /kartalar.",
+		en: "🔄 Trades are made in a group: reply to a message of the member to trade with. To give a card, tap it in the /kartalar app.",
 	}
 	textTradeReply = localText{
-		uz: "↩️ Kimga bermoqchi bo'lsangiz, o'sha odamning xabariga javob qilib yozing.",
-		ru: "↩️ Ответьте на сообщение того, кому хотите отдать карту.",
-		en: "↩️ Reply to a message of the member the card is for.",
-	}
-	textGiveUsage = localText{
-		uz: "🎁 Sovg'a: odamning xabariga javob qilib yozing\n/sovga Karta nomi\nMasalan: /sovga Levi",
-		ru: "🎁 Подарок: ответьте на сообщение человека\n/sovga Имя карты\nНапример: /sovga Levi",
-		en: "🎁 A gift: reply to the member's message with\n/sovga Card name\nFor example: /sovga Levi",
+		uz: "↩️ Kim bilan almashmoqchi bo'lsangiz, o'sha odamning xabariga javob qilib yozing.",
+		ru: "↩️ Ответьте на сообщение того, с кем хотите обменяться.",
+		en: "↩️ Reply to a message of the member to trade with.",
 	}
 	textTradeUsage = localText{
 		uz: "🔄 Almashish: odamning xabariga javob qilib yozing\n/almash Mening kartam = Uning kartasi\nMasalan: /almash Levi = Gojo",
@@ -252,11 +225,6 @@ var (
 		uz: "Qaysi biri? To'liq nomini yozing:",
 		ru: "Какая именно? Напишите полное имя:",
 		en: "Which one? Write its full name:",
-	}
-	textGiveDone = localText{
-		uz: "🎁 %s → %s → %s\n💠 +%s ochko u bilan birga o'tdi",
-		ru: "🎁 %s → %s → %s\n💠 +%s очков перешли вместе с ней",
-		en: "🎁 %s → %s → %s\n💠 +%s points went with it",
 	}
 	textGiveLimit = localText{
 		uz: "⏳ Kuniga %d ta karta berish mumkin. Ertaga yana urinib ko'ring.",
