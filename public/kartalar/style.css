@@ -232,7 +232,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 
 /* nav */
 .nav {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: grid; grid-template-columns: repeat(3, 1fr);
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: grid; grid-template-columns: repeat(4, 1fr);
   height: calc(var(--nav) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
   background: rgba(11, 10, 20, 0.92); backdrop-filter: blur(14px); border-top: 1px solid var(--line);
 }
@@ -366,3 +366,35 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* gift note and market */
+.gift-open:disabled { opacity: 0.45; }
+.gift-note { margin: 6px 0 0; color: var(--muted); font-size: 12px; text-align: center; }
+.gift-note:empty { display: none; }
+.market-head { margin: 4px 16px 0; display: grid; gap: 10px; }
+.market-hint { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.market-head .sets { margin: 0; padding: 0; }
+.sets button[aria-pressed="true"] { background: var(--gold); color: var(--ink); border-color: var(--gold); }
+.offers { list-style: none; margin: 12px 16px 0; padding: 0; display: grid; gap: 10px; }
+.offers .empty { padding: 24px 0; }
+.offer { padding: 12px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+.offer-cards { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+.offer .side { display: grid; gap: 6px; min-width: 0; }
+.offer .side em { font-style: normal; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+.offer .arrow { color: var(--gold); font-size: 20px; }
+.offer-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+.offer-foot small { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.offer-foot button { flex: none; min-height: 40px; padding: 0 14px; }
+.draw.small { width: auto; min-height: 40px; padding: 0 16px; font-size: 14px; }
+.mini { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.mini img { flex: none; width: 40px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 6px; box-shadow: 0 0 0 1.5px var(--c); }
+.mini span { display: grid; min-width: 0; }
+.mini small { display: flex; align-items: center; gap: 3px; color: var(--c); font-size: 10px; font-weight: 700; }
+.mini b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gift .step { display: block; margin-top: 4px; font: 700 14px Manrope, sans-serif; }
+.gift .step + input { margin-top: 8px; }
+.gift .gift-list + .step { margin-top: 14px; }
+.gift-list .pick { justify-content: flex-start; padding: 6px 10px; }
+.gift input:disabled { opacity: 0.4; }
+
+#newOffer { width: 100%; }

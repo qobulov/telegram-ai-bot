@@ -19,7 +19,21 @@ var (
 	// ErrCardTradeOver is a trade already done, called off, too old, or
 	// offered to another player.
 	ErrCardTradeOver = errors.New("storage: card trade over")
+	// ErrCardLastCopy is a gift of a card the giver holds no spare copy of:
+	// a gift is of spares alone.
+	ErrCardLastCopy = errors.New("storage: no spare copy to give")
+	// ErrCardOfferGone is an offer on the market whose player no longer
+	// holds the card offered; it is called off.
+	ErrCardOfferGone = errors.New("storage: card offer gone")
+	// ErrCardOfferOwn is a player taking their own offer.
+	ErrCardOfferOwn = errors.New("storage: own card offer")
 )
+
+// CardOffersError is a player with as many offers on the market as they may
+// have open.
+type CardOffersError struct{ Limit int }
+
+func (e *CardOffersError) Error() string { return "storage: card offers at the limit" }
 
 // CardGiveLimitError is a player who gave as many cards as they may today.
 type CardGiveLimitError struct{ UserID int64 }
@@ -100,8 +114,9 @@ func scanCard(row pgx.CollectableRow) (Card, error) {
 	return c, err
 }
 
-// GiveCard gives a copy of the card from one player to another at once, with
-// its points, and records it.
+// GiveCard gives a spare copy of the card from one player to another at
+// once, with its points, and records it: a player keeps their last copy not
+// melted, ErrCardLastCopy.
 func (s *Store) GiveCard(ctx context.Context, chatID, from, to, cardID int64, rules CardTradeRules) error {
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		if err := lockTraders(ctx, tx, from, to); err != nil {
@@ -110,7 +125,7 @@ func (s *Store) GiveCard(ctx context.Context, chatID, from, to, cardID int64, ru
 		if err := checkGiveLimit(ctx, tx, from, rules); err != nil {
 			return err
 		}
-		if err := moveCard(ctx, tx, from, to, cardID); err != nil {
+		if err := moveCard(ctx, tx, from, to, cardID, true); err != nil {
 			return err
 		}
 		_, err := tx.Exec(ctx, `
@@ -142,7 +157,7 @@ func (s *Store) AcceptCardTrade(ctx context.Context, id, by int64, rules CardTra
 		var created time.Time
 		err := tx.QueryRow(ctx, `
 			SELECT from_id, to_id, give_card, take_card, created_at FROM card_trades
-			WHERE id = $1 AND status = 'open' AND take_card IS NOT NULL FOR UPDATE`, id).
+			WHERE id = $1 AND status = 'open' AND take_card IS NOT NULL AND to_id IS NOT NULL FOR UPDATE`, id).
 			Scan(&trade.From, &trade.To, &trade.Give.ID, &trade.Take.ID, &created)
 		if errors.Is(err, pgx.ErrNoRows) || (err == nil && (trade.To != by || rules.Now.Sub(created) > rules.Day)) {
 			return ErrCardTradeOver
@@ -159,10 +174,10 @@ func (s *Store) AcceptCardTrade(ctx context.Context, id, by int64, rules CardTra
 				return err
 			}
 		}
-		if err := moveCard(ctx, tx, trade.From, trade.To, trade.Give.ID); err != nil {
+		if err := moveCard(ctx, tx, trade.From, trade.To, trade.Give.ID, false); err != nil {
 			return err
 		}
-		if err := moveCard(ctx, tx, trade.To, trade.From, trade.Take.ID); err != nil {
+		if err := moveCard(ctx, tx, trade.To, trade.From, trade.Take.ID, false); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE card_trades SET status = 'done', done_at = $2 WHERE id = $1`, id, rules.Now); err != nil {
@@ -234,7 +249,8 @@ func checkGiveLimit(ctx context.Context, tx pgx.Tx, userID int64, rules CardTrad
 // moveCard moves one copy of the card, not melted, from one player to the
 // other, with its points. A player giving their last copy not melted no
 // longer holds the card; the melted ones went to shards and are gone with it.
-func moveCard(ctx context.Context, tx pgx.Tx, from, to, cardID int64) error {
+// spareOnly refuses that last copy, ErrCardLastCopy.
+func moveCard(ctx context.Context, tx pgx.Tx, from, to, cardID int64, spareOnly bool) error {
 	var count, melted, value int
 	err := tx.QueryRow(ctx, `
 		SELECT o.count, o.melted, c.value FROM card_owned o JOIN card_catalog c ON c.id = o.card_id
@@ -244,6 +260,9 @@ func moveCard(ctx context.Context, tx pgx.Tx, from, to, cardID int64) error {
 	}
 	if err != nil {
 		return err
+	}
+	if spareOnly && count-melted < 2 {
+		return ErrCardLastCopy
 	}
 	lost := 0
 	if count-melted <= 1 {
@@ -291,8 +310,11 @@ func readCards(ctx context.Context, tx pgx.Tx, cards ...*Card) error {
 // tradeError wraps err, keeping the errors a player is told as they are.
 func tradeError(what string, err error) error {
 	var limit *CardGiveLimitError
+	var offers *CardOffersError
 	switch {
-	case err == nil, errors.Is(err, ErrCardNotHeld), errors.Is(err, ErrCardNoPlayer), errors.Is(err, ErrCardTradeOver), errors.As(err, &limit):
+	case err == nil, errors.Is(err, ErrCardNotHeld), errors.Is(err, ErrCardNoPlayer), errors.Is(err, ErrCardTradeOver),
+		errors.Is(err, ErrCardLastCopy), errors.Is(err, ErrCardOfferGone), errors.Is(err, ErrCardOfferOwn),
+		errors.As(err, &limit), errors.As(err, &offers):
 		return err
 	}
 	return fmt.Errorf("storage: %s: %w", what, err)

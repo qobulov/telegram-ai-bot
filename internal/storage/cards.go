@@ -54,10 +54,12 @@ const (
 	mythicRarity    = 4
 )
 
-// OwnedCard is a card a player holds, and how many of it.
+// OwnedCard is a card a player holds, how many of it, and how many of those
+// are melted into shards.
 type OwnedCard struct {
 	Card
-	Count int
+	Count  int
+	Melted int
 }
 
 // CardPlayer is a player on the table of points.
@@ -349,7 +351,7 @@ func (s *Store) CardCounts(ctx context.Context, userID int64) (total, owned map[
 // is negative, the rarest and most loved first.
 func (s *Store) OwnedCards(ctx context.Context, userID int64, rarity int) ([]OwnedCard, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT c.id, c.name, c.anime, c.image_url, c.favourites, c.rarity, c.attack, c.health, c.value, c.collection, o.count
+		SELECT c.id, c.name, c.anime, c.image_url, c.favourites, c.rarity, c.attack, c.health, c.value, c.collection, o.count, o.melted
 		FROM card_owned o JOIN card_catalog c ON c.id = o.card_id
 		WHERE o.user_id = $1 AND ($2 < 0 OR c.rarity = $2)
 		ORDER BY c.rarity DESC, c.favourites DESC`, userID, rarity)
@@ -358,7 +360,7 @@ func (s *Store) OwnedCards(ctx context.Context, userID int64, rarity int) ([]Own
 	}
 	cards, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (OwnedCard, error) {
 		var o OwnedCard
-		err := row.Scan(&o.ID, &o.Name, &o.Anime, &o.ImageURL, &o.Favourites, &o.Rarity, &o.Attack, &o.Health, &o.Value, &o.Collection, &o.Count)
+		err := row.Scan(&o.ID, &o.Name, &o.Anime, &o.ImageURL, &o.Favourites, &o.Rarity, &o.Attack, &o.Health, &o.Value, &o.Collection, &o.Count, &o.Melted)
 		return o, err
 	})
 	if err != nil {

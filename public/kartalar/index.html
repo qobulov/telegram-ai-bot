@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Manrope:wght@500;600;800&display=swap" rel="stylesheet">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="style.css?v=15">
+  <link rel="stylesheet" href="style.css?v=16">
 </head>
 <body>
   <div class="grain" aria-hidden="true"></div>
@@ -78,6 +78,19 @@
       </div>
     </section>
 
+    <section class="tab" id="tab-market" hidden>
+      <div class="market-head">
+        <p class="market-hint" id="marketHint"></p>
+        <button type="button" class="draw" id="newOffer" data-t="newOffer"></button>
+        <div class="sets" id="marketFilter" role="group">
+          <button type="button" data-f="all" data-t="filterAll"></button>
+          <button type="button" data-f="can" data-t="filterCan"></button>
+          <button type="button" data-f="mine" data-t="filterMine"></button>
+        </div>
+      </div>
+      <ul class="offers" id="offers"></ul>
+    </section>
+
     <section class="tab" id="tab-top" hidden>
       <ol class="table" id="table"></ol>
     </section>
@@ -86,6 +99,7 @@
   <nav class="nav">
     <button type="button" class="on" data-tab="collection"><span aria-hidden="true">🎴</span><b data-t="collection"></b></button>
     <button type="button" data-tab="draw"><span aria-hidden="true">✨</span><b data-t="draw"></b><i class="dot" id="readyDot" hidden></i></button>
+    <button type="button" data-tab="market"><span aria-hidden="true">🔄</span><b data-t="market"></b></button>
     <button type="button" data-tab="top"><span aria-hidden="true">🏆</span><b data-t="top"></b></button>
   </nav>
 
@@ -96,6 +110,6 @@
 
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="app.js?v=15"></script>
+  <script src="app.js?v=16"></script>
 </body>
 </html>

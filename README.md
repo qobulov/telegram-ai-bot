@@ -2103,8 +2103,15 @@ once however often it is pressed. Cards pass between players (migration 66, `car
 App a card's large view has 🎁 Give: it searches the players who have opened
 a card by name or @username (the one a group last saw), the most points
 first (`players`), and gives the one picked
-a copy at once (`gift`), the bot telling them in their private chat who gave
-it. In a group, replying to a member, `/almash Levi = Gojo` offers one of the
+a spare copy at once (`gift`: a player keeps their last copy not melted),
+the bot telling them in their private chat who gave it. The Mini App's 🔄
+market tab lists offers (migration 67, `card_trades` rows with no `to_id`
+until taken): a player puts up a card of theirs for a card they pick from the
+whole catalog by name (`catalog`, `offer`), at most 5 open, each for 7 days;
+anyone who holds the card wanted presses 🔄 to take it (`take`), each giving
+the other their card with its points, and the offer's player is told; an
+offer whose card its player no longer holds is called off when taken, and a
+player takes down their own (`unoffer`). In a group, replying to a member, `/almash Levi = Gojo` offers one of the
 sender's cards for one of theirs, done when that member presses ✅ (either
 may press ❌), once, within a day; a name need be only part of the card's,
 when one card matches, else the answer lists those that do. Any card may

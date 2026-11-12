@@ -53,6 +53,8 @@ type fakeStore struct {
 	autoLang string
 	gifts    []int64 // the card, then the player, of each gift
 	giftErr  error
+	offers   []storage.CardOffer
+	takeErr  error
 }
 
 var (
@@ -133,6 +135,46 @@ func (f *fakeStore) GiveCard(_ context.Context, _, _, to, cardID int64, _ storag
 	}
 	f.gifts = append(f.gifts, cardID, to)
 	return nil
+}
+
+func (f *fakeStore) OfferCard(_ context.Context, from, give, want int64, rules storage.CardMarketRules) (int64, error) {
+	if len(f.offers) >= rules.Open {
+		return 0, &storage.CardOffersError{Limit: rules.Open}
+	}
+	id := int64(len(f.offers) + 1)
+	f.offers = append(f.offers, storage.CardOffer{ID: id, From: from, FromName: "Bek", Give: storage.Card{ID: give, Name: "Gojo"}, Want: storage.Card{ID: want, Name: "Levi"}})
+	return id, nil
+}
+func (f *fakeStore) CardMarket(_ context.Context, viewer int64, _ storage.CardMarketRules, _ int) ([]storage.CardOffer, error) {
+	out := make([]storage.CardOffer, len(f.offers))
+	for i, o := range f.offers {
+		o.Mine = o.From == viewer
+		out[i] = o
+	}
+	return out, nil
+}
+func (f *fakeStore) TakeCardOffer(_ context.Context, id, by int64, _ storage.CardTradeRules, _ time.Duration) (storage.CardTrade, error) {
+	if f.takeErr != nil {
+		return storage.CardTrade{}, f.takeErr
+	}
+	o := f.offers[id-1]
+	f.offers = append(f.offers[:id-1], f.offers[id:]...)
+	return storage.CardTrade{ID: id, From: o.From, To: by, Give: o.Give, Take: o.Want}, nil
+}
+func (f *fakeStore) CallOffCardTrade(_ context.Context, id, by int64) (bool, error) {
+	for i, o := range f.offers {
+		if o.ID == id && o.From == by {
+			f.offers = append(f.offers[:i], f.offers[i+1:]...)
+			return true, nil
+		}
+	}
+	return false, nil
+}
+func (f *fakeStore) CatalogCardsNamed(_ context.Context, name string, _ int) ([]storage.Card, error) {
+	if strings.Contains("levi", strings.ToLower(name)) {
+		return []storage.Card{lockedCard}, nil
+	}
+	return nil, nil
 }
 
 func post(t *testing.T, h http.Handler, initData, action string) (int, map[string]any) {
@@ -462,5 +504,56 @@ func TestACardIsGiven(t *testing.T) {
 	store.giftErr = &storage.CardGiveLimitError{UserID: 7}
 	if _, out := call(map[string]any{"action": "gift", "card": 1, "to": 8}); out["refused"] != "limit" {
 		t.Errorf("at the limit = %v", out)
+	}
+}
+
+// A player puts a card up for one found in the catalog; another takes the
+// offer and its player is told; a player calls off their own offer.
+func TestTheCardMarket(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	store := &fakeStore{}
+	var told []string
+	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now },
+		Notify: func(_ context.Context, userID int64, text string) error {
+			told = append(told, fmt.Sprint(userID, ": ", text))
+			return nil
+		}})
+	call := func(user int64, fields map[string]any) map[string]any {
+		fields["init_data"] = signedInit(user, now)
+		body, _ := json.Marshal(fields)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/cards", strings.NewReader(string(body))))
+		var out map[string]any
+		_ = json.Unmarshal(rec.Body.Bytes(), &out)
+		return out
+	}
+	if cards, _ := call(7, map[string]any{"action": "catalog", "query": "lev"})["cards"].([]any); len(cards) != 1 || cards[0].(map[string]any)["name"] != "Levi" {
+		t.Fatalf("catalog search = %v", cards)
+	}
+	if out := call(7, map[string]any{"action": "offer", "card": 1, "want": 1}); out["refused"] != "same" {
+		t.Errorf("an offer of a card for itself = %v", out)
+	}
+	out := call(7, map[string]any{"action": "offer", "card": 1, "want": 2})
+	offers, _ := out["offers"].([]any)
+	if len(offers) != 1 || offers[0].(map[string]any)["mine"] != true {
+		t.Fatalf("market after the offer = %v", out)
+	}
+	if offers, _ = call(8, map[string]any{"action": "market"})["offers"].([]any); len(offers) != 1 || offers[0].(map[string]any)["mine"] != false {
+		t.Fatalf("another's market = %v", offers)
+	}
+	out = call(8, map[string]any{"action": "take", "offer": 1})
+	if got, _ := out["got"].(map[string]any); got["name"] != "Gojo" || out["cards"] == nil {
+		t.Fatalf("take = %v", out)
+	}
+	if len(told) != 1 || !strings.HasPrefix(told[0], "7: 🔄") || !strings.Contains(told[0], "**Levi**") {
+		t.Errorf("told = %q", told)
+	}
+	store.takeErr = storage.ErrCardOfferGone
+	if out := call(8, map[string]any{"action": "take", "offer": 1}); out["refused"] != "gone" {
+		t.Errorf("an offer gone = %v", out)
+	}
+	call(7, map[string]any{"action": "offer", "card": 1, "want": 2})
+	if out := call(7, map[string]any{"action": "unoffer", "offer": 1}); len(out["offers"].([]any)) != 0 {
+		t.Errorf("market after calling off = %v", out)
 	}
 }

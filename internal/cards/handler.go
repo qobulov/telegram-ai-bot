@@ -30,6 +30,11 @@ type Store interface {
 	SetCardAuto(ctx context.Context, userID int64, name string, on bool, language string) error
 	CardPlayersNamed(ctx context.Context, name string, except int64, limit int) ([]storage.CardPlayer, error)
 	GiveCard(ctx context.Context, chatID, from, to, cardID int64, rules storage.CardTradeRules) error
+	OfferCard(ctx context.Context, from, give, want int64, rules storage.CardMarketRules) (int64, error)
+	CardMarket(ctx context.Context, viewer int64, rules storage.CardMarketRules, limit int) ([]storage.CardOffer, error)
+	TakeCardOffer(ctx context.Context, id, by int64, rules storage.CardTradeRules, keep time.Duration) (storage.CardTrade, error)
+	CallOffCardTrade(ctx context.Context, id, by int64) (bool, error)
+	CatalogCardsNamed(ctx context.Context, name string, limit int) ([]storage.Card, error)
 }
 
 // Options configures the Mini App's API.
@@ -65,6 +70,14 @@ const (
 	// second account cannot feed a first one its cards; GiveDay is that day.
 	GiveLimit = 5
 	GiveDay   = 24 * time.Hour
+	// OffersOpen is how many offers a player may have on the market, and
+	// OfferKeep how long one stays there.
+	OffersOpen = 5
+	OfferKeep  = 7 * 24 * time.Hour
+	// marketShown is the most offers the market lists, and catalogShown the
+	// most cards a search of the catalog finds.
+	marketShown  = 60
+	catalogShown = 12
 )
 
 type handler struct {
@@ -102,6 +115,10 @@ type request struct {
 	Query string `json:"query"`
 	Card  int64  `json:"card"`
 	To    int64  `json:"to"`
+	// Want is the card wanted for Card, for "offer"; Offer is the offer
+	// taken or called off, for "take" and "unoffer".
+	Want  int64 `json:"want"`
+	Offer int64 `json:"offer"`
 }
 
 type failure struct {
@@ -166,6 +183,16 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return h.players(ctx, opened.User, req.Query)
 	case "gift":
 		return h.gift(ctx, opened.User, req.Card, req.To)
+	case "market":
+		return h.market(ctx, opened.User)
+	case "catalog":
+		return h.catalogSearch(ctx, req.Query)
+	case "offer":
+		return h.offer(ctx, opened.User, req.Card, req.Want)
+	case "take":
+		return h.take(ctx, opened.User, req.Offer)
+	case "unoffer":
+		return h.unoffer(ctx, opened.User, req.Offer)
 	}
 	return nil, errBadRequest
 }
@@ -208,6 +235,9 @@ type cardView struct {
 	Health int    `json:"health,omitempty"`
 	Value  int    `json:"value,omitempty"`
 	Count  int    `json:"count"`
+	// Spare is the copies held but one that are not melted, which may be
+	// given.
+	Spare int `json:"spare,omitempty"`
 }
 
 func (h *handler) held(c storage.Card, count int) cardView {
@@ -233,14 +263,15 @@ func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
 		h.Logger.Error("could not read a player's cards", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
 	}
-	counts := make(map[int64]int, len(owned))
+	byID := make(map[int64]storage.OwnedCard, len(owned))
 	for _, o := range owned {
-		counts[o.ID] = o.Count
+		byID[o.ID] = o
 	}
 	views := make([]cardView, len(catalog))
 	for i, c := range catalog {
-		if count := counts[c.ID]; count > 0 {
-			views[i] = h.held(c, count)
+		if o, ok := byID[c.ID]; ok && o.Count > 0 {
+			views[i] = h.held(c, o.Count)
+			views[i].Spare = max(0, o.Count-1-o.Melted)
 		} else {
 			views[i] = cardView{ID: c.ID, Rarity: c.Rarity, Set: c.Collection}
 		}
@@ -400,6 +431,8 @@ func (h *handler) gift(ctx context.Context, user miniapp.User, cardID, to int64)
 		return map[string]any{"refused": "no_player"}, failure{}
 	case errors.Is(err, storage.ErrCardNotHeld):
 		return map[string]any{"refused": "not_held"}, failure{}
+	case errors.Is(err, storage.ErrCardLastCopy):
+		return map[string]any{"refused": "no_spare"}, failure{}
 	case err != nil:
 		h.Logger.Error("could not give a card", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
@@ -436,4 +469,129 @@ var giftTexts = map[string]string{
 	"uz": "🎁 {who} sizga karta sovg'a qildi: **{card}**!\nKolleksiyangiz: /kartalar",
 	"ru": "🎁 {who} подарил вам карту: **{card}**!\nВаша коллекция: /kartalar",
 	"en": "🎁 {who} gave you a card: **{card}**!\nYour collection: /kartalar",
+}
+
+func marketRules(now time.Time) storage.CardMarketRules {
+	return storage.CardMarketRules{Open: OffersOpen, Keep: OfferKeep, Now: now}
+}
+
+// offerView is an offer on the market as the page shows it.
+type offerView struct {
+	ID   int64    `json:"id"`
+	Who  string   `json:"who"`
+	Give cardView `json:"give"`
+	Want cardView `json:"want"`
+	Can  bool     `json:"can"`
+	Mine bool     `json:"mine"`
+}
+
+// market is the offers open: the player's own, which they may call off, and
+// the others', each saying whether the player holds the card it wants.
+func (h *handler) market(ctx context.Context, user miniapp.User) (any, failure) {
+	offers, err := h.Store.CardMarket(ctx, user.ID, marketRules(h.Now()), marketShown)
+	if err != nil {
+		h.Logger.Error("could not read the card market", "error", err)
+		return nil, errUnavailable
+	}
+	views := make([]offerView, len(offers))
+	for i, o := range offers {
+		views[i] = offerView{ID: o.ID, Who: o.FromName, Give: h.held(o.Give, 0), Want: h.held(o.Want, 0), Can: o.Can, Mine: o.Mine}
+	}
+	return map[string]any{"offers": views, "open_limit": OffersOpen}, failure{}
+}
+
+// catalogSearch finds the cards of the catalog by name, for the card a
+// player wants: a name searched for is shown, held or not.
+func (h *handler) catalogSearch(ctx context.Context, query string) (any, failure) {
+	if strings.TrimSpace(query) == "" {
+		return map[string]any{"cards": []cardView{}}, failure{}
+	}
+	found, err := h.Store.CatalogCardsNamed(ctx, query, catalogShown)
+	if err != nil {
+		h.Logger.Error("could not search the card catalog", "error", err)
+		return nil, errUnavailable
+	}
+	views := make([]cardView, len(found))
+	for i, c := range found {
+		views[i] = h.held(c, 0)
+	}
+	return map[string]any{"cards": views}, failure{}
+}
+
+// offer puts the player's card up on the market for the card they want. An
+// offer refused says why: "not_held", "limit" or "same".
+func (h *handler) offer(ctx context.Context, user miniapp.User, give, want int64) (any, failure) {
+	switch {
+	case give == 0 || want == 0:
+		return nil, errBadRequest
+	case give == want:
+		return map[string]any{"refused": "same"}, failure{}
+	}
+	_, err := h.Store.OfferCard(ctx, user.ID, give, want, marketRules(h.Now()))
+	var many *storage.CardOffersError
+	switch {
+	case errors.Is(err, storage.ErrCardNotHeld):
+		return map[string]any{"refused": "not_held"}, failure{}
+	case errors.As(err, &many):
+		return map[string]any{"refused": "limit", "limit": many.Limit}, failure{}
+	case err != nil:
+		h.Logger.Error("could not offer a card", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
+	return h.market(ctx, user)
+}
+
+// take takes an offer: its player and this one each give the other their
+// card, and its player is told. An offer refused says why: "over",
+// "gone", "not_held", "limit" or "own".
+func (h *handler) take(ctx context.Context, user miniapp.User, id int64) (any, failure) {
+	if id == 0 {
+		return nil, errBadRequest
+	}
+	trade, err := h.Store.TakeCardOffer(ctx, id, user.ID, storage.CardTradeRules{Limit: GiveLimit, Day: GiveDay, Now: h.Now()}, OfferKeep)
+	var limit *storage.CardGiveLimitError
+	switch {
+	case errors.Is(err, storage.ErrCardTradeOver):
+		return map[string]any{"refused": "over"}, failure{}
+	case errors.Is(err, storage.ErrCardOfferGone):
+		return map[string]any{"refused": "gone"}, failure{}
+	case errors.Is(err, storage.ErrCardOfferOwn):
+		return map[string]any{"refused": "own"}, failure{}
+	case errors.Is(err, storage.ErrCardNotHeld):
+		return map[string]any{"refused": "not_held"}, failure{}
+	case errors.As(err, &limit):
+		return map[string]any{"refused": "limit", "limit": GiveLimit, "mine": limit.UserID == user.ID}, failure{}
+	case err != nil:
+		h.Logger.Error("could not take a card offer", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
+	if h.Notify != nil {
+		text := strings.NewReplacer("{who}", giftMarks.Replace(name(user)), "{got}", giftMarks.Replace(trade.Take.Name), "{gave}", giftMarks.Replace(trade.Give.Name)).
+			Replace(takenTexts[appLanguage(user.Language)])
+		if err := h.Notify(ctx, trade.From, text); err != nil {
+			h.Logger.Info("could not tell a player of a trade", "user_id", trade.From, "error", err)
+		}
+	}
+	state, fail := h.state(ctx, user)
+	if fail != (failure{}) {
+		return nil, fail
+	}
+	result := state.(map[string]any)
+	result["got"] = h.held(trade.Give, 1)
+	return result, failure{}
+}
+
+// unoffer calls off the player's own offer.
+func (h *handler) unoffer(ctx context.Context, user miniapp.User, id int64) (any, failure) {
+	if _, err := h.Store.CallOffCardTrade(ctx, id, user.ID); err != nil {
+		h.Logger.Error("could not call off a card offer", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
+	return h.market(ctx, user)
+}
+
+var takenTexts = map[string]string{
+	"uz": "🔄 {who} taklifingizni qabul qildi: siz **{got}** oldingiz, **{gave}** berdingiz.\nKolleksiyangiz: /kartalar",
+	"ru": "🔄 {who} принял ваше предложение: вы получили **{got}** и отдали **{gave}**.\nВаша коллекция: /kartalar",
+	"en": "🔄 {who} took your offer: you got **{got}** and gave **{gave}**.\nYour collection: /kartalar",
 }

@@ -27,6 +27,13 @@
       gift: "🎁 Sovg'a qilish", giftSearch: "Ism yoki @username", giftHint: (n) => `Karta ochkolari bilan birga o'tadi. Kuniga ${n} tagacha.`,
       giftTo: (name) => `🎁 ${name}ga yuborish`, giftSent: (card, name) => `🎁 ${card} → ${name}`, giftNone: "Bunday o'yinchi topilmadi",
       giftLimit: (n) => `⏳ Kuniga ${n} ta karta berish mumkin. Ertaga yana.`, giftNoPlayer: "Bu o'yinchi hali karta ochmagan", giftGone: "Bu karta endi sizda yo'q", back: "← Orqaga",
+      market: "Bozor", newOffer: "➕ Taklif qo'yish", filterAll: "Hammasi", filterCan: "Bera olaman", filterMine: "Mening",
+      gives: "Beradi", wants: "Xohlaydi", swap: "🔄 Almashish", noCard: "Sizda yo'q", remove: "✕ Olib tashlash", marketEmpty: "Hozircha taklif yo'q",
+      marketHint: (n) => `Kartangizni qo'ying va evaziga kerakli kartani tanlang. Kimda o'sha karta bo'lsa, almashadi. ${n} tagacha taklif, 7 kun turadi.`,
+      step1: "1. Qaysi kartangizni berasiz?", step2: "2. Evaziga qaysi kartani xohlaysiz?", mineSearch: "Kartalaringizdan qidiring", wantSearch: "Xohlagan karta nomini yozing",
+      place: "Taklif qo'yish", placed: "✅ Taklif bozorga qo'yildi", swapped: (c) => `🔄 Almashildi! Siz ${c} oldingiz`, removed: "Taklif olib tashlandi",
+      refused: { over: "Bu taklif endi yo'q", gone: "Bu taklif endi yo'q", own: "Bu o'zingizning taklifingiz", not_held: "Sizda bu karta yo'q", same: "Bir xil kartani almashib bo'lmaydi", no_spare: "Faqat takror kartani sovg'a qilish mumkin" },
+      offersLimit: (n) => `Bir vaqtda ${n} tagacha taklif qo'yish mumkin`, giftSpare: "Faqat takror (×2 va undan ko'p) kartani sovg'a qilish mumkin",
     },
     ru: {
       title: "Карты", collected: "собрано", collection: "Коллекция", draw: "Получить", top: "Рейтинг",
@@ -47,6 +54,13 @@
       gift: "🎁 Подарить", giftSearch: "Имя или @username", giftHint: (n) => `Карта переходит вместе с очками. До ${n} в день.`,
       giftTo: (name) => `🎁 Отправить: ${name}`, giftSent: (card, name) => `🎁 ${card} → ${name}`, giftNone: "Игрок не найден",
       giftLimit: (n) => `⏳ В день можно отдать ${n} карт. Завтра снова.`, giftNoPlayer: "Этот игрок ещё не открыл ни одной карты", giftGone: "Этой карты у вас уже нет", back: "← Назад",
+      market: "Рынок", newOffer: "➕ Выставить", filterAll: "Все", filterCan: "Могу дать", filterMine: "Мои",
+      gives: "Отдаёт", wants: "Хочет", swap: "🔄 Обменять", noCard: "Нет у вас", remove: "✕ Снять", marketEmpty: "Пока предложений нет",
+      marketHint: (n) => `Выставьте свою карту и выберите, какую хотите взамен. У кого она есть — обменяется. До ${n} предложений, 7 дней.`,
+      step1: "1. Какую карту отдаёте?", step2: "2. Какую хотите взамен?", mineSearch: "Поиск по вашим картам", wantSearch: "Название нужной карты",
+      place: "Выставить", placed: "✅ Предложение выставлено", swapped: (c) => `🔄 Обмен! Вы получили ${c}`, removed: "Предложение снято",
+      refused: { over: "Этого предложения уже нет", gone: "Этого предложения уже нет", own: "Это ваше предложение", not_held: "У вас нет этой карты", same: "Нельзя менять карту на ту же", no_spare: "Дарить можно только повторную карту" },
+      offersLimit: (n) => `Одновременно можно выставить до ${n} предложений`, giftSpare: "Дарить можно только повторную карту (×2 и больше)",
     },
     en: {
       title: "Cards", collected: "collected", collection: "Collection", draw: "Draw", top: "Ranking",
@@ -67,6 +81,13 @@
       gift: "🎁 Give", giftSearch: "Name or @username", giftHint: (n) => `The card goes with its points. Up to ${n} a day.`,
       giftTo: (name) => `🎁 Send to ${name}`, giftSent: (card, name) => `🎁 ${card} → ${name}`, giftNone: "No such player",
       giftLimit: (n) => `⏳ You may give ${n} cards a day. Again tomorrow.`, giftNoPlayer: "This player has not opened a card yet", giftGone: "You no longer have this card", back: "← Back",
+      market: "Market", newOffer: "➕ Make an offer", filterAll: "All", filterCan: "I can give", filterMine: "Mine",
+      gives: "Gives", wants: "Wants", swap: "🔄 Trade", noCard: "You lack it", remove: "✕ Take down", marketEmpty: "No offers yet",
+      marketHint: (n) => `Put up a card and pick the one you want for it. Whoever holds it can trade. Up to ${n} offers, for 7 days.`,
+      step1: "1. Which card do you give?", step2: "2. Which card do you want?", mineSearch: "Search your cards", wantSearch: "Name of the card you want",
+      place: "Put it up", placed: "✅ Your offer is up", swapped: (c) => `🔄 Traded! You got ${c}`, removed: "Offer taken down",
+      refused: { over: "This offer is gone", gone: "This offer is gone", own: "This is your own offer", not_held: "You do not have that card", same: "A card cannot be traded for itself", no_spare: "Only a spare card may be given" },
+      offersLimit: (n) => `You may have up to ${n} offers at once`, giftSpare: "Only a spare card (×2 or more) may be given",
     },
   };
   const language = ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code) || "uz").slice(0, 2);
@@ -321,8 +342,16 @@
     give.type = "button";
     give.className = "ghost gift-open";
     give.textContent = t.gift;
-    give.addEventListener("click", (event) => { event.stopPropagation(); giftPanel(card); });
-    sheet.append(face(card), statsOf(card), give);
+    give.disabled = !card.spare;
+    give.title = card.spare ? "" : t.giftSpare;
+    give.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (card.spare) giftPanel(card);
+    });
+    const giveNote = document.createElement("p");
+    giveNote.className = "gift-note";
+    giveNote.textContent = card.spare ? "" : t.giftSpare;
+    sheet.append(face(card), statsOf(card), give, giveNote);
     tilt(sheet, card.rarity === 4);
     $("sheet").hidden = false;
     try { tg.BackButton.show(); } catch (_) { /* older clients */ }
@@ -420,7 +449,7 @@
       try {
         const data = await api("gift", { card: card.id, to: chosen.id });
         if (data.refused) {
-          toast(data.refused === "limit" ? t.giftLimit(data.limit) : data.refused === "no_player" ? t.giftNoPlayer : t.giftGone);
+          toast(data.refused === "limit" ? t.giftLimit(data.limit) : data.refused === "no_player" ? t.giftNoPlayer : data.refused === "no_spare" ? t.giftSpare : t.giftGone);
           send.disabled = false;
           return;
         }
@@ -602,6 +631,196 @@
     odds.append(li);
   }
 
+  // ---------- market ----------
+
+  let offers = [], offerFilter = "all", openLimit = 5;
+
+  // mini is a small card: its picture, rarity and name.
+  function mini(card) {
+    const box = document.createElement("div");
+    box.className = "mini";
+    box.style.setProperty("--c", COLORS[card.rarity]);
+    box.innerHTML = '<img alt=""><span><small></small><b></b></span>';
+    box.querySelector("img").src = card.image;
+    box.querySelector("small").replaceChildren(tierIcon(card.rarity), t.rarities[card.rarity]);
+    box.querySelector("b").textContent = card.name;
+    return box;
+  }
+
+  async function market() {
+    try {
+      const data = await api("market");
+      offers = data.offers || [];
+      openLimit = data.open_limit || openLimit;
+      marketList();
+      notice(null);
+    } catch (error) {
+      notice(error);
+    }
+  }
+
+  function marketList() {
+    $("marketHint").textContent = t.marketHint(openLimit);
+    for (const chip of document.querySelectorAll("#marketFilter button")) chip.setAttribute("aria-pressed", String(chip.dataset.f === offerFilter));
+    const list = $("offers");
+    list.textContent = "";
+    const shown = offers.filter((o) => offerFilter === "all" ? !o.mine : offerFilter === "can" ? o.can && !o.mine : o.mine);
+    if (!shown.length) list.innerHTML = `<li class="empty">${t.marketEmpty}</li>`;
+    for (const o of shown) {
+      const li = document.createElement("li");
+      li.className = "offer";
+      li.innerHTML = '<div class="offer-cards"><div class="side"><em></em></div><span class="arrow" aria-hidden="true">⇄</span><div class="side"><em></em></div></div><div class="offer-foot"><small></small><button type="button"></button></div>';
+      const sides = li.querySelectorAll(".side");
+      sides[0].querySelector("em").textContent = t.gives;
+      sides[0].append(mini(o.give));
+      sides[1].querySelector("em").textContent = t.wants;
+      sides[1].append(mini(o.want));
+      li.querySelector(".offer-foot small").textContent = o.mine ? "" : o.who || "?";
+      const button = li.querySelector(".offer-foot button");
+      if (o.mine) {
+        button.className = "ghost";
+        button.textContent = t.remove;
+        button.addEventListener("click", () => unoffer(o, button));
+      } else {
+        button.className = o.can ? "draw small" : "ghost";
+        button.textContent = o.can ? t.swap : t.noCard;
+        button.disabled = !o.can;
+        button.addEventListener("click", () => takeOffer(o, button));
+      }
+      list.append(li);
+    }
+  }
+
+  for (const chip of document.querySelectorAll("#marketFilter button")) {
+    chip.addEventListener("click", () => { offerFilter = chip.dataset.f; marketList(); haptic("light"); });
+  }
+
+  async function takeOffer(o, button) {
+    button.disabled = true;
+    try {
+      const data = await api("take", { offer: o.id });
+      if (data.refused) {
+        toast(data.refused === "limit" ? t.giftLimit(data.limit) : t.refused[data.refused] || t.unavailable);
+        market();
+        return;
+      }
+      applyState(data);
+      toast(t.swapped(data.got ? data.got.name : o.give.name));
+      haptic("heavy");
+      market();
+    } catch (error) {
+      button.disabled = false;
+      notice(error);
+    }
+  }
+
+  async function unoffer(o, button) {
+    button.disabled = true;
+    try {
+      const data = await api("unoffer", { offer: o.id });
+      offers = data.offers || [];
+      marketList();
+      toast(t.removed);
+    } catch (error) {
+      button.disabled = false;
+      notice(error);
+    }
+  }
+
+  // showPanel opens the sheet with a panel in place of a large card.
+  function showPanel(panel) {
+    const sheet = $("sheetCard");
+    sheet.textContent = "";
+    tilt(sheet, false);
+    sheet.classList.add("giving");
+    panel.addEventListener("click", (event) => event.stopPropagation());
+    sheet.append(panel);
+    $("sheet").hidden = false;
+    try { tg.BackButton.show(); } catch (_) { /* older clients */ }
+  }
+
+  // offerPanel makes an offer in two steps: a card of the player's, then the
+  // card they want for it, found in the whole catalog by name.
+  function offerPanel() {
+    let give = null, want = null, timer = 0, asked = 0;
+    const panel = document.createElement("div");
+    panel.className = "gift";
+    panel.innerHTML = '<b class="step"></b><input type="search" class="mine-q" autocomplete="off"><ul class="gift-list pick-mine"></ul><b class="step"></b><input type="search" class="want-q" autocomplete="off" disabled><ul class="gift-list pick-want"></ul><button type="button" class="draw gift-send" disabled></button>';
+    const steps = panel.querySelectorAll(".step");
+    steps[0].textContent = t.step1;
+    steps[1].textContent = t.step2;
+    const mineQ = panel.querySelector(".mine-q"), wantQ = panel.querySelector(".want-q");
+    mineQ.placeholder = t.mineSearch;
+    wantQ.placeholder = t.wantSearch;
+    const send = panel.querySelector(".gift-send");
+    send.textContent = t.place;
+    const ready = () => { send.disabled = !(give && want); };
+
+    function pickRow(list, card, chosen, onPick) {
+      const li = document.createElement("li");
+      const pick = document.createElement("button");
+      pick.type = "button";
+      pick.className = "pick";
+      pick.append(mini(card));
+      pick.setAttribute("aria-pressed", String(!!chosen && chosen.id === card.id));
+      pick.addEventListener("click", () => {
+        for (const other of list.querySelectorAll("button")) other.setAttribute("aria-pressed", String(other === pick));
+        onPick(card);
+        haptic("light");
+      });
+      li.append(pick);
+      list.append(li);
+    }
+    function mineList() {
+      const list = panel.querySelector(".pick-mine");
+      list.textContent = "";
+      const q = mineQ.value.trim().toLowerCase();
+      const held = cards.filter((c) => c.count > 0 && (!q || c.name.toLowerCase().includes(q))).sort((a, b) => b.rarity - a.rarity).slice(0, 30);
+      if (!held.length) list.innerHTML = `<li class="gift-empty">${t.none}</li>`;
+      for (const card of held) pickRow(list, card, give, (c) => { give = c; wantQ.disabled = false; ready(); });
+    }
+    async function wantList() {
+      const mine = ++asked;
+      const list = panel.querySelector(".pick-want");
+      if (!wantQ.value.trim()) { list.textContent = ""; return; }
+      try {
+        const data = await api("catalog", { query: wantQ.value });
+        if (mine !== asked) return;
+        list.textContent = "";
+        if (!data.cards.length) list.innerHTML = `<li class="gift-empty">${t.none}</li>`;
+        for (const card of data.cards) pickRow(list, card, want, (c) => { want = c; ready(); });
+      } catch (error) {
+        notice(error);
+      }
+    }
+    mineQ.addEventListener("input", mineList);
+    wantQ.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(wantList, 250); });
+    send.addEventListener("click", async () => {
+      if (!give || !want) return;
+      send.disabled = true;
+      try {
+        const data = await api("offer", { card: give.id, want: want.id });
+        if (data.refused) {
+          toast(data.refused === "limit" ? t.offersLimit(data.limit) : t.refused[data.refused] || t.unavailable);
+          ready();
+          return;
+        }
+        offers = data.offers || [];
+        offerFilter = "mine";
+        marketList();
+        closeSheet();
+        toast(t.placed);
+        haptic("medium");
+      } catch (error) {
+        ready();
+        notice(error);
+      }
+    });
+    mineList();
+    showPanel(panel);
+  }
+  $("newOffer").addEventListener("click", offerPanel);
+
   // ---------- ranking ----------
 
   async function ranking() {
@@ -631,8 +850,9 @@
   function showTab(tab) {
     opened = tab;
     for (const button of document.querySelectorAll(".nav button")) button.classList.toggle("on", button.dataset.tab === tab);
-    for (const name of ["collection", "draw", "top"]) $(`tab-${name}`).hidden = name !== tab;
+    for (const name of ["collection", "draw", "market", "top"]) $(`tab-${name}`).hidden = name !== tab;
     if (tab === "top") ranking();
+    if (tab === "market") market();
     drawButton();
     window.scrollTo(0, 0);
   }
