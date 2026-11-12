@@ -206,9 +206,9 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .switch:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .switch, .switch span { transition: none; } }
 .shards { margin: 18px auto 0; max-width: 360px; padding: 14px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
-.shards-head { display: flex; align-items: baseline; justify-content: center; gap: 8px; }
+.shards-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .shards-head b { font: 700 18px Unbounded, sans-serif; color: var(--gold); }
-.shards-head span { color: var(--muted); font-size: 13px; }
+.shards-head > span { font: 700 15px Manrope, sans-serif; color: var(--text); }
 .shards-actions { display: grid; gap: 8px; margin-top: 12px; }
 .ghost { min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); background: none; color: var(--gold); font: 700 14px Manrope, sans-serif; cursor: pointer; }
 .ghost:disabled { opacity: 0.4; cursor: default; }
@@ -398,3 +398,10 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .gift input:disabled { opacity: 0.4; }
 
 #newOffer { width: 100%; }
+
+/* crystals: the rates, and the melt asked once more */
+.rates { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 8px 0 0; color: var(--muted); font-size: 12px; }
+.rates .ti { margin-left: 4px; }
+.melt-list { max-height: 46vh; }
+.melt-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 52px; padding: 6px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--lacquer); }
+.melt-row small { flex: none; color: var(--gold); font-weight: 700; font-size: 13px; }

@@ -402,27 +402,6 @@ func TestCardCaptionShowsTheSureCards(t *testing.T) {
 	}
 }
 
-// Spare copies melt into shards, which draw a card out of turn.
-func TestShardsMeltAndBuyACard(t *testing.T) {
-	f := newFixture()
-	book := newFakeCards("")
-	f.opts.Cards = book
-	book.held[userID] = 2
-
-	if sent := f.run(textFrom(userID, "/kristal")); len(sent) != 1 || !strings.Contains(sent[0].text, "1 ta takror karta → +50 💎") {
-		t.Fatalf("wallet = %+v", sent)
-	}
-	if sent := f.run(textFrom(userID, "/qoshimcha")); len(sent) != 2 || !strings.Contains(sent[1].text, "Kerak: 15, sizda: 0") {
-		t.Fatalf("an extra card for no shards = %+v", sent)
-	}
-	if sent := f.run(textFrom(userID, "/eritish")); len(sent) != 3 || !strings.Contains(sent[2].text, "+50 💎 (jami 50)") {
-		t.Fatalf("melt = %+v", sent)
-	}
-	if sent := f.run(textFrom(userID, "/qoshimcha")); len(sent) != 4 || !strings.Contains(sent[3].text, "💎 -15 (qoldi 35)") {
-		t.Errorf("an extra card = %+v", sent)
-	}
-}
-
 // A duel in a group is accepted by anyone but its challenger, fought once
 // however often it is pressed, and moves the stake to the winner.
 func TestDuelIsFoughtOnce(t *testing.T) {

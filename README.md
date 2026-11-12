@@ -1317,7 +1317,7 @@ match "maria" unless you add it:
 word.
 
 **Commands** in a group need the bot's username (`/help@MyMariaBot`). A plain
-`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/karta`, `/kartalarim`, `/kartatop`, `/kartalar`, `/kristal`, `/eritish`, `/avto`, `/qoshimcha`, `/duel`, `/almash`, `/boss`, `/ilon`, `/otinchi`, `/maydon`, `/shashka` and `/dooz`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username.
+`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/karta`, `/kartalarim`, `/kartatop`, `/kartalar`, `/avto`, `/duel`, `/almash`, `/boss`, `/ilon`, `/otinchi`, `/maydon`, `/shashka` and `/dooz`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username.
 
 ### Example
 
@@ -2075,11 +2075,14 @@ Mini App (`since_legendary` and `since_mythic` on `card_players`, migration
 draws by the odds alone had brought no Mythic. In the Mini App a Mythic card glows: a rainbow foil runs over it, its gold
 glow breathes, it sparkles, and in the large view it leans with the finger or
 the phone, in CSS alone. A card drawn again gave only
-points, so its spare copies melt into 💎 crystals (`/eritish`: 1, 3, 8, 20 or
-50 by rarity), the copies still held and counted in the points so that melting
-costs no place on the table (`card_owned.melted`, migration 63); `/kristal`
-shows the shards, what melting would give and what they buy. `/qoshimcha`
-draws a card out of turn for 15 shards, the hourly card left where it was.
+points, so its spare copies melt into 💎 crystals in the Mini App's draw tab
+(1, 3, 8, 20 or 50 by rarity, shown there), the copies still held and
+counted in the points so that melting costs no place on the table
+(`card_owned.melted`, migration 63); the melt is asked once more, listing
+each card's spares and the crystals they make, as melted copies can no
+longer be given. An extra card out of turn costs 15 crystals, the hourly card
+left where it was. Crystals live in the Mini App alone: the bot has no
+commands for them.
 `/avto`, or the switch on the Mini App's draw tab (`auto`), turns on a player's auto opener, or off again, each player for
 themselves and free (`card_players.auto_draw`, migration 65): each minute's
 call to `/api/reminders`, or the long-polling ticker, first opens the card of

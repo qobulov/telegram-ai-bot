@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Manrope:wght@500;600;800&display=swap" rel="stylesheet">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="style.css?v=16">
+  <link rel="stylesheet" href="style.css?v=17">
 </head>
 <body>
   <div class="grain" aria-hidden="true"></div>
@@ -67,7 +67,8 @@
           <button type="button" class="switch" id="auto" role="switch" aria-checked="false" aria-labelledby="autoLabel"><span></span></button>
         </div>
         <div class="shards" id="shards">
-          <div class="shards-head"><b>💎 <span id="shardCount">0</span></b><span data-t="shardsTitle"></span></div>
+          <div class="shards-head"><span data-t="shardsTitle"></span><b>💎 <span id="shardCount">0</span></b></div>
+          <p class="rates" id="rates"></p>
           <div class="shards-actions">
             <button type="button" class="ghost" id="melt"></button>
             <button type="button" class="ghost" id="extra"></button>
@@ -110,6 +111,6 @@
 
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="app.js?v=16"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>

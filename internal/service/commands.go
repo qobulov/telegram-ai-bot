@@ -793,14 +793,8 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return outcome{text: textCardsApp.to(in), buttons: s.cardsAppButton(in)}
 	case s.opts.Cards != nil && commandName(in.text) == "/kartatop":
 		return s.cardTop(ctx, in)
-	case s.opts.Cards != nil && commandName(in.text) == "/kristal":
-		return s.cardWallet(ctx, in)
-	case s.opts.Cards != nil && commandName(in.text) == "/eritish":
-		return s.meltCards(ctx, in)
 	case s.opts.Cards != nil && commandName(in.text) == "/avto":
 		return s.toggleCardAuto(ctx, in)
-	case s.opts.Cards != nil && commandName(in.text) == "/qoshimcha":
-		return s.extraCard(ctx, in)
 	case s.opts.Cards != nil && s.opts.Buttons != nil && commandName(in.text) == "/duel":
 		return s.duelCommand(ctx, in)
 	case s.opts.Cards != nil && s.opts.Buttons != nil && commandName(in.text) == "/almash":

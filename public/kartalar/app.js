@@ -13,9 +13,9 @@
       search: "Kartani qidirish", rarities: ["Oddiy", "Noyob", "Epik", "Afsonaviy", "Mifik"],
       drawNow: "Karta olish", drawing: "Ochilmoqda…", next: (t) => `Keyingi karta: ${t}`, ready: "Karta tayyor!",
       autoTitle: "🤖 Avto-ochish", autoHint: "Karta tayyor bo'lishi bilan o'zi ochilib, shaxsiy chatga ovozsiz keladi", autoOn: "🤖 Avto-ochish yoqildi", autoOff: "⏸ Avto-ochish o'chirildi",
-      shardsTitle: "kristal", melt: (n, w) => `♻️ Kristalga aylantirish: ${n} ta → +${w} 💎`, noSpare: "♻️ Takror karta yo'q", extra: (c) => `🎴 Qo'shimcha karta · ${c} 💎`, fewShards: (n, h) => `💎 Kerak: ${n}, sizda: ${h}`, melted: (n, g) => `♻️ ${n} ta karta → +${g} 💎`, shardsHint: "Takror kartalar kristalga aylanadi, ochko kamaymaydi. Duel: guruhda /duel",
-      fresh: "🆕 Yangi karta!", sure: "✨ Kafolatlangan karta!", pity: (l, m) => `🎯 Kafolat: {3} ${l} · {4} ${m} kartadan keyin`, again: (n) => `🔁 Sizda endi ×${n}`, plus: (n) => `+${n} ochko`,
-      attack: "Hujum", health: "Sog'liq", value: "Ochko", cards: (n) => `${n} karta`, pts: "ochko",
+      shardsTitle: "Kristallar", melt: (n, w) => `♻️ ${n} ta takrorni aylantirish → +${w} 💎`, noSpare: "♻️ Aylantirish uchun takror karta yo'q", extra: (c) => `🎴 Qo'shimcha karta · ${c} 💎`, extraNeed: (n) => `🎴 Qo'shimcha karta uchun yana ${n} 💎 kerak`, fewShards: (n, h) => `💎 Kerak: ${n}, sizda: ${h}`, melted: (n, g) => `♻️ ${n} ta karta → +${g} 💎`, shardsHint: "Takror kartalar kristalga aylanadi, ochko va reyting kamaymaydi. Kristal bilan qo'shimcha karta oling yoki duelda tiking.", ratesLabel: "1 ta takror:", meltTitle: "Kristalga aylantirish", meltWarn: "Bu nusxalarni keyin sovg'a qilib bo'lmaydi. Har kartaning bittasi kolleksiyada qoladi.", meltDo: (w) => `♻️ Aylantirish · +${w} 💎`, cancel: "Bekor qilish",
+      fresh: "🆕 Yangi karta!", sure: "✨ Kafolatlangan karta!", pity: (l, m) => `{3} Afsonaviy — ${l} kartadan keyin aniq\n{4} Mifik — ${m} kartadan keyin aniq`, again: (n) => `🔁 Sizda endi ×${n}`, plus: (n) => `+${n} ochko`,
+      attack: "Hujum", health: "Jon", value: "Ochko", cards: (n) => `${n} karta`, pts: "ochko",
       none: "Hech narsa topilmadi", noTop: "Hali hech kim karta olmagan",
       noTelegram: "Ilovani Telegram'da oching: botga /kartalar yozing.", stale: "Ilova eskirdi, uni qayta oching.",
       unavailable: "Aloqa uzildi, birozdan keyin urinib ko'ring.",
@@ -40,9 +40,9 @@
       search: "Поиск по картам", rarities: ["Обычная", "Редкая", "Эпическая", "Легендарная", "Мифическая"],
       drawNow: "Получить карту", drawing: "Открываем…", next: (t) => `Следующая карта: ${t}`, ready: "Карта готова!",
       autoTitle: "🤖 Автооткрытие", autoHint: "Карта откроется сама, как только будет готова, и придёт в личку без звука", autoOn: "🤖 Автооткрытие включено", autoOff: "⏸ Автооткрытие выключено",
-      shardsTitle: "кристаллов", melt: (n, w) => `♻️ Расплавить: ${n} → +${w} 💎`, noSpare: "♻️ Повторных карт нет", extra: (c) => `🎴 Карта вне очереди · ${c} 💎`, fewShards: (n, h) => `💎 Нужно: ${n}, у вас: ${h}`, melted: (n, g) => `♻️ ${n} карт → +${g} 💎`, shardsHint: "Повторы становятся кристаллами, очки не уменьшаются. Дуэль: /duel в группе",
-      fresh: "🆕 Новая карта!", sure: "✨ Гарантированная карта!", pity: (l, m) => `🎯 Гарантия: {3} через ${l} · {4} через ${m} карт`, again: (n) => `🔁 Теперь у вас ×${n}`, plus: (n) => `+${n} очков`,
-      attack: "Атака", health: "Здоровье", value: "Очки", cards: (n) => `${n} карт`, pts: "очков",
+      shardsTitle: "Кристаллы", melt: (n, w) => `♻️ Расплавить повторы: ${n} → +${w} 💎`, noSpare: "♻️ Повторных карт нет", extra: (c) => `🎴 Карта вне очереди · ${c} 💎`, extraNeed: (n) => `🎴 Для карты вне очереди нужно ещё ${n} 💎`, fewShards: (n, h) => `💎 Нужно: ${n}, у вас: ${h}`, melted: (n, g) => `♻️ ${n} карт → +${g} 💎`, shardsHint: "Повторы становятся кристаллами, очки и рейтинг не уменьшаются. За кристаллы — карта вне очереди или ставка в дуэли.", ratesLabel: "1 повтор:", meltTitle: "Расплавить в кристаллы", meltWarn: "Эти копии потом нельзя будет подарить. По одной карте каждого вида останется в коллекции.", meltDo: (w) => `♻️ Расплавить · +${w} 💎`, cancel: "Отмена",
+      fresh: "🆕 Новая карта!", sure: "✨ Гарантированная карта!", pity: (l, m) => `{3} Легендарная — точно через ${l} карт\n{4} Мифическая — точно через ${m} карт`, again: (n) => `🔁 Теперь у вас ×${n}`, plus: (n) => `+${n} очков`,
+      attack: "Атака", health: "Жизнь", value: "Очки", cards: (n) => `${n} карт`, pts: "очков",
       none: "Ничего не найдено", noTop: "Ещё никто не получил карту",
       noTelegram: "Откройте приложение в Telegram: напишите боту /kartalar.", stale: "Приложение устарело, откройте его снова.",
       unavailable: "Нет связи, попробуйте чуть позже.",
@@ -67,9 +67,9 @@
       search: "Search cards", rarities: ["Common", "Rare", "Epic", "Legendary", "Mythic"],
       drawNow: "Draw a card", drawing: "Opening…", next: (t) => `Next card in ${t}`, ready: "A card is ready!",
       autoTitle: "🤖 Auto opener", autoHint: "Each card opens itself when it is ready and comes to your private chat quietly", autoOn: "🤖 Auto opener on", autoOff: "⏸ Auto opener off",
-      shardsTitle: "crystals", melt: (n, w) => `♻️ Melt: ${n} → +${w} 💎`, noSpare: "♻️ No spare cards", extra: (c) => `🎴 A card out of turn · ${c} 💎`, fewShards: (n, h) => `💎 It takes ${n}, you have ${h}`, melted: (n, g) => `♻️ ${n} cards → +${g} 💎`, shardsHint: "Spares melt into crystals; your points stay. Duels: /duel in a group",
-      fresh: "🆕 A new card!", sure: "✨ A guaranteed card!", pity: (l, m) => `🎯 Sure: {3} in ${l} · {4} in ${m} cards`, again: (n) => `🔁 You now have ×${n}`, plus: (n) => `+${n} points`,
-      attack: "Attack", health: "Health", value: "Points", cards: (n) => `${n} cards`, pts: "points",
+      shardsTitle: "Crystals", melt: (n, w) => `♻️ Melt ${n} spares → +${w} 💎`, noSpare: "♻️ No spare cards to melt", extra: (c) => `🎴 An extra card · ${c} 💎`, extraNeed: (n) => `🎴 ${n} more 💎 for an extra card`, fewShards: (n, h) => `💎 It takes ${n}, you have ${h}`, melted: (n, g) => `♻️ ${n} cards → +${g} 💎`, shardsHint: "Spares melt into crystals; your points and ranking stay. Crystals buy an extra card or a duel's stake.", ratesLabel: "1 spare:", meltTitle: "Melt into crystals", meltWarn: "These copies cannot be given afterwards. One of each card stays in your collection.", meltDo: (w) => `♻️ Melt · +${w} 💎`, cancel: "Cancel",
+      fresh: "🆕 A new card!", sure: "✨ A guaranteed card!", pity: (l, m) => `{3} Legendary — sure in ${l} cards\n{4} Mythic — sure in ${m} cards`, again: (n) => `🔁 You now have ×${n}`, plus: (n) => `+${n} points`,
+      attack: "Attack", health: "Life", value: "Points", cards: (n) => `${n} cards`, pts: "points",
       none: "Nothing found", noTop: "Nobody has drawn a card yet",
       noTelegram: "Open the app in Telegram: send /kartalar to the bot.", stale: "The app is out of date; open it again.",
       unavailable: "No connection; try again in a bit.",
@@ -500,25 +500,49 @@
     $("shardCount").textContent = spaced(shards);
     $("melt").textContent = spare ? t.melt(spare, spareWorth) : t.noSpare;
     $("melt").disabled = drawing || !spare;
-    $("extra").textContent = t.extra(extraCost);
+    $("extra").textContent = shards >= extraCost ? t.extra(extraCost) : t.extraNeed(extraCost - shards);
     $("extra").disabled = drawing || shards < extraCost;
   }
 
-  $("melt").addEventListener("click", async () => {
+  // The melt is asked once more, with what goes: the spare copies, by card,
+  // and the crystals each makes, as it cannot be undone.
+  const RATES = [1, 3, 8, 20, 50];
+  $("melt").addEventListener("click", () => {
     if (drawing || !spare) return;
-    $("melt").disabled = true;
-    try {
-      const data = await api("melt");
-      shards = data.shards;
-      spare = 0;
-      spareWorth = 0;
-      haptic("light");
-      if (data.melted) toast(t.melted(data.melted, data.gained));
-    } catch (error) {
-      notice(error);
-    } finally {
-      shardsPanel();
+    const spares = cards.filter((c) => c.spare > 0).sort((a, b) => b.rarity - a.rarity);
+    const panel = document.createElement("div");
+    panel.className = "gift melt";
+    panel.innerHTML = '<b class="step"></b><ul class="gift-list melt-list"></ul><p class="gift-hint"></p><button type="button" class="draw gift-send"></button><button type="button" class="link gift-back"></button>';
+    panel.querySelector(".step").textContent = t.meltTitle;
+    const list = panel.querySelector(".melt-list");
+    for (const card of spares) {
+      const li = document.createElement("li");
+      li.className = "melt-row";
+      li.append(mini(card));
+      const gain = document.createElement("small");
+      gain.textContent = `×${card.spare} → +${card.spare * (RATES[card.rarity] || 0)} 💎`;
+      li.append(gain);
+      list.append(li);
     }
+    panel.querySelector(".gift-hint").textContent = t.meltWarn;
+    const go = panel.querySelector(".gift-send");
+    go.textContent = t.meltDo(spareWorth);
+    panel.querySelector(".gift-back").textContent = t.cancel;
+    panel.querySelector(".gift-back").addEventListener("click", closeSheet);
+    go.addEventListener("click", async () => {
+      go.disabled = true;
+      try {
+        const data = await api("melt");
+        closeSheet();
+        haptic("medium");
+        if (data.melted) toast(t.melted(data.melted, data.gained));
+        applyState(await api("state"));
+      } catch (error) {
+        go.disabled = false;
+        notice(error);
+      }
+    });
+    showPanel(panel);
   });
 
   $("extra").addEventListener("click", () => reveal("extra"));
@@ -597,6 +621,8 @@
       if (data.shards !== undefined) shards = data.shards;
       if (card.count > 1) { spare += 1; spareWorth += [1, 3, 8, 20, 50][card.rarity] || 0; }
       const i = cards.findIndex((c) => c.id === card.id);
+      // A copy drawn again is one more spare, which may be given or melted.
+      card.spare = card.count > 1 ? ((i >= 0 && cards[i].spare) || 0) + 1 : 0;
       if (i >= 0) cards[i] = card;
       header();
       shelves();
@@ -621,6 +647,8 @@
     if (tile) tile.scrollIntoView({ block: "center", behavior: "smooth" });
   });
   $("welcomeDraw").addEventListener("click", () => showTab("draw"));
+
+  $("rates").replaceChildren(document.createTextNode(t.ratesLabel + " "), ...withTiers(RATES.map((n, r) => `{${r}}${n}`).join("  ")));
 
   const odds = $("odds");
   for (let rarity = 4; rarity >= 0; rarity--) {

@@ -25,8 +25,6 @@ type CardBook interface {
 	CardTop(ctx context.Context, limit int) ([]storage.CardPlayer, error)
 	CardPlayerOf(ctx context.Context, userID int64) (storage.CardPlayer, time.Time, error)
 	CardWallet(ctx context.Context, userID int64) (shards int, spares map[int]int, err error)
-	MeltCards(ctx context.Context, userID int64, rates []int) (melted, gained, shards int, err error)
-	ExtraCard(ctx context.Context, userID int64, name string, roll storage.CardRoll, cost int) (storage.CardDraw, error)
 	DuelTeam(ctx context.Context, userID int64, n int) ([]storage.Card, error)
 	ResolveDuel(ctx context.Context, chatID, messageID, winner, loser int64, stake int) (moved int, settled bool, err error)
 	ToggleCardAuto(ctx context.Context, userID int64, name, language string) (bool, error)
@@ -351,7 +349,7 @@ var (
 	}
 	textCardStats      = localText{uz: "⚔️ Hujum %s · ❤️ Jon %s", ru: "⚔️ Атака %s · ❤️ Жизнь %s", en: "⚔️ Attack %s · ❤️ Life %s"}
 	textCardNew        = localText{uz: "🆕 Yangi karta · +%s ochko", ru: "🆕 Новая карта · +%s очков", en: "🆕 New card · +%s points"}
-	textCardAgain      = localText{uz: "🔁 Takror, endi ×%d · +%s ochko · ♻️ /eritish", ru: "🔁 Повтор, теперь ×%d · +%s очков · ♻️ /eritish", en: "🔁 Again, now ×%d · +%s points · ♻️ /eritish"}
+	textCardAgain      = localText{uz: "🔁 Takror, endi ×%d · +%s ochko", ru: "🔁 Повтор, теперь ×%d · +%s очков", en: "🔁 Again, now ×%d · +%s points"}
 	textCardTotal      = localText{uz: "💠 Jami: %s ochko", ru: "💠 Всего: %s очков", en: "💠 Total: %s points"}
 	textCardGuaranteed = localText{uz: "✨ Kafolatlangan karta!", ru: "✨ Гарантированная карта!", en: "✨ A guaranteed card!"}
 	// textCardPity says in how many cards a rarity is sure, one line each.
@@ -363,9 +361,9 @@ var (
 	textCardAll        = localText{uz: "🗂 Hammasi - %d/%d", ru: "🗂 Все - %d/%d", en: "🗂 All - %d/%d"}
 	textCardAllTitle   = localText{uz: "🗂 Barcha kartalaringiz", ru: "🗂 Все ваши карты", en: "🗂 All your cards"}
 	textCardCollection = localText{
-		uz: "🎴 %s, qaysi kartalarni ko'rasiz?\n💠 Ochko: %s\n💎 Kristal va duel: /kristal",
-		ru: "🎴 %s, какие карты посмотреть?\n💠 Очки: %s\n💎 Кристаллы и дуэль: /kristal",
-		en: "🎴 %s, which cards do you want to see?\n💠 Points: %s\n💎 Crystals and duels: /kristal",
+		uz: "🎴 %s, qaysi kartalarni ko'rasiz?\n💠 Ochko: %s\n💎 Kristal, sovg'a va bozor: /kartalar ilovasida",
+		ru: "🎴 %s, какие карты посмотреть?\n💠 Очки: %s\n💎 Кристаллы, подарки и рынок: в приложении /kartalar",
+		en: "🎴 %s, which cards do you want to see?\n💠 Points: %s\n💎 Crystals, gifts and the market: in the /kartalar app",
 	}
 	textCardNotYours = localText{
 		uz: "Bu sizning kolleksiyangiz emas: o'zingiznikini /kartalarim bilan oching.",

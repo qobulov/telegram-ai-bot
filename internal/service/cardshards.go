@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/rand/v2"
 	"strconv"
@@ -17,59 +16,6 @@ import (
 // duelData+"a:<challenger>:<target>:<stake>" accepts it and "x:…" calls it
 // off; target 0 is anyone.
 const duelData = "kd:"
-
-// cardWallet answers /kristal: the player's shards, the spare copies they may
-// melt and what shards buy.
-func (s *Service) cardWallet(ctx context.Context, in incoming) outcome {
-	shards, spares, err := s.opts.Cards.CardWallet(ctx, in.userID)
-	if err != nil {
-		s.opts.Logger.Error("could not read a player's shards", "user_id", in.userID, "error", err)
-		return say(textCardsUnavailable.to(in))
-	}
-	copies, worth := cards.SpareWorth(spares)
-	lines := []string{fmt.Sprintf(textShardsTitle.to(in), doozName(in.msg.From), shards), ""}
-	if copies > 0 {
-		lines = append(lines, fmt.Sprintf(textShardsMelt.to(in), copies, worth))
-	} else {
-		lines = append(lines, textShardsNoSpares.to(in))
-	}
-	lines = append(lines, fmt.Sprintf(textShardsExtra.to(in), cards.ExtraCost), textShardsDuel.to(in), "", textShardsRates.to(in))
-	return say(strings.Join(lines, "\n"))
-}
-
-// meltCards answers /eritish: the player's spare copies melted into shards.
-func (s *Service) meltCards(ctx context.Context, in incoming) outcome {
-	melted, gained, shards, err := s.opts.Cards.MeltCards(ctx, in.userID, cards.ShardRates)
-	if err != nil {
-		s.opts.Logger.Error("could not melt cards", "user_id", in.userID, "error", err)
-		return say(textCardsUnavailable.to(in))
-	}
-	if melted == 0 {
-		return say(textShardsNoSpares.to(in))
-	}
-	return say(fmt.Sprintf(textShardsMelted.to(in), melted, gained, shards))
-}
-
-// extraCard answers /qoshimcha: a card out of turn for shards.
-func (s *Service) extraCard(ctx context.Context, in incoming) outcome {
-	ctx, cancel := context.WithTimeout(ctx, cardsTimeout)
-	defer cancel()
-	if err := s.cardCatalog().Ensure(ctx); err != nil {
-		s.opts.Logger.Error("could not fill the card catalog", "error", err)
-		return say(textCardsUnavailable.to(in))
-	}
-	draw, err := s.opts.Cards.ExtraCard(ctx, in.userID, doozName(in.msg.From), cards.WithPity(cards.RollRandom), cards.ExtraCost)
-	var few *storage.ShardsError
-	switch {
-	case errors.As(err, &few):
-		return say(fmt.Sprintf(textShardsTooFew.to(in), few.Need, few.Have))
-	case err != nil:
-		s.opts.Logger.Error("could not draw a card for shards", "user_id", in.userID, "error", err)
-		return say(textCardsUnavailable.to(in))
-	}
-	caption := cardCaption(languageOf(in), draw) + "\n" + fmt.Sprintf(textShardsSpent.to(in), cards.ExtraCost, draw.Shards)
-	return s.withPicture(ctx, say(caption), draw.Card)
-}
 
 // duelCommand answers /duel [stake] in a group: a challenge, to the member
 // the message replies to or to anyone, fought by each one's strongest cards
@@ -273,27 +219,11 @@ func duelTeamLine(in incoming, side string, team []storage.Card) string {
 }
 
 var (
-	textShardsTitle    = localText{uz: "💎 %s, kristallaringiz: **%d**", ru: "💎 %s, ваши кристаллы: **%d**", en: "💎 %s, your crystals: **%d**"}
-	textShardsMelt     = localText{uz: "♻️ %d ta takror karta → +%d 💎: /eritish", ru: "♻️ %d повторных карт → +%d 💎: /eritish", en: "♻️ %d spare cards → +%d 💎: /eritish"}
-	textShardsNoSpares = localText{uz: "♻️ Kristalga aylantirish uchun takror karta yo'q.", ru: "♻️ Повторных карт для кристаллов нет.", en: "♻️ No spare cards to melt."}
-	textShardsExtra    = localText{uz: "🎴 Navbatdan tashqari karta: %d 💎 — /qoshimcha", ru: "🎴 Карта вне очереди: %d 💎 — /qoshimcha", en: "🎴 A card out of turn: %d 💎 — /qoshimcha"}
-	textShardsDuel     = localText{
-		uz: "⚔️ Duel: /duel 10 — xabarga javob qilib yoki hammaga",
-		ru: "⚔️ Дуэль: /duel 10 — ответом на сообщение или всем",
-		en: "⚔️ Duel: /duel 10 — as a reply, or open to all",
+	textShardsTooFew = localText{
+		uz: "💎 Kerak: %d, sizda: %d. Kristallar: /kartalar ilovasida takror kartalarni aylantiring.",
+		ru: "💎 Нужно: %d, у вас: %d. Кристаллы: расплавьте повторы в приложении /kartalar.",
+		en: "💎 It takes %d, you have %d. Crystals: melt your spares in the /kartalar app.",
 	}
-	textShardsRates = localText{
-		uz: "Takror karta: ⚪1 · 🔷3 · 💜8 · 🔥20 · 👑50 💎. Ochko va reyting kamaymaydi.",
-		ru: "Повтор: ⚪1 · 🔷3 · 💜8 · 🔥20 · 👑50 💎. Очки и рейтинг не уменьшаются.",
-		en: "A spare: ⚪1 · 🔷3 · 💜8 · 🔥20 · 👑50 💎. Points and ranking stay.",
-	}
-	textShardsMelted = localText{
-		uz: "♻️ %d ta takror karta kristalga aylandi: +%d 💎 (jami %d). Ochkolaringiz o'zgarmadi.",
-		ru: "♻️ %d повторных карт стали кристаллами: +%d 💎 (всего %d). Очки не изменились.",
-		en: "♻️ %d spare cards melted: +%d 💎 (%d in all). Your points stay.",
-	}
-	textShardsTooFew = localText{uz: "💎 Kerak: %d, sizda: %d. Kristal: /kristal", ru: "💎 Нужно: %d, у вас: %d. Кристаллы: /kristal", en: "💎 It takes %d, you have %d. Crystals: /kristal"}
-	textShardsSpent  = localText{uz: "💎 -%d (qoldi %d)", ru: "💎 -%d (осталось %d)", en: "💎 -%d (%d left)"}
 
 	textDuelGroupOnly = localText{uz: "⚔️ Duel guruhda o'ynaladi.", ru: "⚔️ Дуэль играют в группе.", en: "⚔️ Duels are fought in a group."}
 	textDuelStake     = localText{uz: "Tikish 0 dan %d gacha son bo'lsin: /duel 10", ru: "Ставка — число от 0 до %d: /duel 10", en: "The stake is a number from 0 to %d: /duel 10"}
