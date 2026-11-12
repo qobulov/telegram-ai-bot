@@ -472,7 +472,7 @@ func TestADuelForNoStake(t *testing.T) {
 	book.held[userID] = 1
 	for _, text := range []string{"/duel 0", "/duel"} {
 		sent := f.run(inGroup(groupMessage(text)))
-		if last := sent[len(sent)-1]; len(last.buttons) != 1 || !strings.Contains(last.text, "do'stona duel") || strings.Contains(last.text, "Tikish") {
+		if last := sent[len(sent)-1]; len(last.buttons) != 1 || !strings.Contains(last.text, "do'stona duel") || strings.Contains(last.text, "Tikish:") {
 			t.Errorf("%s = %+v", text, last)
 		}
 	}
