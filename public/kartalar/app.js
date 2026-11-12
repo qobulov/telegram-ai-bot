@@ -160,6 +160,19 @@
     drawButton();
   }
 
+  // picture loads a card's picture into img, asking again twice, a little
+  // later each time, when the image host drops it: with many cards at once
+  // it now and then does, and the card showed an empty frame.
+  function picture(img, src) {
+    let tries = 0;
+    img.onerror = () => {
+      if (tries >= 2 || !src) return;
+      tries++;
+      setTimeout(() => { img.src = src + (src.includes("?") ? "&" : "?") + "r=" + tries; }, 800 * tries);
+    };
+    img.src = src;
+  }
+
   // ---------- header and collection ----------
 
   function header() {
@@ -216,7 +229,7 @@
     const img = new Image();
     img.loading = "lazy";
     img.alt = "";
-    img.src = card.image;
+    picture(img, card.image);
     const name = document.createElement("span");
     name.className = "name";
     name.textContent = card.name;
@@ -305,7 +318,7 @@
     front.style.setProperty("--c", COLORS[card.rarity]);
     const img = new Image();
     img.alt = card.name;
-    img.src = card.image;
+    picture(img, card.image);
     const plate = document.createElement("div");
     plate.className = "plate";
     const rarity = document.createElement("span");
@@ -404,7 +417,7 @@
     panel.className = "gift";
     panel.addEventListener("click", (event) => event.stopPropagation());
     panel.innerHTML = `<div class="gift-head"><img alt=""><span><small></small><b></b></span></div><input type="search" autocomplete="off" enterkeyhint="search"><ul class="gift-list"></ul><p class="gift-hint"></p><button type="button" class="draw gift-send" disabled></button><button type="button" class="link gift-back"></button>`;
-    panel.querySelector(".gift-head img").src = card.image;
+    picture(panel.querySelector(".gift-head img"), card.image);
     panel.querySelector(".gift-head small").replaceChildren(tierIcon(card.rarity), t.rarities[card.rarity]);
     panel.querySelector(".gift-head b").textContent = card.name;
     const input = panel.querySelector("input");
@@ -653,7 +666,7 @@
       await new Promise((resolve) => {
         const img = front.querySelector("img");
         if (img.complete) resolve();
-        else { img.onload = img.onerror = resolve; setTimeout(resolve, 2500); }
+        else { img.addEventListener("load", resolve); img.addEventListener("error", resolve); setTimeout(resolve, 2500); }
       });
       flip.classList.remove("shuffle");
       flip.classList.add("shown");
@@ -719,7 +732,7 @@
     box.className = "mini";
     box.style.setProperty("--c", COLORS[card.rarity]);
     box.innerHTML = '<img alt=""><span><small></small><b></b></span>';
-    box.querySelector("img").src = card.image;
+    picture(box.querySelector("img"), card.image);
     box.querySelector("small").replaceChildren(tierIcon(card.rarity), t.rarities[card.rarity]);
     box.querySelector("b").textContent = card.name;
     return box;
