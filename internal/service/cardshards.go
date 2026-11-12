@@ -114,7 +114,7 @@ func (s *Service) duelCommand(ctx context.Context, in incoming) outcome {
 		targetID = target.ID
 		text = fmt.Sprintf(textDuelTo.to(in), doozName(in.msg.From), doozName(target))
 	}
-	text += "\n" + fmt.Sprintf(textDuelStakeLine.to(in), stake) + "\n" + textDuelRules.to(in)
+	text += "\n\n" + duelTeamLine(in, duelSides[0], team) + "\n" + fmt.Sprintf(textDuelStakeLine.to(in), stake) + "\n\n" + textDuelRules.to(in)
 	data := strconv.FormatInt(in.userID, 36) + ":" + strconv.FormatInt(targetID, 36) + ":" + strconv.Itoa(stake)
 	return outcome{text: text, buttons: [][]telegram.Button{{
 		{Text: textDuelAccept.to(in), Data: duelData + "a:" + data},
@@ -224,7 +224,8 @@ func (s *Service) fightDuel(ctx context.Context, in incoming, q *telegram.Callba
 		s.opts.Logger.Error("could not read a card player", "user_id", press.challenger, "error", err)
 		return "", textCardsUnavailable.to(in)
 	}
-	rounds, winner := cards.Duel(teams, rand.Float64)
+	result := cards.Duel(teams, rand.Float64)
+	winner := result.Winner
 	moved, settled, err := s.opts.Cards.ResolveDuel(ctx, q.Message.Chat.ID, q.Message.MessageID, players[winner], players[1-winner], press.stake)
 	switch {
 	case err != nil:
@@ -234,7 +235,7 @@ func (s *Service) fightDuel(ctx context.Context, in incoming, q *telegram.Callba
 		return "", textDuelOver.to(in)
 	}
 	names := [2]string{cardPlayerName(challenger.Name), doozName(q.From)}
-	return duelReport(in, names, rounds, winner, moved), ""
+	return duelReport(in, names, teams, result, moved), ""
 }
 
 // cardPlayerName is a player's name as the table keeps it, made safe for
@@ -246,48 +247,29 @@ func cardPlayerName(name string) string {
 // duelSides mark the challenger and the one who took the duel.
 var duelSides = [2]string{"🔴", "🔵"}
 
-// duelReport is a fought duel: each round's cards and hits, the winner of
-// each marked, the score, and who won what.
-func duelReport(in incoming, names [2]string, rounds []cards.DuelRound, winner, moved int) string {
-	lines := []string{fmt.Sprintf("⚔️ %s **%s**  🆚  %s **%s**", duelSides[0], names[0], duelSides[1], names[1])}
-	won := [2]int{}
-	for i, r := range rounds {
-		won[r.Won]++
-		lines = append(lines, "", fmt.Sprintf(textDuelRound.to(in), i+1))
-		for side := range 2 {
-			lines = append(lines, duelSides[side]+" "+duelCard(in, r, side))
-		}
+// duelReport is a fought duel: each team with its power and chance, and
+// who won what.
+func duelReport(in incoming, names [2]string, teams [2][]storage.Card, result cards.DuelResult, moved int) string {
+	lines := []string{fmt.Sprintf("⚔️ %s **%s**  🆚  %s **%s**", duelSides[0], names[0], duelSides[1], names[1]), ""}
+	for side := range 2 {
+		lines = append(lines, duelTeamLine(in, duelSides[side], teams[side]),
+			fmt.Sprintf(textDuelChance.to(in), result.Chance[side]), "")
 	}
-	score := fmt.Sprintf(textDuelScore.to(in), duelSides[0], won[0], won[1], duelSides[1])
-	if won[0] == won[1] {
-		score += " 🎲"
-	}
-	lines = append(lines, "", "━━━━━━━━━━━━", score, fmt.Sprintf(textDuelWinner.to(in), names[winner]))
+	lines = append(lines, fmt.Sprintf(textDuelWinner.to(in), duelSides[result.Winner], names[result.Winner]))
 	if moved > 0 {
-		lines = append(lines, fmt.Sprintf(textDuelWon.to(in), moved, names[1-winner]))
+		lines = append(lines, fmt.Sprintf(textDuelWon.to(in), moved, names[1-result.Winner]))
 	}
 	return strings.Join(lines, "\n")
 }
 
-// duelCard is one side's card in a round: its rarity's emoji, its name, the
-// hits it needed and a tick if it won, a die if luck settled it.
-func duelCard(in incoming, r cards.DuelRound, side int) string {
-	c := r.Cards[side]
-	if c.ID == 0 {
-		return textDuelNoCard.to(in)
+// duelTeamLine is a side's team: its cards by their rarity's emoji and name,
+// and its power.
+func duelTeamLine(in incoming, side string, team []storage.Card) string {
+	var cardNames []string
+	for _, c := range team {
+		cardNames = append(cardNames, strings.Fields(rarityNames[c.Rarity].to(in))[0]+" "+cardPlayerName(c.Name))
 	}
-	mark := strings.Fields(rarityNames[c.Rarity].to(in))[0]
-	text := mark + " " + cardPlayerName(c.Name)
-	if r.Hits[side] > 0 {
-		text += " — " + fmt.Sprintf(textDuelHits.to(in), r.Hits[side])
-	}
-	if r.Won == side {
-		text += " ✅"
-		if r.Hits[0] == r.Hits[1] && r.Hits[0] > 0 {
-			text += "🎲"
-		}
-	}
-	return text
+	return side + " " + strings.Join(cardNames, " · ") + "\n" + fmt.Sprintf(textDuelPower.to(in), spaced(int64(cards.TeamPower(team))))
 }
 
 var (
@@ -320,9 +302,9 @@ var (
 	textDuelTo        = localText{uz: "⚔️ **%s** → **%s**: duelga chaqiraman!", ru: "⚔️ **%s** → **%s**: вызываю на дуэль!", en: "⚔️ **%s** → **%s**: I call you to a duel!"}
 	textDuelStakeLine = localText{uz: "💎 Tikish: %d", ru: "💎 Ставка: %d", en: "💎 Stake: %d"}
 	textDuelRules     = localText{
-		uz: "🃏 Har kimning eng kuchli 3 kartasi jang qiladi: kam zarbada yenggan karta raundni oladi.",
-		ru: "🃏 Сражаются 3 сильнейшие карты каждого: раунд берёт карта, победившая за меньше ударов.",
-		en: "🃏 Each one's 3 strongest cards fight: the card that wins in fewer hits takes the round.",
+		uz: "📜 Qoida: har kimning eng kuchli 3 kartasi jamoa bo'ladi. Kuch = hujum + jon. Kuchi ko'p jamoaning yutish imkoni ko'proq, lekin kuchsizi ham yutishi mumkin.",
+		ru: "📜 Правило: 3 сильнейшие карты каждого — его команда. Сила = атака + жизнь. У сильной команды шанс выше, но слабая тоже может победить.",
+		en: "📜 Rule: each one's 3 strongest cards are their team. Power = attack + life. The stronger team has the better chance, but the weaker can still win.",
 	}
 	textDuelAccept    = localText{uz: "⚔️ Qabul qilish", ru: "⚔️ Принять", en: "⚔️ Accept"}
 	textDuelCancel    = localText{uz: "❌ Bekor", ru: "❌ Отмена", en: "❌ Call off"}
@@ -330,10 +312,8 @@ var (
 	textDuelNotYours  = localText{uz: "Bu duel sizga emas.", ru: "Эта дуэль не для вас.", en: "This duel is not yours."}
 	textDuelOwn       = localText{uz: "O'z duelingizni qabul qila olmaysiz.", ru: "Свою дуэль принять нельзя.", en: "You cannot take your own duel."}
 	textDuelCalledOff = localText{uz: "❌ Duel bekor qilindi (%s).", ru: "❌ Дуэль отменена (%s).", en: "❌ The duel was called off (%s)."}
-	textDuelRound     = localText{uz: "**%d-raund**", ru: "**Раунд %d**", en: "**Round %d**"}
-	textDuelHits      = localText{uz: "%d zarba", ru: "ударов: %d", en: "%d hits"}
-	textDuelNoCard    = localText{uz: "— karta yo'q", ru: "— нет карты", en: "— no card"}
-	textDuelScore     = localText{uz: "📊 Hisob: %s %d : %d %s", ru: "📊 Счёт: %s %d : %d %s", en: "📊 Score: %s %d : %d %s"}
-	textDuelWinner    = localText{uz: "🏆 G'olib: **%s**!", ru: "🏆 Победитель: **%s**!", en: "🏆 The winner: **%s**!"}
+	textDuelPower     = localText{uz: "💪 Kuch: %s", ru: "💪 Сила: %s", en: "💪 Power: %s"}
+	textDuelChance    = localText{uz: "🎯 Yutish imkoni: %d%%", ru: "🎯 Шанс победы: %d%%", en: "🎯 Chance to win: %d%%"}
+	textDuelWinner    = localText{uz: "🏆 G'olib: %s **%s**!", ru: "🏆 Победитель: %s **%s**!", en: "🏆 The winner: %s **%s**!"}
 	textDuelWon       = localText{uz: "💎 +%d (%s dan)", ru: "💎 +%d (от %s)", en: "💎 +%d (from %s)"}
 )

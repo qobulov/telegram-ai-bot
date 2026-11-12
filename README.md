@@ -2089,11 +2089,13 @@ never started) keeps the card and has the opener turned off. A card reminder
 of a card it opened is skipped as too soon. The endpoint's `opened` counts
 them.
 `/duel [stake]` in a group calls a member out, the one replied to or anyone,
-for up to 100 shards: whoever presses its button accepts, each side's three
-strongest cards by attack and health fight one against one, the card that
-beats the other in fewer hits, each a little stronger or weaker by luck,
-taking the round, and the winner of more rounds takes the stake of the
-loser's shards, or all they have; the challenger or the one called out may
+for up to 100 shards: whoever presses its button accepts. Each side's three
+strongest cards are its team, and a team's power is their attack and health
+together; each side wins with its share of the two powers as its chance, so
+that the stronger team wins more often and the weaker one still may (twice
+the power is a 67% chance). The challenge shows the challenger's team and
+power, the result both teams, their power and chance, and the winner takes
+the stake of the loser's shards, or all they have; the challenger or the one called out may
 call it off, and `card_duels` keeps each duel's message so that it is settled
 once however often it is pressed. Cards pass between players in a group,
 replying to the member they are for (migration 66, `card_trades`):
