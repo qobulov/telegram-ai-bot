@@ -89,6 +89,9 @@ func (s *Service) gameCommand(ctx context.Context, in incoming, shortName string
 func (s *Service) gamesMenu(in incoming) outcome {
 	lang := languageOf(in)
 	text := textGamesTitle.to(in) + "\n" + textGamesDooz.to(in)
+	if s.opts.Teams != nil {
+		text += "\n" + textGamesTeams.to(in)
+	}
 	if s.opts.Game != nil && s.opts.GameTable != nil {
 		text += helpPages[lang]
 	}
@@ -104,6 +107,11 @@ var (
 		uz: "/tictactoe — Dooz (X-O): do'stingiz yoki men bilan",
 		ru: "/tictactoe — крестики-нолики: с другом или со мной",
 		en: "/tictactoe — tic-tac-toe: with a friend or with me",
+	}
+	textGamesTeams = localText{
+		uz: "/teams — MLBB: o'yinchilarni tasodifiy 2 jamoaga bo'lish (10+ kishi)",
+		ru: "/teams — MLBB: случайно разделить игроков на 2 команды (от 10 человек)",
+		en: "/teams — MLBB: split the players into 2 random teams (10 or more)",
 	}
 	textGamesCards = localText{
 		uz: "🎴 Kartalar: /card · /cards (ilova) · /cardtop · /autocard · /market · /duel · /trade",

@@ -180,7 +180,10 @@ type Options struct {
 	// Invites keeps who brought whom into each group, for /invites; nil
 	// keeps none.
 	Invites InviteBook
-	Logger  *slog.Logger
+	// Teams keeps the groups' MLBB team lobbies, for /teams; nil turns it
+	// off.
+	Teams  TeamLobbyBook
+	Logger *slog.Logger
 	// Model is the model name shown by /model.
 	Model string
 	// Workers is how many messages are processed at once.

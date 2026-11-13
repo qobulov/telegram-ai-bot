@@ -833,6 +833,8 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.cardCollection(ctx, in)
 	case s.opts.Cards != nil && s.opts.CardsURL != "" && commandName(in.text) == "/cards":
 		return outcome{text: textCardsApp.to(in), buttons: s.cardsAppButton(in)}
+	case s.opts.Teams != nil && s.opts.Buttons != nil && commandName(in.text) == "/teams":
+		return s.teamsCommand(ctx, in)
 	case s.opts.Invites != nil && commandName(in.text) == "/invites_auto":
 		return s.inviteAwardCommand(ctx, in)
 	case s.opts.Invites != nil && invitePeriods[commandName(in.text)]:
@@ -1075,6 +1077,10 @@ func (s *Service) pressed(q *telegram.CallbackQuery) {
 	}
 	if strings.HasPrefix(q.Data, doozData) {
 		s.pressedDooz(q)
+		return
+	}
+	if strings.HasPrefix(q.Data, teamsData) && s.opts.Teams != nil {
+		s.pressedTeams(q)
 		return
 	}
 	if strings.HasPrefix(q.Data, announceData) {

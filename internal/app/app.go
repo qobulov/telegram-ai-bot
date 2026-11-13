@@ -320,6 +320,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Groups:          store,
 		Roster:          store,
 		Invites:         store,
+		Teams:           store,
 		Profiles:        store,
 		Exchanges:       store,
 		MemberCount:     bot.Client,

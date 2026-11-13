@@ -16,6 +16,12 @@ func (s *Store) ChangeMafiaGame(ctx context.Context, chatID int64, change func(s
 	return s.changeState(ctx, "mafia_games", chatID, change)
 }
 
+// ChangeTeamLobby changes a chat's MLBB team lobby as ChangeMafiaGame does
+// its game; what it holds is internal/service's.
+func (s *Store) ChangeTeamLobby(ctx context.Context, chatID int64, change func(state []byte) ([]byte, error)) error {
+	return s.changeState(ctx, "team_lobbies", chatID, change)
+}
+
 // changeState changes the JSON state of a chat's row in table, one of the
 // games' tables named above, with the row locked; an error from change is
 // given back as it is.

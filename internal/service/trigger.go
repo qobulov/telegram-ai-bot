@@ -118,7 +118,7 @@ func (s *Service) plainCommand(msg *telegram.Message, text string) bool {
 // "/game", "/mafia", "/start" or "/top" are other bots' too.
 var ownCommands = map[string]bool{
 	"/card": true, "/mycards": true, "/cardtop": true, "/cards": true,
-	"/autocard": true, "/market": true, "/invites": true, "/invites_week": true, "/invites_month": true, "/invites_auto": true, "/duel": true, "/trade": true, "/games": true,
+	"/autocard": true, "/market": true, "/invites": true, "/invites_week": true, "/invites_month": true, "/invites_auto": true, "/teams": true, "/duel": true, "/trade": true, "/games": true,
 	"/boss": true, "/snake": true, "/woodcutter": true, "/checkers": true, "/tictactoe": true,
 }
 
