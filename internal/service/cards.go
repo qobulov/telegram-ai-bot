@@ -120,32 +120,40 @@ func (s *Service) withPicture(ctx context.Context, out outcome, card storage.Car
 	return out
 }
 
-// cardCaption is a drawn card: its name and anime, numbers, rarity, the
-// points it gave, and in how many draws a Legendary and a Mythic are sure.
+// cardCaption is a drawn card in three lines: its name and anime; its
+// rarity and numbers; and the points it gave, with the player's total. A
+// card the wait made sure says so, and a sure Legendary or Mythic soon to
+// come is told only when it is pityShown draws away or fewer.
 func cardCaption(language string, draw storage.CardDraw) string {
 	c := draw.Card
 	emoji, rarity, _ := strings.Cut(rarityNames[c.Rarity].inLanguage(language), " ")
-	about := rarity
+	title := emoji + " **" + cardMarks.Replace(c.Name) + "**"
 	if c.Anime != "" {
-		about += " · " + cardMarks.Replace(c.Anime)
+		title += " — " + cardMarks.Replace(c.Anime)
 	}
-	lines := []string{emoji + " **" + cardMarks.Replace(c.Name) + "**", about, "",
-		fmt.Sprintf(textCardStats.inLanguage(language), spaced(int64(c.Attack)), spaced(int64(c.Health))), ""}
+	got := fmt.Sprintf(textCardAgain.inLanguage(language), draw.Count, spaced(int64(c.Value)), spaced(draw.Points))
 	if draw.New {
-		lines = append(lines, fmt.Sprintf(textCardNew.inLanguage(language), spaced(int64(c.Value))))
-	} else {
-		lines = append(lines, fmt.Sprintf(textCardAgain.inLanguage(language), draw.Count, spaced(int64(c.Value))))
+		got = fmt.Sprintf(textCardNew.inLanguage(language), spaced(int64(c.Value)), spaced(draw.Points))
 	}
-	lines = append(lines, fmt.Sprintf(textCardTotal.inLanguage(language), spaced(draw.Points)))
+	lines := []string{title, fmt.Sprintf("%s · ⚔️ %s · ❤️ %s", rarity, spaced(int64(c.Attack)), spaced(int64(c.Health))), got}
 	if draw.Guaranteed {
 		lines = append(lines, textCardGuaranteed.inLanguage(language))
 	}
 	legendary, mythic := cards.PityIn(draw)
-	lines = append(lines, "",
-		fmt.Sprintf(textCardPity.inLanguage(language), rarityNames[cards.Legendary].inLanguage(language), legendary),
-		fmt.Sprintf(textCardPity.inLanguage(language), rarityNames[cards.Mythic].inLanguage(language), mythic))
+	for _, sure := range []struct {
+		rarity cards.Rarity
+		in     int
+	}{{cards.Legendary, legendary}, {cards.Mythic, mythic}} {
+		if sure.in <= pityShown {
+			lines = append(lines, fmt.Sprintf(textCardPity.inLanguage(language), rarityNames[sure.rarity].inLanguage(language), sure.in))
+		}
+	}
 	return strings.Join(lines, "\n")
 }
+
+// pityShown is how near a sure Legendary or Mythic must be for a drawn
+// card to tell it.
+const pityShown = 5
 
 // spaced writes n with its thousands apart, "12 300", as the cards do.
 func spaced(n int64) string {
@@ -371,10 +379,8 @@ var (
 		ru: "⏳ Следующая карта через %d мин. Коллекция: /mycards",
 		en: "⏳ Your next card in %d min. Collection: /mycards",
 	}
-	textCardStats      = localText{uz: "⚔️ Hujum %s · ❤️ Jon %s", ru: "⚔️ Атака %s · ❤️ Жизнь %s", en: "⚔️ Attack %s · ❤️ Life %s"}
-	textCardNew        = localText{uz: "🆕 Yangi karta · +%s ochko", ru: "🆕 Новая карта · +%s очков", en: "🆕 New card · +%s points"}
-	textCardAgain      = localText{uz: "🔁 Takror, endi ×%d · +%s ochko", ru: "🔁 Повтор, теперь ×%d · +%s очков", en: "🔁 Again, now ×%d · +%s points"}
-	textCardTotal      = localText{uz: "💠 Jami: %s ochko", ru: "💠 Всего: %s очков", en: "💠 Total: %s points"}
+	textCardNew        = localText{uz: "🆕 Yangi · +%s ochko (jami %s)", ru: "🆕 Новая · +%s очков (всего %s)", en: "🆕 New · +%s points (total %s)"}
+	textCardAgain      = localText{uz: "🔁 ×%d · +%s ochko (jami %s)", ru: "🔁 ×%d · +%s очков (всего %s)", en: "🔁 ×%d · +%s points (total %s)"}
 	textCardGuaranteed = localText{uz: "✨ Kafolatlangan karta!", ru: "✨ Гарантированная карта!", en: "✨ A guaranteed card!"}
 	// textCardPity says in how many cards a rarity is sure, one line each.
 	textCardPity = localText{

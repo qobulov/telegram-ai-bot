@@ -383,18 +383,20 @@ func TestGameCommandKeepsTheGamesLimitInAGroup(t *testing.T) {
 	}
 }
 
-// A drawn card says in how many draws a Legendary and a Mythic are sure,
-// and that it was one when the wait raised it.
-func TestCardCaptionShowsTheSureCards(t *testing.T) {
+// A drawn card is three lines, and says it was sure when the wait made it
+// so, and that a sure Legendary or Mythic is near only when it is.
+func TestCardCaptionIsShort(t *testing.T) {
 	in := incoming{msg: &telegram.Message{From: &telegram.User{ID: 1, FirstName: "Bek"}}, text: "/card"}
-	draw := storage.CardDraw{Card: storage.Card{Name: "Gojo", Rarity: 4, Value: 5000}, New: true, Count: 1, Points: 5000, Guaranteed: true, SinceLegendary: 0, SinceMythic: 0}
-	caption := cardCaption(languageOf(in), draw)
-	if !strings.Contains(caption, "✨ Kafolatlangan karta!") || !strings.Contains(caption, "🔥 Afsonaviy — 30 kartadan") || !strings.Contains(caption, "👑 Mifik — 100 kartadan") {
-		t.Errorf("a sure Mythic's caption:\n%s", caption)
+	draw := storage.CardDraw{Card: storage.Card{Name: "Gojo", Anime: "JJK", Rarity: 4, Attack: 5130, Health: 18020, Value: 5000}, New: true, Count: 1, Points: 12300, SinceLegendary: 3, SinceMythic: 40}
+	want := "👑 **Gojo** — JJK\nMifik · ⚔️ 5 130 · ❤️ 18 020\n🆕 Yangi · +5 000 ochko (jami 12 300)"
+	if caption := cardCaption(languageOf(in), draw); caption != want {
+		t.Errorf("caption:\n%s\nwant:\n%s", caption, want)
 	}
-	draw.Guaranteed, draw.SinceLegendary, draw.SinceMythic = false, 12, 70
-	if caption = cardCaption(languageOf(in), draw); strings.Contains(caption, "✨") || !strings.Contains(caption, "🔥 Afsonaviy — 18 kartadan") || !strings.Contains(caption, "👑 Mifik — 30 kartadan") {
-		t.Errorf("a card's caption:\n%s", caption)
+	draw.New, draw.Count, draw.Guaranteed, draw.SinceLegendary = false, 2, true, 26
+	caption := cardCaption(languageOf(in), draw)
+	if !strings.Contains(caption, "🔁 ×2 · +5 000 ochko") || !strings.Contains(caption, "✨ Kafolatlangan karta!") ||
+		!strings.Contains(caption, "🔥 Afsonaviy — 4 kartadan") || strings.Contains(caption, "Mifik —") {
+		t.Errorf("a sure card's caption:\n%s", caption)
 	}
 }
 
