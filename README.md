@@ -1811,6 +1811,15 @@ such as `[gif pubg]`, and GIPHY is searched for those words; a topic has no
 sticker to fall back on, so when it fails nothing is sent. GIPHY's free
 key allows 100 searches an hour, far more than she sends.
 
+A GIF asked for in a word or two, calling her by name, is sent without the
+model and takes nothing from the group's quota of answers: "Мари гиф" sends
+one of a random mood, "Мари гиф кулги" or "Maria gif pubg" one of that
+topic (`internal/service/gifrequest.go`). A mood or a common topic in Uzbek
+or Russian (кулги, xafa, tabrik, кот, танец…) is searched by its English
+words, and a name in Latin letters as it is; any other topic, which only
+the model can put in English, is still hers, and so is a request in more
+words ("anavi bolaga mos gif tashla").
+
 #### Her own sticker set
 
 Owners fill a sticker set of her own from the chat, with the owner-only

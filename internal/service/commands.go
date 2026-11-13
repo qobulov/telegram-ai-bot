@@ -600,7 +600,7 @@ const overQuotaReaction = "👀"
 // It also returns the answer taken, to give back if the turn answers
 // nothing; 0 when none was taken.
 func (s *Service) mayAnswerInGroup(in incoming) (reservation int64, allowed bool) {
-	if !in.group || in.fromBot || s.opts.GroupReplies == nil || !s.hasContent(in) || s.isManagerCommand(in) || isCommand(in.text) {
+	if !in.group || in.fromBot || s.opts.GroupReplies == nil || !s.hasContent(in) || s.isManagerCommand(in) || isCommand(in.text) || s.asksForGIF(in) {
 		return 0, true
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
@@ -792,6 +792,9 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 	}
 	if s.opts.Tools != nil && s.isModCommand(in) {
 		return s.modCommand(ctx, in)
+	}
+	if topic, ok := s.gifRequest(in); ok {
+		return s.gifAnswer(in, topic)
 	}
 	if commandName(in.text) == "/start" {
 		if out, ok := s.startShashka(in); ok {
