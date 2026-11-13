@@ -207,9 +207,14 @@ func (f *fakeRecorder) SetSentMessageID(_ context.Context, answerID, messageID i
 
 // fakeMembers answers the group-administrator check.
 type fakeMembers struct {
-	admins map[int64]bool
-	err    error
-	calls  int
+	admins   map[int64]bool
+	creators map[int64]bool
+	err      error
+	calls    int
+}
+
+func (f *fakeMembers) IsGroupCreator(_ context.Context, _, userID int64) (bool, error) {
+	return f.creators[userID], f.err
 }
 
 func (f *fakeMembers) IsGroupAdmin(_ context.Context, _, userID int64) (bool, error) {
@@ -3977,5 +3982,24 @@ func TestUnansweredMessagesAreRecordedWithWhy(t *testing.T) {
 	}
 	if skip := skips.skips[1]; !strings.Contains(skip.Detail, "quota") {
 		t.Errorf("overloaded skip detail = %q, want the provider's error", skip.Detail)
+	}
+}
+
+// Past the quota the group's creator is still answered, and a member is
+// not.
+func TestGroupCreatorIsAnsweredPastTheQuota(t *testing.T) {
+	f := newFixture()
+	quota := &fakeGroupQuota{}
+	f.opts.GroupReplies = quota
+	f.opts.GroupRatePerMinute = 1
+	f.members.creators = map[int64]bool{userID: true}
+	first := f.run(inGroup(groupMessage("@MyBot one", "@MyBot")))
+	expectOneReply(t, first, "echo: one")
+	if sent := f.run(inGroup(groupMessage("@MyBot two", "@MyBot"))); len(sent) != 2 || sent[1].text != "echo: two" {
+		t.Fatalf("the creator past the quota got %+v", sent)
+	}
+	f.members.creators = nil
+	if sent := f.run(inGroup(groupMessage("@MyBot three", "@MyBot"))); len(sent) != 2 {
+		t.Errorf("a member past the quota got %+v", sent)
 	}
 }

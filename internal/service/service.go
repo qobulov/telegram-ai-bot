@@ -44,6 +44,7 @@ type Replier interface {
 // Members answers whether a user administers a group.
 type Members interface {
 	IsGroupAdmin(ctx context.Context, chatID, userID int64) (bool, error)
+	IsGroupCreator(ctx context.Context, chatID, userID int64) (bool, error)
 }
 
 // Muter stores whether the bot is muted in a chat.

@@ -586,7 +586,8 @@ const overQuotaReaction = "👀"
 // message in a group that already has too many. When the count cannot be
 // read it stays silent, like mayAnswerBot.
 //
-// Owners are not counted; admins are, like anyone, as the owners asked;
+// Owners are not counted, nor, past the quota, the group's creator; other
+// admins are, like anyone, as the owners asked;
 // other bots have their own quota. The commands that manage the bot always
 // pass for those who may use them: they have to work precisely when the
 // group is flooding the bot. So does a group admin's message, past the
@@ -635,6 +636,10 @@ func (s *Service) reserveGroupReply(in incoming) (reservation int64, allowed boo
 		s.opts.Logger.Info("group reply limit reached, but an admin replied to a member", "chat_id", in.scope.ChatID, "user_id", in.userID)
 		return 0, true
 	}
+	if s.isCreatorAsking(ctx, in) {
+		s.opts.Logger.Info("group reply limit reached, but the group's owner asked", "chat_id", in.scope.ChatID, "user_id", in.userID)
+		return 0, true
+	}
 	if s.onlyTheyRead(ctx, in) {
 		// Nobody else reads a group of two, so there is nobody to flood; the
 		// limit once left someone in distress there unanswered.
@@ -675,6 +680,18 @@ func (s *Service) isAdminAsking(ctx context.Context, in incoming) bool {
 		s.opts.Logger.Warn("group admin check failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
 	}
 	return isAdmin && err == nil
+}
+
+// isCreatorAsking reports a message from the group's creator, whom the bot
+// obeys past the quota: in BS news the owner's orders went unanswered once
+// they had talked with the bot that hour. Telegram is asked only past the
+// quota, and a failed check is no creator.
+func (s *Service) isCreatorAsking(ctx context.Context, in incoming) bool {
+	creator, err := s.opts.Members.IsGroupCreator(ctx, in.scope.ChatID, in.userID)
+	if err != nil {
+		s.opts.Logger.Warn("group creator check failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
+	}
+	return creator && err == nil
 }
 
 // tooQuiet reports a group where fewer than MinActiveMembers people wrote
