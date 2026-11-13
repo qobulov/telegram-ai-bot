@@ -752,7 +752,10 @@ to list a bot's groups, so a group the bot joined before this, where nobody
 has written since, is not known. After upgrading, run `set-webhook` again so
 Telegram starts sending `my_chat_member`. The
 `groups` table keeps only each group's name and is not expired; messages
-still are. Channels come only from `my_chat_member` (the bot never asks for
+still are. In a group the bot has not answered for 7 days, the daily cleanup
+keeps only the last 8 days of messages whatever `RETENTION_DAYS` says: there
+the log serves only the week's statistics, and one such group held over a
+third of all messages. Channels come only from `my_chat_member` (the bot never asks for
 channel posts) and are kept apart, in `channels`, so that the overview, the
 statistics and `bot_database groups` stay about groups; a channel the bot
 was made an admin of before this upgrade is recorded once its rights change,

@@ -933,6 +933,14 @@ func ReminderJob(cfg config.Config, store *storage.Store, bot Bot, logger *slog.
 	}
 }
 
+// quietGroupKeep is how long a group's messages are kept where the bot has
+// not answered for quietGroupDays, whatever RETENTION_DAYS says: the week's
+// statistics, and a day more.
+const (
+	quietGroupKeep = 8 * 24 * time.Hour
+	quietGroupDays = 7 * 24 * time.Hour
+)
+
 // reminderKeep is how long a reminder is kept once it was sent, skipped
 // or failed.
 const reminderKeep = 7 * 24 * time.Hour
@@ -948,6 +956,11 @@ func expire(ctx context.Context, cfg config.Config, store *storage.Store, logger
 		logger.Warn("could not delete old shashka games", "error", err)
 	} else if deleted > 0 {
 		logger.Info("old shashka games deleted", "games", deleted)
+	}
+	if deleted, err := store.ExpireQuietGroups(ctx, time.Now().Add(-quietGroupKeep), time.Now().Add(-quietGroupDays)); err != nil {
+		logger.Warn("could not trim the quiet groups' logs", "error", err)
+	} else if deleted > 0 {
+		logger.Info("quiet groups' old messages deleted", "messages", deleted)
 	}
 	if deleted, err := store.DeleteOldReminders(ctx, time.Now().Add(-reminderKeep)); err != nil {
 		logger.Warn("could not delete old reminders", "error", err)

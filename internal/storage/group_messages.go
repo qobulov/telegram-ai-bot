@@ -101,6 +101,22 @@ func (s *Store) AuthorMessageIDs(ctx context.Context, chatID, authorID int64, si
 	return ids, nil
 }
 
+// ExpireQuietGroups removes the logged messages older than before in the
+// groups the bot has not answered since quietSince: where nobody talks to it,
+// the log serves only the week's statistics, and one group of that kind held
+// over a third of all messages. It reports how many it removed.
+func (s *Store) ExpireQuietGroups(ctx context.Context, before, quietSince time.Time) (int64, error) {
+	tag, err := s.pool.Exec(ctx, `
+		DELETE FROM group_messages m
+		WHERE m.created_at < $1
+		  AND NOT EXISTS (SELECT 1 FROM group_replies r WHERE r.chat_id = m.chat_id AND r.created_at >= $2)`,
+		before, quietSince)
+	if err != nil {
+		return 0, fmt.Errorf("storage: expire quiet groups: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}
+
 // ClearGroupMessages deletes a group's logged messages.
 func (s *Store) ClearGroupMessages(ctx context.Context, chatID int64) error {
 	if _, err := s.pool.Exec(ctx, `DELETE FROM group_messages WHERE chat_id = $1`, chatID); err != nil {
