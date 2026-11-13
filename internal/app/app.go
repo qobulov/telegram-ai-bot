@@ -843,6 +843,10 @@ func NewCleanup(ctx context.Context, cfg config.Config, logger *slog.Logger) (*C
 			if _, err := service.DeclineLateJoins(ctx, store, client, store, time.Now(), logger); err != nil {
 				logger.Warn("could not decline the late join requests", "error", err)
 			}
+			awards := service.InviteAwardOptions{Book: store, Telegram: client, Location: cfg.Location, Now: time.Now(), Logger: logger}
+			if _, err := service.PostInviteAwards(ctx, awards); err != nil {
+				logger.Warn("could not post the invite awards", "error", err)
+			}
 			return expire(ctx, cfg, store, logger)
 		},
 	})

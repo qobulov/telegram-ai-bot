@@ -18,6 +18,7 @@ type fakeInviteBook struct {
 	noted  []storage.Invite
 	marked []string
 	since  time.Time
+	awards []storage.InviteAward
 }
 
 func (f *fakeInviteBook) MarkInvitee(_ context.Context, _, userID int64, in bool, _ time.Time) error {
@@ -34,11 +35,31 @@ func (f *fakeInviteBook) RecordInvite(_ context.Context, inv storage.Invite) err
 	return nil
 }
 
-func (f *fakeInviteBook) InviteTop(_ context.Context, _ int64, since time.Time, _ int64, _ int) ([]storage.InviterCount, error) {
+func (f *fakeInviteBook) InviteTop(_ context.Context, _ int64, q storage.InviteQuery) ([]storage.InviterCount, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.since = since
+	f.since = q.Since
 	return []storage.InviterCount{{UserID: 1, Name: "Ali", Added: 17, Stayed: 15}, {UserID: 2, Name: "Vali", Added: 3, Stayed: 3}}, nil
+}
+
+func (f *fakeInviteBook) SetInviteAward(_ context.Context, a storage.InviteAward) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.awards = []storage.InviteAward{a}
+	return nil
+}
+
+func (f *fakeInviteBook) ClearInviteAward(context.Context, int64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.awards = nil
+	return nil
+}
+
+func (f *fakeInviteBook) InviteAwards(context.Context, int64) ([]storage.InviteAward, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.awards, nil
 }
 
 // A member added by another counts for them, and one by another's link for

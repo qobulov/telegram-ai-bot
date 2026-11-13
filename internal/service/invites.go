@@ -13,7 +13,10 @@ import (
 // InviteBook keeps who brought whom into each group.
 type InviteBook interface {
 	RecordInvite(ctx context.Context, inv storage.Invite) error
-	InviteTop(ctx context.Context, chatID int64, since time.Time, inviter int64, limit int) ([]storage.InviterCount, error)
+	InviteTop(ctx context.Context, chatID int64, q storage.InviteQuery) ([]storage.InviterCount, error)
+	SetInviteAward(ctx context.Context, a storage.InviteAward) error
+	ClearInviteAward(ctx context.Context, chatID int64) error
+	InviteAwards(ctx context.Context, chatID int64) ([]storage.InviteAward, error)
 	MarkInvitee(ctx context.Context, chatID, userID int64, in bool, at time.Time) error
 }
 
@@ -111,7 +114,7 @@ func (s *Service) inviteTable(ctx context.Context, in incoming) outcome {
 	if reply := in.msg.ReplyToMessage; reply != nil && reply.From != nil && !reply.From.IsBot {
 		inviter = reply.From.ID
 	}
-	top, err := s.opts.Invites.InviteTop(ctx, in.msg.Chat.ID, since, inviter, inviteTableSize)
+	top, err := s.opts.Invites.InviteTop(ctx, in.msg.Chat.ID, storage.InviteQuery{Since: since, Inviter: inviter, Limit: inviteTableSize})
 	if err != nil {
 		s.opts.Logger.Error("could not read the invite table", "chat_id", in.msg.Chat.ID, "error", err)
 		return say(textInvitesUnavailable.to(in))
@@ -158,7 +161,7 @@ var (
 	textInvitesTitle       = localText{uz: "👥 Kim nechta odam qo'shdi · %s", ru: "👥 Кто сколько людей добавил · %s", en: "👥 Who brought how many in · %s"}
 	textInvitesNone        = localText{uz: "Hali hech kim guruhda qolgan odam qo'shmagan.", ru: "Пока никто не добавил тех, кто остался в группе.", en: "Nobody has brought in anyone who is still here yet."}
 	textInvitesGone        = localText{uz: " (yana %d tasi chiqib ketgan)", ru: " (ещё %d ушли)", en: " (%d more left)"}
-	textInvitesRule        = localText{uz: "Reytingda guruhda qolgan odam qo'shganlar bor: qo'lda qo'shilgan yoki shaxsiy havola orqali kirgan. Kimdir chiqib ketsa, qo'shganning hisobidan ayriladi. Hafta: /invites_week · Oy: /invites_month", ru: "В рейтинге те, кто добавил оставшихся в группе: вручную или по личной ссылке. Кто ушёл, вычитается у добавившего. Неделя: /invites_week · Месяц: /invites_month", en: "Listed: those who brought in people still here, added by hand or by one's own invite link. One who leaves is taken off whoever brought them. Week: /invites_week · Month: /invites_month"}
+	textInvitesRule        = localText{uz: "Reytingda guruhda qolgan odam qo'shganlar bor: qo'lda qo'shilgan yoki shaxsiy havola orqali kirgan. Kimdir chiqib ketsa, qo'shganning hisobidan ayriladi. Hafta: /invites_week · Oy: /invites_month · Avto-e'lon (admin): /invites_auto", ru: "В рейтинге те, кто добавил оставшихся в группе: вручную или по личной ссылке. Кто ушёл, вычитается у добавившего. Неделя: /invites_week · Месяц: /invites_month · Авто (админ): /invites_auto", en: "Listed: those who brought in people still here, added by hand or by one's own invite link. One who leaves is taken off whoever brought them. Week: /invites_week · Month: /invites_month · Automatic (admins): /invites_auto"}
 	textInvitesGroupOnly   = localText{uz: "👥 /invites guruhda ishlaydi.", ru: "👥 /invites работает в группе.", en: "👥 /invites works in a group."}
 	textInvitesUnavailable = localText{uz: "Hisobni hozir o'qib bo'lmadi, birozdan keyin urinib ko'ring.", ru: "Сейчас не удалось прочитать счёт, попробуйте позже.", en: "Could not read the count right now; try again in a bit."}
 )

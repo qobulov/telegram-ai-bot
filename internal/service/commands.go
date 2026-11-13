@@ -789,6 +789,8 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.cardCollection(ctx, in)
 	case s.opts.Cards != nil && s.opts.CardsURL != "" && commandName(in.text) == "/cards":
 		return outcome{text: textCardsApp.to(in), buttons: s.cardsAppButton(in)}
+	case s.opts.Invites != nil && commandName(in.text) == "/invites_auto":
+		return s.inviteAwardCommand(ctx, in)
 	case s.opts.Invites != nil && invitePeriods[commandName(in.text)]:
 		return s.inviteTable(ctx, in)
 	case s.opts.Cards != nil && s.opts.CardsURL != "" && commandName(in.text) == "/market":

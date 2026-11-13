@@ -757,6 +757,18 @@ keeps its own `left_at` (`group_invites`, migration 68), since
 `group_members` forgets those who left. Counting starts when this is
 deployed.
 
+A group's admin can have the bot announce the winners itself:
+`/invites_auto week 3` posts last week's top three every Monday,
+`/invites_auto half 5` the last half month's top five on the 1st and the
+16th, `/invites_auto month 3` last month's on the 1st (`hafta`, `yarim`,
+`oy` too; one to twenty, three by default), and `/invites_auto off` stops
+it. The daily cron (`/api/cleanup`, 08:00 in Tashkent) posts each period
+once it has ended, with medals for the first three, pins the post (the bot
+needs the right to pin) and tags the group's owner, so that whoever rewards
+the winners sees it; a period nobody brought anyone in posts nothing, and
+one that ended before the announcement was turned on, or more than three
+days ago, is not posted (`invite_awards`, migration 71).
+
 Groups are recorded when the bot is added, promoted or removed (Telegram's
 `my_chat_member` updates) and from the messages it logs. Added to a group it
 was not in, the bot greets it in the language of whoever added it: how to
