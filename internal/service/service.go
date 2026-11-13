@@ -461,6 +461,10 @@ type Service struct {
 	// creators are the groups' creators, by group, for limits they are
 	// spared.
 	creators *recently[int64, int64]
+	// answeredAbout are the members' messages the bot's answers in
+	// groups replied about, by group and answer, for orders replying to
+	// the answer.
+	answeredAbout *recently[[2]int64, *telegram.Message]
 	// guardSets are the guards on in each group, and spamVerdicts,
 	// linkVerdicts and pictureVerdicts what the outside services lately
 	// said; see protect.go.
@@ -573,6 +577,7 @@ func New(opts Options) *Service {
 		ownerMenus:      newRecently[[2]int64, bool](ownerMenuMemory, opts.Now),
 		ownersHere:      newRecently[int64, []string](activeMemory, opts.Now),
 		creators:        newRecently[int64, int64](creatorMemory, opts.Now),
+		answeredAbout:   newRecently[[2]int64, *telegram.Message](time.Hour, opts.Now),
 		guardSets:       newRecently[int64, guardSet](guardsMemory, opts.Now),
 		spamVerdicts:    newRecently[int64, verdict](verdictMemory, opts.Now),
 		linkVerdicts:    newRecently[string, verdict](verdictMemory, opts.Now),

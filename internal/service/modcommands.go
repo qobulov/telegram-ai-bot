@@ -28,33 +28,69 @@ var modCommands = map[string]string{
 const modTimeout = 20 * time.Second
 
 // modRequest is the moderation a group message asks for of the member it
-// replies to: a command, or a short order in words; ok false for any other
-// message.
-func (s *Service) modRequest(in incoming) (action string, minutes int, reason string, ok bool) {
-	if !in.group || !repliesToAMember(in, s.opts.Bot.ID) {
-		return "", 0, "", false
+// replies to, with the message as the moderate tool must see it: replying
+// to that member's message. A reply to the bot's own answer about a member
+// asks it of that member: "Мут бер" to the bot's answer to "mute him".
+// ok is false for any other message.
+func (s *Service) modRequest(in incoming) (asked incoming, action string, minutes int, reason string, ok bool) {
+	if !in.group {
+		return in, "", 0, "", false
+	}
+	asked, ok = s.withModTarget(in)
+	if !ok {
+		return in, "", 0, "", false
 	}
 	if action, ok = modCommands[commandName(in.text)]; ok {
 		minutes, reason = modArgs(commandArgument(in.text))
-		return action, minutes, reason, true
+		return asked, action, minutes, reason, true
 	}
 	// The message as written: addressing the bot by a name in the middle
 	// takes off the words before it.
 	written, _ := in.msg.Content()
 	action, minutes, ok = s.modWords(written)
-	return action, minutes, "", ok
+	return asked, action, minutes, "", ok
 }
 
-// isModCommand reports a moderation request replying to a member's message.
+// withModTarget is in replying to the member it is about: the one whose
+// message it replies to, or the one the bot's answer it replies to was
+// about.
+func (s *Service) withModTarget(in incoming) (incoming, bool) {
+	if repliesToAMember(in, s.opts.Bot.ID) {
+		return in, true
+	}
+	replied := in.msg.ReplyToMessage
+	if replied == nil || !s.isFromBot(replied) {
+		return in, false
+	}
+	member, ok := s.answeredAbout.get([2]int64{in.msg.Chat.ID, replied.MessageID})
+	if !ok || member.From == nil || member.From.ID == in.userID {
+		return in, false
+	}
+	msg := *in.msg
+	msg.ReplyToMessage = member
+	in.msg = &msg
+	return in, true
+}
+
+// rememberAnsweredAbout notes, for a group message replying to a member's,
+// the member's message by the bot's answer to it, so that an order replying
+// to the answer reaches them.
+func (s *Service) rememberAnsweredAbout(in incoming, sentID int64) {
+	if sentID != 0 && in.group && repliesToAMember(in, s.opts.Bot.ID) {
+		s.answeredAbout.set([2]int64{in.msg.Chat.ID, sentID}, in.msg.ReplyToMessage)
+	}
+}
+
+// isModCommand reports a moderation request about a member.
 func (s *Service) isModCommand(in incoming) bool {
-	_, _, _, ok := s.modRequest(in)
+	_, _, _, _, ok := s.modRequest(in)
 	return ok
 }
 
 // modCommand does an admin's request to the member they replied to, and
 // says what was done, or why it was not.
 func (s *Service) modCommand(ctx context.Context, in incoming) outcome {
-	action, minutes, reason, _ := s.modRequest(in)
+	in, action, minutes, reason, _ := s.modRequest(in)
 	args, err := json.Marshal(map[string]any{"action": action, "minutes": minutes, "reason": reason})
 	if err != nil {
 		return say(textError.to(in))
@@ -124,6 +160,13 @@ var modWordActions = map[string]string{
 	"kick": "kick", "кик": "kick",
 }
 
+// modFillers are the words an order in words may have besides its action
+// and length: "мут бер", "ban qil".
+var modFillers = map[string]bool{
+	"бер": true, "ber": true, "qil": true, "қил": true, "кил": true, "qilvor": true, "қилвор": true, "килвор": true,
+	"дай": true, "сделай": true, "please": true, "iltimos": true, "илтимос": true,
+}
+
 // modWords reads a short order in words: an action, then perhaps a length
 // ("1 минутга", "4soat"), with the bot's name or @username anywhere and
 // nothing else, so that talk about muting is never taken for an order.
@@ -136,13 +179,19 @@ func (s *Service) modWords(text string) (action string, minutes int, ok bool) {
 		}
 		words = append(words, w)
 	}
-	if len(words) == 0 || len(words) > 3 {
+	if len(words) == 0 || len(words) > 4 {
 		return "", 0, false
 	}
 	if action, ok = modWordActions[words[0]]; !ok {
 		return "", 0, false
 	}
-	if minutes, ok = wordLength(strings.Join(words[1:], "")); !ok {
+	length := ""
+	for _, w := range words[1:] {
+		if !modFillers[w] {
+			length += w
+		}
+	}
+	if minutes, ok = wordLength(length); !ok {
 		return "", 0, false
 	}
 	return action, minutes, true

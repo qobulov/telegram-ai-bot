@@ -80,3 +80,21 @@ func TestModOrdersInWords(t *testing.T) {
 		t.Fatalf("asked %v, sent %+v, model asked %d times", runner.asked, sent, len(f.replier.recorded()))
 	}
 }
+
+// An order replying to the bot's answer about a member reaches that member:
+// "Мут бер" after the bot answered "mute him" with a question.
+func TestModOrderReplyingToTheBotsAnswer(t *testing.T) {
+	f := newFixture()
+	f.opts.WakeWords = []string{"мари"}
+	runner := withToolRunner(f)
+	runner.answers["moderate"] = `{"ok":true,"result":{"done":true,"said":"Bajarildi."}}`
+	first := groupMessage("@MyBot shu bolani tinchlantir", "@MyBot")
+	first.ReplyToMessage = &telegram.Message{MessageID: 9, From: &telegram.User{ID: 501, FirstName: "Sam"}, Chat: first.Chat, Text: "Yo bob turila"}
+	order := groupMessage("Мут бер")
+	order.MessageID = 31
+	order.ReplyToMessage = &telegram.Message{MessageID: 1001, From: &telegram.User{ID: botID, IsBot: true}, Chat: order.Chat, Text: "Kimni?"}
+	sent := f.run(inGroup(first), inGroup(order))
+	if len(runner.asked) != 1 || !strings.Contains(runner.asked[0], `"action":"mute"`) || len(sent) != 2 || sent[1].text != "Bajarildi." {
+		t.Fatalf("asked %v, sent %+v", runner.asked, sent)
+	}
+}

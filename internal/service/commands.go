@@ -168,9 +168,11 @@ func (s *Service) process(in incoming) {
 		in.described = s.describe(ctx, in.msg, in.text)
 	}
 	out := s.respond(ctx, in, rules)
-	if sentID := s.deliver(in, &out); out.answerID != 0 && sentID != 0 {
+	sentID := s.deliver(in, &out)
+	if out.answerID != 0 && sentID != 0 {
 		s.recordSent(out.answerID, sentID)
 	}
+	s.rememberAnsweredAbout(in, sentID)
 	s.logExchange(in, out)
 	if out.skipped != "" {
 		s.noteSkip(in, out.skipped, out.skipDetail)

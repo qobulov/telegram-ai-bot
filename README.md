@@ -1554,7 +1554,11 @@ minutes, `soat`, `kun`, `час`… too; an hour when not given, a week at most)
 `/unmute`, `/ban`, `/unban`, `/kick` and `/del`, or the same as a short order
 calling the bot by name, "Мут мари 1 минутга", "Maria, ban" (an action word,
 perhaps a length, and nothing else, so that talk about muting still goes to
-the model, which once asked back instead of muting). These are done without the
+the model, which once asked back instead of muting); "бер", "qil" and the
+like may go with it. Replying to the bot's own answer about a member, such
+an order reaches that member: "Мут бер" after the bot answered "mute him"
+(the bot remembers whom each of its answers in the last hour was about).
+These are done without the
 model, through the `moderate` tool, so the same rights are checked and
 `undo` puts them back; replying to a member they are answered without the
 bot's name, as such a group sends them (another moderating bot there may
