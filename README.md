@@ -2393,7 +2393,9 @@ both sides or a bot game without the bot is refused.
   `/unmute`, `/ignore` and `/unignore` from those who may use them. A
   group's admins are counted like anyone, their own limit too, as the
   owners asked; but an admin's message that replies to another member's, as
-  asking to moderate or ignore them does, is answered past the limits.
+  asking to moderate or ignore them does, is answered past the limits,
+  and so is the group's creator, whom the bot obeys there (Telegram is
+  asked who created the group only past the limits).
   When the count cannot be read she stays silent and logs a warning.
 - The per-user limit, `USER_RATE_LIMIT_PER_MINUTE`, is a flood guard kept in
   memory. In a private chat its first refusal is announced; in a group it
