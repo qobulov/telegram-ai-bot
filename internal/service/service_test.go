@@ -207,14 +207,14 @@ func (f *fakeRecorder) SetSentMessageID(_ context.Context, answerID, messageID i
 
 // fakeMembers answers the group-administrator check.
 type fakeMembers struct {
-	admins   map[int64]bool
-	creators map[int64]bool
-	err      error
-	calls    int
+	admins  map[int64]bool
+	creator int64
+	err     error
+	calls   int
 }
 
-func (f *fakeMembers) IsGroupCreator(_ context.Context, _, userID int64) (bool, error) {
-	return f.creators[userID], f.err
+func (f *fakeMembers) GroupCreator(context.Context, int64) (int64, error) {
+	return f.creator, f.err
 }
 
 func (f *fakeMembers) IsGroupAdmin(_ context.Context, _, userID int64) (bool, error) {
@@ -3985,21 +3985,25 @@ func TestUnansweredMessagesAreRecordedWithWhy(t *testing.T) {
 	}
 }
 
-// Past the quota the group's creator is still answered, and a member is
-// not.
-func TestGroupCreatorIsAnsweredPastTheQuota(t *testing.T) {
+// The group's creator is held back by no limit: neither the group's quota
+// of answers, which they take nothing from, nor the flood guard. A member
+// is.
+func TestGroupCreatorHasNoLimits(t *testing.T) {
 	f := newFixture()
 	quota := &fakeGroupQuota{}
 	f.opts.GroupReplies = quota
 	f.opts.GroupRatePerMinute = 1
-	f.members.creators = map[int64]bool{userID: true}
-	first := f.run(inGroup(groupMessage("@MyBot one", "@MyBot")))
-	expectOneReply(t, first, "echo: one")
-	if sent := f.run(inGroup(groupMessage("@MyBot two", "@MyBot"))); len(sent) != 2 || sent[1].text != "echo: two" {
-		t.Fatalf("the creator past the quota got %+v", sent)
+	f.opts.RatePerMinute = 1
+	f.members.creator = userID
+	sent := f.run(inGroup(groupMessage("@MyBot one", "@MyBot")), inGroup(groupMessage("@MyBot two", "@MyBot")), inGroup(groupMessage("@MyBot three", "@MyBot")))
+	if len(sent) != 3 || sent[2].text != "echo: three" || len(quota.asked()) != 0 {
+		t.Fatalf("the creator got %+v, quota asked %d times", sent, len(quota.asked()))
 	}
-	f.members.creators = nil
-	if sent := f.run(inGroup(groupMessage("@MyBot three", "@MyBot"))); len(sent) != 2 {
-		t.Errorf("a member past the quota got %+v", sent)
+	g := newFixture()
+	g.opts.GroupReplies = &fakeGroupQuota{}
+	g.opts.GroupRatePerMinute = 1
+	g.members.creator = userID + 1
+	if sent := g.run(inGroup(groupMessage("@MyBot one", "@MyBot")), inGroup(groupMessage("@MyBot two", "@MyBot"))); len(sent) != 1 {
+		t.Errorf("a member got %+v", sent)
 	}
 }

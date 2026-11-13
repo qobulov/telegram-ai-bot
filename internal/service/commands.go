@@ -104,7 +104,7 @@ func (s *Service) process(in incoming) {
 		s.noteSkip(in, "bot_quota", "")
 		return
 	}
-	if notice, limited := s.rateLimited(in); limited {
+	if notice, limited := s.rateLimited(in); limited && !s.unlimited(ctx, in) {
 		if notice != "" {
 			s.reply(in, notice)
 		}
@@ -586,8 +586,8 @@ const overQuotaReaction = "👀"
 // message in a group that already has too many. When the count cannot be
 // read it stays silent, like mayAnswerBot.
 //
-// Owners are not counted, nor, past the quota, the group's creator; other
-// admins are, like anyone, as the owners asked;
+// Owners and the group's creator are not counted; other admins are, like
+// anyone, as the owners asked;
 // other bots have their own quota. The commands that manage the bot always
 // pass for those who may use them: they have to work precisely when the
 // group is flooding the bot. So does a group admin's message, past the
@@ -598,7 +598,12 @@ const overQuotaReaction = "👀"
 // It also returns the answer taken, to give back if the turn answers
 // nothing; 0 when none was taken.
 func (s *Service) mayAnswerInGroup(in incoming) (reservation int64, allowed bool) {
-	if !in.group || in.fromBot || s.opts.GroupReplies == nil || s.isOwner(in.msg.From) || !s.hasContent(in) || s.isManagerCommand(in) || isCommand(in.text) {
+	if !in.group || in.fromBot || s.opts.GroupReplies == nil || !s.hasContent(in) || s.isManagerCommand(in) || isCommand(in.text) {
+		return 0, true
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
+	defer cancel()
+	if s.unlimited(ctx, in) {
 		return 0, true
 	}
 	return s.reserveGroupReply(in)
@@ -634,10 +639,6 @@ func (s *Service) reserveGroupReply(in incoming) (reservation int64, allowed boo
 	}
 	if repliesToAMember(in, s.opts.Bot.ID) && s.isAdminAsking(ctx, in) {
 		s.opts.Logger.Info("group reply limit reached, but an admin replied to a member", "chat_id", in.scope.ChatID, "user_id", in.userID)
-		return 0, true
-	}
-	if s.isCreatorAsking(ctx, in) {
-		s.opts.Logger.Info("group reply limit reached, but the group's owner asked", "chat_id", in.scope.ChatID, "user_id", in.userID)
 		return 0, true
 	}
 	if s.onlyTheyRead(ctx, in) {
@@ -682,23 +683,41 @@ func (s *Service) isAdminAsking(ctx context.Context, in incoming) bool {
 	return isAdmin && err == nil
 }
 
-// isCreatorAsking reports a message from the group's creator, whom the bot
-// obeys past the quota: in BS news the owner's orders went unanswered once
-// they had talked with the bot that hour. Telegram is asked only past the
-// quota, and a failed check is no creator.
-func (s *Service) isCreatorAsking(ctx context.Context, in incoming) bool {
-	creator, err := s.opts.Members.IsGroupCreator(ctx, in.scope.ChatID, in.userID)
-	if err != nil {
-		s.opts.Logger.Warn("group creator check failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
+// unlimited reports a message from one of the bot's owners, or from the
+// group's creator, whom no limit holds back: not the flood guard, the
+// group's quota of answers, nor a quiet group's silence. In BS news the
+// owner's orders went unanswered once they had talked with the bot that
+// hour.
+func (s *Service) unlimited(ctx context.Context, in incoming) bool {
+	return s.isOwner(in.msg.From) || (in.group && in.userID != 0 && s.groupCreator(ctx, in.scope.ChatID) == in.userID)
+}
+
+// creatorMemory is how long a group's creator is trusted before Telegram
+// is asked again; a group changes hands seldom.
+const creatorMemory = 6 * time.Hour
+
+// groupCreator is the group's creator, asked of Telegram once in a while;
+// 0 when it cannot say, which spares no one.
+func (s *Service) groupCreator(ctx context.Context, chatID int64) int64 {
+	if creator, ok := s.creators.get(chatID); ok {
+		return creator
 	}
-	return creator && err == nil
+	ctx, cancel := context.WithTimeout(ctx, logTimeout)
+	defer cancel()
+	creator, err := s.opts.Members.GroupCreator(ctx, chatID)
+	if err != nil {
+		s.opts.Logger.Warn("could not find a group's creator", "chat_id", chatID, "error", err)
+		return 0
+	}
+	s.creators.set(chatID, creator)
+	return creator
 }
 
 // tooQuiet reports a group where fewer than MinActiveMembers people wrote
 // within ActiveWindow, for a message from anyone but an owner. When the
 // count cannot be read, the group is answered.
 func (s *Service) tooQuiet(ctx context.Context, in incoming) bool {
-	if !in.group || s.opts.ActiveCounter == nil || s.isOwner(in.msg.From) {
+	if !in.group || s.opts.ActiveCounter == nil || s.unlimited(ctx, in) {
 		return false
 	}
 	minimum := s.minActive(ctx, in.scope.ChatID)

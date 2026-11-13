@@ -99,6 +99,21 @@ func (m groupMembers) IsGroupCreator(ctx context.Context, chatID, userID int64) 
 	return member.Status == "creator", nil
 }
 
+// GroupCreator is the user ID of whoever created a group, 0 when the
+// admins Telegram lists show none.
+func (m groupMembers) GroupCreator(ctx context.Context, chatID int64) (int64, error) {
+	admins, err := m.client.GetChatAdministrators(ctx, chatID)
+	if err != nil {
+		return 0, err
+	}
+	for _, admin := range admins {
+		if admin.Status == "creator" && admin.User != nil {
+			return admin.User.ID, nil
+		}
+	}
+	return 0, nil
+}
+
 // HoldsRight reports whether a member holds an admin right in a group,
 // for the join check its admins who may invite users may turn on and off.
 func (m groupMembers) HoldsRight(ctx context.Context, chatID, userID int64, right string) (bool, error) {

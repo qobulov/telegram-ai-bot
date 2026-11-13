@@ -44,7 +44,9 @@ type Replier interface {
 // Members answers whether a user administers a group.
 type Members interface {
 	IsGroupAdmin(ctx context.Context, chatID, userID int64) (bool, error)
-	IsGroupCreator(ctx context.Context, chatID, userID int64) (bool, error)
+	// GroupCreator is the user ID of whoever created a group, 0 when
+	// Telegram does not say.
+	GroupCreator(ctx context.Context, chatID int64) (int64, error)
 }
 
 // Muter stores whether the bot is muted in a chat.
@@ -456,6 +458,9 @@ type Service struct {
 	// ownerMenus are the groups and owners whose menu was set lately.
 	ownerMenus *recently[[2]int64, bool]
 	ownersHere *recently[int64, []string]
+	// creators are the groups' creators, by group, for limits they are
+	// spared.
+	creators *recently[int64, int64]
 	// guardSets are the guards on in each group, and spamVerdicts,
 	// linkVerdicts and pictureVerdicts what the outside services lately
 	// said; see protect.go.
@@ -567,6 +572,7 @@ func New(opts Options) *Service {
 		settings:        newRecently[int64, map[string]string](settingsMemory, opts.Now),
 		ownerMenus:      newRecently[[2]int64, bool](ownerMenuMemory, opts.Now),
 		ownersHere:      newRecently[int64, []string](activeMemory, opts.Now),
+		creators:        newRecently[int64, int64](creatorMemory, opts.Now),
 		guardSets:       newRecently[int64, guardSet](guardsMemory, opts.Now),
 		spamVerdicts:    newRecently[int64, verdict](verdictMemory, opts.Now),
 		linkVerdicts:    newRecently[string, verdict](verdictMemory, opts.Now),
