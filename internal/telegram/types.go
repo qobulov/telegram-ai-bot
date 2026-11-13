@@ -91,6 +91,7 @@ type ChatMemberUpdated struct {
 	Chat Chat `json:"chat"`
 	// From is who made the change.
 	From          *User      `json:"from"`
+	OldChatMember ChatMember `json:"old_chat_member"`
 	NewChatMember ChatMember `json:"new_chat_member"`
 }
 

@@ -708,6 +708,7 @@ func (s *Service) recordMembership(change *telegram.ChatMemberUpdated) {
 		return
 	}
 	s.opts.Logger.Info("bot membership changed", "chat_id", change.Chat.ID, "type", change.Chat.Type, "status", change.NewChatMember.Status)
+	s.greetGroup(change)
 }
 
 // MemberBook keeps the members seen in each group. The Bot API cannot list

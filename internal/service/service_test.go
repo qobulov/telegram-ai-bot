@@ -2762,8 +2762,28 @@ func TestBeingAddedToAGroupIsRecorded(t *testing.T) {
 	if !reflect.DeepEqual(groups.recorded, want) {
 		t.Errorf("recorded = %+v, want %+v; private chats are not groups, and the bot's rights are kept", groups.recorded, want)
 	}
-	if len(sent) != 0 {
-		t.Errorf("sent = %+v; a membership change needs no reply", sent)
+	if len(sent) != 1 || sent[0].chatID != groupID || !strings.Contains(sent[0].text, "Salom") || strings.Contains(sent[0].text, "admin qiling") {
+		t.Errorf("sent = %+v; the group is greeted once, as an admin, and the private chat not at all", sent)
+	}
+}
+
+// The bot greets a group it is added to, asking to be made an admin when it
+// is not one; a promotion or its leaving says nothing.
+func TestAGroupIsGreetedWhenTheBotJoins(t *testing.T) {
+	f := newFixture()
+	f.opts.Groups = &fakeGroups{}
+	chat := telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup, Title: "Devs"}
+	change := func(old, now string) telegram.Update {
+		u := membershipChange(chat, now)
+		u.MyChatMember.OldChatMember = telegram.ChatMember{Status: old}
+		return u
+	}
+	sent := f.run(change("left", "member"))
+	if len(sent) != 1 || !strings.Contains(sent[0].text, "@") || !strings.Contains(sent[0].text, "/karta") || !strings.Contains(sent[0].text, "admin qiling") {
+		t.Fatalf("added as a member = %+v", sent)
+	}
+	if sent = f.run(change("member", "administrator"), change("administrator", "left"), change("kicked", "kicked")); len(sent) != 1 {
+		t.Errorf("a promotion, a leave and a ban greeted: %+v", sent[1:])
 	}
 }
 

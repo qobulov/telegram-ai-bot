@@ -744,7 +744,10 @@ admin (`targets` lists them). The owner's own words must ask her to leave
 (chiq, ket, leave, выйди…), so the model cannot leave on its own.
 
 Groups are recorded when the bot is added, promoted or removed (Telegram's
-`my_chat_member` updates) and from the messages it logs. Telegram has no way
+`my_chat_member` updates) and from the messages it logs. Added to a group it
+was not in, the bot greets it in the language of whoever added it: how to
+call it, `/karta`, `/kartalar` and `/oyinlar`, and, when it is not an admin,
+that it clears spam as one; a promotion or its leaving says nothing. Telegram has no way
 to list a bot's groups, so a group the bot joined before this, where nobody
 has written since, is not known. After upgrading, run `set-webhook` again so
 Telegram starts sending `my_chat_member`. The
