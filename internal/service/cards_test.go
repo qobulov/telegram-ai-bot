@@ -383,12 +383,12 @@ func TestGameCommandKeepsTheGamesLimitInAGroup(t *testing.T) {
 	}
 }
 
-// A drawn card is three lines, and says it was sure when the wait made it
+// A drawn card is one thing a line, and says it was sure when the wait made it
 // so, and that a sure Legendary or Mythic is near only when it is.
 func TestCardCaptionIsShort(t *testing.T) {
 	in := incoming{msg: &telegram.Message{From: &telegram.User{ID: 1, FirstName: "Bek"}}, text: "/card"}
 	draw := storage.CardDraw{Card: storage.Card{Name: "Gojo", Anime: "JJK", Rarity: 4, Attack: 5130, Health: 18020, Value: 5000}, New: true, Count: 1, Points: 12300, SinceLegendary: 3, SinceMythic: 40}
-	want := "👑 **Gojo** — JJK\nMifik · ⚔️ 5 130 · ❤️ 18 020\n🆕 Yangi · +5 000 ochko (jami 12 300)"
+	want := "👑 **Gojo**\n🎬 JJK\n⚔️ Hujum: 5 130\n❤️ Jon: 18 020\n💎 Noyoblik: Mifik\n🆕 Yangi · +5 000 ochko (jami 12 300)"
 	if caption := cardCaption(languageOf(in), draw); caption != want {
 		t.Errorf("caption:\n%s\nwant:\n%s", caption, want)
 	}
