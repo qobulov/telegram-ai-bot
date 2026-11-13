@@ -1553,8 +1553,8 @@ member's message: `/mute 4h spam` (a length in `m`, `h`, `d` or `w`, or in
 minutes, `soat`, `kun`, `час`… too; an hour when not given, a week at most),
 `/unmute`, `/ban`, `/unban`, `/kick` and `/del`, or the same as a short order
 calling the bot by name, "Мут мари 1 минутга", "Maria, ban", "замуть его на 5
-минут", "mute him for 2 hours", "sustur 10 dakika", "chiqar" (an action word
-in Uzbek, Russian, English, Turkish or Kazakh,
+минут", "mute him for 2 hours", "chiqar" (an action word
+in Uzbek, Russian or English,
 perhaps a length, and nothing else, so that talk about muting still goes to
 the model, which once asked back instead of muting); "бер", "qil" and the
 like may go with it. Replying to the bot's own answer about a member, such
