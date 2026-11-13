@@ -49,3 +49,34 @@ func TestModCommandsWithoutTheModel(t *testing.T) {
 		t.Errorf("/mute alone reached the tool: %v", runner.asked)
 	}
 }
+
+// A short order in words, replying to a member, is done as a command is:
+// "Мут мари 1 минутга" mutes for a minute; talk about muting goes to the
+// model.
+func TestModOrdersInWords(t *testing.T) {
+	f := newFixture()
+	f.opts.WakeWords = []string{"мари", "maria"}
+	s := New(f.opts)
+	for text, want := range map[string]struct {
+		action  string
+		minutes int
+		ok      bool
+	}{
+		"Мут мари 1 минутга": {"mute", 1, true}, "мут 4 soat": {"mute", 240, true}, "ban": {"ban", 0, true},
+		"Maria, кик!": {"kick", 0, true}, "мут 2kun": {"mute", 2880, true}, "размут": {"unmute", 0, true},
+		"мут бериш керак эди": {"", 0, false}, "уни мут қил": {"", 0, false}, "мут 5 йил": {"", 0, false},
+	} {
+		action, minutes, ok := s.modWords(text)
+		if action != want.action || minutes != want.minutes || ok != want.ok {
+			t.Errorf("modWords(%q) = %q %d %v", text, action, minutes, ok)
+		}
+	}
+	runner := withToolRunner(f)
+	runner.answers["moderate"] = `{"ok":true,"result":{"done":true,"said":"Bajarildi."}}`
+	msg := groupMessage("Мут мари 1 минутга")
+	msg.ReplyToMessage = &telegram.Message{MessageID: 9, From: &telegram.User{ID: 501, FirstName: "Sam"}, Chat: msg.Chat, Text: "Yo bob turila"}
+	sent := f.run(inGroup(msg))
+	if len(runner.asked) != 1 || !strings.Contains(runner.asked[0], `"minutes":1`) || len(sent) != 1 || sent[0].text != "Bajarildi." || len(f.replier.recorded()) != 0 {
+		t.Fatalf("asked %v, sent %+v, model asked %d times", runner.asked, sent, len(f.replier.recorded()))
+	}
+}

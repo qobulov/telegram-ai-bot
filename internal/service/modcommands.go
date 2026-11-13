@@ -12,9 +12,11 @@ import (
 )
 
 // A group's admin moderates as with other group bots, replying to a
-// member's message with a command: "/mute 4h spam", "/ban", "/kick". It is
-// done without the model, through the moderate tool, which checks who may
-// ask and what the bot may do as it does for a request in words. /mute and
+// member's message with a command: "/mute 4h spam", "/ban", "/kick", or the
+// same in a word or two, the bot's name with them or not: "мут мари 1
+// минутга", "ban". It is done without the model, through the moderate
+// tool, which checks who may ask and what the bot may do as it does for a
+// request in words: the model once asked back instead of muting. /mute and
 // /unmute without such a reply still quiet the bot itself.
 
 // modCommands are the commands and the moderate tool's action each does.
@@ -25,17 +27,35 @@ var modCommands = map[string]string{
 // modTimeout bounds one command's action, Telegram's answer included.
 const modTimeout = 20 * time.Second
 
-// isModCommand reports a moderation command replying to a member's message.
-func (s *Service) isModCommand(in incoming) bool {
-	_, ok := modCommands[commandName(in.text)]
-	return ok && in.group && repliesToAMember(in, s.opts.Bot.ID)
+// modRequest is the moderation a group message asks for of the member it
+// replies to: a command, or a short order in words; ok false for any other
+// message.
+func (s *Service) modRequest(in incoming) (action string, minutes int, reason string, ok bool) {
+	if !in.group || !repliesToAMember(in, s.opts.Bot.ID) {
+		return "", 0, "", false
+	}
+	if action, ok = modCommands[commandName(in.text)]; ok {
+		minutes, reason = modArgs(commandArgument(in.text))
+		return action, minutes, reason, true
+	}
+	// The message as written: addressing the bot by a name in the middle
+	// takes off the words before it.
+	written, _ := in.msg.Content()
+	action, minutes, ok = s.modWords(written)
+	return action, minutes, "", ok
 }
 
-// modCommand does an admin's command to the member they replied to, and
+// isModCommand reports a moderation request replying to a member's message.
+func (s *Service) isModCommand(in incoming) bool {
+	_, _, _, ok := s.modRequest(in)
+	return ok
+}
+
+// modCommand does an admin's request to the member they replied to, and
 // says what was done, or why it was not.
 func (s *Service) modCommand(ctx context.Context, in incoming) outcome {
-	minutes, reason := modArgs(commandArgument(in.text))
-	args, err := json.Marshal(map[string]any{"action": modCommands[commandName(in.text)], "minutes": minutes, "reason": reason})
+	action, minutes, reason, _ := s.modRequest(in)
+	args, err := json.Marshal(map[string]any{"action": action, "minutes": minutes, "reason": reason})
 	if err != nil {
 		return say(textError.to(in))
 	}
@@ -94,3 +114,73 @@ func modArgs(arg string) (minutes int, reason string) {
 	n, _ := strconv.Atoi(match[1])
 	return n * modUnits[match[2]], strings.Join(words[1:], " ")
 }
+
+// modWordActions are the words an order in words starts with, and the
+// action each asks for.
+var modWordActions = map[string]string{
+	"mute": "mute", "mut": "mute", "myut": "mute", "мут": "mute", "мют": "mute",
+	"unmute": "unmute", "размут": "unmute", "анмут": "unmute",
+	"ban": "ban", "бан": "ban", "unban": "unban", "разбан": "unban",
+	"kick": "kick", "кик": "kick",
+}
+
+// modWords reads a short order in words: an action, then perhaps a length
+// ("1 минутга", "4soat"), with the bot's name or @username anywhere and
+// nothing else, so that talk about muting is never taken for an order.
+func (s *Service) modWords(text string) (action string, minutes int, ok bool) {
+	var words []string
+	for _, w := range strings.Fields(strings.ToLower(text)) {
+		w = strings.Trim(w, ".,!?:;«»\"'`")
+		if w == "" || isWakeWord(w, s.opts.WakeWords) || strings.EqualFold(w, "@"+s.opts.Bot.Username) {
+			continue
+		}
+		words = append(words, w)
+	}
+	if len(words) == 0 || len(words) > 3 {
+		return "", 0, false
+	}
+	if action, ok = modWordActions[words[0]]; !ok {
+		return "", 0, false
+	}
+	if minutes, ok = wordLength(strings.Join(words[1:], "")); !ok {
+		return "", 0, false
+	}
+	return action, minutes, true
+}
+
+// wordLength reads a length said in words, its unit's ending whatever it
+// is: "1минутга", "4soat", "2kun", "30" (minutes); "" is none.
+var wordLength = func() func(string) (int, bool) {
+	pattern := regexp.MustCompile(`^(\d{1,6})(\pL*)$`)
+	units := []struct {
+		prefixes []string
+		minutes  int
+	}{
+		{[]string{"мин", "min", "daq", "дак"}, 1},
+		{[]string{"soat", "час", "ч", "h"}, 60},
+		{[]string{"kun", "дн", "ден", "сут", "d", "д"}, 24 * 60},
+		{[]string{"hafta", "нед", "w", "н"}, 7 * 24 * 60},
+		{[]string{"m", "м"}, 1},
+	}
+	return func(said string) (int, bool) {
+		if said == "" {
+			return 0, true
+		}
+		match := pattern.FindStringSubmatch(said)
+		if match == nil {
+			return 0, false
+		}
+		n, _ := strconv.Atoi(match[1])
+		if match[2] == "" {
+			return n, true
+		}
+		for _, unit := range units {
+			for _, prefix := range unit.prefixes {
+				if strings.HasPrefix(match[2], prefix) {
+					return n * unit.minutes, true
+				}
+			}
+		}
+		return 0, false
+	}
+}()
