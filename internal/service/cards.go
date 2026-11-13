@@ -56,11 +56,10 @@ const (
 // cardsHTTP fetches the catalog from AniList and the cards' pictures.
 var cardsHTTP = &http.Client{Timeout: 10 * time.Second}
 
-// cardCatalog is the catalog of cards, made once: it remembers when it last
-// asked PokéWallet.
+// cardCatalog is the catalog of cards, made once.
 func (s *Service) cardCatalog() *cards.Catalog {
 	s.cardsOnce.Do(func() {
-		s.cardsCatalog = &cards.Catalog{Store: s.opts.Cards, Client: cardsHTTP, AniList: s.opts.CardsAPI, PokeWallet: s.opts.CardsPokeWallet, Key: s.opts.CardsKey, Logger: s.opts.Logger}
+		s.cardsCatalog = &cards.Catalog{Store: s.opts.Cards, Client: cardsHTTP, AniList: s.opts.CardsAPI, Logger: s.opts.Logger}
 	})
 	return s.cardsCatalog
 }
@@ -392,8 +391,8 @@ var (
 	}
 	textCardNotYours = localText{
 		uz: "Bu sizning kolleksiyangiz emas: o'zingiznikini /mycards bilan oching.",
-		ru: "Это не ваша коллекция: откройте свою через /kartalarim.",
-		en: "This is not your collection: open yours with /kartalarim.",
+		ru: "Это не ваша коллекция: откройте свою через /mycards.",
+		en: "This is not your collection: open yours with /mycards.",
 	}
 	textCardMore     = localText{uz: "…va yana %d ta", ru: "…и ещё %d", en: "…and %d more"}
 	textCardNone     = localText{uz: "Hali bunday karta yo'q. Olish: /card", ru: "Таких карт пока нет. Получить: /card", en: "No such cards yet. Draw one: /card"}

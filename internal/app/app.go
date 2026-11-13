@@ -355,7 +355,6 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Payments:              bot.Client,
 		Premium:               store,
 		Cards:                 store,
-		CardsKey:              cfg.PokeWalletAPIKey,
 		PremiumPrice:          cfg.PremiumPrice,
 		PremiumDays:           cfg.PremiumDays,
 		PremiumDailyLimit:     cfg.PremiumDailyLimit,
@@ -914,7 +913,7 @@ func ReminderJob(cfg config.Config, store *storage.Store, bot Bot, logger *slog.
 	auto := service.CardAutoOptions{
 		Store:    store,
 		Sender:   bot.Client,
-		Pictures: &cards.Catalog{Client: &http.Client{Timeout: 5 * time.Second}, Key: cfg.PokeWalletAPIKey},
+		Pictures: &cards.Catalog{Client: &http.Client{Timeout: 5 * time.Second}},
 		CardsURL: cardsPage(cfg),
 		Logger:   logger,
 	}

@@ -41,6 +41,7 @@ func newFakeCards(picture string) *fakeCards {
 	}
 }
 
+func (f *fakeCards) CardCatalog(context.Context) ([]storage.Card, error) { return nil, nil }
 func (f *fakeCards) CardPlayerOf(_ context.Context, userID int64) (storage.CardPlayer, time.Time, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -185,12 +186,7 @@ func (f *fakeCards) ToggleCardAuto(_ context.Context, userID int64, _, _ string)
 func (f *fakeCards) CardCollections(context.Context) (map[string]int, error) {
 	return map[string]int{"anime": cards.CatalogSize}, nil
 }
-func (f *fakeCards) SaveCardCatalog(context.Context, []storage.Card) error   { return nil }
-func (f *fakeCards) CardSetVersions(context.Context) (map[string]int, error) { return nil, nil }
-func (f *fakeCards) CardCatalog(context.Context) ([]storage.Card, error)     { return nil, nil }
-func (f *fakeCards) FillCardSet(context.Context, string, int, []storage.Card, map[int64]int64) error {
-	return nil
-}
+func (f *fakeCards) SaveCardCatalog(context.Context, []storage.Card) error { return nil }
 func (f *fakeCards) CardTop(_ context.Context, limit int) ([]storage.CardPlayer, error) {
 	return f.top[:min(limit, len(f.top))], nil
 }

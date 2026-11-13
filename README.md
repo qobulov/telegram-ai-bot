@@ -299,7 +299,6 @@ in the environment win over the file.
 | `GOOGLE_SAFE_BROWSING_KEY` | empty | Google Cloud API key restricted to the Safe Browsing API; lets owners turn on the link guard (`group_rules` `guard` `links`), which deletes links Google takes for malware, phishing or unwanted software. Google offers this API for non-commercial use |
 | `CALENDARIFIC_API_KEY` | empty | Calendarific key from <https://calendarific.com> (free plan, monthly limit); adds the `holidays` tool. It is sent in a header, never in a URL |
 | `IMGFLIP_API_KEY` | empty | Imgflip API key from <https://imgflip.com/api> (free, a Bearer key); adds the `make_meme` tool |
-| `POKEWALLET_API_KEY` | empty | [PokéWallet](https://pokewallet.io/api-docs) key (free plan: 100 requests an hour, 1000 a day); adds the trading card collections to Kartalar |
 | `RAPIDAPI_KEY` | empty | RapidAPI key subscribed to the [Shazam Song Recognition API](https://rapidapi.com/dashydata-dashydata-default/api/shazam-song-recognition-api) (the free plan allows 2500 a month, a hard limit); adds the `recognize_song` tool |
 | `URLHAUS_AUTH_KEY` | empty | Free Auth-Key from <https://auth.abuse.ch/>; also lets owners turn on the link guard, and with both keys a link is deleted when either service lists it (URLhaus by its host) |
 | `SIGHTENGINE_API_USER`, `SIGHTENGINE_API_SECRET` | empty | From <https://dashboard.sightengine.com/api-credentials>; let Sightengine judge the picture guard's pictures (`guard` `images`, which deletes nude or very suggestive pictures from anyone, admins and owners included: photos, stickers, pictures sent as files and the first frame of GIFs and videos), one operation of its monthly quota each (nudity only: with gore too, the guarded groups' two hundred pictures a day spent the free plan's month in days). Without them, or when Sightengine fails (its free plan answers `400: 30-day usage limit reached` once the month is spent), the bot's own model judges instead; see [Picture guard](#picture-guard). The guard needs neither |
@@ -2150,16 +2149,12 @@ how many of each rarity's cards the player holds as buttons that list them,
 pressed only by that player; `/cardtop` is the table of points. The
 pictures are the characters' AniList pictures, the studios' art.
 
-With `POKEWALLET_API_KEY` trading cards join them, a collection of up to a
-hundred from one English set each of Pokémon, One Piece, Dragon Ball,
-Yu-Gi-Oh! and Digimon (`internal/cards/pokewallet.go`, migration 55), their
-rarities taken as Kartalar's five and promos and the like left out. A draw
-draws from them all. A set is read to its last page, and art variants of one character (Alternate Art, Parallel) take one place in a rarity, and Yu-Gi-Oh!'s Rare is Kartalar's Rare; a collection an older reading filled is read again once, its cards set to the new reading (pictures at 600 by 838, the Mini App's links carrying the version so that the CDN does not keep the old ones), an older variant's holders moved to the card kept, the counts added, and every player's cards and points counted again (migration 61 notes the version in `card_sets`). If PokéWallet cannot be had the game goes on with what
-it has and asks again ten minutes later. Its pictures want the key too, so
-the Mini App gets them from `/api/cards?image=<id>`, which the CDN keeps:
-the free plan allows 1000 requests a day. The pictures are the games'
-publishers' art, and PokéWallet's terms name unapproved bots among what they
-forbid, which reads as meant for its site.
+The cards come from AniList alone. Trading cards from PokéWallet (one set
+each of Pokémon, One Piece, Dragon Ball, Yu-Gi-Oh! and Digimon) were part of
+the game until migration 70 took them out: each one a player held became an
+anime card of the same rarity, with its copies and melted copies, one the
+player did not have yet first, so that no one's points changed, and the
+market's offers of them were called off.
 
 `/cards` opens the same as a Mini App (`public/kartalar/`, served by
 `api/cards.go` from `internal/cards`): the collection shelf by shelf, the

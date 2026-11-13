@@ -30,18 +30,10 @@ const (
 	SetCost   = 20
 )
 
-// IsCollection reports a collection there are cards of: the anime one and the
-// trading ones.
+// IsCollection reports a collection there are cards of: the anime one, the
+// only one since the trading cards were taken out.
 func IsCollection(name string) bool {
-	if name == "anime" {
-		return true
-	}
-	for _, set := range tradingSets {
-		if set.Collection == name {
-			return true
-		}
-	}
-	return false
+	return name == "anime"
 }
 
 // DuelTeam is how many of a player's strongest cards fight a duel.

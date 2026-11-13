@@ -225,7 +225,7 @@ func duelTeamLine(in incoming, side string, team []storage.Card) string {
 var (
 	textShardsTooFew = localText{
 		uz: "💎 Kerak: %d, sizda: %d. Kristallar: /cards ilovasida takror kartalarni aylantiring.",
-		ru: "💎 Нужно: %d, у вас: %d. Кристаллы: расплавьте повторы в приложении /kartalar.",
+		ru: "💎 Нужно: %d, у вас: %d. Кристаллы: расплавьте повторы в приложении /cards.",
 		en: "💎 It takes %d, you have %d. Crystals: melt your spares in the /cards app.",
 	}
 

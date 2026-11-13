@@ -22,7 +22,7 @@ type Card struct {
 	Attack     int
 	Health     int
 	Value      int
-	// Collection is what it is a card of: "anime", "pokemon"…
+	// Collection is what it is a card of: "anime", the only one now.
 	Collection string
 }
 
@@ -108,19 +108,6 @@ func (s *Store) CardCollections(ctx context.Context) (map[string]int, error) {
 	return sizes, nil
 }
 
-// CardImage is the link of a card's picture, "" for no such card.
-func (s *Store) CardImage(ctx context.Context, id int64) (string, error) {
-	var link string
-	err := s.pool.QueryRow(ctx, `SELECT image_url FROM card_catalog WHERE id = $1`, id).Scan(&link)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return "", nil
-	}
-	if err != nil {
-		return "", fmt.Errorf("storage: read a card's picture: %w", err)
-	}
-	return link, nil
-}
-
 // SaveCardCatalog adds the cards, and updates those there are: a card held
 // is never taken away. A card with a picture of its own in card_pictures,
 // a sharper one chosen by hand, keeps it over the picture given.
@@ -137,81 +124,6 @@ func (s *Store) SaveCardCatalog(ctx context.Context, cards []Card) error {
 	}
 	if err := s.pool.SendBatch(ctx, batch).Close(); err != nil {
 		return fmt.Errorf("storage: save cards: %w", err)
-	}
-	return nil
-}
-
-// CardSetVersions are the versions of the code each trading collection was
-// last filled by; one with no row is missing.
-func (s *Store) CardSetVersions(ctx context.Context) (map[string]int, error) {
-	rows, err := s.pool.Query(ctx, `SELECT collection, version FROM card_sets`)
-	if err != nil {
-		return nil, fmt.Errorf("storage: card sets: %w", err)
-	}
-	defer rows.Close()
-	versions := map[string]int{}
-	for rows.Next() {
-		var collection string
-		var version int
-		if err := rows.Scan(&collection, &version); err != nil {
-			return nil, fmt.Errorf("storage: card sets: %w", err)
-		}
-		versions[collection] = version
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("storage: card sets: %w", err)
-	}
-	return versions, nil
-}
-
-// FillCardSet makes a trading collection's cards these, by their IDs, and
-// notes the version that read them. A card of it that is not among them stays,
-// unless merges names the card that replaces it, an art variant of the same
-// character and rarity: its holders then hold that one instead, the counts
-// added, and it goes. Each player's cards and points are counted again, as a
-// card's rarity, and so its value, may have changed.
-func (s *Store) FillCardSet(ctx context.Context, collection string, version int, cards []Card, merges map[int64]int64) error {
-	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		for _, c := range cards {
-			if _, err := tx.Exec(ctx, `
-				INSERT INTO card_catalog (id, name, anime, image_url, favourites, rarity, attack, health, value, collection)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-				ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, anime = EXCLUDED.anime, image_url = EXCLUDED.image_url,
-					rarity = EXCLUDED.rarity, attack = EXCLUDED.attack, health = EXCLUDED.health, value = EXCLUDED.value,
-					collection = EXCLUDED.collection, updated_at = now()`,
-				c.ID, c.Name, c.Anime, c.ImageURL, c.Favourites, c.Rarity, c.Attack, c.Health, c.Value, collection); err != nil {
-				return err
-			}
-		}
-		for old, kept := range merges {
-			if _, err := tx.Exec(ctx, `
-				INSERT INTO card_owned (user_id, card_id, count, melted, first_at)
-				SELECT user_id, $2, count, melted, first_at FROM card_owned WHERE card_id = $1
-				ON CONFLICT (user_id, card_id) DO UPDATE SET count = card_owned.count + EXCLUDED.count,
-					melted = card_owned.melted + EXCLUDED.melted,
-					first_at = least(card_owned.first_at, EXCLUDED.first_at)`, old, kept); err != nil {
-				return err
-			}
-			if _, err := tx.Exec(ctx, `DELETE FROM card_owned WHERE card_id = $1`, old); err != nil {
-				return err
-			}
-			if _, err := tx.Exec(ctx, `DELETE FROM card_catalog WHERE id = $1 AND collection = $2`, old, collection); err != nil {
-				return err
-			}
-		}
-		if _, err := tx.Exec(ctx, `
-			UPDATE card_players p SET
-				cards = (SELECT count(*) FROM card_owned o WHERE o.user_id = p.user_id),
-				points = (SELECT coalesce(sum(o.count * c.value), 0) FROM card_owned o JOIN card_catalog c ON c.id = o.card_id WHERE o.user_id = p.user_id)`); err != nil {
-			return err
-		}
-		_, err := tx.Exec(ctx, `
-			INSERT INTO card_sets (collection, version) VALUES ($1, $2)
-			ON CONFLICT (collection) DO UPDATE SET version = EXCLUDED.version, filled_at = now()`, collection, version)
-		return err
-	})
-	if err != nil {
-		return fmt.Errorf("storage: fill card set: %w", err)
 	}
 	return nil
 }

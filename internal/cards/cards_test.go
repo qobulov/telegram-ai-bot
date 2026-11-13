@@ -114,16 +114,12 @@ type catalogBook struct {
 	saved []storage.Card
 }
 
+func (b *catalogBook) CardCatalog(context.Context) ([]storage.Card, error) { return b.held, nil }
 func (b *catalogBook) CardCollections(context.Context) (map[string]int, error) {
 	return map[string]int{"anime": len(b.held)}, nil
 }
 func (b *catalogBook) SaveCardCatalog(_ context.Context, cards []storage.Card) error {
 	b.saved = append(b.saved, cards...)
-	return nil
-}
-func (b *catalogBook) CardSetVersions(context.Context) (map[string]int, error) { return nil, nil }
-func (b *catalogBook) CardCatalog(context.Context) ([]storage.Card, error)     { return b.held, nil }
-func (b *catalogBook) FillCardSet(context.Context, string, int, []storage.Card, map[int64]int64) error {
 	return nil
 }
 

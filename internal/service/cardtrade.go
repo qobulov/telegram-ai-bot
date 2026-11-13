@@ -198,7 +198,7 @@ func tradeName(user *telegram.User) string { return cardMarks.Replace(doozName(u
 var (
 	textTradeGroupOnly = localText{
 		uz: "🔄 Almashish guruhda bo'ladi: kim bilan almashmoqchi bo'lsangiz, o'sha odamning xabariga javob qilib yozing. Sovg'a qilish: /cards ilovasida kartani bosing.",
-		ru: "🔄 Обмен — в группе: ответьте на сообщение того, с кем хотите обменяться. Подарить карту: нажмите на неё в приложении /kartalar.",
+		ru: "🔄 Обмен — в группе: ответьте на сообщение того, с кем хотите обменяться. Подарить карту: нажмите на неё в приложении /cards.",
 		en: "🔄 Trades are made in a group: reply to a message of the member to trade with. To give a card, tap it in the /cards app.",
 	}
 	textTradeReply = localText{
@@ -238,7 +238,7 @@ var (
 	}
 	textTradeNoPlayer = localText{
 		uz: "%s hali birorta ham karta ochmagan. Avval /card yozsin.",
-		ru: "%s ещё не открыл ни одной карты. Пусть сначала напишет /karta.",
+		ru: "%s ещё не открыл ни одной карты. Пусть сначала напишет /card.",
 		en: "%s has not opened a card yet. They should send /card first.",
 	}
 	textTradeGone = localText{

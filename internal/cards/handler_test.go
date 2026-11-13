@@ -12,7 +12,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"sort"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -44,11 +43,8 @@ func signedInit(user int64, at time.Time) string {
 
 // fakeStore has two cards; the player holds the first.
 type fakeStore struct {
-	versions map[string]int
-	added    []storage.Card
 	last     time.Time
 	draws    int
-	images   map[int64]string
 	shards   int
 	auto     bool
 	autoLang string
@@ -66,19 +62,7 @@ var (
 func (f *fakeStore) CardCollections(context.Context) (map[string]int, error) {
 	return map[string]int{"anime": CatalogSize}, nil
 }
-func (f *fakeStore) CardImage(_ context.Context, id int64) (string, error) { return f.images[id], nil }
 func (f *fakeStore) SaveCardCatalog(context.Context, []storage.Card) error { return nil }
-func (f *fakeStore) CardSetVersions(context.Context) (map[string]int, error) {
-	return f.versions, nil
-}
-func (f *fakeStore) FillCardSet(_ context.Context, collection string, version int, cards []storage.Card, _ map[int64]int64) error {
-	if f.versions == nil {
-		f.versions = map[string]int{}
-	}
-	f.versions[collection] = version
-	f.added = append(f.added, cards...)
-	return nil
-}
 func (f *fakeStore) CardCatalog(context.Context) ([]storage.Card, error) {
 	return []storage.Card{heldCard, lockedCard}, nil
 }
@@ -245,169 +229,6 @@ func TestCardsAppDrawsOnceAnHour(t *testing.T) {
 	}
 }
 
-// A picture that wants the key is fetched by the server, which alone holds
-// it, and kept by the CDN; any other, or a card there is not, is not served.
-func TestCardsAppServesPicturesThatWantTheKey(t *testing.T) {
-	var key string
-	wallet := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		key = r.Header.Get("X-API-Key")
-		w.Header().Set("Content-Type", "image/jpeg")
-		_, _ = w.Write([]byte("JPEG"))
-	}))
-	defer wallet.Close()
-	store := &fakeStore{images: map[int64]string{-5: wallet.URL + "/images/pk_1?size=high", 1: "https://s4.anilist.co/x.png"}}
-	h := NewHandler(Options{BotToken: testToken, Store: store, PokeWallet: wallet.URL, PokeWalletKey: "secret"})
-	get := func(id string) *httptest.ResponseRecorder {
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/cards?image="+id, nil))
-		return rec
-	}
-	rec := get("-5")
-	if rec.Code != http.StatusOK || rec.Body.String() != "JPEG" || key != "secret" || !strings.Contains(rec.Header().Get("Cache-Control"), "s-maxage") {
-		t.Errorf("picture = %d %q, key %q, cache %q", rec.Code, rec.Body, key, rec.Header().Get("Cache-Control"))
-	}
-	for _, id := range []string{"1", "99"} {
-		if rec := get(id); rec.Code != http.StatusNotFound {
-			t.Errorf("card %s = %d", id, rec.Code)
-		}
-	}
-}
-
-// A set gives the cards of known rarities up to its quota, One Piece's flat
-// shape too, without their numbers in their names; anything else is left out.
-func TestFetchSet(t *testing.T) {
-	var key string
-	wallet := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		key = r.Header.Get("X-API-Key")
-		if strings.HasPrefix(r.URL.Path, "/op/") {
-			_, _ = w.Write([]byte(`{"set":{"name":"Romance Dawn"},"data":[{"id":"op_1","name":"Luffy","rarity":"L","product_type":"card"},{"id":"op_2","name":"DON!!","rarity":"DON!!","product_type":"card"}]}`))
-			return
-		}
-		_, _ = w.Write([]byte(`{"set":{"name":"151"},"cards":[{"id":"pk_1","card_info":{"name":"Blastoise ex - 200/165","rarity":"Special Illustration Rare","product_type":"card"}},{"id":"pk_2","card_info":{"name":"Box","rarity":"Rare","product_type":"sealed"}}]}`))
-	}))
-	defer wallet.Close()
-
-	cards, err := fetchSet(context.Background(), wallet.Client(), wallet.URL, "secret", tradingSet{"pokemon", "Pokémon", "", "", "1"})
-	if err != nil || len(cards) != 1 || key != "secret" {
-		t.Fatalf("cards = %+v, %v, key %q", cards, err, key)
-	}
-	c := cards[0]
-	if c.Name != "Blastoise ex" || c.Rarity != int(Mythic) || c.Collection != "pokemon" || c.Anime != "Pokémon · 151" || c.ID >= 0 || c.ImageURL != wallet.URL+"/images/pk_1?size=high" {
-		t.Errorf("card = %+v", c)
-	}
-	cards, err = fetchSet(context.Background(), wallet.Client(), wallet.URL, "secret", tradingSet{"onepiece", "One Piece", "/op", "", "2"})
-	if err != nil || len(cards) != 1 || cards[0].Name != "Luffy" || cards[0].Rarity != int(Legendary) || cards[0].ImageURL != wallet.URL+"/images/op_1?size=high" {
-		t.Errorf("One Piece = %+v, %v", cards, err)
-	}
-}
-
-// Trading cards that cannot be had leave the anime cards to play with, and
-// are not asked for again at each draw.
-func TestCatalogGoesOnWithoutTradingCards(t *testing.T) {
-	var asked int
-	wallet := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		asked++
-		w.WriteHeader(http.StatusServiceUnavailable)
-	}))
-	defer wallet.Close()
-	catalog := &Catalog{Store: &fakeStore{}, Client: wallet.Client(), PokeWallet: wallet.URL, Key: "secret"}
-	for range 3 {
-		if err := catalog.Ensure(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if asked != len(tradingSets) {
-		t.Errorf("asked %d times; want each set once", asked)
-	}
-}
-
-// A card's number is dropped wherever it stands in its name.
-func TestTradingName(t *testing.T) {
-	for name, want := range map[string]string{
-		"Blastoise ex - 200/165":                     "Blastoise ex",
-		"Trunks : Future - FB01-036 (Alternate Art)": "Trunks : Future (Alternate Art)",
-		"Roronoa Zoro (001)":                         "Roronoa Zoro (001)",
-		"Mew - the Psychic":                          "Mew - the Psychic",
-	} {
-		if got := tradingName.ReplaceAllString(name, ""); got != want {
-			t.Errorf("%q = %q; want %q", name, got, want)
-		}
-	}
-}
-
-// A set is read to its last page, and art variants of one character take one
-// place in a rarity, leaving the rest to other characters.
-func TestFetchSetReadsEveryPageAndOneCardPerCharacter(t *testing.T) {
-	var pages []string
-	wallet := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		pages = append(pages, r.URL.Query().Get("page"))
-		if r.URL.Query().Get("page") == "2" {
-			_, _ = w.Write([]byte(`{"set":{"name":"151"},"pagination":{"total_pages":2},"cards":[{"id":"pk_3","card_info":{"name":"Mew ex - 205/165","rarity":"Hyper Rare","product_type":"card"}}]}`))
-			return
-		}
-		_, _ = w.Write([]byte(`{"set":{"name":"151"},"pagination":{"total_pages":2},"cards":[{"id":"pk_1","card_info":{"name":"Shanks (Parallel)","rarity":"SEC","product_type":"card"}},{"id":"pk_2","card_info":{"name":"Shanks (Parallel) (Manga) (Alternate Art)","rarity":"SEC","product_type":"card"}}]}`))
-	}))
-	defer wallet.Close()
-	cards, err := fetchSet(context.Background(), wallet.Client(), wallet.URL, "secret", tradingSet{"pokemon", "Pokémon", "", "", "1"})
-	if err != nil || len(pages) != 2 {
-		t.Fatalf("cards %+v, %v, pages %v", cards, err, pages)
-	}
-	var names []string
-	for _, c := range cards {
-		names = append(names, c.Name)
-	}
-	if len(cards) != 2 || names[0] != "Shanks (Parallel)" || names[1] != "Mew ex" {
-		t.Errorf("cards = %v", names)
-	}
-}
-
-// A collection an older version filled is read again and what it missed added,
-// once; one filled by this version is not asked for.
-func TestCatalogAddsWhatAnOlderVersionMissed(t *testing.T) {
-	var asked int
-	wallet := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		asked++
-		_, _ = w.Write([]byte(`{"set":{"name":"S"},"cards":[{"id":"x","card_info":{"name":"Mew","rarity":"Common","product_type":"card"}}]}`))
-	}))
-	defer wallet.Close()
-	store := &fakeStore{versions: map[string]int{"pokemon": 1, "onepiece": setsVersion, "dragonball": setsVersion, "yugioh": setsVersion, "digimon": setsVersion}}
-	catalog := &Catalog{Store: store, Client: wallet.Client(), PokeWallet: wallet.URL, Key: "secret"}
-	for range 2 {
-		if err := catalog.Ensure(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if asked != 1 || store.versions["pokemon"] != setsVersion || len(store.added) != 1 {
-		t.Errorf("asked %d, versions %v, added %d", asked, store.versions, len(store.added))
-	}
-}
-
-// A card an older reading took that the new one left out is merged into the
-// card kept of its character and rarity; any other stays.
-func TestVariantsOf(t *testing.T) {
-	held := []storage.Card{
-		{ID: -1, Name: "Shanks (Parallel)", Rarity: 4, Collection: "onepiece"},
-		{ID: -2, Name: "Shanks (Parallel) (Manga) (Alternate Art)", Rarity: 4, Collection: "onepiece"},
-		{ID: -3, Name: "Yamato", Rarity: 4, Collection: "onepiece"},
-		{ID: -4, Name: "Shanks", Rarity: 3, Collection: "onepiece"},
-		{ID: -5, Name: "Shanks (Alt)", Rarity: 4, Collection: "dragonball"},
-	}
-	merges := variantsOf(held, []storage.Card{{ID: -1, Name: "Shanks (Parallel)", Rarity: 4}}, "onepiece")
-	if len(merges) != 1 || merges[-2] != -1 {
-		t.Errorf("merges = %v", merges)
-	}
-}
-
-// A picture that wants the key is linked with the version of the reading, so
-// that the CDN, which keeps one for a year, does not serve an older one.
-func TestProxiedPictureLinkCarriesTheVersion(t *testing.T) {
-	h := NewHandler(Options{BotToken: testToken, Store: &fakeStore{}, PokeWallet: "https://wallet", PokeWalletKey: "secret"}).(*handler)
-	view := h.held(storage.Card{ID: -5, ImageURL: "https://wallet/images/pk_1?size=high"}, 1)
-	if want := "/api/cards?image=-5&v=" + strconv.Itoa(setsVersion); view.Image != want {
-		t.Errorf("image = %q, want %q", view.Image, want)
-	}
-}
-
 // The page shows the player's shards and what their spares melt into, melts
 // them, and draws a card out of turn for shards, saying how few when it
 // cannot.
@@ -436,12 +257,12 @@ func TestShardsInTheMiniApp(t *testing.T) {
 		_ = json.Unmarshal(rec.Body.Bytes(), &out)
 		return rec.Code, out
 	}
-	code, out := buy("pokemon")
+	code, out := buy("anime")
 	card, _ := out["card"].(map[string]any)
-	if code != 200 || out["shards"] != float64(52-ExtraCost-SetCost) || card["set"] != "pokemon" {
-		t.Errorf("a Pokémon card from the shop = %d %v", code, out)
+	if code != 200 || out["shards"] != float64(52-ExtraCost-SetCost) || card["set"] != "anime" {
+		t.Errorf("an anime card from the shop = %d %v", code, out)
 	}
-	if code, _ := buy("marvel"); code != http.StatusBadRequest {
+	if code, _ := buy("pokemon"); code != http.StatusBadRequest {
 		t.Errorf("a collection there is none of = %d", code)
 	}
 }

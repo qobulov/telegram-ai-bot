@@ -44,7 +44,7 @@
       fresh: "🆕 Новая карта!", sure: "✨ Гарантированная карта!", pity: (l, m) => `{3} Легендарная — точно через ${l} карт\n{4} Мифическая — точно через ${m} карт`, again: (n) => `🔁 Теперь у вас ×${n}`, plus: (n) => `+${n} очков`,
       attack: "Атака", health: "Жизнь", value: "Очки", cards: (n) => `${n} карт`, pts: "очков",
       none: "Ничего не найдено", noTop: "Ещё никто не получил карту",
-      noTelegram: "Откройте приложение в Telegram: напишите боту /kartalar.", stale: "Приложение устарело, откройте его снова.",
+      noTelegram: "Откройте приложение в Telegram: напишите боту /cards.", stale: "Приложение устарело, откройте его снова.",
       unavailable: "Нет связи, попробуйте чуть позже.",
       allSets: "Все", pointsLabel: "очки", loading: "Загружаем карты…",
       welcomeTitle: "Коллекция пуста", welcomeText: "Каждый час получайте случайную аниме-карту и соберите все.",
@@ -97,7 +97,7 @@
   $("search").placeholder = t.search;
 
   // The collections, in the order the page lists them.
-  const SETS = [["anime", "🎌 Anime"], ["pokemon", "⚡ Pokémon"], ["onepiece", "🏴‍☠️ One Piece"], ["dragonball", "🐉 Dragon Ball"], ["yugioh", "🃏 Yu-Gi-Oh!"], ["digimon", "🦖 Digimon"]];
+  const SETS = [["anime", "🎌 Anime"]];
   const COLORS = ["var(--r0)", "var(--r1)", "var(--r2)", "var(--r3)", "var(--r4)"];
   const ODDS = ["50%", "28%", "14%", "6.5%", "1.5%"];
   const spaced = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");

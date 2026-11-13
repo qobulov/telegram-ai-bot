@@ -7,7 +7,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -23,7 +22,6 @@ type Store interface {
 	CardPlayerOf(ctx context.Context, userID int64) (storage.CardPlayer, time.Time, error)
 	DrawCard(ctx context.Context, userID int64, name string, roll storage.CardRoll, every time.Duration, now time.Time) (storage.CardDraw, error)
 	CardTop(ctx context.Context, limit int) ([]storage.CardPlayer, error)
-	CardImage(ctx context.Context, id int64) (string, error)
 	CardWallet(ctx context.Context, userID int64) (shards int, spares map[int]int, err error)
 	MeltCards(ctx context.Context, userID int64, rates []int) (melted, gained, shards int, err error)
 	ExtraCard(ctx context.Context, userID int64, name, collection string, roll storage.CardRoll, cost int) (storage.CardDraw, error)
@@ -41,15 +39,12 @@ type Store interface {
 type Options struct {
 	BotToken string
 	Store    Store
-	// HTTPClient, AniList and PokeWallet fill the catalog the first time;
-	// nil and "" mean a short-timeout client and the services' own
-	// addresses. Without PokeWalletKey there are no trading cards.
-	HTTPClient    *http.Client
-	AniList       string
-	PokeWallet    string
-	PokeWalletKey string
-	Logger        *slog.Logger
-	Now           func() time.Time
+	// HTTPClient and AniList fill the catalog the first time; nil and ""
+	// mean a short-timeout client and AniList's own address.
+	HTTPClient *http.Client
+	AniList    string
+	Logger     *slog.Logger
+	Now        func() time.Time
 	// Roll draws a rarity; nil draws by the odds.
 	Roll func() Rarity
 	// Notify tells a player in their private chat of a card given them;
@@ -102,7 +97,7 @@ func NewHandler(opts Options) http.Handler {
 	if opts.HTTPClient == nil {
 		opts.HTTPClient = &http.Client{Timeout: 10 * time.Second}
 	}
-	return &handler{opts, &Catalog{Store: opts.Store, Client: opts.HTTPClient, AniList: opts.AniList, PokeWallet: opts.PokeWallet, Key: opts.PokeWalletKey, Logger: opts.Logger}}
+	return &handler{opts, &Catalog{Store: opts.Store, Client: opts.HTTPClient, AniList: opts.AniList, Logger: opts.Logger}}
 }
 
 type request struct {
@@ -137,10 +132,6 @@ var (
 )
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodGet && r.URL.Query().Has("image") {
-		h.image(w, r)
-		return
-	}
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "application/json")
 	result, fail := h.serve(r)
@@ -199,31 +190,6 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 	return nil, errBadRequest
 }
 
-// image serves the picture of a card in the catalog that wants the key, and
-// only those: the address carries nothing but the card's ID, and it is kept
-// by the CDN, as a picture never changes and PokéWallet counts each request.
-func (h *handler) image(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(r.URL.Query().Get("image"), 10, 64)
-	if err != nil {
-		http.Error(w, "bad_request", http.StatusBadRequest)
-		return
-	}
-	link, err := h.Store.CardImage(r.Context(), id)
-	if err != nil || !h.catalog.Proxied(link) {
-		http.NotFound(w, r)
-		return
-	}
-	data, kind, err := h.catalog.FetchPicture(r.Context(), link)
-	if err != nil {
-		h.Logger.Warn("could not fetch a card's picture", "card", id, "error", err)
-		http.Error(w, "unavailable", http.StatusBadGateway)
-		return
-	}
-	w.Header().Set("Content-Type", kind)
-	w.Header().Set("Cache-Control", "public, max-age=31536000, s-maxage=31536000, immutable")
-	_, _ = w.Write(data)
-}
-
 // cardView is a card as the page shows it; one not held is only its
 // rarity, so that the page holds no secret to peek at.
 type cardView struct {
@@ -243,11 +209,7 @@ type cardView struct {
 }
 
 func (h *handler) held(c storage.Card, count int) cardView {
-	image := c.ImageURL
-	if h.catalog.Proxied(image) {
-		image = "/api/cards?image=" + strconv.FormatInt(c.ID, 10) + "&v=" + strconv.Itoa(setsVersion)
-	}
-	return cardView{ID: c.ID, Rarity: c.Rarity, Set: c.Collection, Name: c.Name, Anime: c.Anime, Image: image, Attack: c.Attack, Health: c.Health, Value: c.Value, Count: count}
+	return cardView{ID: c.ID, Rarity: c.Rarity, Set: c.Collection, Name: c.Name, Anime: c.Anime, Image: c.ImageURL, Attack: c.Attack, Health: c.Health, Value: c.Value, Count: count}
 }
 
 func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {

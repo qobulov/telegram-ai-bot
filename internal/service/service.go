@@ -261,11 +261,7 @@ type Options struct {
 	CardsAPI string
 	// CardsURL is the page of Kartalar's Mini App, which /cards and the
 	// collection's button open; "" for none.
-	CardsURL string
-	// CardsKey is a PokéWallet key, without which there are no trading
-	// cards, at CardsPokeWallet, empty for its own address.
-	CardsKey          string
-	CardsPokeWallet   string
+	CardsURL          string
 	PremiumPrice      int
 	PremiumDays       int
 	PremiumDailyLimit int
@@ -326,7 +322,7 @@ type Options struct {
 	Judge InsultJudge
 	// Writer writes an owner's announcement, from their recent words, when
 	// the main model's provider refused the turn that asked for it; Recent
-	// gives those words. Without either, the owner is pointed to /elon.
+	// gives those words. Without either, the owner is pointed to /announce.
 	Writer AnnouncementWriter
 	Recent RecentMessages
 	// Sworn tells whether the swear guard caught a message already, so that
@@ -384,7 +380,7 @@ type Options struct {
 	GameTable GameTable
 	// ShashkaURL is the page of the draughts Mini App, which /checkers
 	// opens, and ShashkaInvites keeps the invites /checkers makes in a
-	// group; with either unset there is no /shashka. See shashka.go.
+	// group; with either unset there is no /checkers. See shashka.go.
 	ShashkaURL     string
 	ShashkaInvites shashkaapp.InviteMaker
 

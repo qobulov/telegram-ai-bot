@@ -291,7 +291,7 @@ var (
 	textDoozAgain       = lt("🔁 Yana o'ynash", "🔁 Ещё раз", "🔁 Play again")
 	textDoozWaiting     = lt("Raqib kutilmoqda: bu o'yinni siz ochgansiz.", "Ждём соперника: эту игру открыли вы.", "Waiting for someone: you opened this game.")
 	textDoozNotOpener   = lt("Maria bilan o'ynashni o'yinni ochgan kishi tanlaydi.", "Играть с Марией решает тот, кто открыл игру.", "Only whoever opened the game can play Maria.")
-	textDoozNotYours    = lt("Bu o'yin sizniki emas. O'zingiznikini /tictactoe bilan oching.", "Это не ваша игра. Откройте свою: /dooz.", "This game isn't yours. Open your own with /dooz.")
+	textDoozNotYours    = lt("Bu o'yin sizniki emas. O'zingiznikini /tictactoe bilan oching.", "Это не ваша игра. Откройте свою: /tictactoe.", "This game isn't yours. Open your own with /tictactoe.")
 	textDoozNotYourTurn = lt("Hozir navbat sizda emas.", "Сейчас не ваш ход.", "It's not your turn.")
 	textDoozTaken       = lt("Bu katak band.", "Эта клетка занята.", "That cell is taken.")
 	textDoozOver        = lt("Bu o'yin tugagan.", "Эта игра окончена.", "This game is over.")

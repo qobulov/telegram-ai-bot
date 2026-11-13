@@ -53,7 +53,7 @@ func NewCards(ctx context.Context, cfg config.Config, logger *slog.Logger) (*End
 		_, err := client.SendMessage(ctx, telegram.Outgoing{ChatID: userID, Text: text})
 		return err
 	}
-	handler := cards.NewHandler(cards.Options{BotToken: cfg.TelegramToken, Store: store, PokeWalletKey: cfg.PokeWalletAPIKey, Logger: logger, Notify: notify})
+	handler := cards.NewHandler(cards.Options{BotToken: cfg.TelegramToken, Store: store, Logger: logger, Notify: notify})
 	return &Endpoint{Handler: handler, Close: store.Close}, nil
 }
 

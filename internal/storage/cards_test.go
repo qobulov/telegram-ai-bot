@@ -37,14 +37,16 @@ func TestCardsAreDrawnAndCollected(t *testing.T) {
 	if err := store.SaveCardCatalog(ctx, catalog); err != nil {
 		t.Fatal(err)
 	}
-	if link, err := store.CardImage(ctx, 2); err != nil || link != "https://cdn.myanimelist.net/levi.jpg" {
-		t.Fatalf("the chosen picture = %q, %v", link, err)
+	picture := func(id int64) string {
+		var link string
+		_ = store.pool.QueryRow(ctx, `SELECT image_url FROM card_catalog WHERE id = $1`, id).Scan(&link)
+		return link
 	}
-	if link, err := store.CardImage(ctx, 1); err != nil || link != "https://img/1.png" {
-		t.Fatalf("picture = %q, %v", link, err)
+	if link := picture(2); link != "https://cdn.myanimelist.net/levi.jpg" {
+		t.Fatalf("the chosen picture = %q", link)
 	}
-	if link, err := store.CardImage(ctx, 99); err != nil || link != "" {
-		t.Fatalf("no such card's picture = %q, %v", link, err)
+	if link := picture(1); link != "https://img/1.png" {
+		t.Fatalf("picture = %q", link)
 	}
 
 	now := time.Now()
@@ -90,40 +92,6 @@ func TestCardsAreDrawnAndCollected(t *testing.T) {
 	top, err := store.CardTop(ctx, 5)
 	if err != nil || len(top) != 2 || top[0].UserID != alice || top[0].Cards != 1 || top[1].Name != "Bob" {
 		t.Errorf("top = %+v, %v", top, err)
-	}
-}
-
-// FillCardSet changes a card's rarity and value, merges an art variant's
-// holders into the card kept, and counts each player's cards and points again.
-func TestFillCardSet(t *testing.T) {
-	store := newTestStore(t)
-	ctx := context.Background()
-	if err := store.SaveCardCatalog(ctx, []Card{
-		{ID: -1, Name: "Dark Magician", Rarity: 2, Value: 800, Collection: "onepiece"},
-		{ID: -2, Name: "Shanks (Parallel)", Rarity: 4, Value: 5000, Collection: "onepiece"},
-		{ID: -3, Name: "Shanks (Alternate Art)", Rarity: 4, Value: 5000, Collection: "onepiece"},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	for _, q := range []string{
-		`INSERT INTO card_players (user_id, name, points, cards, draws) VALUES (1, 'Alice', 15800, 3, 4)`,
-		`INSERT INTO card_owned (user_id, card_id, count) VALUES (1, -1, 1), (1, -2, 1), (1, -3, 2)`,
-	} {
-		if _, err := store.pool.Exec(ctx, q); err != nil {
-			t.Fatal(err)
-		}
-	}
-	err := store.FillCardSet(ctx, "onepiece", 2, []Card{{ID: -1, Name: "Dark Magician", Rarity: 1, Value: 300}, {ID: -2, Name: "Shanks (Parallel)", Rarity: 4, Value: 5000}}, map[int64]int64{-3: -2})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var points, cards, draws, catalog, shanks int
-	err = store.pool.QueryRow(ctx, `SELECT points, cards, draws, (SELECT count(*) FROM card_catalog), (SELECT count FROM card_owned WHERE card_id = -2) FROM card_players WHERE user_id = 1`).Scan(&points, &cards, &draws, &catalog, &shanks)
-	if err != nil || points != 300+3*5000 || cards != 2 || draws != 4 || catalog != 2 || shanks != 3 {
-		t.Errorf("points %d, cards %d, draws %d, catalog %d, shanks %d, %v", points, cards, draws, catalog, shanks, err)
-	}
-	if versions, err := store.CardSetVersions(ctx); err != nil || versions["onepiece"] != 2 {
-		t.Errorf("versions = %v, %v", versions, err)
 	}
 }
 

@@ -507,7 +507,7 @@ func (f *fakeWriter) Complete(_ context.Context, req ai.Request) (ai.Message, er
 // model asked only to write it does, and the draft for the groups and
 // private chats the words name comes with buttons; Send posts it, putting
 // the outcome in place of the buttons. Words that ask for no announcement
-// are pointed to /elon.
+// are pointed to /announce.
 func TestBlockedAnnouncementIsWrittenApart(t *testing.T) {
 	f := newFixture()
 	f.opts.OwnerUsernames = []string{ownerUsername}
