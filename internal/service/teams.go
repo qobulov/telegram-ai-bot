@@ -53,7 +53,12 @@ type teamLobby struct {
 type teamPlayer struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
+	// Lane is the MLBB lane the split gave a player of a team.
+	Lane string `json:"lane,omitempty"`
 }
+
+// mlbbLanes are MLBB's five lanes, one for each player of a team.
+var mlbbLanes = []string{"⚔️ EXP", "🌲 Jungle", "🔮 Mid", "💰 Gold", "🛡 Roam"}
 
 // teamsCommand opens a lobby in a group, its opener in it.
 func (s *Service) teamsCommand(ctx context.Context, in incoming) outcome {
@@ -162,15 +167,27 @@ func (s *Service) adminPressed(ctx context.Context, q *telegram.CallbackQuery) b
 	return err == nil && admin
 }
 
-// split puts ten of the players, at random, into two teams of five, and
-// the rest on the bench.
+// split puts ten of the players, at random, into two teams of five, each
+// with a lane of MLBB's five given at random, and the rest on the bench.
 func (l *teamLobby) split() {
 	shuffled := slices.Clone(l.Players)
 	rand.Shuffle(len(shuffled), func(i, j int) { shuffled[i], shuffled[j] = shuffled[j], shuffled[i] })
-	l.TeamA = shuffled[:teamSize]
-	l.TeamB = shuffled[teamSize : 2*teamSize]
+	l.TeamA = withLanes(shuffled[:teamSize])
+	l.TeamB = withLanes(shuffled[teamSize : 2*teamSize])
 	l.Bench = shuffled[2*teamSize:]
 	l.Split = true
+}
+
+// withLanes gives each player of a team one of the lanes, at random, and
+// lists them in the lanes' order.
+func withLanes(team []teamPlayer) []teamPlayer {
+	lanes := rand.Perm(len(mlbbLanes))
+	laned := make([]teamPlayer, len(team))
+	for i, p := range team {
+		p.Lane = mlbbLanes[lanes[i]]
+		laned[lanes[i]] = p
+	}
+	return laned
 }
 
 // unsplit takes the teams back when the players change.
@@ -184,6 +201,9 @@ func teamsText(l teamLobby) string {
 		lines := make([]string, len(players))
 		for i, p := range players {
 			lines[i] = strconv.Itoa(i+1) + ". " + cardMarks.Replace(p.Name)
+			if p.Lane != "" {
+				lines[i] = p.Lane + " — " + cardMarks.Replace(p.Name)
+			}
 		}
 		return strings.Join(lines, "\n")
 	}

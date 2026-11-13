@@ -2330,7 +2330,8 @@ seconds.
 `/teams` in a group opens a lobby for a Mobile Legends match, without the
 model: members press ➕ to join (➖ to leave), and once ten are in, whoever
 opened it, or an admin, presses 🎲 to split them at random into two teams
-of five, anyone past ten going to the bench; 🔀 splits them again, and a
+of five, each player of a team given one of MLBB's five lanes (EXP,
+Jungle, Mid, Gold, Roam) at random, anyone past ten going to the bench; 🔀 splits them again, and a
 member joining or leaving takes the teams back to the lobby. Each group
 has one lobby, the latest `/teams`'s, kept in `team_lobbies` (migration 72)
 and changed with the row locked; an older lobby's buttons say it is closed.

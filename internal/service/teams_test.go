@@ -79,7 +79,17 @@ func TestTeamsLobby(t *testing.T) {
 	if !l.Split || len(l.TeamA) != 5 || len(l.TeamB) != 5 || len(l.Bench) != 1 || len(seen) != 11 {
 		t.Fatalf("split = %+v", l)
 	}
-	if menu := buttons.edits[len(buttons.edits)-1]; !strings.Contains(menu, "1-jamoa") || !strings.Contains(menu, "Zaxira") {
+	for _, team := range [][]teamPlayer{l.TeamA, l.TeamB} {
+		for i, p := range team {
+			if p.Lane != mlbbLanes[i] {
+				t.Errorf("team lanes = %+v, want each of %v once", team, mlbbLanes)
+			}
+		}
+	}
+	if l.Bench[0].Lane != "" {
+		t.Errorf("the bench got a lane: %+v", l.Bench)
+	}
+	if menu := buttons.edits[len(buttons.edits)-1]; !strings.Contains(menu, "1-jamoa") || !strings.Contains(menu, "Zaxira") || !strings.Contains(menu, "🌲 Jungle — ") {
 		t.Errorf("shown = %q", menu)
 	}
 	again := groupMessage("/teams")
