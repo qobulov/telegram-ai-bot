@@ -477,3 +477,23 @@ func TestADuelForNoStake(t *testing.T) {
 		}
 	}
 }
+
+// /bozor opens the Mini App at its market: itself in a private chat, and in
+// a group a link to the private chat, whose /start opens it there.
+func TestBozorOpensTheMarket(t *testing.T) {
+	f := newFixture()
+	f.opts.Cards = newFakeCards("")
+	f.opts.CardsURL = "https://app/kartalar"
+	sent := f.run(textFrom(userID, "/bozor"))
+	if b := sent[0].buttons; len(b) != 1 || b[0][0].WebApp == nil || b[0][0].WebApp.URL != "https://app/kartalar?tab=market" {
+		t.Fatalf("private /bozor = %+v", sent[0])
+	}
+	sent = f.run(inGroup(groupMessage("/bozor")))
+	if b := sent[len(sent)-1].buttons; len(b) != 1 || !strings.HasSuffix(b[0][0].URL, "?start=bozor") {
+		t.Fatalf("group /bozor = %+v", sent[len(sent)-1])
+	}
+	sent = f.run(textFrom(userID, "/start bozor"))
+	if b := sent[len(sent)-1].buttons; len(b) != 1 || b[0][0].WebApp == nil || !strings.HasSuffix(b[0][0].WebApp.URL, "?tab=market") {
+		t.Errorf("/start bozor = %+v", sent[len(sent)-1])
+	}
+}

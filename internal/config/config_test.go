@@ -654,8 +654,11 @@ func TestWebAppURL(t *testing.T) {
 	}
 	env := validEnv()
 	env["WEBAPP_URL"] = "https://maria.vercel.app/"
-	if cfg, err := Load(getenv(env)); err != nil || cfg.WebAppURL != "https://maria.vercel.app" {
-		t.Errorf("WebAppURL = %q, err = %v", cfg.WebAppURL, err)
+	if cfg, err := Load(getenv(env)); err != nil || cfg.WebAppURL != "https://maria.vercel.app" || !strings.Contains(cfg.PersonaPrompt, "# Kartalar, your card game") {
+		t.Errorf("WebAppURL = %q, err = %v; with pages the persona knows the card game", cfg.WebAppURL, err)
+	}
+	if strings.Contains(cfg.PersonaPrompt, "# Kartalar") {
+		t.Error("without pages the persona speaks of a card game there is no app for")
 	}
 	for _, bad := range []string{"http://maria.vercel.app", "maria.vercel.app", "https://maria.vercel.app/?a=1", "https://u:p@maria.vercel.app", "https:///x"} {
 		env["WEBAPP_URL"] = bad

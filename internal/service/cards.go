@@ -264,20 +264,39 @@ func (s *Service) cardPage(ctx context.Context, in incoming, player int64, choic
 }
 
 // cardsStart is the /start payload a group's button sends to open the
-// Mini App in a private chat, where Telegram lets it open.
-const cardsStart = "kartalar"
+// Mini App in a private chat, where Telegram lets it open; marketStart opens
+// it at the market.
+const (
+	cardsStart  = "kartalar"
+	marketStart = "bozor"
+)
 
 // cardsAppButton is the button that opens the Mini App: itself in a
 // private chat, and in a group a link to the private chat, as a group's
 // message cannot carry a Mini App's button; none without a page.
 func (s *Service) cardsAppButton(in incoming) [][]telegram.Button {
+	return s.appButton(in, textCardsAppButton, cardsStart, "")
+}
+
+// marketButton opens the Mini App at its market, as cardsAppButton does.
+func (s *Service) marketButton(in incoming) [][]telegram.Button {
+	return s.appButton(in, textMarketButton, marketStart, "market")
+}
+
+// appButton opens the Mini App at tab, "" for its first, under label: itself
+// in a private chat, in a group a link sending start to the private chat.
+func (s *Service) appButton(in incoming, label localText, start, tab string) [][]telegram.Button {
 	switch {
 	case s.opts.CardsURL == "":
 		return nil
 	case !in.group:
-		return [][]telegram.Button{{{Text: textCardsAppButton.to(in), WebApp: &telegram.WebAppInfo{URL: s.opts.CardsURL}}}}
+		page := s.opts.CardsURL
+		if tab != "" {
+			page += "?tab=" + tab
+		}
+		return [][]telegram.Button{{{Text: label.to(in), WebApp: &telegram.WebAppInfo{URL: page}}}}
 	case s.opts.Bot.Username != "":
-		return [][]telegram.Button{{{Text: textCardsAppButton.to(in), URL: "https://t.me/" + s.opts.Bot.Username + "?start=" + cardsStart}}}
+		return [][]telegram.Button{{{Text: label.to(in), URL: "https://t.me/" + s.opts.Bot.Username + "?start=" + start}}}
 	}
 	return nil
 }
@@ -286,10 +305,16 @@ func (s *Service) cardsAppButton(in incoming) [][]telegram.Button {
 // the Mini App's button; ok is false for any other /start.
 func (s *Service) startCards(in incoming) (outcome, bool) {
 	payload := strings.TrimSpace(strings.TrimPrefix(in.text, commandName(in.text)))
-	if in.group || payload != cardsStart || s.opts.Cards == nil || s.opts.CardsURL == "" {
+	if in.group || s.opts.Cards == nil || s.opts.CardsURL == "" {
 		return outcome{}, false
 	}
-	return outcome{text: textCardsApp.to(in), buttons: s.cardsAppButton(in)}, true
+	switch payload {
+	case cardsStart:
+		return outcome{text: textCardsApp.to(in), buttons: s.cardsAppButton(in)}, true
+	case marketStart:
+		return outcome{text: textMarket.to(in), buttons: s.marketButton(in)}, true
+	}
+	return outcome{}, false
 }
 
 // cardTop answers /kartatop: the players with the most points.
@@ -378,6 +403,12 @@ var (
 	textCardTopYou   = localText{uz: "  ← siz", ru: "  ← вы", en: "  ← you"}
 	textCardTopMine  = localText{uz: "📍 Siz: %d-o'rin · 💠 %s · 🎴 %d", ru: "📍 Вы: %d-е место · 💠 %s · 🎴 %d", en: "📍 You: #%d · 💠 %s · 🎴 %d"}
 	textCardTopHint  = localText{uz: "💠 ochko · 🎴 kartalar · yangi karta: /karta", ru: "💠 очки · 🎴 карты · новая карта: /karta", en: "💠 points · 🎴 cards · a new card: /karta"}
+	textMarket       = localText{
+		uz: "🔄 Kartalar bozori: kartangizni qo'ying va evaziga kerakli kartani tanlang. Kimda o'sha karta bo'lsa, bir bosishda almashadi.",
+		ru: "🔄 Рынок карт: выставьте свою карту и выберите, какую хотите взамен. У кого она есть — обменяется в одно нажатие.",
+		en: "🔄 The card market: put up a card and pick the one you want for it. Whoever holds it trades with one press.",
+	}
+	textMarketButton = localText{uz: "🔄 Bozorni ochish", ru: "🔄 Открыть рынок", en: "🔄 Open the market"}
 	textCardsApp     = localText{
 		uz: "🎴 Kartalar ilovasi: kolleksiyangiz, karta olish va reyting bir joyda.",
 		ru: "🎴 Приложение карт: коллекция, получение карт и рейтинг в одном месте.",

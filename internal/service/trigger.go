@@ -105,7 +105,7 @@ func (s *Service) orName(text string) string {
 // "/game", "/mafia", "/start" or "/top" are other bots' too.
 var ownCommands = map[string]bool{
 	"/karta": true, "/kartalarim": true, "/kartatop": true, "/kartalar": true,
-	"/avto": true, "/duel": true, "/almash": true, "/oyinlar": true,
+	"/avto": true, "/bozor": true, "/duel": true, "/almash": true, "/oyinlar": true,
 	"/boss": true, "/ilon": true, "/otinchi": true, "/maydon": true, "/shashka": true, "/dooz": true,
 }
 

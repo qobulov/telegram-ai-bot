@@ -129,8 +129,10 @@
     try {
       applyState(await api("state"));
       $("loading").hidden = true;
-      // A newcomer starts at the draw; anyone else at their collection.
-      if (!opened) showTab(cards.some((c) => c.count > 0) ? "collection" : "draw");
+      // A link may name the tab to open, as /bozor does; otherwise a
+      // newcomer starts at the draw and anyone else at their collection.
+      const asked = new URLSearchParams(location.search).get("tab");
+      if (!opened) showTab(["collection", "draw", "market", "top"].includes(asked) ? asked : cards.some((c) => c.count > 0) ? "collection" : "draw");
     } catch (error) {
       $("loading").hidden = true;
       if (!opened) showTab("collection");

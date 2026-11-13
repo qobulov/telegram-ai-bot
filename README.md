@@ -1320,7 +1320,7 @@ match "maria" unless you add it:
 word.
 
 **Commands** in a group need the bot's username (`/help@MyMariaBot`). A plain
-`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/karta`, `/kartalarim`, `/kartatop`, `/kartalar`, `/avto`, `/duel`, `/almash`, `/boss`, `/ilon`, `/otinchi`, `/maydon`, `/shashka` and `/dooz`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username.
+`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/karta`, `/kartalarim`, `/kartatop`, `/kartalar`, `/bozor`, `/avto`, `/duel`, `/almash`, `/boss`, `/ilon`, `/otinchi`, `/maydon`, `/shashka` and `/dooz`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username.
 
 ### Example
 
@@ -2113,7 +2113,8 @@ a card by name or @username (the one a group last saw), the most points
 first (`players`), and gives the one picked
 a spare copy at once (`gift`: a player keeps their last copy not melted),
 the bot telling them in their private chat who gave it. The Mini App's 🔄
-market tab lists offers (migration 67, `card_trades` rows with no `to_id`
+market tab, which `/bozor` opens (in a group through the private chat's
+`/start bozor`, the page told `?tab=market`), lists offers (migration 67, `card_trades` rows with no `to_id`
 until taken): a player puts up a card of theirs for a card they pick from the
 whole catalog by name (`catalog`, `offer`), at most 5 open, each for 7 days;
 anyone who holds the card wanted presses 🔄 to take it (`take`), each giving
@@ -2126,7 +2127,9 @@ when one card matches, else the answer lists those that do. Any card may
 pass, the last copy too, which leaves the collection (its melted copies, gone
 to shards, with it), and its points pass with it. A player gives at most 5
 cards a day, gifts and trades together, and only to a player who has opened a
-card, so that a second account cannot feed a first one. `/kartalarim` shows
+card, so that a second account cannot feed a first one. With the pages served, the persona is told the game's facts
+(`cardsNote`), as the model had said it was "not the card bot" and named
+commands there are none of. `/kartalarim` shows
 how many of each rarity's cards the player holds as buttons that list them,
 pressed only by that player; `/kartatop` is the table of points. The
 pictures are the characters' AniList pictures, the studios' art.

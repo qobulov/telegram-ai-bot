@@ -791,6 +791,8 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.cardCollection(ctx, in)
 	case s.opts.Cards != nil && s.opts.CardsURL != "" && commandName(in.text) == "/kartalar":
 		return outcome{text: textCardsApp.to(in), buttons: s.cardsAppButton(in)}
+	case s.opts.Cards != nil && s.opts.CardsURL != "" && commandName(in.text) == "/bozor":
+		return outcome{text: textMarket.to(in), buttons: s.marketButton(in)}
 	case s.opts.Cards != nil && commandName(in.text) == "/kartatop":
 		return s.cardTop(ctx, in)
 	case s.opts.Cards != nil && commandName(in.text) == "/avto":

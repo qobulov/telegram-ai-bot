@@ -313,6 +313,9 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.CASKey = r.apiKey("CAS_API_KEY")
 	cfg.WakeWords = r.wakeWords(cfg)
 	cfg.WebAppURL = r.webAppURL("WEBAPP_URL")
+	if cfg.WebAppURL != "" {
+		cfg.PersonaPrompt += "\n\n" + cardsNote
+	}
 	r.checkRemovedVariables()
 	r.checkGroupSettings(cfg)
 	if err := errors.Join(r.errs...); err != nil {
