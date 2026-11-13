@@ -96,6 +96,9 @@ type ChatMemberUpdated struct {
 	// InviteLink is the link a member joined by, when they did; Telegram
 	// gives it to a bot that is an admin.
 	InviteLink *ChatInviteLink `json:"invite_link,omitempty"`
+	// ViaJoinRequest is a member let in on asking, From being the admin
+	// who let them in.
+	ViaJoinRequest bool `json:"via_join_request,omitempty"`
 }
 
 // ChatInviteLink is a group's invite link and who made it.

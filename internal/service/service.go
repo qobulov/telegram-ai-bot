@@ -726,7 +726,7 @@ func (s *Service) recordMember(change *telegram.ChatMemberUpdated) {
 		if was, is := change.OldChatMember.IsMember(), change.NewChatMember.IsMember(); was != is {
 			s.markInvitee(change.Chat.ID, change.NewChatMember.User, is)
 		}
-		s.noteLinkJoin(change)
+		s.noteJoin(change)
 	}
 }
 

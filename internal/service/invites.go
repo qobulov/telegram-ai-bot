@@ -42,12 +42,15 @@ func (s *Service) noteAdded(msg *telegram.Message) {
 	}
 }
 
-// noteLinkJoin notes a member who came in by another member's own invite
-// link, which Telegram tells a bot that is an admin.
-func (s *Service) noteLinkJoin(change *telegram.ChatMemberUpdated) {
-	link, user := change.InviteLink, change.NewChatMember.User
+// noteJoin notes a member who came in by another, as Telegram tells a bot
+// that is an admin: by that member's own invite link, or added by them, the
+// change being theirs. A group may post no message that they joined, so this
+// is where an addition is seen there. One let in on asking, or who came
+// alone, brings no one.
+func (s *Service) noteJoin(change *telegram.ChatMemberUpdated) {
+	user := change.NewChatMember.User
 	switch {
-	case s.opts.Invites == nil, link == nil, link.Creator == nil, user == nil, user.IsBot, link.Creator.IsBot, link.Creator.ID == user.ID:
+	case s.opts.Invites == nil, user == nil, user.IsBot:
 		return
 	case change.NewChatMember.Status != "member" && change.NewChatMember.Status != "restricted":
 		return
@@ -56,8 +59,18 @@ func (s *Service) noteLinkJoin(change *telegram.ChatMemberUpdated) {
 	case "member", "administrator", "creator", "restricted":
 		return
 	}
-	s.noteInvite(storage.Invite{ChatID: change.Chat.ID, UserID: user.ID, InviterID: link.Creator.ID,
-		InviterName: authorLabel(link.Creator.FirstName), Via: "link", At: s.opts.Now()})
+	inviter, via := change.From, "add"
+	switch {
+	case change.InviteLink != nil:
+		inviter, via = change.InviteLink.Creator, "link"
+	case change.ViaJoinRequest:
+		return
+	}
+	if inviter == nil || inviter.IsBot || inviter.ID == user.ID {
+		return
+	}
+	s.noteInvite(storage.Invite{ChatID: change.Chat.ID, UserID: user.ID, InviterID: inviter.ID,
+		InviterName: authorLabel(inviter.FirstName), Via: via, At: s.opts.Now()})
 }
 
 // markInvitee notes a member leaving the group or being removed (in false),

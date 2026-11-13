@@ -745,9 +745,11 @@ brought how many people in who are still there, this week (from Monday,
 Tashkent time) or this month; `/invites` does this week's too, or with
 `bugun`, `oy` or `hammasi` (`today`, `month`, `all`) that period's; replying
 to a member, theirs alone. A person counts for the member who added them (the message saying
-they joined is from that member) or whose own invite link they came by
-(Telegram's `chat_member` update, where the bot is an admin); one who joined
-alone or a bot counts for no one. One who leaves or is removed is taken off
+they joined is from that member, or, where the bot is an admin, Telegram's
+`chat_member` update, whose `from` is who added them: a group that hides
+join messages posts none) or whose own invite link they came by (that
+update's link); one who joined alone, one let in on asking, or a bot counts
+for no one. One who leaves or is removed is taken off
 their inviter's count, shown apart as gone, and put back on coming back,
 never twice; a member none of whose people are still there is not listed,
 and of two with as many, the one fewer left goes first. Each invite row

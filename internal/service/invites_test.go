@@ -62,9 +62,22 @@ func TestInvitesAreNotedAndListed(t *testing.T) {
 		NewChatMember: telegram.ChatMember{Status: "member", User: &telegram.User{ID: 504, FirstName: "Lin"}},
 		InviteLink:    &telegram.ChatInviteLink{InviteLink: "https://t.me/+x", Creator: &telegram.User{ID: 77, FirstName: "Vali"}},
 	}}
-	f.run(inGroup(added), inGroup(alone), byLink)
-	if len(book.noted) != 2 || book.noted[0].UserID != 501 || book.noted[0].InviterID != userID || book.noted[0].Via != "add" ||
-		book.noted[1].UserID != 504 || book.noted[1].InviterID != 77 || book.noted[1].Via != "link" {
+	member := func(from, user int64, viaRequest bool) telegram.Update {
+		nextUpdateID++
+		return telegram.Update{UpdateID: nextUpdateID, ChatMember: &telegram.ChatMemberUpdated{
+			Chat:           telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup},
+			From:           &telegram.User{ID: from, FirstName: "Ali"},
+			OldChatMember:  telegram.ChatMember{Status: "left", User: &telegram.User{ID: user}},
+			NewChatMember:  telegram.ChatMember{Status: "member", User: &telegram.User{ID: user, FirstName: "New"}},
+			ViaJoinRequest: viaRequest,
+		}}
+	}
+	// Added where the group posts no message that they joined; one who came
+	// alone, and one let in on asking, count for no one.
+	f.run(inGroup(added), inGroup(alone), byLink, member(userID, 505, false), member(506, 506, false), member(userID, 507, true))
+	if len(book.noted) != 3 || book.noted[0].UserID != 501 || book.noted[0].InviterID != userID || book.noted[0].Via != "add" ||
+		book.noted[1].UserID != 504 || book.noted[1].InviterID != 77 || book.noted[1].Via != "link" ||
+		book.noted[2].UserID != 505 || book.noted[2].InviterID != userID || book.noted[2].Via != "add" {
 		t.Fatalf("noted = %+v", book.noted)
 	}
 
@@ -79,7 +92,7 @@ func TestInvitesAreNotedAndListed(t *testing.T) {
 		NewChatMember: telegram.ChatMember{Status: "kicked", User: &telegram.User{ID: 504, FirstName: "Lin"}},
 	}}
 	f.run(inGroup(left), kicked)
-	if want := "501:true 503:true 504:true 501:false 504:false"; strings.Join(book.marked, " ") != want {
+	if want := "501:true 503:true 504:true 505:true 506:true 507:true 501:false 504:false"; strings.Join(book.marked, " ") != want {
 		t.Fatalf("marked = %v, want %s", book.marked, want)
 	}
 
