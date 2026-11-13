@@ -106,7 +106,7 @@ func (s *Service) orName(text string) string {
 var ownCommands = map[string]bool{
 	"/card": true, "/mycards": true, "/cardtop": true, "/cards": true,
 	"/autocard": true, "/market": true, "/invites": true, "/duel": true, "/trade": true, "/games": true,
-	"/boss": true, "/snake": true, "/woodcutter": true, "/arena": true, "/checkers": true, "/tictactoe": true,
+	"/boss": true, "/snake": true, "/woodcutter": true, "/checkers": true, "/tictactoe": true,
 }
 
 // commandTarget reports whether text is a command and which bot it names:

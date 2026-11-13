@@ -26,7 +26,7 @@ LAYERS = {
     "tools": ("Tool'lar va tashqi API", ["internal/tools", "internal/webapi", "internal/webapi/internal/genplaces", "internal/webapi/internal/placename", "internal/guards", "internal/gifs", "internal/stickers", "internal/doctext", "internal/doctext/testdata"]),
     "data": ("Saqlash", ["internal/storage"]),
     "telegram": ("Telegram API", ["internal/telegram"]),
-    "games": ("O'yinlar va Mini App", ["internal/game", "internal/mafia", "internal/maydon", "internal/raid", "internal/dooz", "internal/shashka", "internal/shashkaapp", "internal/miniapp", "public/game", "public/shashka", "public/stats"]),
+    "games": ("O'yinlar va Mini App", ["internal/game", "internal/mafia", "internal/raid", "internal/dooz", "internal/shashka", "internal/shashkaapp", "internal/miniapp", "public/game", "public/shashka", "public/stats"]),
     "docs": ("Hujjatlar va g'oyalar", ["(root) README.md", "docs/superpowers/specs", "docs/superpowers/plans"]),
 }
 LAYER_OF = {p: k for k, (_, ps) in LAYERS.items() for p in ps}

@@ -777,8 +777,6 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.gameCommand(ctx, in, game.BossShortName)
 	case commandName(in.text) == "/mafia":
 		return s.gameCommand(ctx, in, game.MafiaShortName)
-	case commandName(in.text) == "/arena":
-		return s.gameCommand(ctx, in, game.MaydonShortName)
 	case commandName(in.text) == "/games":
 		return s.gamesMenu(in)
 	case commandName(in.text) == "/tictactoe":
@@ -1758,7 +1756,7 @@ func commandName(text string) string {
 var uzbekCommands = map[string]string{
 	"/karta": "/card", "/kartalar": "/cards", "/kartalarim": "/mycards", "/kartatop": "/cardtop",
 	"/bozor": "/market", "/almash": "/trade", "/avto": "/autocard", "/oyinlar": "/games",
-	"/ilon": "/snake", "/otinchi": "/woodcutter", "/maydon": "/arena", "/shashka": "/checkers",
+	"/ilon": "/snake", "/otinchi": "/woodcutter", "/shashka": "/checkers",
 	"/dooz": "/tictactoe", "/qoshganlar": "/invites", "/elon": "/announce",
 }
 

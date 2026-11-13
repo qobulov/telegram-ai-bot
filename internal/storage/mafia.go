@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -15,12 +14,6 @@ import (
 // internal/mafia's; this keeps only its JSON.
 func (s *Store) ChangeMafiaGame(ctx context.Context, chatID int64, change func(state []byte) ([]byte, error)) error {
 	return s.changeState(ctx, "mafia_games", chatID, change)
-}
-
-// ChangeMaydonRoom changes a chat's Maydon room as ChangeMafiaGame does its
-// game; the rules are internal/maydon's.
-func (s *Store) ChangeMaydonRoom(ctx context.Context, chatID int64, change func(state []byte) ([]byte, error)) error {
-	return s.changeState(ctx, "maydon_rooms", chatID, change)
 }
 
 // changeState changes the JSON state of a chat's row in table, one of the
@@ -51,19 +44,6 @@ func (s *Store) changeState(ctx context.Context, table string, chatID int64, cha
 		return fmt.Errorf("storage: change %s: %w", table, err)
 	}
 	return nil
-}
-
-// RaidLevels is a player's Dev jangi sword and crit levels, the first ones
-// for a player who has no hero.
-func (s *Store) RaidLevels(ctx context.Context, userID int64) (sword, crit int, err error) {
-	err = s.pool.QueryRow(ctx, `SELECT sword, crit FROM raid_heroes WHERE user_id = $1`, userID).Scan(&sword, &crit)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return 1, 0, nil
-	}
-	if err != nil {
-		return 0, 0, fmt.Errorf("storage: raid levels: %w", err)
-	}
-	return sword, crit, nil
 }
 
 // AddRaidCoins gives each of the users coins to spend in Dev jangi, making

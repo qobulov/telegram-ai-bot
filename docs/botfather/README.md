@@ -11,7 +11,6 @@ tartibi README'ning Mini App va o'yinlar bo'limida.
 | ![](kosmik-ilon.png) | Kosmik ilon | `ilon` | `/snake` |
 | ![](otinchi.png) | O'tinchi | `otinchi` | `/woodcutter` |
 | ![](dev-jangi.png) | Dev jangi | `boss` | `/boss` |
-| ![](maydon.png) | Maydon | `maydon` | `/arena` |
 | ![](mafia.png) | Mafia | `mafiya` | `/mafia` |
 
 ## Tavsiflar
@@ -31,10 +30,6 @@ tartibi README'ning Mini App va o'yinlar bo'limida.
 **Dev jangi** — `dev-jangi.png`
 
 > Guruh bilan birga devlarni yengamiz! Bosing, uring, mahoratlarni ishlating va qilichni kuchaytiring. 8 xil dev, kunlik vazifalar va reyting.
-
-**Maydon** — `maydon.png`, qisqa nomi aynan `maydon`
-
-> Guruh bilan jamoa jangi! Sinfingizni tanlang, aniq zarba bering, mahoratni o'z vaqtida ishlating. 1v1 dan 5v5 gacha, kuchingiz Dev jangi darajasidan.
 
 **Mafia** — `mafia.png`, qisqa nomi `mafiya`
 
