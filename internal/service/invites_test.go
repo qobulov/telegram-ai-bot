@@ -91,6 +91,14 @@ func TestInvitesAreNotedAndListed(t *testing.T) {
 	if wd := book.since.In(f.opts.Location).Weekday(); wd != time.Monday {
 		t.Errorf("the week starts on %v", wd)
 	}
+	sent = f.run(inGroup(groupMessage("/invites_month@" + botUsername)))
+	if got := sent[len(sent)-1].text; !strings.Contains(got, "bu oy") || book.since.In(f.opts.Location).Day() != 1 {
+		t.Errorf("month table = %q since %v", got, book.since)
+	}
+	sent = f.run(inGroup(groupMessage("/invites_week")))
+	if got := sent[len(sent)-1].text; !strings.Contains(got, "bu hafta") || book.since.In(f.opts.Location).Weekday() != time.Monday {
+		t.Errorf("week table = %q since %v", got, book.since)
+	}
 	if sent = f.run(textFrom(userID, "/invites")); !strings.Contains(sent[len(sent)-1].text, "guruhda") {
 		t.Errorf("in private = %+v", sent[len(sent)-1])
 	}

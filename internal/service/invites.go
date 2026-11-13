@@ -20,6 +20,11 @@ type InviteBook interface {
 // inviteTableSize is the most members /invites lists.
 const inviteTableSize = 20
 
+// invitePeriods are the commands that answer the invite table: /invites,
+// whose argument names the period, this week's by default, and one for
+// this week and one for this month alone, to tap.
+var invitePeriods = map[string]bool{"/invites": true, "/invites_week": true, "/invites_month": true}
+
 // noteAdded notes the members a message says joined, when another added
 // them: the message is from the one who added them. One who joined alone, or
 // a bot, brings no one.
@@ -84,7 +89,11 @@ func (s *Service) inviteTable(ctx context.Context, in incoming) outcome {
 	if !in.group {
 		return say(textInvitesGroupOnly.to(in))
 	}
-	since, period := inviteSince(commandArgument(in.text), s.opts.Now(), s.opts.Location)
+	arg := commandArgument(in.text)
+	if command := commandName(in.text); command != "/invites" {
+		arg = strings.TrimPrefix(command, "/invites_")
+	}
+	since, period := inviteSince(arg, s.opts.Now(), s.opts.Location)
 	var inviter int64
 	if reply := in.msg.ReplyToMessage; reply != nil && reply.From != nil && !reply.From.IsBot {
 		inviter = reply.From.ID
@@ -136,7 +145,7 @@ var (
 	textInvitesTitle       = localText{uz: "👥 Kim nechta odam qo'shdi · %s", ru: "👥 Кто сколько людей добавил · %s", en: "👥 Who brought how many in · %s"}
 	textInvitesNone        = localText{uz: "Hali hech kim guruhda qolgan odam qo'shmagan.", ru: "Пока никто не добавил тех, кто остался в группе.", en: "Nobody has brought in anyone who is still here yet."}
 	textInvitesGone        = localText{uz: " (yana %d tasi chiqib ketgan)", ru: " (ещё %d ушли)", en: " (%d more left)"}
-	textInvitesRule        = localText{uz: "Reytingda guruhda qolgan odam qo'shganlar bor: qo'lda qo'shilgan yoki shaxsiy havola orqali kirgan. Kimdir chiqib ketsa, qo'shganning hisobidan ayriladi. Davr: /invites bugun · oy · hammasi", ru: "В рейтинге те, кто добавил оставшихся в группе: вручную или по личной ссылке. Кто ушёл, вычитается у добавившего. Период: /invites сегодня · месяц · все", en: "Listed: those who brought in people still here, added by hand or by one's own invite link. One who leaves is taken off whoever brought them. Period: /invites today · month · all"}
+	textInvitesRule        = localText{uz: "Reytingda guruhda qolgan odam qo'shganlar bor: qo'lda qo'shilgan yoki shaxsiy havola orqali kirgan. Kimdir chiqib ketsa, qo'shganning hisobidan ayriladi. Hafta: /invites_week · Oy: /invites_month", ru: "В рейтинге те, кто добавил оставшихся в группе: вручную или по личной ссылке. Кто ушёл, вычитается у добавившего. Неделя: /invites_week · Месяц: /invites_month", en: "Listed: those who brought in people still here, added by hand or by one's own invite link. One who leaves is taken off whoever brought them. Week: /invites_week · Month: /invites_month"}
 	textInvitesGroupOnly   = localText{uz: "👥 /invites guruhda ishlaydi.", ru: "👥 /invites работает в группе.", en: "👥 /invites works in a group."}
 	textInvitesUnavailable = localText{uz: "Hisobni hozir o'qib bo'lmadi, birozdan keyin urinib ko'ring.", ru: "Сейчас не удалось прочитать счёт, попробуйте позже.", en: "Could not read the count right now; try again in a bit."}
 )

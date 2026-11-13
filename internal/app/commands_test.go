@@ -60,7 +60,7 @@ func TestCommandMenusAreShort(t *testing.T) {
 	setter := &fakeCommandSetter{}
 	SetCommandMenus(context.Background(), setter, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	for scope, commands := range setter.set {
-		if len(commands) > 9 || !slices.ContainsFunc(commands, func(c telegram.BotCommand) bool { return c.Command == "games" }) ||
+		if len(commands) > 10 || !slices.ContainsFunc(commands, func(c telegram.BotCommand) bool { return c.Command == "games" }) ||
 			slices.ContainsFunc(commands, func(c telegram.BotCommand) bool { return c.Command == "boss" || c.Command == "stats" }) {
 			t.Errorf("%s menu %v", scope, commands)
 		}

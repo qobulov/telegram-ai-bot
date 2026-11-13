@@ -741,10 +741,11 @@ chiq" from anywhere, for a group she is in or a channel where she is an
 admin (`targets` lists them). The owner's own words must ask her to leave
 (chiq, ket, leave, выйди…), so the model cannot leave on its own.
 
-`/invites` in a group, with no model, lists who brought how many people
-in who are still there, this week (from Monday, Tashkent time), or `bugun`,
-`oy` or `hammasi` (`today`, `month`, `all`); replying to a member, theirs
-alone. A person counts for the member who added them (the message saying
+`/invites_week` and `/invites_month` in a group, with no model, list who
+brought how many people in who are still there, this week (from Monday,
+Tashkent time) or this month; `/invites` does this week's too, or with
+`bugun`, `oy` or `hammasi` (`today`, `month`, `all`) that period's; replying
+to a member, theirs alone. A person counts for the member who added them (the message saying
 they joined is from that member) or whose own invite link they came by
 (Telegram's `chat_member` update, where the bot is an admin); one who joined
 alone or a bot counts for no one. One who leaves or is removed is taken off
@@ -1335,7 +1336,7 @@ match "maria" unless you add it:
 word.
 
 **Commands** in a group need the bot's username (`/help@MyMariaBot`). A plain
-`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/card`, `/mycards`, `/cardtop`, `/cards`, `/market`, `/invites`, `/autocard`, `/duel`, `/trade`, `/boss`, `/snake`, `/woodcutter`, `/checkers` and `/tictactoe`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username. The commands' names are English; their old Uzbek ones (`/karta`, `/kartalar`, `/kartalarim`, `/kartatop`, `/bozor`, `/almash`, `/avto`, `/oyinlar`, `/ilon`, `/otinchi`, `/shashka`, `/dooz`, `/qoshganlar`, `/elon`) are still answered as the English ones, for players who learned them and the bot's old messages.
+`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/card`, `/mycards`, `/cardtop`, `/cards`, `/market`, `/invites`, `/invites_week`, `/invites_month`, `/autocard`, `/duel`, `/trade`, `/boss`, `/snake`, `/woodcutter`, `/checkers` and `/tictactoe`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username. The commands' names are English; their old Uzbek ones (`/karta`, `/kartalar`, `/kartalarim`, `/kartatop`, `/bozor`, `/almash`, `/avto`, `/oyinlar`, `/ilon`, `/otinchi`, `/shashka`, `/dooz`, `/qoshganlar`, `/elon`) are still answered as the English ones, for players who learned them and the bot's old messages.
 
 ### Example
 
