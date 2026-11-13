@@ -152,19 +152,42 @@ func modArgs(arg string) (minutes int, reason string) {
 }
 
 // modWordActions are the words an order in words starts with, and the
-// action each asks for.
+// action each asks for, in the languages the groups write: Uzbek in both
+// alphabets, Russian, English, Turkish and Kazakh.
 var modWordActions = map[string]string{
-	"mute": "mute", "mut": "mute", "myut": "mute", "мут": "mute", "мют": "mute",
-	"unmute": "unmute", "размут": "unmute", "анмут": "unmute",
-	"ban": "ban", "бан": "ban", "unban": "unban", "разбан": "unban",
-	"kick": "kick", "кик": "kick",
+	// mute
+	"mute": "mute", "mut": "mute", "myut": "mute", "silence": "mute", "shush": "mute",
+	"мут": "mute", "мют": "mute", "мьют": "mute", "замуть": "mute", "замутить": "mute", "мутни": "mute", "мутануть": "mute",
+	"заглуши": "mute", "заткни": "mute", "ovozsiz": "mute", "овозсиз": "mute", "jimla": "mute", "жимла": "mute",
+	"sustur": "mute", "susturun": "mute", "үнсіз": "mute", "өшір": "mute",
+	// unmute
+	"unmute": "unmute", "размут": "unmute", "размуть": "unmute", "размутить": "unmute", "анмут": "unmute",
+	"разглуши": "unmute", "susturmayı": "unmute",
+	// ban
+	"ban": "ban", "бан": "ban", "забань": "ban", "забанить": "ban", "банни": "ban", "заблокируй": "ban",
+	"blok": "ban", "блок": "ban", "yasakla": "ban", "banla": "ban", "банла": "ban", "бұғатта": "ban",
+	// unban
+	"unban": "unban", "разбан": "unban", "разбань": "unban", "разбанить": "unban", "разблокируй": "unban",
+	"yasağı": "unban",
+	// kick
+	"kick": "kick", "кик": "kick", "кикни": "kick", "кикнуть": "kick", "выгони": "kick", "выкинь": "kick",
+	"chiqar": "kick", "чиқар": "kick", "чикар": "kick", "hayda": "kick", "ҳайда": "kick", "хайда": "kick",
+	"remove": "kick", "шығар": "kick", "қу": "kick",
+	// delete the message replied to
+	"del": "delete", "delete": "delete", "удали": "delete", "удалить": "delete", "o'chir": "delete", "ochir": "delete", "ўчир": "delete", "sil": "delete",
 }
 
 // modFillers are the words an order in words may have besides its action
-// and length: "мут бер", "ban qil".
+// and length: "мут бер", "ban qil", "замуть его на 5 минут", "mute him for
+// 2 hours".
 var modFillers = map[string]bool{
 	"бер": true, "ber": true, "qil": true, "қил": true, "кил": true, "qilvor": true, "қилвор": true, "килвор": true,
-	"дай": true, "сделай": true, "please": true, "iltimos": true, "илтимос": true,
+	"qiling": true, "қилинг": true, "bering": true, "беринг": true,
+	"дай": true, "сделай": true, "его": true, "её": true, "ее": true, "их": true, "на": true, "пожалуйста": true,
+	"him": true, "her": true, "them": true, "for": true, "please": true,
+	"iltimos": true, "илтимос": true, "uni": true, "уни": true, "shuni": true, "шуни": true, "буни": true, "buni": true,
+	"onu": true, "lütfen": true, "boyunca": true, "оны": true, "ет": true,
+	"kaldır": true,
 }
 
 // modWords reads a short order in words: an action, then perhaps a length
@@ -179,19 +202,22 @@ func (s *Service) modWords(text string) (action string, minutes int, ok bool) {
 		}
 		words = append(words, w)
 	}
-	if len(words) == 0 || len(words) > 4 {
+	if len(words) == 0 || len(words) > 6 {
 		return "", 0, false
 	}
 	if action, ok = modWordActions[words[0]]; !ok {
 		return "", 0, false
 	}
-	length := ""
+	var length []string
 	for _, w := range words[1:] {
 		if !modFillers[w] {
-			length += w
+			length = append(length, w)
 		}
 	}
-	if minutes, ok = wordLength(length); !ok {
+	if len(length) > 2 {
+		return "", 0, false
+	}
+	if minutes, ok = wordLength(strings.Join(length, "")); !ok {
 		return "", 0, false
 	}
 	return action, minutes, true
@@ -205,10 +231,10 @@ var wordLength = func() func(string) (int, bool) {
 		prefixes []string
 		minutes  int
 	}{
-		{[]string{"мин", "min", "daq", "дак"}, 1},
-		{[]string{"soat", "час", "ч", "h"}, 60},
-		{[]string{"kun", "дн", "ден", "сут", "d", "д"}, 24 * 60},
-		{[]string{"hafta", "нед", "w", "н"}, 7 * 24 * 60},
+		{[]string{"мин", "min", "daq", "дақ", "дак", "dak"}, 1},
+		{[]string{"soat", "соат", "saat", "сағ", "час", "ч", "h"}, 60},
+		{[]string{"kun", "кун", "күн", "gün", "дн", "ден", "сут", "d", "д"}, 24 * 60},
+		{[]string{"hafta", "ҳафта", "хафта", "hafta", "апта", "нед", "w", "н"}, 7 * 24 * 60},
 		{[]string{"m", "м"}, 1},
 	}
 	return func(said string) (int, bool) {

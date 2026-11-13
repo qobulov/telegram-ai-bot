@@ -64,7 +64,11 @@ func TestModOrdersInWords(t *testing.T) {
 	}{
 		"Мут мари 1 минутга": {"mute", 1, true}, "мут 4 soat": {"mute", 240, true}, "ban": {"ban", 0, true},
 		"Maria, кик!": {"kick", 0, true}, "мут 2kun": {"mute", 2880, true}, "размут": {"unmute", 0, true},
+		"замуть его на 5 минут": {"mute", 5, true}, "mute him for 2 hours": {"mute", 120, true}, "забань": {"ban", 0, true},
+		"кикни": {"kick", 0, true}, "выгони пожалуйста": {"kick", 0, true}, "sustur 10 dakika": {"mute", 10, true},
+		"chiqar": {"kick", 0, true}, "ҳайда": {"kick", 0, true}, "мут 1 соатга": {"mute", 60, true}, "разбань": {"unban", 0, true},
 		"мут бериш керак эди": {"", 0, false}, "уни мут қил": {"", 0, false}, "мут 5 йил": {"", 0, false},
+		"chiqar bu gapni yana bir marta": {"", 0, false},
 	} {
 		action, minutes, ok := s.modWords(text)
 		if action != want.action || minutes != want.minutes || ok != want.ok {
