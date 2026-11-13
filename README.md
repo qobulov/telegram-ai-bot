@@ -743,6 +743,15 @@ chiq" from anywhere, for a group she is in or a channel where she is an
 admin (`targets` lists them). The owner's own words must ask her to leave
 (chiq, ket, leave, выйди…), so the model cannot leave on its own.
 
+`/qoshganlar` in a group, with no model, lists who brought how many people
+in this week (from Monday, Tashkent time), or `bugun`, `oy` or `hammasi`;
+replying to a member, theirs alone. A person counts for the member who added
+them (the message saying they joined is from that member) or whose own
+invite link they came by (Telegram's `chat_member` update, where the bot is
+an admin); one who joined alone, a bot, or one who left and came back again
+counts no more, and those who have left since are shown apart
+(`group_invites`, migration 68). Counting starts when this is deployed.
+
 Groups are recorded when the bot is added, promoted or removed (Telegram's
 `my_chat_member` updates) and from the messages it logs. Added to a group it
 was not in, the bot greets it in the language of whoever added it: how to
@@ -1323,7 +1332,7 @@ match "maria" unless you add it:
 word.
 
 **Commands** in a group need the bot's username (`/help@MyMariaBot`). A plain
-`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/karta`, `/kartalarim`, `/kartatop`, `/kartalar`, `/bozor`, `/avto`, `/duel`, `/almash`, `/boss`, `/ilon`, `/otinchi`, `/maydon`, `/shashka` and `/dooz`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username.
+`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/karta`, `/kartalarim`, `/kartatop`, `/kartalar`, `/bozor`, `/qoshganlar`, `/avto`, `/duel`, `/almash`, `/boss`, `/ilon`, `/otinchi`, `/maydon`, `/shashka` and `/dooz`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username.
 
 ### Example
 

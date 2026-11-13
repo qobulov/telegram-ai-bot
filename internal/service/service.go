@@ -174,7 +174,10 @@ type Options struct {
 	ActiveCounter    ActiveCounter
 	// Roster keeps the members seen in each group; nil keeps none.
 	Roster MemberBook
-	Logger *slog.Logger
+	// Invites keeps who brought whom into each group, for /qoshganlar; nil
+	// keeps none.
+	Invites InviteBook
+	Logger  *slog.Logger
 	// Model is the model name shown by /model.
 	Model string
 	// Workers is how many messages are processed at once.
@@ -724,6 +727,7 @@ func (s *Service) recordMember(change *telegram.ChatMemberUpdated) {
 	isGroup := change.Chat.Type == telegram.ChatTypeGroup || change.Chat.Type == telegram.ChatTypeSupergroup
 	if isGroup {
 		s.seeMember(change.Chat.ID, change.NewChatMember.User, change.NewChatMember.Status)
+		s.noteLinkJoin(change)
 	}
 }
 
@@ -738,6 +742,7 @@ func (s *Service) noteMembers(msg *telegram.Message) {
 	for i := range msg.NewChatMembers {
 		s.seeMember(msg.Chat.ID, &msg.NewChatMembers[i], "member")
 	}
+	s.noteAdded(msg)
 	if msg.LeftChatMember != nil {
 		s.seeMember(msg.Chat.ID, msg.LeftChatMember, "left")
 	}

@@ -304,6 +304,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Members:         groupMembers{client: bot.Client, botID: bot.User.ID},
 		Groups:          store,
 		Roster:          store,
+		Invites:         store,
 		Profiles:        store,
 		Exchanges:       store,
 		MemberCount:     bot.Client,

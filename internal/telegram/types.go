@@ -93,6 +93,15 @@ type ChatMemberUpdated struct {
 	From          *User      `json:"from"`
 	OldChatMember ChatMember `json:"old_chat_member"`
 	NewChatMember ChatMember `json:"new_chat_member"`
+	// InviteLink is the link a member joined by, when they did; Telegram
+	// gives it to a bot that is an admin.
+	InviteLink *ChatInviteLink `json:"invite_link,omitempty"`
+}
+
+// ChatInviteLink is a group's invite link and who made it.
+type ChatInviteLink struct {
+	InviteLink string `json:"invite_link"`
+	Creator    *User  `json:"creator,omitempty"`
 }
 
 // Message is an incoming chat message. Text is empty for photos, stickers,
