@@ -1335,7 +1335,7 @@ match "maria" unless you add it:
 word.
 
 **Commands** in a group need the bot's username (`/help@MyMariaBot`). A plain
-`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/card`, `/mycards`, `/cardtop`, `/cards`, `/market`, `/invites`, `/invites_week`, `/invites_month`, `/autocard`, `/duel`, `/trade`, `/boss`, `/snake`, `/woodcutter`, `/checkers` and `/tictactoe`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username. The commands' names are English; their old Uzbek ones (`/karta`, `/kartalar`, `/kartalarim`, `/kartatop`, `/bozor`, `/almash`, `/avto`, `/oyinlar`, `/ilon`, `/otinchi`, `/shashka`, `/dooz`, `/qoshganlar`, `/elon`) are still answered as the English ones, for players who learned them and the bot's old messages.
+`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/card`, `/mycards`, `/cardtop`, `/cards`, `/market`, `/invites`, `/invites_week`, `/invites_month`, `/autocard`, `/duel`, `/trade`, `/boss`, `/snake`, `/woodcutter`, `/checkers` and `/tictactoe`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username. The commands' names are English; their old Uzbek ones (`/karta`, `/kartalar`, `/qoshganlar` and the rest) are not answered any more.
 
 ### Example
 

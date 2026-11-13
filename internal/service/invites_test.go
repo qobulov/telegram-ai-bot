@@ -104,17 +104,13 @@ func TestInvitesAreNotedAndListed(t *testing.T) {
 	}
 }
 
-// A command's old Uzbek name still works, as its English one.
-func TestUzbekCommandNamesStillWork(t *testing.T) {
-	for old, english := range map[string]string{"/karta@Bot x": "/card", "/Qoshganlar": "/invites", "/dooz": "/tictactoe", "/help": "/help"} {
-		if got := commandName(old); got != english {
-			t.Errorf("commandName(%q) = %q, want %q", old, got, english)
-		}
-	}
+// The commands' old Uzbek names are gone: /qoshganlar is no table.
+func TestUzbekCommandNamesAreGone(t *testing.T) {
 	f := newFixture()
 	f.opts.Invites = &fakeInviteBook{}
-	sent := f.run(inGroup(groupMessage("/qoshganlar")))
-	if got := sent[len(sent)-1].text; !strings.Contains(got, "Ali — 15") {
-		t.Fatalf("/qoshganlar = %q", got)
+	for _, sent := range f.run(inGroup(groupMessage("/qoshganlar"))) {
+		if strings.Contains(sent.text, "Ali — 15") {
+			t.Fatalf("/qoshganlar = %q", sent.text)
+		}
 	}
 }

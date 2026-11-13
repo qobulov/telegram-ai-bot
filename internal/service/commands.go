@@ -1735,37 +1735,12 @@ func (s *Service) refuseUnlessManager(ctx context.Context, in incoming) string {
 }
 
 // commandName extracts the command from text such as "/Help@my_bot extra",
-// giving "/help". A command's old Uzbek name gives its English one, so
-// "/karta" is "/card".
+// giving "/help".
 func commandName(text string) string {
 	words := strings.Fields(text)
 	if len(words) == 0 {
 		return ""
 	}
 	name, _, _ := strings.Cut(words[0], "@")
-	name = strings.ToLower(name)
-	if english, ok := uzbekCommands[name]; ok {
-		return english
-	}
-	return name
-}
-
-// uzbekCommands are the commands' names before they were English, still
-// answered: players learned them, and the bot's old messages and pinned
-// posts name them.
-var uzbekCommands = map[string]string{
-	"/karta": "/card", "/kartalar": "/cards", "/kartalarim": "/mycards", "/kartatop": "/cardtop",
-	"/bozor": "/market", "/almash": "/trade", "/avto": "/autocard", "/oyinlar": "/games",
-	"/ilon": "/snake", "/otinchi": "/woodcutter", "/shashka": "/checkers",
-	"/dooz": "/tictactoe", "/qoshganlar": "/invites", "/elon": "/announce",
-}
-
-// englishCommands gives each of commands by its English name, as
-// commandName compares it: ADMIN_COMMANDS may name a command the old way.
-func englishCommands(commands map[string]bool) map[string]bool {
-	english := make(map[string]bool, len(commands))
-	for command := range commands {
-		english[commandName(command)] = true
-	}
-	return english
+	return strings.ToLower(name)
 }

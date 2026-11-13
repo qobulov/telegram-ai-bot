@@ -554,7 +554,6 @@ func New(opts Options) *Service {
 	if opts.Now == nil {
 		opts.Now = time.Now
 	}
-	opts.AdminCommands = englishCommands(opts.AdminCommands)
 	s := &Service{
 		opts:            opts,
 		userLimiter:     newLimiter(opts.RatePerMinute),
