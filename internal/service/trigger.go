@@ -65,7 +65,7 @@ func (s *Service) address(msg *telegram.Message) (string, trigger) {
 		return "", triggerNone
 	}
 	if target, isCommand := commandTarget(text); isCommand && !strings.EqualFold(target, s.opts.Bot.Username) &&
-		(target != "" || !ownCommands[commandName(text)]) {
+		(target != "" || !s.plainCommand(msg, text)) {
 		return "", triggerNone
 	}
 	return text, how
@@ -99,6 +99,19 @@ func (s *Service) orName(text string) string {
 		return s.opts.DisplayName
 	}
 	return text
+}
+
+// plainCommand reports a command the bot answers in a group without its
+// name: one of ownCommands, or a moderation command replying to a member's
+// message, which a group whose admins moderate with commands sends so.
+func (s *Service) plainCommand(msg *telegram.Message, text string) bool {
+	command := commandName(text)
+	if ownCommands[command] {
+		return true
+	}
+	replied := msg.ReplyToMessage
+	_, moderates := modCommands[command]
+	return moderates && replied != nil && replied.From != nil && !s.isFromBot(replied) && msg.From != nil && replied.From.ID != msg.From.ID
 }
 
 // ownCommands are the bot's commands that no other bot in its groups has:

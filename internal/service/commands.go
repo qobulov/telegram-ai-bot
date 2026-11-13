@@ -752,6 +752,9 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 	if pressedHelp(in) {
 		in.text = "/help"
 	}
+	if s.opts.Tools != nil && s.isModCommand(in) {
+		return s.modCommand(ctx, in)
+	}
 	if commandName(in.text) == "/start" {
 		if out, ok := s.startShashka(in); ok {
 			return out

@@ -1105,7 +1105,7 @@ func withUsername(name, username string) string {
 // commands controlling the mute. The bot posts nothing at all in reply to
 // such a message, not even a notice.
 func (s *Service) silenced(in incoming) bool {
-	return in.group && s.isMuted(in.scope.ChatID) && !isMuteCommand(in.text)
+	return in.group && s.isMuted(in.scope.ChatID) && !isMuteCommand(in.text) && !s.isModCommand(in)
 }
 
 func (s *Service) isMuted(chatID int64) bool {

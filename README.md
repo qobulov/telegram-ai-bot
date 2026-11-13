@@ -1548,6 +1548,16 @@ kept with its judge.
 
 ### Moderation
 
+Admins used to other group bots may moderate with commands, replying to a
+member's message: `/mute 4h spam` (a length in `m`, `h`, `d` or `w`, or in
+minutes, `soat`, `kun`, `час`… too; an hour when not given, a week at most),
+`/unmute`, `/ban`, `/unban`, `/kick` and `/del`. These are done without the
+model, through the `moderate` tool, so the same rights are checked and
+`undo` puts them back; replying to a member they are answered without the
+bot's name, as such a group sends them (another moderating bot there may
+act on them too). `/mute` and `/unmute` replying to no one still quiet the
+bot itself.
+
 A group's admins can have her act on a message by replying to it and asking
 ("Maria, o'chir", "Maria, buni 30 daqiqaga mute qil", "Maria, pin qil"). The
 model calls the `moderate` tool, which is offered in groups only, and every
