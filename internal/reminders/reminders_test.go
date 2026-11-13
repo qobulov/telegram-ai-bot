@@ -126,11 +126,11 @@ func TestFireCardReminders(t *testing.T) {
 		t.Fatalf("summary = %+v, outcomes = %v", summary, store.outcomes)
 	}
 	private, group := sender.sent[0], sender.sent[1]
-	if !strings.Contains(private.Text, "/karta") || strings.Contains(private.Text, "@maria_bot") ||
+	if !strings.Contains(private.Text, "/card") || strings.Contains(private.Text, "@maria_bot") ||
 		len(private.Buttons) != 1 || private.Buttons[0][0].WebApp == nil || private.Buttons[0][0].WebApp.URL != "https://bot.example/kartalar/" {
 		t.Errorf("private card reminder = %+v", private)
 	}
-	if !strings.HasPrefix(group.Text, "⏰ [Ali](tg://user?id=9)\n") || !strings.Contains(group.Text, "/karta@maria_bot") || !strings.Contains(group.Text, "карту") ||
+	if !strings.HasPrefix(group.Text, "⏰ [Ali](tg://user?id=9)\n") || !strings.Contains(group.Text, "/card@maria_bot") || !strings.Contains(group.Text, "карту") ||
 		group.ReplyToMessageID != 42 || group.Buttons[0][0].URL != "https://t.me/maria_bot?start=kartalar" || group.Buttons[0][0].WebApp != nil {
 		t.Errorf("group card reminder = %+v", group)
 	}

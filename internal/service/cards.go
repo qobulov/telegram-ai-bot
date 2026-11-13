@@ -78,10 +78,10 @@ var rarityNames = []localText{
 // name, which is outside data, as a mark of its own.
 var cardMarks = strings.NewReplacer("*", "", "`", "", "[", "(", "]", ")")
 
-// isCardDraw reports a message asking for a card: /karta anywhere, or the
+// isCardDraw reports a message asking for a card: /card anywhere, or the
 // word alone in a private chat.
 func isCardDraw(in incoming) bool {
-	if commandName(in.text) == "/karta" {
+	if commandName(in.text) == "/card" {
 		return true
 	}
 	word := strings.ToLower(strings.TrimSpace(in.text))
@@ -161,7 +161,7 @@ func spaced(n int64) string {
 	return b.String()
 }
 
-// cardCollection answers /kartalarim: the player's points, and for each
+// cardCollection answers /mycards: the player's points, and for each
 // rarity how many of its cards they hold, as buttons that list them.
 func (s *Service) cardCollection(ctx context.Context, in incoming) outcome {
 	text, buttons, err := s.collectionMenu(ctx, in, in.userID)
@@ -317,7 +317,7 @@ func (s *Service) startCards(in incoming) (outcome, bool) {
 	return outcome{}, false
 }
 
-// cardTop answers /kartatop: the players with the most points.
+// cardTop answers /cardtop: the players with the most points.
 func (s *Service) cardTop(ctx context.Context, in incoming) outcome {
 	top, err := s.opts.Cards.CardTop(ctx, cardRankSize)
 	if err != nil {
@@ -368,9 +368,9 @@ var (
 		en: "Cards are not available right now; try again in a bit.",
 	}
 	textCardWait = localText{
-		uz: "⏳ Keyingi karta %d daqiqadan keyin. Kolleksiya: /kartalarim",
-		ru: "⏳ Следующая карта через %d мин. Коллекция: /kartalarim",
-		en: "⏳ Your next card in %d min. Collection: /kartalarim",
+		uz: "⏳ Keyingi karta %d daqiqadan keyin. Kolleksiya: /mycards",
+		ru: "⏳ Следующая карта через %d мин. Коллекция: /mycards",
+		en: "⏳ Your next card in %d min. Collection: /mycards",
 	}
 	textCardStats      = localText{uz: "⚔️ Hujum %s · ❤️ Jon %s", ru: "⚔️ Атака %s · ❤️ Жизнь %s", en: "⚔️ Attack %s · ❤️ Life %s"}
 	textCardNew        = localText{uz: "🆕 Yangi karta · +%s ochko", ru: "🆕 Новая карта · +%s очков", en: "🆕 New card · +%s points"}
@@ -386,23 +386,23 @@ var (
 	textCardAll        = localText{uz: "🗂 Hammasi - %d/%d", ru: "🗂 Все - %d/%d", en: "🗂 All - %d/%d"}
 	textCardAllTitle   = localText{uz: "🗂 Barcha kartalaringiz", ru: "🗂 Все ваши карты", en: "🗂 All your cards"}
 	textCardCollection = localText{
-		uz: "🎴 %s, qaysi kartalarni ko'rasiz?\n💠 Ochko: %s\n💎 Kristal, sovg'a va bozor: /kartalar ilovasida",
-		ru: "🎴 %s, какие карты посмотреть?\n💠 Очки: %s\n💎 Кристаллы, подарки и рынок: в приложении /kartalar",
-		en: "🎴 %s, which cards do you want to see?\n💠 Points: %s\n💎 Crystals, gifts and the market: in the /kartalar app",
+		uz: "🎴 %s, qaysi kartalarni ko'rasiz?\n💠 Ochko: %s\n💎 Kristal, sovg'a va bozor: /cards ilovasida",
+		ru: "🎴 %s, какие карты посмотреть?\n💠 Очки: %s\n💎 Кристаллы, подарки и рынок: в приложении /cards",
+		en: "🎴 %s, which cards do you want to see?\n💠 Points: %s\n💎 Crystals, gifts and the market: in the /cards app",
 	}
 	textCardNotYours = localText{
-		uz: "Bu sizning kolleksiyangiz emas: o'zingiznikini /kartalarim bilan oching.",
+		uz: "Bu sizning kolleksiyangiz emas: o'zingiznikini /mycards bilan oching.",
 		ru: "Это не ваша коллекция: откройте свою через /kartalarim.",
 		en: "This is not your collection: open yours with /kartalarim.",
 	}
 	textCardMore     = localText{uz: "…va yana %d ta", ru: "…и ещё %d", en: "…and %d more"}
-	textCardNone     = localText{uz: "Hali bunday karta yo'q. Olish: /karta", ru: "Таких карт пока нет. Получить: /karta", en: "No such cards yet. Draw one: /karta"}
+	textCardNone     = localText{uz: "Hali bunday karta yo'q. Olish: /card", ru: "Таких карт пока нет. Получить: /card", en: "No such cards yet. Draw one: /card"}
 	textCardBack     = localText{uz: "⬅️ Orqaga", ru: "⬅️ Назад", en: "⬅️ Back"}
 	textCardTopTitle = localText{uz: "🏆 **Kartalar reytingi**", ru: "🏆 **Рейтинг карт**", en: "🏆 **Card ranking**"}
 	textCardTopRow   = localText{uz: "%s %s\n      💠 %s · 🎴 %d", ru: "%s %s\n      💠 %s · 🎴 %d", en: "%s %s\n      💠 %s · 🎴 %d"}
 	textCardTopYou   = localText{uz: "  ← siz", ru: "  ← вы", en: "  ← you"}
 	textCardTopMine  = localText{uz: "📍 Siz: %d-o'rin · 💠 %s · 🎴 %d", ru: "📍 Вы: %d-е место · 💠 %s · 🎴 %d", en: "📍 You: #%d · 💠 %s · 🎴 %d"}
-	textCardTopHint  = localText{uz: "💠 ochko · 🎴 kartalar · yangi karta: /karta", ru: "💠 очки · 🎴 карты · новая карта: /karta", en: "💠 points · 🎴 cards · a new card: /karta"}
+	textCardTopHint  = localText{uz: "💠 ochko · 🎴 kartalar · yangi karta: /card", ru: "💠 очки · 🎴 карты · новая карта: /card", en: "💠 points · 🎴 cards · a new card: /card"}
 	textMarket       = localText{
 		uz: "🔄 Kartalar bozori: kartangizni qo'ying va evaziga kerakli kartani tanlang. Kimda o'sha karta bo'lsa, bir bosishda almashadi.",
 		ru: "🔄 Рынок карт: выставьте свою карту и выберите, какую хотите взамен. У кого она есть — обменяется в одно нажатие.",
@@ -415,5 +415,5 @@ var (
 		en: "🎴 The cards app: your collection, drawing cards and the ranking in one place.",
 	}
 	textCardsAppButton = localText{uz: "📱 Ilovada ochish", ru: "📱 Открыть приложение", en: "📱 Open the app"}
-	textCardTopEmpty   = localText{uz: "Hali hech kim karta olmagan. Birinchi bo'ling: /karta", ru: "Ещё никто не получил карту. Будьте первым: /karta", en: "Nobody has drawn a card yet. Be the first: /karta"}
+	textCardTopEmpty   = localText{uz: "Hali hech kim karta olmagan. Birinchi bo'ling: /card", ru: "Ещё никто не получил карту. Будьте первым: /card", en: "Nobody has drawn a card yet. Be the first: /card"}
 )

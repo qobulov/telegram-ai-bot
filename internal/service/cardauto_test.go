@@ -136,14 +136,14 @@ func TestAnOpenedCardWithoutItsPicture(t *testing.T) {
 	}
 }
 
-// /avto turns the auto opener on, and again off.
+// /autocard turns the auto opener on, and again off.
 func TestAvtoTogglesTheAutoOpener(t *testing.T) {
 	f := newFixture()
 	f.opts.Cards = newFakeCards("")
-	if sent := f.run(textFrom(userID, "/avto")); len(sent) != 1 || !strings.Contains(sent[0].text, "Avto-ochish yoqildi") {
+	if sent := f.run(textFrom(userID, "/autocard")); len(sent) != 1 || !strings.Contains(sent[0].text, "Avto-ochish yoqildi") {
 		t.Fatalf("on = %+v", sent)
 	}
-	if sent := f.run(textFrom(userID, "/avto")); len(sent) != 2 || !strings.Contains(sent[1].text, "o'chirildi") {
+	if sent := f.run(textFrom(userID, "/autocard")); len(sent) != 2 || !strings.Contains(sent[1].text, "o'chirildi") {
 		t.Fatalf("off = %+v", sent)
 	}
 }

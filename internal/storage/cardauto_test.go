@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// /avto turns a player's auto opener on and off; the opener finds the
+// /autocard turns a player's auto opener on and off; the opener finds the
 // players whose card is ready, longest waiting first, and stops for one.
 func TestCardAutoOpenerFindsTheReadyPlayers(t *testing.T) {
 	store := newTestStore(t)

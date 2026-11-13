@@ -225,7 +225,7 @@ func (h *handler) tell(ctx context.Context, chatID int64, events []Event) {
 			if err := h.Store.AddRaidCoins(ctx, e.Winners, prize); err != nil {
 				h.Logger.Error("could not pay maydon winners", "chat_id", chatID, "error", err)
 			} else {
-				text += fmt.Sprintf("\n\n🏆 G'oliblarga +%d 💰 Dev jangi tangasi. Yana jang: /maydon", prize)
+				text += fmt.Sprintf("\n\n🏆 G'oliblarga +%d 💰 Dev jangi tangasi. Yana jang: /arena", prize)
 			}
 		}
 		if _, err := h.Telegram.SendMessage(ctx, telegram.Outgoing{ChatID: chatID, Text: text}); err != nil {

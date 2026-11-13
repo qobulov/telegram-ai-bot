@@ -17,7 +17,7 @@
       fresh: "🆕 Yangi karta!", sure: "✨ Kafolatlangan karta!", pity: (l, m) => `{3} Afsonaviy — ${l} kartadan keyin aniq\n{4} Mifik — ${m} kartadan keyin aniq`, again: (n) => `🔁 Sizda endi ×${n}`, plus: (n) => `+${n} ochko`,
       attack: "Hujum", health: "Jon", value: "Ochko", cards: (n) => `${n} karta`, pts: "ochko",
       none: "Hech narsa topilmadi", noTop: "Hali hech kim karta olmagan",
-      noTelegram: "Ilovani Telegram'da oching: botga /kartalar yozing.", stale: "Ilova eskirdi, uni qayta oching.",
+      noTelegram: "Ilovani Telegram'da oching: botga /cards yozing.", stale: "Ilova eskirdi, uni qayta oching.",
       unavailable: "Aloqa uzildi, birozdan keyin urinib ko'ring.",
       allSets: "Hammasi", pointsLabel: "ochko", loading: "Kartalar yuklanmoqda…",
       welcomeTitle: "Kolleksiyangiz bo'sh", welcomeText: "Har soatda bitta tasodifiy anime karta oling va hammasini to'plang.",
@@ -71,7 +71,7 @@
       fresh: "🆕 A new card!", sure: "✨ A guaranteed card!", pity: (l, m) => `{3} Legendary — sure in ${l} cards\n{4} Mythic — sure in ${m} cards`, again: (n) => `🔁 You now have ×${n}`, plus: (n) => `+${n} points`,
       attack: "Attack", health: "Life", value: "Points", cards: (n) => `${n} cards`, pts: "points",
       none: "Nothing found", noTop: "Nobody has drawn a card yet",
-      noTelegram: "Open the app in Telegram: send /kartalar to the bot.", stale: "The app is out of date; open it again.",
+      noTelegram: "Open the app in Telegram: send /cards to the bot.", stale: "The app is out of date; open it again.",
       unavailable: "No connection; try again in a bit.",
       allSets: "All", pointsLabel: "points", loading: "Loading the cards…",
       welcomeTitle: "Your collection is empty", welcomeText: "Draw a random anime card every hour and collect them all.",
@@ -129,7 +129,7 @@
     try {
       applyState(await api("state"));
       $("loading").hidden = true;
-      // A link may name the tab to open, as /bozor does; otherwise a
+      // A link may name the tab to open, as /market does; otherwise a
       // newcomer starts at the draw and anyone else at their collection.
       const asked = new URLSearchParams(location.search).get("tab");
       if (!opened) showTab(["collection", "draw", "market", "top"].includes(asked) ? asked : cards.some((c) => c.count > 0) ? "collection" : "draw");

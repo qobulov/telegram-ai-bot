@@ -137,7 +137,7 @@ func unreachable(err error) bool {
 	return errors.As(err, &apiErr) && (apiErr.Code == http.StatusForbidden || apiErr.Code == http.StatusBadRequest)
 }
 
-// toggleCardAuto answers /avto: it turns the player's auto opener on, or off
+// toggleCardAuto answers /autocard: it turns the player's auto opener on, or off
 // when it was on.
 func (s *Service) toggleCardAuto(ctx context.Context, in incoming) outcome {
 	on, err := s.opts.Cards.ToggleCardAuto(ctx, in.userID, doozName(in.msg.From), languageOf(in))
@@ -156,23 +156,23 @@ func (s *Service) toggleCardAuto(ctx context.Context, in incoming) outcome {
 
 var (
 	textCardAutoOpened = localText{
-		uz: "🤖 Avto-ochildi · o'chirish: /avto",
-		ru: "🤖 Открыто автоматически · выключить: /avto",
-		en: "🤖 Opened for you · turn off: /avto",
+		uz: "🤖 Avto-ochildi · o'chirish: /autocard",
+		ru: "🤖 Открыто автоматически · выключить: /autocard",
+		en: "🤖 Opened for you · turn off: /autocard",
 	}
 	textCardAutoOn = localText{
-		uz: "🤖 Avto-ochish yoqildi: har karta tayyor bo'lishi bilan o'zim ochib, shu yerga ovozsiz yuboraman.\nO'chirish: /avto",
-		ru: "🤖 Автооткрытие включено: каждую карту я открою, как только она будет готова, и пришлю сюда без звука.\nВыключить: /avto",
-		en: "🤖 Auto opener on: I will open each card as soon as it is ready and send it here quietly.\nTurn off: /avto",
+		uz: "🤖 Avto-ochish yoqildi: har karta tayyor bo'lishi bilan o'zim ochib, shu yerga ovozsiz yuboraman.\nO'chirish: /autocard",
+		ru: "🤖 Автооткрытие включено: каждую карту я открою, как только она будет готова, и пришлю сюда без звука.\nВыключить: /autocard",
+		en: "🤖 Auto opener on: I will open each card as soon as it is ready and send it here quietly.\nTurn off: /autocard",
 	}
 	textCardAutoOnGroup = localText{
-		uz: "🤖 Avto-ochish yoqildi: kartalar shaxsiy chatingizga ovozsiz keladi. Botga hali yozmagan bo'lsangiz, pastdagi tugma orqali /start bosing.\nO'chirish: /avto",
-		ru: "🤖 Автооткрытие включено: карты будут приходить вам в личку без звука. Если вы ещё не писали боту, нажмите кнопку ниже и /start.\nВыключить: /avto",
-		en: "🤖 Auto opener on: your cards will come to your private chat quietly. If you have not written to the bot yet, tap the button below and /start.\nTurn off: /avto",
+		uz: "🤖 Avto-ochish yoqildi: kartalar shaxsiy chatingizga ovozsiz keladi. Botga hali yozmagan bo'lsangiz, pastdagi tugma orqali /start bosing.\nO'chirish: /autocard",
+		ru: "🤖 Автооткрытие включено: карты будут приходить вам в личку без звука. Если вы ещё не писали боту, нажмите кнопку ниже и /start.\nВыключить: /autocard",
+		en: "🤖 Auto opener on: your cards will come to your private chat quietly. If you have not written to the bot yet, tap the button below and /start.\nTurn off: /autocard",
 	}
 	textCardAutoOff = localText{
-		uz: "⏸ Avto-ochish o'chirildi. Kartani o'zingiz oching: /karta",
-		ru: "⏸ Автооткрытие выключено. Открывайте карты сами: /karta",
-		en: "⏸ Auto opener off. Open your cards yourself: /karta",
+		uz: "⏸ Avto-ochish o'chirildi. Kartani o'zingiz oching: /card",
+		ru: "⏸ Автооткрытие выключено. Открывайте карты сами: /card",
+		en: "⏸ Auto opener off. Open your cards yourself: /card",
 	}
 )

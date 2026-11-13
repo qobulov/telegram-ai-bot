@@ -476,9 +476,9 @@ func (h *handler) tellGift(ctx context.Context, user miniapp.User, cardID, to in
 var giftMarks = strings.NewReplacer("*", "", "`", "", "[", "(", "]", ")")
 
 var giftTexts = map[string]string{
-	"uz": "🎁 {who} sizga karta sovg'a qildi: **{card}**!\nKolleksiyangiz: /kartalar",
-	"ru": "🎁 {who} подарил вам карту: **{card}**!\nВаша коллекция: /kartalar",
-	"en": "🎁 {who} gave you a card: **{card}**!\nYour collection: /kartalar",
+	"uz": "🎁 {who} sizga karta sovg'a qildi: **{card}**!\nKolleksiyangiz: /cards",
+	"ru": "🎁 {who} подарил вам карту: **{card}**!\nВаша коллекция: /cards",
+	"en": "🎁 {who} gave you a card: **{card}**!\nYour collection: /cards",
 }
 
 func marketRules(now time.Time) storage.CardMarketRules {
@@ -601,7 +601,7 @@ func (h *handler) unoffer(ctx context.Context, user miniapp.User, id int64) (any
 }
 
 var takenTexts = map[string]string{
-	"uz": "🔄 {who} taklifingizni qabul qildi: siz **{got}** oldingiz, **{gave}** berdingiz.\nKolleksiyangiz: /kartalar",
-	"ru": "🔄 {who} принял ваше предложение: вы получили **{got}** и отдали **{gave}**.\nВаша коллекция: /kartalar",
-	"en": "🔄 {who} took your offer: you got **{got}** and gave **{gave}**.\nYour collection: /kartalar",
+	"uz": "🔄 {who} taklifingizni qabul qildi: siz **{got}** oldingiz, **{gave}** berdingiz.\nKolleksiyangiz: /cards",
+	"ru": "🔄 {who} принял ваше предложение: вы получили **{got}** и отдали **{gave}**.\nВаша коллекция: /cards",
+	"en": "🔄 {who} took your offer: you got **{got}** and gave **{gave}**.\nYour collection: /cards",
 }

@@ -16,7 +16,7 @@
   };
   const PERFECT = 450;
   const ERRORS = {
-    group: "Maydon guruhda o'ynaladi: o'yinni guruhga yuboring (/maydon).",
+    group: "Maydon guruhda o'ynaladi: o'yinni guruhga yuboring (/arena).",
     session: "O'yin havolasi eskirdi. Telegram'da «Play» ni qaytadan bosing.",
     started: "Jang boshlangan — keyingisini kuting.", full: "Xona to'la (5v5).", too_few: "Kamida 2 jangchi kerak.",
     early: "Erta!", energy: "Energiya hali to'lmagan.", block: "Himoya hali tayyor emas.", target: "Bu nishonni tanlab bo'lmaydi.",
@@ -360,6 +360,6 @@
   setInterval(() => { if (state && state.phase !== "battle") poll(); }, 2000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
   requestAnimationFrame(frame);
-  if (!session) { fatal = "O'yinni Telegram'da oching: guruhga /maydon yozing va «Play» ni bosing."; render(); }
+  if (!session) { fatal = "O'yinni Telegram'da oching: guruhga /arena yozing va «Play» ni bosing."; render(); }
   else { render(); poll(); }
 })();

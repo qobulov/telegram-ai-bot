@@ -605,7 +605,7 @@ func (s *Service) mayAnswerInGroup(in incoming) (reservation int64, allowed bool
 
 // isCommand reports a command, which the group's quota of answers does not
 // count: the quota is for the model's talk, and a command never asks the
-// model, an unknown one only saying so. Counted with that talk, /kartalarim
+// model, an unknown one only saying so. Counted with that talk, /mycards
 // went unanswered to a member who had talked with the bot that hour. The
 // flood guard still holds for commands, as for anything.
 func isCommand(text string) bool {
@@ -769,41 +769,41 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.statsCommand(in)
 	case commandName(in.text) == "/game":
 		return s.gameCommand(ctx, in, game.ShortName)
-	case commandName(in.text) == "/ilon":
+	case commandName(in.text) == "/snake":
 		return s.gameCommand(ctx, in, game.IlonShortName)
-	case commandName(in.text) == "/otinchi":
+	case commandName(in.text) == "/woodcutter":
 		return s.gameCommand(ctx, in, game.OtinchiShortName)
 	case commandName(in.text) == "/boss":
 		return s.gameCommand(ctx, in, game.BossShortName)
 	case commandName(in.text) == "/mafia":
 		return s.gameCommand(ctx, in, game.MafiaShortName)
-	case commandName(in.text) == "/maydon":
+	case commandName(in.text) == "/arena":
 		return s.gameCommand(ctx, in, game.MaydonShortName)
-	case commandName(in.text) == "/oyinlar":
+	case commandName(in.text) == "/games":
 		return s.gamesMenu(in)
-	case commandName(in.text) == "/dooz":
+	case commandName(in.text) == "/tictactoe":
 		return s.doozCommand(in)
-	case commandName(in.text) == "/shashka":
+	case commandName(in.text) == "/checkers":
 		return s.shashkaCommand(ctx, in)
 	case s.opts.Cards != nil && isCardDraw(in):
 		return s.drawCard(ctx, in)
-	case s.opts.Cards != nil && s.opts.Buttons != nil && commandName(in.text) == "/kartalarim":
+	case s.opts.Cards != nil && s.opts.Buttons != nil && commandName(in.text) == "/mycards":
 		return s.cardCollection(ctx, in)
-	case s.opts.Cards != nil && s.opts.CardsURL != "" && commandName(in.text) == "/kartalar":
+	case s.opts.Cards != nil && s.opts.CardsURL != "" && commandName(in.text) == "/cards":
 		return outcome{text: textCardsApp.to(in), buttons: s.cardsAppButton(in)}
-	case s.opts.Invites != nil && commandName(in.text) == "/qoshganlar":
+	case s.opts.Invites != nil && commandName(in.text) == "/invites":
 		return s.inviteTable(ctx, in)
-	case s.opts.Cards != nil && s.opts.CardsURL != "" && commandName(in.text) == "/bozor":
+	case s.opts.Cards != nil && s.opts.CardsURL != "" && commandName(in.text) == "/market":
 		return outcome{text: textMarket.to(in), buttons: s.marketButton(in)}
-	case s.opts.Cards != nil && commandName(in.text) == "/kartatop":
+	case s.opts.Cards != nil && commandName(in.text) == "/cardtop":
 		return s.cardTop(ctx, in)
-	case s.opts.Cards != nil && commandName(in.text) == "/avto":
+	case s.opts.Cards != nil && commandName(in.text) == "/autocard":
 		return s.toggleCardAuto(ctx, in)
 	case s.opts.Cards != nil && s.opts.Buttons != nil && commandName(in.text) == "/duel":
 		return s.duelCommand(ctx, in)
-	case s.opts.Cards != nil && s.opts.Buttons != nil && commandName(in.text) == "/almash":
+	case s.opts.Cards != nil && s.opts.Buttons != nil && commandName(in.text) == "/trade":
 		return s.tradeCardCommand(ctx, in)
-	case commandName(in.text) == "/elon" && !in.group && s.opts.Tools != nil && s.isOwner(in.msg.From):
+	case commandName(in.text) == "/announce" && !in.group && s.opts.Tools != nil && s.isOwner(in.msg.From):
 		return s.announceCommand(ctx, in)
 	case !in.group && s.opts.Tools != nil && s.opts.Buttons != nil && s.isOwner(in.msg.From) && pressed(in, keyboardAd):
 		return askForAd(in)
@@ -1737,12 +1737,37 @@ func (s *Service) refuseUnlessManager(ctx context.Context, in incoming) string {
 }
 
 // commandName extracts the command from text such as "/Help@my_bot extra",
-// giving "/help".
+// giving "/help". A command's old Uzbek name gives its English one, so
+// "/karta" is "/card".
 func commandName(text string) string {
 	words := strings.Fields(text)
 	if len(words) == 0 {
 		return ""
 	}
 	name, _, _ := strings.Cut(words[0], "@")
-	return strings.ToLower(name)
+	name = strings.ToLower(name)
+	if english, ok := uzbekCommands[name]; ok {
+		return english
+	}
+	return name
+}
+
+// uzbekCommands are the commands' names before they were English, still
+// answered: players learned them, and the bot's old messages and pinned
+// posts name them.
+var uzbekCommands = map[string]string{
+	"/karta": "/card", "/kartalar": "/cards", "/kartalarim": "/mycards", "/kartatop": "/cardtop",
+	"/bozor": "/market", "/almash": "/trade", "/avto": "/autocard", "/oyinlar": "/games",
+	"/ilon": "/snake", "/otinchi": "/woodcutter", "/maydon": "/arena", "/shashka": "/checkers",
+	"/dooz": "/tictactoe", "/qoshganlar": "/invites", "/elon": "/announce",
+}
+
+// englishCommands gives each of commands by its English name, as
+// commandName compares it: ADMIN_COMMANDS may name a command the old way.
+func englishCommands(commands map[string]bool) map[string]bool {
+	english := make(map[string]bool, len(commands))
+	for command := range commands {
+		english[commandName(command)] = true
+	}
+	return english
 }

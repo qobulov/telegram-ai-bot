@@ -16,21 +16,23 @@ const commandsTimeout = 5 * time.Second
 // have it ignore a member. Owners' commands, /model among them, are left
 // out, and so are the games' and Kartalar's many: 22 commands crowded the
 // menu, so it keeps the card of the hour, the Mini App that holds the
-// collection, the table and the shards, and /oyinlar, which lists every game
-// to tap. The rest are answered all the same.
+// collection, the table and the shards, and /games, which lists every game
+// to tap; in groups also /invites, the table of who brought whom. The rest
+// are answered all the same.
 var commandMenus = map[string][]telegram.BotCommand{
 	telegram.ScopeDefault: {
 		{Command: "start", Description: "Salomlashish"},
 		{Command: "help", Description: "Yordam va buyruqlar"},
-		{Command: "karta", Description: "Anime karta olish (soatiga 1 ta)"},
-		{Command: "kartalar", Description: "Kartalar ilovasi: kolleksiya, reyting, kristal"},
-		{Command: "oyinlar", Description: "Barcha o'yinlar"},
+		{Command: "card", Description: "Anime karta olish (soatiga 1 ta)"},
+		{Command: "cards", Description: "Kartalar ilovasi: kolleksiya, reyting, kristal"},
+		{Command: "games", Description: "Barcha o'yinlar"},
 	},
 	telegram.ScopeAllGroupChats: {
 		{Command: "help", Description: "Yordam va buyruqlar"},
-		{Command: "karta", Description: "Anime karta olish (soatiga 1 ta)"},
-		{Command: "kartalar", Description: "Kartalar ilovasi: kolleksiya, reyting, kristal"},
-		{Command: "oyinlar", Description: "Barcha o'yinlar"},
+		{Command: "card", Description: "Anime karta olish (soatiga 1 ta)"},
+		{Command: "cards", Description: "Kartalar ilovasi: kolleksiya, reyting, kristal"},
+		{Command: "games", Description: "Barcha o'yinlar"},
+		{Command: "invites", Description: "Kim nechta odam qo'shdi (reyting)"},
 	},
 	telegram.ScopeAllChatAdmins: {
 		{Command: "help", Description: "Yordam va buyruqlar"},
@@ -38,9 +40,10 @@ var commandMenus = map[string][]telegram.BotCommand{
 		{Command: "unmute", Description: "Botni yana gapirtirish"},
 		{Command: "ignore", Description: "A'zoga 24 soat javob bermaslik (xabariga reply qiling)"},
 		{Command: "unignore", Description: "A'zoga yana javob berish (xabariga reply qiling)"},
-		{Command: "karta", Description: "Anime karta olish (soatiga 1 ta)"},
-		{Command: "kartalar", Description: "Kartalar ilovasi: kolleksiya, reyting, kristal"},
-		{Command: "oyinlar", Description: "Barcha o'yinlar"},
+		{Command: "card", Description: "Anime karta olish (soatiga 1 ta)"},
+		{Command: "cards", Description: "Kartalar ilovasi: kolleksiya, reyting, kristal"},
+		{Command: "games", Description: "Barcha o'yinlar"},
+		{Command: "invites", Description: "Kim nechta odam qo'shdi (reyting)"},
 	},
 }
 

@@ -130,14 +130,14 @@ func (fakeGameLinks) PlayURL(shortName string, p game.Player) (string, bool) {
 	return fmt.Sprintf("https://maria.example/%s?for=%d,%d,%d,%s", page, p.UserID, p.ChatID, p.MessageID, p.InlineMessageID), page != ""
 }
 
-// /game posts Tarozi, /ilon Kosmik ilon, /otinchi O'tinchi and /boss Dev
+// /game posts Tarozi, /snake Kosmik ilon, /woodcutter O'tinchi and /boss Dev
 // jangi, as a reply in a group, and nothing more is written.
 func TestGameCommandSendsTheGame(t *testing.T) {
 	f := newFixture()
 	table := &fakeGameTable{}
 	f.opts.Game, f.opts.GameTable = fakeGameLinks{}, table
 
-	sent := f.run(inGroup(groupMessage("/game@MyBot")), textFrom(userID, "/game"), textFrom(userID, "/ilon"), textFrom(userID, "/otinchi"), textFrom(userID, "/boss"))
+	sent := f.run(inGroup(groupMessage("/game@MyBot")), textFrom(userID, "/game"), textFrom(userID, "/snake"), textFrom(userID, "/woodcutter"), textFrom(userID, "/boss"))
 
 	if len(sent) != 0 {
 		t.Errorf("sent %+v besides the game", sent)

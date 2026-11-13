@@ -303,7 +303,7 @@ type InviteMaker interface {
 }
 
 // NewInvite keeps an invite of the player's, for a friend to take with its
-// code; /shashka in a group makes one too.
+// code; /checkers in a group makes one too.
 func NewInvite(ctx context.Context, store InviteMaker, userID int64) (storage.ShashkaGame, error) {
 	return store.CreateShashkaGame(ctx, storage.ShashkaGame{
 		Kind: kindFriend, WhiteID: userID, Position: shashka.Start().Encode(), Status: storage.ShashkaWaiting,

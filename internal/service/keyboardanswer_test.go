@@ -440,9 +440,9 @@ func TestCodeAnswersSkipTheModel(t *testing.T) {
 	}
 }
 
-// An owner's /elon runs send_to_groups without the model: in reply to a
-// video it drafts the video under the words as its caption, "/elon ha"
-// sends it; a member's /elon is no command of theirs.
+// An owner's /announce runs send_to_groups without the model: in reply to a
+// video it drafts the video under the words as its caption, "/announce ha"
+// sends it; a member's /announce is no command of theirs.
 func TestOwnersAnnounceWithoutTheModel(t *testing.T) {
 	f := newFixture()
 	f.opts.OwnerUsernames = []string{ownerUsername}
@@ -453,10 +453,10 @@ func TestOwnersAnnounceWithoutTheModel(t *testing.T) {
 		update.Message.From.Username = "Pronium"
 		return update
 	}
-	video := owner("/elon Akkaunt: 150$")
+	video := owner("/announce Akkaunt: 150$")
 	video.Message.ReplyToMessage = &telegram.Message{MessageID: 1642, Chat: video.Message.Chat, Video: &telegram.Video{FileID: "v"}}
 
-	sent := f.run(video, owner("/elon ha"), textFrom(userID, "/elon hi"))
+	sent := f.run(video, owner("/announce ha"), textFrom(userID, "/announce hi"))
 
 	asked := runner.recorded()
 	if len(asked) != 2 || asked[0] != `send_to_groups {"action":"prepare","copy":true,"text":"Akkaunt: 150$","to":"groups"}` || asked[1] != `send_to_groups {"action":"confirm"}` {
@@ -475,7 +475,7 @@ func TestOwnersAnnounceWithoutTheModel(t *testing.T) {
 	}
 }
 
-// The first word of /elon says whom it is for; any other word is the text.
+// The first word of /announce says whom it is for; any other word is the text.
 func TestAnnouncementAudience(t *testing.T) {
 	for words, want := range map[string][2]string{
 		"hammaga Akkaunt 150$":  {"all", "Akkaunt 150$"},

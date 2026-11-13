@@ -8,10 +8,10 @@ tartibi README'ning Mini App va o'yinlar bo'limida.
 | Rasm | Nom | Qisqa nom | Buyruq |
 |---|---|---|---|
 | ![](tarozi.png) | Tarozi | `tarozi` | `/game` |
-| ![](kosmik-ilon.png) | Kosmik ilon | `ilon` | `/ilon` |
-| ![](otinchi.png) | O'tinchi | `otinchi` | `/otinchi` |
+| ![](kosmik-ilon.png) | Kosmik ilon | `ilon` | `/snake` |
+| ![](otinchi.png) | O'tinchi | `otinchi` | `/woodcutter` |
 | ![](dev-jangi.png) | Dev jangi | `boss` | `/boss` |
-| ![](maydon.png) | Maydon | `maydon` | `/maydon` |
+| ![](maydon.png) | Maydon | `maydon` | `/arena` |
 | ![](mafia.png) | Mafia | `mafiya` | `/mafia` |
 
 ## Tavsiflar
@@ -45,7 +45,7 @@ Rasmni o'zgartirish yoki tavsifni yangilash uchun: `/mygames` → o'yin → *Edi
 ## Kartalar (Mini App)
 
 Kartalar o'yin emas, Mini App: @BotFather'da `/newapp` bilan ro'yxatdan
-o'tkaziladi. Bot uni `/kartalar` bilan tugma orqali ochadi, shuning uchun bu
+o'tkaziladi. Bot uni `/cards` bilan tugma orqali ochadi, shuning uchun bu
 ixtiyoriy; ro'yxatdan o'tgach esa `t.me/<bot>/kartalar` havolasi bilan ham
 ochiladi.
 

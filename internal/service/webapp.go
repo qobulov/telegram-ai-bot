@@ -53,7 +53,7 @@ func (s *Service) statsCommand(in incoming) outcome {
 	return outcome{text: textStatsGroup.to(in), buttons: [][]telegram.Button{{{Text: textStatsButton.to(in), URL: link}}}}
 }
 
-// gameCommand answers /game, /ilon, /otinchi and /boss with the game itself, which Telegram
+// gameCommand answers /game, /snake, /woodcutter and /boss with the game itself, which Telegram
 // shows with its Play button and table of scores.
 func (s *Service) gameCommand(ctx context.Context, in incoming, shortName string) outcome {
 	if s.opts.Game == nil || s.opts.GameTable == nil {
@@ -84,7 +84,7 @@ func (s *Service) gameCommand(ctx context.Context, in incoming, shortName string
 	return outcome{}
 }
 
-// gamesMenu answers /oyinlar: every game, as commands to tap, which the
+// gamesMenu answers /games: every game, as commands to tap, which the
 // menu no longer lists one by one.
 func (s *Service) gamesMenu(in incoming) outcome {
 	lang := languageOf(in)
@@ -101,14 +101,14 @@ func (s *Service) gamesMenu(in incoming) outcome {
 var (
 	textGamesTitle = localText{uz: "🎮 **O'yinlar** — bosing va o'ynang:", ru: "🎮 **Игры** — нажмите и играйте:", en: "🎮 **Games** — tap one to play:"}
 	textGamesDooz  = localText{
-		uz: "/dooz — Dooz (X-O): do'stingiz yoki men bilan",
-		ru: "/dooz — крестики-нолики: с другом или со мной",
-		en: "/dooz — tic-tac-toe: with a friend or with me",
+		uz: "/tictactoe — Dooz (X-O): do'stingiz yoki men bilan",
+		ru: "/tictactoe — крестики-нолики: с другом или со мной",
+		en: "/tictactoe — tic-tac-toe: with a friend or with me",
 	}
 	textGamesCards = localText{
-		uz: "🎴 Kartalar: /karta · /kartalar (ilova) · /kartatop · /avto · /bozor · /duel · /almash",
-		ru: "🎴 Карты: /karta · /kartalar (приложение) · /kartatop · /avto · /bozor · /duel · /almash",
-		en: "🎴 Cards: /karta · /kartalar (the app) · /kartatop · /avto · /bozor · /duel · /almash",
+		uz: "🎴 Kartalar: /card · /cards (ilova) · /cardtop · /autocard · /market · /duel · /trade",
+		ru: "🎴 Карты: /card · /cards (приложение) · /cardtop · /autocard · /market · /duel · /trade",
+		en: "🎴 Cards: /card · /cards (the app) · /cardtop · /autocard · /market · /duel · /trade",
 	}
 )
 

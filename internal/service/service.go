@@ -174,7 +174,7 @@ type Options struct {
 	ActiveCounter    ActiveCounter
 	// Roster keeps the members seen in each group; nil keeps none.
 	Roster MemberBook
-	// Invites keeps who brought whom into each group, for /qoshganlar; nil
+	// Invites keeps who brought whom into each group, for /invites; nil
 	// keeps none.
 	Invites InviteBook
 	Logger  *slog.Logger
@@ -254,12 +254,12 @@ type Options struct {
 	// though premium bought before still counts while Premium is set.
 	Payments Payments
 	Premium  PremiumBook
-	// Cards keeps Kartalar, the anime card collection (/karta, /kartalarim,
-	// /kartatop), whose catalog comes from AniList at CardsAPI, empty for
+	// Cards keeps Kartalar, the anime card collection (/card, /mycards,
+	// /cardtop), whose catalog comes from AniList at CardsAPI, empty for
 	// AniList's own address. Nil turns it off.
 	Cards    CardBook
 	CardsAPI string
-	// CardsURL is the page of Kartalar's Mini App, which /kartalar and the
+	// CardsURL is the page of Kartalar's Mini App, which /cards and the
 	// collection's button open; "" for none.
 	CardsURL string
 	// CardsKey is a PokéWallet key, without which there are no trading
@@ -382,8 +382,8 @@ type Options struct {
 	// no game.
 	Game      GameLinks
 	GameTable GameTable
-	// ShashkaURL is the page of the draughts Mini App, which /shashka
-	// opens, and ShashkaInvites keeps the invites /shashka makes in a
+	// ShashkaURL is the page of the draughts Mini App, which /checkers
+	// opens, and ShashkaInvites keeps the invites /checkers makes in a
 	// group; with either unset there is no /shashka. See shashka.go.
 	ShashkaURL     string
 	ShashkaInvites shashkaapp.InviteMaker
@@ -558,6 +558,7 @@ func New(opts Options) *Service {
 	if opts.Now == nil {
 		opts.Now = time.Now
 	}
+	opts.AdminCommands = englishCommands(opts.AdminCommands)
 	s := &Service{
 		opts:            opts,
 		userLimiter:     newLimiter(opts.RatePerMinute),
@@ -727,6 +728,9 @@ func (s *Service) recordMember(change *telegram.ChatMemberUpdated) {
 	isGroup := change.Chat.Type == telegram.ChatTypeGroup || change.Chat.Type == telegram.ChatTypeSupergroup
 	if isGroup {
 		s.seeMember(change.Chat.ID, change.NewChatMember.User, change.NewChatMember.Status)
+		if was, is := change.OldChatMember.IsMember(), change.NewChatMember.IsMember(); was != is {
+			s.markInvitee(change.Chat.ID, change.NewChatMember.User, is)
+		}
 		s.noteLinkJoin(change)
 	}
 }
@@ -741,10 +745,12 @@ func (s *Service) noteMembers(msg *telegram.Message) {
 	}
 	for i := range msg.NewChatMembers {
 		s.seeMember(msg.Chat.ID, &msg.NewChatMembers[i], "member")
+		s.markInvitee(msg.Chat.ID, &msg.NewChatMembers[i], true)
 	}
 	s.noteAdded(msg)
 	if msg.LeftChatMember != nil {
 		s.seeMember(msg.Chat.ID, msg.LeftChatMember, "left")
+		s.markInvitee(msg.Chat.ID, msg.LeftChatMember, false)
 	}
 }
 

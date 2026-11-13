@@ -312,7 +312,7 @@ in the environment win over the file.
 | `DB_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
 | `TELEGRAM_WEBHOOK_SECRET` | empty | Only for webhook deployments; see [Vercel deployment](#vercel-deployment-webhook) |
 | `CRON_SECRET` | empty | Only on Vercel: protects the daily cleanup endpoint and the reminders endpoint |
-| `WEBAPP_URL` | empty | The Vercel deployment's `https://` address, such as `https://maria.vercel.app`, where `public/` is served: turns on the [dashboard](#dashboard-mini-app) (`/stats`, the private chats' menu button) and the games [Tarozi](#the-game-tarozi), [Kosmik ilon](#kosmik-ilon), [O'tinchi](#otinchi) and [Dev jangi](#dev-jangi) (`/game`, `/ilon`, `/otinchi`, `/boss`, the `send_game` tool). Empty turns them off |
+| `WEBAPP_URL` | empty | The Vercel deployment's `https://` address, such as `https://maria.vercel.app`, where `public/` is served: turns on the [dashboard](#dashboard-mini-app) (`/stats`, the private chats' menu button) and the games [Tarozi](#the-game-tarozi), [Kosmik ilon](#kosmik-ilon), [O'tinchi](#otinchi) and [Dev jangi](#dev-jangi) (`/game`, `/snake`, `/woodcutter`, `/boss`, the `send_game` tool). Empty turns them off |
 | `MAX_OUTPUT_TOKENS`           | `8192`                         | Longest model reply, in tokens, thinking included |
 | `AI_REASONING_EFFORT`         | `low` (Gemini)                 | How hard Gemini thinks before answering: `none`, `minimal`, `low`, `medium`, `high`, or `default` for the model's own. Thinking is paid as output and takes from `MAX_OUTPUT_TOKENS`; the lite models refuse `none`. Each request logs its tokens as `model usage` |
 | `CHAT_REASONING_EFFORT` | `minimal` | How hard the chat model thinks before a reply in words alone (Gemini): `none`, `minimal`, `low`, `medium`, `high` or `default`. At `low` it spent 500 to 800 thinking tokens, seconds, on a one-line joke |
@@ -406,7 +406,7 @@ the message it is working on before exiting.
 
 Bot commands: `/start`, `/help`,
 `/model`, `/about`, `/premium`, `/paysupport`, with `WEBAPP_URL` set
-`/stats`, `/game`, `/ilon`, `/otinchi` and `/boss`, for owners `/payments` and `/refund`, and
+`/stats`, `/game`, `/snake`, `/woodcutter` and `/boss`, for owners `/payments` and `/refund`, and
 in groups `/mute`, `/unmute`, `/ignore` and `/unignore`.
 
 ## Tests
@@ -720,15 +720,15 @@ chats only, or not at all), then with where the draft goes and Send and
 Drop buttons; the post is copied as it is, caption and all. An owner's
 photo or video the provider's filter refused is offered the same way.
 
-The owners' `/elon` does the same in code, without the model, whose
-provider may refuse a sale's words or a video's picture: `/elon <text>` for
-the groups, `/elon hammaga <text>` for the groups and private chats,
-`/elon lichkaga <text>` for private chats only, in reply to a photo or a
-video for it under the text; the preview comes first, then `/elon ha`
-sends it and `/elon bekor` drops it. When the provider's filter refuses a
+The owners' `/announce` does the same in code, without the model, whose
+provider may refuse a sale's words or a video's picture: `/announce <text>` for
+the groups, `/announce hammaga <text>` for the groups and private chats,
+`/announce lichkaga <text>` for private chats only, in reply to a photo or a
+video for it under the text; the preview comes first, then `/announce ha`
+sends it and `/announce bekor` drops it. When the provider's filter refuses a
 turn that has a picture, the turn is asked again without it; when it
 refuses the words, a private chat is told so, and an owner how to post with
-`/elon`, instead of "try again". An owner's refused words that ask for an
+`/announce`, instead of "try again". An owner's refused words that ask for an
 announcement ("e'lon", "guruhlarga", "lichkaga", "hammaga"…) are taken
 apart from the main model: the same model, told nothing but to write an
 announcement, writes it from the owner's last few messages, it is drafted
@@ -743,19 +743,24 @@ chiq" from anywhere, for a group she is in or a channel where she is an
 admin (`targets` lists them). The owner's own words must ask her to leave
 (chiq, ket, leave, выйди…), so the model cannot leave on its own.
 
-`/qoshganlar` in a group, with no model, lists who brought how many people
-in this week (from Monday, Tashkent time), or `bugun`, `oy` or `hammasi`;
-replying to a member, theirs alone. A person counts for the member who added
-them (the message saying they joined is from that member) or whose own
-invite link they came by (Telegram's `chat_member` update, where the bot is
-an admin); one who joined alone, a bot, or one who left and came back again
-counts no more, and those who have left since are shown apart
-(`group_invites`, migration 68). Counting starts when this is deployed.
+`/invites` in a group, with no model, lists who brought how many people
+in who are still there, this week (from Monday, Tashkent time), or `bugun`,
+`oy` or `hammasi` (`today`, `month`, `all`); replying to a member, theirs
+alone. A person counts for the member who added them (the message saying
+they joined is from that member) or whose own invite link they came by
+(Telegram's `chat_member` update, where the bot is an admin); one who joined
+alone or a bot counts for no one. One who leaves or is removed is taken off
+their inviter's count, shown apart as gone, and put back on coming back,
+never twice; a member none of whose people are still there is not listed,
+and of two with as many, the one fewer left goes first. Each invite row
+keeps its own `left_at` (`group_invites`, migration 68), since
+`group_members` forgets those who left. Counting starts when this is
+deployed.
 
 Groups are recorded when the bot is added, promoted or removed (Telegram's
 `my_chat_member` updates) and from the messages it logs. Added to a group it
 was not in, the bot greets it in the language of whoever added it: how to
-call it, `/karta`, `/kartalar` and `/oyinlar`, and, when it is not an admin,
+call it, `/card`, `/cards` and `/games`, and, when it is not an admin,
 that it clears spam as one; a promotion or its leaving says nothing. Telegram has no way
 to list a bot's groups, so a group the bot joined before this, where nobody
 has written since, is not known. After upgrading, run `set-webhook` again so
@@ -849,7 +854,7 @@ or in a group (`internal/tools/reminders.go`, the `reminders` tool):
 - "karta ochish vaqti kelganda eslat": a reminder at the player's next
   [Kartalar](#kartalar) draw, their last draw and an hour after, with the
   Mini App's button; one who may open a card now is told so. "har safar
-  eslat" turns on a reminder after every card: each draw, from `/karta`
+  eslat" turns on a reminder after every card: each draw, from `/card`
   or the Mini App, schedules the next one (`DrawCard`, kept on
   `card_players.remind_chat_id`), until "karta eslatmasini o'chir". It is
   off by default.
@@ -1284,9 +1289,9 @@ keep it from taking over the chat.
 
 Each start sets the menu Telegram opens on "/" (`setMyCommands`, in
 `internal/app/commands.go`), kept short as 22 commands crowded it:
-`/start`, `/help`, `/karta`, `/kartalar` and `/oyinlar` in private chats; the
+`/start`, `/help`, `/card`, `/cards` and `/games` in private chats; the
 same but `/start` for a group's members; and for its admins also `/mute`,
-`/unmute`, `/ignore` and `/unignore`. `/oyinlar` lists every game and
+`/unmute`, `/ignore` and `/unignore`. `/games` lists every game and
 Kartalar's commands to tap, the page games only while `WEBAPP_URL` serves
 them, and the Mini App holds the collection, the table and the shards (melting
 and a card out of turn); every command left out of the menu is answered all
@@ -1332,7 +1337,7 @@ match "maria" unless you add it:
 word.
 
 **Commands** in a group need the bot's username (`/help@MyMariaBot`). A plain
-`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/karta`, `/kartalarim`, `/kartatop`, `/kartalar`, `/bozor`, `/qoshganlar`, `/avto`, `/duel`, `/almash`, `/boss`, `/ilon`, `/otinchi`, `/maydon`, `/shashka` and `/dooz`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username.
+`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/card`, `/mycards`, `/cardtop`, `/cards`, `/market`, `/invites`, `/autocard`, `/duel`, `/trade`, `/boss`, `/snake`, `/woodcutter`, `/arena`, `/checkers` and `/tictactoe`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username. The commands' names are English; their old Uzbek ones (`/karta`, `/kartalar`, `/kartalarim`, `/kartatop`, `/bozor`, `/almash`, `/avto`, `/oyinlar`, `/ilon`, `/otinchi`, `/maydon`, `/shashka`, `/dooz`, `/qoshganlar`, `/elon`) are still answered as the English ones, for players who learned them and the bot's old messages.
 
 ### Example
 
@@ -2018,7 +2023,7 @@ cannot name its score, another player or another message.
 
 ### Kosmik ilon
 
-`/ilon` posts the bot's second game the same way, and `send_game` takes it
+`/snake` posts the bot's second game the same way, and `send_game` takes it
 when asked by name ("ilon o'ynaymiz"; Tarozi when no game is named). It is a
 snake in space (`public/game/ilon/`, `internal/game/ilon.go`): the field,
 15 by 21, wraps at its edges; the snake moves a cell a tick, turned by a
@@ -2049,7 +2054,7 @@ server's score to the point.
 
 ### O'tinchi
 
-`/otinchi` posts the woodcutter, and `send_game` takes it by name: an old
+`/woodcutter` posts the woodcutter, and `send_game` takes it by name: an old
 plane tree in a mahalla (`public/game/otinchi/`, `internal/game/otinchi.go`).
 A tap on the left or right half of the screen chops the trunk's lowest
 piece from that side, and the trunk comes down a piece; branches grow from
@@ -2067,7 +2072,7 @@ play sent sooner than its chops took.
 
 ### Kartalar
 
-`/karta` draws an anime card, one an hour, owners' too (in a private chat
+`/card` draws an anime card, one an hour, owners' too (in a private chat
 the word "karta" does too). The cards are AniList's 500 most loved
 characters, fetched the first time a card is drawn (`internal/cards`, kept in
 `card_catalog`, migration 52), the most loved the rarest: 15 👑 Mifik, 30 🔥
@@ -2100,7 +2105,7 @@ card's button opens a card now for 15 of them (`extra`), by the usual odds
 and sure cards, the hourly card left where it was. (`extra` also takes a
 `set`, a collection to draw from for 20, which no page offers now.) Crystals live in the Mini App alone: the bot has no
 commands for them.
-`/avto`, or the switch on the Mini App's draw tab (`auto`), turns on a player's auto opener, or off again, each player for
+`/autocard`, or the switch on the Mini App's draw tab (`auto`), turns on a player's auto opener, or off again, each player for
 themselves and free (`card_players.auto_draw`, migration 65): each minute's
 call to `/api/reminders`, or the long-polling ticker, first opens the card of
 every player with it on whose card is ready, and sends it to their private
@@ -2125,14 +2130,14 @@ a card by name or @username (the one a group last saw), the most points
 first (`players`), and gives the one picked
 a spare copy at once (`gift`: a player keeps their last copy not melted),
 the bot telling them in their private chat who gave it. The Mini App's 🔄
-market tab, which `/bozor` opens (in a group through the private chat's
+market tab, which `/market` opens (in a group through the private chat's
 `/start bozor`, the page told `?tab=market`), lists offers (migration 67, `card_trades` rows with no `to_id`
 until taken): a player puts up a card of theirs for a card they pick from the
 whole catalog by name (`catalog`, `offer`), at most 5 open, each for 7 days;
 anyone who holds the card wanted presses 🔄 to take it (`take`), each giving
 the other their card with its points, and the offer's player is told; an
 offer whose card its player no longer holds is called off when taken, and a
-player takes down their own (`unoffer`). In a group, replying to a member, `/almash Levi = Gojo` offers one of the
+player takes down their own (`unoffer`). In a group, replying to a member, `/trade Levi = Gojo` offers one of the
 sender's cards for one of theirs, done when that member presses ✅ (either
 may press ❌), once, within a day; a name need be only part of the card's,
 when one card matches, else the answer lists those that do. Any card may
@@ -2141,9 +2146,9 @@ to shards, with it), and its points pass with it. A player gives at most 5
 cards a day, gifts and trades together, and only to a player who has opened a
 card, so that a second account cannot feed a first one. With the pages served, the persona is told the game's facts
 (`cardsNote`), as the model had said it was "not the card bot" and named
-commands there are none of. `/kartalarim` shows
+commands there are none of. `/mycards` shows
 how many of each rarity's cards the player holds as buttons that list them,
-pressed only by that player; `/kartatop` is the table of points. The
+pressed only by that player; `/cardtop` is the table of points. The
 pictures are the characters' AniList pictures, the studios' art.
 
 With `POKEWALLET_API_KEY` trading cards join them, a collection of up to a
@@ -2157,7 +2162,7 @@ the free plan allows 1000 requests a day. The pictures are the games'
 publishers' art, and PokéWallet's terms name unapproved bots among what they
 forbid, which reads as meant for its site.
 
-`/kartalar` opens the same as a Mini App (`public/kartalar/`, served by
+`/cards` opens the same as a Mini App (`public/kartalar/`, served by
 `api/cards.go` from `internal/cards`): the collection shelf by shelf, the
 rarest first, the cards held with their pictures and the rest as locked
 cards folded into one row each, a search through the cards held, a card
@@ -2286,7 +2291,7 @@ seconds.
 
 ### Maydon
 
-`/maydon` posts Maydon, a team battle of a group, one against one up to
+`/arena` posts Maydon, a team battle of a group, one against one up to
 five against five (`public/game/maydon/`, `internal/maydon`,
 `api/maydon.go`; its short name with @BotFather is `maydon`). Members press
 Play, pick a class — warrior, archer, mage or healer — and join; any of them
@@ -2315,14 +2320,14 @@ hits since its last to draw.
 
 ### Shashka (draughts Mini App)
 
-With `WEBAPP_URL` set, `/shashka` opens Russian draughts, played against
+With `WEBAPP_URL` set, `/checkers` opens Russian draughts, played against
 people or the bot in a Mini App (`public/shashka`, `internal/shashkaapp`,
 `internal/shashka`), with no model and no limit. Nothing needs setting up in
 @BotFather.
 
-- **Opening it.** In a private chat `/shashka`, and «📋 Ko'proq» →
+- **Opening it.** In a private chat `/checkers`, and «📋 Ko'proq» →
   🕹 O'yinlar → ♟ Shashka, answer with the Mini App's button. A group cannot
-  have one, so there `/shashka` makes the sender's invite and posts it with
+  have one, so there `/checkers` makes the sender's invite and posts it with
   «⚔️ Qabul qilish», a link to `https://t.me/<bot>?start=sh_<code>`: the bot's
   private chat answers that `/start` with the button into the game, for
   whoever takes it and for the sender too, who sees their invite waiting.
@@ -2357,7 +2362,7 @@ the daily cleanup.
 
 ### Dooz
 
-`/dooz` is noughts and crosses, played on nine buttons under one message,
+`/tictactoe` is noughts and crosses, played on nine buttons under one message,
 with no model and no limit (`internal/service/dooz.go`,
 `internal/dooz`).
 
@@ -2427,7 +2432,7 @@ both sides or a bot game without the bot is refused.
   The conversation, the mute setting and the standing rules from before the
   upgrade no longer apply.
 - In forum-style supergroups she answers in the topic of the message she
-  replies to. This was not tested against a real forum. No command is counted, the quota being for the model's talk: a command never asks the model, so `/kartalarim`, `/karta` and its wait, the games and the rest are always answered, the flood guard still bounding them, and the games in a group keep `send_game`'s two a chat in ten minutes, one too soon getting only 👀.
+  replies to. This was not tested against a real forum. No command is counted, the quota being for the model's talk: a command never asks the model, so `/mycards`, `/card` and its wait, the games and the rest are always answered, the flood guard still bounding them, and the games in a group keep `send_game`'s two a chat in ten minutes, one too soon getting only 👀.
 
 ### BotFather privacy mode
 
@@ -2906,7 +2911,7 @@ migration 50.
    and the games' scores migration 48, Mafia (`mafiya`, at
    `/game/mafiya/`) migration 49, Maydon (`maydon`, at `/game/maydon/`)
    migration 50.
-4. As an owner, send `/stats`, `/game`, `/ilon`, `/otinchi` and `/boss` in a
+4. As an owner, send `/stats`, `/game`, `/snake`, `/woodcutter` and `/boss` in a
    group and in a private chat.
 
 Until step 2 the group links open nothing; until step 3 a game's command

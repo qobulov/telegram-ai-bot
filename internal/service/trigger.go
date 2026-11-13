@@ -57,7 +57,7 @@ const (
 // A plain "/reset", or one naming another bot, may be meant for someone else
 // and is ignored however the rest of the message addresses the bot; only the
 // bot's own commands no other bot has, ownCommands, count plain too, as the
-// bot's answers name them so ("Kolleksiya: /kartalarim") and a press of one in
+// bot's answers name them so ("Kolleksiya: /mycards") and a press of one in
 // a message sends it without the bot's name, which it ignored.
 func (s *Service) address(msg *telegram.Message) (string, trigger) {
 	text, how := s.addressedText(msg)
@@ -104,9 +104,9 @@ func (s *Service) orName(text string) string {
 // ownCommands are the bot's commands that no other bot in its groups has:
 // "/game", "/mafia", "/start" or "/top" are other bots' too.
 var ownCommands = map[string]bool{
-	"/karta": true, "/kartalarim": true, "/kartatop": true, "/kartalar": true,
-	"/avto": true, "/bozor": true, "/qoshganlar": true, "/duel": true, "/almash": true, "/oyinlar": true,
-	"/boss": true, "/ilon": true, "/otinchi": true, "/maydon": true, "/shashka": true, "/dooz": true,
+	"/card": true, "/mycards": true, "/cardtop": true, "/cards": true,
+	"/autocard": true, "/market": true, "/invites": true, "/duel": true, "/trade": true, "/games": true,
+	"/boss": true, "/snake": true, "/woodcutter": true, "/arena": true, "/checkers": true, "/tictactoe": true,
 }
 
 // commandTarget reports whether text is a command and which bot it names:

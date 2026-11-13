@@ -10,7 +10,7 @@ import (
 	"telegram-ai-bot/internal/telegram"
 )
 
-// shashkaCommand answers /shashka with a way into the draughts Mini App.
+// shashkaCommand answers /checkers with a way into the draughts Mini App.
 // In a private chat it is the Mini App's button. A group cannot have one,
 // so there the sender's invite is made, and its button is a link to the
 // bot's private chat with the invite's code, where startShashka answers

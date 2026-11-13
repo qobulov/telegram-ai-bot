@@ -61,7 +61,7 @@ type GameOptions struct {
 }
 
 // GameTool lets anyone have the bot post one of its games in the chat the
-// turn is in, as /game, /ilon, /otinchi and /boss do: the members play it inside Telegram,
+// turn is in, as /game, /snake, /woodcutter and /boss do: the members play it inside Telegram,
 // and their scores are kept on the message.
 func GameTool(opts GameOptions) Tool {
 	if opts.Now == nil {

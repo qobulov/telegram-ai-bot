@@ -235,7 +235,7 @@ func TestCardIsDrawnOnceAnHour(t *testing.T) {
 	book := newFakeCards(server.URL + "/gojo.png")
 	f.opts.Cards = book
 
-	sent := f.run(textFrom(userID, "/karta"))
+	sent := f.run(textFrom(userID, "/card"))
 	if len(sent) != 1 || !sent[0].photo {
 		t.Fatalf("sent = %+v, want the card's picture", sent)
 	}
@@ -249,7 +249,7 @@ func TestCardIsDrawnOnceAnHour(t *testing.T) {
 		t.Errorf("second draw = %+v, want to wait", sent)
 	}
 	f.opts.OwnerIDs = map[int64]bool{userID: true}
-	if sent = f.run(textFrom(userID, "/karta")); len(sent) != 3 || sent[2].photo || !strings.Contains(sent[2].text, "⏳") {
+	if sent = f.run(textFrom(userID, "/card")); len(sent) != 3 || sent[2].photo || !strings.Contains(sent[2].text, "⏳") {
 		t.Errorf("an owner's draw = %+v, want to wait", sent)
 	}
 	if book.everys[len(book.everys)-1] != time.Hour {
@@ -267,7 +267,7 @@ func TestCardCollectionIsItsPlayers(t *testing.T) {
 	f.opts.Cards = book
 	book.held[userID] = 2
 
-	sent := f.run(textFrom(userID, "/kartalarim"))
+	sent := f.run(textFrom(userID, "/mycards"))
 	if len(sent) != 1 || len(sent[0].buttons) != 6 || sent[0].buttons[4][0].Text != "👑 Mifik - 1/15" || sent[0].buttons[5][0].Text != "🗂 Hammasi - 1/200" {
 		t.Fatalf("collection = %+v", sent)
 	}
@@ -301,7 +301,7 @@ func TestSpaced(t *testing.T) {
 func TestOwnCommandsAreAnsweredPlainInAGroup(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("\x89PNG")) }))
 	defer server.Close()
-	for text, want := range map[string]int{"/kartalarim": 1, "/Kartalarim": 1, "/kartatop": 1, "/kartalarim@OtherBot": 0, "/top": 0} {
+	for text, want := range map[string]int{"/mycards": 1, "/Kartalarim": 1, "/cardtop": 1, "/mycards@OtherBot": 0, "/top": 0} {
 		f := newFixture()
 		f.opts.Cards = newFakeCards(server.URL + "/g.png")
 		f.opts.Buttons = &fakeButtons{}
@@ -323,7 +323,7 @@ func TestCardTopShowsTheAskersPlace(t *testing.T) {
 	book.top[11].UserID = userID
 	f.opts.Cards = book
 
-	sent := f.run(textFrom(userID, "/kartatop"))
+	sent := f.run(textFrom(userID, "/cardtop"))
 	if len(sent) != 1 {
 		t.Fatalf("sent = %+v", sent)
 	}
@@ -339,7 +339,7 @@ func TestCardTopShowsTheAskersPlace(t *testing.T) {
 	}
 }
 
-// /karta is not counted in the group's quota, which is for the model's talk:
+// /card is not counted in the group's quota, which is for the model's talk:
 // a member out of answers still draws, and is still told to wait.
 func TestCardDrawsTakeNoGroupQuota(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("\x89PNG")) }))
@@ -351,11 +351,11 @@ func TestCardDrawsTakeNoGroupQuota(t *testing.T) {
 	f.opts.GroupRatePerMinute, f.opts.MemberRepliesPer10Min = 6, 1
 	f.opts.Workers = 1
 
-	sent := f.run(inGroup(groupMessage("Mira, salom")), inGroup(groupMessage("/karta")))
+	sent := f.run(inGroup(groupMessage("Mira, salom")), inGroup(groupMessage("/card")))
 	if len(sent) != 2 || !sent[1].photo {
 		t.Fatalf("sent = %+v, want the answer and then the card", sent)
 	}
-	if sent = f.run(inGroup(groupMessage("/karta"))); len(sent) != 3 || !strings.Contains(sent[2].text, "⏳") {
+	if sent = f.run(inGroup(groupMessage("/card"))); len(sent) != 3 || !strings.Contains(sent[2].text, "⏳") {
 		t.Errorf("a wait over the quota sent %+v, want the wait", sent)
 	}
 }
@@ -390,7 +390,7 @@ func TestGameCommandKeepsTheGamesLimitInAGroup(t *testing.T) {
 // A drawn card says in how many draws a Legendary and a Mythic are sure,
 // and that it was one when the wait raised it.
 func TestCardCaptionShowsTheSureCards(t *testing.T) {
-	in := incoming{msg: &telegram.Message{From: &telegram.User{ID: 1, FirstName: "Bek"}}, text: "/karta"}
+	in := incoming{msg: &telegram.Message{From: &telegram.User{ID: 1, FirstName: "Bek"}}, text: "/card"}
 	draw := storage.CardDraw{Card: storage.Card{Name: "Gojo", Rarity: 4, Value: 5000}, New: true, Count: 1, Points: 5000, Guaranteed: true, SinceLegendary: 0, SinceMythic: 0}
 	caption := cardCaption(languageOf(in), draw)
 	if !strings.Contains(caption, "✨ Kafolatlangan karta!") || !strings.Contains(caption, "🔥 Afsonaviy — 30 kartadan") || !strings.Contains(caption, "👑 Mifik — 100 kartadan") {
@@ -447,18 +447,18 @@ func TestDuelIsFoughtOnce(t *testing.T) {
 	}
 }
 
-// /oyinlar lists every game to tap, in a private chat and plain in a group,
+// /games lists every game to tap, in a private chat and plain in a group,
 // the page games only when they are served.
 func TestGamesMenuListsTheGames(t *testing.T) {
 	f := newFixture()
 	f.opts.Cards = newFakeCards("")
-	sent := f.run(textFrom(userID, "/oyinlar"))
-	if len(sent) != 1 || !strings.Contains(sent[0].text, "/dooz") || strings.Contains(sent[0].text, "/boss") || !strings.Contains(sent[0].text, "/duel") {
+	sent := f.run(textFrom(userID, "/games"))
+	if len(sent) != 1 || !strings.Contains(sent[0].text, "/tictactoe") || strings.Contains(sent[0].text, "/boss") || !strings.Contains(sent[0].text, "/duel") {
 		t.Fatalf("games without pages = %+v", sent)
 	}
 	f.opts.Game, f.opts.GameTable = fakeGameLinks{}, &fakeGameTable{}
-	sent = f.run(inGroup(groupMessage("/oyinlar")))
-	if len(sent) != 2 || !strings.Contains(sent[1].text, "/boss") || !strings.Contains(sent[1].text, "/shashka") {
+	sent = f.run(inGroup(groupMessage("/games")))
+	if len(sent) != 2 || !strings.Contains(sent[1].text, "/boss") || !strings.Contains(sent[1].text, "/checkers") {
 		t.Errorf("games in a group = %+v", sent)
 	}
 }
@@ -478,19 +478,19 @@ func TestADuelForNoStake(t *testing.T) {
 	}
 }
 
-// /bozor opens the Mini App at its market: itself in a private chat, and in
+// /market opens the Mini App at its market: itself in a private chat, and in
 // a group a link to the private chat, whose /start opens it there.
 func TestBozorOpensTheMarket(t *testing.T) {
 	f := newFixture()
 	f.opts.Cards = newFakeCards("")
 	f.opts.CardsURL = "https://app/kartalar"
-	sent := f.run(textFrom(userID, "/bozor"))
+	sent := f.run(textFrom(userID, "/market"))
 	if b := sent[0].buttons; len(b) != 1 || b[0][0].WebApp == nil || b[0][0].WebApp.URL != "https://app/kartalar?tab=market" {
-		t.Fatalf("private /bozor = %+v", sent[0])
+		t.Fatalf("private /market = %+v", sent[0])
 	}
-	sent = f.run(inGroup(groupMessage("/bozor")))
+	sent = f.run(inGroup(groupMessage("/market")))
 	if b := sent[len(sent)-1].buttons; len(b) != 1 || !strings.HasSuffix(b[0][0].URL, "?start=bozor") {
-		t.Fatalf("group /bozor = %+v", sent[len(sent)-1])
+		t.Fatalf("group /market = %+v", sent[len(sent)-1])
 	}
 	sent = f.run(textFrom(userID, "/start bozor"))
 	if b := sent[len(sent)-1].buttons; len(b) != 1 || b[0][0].WebApp == nil || !strings.HasSuffix(b[0][0].WebApp.URL, "?tab=market") {

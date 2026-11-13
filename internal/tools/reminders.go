@@ -35,7 +35,7 @@ const (
 	reminderNoCards    = "the card reminders are not available here"
 	reminderBadAction  = "action must be one of set, list, cancel, card, card_off"
 	reminderSetNote    = "Confirm in one short line, with the local time, that you will remind them here then. Never say it is set unless this tool says so."
-	reminderCardNow    = "They may open a card right now: say so, and that /karta or Kartalar opens it."
+	reminderCardNow    = "They may open a card right now: say so, and that /card or Kartalar opens it."
 	reminderCardNote   = "Confirm in one short line that you will remind them here when their next card may be opened, at the local time due."
 	reminderAutoNote   = " From now on every card they open schedules the next reminder, until they ask you to stop."
 	reminderOffNote    = "Card reminders are off and none is waiting. Confirm in one short line."

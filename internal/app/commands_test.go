@@ -54,13 +54,13 @@ func TestSetCommandMenus(t *testing.T) {
 	}
 }
 
-// The menus keep a few commands, the games behind /oyinlar, and none for
+// The menus keep a few commands, the games behind /games, and none for
 // the owners alone.
 func TestCommandMenusAreShort(t *testing.T) {
 	setter := &fakeCommandSetter{}
 	SetCommandMenus(context.Background(), setter, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	for scope, commands := range setter.set {
-		if len(commands) > 8 || !slices.ContainsFunc(commands, func(c telegram.BotCommand) bool { return c.Command == "oyinlar" }) ||
+		if len(commands) > 9 || !slices.ContainsFunc(commands, func(c telegram.BotCommand) bool { return c.Command == "games" }) ||
 			slices.ContainsFunc(commands, func(c telegram.BotCommand) bool { return c.Command == "boss" || c.Command == "stats" }) {
 			t.Errorf("%s menu %v", scope, commands)
 		}

@@ -42,9 +42,9 @@ func TestDoozIsPlayedInAGroup(t *testing.T) {
 	vali := &telegram.User{ID: userID + 1, FirstName: "Vali"}
 	stranger := &telegram.User{ID: userID + 2, FirstName: "Sardor"}
 
-	sent := f.run(inGroup(groupMessage("/dooz@MyBot")))
+	sent := f.run(inGroup(groupMessage("/tictactoe@MyBot")))
 	if len(sent) != 1 || !strings.HasPrefix(sent[0].text, "❌ Bek  ⚔️  ⭕ ?") || len(sent[0].buttons) != 1 || len(sent[0].buttons[0]) != 2 {
-		t.Fatalf("/dooz sent %+v, want the open game with join and bot buttons", sent)
+		t.Fatalf("/tictactoe sent %+v, want the open game with join and bot buttons", sent)
 	}
 	join := sent[0].buttons[0][0].Data
 
@@ -112,7 +112,7 @@ func TestDoozIsPlayedInAGroup(t *testing.T) {
 	}
 }
 
-// In a private chat /dooz offers the bot's levels, as «📋 Ko'proq» does;
+// In a private chat /tictactoe offers the bot's levels, as «📋 Ko'proq» does;
 // the bot answers each move on the same message at once.
 func TestDoozAgainstTheBot(t *testing.T) {
 	f := newFixture()
@@ -120,7 +120,7 @@ func TestDoozAgainstTheBot(t *testing.T) {
 	f.opts.Buttons = buttons
 	withToolRunner(f)
 
-	sent := f.run(textFrom(userID, "/dooz"), menuPress(1, "kb:item:dooz"))
+	sent := f.run(textFrom(userID, "/tictactoe"), menuPress(1, "kb:item:dooz"))
 	if len(sent) != 2 {
 		t.Fatalf("sent %d messages, want the levels twice", len(sent))
 	}
@@ -164,7 +164,7 @@ func TestDoozRefusesAForgedGame(t *testing.T) {
 	}
 }
 
-// fakeInvites keeps the invites /shashka makes.
+// fakeInvites keeps the invites /checkers makes.
 type fakeInvites struct{ made []storage.ShashkaGame }
 
 func (f *fakeInvites) CreateShashkaGame(_ context.Context, g storage.ShashkaGame) (storage.ShashkaGame, error) {
@@ -173,24 +173,24 @@ func (f *fakeInvites) CreateShashkaGame(_ context.Context, g storage.ShashkaGame
 	return g, nil
 }
 
-// /shashka in a group makes the sender's invite, whose link opens the bot's
+// /checkers in a group makes the sender's invite, whose link opens the bot's
 // private chat, which answers it with the Mini App's button into that game;
-// in a private chat /shashka is the button.
+// in a private chat /checkers is the button.
 func TestShashkaIsOpenedFromAGroupAndAPrivateChat(t *testing.T) {
 	f := newFixture()
 	invites := &fakeInvites{}
 	f.opts.ShashkaURL, f.opts.ShashkaInvites = "https://example.app/shashka/", invites
 
-	sent := f.run(inGroup(groupMessage("/shashka@MyBot")))
+	sent := f.run(inGroup(groupMessage("/checkers@MyBot")))
 	if len(invites.made) != 1 || invites.made[0].WhiteID != userID || invites.made[0].Status != storage.ShashkaWaiting || invites.made[0].InviteCode == "" {
 		t.Fatalf("invites made: %+v", invites.made)
 	}
 	code := invites.made[0].InviteCode
 	if len(sent) != 1 || !strings.Contains(sent[0].text, "Bek") || len(sent[0].buttons) != 1 || sent[0].buttons[0][0].URL != "https://t.me/MyBot?start=sh_"+code {
-		t.Fatalf("/shashka in the group sent %+v", sent)
+		t.Fatalf("/checkers in the group sent %+v", sent)
 	}
 
-	sent = f.run(textFrom(userID, "/start sh_"+code), textFrom(userID, "/shashka"))
+	sent = f.run(textFrom(userID, "/start sh_"+code), textFrom(userID, "/checkers"))
 	if len(sent) != 3 {
 		t.Fatalf("sent %d messages, want the invite's and the private chat's buttons", len(sent))
 	}

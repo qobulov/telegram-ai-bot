@@ -31,7 +31,7 @@ func tradeRules() storage.CardTradeRules {
 	return storage.CardTradeRules{Limit: cardGiveLimit, Day: cardTradeDay, Now: time.Now()}
 }
 
-// tradeCardCommand answers /almash <my card> = <their card> in a group,
+// tradeCardCommand answers /trade <my card> = <their card> in a group,
 // replying to the member it is offered to: an offer they accept or either
 // calls off with its buttons.
 func (s *Service) tradeCardCommand(ctx context.Context, in incoming) outcome {
@@ -197,9 +197,9 @@ func tradeName(user *telegram.User) string { return cardMarks.Replace(doozName(u
 
 var (
 	textTradeGroupOnly = localText{
-		uz: "🔄 Almashish guruhda bo'ladi: kim bilan almashmoqchi bo'lsangiz, o'sha odamning xabariga javob qilib yozing. Sovg'a qilish: /kartalar ilovasida kartani bosing.",
+		uz: "🔄 Almashish guruhda bo'ladi: kim bilan almashmoqchi bo'lsangiz, o'sha odamning xabariga javob qilib yozing. Sovg'a qilish: /cards ilovasida kartani bosing.",
 		ru: "🔄 Обмен — в группе: ответьте на сообщение того, с кем хотите обменяться. Подарить карту: нажмите на неё в приложении /kartalar.",
-		en: "🔄 Trades are made in a group: reply to a message of the member to trade with. To give a card, tap it in the /kartalar app.",
+		en: "🔄 Trades are made in a group: reply to a message of the member to trade with. To give a card, tap it in the /cards app.",
 	}
 	textTradeReply = localText{
 		uz: "↩️ Kim bilan almashmoqchi bo'lsangiz, o'sha odamning xabariga javob qilib yozing.",
@@ -207,14 +207,14 @@ var (
 		en: "↩️ Reply to a message of the member to trade with.",
 	}
 	textTradeUsage = localText{
-		uz: "🔄 Almashish: odamning xabariga javob qilib yozing\n/almash Mening kartam = Uning kartasi\nMasalan: /almash Levi = Gojo",
-		ru: "🔄 Обмен: ответьте на сообщение человека\n/almash Моя карта = Его карта\nНапример: /almash Levi = Gojo",
-		en: "🔄 A trade: reply to the member's message with\n/almash My card = Their card\nFor example: /almash Levi = Gojo",
+		uz: "🔄 Almashish: odamning xabariga javob qilib yozing\n/trade Mening kartam = Uning kartasi\nMasalan: /trade Levi = Gojo",
+		ru: "🔄 Обмен: ответьте на сообщение человека\n/trade Моя карта = Его карта\nНапример: /trade Levi = Gojo",
+		en: "🔄 A trade: reply to the member's message with\n/trade My card = Their card\nFor example: /trade Levi = Gojo",
 	}
 	textCardNotMine = localText{
-		uz: "Sizda «%s» degan karta yo'q. Kartalaringiz: /kartalarim",
-		ru: "У вас нет карты «%s». Ваши карты: /kartalarim",
-		en: "You have no card called “%s”. Your cards: /kartalarim",
+		uz: "Sizda «%s» degan karta yo'q. Kartalaringiz: /mycards",
+		ru: "У вас нет карты «%s». Ваши карты: /mycards",
+		en: "You have no card called “%s”. Your cards: /mycards",
 	}
 	textCardNotTheirs = localText{
 		uz: "Unda «%s» degan karta yo'q.",
@@ -237,9 +237,9 @@ var (
 		en: "⏳ The other player has given %d cards today. Try again tomorrow.",
 	}
 	textTradeNoPlayer = localText{
-		uz: "%s hali birorta ham karta ochmagan. Avval /karta yozsin.",
+		uz: "%s hali birorta ham karta ochmagan. Avval /card yozsin.",
 		ru: "%s ещё не открыл ни одной карты. Пусть сначала напишет /karta.",
-		en: "%s has not opened a card yet. They should send /karta first.",
+		en: "%s has not opened a card yet. They should send /card first.",
 	}
 	textTradeGone = localText{
 		uz: "Bu karta endi yo'q.",

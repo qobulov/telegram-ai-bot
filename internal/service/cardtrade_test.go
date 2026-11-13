@@ -15,7 +15,7 @@ func toMember(text string, member *telegram.User) telegram.Update {
 	return inGroup(msg)
 }
 
-// /almash offers the member replied to a trade of cards named in part, one
+// /trade offers the member replied to a trade of cards named in part, one
 // only they may accept, once.
 func TestCardsAreTraded(t *testing.T) {
 	f := newFixture()
@@ -33,21 +33,21 @@ func TestCardsAreTraded(t *testing.T) {
 	}
 	last := func(sent []sentMessage) sentMessage { return sent[len(sent)-1] }
 
-	if sent := f.run(textFrom(userID, "/almash Levi = Gojo")); !strings.Contains(last(sent).text, "guruhda") || !strings.Contains(last(sent).text, "/kartalar") {
+	if sent := f.run(textFrom(userID, "/trade Levi = Gojo")); !strings.Contains(last(sent).text, "guruhda") || !strings.Contains(last(sent).text, "/cards") {
 		t.Fatalf("a trade in private = %+v", sent)
 	}
-	if sent := f.run(inGroup(groupMessage("/almash Levi = Gojo"))); !strings.Contains(last(sent).text, "javob qilib") {
+	if sent := f.run(inGroup(groupMessage("/trade Levi = Gojo"))); !strings.Contains(last(sent).text, "javob qilib") {
 		t.Fatalf("a trade with no one = %+v", sent)
 	}
-	if sent := f.run(toMember("/almash u = Levi", vali)); !strings.Contains(last(sent).text, "Qaysi biri") || !strings.Contains(last(sent).text, "Naruto Uzumaki") {
+	if sent := f.run(toMember("/trade u = Levi", vali)); !strings.Contains(last(sent).text, "Qaysi biri") || !strings.Contains(last(sent).text, "Naruto Uzumaki") {
 		t.Fatalf("a name of two cards = %+v", last(sent))
 	}
-	if sent := f.run(toMember("/almash Sasuke = Levi", vali)); !strings.Contains(last(sent).text, "«Sasuke» degan karta yo'q") {
+	if sent := f.run(toMember("/trade Sasuke = Levi", vali)); !strings.Contains(last(sent).text, "«Sasuke» degan karta yo'q") {
 		t.Fatalf("a card not held = %+v", last(sent))
 	}
 	book.named[rival] = []storage.Card{{ID: 40, Name: "Levi Ackerman", Rarity: 3, Value: 1000}}
 
-	sent := f.run(toMember("/almash Gojo = Levi", vali))
+	sent := f.run(toMember("/trade Gojo = Levi", vali))
 	offer := last(sent)
 	if len(offer.buttons) != 1 || !strings.Contains(offer.text, "Beradi: 👑 **Gojo Satoru**") || !strings.Contains(offer.text, "Oladi: 🔥 **Levi Ackerman**") {
 		t.Fatalf("offer = %+v", offer)

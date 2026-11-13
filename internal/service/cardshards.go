@@ -224,14 +224,14 @@ func duelTeamLine(in incoming, side string, team []storage.Card) string {
 
 var (
 	textShardsTooFew = localText{
-		uz: "💎 Kerak: %d, sizda: %d. Kristallar: /kartalar ilovasida takror kartalarni aylantiring.",
+		uz: "💎 Kerak: %d, sizda: %d. Kristallar: /cards ilovasida takror kartalarni aylantiring.",
 		ru: "💎 Нужно: %d, у вас: %d. Кристаллы: расплавьте повторы в приложении /kartalar.",
-		en: "💎 It takes %d, you have %d. Crystals: melt your spares in the /kartalar app.",
+		en: "💎 It takes %d, you have %d. Crystals: melt your spares in the /cards app.",
 	}
 
 	textDuelGroupOnly = localText{uz: "⚔️ Duel guruhda o'ynaladi.", ru: "⚔️ Дуэль играют в группе.", en: "⚔️ Duels are fought in a group."}
 	textDuelStake     = localText{uz: "Tikish 0 dan %d gacha son bo'lsin: /duel 10", ru: "Ставка — число от 0 до %d: /duel 10", en: "The stake is a number from 0 to %d: /duel 10"}
-	textDuelNoCards   = localText{uz: "Duel uchun avval karta oling: /karta", ru: "Для дуэли сначала получите карту: /karta", en: "Draw a card for a duel first: /karta"}
+	textDuelNoCards   = localText{uz: "Duel uchun avval karta oling: /card", ru: "Для дуэли сначала получите карту: /card", en: "Draw a card for a duel first: /card"}
 	textDuelOpen      = localText{uz: "⚔️ **%s** duelga chaqiradi! Kim qabul qiladi?", ru: "⚔️ **%s** вызывает на дуэль! Кто примет?", en: "⚔️ **%s** calls for a duel! Who takes it?"}
 	textDuelTo        = localText{uz: "⚔️ **%s** → **%s**: duelga chaqiraman!", ru: "⚔️ **%s** → **%s**: вызываю на дуэль!", en: "⚔️ **%s** → **%s**: I call you to a duel!"}
 	textDuelStakeLine = localText{uz: "💎 Tikish: %d", ru: "💎 Ставка: %d", en: "💎 Stake: %d"}

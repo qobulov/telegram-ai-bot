@@ -14,9 +14,10 @@ import (
 type InviteBook interface {
 	RecordInvite(ctx context.Context, inv storage.Invite) error
 	InviteTop(ctx context.Context, chatID int64, since time.Time, inviter int64, limit int) ([]storage.InviterCount, error)
+	MarkInvitee(ctx context.Context, chatID, userID int64, in bool, at time.Time) error
 }
 
-// inviteTableSize is the most members /qoshganlar lists.
+// inviteTableSize is the most members /invites lists.
 const inviteTableSize = 20
 
 // noteAdded notes the members a message says joined, when another added
@@ -54,6 +55,20 @@ func (s *Service) noteLinkJoin(change *telegram.ChatMemberUpdated) {
 		InviterName: authorLabel(link.Creator.FirstName), Via: "link", At: s.opts.Now()})
 }
 
+// markInvitee notes a member leaving the group or being removed (in false),
+// or coming back (in true), so that whoever brought them counts them only
+// while they are there.
+func (s *Service) markInvitee(chatID int64, user *telegram.User, in bool) {
+	if s.opts.Invites == nil || user == nil || user.IsBot {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
+	defer cancel()
+	if err := s.opts.Invites.MarkInvitee(ctx, chatID, user.ID, in, s.opts.Now()); err != nil {
+		s.opts.Logger.Warn("could not mark an invitee", "chat_id", chatID, "error", err)
+	}
+}
+
 func (s *Service) noteInvite(inv storage.Invite) {
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
 	defer cancel()
@@ -62,9 +77,9 @@ func (s *Service) noteInvite(inv storage.Invite) {
 	}
 }
 
-// inviteTable answers /qoshganlar [hafta|oy|bugun|hammasi] in a group: who
-// brought how many people in, those still there first; replying to a member,
-// that member's alone. It asks no model.
+// inviteTable answers /invites [hafta|oy|bugun|hammasi] in a group: who
+// brought how many people in who are still there, only those who brought
+// at least one; replying to a member, that member's alone. It asks no model.
 func (s *Service) inviteTable(ctx context.Context, in incoming) outcome {
 	if !in.group {
 		return say(textInvitesGroupOnly.to(in))
@@ -119,9 +134,9 @@ var (
 		"all":   {uz: "hamma vaqt", ru: "за всё время", en: "all time"},
 	}
 	textInvitesTitle       = localText{uz: "👥 Kim nechta odam qo'shdi · %s", ru: "👥 Кто сколько людей добавил · %s", en: "👥 Who brought how many in · %s"}
-	textInvitesNone        = localText{uz: "Hali hech kim odam qo'shmagan.", ru: "Пока никто никого не добавил.", en: "Nobody has brought anyone in yet."}
+	textInvitesNone        = localText{uz: "Hali hech kim guruhda qolgan odam qo'shmagan.", ru: "Пока никто не добавил тех, кто остался в группе.", en: "Nobody has brought in anyone who is still here yet."}
 	textInvitesGone        = localText{uz: " (yana %d tasi chiqib ketgan)", ru: " (ещё %d ушли)", en: " (%d more left)"}
-	textInvitesRule        = localText{uz: "Hisobda: qo'lda qo'shilganlar va shaxsiy havola orqali kirganlar, guruhda qolganlari. Davr: /qoshganlar bugun · oy · hammasi", ru: "Считаются добавленные вручную и пришедшие по личной ссылке, кто остался в группе. Период: /qoshganlar сегодня · месяц · все", en: "Counted: those added by hand or come by one's own invite link who are still here. Period: /qoshganlar today · month · all"}
-	textInvitesGroupOnly   = localText{uz: "👥 /qoshganlar guruhda ishlaydi.", ru: "👥 /qoshganlar работает в группе.", en: "👥 /qoshganlar works in a group."}
+	textInvitesRule        = localText{uz: "Reytingda guruhda qolgan odam qo'shganlar bor: qo'lda qo'shilgan yoki shaxsiy havola orqali kirgan. Kimdir chiqib ketsa, qo'shganning hisobidan ayriladi. Davr: /invites bugun · oy · hammasi", ru: "В рейтинге те, кто добавил оставшихся в группе: вручную или по личной ссылке. Кто ушёл, вычитается у добавившего. Период: /invites сегодня · месяц · все", en: "Listed: those who brought in people still here, added by hand or by one's own invite link. One who leaves is taken off whoever brought them. Period: /invites today · month · all"}
+	textInvitesGroupOnly   = localText{uz: "👥 /invites guruhda ishlaydi.", ru: "👥 /invites работает в группе.", en: "👥 /invites works in a group."}
 	textInvitesUnavailable = localText{uz: "Hisobni hozir o'qib bo'lmadi, birozdan keyin urinib ko'ring.", ru: "Сейчас не удалось прочитать счёт, попробуйте позже.", en: "Could not read the count right now; try again in a bit."}
 )

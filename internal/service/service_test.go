@@ -583,7 +583,7 @@ func TestEmptyAnswerIsSilentInAGroup(t *testing.T) {
 }
 
 // A turn the provider's filter refused says so in a private chat, and to
-// an owner how to post an announcement with /elon; a group hears nothing.
+// an owner how to post an announcement with /announce; a group hears nothing.
 func TestBlockedTurnSaysWhy(t *testing.T) {
 	blocked := fmt.Errorf("agent: %w: %w (finish reason content_filter)", ai.ErrEmptyResponse, ai.ErrBlocked)
 	f := newFixture()
@@ -595,7 +595,7 @@ func TestBlockedTurnSaysWhy(t *testing.T) {
 	f.replier.err = blocked
 	owner := textFrom(9001, "e'lon ber")
 	owner.Message.From.Username = "Pronium"
-	if sent := f.run(owner); len(sent) != 1 || !strings.Contains(sent[0].text, "/elon hammaga") {
+	if sent := f.run(owner); len(sent) != 1 || !strings.Contains(sent[0].text, "/announce hammaga") {
 		t.Errorf("the owner was told %+v", sent)
 	}
 
@@ -2779,7 +2779,7 @@ func TestAGroupIsGreetedWhenTheBotJoins(t *testing.T) {
 		return u
 	}
 	sent := f.run(change("left", "member"))
-	if len(sent) != 1 || !strings.Contains(sent[0].text, "@") || !strings.Contains(sent[0].text, "/karta") || !strings.Contains(sent[0].text, "admin qiling") {
+	if len(sent) != 1 || !strings.Contains(sent[0].text, "@") || !strings.Contains(sent[0].text, "/card") || !strings.Contains(sent[0].text, "admin qiling") {
 		t.Fatalf("added as a member = %+v", sent)
 	}
 	if sent = f.run(change("member", "administrator"), change("administrator", "left"), change("kicked", "kicked")); len(sent) != 1 {

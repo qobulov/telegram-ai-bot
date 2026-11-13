@@ -37,13 +37,13 @@ const announceTimeout = 45 * time.Second
 // groups or private chats.
 var announceWords = regexp.MustCompile(`(?i)(e['ʼ‘’` + "`" + `]?lon|эълон|элон|объявлени|reklama|реклам|tarqat|guruhlarga|guruhga|lichka|личк|personal|hammaga|разошли|разошл)`)
 
-// announceCommand is an owner's /elon: send_to_groups run in code, without
+// announceCommand is an owner's /announce: send_to_groups run in code, without
 // the model, whose provider may refuse a sale's words or a video's picture.
-// "/elon <text>" drafts a post for every group, in reply to a photo or a
+// "/announce <text>" drafts a post for every group, in reply to a photo or a
 // video that post under the text as its caption, the owner seeing a
-// preview first; "/elon hammaga <text>" drafts it for the private chats of
-// those who wrote to the bot too, "/elon lichkaga <text>" for those only;
-// "/elon ha" sends it, "/elon bekor" drops it.
+// preview first; "/announce hammaga <text>" drafts it for the private chats of
+// those who wrote to the bot too, "/announce lichkaga <text>" for those only;
+// "/announce ha" sends it, "/announce bekor" drops it.
 func (s *Service) announceCommand(ctx context.Context, in incoming) outcome {
 	rest := strings.TrimSpace(strings.TrimPrefix(in.text, strings.Fields(in.text)[0]))
 	switch strings.ToLower(rest) {
@@ -304,14 +304,14 @@ func (s *Service) runAnnounce(ctx context.Context, in incoming, args string) (js
 
 var (
 	textAnnounceUsage = localText{
-		uz: "📢 E'lon: /elon matn — barcha guruhlarga; /elon hammaga matn — guruhlarga va botga yozgan hammaning lichkasiga; /elon lichkaga matn — faqat lichkalarga. Rasm yoki videoga reply qilib yozsangiz — o'sha video shu tavsif bilan. Avval namunasi keladi, keyin /elon ha — yuborish, /elon bekor — bekor qilish.",
-		ru: "📢 Объявление: /elon текст — во все группы; /elon всем текст — в группы и в личку всем, кто писал боту; /elon личка текст — только в личку. Ответом на фото или видео — оно с этой подписью. Сначала придёт образец, потом /elon да — отправить, /elon нет — отменить.",
-		en: "📢 Announcement: /elon text — to every group; /elon everyone text — to the groups and the private chat of everyone who wrote to the bot; /elon private text — to private chats only. In reply to a photo or a video — it under that caption. A preview comes first, then /elon yes sends it, /elon no drops it.",
+		uz: "📢 E'lon: /announce matn — barcha guruhlarga; /announce hammaga matn — guruhlarga va botga yozgan hammaning lichkasiga; /announce lichkaga matn — faqat lichkalarga. Rasm yoki videoga reply qilib yozsangiz — o'sha video shu tavsif bilan. Avval namunasi keladi, keyin /announce ha — yuborish, /announce bekor — bekor qilish.",
+		ru: "📢 Объявление: /announce текст — во все группы; /announce всем текст — в группы и в личку всем, кто писал боту; /announce личка текст — только в личку. Ответом на фото или видео — оно с этой подписью. Сначала придёт образец, потом /announce да — отправить, /announce нет — отменить.",
+		en: "📢 Announcement: /announce text — to every group; /announce everyone text — to the groups and the private chat of everyone who wrote to the bot; /announce private text — to private chats only. In reply to a photo or a video — it under that caption. A preview comes first, then /announce yes sends it, /announce no drops it.",
 	}
 	textAnnounceDrafted = localText{
-		uz: "👆 Namuna shu.\n%s\n\nYuborish: /elon ha · Bekor: /elon bekor",
-		ru: "👆 Вот образец.\n%s\n\nОтправить: /elon да · Отменить: /elon нет",
-		en: "👆 That is the preview.\n%s\n\nSend: /elon yes · Drop: /elon no",
+		uz: "👆 Namuna shu.\n%s\n\nYuborish: /announce ha · Bekor: /announce bekor",
+		ru: "👆 Вот образец.\n%s\n\nОтправить: /announce да · Отменить: /announce нет",
+		en: "👆 That is the preview.\n%s\n\nSend: /announce yes · Drop: /announce no",
 	}
 	textAnnounceDraftedButtons = localText{
 		uz: "👆 Gemini so'rovni to'xtatgani uchun e'lonni o'zim yozdim, namuna shu.\n%s",

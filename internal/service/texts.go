@@ -136,9 +136,9 @@ var (
 		en: "🚫 I can't answer this: the model stopped it as prohibited content. Try putting it another way.",
 	}
 	textBlockedOwner = localText{
-		uz: "🚫 Gemini bu so'rovni taqiqlangan kontent deb to'xtatdi, javob yoza olmadim. E'lon bo'lsa, o'zim yuboraman: videoga reply qilib /elon hammaga <tavsif> (yoki faqat guruhlarga: /elon <tavsif>).",
-		ru: "🚫 Gemini остановил запрос как запрещённый контент, я не смогла ответить. Если это объявление, отправлю сама: ответом на видео /elon всем <описание> (или только в группы: /elon <описание>).",
-		en: "🚫 Gemini stopped this as prohibited content, so I couldn't answer. For an announcement, I'll post it myself: in reply to the video, /elon everyone <caption> (or groups only: /elon <caption>).",
+		uz: "🚫 Gemini bu so'rovni taqiqlangan kontent deb to'xtatdi, javob yoza olmadim. E'lon bo'lsa, o'zim yuboraman: videoga reply qilib /announce hammaga <tavsif> (yoki faqat guruhlarga: /announce <tavsif>).",
+		ru: "🚫 Gemini остановил запрос как запрещённый контент, я не смогла ответить. Если это объявление, отправлю сама: ответом на видео /announce всем <описание> (или только в группы: /announce <описание>).",
+		en: "🚫 Gemini stopped this as prohibited content, so I couldn't answer. For an announcement, I'll post it myself: in reply to the video, /announce everyone <caption> (or groups only: /announce <caption>).",
 	}
 	textError = localText{
 		uz: "Nimadir xato ketdi, birozdan keyin qayta yozing.",
@@ -225,7 +225,7 @@ Buyruqlar:
 /start — salomlashish
 /help — shu yordam
 /about — bot haqida
-/dooz — Dooz (X-O): guruhda do'stingiz bilan yoki men bilan%s
+/tictactoe — Dooz (X-O): guruhda do'stingiz bilan yoki men bilan%s
 
 Guruhda meni ismim bilan chaqiring, @username bilan belgilang yoki xabarimga reply qiling. U yerda buyruqqa username qo'shiladi: /help@username. Guruh men bilan bitta umumiy suhbatda.
 
@@ -242,7 +242,7 @@ A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yo
 /start — приветствие
 /help — эта справка
 /about — о боте
-/dooz — крестики-нолики: с другом в группе или со мной%s
+/tictactoe — крестики-нолики: с другом в группе или со мной%s
 
 В группе зовите меня по имени, упоминайте (@username) или отвечайте на моё сообщение. Там к команде добавляется username: /help@username. У группы со мной один общий разговор.
 
@@ -259,7 +259,7 @@ Commands:
 /start — welcome message
 /help — this help
 /about — about this bot
-/dooz — tic-tac-toe: with a friend in a group, or with me%s
+/tictactoe — tic-tac-toe: with a friend in a group, or with me%s
 
 In a group, call me by name, mention me (@username) or reply to one of my messages. Commands there need my username, like /help@username. A group shares one conversation with me.
 
@@ -316,9 +316,9 @@ type Abilities struct {
 // helpPages are the games' commands, in each language, listed after /about
 // when the pages are on. /stats, for the owners alone, is not listed.
 var helpPages = map[string]string{
-	"uz": "\n/game — Tarozi o'yini\n/ilon — Kosmik ilon o'yini\n/otinchi — O'tinchi: daraxtni chop, shoxlardan qoch\n/boss — Dev jangi: guruh bilan birga devni uring\n/mafia — Mafia: guruh bilan, yashirin rollar, 5+ kishi\n/maydon — Maydon: jamoa jangi, 1v1 dan 5v5 gacha\n/shashka — shashka: tasodifiy raqib, do'st yoki men bilan, reyting bilan",
-	"ru": "\n/game — игра «Tarozi»\n/ilon — игра «Космическая змейка»\n/otinchi — «Дровосек»: руби дерево, уворачивайся от веток\n/boss — «Битва с дэвом»: бейте дэва всей группой\n/mafia — «Мафия»: всей группой, тайные роли, от 5 человек\n/maydon — «Майдон»: командный бой, от 1 на 1 до 5 на 5\n/shashka — шашки: со случайным соперником, другом или со мной, с рейтингом",
-	"en": "\n/game — the Tarozi game\n/ilon — the space snake game\n/otinchi — the woodcutter: chop the tree, dodge the branches\n/boss — the boss raid: hit the giant with the whole group\n/mafia — Mafia: with the group, secret roles, 5 or more\n/maydon — Maydon: a team battle, one on one up to five on five\n/shashka — draughts: a random opponent, a friend or me, with ratings",
+	"uz": "\n/game — Tarozi o'yini\n/snake — Kosmik ilon o'yini\n/woodcutter — O'tinchi: daraxtni chop, shoxlardan qoch\n/boss — Dev jangi: guruh bilan birga devni uring\n/mafia — Mafia: guruh bilan, yashirin rollar, 5+ kishi\n/arena — Maydon: jamoa jangi, 1v1 dan 5v5 gacha\n/checkers — shashka: tasodifiy raqib, do'st yoki men bilan, reyting bilan",
+	"ru": "\n/game — игра «Tarozi»\n/snake — игра «Космическая змейка»\n/woodcutter — «Дровосек»: руби дерево, уворачивайся от веток\n/boss — «Битва с дэвом»: бейте дэва всей группой\n/mafia — «Мафия»: всей группой, тайные роли, от 5 человек\n/arena — «Майдон»: командный бой, от 1 на 1 до 5 на 5\n/checkers — шашки: со случайным соперником, другом или со мной, с рейтингом",
+	"en": "\n/game — the Tarozi game\n/snake — the space snake game\n/woodcutter — the woodcutter: chop the tree, dodge the branches\n/boss — the boss raid: hit the giant with the whole group\n/mafia — Mafia: with the group, secret roles, 5 or more\n/arena — Maydon: a team battle, one on one up to five on five\n/checkers — draughts: a random opponent, a friend or me, with ratings",
 }
 
 // HelpText describes the bot's commands and what it can do with these

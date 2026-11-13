@@ -179,7 +179,7 @@ func Message(opts Options, r storage.Reminder) telegram.Outgoing {
 	}
 	switch r.Kind {
 	case storage.ReminderCard:
-		command := "/karta"
+		command := "/card"
 		if group && opts.BotUsername != "" {
 			command += "@" + opts.BotUsername
 		}
