@@ -602,8 +602,8 @@
   $("open1").addEventListener("click", () => reveal(1));
   $("open10").addEventListener("click", () => reveal(batch));
 
-  // reveal opens n cards, for tokens and then crystals, and turns the rarest
-  // of them; a batch is then laid out together.
+  // reveal opens n cards, for tokens and then crystals: one turns on the
+  // deck, a batch is laid out together.
   async function reveal(n) {
     if (drawing || cost(n).shards > shards) return;
     drawing = true;
@@ -627,6 +627,15 @@
       if (data.given) toast(t.given(data.given));
       const drawn = data.drawn.map((d) => ({ card: d.card, fresh: d.new }));
       for (const { card } of drawn) keep(card);
+      points = data.points;
+      // A batch is laid out on its own; the deck stays face down.
+      if (drawn.length > 1) {
+        flip.classList.remove("shuffle");
+        header();
+        shelves();
+        openedPanel(drawn);
+        return;
+      }
       const best = drawn.reduce((a, b) => (b.card.rarity > a.card.rarity ? b : a));
       const front = face(best.card);
       front.id = "front";
@@ -639,17 +648,12 @@
       flip.classList.remove("shuffle");
       flip.classList.add("shown");
       haptic(best.card.rarity >= 3 ? "heavy" : "light");
-      const fresh = drawn.filter((d) => d.fresh).length;
-      $("result").replaceChildren(...withTiers(drawn.length === 1
-        ? (best.fresh ? `${t.fresh} · ${t.plus(spaced(best.card.value))}` : `${t.again(best.card.count)} · ${t.noPoints}`)
-        : `${t.openedTen} · 🆕 ${fresh}`));
+      $("result").replaceChildren(...withTiers(best.fresh ? `${t.fresh} · ${t.plus(spaced(best.card.value))}` : `${t.again(best.card.count)} · ${t.noPoints}`));
       $("drawnStats").replaceChildren(statsOf(best.card));
       lastDrawn = best.card.id;
       $("seeCollection").hidden = false;
-      points = data.points;
       header();
       shelves();
-      if (drawn.length > 1) setTimeout(() => openedPanel(drawn), 900);
     } catch (error) {
       flip.classList.remove("shuffle");
       notice(error);
