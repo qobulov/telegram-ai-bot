@@ -444,6 +444,17 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .open-btn { width: 100%; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; }
 .open-btn b { font: 700 16px Unbounded, sans-serif; }
 .open-btn small { font: 700 12px Manrope, sans-serif; opacity: 0.8; }
-.open-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-.open-grid .card .name { font-size: 9px; left: 4px; right: 4px; bottom: 4px; }
-.open-grid .card .fresh { position: absolute; top: 4px; left: 4px; z-index: 3; font-size: 11px; }
+/* the cards just opened, dealt out three and two, the rarest first */
+.sheet-card.giving:has(.opened) { width: min(94vw, 440px); }
+.opened { padding: 18px 16px 16px; border-radius: 22px; background: var(--panel); border: 1px solid var(--line); text-align: center; }
+.opened-head b { display: block; font: 700 18px Unbounded, sans-serif; }
+.opened-head span { display: block; margin-top: 4px; color: var(--muted); font: 700 13px Manrope, sans-serif; }
+.opened-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 16px; }
+.opened-grid .card { width: calc((100% - 20px) / 3); animation: deal 0.5s cubic-bezier(.2, 1.2, .4, 1) both; }
+.opened-grid .card .name { font-size: 11px; left: 7px; right: 7px; bottom: 7px; text-align: left; }
+.opened-grid .card .fresh {
+  position: absolute; top: 6px; right: 6px; z-index: 4; padding: 2px 7px; border-radius: 999px;
+  background: var(--gold); color: var(--ink); font: 800 9px Unbounded, sans-serif; letter-spacing: 0.06em;
+}
+@keyframes deal { from { opacity: 0; transform: translateY(18px) rotateY(80deg) scale(0.85); } to { opacity: 1; transform: none; } }
+.opened-ok { width: 100%; margin-top: 18px; min-height: 50px; }
