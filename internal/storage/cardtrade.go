@@ -38,11 +38,6 @@ type CardOffersError struct{ Limit int }
 
 func (e *CardOffersError) Error() string { return "storage: card offers at the limit" }
 
-// CardGiveLimitError is a player who gave as many cards as they may today.
-type CardGiveLimitError struct{ UserID int64 }
-
-func (e *CardGiveLimitError) Error() string { return "storage: cards given today at the limit" }
-
 // CardTrade is a trade done: the card From gave To and the card To gave
 // back.
 type CardTrade struct {
@@ -52,12 +47,10 @@ type CardTrade struct {
 	Take     Card
 }
 
-// CardTradeRules bound passing cards: Limit is how many a player may give
-// in Day, and an offer older than Day may no longer be accepted.
+// CardTradeRules are what passing a card needs to know: the time it is done.
+// A player gives or trades as many cards a day as they like.
 type CardTradeRules struct {
-	Limit int
-	Day   time.Duration
-	Now   time.Time
+	Now time.Time
 }
 
 // CardPlayersNamed are the players whose name or @username holds name, in
@@ -103,9 +96,6 @@ func scanCard(row pgx.CollectableRow) (Card, error) {
 func (s *Store) GiveCard(ctx context.Context, chatID, from, to, cardID int64, rules CardTradeRules) error {
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		if err := lockTraders(ctx, tx, from, to); err != nil {
-			return err
-		}
-		if err := checkGiveLimit(ctx, tx, from, rules); err != nil {
 			return err
 		}
 		if err := moveCard(ctx, tx, from, to, cardID, true); err != nil {
@@ -188,22 +178,6 @@ func checkFair(ctx context.Context, tx pgx.Tx, trade CardTrade) error {
 	return checkEven(ctx, tx, trade.Give.ID, trade.Take.ID)
 }
 
-// checkGiveLimit refuses a player who gave rules.Limit cards in rules.Day.
-func checkGiveLimit(ctx context.Context, tx pgx.Tx, userID int64, rules CardTradeRules) error {
-	var given int
-	err := tx.QueryRow(ctx, `
-		SELECT (SELECT count(*) FROM card_trades WHERE from_id = $1 AND status = 'done' AND done_at > $2)
-		     + (SELECT count(*) FROM card_trades WHERE to_id = $1 AND status = 'done' AND take_card IS NOT NULL AND done_at > $2)`,
-		userID, rules.Now.Add(-rules.Day)).Scan(&given)
-	if err != nil {
-		return err
-	}
-	if given >= rules.Limit {
-		return &CardGiveLimitError{UserID: userID}
-	}
-	return nil
-}
-
 // moveCard moves one copy of the card, not melted, from one player to the
 // other: the giver loses its points only with their last copy, and the
 // other gains them only when it is new to them. A player giving their last copy not melted no
@@ -268,13 +242,12 @@ func readCards(ctx context.Context, tx pgx.Tx, cards ...*Card) error {
 
 // tradeError wraps err, keeping the errors a player is told as they are.
 func tradeError(what string, err error) error {
-	var limit *CardGiveLimitError
 	var offers *CardOffersError
 	switch {
 	case err == nil, errors.Is(err, ErrCardNotHeld), errors.Is(err, ErrCardNoPlayer), errors.Is(err, ErrCardTradeOver),
 		errors.Is(err, ErrCardLastCopy), errors.Is(err, ErrCardOfferGone), errors.Is(err, ErrCardOfferOwn),
 		errors.Is(err, ErrCardTradeUneven),
-		errors.As(err, &limit), errors.As(err, &offers):
+		errors.As(err, &offers):
 		return err
 	}
 	return fmt.Errorf("storage: %s: %w", what, err)

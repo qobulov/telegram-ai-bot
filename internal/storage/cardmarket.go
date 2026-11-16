@@ -124,11 +124,6 @@ func (s *Store) TakeCardOffer(ctx context.Context, id, by int64, rules CardTrade
 		if err := lockTraders(ctx, tx, by, trade.From); err != nil {
 			return err
 		}
-		for _, giver := range []int64{trade.From, by} {
-			if err := checkGiveLimit(ctx, tx, giver, rules); err != nil {
-				return err
-			}
-		}
 		if err := moveCard(ctx, tx, trade.From, by, trade.Give.ID, false); errors.Is(err, ErrCardNotHeld) {
 			return ErrCardOfferGone
 		} else if err != nil {

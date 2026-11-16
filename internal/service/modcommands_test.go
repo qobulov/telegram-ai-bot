@@ -69,6 +69,14 @@ func TestModOrdersInWords(t *testing.T) {
 		"chiqar": {"kick", 0, true}, "ҳайда": {"kick", 0, true}, "мут 1 соатга": {"mute", 60, true}, "разбань": {"unban", 0, true},
 		"мут бериш керак эди": {"", 0, false}, "уни мут қил": {"", 0, false}, "мут 5 йил": {"", 0, false},
 		"chiqar bu gapni yana bir marta": {"", 0, false},
+		// adminship, which the model once refused one time in three
+		"Админ кил мари": {"promote", 0, true}, "admin qil": {"promote", 0, true}, "админ бер": {"promote", 0, true},
+		"сделай админом": {"promote", 0, true}, "Админ бекор кил мари": {"demote", 0, true}, "Админни бекор кил мари": {"demote", 0, true},
+		"admin bekor qil": {"demote", 0, true}, "adminlikdan ol": {"demote", 0, true}, "сними админа": {"demote", 0, true},
+		"admin emas": {"demote", 0, true}, "кто тут админ": {"", 0, false}, "admin qachon keladi": {"", 0, false},
+		// warnings
+		"varn ber": {"warn", 0, true}, "пред": {"warn", 0, true}, "Мари предупреждение": {"warn", 0, true},
+		"ogohlantir": {"warn", 0, true}, "unwarn": {"unwarn", 0, true}, "варн нима": {"", 0, false},
 	} {
 		action, minutes, ok := s.modWords(text)
 		if action != want.action || minutes != want.minutes || ok != want.ok {

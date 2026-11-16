@@ -1551,12 +1551,12 @@ kept with its judge.
 Admins used to other group bots may moderate with commands, replying to a
 member's message: `/mute 4h spam` (a length in `m`, `h`, `d` or `w`, or in
 minutes, `soat`, `kun`, `час`… too; an hour when not given, a week at most),
-`/unmute`, `/ban`, `/unban`, `/kick` and `/del`, or the same as a short order
+`/unmute`, `/ban`, `/unban`, `/kick`, `/del`, `/warn`, `/unwarn`, `/promote` and `/demote`, or the same as a short order
 calling the bot by name, "Мут мари 1 минутга", "Maria, ban", "замуть его на 5
 минут", "mute him for 2 hours", "chiqar" (an action word
 in Uzbek, Russian or English,
 perhaps a length, and nothing else, so that talk about muting still goes to
-the model, which once asked back instead of muting); "бер", "qil" and the
+the model, which once asked back instead of muting, and refused one adminship order in three); adminship goes the same way, "admin qil", "админ бекор кил", "adminlikdan ol", "сними админа", and a warning, "varn ber", "пред", "ogohlantir": the third warning mutes the member for a day and their count starts again (`member_warns`, migration 83); "бер", "qil" and the
 like may go with it. Replying to the bot's own answer about a member, such
 an order reaches that member: "Мут бер" after the bot answered "mute him"
 (the bot remembers whom each of its answers in the last hour was about).
@@ -2197,7 +2197,7 @@ whole catalog by name (`catalog`, `offer`), at most 5 open, each for 7 days;
 anyone who holds the card wanted presses 🔄 to take it (`take`), each giving
 the other their card with its points, and the offer's player is told; an
 offer whose card its player no longer holds is called off when taken, and a
-player takes down their own (`unoffer`). A trade's two cards must be at most one rarity apart, a Mythic going only for a Mythic or a Legendary, as an offer and as a market take (`ErrCardTradeUneven`): one player's cards had gone to another's, Common cards for three Mythic in seven minutes. The same two players trade as often as they like; the daily limit between them was taken out. The market's cards show each card's tier; migration 75 called off the open offers the rule forbids. There is no trade command: `/trade`, which offered a card for a member's in
+player takes down their own (`unoffer`). A trade's two cards must be at most one rarity apart, a Mythic going only for a Mythic or a Legendary, as an offer and as a market take (`ErrCardTradeUneven`): one player's cards had gone to another's, Common cards for three Mythic in seven minutes. The same two players trade as often as they like, and a player gives and trades as many cards a day as they like: both daily limits were taken out. The market's cards show each card's tier; migration 75 called off the open offers the rule forbids. There is no trade command: `/trade`, which offered a card for a member's in
 a group, was taken out, and trades are done on the market alone. A card taken
 from the market may be the last copy, which leaves the collection (its melted copies, gone
 to shards, with it), its points passing only as it is new to its taker or the giver's last copy. A player gives at most 5

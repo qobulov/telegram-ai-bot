@@ -22,6 +22,7 @@ import (
 // modCommands are the commands and the moderate tool's action each does.
 var modCommands = map[string]string{
 	"/mute": "mute", "/unmute": "unmute", "/ban": "ban", "/unban": "unban", "/kick": "kick", "/del": "delete",
+	"/warn": "warn", "/unwarn": "unwarn", "/promote": "promote", "/demote": "demote",
 }
 
 // modTimeout bounds one command's action, Telegram's answer included.
@@ -171,6 +172,13 @@ var modWordActions = map[string]string{
 	"kick": "kick", "кик": "kick", "кикни": "kick", "кикнуть": "kick", "выгони": "kick", "выкинь": "kick",
 	"chiqar": "kick", "чиқар": "kick", "чикар": "kick", "hayda": "kick", "ҳайда": "kick", "хайда": "kick",
 	"remove": "kick",
+	// warn, at the third a day's mute; unwarn takes one off
+	"warn": "warn", "varn": "warn", "варн": "warn", "пред": "warn", "предупреждение": "warn", "предупреди": "warn",
+	"ogohlantir": "warn", "огоҳлантир": "warn", "огохлантир": "warn", "ogohlantirish": "warn",
+	"unwarn": "unwarn", "разварн": "unwarn",
+	// adminship, in one word; "admin qil" and "admin bekor qil" are read by
+	// adminOrder
+	"promote": "promote", "demote": "demote", "unadmin": "demote",
 	// delete the message replied to
 	"del": "delete", "delete": "delete", "удали": "delete", "удалить": "delete", "o'chir": "delete", "ochir": "delete", "ўчир": "delete",
 }
@@ -201,6 +209,9 @@ func (s *Service) modWords(text string) (action string, minutes int, ok bool) {
 	if len(words) == 0 || len(words) > 6 {
 		return "", 0, false
 	}
+	if action, ok = adminOrder(words); ok {
+		return action, 0, true
+	}
 	if action, ok = modWordActions[words[0]]; !ok {
 		return "", 0, false
 	}
@@ -217,6 +228,52 @@ func (s *Service) modWords(text string) (action string, minutes int, ok bool) {
 		return "", 0, false
 	}
 	return action, minutes, true
+}
+
+// adminOrder reads an order about adminship: "admin qil", "админ бер",
+// "сделай админом" make the member an admin; "admin bekor qil", "админни
+// бекор кил", "adminlikdan ol", "сними админа" take it back. Every word but
+// the admin one is a filler or a word for taking back, so that talk about
+// admins is never taken for an order.
+func adminOrder(words []string) (action string, ok bool) {
+	admin, back := false, false
+	for _, w := range words {
+		switch {
+		case isAdminWord(w):
+			admin = true
+		case adminBack[w]:
+			back = true
+		case modFillers[w] || adminMake[w]:
+		default:
+			return "", false
+		}
+	}
+	switch {
+	case !admin:
+		return "", false
+	case back:
+		return "demote", true
+	}
+	return "promote", true
+}
+
+// isAdminWord is "admin" or "админ" with any ending: "adminni", "админом",
+// "adminlikdan", "админка".
+func isAdminWord(w string) bool {
+	return strings.HasPrefix(w, "admin") || strings.HasPrefix(w, "админ")
+}
+
+// adminBack are the words that take adminship back.
+var adminBack = map[string]bool{
+	"bekor": true, "бекор": true, "ol": true, "ол": true, "olib": true, "олиб": true, "olvor": true, "олвор": true,
+	"tashla": true, "ташла": true, "emas": true, "эмас": true,
+	"сними": true, "снять": true, "убери": true, "забери": true, "отмени": true, "лиши": true, "разжалуй": true,
+	"remove": true, "revoke": true, "take": true, "away": true,
+}
+
+// adminMake are the other words an order to make an admin may have.
+var adminMake = map[string]bool{
+	"сделай": true, "назначь": true, "дай": true, "make": true, "an": true, "as": true,
 }
 
 // wordLength reads a length said in words, its unit's ending whatever it

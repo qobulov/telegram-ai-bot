@@ -942,7 +942,7 @@ func TestModerateChecksItsArguments(t *testing.T) {
 	env := newModerationEnv(t)
 	for _, args := range []string{
 		`{}`,
-		`{"action":"warn"}`,
+		`{"action":"caution"}`,
 		// Nothing waits for a confirmation any more, so there is nothing to
 		// cancel or confirm.
 		`{"action":"cancel"}`,

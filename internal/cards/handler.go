@@ -60,10 +60,6 @@ const (
 	// playersShown is the most players a search for whom to give a card
 	// lists.
 	playersShown = 10
-	// GiveLimit is how many cards a player may give a day, so that a
-	// second account cannot feed a first one its cards; GiveDay is that day.
-	GiveLimit = 5
-	GiveDay   = 24 * time.Hour
 	// OffersOpen is how many offers a player may have on the market, and
 	// OfferKeep how long one stays there.
 	OffersOpen = 5
@@ -355,11 +351,8 @@ func (h *handler) gift(ctx context.Context, user miniapp.User, cardID, to int64)
 	if cardID == 0 || to == 0 || to == user.ID {
 		return nil, errBadRequest
 	}
-	err := h.Store.GiveCard(ctx, 0, user.ID, to, cardID, storage.CardTradeRules{Limit: GiveLimit, Day: GiveDay, Now: h.Now()})
-	var limit *storage.CardGiveLimitError
+	err := h.Store.GiveCard(ctx, 0, user.ID, to, cardID, storage.CardTradeRules{Now: h.Now()})
 	switch {
-	case errors.As(err, &limit):
-		return map[string]any{"refused": "limit", "limit": GiveLimit}, failure{}
 	case errors.Is(err, storage.ErrCardNoPlayer):
 		return map[string]any{"refused": "no_player"}, failure{}
 	case errors.Is(err, storage.ErrCardNotHeld):
@@ -502,8 +495,7 @@ func (h *handler) take(ctx context.Context, user miniapp.User, id int64) (any, f
 	if id == 0 {
 		return nil, errBadRequest
 	}
-	trade, err := h.Store.TakeCardOffer(ctx, id, user.ID, storage.CardTradeRules{Limit: GiveLimit, Day: GiveDay, Now: h.Now()}, OfferKeep)
-	var limit *storage.CardGiveLimitError
+	trade, err := h.Store.TakeCardOffer(ctx, id, user.ID, storage.CardTradeRules{Now: h.Now()}, OfferKeep)
 	switch {
 	case errors.Is(err, storage.ErrCardTradeOver):
 		return map[string]any{"refused": "over"}, failure{}
@@ -515,8 +507,6 @@ func (h *handler) take(ctx context.Context, user miniapp.User, id int64) (any, f
 		return map[string]any{"refused": "not_held"}, failure{}
 	case errors.Is(err, storage.ErrCardTradeUneven):
 		return map[string]any{"refused": "uneven"}, failure{}
-	case errors.As(err, &limit):
-		return map[string]any{"refused": "limit", "limit": GiveLimit, "mine": limit.UserID == user.ID}, failure{}
 	case err != nil:
 		h.Logger.Error("could not take a card offer", "user_id", user.ID, "error", err)
 		return nil, errUnavailable

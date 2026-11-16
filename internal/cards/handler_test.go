@@ -306,10 +306,6 @@ func TestACardIsGiven(t *testing.T) {
 	if code, _ := call(map[string]any{"action": "gift", "card": 1, "to": 7}); code != http.StatusBadRequest {
 		t.Errorf("a gift to oneself = %d", code)
 	}
-	store.giftErr = &storage.CardGiveLimitError{UserID: 7}
-	if _, out := call(map[string]any{"action": "gift", "card": 1, "to": 8}); out["refused"] != "limit" {
-		t.Errorf("at the limit = %v", out)
-	}
 }
 
 // A player puts a card up for one found in the catalog; another takes the

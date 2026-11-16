@@ -8,8 +8,8 @@ import (
 )
 
 // A gift moves one copy and its points; giving the last copy not melted
-// takes the card out of the collection; a player gives at most the limit a
-// day; a trade is done once, by the player it was offered to.
+// takes the card out of the collection; a player gives as many cards a
+// day as they like; a trade is done once, by the player it was offered to.
 func TestCardsPassBetweenPlayers(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -22,7 +22,7 @@ func TestCardsPassBetweenPlayers(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	rules := CardTradeRules{Limit: 2, Day: 24 * time.Hour, Now: time.Now()}
+	rules := CardTradeRules{Now: time.Now()}
 	held := func(user, card int64) (count, melted int) {
 		_ = store.pool.QueryRow(ctx, `SELECT count, melted FROM card_owned WHERE user_id = $1 AND card_id = $2`, user, card).Scan(&count, &melted)
 		return
@@ -76,14 +76,17 @@ func TestCardsPassBetweenPlayers(t *testing.T) {
 	if err := store.GiveCard(ctx, -100, 1, 2, 10, rules); err != nil {
 		t.Fatal(err)
 	}
-	var limit *CardGiveLimitError
-	if err := store.GiveCard(ctx, -100, 1, 2, 30, rules); !errors.As(err, &limit) || limit.UserID != 1 {
-		t.Errorf("a third gift = %v", err)
+	// There is no daily limit: a third gift the same day goes too.
+	if _, err := store.pool.Exec(ctx, `UPDATE card_owned SET count = 2 WHERE user_id = 1 AND card_id = 30`); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.GiveCard(ctx, -100, 1, 2, 30, rules); err != nil {
+		t.Errorf("a third gift the same day = %v", err)
 	}
 	if err := store.GiveCard(ctx, -100, 2, 3, 20, rules); !errors.Is(err, ErrCardNoPlayer) {
 		t.Errorf("a gift to one who never drew = %v", err)
 	}
-	if err := store.GiveCard(ctx, -100, 2, 1, 30, rules); !errors.Is(err, ErrCardNotHeld) {
+	if err := store.GiveCard(ctx, -100, 2, 1, 99, rules); !errors.Is(err, ErrCardNotHeld) {
 		t.Errorf("a card not held = %v", err)
 	}
 }
@@ -105,7 +108,7 @@ func TestTheCardMarket(t *testing.T) {
 	}
 	now := time.Now()
 	market := CardMarketRules{Open: 2, Keep: 7 * 24 * time.Hour, Now: now}
-	rules := CardTradeRules{Limit: 5, Day: 24 * time.Hour, Now: now}
+	rules := CardTradeRules{Now: now}
 
 	if _, err := store.OfferCard(ctx, 1, 30, 10, market); !errors.Is(err, ErrCardNotHeld) {
 		t.Errorf("an offer of a card not held = %v", err)
@@ -177,7 +180,7 @@ func TestTradesAreEvenAndUnlimited(t *testing.T) {
 		}
 	}
 	now := time.Now()
-	rules := CardTradeRules{Limit: 20, Day: 24 * time.Hour, Now: now}
+	rules := CardTradeRules{Now: now}
 	market := CardMarketRules{Open: 5, Keep: 7 * 24 * time.Hour, Now: now}
 	if _, err := store.OfferCard(ctx, 1, 30, 10, market); !errors.Is(err, ErrCardTradeUneven) {
 		t.Errorf("a Common put up for a Mythic = %v", err)

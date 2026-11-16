@@ -25,7 +25,7 @@
       welcomeButton: "Birinchi kartani olish", seeCollection: "Kolleksiyada ko'rish →",
       locked: (r, o) => `🔒 Bu ${r.toLowerCase()} karta hali yopiq. Uning tushish ehtimoli: ${o}.`,
       wait: (time) => `⏳ ${time}`,
-      gift: "🎁 Sovg'a qilish", giftSearch: "Ism yoki @username", giftHint: (n) => `Karta ochkolari bilan birga o'tadi. Kuniga ${n} tagacha.`,
+      gift: "🎁 Sovg'a qilish", giftSearch: "Ism yoki @username", giftHint: () => `Karta ochkolari bilan birga o'tadi.`,
       giftTo: (name) => `🎁 ${name}ga yuborish`, giftSent: (card, name) => `🎁 ${card} → ${name}`, giftNone: "Bunday o'yinchi topilmadi",
       giftLimit: (n) => `⏳ Kuniga ${n} ta karta berish mumkin. Ertaga yana.`, giftNoPlayer: "Bu o'yinchi hali karta ochmagan", giftGone: "Bu karta endi sizda yo'q", back: "← Orqaga",
       market: "Bozor", newOffer: "➕ Taklif qo'yish", filterAll: "Hammasi", filterCan: "Bera olaman", filterMine: "Mening",
@@ -53,7 +53,7 @@
       welcomeButton: "Получить первую карту", seeCollection: "Посмотреть в коллекции →",
       locked: (r, o) => `🔒 Эта карта (${r.toLowerCase()}) ещё закрыта. Шанс выпадения: ${o}.`,
       wait: (time) => `⏳ ${time}`,
-      gift: "🎁 Подарить", giftSearch: "Имя или @username", giftHint: (n) => `Карта переходит вместе с очками. До ${n} в день.`,
+      gift: "🎁 Подарить", giftSearch: "Имя или @username", giftHint: () => `Карта переходит вместе с очками.`,
       giftTo: (name) => `🎁 Отправить: ${name}`, giftSent: (card, name) => `🎁 ${card} → ${name}`, giftNone: "Игрок не найден",
       giftLimit: (n) => `⏳ В день можно отдать ${n} карт. Завтра снова.`, giftNoPlayer: "Этот игрок ещё не открыл ни одной карты", giftGone: "Этой карты у вас уже нет", back: "← Назад",
       market: "Рынок", newOffer: "➕ Выставить", filterAll: "Все", filterCan: "Могу дать", filterMine: "Мои",
@@ -81,7 +81,7 @@
       welcomeButton: "Draw your first card", seeCollection: "See it in the collection →",
       locked: (r, o) => `🔒 This ${r.toLowerCase()} card is still locked. Its odds: ${o}.`,
       wait: (time) => `⏳ ${time}`,
-      gift: "🎁 Give", giftSearch: "Name or @username", giftHint: (n) => `The card goes with its points. Up to ${n} a day.`,
+      gift: "🎁 Give", giftSearch: "Name or @username", giftHint: () => `The card goes with its points.`,
       giftTo: (name) => `🎁 Send to ${name}`, giftSent: (card, name) => `🎁 ${card} → ${name}`, giftNone: "No such player",
       giftLimit: (n) => `⏳ You may give ${n} cards a day. Again tomorrow.`, giftNoPlayer: "This player has not opened a card yet", giftGone: "You no longer have this card", back: "← Back",
       market: "Market", newOffer: "➕ Make an offer", filterAll: "All", filterCan: "I can give", filterMine: "Mine",
@@ -445,7 +445,7 @@
     panel.querySelector(".gift-head b").textContent = card.name;
     const input = panel.querySelector("input");
     input.placeholder = t.giftSearch;
-    panel.querySelector(".gift-hint").textContent = t.giftHint(5);
+    panel.querySelector(".gift-hint").textContent = t.giftHint();
     const send = panel.querySelector(".gift-send");
     send.textContent = t.gift;
     panel.querySelector(".gift-back").textContent = t.back;

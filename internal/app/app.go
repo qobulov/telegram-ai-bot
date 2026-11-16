@@ -255,6 +255,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Telegram: bot.Client,
 		Store:    store,
 		Rights:   store,
+		Warns:    store,
 		Location: cfg.Location,
 		// A username can change hands; only an ID makes an owner a moderator.
 		OwnersByID: len(cfg.OwnerIDs) > 0,

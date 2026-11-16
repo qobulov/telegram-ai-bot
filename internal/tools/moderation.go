@@ -29,6 +29,10 @@ const (
 	actionKick  = "kick"
 	actionPin   = "pin"
 	actionUnpin = "unpin"
+	// actionWarn warns a member; at the WarnLimit'th they are muted for
+	// WarnMuteMinutes and the count starts again. actionUnwarn takes one off.
+	actionWarn   = "warn"
+	actionUnwarn = "unwarn"
 	// actionNoStickers takes away a member's stickers and GIFs, which
 	// Telegram allows or forbids together; actionStickers gives them back.
 	actionNoStickers = "no_stickers"
@@ -128,6 +132,8 @@ var neededRight = map[string]string{
 	actionPin:    telegram.RightPinMessages,
 	actionUnpin:  telegram.RightPinMessages,
 	actionPurge:  telegram.RightDeleteMessages,
+	actionWarn:   telegram.RightRestrictMembers,
+	actionUnwarn: telegram.RightRestrictMembers,
 
 	actionNoStickers: telegram.RightRestrictMembers,
 	actionStickers:   telegram.RightRestrictMembers,
@@ -262,6 +268,15 @@ type ModerationOptions struct {
 	// Messages finds a member's messages in the group's log, for purge;
 	// without it purge is refused.
 	Messages MessageLog
+	// Warns keeps members' warnings; without it warn is refused.
+	Warns WarnStore
+}
+
+// WarnStore keeps how many warnings each member has in a group.
+type WarnStore interface {
+	AddWarn(ctx context.Context, chatID, userID int64) (int, error)
+	RemoveWarn(ctx context.Context, chatID, userID int64) (int, error)
+	ResetWarns(ctx context.Context, chatID, userID int64) error
 }
 
 type moderationArgs struct {
@@ -318,6 +333,7 @@ func (m *Moderation) Tool() Tool {
 			"no_stickers (minutes, default a day) or allow_stickers: take away or give back its author's stickers and GIFs, which Telegram only allows or forbids together; use it, not ban or ignore, when they ask to block someone's stickers. " +
 			"no_photos (minutes, default a day) or allow_photos: the same for photos. A member's other limits stay as they are. " +
 			"promote: make its author an admin, with your own delete, mute and pin rights at most; demote: take that back; admin_title (text, 16 characters at most): the title shown for an admin you made; member_tag (text, 16 characters at most, no emoji; empty takes it off): the tag shown by a regular member's name. " +
+			"warn: warn its author; at the third warning they are muted for a day and the count starts again; unwarn: take one warning off. Use warn, not mute, when they ask to warn (\"varn ber\", \"предупреждение\"). " +
 			"purge (minutes, default 60, at most 2880): delete every message its author wrote here in the last minutes, as far as your log of the group has them, when they ask to clear out or delete all of someone's messages; it cannot be undone. " +
 			"A message posted on behalf of a channel can only be deleted, pinned, or banned or unbanned, which bans the channel from posting here. " +
 			"For the group itself, with no reply or tag: set_title (text), set_description (text, empty to remove), set_photo (the photo in their message), delete_photo, set_sticker_set (the pack of the sticker they replied to, as the group's pack every member may use) or delete_sticker_set, invite_link (a new link; text names it, minutes ends it), unpin_all, and lock or unlock (kind) to forbid or allow one kind of message to everyone, keeping the group's other permissions: when they ask to block stickers or photos for all, it is lock, never a guard. " +
@@ -328,7 +344,7 @@ func (m *Moderation) Tool() Tool {
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["delete", "purge", "mute", "unmute", "ban", "unban", "kick", "pin", "unpin", "no_stickers", "allow_stickers", "no_photos", "allow_photos", "promote", "demote", "admin_title", "member_tag", "set_title", "set_description", "set_photo", "delete_photo", "set_sticker_set", "delete_sticker_set", "invite_link", "revoke_link", "edit_link", "unpin_all", "lock", "unlock", "undo"]},
+				"action": {"type": "string", "enum": ["delete", "purge", "mute", "unmute", "ban", "unban", "kick", "pin", "unpin", "no_stickers", "allow_stickers", "no_photos", "allow_photos", "promote", "demote", "admin_title", "member_tag", "warn", "unwarn", "set_title", "set_description", "set_photo", "delete_photo", "set_sticker_set", "delete_sticker_set", "invite_link", "revoke_link", "edit_link", "unpin_all", "lock", "unlock", "undo"]},
 				"minutes": {"type": "integer", "description": "For mute: how long, 1 to 10080, default 60. For purge: how far back, 1 to 2880, default 60. For no_stickers and no_photos: 1 to 525600, default 1440; the most for \"forever\". For invite_link: when it stops working; none for never."},
 				"text": {"type": "string", "description": "For set_title, set_description, admin_title and member_tag: the new text, in the words they gave. For invite_link: an optional name."},
 				"force": {"type": "boolean", "description": "For undo: true only when they want it back though it was changed by hand since."},
@@ -400,6 +416,9 @@ func (m *Moderation) run(ctx context.Context, raw json.RawMessage) (any, error) 
 	}
 	if o.action == actionPurge {
 		return m.purge(ctx, o)
+	}
+	if o.action == actionWarn || o.action == actionUnwarn {
+		return m.warn(ctx, o)
 	}
 	// The owners want it done at once, with no question to confirm: the
 	// rights were just checked, and the target came from the update.
@@ -681,7 +700,7 @@ func hasEmoji(text string) bool {
 func onMember(action string) bool {
 	switch action {
 	case actionMute, actionUnmute, actionBan, actionUnban, actionKick, actionNoStickers, actionStickers, actionNoPhotos, actionPhotos,
-		actionPromote, actionDemote, actionAdminTitle, actionMemberTag, actionPurge:
+		actionPromote, actionDemote, actionAdminTitle, actionMemberTag, actionPurge, actionWarn, actionUnwarn:
 		return true
 	}
 	return false
@@ -1227,6 +1246,8 @@ var actionWords = map[string][]string{
 	actionBan:    {"ban", "бан", "blok", "chiqar", "hayda", "kick", "кик", "выгн", "выкин", "заблок"},
 	actionUnban:  {"ban", "бан", "blok", "qaytar", "верн", "разблок"},
 	actionKick:   {"kick", "кик", "chiqar", "hayda", "выгн", "выкин", "удали из"},
+	actionWarn:   warnWords,
+	actionUnwarn: warnWords,
 	actionPin:    {"pin", "qada", "закреп"},
 	// Deleting one message is not clearing out them all: "tozala",
 	// "hammasini o'chir", "очисти", "удали все".
@@ -1268,6 +1289,10 @@ var foldApostrophes = strings.NewReplacer("'", "", "ʻ", "", "ʼ", "", "’", ""
 // answering "o'zgartiraymi?" says "ha change qil Azizbek_Bot": the model
 // knows from the talk what, as it does a member's stickers.
 var changeWords = []string{"ozgartir", "uzgartir", "almashtir", "change", "rename", "поменя", "смени", "измени", "переимен", "ўзгартир", "узгартир"}
+
+// warnWords ask for a warning, or to take one off: "varn ber", "пред",
+// "ogohlantir".
+var warnWords = []string{"warn", "varn", "варн", "пред", "ogohlantir", "огоҳлантир", "огохлантир", "ogoh"}
 
 // adminWords ask for something about adminship: "admin qil", "админка".
 var adminWords = []string{"admin", "админ"}
