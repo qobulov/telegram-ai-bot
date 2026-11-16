@@ -77,6 +77,7 @@ func TestModOrdersInWords(t *testing.T) {
 		// warnings
 		"varn ber": {"warn", 0, true}, "пред": {"warn", 0, true}, "Мари предупреждение": {"warn", 0, true},
 		"ogohlantir": {"warn", 0, true}, "unwarn": {"unwarn", 0, true}, "варн нима": {"", 0, false},
+		"Пин мари": {"pin", 0, true}, "qada": {"pin", 0, true}, "закрепи": {"pin", 0, true},
 	} {
 		action, minutes, ok := s.modWords(text)
 		if action != want.action || minutes != want.minutes || ok != want.ok {

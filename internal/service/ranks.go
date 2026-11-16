@@ -30,7 +30,7 @@ const rankLogShown = 10
 // log or the commands' ranks, set a command's rank, or give a member a rank,
 // 0 taking it away.
 type rankOrder struct {
-	kind string // "staff", "log", "access", "give"
+	kind string // "staff", "log", "access", "give", "mine"
 	rank int
 	code string
 }
@@ -38,12 +38,15 @@ type rankOrder struct {
 var (
 	plusRank   = regexp.MustCompile(`^\+([1-5])$`)
 	rankDigit  = regexp.MustCompile(`^[0-5]$`)
-	rankWords  = map[string]bool{"daraja": true, "rank": true, "ранг": true, "повысить": true, "повысь": true, "понизить": true, "понизь": true}
+	rankWords  = map[string]bool{"daraja": true, "даража": true, "дараже": true, "rank": true, "ранг": true, "повысить": true, "повысь": true, "понизить": true, "понизь": true}
 	staffWords = map[string]bool{"moderatorlar": true, "модераторы": true, "ранги": true, "darajalar": true, "staff": true}
 	takeWords  = map[string]bool{"-admin": true, "-админ": true, "-модер": true, "-moder": true, "-rank": true, "-ранг": true,
 		"-daraja": true, "разжаловать": true, "разжалуй": true}
 	logPhrases  = map[string]bool{"kim tayinlagan": true, "kim tayinladi": true, "кто назначил": true, "ким тайинлаган": true}
-	takePhrases = map[string]bool{"darajani ol": true, "darajasini ol": true, "снять ранг": true, "сними ранг": true}
+	takePhrases = map[string]bool{"darajani ol": true, "darajasini ol": true, "darajani olib tashla": true, "даражани ол": true, "даражасини ол": true,
+		"даражани олиб ташла": true, "снять ранг": true, "сними ранг": true}
+	minePhrases = map[string]bool{"darajam": true, "darajam qaysi": true, "darajam nechchi": true, "мени darajam qaysi": true, "meni darajam qaysi": true,
+		"даражам": true, "даражам қайси": true, "даражам кайси": true, "мени даражам кайси": true, "мой ранг": true, "какой у меня ранг": true, "my rank": true}
 )
 
 // isRankWord is a word that says the "+3" is a rank, not agreement: "admin",
@@ -84,6 +87,8 @@ func (s *Service) rankRequest(in incoming) (order rankOrder, ok bool) {
 		return rankOrder{kind: "staff"}, true
 	case logPhrases[joined]:
 		return rankOrder{kind: "log"}, true
+	case minePhrases[joined]:
+		return rankOrder{kind: "mine"}, true
 	case takePhrases[joined] || (len(words) == 1 && takeWords[words[0]]):
 		return rankOrder{kind: "give"}, true
 	}
@@ -160,6 +165,8 @@ func (s *Service) rankCommand(ctx context.Context, in incoming) outcome {
 		return s.rankLog(ctx, chatID, userID)
 	case "access":
 		return s.accessCommand(ctx, in, order)
+	case "mine":
+		return s.myRank(ctx, in)
 	}
 	return s.giveRank(ctx, in, order.rank)
 }
@@ -220,6 +227,22 @@ func (s *Service) giveRank(ctx context.Context, in incoming, rank int) outcome {
 		return say("✅ " + name + " endi moderator emas.")
 	}
 	return say(fmt.Sprintf("✅ %s endi %s %d-darajali moderator.", name, stars(rank), rank))
+}
+
+// myRank says the asker's rank, or that they have none and how one is
+// given.
+func (s *Service) myRank(ctx context.Context, in incoming) outcome {
+	mine, err := s.askerRank(ctx, in)
+	if err != nil {
+		return say(textError.to(in))
+	}
+	switch {
+	case mine >= ranks.Above:
+		return say("👑 Siz guruh egasi yoki bot egasisiz: hamma darajadan yuqorisiz.")
+	case mine > 0:
+		return say(fmt.Sprintf("%s Sizning darajangiz: %d.", stars(mine), mine))
+	}
+	return say("Sizda daraja yo'q. Uni guruh egasi yoki 4-darajali moderator xabaringizga reply qilib \"+2 admin mari\" deb beradi.")
 }
 
 // stars is a rank drawn: ⭐⭐⭐ for 3.

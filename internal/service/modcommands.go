@@ -21,7 +21,8 @@ import (
 
 // modCommands are the commands and the moderate tool's action each does.
 var modCommands = map[string]string{
-	"/mute": "mute", "/unmute": "unmute", "/ban": "ban", "/unban": "unban", "/kick": "kick", "/del": "delete",
+	"/mute": "mute", "/unmute": "unmute", "/ban": "ban", "/unban": "unban", "/kick": "kick", "/del": "delete", "/delete": "delete",
+	"/pin": "pin", "/unpin": "unpin",
 	"/warn": "warn", "/unwarn": "unwarn", "/promote": "promote", "/demote": "demote",
 }
 
@@ -185,6 +186,9 @@ var modWordActions = map[string]string{
 	// adminship, in one word; "admin qil" and "admin bekor qil" are read by
 	// adminOrder
 	"promote": "promote", "demote": "demote", "unadmin": "demote",
+	// pin the message replied to, or take it off
+	"pin": "pin", "пин": "pin", "qada": "pin", "қада": "pin", "када": "pin", "закрепи": "pin", "закреп": "pin",
+	"unpin": "unpin", "открепи": "unpin", "анпин": "unpin",
 	// delete the message replied to
 	"del": "delete", "delete": "delete", "удали": "delete", "удалить": "delete", "o'chir": "delete", "ochir": "delete", "ўчир": "delete",
 }

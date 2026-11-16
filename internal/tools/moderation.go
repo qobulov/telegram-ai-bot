@@ -1294,7 +1294,7 @@ var actionWords = map[string][]string{
 
 	actionAmnesty:      {"amnist", "amnest", "амнист", "hammasini bandan", "разбань всех", "unban all"},
 	actionKickInactive: {"inactive", "faol emas", "faolmas", "неактив", "молчун", "molchun", "yozmagan"},
-	actionPin:          {"pin", "qada", "закреп"},
+	actionPin:          {"pin", "пин", "qada", "қада", "када", "закреп"},
 	// Deleting one message is not clearing out them all: "tozala",
 	// "hammasini o'chir", "очисти", "удали все".
 	actionPurge: {"tozala", "hammasini ochir", "barchasini ochir", "hammasini del", "xabarlarini ochir", "hamma xabar", "barcha xabar",
@@ -1323,7 +1323,7 @@ var actionWords = map[string][]string{
 	actionLock:             {"yop", "blok", "taqiq", "chekla", "ochir", "запрет", "закр", "огранич", "lock", "заблок"},
 	actionUndo:             {"qaytar", "orqaga", "ortga", "bekor qil", "undo", "верн", "отмен", "назад"},
 	actionUnlock:           {"och", "ruxsat", "разреш", "откр", "unlock", "разблок"},
-	actionUnpin:            {"pin", "qada", "закреп", "откреп"},
+	actionUnpin:            {"pin", "пин", "qada", "қада", "када", "закреп", "откреп"},
 }
 
 var foldApostrophes = strings.NewReplacer("'", "", "ʻ", "", "ʼ", "", "’", "", "‘", "", "`", "")

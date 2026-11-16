@@ -75,6 +75,11 @@ func (s *Service) address(msg *telegram.Message) (string, trigger) {
 // explicit to the least, so a reply that also names the bot counts as a call.
 func (s *Service) addressedText(msg *telegram.Message) (string, trigger) {
 	text, entities := msg.Content()
+	// "@admin" alone calls the staff, as members of groups with other bots
+	// write it.
+	if staffCall[strings.ToLower(strings.TrimSpace(text))] {
+		return strings.TrimSpace(text), triggerMention
+	}
 	if _, isCommand := commandTarget(text); isCommand {
 		return strings.TrimSpace(text), triggerCommand
 	}
@@ -91,6 +96,9 @@ func (s *Service) addressedText(msg *telegram.Message) (string, trigger) {
 	}
 	return "", triggerNone
 }
+
+// staffCall are the messages that call a group's admins on their own.
+var staffCall = map[string]bool{"@admin": true, "@admins": true, "@админ": true, "@админы": true}
 
 // orName stands in for a message that was nothing but a mention of the bot:
 // being called by name is something the character can answer.

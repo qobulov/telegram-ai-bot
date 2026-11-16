@@ -128,3 +128,26 @@ func TestRanksAreGivenInWords(t *testing.T) {
 		t.Error("+1 alone read as a rank")
 	}
 }
+
+// Cyrillic rank orders are read too, and "darajam qaysi" tells the asker
+// their rank in code.
+func TestRanksInCyrillicAndOnesOwn(t *testing.T) {
+	const creator, member = int64(10), int64(12)
+	f := newFixture()
+	f.opts.WakeWords = []string{"мари", "mari"}
+	f.members.creator = creator
+	book := &fakeRankBook{ranks: map[int64]int{}, overrides: map[string]int{}}
+	f.opts.Ranks = book
+	sent := f.run(from(creator, "даража 3 мари", member))
+	if last := sent[len(sent)-1].text; !strings.Contains(last, "3-darajali") || book.ranks[member] != 3 {
+		t.Fatalf("даража 3 = %q, ranks %v", last, book.ranks)
+	}
+	sent = f.run(from(member, "mari darajam qaysi", 0))
+	if last := sent[len(sent)-1].text; !strings.Contains(last, "darajangiz: 3") {
+		t.Errorf("one's own = %q", last)
+	}
+	sent = f.run(from(creator, "даражани ол мари", member))
+	if last := sent[len(sent)-1].text; !strings.Contains(last, "moderator emas") || book.ranks[member] != 0 {
+		t.Errorf("даражани ол = %q", last)
+	}
+}

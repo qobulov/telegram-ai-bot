@@ -74,7 +74,7 @@ func (s *Service) callOrder(in incoming) (string, bool) {
 	}
 	written, _ := in.msg.Content()
 	switch strings.Join(s.orderWords(written), " ") {
-	case "adminlar", "adminlarni chaqir", "админы", "позови админов", "@admin", "@admins":
+	case "adminlar", "adminlarni chaqir", "админы", "позови админов", "@admin", "@admins", "@админ", "@админы":
 		return "admins", s.opts.AdminList != nil
 	case "report", "репорт", "жалоба", "shikoyat":
 		return "report", s.opts.AdminList != nil
