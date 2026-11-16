@@ -64,10 +64,11 @@ func TestCardsPassBetweenPlayers(t *testing.T) {
 	if c, _ := held(2, 20); c != 2 {
 		t.Errorf("Bob's Levi = %d", c)
 	}
-	if p, n := player(1); p != 5300 || n != 3 {
+	// A copy adds no points, and its giver keeps the card.
+	if p, n := player(1); p != 6300 || n != 3 {
 		t.Errorf("Alice = %d points, %d cards", p, n)
 	}
-	if p, n := player(2); p != 2000 || n != 1 {
+	if p, n := player(2); p != 1000 || n != 1 {
 		t.Errorf("Bob = %d points, %d cards", p, n)
 	}
 	// Her last Levi not melted is not a spare: a gift is of spares alone.

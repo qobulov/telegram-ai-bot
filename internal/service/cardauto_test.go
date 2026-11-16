@@ -19,12 +19,12 @@ type autoBook struct {
 	stopped []int64
 }
 
-func (b *autoBook) DueCardAutos(_ context.Context, now time.Time, every time.Duration, limit int) ([]storage.CardAuto, error) {
+func (b *autoBook) DueCardAutos(_ context.Context, day storage.CardDay, limit int) ([]storage.CardAuto, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	var due []storage.CardAuto
 	for _, p := range b.players {
-		if last, ok := b.last[p.UserID]; (!ok || now.Sub(last) >= every) && len(due) < limit {
+		if b.used[p.UserID] < day.PerDay && len(due) < limit {
 			due = append(due, p)
 		}
 	}
@@ -113,14 +113,15 @@ func TestDueCardsAreOpenedForThePlayers(t *testing.T) {
 		t.Errorf("the blocked player held %d, stopped %v", book.held[3], book.stopped)
 	}
 
-	// A minute on, no card is ready; an hour on, the next one is opened.
-	now = now.Add(time.Minute)
-	if opened, _ := OpenDueCards(context.Background(), opts); opened != 0 {
-		t.Errorf("a minute later opened %d", opened)
+	// Each run opens the next of the day's three; then none is left.
+	for run, want := range []int{2, 2, 0} {
+		now = now.Add(time.Minute)
+		if opened, _ := OpenDueCards(context.Background(), opts); opened != want {
+			t.Errorf("run %d opened %d, want %d", run+2, opened, want)
+		}
 	}
-	now = now.Add(time.Hour)
-	if opened, _ := OpenDueCards(context.Background(), opts); opened != 2 || book.held[1] != 2 {
-		t.Errorf("an hour later opened %d, Bek holds %d", opened, book.held[1])
+	if book.held[1] != 3 {
+		t.Errorf("Bek holds %d, want the day's three", book.held[1])
 	}
 }
 

@@ -25,8 +25,8 @@ const (
 
 // CardAutoStore is what the auto opener needs of Kartalar.
 type CardAutoStore interface {
-	DueCardAutos(ctx context.Context, now time.Time, every time.Duration, limit int) ([]storage.CardAuto, error)
-	DrawCard(ctx context.Context, userID int64, name string, roll storage.CardRoll, every time.Duration, now time.Time) (storage.CardDraw, error)
+	DueCardAutos(ctx context.Context, day storage.CardDay, limit int) ([]storage.CardAuto, error)
+	DrawCard(ctx context.Context, userID int64, name string, roll storage.CardRoll, day storage.CardDay, now time.Time) (storage.CardDraw, error)
 	StopCardAuto(ctx context.Context, userID int64) error
 }
 
@@ -68,7 +68,7 @@ func OpenDueCards(ctx context.Context, opts CardAutoOptions) (int, error) {
 	opened := 0
 	started := opts.Now()
 	for opts.Now().Sub(started) < cardAutoBudget && ctx.Err() == nil {
-		due, err := opts.Store.DueCardAutos(ctx, opts.Now(), cards.Every, cardAutoBatch)
+		due, err := opts.Store.DueCardAutos(ctx, cards.Today(opts.Now()), cardAutoBatch)
 		if err != nil {
 			return opened, err
 		}
@@ -92,7 +92,7 @@ func OpenDueCards(ctx context.Context, opts CardAutoOptions) (int, error) {
 func openCard(ctx context.Context, opts CardAutoOptions, player storage.CardAuto) bool {
 	ctx, cancel := context.WithTimeout(ctx, cardAutoTimeout)
 	defer cancel()
-	draw, err := opts.Store.DrawCard(ctx, player.UserID, player.Name, cards.WithPity(cards.RollRandom), cards.Every, opts.Now())
+	draw, err := opts.Store.DrawCard(ctx, player.UserID, player.Name, cards.WithPity(cards.RollRandom), cards.Today(opts.Now()), opts.Now())
 	var wait *storage.CardWaitError
 	switch {
 	case errors.As(err, &wait):

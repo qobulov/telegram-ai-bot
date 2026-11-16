@@ -7,13 +7,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"telegram-ai-bot/internal/storage"
 )
 
 // The odds add up to a thousand draws, the rarest least often, and the
-// catalog's cards are parted 15, 30, 45, 60 and the rest by how loved they
-// are.
+// catalog's cards are parted 25, 50, 100, 150 and the rest by how loved
+// they are, the catalog's 501 in proportion.
 func TestRarityRules(t *testing.T) {
 	drawn := map[Rarity]int{}
 	for n := range 1000 {
@@ -26,7 +27,7 @@ func TestRarityRules(t *testing.T) {
 	for rank := range CatalogSize {
 		held[OfRank(rank)]++
 	}
-	if held[Mythic] != 15 || held[Legendary] != 30 || held[Epic] != 45 || held[Rare] != 60 || held[Common] != CatalogSize-150 {
+	if held[Mythic] != 25 || held[Legendary] != 50 || held[Epic] != 100 || held[Rare] != 150 || held[Common] != CatalogSize-325 {
 		t.Errorf("catalog = %v", held)
 	}
 	if OfRank(0) != Mythic || OfRank(CatalogSize-1) != Common {
@@ -155,5 +156,26 @@ func TestEnsureAddsOnlyNewCards(t *testing.T) {
 		if c.ID == kept.ID {
 			t.Fatalf("the card there was saved again: %+v", c)
 		}
+	}
+}
+
+// The day's free cards start at midnight in Tashkent: three each day, the
+// next day's at the next midnight.
+func TestThreeFreeCardsADay(t *testing.T) {
+	now := time.Date(2026, 11, 16, 20, 30, 0, 0, time.UTC) // 01:30 in Tashkent
+	if start := DayStart(now); !start.Equal(time.Date(2026, 11, 17, 0, 0, 0, 0, Location)) {
+		t.Errorf("day start = %v", start)
+	}
+	player := storage.CardPlayer{FreeDay: DayStart(now), FreeUsed: 2}
+	if FreeLeft(player, now) != 1 || !NextFree(player, now).Equal(now) {
+		t.Errorf("one left = %d, next %v", FreeLeft(player, now), NextFree(player, now))
+	}
+	player.FreeUsed = 3
+	if FreeLeft(player, now) != 0 || !NextFree(player, now).Equal(DayStart(now).AddDate(0, 0, 1)) {
+		t.Errorf("none left = %d, next %v", FreeLeft(player, now), NextFree(player, now))
+	}
+	player.FreeDay = DayStart(now).AddDate(0, 0, -1)
+	if FreeLeft(player, now) != PerDay {
+		t.Errorf("yesterday's = %d left, want %d", FreeLeft(player, now), PerDay)
 	}
 }

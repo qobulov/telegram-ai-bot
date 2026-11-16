@@ -1,7 +1,7 @@
 // Package cards is Kartalar, an anime card collection: AniList's most loved
-// characters are its cards, the most loved the rarest; a player draws one
-// at random every hour, of a rarity drawn by its odds, and collects them
-// for points.
+// characters are its cards, the most loved the rarest; a player opens three
+// free a day at random, of a rarity drawn by its odds, and collects them
+// for points, a card counted once however many copies they hold.
 package cards
 
 import (
@@ -36,11 +36,44 @@ const (
 // Rarities lists every rarity, the most common first.
 var Rarities = []Rarity{Common, Rare, Epic, Legendary, Mythic}
 
-// Every is how often a player may draw a card.
-const Every = time.Hour
+// PerDay is how many cards a player opens free each day, the day starting
+// at midnight in Location; crystals open more.
+const PerDay = 3
+
+// Location is where the card game's day starts: Tashkent, which keeps no
+// summer time.
+var Location = time.FixedZone("Tashkent", 5*60*60)
+
+// DayStart is the midnight in Location that began now's day.
+func DayStart(now time.Time) time.Time {
+	local := now.In(Location)
+	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, Location)
+}
+
+// Today is the day's free cards as a draw counts them.
+func Today(now time.Time) storage.CardDay {
+	return storage.CardDay{Start: DayStart(now), PerDay: PerDay}
+}
+
+// FreeLeft is how many free cards the player may still open today.
+func FreeLeft(p storage.CardPlayer, now time.Time) int {
+	if !p.FreeDay.Equal(DayStart(now)) {
+		return PerDay
+	}
+	return max(0, PerDay-p.FreeUsed)
+}
+
+// NextFree is when the player may open a free card: now while one is left
+// today, or the next midnight.
+func NextFree(p storage.CardPlayer, now time.Time) time.Time {
+	if FreeLeft(p, now) > 0 {
+		return now
+	}
+	return DayStart(now).AddDate(0, 0, 1)
+}
 
 // CatalogSize is how many of AniList's most loved characters are cards: the
-// rarities take the first 200 by rank, and the rest are Common.
+// rarities take the first 325 by rank, and the rest are Common.
 const CatalogSize = 500
 
 // rule is what one rarity is: how many cards of the catalog have it, the
@@ -52,13 +85,15 @@ type rule struct {
 	healthLeast, healthMost int
 }
 
-// rules are by rarity: 15 mythic cards of the 200, drawn once in 67 draws.
+// rules are by rarity, the catalog's cards by rank in proportion: 25
+// Mythic (5%), 50 Legendary (10%), 100 Epic (20%), 150 Rare (30%) and the
+// rest Common; a Mythic is drawn once in 67 draws.
 var rules = map[Rarity]rule{
-	Mythic:    {cards: 15, odds: 15, value: 5000, attackLeast: 4000, attackMost: 6000, healthLeast: 15000, healthMost: 22000},
-	Legendary: {cards: 30, odds: 65, value: 2000, attackLeast: 2500, attackMost: 4000, healthLeast: 9000, healthMost: 15000},
-	Epic:      {cards: 45, odds: 140, value: 800, attackLeast: 1500, attackMost: 2500, healthLeast: 6000, healthMost: 9000},
-	Rare:      {cards: 60, odds: 280, value: 300, attackLeast: 800, attackMost: 1500, healthLeast: 3000, healthMost: 6000},
-	Common:    {cards: 50, odds: 500, value: 100, attackLeast: 300, attackMost: 800, healthLeast: 1000, healthMost: 3000},
+	Mythic:    {cards: 25, odds: 15, value: 5000, attackLeast: 4000, attackMost: 6000, healthLeast: 15000, healthMost: 22000},
+	Legendary: {cards: 50, odds: 65, value: 2000, attackLeast: 2500, attackMost: 4000, healthLeast: 9000, healthMost: 15000},
+	Epic:      {cards: 100, odds: 140, value: 800, attackLeast: 1500, attackMost: 2500, healthLeast: 6000, healthMost: 9000},
+	Rare:      {cards: 150, odds: 280, value: 300, attackLeast: 800, attackMost: 1500, healthLeast: 3000, healthMost: 6000},
+	Common:    {cards: 176, odds: 500, value: 100, attackLeast: 300, attackMost: 800, healthLeast: 1000, healthMost: 3000},
 }
 
 // Roll draws a rarity by the odds, from a number in [0, 1000).

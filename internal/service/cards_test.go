@@ -22,7 +22,8 @@ type fakeCards struct {
 	card   storage.Card
 	last   map[int64]time.Time
 	held   map[int64]int
-	everys []time.Duration
+	used   map[int64]int
+	days   []storage.CardDay
 	top    []storage.CardPlayer
 	shards map[int64]int
 	melted map[int64]int
@@ -35,7 +36,7 @@ type fakeCards struct {
 func newFakeCards(picture string) *fakeCards {
 	return &fakeCards{
 		card: storage.Card{ID: 1, Name: "Gojo *Satoru*", Anime: "Jujutsu Kaisen", ImageURL: picture, Rarity: 4, Attack: 5130, Health: 18020, Value: 5000},
-		last: map[int64]time.Time{}, held: map[int64]int{},
+		last: map[int64]time.Time{}, held: map[int64]int{}, used: map[int64]int{},
 		shards: map[int64]int{}, melted: map[int64]int{}, duels: map[int64]bool{},
 		named: map[int64][]storage.Card{},
 	}
@@ -191,16 +192,17 @@ func (f *fakeCards) CardTop(_ context.Context, limit int) ([]storage.CardPlayer,
 	return f.top[:min(limit, len(f.top))], nil
 }
 
-func (f *fakeCards) DrawCard(_ context.Context, userID int64, _ string, _ storage.CardRoll, every time.Duration, now time.Time) (storage.CardDraw, error) {
+func (f *fakeCards) DrawCard(_ context.Context, userID int64, _ string, _ storage.CardRoll, day storage.CardDay, now time.Time) (storage.CardDraw, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.everys = append(f.everys, every)
-	if last, ok := f.last[userID]; ok && now.Sub(last) < every {
-		return storage.CardDraw{}, &storage.CardWaitError{Wait: every - now.Sub(last)}
+	f.days = append(f.days, day)
+	if f.used[userID] >= day.PerDay {
+		return storage.CardDraw{}, &storage.CardWaitError{Wait: day.Start.AddDate(0, 0, 1).Sub(now)}
 	}
 	f.last[userID] = now
+	f.used[userID]++
 	f.held[userID]++
-	return storage.CardDraw{Card: f.card, New: f.held[userID] == 1, Count: f.held[userID], Points: int64(f.held[userID]) * 5000}, nil
+	return storage.CardDraw{Card: f.card, New: f.held[userID] == 1, Count: f.held[userID], Points: 5000, Free: true, FreeLeft: day.PerDay - f.used[userID]}, nil
 }
 
 func (f *fakeCards) CardCounts(_ context.Context, userID int64) (map[int]int, map[int]int, int64, error) {
@@ -235,21 +237,25 @@ func TestCardIsDrawnOnceAnHour(t *testing.T) {
 	if len(sent) != 1 || !sent[0].photo {
 		t.Fatalf("sent = %+v, want the card's picture", sent)
 	}
-	for _, want := range []string{"👑", "Gojo Satoru", "Jujutsu Kaisen", "5 130", "18 020", "+5 000", "🆕"} {
+	for _, want := range []string{"👑", "Gojo Satoru", "Jujutsu Kaisen", "5 130", "18 020", "+5 000", "🆕", "yana 2 ta tekin"} {
 		if !strings.Contains(sent[0].text, want) {
 			t.Errorf("caption lacks %q:\n%s", want, sent[0].text)
 		}
 	}
-	// f.run gives every message sent so far: the last is this draw's.
-	if sent = f.run(textFrom(userID, "karta")); len(sent) != 2 || sent[1].photo || !strings.Contains(sent[1].text, "⏳") {
-		t.Errorf("second draw = %+v, want to wait", sent)
+	// f.run gives every message sent so far: the last is this draw's. A
+	// copy adds no points; the third of the day says they are done.
+	if sent = f.run(textFrom(userID, "karta")); len(sent) != 2 || !sent[1].photo || !strings.Contains(sent[1].text, "ochko qo'shilmaydi") {
+		t.Errorf("second draw = %+v, want the copy without points", sent)
+	}
+	if sent = f.run(textFrom(userID, "/card")); len(sent) != 3 || !strings.Contains(sent[2].text, "tugadi") {
+		t.Errorf("third draw = %+v, want the day's cards done", sent)
 	}
 	f.opts.OwnerIDs = map[int64]bool{userID: true}
-	if sent = f.run(textFrom(userID, "/card")); len(sent) != 3 || sent[2].photo || !strings.Contains(sent[2].text, "⏳") {
-		t.Errorf("an owner's draw = %+v, want to wait", sent)
+	if sent = f.run(textFrom(userID, "/card")); len(sent) != 4 || sent[3].photo || !strings.Contains(sent[3].text, "⏳") || !strings.Contains(sent[3].text, "00:00") {
+		t.Errorf("an owner's fourth draw = %+v, want to wait for midnight", sent)
 	}
-	if book.everys[len(book.everys)-1] != time.Hour {
-		t.Errorf("an owner waited %v", book.everys[len(book.everys)-1])
+	if day := book.days[len(book.days)-1]; day.PerDay != 3 || day.Start.Hour() != 0 {
+		t.Errorf("an owner's day = %+v", day)
 	}
 }
 
@@ -351,6 +357,8 @@ func TestCardDrawsTakeNoGroupQuota(t *testing.T) {
 	if len(sent) != 2 || !sent[1].photo {
 		t.Fatalf("sent = %+v, want the answer and then the card", sent)
 	}
+	book := f.opts.Cards.(*fakeCards)
+	book.used[userID] = 3
 	if sent = f.run(inGroup(groupMessage("/card"))); len(sent) != 3 || !strings.Contains(sent[2].text, "⏳") {
 		t.Errorf("a wait over the quota sent %+v, want the wait", sent)
 	}
@@ -394,7 +402,7 @@ func TestCardCaptionIsShort(t *testing.T) {
 	}
 	draw.New, draw.Count, draw.Guaranteed, draw.SinceLegendary = false, 2, true, 26
 	caption := cardCaption(languageOf(in), draw)
-	if !strings.Contains(caption, "🔁 ×2 · +5 000 ochko") || !strings.Contains(caption, "✨ Kafolatlangan karta!") ||
+	if !strings.Contains(caption, "🔁 Takror, endi ×2 · ochko qo'shilmaydi") || !strings.Contains(caption, "✨ Kafolatlangan karta!") ||
 		!strings.Contains(caption, "🔥 Afsonaviy — 4 kartadan") || strings.Contains(caption, "Mifik —") {
 		t.Errorf("a sure card's caption:\n%s", caption)
 	}

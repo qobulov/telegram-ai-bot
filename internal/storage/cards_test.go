@@ -49,20 +49,27 @@ func TestCardsAreDrawnAndCollected(t *testing.T) {
 		t.Fatalf("picture = %q", link)
 	}
 
-	now := time.Now()
-	draw, err := store.DrawCard(ctx, alice, "Alice", rarity(4), time.Hour, now)
-	if err != nil || draw.Card.ID != 1 || !draw.New || draw.Count != 1 || draw.Points != 5000 {
+	// Alice opens two free cards a day, here; a copy adds no points.
+	start := time.Date(2026, 11, 16, 0, 0, 0, 0, time.UTC)
+	now := start.Add(10 * time.Hour)
+	day := CardDay{Start: start, PerDay: 2}
+	draw, err := store.DrawCard(ctx, alice, "Alice", rarity(4), day, now)
+	if err != nil || draw.Card.ID != 1 || !draw.New || draw.Count != 1 || draw.Points != 5000 || !draw.Free || draw.FreeLeft != 1 {
 		t.Fatalf("first draw = %+v, %v", draw, err)
 	}
-	_, err = store.DrawCard(ctx, alice, "Alice", rarity(0), time.Hour, now.Add(10*time.Minute))
+	if draw, err = store.DrawCard(ctx, alice, "Alice", rarity(4), day, now.Add(time.Minute)); err != nil || draw.New || draw.Count != 2 || draw.Points != 5000 || draw.FreeLeft != 0 {
+		t.Fatalf("the same card again = %+v, %v; want no points for the copy", draw, err)
+	}
+	_, err = store.DrawCard(ctx, alice, "Alice", rarity(0), day, now.Add(2*time.Hour))
 	var wait *CardWaitError
-	if !errors.As(err, &wait) || wait.Wait.Round(time.Second) != 50*time.Minute {
-		t.Fatalf("a draw ten minutes later = %v, want a 50-minute wait", err)
+	if !errors.As(err, &wait) || wait.Wait != 12*time.Hour {
+		t.Fatalf("a third draw at noon = %v, want a wait until midnight", err)
 	}
-	if draw, err = store.DrawCard(ctx, alice, "Alice", rarity(4), time.Hour, now.Add(time.Hour)); err != nil || draw.New || draw.Count != 2 || draw.Points != 10000 {
-		t.Fatalf("the same card again = %+v, %v", draw, err)
+	nextDay := CardDay{Start: start.AddDate(0, 0, 1), PerDay: 2}
+	if draw, err = store.DrawCard(ctx, alice, "Alice", rarity(4), nextDay, start.AddDate(0, 0, 1).Add(time.Hour)); err != nil || draw.FreeLeft != 1 || draw.Count != 3 {
+		t.Fatalf("the next day's first = %+v, %v", draw, err)
 	}
-	if draw, err = store.DrawCard(ctx, bob, "Bob", rarity(0), 0, now); err != nil || draw.Card.ID != 2 || draw.Points != 100 {
+	if draw, err = store.DrawCard(ctx, bob, "Bob", rarity(0), CardDay{}, now); err != nil || draw.Card.ID != 2 || draw.Points != 100 {
 		t.Fatalf("Bob's draw = %+v, %v", draw, err)
 	}
 	if draw.SinceLegendary != 1 || draw.SinceMythic != 1 {
@@ -73,24 +80,24 @@ func TestCardsAreDrawnAndCollected(t *testing.T) {
 	draw, err = store.DrawCard(ctx, bob, "Bob", func(legendary, mythic int) (int, bool) {
 		told = [2]int{legendary, mythic}
 		return 4, true
-	}, 0, now)
+	}, CardDay{}, now)
 	if err != nil || told != [2]int{1, 1} || !draw.Guaranteed || draw.SinceLegendary != 0 || draw.SinceMythic != 0 {
 		t.Errorf("Bob's sure Mythic = %+v, told %v, %v", draw, told, err)
 	}
 
 	total, owned, points, err := store.CardCounts(ctx, alice)
-	if err != nil || total[4] != 1 || total[0] != 1 || owned[4] != 1 || owned[0] != 0 || points != 10000 {
+	if err != nil || total[4] != 1 || total[0] != 1 || owned[4] != 1 || owned[0] != 0 || points != 5000 {
 		t.Errorf("Alice's counts = %v %v %d, %v", total, owned, points, err)
 	}
 	cards, err := store.OwnedCards(ctx, alice, -1)
-	if err != nil || len(cards) != 1 || cards[0].Name != "Gojo" || cards[0].Count != 2 {
+	if err != nil || len(cards) != 1 || cards[0].Name != "Gojo" || cards[0].Count != 3 {
 		t.Errorf("Alice's cards = %+v, %v", cards, err)
 	}
 	if cards, err = store.OwnedCards(ctx, alice, 0); err != nil || len(cards) != 0 {
 		t.Errorf("Alice's common cards = %+v, %v", cards, err)
 	}
 	top, err := store.CardTop(ctx, 5)
-	if err != nil || len(top) != 2 || top[0].UserID != alice || top[0].Cards != 1 || top[1].Name != "Bob" {
+	if err != nil || len(top) != 2 || top[0].Name != "Bob" || top[1].UserID != alice || top[1].Cards != 1 {
 		t.Errorf("top = %+v, %v", top, err)
 	}
 }

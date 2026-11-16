@@ -43,6 +43,10 @@ type Reminder struct {
 	// LastDraw is, as claimed, when the user last drew a card; zero for
 	// one who never did. A card reminder is not sent when it is too soon.
 	LastDraw time.Time
+	// FreeDay and FreeUsed are, as claimed, the day the user last opened a
+	// free card and how many they opened that day.
+	FreeDay  time.Time
+	FreeUsed int
 }
 
 // ErrReminderLimit is returned by AddReminder when the user, or the chat,
@@ -187,16 +191,21 @@ func (s *Store) ClaimDueReminders(ctx context.Context, now time.Time, limit int)
 		)
 		UPDATE reminders r SET claimed_at = $1, attempts = r.attempts + 1 FROM due WHERE r.id = due.id
 		RETURNING r.id, r.chat_id, r.user_id, r.user_name, r.message_id, r.kind, r.text, r.language, r.due_at, r.attempts,
-			(SELECT p.last_draw_at FROM card_players p WHERE p.user_id = r.user_id)`, now, limit)
+			(SELECT p.last_draw_at FROM card_players p WHERE p.user_id = r.user_id),
+			(SELECT p.free_day FROM card_players p WHERE p.user_id = r.user_id),
+			coalesce((SELECT p.free_used FROM card_players p WHERE p.user_id = r.user_id), 0)`, now, limit)
 	if err != nil {
 		return nil, fmt.Errorf("storage: claim reminders: %w", err)
 	}
 	claimed, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (Reminder, error) {
 		var r Reminder
-		var last *time.Time
-		err := row.Scan(&r.ID, &r.ChatID, &r.UserID, &r.UserName, &r.MessageID, &r.Kind, &r.Text, &r.Language, &r.DueAt, &r.Attempts, &last)
+		var last, freeDay *time.Time
+		err := row.Scan(&r.ID, &r.ChatID, &r.UserID, &r.UserName, &r.MessageID, &r.Kind, &r.Text, &r.Language, &r.DueAt, &r.Attempts, &last, &freeDay, &r.FreeUsed)
 		if last != nil {
 			r.LastDraw = *last
+		}
+		if freeDay != nil {
+			r.FreeDay = *freeDay
 		}
 		return r, err
 	})

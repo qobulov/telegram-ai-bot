@@ -56,9 +56,9 @@ type ReminderStore interface {
 // RemindersOptions configures the reminders tool. Store is required.
 type RemindersOptions struct {
 	Store ReminderStore
-	// CardEvery is how often a Kartalar card may be drawn; zero leaves the
+	// CardDay is the day's free Kartalar cards at a time; nil leaves the
 	// card reminders out.
-	CardEvery time.Duration
+	CardDay func(now time.Time) storage.CardDay
 	// Location is where "18:00" is read: the groups' time zone.
 	Location *time.Location
 	Now      func() time.Time
@@ -119,7 +119,7 @@ type reminderList struct {
 // own, in the chat they set them in.
 func RemindersTool(opts RemindersOptions) Tool {
 	card := ""
-	if opts.CardEvery > 0 {
+	if opts.CardDay != nil {
 		card = " card: remind them when their next Kartalar card may be opened (\"karta ochish vaqti kelganda eslat\"); always true when they want that after every card (\"har safar eslat\"). card_off: stop the card reminders."
 	}
 	return Tool{
@@ -164,7 +164,7 @@ func runReminders(ctx context.Context, opts RemindersOptions, raw json.RawMessag
 	case "cancel":
 		return cancelReminder(ctx, opts, caller, args)
 	case "card", "card_off":
-		if opts.CardEvery <= 0 {
+		if opts.CardDay == nil {
 			return nil, &DeniedError{Message: reminderNoCards}
 		}
 		if args.Action == "card_off" {
@@ -272,7 +272,7 @@ func listReminders(ctx context.Context, opts RemindersOptions, caller Caller) (a
 	for _, r := range waiting {
 		list.Reminders = append(list.Reminders, reminderView{ID: r.ID, Kind: r.Kind, Text: r.Text, Due: r.DueAt.In(opts.location()).Format(timeLayout)})
 	}
-	if opts.CardEvery > 0 {
+	if opts.CardDay != nil {
 		chatID, err := opts.Store.CardAutoRemind(ctx, caller.UserID)
 		if err != nil {
 			return nil, internal(err)
@@ -297,8 +297,8 @@ func cancelReminder(ctx context.Context, opts RemindersOptions, caller Caller, a
 }
 
 // cardReminder schedules a reminder for when the caller may next draw a
-// card: their last draw and CardEvery after. One who may draw now is told
-// so instead. always turns on the reminder after every draw, too.
+// card: the next midnight, once the day's free cards are opened. One who
+// may draw now is told so instead. always turns on the reminder after every draw, too.
 func cardReminder(ctx context.Context, opts RemindersOptions, caller Caller, args reminderArgs) (any, error) {
 	language := pickLanguage(args.Language)
 	if args.Always {
@@ -307,13 +307,14 @@ func cardReminder(ctx context.Context, opts RemindersOptions, caller Caller, arg
 		}
 	}
 	now := opts.now()
-	_, last, err := opts.Store.CardPlayerOf(ctx, caller.UserID)
+	player, _, err := opts.Store.CardPlayerOf(ctx, caller.UserID)
 	if err != nil {
 		return nil, internal(err)
 	}
 	result := reminderSet{Timezone: opts.location().String(), Always: args.Always}
-	next := last.Add(opts.CardEvery)
-	if last.IsZero() || !next.After(now) {
+	day := opts.CardDay(now)
+	next := day.Start.AddDate(0, 0, 1)
+	if !player.FreeDay.Equal(day.Start) || player.FreeUsed < day.PerDay {
 		result.CanDraw, result.Note = true, reminderCardNow
 		if args.Always {
 			result.Note += reminderAutoNote

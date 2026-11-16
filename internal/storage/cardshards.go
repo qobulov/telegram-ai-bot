@@ -82,7 +82,7 @@ func (s *Store) MeltCards(ctx context.Context, userID int64, rates []int) (melte
 }
 
 // ExtraCard gives the player a card out of turn for cost shards, as
-// DrawCard does but leaving their hourly card where it was, of collection or
+// DrawCard does but leaving the day's free cards as they were, of collection or
 // of any when it is ""; with too few it returns a *ShardsError.
 func (s *Store) ExtraCard(ctx context.Context, userID int64, name, collection string, roll CardRoll, cost int) (CardDraw, error) {
 	var draw CardDraw

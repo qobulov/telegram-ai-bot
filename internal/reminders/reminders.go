@@ -57,11 +57,11 @@ type Options struct {
 	// group to it through the private chat.
 	CardsURL    string
 	BotUsername string
-	// CardEvery is how often a card may be drawn: a card reminder whose
-	// player drew less than that ago is not sent.
-	CardEvery time.Duration
-	Logger    *slog.Logger
-	Now       func() time.Time
+	// CardDay is the day's free cards at a time: a card reminder whose
+	// player has opened them all today is not sent; nil sends every one.
+	CardDay func(now time.Time) storage.CardDay
+	Logger  *slog.Logger
+	Now     func() time.Time
 }
 
 // Summary is what one call did, as the endpoint answers it.
@@ -154,10 +154,14 @@ func fire(ctx context.Context, opts Options, r storage.Reminder, summary *Summar
 	}
 }
 
-// tooSoon is true when the player drew a card since the reminder was set,
-// so that no new card may be opened yet.
+// tooSoon is true when the player has opened the day's free cards since
+// the reminder was set, so that no new card may be opened yet.
 func tooSoon(opts Options, r storage.Reminder) bool {
-	return !r.LastDraw.IsZero() && opts.Now().Before(r.LastDraw.Add(opts.CardEvery))
+	if opts.CardDay == nil {
+		return false
+	}
+	day := opts.CardDay(opts.Now())
+	return r.FreeDay.Equal(day.Start) && r.FreeUsed >= day.PerDay
 }
 
 // retryable is a send Telegram answered it did not do for now: its rate

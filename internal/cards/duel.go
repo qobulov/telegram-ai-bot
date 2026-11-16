@@ -22,8 +22,8 @@ func SpareWorth(spares map[int]int) (copies, worth int) {
 	return copies, worth
 }
 
-// ExtraCost is the shards a card drawn out of turn costs; it does not move
-// the player's hourly card. SetCost is one drawn from a collection the player
+// ExtraCost is the shards a card drawn out of turn costs; it takes none of
+// the player's free cards of the day. SetCost is one drawn from a collection the player
 // picks, in the Mini App's shop.
 const (
 	ExtraCost = 15

@@ -17,7 +17,7 @@ type fakeReminders struct {
 	card      *storage.Reminder
 	autoChat  int64
 	autoSet   bool
-	lastDraw  time.Time
+	player    storage.CardPlayer
 	limitFull bool
 }
 
@@ -66,12 +66,15 @@ func (f *fakeReminders) CancelReminder(_ context.Context, id, userID, chatID int
 }
 
 func (f *fakeReminders) CardPlayerOf(context.Context, int64) (storage.CardPlayer, time.Time, error) {
-	return storage.CardPlayer{}, f.lastDraw, nil
+	return f.player, time.Time{}, nil
 }
+
+// reminderDay is the day of reminderNow, three free cards in it.
+var reminderDay = storage.CardDay{Start: time.Date(2026, 11, 9, 0, 0, 0, 0, tashkent), PerDay: 3}
 
 func remindersRegistry(t *testing.T, store *fakeReminders) *Registry {
 	t.Helper()
-	return mustRegistry(t, RemindersTool(RemindersOptions{Store: store, CardEvery: time.Hour, Location: tashkent, Now: func() time.Time { return reminderNow }}))
+	return mustRegistry(t, RemindersTool(RemindersOptions{Store: store, CardDay: func(time.Time) storage.CardDay { return reminderDay }, Location: tashkent, Now: func() time.Time { return reminderNow }}))
 }
 
 // remindIn runs the tool as a person's message in chatID.
@@ -221,11 +224,11 @@ func TestListAndCancelOnlyOwnReminders(t *testing.T) {
 	}
 }
 
-// A card reminder falls at the last draw and an hour after; one who may
-// open a card now is told so and nothing is scheduled; always turns on the
+// A card reminder falls at the next midnight once the day's free cards are
+// opened; one who may open a card now is told so and nothing is scheduled; always turns on the
 // reminder after every draw, and card_off turns it off.
 func TestCardReminder(t *testing.T) {
-	store := &fakeReminders{lastDraw: reminderNow.Add(-20 * time.Minute)}
+	store := &fakeReminders{player: storage.CardPlayer{FreeDay: reminderDay.Start, FreeUsed: 3}}
 	registry := remindersRegistry(t, store)
 	env := remindIn(t, registry, 7, 7, `{"action":"card","language":"ru"}`)
 	var result struct {
@@ -233,14 +236,14 @@ func TestCardReminder(t *testing.T) {
 		InMinutes int    `json:"in_minutes"`
 		CanOpen   bool   `json:"can_open_card_now"`
 	}
-	if err := json.Unmarshal(env.Result, &result); err != nil || !env.OK || result.Due != "2026-11-09 15:10" || result.InMinutes != 40 || result.CanOpen {
+	if err := json.Unmarshal(env.Result, &result); err != nil || !env.OK || result.Due != "2026-11-10 00:00" || result.InMinutes != 570 || result.CanOpen {
 		t.Fatalf("card = %+v %s", env, env.Result)
 	}
-	if store.card == nil || !store.card.DueAt.Equal(reminderNow.Add(40*time.Minute)) || store.card.Language != "ru" || store.card.ChatID != 7 || store.autoSet {
+	if store.card == nil || !store.card.DueAt.Equal(reminderDay.Start.AddDate(0, 0, 1)) || store.card.Language != "ru" || store.card.ChatID != 7 || store.autoSet {
 		t.Errorf("card reminder = %+v, auto %v", store.card, store.autoSet)
 	}
 
-	store = &fakeReminders{lastDraw: reminderNow.Add(-2 * time.Hour)}
+	store = &fakeReminders{player: storage.CardPlayer{FreeDay: reminderDay.Start, FreeUsed: 1}}
 	registry = remindersRegistry(t, store)
 	env = remindIn(t, registry, -100, 7, `{"action":"card","always":true}`)
 	if err := json.Unmarshal(env.Result, &result); err != nil || !result.CanOpen || store.card != nil || store.autoChat != -100 {

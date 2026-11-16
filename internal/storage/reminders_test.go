@@ -154,8 +154,9 @@ func TestCardRemindersFollowDraws(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now().Truncate(time.Second)
+	day := CardDay{Start: now.Add(-time.Hour), PerDay: 1}
 
-	if _, err := store.DrawCard(ctx, alice, "Alice", rarity(0), time.Hour, now); err != nil {
+	if _, err := store.DrawCard(ctx, alice, "Alice", rarity(0), CardDay{}, now); err != nil {
 		t.Fatal(err)
 	}
 	if waiting, _ := store.WaitingReminders(ctx, alice, alice); len(waiting) != 0 {
@@ -179,19 +180,19 @@ func TestCardRemindersFollowDraws(t *testing.T) {
 		t.Fatalf("auto chat = %d, %v", chat, err)
 	}
 	next := now.Add(time.Hour)
-	if _, err := store.DrawCard(ctx, alice, "Alice", rarity(0), time.Hour, next); err != nil {
+	if _, err := store.DrawCard(ctx, alice, "Alice", rarity(0), day, next); err != nil {
 		t.Fatal(err)
 	}
 	if waiting, _ := store.WaitingReminders(ctx, alice, alice); len(waiting) != 0 {
 		t.Errorf("the private one stayed after the draw moved it: %+v", waiting)
 	}
 	waiting, err = store.WaitingReminders(ctx, alice, reminderGroup)
-	if err != nil || len(waiting) != 1 || !waiting[0].DueAt.Equal(next.Add(time.Hour)) || waiting[0].Language != "ru" {
-		t.Fatalf("after a draw = %+v, %v; want one in the group an hour on", waiting, err)
+	if err != nil || len(waiting) != 1 || !waiting[0].DueAt.Equal(day.Start.AddDate(0, 0, 1)) || waiting[0].Language != "ru" {
+		t.Fatalf("after the day's last draw = %+v, %v; want one in the group at the next day's start", waiting, err)
 	}
 
-	claimed, err := store.ClaimDueReminders(ctx, next.Add(2*time.Hour), 10)
-	if err != nil || len(claimed) != 1 || !claimed[0].LastDraw.Equal(next) {
+	claimed, err := store.ClaimDueReminders(ctx, day.Start.AddDate(0, 0, 1), 10)
+	if err != nil || len(claimed) != 1 || !claimed[0].LastDraw.Equal(next) || !claimed[0].FreeDay.Equal(day.Start) || claimed[0].FreeUsed != 1 {
 		t.Fatalf("claimed = %+v, %v; want the last draw with it", claimed, err)
 	}
 	// Claimed, it no longer holds the player's one slot.

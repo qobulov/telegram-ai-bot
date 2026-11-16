@@ -20,7 +20,7 @@ func TestShardsAndDuels(t *testing.T) {
 	}
 	const alice, bob = 1, 2
 	for _, q := range []string{
-		`INSERT INTO card_players (user_id, name, points, cards, draws) VALUES (1, 'Alice', 5300, 2, 4), (2, 'Bob', 100, 1, 1)`,
+		`INSERT INTO card_players (user_id, name, points, cards, draws) VALUES (1, 'Alice', 5100, 2, 4), (2, 'Bob', 100, 1, 1)`,
 		`INSERT INTO card_owned (user_id, card_id, count) VALUES (1, 1, 1), (1, 2, 3), (2, 2, 1)`,
 	} {
 		if _, err := store.pool.Exec(ctx, q); err != nil {
@@ -41,7 +41,7 @@ func TestShardsAndDuels(t *testing.T) {
 	if _, _, _, err = store.MeltCards(ctx, 99, rates); err != nil {
 		t.Errorf("a melt by no player = %v", err)
 	}
-	if p, _, err := store.CardPlayerOf(ctx, alice); err != nil || p.Points != 5300 {
+	if p, _, err := store.CardPlayerOf(ctx, alice); err != nil || p.Points != 5100 {
 		t.Errorf("Alice's points after melting = %d, %v", p.Points, err)
 	}
 
@@ -51,7 +51,7 @@ func TestShardsAndDuels(t *testing.T) {
 		t.Fatalf("an extra card for too few shards = %v", err)
 	}
 	draw, err := store.ExtraCard(ctx, alice, "Alice", "", rarity(0), 2)
-	if err != nil || draw.Card.ID != 2 || draw.Count != 4 || draw.Shards != 0 || draw.Points != 5400 {
+	if err != nil || draw.Card.ID != 2 || draw.Count != 4 || draw.Shards != 0 || draw.Points != 5100 {
 		t.Fatalf("an extra card = %+v, %v", draw, err)
 	}
 	if _, last, err := store.CardPlayerOf(ctx, alice); err != nil || !last.IsZero() {

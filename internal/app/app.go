@@ -463,7 +463,7 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 		tools.GroupStatsTool(tools.GroupStatsOptions{Store: store, BotID: bot.User.ID, Location: cfg.Location}),
 		tools.PunishmentsTool(tools.PunishmentsOptions{Store: store, Creators: groupMembers{client: bot.Client, botID: bot.User.ID}, BotID: bot.User.ID, Location: cfg.Location}),
 		tools.JoinCaptchaTool(tools.JoinCaptchaOptions{Store: store, Rights: groupMembers{client: bot.Client, botID: bot.User.ID}}),
-		tools.RemindersTool(tools.RemindersOptions{Store: store, CardEvery: cards.Every, Location: cfg.Location}),
+		tools.RemindersTool(tools.RemindersOptions{Store: store, CardDay: cards.Today, Location: cfg.Location}),
 	)
 	// Only owners known by ID can be written to, and only they are. Only
 	// their business accounts are used, too: the account speaks for whoever
@@ -927,7 +927,7 @@ func ReminderJob(cfg config.Config, store *storage.Store, bot Bot, logger *slog.
 		Sender:      bot.Client,
 		CardsURL:    cardsPage(cfg),
 		BotUsername: bot.User.Username,
-		CardEvery:   cards.Every,
+		CardDay:     cards.Today,
 		Logger:      logger,
 	}
 	auto := service.CardAutoOptions{

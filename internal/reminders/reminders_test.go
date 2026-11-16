@@ -13,7 +13,10 @@ import (
 	"telegram-ai-bot/internal/telegram"
 )
 
-var now = time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC)
+var (
+	now   = time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC)
+	today = time.Date(2026, 11, 9, 0, 0, 0, 0, time.UTC)
+)
 
 type fakeStore struct {
 	due      []storage.Reminder
@@ -58,7 +61,8 @@ func fireAll(t *testing.T, due []storage.Reminder, fail map[int64]error) (Summar
 	sender := &fakeSender{fail: fail}
 	summary, err := Fire(context.Background(), Options{
 		Store: store, Sender: sender, CardsURL: "https://bot.example/kartalar/", BotUsername: "maria_bot",
-		CardEvery: time.Hour, Now: func() time.Time { return now }, Logger: slog.New(slog.DiscardHandler),
+		CardDay: func(time.Time) storage.CardDay { return storage.CardDay{Start: today, PerDay: 3} },
+		Now:     func() time.Time { return now }, Logger: slog.New(slog.DiscardHandler),
 	})
 	if err != nil {
 		t.Fatalf("Fire: %v", err)
@@ -112,14 +116,14 @@ func TestFireDoesNotRetryWithoutAnAnswer(t *testing.T) {
 	}
 }
 
-// A card reminder is skipped when the player drew since it was set, so
-// that no card may be opened yet; otherwise it carries the Mini App:
+// A card reminder is skipped when the player has opened the day's free
+// cards since it was set, so that no card may be opened yet; otherwise it carries the Mini App:
 // itself in a private chat, a link to the private chat in a group.
 func TestFireCardReminders(t *testing.T) {
 	due := []storage.Reminder{
-		{ID: 1, ChatID: 7, UserID: 7, Kind: storage.ReminderCard, Language: "uz", LastDraw: now.Add(-time.Hour)},
-		{ID: 2, ChatID: 8, UserID: 8, Kind: storage.ReminderCard, Language: "uz", LastDraw: now.Add(-10 * time.Minute)},
-		{ID: 3, ChatID: -100, UserID: 9, UserName: "Ali @ali", MessageID: 42, Kind: storage.ReminderCard, Language: "ru", LastDraw: now.Add(-2 * time.Hour)},
+		{ID: 1, ChatID: 7, UserID: 7, Kind: storage.ReminderCard, Language: "uz", FreeDay: today.AddDate(0, 0, -1), FreeUsed: 3},
+		{ID: 2, ChatID: 8, UserID: 8, Kind: storage.ReminderCard, Language: "uz", FreeDay: today, FreeUsed: 3},
+		{ID: 3, ChatID: -100, UserID: 9, UserName: "Ali @ali", MessageID: 42, Kind: storage.ReminderCard, Language: "ru"},
 	}
 	summary, store, sender := fireAll(t, due, nil)
 	if summary != (Summary{Sent: 2, Skipped: 1}) || store.outcomes[2] != storage.ReminderSkipped {

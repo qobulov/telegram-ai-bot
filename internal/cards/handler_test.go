@@ -43,7 +43,8 @@ func signedInit(user int64, at time.Time) string {
 
 // fakeStore has two cards; the player holds the first.
 type fakeStore struct {
-	last     time.Time
+	day      time.Time
+	used     int
 	draws    int
 	shards   int
 	auto     bool
@@ -70,17 +71,20 @@ func (f *fakeStore) OwnedCards(context.Context, int64, int) ([]storage.OwnedCard
 	return []storage.OwnedCard{{Card: heldCard, Count: 2}}, nil
 }
 func (f *fakeStore) CardPlayerOf(context.Context, int64) (storage.CardPlayer, time.Time, error) {
-	return storage.CardPlayer{Points: 10000, Cards: 1, Auto: f.auto}, f.last, nil
+	return storage.CardPlayer{Points: 10000, Cards: 1, Auto: f.auto, FreeDay: f.day, FreeUsed: f.used}, time.Time{}, nil
 }
 func (f *fakeStore) CardTop(context.Context, int) ([]storage.CardPlayer, error) {
 	return []storage.CardPlayer{{UserID: 7, Name: "Bek", Points: 10000, Cards: 1}}, nil
 }
-func (f *fakeStore) DrawCard(_ context.Context, _ int64, _ string, _ storage.CardRoll, every time.Duration, now time.Time) (storage.CardDraw, error) {
-	if !f.last.IsZero() && now.Sub(f.last) < every {
-		return storage.CardDraw{}, &storage.CardWaitError{Wait: every - now.Sub(f.last)}
+func (f *fakeStore) DrawCard(_ context.Context, _ int64, _ string, _ storage.CardRoll, day storage.CardDay, now time.Time) (storage.CardDraw, error) {
+	if !f.day.Equal(day.Start) {
+		f.day, f.used = day.Start, 0
 	}
-	f.last, f.draws = now, f.draws+1
-	return storage.CardDraw{Card: heldCard, Count: 3, Points: 15000}, nil
+	if f.used >= day.PerDay {
+		return storage.CardDraw{}, &storage.CardWaitError{Wait: day.Start.AddDate(0, 0, 1).Sub(now)}
+	}
+	f.used, f.draws = f.used+1, f.draws+1
+	return storage.CardDraw{Card: heldCard, Count: 3, Points: 15000, Free: true, FreeLeft: day.PerDay - f.used}, nil
 }
 
 func (f *fakeStore) CardWallet(context.Context, int64) (int, map[int]int, error) {
@@ -192,11 +196,11 @@ func TestCardsAppWantsSignedInitData(t *testing.T) {
 // The state names only the cards held: one not held is its rarity alone.
 func TestCardsAppHidesCardsNotHeld(t *testing.T) {
 	now := time.Now()
-	store := &fakeStore{last: now.Add(-20 * time.Minute)}
+	store := &fakeStore{day: DayStart(now), used: PerDay}
 	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }})
 	code, out := post(t, h, signedInit(7, now), "state")
 	views, _ := out["cards"].([]any)
-	if code != http.StatusOK || len(views) != 2 || out["held"] != 1.0 || out["points"] != 10000.0 || out["next_in"] != float64((40*time.Minute).Milliseconds()) {
+	if code != http.StatusOK || len(views) != 2 || out["held"] != 1.0 || out["points"] != 10000.0 || out["next_in"] != float64(DayStart(now).AddDate(0, 0, 1).Sub(now).Milliseconds()) || out["free_left"] != 0.0 {
 		t.Fatalf("state = %d %v", code, out)
 	}
 	held, locked := views[0].(map[string]any), views[1].(map[string]any)
@@ -208,20 +212,26 @@ func TestCardsAppHidesCardsNotHeld(t *testing.T) {
 	}
 }
 
-// A player draws once an hour, an owner like anyone.
-func TestCardsAppDrawsOnceAnHour(t *testing.T) {
+// A player opens three free cards a day, an owner like anyone; the next
+// waits for midnight in Tashkent.
+func TestCardsAppDrawsThreeADay(t *testing.T) {
 	now := time.Now()
+	toMidnight := float64(DayStart(now).AddDate(0, 0, 1).Sub(now).Milliseconds())
 	store := &fakeStore{}
 	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }, Roll: func() Rarity { return Mythic }})
 	code, out := post(t, h, signedInit(7, now), "draw")
 	card, _ := out["card"].(map[string]any)
-	if code != http.StatusOK || card["name"] != "Gojo" || out["points"] != 15000.0 || out["next_in"] != float64(Every.Milliseconds()) {
+	if code != http.StatusOK || card["name"] != "Gojo" || out["points"] != 15000.0 || out["next_in"] != 0.0 || out["free_left"] != 2.0 {
 		t.Fatalf("draw = %d %v", code, out)
 	}
-	if _, out := post(t, h, signedInit(7, now), "draw"); out["wait"] != float64(Every.Milliseconds()) {
-		t.Errorf("a second draw = %v", out)
+	post(t, h, signedInit(7, now), "draw")
+	if _, out := post(t, h, signedInit(7, now), "draw"); out["next_in"] != toMidnight || out["free_left"] != 0.0 {
+		t.Errorf("the third draw = %v", out)
 	}
-	if store.draws != 1 {
+	if _, out := post(t, h, signedInit(7, now), "draw"); out["wait"] != toMidnight {
+		t.Errorf("a fourth draw = %v", out)
+	}
+	if store.draws != 3 {
 		t.Errorf("draws = %d", store.draws)
 	}
 	if _, out := post(t, h, signedInit(7, now), "top"); len(out["top"].([]any)) != 1 || out["top"].([]any)[0].(map[string]any)["me"] != true {

@@ -247,7 +247,8 @@ func checkGiveLimit(ctx context.Context, tx pgx.Tx, userID int64, rules CardTrad
 }
 
 // moveCard moves one copy of the card, not melted, from one player to the
-// other, with its points. A player giving their last copy not melted no
+// other: the giver loses its points only with their last copy, and the
+// other gains them only when it is new to them. A player giving their last copy not melted no
 // longer holds the card; the melted ones went to shards and are gone with it.
 // spareOnly refuses that last copy, ErrCardLastCopy.
 func moveCard(ctx context.Context, tx pgx.Tx, from, to, cardID int64, spareOnly bool) error {
@@ -287,7 +288,7 @@ func moveCard(ctx context.Context, tx pgx.Tx, from, to, cardID int64, spareOnly 
 	}
 	_, err = tx.Exec(ctx, `
 		UPDATE card_players SET
-			points = CASE WHEN user_id = $1 THEN greatest(points - $3, 0) ELSE points + $3 END,
+			points = CASE WHEN user_id = $1 THEN greatest(points - $3::bigint * $4, 0) ELSE points + $3::bigint * $5 END,
 			cards = cards + CASE WHEN user_id = $1 THEN -$4::int ELSE $5::int END
 		WHERE user_id IN ($1, $2)`, from, to, value, lost, gained)
 	return err

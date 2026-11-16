@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"time"
 )
 
 // CardAuto is a player whose cards the auto opener opens: their name as
@@ -52,15 +51,13 @@ func (s *Store) StopCardAuto(ctx context.Context, userID int64) error {
 	return nil
 }
 
-// DueCardAutos are at most limit players with the auto opener on whose
-// next card may be opened at now, those waiting longest first. The draw
-// checks the wait again under the player's lock, so two calls at once open
-// one card.
-func (s *Store) DueCardAutos(ctx context.Context, now time.Time, every time.Duration, limit int) ([]CardAuto, error) {
+// DueCardAutos is at most limit players whose auto opener is on and who
+// have a free card of day left, the longest since a draw first.
+func (s *Store) DueCardAutos(ctx context.Context, day CardDay, limit int) ([]CardAuto, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT user_id, name, auto_language FROM card_players
-		WHERE auto_draw AND (last_draw_at IS NULL OR last_draw_at <= $1)
-		ORDER BY last_draw_at NULLS FIRST LIMIT $2`, now.Add(-every), limit)
+		WHERE auto_draw AND (free_day IS DISTINCT FROM $1 OR free_used < $2)
+		ORDER BY last_draw_at NULLS FIRST LIMIT $3`, day.Start, day.PerDay, limit)
 	if err != nil {
 		return nil, fmt.Errorf("storage: due card auto openers: %w", err)
 	}

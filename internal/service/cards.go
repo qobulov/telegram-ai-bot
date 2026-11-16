@@ -19,7 +19,7 @@ import (
 // their collections.
 type CardBook interface {
 	cards.CatalogStore
-	DrawCard(ctx context.Context, userID int64, name string, roll storage.CardRoll, every time.Duration, now time.Time) (storage.CardDraw, error)
+	DrawCard(ctx context.Context, userID int64, name string, roll storage.CardRoll, day storage.CardDay, now time.Time) (storage.CardDraw, error)
 	CardCounts(ctx context.Context, userID int64) (total, owned map[int]int, points int64, err error)
 	OwnedCards(ctx context.Context, userID int64, rarity int) ([]storage.OwnedCard, error)
 	CardTop(ctx context.Context, limit int) ([]storage.CardPlayer, error)
@@ -97,11 +97,12 @@ func (s *Service) drawCard(ctx context.Context, in incoming) outcome {
 		s.opts.Logger.Error("could not fill the card catalog", "error", err)
 		return say(textCardsUnavailable.to(in))
 	}
-	draw, err := s.opts.Cards.DrawCard(ctx, in.userID, doozName(in.msg.From), cards.WithPity(cards.RollRandom), cards.Every, time.Now())
+	now := time.Now()
+	draw, err := s.opts.Cards.DrawCard(ctx, in.userID, doozName(in.msg.From), cards.WithPity(cards.RollRandom), cards.Today(now), now)
 	var wait *storage.CardWaitError
 	switch {
 	case errors.As(err, &wait):
-		return say(fmt.Sprintf(textCardWait.to(in), max(1, int(wait.Wait.Round(time.Minute).Minutes()))))
+		return say(fmt.Sprintf(textCardWait.to(in), cards.PerDay, waitText(languageOf(in), wait.Wait)))
 	case err != nil:
 		s.opts.Logger.Error("could not draw a card", "user_id", in.userID, "error", err)
 		return say(textCardsUnavailable.to(in))
@@ -135,13 +136,19 @@ func cardCaption(language string, draw storage.CardDraw) string {
 		fmt.Sprintf(textCardAttack.inLanguage(language), spaced(int64(c.Attack))),
 		fmt.Sprintf(textCardLife.inLanguage(language), spaced(int64(c.Health))),
 		fmt.Sprintf(textCardRarity.inLanguage(language), rarity))
-	got := fmt.Sprintf(textCardAgain.inLanguage(language), draw.Count, spaced(int64(c.Value)), spaced(draw.Points))
+	got := fmt.Sprintf(textCardAgain.inLanguage(language), draw.Count, spaced(draw.Points))
 	if draw.New {
 		got = fmt.Sprintf(textCardNew.inLanguage(language), spaced(int64(c.Value)), spaced(draw.Points))
 	}
 	lines = append(lines, got)
 	if draw.Guaranteed {
 		lines = append(lines, textCardGuaranteed.inLanguage(language))
+	}
+	switch {
+	case draw.Free && draw.FreeLeft > 0:
+		lines = append(lines, fmt.Sprintf(textCardFreeLeft.inLanguage(language), draw.FreeLeft))
+	case draw.Free:
+		lines = append(lines, textCardFreeDone.inLanguage(language))
 	}
 	legendary, mythic := cards.PityIn(draw)
 	for _, sure := range []struct {
@@ -154,6 +161,25 @@ func cardCaption(language string, draw storage.CardDraw) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+// waitText is a wait in hours and minutes, as the wait for the next day's
+// cards is said: "4 soat 12 daqiqa".
+func waitText(language string, wait time.Duration) string {
+	minutes := max(1, int(wait.Round(time.Minute).Minutes()))
+	hours, minutes := minutes/60, minutes%60
+	switch {
+	case hours == 0:
+		return fmt.Sprintf(textMinutes.inLanguage(language), minutes)
+	case minutes == 0:
+		return fmt.Sprintf(textHours.inLanguage(language), hours)
+	}
+	return fmt.Sprintf(textHours.inLanguage(language), hours) + " " + fmt.Sprintf(textMinutes.inLanguage(language), minutes)
+}
+
+var (
+	textHours   = localText{uz: "%d soat", ru: "%d ч", en: "%d h"}
+	textMinutes = localText{uz: "%d daqiqa", ru: "%d мин", en: "%d min"}
+)
 
 // pityShown is how near a sure Legendary or Mythic must be for a drawn
 // card to tell it.
@@ -379,15 +405,17 @@ var (
 		en: "Cards are not available right now; try again in a bit.",
 	}
 	textCardWait = localText{
-		uz: "⏳ Keyingi karta %d daqiqadan keyin. Kolleksiya: /mycards",
-		ru: "⏳ Следующая карта через %d мин. Коллекция: /mycards",
-		en: "⏳ Your next card in %d min. Collection: /mycards",
+		uz: "⏳ Bugungi %d ta tekin karta ochildi. Yangilari %s dan keyin, 00:00 da. Kolleksiya: /mycards",
+		ru: "⏳ Сегодняшние %d бесплатные карты открыты. Новые через %s, в 00:00. Коллекция: /mycards",
+		en: "⏳ Today's %d free cards are open. New ones in %s, at midnight. Collection: /mycards",
 	}
+	textCardFreeLeft   = localText{uz: "🎴 Bugun yana %d ta tekin karta bor", ru: "🎴 Сегодня ещё %d бесплатные карты", en: "🎴 %d more free cards today"}
+	textCardFreeDone   = localText{uz: "🎴 Bugungi tekin kartalar tugadi, yangilari 00:00 da", ru: "🎴 Бесплатные карты на сегодня закончились, новые в 00:00", en: "🎴 Today's free cards are done; new ones at midnight"}
 	textCardAttack     = localText{uz: "⚔️ Hujum: %s", ru: "⚔️ Атака: %s", en: "⚔️ Attack: %s"}
 	textCardLife       = localText{uz: "❤️ Jon: %s", ru: "❤️ Жизнь: %s", en: "❤️ Life: %s"}
 	textCardRarity     = localText{uz: "💎 Noyoblik: %s", ru: "💎 Редкость: %s", en: "💎 Rarity: %s"}
 	textCardNew        = localText{uz: "🆕 Yangi · +%s ochko (jami %s)", ru: "🆕 Новая · +%s очков (всего %s)", en: "🆕 New · +%s points (total %s)"}
-	textCardAgain      = localText{uz: "🔁 ×%d · +%s ochko (jami %s)", ru: "🔁 ×%d · +%s очков (всего %s)", en: "🔁 ×%d · +%s points (total %s)"}
+	textCardAgain      = localText{uz: "🔁 Takror, endi ×%d · ochko qo'shilmaydi (jami %s)", ru: "🔁 Повтор, теперь ×%d · очки не добавляются (всего %s)", en: "🔁 Again, now ×%d · no points added (total %s)"}
 	textCardGuaranteed = localText{uz: "✨ Kafolatlangan karta!", ru: "✨ Гарантированная карта!", en: "✨ A guaranteed card!"}
 	// textCardPity says in how many cards a rarity is sure, one line each.
 	textCardPity = localText{

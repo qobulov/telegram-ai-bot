@@ -20,7 +20,7 @@ type Store interface {
 	CardCatalog(ctx context.Context) ([]storage.Card, error)
 	OwnedCards(ctx context.Context, userID int64, rarity int) ([]storage.OwnedCard, error)
 	CardPlayerOf(ctx context.Context, userID int64) (storage.CardPlayer, time.Time, error)
-	DrawCard(ctx context.Context, userID int64, name string, roll storage.CardRoll, every time.Duration, now time.Time) (storage.CardDraw, error)
+	DrawCard(ctx context.Context, userID int64, name string, roll storage.CardRoll, day storage.CardDay, now time.Time) (storage.CardDraw, error)
 	CardTop(ctx context.Context, limit int) ([]storage.CardPlayer, error)
 	CardWallet(ctx context.Context, userID int64) (shards int, spares map[int]int, err error)
 	MeltCards(ctx context.Context, userID int64, rates []int) (melted, gained, shards int, err error)
@@ -240,7 +240,7 @@ func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
 			views[i] = cardView{ID: c.ID, Rarity: c.Rarity, Set: c.Collection}
 		}
 	}
-	player, last, err := h.Store.CardPlayerOf(ctx, user.ID)
+	player, _, err := h.Store.CardPlayerOf(ctx, user.ID)
 	if err != nil {
 		h.Logger.Error("could not read a card player", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
@@ -253,18 +253,10 @@ func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
 	spare, worth := SpareWorth(spares)
 	return map[string]any{
 		"cards": views, "points": player.Points, "held": len(owned),
-		"next_in": h.wait(last).Milliseconds(), "every": Every.Milliseconds(),
+		"next_in": NextFree(player, h.Now()).Sub(h.Now()).Milliseconds(), "free_left": FreeLeft(player, h.Now()), "per_day": PerDay,
 		"shards": shards, "spare": spare, "spare_worth": worth, "extra_cost": ExtraCost, "set_cost": SetCost,
 		"auto": player.Auto,
 	}, failure{}
-}
-
-// wait is how long until the player may draw again.
-func (h *handler) wait(last time.Time) time.Duration {
-	if last.IsZero() {
-		return 0
-	}
-	return max(0, Every-h.Now().Sub(last))
 }
 
 func (h *handler) draw(ctx context.Context, user miniapp.User) (any, failure) {
@@ -272,7 +264,8 @@ func (h *handler) draw(ctx context.Context, user miniapp.User) (any, failure) {
 		h.Logger.Error("could not fill the card catalog", "error", err)
 		return nil, errUnavailable
 	}
-	draw, err := h.Store.DrawCard(ctx, user.ID, name(user), WithPity(h.Roll), Every, h.Now())
+	now := h.Now()
+	draw, err := h.Store.DrawCard(ctx, user.ID, name(user), WithPity(h.Roll), Today(now), now)
 	var wait *storage.CardWaitError
 	switch {
 	case errors.As(err, &wait):
@@ -283,9 +276,18 @@ func (h *handler) draw(ctx context.Context, user miniapp.User) (any, failure) {
 	}
 	legendaryIn, mythicIn := PityIn(draw)
 	return map[string]any{
-		"card": h.held(draw.Card, draw.Count), "new": draw.New, "points": draw.Points, "next_in": Every.Milliseconds(),
+		"card": h.held(draw.Card, draw.Count), "new": draw.New, "points": draw.Points, "next_in": nextIn(draw, now).Milliseconds(), "free_left": draw.FreeLeft,
 		"guaranteed": draw.Guaranteed, "legendary_in": legendaryIn, "mythic_in": mythicIn,
 	}, failure{}
+}
+
+// nextIn is how long after a draw the player may open their next free
+// card: at once while one is left today, or at the next midnight.
+func nextIn(draw storage.CardDraw, now time.Time) time.Duration {
+	if draw.FreeLeft > 0 {
+		return 0
+	}
+	return DayStart(now).AddDate(0, 0, 1).Sub(now)
 }
 
 // auto turns the player's auto opener on or off; its cards go to their

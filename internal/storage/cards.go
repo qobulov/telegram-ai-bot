@@ -40,6 +40,10 @@ type CardDraw struct {
 	SinceMythic    int
 	// Shards are the player's 💎 shards after it.
 	Shards int
+	// Free is a draw of the day's free cards, and FreeLeft how many the
+	// player may still open today.
+	Free     bool
+	FreeLeft int
 }
 
 // CardRoll picks a draw's rarity from the player's draws in a row since
@@ -74,6 +78,19 @@ type CardPlayer struct {
 	// Username is their @username without the @; only CardPlayersNamed
 	// reads it.
 	Username string
+	// FreeDay is the day the player last opened a free card, as the
+	// midnight that began it, and FreeUsed how many they opened that day;
+	// only CardPlayerOf reads them.
+	FreeDay  time.Time
+	FreeUsed int
+}
+
+// CardDay is the day's free cards as a draw counts them: the midnight that
+// began the day and how many a player opens free in it; a PerDay of 0
+// never makes a player wait.
+type CardDay struct {
+	Start  time.Time
+	PerDay int
 }
 
 // ErrCardWait is returned by DrawCard when the player drew too lately: the
@@ -128,39 +145,48 @@ func (s *Store) SaveCardCatalog(ctx context.Context, cards []Card) error {
 	return nil
 }
 
-// DrawCard gives the player a card of the rarity roll picks, at random,
-// unless they drew one less than every ago, when it returns a
-// *CardWaitError; every of 0 never waits. The player's row is locked, so that two draws at once are
-// two draws, the second waiting its turn. A player who turned on the card
-// reminders gets the next one scheduled, every after now.
-func (s *Store) DrawCard(ctx context.Context, userID int64, name string, roll CardRoll, every time.Duration, now time.Time) (CardDraw, error) {
+// DrawCard gives the player a free card of the rarity roll picks, at
+// random, unless they opened day.PerDay of them since day.Start, when it
+// returns a *CardWaitError with the wait until the next midnight. The
+// player's row is locked, so that two draws at once are two draws, the
+// second waiting its turn. A player who turned on the card reminders, and
+// has opened the day's last, gets one for the next midnight.
+func (s *Store) DrawCard(ctx context.Context, userID int64, name string, roll CardRoll, day CardDay, now time.Time) (CardDraw, error) {
 	var draw CardDraw
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		player, err := lockCardPlayer(ctx, tx, userID, name)
 		if err != nil {
 			return err
 		}
-		if player.last != nil && every > 0 && now.Sub(*player.last) < every {
-			return &CardWaitError{Wait: every - now.Sub(*player.last)}
+		used := 0
+		if player.freeDay != nil && player.freeDay.Equal(day.Start) {
+			used = player.freeUsed
+		}
+		next := day.Start.AddDate(0, 0, 1)
+		if day.PerDay > 0 && used >= day.PerDay {
+			return &CardWaitError{Wait: next.Sub(now)}
 		}
 		if draw, err = giveCard(ctx, tx, userID, name, "", roll, player); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE card_players SET last_draw_at = $2 WHERE user_id = $1`, userID, now); err != nil {
+		if _, err := tx.Exec(ctx, `UPDATE card_players SET last_draw_at = $2, free_day = $3, free_used = $4 WHERE user_id = $1`,
+			userID, now, day.Start, used+1); err != nil {
 			return err
 		}
-		if every <= 0 {
+		draw.Free, draw.FreeLeft = true, max(0, day.PerDay-used-1)
+		if day.PerDay <= 0 || draw.FreeLeft > 0 {
 			return nil
 		}
-		// A player who asked to be reminded of every card is reminded of
-		// the next one, in place of the reminder this draw made stale.
+		// A player who asked to be reminded of every card is reminded when
+		// the next day's cards come, in place of the reminder this draw
+		// made stale.
 		_, err = tx.Exec(ctx, `
 			INSERT INTO reminders (chat_id, user_id, user_name, kind, language, due_at)
 			SELECT remind_chat_id, user_id, name, 'card', remind_language, $2
 			FROM card_players WHERE user_id = $1 AND remind_chat_id IS NOT NULL
 			ON CONFLICT (user_id) WHERE kind = 'card' AND claimed_at IS NULL DO UPDATE SET
 				chat_id = EXCLUDED.chat_id, user_name = EXCLUDED.user_name, message_id = 0,
-				language = EXCLUDED.language, due_at = EXCLUDED.due_at`, userID, now.Add(every))
+				language = EXCLUDED.language, due_at = EXCLUDED.due_at`, userID, next)
 		return err
 	})
 	var wait *CardWaitError
@@ -178,6 +204,8 @@ type cardPlayerRow struct {
 	last                        *time.Time
 	sinceLegendary, sinceMythic int
 	shards                      int
+	freeDay                     *time.Time
+	freeUsed                    int
 }
 
 // lockCardPlayer makes the player's row if there is none and locks it, so
@@ -189,14 +217,15 @@ func lockCardPlayer(ctx context.Context, tx pgx.Tx, userID int64, name string) (
 		ON CONFLICT (user_id) DO NOTHING`, userID, name); err != nil {
 		return p, err
 	}
-	err := tx.QueryRow(ctx, `SELECT last_draw_at, since_legendary, since_mythic, shards FROM card_players WHERE user_id = $1 FOR UPDATE`, userID).
-		Scan(&p.last, &p.sinceLegendary, &p.sinceMythic, &p.shards)
+	err := tx.QueryRow(ctx, `SELECT last_draw_at, since_legendary, since_mythic, shards, free_day, free_used FROM card_players WHERE user_id = $1 FOR UPDATE`, userID).
+		Scan(&p.last, &p.sinceLegendary, &p.sinceMythic, &p.shards, &p.freeDay, &p.freeUsed)
 	return p, err
 }
 
 // giveCard gives the player a card of the rarity roll picks, at random, of
-// collection or of any when it is "", and counts it in their points, cards
-// and wait for a rare card.
+// collection or of any when it is "", and counts it in their wait for a
+// rare card, and in their points and cards when it is new to them: a copy
+// of a card held adds no points.
 func giveCard(ctx context.Context, tx pgx.Tx, userID int64, name, collection string, roll CardRoll, player cardPlayerRow) (CardDraw, error) {
 	var draw CardDraw
 	rarity, guaranteed := roll(player.sinceLegendary, player.sinceMythic)
@@ -216,9 +245,9 @@ func giveCard(ctx context.Context, tx pgx.Tx, userID int64, name, collection str
 		return draw, err
 	}
 	draw.New = draw.Count == 1
-	newCard := 0
+	newCard, gained := 0, 0
 	if draw.New {
-		newCard = 1
+		newCard, gained = 1, c.Value
 	}
 	err = tx.QueryRow(ctx, `
 		UPDATE card_players SET name = coalesce(nullif($4, ''), name), points = points + $2,
@@ -226,7 +255,7 @@ func giveCard(ctx context.Context, tx pgx.Tx, userID int64, name, collection str
 			since_legendary = CASE WHEN $5 THEN 0 ELSE since_legendary + 1 END,
 			since_mythic = CASE WHEN $6 THEN 0 ELSE since_mythic + 1 END
 		WHERE user_id = $1 RETURNING points, since_legendary, since_mythic, shards`,
-		userID, c.Value, newCard, name, c.Rarity >= legendaryRarity, c.Rarity >= mythicRarity).
+		userID, gained, newCard, name, c.Rarity >= legendaryRarity, c.Rarity >= mythicRarity).
 		Scan(&draw.Points, &draw.SinceLegendary, &draw.SinceMythic, &draw.Shards)
 	return draw, err
 }
@@ -320,13 +349,16 @@ func (s *Store) CardCatalog(ctx context.Context) ([]Card, error) {
 	return catalog, nil
 }
 
-// CardPlayerOf is the player's points and cards held, and when they last
-// drew one; zero for one who never did.
+// CardPlayerOf is the player's points and cards held, the day's free cards
+// they opened, and when they last drew one; zero for one who never did.
 func (s *Store) CardPlayerOf(ctx context.Context, userID int64) (CardPlayer, time.Time, error) {
 	p := CardPlayer{UserID: userID}
-	var last *time.Time
-	err := s.pool.QueryRow(ctx, `SELECT name, points, cards, last_draw_at, auto_draw FROM card_players WHERE user_id = $1`, userID).
-		Scan(&p.Name, &p.Points, &p.Cards, &last, &p.Auto)
+	var last, freeDay *time.Time
+	err := s.pool.QueryRow(ctx, `SELECT name, points, cards, last_draw_at, auto_draw, free_day, free_used FROM card_players WHERE user_id = $1`, userID).
+		Scan(&p.Name, &p.Points, &p.Cards, &last, &p.Auto, &freeDay, &p.FreeUsed)
+	if freeDay != nil {
+		p.FreeDay = *freeDay
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return p, time.Time{}, nil
 	}

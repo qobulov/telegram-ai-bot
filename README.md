@@ -864,7 +864,7 @@ or in a group (`internal/tools/reminders.go`, the `reminders` tool):
 - "eslatmalarim", "qanday eslatmalarim bor?": the ones waiting; "2-sini
   bekor qil": cancels one.
 - "karta ochish vaqti kelganda eslat": a reminder at the player's next
-  [Kartalar](#kartalar) draw, their last draw and an hour after, with the
+  [Kartalar](#kartalar) draw, the next midnight once the day's free cards are opened, with the
   Mini App's button; one who may open a card now is told so. "har safar
   eslat" turns on a reminder after every card: each draw, from `/card`
   or the Mini App, schedules the next one (`DrawCard`, kept on
@@ -2112,11 +2112,16 @@ play sent sooner than its chops took.
 
 ### Kartalar
 
-`/card` draws an anime card, one an hour, owners' too (in a private chat
-the word "karta" does too). The cards are AniList's 500 most loved
+`/card` draws an anime card, three free a day, the day starting at midnight
+in Tashkent, owners' too (in a private chat the word "karta" does too); the
+fourth is told how long until midnight (`card_players.free_day` and
+`free_used`, migration 73). The cards are AniList's 500 most loved
 characters, fetched the first time a card is drawn (`internal/cards`, kept in
-`card_catalog`, migration 52), the most loved the rarest: 15 👑 Mifik, 30 🔥
-Afsonaviy, 45 💜 Epik, 60 🔷 Noyob and the other 350 ⚪ Oddiy. A larger
+`card_catalog`, migration 52), the most loved the rarest, in proportion: 25
+👑 Mifik (5%), 50 🔥 Afsonaviy (10%), 100 💜 Epik (20%), 150 🔷 Noyob (30%)
+and the other 176 ⚪ Oddiy. The tiers were cut for 200 cards until migration
+73, which left the 301 added later all Oddiy; it tiered the 501 again by
+rank, each card's numbers its new rarity's. A larger
 catalog adds only the characters it lacks: a card there keeps its rarity and
 numbers, as players hold it, however AniList's ranks have moved. A draw first draws a
 rarity, by odds of 1.5%, 6.5%, 14%, 28% and 50%, then a card of it at random,
@@ -2126,7 +2131,8 @@ sharper one from MyAnimeList, 450 by 700, chosen by hand and kept in
 characters, their rarity and the table stay AniList's) with its anime, attack
 and health, the same
 each time for the same character, and the points it is worth (5000, 2000,
-800, 300 or 100), which add up, a card drawn again too. A long wait ends in a
+800, 300 or 100), each card counted once: a copy of a card held adds no
+points, and migration 73 counted every player's points again so. A long wait ends in a
 rare card for sure: a player's 30th draw in a row without a Legendary or
 better is one, and their 100th without a Mythic is one, the draw saying so and
 each card telling in how many draws the next sure ones are, in the chat and the
@@ -2140,17 +2146,18 @@ points, so its spare copies melt into 💎 crystals in the Mini App's draw tab
 counted in the points so that melting costs no place on the table
 (`card_owned.melted`, migration 63); the melt is asked once more, listing
 each card's spares and the crystals they make, as melted copies can no
-longer be given. The Mini App's draw tab holds the crystals, and under the hourly
-card's button opens a card now for 15 of them (`extra`), by the usual odds
-and sure cards, the hourly card left where it was. (`extra` also takes a
+longer be given. The Mini App's draw tab holds the crystals, and under the free
+cards' button opens a card now for 15 of them (`extra`), by the usual odds
+and sure cards, the day's free cards left as they were. (`extra` also takes a
 `set`, a collection to draw from for 20, which no page offers now.) Crystals live in the Mini App alone: the bot has no
 commands for them.
 `/autocard`, or the switch on the Mini App's draw tab (`auto`), turns on a player's auto opener, or off again, each player for
 themselves and free (`card_players.auto_draw`, migration 65): each minute's
-call to `/api/reminders`, or the long-polling ticker, first opens the card of
-every player with it on whose card is ready, and sends it to their private
-chat without a sound, with the Mini App's button, in the language they turned
-it on in. The draw checks the hour again under the player's lock, so that
+call to `/api/reminders`, or the long-polling ticker, first opens a card for
+every player with it on who has a free card left today, one a call, so that
+the day's three come a minute apart, and sends it to their private chat
+without a sound, with the Mini App's button, in the language they turned it
+on in. The draw counts the day's cards again under the player's lock, so that
 overlapping calls open one card; a player the bot may not write to (blocked,
 never started) keeps the card and has the opener turned off. A card reminder
 of a card it opened is skipped as too soon. The endpoint's `opened` counts
