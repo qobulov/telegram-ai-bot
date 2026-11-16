@@ -32,14 +32,6 @@ func TestCardsPassBetweenPlayers(t *testing.T) {
 		return
 	}
 
-	found, err := store.HeldCardsNamed(ctx, 1, "LEV", 5)
-	if err != nil || len(found) != 1 || found[0].ID != 20 {
-		t.Fatalf("found = %+v, %v", found, err)
-	}
-	if found, _ = store.HeldCardsNamed(ctx, 1, "%", 5); len(found) != 0 {
-		t.Errorf("a %% matched %+v", found)
-	}
-
 	players, err := store.CardPlayersNamed(ctx, "", 1, 10)
 	if err != nil || len(players) != 1 || players[0].Name != "Bob" {
 		t.Fatalf("players but Alice, who have drawn = %+v, %v", players, err)
@@ -93,46 +85,6 @@ func TestCardsPassBetweenPlayers(t *testing.T) {
 	}
 	if err := store.GiveCard(ctx, -100, 2, 1, 30, rules); !errors.Is(err, ErrCardNotHeld) {
 		t.Errorf("a card not held = %v", err)
-	}
-
-	// Bob offers a Levi for Alice's Naruto.
-	id, err := store.OfferCardTrade(ctx, -100, 2, 1, 20, 30, rules.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := store.AcceptCardTrade(ctx, id, 2, rules); !errors.Is(err, ErrCardTradeOver) {
-		t.Errorf("accepted by the one who offered = %v", err)
-	}
-	if _, err := store.AcceptCardTrade(ctx, id, 1, rules); !errors.As(err, &limit) || limit.UserID != 1 {
-		t.Errorf("Alice at her limit = %v", err)
-	}
-	rules.Now = rules.Now.Add(time.Hour)
-	rules.Limit = 5
-	trade, err := store.AcceptCardTrade(ctx, id, 1, rules)
-	if err != nil || trade.Give.Name != "Levi" || trade.Take.Name != "Naruto Uzumaki" {
-		t.Fatalf("trade = %+v, %v", trade, err)
-	}
-	if c, _ := held(1, 20); c != 3 {
-		t.Errorf("Alice's Levi back = %d", c)
-	}
-	if c, _ := held(2, 30); c != 1 {
-		t.Errorf("Bob's Naruto = %d", c)
-	}
-	if _, err := store.AcceptCardTrade(ctx, id, 1, rules); !errors.Is(err, ErrCardTradeOver) {
-		t.Errorf("accepted twice = %v", err)
-	}
-	off, err := store.OfferCardTrade(ctx, -100, 2, 1, 30, 20, rules.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if ok, err := store.CallOffCardTrade(ctx, off, 3); err != nil || ok {
-		t.Errorf("called off by a stranger = %v, %v", ok, err)
-	}
-	if ok, err := store.CallOffCardTrade(ctx, off, 1); err != nil || !ok {
-		t.Errorf("called off = %v, %v", ok, err)
-	}
-	if _, err := store.AcceptCardTrade(ctx, off, 1, rules); !errors.Is(err, ErrCardTradeOver) {
-		t.Errorf("a trade called off accepted = %v", err)
 	}
 }
 
@@ -227,43 +179,27 @@ func TestTradesAreEvenAndOnceADayAPair(t *testing.T) {
 	now := time.Now()
 	rules := CardTradeRules{Limit: 10, Day: 24 * time.Hour, Now: now}
 	market := CardMarketRules{Open: 5, Keep: 7 * 24 * time.Hour, Now: now}
-	if _, err := store.OfferCardTrade(ctx, -1, 1, 2, 30, 40, now); !errors.Is(err, ErrCardTradeUneven) {
-		t.Errorf("a Common for a Legendary offered = %v", err)
-	}
 	if _, err := store.OfferCard(ctx, 1, 30, 10, market); !errors.Is(err, ErrCardTradeUneven) {
 		t.Errorf("a Common put up for a Mythic = %v", err)
 	}
 	// A Mythic for a Legendary is one rarity apart: done once, not twice.
-	first, err := store.OfferCardTrade(ctx, -1, 1, 2, 10, 40, now)
+	goku, err := store.OfferCard(ctx, 1, 10, 40, market)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.AcceptCardTrade(ctx, first, 2, rules); err != nil {
-		t.Fatalf("Goku for Kakashi = %v", err)
+	if _, err := store.TakeCardOffer(ctx, goku, 2, rules, market.Keep); err != nil {
+		t.Fatalf("Bob taking Goku for Kakashi = %v", err)
 	}
-	second, err := store.OfferCardTrade(ctx, -1, 2, 1, 20, 20, now)
+	// Bob puts his Vegeta up for a Kakashi, which Alice now holds.
+	vegeta, err := store.OfferCard(ctx, 2, 20, 40, market)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.AcceptCardTrade(ctx, second, 1, rules); !errors.Is(err, ErrCardPairLimit) {
-		t.Errorf("a second trade the same day, the other way round = %v", err)
-	}
-	offer, err := store.OfferCard(ctx, 2, 20, 40, market)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := store.TakeCardOffer(ctx, offer, 1, rules, market.Keep); !errors.Is(err, ErrCardPairLimit) {
+	if _, err := store.TakeCardOffer(ctx, vegeta, 1, rules, market.Keep); !errors.Is(err, ErrCardPairLimit) {
 		t.Errorf("Alice taking Bob's offer the same day = %v", err)
 	}
-	if _, err := store.TakeCardOffer(ctx, offer, 3, rules, market.Keep); err != nil {
-		t.Errorf("Carol taking it = %v", err)
-	}
 	rules.Now = now.Add(25 * time.Hour)
-	third, err := store.OfferCardTrade(ctx, -1, 1, 2, 20, 20, rules.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := store.AcceptCardTrade(ctx, third, 2, rules); err != nil {
-		t.Errorf("the next day = %v", err)
+	if _, err := store.TakeCardOffer(ctx, vegeta, 1, rules, market.Keep); err != nil {
+		t.Errorf("Alice taking it the next day = %v", err)
 	}
 }

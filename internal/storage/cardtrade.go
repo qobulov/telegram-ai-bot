@@ -63,26 +63,6 @@ type CardTradeRules struct {
 	Now   time.Time
 }
 
-// HeldCardsNamed are the player's cards whose name holds name, in any case,
-// the one so named first, then the rarest; at most limit.
-func (s *Store) HeldCardsNamed(ctx context.Context, userID int64, name string, limit int) ([]Card, error) {
-	name = strings.TrimSpace(name)
-	rows, err := s.pool.Query(ctx, `
-		SELECT c.id, c.name, c.anime, c.image_url, c.favourites, c.rarity, c.attack, c.health, c.value, c.collection
-		FROM card_owned o JOIN card_catalog c ON c.id = o.card_id
-		WHERE o.user_id = $1 AND c.name ILIKE $2
-		ORDER BY lower(c.name) = lower($3) DESC, c.rarity DESC, c.favourites DESC
-		LIMIT $4`, userID, "%"+likeMarks.Replace(name)+"%", name, limit)
-	if err != nil {
-		return nil, fmt.Errorf("storage: find a player's card: %w", err)
-	}
-	cards, err := pgx.CollectRows(rows, scanCard)
-	if err != nil {
-		return nil, fmt.Errorf("storage: find a player's card: %w", err)
-	}
-	return cards, nil
-}
-
 // CardPlayersNamed are the players whose name or @username holds name, in
 // any case, who have opened a card, all but except, the most points first;
 // at most limit. An empty name finds them all. A player's username is the one
@@ -140,66 +120,6 @@ func (s *Store) GiveCard(ctx context.Context, chatID, from, to, cardID int64, ru
 		return err
 	})
 	return tradeError("give a card", err)
-}
-
-// OfferCardTrade records an offer of a trade, open until the other player
-// accepts it or either calls it off, and gives its ID.
-func (s *Store) OfferCardTrade(ctx context.Context, chatID, from, to, give, take int64, now time.Time) (int64, error) {
-	if err := checkEven(ctx, s.pool, give, take); err != nil {
-		return 0, tradeError("offer a card trade", err)
-	}
-	var id int64
-	err := s.pool.QueryRow(ctx, `
-		INSERT INTO card_trades (chat_id, from_id, to_id, give_card, take_card, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`, chatID, from, to, give, take, now).Scan(&id)
-	if err != nil {
-		return 0, fmt.Errorf("storage: offer a card trade: %w", err)
-	}
-	return id, nil
-}
-
-// AcceptCardTrade does the open trade for by, the player it was offered to:
-// each gives the other their card with its points.
-func (s *Store) AcceptCardTrade(ctx context.Context, id, by int64, rules CardTradeRules) (CardTrade, error) {
-	var trade CardTrade
-	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		var created time.Time
-		err := tx.QueryRow(ctx, `
-			SELECT from_id, to_id, give_card, take_card, created_at FROM card_trades
-			WHERE id = $1 AND status = 'open' AND take_card IS NOT NULL AND to_id IS NOT NULL FOR UPDATE`, id).
-			Scan(&trade.From, &trade.To, &trade.Give.ID, &trade.Take.ID, &created)
-		if errors.Is(err, pgx.ErrNoRows) || (err == nil && (trade.To != by || rules.Now.Sub(created) > rules.Day)) {
-			return ErrCardTradeOver
-		}
-		if err != nil {
-			return err
-		}
-		trade.ID = id
-		if err := lockTraders(ctx, tx, trade.From, trade.To); err != nil {
-			return err
-		}
-		for _, giver := range []int64{trade.From, trade.To} {
-			if err := checkGiveLimit(ctx, tx, giver, rules); err != nil {
-				return err
-			}
-		}
-		if err := moveCard(ctx, tx, trade.From, trade.To, trade.Give.ID, false); err != nil {
-			return err
-		}
-		if err := moveCard(ctx, tx, trade.To, trade.From, trade.Take.ID, false); err != nil {
-			return err
-		}
-		// Checked once the cards are known to be held, in the transaction
-		// that a refusal rolls back.
-		if err := checkFair(ctx, tx, trade, rules); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, `UPDATE card_trades SET status = 'done', done_at = $2 WHERE id = $1`, id, rules.Now); err != nil {
-			return err
-		}
-		return readCards(ctx, tx, &trade.Give, &trade.Take)
-	})
-	return trade, tradeError("accept a card trade", err)
 }
 
 // CallOffCardTrade calls off the open trade, by either of its players, and

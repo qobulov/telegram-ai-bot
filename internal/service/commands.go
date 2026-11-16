@@ -845,8 +845,6 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.cardTop(ctx, in)
 	case s.opts.Cards != nil && s.opts.Buttons != nil && commandName(in.text) == "/duel":
 		return s.duelCommand(ctx, in)
-	case s.opts.Cards != nil && s.opts.Buttons != nil && commandName(in.text) == "/trade":
-		return s.tradeCardCommand(ctx, in)
 	case commandName(in.text) == "/announce" && !in.group && s.opts.Tools != nil && s.isOwner(in.msg.From):
 		return s.announceCommand(ctx, in)
 	case !in.group && s.opts.Tools != nil && s.opts.Buttons != nil && s.isOwner(in.msg.From) && pressed(in, keyboardAd):
@@ -1091,10 +1089,6 @@ func (s *Service) pressed(q *telegram.CallbackQuery) {
 	}
 	if strings.HasPrefix(q.Data, duelData) {
 		s.pressedDuel(q)
-		return
-	}
-	if strings.HasPrefix(q.Data, tradeData) {
-		s.pressedTrade(q)
 		return
 	}
 	if strings.HasPrefix(q.Data, cardData) {
@@ -1782,6 +1776,15 @@ func (s *Service) refuseUnlessManager(ctx context.Context, in incoming) string {
 		return textAdminsOnly
 	}
 	return ""
+}
+
+// commandArgument is what follows the command's name.
+func commandArgument(text string) string {
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(text), words[0]))
 }
 
 // commandName extracts the command from text such as "/Help@my_bot extra",
