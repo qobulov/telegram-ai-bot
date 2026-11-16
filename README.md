@@ -2122,8 +2122,9 @@ characters anime fans at large know, not today's votes, chosen by hand in
 `internal/cards` (`mythicIDs`, `legendaryIDs`): the 25 Mifik the leads of the
 best known series (Son Goku, Naruto, Luffy, Ichigo, Eren, Edward Elric, Light,
 Tanjiro, Saitama, Deku, Gon, Itadori, Spike, Shinji, Lelouch, Jotaro, Kaneki,
-Denji, Guts, Gintoki, Natsu, Asta, Yusuke, Mob, Hanamichi, Meliodas, and Mikasa,
-the first of the women, migration 76) and the 50 Afsonaviy
+Denji, Guts, Gintoki, Natsu, Asta, Yusuke, Mob, Hanamichi, Meliodas, and the
+women Mikasa, Maomao and Frieren, migration 76, which also brought in
+Firefly Wedding's Satoko Kirigaya as Epik) and the 50 Afsonaviy
 their legendary rivals and companions (Vegeta, Sasuke, Kakashi, Itachi, Levi,
 L, Zoro, Killua, Gojo…) and other well known leads (Frieren, Thorfinn,
 Rimuru…); the rest go by rank among AniList's most loved, never above Epik:

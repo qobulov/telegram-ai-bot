@@ -54,7 +54,7 @@ func TestChosenRarities(t *testing.T) {
 	if RarityOf(88572, 7) != Epic || RarityOf(99999, 400) != Common {
 		t.Errorf("Emilia at 7 = %v, an unknown at 400 = %v", RarityOf(88572, 7), RarityOf(99999, 400))
 	}
-	if len(mythicIDs) != 27 || len(legendaryIDs) != 51 || len(epicIDs) != 7 {
+	if len(mythicIDs) != 29 || len(legendaryIDs) != 50 || len(epicIDs) != 8 {
 		t.Errorf("chosen %d Mythic and %d Legendary", len(mythicIDs), len(legendaryIDs))
 	}
 }
