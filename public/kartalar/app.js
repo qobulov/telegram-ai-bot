@@ -660,8 +660,7 @@
     box.style.setProperty("--c", COLORS[card.rarity]);
     box.innerHTML = '<img alt=""><span><small></small><b></b></span>';
     picture(box.querySelector("img"), card.image);
-    // The tier and the points, so that a player sees what a trade is worth.
-    box.querySelector("small").replaceChildren(tierIcon(card.rarity), `${t.rarities[card.rarity]}${card.value ? ` · ${t.plus(spaced(card.value)).replace(/^\+/, "")}` : ""}`);
+    box.querySelector("small").replaceChildren(tierIcon(card.rarity), t.rarities[card.rarity]);
     box.querySelector("b").textContent = card.name;
     return box;
   }
