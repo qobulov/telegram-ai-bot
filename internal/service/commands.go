@@ -796,6 +796,9 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 	if s.isGroupOrder(in) {
 		return s.groupCommand(ctx, in)
 	}
+	if s.isCallOrder(in) {
+		return s.callCommand(ctx, in)
+	}
 	if s.opts.Tools != nil && s.isModCommand(in) {
 		return s.modCommand(ctx, in)
 	}
@@ -1083,6 +1086,10 @@ func (s *Service) pressed(q *telegram.CallbackQuery) {
 	}
 	if strings.HasPrefix(q.Data, teamsData) && s.opts.Teams != nil {
 		s.pressedTeams(q)
+		return
+	}
+	if strings.HasPrefix(q.Data, voteBanData) && s.opts.BanVotes != nil {
+		s.pressedBanVote(q)
 		return
 	}
 	if strings.HasPrefix(q.Data, announceData) {

@@ -22,6 +22,11 @@ func (s *Store) ChangeTeamLobby(ctx context.Context, chatID int64, change func(s
 	return s.changeState(ctx, "team_lobbies", chatID, change)
 }
 
+// ChangeBanVote changes a group's vote to ban a member, with its row locked.
+func (s *Store) ChangeBanVote(ctx context.Context, chatID int64, change func(state []byte) ([]byte, error)) error {
+	return s.changeState(ctx, "ban_votes", chatID, change)
+}
+
 // changeState changes the JSON state of a chat's row in table, one of the
 // games' tables named above, with the row locked; an error from change is
 // given back as it is.
