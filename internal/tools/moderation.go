@@ -270,6 +270,17 @@ type ModerationOptions struct {
 	Messages MessageLog
 	// Warns keeps members' warnings; without it warn is refused.
 	Warns WarnStore
+	// Ranks keeps the moderators' ranks: a member whose rank opens an
+	// action may ask for it without the Telegram right. Without it only
+	// Telegram's rights count.
+	Ranks RankBook
+}
+
+// RankBook keeps each group's moderators' ranks and the rank each command
+// needs there.
+type RankBook interface {
+	RankOf(ctx context.Context, chatID, userID int64) (int, error)
+	CommandRanks(ctx context.Context, chatID int64) (map[string]int, error)
 }
 
 // WarnStore keeps how many warnings each member has in a group.
@@ -790,7 +801,8 @@ func clampMinutes(minutes, byDefault, most int) int {
 // answer, the answer is no.
 func (m *Moderation) check(ctx context.Context, o order) error {
 	right := neededRight[o.action]
-	if err := m.checkRequester(ctx, o.caller, right); err != nil {
+	rank, err := m.checkAsker(ctx, o.caller, o.action, right)
+	if err != nil {
 		return err
 	}
 	if err := m.checkBot(ctx, o.caller.ChatID, right); err != nil {
@@ -798,6 +810,9 @@ func (m *Moderation) check(ctx context.Context, o order) error {
 	}
 	if !groupWide(o.action) {
 		if err := m.checkTarget(ctx, o); err != nil {
+			return err
+		}
+		if err := m.checkRankedTarget(ctx, o, rank); err != nil {
 			return err
 		}
 	}
@@ -1241,8 +1256,8 @@ func (m *Moderation) untilText(until time.Time) string {
 // "o'chirib tashla", "mute qilvor" and "заблокируй" count.
 var actionWords = map[string][]string{
 	actionDelete: {"ochir", "delete", "del ", "sil", "olib tashla", "yoq qil", "удал", "сотри"},
-	actionMute:   {"mute", "myut", "мут", "мют", "ovozsiz", "jim qil", "yozolmasin", "yoza olmasin", "yozmasin", "yozdirma", "заглуш", "молч", "readonly", "read only"},
-	actionUnmute: {"mute", "мут", "мют", "ovozsiz", "yozsin", "yoza olsin", "ochib qoy", "ochvor", "разреш"},
+	actionMute:   {"mute", "mut ", "myut", "мут", "мют", "ovozsiz", "jim qil", "yozolmasin", "yoza olmasin", "yozmasin", "yozdirma", "заглуш", "молч", "readonly", "read only"},
+	actionUnmute: {"mute", "mut ", "мут", "мют", "ovozsiz", "yozsin", "yoza olsin", "ochib qoy", "ochvor", "разреш"},
 	actionBan:    {"ban", "бан", "blok", "chiqar", "hayda", "kick", "кик", "выгн", "выкин", "заблок"},
 	actionUnban:  {"ban", "бан", "blok", "qaytar", "верн", "разблок"},
 	actionKick:   {"kick", "кик", "chiqar", "hayda", "выгн", "выкин", "удали из"},

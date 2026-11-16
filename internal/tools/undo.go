@@ -124,7 +124,7 @@ func (m *Moderation) undo(ctx context.Context, caller Caller, force bool) (any, 
 		return nil, internal(err)
 	}
 	right := neededRight[last.Action]
-	if err := m.checkRequester(ctx, caller, right); err != nil {
+	if _, err := m.checkAsker(ctx, caller, actionUndo, right); err != nil {
 		return nil, err
 	}
 	if err := m.checkBot(ctx, caller.ChatID, right); err != nil {

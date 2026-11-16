@@ -182,7 +182,9 @@ type Options struct {
 	Invites InviteBook
 	// Teams keeps the groups' MLBB team lobbies, for /teams; nil turns it
 	// off.
-	Teams  TeamLobbyBook
+	Teams TeamLobbyBook
+	// Ranks keeps the moderators' ranks, 1 to 5; nil turns them off.
+	Ranks  RankBook
 	Logger *slog.Logger
 	// Model is the model name shown by /model.
 	Model string
