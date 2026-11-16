@@ -14,7 +14,7 @@
       drawNow: "Karta olish", drawing: "Ochilmoqda…", next: (t) => `Keyingi karta: ${t}`, ready: "Karta tayyor!",
      
       extraDraw: (c) => `💎 ${c} bilan hozir karta ochish`, extraNeed: (n) => `💎 Kristal bilan ochish uchun yana ${n} kerak`, shardsTitle: "Kristallar", melt: (n, w) => `♻️ ${n} ta takrorni aylantirish → +${w} 💎`, noSpare: "♻️ Aylantirish uchun takror karta yo'q", fewShards: (n, h) => `💎 Kerak: ${n}, sizda: ${h}`, melted: (n, g) => `♻️ ${n} ta karta → +${g} 💎`, shardsHint: "Takror kartalar kristalga aylanadi, ochko va reyting kamaymaydi. Kristal bilan kutmasdan karta oching yoki duelda tiking.", ratesLabel: "1 ta takror:", meltTitle: "Kristalga aylantirish", meltWarn: "Bu nusxalarni keyin sovg'a qilib bo'lmaydi. Har kartaning bittasi kolleksiyada qoladi.", meltDo: (w) => `♻️ Aylantirish · +${w} 💎`, cancel: "Bekor qilish",
-      tomorrow: "⏳ Yangi kartalar ertaga", noPoints: "ochko qo'shilmaydi", freeLeft: (n, of) => `🎴 Bugungi tekin kartalar: ${n}/${of}`,
+      tokenDraw: (n) => `🎟 Token bilan ochish · ${n} ta`, noTokens: "🎟 Tokeningiz qolmadi", tomorrow: "⏳ Yangi kartalar ertaga", noPoints: "ochko qo'shilmaydi", freeLeft: (n, of) => `🎴 Bugungi tekin kartalar: ${n}/${of}`,
       fresh: "🆕 Yangi karta!", again: (n) => `🔁 Sizda endi ×${n}`, plus: (n) => `+${n} ochko`,
       attack: "Hujum", health: "Jon", value: "Ochko", cards: (n) => `${n} karta`, pts: "ochko",
       none: "Hech narsa topilmadi", noTop: "Hali hech kim karta olmagan",
@@ -42,7 +42,7 @@
       drawNow: "Получить карту", drawing: "Открываем…", next: (t) => `Следующая карта: ${t}`, ready: "Карта готова!",
      
       extraDraw: (c) => `💎 Открыть карту сейчас за ${c}`, extraNeed: (n) => `💎 Чтобы открыть за кристаллы, нужно ещё ${n}`, shardsTitle: "Кристаллы", melt: (n, w) => `♻️ Расплавить повторы: ${n} → +${w} 💎`, noSpare: "♻️ Повторных карт нет", fewShards: (n, h) => `💎 Нужно: ${n}, у вас: ${h}`, melted: (n, g) => `♻️ ${n} карт → +${g} 💎`, shardsHint: "Повторы становятся кристаллами, очки и рейтинг не уменьшаются. За кристаллы — карта без ожидания или ставка в дуэли.", ratesLabel: "1 повтор:", meltTitle: "Расплавить в кристаллы", meltWarn: "Эти копии потом нельзя будет подарить. По одной карте каждого вида останется в коллекции.", meltDo: (w) => `♻️ Расплавить · +${w} 💎`, cancel: "Отмена",
-      tomorrow: "⏳ Новые карты завтра", noPoints: "очки не добавляются", freeLeft: (n, of) => `🎴 Бесплатные карты сегодня: ${n}/${of}`,
+      tokenDraw: (n) => `🎟 Открыть за токен · ${n}`, noTokens: "🎟 Токены закончились", tomorrow: "⏳ Новые карты завтра", noPoints: "очки не добавляются", freeLeft: (n, of) => `🎴 Бесплатные карты сегодня: ${n}/${of}`,
       fresh: "🆕 Новая карта!", again: (n) => `🔁 Теперь у вас ×${n}`, plus: (n) => `+${n} очков`,
       attack: "Атака", health: "Жизнь", value: "Очки", cards: (n) => `${n} карт`, pts: "очков",
       none: "Ничего не найдено", noTop: "Ещё никто не получил карту",
@@ -70,7 +70,7 @@
       drawNow: "Draw a card", drawing: "Opening…", next: (t) => `Next card in ${t}`, ready: "A card is ready!",
      
       extraDraw: (c) => `💎 Open a card now for ${c}`, extraNeed: (n) => `💎 ${n} more crystals to open one now`, shardsTitle: "Crystals", melt: (n, w) => `♻️ Melt ${n} spares → +${w} 💎`, noSpare: "♻️ No spare cards to melt", fewShards: (n, h) => `💎 It takes ${n}, you have ${h}`, melted: (n, g) => `♻️ ${n} cards → +${g} 💎`, shardsHint: "Spares melt into crystals; your points and ranking stay. Crystals open a card without the wait or make a duel's stake.", ratesLabel: "1 spare:", meltTitle: "Melt into crystals", meltWarn: "These copies cannot be given afterwards. One of each card stays in your collection.", meltDo: (w) => `♻️ Melt · +${w} 💎`, cancel: "Cancel",
-      tomorrow: "⏳ New cards tomorrow", noPoints: "no points added", freeLeft: (n, of) => `🎴 Free cards today: ${n}/${of}`,
+      tokenDraw: (n) => `🎟 Open with a token · ${n} left`, noTokens: "🎟 No tokens left", tomorrow: "⏳ New cards tomorrow", noPoints: "no points added", freeLeft: (n, of) => `🎴 Free cards today: ${n}/${of}`,
       fresh: "🆕 A new card!", again: (n) => `🔁 You now have ×${n}`, plus: (n) => `+${n} points`,
       attack: "Attack", health: "Life", value: "Points", cards: (n) => `${n} cards`, pts: "points",
       none: "Nothing found", noTop: "Nobody has drawn a card yet",
@@ -107,7 +107,7 @@
   const haptic = (kind) => { try { tg.HapticFeedback.impactOccurred(kind); } catch (_) { /* outside Telegram */ } };
 
   let cards = [], points = 0, nextAt = 0, freeLeft = 0, perDay = 2, drawing = false, query = "", opened = "", chosenSet = "";
-  let shards = 0, spare = 0, spareWorth = 0, extraCost = 15;
+  let shards = 0, spare = 0, spareWorth = 0, extraCost = 15, tokens = 0;
 
   // ---------- server ----------
 
@@ -154,6 +154,7 @@
     spare = data.spare || 0;
     spareWorth = data.spare_worth || 0;
     extraCost = data.extra_cost || extraCost;
+    tokens = data.tokens || 0;
     shardsPanel();
     notice(null);
     header();
@@ -514,6 +515,9 @@
     $("melt").disabled = drawing || !spare;
     $("extraDraw").textContent = shards >= extraCost ? t.extraDraw(extraCost) : t.extraNeed(extraCost - shards);
     $("extraDraw").disabled = drawing || shards < extraCost;
+    $("tokenDraw").hidden = !tokens;
+    $("tokenDraw").textContent = t.tokenDraw(tokens);
+    $("tokenDraw").disabled = drawing || !tokens;
   }
 
   // The melt is asked once more, with what goes: the spare copies, by card,
@@ -563,11 +567,16 @@
   });
 
 
+  // A card may be opened for a token, the day's free ones left as they were.
+  $("tokenDraw").addEventListener("click", () => {
+    if (tokens) reveal("token");
+  });
+
   $("draw").addEventListener("click", () => {
     if (Date.now() >= nextAt) reveal("draw");
   });
 
-  // reveal draws a card, a free one of the day's or one for shards, and turns it.
+  // reveal draws a card, a free one of the day's or one for a token or shards, and turns it.
   async function reveal(action) {
     if (drawing) return;
     drawing = true;
@@ -581,6 +590,12 @@
     haptic("medium");
     try {
       const data = await api(action);
+      if (data.no_tokens) {
+        tokens = 0;
+        toast(t.noTokens);
+        flip.classList.remove("shuffle");
+        return;
+      }
       if (data.wait || data.need) {
         if (data.wait) nextAt = Date.now() + data.wait;
         if (data.need) { shards = data.have; toast(t.fewShards(data.need, data.have)); }
@@ -609,6 +624,7 @@
       if (data.next_in !== undefined) nextAt = Date.now() + data.next_in;
       if (data.free_left !== undefined) freeLeft = data.free_left;
       if (data.shards !== undefined) shards = data.shards;
+      if (data.tokens !== undefined) tokens = data.tokens;
       if (card.count > 1) { spare += 1; spareWorth += [1, 3, 8, 20, 50][card.rarity] || 0; }
       const i = cards.findIndex((c) => c.id === card.id);
       // A copy drawn again is one more spare, which may be given or melted.

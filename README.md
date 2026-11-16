@@ -2161,6 +2161,10 @@ cards' button opens a card now for 15 of them (`extra`), by the usual odds
 and sure cards, the day's free cards left as they were. (`extra` also takes a
 `set`, a collection to draw from for 20, which no page offers now.) Crystals live in the Mini App alone: the bot has no
 commands for them.
+A player's 🎟 tokens (`card_players.tokens`, migration 80) each open one card
+(`token`), by the usual odds, the day's free cards left as they were; the
+draw tab shows the button only while the player has tokens. Players got them
+at the reset, by their points; nothing else gives them yet.
 Kartalar had an auto opener (`/autocard`, migration 65) that opened each
 player's cards and sent them to their private chat; the owners took it out,
 and migration 74 drops its columns: players open the day's cards themselves.

@@ -208,3 +208,34 @@ func TestTradesAreEvenAndFiveADayAPair(t *testing.T) {
 		t.Errorf("the sixth the next day = %v", err)
 	}
 }
+
+// A token opens a card and is spent, the day's free cards untouched; with
+// none left nothing is drawn.
+func TestATokenOpensACard(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	for _, q := range []string{
+		`INSERT INTO card_catalog (id, name, rarity, attack, health, value) VALUES (10, 'Goku', 4, 1, 1, 4000)`,
+		`INSERT INTO card_players (user_id, name, tokens) VALUES (1, 'Alice', 1)`,
+	} {
+		if _, err := store.pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	roll := func(int, int) (int, bool) { return 4, false }
+	if tokens, err := store.CardTokens(ctx, 1); err != nil || tokens != 1 {
+		t.Fatalf("tokens = %d, %v", tokens, err)
+	}
+	draw, err := store.TokenCard(ctx, 1, "Alice", roll)
+	if err != nil || draw.Tokens != 0 || draw.Card.ID != 10 || !draw.New || draw.Points != 4000 {
+		t.Fatalf("a card for a token = %+v, %v", draw, err)
+	}
+	if _, err := store.TokenCard(ctx, 1, "Alice", roll); !errors.Is(err, ErrNoTokens) {
+		t.Errorf("a card with no token = %v", err)
+	}
+	var count int
+	_ = store.pool.QueryRow(ctx, `SELECT count FROM card_owned WHERE user_id = 1 AND card_id = 10`).Scan(&count)
+	if count != 1 {
+		t.Errorf("Goku held %d times", count)
+	}
+}

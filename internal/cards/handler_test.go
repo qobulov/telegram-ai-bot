@@ -47,6 +47,7 @@ type fakeStore struct {
 	used    int
 	draws   int
 	shards  int
+	tokens  int
 	gifts   []int64 // the card, then the player, of each gift
 	giftErr error
 	offers  []storage.CardOffer
@@ -101,6 +102,15 @@ func (f *fakeStore) ExtraCard(_ context.Context, _ int64, _, collection string, 
 	card := heldCard
 	card.Collection = cmp.Or(collection, card.Collection)
 	return storage.CardDraw{Card: card, Count: 4, Points: 20000, Shards: f.shards}, nil
+}
+
+func (f *fakeStore) CardTokens(context.Context, int64) (int, error) { return f.tokens, nil }
+func (f *fakeStore) TokenCard(context.Context, int64, string, storage.CardRoll) (storage.CardDraw, error) {
+	if f.tokens == 0 {
+		return storage.CardDraw{}, storage.ErrNoTokens
+	}
+	f.tokens--
+	return storage.CardDraw{Card: heldCard, Count: 4, Points: 20000, Tokens: f.tokens}, nil
 }
 
 func (f *fakeStore) CardPlayersNamed(_ context.Context, name string, except int64, _ int) ([]storage.CardPlayer, error) {
@@ -368,5 +378,25 @@ func TestTheCardMarket(t *testing.T) {
 	call(7, map[string]any{"action": "offer", "card": 1, "want": 2})
 	if out := call(7, map[string]any{"action": "unoffer", "offer": 1}); len(out["offers"].([]any)) != 0 {
 		t.Errorf("market after calling off = %v", out)
+	}
+}
+
+// The page shows the player's tokens, opens a card for each, and says so
+// when none is left.
+func TestTokensInTheMiniApp(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	store := &fakeStore{tokens: 2}
+	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }})
+	initData := signedInit(7, now)
+	if code, out := post(t, h, initData, "state"); code != 200 || out["tokens"] != 2.0 {
+		t.Fatalf("state = %d %v", code, out)
+	}
+	for want := 1.0; want >= 0; want-- {
+		if code, out := post(t, h, initData, "token"); code != 200 || out["tokens"] != want || out["card"] == nil {
+			t.Fatalf("a card for a token = %d %v", code, out)
+		}
+	}
+	if code, out := post(t, h, initData, "token"); code != 200 || out["no_tokens"] != true || out["card"] != nil {
+		t.Errorf("a card with no tokens = %d %v", code, out)
 	}
 }

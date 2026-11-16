@@ -38,8 +38,10 @@ type CardDraw struct {
 	Guaranteed     bool
 	SinceLegendary int
 	SinceMythic    int
-	// Shards are the player's 💎 shards after it.
+	// Shards are the player's 💎 shards after it, and Tokens their 🎟 tokens
+	// after a card opened for one.
 	Shards int
+	Tokens int
 	// Free is a draw of the day's free cards, and FreeLeft how many the
 	// player may still open today.
 	Free     bool
