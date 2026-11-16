@@ -180,6 +180,8 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return h.market(ctx, opened.User)
 	case "catalog":
 		return h.catalogSearch(ctx, req.Query)
+	case "animes":
+		return h.animes(ctx)
 	case "offer":
 		return h.offer(ctx, opened.User, req.Card, req.Want)
 	case "take":
@@ -487,6 +489,25 @@ func (h *handler) market(ctx context.Context, user miniapp.User) (any, failure) 
 
 // catalogSearch finds the cards of the catalog by name, for the card a
 // player wants: a name searched for is shown, held or not.
+// animes is the whole catalog with every card's name and picture, so that
+// a player may look through each anime's cards, held or not.
+func (h *handler) animes(ctx context.Context) (any, failure) {
+	if err := h.catalog.Ensure(ctx); err != nil {
+		h.Logger.Error("could not fill the card catalog", "error", err)
+		return nil, errUnavailable
+	}
+	catalog, err := h.Store.CardCatalog(ctx)
+	if err != nil {
+		h.Logger.Error("could not read the card catalog", "error", err)
+		return nil, errUnavailable
+	}
+	views := make([]cardView, len(catalog))
+	for i, c := range catalog {
+		views[i] = h.held(c, 0)
+	}
+	return map[string]any{"cards": views}, failure{}
+}
+
 func (h *handler) catalogSearch(ctx context.Context, query string) (any, failure) {
 	if strings.TrimSpace(query) == "" {
 		return map[string]any{"cards": []cardView{}}, failure{}

@@ -400,3 +400,19 @@ func TestTokensInTheMiniApp(t *testing.T) {
 		t.Errorf("a card with no tokens = %d %v", code, out)
 	}
 }
+
+// The anime page gets every card with its name and picture, held or not.
+func TestTheAnimePageSeesEveryCard(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	h := NewHandler(Options{BotToken: testToken, Store: &fakeStore{}, Now: func() time.Time { return now }})
+	code, out := post(t, h, signedInit(7, now), "animes")
+	cards, _ := out["cards"].([]any)
+	if code != 200 || len(cards) == 0 {
+		t.Fatalf("animes = %d %v", code, out)
+	}
+	for _, c := range cards {
+		if card := c.(map[string]any); card["name"] == nil || card["image"] == nil {
+			t.Errorf("a card without its name or picture: %v", card)
+		}
+	}
+}

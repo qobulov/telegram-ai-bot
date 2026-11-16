@@ -9,7 +9,7 @@
 
   const texts = {
     uz: {
-      title: "Kartalar", collected: "to'plandi", collection: "Kolleksiya", draw: "Olish", top: "Reyting",
+      title: "Kartalar", collected: "to'plandi", animeTab: "Animelar", animeSearch: "Anime yoki personaj", animeBack: "← Barcha animelar", animeOwned: "✓ Sizda bor", animeMissing: "Sizda hali yo'q", animeEmpty: "Hech narsa topilmadi", collection: "Kolleksiya", draw: "Olish", top: "Reyting",
       search: "Kartani qidirish", rarities: ["Oddiy", "Noyob", "Epik", "Afsonaviy", "Mifik"],
       drawNow: "Karta olish", drawing: "Ochilmoqda…", next: (t) => `Keyingi karta: ${t}`, ready: "Karta tayyor!",
      
@@ -37,7 +37,7 @@
       offersLimit: (n) => `Bir vaqtda ${n} tagacha taklif qo'yish mumkin`, giftSpare: "Faqat takror (×2 va undan ko'p) kartani sovg'a qilish mumkin",
     },
     ru: {
-      title: "Карты", collected: "собрано", collection: "Коллекция", draw: "Получить", top: "Рейтинг",
+      title: "Карты", collected: "собрано", animeTab: "Аниме", animeSearch: "Аниме или персонаж", animeBack: "← Все аниме", animeOwned: "✓ Есть у вас", animeMissing: "Пока нет у вас", animeEmpty: "Ничего не найдено", collection: "Коллекция", draw: "Получить", top: "Рейтинг",
       search: "Поиск по картам", rarities: ["Обычная", "Редкая", "Эпическая", "Легендарная", "Мифическая"],
       drawNow: "Получить карту", drawing: "Открываем…", next: (t) => `Следующая карта: ${t}`, ready: "Карта готова!",
      
@@ -65,7 +65,7 @@
       offersLimit: (n) => `Одновременно можно выставить до ${n} предложений`, giftSpare: "Дарить можно только повторную карту (×2 и больше)",
     },
     en: {
-      title: "Cards", collected: "collected", collection: "Collection", draw: "Draw", top: "Ranking",
+      title: "Cards", collected: "collected", animeTab: "Anime", animeSearch: "Anime or character", animeBack: "← All anime", animeOwned: "✓ You have it", animeMissing: "Not yours yet", animeEmpty: "Nothing found", collection: "Collection", draw: "Draw", top: "Ranking",
       search: "Search cards", rarities: ["Common", "Rare", "Epic", "Legendary", "Mythic"],
       drawNow: "Draw a card", drawing: "Opening…", next: (t) => `Next card in ${t}`, ready: "A card is ready!",
      
@@ -98,6 +98,7 @@
   document.documentElement.lang = texts[language] ? language : "uz";
   for (const node of document.querySelectorAll("[data-t]")) node.textContent = t[node.dataset.t];
   $("search").placeholder = t.search;
+  $("animeSearch").placeholder = t.animeSearch;
 
   // The collections, in the order the page lists them.
   const SETS = [["anime", "🎌 Anime"]];
@@ -879,13 +880,134 @@
     }
   }
 
+  // ---------- every anime ----------
+
+  // An anime's seasons and sequels are one anime here, as players know them.
+  const FRANCHISES = ["Attack on Titan", "My Hero Academia", "JUJUTSU KAISEN", "HAIKYU!!", "Demon Slayer", "Naruto", "JoJo's Bizarre Adventure",
+    "The Seven Deadly Sins", "Re:ZERO", "Sword Art Online", "Assassination Classroom", "Danganronpa"];
+  function franchise(anime) {
+    if (/^(Bakemonogatari|Nisemonogatari|Monogatari)/.test(anime)) return "Monogatari";
+    if (anime.startsWith("Fate/")) return "Fate";
+    return FRANCHISES.find((f) => anime.startsWith(f)) || anime;
+  }
+  let catalogAll = null, animeQuery = "";
+  async function animePage() {
+    if (!catalogAll) {
+      try {
+        catalogAll = (await api("animes")).cards;
+      } catch (error) {
+        notice(error);
+        return;
+      }
+    }
+    animeList();
+  }
+  function heldCount(id) {
+    const own = cards.find((c) => c.id === id);
+    return own ? own.count : 0;
+  }
+  function animeList() {
+    $("animeCards").hidden = true;
+    const root = $("animeList");
+    root.hidden = false;
+    root.textContent = "";
+    const q = animeQuery.trim().toLowerCase();
+    const groups = new Map();
+    for (const card of catalogAll) {
+      const name = franchise(card.anime || "");
+      if (!groups.has(name)) groups.set(name, []);
+      groups.get(name).push(card);
+    }
+    const shown = [...groups].filter(([name, list]) => !q || name.toLowerCase().includes(q) || list.some((c) => c.name.toLowerCase().includes(q)))
+      .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
+    for (const [name, list] of shown) {
+      list.sort((a, b) => b.rarity - a.rarity);
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "anime-row";
+      row.style.setProperty("--c", COLORS[list[0].rarity]);
+      const img = new Image();
+      img.loading = "lazy";
+      img.alt = "";
+      picture(img, list[0].image);
+      const text = document.createElement("span");
+      const title = document.createElement("b");
+      title.textContent = name;
+      const dots = document.createElement("small");
+      for (const card of list.slice(0, 12)) {
+        const dot = document.createElement("i");
+        dot.style.setProperty("--c", COLORS[card.rarity]);
+        dots.append(dot);
+      }
+      text.append(title, dots);
+      const held = document.createElement("span");
+      held.className = "held";
+      held.innerHTML = `${list.filter((c) => heldCount(c.id)).length} <em>/ ${list.length}</em>`;
+      row.append(img, text, held);
+      row.addEventListener("click", () => { animeCards(name, list); haptic("light"); });
+      root.append(row);
+    }
+    if (!shown.length) root.innerHTML = `<p class="empty">${t.animeEmpty}</p>`;
+  }
+  function animeCards(name, list) {
+    $("animeList").hidden = true;
+    $("animeCards").hidden = false;
+    $("animeTitle").textContent = name;
+    $("animeHeld").textContent = `${list.filter((c) => heldCount(c.id)).length} / ${list.length}`;
+    const grid = $("animeGrid");
+    grid.textContent = "";
+    for (const card of list) grid.append(previewTile(card, heldCount(card.id)));
+    window.scrollTo(0, 0);
+  }
+  // previewTile shows a card whether it is held or not: its picture and name,
+  // dimmed and unmarked while the player does not have it.
+  function previewTile(card, count) {
+    const tile = document.createElement("button");
+    tile.type = "button";
+    tile.className = "card" + (count ? "" : " missing");
+    tile.style.setProperty("--c", COLORS[card.rarity]);
+    if (count && card.rarity >= 3) tile.classList.add("foil");
+    if (card.rarity === 4) tile.classList.add("mythic");
+    const img = new Image();
+    img.loading = "lazy";
+    img.alt = "";
+    picture(img, card.image);
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = card.name;
+    tile.append(img, name);
+    if (card.rarity === 4) tile.insertAdjacentHTML("beforeend", MYTHIC_DRESS);
+    if (count) tile.insertAdjacentHTML("beforeend", '<span class="owned" aria-hidden="true">✓</span>');
+    tile.addEventListener("click", () => previewCard(card, count));
+    return tile;
+  }
+  function previewCard(card, count) {
+    const sheet = $("sheetCard");
+    sheet.textContent = "";
+    sheet.classList.remove("giving");
+    const note = document.createElement("p");
+    note.className = "preview-note";
+    note.textContent = count ? t.animeOwned : t.animeMissing;
+    sheet.append(face(card), note);
+    tilt(sheet, card.rarity === 4);
+    $("sheet").hidden = false;
+    try { tg.BackButton.show(); } catch (_) { /* older clients */ }
+    haptic("light");
+  }
+  $("animeSearch").addEventListener("input", (event) => {
+    animeQuery = event.target.value;
+    if (catalogAll) animeList();
+  });
+  $("animeBack").addEventListener("click", () => { animeList(); window.scrollTo(0, 0); });
+
   // ---------- tabs ----------
 
   function showTab(tab) {
     opened = tab;
     for (const button of document.querySelectorAll(".nav button")) button.classList.toggle("on", button.dataset.tab === tab);
-    for (const name of ["collection", "draw", "market", "top"]) $(`tab-${name}`).hidden = name !== tab;
+    for (const name of ["collection", "draw", "market", "anime", "top"]) $(`tab-${name}`).hidden = name !== tab;
     if (tab === "top") ranking();
+    if (tab === "anime") animePage();
     if (tab === "market") market();
     drawButton();
     window.scrollTo(0, 0);

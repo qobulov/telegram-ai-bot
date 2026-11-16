@@ -2165,6 +2165,10 @@ A player's 🎟 tokens (`card_players.tokens`, migration 80) each open one card
 (`token`), by the usual odds, the day's free cards left as they were; the
 draw tab shows the button only while the player has tokens. Players got them
 at the reset, by their points; nothing else gives them yet.
+The Animelar tab (`animes`) lists every anime, its seasons and sequels as one, with
+how many of its cards the player holds; an anime opens on all its cards with their
+pictures and names, the ones not held dimmed, so that a player sees what is there to
+collect. The Kolleksiya tab still hides the cards not held.
 Kartalar had an auto opener (`/autocard`, migration 65) that opened each
 player's cards and sent them to their private chat; the owners took it out,
 and migration 74 drops its columns: players open the day's cards themselves.
