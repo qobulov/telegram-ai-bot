@@ -226,7 +226,11 @@ type Catalog struct {
 	Store   CatalogStore
 	Client  *http.Client
 	AniList string
-	Logger  *slog.Logger
+	// Site is where a picture kept on the bot's own pages is, such as
+	// "https://maria.vercel.app": a card's picture may be a path there,
+	// "/kartalar/art/40.jpg", which the Mini App opens as it is.
+	Site   string
+	Logger *slog.Logger
 }
 
 // Ensure asks AniList for the anime cards when the catalog has fewer than
@@ -247,8 +251,12 @@ func (c *Catalog) Ensure(ctx context.Context) error {
 	return c.Store.SaveCardCatalog(ctx, fresh)
 }
 
-// FetchPicture is a card's picture.
+// FetchPicture is a card's picture: a path on the bot's own pages is
+// fetched from Site.
 func (c *Catalog) FetchPicture(ctx context.Context, link string) ([]byte, string, error) {
+	if strings.HasPrefix(link, "/") {
+		link = strings.TrimSuffix(c.Site, "/") + link
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
 	if err != nil {
 		return nil, "", err

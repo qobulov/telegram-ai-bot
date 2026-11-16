@@ -176,3 +176,19 @@ func TestTwoFreeCardsADay(t *testing.T) {
 		t.Errorf("yesterday's = %d left, want %d", FreeLeft(player, now), PerDay)
 	}
 }
+
+// A picture kept on the bot's own pages is a path, fetched from the site.
+func TestFetchPictureOfAPath(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/kartalar/art/40.jpg" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte("\xff\xd8JPEG"))
+	}))
+	defer server.Close()
+	c := &Catalog{Client: server.Client(), Site: server.URL + "/"}
+	if data, _, err := c.FetchPicture(context.Background(), "/kartalar/art/40.jpg"); err != nil || string(data) != "\xff\xd8JPEG" {
+		t.Errorf("picture = %q, %v", data, err)
+	}
+}

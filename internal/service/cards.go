@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -55,9 +56,19 @@ var cardsHTTP = &http.Client{Timeout: 10 * time.Second}
 // cardCatalog is the catalog of cards, made once.
 func (s *Service) cardCatalog() *cards.Catalog {
 	s.cardsOnce.Do(func() {
-		s.cardsCatalog = &cards.Catalog{Store: s.opts.Cards, Client: cardsHTTP, AniList: s.opts.CardsAPI, Logger: s.opts.Logger}
+		s.cardsCatalog = &cards.Catalog{Store: s.opts.Cards, Client: cardsHTTP, AniList: s.opts.CardsAPI, Site: siteOf(s.opts.CardsURL), Logger: s.opts.Logger}
 	})
 	return s.cardsCatalog
+}
+
+// siteOf is the scheme and host of page, "" for none: where the bot's own
+// pages, and the card pictures kept with them, are.
+func siteOf(page string) string {
+	u, err := url.Parse(page)
+	if err != nil || u.Host == "" {
+		return ""
+	}
+	return u.Scheme + "://" + u.Host
 }
 
 // rarityNames are the rarities' emoji and names, the most common first.

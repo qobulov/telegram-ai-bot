@@ -2137,7 +2137,10 @@ numbers, as players hold it, however AniList's ranks have moved. A draw first dr
 rarity, by odds of 1.5%, 6.5%, 14%, 28% and 50%, then a card of it at random,
 sent as the character's picture (AniList's, or for 138 anime characters a
 sharper one from MyAnimeList, 450 by 700, chosen by hand and kept in
-`card_pictures`, migration 64, which a refresh of the catalog keeps; the
+`card_pictures`, migration 64; for 361 others its AniList picture upscaled four
+times by Real-ESRGAN's anime model to 600 by 900, kept under
+`public/kartalar/art` and served by Vercel's CDN as a path, `/kartalar/art/<id>.jpg`,
+which the Mini App opens as it is and the bot fetches from its own site, migration 77; which a refresh of the catalog keeps; the
 characters, their rarity and the table stay AniList's) with its anime, attack
 and health, the same
 each time for the same character, and the points it is worth (4000, 2000, 400, 200 or 100), each card counted once: a copy of a card held adds no
