@@ -486,6 +486,8 @@ func (h *handler) offer(ctx context.Context, user miniapp.User, give, want int64
 	switch {
 	case errors.Is(err, storage.ErrCardNotHeld):
 		return map[string]any{"refused": "not_held"}, failure{}
+	case errors.Is(err, storage.ErrCardTradeUneven):
+		return map[string]any{"refused": "uneven"}, failure{}
 	case errors.As(err, &many):
 		return map[string]any{"refused": "limit", "limit": many.Limit}, failure{}
 	case err != nil:
@@ -513,6 +515,10 @@ func (h *handler) take(ctx context.Context, user miniapp.User, id int64) (any, f
 		return map[string]any{"refused": "own"}, failure{}
 	case errors.Is(err, storage.ErrCardNotHeld):
 		return map[string]any{"refused": "not_held"}, failure{}
+	case errors.Is(err, storage.ErrCardTradeUneven):
+		return map[string]any{"refused": "uneven"}, failure{}
+	case errors.Is(err, storage.ErrCardPairLimit):
+		return map[string]any{"refused": "pair"}, failure{}
 	case errors.As(err, &limit):
 		return map[string]any{"refused": "limit", "limit": GiveLimit, "mine": limit.UserID == user.ID}, failure{}
 	case err != nil:

@@ -52,6 +52,9 @@ func (s *Service) tradeCardCommand(ctx context.Context, in incoming) outcome {
 		return say(refusal)
 	}
 	id, err := s.opts.Cards.OfferCardTrade(ctx, in.msg.Chat.ID, in.userID, target.ID, give.ID, take.ID, time.Now())
+	if errors.Is(err, storage.ErrCardTradeUneven) {
+		return say(textTradeUneven.to(in))
+	}
 	if err != nil {
 		s.opts.Logger.Error("could not offer a card trade", "user_id", in.userID, "error", err)
 		return say(textCardsUnavailable.to(in))
@@ -125,6 +128,10 @@ func (s *Service) tradeRefusal(in incoming, err error, target *telegram.User) st
 		return textTradeGone.to(in)
 	case errors.Is(err, storage.ErrCardTradeOver):
 		return textTradeOver.to(in)
+	case errors.Is(err, storage.ErrCardTradeUneven):
+		return textTradeUneven.to(in)
+	case errors.Is(err, storage.ErrCardPairLimit):
+		return textTradePairLimit.to(in)
 	}
 	s.opts.Logger.Error("could not pass a card", "user_id", in.userID, "error", err)
 	return textCardsUnavailable.to(in)
@@ -188,8 +195,8 @@ func parseTradePress(data string) (accept bool, id, target int64, ok bool) {
 // cardLabel is a card as a gift or trade names it: its rarity's emoji and
 // its name in bold.
 func cardLabel(in incoming, c storage.Card) string {
-	emoji, _, _ := strings.Cut(rarityNames[min(max(c.Rarity, 0), len(rarityNames)-1)].to(in), " ")
-	return emoji + " **" + cardMarks.Replace(c.Name) + "**"
+	emoji, rarity, _ := strings.Cut(rarityNames[min(max(c.Rarity, 0), len(rarityNames)-1)].to(in), " ")
+	return emoji + " **" + cardMarks.Replace(c.Name) + "** — " + rarity + ", " + fmt.Sprintf(textCardPoints.to(in), spaced(int64(c.Value)))
 }
 
 // tradeName is a player as a gift or trade names them.
@@ -251,6 +258,9 @@ var (
 		ru: "🔄 %s → %s: меняемся?\nОтдаёт: %s\nПолучает: %s",
 		en: "🔄 %s → %s: a trade?\nGives: %s\nGets: %s",
 	}
+	textCardPoints     = localText{uz: "%s ochko", ru: "%s очков", en: "%s points"}
+	textTradeUneven    = localText{uz: "🔄 Bunday almashuv bo'lmaydi: kartalar tier'i yaqin bo'lishi kerak. Mifik faqat Mifik yoki Afsonaviyga, Afsonaviy Mifik, Afsonaviy yoki Epikka almashadi va hokazo.", ru: "🔄 Такой обмен нельзя: редкость карт должна быть близкой. Мифическая меняется только на мифическую или легендарную, легендарная на мифическую, легендарную или эпическую и так далее.", en: "🔄 That trade is not allowed: the cards must be close in rarity. A Mythic goes only for a Mythic or a Legendary, a Legendary for a Mythic, Legendary or Epic, and so on."}
+	textTradePairLimit = localText{uz: "🔄 Siz bu o'yinchi bilan bugun almashgansiz: bir juftlik kuniga 1 marta almasha oladi.", ru: "🔄 Вы уже менялись с этим игроком сегодня: пара может меняться раз в день.", en: "🔄 You two already traded today: a pair may trade once a day."}
 	textTradeAccept    = localText{uz: "✅ Qabul", ru: "✅ Принять", en: "✅ Accept"}
 	textTradeCancel    = localText{uz: "❌ Bekor", ru: "❌ Отмена", en: "❌ Cancel"}
 	textTradeNotYours  = localText{uz: "Bu taklif sizga emas.", ru: "Это предложение не для вас.", en: "This offer is not yours."}

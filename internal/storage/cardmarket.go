@@ -59,6 +59,9 @@ func (s *Store) OfferCard(ctx context.Context, from, give, want int64, rules Car
 		if open >= rules.Open {
 			return &CardOffersError{Limit: rules.Open}
 		}
+		if err := checkEven(ctx, tx, give, want); err != nil {
+			return err
+		}
 		return tx.QueryRow(ctx, `
 			INSERT INTO card_trades (chat_id, from_id, give_card, take_card, created_at)
 			VALUES (0, $1, $2, $3, $4) RETURNING id`, from, give, want, rules.Now).Scan(&id)
@@ -132,6 +135,11 @@ func (s *Store) TakeCardOffer(ctx context.Context, id, by int64, rules CardTrade
 			return err
 		}
 		if err := moveCard(ctx, tx, by, trade.From, trade.Take.ID, false); err != nil {
+			return err
+		}
+		// Checked once the cards are known to be held, in the transaction
+		// that a refusal rolls back.
+		if err := checkFair(ctx, tx, trade, rules); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE card_trades SET status = 'done', to_id = $2, done_at = $3 WHERE id = $1`, id, by, rules.Now); err != nil {

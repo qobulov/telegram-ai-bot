@@ -27,6 +27,12 @@ var (
 	ErrCardOfferGone = errors.New("storage: card offer gone")
 	// ErrCardOfferOwn is a player taking their own offer.
 	ErrCardOfferOwn = errors.New("storage: own card offer")
+	// ErrCardTradeUneven is a trade of cards more than one rarity apart: a
+	// Common for a Mythic was how one player's cards went to another's.
+	ErrCardTradeUneven = errors.New("storage: cards too far apart in rarity")
+	// ErrCardPairLimit is a second trade between the same two players in a
+	// day.
+	ErrCardPairLimit = errors.New("storage: these two traded today")
 )
 
 // CardOffersError is a player with as many offers on the market as they may
@@ -139,6 +145,9 @@ func (s *Store) GiveCard(ctx context.Context, chatID, from, to, cardID int64, ru
 // OfferCardTrade records an offer of a trade, open until the other player
 // accepts it or either calls it off, and gives its ID.
 func (s *Store) OfferCardTrade(ctx context.Context, chatID, from, to, give, take int64, now time.Time) (int64, error) {
+	if err := checkEven(ctx, s.pool, give, take); err != nil {
+		return 0, tradeError("offer a card trade", err)
+	}
 	var id int64
 	err := s.pool.QueryRow(ctx, `
 		INSERT INTO card_trades (chat_id, from_id, to_id, give_card, take_card, created_at)
@@ -178,6 +187,11 @@ func (s *Store) AcceptCardTrade(ctx context.Context, id, by int64, rules CardTra
 			return err
 		}
 		if err := moveCard(ctx, tx, trade.To, trade.From, trade.Take.ID, false); err != nil {
+			return err
+		}
+		// Checked once the cards are known to be held, in the transaction
+		// that a refusal rolls back.
+		if err := checkFair(ctx, tx, trade, rules); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE card_trades SET status = 'done', done_at = $2 WHERE id = $1`, id, rules.Now); err != nil {
@@ -228,6 +242,55 @@ func lockTraders(ctx context.Context, tx pgx.Tx, from, to int64) error {
 		return ErrCardNoPlayer
 	}
 	return nil
+}
+
+// tradeRarityGap is how many rarities apart a trade's two cards may be: a
+// Mythic goes for a Mythic or a Legendary, never for a Common.
+const tradeRarityGap = 1
+
+// checkEven refuses a trade of two cards more than tradeRarityGap
+// rarities apart.
+func checkEven(ctx context.Context, q interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}, give, take int64) error {
+	var gap int
+	err := q.QueryRow(ctx, `
+		SELECT abs((SELECT rarity FROM card_catalog WHERE id = $1) - (SELECT rarity FROM card_catalog WHERE id = $2))`,
+		give, take).Scan(&gap)
+	if err != nil {
+		return err
+	}
+	if gap > tradeRarityGap {
+		return ErrCardTradeUneven
+	}
+	return nil
+}
+
+// checkPair refuses a second trade between the same two players in
+// rules.Day, either way round: one player's cards went to another's a
+// trade at a time.
+func checkPair(ctx context.Context, tx pgx.Tx, a, b int64, rules CardTradeRules) error {
+	var traded bool
+	err := tx.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM card_trades WHERE status = 'done' AND take_card IS NOT NULL AND done_at > $3
+			AND ((from_id = $1 AND to_id = $2) OR (from_id = $2 AND to_id = $1)))`,
+		a, b, rules.Now.Add(-rules.Day)).Scan(&traded)
+	if err != nil {
+		return err
+	}
+	if traded {
+		return ErrCardPairLimit
+	}
+	return nil
+}
+
+// checkFair refuses a trade between two players of uneven cards, or their
+// second in a day.
+func checkFair(ctx context.Context, tx pgx.Tx, trade CardTrade, rules CardTradeRules) error {
+	if err := checkEven(ctx, tx, trade.Give.ID, trade.Take.ID); err != nil {
+		return err
+	}
+	return checkPair(ctx, tx, trade.From, trade.To, rules)
 }
 
 // checkGiveLimit refuses a player who gave rules.Limit cards in rules.Day.
@@ -315,6 +378,7 @@ func tradeError(what string, err error) error {
 	switch {
 	case err == nil, errors.Is(err, ErrCardNotHeld), errors.Is(err, ErrCardNoPlayer), errors.Is(err, ErrCardTradeOver),
 		errors.Is(err, ErrCardLastCopy), errors.Is(err, ErrCardOfferGone), errors.Is(err, ErrCardOfferOwn),
+		errors.Is(err, ErrCardTradeUneven), errors.Is(err, ErrCardPairLimit),
 		errors.As(err, &limit), errors.As(err, &offers):
 		return err
 	}
