@@ -25,7 +25,6 @@ type Store interface {
 	CardWallet(ctx context.Context, userID int64) (shards int, spares map[int]int, err error)
 	MeltCards(ctx context.Context, userID int64, rates []int) (melted, gained, shards int, err error)
 	ExtraCard(ctx context.Context, userID int64, name, collection string, roll storage.CardRoll, cost int) (storage.CardDraw, error)
-	SetCardAuto(ctx context.Context, userID int64, name string, on bool, language string) error
 	CardPlayersNamed(ctx context.Context, name string, except int64, limit int) ([]storage.CardPlayer, error)
 	GiveCard(ctx context.Context, chatID, from, to, cardID int64, rules storage.CardTradeRules) error
 	OfferCard(ctx context.Context, from, give, want int64, rules storage.CardMarketRules) (int64, error)
@@ -103,8 +102,6 @@ func NewHandler(opts Options) http.Handler {
 type request struct {
 	InitData string `json:"init_data"`
 	Action   string `json:"action"`
-	// On is the auto opener's switch, for "auto".
-	On bool `json:"on"`
 	// Query is the name searched for, for "players"; Card and To are the
 	// card given and the player it is given to, for "gift".
 	Query string `json:"query"`
@@ -170,8 +167,6 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return h.melt(ctx, opened.User)
 	case "extra":
 		return h.extra(ctx, opened.User, req.Set)
-	case "auto":
-		return h.auto(ctx, opened.User, req.On)
 	case "players":
 		return h.players(ctx, opened.User, req.Query)
 	case "gift":
@@ -255,7 +250,6 @@ func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
 		"cards": views, "points": player.Points, "held": len(owned),
 		"next_in": NextFree(player, h.Now()).Sub(h.Now()).Milliseconds(), "free_left": FreeLeft(player, h.Now()), "per_day": PerDay,
 		"shards": shards, "spare": spare, "spare_worth": worth, "extra_cost": ExtraCost, "set_cost": SetCost,
-		"auto": player.Auto,
 	}, failure{}
 }
 
@@ -286,16 +280,6 @@ func nextIn(draw storage.CardDraw, now time.Time) time.Duration {
 		return 0
 	}
 	return DayStart(now).AddDate(0, 0, 1).Sub(now)
-}
-
-// auto turns the player's auto opener on or off; its cards go to their
-// private chat in the language of their Telegram.
-func (h *handler) auto(ctx context.Context, user miniapp.User, on bool) (any, failure) {
-	if err := h.Store.SetCardAuto(ctx, user.ID, name(user), on, appLanguage(user.Language)); err != nil {
-		h.Logger.Error("could not set a card auto opener", "user_id", user.ID, "error", err)
-		return nil, errUnavailable
-	}
-	return map[string]any{"auto": on}, failure{}
 }
 
 // appLanguage is "uz", "ru" or "en" for a Telegram language code, as the

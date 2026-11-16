@@ -43,16 +43,14 @@ func signedInit(user int64, at time.Time) string {
 
 // fakeStore has two cards; the player holds the first.
 type fakeStore struct {
-	day      time.Time
-	used     int
-	draws    int
-	shards   int
-	auto     bool
-	autoLang string
-	gifts    []int64 // the card, then the player, of each gift
-	giftErr  error
-	offers   []storage.CardOffer
-	takeErr  error
+	day     time.Time
+	used    int
+	draws   int
+	shards  int
+	gifts   []int64 // the card, then the player, of each gift
+	giftErr error
+	offers  []storage.CardOffer
+	takeErr error
 }
 
 var (
@@ -71,7 +69,7 @@ func (f *fakeStore) OwnedCards(context.Context, int64, int) ([]storage.OwnedCard
 	return []storage.OwnedCard{{Card: heldCard, Count: 2}}, nil
 }
 func (f *fakeStore) CardPlayerOf(context.Context, int64) (storage.CardPlayer, time.Time, error) {
-	return storage.CardPlayer{Points: 10000, Cards: 1, Auto: f.auto, FreeDay: f.day, FreeUsed: f.used}, time.Time{}, nil
+	return storage.CardPlayer{Points: 10000, Cards: 1, FreeDay: f.day, FreeUsed: f.used}, time.Time{}, nil
 }
 func (f *fakeStore) CardTop(context.Context, int) ([]storage.CardPlayer, error) {
 	return []storage.CardPlayer{{UserID: 7, Name: "Bek", Points: 10000, Cards: 1}}, nil
@@ -103,11 +101,6 @@ func (f *fakeStore) ExtraCard(_ context.Context, _ int64, _, collection string, 
 	card := heldCard
 	card.Collection = cmp.Or(collection, card.Collection)
 	return storage.CardDraw{Card: card, Count: 4, Points: 20000, Shards: f.shards}, nil
-}
-
-func (f *fakeStore) SetCardAuto(_ context.Context, _ int64, _ string, on bool, language string) error {
-	f.auto, f.autoLang = on, language
-	return nil
 }
 
 func (f *fakeStore) CardPlayersNamed(_ context.Context, name string, except int64, _ int) ([]storage.CardPlayer, error) {
@@ -274,35 +267,6 @@ func TestShardsInTheMiniApp(t *testing.T) {
 	}
 	if code, _ := buy("pokemon"); code != http.StatusBadRequest {
 		t.Errorf("a collection there is none of = %d", code)
-	}
-}
-
-// The Mini App's switch turns the auto opener on and off, in the player's
-// language, and the state shows where it is.
-func TestTheAutoOpenerSwitch(t *testing.T) {
-	now := time.Unix(1_800_000_000, 0)
-	store := &fakeStore{}
-	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }})
-	initData := signedInit(7, now)
-	turn := func(on bool) (int, map[string]any) {
-		body, _ := json.Marshal(map[string]any{"init_data": initData, "action": "auto", "on": on})
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/cards", strings.NewReader(string(body))))
-		var out map[string]any
-		_ = json.Unmarshal(rec.Body.Bytes(), &out)
-		return rec.Code, out
-	}
-	if _, out := post(t, h, initData, "state"); out["auto"] != false {
-		t.Fatalf("state = %v", out)
-	}
-	if code, out := turn(true); code != 200 || out["auto"] != true || !store.auto || store.autoLang != "uz" {
-		t.Fatalf("on = %d %v, stored %v %q", code, out, store.auto, store.autoLang)
-	}
-	if _, out := post(t, h, initData, "state"); out["auto"] != true {
-		t.Errorf("state after on = %v", out)
-	}
-	if code, out := turn(false); code != 200 || out["auto"] != false || store.auto {
-		t.Errorf("off = %d %v", code, out)
 	}
 }
 

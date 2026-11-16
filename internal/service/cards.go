@@ -27,7 +27,6 @@ type CardBook interface {
 	CardWallet(ctx context.Context, userID int64) (shards int, spares map[int]int, err error)
 	DuelTeam(ctx context.Context, userID int64, n int) ([]storage.Card, error)
 	ResolveDuel(ctx context.Context, chatID, messageID, winner, loser int64, stake int) (moved int, settled bool, err error)
-	ToggleCardAuto(ctx context.Context, userID int64, name, language string) (bool, error)
 	HeldCardsNamed(ctx context.Context, userID int64, name string, limit int) ([]storage.Card, error)
 	OfferCardTrade(ctx context.Context, chatID, from, to, give, take int64, now time.Time) (int64, error)
 	AcceptCardTrade(ctx context.Context, id, by int64, rules storage.CardTradeRules) (storage.CardTrade, error)
@@ -102,7 +101,7 @@ func (s *Service) drawCard(ctx context.Context, in incoming) outcome {
 	var wait *storage.CardWaitError
 	switch {
 	case errors.As(err, &wait):
-		return say(fmt.Sprintf(textCardWait.to(in), cards.PerDay, waitText(languageOf(in), wait.Wait)))
+		return say(fmt.Sprintf(textCardWait.to(in), cards.PerDay))
 	case err != nil:
 		s.opts.Logger.Error("could not draw a card", "user_id", in.userID, "error", err)
 		return say(textCardsUnavailable.to(in))
@@ -148,25 +147,6 @@ func cardCaption(language string, draw storage.CardDraw) string {
 	}
 	return strings.Join(lines, "\n")
 }
-
-// waitText is a wait in hours and minutes, as the wait for the next day's
-// cards is said: "4 soat 12 daqiqa".
-func waitText(language string, wait time.Duration) string {
-	minutes := max(1, int(wait.Round(time.Minute).Minutes()))
-	hours, minutes := minutes/60, minutes%60
-	switch {
-	case hours == 0:
-		return fmt.Sprintf(textMinutes.inLanguage(language), minutes)
-	case minutes == 0:
-		return fmt.Sprintf(textHours.inLanguage(language), hours)
-	}
-	return fmt.Sprintf(textHours.inLanguage(language), hours) + " " + fmt.Sprintf(textMinutes.inLanguage(language), minutes)
-}
-
-var (
-	textHours   = localText{uz: "%d soat", ru: "%d ч", en: "%d h"}
-	textMinutes = localText{uz: "%d daqiqa", ru: "%d мин", en: "%d min"}
-)
 
 // spaced writes n with its thousands apart, "12 300", as the cards do.
 func spaced(n int64) string {
@@ -388,12 +368,12 @@ var (
 		en: "Cards are not available right now; try again in a bit.",
 	}
 	textCardWait = localText{
-		uz: "⏳ Bugungi %d ta tekin karta ochildi. Yangilari %s dan keyin, 00:00 da. Kolleksiya: /mycards",
-		ru: "⏳ Сегодняшние %d бесплатные карты открыты. Новые через %s, в 00:00. Коллекция: /mycards",
-		en: "⏳ Today's %d free cards are open. New ones in %s, at midnight. Collection: /mycards",
+		uz: "⏳ Bugungi %d ta tekin karta ochildi, yangilari ertaga. Kolleksiya: /mycards",
+		ru: "⏳ Сегодняшние %d бесплатные карты открыты, новые завтра. Коллекция: /mycards",
+		en: "⏳ Today's %d free cards are open; new ones tomorrow. Collection: /mycards",
 	}
 	textCardFreeLeft   = localText{uz: "🎴 Bugun yana %d ta tekin karta bor", ru: "🎴 Сегодня ещё %d бесплатные карты", en: "🎴 %d more free cards today"}
-	textCardFreeDone   = localText{uz: "🎴 Bugungi tekin kartalar tugadi, yangilari 00:00 da", ru: "🎴 Бесплатные карты на сегодня закончились, новые в 00:00", en: "🎴 Today's free cards are done; new ones at midnight"}
+	textCardFreeDone   = localText{uz: "🎴 Bugungi tekin kartalar tugadi, yangilari ertaga", ru: "🎴 Бесплатные карты на сегодня закончились, новые завтра", en: "🎴 Today's free cards are done; new ones tomorrow"}
 	textCardAttack     = localText{uz: "⚔️ Hujum: %s", ru: "⚔️ Атака: %s", en: "⚔️ Attack: %s"}
 	textCardLife       = localText{uz: "❤️ Jon: %s", ru: "❤️ Жизнь: %s", en: "❤️ Life: %s"}
 	textCardRarity     = localText{uz: "💎 Noyoblik: %s", ru: "💎 Редкость: %s", en: "💎 Rarity: %s"}

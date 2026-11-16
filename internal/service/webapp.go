@@ -114,9 +114,9 @@ var (
 		en: "/teams — MLBB: split the players into 2 random teams (10 or more)",
 	}
 	textGamesCards = localText{
-		uz: "🎴 Kartalar: /card · /cards (ilova) · /cardtop · /autocard · /market · /duel · /trade",
-		ru: "🎴 Карты: /card · /cards (приложение) · /cardtop · /autocard · /market · /duel · /trade",
-		en: "🎴 Cards: /card · /cards (the app) · /cardtop · /autocard · /market · /duel · /trade",
+		uz: "🎴 Kartalar: /card · /cards (ilova) · /cardtop · /market · /duel · /trade",
+		ru: "🎴 Карты: /card · /cards (приложение) · /cardtop · /market · /duel · /trade",
+		en: "🎴 Cards: /card · /cards (the app) · /cardtop · /market · /duel · /trade",
 	}
 )
 

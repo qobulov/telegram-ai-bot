@@ -2114,8 +2114,8 @@ play sent sooner than its chops took.
 
 `/card` draws an anime card, three free a day, the day starting at midnight
 in Tashkent, owners' too (in a private chat the word "karta" does too); the
-fourth is told how long until midnight (`card_players.free_day` and
-`free_used`, migration 73). The cards are AniList's 500 most loved
+fourth is told the new ones come tomorrow, with no count of the time left
+(`card_players.free_day` and `free_used`, migration 73). The cards are AniList's 500 most loved
 characters, fetched the first time a card is drawn (`internal/cards`, kept in
 `card_catalog`, migration 52). Its 👑 Mifik and 🔥 Afsonaviy are the
 characters anime fans at large know, not today's votes, chosen by hand in
@@ -2155,52 +2155,9 @@ cards' button opens a card now for 15 of them (`extra`), by the usual odds
 and sure cards, the day's free cards left as they were. (`extra` also takes a
 `set`, a collection to draw from for 20, which no page offers now.) Crystals live in the Mini App alone: the bot has no
 commands for them.
-`/autocard`, or the switch on the Mini App's draw tab (`auto`), turns on a player's auto opener, or off again, each player for
-themselves and free (`card_players.auto_draw`, migration 65): each minute's
-call to `/api/reminders`, or the long-polling ticker, first opens a card for
-every player with it on who has a free card left today, one a call, so that
-the day's three come a minute apart, and sends it to their private chat
-without a sound, with the Mini App's button, in the language they turned it
-on in. The draw counts the day's cards again under the player's lock, so that
-overlapping calls open one card; a player the bot may not write to (blocked,
-never started) keeps the card and has the opener turned off. A card reminder
-of a card it opened is skipped as too soon. The endpoint's `opened` counts
-them.
-`/duel [stake]` in a group calls a member out, the one replied to or anyone,
-for up to 100 shards: whoever presses its button accepts. Each side's three
-strongest cards are its team, and a team's power is their attack and health
-together; each side wins with its share of the two powers as its chance, so
-that the stronger team wins more often and the weaker one still may (twice
-the power is a 67% chance). The challenge shows the challenger's team and
-power, the result both teams, their power and chance, and the winner takes
-the stake of the loser's shards, or all they have; the challenger or the one called out may
-call it off, and `card_duels` keeps each duel's message so that it is settled
-once however often it is pressed. Cards pass between players (migration 66, `card_trades`). In the Mini
-App a card's large view has 🎁 Give: it searches the players who have opened
-a card by name or @username (the one a group last saw), the most points
-first (`players`), and gives the one picked
-a spare copy at once (`gift`: a player keeps their last copy not melted),
-the bot telling them in their private chat who gave it. The Mini App's 🔄
-market tab, which `/market` opens (in a group through the private chat's
-`/start bozor`, the page told `?tab=market`), lists offers (migration 67, `card_trades` rows with no `to_id`
-until taken): a player puts up a card of theirs for a card they pick from the
-whole catalog by name (`catalog`, `offer`), at most 5 open, each for 7 days;
-anyone who holds the card wanted presses 🔄 to take it (`take`), each giving
-the other their card with its points, and the offer's player is told; an
-offer whose card its player no longer holds is called off when taken, and a
-player takes down their own (`unoffer`). In a group, replying to a member, `/trade Levi = Gojo` offers one of the
-sender's cards for one of theirs, done when that member presses ✅ (either
-may press ❌), once, within a day; a name need be only part of the card's,
-when one card matches, else the answer lists those that do. Any card may
-pass, the last copy too, which leaves the collection (its melted copies, gone
-to shards, with it), and its points pass with it. A player gives at most 5
-cards a day, gifts and trades together, and only to a player who has opened a
-card, so that a second account cannot feed a first one. With the pages served, the persona is told the game's facts
-(`cardsNote`), as the model had said it was "not the card bot" and named
-commands there are none of. `/mycards` shows
-how many of each rarity's cards the player holds as buttons that list them,
-pressed only by that player; `/cardtop` is the table of points. The
-pictures are the characters' AniList pictures, the studios' art.
+Kartalar had an auto opener (`/autocard`, migration 65) that opened each
+player's cards and sent them to their private chat; the owners took it out,
+and migration 74 drops its columns: players open the day's cards themselves.
 
 The cards come from AniList alone. Trading cards from PokéWallet (one set
 each of Pokémon, One Piece, Dragon Ball, Yu-Gi-Oh! and Digimon) were part of

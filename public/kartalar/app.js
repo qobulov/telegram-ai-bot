@@ -12,9 +12,9 @@
       title: "Kartalar", collected: "to'plandi", collection: "Kolleksiya", draw: "Olish", top: "Reyting",
       search: "Kartani qidirish", rarities: ["Oddiy", "Noyob", "Epik", "Afsonaviy", "Mifik"],
       drawNow: "Karta olish", drawing: "Ochilmoqda…", next: (t) => `Keyingi karta: ${t}`, ready: "Karta tayyor!",
-      autoTitle: "🤖 Avto-ochish", autoHint: "Karta tayyor bo'lishi bilan o'zi ochilib, shaxsiy chatga ovozsiz keladi", autoOn: "🤖 Avto-ochish yoqildi", autoOff: "⏸ Avto-ochish o'chirildi",
+     
       extraDraw: (c) => `💎 ${c} bilan hozir karta ochish`, extraNeed: (n) => `💎 Kristal bilan ochish uchun yana ${n} kerak`, shardsTitle: "Kristallar", melt: (n, w) => `♻️ ${n} ta takrorni aylantirish → +${w} 💎`, noSpare: "♻️ Aylantirish uchun takror karta yo'q", fewShards: (n, h) => `💎 Kerak: ${n}, sizda: ${h}`, melted: (n, g) => `♻️ ${n} ta karta → +${g} 💎`, shardsHint: "Takror kartalar kristalga aylanadi, ochko va reyting kamaymaydi. Kristal bilan kutmasdan karta oching yoki duelda tiking.", ratesLabel: "1 ta takror:", meltTitle: "Kristalga aylantirish", meltWarn: "Bu nusxalarni keyin sovg'a qilib bo'lmaydi. Har kartaning bittasi kolleksiyada qoladi.", meltDo: (w) => `♻️ Aylantirish · +${w} 💎`, cancel: "Bekor qilish",
-      noPoints: "ochko qo'shilmaydi", freeLeft: (n, of) => `🎴 Bugungi tekin kartalar: ${n}/${of}`,
+      tomorrow: "⏳ Yangi kartalar ertaga", noPoints: "ochko qo'shilmaydi", freeLeft: (n, of) => `🎴 Bugungi tekin kartalar: ${n}/${of}`,
       fresh: "🆕 Yangi karta!", again: (n) => `🔁 Sizda endi ×${n}`, plus: (n) => `+${n} ochko`,
       attack: "Hujum", health: "Jon", value: "Ochko", cards: (n) => `${n} karta`, pts: "ochko",
       none: "Hech narsa topilmadi", noTop: "Hali hech kim karta olmagan",
@@ -40,9 +40,9 @@
       title: "Карты", collected: "собрано", collection: "Коллекция", draw: "Получить", top: "Рейтинг",
       search: "Поиск по картам", rarities: ["Обычная", "Редкая", "Эпическая", "Легендарная", "Мифическая"],
       drawNow: "Получить карту", drawing: "Открываем…", next: (t) => `Следующая карта: ${t}`, ready: "Карта готова!",
-      autoTitle: "🤖 Автооткрытие", autoHint: "Карта откроется сама, как только будет готова, и придёт в личку без звука", autoOn: "🤖 Автооткрытие включено", autoOff: "⏸ Автооткрытие выключено",
+     
       extraDraw: (c) => `💎 Открыть карту сейчас за ${c}`, extraNeed: (n) => `💎 Чтобы открыть за кристаллы, нужно ещё ${n}`, shardsTitle: "Кристаллы", melt: (n, w) => `♻️ Расплавить повторы: ${n} → +${w} 💎`, noSpare: "♻️ Повторных карт нет", fewShards: (n, h) => `💎 Нужно: ${n}, у вас: ${h}`, melted: (n, g) => `♻️ ${n} карт → +${g} 💎`, shardsHint: "Повторы становятся кристаллами, очки и рейтинг не уменьшаются. За кристаллы — карта без ожидания или ставка в дуэли.", ratesLabel: "1 повтор:", meltTitle: "Расплавить в кристаллы", meltWarn: "Эти копии потом нельзя будет подарить. По одной карте каждого вида останется в коллекции.", meltDo: (w) => `♻️ Расплавить · +${w} 💎`, cancel: "Отмена",
-      noPoints: "очки не добавляются", freeLeft: (n, of) => `🎴 Бесплатные карты сегодня: ${n}/${of}`,
+      tomorrow: "⏳ Новые карты завтра", noPoints: "очки не добавляются", freeLeft: (n, of) => `🎴 Бесплатные карты сегодня: ${n}/${of}`,
       fresh: "🆕 Новая карта!", again: (n) => `🔁 Теперь у вас ×${n}`, plus: (n) => `+${n} очков`,
       attack: "Атака", health: "Жизнь", value: "Очки", cards: (n) => `${n} карт`, pts: "очков",
       none: "Ничего не найдено", noTop: "Ещё никто не получил карту",
@@ -68,9 +68,9 @@
       title: "Cards", collected: "collected", collection: "Collection", draw: "Draw", top: "Ranking",
       search: "Search cards", rarities: ["Common", "Rare", "Epic", "Legendary", "Mythic"],
       drawNow: "Draw a card", drawing: "Opening…", next: (t) => `Next card in ${t}`, ready: "A card is ready!",
-      autoTitle: "🤖 Auto opener", autoHint: "Each card opens itself when it is ready and comes to your private chat quietly", autoOn: "🤖 Auto opener on", autoOff: "⏸ Auto opener off",
+     
       extraDraw: (c) => `💎 Open a card now for ${c}`, extraNeed: (n) => `💎 ${n} more crystals to open one now`, shardsTitle: "Crystals", melt: (n, w) => `♻️ Melt ${n} spares → +${w} 💎`, noSpare: "♻️ No spare cards to melt", fewShards: (n, h) => `💎 It takes ${n}, you have ${h}`, melted: (n, g) => `♻️ ${n} cards → +${g} 💎`, shardsHint: "Spares melt into crystals; your points and ranking stay. Crystals open a card without the wait or make a duel's stake.", ratesLabel: "1 spare:", meltTitle: "Melt into crystals", meltWarn: "These copies cannot be given afterwards. One of each card stays in your collection.", meltDo: (w) => `♻️ Melt · +${w} 💎`, cancel: "Cancel",
-      noPoints: "no points added", freeLeft: (n, of) => `🎴 Free cards today: ${n}/${of}`,
+      tomorrow: "⏳ New cards tomorrow", noPoints: "no points added", freeLeft: (n, of) => `🎴 Free cards today: ${n}/${of}`,
       fresh: "🆕 A new card!", again: (n) => `🔁 You now have ×${n}`, plus: (n) => `+${n} points`,
       attack: "Attack", health: "Life", value: "Points", cards: (n) => `${n} cards`, pts: "points",
       none: "Nothing found", noTop: "Nobody has drawn a card yet",
@@ -107,7 +107,7 @@
   const haptic = (kind) => { try { tg.HapticFeedback.impactOccurred(kind); } catch (_) { /* outside Telegram */ } };
 
   let cards = [], points = 0, nextAt = 0, freeLeft = 0, perDay = 3, drawing = false, query = "", opened = "", chosenSet = "";
-  let shards = 0, spare = 0, spareWorth = 0, extraCost = 15, autoOn = false;
+  let shards = 0, spare = 0, spareWorth = 0, extraCost = 15;
 
   // ---------- server ----------
 
@@ -154,8 +154,6 @@
     spare = data.spare || 0;
     spareWorth = data.spare_worth || 0;
     extraCost = data.extra_cost || extraCost;
-    autoOn = !!data.auto;
-    autoSwitch();
     shardsPanel();
     notice(null);
     header();
@@ -498,20 +496,12 @@
 
   // ---------- drawing ----------
 
-  // clock is a wait as h:mm:ss, or m:ss under an hour: the day's next
-  // cards come at midnight.
-  function clock(ms) {
-    const s = Math.ceil(ms / 1000);
-    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), pad = (n) => String(n).padStart(2, "0");
-    return h > 0 ? `${h}:${pad(m)}:${pad(s % 60)}` : `${m}:${pad(s % 60)}`;
-  }
-
   function drawButton() {
     const wait = Math.max(0, nextAt - Date.now());
     $("draw").disabled = drawing || wait > 0;
-    $("drawLabel").textContent = drawing ? t.drawing : wait > 0 ? t.wait(clock(wait)) : t.drawNow;
+    $("drawLabel").textContent = drawing ? t.drawing : wait > 0 ? t.tomorrow : t.drawNow;
     // The button counts down; the line below it only says a card is ready.
-    $("timer").textContent = wait > 0 ? t.freeLeft(0, perDay) : !cards.length ? "" : `${t.ready} ${t.freeLeft(freeLeft, perDay)}`;
+    $("timer").textContent = wait > 0 || !cards.length ? "" : `${t.ready} ${t.freeLeft(freeLeft, perDay)}`;
     $("readyDot").hidden = !cards.length || wait > 0 || drawing || opened === "draw";
   }
   setInterval(drawButton, 1000);
@@ -572,31 +562,6 @@
     if (shards >= extraCost) reveal("extra");
   });
 
-
-  // ---------- auto opener ----------
-
-  function autoSwitch() {
-    $("auto").setAttribute("aria-checked", String(autoOn));
-  }
-
-  let autoBusy = false;
-  $("auto").addEventListener("click", async () => {
-    if (autoBusy) return;
-    autoBusy = true;
-    autoOn = !autoOn;
-    autoSwitch();
-    try {
-      const data = await api("auto", { on: autoOn });
-      autoOn = !!data.auto;
-      toast(autoOn ? t.autoOn : t.autoOff);
-    } catch (error) {
-      autoOn = !autoOn;
-      notice(error);
-    } finally {
-      autoBusy = false;
-      autoSwitch();
-    }
-  });
 
   $("draw").addEventListener("click", () => {
     if (Date.now() >= nextAt) reveal("draw");

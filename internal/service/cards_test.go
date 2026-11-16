@@ -28,7 +28,6 @@ type fakeCards struct {
 	shards map[int64]int
 	melted map[int64]int
 	duels  map[int64]bool
-	auto   map[int64]bool
 	named  map[int64][]storage.Card
 	trades []*fakeTrade
 }
@@ -174,16 +173,6 @@ func (f *fakeCards) CallOffCardTrade(_ context.Context, id, by int64) (bool, err
 	return true, nil
 }
 
-func (f *fakeCards) ToggleCardAuto(_ context.Context, userID int64, _, _ string) (bool, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if f.auto == nil {
-		f.auto = map[int64]bool{}
-	}
-	f.auto[userID] = !f.auto[userID]
-	return f.auto[userID], nil
-}
-
 func (f *fakeCards) CardCollections(context.Context) (map[string]int, error) {
 	return map[string]int{"anime": cards.CatalogSize}, nil
 }
@@ -251,8 +240,8 @@ func TestCardIsDrawnOnceAnHour(t *testing.T) {
 		t.Errorf("third draw = %+v, want the day's cards done", sent)
 	}
 	f.opts.OwnerIDs = map[int64]bool{userID: true}
-	if sent = f.run(textFrom(userID, "/card")); len(sent) != 4 || sent[3].photo || !strings.Contains(sent[3].text, "⏳") || !strings.Contains(sent[3].text, "00:00") {
-		t.Errorf("an owner's fourth draw = %+v, want to wait for midnight", sent)
+	if sent = f.run(textFrom(userID, "/card")); len(sent) != 4 || sent[3].photo || !strings.Contains(sent[3].text, "ertaga") || strings.Contains(sent[3].text, "soat") {
+		t.Errorf("an owner's fourth draw = %+v, want the new ones tomorrow, with no count of the time", sent)
 	}
 	if day := book.days[len(book.days)-1]; day.PerDay != 3 || day.Start.Hour() != 0 {
 		t.Errorf("an owner's day = %+v", day)

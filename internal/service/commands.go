@@ -843,8 +843,6 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return outcome{text: textMarket.to(in), buttons: s.marketButton(in)}
 	case s.opts.Cards != nil && commandName(in.text) == "/cardtop":
 		return s.cardTop(ctx, in)
-	case s.opts.Cards != nil && commandName(in.text) == "/autocard":
-		return s.toggleCardAuto(ctx, in)
 	case s.opts.Cards != nil && s.opts.Buttons != nil && commandName(in.text) == "/duel":
 		return s.duelCommand(ctx, in)
 	case s.opts.Cards != nil && s.opts.Buttons != nil && commandName(in.text) == "/trade":

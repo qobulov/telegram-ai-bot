@@ -66,8 +66,6 @@ type Options struct {
 
 // Summary is what one call did, as the endpoint answers it.
 type Summary struct {
-	// Opened is the cards the auto opener opened before the reminders.
-	Opened  int `json:"opened"`
 	Sent    int `json:"sent"`
 	Skipped int `json:"skipped"`
 	Failed  int `json:"failed"`
