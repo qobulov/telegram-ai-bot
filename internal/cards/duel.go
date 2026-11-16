@@ -22,19 +22,12 @@ func SpareWorth(spares map[int]int) (copies, worth int) {
 	return copies, worth
 }
 
-// ExtraCost is the shards a card drawn out of turn costs; it takes none of
-// the player's free cards of the day. SetCost is one drawn from a collection the player
-// picks, in the Mini App's shop.
+// CardCost is the crystals a card costs once the player has no token; a
+// player opens one card or Batch at once.
 const (
-	ExtraCost = 15
-	SetCost   = 20
+	CardCost = 15
+	Batch    = 5
 )
-
-// IsCollection reports a collection there are cards of: the anime one, the
-// only one since the trading cards were taken out.
-func IsCollection(name string) bool {
-	return name == "anime"
-}
 
 // DuelTeam is how many of a player's strongest cards fight a duel.
 const DuelTeam = 3

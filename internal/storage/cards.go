@@ -38,14 +38,8 @@ type CardDraw struct {
 	Guaranteed     bool
 	SinceLegendary int
 	SinceMythic    int
-	// Shards are the player's 💎 shards after it, and Tokens their 🎟 tokens
-	// after a card opened for one.
+	// Shards are the player's 💎 shards after it.
 	Shards int
-	Tokens int
-	// Free is a draw of the day's free cards, and FreeLeft how many the
-	// player may still open today.
-	Free     bool
-	FreeLeft int
 }
 
 // CardRoll picks a draw's rarity from the player's draws in a row since
@@ -77,30 +71,20 @@ type CardPlayer struct {
 	// Username is their @username without the @; only CardPlayersNamed
 	// reads it.
 	Username string
-	// FreeDay is the day the player last opened a free card, as the
-	// midnight that began it, and FreeUsed how many they opened that day;
-	// only CardPlayerOf reads them.
+	// FreeDay is the day the player was last given the day's tokens, as the
+	// midnight that began it, and Tokens how many they hold; only
+	// CardPlayerOf reads them.
 	FreeDay  time.Time
 	FreeUsed int
+	Tokens   int
 }
 
-// CardDay is the day's free cards as a draw counts them: the midnight that
-// began the day and how many a player opens free in it; a PerDay of 0
-// never makes a player wait.
+// CardDay is the day as the tokens count it: the midnight that began it and
+// the tokens a player is given in it.
 type CardDay struct {
 	Start  time.Time
 	PerDay int
 }
-
-// ErrCardWait is returned by DrawCard when the player drew too lately: the
-// wait is in CardWaitError.
-var ErrCardWait = errors.New("storage: too soon to draw a card")
-
-// CardWaitError says how long the player must wait for their next card.
-type CardWaitError struct{ Wait time.Duration }
-
-func (e *CardWaitError) Error() string { return ErrCardWait.Error() }
-func (e *CardWaitError) Unwrap() error { return ErrCardWait }
 
 // CardCollections counts the cards of each collection there is.
 func (s *Store) CardCollections(ctx context.Context) (map[string]int, error) {
@@ -144,65 +128,11 @@ func (s *Store) SaveCardCatalog(ctx context.Context, cards []Card) error {
 	return nil
 }
 
-// DrawCard gives the player a free card of the rarity roll picks, at
-// random, unless they opened day.PerDay of them since day.Start, when it
-// returns a *CardWaitError with the wait until the next midnight. The
-// player's row is locked, so that two draws at once are two draws, the
-// second waiting its turn. A player who turned on the card reminders, and
-// has opened the day's last, gets one for the next midnight.
-func (s *Store) DrawCard(ctx context.Context, userID int64, name string, roll CardRoll, day CardDay, now time.Time) (CardDraw, error) {
-	var draw CardDraw
-	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		player, err := lockCardPlayer(ctx, tx, userID, name)
-		if err != nil {
-			return err
-		}
-		used := 0
-		if player.freeDay != nil && player.freeDay.Equal(day.Start) {
-			used = player.freeUsed
-		}
-		next := day.Start.AddDate(0, 0, 1)
-		if day.PerDay > 0 && used >= day.PerDay {
-			return &CardWaitError{Wait: next.Sub(now)}
-		}
-		if draw, err = giveCard(ctx, tx, userID, name, "", roll, player); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, `UPDATE card_players SET last_draw_at = $2, free_day = $3, free_used = $4 WHERE user_id = $1`,
-			userID, now, day.Start, used+1); err != nil {
-			return err
-		}
-		draw.Free, draw.FreeLeft = true, max(0, day.PerDay-used-1)
-		if day.PerDay <= 0 || draw.FreeLeft > 0 {
-			return nil
-		}
-		// A player who asked to be reminded of every card is reminded when
-		// the next day's cards come, in place of the reminder this draw
-		// made stale.
-		_, err = tx.Exec(ctx, `
-			INSERT INTO reminders (chat_id, user_id, user_name, kind, language, due_at)
-			SELECT remind_chat_id, user_id, name, 'card', remind_language, $2
-			FROM card_players WHERE user_id = $1 AND remind_chat_id IS NOT NULL
-			ON CONFLICT (user_id) WHERE kind = 'card' AND claimed_at IS NULL DO UPDATE SET
-				chat_id = EXCLUDED.chat_id, user_name = EXCLUDED.user_name, message_id = 0,
-				language = EXCLUDED.language, due_at = EXCLUDED.due_at`, userID, next)
-		return err
-	})
-	var wait *CardWaitError
-	if errors.As(err, &wait) {
-		return CardDraw{}, wait
-	}
-	if err != nil {
-		return CardDraw{}, fmt.Errorf("storage: draw a card: %w", err)
-	}
-	return draw, nil
-}
-
 // cardPlayerRow is a player's row as a draw reads it, locked.
 type cardPlayerRow struct {
 	last                        *time.Time
 	sinceLegendary, sinceMythic int
-	shards                      int
+	shards, tokens              int
 	freeDay                     *time.Time
 	freeUsed                    int
 }
@@ -216,8 +146,8 @@ func lockCardPlayer(ctx context.Context, tx pgx.Tx, userID int64, name string) (
 		ON CONFLICT (user_id) DO NOTHING`, userID, name); err != nil {
 		return p, err
 	}
-	err := tx.QueryRow(ctx, `SELECT last_draw_at, since_legendary, since_mythic, shards, free_day, free_used FROM card_players WHERE user_id = $1 FOR UPDATE`, userID).
-		Scan(&p.last, &p.sinceLegendary, &p.sinceMythic, &p.shards, &p.freeDay, &p.freeUsed)
+	err := tx.QueryRow(ctx, `SELECT last_draw_at, since_legendary, since_mythic, shards, tokens, free_day, free_used FROM card_players WHERE user_id = $1 FOR UPDATE`, userID).
+		Scan(&p.last, &p.sinceLegendary, &p.sinceMythic, &p.shards, &p.tokens, &p.freeDay, &p.freeUsed)
 	return p, err
 }
 
@@ -353,8 +283,8 @@ func (s *Store) CardCatalog(ctx context.Context) ([]Card, error) {
 func (s *Store) CardPlayerOf(ctx context.Context, userID int64) (CardPlayer, time.Time, error) {
 	p := CardPlayer{UserID: userID}
 	var last, freeDay *time.Time
-	err := s.pool.QueryRow(ctx, `SELECT name, points, cards, last_draw_at, free_day, free_used FROM card_players WHERE user_id = $1`, userID).
-		Scan(&p.Name, &p.Points, &p.Cards, &last, &freeDay, &p.FreeUsed)
+	err := s.pool.QueryRow(ctx, `SELECT name, points, cards, last_draw_at, free_day, free_used, tokens FROM card_players WHERE user_id = $1`, userID).
+		Scan(&p.Name, &p.Points, &p.Cards, &last, &freeDay, &p.FreeUsed, &p.Tokens)
 	if freeDay != nil {
 		p.FreeDay = *freeDay
 	}

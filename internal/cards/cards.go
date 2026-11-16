@@ -36,8 +36,8 @@ const (
 // Rarities lists every rarity, the most common first.
 var Rarities = []Rarity{Common, Rare, Epic, Legendary, Mythic}
 
-// PerDay is how many cards a player opens free each day, the day starting
-// at midnight in Location; crystals open more.
+// PerDay is the tokens a player is given each day, the day starting at
+// midnight in Location; each token opens a card, and crystals open more.
 const PerDay = 2
 
 // Location is where the card game's day starts: Tashkent, which keeps no
@@ -50,26 +50,18 @@ func DayStart(now time.Time) time.Time {
 	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, Location)
 }
 
-// Today is the day's free cards as a draw counts them.
+// Today is the day as the tokens count it.
 func Today(now time.Time) storage.CardDay {
 	return storage.CardDay{Start: DayStart(now), PerDay: PerDay}
 }
 
-// FreeLeft is how many free cards the player may still open today.
-func FreeLeft(p storage.CardPlayer, now time.Time) int {
+// Tokens is how many tokens the player may spend now: those they hold,
+// and the day's when they have not been given them yet today.
+func Tokens(p storage.CardPlayer, now time.Time) int {
 	if !p.FreeDay.Equal(DayStart(now)) {
-		return PerDay
+		return p.Tokens + PerDay
 	}
-	return max(0, PerDay-p.FreeUsed)
-}
-
-// NextFree is when the player may open a free card: now while one is left
-// today, or the next midnight.
-func NextFree(p storage.CardPlayer, now time.Time) time.Time {
-	if FreeLeft(p, now) > 0 {
-		return now
-	}
-	return DayStart(now).AddDate(0, 0, 1)
+	return p.Tokens
 }
 
 // CatalogSize is how many of AniList's most loved characters are cards: the

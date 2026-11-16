@@ -20,7 +20,7 @@ import (
 // their collections.
 type CardBook interface {
 	cards.CatalogStore
-	DrawCard(ctx context.Context, userID int64, name string, roll storage.CardRoll, day storage.CardDay, now time.Time) (storage.CardDraw, error)
+	OpenCards(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, cost int, day storage.CardDay, now time.Time) (storage.CardOpening, error)
 	CardCounts(ctx context.Context, userID int64) (total, owned map[int]int, points int64, err error)
 	OwnedCards(ctx context.Context, userID int64, rarity int) ([]storage.OwnedCard, error)
 	CardTop(ctx context.Context, limit int) ([]storage.CardPlayer, error)
@@ -94,8 +94,9 @@ func isCardDraw(in incoming) bool {
 	return !in.group && (word == "karta" || word == "карта" || word == "получить карту")
 }
 
-// drawCard answers a draw: the card's picture with its name, numbers and
-// rarity, or how long until the next one.
+// drawCard opens a card for a token, or for crystals once the player has
+// none: the card's picture with its name, numbers and rarity, or that they
+// have neither.
 func (s *Service) drawCard(ctx context.Context, in incoming) outcome {
 	ctx, cancel := context.WithTimeout(ctx, cardsTimeout)
 	defer cancel()
@@ -105,16 +106,17 @@ func (s *Service) drawCard(ctx context.Context, in incoming) outcome {
 		return say(textCardsUnavailable.to(in))
 	}
 	now := time.Now()
-	draw, err := s.opts.Cards.DrawCard(ctx, in.userID, doozName(in.msg.From), cards.ByOdds(cards.RollRandom), cards.Today(now), now)
-	var wait *storage.CardWaitError
+	opened, err := s.opts.Cards.OpenCards(ctx, in.userID, doozName(in.msg.From), 1, cards.ByOdds(cards.RollRandom), cards.CardCost, cards.Today(now), now)
+	var few *storage.CardFundsError
 	switch {
-	case errors.As(err, &wait):
-		return say(fmt.Sprintf(textCardWait.to(in), cards.PerDay))
+	case errors.As(err, &few):
+		return say(fmt.Sprintf(textCardWait.to(in), cards.CardCost, few.Shards, cards.PerDay))
 	case err != nil:
-		s.opts.Logger.Error("could not draw a card", "user_id", in.userID, "error", err)
+		s.opts.Logger.Error("could not open a card", "user_id", in.userID, "error", err)
 		return say(textCardsUnavailable.to(in))
 	}
-	return s.withPicture(ctx, say(cardCaption(languageOf(in), draw)), draw.Card)
+	draw := opened.Draws[0]
+	return s.withPicture(ctx, say(cardCaption(languageOf(in), draw, opened)), draw.Card)
 }
 
 // withPicture adds the card's picture to out, which goes without it when
@@ -130,8 +132,8 @@ func (s *Service) withPicture(ctx context.Context, out outcome, card storage.Car
 
 // cardCaption is a drawn card, one thing a line: its name, anime, attack,
 // life and rarity, the points it gave with the player's total, and the
-// day's free cards left.
-func cardCaption(language string, draw storage.CardDraw) string {
+// tokens and crystals left.
+func cardCaption(language string, draw storage.CardDraw, opened storage.CardOpening) string {
 	c := draw.Card
 	emoji, rarity, _ := strings.Cut(rarityNames[c.Rarity].inLanguage(language), " ")
 	lines := []string{emoji + " **" + cardMarks.Replace(c.Name) + "**"}
@@ -146,13 +148,7 @@ func cardCaption(language string, draw storage.CardDraw) string {
 	if draw.New {
 		got = fmt.Sprintf(textCardNew.inLanguage(language), spaced(int64(c.Value)), spaced(draw.Points))
 	}
-	lines = append(lines, got)
-	switch {
-	case draw.Free && draw.FreeLeft > 0:
-		lines = append(lines, fmt.Sprintf(textCardFreeLeft.inLanguage(language), draw.FreeLeft))
-	case draw.Free:
-		lines = append(lines, textCardFreeDone.inLanguage(language))
-	}
+	lines = append(lines, got, fmt.Sprintf(textCardWallet.inLanguage(language), opened.Tokens, spaced(int64(opened.Shards))))
 	return strings.Join(lines, "\n")
 }
 
@@ -376,12 +372,11 @@ var (
 		en: "Cards are not available right now; try again in a bit.",
 	}
 	textCardWait = localText{
-		uz: "⏳ Bugungi %d ta tekin karta ochildi, yangilari ertaga. Kolleksiya: /mycards",
-		ru: "⏳ Сегодняшние %d бесплатные карты открыты, новые завтра. Коллекция: /mycards",
-		en: "⏳ Today's %d free cards are open; new ones tomorrow. Collection: /mycards",
+		uz: "🎟 Tokeningiz qolmadi, karta %d 💎 turadi, sizda %d bor. Ertaga yana %d token beriladi. Kolleksiya: /mycards",
+		ru: "🎟 Токенов нет, карта стоит %d 💎, у вас %d. Завтра дадут ещё %d токена. Коллекция: /mycards",
+		en: "🎟 No tokens left; a card costs %d 💎 and you have %d. Tomorrow brings %d more tokens. Collection: /mycards",
 	}
-	textCardFreeLeft   = localText{uz: "🎴 Bugun yana %d ta tekin karta bor", ru: "🎴 Сегодня ещё %d бесплатные карты", en: "🎴 %d more free cards today"}
-	textCardFreeDone   = localText{uz: "🎴 Bugungi tekin kartalar tugadi, yangilari ertaga", ru: "🎴 Бесплатные карты на сегодня закончились, новые завтра", en: "🎴 Today's free cards are done; new ones tomorrow"}
+	textCardWallet = localText{uz: "🎟 Token: %d · 💎 %s", ru: "🎟 Токены: %d · 💎 %s", en: "🎟 Tokens: %d · 💎 %s"}
 	textCardAttack     = localText{uz: "⚔️ Hujum: %s", ru: "⚔️ Атака: %s", en: "⚔️ Attack: %s"}
 	textCardLife       = localText{uz: "❤️ Jon: %s", ru: "❤️ Жизнь: %s", en: "❤️ Life: %s"}
 	textCardRarity     = localText{uz: "💎 Noyoblik: %s", ru: "💎 Редкость: %s", en: "💎 Rarity: %s"}

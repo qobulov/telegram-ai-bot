@@ -297,7 +297,7 @@ func cancelReminder(ctx context.Context, opts RemindersOptions, caller Caller, a
 }
 
 // cardReminder schedules a reminder for when the caller may next draw a
-// card: the next midnight, once the day's free cards are opened. One who
+// card: the next midnight, once the player's tokens are spent. One who
 // may draw now is told so instead. always turns on the reminder after every draw, too.
 func cardReminder(ctx context.Context, opts RemindersOptions, caller Caller, args reminderArgs) (any, error) {
 	language := pickLanguage(args.Language)
@@ -314,7 +314,7 @@ func cardReminder(ctx context.Context, opts RemindersOptions, caller Caller, arg
 	result := reminderSet{Timezone: opts.location().String(), Always: args.Always}
 	day := opts.CardDay(now)
 	next := day.Start.AddDate(0, 0, 1)
-	if !player.FreeDay.Equal(day.Start) || player.FreeUsed < day.PerDay {
+	if !player.FreeDay.Equal(day.Start) || player.Tokens > 0 {
 		result.CanDraw, result.Note = true, reminderCardNow
 		if args.Always {
 			result.Note += reminderAutoNote

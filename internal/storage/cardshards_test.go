@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"errors"
 	"testing"
 )
 
@@ -45,19 +44,6 @@ func TestShardsAndDuels(t *testing.T) {
 		t.Errorf("Alice's points after melting = %d, %v", p.Points, err)
 	}
 
-	_, err = store.ExtraCard(ctx, alice, "Alice", "", rarity(0), 15)
-	var few *ShardsError
-	if !errors.As(err, &few) || few.Have != 2 || few.Need != 15 {
-		t.Fatalf("an extra card for too few shards = %v", err)
-	}
-	draw, err := store.ExtraCard(ctx, alice, "Alice", "", rarity(0), 2)
-	if err != nil || draw.Card.ID != 2 || draw.Count != 4 || draw.Shards != 0 || draw.Points != 5100 {
-		t.Fatalf("an extra card = %+v, %v", draw, err)
-	}
-	if _, last, err := store.CardPlayerOf(ctx, alice); err != nil || !last.IsZero() {
-		t.Errorf("an extra card moved the hourly card to %v, %v", last, err)
-	}
-
 	team, err := store.DuelTeam(ctx, alice, 3)
 	if err != nil || len(team) != 2 || team[0].ID != 1 {
 		t.Fatalf("Alice's team = %+v, %v", team, err)
@@ -71,31 +57,11 @@ func TestShardsAndDuels(t *testing.T) {
 	if moved, settled, err := store.ResolveDuel(ctx, -100, 5, alice, bob, 10); err != nil || settled || moved != 0 {
 		t.Errorf("the duel pressed again = %d %v, %v", moved, settled, err)
 	}
-	if shards, _, _ := store.CardWallet(ctx, alice); shards != 7 {
-		t.Errorf("Alice won %d shards, want 7", shards)
+	if shards, _, _ := store.CardWallet(ctx, alice); shards != 9 {
+		t.Errorf("Alice has %d shards after winning 7, want 9", shards)
 	}
 	if _, settled, err := store.ResolveDuel(ctx, -100, 6, 0, 0, 0); err != nil || !settled {
 		t.Errorf("a refused duel = %v, %v", settled, err)
 	}
 }
 
-// A card bought from a collection is of that collection.
-func TestAnExtraCardOfACollection(t *testing.T) {
-	store := newTestStore(t)
-	ctx := context.Background()
-	if err := store.SaveCardCatalog(ctx, []Card{
-		{ID: 1, Name: "Usopp", Rarity: 0, Attack: 400, Health: 1500, Value: 100},
-		{ID: 2, Name: "Pikachu", Rarity: 0, Attack: 400, Health: 1500, Value: 100, Collection: "pokemon"},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := store.pool.Exec(ctx, `INSERT INTO card_players (user_id, name, shards) VALUES (1, 'Alice', 100)`); err != nil {
-		t.Fatal(err)
-	}
-	for range 5 {
-		draw, err := store.ExtraCard(ctx, 1, "Alice", "pokemon", func(int, int) (int, bool) { return 0, false }, 20)
-		if err != nil || draw.Card.Collection != "pokemon" {
-			t.Fatalf("a Pokémon card = %+v, %v", draw.Card, err)
-		}
-	}
-}

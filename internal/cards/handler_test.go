@@ -1,7 +1,6 @@
 package cards
 
 import (
-	"cmp"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -44,7 +43,6 @@ func signedInit(user int64, at time.Time) string {
 // fakeStore has two cards; the player holds the first.
 type fakeStore struct {
 	day     time.Time
-	used    int
 	draws   int
 	shards  int
 	tokens  int
@@ -70,20 +68,32 @@ func (f *fakeStore) OwnedCards(context.Context, int64, int) ([]storage.OwnedCard
 	return []storage.OwnedCard{{Card: heldCard, Count: 2}}, nil
 }
 func (f *fakeStore) CardPlayerOf(context.Context, int64) (storage.CardPlayer, time.Time, error) {
-	return storage.CardPlayer{Points: 10000, Cards: 1, FreeDay: f.day, FreeUsed: f.used}, time.Time{}, nil
+	return storage.CardPlayer{Points: 10000, Cards: 1, FreeDay: f.day, Tokens: f.tokens}, time.Time{}, nil
 }
 func (f *fakeStore) CardTop(context.Context, int) ([]storage.CardPlayer, error) {
 	return []storage.CardPlayer{{UserID: 7, Name: "Bek", Points: 10000, Cards: 1}}, nil
 }
-func (f *fakeStore) DrawCard(_ context.Context, _ int64, _ string, _ storage.CardRoll, day storage.CardDay, now time.Time) (storage.CardDraw, error) {
-	if !f.day.Equal(day.Start) {
-		f.day, f.used = day.Start, 0
+func (f *fakeStore) GiveDayTokens(_ context.Context, _ int64, _ string, day storage.CardDay) (int, error) {
+	if f.day.Equal(day.Start) {
+		return 0, nil
 	}
-	if f.used >= day.PerDay {
-		return storage.CardDraw{}, &storage.CardWaitError{Wait: day.Start.AddDate(0, 0, 1).Sub(now)}
+	f.day, f.tokens = day.Start, f.tokens+day.PerDay
+	return day.PerDay, nil
+}
+func (f *fakeStore) OpenCards(ctx context.Context, userID int64, name string, n int, _ storage.CardRoll, cost int, day storage.CardDay, _ time.Time) (storage.CardOpening, error) {
+	given, _ := f.GiveDayTokens(ctx, userID, name, day)
+	tokens := min(f.tokens, n)
+	if shards := (n - tokens) * cost; shards > f.shards {
+		return storage.CardOpening{}, &storage.CardFundsError{Tokens: f.tokens, Shards: f.shards, Need: shards}
+	} else {
+		f.tokens, f.shards = f.tokens-tokens, f.shards-shards
 	}
-	f.used, f.draws = f.used+1, f.draws+1
-	return storage.CardDraw{Card: heldCard, Count: 3, Points: 15000, Free: true, FreeLeft: day.PerDay - f.used}, nil
+	f.draws += n
+	open := storage.CardOpening{Tokens: f.tokens, Shards: f.shards, Points: 15000, Given: given}
+	for range n {
+		open.Draws = append(open.Draws, storage.CardDraw{Card: heldCard, Count: 3, Points: 15000})
+	}
+	return open, nil
 }
 
 func (f *fakeStore) CardWallet(context.Context, int64) (int, map[int]int, error) {
@@ -94,25 +104,6 @@ func (f *fakeStore) MeltCards(_ context.Context, _ int64, rates []int) (int, int
 	f.shards += gained
 	return 3, gained, f.shards, nil
 }
-func (f *fakeStore) ExtraCard(_ context.Context, _ int64, _, collection string, _ storage.CardRoll, cost int) (storage.CardDraw, error) {
-	if f.shards < cost {
-		return storage.CardDraw{}, &storage.ShardsError{Have: f.shards, Need: cost}
-	}
-	f.shards -= cost
-	card := heldCard
-	card.Collection = cmp.Or(collection, card.Collection)
-	return storage.CardDraw{Card: card, Count: 4, Points: 20000, Shards: f.shards}, nil
-}
-
-func (f *fakeStore) CardTokens(context.Context, int64) (int, error) { return f.tokens, nil }
-func (f *fakeStore) TokenCard(context.Context, int64, string, storage.CardRoll) (storage.CardDraw, error) {
-	if f.tokens == 0 {
-		return storage.CardDraw{}, storage.ErrNoTokens
-	}
-	f.tokens--
-	return storage.CardDraw{Card: heldCard, Count: 4, Points: 20000, Tokens: f.tokens}, nil
-}
-
 func (f *fakeStore) CardPlayersNamed(_ context.Context, name string, except int64, _ int) ([]storage.CardPlayer, error) {
 	var found []storage.CardPlayer
 	for _, p := range []storage.CardPlayer{{UserID: 7, Name: "Bek", Cards: 3}, {UserID: 8, Name: "Vali", Cards: 1}} {
@@ -199,11 +190,11 @@ func TestCardsAppWantsSignedInitData(t *testing.T) {
 // The state names only the cards held: one not held is its rarity alone.
 func TestCardsAppHidesCardsNotHeld(t *testing.T) {
 	now := time.Now()
-	store := &fakeStore{day: DayStart(now), used: PerDay}
+	store := &fakeStore{day: DayStart(now)}
 	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }})
 	code, out := post(t, h, signedInit(7, now), "state")
 	views, _ := out["cards"].([]any)
-	if code != http.StatusOK || len(views) != 2 || out["held"] != 1.0 || out["points"] != 10000.0 || out["next_in"] != float64(DayStart(now).AddDate(0, 0, 1).Sub(now).Milliseconds()) || out["free_left"] != 0.0 {
+	if code != http.StatusOK || len(views) != 2 || out["held"] != 1.0 || out["points"] != 10000.0 || out["tokens"] != 0.0 || out["given"] != 0.0 {
 		t.Fatalf("state = %d %v", code, out)
 	}
 	held, locked := views[0].(map[string]any), views[1].(map[string]any)
@@ -215,67 +206,58 @@ func TestCardsAppHidesCardsNotHeld(t *testing.T) {
 	}
 }
 
-// A player opens two free cards a day, an owner like anyone; the next
-// waits for midnight in Tashkent.
-func TestCardsAppDrawsTwoADay(t *testing.T) {
+// Opening the app gives the day's two tokens; a card or ten open for
+// tokens, then for crystals; with too few of both nothing opens.
+func TestCardsAppOpensForTokensThenCrystals(t *testing.T) {
 	now := time.Now()
-	toMidnight := float64(DayStart(now).AddDate(0, 0, 1).Sub(now).Milliseconds())
 	store := &fakeStore{}
 	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }, Roll: func() Rarity { return Mythic }})
-	code, out := post(t, h, signedInit(7, now), "draw")
-	card, _ := out["card"].(map[string]any)
-	if code != http.StatusOK || card["name"] != "Gojo" || out["points"] != 15000.0 || out["next_in"] != 0.0 || out["free_left"] != 1.0 {
-		t.Fatalf("draw = %d %v", code, out)
+	initData := signedInit(7, now)
+	open := func(n int) map[string]any {
+		body, _ := json.Marshal(map[string]any{"init_data": initData, "action": "open", "count": n})
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/cards", strings.NewReader(string(body))))
+		var out map[string]any
+		_ = json.Unmarshal(rec.Body.Bytes(), &out)
+		out["code"] = float64(rec.Code)
+		return out
 	}
-	if _, out := post(t, h, signedInit(7, now), "draw"); out["next_in"] != toMidnight || out["free_left"] != 0.0 {
-		t.Errorf("the second draw = %v", out)
+	if code, out := post(t, h, initData, "state"); code != 200 || out["tokens"] != 2.0 || out["given"] != 2.0 || out["card_cost"] != float64(CardCost) || out["batch"] != float64(Batch) {
+		t.Fatalf("state = %d %v", code, out)
 	}
-	if _, out := post(t, h, signedInit(7, now), "draw"); out["wait"] != toMidnight {
-		t.Errorf("a third draw = %v", out)
+	if out := open(1); out["tokens"] != 1.0 || len(out["drawn"].([]any)) != 1 || out["drawn"].([]any)[0].(map[string]any)["card"].(map[string]any)["name"] != "Gojo" {
+		t.Fatalf("one card = %v", out)
 	}
-	if store.draws != 2 {
+	if out := open(Batch); out["short"] != float64((Batch-1)*CardCost) || out["drawn"] != nil {
+		t.Fatalf("ten with one token and no crystals = %v", out)
+	}
+	store.shards = (Batch - 1) * CardCost
+	if out := open(Batch); out["tokens"] != 0.0 || out["shards"] != 0.0 || len(out["drawn"].([]any)) != Batch {
+		t.Fatalf("ten with one token and crystals for nine = %v", out)
+	}
+	if out := open(3); out["code"] != float64(http.StatusBadRequest) {
+		t.Errorf("three at once = %v", out)
+	}
+	if store.draws != 1+Batch {
 		t.Errorf("draws = %d", store.draws)
 	}
-	if _, out := post(t, h, signedInit(7, now), "top"); len(out["top"].([]any)) != 1 || out["top"].([]any)[0].(map[string]any)["me"] != true {
+	if _, out := post(t, h, initData, "top"); len(out["top"].([]any)) != 1 || out["top"].([]any)[0].(map[string]any)["me"] != true {
 		t.Errorf("top = %v", out)
 	}
 }
 
-// The page shows the player's shards and what their spares melt into, melts
-// them, and draws a card out of turn for shards, saying how few when it
-// cannot.
+// The page shows the player's shards and what their spares melt into, and
+// melts them.
 func TestShardsInTheMiniApp(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	store := &fakeStore{}
 	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }})
 	initData := signedInit(7, now)
-	if code, out := post(t, h, initData, "state"); code != 200 || out["spare"] != 3.0 || out["spare_worth"] != 52.0 || out["extra_cost"] != float64(ExtraCost) {
+	if code, out := post(t, h, initData, "state"); code != 200 || out["spare"] != 3.0 || out["spare_worth"] != 52.0 {
 		t.Fatalf("state = %d %v", code, out)
-	}
-	if code, out := post(t, h, initData, "extra"); code != 200 || out["need"] != float64(ExtraCost) || out["have"] != 0.0 {
-		t.Fatalf("an extra card for no shards = %d %v", code, out)
 	}
 	if code, out := post(t, h, initData, "melt"); code != 200 || out["gained"] != 52.0 || out["shards"] != 52.0 {
 		t.Fatalf("melt = %d %v", code, out)
-	}
-	if code, out := post(t, h, initData, "extra"); code != 200 || out["shards"] != float64(52-ExtraCost) || out["card"] == nil {
-		t.Errorf("an extra card = %d %v", code, out)
-	}
-	buy := func(set string) (int, map[string]any) {
-		body, _ := json.Marshal(map[string]any{"init_data": initData, "action": "extra", "set": set})
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/cards", strings.NewReader(string(body))))
-		var out map[string]any
-		_ = json.Unmarshal(rec.Body.Bytes(), &out)
-		return rec.Code, out
-	}
-	code, out := buy("anime")
-	card, _ := out["card"].(map[string]any)
-	if code != 200 || out["shards"] != float64(52-ExtraCost-SetCost) || card["set"] != "anime" {
-		t.Errorf("an anime card from the shop = %d %v", code, out)
-	}
-	if code, _ := buy("pokemon"); code != http.StatusBadRequest {
-		t.Errorf("a collection there is none of = %d", code)
 	}
 }
 
@@ -378,26 +360,6 @@ func TestTheCardMarket(t *testing.T) {
 	call(7, map[string]any{"action": "offer", "card": 1, "want": 2})
 	if out := call(7, map[string]any{"action": "unoffer", "offer": 1}); len(out["offers"].([]any)) != 0 {
 		t.Errorf("market after calling off = %v", out)
-	}
-}
-
-// The page shows the player's tokens, opens a card for each, and says so
-// when none is left.
-func TestTokensInTheMiniApp(t *testing.T) {
-	now := time.Unix(1_800_000_000, 0)
-	store := &fakeStore{tokens: 2}
-	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }})
-	initData := signedInit(7, now)
-	if code, out := post(t, h, initData, "state"); code != 200 || out["tokens"] != 2.0 {
-		t.Fatalf("state = %d %v", code, out)
-	}
-	for want := 1.0; want >= 0; want-- {
-		if code, out := post(t, h, initData, "token"); code != 200 || out["tokens"] != want || out["card"] == nil {
-			t.Fatalf("a card for a token = %d %v", code, out)
-		}
-	}
-	if code, out := post(t, h, initData, "token"); code != 200 || out["no_tokens"] != true || out["card"] != nil {
-		t.Errorf("a card with no tokens = %d %v", code, out)
 	}
 }
 

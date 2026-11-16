@@ -408,7 +408,6 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 
 
 
-.extra-draw { display: block; width: min(100%, 360px); margin: 10px auto 0; }
 
 /* anime page: every anime and its cards, held or not */
 .anime-list { display: flex; flex-direction: column; gap: 8px; padding: 4px 16px 16px; }
@@ -434,3 +433,12 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 }
 .card .tier-dot { position: absolute; top: 7px; left: 7px; z-index: 3; color: var(--c); font: 800 9px Unbounded, sans-serif; letter-spacing: 0.08em; text-shadow: 0 1px 4px #000; text-transform: uppercase; }
 .preview-note { margin: 10px 0 0; text-align: center; font: 600 13px Manrope, sans-serif; color: var(--muted); }
+
+/* opening one card or ten: a token each, crystals once there are none */
+.opens { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: min(100%, 360px); margin: 0 auto; }
+.open-btn { width: 100%; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; }
+.open-btn b { font: 700 16px Unbounded, sans-serif; }
+.open-btn small { font: 700 12px Manrope, sans-serif; opacity: 0.8; }
+.open-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.open-grid .card .name { font-size: 9px; left: 4px; right: 4px; bottom: 4px; }
+.open-grid .card .fresh { position: absolute; top: 4px; left: 4px; z-index: 3; font-size: 11px; }

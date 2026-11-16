@@ -20,13 +20,11 @@ type Store interface {
 	CardCatalog(ctx context.Context) ([]storage.Card, error)
 	OwnedCards(ctx context.Context, userID int64, rarity int) ([]storage.OwnedCard, error)
 	CardPlayerOf(ctx context.Context, userID int64) (storage.CardPlayer, time.Time, error)
-	DrawCard(ctx context.Context, userID int64, name string, roll storage.CardRoll, day storage.CardDay, now time.Time) (storage.CardDraw, error)
+	OpenCards(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, cost int, day storage.CardDay, now time.Time) (storage.CardOpening, error)
+	GiveDayTokens(ctx context.Context, userID int64, name string, day storage.CardDay) (int, error)
 	CardTop(ctx context.Context, limit int) ([]storage.CardPlayer, error)
 	CardWallet(ctx context.Context, userID int64) (shards int, spares map[int]int, err error)
 	MeltCards(ctx context.Context, userID int64, rates []int) (melted, gained, shards int, err error)
-	ExtraCard(ctx context.Context, userID int64, name, collection string, roll storage.CardRoll, cost int) (storage.CardDraw, error)
-	CardTokens(ctx context.Context, userID int64) (int, error)
-	TokenCard(ctx context.Context, userID int64, name string, roll storage.CardRoll) (storage.CardDraw, error)
 	CardPlayersNamed(ctx context.Context, name string, except int64, limit int) ([]storage.CardPlayer, error)
 	GiveCard(ctx context.Context, chatID, from, to, cardID int64, rules storage.CardTradeRules) error
 	OfferCard(ctx context.Context, from, give, want int64, rules storage.CardMarketRules) (int64, error)
@@ -83,8 +81,7 @@ type handler struct {
 
 // NewHandler serves the Kartalar Mini App: "state" is the catalog, with
 // the names and pictures of only the cards the player holds, their points
-// and how long until their next card; "draw" draws one; "token" draws one
-// for a token; "top" is the table.
+// and their tokens; "open" opens one card or Batch; "top" is the table.
 // Each request is the player's by the init data Telegram signs.
 func NewHandler(opts Options) http.Handler {
 	if opts.Logger == nil {
@@ -114,8 +111,8 @@ type request struct {
 	// taken or called off, for "take" and "unoffer".
 	Want  int64 `json:"want"`
 	Offer int64 `json:"offer"`
-	// Set is the collection a card is bought from, for "extra"; "" is any.
-	Set string `json:"set"`
+	// Count is how many cards "open" opens: 1 or Batch.
+	Count int `json:"count"`
 }
 
 type failure struct {
@@ -162,16 +159,12 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 	switch req.Action {
 	case "state":
 		return h.state(ctx, opened.User)
-	case "draw":
-		return h.draw(ctx, opened.User)
+	case "open":
+		return h.open(ctx, opened.User, req.Count)
 	case "top":
 		return h.top(ctx, opened.User)
 	case "melt":
 		return h.melt(ctx, opened.User)
-	case "extra":
-		return h.extra(ctx, opened.User, req.Set)
-	case "token":
-		return h.token(ctx, opened.User)
 	case "players":
 		return h.players(ctx, opened.User, req.Query)
 	case "gift":
@@ -242,6 +235,13 @@ func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
 			views[i] = cardView{ID: c.ID, Rarity: c.Rarity, Set: c.Collection}
 		}
 	}
+	// Opening the app gives the day's tokens, so that the page shows them.
+	now := h.Now()
+	given, err := h.Store.GiveDayTokens(ctx, user.ID, name(user), Today(now))
+	if err != nil {
+		h.Logger.Error("could not give the day's tokens", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
 	player, _, err := h.Store.CardPlayerOf(ctx, user.ID)
 	if err != nil {
 		h.Logger.Error("could not read a card player", "user_id", user.ID, "error", err)
@@ -252,47 +252,41 @@ func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
 		h.Logger.Error("could not read a player's shards", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
 	}
-	tokens, err := h.Store.CardTokens(ctx, user.ID)
-	if err != nil {
-		h.Logger.Error("could not read a player's tokens", "user_id", user.ID, "error", err)
-		return nil, errUnavailable
-	}
 	spare, worth := SpareWorth(spares)
 	return map[string]any{
 		"cards": views, "points": player.Points, "held": len(owned),
-		"next_in": NextFree(player, h.Now()).Sub(h.Now()).Milliseconds(), "free_left": FreeLeft(player, h.Now()), "per_day": PerDay,
-		"shards": shards, "spare": spare, "spare_worth": worth, "extra_cost": ExtraCost, "set_cost": SetCost,
-		"tokens": tokens,
+		"tokens": Tokens(player, now), "given": given, "per_day": PerDay, "card_cost": CardCost, "batch": Batch,
+		"shards": shards, "spare": spare, "spare_worth": worth,
 	}, failure{}
 }
 
-func (h *handler) draw(ctx context.Context, user miniapp.User) (any, failure) {
+// open opens 1 or Batch cards, each for a token or, with none left, for
+// CardCost crystals; with too few of both it says what the player has.
+func (h *handler) open(ctx context.Context, user miniapp.User, n int) (any, failure) {
+	if n != 1 && n != Batch {
+		return nil, errBadRequest
+	}
 	if err := h.catalog.Ensure(ctx); err != nil {
 		h.Logger.Error("could not fill the card catalog", "error", err)
 		return nil, errUnavailable
 	}
 	now := h.Now()
-	draw, err := h.Store.DrawCard(ctx, user.ID, name(user), ByOdds(h.Roll), Today(now), now)
-	var wait *storage.CardWaitError
+	opened, err := h.Store.OpenCards(ctx, user.ID, name(user), n, ByOdds(h.Roll), CardCost, Today(now), now)
+	var few *storage.CardFundsError
 	switch {
-	case errors.As(err, &wait):
-		return map[string]any{"wait": wait.Wait.Milliseconds()}, failure{}
+	case errors.As(err, &few):
+		return map[string]any{"short": few.Need - few.Shards, "tokens": few.Tokens, "shards": few.Shards}, failure{}
 	case err != nil:
-		h.Logger.Error("could not draw a card", "user_id", user.ID, "error", err)
+		h.Logger.Error("could not open cards", "user_id", user.ID, "count", n, "error", err)
 		return nil, errUnavailable
 	}
-	return map[string]any{
-		"card": h.held(draw.Card, draw.Count), "new": draw.New, "points": draw.Points, "next_in": nextIn(draw, now).Milliseconds(), "free_left": draw.FreeLeft,
-	}, failure{}
-}
-
-// nextIn is how long after a draw the player may open their next free
-// card: at once while one is left today, or at the next midnight.
-func nextIn(draw storage.CardDraw, now time.Time) time.Duration {
-	if draw.FreeLeft > 0 {
-		return 0
+	drawn := make([]map[string]any, len(opened.Draws))
+	for i, d := range opened.Draws {
+		drawn[i] = map[string]any{"card": h.held(d.Card, d.Count), "new": d.New}
 	}
-	return DayStart(now).AddDate(0, 0, 1).Sub(now)
+	return map[string]any{
+		"drawn": drawn, "points": opened.Points, "tokens": opened.Tokens, "shards": opened.Shards, "given": opened.Given,
+	}, failure{}
 }
 
 // appLanguage is "uz", "ru" or "en" for a Telegram language code, as the
@@ -316,54 +310,6 @@ func (h *handler) melt(ctx context.Context, user miniapp.User) (any, failure) {
 		return nil, errUnavailable
 	}
 	return map[string]any{"melted": melted, "gained": gained, "shards": shards}, failure{}
-}
-
-// extra draws a card out of turn for shards, of the collection set or of
-// any when it is "", or says how few the player has.
-func (h *handler) extra(ctx context.Context, user miniapp.User, set string) (any, failure) {
-	cost := ExtraCost
-	if set != "" {
-		if !IsCollection(set) {
-			return nil, errBadRequest
-		}
-		cost = SetCost
-	}
-	if err := h.catalog.Ensure(ctx); err != nil {
-		h.Logger.Error("could not fill the card catalog", "error", err)
-		return nil, errUnavailable
-	}
-	draw, err := h.Store.ExtraCard(ctx, user.ID, name(user), set, ByOdds(h.Roll), cost)
-	var few *storage.ShardsError
-	switch {
-	case errors.As(err, &few):
-		return map[string]any{"need": few.Need, "have": few.Have}, failure{}
-	case err != nil:
-		h.Logger.Error("could not draw a card for shards", "user_id", user.ID, "error", err)
-		return nil, errUnavailable
-	}
-	return map[string]any{
-		"card": h.held(draw.Card, draw.Count), "new": draw.New, "points": draw.Points, "shards": draw.Shards,
-	}, failure{}
-}
-
-// token draws a card for one of the player's tokens, or says they have
-// none left.
-func (h *handler) token(ctx context.Context, user miniapp.User) (any, failure) {
-	if err := h.catalog.Ensure(ctx); err != nil {
-		h.Logger.Error("could not fill the card catalog", "error", err)
-		return nil, errUnavailable
-	}
-	draw, err := h.Store.TokenCard(ctx, user.ID, name(user), ByOdds(h.Roll))
-	switch {
-	case errors.Is(err, storage.ErrNoTokens):
-		return map[string]any{"no_tokens": true, "tokens": 0}, failure{}
-	case err != nil:
-		h.Logger.Error("could not draw a card for a token", "user_id", user.ID, "error", err)
-		return nil, errUnavailable
-	}
-	return map[string]any{
-		"card": h.held(draw.Card, draw.Count), "new": draw.New, "points": draw.Points, "tokens": draw.Tokens,
-	}, failure{}
 }
 
 func (h *handler) top(ctx context.Context, user miniapp.User) (any, failure) {

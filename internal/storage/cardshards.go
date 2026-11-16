@@ -8,16 +8,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// ErrNoShards is returned by ExtraCard when the player has too few shards:
-// how many they have is in ShardsError.
-var ErrNoShards = errors.New("storage: too few shards")
-
-// ShardsError says how many shards the player has, and how many it took.
-type ShardsError struct{ Have, Need int }
-
-func (e *ShardsError) Error() string { return ErrNoShards.Error() }
-func (e *ShardsError) Unwrap() error { return ErrNoShards }
-
 // CardWallet is the player's 💎 shards, and for each rarity the spare
 // copies of cards they hold that are not melted yet: all of a card's copies
 // but one.
@@ -79,34 +69,6 @@ func (s *Store) MeltCards(ctx context.Context, userID int64, rates []int) (melte
 		return 0, 0, 0, fmt.Errorf("storage: melt cards: %w", err)
 	}
 	return melted, gained, shards, nil
-}
-
-// ExtraCard gives the player a card out of turn for cost shards, as
-// DrawCard does but leaving the day's free cards as they were, of collection or
-// of any when it is ""; with too few it returns a *ShardsError.
-func (s *Store) ExtraCard(ctx context.Context, userID int64, name, collection string, roll CardRoll, cost int) (CardDraw, error) {
-	var draw CardDraw
-	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		player, err := lockCardPlayer(ctx, tx, userID, name)
-		if err != nil {
-			return err
-		}
-		if player.shards < cost {
-			return &ShardsError{Have: player.shards, Need: cost}
-		}
-		if draw, err = giveCard(ctx, tx, userID, name, collection, roll, player); err != nil {
-			return err
-		}
-		return tx.QueryRow(ctx, `UPDATE card_players SET shards = shards - $2 WHERE user_id = $1 RETURNING shards`, userID, cost).Scan(&draw.Shards)
-	})
-	var few *ShardsError
-	if errors.As(err, &few) {
-		return CardDraw{}, few
-	}
-	if err != nil {
-		return CardDraw{}, fmt.Errorf("storage: draw a card for shards: %w", err)
-	}
-	return draw, nil
 }
 
 // DuelTeam is the player's n strongest cards, by attack and health.

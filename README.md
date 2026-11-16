@@ -864,7 +864,7 @@ or in a group (`internal/tools/reminders.go`, the `reminders` tool):
 - "eslatmalarim", "qanday eslatmalarim bor?": the ones waiting; "2-sini
   bekor qil": cancels one.
 - "karta ochish vaqti kelganda eslat": a reminder at the player's next
-  [Kartalar](#kartalar) draw, the next midnight once the day's free cards are opened, with the
+  [Kartalar](#kartalar) draw, the next midnight once the player's tokens are spent, with the
   Mini App's button; one who may open a card now is told so. "har safar
   eslat" turns on a reminder after every card: each draw, from `/card`
   or the Mini App, schedules the next one (`DrawCard`, kept on
@@ -2156,15 +2156,18 @@ points, so its spare copies melt into 💎 crystals in the Mini App's draw tab
 counted in the points so that melting costs no place on the table
 (`card_owned.melted`, migration 63); the melt is asked once more, listing
 each card's spares and the crystals they make, as melted copies can no
-longer be given. The Mini App's draw tab holds the crystals, and under the free
-cards' button opens a card now for 15 of them (`extra`), by the usual odds
-and sure cards, the day's free cards left as they were. (`extra` also takes a
-`set`, a collection to draw from for 20, which no page offers now.) Crystals live in the Mini App alone: the bot has no
+longer be given. The Mini App's draw tab holds the crystals, which open cards
+once the tokens are spent. Crystals are melted in the Mini App alone: the bot has no
 commands for them.
-A player's 🎟 tokens (`card_players.tokens`, migration 80) each open one card
-(`token`), by the usual odds, the day's free cards left as they were; the
-draw tab shows the button only while the player has tokens. Players got them
-at the reset, by their points; nothing else gives them yet.
+A player's 🎟 tokens (`card_players.tokens`, migration 80) each open one card,
+by the usual odds. Every player is given `PerDay` (2) tokens a day, at the day's
+first open of the app or first card (`GiveDayTokens`, `free_day` marking the day
+given), and keeps the ones not spent; the players got more at the reset, by their
+points. The draw tab has two buttons, open 1 and open 5 (`open`, `count`): each
+card takes a token while there is one and 15 crystals once there is none, and with
+too few for all of them none open (`OpenCards`, `CardFundsError`). Five are laid
+out together after the rarest of them turns. `/card` in the chat opens one the
+same way.
 The Animelar tab (`animes`) lists every anime, its seasons and sequels as one, with
 how many of its cards the player holds; an anime opens on all its cards with their
 pictures and names, the ones not held dimmed, so that a player sees what is there to

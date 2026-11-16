@@ -156,7 +156,7 @@ func TestCardRemindersFollowDraws(t *testing.T) {
 	now := time.Now().Truncate(time.Second)
 	day := CardDay{Start: now.Add(-time.Hour), PerDay: 1}
 
-	if _, err := store.DrawCard(ctx, alice, "Alice", rarity(0), CardDay{}, now); err != nil {
+	if _, err := store.OpenCards(ctx, alice, "Alice", 1, rarity(0), 15, day, now); err != nil {
 		t.Fatal(err)
 	}
 	if waiting, _ := store.WaitingReminders(ctx, alice, alice); len(waiting) != 0 {
@@ -180,7 +180,10 @@ func TestCardRemindersFollowDraws(t *testing.T) {
 		t.Fatalf("auto chat = %d, %v", chat, err)
 	}
 	next := now.Add(time.Hour)
-	if _, err := store.DrawCard(ctx, alice, "Alice", rarity(0), day, next); err != nil {
+	if _, err := store.pool.Exec(ctx, `UPDATE card_players SET tokens = 1 WHERE user_id = $1`, alice); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.OpenCards(ctx, alice, "Alice", 1, rarity(0), 15, day, next); err != nil {
 		t.Fatal(err)
 	}
 	if waiting, _ := store.WaitingReminders(ctx, alice, alice); len(waiting) != 0 {
@@ -192,7 +195,7 @@ func TestCardRemindersFollowDraws(t *testing.T) {
 	}
 
 	claimed, err := store.ClaimDueReminders(ctx, day.Start.AddDate(0, 0, 1), 10)
-	if err != nil || len(claimed) != 1 || !claimed[0].LastDraw.Equal(next) || !claimed[0].FreeDay.Equal(day.Start) || claimed[0].FreeUsed != 1 {
+	if err != nil || len(claimed) != 1 || !claimed[0].LastDraw.Equal(next) || !claimed[0].FreeDay.Equal(day.Start) {
 		t.Fatalf("claimed = %+v, %v; want the last draw with it", claimed, err)
 	}
 	// Claimed, it no longer holds the player's one slot.

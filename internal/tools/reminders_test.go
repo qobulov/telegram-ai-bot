@@ -224,11 +224,11 @@ func TestListAndCancelOnlyOwnReminders(t *testing.T) {
 	}
 }
 
-// A card reminder falls at the next midnight once the day's free cards are
-// opened; one who may open a card now is told so and nothing is scheduled; always turns on the
+// A card reminder falls at the next midnight once the player's tokens are
+// spent; one who may open a card now is told so and nothing is scheduled; always turns on the
 // reminder after every draw, and card_off turns it off.
 func TestCardReminder(t *testing.T) {
-	store := &fakeReminders{player: storage.CardPlayer{FreeDay: reminderDay.Start, FreeUsed: 3}}
+	store := &fakeReminders{player: storage.CardPlayer{FreeDay: reminderDay.Start, Tokens: 0}}
 	registry := remindersRegistry(t, store)
 	env := remindIn(t, registry, 7, 7, `{"action":"card","language":"ru"}`)
 	var result struct {
@@ -243,7 +243,7 @@ func TestCardReminder(t *testing.T) {
 		t.Errorf("card reminder = %+v, auto %v", store.card, store.autoSet)
 	}
 
-	store = &fakeReminders{player: storage.CardPlayer{FreeDay: reminderDay.Start, FreeUsed: 1}}
+	store = &fakeReminders{player: storage.CardPlayer{FreeDay: reminderDay.Start, Tokens: 1}}
 	registry = remindersRegistry(t, store)
 	env = remindIn(t, registry, -100, 7, `{"action":"card","always":true}`)
 	if err := json.Unmarshal(env.Result, &result); err != nil || !result.CanOpen || store.card != nil || store.autoChat != -100 {

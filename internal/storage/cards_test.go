@@ -49,40 +49,62 @@ func TestCardsAreDrawnAndCollected(t *testing.T) {
 		t.Fatalf("picture = %q", link)
 	}
 
-	// Alice opens two free cards a day, here; a copy adds no points.
+	// Alice is given two tokens a day, here; a copy adds no points.
 	start := time.Date(2026, 11, 16, 0, 0, 0, 0, time.UTC)
 	now := start.Add(10 * time.Hour)
 	day := CardDay{Start: start, PerDay: 2}
-	draw, err := store.DrawCard(ctx, alice, "Alice", rarity(4), day, now)
-	if err != nil || draw.Card.ID != 1 || !draw.New || draw.Count != 1 || draw.Points != 5000 || !draw.Free || draw.FreeLeft != 1 {
-		t.Fatalf("first draw = %+v, %v", draw, err)
+	open, err := store.OpenCards(ctx, alice, "Alice", 1, rarity(4), 15, day, now)
+	if err != nil || len(open.Draws) != 1 || open.Given != 2 || open.Tokens != 1 || open.Points != 5000 {
+		t.Fatalf("first opening = %+v, %v", open, err)
 	}
-	if draw, err = store.DrawCard(ctx, alice, "Alice", rarity(4), day, now.Add(time.Minute)); err != nil || draw.New || draw.Count != 2 || draw.Points != 5000 || draw.FreeLeft != 0 {
-		t.Fatalf("the same card again = %+v, %v; want no points for the copy", draw, err)
+	if d := open.Draws[0]; d.Card.ID != 1 || !d.New || d.Count != 1 {
+		t.Fatalf("first card = %+v", d)
 	}
-	_, err = store.DrawCard(ctx, alice, "Alice", rarity(0), day, now.Add(2*time.Hour))
-	var wait *CardWaitError
-	if !errors.As(err, &wait) || wait.Wait != 12*time.Hour {
-		t.Fatalf("a third draw at noon = %v, want a wait until midnight", err)
+	if open, err = store.OpenCards(ctx, alice, "Alice", 1, rarity(4), 15, day, now.Add(time.Minute)); err != nil || open.Given != 0 || open.Tokens != 0 || open.Draws[0].New || open.Draws[0].Count != 2 || open.Points != 5000 {
+		t.Fatalf("the same card again = %+v, %v; want no points for the copy and no second gift", open, err)
 	}
+	// No token and no crystals: nothing opens, and it says what is short.
+	_, err = store.OpenCards(ctx, alice, "Alice", 1, rarity(0), 15, day, now.Add(2*time.Hour))
+	var few *CardFundsError
+	if !errors.As(err, &few) || few.Tokens != 0 || few.Shards != 0 || few.Need != 15 {
+		t.Fatalf("a card with nothing to pay = %v", err)
+	}
+	// Ten at once: the token first, then crystals for the other nine.
+	if _, err := store.pool.Exec(ctx, `UPDATE card_players SET tokens = 1, shards = 134 WHERE user_id = $1`, alice); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.OpenCards(ctx, alice, "Alice", 10, rarity(4), 15, day, now); !errors.As(err, &few) || few.Need != 135 || few.Shards != 134 {
+		t.Fatalf("ten for one token and 134 crystals = %v; want refused, 135 needed", err)
+	}
+	if _, err := store.pool.Exec(ctx, `UPDATE card_players SET shards = 140 WHERE user_id = $1`, alice); err != nil {
+		t.Fatal(err)
+	}
+	if open, err = store.OpenCards(ctx, alice, "Alice", 10, rarity(4), 15, day, now); err != nil || len(open.Draws) != 10 || open.Tokens != 0 || open.Shards != 5 {
+		t.Fatalf("ten for one token and 135 crystals = %+v, %v", open, err)
+	}
+	// The next day brings two tokens more.
 	nextDay := CardDay{Start: start.AddDate(0, 0, 1), PerDay: 2}
-	if draw, err = store.DrawCard(ctx, alice, "Alice", rarity(4), nextDay, start.AddDate(0, 0, 1).Add(time.Hour)); err != nil || draw.FreeLeft != 1 || draw.Count != 3 {
-		t.Fatalf("the next day's first = %+v, %v", draw, err)
+	if given, err := store.GiveDayTokens(ctx, alice, "Alice", nextDay); err != nil || given != 2 {
+		t.Fatalf("the next day's tokens = %d, %v", given, err)
 	}
-	if draw, err = store.DrawCard(ctx, bob, "Bob", rarity(0), CardDay{}, now); err != nil || draw.Card.ID != 2 || draw.Points != 100 {
-		t.Fatalf("Bob's draw = %+v, %v", draw, err)
+	if given, _ := store.GiveDayTokens(ctx, alice, "Alice", nextDay); given != 0 {
+		t.Errorf("the day's tokens given twice: %d", given)
 	}
-	if draw.SinceLegendary != 1 || draw.SinceMythic != 1 {
-		t.Errorf("after a common card Bob waited %d and %d draws, want 1 and 1", draw.SinceLegendary, draw.SinceMythic)
+	if p, _, _ := store.CardPlayerOf(ctx, alice); p.Tokens != 2 || !p.FreeDay.Equal(nextDay.Start) {
+		t.Errorf("Alice after the next day's gift = %+v", p)
 	}
-	// The roll is told the wait, and a Mythic ends both.
-	var told [2]int
-	draw, err = store.DrawCard(ctx, bob, "Bob", func(legendary, mythic int) (int, bool) {
-		told = [2]int{legendary, mythic}
-		return 4, true
-	}, CardDay{}, now)
-	if err != nil || told != [2]int{1, 1} || !draw.Guaranteed || draw.SinceLegendary != 0 || draw.SinceMythic != 0 {
-		t.Errorf("Bob's sure Mythic = %+v, told %v, %v", draw, told, err)
+	if open, err = store.OpenCards(ctx, alice, "Alice", 1, rarity(4), 15, nextDay, start.AddDate(0, 0, 1).Add(time.Hour)); err != nil || open.Tokens != 1 || open.Draws[0].Count != 13 {
+		t.Fatalf("the next day's first = %+v, %v", open, err)
+	}
+	if open, err = store.OpenCards(ctx, bob, "Bob", 1, rarity(0), 15, CardDay{}, now); !errors.As(err, &few) {
+		t.Fatalf("Bob with no day's tokens and nothing = %+v, %v", open, err)
+	}
+	if _, err := store.pool.Exec(ctx, `INSERT INTO card_players (user_id, name, tokens) VALUES ($1, 'Bob', 2)`, bob); err != nil {
+		t.Fatal(err)
+	}
+	open, err = store.OpenCards(ctx, bob, "Bob", 1, rarity(0), 15, CardDay{}, now)
+	if err != nil || open.Draws[0].Card.ID != 2 || open.Points != 100 {
+		t.Fatalf("Bob's card = %+v, %v", open, err)
 	}
 
 	total, owned, points, err := store.CardCounts(ctx, alice)
@@ -90,14 +112,14 @@ func TestCardsAreDrawnAndCollected(t *testing.T) {
 		t.Errorf("Alice's counts = %v %v %d, %v", total, owned, points, err)
 	}
 	cards, err := store.OwnedCards(ctx, alice, -1)
-	if err != nil || len(cards) != 1 || cards[0].Name != "Gojo" || cards[0].Count != 3 {
+	if err != nil || len(cards) != 1 || cards[0].Name != "Gojo" || cards[0].Count != 13 {
 		t.Errorf("Alice's cards = %+v, %v", cards, err)
 	}
 	if cards, err = store.OwnedCards(ctx, alice, 0); err != nil || len(cards) != 0 {
 		t.Errorf("Alice's common cards = %+v, %v", cards, err)
 	}
 	top, err := store.CardTop(ctx, 5)
-	if err != nil || len(top) != 2 || top[0].Name != "Bob" || top[1].UserID != alice || top[1].Cards != 1 {
+	if err != nil || len(top) != 2 || top[0].UserID != alice || top[0].Cards != 1 || top[1].Name != "Bob" {
 		t.Errorf("top = %+v, %v", top, err)
 	}
 }

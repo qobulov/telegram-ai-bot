@@ -66,17 +66,6 @@ func (f *fakeCards) MeltCards(_ context.Context, userID int64, rates []int) (int
 	return n, n * rates[f.card.Rarity], f.shards[userID], nil
 }
 
-func (f *fakeCards) ExtraCard(_ context.Context, userID int64, _ string, _ storage.CardRoll, cost int) (storage.CardDraw, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if f.shards[userID] < cost {
-		return storage.CardDraw{}, &storage.ShardsError{Have: f.shards[userID], Need: cost}
-	}
-	f.shards[userID] -= cost
-	f.held[userID]++
-	return storage.CardDraw{Card: f.card, Count: f.held[userID], Shards: f.shards[userID]}, nil
-}
-
 func (f *fakeCards) DuelTeam(_ context.Context, userID int64, _ int) ([]storage.Card, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -181,17 +170,29 @@ func (f *fakeCards) CardTop(_ context.Context, limit int) ([]storage.CardPlayer,
 	return f.top[:min(limit, len(f.top))], nil
 }
 
-func (f *fakeCards) DrawCard(_ context.Context, userID int64, _ string, _ storage.CardRoll, day storage.CardDay, now time.Time) (storage.CardDraw, error) {
+// OpenCards gives the day's tokens at the day's first opening, then spends
+// a token a card, or cost crystals once there is none.
+func (f *fakeCards) OpenCards(_ context.Context, userID int64, _ string, n int, _ storage.CardRoll, cost int, day storage.CardDay, now time.Time) (storage.CardOpening, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.days = append(f.days, day)
-	if f.used[userID] >= day.PerDay {
-		return storage.CardDraw{}, &storage.CardWaitError{Wait: day.Start.AddDate(0, 0, 1).Sub(now)}
+	if f.used[userID] == 0 {
+		f.used[userID] = 1 + day.PerDay // the day's tokens, kept one up so that 0 is "not given"
+	}
+	tokens := min(f.used[userID]-1, n)
+	if shards := (n - tokens) * cost; shards > f.shards[userID] {
+		return storage.CardOpening{}, &storage.CardFundsError{Tokens: f.used[userID] - 1, Shards: f.shards[userID], Need: shards}
+	} else {
+		f.used[userID] -= tokens
+		f.shards[userID] -= shards
 	}
 	f.last[userID] = now
-	f.used[userID]++
-	f.held[userID]++
-	return storage.CardDraw{Card: f.card, New: f.held[userID] == 1, Count: f.held[userID], Points: 5000, Free: true, FreeLeft: day.PerDay - f.used[userID]}, nil
+	open := storage.CardOpening{Tokens: f.used[userID] - 1, Shards: f.shards[userID], Points: 5000}
+	for range n {
+		f.held[userID]++
+		open.Draws = append(open.Draws, storage.CardDraw{Card: f.card, New: f.held[userID] == 1, Count: f.held[userID], Points: 5000})
+	}
+	return open, nil
 }
 
 func (f *fakeCards) CardCounts(_ context.Context, userID int64) (map[int]int, map[int]int, int64, error) {
@@ -213,9 +214,9 @@ func (f *fakeCards) OwnedCards(_ context.Context, userID int64, rarity int) ([]s
 	return []storage.OwnedCard{{Card: f.card, Count: f.held[userID]}}, nil
 }
 
-// A card is drawn with its picture and its numbers under it, once an hour:
-// the next asks to wait, an owner's like anyone's.
-func TestCardIsDrawnOnceAnHour(t *testing.T) {
+// A card opens for a token with its picture and its numbers under it; with
+// no token and no crystals the next says so, an owner's like anyone's.
+func TestCardOpensForAToken(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("\x89PNG card")) }))
 	defer server.Close()
 	f := newFixture()
@@ -226,19 +227,19 @@ func TestCardIsDrawnOnceAnHour(t *testing.T) {
 	if len(sent) != 1 || !sent[0].photo {
 		t.Fatalf("sent = %+v, want the card's picture", sent)
 	}
-	for _, want := range []string{"👑", "Gojo Satoru", "Jujutsu Kaisen", "5 130", "18 020", "+5 000", "🆕", "yana 1 ta tekin"} {
+	for _, want := range []string{"👑", "Gojo Satoru", "Jujutsu Kaisen", "5 130", "18 020", "+5 000", "🆕", "🎟 Token: 1"} {
 		if !strings.Contains(sent[0].text, want) {
 			t.Errorf("caption lacks %q:\n%s", want, sent[0].text)
 		}
 	}
 	// f.run gives every message sent so far: the last is this draw's. A
-	// copy adds no points; the second of the day says they are done.
-	if sent = f.run(textFrom(userID, "karta")); len(sent) != 2 || !sent[1].photo || !strings.Contains(sent[1].text, "ochko qo'shilmaydi") || !strings.Contains(sent[1].text, "tugadi") {
-		t.Errorf("second draw = %+v, want the copy without points and the day's cards done", sent)
+	// copy adds no points; the second spends the day's last token.
+	if sent = f.run(textFrom(userID, "karta")); len(sent) != 2 || !sent[1].photo || !strings.Contains(sent[1].text, "ochko qo'shilmaydi") || !strings.Contains(sent[1].text, "🎟 Token: 0") {
+		t.Errorf("second draw = %+v, want the copy without points and no token left", sent)
 	}
 	f.opts.OwnerIDs = map[int64]bool{userID: true}
-	if sent = f.run(textFrom(userID, "/card")); len(sent) != 3 || sent[2].photo || !strings.Contains(sent[2].text, "ertaga") || strings.Contains(sent[2].text, "soat") {
-		t.Errorf("an owner's third draw = %+v, want the new ones tomorrow, with no count of the time", sent)
+	if sent = f.run(textFrom(userID, "/card")); len(sent) != 3 || sent[2].photo || !strings.Contains(sent[2].text, "Tokeningiz qolmadi") || !strings.Contains(sent[2].text, "Ertaga") {
+		t.Errorf("an owner's third draw = %+v, want no token, the price in crystals and tomorrow's tokens", sent)
 	}
 	if day := book.days[len(book.days)-1]; day.PerDay != 2 || day.Start.Hour() != 0 {
 		t.Errorf("an owner's day = %+v", day)
@@ -328,7 +329,7 @@ func TestCardTopShowsTheAskersPlace(t *testing.T) {
 }
 
 // /card is not counted in the group's quota, which is for the model's talk:
-// a member out of answers still draws, and is still told to wait.
+// a member out of answers still draws, and is still told when out of tokens.
 func TestCardDrawsTakeNoGroupQuota(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("\x89PNG")) }))
 	defer server.Close()
@@ -344,9 +345,9 @@ func TestCardDrawsTakeNoGroupQuota(t *testing.T) {
 		t.Fatalf("sent = %+v, want the answer and then the card", sent)
 	}
 	book := f.opts.Cards.(*fakeCards)
-	book.used[userID] = 3
-	if sent = f.run(inGroup(groupMessage("/card"))); len(sent) != 3 || !strings.Contains(sent[2].text, "⏳") {
-		t.Errorf("a wait over the quota sent %+v, want the wait", sent)
+	book.used[userID] = 1 // no token left
+	if sent = f.run(inGroup(groupMessage("/card"))); len(sent) != 3 || !strings.Contains(sent[2].text, "🎟") || sent[2].photo {
+		t.Errorf("no token over the quota sent %+v, want that there is none", sent)
 	}
 }
 
@@ -382,12 +383,13 @@ func TestGameCommandKeepsTheGamesLimitInAGroup(t *testing.T) {
 func TestCardCaptionIsShort(t *testing.T) {
 	in := incoming{msg: &telegram.Message{From: &telegram.User{ID: 1, FirstName: "Bek"}}, text: "/card"}
 	draw := storage.CardDraw{Card: storage.Card{Name: "Gojo", Anime: "JJK", Rarity: 4, Attack: 5130, Health: 18020, Value: 5000}, New: true, Count: 1, Points: 12300, SinceLegendary: 3, SinceMythic: 40}
-	want := "👑 **Gojo**\n🎬 JJK\n⚔️ Hujum: 5 130\n❤️ Jon: 18 020\n💎 Noyoblik: Mifik\n🆕 Yangi · +5 000 ochko (jami 12 300)"
-	if caption := cardCaption(languageOf(in), draw); caption != want {
+	opened := storage.CardOpening{Tokens: 1, Shards: 1500}
+	want := "👑 **Gojo**\n🎬 JJK\n⚔️ Hujum: 5 130\n❤️ Jon: 18 020\n💎 Noyoblik: Mifik\n🆕 Yangi · +5 000 ochko (jami 12 300)\n🎟 Token: 1 · 💎 1 500"
+	if caption := cardCaption(languageOf(in), draw, opened); caption != want {
 		t.Errorf("caption:\n%s\nwant:\n%s", caption, want)
 	}
 	draw.New, draw.Count, draw.Guaranteed, draw.SinceLegendary = false, 2, true, 99
-	caption := cardCaption(languageOf(in), draw)
+	caption := cardCaption(languageOf(in), draw, opened)
 	if !strings.Contains(caption, "🔁 Takror, endi ×2 · ochko qo'shilmaydi") || strings.Contains(caption, "Kafolat") || strings.Contains(caption, "aniq") {
 		t.Errorf("a copy's caption, with no sure cards:\n%s", caption)
 	}

@@ -156,24 +156,20 @@ func TestEnsureAddsOnlyNewCards(t *testing.T) {
 	}
 }
 
-// The day's free cards start at midnight in Tashkent: two each day, the
-// next day's at the next midnight.
-func TestTwoFreeCardsADay(t *testing.T) {
+// The day starts at midnight in Tashkent, and a player not yet given the
+// day's tokens counts them as theirs.
+func TestTwoTokensADay(t *testing.T) {
 	now := time.Date(2026, 11, 16, 20, 30, 0, 0, time.UTC) // 01:30 in Tashkent
 	if start := DayStart(now); !start.Equal(time.Date(2026, 11, 17, 0, 0, 0, 0, Location)) {
 		t.Errorf("day start = %v", start)
 	}
-	player := storage.CardPlayer{FreeDay: DayStart(now), FreeUsed: 1}
-	if FreeLeft(player, now) != 1 || !NextFree(player, now).Equal(now) {
-		t.Errorf("one left = %d, next %v", FreeLeft(player, now), NextFree(player, now))
-	}
-	player.FreeUsed = 2
-	if FreeLeft(player, now) != 0 || !NextFree(player, now).Equal(DayStart(now).AddDate(0, 0, 1)) {
-		t.Errorf("none left = %d, next %v", FreeLeft(player, now), NextFree(player, now))
+	player := storage.CardPlayer{FreeDay: DayStart(now), Tokens: 1}
+	if n := Tokens(player, now); n != 1 {
+		t.Errorf("given today, one held = %d", n)
 	}
 	player.FreeDay = DayStart(now).AddDate(0, 0, -1)
-	if FreeLeft(player, now) != PerDay {
-		t.Errorf("yesterday's = %d left, want %d", FreeLeft(player, now), PerDay)
+	if n := Tokens(player, now); n != 1+PerDay {
+		t.Errorf("given yesterday = %d, want %d", n, 1+PerDay)
 	}
 }
 
