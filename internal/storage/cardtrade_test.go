@@ -163,43 +163,48 @@ func TestTheCardMarket(t *testing.T) {
 }
 
 // A trade of cards more than one rarity apart is refused, as an offer and
-// as a take; two players trade with each other once a day, either way round.
-func TestTradesAreEvenAndOnceADayAPair(t *testing.T) {
+// as a take; two players trade with each other five times a day, either way
+// round, and a sixth waits for the next day.
+func TestTradesAreEvenAndFiveADayAPair(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 	for _, q := range []string{
 		`INSERT INTO card_catalog (id, name, rarity, attack, health, value) VALUES (10, 'Goku', 4, 1, 1, 4000), (20, 'Vegeta', 3, 1, 1, 2000), (30, 'Extra', 0, 1, 1, 100), (40, 'Kakashi', 3, 1, 1, 2000)`,
-		`INSERT INTO card_players (user_id, name, points, cards, draws) VALUES (1, 'Alice', 6100, 3, 3), (2, 'Bob', 4000, 2, 2), (3, 'Carol', 2000, 1, 1)`,
-		`INSERT INTO card_owned (user_id, card_id) VALUES (1, 10), (1, 20), (1, 30), (2, 20), (2, 40), (3, 40)`,
+		`INSERT INTO card_players (user_id, name, points, cards, draws) VALUES (1, 'Alice', 6100, 3, 3), (2, 'Bob', 4000, 2, 2)`,
+		`INSERT INTO card_owned (user_id, card_id) VALUES (1, 10), (1, 20), (1, 30), (2, 40)`,
 	} {
 		if _, err := store.pool.Exec(ctx, q); err != nil {
 			t.Fatal(err)
 		}
 	}
 	now := time.Now()
-	rules := CardTradeRules{Limit: 10, Day: 24 * time.Hour, Now: now}
+	rules := CardTradeRules{Limit: 20, Day: 24 * time.Hour, Now: now}
 	market := CardMarketRules{Open: 5, Keep: 7 * 24 * time.Hour, Now: now}
 	if _, err := store.OfferCard(ctx, 1, 30, 10, market); !errors.Is(err, ErrCardTradeUneven) {
 		t.Errorf("a Common put up for a Mythic = %v", err)
 	}
-	// A Mythic for a Legendary is one rarity apart: done once, not twice.
-	goku, err := store.OfferCard(ctx, 1, 10, 40, market)
+	// Alice's Goku and Bob's Kakashi, one rarity apart, go back and forth:
+	// whoever holds Goku puts it up for Kakashi, the other takes it.
+	holder, other := int64(1), int64(2)
+	for i := 1; i <= tradesPerPair; i++ {
+		id, err := store.OfferCard(ctx, holder, 10, 40, market)
+		if err != nil {
+			t.Fatalf("offer %d = %v", i, err)
+		}
+		if _, err := store.TakeCardOffer(ctx, id, other, rules, market.Keep); err != nil {
+			t.Fatalf("trade %d = %v", i, err)
+		}
+		holder, other = other, holder
+	}
+	sixth, err := store.OfferCard(ctx, holder, 10, 40, market)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.TakeCardOffer(ctx, goku, 2, rules, market.Keep); err != nil {
-		t.Fatalf("Bob taking Goku for Kakashi = %v", err)
-	}
-	// Bob puts his Vegeta up for a Kakashi, which Alice now holds.
-	vegeta, err := store.OfferCard(ctx, 2, 20, 40, market)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := store.TakeCardOffer(ctx, vegeta, 1, rules, market.Keep); !errors.Is(err, ErrCardPairLimit) {
-		t.Errorf("Alice taking Bob's offer the same day = %v", err)
+	if _, err := store.TakeCardOffer(ctx, sixth, other, rules, market.Keep); !errors.Is(err, ErrCardPairLimit) {
+		t.Errorf("a sixth trade the same day = %v", err)
 	}
 	rules.Now = now.Add(25 * time.Hour)
-	if _, err := store.TakeCardOffer(ctx, vegeta, 1, rules, market.Keep); err != nil {
-		t.Errorf("Alice taking it the next day = %v", err)
+	if _, err := store.TakeCardOffer(ctx, sixth, other, rules, market.Keep); err != nil {
+		t.Errorf("the sixth the next day = %v", err)
 	}
 }

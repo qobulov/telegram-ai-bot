@@ -2186,7 +2186,7 @@ whole catalog by name (`catalog`, `offer`), at most 5 open, each for 7 days;
 anyone who holds the card wanted presses 🔄 to take it (`take`), each giving
 the other their card with its points, and the offer's player is told; an
 offer whose card its player no longer holds is called off when taken, and a
-player takes down their own (`unoffer`). A trade's two cards must be at most one rarity apart, a Mythic going only for a Mythic or a Legendary, and the same two players trade once a day, either way round, as an offer and as a market take (`ErrCardTradeUneven`, `ErrCardPairLimit`): one player's cards had gone to another's, Common cards for three Mythic in seven minutes. The offer and the market's cards show each card's tier and points; migration 75 called off the open offers the rule forbids. There is no trade command: `/trade`, which offered a card for a member's in
+player takes down their own (`unoffer`). A trade's two cards must be at most one rarity apart, a Mythic going only for a Mythic or a Legendary, and the same two players trade at most 5 times a day, either way round, as an offer and as a market take (`ErrCardTradeUneven`, `ErrCardPairLimit`): one player's cards had gone to another's, Common cards for three Mythic in seven minutes. The market's cards show each card's tier; migration 75 called off the open offers the rule forbids. There is no trade command: `/trade`, which offered a card for a member's in
 a group, was taken out, and trades are done on the market alone. A card taken
 from the market may be the last copy, which leaves the collection (its melted copies, gone
 to shards, with it), its points passing only as it is new to its taker or the giver's last copy. A player gives at most 5
