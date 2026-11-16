@@ -92,7 +92,13 @@ func (s *Service) isModCommand(in incoming) bool {
 // says what was done, or why it was not.
 func (s *Service) modCommand(ctx context.Context, in incoming) outcome {
 	in, action, minutes, reason, _ := s.modRequest(in)
-	args, err := json.Marshal(map[string]any{"action": action, "minutes": minutes, "reason": reason})
+	return s.runModerate(ctx, in, map[string]any{"action": action, "minutes": minutes, "reason": reason})
+}
+
+// runModerate has the moderate tool do args for in, and says what was done,
+// or why it was not.
+func (s *Service) runModerate(ctx context.Context, in incoming, fields map[string]any) outcome {
+	args, err := json.Marshal(fields)
 	if err != nil {
 		return say(textError.to(in))
 	}

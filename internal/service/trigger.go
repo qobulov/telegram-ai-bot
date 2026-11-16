@@ -121,6 +121,7 @@ var ownCommands = map[string]bool{
 	"/market": true, "/invites": true, "/invites_week": true, "/invites_month": true, "/invites_auto": true, "/teams": true, "/duel": true, "/games": true,
 	"/boss": true, "/snake": true, "/woodcutter": true, "/checkers": true, "/tictactoe": true,
 	"/staff": true, "/ranks": true, "/ranklog": true, "/access": true, "/rank": true,
+	"/banlist": true, "/amnesty": true, "/kickinactive": true,
 }
 
 // commandTarget reports whether text is a command and which bot it names:

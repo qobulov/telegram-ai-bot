@@ -793,6 +793,9 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 	if s.isRankCommand(in) {
 		return s.rankCommand(ctx, in)
 	}
+	if s.isGroupOrder(in) {
+		return s.groupCommand(ctx, in)
+	}
 	if s.opts.Tools != nil && s.isModCommand(in) {
 		return s.modCommand(ctx, in)
 	}

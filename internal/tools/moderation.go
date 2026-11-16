@@ -33,6 +33,11 @@ const (
 	// WarnMuteMinutes and the count starts again. actionUnwarn takes one off.
 	actionWarn   = "warn"
 	actionUnwarn = "unwarn"
+	// actionAmnesty unbans everyone the bot banned in the group;
+	// actionKickInactive removes the members it last saw write more than
+	// days ago, shown first and done only when confirmed.
+	actionAmnesty      = "amnesty"
+	actionKickInactive = "kick_inactive"
 	// actionNoStickers takes away a member's stickers and GIFs, which
 	// Telegram allows or forbids together; actionStickers gives them back.
 	actionNoStickers = "no_stickers"
@@ -134,6 +139,9 @@ var neededRight = map[string]string{
 	actionPurge:  telegram.RightDeleteMessages,
 	actionWarn:   telegram.RightRestrictMembers,
 	actionUnwarn: telegram.RightRestrictMembers,
+
+	actionAmnesty:      telegram.RightRestrictMembers,
+	actionKickInactive: telegram.RightRestrictMembers,
 
 	actionNoStickers: telegram.RightRestrictMembers,
 	actionStickers:   telegram.RightRestrictMembers,
@@ -270,10 +278,20 @@ type ModerationOptions struct {
 	Messages MessageLog
 	// Warns keeps members' warnings; without it warn is refused.
 	Warns WarnStore
+	// Bans lists those the bot banned and the members who stopped writing,
+	// for amnesty and kick_inactive; without it both are refused.
+	Bans BanBook
 	// Ranks keeps the moderators' ranks: a member whose rank opens an
 	// action may ask for it without the Telegram right. Without it only
 	// Telegram's rights count.
 	Ranks RankBook
+}
+
+// BanBook lists a group's members the bot banned, and those it last saw
+// write before a time.
+type BanBook interface {
+	BannedMembers(ctx context.Context, chatID int64, limit int) ([]storage.BannedMember, error)
+	InactiveMembers(ctx context.Context, chatID int64, since time.Time, limit int) ([]storage.GroupMember, error)
 }
 
 // RankBook keeps each group's moderators' ranks and the rank each command
@@ -302,6 +320,8 @@ type moderationArgs struct {
 	Force bool `json:"force"`
 	// Member is who the asker named, without a reply or a tag.
 	Member string `json:"member"`
+	// Days is how long kick_inactive's members have not written.
+	Days int `json:"days"`
 	// MemberLimit, JoinRequest and Link are an invite link's: see
 	// inviteRequest.
 	MemberLimit *int   `json:"member_limit"`
@@ -344,6 +364,7 @@ func (m *Moderation) Tool() Tool {
 			"no_stickers (minutes, default a day) or allow_stickers: take away or give back its author's stickers and GIFs, which Telegram only allows or forbids together; use it, not ban or ignore, when they ask to block someone's stickers. " +
 			"no_photos (minutes, default a day) or allow_photos: the same for photos. A member's other limits stay as they are. " +
 			"promote: make its author an admin, with your own delete, mute and pin rights at most; demote: take that back; admin_title (text, 16 characters at most): the title shown for an admin you made; member_tag (text, 16 characters at most, no emoji; empty takes it off): the tag shown by a regular member's name. " +
+			"amnesty: unban everyone you banned here. kick_inactive (days, default 30): first lists the members who have not written for that long; only with force, when they confirm, removes them. " +
 			"warn: warn its author; at the third warning they are muted for a day and the count starts again; unwarn: take one warning off. Use warn, not mute, when they ask to warn (\"varn ber\", \"предупреждение\"). " +
 			"purge (minutes, default 60, at most 2880): delete every message its author wrote here in the last minutes, as far as your log of the group has them, when they ask to clear out or delete all of someone's messages; it cannot be undone. " +
 			"A message posted on behalf of a channel can only be deleted, pinned, or banned or unbanned, which bans the channel from posting here. " +
@@ -355,7 +376,7 @@ func (m *Moderation) Tool() Tool {
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["delete", "purge", "mute", "unmute", "ban", "unban", "kick", "pin", "unpin", "no_stickers", "allow_stickers", "no_photos", "allow_photos", "promote", "demote", "admin_title", "member_tag", "warn", "unwarn", "set_title", "set_description", "set_photo", "delete_photo", "set_sticker_set", "delete_sticker_set", "invite_link", "revoke_link", "edit_link", "unpin_all", "lock", "unlock", "undo"]},
+				"action": {"type": "string", "enum": ["delete", "purge", "mute", "unmute", "ban", "unban", "kick", "pin", "unpin", "no_stickers", "allow_stickers", "no_photos", "allow_photos", "promote", "demote", "admin_title", "member_tag", "warn", "unwarn", "amnesty", "kick_inactive", "set_title", "set_description", "set_photo", "delete_photo", "set_sticker_set", "delete_sticker_set", "invite_link", "revoke_link", "edit_link", "unpin_all", "lock", "unlock", "undo"]},
 				"minutes": {"type": "integer", "description": "For mute: how long, 1 to 10080, default 60. For purge: how far back, 1 to 2880, default 60. For no_stickers and no_photos: 1 to 525600, default 1440; the most for \"forever\". For invite_link: when it stops working; none for never."},
 				"text": {"type": "string", "description": "For set_title, set_description, admin_title and member_tag: the new text, in the words they gave. For invite_link: an optional name."},
 				"force": {"type": "boolean", "description": "For undo: true only when they want it back though it was changed by hand since."},
@@ -364,7 +385,8 @@ func (m *Moderation) Tool() Tool {
 				"member": {"type": "string", "description": "For an action on a member they named without a reply or a tag: that member's first name or @username, as they wrote it or group_members lists it."},
 				"member_limit": {"type": "integer", "description": "For invite_link and edit_link: how many people may join through it, 1 to 99999; for edit_link 0 removes the limit."},
 				"join_request": {"type": "boolean", "description": "For invite_link and edit_link: true when each person who opens it must be approved by the admins."},
-				"link": {"type": "string", "description": "For revoke_link and edit_link: the link they mean, as they wrote it; omit for the latest you made here."}
+				"link": {"type": "string", "description": "For revoke_link and edit_link: the link they mean, as they wrote it; omit for the latest you made here."},
+				"days": {"type": "integer", "description": "For kick_inactive: how many days the members have not written, 7 to 365, default 30."}
 			},
 			"required": ["action"],
 			"additionalProperties": false
@@ -430,6 +452,12 @@ func (m *Moderation) run(ctx context.Context, raw json.RawMessage) (any, error) 
 	}
 	if o.action == actionWarn || o.action == actionUnwarn {
 		return m.warn(ctx, o)
+	}
+	if o.action == actionAmnesty {
+		return m.amnesty(ctx, o)
+	}
+	if o.action == actionKickInactive {
+		return m.kickInactive(ctx, o, args.Days, args.Force)
 	}
 	// The owners want it done at once, with no question to confirm: the
 	// rights were just checked, and the target came from the update.
@@ -722,7 +750,7 @@ func onMember(action string) bool {
 func groupWide(action string) bool {
 	switch action {
 	case actionSetTitle, actionSetDescription, actionSetPhoto, actionDeletePhoto, actionInviteLink, actionRevokeLink, actionEditLink, actionUnpinAll, actionLock, actionUnlock,
-		actionSetStickerSet, actionDeleteStickerSet:
+		actionSetStickerSet, actionDeleteStickerSet, actionAmnesty, actionKickInactive:
 		return true
 	}
 	return false
@@ -1263,7 +1291,10 @@ var actionWords = map[string][]string{
 	actionKick:   {"kick", "кик", "chiqar", "hayda", "выгн", "выкин", "удали из"},
 	actionWarn:   warnWords,
 	actionUnwarn: warnWords,
-	actionPin:    {"pin", "qada", "закреп"},
+
+	actionAmnesty:      {"amnist", "amnest", "амнист", "hammasini bandan", "разбань всех", "unban all"},
+	actionKickInactive: {"inactive", "faol emas", "faolmas", "неактив", "молчун", "molchun", "yozmagan"},
+	actionPin:          {"pin", "qada", "закреп"},
 	// Deleting one message is not clearing out them all: "tozala",
 	// "hammasini o'chir", "очисти", "удали все".
 	actionPurge: {"tozala", "hammasini ochir", "barchasini ochir", "hammasini del", "xabarlarini ochir", "hamma xabar", "barcha xabar",

@@ -184,8 +184,10 @@ type Options struct {
 	// off.
 	Teams TeamLobbyBook
 	// Ranks keeps the moderators' ranks, 1 to 5; nil turns them off.
-	Ranks  RankBook
-	Logger *slog.Logger
+	Ranks RankBook
+	// BanList lists those the bot banned, for /banlist; nil turns it off.
+	BanList BanList
+	Logger  *slog.Logger
 	// Model is the model name shown by /model.
 	Model string
 	// Workers is how many messages are processed at once.

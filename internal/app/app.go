@@ -257,6 +257,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Rights:   store,
 		Warns:    store,
 		Ranks:    store,
+		Bans:     store,
 		Location: cfg.Location,
 		// A username can change hands; only an ID makes an owner a moderator.
 		OwnersByID: len(cfg.OwnerIDs) > 0,
@@ -324,6 +325,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Invites:         store,
 		Teams:           store,
 		Ranks:           store,
+		BanList:         store,
 		Profiles:        store,
 		Exchanges:       store,
 		MemberCount:     bot.Client,
