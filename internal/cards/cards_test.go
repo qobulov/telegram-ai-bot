@@ -38,9 +38,24 @@ func TestRarityRules(t *testing.T) {
 // A character's card is the same every time, its numbers within its
 // rarity's, rounded to tens.
 func TestCardNumbers(t *testing.T) {
-	a, b := Card(127691, "Satoru Gojou", "JJK", "https://x/y.png", 39194, 0), Card(127691, "Satoru Gojou", "JJK", "https://x/y.png", 39194, 0)
-	if a != b || a.Rarity != int(Mythic) || a.Value != 10800 || a.Attack%10 != 0 || a.Attack < 4000 || a.Attack > 6000 || a.Health < 15000 || a.Health > 22000 {
+	a, b := Card(246, "Gokuu Son", "Dragon Ball Z", "https://x/y.png", 9000, 130), Card(246, "Gokuu Son", "Dragon Ball Z", "https://x/y.png", 9000, 130)
+	if a != b || a.Rarity != int(Mythic) || a.Value != 4000 || a.Attack%10 != 0 || a.Attack < 4000 || a.Attack > 6000 || a.Health < 15000 || a.Health > 22000 {
 		t.Errorf("card = %+v", a)
+	}
+}
+
+// Mythic and Legendary are the characters chosen by hand, whatever their
+// rank: Son Goku is Mythic at 130, Gojo Legendary at 1; anyone else is at
+// most Epic, however loved.
+func TestChosenRarities(t *testing.T) {
+	if RarityOf(246, 130) != Mythic || RarityOf(17, 32) != Mythic || RarityOf(127691, 0) != Legendary || RarityOf(913, 190) != Legendary {
+		t.Error("a chosen character's rarity")
+	}
+	if RarityOf(88572, 7) != Epic || RarityOf(99999, 400) != Common {
+		t.Errorf("Emilia at 7 = %v, an unknown at 400 = %v", RarityOf(88572, 7), RarityOf(99999, 400))
+	}
+	if len(mythicIDs) != 25 || len(legendaryIDs) != 50 {
+		t.Errorf("chosen %d Mythic and %d Legendary", len(mythicIDs), len(legendaryIDs))
 	}
 }
 

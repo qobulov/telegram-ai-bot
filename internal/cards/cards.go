@@ -85,18 +85,19 @@ type rule struct {
 	healthLeast, healthMost int
 }
 
-// rules are by rarity, the catalog's cards by rank in proportion: 25
-// Mythic (5%), 50 Legendary (10%), 100 Epic (20%), 150 Rare (30%) and the
-// rest Common; a Mythic is drawn once in 67 draws. A card is worth the
-// diamonds an MLBB skin of the like tier costs: Mythic a Legend skin's
-// 10 800, Legendary a Collector's 6 210, Epic an Epic's 899, Rare an
-// Elite's 599 and Common a Basic's 269.
+// rules are by rarity. Mythic and Legendary are the characters anime fans
+// at large know, not today's votes: the leads of the best known series and
+// their legendary rivals and companions, chosen by hand in mythicIDs and
+// legendaryIDs. The rest go by rank among AniList's most loved, never above
+// Epic: 100 Epic, 150 Rare and the others Common. A Mythic is drawn once in
+// 67 draws, and worth 4 000 points, a Legendary 2 000, an Epic 400, a Rare
+// 200 and a Common 100.
 var rules = map[Rarity]rule{
-	Mythic:    {cards: 25, odds: 15, value: 10800, attackLeast: 4000, attackMost: 6000, healthLeast: 15000, healthMost: 22000},
-	Legendary: {cards: 50, odds: 65, value: 6210, attackLeast: 2500, attackMost: 4000, healthLeast: 9000, healthMost: 15000},
-	Epic:      {cards: 100, odds: 140, value: 899, attackLeast: 1500, attackMost: 2500, healthLeast: 6000, healthMost: 9000},
-	Rare:      {cards: 150, odds: 280, value: 599, attackLeast: 800, attackMost: 1500, healthLeast: 3000, healthMost: 6000},
-	Common:    {cards: 176, odds: 500, value: 269, attackLeast: 300, attackMost: 800, healthLeast: 1000, healthMost: 3000},
+	Mythic:    {cards: 25, odds: 15, value: 4000, attackLeast: 4000, attackMost: 6000, healthLeast: 15000, healthMost: 22000},
+	Legendary: {cards: 50, odds: 65, value: 2000, attackLeast: 2500, attackMost: 4000, healthLeast: 9000, healthMost: 15000},
+	Epic:      {cards: 100, odds: 140, value: 400, attackLeast: 1500, attackMost: 2500, healthLeast: 6000, healthMost: 9000},
+	Rare:      {cards: 150, odds: 280, value: 200, attackLeast: 800, attackMost: 1500, healthLeast: 3000, healthMost: 6000},
+	Common:    {cards: 176, odds: 500, value: 100, attackLeast: 300, attackMost: 800, healthLeast: 1000, healthMost: 3000},
 }
 
 // Roll draws a rarity by the odds, from a number in [0, 1000).
@@ -146,6 +147,40 @@ func PityIn(draw storage.CardDraw) (legendary, mythic int) {
 	return LegendaryPity - draw.SinceLegendary, MythicPity - draw.SinceMythic
 }
 
+// mythicIDs are the Mythic cards' AniList IDs: the leads of the best known
+// series, Son Goku, Naruto, Luffy, Ichigo, Eren, Edward Elric, Light, Tanjiro,
+// Saitama, Deku, Gon, Itadori, Spike, Shinji, Lelouch, Jotaro, Kaneki, Denji,
+// Guts, Gintoki, Natsu, Asta, Yusuke, Mob and Hanamichi.
+var mythicIDs = map[int64]bool{
+	246: true, 17: true, 40: true, 5: true, 40882: true, 11: true, 80: true, 126071: true, 73935: true,
+	89028: true, 30: true, 127212: true, 1: true, 89: true, 417: true, 4003: true, 87275: true, 130102: true,
+	422: true, 672: true, 5187: true, 123285: true, 729: true, 89616: true, 310: true,
+}
+
+// legendaryIDs are the Legendary cards': the leads' legendary rivals and
+// companions, Vegeta, Sasuke, Kakashi, Itachi, Levi, L, Zoro, Killua, Gojo and
+// their like, and other well known leads, Frieren, Thorfinn, Rimuru and theirs.
+var legendaryIDs = map[int64]bool{
+	913: true, 13: true, 85: true, 14: true, 53901: true, 2535: true, 2423: true, 62: true, 305: true, 727: true,
+	2072: true, 13767: true, 45627: true, 40881: true, 46494: true, 46496: true, 71: true, 75: true, 27: true, 28: true,
+	31: true, 127691: true, 133701: true, 126635: true, 68: true, 12: true, 88892: true, 89220: true, 129133: true, 127518: true,
+	129131: true, 129130: true, 6356: true, 10529: true, 4004: true, 162: true, 2075: true, 2257: true, 601: true, 176754: true,
+	10138: true, 123962: true, 124142: true, 88573: true, 35252: true, 138101: true, 64769: true, 137080: true, 88575: true, 86: true,
+}
+
+// RarityOf is the rarity of a character at rank among the most loved, from
+// 0: Mythic or Legendary when chosen so, and otherwise by rank, at most
+// Epic.
+func RarityOf(id int64, rank int) Rarity {
+	switch {
+	case mythicIDs[id]:
+		return Mythic
+	case legendaryIDs[id]:
+		return Legendary
+	}
+	return min(OfRank(rank), Epic)
+}
+
 // OfRank is the rarity of the card at rank among the most loved, from 0.
 func OfRank(rank int) Rarity {
 	for _, r := range []Rarity{Mythic, Legendary, Epic, Rare} {
@@ -164,7 +199,11 @@ func Value(r Rarity) int { return rules[r].value }
 // its points, and its attack and health, the same each time for the same
 // character, within its rarity's.
 func Card(id int64, name, anime, image string, favourites, rank int) storage.Card {
-	r := OfRank(rank)
+	return CardOf(id, name, anime, image, favourites, RarityOf(id, rank))
+}
+
+// CardOf is the card of a character of rarity r, its numbers within r's.
+func CardOf(id int64, name, anime, image string, favourites int, r Rarity) storage.Card {
 	rl := rules[r]
 	return storage.Card{
 		ID: id, Name: name, Anime: anime, ImageURL: image, Favourites: favourites, Rarity: int(r), Value: rl.value, Collection: "anime",

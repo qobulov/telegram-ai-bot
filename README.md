@@ -2117,11 +2117,18 @@ in Tashkent, owners' too (in a private chat the word "karta" does too); the
 fourth is told how long until midnight (`card_players.free_day` and
 `free_used`, migration 73). The cards are AniList's 500 most loved
 characters, fetched the first time a card is drawn (`internal/cards`, kept in
-`card_catalog`, migration 52), the most loved the rarest, in proportion: 25
-👑 Mifik (5%), 50 🔥 Afsonaviy (10%), 100 💜 Epik (20%), 150 🔷 Noyob (30%)
-and the other 176 ⚪ Oddiy. The tiers were cut for 200 cards until migration
-73, which left the 301 added later all Oddiy; it tiered the 501 again by
-rank, each card's numbers its new rarity's. A larger
+`card_catalog`, migration 52). Its 👑 Mifik and 🔥 Afsonaviy are the
+characters anime fans at large know, not today's votes, chosen by hand in
+`internal/cards` (`mythicIDs`, `legendaryIDs`): the 25 Mifik the leads of the
+best known series (Son Goku, Naruto, Luffy, Ichigo, Eren, Edward Elric, Light,
+Tanjiro, Saitama, Deku, Gon, Itadori, Spike, Shinji, Lelouch, Jotaro, Kaneki,
+Denji, Guts, Gintoki, Natsu, Asta, Yusuke, Mob, Hanamichi) and the 50 Afsonaviy
+their legendary rivals and companions (Vegeta, Sasuke, Kakashi, Itachi, Levi,
+L, Zoro, Killua, Gojo…) and other well known leads (Frieren, Thorfinn,
+Rimuru…); the rest go by rank among AniList's most loved, never above Epik:
+100 💜 Epik, 150 🔷 Noyob and the other 176 ⚪ Oddiy. The tiers were cut for 200
+cards by AniList's votes until migration 73, which left the 301 added later
+all Oddiy; it tiered the 501 again so, each card's numbers its new rarity's. A larger
 catalog adds only the characters it lacks: a card there keeps its rarity and
 numbers, as players hold it, however AniList's ranks have moved. A draw first draws a
 rarity, by odds of 1.5%, 6.5%, 14%, 28% and 50%, then a card of it at random,
@@ -2130,8 +2137,7 @@ sharper one from MyAnimeList, 450 by 700, chosen by hand and kept in
 `card_pictures`, migration 64, which a refresh of the catalog keeps; the
 characters, their rarity and the table stay AniList's) with its anime, attack
 and health, the same
-each time for the same character, and the points it is worth (10 800, 6 210, 899, 599 or 269, the diamonds an MLBB Legend, Collector, Epic,
-Elite or Basic skin costs), each card counted once: a copy of a card held adds no
+each time for the same character, and the points it is worth (4000, 2000, 400, 200 or 100), each card counted once: a copy of a card held adds no
 points, and migration 73 counted every player's points again so. A long wait ends in a
 rare card for sure: a player's 30th draw in a row without a Legendary or
 better is one, and their 100th without a Mythic is one, the draw saying so and
