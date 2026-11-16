@@ -122,29 +122,29 @@ func ByOdds(roll func() Rarity) storage.CardRoll {
 	return func(int, int) (int, bool) { return int(roll()), false }
 }
 
-// mythicIDs are the Mythic cards' AniList IDs: the leads of the best known
-// series, Son Goku, Naruto, Luffy, Ichigo, Eren, Edward Elric, Light, Tanjiro,
-// Saitama, Deku, Gon, Itadori, Spike, Shinji, Lelouch, Jotaro, Kaneki, Denji,
-// Guts, Gintoki, Natsu, Asta, Yusuke, Mob, Hanamichi and Meliodas, and the
-// women Mikasa, Maomao and Frieren.
+// mythicIDs are the Mythic cards' AniList IDs, 15 men and 10 women: the
+// leads of the best known series, Son Goku, Naruto, Luffy, Ichigo, Eren,
+// Edward Elric, Light, Tanjiro, Saitama, Gon, Lelouch, Spike, Guts, Jotaro and
+// Meliodas, and the best known women, Mikasa, Maomao, Frieren, Makima, Nezuko,
+// Emilia, Kurisu, Violet Evergarden, Zero Two and Mai Sakurajima.
 var mythicIDs = map[int64]bool{
-	72921: true, 40881: true, 126824: true, 176754: true,
-	246: true, 17: true, 40: true, 5: true, 40882: true, 11: true, 80: true, 126071: true, 73935: true,
-	89028: true, 30: true, 127212: true, 1: true, 89: true, 417: true, 4003: true, 87275: true, 130102: true,
-	422: true, 672: true, 5187: true, 123285: true, 729: true, 89616: true, 310: true,
+	246: true, 17: true, 40: true, 5: true, 40882: true, 11: true, 80: true, 126071: true, 73935: true, 30: true,
+	417: true, 1: true, 422: true, 4003: true, 72921: true,
+	40881: true, 126824: true, 176754: true, 137080: true, 127518: true, 88572: true, 34470: true, 90169: true, 124381: true, 127222: true,
 }
 
 // legendaryIDs are the Legendary cards': the leads' legendary rivals and
 // companions, Vegeta, Sasuke, Kakashi, Itachi, Levi, L, Zoro, Killua, Gojo and
-// their like, Escanor and Ban, and other well known leads, Thorfinn, Rimuru
-// and theirs.
+// their like, Escanor and Ban, and other well known leads, Deku, Itadori,
+// Shinji, Kaneki, Denji, Gintoki, Natsu, Asta, Yusuke, Mob, Hanamichi,
+// Thorfinn, Rimuru and theirs.
 var legendaryIDs = map[int64]bool{
-	90202: true, 77605: true,
-	913: true, 13: true, 85: true, 14: true, 53901: true, 2535: true, 2423: true, 62: true, 305: true, 727: true,
-	2072: true, 13767: true, 45627: true, 46494: true, 46496: true, 71: true, 75: true, 27: true, 28: true,
-	31: true, 127691: true, 133701: true, 126635: true, 68: true, 12: true, 88892: true, 89220: true, 129133: true, 127518: true,
-	129131: true, 129130: true, 6356: true, 10529: true, 4004: true, 162: true, 2075: true, 2257: true, 601: true,
-	10138: true, 123962: true, 124142: true, 88573: true, 35252: true, 138101: true, 64769: true, 137080: true, 88575: true, 86: true,
+	90202: true, 77605: true, 913: true, 13: true, 85: true, 14: true, 53901: true, 2535: true, 2423: true, 62: true,
+	305: true, 727: true, 2072: true, 13767: true, 45627: true, 46494: true, 46496: true, 71: true, 75: true, 27: true,
+	28: true, 31: true, 127691: true, 133701: true, 126635: true, 68: true, 12: true, 88892: true, 89220: true, 129133: true,
+	129131: true, 129130: true, 6356: true, 10529: true, 4004: true, 162: true, 2075: true, 2257: true, 601: true, 10138: true,
+	123962: true, 124142: true, 88573: true, 35252: true, 138101: true, 64769: true, 88575: true, 86: true, 89028: true, 127212: true,
+	89: true, 87275: true, 130102: true, 672: true, 5187: true, 123285: true, 729: true, 89616: true, 310: true,
 }
 
 // epicIDs are the Epic cards chosen by hand, whatever their rank: The Seven

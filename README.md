@@ -2119,16 +2119,16 @@ fourth is told the new ones come tomorrow, with no count of the time left
 characters, fetched the first time a card is drawn (`internal/cards`, kept in
 `card_catalog`, migration 52). Its 👑 Mifik and 🔥 Afsonaviy are the
 characters anime fans at large know, not today's votes, chosen by hand in
-`internal/cards` (`mythicIDs`, `legendaryIDs`): the 25 Mifik the leads of the
-best known series (Son Goku, Naruto, Luffy, Ichigo, Eren, Edward Elric, Light,
-Tanjiro, Saitama, Deku, Gon, Itadori, Spike, Shinji, Lelouch, Jotaro, Kaneki,
-Denji, Guts, Gintoki, Natsu, Asta, Yusuke, Mob, Hanamichi, Meliodas, and the
-women Mikasa, Maomao and Frieren, migration 76, which also brought in
-Firefly Wedding's Satoko Kirigaya as Epik) and the 50 Afsonaviy
-their legendary rivals and companions (Vegeta, Sasuke, Kakashi, Itachi, Levi,
-L, Zoro, Killua, Gojo…) and other well known leads (Frieren, Thorfinn,
-Rimuru…); the rest go by rank among AniList's most loved, never above Epik:
-100 💜 Epik, 150 🔷 Noyob and the other 176 ⚪ Oddiy. The tiers were cut for 200
+`internal/cards` (`mythicIDs`, `legendaryIDs`): the 25 Mifik are 15 men, the
+leads of the best known series (Son Goku, Naruto, Luffy, Ichigo, Eren, Edward
+Elric, Light, Tanjiro, Saitama, Gon, Lelouch, Spike, Guts, Jotaro, Meliodas),
+and 10 women (Mikasa, Maomao, Frieren, Makima, Nezuko, Emilia, Kurisu, Violet
+Evergarden, Zero Two, Mai Sakurajima), migration 76; the 59 Afsonaviy their
+legendary rivals and companions (Vegeta, Sasuke, Kakashi, Itachi, Levi, L,
+Zoro, Killua, Gojo…) and other well known leads (Deku, Itadori, Kaneki,
+Denji, Gintoki, Natsu, Thorfinn, Rimuru…); the rest go by rank among
+AniList's most loved, never above Epik, with The Seven Deadly Sins' cast
+and Firefly Wedding's Satoko Kirigaya added as Epik: 100 💜 Epik, 150 🔷 Noyob and the other 176 ⚪ Oddiy. The tiers were cut for 200
 cards by AniList's votes until migration 73, which left the 301 added later
 all Oddiy; it tiered the 501 again so, each card's numbers its new rarity's. A larger
 catalog adds only the characters it lacks: a card there keeps its rarity and

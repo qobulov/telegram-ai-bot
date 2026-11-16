@@ -51,10 +51,10 @@ func TestChosenRarities(t *testing.T) {
 	if RarityOf(246, 130) != Mythic || RarityOf(17, 32) != Mythic || RarityOf(127691, 0) != Legendary || RarityOf(913, 190) != Legendary {
 		t.Error("a chosen character's rarity")
 	}
-	if RarityOf(88572, 7) != Epic || RarityOf(99999, 400) != Common {
-		t.Errorf("Emilia at 7 = %v, an unknown at 400 = %v", RarityOf(88572, 7), RarityOf(99999, 400))
+	if RarityOf(89334, 9) != Epic || RarityOf(99999, 400) != Common || RarityOf(88572, 7) != Mythic {
+		t.Errorf("Reigen at 9 = %v, an unknown at 400 = %v, Emilia = %v", RarityOf(89334, 9), RarityOf(99999, 400), RarityOf(88572, 7))
 	}
-	if len(mythicIDs) != 29 || len(legendaryIDs) != 50 || len(epicIDs) != 8 {
+	if len(mythicIDs) != 25 || len(legendaryIDs) != 59 || len(epicIDs) != 8 {
 		t.Errorf("chosen %d Mythic and %d Legendary", len(mythicIDs), len(legendaryIDs))
 	}
 }
