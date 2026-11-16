@@ -215,6 +215,22 @@
   // crown and two sparkles; the large view adds two more and rising motes.
   const MYTHIC_DRESS = '<i class="glint"></i><i class="frame"></i><span class="crest" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 8l4.5 4L12 4l4.5 8L21 8l-2 10H5z"/><rect x="5" y="19.5" width="14" height="2.2" rx="1.1"/></svg></span><em class="spark"></em><em class="spark"></em>';
 
+  // alive is a Mythic card's character, cut from the picture, laid over it
+  // and moving: it breathes, and in the large view its hair stirs.
+  function alive(card) {
+    const box = document.createElement("div");
+    box.className = "alive";
+    box.setAttribute("aria-hidden", "true");
+    const cut = `url("/kartalar/art/cut/${card.id}.webp")`;
+    for (const part of ["body", "hair"]) {
+      const layer = document.createElement("i");
+      layer.className = part;
+      layer.style.backgroundImage = cut;
+      box.append(layer);
+    }
+    return box;
+  }
+
   function cardTile(card) {
     const tile = document.createElement("button");
     tile.type = "button";
@@ -237,7 +253,10 @@
     name.className = "name";
     name.textContent = card.name;
     tile.append(img, name);
-    if (card.rarity === 4) tile.insertAdjacentHTML("beforeend", MYTHIC_DRESS);
+    if (card.rarity === 4) {
+      img.after(alive(card));
+      tile.insertAdjacentHTML("beforeend", MYTHIC_DRESS);
+    }
     if (card.count > 1) {
       const count = document.createElement("span");
       count.className = "count";
@@ -336,6 +355,7 @@
     front.append(plate);
     if (card.rarity === 4) {
       front.classList.add("mythic");
+      img.after(alive(card));
       front.insertAdjacentHTML("beforeend", MYTHIC_DRESS + '<em class="spark"></em><em class="spark"></em><div class="motes">' + "<i></i>".repeat(6) + "</div>");
     }
     return front;
@@ -1008,7 +1028,10 @@
     name.className = "name";
     name.textContent = card.name;
     tile.append(img, name);
-    if (card.rarity === 4) tile.insertAdjacentHTML("beforeend", MYTHIC_DRESS);
+    if (card.rarity === 4) {
+      img.after(alive(card));
+      tile.insertAdjacentHTML("beforeend", MYTHIC_DRESS);
+    }
     if (count) tile.insertAdjacentHTML("beforeend", '<span class="owned" aria-hidden="true">✓</span>');
     tile.addEventListener("click", () => previewCard(card, count));
     return tile;

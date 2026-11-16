@@ -458,3 +458,14 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 }
 @keyframes deal { from { opacity: 0; transform: translateY(18px) rotateY(80deg) scale(0.85); } to { opacity: 1; transform: none; } }
 .opened-ok { width: 100%; margin-top: 18px; min-height: 50px; }
+
+/* A Mythic card lives: its character, cut from the picture and laid over it,
+   breathes, and in the large view its hair stirs in the wind. */
+.alive { position: absolute; inset: 0; pointer-events: none; }
+.card .alive { z-index: -1; }
+.alive i { position: absolute; inset: 0; background: center / cover no-repeat; transform-origin: 50% 100%; animation: alive 3.2s ease-in-out infinite; will-change: transform; }
+.alive .hair { clip-path: inset(0 0 56% 0); }
+.alive .body { clip-path: inset(43.5% 0 0 0); }
+.front .alive .hair { filter: url(#wind); }
+@keyframes alive { 50% { transform: scale(1.018, 1.028) translateY(-2px); } }
+@media (prefers-reduced-motion: reduce) { .alive i { animation: none; } .front .alive .hair { filter: none; } }
