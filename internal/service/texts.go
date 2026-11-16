@@ -232,7 +232,15 @@ Guruhda meni ismim bilan chaqiring, @username bilan belgilang yoki xabarimga rep
 Guruh adminlari uchun:
 A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yoki ban qilishni, stiker va GIF yoki rasm yuborishini cheklashni, admin qilishni so'rang. Guruhning nomi, tavsifi, rasmi, stiker to'plami, taklif havolasi va kim nima yubora olishini ham o'zgartiraman; "orqaga qaytar" desangiz, oxirgisini qaytaraman. Buning uchun o'sha admin huquqi sizda ham, menda ham bo'lishi kerak; men darhol bajaraman.
 /mute@username, /unmute@username — guruhda jim turishim yoki qaytishim
-/ignore@username, /unignore@username — a'zoning xabariga reply qilib: unga 24 soat javob bermayman yoki yana javob beraman`,
+/ignore@username, /unignore@username — a'zoning xabariga reply qilib: unga 24 soat javob bermayman yoki yana javob beraman
+/warn, /unwarn — ogohlantirish (3-sida 1 kunga mut), /ban sabab, /kick — a'zoga reply qilib
+"+3 admin mari" — moderatorga 1–5 daraja berish; /staff, /ranklog, /access — moderatorlar, kim tayinlagan, buyruqlar darajasi
+/banlist, /amnesty, /kickinactive 30 — banlar ro'yxati, hammani bandan chiqarish, faol emaslarni chiqarish
+
+Hamma uchun:
+/cards — kartalar (har kuni 2 token), /mylink — shaxsiy taklif havolangiz, /invites_week — kim nechta odam qo'shdi
+/admins — adminlarni chaqirish, /report va /voteban — xabarga reply qilib shikoyat yoki ban uchun ovoz
+/id, /ping, /calc 2+2, /weather Toshkent`,
 	"ru": `Пишите мне: отвечаю на узбекском, русском или английском — на вашем языке.
 
 Я помню недавнюю часть нашего разговора. %s %s
@@ -249,7 +257,15 @@ A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yo
 Для админов группы:
 Ответьте на сообщение участника и попросите удалить или закрепить его, замутить или забанить автора, ограничить ему стикеры и GIF или фото, сделать админом. Ещё меняю название, описание, фото группы, её стикерпак, ссылку-приглашение и что можно отправлять; скажите «верни», и я отменю последнее. Нужно, чтобы это право было и у вас, и у меня; я делаю это сразу.
 /mute@username, /unmute@username — чтобы я молчала в группе или вернулась
-/ignore@username, /unignore@username — ответом на сообщение участника: не отвечаю ему 24 часа или снова отвечаю`,
+/ignore@username, /unignore@username — ответом на сообщение участника: не отвечаю ему 24 часа или снова отвечаю
+/warn, /unwarn — предупреждение (на третьем мут на сутки), /ban причина, /kick — ответом на сообщение
+«+3 admin мари» — дать модератору ранг 1–5; /staff, /ranklog, /access — модераторы, кто назначил, ранги команд
+/banlist, /amnesty, /kickinactive 30 — банлист, разбан всех, кик неактивных
+
+Для всех:
+/cards — карты (2 токена в день), /mylink — ваша личная ссылка-приглашение, /invites_week — кто сколько добавил
+/admins — позвать админов, /report и /voteban — ответом на сообщение: жалоба или голосование за бан
+/id, /ping, /calc 2+2, /weather Ташкент`,
 	"en": `Talk to me and I will answer, in Uzbek, Russian or English, matching your language.
 
 I remember the recent part of our conversation. %s %s
@@ -266,7 +282,15 @@ In a group, call me by name, mention me (@username) or reply to one of my messag
 For a group's admins:
 Reply to a member's message and ask me to delete or pin it, to mute or ban its author, to take away their stickers and GIFs or photos, or to make them an admin. I also change the group's name, description, photo, sticker pack, invite link and what members may send, and undo the last change when asked. It takes that admin right, yours and mine, and I do it at once.
 /mute@username, /unmute@username — make me stay quiet in the group, or bring me back
-/ignore@username, /unignore@username — as a reply to a member's message: I stop answering them for 24 hours, or answer them again`,
+/ignore@username, /unignore@username — as a reply to a member's message: I stop answering them for 24 hours, or answer them again
+/warn, /unwarn — a warning (the third mutes for a day), /ban reason, /kick — as a reply
+"+3 admin mari" — give a moderator rank 1–5; /staff, /ranklog, /access — moderators, who gave ranks, commands' ranks
+/banlist, /amnesty, /kickinactive 30 — the ban list, unban everyone, remove the inactive
+
+For everyone:
+/cards — cards (2 tokens a day), /mylink — your own invite link, /invites_week — who brought how many in
+/admins — call the admins, /report and /voteban — as a reply: report, or vote to ban
+/id, /ping, /calc 2+2, /weather Tashkent`,
 }
 
 // helpAbilities are the sentences HelpTextIn fills the help's blanks with,

@@ -12,40 +12,51 @@ import (
 const commandsTimeout = 5 * time.Second
 
 // commandMenus are the commands Telegram lists on "/": in private chats,
-// for a group's members, and for its admins, who can also quiet the bot or
-// have it ignore a member. Owners' commands, /model among them, are left
-// out, and so are the games' and Kartalar's many: 22 commands crowded the
-// menu, so it keeps the card of the hour, the Mini App that holds the
-// collection, the table and the shards, and /games, which lists every game
-// to tap; in groups also /invites_week and /invites_month, the tables of
-// who brought whom. The rest are answered all the same.
+// for a group's members, and for its admins and moderators, who also
+// moderate with them. Owners' commands, /model among them, are left out, and
+// so are the games' many, behind /games. The rest are answered all the same.
 var commandMenus = map[string][]telegram.BotCommand{
 	telegram.ScopeDefault: {
 		{Command: "start", Description: "Salomlashish"},
 		{Command: "help", Description: "Yordam va buyruqlar"},
-		{Command: "card", Description: "Anime karta ochish (kuniga 2 ta tekin)"},
-		{Command: "cards", Description: "Kartalar ilovasi: kolleksiya, reyting, kristal"},
+		{Command: "cards", Description: "Kartalar: kunlik tokenlar, 1x/5x ochish, kolleksiya"},
 		{Command: "games", Description: "Barcha o'yinlar"},
+		{Command: "calc", Description: "Kalkulyator: /calc 2+2"},
+		{Command: "id", Description: "Sizning ID'ingiz"},
 	},
 	telegram.ScopeAllGroupChats: {
 		{Command: "help", Description: "Yordam va buyruqlar"},
-		{Command: "card", Description: "Anime karta ochish (kuniga 2 ta tekin)"},
-		{Command: "cards", Description: "Kartalar ilovasi: kolleksiya, reyting, kristal"},
+		{Command: "cards", Description: "Kartalar: kunlik tokenlar, 1x/5x ochish, kolleksiya"},
 		{Command: "games", Description: "Barcha o'yinlar"},
+		{Command: "mylink", Description: "Shaxsiy taklif havolangiz: kirganlar sizga hisoblanadi"},
 		{Command: "invites_week", Description: "Haftalik reyting: kim nechta odam qo'shdi"},
 		{Command: "invites_month", Description: "Oylik reyting: kim nechta odam qo'shdi"},
+		{Command: "admins", Description: "Adminlar va moderatorlarni chaqirish"},
+		{Command: "report", Description: "Shikoyat: xabarga reply qiling"},
+		{Command: "voteban", Description: "Ban uchun ovoz berish: xabarga reply qiling"},
+		{Command: "staff", Description: "Moderatorlar ro'yxati"},
+		{Command: "id", Description: "Sizning va chatning ID'si"},
+		{Command: "weather", Description: "Ob-havo: /weather Toshkent"},
 	},
 	telegram.ScopeAllChatAdmins: {
 		{Command: "help", Description: "Yordam va buyruqlar"},
-		{Command: "mute", Description: "Botni guruhda jim qilish"},
-		{Command: "unmute", Description: "Botni yana gapirtirish"},
-		{Command: "ignore", Description: "A'zoga 24 soat javob bermaslik (xabariga reply qiling)"},
-		{Command: "unignore", Description: "A'zoga yana javob berish (xabariga reply qiling)"},
-		{Command: "card", Description: "Anime karta ochish (kuniga 2 ta tekin)"},
-		{Command: "cards", Description: "Kartalar ilovasi: kolleksiya, reyting, kristal"},
+		{Command: "warn", Description: "Ogohlantirish, 3-sida 1 kunga mut (reply)"},
+		{Command: "unwarn", Description: "Bitta ogohlantirishni olib tashlash (reply)"},
+		{Command: "mute", Description: "Mut: a'zoga reply — a'zoni, aks holda botni"},
+		{Command: "unmute", Description: "Mutdan chiqarish (reply) yoki botni gapirtirish"},
+		{Command: "ban", Description: "Ban: /ban sabab (reply)"},
+		{Command: "kick", Description: "Guruhdan chiqarish (reply)"},
+		{Command: "banlist", Description: "Banlar ro'yxati va sabablari"},
+		{Command: "staff", Description: "Moderatorlar ro'yxati (daraja: \"+3 admin mari\")"},
+		{Command: "ranklog", Description: "Kim kimga daraja bergan"},
+		{Command: "access", Description: "Buyruqlar darajasi: /access ban 2"},
+		{Command: "kickinactive", Description: "Faol emaslarni chiqarish: /kickinactive 30"},
+		{Command: "ignore", Description: "A'zoga 24 soat javob bermaslik (reply)"},
+		{Command: "cards", Description: "Kartalar: kunlik tokenlar, 1x/5x ochish, kolleksiya"},
 		{Command: "games", Description: "Barcha o'yinlar"},
+		{Command: "mylink", Description: "Shaxsiy taklif havolangiz"},
 		{Command: "invites_week", Description: "Haftalik reyting: kim nechta odam qo'shdi"},
-		{Command: "invites_month", Description: "Oylik reyting: kim nechta odam qo'shdi"},
+		{Command: "admins", Description: "Adminlar va moderatorlarni chaqirish"},
 	},
 }
 
