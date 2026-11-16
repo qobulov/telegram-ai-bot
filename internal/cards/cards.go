@@ -116,51 +116,29 @@ func RollRandom() Rarity {
 	return Roll(rand.IntN(1000))
 }
 
-// LegendaryPity and MythicPity are the draws in a row that bring a player
-// no Legendary or better, and no Mythic, the last of which is one for sure:
-// by the odds alone 412 draws had brought no Mythic, which players took for
-// there being none to draw.
-const (
-	LegendaryPity = 30
-	MythicPity    = 100
-)
-
-// WithPity draws a rarity by roll, raised to Mythic on a player's
-// MythicPity-th draw in a row without one, and to Legendary on their
-// LegendaryPity-th without one or better.
-func WithPity(roll func() Rarity) storage.CardRoll {
-	return func(sinceLegendary, sinceMythic int) (int, bool) {
-		r := roll()
-		switch {
-		case r < Mythic && sinceMythic+1 >= MythicPity:
-			return int(Mythic), true
-		case r < Legendary && sinceLegendary+1 >= LegendaryPity:
-			return int(Legendary), true
-		}
-		return int(r), false
-	}
-}
-
-// PityIn is in how many draws a player's next sure Legendary and Mythic
-// are, after the draw that left them these counts.
-func PityIn(draw storage.CardDraw) (legendary, mythic int) {
-	return LegendaryPity - draw.SinceLegendary, MythicPity - draw.SinceMythic
+// ByOdds draws a rarity by roll alone: no card is ever sure, however long
+// a player waited for a rare one.
+func ByOdds(roll func() Rarity) storage.CardRoll {
+	return func(int, int) (int, bool) { return int(roll()), false }
 }
 
 // mythicIDs are the Mythic cards' AniList IDs: the leads of the best known
 // series, Son Goku, Naruto, Luffy, Ichigo, Eren, Edward Elric, Light, Tanjiro,
 // Saitama, Deku, Gon, Itadori, Spike, Shinji, Lelouch, Jotaro, Kaneki, Denji,
-// Guts, Gintoki, Natsu, Asta, Yusuke, Mob and Hanamichi.
+// Guts, Gintoki, Natsu, Asta, Yusuke, Mob, Hanamichi and Meliodas.
 var mythicIDs = map[int64]bool{
-	246: true, 17: true, 40: true, 5: true, 40882: true, 11: true, 80: true, 126071: true, 73935: true,
+	72921: true,
+	246:   true, 17: true, 40: true, 5: true, 40882: true, 11: true, 80: true, 126071: true, 73935: true,
 	89028: true, 30: true, 127212: true, 1: true, 89: true, 417: true, 4003: true, 87275: true, 130102: true,
 	422: true, 672: true, 5187: true, 123285: true, 729: true, 89616: true, 310: true,
 }
 
 // legendaryIDs are the Legendary cards': the leads' legendary rivals and
 // companions, Vegeta, Sasuke, Kakashi, Itachi, Levi, L, Zoro, Killua, Gojo and
-// their like, and other well known leads, Frieren, Thorfinn, Rimuru and theirs.
+// their like, Escanor and Ban, and other well known leads, Frieren, Thorfinn,
+// Rimuru and theirs.
 var legendaryIDs = map[int64]bool{
+	90202: true, 77605: true,
 	913: true, 13: true, 85: true, 14: true, 53901: true, 2535: true, 2423: true, 62: true, 305: true, 727: true,
 	2072: true, 13767: true, 45627: true, 40881: true, 46494: true, 46496: true, 71: true, 75: true, 27: true, 28: true,
 	31: true, 127691: true, 133701: true, 126635: true, 68: true, 12: true, 88892: true, 89220: true, 129133: true, 127518: true,
@@ -168,15 +146,24 @@ var legendaryIDs = map[int64]bool{
 	10138: true, 123962: true, 124142: true, 88573: true, 35252: true, 138101: true, 64769: true, 137080: true, 88575: true, 86: true,
 }
 
+// epicIDs are the Epic cards chosen by hand, whatever their rank: The Seven
+// Deadly Sins' Elizabeth, Merlin, King, Diane, Zeldris, Mael and Gowther,
+// whom the players asked for.
+var epicIDs = map[int64]bool{
+	72923: true, 89180: true, 83801: true, 74653: true, 131559: true, 126851: true, 88823: true,
+}
+
 // RarityOf is the rarity of a character at rank among the most loved, from
-// 0: Mythic or Legendary when chosen so, and otherwise by rank, at most
-// Epic.
+// 0: Mythic, Legendary or Epic when chosen so, and otherwise by rank, at
+// most Epic.
 func RarityOf(id int64, rank int) Rarity {
 	switch {
 	case mythicIDs[id]:
 		return Mythic
 	case legendaryIDs[id]:
 		return Legendary
+	case epicIDs[id]:
+		return Epic
 	}
 	return min(OfRank(rank), Epic)
 }

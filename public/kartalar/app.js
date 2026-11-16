@@ -15,7 +15,7 @@
       autoTitle: "🤖 Avto-ochish", autoHint: "Karta tayyor bo'lishi bilan o'zi ochilib, shaxsiy chatga ovozsiz keladi", autoOn: "🤖 Avto-ochish yoqildi", autoOff: "⏸ Avto-ochish o'chirildi",
       extraDraw: (c) => `💎 ${c} bilan hozir karta ochish`, extraNeed: (n) => `💎 Kristal bilan ochish uchun yana ${n} kerak`, shardsTitle: "Kristallar", melt: (n, w) => `♻️ ${n} ta takrorni aylantirish → +${w} 💎`, noSpare: "♻️ Aylantirish uchun takror karta yo'q", fewShards: (n, h) => `💎 Kerak: ${n}, sizda: ${h}`, melted: (n, g) => `♻️ ${n} ta karta → +${g} 💎`, shardsHint: "Takror kartalar kristalga aylanadi, ochko va reyting kamaymaydi. Kristal bilan kutmasdan karta oching yoki duelda tiking.", ratesLabel: "1 ta takror:", meltTitle: "Kristalga aylantirish", meltWarn: "Bu nusxalarni keyin sovg'a qilib bo'lmaydi. Har kartaning bittasi kolleksiyada qoladi.", meltDo: (w) => `♻️ Aylantirish · +${w} 💎`, cancel: "Bekor qilish",
       noPoints: "ochko qo'shilmaydi", freeLeft: (n, of) => `🎴 Bugungi tekin kartalar: ${n}/${of}`,
-      fresh: "🆕 Yangi karta!", sure: "✨ Kafolatlangan karta!", pity: (l, m) => `{3} Afsonaviy — ${l} kartadan keyin aniq\n{4} Mifik — ${m} kartadan keyin aniq`, again: (n) => `🔁 Sizda endi ×${n}`, plus: (n) => `+${n} ochko`,
+      fresh: "🆕 Yangi karta!", again: (n) => `🔁 Sizda endi ×${n}`, plus: (n) => `+${n} ochko`,
       attack: "Hujum", health: "Jon", value: "Ochko", cards: (n) => `${n} karta`, pts: "ochko",
       none: "Hech narsa topilmadi", noTop: "Hali hech kim karta olmagan",
       noTelegram: "Ilovani Telegram'da oching: botga /cards yozing.", stale: "Ilova eskirdi, uni qayta oching.",
@@ -43,7 +43,7 @@
       autoTitle: "🤖 Автооткрытие", autoHint: "Карта откроется сама, как только будет готова, и придёт в личку без звука", autoOn: "🤖 Автооткрытие включено", autoOff: "⏸ Автооткрытие выключено",
       extraDraw: (c) => `💎 Открыть карту сейчас за ${c}`, extraNeed: (n) => `💎 Чтобы открыть за кристаллы, нужно ещё ${n}`, shardsTitle: "Кристаллы", melt: (n, w) => `♻️ Расплавить повторы: ${n} → +${w} 💎`, noSpare: "♻️ Повторных карт нет", fewShards: (n, h) => `💎 Нужно: ${n}, у вас: ${h}`, melted: (n, g) => `♻️ ${n} карт → +${g} 💎`, shardsHint: "Повторы становятся кристаллами, очки и рейтинг не уменьшаются. За кристаллы — карта без ожидания или ставка в дуэли.", ratesLabel: "1 повтор:", meltTitle: "Расплавить в кристаллы", meltWarn: "Эти копии потом нельзя будет подарить. По одной карте каждого вида останется в коллекции.", meltDo: (w) => `♻️ Расплавить · +${w} 💎`, cancel: "Отмена",
       noPoints: "очки не добавляются", freeLeft: (n, of) => `🎴 Бесплатные карты сегодня: ${n}/${of}`,
-      fresh: "🆕 Новая карта!", sure: "✨ Гарантированная карта!", pity: (l, m) => `{3} Легендарная — точно через ${l} карт\n{4} Мифическая — точно через ${m} карт`, again: (n) => `🔁 Теперь у вас ×${n}`, plus: (n) => `+${n} очков`,
+      fresh: "🆕 Новая карта!", again: (n) => `🔁 Теперь у вас ×${n}`, plus: (n) => `+${n} очков`,
       attack: "Атака", health: "Жизнь", value: "Очки", cards: (n) => `${n} карт`, pts: "очков",
       none: "Ничего не найдено", noTop: "Ещё никто не получил карту",
       noTelegram: "Откройте приложение в Telegram: напишите боту /cards.", stale: "Приложение устарело, откройте его снова.",
@@ -71,7 +71,7 @@
       autoTitle: "🤖 Auto opener", autoHint: "Each card opens itself when it is ready and comes to your private chat quietly", autoOn: "🤖 Auto opener on", autoOff: "⏸ Auto opener off",
       extraDraw: (c) => `💎 Open a card now for ${c}`, extraNeed: (n) => `💎 ${n} more crystals to open one now`, shardsTitle: "Crystals", melt: (n, w) => `♻️ Melt ${n} spares → +${w} 💎`, noSpare: "♻️ No spare cards to melt", fewShards: (n, h) => `💎 It takes ${n}, you have ${h}`, melted: (n, g) => `♻️ ${n} cards → +${g} 💎`, shardsHint: "Spares melt into crystals; your points and ranking stay. Crystals open a card without the wait or make a duel's stake.", ratesLabel: "1 spare:", meltTitle: "Melt into crystals", meltWarn: "These copies cannot be given afterwards. One of each card stays in your collection.", meltDo: (w) => `♻️ Melt · +${w} 💎`, cancel: "Cancel",
       noPoints: "no points added", freeLeft: (n, of) => `🎴 Free cards today: ${n}/${of}`,
-      fresh: "🆕 A new card!", sure: "✨ A guaranteed card!", pity: (l, m) => `{3} Legendary — sure in ${l} cards\n{4} Mythic — sure in ${m} cards`, again: (n) => `🔁 You now have ×${n}`, plus: (n) => `+${n} points`,
+      fresh: "🆕 A new card!", again: (n) => `🔁 You now have ×${n}`, plus: (n) => `+${n} points`,
       attack: "Attack", health: "Life", value: "Points", cards: (n) => `${n} cards`, pts: "points",
       none: "Nothing found", noTop: "Nobody has drawn a card yet",
       noTelegram: "Open the app in Telegram: send /cards to the bot.", stale: "The app is out of date; open it again.",
@@ -635,9 +635,7 @@
       flip.classList.add("shown");
       haptic(card.rarity >= 3 ? "heavy" : "light");
       $("result").replaceChildren(...withTiers([
-        data.guaranteed ? t.sure : "",
         data.new ? `${t.fresh} · ${t.plus(spaced(card.value))}` : `${t.again(card.count)} · ${t.noPoints}`,
-        data.legendary_in ? t.pity(data.legendary_in, data.mythic_in) : "",
       ].filter(Boolean).join("\n")));
       $("drawnStats").replaceChildren(statsOf(card));
       lastDrawn = card.id;

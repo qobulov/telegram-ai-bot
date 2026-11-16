@@ -98,7 +98,7 @@ func (s *Service) drawCard(ctx context.Context, in incoming) outcome {
 		return say(textCardsUnavailable.to(in))
 	}
 	now := time.Now()
-	draw, err := s.opts.Cards.DrawCard(ctx, in.userID, doozName(in.msg.From), cards.WithPity(cards.RollRandom), cards.Today(now), now)
+	draw, err := s.opts.Cards.DrawCard(ctx, in.userID, doozName(in.msg.From), cards.ByOdds(cards.RollRandom), cards.Today(now), now)
 	var wait *storage.CardWaitError
 	switch {
 	case errors.As(err, &wait):
@@ -122,9 +122,8 @@ func (s *Service) withPicture(ctx context.Context, out outcome, card storage.Car
 }
 
 // cardCaption is a drawn card, one thing a line: its name, anime, attack,
-// life and rarity, and the points it gave with the player's total. A
-// card the wait made sure says so, and a sure Legendary or Mythic soon to
-// come is told only when it is pityShown draws away or fewer.
+// life and rarity, the points it gave with the player's total, and the
+// day's free cards left.
 func cardCaption(language string, draw storage.CardDraw) string {
 	c := draw.Card
 	emoji, rarity, _ := strings.Cut(rarityNames[c.Rarity].inLanguage(language), " ")
@@ -141,23 +140,11 @@ func cardCaption(language string, draw storage.CardDraw) string {
 		got = fmt.Sprintf(textCardNew.inLanguage(language), spaced(int64(c.Value)), spaced(draw.Points))
 	}
 	lines = append(lines, got)
-	if draw.Guaranteed {
-		lines = append(lines, textCardGuaranteed.inLanguage(language))
-	}
 	switch {
 	case draw.Free && draw.FreeLeft > 0:
 		lines = append(lines, fmt.Sprintf(textCardFreeLeft.inLanguage(language), draw.FreeLeft))
 	case draw.Free:
 		lines = append(lines, textCardFreeDone.inLanguage(language))
-	}
-	legendary, mythic := cards.PityIn(draw)
-	for _, sure := range []struct {
-		rarity cards.Rarity
-		in     int
-	}{{cards.Legendary, legendary}, {cards.Mythic, mythic}} {
-		if sure.in <= pityShown {
-			lines = append(lines, fmt.Sprintf(textCardPity.inLanguage(language), rarityNames[sure.rarity].inLanguage(language), sure.in))
-		}
 	}
 	return strings.Join(lines, "\n")
 }
@@ -180,10 +167,6 @@ var (
 	textHours   = localText{uz: "%d soat", ru: "%d ч", en: "%d h"}
 	textMinutes = localText{uz: "%d daqiqa", ru: "%d мин", en: "%d min"}
 )
-
-// pityShown is how near a sure Legendary or Mythic must be for a drawn
-// card to tell it.
-const pityShown = 5
 
 // spaced writes n with its thousands apart, "12 300", as the cards do.
 func spaced(n int64) string {
@@ -416,13 +399,6 @@ var (
 	textCardRarity     = localText{uz: "💎 Noyoblik: %s", ru: "💎 Редкость: %s", en: "💎 Rarity: %s"}
 	textCardNew        = localText{uz: "🆕 Yangi · +%s ochko (jami %s)", ru: "🆕 Новая · +%s очков (всего %s)", en: "🆕 New · +%s points (total %s)"}
 	textCardAgain      = localText{uz: "🔁 Takror, endi ×%d · ochko qo'shilmaydi (jami %s)", ru: "🔁 Повтор, теперь ×%d · очки не добавляются (всего %s)", en: "🔁 Again, now ×%d · no points added (total %s)"}
-	textCardGuaranteed = localText{uz: "✨ Kafolatlangan karta!", ru: "✨ Гарантированная карта!", en: "✨ A guaranteed card!"}
-	// textCardPity says in how many cards a rarity is sure, one line each.
-	textCardPity = localText{
-		uz: "%s — %d kartadan keyin aniq",
-		ru: "%s — точно через %d карт",
-		en: "%s — sure in %d cards",
-	}
 	textCardAll        = localText{uz: "🗂 Hammasi - %d/%d", ru: "🗂 Все - %d/%d", en: "🗂 All - %d/%d"}
 	textCardAllTitle   = localText{uz: "🗂 Barcha kartalaringiz", ru: "🗂 Все ваши карты", en: "🗂 All your cards"}
 	textCardCollection = localText{

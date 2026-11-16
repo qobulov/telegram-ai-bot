@@ -391,8 +391,8 @@ func TestGameCommandKeepsTheGamesLimitInAGroup(t *testing.T) {
 	}
 }
 
-// A drawn card is one thing a line, and says it was sure when the wait made it
-// so, and that a sure Legendary or Mythic is near only when it is.
+// A drawn card is one thing a line, and never speaks of sure cards, which
+// there are none of.
 func TestCardCaptionIsShort(t *testing.T) {
 	in := incoming{msg: &telegram.Message{From: &telegram.User{ID: 1, FirstName: "Bek"}}, text: "/card"}
 	draw := storage.CardDraw{Card: storage.Card{Name: "Gojo", Anime: "JJK", Rarity: 4, Attack: 5130, Health: 18020, Value: 5000}, New: true, Count: 1, Points: 12300, SinceLegendary: 3, SinceMythic: 40}
@@ -400,11 +400,10 @@ func TestCardCaptionIsShort(t *testing.T) {
 	if caption := cardCaption(languageOf(in), draw); caption != want {
 		t.Errorf("caption:\n%s\nwant:\n%s", caption, want)
 	}
-	draw.New, draw.Count, draw.Guaranteed, draw.SinceLegendary = false, 2, true, 26
+	draw.New, draw.Count, draw.Guaranteed, draw.SinceLegendary = false, 2, true, 99
 	caption := cardCaption(languageOf(in), draw)
-	if !strings.Contains(caption, "🔁 Takror, endi ×2 · ochko qo'shilmaydi") || !strings.Contains(caption, "✨ Kafolatlangan karta!") ||
-		!strings.Contains(caption, "🔥 Afsonaviy — 4 kartadan") || strings.Contains(caption, "Mifik —") {
-		t.Errorf("a sure card's caption:\n%s", caption)
+	if !strings.Contains(caption, "🔁 Takror, endi ×2 · ochko qo'shilmaydi") || strings.Contains(caption, "Kafolat") || strings.Contains(caption, "aniq") {
+		t.Errorf("a copy's caption, with no sure cards:\n%s", caption)
 	}
 }
 

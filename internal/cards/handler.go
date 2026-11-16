@@ -265,7 +265,7 @@ func (h *handler) draw(ctx context.Context, user miniapp.User) (any, failure) {
 		return nil, errUnavailable
 	}
 	now := h.Now()
-	draw, err := h.Store.DrawCard(ctx, user.ID, name(user), WithPity(h.Roll), Today(now), now)
+	draw, err := h.Store.DrawCard(ctx, user.ID, name(user), ByOdds(h.Roll), Today(now), now)
 	var wait *storage.CardWaitError
 	switch {
 	case errors.As(err, &wait):
@@ -274,10 +274,8 @@ func (h *handler) draw(ctx context.Context, user miniapp.User) (any, failure) {
 		h.Logger.Error("could not draw a card", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
 	}
-	legendaryIn, mythicIn := PityIn(draw)
 	return map[string]any{
 		"card": h.held(draw.Card, draw.Count), "new": draw.New, "points": draw.Points, "next_in": nextIn(draw, now).Milliseconds(), "free_left": draw.FreeLeft,
-		"guaranteed": draw.Guaranteed, "legendary_in": legendaryIn, "mythic_in": mythicIn,
 	}, failure{}
 }
 
@@ -337,7 +335,7 @@ func (h *handler) extra(ctx context.Context, user miniapp.User, set string) (any
 		h.Logger.Error("could not fill the card catalog", "error", err)
 		return nil, errUnavailable
 	}
-	draw, err := h.Store.ExtraCard(ctx, user.ID, name(user), set, WithPity(h.Roll), cost)
+	draw, err := h.Store.ExtraCard(ctx, user.ID, name(user), set, ByOdds(h.Roll), cost)
 	var few *storage.ShardsError
 	switch {
 	case errors.As(err, &few):
@@ -346,10 +344,8 @@ func (h *handler) extra(ctx context.Context, user miniapp.User, set string) (any
 		h.Logger.Error("could not draw a card for shards", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
 	}
-	legendaryIn, mythicIn := PityIn(draw)
 	return map[string]any{
 		"card": h.held(draw.Card, draw.Count), "new": draw.New, "points": draw.Points, "shards": draw.Shards,
-		"guaranteed": draw.Guaranteed, "legendary_in": legendaryIn, "mythic_in": mythicIn,
 	}, failure{}
 }
 

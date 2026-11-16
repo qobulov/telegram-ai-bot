@@ -2138,13 +2138,11 @@ sharper one from MyAnimeList, 450 by 700, chosen by hand and kept in
 characters, their rarity and the table stay AniList's) with its anime, attack
 and health, the same
 each time for the same character, and the points it is worth (4000, 2000, 400, 200 or 100), each card counted once: a copy of a card held adds no
-points, and migration 73 counted every player's points again so. A long wait ends in a
-rare card for sure: a player's 30th draw in a row without a Legendary or
-better is one, and their 100th without a Mythic is one, the draw saying so and
-each card telling in how many draws the next sure ones are, in the chat and the
-Mini App (`since_legendary` and `since_mythic` on `card_players`, migration
-62, which counted a player holding no such card from their first draw), as 412
-draws by the odds alone had brought no Mythic. In the Mini App a Mythic card glows: a rainbow foil runs over it, its gold
+points, and migration 73 counted every player's points again so. No card is ever sure:
+each is drawn by its odds alone. A player's 30th draw without a Legendary and
+100th without a Mythic were sure ones until the owners took that out (the
+counts, `since_legendary` and `since_mythic` on `card_players`, migration 62,
+are still kept). In the Mini App a Mythic card glows: a rainbow foil runs over it, its gold
 glow breathes, it sparkles, and in the large view it leans with the finger or
 the phone, in CSS alone. A card drawn again gave only
 points, so its spare copies melt into 💎 crystals in the Mini App's draw tab

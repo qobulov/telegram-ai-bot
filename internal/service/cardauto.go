@@ -92,7 +92,7 @@ func OpenDueCards(ctx context.Context, opts CardAutoOptions) (int, error) {
 func openCard(ctx context.Context, opts CardAutoOptions, player storage.CardAuto) bool {
 	ctx, cancel := context.WithTimeout(ctx, cardAutoTimeout)
 	defer cancel()
-	draw, err := opts.Store.DrawCard(ctx, player.UserID, player.Name, cards.WithPity(cards.RollRandom), cards.Today(opts.Now()), opts.Now())
+	draw, err := opts.Store.DrawCard(ctx, player.UserID, player.Name, cards.ByOdds(cards.RollRandom), cards.Today(opts.Now()), opts.Now())
 	var wait *storage.CardWaitError
 	switch {
 	case errors.As(err, &wait):

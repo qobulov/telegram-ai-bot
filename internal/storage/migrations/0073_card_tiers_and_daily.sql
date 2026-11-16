@@ -1,12 +1,12 @@
 -- Kartalar's new rules. Its tiers were cut for a catalog of 200 cards, and
 -- when it grew to 500 the 301 added were all Common, 70% of the cards, while
 -- the rarest followed today's votes on AniList. Now Mythic and Legendary are
--- the characters anime fans at large know: the 25 Mythic the leads of the
--- best known series (Son Goku, Naruto, Luffy, Ichigo, Eren...) and the 50
--- Legendary their legendary rivals and companions (Vegeta, Sasuke, Levi, L,
--- Gojo...) and other well known leads, chosen by hand as internal/cards
--- lists them; the rest go by rank among AniList's most loved, 100 Epic, 150
--- Rare and 176 Common. Each card's attack and health are its new rarity's,
+-- the characters anime fans at large know: the 26 Mythic the leads of the
+-- best known series (Son Goku, Naruto, Luffy, Ichigo, Eren, Meliodas...) and
+-- the 52 Legendary their legendary rivals and companions (Vegeta, Sasuke,
+-- Levi, L, Gojo, Escanor, Ban...) and other well known leads, chosen by hand
+-- as internal/cards lists them; the rest go by rank among AniList's most
+-- loved, 100 Epic, 150 Rare and 173 Common, and seven more Epic are added. Each card's attack and health are its new rarity's,
 -- and it is worth 4 000 points as a Mythic, 2 000 as a Legendary, 400 as an
 -- Epic, 200 as a Rare and 100 as a Common.
 -- A player opens 3 free cards a day, from midnight in Tashkent, not one an
@@ -204,7 +204,7 @@ FROM (VALUES
     (22055, 1, 1130, 4300, 200),
     (46484, 1, 1230, 4760, 200),
     (162722, 1, 1480, 4200, 200),
-    (77605, 1, 1040, 3270, 200),
+    (77605, 3, 3110, 9300, 2000),
     (1662, 1, 810, 3930, 200),
     (2514, 1, 1470, 5730, 200),
     (6, 1, 1230, 5330, 200),
@@ -344,7 +344,7 @@ FROM (VALUES
     (136069, 1, 800, 5150, 200),
     (130715, 1, 1130, 3770, 200),
     (124696, 1, 1320, 5630, 200),
-    (89199, 0, 330, 2720, 100),
+    (89199, 1, 1260, 5150, 200),
     (390, 0, 690, 2850, 100),
     (8945, 0, 550, 2660, 100),
     (124586, 0, 450, 2930, 100),
@@ -379,7 +379,7 @@ FROM (VALUES
     (310, 4, 5520, 15350, 4000),
     (208, 0, 390, 1900, 100),
     (6977, 0, 500, 2810, 100),
-    (72921, 0, 550, 1240, 100),
+    (72921, 4, 5620, 21510, 4000),
     (82523, 0, 490, 2990, 100),
     (55133, 0, 400, 2250, 100),
     (121514, 0, 790, 1830, 100),
@@ -440,7 +440,7 @@ FROM (VALUES
     (251, 0, 530, 1510, 100),
     (22054, 0, 450, 1450, 100),
     (123181, 0, 640, 2700, 100),
-    (90202, 0, 600, 2090, 100),
+    (90202, 3, 3520, 10330, 2000),
     (136548, 0, 660, 2780, 100),
     (89897, 0, 720, 2400, 100),
     (2707, 0, 690, 1720, 100),
@@ -525,6 +525,23 @@ FROM (VALUES
     (126371, 0, 330, 2760, 100)
 ) AS v(id, rarity, attack, health, value)
 WHERE c.id = v.id;
+
+-- The Seven Deadly Sins' cast the players asked for, Epic, beyond
+-- AniList's most loved 501: Elizabeth, Merlin, King, Diane, Zeldris, Mael
+-- (Estarossa) and Gowther.
+INSERT INTO card_catalog (id, name, anime, image_url, favourites, rarity, attack, health, value, collection)
+SELECT v.*, 'anime' FROM (VALUES
+    (72923, 'Elizabeth Liones', 'The Seven Deadly Sins', 'https://s4.anilist.co/file/anilistcdn/character/large/b72923-Hidpb955mwMW.png', 1766, 2, 1750, 6040, 400),
+    (89180, 'Merlin', 'The Seven Deadly Sins', 'https://s4.anilist.co/file/anilistcdn/character/large/b89180-rN6OVPki8h3V.png', 1755, 2, 2010, 7480, 400),
+    (83801, 'King', 'The Seven Deadly Sins', 'https://s4.anilist.co/file/anilistcdn/character/large/b83801-52RnDXQDZ1I7.png', 2062, 2, 1570, 8290, 400),
+    (74653, 'Diane', 'The Seven Deadly Sins', 'https://s4.anilist.co/file/anilistcdn/character/large/b74653-XpMcsLVZBnkZ.jpg', 1966, 2, 1560, 8170, 400),
+    (131559, 'Zeldris', 'The Seven Deadly Sins: Revival of the Commandments', 'https://s4.anilist.co/file/anilistcdn/character/large/b131559-MmROAidOkGqL.jpg', 455, 2, 1700, 8360, 400),
+    (126851, 'Mael (Estarossa)', 'The Seven Deadly Sins: Revival of the Commandments', 'https://s4.anilist.co/file/anilistcdn/character/large/b126851-m1Vyj4V0IHNo.jpg', 337, 2, 1780, 8200, 400),
+    (88823, 'Gowther', 'The Seven Deadly Sins', 'https://s4.anilist.co/file/anilistcdn/character/large/b88823-Oppzl2h6OhO8.png', 1562, 2, 2380, 6370, 400)
+) AS v(id, name, anime, image_url, favourites, rarity, attack, health, value)
+-- Only into a catalog already filled: an empty one is filled from AniList.
+WHERE EXISTS (SELECT 1 FROM card_catalog WHERE collection = 'anime')
+ON CONFLICT (id) DO UPDATE SET rarity = EXCLUDED.rarity, attack = EXCLUDED.attack, health = EXCLUDED.health, value = EXCLUDED.value;
 
 UPDATE card_players p
 SET cards  = (SELECT count(*) FROM card_owned o WHERE o.user_id = p.user_id),

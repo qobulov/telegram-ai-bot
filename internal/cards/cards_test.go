@@ -54,7 +54,7 @@ func TestChosenRarities(t *testing.T) {
 	if RarityOf(88572, 7) != Epic || RarityOf(99999, 400) != Common {
 		t.Errorf("Emilia at 7 = %v, an unknown at 400 = %v", RarityOf(88572, 7), RarityOf(99999, 400))
 	}
-	if len(mythicIDs) != 25 || len(legendaryIDs) != 50 {
+	if len(mythicIDs) != 26 || len(legendaryIDs) != 52 || len(epicIDs) != 7 {
 		t.Errorf("chosen %d Mythic and %d Legendary", len(mythicIDs), len(legendaryIDs))
 	}
 }
@@ -94,32 +94,14 @@ func TestFetchCatalog(t *testing.T) {
 	}
 }
 
-// A long wait for a rare card ends in one: the 30th draw without a Legendary
-// or better is one, the 100th without a Mythic is one, and a roll better
-// than the sure one is kept.
-func TestWithPity(t *testing.T) {
-	common := WithPity(func() Rarity { return Common })
-	for _, tc := range []struct {
-		sinceLegendary, sinceMythic int
-		want                        Rarity
-		sure                        bool
-	}{
-		{0, 0, Common, false},
-		{LegendaryPity - 2, 50, Common, false},
-		{LegendaryPity - 1, 50, Legendary, true},
-		{5, MythicPity - 1, Mythic, true},
-		{LegendaryPity - 1, MythicPity - 1, Mythic, true},
-	} {
-		r, sure := common(tc.sinceLegendary, tc.sinceMythic)
-		if Rarity(r) != tc.want || sure != tc.sure {
-			t.Errorf("after %d and %d draws: %d, %v; want %d, %v", tc.sinceLegendary, tc.sinceMythic, r, sure, tc.want, tc.sure)
+// No card is ever sure: the roll alone gives the rarity, however long the
+// player waited.
+func TestByOdds(t *testing.T) {
+	common := ByOdds(func() Rarity { return Common })
+	for _, since := range [][2]int{{0, 0}, {29, 99}, {500, 500}} {
+		if r, sure := common(since[0], since[1]); Rarity(r) != Common || sure {
+			t.Errorf("after %v draws: %d, %v; want Common, not sure", since, r, sure)
 		}
-	}
-	if r, sure := WithPity(func() Rarity { return Mythic })(LegendaryPity-1, 0); Rarity(r) != Mythic || sure {
-		t.Errorf("a Mythic roll on a sure Legendary = %d, %v", r, sure)
-	}
-	if l, m := PityIn(storage.CardDraw{SinceLegendary: 4, SinceMythic: 40}); l != LegendaryPity-4 || m != MythicPity-40 {
-		t.Errorf("PityIn = %d, %d", l, m)
 	}
 }
 
