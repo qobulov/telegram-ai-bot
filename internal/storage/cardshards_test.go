@@ -64,4 +64,3 @@ func TestShardsAndDuels(t *testing.T) {
 		t.Errorf("a refused duel = %v, %v", settled, err)
 	}
 }
-

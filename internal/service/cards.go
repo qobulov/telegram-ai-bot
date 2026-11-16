@@ -376,7 +376,7 @@ var (
 		ru: "🎟 Токенов нет, карта стоит %d 💎, у вас %d. Завтра дадут ещё %d токена. Коллекция: /mycards",
 		en: "🎟 No tokens left; a card costs %d 💎 and you have %d. Tomorrow brings %d more tokens. Collection: /mycards",
 	}
-	textCardWallet = localText{uz: "🎟 Token: %d · 💎 %s", ru: "🎟 Токены: %d · 💎 %s", en: "🎟 Tokens: %d · 💎 %s"}
+	textCardWallet     = localText{uz: "🎟 Token: %d · 💎 %s", ru: "🎟 Токены: %d · 💎 %s", en: "🎟 Tokens: %d · 💎 %s"}
 	textCardAttack     = localText{uz: "⚔️ Hujum: %s", ru: "⚔️ Атака: %s", en: "⚔️ Attack: %s"}
 	textCardLife       = localText{uz: "❤️ Jon: %s", ru: "❤️ Жизнь: %s", en: "❤️ Life: %s"}
 	textCardRarity     = localText{uz: "💎 Noyoblik: %s", ru: "💎 Редкость: %s", en: "💎 Rarity: %s"}
