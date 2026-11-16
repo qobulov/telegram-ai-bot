@@ -64,6 +64,9 @@ func (s *Service) noteJoin(change *telegram.ChatMemberUpdated) {
 	}
 	inviter, via := change.From, "add"
 	switch {
+	case s.linkOwner(change.InviteLink) != 0:
+		// A member's own link, made by the bot: the member brought them.
+		inviter, via = &telegram.User{ID: s.linkOwner(change.InviteLink), FirstName: linkMemberName(change.InviteLink.Name)}, "link"
 	case change.InviteLink != nil:
 		inviter, via = change.InviteLink.Creator, "link"
 	case change.ViaJoinRequest:
@@ -161,7 +164,14 @@ var (
 	textInvitesTitle       = localText{uz: "👥 Kim nechta odam qo'shdi · %s", ru: "👥 Кто сколько людей добавил · %s", en: "👥 Who brought how many in · %s"}
 	textInvitesNone        = localText{uz: "Hali hech kim guruhda qolgan odam qo'shmagan.", ru: "Пока никто не добавил тех, кто остался в группе.", en: "Nobody has brought in anyone who is still here yet."}
 	textInvitesGone        = localText{uz: " (yana %d tasi chiqib ketgan)", ru: " (ещё %d ушли)", en: " (%d more left)"}
-	textInvitesRule        = localText{uz: "Reytingda guruhda qolgan odam qo'shganlar bor: qo'lda qo'shilgan yoki shaxsiy havola orqali kirgan. Kimdir chiqib ketsa, qo'shganning hisobidan ayriladi. Hafta: /invites_week · Oy: /invites_month · Avto-e'lon (admin): /invites_auto", ru: "В рейтинге те, кто добавил оставшихся в группе: вручную или по личной ссылке. Кто ушёл, вычитается у добавившего. Неделя: /invites_week · Месяц: /invites_month · Авто (админ): /invites_auto", en: "Listed: those who brought in people still here, added by hand or by one's own invite link. One who leaves is taken off whoever brought them. Week: /invites_week · Month: /invites_month · Automatic (admins): /invites_auto"}
+	textInvitesRule        = localText{uz: "Reytingda guruhda qolgan odam qo'shganlar bor: qo'lda qo'shilgan yoki shaxsiy havola (/mylink) orqali kirgan. Kimdir chiqib ketsa, qo'shganning hisobidan ayriladi. Hafta: /invites_week · Oy: /invites_month · Avto-e'lon (admin): /invites_auto", ru: "В рейтинге те, кто добавил оставшихся в группе: вручную или по личной ссылке (/mylink). Кто ушёл, вычитается у добавившего. Неделя: /invites_week · Месяц: /invites_month · Авто (админ): /invites_auto", en: "Listed: those who brought in people still here, added by hand or by one's own invite link (/mylink). One who leaves is taken off whoever brought them. Week: /invites_week · Month: /invites_month · Automatic (admins): /invites_auto"}
 	textInvitesGroupOnly   = localText{uz: "👥 /invites guruhda ishlaydi.", ru: "👥 /invites работает в группе.", en: "👥 /invites works in a group."}
 	textInvitesUnavailable = localText{uz: "Hisobni hozir o'qib bo'lmadi, birozdan keyin urinib ko'ring.", ru: "Сейчас не удалось прочитать счёт, попробуйте позже.", en: "Could not read the count right now; try again in a bit."}
 )
+
+// linkMemberName is the member's name a link the bot made for them carries
+// after their ID.
+func linkMemberName(linkName string) string {
+	_, name, _ := strings.Cut(linkName, " ")
+	return name
+}

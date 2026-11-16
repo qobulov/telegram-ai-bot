@@ -105,6 +105,9 @@ type ChatMemberUpdated struct {
 type ChatInviteLink struct {
 	InviteLink string `json:"invite_link"`
 	Creator    *User  `json:"creator,omitempty"`
+	// Name is the link's name, which the bot's own links for members carry
+	// the member's ID in.
+	Name string `json:"name,omitempty"`
 }
 
 // Message is an incoming chat message. Text is empty for photos, stickers,

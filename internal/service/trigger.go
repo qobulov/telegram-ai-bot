@@ -124,6 +124,7 @@ var ownCommands = map[string]bool{
 	"/banlist": true, "/amnesty": true, "/kickinactive": true,
 	"/admins": true, "/report": true, "/voteban": true,
 	"/ping": true, "/id": true, "/calc": true, "/weather": true,
+	"/mylink": true,
 }
 
 // commandTarget reports whether text is a command and which bot it names:

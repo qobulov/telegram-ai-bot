@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -164,4 +165,28 @@ func (s *Store) MarkInviteAwardPosted(ctx context.Context, chatID int64, period 
 		return false, fmt.Errorf("storage: mark an invite award posted: %w", err)
 	}
 	return tag.RowsAffected() == 1, nil
+}
+
+// MemberLink is the invite link the bot made for the member in the chat.
+func (s *Store) MemberLink(ctx context.Context, chatID, userID int64) (string, bool, error) {
+	var link string
+	err := s.pool.QueryRow(ctx, `SELECT link FROM member_links WHERE chat_id = $1 AND user_id = $2`, chatID, userID).Scan(&link)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("storage: read a member's link: %w", err)
+	}
+	return link, true, nil
+}
+
+// SaveMemberLink keeps the invite link the bot made for the member.
+func (s *Store) SaveMemberLink(ctx context.Context, chatID, userID int64, link string) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO member_links (chat_id, user_id, link) VALUES ($1, $2, $3)
+		ON CONFLICT (chat_id, user_id) DO UPDATE SET link = EXCLUDED.link, created_at = now()`, chatID, userID, link)
+	if err != nil {
+		return fmt.Errorf("storage: keep a member's link: %w", err)
+	}
+	return nil
 }

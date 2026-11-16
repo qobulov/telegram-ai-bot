@@ -190,7 +190,11 @@ type Options struct {
 	// BanVotes keeps the groups' votes to ban a member, for /voteban; nil
 	// turns it off.
 	BanVotes BanVoteBook
-	Logger   *slog.Logger
+	// MemberLinks and LinkMaker give each member their own invite link,
+	// /mylink; nil turns it off.
+	MemberLinks MemberLinks
+	LinkMaker   LinkMaker
+	Logger      *slog.Logger
 	// Model is the model name shown by /model.
 	Model string
 	// Workers is how many messages are processed at once.

@@ -805,6 +805,9 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 	if s.isCallOrder(in) {
 		return s.callCommand(ctx, in)
 	}
+	if s.isMyLink(in) {
+		return s.myLink(ctx, in)
+	}
 	if s.opts.Tools != nil && s.isModCommand(in) {
 		return s.modCommand(ctx, in)
 	}
