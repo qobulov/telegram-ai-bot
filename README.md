@@ -2130,8 +2130,8 @@ sharper one from MyAnimeList, 450 by 700, chosen by hand and kept in
 `card_pictures`, migration 64, which a refresh of the catalog keeps; the
 characters, their rarity and the table stay AniList's) with its anime, attack
 and health, the same
-each time for the same character, and the points it is worth (5000, 2000,
-800, 300 or 100), each card counted once: a copy of a card held adds no
+each time for the same character, and the points it is worth (10 800, 6 210, 899, 599 or 269, the diamonds an MLBB Legend, Collector, Epic,
+Elite or Basic skin costs), each card counted once: a copy of a card held adds no
 points, and migration 73 counted every player's points again so. A long wait ends in a
 rare card for sure: a player's 30th draw in a row without a Legendary or
 better is one, and their 100th without a Mythic is one, the draw saying so and

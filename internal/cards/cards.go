@@ -87,13 +87,16 @@ type rule struct {
 
 // rules are by rarity, the catalog's cards by rank in proportion: 25
 // Mythic (5%), 50 Legendary (10%), 100 Epic (20%), 150 Rare (30%) and the
-// rest Common; a Mythic is drawn once in 67 draws.
+// rest Common; a Mythic is drawn once in 67 draws. A card is worth the
+// diamonds an MLBB skin of the like tier costs: Mythic a Legend skin's
+// 10 800, Legendary a Collector's 6 210, Epic an Epic's 899, Rare an
+// Elite's 599 and Common a Basic's 269.
 var rules = map[Rarity]rule{
-	Mythic:    {cards: 25, odds: 15, value: 5000, attackLeast: 4000, attackMost: 6000, healthLeast: 15000, healthMost: 22000},
-	Legendary: {cards: 50, odds: 65, value: 2000, attackLeast: 2500, attackMost: 4000, healthLeast: 9000, healthMost: 15000},
-	Epic:      {cards: 100, odds: 140, value: 800, attackLeast: 1500, attackMost: 2500, healthLeast: 6000, healthMost: 9000},
-	Rare:      {cards: 150, odds: 280, value: 300, attackLeast: 800, attackMost: 1500, healthLeast: 3000, healthMost: 6000},
-	Common:    {cards: 176, odds: 500, value: 100, attackLeast: 300, attackMost: 800, healthLeast: 1000, healthMost: 3000},
+	Mythic:    {cards: 25, odds: 15, value: 10800, attackLeast: 4000, attackMost: 6000, healthLeast: 15000, healthMost: 22000},
+	Legendary: {cards: 50, odds: 65, value: 6210, attackLeast: 2500, attackMost: 4000, healthLeast: 9000, healthMost: 15000},
+	Epic:      {cards: 100, odds: 140, value: 899, attackLeast: 1500, attackMost: 2500, healthLeast: 6000, healthMost: 9000},
+	Rare:      {cards: 150, odds: 280, value: 599, attackLeast: 800, attackMost: 1500, healthLeast: 3000, healthMost: 6000},
+	Common:    {cards: 176, odds: 500, value: 269, attackLeast: 300, attackMost: 800, healthLeast: 1000, healthMost: 3000},
 }
 
 // Roll draws a rarity by the odds, from a number in [0, 1000).

@@ -39,7 +39,7 @@ func TestRarityRules(t *testing.T) {
 // rarity's, rounded to tens.
 func TestCardNumbers(t *testing.T) {
 	a, b := Card(127691, "Satoru Gojou", "JJK", "https://x/y.png", 39194, 0), Card(127691, "Satoru Gojou", "JJK", "https://x/y.png", 39194, 0)
-	if a != b || a.Rarity != int(Mythic) || a.Value != 5000 || a.Attack%10 != 0 || a.Attack < 4000 || a.Attack > 6000 || a.Health < 15000 || a.Health > 22000 {
+	if a != b || a.Rarity != int(Mythic) || a.Value != 10800 || a.Attack%10 != 0 || a.Attack < 4000 || a.Attack > 6000 || a.Health < 15000 || a.Health > 22000 {
 		t.Errorf("card = %+v", a)
 	}
 }
