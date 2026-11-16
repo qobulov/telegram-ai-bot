@@ -159,7 +159,7 @@ func tooSoon(opts Options, r storage.Reminder) bool {
 		return false
 	}
 	day := opts.CardDay(opts.Now())
-	return r.FreeDay.Equal(day.Start) && r.FreeUsed >= day.PerDay
+	return r.FreeDay.Equal(day.Start)
 }
 
 // retryable is a send Telegram answered it did not do for now: its rate

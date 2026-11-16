@@ -79,11 +79,22 @@ type CardPlayer struct {
 	Tokens   int
 }
 
-// CardDay is the day as the tokens count it: the midnight that began it and
-// the tokens a player is given in it.
+// CardDay is a period as the tokens count it: when it began, the tokens a
+// player is given in it, how long one lasts, and how many periods' tokens
+// a player who stayed away gathers at most.
 type CardDay struct {
 	Start  time.Time
 	PerDay int
+	Every  time.Duration
+	Most   int
+}
+
+// Next is when the next period's tokens come.
+func (d CardDay) Next() time.Time {
+	if d.Every > 0 {
+		return d.Start.Add(d.Every)
+	}
+	return d.Start.AddDate(0, 0, 1)
 }
 
 // CardCollections counts the cards of each collection there is.

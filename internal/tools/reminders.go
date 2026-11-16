@@ -313,7 +313,7 @@ func cardReminder(ctx context.Context, opts RemindersOptions, caller Caller, arg
 	}
 	result := reminderSet{Timezone: opts.location().String(), Always: args.Always}
 	day := opts.CardDay(now)
-	next := day.Start.AddDate(0, 0, 1)
+	next := day.Next()
 	if !player.FreeDay.Equal(day.Start) || player.Tokens > 0 {
 		result.CanDraw, result.Note = true, reminderCardNow
 		if args.Always {

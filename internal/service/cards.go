@@ -338,7 +338,7 @@ var (
 	}
 	textMarketButton = localText{uz: "🔄 Bozorni ochish", ru: "🔄 Открыть рынок", en: "🔄 Open the market"}
 	textCardsApp     = localText{
-		uz: "🎴 Kartalar ilovada ochiladi: kunlik tokenlar, 1x va 5x ochish, kolleksiya va reyting.",
+		uz: "🎴 Kartalar ilovada ochiladi: har 2 soatda token, 1x va 5x ochish, kolleksiya va reyting.",
 		ru: "🎴 Карты открываются в приложении: токены дня, открыть 1 или 5, коллекция и рейтинг.",
 		en: "🎴 Cards open in the app: the day's tokens, open 1 or 5, the collection and the ranking.",
 	}

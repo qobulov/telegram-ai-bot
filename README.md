@@ -2160,9 +2160,9 @@ longer be given. The Mini App's draw tab holds the crystals, which open cards
 once the tokens are spent. Crystals are melted in the Mini App alone: the bot has no
 commands for them.
 A player's 🎟 tokens (`card_players.tokens`, migration 80) each open one card,
-by the usual odds. Every player is given `PerDay` (2) tokens a day, at the day's
-first open of the app or first card (`GiveDayTokens`, `free_day` marking the day
-given), and keeps the ones not spent; the players got more at the reset, by their
+by the usual odds (Mythic 0.5%, Legendary 2.5%, Epic 9%, Rare 25%, Common 63%). Every player is given a token every 2 hours, the periods starting at even
+hours in Tashkent, when they next open the app or a card (`GiveDayTokens`, `free_day` marking the period
+last given), gathering up to 12 periods' while away, and keeps the ones not spent; the players got more at the reset, by their
 points. The draw tab has two buttons, 1x and 5x (`open`, `count`): each
 card takes a token while there is one and 15 crystals once there is none, and with
 too few for all of them none open (`OpenCards`, `CardFundsError`). Five are laid

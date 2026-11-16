@@ -252,7 +252,8 @@ func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
 	return map[string]any{
 		"cards": views, "points": player.Points, "held": len(owned),
 		"tokens": Tokens(player, now), "given": given, "per_day": PerDay, "card_cost": CardCost, "batch": Batch,
-		"shards": shards, "spare": spare, "spare_worth": worth,
+		"next_token_in": Today(now).Next().Sub(now).Milliseconds(),
+		"shards":        shards, "spare": spare, "spare_worth": worth,
 	}, failure{}
 }
 

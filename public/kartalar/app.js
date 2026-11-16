@@ -14,14 +14,14 @@
       drawNow: "Karta olish", drawing: "Ochilmoqda…", next: (t) => `Keyingi karta: ${t}`, ready: "Karta tayyor!",
      
       shardsTitle: "Kristallar", melt: (n, w) => `♻️ ${n} ta takrorni aylantirish → +${w} 💎`, noSpare: "♻️ Aylantirish uchun takror karta yo'q", melted: (n, g) => `♻️ ${n} ta karta → +${g} 💎`, shardsHint: "Takror kartalar kristalga aylanadi, ochko va reyting kamaymaydi. Kristal bilan kutmasdan karta oching yoki duelda tiking.", ratesLabel: "1 ta takror:", meltTitle: "Kristalga aylantirish", meltWarn: "Bu nusxalarni keyin sovg'a qilib bo'lmaydi. Har kartaning bittasi kolleksiyada qoladi.", meltDo: (w) => `♻️ Aylantirish · +${w} 💎`, cancel: "Bekor qilish",
-      open1: "1x", open10: "5x", costShort: "💎 yetmaydi", tokenHint: (d, c) => `🎟 Token bitta karta ochadi. Har kuni +${d} token, tugasa karta ${c} 💎`, shardHint: (c) => `💎 Kristal: takror kartalardan. Token tugasa karta ${c} 💎`, given: (n) => `🎟 Bugungi ${n} ta token berildi`, short: (n) => `💎 Yana ${n} kristal kerak`, openedTen: "5 ta karta", freshN: (n) => `🆕 ${n} ta yangi`, againN: (n) => `🔁 ${n} ta takror`, freshTag: "YANGI", carryOn: "Davom etish", noPoints: "ochko qo'shilmaydi", 
+      open1: "1x", open10: "5x", costShort: "💎 yetmaydi", tokenHint: (d, c) => `🎟 Token bitta karta ochadi. Har 2 soatda +${d} token (12 tagacha yig'iladi), tugasa karta ${c} 💎`, nextToken: (time) => `⏳ Keyingi token: ${time}`, shardHint: (c) => `💎 Kristal: takror kartalardan. Token tugasa karta ${c} 💎`, given: (n) => `🎟 +${n} token berildi`, short: (n) => `💎 Yana ${n} kristal kerak`, openedTen: "5 ta karta", freshN: (n) => `🆕 ${n} ta yangi`, againN: (n) => `🔁 ${n} ta takror`, freshTag: "YANGI", carryOn: "Davom etish", noPoints: "ochko qo'shilmaydi", 
       fresh: "🆕 Yangi karta!", again: (n) => `🔁 Sizda endi ×${n}`, plus: (n) => `+${n} ochko`,
       attack: "Hujum", health: "Jon", value: "Ochko", cards: (n) => `${n} karta`, pts: "ochko",
       none: "Hech narsa topilmadi", noTop: "Hali hech kim karta olmagan",
       noTelegram: "Ilovani Telegram'da oching: botga /cards yozing.", stale: "Ilova eskirdi, uni qayta oching.",
       unavailable: "Aloqa uzildi, birozdan keyin urinib ko'ring.",
       allSets: "Hammasi", pointsLabel: "ochko", loading: "Kartalar yuklanmoqda…",
-      welcomeTitle: "Kolleksiyangiz bo'sh", welcomeText: "Har kuni 2 ta token oling, har biri bitta anime karta ochadi. Hammasini to'plang.",
+      welcomeTitle: "Kolleksiyangiz bo'sh", welcomeText: "Har 2 soatda bitta token oling, har biri bitta anime karta ochadi. Hammasini to'plang.",
       welcomeButton: "Birinchi kartani olish", seeCollection: "Kolleksiyada ko'rish →",
       locked: (r, o) => `🔒 Bu ${r.toLowerCase()} karta hali yopiq. Uning tushish ehtimoli: ${o}.`,
       wait: (time) => `⏳ ${time}`,
@@ -42,14 +42,14 @@
       drawNow: "Получить карту", drawing: "Открываем…", next: (t) => `Следующая карта: ${t}`, ready: "Карта готова!",
      
       shardsTitle: "Кристаллы", melt: (n, w) => `♻️ Расплавить повторы: ${n} → +${w} 💎`, noSpare: "♻️ Повторных карт нет", melted: (n, g) => `♻️ ${n} карт → +${g} 💎`, shardsHint: "Повторы становятся кристаллами, очки и рейтинг не уменьшаются. За кристаллы — карта без ожидания или ставка в дуэли.", ratesLabel: "1 повтор:", meltTitle: "Расплавить в кристаллы", meltWarn: "Эти копии потом нельзя будет подарить. По одной карте каждого вида останется в коллекции.", meltDo: (w) => `♻️ Расплавить · +${w} 💎`, cancel: "Отмена",
-      open1: "1x", open10: "5x", costShort: "💎 не хватает", tokenHint: (d, c) => `🎟 Токен открывает одну карту. Каждый день +${d}, без токенов карта стоит ${c} 💎`, shardHint: (c) => `💎 Кристаллы — из повторов. Без токенов карта стоит ${c} 💎`, given: (n) => `🎟 Сегодняшние ${n} токена выданы`, short: (n) => `💎 Нужно ещё ${n} кристаллов`, openedTen: "5 карт", freshN: (n) => `🆕 Новых: ${n}`, againN: (n) => `🔁 Повторов: ${n}`, freshTag: "НОВАЯ", carryOn: "Продолжить", noPoints: "очки не добавляются", 
+      open1: "1x", open10: "5x", costShort: "💎 не хватает", tokenHint: (d, c) => `🎟 Токен открывает одну карту. Каждые 2 часа +${d} (копится до 12), без токенов карта стоит ${c} 💎`, nextToken: (time) => `⏳ Следующий токен: ${time}`, shardHint: (c) => `💎 Кристаллы — из повторов. Без токенов карта стоит ${c} 💎`, given: (n) => `🎟 +${n} токен(ов)`, short: (n) => `💎 Нужно ещё ${n} кристаллов`, openedTen: "5 карт", freshN: (n) => `🆕 Новых: ${n}`, againN: (n) => `🔁 Повторов: ${n}`, freshTag: "НОВАЯ", carryOn: "Продолжить", noPoints: "очки не добавляются", 
       fresh: "🆕 Новая карта!", again: (n) => `🔁 Теперь у вас ×${n}`, plus: (n) => `+${n} очков`,
       attack: "Атака", health: "Жизнь", value: "Очки", cards: (n) => `${n} карт`, pts: "очков",
       none: "Ничего не найдено", noTop: "Ещё никто не получил карту",
       noTelegram: "Откройте приложение в Telegram: напишите боту /cards.", stale: "Приложение устарело, откройте его снова.",
       unavailable: "Нет связи, попробуйте чуть позже.",
       allSets: "Все", pointsLabel: "очки", loading: "Загружаем карты…",
-      welcomeTitle: "Коллекция пуста", welcomeText: "Каждый день получайте 2 токена, каждый открывает аниме-карту. Соберите все.",
+      welcomeTitle: "Коллекция пуста", welcomeText: "Каждые 2 часа получайте токен, он открывает аниме-карту. Соберите все.",
       welcomeButton: "Получить первую карту", seeCollection: "Посмотреть в коллекции →",
       locked: (r, o) => `🔒 Эта карта (${r.toLowerCase()}) ещё закрыта. Шанс выпадения: ${o}.`,
       wait: (time) => `⏳ ${time}`,
@@ -70,14 +70,14 @@
       drawNow: "Draw a card", drawing: "Opening…", next: (t) => `Next card in ${t}`, ready: "A card is ready!",
      
       shardsTitle: "Crystals", melt: (n, w) => `♻️ Melt ${n} spares → +${w} 💎`, noSpare: "♻️ No spare cards to melt", melted: (n, g) => `♻️ ${n} cards → +${g} 💎`, shardsHint: "Spares melt into crystals; your points and ranking stay. Crystals open a card without the wait or make a duel's stake.", ratesLabel: "1 spare:", meltTitle: "Melt into crystals", meltWarn: "These copies cannot be given afterwards. One of each card stays in your collection.", meltDo: (w) => `♻️ Melt · +${w} 💎`, cancel: "Cancel",
-      open1: "1x", open10: "5x", costShort: "💎 not enough", tokenHint: (d, c) => `🎟 A token opens one card. +${d} every day; with none, a card is ${c} 💎`, shardHint: (c) => `💎 Crystals come from spares. With no token, a card is ${c} 💎`, given: (n) => `🎟 Today's ${n} tokens are yours`, short: (n) => `💎 ${n} more crystals needed`, openedTen: "5 cards", freshN: (n) => `🆕 ${n} new`, againN: (n) => `🔁 ${n} again`, freshTag: "NEW", carryOn: "Continue", noPoints: "no points added", 
+      open1: "1x", open10: "5x", costShort: "💎 not enough", tokenHint: (d, c) => `🎟 A token opens one card. +${d} every 2 hours, up to 12 kept; with none, a card is ${c} 💎`, nextToken: (time) => `⏳ Next token: ${time}`, shardHint: (c) => `💎 Crystals come from spares. With no token, a card is ${c} 💎`, given: (n) => `🎟 +${n} tokens`, short: (n) => `💎 ${n} more crystals needed`, openedTen: "5 cards", freshN: (n) => `🆕 ${n} new`, againN: (n) => `🔁 ${n} again`, freshTag: "NEW", carryOn: "Continue", noPoints: "no points added", 
       fresh: "🆕 A new card!", again: (n) => `🔁 You now have ×${n}`, plus: (n) => `+${n} points`,
       attack: "Attack", health: "Life", value: "Points", cards: (n) => `${n} cards`, pts: "points",
       none: "Nothing found", noTop: "Nobody has drawn a card yet",
       noTelegram: "Open the app in Telegram: send /cards to the bot.", stale: "The app is out of date; open it again.",
       unavailable: "No connection; try again in a bit.",
       allSets: "All", pointsLabel: "points", loading: "Loading the cards…",
-      welcomeTitle: "Your collection is empty", welcomeText: "Get 2 tokens every day, each opens an anime card. Collect them all.",
+      welcomeTitle: "Your collection is empty", welcomeText: "Get a token every 2 hours, each opens an anime card. Collect them all.",
       welcomeButton: "Draw your first card", seeCollection: "See it in the collection →",
       locked: (r, o) => `🔒 This ${r.toLowerCase()} card is still locked. Its odds: ${o}.`,
       wait: (time) => `⏳ ${time}`,
@@ -103,12 +103,12 @@
   // The collections, in the order the page lists them.
   const SETS = [["anime", "🎌 Anime"]];
   const COLORS = ["var(--r0)", "var(--r1)", "var(--r2)", "var(--r3)", "var(--r4)"];
-  const ODDS = ["50%", "28%", "14%", "6.5%", "1.5%"];
+  const ODDS = ["63%", "25%", "9%", "2.5%", "0.5%"];
   const spaced = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
   const haptic = (kind) => { try { tg.HapticFeedback.impactOccurred(kind); } catch (_) { /* outside Telegram */ } };
 
   let cards = [], points = 0, perDay = 2, drawing = false, query = "", opened = "", chosenSet = "";
-  let shards = 0, spare = 0, spareWorth = 0, cardCost = 15, batch = 5, tokens = 0;
+  let shards = 0, spare = 0, spareWorth = 0, cardCost = 15, batch = 5, tokens = 0, nextTokenAt = 0, refreshing = false;
 
   // ---------- server ----------
 
@@ -154,6 +154,7 @@
     spareWorth = data.spare_worth || 0;
     cardCost = data.card_cost || cardCost;
     batch = data.batch || batch;
+    nextTokenAt = Date.now() + (data.next_token_in || 0);
     tokens = data.tokens || 0;
     if (data.given) toast(t.given(data.given));
     shardsPanel();
@@ -547,7 +548,23 @@
     coin("tokenCount", tokens);
     coin("shardTop", spaced(shards));
     $("readyDot").hidden = !cards.length || !tokens || drawing || opened === "draw";
+    nextTokenLine();
   }
+
+  // nextTokenLine counts down to the next token, and asks for the state
+  // when it comes.
+  function nextTokenLine() {
+    if (!nextTokenAt) return;
+    const left = Math.max(0, nextTokenAt - Date.now());
+    const s = Math.floor(left / 1000);
+    const pad = (n) => String(n).padStart(2, "0");
+    $("nextToken").textContent = t.nextToken(`${Math.floor(s / 3600)}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`);
+    if (left === 0 && !refreshing && !drawing) {
+      refreshing = true;
+      api("state").then(applyState).catch(() => {}).finally(() => { refreshing = false; });
+    }
+  }
+  setInterval(nextTokenLine, 1000);
 
   // ---------- shards ----------
 

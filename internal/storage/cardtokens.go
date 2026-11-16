@@ -68,7 +68,7 @@ func (s *Store) OpenCards(ctx context.Context, userID int64, name string, n int,
 		if err != nil || open.Tokens > 0 {
 			return err
 		}
-		return remindAtNextDay(ctx, tx, userID, day.Start.AddDate(0, 0, 1))
+		return remindAtNextDay(ctx, tx, userID, day.Next())
 	})
 	var few *CardFundsError
 	if errors.As(err, &few) {
@@ -99,12 +99,30 @@ func (s *Store) GiveDayTokens(ctx context.Context, userID int64, name string, da
 }
 
 func giveDayTokens(ctx context.Context, tx pgx.Tx, userID int64, day CardDay, player cardPlayerRow) (int, error) {
-	if day.PerDay <= 0 || (player.freeDay != nil && player.freeDay.Equal(day.Start)) {
+	given := DueTokens(player.freeDay, day)
+	if given == 0 {
 		return 0, nil
 	}
 	_, err := tx.Exec(ctx, `UPDATE card_players SET tokens = tokens + $2, free_day = $3, free_used = 0 WHERE user_id = $1`,
-		userID, day.PerDay, day.Start)
-	return day.PerDay, err
+		userID, given, day.Start)
+	return given, err
+}
+
+// DueTokens are the tokens a player last given them in the period that
+// began at last is due now: a period's for each that began since, at most
+// day.Most periods', and one period's for a player never given any.
+func DueTokens(last *time.Time, day CardDay) int {
+	if day.PerDay <= 0 || (last != nil && !last.Before(day.Start)) {
+		return 0
+	}
+	periods := 1
+	if last != nil && day.Every > 0 {
+		periods = int(day.Start.Sub(*last) / day.Every)
+	}
+	if day.Most > 0 {
+		periods = min(periods, day.Most)
+	}
+	return max(periods, 1) * day.PerDay
 }
 
 // remindAtNextDay moves a player's card reminder, when they asked to be

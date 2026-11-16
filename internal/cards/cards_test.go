@@ -20,7 +20,7 @@ func TestRarityRules(t *testing.T) {
 	for n := range 1000 {
 		drawn[Roll(n)]++
 	}
-	if drawn[Mythic] != 15 || drawn[Legendary] != 65 || drawn[Epic] != 140 || drawn[Rare] != 280 || drawn[Common] != 500 {
+	if drawn[Mythic] != 5 || drawn[Legendary] != 25 || drawn[Epic] != 90 || drawn[Rare] != 250 || drawn[Common] != 630 {
 		t.Errorf("odds = %v", drawn)
 	}
 	held := map[Rarity]int{}
@@ -156,20 +156,29 @@ func TestEnsureAddsOnlyNewCards(t *testing.T) {
 	}
 }
 
-// The day starts at midnight in Tashkent, and a player not yet given the
-// day's tokens counts them as theirs.
-func TestTwoTokensADay(t *testing.T) {
+// A token comes every 2 hours, the periods starting at even hours in
+// Tashkent; one away gathers a token a period, twelve at most, and one never
+// given any gets one.
+func TestATokenEveryTwoHours(t *testing.T) {
 	now := time.Date(2026, 11, 16, 20, 30, 0, 0, time.UTC) // 01:30 in Tashkent
-	if start := DayStart(now); !start.Equal(time.Date(2026, 11, 17, 0, 0, 0, 0, Location)) {
-		t.Errorf("day start = %v", start)
+	start := PeriodStart(now)
+	if !start.Equal(time.Date(2026, 11, 17, 0, 0, 0, 0, Location)) || !Today(now).Next().Equal(start.Add(2*time.Hour)) {
+		t.Errorf("period start = %v, next %v", start, Today(now).Next())
 	}
-	player := storage.CardPlayer{FreeDay: DayStart(now), Tokens: 1}
+	player := storage.CardPlayer{FreeDay: start, Tokens: 1}
 	if n := Tokens(player, now); n != 1 {
-		t.Errorf("given today, one held = %d", n)
+		t.Errorf("given this period, one held = %d", n)
 	}
-	player.FreeDay = DayStart(now).AddDate(0, 0, -1)
-	if n := Tokens(player, now); n != 1+PerDay {
-		t.Errorf("given yesterday = %d, want %d", n, 1+PerDay)
+	player.FreeDay = start.Add(-6 * time.Hour)
+	if n := Tokens(player, now); n != 1+3 {
+		t.Errorf("three periods away = %d, want 4", n)
+	}
+	player.FreeDay = start.AddDate(0, 0, -5)
+	if n := Tokens(player, now); n != 1+TokenMost {
+		t.Errorf("five days away = %d, want %d", n, 1+TokenMost)
+	}
+	if n := Tokens(storage.CardPlayer{}, now); n != 1 {
+		t.Errorf("never given = %d", n)
 	}
 }
 

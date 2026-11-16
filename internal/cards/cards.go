@@ -36,32 +36,39 @@ const (
 // Rarities lists every rarity, the most common first.
 var Rarities = []Rarity{Common, Rare, Epic, Legendary, Mythic}
 
-// PerDay is the tokens a player is given each day, the day starting at
-// midnight in Location; each token opens a card, and crystals open more.
-const PerDay = 2
+// A player is given PerDay tokens every TokenEvery, the periods starting at
+// even hours in Location, and gathers at most TokenMost periods' while away;
+// each token opens a card, and crystals open more.
+const (
+	PerDay     = 1
+	TokenEvery = 2 * time.Hour
+	TokenMost  = 12
+)
 
-// Location is where the card game's day starts: Tashkent, which keeps no
-// summer time.
+// Location is where the card game's token periods start: Tashkent, which
+// keeps no summer time.
 var Location = time.FixedZone("Tashkent", 5*60*60)
 
-// DayStart is the midnight in Location that began now's day.
-func DayStart(now time.Time) time.Time {
+// PeriodStart is the even hour in Location that began now's token period.
+func PeriodStart(now time.Time) time.Time {
 	local := now.In(Location)
-	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, Location)
+	hours := int(TokenEvery / time.Hour)
+	return time.Date(local.Year(), local.Month(), local.Day(), local.Hour()-local.Hour()%hours, 0, 0, 0, Location)
 }
 
-// Today is the day as the tokens count it.
+// Today is the period as the tokens count it.
 func Today(now time.Time) storage.CardDay {
-	return storage.CardDay{Start: DayStart(now), PerDay: PerDay}
+	return storage.CardDay{Start: PeriodStart(now), PerDay: PerDay, Every: TokenEvery, Most: TokenMost}
 }
 
-// Tokens is how many tokens the player may spend now: those they hold,
-// and the day's when they have not been given them yet today.
+// Tokens is how many tokens the player may spend now: those they hold, and
+// those due since they were last given some.
 func Tokens(p storage.CardPlayer, now time.Time) int {
-	if !p.FreeDay.Equal(DayStart(now)) {
-		return p.Tokens + PerDay
+	var last *time.Time
+	if !p.FreeDay.IsZero() {
+		last = &p.FreeDay
 	}
-	return p.Tokens
+	return p.Tokens + storage.DueTokens(last, Today(now))
 }
 
 // CatalogSize is how many of AniList's most loved characters are cards: the
@@ -85,11 +92,11 @@ type rule struct {
 // 67 draws, and worth 4 000 points, a Legendary 2 000, an Epic 400, a Rare
 // 200 and a Common 100.
 var rules = map[Rarity]rule{
-	Mythic:    {cards: 25, odds: 15, value: 4000, attackLeast: 4000, attackMost: 6000, healthLeast: 15000, healthMost: 22000},
-	Legendary: {cards: 50, odds: 65, value: 2000, attackLeast: 2500, attackMost: 4000, healthLeast: 9000, healthMost: 15000},
-	Epic:      {cards: 100, odds: 140, value: 400, attackLeast: 1500, attackMost: 2500, healthLeast: 6000, healthMost: 9000},
-	Rare:      {cards: 150, odds: 280, value: 200, attackLeast: 800, attackMost: 1500, healthLeast: 3000, healthMost: 6000},
-	Common:    {cards: 176, odds: 500, value: 100, attackLeast: 300, attackMost: 800, healthLeast: 1000, healthMost: 3000},
+	Mythic:    {cards: 25, odds: 5, value: 4000, attackLeast: 4000, attackMost: 6000, healthLeast: 15000, healthMost: 22000},
+	Legendary: {cards: 50, odds: 25, value: 2000, attackLeast: 2500, attackMost: 4000, healthLeast: 9000, healthMost: 15000},
+	Epic:      {cards: 100, odds: 90, value: 400, attackLeast: 1500, attackMost: 2500, healthLeast: 6000, healthMost: 9000},
+	Rare:      {cards: 150, odds: 250, value: 200, attackLeast: 800, attackMost: 1500, healthLeast: 3000, healthMost: 6000},
+	Common:    {cards: 176, odds: 630, value: 100, attackLeast: 300, attackMost: 800, healthLeast: 1000, healthMost: 3000},
 }
 
 // Roll draws a rarity by the odds, from a number in [0, 1000).

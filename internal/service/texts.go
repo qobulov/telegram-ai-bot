@@ -238,7 +238,7 @@ A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yo
 /banlist, /amnesty, /kickinactive 30 — banlar ro'yxati, hammani bandan chiqarish, faol emaslarni chiqarish
 
 Hamma uchun:
-/cards — kartalar (har kuni 2 token), /mylink — shaxsiy taklif havolangiz, /invites_week — kim nechta odam qo'shdi
+/cards — kartalar (har 2 soatda token), /mylink — shaxsiy taklif havolangiz, /invites_week — kim nechta odam qo'shdi
 /admins — adminlarni chaqirish, /report va /voteban — xabarga reply qilib shikoyat yoki ban uchun ovoz
 /id, /ping, /calc 2+2, /weather Toshkent`,
 	"ru": `Пишите мне: отвечаю на узбекском, русском или английском — на вашем языке.
@@ -263,7 +263,7 @@ Hamma uchun:
 /banlist, /amnesty, /kickinactive 30 — банлист, разбан всех, кик неактивных
 
 Для всех:
-/cards — карты (2 токена в день), /mylink — ваша личная ссылка-приглашение, /invites_week — кто сколько добавил
+/cards — карты (токен каждые 2 часа), /mylink — ваша личная ссылка-приглашение, /invites_week — кто сколько добавил
 /admins — позвать админов, /report и /voteban — ответом на сообщение: жалоба или голосование за бан
 /id, /ping, /calc 2+2, /weather Ташкент`,
 	"en": `Talk to me and I will answer, in Uzbek, Russian or English, matching your language.
@@ -288,7 +288,7 @@ Reply to a member's message and ask me to delete or pin it, to mute or ban its a
 /banlist, /amnesty, /kickinactive 30 — the ban list, unban everyone, remove the inactive
 
 For everyone:
-/cards — cards (2 tokens a day), /mylink — your own invite link, /invites_week — who brought how many in
+/cards — cards (a token every 2 hours), /mylink — your own invite link, /invites_week — who brought how many in
 /admins — call the admins, /report and /voteban — as a reply: report, or vote to ban
 /id, /ping, /calc 2+2, /weather Tashkent`,
 }

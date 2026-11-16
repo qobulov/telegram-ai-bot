@@ -190,7 +190,7 @@ func TestCardsAppWantsSignedInitData(t *testing.T) {
 // The state names only the cards held: one not held is its rarity alone.
 func TestCardsAppHidesCardsNotHeld(t *testing.T) {
 	now := time.Now()
-	store := &fakeStore{day: DayStart(now)}
+	store := &fakeStore{day: PeriodStart(now)}
 	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }})
 	code, out := post(t, h, signedInit(7, now), "state")
 	views, _ := out["cards"].([]any)
@@ -206,11 +206,11 @@ func TestCardsAppHidesCardsNotHeld(t *testing.T) {
 	}
 }
 
-// Opening the app gives the day's two tokens; a card or ten open for
+// Opening the app gives the period's token; a card or five open for
 // tokens, then for crystals; with too few of both nothing opens.
 func TestCardsAppOpensForTokensThenCrystals(t *testing.T) {
 	now := time.Now()
-	store := &fakeStore{}
+	store := &fakeStore{tokens: 1}
 	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }, Roll: func() Rarity { return Mythic }})
 	initData := signedInit(7, now)
 	open := func(n int) map[string]any {
@@ -222,7 +222,7 @@ func TestCardsAppOpensForTokensThenCrystals(t *testing.T) {
 		out["code"] = float64(rec.Code)
 		return out
 	}
-	if code, out := post(t, h, initData, "state"); code != 200 || out["tokens"] != 2.0 || out["given"] != 2.0 || out["card_cost"] != float64(CardCost) || out["batch"] != float64(Batch) {
+	if code, out := post(t, h, initData, "state"); code != 200 || out["tokens"] != 2.0 || out["given"] != 1.0 || out["next_token_in"] == nil || out["card_cost"] != float64(CardCost) || out["batch"] != float64(Batch) {
 		t.Fatalf("state = %d %v", code, out)
 	}
 	if out := open(1); out["tokens"] != 1.0 || len(out["drawn"].([]any)) != 1 || out["drawn"].([]any)[0].(map[string]any)["card"].(map[string]any)["name"] != "Gojo" {
