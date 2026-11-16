@@ -790,6 +790,12 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 	if pressedHelp(in) {
 		in.text = "/help"
 	}
+	if out, ok := s.utilityCommand(in); ok {
+		return out
+	}
+	if question, ok := weatherQuestion(in.text); ok {
+		in.text = question
+	}
 	if s.isRankCommand(in) {
 		return s.rankCommand(ctx, in)
 	}
