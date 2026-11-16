@@ -2120,13 +2120,13 @@ fourth is told the new ones come tomorrow, with no count of the time left
 characters, fetched the first time a card is drawn (`internal/cards`, kept in
 `card_catalog`, migration 52). Its 👑 Mifik and 🔥 Afsonaviy are the
 characters anime fans at large know, not today's votes, chosen by hand in
-`internal/cards` (`mythicIDs`, `legendaryIDs`): the 25 Mifik are 15 men, the
+`internal/cards` (`mythicIDs`, `legendaryIDs`): the 26 Mifik are 16 men, the
 leads of the best known series (Son Goku, Naruto, Luffy, Ichigo, Eren, Edward
-Elric, Light, Tanjiro, Saitama, Gon, Lelouch, Spike, Guts, Jotaro, Meliodas),
-and 10 women (Mikasa, Maomao, Frieren, Makima, Nezuko, Emilia, Kurisu, Violet
-Evergarden, Zero Two, Mai Sakurajima), migration 76; the 59 Afsonaviy their
+Elric, Light, Tanjiro, Saitama, Gon, Lelouch, Spike, Guts, Jotaro, Meliodas,
+and Gojo, made Mythic by the owners in migration 82), and 10 women (Mikasa, Maomao, Frieren, Makima, Nezuko, Emilia, Kurisu, Violet
+Evergarden, Zero Two, Mai Sakurajima), migration 76; the 58 Afsonaviy their
 legendary rivals and companions (Vegeta, Sasuke, Kakashi, Itachi, Levi, L,
-Zoro, Killua, Gojo…) and other well known leads (Deku, Itadori, Kaneki,
+Zoro, Killua…) and other well known leads (Deku, Itadori, Kaneki,
 Denji, Gintoki, Natsu, Thorfinn, Rimuru…); the rest go by rank among
 AniList's most loved, never above Epik, with The Seven Deadly Sins' cast
 and Firefly Wedding's Satoko Kirigaya added as Epik: 100 💜 Epik, 150 🔷 Noyob and the other 176 ⚪ Oddiy. The tiers were cut for 200

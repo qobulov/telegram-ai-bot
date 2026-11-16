@@ -45,16 +45,16 @@ func TestCardNumbers(t *testing.T) {
 }
 
 // Mythic and Legendary are the characters chosen by hand, whatever their
-// rank: Son Goku is Mythic at 130, Gojo Legendary at 1; anyone else is at
+// rank: Son Goku is Mythic at 130, Gojo Mythic at 1, Sasuke Legendary; anyone else is at
 // most Epic, however loved.
 func TestChosenRarities(t *testing.T) {
-	if RarityOf(246, 130) != Mythic || RarityOf(17, 32) != Mythic || RarityOf(127691, 0) != Legendary || RarityOf(913, 190) != Legendary {
+	if RarityOf(246, 130) != Mythic || RarityOf(17, 32) != Mythic || RarityOf(127691, 0) != Mythic || RarityOf(913, 190) != Legendary {
 		t.Error("a chosen character's rarity")
 	}
 	if RarityOf(89334, 9) != Epic || RarityOf(99999, 400) != Common || RarityOf(88572, 7) != Mythic {
 		t.Errorf("Reigen at 9 = %v, an unknown at 400 = %v, Emilia = %v", RarityOf(89334, 9), RarityOf(99999, 400), RarityOf(88572, 7))
 	}
-	if len(mythicIDs) != 25 || len(legendaryIDs) != 59 || len(epicIDs) != 8 {
+	if len(mythicIDs) != 26 || len(legendaryIDs) != 58 || len(epicIDs) != 8 {
 		t.Errorf("chosen %d Mythic and %d Legendary", len(mythicIDs), len(legendaryIDs))
 	}
 }
