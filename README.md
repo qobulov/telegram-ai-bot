@@ -866,8 +866,8 @@ or in a group (`internal/tools/reminders.go`, the `reminders` tool):
 - "karta ochish vaqti kelganda eslat": a reminder at the player's next
   [Kartalar](#kartalar) draw, the next midnight once the player's tokens are spent, with the
   Mini App's button; one who may open a card now is told so. "har safar
-  eslat" turns on a reminder after every card: each draw, from `/card`
-  or the Mini App, schedules the next one (`DrawCard`, kept on
+  eslat" turns on a reminder after every card: each opening that spends the last token
+  schedules the next one (`OpenCards`, kept on
   `card_players.remind_chat_id`), until "karta eslatmasini o'chir". It is
   off by default.
 
@@ -2163,11 +2163,11 @@ A player's 🎟 tokens (`card_players.tokens`, migration 80) each open one card,
 by the usual odds. Every player is given `PerDay` (2) tokens a day, at the day's
 first open of the app or first card (`GiveDayTokens`, `free_day` marking the day
 given), and keeps the ones not spent; the players got more at the reset, by their
-points. The draw tab has two buttons, open 1 and open 5 (`open`, `count`): each
+points. The draw tab has two buttons, 1x and 5x (`open`, `count`): each
 card takes a token while there is one and 15 crystals once there is none, and with
 too few for all of them none open (`OpenCards`, `CardFundsError`). Five are laid
-out together after the rarest of them turns. `/card` in the chat opens one the
-same way.
+out together after the rarest of them turns. `/card` in the chat, like `/cards`, answers with the app's button: cards open
+in the app alone.
 The Animelar tab (`animes`) lists every anime, its seasons and sequels as one, with
 how many of its cards the player holds; an anime opens on all its cards with their
 pictures and names, the ones not held dimmed, so that a player sees what is there to

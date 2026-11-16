@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -13,14 +12,12 @@ import (
 	"telegram-ai-bot/internal/cards"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
-	"telegram-ai-bot/internal/tools"
 )
 
 // CardBook keeps Kartalar: the catalog of cards, the players' draws and
 // their collections.
 type CardBook interface {
 	cards.CatalogStore
-	OpenCards(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, cost int, day storage.CardDay, now time.Time) (storage.CardOpening, error)
 	CardCounts(ctx context.Context, userID int64) (total, owned map[int]int, points int64, err error)
 	OwnedCards(ctx context.Context, userID int64, rarity int) ([]storage.OwnedCard, error)
 	CardTop(ctx context.Context, limit int) ([]storage.CardPlayer, error)
@@ -85,71 +82,14 @@ var rarityNames = []localText{
 var cardMarks = strings.NewReplacer("*", "", "`", "", "[", "(", "]", ")")
 
 // isCardDraw reports a message asking for a card: /card anywhere, or the
-// word alone in a private chat.
+// word alone in a private chat. Cards open in the Mini App alone, so it
+// answers with the app's button.
 func isCardDraw(in incoming) bool {
 	if commandName(in.text) == "/card" {
 		return true
 	}
 	word := strings.ToLower(strings.TrimSpace(in.text))
 	return !in.group && (word == "karta" || word == "карта" || word == "получить карту")
-}
-
-// drawCard opens a card for a token, or for crystals once the player has
-// none: the card's picture with its name, numbers and rarity, or that they
-// have neither.
-func (s *Service) drawCard(ctx context.Context, in incoming) outcome {
-	ctx, cancel := context.WithTimeout(ctx, cardsTimeout)
-	defer cancel()
-	catalog := s.cardCatalog()
-	if err := catalog.Ensure(ctx); err != nil {
-		s.opts.Logger.Error("could not fill the card catalog", "error", err)
-		return say(textCardsUnavailable.to(in))
-	}
-	now := time.Now()
-	opened, err := s.opts.Cards.OpenCards(ctx, in.userID, doozName(in.msg.From), 1, cards.ByOdds(cards.RollRandom), cards.CardCost, cards.Today(now), now)
-	var few *storage.CardFundsError
-	switch {
-	case errors.As(err, &few):
-		return say(fmt.Sprintf(textCardWait.to(in), cards.CardCost, few.Shards, cards.PerDay))
-	case err != nil:
-		s.opts.Logger.Error("could not open a card", "user_id", in.userID, "error", err)
-		return say(textCardsUnavailable.to(in))
-	}
-	draw := opened.Draws[0]
-	return s.withPicture(ctx, say(cardCaption(languageOf(in), draw, opened)), draw.Card)
-}
-
-// withPicture adds the card's picture to out, which goes without it when
-// the picture cannot be had.
-func (s *Service) withPicture(ctx context.Context, out outcome, card storage.Card) outcome {
-	if picture, _, err := s.cardCatalog().FetchPicture(ctx, card.ImageURL); err == nil {
-		out.drawings = []tools.Drawing{{Data: picture, MimeType: http.DetectContentType(picture)}}
-	} else {
-		s.opts.Logger.Warn("could not fetch a card's picture", "card", card.ID, "error", err)
-	}
-	return out
-}
-
-// cardCaption is a drawn card, one thing a line: its name, anime, attack,
-// life and rarity, the points it gave with the player's total, and the
-// tokens and crystals left.
-func cardCaption(language string, draw storage.CardDraw, opened storage.CardOpening) string {
-	c := draw.Card
-	emoji, rarity, _ := strings.Cut(rarityNames[c.Rarity].inLanguage(language), " ")
-	lines := []string{emoji + " **" + cardMarks.Replace(c.Name) + "**"}
-	if c.Anime != "" {
-		lines = append(lines, "🎬 "+cardMarks.Replace(c.Anime))
-	}
-	lines = append(lines,
-		fmt.Sprintf(textCardAttack.inLanguage(language), spaced(int64(c.Attack))),
-		fmt.Sprintf(textCardLife.inLanguage(language), spaced(int64(c.Health))),
-		fmt.Sprintf(textCardRarity.inLanguage(language), rarity))
-	got := fmt.Sprintf(textCardAgain.inLanguage(language), draw.Count, spaced(draw.Points))
-	if draw.New {
-		got = fmt.Sprintf(textCardNew.inLanguage(language), spaced(int64(c.Value)), spaced(draw.Points))
-	}
-	lines = append(lines, got, fmt.Sprintf(textCardWallet.inLanguage(language), opened.Tokens, spaced(int64(opened.Shards))))
-	return strings.Join(lines, "\n")
 }
 
 // spaced writes n with its thousands apart, "12 300", as the cards do.
@@ -371,17 +311,6 @@ var (
 		ru: "Карты сейчас недоступны, попробуйте чуть позже.",
 		en: "Cards are not available right now; try again in a bit.",
 	}
-	textCardWait = localText{
-		uz: "🎟 Tokeningiz qolmadi, karta %d 💎 turadi, sizda %d bor. Ertaga yana %d token beriladi. Kolleksiya: /mycards",
-		ru: "🎟 Токенов нет, карта стоит %d 💎, у вас %d. Завтра дадут ещё %d токена. Коллекция: /mycards",
-		en: "🎟 No tokens left; a card costs %d 💎 and you have %d. Tomorrow brings %d more tokens. Collection: /mycards",
-	}
-	textCardWallet     = localText{uz: "🎟 Token: %d · 💎 %s", ru: "🎟 Токены: %d · 💎 %s", en: "🎟 Tokens: %d · 💎 %s"}
-	textCardAttack     = localText{uz: "⚔️ Hujum: %s", ru: "⚔️ Атака: %s", en: "⚔️ Attack: %s"}
-	textCardLife       = localText{uz: "❤️ Jon: %s", ru: "❤️ Жизнь: %s", en: "❤️ Life: %s"}
-	textCardRarity     = localText{uz: "💎 Noyoblik: %s", ru: "💎 Редкость: %s", en: "💎 Rarity: %s"}
-	textCardNew        = localText{uz: "🆕 Yangi · +%s ochko (jami %s)", ru: "🆕 Новая · +%s очков (всего %s)", en: "🆕 New · +%s points (total %s)"}
-	textCardAgain      = localText{uz: "🔁 Takror, endi ×%d · ochko qo'shilmaydi (jami %s)", ru: "🔁 Повтор, теперь ×%d · очки не добавляются (всего %s)", en: "🔁 Again, now ×%d · no points added (total %s)"}
 	textCardAll        = localText{uz: "🗂 Hammasi - %d/%d", ru: "🗂 Все - %d/%d", en: "🗂 All - %d/%d"}
 	textCardAllTitle   = localText{uz: "🗂 Barcha kartalaringiz", ru: "🗂 Все ваши карты", en: "🗂 All your cards"}
 	textCardCollection = localText{
@@ -409,9 +338,9 @@ var (
 	}
 	textMarketButton = localText{uz: "🔄 Bozorni ochish", ru: "🔄 Открыть рынок", en: "🔄 Open the market"}
 	textCardsApp     = localText{
-		uz: "🎴 Kartalar ilovasi: kolleksiyangiz, karta olish va reyting bir joyda.",
-		ru: "🎴 Приложение карт: коллекция, получение карт и рейтинг в одном месте.",
-		en: "🎴 The cards app: your collection, drawing cards and the ranking in one place.",
+		uz: "🎴 Kartalar ilovada ochiladi: kunlik tokenlar, 1x va 5x ochish, kolleksiya va reyting.",
+		ru: "🎴 Карты открываются в приложении: токены дня, открыть 1 или 5, коллекция и рейтинг.",
+		en: "🎴 Cards open in the app: the day's tokens, open 1 or 5, the collection and the ranking.",
 	}
 	textCardsAppButton = localText{uz: "📱 Ilovada ochish", ru: "📱 Открыть приложение", en: "📱 Open the app"}
 	textCardTopEmpty   = localText{uz: "Hali hech kim karta olmagan. Birinchi bo'ling: /card", ru: "Ещё никто не получил карту. Будьте первым: /card", en: "Nobody has drawn a card yet. Be the first: /card"}

@@ -170,31 +170,6 @@ func (f *fakeCards) CardTop(_ context.Context, limit int) ([]storage.CardPlayer,
 	return f.top[:min(limit, len(f.top))], nil
 }
 
-// OpenCards gives the day's tokens at the day's first opening, then spends
-// a token a card, or cost crystals once there is none.
-func (f *fakeCards) OpenCards(_ context.Context, userID int64, _ string, n int, _ storage.CardRoll, cost int, day storage.CardDay, now time.Time) (storage.CardOpening, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.days = append(f.days, day)
-	if f.used[userID] == 0 {
-		f.used[userID] = 1 + day.PerDay // the day's tokens, kept one up so that 0 is "not given"
-	}
-	tokens := min(f.used[userID]-1, n)
-	if shards := (n - tokens) * cost; shards > f.shards[userID] {
-		return storage.CardOpening{}, &storage.CardFundsError{Tokens: f.used[userID] - 1, Shards: f.shards[userID], Need: shards}
-	} else {
-		f.used[userID] -= tokens
-		f.shards[userID] -= shards
-	}
-	f.last[userID] = now
-	open := storage.CardOpening{Tokens: f.used[userID] - 1, Shards: f.shards[userID], Points: 5000}
-	for range n {
-		f.held[userID]++
-		open.Draws = append(open.Draws, storage.CardDraw{Card: f.card, New: f.held[userID] == 1, Count: f.held[userID], Points: 5000})
-	}
-	return open, nil
-}
-
 func (f *fakeCards) CardCounts(_ context.Context, userID int64) (map[int]int, map[int]int, int64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -214,35 +189,20 @@ func (f *fakeCards) OwnedCards(_ context.Context, userID int64, rarity int) ([]s
 	return []storage.OwnedCard{{Card: f.card, Count: f.held[userID]}}, nil
 }
 
-// A card opens for a token with its picture and its numbers under it; with
-// no token and no crystals the next says so, an owner's like anyone's.
-func TestCardOpensForAToken(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("\x89PNG card")) }))
-	defer server.Close()
+// /card, or the word alone in a private chat, opens no card in the chat: it
+// answers with the app's button, where cards open.
+func TestCardOpensOnlyInTheApp(t *testing.T) {
 	f := newFixture()
-	book := newFakeCards(server.URL + "/gojo.png")
-	f.opts.Cards = book
-
-	sent := f.run(textFrom(userID, "/card"))
-	if len(sent) != 1 || !sent[0].photo {
-		t.Fatalf("sent = %+v, want the card's picture", sent)
+	f.opts.Cards = newFakeCards("")
+	f.opts.CardsURL = "https://example.test/kartalar/"
+	sent := f.run(textFrom(userID, "/card"), textFrom(userID, "karta"))
+	if len(sent) != 2 {
+		t.Fatalf("sent = %+v", sent)
 	}
-	for _, want := range []string{"👑", "Gojo Satoru", "Jujutsu Kaisen", "5 130", "18 020", "+5 000", "🆕", "🎟 Token: 1"} {
-		if !strings.Contains(sent[0].text, want) {
-			t.Errorf("caption lacks %q:\n%s", want, sent[0].text)
+	for _, m := range sent {
+		if m.photo || len(m.buttons) != 1 || !strings.Contains(m.text, "ilovada") {
+			t.Errorf("a card asked for in the chat = %+v, want the app's button", m)
 		}
-	}
-	// f.run gives every message sent so far: the last is this draw's. A
-	// copy adds no points; the second spends the day's last token.
-	if sent = f.run(textFrom(userID, "karta")); len(sent) != 2 || !sent[1].photo || !strings.Contains(sent[1].text, "ochko qo'shilmaydi") || !strings.Contains(sent[1].text, "🎟 Token: 0") {
-		t.Errorf("second draw = %+v, want the copy without points and no token left", sent)
-	}
-	f.opts.OwnerIDs = map[int64]bool{userID: true}
-	if sent = f.run(textFrom(userID, "/card")); len(sent) != 3 || sent[2].photo || !strings.Contains(sent[2].text, "Tokeningiz qolmadi") || !strings.Contains(sent[2].text, "Ertaga") {
-		t.Errorf("an owner's third draw = %+v, want no token, the price in crystals and tomorrow's tokens", sent)
-	}
-	if day := book.days[len(book.days)-1]; day.PerDay != 2 || day.Start.Hour() != 0 {
-		t.Errorf("an owner's day = %+v", day)
 	}
 }
 
@@ -329,25 +289,18 @@ func TestCardTopShowsTheAskersPlace(t *testing.T) {
 }
 
 // /card is not counted in the group's quota, which is for the model's talk:
-// a member out of answers still draws, and is still told when out of tokens.
-func TestCardDrawsTakeNoGroupQuota(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("\x89PNG")) }))
-	defer server.Close()
+// a member out of answers is still given the app's button.
+func TestCardTakesNoGroupQuota(t *testing.T) {
 	f := newFixture()
-	f.opts.Cards = newFakeCards(server.URL + "/g.png")
-	quota := &fakeGroupQuota{}
-	f.opts.GroupReplies = quota
+	f.opts.Cards = newFakeCards("")
+	f.opts.CardsURL = "https://example.test/kartalar/"
+	f.opts.Bot.Username = "testbot"
+	f.opts.GroupReplies = &fakeGroupQuota{}
 	f.opts.GroupRatePerMinute, f.opts.MemberRepliesPer10Min = 6, 1
 	f.opts.Workers = 1
-
 	sent := f.run(inGroup(groupMessage("Mira, salom")), inGroup(groupMessage("/card")))
-	if len(sent) != 2 || !sent[1].photo {
-		t.Fatalf("sent = %+v, want the answer and then the card", sent)
-	}
-	book := f.opts.Cards.(*fakeCards)
-	book.used[userID] = 1 // no token left
-	if sent = f.run(inGroup(groupMessage("/card"))); len(sent) != 3 || !strings.Contains(sent[2].text, "🎟") || sent[2].photo {
-		t.Errorf("no token over the quota sent %+v, want that there is none", sent)
+	if len(sent) != 2 || len(sent[1].buttons) != 1 || sent[1].photo {
+		t.Fatalf("sent = %+v, want the answer and then the app's button", sent)
 	}
 }
 
@@ -375,23 +328,6 @@ func TestGameCommandKeepsTheGamesLimitInAGroup(t *testing.T) {
 	}
 	if got := f.reactor.recorded(); len(got) != 1 || got[0].emoji != overQuotaReaction {
 		t.Errorf("reactions = %+v", got)
-	}
-}
-
-// A drawn card is one thing a line, and never speaks of sure cards, which
-// there are none of.
-func TestCardCaptionIsShort(t *testing.T) {
-	in := incoming{msg: &telegram.Message{From: &telegram.User{ID: 1, FirstName: "Bek"}}, text: "/card"}
-	draw := storage.CardDraw{Card: storage.Card{Name: "Gojo", Anime: "JJK", Rarity: 4, Attack: 5130, Health: 18020, Value: 5000}, New: true, Count: 1, Points: 12300, SinceLegendary: 3, SinceMythic: 40}
-	opened := storage.CardOpening{Tokens: 1, Shards: 1500}
-	want := "👑 **Gojo**\n🎬 JJK\n⚔️ Hujum: 5 130\n❤️ Jon: 18 020\n💎 Noyoblik: Mifik\n🆕 Yangi · +5 000 ochko (jami 12 300)\n🎟 Token: 1 · 💎 1 500"
-	if caption := cardCaption(languageOf(in), draw, opened); caption != want {
-		t.Errorf("caption:\n%s\nwant:\n%s", caption, want)
-	}
-	draw.New, draw.Count, draw.Guaranteed, draw.SinceLegendary = false, 2, true, 99
-	caption := cardCaption(languageOf(in), draw, opened)
-	if !strings.Contains(caption, "🔁 Takror, endi ×2 · ochko qo'shilmaydi") || strings.Contains(caption, "Kafolat") || strings.Contains(caption, "aniq") {
-		t.Errorf("a copy's caption, with no sure cards:\n%s", caption)
 	}
 }
 

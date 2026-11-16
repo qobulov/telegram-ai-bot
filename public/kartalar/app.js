@@ -14,7 +14,7 @@
       drawNow: "Karta olish", drawing: "Ochilmoqda…", next: (t) => `Keyingi karta: ${t}`, ready: "Karta tayyor!",
      
       shardsTitle: "Kristallar", melt: (n, w) => `♻️ ${n} ta takrorni aylantirish → +${w} 💎`, noSpare: "♻️ Aylantirish uchun takror karta yo'q", melted: (n, g) => `♻️ ${n} ta karta → +${g} 💎`, shardsHint: "Takror kartalar kristalga aylanadi, ochko va reyting kamaymaydi. Kristal bilan kutmasdan karta oching yoki duelda tiking.", ratesLabel: "1 ta takror:", meltTitle: "Kristalga aylantirish", meltWarn: "Bu nusxalarni keyin sovg'a qilib bo'lmaydi. Har kartaning bittasi kolleksiyada qoladi.", meltDo: (w) => `♻️ Aylantirish · +${w} 💎`, cancel: "Bekor qilish",
-      open1: "1x ochish", open10: "5x ochish", costShort: "💎 yetmaydi", tokenHint: (d, c) => `🎟 Token bitta karta ochadi. Har kuni +${d} token, tugasa karta ${c} 💎`, shardHint: (c) => `💎 Kristal: takror kartalardan. Token tugasa karta ${c} 💎`, given: (n) => `🎟 Bugungi ${n} ta token berildi`, short: (n) => `💎 Yana ${n} kristal kerak`, openedTen: "5 ta karta", noPoints: "ochko qo'shilmaydi", 
+      open1: "1x", open10: "5x", costShort: "💎 yetmaydi", tokenHint: (d, c) => `🎟 Token bitta karta ochadi. Har kuni +${d} token, tugasa karta ${c} 💎`, shardHint: (c) => `💎 Kristal: takror kartalardan. Token tugasa karta ${c} 💎`, given: (n) => `🎟 Bugungi ${n} ta token berildi`, short: (n) => `💎 Yana ${n} kristal kerak`, openedTen: "5 ta karta", noPoints: "ochko qo'shilmaydi", 
       fresh: "🆕 Yangi karta!", again: (n) => `🔁 Sizda endi ×${n}`, plus: (n) => `+${n} ochko`,
       attack: "Hujum", health: "Jon", value: "Ochko", cards: (n) => `${n} karta`, pts: "ochko",
       none: "Hech narsa topilmadi", noTop: "Hali hech kim karta olmagan",
@@ -42,7 +42,7 @@
       drawNow: "Получить карту", drawing: "Открываем…", next: (t) => `Следующая карта: ${t}`, ready: "Карта готова!",
      
       shardsTitle: "Кристаллы", melt: (n, w) => `♻️ Расплавить повторы: ${n} → +${w} 💎`, noSpare: "♻️ Повторных карт нет", melted: (n, g) => `♻️ ${n} карт → +${g} 💎`, shardsHint: "Повторы становятся кристаллами, очки и рейтинг не уменьшаются. За кристаллы — карта без ожидания или ставка в дуэли.", ratesLabel: "1 повтор:", meltTitle: "Расплавить в кристаллы", meltWarn: "Эти копии потом нельзя будет подарить. По одной карте каждого вида останется в коллекции.", meltDo: (w) => `♻️ Расплавить · +${w} 💎`, cancel: "Отмена",
-      open1: "Открыть 1", open10: "Открыть 5", costShort: "💎 не хватает", tokenHint: (d, c) => `🎟 Токен открывает одну карту. Каждый день +${d}, без токенов карта стоит ${c} 💎`, shardHint: (c) => `💎 Кристаллы — из повторов. Без токенов карта стоит ${c} 💎`, given: (n) => `🎟 Сегодняшние ${n} токена выданы`, short: (n) => `💎 Нужно ещё ${n} кристаллов`, openedTen: "5 карт", noPoints: "очки не добавляются", 
+      open1: "1x", open10: "5x", costShort: "💎 не хватает", tokenHint: (d, c) => `🎟 Токен открывает одну карту. Каждый день +${d}, без токенов карта стоит ${c} 💎`, shardHint: (c) => `💎 Кристаллы — из повторов. Без токенов карта стоит ${c} 💎`, given: (n) => `🎟 Сегодняшние ${n} токена выданы`, short: (n) => `💎 Нужно ещё ${n} кристаллов`, openedTen: "5 карт", noPoints: "очки не добавляются", 
       fresh: "🆕 Новая карта!", again: (n) => `🔁 Теперь у вас ×${n}`, plus: (n) => `+${n} очков`,
       attack: "Атака", health: "Жизнь", value: "Очки", cards: (n) => `${n} карт`, pts: "очков",
       none: "Ничего не найдено", noTop: "Ещё никто не получил карту",
@@ -70,7 +70,7 @@
       drawNow: "Draw a card", drawing: "Opening…", next: (t) => `Next card in ${t}`, ready: "A card is ready!",
      
       shardsTitle: "Crystals", melt: (n, w) => `♻️ Melt ${n} spares → +${w} 💎`, noSpare: "♻️ No spare cards to melt", melted: (n, g) => `♻️ ${n} cards → +${g} 💎`, shardsHint: "Spares melt into crystals; your points and ranking stay. Crystals open a card without the wait or make a duel's stake.", ratesLabel: "1 spare:", meltTitle: "Melt into crystals", meltWarn: "These copies cannot be given afterwards. One of each card stays in your collection.", meltDo: (w) => `♻️ Melt · +${w} 💎`, cancel: "Cancel",
-      open1: "Open 1", open10: "Open 5", costShort: "💎 not enough", tokenHint: (d, c) => `🎟 A token opens one card. +${d} every day; with none, a card is ${c} 💎`, shardHint: (c) => `💎 Crystals come from spares. With no token, a card is ${c} 💎`, given: (n) => `🎟 Today's ${n} tokens are yours`, short: (n) => `💎 ${n} more crystals needed`, openedTen: "5 cards", noPoints: "no points added", 
+      open1: "1x", open10: "5x", costShort: "💎 not enough", tokenHint: (d, c) => `🎟 A token opens one card. +${d} every day; with none, a card is ${c} 💎`, shardHint: (c) => `💎 Crystals come from spares. With no token, a card is ${c} 💎`, given: (n) => `🎟 Today's ${n} tokens are yours`, short: (n) => `💎 ${n} more crystals needed`, openedTen: "5 cards", noPoints: "no points added", 
       fresh: "🆕 A new card!", again: (n) => `🔁 You now have ×${n}`, plus: (n) => `+${n} points`,
       attack: "Attack", health: "Life", value: "Points", cards: (n) => `${n} cards`, pts: "points",
       none: "Nothing found", noTop: "Nobody has drawn a card yet",

@@ -827,8 +827,8 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.doozCommand(in)
 	case commandName(in.text) == "/checkers":
 		return s.shashkaCommand(ctx, in)
-	case s.opts.Cards != nil && isCardDraw(in):
-		return s.drawCard(ctx, in)
+	case s.opts.Cards != nil && s.opts.CardsURL != "" && isCardDraw(in):
+		return outcome{text: textCardsApp.to(in), buttons: s.cardsAppButton(in)}
 	case s.opts.Cards != nil && s.opts.Buttons != nil && commandName(in.text) == "/mycards":
 		return s.cardCollection(ctx, in)
 	case s.opts.Cards != nil && s.opts.CardsURL != "" && commandName(in.text) == "/cards":
