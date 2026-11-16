@@ -226,24 +226,21 @@ func TestCardIsDrawnOnceAnHour(t *testing.T) {
 	if len(sent) != 1 || !sent[0].photo {
 		t.Fatalf("sent = %+v, want the card's picture", sent)
 	}
-	for _, want := range []string{"👑", "Gojo Satoru", "Jujutsu Kaisen", "5 130", "18 020", "+5 000", "🆕", "yana 2 ta tekin"} {
+	for _, want := range []string{"👑", "Gojo Satoru", "Jujutsu Kaisen", "5 130", "18 020", "+5 000", "🆕", "yana 1 ta tekin"} {
 		if !strings.Contains(sent[0].text, want) {
 			t.Errorf("caption lacks %q:\n%s", want, sent[0].text)
 		}
 	}
 	// f.run gives every message sent so far: the last is this draw's. A
-	// copy adds no points; the third of the day says they are done.
-	if sent = f.run(textFrom(userID, "karta")); len(sent) != 2 || !sent[1].photo || !strings.Contains(sent[1].text, "ochko qo'shilmaydi") {
-		t.Errorf("second draw = %+v, want the copy without points", sent)
-	}
-	if sent = f.run(textFrom(userID, "/card")); len(sent) != 3 || !strings.Contains(sent[2].text, "tugadi") {
-		t.Errorf("third draw = %+v, want the day's cards done", sent)
+	// copy adds no points; the second of the day says they are done.
+	if sent = f.run(textFrom(userID, "karta")); len(sent) != 2 || !sent[1].photo || !strings.Contains(sent[1].text, "ochko qo'shilmaydi") || !strings.Contains(sent[1].text, "tugadi") {
+		t.Errorf("second draw = %+v, want the copy without points and the day's cards done", sent)
 	}
 	f.opts.OwnerIDs = map[int64]bool{userID: true}
-	if sent = f.run(textFrom(userID, "/card")); len(sent) != 4 || sent[3].photo || !strings.Contains(sent[3].text, "ertaga") || strings.Contains(sent[3].text, "soat") {
-		t.Errorf("an owner's fourth draw = %+v, want the new ones tomorrow, with no count of the time", sent)
+	if sent = f.run(textFrom(userID, "/card")); len(sent) != 3 || sent[2].photo || !strings.Contains(sent[2].text, "ertaga") || strings.Contains(sent[2].text, "soat") {
+		t.Errorf("an owner's third draw = %+v, want the new ones tomorrow, with no count of the time", sent)
 	}
-	if day := book.days[len(book.days)-1]; day.PerDay != 3 || day.Start.Hour() != 0 {
+	if day := book.days[len(book.days)-1]; day.PerDay != 2 || day.Start.Hour() != 0 {
 		t.Errorf("an owner's day = %+v", day)
 	}
 }

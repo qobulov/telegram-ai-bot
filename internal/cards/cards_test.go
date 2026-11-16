@@ -156,18 +156,18 @@ func TestEnsureAddsOnlyNewCards(t *testing.T) {
 	}
 }
 
-// The day's free cards start at midnight in Tashkent: three each day, the
+// The day's free cards start at midnight in Tashkent: two each day, the
 // next day's at the next midnight.
-func TestThreeFreeCardsADay(t *testing.T) {
+func TestTwoFreeCardsADay(t *testing.T) {
 	now := time.Date(2026, 11, 16, 20, 30, 0, 0, time.UTC) // 01:30 in Tashkent
 	if start := DayStart(now); !start.Equal(time.Date(2026, 11, 17, 0, 0, 0, 0, Location)) {
 		t.Errorf("day start = %v", start)
 	}
-	player := storage.CardPlayer{FreeDay: DayStart(now), FreeUsed: 2}
+	player := storage.CardPlayer{FreeDay: DayStart(now), FreeUsed: 1}
 	if FreeLeft(player, now) != 1 || !NextFree(player, now).Equal(now) {
 		t.Errorf("one left = %d, next %v", FreeLeft(player, now), NextFree(player, now))
 	}
-	player.FreeUsed = 3
+	player.FreeUsed = 2
 	if FreeLeft(player, now) != 0 || !NextFree(player, now).Equal(DayStart(now).AddDate(0, 0, 1)) {
 		t.Errorf("none left = %d, next %v", FreeLeft(player, now), NextFree(player, now))
 	}

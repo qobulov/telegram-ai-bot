@@ -1,5 +1,5 @@
 // Package cards is Kartalar, an anime card collection: AniList's most loved
-// characters are its cards, the most loved the rarest; a player opens three
+// characters are its cards, the most loved the rarest; a player opens two
 // free a day at random, of a rarity drawn by its odds, and collects them
 // for points, a card counted once however many copies they hold.
 package cards
@@ -38,7 +38,7 @@ var Rarities = []Rarity{Common, Rare, Epic, Legendary, Mythic}
 
 // PerDay is how many cards a player opens free each day, the day starting
 // at midnight in Location; crystals open more.
-const PerDay = 3
+const PerDay = 2
 
 // Location is where the card game's day starts: Tashkent, which keeps no
 // summer time.

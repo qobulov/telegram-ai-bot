@@ -21,7 +21,7 @@
       noTelegram: "Ilovani Telegram'da oching: botga /cards yozing.", stale: "Ilova eskirdi, uni qayta oching.",
       unavailable: "Aloqa uzildi, birozdan keyin urinib ko'ring.",
       allSets: "Hammasi", pointsLabel: "ochko", loading: "Kartalar yuklanmoqda…",
-      welcomeTitle: "Kolleksiyangiz bo'sh", welcomeText: "Har kuni 3 ta tasodifiy anime karta tekin oching va hammasini to'plang.",
+      welcomeTitle: "Kolleksiyangiz bo'sh", welcomeText: "Har kuni 2 ta tasodifiy anime karta tekin oching va hammasini to'plang.",
       welcomeButton: "Birinchi kartani olish", seeCollection: "Kolleksiyada ko'rish →",
       locked: (r, o) => `🔒 Bu ${r.toLowerCase()} karta hali yopiq. Uning tushish ehtimoli: ${o}.`,
       wait: (time) => `⏳ ${time}`,
@@ -49,7 +49,7 @@
       noTelegram: "Откройте приложение в Telegram: напишите боту /cards.", stale: "Приложение устарело, откройте его снова.",
       unavailable: "Нет связи, попробуйте чуть позже.",
       allSets: "Все", pointsLabel: "очки", loading: "Загружаем карты…",
-      welcomeTitle: "Коллекция пуста", welcomeText: "Каждый день открывайте 3 случайные аниме-карты бесплатно и соберите все.",
+      welcomeTitle: "Коллекция пуста", welcomeText: "Каждый день открывайте 2 случайные аниме-карты бесплатно и соберите все.",
       welcomeButton: "Получить первую карту", seeCollection: "Посмотреть в коллекции →",
       locked: (r, o) => `🔒 Эта карта (${r.toLowerCase()}) ещё закрыта. Шанс выпадения: ${o}.`,
       wait: (time) => `⏳ ${time}`,
@@ -77,7 +77,7 @@
       noTelegram: "Open the app in Telegram: send /cards to the bot.", stale: "The app is out of date; open it again.",
       unavailable: "No connection; try again in a bit.",
       allSets: "All", pointsLabel: "points", loading: "Loading the cards…",
-      welcomeTitle: "Your collection is empty", welcomeText: "Open 3 random anime cards free every day and collect them all.",
+      welcomeTitle: "Your collection is empty", welcomeText: "Open 2 random anime cards free every day and collect them all.",
       welcomeButton: "Draw your first card", seeCollection: "See it in the collection →",
       locked: (r, o) => `🔒 This ${r.toLowerCase()} card is still locked. Its odds: ${o}.`,
       wait: (time) => `⏳ ${time}`,
@@ -106,7 +106,7 @@
   const spaced = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
   const haptic = (kind) => { try { tg.HapticFeedback.impactOccurred(kind); } catch (_) { /* outside Telegram */ } };
 
-  let cards = [], points = 0, nextAt = 0, freeLeft = 0, perDay = 3, drawing = false, query = "", opened = "", chosenSet = "";
+  let cards = [], points = 0, nextAt = 0, freeLeft = 0, perDay = 2, drawing = false, query = "", opened = "", chosenSet = "";
   let shards = 0, spare = 0, spareWorth = 0, extraCost = 15;
 
   // ---------- server ----------

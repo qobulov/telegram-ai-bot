@@ -2112,7 +2112,8 @@ play sent sooner than its chops took.
 
 ### Kartalar
 
-`/card` draws an anime card, three free a day, the day starting at midnight
+`/card` draws an anime card, two free a day (three until the owners made
+it two), the day starting at midnight
 in Tashkent, owners' too (in a private chat the word "karta" does too); the
 fourth is told the new ones come tomorrow, with no count of the time left
 (`card_players.free_day` and `free_used`, migration 73). The cards are AniList's 500 most loved

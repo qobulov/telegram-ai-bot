@@ -205,26 +205,25 @@ func TestCardsAppHidesCardsNotHeld(t *testing.T) {
 	}
 }
 
-// A player opens three free cards a day, an owner like anyone; the next
+// A player opens two free cards a day, an owner like anyone; the next
 // waits for midnight in Tashkent.
-func TestCardsAppDrawsThreeADay(t *testing.T) {
+func TestCardsAppDrawsTwoADay(t *testing.T) {
 	now := time.Now()
 	toMidnight := float64(DayStart(now).AddDate(0, 0, 1).Sub(now).Milliseconds())
 	store := &fakeStore{}
 	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }, Roll: func() Rarity { return Mythic }})
 	code, out := post(t, h, signedInit(7, now), "draw")
 	card, _ := out["card"].(map[string]any)
-	if code != http.StatusOK || card["name"] != "Gojo" || out["points"] != 15000.0 || out["next_in"] != 0.0 || out["free_left"] != 2.0 {
+	if code != http.StatusOK || card["name"] != "Gojo" || out["points"] != 15000.0 || out["next_in"] != 0.0 || out["free_left"] != 1.0 {
 		t.Fatalf("draw = %d %v", code, out)
 	}
-	post(t, h, signedInit(7, now), "draw")
 	if _, out := post(t, h, signedInit(7, now), "draw"); out["next_in"] != toMidnight || out["free_left"] != 0.0 {
-		t.Errorf("the third draw = %v", out)
+		t.Errorf("the second draw = %v", out)
 	}
 	if _, out := post(t, h, signedInit(7, now), "draw"); out["wait"] != toMidnight {
-		t.Errorf("a fourth draw = %v", out)
+		t.Errorf("a third draw = %v", out)
 	}
-	if store.draws != 3 {
+	if store.draws != 2 {
 		t.Errorf("draws = %d", store.draws)
 	}
 	if _, out := post(t, h, signedInit(7, now), "top"); len(out["top"].([]any)) != 1 || out["top"].([]any)[0].(map[string]any)["me"] != true {
