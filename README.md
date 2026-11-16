@@ -2158,6 +2158,41 @@ commands for them.
 Kartalar had an auto opener (`/autocard`, migration 65) that opened each
 player's cards and sent them to their private chat; the owners took it out,
 and migration 74 drops its columns: players open the day's cards themselves.
+`/duel [stake]` in a group calls a member out, the one replied to or anyone,
+for up to 100 shards: whoever presses its button accepts. Each side's three
+strongest cards are its team, and a team's power is their attack and health
+together; each side wins with its share of the two powers as its chance, so
+that the stronger team wins more often and the weaker one still may (twice
+the power is a 67% chance). The challenge shows the challenger's team and
+power, the result both teams, their power and chance, and the winner takes
+the stake of the loser's shards, or all they have; the challenger or the one called out may
+call it off, and `card_duels` keeps each duel's message so that it is settled
+once however often it is pressed. Cards pass between players (migration 66, `card_trades`). In the Mini
+App a card's large view has 🎁 Give: it searches the players who have opened
+a card by name or @username (the one a group last saw), the most points
+first (`players`), and gives the one picked
+a spare copy at once (`gift`: a player keeps their last copy not melted),
+the bot telling them in their private chat who gave it. The Mini App's 🔄
+market tab, which `/market` opens (in a group through the private chat's
+`/start bozor`, the page told `?tab=market`), lists offers (migration 67, `card_trades` rows with no `to_id`
+until taken): a player puts up a card of theirs for a card they pick from the
+whole catalog by name (`catalog`, `offer`), at most 5 open, each for 7 days;
+anyone who holds the card wanted presses 🔄 to take it (`take`), each giving
+the other their card with its points, and the offer's player is told; an
+offer whose card its player no longer holds is called off when taken, and a
+player takes down their own (`unoffer`). A trade's two cards must be at most one rarity apart, a Mythic going only for a Mythic or a Legendary, and the same two players trade once a day, either way round, as an offer and as a market take (`ErrCardTradeUneven`, `ErrCardPairLimit`): one player's cards had gone to another's, Common cards for three Mythic in seven minutes. The offer and the market's cards show each card's tier and points; migration 75 called off the open offers the rule forbids. In a group, replying to a member, `/trade Levi = Gojo` offers one of the
+sender's cards for one of theirs, done when that member presses ✅ (either
+may press ❌), once, within a day; a name need be only part of the card's,
+when one card matches, else the answer lists those that do. Any card may
+pass, the last copy too, which leaves the collection (its melted copies, gone
+to shards, with it), its points passing only as it is new to its taker or the giver's last copy. A player gives at most 5
+cards a day, gifts and trades together, and only to a player who has opened a
+card, so that a second account cannot feed a first one. With the pages served, the persona is told the game's facts
+(`cardsNote`), as the model had said it was "not the card bot" and named
+commands there are none of. `/mycards` shows
+how many of each rarity's cards the player holds as buttons that list them,
+pressed only by that player; `/cardtop` is the table of points. The
+pictures are the characters' AniList pictures, the studios' art.
 
 The cards come from AniList alone. Trading cards from PokéWallet (one set
 each of Pokémon, One Piece, Dragon Ball, Yu-Gi-Oh! and Digimon) were part of
