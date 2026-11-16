@@ -30,9 +30,6 @@ var (
 	// ErrCardTradeUneven is a trade of cards more than one rarity apart: a
 	// Common for a Mythic was how one player's cards went to another's.
 	ErrCardTradeUneven = errors.New("storage: cards too far apart in rarity")
-	// ErrCardPairLimit is a trade past tradesPerPair between the same two
-	// players in a day.
-	ErrCardPairLimit = errors.New("storage: these two traded enough today")
 )
 
 // CardOffersError is a player with as many offers on the market as they may
@@ -186,34 +183,9 @@ func checkEven(ctx context.Context, q interface {
 	return nil
 }
 
-// tradesPerPair is how many trades the same two players make in a day.
-const tradesPerPair = 5
-
-// checkPair refuses a trade past tradesPerPair between the same two players
-// in rules.Day, either way round: one player's cards went to another's a
-// trade at a time.
-func checkPair(ctx context.Context, tx pgx.Tx, a, b int64, rules CardTradeRules) error {
-	var traded int
-	err := tx.QueryRow(ctx, `
-		SELECT count(*) FROM card_trades WHERE status = 'done' AND take_card IS NOT NULL AND done_at > $3
-			AND ((from_id = $1 AND to_id = $2) OR (from_id = $2 AND to_id = $1))`,
-		a, b, rules.Now.Add(-rules.Day)).Scan(&traded)
-	if err != nil {
-		return err
-	}
-	if traded >= tradesPerPair {
-		return ErrCardPairLimit
-	}
-	return nil
-}
-
-// checkFair refuses a trade between two players of uneven cards, or one past
-// their trades for the day.
-func checkFair(ctx context.Context, tx pgx.Tx, trade CardTrade, rules CardTradeRules) error {
-	if err := checkEven(ctx, tx, trade.Give.ID, trade.Take.ID); err != nil {
-		return err
-	}
-	return checkPair(ctx, tx, trade.From, trade.To, rules)
+// checkFair refuses a trade between two players of uneven cards.
+func checkFair(ctx context.Context, tx pgx.Tx, trade CardTrade) error {
+	return checkEven(ctx, tx, trade.Give.ID, trade.Take.ID)
 }
 
 // checkGiveLimit refuses a player who gave rules.Limit cards in rules.Day.
@@ -301,7 +273,7 @@ func tradeError(what string, err error) error {
 	switch {
 	case err == nil, errors.Is(err, ErrCardNotHeld), errors.Is(err, ErrCardNoPlayer), errors.Is(err, ErrCardTradeOver),
 		errors.Is(err, ErrCardLastCopy), errors.Is(err, ErrCardOfferGone), errors.Is(err, ErrCardOfferOwn),
-		errors.Is(err, ErrCardTradeUneven), errors.Is(err, ErrCardPairLimit),
+		errors.Is(err, ErrCardTradeUneven),
 		errors.As(err, &limit), errors.As(err, &offers):
 		return err
 	}

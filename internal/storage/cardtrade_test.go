@@ -163,9 +163,8 @@ func TestTheCardMarket(t *testing.T) {
 }
 
 // A trade of cards more than one rarity apart is refused, as an offer and
-// as a take; two players trade with each other five times a day, either way
-// round, and a sixth waits for the next day.
-func TestTradesAreEvenAndFiveADayAPair(t *testing.T) {
+// as a take; two players trade with each other as often as they like.
+func TestTradesAreEvenAndUnlimited(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 	for _, q := range []string{
@@ -183,10 +182,10 @@ func TestTradesAreEvenAndFiveADayAPair(t *testing.T) {
 	if _, err := store.OfferCard(ctx, 1, 30, 10, market); !errors.Is(err, ErrCardTradeUneven) {
 		t.Errorf("a Common put up for a Mythic = %v", err)
 	}
-	// Alice's Goku and Bob's Kakashi, one rarity apart, go back and forth:
-	// whoever holds Goku puts it up for Kakashi, the other takes it.
+	// Alice's Goku and Bob's Kakashi, one rarity apart, go back and forth
+	// eight times the same day: whoever holds Goku puts it up, the other takes it.
 	holder, other := int64(1), int64(2)
-	for i := 1; i <= tradesPerPair; i++ {
+	for i := 1; i <= 8; i++ {
 		id, err := store.OfferCard(ctx, holder, 10, 40, market)
 		if err != nil {
 			t.Fatalf("offer %d = %v", i, err)
@@ -195,16 +194,5 @@ func TestTradesAreEvenAndFiveADayAPair(t *testing.T) {
 			t.Fatalf("trade %d = %v", i, err)
 		}
 		holder, other = other, holder
-	}
-	sixth, err := store.OfferCard(ctx, holder, 10, 40, market)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := store.TakeCardOffer(ctx, sixth, other, rules, market.Keep); !errors.Is(err, ErrCardPairLimit) {
-		t.Errorf("a sixth trade the same day = %v", err)
-	}
-	rules.Now = now.Add(25 * time.Hour)
-	if _, err := store.TakeCardOffer(ctx, sixth, other, rules, market.Keep); err != nil {
-		t.Errorf("the sixth the next day = %v", err)
 	}
 }

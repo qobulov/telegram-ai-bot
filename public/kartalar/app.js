@@ -33,7 +33,7 @@
       marketHint: (n) => `Kartangizni qo'ying va evaziga kerakli kartani tanlang. Kimda o'sha karta bo'lsa, almashadi. ${n} tagacha taklif, 7 kun turadi.`,
       step1: "1. Qaysi kartangizni berasiz?", step2: "2. Evaziga qaysi kartani xohlaysiz?", mineSearch: "Kartalaringizdan qidiring", wantSearch: "Xohlagan karta nomini yozing",
       place: "Taklif qo'yish", placed: "✅ Taklif bozorga qo'yildi", swapped: (c) => `🔄 Almashildi! Siz ${c} oldingiz`, removed: "Taklif olib tashlandi",
-      refused: { uneven: "Kartalar tier'i yaqin bo'lishi kerak: Mifik faqat Mifik yoki Afsonaviyga almashadi", pair: "Bu o'yinchi bilan bugun 5 marta almashgansiz: kuniga 5 marta", over: "Bu taklif endi yo'q", gone: "Bu taklif endi yo'q", own: "Bu o'zingizning taklifingiz", not_held: "Sizda bu karta yo'q", same: "Bir xil kartani almashib bo'lmaydi", no_spare: "Faqat takror kartani sovg'a qilish mumkin" },
+      refused: { uneven: "Kartalar tier'i yaqin bo'lishi kerak: Mifik faqat Mifik yoki Afsonaviyga almashadi", over: "Bu taklif endi yo'q", gone: "Bu taklif endi yo'q", own: "Bu o'zingizning taklifingiz", not_held: "Sizda bu karta yo'q", same: "Bir xil kartani almashib bo'lmaydi", no_spare: "Faqat takror kartani sovg'a qilish mumkin" },
       offersLimit: (n) => `Bir vaqtda ${n} tagacha taklif qo'yish mumkin`, giftSpare: "Faqat takror (×2 va undan ko'p) kartani sovg'a qilish mumkin",
     },
     ru: {
@@ -61,7 +61,7 @@
       marketHint: (n) => `Выставьте свою карту и выберите, какую хотите взамен. У кого она есть — обменяется. До ${n} предложений, 7 дней.`,
       step1: "1. Какую карту отдаёте?", step2: "2. Какую хотите взамен?", mineSearch: "Поиск по вашим картам", wantSearch: "Название нужной карты",
       place: "Выставить", placed: "✅ Предложение выставлено", swapped: (c) => `🔄 Обмен! Вы получили ${c}`, removed: "Предложение снято",
-      refused: { uneven: "Редкость карт должна быть близкой: мифическая меняется только на мифическую или легендарную", pair: "Вы уже менялись с этим игроком 5 раз сегодня: 5 раз в день", over: "Этого предложения уже нет", gone: "Этого предложения уже нет", own: "Это ваше предложение", not_held: "У вас нет этой карты", same: "Нельзя менять карту на ту же", no_spare: "Дарить можно только повторную карту" },
+      refused: { uneven: "Редкость карт должна быть близкой: мифическая меняется только на мифическую или легендарную", over: "Этого предложения уже нет", gone: "Этого предложения уже нет", own: "Это ваше предложение", not_held: "У вас нет этой карты", same: "Нельзя менять карту на ту же", no_spare: "Дарить можно только повторную карту" },
       offersLimit: (n) => `Одновременно можно выставить до ${n} предложений`, giftSpare: "Дарить можно только повторную карту (×2 и больше)",
     },
     en: {
@@ -89,7 +89,7 @@
       marketHint: (n) => `Put up a card and pick the one you want for it. Whoever holds it can trade. Up to ${n} offers, for 7 days.`,
       step1: "1. Which card do you give?", step2: "2. Which card do you want?", mineSearch: "Search your cards", wantSearch: "Name of the card you want",
       place: "Put it up", placed: "✅ Your offer is up", swapped: (c) => `🔄 Traded! You got ${c}`, removed: "Offer taken down",
-      refused: { uneven: "The cards must be close in rarity: a Mythic goes only for a Mythic or a Legendary", pair: "You two already traded 5 times today: 5 a day", over: "This offer is gone", gone: "This offer is gone", own: "This is your own offer", not_held: "You do not have that card", same: "A card cannot be traded for itself", no_spare: "Only a spare card may be given" },
+      refused: { uneven: "The cards must be close in rarity: a Mythic goes only for a Mythic or a Legendary", over: "This offer is gone", gone: "This offer is gone", own: "This is your own offer", not_held: "You do not have that card", same: "A card cannot be traded for itself", no_spare: "Only a spare card may be given" },
       offersLimit: (n) => `You may have up to ${n} offers at once`, giftSpare: "Only a spare card (×2 or more) may be given",
     },
   };
