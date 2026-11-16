@@ -55,13 +55,18 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .sub b { color: var(--gold); }
 .progress { width: 130px; height: 4px; margin-top: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
 .progress i, .shelf-bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--gold-deep), var(--gold)); transition: width 0.6s ease; }
-.points div { display: flex; flex-direction: column; line-height: 1.05; }
-.points small { font: 600 10px Manrope, sans-serif; color: var(--muted); letter-spacing: 0.04em; }
-.points {
-  display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px;
-  background: var(--panel); border: 1px solid var(--line);
-  font: 700 15px Unbounded, sans-serif;
+/* the wallet, as games keep it: icons and numbers, top right */
+.wallet { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.coins { display: flex; gap: 6px; }
+.coin {
+  display: flex; align-items: center; gap: 5px; min-height: 32px; padding: 0 11px 0 8px; border-radius: 999px; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--line); color: var(--text); font: 700 14px Unbounded, sans-serif;
 }
+.coin span { font-size: 15px; }
+.coin.bump { animation: bump 0.45s ease; }
+@keyframes bump { 40% { transform: scale(1.18); border-color: var(--gold); } }
+.points { display: flex; align-items: center; gap: 5px; padding: 0 4px; font: 700 13px Unbounded, sans-serif; color: var(--gold); }
+.points span { font-size: 13px; }
 .notice { margin: 0 16px 10px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 138, 61, 0.12); border: 1px solid rgba(255, 138, 61, 0.35); font-size: 14px; }
 
 /* collection */
