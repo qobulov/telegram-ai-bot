@@ -20,7 +20,7 @@ const (
 	// log, which changes with every message and so is never cached. At
 	// 18,000 it was still the largest part of a prompt paid in full; 10,000
 	// holds about an hour or two of a busy group.
-	maxContextChars = 10_000
+	maxContextChars = 6_000
 	logTimeout      = 5 * time.Second
 	// ambientWindow is how far back the log given to the model reaches. A
 	// fixed span rather than "since midnight" keeps a conversation that runs
