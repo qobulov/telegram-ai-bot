@@ -554,6 +554,9 @@ func TestModerateActsOnlyWhenAskedInWords(t *testing.T) {
 		{"mari", "set_title", false},
 		{"ha change qil", "ban", false},
 		{"Бекор кил", "undo", true},
+		{"Очир", "delete", true},
+		{"Жастин групадан чказвор", "kick", true},
+		{"@nusretik чказвор", "kick", true},
 		{"кайтар", "undo", true},
 		{"/promote", "promote", true},
 	}
@@ -1387,4 +1390,36 @@ func TestKickIsNotUndoable(t *testing.T) {
 	if err != nil || state != nil {
 		t.Errorf("snapshot = %s, %v; want none", state, err)
 	}
+}
+
+// A name is found in either script and either spelling, with the endings a
+// sentence gives it.
+func TestNamedByFoldsSpellings(t *testing.T) {
+	for _, c := range []struct {
+		words, name string
+		want        bool
+	}{
+		{"шохрухга админ бер", "Шахрух", true},
+		{"shoxruxni mut qil", "Шахрух", true},
+		{"Азаматни чиқар", "Azamat", true},
+		{"qodirga ber", "Kodir", true},
+		{"salom hammaga", "Шахрух", false},
+		{"шох", "Шахрух", false},
+	} {
+		if got := namedBy(wordsOf(c.words), c.name); got != c.want {
+			t.Errorf("namedBy(%q, %q) = %t, want %t", c.words, c.name, got, c.want)
+		}
+	}
+}
+
+// "1 daqiqaga ban ber" mutes for that while; "ban ber" alone is no mute.
+func TestTimedBanMutes(t *testing.T) {
+	env := newModerationEnv(t)
+	turn := func(id int64, words string) context.Context {
+		return WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: id, MessageID: 50, Target: bekTarget(), Words: words}, &Sink{})
+	}
+	if got := env.moderate(turn(700, "1 daqiqaga ban ber shunga maria"), `{"action":"mute","minutes":1}`); !got.OK {
+		t.Errorf("a timed ban as a mute = %+v", got)
+	}
+	expectRefusal(t, env.moderate(turn(701, "ban ber shunga"), `{"action":"mute"}`), "forbidden", "does not ask for this")
 }

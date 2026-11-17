@@ -434,7 +434,9 @@ func (m *Moderation) run(ctx context.Context, raw json.RawMessage) (any, error) 
 	if _, known := neededRight[args.Action]; !known {
 		return nil, &ArgumentError{Message: "action must be one of the tool's actions"}
 	}
-	if !askedFor(caller.Words, args.Action) {
+	// "1 daqiqaga ban ber": a ban for a while is, in these groups, a mute.
+	timedBan := args.Action == actionMute && args.Minutes > 0 && askedFor(caller.Words, actionBan)
+	if !askedFor(caller.Words, args.Action) && !timedBan {
 		return nil, &DeniedError{Message: notAsked}
 	}
 	if args.Action == actionUndo {
@@ -685,7 +687,7 @@ const minNameRunes = 3
 
 // nameEndings are what Uzbek and Russian add to a name in a sentence:
 // "Azamatni", "Azamatga", "Азамата".
-var nameEndings = []string{"", "ni", "ning", "ga", "ka", "qa", "da", "dan", "jon", "a", "u", "а", "у", "е", "ом"}
+var nameEndings = []string{"", "ni", "ning", "ga", "ka", "da", "dan", "jan", "a", "u", "e", "am", "izini", "ini"}
 
 // goesBy reports whether member is a seen member's username, first name or
 // the first word of it.
@@ -694,8 +696,8 @@ func goesBy(seen storage.GroupMember, member string) bool {
 	if member == "" {
 		return false
 	}
-	return strings.EqualFold(seen.Username, member) || strings.EqualFold(seen.FirstName, member) ||
-		strings.EqualFold(firstName(seen.FirstName), member)
+	return strings.EqualFold(seen.Username, member) || foldName(seen.FirstName) == foldName(member) ||
+		foldName(firstName(seen.FirstName)) == foldName(member)
 }
 
 // firstName is the first word of a first name: "Azamat" of "Azamat 아자마트".
@@ -715,18 +717,36 @@ func wordsOf(text string) []string {
 }
 
 // namedBy reports whether one of words is name, as it is or with an ending
-// a sentence gives it.
+// a sentence gives it, in either script: "шохрухга" names Shaxrux.
 func namedBy(words []string, name string) bool {
-	name = strings.ToLower(name)
+	name = foldName(name)
 	if utf8.RuneCountInString(name) < minNameRunes {
 		return false
 	}
 	for _, word := range words {
-		if ending, ok := strings.CutPrefix(word, name); ok && slices.Contains(nameEndings, ending) {
+		if ending, ok := strings.CutPrefix(foldName(word), name); ok && slices.Contains(nameEndings, ending) {
 			return true
 		}
 	}
 	return false
+}
+
+// nameLetters write Uzbek and Russian Cyrillic in Latin letters.
+var nameLetters = strings.NewReplacer(
+	"ш", "sh", "ч", "ch", "ж", "j", "ё", "yo", "ю", "yu", "я", "ya", "ц", "s", "щ", "sh",
+	"ў", "o", "қ", "q", "ғ", "g", "ҳ", "h", "а", "a", "б", "b", "в", "v", "г", "g", "д", "d",
+	"е", "e", "з", "z", "и", "i", "й", "y", "к", "k", "л", "l", "м", "m", "н", "n", "о", "o",
+	"п", "p", "р", "r", "с", "s", "т", "t", "у", "u", "ф", "f", "х", "x", "ы", "i", "э", "e",
+	"ь", "", "ъ", "")
+
+// soundAlikes are the letters a name is written either way with: Шахрух
+// and Shoxrux, Qodir and Kodir, Hasan and Xasan.
+var soundAlikes = strings.NewReplacer("o", "a", "q", "k", "h", "x", "w", "v")
+
+// foldName is a name or word as it sounds, in Latin letters, so that its
+// spellings in either script compare equal.
+func foldName(word string) string {
+	return soundAlikes.Replace(nameLetters.Replace(strings.ToLower(word)))
 }
 
 // defaultAdminTitle is the title of an admin made with none asked for.
@@ -1306,12 +1326,12 @@ func (m *Moderation) untilText(until time.Time) string {
 // askedFor folds a message. Many are only the start of a word, so that
 // "o'chirib tashla", "mute qilvor" and "заблокируй" count.
 var actionWords = map[string][]string{
-	actionDelete: {"ochir", "delete", "del ", "sil", "olib tashla", "yoq qil", "удал", "сотри"},
+	actionDelete: {"ochir", "delete", "del ", "sil", "olib tashla", "yoq qil", "удал", "сотри", "ўчир", "учир", "очир", "олиб ташла", "йўқ қил", "йок кил"},
 	actionMute:   {"mute", "mut ", "myut", "мут", "мют", "ovozsiz", "jim qil", "yozolmasin", "yoza olmasin", "yozmasin", "yozdirma", "заглуш", "молч", "readonly", "read only"},
 	actionUnmute: {"mute", "mut ", "мут", "мют", "ovozsiz", "yozsin", "yoza olsin", "ochib qoy", "ochvor", "разреш"},
-	actionBan:    {"ban", "бан", "blok", "chiqar", "hayda", "kick", "кик", "выгн", "выкин", "заблок"},
+	actionBan:    {"ban", "бан", "blok", "chiqar", "hayda", "kick", "кик", "выгн", "выкин", "заблок", "блок", "чиқар", "чикар", "чказ", "чиказ", "чиқаз", "ҳайда", "хайда"},
 	actionUnban:  {"ban", "бан", "blok", "qaytar", "верн", "разблок"},
-	actionKick:   {"kick", "кик", "chiqar", "hayda", "выгн", "выкин", "удали из"},
+	actionKick:   {"kick", "кик", "chiqar", "chqaz", "chiqaz", "hayda", "выгн", "выкин", "удали из", "чиқар", "чикар", "чказ", "чиказ", "чиқаз", "ҳайда", "хайда"},
 	actionWarn:   warnWords,
 	actionUnwarn: warnWords,
 
