@@ -62,14 +62,37 @@ func TestAIChatCommand(t *testing.T) {
 	if len(f.replier.recorded()) != 1 {
 		t.Errorf("a member was not answered with AI on")
 	}
-	private := textFrom(77, "/aigroups")
-	private.Message.From.ID = 77
-	sent = f.run(private)
-	if last := sent[len(sent)-1].text; !strings.Contains(last, "Devs") {
-		t.Errorf("/aigroups = %q", last)
-	}
 	f.run(asOwner("/aichat off"))
 	if extras.settings[storage.SettingAI] != "" {
 		t.Errorf("off left %v", extras.settings)
+	}
+}
+
+// /aigroups lists the bot's groups as buttons, ✅ or ❌; an owner's press
+// turns AI on or off in that group, anyone else's is refused.
+func TestAIGroupsButtons(t *testing.T) {
+	f := newFixture()
+	extras, buttons := newMemoryExtras(), &fakeButtons{}
+	f.opts.Extras, f.opts.Buttons = extras, buttons
+	f.opts.OwnerIDs = map[int64]bool{77: true}
+	sent := f.run(textFrom(77, "/aigroups"))
+	last := sent[len(sent)-1]
+	if len(last.buttons) != 1 || last.buttons[0][0].Text != "❌ Devs" {
+		t.Fatalf("menu = %+v", last.buttons)
+	}
+	press := func(from int64) telegram.Update {
+		return doozPlayer(int(from), &telegram.User{ID: from}, telegram.Chat{ID: from, Type: telegram.ChatTypePrivate}, "", last.buttons[0][0].Data)
+	}
+	f.run(press(5))
+	if extras.settings[storage.SettingAI] != "" {
+		t.Errorf("a stranger turned AI on")
+	}
+	f.run(press(77))
+	if extras.settings[storage.SettingAI] != "on" {
+		t.Fatalf("the owner's press left %v", extras.settings)
+	}
+	edits, menus := buttons.recordedMenus()
+	if len(menus) == 0 || menus[len(menus)-1][0][0].Text != "✅ Devs" || !strings.Contains(edits[len(edits)-1], "1 ta guruhda") {
+		t.Errorf("menu after = %+v %q", menus, edits)
 	}
 }

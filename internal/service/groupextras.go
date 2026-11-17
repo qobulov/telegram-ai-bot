@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 	"unicode"
 
 	"telegram-ai-bot/internal/storage"
@@ -19,6 +20,7 @@ type GroupExtras interface {
 	RepOf(ctx context.Context, chatID, userID int64) (points, place int, err error)
 	RepTop(ctx context.Context, chatID int64, limit int) ([]storage.MemberRep, error)
 	GroupsWithSetting(ctx context.Context, key, value string) ([]storage.GroupWithSetting, error)
+	Groups(ctx context.Context, since time.Time, limit int) ([]storage.GroupSummary, error)
 }
 
 // repWords thank the member replied to, and give them a point.

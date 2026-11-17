@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
@@ -58,6 +59,9 @@ func (m *memoryExtras) GroupsWithSetting(_ context.Context, key, value string) (
 		return []storage.GroupWithSetting{{ChatID: groupID, Title: "Devs"}}, nil
 	}
 	return nil, nil
+}
+func (m *memoryExtras) Groups(context.Context, time.Time, int) ([]storage.GroupSummary, error) {
+	return []storage.GroupSummary{{ChatID: groupID, Title: "Devs", BotStatus: "administrator"}, {ChatID: -5, Title: "Gone", BotStatus: "left"}}, nil
 }
 func (m *memoryExtras) RepTop(context.Context, int64, int) ([]storage.MemberRep, error) {
 	m.mu.Lock()

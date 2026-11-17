@@ -3,10 +3,12 @@ package service
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	"telegram-ai-bot/internal/storage"
+	"telegram-ai-bot/internal/telegram"
 )
 
 const (
@@ -81,27 +83,89 @@ func (s *Service) aiChatCommand(ctx context.Context, in incoming) outcome {
 	return say("🤖 AI suhbat o'chirildi: bu yerda faqat buyruqlar va o'yinlar ishlaydi. Yoqish: /aichat")
 }
 
-// aiGroupsCommand answers an owner's /aigroups in private: the groups with
-// AI on.
+// aiData starts the button of a group in /aigroups: "ai:<chat ID>".
+const aiData = "ai:"
+
+// aiGroupsShown is how many of the bot's groups /aigroups lists, the
+// latest active first.
+const aiGroupsShown = 40
+
+// aiGroupsCommand answers an owner's /aigroups in private: the bot's groups,
+// each a button that turns AI on or off there.
 func (s *Service) aiGroupsCommand(ctx context.Context, in incoming) outcome {
 	if !s.isOwner(in.msg.From) {
 		return say(textUnknown.to(in))
 	}
-	groups, err := s.opts.Extras.GroupsWithSetting(ctx, storage.SettingAI, "on")
+	text, buttons, err := s.aiGroupsMenu(ctx)
 	if err != nil {
 		return say(textError.to(in))
 	}
-	if len(groups) == 0 {
-		return say("🤖 Hech bir guruhda AI suhbat yoqilmagan. Yoqish: guruhda /aichat on")
+	return outcome{text: text, buttons: buttons}
+}
+
+func (s *Service) aiGroupsMenu(ctx context.Context) (string, [][]telegram.Button, error) {
+	groups, err := s.opts.Extras.Groups(ctx, time.Now(), aiGroupsShown)
+	if err != nil {
+		return "", nil, err
 	}
-	lines := []string{fmt.Sprintf("🤖 AI suhbat yoqilgan guruhlar (%d):", len(groups))}
+	on, err := s.opts.Extras.GroupsWithSetting(ctx, storage.SettingAI, "on")
+	if err != nil {
+		return "", nil, err
+	}
+	allowed := make(map[int64]bool, len(on))
+	for _, g := range on {
+		allowed[g.ChatID] = true
+	}
+	var rows [][]telegram.Button
+	count := 0
 	for _, g := range groups {
-		title := cardMarks.Replace(g.Title)
-		if title == "" {
-			title = fmt.Sprint(g.ChatID)
+		if g.BotStatus != "member" && g.BotStatus != "administrator" {
+			continue
 		}
-		lines = append(lines, "• "+title)
+		mark := "❌"
+		if allowed[g.ChatID] {
+			mark, count = "✅", count+1
+		}
+		title := []rune(cardMarks.Replace(g.Title))
+		if len(title) > 40 {
+			title = append(title[:40], '…')
+		}
+		rows = append(rows, []telegram.Button{{Text: mark + " " + string(title), Data: aiData + fmt.Sprint(g.ChatID)}})
 	}
-	lines = append(lines, "", "Boshqa guruhlarda faqat buyruqlar va o'yinlar ishlaydi, limitsiz.")
-	return say(strings.Join(lines, "\n"))
+	if len(rows) == 0 {
+		return "🤖 Bot hali hech bir guruhda yo'q.", nil, nil
+	}
+	text := fmt.Sprintf("🤖 AI suhbat: %d ta guruhda yoqilgan.\nGuruhni bossangiz, unda AI yoqiladi yoki o'chadi. ❌ guruhlarda faqat buyruqlar, o'yinlar va moderatsiya ishlaydi, limitsiz.", count)
+	return text, rows, nil
+}
+
+// pressedAIGroup turns AI on or off in the group pressed, for an owner, and
+// shows the list again.
+func (s *Service) pressedAIGroup(q *telegram.CallbackQuery) {
+	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
+	defer cancel()
+	answer := func(text string, alert bool) { _ = s.opts.Buttons.AnswerCallbackQuery(ctx, q.ID, text, alert) }
+	chatID, err := strconv.ParseInt(strings.TrimPrefix(q.Data, aiData), 10, 64)
+	if err != nil || !s.isOwner(q.From) {
+		answer("Buni faqat bot egalari o'zgartiradi.", true)
+		return
+	}
+	current, err := s.opts.Extras.GroupSetting(ctx, chatID, storage.SettingAI)
+	if err != nil {
+		answer("Hozir bo'lmadi.", true)
+		return
+	}
+	value, said := "on", "✅ AI yoqildi"
+	if current == "on" {
+		value, said = "", "❌ AI o'chirildi"
+	}
+	if err := s.opts.Extras.SetGroupSetting(ctx, chatID, storage.SettingAI, value, q.From.ID); err != nil {
+		answer("Hozir bo'lmadi.", true)
+		return
+	}
+	s.aiChats.set(chatID, value == "on")
+	answer(said, false)
+	if text, buttons, err := s.aiGroupsMenu(ctx); err == nil {
+		_ = s.opts.Buttons.EditMessageMenu(ctx, q.Message.Chat.ID, q.Message.MessageID, text, buttons)
+	}
 }

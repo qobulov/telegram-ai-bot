@@ -874,7 +874,7 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.setCleanService(ctx, in)
 	case in.group && s.opts.Extras != nil && commandName(in.text) == "/aichat":
 		return s.aiChatCommand(ctx, in)
-	case !in.group && s.opts.Extras != nil && commandName(in.text) == "/aigroups":
+	case !in.group && s.opts.Extras != nil && s.opts.Buttons != nil && commandName(in.text) == "/aigroups":
 		return s.aiGroupsCommand(ctx, in)
 	case s.opts.Cards != nil && commandName(in.text) == "/profile":
 		return s.profile(ctx, in)
@@ -1130,6 +1130,10 @@ func (s *Service) pressed(q *telegram.CallbackQuery) {
 	}
 	if strings.HasPrefix(q.Data, teamsData) && s.opts.Teams != nil {
 		s.pressedTeams(q)
+		return
+	}
+	if strings.HasPrefix(q.Data, aiData) && s.opts.Extras != nil {
+		s.pressedAIGroup(q)
 		return
 	}
 	if strings.HasPrefix(q.Data, unbanData) && s.opts.GroupModerator != nil && s.opts.Strikes != nil {
