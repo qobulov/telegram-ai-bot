@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"telegram-ai-bot/internal/cards"
 	"time"
 
 	"telegram-ai-bot/internal/storage"
@@ -237,6 +238,10 @@ func (s *Service) checkout(q *telegram.PreCheckoutQuery) {
 	if s.opts.Payments == nil {
 		return
 	}
+	if _, _, isCrystal := cards.ParseCrystalPayload(q.InvoicePayload); isCrystal {
+		s.checkoutCrystals(q)
+		return
+	}
 	in := incoming{msg: &telegram.Message{From: q.From}} // for the language
 	refusal := s.checkoutRefusal(q)
 	ctx, cancel := context.WithTimeout(context.Background(), checkoutTimeout)
@@ -272,6 +277,10 @@ func (s *Service) checkoutRefusal(q *telegram.PreCheckoutQuery) localText {
 // payment twice; it is recorded and thanked once.
 func (s *Service) recordPayment(msg *telegram.Message) {
 	paid := msg.SuccessfulPayment
+	if _, _, isCrystal := cards.ParseCrystalPayload(paid.InvoicePayload); isCrystal {
+		s.recordCrystals(msg)
+		return
+	}
 	if s.opts.Premium == nil || msg.From == nil {
 		s.opts.Logger.Error("a payment arrived with nowhere to record it; refund it by hand", "charge_id", paid.TelegramPaymentChargeID)
 		return
@@ -314,6 +323,10 @@ func (s *Service) recordPayment(msg *telegram.Message) {
 // noteRefund records a payment given back, by an owner's /refund or by
 // Telegram, and so ends its premium; the user is told by Telegram.
 func (s *Service) noteRefund(msg *telegram.Message) {
+	if _, _, isCrystal := cards.ParseCrystalPayload(msg.RefundedPayment.InvoicePayload); isCrystal {
+		s.refundCrystals(msg)
+		return
+	}
 	if s.opts.Premium == nil {
 		return
 	}

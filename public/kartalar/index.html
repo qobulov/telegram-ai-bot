@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Manrope:wght@500;600;800&display=swap" rel="stylesheet">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="style.css?v=30">
+  <link rel="stylesheet" href="style.css?v=31">
 </head>
 <body>
   <div class="grain" aria-hidden="true"></div>
@@ -113,6 +113,21 @@
       </div>
     </section>
 
+    <section class="tab" id="tab-shop" hidden>
+      <div class="shop">
+        <div class="shop-block">
+          <h2 class="shop-title" data-t="shopBuyTitle"></h2>
+          <p class="market-hint" data-t="shopBuyHint"></p>
+          <div class="packs" id="crystalPacks"></div>
+        </div>
+        <div class="shop-block">
+          <h2 class="shop-title" data-t="shopItemsTitle"></h2>
+          <p class="market-hint" id="shopWallet"></p>
+          <ul class="shop-items" id="shopItems"></ul>
+        </div>
+      </div>
+    </section>
+
     <section class="tab" id="tab-top" hidden>
       <ol class="table" id="table"></ol>
     </section>
@@ -123,6 +138,7 @@
     <button type="button" data-tab="draw"><span aria-hidden="true">✨</span><b data-t="draw"></b><i class="dot" id="readyDot" hidden></i></button>
     <button type="button" data-tab="market"><span aria-hidden="true">🔄</span><b data-t="market"></b></button>
     <button type="button" data-tab="anime"><span aria-hidden="true">📚</span><b data-t="animeTab"></b></button>
+    <button type="button" data-tab="shop"><span aria-hidden="true">💎</span><b data-t="shopTab"></b></button>
     <button type="button" data-tab="top"><span aria-hidden="true">🏆</span><b data-t="top"></b></button>
   </nav>
 
@@ -133,6 +149,6 @@
 
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="app.js?v=30"></script>
+  <script src="app.js?v=31"></script>
 </body>
 </html>

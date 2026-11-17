@@ -112,3 +112,26 @@ type refundParams struct {
 func (c *Client) RefundStarPayment(ctx context.Context, userID int64, chargeID string) error {
 	return c.call(ctx, "refundStarPayment", refundParams{UserID: userID, ChargeID: chargeID}, nil)
 }
+
+type createInvoiceLinkParams struct {
+	Title         string         `json:"title"`
+	Description   string         `json:"description"`
+	Payload       string         `json:"payload"`
+	ProviderToken string         `json:"provider_token"`
+	Currency      string         `json:"currency"`
+	Prices        []labeledPrice `json:"prices"`
+}
+
+// CreateInvoiceLink makes a link to an invoice in Stars, which a Mini App
+// opens with openInvoice; ChatID is not used.
+func (c *Client) CreateInvoiceLink(ctx context.Context, inv Invoice) (string, error) {
+	params := createInvoiceLinkParams{
+		Title: inv.Title, Description: inv.Description, Payload: inv.Payload,
+		Currency: Stars, Prices: []labeledPrice{{Label: inv.Label, Amount: inv.Price}},
+	}
+	var link string
+	if err := c.call(ctx, "createInvoiceLink", params, &link); err != nil {
+		return "", err
+	}
+	return link, nil
+}

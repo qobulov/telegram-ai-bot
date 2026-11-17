@@ -193,9 +193,12 @@ type Options struct {
 	// Extras keeps reputation, saved answers and a group's settings, and
 	// Copier sends a saved answer's picture back; Journal writes to a
 	// group's log chat. nil turns each off.
-	Extras  GroupExtras
-	Copier  Copier
-	Journal func(ctx context.Context, chatID int64, line string)
+	// Crystals keeps crystals bought for Stars in the cards app; nil sells
+	// none.
+	Crystals CrystalBook
+	Extras   GroupExtras
+	Copier   Copier
+	Journal  func(ctx context.Context, chatID int64, line string)
 	// Reports keeps the members' reports, and WarnList their warnings, for
 	// /reports and /warns; nil turns each off.
 	Reports  ReportBook

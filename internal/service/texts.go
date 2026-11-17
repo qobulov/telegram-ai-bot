@@ -428,15 +428,18 @@ To quiet me: /mute bot, to bring me back: /unmute`,
 		uz: `🃏 Kartalar
 /cards — ilovani ochish: har 2 soatda 1 token (12 tagacha yig'iladi), 1x yoki 5x ochish, token tugasa kristallga
 /mycards — kollektsiyangiz, /profile — ochko, o'rin, eng zo'r kartalar
-/cardtop — eng ko'p ochko yig'ganlar, /market — bozor, /duel — duel`,
+/cardtop — eng ko'p ochko yig'ganlar, /market — bozor, /duel — duel
+💎 Do'kon (ilovada): kristallni Telegram Stars bilan sotib olish; kristallga token va kafolatli paketlar (Epik, Afsonaviy, Mifik)`,
 		ru: `🃏 Карты
 /cards — открыть приложение: токен каждые 2 часа (копится до 12), открытие 1x или 5x, без токенов — за кристаллы
 /mycards — коллекция, /profile — очки, место, лучшие карты
-/cardtop — топ по очкам, /market — рынок, /duel — дуэль`,
+/cardtop — топ по очкам, /market — рынок, /duel — дуэль
+💎 Магазин (в приложении): кристаллы за Telegram Stars; за кристаллы — токены и паки с гарантией (эпик, легендарка, мифик)`,
 		en: `🃏 Cards
 /cards — open the app: a token every 2 hours (up to 12 saved), open 1x or 5x, crystals once tokens run out
 /mycards — your collection, /profile — points, place, best cards
-/cardtop — the table, /market — the market, /duel — a duel`,
+/cardtop — the table, /market — the market, /duel — a duel
+💎 Shop (in the app): crystals for Telegram Stars; crystals buy tokens and packs with a sure Epic, Legendary or Mythic`,
 	},
 	"member": {
 		uz: `👥 Hamma uchun

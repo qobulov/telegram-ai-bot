@@ -1,0 +1,125 @@
+package storage
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+)
+
+// BuyCardTokens trades price crystals for tokens; with too few crystals it
+// changes nothing and returns a *CardFundsError.
+func (s *Store) BuyCardTokens(ctx context.Context, userID int64, name string, tokens, price int) (CardOpening, error) {
+	var after CardOpening
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		player, err := lockCardPlayer(ctx, tx, userID, name)
+		if err != nil {
+			return err
+		}
+		if player.shards < price {
+			return &CardFundsError{Tokens: player.tokens, Shards: player.shards, Need: price}
+		}
+		return tx.QueryRow(ctx, `UPDATE card_players SET shards = shards - $2, tokens = tokens + $3 WHERE user_id = $1 RETURNING tokens, shards, points`,
+			userID, price, tokens).Scan(&after.Tokens, &after.Shards, &after.Points)
+	})
+	var few *CardFundsError
+	if errors.As(err, &few) {
+		return CardOpening{}, few
+	}
+	if err != nil {
+		return CardOpening{}, fmt.Errorf("storage: buy card tokens: %w", err)
+	}
+	return after, nil
+}
+
+// OpenCardPack opens n cards for price crystals, roll picking each one's
+// rarity; with too few crystals it opens none and returns a
+// *CardFundsError. Tokens are left as they are.
+func (s *Store) OpenCardPack(ctx context.Context, userID int64, name string, n int, roll CardRoll, price int, now time.Time) (CardOpening, error) {
+	var open CardOpening
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		player, err := lockCardPlayer(ctx, tx, userID, name)
+		if err != nil {
+			return err
+		}
+		if player.shards < price {
+			return &CardFundsError{Tokens: player.tokens, Shards: player.shards, Need: price}
+		}
+		for range n {
+			draw, err := giveCard(ctx, tx, userID, name, "", roll, player)
+			if err != nil {
+				return err
+			}
+			open.Draws = append(open.Draws, draw)
+		}
+		return tx.QueryRow(ctx, `UPDATE card_players SET shards = shards - $2, last_draw_at = $3 WHERE user_id = $1 RETURNING tokens, shards, points`,
+			userID, price, now).Scan(&open.Tokens, &open.Shards, &open.Points)
+	})
+	var few *CardFundsError
+	if errors.As(err, &few) {
+		return CardOpening{}, few
+	}
+	if err != nil {
+		return CardOpening{}, fmt.Errorf("storage: open a card pack: %w", err)
+	}
+	return open, nil
+}
+
+// CrystalPurchase is crystals bought for Stars.
+type CrystalPurchase struct {
+	ChargeID string
+	UserID   int64
+	Name     string
+	Stars    int
+	Crystals int
+}
+
+// RecordCrystalPurchase keeps a payment and adds its crystals, once: a
+// payment Telegram reports again adds nothing, and recorded is false. It
+// gives the player's crystals after.
+func (s *Store) RecordCrystalPurchase(ctx context.Context, p CrystalPurchase) (shards int, recorded bool, err error) {
+	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `INSERT INTO crystal_purchases (charge_id, user_id, stars, crystals) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
+			p.ChargeID, p.UserID, p.Stars, p.Crystals)
+		if err != nil || tag.RowsAffected() == 0 {
+			return err
+		}
+		recorded = true
+		if _, err := lockCardPlayer(ctx, tx, p.UserID, p.Name); err != nil {
+			return err
+		}
+		return tx.QueryRow(ctx, `UPDATE card_players SET shards = shards + $2 WHERE user_id = $1 RETURNING shards`, p.UserID, p.Crystals).Scan(&shards)
+	})
+	if err != nil {
+		return 0, false, fmt.Errorf("storage: record a crystal purchase: %w", err)
+	}
+	return shards, recorded, nil
+}
+
+// MarkCrystalRefunded takes back a refunded purchase's crystals, as many as
+// the player still has, and reports whether it was a purchase not yet
+// marked.
+func (s *Store) MarkCrystalRefunded(ctx context.Context, chargeID string) (bool, error) {
+	var marked bool
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		var userID int64
+		var crystals int
+		err := tx.QueryRow(ctx, `UPDATE crystal_purchases SET refunded_at = now() WHERE charge_id = $1 AND refunded_at IS NULL RETURNING user_id, crystals`,
+			chargeID).Scan(&userID, &crystals)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		marked = true
+		_, err = tx.Exec(ctx, `UPDATE card_players SET shards = greatest(shards - $2, 0) WHERE user_id = $1`, userID, crystals)
+		return err
+	})
+	if err != nil {
+		return false, fmt.Errorf("storage: mark a crystal refund: %w", err)
+	}
+	return marked, nil
+}

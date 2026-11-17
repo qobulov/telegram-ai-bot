@@ -35,6 +35,10 @@
       place: "Taklif qo'yish", placed: "✅ Taklif bozorga qo'yildi", swapped: (c) => `🔄 Almashildi! Siz ${c} oldingiz`, removed: "Taklif olib tashlandi",
       refused: { uneven: "Kartalar tier'i yaqin bo'lishi kerak: Mifik faqat Mifik yoki Afsonaviyga almashadi", over: "Bu taklif endi yo'q", gone: "Bu taklif endi yo'q", own: "Bu o'zingizning taklifingiz", not_held: "Sizda bu karta yo'q", same: "Bir xil kartani almashib bo'lmaydi", no_spare: "Faqat takror kartani sovg'a qilish mumkin" },
       offersLimit: (n) => `Bir vaqtda ${n} tagacha taklif qo'yish mumkin`, giftSpare: "Faqat takror (×2 va undan ko'p) kartani sovg'a qilish mumkin",
+      shopTab: "Do'kon", shopBuyTitle: "💎 Kristall sotib olish", shopBuyHint: "Telegram Stars bilan to'lanadi, kristall darhol hisobingizga tushadi.", shopItemsTitle: "🛒 Kristallga xarid",
+      wallet: (n) => `Sizda: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% foyda`,
+      tokensItem: (n) => `${n} ta token`, tokensHint: (n) => `${n} ta karta ochadi, kutmasdan`, packItem: (r) => `${r} paket`, packHint: (n, r) => `${n} ta karta, kamida 1 ta ${r.toLowerCase()} kafolatlangan`,
+      paid: "✅ To'lov qabul qilindi, kristall qo'shilmoqda…", crystalsAdded: (n) => `💎 +${n} kristall qo'shildi!`, payFailed: "To'lov amalga oshmadi", bought: (n) => `🎟 +${n} token`, packOpened: (r) => `${r} paket`,
     },
     ru: {
       title: "Карты", collected: "собрано", animeTab: "Аниме", animeSearch: "Аниме или персонаж", animeBack: "← Все аниме", animeOwned: "✓ Есть у вас", animeMissing: "Пока нет у вас", animeEmpty: "Ничего не найдено", collection: "Коллекция", draw: "Получить", top: "Рейтинг",
@@ -63,6 +67,10 @@
       place: "Выставить", placed: "✅ Предложение выставлено", swapped: (c) => `🔄 Обмен! Вы получили ${c}`, removed: "Предложение снято",
       refused: { uneven: "Редкость карт должна быть близкой: мифическая меняется только на мифическую или легендарную", over: "Этого предложения уже нет", gone: "Этого предложения уже нет", own: "Это ваше предложение", not_held: "У вас нет этой карты", same: "Нельзя менять карту на ту же", no_spare: "Дарить можно только повторную карту" },
       offersLimit: (n) => `Одновременно можно выставить до ${n} предложений`, giftSpare: "Дарить можно только повторную карту (×2 и больше)",
+      shopTab: "Магазин", shopBuyTitle: "💎 Купить кристаллы", shopBuyHint: "Оплата Telegram Stars, кристаллы приходят сразу.", shopItemsTitle: "🛒 За кристаллы",
+      wallet: (n) => `У вас: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% выгоды`,
+      tokensItem: (n) => `${n} токенов`, tokensHint: (n) => `Откроют ${n} карт без ожидания`, packItem: (r) => `Пак: ${r}`, packHint: (n, r) => `${n} карт, минимум одна ${r.toLowerCase()} гарантирована`,
+      paid: "✅ Оплата принята, кристаллы зачисляются…", crystalsAdded: (n) => `💎 +${n} кристаллов!`, payFailed: "Оплата не прошла", bought: (n) => `🎟 +${n} токенов`, packOpened: (r) => `Пак: ${r}`,
     },
     en: {
       title: "Cards", collected: "collected", animeTab: "Anime", animeSearch: "Anime or character", animeBack: "← All anime", animeOwned: "✓ You have it", animeMissing: "Not yours yet", animeEmpty: "Nothing found", collection: "Collection", draw: "Draw", top: "Ranking",
@@ -91,6 +99,10 @@
       place: "Put it up", placed: "✅ Your offer is up", swapped: (c) => `🔄 Traded! You got ${c}`, removed: "Offer taken down",
       refused: { uneven: "The cards must be close in rarity: a Mythic goes only for a Mythic or a Legendary", over: "This offer is gone", gone: "This offer is gone", own: "This is your own offer", not_held: "You do not have that card", same: "A card cannot be traded for itself", no_spare: "Only a spare card may be given" },
       offersLimit: (n) => `You may have up to ${n} offers at once`, giftSpare: "Only a spare card (×2 or more) may be given",
+      shopTab: "Shop", shopBuyTitle: "💎 Buy crystals", shopBuyHint: "Paid in Telegram Stars; the crystals arrive at once.", shopItemsTitle: "🛒 For crystals",
+      wallet: (n) => `You have: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% value`,
+      tokensItem: (n) => `${n} tokens`, tokensHint: (n) => `Open ${n} cards without the wait`, packItem: (r) => `${r} pack`, packHint: (n, r) => `${n} cards, at least one ${r.toLowerCase()} guaranteed`,
+      paid: "✅ Payment received, adding your crystals…", crystalsAdded: (n) => `💎 +${n} crystals!`, payFailed: "The payment did not go through", bought: (n) => `🎟 +${n} tokens`, packOpened: (r) => `${r} pack`,
     },
   };
   const language = ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code) || "uz").slice(0, 2);
@@ -136,7 +148,7 @@
       // A link may name the tab to open, as /market does; otherwise a
       // newcomer starts at the draw and anyone else at their collection.
       const asked = new URLSearchParams(location.search).get("tab");
-      if (!opened) showTab(["collection", "draw", "market", "top"].includes(asked) ? asked : cards.some((c) => c.count > 0) ? "collection" : "draw");
+      if (!opened) showTab(["collection", "draw", "market", "shop", "top"].includes(asked) ? asked : cards.some((c) => c.count > 0) ? "collection" : "draw");
     } catch (error) {
       $("loading").hidden = true;
       if (!opened) showTab("collection");
@@ -528,7 +540,7 @@
     node.textContent = text;
   }
   $("coinTokens").addEventListener("click", () => toast(t.tokenHint(perDay, cardCost)));
-  $("coinShards").addEventListener("click", () => toast(t.shardHint(cardCost)));
+  $("coinShards").addEventListener("click", () => showTab("shop"));
 
   // cost is what n cards take: tokens first, crystals for the rest.
   function cost(n) {
@@ -691,12 +703,12 @@
   }
 
   // openedPanel lays out the batch just opened, the new ones marked.
-  function openedPanel(drawn) {
+  function openedPanel(drawn, title) {
     const fresh = drawn.filter((d) => d.fresh).length;
     const panel = document.createElement("div");
     panel.className = "opened";
     panel.innerHTML = '<div class="opened-head"><b></b><span></span></div><div class="opened-grid"></div><button type="button" class="draw opened-ok"></button>';
-    panel.querySelector(".opened-head b").textContent = t.openedTen;
+    panel.querySelector(".opened-head b").textContent = title || t.openedTen;
     panel.querySelector(".opened-head span").textContent = [fresh ? t.freshN(fresh) : "", drawn.length - fresh ? t.againN(drawn.length - fresh) : ""].filter(Boolean).join(" · ");
     const grid = panel.querySelector(".opened-grid");
     [...drawn].sort((a, b) => b.card.rarity - a.card.rarity).forEach(({ card, fresh }, i) => {
@@ -1076,13 +1088,128 @@
   });
   $("animeBack").addEventListener("click", () => { animeList(); window.scrollTo(0, 0); });
 
+  // ---------- shop ----------
+
+  const RARITY_ICON = ["⚪", "🔷", "💜", "🔥", "👑"];
+  let shopData = null, buying = false;
+
+  // shop lists the crystals sold for Stars and what crystals buy.
+  async function shop() {
+    $("shopWallet").textContent = t.wallet(spaced(shards));
+    try {
+      shopData = shopData || await api("shop");
+    } catch (error) {
+      notice(error);
+      return;
+    }
+    const packs = $("crystalPacks");
+    packs.replaceChildren();
+    const base = shopData.packs[0] ? shopData.packs[0].crystals / shopData.packs[0].stars : 0;
+    for (const pack of shopData.packs) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "pack-btn";
+      const gain = base ? Math.round(((pack.crystals / pack.stars) / base - 1) * 100) : 0;
+      button.innerHTML = '<b></b><span class="stars"></span><small></small>';
+      button.querySelector("b").textContent = t.crystalsN(spaced(pack.crystals));
+      button.querySelector(".stars").textContent = t.starsN(pack.stars);
+      button.querySelector("small").textContent = gain > 0 ? t.bonus(gain) : "";
+      button.disabled = !shopData.stars;
+      button.addEventListener("click", () => buyCrystals(pack));
+      packs.append(button);
+    }
+    const list = $("shopItems");
+    list.replaceChildren();
+    for (const item of shopData.items) {
+      const row = document.createElement("li");
+      row.className = "shop-item";
+      const rarity = t.rarities[item.least || 0];
+      row.style.setProperty("--tier", item.tokens ? "var(--r1)" : COLORS[item.least || 0]);
+      row.innerHTML = '<span class="icon"></span><div><b></b><small></small></div><button type="button" class="ghost"></button>';
+      row.querySelector(".icon").textContent = item.tokens ? "🎟" : RARITY_ICON[item.least || 0];
+      row.querySelector("b").textContent = item.tokens ? t.tokensItem(item.tokens) : t.packItem(rarity);
+      row.querySelector("small").textContent = item.tokens ? t.tokensHint(item.tokens) : t.packHint(item.cards, rarity);
+      const button = row.querySelector("button");
+      button.textContent = t.buyFor(spaced(item.price));
+      button.disabled = item.price > shards;
+      button.addEventListener("click", () => buyItem(item));
+      list.append(row);
+    }
+  }
+
+  // buyItem buys tokens or a pack for crystals, laying a pack out as a
+  // batch is.
+  async function buyItem(item) {
+    if (buying) return;
+    buying = true;
+    haptic("medium");
+    try {
+      const data = await api("buy", { item: item.id });
+      tokens = data.tokens ?? tokens;
+      shards = data.shards ?? shards;
+      if (data.short) { toast(t.short(data.short)); return; }
+      if (item.tokens) {
+        toast(t.bought(item.tokens));
+      } else {
+        const drawn = data.drawn.map((d) => ({ card: d.card, fresh: d.new }));
+        for (const { card } of drawn) keep(card);
+        points = data.points ?? points;
+        header();
+        shelves();
+        openedPanel(drawn, t.packOpened(t.rarities[item.least || 0]));
+      }
+    } catch (error) {
+      notice(error);
+    } finally {
+      buying = false;
+      drawButton();
+      shardsPanel();
+      shop();
+    }
+  }
+
+  // buyCrystals opens Telegram's payment for a crystal pack; the crystals
+  // come when the bot hears of the payment, so the state is asked for
+  // until they are there.
+  async function buyCrystals(pack) {
+    if (buying) return;
+    if (!tg.openInvoice) { toast(t.payFailed); return; }
+    buying = true;
+    try {
+      const { link } = await api("invoice", { item: pack.id });
+      tg.openInvoice(link, (status) => {
+        buying = false;
+        if (status === "paid") {
+          toast(t.paid);
+          awaitCrystals(shards, pack.crystals, 0);
+        } else if (status === "failed") {
+          toast(t.payFailed);
+        }
+      });
+    } catch (error) {
+      buying = false;
+      notice(error);
+    }
+  }
+
+  function awaitCrystals(before, crystals, tries) {
+    setTimeout(async () => {
+      try {
+        applyState(await api("state"));
+        if (shards >= before + crystals) { toast(t.crystalsAdded(crystals)); haptic("heavy"); shop(); return; }
+      } catch (_) { /* asked again below */ }
+      if (tries < 8) awaitCrystals(before, crystals, tries + 1);
+    }, 1500);
+  }
+
   // ---------- tabs ----------
 
   function showTab(tab) {
     opened = tab;
     for (const button of document.querySelectorAll(".nav button")) button.classList.toggle("on", button.dataset.tab === tab);
-    for (const name of ["collection", "draw", "market", "anime", "top"]) $(`tab-${name}`).hidden = name !== tab;
+    for (const name of ["collection", "draw", "market", "anime", "shop", "top"]) $(`tab-${name}`).hidden = name !== tab;
     if (tab === "top") ranking();
+    if (tab === "shop") shop();
     if (tab === "anime") animePage();
     if (tab === "market") market();
     drawButton();

@@ -12,6 +12,7 @@ import (
 
 	"telegram-ai-bot/internal/miniapp"
 	"telegram-ai-bot/internal/storage"
+	"telegram-ai-bot/internal/telegram"
 )
 
 // Store keeps Kartalar for the Mini App.
@@ -32,6 +33,13 @@ type Store interface {
 	TakeCardOffer(ctx context.Context, id, by int64, rules storage.CardTradeRules, keep time.Duration) (storage.CardTrade, error)
 	CallOffCardTrade(ctx context.Context, id, by int64) (bool, error)
 	CatalogCardsNamed(ctx context.Context, name string, limit int) ([]storage.Card, error)
+	BuyCardTokens(ctx context.Context, userID int64, name string, tokens, price int) (storage.CardOpening, error)
+	OpenCardPack(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, price int, now time.Time) (storage.CardOpening, error)
+}
+
+// Invoices makes links to invoices in Stars, for crystals bought in the app.
+type Invoices interface {
+	CreateInvoiceLink(ctx context.Context, inv telegram.Invoice) (string, error)
 }
 
 // Options configures the Mini App's API.
@@ -49,6 +57,8 @@ type Options struct {
 	// Notify tells a player in their private chat of a card given them;
 	// nil tells no one.
 	Notify func(ctx context.Context, userID int64, text string) error
+	// Invoices sells crystals for Stars; nil sells none.
+	Invoices Invoices
 }
 
 const (
@@ -109,6 +119,9 @@ type request struct {
 	Offer int64 `json:"offer"`
 	// Count is how many cards "open" opens: 1 or Batch.
 	Count int `json:"count"`
+	// Item is what "buy" buys, of ShopItems, or "invoice" sells, of
+	// CrystalPacks.
+	Item string `json:"item"`
 }
 
 type failure struct {
@@ -155,6 +168,12 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 	switch req.Action {
 	case "state":
 		return h.state(ctx, opened.User)
+	case "shop":
+		return map[string]any{"items": ShopItems, "packs": CrystalPacks, "stars": h.Invoices != nil}, failure{}
+	case "buy":
+		return h.buy(ctx, opened.User, req.Item)
+	case "invoice":
+		return h.invoice(ctx, opened.User, req.Item)
 	case "open":
 		return h.open(ctx, opened.User, req.Count)
 	case "top":
