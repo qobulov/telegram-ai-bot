@@ -43,7 +43,7 @@ func (s *Store) Warns(ctx context.Context, chatID, userID int64, limit int) ([]M
 	rows, err := s.pool.Query(ctx, `
 		SELECT w.user_id, coalesce(g.first_name, ''), w.count, w.reason, w.updated_at
 		FROM member_warns w LEFT JOIN group_members g ON g.chat_id = w.chat_id AND g.user_id = w.user_id
-		WHERE w.chat_id = $1 AND w.count > 0 AND w.updated_at > now() - $2::interval AND ($3 = 0 OR w.user_id = $3)
+		WHERE w.chat_id = $1 AND w.count > 0 AND w.updated_at > now() - $2::interval AND ($3::bigint = 0 OR w.user_id = $3)
 		ORDER BY w.count DESC, w.updated_at DESC LIMIT $4`, chatID, warnsLast.String(), userID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("storage: list warnings: %w", err)

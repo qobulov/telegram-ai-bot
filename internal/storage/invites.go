@@ -83,7 +83,7 @@ func (s *Store) InviteTop(ctx context.Context, chatID int64, q InviteQuery) ([]I
 		SELECT inviter_id, (array_agg(inviter_name ORDER BY joined_at DESC))[1],
 			count(*)::int, count(*) FILTER (WHERE left_at IS NULL)::int
 		FROM group_invites
-		WHERE chat_id = $1 AND joined_at >= $2 AND ($5::timestamptz IS NULL OR joined_at < $5) AND ($3 = 0 OR inviter_id = $3)
+		WHERE chat_id = $1 AND joined_at >= $2 AND ($5::timestamptz IS NULL OR joined_at < $5) AND ($3::bigint = 0 OR inviter_id = $3)
 		GROUP BY inviter_id
 		HAVING $3 <> 0 OR count(*) FILTER (WHERE left_at IS NULL) > 0
 		ORDER BY 4 DESC, 3, inviter_id
@@ -142,7 +142,7 @@ func (s *Store) ClearInviteAward(ctx context.Context, chatID int64) error {
 func (s *Store) InviteAwards(ctx context.Context, chatID int64) ([]InviteAward, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT chat_id, period, top, language, set_by, set_at, posted FROM invite_awards
-		WHERE $1 = 0 OR chat_id = $1 ORDER BY chat_id`, chatID)
+		WHERE $1::bigint = 0 OR chat_id = $1 ORDER BY chat_id`, chatID)
 	if err != nil {
 		return nil, fmt.Errorf("storage: read the invite awards: %w", err)
 	}

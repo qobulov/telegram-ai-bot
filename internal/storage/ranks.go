@@ -94,7 +94,7 @@ func (s *Store) RankLog(ctx context.Context, chatID, userID int64, limit int) ([
 		FROM rank_log l
 		LEFT JOIN group_members t ON t.chat_id = l.chat_id AND t.user_id = l.user_id
 		LEFT JOIN group_members b ON b.chat_id = l.chat_id AND b.user_id = l.given_by
-		WHERE l.chat_id = $1 AND ($2 = 0 OR l.user_id = $2) ORDER BY l.given_at DESC, l.id DESC LIMIT $3`, chatID, userID, limit)
+		WHERE l.chat_id = $1 AND ($2::bigint = 0 OR l.user_id = $2) ORDER BY l.given_at DESC, l.id DESC LIMIT $3`, chatID, userID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("storage: read the rank log: %w", err)
 	}

@@ -98,7 +98,7 @@ func (s *Store) DuelTeam(ctx context.Context, userID int64, n int) ([]Card, erro
 func (s *Store) ResolveDuel(ctx context.Context, chatID, messageID, winner, loser int64, stake int) (moved int, settled bool, err error) {
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `
-			INSERT INTO card_duels (chat_id, message_id, winner_id, loser_id) VALUES ($1, $2, nullif($3, 0), nullif($4, 0))
+			INSERT INTO card_duels (chat_id, message_id, winner_id, loser_id) VALUES ($1, $2, nullif($3::bigint, 0), nullif($4::bigint, 0))
 			ON CONFLICT DO NOTHING`, chatID, messageID, winner, loser)
 		if err != nil || tag.RowsAffected() == 0 || winner == 0 || stake <= 0 {
 			settled = err == nil && tag.RowsAffected() == 1

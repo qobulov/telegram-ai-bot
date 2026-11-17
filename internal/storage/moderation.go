@@ -96,7 +96,7 @@ func (s *Store) OpenPoll(ctx context.Context, chatID, messageID int64) (a Modera
 		SELECT p.id, p.chat_id, p.action, p.requester_id, p.target_message_id, p.update_id
 		FROM moderation_actions p
 		WHERE p.chat_id = $1 AND p.action = 'poll' AND p.target_message_id IS NOT NULL
-		  AND ($2 = 0 OR p.target_message_id = $2)
+		  AND ($2::bigint = 0 OR p.target_message_id = $2)
 		  AND NOT EXISTS (
 			SELECT 1 FROM moderation_actions s
 			WHERE s.chat_id = p.chat_id AND s.action = 'poll_stop' AND s.target_message_id = p.target_message_id)
