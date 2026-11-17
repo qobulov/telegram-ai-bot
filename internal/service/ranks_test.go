@@ -187,3 +187,22 @@ func TestStaffShowsAdmins(t *testing.T) {
 		t.Errorf("staff lists a bot: %q", last)
 	}
 }
+
+// "-1 admin mari" takes a rank as "-admin" does: refused to a member
+// without the rank to give ranks, done for the creator.
+func TestMinusNumberTakesARank(t *testing.T) {
+	const creator, member, other = int64(10), int64(12), int64(13)
+	f := newFixture()
+	f.opts.WakeWords = []string{"mari"}
+	f.members.creator = creator
+	book := &fakeRankBook{ranks: map[int64]int{member: 2}, overrides: map[string]int{}}
+	f.opts.Ranks = book
+	sent := f.run(from(other, "-1 admin mari", member))
+	if last := sent[len(sent)-1].text; !strings.Contains(last, "⛔") || book.ranks[member] != 2 {
+		t.Errorf("a member's -1 admin = %q, ranks %v", last, book.ranks)
+	}
+	f.run(from(creator, "-1 admin mari", member))
+	if book.ranks[member] != 0 {
+		t.Errorf("the creator's -1 admin left rank %d", book.ranks[member])
+	}
+}

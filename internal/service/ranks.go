@@ -38,6 +38,7 @@ type rankOrder struct {
 var (
 	plusRank   = regexp.MustCompile(`^\+([1-5])$`)
 	rankDigit  = regexp.MustCompile(`^[0-5]$`)
+	minusRank  = regexp.MustCompile(`^-[0-5]$`)
 	rankWords  = map[string]bool{"daraja": true, "даража": true, "дараже": true, "rank": true, "ранг": true, "повысить": true, "повысь": true, "понизить": true, "понизь": true}
 	staffWords = map[string]bool{"moderatorlar": true, "модераторы": true, "ранги": true, "darajalar": true, "staff": true}
 	takeWords  = map[string]bool{"-admin": true, "-админ": true, "-модер": true, "-moder": true, "-rank": true, "-ранг": true,
@@ -102,6 +103,10 @@ func (s *Service) rankRequest(in incoming) (order rankOrder, ok bool) {
 	case minePhrases[joined] || asksOwnRank(words):
 		return rankOrder{kind: "mine"}, true
 	case takePhrases[joined] || (len(words) == 1 && takeWords[words[0]]):
+		return rankOrder{kind: "give"}, true
+	}
+	if minusRank.MatchString(words[0]) && len(words) > 1 && allRankWords(words[1:]) {
+		// "-1 admin mari" takes the rank, whatever the number.
 		return rankOrder{kind: "give"}, true
 	}
 	if m := plusRank.FindStringSubmatch(words[0]); m != nil && len(words) > 1 && allRankWords(words[1:]) {
