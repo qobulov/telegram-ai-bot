@@ -47,7 +47,8 @@ func (m *Moderation) rankFor(ctx context.Context, caller Caller, action string) 
 // checkRankedTarget keeps a moderator acting by rank off a member of the
 // same rank or higher.
 func (m *Moderation) checkRankedTarget(ctx context.Context, o order, rank int) error {
-	if rank == 0 || o.target.UserID == 0 {
+	if rank == 0 || o.target.UserID == 0 || o.target.UserID == o.caller.UserID {
+		// One's own title or tag is no act on a peer.
 		return nil
 	}
 	theirs, err := m.opts.Ranks.RankOf(ctx, o.caller.ChatID, o.target.UserID)

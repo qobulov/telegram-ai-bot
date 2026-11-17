@@ -1342,6 +1342,12 @@ func TestModerateSetsAMembersTag(t *testing.T) {
 	if said := env.act(t, turn(450, "bunga Pro tegini qo'y"), `{"action":"member_tag","text":"Pro"}`); said != "Bajarildi: Bek @bek tegi «Pro» bo'ldi." {
 		t.Errorf("said %q", said)
 	}
+	// One's own tag is no act on oneself refused: an admin asking is told
+	// theirs is a title.
+	self := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: 448, MessageID: 448, Target: &Target{UserID: userID, MessageID: 448}, Words: "/tag Abu solo"}, &Sink{})
+	if got := env.moderate(self, `{"action":"member_tag","text":"Abu solo"}`); got.OK || !strings.Contains(got.Error.Message, "admin_title") {
+		t.Errorf("one's own tag = %+v", got)
+	}
 	env.chat.set(memberID, telegram.ChatMember{Status: "administrator", User: &telegram.User{ID: memberID, FirstName: "Bek", Username: "bek"}})
 	if got := env.moderate(turn(449, "tegini Pro qil"), `{"action":"member_tag","text":"Pro"}`); got.OK || !strings.Contains(got.Error.Message, "admin_title") {
 		t.Errorf("an admin's member tag = %+v", got)

@@ -78,6 +78,28 @@ func (s *Service) tagsAMember(in incoming) bool {
 	return false
 }
 
+// tagsOnlySelf reports a message whose tags all name the asker.
+func (s *Service) tagsOnlySelf(in incoming) bool {
+	text, entities := in.msg.Content()
+	self := false
+	for _, e := range entities {
+		switch e.Type {
+		case telegram.EntityTextMention:
+			if e.User == nil || e.User.ID != in.userID {
+				return false
+			}
+			self = true
+		case telegram.EntityMention:
+			tag, ok := telegram.EntityText(text, e)
+			if !ok || in.msg.From == nil || in.msg.From.Username == "" || !strings.EqualFold(tag, "@"+in.msg.From.Username) {
+				return false
+			}
+			self = true
+		}
+	}
+	return self
+}
+
 // withoutTags is a command's argument without the @usernames in it.
 func withoutTags(arg string) string {
 	var kept []string
@@ -129,6 +151,12 @@ func (s *Service) isModCommand(in incoming) bool {
 // says what was done, or why it was not.
 func (s *Service) modCommand(ctx context.Context, in incoming) outcome {
 	command, arg := commandName(in.text), withoutTags(commandArgument(in.text))
+	if command == "/tag" && s.tagsOnlySelf(in) {
+		// "/tag @me Abu solo": one's own tag, as replying to one's own message.
+		msg := *in.msg
+		msg.ReplyToMessage = &telegram.Message{MessageID: in.msg.MessageID, From: in.msg.From, Chat: in.msg.Chat}
+		in.msg = &msg
+	}
 	in, action, minutes, reason, _ := s.modRequest(in)
 	if _, replied := s.withModTarget(in); !replied {
 		// A member's "/ban @user" may be meant for another bot: only those

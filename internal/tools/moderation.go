@@ -904,7 +904,8 @@ func (m *Moderation) checkTarget(ctx context.Context, o order) error {
 		return channelOnly(o.action)
 	}
 	userID := o.target.UserID
-	if userID == m.opts.BotID || userID == o.caller.UserID {
+	selfTitle := userID == o.caller.UserID && (o.action == actionAdminTitle || o.action == actionMemberTag)
+	if userID == m.opts.BotID || (userID == o.caller.UserID && !selfTitle) {
 		return ownMessageOnly(o.action)
 	}
 	if isTelegramAccount(userID) || (o.target.Owner && m.opts.OwnersByID) {

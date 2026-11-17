@@ -186,3 +186,17 @@ func TestModCommandsWithATag(t *testing.T) {
 		t.Errorf("a member's tagged ban = %+v, asked %v", sent, runner.asked)
 	}
 }
+
+// "/tag @me Abu solo" is one's own tag, the asker the target.
+func TestTagOneself(t *testing.T) {
+	f := newFixture()
+	runner := withToolRunner(f)
+	runner.answers["moderate"] = `{"ok":true,"result":{"done":true,"said":"Bajarildi."}}`
+	f.opts.Ranks = &fakeRankBook{ranks: map[int64]int{userID: 5}, overrides: map[string]int{}}
+	msg := groupMessage("/tag @bek_me Abu solo", "@bek_me")
+	msg.From.Username = "bek_me"
+	f.run(inGroup(msg))
+	if len(runner.asked) != 1 || !strings.Contains(runner.asked[0], `"action":"member_tag"`) || !strings.Contains(runner.asked[0], `"text":"Abu solo"`) {
+		t.Fatalf("asked = %v", runner.asked)
+	}
+}
