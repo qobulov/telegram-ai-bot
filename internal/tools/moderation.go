@@ -109,6 +109,12 @@ const (
 	notAsked       = "their own message does not ask for this, so nothing was done; do it only when they ask for it in words, such as \"mute qil\" or \"o'chir\""
 	noAnswer       = "Telegram did not answer, so it may not have been done; try again later"
 	notAnAdmin     = "that member is not an admin I can change: I can only demote or title admins I made myself"
+	// notMyAdmin is an admin another admin made: Telegram lets only that one,
+	// or the creator, change their rights or title.
+	notMyAdmin = "that admin was made by another admin, not by me, and Telegram lets only the one who made them or the group's creator change their title or rights; to have me do it, that admin removes them and I make them admin again, then I can set the title"
+	// adminHasTitle is a member tag asked for an admin, whose tag is their
+	// admin title.
+	adminHasTitle = "that member is an admin: an admin's tag is their admin title, so call moderate again with admin_title and the same text"
 	// A channel is no member: it can be banned from posting here, and its
 	// posts deleted or pinned, but nothing else.
 	onChannel = "that message was posted on behalf of a channel, not by a member: I can only delete or pin it, or ban the channel from posting here and unban it; muting, stickers, photos, adminship and purge are for members"
@@ -178,6 +184,7 @@ var rightWords = map[string]string{
 	telegram.RightInviteUsers:     "invite users",
 	telegram.RightPromoteMembers:  "add new admins",
 	telegram.RightManageTopics:    "manage topics",
+	telegram.RightManageTags:      "manage members' tags",
 }
 
 // MemberLookup asks Telegram about a member of a chat.
@@ -910,7 +917,13 @@ func (m *Moderation) checkTarget(ctx context.Context, o order) error {
 		if member.Status != "administrator" {
 			return &DeniedError{Message: notAnAdmin}
 		}
+		if !member.CanBeEdited {
+			return &DeniedError{Message: notMyAdmin}
+		}
 		return nil
+	}
+	if o.action == actionMemberTag && member.Status == "administrator" {
+		return &DeniedError{Message: adminHasTitle}
 	}
 	if member.IsAdmin() {
 		return &DeniedError{Message: immune}
@@ -1307,7 +1320,7 @@ var actionWords = map[string][]string{
 	actionPhotos:     photoWords,
 	actionPromote:    adminWords,
 	actionDemote:     adminWords,
-	actionAdminTitle: {"admin", "админ", "unvon", "titul", "титул", "звани", "title", "lavozim", "должн"},
+	actionAdminTitle: {"admin", "админ", "unvon", "titul", "титул", "звани", "title", "lavozim", "должн", "teg", "tag", "тег"},
 	actionMemberTag:  {"teg", "tag", "тег", "metka", "метк", "yorliq", "ярлык"},
 
 	actionSetTitle:         append([]string{"nom", "title", "назв", "имя"}, changeWords...),

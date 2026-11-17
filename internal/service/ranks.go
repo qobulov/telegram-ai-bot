@@ -52,7 +52,19 @@ var (
 // isRankWord is a word that says the "+3" is a rank, not agreement: "admin",
 // "модер", "daraja".
 func isRankWord(w string) bool {
-	return isAdminWord(w) || strings.HasPrefix(w, "модер") || strings.HasPrefix(w, "moder") || rankWords[w]
+	return isAdminWord(w) || strings.HasPrefix(w, "модер") || strings.HasPrefix(w, "moder") || rankWords[w] ||
+		strings.HasPrefix(w, "daraj") || strings.HasPrefix(w, "дараж")
+}
+
+// asksOwnRank reports "darajam qaysi" in any wording: a word of one's own
+// rank, "darajam", "даражам", among a few.
+func asksOwnRank(words []string) bool {
+	for _, w := range words {
+		if strings.HasPrefix(w, "darajam") || strings.HasPrefix(w, "даражам") {
+			return true
+		}
+	}
+	return false
 }
 
 // rankRequest reads a group message about ranks; ok is false for any other.
@@ -87,7 +99,7 @@ func (s *Service) rankRequest(in incoming) (order rankOrder, ok bool) {
 		return rankOrder{kind: "staff"}, true
 	case logPhrases[joined]:
 		return rankOrder{kind: "log"}, true
-	case minePhrases[joined]:
+	case minePhrases[joined] || asksOwnRank(words):
 		return rankOrder{kind: "mine"}, true
 	case takePhrases[joined] || (len(words) == 1 && takeWords[words[0]]):
 		return rankOrder{kind: "give"}, true
@@ -96,7 +108,11 @@ func (s *Service) rankRequest(in incoming) (order rankOrder, ok bool) {
 		n, _ := strconv.Atoi(m[1])
 		return rankOrder{kind: "give", rank: n}, true
 	}
-	if rankWords[words[0]] && len(words) >= 2 && rankDigit.MatchString(words[1]) && allRankWords(words[2:]) {
+	if rankDigit.MatchString(words[0]) && len(words) >= 2 && isRankWord(words[1]) && allRankWords(words[2:]) {
+		n, _ := strconv.Atoi(words[0])
+		return rankOrder{kind: "give", rank: n}, true
+	}
+	if isRankWord(words[0]) && !isAdminWord(words[0]) && len(words) >= 2 && rankDigit.MatchString(words[1]) && allRankWords(words[2:]) {
 		n, _ := strconv.Atoi(words[1])
 		return rankOrder{kind: "give", rank: n}, true
 	}

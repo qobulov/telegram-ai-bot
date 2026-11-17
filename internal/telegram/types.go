@@ -383,6 +383,8 @@ type ChatMember struct {
 	// IsAnonymous is true for an admin who posts in the group's name, hiding
 	// who they are.
 	IsAnonymous bool `json:"is_anonymous,omitempty"`
+	// CanBeEdited is true for an admin the bot may change: one it made.
+	CanBeEdited bool `json:"can_be_edited,omitempty"`
 
 	// ChatPermissions are a restricted member's: what they may still send.
 	// can_change_info, can_invite_users, can_pin_messages and

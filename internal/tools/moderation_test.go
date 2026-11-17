@@ -1308,7 +1308,14 @@ func TestModeratePromotesAndDemotes(t *testing.T) {
 	if got := env.moderate(ctx, `{"action":"demote"}`); got.OK || !strings.Contains(got.Error.Message, "not an admin") {
 		t.Errorf("demoting a plain member = %+v", got)
 	}
-	env.chat.set(memberID, admin(telegram.RightDeleteMessages))
+	others := admin(telegram.RightDeleteMessages)
+	env.chat.set(memberID, others)
+	if got := env.moderate(ctx, `{"action":"demote"}`); got.OK || !strings.Contains(got.Error.Message, "made by another admin") {
+		t.Errorf("demoting another admin's admin = %+v", got)
+	}
+	mine := admin(telegram.RightDeleteMessages)
+	mine.CanBeEdited = true
+	env.chat.set(memberID, mine)
 	env.act(t, ctx, `{"action":"demote"}`)
 	ctx = WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: 442, MessageID: 442, Target: bekTarget(), Words: "unvonini Moderator qil"}, &Sink{})
 	env.act(t, ctx, `{"action":"admin_title","text":"Moderator"}`)
@@ -1334,6 +1341,11 @@ func TestModerateSetsAMembersTag(t *testing.T) {
 	if said := env.act(t, turn(450, "bunga Pro tegini qo'y"), `{"action":"member_tag","text":"Pro"}`); said != "Bajarildi: Bek @bek tegi «Pro» bo'ldi." {
 		t.Errorf("said %q", said)
 	}
+	env.chat.set(memberID, telegram.ChatMember{Status: "administrator", User: &telegram.User{ID: memberID, FirstName: "Bek", Username: "bek"}})
+	if got := env.moderate(turn(449, "tegini Pro qil"), `{"action":"member_tag","text":"Pro"}`); got.OK || !strings.Contains(got.Error.Message, "admin_title") {
+		t.Errorf("an admin's member tag = %+v", got)
+	}
+	env.chat.set(memberID, telegram.ChatMember{Status: "member", Tag: "Yangi", User: &telegram.User{ID: memberID, FirstName: "Bek", Username: "bek"}})
 	for _, args := range []string{`{"action":"member_tag","text":"🔥 Pro"}`, `{"action":"member_tag","text":"` + strings.Repeat("a", 17) + `"}`} {
 		if got := env.moderate(turn(451, "tegini o'zgartir"), args); got.OK || !strings.Contains(got.Error.Message, "no emoji") {
 			t.Errorf("%s = %+v", args, got)

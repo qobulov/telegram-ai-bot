@@ -200,7 +200,7 @@ var modWordActions = map[string]string{
 // 2 hours".
 var modFillers = map[string]bool{
 	"бер": true, "ber": true, "qil": true, "қил": true, "кил": true, "qilvor": true, "қилвор": true, "килвор": true,
-	"qiling": true, "қилинг": true, "bering": true, "беринг": true,
+	"qiling": true, "қилинг": true, "bering": true, "беринг": true, "бен": true, "берин": true, "bervor": true, "бервор": true,
 	"дай": true, "сделай": true, "его": true, "её": true, "ее": true, "их": true, "на": true, "пожалуйста": true,
 	"him": true, "her": true, "them": true, "for": true, "please": true,
 	"iltimos": true, "илтимос": true, "uni": true, "уни": true, "shuni": true, "шуни": true, "буни": true, "buni": true,

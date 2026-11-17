@@ -150,4 +150,18 @@ func TestRanksInCyrillicAndOnesOwn(t *testing.T) {
 	if last := sent[len(sent)-1].text; !strings.Contains(last, "moderator emas") || book.ranks[member] != 0 {
 		t.Errorf("даражани ол = %q", last)
 	}
+	// The wordings seen in a group that the code once left to the model.
+	for _, c := range []struct {
+		text string
+		rank int
+	}{{"+3 даражали мари", 3}, {"Мари 2 даража бен", 2}, {"мари 4 darajali qil", 4}} {
+		f.run(from(creator, c.text, member))
+		if book.ranks[member] != c.rank {
+			t.Errorf("%q: rank %d, want %d", c.text, book.ranks[member], c.rank)
+		}
+	}
+	sent = f.run(from(member, "Мени даражам неччи мари", 0))
+	if last := sent[len(sent)-1].text; !strings.Contains(last, "darajangiz: 4") {
+		t.Errorf("даражам неччи = %q", last)
+	}
 }
