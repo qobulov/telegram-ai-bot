@@ -858,10 +858,16 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.teamsCommand(ctx, in)
 	case s.opts.Invites != nil && commandName(in.text) == "/invites_auto":
 		return s.inviteAwardCommand(ctx, in)
+	case s.opts.Invites != nil && commandName(in.text) == "/myinvites":
+		return s.myInvites(ctx, in)
 	case s.opts.Invites != nil && invitePeriods[commandName(in.text)]:
 		return s.inviteTable(ctx, in)
 	case s.opts.Cards != nil && s.opts.CardsURL != "" && commandName(in.text) == "/market":
 		return outcome{text: textMarket.to(in), buttons: s.marketButton(in)}
+	case s.opts.Cards != nil && commandName(in.text) == "/profile":
+		return s.profile(ctx, in)
+	case in.group && s.opts.Ranks != nil && s.isRightsQuestion(in.text):
+		return s.myRights(ctx, in)
 	case s.opts.Cards != nil && commandName(in.text) == "/cardtop":
 		return s.cardTop(ctx, in)
 	case s.opts.Cards != nil && s.opts.Buttons != nil && commandName(in.text) == "/duel":
@@ -1098,6 +1104,14 @@ func (s *Service) pressed(q *telegram.CallbackQuery) {
 	}
 	if strings.HasPrefix(q.Data, teamsData) && s.opts.Teams != nil {
 		s.pressedTeams(q)
+		return
+	}
+	if strings.HasPrefix(q.Data, unbanData) && s.opts.GroupModerator != nil && s.opts.Strikes != nil {
+		s.pressedUnban(q)
+		return
+	}
+	if strings.HasPrefix(q.Data, reportData) && s.opts.Reports != nil {
+		s.pressedReport(q)
 		return
 	}
 	if strings.HasPrefix(q.Data, voteBanData) && s.opts.BanVotes != nil {
@@ -1603,6 +1617,9 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 	case "/start":
 		return textWelcome.to(in)
 	case "/help":
+		if section, ok := helpSectionNames[strings.ToLower(strings.TrimSpace(commandArgument(in.text)))]; ok {
+			return helpSections[section].to(in)
+		}
 		help := HelpTextIn(languageOf(in), Abilities{Draw: s.opts.ImagesEnabled, Listen: s.canListen(), Football: s.opts.FootballEnabled, Pages: s.opts.StatsURL != ""})
 		if s.opts.Bot.Username != "" {
 			// The bot's own username makes the group commands tappable.

@@ -190,6 +190,10 @@ type Options struct {
 	// BanVotes keeps the groups' votes to ban a member, for /voteban; nil
 	// turns it off.
 	BanVotes BanVoteBook
+	// Reports keeps the members' reports, and WarnList their warnings, for
+	// /reports and /warns; nil turns each off.
+	Reports  ReportBook
+	WarnList WarnList
 	// MemberLinks and LinkMaker give each member their own invite link,
 	// /mylink; nil turns it off.
 	MemberLinks MemberLinks

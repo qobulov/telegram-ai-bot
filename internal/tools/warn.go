@@ -38,12 +38,16 @@ func (m *Moderation) warn(ctx context.Context, o order) (any, error) {
 		}
 		return map[string]any{"done": true, "said": "Bajarildi: " + name + " ogohlantirishi olib tashlandi, endi " + count(left) + ".", "note": doneNote}, nil
 	}
-	n, err := m.opts.Warns.AddWarn(ctx, chatID, userID)
+	n, err := m.opts.Warns.AddWarn(ctx, chatID, userID, o.reason)
 	if err != nil {
 		return nil, err
 	}
 	if n < WarnLimit {
-		return map[string]any{"done": true, "said": "⚠️ " + name + " ogohlantirildi: " + count(n) + ". " + strconv.Itoa(WarnLimit) + "-ogohlantirishda 1 kunga yoza olmaydi.", "note": doneNote}, nil
+		why := ""
+		if o.reason != "" {
+			why = " Sabab: " + o.reason + "."
+		}
+		return map[string]any{"done": true, "said": "⚠️ " + name + " ogohlantirildi: " + count(n) + "." + why + " " + strconv.Itoa(WarnLimit) + "-ogohlantirishda 1 kunga yoza olmaydi; ogohlantirishlar 30 kundan keyin o'chadi.", "note": doneNote}, nil
 	}
 	until := m.opts.Now().Add(WarnMuteMinutes * time.Minute)
 	if err := m.opts.Telegram.RestrictChatMember(ctx, telegram.Restriction{ChatID: chatID, UserID: userID, Permissions: telegram.NoPermissions(), Until: until}); err != nil {

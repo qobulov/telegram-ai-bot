@@ -236,11 +236,14 @@ A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yo
 /warn, /unwarn — ogohlantirish (3-sida 1 kunga mut), /ban sabab, /kick — a'zoga reply qilib
 "+3 admin mari" — moderatorga 1–5 daraja berish; /staff, /ranklog, /access — moderatorlar, kim tayinlagan, buyruqlar darajasi
 /banlist, /amnesty, /kickinactive 30 — banlar ro'yxati, hammani bandan chiqarish, faol emaslarni chiqarish
+/reports, /warns — ko'rilmagan shikoyatlar, kimda nechta ogohlantirish
 
 Hamma uchun:
-/cards — kartalar (har 2 soatda token), /mylink — shaxsiy taklif havolangiz, /invites_week — kim nechta odam qo'shdi
-/admins — adminlarni chaqirish, /report va /voteban — xabarga reply qilib shikoyat yoki ban uchun ovoz
-/id, /ping, /calc 2+2, /weather Toshkent`,
+/cards — kartalar (har 2 soatda token), /profile — o'yinchi kartangiz, /mylink — shaxsiy taklif havolangiz, /myinvites — siz nechta odam qo'shdingiz
+/admins — adminlarni chaqirish, /report va /voteban — xabarga reply qilib shikoyat yoki ban uchun ovoz, /rights — huquqlaringiz
+/id, /ping, /calc 2+2, /weather Toshkent
+
+Bo'limlar: /help mod, /help kartalar, /help azo`,
 	"ru": `Пишите мне: отвечаю на узбекском, русском или английском — на вашем языке.
 
 Я помню недавнюю часть нашего разговора. %s %s
@@ -261,11 +264,14 @@ Hamma uchun:
 /warn, /unwarn — предупреждение (на третьем мут на сутки), /ban причина, /kick — ответом на сообщение
 «+3 admin мари» — дать модератору ранг 1–5; /staff, /ranklog, /access — модераторы, кто назначил, ранги команд
 /banlist, /amnesty, /kickinactive 30 — банлист, разбан всех, кик неактивных
+/reports, /warns — нерассмотренные жалобы, у кого сколько предупреждений
 
 Для всех:
-/cards — карты (токен каждые 2 часа), /mylink — ваша личная ссылка-приглашение, /invites_week — кто сколько добавил
-/admins — позвать админов, /report и /voteban — ответом на сообщение: жалоба или голосование за бан
-/id, /ping, /calc 2+2, /weather Ташкент`,
+/cards — карты (токен каждые 2 часа), /profile — ваш профиль игрока, /mylink — ваша личная ссылка-приглашение, /myinvites — сколько добавили вы
+/admins — позвать админов, /report и /voteban — ответом на сообщение: жалоба или голосование за бан, /rights — ваши права
+/id, /ping, /calc 2+2, /weather Ташкент
+
+Разделы: /help mod, /help cards, /help member`,
 	"en": `Talk to me and I will answer, in Uzbek, Russian or English, matching your language.
 
 I remember the recent part of our conversation. %s %s
@@ -286,11 +292,14 @@ Reply to a member's message and ask me to delete or pin it, to mute or ban its a
 /warn, /unwarn — a warning (the third mutes for a day), /ban reason, /kick — as a reply
 "+3 admin mari" — give a moderator rank 1–5; /staff, /ranklog, /access — moderators, who gave ranks, commands' ranks
 /banlist, /amnesty, /kickinactive 30 — the ban list, unban everyone, remove the inactive
+/reports, /warns — open reports, who has how many warnings
 
 For everyone:
-/cards — cards (a token every 2 hours), /mylink — your own invite link, /invites_week — who brought how many in
-/admins — call the admins, /report and /voteban — as a reply: report, or vote to ban
-/id, /ping, /calc 2+2, /weather Tashkent`,
+/cards — cards (a token every 2 hours), /profile — your player card, /mylink — your own invite link, /myinvites — how many you brought in
+/admins — call the admins, /report and /voteban — as a reply: report, or vote to ban, /rights — what you may do
+/id, /ping, /calc 2+2, /weather Tashkent
+
+Sections: /help mod, /help cards, /help member`,
 }
 
 // helpAbilities are the sentences HelpTextIn fills the help's blanks with,
@@ -374,3 +383,80 @@ func HelpTextIn(lang string, abilities Abilities) string {
 // textMuteWhom answers a /mute with no member replied to and no word for
 // the bot.
 const textMuteWhom = "Kimni mut qilay? A'zoning xabariga reply qilib /mute 1h yozing.\nMeni (botni) jim qilish uchun: /mute bot"
+
+// helpSections are /help's parts, asked for by name: "/help mod".
+var helpSections = map[string]localText{
+	"mod": {
+		uz: `🛡 Moderatsiya (a'zoning xabariga reply qilib)
+/warn sabab, /unwarn — ogohlantirish; 3-sida 1 kunga mut, 30 kunda o'chadi
+/mute 1h, /unmute — mut; /ban sabab, /kick — ban va chiqarish
+/delete, /pin, /unpin — xabarni o'chirish, qadash
+"+3 admin" yoki "-admin" — moderator darajasi 1–5; /staff, /ranklog, /access
+/banlist — banlar va "bandan chiqarish" tugmalari; /amnesty — hammani chiqarish
+/reports — ko'rilmagan shikoyatlar; /warns — kimda nechta ogohlantirish
+/kickinactive 30 — 30 kun yozmaganlarni chiqarish
+"orqaga qaytar" — oxirgi amalni bekor qilish
+Meni jim qilish: /mute bot, qaytarish: /unmute`,
+		ru: `🛡 Модерация (ответом на сообщение участника)
+/warn причина, /unwarn — предупреждение; на третьем мут на сутки, сгорает за 30 дней
+/mute 1h, /unmute — мут; /ban причина, /kick — бан и кик
+/delete, /pin, /unpin — удалить, закрепить
+«+3 admin» или «-admin» — ранг модератора 1–5; /staff, /ranklog, /access
+/banlist — баны и кнопки разбана; /amnesty — разбан всех
+/reports — нерассмотренные жалобы; /warns — предупреждения
+/kickinactive 30 — кик тех, кто молчит 30 дней
+«верни» — отменить последнее
+Чтобы я молчала: /mute bot, вернуть: /unmute`,
+		en: `🛡 Moderation (as a reply to a member's message)
+/warn reason, /unwarn — a warning; the third mutes for a day, they lapse in 30 days
+/mute 1h, /unmute — mute; /ban reason, /kick — ban and remove
+/delete, /pin, /unpin — delete, pin
+"+3 admin" or "-admin" — a moderator's rank 1–5; /staff, /ranklog, /access
+/banlist — bans with unban buttons; /amnesty — unban everyone
+/reports — open reports; /warns — who has warnings
+/kickinactive 30 — remove those silent for 30 days
+"undo" — undo the last action
+To quiet me: /mute bot, to bring me back: /unmute`,
+	},
+	"cards": {
+		uz: `🃏 Kartalar
+/cards — ilovani ochish: har 2 soatda 1 token (12 tagacha yig'iladi), 1x yoki 5x ochish, token tugasa kristallga
+/mycards — kollektsiyangiz, /profile — ochko, o'rin, eng zo'r kartalar
+/cardtop — eng ko'p ochko yig'ganlar, /market — bozor, /duel — duel`,
+		ru: `🃏 Карты
+/cards — открыть приложение: токен каждые 2 часа (копится до 12), открытие 1x или 5x, без токенов — за кристаллы
+/mycards — коллекция, /profile — очки, место, лучшие карты
+/cardtop — топ по очкам, /market — рынок, /duel — дуэль`,
+		en: `🃏 Cards
+/cards — open the app: a token every 2 hours (up to 12 saved), open 1x or 5x, crystals once tokens run out
+/mycards — your collection, /profile — points, place, best cards
+/cardtop — the table, /market — the market, /duel — a duel`,
+	},
+	"member": {
+		uz: `👥 Hamma uchun
+/report — xabarga reply qilib adminlarga shikoyat
+/voteban — xabarga reply qilib ban uchun ovoz (5 ta "ha"); boshlagan a'zo bekor qila oladi
+/admins — adminlarni chaqirish, /rights — huquqlaringiz
+/mylink — shaxsiy taklif havolangiz, /myinvites — siz qo'shganlar, /invites_week — hafta reytingi
+/id, /ping, /calc 2+2, /weather Toshkent, /tictactoe`,
+		ru: `👥 Для всех
+/report — ответом на сообщение: жалоба админам
+/voteban — ответом на сообщение: голосование за бан (5 «да»); начавший может отменить
+/admins — позвать админов, /rights — ваши права
+/mylink — личная ссылка, /myinvites — кого добавили вы, /invites_week — рейтинг недели
+/id, /ping, /calc 2+2, /weather Ташкент, /tictactoe`,
+		en: `👥 For everyone
+/report — as a reply: report to the admins
+/voteban — as a reply: vote to ban (5 "yes"); the one who started may cancel
+/admins — call the admins, /rights — what you may do
+/mylink — your invite link, /myinvites — whom you brought, /invites_week — the week's table
+/id, /ping, /calc 2+2, /weather Tashkent, /tictactoe`,
+	},
+}
+
+// helpSectionNames are the words that name each section.
+var helpSectionNames = map[string]string{
+	"mod": "mod", "moderatsiya": "mod", "admin": "mod", "модерация": "mod", "moderation": "mod",
+	"kartalar": "cards", "karta": "cards", "cards": "cards", "карты": "cards",
+	"azo": "member", "a'zo": "member", "member": "member", "members": "member", "участник": "member", "hamma": "member",
+}

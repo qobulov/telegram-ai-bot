@@ -11,7 +11,7 @@ import (
 
 type fakeWarns struct{ n map[int64]int }
 
-func (f *fakeWarns) AddWarn(_ context.Context, _, userID int64) (int, error) {
+func (f *fakeWarns) AddWarn(_ context.Context, _, userID int64, _ string) (int, error) {
 	f.n[userID]++
 	return f.n[userID], nil
 }

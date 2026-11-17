@@ -303,7 +303,7 @@ type RankBook interface {
 
 // WarnStore keeps how many warnings each member has in a group.
 type WarnStore interface {
-	AddWarn(ctx context.Context, chatID, userID int64) (int, error)
+	AddWarn(ctx context.Context, chatID, userID int64, reason string) (int, error)
 	RemoveWarn(ctx context.Context, chatID, userID int64) (int, error)
 	ResetWarns(ctx context.Context, chatID, userID int64) error
 }

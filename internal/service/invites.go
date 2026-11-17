@@ -175,3 +175,38 @@ func linkMemberName(linkName string) string {
 	_, name, _ := strings.Cut(linkName, " ")
 	return name
 }
+
+// myInvites answers /myinvites: how many the asker brought into the group,
+// all time and this week, and how many of them stayed.
+func (s *Service) myInvites(ctx context.Context, in incoming) outcome {
+	if !in.group {
+		return say(textInvitesGroupOnly.to(in))
+	}
+	weekStart, _ := inviteSince("", s.opts.Now(), s.opts.Location)
+	count := func(since time.Time) (storage.InviterCount, error) {
+		top, err := s.opts.Invites.InviteTop(ctx, in.msg.Chat.ID, storage.InviteQuery{Since: since, Inviter: in.userID, Limit: inviteTableSize})
+		for _, c := range top {
+			if c.UserID == in.userID {
+				return c, err
+			}
+		}
+		return storage.InviterCount{}, err
+	}
+	all, err := count(time.Time{})
+	if err != nil {
+		return say(textInvitesUnavailable.to(in))
+	}
+	week, err := count(weekStart)
+	if err != nil {
+		return say(textInvitesUnavailable.to(in))
+	}
+	lines := []string{
+		"📨 " + cardMarks.Replace(doozName(in.msg.From)) + " olib kelganlar",
+		fmt.Sprintf("Jami: %d, guruhda qolgan: %d", all.Added, all.Stayed),
+		fmt.Sprintf("Shu hafta: %d, qolgan: %d", week.Added, week.Stayed),
+	}
+	if s.opts.MemberLinks != nil {
+		lines = append(lines, "", "Shaxsiy havolangiz: /mylink — u orqali kirganlar ham sizga yoziladi.")
+	}
+	return say(strings.Join(lines, "\n"))
+}
