@@ -387,7 +387,7 @@ const textMuteWhom = "Kimni mut qilay? A'zoning xabariga reply qilib /mute 1h yo
 // helpSections are /help's parts, asked for by name: "/help mod".
 var helpSections = map[string]localText{
 	"mod": {
-		uz: `🛡 Moderatsiya (a'zoning xabariga reply qilib)
+		uz: `🛡 Moderatsiya (a'zoning xabariga reply qilib yoki @username bilan: /demote @user)
 /warn sabab, /unwarn — ogohlantirish; 3-sida 1 kunga mut, 30 kunda o'chadi
 /mute 1h, /unmute — mut; /ban sabab, /kick — ban va chiqarish
 /delete, /pin, /unpin — xabarni o'chirish, qadash
@@ -398,7 +398,7 @@ var helpSections = map[string]localText{
 /kickinactive 30 — 30 kun yozmaganlarni chiqarish
 "orqaga qaytar" — oxirgi amalni bekor qilish
 Meni jim qilish: /mute bot, qaytarish: /unmute`,
-		ru: `🛡 Модерация (ответом на сообщение участника)
+		ru: `🛡 Модерация (ответом на сообщение участника или с @username: /demote @user)
 /warn причина, /unwarn — предупреждение; на третьем мут на сутки, сгорает за 30 дней
 /mute 1h, /unmute — мут; /ban причина, /kick — бан и кик
 /delete, /pin, /unpin — удалить, закрепить
@@ -409,7 +409,7 @@ Meni jim qilish: /mute bot, qaytarish: /unmute`,
 /kickinactive 30 — кик тех, кто молчит 30 дней
 «верни» — отменить последнее
 Чтобы я молчала: /mute bot, вернуть: /unmute`,
-		en: `🛡 Moderation (as a reply to a member's message)
+		en: `🛡 Moderation (as a reply to a member's message, or with their @username: /demote @user)
 /warn reason, /unwarn — a warning; the third mutes for a day, they lapse in 30 days
 /mute 1h, /unmute — mute; /ban reason, /kick — ban and remove
 /delete, /pin, /unpin — delete, pin

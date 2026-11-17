@@ -161,3 +161,28 @@ func TestAdminCommands(t *testing.T) {
 		t.Errorf("asked = %v", runner.asked)
 	}
 }
+
+// "/demote @user" without a reply reaches the tool, which finds the member
+// tagged; a member's "/ban @user", likely for another bot, is left alone.
+func TestModCommandsWithATag(t *testing.T) {
+	f := newFixture()
+	runner := withToolRunner(f)
+	runner.answers["moderate"] = `{"ok":true,"result":{"done":true,"said":"Bajarildi."}}`
+	book := &fakeRankBook{ranks: map[int64]int{userID: 5}, overrides: map[string]int{}}
+	f.opts.Ranks = book
+	sent := f.run(inGroup(groupMessage("/demote @qobuIov", "@qobuIov")))
+	if len(runner.asked) != 1 || !strings.Contains(runner.asked[0], `"action":"demote"`) || strings.Contains(runner.asked[0], "@") {
+		t.Fatalf("asked = %v", runner.asked)
+	}
+	if len(sent) != 1 || sent[0].text != "Bajarildi." {
+		t.Errorf("sent = %+v", sent)
+	}
+	f.run(inGroup(groupMessage("/promote @qobuIov Streamer", "@qobuIov")))
+	if len(runner.asked) != 2 || !strings.Contains(runner.asked[1], `"text":"Streamer"`) {
+		t.Errorf("asked = %v", runner.asked)
+	}
+	delete(book.ranks, userID)
+	if sent = f.run(inGroup(groupMessage("/ban @someone", "@someone"))); len(sent) != 2 || len(runner.asked) != 2 {
+		t.Errorf("a member's tagged ban = %+v, asked %v", sent, runner.asked)
+	}
+}

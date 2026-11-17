@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"telegram-ai-bot/internal/telegram"
 	"time"
 
 	"telegram-ai-bot/internal/ranks"
@@ -42,18 +43,50 @@ func (s *Service) modRequest(in incoming) (asked incoming, action string, minute
 		return in, "", 0, "", false
 	}
 	asked, ok = s.withModTarget(in)
+	if command, isCommand := modCommands[commandName(in.text)]; isCommand && (ok || s.tagsAMember(in)) {
+		// "/demote @user": the moderate tool finds the member tagged.
+		minutes, reason = modArgs(withoutTags(commandArgument(in.text)))
+		return asked, command, minutes, reason, true
+	}
 	if !ok {
 		return in, "", 0, "", false
-	}
-	if action, ok = modCommands[commandName(in.text)]; ok {
-		minutes, reason = modArgs(commandArgument(in.text))
-		return asked, action, minutes, reason, true
 	}
 	// The message as written: addressing the bot by a name in the middle
 	// takes off the words before it.
 	written, _ := in.msg.Content()
 	action, minutes, ok = s.modWords(written)
 	return asked, action, minutes, "", ok
+}
+
+// tagsAMember reports a message that itself tags a member other than the
+// bot and the asker, by @username or by a mention without one.
+func (s *Service) tagsAMember(in incoming) bool {
+	text, entities := in.msg.Content()
+	for _, e := range entities {
+		switch e.Type {
+		case telegram.EntityTextMention:
+			if e.User != nil && e.User.ID != s.opts.Bot.ID && e.User.ID != in.userID {
+				return true
+			}
+		case telegram.EntityMention:
+			tag, ok := telegram.EntityText(text, e)
+			if ok && !strings.EqualFold(tag, "@"+s.opts.Bot.Username) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// withoutTags is a command's argument without the @usernames in it.
+func withoutTags(arg string) string {
+	var kept []string
+	for _, w := range strings.Fields(arg) {
+		if !strings.HasPrefix(w, "@") {
+			kept = append(kept, w)
+		}
+	}
+	return strings.Join(kept, " ")
 }
 
 // withModTarget is in replying to the member it is about: the one whose
@@ -95,8 +128,15 @@ func (s *Service) isModCommand(in incoming) bool {
 // modCommand does an admin's request to the member they replied to, and
 // says what was done, or why it was not.
 func (s *Service) modCommand(ctx context.Context, in incoming) outcome {
-	command, arg := commandName(in.text), strings.TrimSpace(commandArgument(in.text))
+	command, arg := commandName(in.text), withoutTags(commandArgument(in.text))
 	in, action, minutes, reason, _ := s.modRequest(in)
+	if _, replied := s.withModTarget(in); !replied {
+		// A member's "/ban @user" may be meant for another bot: only those
+		// who may moderate are answered.
+		if allowed, err := s.mayModerate(ctx, in, cmp.Or(ranks.CodeOf(action), "ban")); err != nil || !allowed {
+			return outcome{}
+		}
+	}
 	switch {
 	case command == "/tag":
 		// An admin's tag is their admin title.
