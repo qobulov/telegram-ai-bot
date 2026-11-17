@@ -125,3 +125,32 @@ func (s *Store) RepTop(ctx context.Context, chatID int64, limit int) ([]MemberRe
 	}
 	return top, nil
 }
+
+// SettingAI, "on", lets a group talk with the model; without it only the
+// bot's commands and code answer there.
+const SettingAI = "ai"
+
+// GroupWithSetting is a group whose setting has a value, by its title.
+type GroupWithSetting struct {
+	ChatID int64
+	Title  string
+}
+
+// GroupsWithSetting are the groups whose key is value, by title.
+func (s *Store) GroupsWithSetting(ctx context.Context, key, value string) ([]GroupWithSetting, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT s.chat_id, coalesce(g.title, '') FROM group_settings s LEFT JOIN groups g ON g.chat_id = s.chat_id
+		WHERE s.key = $1 AND s.value = $2 ORDER BY g.title`, key, value)
+	if err != nil {
+		return nil, fmt.Errorf("storage: list groups by a setting: %w", err)
+	}
+	groups, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (GroupWithSetting, error) {
+		var g GroupWithSetting
+		err := row.Scan(&g.ChatID, &g.Title)
+		return g, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("storage: list groups by a setting: %w", err)
+	}
+	return groups, nil
+}

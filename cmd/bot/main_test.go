@@ -174,6 +174,10 @@ func startE2E(t *testing.T, update string, answer func([]modelMessage) string) *
 	if err := env.store.ClearGroupMessages(ctx, e2eGroup); err != nil {
 		t.Fatal(err)
 	}
+	// Talk with the model is only for groups that turned it on.
+	if err := env.store.SetGroupSetting(ctx, e2eGroup, storage.SettingAI, "on", e2eUser); err != nil {
+		t.Fatal(err)
+	}
 	for _, scope := range []storage.Scope{privateScope(e2eUser), privateScope(e2eMember), {ChatID: e2eGroup}} {
 		if err := env.store.Reset(ctx, scope); err != nil {
 			t.Fatal(err)

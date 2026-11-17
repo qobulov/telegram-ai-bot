@@ -51,6 +51,14 @@ func (m *memoryExtras) RepOf(_ context.Context, _, userID int64) (int, int, erro
 	}
 	return m.rep[userID], 1, nil
 }
+func (m *memoryExtras) GroupsWithSetting(_ context.Context, key, value string) ([]storage.GroupWithSetting, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.settings[key] == value {
+		return []storage.GroupWithSetting{{ChatID: groupID, Title: "Devs"}}, nil
+	}
+	return nil, nil
+}
 func (m *memoryExtras) RepTop(context.Context, int64, int) ([]storage.MemberRep, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

@@ -18,6 +18,7 @@ type GroupExtras interface {
 	GiveRep(ctx context.Context, chatID, from, to int64) (int, error)
 	RepOf(ctx context.Context, chatID, userID int64) (points, place int, err error)
 	RepTop(ctx context.Context, chatID int64, limit int) ([]storage.MemberRep, error)
+	GroupsWithSetting(ctx context.Context, key, value string) ([]storage.GroupWithSetting, error)
 }
 
 // repWords thank the member replied to, and give them a point.

@@ -116,6 +116,10 @@ func startWebhook(t *testing.T) *hookEnv {
 	if err := store.ClearGroupMessages(ctx, hookGroup); err != nil {
 		t.Fatal(err)
 	}
+	// Talk with the model is only for groups that turned it on.
+	if err := store.SetGroupSetting(ctx, hookGroup, storage.SettingAI, "on", hookUser); err != nil {
+		t.Fatal(err)
+	}
 	if err := store.SetMuted(ctx, hookGroup, false, hookUser); err != nil {
 		t.Fatal(err)
 	}

@@ -44,6 +44,8 @@ type outcome struct {
 	// duplicate marks an update that was already answered: Telegram sent it
 	// again after a slow turn. The exchange is in the log already.
 	duplicate bool
+	// passedOver marks a message noted as chatter, left unanswered.
+	passedOver bool
 	// sticker is the category of sticker the model asked to send after the
 	// text, or alone; "" for none. gif is the same for a GIF.
 	sticker, gif string
@@ -155,17 +157,15 @@ func (s *Service) process(in incoming) {
 	if s.reactedToApplause(in) {
 		return
 	}
-	reservation, allowed := s.mayAnswerInGroup(in)
-	if !allowed {
-		s.passOver(in)
-		s.noteSkip(in, "group_quota", "")
-		return
-	}
-	in.groupReply = reservation
+	in.aiOff = !s.aiAllowed(ctx, in)
 	if in.group {
 		// The group's log needs it even when no answer follows. A private
-		// message is described in ask, within the daily limit.
-		in.described = s.describe(ctx, in.msg, in.text)
+		// message is described in ask, within the daily limit. A group
+		// without AI has no voice message heard: that is the model too.
+		in.described = in.text
+		if !in.aiOff {
+			in.described = s.describe(ctx, in.msg, in.text)
+		}
 	}
 	out := s.respond(ctx, in, rules)
 	sentID := s.deliver(in, &out)
@@ -505,7 +505,7 @@ func (s *Service) replyPhoto(in incoming, drawing tools.Drawing, caption string,
 // to the group's log, after the answer: logged before, the question would
 // also appear in its own context.
 func (s *Service) logExchange(in incoming, out outcome) {
-	if !in.group || out.duplicate || strings.HasPrefix(in.text, "/") {
+	if !in.group || out.duplicate || out.passedOver || strings.HasPrefix(in.text, "/") {
 		return
 	}
 	s.logFrom(in.msg, in.described)
@@ -794,7 +794,9 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return out
 	}
 	if question, ok := weatherQuestion(in.text); ok {
-		in.text = question
+		// /weather is a tool, asked through the model: it works in a group
+		// without AI too, and takes nothing from the quota.
+		in.text, in.toolCommand = question, true
 	}
 	if s.isRankCommand(in) {
 		return s.rankCommand(ctx, in)
@@ -870,6 +872,10 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.reputationTop(ctx, in)
 	case in.group && s.opts.Extras != nil && commandName(in.text) == "/cleanservice":
 		return s.setCleanService(ctx, in)
+	case in.group && s.opts.Extras != nil && commandName(in.text) == "/aichat":
+		return s.aiChatCommand(ctx, in)
+	case !in.group && s.opts.Extras != nil && commandName(in.text) == "/aigroups":
+		return s.aiGroupsCommand(ctx, in)
 	case s.opts.Cards != nil && commandName(in.text) == "/profile":
 		return s.profile(ctx, in)
 	case in.group && s.opts.Ranks != nil && s.isRightsQuestion(in.text):
@@ -931,6 +937,20 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	}
 	if out, ok := s.quickAnswer(ctx, in); ok {
 		return out
+	}
+	// A group without AI gets no talk; one with it takes an answer from its
+	// quota here, where the model is asked, and not for the commands and
+	// orders done in code before.
+	if in.group && in.aiOff && !in.toolCommand {
+		return s.aiOff(in)
+	}
+	if !in.toolCommand {
+		groupReply, allowed := s.mayAnswerInGroup(in)
+		if !allowed {
+			s.passOver(in)
+			return outcome{skipped: "group_quota", passedOver: true}
+		}
+		in.groupReply = groupReply
 	}
 	// Past the day's limit the sender gets the notice, and no model is
 	// asked at all, the router included.

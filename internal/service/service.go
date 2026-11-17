@@ -484,6 +484,10 @@ type Service struct {
 	// creators are the groups' creators, by group, for limits they are
 	// spared.
 	creators *recently[int64, int64]
+	// aiChats keeps whether each group may talk with the model, and
+	// aiOffTold the groups lately told they may not.
+	aiChats   *recently[int64, bool]
+	aiOffTold *recently[int64, bool]
 	// answeredAbout are the members' messages the bot's answers in
 	// groups replied about, by group and answer, for orders replying to
 	// the answer.
@@ -539,6 +543,10 @@ type incoming struct {
 	// groupReply is the answer taken from the group's quota for this
 	// message, to give back if the turn answers nothing; 0 when none was.
 	groupReply int64
+	// aiOff marks a group message where the model may not be asked, and
+	// toolCommand a command done by a tool through the model, as /weather,
+	// which goes all the same.
+	aiOff, toolCommand bool
 	// unanswered marks a private message PRIVATE_CHATS does not answer: it
 	// gets a reaction, chosen in code, and nothing else.
 	unanswered bool
@@ -600,6 +608,8 @@ func New(opts Options) *Service {
 		ownerMenus:      newRecently[[2]int64, bool](ownerMenuMemory, opts.Now),
 		ownersHere:      newRecently[int64, []string](activeMemory, opts.Now),
 		creators:        newRecently[int64, int64](creatorMemory, opts.Now),
+		aiChats:         newRecently[int64, bool](aiMemory, opts.Now),
+		aiOffTold:       newRecently[int64, bool](aiOffNoticeEvery, opts.Now),
 		answeredAbout:   newRecently[[2]int64, *telegram.Message](time.Hour, opts.Now),
 		guardSets:       newRecently[int64, guardSet](guardsMemory, opts.Now),
 		spamVerdicts:    newRecently[int64, verdict](verdictMemory, opts.Now),

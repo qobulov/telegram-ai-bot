@@ -77,6 +77,7 @@ var commandMenus = map[string][]telegram.BotCommand{
 var ownerMenu = append(append([]telegram.BotCommand(nil), commandMenus[telegram.ScopeAllChatAdmins]...),
 	telegram.BotCommand{Command: "limit", Description: "Guruhda daqiqasiga javoblar soni (owner)"},
 	telegram.BotCommand{Command: "active", Description: "Kamida X faol a'zo sharti, yoki off (owner)"},
+	telegram.BotCommand{Command: "aichat", Description: "Bu guruhda AI suhbatni yoqish/o'chirish (owner)"},
 )
 
 // CommandSetter sets a command menu.
