@@ -338,30 +338,35 @@ func logTarget(msg *telegram.Message, arg string) (int64, bool) {
 	return 0, false
 }
 
-// setCleanService answers "/cleanservice on|off": whether the group's
-// service messages ("X joined", "Y pinned") are deleted.
+// setCleanService answers /cleanservice: whether the group's service
+// messages ("X joined", "Y pinned") are deleted. Alone it switches the
+// setting; "on" and "off" set it.
 func (s *Service) setCleanService(ctx context.Context, in incoming) outcome {
 	if allowed, err := s.mayModerate(ctx, in, "group"); err != nil || !allowed {
 		return say("⛔ Buni guruh egasi yoki 4-darajali moderator sozlaydi.")
 	}
+	current, err := s.opts.Extras.GroupSetting(ctx, in.scope.ChatID, storage.SettingCleanService)
+	if err != nil {
+		return say(textError.to(in))
+	}
+	on := current != "on"
 	switch strings.ToLower(strings.TrimSpace(commandArgument(in.text))) {
 	case "on", "yoq", "ha":
-		if err := s.opts.Extras.SetGroupSetting(ctx, in.scope.ChatID, storage.SettingCleanService, "on", in.userID); err != nil {
-			return say(textError.to(in))
-		}
-		return say("🧹 Endi \"kirdi\", \"chiqdi\", \"qadadi\" kabi xizmat xabarlarini o'chiraman. Menga xabarlarni o'chirish huquqi kerak.")
-	case "off", "o'chir", "yo'q":
-		if err := s.opts.Extras.SetGroupSetting(ctx, in.scope.ChatID, storage.SettingCleanService, "", in.userID); err != nil {
-			return say(textError.to(in))
-		}
-		return say("🧹 Xizmat xabarlari endi o'chirilmaydi.")
+		on = true
+	case "off", "o'chir", "ochir", "yo'q":
+		on = false
 	}
-	value, _ := s.opts.Extras.GroupSetting(ctx, in.scope.ChatID, storage.SettingCleanService)
-	state := "o'chiq"
-	if value == "on" {
-		state = "yoqilgan"
+	value := ""
+	if on {
+		value = "on"
 	}
-	return say("🧹 Xizmat xabarlarini tozalash: " + state + ". Yoqish: /cleanservice on, o'chirish: /cleanservice off")
+	if err := s.opts.Extras.SetGroupSetting(ctx, in.scope.ChatID, storage.SettingCleanService, value, in.userID); err != nil {
+		return say(textError.to(in))
+	}
+	if on {
+		return say("🧹 Yoqildi: \"kirdi\", \"chiqdi\", \"qadadi\" kabi xizmat xabarlarini o'chiraman. Menga xabarlarni o'chirish huquqi kerak. O'chirish: /cleanservice")
+	}
+	return say("🧹 O'chirildi: xizmat xabarlari endi o'chirilmaydi. Yoqish: /cleanservice")
 }
 
 // cleanedService deletes a service message in a group that asked for it,

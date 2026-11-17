@@ -241,3 +241,19 @@ func TestIsThanks(t *testing.T) {
 		}
 	}
 }
+
+// /cleanservice alone switches the setting, on then off.
+func TestCleanServiceToggles(t *testing.T) {
+	f := newFixture()
+	extras := newMemoryExtras()
+	f.opts.Extras = extras
+	f.members.creator = 10
+	sent := f.run(from(10, "/cleanservice", 0))
+	if extras.settings[storage.SettingCleanService] != "on" || !strings.Contains(sent[len(sent)-1].text, "Yoqildi") {
+		t.Fatalf("first = %v, %q", extras.settings, sent[len(sent)-1].text)
+	}
+	sent = f.run(from(10, "/cleanservice", 0))
+	if extras.settings[storage.SettingCleanService] != "" || !strings.Contains(sent[len(sent)-1].text, "O'chirildi") {
+		t.Errorf("second = %v, %q", extras.settings, sent[len(sent)-1].text)
+	}
+}

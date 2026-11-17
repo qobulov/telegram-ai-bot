@@ -72,7 +72,7 @@ var commandMenus = map[string][]telegram.BotCommand{
 		{Command: "save", Description: "Javob saqlash: /save qoidalar Matn (yoki reply)"},
 		{Command: "clear", Description: "Saqlangan javobni o'chirish: /clear qoidalar"},
 		{Command: "setlog", Description: "Jurnal kanali: /setlog -100… yoki off"},
-		{Command: "cleanservice", Description: "\"Kirdi/chiqdi\" xabarlarini o'chirish: on/off"},
+		{Command: "cleanservice", Description: "\"Kirdi/chiqdi\" xabarlarini o'chirish (yoqish/o'chirish)"},
 	}, membersMenu...),
 }
 

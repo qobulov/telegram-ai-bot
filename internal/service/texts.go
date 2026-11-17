@@ -398,7 +398,7 @@ var helpSections = map[string]localText{
 /kickinactive 30 — 30 kun yozmaganlarni chiqarish
 /save nomi matn (yoki reply) — javob saqlash, #nomi bilan chiqadi; /clear nomi — o'chirish
 /setlog -100… — jurnal kanali (ban, mut, shikoyat, kirgan-chiqqan); /setlog off
-/cleanservice on — "kirdi", "chiqdi", "qadadi" xabarlarini o'chirish
+/cleanservice — "kirdi", "chiqdi", "qadadi" xabarlarini o'chirishni yoqish yoki o'chirish
 "orqaga qaytar" — oxirgi amalni bekor qilish
 Meni jim qilish: /mute bot, qaytarish: /unmute`,
 		ru: `🛡 Модерация (ответом на сообщение участника или с @username: /demote @user)
