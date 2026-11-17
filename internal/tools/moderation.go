@@ -292,6 +292,24 @@ type ModerationOptions struct {
 	// action may ask for it without the Telegram right. Without it only
 	// Telegram's rights count.
 	Ranks RankBook
+	// Journal, when set, is told each action done, in a line for the
+	// group's log: who asked, and what the bot said it did.
+	Journal func(ctx context.Context, chatID int64, line string)
+}
+
+// runAndJournal is run, with each action done written to the group's log.
+func (m *Moderation) runAndJournal(ctx context.Context, raw json.RawMessage) (any, error) {
+	result, err := m.run(ctx, raw)
+	if err != nil || m.opts.Journal == nil {
+		return result, err
+	}
+	done, _ := result.(map[string]any)
+	said, _ := done["said"].(string)
+	caller, ok := CallerFrom(ctx)
+	if ok && done["done"] == true && said != "" {
+		m.opts.Journal(ctx, caller.ChatID, "🛡 "+caller.Name+": "+said)
+	}
+	return result, err
 }
 
 // BanBook lists a group's members the bot banned, and those it last saw
@@ -324,7 +342,7 @@ type moderationArgs struct {
 	Text string `json:"text"`
 	// AdminTitle is the title models give promote by this name; it is text.
 	AdminTitle string `json:"admin_title"`
-	Kind string `json:"kind"`
+	Kind       string `json:"kind"`
 	// Force puts an action back even after someone changed it by hand.
 	Force bool `json:"force"`
 	// Member is who the asker named, without a reply or a tag.
@@ -402,7 +420,7 @@ func (m *Moderation) Tool() Tool {
 		}`),
 		GroupOnly: true,
 		Timeout:   moderationTimeout,
-		Run:       m.run,
+		Run:       m.runAndJournal,
 	}
 }
 

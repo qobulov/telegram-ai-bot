@@ -864,6 +864,22 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.inviteTable(ctx, in)
 	case s.opts.Cards != nil && s.opts.CardsURL != "" && commandName(in.text) == "/market":
 		return outcome{text: textMarket.to(in), buttons: s.marketButton(in)}
+	case in.group && s.opts.Extras != nil && commandName(in.text) == "/note":
+		return s.showNote(ctx, in)
+	case in.group && s.opts.Extras != nil && commandName(in.text) == "/save":
+		return s.saveNote(ctx, in)
+	case in.group && s.opts.Extras != nil && commandName(in.text) == "/notes":
+		return s.listNotes(ctx, in)
+	case in.group && s.opts.Extras != nil && (commandName(in.text) == "/clear" || commandName(in.text) == "/delnote"):
+		return s.clearNote(ctx, in)
+	case in.group && s.opts.Extras != nil && commandName(in.text) == "/rep":
+		return s.reputation(ctx, in)
+	case in.group && s.opts.Extras != nil && commandName(in.text) == "/toprep":
+		return s.reputationTop(ctx, in)
+	case in.group && s.opts.Extras != nil && commandName(in.text) == "/setlog":
+		return s.setLog(ctx, in)
+	case in.group && s.opts.Extras != nil && commandName(in.text) == "/cleanservice":
+		return s.setCleanService(ctx, in)
 	case s.opts.Cards != nil && commandName(in.text) == "/profile":
 		return s.profile(ctx, in)
 	case in.group && s.opts.Ranks != nil && s.isRightsQuestion(in.text):

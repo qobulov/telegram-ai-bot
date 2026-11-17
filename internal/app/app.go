@@ -249,7 +249,9 @@ func membershipError(err error) error {
 
 // NewService wires the tools, the model client, the agent and the service.
 func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, logger *slog.Logger) (*service.Service, error) {
+	journal := service.GroupJournal(store, bot.Client, logger)
 	moderation := tools.NewModeration(tools.ModerationOptions{
+		Journal:  journal,
 		BotID:    bot.User.ID,
 		Members:  bot.Client,
 		Telegram: bot.Client,
@@ -329,6 +331,9 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		BanVotes:        store,
 		MemberLinks:     store,
 		Reports:         store,
+		Extras:          store,
+		Copier:          bot.Client,
+		Journal:         journal,
 		WarnList:        store,
 		LinkMaker:       bot.Client,
 		Profiles:        store,
