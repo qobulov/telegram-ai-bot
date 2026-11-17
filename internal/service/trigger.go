@@ -117,9 +117,10 @@ func (s *Service) plainCommand(msg *telegram.Message, text string) bool {
 	if ownCommands[command] {
 		return true
 	}
-	replied := msg.ReplyToMessage
+	// A moderation command is the bot's too without a reply, so that it can
+	// ask whom: a /kick sent so went unanswered.
 	_, moderates := modCommands[command]
-	return moderates && replied != nil && replied.From != nil && !s.isFromBot(replied) && msg.From != nil && replied.From.ID != msg.From.ID
+	return moderates
 }
 
 // ownCommands are the bot's commands that no other bot in its groups has:

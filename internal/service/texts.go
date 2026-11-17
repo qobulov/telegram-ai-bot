@@ -370,3 +370,7 @@ func HelpTextIn(lang string, abilities Abilities) string {
 	}
 	return fmt.Sprintf(helpTexts[lang], pick(0, abilities.Listen), pick(2, abilities.Draw), pick(4, abilities.Football), pages)
 }
+
+// textMuteWhom answers a /mute with no member replied to and no word for
+// the bot.
+const textMuteWhom = "Kimni mut qilay? A'zoning xabariga reply qilib /mute 1h yozing.\nMeni (botni) jim qilish uchun: /mute bot"

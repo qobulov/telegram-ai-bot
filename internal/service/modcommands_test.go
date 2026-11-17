@@ -111,3 +111,25 @@ func TestModOrderReplyingToTheBotsAnswer(t *testing.T) {
 		t.Fatalf("asked %v, sent %+v", runner.asked, sent)
 	}
 }
+
+// A moderation command with no reply asks whom, to an admin, and stays
+// silent to a member, whose command may be another bot's; a bare /mute asks
+// too, and only "/mute bot" quiets the bot.
+func TestModCommandsWithoutAReplyAskWhom(t *testing.T) {
+	f := newFixture()
+	f.members.admins = map[int64]bool{userID: true}
+	withToolRunner(f)
+	sent := f.run(from(userID, "/kick", 0))
+	if len(sent) != 1 || !strings.Contains(sent[0].text, "reply qilib /kick") {
+		t.Fatalf("an admin's bare /kick = %+v", sent)
+	}
+	if sent = f.run(from(55, "/ban", 0)); len(sent) != 1 {
+		t.Errorf("a member's bare /ban was answered: %+v", sent)
+	}
+	if sent = f.run(from(userID, "/mute", 0)); !strings.Contains(sent[len(sent)-1].text, "Kimni mut qilay") {
+		t.Errorf("a bare /mute = %q", sent[len(sent)-1].text)
+	}
+	if sent = f.run(from(userID, "/mute bot", 0)); strings.Contains(sent[len(sent)-1].text, "Kimni") {
+		t.Errorf("/mute bot = %q", sent[len(sent)-1].text)
+	}
+}

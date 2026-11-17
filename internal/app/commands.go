@@ -42,7 +42,7 @@ var commandMenus = map[string][]telegram.BotCommand{
 		{Command: "help", Description: "Yordam va buyruqlar"},
 		{Command: "warn", Description: "Ogohlantirish, 3-sida 1 kunga mut (reply)"},
 		{Command: "unwarn", Description: "Bitta ogohlantirishni olib tashlash (reply)"},
-		{Command: "mute", Description: "Mut: a'zoga reply — a'zoni, aks holda botni"},
+		{Command: "mute", Description: "Mut: a'zoga reply qilib /mute 1h; botni: /mute bot"},
 		{Command: "unmute", Description: "Mutdan chiqarish (reply) yoki botni gapirtirish"},
 		{Command: "ban", Description: "Ban: /ban sabab (reply)"},
 		{Command: "kick", Description: "Guruhdan chiqarish (reply)"},

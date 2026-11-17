@@ -811,6 +811,9 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 	if s.opts.Tools != nil && s.isModCommand(in) {
 		return s.modCommand(ctx, in)
 	}
+	if out, ok := s.askWhom(ctx, in); ok {
+		return out
+	}
 	if topic, ok := s.gifRequest(in); ok {
 		return s.gifAnswer(in, topic)
 	}
@@ -1615,6 +1618,9 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 		}
 		return fmt.Sprintf(textModel, s.opts.Model)
 	case "/mute":
+		if in.group && !s.mutesTheBot(in.text) {
+			return textMuteWhom
+		}
 		return s.setMuted(ctx, in, true)
 	case "/unmute":
 		return s.setMuted(ctx, in, false)
@@ -1779,6 +1785,20 @@ func (s *Service) setMuted(ctx context.Context, in incoming, muted bool) string 
 		return fmt.Sprintf(textMuted, s.opts.Bot.Username)
 	}
 	return textUnmuted
+}
+
+// botMuteWords are what "/mute" takes to quiet the bot itself; without a
+// reply or one of them it asks whom to mute, as a /mute meant for a member
+// once quieted the bot for twelve hours.
+var botMuteWords = map[string]bool{"bot": true, "бот": true, "mari": true, "мари": true, "maria": true, "o'zing": true, "ozing": true, "себя": true, "yourself": true}
+
+// mutesTheBot reports a /mute that quiets the bot: one naming it, as "/mute
+// bot" or "/mute@MyBot".
+func (s *Service) mutesTheBot(text string) bool {
+	if target, _ := commandTarget(text); target != "" && strings.EqualFold(target, s.opts.Bot.Username) {
+		return true
+	}
+	return botMuteWords[strings.ToLower(strings.TrimSpace(commandArgument(text)))]
 }
 
 // refuseUnlessManager returns the refusal to send when the sender may not

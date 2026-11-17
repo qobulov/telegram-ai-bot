@@ -1,6 +1,7 @@
 package service
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"regexp"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"telegram-ai-bot/internal/ranks"
 	"telegram-ai-bot/internal/tools"
 )
 
@@ -322,3 +324,23 @@ var wordLength = func() func(string) (int, bool) {
 		return 0, false
 	}
 }()
+
+// askWhom answers a moderation command in a group that replies to no
+// member: it asks whom, to one who may moderate, and says nothing to anyone
+// else, whose command another bot may be meant to answer. /mute and /unmute
+// go on to the bot's own mute.
+func (s *Service) askWhom(ctx context.Context, in incoming) (outcome, bool) {
+	command := commandName(in.text)
+	action, ok := modCommands[command]
+	if !in.group || !ok || command == "/mute" || command == "/unmute" {
+		return outcome{}, false
+	}
+	if _, targeted := s.withModTarget(in); targeted {
+		return outcome{}, false
+	}
+	code := ranks.CodeOf(action)
+	if allowed, err := s.mayModerate(ctx, in, cmp.Or(code, "ban")); err != nil || !allowed {
+		return outcome{}, true
+	}
+	return say("Kimga? A'zoning xabariga reply qilib " + command + " yozing."), true
+}
