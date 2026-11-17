@@ -17,10 +17,10 @@ type CrystalPack struct {
 
 // CrystalPacks are the crystals on sale, the bigger the cheaper each.
 var CrystalPacks = []CrystalPack{
-	{ID: "c100", Crystals: 100, Stars: 25},
-	{ID: "c300", Crystals: 300, Stars: 65},
-	{ID: "c700", Crystals: 700, Stars: 140},
-	{ID: "c1500", Crystals: 1500, Stars: 280},
+	{ID: "c100", Crystals: 100, Stars: 10},
+	{ID: "c300", Crystals: 300, Stars: 25},
+	{ID: "c700", Crystals: 700, Stars: 50},
+	{ID: "c1500", Crystals: 1500, Stars: 99},
 }
 
 // ShopItem is what crystals buy in the shop: tokens, or a pack of Cards

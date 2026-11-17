@@ -98,7 +98,7 @@ func TestShop(t *testing.T) {
 	if out := postItem(t, h, init, "buy", "legendary"); out["short"] != float64(330) {
 		t.Errorf("too few = %v", out)
 	}
-	if out := postItem(t, h, init, "invoice", "c300"); out["link"] == nil || len(invoices.made) != 1 || invoices.made[0].Price != 65 || invoices.made[0].Payload != "cr:7:c300" {
+	if out := postItem(t, h, init, "invoice", "c300"); out["link"] == nil || len(invoices.made) != 1 || invoices.made[0].Price != 25 || invoices.made[0].Payload != "cr:7:c300" {
 		t.Errorf("invoice = %v, made %+v", out, invoices.made)
 	}
 	if userID, pack, ok := ParseCrystalPayload("cr:7:c300"); !ok || userID != 7 || pack.Crystals != 300 {

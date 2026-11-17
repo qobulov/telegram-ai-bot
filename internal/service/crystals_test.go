@@ -46,13 +46,13 @@ func TestCrystalPayments(t *testing.T) {
 	f.opts.Crystals = crystals
 	s := New(f.opts)
 	payload := fmt.Sprintf("cr:%d:c300", userID)
-	s.HandleNow(checkoutUpdate(userID, payload, 65))
-	s.HandleNow(checkoutUpdate(9, payload, 65))
+	s.HandleNow(checkoutUpdate(userID, payload, 25))
+	s.HandleNow(checkoutUpdate(9, payload, 25))
 	s.HandleNow(checkoutUpdate(userID, payload, 50))
 	if len(payments.answers) != 3 || !payments.answers[0].ok || payments.answers[1].ok || payments.answers[2].refusal != textCrystalsChanged.uz {
 		t.Fatalf("answers = %+v", payments.answers)
 	}
-	payment := paymentUpdate(userID, "ch_c", payload, 65)
+	payment := paymentUpdate(userID, "ch_c", payload, 25)
 	sent := f.run(payment, payment)
 	if crystals.shards != 300 || len(sent) != 1 || !strings.Contains(sent[0].text, "+300") {
 		t.Fatalf("shards = %d, sent %+v", crystals.shards, sent)
@@ -60,7 +60,7 @@ func TestCrystalPayments(t *testing.T) {
 	nextUpdateID++
 	refund := telegram.Update{UpdateID: nextUpdateID, Message: &telegram.Message{
 		MessageID: 61, From: &telegram.User{ID: userID}, Chat: telegram.Chat{ID: userID, Type: telegram.ChatTypePrivate}, Service: "refunded_payment",
-		RefundedPayment: &telegram.RefundedPayment{Currency: telegram.Stars, TotalAmount: 65, InvoicePayload: payload, TelegramPaymentChargeID: "ch_c"},
+		RefundedPayment: &telegram.RefundedPayment{Currency: telegram.Stars, TotalAmount: 25, InvoicePayload: payload, TelegramPaymentChargeID: "ch_c"},
 	}}
 	f.run(refund)
 	if len(crystals.refunded) != 1 || crystals.refunded[0] != "ch_c" {
