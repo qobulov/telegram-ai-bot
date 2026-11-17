@@ -1423,3 +1423,18 @@ func TestTimedBanMutes(t *testing.T) {
 	}
 	expectRefusal(t, env.moderate(turn(701, "ban ber shunga"), `{"action":"mute"}`), "forbidden", "does not ask for this")
 }
+
+// An owner may make themselves admin; a title the model names admin_title
+// is taken as the text.
+func TestOwnerPromotesThemselves(t *testing.T) {
+	env := groupAdminEnv(t)
+	env.chat.set(userID, telegram.ChatMember{Status: "member", User: &telegram.User{ID: userID, FirstName: "Aziz"}})
+	ctx := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, Owner: true, UpdateID: 720, MessageID: 720,
+		Target: &Target{UserID: userID, Owner: true}, Words: "admin ber menga"}, &Sink{})
+	if got := env.moderate(ctx, `{"action":"promote","admin_title":"Boss"}`); !got.OK {
+		t.Fatalf("an owner's own promote = %+v", got)
+	}
+	if calls := env.telegram.made(); len(calls) != 2 || !strings.Contains(calls[1], "setChatAdministratorCustomTitle Boss") {
+		t.Errorf("calls = %q", calls)
+	}
+}

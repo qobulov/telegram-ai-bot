@@ -322,6 +322,8 @@ type moderationArgs struct {
 	// Text is a new title, description or admin title, or an invite link's
 	// name; Kind is what lock and unlock act on.
 	Text string `json:"text"`
+	// AdminTitle is the title models give promote by this name; it is text.
+	AdminTitle string `json:"admin_title"`
 	Kind string `json:"kind"`
 	// Force puts an action back even after someone changed it by hand.
 	Force bool `json:"force"`
@@ -430,6 +432,9 @@ func (m *Moderation) run(ctx context.Context, raw json.RawMessage) (any, error) 
 	caller, err := groupRequester(ctx)
 	if err != nil {
 		return nil, err
+	}
+	if args.Text == "" {
+		args.Text = args.AdminTitle
 	}
 	if _, known := neededRight[args.Action]; !known {
 		return nil, &ArgumentError{Message: "action must be one of the tool's actions"}
@@ -924,11 +929,14 @@ func (m *Moderation) checkTarget(ctx context.Context, o order) error {
 		return channelOnly(o.action)
 	}
 	userID := o.target.UserID
-	selfTitle := userID == o.caller.UserID && (o.action == actionAdminTitle || o.action == actionMemberTag)
+	// One's own title or tag may be asked for, and an owner may make
+	// themselves admin.
+	selfTitle := userID == o.caller.UserID && (o.action == actionAdminTitle || o.action == actionMemberTag ||
+		(o.action == actionPromote && o.caller.Owner))
 	if userID == m.opts.BotID || (userID == o.caller.UserID && !selfTitle) {
 		return ownMessageOnly(o.action)
 	}
-	if isTelegramAccount(userID) || (o.target.Owner && m.opts.OwnersByID) {
+	if isTelegramAccount(userID) || (o.target.Owner && m.opts.OwnersByID && !selfTitle) {
 		return &DeniedError{Message: immune}
 	}
 	member, err := m.opts.Members.GetChatMember(ctx, o.caller.ChatID, userID)
