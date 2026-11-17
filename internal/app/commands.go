@@ -55,7 +55,7 @@ var commandMenus = map[string][]telegram.BotCommand{
 		{Command: "ranklog", Description: "Kim kimga daraja bergan"},
 		{Command: "access", Description: "Buyruqlar darajasi: /access ban 2"},
 		{Command: "kickinactive", Description: "Faol emaslarni chiqarish: /kickinactive 30"},
-		{Command: "promote", Description: "Admin qilish: /promote Unvon (reply); /demote, /title, /tag"},
+		{Command: "promote", Description: "Admin qilish: /promote Unvon (reply); /demote, /tag"},
 		{Command: "cards", Description: "Kartalar: har 2 soatda token, 1x/5x ochish, kolleksiya"},
 		{Command: "games", Description: "Barcha o'yinlar"},
 		{Command: "admins", Description: "Adminlar va moderatorlarni chaqirish"},

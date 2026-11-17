@@ -26,11 +26,8 @@ var modCommands = map[string]string{
 	"/mute": "mute", "/unmute": "unmute", "/ban": "ban", "/unban": "unban", "/kick": "kick", "/del": "delete", "/delete": "delete",
 	"/pin": "pin", "/unpin": "unpin",
 	"/warn": "warn", "/unwarn": "unwarn", "/promote": "promote", "/demote": "demote",
-	"/admin": "promote", "/unadmin": "demote", "/title": "admin_title", "/tag": "member_tag",
+	"/tag": "member_tag",
 }
-
-// textModCommands take their whole argument as text: a title or a tag.
-var textModCommands = map[string]bool{"/title": true, "/tag": true}
 
 // modTimeout bounds one command's action, Telegram's answer included.
 const modTimeout = 20 * time.Second
@@ -101,10 +98,13 @@ func (s *Service) modCommand(ctx context.Context, in incoming) outcome {
 	command, arg := commandName(in.text), strings.TrimSpace(commandArgument(in.text))
 	in, action, minutes, reason, _ := s.modRequest(in)
 	switch {
-	case command == "/title" && arg == "":
-		return say("Unvonni yozing: admin xabariga reply qilib /title Streamer")
-	case textModCommands[command]:
-		return s.runModerate(ctx, in, map[string]any{"action": action, "text": arg})
+	case command == "/tag":
+		// An admin's tag is their admin title.
+		done := s.runModerate(ctx, in, map[string]any{"action": action, "text": arg})
+		if strings.Contains(done.text, "admin_title") {
+			return s.runModerate(ctx, in, map[string]any{"action": "admin_title", "text": arg})
+		}
+		return done
 	case action == "promote" && arg != "":
 		// "/promote Streamer" makes them admin with that title.
 		// One already an admin the bot made only gets the title.

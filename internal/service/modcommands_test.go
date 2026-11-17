@@ -150,9 +150,14 @@ func TestAdminCommands(t *testing.T) {
 		!strings.Contains(runner.asked[1], `"action":"admin_title"`) || !strings.Contains(runner.asked[1], `"text":"Sazeks streamer"`) {
 		t.Fatalf("asked = %v", runner.asked)
 	}
-	f.run(inGroup(reply("/tag Pro player")), inGroup(reply("/admin")))
-	if len(runner.asked) != 4 || !strings.Contains(runner.asked[2], `"action":"member_tag"`) || !strings.Contains(runner.asked[2], `"text":"Pro player"`) ||
-		!strings.Contains(runner.asked[3], `"action":"promote"`) {
+	f.run(inGroup(reply("/tag Pro player")))
+	if len(runner.asked) != 3 || !strings.Contains(runner.asked[2], `"action":"member_tag"`) || !strings.Contains(runner.asked[2], `"text":"Pro player"`) {
+		t.Errorf("asked = %v", runner.asked)
+	}
+	// On an admin the tag is their title.
+	runner.answers["moderate"] = `{"ok":false,"error":{"code":"forbidden","message":"that member is an admin: an admin's tag is their admin title, so call moderate again with admin_title and the same text"}}`
+	f.run(inGroup(reply("/tag Boss")))
+	if len(runner.asked) != 5 || !strings.Contains(runner.asked[4], `"action":"admin_title"`) || !strings.Contains(runner.asked[4], `"text":"Boss"`) {
 		t.Errorf("asked = %v", runner.asked)
 	}
 }
