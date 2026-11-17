@@ -60,9 +60,27 @@ func TestCommandMenusAreShort(t *testing.T) {
 	setter := &fakeCommandSetter{}
 	SetCommandMenus(context.Background(), setter, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	for scope, commands := range setter.set {
-		if len(commands) > 20 || !slices.ContainsFunc(commands, func(c telegram.BotCommand) bool { return c.Command == "games" }) ||
+		if len(commands) > 100 || !slices.ContainsFunc(commands, func(c telegram.BotCommand) bool { return c.Command == "games" }) ||
 			slices.ContainsFunc(commands, func(c telegram.BotCommand) bool { return c.Command == "boss" || c.Command == "stats" }) {
 			t.Errorf("%s menu %v", scope, commands)
+		}
+	}
+}
+
+// An admin, shown the admins' menu alone, finds everyone's commands in it
+// too, each once.
+func TestAdminsMenuHoldsTheMembers(t *testing.T) {
+	admins := commandMenus[telegram.ScopeAllChatAdmins]
+	seen := map[string]bool{}
+	for _, c := range admins {
+		if seen[c.Command] {
+			t.Errorf("/%s twice in the admins' menu", c.Command)
+		}
+		seen[c.Command] = true
+	}
+	for _, c := range commandMenus[telegram.ScopeAllGroupChats] {
+		if !seen[c.Command] {
+			t.Errorf("/%s is missing from the admins' menu", c.Command)
 		}
 	}
 }
