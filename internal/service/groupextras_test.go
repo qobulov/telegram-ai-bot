@@ -229,3 +229,15 @@ func TestGroupJournal(t *testing.T) {
 		t.Errorf("wrote without a log chat: %+v", sender.sent)
 	}
 }
+
+// Thanks are read with fillers, punctuation and emoji; talk is not.
+func TestIsThanks(t *testing.T) {
+	for text, want := range map[string]bool{
+		"raxmat": true, "Рахмат!": true, "спс": true, "rahmat aka": true, "katta rahmat 🙏": true, "спасибо бро": true, "+": true, "++": true,
+		"rahmat lekin bu noto'g'ri": false, "salom": false, "": false, "+ va -": false,
+	} {
+		if got := isThanks(text); got != want {
+			t.Errorf("isThanks(%q) = %t, want %t", text, got, want)
+		}
+	}
+}

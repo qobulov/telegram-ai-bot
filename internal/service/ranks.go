@@ -160,6 +160,11 @@ func (s *Service) orderWords(text string) []string {
 		if w == "" || isWakeWord(w, s.opts.WakeWords) || strings.EqualFold(w, "@"+s.opts.Bot.Username) {
 			continue
 		}
+		if n := len(words); n > 0 && (words[n-1] == "-" || words[n-1] == "+") {
+			// "- админ": a sign written apart is still the word's.
+			words[n-1] += w
+			continue
+		}
 		words = append(words, w)
 	}
 	return words

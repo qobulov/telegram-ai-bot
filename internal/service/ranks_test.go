@@ -206,3 +206,21 @@ func TestMinusNumberTakesARank(t *testing.T) {
 		t.Errorf("the creator's -1 admin left rank %d", book.ranks[member])
 	}
 }
+
+// "- админ Мари", the sign written apart, takes a rank as "-admin" does.
+func TestSignWrittenApart(t *testing.T) {
+	const creator, member = int64(10), int64(12)
+	f := newFixture()
+	f.opts.WakeWords = []string{"мари"}
+	f.members.creator = creator
+	book := &fakeRankBook{ranks: map[int64]int{member: 2}, overrides: map[string]int{}}
+	f.opts.Ranks = book
+	f.run(from(creator, "- админ Мари", member))
+	if book.ranks[member] != 0 {
+		t.Errorf("- админ left rank %d", book.ranks[member])
+	}
+	f.run(from(creator, "+ 3 даража мари", member))
+	if book.ranks[member] != 3 {
+		t.Errorf("+ 3 даража gave %d", book.ranks[member])
+	}
+}

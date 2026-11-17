@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
@@ -72,9 +73,39 @@ func (s *Service) journal(chatID int64, line string) {
 
 // repWords thank the member replied to, and give them a point.
 var repWords = map[string]bool{
-	"+": true, "++": true, "+1": true, "+rep": true, "+реп": true,
-	"rahmat": true, "raxmat": true, "rahmat!": true, "katta rahmat": true, "рахмат": true, "раҳмат": true,
-	"спасибо": true, "спс": true, "благодарю": true, "thanks": true, "thank you": true, "thx": true, "respect": true, "респект": true,
+	"+": true, "++": true, "+++": true, "+1": true, "+rep": true, "+реп": true,
+	"rahmat": true, "raxmat": true, "rahmet": true, "raxmet": true, "rakhmat": true, "rahmatt": true, "raxmatt": true,
+	"рахмат": true, "раҳмат": true, "рахмет": true, "рахматт": true,
+	"спасибо": true, "спасиб": true, "спасибки": true, "спс": true, "спсб": true, "пасиба": true, "благодарю": true, "spasibo": true, "spс": true, "sps": true,
+	"thanks": true, "thank": true, "thx": true, "tnx": true, "ty": true, "respect": true, "респект": true, "barakalla": true, "баракалла": true,
+}
+
+// repFillers may follow a thanks: "rahmat aka", "katta rahmat", "спс бро".
+var repFillers = map[string]bool{
+	"katta": true, "kotta": true, "катта": true, "aka": true, "ака": true, "uka": true, "ука": true, "opa": true, "опа": true,
+	"bro": true, "бро": true, "brat": true, "брат": true, "you": true, "a lot": true, "большое": true, "огромное": true, "sizga": true, "сизга": true,
+	"senga": true, "сенга": true, "jon": true, "жон": true, "do'stim": true, "dostim": true, "mari": true, "мари": true,
+}
+
+// isThanks reports a short thanks: a thanks word, with at most two
+// fillers, punctuation and emoji around it.
+func isThanks(text string) bool {
+	words := strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
+		return r == ' ' || r == ',' || r == '!' || r == '.' || r == ')' || r == '(' || unicode.Is(unicode.So, r) || unicode.Is(unicode.Sk, r)
+	})
+	if len(words) == 0 || len(words) > 3 {
+		return false
+	}
+	thanked := false
+	for _, w := range words {
+		switch {
+		case repWords[w]:
+			thanked = true
+		case !repFillers[w]:
+			return false
+		}
+	}
+	return thanked
 }
 
 // thanked gives a point to the member a "+" or "rahmat" replies to, marking
@@ -83,7 +114,7 @@ func (s *Service) thanked(in incoming) bool {
 	replied := in.msg.ReplyToMessage
 	text, _ := in.msg.Content()
 	if s.opts.Extras == nil || replied == nil || replied.From == nil || replied.From.IsBot || replied.SenderChat != nil ||
-		replied.From.ID == in.userID || in.fromBot || !repWords[strings.ToLower(strings.TrimSpace(text))] {
+		replied.From.ID == in.userID || in.fromBot || !isThanks(text) {
 		return false
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
