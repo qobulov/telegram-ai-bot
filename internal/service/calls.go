@@ -424,8 +424,25 @@ func (s *Service) pressedBanVote(q *telegram.CallbackQuery) {
 	text := fmt.Sprintf("🔨 %s %d ovoz bilan bloklandi.", cardMarks.Replace(vote.Name), len(vote.Yes))
 	if err := s.opts.GroupModerator.BanChatMember(ctx, q.Message.Chat.ID, vote.Target); err != nil {
 		text = fmt.Sprintf("Ovoz yig'ildi, lekin %s ni bloklab bo'lmadi: menga a'zolarni cheklash huquqi kerak.", cardMarks.Replace(vote.Name))
+	} else {
+		s.noteVoteBan(ctx, q.Message.Chat.ID, vote)
 	}
 	_ = s.opts.Buttons.EditMessageText(ctx, q.Message.Chat.ID, q.Message.MessageID, text)
+}
+
+// noteVoteBan keeps a vote's ban as the bot's, for /banlist and its unban
+// button; the starter stands as who asked.
+func (s *Service) noteVoteBan(ctx context.Context, chatID int64, vote banVote) {
+	if s.opts.Strikes == nil {
+		return
+	}
+	_, err := s.opts.Strikes.RecordModeration(ctx, storage.ModerationAction{
+		ChatID: chatID, Action: "ban", RequesterID: vote.Starter, TargetUserID: vote.Target,
+		Reason: fmt.Sprintf("/voteban: %d ovoz", len(vote.Yes)), UpdateID: -time.Now().UnixMicro(),
+	})
+	if err != nil {
+		s.opts.Logger.Warn("could not note a vote's ban", "chat_id", chatID, "error", err)
+	}
 }
 
 func banVoteText(v banVote) string {

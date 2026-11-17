@@ -167,7 +167,8 @@ func TestCallsReportsAndBanVotes(t *testing.T) {
 	moderator := &fakeModerator{}
 	votes := &memoryVotes{}
 	buttons := &fakeButtons{}
-	f.opts.GroupModerator, f.opts.BanVotes, f.opts.Buttons = moderator, votes, buttons
+	strikes := &fakeStrikes{}
+	f.opts.GroupModerator, f.opts.BanVotes, f.opts.Buttons, f.opts.Strikes = moderator, votes, buttons, strikes
 
 	sent := f.run(from(20, "/admins", 0))
 	if last := sent[len(sent)-1].text; !strings.Contains(last, "@boss") || strings.Contains(last, "somebot") {
@@ -199,5 +200,8 @@ func TestCallsReportsAndBanVotes(t *testing.T) {
 	f.run(press(25, "y"))
 	if len(moderator.banned) != 1 || moderator.banned[0] != 30 {
 		t.Fatalf("banned = %v, want the target at five votes", moderator.banned)
+	}
+	if len(strikes.actions) != 1 || strikes.actions[0].Action != "ban" || strikes.actions[0].TargetUserID != 30 {
+		t.Errorf("noted = %+v, want the ban kept for /banlist", strikes.actions)
 	}
 }
