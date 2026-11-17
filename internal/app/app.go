@@ -472,6 +472,8 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 		tools.CatchUpTool(tools.CatchUpOptions{Store: store, Location: cfg.Location}),
 		tools.GroupStatsTool(tools.GroupStatsOptions{Store: store, BotID: bot.User.ID, Location: cfg.Location}),
 		tools.InviteStatsTool(tools.InviteStatsOptions{Store: store, Location: cfg.Location}),
+		tools.GroupInfoTool(bot.Client, bot.User.ID),
+		tools.MemberInfoTool(tools.MemberInfoOptions{Store: store, Telegram: bot.Client, Tokens: cards.Tokens, Location: cfg.Location}),
 		tools.PunishmentsTool(tools.PunishmentsOptions{Store: store, Creators: groupMembers{client: bot.Client, botID: bot.User.ID}, BotID: bot.User.ID, Location: cfg.Location}),
 		tools.JoinCaptchaTool(tools.JoinCaptchaOptions{Store: store, Rights: groupMembers{client: bot.Client, botID: bot.User.ID}}),
 		tools.RemindersTool(tools.RemindersOptions{Store: store, CardDay: cards.Today, Location: cfg.Location}),
