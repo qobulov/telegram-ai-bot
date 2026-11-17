@@ -464,11 +464,18 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .alive { position: absolute; inset: 0; pointer-events: none; }
 .card .alive { z-index: -1; }
 .alive i { position: absolute; inset: 0; background: center / cover no-repeat; transform-origin: 50% 100%; animation: alive 3.2s ease-in-out infinite; will-change: transform; }
-.alive .hair { clip-path: inset(0 0 56% 0); }
+.alive .hair { clip-path: inset(0 0 56% 0); transform-origin: 50% 62%; animation: alive 3.2s ease-in-out infinite, sway 2.6s ease-in-out infinite; }
 .alive .body { clip-path: inset(43.5% 0 0 0); }
+/* The hair sways in CSS, which every phone plays; the wind's turbulence,
+   an SVG filter iPhones' Telegram does not move, only adds to it. */
 .front .alive .hair { filter: url(#wind); }
-@keyframes alive { 50% { transform: scale(1.018, 1.028) translateY(-2px); } }
-@media (prefers-reduced-motion: reduce) { .alive i { animation: none; } .front .alive .hair { filter: none; } }
+@keyframes alive { 50% { transform: scale(1.035, 1.05) translateY(-4px); } }
+@keyframes sway {
+  0%, 100% { translate: 0 0; rotate: 0deg; }
+  25% { translate: -2px -1px; rotate: -1.4deg; }
+  75% { translate: 2px -1px; rotate: 1.4deg; }
+}
+@media (prefers-reduced-motion: reduce) { .alive i, .alive .hair { animation: none; } .front .alive .hair { filter: none; } }
 
 /* ---------- shop ---------- */
 .shop { display: grid; gap: 18px; padding: 8px 16px 0; }
