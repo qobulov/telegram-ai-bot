@@ -14,7 +14,7 @@ import (
 
 // The odds add up to a thousand draws, the rarest least often, and the
 // catalog's cards are parted 25, 50, 100, 150 and the rest by how loved
-// they are, the catalog's 501 in proportion.
+// they are, the rest Common.
 func TestRarityRules(t *testing.T) {
 	drawn := map[Rarity]int{}
 	for n := range 1000 {

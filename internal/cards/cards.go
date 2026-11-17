@@ -72,8 +72,9 @@ func Tokens(p storage.CardPlayer, now time.Time) int {
 }
 
 // CatalogSize is how many of AniList's most loved characters are cards: the
-// rarities take the first 325 by rank, and the rest are Common.
-const CatalogSize = 500
+// rarities take the first 325 by rank, and the rest are Common. It was 500,
+// and the players found too many anime missing.
+const CatalogSize = 1500
 
 // rule is what one rarity is: how many cards of the catalog have it, the
 // most loved first, its odds in a thousand draws, the points it is worth
@@ -310,7 +311,7 @@ func FetchCatalog(ctx context.Context, client *http.Client, baseURL string) ([]s
 	const perPage = 50
 	var catalog []storage.Card
 	for page := 1; len(catalog) < CatalogSize; page++ {
-		characters, err := fetchPage(ctx, client, baseURL, page, perPage)
+		characters, err := fetchPageAgain(ctx, client, baseURL, page, perPage)
 		if err != nil {
 			return nil, err
 		}
@@ -365,6 +366,30 @@ const charactersQuery = `query ($page: Int, $perPage: Int) {
   }
 }`
 
+// errAniListBusy is AniList asking to slow down.
+var errAniListBusy = errors.New("cards: AniList is busy")
+
+// aniListWaits are the pauses before asking a page again after AniList
+// asked to slow down: it lets 30 to 90 requests through a minute.
+var aniListWaits = []time.Duration{3 * time.Second, 10 * time.Second, 30 * time.Second}
+
+// fetchPageAgain is fetchPage, asked again after a pause when AniList says
+// it is too busy.
+func fetchPageAgain(ctx context.Context, client *http.Client, baseURL string, page, perPage int) ([]aniListCharacter, error) {
+	for _, wait := range aniListWaits {
+		characters, err := fetchPage(ctx, client, baseURL, page, perPage)
+		if !errors.Is(err, errAniListBusy) {
+			return characters, err
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(wait):
+		}
+	}
+	return fetchPage(ctx, client, baseURL, page, perPage)
+}
+
 func fetchPage(ctx context.Context, client *http.Client, baseURL string, page, perPage int) ([]aniListCharacter, error) {
 	body, _ := json.Marshal(map[string]any{"query": charactersQuery, "variables": map[string]int{"page": page, "perPage": perPage}})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL, strings.NewReader(string(body)))
@@ -378,6 +403,9 @@ func fetchPage(ctx context.Context, client *http.Client, baseURL string, page, p
 		return nil, fmt.Errorf("cards: ask AniList: %w", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusTooManyRequests {
+		return nil, errAniListBusy
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("%w: status %d", errAniList, resp.StatusCode)
 	}
