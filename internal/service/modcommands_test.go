@@ -146,10 +146,10 @@ func TestAdminCommands(t *testing.T) {
 		return msg
 	}
 	f.run(inGroup(reply("/promote Sazeks streamer")))
-	if len(runner.asked) != 2 || !strings.Contains(runner.asked[0], `"action":"promote"`) ||
-		!strings.Contains(runner.asked[1], `"action":"admin_title"`) || !strings.Contains(runner.asked[1], `"text":"Sazeks streamer"`) {
+	if len(runner.asked) != 1 || !strings.Contains(runner.asked[0], `"action":"promote"`) || !strings.Contains(runner.asked[0], `"text":"Sazeks streamer"`) {
 		t.Fatalf("asked = %v", runner.asked)
 	}
+	runner.asked = append(runner.asked, "")
 	f.run(inGroup(reply("/tag Pro player")))
 	if len(runner.asked) != 3 || !strings.Contains(runner.asked[2], `"action":"member_tag"`) || !strings.Contains(runner.asked[2], `"text":"Pro player"`) {
 		t.Errorf("asked = %v", runner.asked)

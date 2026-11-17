@@ -105,18 +105,16 @@ func (s *Service) modCommand(ctx context.Context, in incoming) outcome {
 			return s.runModerate(ctx, in, map[string]any{"action": "admin_title", "text": arg})
 		}
 		return done
-	case action == "promote" && arg != "":
-		// "/promote Streamer" makes them admin with that title.
-		// One already an admin the bot made only gets the title.
-		done := s.runModerate(ctx, in, map[string]any{"action": action})
-		titled := s.runModerate(ctx, in, map[string]any{"action": "admin_title", "text": arg})
-		if strings.HasPrefix(done.text, "⛔") {
-			if strings.HasPrefix(titled.text, "⛔") {
-				return done
+	case action == "promote":
+		// "/promote Streamer" makes them admin with that title, Moderator
+		// without one; one already an admin the bot made only gets the title.
+		done := s.runModerate(ctx, in, map[string]any{"action": action, "text": arg})
+		if arg != "" && strings.HasPrefix(done.text, "⛔") {
+			if titled := s.runModerate(ctx, in, map[string]any{"action": "admin_title", "text": arg}); !strings.HasPrefix(titled.text, "⛔") {
+				return titled
 			}
-			return titled
 		}
-		return say(strings.TrimSpace(done.text + "\n" + titled.text))
+		return done
 	}
 	return s.runModerate(ctx, in, map[string]any{"action": action, "minutes": minutes, "reason": reason})
 }

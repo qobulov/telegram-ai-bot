@@ -1300,7 +1300,8 @@ func TestModeratePromotesAndDemotes(t *testing.T) {
 		t.Errorf("said %q", said)
 	}
 	rights := telegram.AdminRights{CanDeleteMessages: true, CanRestrictMembers: true, CanPinMessages: true, CanInviteUsers: true}
-	if calls := env.telegram.made(); len(calls) != 1 || calls[0] != fmt.Sprintf("promoteChatMember %+v %d %d", rights, groupA, memberID) {
+	if calls := env.telegram.made(); len(calls) != 2 || calls[0] != fmt.Sprintf("promoteChatMember %+v %d %d", rights, groupA, memberID) ||
+		calls[1] != fmt.Sprintf("setChatAdministratorCustomTitle Moderator %d %d", groupA, memberID) {
 		t.Errorf("calls = %q", calls)
 	}
 
@@ -1320,7 +1321,7 @@ func TestModeratePromotesAndDemotes(t *testing.T) {
 	ctx = WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: 442, MessageID: 442, Target: bekTarget(), Words: "unvonini Moderator qil"}, &Sink{})
 	env.act(t, ctx, `{"action":"admin_title","text":"Moderator"}`)
 	calls := env.telegram.made()
-	if calls[1] != fmt.Sprintf("promoteChatMember %+v %d %d", telegram.AdminRights{}, groupA, memberID) || calls[2] != fmt.Sprintf("setChatAdministratorCustomTitle Moderator %d %d", groupA, memberID) {
+	if calls[2] != fmt.Sprintf("promoteChatMember %+v %d %d", telegram.AdminRights{}, groupA, memberID) || calls[3] != fmt.Sprintf("setChatAdministratorCustomTitle Moderator %d %d", groupA, memberID) {
 		t.Errorf("calls = %q", calls)
 	}
 }

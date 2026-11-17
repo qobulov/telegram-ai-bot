@@ -370,7 +370,7 @@ func (m *Moderation) Tool() Tool {
 			"delete: delete that message. mute (minutes, default 60) or unmute: its author. ban or unban: its author. kick: remove its author, who may join again. pin or unpin: that message. " +
 			"no_stickers (minutes, default a day) or allow_stickers: take away or give back its author's stickers and GIFs, which Telegram only allows or forbids together; use it, not ban or ignore, when they ask to block someone's stickers. " +
 			"no_photos (minutes, default a day) or allow_photos: the same for photos. A member's other limits stay as they are. " +
-			"promote: make its author an admin, with your own delete, mute and pin rights at most; demote: take that back; admin_title (text, 16 characters at most): the title shown for an admin you made; member_tag (text, 16 characters at most, no emoji; empty takes it off): the tag shown by a regular member's name. " +
+			"promote: make its author an admin, with your own delete, mute and pin rights at most; demote: take that back; admin_title (text, 16 characters at most): the title shown for an admin you made; promote takes an optional text as their title, Moderator otherwise; member_tag (text, 16 characters at most, no emoji; empty takes it off): the tag shown by a regular member's name. " +
 			"amnesty: unban everyone you banned here. kick_inactive (days, default 30): first lists the members who have not written for that long; only with force, when they confirm, removes them. " +
 			"warn: warn its author; at the third warning they are muted for a day and the count starts again; unwarn: take one warning off. Use warn, not mute, when they ask to warn (\"varn ber\", \"предупреждение\"). " +
 			"purge (minutes, default 60, at most 2880): delete every message its author wrote here in the last minutes, as far as your log of the group has them, when they ask to clear out or delete all of someone's messages; it cannot be undone. " +
@@ -499,7 +499,7 @@ func (o *order) setGroupArgs(args moderationArgs, picture []byte) error {
 		if utf8.RuneCountInString(text) > maxDescriptionRunes {
 			return &ArgumentError{Message: fmt.Sprintf("text must be the new description, at most %d characters", maxDescriptionRunes)}
 		}
-	case actionAdminTitle:
+	case actionAdminTitle, actionPromote:
 		if utf8.RuneCountInString(text) > maxAdminTitleRunes {
 			return &ArgumentError{Message: fmt.Sprintf("an admin title has at most %d characters", maxAdminTitleRunes)}
 		}
@@ -728,6 +728,9 @@ func namedBy(words []string, name string) bool {
 	}
 	return false
 }
+
+// defaultAdminTitle is the title of an admin made with none asked for.
+const defaultAdminTitle = "Moderator"
 
 // maxMemberTagRunes is the longest tag Telegram shows by a member's name.
 const maxMemberTagRunes = 16
@@ -1055,7 +1058,13 @@ func (m *Moderation) send(ctx context.Context, o order) error {
 	case actionUnpin:
 		return m.opts.Telegram.UnpinChatMessage(ctx, chatID, messageID)
 	case actionPromote:
-		return m.promote(ctx, chatID, userID)
+		if err := m.promote(ctx, chatID, userID); err != nil {
+			return err
+		}
+		// A new admin always shows a title; one that cannot be set leaves
+		// them an admin all the same.
+		_ = m.opts.Telegram.SetChatAdministratorCustomTitle(ctx, chatID, userID, cmp.Or(o.text, defaultAdminTitle))
+		return nil
 	case actionDemote:
 		return m.opts.Telegram.PromoteChatMember(ctx, chatID, userID, telegram.AdminRights{})
 	case actionAdminTitle:
