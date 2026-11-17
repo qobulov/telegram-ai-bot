@@ -149,9 +149,13 @@ var legendaryIDs = map[int64]bool{
 
 // epicIDs are the Epic cards chosen by hand, whatever their rank: The Seven
 // Deadly Sins' Elizabeth, Merlin, King, Diane, Zeldris, Mael and Gowther,
-// and Firefly Wedding's Satoko Kirigaya, whom the players asked for.
+// Firefly Wedding's Satoko Kirigaya and the Four Knights of the Apocalypse,
+// whom the players asked for.
 var epicIDs = map[int64]bool{
 	298761: true, 72923: true, 89180: true, 83801: true, 74653: true, 131559: true, 126851: true, 88823: true,
+	// Four Knights of the Apocalypse: Percival, Lancelot, Tristan, Gawain
+	// and Arthur, added by hand (migration 92).
+	206212: true, 265209: true, 249281: true, 282753: true, 122210: true,
 }
 
 // RarityOf is the rarity of a character at rank among the most loved, from
