@@ -86,7 +86,9 @@ func (s *Service) addressedText(msg *telegram.Message) (string, trigger) {
 	if mentions := s.mentionsOfBot(text, entities); len(mentions) > 0 {
 		return s.orName(telegram.RemoveEntities(text, mentions)), triggerMention
 	}
-	if s.opts.WakeWordTrigger {
+	// A reply to another bot speaks to that bot: "Mari name", guessing a
+	// character for a card bot, is no call however it reads.
+	if s.opts.WakeWordTrigger && !s.repliesToOtherBot(msg) {
 		if rest, called := stripWakeWord(text, s.opts.WakeWords); called {
 			return rest, triggerWakeWord
 		}
@@ -177,6 +179,13 @@ func (s *Service) mentionsBot(text string, entity telegram.MessageEntity) bool {
 	default:
 		return false
 	}
+}
+
+// repliesToOtherBot reports a message replying to a bot that is not this
+// one.
+func (s *Service) repliesToOtherBot(msg *telegram.Message) bool {
+	r := msg.ReplyToMessage
+	return r != nil && r.From != nil && r.From.IsBot && r.From.ID != s.opts.Bot.ID
 }
 
 func (s *Service) isFromBot(msg *telegram.Message) bool {

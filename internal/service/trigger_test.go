@@ -353,3 +353,19 @@ func TestQuoteOfTheBotsOwnMessageIsShort(t *testing.T) {
 		t.Errorf("quote of the bot's own message is %d characters, want at most %d", n, maxOwnQuoteChars)
 	}
 }
+
+// A reply to another bot is that bot's, though it holds the wake word:
+// "Mari name" guesses a character for a card bot.
+func TestWakeWordInAReplyToAnotherBot(t *testing.T) {
+	f := newFixture()
+	msg := groupMessage("Mira name")
+	msg.ReplyToMessage = &telegram.Message{MessageID: 5, From: &telegram.User{ID: 4242, IsBot: true, Username: "husbando_bot"}, Chat: msg.Chat, Text: "Guess who"}
+	if sent := f.run(inGroup(msg)); len(sent) != 0 || len(f.replier.recorded()) != 0 {
+		t.Errorf("answered a reply to another bot: %+v", sent)
+	}
+	member := groupMessage("Mira, salom")
+	member.ReplyToMessage = &telegram.Message{MessageID: 6, From: &telegram.User{ID: 501, FirstName: "Sam"}, Chat: member.Chat, Text: "hi"}
+	if sent := f.run(inGroup(member)); len(sent) != 1 {
+		t.Errorf("a call replying to a member = %+v", sent)
+	}
+}
