@@ -123,8 +123,10 @@ type MemberInfoOptions struct {
 	Store    MemberInfoStore
 	Telegram MemberLookup
 	// Tokens is how many card tokens a player may spend now.
-	Tokens   func(p storage.CardPlayer, now time.Time) int
-	Location *time.Location
+	Tokens func(p storage.CardPlayer, now time.Time) int
+	// NextToken is when the next card token comes.
+	NextToken func(now time.Time) time.Time
+	Location  *time.Location
 }
 
 type memberInfoArgs struct {
@@ -137,7 +139,7 @@ type memberInfoArgs struct {
 func MemberInfoTool(opts MemberInfoOptions) Tool {
 	return Tool{
 		Name: "member_info",
-		Description: "Everything known about the asker in this group (whose: me, the default), or about the member their message replies to (replied) or the one they tagged with @ (tagged): Telegram status and admin title or tag, moderator rank (1–5), warnings with the last reason, mutes and bans received, messages written today and this week, when last seen, who brought them in, how many people they brought, and their card game points, place, cards, tokens and crystals. " +
+		Description: "Everything known about the asker in this group (whose: me, the default), or about the member their message replies to (replied) or the one they tagged with @ (tagged): Telegram status and admin title or tag, moderator rank (1–5), warnings with the last reason, mutes and bans received, messages written today and this week, when last seen, who brought them in, how many people they brought, and their card game points, place, cards, tokens, minutes to the next token and crystals. " +
 			"Use it whenever someone asks about themselves or a member (\"men haqimda\", \"darajam qaysi\", \"nechta ogohlantirishim bor\", \"nechta xabar yozdim\", \"kim qo'shgan meni\", \"ochkoim\", \"мой ранг\", \"сколько у меня предупреждений\"); answer only from what it gives.",
 		Schema: json.RawMessage(`{"type": "object", "properties": {
 			"whose": {"type": "string", "enum": ["me", "replied", "tagged"], "description": "me, the default; replied for the member their message replies to; tagged for the one member they tagged."}
@@ -296,6 +298,9 @@ func addCardFacts(ctx context.Context, opts MemberInfoOptions, userID int64, out
 	}
 	if player, _, err := opts.Store.CardPlayerOf(ctx, userID); err == nil && opts.Tokens != nil {
 		cards["tokens"] = opts.Tokens(player, time.Now())
+	}
+	if opts.NextToken != nil {
+		cards["next_token_in_minutes"] = int(time.Until(opts.NextToken(time.Now())).Minutes()) + 1
 	}
 	if shards, _, err := opts.Store.CardWallet(ctx, userID); err == nil {
 		cards["crystals"] = shards

@@ -1439,8 +1439,8 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 	case in.group && errors.Is(err, ai.ErrEmptyResponse):
 		// Models give back nothing where [silent] was meant, such as after a
 		// second insult; an error message would be worse than silence.
-		log.Warn("the model gave an empty answer; nothing was sent")
-		return outcome{skipped: "model_empty"}
+		log.Warn("the model gave an empty answer; nothing was sent", "error", err)
+		return outcome{skipped: "model_empty", skipDetail: err.Error()}
 	case errors.Is(err, ai.ErrBlocked):
 		// The provider's filter, not a failure: saying so, and to an owner
 		// how to post an announcement without the model, beats "try again".
