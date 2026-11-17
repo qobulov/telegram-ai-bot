@@ -553,6 +553,9 @@ func TestModerateActsOnlyWhenAskedInWords(t *testing.T) {
 		{"поменяй на Чат", "set_title", true},
 		{"mari", "set_title", false},
 		{"ha change qil", "ban", false},
+		{"Бекор кил", "undo", true},
+		{"кайтар", "undo", true},
+		{"/promote", "promote", true},
 	}
 	for _, c := range cases {
 		if got := askedFor(c.words, c.action); got != c.want {

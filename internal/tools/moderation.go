@@ -1344,9 +1344,10 @@ var actionWords = map[string][]string{
 	actionEditLink:         linkWords,
 	actionUnpinAll:         {"pin", "qada", "закреп", "откреп"},
 	actionLock:             {"yop", "blok", "taqiq", "chekla", "ochir", "запрет", "закр", "огранич", "lock", "заблок"},
-	actionUndo:             {"qaytar", "orqaga", "ortga", "bekor qil", "undo", "верн", "отмен", "назад"},
-	actionUnlock:           {"och", "ruxsat", "разреш", "откр", "unlock", "разблок"},
-	actionUnpin:            {"pin", "пин", "qada", "қада", "када", "закреп", "откреп"},
+	actionUndo: {"qaytar", "orqaga", "ortga", "bekor qil", "bekor kil", "undo", "верн", "отмен", "назад",
+		"қайтар", "кайтар", "орқага", "оркага", "бекор қил", "бекор кил", "бекор кл"},
+	actionUnlock: {"och", "ruxsat", "разреш", "откр", "unlock", "разблок"},
+	actionUnpin:  {"pin", "пин", "qada", "қада", "када", "закреп", "откреп"},
 }
 
 var foldApostrophes = strings.NewReplacer("'", "", "ʻ", "", "ʼ", "", "’", "", "‘", "", "`", "")
