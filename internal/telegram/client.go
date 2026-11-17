@@ -1340,3 +1340,12 @@ func (c *Client) SetMemberCommands(ctx context.Context, chatID, userID int64, co
 	var ok bool
 	return c.call(ctx, "setMyCommands", params, &ok)
 }
+
+// SetChatCommands sets the command menu of one chat, such as an owner's
+// private chat with the bot, over the default one there.
+func (c *Client) SetChatCommands(ctx context.Context, chatID int64, commands []BotCommand) error {
+	params := setMyCommandsParams{Commands: commands}
+	params.Scope.Type, params.Scope.ChatID = "chat", chatID
+	var ok bool
+	return c.call(ctx, "setMyCommands", params, &ok)
+}

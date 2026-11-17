@@ -119,6 +119,7 @@ func serve(ctx context.Context, cfg config.Config, store *storage.Store, logger 
 		return err
 	}
 	app.SetCommandMenus(ctx, bot.Client, logger)
+	app.SetOwnerMenus(ctx, bot.Client, cfg.OwnerIDs, logger)
 	app.SetMenuApp(ctx, bot.Client, cfg, logger)
 	app.SetAdminRights(ctx, bot.Client, logger)
 	app.SetProfileTexts(ctx, bot.Client, logger)

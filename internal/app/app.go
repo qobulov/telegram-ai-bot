@@ -814,6 +814,7 @@ func newWebhook(ctx context.Context, cfg config.Config, store *storage.Store, lo
 		return nil, err
 	}
 	SetCommandMenus(ctx, bot.Client, logger)
+	SetOwnerMenus(ctx, bot.Client, cfg.OwnerIDs, logger)
 	SetMenuApp(ctx, bot.Client, cfg, logger)
 	SetAdminRights(ctx, bot.Client, logger)
 	SetProfileTexts(ctx, bot.Client, logger)

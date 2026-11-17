@@ -141,3 +141,26 @@ func TestSwearJudgeThinksLittle(t *testing.T) {
 		}
 	}
 }
+
+type fakeChatCommandSetter struct {
+	set map[int64][]telegram.BotCommand
+}
+
+func (f *fakeChatCommandSetter) SetChatCommands(_ context.Context, chatID int64, commands []telegram.BotCommand) error {
+	f.set[chatID] = commands
+	return nil
+}
+
+// Each owner gets /aigroups in their private chat's menu, with the rest of
+// the default menu.
+func TestOwnerPrivateMenus(t *testing.T) {
+	setter := &fakeChatCommandSetter{set: map[int64][]telegram.BotCommand{}}
+	SetOwnerMenus(context.Background(), setter, map[int64]bool{7: true, 8: true}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	for _, owner := range []int64{7, 8} {
+		menu := setter.set[owner]
+		if !slices.ContainsFunc(menu, func(c telegram.BotCommand) bool { return c.Command == "aigroups" }) ||
+			!slices.ContainsFunc(menu, func(c telegram.BotCommand) bool { return c.Command == "cards" }) {
+			t.Errorf("owner %d menu = %v", owner, menu)
+		}
+	}
+}

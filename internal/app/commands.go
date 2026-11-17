@@ -144,3 +144,30 @@ func SetCommandMenus(ctx context.Context, setter CommandSetter, logger *slog.Log
 		}
 	}
 }
+
+// ownerPrivateMenu is what an owner sees in their private chat with the
+// bot: the default menu and the owners' own commands there.
+var ownerPrivateMenu = append(append([]telegram.BotCommand(nil), commandMenus[telegram.ScopeDefault]...),
+	telegram.BotCommand{Command: "aigroups", Description: "AI suhbat yoqilgan guruhlarni tanlash (owner)"},
+	telegram.BotCommand{Command: "announce", Description: "Guruhlarga e'lon yuborish (owner)"},
+	telegram.BotCommand{Command: "payments", Description: "Stars to'lovlari (owner)"},
+	telegram.BotCommand{Command: "refund", Description: "To'lovni qaytarish (owner)"},
+)
+
+// ChatCommandSetter sets one chat's menu.
+type ChatCommandSetter interface {
+	SetChatCommands(ctx context.Context, chatID int64, commands []telegram.BotCommand) error
+}
+
+// SetOwnerMenus gives each owner known by ID their own menu in their
+// private chat with the bot, logging a failure: one who never wrote to the
+// bot has no chat with it yet.
+func SetOwnerMenus(ctx context.Context, setter ChatCommandSetter, owners map[int64]bool, logger *slog.Logger) {
+	ctx, cancel := context.WithTimeout(ctx, commandsTimeout)
+	defer cancel()
+	for owner := range owners {
+		if err := setter.SetChatCommands(ctx, owner, ownerPrivateMenu); err != nil {
+			logger.Warn("could not set an owner's private menu", "error", err)
+		}
+	}
+}
