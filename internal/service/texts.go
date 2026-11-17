@@ -391,6 +391,7 @@ var helpSections = map[string]localText{
 /warn sabab, /unwarn — ogohlantirish; 3-sida 1 kunga mut, 30 kunda o'chadi
 /mute 1h, /unmute — mut; /ban sabab, /kick — ban va chiqarish
 /delete, /pin, /unpin — xabarni o'chirish, qadash
+/promote unvon, /demote — Telegram admin qilish va olish; /title unvon — men tayinlagan adminning unvoni; /tag matn — oddiy a'zoning tegi
 "+3 admin" yoki "-admin" — moderator darajasi 1–5; /staff, /ranklog, /access
 /banlist — banlar va "bandan chiqarish" tugmalari; /amnesty — hammani chiqarish
 /reports — ko'rilmagan shikoyatlar; /warns — kimda nechta ogohlantirish
@@ -401,6 +402,7 @@ Meni jim qilish: /mute bot, qaytarish: /unmute`,
 /warn причина, /unwarn — предупреждение; на третьем мут на сутки, сгорает за 30 дней
 /mute 1h, /unmute — мут; /ban причина, /kick — бан и кик
 /delete, /pin, /unpin — удалить, закрепить
+/promote звание, /demote — дать и снять админку Telegram; /title звание — звание админа, которого назначила я; /tag текст — тег обычного участника
 «+3 admin» или «-admin» — ранг модератора 1–5; /staff, /ranklog, /access
 /banlist — баны и кнопки разбана; /amnesty — разбан всех
 /reports — нерассмотренные жалобы; /warns — предупреждения
@@ -411,6 +413,7 @@ Meni jim qilish: /mute bot, qaytarish: /unmute`,
 /warn reason, /unwarn — a warning; the third mutes for a day, they lapse in 30 days
 /mute 1h, /unmute — mute; /ban reason, /kick — ban and remove
 /delete, /pin, /unpin — delete, pin
+/promote title, /demote — make or unmake a Telegram admin; /title text — the title of an admin I made; /tag text — a regular member's tag
 "+3 admin" or "-admin" — a moderator's rank 1–5; /staff, /ranklog, /access
 /banlist — bans with unban buttons; /amnesty — unban everyone
 /reports — open reports; /warns — who has warnings

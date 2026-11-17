@@ -1354,7 +1354,7 @@ var changeWords = []string{"ozgartir", "uzgartir", "almashtir", "change", "renam
 var warnWords = []string{"warn", "varn", "варн", "пред", "ogohlantir", "огоҳлантир", "огохлантир", "ogoh"}
 
 // adminWords ask for something about adminship: "admin qil", "админка".
-var adminWords = []string{"admin", "админ"}
+var adminWords = []string{"admin", "админ", "promot", "demot"}
 
 // stickerPackWords ask for something about the group's sticker pack:
 // "stiker paket", "shu stikerlarni guruhga qo'y", "стикерпак".

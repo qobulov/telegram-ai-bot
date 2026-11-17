@@ -133,3 +133,26 @@ func TestModCommandsWithoutAReplyAskWhom(t *testing.T) {
 		t.Errorf("/mute bot = %q", sent[len(sent)-1].text)
 	}
 }
+
+// /promote Streamer makes the member replied to an admin and titles them;
+// /title and /tag take their whole argument as the text.
+func TestAdminCommands(t *testing.T) {
+	f := newFixture()
+	runner := withToolRunner(f)
+	runner.answers["moderate"] = `{"ok":true,"result":{"done":true,"said":"Bajarildi."}}`
+	reply := func(text string) *telegram.Message {
+		msg := groupMessage(text)
+		msg.ReplyToMessage = &telegram.Message{MessageID: 9, From: &telegram.User{ID: 501, FirstName: "Sam"}, Chat: msg.Chat, Text: "salom"}
+		return msg
+	}
+	f.run(inGroup(reply("/promote Sazeks streamer")))
+	if len(runner.asked) != 2 || !strings.Contains(runner.asked[0], `"action":"promote"`) ||
+		!strings.Contains(runner.asked[1], `"action":"admin_title"`) || !strings.Contains(runner.asked[1], `"text":"Sazeks streamer"`) {
+		t.Fatalf("asked = %v", runner.asked)
+	}
+	f.run(inGroup(reply("/tag Pro player")), inGroup(reply("/admin")))
+	if len(runner.asked) != 4 || !strings.Contains(runner.asked[2], `"action":"member_tag"`) || !strings.Contains(runner.asked[2], `"text":"Pro player"`) ||
+		!strings.Contains(runner.asked[3], `"action":"promote"`) {
+		t.Errorf("asked = %v", runner.asked)
+	}
+}

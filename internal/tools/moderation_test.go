@@ -1294,7 +1294,7 @@ func TestModerateLocksOneKindAndKeepsTheRest(t *testing.T) {
 // demoted or titled.
 func TestModeratePromotesAndDemotes(t *testing.T) {
 	env := groupAdminEnv(t)
-	ctx := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: 440, MessageID: 440, Target: bekTarget(), Words: "buni admin qil"}, &Sink{})
+	ctx := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: 440, MessageID: 440, Target: bekTarget(), Words: "/promote"}, &Sink{})
 
 	if said := env.act(t, ctx, `{"action":"promote"}`); said != "Bajarildi: Bek @bek endi admin." {
 		t.Errorf("said %q", said)
