@@ -179,7 +179,11 @@
   // picture loads a card's picture into img, asking again twice, a little
   // later each time, when the image host drops it: with many cards at once
   // it now and then does, and the card showed an empty frame.
-  function picture(img, src) {
+  // A picture loads only when it comes near the screen, unless eager, as
+  // the card just drawn is, which is waited for.
+  function picture(img, src, eager) {
+    img.loading = eager ? "eager" : "lazy";
+    img.decoding = "async";
     let tries = 0;
     img.onerror = () => {
       if (tries >= 2 || !src) return;
@@ -353,7 +357,7 @@
     front.style.setProperty("--c", COLORS[card.rarity]);
     const img = new Image();
     img.alt = card.name;
-    picture(img, card.image);
+    picture(img, card.image, true);
     const plate = document.createElement("div");
     plate.className = "plate";
     const rarity = document.createElement("span");
