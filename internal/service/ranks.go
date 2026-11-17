@@ -270,19 +270,54 @@ func (s *Service) staffList(ctx context.Context, chatID int64) outcome {
 	if err != nil {
 		return say("Ro'yxatni hozir ochib bo'lmadi.")
 	}
+	lines := s.adminLines(ctx, chatID)
 	if len(ranked) == 0 {
-		return say("👮 Hali hech kimga daraja berilmagan. Moderatorning xabariga reply qilib \"+1 admin mari\" deb bering (1–5).")
+		lines = append(lines, "", "🎖 Hozir hech kimda moderator darajasi yo'q. Berish: a'zoning xabariga reply qilib \"+1 admin mari\" (1–5).")
+		return say(strings.TrimSpace(strings.Join(lines, "\n")))
 	}
-	lines := []string{"👮 Moderatorlar"}
+	lines = append(lines, "", "🎖 Moderatorlar")
 	current := 0
 	for _, m := range ranked {
 		if m.Rank != current {
 			current = m.Rank
-			lines = append(lines, "", stars(current)+fmt.Sprintf(" %d-daraja", current))
+			lines = append(lines, stars(current)+fmt.Sprintf(" %d-daraja", current))
 		}
 		lines = append(lines, "• "+memberLabel(m.Name, m.Username, m.UserID))
 	}
-	return say(strings.Join(lines, "\n"))
+	return say(strings.TrimSpace(strings.Join(lines, "\n")))
+}
+
+// adminLines are the group's owner and Telegram admins, bots and hidden
+// ones left out; none when Telegram cannot be asked.
+func (s *Service) adminLines(ctx context.Context, chatID int64) []string {
+	if s.opts.AdminList == nil {
+		return nil
+	}
+	admins, err := s.opts.AdminList.GetChatAdministrators(ctx, chatID)
+	if err != nil {
+		return nil
+	}
+	var owner, others []string
+	for _, a := range admins {
+		if a.User == nil || a.User.IsBot || a.IsAnonymous {
+			continue
+		}
+		label := memberLabel(a.User.FirstName, a.User.Username, a.User.ID)
+		if a.CustomTitle != "" {
+			label += " — " + cardMarks.Replace(a.CustomTitle)
+		}
+		if a.Status == "creator" {
+			owner = append(owner, "👑 Egasi: "+label)
+		} else {
+			others = append(others, "• "+label)
+		}
+	}
+	lines := owner
+	if len(others) > 0 {
+		lines = append(lines, "🛡 Adminlar:")
+		lines = append(lines, others...)
+	}
+	return lines
 }
 
 // memberLabel names a member as the group knows them.

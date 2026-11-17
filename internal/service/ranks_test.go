@@ -165,3 +165,25 @@ func TestRanksInCyrillicAndOnesOwn(t *testing.T) {
 		t.Errorf("даражам неччи = %q", last)
 	}
 }
+
+// /staff names the owner and the Telegram admins, with their titles, and
+// says when no one holds a rank; bots are left out.
+func TestStaffShowsAdmins(t *testing.T) {
+	f := newFixture()
+	f.opts.Ranks = &fakeRankBook{ranks: map[int64]int{}, overrides: map[string]int{}}
+	f.opts.AdminList = fakeAdminList{admins: []telegram.ChatMember{
+		{Status: "creator", User: &telegram.User{ID: 1, FirstName: "Aziz", Username: "boss"}},
+		{Status: "administrator", CustomTitle: "Moderator", User: &telegram.User{ID: 2, FirstName: "Abu"}},
+		{Status: "administrator", User: &telegram.User{ID: 99, IsBot: true, Username: "somebot"}},
+	}}
+	sent := f.run(from(20, "/staff", 0))
+	last := sent[len(sent)-1].text
+	for _, want := range []string{"Egasi: Aziz (@boss)", "Abu — Moderator", "hech kimda moderator darajasi yo'q"} {
+		if !strings.Contains(last, want) {
+			t.Errorf("staff = %q, want %q", last, want)
+		}
+	}
+	if strings.Contains(last, "somebot") {
+		t.Errorf("staff lists a bot: %q", last)
+	}
+}
