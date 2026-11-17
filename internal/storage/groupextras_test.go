@@ -10,18 +10,18 @@ import (
 func TestGroupSettings(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
-	if err := store.SetGroupSetting(ctx, -100, SettingLogChat, "-200", 1); err != nil {
+	if err := store.SetGroupSetting(ctx, -100, SettingCleanService, "on", 1); err != nil {
 		t.Fatal(err)
 	}
-	if v, _ := store.GroupSetting(ctx, -100, SettingLogChat); v != "-200" {
-		t.Errorf("log chat = %q", v)
+	if v, _ := store.GroupSetting(ctx, -100, SettingCleanService); v != "on" {
+		t.Errorf("setting = %q", v)
 	}
-	_ = store.SetGroupSetting(ctx, -100, SettingLogChat, "-300", 1)
-	if v, _ := store.GroupSetting(ctx, -100, SettingLogChat); v != "-300" {
+	_ = store.SetGroupSetting(ctx, -100, SettingCleanService, "yes", 1)
+	if v, _ := store.GroupSetting(ctx, -100, SettingCleanService); v != "yes" {
 		t.Errorf("changed = %q", v)
 	}
-	_ = store.SetGroupSetting(ctx, -100, SettingLogChat, "", 1)
-	if v, _ := store.GroupSetting(ctx, -100, SettingLogChat); v != "" {
+	_ = store.SetGroupSetting(ctx, -100, SettingCleanService, "", 1)
+	if v, _ := store.GroupSetting(ctx, -100, SettingCleanService); v != "" {
 		t.Errorf("removed = %q", v)
 	}
 }
@@ -49,27 +49,5 @@ func TestReputation(t *testing.T) {
 	}
 	if points, place, _ := store.RepOf(ctx, chat, 99); points != 0 || place != 0 {
 		t.Errorf("none = %d %d", points, place)
-	}
-}
-
-// A note is saved, replaced, listed and deleted.
-func TestNotes(t *testing.T) {
-	store := newTestStore(t)
-	ctx := context.Background()
-	_ = store.SaveNote(ctx, GroupNote{ChatID: -100, Name: "qoidalar", Text: "reklama yo'q", SavedBy: 1})
-	_ = store.SaveNote(ctx, GroupNote{ChatID: -100, Name: "qoidalar", Text: "reklama taqiq", MediaKind: "photo", FileID: "F1", SavedBy: 1})
-	_ = store.SaveNote(ctx, GroupNote{ChatID: -100, Name: "donat", Text: "karta", SavedBy: 1})
-	n, found, err := store.Note(ctx, -100, "qoidalar")
-	if err != nil || !found || n.Text != "reklama taqiq" || n.FileID != "F1" {
-		t.Errorf("note = %+v %v %v", n, found, err)
-	}
-	if names, _ := store.NoteNames(ctx, -100); len(names) != 2 || names[0] != "donat" {
-		t.Errorf("names = %v", names)
-	}
-	if ok, _ := store.DeleteNote(ctx, -100, "donat"); !ok {
-		t.Error("not deleted")
-	}
-	if _, found, _ := store.Note(ctx, -100, "donat"); found {
-		t.Error("still found")
 	}
 }

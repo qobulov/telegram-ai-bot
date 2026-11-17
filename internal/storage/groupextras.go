@@ -11,8 +11,6 @@ import (
 
 // Group settings' keys.
 const (
-	// SettingLogChat is the chat a group's log goes to, as a chat ID.
-	SettingLogChat = "log_chat"
 	// SettingCleanService, "on", has a group's service messages deleted.
 	SettingCleanService = "clean_service"
 )
@@ -126,96 +124,4 @@ func (s *Store) RepTop(ctx context.Context, chatID int64, limit int) ([]MemberRe
 		return nil, fmt.Errorf("storage: read the reputation table: %w", err)
 	}
 	return top, nil
-}
-
-// GroupNote is a saved answer.
-type GroupNote struct {
-	ChatID    int64
-	Name      string
-	Text      string
-	MediaKind string
-	FileID    string
-	SavedBy   int64
-}
-
-// MaxNotes is how many saved answers a group keeps.
-const MaxNotes = 100
-
-// ErrTooManyNotes is a new note past MaxNotes.
-var ErrTooManyNotes = errors.New("storage: too many notes")
-
-// SaveNote keeps a note, replacing one by the same name.
-func (s *Store) SaveNote(ctx context.Context, n GroupNote) error {
-	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		var count int
-		var exists bool
-		if err := tx.QueryRow(ctx, `SELECT count(*), coalesce(bool_or(name = $2), false) FROM group_notes WHERE chat_id = $1`,
-			n.ChatID, n.Name).Scan(&count, &exists); err != nil {
-			return err
-		}
-		if !exists && count >= MaxNotes {
-			return ErrTooManyNotes
-		}
-		_, err := tx.Exec(ctx, `
-			INSERT INTO group_notes (chat_id, name, text, media_kind, file_id, saved_by) VALUES ($1, $2, $3, $4, $5, $6)
-			ON CONFLICT (chat_id, name) DO UPDATE SET text = EXCLUDED.text, media_kind = EXCLUDED.media_kind,
-				file_id = EXCLUDED.file_id, saved_by = EXCLUDED.saved_by, saved_at = now()`,
-			n.ChatID, n.Name, n.Text, n.MediaKind, n.FileID, n.SavedBy)
-		return err
-	})
-	if errors.Is(err, ErrTooManyNotes) {
-		return err
-	}
-	if err != nil {
-		return fmt.Errorf("storage: save a note: %w", err)
-	}
-	return nil
-}
-
-// Note is a group's note by name; found is false when it has none.
-func (s *Store) Note(ctx context.Context, chatID int64, name string) (n GroupNote, found bool, err error) {
-	err = s.pool.QueryRow(ctx, `SELECT chat_id, name, text, media_kind, file_id, saved_by FROM group_notes WHERE chat_id = $1 AND name = $2`,
-		chatID, name).Scan(&n.ChatID, &n.Name, &n.Text, &n.MediaKind, &n.FileID, &n.SavedBy)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return GroupNote{}, false, nil
-	}
-	if err != nil {
-		return GroupNote{}, false, fmt.Errorf("storage: read a note: %w", err)
-	}
-	return n, true, nil
-}
-
-// NoteNames are a group's notes' names, in order.
-func (s *Store) NoteNames(ctx context.Context, chatID int64) ([]string, error) {
-	rows, err := s.pool.Query(ctx, `SELECT name FROM group_notes WHERE chat_id = $1 ORDER BY name`, chatID)
-	if err != nil {
-		return nil, fmt.Errorf("storage: list notes: %w", err)
-	}
-	names, err := pgx.CollectRows(rows, pgx.RowTo[string])
-	if err != nil {
-		return nil, fmt.Errorf("storage: list notes: %w", err)
-	}
-	return names, nil
-}
-
-// DeleteNote removes a note, reporting whether there was one.
-func (s *Store) DeleteNote(ctx context.Context, chatID int64, name string) (bool, error) {
-	tag, err := s.pool.Exec(ctx, `DELETE FROM group_notes WHERE chat_id = $1 AND name = $2`, chatID, name)
-	if err != nil {
-		return false, fmt.Errorf("storage: delete a note: %w", err)
-	}
-	return tag.RowsAffected() == 1, nil
-}
-
-// GroupTitle is a group's title as the bot last saw it, "" when unknown.
-func (s *Store) GroupTitle(ctx context.Context, chatID int64) (string, error) {
-	var title string
-	err := s.pool.QueryRow(ctx, `SELECT title FROM groups WHERE chat_id = $1`, chatID).Scan(&title)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return "", nil
-	}
-	if err != nil {
-		return "", fmt.Errorf("storage: read a group's title: %w", err)
-	}
-	return title, nil
 }

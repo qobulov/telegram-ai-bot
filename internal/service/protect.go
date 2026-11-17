@@ -465,7 +465,6 @@ func (s *Service) removeGuarded(ctx context.Context, in incoming, action, note s
 		return false
 	}
 	s.postGuard(in.msg, "⚠️ "+note)
-	s.journal(in.msg.Chat.ID, "⚠️ Himoya: "+note)
 	return true
 }
 

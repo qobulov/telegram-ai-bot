@@ -396,8 +396,6 @@ var helpSections = map[string]localText{
 /banlist — banlar va "bandan chiqarish" tugmalari; /amnesty — hammani chiqarish
 /reports — ko'rilmagan shikoyatlar; /warns — kimda nechta ogohlantirish
 /kickinactive 30 — 30 kun yozmaganlarni chiqarish
-/save nomi matn (yoki reply) — javob saqlash, #nomi bilan chiqadi; /clear nomi — o'chirish
-/setlog -100… — jurnal kanali (ban, mut, shikoyat, kirgan-chiqqan); /setlog off
 /cleanservice — "kirdi", "chiqdi", "qadadi" xabarlarini o'chirishni yoqish yoki o'chirish
 "orqaga qaytar" — oxirgi amalni bekor qilish
 Meni jim qilish: /mute bot, qaytarish: /unmute`,
@@ -447,7 +445,6 @@ To quiet me: /mute bot, to bring me back: /unmute`,
 /voteban — xabarga reply qilib ban uchun ovoz (5 ta "ha"); boshlagan a'zo bekor qila oladi
 /admins — adminlarni chaqirish, /rights — huquqlaringiz
 Xabarga reply qilib "+" yoki "rahmat" — reputatsiya; /rep, /toprep — reyting
-/notes — saqlangan javoblar, #nomi deb chaqiring
 /mylink — shaxsiy taklif havolangiz, /myinvites — siz qo'shganlar, /invites_week — hafta reytingi
 /id, /ping, /calc 2+2, /weather Toshkent, /tictactoe`,
 		ru: `👥 Для всех

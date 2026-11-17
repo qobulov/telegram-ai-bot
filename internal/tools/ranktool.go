@@ -78,9 +78,6 @@ func (m *Moderation) setRank(ctx context.Context, writer RankWriter, raw json.Ra
 	if *args.Rank == 0 {
 		said = "Bajarildi: " + target.Name + " endi moderator emas."
 	}
-	if m.opts.Journal != nil {
-		m.opts.Journal(ctx, caller.ChatID, "🎖 "+caller.Name+": "+said)
-	}
 	return map[string]any{"done": true, "said": said, "note": doneNote}, nil
 }
 

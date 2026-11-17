@@ -4,9 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
-	"regexp"
-	"strconv"
 	"strings"
 	"unicode"
 
@@ -14,61 +11,13 @@ import (
 	"telegram-ai-bot/internal/telegram"
 )
 
-// GroupExtras keeps what a group's members and admins set up for it:
-// reputation, saved answers, its log chat and its other settings.
+// GroupExtras keeps a group's reputation and its settings.
 type GroupExtras interface {
 	GroupSetting(ctx context.Context, chatID int64, key string) (string, error)
 	SetGroupSetting(ctx context.Context, chatID int64, key, value string, by int64) error
 	GiveRep(ctx context.Context, chatID, from, to int64) (int, error)
 	RepOf(ctx context.Context, chatID, userID int64) (points, place int, err error)
 	RepTop(ctx context.Context, chatID int64, limit int) ([]storage.MemberRep, error)
-	SaveNote(ctx context.Context, n storage.GroupNote) error
-	Note(ctx context.Context, chatID int64, name string) (storage.GroupNote, bool, error)
-	NoteNames(ctx context.Context, chatID int64) ([]string, error)
-	DeleteNote(ctx context.Context, chatID int64, name string) (bool, error)
-}
-
-// Copier copies a message, as a saved answer with a picture is sent back.
-type Copier interface {
-	CopyMessage(ctx context.Context, chatID, fromChatID, messageID int64, caption string) (int64, error)
-}
-
-// JournalStore reads where a group's log goes, and the group's title.
-type JournalStore interface {
-	GroupSetting(ctx context.Context, chatID int64, key string) (string, error)
-	GroupTitle(ctx context.Context, chatID int64) (string, error)
-}
-
-// GroupJournal writes a line to a group's log chat, when it has one: what
-// a moderator or the bot did there. A failure is logged and nothing more.
-func GroupJournal(store JournalStore, sender Sender, logger *slog.Logger) func(ctx context.Context, chatID int64, line string) {
-	return func(ctx context.Context, chatID int64, line string) {
-		logChat, err := store.GroupSetting(ctx, chatID, storage.SettingLogChat)
-		if err != nil || logChat == "" {
-			return
-		}
-		to, err := strconv.ParseInt(logChat, 10, 64)
-		if err != nil {
-			return
-		}
-		title, _ := store.GroupTitle(ctx, chatID)
-		if title == "" {
-			title = strconv.FormatInt(chatID, 10)
-		}
-		if _, err := sender.SendMessage(ctx, telegram.Outgoing{ChatID: to, Text: "📋 " + cardMarks.Replace(title) + "\n" + line}); err != nil {
-			logger.Warn("could not write to a group's log", "chat_id", chatID, "error", err)
-		}
-	}
-}
-
-// journal writes a line to the group's log, if the service has one.
-func (s *Service) journal(chatID int64, line string) {
-	if s.opts.Journal == nil {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
-	defer cancel()
-	s.opts.Journal(ctx, chatID, line)
 }
 
 // repWords thank the member replied to, and give them a point.
@@ -170,174 +119,6 @@ func (s *Service) reputationTop(ctx context.Context, in incoming) outcome {
 	return say(strings.Join(lines, "\n"))
 }
 
-// noteName is a saved answer's name: letters, digits and _, up to 32.
-var noteName = regexp.MustCompile(`^[\p{L}\p{N}_]{1,32}$`)
-
-// noteCalled is the note a "#qoidalar" or "!donat" message calls, "" for
-// any other message.
-func noteCalled(text string) string {
-	text = strings.TrimSpace(text)
-	if len(text) < 2 || (text[0] != '#' && text[0] != '!') {
-		return ""
-	}
-	name := strings.ToLower(text[1:])
-	if !noteName.MatchString(name) {
-		return ""
-	}
-	return name
-}
-
-// callsNote reports a message calling a note the group has, made into
-// "/note name" for respond.
-func (s *Service) callsNote(in incoming) (incoming, bool) {
-	text, _ := in.msg.Content()
-	name := noteCalled(text)
-	if s.opts.Extras == nil || name == "" || in.fromBot {
-		return in, false
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
-	defer cancel()
-	if _, found, err := s.opts.Extras.Note(ctx, in.msg.Chat.ID, name); err != nil || !found {
-		return in, false
-	}
-	in.text, in.trigger = "/note "+name, triggerCommand
-	return in, true
-}
-
-// showNote sends a saved answer: its message copied when it had a picture
-// or the like, else its text.
-func (s *Service) showNote(ctx context.Context, in incoming) outcome {
-	name := strings.ToLower(strings.TrimLeft(strings.TrimSpace(commandArgument(in.text)), "#!"))
-	note, found, err := s.opts.Extras.Note(ctx, in.scope.ChatID, name)
-	switch {
-	case err != nil:
-		return say(textError.to(in))
-	case !found:
-		return say("📭 Bunday saqlangan javob yo'q. Ro'yxat: /notes")
-	}
-	if note.MediaKind == "copy" && s.opts.Copier != nil {
-		if source, err := strconv.ParseInt(note.FileID, 10, 64); err == nil {
-			if _, err := s.opts.Copier.CopyMessage(ctx, in.scope.ChatID, in.scope.ChatID, source, ""); err == nil {
-				return outcome{}
-			}
-		}
-		if note.Text == "" {
-			return say("Bu javobning asl xabari o'chirilgan: uni /save " + name + " bilan qayta saqlang.")
-		}
-	}
-	return say(note.Text)
-}
-
-// saveNote answers /save name [text]: the text, or the message replied to,
-// is kept under name, by those whose rank opens notes.
-func (s *Service) saveNote(ctx context.Context, in incoming) outcome {
-	if allowed, err := s.mayModerate(ctx, in, "notes"); err != nil || !allowed {
-		return say("⛔ Javob saqlash adminlar va moderatorlar uchun.")
-	}
-	name, text, _ := strings.Cut(strings.TrimSpace(commandArgument(in.text)), " ")
-	name = strings.ToLower(strings.TrimLeft(name, "#!"))
-	if !noteName.MatchString(name) {
-		return say("Masalan: /save qoidalar Reklama taqiqlanadi. Yoki xabarga reply qilib: /save qoidalar")
-	}
-	note := storage.GroupNote{ChatID: in.scope.ChatID, Name: name, Text: strings.TrimSpace(text), SavedBy: in.userID}
-	if r := in.msg.ReplyToMessage; r != nil && note.Text == "" {
-		content, _ := r.Content()
-		note.Text = strings.TrimSpace(content)
-		if r.Text == "" {
-			// A picture, sticker, GIF, video or file: the message itself is
-			// copied back.
-			note.MediaKind, note.FileID = "copy", strconv.FormatInt(r.MessageID, 10)
-		}
-	}
-	if note.Text == "" && note.MediaKind == "" {
-		return say("Nimani saqlay? Matnini yozing yoki xabarga reply qiling: /save " + name)
-	}
-	switch err := s.opts.Extras.SaveNote(ctx, note); {
-	case errors.Is(err, storage.ErrTooManyNotes):
-		return say(fmt.Sprintf("⛔ Guruhda ko'pi bilan %d ta saqlangan javob bo'ladi: keraksizini /clear bilan o'chiring.", storage.MaxNotes))
-	case err != nil:
-		return say(textError.to(in))
-	}
-	s.journal(in.scope.ChatID, "📝 "+plainLabel(in.msg.From)+": #"+name+" javobi saqlandi")
-	return say("✅ Saqlandi: #" + name + " yoki !" + name + " deb yozilsa chiqaraman.")
-}
-
-// listNotes answers /notes: the group's saved answers.
-func (s *Service) listNotes(ctx context.Context, in incoming) outcome {
-	names, err := s.opts.Extras.NoteNames(ctx, in.scope.ChatID)
-	if err != nil {
-		return say(textError.to(in))
-	}
-	if len(names) == 0 {
-		return say("📭 Saqlangan javoblar yo'q. Admin saqlaydi: /save qoidalar Reklama taqiqlanadi")
-	}
-	for i, n := range names {
-		names[i] = "#" + n
-	}
-	return say("📝 Saqlangan javoblar (yozing, chiqaraman):\n" + strings.Join(names, "  "))
-}
-
-// clearNote answers /clear name.
-func (s *Service) clearNote(ctx context.Context, in incoming) outcome {
-	if allowed, err := s.mayModerate(ctx, in, "notes"); err != nil || !allowed {
-		return say("⛔ Javobni adminlar va moderatorlar o'chiradi.")
-	}
-	name := strings.ToLower(strings.TrimLeft(strings.TrimSpace(commandArgument(in.text)), "#!"))
-	removed, err := s.opts.Extras.DeleteNote(ctx, in.scope.ChatID, name)
-	switch {
-	case err != nil:
-		return say(textError.to(in))
-	case !removed:
-		return say("📭 #" + name + " degan saqlangan javob yo'q. Ro'yxat: /notes")
-	}
-	s.journal(in.scope.ChatID, "🗑 "+plainLabel(in.msg.From)+": #"+name+" javobi o'chirildi")
-	return say("🗑 #" + name + " o'chirildi.")
-}
-
-// setLog answers /setlog: the chat whose ID is given, or that a forwarded
-// message came from, gets the group's log; "/setlog off" stops it.
-func (s *Service) setLog(ctx context.Context, in incoming) outcome {
-	if allowed, err := s.mayModerate(ctx, in, "group"); err != nil || !allowed {
-		return say("⛔ Jurnalni guruh egasi yoki 4-darajali moderator ulaydi.")
-	}
-	arg := strings.ToLower(strings.TrimSpace(commandArgument(in.text)))
-	if arg == "off" || arg == "o'chir" || arg == "ochir" {
-		if err := s.opts.Extras.SetGroupSetting(ctx, in.scope.ChatID, storage.SettingLogChat, "", in.userID); err != nil {
-			return say(textError.to(in))
-		}
-		return say("📋 Jurnal o'chirildi.")
-	}
-	target, ok := logTarget(in.msg, arg)
-	if !ok {
-		return say("📋 Jurnal: botni kanal yoki guruhga admin qilib qo'shing, u yerda /id yozib ID'ni oling, keyin bu yerda /setlog -100… yozing. Yoki o'sha kanaldan bir xabarni forward qilib, unga reply qilib /setlog yozing. O'chirish: /setlog off")
-	}
-	title := in.msg.Chat.Title
-	if _, err := s.opts.Sender.SendMessage(ctx, telegram.Outgoing{ChatID: target, Text: "📋 Bu chat «" + cardMarks.Replace(title) + "» guruhining jurnali bo'ldi: ban, mut, shikoyat, kirgan-chiqqanlar shu yerga yoziladi."}); err != nil {
-		return say("⛔ U chatga yoza olmadim: botni o'sha kanal yoki guruhga qo'shib, yozish huquqini bering.")
-	}
-	if err := s.opts.Extras.SetGroupSetting(ctx, in.scope.ChatID, storage.SettingLogChat, strconv.FormatInt(target, 10), in.userID); err != nil {
-		return say(textError.to(in))
-	}
-	return say("✅ Jurnal ulandi: endi moderatsiya amallari u chatga yoziladi.")
-}
-
-// logTarget is the chat a /setlog names: an ID, or the origin of the
-// forwarded message it replies to.
-func logTarget(msg *telegram.Message, arg string) (int64, bool) {
-	if id, err := strconv.ParseInt(arg, 10, 64); err == nil && id < 0 && id != msg.Chat.ID {
-		return id, true
-	}
-	if r := msg.ReplyToMessage; r != nil && r.ForwardOrigin != nil {
-		if c := r.ForwardOrigin.Chat; c != nil && c.ID != msg.Chat.ID {
-			return c.ID, true
-		}
-		if c := r.ForwardOrigin.SenderChat; c != nil && c.ID != msg.Chat.ID {
-			return c.ID, true
-		}
-	}
-	return 0, false
-}
-
 // setCleanService answers /cleanservice: whether the group's service
 // messages ("X joined", "Y pinned") are deleted. Alone it switches the
 // setting; "on" and "off" set it.
@@ -386,22 +167,4 @@ func (s *Service) cleanedService(msg *telegram.Message) bool {
 		return false
 	}
 	return true
-}
-
-// journalMembers writes joins and leaves to the group's log.
-func (s *Service) journalMembers(msg *telegram.Message) {
-	if s.opts.Journal == nil {
-		return
-	}
-	for i := range msg.NewChatMembers {
-		joined := &msg.NewChatMembers[i]
-		line := "➕ Kirdi: " + plainLabel(joined) + " (" + strconv.FormatInt(joined.ID, 10) + ")"
-		if msg.From != nil && msg.From.ID != joined.ID {
-			line += ", qo'shgan: " + plainLabel(msg.From)
-		}
-		s.journal(msg.Chat.ID, line)
-	}
-	if left := msg.LeftChatMember; left != nil {
-		s.journal(msg.Chat.ID, "➖ Chiqdi: "+plainLabel(left)+" ("+strconv.FormatInt(left.ID, 10)+")")
-	}
 }

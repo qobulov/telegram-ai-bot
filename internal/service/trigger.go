@@ -134,7 +134,7 @@ var ownCommands = map[string]bool{
 	"/admins": true, "/report": true, "/voteban": true,
 	"/ping": true, "/id": true, "/calc": true, "/weather": true,
 	"/mylink": true, "/reports": true, "/warns": true, "/profile": true, "/rights": true, "/myinvites": true,
-	"/note": true, "/save": true, "/notes": true, "/clear": true, "/delnote": true, "/rep": true, "/toprep": true, "/setlog": true, "/cleanservice": true,
+	"/rep": true, "/toprep": true, "/cleanservice": true,
 }
 
 // commandTarget reports whether text is a command and which bot it names:

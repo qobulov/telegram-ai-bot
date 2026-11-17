@@ -1438,29 +1438,3 @@ func TestOwnerPromotesThemselves(t *testing.T) {
 		t.Errorf("calls = %q", calls)
 	}
 }
-
-// Each action done is told to the journal, with who asked; a refusal is
-// not.
-func TestModerationJournal(t *testing.T) {
-	env := newModerationEnv(t)
-	var lines []string
-	env.opts.Journal = func(_ context.Context, chatID int64, line string) {
-		if chatID == groupA {
-			lines = append(lines, line)
-		}
-	}
-	env.moderation = NewModeration(env.opts)
-	env.registry = mustRegistry(t, env.moderation.Tool())
-	ctx := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Name: "Aziz", Human: true, UpdateID: 900, MessageID: 50, Target: bekTarget(), Words: askingForAll}, &Sink{})
-	if got := env.moderate(ctx, `{"action":"mute","minutes":30}`); !got.OK {
-		t.Fatalf("mute = %+v", got)
-	}
-	if len(lines) != 1 || !strings.HasPrefix(lines[0], "🛡 Aziz: Bajarildi") {
-		t.Errorf("journal = %q", lines)
-	}
-	wondering := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Name: "Aziz", Human: true, UpdateID: 901, MessageID: 50, Target: bekTarget(), Words: "salom"}, &Sink{})
-	env.moderate(wondering, `{"action":"mute"}`)
-	if len(lines) != 1 {
-		t.Errorf("a refusal was journaled: %q", lines)
-	}
-}

@@ -190,15 +190,11 @@ type Options struct {
 	// BanVotes keeps the groups' votes to ban a member, for /voteban; nil
 	// turns it off.
 	BanVotes BanVoteBook
-	// Extras keeps reputation, saved answers and a group's settings, and
-	// Copier sends a saved answer's picture back; Journal writes to a
-	// group's log chat. nil turns each off.
 	// Crystals keeps crystals bought for Stars in the cards app; nil sells
-	// none.
+	// none. Extras keeps reputation and a group's settings; nil turns them
+	// off.
 	Crystals CrystalBook
 	Extras   GroupExtras
-	Copier   Copier
-	Journal  func(ctx context.Context, chatID int64, line string)
 	// Reports keeps the members' reports, and WarnList their warnings, for
 	// /reports and /warns; nil turns each off.
 	Reports  ReportBook
@@ -782,7 +778,6 @@ func (s *Service) noteMembers(msg *telegram.Message) {
 		s.markInvitee(msg.Chat.ID, &msg.NewChatMembers[i], true)
 	}
 	s.noteAdded(msg)
-	s.journalMembers(msg)
 	if msg.LeftChatMember != nil {
 		s.seeMember(msg.Chat.ID, msg.LeftChatMember, "left")
 		s.markInvitee(msg.Chat.ID, msg.LeftChatMember, false)
@@ -930,10 +925,6 @@ func (s *Service) acceptGroup(in incoming) (incoming, bool) {
 			s.remember(in.msg)
 		}
 		return incoming{}, false
-	}
-	// "#qoidalar" calls a saved answer.
-	if called, ok := s.callsNote(in); ok {
-		return called, true
 	}
 	// Swearing in a guarded group is handled in code and not answered.
 	if s.guardedSwearing(in.msg, in.updateID) {

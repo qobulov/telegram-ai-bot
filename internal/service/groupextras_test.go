@@ -10,17 +10,16 @@ import (
 	"telegram-ai-bot/internal/telegram"
 )
 
-// memoryExtras keeps reputation, notes and settings in memory.
+// memoryExtras keeps reputation and settings in memory.
 type memoryExtras struct {
 	mu       sync.Mutex
 	settings map[string]string
 	rep      map[int64]int
 	given    map[[2]int64]bool
-	notes    map[string]storage.GroupNote
 }
 
 func newMemoryExtras() *memoryExtras {
-	return &memoryExtras{settings: map[string]string{}, rep: map[int64]int{}, given: map[[2]int64]bool{}, notes: map[string]storage.GroupNote{}}
+	return &memoryExtras{settings: map[string]string{}, rep: map[int64]int{}, given: map[[2]int64]bool{}}
 }
 
 func (m *memoryExtras) GroupSetting(_ context.Context, _ int64, key string) (string, error) {
@@ -61,41 +60,6 @@ func (m *memoryExtras) RepTop(context.Context, int64, int) ([]storage.MemberRep,
 	}
 	return top, nil
 }
-func (m *memoryExtras) SaveNote(_ context.Context, n storage.GroupNote) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.notes[n.Name] = n
-	return nil
-}
-func (m *memoryExtras) Note(_ context.Context, _ int64, name string) (storage.GroupNote, bool, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	n, ok := m.notes[name]
-	return n, ok, nil
-}
-func (m *memoryExtras) NoteNames(context.Context, int64) ([]string, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	var names []string
-	for n := range m.notes {
-		names = append(names, n)
-	}
-	return names, nil
-}
-func (m *memoryExtras) DeleteNote(_ context.Context, _ int64, name string) (bool, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	_, ok := m.notes[name]
-	delete(m.notes, name)
-	return ok, nil
-}
-
-type fakeCopier struct{ copied []int64 }
-
-func (f *fakeCopier) CopyMessage(_ context.Context, _, _, messageID int64, _ string) (int64, error) {
-	f.copied = append(f.copied, messageID)
-	return 1, nil
-}
 
 // "+" or "rahmat" to a member gives them a point once, marked with a
 // reaction and unanswered; /rep and /toprep show it; a "+" to oneself or
@@ -115,75 +79,6 @@ func TestReputationByThanks(t *testing.T) {
 	sent = f.run(from(20, "/toprep", 0))
 	if last := sent[len(sent)-1].text; !strings.Contains(last, "Sam — 2") {
 		t.Errorf("/toprep = %q", last)
-	}
-}
-
-// A moderator saves an answer, anyone calls it with "#name" or "!name", a
-// member cannot save, and a reply to a picture is copied back.
-func TestNotes(t *testing.T) {
-	f := newFixture()
-	extras, copier := newMemoryExtras(), &fakeCopier{}
-	f.opts.Extras, f.opts.Copier = extras, copier
-	f.opts.Ranks = &fakeRankBook{ranks: map[int64]int{40: 2}, overrides: map[string]int{}}
-	sent := f.run(from(21, "/save qoidalar Reklama yo'q", 0))
-	if last := sent[len(sent)-1].text; !strings.Contains(last, "⛔") {
-		t.Errorf("a member's /save = %q", last)
-	}
-	f.run(from(40, "/save qoidalar Reklama yo'q", 0))
-	sent = f.run(from(21, "#qoidalar", 0), from(22, "!Qoidalar", 0))
-	if len(sent) < 2 || sent[len(sent)-1].text != "Reklama yo'q" || sent[len(sent)-2].text != "Reklama yo'q" {
-		t.Fatalf("called = %+v", sent)
-	}
-	if before := len(sent); len(f.run(from(21, "#nimadir", 0))) != before {
-		t.Errorf("an unknown #tag was answered")
-	}
-	picture := groupMessage("/save meme")
-	picture.From = &telegram.User{ID: 40, FirstName: "M"}
-	picture.ReplyToMessage = &telegram.Message{MessageID: 77, From: &telegram.User{ID: 30}, Chat: picture.Chat, Caption: "kulgili"}
-	f.run(inGroup(picture))
-	f.run(from(21, "#meme", 0))
-	if len(copier.copied) != 1 || copier.copied[0] != 77 {
-		t.Errorf("copied = %v", copier.copied)
-	}
-	sent = f.run(from(21, "/notes", 0))
-	if last := sent[len(sent)-1].text; !strings.Contains(last, "#qoidalar") || !strings.Contains(last, "#meme") {
-		t.Errorf("/notes = %q", last)
-	}
-	f.run(from(40, "/clear qoidalar", 0))
-	if _, ok := extras.notes["qoidalar"]; ok {
-		t.Error("/clear left the note")
-	}
-}
-
-// /setlog links a log chat that the bot can write to, and moderation then
-// goes there; a join is logged too; /setlog off stops it.
-func TestGroupLog(t *testing.T) {
-	f := newFixture()
-	extras := newMemoryExtras()
-	f.opts.Extras = extras
-	f.members.creator = 10
-	var lines []string
-	f.opts.Journal = func(_ context.Context, _ int64, line string) { lines = append(lines, line) }
-	sent := f.run(from(10, "/setlog -1009999", 0))
-	if extras.settings[storage.SettingLogChat] != "-1009999" || !strings.Contains(sent[len(sent)-1].text, "ulandi") {
-		t.Fatalf("setlog = %v, %+v", extras.settings, sent)
-	}
-	if !strings.Contains(sent[len(sent)-2].text, "jurnali bo'ldi") || sent[len(sent)-2].chatID != -1009999 {
-		t.Errorf("no greeting in the log chat: %+v", sent)
-	}
-	join := groupMessage("")
-	join.NewChatMembers = []telegram.User{{ID: 55, FirstName: "Yangi"}}
-	f.run(inGroup(join))
-	if len(lines) == 0 || !strings.Contains(lines[len(lines)-1], "Kirdi: Yangi") {
-		t.Errorf("join lines = %v", lines)
-	}
-	sent = f.run(from(21, "/setlog -1008888", 0))
-	if !strings.Contains(sent[len(sent)-1].text, "⛔") {
-		t.Errorf("a member's /setlog = %q", sent[len(sent)-1].text)
-	}
-	f.run(from(10, "/setlog off", 0))
-	if extras.settings[storage.SettingLogChat] != "" {
-		t.Errorf("off left %v", extras.settings)
 	}
 }
 
@@ -215,20 +110,6 @@ func (j journalStore) GroupSetting(context.Context, int64, string) (string, erro
 	return j.logChat, nil
 }
 func (journalStore) GroupTitle(context.Context, int64) (string, error) { return "BS news", nil }
-
-// The journal writes to the log chat under the group's title, and to
-// nowhere when the group has none.
-func TestGroupJournal(t *testing.T) {
-	sender := &fakeSender{}
-	GroupJournal(journalStore{logChat: "-1009999"}, sender, discardLogger())(context.Background(), groupID, "🛡 Aziz: Bajarildi")
-	if len(sender.sent) != 1 || sender.sent[0].chatID != -1009999 || sender.sent[0].text != "📋 BS news\n🛡 Aziz: Bajarildi" {
-		t.Errorf("sent = %+v", sender.sent)
-	}
-	GroupJournal(journalStore{}, sender, discardLogger())(context.Background(), groupID, "x")
-	if len(sender.sent) != 1 {
-		t.Errorf("wrote without a log chat: %+v", sender.sent)
-	}
-}
 
 // Thanks are read with fillers, punctuation and emoji; talk is not.
 func TestIsThanks(t *testing.T) {

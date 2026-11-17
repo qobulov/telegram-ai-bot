@@ -205,7 +205,6 @@ func (s *Service) pressedUnban(q *telegram.CallbackQuery) {
 		s.opts.Logger.Warn("could not note an unban", "chat_id", q.Message.Chat.ID, "error", err)
 	}
 	answer("🔓 Bandan chiqarildi.", false)
-	s.journal(q.Message.Chat.ID, fmt.Sprintf("🔓 %s: %d bandan chiqarildi (/banlist)", plainLabel(q.From), userID))
 	if text, buttons, err := s.banListPage(ctx, q.Message.Chat.ID); err == nil {
 		_ = s.opts.Buttons.EditMessageMenu(ctx, q.Message.Chat.ID, q.Message.MessageID, text, buttons)
 	}

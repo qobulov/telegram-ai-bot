@@ -24,7 +24,6 @@ var membersMenu = []telegram.BotCommand{
 	{Command: "rights", Description: "Guruhdagi huquqlaringiz"},
 	{Command: "rep", Description: "Reputatsiya: \"+\" yoki \"rahmat\" reply bilan beriladi"},
 	{Command: "toprep", Description: "Reputatsiya reytingi"},
-	{Command: "notes", Description: "Saqlangan javoblar: #nomi deb chaqiring"},
 	{Command: "admins", Description: "Adminlar va moderatorlarni chaqirish"},
 	{Command: "report", Description: "Shikoyat: xabarga reply qiling"},
 	{Command: "voteban", Description: "Ban uchun ovoz berish: xabarga reply qiling"},
@@ -69,9 +68,6 @@ var commandMenus = map[string][]telegram.BotCommand{
 		{Command: "kickinactive", Description: "Faol emaslarni chiqarish: /kickinactive 30"},
 		{Command: "amnesty", Description: "Hammani bandan chiqarish"},
 		{Command: "ignore", Description: "A'zoga 24 soat javob bermaslik (reply)"},
-		{Command: "save", Description: "Javob saqlash: /save qoidalar Matn (yoki reply)"},
-		{Command: "clear", Description: "Saqlangan javobni o'chirish: /clear qoidalar"},
-		{Command: "setlog", Description: "Jurnal kanali: /setlog -100… yoki off"},
 		{Command: "cleanservice", Description: "\"Kirdi/chiqdi\" xabarlarini o'chirish (yoqish/o'chirish)"},
 	}, membersMenu...),
 }

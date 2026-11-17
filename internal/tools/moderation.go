@@ -292,24 +292,6 @@ type ModerationOptions struct {
 	// action may ask for it without the Telegram right. Without it only
 	// Telegram's rights count.
 	Ranks RankBook
-	// Journal, when set, is told each action done, in a line for the
-	// group's log: who asked, and what the bot said it did.
-	Journal func(ctx context.Context, chatID int64, line string)
-}
-
-// runAndJournal is run, with each action done written to the group's log.
-func (m *Moderation) runAndJournal(ctx context.Context, raw json.RawMessage) (any, error) {
-	result, err := m.run(ctx, raw)
-	if err != nil || m.opts.Journal == nil {
-		return result, err
-	}
-	done, _ := result.(map[string]any)
-	said, _ := done["said"].(string)
-	caller, ok := CallerFrom(ctx)
-	if ok && done["done"] == true && said != "" {
-		m.opts.Journal(ctx, caller.ChatID, "🛡 "+caller.Name+": "+said)
-	}
-	return result, err
 }
 
 // BanBook lists a group's members the bot banned, and those it last saw
@@ -420,7 +402,7 @@ func (m *Moderation) Tool() Tool {
 		}`),
 		GroupOnly: true,
 		Timeout:   moderationTimeout,
-		Run:       m.runAndJournal,
+		Run:       m.run,
 	}
 }
 

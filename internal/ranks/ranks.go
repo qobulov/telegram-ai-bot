@@ -27,7 +27,6 @@ var Commands = []Command{
 	{"mute", "Mut va mutdan chiqarish", 1},
 	{"warn", "Ogohlantirish (varn)", 1},
 	{"pin", "Xabarni qadash", 2},
-	{"notes", "Saqlangan javoblar (/save, /clear)", 2},
 	{"media", "Stiker va rasm cheklovi", 2},
 	{"delete", "Xabarni o'chirish", 3},
 	{"undo", "Oxirgi amalni bekor qilish", 3},

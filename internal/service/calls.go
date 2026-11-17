@@ -202,7 +202,6 @@ func (s *Service) report(ctx context.Context, in incoming) outcome {
 		s.opts.Logger.Warn("could not keep a report", "chat_id", in.scope.ChatID, "error", err)
 		return say(text)
 	}
-	s.journal(in.scope.ChatID, fmt.Sprintf("🚨 Shikoyat: %s → %s: «%s»", plainLabel(in.msg.From), plainLabel(replied.From), quote))
 	return outcome{text: text, buttons: reportButtons(id)}
 }
 
@@ -248,7 +247,6 @@ func (s *Service) pressedReport(q *telegram.CallbackQuery) {
 		}
 	}
 	answer(verdict, false)
-	s.journal(q.Message.Chat.ID, fmt.Sprintf("🚨 %s: shikoyat — %s (%s → %s)", plainLabel(q.From), verdict, r.ReporterName, r.TargetName))
 	text := fmt.Sprintf("🚨 Shikoyat: %s → %s\n«%s»\n%s — %s", cardMarks.Replace(r.ReporterName), cardMarks.Replace(r.TargetName), r.Quote, verdict, cardMarks.Replace(doozName(q.From)))
 	_ = s.opts.Buttons.EditMessageText(ctx, q.Message.Chat.ID, q.Message.MessageID, text)
 }
@@ -428,7 +426,6 @@ func (s *Service) pressedBanVote(q *telegram.CallbackQuery) {
 		text = fmt.Sprintf("Ovoz yig'ildi, lekin %s ni bloklab bo'lmadi: menga a'zolarni cheklash huquqi kerak.", cardMarks.Replace(vote.Name))
 	} else {
 		s.noteVoteBan(ctx, q.Message.Chat.ID, vote)
-		s.journal(q.Message.Chat.ID, fmt.Sprintf("🗳 %s %d ovoz bilan bloklandi", vote.Name, len(vote.Yes)))
 	}
 	_ = s.opts.Buttons.EditMessageText(ctx, q.Message.Chat.ID, q.Message.MessageID, text)
 }
