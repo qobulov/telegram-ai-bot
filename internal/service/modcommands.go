@@ -168,8 +168,8 @@ func (s *Service) modCommand(ctx context.Context, in incoming) outcome {
 	switch {
 	case command == "/tag":
 		// An admin's tag is their admin title.
-		done := s.runModerate(ctx, in, map[string]any{"action": action, "text": arg})
-		if strings.Contains(done.text, "admin_title") {
+		done, refusal := s.moderate(ctx, in, map[string]any{"action": action, "text": arg})
+		if strings.Contains(refusal, "admin_title") {
 			return s.runModerate(ctx, in, map[string]any{"action": "admin_title", "text": arg})
 		}
 		return done
@@ -190,9 +190,15 @@ func (s *Service) modCommand(ctx context.Context, in incoming) outcome {
 // runModerate has the moderate tool do args for in, and says what was done,
 // or why it was not.
 func (s *Service) runModerate(ctx context.Context, in incoming, fields map[string]any) outcome {
+	done, _ := s.moderate(ctx, in, fields)
+	return done
+}
+
+// moderate is runModerate, with the tool's refusal as it gave it.
+func (s *Service) moderate(ctx context.Context, in incoming, fields map[string]any) (outcome, string) {
 	args, err := json.Marshal(fields)
 	if err != nil {
-		return say(textError.to(in))
+		return say(textError.to(in)), ""
 	}
 	ctx, cancel := context.WithTimeout(ctx, modTimeout)
 	defer cancel()
@@ -209,18 +215,22 @@ func (s *Service) runModerate(ctx context.Context, in incoming, fields map[strin
 	}
 	if err := json.Unmarshal([]byte(s.opts.Tools.Execute(ctx, in.userID, "moderate", string(args))), &envelope); err != nil {
 		s.opts.Logger.Error("could not read a moderation command's result", "chat_id", in.scope.ChatID, "error", err)
-		return say(textError.to(in))
+		return say(textError.to(in)), ""
 	}
 	switch {
 	case envelope.OK && envelope.Result.Said != "":
-		return say(envelope.Result.Said)
+		return say(envelope.Result.Said), ""
 	case envelope.OK:
-		return outcome{}
+		return outcome{}, ""
 	case envelope.Error.Message != "" && envelope.Error.Code != "execution_failed":
-		return say("⛔ " + envelope.Error.Message)
+		if text := modRefusalText(envelope.Error.Message); text != "" {
+			return say("⛔ " + text), envelope.Error.Message
+		}
+		s.opts.Logger.Warn("a moderation refusal has no Uzbek words", "message", envelope.Error.Message)
+		return say("⛔ Bajarib bo'lmadi."), envelope.Error.Message
 	}
 	s.opts.Logger.Warn("a moderation command failed", "chat_id", in.scope.ChatID, "code", envelope.Error.Code)
-	return say(textError.to(in))
+	return say(textError.to(in)), envelope.Error.Message
 }
 
 // modDuration reads a mute's length: "30m", "4h", "2d", "1w", or a number

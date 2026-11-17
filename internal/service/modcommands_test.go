@@ -41,8 +41,8 @@ func TestModCommandsWithoutTheModel(t *testing.T) {
 	if len(sent) != 1 || sent[0].text != "Bajarildi: Sam 4 soat yoza olmaydi." || len(f.replier.recorded()) != 0 {
 		t.Fatalf("sent = %+v, model asked %d times", sent, len(f.replier.recorded()))
 	}
-	runner.answers["moderate"] = `{"ok":false,"error":{"code":"forbidden","message":"Buni faqat guruh adminlari so'ray oladi."}}`
-	if sent = f.run(inGroup(reply("/ban"))); len(sent) != 2 || !strings.Contains(sent[1].text, "faqat guruh adminlari") || !strings.Contains(runner.asked[1], `"action":"ban"`) {
+	runner.answers["moderate"] = `{"ok":false,"error":{"code":"forbidden","message":"only admins of this group who have the right to ban and mute members, or my owners, can ask me to do that; the person asking is neither"}}`
+	if sent = f.run(inGroup(reply("/ban"))); len(sent) != 2 || !strings.Contains(sent[1].text, "«a'zolarni cheklash» huquqi bor adminlar") || !strings.Contains(runner.asked[1], `"action":"ban"`) {
 		t.Errorf("a refused ban = %+v", sent)
 	}
 	if f.run(inGroup(groupMessage("/mute"))); len(runner.asked) != 2 {
