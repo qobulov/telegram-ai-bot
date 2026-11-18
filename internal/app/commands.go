@@ -73,13 +73,87 @@ var commandMenus = map[string][]telegram.BotCommand{
 	}, membersMenu...),
 }
 
-// ownerMenu is what an owner sees in a group: the admins' menu and the
-// commands only owners have, set for them alone in each group they write in.
-var ownerMenu = append(append([]telegram.BotCommand(nil), commandMenus[telegram.ScopeAllChatAdmins]...),
-	telegram.BotCommand{Command: "limit", Description: "Guruhda daqiqasiga javoblar soni (owner)"},
-	telegram.BotCommand{Command: "active", Description: "Kamida X faol a'zo sharti, yoki off (owner)"},
-	telegram.BotCommand{Command: "aichat", Description: "Bu guruhda AI suhbatni yoqish/o'chirish (owner)"},
-)
+// ownerMenu is every command the bot answers, for its owners alone, set
+// for each in every group they write in and in their private chat with it. The menus of
+// everyone else come first, then the commands they do not list, then the
+// owners' own. Aliases, /delete and /ranks, are left out.
+var ownerMenu = []telegram.BotCommand{
+	{Command: "help", Description: "Yordam va buyruqlar"},
+	{Command: "start", Description: "Salomlashish"},
+	{Command: "about", Description: "Bot haqida"},
+	{Command: "cards", Description: "Kartalar: har 2 soatda token, 1x/5x ochish, kolleksiya"},
+	{Command: "card", Description: "Karta ochish (ilovada)"},
+	{Command: "mycards", Description: "Kartalaringiz kolleksiyasi"},
+	{Command: "cardtop", Description: "Kartalar reytingi: eng ko'p ochko"},
+	{Command: "market", Description: "Kartalar bozori: kartalarni almashish"},
+	{Command: "duel", Description: "Kartalar dueli: /duel 100 (reply yoki hammaga)"},
+	{Command: "profile", Description: "O'yinchi kartangiz: ochko, o'rin, kartalar"},
+	{Command: "games", Description: "Barcha o'yinlar"},
+	{Command: "game", Description: "Tarozi o'yini"},
+	{Command: "snake", Description: "Kosmik ilon o'yini"},
+	{Command: "woodcutter", Description: "O'tinchi: daraxtni chop, shoxlardan qoch"},
+	{Command: "boss", Description: "Dev jangi: guruh bilan birga devni uring"},
+	{Command: "mafia", Description: "Mafia: guruh bilan, yashirin rollar, 5+ kishi"},
+	{Command: "tictactoe", Description: "X-O: do'stingiz yoki men bilan"},
+	{Command: "checkers", Description: "Shashka: tasodifiy raqib, do'st yoki men bilan"},
+	{Command: "teams", Description: "MLBB: o'yinchilarni tasodifiy 2 jamoaga bo'lish"},
+	{Command: "mylink", Description: "Shaxsiy taklif havolangiz: kirganlar sizga hisoblanadi"},
+	{Command: "myinvites", Description: "Siz nechta odam qo'shdingiz"},
+	{Command: "invites", Description: "Reyting: kim nechta odam qo'shdi"},
+	{Command: "invites_week", Description: "Haftalik reyting: kim nechta odam qo'shdi"},
+	{Command: "invites_month", Description: "Oylik reyting: kim nechta odam qo'shdi"},
+	{Command: "rights", Description: "Guruhdagi huquqlaringiz"},
+	{Command: "rep", Description: "Reputatsiya: \"+\" yoki \"rahmat\" reply bilan beriladi"},
+	{Command: "toprep", Description: "Reputatsiya reytingi"},
+	{Command: "admins", Description: "Adminlar va moderatorlarni chaqirish"},
+	{Command: "report", Description: "Shikoyat: xabarga reply qiling"},
+	{Command: "voteban", Description: "Ban uchun ovoz berish: xabarga reply qiling"},
+	{Command: "staff", Description: "Moderatorlar ro'yxati"},
+	{Command: "id", Description: "Sizning va chatning ID'si"},
+	{Command: "ping", Description: "Bot ishlayaptimi: javob vaqti"},
+	{Command: "calc", Description: "Kalkulyator: /calc 2+2"},
+	{Command: "weather", Description: "Ob-havo: /weather Toshkent"},
+	{Command: "premium", Description: "Premium: nima beradi, sotib olish yoki uzaytirish"},
+	{Command: "paysupport", Description: "To'lov bo'yicha kimga yozish"},
+	{Command: "warn", Description: "Ogohlantirish, 3-sida 1 kunga mut (reply yoki @user)"},
+	{Command: "unwarn", Description: "Bitta ogohlantirishni olib tashlash"},
+	{Command: "mute", Description: "Mut: /mute 1h (reply yoki @user); botni: /mute bot"},
+	{Command: "unmute", Description: "Mutdan chiqarish yoki botni gapirtirish"},
+	{Command: "ban", Description: "Ban: /ban sabab (reply yoki @user)"},
+	{Command: "unban", Description: "Bandan chiqarish (reply yoki @user)"},
+	{Command: "kick", Description: "Guruhdan chiqarish (reply yoki @user)"},
+	{Command: "del", Description: "Xabarni o'chirish (reply)"},
+	{Command: "pin", Description: "Xabarni qadash (reply)"},
+	{Command: "unpin", Description: "Qadalgan xabarni olib tashlash"},
+	{Command: "promote", Description: "Admin qilish: /promote Unvon (reply yoki @user)"},
+	{Command: "demote", Description: "Adminlikni olish (reply yoki @user)"},
+	{Command: "tag", Description: "Teg yoki unvon: /tag Matn (reply yoki @user)"},
+	{Command: "banlist", Description: "Banlar ro'yxati, bandan chiqarish tugmalari"},
+	{Command: "reports", Description: "Ko'rib chiqilmagan shikoyatlar"},
+	{Command: "warns", Description: "Kimda nechta ogohlantirish (reply: bittasi)"},
+	{Command: "rank", Description: "Daraja berish: /rank 3, olish: /rank 0 (reply)"},
+	{Command: "ranklog", Description: "Kim kimga daraja bergan"},
+	{Command: "access", Description: "Buyruqlar darajasi: /access ban 2"},
+	{Command: "kickinactive", Description: "Faol emaslarni chiqarish: /kickinactive 30"},
+	{Command: "amnesty", Description: "Hammani bandan chiqarish"},
+	{Command: "ignore", Description: "A'zoga 24 soat javob bermaslik (reply)"},
+	{Command: "unignore", Description: "A'zoga yana javob berish (reply)"},
+	{Command: "cleanservice", Description: "\"Kirdi/chiqdi\" xabarlarini o'chirish (yoqish/o'chirish)"},
+	{Command: "invites_auto", Description: "Takliflar reytingini avto-e'lon qilish, yoki off"},
+	{Command: "aichat", Description: "Bu guruhda AI suhbatni yoqish/o'chirish (owner)"},
+	{Command: "limit", Description: "Guruhda daqiqasiga javoblar soni (owner)"},
+	{Command: "active", Description: "Kamida X faol a'zo sharti, yoki off (owner)"},
+	{Command: "settings", Description: "Guruh va bot sozlamalari (owner)"},
+	{Command: "set", Description: "Sozlamani o'zgartirish: /set NOM qiymat|default (owner)"},
+	{Command: "stats", Description: "Statistika paneli (owner)"},
+	{Command: "model", Description: "Qaysi model ishlayapti (owner)"},
+	{Command: "aigroups", Description: "AI suhbat yoqilgan guruhlarni tanlash (owner)"},
+	{Command: "announce", Description: "Guruhlarga e'lon yuborish (owner)"},
+	{Command: "payments", Description: "Stars to'lovlari (owner)"},
+	{Command: "refund", Description: "To'lovni qaytarish: /refund ID yoki @user (owner)"},
+	{Command: "business", Description: "Business hisob javoblari: /business on|off (owner)"},
+	{Command: "import_stickers", Description: "Stiker to'plamini import qilish: havola yoki nom (owner)"},
+}
 
 // CommandSetter sets a command menu.
 type CommandSetter interface {
@@ -146,15 +220,6 @@ func SetCommandMenus(ctx context.Context, setter CommandSetter, logger *slog.Log
 	}
 }
 
-// ownerPrivateMenu is what an owner sees in their private chat with the
-// bot: the default menu and the owners' own commands there.
-var ownerPrivateMenu = append(append([]telegram.BotCommand(nil), commandMenus[telegram.ScopeDefault]...),
-	telegram.BotCommand{Command: "aigroups", Description: "AI suhbat yoqilgan guruhlarni tanlash (owner)"},
-	telegram.BotCommand{Command: "announce", Description: "Guruhlarga e'lon yuborish (owner)"},
-	telegram.BotCommand{Command: "payments", Description: "Stars to'lovlari (owner)"},
-	telegram.BotCommand{Command: "refund", Description: "To'lovni qaytarish (owner)"},
-)
-
 // ChatCommandSetter sets one chat's menu.
 type ChatCommandSetter interface {
 	SetChatCommands(ctx context.Context, chatID int64, commands []telegram.BotCommand) error
@@ -167,7 +232,7 @@ func SetOwnerMenus(ctx context.Context, setter ChatCommandSetter, owners map[int
 	ctx, cancel := context.WithTimeout(ctx, commandsTimeout)
 	defer cancel()
 	for owner := range owners {
-		if err := setter.SetChatCommands(ctx, owner, ownerPrivateMenu); err != nil {
+		if err := setter.SetChatCommands(ctx, owner, ownerMenu); err != nil {
 			logger.Warn("could not set an owner's private menu", "error", err)
 		}
 	}

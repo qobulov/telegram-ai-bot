@@ -151,16 +151,47 @@ func (f *fakeChatCommandSetter) SetChatCommands(_ context.Context, chatID int64,
 	return nil
 }
 
-// Each owner gets /aigroups in their private chat's menu, with the rest of
-// the default menu.
+// Each owner gets every command in their private chat's menu.
 func TestOwnerPrivateMenus(t *testing.T) {
 	setter := &fakeChatCommandSetter{set: map[int64][]telegram.BotCommand{}}
 	SetOwnerMenus(context.Background(), setter, map[int64]bool{7: true, 8: true}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	for _, owner := range []int64{7, 8} {
-		menu := setter.set[owner]
-		if !slices.ContainsFunc(menu, func(c telegram.BotCommand) bool { return c.Command == "aigroups" }) ||
-			!slices.ContainsFunc(menu, func(c telegram.BotCommand) bool { return c.Command == "cards" }) {
-			t.Errorf("owner %d menu = %v", owner, menu)
+		if !slices.Equal(setter.set[owner], ownerMenu) {
+			t.Errorf("owner %d menu = %v, want every command", owner, setter.set[owner])
+		}
+	}
+}
+
+// The owners' menu holds every command of the others' menus and the
+// owners' own, each once, as many as Telegram takes, each one it accepts.
+func TestOwnerMenuHoldsEveryCommand(t *testing.T) {
+	if len(ownerMenu) > 100 {
+		t.Errorf("owners' menu has %d commands, Telegram takes 100", len(ownerMenu))
+	}
+	valid := regexp.MustCompile(`^[a-z0-9_]{1,32}$`)
+	seen := map[string]bool{}
+	for _, c := range ownerMenu {
+		if seen[c.Command] {
+			t.Errorf("/%s twice in the owners' menu", c.Command)
+		}
+		seen[c.Command] = true
+		if !valid.MatchString(c.Command) || c.Description == "" || len([]rune(c.Description)) > 256 {
+			t.Errorf("%+v is not a command Telegram takes", c)
+		}
+	}
+	for scope, commands := range commandMenus {
+		for _, c := range commands {
+			if !seen[c.Command] {
+				t.Errorf("/%s of the %s menu is missing from the owners' menu", c.Command, scope)
+			}
+		}
+	}
+	for _, command := range []string{"limit", "active", "aichat", "aigroups", "announce", "payments", "refund",
+		"model", "stats", "settings", "set", "business", "import_stickers", "premium", "paysupport",
+		"game", "snake", "woodcutter", "boss", "mafia", "checkers", "card", "mycards", "cardtop", "market",
+		"duel", "teams", "invites", "invites_month", "invites_auto", "unpin", "unignore", "ping", "about"} {
+		if !seen[command] {
+			t.Errorf("/%s is missing from the owners' menu", command)
 		}
 	}
 }
