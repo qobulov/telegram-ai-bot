@@ -2240,7 +2240,7 @@ crystals players hold stay, for the shop and a card out of turn.
 `card_owned.melted` (migration 63) now counts the copies of a card used up, and
 the copies still held stay counted in the points.
 Fusion takes melting's place: copies of one character raise it, ★1 to ★5
-(`card_owned.stars`, migration 96). A card's free copies are those beyond the
+(`card_owned.stars`, migration 97). A card's free copies are those beyond the
 one kept and those used up (`count - 1 - melted`); the next star uses up 1, 2,
 3 and 4 of them (`FuseCost` in `internal/cards/fusion.go`, ten from ★1 to
 ★5), and the card's attack and health are its own times 1.00, 1.20, 1.45,

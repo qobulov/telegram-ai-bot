@@ -62,7 +62,7 @@
 ### Task 3: Fusion
 
 **Files:**
-- Create: `internal/storage/migrations/0095_card_stars.sql` — `ALTER TABLE card_owned ADD COLUMN stars SMALLINT NOT NULL DEFAULT 1 CHECK (stars BETWEEN 1 AND 5);`
+- Create: `internal/storage/migrations/0097_card_stars.sql` — `ALTER TABLE card_owned ADD COLUMN stars SMALLINT NOT NULL DEFAULT 1 CHECK (stars BETWEEN 1 AND 5);`
 - Create: `internal/cards/fusion.go`, `internal/cards/fusion_test.go`, `internal/storage/cardfusion.go`, `internal/storage/cardfusion_test.go`
 - Modify: `internal/storage/cards.go` (`OwnedCard.Stars`, read in `OwnedCards`), `internal/cards/handler.go` (action `fuse`; `cardView.Stars`, `cardView.Free`), `public/kartalar/*` (stars on tiles and large view; "⭐ Fuse" button with cost and new numbers), README, persona
 
@@ -95,7 +95,7 @@
 
 ### Task 5: Arena storage
 
-**Files:** Create `internal/storage/migrations/0096_arena.sql`, `internal/storage/arena.go`, `internal/storage/arena_test.go`; modify `internal/storage/store_test.go`.
+**Files:** Create `internal/storage/migrations/0098_arena.sql`, `internal/storage/arena.go`, `internal/storage/arena_test.go`; modify `internal/storage/store_test.go`.
 
 Migration: `arena_teams(user_id BIGINT PRIMARY KEY, front BIGINT[] NOT NULL, back BIGINT[] NOT NULL, power INT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT now())`; `arena_players(user_id BIGINT PRIMARY KEY, rating INT NOT NULL DEFAULT 1000, wins INT NOT NULL DEFAULT 0, losses INT NOT NULL DEFAULT 0, attacks_day DATE, attacks INT NOT NULL DEFAULT 0, tokens_day DATE, tokens_won INT NOT NULL DEFAULT 0)` with an index on `rating`; `arena_battles(id BIGSERIAL PRIMARY KEY, attacker BIGINT NOT NULL, defender BIGINT NOT NULL, seed BIGINT NOT NULL, attacker_won BOOLEAN NOT NULL, rating_change INT NOT NULL, at TIMESTAMPTZ NOT NULL DEFAULT now())`.
 
@@ -137,4 +137,4 @@ Migration: `arena_teams(user_id BIGINT PRIMARY KEY, front BIGINT[] NOT NULL, bac
 - [ ] **Step 5:** Harness check at 390 px (save, attack, replay, skip); node check; bump assets; commit.
 
 ### Deploy
-Full suite green → run `bot migrate` on prod (0095, 0096) → push at once → check Vercel Ready and logs.
+Full suite green → run `bot migrate` on prod (0097, 0098) → push at once → check Vercel Ready and logs.
