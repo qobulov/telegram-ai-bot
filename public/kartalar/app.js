@@ -248,24 +248,44 @@
     return box;
   }
 
-  // SPECIAL are the cards the owners dressed by hand: a "LIMITED" mark and
-  // cherry petals drifting over the picture.
-  const SPECIAL = { 298761: { tag: "LIMITED", petals: true } };
+  // SPECIAL are the cards the owners dressed by hand: a winged "LIMITED"
+  // crest with its number on a ribbon, cherry petals drifting over the
+  // picture and fireflies glowing among them.
+  const SPECIAL = { 298761: { tag: "LIMITED", serial: "No.000001", petals: true, fireflies: true } };
 
-  // dress adds a special card's tag and petals; the large view has more
-  // petals.
+  // The crest's wings, one drawn and the other its mirror.
+  const WING = '<path d="M80 36C63 22 42 14 14 4c11 9 14 15 7 19 13 1 20 4 11 9 15 0 25 2 19 8 12-1 21-2 29-4z"/>';
+
+  // crests counts the crests drawn, each wing gradient needing its own id.
+  let crests = 0;
+
+  // dress adds a special card's crest, petals and fireflies; the large view
+  // has more of them, and the wings and ribbon about the crest.
   function dress(el, card, large) {
     const special = SPECIAL[card.id];
     if (!special) return;
     el.classList.add("special");
-    if (special.petals) {
-      el.insertAdjacentHTML("beforeend", '<div class="petals" aria-hidden="true">' + "<i></i>".repeat(large ? 12 : 6) + "</div>");
-    }
+    let html = "";
+    if (special.petals) html += '<div class="petals" aria-hidden="true">' + "<i></i>".repeat(large ? 14 : 6) + "</div>";
+    if (special.fireflies) html += '<div class="fireflies" aria-hidden="true">' + "<i></i>".repeat(large ? 9 : 4) + "</div>";
+    el.insertAdjacentHTML("beforeend", html);
     if (special.tag) {
-      const tag = document.createElement("span");
-      tag.className = "limited";
-      tag.textContent = special.tag;
-      el.append(tag);
+      const crest = document.createElement("div");
+      crest.className = "lcrest";
+      const id = "wg" + ++crests;
+      const wings = large
+        ? '<svg class="wings" viewBox="0 0 160 48" aria-hidden="true"><defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff4c4"/><stop offset=".5" stop-color="#f2c45a"/><stop offset="1" stop-color="#a8701c"/></linearGradient></defs>' +
+          '<g fill="url(#' + id + ')" stroke="#7a4e12" stroke-width=".8">' + WING + '<g transform="matrix(-1 0 0 1 160 0)">' + WING + "</g></g></svg>"
+        : "";
+      crest.innerHTML = wings + '<i class="gem" aria-hidden="true"></i><b class="plaque"></b>';
+      crest.querySelector(".plaque").textContent = special.tag;
+      if (large && special.serial) {
+        const ribbon = document.createElement("span");
+        ribbon.className = "ribbon";
+        ribbon.textContent = special.serial;
+        crest.append(ribbon);
+      }
+      el.append(crest);
     }
   }
 
