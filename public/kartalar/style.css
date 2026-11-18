@@ -63,6 +63,14 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
   background: var(--panel); border: 1px solid var(--line); color: var(--text); font: 700 14px Unbounded, sans-serif;
 }
 .coin span { font-size: 15px; }
+/* The crystals' pill opens the shop, which has no tab of its own: a gold +
+   says so, and the pill is lit while the shop is open. */
+.coin .plus {
+  display: grid; place-items: center; width: 18px; height: 18px; margin-left: 2px; border-radius: 50%;
+  font: 800 14px/1 Manrope, sans-serif; font-style: normal; color: #1a1205;
+  background: linear-gradient(180deg, #ffe9a0, #e0a630); box-shadow: 0 0 6px rgba(255, 200, 80, 0.5);
+}
+#coinShards.on { border-color: var(--gold); }
 .coin.bump { animation: bump 0.45s ease; }
 @keyframes bump { 40% { transform: scale(1.18); border-color: var(--gold); } }
 .points { display: flex; align-items: center; gap: 5px; padding: 0 4px; font: 700 13px Unbounded, sans-serif; color: var(--gold); }
@@ -237,7 +245,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 
 /* nav */
 .nav {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: grid; grid-template-columns: repeat(6, 1fr);
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: grid; grid-template-columns: repeat(5, 1fr);
   height: calc(var(--nav) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
   background: rgba(11, 10, 20, 0.92); backdrop-filter: blur(14px); border-top: 1px solid var(--line);
 }
@@ -368,44 +376,39 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
   100% { opacity: 0; transform: translateY(-260px) translateX(8px); }
 }
 
-/* A special card (SPECIAL in app.js), dressed like a game's legend item:
-   a winged crest at the top, a maroon plaque saying LIMITED in gold with a
-   gem over it and, in the large view, its number on a gold ribbon; the wings
-   beat slowly, the gem glows and a gloss runs over the plaque. Cherry petals
-   of three sizes drift and turn over the picture, and fireflies glow and
-   wander among them, all under the frame. */
-.lcrest {
-  position: absolute; top: 4px; left: 50%; z-index: 5; width: 74px; transform: translateX(-50%);
-  display: flex; flex-direction: column; align-items: center; pointer-events: none;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.75));
+/* A special card (SPECIAL in app.js): a gold "LIMITED" mark in the top
+   right corner, drawn like a game's edition logo (heavy slanted gold letters
+   with a dark edge and two green streaks after them) with its number under
+   it, cherry petals of three sizes drifting and turning over the picture and
+   fireflies glowing and wandering among them, all under the frame. A count
+   moves below the mark. */
+.lmark {
+  position: absolute; top: 5px; right: 20px; z-index: 5; pointer-events: none;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 1px;
 }
-.front .lcrest { top: 10px; width: 168px; }
-.lcrest .wings { position: absolute; top: -10px; left: -42%; width: 184%; height: auto; overflow: visible; }
-.lcrest .wings path { transform-box: fill-box; transform-origin: 100% 80%; animation: wing 3.4s ease-in-out infinite; }
-.lcrest .gem {
-  position: relative; z-index: 2; width: 9px; height: 9px; margin-bottom: -4px; transform: rotate(45deg);
-  background: linear-gradient(135deg, #f3eaff, #b58cff 45%, #6a3fd6); box-shadow: 0 0 0 1px #ffe6a0, 0 0 8px 2px rgba(190, 150, 255, 0.85);
-  animation: gem 2.6s ease-in-out infinite;
+.front .lmark { top: 12px; right: 36px; gap: 2px; }
+.special .limited {
+  position: relative; padding: 1px 2px;
+  font: italic 900 11px/1.15 Unbounded, sans-serif; letter-spacing: 0.02em;
+  transform: skewX(-14deg);
+  color: transparent; -webkit-text-stroke: 0.7px #2a1a04;
+  background: linear-gradient(180deg, #fff7cf 0%, #ffe07a 40%, #e0a630 70%, #fff0b0 100%);
+  -webkit-background-clip: text; background-clip: text;
+  filter: drop-shadow(0 1px 0 #2a1a04) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.7)) drop-shadow(0 0 6px rgba(255, 200, 80, 0.55));
 }
-.front .lcrest .gem { width: 15px; height: 15px; margin-bottom: -7px; }
-.lcrest .plaque {
-  position: relative; z-index: 1; overflow: hidden; padding: 2px 9px 1px; border-radius: 7px;
-  font: 900 9px/1.3 "Unbounded", serif; letter-spacing: 0.06em; color: transparent;
-  background-image: linear-gradient(180deg, #fff6cc, #ffd56a 55%, #d0952a), linear-gradient(180deg, #8d1f3c, #4d0b1f);
-  -webkit-background-clip: text, padding-box; background-clip: text, padding-box;
-  border: 1.5px solid #f2c96a; box-shadow: inset 0 0 0 1px rgba(80, 10, 30, 0.9), 0 0 10px rgba(255, 200, 90, 0.45);
+.special .limited::after {
+  content: ""; position: absolute; top: 1px; bottom: 1px; left: 100%; width: 14px;
+  background: linear-gradient(108deg, transparent 0 8%, #b6ffd9 8% 34%, transparent 34% 52%, #3fe08e 52% 88%, transparent 88%);
 }
-.front .lcrest .plaque { padding: 5px 18px 4px; border-radius: 12px; font-size: 18px; border-width: 2.5px; }
-.lcrest .plaque::after {
-  content: ""; position: absolute; top: -20%; bottom: -20%; left: -60%; width: 40%; transform: skewX(-20deg);
-  background: linear-gradient(90deg, transparent, rgba(255, 250, 225, 0.8), transparent); animation: gloss 4s ease-in-out infinite;
+.front.special .limited { font-size: 17px; }
+.front.special .limited::after { width: 22px; }
+.special .serial {
+  padding: 0 3px; transform: skewX(-14deg);
+  font: italic 800 8px/1.2 Unbounded, sans-serif; letter-spacing: 0.04em; color: #ffe7a0;
+  text-shadow: 0 1px 0 #2a1a04, 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 6px rgba(255, 200, 80, 0.5);
 }
-.lcrest .ribbon {
-  margin-top: 3px; padding: 2px 16px; font: 800 11px/1.3 Manrope, sans-serif; letter-spacing: 0.04em; color: #4a3108;
-  background: linear-gradient(180deg, #fff3c4, #f0c75f 60%, #c99332);
-  clip-path: polygon(0 0, 100% 0, 94% 50%, 100% 100%, 0 100%, 6% 50%);
-}
-.card.special .count { top: 30px; z-index: 6; }
+.front.special .serial { font-size: 12px; }
+.card.special .count { top: 34px; z-index: 6; }
 
 .special .petals { --fall: 240px; position: absolute; inset: 0; z-index: 2; overflow: hidden; border-radius: inherit; pointer-events: none; }
 .front.special .petals { --fall: 640px; }
@@ -474,9 +477,6 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
   100% { transform: translate3d(0, 0, 0); }
 }
 @keyframes blink { 0%, 100% { opacity: 0; } 30%, 60% { opacity: 1; } }
-@keyframes wing { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-7deg); } }
-@keyframes gem { 0%, 100% { box-shadow: 0 0 0 1px #ffe6a0, 0 0 6px 1px rgba(190, 150, 255, 0.6); } 50% { box-shadow: 0 0 0 1px #fff3c8, 0 0 14px 4px rgba(210, 175, 255, 1); } }
-@keyframes gloss { 0%, 55% { left: -60%; } 85%, 100% { left: 130%; } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
