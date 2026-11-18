@@ -100,6 +100,30 @@ func TestAuthorMessageIDsAreOneMembersSince(t *testing.T) {
 	}
 }
 
+// The newcomer guard counts a member's logged messages in one group, up to
+// what it asks.
+func TestAuthorMessageCountStopsAtTheLimit(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	for i := range 4 {
+		if err := store.AppendGroupMessage(ctx, GroupMessage{ChatID: -1, MessageID: int64(20 + i), AuthorID: 7, AuthorName: "Sam", Text: "salom"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := store.AppendGroupMessage(ctx, GroupMessage{ChatID: -2, MessageID: 30, AuthorID: 8, AuthorName: "Ann", Text: "salom"}); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := store.AuthorMessageCount(ctx, -1, 7, 3); err != nil || n != 3 {
+		t.Errorf("count = %d %v, want 3, the limit", n, err)
+	}
+	if n, _ := store.AuthorMessageCount(ctx, -1, 7, 10); n != 4 {
+		t.Errorf("count = %d, want 4", n)
+	}
+	if n, _ := store.AuthorMessageCount(ctx, -1, 8, 10); n != 0 {
+		t.Errorf("count in another group = %d, want 0", n)
+	}
+}
+
 // A message the swear guard caught is known in every version; another
 // message, or another kind of action on it, is not.
 func TestSwornInFindsACaughtMessage(t *testing.T) {

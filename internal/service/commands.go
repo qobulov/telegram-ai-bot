@@ -884,6 +884,8 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.reputationTop(ctx, in)
 	case in.group && s.opts.Extras != nil && commandName(in.text) == "/cleanservice":
 		return s.setCleanService(ctx, in)
+	case in.group && s.opts.Extras != nil && commandName(in.text) == "/antispam":
+		return s.antispamCommand(ctx, in)
 	case !in.group && s.opts.Extras != nil && s.opts.Buttons != nil && commandName(in.text) == "/aigroups":
 		return s.aiGroupsCommand(ctx, in)
 	case in.group && s.opts.Ranks != nil && s.isRightsQuestion(in.text):
@@ -1141,6 +1143,10 @@ func (s *Service) pressed(q *telegram.CallbackQuery) {
 	}
 	if strings.HasPrefix(q.Data, inviteData) && s.opts.Invites != nil {
 		s.pressedInvites(q)
+		return
+	}
+	if strings.HasPrefix(q.Data, antispamData) && s.opts.Extras != nil {
+		s.pressedAntispam(q)
 		return
 	}
 	if strings.HasPrefix(q.Data, aiData) && s.opts.Extras != nil {

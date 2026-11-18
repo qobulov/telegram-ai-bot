@@ -173,7 +173,7 @@ var guardLines = map[string]string{
 	storage.RuleLinkGuard:   "Links to malware or phishing (Google Safe Browsing, URLhaus) are deleted here in code, not by you.",
 	storage.RuleImageGuard:  "Nude pictures are deleted here in code, from anyone, not by you, even as a sticker, GIF or file; other stickers and GIFs are allowed.",
 	storage.RuleJoinCaptcha: "People asking to join are sent a button in private, in code, not by you: pressed within 10 minutes it lets them in, and otherwise they are declined.",
-	storage.RuleFloodGuard:  "A member who floods the group, sending many messages within seconds, is muted here for 10 minutes in code, not by you.",
+	storage.RuleFloodGuard:  "A member who floods the group, sending many messages within seconds or the same one again and again, has them deleted and is muted here in code, not by you: 10 minutes, then an hour, then a day.",
 }
 
 // ruleLines lists the instructions, then the ignored members. Each is folded

@@ -69,6 +69,7 @@ var commandMenus = map[string][]telegram.BotCommand{
 		{Command: "amnesty", Description: "Hammani bandan chiqarish"},
 		{Command: "ignore", Description: "A'zoga 24 soat javob bermaslik (reply)"},
 		{Command: "cleanservice", Description: "\"Kirdi/chiqdi\" xabarlarini o'chirish (yoqish/o'chirish)"},
+		{Command: "antispam", Description: "Antispam: flood, spamerlar, yangi a'zolar havolasi (tugmalar)"},
 	}, membersMenu...),
 }
 
@@ -129,6 +130,7 @@ var ownerGroupMenu = []telegram.BotCommand{
 	{Command: "ignore", Description: "A'zoga 24 soat javob bermaslik (reply)"},
 	{Command: "unignore", Description: "A'zoga yana javob berish (reply)"},
 	{Command: "cleanservice", Description: "\"Kirdi/chiqdi\" xabarlarini o'chirish (yoqish/o'chirish)"},
+	{Command: "antispam", Description: "Antispam: flood, spamerlar, yangi a'zolar havolasi (tugmalar)"},
 	{Command: "invites_auto", Description: "Takliflar reytingini avto-e'lon qilish, yoki off"},
 }
 
@@ -162,7 +164,7 @@ var rankedCommands = []struct{ name, code string }{
 	{"kick", "kick"},
 	{"pin", "pin"}, {"unpin", "pin"},
 	{"del", "delete"},
-	{"tag", "group"}, {"cleanservice", "group"},
+	{"tag", "group"}, {"cleanservice", "group"}, {"antispam", "group"},
 	{"kickinactive", "masskick"},
 	{"rank", "rank"},
 	{"promote", "admin"}, {"demote", "admin"},

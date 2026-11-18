@@ -684,10 +684,8 @@ func TestRulesToolTurnsGuardsOnAndOff(t *testing.T) {
 	registry := mustRegistry(t, RulesTool(RulesOptions{Store: store, BotID: rulesBotID, CanCheckLinks: true}))
 	ctx := ownerSaying(groupA, "Mari, spamerlarni va yomon havolalarni o'chir")
 
-	for _, guard := range []string{"spam", "links"} {
-		if env := rules(registry, ctx, `{"action":"guard","guard":"`+guard+`"}`); !env.OK || !strings.Contains(string(env.Result), "On within a minute") {
-			t.Fatalf("guard %s = %+v %s", guard, env, env.Result)
-		}
+	if env := rules(registry, ctx, `{"action":"guard","guard":"links"}`); !env.OK || !strings.Contains(string(env.Result), "On within a minute") {
+		t.Fatalf("guard links = %+v %s", env, env.Result)
 	}
 	env := rules(registry, ctx, `{"action":"guard","guard":"images"}`)
 	if env.OK || !strings.Contains(env.Error.Message, "SIGHTENGINE_API_USER") {
@@ -696,28 +694,30 @@ func TestRulesToolTurnsGuardsOnAndOff(t *testing.T) {
 	if env := rules(registry, ctx, `{"action":"guard","guard":"everything"}`); env.OK || env.Error.Code != "invalid_arguments" {
 		t.Errorf("an unknown guard = %+v", env)
 	}
-	if env := rules(registry, ownerSaying(9001, "spamni o'chir"), `{"action":"guard","guard":"spam"}`); env.OK {
+	if env := rules(registry, ownerSaying(9001, "spamni o'chir"), `{"action":"guard","guard":"links"}`); env.OK {
 		t.Errorf("a guard was turned on in a private chat: %+v", env)
 	}
 	got := store.all()
-	if len(got) != 2 || got[0].Kind != storage.RuleSpamGuard || got[1].Kind != storage.RuleLinkGuard || got[0].ChatID != groupA {
+	if len(got) != 1 || got[0].Kind != storage.RuleLinkGuard || got[0].ChatID != groupA {
 		t.Fatalf("rules = %+v", got)
 	}
-	if env := rules(registry, ctx, `{"action":"unguard","guard":"spam"}`); !env.OK || len(store.all()) != 1 || store.all()[0].Kind != storage.RuleLinkGuard {
+	if env := rules(registry, ctx, `{"action":"unguard","guard":"links"}`); !env.OK || len(store.all()) != 0 {
 		t.Errorf("unguard = %+v, rules %+v", env, store.all())
 	}
 }
 
-func TestRulesToolTurnsTheFloodGuardOn(t *testing.T) {
+// The spam and flood guards are on by default and switched with /antispam:
+// guard and unguard only say so, and store nothing.
+func TestRulesToolPointsTheAntispamGuardsToTheCommand(t *testing.T) {
 	store := &fakeRules{}
 	registry := mustRegistry(t, RulesTool(RulesOptions{Store: store, BotID: rulesBotID}))
-
-	env := rules(registry, ownerSaying(groupA, "Mari, flood qilganlarni mute qil"), `{"action":"guard","guard":"flood"}`)
-
-	if !env.OK || !strings.Contains(string(env.Result), "6 messages within 10 seconds") {
-		t.Fatalf("guard flood = %+v %s", env, env.Result)
+	for _, call := range []string{`{"action":"guard","guard":"flood"}`, `{"action":"unguard","guard":"spam"}`} {
+		env := rules(registry, ownerSaying(groupA, "Mari, flood qilganlarni mute qil"), call)
+		if !env.OK || !strings.Contains(string(env.Result), "/antispam") {
+			t.Errorf("%s = %+v %s", call, env, env.Result)
+		}
 	}
-	if got := store.all(); len(got) != 1 || got[0].Kind != storage.RuleFloodGuard {
+	if got := store.all(); len(got) != 0 {
 		t.Errorf("rules = %+v", got)
 	}
 }

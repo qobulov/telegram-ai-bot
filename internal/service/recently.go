@@ -76,3 +76,10 @@ type memberKey struct{ chatID, userID int64 }
 
 // memberName is how a member was last recorded.
 type memberName struct{ firstName, username string }
+
+// forget drops what is remembered for key, so that it is asked afresh.
+func (r *recently[K, V]) forget(key K) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.items, key)
+}

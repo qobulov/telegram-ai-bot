@@ -79,7 +79,7 @@ var rightCommands = []struct{ right, line string }{
 
 // everyAdmin are the commands any Telegram admin of the group may use,
 // whatever their rights: the bot checks only that they are an admin.
-const everyAdmin = "• /banlist, /reports, /warns, /cleanservice, /ignore, /unignore, /invites_auto, /mute bot — har bir admin uchun"
+const everyAdmin = "• /banlist, /reports, /warns, /cleanservice, /antispam, /ignore, /unignore, /invites_auto, /mute bot — har bir admin uchun"
 
 // rankRights are the admin rights that open, with no rank, all a rank
 // command does; a command missing here (undo, rank, access) only a rank

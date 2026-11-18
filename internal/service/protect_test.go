@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/url"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"telegram-ai-bot/internal/ai"
 	"telegram-ai-bot/internal/storage"
@@ -150,7 +152,20 @@ func protectFixture(kinds ...string) (*fixture, *fakeGuards, *fakeModerator) {
 	moderator := &fakeModerator{}
 	f.opts.Guards, f.opts.GroupModerator = guards, moderator
 	f.opts.Media = newFakeMedia()
+	f.opts.Extras = newMemoryExtras()
 	return f, guards, moderator
+}
+
+// established logs messages enough from a member, an hour ago, for the
+// newcomer guard to take them for one of the group.
+func established(f *fixture, userID int64) {
+	f.chatLog.mu.Lock()
+	defer f.chatLog.mu.Unlock()
+	for i := range newcomerMessages {
+		f.chatLog.messages = append(f.chatLog.messages, storage.GroupMessage{
+			ChatID: groupID, MessageID: int64(10 + i), AuthorID: userID, AuthorName: "Sam", Text: "salom", SentAt: time.Now().Add(-time.Hour),
+		})
+	}
 }
 
 func messageFrom(userID int64, username, text string) *telegram.Message {
@@ -227,8 +242,11 @@ func TestGuardsLeaveAdminsAndOwnersAlone(t *testing.T) {
 	}
 }
 
+// With the anti-spam guards turned off by /antispam, and no rule for the
+// link guard, nothing looks at a member's message.
 func TestGuardsAreOffWithoutTheirRule(t *testing.T) {
 	f, guards, moderator := protectFixture()
+	_ = f.opts.Extras.SetGroupSetting(context.Background(), groupID, storage.SettingAntispamOff, "flood,spam,newcomers", 1)
 	msg := messageFrom(spammerID, "promo", "evil.example")
 	msg.Entities = []telegram.MessageEntity{entityAt("url", msg.Text, "evil.example")}
 
@@ -241,6 +259,7 @@ func TestGuardsAreOffWithoutTheirRule(t *testing.T) {
 
 func TestLinkGuardDeletesLinksToMaliciousHosts(t *testing.T) {
 	f, guards, moderator := protectFixture(storage.RuleLinkGuard)
+	established(f, 5353)
 	guards.badHosts["evil.example"] = "malware_download"
 	text := "ko'ring: https://Evil.example/app.apk va bu"
 	bad := messageFrom(5353, "lin", text)
@@ -267,6 +286,7 @@ func TestLinkGuardDeletesLinksToMaliciousHosts(t *testing.T) {
 
 func TestLinkGuardNeedsItsKey(t *testing.T) {
 	f, guards, moderator := protectFixture(storage.RuleLinkGuard)
+	established(f, 5353)
 	guards.links = false
 	guards.badHosts["evil.example"] = "malware_download"
 	msg := messageFrom(5353, "lin", "evil.example")
@@ -312,13 +332,14 @@ func TestGuardRulesAreToldToTheModel(t *testing.T) {
 const flooderID = int64(7707)
 
 // A member who sends six messages within ten seconds is muted for ten
-// minutes, once; their messages still on the way are only deleted.
+// minutes, once, and all six deleted; their messages still on the way are
+// only deleted.
 func TestFloodGuardMutesAMemberWhoFloods(t *testing.T) {
 	f, _, moderator := protectFixture(storage.RuleFloodGuard)
 	restrictor := f.opts.Restrictor.(*fakeRestrictor)
 	var updates []telegram.Update
 	for i := range 7 {
-		msg := messageFrom(flooderID, "tez", "xabar")
+		msg := messageFrom(flooderID, "tez", fmt.Sprintf("xabar %d", i))
 		msg.MessageID = int64(100 + i)
 		updates = append(updates, inGroup(msg))
 	}
@@ -328,9 +349,10 @@ func TestFloodGuardMutesAMemberWhoFloods(t *testing.T) {
 	if want := "⚠️ @tez juda tez-tez yozgani uchun (flood) 10 daqiqa yozolmaydi."; len(sent) != 1 || sent[0].text != want {
 		t.Fatalf("sent = %+v, want one %q", sent, want)
 	}
-	// The sixth message is the flood: it and the seventh are deleted.
-	if !slices.Equal(moderator.deleted, []int64{105, 106}) {
-		t.Errorf("deleted %v, want the sixth and seventh", moderator.deleted)
+	// The sixth message is the flood: it, the five before and the seventh
+	// are deleted.
+	if !slices.Equal(moderator.deleted, []int64{100, 101, 102, 103, 104, 105, 106}) {
+		t.Errorf("deleted %v, want all seven", moderator.deleted)
 	}
 	if len(restrictor.done) != 1 || restrictor.done[0].UserID != flooderID || restrictor.done[0].Permissions != telegram.NoPermissions() {
 		t.Errorf("restrictions = %+v, want one mute", restrictor.done)
@@ -342,7 +364,7 @@ func TestFloodGuardLeavesOrdinaryWritingAndAdminsAlone(t *testing.T) {
 	f, _, moderator := protectFixture(storage.RuleFloodGuard)
 	var updates []telegram.Update
 	for i := range 5 {
-		msg := messageFrom(flooderID, "tez", "xabar")
+		msg := messageFrom(flooderID, "tez", fmt.Sprintf("xabar %d", i))
 		msg.MessageID = int64(100 + i)
 		updates = append(updates, inGroup(msg))
 	}

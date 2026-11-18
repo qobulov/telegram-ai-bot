@@ -199,13 +199,16 @@ const (
 	ActionSwearWord  = "swear_word"
 )
 
-// What the guards an owner may turn on did: banned a known spammer, deleted
-// a link to a malicious host or an unsafe picture.
+// What the guards did: banned a known spammer, deleted a link to a
+// malicious host or an unsafe picture, muted a flooding member, and deleted
+// a newcomer's link, muting them when they sent another.
 const (
-	ActionSpamBan     = "spam_ban"
-	ActionLinkDelete  = "link_delete"
-	ActionImageDelete = "image_delete"
-	ActionFloodMute   = "flood_mute"
+	ActionSpamBan      = "spam_ban"
+	ActionLinkDelete   = "link_delete"
+	ActionImageDelete  = "image_delete"
+	ActionFloodMute    = "flood_mute"
+	ActionNewcomerLink = "newcomer_link"
+	ActionNewcomerMute = "newcomer_mute"
 )
 
 // SwearStrikes counts the swears of one kind the swear guard caught from one

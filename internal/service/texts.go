@@ -408,6 +408,7 @@ var helpSections = map[string]localText{
 /reports — ko'rilmagan shikoyatlar; /warns — kimda nechta ogohlantirish
 /kickinactive 30 — 30 kun yozmaganlarni chiqarish
 /cleanservice — "kirdi", "chiqdi", "qadadi" xabarlarini o'chirishni yoqish yoki o'chirish
+/antispam — flood, spamerlar va yangi a'zolar havolasiga qarshi himoya: tugmalar bilan yoqish yoki o'chirish (odatda yoqilgan)
 "orqaga qaytar" — oxirgi amalni bekor qilish
 Meni jim qilish: /mute bot, qaytarish: /unmute`,
 		ru: `🛡 Модерация (ответом на сообщение участника или с @username: /demote @user)
@@ -419,6 +420,7 @@ Meni jim qilish: /mute bot, qaytarish: /unmute`,
 /banlist — баны и кнопки разбана; /amnesty — разбан всех
 /reports — нерассмотренные жалобы; /warns — предупреждения
 /kickinactive 30 — кик тех, кто молчит 30 дней
+/antispam — защита от флуда, спамеров и ссылок новичков: кнопки вкл/выкл (по умолчанию включена)
 «верни» — отменить последнее
 Чтобы я молчала: /mute bot, вернуть: /unmute`,
 		en: `🛡 Moderation (as a reply to a member's message, or with their @username: /demote @user)
@@ -430,6 +432,7 @@ Meni jim qilish: /mute bot, qaytarish: /unmute`,
 /banlist — bans with unban buttons; /amnesty — unban everyone
 /reports — open reports; /warns — who has warnings
 /kickinactive 30 — remove those silent for 30 days
+/antispam — the flood, spammer and newcomer-link guards: buttons to switch them (on by default)
 "undo" — undo the last action
 To quiet me: /mute bot, to bring me back: /unmute`,
 	},

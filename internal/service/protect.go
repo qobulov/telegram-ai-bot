@@ -5,19 +5,25 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"telegram-ai-bot/internal/ai"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 )
 
-// The guards an owner may turn on in a group, run in code with no model:
-// known spammers banned, links to malicious hosts and nude pictures
-// deleted, a member flooding the group muted. The spam, link and flood
-// guards leave admins, owners, bots and posts on behalf of a chat alone;
-// the picture guard spares nobody. A muted group is left alone.
+// The guards run in code with no model: known spammers banned, links to
+// malicious hosts and nude pictures deleted, a member flooding the group
+// muted, and a newcomer's links and ads deleted. The spam, flood and
+// newcomer guards are on in every group, unless its admins turned them off
+// with /antispam (see antispam.go), and run only where the bot holds the
+// rights they need; the link and picture guards only where an owner turned
+// them on. All but the picture guard leave admins, owners, bots and posts
+// on behalf of a chat alone; the picture guard spares nobody. A muted group
+// is left alone.
 
 const (
 	guardTime      = 15 * time.Second
@@ -27,13 +33,27 @@ const (
 	// maxGuardedImage is the largest picture size looked at; the biggest
 	// size Telegram keeps under it is taken.
 	maxGuardedImage = 1 << 20
-	// A member who sends floodMessages within floodWindow, the message at
-	// hand included, is flooding: muted for floodMute. floodLogLimit bounds
-	// the group log read to count them.
-	floodMessages = 6
-	floodWindow   = 10 * time.Second
-	floodMute     = 10 * time.Minute
-	floodLogLimit = 60
+	// A member floods who sends floodMessages within floodWindow, or
+	// floodLongMessages within floodLongWindow, the message at hand
+	// included, or the same text or sticker repeatMessages times within
+	// repeatWindow. floodLogLimit bounds the group log read to count them,
+	// and maxFloodDeleted the member's messages deleted for it.
+	floodMessages     = 6
+	floodWindow       = 10 * time.Second
+	floodLongMessages = 10
+	floodLongWindow   = 30 * time.Second
+	repeatMessages    = 3
+	repeatWindow      = time.Minute
+	floodLogLimit     = 100
+	maxFloodDeleted   = 30
+	// A flooding member muted within floodInFlight only has the messages
+	// still on the way deleted. Mutes escalate over floodMemory: 10
+	// minutes, then an hour, then a day.
+	floodInFlight = time.Minute
+	floodMemory   = 24 * time.Hour
+	// minRepeatRunes is the shortest text whose repeats count: "ha", "+" or
+	// "😂" said three times in a minute is talk, not a flood.
+	minRepeatRunes = 3
 )
 
 // Guards ask outside services about members, links and pictures.
@@ -51,12 +71,19 @@ type GroupModerator interface {
 	BanChatMember(ctx context.Context, chatID, userID int64) error
 }
 
+// batchDeleter deletes many messages of a chat in one call, as the
+// Telegram client does.
+type batchDeleter interface {
+	DeleteMessages(ctx context.Context, chatID int64, messageIDs []int64) error
+}
+
 // guardSet are the guards on in a group; joins answers its join requests
-// (see joins.go) and has nothing to do with its messages.
-type guardSet struct{ spam, links, images, joins, flood bool }
+// (see joins.go) and has nothing to do with its messages. restrict says
+// the bot may mute there, which the newcomer guard needs for a second link.
+type guardSet struct{ spam, links, images, joins, flood, newcomers, restrict bool }
 
 // any reports a guard on that looks at the group's messages.
-func (g guardSet) any() bool { return g.spam || g.links || g.images || g.flood }
+func (g guardSet) any() bool { return g.spam || g.links || g.images || g.flood || g.newcomers }
 
 // verdict is an outside service's answer kept a while: bad, and why.
 type verdict struct {
@@ -64,7 +91,9 @@ type verdict struct {
 	reason string
 }
 
-// guardsOn are the guards on in a group, lately read.
+// guardsOn are the guards on in a group, lately read: the owners' rules,
+// and the anti-spam guards the group did not turn off, where the bot holds
+// the rights they need.
 func (s *Service) guardsOn(ctx context.Context, chatID int64) guardSet {
 	if set, ok := s.guardSets.get(chatID); ok {
 		return set
@@ -80,20 +109,45 @@ func (s *Service) guardsOn(ctx context.Context, chatID int64) guardSet {
 			continue
 		}
 		switch r.Kind {
-		case storage.RuleSpamGuard:
-			set.spam = true
 		case storage.RuleLinkGuard:
 			set.links = s.opts.Guards.CanCheckLinks()
 		case storage.RuleImageGuard:
 			set.images = s.canCheckImages()
 		case storage.RuleJoinCaptcha:
 			set.joins = true
-		case storage.RuleFloodGuard:
-			set.flood = s.ambient.enabled() && s.opts.Restrictor != nil
 		}
 	}
+	// The spam_guard and flood_guard rules owners set before are on by
+	// default now, and need nothing more.
+	off, ok := s.antispamOff(ctx, chatID)
+	restrict, del := s.botMay(ctx, chatID)
+	logged := s.ambient.enabled()
+	set.restrict = restrict && s.opts.Restrictor != nil
+	set.spam = ok && !off[antispamSpam] && restrict
+	set.flood = ok && !off[antispamFlood] && logged && set.restrict && del
+	set.newcomers = ok && !off[antispamNewcomers] && logged && del
 	s.guardSets.set(chatID, set)
 	return set
+}
+
+// botMay reports whether the bot may restrict members and delete messages
+// in a group. Without a source of its rights it is taken to; when they
+// cannot be learned, not, so that no guard acts on a guess.
+func (s *Service) botMay(ctx context.Context, chatID int64) (restrict, del bool) {
+	if s.opts.BotRights == nil {
+		return true, true
+	}
+	rights, err := s.opts.BotRights.BotRights(ctx, chatID)
+	if err != nil {
+		s.opts.Logger.Warn("guards: could not learn the bot's rights; leaving the anti-spam guards off", "chat_id", chatID, "error", err)
+		return false, false
+	}
+	restrict = slices.Contains(rights, telegram.RightRestrictMembers)
+	del = slices.Contains(rights, telegram.RightDeleteMessages)
+	if !restrict || !del {
+		s.opts.Logger.Debug("guards: the bot lacks rights here", "chat_id", chatID, "restrict", restrict, "delete", del)
+	}
+	return restrict, del
 }
 
 // guardsReady reports whether the guards can run at all.
@@ -126,15 +180,23 @@ func (s *Service) protected(in incoming) bool {
 			return true
 		}
 	}
-	if guardable && set.flood && s.flooding(ctx, msg) && !s.isGroupAdmin(ctx, msg) {
-		s.muteFlooder(ctx, in)
-		return true
+	if guardable && set.flood {
+		if flood, ok := s.flooding(ctx, msg); ok && !s.isGroupAdmin(ctx, msg) {
+			s.muteFlooder(ctx, in, flood)
+			return true
+		}
 	}
 	if guardable && set.links {
 		if reason, bad := s.maliciousLink(ctx, msg); bad && !s.isGroupAdmin(ctx, msg) {
 			s.removeGuarded(ctx, in, storage.ActionLinkDelete, mentionOf(msg.From)+", xavfli havola o'chirildi ("+reason+").")
 			return true
 		}
+	}
+	// A link the link guard did not take for malicious is still a
+	// newcomer's ad.
+	if guardable && set.newcomers && promotes(msg) && s.isNewcomer(ctx, msg) && !s.isGroupAdmin(ctx, msg) {
+		s.stopNewcomerLink(ctx, in, set.restrict)
+		return true
 	}
 	// A nude picture goes whoever sent it, owners and admins too; the
 	// owners' punishment for it spares them.
@@ -503,46 +565,155 @@ func (s *Service) recordGuard(ctx context.Context, in incoming, action string, u
 	return first
 }
 
-// flooding reports a member who sent floodMessages or more within
-// floodWindow, the message at hand included, as the group log counts them.
-func (s *Service) flooding(ctx context.Context, msg *telegram.Message) bool {
-	recent, err := s.ambient.log.GroupMessagesSince(ctx, msg.Chat.ID, s.opts.Now().Add(-floodWindow), floodLogLimit)
+// flooding reports a member who floods, as the group log counts their
+// messages, and gives the IDs of those the log has from the last
+// repeatWindow: what is deleted with the message at hand.
+func (s *Service) flooding(ctx context.Context, msg *telegram.Message) ([]int64, bool) {
+	now := s.opts.Now()
+	recent, err := s.ambient.log.GroupMessagesSince(ctx, msg.Chat.ID, now.Add(-repeatWindow), floodLogLimit)
 	if err != nil {
 		s.opts.Logger.Warn("guards: could not read the group log for flooding", "chat_id", msg.Chat.ID, "error", err)
-		return false
+		return nil, false
 	}
-	count := 1
+	key := s.repeatKey(msg)
+	fast, steady, same := 1, 1, 1
+	var ids []int64
 	for _, m := range recent {
-		if m.AuthorID == msg.From.ID {
-			count++
+		if m.AuthorID != msg.From.ID {
+			continue
+		}
+		if m.MessageID != 0 {
+			ids = append(ids, m.MessageID)
+		}
+		if !m.SentAt.Before(now.Add(-floodWindow)) {
+			fast++
+		}
+		if !m.SentAt.Before(now.Add(-floodLongWindow)) {
+			steady++
+		}
+		if key != "" && loggedRepeatKey(m.Text) == key {
+			same++
 		}
 	}
-	return count >= floodMessages
+	if fast < floodMessages && steady < floodLongMessages && same < repeatMessages {
+		return nil, false
+	}
+	if len(ids) > maxFloodDeleted {
+		ids = ids[len(ids)-maxFloodDeleted:]
+	}
+	return ids, true
 }
 
-// muteFlooder deletes a flooding member's message and mutes them for
-// floodMute, saying so once: their messages already on the way are only
-// deleted.
-func (s *Service) muteFlooder(ctx context.Context, in incoming) {
-	msg := in.msg
-	if err := s.opts.GroupModerator.DeleteMessage(ctx, msg.Chat.ID, msg.MessageID); err != nil {
-		s.opts.Logger.Warn("guards: could not delete a flooding message", "chat_id", msg.Chat.ID, "error", err)
+// repeatKey is what a message's repeats are known by: its text as the log
+// writes it, in lower case, the label of a sticker or a captioned picture
+// in front. A text shorter than minRepeatRunes, a command, sent again
+// when a game or the bot is slow to answer, and media without a caption
+// other than stickers have none: every photo and GIF is logged alike,
+// "<photo>", so two would be taken for one sent twice.
+func (s *Service) repeatKey(msg *telegram.Message) string {
+	content, _ := msg.Content()
+	content = strings.TrimSpace(content)
+	if strings.HasPrefix(content, "/") {
+		return ""
 	}
-	if s.opts.Strikes != nil {
-		muted, err := s.opts.Strikes.SwearStrikes(ctx, msg.Chat.ID, msg.From.ID, storage.ActionFloodMute, s.opts.Now().Add(-floodMute))
-		if err == nil && muted > 0 {
-			return
+	text := content
+	if m, isMedia := s.mediaOf(msg); isMedia {
+		if msg.Sticker == nil && content == "" {
+			return ""
+		}
+		text = withMediaLabel(m, content)
+	} else if utf8.RuneCountInString(content) < minRepeatRunes {
+		return ""
+	}
+	return normalRepeat(withForward(msg, text))
+}
+
+// loggedRepeatKey is repeatKey for a line of the log, which says first whom
+// a reply answers: "(to Ann @ann) salom" is a repeat of "salom".
+func loggedRepeatKey(text string) string {
+	if strings.HasPrefix(text, "(to ") {
+		if _, rest, ok := strings.Cut(text, ") "); ok {
+			text = rest
 		}
 	}
+	return normalRepeat(text)
+}
+
+// normalRepeat folds text as the log does, and lowers it; long texts are
+// compared by their beginning, which the log keeps.
+func normalRepeat(text string) string {
+	text = strings.ToLower(strings.Join(strings.Fields(bracketless.Replace(text)), " "))
+	return truncate(text, maxAmbientChars/2)
+}
+
+// muteFlooder deletes a flooding member's messages and mutes them, longer
+// each time within floodMemory, saying so once: their messages still on the
+// way after the mute are only deleted.
+func (s *Service) muteFlooder(ctx context.Context, in incoming, flood []int64) {
+	msg := in.msg
+	now := s.opts.Now()
+	past := 0
+	if s.opts.Strikes != nil {
+		if lately, err := s.opts.Strikes.SwearStrikes(ctx, msg.Chat.ID, msg.From.ID, storage.ActionFloodMute, now.Add(-floodInFlight)); err == nil && lately > 0 {
+			s.deleteGuarded(ctx, msg.Chat.ID, []int64{msg.MessageID})
+			return
+		}
+		if n, err := s.opts.Strikes.SwearStrikes(ctx, msg.Chat.ID, msg.From.ID, storage.ActionFloodMute, now.Add(-floodMemory)); err == nil {
+			past = n
+		}
+	}
+	s.deleteGuarded(ctx, msg.Chat.ID, append(flood, msg.MessageID))
 	if !s.recordGuard(ctx, in, storage.ActionFloodMute, msg.From.ID) {
 		return
 	}
+	mute := floodMuteFor(past)
 	err := s.opts.Restrictor.RestrictChatMember(ctx, telegram.Restriction{
-		ChatID: msg.Chat.ID, UserID: msg.From.ID, Permissions: telegram.NoPermissions(), Until: s.opts.Now().Add(floodMute),
+		ChatID: msg.Chat.ID, UserID: msg.From.ID, Permissions: telegram.NoPermissions(), Until: now.Add(mute),
 	})
 	if err != nil {
 		s.opts.Logger.Warn("guards: could not mute a flooding member", "chat_id", msg.Chat.ID, "error", err)
 		return
 	}
-	s.postGuard(msg, "⚠️ "+mentionOf(msg.From)+" juda tez-tez yozgani uchun (flood) 10 daqiqa yozolmaydi.")
+	s.opts.Logger.Info("guards: flood muted", "chat_id", msg.Chat.ID, "user_id", msg.From.ID, "minutes", int(mute.Minutes()), "deleted", len(flood)+1)
+	s.postGuard(msg, "⚠️ "+mentionOf(msg.From)+" juda tez-tez yozgani uchun (flood) "+durationWords(mute)+" yozolmaydi.")
+}
+
+// floodMuteFor is how long a flood mutes, after past flood mutes within
+// floodMemory.
+func floodMuteFor(past int) time.Duration {
+	switch past {
+	case 0:
+		return 10 * time.Minute
+	case 1:
+		return time.Hour
+	}
+	return 24 * time.Hour
+}
+
+// durationWords says a mute's length in Uzbek: "10 daqiqa", "1 soat",
+// "1 kun".
+func durationWords(d time.Duration) string {
+	switch {
+	case d >= 24*time.Hour && d%(24*time.Hour) == 0:
+		return fmt.Sprintf("%d kun", d/(24*time.Hour))
+	case d >= time.Hour && d%time.Hour == 0:
+		return fmt.Sprintf("%d soat", d/time.Hour)
+	}
+	return fmt.Sprintf("%d daqiqa", int(d.Minutes()))
+}
+
+// deleteGuarded deletes messages a guard caught, in one call when the
+// client can, a failure logged: what Telegram cannot find is skipped.
+func (s *Service) deleteGuarded(ctx context.Context, chatID int64, ids []int64) {
+	if batch, ok := s.opts.GroupModerator.(batchDeleter); ok && len(ids) > 1 {
+		if err := batch.DeleteMessages(ctx, chatID, ids); err != nil {
+			s.opts.Logger.Warn("guards: could not delete messages", "chat_id", chatID, "count", len(ids), "error", err)
+		}
+		return
+	}
+	for _, id := range ids {
+		if err := s.opts.GroupModerator.DeleteMessage(ctx, chatID, id); err != nil {
+			s.opts.Logger.Warn("guards: could not delete a message", "chat_id", chatID, "error", err)
+		}
+	}
 }

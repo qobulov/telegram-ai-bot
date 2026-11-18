@@ -209,10 +209,14 @@ func TestJoinRequestFromAKnownSpammerIsDeclinedWhereTheSpamGuardIsOn(t *testing.
 	}
 }
 
-// With the joins guard alone, a spammer is not looked up: the spam guard
-// decides that, and the button stops spam bots anyway.
+// With the spam lists turned off by /antispam and the joins guard on, a
+// spammer is not looked up: the spam guard decides that, and the button
+// stops spam bots anyway.
 func TestJoinsGuardAloneSendsEveryoneTheButton(t *testing.T) {
 	f, book, gate, _, _ := joinFixture()
+	extras := newMemoryExtras()
+	_ = extras.SetGroupSetting(context.Background(), groupID, storage.SettingAntispamOff, "spam", 1)
+	f.opts.Extras = extras
 
 	sent := f.run(joinRequest(spammerID, ""))
 

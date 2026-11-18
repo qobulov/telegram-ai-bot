@@ -74,6 +74,18 @@ func (m *memoryLog) ClearGroupMessages(_ context.Context, chatID int64) error {
 	return nil
 }
 
+func (m *memoryLog) AuthorMessageCount(_ context.Context, chatID, authorID int64, limit int) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	n := 0
+	for _, msg := range m.messages {
+		if msg.ChatID == chatID && msg.AuthorID == authorID && n < limit {
+			n++
+		}
+	}
+	return n, nil
+}
+
 func (m *memoryLog) texts(chatID int64) []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()

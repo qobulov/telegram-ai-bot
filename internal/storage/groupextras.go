@@ -13,6 +13,10 @@ import (
 const (
 	// SettingCleanService, "on", has a group's service messages deleted.
 	SettingCleanService = "clean_service"
+	// SettingAntispamOff lists, joined by commas, the anti-spam guards a
+	// group turned off with /antispam: "flood", "spam" and "newcomers". They
+	// are on everywhere else.
+	SettingAntispamOff = "antispam_off"
 )
 
 // GroupSetting is a group's value for key, "" when it has none.

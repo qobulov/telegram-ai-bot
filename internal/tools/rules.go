@@ -125,7 +125,7 @@ func RulesTool(opts RulesOptions) Tool {
 			"ignore: stop answering the member whose message the owner replied to, or, when they replied to your own answer, the member it answered (hours, default 24); never admins or owners. unignore: answer that member again. " +
 			"set_address: how to address the owner who is asking, in every chat (text). " +
 			"watch_swearing: from now on, without you, a member's first insult here gets a warning and the next within a day a 1-hour mute, an exclamation aimed at nobody one warning a day and no mute, and a second swear at you within a day a 15-minute mute without warning that tags the group's creator, or the @username in text when the owner names whom to call; an admin, who cannot be muted, gets the warning and then that tag; the creator and owners are left alone. stop_watching_swearing turns it off. " +
-			"guard: turn on a guard run in code, without you (guard): spam bans members on the CAS and lols.bot spammer lists, links deletes links to malware and phishing (Google Safe Browsing, URLhaus), images deletes nude pictures (Sightengine, or a model where it cannot judge), whether sent as a photo, sticker, GIF or file, from anyone, admins and owners too; it never blocks stickers or GIFs as such; spam and links leave admins and owners alone; joins sends everyone who asks to join the group a button in private, letting them in when pressed within 10 minutes and declining them otherwise; flood mutes for 10 minutes a member sending 6 messages within 10 seconds, admins and owners left alone. unguard turns one off. " +
+			"guard: turn on a guard run in code, without you (guard): spam (members on the CAS and lols.bot spammer lists banned) and flood (a member sending 6 messages within 10 seconds, 10 within 30, or the same text or sticker 3 times within a minute muted, 10 minutes, then an hour, then a day, their messages deleted) are on in every group by default, switched by the group's admins with /antispam, so guard and unguard only say so; links deletes links to malware and phishing (Google Safe Browsing, URLhaus), images deletes nude pictures (Sightengine, or a model where it cannot judge), whether sent as a photo, sticker, GIF or file, from anyone, admins and owners too; it never blocks stickers or GIFs as such; spam and links leave admins and owners alone; joins sends everyone who asks to join the group a button in private, letting them in when pressed within 10 minutes and declining them otherwise; unguard turns one off. " +
 			"mute: stop writing in the group at all, until unmute. " +
 			"set_welcome: what you say, in code, to everyone who joins the group from now on, the owner's words copied exactly (text), \"{name}\" in it standing for the newcomers' names; remove_welcome: stop. " +
 			"list: the rules in force here. remove: delete a rule by its id from list. " +
@@ -198,9 +198,13 @@ func runRule(ctx context.Context, opts RulesOptions, caller Caller, args rulesAr
 		return setWelcome(ctx, opts, caller, args)
 	case "remove_welcome":
 		return removeWelcome(ctx, opts, caller)
-	case "guard":
-		return setGuard(ctx, opts, caller, args.Guard)
-	case "unguard":
+	case "guard", "unguard":
+		if args.Guard == "spam" || args.Guard == "flood" {
+			return map[string]any{"saved": false, "note": antispamNote}, nil
+		}
+		if args.Action == "guard" {
+			return setGuard(ctx, opts, caller, args.Guard)
+		}
 		kind, err := guardKind(opts, args.Guard, false)
 		if err != nil {
 			return nil, err
@@ -431,6 +435,10 @@ func removeKind(ctx context.Context, opts RulesOptions, caller Caller, kind stri
 	}
 	return map[string]bool{"removed": removed}, nil
 }
+
+// antispamNote answers guard and unguard of the spam and flood guards,
+// which are on everywhere unless a group's admins turn them off.
+const antispamNote = "Nothing to change here: the spam and flood guards are on in every group where you may delete messages and restrict members, unless its admins turned them off. The group's admins see and switch them with /antispam (buttons for each, or /antispam on, /antispam off); tell the owner so."
 
 // guardNotes say what each guard does once it is on.
 var guardNotes = map[string]string{

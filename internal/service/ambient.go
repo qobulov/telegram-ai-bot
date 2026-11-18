@@ -50,6 +50,8 @@ type ChatLog interface {
 	AppendGroupMessage(ctx context.Context, m storage.GroupMessage) error
 	GroupMessagesSince(ctx context.Context, chatID int64, since time.Time, limit int) ([]storage.GroupMessage, error)
 	ClearGroupMessages(ctx context.Context, chatID int64) error
+	// AuthorMessageCount counts a member's logged messages, up to limit.
+	AuthorMessageCount(ctx context.Context, chatID, authorID int64, limit int) (int, error)
 }
 
 // ambient keeps the log of each group, so the bot can follow the

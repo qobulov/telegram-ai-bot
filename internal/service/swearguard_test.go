@@ -19,18 +19,35 @@ import (
 type fakeStrikes struct {
 	mu      sync.Mutex
 	actions []storage.ModerationAction
+	// at is when the action of each index was taken, for those not taken
+	// now.
+	at map[int]time.Time
 }
 
-func (f *fakeStrikes) SwearStrikes(_ context.Context, chatID, userID int64, action string, _ time.Time) (int, error) {
+func (f *fakeStrikes) SwearStrikes(_ context.Context, chatID, userID int64, action string, since time.Time) (int, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	n := 0
-	for _, a := range f.actions {
+	for i, a := range f.actions {
+		if at, ok := f.at[i]; ok && at.Before(since) {
+			continue
+		}
 		if a.ChatID == chatID && a.TargetUserID == userID && a.Action == action {
 			n++
 		}
 	}
 	return n, nil
+}
+
+// tookAt notes an action taken at a past moment.
+func (f *fakeStrikes) tookAt(a storage.ModerationAction, at time.Time) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.at == nil {
+		f.at = map[int]time.Time{}
+	}
+	f.at[len(f.actions)] = at
+	f.actions = append(f.actions, a)
 }
 
 func (f *fakeStrikes) RecordModeration(_ context.Context, a storage.ModerationAction) (bool, error) {

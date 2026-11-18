@@ -143,6 +143,9 @@ type Message struct {
 	IsAutomaticForward bool `json:"is_automatic_forward"`
 	// ForwardOrigin says where a forwarded message first came from.
 	ForwardOrigin *MessageOrigin `json:"forward_origin"`
+	// ReplyMarkup is the buttons under a message, such as an inline bot's
+	// ad; only whether there are any is read (HasButtons).
+	ReplyMarkup *MessageButtons `json:"reply_markup"`
 	// BusinessConnectionID is, for a message in a chat of a business
 	// account, the connection it came through, which an answer is sent on.
 	BusinessConnectionID string `json:"business_connection_id"`
@@ -174,6 +177,24 @@ type Message struct {
 	Document  *Document   `json:"document"`
 	Audio     *Audio      `json:"audio"`
 	Poll      *Poll       `json:"poll"`
+}
+
+// MessageButtons are the rows of buttons under a message.
+type MessageButtons struct {
+	InlineKeyboard [][]json.RawMessage `json:"inline_keyboard"`
+}
+
+// HasButtons reports a message sent with buttons under it.
+func (m *Message) HasButtons() bool {
+	if m.ReplyMarkup == nil {
+		return false
+	}
+	for _, row := range m.ReplyMarkup.InlineKeyboard {
+		if len(row) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // serviceKinds are the fields that make a message a service message:

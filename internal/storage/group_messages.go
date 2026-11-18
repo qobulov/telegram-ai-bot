@@ -101,6 +101,21 @@ func (s *Store) AuthorMessageIDs(ctx context.Context, chatID, authorID int64, si
 	return ids, nil
 }
 
+// AuthorMessageCount counts one member's logged messages in a group, up to
+// limit: whether they wrote at least that many is all the newcomer guard
+// asks, so the count stops there.
+func (s *Store) AuthorMessageCount(ctx context.Context, chatID, authorID int64, limit int) (int, error) {
+	var count int
+	err := s.pool.QueryRow(ctx, `
+		SELECT count(*) FROM (
+			SELECT 1 FROM group_messages WHERE chat_id = $1 AND author_id = $2 LIMIT $3
+		) found`, chatID, authorID, limit).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("storage: count an author's messages: %w", err)
+	}
+	return count, nil
+}
+
 // ExpireQuietGroups removes the logged messages older than before in the
 // groups the bot has not answered since quietSince: where nobody talks to it,
 // the log serves only the week's statistics, and one group of that kind held

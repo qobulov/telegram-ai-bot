@@ -1483,7 +1483,7 @@ does not erase them, and every turn in the group is told the ones in force.
 | Ignore a member | an owner replying to that member's message, or to her answer to them, in the group | 24 hours, or 1 to 720 hours if the owner says |
 | Form of address | an owner, for themselves, in any chat; it holds everywhere | until removed |
 | Swear guard | an owner, in the group it is for ("so'kinganlarni avtomatik mute qil", optionally "@Bakxtyorvch ni chaqir"); one per group | until turned off |
-| Spam, link, picture and joins guards | an owner, in the group it is for (`guard` `spam`, `links`, `images` or `joins`; see [Join requests](#join-requests) for the last); the joins guard also the group's creator and its admins who may invite users, through the `join_captcha` tool | until turned off |
+| Link, picture and joins guards | an owner, in the group it is for (`guard` `links`, `images` or `joins`; the spam and flood guards are on everywhere, see [Anti-spam](#anti-spam); see [Join requests](#join-requests) for the last); the joins guard also the group's creator and its admins who may invite users, through the `join_captcha` tool | until turned off |
 | Punishment | an owner or the group's creator, in the group, for swearing or nude pictures: in reply to a member ("bu bola yana so'kinsa ban qil") or for anyone ("18+ tashasa 3 soat mute qil"); one per member and kind | 30 days, or the hours given |
 
 The swear guard runs in code, with no model. In a group where it is on, every
@@ -1556,6 +1556,41 @@ that member's message ("Maria, bunga javob berma", "javob qaytarma",
 ignored for 24 hours, exactly as with `/ignore`, and she reacts 👌 to the
 order. Any other wording, a question such as "nega javob bermading?", or an
 order about someone who cannot be ignored goes to the model as before.
+
+### Anti-spam
+
+Three guards are on in every group, with no rule and no owner, wherever the
+bot is an admin who may delete messages and restrict members, and run in code
+with no model. A group's admins, the owners and moderators whose rank opens
+`group` see them with `/antispam`: one line each, ✅ or ❌, and a button each
+that switches it (anyone else pressing gets a box and changes nothing);
+`/antispam off` and `/antispam on` switch all three. What a group turned off
+is kept in `group_settings` under `antispam_off` ("flood,spam,newcomers"), with
+no migration; the `spam_guard` and `flood_guard` rules owners set before mean
+nothing more, and the `group_rules` tool's `guard` and `unguard` of `spam` or
+`flood` only point to `/antispam`. Where the bot lacks either right, or its
+rights cannot be learned, the guards do nothing and say nothing. Admins,
+owners, bots and posts on behalf of a chat are left alone.
+
+- **Flood.** A member floods who sends 6 messages within 10 seconds, 10 within
+  30 seconds, or the same text (folded to lower case and single spaces, a
+  reply's "(to ...)" aside, at least 3 characters, not a command) or the same sticker, or
+  picture with the same caption, 3 times within a minute, as the group log
+  counts them. All their messages the log has from that minute go, up to 30,
+  in one `deleteMessages` call, and they are muted, longer each time within a
+  day (`flood_mute` in `moderation_actions`): 10 minutes, then an hour, then a
+  day, with one notice saying how long. Messages already on the way when the
+  mute falls are only deleted. Photos and GIFs without a caption are logged
+  alike, so their repeats are not counted.
+- **Spam lists.** Members on the CAS or lols.bot lists are banned when they
+  join, ask to join or write, as before.
+- **Newcomers' links.** A member with fewer than 5 messages in the group's log
+  (which keeps about a month, so a member silent that long counts as new: join
+  times are known only for those invited, so the log decides) may not post a
+  link other than to the group itself, an @mention asking to subscribe
+  ("obuna", "подпишись"), a post forwarded from a channel, or a message with
+  buttons: it is deleted with a warning (`newcomer_link`), and a second within
+  the hour mutes them for an hour (`newcomer_mute`).
 
 ### Picture guard
 
