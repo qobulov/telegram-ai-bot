@@ -280,13 +280,13 @@ type Options struct {
 	// though premium bought before still counts while Premium is set.
 	Payments Payments
 	Premium  PremiumBook
-	// Cards keeps Kartalar, the anime card collection (/card, /mycards,
-	// /cardtop), whose catalog comes from AniList at CardsAPI, empty for
+	// Cards keeps Kartalar, the anime card collection, which /card opens
+	// in its Mini App, whose catalog comes from AniList at CardsAPI, empty for
 	// AniList's own address. Nil turns it off.
 	Cards    CardBook
 	CardsAPI string
-	// CardsURL is the page of Kartalar's Mini App, which /cards and the
-	// collection's button open; "" for none.
+	// CardsURL is the page of Kartalar's Mini App, which /card and its
+	// buttons open; "" for none.
 	CardsURL          string
 	PremiumPrice      int
 	PremiumDays       int

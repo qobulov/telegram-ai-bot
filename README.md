@@ -773,7 +773,7 @@ days ago, is not posted (`invite_awards`, migration 71).
 Groups are recorded when the bot is added, promoted or removed (Telegram's
 `my_chat_member` updates) and from the messages it logs. Added to a group it
 was not in, the bot greets it in the language of whoever added it: how to
-call it, `/card`, `/cards` and `/games`, and, when it is not an admin,
+call it, `/card` and `/games`, and, when it is not an admin,
 that it clears spam as one; a promotion or its leaving says nothing. Telegram has no way
 to list a bot's groups, so a group the bot joined before this, where nobody
 has written since, is not known. After upgrading, run `set-webhook` again so
@@ -1302,21 +1302,22 @@ keep it from taking over the chat.
 
 Each start sets the menu Telegram opens on "/" (`setMyCommands`, in
 `internal/app/commands.go`), kept short as 22 commands crowded it:
-`/start`, `/help`, `/card`, `/cards` and `/games` in private chats; the
+`/start`, `/help`, `/card` and `/games` in private chats; the
 same but `/start` for a group's members; and for its admins also `/mute`,
 `/unmute`, `/ignore` and `/unignore`. `/games` lists every game and
-Kartalar's commands to tap, the page games only while `WEBAPP_URL` serves
+`/card` to tap, the page games only while `WEBAPP_URL` serves
 them, and the Mini App holds the collection, the table and the shards (melting
 and a card out of turn); every command left out of the menu is answered all
-the same. In a group the menu adds the bot's username itself. A failure is
-only logged.
+the same. In a group the menu adds the bot's username itself. `/ranklog` is in
+no menu, the owner's or a rank's, as the owner asked, and is answered all the
+same. A failure is only logged.
 
 A moderator with a rank who is not the group's Telegram admin sees there a
 menu for them alone (`chat_member` scope, `RankMenu` in the same file, set
 in `internal/service/rankmenu.go`): the moderation commands their rank opens
 in that group, as `/access` set them (rank 1 by default `/warn`, `/unwarn`,
 `/warns`, `/mute`, `/unmute`, `/ban`, `/unban`, `/banlist`, `/reports`,
-`/kick` and `/ranklog`; 2 adds `/pin` and `/unpin`; 3 `/del`; 4 `/tag`,
+and `/kick`; 2 adds `/pin` and `/unpin`; 3 `/del`; 4 `/tag`,
 `/cleanservice`, `/kickinactive` and `/rank`; 5 `/promote`, `/demote`,
 `/amnesty` and `/access`), then everyone's. `/ignore`, `/unignore` and
 `/invites_auto` take a Telegram admin whatever the rank and stay out. It is
@@ -1365,7 +1366,7 @@ match "maria" unless you add it:
 word.
 
 **Commands** in a group need the bot's username (`/help@MyMariaBot`). A plain
-`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/card`, `/mycards`, `/cardtop`, `/cards`, `/market`, `/invites`, `/invites_week`, `/invites_month`, `/duel`, `/boss`, `/snake`, `/woodcutter`, `/checkers` and `/tictactoe`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username. The commands' names are English; their old Uzbek ones (`/karta`, `/kartalar`, `/qoshganlar` and the rest) are not answered any more.
+`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/card`, `/invites`, `/invites_week`, `/invites_month`, `/boss`, `/snake`, `/woodcutter`, `/checkers` and `/tictactoe`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username. The commands' names are English; their old Uzbek ones (`/karta`, `/kartalar`, `/qoshganlar` and the rest) are not answered any more.
 
 ### Example
 
@@ -1572,7 +1573,7 @@ calling the bot by name, "Мут мари 1 минутга", "Maria, ban", "за
 минут", "mute him for 2 hours", "chiqar" (an action word
 in Uzbek, Russian or English,
 perhaps a length, and nothing else, so that talk about muting still goes to
-the model, which once asked back instead of muting, and refused one adminship order in three); adminship goes the same way, "admin qil", "админ бекор кил", "adminlikdan ol", "сними админа", and a warning, "varn ber", "пред", "ogohlantir": the third warning mutes the member for a day and their count starts again (`member_warns`, migration 83); moderators' ranks, 1 to 5, as Iris keeps them (`internal/ranks`, `member_ranks`, `rank_log`, `command_ranks`, migration 84): the group's creator and the owners stand above every rank and give any; a moderator whose rank opens giving ranks (4 unless set) gives one below their own only with `/rank 2` replying to the member, and `/rank 0` takes it away, while `/rank` alone replying to a member says their rank to anyone who asks: words such as "+3 admin Mari", "Mari daraja 2" or "-admin Mari" are no order, and the model has no tool to give ranks, so it teaches `/rank` instead; a ranked member may have the bot do each moderate action their rank opens without the Telegram right, never on a member of their rank or higher; `/staff` lists the ranks, `/ranklog` who gave which, and `/access` (".дк") the rank each command needs, the defaults Iris's, which rank 5 or the creator changes, "/access ban 2"; `/banlist` lists those the bot banned since the last amnesty, with why and who, to admins and moderators; `/amnesty` (rank 5) unbans them all; `/kickinactive 30` (rank 4) lists the members the bot last saw write more than 30 days ago, past admins, owners and ranked moderators, and removes up to 50 of them, who may come back, when repeated with "ha"; any member calls the admins and moderators with `/admins` (once in three minutes a group), reports the message replied to with `/report` (once in two minutes a member), the quote and the tags in one line, and opens a vote to ban the member replied to with `/voteban`, buttons for and against, five votes for banning them within thirty minutes, one vote a member, never the target's, never on an admin or an owner (`ban_votes`, migration 85), cancelled by its starter or a moderator, and closed as not banned when pressed after its time; a report is kept (`reports`, migration 88) with buttons for a moderator to mark it seen, ban the reported member or reject it, the first press settling it, and `/reports` lists a week's open ones; a warning keeps its reason and lapses after 30 days, `/warns` listing them; `/banlist` has an unban button for each of its latest ten; `/profile` is a player's points, place, cards by rarity, rarest cards, tokens and crystals, with their rank and warnings in a group; `/rights` ("huquqlarim") lists what the asker's rank opens; `/myinvites` counts the asker's own invites; talk with the model is only for the groups an owner turned it on for (`group_settings` key `ai`; `/aigroups` in private lists the bot's groups as ✅/❌ buttons that switch it); the owners' own commands (`/settings`, `/set`, `/stats`, `/model`, `/aigroups`, `/announce`, `/payments`, `/refund`, `/business`, `/import_stickers`) work only in private: in a group they, and the former group switches `/aichat`, `/limit` and `/active`, get no answer, and an owner's menu there leaves them out: elsewhere the commands, games, moderation, reputation, guards and `/weather` all work without any quota, talk to the bot gets "AI suhbat yoqilmagan" once in six hours and is otherwise noted as chatter, and no voice message is transcribed; where AI is on the group's quota is taken only when the model is asked, not for the commands and orders done in code; the cards app has a 💎 shop: crystals sold for Telegram Stars by an invoice link the app opens (`createInvoiceLink`, `openInvoice`), its payload `cr:<user>:<pack>` checked before the payment and the crystals added once per charge (`crystal_purchases`, migration 90) and taken back on a refund, and crystals buy tokens (5 for 60, 12 for 135) and 5-card packs with one sure Epic (120), Legendary (350) or Mythic (2000), the last card raised only when none before it was as rare; a reply of "+", "rahmat", "raxmat", "рахмат", "спс" or the like, with a filler such as "aka" or an emoji, to a member gives them a reputation point, once an hour from the same member, marked with 👍 and unanswered, `/rep` and `/toprep` showing it (`member_reputation`, `reputation_log`); and `/cleanservice` switches deleting join, leave, pin and other service messages (`group_settings`, migration 89, whose `group_notes` table is no longer used); the model reads the group itself with `group_info` (its bio, link, size, admins, what members may send, the pinned message and the bot's own rights) and a member with `member_info` (the asker, the member replied to or tagged: Telegram status, title or tag, rank, warnings and the last reason, mutes and bans received, messages today and this week, last seen, who brought them, whom they brought, and their card points, place, tokens and crystals); moderation commands take the member replied to or one tagged, "/demote @user", a tagged one answered only for those who may moderate; `/promote` makes the member replied to a Telegram admin, "/promote Streamer" with that title and "Moderator" without one, as in words, `/demote` takes it back, and `/tag` sets a member's tag, or the title of an admin the bot made; and `/help mod`, `/help kartalar` and `/help azo` are the help's parts; and everyday commands are answered in code: `/ping`, `/id` (the member replied to, or the asker's and the chat's) and `/calc` (+ - * / ^ %, parentheses), while `/weather Toshkent` is asked of the model, which looks it up; the model reads the invite table itself with `invite_stats` (the top, the asker's own or the member replied to's, for today, the week, the month or all time); and `/mylink` gives a member their own invite link, made once by the bot with the member's ID in its name (`member_links`, migration 86), so that whoever joins by it counts for that member: a group's public link tells the bot nothing, and an admin's link only who made it; "бер", "qil" and the
+the model, which once asked back instead of muting, and refused one adminship order in three); adminship goes the same way, "admin qil", "админ бекор кил", "adminlikdan ol", "сними админа", and a warning, "varn ber", "пред", "ogohlantir": the third warning mutes the member for a day and their count starts again (`member_warns`, migration 83); moderators' ranks, 1 to 5, as Iris keeps them (`internal/ranks`, `member_ranks`, `rank_log`, `command_ranks`, migration 84): the group's creator and the owners stand above every rank and give any; a moderator whose rank opens giving ranks (4 unless set) gives one below their own only with `/rank 2` replying to the member, and `/rank 0` takes it away, while `/rank` alone replying to a member says their rank to anyone who asks: words such as "+3 admin Mari", "Mari daraja 2" or "-admin Mari" are no order, and the model has no tool to give ranks, so it teaches `/rank` instead; a ranked member may have the bot do each moderate action their rank opens without the Telegram right, never on a member of their rank or higher; `/staff` lists the ranks, `/ranklog` who gave which, and `/access` (".дк") the rank each command needs, the defaults Iris's, which rank 5 or the creator changes, "/access ban 2"; `/banlist` lists those the bot banned since the last amnesty, with why and who, to admins and moderators; `/amnesty` (rank 5) unbans them all; `/kickinactive 30` (rank 4) lists the members the bot last saw write more than 30 days ago, past admins, owners and ranked moderators, and removes up to 50 of them, who may come back, when repeated with "ha"; any member calls the admins and moderators with `/admins` (once in three minutes a group), reports the message replied to with `/report` (once in two minutes a member), the quote and the tags in one line, and opens a vote to ban the member replied to with `/voteban`, buttons for and against, five votes for banning them within thirty minutes, one vote a member, never the target's, never on an admin or an owner (`ban_votes`, migration 85), cancelled by its starter or a moderator, and closed as not banned when pressed after its time; a report is kept (`reports`, migration 88) with buttons for a moderator to mark it seen, ban the reported member or reject it, the first press settling it, and `/reports` lists a week's open ones; a warning keeps its reason and lapses after 30 days, `/warns` listing them; `/banlist` has an unban button for each of its latest ten; `/rights` ("huquqlarim") lists what the asker's rank opens; `/myinvites` counts the asker's own invites; talk with the model is only for the groups an owner turned it on for (`group_settings` key `ai`; `/aigroups` in private lists the bot's groups as ✅/❌ buttons that switch it); the owners' own commands (`/settings`, `/set`, `/stats`, `/model`, `/aigroups`, `/announce`, `/payments`, `/refund`, `/business`, `/import_stickers`) work only in private: in a group they, and the former group switches `/aichat`, `/limit` and `/active`, get no answer, and an owner's menu there leaves them out: elsewhere the commands, games, moderation, reputation, guards and `/weather` all work without any quota, talk to the bot gets "AI suhbat yoqilmagan" once in six hours and is otherwise noted as chatter, and no voice message is transcribed; where AI is on the group's quota is taken only when the model is asked, not for the commands and orders done in code; the cards app has a 💎 shop: crystals sold for Telegram Stars by an invoice link the app opens (`createInvoiceLink`, `openInvoice`), its payload `cr:<user>:<pack>` checked before the payment and the crystals added once per charge (`crystal_purchases`, migration 90) and taken back on a refund, and crystals buy tokens (5 for 60, 12 for 135) and 5-card packs with one sure Epic (120), Legendary (350) or Mythic (2000), the last card raised only when none before it was as rare; a reply of "+", "rahmat", "raxmat", "рахмат", "спс" or the like, with a filler such as "aka" or an emoji, to a member gives them a reputation point, once an hour from the same member, marked with 👍 and unanswered, `/rep` and `/toprep` showing it (`member_reputation`, `reputation_log`); and `/cleanservice` switches deleting join, leave, pin and other service messages (`group_settings`, migration 89, whose `group_notes` table is no longer used); the model reads the group itself with `group_info` (its bio, link, size, admins, what members may send, the pinned message and the bot's own rights) and a member with `member_info` (the asker, the member replied to or tagged: Telegram status, title or tag, rank, warnings and the last reason, mutes and bans received, messages today and this week, last seen, who brought them, whom they brought, and their card points, place, tokens and crystals); moderation commands take the member replied to or one tagged, "/demote @user", a tagged one answered only for those who may moderate; `/promote` makes the member replied to a Telegram admin, "/promote Streamer" with that title and "Moderator" without one, as in words, `/demote` takes it back, and `/tag` sets a member's tag, or the title of an admin the bot made; and `/help mod`, `/help kartalar` and `/help azo` are the help's parts; and everyday commands are answered in code: `/ping`, `/id` (the member replied to, or the asker's and the chat's) and `/calc` (+ - * / ^ %, parentheses), while `/weather Toshkent` is asked of the model, which looks it up; the model reads the invite table itself with `invite_stats` (the top, the asker's own or the member replied to's, for today, the week, the month or all time); and `/mylink` gives a member their own invite link, made once by the bot with the member's ID in its name (`member_links`, migration 86), so that whoever joins by it counts for that member: a group's public link tells the bot nothing, and an admin's link only who made it; "бер", "qil" and the
 like may go with it. Replying to the bot's own answer about a member, such
 an order reaches that member: "Мут бер" after the bot answered "mute him"
 (the bot remembers whom each of its answers in the last hour was about).
@@ -2182,8 +2183,13 @@ last given), gathering up to 12 periods' while away, and keeps the ones not spen
 points. The draw tab has two buttons, 1x and 5x (`open`, `count`): each
 card takes a token while there is one and 15 crystals once there is none, and with
 too few for all of them none open (`OpenCards`, `CardFundsError`). Five are laid
-out together after the rarest of them turns. `/card` in the chat, like `/cards`, answers with the app's button: cards open
-in the app alone.
+out together after the rarest of them turns. `/card` in the chat, in a group or in private, answers with the app's button: cards open
+in the app alone, and `/card` is the game's one command. `/cards`, `/mycards`,
+`/cardtop`, `/market`, `/duel` and `/profile` were taken out, as the owner
+asked: in a group they get no answer, named for the bot or not, in a private chat
+the answer for an unknown command, and the buttons of a collection or a duel
+posted before are ignored. `/profile` also showed a member's rank and warnings in
+a group; `/rights` and the model's `member_info` still tell them.
 The Animelar tab (`animes`) lists every anime, its seasons and sequels as one, with
 how many of its cards the player holds; an anime opens on all its cards with their
 pictures and names, the ones not held dimmed, so that a player sees what is there to
@@ -2191,23 +2197,15 @@ collect. The Kolleksiya tab still hides the cards not held.
 Kartalar had an auto opener (`/autocard`, migration 65) that opened each
 player's cards and sent them to their private chat; the owners took it out,
 and migration 74 drops its columns: players open the day's cards themselves.
-`/duel [stake]` in a group calls a member out, the one replied to or anyone,
-for up to 100 shards: whoever presses its button accepts. Each side's three
-strongest cards are its team, and a team's power is their attack and health
-together; each side wins with its share of the two powers as its chance, so
-that the stronger team wins more often and the weaker one still may (twice
-the power is a 67% chance). The challenge shows the challenger's team and
-power, the result both teams, their power and chance, and the winner takes
-the stake of the loser's shards, or all they have; the challenger or the one called out may
-call it off, and `card_duels` keeps each duel's message so that it is settled
-once however often it is pressed. Cards pass between players (migration 66, `card_trades`). In the Mini
+Duels (`/duel`, `card_duels`) were taken out with the commands; the table stays.
+Cards pass between players (migration 66, `card_trades`). In the Mini
 App a card's large view has 🎁 Give: it searches the players who have opened
 a card by name or @username (the one a group last saw), the most points
 first (`players`), and gives the one picked
 a spare copy at once (`gift`: a player keeps their last copy not melted),
 the bot telling them in their private chat who gave it. The Mini App's 🔄
-market tab, which `/market` opens (in a group through the private chat's
-`/start bozor`, the page told `?tab=market`), lists offers (migration 67, `card_trades` rows with no `to_id`
+market tab, which `/start bozor` opens (the link the old `/market` gave in a
+group; the page told `?tab=market`), lists offers (migration 67, `card_trades` rows with no `to_id`
 until taken): a player puts up a card of theirs for a card they pick from the
 whole catalog by name (`catalog`, `offer`), at most 5 open, each for 7 days;
 anyone who holds the card wanted presses 🔄 to take it (`take`), each giving
@@ -2220,9 +2218,7 @@ to shards, with it), its points passing only as it is new to its taker or the gi
 cards a day, gifts and trades together, and only to a player who has opened a
 card, so that a second account cannot feed a first one. With the pages served, the persona is told the game's facts
 (`cardsNote`), as the model had said it was "not the card bot" and named
-commands there are none of. `/mycards` shows
-how many of each rarity's cards the player holds as buttons that list them,
-pressed only by that player; `/cardtop` is the table of points. The
+commands there are none of; it teaches `/card` alone. The
 pictures are the characters' AniList pictures, the studios' art.
 
 The cards come from AniList alone. Trading cards from PokéWallet (one set
@@ -2232,7 +2228,7 @@ anime card of the same rarity, with its copies and melted copies, one the
 player did not have yet first, so that no one's points changed, and the
 market's offers of them were called off.
 
-`/cards` opens the same as a Mini App (`public/kartalar/`, served by
+`/card` opens it as a Mini App (`public/kartalar/`, served by
 `api/cards.go` from `internal/cards`): the collection shelf by shelf, the
 rarest first, the cards held with their pictures and the rest as locked
 cards folded into one row each, a search through the cards held, a card
@@ -2240,8 +2236,7 @@ opened large with its numbers, drawing a card that turns over with a
 countdown to the next, and the table. The player is the one Telegram's
 signed init data names, and a card not held reaches the page as its rarity
 alone. In a group its button links to the private chat (`/start
-kartalar`), as Telegram opens Mini App buttons only there; the collection's
-message carries it too.
+kartalar`), as Telegram opens Mini App buttons only there.
 
 "Karta ochish vaqti kelganda eslat" has Maria remind the player when their
 next card may be opened, and "har safar eslat" after every card; see
@@ -2489,7 +2484,7 @@ both sides or a bot game without the bot is refused.
   The conversation, the mute setting and the standing rules from before the
   upgrade no longer apply.
 - In forum-style supergroups she answers in the topic of the message she
-  replies to. This was not tested against a real forum. No command is counted, the quota being for the model's talk: a command never asks the model, so `/mycards`, `/card` and its wait, the games and the rest are always answered, the flood guard still bounding them, and the games in a group keep `send_game`'s two a chat in ten minutes, one too soon getting only 👀.
+  replies to. This was not tested against a real forum. No command is counted, the quota being for the model's talk: a command never asks the model, so `/card`, the games and the rest are always answered, the flood guard still bounding them, and the games in a group keep `send_game`'s two a chat in ten minutes, one too soon getting only 👀.
 
 ### BotFather privacy mode
 

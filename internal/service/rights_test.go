@@ -3,27 +3,7 @@ package service
 import (
 	"strings"
 	"testing"
-
-	"telegram-ai-bot/internal/storage"
 )
-
-// /profile shows a player's points, place, rarest cards, tokens and
-// crystals, and in a group their rank there.
-func TestProfile(t *testing.T) {
-	f := newFixture()
-	book := newFakeCards("")
-	book.held[20], book.shards[20] = 2, 40
-	book.top = []storage.CardPlayer{{UserID: 9, Points: 20000}, {UserID: 20, Points: 10000}}
-	f.opts.Cards = book
-	f.opts.Ranks = &fakeRankBook{ranks: map[int64]int{20: 2}, overrides: map[string]int{}}
-	sent := f.run(from(20, "/profile", 0))
-	last := sent[len(sent)-1].text
-	for _, want := range []string{"10 000", "2/2", "Gojo", "Kristall: 40", "Daraja: 2"} {
-		if !strings.Contains(last, want) {
-			t.Errorf("profile = %q, want %q", last, want)
-		}
-	}
-}
 
 // /rights lists the commands a rank opens; with no rank it says so.
 func TestRights(t *testing.T) {

@@ -46,9 +46,9 @@ func joinedGroup(change *telegram.ChatMemberUpdated) bool {
 
 var (
 	textBotJoined = localText{
-		uz: "👋 Salom! Men guruhingiz uchun AI yordamchiman.\n💬 Menga yozish: xabarimga javob qiling yoki @%s deb yozing.\n🎴 Kartalar o'yini: /card · ilova: /cards\n🎮 Boshqa o'yinlar: /games",
-		ru: "👋 Привет! Я ИИ-помощник для вашей группы.\n💬 Чтобы написать мне, ответьте на моё сообщение или упомяните @%s.\n🎴 Игра в карты: /card · приложение: /cards\n🎮 Другие игры: /games",
-		en: "👋 Hi! I am an AI helper for your group.\n💬 To talk to me, reply to my message or mention @%s.\n🎴 The card game: /card · the app: /cards\n🎮 More games: /games",
+		uz: "👋 Salom! Men guruhingiz uchun AI yordamchiman.\n💬 Menga yozish: xabarimga javob qiling yoki @%s deb yozing.\n🎴 Kartalar o'yini: /card\n🎮 Boshqa o'yinlar: /games",
+		ru: "👋 Привет! Я ИИ-помощник для вашей группы.\n💬 Чтобы написать мне, ответьте на моё сообщение или упомяните @%s.\n🎴 Игра в карты: /card\n🎮 Другие игры: /games",
+		en: "👋 Hi! I am an AI helper for your group.\n💬 To talk to me, reply to my message or mention @%s.\n🎴 The card game: /card\n🎮 More games: /games",
 	}
 	textBotJoinedAdmin = localText{
 		uz: "🛡 Spam va reklamani tozalashim uchun meni admin qiling.",

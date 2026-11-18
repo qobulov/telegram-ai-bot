@@ -18,7 +18,7 @@ type CrystalBook interface {
 var (
 	textCrystalsOff      = localText{uz: "Kristall sotuvi hozir yopiq.", ru: "Продажа кристаллов сейчас закрыта.", en: "Crystals are not on sale now."}
 	textCrystalsChanged  = localText{uz: "Narx o'zgargan: ilovani qayta ochib, yana sotib oling.", ru: "Цена изменилась: откройте приложение заново.", en: "The price changed: open the app again."}
-	textCrystalsThanks   = localText{uz: "💎 +%d kristall qo'shildi! Endi sizda %d 💎. Do'kon: /cards", ru: "💎 +%d кристаллов! Теперь у вас %d 💎. Магазин: /cards", en: "💎 +%d crystals! You now have %d 💎. Shop: /cards"}
+	textCrystalsThanks   = localText{uz: "💎 +%d kristall qo'shildi! Endi sizda %d 💎. Do'kon: /card", ru: "💎 +%d кристаллов! Теперь у вас %d 💎. Магазин: /card", en: "💎 +%d crystals! You now have %d 💎. Shop: /card"}
 	textCrystalsNotSaved = localText{uz: "To'lov qabul qilindi, lekin kristallni yozib bo'lmadi. Egalari tez orada qo'shadi yoki pulni qaytaradi.", ru: "Оплата принята, но кристаллы не записались. Владельцы скоро добавят их или вернут деньги.", en: "The payment went through but the crystals could not be added; the owners will add them or refund it."}
 )
 

@@ -17,12 +17,11 @@ const commandsTimeout = 5 * time.Second
 // after their own, as Telegram shows an admin the admins' menu alone.
 var membersMenu = []telegram.BotCommand{
 	{Command: "help", Description: "Yordam va buyruqlar"},
-	{Command: "cards", Description: "Kartalar: har 2 soatda token, 1x/5x ochish, kolleksiya"},
+	{Command: "card", Description: "Kartalar o'yini: har 2 soatda token, 1x/5x ochish, kolleksiya"},
 	{Command: "games", Description: "Barcha o'yinlar"},
 	{Command: "mylink", Description: "Shaxsiy taklif havolangiz: kirganlar sizga hisoblanadi"},
 	{Command: "invites_week", Description: "Haftalik reyting: kim nechta odam qo'shdi"},
 	{Command: "myinvites", Description: "Siz nechta odam qo'shdingiz"},
-	{Command: "profile", Description: "O'yinchi kartangiz: ochko, o'rin, kartalar"},
 	{Command: "rights", Description: "Guruhdagi huquqlaringiz"},
 	{Command: "rep", Description: "Reputatsiya: \"+\" yoki \"rahmat\" reply bilan beriladi"},
 	{Command: "toprep", Description: "Reputatsiya reytingi"},
@@ -43,7 +42,7 @@ var commandMenus = map[string][]telegram.BotCommand{
 	telegram.ScopeDefault: {
 		{Command: "start", Description: "Salomlashish"},
 		{Command: "help", Description: "Yordam va buyruqlar"},
-		{Command: "cards", Description: "Kartalar: har 2 soatda token, 1x/5x ochish, kolleksiya"},
+		{Command: "card", Description: "Kartalar o'yini: har 2 soatda token, 1x/5x ochish, kolleksiya"},
 		{Command: "games", Description: "Barcha o'yinlar"},
 		{Command: "calc", Description: "Kalkulyator: /calc 2+2"},
 		{Command: "id", Description: "Sizning ID'ingiz"},
@@ -66,7 +65,6 @@ var commandMenus = map[string][]telegram.BotCommand{
 		{Command: "reports", Description: "Ko'rib chiqilmagan shikoyatlar"},
 		{Command: "warns", Description: "Kimda nechta ogohlantirish (reply: bittasi)"},
 		{Command: "rank", Description: "Daraja: /rank 3 berish, /rank 0 olish, /rank ko'rish (reply)"},
-		{Command: "ranklog", Description: "Kim kimga daraja bergan"},
 		{Command: "access", Description: "Buyruqlar darajasi: /access ban 2"},
 		{Command: "kickinactive", Description: "Faol emaslarni chiqarish: /kickinactive 30"},
 		{Command: "amnesty", Description: "Hammani bandan chiqarish"},
@@ -78,18 +76,13 @@ var commandMenus = map[string][]telegram.BotCommand{
 // ownerGroupMenu is what an owner sees in a group they write in: every
 // command the bot answers there, the menus of everyone else first, then the
 // commands they do not list. The owners' own commands work only in private,
-// so they are not here. Aliases, /delete and /ranks, are left out.
+// so they are not here. Aliases, /delete and /ranks, are left out, and so
+// is /ranklog, which no menu lists.
 var ownerGroupMenu = []telegram.BotCommand{
 	{Command: "help", Description: "Yordam va buyruqlar"},
 	{Command: "start", Description: "Salomlashish"},
 	{Command: "about", Description: "Bot haqida"},
-	{Command: "cards", Description: "Kartalar: har 2 soatda token, 1x/5x ochish, kolleksiya"},
-	{Command: "card", Description: "Karta ochish (ilovada)"},
-	{Command: "mycards", Description: "Kartalaringiz kolleksiyasi"},
-	{Command: "cardtop", Description: "Kartalar reytingi: eng ko'p ochko"},
-	{Command: "market", Description: "Kartalar bozori: kartalarni almashish"},
-	{Command: "duel", Description: "Kartalar dueli: /duel 100 (reply yoki hammaga)"},
-	{Command: "profile", Description: "O'yinchi kartangiz: ochko, o'rin, kartalar"},
+	{Command: "card", Description: "Kartalar o'yini: har 2 soatda token, 1x/5x ochish, kolleksiya"},
 	{Command: "games", Description: "Barcha o'yinlar"},
 	{Command: "game", Description: "Tarozi o'yini"},
 	{Command: "snake", Description: "Kosmik ilon o'yini"},
@@ -134,7 +127,6 @@ var ownerGroupMenu = []telegram.BotCommand{
 	{Command: "reports", Description: "Ko'rib chiqilmagan shikoyatlar"},
 	{Command: "warns", Description: "Kimda nechta ogohlantirish (reply: bittasi)"},
 	{Command: "rank", Description: "Daraja: /rank 3 berish, /rank 0 olish, /rank ko'rish (reply)"},
-	{Command: "ranklog", Description: "Kim kimga daraja bergan"},
 	{Command: "access", Description: "Buyruqlar darajasi: /access ban 2"},
 	{Command: "kickinactive", Description: "Faol emaslarni chiqarish: /kickinactive 30"},
 	{Command: "amnesty", Description: "Hammani bandan chiqarish"},
@@ -163,7 +155,8 @@ var ownerMenu = append(slices.Clone(ownerGroupMenu), ownerOnlyMenu...)
 
 // rankedCommands are the admins' commands a moderator with a rank may run
 // in a group without being its Telegram admin, each with the rank code
-// (internal/ranks) that opens it, "" for any rank: /ranklog asks none.
+// (internal/ranks) that opens it. /ranklog, which any rank may run, is in
+// no menu, as the owner asked, and is answered all the same.
 // /ignore, /unignore and /invites_auto are left out, as they take a
 // Telegram admin or an owner whatever the rank.
 var rankedCommands = []struct{ name, code string }{
@@ -175,7 +168,7 @@ var rankedCommands = []struct{ name, code string }{
 	{"del", "delete"},
 	{"tag", "group"}, {"cleanservice", "group"},
 	{"kickinactive", "masskick"},
-	{"rank", "rank"}, {"ranklog", ""},
+	{"rank", "rank"},
 	{"promote", "admin"}, {"demote", "admin"},
 	{"amnesty", "amnesty"},
 	{"access", "access"},
@@ -198,7 +191,7 @@ func RankMenu(rank int, overrides map[string]int) []telegram.BotCommand {
 		}
 	}
 	for _, c := range rankedCommands {
-		if rank > 0 && (c.code == "" || ranks.Need(c.code, overrides) <= rank) {
+		if rank > 0 && ranks.Need(c.code, overrides) <= rank {
 			add(telegram.BotCommand{Command: c.name, Description: described[c.name]})
 		}
 	}

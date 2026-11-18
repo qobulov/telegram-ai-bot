@@ -189,8 +189,7 @@ func TestOwnerMenuHoldsEveryCommand(t *testing.T) {
 	}
 	for _, command := range []string{"aigroups", "announce", "payments", "refund",
 		"model", "stats", "settings", "set", "business", "import_stickers", "premium", "paysupport",
-		"game", "snake", "woodcutter", "boss", "mafia", "checkers", "card", "mycards", "cardtop", "market",
-		"duel", "teams", "invites", "invites_month", "invites_auto", "unpin", "unignore", "ping", "about"} {
+		"game", "snake", "woodcutter", "boss", "mafia", "checkers", "card", "teams", "invites", "invites_month", "invites_auto", "unpin", "unignore", "ping", "about"} {
 		if !seen[command] {
 			t.Errorf("/%s is missing from the owners' menu", command)
 		}
@@ -246,12 +245,12 @@ func TestRankMenuFollowsTheRank(t *testing.T) {
 		}
 	}
 	first := menuNames(RankMenu(1, nil))
-	for _, want := range []string{"ban", "unban", "kick", "mute", "unmute", "warn", "unwarn", "warns", "banlist", "reports", "ranklog"} {
+	for _, want := range []string{"ban", "unban", "kick", "mute", "unmute", "warn", "unwarn", "warns", "banlist", "reports"} {
 		if !slices.Contains(first, want) {
 			t.Errorf("rank 1 menu %v lacks /%s", first, want)
 		}
 	}
-	for _, not := range []string{"pin", "del", "rank", "kickinactive", "promote", "amnesty", "access", "ignore", "invites_auto"} {
+	for _, not := range []string{"ranklog", "pin", "del", "rank", "kickinactive", "promote", "amnesty", "access", "ignore", "invites_auto"} {
 		if slices.Contains(first, not) {
 			t.Errorf("rank 1 menu %v has /%s, which rank 1 does not open", first, not)
 		}

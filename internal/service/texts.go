@@ -239,7 +239,7 @@ A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yo
 /reports, /warns — ko'rilmagan shikoyatlar, kimda nechta ogohlantirish
 
 Hamma uchun:
-/cards — kartalar (har 2 soatda token), /profile — o'yinchi kartangiz, /mylink — shaxsiy taklif havolangiz, /myinvites — siz nechta odam qo'shdingiz
+/card — kartalar o'yini (har 2 soatda token), /mylink — shaxsiy taklif havolangiz, /myinvites — siz nechta odam qo'shdingiz
 /admins — adminlarni chaqirish, /report va /voteban — xabarga reply qilib shikoyat yoki ban uchun ovoz, /rights — huquqlaringiz
 /id, /ping, /calc 2+2, /weather Toshkent
 
@@ -267,7 +267,7 @@ Bo'limlar: /help mod, /help kartalar, /help azo`,
 /reports, /warns — нерассмотренные жалобы, у кого сколько предупреждений
 
 Для всех:
-/cards — карты (токен каждые 2 часа), /profile — ваш профиль игрока, /mylink — ваша личная ссылка-приглашение, /myinvites — сколько добавили вы
+/card — игра в карты (токен каждые 2 часа), /mylink — ваша личная ссылка-приглашение, /myinvites — сколько добавили вы
 /admins — позвать админов, /report и /voteban — ответом на сообщение: жалоба или голосование за бан, /rights — ваши права
 /id, /ping, /calc 2+2, /weather Ташкент
 
@@ -295,7 +295,7 @@ Reply to a member's message and ask me to delete or pin it, to mute or ban its a
 /reports, /warns — open reports, who has how many warnings
 
 For everyone:
-/cards — cards (a token every 2 hours), /profile — your player card, /mylink — your own invite link, /myinvites — how many you brought in
+/card — the card game (a token every 2 hours), /mylink — your own invite link, /myinvites — how many you brought in
 /admins — call the admins, /report and /voteban — as a reply: report, or vote to ban, /rights — what you may do
 /id, /ping, /calc 2+2, /weather Tashkent
 
@@ -424,19 +424,19 @@ To quiet me: /mute bot, to bring me back: /unmute`,
 	},
 	"cards": {
 		uz: `🃏 Kartalar
-/cards — ilovani ochish: har 2 soatda 1 token (12 tagacha yig'iladi), 1x yoki 5x ochish, token tugasa kristallga
-/mycards — kollektsiyangiz, /profile — ochko, o'rin, eng zo'r kartalar
-/cardtop — eng ko'p ochko yig'ganlar, /market — bozor, /duel — duel
+/card — o'yinni ochish: hammasi ilovada
+Har 2 soatda 1 token (12 tagacha yig'iladi), 1x yoki 5x ochish, token tugasa kristallga
+Ilovada: kolleksiya, bozor (almashish), reyting
 💎 Do'kon (ilovada): kristallni Telegram Stars bilan sotib olish; kristallga token va kafolatli paketlar (Epik, Afsonaviy, Mifik)`,
 		ru: `🃏 Карты
-/cards — открыть приложение: токен каждые 2 часа (копится до 12), открытие 1x или 5x, без токенов — за кристаллы
-/mycards — коллекция, /profile — очки, место, лучшие карты
-/cardtop — топ по очкам, /market — рынок, /duel — дуэль
+/card — открыть игру: всё в приложении
+Токен каждые 2 часа (копится до 12), открытие 1x или 5x, без токенов — за кристаллы
+В приложении: коллекция, рынок (обмен), рейтинг
 💎 Магазин (в приложении): кристаллы за Telegram Stars; за кристаллы — токены и паки с гарантией (эпик, легендарка, мифик)`,
 		en: `🃏 Cards
-/cards — open the app: a token every 2 hours (up to 12 saved), open 1x or 5x, crystals once tokens run out
-/mycards — your collection, /profile — points, place, best cards
-/cardtop — the table, /market — the market, /duel — a duel
+/card — open the game: it is all in the app
+A token every 2 hours (up to 12 saved), open 1x or 5x, crystals once tokens run out
+In the app: the collection, the market (trades), the ranking
 💎 Shop (in the app): crystals for Telegram Stars; crystals buy tokens and packs with a sure Epic, Legendary or Mythic`,
 	},
 	"member": {

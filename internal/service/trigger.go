@@ -57,7 +57,7 @@ const (
 // A plain "/reset", or one naming another bot, may be meant for someone else
 // and is ignored however the rest of the message addresses the bot; only the
 // bot's own commands no other bot has, ownCommands, count plain too, as the
-// bot's answers name them so ("Kolleksiya: /mycards") and a press of one in
+// bot's answers name them so ("Kartalar: /card") and a press of one in
 // a message sends it without the bot's name, which it ignored.
 func (s *Service) address(msg *telegram.Message) (string, trigger) {
 	text, how := s.addressedText(msg)
@@ -128,14 +128,13 @@ func (s *Service) plainCommand(msg *telegram.Message, text string) bool {
 // ownCommands are the bot's commands that no other bot in its groups has:
 // "/game", "/mafia", "/start" or "/top" are other bots' too.
 var ownCommands = map[string]bool{
-	"/card": true, "/mycards": true, "/cardtop": true, "/cards": true,
-	"/market": true, "/invites": true, "/invites_week": true, "/invites_month": true, "/invites_auto": true, "/teams": true, "/duel": true, "/games": true,
+	"/card": true, "/invites": true, "/invites_week": true, "/invites_month": true, "/invites_auto": true, "/teams": true, "/games": true,
 	"/boss": true, "/snake": true, "/woodcutter": true, "/checkers": true, "/tictactoe": true,
 	"/staff": true, "/ranks": true, "/ranklog": true, "/access": true, "/rank": true,
 	"/banlist": true, "/amnesty": true, "/kickinactive": true,
 	"/admins": true, "/report": true, "/voteban": true,
 	"/ping": true, "/id": true, "/calc": true, "/weather": true,
-	"/mylink": true, "/reports": true, "/warns": true, "/profile": true, "/rights": true, "/myinvites": true,
+	"/mylink": true, "/reports": true, "/warns": true, "/rights": true, "/myinvites": true,
 	"/rep": true, "/toprep": true, "/cleanservice": true,
 }
 

@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,7 +11,6 @@ import (
 
 	"telegram-ai-bot/internal/cards"
 	"telegram-ai-bot/internal/storage"
-	"telegram-ai-bot/internal/telegram"
 )
 
 // fakeCards keeps one card, draws it once an hour, and counts what it was
@@ -206,36 +204,6 @@ func TestCardOpensOnlyInTheApp(t *testing.T) {
 	}
 }
 
-// A collection shows each rarity's cards held as buttons; its player opens
-// a rarity's list and goes back, and anyone else is told it is not theirs.
-func TestCardCollectionIsItsPlayers(t *testing.T) {
-	f := newFixture()
-	buttons := &fakeButtons{}
-	f.opts.Buttons = buttons
-	book := newFakeCards("")
-	f.opts.Cards = book
-	book.held[userID] = 2
-
-	sent := f.run(textFrom(userID, "/mycards"))
-	if len(sent) != 1 || len(sent[0].buttons) != 6 || sent[0].buttons[4][0].Text != "👑 Mifik - 1/15" || sent[0].buttons[5][0].Text != "🗂 Hammasi - 1/200" {
-		t.Fatalf("collection = %+v", sent)
-	}
-	mythic := sent[0].buttons[4][0].Data
-	private := telegram.Chat{ID: userID, Type: telegram.ChatTypePrivate}
-
-	s := New(f.opts)
-	defer s.stop()
-	s.Handle(doozPlayer(1, &telegram.User{ID: userID, FirstName: "Bek"}, private, sent[0].text, mythic))
-	edits, menus := buttons.recordedMenus()
-	if len(edits) != 1 || !strings.Contains(edits[0], "Gojo Satoru ×2") || !strings.HasSuffix(menus[0][0][0].Data, ":b") {
-		t.Fatalf("mythic list = %q %+v", edits, menus)
-	}
-	s.Handle(doozPlayer(2, &telegram.User{ID: userID + 1, FirstName: "Vali"}, private, sent[0].text, mythic))
-	if edits, _ = buttons.recordedMenus(); len(edits) != 1 || !buttons.answers[1].alert || !strings.Contains(buttons.answers[1].text, "emas") {
-		t.Errorf("a stranger's press = %q, answers %+v", edits, buttons.answers)
-	}
-}
-
 func TestSpaced(t *testing.T) {
 	for n, want := range map[int64]string{0: "0", 950: "950", 1550: "1 550", 1234567: "1 234 567"} {
 		if got := spaced(n); got != want {
@@ -250,41 +218,14 @@ func TestSpaced(t *testing.T) {
 func TestOwnCommandsAreAnsweredPlainInAGroup(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("\x89PNG")) }))
 	defer server.Close()
-	for text, want := range map[string]int{"/mycards": 1, "/MyCards": 1, "/kartalarim": 0, "/cardtop": 1, "/mycards@OtherBot": 0, "/top": 0} {
+	for text, want := range map[string]int{"/card": 1, "/Card": 1, "/kartalarim": 0, "/games": 1, "/card@OtherBot": 0, "/top": 0} {
 		f := newFixture()
 		f.opts.Cards = newFakeCards(server.URL + "/g.png")
+		f.opts.CardsURL = "https://app/kartalar"
 		f.opts.Buttons = &fakeButtons{}
 		if sent := f.run(inGroup(groupMessage(text))); len(sent) != want {
 			t.Errorf("%s: sent %d, want %d", text, len(sent), want)
 		}
-	}
-}
-
-// The table shows the top ten, the first three bold with medals, a long name
-// cut, and the asker's own place under it when they are not among them.
-func TestCardTopShowsTheAskersPlace(t *testing.T) {
-	f := newFixture()
-	book := newFakeCards("")
-	for i := range 12 {
-		book.top = append(book.top, storage.CardPlayer{UserID: int64(100 + i), Name: fmt.Sprintf("P%d", i), Points: int64(40000 - i*1000), Cards: 30 - i})
-	}
-	book.top[0].Name = "Стр.Лнт. Турсунов—͟͟͞͞𖣘 ✨ juda uzun ism bilan"
-	book.top[11].UserID = userID
-	f.opts.Cards = book
-
-	sent := f.run(textFrom(userID, "/cardtop"))
-	if len(sent) != 1 {
-		t.Fatalf("sent = %+v", sent)
-	}
-	text := sent[0].text
-	t.Log("\n" + text)
-	for _, want := range []string{"🥇", "💠 40 000 · 🎴 30", "10. P9", "📍 Siz: 12-o'rin · 💠 29 000 · 🎴 19"} {
-		if !strings.Contains(text, want) {
-			t.Errorf("table lacks %q", want)
-		}
-	}
-	if strings.Contains(text, "P10") || strings.Contains(text, "juda uzun ism bilan") {
-		t.Errorf("table shows too much:\n%s", text)
 	}
 }
 
@@ -331,58 +272,13 @@ func TestGameCommandKeepsTheGamesLimitInAGroup(t *testing.T) {
 	}
 }
 
-// A duel in a group is accepted by anyone but its challenger, fought once
-// however often it is pressed, and moves the stake to the winner.
-func TestDuelIsFoughtOnce(t *testing.T) {
-	f := newFixture()
-	buttons := &fakeButtons{}
-	f.opts.Buttons = buttons
-	book := newFakeCards("")
-	f.opts.Cards = book
-	const rival = userID + 1
-	book.held[userID], book.held[rival] = 1, 1
-	book.shards[userID], book.shards[rival] = 10, 10
-
-	if sent := f.run(textFrom(userID, "/duel")); len(sent) != 1 || !strings.Contains(sent[0].text, "guruhda") {
-		t.Fatalf("a duel in private = %+v", sent)
-	}
-	if sent := f.run(inGroup(groupMessage("/duel 20"))); len(sent) != 2 || !strings.Contains(sent[1].text, "Kerak: 20, sizda: 10") {
-		t.Fatalf("a duel for more shards than held = %+v", sent)
-	}
-	all := f.run(inGroup(groupMessage("/duel 5")))
-	if len(all) != 3 || len(all[2].buttons) != 1 || !strings.Contains(all[2].text, "Tikish: 5") {
-		t.Fatalf("challenge = %+v", all)
-	}
-	sent := all[2:]
-	accept := sent[0].buttons[0][0].Data
-	group := telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup}
-	s := New(f.opts)
-	defer s.stop()
-	s.Handle(doozPlayer(1, &telegram.User{ID: userID, FirstName: "Bek"}, group, sent[0].text, accept))
-	if edits, _ := buttons.recordedMenus(); len(edits) != 0 || !strings.Contains(buttons.answers[0].text, "O'z duelingizni") {
-		t.Fatalf("the challenger's own press = %q, %+v", edits, buttons.answers)
-	}
-	s.Handle(doozPlayer(2, &telegram.User{ID: rival, FirstName: "Vali"}, group, sent[0].text, accept))
-	s.Handle(doozPlayer(3, &telegram.User{ID: rival, FirstName: "Vali"}, group, sent[0].text, accept))
-	edits, _ := buttons.recordedMenus()
-	if len(edits) != 1 || !strings.Contains(edits[0], "G'olib") || !strings.Contains(edits[0], "💎 +5") {
-		t.Fatalf("duel = %q", edits)
-	}
-	if book.shards[userID]+book.shards[rival] != 20 || (book.shards[userID] != 15 && book.shards[rival] != 15) {
-		t.Errorf("shards after = %d and %d", book.shards[userID], book.shards[rival])
-	}
-	if !strings.Contains(buttons.answers[2].text, "tugagan") {
-		t.Errorf("the second press = %+v", buttons.answers[2])
-	}
-}
-
 // /games lists every game to tap, in a private chat and plain in a group,
 // the page games only when they are served.
 func TestGamesMenuListsTheGames(t *testing.T) {
 	f := newFixture()
 	f.opts.Cards = newFakeCards("")
 	sent := f.run(textFrom(userID, "/games"))
-	if len(sent) != 1 || !strings.Contains(sent[0].text, "/tictactoe") || strings.Contains(sent[0].text, "/boss") || !strings.Contains(sent[0].text, "/duel") {
+	if len(sent) != 1 || !strings.Contains(sent[0].text, "/tictactoe") || strings.Contains(sent[0].text, "/boss") || !strings.Contains(sent[0].text, "/card") || strings.Contains(sent[0].text, "/duel") {
 		t.Fatalf("games without pages = %+v", sent)
 	}
 	f.opts.Game, f.opts.GameTable = fakeGameLinks{}, &fakeGameTable{}
@@ -392,36 +288,32 @@ func TestGamesMenuListsTheGames(t *testing.T) {
 	}
 }
 
-// A duel for no stake is a friendly one, open to anyone with a card.
-func TestADuelForNoStake(t *testing.T) {
-	f := newFixture()
-	f.opts.Buttons = &fakeButtons{}
-	book := newFakeCards("")
-	f.opts.Cards = book
-	book.held[userID] = 1
-	for _, text := range []string{"/duel 0", "/duel"} {
-		sent := f.run(inGroup(groupMessage(text)))
-		if last := sent[len(sent)-1]; len(last.buttons) != 1 || !strings.Contains(last.text, "do'stona duel") || strings.Contains(last.text, "Tikish:") {
-			t.Errorf("%s = %+v", text, last)
+// The card game's old commands are gone: /card alone opens the app. In a
+// group they get no answer, named for the bot or not; in a private chat the
+// answer for a command the bot does not know.
+func TestRetiredCardCommands(t *testing.T) {
+	for _, command := range []string{"/cards", "/mycards", "/cardtop", "/market", "/duel", "/profile"} {
+		f := newFixture()
+		f.opts.Cards = newFakeCards("")
+		f.opts.CardsURL = "https://app/kartalar"
+		f.opts.Buttons = &fakeButtons{}
+		f.opts.Bot.Username = "testbot"
+		if sent := f.run(inGroup(groupMessage(command)), inGroup(groupMessage(command+"@testbot"))); len(sent) != 0 {
+			t.Errorf("%s in a group = %+v, want no answer", command, sent)
+		}
+		if sent := f.run(textFrom(userID, command)); len(sent) != 1 || sent[0].text != textUnknown.uz || len(sent[0].buttons) != 0 {
+			t.Errorf("%s in private = %+v, want the unknown command's answer", command, sent)
 		}
 	}
 }
 
-// /market opens the Mini App at its market: itself in a private chat, and in
-// a group a link to the private chat, whose /start opens it there.
-func TestBozorOpensTheMarket(t *testing.T) {
+// "/start bozor", which the market's old buttons send, still opens the Mini
+// App at its market.
+func TestStartBozorOpensTheMarket(t *testing.T) {
 	f := newFixture()
 	f.opts.Cards = newFakeCards("")
 	f.opts.CardsURL = "https://app/kartalar"
-	sent := f.run(textFrom(userID, "/market"))
-	if b := sent[0].buttons; len(b) != 1 || b[0][0].WebApp == nil || b[0][0].WebApp.URL != "https://app/kartalar?tab=market" {
-		t.Fatalf("private /market = %+v", sent[0])
-	}
-	sent = f.run(inGroup(groupMessage("/market")))
-	if b := sent[len(sent)-1].buttons; len(b) != 1 || !strings.HasSuffix(b[0][0].URL, "?start=bozor") {
-		t.Fatalf("group /market = %+v", sent[len(sent)-1])
-	}
-	sent = f.run(textFrom(userID, "/start bozor"))
+	sent := f.run(textFrom(userID, "/start bozor"))
 	if b := sent[len(sent)-1].buttons; len(b) != 1 || b[0][0].WebApp == nil || !strings.HasSuffix(b[0][0].WebApp.URL, "?tab=market") {
 		t.Errorf("/start bozor = %+v", sent[len(sent)-1])
 	}

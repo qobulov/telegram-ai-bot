@@ -18,7 +18,7 @@
       fresh: "🆕 Yangi karta!", again: (n) => `🔁 Sizda endi ×${n}`, plus: (n) => `+${n} ochko`,
       attack: "Hujum", health: "Jon", value: "Ochko", cards: (n) => `${n} karta`, pts: "ochko",
       none: "Hech narsa topilmadi", noTop: "Hali hech kim karta olmagan",
-      noTelegram: "Ilovani Telegram'da oching: botga /cards yozing.", stale: "Ilova eskirdi, uni qayta oching.",
+      noTelegram: "Ilovani Telegram'da oching: botga /card yozing.", stale: "Ilova eskirdi, uni qayta oching.",
       unavailable: "Aloqa uzildi, birozdan keyin urinib ko'ring.",
       allSets: "Hammasi", pointsLabel: "ochko", loading: "Kartalar yuklanmoqda…",
       welcomeTitle: "Kolleksiyangiz bo'sh", welcomeText: "Har 2 soatda bitta token oling, har biri bitta anime karta ochadi. Hammasini to'plang.",
@@ -50,7 +50,7 @@
       fresh: "🆕 Новая карта!", again: (n) => `🔁 Теперь у вас ×${n}`, plus: (n) => `+${n} очков`,
       attack: "Атака", health: "Жизнь", value: "Очки", cards: (n) => `${n} карт`, pts: "очков",
       none: "Ничего не найдено", noTop: "Ещё никто не получил карту",
-      noTelegram: "Откройте приложение в Telegram: напишите боту /cards.", stale: "Приложение устарело, откройте его снова.",
+      noTelegram: "Откройте приложение в Telegram: напишите боту /card.", stale: "Приложение устарело, откройте его снова.",
       unavailable: "Нет связи, попробуйте чуть позже.",
       allSets: "Все", pointsLabel: "очки", loading: "Загружаем карты…",
       welcomeTitle: "Коллекция пуста", welcomeText: "Каждые 2 часа получайте токен, он открывает аниме-карту. Соберите все.",
@@ -82,7 +82,7 @@
       fresh: "🆕 A new card!", again: (n) => `🔁 You now have ×${n}`, plus: (n) => `+${n} points`,
       attack: "Attack", health: "Life", value: "Points", cards: (n) => `${n} cards`, pts: "points",
       none: "Nothing found", noTop: "Nobody has drawn a card yet",
-      noTelegram: "Open the app in Telegram: send /cards to the bot.", stale: "The app is out of date; open it again.",
+      noTelegram: "Open the app in Telegram: send /card to the bot.", stale: "The app is out of date; open it again.",
       unavailable: "No connection; try again in a bit.",
       allSets: "All", pointsLabel: "points", loading: "Loading the cards…",
       welcomeTitle: "Your collection is empty", welcomeText: "Get a token every 2 hours, each opens an anime card. Collect them all.",
@@ -145,7 +145,7 @@
     try {
       applyState(await api("state"));
       $("loading").hidden = true;
-      // A link may name the tab to open, as /market does; otherwise a
+      // A link may name the tab to open, as the market's old button does; otherwise a
       // newcomer starts at the draw and anyone else at their collection.
       const asked = new URLSearchParams(location.search).get("tab");
       if (!opened) showTab(["collection", "draw", "market", "shop", "top"].includes(asked) ? asked : cards.some((c) => c.count > 0) ? "collection" : "draw");

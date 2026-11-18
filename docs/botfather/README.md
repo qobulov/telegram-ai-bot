@@ -40,7 +40,7 @@ Rasmni o'zgartirish yoki tavsifni yangilash uchun: `/mygames` → o'yin → *Edi
 ## Kartalar (Mini App)
 
 Kartalar o'yin emas, Mini App: @BotFather'da `/newapp` bilan ro'yxatdan
-o'tkaziladi. Bot uni `/cards` bilan tugma orqali ochadi, shuning uchun bu
+o'tkaziladi. Bot uni `/card` bilan tugma orqali ochadi, shuning uchun bu
 ixtiyoriy; ro'yxatdan o'tgach esa `t.me/<bot>/kartalar` havolasi bilan ham
 ochiladi.
 

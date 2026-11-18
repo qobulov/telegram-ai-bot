@@ -792,13 +792,19 @@ var privateOwnerCommands = map[string]bool{
 	"/refund": true, "/business": true, "/import_stickers": true,
 }
 
+// retiredCommands are the card game's commands the app replaced: /card
+// alone opens it now, and in a group these get no answer at all.
+var retiredCommands = map[string]bool{
+	"/cards": true, "/mycards": true, "/cardtop": true, "/market": true, "/duel": true, "/profile": true,
+}
+
 // respond decides what to send back. An empty outcome sends nothing. rules
 // are the standing rules loaded for this turn.
 func (s *Service) respond(ctx context.Context, in incoming, rules []storage.GroupRule) outcome {
 	if pressedHelp(in) {
 		in.text = "/help"
 	}
-	if in.group && privateOwnerCommands[commandName(in.text)] {
+	if in.group && (privateOwnerCommands[commandName(in.text)] || retiredCommands[commandName(in.text)]) {
 		return outcome{}
 	}
 	if out, ok := s.utilityCommand(in); ok {
@@ -863,10 +869,6 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.shashkaCommand(ctx, in)
 	case s.opts.Cards != nil && s.opts.CardsURL != "" && isCardDraw(in):
 		return outcome{text: textCardsApp.to(in), buttons: s.cardsAppButton(in)}
-	case s.opts.Cards != nil && s.opts.Buttons != nil && commandName(in.text) == "/mycards":
-		return s.cardCollection(ctx, in)
-	case s.opts.Cards != nil && s.opts.CardsURL != "" && commandName(in.text) == "/cards":
-		return outcome{text: textCardsApp.to(in), buttons: s.cardsAppButton(in)}
 	case s.opts.Teams != nil && s.opts.Buttons != nil && commandName(in.text) == "/teams":
 		return s.teamsCommand(ctx, in)
 	case s.opts.Invites != nil && commandName(in.text) == "/invites_auto":
@@ -875,8 +877,6 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.myInvites(ctx, in)
 	case s.opts.Invites != nil && invitePeriods[commandName(in.text)]:
 		return s.inviteTable(ctx, in)
-	case s.opts.Cards != nil && s.opts.CardsURL != "" && commandName(in.text) == "/market":
-		return outcome{text: textMarket.to(in), buttons: s.marketButton(in)}
 	case in.group && s.opts.Extras != nil && commandName(in.text) == "/rep":
 		return s.reputation(ctx, in)
 	case in.group && s.opts.Extras != nil && commandName(in.text) == "/toprep":
@@ -885,14 +885,8 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.setCleanService(ctx, in)
 	case !in.group && s.opts.Extras != nil && s.opts.Buttons != nil && commandName(in.text) == "/aigroups":
 		return s.aiGroupsCommand(ctx, in)
-	case s.opts.Cards != nil && commandName(in.text) == "/profile":
-		return s.profile(ctx, in)
 	case in.group && s.opts.Ranks != nil && s.isRightsQuestion(in.text):
 		return s.myRights(ctx, in)
-	case s.opts.Cards != nil && commandName(in.text) == "/cardtop":
-		return s.cardTop(ctx, in)
-	case s.opts.Cards != nil && s.opts.Buttons != nil && commandName(in.text) == "/duel":
-		return s.duelCommand(ctx, in)
 	case commandName(in.text) == "/announce" && !in.group && s.opts.Tools != nil && s.isOwner(in.msg.From):
 		return s.announceCommand(ctx, in)
 	case !in.group && s.opts.Tools != nil && s.opts.Buttons != nil && s.isOwner(in.msg.From) && pressed(in, keyboardAd):
@@ -1163,14 +1157,6 @@ func (s *Service) pressed(q *telegram.CallbackQuery) {
 	}
 	if strings.HasPrefix(q.Data, adData) {
 		s.pressedAd(q)
-		return
-	}
-	if strings.HasPrefix(q.Data, duelData) {
-		s.pressedDuel(q)
-		return
-	}
-	if strings.HasPrefix(q.Data, cardData) {
-		s.pressedCards(q)
 		return
 	}
 	if q.Data != checkPayload {
