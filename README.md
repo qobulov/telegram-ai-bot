@@ -849,8 +849,13 @@ For data and longer explanations she writes Markdown: `**bold**`, "- " lists,
 quotations goes as a rich message (`sendRichMessage`, Bot API 10.1), which
 Telegram renders with large headings and real lists; if Telegram refuses it,
 it goes as ordinary text. Ordinary messages are sent without a parse mode: the
-code turns `**bold**` and `` `code` `` into entities itself, so a stray mark
-stays as text and never makes a send fail.
+code turns `**bold**` and `__bold__`, `*italic*` and `_italic_`, `` `code` ``,
+fenced code blocks and member tags into entities itself (bold holding code
+keeps the bold), writes `[text](url)` as the text and its address, and leaves
+an underscore inside a word (`@some_user`), an address and an unbalanced mark
+as they are. Entities need no escaping, so `<`, `>` and `&` stay as written
+and a stray mark never makes a send fail. The persona asks for no Markdown
+beyond `**bold**` and "- " lines.
 
 ## Reminders
 

@@ -1816,3 +1816,15 @@ func TestGroupNoteTeachesTheRealRankTable(t *testing.T) {
 		t.Error("the rank defaults were not filled in")
 	}
 }
+
+// Fact lists came out with raw Markdown: the persona keeps to the bold and
+// "- " lines the code shows formatted.
+func TestPersonaAvoidsOtherMarkdown(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rule := lineContaining(cfg.PersonaPrompt, "Write plain text in chat"); !strings.Contains(rule, "Use no other Markdown: no *italics*, __underlines__, backticks or code blocks") {
+		t.Errorf("the formatting rule = %q", rule)
+	}
+}

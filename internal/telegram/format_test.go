@@ -23,11 +23,42 @@ func TestFormattedMarksBoldCodeHeadingsAndBullets(t *testing.T) {
 		"heading": {"## Ling\nAssassin", "Ling\nAssassin", []messageEntity{{"bold", 0, 4, ""}}},
 		// An emoji is two UTF-16 units, as Telegram counts offsets.
 		"emoji":     {"🔥 **Fanny**", "🔥 Fanny", []messageEntity{{"bold", 3, 5, ""}}},
-		"unmatched": {"2 ** 3 = 8, *ok*", "2 ** 3 = 8, *ok*", nil},
+		"unmatched": {"2 ** 3 = 8, 2 * 3 * 4 **", "2 ** 3 = 8, 2 * 3 * 4 **", nil},
+		"italic":    {"*ok* va _zo'r_", "ok va zo'r", []messageEntity{{"italic", 0, 2, ""}, {"italic", 6, 4, ""}}},
 		"two lines": {"**a\nb**", "**a\nb**", nil},
 		// A member without a @username is tagged by a link to their ID.
-		"tag":       {"[無敵•мᴀʏoʀ](tg://user?id=5539888451), tur!", "無敵•мᴀʏoʀ, tur!", []messageEntity{{"text_link", 0, 8, "tg://user?id=5539888451"}}},
-		"not a tag": {"[ko'r](https://t.me/x) [a](tg://user?id=x)", "[ko'r](https://t.me/x) [a](tg://user?id=x)", nil},
+		"tag": {"[無敵•мᴀʏoʀ](tg://user?id=5539888451), tur!", "無敵•мᴀʏoʀ, tur!", []messageEntity{{"text_link", 0, 8, "tg://user?id=5539888451"}}},
+		// A web link shows its address: no address hides behind words.
+		"not a tag": {"[ko'r](https://t.me/x) [a](tg://user?id=x)", "ko'r (https://t.me/x) [a](tg://user?id=x)", nil},
+	} {
+		text, entities := formatted(c.in)
+		if text != c.text || !reflect.DeepEqual(entities, c.entities) {
+			t.Errorf("%s: got %q %+v, want %q %+v", name, text, entities, c.text, c.entities)
+		}
+	}
+}
+
+// The Markdown models write in fact lists, with the marks that must stay as
+// they are: underscores in usernames and addresses, unbalanced stars, and
+// code holding what looks like HTML, which needs no escaping as entities.
+func TestFormattedTrickyMarkdown(t *testing.T) {
+	for name, c := range map[string]struct {
+		in, text string
+		entities []messageEntity
+	}{
+		"bold code":       {"**`/start`** bosing", "/start bosing", []messageEntity{{"bold", 0, 6, ""}}},
+		"bold italic":     {"***Muhim***", "Muhim", []messageEntity{{"bold", 0, 5, ""}, {"italic", 0, 5, ""}}},
+		"underscore bold": {"__Fakt__: suv", "Fakt: suv", []messageEntity{{"bold", 0, 4, ""}}},
+		"italic in bold":  {"**a *b* c**", "a b c", []messageEntity{{"bold", 0, 5, ""}, {"italic", 2, 1, ""}}},
+		"usernames":       {"@some_user va @a_b_c, snake_case_name", "@some_user va @a_b_c, snake_case_name", nil},
+		"url":             {"https://example.com/a_b_c/__init__.py?x=*y*", "https://example.com/a_b_c/__init__.py?x=*y*", nil},
+		"link":            {"[Wiki](https://en.wikipedia.org/wiki/Foo_(bar))", "[Wiki](https://en.wikipedia.org/wiki/Foo_(bar))", nil},
+		"unbalanced":      {"**Fakt: suv 100° da qaynaydi", "**Fakt: suv 100° da qaynaydi", nil},
+		"html code":       {"`<b>&amp;</b>` va <i>", "<b>&amp;</b> va <i>", []messageEntity{{"code", 0, 12, ""}}},
+		"code block":      {"Kod:\n```go\nfmt.Println(\"<tag>\") // **x**\n- y\n```\n- **ok**", "Kod:\nfmt.Println(\"<tag>\") // **x**\n- y\n• ok", []messageEntity{{"pre", 5, 33, ""}, {"bold", 41, 2, ""}}},
+		"unclosed fence":  {"```\nx", "```\nx", nil},
+		"fact list": {"**Qiziqarli faktlar:**\n- **Asal** buzilmaydi\n* `H2O` — suv", "Qiziqarli faktlar:\n• Asal buzilmaydi\n• H2O — suv",
+			[]messageEntity{{"bold", 0, 18, ""}, {"bold", 21, 4, ""}, {"code", 39, 3, ""}}},
 	} {
 		text, entities := formatted(c.in)
 		if text != c.text || !reflect.DeepEqual(entities, c.entities) {

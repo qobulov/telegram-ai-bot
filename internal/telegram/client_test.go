@@ -114,11 +114,11 @@ func TestAPIErrorIsDecoded(t *testing.T) {
 func TestSendMessageSendsPlainText(t *testing.T) {
 	client, api := newTestClient(t, okSent)
 
-	if _, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: "hello *world*"}); err != nil {
+	if _, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: "hello <b>world</b> & *you*"}); err != nil {
 		t.Fatalf("SendMessage: %v", err)
 	}
 	sent := api.recorded()[0]
-	if sent.method != "sendMessage" || sent.params["chat_id"] != float64(42) || sent.params["text"] != "hello *world*" {
+	if sent.method != "sendMessage" || sent.params["chat_id"] != float64(42) || sent.params["text"] != "hello <b>world</b> & you" {
 		t.Errorf("call = %+v", sent)
 	}
 	if _, present := sent.params["parse_mode"]; present {
