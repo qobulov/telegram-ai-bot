@@ -184,11 +184,16 @@
   function picture(img, src, eager) {
     img.loading = eager ? "eager" : "lazy";
     img.decoding = "async";
+    // A failed picture is asked for again, the last time under a name no
+    // cache has seen: a phone that once got an error for a new picture
+    // (it was asked for before the picture was out) keeps that error for the
+    // pictures' month-long cache, under its plain name and the first retry's.
     let tries = 0;
     img.onerror = () => {
       if (tries >= 2 || !src) return;
       tries++;
-      setTimeout(() => { img.src = src + (src.includes("?") ? "&" : "?") + "r=" + tries; }, 800 * tries);
+      const mark = tries === 1 ? "1" : Date.now().toString(36);
+      setTimeout(() => { img.src = src + (src.includes("?") ? "&" : "?") + "r=" + mark; }, 800 * tries);
     };
     img.src = src;
   }
