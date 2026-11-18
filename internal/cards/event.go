@@ -74,7 +74,15 @@ func (h *handler) eventView(ctx context.Context, user miniapp.User) (any, failur
 		h.Logger.Error("could not read the card event", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
 	}
+	// A player holds the limited card once at most; one who has it is told so.
+	owned := false
+	if held, err := h.Store.OwnedCards(ctx, user.ID, int(Mythic)); err == nil {
+		for _, c := range held {
+			owned = owned || c.ID == EventCard
+		}
+	}
 	return map[string]any{
+		"owned":  owned,
 		"active": !now.Before(EventStarts) && now.Before(EventEnds), "soon": now.Before(EventStarts),
 		"starts_in": max(0, EventStarts.Sub(now).Milliseconds()),
 		"ends_at":   EventEnds.UnixMilli(), "ends_in": max(0, EventEnds.Sub(now).Milliseconds()),

@@ -1303,21 +1303,21 @@
     uz: {
       title: "🌸 Firefly Wedding", tag: "EVENT · LIMITED",
       left: (d, h, m) => (d ? `⏳ ${d} kun ${h} soat qoldi` : h ? `⏳ ${h} soat ${m} daqiqa qoldi` : `⏳ ${m} daqiqa qoldi`),
-      odds: (m, s) => `👑 Mifik ${m} (×2) · 🌸 Satoko ${s}`, pity: (n, max) => `Satoko kafolati: ${n}/${max}`,
+      odds: (m, s) => `👑 Mifik ${m} (×2) · 🌸 Satoko ${s}`, pity: (n, max) => `Satoko kafolati: ${n}/${max}`, owned: "✅ Satoko sizda bor — har kim faqat bir marta oladi",
       open: (n, price) => `${n} ta · ${n * price} 🎟`, short: (n) => `🎟 Yana ${n} ta token kerak`, over: "🌸 Event tugadi", starts: (h, m) => (h ? `⏳ ${h} soat ${m} daqiqadan keyin boshlanadi` : `⏳ ${m} daqiqadan keyin boshlanadi`), soon: "🌸 Event hali boshlanmadi",
       pulled: (n) => `🌸 ${n} ta event karta`, got: "🌸 Satoko Kirigaya tushdi!", badge: "🌸 EVENT",
     },
     ru: {
       title: "🌸 Firefly Wedding", tag: "ИВЕНТ · LIMITED",
       left: (d, h, m) => (d ? `⏳ Осталось ${d} дн. ${h} ч.` : h ? `⏳ Осталось ${h} ч. ${m} мин.` : `⏳ Осталось ${m} мин.`),
-      odds: (m, s) => `👑 Мифическая ${m} (×2) · 🌸 Сатоко ${s}`, pity: (n, max) => `Гарант Сатоко: ${n}/${max}`,
+      odds: (m, s) => `👑 Мифическая ${m} (×2) · 🌸 Сатоко ${s}`, pity: (n, max) => `Гарант Сатоко: ${n}/${max}`, owned: "✅ Сатоко уже у вас — её можно получить только один раз",
       open: (n, price) => `${n} шт. · ${n * price} 🎟`, short: (n) => `🎟 Нужно ещё ${n} токенов`, over: "🌸 Ивент закончился", starts: (h, m) => (h ? `⏳ Начнётся через ${h} ч. ${m} мин.` : `⏳ Начнётся через ${m} мин.`), soon: "🌸 Ивент ещё не начался",
       pulled: (n) => `🌸 Ивент-карты: ${n}`, got: "🌸 Выпала Сатоко Киригая!", badge: "🌸 ИВЕНТ",
     },
     en: {
       title: "🌸 Firefly Wedding", tag: "EVENT · LIMITED",
       left: (d, h, m) => (d ? `⏳ ${d} days ${h} hours left` : h ? `⏳ ${h} hours ${m} minutes left` : `⏳ ${m} minutes left`),
-      odds: (m, s) => `👑 Mythic ${m} (×2) · 🌸 Satoko ${s}`, pity: (n, max) => `Satoko guarantee: ${n}/${max}`,
+      odds: (m, s) => `👑 Mythic ${m} (×2) · 🌸 Satoko ${s}`, pity: (n, max) => `Satoko guarantee: ${n}/${max}`, owned: "✅ You have Satoko — each player gets her once",
       open: (n, price) => `${n} · ${n * price} 🎟`, short: (n) => `🎟 ${n} more tokens needed`, over: "🌸 The event is over", starts: (h, m) => (h ? `⏳ Starts in ${h} hours ${m} minutes` : `⏳ Starts in ${m} minutes`), soon: "🌸 The event has not started yet",
       pulled: (n) => `🌸 ${n} event cards`, got: "🌸 Satoko Kirigaya dropped!", badge: "🌸 EVENT",
     },
@@ -1360,8 +1360,8 @@
   }
 
   function eventPity() {
-    $("eventPity").textContent = et.pity(eventData.pity, eventData.pity_max);
-    $("eventPityBar").style.width = `${Math.min(100, (eventData.pity / eventData.pity_max) * 100)}%`;
+    $("eventPity").textContent = eventData.owned ? et.owned : et.pity(eventData.pity, eventData.pity_max);
+    $("eventPityBar").style.width = eventData.owned ? "100%" : `${Math.min(100, (eventData.pity / eventData.pity_max) * 100)}%`;
     for (const [id, n] of [["eventOpen1", 1], ["eventOpen10", eventData.batch]]) {
       $(id).textContent = et.open(n, eventData.price);
       $(id).disabled = pulling || !eventData.active;
@@ -1406,6 +1406,7 @@
       shards = data.shards ?? shards;
       points = data.points ?? points;
       eventData.pity = data.pity;
+      if (data.drawn.some((d) => d.card && d.card.id === eventData.card.id)) eventData.owned = true;
       if (data.given) toast(t.given(data.given));
       const drawn = data.drawn.map((d) => ({ card: d.card, fresh: d.new, serial: d.serial }));
       for (const { card } of drawn) keep(card);

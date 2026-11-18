@@ -2320,7 +2320,8 @@ for 1 token each (`event` reads it, `event_open` with `count` pulls). A pull
 rolls the usual rarities with the Mythic three times as likely, the extra
 taken from Common (Mythic 1%, Legendary 2.5%, Epic 9%, Rare 25%, Common
 62.5%); a Mythic is Satoko half the time (0.5%) and any other Mythic
-otherwise, and it opens at 2026-11-18 22:00 Tashkent (started again by the owners; before
+otherwise (a player holds her once at most: one who has her gets another
+Mythic, and the guarantee stops counting), and it opens at 2026-11-18 22:00 Tashkent (started again by the owners; before
 that the shop shows it as coming, with the time to its start, and refuses
 pulls as "soon"); the 200th pull in a row without her gives her (50 at first,
 then 130, 200 since the owners raised it on 2026-11-18, the Mythic odds
