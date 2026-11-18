@@ -2349,7 +2349,7 @@ whole game it is (`CardDraw.Serial`, counted in `addCard` in the draw's
 transaction). When a draw holds a Mythic, the app celebrates it on the whole
 screen before the usual reveal: gold rays turning, 36 pieces of gold
 confetti (cherry petals among them for Satoko), the card rising, "🎉
-TABRIKLAYMIZ! MIFIK KARTA!", its name and its number ("No.000123", "o'yindagi
+TABRIKLAYMIZ! MIFIK KARTA!", its name and, for a limited card alone, its number ("No.000123", "o'yindagi
 123-nusxa"), with a success and a heavy haptic; a tap or "Davom etish" closes
 it, and several Mythics in one batch are celebrated in turn. With less
 motion asked for, the rays and confetti are left out.

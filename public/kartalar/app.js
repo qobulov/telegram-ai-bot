@@ -725,7 +725,8 @@
         '<button type="button" class="draw cel-ok"></button></div>';
       box.querySelector(".cel-title").textContent = ct.title;
       box.querySelector(".cel-name").textContent = card.name;
-      if (serial > 0) {
+      // the number is a limited card's alone, which each player gets once
+      if (serial > 0 && (card.limited || SPECIAL[card.id])) {
         box.querySelector(".cel-no").textContent = serialMark(serial);
         box.querySelector(".cel-serial small").textContent = ct.copy(serial);
       } else {
