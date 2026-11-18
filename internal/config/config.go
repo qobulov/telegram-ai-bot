@@ -225,7 +225,7 @@ func Load(getenv func(string) string) (Config, error) {
 		CronSecret:     r.cronSecret("CRON_SECRET"),
 		TelegramAPIURL: r.text("TELEGRAM_API_URL", "https://api.telegram.org"),
 		BotDisplayName: r.text("BOT_DISPLAY_NAME", "Maria"),
-		GroupNote:      groupNote + "\n\n" + moderationNote,
+		GroupNote:      groupNote + "\n\n" + moderationText(),
 
 		MaxHistoryMessages:     r.positive("MAX_HISTORY_MESSAGES", 20),
 		MaxToolCallsPerTurn:    r.positive("MAX_TOOL_CALLS_PER_TURN", 4),

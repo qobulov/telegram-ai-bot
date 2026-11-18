@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"telegram-ai-bot/internal/ranks"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 )
@@ -32,14 +33,15 @@ func (fakeGroupInfo) GetChatAdministrators(context.Context, int64) ([]telegram.C
 // group_info reads the group's bio, link, size, permissions, pin and the
 // bot's own rights.
 func TestGroupInfo(t *testing.T) {
-	tool := GroupInfoTool(fakeGroupInfo{}, rulesBotID)
+	tool := GroupInfoTool(fakeGroupInfo{}, rulesBotID, &fakeRanks{overrides: map[string]int{"ban": 3, "access": ranks.Above}})
 	ctx := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true}, &Sink{})
 	got, err := tool.Run(ctx, json.RawMessage(`{}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	b, _ := json.Marshal(got)
-	for _, want := range []string{`"description":"Brawl Stars yangiliklari"`, `"link":"https://t.me/bsnews"`, `"members":1234`, `"admins":3`, `"pinned_message":"Qoidalar`, `"photos"`, `"can_restrict_members"`} {
+	for _, want := range []string{`"description":"Brawl Stars yangiliklari"`, `"link":"https://t.me/bsnews"`, `"members":1234`, `"admins":3`, `"pinned_message":"Qoidalar`, `"photos"`, `"can_restrict_members"`,
+		`{"rank":1,"opens":["Guruhdan chiqarish (kik)","Mut va mutdan chiqarish"`, `{"rank":3,"opens":["Ban va bandan chiqarish","Xabarni o'chirish"`, `{"rank":6,"opens":["Buyruqlar darajasini o'zgartirish"]}`} {
 		if !strings.Contains(string(b), want) {
 			t.Errorf("group_info = %s, want %s", b, want)
 		}

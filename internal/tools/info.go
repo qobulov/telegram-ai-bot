@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"telegram-ai-bot/internal/ranks"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 )
@@ -26,14 +27,19 @@ type GroupInfoReader interface {
 	GetChatAdministrators(ctx context.Context, chatID int64) ([]telegram.ChatMember, error)
 }
 
+// CommandRanker reads the ranks a group's creator set for its commands.
+type CommandRanker interface {
+	CommandRanks(ctx context.Context, chatID int64) (map[string]int, error)
+}
+
 // GroupInfoTool tells anyone in a group about it: its description, link,
-// size, what members may send, its pinned message and what the bot may do
-// there.
-func GroupInfoTool(telegramAPI GroupInfoReader, botID int64) Tool {
+// size, what members may send, its pinned message, what the bot may do
+// there and, with commandRanks, what each moderator rank opens there.
+func GroupInfoTool(telegramAPI GroupInfoReader, botID int64, commandRanks CommandRanker) Tool {
 	return Tool{
 		Name: "group_info",
-		Description: "This group as Telegram has it now: title, public link, description (bio), member count, admins count, whether it has topics, what members may send, its latest pinned message, its sticker pack, and which admin rights you yourself hold here. " +
-			"Use it whenever someone asks about the group's bio or description, link, size, rules of what may be sent, the pinned message, or what you are able to do here (\"guruh biosi\", \"guruhda nechta odam\", \"qanday huquqing bor\", \"описание группы\"); never guess.",
+		Description: "This group as Telegram has it now: title, public link, description (bio), member count, admins count, whether it has topics, what members may send, its latest pinned message, its sticker pack, which admin rights you yourself hold here, and rank_table: what each moderator rank (1 to 5) opens in this group, as its /access sets it. " +
+			"Use it whenever someone asks about the group's bio or description, link, size, rules of what may be sent, the pinned message, what you are able to do here, or what a rank gives (\"guruh biosi\", \"guruhda nechta odam\", \"qanday huquqing bor\", \"3-daraja nima beradi\", \"описание группы\"); never guess.",
 		Schema:    json.RawMessage(`{"type": "object", "properties": {}, "additionalProperties": false}`),
 		GroupOnly: true,
 		Run: func(ctx context.Context, _ json.RawMessage) (any, error) {
@@ -41,12 +47,48 @@ func GroupInfoTool(telegramAPI GroupInfoReader, botID int64) Tool {
 			if !ok || caller.ChatID >= 0 {
 				return nil, &DeniedError{Message: statsNotInAGroup}
 			}
-			return groupInfo(ctx, telegramAPI, botID, caller.ChatID)
+			out, err := groupInfo(ctx, telegramAPI, botID, caller.ChatID)
+			if err != nil || commandRanks == nil {
+				return out, err
+			}
+			if overrides, err := commandRanks.CommandRanks(ctx, caller.ChatID); err == nil {
+				out["rank_table"], out["rank_note"] = rankTable(overrides), rankNote
+			}
+			return out, nil
 		},
 	}
 }
 
-func groupInfo(ctx context.Context, api GroupInfoReader, botID, chatID int64) (any, error) {
+// rankNote reads the rank table for the model.
+const rankNote = "A rank opens its own commands and every lower rank's, never on a member of the same rank or higher; rank 6 is the group's creator and your owners alone. " +
+	"Telegram admins use the commands their admin rights allow, whatever the table says. Say what a rank gives only from this table."
+
+// rankLevel is what one moderator rank opens in a group.
+type rankLevel struct {
+	Rank  int      `json:"rank"`
+	Opens []string `json:"opens"`
+}
+
+// rankTable is what each rank opens in a group whose creator set
+// overrides, lowest first; a rank opens its own commands and every lower
+// rank's. Commands kept above every rank are the creator's and the owners'.
+func rankTable(overrides map[string]int) []rankLevel {
+	table := make([]rankLevel, 0, ranks.Above)
+	for rank := 1; rank <= ranks.Above; rank++ {
+		level := rankLevel{Rank: rank, Opens: []string{}}
+		for _, c := range ranks.Commands {
+			if ranks.Need(c.Code, overrides) == rank {
+				level.Opens = append(level.Opens, c.Name)
+			}
+		}
+		if len(level.Opens) > 0 {
+			table = append(table, level)
+		}
+	}
+	return table
+}
+
+func groupInfo(ctx context.Context, api GroupInfoReader, botID, chatID int64) (map[string]any, error) {
 	chat, err := api.GetChat(ctx, chatID)
 	if err != nil {
 		return nil, &InternalError{Err: err, Message: infoUnavailable}

@@ -368,7 +368,7 @@ func NewModeration(opts ModerationOptions) *Moderation {
 func (m *Moderation) Tool() Tool {
 	return Tool{
 		Name: "moderate",
-		Description: "Whenever someone in a group asks you to: have something done to the message they replied to. It checks who may ask, which are the group's admins with the right and your owners, and refuses anyone else with the reason. " +
+		Description: "Whenever someone in a group asks you to: have something done to the message they replied to. It checks who may ask, which are the group's admins with the right, its moderators whose rank opens the action (no Telegram adminship needed) and your owners, and refuses anyone else with the reason: so call it for a ranked moderator too, never refuse them yourself. " +
 			"delete: delete that message. mute (minutes, default 60) or unmute: its author. ban or unban: its author. kick: remove its author, who may join again. pin or unpin: that message. " +
 			"no_stickers (minutes, default a day) or allow_stickers: take away or give back its author's stickers and GIFs, which Telegram only allows or forbids together; use it, not ban or ignore, when they ask to block someone's stickers. " +
 			"no_photos (minutes, default a day) or allow_photos: the same for photos. A member's other limits stay as they are. " +

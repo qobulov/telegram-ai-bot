@@ -1774,3 +1774,26 @@ func TestRoutingModels(t *testing.T) {
 		t.Errorf("router %q, chat %q, %v", cfg.RouterModel, cfg.ChatModel, err)
 	}
 }
+
+// The group note teaches the ranks' default commands from ranks.Commands,
+// so it can never teach "rank 2 bans", and sends the model to group_info's
+// rank_table for a group's own.
+func TestGroupNoteTeachesTheRealRankTable(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"rank 1: Ban va bandan chiqarish, Guruhdan chiqarish (kik), Mut va mutdan chiqarish, Ogohlantirish (varn), Banlar ro'yxati;",
+		"rank 4: Ko'p xabarni o'chirish",
+		"call group_info and answer from its rank_table alone",
+		"call moderate for them as for an admin",
+	} {
+		if !strings.Contains(cfg.GroupNote, want) {
+			t.Errorf("the group note does not contain %q", want)
+		}
+	}
+	if strings.Contains(cfg.GroupNote, "{rank_defaults}") {
+		t.Error("the rank defaults were not filled in")
+	}
+}
