@@ -609,8 +609,13 @@ func (s *Service) flooding(ctx context.Context, msg *telegram.Message) ([]int64,
 // in front. A text shorter than minRepeatRunes, a command, sent again
 // when a game or the bot is slow to answer, and media without a caption
 // other than stickers have none: every photo and GIF is logged alike,
-// "<photo>", so two would be taken for one sent twice.
+// "<photo>", so two would be taken for one sent twice. Nor has a message
+// sent through an inline bot (via_bot), a card or a game shared by a
+// player, whose lines look the same each time though they differ.
 func (s *Service) repeatKey(msg *telegram.Message) string {
+	if msg.ViaBot != nil {
+		return ""
+	}
 	content, _ := msg.Content()
 	content = strings.TrimSpace(content)
 	if strings.HasPrefix(content, "/") {
