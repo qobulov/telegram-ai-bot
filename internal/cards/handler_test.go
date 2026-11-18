@@ -42,14 +42,16 @@ func signedInit(user int64, at time.Time) string {
 
 // fakeStore has two cards; the player holds the first.
 type fakeStore struct {
-	day     time.Time
-	draws   int
-	shards  int
-	tokens  int
-	gifts   []int64 // the card, then the player, of each gift
-	giftErr error
-	offers  []storage.CardOffer
-	takeErr error
+	day      time.Time
+	draws    int
+	shards   int
+	tokens   int
+	gifts    []int64 // the card, then the player, of each gift
+	giftErr  error
+	offers   []storage.CardOffer
+	takeErr  error
+	offerErr error
+	pages    []storage.CatalogPage // the catalog pages asked for
 }
 
 var (
@@ -123,6 +125,9 @@ func (f *fakeStore) GiveCard(_ context.Context, _, _, to, cardID int64, _ storag
 }
 
 func (f *fakeStore) OfferCard(_ context.Context, from, give, want int64, rules storage.CardMarketRules) (int64, error) {
+	if f.offerErr != nil {
+		return 0, f.offerErr
+	}
 	if len(f.offers) >= rules.Open {
 		return 0, &storage.CardOffersError{Limit: rules.Open}
 	}
@@ -160,6 +165,16 @@ func (f *fakeStore) CatalogCardsNamed(_ context.Context, name string, _ int) ([]
 		return []storage.Card{lockedCard}, nil
 	}
 	return nil, nil
+}
+
+// CatalogCards pages through 25 Mythic cards, named "Card 1" on.
+func (f *fakeStore) CatalogCards(_ context.Context, page storage.CatalogPage) ([]storage.Card, bool, error) {
+	f.pages = append(f.pages, page)
+	var cards []storage.Card
+	for i := page.Offset; i < 25 && len(cards) < page.Limit; i++ {
+		cards = append(cards, storage.Card{ID: int64(100 + i), Name: fmt.Sprint("Card ", i+1), Rarity: page.Rarity})
+	}
+	return cards, page.Offset+len(cards) < 25, nil
 }
 
 func post(t *testing.T, h http.Handler, initData, action string) (int, map[string]any) {
@@ -372,5 +387,65 @@ func TestTheAnimePageSeesEveryCard(t *testing.T) {
 		if card := c.(map[string]any); card["name"] == nil || card["image"] == nil {
 			t.Errorf("a card without its name or picture: %v", card)
 		}
+	}
+}
+
+// The card wanted is paged through the catalog by the rarity of the card
+// given, ten at a time; a limited card or cards of different rarities are
+// refused with a reason the page shows.
+func TestTradesAreOfOneRarityAndNoLimitedCard(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	store := &fakeStore{}
+	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }})
+	call := func(fields map[string]any) (int, map[string]any) {
+		fields["init_data"] = signedInit(7, now)
+		body, _ := json.Marshal(fields)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/cards", strings.NewReader(string(body))))
+		var out map[string]any
+		_ = json.Unmarshal(rec.Body.Bytes(), &out)
+		return rec.Code, out
+	}
+	_, out := call(map[string]any{"action": "catalog", "rarity": 4, "card": 1})
+	cards, _ := out["cards"].([]any)
+	if len(cards) != 10 || out["more"] != true || cards[0].(map[string]any)["name"] != "Card 1" {
+		t.Fatalf("first page = %v", out)
+	}
+	_, out = call(map[string]any{"action": "catalog", "rarity": 4, "card": 1, "offset": 20, "query": "ca"})
+	if cards, _ = out["cards"].([]any); len(cards) != 5 || out["more"] != false {
+		t.Errorf("last page = %v", out)
+	}
+	if got := store.pages[1]; got != (storage.CatalogPage{Rarity: 4, Name: "ca", Except: 1, Offset: 20, Limit: catalogPage}) {
+		t.Errorf("page asked = %+v", got)
+	}
+	if code, _ := call(map[string]any{"action": "catalog", "rarity": 9}); code != http.StatusBadRequest {
+		t.Errorf("an unknown rarity = %d", code)
+	}
+	store.offerErr = storage.ErrCardTradeUneven
+	if _, out := call(map[string]any{"action": "offer", "card": 1, "want": 2}); out["refused"] != "uneven" {
+		t.Errorf("an uneven offer = %v", out)
+	}
+	store.offerErr = storage.ErrCardLimited
+	if _, out := call(map[string]any{"action": "offer", "card": 1, "want": 2}); out["refused"] != "limited" {
+		t.Errorf("an offer of a limited card = %v", out)
+	}
+	store.takeErr = storage.ErrCardLimited
+	if _, out := call(map[string]any{"action": "take", "offer": 1}); out["refused"] != "limited" {
+		t.Errorf("taking a limited offer = %v", out)
+	}
+	store.giftErr = storage.ErrCardLimited
+	if _, out := call(map[string]any{"action": "gift", "card": 1, "to": 8}); out["refused"] != "limited" {
+		t.Errorf("a gift of a limited card = %v", out)
+	}
+}
+
+// The page is told which cards are limited, held or not.
+func TestTheAppKnowsLimitedCards(t *testing.T) {
+	h := &handler{}
+	if v := h.held(storage.Card{ID: 298761, Name: "Satoko Kirigaya"}, 1); !v.Limited {
+		t.Errorf("Satoko = %+v", v)
+	}
+	if v := h.held(heldCard, 1); v.Limited {
+		t.Errorf("Gojo = %+v", v)
 	}
 }

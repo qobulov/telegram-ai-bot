@@ -20,7 +20,7 @@
       none: "Hech narsa topilmadi", noTop: "Hali hech kim karta olmagan",
       noTelegram: "Ilovani Telegram'da oching: botga /card yozing.", stale: "Ilova eskirdi, uni qayta oching.",
       unavailable: "Aloqa uzildi, birozdan keyin urinib ko'ring.",
-      allSets: "Hammasi", pointsLabel: "ochko", loading: "Kartalar yuklanmoqda…",
+      allSets: "Hammasi", pointsLabel: "ochko", loading: "Kartalar yuklanmoqda…", more: "Yuklanmoqda…",
       welcomeTitle: "Kolleksiyangiz bo'sh", welcomeText: "Har 2 soatda bitta token oling, har biri bitta anime karta ochadi. Hammasini to'plang.",
       welcomeButton: "Birinchi kartani olish", seeCollection: "Kolleksiyada ko'rish →",
       locked: (r, o) => `🔒 Bu ${r.toLowerCase()} karta hali yopiq. Uning tushish ehtimoli: ${o}.`,
@@ -33,7 +33,7 @@
       marketHint: (n) => `Kartangizni qo'ying va evaziga kerakli kartani tanlang. Kimda o'sha karta bo'lsa, almashadi. ${n} tagacha taklif, 7 kun turadi.`,
       step1: "1. Qaysi kartangizni berasiz?", step2: "2. Evaziga qaysi kartani xohlaysiz?", mineSearch: "Kartalaringizdan qidiring", wantSearch: "Xohlagan karta nomini yozing",
       place: "Taklif qo'yish", placed: "✅ Taklif bozorga qo'yildi", swapped: (c) => `🔄 Almashildi! Siz ${c} oldingiz`, removed: "Taklif olib tashlandi",
-      refused: { uneven: "Kartalar tier'i yaqin bo'lishi kerak: Mifik faqat Mifik yoki Afsonaviyga almashadi", over: "Bu taklif endi yo'q", gone: "Bu taklif endi yo'q", own: "Bu o'zingizning taklifingiz", not_held: "Sizda bu karta yo'q", same: "Bir xil kartani almashib bo'lmaydi", no_spare: "Faqat takror kartani sovg'a qilish mumkin" },
+      refused: { uneven: "Faqat bir xil darajadagi kartaga almashish mumkin", limited: "🔒 Limited kartani almashib yoki sovg'a qilib bo'lmaydi", over: "Bu taklif endi yo'q", gone: "Bu taklif endi yo'q", own: "Bu o'zingizning taklifingiz", not_held: "Sizda bu karta yo'q", same: "Bir xil kartani almashib bo'lmaydi", no_spare: "Faqat takror kartani sovg'a qilish mumkin" },
       offersLimit: (n) => `Bir vaqtda ${n} tagacha taklif qo'yish mumkin`, giftSpare: "Faqat takror (×2 va undan ko'p) kartani sovg'a qilish mumkin",
       shopTab: "Do'kon", shopBuyTitle: "💎 Kristall sotib olish", shopBuyHint: "Telegram Stars bilan to'lanadi, kristall darhol hisobingizga tushadi.", shopItemsTitle: "🛒 Kristallga xarid",
       wallet: (n) => `Sizda: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% foyda`,
@@ -52,7 +52,7 @@
       none: "Ничего не найдено", noTop: "Ещё никто не получил карту",
       noTelegram: "Откройте приложение в Telegram: напишите боту /card.", stale: "Приложение устарело, откройте его снова.",
       unavailable: "Нет связи, попробуйте чуть позже.",
-      allSets: "Все", pointsLabel: "очки", loading: "Загружаем карты…",
+      allSets: "Все", pointsLabel: "очки", loading: "Загружаем карты…", more: "Загружаем…",
       welcomeTitle: "Коллекция пуста", welcomeText: "Каждые 2 часа получайте токен, он открывает аниме-карту. Соберите все.",
       welcomeButton: "Получить первую карту", seeCollection: "Посмотреть в коллекции →",
       locked: (r, o) => `🔒 Эта карта (${r.toLowerCase()}) ещё закрыта. Шанс выпадения: ${o}.`,
@@ -65,7 +65,7 @@
       marketHint: (n) => `Выставьте свою карту и выберите, какую хотите взамен. У кого она есть — обменяется. До ${n} предложений, 7 дней.`,
       step1: "1. Какую карту отдаёте?", step2: "2. Какую хотите взамен?", mineSearch: "Поиск по вашим картам", wantSearch: "Название нужной карты",
       place: "Выставить", placed: "✅ Предложение выставлено", swapped: (c) => `🔄 Обмен! Вы получили ${c}`, removed: "Предложение снято",
-      refused: { uneven: "Редкость карт должна быть близкой: мифическая меняется только на мифическую или легендарную", over: "Этого предложения уже нет", gone: "Этого предложения уже нет", own: "Это ваше предложение", not_held: "У вас нет этой карты", same: "Нельзя менять карту на ту же", no_spare: "Дарить можно только повторную карту" },
+      refused: { uneven: "Менять можно только на карту той же редкости", limited: "🔒 Лимитированную карту нельзя обменять или подарить", over: "Этого предложения уже нет", gone: "Этого предложения уже нет", own: "Это ваше предложение", not_held: "У вас нет этой карты", same: "Нельзя менять карту на ту же", no_spare: "Дарить можно только повторную карту" },
       offersLimit: (n) => `Одновременно можно выставить до ${n} предложений`, giftSpare: "Дарить можно только повторную карту (×2 и больше)",
       shopTab: "Магазин", shopBuyTitle: "💎 Купить кристаллы", shopBuyHint: "Оплата Telegram Stars, кристаллы приходят сразу.", shopItemsTitle: "🛒 За кристаллы",
       wallet: (n) => `У вас: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% выгоды`,
@@ -84,7 +84,7 @@
       none: "Nothing found", noTop: "Nobody has drawn a card yet",
       noTelegram: "Open the app in Telegram: send /card to the bot.", stale: "The app is out of date; open it again.",
       unavailable: "No connection; try again in a bit.",
-      allSets: "All", pointsLabel: "points", loading: "Loading the cards…",
+      allSets: "All", pointsLabel: "points", loading: "Loading the cards…", more: "Loading…",
       welcomeTitle: "Your collection is empty", welcomeText: "Get a token every 2 hours, each opens an anime card. Collect them all.",
       welcomeButton: "Draw your first card", seeCollection: "See it in the collection →",
       locked: (r, o) => `🔒 This ${r.toLowerCase()} card is still locked. Its odds: ${o}.`,
@@ -97,7 +97,7 @@
       marketHint: (n) => `Put up a card and pick the one you want for it. Whoever holds it can trade. Up to ${n} offers, for 7 days.`,
       step1: "1. Which card do you give?", step2: "2. Which card do you want?", mineSearch: "Search your cards", wantSearch: "Name of the card you want",
       place: "Put it up", placed: "✅ Your offer is up", swapped: (c) => `🔄 Traded! You got ${c}`, removed: "Offer taken down",
-      refused: { uneven: "The cards must be close in rarity: a Mythic goes only for a Mythic or a Legendary", over: "This offer is gone", gone: "This offer is gone", own: "This is your own offer", not_held: "You do not have that card", same: "A card cannot be traded for itself", no_spare: "Only a spare card may be given" },
+      refused: { uneven: "A card may be traded only for one of the same rarity", limited: "🔒 A limited card cannot be traded or given", over: "This offer is gone", gone: "This offer is gone", own: "This is your own offer", not_held: "You do not have that card", same: "A card cannot be traded for itself", no_spare: "Only a spare card may be given" },
       offersLimit: (n) => `You may have up to ${n} offers at once`, giftSpare: "Only a spare card (×2 or more) may be given",
       shopTab: "Shop", shopBuyTitle: "💎 Buy crystals", shopBuyHint: "Paid in Telegram Stars; the crystals arrive at once.", shopItemsTitle: "🛒 For crystals",
       wallet: (n) => `You have: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% value`,
@@ -262,7 +262,7 @@
   // dress adds a special card's mark, petals and fireflies; the large view
   // has more of them.
   function dress(el, card, large) {
-    const special = SPECIAL[card.id];
+    const special = SPECIAL[card.id] || (card.limited ? { tag: "LIMITED" } : null);
     if (!special) return;
     el.classList.add("special");
     let html = "";
@@ -452,15 +452,19 @@
     give.type = "button";
     give.className = "ghost gift-open";
     give.textContent = t.gift;
-    give.disabled = !card.spare;
-    give.title = card.spare ? "" : t.giftSpare;
+    // a limited card is never given; any other only by a spare copy
+    const canGive = card.spare && !card.limited;
+    const why = card.limited ? t.refused.limited : card.spare ? "" : t.giftSpare;
+    give.disabled = !canGive;
+    give.hidden = !!card.limited;
+    give.title = why;
     give.addEventListener("click", (event) => {
       event.stopPropagation();
-      if (card.spare) giftPanel(card);
+      if (canGive) giftPanel(card);
     });
     const giveNote = document.createElement("p");
     giveNote.className = "gift-note";
-    giveNote.textContent = card.spare ? "" : t.giftSpare;
+    giveNote.textContent = why;
     sheet.append(face(card), statsOf(card), give, giveNote);
     tilt(sheet, card.rarity === 4);
     $("sheet").hidden = false;
@@ -559,7 +563,7 @@
       try {
         const data = await api("gift", { card: card.id, to: chosen.id });
         if (data.refused) {
-          toast(data.refused === "limit" ? t.giftLimit(data.limit) : data.refused === "no_player" ? t.giftNoPlayer : data.refused === "no_spare" ? t.giftSpare : t.giftGone);
+          toast(data.refused === "limit" ? t.giftLimit(data.limit) : data.refused === "no_player" ? t.giftNoPlayer : data.refused === "no_spare" ? t.giftSpare : data.refused === "limited" ? t.refused.limited : t.giftGone);
           send.disabled = false;
           return;
         }
@@ -920,9 +924,14 @@
   }
 
   // offerPanel makes an offer in two steps: a card of the player's, then the
-  // card they want for it, found in the whole catalog by name.
+  // card they want for it, of the same rarity: the first ten of the catalog
+  // show at once, the most loved first, ten more as the list is scrolled
+  // down, a name typed narrowing them. A limited card is in neither list.
   function offerPanel() {
-    let give = null, want = null, timer = 0, asked = 0;
+    let give = null, want = null, timer = 0;
+    // the pages of the card wanted: asked counts the lists begun, so that a
+    // page come late for an older list is dropped
+    let asked = 0, offset = 0, more = false, loading = false;
     const panel = document.createElement("div");
     panel.className = "gift";
     panel.innerHTML = '<b class="step"></b><input type="search" class="mine-q" autocomplete="off"><ul class="gift-list pick-mine"></ul><b class="step"></b><input type="search" class="want-q" autocomplete="off" disabled><ul class="gift-list pick-want"></ul><button type="button" class="draw gift-send" disabled></button>';
@@ -935,8 +944,9 @@
     const send = panel.querySelector(".gift-send");
     send.textContent = t.place;
     const ready = () => { send.disabled = !(give && want); };
+    const wanted = panel.querySelector(".pick-want");
 
-    function pickRow(list, card, chosen, onPick) {
+    function pickRow(list, card, chosen, onPick, before) {
       const li = document.createElement("li");
       const pick = document.createElement("button");
       pick.type = "button";
@@ -949,28 +959,76 @@
         haptic("light");
       });
       li.append(pick);
-      list.append(li);
+      list.insertBefore(li, before || null);
     }
     function mineList() {
       const list = panel.querySelector(".pick-mine");
       list.textContent = "";
       const q = mineQ.value.trim().toLowerCase();
-      const held = cards.filter((c) => c.count > 0 && (!q || c.name.toLowerCase().includes(q))).sort((a, b) => b.rarity - a.rarity).slice(0, 30);
+      const held = cards.filter((c) => c.count > 0 && !c.limited && (!q || c.name.toLowerCase().includes(q))).sort((a, b) => b.rarity - a.rarity).slice(0, 30);
       if (!held.length) list.innerHTML = `<li class="gift-empty">${t.none}</li>`;
-      for (const card of held) pickRow(list, card, give, (c) => { give = c; wantQ.disabled = false; ready(); });
+      for (const card of held) pickRow(list, card, give, choose);
     }
-    async function wantList() {
-      const mine = ++asked;
-      const list = panel.querySelector(".pick-want");
-      if (!wantQ.value.trim()) { list.textContent = ""; return; }
+    function choose(card) {
+      const sameRarity = give && give.rarity === card.rarity;
+      give = card;
+      steps[1].textContent = t.step2 + " · " + t.rarities[card.rarity];
+      wantQ.disabled = false;
+      if (!sameRarity || (want && want.id === card.id)) want = null;
+      ready();
+      wantList();
+    }
+
+    // sentinel is the last row of the list: once it is seen, the next page
+    // is asked for; it says the page is loading meanwhile.
+    const sentinel = document.createElement("li");
+    sentinel.className = "gift-empty want-more";
+    sentinel.textContent = t.more;
+    // near is the end of the list in sight; never so while the list is not
+    // shown, as with the sheet closed
+    const near = () => wanted.offsetParent !== null && sentinel.getBoundingClientRect().top <= wanted.getBoundingClientRect().bottom + 120;
+    const watcher = "IntersectionObserver" in window
+      ? new IntersectionObserver((seen) => { if (seen.some((e) => e.isIntersecting)) wantPage(); }, { root: wanted, rootMargin: "0px 0px 120px 0px" })
+      : null;
+    if (watcher) watcher.observe(sentinel);
+    else wanted.addEventListener("scroll", () => { if (near()) wantPage(); });
+
+    // wantList begins the list of the card wanted again, for the card given
+    // and the name typed.
+    function wantList() {
+      asked++;
+      offset = 0;
+      more = true;
+      loading = false;
+      wanted.textContent = "";
+      wanted.scrollTop = 0;
+      wanted.append(sentinel);
+      wantPage();
+    }
+    async function wantPage() {
+      if (!give || !more || loading) return;
+      const mine = asked;
+      loading = true;
+      sentinel.hidden = false;
       try {
-        const data = await api("catalog", { query: wantQ.value });
+        const data = await api("catalog", { rarity: give.rarity, card: give.id, query: wantQ.value.trim(), offset });
         if (mine !== asked) return;
-        list.textContent = "";
-        if (!data.cards.length) list.innerHTML = `<li class="gift-empty">${t.none}</li>`;
-        for (const card of data.cards) pickRow(list, card, want, (c) => { want = c; ready(); });
+        for (const card of data.cards) pickRow(wanted, card, want, (c) => { want = c; ready(); }, sentinel);
+        offset += data.cards.length;
+        more = !!data.more && data.cards.length > 0;
+        if (!offset) wanted.insertAdjacentHTML("afterbegin", `<li class="gift-empty">${t.none}</li>`);
       } catch (error) {
+        if (mine !== asked) return;
+        more = false;
         notice(error);
+      } finally {
+        if (mine === asked) {
+          loading = false;
+          sentinel.hidden = !more;
+          // the end still in sight, as a page too short to scroll leaves
+          // it, asks for the next at once: the watcher sees only a change
+          if (more && near()) wantPage();
+        }
       }
     }
     mineQ.addEventListener("input", mineList);

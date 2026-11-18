@@ -2282,12 +2282,16 @@ a spare copy at once (`gift`: a player keeps their last copy not melted),
 the bot telling them in their private chat who gave it. The Mini App's 🔄
 market tab, which `/start bozor` opens (the link the old `/market` gave in a
 group; the page told `?tab=market`), lists offers (migration 67, `card_trades` rows with no `to_id`
-until taken): a player puts up a card of theirs for a card they pick from the
-whole catalog by name (`catalog`, `offer`), at most 5 open, each for 7 days;
+until taken): a player puts up a card of theirs for a card of the same rarity
+they pick from the catalog (`offer`): as soon as their card is picked the list
+shows the first 10 of that rarity, the most loved first, and 10 more each time
+it is scrolled to its end, a name typed narrowing it (`catalog` with `rarity`,
+`card` and `offset`, `CatalogCards`; without `rarity` it still searches the
+whole catalog by name); at most 5 open, each for 7 days;
 anyone who holds the card wanted presses 🔄 to take it (`take`), each giving
 the other their card with its points, and the offer's player is told; an
 offer whose card its player no longer holds is called off when taken, and a
-player takes down their own (`unoffer`). A trade's two cards must be at most one rarity apart, a Mythic going only for a Mythic or a Legendary, as an offer and as a market take (`ErrCardTradeUneven`): one player's cards had gone to another's, Common cards for three Mythic in seven minutes. The same two players trade as often as they like, and a player gives and trades as many cards a day as they like: both daily limits were taken out. The market's cards show each card's tier; migration 75 called off the open offers the rule forbids. There is no trade command: `/trade`, which offered a card for a member's in
+player takes down their own (`unoffer`). A trade's two cards must be of the same rarity, a Mythic going only for a Mythic, as an offer and as a market take (`ErrCardTradeUneven`, "faqat bir xil darajadagi kartaga almashish mumkin"): one player's cards had gone to another's, Common cards for three Mythic in seven minutes, and later one rarity apart was still allowed. A limited card (`limitedCards` in `internal/storage/cardtrade.go`: Satoko Kirigaya, LIMITED No.000001) never changes hands: it is not given, offered, wanted or taken (`ErrCardLimited`, checked in `moveCard`, which every gift and trade goes through, and in the offer's check), the page hides its gift button and leaves it out of both lists of an offer (`limited` on each card). Offers placed before these rules, of two rarities or of a limited card, are left off the market and refused when taken; they are not changed in the database. The same two players trade as often as they like, and a player gives and trades as many cards a day as they like: both daily limits were taken out. The market's cards show each card's tier; migration 75 called off the open offers the rule forbids. There is no trade command: `/trade`, which offered a card for a member's in
 a group, was taken out, and trades are done on the market alone. A card taken
 from the market may be the last copy, which leaves the collection (its melted copies, gone
 to shards, with it), its points passing only as it is new to its taker or the giver's last copy. A player gives at most 5

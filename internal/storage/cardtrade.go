@@ -27,10 +27,32 @@ var (
 	ErrCardOfferGone = errors.New("storage: card offer gone")
 	// ErrCardOfferOwn is a player taking their own offer.
 	ErrCardOfferOwn = errors.New("storage: own card offer")
-	// ErrCardTradeUneven is a trade of cards more than one rarity apart: a
-	// Common for a Mythic was how one player's cards went to another's.
-	ErrCardTradeUneven = errors.New("storage: cards too far apart in rarity")
+	// ErrCardTradeUneven is a trade of cards of different rarities: a Common
+	// for a Mythic was how one player's cards went to another's.
+	ErrCardTradeUneven = errors.New("storage: cards of different rarities")
+	// ErrCardLimited is a limited card given, offered, wanted or traded: it
+	// stays with the player who drew it.
+	ErrCardLimited = errors.New("storage: limited card")
 )
+
+// limitedCards are the cards the owners made limited, one of a kind: none
+// of them changes hands, by gift, offer or trade.
+var limitedCards = map[int64]bool{
+	298761: true, // Satoko Kirigaya, LIMITED No.000001
+}
+
+// CardLimited reports whether the card is limited and so never changes
+// hands.
+func CardLimited(id int64) bool { return limitedCards[id] }
+
+// limitedCardIDs are the limited cards' IDs, for a query to leave them out.
+func limitedCardIDs() []int64 {
+	ids := make([]int64, 0, len(limitedCards))
+	for id := range limitedCards {
+		ids = append(ids, id)
+	}
+	return ids
+}
 
 // CardOffersError is a player with as many offers on the market as they may
 // have open.
@@ -151,15 +173,18 @@ func lockTraders(ctx context.Context, tx pgx.Tx, from, to int64) error {
 	return nil
 }
 
-// tradeRarityGap is how many rarities apart a trade's two cards may be: a
-// Mythic goes for a Mythic or a Legendary, never for a Common.
-const tradeRarityGap = 1
+// tradeRarityGap is how many rarities apart a trade's two cards may be:
+// none, a Mythic goes for a Mythic alone.
+const tradeRarityGap = 0
 
 // checkEven refuses a trade of two cards more than tradeRarityGap
-// rarities apart.
+// rarities apart, or of a limited card.
 func checkEven(ctx context.Context, q interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }, give, take int64) error {
+	if CardLimited(give) || CardLimited(take) {
+		return ErrCardLimited
+	}
 	var gap int
 	err := q.QueryRow(ctx, `
 		SELECT abs((SELECT rarity FROM card_catalog WHERE id = $1) - (SELECT rarity FROM card_catalog WHERE id = $2))`,
@@ -182,8 +207,12 @@ func checkFair(ctx context.Context, tx pgx.Tx, trade CardTrade) error {
 // other: the giver loses its points only with their last copy, and the
 // other gains them only when it is new to them. A player giving their last copy not melted no
 // longer holds the card; the melted ones went to shards and are gone with it.
-// spareOnly refuses that last copy, ErrCardLastCopy.
+// spareOnly refuses that last copy, ErrCardLastCopy. A limited card never
+// moves, ErrCardLimited: every gift and trade comes this way.
 func moveCard(ctx context.Context, tx pgx.Tx, from, to, cardID int64, spareOnly bool) error {
+	if CardLimited(cardID) {
+		return ErrCardLimited
+	}
 	var count, melted, value int
 	err := tx.QueryRow(ctx, `
 		SELECT o.count, o.melted, c.value FROM card_owned o JOIN card_catalog c ON c.id = o.card_id
@@ -246,7 +275,7 @@ func tradeError(what string, err error) error {
 	switch {
 	case err == nil, errors.Is(err, ErrCardNotHeld), errors.Is(err, ErrCardNoPlayer), errors.Is(err, ErrCardTradeOver),
 		errors.Is(err, ErrCardLastCopy), errors.Is(err, ErrCardOfferGone), errors.Is(err, ErrCardOfferOwn),
-		errors.Is(err, ErrCardTradeUneven),
+		errors.Is(err, ErrCardTradeUneven), errors.Is(err, ErrCardLimited),
 		errors.As(err, &offers):
 		return err
 	}

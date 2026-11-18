@@ -33,6 +33,7 @@ type Store interface {
 	TakeCardOffer(ctx context.Context, id, by int64, rules storage.CardTradeRules, keep time.Duration) (storage.CardTrade, error)
 	CallOffCardTrade(ctx context.Context, id, by int64) (bool, error)
 	CatalogCardsNamed(ctx context.Context, name string, limit int) ([]storage.Card, error)
+	CatalogCards(ctx context.Context, page storage.CatalogPage) ([]storage.Card, bool, error)
 	BuyCardTokens(ctx context.Context, userID int64, name string, tokens, price int) (storage.CardOpening, error)
 	OpenCardPack(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, price int, now time.Time) (storage.CardOpening, error)
 }
@@ -75,9 +76,11 @@ const (
 	OffersOpen = 5
 	OfferKeep  = 7 * 24 * time.Hour
 	// marketShown is the most offers the market lists, and catalogShown the
-	// most cards a search of the catalog finds.
+	// most cards a search of the catalog finds; catalogPage is how many of a
+	// rarity each page of the card wanted lists.
 	marketShown  = 60
 	catalogShown = 12
+	catalogPage  = 10
 )
 
 type handler struct {
@@ -117,6 +120,10 @@ type request struct {
 	// taken or called off, for "take" and "unoffer".
 	Want  int64 `json:"want"`
 	Offer int64 `json:"offer"`
+	// Rarity and Offset page "catalog" through the cards of one rarity, but
+	// Card; without Rarity it searches the whole catalog by Query.
+	Rarity *int `json:"rarity"`
+	Offset int  `json:"offset"`
 	// Count is how many cards "open" opens: 1 or Batch.
 	Count int `json:"count"`
 	// Item is what "buy" buys, of ShopItems, or "invoice" sells, of
@@ -187,6 +194,9 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 	case "market":
 		return h.market(ctx, opened.User)
 	case "catalog":
+		if req.Rarity != nil {
+			return h.catalogPage(ctx, storage.CatalogPage{Rarity: *req.Rarity, Name: req.Query, Except: req.Card, Offset: req.Offset, Limit: catalogPage})
+		}
 		return h.catalogSearch(ctx, req.Query)
 	case "animes":
 		return h.animes(ctx)
@@ -216,10 +226,12 @@ type cardView struct {
 	// Spare is the copies held but one that are not melted, which may be
 	// given.
 	Spare int `json:"spare,omitempty"`
+	// Limited is a card that is never given or traded.
+	Limited bool `json:"limited,omitempty"`
 }
 
 func (h *handler) held(c storage.Card, count int) cardView {
-	return cardView{ID: c.ID, Rarity: c.Rarity, Set: c.Collection, Name: c.Name, Anime: c.Anime, Image: c.ImageURL, Attack: c.Attack, Health: c.Health, Value: c.Value, Count: count}
+	return cardView{ID: c.ID, Rarity: c.Rarity, Set: c.Collection, Name: c.Name, Anime: c.Anime, Image: c.ImageURL, Attack: c.Attack, Health: c.Health, Value: c.Value, Count: count, Limited: storage.CardLimited(c.ID)}
 }
 
 func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
@@ -247,7 +259,7 @@ func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
 			views[i] = h.held(c, o.Count)
 			views[i].Spare = max(0, o.Count-1-o.Melted)
 		} else {
-			views[i] = cardView{ID: c.ID, Rarity: c.Rarity, Set: c.Collection}
+			views[i] = cardView{ID: c.ID, Rarity: c.Rarity, Set: c.Collection, Limited: storage.CardLimited(c.ID)}
 		}
 	}
 	// Opening the app gives the day's tokens, so that the page shows them.
@@ -366,7 +378,8 @@ func (h *handler) players(ctx context.Context, user miniapp.User, query string) 
 }
 
 // gift gives a copy of the player's card to another, with its points, and
-// tells them. A gift refused says why: "limit", "no_player" or "not_held".
+// tells them. A gift refused says why: "no_player", "not_held", "no_spare"
+// or "limited".
 func (h *handler) gift(ctx context.Context, user miniapp.User, cardID, to int64) (any, failure) {
 	if cardID == 0 || to == 0 || to == user.ID {
 		return nil, errBadRequest
@@ -379,6 +392,8 @@ func (h *handler) gift(ctx context.Context, user miniapp.User, cardID, to int64)
 		return map[string]any{"refused": "not_held"}, failure{}
 	case errors.Is(err, storage.ErrCardLastCopy):
 		return map[string]any{"refused": "no_spare"}, failure{}
+	case errors.Is(err, storage.ErrCardLimited):
+		return map[string]any{"refused": "limited"}, failure{}
 	case err != nil:
 		h.Logger.Error("could not give a card", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
@@ -446,8 +461,6 @@ func (h *handler) market(ctx context.Context, user miniapp.User) (any, failure) 
 	return map[string]any{"offers": views, "open_limit": OffersOpen}, failure{}
 }
 
-// catalogSearch finds the cards of the catalog by name, for the card a
-// player wants: a name searched for is shown, held or not.
 // animes is the whole catalog with every card's name and picture, so that
 // a player may look through each anime's cards, held or not.
 func (h *handler) animes(ctx context.Context) (any, failure) {
@@ -467,6 +480,8 @@ func (h *handler) animes(ctx context.Context) (any, failure) {
 	return map[string]any{"cards": views}, failure{}
 }
 
+// catalogSearch finds the cards of the catalog by name, for the card a
+// player wants: a name searched for is shown, held or not.
 func (h *handler) catalogSearch(ctx context.Context, query string) (any, failure) {
 	if strings.TrimSpace(query) == "" {
 		return map[string]any{"cards": []cardView{}}, failure{}
@@ -483,8 +498,27 @@ func (h *handler) catalogSearch(ctx context.Context, query string) (any, failure
 	return map[string]any{"cards": views}, failure{}
 }
 
+// catalogPage is a page of the cards of one rarity a player may want for
+// theirs, and whether another page follows.
+func (h *handler) catalogPage(ctx context.Context, page storage.CatalogPage) (any, failure) {
+	if page.Rarity < 0 || page.Rarity >= len(Rarities) || page.Offset < 0 {
+		return nil, errBadRequest
+	}
+	found, more, err := h.Store.CatalogCards(ctx, page)
+	if err != nil {
+		h.Logger.Error("could not read a catalog page", "error", err)
+		return nil, errUnavailable
+	}
+	views := make([]cardView, len(found))
+	for i, c := range found {
+		views[i] = h.held(c, 0)
+	}
+	return map[string]any{"cards": views, "more": more}, failure{}
+}
+
 // offer puts the player's card up on the market for the card they want. An
-// offer refused says why: "not_held", "limit" or "same".
+// offer refused says why: "not_held", "limit", "same", "uneven" or
+// "limited".
 func (h *handler) offer(ctx context.Context, user miniapp.User, give, want int64) (any, failure) {
 	switch {
 	case give == 0 || want == 0:
@@ -499,6 +533,8 @@ func (h *handler) offer(ctx context.Context, user miniapp.User, give, want int64
 		return map[string]any{"refused": "not_held"}, failure{}
 	case errors.Is(err, storage.ErrCardTradeUneven):
 		return map[string]any{"refused": "uneven"}, failure{}
+	case errors.Is(err, storage.ErrCardLimited):
+		return map[string]any{"refused": "limited"}, failure{}
 	case errors.As(err, &many):
 		return map[string]any{"refused": "limit", "limit": many.Limit}, failure{}
 	case err != nil:
@@ -510,7 +546,7 @@ func (h *handler) offer(ctx context.Context, user miniapp.User, give, want int64
 
 // take takes an offer: its player and this one each give the other their
 // card, and its player is told. An offer refused says why: "over",
-// "gone", "not_held", "limit" or "own".
+// "gone", "not_held", "own", "uneven" or "limited".
 func (h *handler) take(ctx context.Context, user miniapp.User, id int64) (any, failure) {
 	if id == 0 {
 		return nil, errBadRequest
@@ -527,6 +563,8 @@ func (h *handler) take(ctx context.Context, user miniapp.User, id int64) (any, f
 		return map[string]any{"refused": "not_held"}, failure{}
 	case errors.Is(err, storage.ErrCardTradeUneven):
 		return map[string]any{"refused": "uneven"}, failure{}
+	case errors.Is(err, storage.ErrCardLimited):
+		return map[string]any{"refused": "limited"}, failure{}
 	case err != nil:
 		h.Logger.Error("could not take a card offer", "user_id", user.ID, "error", err)
 		return nil, errUnavailable

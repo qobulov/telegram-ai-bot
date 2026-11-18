@@ -71,7 +71,8 @@ func (s *Store) OfferCard(ctx context.Context, from, give, want int64, rules Car
 
 // CardMarket is the offers open on the market as viewer sees them: those
 // they can take first, then the newest; at most limit. An offer whose player
-// no longer holds the card offered is left out, as taking it would fail.
+// no longer holds the card offered is left out, as taking it would fail, and
+// so is one placed before trades were of one rarity and of no limited card.
 func (s *Store) CardMarket(ctx context.Context, viewer int64, rules CardMarketRules, limit int) ([]CardOffer, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT t.id, t.from_id, coalesce(p.name, ''), t.created_at,
@@ -87,7 +88,8 @@ func (s *Store) CardMarket(ctx context.Context, viewer int64, rules CardMarketRu
 		) c
 		WHERE t.status = 'open' AND t.to_id IS NULL AND t.created_at > $2
 			AND EXISTS (SELECT 1 FROM card_owned o WHERE o.user_id = t.from_id AND o.card_id = t.give_card)
-		ORDER BY c.can DESC, t.created_at DESC, t.id DESC LIMIT $3`, viewer, rules.Now.Add(-rules.Keep), limit)
+			AND g.rarity = w.rarity AND NOT (t.give_card = ANY($4) OR t.take_card = ANY($4))
+		ORDER BY c.can DESC, t.created_at DESC, t.id DESC LIMIT $3`, viewer, rules.Now.Add(-rules.Keep), limit, limitedCardIDs())
 	if err != nil {
 		return nil, fmt.Errorf("storage: read the card market: %w", err)
 	}
@@ -172,4 +174,39 @@ func (s *Store) CatalogCardsNamed(ctx context.Context, name string, limit int) (
 		return nil, fmt.Errorf("storage: find catalog cards: %w", err)
 	}
 	return cards, nil
+}
+
+// CatalogPage asks for a page of the catalog's cards of one rarity: those
+// whose name holds Name, in any case (an empty Name is all of them), but
+// Except; Offset are skipped and Limit given.
+type CatalogPage struct {
+	Rarity int
+	Name   string
+	Except int64
+	Offset int
+	Limit  int
+}
+
+// CatalogCards are a page of the catalog's cards of one rarity that may be
+// traded, the most loved first, then by name; more is whether a page
+// follows. Limited cards are left out, as none is traded.
+func (s *Store) CatalogCards(ctx context.Context, page CatalogPage) (cards []Card, more bool, err error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT id, name, anime, image_url, favourites, rarity, attack, health, value, collection
+		FROM card_catalog
+		WHERE rarity = $1 AND name ILIKE $2 AND id <> $3 AND NOT id = ANY($4)
+		ORDER BY favourites DESC, name, id OFFSET $5 LIMIT $6`,
+		page.Rarity, "%"+likeMarks.Replace(strings.TrimSpace(page.Name))+"%", page.Except, limitedCardIDs(),
+		max(page.Offset, 0), page.Limit+1)
+	if err != nil {
+		return nil, false, fmt.Errorf("storage: read a catalog page: %w", err)
+	}
+	cards, err = pgx.CollectRows(rows, scanCard)
+	if err != nil {
+		return nil, false, fmt.Errorf("storage: read a catalog page: %w", err)
+	}
+	if len(cards) > page.Limit {
+		return cards[:page.Limit], true, nil
+	}
+	return cards, false, nil
 }
