@@ -368,12 +368,7 @@ func (s *Service) accessCommand(ctx context.Context, in incoming, order rankOrde
 		return say(textError.to(in))
 	}
 	if order.rank == -1 {
-		lines := []string{"⚙️ Buyruqlar darajasi (o'zgartirish: \".дк ban 2\")"}
-		for _, c := range ranks.Commands {
-			lines = append(lines, fmt.Sprintf("%d · %s — %s", ranks.Need(c.Code, overrides), c.Code, c.Name))
-		}
-		lines = append(lines, "", "6 — faqat guruh yaratuvchisi va bot egalari.")
-		return say(strings.Join(lines, "\n"))
+		return say(accessTable(overrides))
 	}
 	if _, known := ranks.Find(order.code); order.rank == -2 || !known {
 		return say("Masalan: \".дк ban 2\" — ban buyrug'i 2-darajadan ochiladi. Ro'yxat: \".дк\".")
@@ -393,6 +388,29 @@ func (s *Service) accessCommand(ctx context.Context, in incoming, order rankOrde
 	}
 	c, _ := ranks.Find(order.code)
 	return say(fmt.Sprintf("✅ «%s» endi %d-darajadan ochiladi.", c.Name, order.rank))
+}
+
+// accessTable is the group's commands by the rank each needs, lowest first,
+// the ones kept for the creator and the owners last.
+func accessTable(overrides map[string]int) string {
+	byRank := map[int][]string{}
+	for _, c := range ranks.Commands {
+		need := ranks.Need(c.Code, overrides)
+		byRank[need] = append(byRank[need], fmt.Sprintf("   • %s  ·  %s", c.Name, c.Code))
+	}
+	lines := []string{"⚙️ Buyruqlar darajasi"}
+	for rank := 1; rank <= ranks.Above; rank++ {
+		if len(byRank[rank]) == 0 {
+			continue
+		}
+		head := fmt.Sprintf("%s %d-daraja", stars(rank), rank)
+		if rank == ranks.Above {
+			head = "👑 Faqat guruh egasi va bot egalari"
+		}
+		lines = append(lines, "", head)
+		lines = append(lines, byRank[rank]...)
+	}
+	return strings.Join(append(lines, "", "✏️ O'zgartirish: /access ban 2  (yoki \".дк ban 2\")"), "\n")
 }
 
 // location is the group's time zone for times shown.

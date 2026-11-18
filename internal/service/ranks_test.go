@@ -124,7 +124,7 @@ func TestRanksAreGivenWithSlashRank(t *testing.T) {
 		t.Errorf("the creator setting access = %q", last)
 	}
 	sent = f.run(from(member, "/access", 0))
-	if last := sent[len(sent)-1].text; !strings.Contains(last, "2 · ban") {
+	if last := sent[len(sent)-1].text; !strings.Contains(last, "⭐⭐ 2-daraja\n   • Ban va bandan chiqarish  ·  ban") {
 		t.Errorf("access list = %q", last)
 	}
 	sent = f.run(from(creator, "/rank", 0))
