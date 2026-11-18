@@ -123,6 +123,9 @@ type Message struct {
 	Entities        []MessageEntity `json:"entities"`
 	Caption         string          `json:"caption"`
 	CaptionEntities []MessageEntity `json:"caption_entities"`
+	// ViaBot is the bot whose inline answer the member sent, if any: a
+	// card, a game or a share, which look alike each time.
+	ViaBot *User `json:"via_bot,omitempty"`
 	// ReplyToMessage is the message this one replies to, if any. In a forum
 	// topic it may be only the topic's first message; see
 	// ImplicitTopicReply.

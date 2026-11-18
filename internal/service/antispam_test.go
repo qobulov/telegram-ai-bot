@@ -121,7 +121,18 @@ func TestFloodGuardCatchesRepeats(t *testing.T) {
 		t.Errorf("sticker repeat: sent = %+v", sent)
 	}
 
+	// Three shares of a card through an inline bot, alike in the log, are
+	// no repeat: a player trading or showing cards is not flooding.
 	f, _, moderator := protectFixture()
+	logAgo(f, flooderID, 92, "(to Nur @nur) Naruto Uzumaki", 20*time.Second)
+	logAgo(f, flooderID, 93, "(to Nur @nur) Naruto Uzumaki", 10*time.Second)
+	share := messageFrom(flooderID, "tez", "Naruto Uzumaki")
+	share.ViaBot = &telegram.User{ID: 77, IsBot: true, Username: "gemini_max1bot"}
+	if sent := f.run(inGroup(share)); len(sent) != 0 || len(moderator.deleted) != 0 {
+		t.Errorf("an inline bot's share three times: sent %+v, deleted %v", sent, moderator.deleted)
+	}
+
+	f, _, moderator = protectFixture()
 	var short []telegram.Update
 	for i := range 4 {
 		msg := messageFrom(5353, "ha", "ha")
