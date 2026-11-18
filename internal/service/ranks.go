@@ -191,10 +191,10 @@ func (s *Service) giveRank(ctx context.Context, in incoming, rank int) outcome {
 	if !ok {
 		return say("Kimga? " + rankUsage)
 	}
-	target := asked.msg.ReplyToMessage.From
-	if target == nil || target.IsBot || target.ID == in.userID {
-		return say("⛔ Bunga daraja berib bo'lmaydi.")
+	if refusal := unrankable(asked.msg.ReplyToMessage, in.scope.ChatID); refusal != "" {
+		return say(refusal)
 	}
+	target := asked.msg.ReplyToMessage.From
 	mine, err := s.askerRank(ctx, in)
 	if err != nil {
 		return say(textError.to(in))
@@ -225,6 +225,22 @@ func (s *Service) giveRank(ctx context.Context, in incoming, rank int) outcome {
 	return say(fmt.Sprintf("✅ %s endi %s %d-darajali moderator.", name, stars(rank), rank))
 }
 
+// unrankable is why the author of reply can hold no rank, or "": a channel
+// writing in the group, an admin writing anonymously as the group, or a bot
+// (a reply to one's own message is no target at all). Ranks are a person's, so the refusal says to reply to
+// the person's own message.
+func unrankable(reply *telegram.Message, chatID int64) string {
+	switch {
+	case reply.SenderChat != nil && reply.SenderChat.ID == chatID:
+		return "⛔ Bu xabar guruh nomidan (anonim admin) yozilgan: unga daraja berib bo'lmaydi."
+	case reply.SenderChat != nil:
+		return "⛔ Bu xabar kanal nomidan yozilgan: kanalga daraja berib bo'lmaydi. Odamning o'z nomidan yozgan xabariga reply qiling."
+	case reply.From == nil || reply.From.IsBot:
+		return "⛔ Botga daraja berib bo'lmaydi."
+	}
+	return ""
+}
+
 // myRank says the asker's rank, or that they have none and how one is
 // given.
 func (s *Service) myRank(ctx context.Context, in incoming) outcome {
@@ -245,7 +261,11 @@ func (s *Service) myRank(ctx context.Context, in incoming) outcome {
 // may ask.
 func (s *Service) theirRank(ctx context.Context, in incoming) outcome {
 	asked, _ := s.withModTarget(in)
-	target := asked.msg.ReplyToMessage.From
+	reply := asked.msg.ReplyToMessage
+	if refusal := unrankable(reply, in.scope.ChatID); refusal != "" {
+		return say(refusal)
+	}
+	target := reply.From
 	rank, err := s.memberRank(ctx, in.scope.ChatID, target)
 	if err != nil {
 		return say(textError.to(in))

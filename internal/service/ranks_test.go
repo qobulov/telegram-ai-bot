@@ -302,3 +302,42 @@ func TestRankedMemberGetsTheMenuOnce(t *testing.T) {
 		t.Errorf("menus set = %v, want once, for the moderator", menus.calls)
 	}
 }
+
+// A rank given to a message written as a channel, as an anonymous admin or
+// by a bot is refused saying why, as a member replied /rank 5 to a channel's
+// message in a group and was told only that it could not be done.
+func TestRankRefusesWhoCannotHoldOne(t *testing.T) {
+	const creator = int64(10)
+	for name, c := range map[string]struct {
+		reply func(*telegram.Message)
+		want  string
+	}{
+		"channel": {func(m *telegram.Message) {
+			m.From = &telegram.User{ID: 136817688, IsBot: true, FirstName: "Channel"}
+			m.SenderChat = &telegram.Chat{ID: -1001111, Title: "."}
+		}, "kanal nomidan"},
+		"anonymous admin": {func(m *telegram.Message) {
+			m.From = &telegram.User{ID: 1087968824, IsBot: true, FirstName: "Group"}
+			m.SenderChat = &telegram.Chat{ID: groupID}
+		}, "anonim admin"},
+		"bot": {func(m *telegram.Message) { m.From.IsBot = true }, "Botga"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture()
+			f.members.creator = creator
+			book := &fakeRankBook{ranks: map[int64]int{}, overrides: map[string]int{}}
+			f.opts.Ranks = book
+			update := from(creator, "/rank 5", 14)
+			c.reply(update.Message.ReplyToMessage)
+			sent := f.run(update)
+			if len(sent) == 0 || !strings.Contains(sent[len(sent)-1].text, c.want) || len(book.log) != 0 {
+				t.Errorf("sent %v, log %v; want %q and no rank", sent, book.log, c.want)
+			}
+			bare := from(creator, "/rank", 14)
+			c.reply(bare.Message.ReplyToMessage)
+			if sent := f.run(bare); len(sent) == 0 || !strings.Contains(sent[len(sent)-1].text, c.want) {
+				t.Errorf("bare /rank = %v, want %q", sent, c.want)
+			}
+		})
+	}
+}
