@@ -29,7 +29,7 @@
       giftTo: (name) => `🎁 ${name}ga yuborish`, giftSent: (card, name) => `🎁 ${card} → ${name}`, giftNone: "Bunday o'yinchi topilmadi",
       giftLimit: (n) => `⏳ Kuniga ${n} ta karta berish mumkin. Ertaga yana.`, giftNoPlayer: "Bu o'yinchi hali karta ochmagan", giftGone: "Bu karta endi sizda yo'q", back: "← Orqaga",
       market: "Bozor", newOffer: "➕ Taklif qo'yish", filterAll: "Hammasi", filterCan: "Bera olaman", filterMine: "Mening",
-      gives: "Beradi", wants: "Xohlaydi", swap: "🔄 Almashish", noCard: "Sizda yo'q", remove: "✕ Olib tashlash", marketEmpty: "Hozircha taklif yo'q",
+      gives: "Beradi", wants: "Xohlaydi", swap: "🔄 Almashish", noCard: "Sizda yo'q", remove: "✕ Olib tashlash", yours: "⭐ Sizniki", marketEmpty: "Hozircha taklif yo'q",
       marketHint: (n) => `Kartangizni qo'ying va evaziga kerakli kartani tanlang. Kimda o'sha karta bo'lsa, almashadi. ${n} tagacha taklif, 7 kun turadi.`,
       step1: "1. Qaysi kartangizni berasiz?", step2: "2. Evaziga qaysi kartani xohlaysiz?", mineSearch: "Kartalaringizdan qidiring", wantSearch: "Xohlagan karta nomini yozing",
       place: "Taklif qo'yish", placed: "✅ Taklif bozorga qo'yildi", swapped: (c) => `🔄 Almashildi! Siz ${c} oldingiz`, removed: "Taklif olib tashlandi",
@@ -61,7 +61,7 @@
       giftTo: (name) => `🎁 Отправить: ${name}`, giftSent: (card, name) => `🎁 ${card} → ${name}`, giftNone: "Игрок не найден",
       giftLimit: (n) => `⏳ В день можно отдать ${n} карт. Завтра снова.`, giftNoPlayer: "Этот игрок ещё не открыл ни одной карты", giftGone: "Этой карты у вас уже нет", back: "← Назад",
       market: "Рынок", newOffer: "➕ Выставить", filterAll: "Все", filterCan: "Могу дать", filterMine: "Мои",
-      gives: "Отдаёт", wants: "Хочет", swap: "🔄 Обменять", noCard: "Нет у вас", remove: "✕ Снять", marketEmpty: "Пока предложений нет",
+      gives: "Отдаёт", wants: "Хочет", swap: "🔄 Обменять", noCard: "Нет у вас", remove: "✕ Снять", yours: "⭐ Ваше", marketEmpty: "Пока предложений нет",
       marketHint: (n) => `Выставьте свою карту и выберите, какую хотите взамен. У кого она есть — обменяется. До ${n} предложений, 7 дней.`,
       step1: "1. Какую карту отдаёте?", step2: "2. Какую хотите взамен?", mineSearch: "Поиск по вашим картам", wantSearch: "Название нужной карты",
       place: "Выставить", placed: "✅ Предложение выставлено", swapped: (c) => `🔄 Обмен! Вы получили ${c}`, removed: "Предложение снято",
@@ -93,7 +93,7 @@
       giftTo: (name) => `🎁 Send to ${name}`, giftSent: (card, name) => `🎁 ${card} → ${name}`, giftNone: "No such player",
       giftLimit: (n) => `⏳ You may give ${n} cards a day. Again tomorrow.`, giftNoPlayer: "This player has not opened a card yet", giftGone: "You no longer have this card", back: "← Back",
       market: "Market", newOffer: "➕ Make an offer", filterAll: "All", filterCan: "I can give", filterMine: "Mine",
-      gives: "Gives", wants: "Wants", swap: "🔄 Trade", noCard: "You lack it", remove: "✕ Take down", marketEmpty: "No offers yet",
+      gives: "Gives", wants: "Wants", swap: "🔄 Trade", noCard: "You lack it", remove: "✕ Take down", yours: "⭐ Yours", marketEmpty: "No offers yet",
       marketHint: (n) => `Put up a card and pick the one you want for it. Whoever holds it can trade. Up to ${n} offers, for 7 days.`,
       step1: "1. Which card do you give?", step2: "2. Which card do you want?", mineSearch: "Search your cards", wantSearch: "Name of the card you want",
       place: "Put it up", placed: "✅ Your offer is up", swapped: (c) => `🔄 Traded! You got ${c}`, removed: "Offer taken down",
@@ -842,18 +842,20 @@
     for (const chip of document.querySelectorAll("#marketFilter button")) chip.setAttribute("aria-pressed", String(chip.dataset.f === offerFilter));
     const list = $("offers");
     list.textContent = "";
-    const shown = offers.filter((o) => offerFilter === "all" ? !o.mine : offerFilter === "can" ? o.can && !o.mine : o.mine);
+    // "All" holds the player's own offers too, marked, so one just placed is
+    // seen on the market; "can" is others' the player can take.
+    const shown = offers.filter((o) => offerFilter === "all" ? true : offerFilter === "can" ? o.can && !o.mine : o.mine);
     if (!shown.length) list.innerHTML = `<li class="empty">${t.marketEmpty}</li>`;
     for (const o of shown) {
       const li = document.createElement("li");
-      li.className = "offer";
+      li.className = o.mine ? "offer mine" : "offer";
       li.innerHTML = '<div class="offer-cards"><div class="side"><em></em></div><span class="arrow" aria-hidden="true">⇄</span><div class="side"><em></em></div></div><div class="offer-foot"><small></small><button type="button"></button></div>';
       const sides = li.querySelectorAll(".side");
       sides[0].querySelector("em").textContent = t.gives;
       sides[0].append(mini(o.give));
       sides[1].querySelector("em").textContent = t.wants;
       sides[1].append(mini(o.want));
-      li.querySelector(".offer-foot small").textContent = o.mine ? "" : o.who || "?";
+      li.querySelector(".offer-foot small").textContent = o.mine ? t.yours : o.who || "?";
       const button = li.querySelector(".offer-foot button");
       if (o.mine) {
         button.className = "ghost";
