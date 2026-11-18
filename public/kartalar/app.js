@@ -136,6 +136,7 @@
     try {
       applyState(await api("state"));
       $("loading").hidden = true;
+      eventBlock();
       // A link may name the tab to open, as the market's old button does; otherwise a
       // newcomer starts at the draw and anyone else at their collection.
       const asked = new URLSearchParams(location.search).get("tab");
@@ -1304,27 +1305,35 @@
       left: (d, h, m) => (d ? `⏳ ${d} kun ${h} soat qoldi` : h ? `⏳ ${h} soat ${m} daqiqa qoldi` : `⏳ ${m} daqiqa qoldi`),
       odds: (m, s) => `👑 Mifik ${m} (×3) · 🌸 Satoko ${s}`, pity: (n, max) => `Satoko kafolati: ${n}/${max}`,
       open: (n, price) => `${n} ta · ${n * price} 🎟`, short: (n) => `🎟 Yana ${n} ta token kerak`, over: "🌸 Event tugadi",
-      pulled: (n) => `🌸 ${n} ta event karta`, got: "🌸 Satoko Kirigaya tushdi!",
+      pulled: (n) => `🌸 ${n} ta event karta`, got: "🌸 Satoko Kirigaya tushdi!", badge: "🌸 EVENT",
     },
     ru: {
       title: "🌸 Firefly Wedding", tag: "ИВЕНТ · LIMITED",
       left: (d, h, m) => (d ? `⏳ Осталось ${d} дн. ${h} ч.` : h ? `⏳ Осталось ${h} ч. ${m} мин.` : `⏳ Осталось ${m} мин.`),
       odds: (m, s) => `👑 Мифическая ${m} (×3) · 🌸 Сатоко ${s}`, pity: (n, max) => `Гарант Сатоко: ${n}/${max}`,
       open: (n, price) => `${n} шт. · ${n * price} 🎟`, short: (n) => `🎟 Нужно ещё ${n} токенов`, over: "🌸 Ивент закончился",
-      pulled: (n) => `🌸 Ивент-карты: ${n}`, got: "🌸 Выпала Сатоко Киригая!",
+      pulled: (n) => `🌸 Ивент-карты: ${n}`, got: "🌸 Выпала Сатоко Киригая!", badge: "🌸 ИВЕНТ",
     },
     en: {
       title: "🌸 Firefly Wedding", tag: "EVENT · LIMITED",
       left: (d, h, m) => (d ? `⏳ ${d} days ${h} hours left` : h ? `⏳ ${h} hours ${m} minutes left` : `⏳ ${m} minutes left`),
       odds: (m, s) => `👑 Mythic ${m} (×3) · 🌸 Satoko ${s}`, pity: (n, max) => `Satoko guarantee: ${n}/${max}`,
       open: (n, price) => `${n} · ${n * price} 🎟`, short: (n) => `🎟 ${n} more tokens needed`, over: "🌸 The event is over",
-      pulled: (n) => `🌸 ${n} event cards`, got: "🌸 Satoko Kirigaya dropped!",
+      pulled: (n) => `🌸 ${n} event cards`, got: "🌸 Satoko Kirigaya dropped!", badge: "🌸 EVENT",
     },
   };
   const et = eventTexts[language] || eventTexts.uz;
   let eventData = null, eventEndsAt = 0, pulling = false;
 
-  // eventBlock asks for the event and shows it while it runs.
+  // eventMark shows the event's badge on the crystals' pill, which opens
+  // the shop, while the event runs, so that players notice it.
+  $("eventBadge").textContent = et.badge;
+  function eventMark() {
+    $("eventBadge").hidden = !(eventData && eventData.active);
+  }
+
+  // eventBlock asks for the event and shows it while it runs; the app asks
+  // once it has loaded, for the badge, and again whenever the shop opens.
   async function eventBlock() {
     try {
       eventData = await api("event");
@@ -1334,6 +1343,7 @@
     }
     eventEndsAt = Date.now() + (eventData.ends_in || 0);
     $("event").hidden = !eventData.active;
+    eventMark();
     if (!eventData.active) return;
     const tile = previewTile(eventData.card, 1);
     const mark = tile.querySelector(".owned");
@@ -1361,7 +1371,7 @@
   function eventLeft() {
     if (!eventData || !eventData.active) return;
     const left = eventEndsAt - Date.now();
-    if (left <= 0) { $("event").hidden = true; eventData.active = false; return; }
+    if (left <= 0) { $("event").hidden = true; eventData.active = false; eventMark(); return; }
     const minutes = Math.floor(left / 60000);
     $("eventEnds").textContent = et.left(Math.floor(minutes / 1440), Math.floor((minutes % 1440) / 60), minutes % 60);
   }
@@ -1380,7 +1390,7 @@
     haptic("medium");
     try {
       const data = await api("event_open", { count: n });
-      if (data.refused === "over") { toast(et.over); $("event").hidden = true; eventData.active = false; return; }
+      if (data.refused === "over") { toast(et.over); $("event").hidden = true; eventData.active = false; eventMark(); return; }
       if (data.refused === "funds") { tokens = data.tokens ?? tokens; toast(et.short(data.short)); return; }
       tokens = data.tokens ?? tokens;
       shards = data.shards ?? shards;

@@ -71,6 +71,17 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
   background: linear-gradient(180deg, #ffe9a0, #e0a630); box-shadow: 0 0 6px rgba(255, 200, 80, 0.5);
 }
 #coinShards.on { border-color: var(--gold); }
+/* While the event runs a small pink and gold tag sits on the pill, beating
+   gently (transform alone; still when less motion is asked for). */
+#coinShards { position: relative; }
+.event-badge {
+  position: absolute; top: -9px; right: 8px; z-index: 2; padding: 1px 6px; border-radius: 999px; pointer-events: none;
+  font: 800 8px/1.5 Unbounded, sans-serif; font-style: normal; letter-spacing: 0.06em; white-space: nowrap; color: #2a0f1c;
+  background: linear-gradient(180deg, #ffd0e4, #ff9ec7 55%, #e8c878); box-shadow: 0 0 0 1px #ffe39a, 0 2px 6px rgba(255, 158, 199, 0.55);
+  animation: event-beat 1.8s ease-in-out infinite;
+}
+.event-badge[hidden] { display: none; }
+@keyframes event-beat { 0%, 70%, 100% { transform: scale(1); } 80% { transform: scale(1.14); } 90% { transform: scale(0.98); } }
 .coin.bump { animation: bump 0.45s ease; }
 @keyframes bump { 40% { transform: scale(1.18); border-color: var(--gold); } }
 .points { display: flex; align-items: center; gap: 5px; padding: 0 4px; font: 700 13px Unbounded, sans-serif; color: var(--gold); }

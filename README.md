@@ -2329,6 +2329,10 @@ tokens are given first, and with too few tokens nothing is pulled
 (`refused: "funds"`, `CardTokensError`). Copies of Satoko are kept. After the
 end the block is hidden and the server refuses (`refused: "over"`,
 `ErrCardEventOver`).
+While it runs, the 💎 pill at the top, which opens the shop, wears a small
+pink and gold "🌸 EVENT" tag ("🌸 ИВЕНТ" in Russian), beating gently, so
+that players notice it: the app asks for the event once it has loaded and
+hides the tag when the event ends.
 
 A limited card comes only from its event: normal draws and crystal packs
 never pick one (`randomCard` leaves out every card of `limitedCards`), and
