@@ -252,7 +252,7 @@
   // with a number under it (a mark, not a count of copies), cherry petals
   // drifting over the picture, fireflies glowing among them and, in the large
   // view, long hair flowing in the wind while the face and body keep still.
-  const SPECIAL = { 298761: { tag: "LIMITED", serial: "No.000001", petals: true, fireflies: true, hair: true } };
+  const SPECIAL = { 298761: { tag: "LIMITED", serial: "No.000001", petals: true, fireflies: true, hair: true, plate: "/kartalar/art/298761p.jpg" } };
 
   // dress adds a special card's mark, petals and fireflies; the large view
   // has more of them.
@@ -272,6 +272,10 @@
       flow.style.backgroundImage = `url("/kartalar/art/cut/${card.id}.webp")`;
       living.classList.add("flowing");
       living.append(flow);
+      // the picture under it without her, so no still hair shows behind
+      // the moving one
+      const base = el.querySelector("img");
+      if (special.plate && base) base.src = special.plate;
     }
     if (special.tag) {
       const mark = document.createElement("div");
