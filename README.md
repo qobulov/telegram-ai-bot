@@ -1325,7 +1325,7 @@ same but `/start` for a group's members; and for its admins also `/mute`,
 `/unmute`, `/ignore` and `/unignore`. `/games` lists every game and
 `/card` to tap, the page games only while `WEBAPP_URL` serves
 them, and the Mini App holds the collection, the table and the shards (a card
-out of turn, a duel's stake and the shop); every command left out of the menu is answered all
+out of turn and the shop); every command left out of the menu is answered all
 the same. In a group the menu adds the bot's username itself. `/ranklog` is in
 no menu, the owner's or a rank's, as the owner asked, and is answered all the
 same. A failure is only logged.
