@@ -2327,6 +2327,48 @@ signed init data names, and a card not held reaches the page as its rarity
 alone. In a group its button links to the private chat (`/start
 kartalar`), as Telegram opens Mini App buttons only there.
 
+The 🌸 Firefly Wedding event, as the owners asked, runs until 2026-12-02
+00:00 Tashkent (`internal/cards/event.go`: `EventCard`, `EventEnds`,
+`EventMythicBoost`, `EventShare`, `EventPity`, `EventPrice`). While it runs
+the shop opens on its block: Satoko Kirigaya's card, the time left, the odds,
+the player's pity ("Satoko kafolati: 37/200") and two buttons, 1 and 10 pulls
+for 1 token each (`event` reads it, `event_open` with `count` pulls). A pull
+rolls the usual rarities with the Mythic twice as likely, the extra
+taken from Common (Mythic 1%, Legendary 2.5%, Epic 9%, Rare 25%, Common
+62.5%); a Mythic is Satoko half the time (0.5%) and any other Mythic
+otherwise, and it opens at 2026-11-18 22:00 Tashkent (started again by the owners; before
+that the shop shows it as coming, with the time to its start, and refuses
+pulls as "soon"); the 200th pull in a row without her gives her (50 at first,
+then 130, 200 since the owners raised it on 2026-11-18, the Mythic odds
+then lowered from three to two times the usual; counters kept), the count
+(`card_players.event_pulls`, migration 95) starting again whenever she drops
+from the event (`OpenEventCards`, one transaction under the player's row
+lock). Pulls count as draws do, in points, cards and `since_*`; the day's
+tokens are given first, and with too few tokens nothing is pulled
+(`refused: "funds"`, `CardTokensError`). Copies of Satoko are kept. After the
+end the block is hidden and the server refuses (`refused: "over"`,
+`ErrCardEventOver`).
+While it runs, the 💎 pill at the top, which opens the shop, wears a small
+pink and gold "🌸 EVENT" tag ("🌸 ИВЕНТ" in Russian), beating gently, so
+that players notice it: the app asks for the event once it has loaded and
+hides the tag when the event ends.
+
+A limited card comes only from its event: normal draws and crystal packs
+never pick one (`randomCard` leaves out every card of `limitedCards`), and
+event pulls give Satoko as above.
+
+Every card drawn, by a draw, a pack or an event pull, is counted in
+`card_catalog.drawn` (migration 96, filled from the copies held then), which
+only grows, and the draw carries `serial`, which copy of that card in the
+whole game it is (`CardDraw.Serial`, counted in `addCard` in the draw's
+transaction). When a draw holds a Mythic, the app celebrates it on the whole
+screen before the usual reveal: gold rays turning, 36 pieces of gold
+confetti (cherry petals among them for Satoko), the card rising, "🎉
+TABRIKLAYMIZ! MIFIK KARTA!", its name and its number ("No.000123", "o'yindagi
+123-nusxa"), with a success and a heavy haptic; a tap or "Davom etish" closes
+it, and several Mythics in one batch are celebrated in turn. With less
+motion asked for, the rays and confetti are left out.
+
 "Karta ochish vaqti kelganda eslat" has Maria remind the player when their
 next card may be opened, and "har safar eslat" after every card; see
 [Reminders](#reminders).

@@ -40,7 +40,7 @@ func (h *handler) buy(ctx context.Context, user miniapp.User, id string) (any, f
 	}
 	drawn := make([]map[string]any, len(after.Draws))
 	for i, d := range after.Draws {
-		drawn[i] = map[string]any{"card": h.held(d.Card, d.Count), "new": d.New}
+		drawn[i] = map[string]any{"card": h.held(d.Card, d.Count), "new": d.New, "serial": d.Serial}
 	}
 	return map[string]any{"drawn": drawn, "points": after.Points, "tokens": after.Tokens, "shards": after.Shards}, failure{}
 }

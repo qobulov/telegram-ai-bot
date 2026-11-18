@@ -71,6 +71,17 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
   background: linear-gradient(180deg, #ffe9a0, #e0a630); box-shadow: 0 0 6px rgba(255, 200, 80, 0.5);
 }
 #coinShards.on { border-color: var(--gold); }
+/* While the event runs a small pink and gold tag sits on the pill, beating
+   gently (transform alone; still when less motion is asked for). */
+#coinShards { position: relative; }
+.event-badge {
+  position: absolute; top: -9px; right: 8px; z-index: 2; padding: 1px 6px; border-radius: 999px; pointer-events: none;
+  font: 800 8px/1.5 Unbounded, sans-serif; font-style: normal; letter-spacing: 0.06em; white-space: nowrap; color: #2a0f1c;
+  background: linear-gradient(180deg, #ffd0e4, #ff9ec7 55%, #e8c878); box-shadow: 0 0 0 1px #ffe39a, 0 2px 6px rgba(255, 158, 199, 0.55);
+  animation: event-beat 1.8s ease-in-out infinite;
+}
+.event-badge[hidden] { display: none; }
+@keyframes event-beat { 0%, 70%, 100% { transform: scale(1); } 80% { transform: scale(1.14); } 90% { transform: scale(0.98); } }
 .coin.bump { animation: bump 0.45s ease; }
 @keyframes bump { 40% { transform: scale(1.18); border-color: var(--gold); } }
 .points { display: flex; align-items: center; gap: 5px; padding: 0 4px; font: 700 13px Unbounded, sans-serif; color: var(--gold); }
@@ -615,3 +626,94 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .fuse .fuse-do { width: 100%; }
 .fuse small { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; }
 .sheet-card.giving > .fuse { display: none; }
+
+/* ---------- event ---------- */
+/* The Firefly Wedding event sits at the top of the shop while it runs. */
+.event {
+  --sakura: #ff9ec7;
+  display: grid; grid-template-columns: 104px 1fr; gap: 12px 14px; align-items: center; padding: 14px; border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--sakura) 50%, transparent);
+  background: radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--sakura) 26%, transparent), transparent 60%),
+    linear-gradient(160deg, color-mix(in srgb, var(--r4) 14%, var(--panel)), var(--panel));
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--sakura) 18%, transparent);
+}
+.event[hidden] { display: none; }
+.event-art .card { width: 100%; }
+.event-info { display: grid; gap: 4px; min-width: 0; }
+.event-tag { justify-self: start; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--sakura) 22%, transparent); color: var(--sakura); font: 700 10px Unbounded, sans-serif; letter-spacing: 0.08em; }
+.event-title { margin: 0; font: 700 17px Unbounded, sans-serif; color: var(--text); }
+.event-ends { margin: 0; color: var(--gold); font: 700 13px Manrope, sans-serif; }
+.event-odds { margin: 0; color: var(--muted); font-size: 12px; }
+.event-pity { display: grid; gap: 4px; margin-top: 2px; font: 700 12px Manrope, sans-serif; color: var(--text); }
+.event-pity .progress { width: 100%; margin: 0; }
+.event-pity .progress i { background: linear-gradient(90deg, var(--sakura), var(--r4)); }
+.event-buttons { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.event-buttons .draw { width: 100%; min-height: 48px; font-size: 14px; }
+
+/* A Mythic's celebration: the whole screen, above the sheet and the toast.
+   Only transforms and opacity move; the rays are one gradient turned whole,
+   the confetti 36 small pieces, no filter over a large area. */
+.celebrate {
+  position: fixed; inset: 0; z-index: 30; overflow: hidden; display: grid; place-items: center;
+  padding: 24px 16px calc(24px + env(safe-area-inset-bottom)); background: rgba(5, 4, 10, 0.88);
+  animation: cel-in 0.3s ease both;
+}
+.celebrate.leaving { animation: cel-out 0.22s ease both; }
+.cel-rays {
+  position: absolute; left: 50%; top: 42%; width: 170vmax; height: 170vmax; margin: -85vmax 0 0 -85vmax;
+  pointer-events: none; opacity: 0.55; will-change: transform;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 214, 110, 0.34) 0deg 7deg, transparent 7deg 22deg);
+  animation: cel-turn 18s linear infinite;
+}
+.cel-glow {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(circle at 50% 42%, rgba(255, 226, 140, 0.55) 0, rgba(255, 190, 70, 0.22) 22%, rgba(5, 4, 10, 0) 48%, rgba(5, 4, 10, 0.9) 78%);
+  animation: cel-pulse 2.4s ease-in-out infinite;
+}
+.cel-confetti { position: absolute; inset: 0; pointer-events: none; }
+.cel-confetti i {
+  position: absolute; top: -16px; width: 8px; height: 12px; border-radius: 2px; opacity: 0; will-change: transform, opacity;
+  background: #ffd25a; animation: cel-fall 3.2s linear infinite;
+}
+.cel-confetti i.pale { background: #fff2c0; width: 6px; height: 6px; border-radius: 50%; }
+.cel-confetti i.deep { background: #c8922e; width: 10px; height: 6px; }
+.cel-confetti i.petal { background: #ff9ec7; width: 11px; height: 8px; border-radius: 80% 0 80% 0; }
+.cel-body {
+  position: relative; display: grid; justify-items: center; gap: 10px; width: 100%; max-width: 340px; text-align: center;
+}
+.cel-title {
+  margin: 0; font: 900 19px/1.25 Unbounded, sans-serif; letter-spacing: 0.02em; color: #ffe39a;
+  text-shadow: 0 2px 0 #2a1a04, 0 0 18px rgba(255, 200, 80, 0.6);
+  animation: cel-pop 0.6s cubic-bezier(.2, 1.4, .4, 1) 0.15s both;
+}
+.cel-card { position: relative; width: min(58vw, 220px); pointer-events: none; animation: cel-rise 0.9s cubic-bezier(.2, .9, .25, 1) 0.1s both; }
+.cel-card::before {
+  content: ""; position: absolute; inset: -18%; border-radius: 50%; z-index: -1;
+  background: radial-gradient(circle, rgba(255, 214, 110, 0.75), rgba(255, 190, 70, 0) 68%);
+  animation: cel-pulse 1.8s ease-in-out infinite;
+}
+.cel-card .card { display: block; width: 100%; cursor: default; }
+.cel-name { font: 800 18px/1.2 Manrope, sans-serif; color: var(--text); animation: cel-pop 0.5s ease 0.5s both; }
+.cel-serial { display: grid; justify-items: center; gap: 2px; animation: cel-pop 0.5s ease 0.65s both; }
+.cel-serial[hidden] { display: none; }
+.cel-no {
+  transform: skewX(-14deg); font: italic 900 24px/1.15 Unbounded, sans-serif; letter-spacing: 0.04em; color: #ffe7a0;
+  text-shadow: 0 1px 0 #2a1a04, 0 2px 4px rgba(0, 0, 0, 0.85), 0 0 10px rgba(255, 200, 80, 0.6);
+}
+.cel-serial small { color: var(--muted); font: 600 13px Manrope, sans-serif; }
+.cel-ok { margin-top: 6px; animation: cel-pop 0.4s ease 0.8s both; }
+@keyframes cel-in { from { opacity: 0; } }
+@keyframes cel-out { to { opacity: 0; } }
+@keyframes cel-turn { to { transform: rotate(360deg); } }
+@keyframes cel-pulse { 50% { opacity: 0.6; } }
+@keyframes cel-pop { from { opacity: 0; transform: scale(0.7); } }
+@keyframes cel-rise { from { opacity: 0; transform: translateY(90px) scale(0.7); } 70% { transform: translateY(-6px) scale(1.03); } }
+@keyframes cel-fall {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg); }
+  8% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(var(--dx), 105vh, 0) rotate(var(--r)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cel-rays, .cel-confetti { display: none; }
+}

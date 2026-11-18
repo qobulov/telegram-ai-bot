@@ -40,6 +40,9 @@ type CardDraw struct {
 	SinceMythic    int
 	// Shards are the player's 💎 shards after it.
 	Shards int
+	// Serial is which copy of the card in the whole game this one is: the
+	// copies of it ever drawn, this one with them.
+	Serial int
 }
 
 // CardRoll picks a draw's rarity from the player's draws in a row since
@@ -178,19 +181,37 @@ func lockCardPlayer(ctx context.Context, tx pgx.Tx, userID int64, name string) (
 }
 
 // giveCard gives the player a card of the rarity roll picks, at random, of
-// collection or of any when it is "", and counts it in their wait for a
-// rare card, and in their points and cards when it is new to them: a copy
-// of a card held adds no points.
+// collection or of any when it is "", and counts it as addCard does.
 func giveCard(ctx context.Context, tx pgx.Tx, userID int64, name, collection string, roll CardRoll, player cardPlayerRow) (CardDraw, error) {
-	var draw CardDraw
 	rarity, guaranteed := roll(player.sinceLegendary, player.sinceMythic)
-	draw.Guaranteed = guaranteed
-	c := &draw.Card
+	card, err := randomCard(ctx, tx, rarity, collection, 0)
+	if err != nil {
+		return CardDraw{Guaranteed: guaranteed}, err
+	}
+	return addCard(ctx, tx, userID, name, card, guaranteed)
+}
+
+// randomCard is a card of rarity at random, of collection or of any when it
+// is "", and never the card but nor a limited card, which only its event
+// gives.
+func randomCard(ctx context.Context, tx pgx.Tx, rarity int, collection string, but int64) (Card, error) {
+	var c Card
 	err := tx.QueryRow(ctx, `
 		SELECT id, name, anime, image_url, favourites, rarity, attack, health, value, collection
-		FROM card_catalog WHERE rarity = $1 AND ($2 = '' OR collection = $2) ORDER BY random() LIMIT 1`, rarity, collection).
+		FROM card_catalog WHERE rarity = $1 AND ($2 = '' OR collection = $2) AND id <> $3 AND id <> ALL($4)
+		ORDER BY random() LIMIT 1`, rarity, collection, but, limitedCardIDs()).
 		Scan(&c.ID, &c.Name, &c.Anime, &c.ImageURL, &c.Favourites, &c.Rarity, &c.Attack, &c.Health, &c.Value, &c.Collection)
-	if err != nil {
+	return c, err
+}
+
+// addCard gives the player card and counts it in their wait for a rare
+// card, and in their points and cards when it is new to them: a copy of a
+// card held adds no points. It counts the copy in the card's copies ever
+// drawn, the draw's Serial.
+func addCard(ctx context.Context, tx pgx.Tx, userID int64, name string, card Card, guaranteed bool) (CardDraw, error) {
+	draw := CardDraw{Card: card, Guaranteed: guaranteed}
+	c := &draw.Card
+	if err := tx.QueryRow(ctx, `UPDATE card_catalog SET drawn = drawn + 1 WHERE id = $1 RETURNING drawn`, c.ID).Scan(&draw.Serial); err != nil {
 		return draw, err
 	}
 	if err := tx.QueryRow(ctx, `
@@ -204,7 +225,7 @@ func giveCard(ctx context.Context, tx pgx.Tx, userID int64, name, collection str
 	if draw.New {
 		newCard, gained = 1, c.Value
 	}
-	err = tx.QueryRow(ctx, `
+	err := tx.QueryRow(ctx, `
 		UPDATE card_players SET name = coalesce(nullif($4, ''), name), points = points + $2,
 			cards = cards + $3, draws = draws + 1,
 			since_legendary = CASE WHEN $5 THEN 0 ELSE since_legendary + 1 END,

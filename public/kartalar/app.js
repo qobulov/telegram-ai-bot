@@ -145,6 +145,7 @@
     try {
       applyState(await api("state"));
       $("loading").hidden = true;
+      eventBlock();
       // A link may name the tab to open, as the market's old button does; otherwise a
       // newcomer starts at the draw and anyone else at their collection.
       const asked = new URLSearchParams(location.search).get("tab");
@@ -631,9 +632,10 @@
         return;
       }
       if (data.given) toast(t.given(data.given));
-      const drawn = data.drawn.map((d) => ({ card: d.card, fresh: d.new }));
+      const drawn = data.drawn.map((d) => ({ card: d.card, fresh: d.new, serial: d.serial }));
       for (const { card } of drawn) keep(card);
       points = data.points;
+      await celebrateMythics(drawn);
       // A batch is laid out on its own; the deck stays face down.
       if (drawn.length > 1) {
         flip.classList.remove("shuffle");
@@ -708,6 +710,79 @@
     done.textContent = t.carryOn;
     done.addEventListener("click", closeSheet);
     showPanel(panel);
+  }
+
+  // ---------- a Mythic's celebration ----------
+
+  // celebrate shows a Mythic just drawn on the whole screen before the
+  // draw's usual reveal: light turning behind it, gold confetti (and cherry
+  // petals for a card dressed with them), the card rising, and which copy of
+  // it in the whole game this is. A tap or the button closes it. Only
+  // transforms and opacity move, so that weak phones keep up; with less
+  // motion asked for, the card and the words stand still.
+  const celebrateTexts = {
+    uz: { title: "🎉 TABRIKLAYMIZ! MIFIK KARTA!", copy: (n) => `o'yindagi ${n}-nusxa` },
+    ru: { title: "🎉 ПОЗДРАВЛЯЕМ! МИФИЧЕСКАЯ КАРТА!", copy: (n) => `${n}-й экземпляр в игре` },
+    en: { title: "🎉 CONGRATULATIONS! MYTHIC CARD!", copy: (n) => `copy #${n} in the game` },
+  };
+  const ct = celebrateTexts[language] || celebrateTexts.uz;
+  const serialMark = (n) => "No." + String(n).padStart(6, "0");
+  const CONFETTI = 36;
+
+  function celebrate(card, serial) {
+    return new Promise((resolve) => {
+      const petals = Boolean(SPECIAL[card.id] && SPECIAL[card.id].petals);
+      const box = document.createElement("div");
+      box.className = "celebrate";
+      box.setAttribute("role", "dialog");
+      box.setAttribute("aria-label", ct.title);
+      let bits = "";
+      for (let i = 0; i < CONFETTI; i++) {
+        const kind = petals && i % 3 === 0 ? "petal" : ["gold", "pale", "deep"][i % 3];
+        const style = `left:${(Math.random() * 100).toFixed(1)}%;--dx:${(Math.random() * 80 - 40).toFixed(0)}px;--r:${(360 + Math.random() * 540).toFixed(0)}deg;animation-delay:${(Math.random() * 1.6).toFixed(2)}s;animation-duration:${(2.6 + Math.random() * 1.8).toFixed(2)}s`;
+        bits += `<i class="${kind}" style="${style}"></i>`;
+      }
+      box.innerHTML = '<div class="cel-rays" aria-hidden="true"></div><div class="cel-glow" aria-hidden="true"></div>' +
+        '<div class="cel-confetti" aria-hidden="true">' + bits + "</div>" +
+        '<div class="cel-body"><p class="cel-title"></p><div class="cel-card"></div><b class="cel-name"></b>' +
+        '<div class="cel-serial"><span class="cel-no"></span><small></small></div>' +
+        '<button type="button" class="draw cel-ok"></button></div>';
+      box.querySelector(".cel-title").textContent = ct.title;
+      box.querySelector(".cel-name").textContent = card.name;
+      if (serial > 0) {
+        box.querySelector(".cel-no").textContent = serialMark(serial);
+        box.querySelector(".cel-serial small").textContent = ct.copy(serial);
+      } else {
+        box.querySelector(".cel-serial").hidden = true;
+      }
+      const tile = cardTile(card);
+      tile.tabIndex = -1;
+      for (const extra of tile.querySelectorAll(".count, .lmark .serial, .name")) extra.remove();
+      box.querySelector(".cel-card").append(tile);
+      const ok = box.querySelector(".cel-ok");
+      ok.textContent = t.carryOn;
+      // A tap that came with the draw itself is not taken for a close.
+      const shownAt = Date.now();
+      let closed = false;
+      box.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (closed || (e.target !== ok && Date.now() - shownAt < 700)) return;
+        closed = true;
+        box.classList.add("leaving");
+        setTimeout(() => { box.remove(); resolve(); }, 220);
+      });
+      document.body.append(box);
+      ok.focus({ preventScroll: true });
+      try {
+        tg.HapticFeedback.notificationOccurred("success");
+        setTimeout(() => { try { tg.HapticFeedback.impactOccurred("heavy"); } catch (_) { /* outside Telegram */ } }, 180);
+      } catch (_) { /* outside Telegram */ }
+    });
+  }
+
+  // celebrateMythics celebrates each Mythic of a draw in turn.
+  async function celebrateMythics(drawn) {
+    for (const d of drawn) if (d.card.rarity === 4) await celebrate(d.card, d.serial);
   }
 
   // The deck itself is pressed as often as the button: it draws too.
@@ -1132,6 +1207,7 @@
 
   // shop lists the crystals sold for Stars and what crystals buy.
   async function shop() {
+    eventBlock();
     $("shopWallet").textContent = t.wallet(spaced(shards));
     try {
       shopData = shopData || await api("shop");
@@ -1188,11 +1264,12 @@
       if (item.tokens) {
         toast(t.bought(item.tokens));
       } else {
-        const drawn = data.drawn.map((d) => ({ card: d.card, fresh: d.new }));
+        const drawn = data.drawn.map((d) => ({ card: d.card, fresh: d.new, serial: d.serial }));
         for (const { card } of drawn) keep(card);
         points = data.points ?? points;
         header();
         shelves();
+        await celebrateMythics(drawn);
         openedPanel(drawn, t.packOpened(t.rarities[item.least || 0]));
       }
     } catch (error) {
@@ -1237,6 +1314,144 @@
       } catch (_) { /* asked again below */ }
       if (tries < 8) awaitCrystals(before, crystals, tries + 1);
     }, 1500);
+  }
+
+  // ---------- event ----------
+
+  // The Firefly Wedding event: pulls for tokens at the top of the shop,
+  // with twice the Mythic odds, half of them Satoko, the 200th pull
+  // without her sure to give her. The server says whether it runs.
+  const eventTexts = {
+    uz: {
+      title: "🌸 Firefly Wedding", tag: "EVENT · LIMITED",
+      left: (d, h, m) => (d ? `⏳ ${d} kun ${h} soat qoldi` : h ? `⏳ ${h} soat ${m} daqiqa qoldi` : `⏳ ${m} daqiqa qoldi`),
+      odds: (m, s) => `👑 Mifik ${m} (×2) · 🌸 Satoko ${s}`, pity: (n, max) => `Satoko kafolati: ${n}/${max}`,
+      open: (n, price) => `${n} ta · ${n * price} 🎟`, short: (n) => `🎟 Yana ${n} ta token kerak`, over: "🌸 Event tugadi", starts: (h, m) => (h ? `⏳ ${h} soat ${m} daqiqadan keyin boshlanadi` : `⏳ ${m} daqiqadan keyin boshlanadi`), soon: "🌸 Event hali boshlanmadi",
+      pulled: (n) => `🌸 ${n} ta event karta`, got: "🌸 Satoko Kirigaya tushdi!", badge: "🌸 EVENT",
+    },
+    ru: {
+      title: "🌸 Firefly Wedding", tag: "ИВЕНТ · LIMITED",
+      left: (d, h, m) => (d ? `⏳ Осталось ${d} дн. ${h} ч.` : h ? `⏳ Осталось ${h} ч. ${m} мин.` : `⏳ Осталось ${m} мин.`),
+      odds: (m, s) => `👑 Мифическая ${m} (×2) · 🌸 Сатоко ${s}`, pity: (n, max) => `Гарант Сатоко: ${n}/${max}`,
+      open: (n, price) => `${n} шт. · ${n * price} 🎟`, short: (n) => `🎟 Нужно ещё ${n} токенов`, over: "🌸 Ивент закончился", starts: (h, m) => (h ? `⏳ Начнётся через ${h} ч. ${m} мин.` : `⏳ Начнётся через ${m} мин.`), soon: "🌸 Ивент ещё не начался",
+      pulled: (n) => `🌸 Ивент-карты: ${n}`, got: "🌸 Выпала Сатоко Киригая!", badge: "🌸 ИВЕНТ",
+    },
+    en: {
+      title: "🌸 Firefly Wedding", tag: "EVENT · LIMITED",
+      left: (d, h, m) => (d ? `⏳ ${d} days ${h} hours left` : h ? `⏳ ${h} hours ${m} minutes left` : `⏳ ${m} minutes left`),
+      odds: (m, s) => `👑 Mythic ${m} (×2) · 🌸 Satoko ${s}`, pity: (n, max) => `Satoko guarantee: ${n}/${max}`,
+      open: (n, price) => `${n} · ${n * price} 🎟`, short: (n) => `🎟 ${n} more tokens needed`, over: "🌸 The event is over", starts: (h, m) => (h ? `⏳ Starts in ${h} hours ${m} minutes` : `⏳ Starts in ${m} minutes`), soon: "🌸 The event has not started yet",
+      pulled: (n) => `🌸 ${n} event cards`, got: "🌸 Satoko Kirigaya dropped!", badge: "🌸 EVENT",
+    },
+  };
+  const et = eventTexts[language] || eventTexts.uz;
+  let eventData = null, eventEndsAt = 0, eventStartsAt = 0, pulling = false;
+
+  // eventMark shows the event's badge on the crystals' pill, which opens
+  // the shop, while the event runs, so that players notice it.
+  $("eventBadge").textContent = et.badge;
+  function eventMark() {
+    $("eventBadge").hidden = !(eventData && (eventData.active || eventData.soon));
+  }
+
+  // eventBlock asks for the event and shows it while it runs; the app asks
+  // once it has loaded, for the badge, and again whenever the shop opens.
+  async function eventBlock() {
+    try {
+      eventData = await api("event");
+    } catch (_) {
+      $("event").hidden = true;
+      return;
+    }
+    eventEndsAt = Date.now() + (eventData.ends_in || 0);
+    eventStartsAt = Date.now() + (eventData.starts_in || 0);
+    $("event").hidden = !(eventData.active || eventData.soon);
+    eventMark();
+    if (!eventData.active && !eventData.soon) return;
+    const tile = previewTile(eventData.card, 1);
+    const mark = tile.querySelector(".owned");
+    if (mark) mark.remove();
+    $("eventArt").replaceChildren(tile);
+    $("eventTag").textContent = et.tag;
+    $("eventTitle").textContent = et.title;
+    const percent = (n) => `${n / 10}%`;
+    const mythic = eventData.odds[4];
+    $("eventOdds").textContent = et.odds(percent(mythic), percent(mythic * eventData.share));
+    eventPity();
+    eventLeft();
+  }
+
+  function eventPity() {
+    $("eventPity").textContent = et.pity(eventData.pity, eventData.pity_max);
+    $("eventPityBar").style.width = `${Math.min(100, (eventData.pity / eventData.pity_max) * 100)}%`;
+    for (const [id, n] of [["eventOpen1", 1], ["eventOpen10", eventData.batch]]) {
+      $(id).textContent = et.open(n, eventData.price);
+      $(id).disabled = pulling || !eventData.active;
+    }
+  }
+
+  // eventLeft counts down to the event's end, and hides it then.
+  function eventLeft() {
+    if (!eventData) return;
+    if (eventData.soon) {
+      const wait = eventStartsAt - Date.now();
+      if (wait <= 0) { eventBlock(); return; }
+      const m = Math.ceil(wait / 60000);
+      $("eventEnds").textContent = et.starts(Math.floor(m / 60), m % 60);
+      return;
+    }
+    if (!eventData.active) return;
+    const left = eventEndsAt - Date.now();
+    if (left <= 0) { $("event").hidden = true; eventData.active = false; eventMark(); return; }
+    const minutes = Math.floor(left / 60000);
+    $("eventEnds").textContent = et.left(Math.floor(minutes / 1440), Math.floor((minutes % 1440) / 60), minutes % 60);
+  }
+  setInterval(eventLeft, 30000);
+
+  $("eventOpen1").addEventListener("click", () => eventPull(1));
+  $("eventOpen10").addEventListener("click", () => eventPull(eventData ? eventData.batch : 10));
+
+  // eventPull pulls n event cards for tokens, one shown large as a card
+  // opened is, more laid out as a batch is.
+  async function eventPull(n) {
+    if (pulling || !eventData || !eventData.active) return;
+    if (tokens < n * eventData.price) { toast(et.short(n * eventData.price - tokens)); return; }
+    pulling = true;
+    eventPity();
+    haptic("medium");
+    try {
+      const data = await api("event_open", { count: n });
+      if (data.refused === "soon") { toast(et.soon); return; }
+      if (data.refused === "over") { toast(et.over); $("event").hidden = true; eventData.active = false; eventMark(); return; }
+      if (data.refused === "funds") { tokens = data.tokens ?? tokens; toast(et.short(data.short)); return; }
+      tokens = data.tokens ?? tokens;
+      shards = data.shards ?? shards;
+      points = data.points ?? points;
+      eventData.pity = data.pity;
+      if (data.given) toast(t.given(data.given));
+      const drawn = data.drawn.map((d) => ({ card: d.card, fresh: d.new, serial: d.serial }));
+      for (const { card } of drawn) keep(card);
+      header();
+      shelves();
+      await celebrateMythics(drawn);
+      if (drawn.length > 1) {
+        openedPanel(drawn, et.pulled(drawn.length));
+      } else {
+        const { card, fresh } = drawn[0];
+        open(card);
+        const note = document.createElement("p");
+        note.className = "result";
+        note.replaceChildren(...withTiers(fresh ? `${t.fresh} · ${t.plus(spaced(card.value))}` : `${t.again(card.count)} · ${t.noPoints}`));
+        $("sheetCard").prepend(note);
+      }
+      if (drawn.some((d) => d.card.id === eventData.card.id)) { haptic("heavy"); toast(et.got); }
+    } catch (error) {
+      notice(error);
+    } finally {
+      pulling = false;
+      eventPity();
+      drawButton();
+    }
   }
 
   // ---------- tabs ----------
