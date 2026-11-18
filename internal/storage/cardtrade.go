@@ -19,9 +19,9 @@ var (
 	// ErrCardTradeOver is a trade already done, called off, too old, or
 	// offered to another player.
 	ErrCardTradeOver = errors.New("storage: card trade over")
-	// ErrCardLastCopy is a gift of a card the giver holds no spare copy of:
-	// a gift is of spares alone.
-	ErrCardLastCopy = errors.New("storage: no spare copy to give")
+	// ErrCardFused is the last free copy of a card raised above ★1 offered
+	// or traded: its stars stay with its holder.
+	ErrCardFused = errors.New("storage: last copy of a fused card")
 	// ErrCardOfferGone is an offer on the market whose player no longer
 	// holds the card offered; it is called off.
 	ErrCardOfferGone = errors.New("storage: card offer gone")
@@ -158,26 +158,28 @@ func checkFair(ctx context.Context, tx pgx.Tx, trade CardTrade) error {
 
 // moveCard moves one copy of the card, not melted, from one player to the
 // other: the giver loses its points only with their last copy, and the
-// other gains them only when it is new to them. A player giving their last copy not melted no
-// longer holds the card; the used-up ones are gone with it.
-// spareOnly refuses that last copy, ErrCardLastCopy. A limited card never
-// moves, ErrCardLimited: every gift and trade comes this way.
-func moveCard(ctx context.Context, tx pgx.Tx, from, to, cardID int64, spareOnly bool) error {
+// other gains them only when it is new to them. A player giving their last
+// copy not melted no longer holds the card; the used-up ones are gone with
+// it. A card raised above ★1 keeps its stars with its holder, so its last
+// copy never moves, ErrCardFused, and the copy received is the other's own
+// stars; a limited card never moves, ErrCardLimited: every trade comes this
+// way.
+func moveCard(ctx context.Context, tx pgx.Tx, from, to, cardID int64) error {
 	if CardLimited(cardID) {
 		return ErrCardLimited
 	}
-	var count, melted, value int
+	var count, melted, stars, value int
 	err := tx.QueryRow(ctx, `
-		SELECT o.count, o.melted, c.value FROM card_owned o JOIN card_catalog c ON c.id = o.card_id
-		WHERE o.user_id = $1 AND o.card_id = $2 FOR UPDATE OF o`, from, cardID).Scan(&count, &melted, &value)
+		SELECT o.count, o.melted, o.stars, c.value FROM card_owned o JOIN card_catalog c ON c.id = o.card_id
+		WHERE o.user_id = $1 AND o.card_id = $2 FOR UPDATE OF o`, from, cardID).Scan(&count, &melted, &stars, &value)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrCardNotHeld
 	}
 	if err != nil {
 		return err
 	}
-	if spareOnly && count-melted < 2 {
-		return ErrCardLastCopy
+	if stars > 1 && count-melted < 2 {
+		return ErrCardFused
 	}
 	lost := 0
 	if count-melted <= 1 {
@@ -227,7 +229,7 @@ func tradeError(what string, err error) error {
 	var offers *CardOffersError
 	switch {
 	case err == nil, errors.Is(err, ErrCardNotHeld), errors.Is(err, ErrCardNoPlayer), errors.Is(err, ErrCardTradeOver),
-		errors.Is(err, ErrCardLastCopy), errors.Is(err, ErrCardOfferGone), errors.Is(err, ErrCardOfferOwn),
+		errors.Is(err, ErrCardFused), errors.Is(err, ErrCardOfferGone), errors.Is(err, ErrCardOfferOwn),
 		errors.Is(err, ErrCardTradeUneven), errors.Is(err, ErrCardLimited),
 		errors.As(err, &offers):
 		return err

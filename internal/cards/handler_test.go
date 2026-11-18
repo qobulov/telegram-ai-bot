@@ -50,6 +50,8 @@ type fakeStore struct {
 	takeErr  error
 	offerErr error
 	pages    []storage.CatalogPage // the catalog pages asked for
+	stars    int                   // the held card's stars; 0 is ★1
+	fuseErr  error
 }
 
 var (
@@ -65,7 +67,17 @@ func (f *fakeStore) CardCatalog(context.Context) ([]storage.Card, error) {
 	return []storage.Card{heldCard, lockedCard}, nil
 }
 func (f *fakeStore) OwnedCards(context.Context, int64, int) ([]storage.OwnedCard, error) {
-	return []storage.OwnedCard{{Card: heldCard, Count: 2}}, nil
+	return []storage.OwnedCard{{Card: heldCard, Count: 2, Stars: max(f.stars, 1)}}, nil
+}
+func (f *fakeStore) FuseCard(_ context.Context, _, cardID int64, cost []int) (int, error) {
+	if f.fuseErr != nil {
+		return 0, f.fuseErr
+	}
+	if cardID != heldCard.ID {
+		return 0, storage.ErrCardNotHeld
+	}
+	f.stars = max(f.stars, 1) + 1
+	return f.stars, nil
 }
 func (f *fakeStore) CardPlayerOf(context.Context, int64) (storage.CardPlayer, time.Time, error) {
 	return storage.CardPlayer{Points: 10000, Cards: 1, FreeDay: f.day, Tokens: f.tokens}, time.Time{}, nil
@@ -396,5 +408,54 @@ func TestTheAppKnowsLimitedCards(t *testing.T) {
 	}
 	if v := h.held(heldCard, 1); v.Limited {
 		t.Errorf("Gojo = %+v", v)
+	}
+}
+
+// A card held shows its stars, its free copies, what the next star costs
+// and its numbers then; "fuse" raises it and gives the state, or says why
+// not.
+func TestTheAppFuses(t *testing.T) {
+	now := time.Now()
+	store := &fakeStore{day: PeriodStart(now)}
+	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }})
+	call := func(fields map[string]any) (int, map[string]any) {
+		fields["init_data"] = signedInit(7, now)
+		body, _ := json.Marshal(fields)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/cards", strings.NewReader(string(body))))
+		var out map[string]any
+		_ = json.Unmarshal(rec.Body.Bytes(), &out)
+		return rec.Code, out
+	}
+	gojo := func(out map[string]any) map[string]any {
+		views, _ := out["cards"].([]any)
+		if len(views) == 0 {
+			t.Fatalf("no cards in %v", out)
+		}
+		return views[0].(map[string]any)
+	}
+	_, out := call(map[string]any{"action": "state"})
+	if g := gojo(out); g["stars"] != 1.0 || g["free"] != 1.0 || g["fuse"] != 1.0 || g["attack"] != 5000.0 || g["next_attack"] != 6000.0 || g["next_health"] != 21600.0 {
+		t.Errorf("Gojo at ★1 = %v", g)
+	}
+	code, out := call(map[string]any{"action": "fuse", "card": heldCard.ID})
+	if g := gojo(out); code != http.StatusOK || out["fused"] != 2.0 || g["stars"] != 2.0 || g["attack"] != 6000.0 || g["health"] != 21600.0 {
+		t.Errorf("fused = %d %v", code, out)
+	}
+	if code, _ := call(map[string]any{"action": "fuse"}); code != http.StatusBadRequest {
+		t.Errorf("a fusion of no card = %d", code)
+	}
+	for err, refused := range map[error]string{storage.ErrCardMaxStars: "max", storage.ErrCardFewCopies: "few", storage.ErrCardNotHeld: "not_held"} {
+		store.fuseErr = err
+		if _, out := call(map[string]any{"action": "fuse", "card": heldCard.ID}); out["refused"] != refused {
+			t.Errorf("%v = %v", err, out)
+		}
+	}
+	store.offerErr, store.takeErr = storage.ErrCardFused, storage.ErrCardFused
+	if _, out := call(map[string]any{"action": "offer", "card": 1, "want": 2}); out["refused"] != "fused" {
+		t.Errorf("an offer of a fused last copy = %v", out)
+	}
+	if _, out := call(map[string]any{"action": "take", "offer": 1}); out["refused"] != "fused" {
+		t.Errorf("taking a fused last copy = %v", out)
 	}
 }

@@ -2238,7 +2238,24 @@ points. Spare copies once melted into 💎 crystals in the Mini App's draw tab; 
 owners took melting out (action `melt` answers 400, `TestMeltIsGone`), and the
 crystals players hold stay, for the shop and a card out of turn.
 `card_owned.melted` (migration 63) now counts the copies of a card used up, and
-the copies still held stay counted in the points. The Mini App's draw tab holds the
+the copies still held stay counted in the points.
+Fusion takes melting's place: copies of one character raise it, ★1 to ★5
+(`card_owned.stars`, migration 96). A card's free copies are those beyond the
+one kept and those used up (`count - 1 - melted`); the next star uses up 1, 2,
+3 and 4 of them (`FuseCost` in `internal/cards/fusion.go`, ten from ★1 to
+★5), and the card's attack and health are its own times 1.00, 1.20, 1.45,
+1.70 and 2.00 by its stars, rounded to tens (`StarMultiplier`, `Boosted`).
+The large card's ⭐ button (action `fuse`, `card`; `FuseCard`, one
+transaction with the row locked) says "★2 → ★3 · 2 nusxa" and the numbers
+after, and is disabled at ★5 or with too few copies, saying why; refused,
+`fuse` answers `max`, `few` or `not_held`. The state gives each card held its
+`stars`, `free`, `fuse` (the copies its next star needs) and `next_attack`
+and `next_health`, its `attack` and `health` those of its stars; a tile shows
+★2 and up. The stars stay with their holder: the last copy of a card raised
+above ★1 is not offered, taken or traded (`ErrCardFused`, refusal `fused`,
+"⭐ Yulduzli kartaning oxirgi nusxasini almashib bo'lmaydi", checked in
+`moveCard` and in the offer), and an offer of one is left off the market
+until a free copy comes; a copy received starts at its taker's own stars. The Mini App's draw tab holds the
 crystals, which open cards once the tokens are spent. The bot has no commands
 for them.
 A player's 🎟 tokens (`card_players.tokens`, migration 80) each open one card,
@@ -2287,7 +2304,7 @@ the other their card with its points, and the offer's player is told; an
 offer whose card its player no longer holds is called off when taken, and a
 player takes down their own (`unoffer`). A trade's two cards must be of the same rarity, a Mythic going only for a Mythic, as an offer and as a market take (`ErrCardTradeUneven`, "faqat bir xil darajadagi kartaga almashish mumkin"): one player's cards had gone to another's, Common cards for three Mythic in seven minutes, and later one rarity apart was still allowed. A limited card (`limitedCards` in `internal/storage/cardtrade.go`: Satoko Kirigaya, LIMITED No.000001) never changes hands: it is not offered, wanted or taken (`ErrCardLimited`, checked in `moveCard`, which every take goes through, and in the offer's check), and the page leaves it out of both lists of an offer (`limited` on each card). Offers placed before these rules, of two rarities or of a limited card, are left off the market and refused when taken; they are not changed in the database. The same two players trade as often as they like, and a player trades as many cards a day as they like: the daily limits were taken out. The market's cards show each card's tier; migration 75 called off the open offers the rule forbids. There is no trade command: `/trade`, which offered a card for a member's in
 a group, was taken out, and trades are done on the market alone. A card taken
-from the market may be the last copy, which leaves the collection (its used-up copies
+from the market may be the last copy of a card at ★1, which leaves the collection (its used-up copies
 with it), its points passing only as it is new to its taker. With the pages served, the persona is told the game's facts
 (`cardsNote`), as the model had said it was "not the card bot" and named
 commands there are none of; it teaches `/card` alone. The

@@ -30,7 +30,10 @@
       marketHint: (n) => `Kartangizni qo'ying va evaziga kerakli kartani tanlang. Kimda o'sha karta bo'lsa, almashadi. ${n} tagacha taklif, 7 kun turadi.`,
       step1: "1. Qaysi kartangizni berasiz?", step2: "2. Evaziga qaysi kartani xohlaysiz?", mineSearch: "Kartalaringizdan qidiring", wantSearch: "Xohlagan karta nomini yozing",
       place: "Taklif qo'yish", placed: "✅ Taklif bozorga qo'yildi", swapped: (c) => `🔄 Almashildi! Siz ${c} oldingiz`, removed: "Taklif olib tashlandi",
-      refused: { uneven: "Faqat bir xil darajadagi kartaga almashish mumkin", limited: "🔒 Limited kartani almashib bo'lmaydi", over: "Bu taklif endi yo'q", gone: "Bu taklif endi yo'q", own: "Bu o'zingizning taklifingiz", not_held: "Sizda bu karta yo'q", same: "Bir xil kartani almashib bo'lmaydi" },
+      refused: { uneven: "Faqat bir xil darajadagi kartaga almashish mumkin", limited: "🔒 Limited kartani almashib bo'lmaydi", over: "Bu taklif endi yo'q", gone: "Bu taklif endi yo'q", own: "Bu o'zingizning taklifingiz", not_held: "Sizda bu karta yo'q", same: "Bir xil kartani almashib bo'lmaydi", fused: "⭐ Yulduzli kartaning oxirgi nusxasini almashib bo'lmaydi" },
+      fuse: (a, b, n) => `⭐ ★${a} → ★${b} · ${n} nusxa`, fuseNext: (a, h) => `Keyin: Hujum ${a} · Jon ${h}`, fuseFree: (n) => `Bo'sh nusxa: ${n}`,
+      fuseMax: "⭐ Eng yuqori daraja: ★5", fuseFew: (n) => `Yana ${n} ta nusxa kerak`, fused: (s) => `⭐ Karta ★${s} bo'ldi!`,
+      fuseRefused: { max: "⭐ Karta allaqachon ★5", few: "Nusxalar yetmaydi", not_held: "Sizda bu karta yo'q" },
       offersLimit: (n) => `Bir vaqtda ${n} tagacha taklif qo'yish mumkin`,
       shopTab: "Do'kon", shopBuyTitle: "💎 Kristall sotib olish", shopBuyHint: "Telegram Stars bilan to'lanadi, kristall darhol hisobingizga tushadi.", shopItemsTitle: "🛒 Kristallga xarid",
       wallet: (n) => `Sizda: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% foyda`,
@@ -59,7 +62,10 @@
       marketHint: (n) => `Выставьте свою карту и выберите, какую хотите взамен. У кого она есть — обменяется. До ${n} предложений, 7 дней.`,
       step1: "1. Какую карту отдаёте?", step2: "2. Какую хотите взамен?", mineSearch: "Поиск по вашим картам", wantSearch: "Название нужной карты",
       place: "Выставить", placed: "✅ Предложение выставлено", swapped: (c) => `🔄 Обмен! Вы получили ${c}`, removed: "Предложение снято",
-      refused: { uneven: "Менять можно только на карту той же редкости", limited: "🔒 Лимитированную карту нельзя обменять", over: "Этого предложения уже нет", gone: "Этого предложения уже нет", own: "Это ваше предложение", not_held: "У вас нет этой карты", same: "Нельзя менять карту на ту же" },
+      refused: { uneven: "Менять можно только на карту той же редкости", limited: "🔒 Лимитированную карту нельзя обменять", over: "Этого предложения уже нет", gone: "Этого предложения уже нет", own: "Это ваше предложение", not_held: "У вас нет этой карты", same: "Нельзя менять карту на ту же", fused: "⭐ Последнюю копию звёздной карты нельзя обменять" },
+      fuse: (a, b, n) => `⭐ ★${a} → ★${b} · ${n} коп.`, fuseNext: (a, h) => `Станет: Атака ${a} · Жизнь ${h}`, fuseFree: (n) => `Свободных копий: ${n}`,
+      fuseMax: "⭐ Высший уровень: ★5", fuseFew: (n) => `Нужно ещё копий: ${n}`, fused: (s) => `⭐ Карта стала ★${s}!`,
+      fuseRefused: { max: "⭐ Карта уже ★5", few: "Не хватает копий", not_held: "У вас нет этой карты" },
       offersLimit: (n) => `Одновременно можно выставить до ${n} предложений`,
       shopTab: "Магазин", shopBuyTitle: "💎 Купить кристаллы", shopBuyHint: "Оплата Telegram Stars, кристаллы приходят сразу.", shopItemsTitle: "🛒 За кристаллы",
       wallet: (n) => `У вас: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% выгоды`,
@@ -88,7 +94,10 @@
       marketHint: (n) => `Put up a card and pick the one you want for it. Whoever holds it can trade. Up to ${n} offers, for 7 days.`,
       step1: "1. Which card do you give?", step2: "2. Which card do you want?", mineSearch: "Search your cards", wantSearch: "Name of the card you want",
       place: "Put it up", placed: "✅ Your offer is up", swapped: (c) => `🔄 Traded! You got ${c}`, removed: "Offer taken down",
-      refused: { uneven: "A card may be traded only for one of the same rarity", limited: "🔒 A limited card cannot be traded", over: "This offer is gone", gone: "This offer is gone", own: "This is your own offer", not_held: "You do not have that card", same: "A card cannot be traded for itself" },
+      refused: { uneven: "A card may be traded only for one of the same rarity", limited: "🔒 A limited card cannot be traded", over: "This offer is gone", gone: "This offer is gone", own: "This is your own offer", not_held: "You do not have that card", same: "A card cannot be traded for itself", fused: "⭐ The last copy of a starred card cannot be traded" },
+      fuse: (a, b, n) => `⭐ ★${a} → ★${b} · ${n} ${n === 1 ? "copy" : "copies"}`, fuseNext: (a, h) => `Then: Attack ${a} · Life ${h}`, fuseFree: (n) => `Free copies: ${n}`,
+      fuseMax: "⭐ Top level: ★5", fuseFew: (n) => `${n} more ${n === 1 ? "copy" : "copies"} needed`, fused: (s) => `⭐ The card is now ★${s}!`,
+      fuseRefused: { max: "⭐ The card is already ★5", few: "Not enough copies", not_held: "You do not have that card" },
       offersLimit: (n) => `You may have up to ${n} offers at once`,
       shopTab: "Shop", shopBuyTitle: "💎 Buy crystals", shopBuyHint: "Paid in Telegram Stars; the crystals arrive at once.", shopItemsTitle: "🛒 For crystals",
       wallet: (n) => `You have: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% value`,
@@ -315,6 +324,12 @@
       tile.insertAdjacentHTML("beforeend", MYTHIC_DRESS);
     }
     dress(tile, card, false);
+    if (card.stars > 1) {
+      const stars = document.createElement("span");
+      stars.className = "stars";
+      stars.textContent = `★${card.stars}`;
+      tile.append(stars);
+    }
     if (card.count > 1) {
       const count = document.createElement("span");
       count.className = "count";
@@ -409,6 +424,12 @@
     const anime = document.createElement("small");
     anime.textContent = card.anime;
     plate.append(rarity, name, anime);
+    if (card.stars) {
+      const stars = document.createElement("span");
+      stars.className = "plate-stars";
+      stars.textContent = "★".repeat(card.stars) + "☆".repeat(5 - card.stars);
+      plate.append(stars);
+    }
     front.append(img);
     front.append(plate);
     if (card.rarity === 4) {
@@ -438,11 +459,54 @@
     sheet.textContent = "";
     sheet.classList.remove("giving");
     sheet.append(face(card), statsOf(card));
+    if (card.stars) sheet.append(fusePanel(card));
     tilt(sheet, card.rarity === 4);
     $("sheet").hidden = false;
     try { tg.BackButton.show(); } catch (_) { /* older clients */ }
     haptic("light");
   }
+  // fusePanel is the large card's ⭐ button: the next star, the free copies
+  // it uses up and the card's numbers after; at ★5, or with too few copies,
+  // it is disabled and says why. A fusion re-renders from the state given.
+  function fusePanel(card) {
+    const box = document.createElement("div");
+    box.className = "fuse";
+    box.addEventListener("click", (event) => event.stopPropagation());
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "draw fuse-do";
+    const hint = document.createElement("small");
+    if (!card.fuse) {
+      button.textContent = t.fuseMax;
+      button.disabled = true;
+      hint.textContent = t.fuseFree(card.free || 0);
+    } else {
+      button.textContent = t.fuse(card.stars, card.stars + 1, card.fuse);
+      button.disabled = (card.free || 0) < card.fuse;
+      hint.textContent = (button.disabled ? t.fuseFew(card.fuse - (card.free || 0)) + " · " : "") + t.fuseNext(spaced(card.next_attack), spaced(card.next_health));
+    }
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        const data = await api("fuse", { card: card.id });
+        if (data.refused) {
+          toast(t.fuseRefused[data.refused] || t.unavailable);
+          return;
+        }
+        haptic("medium");
+        applyState(data);
+        toast(t.fused(data.fused));
+        const now = cards.find((c) => c.id === card.id);
+        if (now) open(now);
+      } catch (error) {
+        button.disabled = false;
+        notice(error);
+      }
+    });
+    box.append(button, hint);
+    return box;
+  }
+
   // A Mythic card in the large view leans toward the finger, or as the
   // phone is tilted, its glint sliding with it; any other card stays flat.
   let tilted = null;
@@ -606,10 +670,18 @@
     }
   }
 
-  // keep puts a card just opened into the collection.
+  // keep puts a card just opened into the collection, with the stars the
+  // card held had: a copy more is one more free copy to fuse. A card new to
+  // the player shows its ⭐ button from the next state.
   function keep(card) {
     const i = cards.findIndex((c) => c.id === card.id);
-    if (i >= 0) cards[i] = card;
+    if (i < 0) return;
+    const old = cards[i];
+    if (old.stars) {
+      for (const key of ["stars", "fuse", "attack", "health", "next_attack", "next_health"]) card[key] = old[key];
+      card.free = (old.free || 0) + card.count - (old.count || 0);
+    }
+    cards[i] = card;
   }
 
   // openedPanel lays out the batch just opened, the new ones marked.

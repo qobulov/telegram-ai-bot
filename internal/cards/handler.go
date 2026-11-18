@@ -33,6 +33,7 @@ type Store interface {
 	CatalogCards(ctx context.Context, page storage.CatalogPage) ([]storage.Card, bool, error)
 	BuyCardTokens(ctx context.Context, userID int64, name string, tokens, price int) (storage.CardOpening, error)
 	OpenCardPack(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, price int, now time.Time) (storage.CardOpening, error)
+	FuseCard(ctx context.Context, userID, cardID int64, cost []int) (stars int, err error)
 }
 
 // Invoices makes links to invoices in Stars, for crystals bought in the app.
@@ -106,7 +107,7 @@ type request struct {
 	InitData string `json:"init_data"`
 	Action   string `json:"action"`
 	// Query is the name searched for, for "catalog"; Card is the card
-	// offered, for "offer".
+	// offered, for "offer", or raised, for "fuse".
 	Query string `json:"query"`
 	Card  int64  `json:"card"`
 	// Want is the card wanted for Card, for "offer"; Offer is the offer
@@ -193,6 +194,8 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return h.take(ctx, opened.User, req.Offer)
 	case "unoffer":
 		return h.unoffer(ctx, opened.User, req.Offer)
+	case "fuse":
+		return h.fuse(ctx, opened.User, req.Card)
 	}
 	return nil, errBadRequest
 }
@@ -210,12 +213,35 @@ type cardView struct {
 	Health int    `json:"health,omitempty"`
 	Value  int    `json:"value,omitempty"`
 	Count  int    `json:"count"`
-	// Limited is a card that is never given or traded.
+	// Limited is a card that is never traded.
 	Limited bool `json:"limited,omitempty"`
+	// Stars are a card held's, which raise its Attack and Health; Free are
+	// its copies beyond the one kept and those used up, Fuse the free copies
+	// its next star needs (0 at the most stars), and NextAttack and
+	// NextHealth its numbers then.
+	Stars      int `json:"stars,omitempty"`
+	Free       int `json:"free,omitempty"`
+	Fuse       int `json:"fuse,omitempty"`
+	NextAttack int `json:"next_attack,omitempty"`
+	NextHealth int `json:"next_health,omitempty"`
 }
 
 func (h *handler) held(c storage.Card, count int) cardView {
 	return cardView{ID: c.ID, Rarity: c.Rarity, Set: c.Collection, Name: c.Name, Anime: c.Anime, Image: c.ImageURL, Attack: c.Attack, Health: c.Health, Value: c.Value, Count: count, Limited: storage.CardLimited(c.ID)}
+}
+
+// owned is a card the player holds, with its stars and what fusing it
+// next costs and gives.
+func (h *handler) owned(o storage.OwnedCard) cardView {
+	v := h.held(o.Card, o.Count)
+	v.Stars = min(max(o.Stars, 1), MaxStars)
+	v.Free = max(o.Count-1-o.Melted, 0)
+	v.Attack, v.Health = Boosted(o.Card, v.Stars)
+	if v.Stars < MaxStars {
+		v.Fuse = FuseCost[v.Stars]
+		v.NextAttack, v.NextHealth = Boosted(o.Card, v.Stars+1)
+	}
+	return v
 }
 
 func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
@@ -240,7 +266,8 @@ func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
 	views := make([]cardView, len(catalog))
 	for i, c := range catalog {
 		if o, ok := byID[c.ID]; ok && o.Count > 0 {
-			views[i] = h.held(c, o.Count)
+			o.Card = c
+			views[i] = h.owned(o)
 		} else {
 			views[i] = cardView{ID: c.ID, Rarity: c.Rarity, Set: c.Collection, Limited: storage.CardLimited(c.ID)}
 		}
@@ -423,7 +450,7 @@ func (h *handler) catalogPage(ctx context.Context, page storage.CatalogPage) (an
 
 // offer puts the player's card up on the market for the card they want. An
 // offer refused says why: "not_held", "limit", "same", "uneven" or
-// "limited".
+// "limited" or "fused".
 func (h *handler) offer(ctx context.Context, user miniapp.User, give, want int64) (any, failure) {
 	switch {
 	case give == 0 || want == 0:
@@ -440,6 +467,8 @@ func (h *handler) offer(ctx context.Context, user miniapp.User, give, want int64
 		return map[string]any{"refused": "uneven"}, failure{}
 	case errors.Is(err, storage.ErrCardLimited):
 		return map[string]any{"refused": "limited"}, failure{}
+	case errors.Is(err, storage.ErrCardFused):
+		return map[string]any{"refused": "fused"}, failure{}
 	case errors.As(err, &many):
 		return map[string]any{"refused": "limit", "limit": many.Limit}, failure{}
 	case err != nil:
@@ -451,7 +480,7 @@ func (h *handler) offer(ctx context.Context, user miniapp.User, give, want int64
 
 // take takes an offer: its player and this one each give the other their
 // card, and its player is told. An offer refused says why: "over",
-// "gone", "not_held", "own", "uneven" or "limited".
+// "gone", "not_held", "own", "uneven", "limited" or "fused".
 func (h *handler) take(ctx context.Context, user miniapp.User, id int64) (any, failure) {
 	if id == 0 {
 		return nil, errBadRequest
@@ -470,6 +499,8 @@ func (h *handler) take(ctx context.Context, user miniapp.User, id int64) (any, f
 		return map[string]any{"refused": "uneven"}, failure{}
 	case errors.Is(err, storage.ErrCardLimited):
 		return map[string]any{"refused": "limited"}, failure{}
+	case errors.Is(err, storage.ErrCardFused):
+		return map[string]any{"refused": "fused"}, failure{}
 	case err != nil:
 		h.Logger.Error("could not take a card offer", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
@@ -487,6 +518,34 @@ func (h *handler) take(ctx context.Context, user miniapp.User, id int64) (any, f
 	}
 	result := state.(map[string]any)
 	result["got"] = h.held(trade.Give, 1)
+	return result, failure{}
+}
+
+// fuse raises the player's card one star with its free copies, and gives
+// the state with "fused", its stars now. A fusion refused says why: "max",
+// "few" or "not_held".
+func (h *handler) fuse(ctx context.Context, user miniapp.User, cardID int64) (any, failure) {
+	if cardID == 0 {
+		return nil, errBadRequest
+	}
+	stars, err := h.Store.FuseCard(ctx, user.ID, cardID, FuseCost[:])
+	switch {
+	case errors.Is(err, storage.ErrCardMaxStars):
+		return map[string]any{"refused": "max"}, failure{}
+	case errors.Is(err, storage.ErrCardFewCopies):
+		return map[string]any{"refused": "few"}, failure{}
+	case errors.Is(err, storage.ErrCardNotHeld):
+		return map[string]any{"refused": "not_held"}, failure{}
+	case err != nil:
+		h.Logger.Error("could not fuse a card", "user_id", user.ID, "card_id", cardID, "error", err)
+		return nil, errUnavailable
+	}
+	state, fail := h.state(ctx, user)
+	if fail != (failure{}) {
+		return nil, fail
+	}
+	result := state.(map[string]any)
+	result["fused"] = stars
 	return result, failure{}
 }
 

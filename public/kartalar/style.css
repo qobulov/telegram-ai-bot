@@ -603,3 +603,15 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .shop-item b { display: block; font: 700 14px Manrope, sans-serif; }
 .shop-item small { color: var(--muted); font-size: 12px; }
 .shop-item .ghost { white-space: nowrap; }
+
+/* fusion: a card's stars on its tile and plate, and the large card's ⭐ button */
+.card .stars {
+  position: absolute; top: 6px; left: 6px; z-index: 6; padding: 1px 7px; border-radius: 999px;
+  background: rgba(8, 6, 14, 0.75); font: 700 11px Unbounded, sans-serif; color: var(--gold);
+}
+.card.special .stars { top: 34px; }
+.plate-stars { display: block; margin-top: 2px; color: var(--gold); font-size: 13px; letter-spacing: 2px; }
+.fuse { margin-top: 10px; text-align: center; }
+.fuse .fuse-do { width: 100%; }
+.fuse small { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; }
+.sheet-card.giving > .fuse { display: none; }

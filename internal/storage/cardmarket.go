@@ -39,15 +39,21 @@ func (s *Store) OfferCard(ctx context.Context, from, give, want int64, rules Car
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		// The player's row, locked, so that two offers at once are counted
 		// one after the other.
-		var held bool
+		var held, fused bool
 		err := tx.QueryRow(ctx, `
-			SELECT EXISTS (SELECT 1 FROM card_owned WHERE user_id = $1 AND card_id = $2)
-			FROM card_players WHERE user_id = $1 FOR UPDATE`, from, give).Scan(&held)
+			SELECT EXISTS (SELECT 1 FROM card_owned WHERE user_id = $1 AND card_id = $2),
+				EXISTS (SELECT 1 FROM card_owned WHERE user_id = $1 AND card_id = $2 AND stars > 1 AND count - melted < 2)
+			FROM card_players WHERE user_id = $1 FOR UPDATE`, from, give).Scan(&held, &fused)
 		if errors.Is(err, pgx.ErrNoRows) || (err == nil && !held) {
 			return ErrCardNotHeld
 		}
 		if err != nil {
 			return err
+		}
+		// The last copy of a card raised above ★1 keeps its stars with its
+		// holder, so it is not offered.
+		if fused {
+			return ErrCardFused
 		}
 		var open int
 		if err := tx.QueryRow(ctx, `
@@ -71,7 +77,8 @@ func (s *Store) OfferCard(ctx context.Context, from, give, want int64, rules Car
 
 // CardMarket is the offers open on the market as viewer sees them: those
 // they can take first, then the newest; at most limit. An offer whose player
-// no longer holds the card offered is left out, as taking it would fail, and
+// no longer holds the card offered, or holds only the last copy of it raised
+// above ★1, is left out, as taking it would fail, and
 // so is one placed before trades were of one rarity and of no limited card.
 func (s *Store) CardMarket(ctx context.Context, viewer int64, rules CardMarketRules, limit int) ([]CardOffer, error) {
 	rows, err := s.pool.Query(ctx, `
@@ -87,7 +94,8 @@ func (s *Store) CardMarket(ctx context.Context, viewer int64, rules CardMarketRu
 			SELECT t.from_id <> $1 AND EXISTS (SELECT 1 FROM card_owned o WHERE o.user_id = $1 AND o.card_id = t.take_card) AS can
 		) c
 		WHERE t.status = 'open' AND t.to_id IS NULL AND t.created_at > $2
-			AND EXISTS (SELECT 1 FROM card_owned o WHERE o.user_id = t.from_id AND o.card_id = t.give_card)
+			AND EXISTS (SELECT 1 FROM card_owned o WHERE o.user_id = t.from_id AND o.card_id = t.give_card
+				AND (o.stars = 1 OR o.count - o.melted >= 2))
 			AND g.rarity = w.rarity AND NOT (t.give_card = ANY($4) OR t.take_card = ANY($4))
 		ORDER BY c.can DESC, t.created_at DESC, t.id DESC LIMIT $3`, viewer, rules.Now.Add(-rules.Keep), limit, limitedCardIDs())
 	if err != nil {
@@ -131,12 +139,12 @@ func (s *Store) TakeCardOffer(ctx context.Context, id, by int64, rules CardTrade
 		if err := lockTraders(ctx, tx, by, trade.From); err != nil {
 			return err
 		}
-		if err := moveCard(ctx, tx, trade.From, by, trade.Give.ID, false); errors.Is(err, ErrCardNotHeld) {
+		if err := moveCard(ctx, tx, trade.From, by, trade.Give.ID); errors.Is(err, ErrCardNotHeld) {
 			return ErrCardOfferGone
 		} else if err != nil {
 			return err
 		}
-		if err := moveCard(ctx, tx, by, trade.From, trade.Take.ID, false); err != nil {
+		if err := moveCard(ctx, tx, by, trade.From, trade.Take.ID); err != nil {
 			return err
 		}
 		// Checked once the cards are known to be held, in the transaction
