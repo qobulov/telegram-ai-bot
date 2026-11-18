@@ -2329,6 +2329,22 @@ tokens are given first, and with too few tokens nothing is pulled
 end the block is hidden and the server refuses (`refused: "over"`,
 `ErrCardEventOver`).
 
+A limited card comes only from its event: normal draws and crystal packs
+never pick one (`randomCard` leaves out every card of `limitedCards`), and
+event pulls give Satoko as above.
+
+Every card drawn, by a draw, a pack or an event pull, is counted in
+`card_catalog.drawn` (migration 96, filled from the copies held then), which
+only grows, and the draw carries `serial`, which copy of that card in the
+whole game it is (`CardDraw.Serial`, counted in `addCard` in the draw's
+transaction). When a draw holds a Mythic, the app celebrates it on the whole
+screen before the usual reveal: gold rays turning, 36 pieces of gold
+confetti (cherry petals among them for Satoko), the card rising, "🎉
+TABRIKLAYMIZ! MIFIK KARTA!", its name and its number ("No.000123", "o'yindagi
+123-nusxa"), with a success and a heavy haptic; a tap or "Davom etish" closes
+it, and several Mythics in one batch are celebrated in turn. With less
+motion asked for, the rays and confetti are left out.
+
 "Karta ochish vaqti kelganda eslat" has Maria remind the player when their
 next card may be opened, and "har safar eslat" after every card; see
 [Reminders](#reminders).

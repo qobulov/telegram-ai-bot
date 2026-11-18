@@ -107,7 +107,7 @@ func (h *handler) eventOpen(ctx context.Context, user miniapp.User, n int) (any,
 	}
 	drawn := make([]map[string]any, len(opened.Draws))
 	for i, d := range opened.Draws {
-		drawn[i] = map[string]any{"card": h.held(d.Card, d.Count), "new": d.New, "sure": d.Guaranteed}
+		drawn[i] = map[string]any{"card": h.held(d.Card, d.Count), "new": d.New, "sure": d.Guaranteed, "serial": d.Serial}
 	}
 	return map[string]any{
 		"drawn": drawn, "points": opened.Points, "tokens": opened.Tokens, "shards": opened.Shards, "given": opened.Given,

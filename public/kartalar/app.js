@@ -612,9 +612,10 @@
         return;
       }
       if (data.given) toast(t.given(data.given));
-      const drawn = data.drawn.map((d) => ({ card: d.card, fresh: d.new }));
+      const drawn = data.drawn.map((d) => ({ card: d.card, fresh: d.new, serial: d.serial }));
       for (const { card } of drawn) keep(card);
       points = data.points;
+      await celebrateMythics(drawn);
       // A batch is laid out on its own; the deck stays face down.
       if (drawn.length > 1) {
         flip.classList.remove("shuffle");
@@ -684,6 +685,79 @@
     done.textContent = t.carryOn;
     done.addEventListener("click", closeSheet);
     showPanel(panel);
+  }
+
+  // ---------- a Mythic's celebration ----------
+
+  // celebrate shows a Mythic just drawn on the whole screen before the
+  // draw's usual reveal: light turning behind it, gold confetti (and cherry
+  // petals for a card dressed with them), the card rising, and which copy of
+  // it in the whole game this is. A tap or the button closes it. Only
+  // transforms and opacity move, so that weak phones keep up; with less
+  // motion asked for, the card and the words stand still.
+  const celebrateTexts = {
+    uz: { title: "🎉 TABRIKLAYMIZ! MIFIK KARTA!", copy: (n) => `o'yindagi ${n}-nusxa` },
+    ru: { title: "🎉 ПОЗДРАВЛЯЕМ! МИФИЧЕСКАЯ КАРТА!", copy: (n) => `${n}-й экземпляр в игре` },
+    en: { title: "🎉 CONGRATULATIONS! MYTHIC CARD!", copy: (n) => `copy #${n} in the game` },
+  };
+  const ct = celebrateTexts[language] || celebrateTexts.uz;
+  const serialMark = (n) => "No." + String(n).padStart(6, "0");
+  const CONFETTI = 36;
+
+  function celebrate(card, serial) {
+    return new Promise((resolve) => {
+      const petals = Boolean(SPECIAL[card.id] && SPECIAL[card.id].petals);
+      const box = document.createElement("div");
+      box.className = "celebrate";
+      box.setAttribute("role", "dialog");
+      box.setAttribute("aria-label", ct.title);
+      let bits = "";
+      for (let i = 0; i < CONFETTI; i++) {
+        const kind = petals && i % 3 === 0 ? "petal" : ["gold", "pale", "deep"][i % 3];
+        const style = `left:${(Math.random() * 100).toFixed(1)}%;--dx:${(Math.random() * 80 - 40).toFixed(0)}px;--r:${(360 + Math.random() * 540).toFixed(0)}deg;animation-delay:${(Math.random() * 1.6).toFixed(2)}s;animation-duration:${(2.6 + Math.random() * 1.8).toFixed(2)}s`;
+        bits += `<i class="${kind}" style="${style}"></i>`;
+      }
+      box.innerHTML = '<div class="cel-rays" aria-hidden="true"></div><div class="cel-glow" aria-hidden="true"></div>' +
+        '<div class="cel-confetti" aria-hidden="true">' + bits + "</div>" +
+        '<div class="cel-body"><p class="cel-title"></p><div class="cel-card"></div><b class="cel-name"></b>' +
+        '<div class="cel-serial"><span class="cel-no"></span><small></small></div>' +
+        '<button type="button" class="draw cel-ok"></button></div>';
+      box.querySelector(".cel-title").textContent = ct.title;
+      box.querySelector(".cel-name").textContent = card.name;
+      if (serial > 0) {
+        box.querySelector(".cel-no").textContent = serialMark(serial);
+        box.querySelector(".cel-serial small").textContent = ct.copy(serial);
+      } else {
+        box.querySelector(".cel-serial").hidden = true;
+      }
+      const tile = cardTile(card);
+      tile.tabIndex = -1;
+      for (const extra of tile.querySelectorAll(".count, .lmark .serial, .name")) extra.remove();
+      box.querySelector(".cel-card").append(tile);
+      const ok = box.querySelector(".cel-ok");
+      ok.textContent = t.carryOn;
+      // A tap that came with the draw itself is not taken for a close.
+      const shownAt = Date.now();
+      let closed = false;
+      box.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (closed || (e.target !== ok && Date.now() - shownAt < 700)) return;
+        closed = true;
+        box.classList.add("leaving");
+        setTimeout(() => { box.remove(); resolve(); }, 220);
+      });
+      document.body.append(box);
+      ok.focus({ preventScroll: true });
+      try {
+        tg.HapticFeedback.notificationOccurred("success");
+        setTimeout(() => { try { tg.HapticFeedback.impactOccurred("heavy"); } catch (_) { /* outside Telegram */ } }, 180);
+      } catch (_) { /* outside Telegram */ }
+    });
+  }
+
+  // celebrateMythics celebrates each Mythic of a draw in turn.
+  async function celebrateMythics(drawn) {
+    for (const d of drawn) if (d.card.rarity === 4) await celebrate(d.card, d.serial);
   }
 
   // The deck itself is pressed as often as the button: it draws too.
@@ -1167,11 +1241,12 @@
       if (item.tokens) {
         toast(t.bought(item.tokens));
       } else {
-        const drawn = data.drawn.map((d) => ({ card: d.card, fresh: d.new }));
+        const drawn = data.drawn.map((d) => ({ card: d.card, fresh: d.new, serial: d.serial }));
         for (const { card } of drawn) keep(card);
         points = data.points ?? points;
         header();
         shelves();
+        await celebrateMythics(drawn);
         openedPanel(drawn, t.packOpened(t.rarities[item.least || 0]));
       }
     } catch (error) {
@@ -1312,10 +1387,11 @@
       points = data.points ?? points;
       eventData.pity = data.pity;
       if (data.given) toast(t.given(data.given));
-      const drawn = data.drawn.map((d) => ({ card: d.card, fresh: d.new }));
+      const drawn = data.drawn.map((d) => ({ card: d.card, fresh: d.new, serial: d.serial }));
       for (const { card } of drawn) keep(card);
       header();
       shelves();
+      await celebrateMythics(drawn);
       if (drawn.length > 1) {
         openedPanel(drawn, et.pulled(drawn.length));
       } else {

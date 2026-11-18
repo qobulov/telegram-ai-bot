@@ -91,7 +91,7 @@ func (f *fakeStore) OpenCards(ctx context.Context, userID int64, name string, n 
 	f.draws += n
 	open := storage.CardOpening{Tokens: f.tokens, Shards: f.shards, Points: 15000, Given: given}
 	for range n {
-		open.Draws = append(open.Draws, storage.CardDraw{Card: heldCard, Count: 3, Points: 15000})
+		open.Draws = append(open.Draws, storage.CardDraw{Card: heldCard, Count: 3, Points: 15000, Serial: 123})
 	}
 	return open, nil
 }
@@ -220,7 +220,7 @@ func TestCardsAppOpensForTokensThenCrystals(t *testing.T) {
 	if code, out := post(t, h, initData, "state"); code != 200 || out["tokens"] != 2.0 || out["given"] != 1.0 || out["next_token_in"] == nil || out["card_cost"] != float64(CardCost) || out["batch"] != float64(Batch) {
 		t.Fatalf("state = %d %v", code, out)
 	}
-	if out := open(1); out["tokens"] != 1.0 || len(out["drawn"].([]any)) != 1 || out["drawn"].([]any)[0].(map[string]any)["card"].(map[string]any)["name"] != "Gojo" {
+	if out := open(1); out["tokens"] != 1.0 || len(out["drawn"].([]any)) != 1 || out["drawn"].([]any)[0].(map[string]any)["card"].(map[string]any)["name"] != "Gojo" || out["drawn"].([]any)[0].(map[string]any)["serial"] != 123.0 {
 		t.Fatalf("one card = %v", out)
 	}
 	if out := open(Batch); out["short"] != float64((Batch-1)*CardCost) || out["drawn"] != nil {

@@ -43,7 +43,7 @@ func (f *eventStore) OpenEventCards(_ context.Context, _ int64, _ string, n int,
 		if rarity, _ := ev.Roll(0, 0); rarity == int(Mythic) && ev.Pick() {
 			card = eventCard
 		}
-		open.Draws = append(open.Draws, storage.CardDraw{Card: card, Count: 1, New: true})
+		open.Draws = append(open.Draws, storage.CardDraw{Card: card, Count: 1, New: true, Serial: 7})
 		f.eventPulls++
 		if card.ID == ev.Card {
 			f.eventPulls = 0
@@ -98,7 +98,7 @@ func TestTheCardEvent(t *testing.T) {
 		t.Errorf("odds = %v", odds)
 	}
 
-	if out := pull(1); out["tokens"] != 4.0 || out["pity"] != 0.0 || out["drawn"].([]any)[0].(map[string]any)["card"].(map[string]any)["name"] != "Satoko Kirigaya" {
+	if out := pull(1); out["tokens"] != 4.0 || out["pity"] != 0.0 || out["drawn"].([]any)[0].(map[string]any)["card"].(map[string]any)["name"] != "Satoko Kirigaya" || out["drawn"].([]any)[0].(map[string]any)["serial"] != 7.0 {
 		t.Fatalf("one pull = %v", out)
 	}
 	pick = false

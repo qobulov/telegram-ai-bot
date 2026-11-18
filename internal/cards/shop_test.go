@@ -27,11 +27,11 @@ func (f *fakeStore) OpenCardPack(_ context.Context, _ int64, _ string, n int, ro
 	}
 	f.shards -= price
 	open := storage.CardOpening{Tokens: f.tokens, Shards: f.shards}
-	for range n {
+	for i := range n {
 		rarity, _ := roll(0, 0)
 		card := lockedCard
 		card.Rarity = rarity
-		open.Draws = append(open.Draws, storage.CardDraw{Card: card, Count: 1, New: true})
+		open.Draws = append(open.Draws, storage.CardDraw{Card: card, Count: 1, New: true, Serial: i + 1})
 	}
 	return open, nil
 }
@@ -92,7 +92,7 @@ func TestShop(t *testing.T) {
 		t.Fatalf("epic pack = %v", out)
 	}
 	last := drawn[4].(map[string]any)["card"].(map[string]any)
-	if last["rarity"] != float64(Epic) {
+	if last["rarity"] != float64(Epic) || drawn[4].(map[string]any)["serial"] != 5.0 {
 		t.Errorf("the pack's sure card = %v", last)
 	}
 	if out := postItem(t, h, init, "buy", "legendary"); out["short"] != float64(330) {
