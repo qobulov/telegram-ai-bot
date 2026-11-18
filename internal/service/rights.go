@@ -53,7 +53,7 @@ func (s *Service) myRights(ctx context.Context, in incoming) outcome {
 	case admin:
 		return say("🛡 Siz Telegram adminisiz: o'z huquqlaringiz doirasidagi moderatsiya buyruqlari ochiq.")
 	}
-	return say("Sizda daraja yo'q: oddiy a'zo buyruqlari ochiq — /report, /voteban, /admins, /myinvites. Darajalar: /ranks")
+	return say("Sizda daraja yo'q: oddiy a'zo buyruqlari ochiq — /report, /voteban, /admins, /invites. Darajalar: /ranks")
 }
 
 func rankLines(byRank []ranks.Command) []string {

@@ -189,7 +189,7 @@ func TestOwnerMenuHoldsEveryCommand(t *testing.T) {
 	}
 	for _, command := range []string{"aigroups", "announce", "payments", "refund",
 		"model", "stats", "settings", "set", "business", "import_stickers", "premium", "paysupport",
-		"game", "snake", "woodcutter", "boss", "mafia", "checkers", "card", "teams", "invites", "invites_month", "invites_auto", "unpin", "unignore", "ping", "about"} {
+		"game", "snake", "woodcutter", "boss", "mafia", "checkers", "card", "teams", "invites", "invites_auto", "unpin", "unignore", "ping", "about"} {
 		if !seen[command] {
 			t.Errorf("/%s is missing from the owners' menu", command)
 		}

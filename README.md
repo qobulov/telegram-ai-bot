@@ -741,11 +741,15 @@ chiq" from anywhere, for a group she is in or a channel where she is an
 admin (`targets` lists them). The owner's own words must ask her to leave
 (chiq, ket, leave, выйди…), so the model cannot leave on its own.
 
-`/invites_week` and `/invites_month` in a group, with no model, list who
-brought how many people in who are still there, this week (from Monday,
-Tashkent time) or this month; `/invites` does this week's too, or with
-`bugun`, `oy` or `hammasi` (`today`, `month`, `all`) that period's; replying
-to a member, theirs alone. A person counts for the member who added them (the message saying
+`/invites` in a group, with no model, lists who brought how many people in
+who are still there, this week (from Monday, Tashkent time) by default, with
+buttons under it that switch it in place to today, the week, the month or all
+time, and a "📨 Meniki" button that tells the presser alone, in a box, how
+many they brought (all time and this week, and how many stayed);
+`/invites bugun`, `oy` or `hammasi` (`today`, `month`, `all`) opens on that
+period, and replying to a member shows theirs alone, without buttons.
+`/invites_week`, `/invites_month` and `/myinvites` still answer when typed but
+are in no menu. A person counts for the member who added them (the message saying
 they joined is from that member, or, where the bot is an admin, Telegram's
 `chat_member` update, whose `from` is who added them: a group that hides
 join messages posts none) or whose own invite link they came by (that

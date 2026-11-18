@@ -148,3 +148,36 @@ func TestUzbekCommandNamesAreGone(t *testing.T) {
 		}
 	}
 }
+
+// /invites has buttons that switch the table's period in place, and a
+// "Meniki" button that tells the presser alone how many they brought.
+func TestInviteTableButtons(t *testing.T) {
+	f := newFixture()
+	book, buttons := &fakeInviteBook{}, &fakeButtons{}
+	f.opts.Invites, f.opts.Buttons = book, buttons
+
+	sent := f.run(inGroup(groupMessage("/invites")))
+	menu := sent[len(sent)-1].buttons
+	if len(menu) != 2 || len(menu[0]) != 4 || menu[0][1].Text != "✅ Hafta" || menu[0][2].Data != "inv:month" || menu[1][0].Data != "inv:me" {
+		t.Fatalf("buttons = %+v", menu)
+	}
+	press := func(id int64, data string, from int64) telegram.Update {
+		return telegram.Update{UpdateID: 950 + id, CallbackQuery: &telegram.CallbackQuery{
+			ID: fmt.Sprint(id), From: &telegram.User{ID: from, FirstName: "Vali"}, Data: data,
+			Message: &telegram.Message{MessageID: 77, Chat: telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup}},
+		}}
+	}
+	f.run(press(1, "inv:month", 9))
+	if len(buttons.edits) != 1 || !strings.Contains(buttons.edits[0], "bu oy") || buttons.menus[0][0][2].Text != "✅ Oy" ||
+		book.since.In(f.opts.Location).Day() != 1 {
+		t.Fatalf("month press: edits %q, menus %+v, since %v", buttons.edits, buttons.menus, book.since)
+	}
+	f.run(press(2, "inv:me", 2))
+	last := buttons.answers[len(buttons.answers)-1]
+	if !last.alert || !strings.Contains(last.text, "Vali olib kelganlar") || !strings.Contains(last.text, "Jami: 3") || len(buttons.edits) != 1 {
+		t.Errorf("own press = %+v, edits %d; want a box with Vali's count and no edit", last, len(buttons.edits))
+	}
+	if sent := f.run(inGroup(groupMessage("/invites_week"))); len(sent) == 0 || !strings.Contains(sent[len(sent)-1].text, "bu hafta") {
+		t.Errorf("typed /invites_week = %+v", sent)
+	}
+}

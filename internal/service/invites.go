@@ -103,7 +103,10 @@ func (s *Service) noteInvite(inv storage.Invite) {
 
 // inviteTable answers /invites [hafta|oy|bugun|hammasi] in a group: who
 // brought how many people in who are still there, only those who brought
-// at least one; replying to a member, that member's alone. It asks no model.
+// at least one, with buttons that switch the period in place and show the
+// presser their own count; replying to a member, that member's alone. It
+// asks no model. /invites_week and /invites_month, typed, are its week and
+// month.
 func (s *Service) inviteTable(ctx context.Context, in incoming) outcome {
 	if !in.group {
 		return say(textInvitesGroupOnly.to(in))
@@ -112,29 +115,104 @@ func (s *Service) inviteTable(ctx context.Context, in incoming) outcome {
 	if command := commandName(in.text); command != "/invites" {
 		arg = strings.TrimPrefix(command, "/invites_")
 	}
-	since, period := inviteSince(arg, s.opts.Now(), s.opts.Location)
+	_, period := inviteSince(arg, s.opts.Now(), s.opts.Location)
 	var inviter int64
 	if reply := in.msg.ReplyToMessage; reply != nil && reply.From != nil && !reply.From.IsBot {
 		inviter = reply.From.ID
 	}
-	top, err := s.opts.Invites.InviteTop(ctx, in.msg.Chat.ID, storage.InviteQuery{Since: since, Inviter: inviter, Limit: inviteTableSize})
+	language := languageOf(in)
+	text, err := s.inviteTableText(ctx, in.msg.Chat.ID, period, inviter, language)
 	if err != nil {
-		s.opts.Logger.Error("could not read the invite table", "chat_id", in.msg.Chat.ID, "error", err)
 		return say(textInvitesUnavailable.to(in))
 	}
-	lines := []string{fmt.Sprintf(textInvitesTitle.to(in), periodNames[period].to(in)), ""}
+	if inviter != 0 || s.opts.Buttons == nil {
+		return say(text)
+	}
+	return outcome{text: text, buttons: inviteButtons(period, language)}
+}
+
+// inviteTableText is the invite table of a group for a period, of one
+// inviter's alone when inviter is not 0.
+func (s *Service) inviteTableText(ctx context.Context, chatID int64, period string, inviter int64, language string) (string, error) {
+	since, _ := inviteSince(period, s.opts.Now(), s.opts.Location)
+	top, err := s.opts.Invites.InviteTop(ctx, chatID, storage.InviteQuery{Since: since, Inviter: inviter, Limit: inviteTableSize})
+	if err != nil {
+		s.opts.Logger.Error("could not read the invite table", "chat_id", chatID, "error", err)
+		return "", err
+	}
+	lines := []string{fmt.Sprintf(textInvitesTitle.inLanguage(language), periodNames[period].inLanguage(language)), ""}
 	if len(top) == 0 {
-		lines = append(lines, textInvitesNone.to(in))
+		lines = append(lines, textInvitesNone.inLanguage(language))
 	}
 	for i, c := range top {
 		line := fmt.Sprintf("%d. %s — %d", i+1, cardMarks.Replace(c.Name), c.Stayed)
 		if gone := c.Added - c.Stayed; gone > 0 {
-			line += fmt.Sprintf(textInvitesGone.to(in), gone)
+			line += fmt.Sprintf(textInvitesGone.inLanguage(language), gone)
 		}
 		lines = append(lines, line)
 	}
-	lines = append(lines, "", textInvitesRule.to(in))
-	return say(strings.Join(lines, "\n"))
+	lines = append(lines, "", textInvitesRule.inLanguage(language))
+	return strings.Join(lines, "\n"), nil
+}
+
+// inviteData starts the data of the invite table's buttons: "inv:<period>"
+// shows that period, "inv:me" the presser's own count.
+const inviteData = "inv:"
+
+// invitePeriodOrder are the periods the table's buttons offer, in order.
+var invitePeriodOrder = []string{"today", "week", "month", "all"}
+
+var inviteButtonNames = map[string]localText{
+	"today": {uz: "Bugun", ru: "Сегодня", en: "Today"},
+	"week":  {uz: "Hafta", ru: "Неделя", en: "Week"},
+	"month": {uz: "Oy", ru: "Месяц", en: "Month"},
+	"all":   {uz: "Hammasi", ru: "Всё", en: "All"},
+	"me":    {uz: "📨 Meniki", ru: "📨 Мои", en: "📨 Mine"},
+}
+
+// inviteButtons are the periods, the one shown ticked, and the presser's
+// own count under them.
+func inviteButtons(shown, language string) [][]telegram.Button {
+	var periods []telegram.Button
+	for _, period := range invitePeriodOrder {
+		name := inviteButtonNames[period].inLanguage(language)
+		if period == shown {
+			name = "✅ " + name
+		}
+		periods = append(periods, telegram.Button{Text: name, Data: inviteData + period})
+	}
+	return [][]telegram.Button{periods, {{Text: inviteButtonNames["me"].inLanguage(language), Data: inviteData + "me"}}}
+}
+
+// pressedInvites switches the invite table to the period pressed, or tells
+// the presser alone, in a box, how many they brought.
+func (s *Service) pressedInvites(q *telegram.CallbackQuery) {
+	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
+	defer cancel()
+	language := appLanguage(q.From)
+	choice := strings.TrimPrefix(q.Data, inviteData)
+	chatID := q.Message.Chat.ID
+	if choice == "me" {
+		text, err := s.ownInvites(ctx, chatID, q.From)
+		if err != nil {
+			text = textInvitesUnavailable.inLanguage(language)
+		}
+		_ = s.opts.Buttons.AnswerCallbackQuery(ctx, q.ID, text, true)
+		return
+	}
+	if _, known := periodNames[choice]; !known {
+		_ = s.opts.Buttons.AnswerCallbackQuery(ctx, q.ID, "", false)
+		return
+	}
+	text, err := s.inviteTableText(ctx, chatID, choice, 0, language)
+	if err != nil {
+		_ = s.opts.Buttons.AnswerCallbackQuery(ctx, q.ID, textInvitesUnavailable.inLanguage(language), true)
+		return
+	}
+	_ = s.opts.Buttons.AnswerCallbackQuery(ctx, q.ID, "", false)
+	if err := s.opts.Buttons.EditMessageMenu(ctx, chatID, q.Message.MessageID, text, inviteButtons(choice, language)); err != nil {
+		s.opts.Logger.Warn("could not switch the invite table", "chat_id", chatID, "error", err)
+	}
 }
 
 // inviteSince is when the period an argument names starts, in location: this
@@ -164,7 +242,7 @@ var (
 	textInvitesTitle       = localText{uz: "👥 Kim nechta odam qo'shdi · %s", ru: "👥 Кто сколько людей добавил · %s", en: "👥 Who brought how many in · %s"}
 	textInvitesNone        = localText{uz: "Hali hech kim guruhda qolgan odam qo'shmagan.", ru: "Пока никто не добавил тех, кто остался в группе.", en: "Nobody has brought in anyone who is still here yet."}
 	textInvitesGone        = localText{uz: " (yana %d tasi chiqib ketgan)", ru: " (ещё %d ушли)", en: " (%d more left)"}
-	textInvitesRule        = localText{uz: "Reytingda guruhda qolgan odam qo'shganlar bor: qo'lda qo'shilgan yoki shaxsiy havola (/mylink) orqali kirgan. Kimdir chiqib ketsa, qo'shganning hisobidan ayriladi. Hafta: /invites_week · Oy: /invites_month · Avto-e'lon (admin): /invites_auto", ru: "В рейтинге те, кто добавил оставшихся в группе: вручную или по личной ссылке (/mylink). Кто ушёл, вычитается у добавившего. Неделя: /invites_week · Месяц: /invites_month · Авто (админ): /invites_auto", en: "Listed: those who brought in people still here, added by hand or by one's own invite link (/mylink). One who leaves is taken off whoever brought them. Week: /invites_week · Month: /invites_month · Automatic (admins): /invites_auto"}
+	textInvitesRule        = localText{uz: "Reytingda guruhda qolgan odam qo'shganlar bor: qo'lda qo'shilgan yoki shaxsiy havola (/mylink) orqali kirgan. Kimdir chiqib ketsa, qo'shganning hisobidan ayriladi. Avto-e'lon (admin): /invites_auto", ru: "В рейтинге те, кто добавил оставшихся в группе: вручную или по личной ссылке (/mylink). Кто ушёл, вычитается у добавившего. Авто (админ): /invites_auto", en: "Listed: those who brought in people still here, added by hand or by one's own invite link (/mylink). One who leaves is taken off whoever brought them. Automatic (admins): /invites_auto"}
 	textInvitesGroupOnly   = localText{uz: "👥 /invites guruhda ishlaydi.", ru: "👥 /invites работает в группе.", en: "👥 /invites works in a group."}
 	textInvitesUnavailable = localText{uz: "Hisobni hozir o'qib bo'lmadi, birozdan keyin urinib ko'ring.", ru: "Сейчас не удалось прочитать счёт, попробуйте позже.", en: "Could not read the count right now; try again in a bit."}
 )
@@ -177,16 +255,30 @@ func linkMemberName(linkName string) string {
 }
 
 // myInvites answers /myinvites: how many the asker brought into the group,
-// all time and this week, and how many of them stayed.
+// all time and this week, and how many of them stayed. The table's
+// "Meniki" button says the same.
 func (s *Service) myInvites(ctx context.Context, in incoming) outcome {
 	if !in.group {
 		return say(textInvitesGroupOnly.to(in))
 	}
+	text, err := s.ownInvites(ctx, in.msg.Chat.ID, in.msg.From)
+	if err != nil {
+		return say(textInvitesUnavailable.to(in))
+	}
+	if s.opts.MemberLinks != nil {
+		text += "\n\nShaxsiy havolangiz: /mylink — u orqali kirganlar ham sizga yoziladi."
+	}
+	return say(text)
+}
+
+// ownInvites is how many user brought into the group, all time and this
+// week, and how many of them stayed, short enough for a button's box.
+func (s *Service) ownInvites(ctx context.Context, chatID int64, user *telegram.User) (string, error) {
 	weekStart, _ := inviteSince("", s.opts.Now(), s.opts.Location)
 	count := func(since time.Time) (storage.InviterCount, error) {
-		top, err := s.opts.Invites.InviteTop(ctx, in.msg.Chat.ID, storage.InviteQuery{Since: since, Inviter: in.userID, Limit: inviteTableSize})
+		top, err := s.opts.Invites.InviteTop(ctx, chatID, storage.InviteQuery{Since: since, Inviter: user.ID, Limit: inviteTableSize})
 		for _, c := range top {
-			if c.UserID == in.userID {
+			if c.UserID == user.ID {
 				return c, err
 			}
 		}
@@ -194,19 +286,15 @@ func (s *Service) myInvites(ctx context.Context, in incoming) outcome {
 	}
 	all, err := count(time.Time{})
 	if err != nil {
-		return say(textInvitesUnavailable.to(in))
+		return "", err
 	}
 	week, err := count(weekStart)
 	if err != nil {
-		return say(textInvitesUnavailable.to(in))
+		return "", err
 	}
-	lines := []string{
-		"📨 " + cardMarks.Replace(doozName(in.msg.From)) + " olib kelganlar",
+	return strings.Join([]string{
+		"📨 " + cardMarks.Replace(doozName(user)) + " olib kelganlar",
 		fmt.Sprintf("Jami: %d, guruhda qolgan: %d", all.Added, all.Stayed),
 		fmt.Sprintf("Shu hafta: %d, qolgan: %d", week.Added, week.Stayed),
-	}
-	if s.opts.MemberLinks != nil {
-		lines = append(lines, "", "Shaxsiy havolangiz: /mylink — u orqali kirganlar ham sizga yoziladi.")
-	}
-	return say(strings.Join(lines, "\n"))
+	}, "\n"), nil
 }

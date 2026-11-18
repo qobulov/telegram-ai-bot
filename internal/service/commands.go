@@ -1136,6 +1136,10 @@ func (s *Service) pressed(q *telegram.CallbackQuery) {
 		s.pressedTeams(q)
 		return
 	}
+	if strings.HasPrefix(q.Data, inviteData) && s.opts.Invites != nil {
+		s.pressedInvites(q)
+		return
+	}
 	if strings.HasPrefix(q.Data, aiData) && s.opts.Extras != nil {
 		s.pressedAIGroup(q)
 		return
