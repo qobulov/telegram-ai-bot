@@ -41,11 +41,26 @@ button:disabled { opacity: .45; cursor: default; }
 body.day .badge { background: #c62828; }
 .mark { position: absolute; top: -8px; left: -6px; font-size: 16px; }
 .center { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
-.feed { flex: 1.4 1 0; min-height: 80px; overflow-y: auto; margin-top: 6px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 0 10px 6px; display: flex; flex-direction: column; gap: 3px; font-size: 14px; user-select: text; -webkit-user-select: text; }
-.feed[hidden], .chatbox[hidden], .center[hidden] { display: none; }
-.feed .room { position: sticky; top: 0; padding: 6px 0 4px; font-size: 12px; font-weight: 800; color: var(--muted); text-align: center; background: var(--bg1); border-bottom: 1px solid var(--line); margin: 0 -10px 2px; }
-body.day .feed .room { background: #fff1dc; }
-.feed .room.mafia { color: var(--red); }
+.chatbox[hidden], .center[hidden], .fab[hidden], .unread[hidden], .sheet[hidden], .sheetnote[hidden], .sheettitle small[hidden] { display: none; }
+/* The players' chat: a round button above the bar, and the sheet it opens over the whole screen. */
+.fabdock { position: relative; height: 0; flex: 0 0 auto; }
+.fab { position: absolute; right: 2px; bottom: 10px; z-index: 3; width: 56px; height: 56px; border-radius: 50%; font-size: 26px; line-height: 1; display: grid; place-items: center; background: linear-gradient(180deg, #ffd45a, #e09a10); color: #2a1606; box-shadow: 0 4px 0 #8a5a00, 0 8px 20px rgba(0,0,0,.35); }
+.fab.mafia { background: linear-gradient(180deg, #ff7b7b, #c62828); box-shadow: 0 4px 0 #7f1d1d, 0 8px 20px rgba(0,0,0,.35); }
+.fab.ping { animation: ping .5s ease-out; }
+@keyframes ping { 40% { transform: scale(1.14); } }
+.unread { position: absolute; top: -4px; right: -4px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--red); color: #fff; font-size: 12px; font-weight: 900; line-height: 18px; text-align: center; border: 2px solid var(--bg1); font-family: system-ui, sans-serif; }
+.center.withfab { padding-bottom: 66px; }
+.sheet { position: fixed; inset: 0; z-index: 4; max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; height: 100%; height: 100dvh; padding: calc(10px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, var(--bg1), var(--bg2)); animation: rise .25s cubic-bezier(.2,.8,.2,1); }
+@keyframes rise { from { transform: translateY(100%); } }
+.sheethead { display: flex; align-items: center; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.sheettitle { flex: 1; min-width: 0; }
+.sheettitle h2 { font-family: "Lilita One", system-ui; font-weight: 400; font-size: 22px; margin: 0; }
+.sheettitle small { display: block; color: var(--muted); font-size: 12px; font-weight: 700; }
+.sheet.mafia .sheettitle h2 { color: var(--red); }
+.close { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%; font-size: 18px; background: var(--card); border: 1px solid var(--line); }
+.feed { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px; display: flex; flex-direction: column; gap: 6px; font-size: 15px; user-select: text; -webkit-user-select: text; }
+.feed > :first-child { margin-top: auto; }
+.sheetnote { margin: 0; text-align: center; color: var(--muted); font-size: 13px; font-weight: 700; }
 .feed .empty { color: var(--muted); text-align: center; font-size: 13px; padding: 10px 0; }
 .ln { line-height: 1.35; overflow-wrap: anywhere; }
 .ln b { margin-right: 4px; }
@@ -53,7 +68,7 @@ body.day .ln b { filter: brightness(.5) saturate(1.6); }
 .ln.mafia { color: #ffb0b6; }
 body.day .ln.mafia { color: #a3121e; }
 .ln.mine b::after { content: " (siz)"; font-weight: 600; color: var(--muted); }
-.chatbox { margin-top: 6px; display: flex; flex-direction: column; gap: 6px; }
+.chatbox { display: flex; flex-direction: column; gap: 6px; }
 .chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
 .chips button { white-space: nowrap; padding: 6px 10px; font-size: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 999px; font-weight: 700; }
 #chatline { flex: 1; min-width: 0; font: inherit; font-size: 16px; color: inherit; background: rgba(0,0,0,.25); border: 1px solid var(--line); border-radius: 12px; padding: 10px; user-select: text; -webkit-user-select: text; }
@@ -113,4 +128,4 @@ tr.dead td { opacity: .6; }
 tr.me td { color: var(--gold); font-weight: 800; }
 .stars { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; transition: opacity .8s; }
 body.day .stars { opacity: 0; }
-@media (prefers-reduced-motion: reduce) { .card .inner, body, .stars { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .card .inner, body, .stars { transition: none; } .sheet, .fab.ping { animation: none; } }

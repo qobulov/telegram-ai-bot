@@ -58,6 +58,7 @@
 
   let state = null, ends = 0, picked = null, busy = false, overlaySeq = null, cardFor = null, fatal = "";
   let shownNews = null, closing = 0, draft = "", heardTo = "";
+  let chatOpen = false, unread = 0, seenTo = null;
 
   // ---------- server ----------
 
@@ -253,28 +254,35 @@
     renderBar();
   }
 
-  // renderChat shows the chat this player may read, redrawn only when a
-  // line came or the room changed, kept at its end when it was there; the
-  // box to write in shows while a room is open to them.
+  // renderChat shows the chat this player may read behind the round chat
+  // button, which counts the lines that came while the sheet was shut. The
+  // list is redrawn only when a line came or the room changed, kept at its
+  // end when it was there; the box to write in shows while a room is open
+  // to them.
   function renderChat() {
-    const feed = $("feed"), box = $("chatbox");
+    const feed = $("feed"), box = $("chatbox"), fab = $("chatfab");
     const me = (state && state.me) || {};
     const lines = (state && state.chat) || [];
     const room = fatal ? "" : me.room || "";
-    feed.hidden = !state || fatal || (!room && !lines.length);
+    const available = Boolean(state) && !fatal && Boolean(room || lines.length);
+    fab.hidden = !available;
+    fab.classList.toggle("mafia", room === "mafia");
+    $("center").classList.toggle("withfab", available);
+    if (!available) { if (chatOpen) closeChat(); return; }
     box.hidden = !room;
+    $("chatnote").hidden = Boolean(room);
     box.classList.toggle("mafia", room === "mafia");
-    // The notes take the room the chat leaves; without a chat, all of it.
-    $("center").style.flex = feed.hidden ? "1 1 auto" : "0 1 auto";
-    if (feed.hidden) return;
+    $("chatsheet").classList.toggle("mafia", room === "mafia");
+    $("chattitle").textContent = room === "mafia" ? "🤵 Mafiya chati" : "💬 O'yinchilar chati";
+    $("chatsub").hidden = room !== "mafia";
+    $("chatsub").textContent = "Faqat sheriklaringiz ko'radi";
+    countUnread(lines);
     const key = `${room}|${lines.length ? lines[lines.length - 1].id : 0}|${lines.length}`;
     if (key !== heardTo) {
       const atEnd = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 40;
       heardTo = key;
-      const title = room === "mafia" ? `<div class="room mafia">🤵 Mafiya chati — faqat sheriklaringiz ko'radi</div>` : `<div class="room">💬 O'yinchilar chati</div>`;
-      const body = lines.length ? lines.map((l) => `<div class="ln${l.room === "mafia" ? " mafia" : ""}${l.from === myId() ? " mine" : ""}"><b style="color:${colorOf(l.from)}">${esc(l.name)}</b>${esc(l.text)}</div>`).join("")
+      feed.innerHTML = lines.length ? lines.map((l) => `<div class="ln${l.room === "mafia" ? " mafia" : ""}${l.from === myId() ? " mine" : ""}"><b style="color:${colorOf(l.from)}">${esc(l.name)}</b>${esc(l.text)}</div>`).join("")
         : `<div class="empty">${room === "mafia" ? "Sheriklaringiz bilan kelishib oling 🤫" : "Hali hech kim yozmadi"}</div>`;
-      feed.innerHTML = title + body;
       if (atEnd || lines.length && lines[lines.length - 1].from === myId()) feed.scrollTop = feed.scrollHeight;
     }
     const chips = room === "mafia" ? CHIPS.mafia : state.phase === "lobby" ? CHIPS.lobby : state.phase === "over" ? CHIPS.over : CHIPS.town;
@@ -283,6 +291,48 @@
       $("chips").dataset.k = chipsKey;
       $("chips").innerHTML = chips.map((c) => `<button type="button" data-chip="${esc(c)}">${esc(c)}</button>`).join("");
     }
+  }
+
+  // countUnread adds the others' lines that came while the sheet was shut
+  // to the button's badge; what the page opens on counts as read.
+  function countUnread(lines) {
+    const last = lines.length ? Math.max(...lines.map((l) => Number(l.id) || 0)) : 0;
+    if (seenTo === null || chatOpen) { seenTo = last; unread = 0; }
+    else if (last > seenTo) {
+      unread += lines.filter((l) => Number(l.id) > seenTo && l.from !== myId()).length;
+      seenTo = last;
+      if (unread) { const fab = $("chatfab"); fab.classList.remove("ping"); void fab.offsetWidth; fab.classList.add("ping"); }
+    }
+    $("unread").hidden = unread === 0;
+    $("unread").textContent = unread > 99 ? "99+" : String(unread);
+  }
+
+  // The sheet closes by its ✕, Escape, and the phone's back: Telegram's
+  // own back button where the page runs as a Web App, else a history step.
+  const backButton = window.Telegram && Telegram.WebApp && Telegram.WebApp.BackButton;
+  function openChat() {
+    if (chatOpen) return;
+    chatOpen = true;
+    $("chatsheet").hidden = false;
+    $("app").inert = true;
+    $("chatfab").setAttribute("aria-expanded", "true");
+    unread = 0;
+    heardTo = "";
+    render();
+    $("feed").scrollTop = $("feed").scrollHeight;
+    if (backButton) backButton.show();
+    else try { history.pushState({ chat: true }, ""); } catch (error) { /* back then leaves the page */ }
+  }
+  function closeChat(fromHistory) {
+    if (!chatOpen) return;
+    chatOpen = false;
+    $("chatsheet").hidden = true;
+    $("app").inert = false;
+    $("chatfab").setAttribute("aria-expanded", "false");
+    if (document.activeElement && $("chatsheet").contains(document.activeElement)) document.activeElement.blur();
+    if (backButton) backButton.hide();
+    else if (!fromHistory && history.state && history.state.chat) history.back();
+    render();
   }
 
   // sayLine sends a line to the room the page shows; typed is true for
@@ -330,11 +380,11 @@
         notes.push(`<div class="note secret"><b>${WINNERS[state.winner] || "O'yin tugadi"}</b>${me.joined ? (won ? " Siz g'oliblar safidasiz 🏆" : state.winner === "none" ? "" : " Bu safar yutqazdingiz.") : ""}</div>`);
       }
       if (state.phase === "" || state.phase === "lobby" || state.phase === "over") {
-        notes.push(`<div class="note">🎭 <b>Mafia</b> — guruh bilan o'ynaladi. Har kim yashirin rol oladi: Don va mafiya, komissar, shifokor, putana, manyak, omadli va tinch aholi. Tunda rollar shu sahifada harakat qiladi (mafiya o'z yashirin chatida kelishadi), kunduzi shu yerdagi chatda yoki guruhda bahslashib, ovoz bilan bir kishini chiqarasiz.</div>`);
+        notes.push(`<div class="note">🎭 <b>Mafia</b> — guruh bilan o'ynaladi. Har kim yashirin rol oladi: Don va mafiya, komissar, shifokor, putana, manyak, omadli va tinch aholi. Tunda rollar shu sahifada harakat qiladi (mafiya o'z yashirin chatida kelishadi), kunduzi 💬 chatda yoki guruhda bahslashib, ovoz bilan bir kishini chiqarasiz.</div>`);
         notes.push(`<div class="note">👥 ${state.min_players}–${state.max_players} kishi. G'oliblarga Dev jangi tangasi beriladi 💰</div>`);
       }
       if (state.phase === "night" && !pendingAct()) notes.push(`<div class="note calm"><div class="big">🌙</div><b>Shahar uxlayapti…</b><small>Rollar tanlov qilmoqda. Tong otishini kuting.</small></div>`);
-      if (state.phase === "day") notes.push(`<div class="note">💬 Bahslashing: kim mafiya? Pastdagi chatda yoki guruhda yozing. Ovoz berish vaqt tugagach shu sahifada ochiladi.</div>`);
+      if (state.phase === "day") notes.push(`<div class="note">💬 Bahslashing: kim mafiya? 💬 tugmasidagi chatda yoki guruhda yozing. Ovoz berish vaqt tugagach shu sahifada ochiladi.</div>`);
       if ((state.news || []).length && state.phase !== "lobby" && state.phase !== "") notes.push(`<div class="note news">${state.news.map((n) => `<p>${esc(n)}</p>`).join("")}</div>`);
       for (const p of (state.players || []).filter((p) => p.words)) notes.push(`<div class="note words">🕯 <b>${esc(p.name)}</b>ning so'nggi so'zi: <q>${esc(p.words)}</q></div>`);
       const marks = (state.players || []).filter((p) => p.mark);
@@ -381,7 +431,7 @@
           <div class="row"><button class="btn ${a.danger ? "red" : "main"}" data-do="act" ${target ? "" : "disabled"}>Tasdiqlash</button></div>`;
       } else b.innerHTML = `<div class="prompt">😴 ${(me.pending || []).length === 0 && me.role && !["tinch", "omadli"].includes(me.role) ? "Tanlovingiz qabul qilindi" : "Siz uxlayapsiz…"}<small>Tong otishini kuting</small></div>`;
     } else if (phase === "day") {
-      b.innerHTML = `<div class="prompt">☀️ Bahs vaqti<small>Yuqoridagi chatda yozing · ovoz berish birozdan keyin</small></div>`;
+      b.innerHTML = `<div class="prompt">☀️ Bahs vaqti<small>💬 chatda yoki guruhda yozing · ovoz berish birozdan keyin</small></div>`;
     } else if (phase === "vote") {
       const voted = me.voted ? state.players.find((p) => p.id === me.voted) : null;
       const target = picked !== null ? state.players.find((p) => p.id === picked) : null;
@@ -391,6 +441,11 @@
   }
 
   $("role").addEventListener("click", () => { if (state && state.me && state.me.role) showCard(state.me, true); });
+  $("chatfab").addEventListener("click", openChat);
+  $("chatclose").addEventListener("click", () => closeChat());
+  addEventListener("popstate", () => closeChat(true));
+  if (backButton) backButton.onClick(() => closeChat());
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && chatOpen && $("overlay").hidden) closeChat(); });
   $("chatbox").addEventListener("submit", (e) => { e.preventDefault(); sayLine($("chatline").value, true); });
   $("chips").addEventListener("click", (e) => { const chip = e.target.closest("[data-chip]"); if (chip) sayLine(chip.dataset.chip, false); });
 
