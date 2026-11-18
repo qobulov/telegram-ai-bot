@@ -171,6 +171,12 @@ Design points worth knowing:
 - **History integrity.** History is trimmed by message count, which could cut
   a tool exchange in half. Before each request the history is cleaned so it
   starts at a user message and contains no tool call without all its results.
+- **No laughing habit.** A 😂 or 🤣 ending one of the bot's past answers is
+  taken off in the history the model is sent (what is stored stays), as the
+  model copied its own: a fifth of group answers ended with 😂, in one group
+  most. When two of the bot's last five written answers in the chat laugh,
+  the next answer loses the laugh it ends with, unless it is nothing else
+  (`internal/agent/laughs.go`).
 - **Duplicates.** Each user message stores its Telegram `update_id` under a
   unique index. An update redelivered after a crash is recognised and skipped.
 

@@ -26,7 +26,8 @@ const cutResultNote = "… [cut in the history; call the tool again for the rest
 //     call is answered by the tool messages directly after it,
 //   - drops tool messages that answer nothing.
 //
-// It also cuts a long tool result to maxHistoryResultRunes, the same way
+// It also takes the laughs off the end of the bot's answers, which the model
+// copies, and cuts a long tool result to maxHistoryResultRunes, the same way
 // every time, so that the history still begins the same way and stays
 // cached.
 func sanitize(history []ai.Message) []ai.Message {
@@ -40,6 +41,9 @@ func sanitize(history []ai.Message) []ai.Message {
 		case msg.Role != ai.RoleAssistant || len(clean) == 0:
 			// An orphan tool result, or a reply whose question was trimmed away.
 		case len(msg.ToolCalls) == 0:
+			// The model copies its own habits: a laugh ending an old answer
+			// ends the next one too.
+			msg.Content = withoutTrailingLaugh(msg.Content)
 			clean = append(clean, msg)
 		case answersAll(msg.ToolCalls, results):
 			clean = append(clean, msg)

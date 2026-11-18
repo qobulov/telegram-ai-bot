@@ -188,9 +188,10 @@ func (a *Agent) Reply(ctx context.Context, req Request) (Answer, error) {
 	}
 
 	t := &turn{
-		req:      req,
-		history:  sanitize(history),
-		messages: []ai.Message{{Role: ai.RoleUser, Content: req.Text}},
+		req:        req,
+		history:    sanitize(history),
+		messages:   []ai.Message{{Role: ai.RoleUser, Content: req.Text}},
+		laughsALot: laughsALot(history),
 	}
 	answer, err := a.run(ctx, t)
 	if err != nil {
@@ -236,6 +237,9 @@ type turn struct {
 	noPictures  bool
 	// route is the path the turn takes when it is not the chat one.
 	route string
+	// laughsALot is set when the bot's recent answers in the chat laugh
+	// too often, so that this one does not end with a laugh too.
+	laughsALot bool
 }
 
 // run alternates between the model and its tool calls until the model
@@ -466,6 +470,9 @@ func finishText(t *turn, answer string) (Answer, error) {
 		answer = said
 	}
 	answer = currentCommands(answer)
+	if t.laughsALot {
+		answer = withoutTrailingLaugh(answer)
+	}
 	if t.req.LatinScript && uzscript.IsUzbekCyrillic(answer) {
 		answer = uzscript.Latin(answer)
 	}
