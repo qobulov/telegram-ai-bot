@@ -2213,7 +2213,17 @@ in the app alone, and `/card` is the game's one command. `/cards`, `/mycards`,
 asked: in a group they get no answer, named for the bot or not, in a private chat
 the answer for an unknown command, and the buttons of a collection or a duel
 posted before are ignored. `/profile` also showed a member's rank and warnings in
-a group; `/rights` and the model's `member_info` still tell them.
+a group; `/rights` and the model's `member_info` still tell them. The model
+still taught them from memory, so before an answer is sent and saved the
+agent writes each removed command as the one that does its work now
+(`internal/agent/commands.go`): `/cards`, `/mycards`, `/cardtop`, `/market`
+and `/duel` as `/card`, `/profile` as `/rights`, `/myinvites`,
+`/invites_week` and `/invites_month` as `/invites`, and Iris's `.дк` as
+`/access`; only a whole command, with or without `@bot`, never `/cardsx` or a
+link's `/cards`. The router sends questions about anyone's cards, points,
+tokens, rank or warnings, or what a rank gives, to the tools, and the
+persona and the tools' descriptions say to call `member_info` or
+`group_info` before stating any of them.
 The Animelar tab (`animes`) lists every anime, its seasons and sequels as one, with
 how many of its cards the player holds; an anime opens on all its cards with their
 pictures and names, the ones not held dimmed, so that a player sees what is there to

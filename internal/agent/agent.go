@@ -465,6 +465,7 @@ func finishText(t *turn, answer string) (Answer, error) {
 		// is the truth.
 		answer = said
 	}
+	answer = currentCommands(answer)
 	if t.req.LatinScript && uzscript.IsUzbekCyrillic(answer) {
 		answer = uzscript.Latin(answer)
 	}

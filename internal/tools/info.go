@@ -39,7 +39,7 @@ func GroupInfoTool(telegramAPI GroupInfoReader, botID int64, commandRanks Comman
 	return Tool{
 		Name: "group_info",
 		Description: "This group as Telegram has it now: title, public link, description (bio), member count, admins count, whether it has topics, what members may send, its latest pinned message, its sticker pack, which admin rights you yourself hold here, and rank_table: what each moderator rank (1 to 5) opens in this group, as its /access sets it. " +
-			"Use it whenever someone asks about the group's bio or description, link, size, rules of what may be sent, the pinned message, what you are able to do here, or what a rank gives (\"guruh biosi\", \"guruhda nechta odam\", \"qanday huquqing bor\", \"3-daraja nima beradi\", \"описание группы\"); never guess.",
+			"Call it before you say what a rank gives or anything about the group, even when the chat or your earlier answers seem to say it, whenever someone asks about the group's bio or description, link, size, rules of what may be sent, the pinned message, what you are able to do here, or what a rank gives (\"guruh biosi\", \"guruhda nechta odam\", \"qanday huquqing bor\", \"3-daraja nima beradi\", \"описание группы\"); never guess.",
 		Schema:    json.RawMessage(`{"type": "object", "properties": {}, "additionalProperties": false}`),
 		GroupOnly: true,
 		Run: func(ctx context.Context, _ json.RawMessage) (any, error) {
@@ -182,7 +182,7 @@ func MemberInfoTool(opts MemberInfoOptions) Tool {
 	return Tool{
 		Name: "member_info",
 		Description: "Everything known about the asker in this group (whose: me, the default), or about the member their message replies to (replied) or the one they tagged with @ (tagged): Telegram status and admin title or tag, moderator rank (1–5), warnings with the last reason, mutes and bans received, messages written today and this week, when last seen, who brought them in, how many people they brought, and their card game points, place, cards, tokens, minutes to the next token and crystals. " +
-			"Use it whenever someone asks about themselves or a member (\"men haqimda\", \"darajam qaysi\", \"nechta ogohlantirishim bor\", \"nechta xabar yozdim\", \"kim qo'shgan meni\", \"ochkoim\", \"мой ранг\", \"сколько у меня предупреждений\"); answer only from what it gives.",
+			"Call it before you state anyone's cards, points, tokens, crystals, rank, warnings or messages, even when the chat or your earlier answers seem to say them: they change, and memory is wrong. Use it whenever someone asks about themselves or a member (\"men haqimda\", \"darajam qaysi\", \"nechta ogohlantirishim bor\", \"nechta xabar yozdim\", \"kim qo'shgan meni\", \"ochkoim\", \"мой ранг\", \"сколько у меня предупреждений\"); answer only from what it gives.",
 		Schema: json.RawMessage(`{"type": "object", "properties": {
 			"whose": {"type": "string", "enum": ["me", "replied", "tagged"], "description": "me, the default; replied for the member their message replies to; tagged for the one member they tagged."}
 		}, "additionalProperties": false}`),
