@@ -27,6 +27,7 @@ var Settings = []Setting{
 	{Name: "MAX_GROUP_REPLY_LENGTH", Group: true, Max: 4096, About: "guruhdagi javobning eng ko'p belgisi"},
 	{Name: "GROUP_MIN_MEMBERS", Max: 100000, About: "boshqa guruhlarda ishlash uchun kamida a'zolar"},
 	{Name: "PRIVATE_CHATS", About: "shaxsiy chat: on, owners yoki off"},
+	{Name: "REQUIRED_CHANNEL", About: "botga yozish uchun a'zo bo'lish shart kanallar: @kanal1,@kanal2 yoki off"},
 	{Name: "PRIVATE_DAILY_LIMIT", Max: 10000, About: "shaxsiy chatda kuniga javoblar (0 cheksiz)"},
 	{Name: "PREMIUM_PRICE_STARS", Max: 10000, About: "premium narxi, Telegram Stars'da (0 sotilmaydi)"},
 	{Name: "PREMIUM_DAYS", Max: 365, About: "premium necha kun amal qiladi"},

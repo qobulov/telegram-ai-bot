@@ -476,8 +476,13 @@ func (r *reader) chooseProvider(cfg *Config) {
 // requiredChannels reads REQUIRED_CHANNEL: channels' @usernames or -100
 // IDs, separated by commas, or nothing.
 func (r *reader) requiredChannels() []string {
+	list := r.text("REQUIRED_CHANNEL", "")
+	if offWords[strings.ToLower(strings.TrimSpace(list))] {
+		// "off" saved with /set turns the environment's channels off.
+		return nil
+	}
 	var channels []string
-	for _, channel := range strings.Split(r.text("REQUIRED_CHANNEL", ""), ",") {
+	for _, channel := range strings.Split(list, ",") {
 		channel = strings.TrimSpace(channel)
 		if channel == "" {
 			continue
@@ -490,6 +495,9 @@ func (r *reader) requiredChannels() []string {
 	}
 	return channels
 }
+
+// offWords turn a list setting off.
+var offWords = map[string]bool{"off": true, "none": true, "0": true, "-": true}
 
 var channelName = regexp.MustCompile(`^(@[A-Za-z][A-Za-z0-9_]{3,31}|-100[0-9]{5,})$`)
 

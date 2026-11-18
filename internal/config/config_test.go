@@ -1734,6 +1734,19 @@ func TestRequiredChannel(t *testing.T) {
 			t.Errorf("REQUIRED_CHANNEL=%s: %q, %v; want %s", value, cfg.RequiredChannels, err, want)
 		}
 	}
+	// Saved with /set over the environment's, the owners' list holds, and
+	// "off" turns the environment's off.
+	if _, ok := FindSetting("REQUIRED_CHANNEL"); !ok {
+		t.Error("REQUIRED_CHANNEL is not a setting /set may change")
+	}
+	env := validEnv()
+	env["REQUIRED_CHANNEL"] = "@maria_news"
+	if cfg, err := Load(Overlay(getenv(env), map[string]string{"REQUIRED_CHANNEL": "@BSnewsmlbb,@tiktok_trends_music"})); err != nil || strings.Join(cfg.RequiredChannels, " ") != "@BSnewsmlbb @tiktok_trends_music" {
+		t.Errorf("saved over the environment's = %q, %v", cfg.RequiredChannels, err)
+	}
+	if cfg, err := Load(Overlay(getenv(env), map[string]string{"REQUIRED_CHANNEL": "off"})); err != nil || len(cfg.RequiredChannels) != 0 {
+		t.Errorf("off = %q, %v; want none", cfg.RequiredChannels, err)
+	}
 	for _, channel := range []string{"maria_news", "https://t.me/maria_news", "@ab", "123", "@maria_news, nope"} {
 		env := validEnv()
 		env["REQUIRED_CHANNEL"] = channel
