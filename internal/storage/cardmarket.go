@@ -119,7 +119,8 @@ func (s *Store) CardMarket(ctx context.Context, viewer int64, rules CardMarketRu
 
 // TakeCardOffer takes the offer for by: its player gives by the card
 // offered and by gives them the card wanted, each with its points. An offer
-// whose player no longer holds its card is called off, ErrCardOfferGone.
+// whose player no longer holds a free copy of its card, gone or fused
+// away, is called off, ErrCardOfferGone.
 func (s *Store) TakeCardOffer(ctx context.Context, id, by int64, rules CardTradeRules, keep time.Duration) (CardTrade, error) {
 	var trade CardTrade
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
@@ -139,7 +140,10 @@ func (s *Store) TakeCardOffer(ctx context.Context, id, by int64, rules CardTrade
 		if err := lockTraders(ctx, tx, by, trade.From); err != nil {
 			return err
 		}
-		if err := moveCard(ctx, tx, trade.From, by, trade.Give.ID); errors.Is(err, ErrCardNotHeld) {
+		if err := moveCard(ctx, tx, trade.From, by, trade.Give.ID); errors.Is(err, ErrCardNotHeld) || errors.Is(err, ErrCardFused) {
+			// The offerer no longer has a copy to give, whether sold away or
+			// fused into stars after the offer; the taker's own side failing
+			// stays what it is.
 			return ErrCardOfferGone
 		} else if err != nil {
 			return err

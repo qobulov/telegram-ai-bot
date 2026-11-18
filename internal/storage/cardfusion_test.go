@@ -68,8 +68,8 @@ func TestFuseCard(t *testing.T) {
 }
 
 // A card raised above ★1 stays with its holder: an offer giving it, once
-// its free copies are fused away, is refused on take and left off the
-// market, and the last copy of a raised card is not offered.
+// its free copies are fused away, is called off on take (offer gone, not
+// "fused") and left off the market, and the last copy of a raised card is not offered.
 func TestFuseThenOfferedCopyIsGone(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -94,8 +94,12 @@ func TestFuseThenOfferedCopyIsGone(t *testing.T) {
 	if offers, err := store.CardMarket(ctx, 2, market, 10); err != nil || len(offers) != 0 {
 		t.Errorf("the market shows a fused last copy: %+v, %v", offers, err)
 	}
-	if _, err := store.TakeCardOffer(ctx, offer, 2, CardTradeRules{Now: now}, market.Keep); !errors.Is(err, ErrCardFused) {
-		t.Errorf("taking a fused last copy = %v", err)
+	if _, err := store.TakeCardOffer(ctx, offer, 2, CardTradeRules{Now: now}, market.Keep); !errors.Is(err, ErrCardOfferGone) {
+		t.Errorf("taking a fused last copy = %v, want the offer gone", err)
+	}
+	var status string
+	if err := store.pool.QueryRow(ctx, `SELECT status FROM card_trades WHERE id = $1`, offer).Scan(&status); err != nil || status != "off" {
+		t.Errorf("the offer of a fused last copy = %q, %v, want off", status, err)
 	}
 	if _, err := store.OfferCard(ctx, 1, 10, 20, market); !errors.Is(err, ErrCardFused) {
 		t.Errorf("offering a fused last copy = %v", err)
@@ -106,6 +110,10 @@ func TestFuseThenOfferedCopyIsGone(t *testing.T) {
 	}
 	// A copy drawn again is free, and may be traded; the stars stay.
 	if _, err := store.pool.Exec(ctx, `UPDATE card_owned SET count = 3 WHERE user_id = 1 AND card_id = 10`); err != nil {
+		t.Fatal(err)
+	}
+	offer, err = store.OfferCard(ctx, 1, 10, 20, market)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.TakeCardOffer(ctx, offer, 2, CardTradeRules{Now: now}, market.Keep); err != nil {
