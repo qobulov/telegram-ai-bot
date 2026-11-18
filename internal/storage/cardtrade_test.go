@@ -165,6 +165,44 @@ func TestTheCardMarket(t *testing.T) {
 	}
 }
 
+// The market lists first the offers its viewer can take, older ones among
+// them, and leaves out an offer whose player no longer holds its card: the
+// market had stalled with such offers listed as takeable among the rest.
+func TestTheMarketListsWhatTheViewerCanTakeFirst(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	for _, q := range []string{
+		`INSERT INTO card_catalog (id, name, rarity, attack, health, value) VALUES (20, 'Levi', 3, 1, 1, 1000), (30, 'Hinata Hyuuga', 3, 1, 1, 1000), (40, 'Kakashi', 3, 1, 1, 1000)`,
+		`INSERT INTO card_players (user_id, name, points, cards, draws) VALUES (1, 'Alice', 2000, 2, 2), (2, 'Bob', 1000, 1, 1)`,
+		`INSERT INTO card_owned (user_id, card_id) VALUES (1, 20), (1, 40), (2, 30)`,
+	} {
+		if _, err := store.pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	now := time.Now()
+	market := CardMarketRules{Open: 5, Keep: 7 * 24 * time.Hour, Now: now}
+	older, err := store.OfferCard(ctx, 1, 20, 30, market)
+	if err != nil {
+		t.Fatal(err)
+	}
+	market.Now = now.Add(time.Minute)
+	newer, err := store.OfferCard(ctx, 1, 40, 20, market)
+	if err != nil {
+		t.Fatal(err)
+	}
+	offers, err := store.CardMarket(ctx, 2, market, 10)
+	if err != nil || len(offers) != 2 || offers[0].ID != older || !offers[0].Can || offers[1].ID != newer || offers[1].Can {
+		t.Fatalf("Bob's market = %+v, %v", offers, err)
+	}
+	if _, err := store.pool.Exec(ctx, `DELETE FROM card_owned WHERE user_id = 1 AND card_id = 40`); err != nil {
+		t.Fatal(err)
+	}
+	if offers, err = store.CardMarket(ctx, 2, market, 10); err != nil || len(offers) != 1 || offers[0].ID != older {
+		t.Errorf("Bob's market once Alice's Kakashi is gone = %+v, %v", offers, err)
+	}
+}
+
 // A trade of cards more than one rarity apart is refused, as an offer and
 // as a take; two players trade with each other as often as they like.
 func TestTradesAreEvenAndUnlimited(t *testing.T) {

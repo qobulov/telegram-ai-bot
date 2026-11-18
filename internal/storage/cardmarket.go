@@ -69,20 +69,25 @@ func (s *Store) OfferCard(ctx context.Context, from, give, want int64, rules Car
 	return id, tradeError("offer a card", err)
 }
 
-// CardMarket is the offers open on the market, the newest first, as viewer
-// sees them; at most limit.
+// CardMarket is the offers open on the market as viewer sees them: those
+// they can take first, then the newest; at most limit. An offer whose player
+// no longer holds the card offered is left out, as taking it would fail.
 func (s *Store) CardMarket(ctx context.Context, viewer int64, rules CardMarketRules, limit int) ([]CardOffer, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT t.id, t.from_id, coalesce(p.name, ''), t.created_at,
 			g.id, g.name, g.anime, g.image_url, g.favourites, g.rarity, g.attack, g.health, g.value, g.collection,
 			w.id, w.name, w.anime, w.image_url, w.favourites, w.rarity, w.attack, w.health, w.value, w.collection,
-			EXISTS (SELECT 1 FROM card_owned o WHERE o.user_id = $1 AND o.card_id = t.take_card)
+			c.can
 		FROM card_trades t
 		JOIN card_catalog g ON g.id = t.give_card
 		JOIN card_catalog w ON w.id = t.take_card
 		LEFT JOIN card_players p ON p.user_id = t.from_id
+		CROSS JOIN LATERAL (
+			SELECT t.from_id <> $1 AND EXISTS (SELECT 1 FROM card_owned o WHERE o.user_id = $1 AND o.card_id = t.take_card) AS can
+		) c
 		WHERE t.status = 'open' AND t.to_id IS NULL AND t.created_at > $2
-		ORDER BY t.created_at DESC, t.id DESC LIMIT $3`, viewer, rules.Now.Add(-rules.Keep), limit)
+			AND EXISTS (SELECT 1 FROM card_owned o WHERE o.user_id = t.from_id AND o.card_id = t.give_card)
+		ORDER BY c.can DESC, t.created_at DESC, t.id DESC LIMIT $3`, viewer, rules.Now.Add(-rules.Keep), limit)
 	if err != nil {
 		return nil, fmt.Errorf("storage: read the card market: %w", err)
 	}
