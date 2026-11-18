@@ -11,20 +11,25 @@ import (
 )
 
 // The Firefly Wedding event, as the owners asked: for two weeks the shop
-// sells pulls for tokens with three times the Mythic odds, half of the
+// sells pulls for tokens with twice the Mythic odds, half of the
 // Mythic ones Satoko Kirigaya, the limited card, and the EventPity-th pull
 // in a row without her sure to give her.
 const (
 	EventCard        int64 = 298761 // Satoko Kirigaya
-	EventMythicBoost       = 3
+	EventMythicBoost       = 2
 	EventShare             = 0.5
-	EventPity              = 130
+	EventPity              = 200
 	EventPrice             = 1 // tokens a pull
 	EventBatch             = 10
 )
 
-// EventEnds is when the event ends: 2026-12-02 00:00 in Tashkent.
-var EventEnds = time.Date(2026, 12, 2, 0, 0, 0, 0, Location)
+// EventStarts is when the event (started again by the owners) opens:
+// 2026-11-18 22:00 in Tashkent; before it the shop shows it as coming.
+// EventEnds is when it ends: 2026-12-02 00:00 in Tashkent.
+var (
+	EventStarts = time.Date(2026, 11, 18, 22, 0, 0, 0, Location)
+	EventEnds   = time.Date(2026, 12, 2, 0, 0, 0, 0, Location)
+)
 
 // EventRoll draws an event pull's rarity from a number in [0, 1000): the
 // usual odds but a Mythic EventMythicBoost times as likely, the extra taken
@@ -70,19 +75,25 @@ func (h *handler) eventView(ctx context.Context, user miniapp.User) (any, failur
 		return nil, errUnavailable
 	}
 	return map[string]any{
-		"active": now.Before(EventEnds), "ends_at": EventEnds.UnixMilli(), "ends_in": max(0, EventEnds.Sub(now).Milliseconds()),
+		"active": !now.Before(EventStarts) && now.Before(EventEnds), "soon": now.Before(EventStarts),
+		"starts_in": max(0, EventStarts.Sub(now).Milliseconds()),
+		"ends_at":   EventEnds.UnixMilli(), "ends_in": max(0, EventEnds.Sub(now).Milliseconds()),
 		"pity": pulls, "pity_max": EventPity, "odds": EventOdds(), "share": EventShare,
 		"price": EventPrice, "batch": EventBatch, "card": h.held(card, 0),
 	}, failure{}
 }
 
 // eventOpen pulls 1 or EventBatch event cards for tokens. A pull refused
-// says why: "over" once the event has ended, "funds" with too few tokens.
+// says why: "soon" before it starts, "over" once it has ended, "funds" with
+// too few tokens.
 func (h *handler) eventOpen(ctx context.Context, user miniapp.User, n int) (any, failure) {
 	if n != 1 && n != EventBatch {
 		return nil, errBadRequest
 	}
 	now := h.Now()
+	if now.Before(EventStarts) {
+		return map[string]any{"refused": "soon"}, failure{}
+	}
 	if !now.Before(EventEnds) {
 		return map[string]any{"refused": "over"}, failure{}
 	}

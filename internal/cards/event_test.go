@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -57,13 +58,13 @@ func (f *eventStore) CardEventPulls(context.Context, int64, int64) (int, storage
 	return f.eventPulls, eventCard, nil
 }
 
-// An event pull's odds are the usual ones with the Mythic three times as
+// An event pull's odds are the usual ones with the Mythic twice as
 // likely, the extra taken from Common.
 func TestEventOdds(t *testing.T) {
-	if got := EventOdds(); !slices.Equal(got, []int{620, 250, 90, 25, 15}) {
+	if got := EventOdds(); !slices.Equal(got, []int{625, 250, 90, 25, 10}) {
 		t.Errorf("event odds = %v", got)
 	}
-	if EventRoll(14) != Mythic || EventRoll(15) != Legendary || EventRoll(999) != Common {
+	if EventRoll(9) != Mythic || EventRoll(10) != Legendary || EventRoll(999) != Common {
 		t.Error("the event roll's edges moved")
 	}
 }
@@ -94,7 +95,7 @@ func TestTheCardEvent(t *testing.T) {
 	if code != 200 || out["active"] != true || out["pity"] != 37.0 || out["pity_max"] != float64(EventPity) || out["ends_in"] != float64(50*time.Hour/time.Millisecond) || card["name"] != "Satoko Kirigaya" || card["limited"] != true {
 		t.Fatalf("event = %d %v", code, out)
 	}
-	if odds := out["odds"].([]any); len(odds) != 5 || odds[4] != 15.0 {
+	if odds := out["odds"].([]any); len(odds) != 5 || odds[4] != 10.0 {
 		t.Errorf("odds = %v", odds)
 	}
 
@@ -119,5 +120,23 @@ func TestTheCardEvent(t *testing.T) {
 	}
 	if _, out := post(t, h, signedInit(7, now), "event"); out["active"] != false || out["ends_in"] != 0.0 {
 		t.Errorf("the event after its end = %v", out)
+	}
+}
+
+// Before it starts the event is shown as coming, with the time to its
+// start, and a pull is refused as too soon.
+func TestTheCardEventBeforeItStarts(t *testing.T) {
+	now := EventStarts.Add(-90 * time.Minute)
+	store := &eventStore{fakeStore: &fakeStore{day: PeriodStart(now), tokens: 5}}
+	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }})
+	code, out := post(t, h, signedInit(7, now), "event")
+	if code != 200 || out["active"] != false || out["soon"] != true || out["starts_in"] != float64(90*time.Minute/time.Millisecond) {
+		t.Fatalf("event before its start = %d %v", code, out)
+	}
+	body := `{"init_data":` + strconv.Quote(signedInit(7, now)) + `,"action":"event_open","count":1}`
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/cards", strings.NewReader(body)))
+	if !strings.Contains(rec.Body.String(), `"refused":"soon"`) {
+		t.Errorf("a pull before the start = %d %s", rec.Code, rec.Body.String())
 	}
 }

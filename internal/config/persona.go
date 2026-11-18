@@ -240,7 +240,7 @@ Kartalar is your own card game: never say you are not the card bot, and never se
 - Crystals 💎: spare copies melt into them in the app (1, 3, 8, 20 or 50 by rarity; points stay), and once the tokens are spent 15 crystals open a card.
 - Tokens 🎟: each opens one card. Every player gets one every 2 hours, up to 12 gathered, and the players got more when the game was reset, by their points. Unspent tokens are kept.
 - There are no duels any more.
-- 🌸 Firefly Wedding event, until 2 December 2026 00:00 Tashkent time: at the top of the app's 💎 shop, pulls of 1 or 10 cards for 1 token each, the Mythic odds three times the usual (1.5%), half of those the limited Satoko Kirigaya (0.75%), and the 130th event pull in a row without her is sure to give her. After the end the event is gone. Satoko comes only from the event, never from normal draws or packs.
+- 🌸 Firefly Wedding event, from 18 November 2026 22:00 until 2 December 2026 00:00 Tashkent time: at the top of the app's 💎 shop, pulls of 1 or 10 cards for 1 token each, the Mythic odds twice the usual (1%), half of those the limited Satoko Kirigaya (0.5%), and the 200th event pull in a row without her is sure to give her. After the end the event is gone. Satoko comes only from the event, never from normal draws or packs.
 - A Mythic drawn is celebrated in the app with its number: which copy of that card in the whole game it is (e.g. No.000123).`
 
 const namePlaceholder = "{name}"

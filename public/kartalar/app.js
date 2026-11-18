@@ -1297,39 +1297,39 @@
   // ---------- event ----------
 
   // The Firefly Wedding event: pulls for tokens at the top of the shop,
-  // with three times the Mythic odds, half of them Satoko, the 130th pull
+  // with twice the Mythic odds, half of them Satoko, the 200th pull
   // without her sure to give her. The server says whether it runs.
   const eventTexts = {
     uz: {
       title: "🌸 Firefly Wedding", tag: "EVENT · LIMITED",
       left: (d, h, m) => (d ? `⏳ ${d} kun ${h} soat qoldi` : h ? `⏳ ${h} soat ${m} daqiqa qoldi` : `⏳ ${m} daqiqa qoldi`),
-      odds: (m, s) => `👑 Mifik ${m} (×3) · 🌸 Satoko ${s}`, pity: (n, max) => `Satoko kafolati: ${n}/${max}`,
-      open: (n, price) => `${n} ta · ${n * price} 🎟`, short: (n) => `🎟 Yana ${n} ta token kerak`, over: "🌸 Event tugadi",
+      odds: (m, s) => `👑 Mifik ${m} (×2) · 🌸 Satoko ${s}`, pity: (n, max) => `Satoko kafolati: ${n}/${max}`,
+      open: (n, price) => `${n} ta · ${n * price} 🎟`, short: (n) => `🎟 Yana ${n} ta token kerak`, over: "🌸 Event tugadi", starts: (h, m) => (h ? `⏳ ${h} soat ${m} daqiqadan keyin boshlanadi` : `⏳ ${m} daqiqadan keyin boshlanadi`), soon: "🌸 Event hali boshlanmadi",
       pulled: (n) => `🌸 ${n} ta event karta`, got: "🌸 Satoko Kirigaya tushdi!", badge: "🌸 EVENT",
     },
     ru: {
       title: "🌸 Firefly Wedding", tag: "ИВЕНТ · LIMITED",
       left: (d, h, m) => (d ? `⏳ Осталось ${d} дн. ${h} ч.` : h ? `⏳ Осталось ${h} ч. ${m} мин.` : `⏳ Осталось ${m} мин.`),
-      odds: (m, s) => `👑 Мифическая ${m} (×3) · 🌸 Сатоко ${s}`, pity: (n, max) => `Гарант Сатоко: ${n}/${max}`,
-      open: (n, price) => `${n} шт. · ${n * price} 🎟`, short: (n) => `🎟 Нужно ещё ${n} токенов`, over: "🌸 Ивент закончился",
+      odds: (m, s) => `👑 Мифическая ${m} (×2) · 🌸 Сатоко ${s}`, pity: (n, max) => `Гарант Сатоко: ${n}/${max}`,
+      open: (n, price) => `${n} шт. · ${n * price} 🎟`, short: (n) => `🎟 Нужно ещё ${n} токенов`, over: "🌸 Ивент закончился", starts: (h, m) => (h ? `⏳ Начнётся через ${h} ч. ${m} мин.` : `⏳ Начнётся через ${m} мин.`), soon: "🌸 Ивент ещё не начался",
       pulled: (n) => `🌸 Ивент-карты: ${n}`, got: "🌸 Выпала Сатоко Киригая!", badge: "🌸 ИВЕНТ",
     },
     en: {
       title: "🌸 Firefly Wedding", tag: "EVENT · LIMITED",
       left: (d, h, m) => (d ? `⏳ ${d} days ${h} hours left` : h ? `⏳ ${h} hours ${m} minutes left` : `⏳ ${m} minutes left`),
-      odds: (m, s) => `👑 Mythic ${m} (×3) · 🌸 Satoko ${s}`, pity: (n, max) => `Satoko guarantee: ${n}/${max}`,
-      open: (n, price) => `${n} · ${n * price} 🎟`, short: (n) => `🎟 ${n} more tokens needed`, over: "🌸 The event is over",
+      odds: (m, s) => `👑 Mythic ${m} (×2) · 🌸 Satoko ${s}`, pity: (n, max) => `Satoko guarantee: ${n}/${max}`,
+      open: (n, price) => `${n} · ${n * price} 🎟`, short: (n) => `🎟 ${n} more tokens needed`, over: "🌸 The event is over", starts: (h, m) => (h ? `⏳ Starts in ${h} hours ${m} minutes` : `⏳ Starts in ${m} minutes`), soon: "🌸 The event has not started yet",
       pulled: (n) => `🌸 ${n} event cards`, got: "🌸 Satoko Kirigaya dropped!", badge: "🌸 EVENT",
     },
   };
   const et = eventTexts[language] || eventTexts.uz;
-  let eventData = null, eventEndsAt = 0, pulling = false;
+  let eventData = null, eventEndsAt = 0, eventStartsAt = 0, pulling = false;
 
   // eventMark shows the event's badge on the crystals' pill, which opens
   // the shop, while the event runs, so that players notice it.
   $("eventBadge").textContent = et.badge;
   function eventMark() {
-    $("eventBadge").hidden = !(eventData && eventData.active);
+    $("eventBadge").hidden = !(eventData && (eventData.active || eventData.soon));
   }
 
   // eventBlock asks for the event and shows it while it runs; the app asks
@@ -1342,9 +1342,10 @@
       return;
     }
     eventEndsAt = Date.now() + (eventData.ends_in || 0);
-    $("event").hidden = !eventData.active;
+    eventStartsAt = Date.now() + (eventData.starts_in || 0);
+    $("event").hidden = !(eventData.active || eventData.soon);
     eventMark();
-    if (!eventData.active) return;
+    if (!eventData.active && !eventData.soon) return;
     const tile = previewTile(eventData.card, 1);
     const mark = tile.querySelector(".owned");
     if (mark) mark.remove();
@@ -1363,13 +1364,21 @@
     $("eventPityBar").style.width = `${Math.min(100, (eventData.pity / eventData.pity_max) * 100)}%`;
     for (const [id, n] of [["eventOpen1", 1], ["eventOpen10", eventData.batch]]) {
       $(id).textContent = et.open(n, eventData.price);
-      $(id).disabled = pulling;
+      $(id).disabled = pulling || !eventData.active;
     }
   }
 
   // eventLeft counts down to the event's end, and hides it then.
   function eventLeft() {
-    if (!eventData || !eventData.active) return;
+    if (!eventData) return;
+    if (eventData.soon) {
+      const wait = eventStartsAt - Date.now();
+      if (wait <= 0) { eventBlock(); return; }
+      const m = Math.ceil(wait / 60000);
+      $("eventEnds").textContent = et.starts(Math.floor(m / 60), m % 60);
+      return;
+    }
+    if (!eventData.active) return;
     const left = eventEndsAt - Date.now();
     if (left <= 0) { $("event").hidden = true; eventData.active = false; eventMark(); return; }
     const minutes = Math.floor(left / 60000);
@@ -1390,6 +1399,7 @@
     haptic("medium");
     try {
       const data = await api("event_open", { count: n });
+      if (data.refused === "soon") { toast(et.soon); return; }
       if (data.refused === "over") { toast(et.over); $("event").hidden = true; eventData.active = false; eventMark(); return; }
       if (data.refused === "funds") { tokens = data.tokens ?? tokens; toast(et.short(data.short)); return; }
       tokens = data.tokens ?? tokens;

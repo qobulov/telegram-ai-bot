@@ -8,7 +8,7 @@ import (
 )
 
 // An event pull costs a token, refused with too few and after the event;
-// the 130th pull in a row without the event's card gives it and starts the
+// the 200th pull in a row without the event's card gives it and starts the
 // count again, and a Mythic is the event's card when the pick says so.
 func TestCardEventPulls(t *testing.T) {
 	store := newTestStore(t)
@@ -39,7 +39,7 @@ func TestCardEventPulls(t *testing.T) {
 	end := time.Date(2026, 12, 2, 0, 0, 0, 0, time.UTC)
 	now := end.Add(-time.Hour)
 	never := func() bool { return false }
-	ev := CardEvent{Card: satoko, Ends: end, Pity: 130, Price: 1, Roll: rarity(0), Pick: never}
+	ev := CardEvent{Card: satoko, Ends: end, Pity: 200, Price: 1, Roll: rarity(0), Pick: never}
 
 	setTokens(5)
 	var few *CardTokensError
@@ -54,25 +54,25 @@ func TestCardEventPulls(t *testing.T) {
 		t.Fatalf("one pull = %+v, %v", open, err)
 	}
 
-	// 129 pulls without her, and the 130th gives her, sure.
-	setTokens(200)
-	for range 12 {
+	// 199 pulls without her, and the 200th gives her, sure.
+	setTokens(300)
+	for range 19 {
 		if open, err = store.OpenEventCards(ctx, player, "Ann", 10, ev, CardDay{}, now); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if open.Pulls != 121 || open.Tokens != 80 {
-		t.Fatalf("after 121 pulls = %d pulls, %d tokens", open.Pulls, open.Tokens)
+	if open.Pulls != 191 || open.Tokens != 110 {
+		t.Fatalf("after 191 pulls = %d pulls, %d tokens", open.Pulls, open.Tokens)
 	}
 	if open, err = store.OpenEventCards(ctx, player, "Ann", 10, ev, CardDay{}, now); err != nil {
 		t.Fatal(err)
 	}
 	for i, d := range open.Draws {
 		if got := d.Card.ID == satoko; got != (i == 8) || d.Guaranteed != (i == 8) {
-			t.Errorf("pull %d = %+v", 122+i, d)
+			t.Errorf("pull %d = %+v", 192+i, d)
 		}
 	}
-	if open.Pulls != 1 || open.Tokens != 70 || open.Points != 4100 || !open.Draws[8].New {
+	if open.Pulls != 1 || open.Tokens != 100 || open.Points != 4100 || !open.Draws[8].New {
 		t.Fatalf("after the pity = %d pulls, %d tokens, %d points", open.Pulls, open.Tokens, open.Points)
 	}
 
@@ -91,11 +91,11 @@ func TestCardEventPulls(t *testing.T) {
 			t.Errorf("Mythic pull %d = %d, want %d", i, d.Card.ID, want)
 		}
 	}
-	if open.Pulls != 1 || open.Tokens != 60 || open.Draws[9].SinceMythic != 0 {
+	if open.Pulls != 1 || open.Tokens != 90 || open.Draws[9].SinceMythic != 0 {
 		t.Fatalf("after the Mythic pulls = %+v", open)
 	}
 	var pulls, draws int
-	if err := store.pool.QueryRow(ctx, `SELECT event_pulls, draws FROM card_players WHERE user_id = $1`, player).Scan(&pulls, &draws); err != nil || pulls != 1 || draws != 141 {
+	if err := store.pool.QueryRow(ctx, `SELECT event_pulls, draws FROM card_players WHERE user_id = $1`, player).Scan(&pulls, &draws); err != nil || pulls != 1 || draws != 211 {
 		t.Fatalf("event_pulls = %d, draws = %d, %v", pulls, draws, err)
 	}
 	if got, card, err := store.CardEventPulls(ctx, player, satoko); err != nil || got != 1 || card.Name != "Satoko Kirigaya" {
