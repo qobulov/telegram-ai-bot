@@ -9,12 +9,13 @@ The cards game has collecting (draws, market, gifts) but nothing to *do* with a 
 - **Arena with saved teams** (asynchronous): each player saves a defence team; anyone attacks others' saved teams at any time. No waiting for an opponent.
 - **No stakes**: the winner earns tokens and rating; the loser loses only rating. (The DB showed alt-account funnelling; stakes would invite it.)
 - **No more melt**: duplicates fuse into the same character; max ★5.
+- **No more gifts** (owner, on approving this design): cards change hands on the market only.
 
 ## Fusion
 - Every owned character has stars, ★1 when first drawn.
 - Fusing uses copies of the *same* character: ★1→★2 costs 1 copy, ★2→★3 2, ★3→★4 3, ★4→★5 4 (10 copies past the first). *(my call)*
 - Each star multiplies attack and health: ★1 ×1.00, ★2 ×1.20, ★3 ×1.45, ★4 ×1.70, ★5 ×2.00. *(my call)*
-- The fuse is the player's choice: a "⭐ Fuse" button in the card's large view, showing the cost and the new numbers; one transaction. Copies stay giftable/tradeable until fused.
+- The fuse is the player's choice: a "⭐ Fuse" button in the card's large view, showing the cost and the new numbers; one transaction. Copies stay tradeable on the market until fused.
 - Melt goes: its button, texts and API action are removed; crystals already held stay with their other uses (shop: tokens, packs).
 - Collection points and ranking are unchanged; stars add to arena power only.
 
