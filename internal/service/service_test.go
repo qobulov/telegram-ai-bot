@@ -3129,7 +3129,7 @@ func TestTurnTellsToolsTheRepliedMessage(t *testing.T) {
 	}
 	caller := calls[0].caller
 	want := tools.Target{MessageID: 29, UserID: 9001, Name: "Azizbek @Pronium", Owner: true, Text: strings.Repeat("я", 499) + "…"}
-	if !caller.Human || caller.MessageID != 30 || caller.Target == nil || *caller.Target != want {
+	if !caller.Human || caller.MessageID != 30 || caller.Target == nil || !reflect.DeepEqual(*caller.Target, want) {
 		t.Errorf("caller = %+v, target = %+v\nwant target %+v", caller, caller.Target, want)
 	}
 	if target := calls[1].caller.Target; target != nil {
@@ -3179,7 +3179,7 @@ func TestOwnersReplyToTheBotsAnswerNamesWhomItAnswered(t *testing.T) {
 		t.Fatalf("model calls = %d, want 2", len(calls))
 	}
 	want := tools.Target{MessageID: 28, UserID: userID, Name: "Bek @bek"}
-	if target := calls[0].caller.Target; target == nil || target.UserID != botID || target.Answered == nil || *target.Answered != want {
+	if target := calls[0].caller.Target; target == nil || target.UserID != botID || target.Answered == nil || !reflect.DeepEqual(*target.Answered, want) {
 		t.Errorf("owner's target = %+v, want the bot's message answering %+v", target, want)
 	}
 	// Only owners give such orders; nobody else's turn asks.

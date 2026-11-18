@@ -111,6 +111,9 @@ type Target struct {
 	// whose message it answered, if known: whom an owner means by "don't
 	// answer him" in a reply to that answer.
 	Answered *Target
+	// About is, when the message is the bot's own, the members it tags:
+	// whom a moderation notice such as "@spammer was banned" was about.
+	About []Mention
 }
 
 // Drawing is a picture made during a turn, to be sent with the answer.

@@ -16,7 +16,11 @@ var modRefusals = []struct {
 }{
 	{regexp.MustCompile(`^that admin was made by another admin`), "Bu adminni men emas, boshqa admin tayinlagan: Telegram uning unvoni va huquqlarini faqat o'sha admin yoki guruh egasiga o'zgartirishga ruxsat beradi. Men qilishim uchun uni adminlikdan olib, men orqali qayta admin qiling."},
 	{regexp.MustCompile(`^that member is not an admin I can change`), "U admin emas, men faqat o'zim tayinlagan adminlarni o'zgartira olaman."},
+	{regexp.MustCompile(`^that member is the group's creator`), "U guruh egasi: Telegram botga guruh egasini mute, ban, kik qilish yoki cheklashga ruxsat bermaydi."},
+	{regexp.MustCompile(`^that member is an admin of this group`), "U shu guruh admini (unvoni shuni ko'rsatadi): Telegram botga adminni mute, ban, kik qilish yoki cheklashga ruxsat bermaydi, shuning uchun adminlarga ham, xabarlariga ham tegmayman. Avval guruh egasi yoki uni admin qilgan kishi adminlikni olib tashlasin."},
 	{regexp.MustCompile(`^I can't do that to admins`), "Buni adminlarga, bot egalariga, menga yoki o'zingizga qila olmayman."},
+	{regexp.MustCompile(`^that message of mine is not about a member`), "Bu xabarim kim haqida ekanini topmadim: a'zoning o'z xabariga reply qiling yoki ismini yozing."},
+	{regexp.MustCompile(`^that message of mine names more than one member`), "Bu xabarimda bir nechta a'zo bor: keragini @ bilan yozing yoki uning o'z xabariga reply qiling."},
 	{regexp.MustCompile(`^reply to the message of the member you mean`), "Kimga? A'zoning xabariga reply qiling yoki @username bilan yozing."},
 	{regexp.MustCompile(`^more than one member is tagged`), "Bir nechta a'zo belgilangan: bittasini @ bilan yozing yoki uning xabariga reply qiling."},
 	{regexp.MustCompile(`^I have not seen that @username`), "Bu @username'ni guruhda ko'rmaganman: uning xabariga reply qilib yozing."},

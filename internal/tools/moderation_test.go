@@ -700,20 +700,24 @@ func TestModerateRefusesImmuneTargets(t *testing.T) {
 	// pinned; everyone else here is kept off even that.
 	members := []string{"mute", "ban"}
 	everything := []string{"mute", "ban", "delete", "pin"}
+	const immuneWords = "I can't do that to"
 	cases := map[string]struct {
 		target  *Target
 		member  *telegram.ChatMember
 		actions []string
+		refusal string
 	}{
-		"the person asking": {&Target{MessageID: 29, UserID: userID, Name: "Ali"}, nil, members},
-		"the bot":           {botMessage(), nil, members},
-		"an owner":          {&Target{MessageID: 29, UserID: 9002, Name: "Muhammad", Owner: true}, nil, everything},
-		"the creator":       {bekTarget(), &creator, everything},
-		// An admin is immune whatever rights they hold.
-		"an administrator":        {bekTarget(), &noRights, everything},
-		"a linked channel's post": {&Target{MessageID: 29, UserID: 777000, Name: "Telegram"}, nil, everything},
-		"an anonymous admin":      {&Target{MessageID: 29, UserID: 1087968824, Name: "Group @GroupAnonymousBot", IsBot: true}, nil, everything},
-		"a channel":               {&Target{MessageID: 29, UserID: 136817688, Name: "Channel @Channel_Bot", IsBot: true}, nil, everything},
+		"the person asking": {&Target{MessageID: 29, UserID: userID, Name: "Ali"}, nil, members, immuneWords},
+		// A member action replying to the bot's own message looks for whom
+		// it was about, and here it names nobody.
+		"the bot":     {botMessage(), nil, members, "that message of mine is not about a member"},
+		"an owner":    {&Target{MessageID: 29, UserID: 9002, Name: "Muhammad", Owner: true}, nil, everything, immuneWords},
+		"the creator": {bekTarget(), &creator, everything, "that member is the group's creator: Telegram does not let a bot"},
+		// An admin is immune whatever rights they hold, and is told why.
+		"an administrator":        {bekTarget(), &noRights, everything, "that member is an admin of this group (an admin's title"},
+		"a linked channel's post": {&Target{MessageID: 29, UserID: 777000, Name: "Telegram"}, nil, everything, immuneWords},
+		"an anonymous admin":      {&Target{MessageID: 29, UserID: 1087968824, Name: "Group @GroupAnonymousBot", IsBot: true}, nil, everything, immuneWords},
+		"a channel":               {&Target{MessageID: 29, UserID: 136817688, Name: "Channel @Channel_Bot", IsBot: true}, nil, everything, immuneWords},
 	}
 	for name, c := range cases {
 		for _, action := range c.actions {
@@ -725,7 +729,7 @@ func TestModerateRefusesImmuneTargets(t *testing.T) {
 
 				got := env.moderate(asking(100, c.target), `{"action":"`+action+`"}`)
 
-				expectRefusal(t, got, "forbidden", "I can't do that to")
+				expectRefusal(t, got, "forbidden", c.refusal)
 				env.nothingActed(t)
 			})
 		}
@@ -738,7 +742,7 @@ func TestModerateOwnMessageDeleteAllowedMuteRefused(t *testing.T) {
 	if said := env.act(t, asking(100, botMessage()), `{"action":"delete"}`); !strings.HasPrefix(said, "Bajarildi:") {
 		t.Fatalf("deleting the bot's own message said %q", said)
 	}
-	expectRefusal(t, env.moderate(asking(102, botMessage()), `{"action":"mute"}`), "forbidden", "I can't do that to")
+	expectRefusal(t, env.moderate(asking(102, botMessage()), `{"action":"mute"}`), "forbidden", "that message of mine is not about a member")
 
 	// The person asking may have their own message deleted or pinned, but
 	// may not mute or ban themselves.

@@ -17,6 +17,10 @@ func TestModRefusalsInUzbek(t *testing.T) {
 		"that member's rank is 3, not lower than the asker's 3, so nothing was done":                                                        "Uning darajasi 3",
 		"that's 20 actions in 10 minutes; wait a bit":                                                                                       "10 daqiqada 20 ta",
 		"I have not seen that @username in this group, so I can't tell who it is; reply":                                                    "@username'ni guruhda ko'rmaganman",
+		"that member is an admin of this group (an admin's title, such as a custom one, shows it), and Telegram":                            "Telegram botga adminni",
+		"that member is the group's creator: Telegram does not let a bot":                                                                   "guruh egasi",
+		"that message of mine is not about a member I acted on lately; reply":                                                               "kim haqida ekanini topmadim",
+		"that message of mine names more than one member; tag":                                                                              "bir nechta a'zo",
 		"a member's tag has at most 16 characters and no emoji":                                                                             "16 belgi",
 	} {
 		if got := modRefusalText(message); !strings.Contains(got, want) {

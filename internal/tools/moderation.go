@@ -106,6 +106,13 @@ const (
 	unknownMention = "I have not seen that @username in this group, so I can't tell who it is; reply to one of their own messages instead"
 	unsureMention  = "Telegram did not confirm that the tagged account is a member here under that name, so nothing was done; reply to one of their own messages instead"
 	immune         = "I can't do that to admins, my owners, myself, Telegram's service accounts or the person asking"
+	// targetIsAdmin is a member Telegram shows as an admin, whatever their
+	// title: a custom title such as "Legend" is an admin's.
+	targetIsCreator = "that member is the group's creator: Telegram does not let a bot mute, ban, kick or restrict the creator, and I keep off their messages too"
+	targetIsAdmin   = "that member is an admin of this group (an admin's title, such as a custom one, shows it), and Telegram does not let a bot mute, ban, kick or restrict an admin, so I keep off admins and their messages; the group's creator, or the admin who made them admin, must take their adminship away first"
+	// The bot's own message replied to must name the one member meant.
+	noticeOfNobody = "that message of mine is not about a member I acted on lately; reply to the member's own message, or name them"
+	noticeOfMany   = "that message of mine names more than one member; tag the one you mean with @, or reply to their own message"
 	notAsked       = "their own message does not ask for this, so nothing was done; do it only when they ask for it in words, such as \"mute qil\" or \"o'chir\""
 	noAnswer       = "Telegram did not answer, so it may not have been done; try again later"
 	notAnAdmin     = "that member is not an admin I can change: I can only demote or title admins I made myself"
@@ -277,6 +284,10 @@ type ModerationOptions struct {
 	// Roster finds a member the asker named by first name or username,
 	// without a tag; without it only replies and tags name a member.
 	Roster MemberLister
+	// Targets lists the members the bot acted on lately, so that a reply
+	// to its notice about one, or their name, finds them after they left;
+	// without it only the notice's tags and the members still here count.
+	Targets TargetBook
 	// Links finds the invite links the bot made, to revoke or edit them;
 	// without it neither can be done.
 	Links InviteLinks
@@ -300,6 +311,20 @@ type BanBook interface {
 	BannedMembers(ctx context.Context, chatID int64, limit int) ([]storage.BannedMember, error)
 	InactiveMembers(ctx context.Context, chatID int64, since time.Time, limit int) ([]storage.GroupMember, error)
 }
+
+// TargetBook lists the members the bot acted on in a group since a time,
+// the latest first, with the names last seen, whether or not they are
+// still in it.
+type TargetBook interface {
+	ModerationTargets(ctx context.Context, chatID int64, since time.Time, limit int) ([]storage.GroupMember, error)
+}
+
+// recentTargets is how far back, and how many of, the members the bot acted
+// on are looked through for a notice or a name.
+const (
+	recentTargetsWindow = 7 * 24 * time.Hour
+	recentTargetsListed = 50
+)
 
 // RankBook keeps each group's moderators' ranks and the rank each command
 // needs there.
@@ -380,7 +405,7 @@ func (m *Moderation) Tool() Tool {
 			"For the group itself, with no reply or tag: set_title (text), set_description (text, empty to remove), set_photo (the photo in their message), delete_photo, set_sticker_set (the pack of the sticker they replied to, as the group's pack every member may use) or delete_sticker_set, invite_link (a new link; text names it, minutes ends it), unpin_all, and lock or unlock (kind) to forbid or allow one kind of message to everyone, keeping the group's other permissions: when they ask to block stickers or photos for all, it is lock, never a guard. " +
 			"An invite_link may let only member_limit people join, or with join_request make each ask the admins to approve them, never both. revoke_link stops a link you made from working, and edit_link changes its text, minutes, member_limit (0 for none) or join_request; both act on link, or without it on the latest link you made here. " +
 			"undo: put back the last thing you did here with this tool, whatever it was; a deleted message never comes back. With force only when, told it was changed by hand since, they still want it back. " +
-			"For member actions without such a reply, or replying to their own message, it acts on the one member they tagged with @, once Telegram confirms who that is; when they named the member without a tag (\"Azamatni mute qil\"), pass member: never ask them to tag or reply instead. " +
+			"For member actions without such a reply, or replying to their own message, it acts on the one member they tagged with @, once Telegram confirms who that is; when they named the member without a tag (\"Azamatni mute qil\"), pass member: never ask them to tag or reply instead; a member you acted on lately is found by name even after they left. A reply to your own notice (\"X bloklandi\") acts on the member it is about. " +
 			"It checks everyone's rights and does it at once, with no question, but only when the person's own message asks for it; say it is done only when it reports done.",
 		Schema: json.RawMessage(`{
 			"type": "object",
@@ -599,6 +624,9 @@ func (m *Moderation) targetOf(ctx context.Context, caller Caller, action, member
 	ownReply := replied != nil && replied.UserID == caller.UserID
 	named := len(caller.Mentions) > 0 || member != ""
 	switch {
+	case replied != nil && replied.UserID == m.opts.BotID && onMember(action) && !named:
+		// "Purge him" replying to the bot's "X was banned" means X.
+		return m.noticeSubject(ctx, caller, *replied, action)
 	case replied != nil && (!ownReply || !onMember(action) || !named):
 		// Acting on oneself is refused when the order is checked.
 		return *replied, nil
@@ -658,6 +686,17 @@ func (m *Moderation) named(ctx context.Context, caller Caller, member, action st
 	if err != nil {
 		return Target{}, internal(err)
 	}
+	// A spammer just banned has left the members, but is still the one
+	// "purge Ali" means.
+	gone, err := m.recentTargets(ctx, caller.ChatID)
+	if err != nil {
+		return Target{}, err
+	}
+	for _, t := range gone {
+		if !slices.ContainsFunc(members, func(seen storage.GroupMember) bool { return seen.UserID == t.UserID }) {
+			members = append(members, t)
+		}
+	}
 	var found []storage.GroupMember
 	for _, seen := range members {
 		if goesBy(seen, member) {
@@ -684,6 +723,52 @@ func (m *Moderation) named(ctx context.Context, caller Caller, member, action st
 		}
 	}
 	return m.tagged(ctx, caller.ChatID, Mention{UserID: chosen.UserID}, action)
+}
+
+// noticeSubject is the member one of the bot's own messages is about, as an
+// order replying to its notice "Ali @ali was banned" means Ali: the one
+// member the message tags, or else the one member the bot acted on lately
+// whose @username or first name it says. Anything less certain acts on
+// nobody.
+func (m *Moderation) noticeSubject(ctx context.Context, caller Caller, notice Target, action string) (Target, error) {
+	if len(notice.About) == 1 {
+		return m.tagged(ctx, caller.ChatID, notice.About[0], action)
+	}
+	if len(notice.About) > 1 {
+		return Target{}, &DeniedError{Message: noticeOfMany}
+	}
+	targets, err := m.recentTargets(ctx, caller.ChatID)
+	if err != nil {
+		return Target{}, err
+	}
+	words := wordsOf(notice.Text)
+	var found []storage.GroupMember
+	for _, t := range targets {
+		byUsername := t.Username != "" && slices.Contains(words, strings.ToLower(t.Username))
+		if byUsername || namedBy(words, firstName(t.FirstName)) {
+			found = append(found, t)
+		}
+	}
+	switch len(found) {
+	case 0:
+		return Target{}, &DeniedError{Message: noticeOfNobody}
+	case 1:
+		return m.tagged(ctx, caller.ChatID, Mention{UserID: found[0].UserID}, action)
+	}
+	return Target{}, &DeniedError{Message: noticeOfMany}
+}
+
+// recentTargets are the members the bot acted on in the chat lately; none
+// without Targets.
+func (m *Moderation) recentTargets(ctx context.Context, chatID int64) ([]storage.GroupMember, error) {
+	if m.opts.Targets == nil {
+		return nil, nil
+	}
+	targets, err := m.opts.Targets.ModerationTargets(ctx, chatID, m.opts.Now().Add(-recentTargetsWindow), recentTargetsListed)
+	if err != nil {
+		return nil, internal(err)
+	}
+	return targets, nil
 }
 
 // minNameRunes is the shortest first name taken from someone's words: a
@@ -957,8 +1042,11 @@ func (m *Moderation) checkTarget(ctx context.Context, o order) error {
 	if o.action == actionMemberTag && member.Status == "administrator" {
 		return &DeniedError{Message: adminHasTitle}
 	}
-	if member.IsAdmin() {
-		return &DeniedError{Message: immune}
+	switch {
+	case member.Status == "creator":
+		return &DeniedError{Message: targetIsCreator}
+	case member.IsAdmin():
+		return &DeniedError{Message: targetIsAdmin}
 	}
 	return nil
 }

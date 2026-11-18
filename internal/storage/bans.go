@@ -72,3 +72,33 @@ func (s *Store) InactiveMembers(ctx context.Context, chatID int64, since time.Ti
 	}
 	return members, nil
 }
+
+// ModerationTargets are the members the bot acted on in the chat since a
+// time, the latest first, with the names the group log last saw them by,
+// also once they have left or were banned: whom a reply to the bot's notice,
+// or a name, means after the member is gone.
+func (s *Store) ModerationTargets(ctx context.Context, chatID int64, since time.Time, limit int) ([]GroupMember, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT a.target_user_id, coalesce(m.first_name, ''), coalesce(m.username, ''), coalesce(m.is_bot, false), coalesce(m.status, '')
+		FROM (
+			SELECT target_user_id, max(created_at) AS at
+			FROM moderation_actions
+			WHERE chat_id = $1 AND target_user_id > 0 AND created_at >= $2
+			GROUP BY target_user_id
+		) a
+		LEFT JOIN group_members m ON m.chat_id = $1 AND m.user_id = a.target_user_id
+		ORDER BY a.at DESC, a.target_user_id
+		LIMIT $3`, chatID, since, limit)
+	if err != nil {
+		return nil, fmt.Errorf("storage: moderation targets: %w", err)
+	}
+	targets, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (GroupMember, error) {
+		m := GroupMember{ChatID: chatID}
+		err := row.Scan(&m.UserID, &m.FirstName, &m.Username, &m.IsBot, &m.Status)
+		return m, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("storage: moderation targets: %w", err)
+	}
+	return targets, nil
+}

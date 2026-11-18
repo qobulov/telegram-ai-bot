@@ -49,3 +49,32 @@ func TestBanListAndTheInactive(t *testing.T) {
 		t.Errorf("inactive = %+v, %v", quiet, err)
 	}
 }
+
+// The members acted on lately are listed with their names even once they
+// left, the latest first, and older actions and other chats are not.
+func TestModerationTargets(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	if _, err := store.pool.Exec(ctx, `INSERT INTO group_members (chat_id, user_id, first_name, username, is_bot, status, last_seen_at) VALUES
+		(-100, 7, 'Spammer', 'spam_bot_7', false, 'kicked', now()),
+		(-100, 8, 'Vali', '', false, 'member', now())`); err != nil {
+		t.Fatal(err)
+	}
+	for i, a := range []ModerationAction{
+		{ChatID: -100, Action: "mute", RequesterID: 1, TargetUserID: 8, UpdateID: 11},
+		{ChatID: -100, Action: "ban", RequesterID: 1, TargetUserID: 7, UpdateID: 12},
+		{ChatID: -200, Action: "ban", RequesterID: 1, TargetUserID: 9, UpdateID: 13},
+		{ChatID: -100, Action: "amnesty", RequesterID: 1, UpdateID: 14},
+	} {
+		if _, err := store.RecordModeration(ctx, a); err != nil {
+			t.Fatalf("record %d: %v", i, err)
+		}
+	}
+	got, err := store.ModerationTargets(ctx, -100, time.Now().Add(-time.Hour), 10)
+	if err != nil || len(got) != 2 || got[0].UserID != 7 || got[0].Username != "spam_bot_7" || got[0].Status != "kicked" || got[1].FirstName != "Vali" {
+		t.Errorf("targets = %+v, %v", got, err)
+	}
+	if got, _ := store.ModerationTargets(ctx, -100, time.Now().Add(time.Hour), 10); len(got) != 0 {
+		t.Errorf("targets since later = %+v", got)
+	}
+}

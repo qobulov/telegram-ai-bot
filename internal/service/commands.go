@@ -8,6 +8,7 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -1431,7 +1432,48 @@ func (s *Service) target(replied *telegram.Message) *tools.Target {
 	if replied.Sticker != nil {
 		target.StickerSet = replied.Sticker.SetName
 	}
+	if replied.From.ID == s.opts.Bot.ID {
+		target.About = s.taggedIn(replied)
+	}
 	return target
+}
+
+// taggedIn are the members a message tags, by @username or by a link to
+// their account, the bot left out: whom the bot's own notice was about.
+func (s *Service) taggedIn(msg *telegram.Message) []tools.Mention {
+	var found []tools.Mention
+	text, entities := msg.Content()
+	for _, e := range entities {
+		var m tools.Mention
+		switch e.Type {
+		case telegram.EntityTextMention:
+			if e.User == nil || e.User.ID == s.opts.Bot.ID {
+				continue
+			}
+			m.UserID = e.User.ID
+		case "text_link":
+			// A notice written as HTML links the member: tg://user?id=42.
+			id, err := strconv.ParseInt(strings.TrimPrefix(e.URL, "tg://user?id="), 10, 64)
+			if err != nil || !strings.HasPrefix(e.URL, "tg://user?id=") || id == s.opts.Bot.ID {
+				continue
+			}
+			m.UserID = id
+		case telegram.EntityMention:
+			tag, ok := telegram.EntityText(text, e)
+			m.Username = strings.TrimPrefix(tag, "@")
+			if !ok || m.Username == "" || strings.EqualFold(m.Username, s.opts.Bot.Username) {
+				continue
+			}
+		default:
+			continue
+		}
+		if !slices.ContainsFunc(found, func(f tools.Mention) bool {
+			return (m.UserID != 0 && f.UserID == m.UserID) || (m.Username != "" && strings.EqualFold(f.Username, m.Username))
+		}) {
+			found = append(found, m)
+		}
+	}
+	return found
 }
 
 // answerOf turns the agent's answer, or its error, into what is sent back.

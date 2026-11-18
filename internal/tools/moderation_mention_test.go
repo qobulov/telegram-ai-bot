@@ -2,8 +2,11 @@ package tools
 
 import (
 	"context"
+	"fmt"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
@@ -230,4 +233,69 @@ func TestAUsernameTellsNamesakesApart(t *testing.T) {
 	env := namingEnv(t, storage.GroupMember{ChatID: groupA, UserID: 8008, FirstName: "Azamat"})
 	env.act(t, sayingAs(nil, "Azamat mkmillioner8 ni mute qil"), `{"action":"mute","member":"mkmillioner8"}`)
 	env.mutedOnly(t, azamatID)
+}
+
+// fakeTargets is the members the bot acted on lately.
+type fakeTargets []storage.GroupMember
+
+func (f fakeTargets) ModerationTargets(context.Context, int64, time.Time, int) ([]storage.GroupMember, error) {
+	return f, nil
+}
+
+const spammerID = int64(6106)
+
+// spammerEnv is purgeEnv where the bot banned a spammer, Ziyo @ziyo_spam,
+// who has left the members: Telegram has them as kicked, and only the bot's
+// record of its actions still knows them.
+func spammerEnv(t *testing.T) (*moderationEnv, *fakeMessageLog) {
+	t.Helper()
+	env, log := purgeEnv(t)
+	log.ids[spammerID] = []int64{70, 71}
+	env.chat.set(spammerID, telegram.ChatMember{Status: "kicked", User: &telegram.User{ID: spammerID, FirstName: "Ziyo", Username: "ziyo_spam"}})
+	env.opts.Usernames = fakeUsernames{"ziyo_spam": spammerID}
+	env.opts.Roster = &fakeRoster{members: []storage.GroupMember{{ChatID: groupA, UserID: memberID, FirstName: "Bek", Username: "bek"}}}
+	env.opts.Targets = fakeTargets{{ChatID: groupA, UserID: spammerID, FirstName: "Ziyo", Username: "ziyo_spam", Status: "kicked"}}
+	env.moderation = NewModeration(env.opts)
+	env.registry = mustRegistry(t, env.moderation.Tool())
+	return env, log
+}
+
+// In production the owner replied "tozala" to Mari's own "X bloklandi"
+// notice and nothing could be done: the reply named only the bot. A reply
+// to the bot's notice means the member it is about, by its tag or, when it
+// tags nobody, by the name of a member the bot acted on lately.
+func TestReplyToTheBotsNoticeActsOnItsMember(t *testing.T) {
+	cases := map[string]*Target{
+		"tagged":  {MessageID: 80, UserID: rulesBotID, IsBot: true, Text: "Bajarildi: Ziyo @ziyo_spam bloklandi.", About: []Mention{{Username: "ziyo_spam"}}},
+		"by link": {MessageID: 80, UserID: rulesBotID, IsBot: true, Text: "Bajarildi: Ziyo bloklandi.", About: []Mention{{UserID: spammerID}}},
+		"named":   {MessageID: 80, UserID: rulesBotID, IsBot: true, Text: "Bajarildi: Ziyo bloklandi."},
+	}
+	for name, notice := range cases {
+		t.Run(name, func(t *testing.T) {
+			env, _ := spammerEnv(t)
+			said := env.act(t, replyingWith(100, notice, "Mari buning hammasini tozala"), `{"action":"purge"}`)
+			if !strings.Contains(said, "Ziyo") {
+				t.Errorf("said %q, want the spammer purged", said)
+			}
+			if want := []string{fmt.Sprintf("deleteMessages %d 70+2", groupA)}; !slices.Equal(env.telegram.made(), want) {
+				t.Errorf("calls = %q, want %q", env.telegram.made(), want)
+			}
+		})
+	}
+
+	env, _ := spammerEnv(t)
+	vague := &Target{MessageID: 80, UserID: rulesBotID, IsBot: true, Text: "Salom hammaga!"}
+	expectRefusal(t, env.moderate(replyingWith(101, vague, "tozala"), `{"action":"purge"}`), "forbidden", "that message of mine is not about a member")
+	many := &Target{MessageID: 80, UserID: rulesBotID, IsBot: true, Text: "@a va @b", About: []Mention{{Username: "a"}, {Username: "b"}}}
+	expectRefusal(t, env.moderate(replyingWith(102, many, "tozala"), `{"action":"purge"}`), "forbidden", "names more than one member")
+	env.nothingActed(t)
+}
+
+// Named in words, a member the bot banned is found though they left.
+func TestPurgeAMemberNamedAfterTheyWereBanned(t *testing.T) {
+	env, _ := spammerEnv(t)
+	said := env.act(t, replyingWith(100, nil, "Ziyoning hammasini tozala"), `{"action":"purge","member":"Ziyo"}`)
+	if !strings.Contains(said, "Ziyo") {
+		t.Errorf("said %q", said)
+	}
 }

@@ -2,11 +2,13 @@ package service
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"unicode/utf16"
 
 	"telegram-ai-bot/internal/telegram"
+	"telegram-ai-bot/internal/tools"
 )
 
 const (
@@ -388,5 +390,30 @@ func TestBareCommandReplyingToTheBotIsAnswered(t *testing.T) {
 	}
 	if sent := newFixture().run(inGroup(groupMessage("/help"))); len(sent) != 0 {
 		t.Errorf("a bare /help to nobody = %+v, want silence", sent)
+	}
+}
+
+// A reply to the bot's own notice carries the members the notice tags, by
+// @username or by a link to their account, for the moderate tool to find
+// whom it was about.
+func TestTargetOfTheBotsNoticeNamesWhomItTags(t *testing.T) {
+	s := triggerService(nil)
+	notice := &telegram.Message{
+		MessageID: 80, From: &telegram.User{ID: botID, IsBot: true},
+		Text: "Bajarildi: Ziyo @ziyo_spam bloklandi. Vali @MyBot",
+		Entities: []telegram.MessageEntity{
+			{Type: telegram.EntityMention, Offset: 16, Length: 10},
+			{Type: "text_link", Offset: 11, Length: 4, URL: "tg://user?id=42"},
+			{Type: telegram.EntityMention, Offset: 43, Length: 6},
+		},
+	}
+	got := s.target(notice).About
+	want := []tools.Mention{{Username: "ziyo_spam"}, {UserID: 42}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("about = %+v, want %+v", got, want)
+	}
+	member := &telegram.Message{MessageID: 81, From: &telegram.User{ID: 4242}, Text: "@ziyo_spam", Entities: notice.Entities[:1]}
+	if about := s.target(member).About; about != nil {
+		t.Errorf("a member's message = %+v; only the bot's own notices are read so", about)
 	}
 }

@@ -274,6 +274,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Owners:     cfg.OwnerIDs,
 		Usernames:  store,
 		Roster:     store,
+		Targets:    store,
 		Links:      store,
 		Messages:   store,
 	})
