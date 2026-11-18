@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
 
 	"telegram-ai-bot/internal/telegram"
@@ -186,12 +187,30 @@ func TestOwnerMenuHoldsEveryCommand(t *testing.T) {
 			}
 		}
 	}
-	for _, command := range []string{"limit", "active", "aichat", "aigroups", "announce", "payments", "refund",
+	for _, command := range []string{"aigroups", "announce", "payments", "refund",
 		"model", "stats", "settings", "set", "business", "import_stickers", "premium", "paysupport",
 		"game", "snake", "woodcutter", "boss", "mafia", "checkers", "card", "mycards", "cardtop", "market",
 		"duel", "teams", "invites", "invites_month", "invites_auto", "unpin", "unignore", "ping", "about"} {
 		if !seen[command] {
 			t.Errorf("/%s is missing from the owners' menu", command)
+		}
+	}
+}
+
+// In a group an owner's menu is the owners' menu without their own
+// commands, which work only in private.
+func TestOwnerGroupMenuLeavesOutTheOwnersOwn(t *testing.T) {
+	if want := len(ownerGroupMenu) + len(ownerOnlyMenu); len(ownerMenu) != want {
+		t.Errorf("owners' menu has %d commands, want %d", len(ownerMenu), want)
+	}
+	for _, c := range ownerGroupMenu {
+		if slices.ContainsFunc(ownerOnlyMenu, func(o telegram.BotCommand) bool { return o.Command == c.Command }) {
+			t.Errorf("/%s, an owner's own, is in the group menu", c.Command)
+		}
+	}
+	for _, c := range ownerOnlyMenu {
+		if !strings.HasSuffix(c.Description, "(owner)") {
+			t.Errorf("/%s is not marked (owner)", c.Command)
 		}
 	}
 }

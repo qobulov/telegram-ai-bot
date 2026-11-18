@@ -419,7 +419,7 @@ func ownerWrites(text string) telegram.Update {
 }
 
 // Owners list the payments and refund one by ID or @username, which ends
-// that premium; nobody else may, and not in a group.
+// that premium; nobody else may, and in a group it gets no answer.
 func TestOwnersListAndRefundPayments(t *testing.T) {
 	f := newFixture()
 	_, payments, book := withPremium(f)
@@ -433,8 +433,8 @@ func TestOwnersListAndRefundPayments(t *testing.T) {
 	f.run(ownerWrites("/payments"), ownerWrites("/refund @Ann"), ownerWrites("/refund @ann"), ownerWrites("/refund"))
 	sent := f.run(inGroup(group))
 
-	if len(sent) != 7 {
-		t.Fatalf("sent = %+v", sent)
+	if len(sent) != 6 {
+		t.Fatalf("sent = %+v; want nothing for the group's", sent)
 	}
 	if sent[1].text != textUnknown.uz {
 		t.Errorf("a member's /payments = %q, want the unknown command", sent[1].text)
@@ -450,9 +450,6 @@ func TestOwnersListAndRefundPayments(t *testing.T) {
 	}
 	if sent[4].text != fmt.Sprintf(textNothingToRefund, "@ann") || sent[5].text != textRefundUsage {
 		t.Errorf("again = %q, bare = %q", sent[4].text, sent[5].text)
-	}
-	if sent[6].text != textPaymentsPrivateOnly {
-		t.Errorf("in a group = %q", sent[6].text)
 	}
 }
 

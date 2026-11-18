@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"log/slog"
+	"slices"
 	"time"
 
 	"telegram-ai-bot/internal/telegram"
@@ -73,11 +74,11 @@ var commandMenus = map[string][]telegram.BotCommand{
 	}, membersMenu...),
 }
 
-// ownerMenu is every command the bot answers, for its owners alone, set
-// for each in every group they write in and in their private chat with it. The menus of
-// everyone else come first, then the commands they do not list, then the
-// owners' own. Aliases, /delete and /ranks, are left out.
-var ownerMenu = []telegram.BotCommand{
+// ownerGroupMenu is what an owner sees in a group they write in: every
+// command the bot answers there, the menus of everyone else first, then the
+// commands they do not list. The owners' own commands work only in private,
+// so they are not here. Aliases, /delete and /ranks, are left out.
+var ownerGroupMenu = []telegram.BotCommand{
 	{Command: "help", Description: "Yordam va buyruqlar"},
 	{Command: "start", Description: "Salomlashish"},
 	{Command: "about", Description: "Bot haqida"},
@@ -140,9 +141,10 @@ var ownerMenu = []telegram.BotCommand{
 	{Command: "unignore", Description: "A'zoga yana javob berish (reply)"},
 	{Command: "cleanservice", Description: "\"Kirdi/chiqdi\" xabarlarini o'chirish (yoqish/o'chirish)"},
 	{Command: "invites_auto", Description: "Takliflar reytingini avto-e'lon qilish, yoki off"},
-	{Command: "aichat", Description: "Bu guruhda AI suhbatni yoqish/o'chirish (owner)"},
-	{Command: "limit", Description: "Guruhda daqiqasiga javoblar soni (owner)"},
-	{Command: "active", Description: "Kamida X faol a'zo sharti, yoki off (owner)"},
+}
+
+// ownerOnlyMenu are the owners' own commands, answered only in private.
+var ownerOnlyMenu = []telegram.BotCommand{
 	{Command: "settings", Description: "Guruh va bot sozlamalari (owner)"},
 	{Command: "set", Description: "Sozlamani o'zgartirish: /set NOM qiymat|default (owner)"},
 	{Command: "stats", Description: "Statistika paneli (owner)"},
@@ -154,6 +156,9 @@ var ownerMenu = []telegram.BotCommand{
 	{Command: "business", Description: "Business hisob javoblari: /business on|off (owner)"},
 	{Command: "import_stickers", Description: "Stiker to'plamini import qilish: havola yoki nom (owner)"},
 }
+
+// ownerMenu is every command the bot answers, in an owner's private chat.
+var ownerMenu = append(slices.Clone(ownerGroupMenu), ownerOnlyMenu...)
 
 // CommandSetter sets a command menu.
 type CommandSetter interface {

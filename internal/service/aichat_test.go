@@ -39,32 +39,17 @@ func TestGroupWithoutAI(t *testing.T) {
 	}
 }
 
-// An owner turns AI on and off with /aichat; anyone else's is ignored;
-// /aigroups lists the groups with it.
-func TestAIChatCommand(t *testing.T) {
+// /aichat is no command any more: in a group, an owner's too, it gets no
+// answer and changes nothing; AI is turned on with /aigroups in private.
+func TestAIChatIsSilentInAGroup(t *testing.T) {
 	f := newFixture()
 	extras := newMemoryExtras()
 	f.opts.Extras = extras
 	f.opts.OwnerIDs = map[int64]bool{77: true}
-	asOwner := func(text string) telegram.Update {
-		msg := groupMessage(text)
-		msg.From = &telegram.User{ID: 77, FirstName: "Aziz"}
-		return inGroup(msg)
-	}
-	if sent := f.run(inGroup(groupMessage("/aichat"))); len(sent) != 0 || extras.settings[storage.SettingAI] != "" {
-		t.Errorf("a member's /aichat = %+v, %v", sent, extras.settings)
-	}
-	sent := f.run(asOwner("/aichat"))
-	if extras.settings[storage.SettingAI] != "on" || !strings.Contains(sent[len(sent)-1].text, "yoqildi") {
-		t.Fatalf("on = %v, %+v", extras.settings, sent)
-	}
-	f.run(inGroup(groupMessage("Mira, salom")))
-	if len(f.replier.recorded()) != 1 {
-		t.Errorf("a member was not answered with AI on")
-	}
-	f.run(asOwner("/aichat off"))
-	if extras.settings[storage.SettingAI] != "" {
-		t.Errorf("off left %v", extras.settings)
+	owner := groupMessage("/aichat")
+	owner.From = &telegram.User{ID: 77, FirstName: "Aziz"}
+	if sent := f.run(inGroup(groupMessage("/aichat")), inGroup(owner)); len(sent) != 0 || extras.settings[storage.SettingAI] != "" {
+		t.Errorf("/aichat in a group = %+v, %v; want no answer and nothing set", sent, extras.settings)
 	}
 }
 

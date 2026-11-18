@@ -12,11 +12,10 @@ import (
 	"telegram-ai-bot/internal/telegram"
 )
 
-// Owners change the bot's settings from Telegram: /set NAME value in a
-// private chat for the whole bot, in a group for that group alone where the
-// setting allows it, and /settings to see them. The bot's own come into
-// force when the serverless instance rebuilds, within a minute; a group's at
-// once. /limit and /active are short ways to set a group's two most used.
+// Owners change the bot's settings from Telegram, in a private chat alone:
+// /set NAME value, and /settings to see them. They come into force when the
+// serverless instance rebuilds, within a minute. A group's own values, set
+// before, are still read.
 const (
 	// settingsMemory is how long a group's settings are trusted before they
 	// are read again; a change made here is seen at once.
@@ -107,8 +106,7 @@ func (s *Service) replyLength(ctx context.Context, chatID int64) int {
 	return s.opts.MaxGroupReplyChars
 }
 
-// showSettings is /settings: in a group its own settings and the bot's
-// under them, in a private chat the bot's, for owners.
+// showSettings is /settings, the bot's settings, for owners in private.
 func (s *Service) showSettings(ctx context.Context, in incoming) string {
 	if !s.isOwner(in.msg.From) {
 		return textUnknown.to(in)
@@ -120,24 +118,7 @@ func (s *Service) showSettings(ctx context.Context, in incoming) string {
 	if err != nil {
 		return textError.to(in)
 	}
-	var lines []string
-	if in.group {
-		own := s.loadGroupSettings(ctx, in.scope.ChatID)
-		lines = append(lines, "Bu guruh sozlamalari (guruh → umumiy):")
-		for _, setting := range config.Settings {
-			if !setting.Group {
-				continue
-			}
-			value, from := s.settingValue(global, setting.Name), "umumiy"
-			if v, ok := own[setting.Name]; ok {
-				value, from = v, "guruh"
-			}
-			lines = append(lines, fmt.Sprintf("• %s = %s (%s) — %s", setting.Name, value, from, setting.About))
-		}
-		lines = append(lines, "", "O'zgartirish: /set NOMI qiymat. Umumiyga qaytarish: /set NOMI default.")
-		return strings.Join(lines, "\n")
-	}
-	lines = append(lines, "Botning umumiy sozlamalari:")
+	lines := []string{"Botning umumiy sozlamalari:"}
 	for _, setting := range config.Settings {
 		from := "env"
 		if _, ok := global[setting.Name]; ok {
@@ -145,7 +126,7 @@ func (s *Service) showSettings(ctx context.Context, in incoming) string {
 		}
 		lines = append(lines, fmt.Sprintf("• %s = %s (%s) — %s", setting.Name, s.settingValue(global, setting.Name), from, setting.About))
 	}
-	lines = append(lines, "", "O'zgartirish: /set NOMI qiymat. Env qiymatiga qaytarish: /set NOMI default. Guruhning o'zinikini guruhda o'zgartiring.")
+	lines = append(lines, "", "O'zgartirish: /set NOMI qiymat. Env qiymatiga qaytarish: /set NOMI default.")
 	return strings.Join(lines, "\n")
 }
 
@@ -163,8 +144,8 @@ func (s *Service) settingValue(global map[string]string, name string) string {
 	return "standart"
 }
 
-// setSetting is /set NAME value|default, for owners: the bot's in a private
-// chat, the group's in a group.
+// setSetting is /set NAME value|default, the bot's setting, for owners in
+// private.
 func (s *Service) setSetting(ctx context.Context, in incoming) string {
 	if !s.isOwner(in.msg.From) {
 		return textUnknown.to(in)
@@ -177,14 +158,7 @@ func (s *Service) setSetting(ctx context.Context, in incoming) string {
 	if !ok {
 		return fmt.Sprintf("%s degan sozlama yo'q. Ro'yxat: /settings.", fields[1])
 	}
-	chatID := int64(storage.GlobalSettings)
-	if in.group {
-		if !setting.Group {
-			return setting.Name + " faqat umumiy sozlama: uni botga shaxsiy chatda yozing."
-		}
-		chatID = in.scope.ChatID
-	}
-	return s.changeSetting(ctx, in, chatID, setting, fields[2])
+	return s.changeSetting(ctx, in, storage.GlobalSettings, setting, fields[2])
 }
 
 // changeSetting saves value as the setting in chatID, or clears it for
@@ -228,103 +202,6 @@ func (s *Service) settingChanged(ctx context.Context, chatID int64) {
 func (s *Service) takesEffect(chatID int64) string {
 	if chatID == storage.GlobalSettings {
 		return "; bir daqiqa ichida kuchga kiradi"
-	}
-	return ""
-}
-
-// setReplyLimit is /limit [n|default], for owners in a group.
-func (s *Service) setReplyLimit(ctx context.Context, in incoming) string {
-	arg, refusal := s.groupArg(in)
-	if refusal != "" {
-		return refusal
-	}
-	chatID := in.scope.ChatID
-	if arg == "" {
-		_, own := s.groupNumber(ctx, chatID, settingRateLimit)
-		return fmt.Sprintf("Bu guruhda bot daqiqasiga %d ta javob beradi%s.\nO'zgartirish: /limit 10. Umumiyga qaytarish: /limit default.",
-			s.replyLimit(ctx, chatID), defaultMark(!own))
-	}
-	setting, _ := config.FindSetting(settingRateLimit)
-	if defaultWords[arg] {
-		if reply := s.changeSetting(ctx, in, chatID, setting, "default"); reply == textError.to(in) {
-			return reply
-		}
-		return fmt.Sprintf("Bu guruhda umumiy limit qaytdi: daqiqasiga %d ta javob.", s.opts.GroupRatePerMinute)
-	}
-	n, err := strconv.Atoi(arg)
-	if err != nil || n < 1 || n > setting.Max {
-		return fmt.Sprintf("Son yozing, 1 dan %d gacha: /limit 10. Umumiyga qaytarish: /limit default.", setting.Max)
-	}
-	if reply := s.changeSetting(ctx, in, chatID, setting, arg); !strings.Contains(reply, " = ") {
-		return reply
-	}
-	return fmt.Sprintf("Endi bu guruhda bot daqiqasiga %d ta javob beradi.", n)
-}
-
-// setMinActive is /active [n|off|default], for owners in a group.
-func (s *Service) setMinActive(ctx context.Context, in incoming) string {
-	arg, refusal := s.groupArg(in)
-	if refusal != "" {
-		return refusal
-	}
-	chatID := in.scope.ChatID
-	window := s.activeWindow(ctx, chatID)
-	days := int(window.Hours() / 24)
-	setting, _ := config.FindSetting(settingMinActive)
-	switch {
-	case arg == "":
-		_, own := s.groupNumber(ctx, chatID, settingMinActive)
-		n := s.minActive(ctx, chatID)
-		if n <= 0 {
-			return "Bu guruhda faol a'zolar sharti o'chiq" + defaultMark(!own) + ": bot har doim javob beradi.\nYoqish: /active 10."
-		}
-		text := fmt.Sprintf("Bu guruhda bot oxirgi %d kunda kamida %d kishi yozgan bo'lsa javob beradi%s.", days, n, defaultMark(!own))
-		if s.opts.ActiveCounter != nil {
-			if count, err := s.opts.ActiveCounter.ActiveMembers(ctx, chatID, s.opts.Now().Add(-window)); err == nil {
-				text += fmt.Sprintf(" Hozir %d kishi.", count)
-			}
-		}
-		return text + "\nO'zgartirish: /active 5. O'chirish: /active off. Umumiyga qaytarish: /active default."
-	case defaultWords[arg]:
-		if reply := s.changeSetting(ctx, in, chatID, setting, "default"); reply == textError.to(in) {
-			return reply
-		}
-		if s.opts.MinActiveMembers <= 0 {
-			return "Bu guruhda umumiy qoida qaytdi: faol a'zolar sharti yo'q."
-		}
-		return fmt.Sprintf("Bu guruhda umumiy qoida qaytdi: kamida %d faol a'zo.", s.opts.MinActiveMembers)
-	case offWords[arg], arg == "0":
-		if reply := s.changeSetting(ctx, in, chatID, setting, "0"); !strings.Contains(reply, " = ") {
-			return reply
-		}
-		return "Bu guruhda faol a'zolar sharti o'chirildi: bot har doim javob beradi."
-	}
-	n, err := strconv.Atoi(arg)
-	if err != nil || n < 1 || n > setting.Max {
-		return fmt.Sprintf("Son yozing, 1 dan %d gacha: /active 10. O'chirish: /active off.", setting.Max)
-	}
-	if reply := s.changeSetting(ctx, in, chatID, setting, arg); !strings.Contains(reply, " = ") {
-		return reply
-	}
-	return fmt.Sprintf("Endi bu guruhda bot oxirgi %d kunda kamida %d kishi yozgan bo'lsa javob beradi.", days, n)
-}
-
-// groupArg is the word after the command, lowered, for an owner in a
-// group; otherwise the refusal. To anyone else the command does not exist.
-func (s *Service) groupArg(in incoming) (string, string) {
-	if !s.isOwner(in.msg.From) {
-		return "", textUnknown.to(in)
-	}
-	if !in.group {
-		return "", textGroupsOnly
-	}
-	_, arg, _ := strings.Cut(strings.TrimSpace(in.text), " ")
-	return strings.ToLower(strings.TrimSpace(arg)), ""
-}
-
-func defaultMark(isDefault bool) string {
-	if isDefault {
-		return " (umumiy qiymat)"
 	}
 	return ""
 }

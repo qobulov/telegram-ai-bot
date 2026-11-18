@@ -388,7 +388,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		PremiumDailyLimit:     cfg.PremiumDailyLimit,
 		PrivateChats:          cfg.PrivateChats,
 		Reactor:               bot.Client,
-		OwnerMenu:             ownerMenu,
+		OwnerMenu:             ownerGroupMenu,
 		MenuSetter:            bot.Client,
 		Settings:              store,
 		CheckSetting: func(setting config.Setting, value string) error {

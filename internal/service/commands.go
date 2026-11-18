@@ -784,11 +784,22 @@ func (s *Service) ignored(in incoming, rules []storage.GroupRule) bool {
 	})
 }
 
+// privateOwnerCommands are the owners' own commands: they work only in a
+// private chat with the bot, and in a group they get no answer at all.
+var privateOwnerCommands = map[string]bool{
+	"/aichat": true, "/limit": true, "/active": true, "/settings": true, "/set": true,
+	"/stats": true, "/model": true, "/aigroups": true, "/announce": true, "/payments": true,
+	"/refund": true, "/business": true, "/import_stickers": true,
+}
+
 // respond decides what to send back. An empty outcome sends nothing. rules
 // are the standing rules loaded for this turn.
 func (s *Service) respond(ctx context.Context, in incoming, rules []storage.GroupRule) outcome {
 	if pressedHelp(in) {
 		in.text = "/help"
+	}
+	if in.group && privateOwnerCommands[commandName(in.text)] {
+		return outcome{}
 	}
 	if out, ok := s.utilityCommand(in); ok {
 		return out
@@ -872,8 +883,6 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.reputationTop(ctx, in)
 	case in.group && s.opts.Extras != nil && commandName(in.text) == "/cleanservice":
 		return s.setCleanService(ctx, in)
-	case in.group && s.opts.Extras != nil && commandName(in.text) == "/aichat":
-		return s.aiChatCommand(ctx, in)
 	case !in.group && s.opts.Extras != nil && s.opts.Buttons != nil && commandName(in.text) == "/aigroups":
 		return s.aiGroupsCommand(ctx, in)
 	case s.opts.Cards != nil && commandName(in.text) == "/profile":
@@ -1681,10 +1690,6 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 		return s.showSettings(ctx, in)
 	case "/set":
 		return s.setSetting(ctx, in)
-	case "/limit":
-		return s.setReplyLimit(ctx, in)
-	case "/active":
-		return s.setMinActive(ctx, in)
 	case "/payments":
 		return s.showPayments(ctx, in)
 	case "/refund":

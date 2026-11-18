@@ -344,14 +344,10 @@ func (s *Service) noteRefund(msg *telegram.Message) {
 }
 
 // refusePaymentsCommand is the answer to /payments or /refund from someone
-// who may not use them, or "" for an owner in a private chat: payments are
-// shown nowhere else.
+// who may not use them, or "" for an owner; in a group they get no answer.
 func (s *Service) refusePaymentsCommand(in incoming) string {
-	switch {
-	case !s.isOwner(in.msg.From) || s.opts.Premium == nil || s.opts.Payments == nil:
+	if !s.isOwner(in.msg.From) || s.opts.Premium == nil || s.opts.Payments == nil {
 		return textUnknown.to(in)
-	case in.group:
-		return textPaymentsPrivateOnly
 	}
 	return ""
 }
@@ -443,13 +439,12 @@ func (s *Service) paySupport(in incoming) string {
 
 // The owners' texts about payments, in Uzbek like /settings.
 const (
-	textPaymentsPrivateOnly = "To'lovlar faqat shaxsiy chatda ko'rsatiladi."
-	textNoPayments          = "Hali to'lov yo'q."
-	textRefundUsage         = "Yozilishi: /refund ID yoki /refund @username. To'lovlar: /payments."
-	textNothingToRefund     = "%s ning qaytariladigan to'lovi yo'q. To'lovlar: /payments."
-	textRefundRefused       = "Telegram qaytarmadi: %s"
-	textRefundUnrecorded    = "%s ga Stars qaytarildi, lekin bazaga yozolmadim: premiumi hali tugamagan bo'lishi mumkin."
-	textRefunded            = "✅ %s ga %d ⭐ qaytarildi, premiumi tugadi."
+	textNoPayments       = "Hali to'lov yo'q."
+	textRefundUsage      = "Yozilishi: /refund ID yoki /refund @username. To'lovlar: /payments."
+	textNothingToRefund  = "%s ning qaytariladigan to'lovi yo'q. To'lovlar: /payments."
+	textRefundRefused    = "Telegram qaytarmadi: %s"
+	textRefundUnrecorded = "%s ga Stars qaytarildi, lekin bazaga yozolmadim: premiumi hali tugamagan bo'lishi mumkin."
+	textRefunded         = "✅ %s ga %d ⭐ qaytarildi, premiumi tugadi."
 )
 
 // The members' texts about premium.

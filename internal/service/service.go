@@ -476,7 +476,7 @@ type Service struct {
 	// actives are groups' counts of active members, lately read, and
 	// ownersHere the owners lately found in each group.
 	actives *recently[int64, int]
-	// settings are groups' owner settings, such as /limit, lately read.
+	// settings are groups' own settings, lately read.
 	settings *recently[int64, map[string]string]
 	// ownerMenus are the groups and owners whose menu was set lately.
 	ownerMenus *recently[[2]int64, bool]

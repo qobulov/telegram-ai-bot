@@ -21,7 +21,7 @@ const (
 )
 
 // aiAllowed reports whether a group may talk with the model: one its owner
-// turned it on for, with /aichat; an owner of the bot always may. Without
+// turned it on for, with /aigroups; an owner of the bot always may. Without
 // a store every group may.
 func (s *Service) aiAllowed(ctx context.Context, in incoming) bool {
 	if !in.group || s.opts.Extras == nil || s.isOwner(in.msg.From) {
@@ -49,38 +49,6 @@ func (s *Service) aiOff(in incoming) outcome {
 	}
 	s.aiOffTold.set(in.scope.ChatID, true)
 	return outcome{text: "🤖 Bu guruhda AI suhbat yoqilmagan. Buyruqlar ishlaydi: /help", skipped: "ai_off"}
-}
-
-// aiChatCommand answers an owner's /aichat in a group: "on" or "off", or
-// alone it switches; to anyone else it says nothing, as the command may be
-// another bot's.
-func (s *Service) aiChatCommand(ctx context.Context, in incoming) outcome {
-	if !s.isOwner(in.msg.From) {
-		return outcome{}
-	}
-	current, err := s.opts.Extras.GroupSetting(ctx, in.scope.ChatID, storage.SettingAI)
-	if err != nil {
-		return say(textError.to(in))
-	}
-	on := current != "on"
-	switch strings.ToLower(strings.TrimSpace(commandArgument(in.text))) {
-	case "on", "yoq", "ha":
-		on = true
-	case "off", "o'chir", "ochir", "yo'q":
-		on = false
-	}
-	value := ""
-	if on {
-		value = "on"
-	}
-	if err := s.opts.Extras.SetGroupSetting(ctx, in.scope.ChatID, storage.SettingAI, value, in.userID); err != nil {
-		return say(textError.to(in))
-	}
-	s.aiChats.set(in.scope.ChatID, on)
-	if on {
-		return say("🤖 AI suhbat yoqildi: endi meni chaqirib gaplashish mumkin. O'chirish: /aichat")
-	}
-	return say("🤖 AI suhbat o'chirildi: bu yerda faqat buyruqlar va o'yinlar ishlaydi. Yoqish: /aichat")
 }
 
 // aiData starts the button of a group in /aigroups: "ai:<chat ID>".
