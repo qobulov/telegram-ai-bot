@@ -139,7 +139,10 @@ var mythicIDs = map[int64]bool{
 // companions, Vegeta, Sasuke, Kakashi, Itachi, Levi, L, Zoro, Killua and
 // their like, Escanor and Ban, and other well known leads, Deku, Itadori,
 // Shinji, Kaneki, Denji, Gintoki, Natsu, Asta, Yusuke, Mob, Hanamichi,
-// Thorfinn, Rimuru and theirs.
+// Thorfinn, Rimuru and theirs, and the best known women, Rem, Rei Ayanami,
+// Power, Kaguya Shinomiya, Marin Kitagawa, Megumin, Robin, Asuka, Hitagi
+// Senjougahara, Yor and Anya Forger, Nobara Kugisaki, Nami and Asuna, the
+// last twelve made Legendary at the owners' asking (migration 99).
 var legendaryIDs = map[int64]bool{
 	90202: true, 77605: true, 913: true, 13: true, 85: true, 14: true, 53901: true, 2535: true, 2423: true, 62: true,
 	305: true, 727: true, 2072: true, 13767: true, 45627: true, 46494: true, 46496: true, 71: true, 75: true, 27: true,
@@ -147,6 +150,8 @@ var legendaryIDs = map[int64]bool{
 	129131: true, 129130: true, 6356: true, 10529: true, 4004: true, 162: true, 2075: true, 2257: true, 601: true, 10138: true,
 	123962: true, 124142: true, 88573: true, 35252: true, 138101: true, 64769: true, 88575: true, 86: true, 89028: true, 127212: true,
 	89: true, 87275: true, 130102: true, 672: true, 5187: true, 123285: true, 729: true, 89616: true, 310: true,
+	137079: true, 120649: true, 133676: true, 89361: true, 61: true, 94: true, 22037: true, 138102: true, 133700: true, 138100: true,
+	723: true, 36828: true,
 }
 
 // epicIDs are the Epic cards chosen by hand, whatever their rank: The Seven

@@ -54,8 +54,14 @@ func TestChosenRarities(t *testing.T) {
 	if RarityOf(89334, 9) != Epic || RarityOf(99999, 400) != Common || RarityOf(88572, 7) != Mythic {
 		t.Errorf("Reigen at 9 = %v, an unknown at 400 = %v, Emilia = %v", RarityOf(89334, 9), RarityOf(99999, 400), RarityOf(88572, 7))
 	}
-	if len(mythicIDs) != 27 || len(legendaryIDs) != 58 || len(epicIDs) != 13 || RarityOf(298761, 900) != Mythic || RarityOf(298762, 900) != Epic {
+	if len(mythicIDs) != 27 || len(legendaryIDs) != 70 || len(epicIDs) != 13 || RarityOf(298761, 900) != Mythic || RarityOf(298762, 900) != Epic {
 		t.Errorf("chosen %d Mythic and %d Legendary", len(mythicIDs), len(legendaryIDs))
+	}
+	// The best known women made Legendary (migration 99), at any rank.
+	for _, id := range []int64{137079, 120649, 133676, 89361, 61, 94, 22037, 138102, 133700, 138100, 723, 36828} {
+		if RarityOf(id, 0) != Legendary || RarityOf(id, 1400) != Legendary {
+			t.Errorf("%d is %v, not Legendary", id, RarityOf(id, 0))
+		}
 	}
 }
 

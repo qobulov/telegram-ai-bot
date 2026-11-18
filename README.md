@@ -2210,7 +2210,7 @@ and Gojo, made Mythic by the owners in migration 82), and 10 women (Mikasa, Maom
 Evergarden, Zero Two, Mai Sakurajima), migration 76; the 58 Afsonaviy their
 legendary rivals and companions (Vegeta, Sasuke, Kakashi, Itachi, Levi, L,
 Zoro, Killua…) and other well known leads (Deku, Itadori, Kaneki,
-Denji, Gintoki, Natsu, Thorfinn, Rimuru…); the rest go by rank among
+Denji, Gintoki, Natsu, Thorfinn, Rimuru…), and the best known women, Rem and Rei Ayanami and, at the owners' asking, the twelve most loved women on AniList who were not Mifik (Power, Kaguya Shinomiya, Marin Kitagawa, Megumin, Robin, Asuka, Hitagi Senjougahara, Yor and Anya Forger, Nobara Kugisaki, Nami, Asuna; migration 99, which counts again the points of the players who hold one), 70 Afsonaviy in all; the rest go by rank among
 AniList's most loved, never above Epik, with The Seven Deadly Sins' cast
 and Firefly Wedding's Satoko Kirigaya added as Epik: 100 💜 Epik, 150 🔷 Noyob and the other 176 ⚪ Oddiy. The tiers were cut for 200
 cards by AniList's votes until migration 73, which left the 301 added later
