@@ -21,9 +21,19 @@ import (
 // maxBodyBytes bounds a request, which is a session and a few words.
 const maxBodyBytes = 8 << 10
 
-// prize is the Dev jangi coins each player of the winning side gets; the
-// maniac, who wins alone, gets twice as many.
-const prize = 150
+// prizeOf is the card-game tokens each player of an ended game's winning
+// side gets: one, two in a game of ten or more, and twice as many for the
+// maniac, who wins alone.
+func prizeOf(g *Game) int {
+	tokens := 1
+	if len(g.Players) >= 10 {
+		tokens = 2
+	}
+	if g.Winner == Solo {
+		tokens *= 2
+	}
+	return tokens
+}
 
 // Sessions reads the session a press of Play opened the page with, and
 // gives the address of a player's photo.
@@ -32,10 +42,10 @@ type Sessions interface {
 	AvatarPath(userID int64) string
 }
 
-// Store keeps the games and pays the winners.
+// Store keeps the games, and gives the winners the card-game tokens change
+// names with the game's end, in the same transaction.
 type Store interface {
-	ChangeMafiaGame(ctx context.Context, chatID int64, change func(state []byte) ([]byte, error)) error
-	AddRaidCoins(ctx context.Context, userIDs []int64, coins int64) error
+	ChangeMafiaGame(ctx context.Context, chatID int64, change func(state []byte) ([]byte, map[int64]int, error)) error
 }
 
 // Telegram tells the group how the game goes, and keeps the fallen from
@@ -140,11 +150,11 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 	var view map[string]any
 	var events []Event
 	var refused error
-	round := 0
-	err = h.Store.ChangeMafiaGame(ctx, player.ChatID, func(state []byte) ([]byte, error) {
+	round, prize := 0, 0
+	err = h.Store.ChangeMafiaGame(ctx, player.ChatID, func(state []byte) ([]byte, map[int64]int, error) {
 		var g Game
 		if err := json.Unmarshal(state, &g); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		events = g.Advance(now)
 		var happened []Event
@@ -152,14 +162,15 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		events = append(events, happened...)
 		events = append(events, g.Advance(now)...)
 		view = h.view(&g, player.UserID, now)
-		round = g.Round
-		return json.Marshal(g)
+		round, prize = g.Round, prizeOf(&g)
+		next, err := json.Marshal(g)
+		return next, pay(events, prize), err
 	})
 	if err != nil {
 		h.Logger.Error("could not change a mafia game", "chat_id", player.ChatID, "error", err)
 		return nil, errUnavailable
 	}
-	h.tell(ctx, player.ChatID, round, events)
+	h.tell(ctx, player.ChatID, round, prize, events)
 	if refused != nil {
 		code, ok := refusals[refused]
 		if !ok {
@@ -208,22 +219,30 @@ func (h *handler) apply(g *Game, req request, p game.Player, now time.Time) ([]E
 	return nil, errors.New("mafia: no such action")
 }
 
+// pay is the tokens the winners of a game that ended in events get; a game
+// ends once, so its winners are named once.
+func pay(events []Event, prize int) map[int64]int {
+	var tokens map[int64]int
+	for _, e := range events {
+		for _, w := range e.Winners {
+			if tokens == nil {
+				tokens = map[int64]int{}
+			}
+			tokens[w] += prize
+		}
+	}
+	return tokens
+}
+
 // tell sends the group the game's news, keeps the fallen from writing in
-// it, and when the game ends pays the winners and lets the fallen write
-// again; a failure does not undo the game, so it is only logged.
-func (h *handler) tell(ctx context.Context, chatID int64, round int, events []Event) {
+// it, and when the game ends names the winners' prize, paid already with
+// the game's end, and lets the fallen write again; a failure does not undo
+// the game, so it is only logged.
+func (h *handler) tell(ctx context.Context, chatID int64, round, prize int, events []Event) {
 	for _, e := range events {
 		text := e.Text
 		if len(e.Winners) > 0 {
-			coins := int64(prize)
-			if e.Winner == Solo {
-				coins *= 2
-			}
-			if err := h.Store.AddRaidCoins(ctx, e.Winners, coins); err != nil {
-				h.Logger.Error("could not pay mafia winners", "chat_id", chatID, "error", err)
-			} else {
-				text += fmt.Sprintf("\n\n🏆 G'oliblarga +%d 💰 Dev jangi tangasi. Yangi o'yin: /mafia", coins)
-			}
+			text += fmt.Sprintf("\n\n🏆 G'oliblarga +%d 🎴 kartalar o'yini tokeni — /card da karta oching. Yangi o'yin: /mafia", prize)
 		}
 		h.say(ctx, chatID, text)
 		if len(e.Fallen) > 0 {
@@ -264,6 +283,9 @@ func (h *handler) view(g *Game, me int64, now time.Time) map[string]any {
 		"left_ms": max(0, g.Ends.Sub(now).Milliseconds()), "min_players": MinPlayers, "max_players": MaxPlayers,
 		"max_words": MaxWords, "phase_ms": phaseLength(g.Phase).Milliseconds(),
 		"chat": g.Heard(me), "max_line": MaxLine,
+	}
+	if g.Phase == Over {
+		view["prize"] = prizeOf(g)
 	}
 	if g.Phase == Vote {
 		tally := map[int64]int{}

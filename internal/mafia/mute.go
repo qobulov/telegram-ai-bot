@@ -78,14 +78,14 @@ func (h *handler) markMuted(ctx context.Context, chatID int64, round int, ids []
 	if len(ids) == 0 && !unruly {
 		return false, false
 	}
-	err := h.Store.ChangeMafiaGame(ctx, chatID, func(state []byte) ([]byte, error) {
+	err := h.Store.ChangeMafiaGame(ctx, chatID, func(state []byte) ([]byte, map[int64]int, error) {
 		var g Game
 		if err := json.Unmarshal(state, &g); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if g.Round != round || g.Phase == Over || g.Phase == Lobby || g.Phase == "" {
 			over = true
-			return state, nil
+			return state, nil, nil
 		}
 		for _, id := range ids {
 			if p := g.player(id); p != nil {
@@ -94,7 +94,8 @@ func (h *handler) markMuted(ctx context.Context, chatID int64, round int, ids []
 		}
 		warn = unruly && !g.Unruly
 		g.Unruly = g.Unruly || unruly
-		return json.Marshal(g)
+		next, err := json.Marshal(g)
+		return next, nil, err
 	})
 	if err != nil {
 		h.Logger.Error("could not note the muted mafia players", "chat_id", chatID, "error", err)

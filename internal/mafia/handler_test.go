@@ -21,27 +21,23 @@ import (
 type fakeStore struct {
 	mu    sync.Mutex
 	games map[int64][]byte
-	paid  map[int64]int64
+	paid  map[int64]int
 }
 
-func (f *fakeStore) ChangeMafiaGame(_ context.Context, chatID int64, change func([]byte) ([]byte, error)) error {
+func (f *fakeStore) ChangeMafiaGame(_ context.Context, chatID int64, change func([]byte) ([]byte, map[int64]int, error)) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	state := f.games[chatID]
 	if state == nil {
 		state = []byte("{}")
 	}
-	next, err := change(state)
+	next, tokens, err := change(state)
 	if err != nil {
 		return err
 	}
 	f.games[chatID] = next
-	return nil
-}
-
-func (f *fakeStore) AddRaidCoins(_ context.Context, users []int64, coins int64) error {
-	for _, u := range users {
-		f.paid[u] += coins
+	for u, n := range tokens {
+		f.paid[u] += n
 	}
 	return nil
 }
@@ -91,7 +87,7 @@ type fixture struct {
 }
 
 func newFixture() *fixture {
-	f := &fixture{games: game.New("1:test", "https://example.com/game/", nil), store: &fakeStore{games: map[int64][]byte{}, paid: map[int64]int64{}}, tg: &fakeTelegram{}, now: t0}
+	f := &fixture{games: game.New("1:test", "https://example.com/game/", nil), store: &fakeStore{games: map[int64][]byte{}, paid: map[int64]int{}}, tg: &fakeTelegram{}, now: t0}
 	f.h = NewHandler(Options{Sessions: f.games, Store: f.store, Telegram: f.tg, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Now: func() time.Time { return f.now }, Intn: func(int) int { return 0 }})
 	return f
@@ -214,13 +210,46 @@ func TestHandlerEndsAndPays(t *testing.T) {
 		}
 	}
 	last := f.tg.sent[len(f.tg.sent)-1]
-	if !strings.Contains(last, "Tinch aholi yutdi") || !strings.Contains(last, "+150") {
+	if !strings.Contains(last, "Tinch aholi yutdi") || !strings.Contains(last, "+1 🎴 kartalar o'yini tokeni") {
 		t.Errorf("the group was told %q", last)
 	}
+	if view["prize"] != float64(1) {
+		t.Errorf("the end shows a prize of %v", view["prize"])
+	}
+	// The ended game asked again pays no one twice.
+	told := len(f.tg.sent)
+	for _, s := range sessions {
+		f.post(t, map[string]any{"session": s, "action": "state"})
+	}
+	if len(f.tg.sent) != told {
+		t.Errorf("the end was told again: %q", f.tg.sent[told:])
+	}
 	for id := int64(1); id <= 5; id++ {
-		if want := map[bool]int64{true: 0, false: prize}[id == don]; f.store.paid[id] != want {
+		if want := map[bool]int{true: 0, false: 1}[id == don]; f.store.paid[id] != want {
 			t.Errorf("player %d was paid %d, want %d", id, f.store.paid[id], want)
 		}
+	}
+}
+
+// A winner gets a card token, two in a game of ten or more; the maniac,
+// who wins alone, twice as many.
+func TestPrize(t *testing.T) {
+	for _, c := range []struct {
+		players int
+		winner  Team
+		want    int
+	}{{5, Town, 1}, {9, Mafia, 1}, {10, Town, 2}, {20, Mafia, 2}, {5, Solo, 2}, {12, Solo, 4}} {
+		g := Game{Players: make([]Player, c.players), Winner: c.winner}
+		if got := prizeOf(&g); got != c.want {
+			t.Errorf("%d players, %s won: %d tokens, want %d", c.players, c.winner, got, c.want)
+		}
+	}
+	ended := []Event{{Text: "news"}, {Text: "end", Winners: []int64{3, 4}}}
+	if got := pay(ended, 2); len(got) != 2 || got[3] != 2 || got[4] != 2 {
+		t.Errorf("pay = %v", got)
+	}
+	if got := pay([]Event{{Text: "news"}}, 2); got != nil {
+		t.Errorf("paid with no end: %v", got)
 	}
 }
 
