@@ -145,13 +145,29 @@ type cardPlayerRow struct {
 	freeUsed                    int
 }
 
+// WelcomeTokens are the tokens a player new to the cards is given when their
+// row is made, until WelcomeUntil: the owners' welcome of 2026-11-18, for
+// two weeks (the players there then were given as many once, by hand).
+var (
+	WelcomeTokens = 99
+	WelcomeUntil  = time.Date(2026, 12, 2, 0, 0, 0, 0, time.FixedZone("Asia/Tashkent", 5*60*60))
+)
+
+// welcomeTokens are the tokens a row made now starts with.
+func welcomeTokens() int {
+	if time.Now().Before(WelcomeUntil) {
+		return WelcomeTokens
+	}
+	return 0
+}
+
 // lockCardPlayer makes the player's row if there is none and locks it, so
 // that two draws at once are two draws, the second waiting its turn.
 func lockCardPlayer(ctx context.Context, tx pgx.Tx, userID int64, name string) (cardPlayerRow, error) {
 	var p cardPlayerRow
 	if _, err := tx.Exec(ctx, `
-		INSERT INTO card_players (user_id, name) VALUES ($1, $2)
-		ON CONFLICT (user_id) DO NOTHING`, userID, name); err != nil {
+		INSERT INTO card_players (user_id, name, tokens) VALUES ($1, $2, $3)
+		ON CONFLICT (user_id) DO NOTHING`, userID, name, welcomeTokens()); err != nil {
 		return p, err
 	}
 	err := tx.QueryRow(ctx, `SELECT last_draw_at, since_legendary, since_mythic, shards, tokens, free_day, free_used FROM card_players WHERE user_id = $1 FOR UPDATE`, userID).

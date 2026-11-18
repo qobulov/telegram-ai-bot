@@ -42,9 +42,9 @@ func addCardTokens(ctx context.Context, tx pgx.Tx, tokens map[int64]int) error {
 	}
 	_, err := tx.Exec(ctx, `
 		INSERT INTO card_players (user_id, tokens)
-		SELECT u, n FROM unnest($1::bigint[], $2::integer[]) AS t(u, n)
-		ON CONFLICT (user_id) DO UPDATE SET tokens = card_players.tokens + EXCLUDED.tokens`,
-		users, counts)
+		SELECT u, n + $3 FROM unnest($1::bigint[], $2::integer[]) AS t(u, n)
+		ON CONFLICT (user_id) DO UPDATE SET tokens = card_players.tokens + EXCLUDED.tokens - $3`,
+		users, counts, welcomeTokens())
 	return err
 }
 

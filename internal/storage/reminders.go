@@ -115,9 +115,9 @@ func (s *Store) SetCardAutoRemind(ctx context.Context, userID int64, name string
 			remindChat = &chatID
 		}
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO card_players (user_id, name, remind_chat_id, remind_language) VALUES ($1, $2, $3, $4)
+			INSERT INTO card_players (user_id, name, remind_chat_id, remind_language, tokens) VALUES ($1, $2, $3, $4, $5)
 			ON CONFLICT (user_id) DO UPDATE SET remind_chat_id = EXCLUDED.remind_chat_id, remind_language = EXCLUDED.remind_language`,
-			userID, name, remindChat, language); err != nil {
+			userID, name, remindChat, language, welcomeTokens()); err != nil {
 			return err
 		}
 		if chatID != 0 {
