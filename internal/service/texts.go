@@ -234,7 +234,7 @@ A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yo
 /mute@username, /unmute@username — guruhda jim turishim yoki qaytishim
 /ignore@username, /unignore@username — a'zoning xabariga reply qilib: unga 24 soat javob bermayman yoki yana javob beraman
 /warn, /unwarn — ogohlantirish (3-sida 1 kunga mut), /ban sabab, /kick — a'zoga reply qilib
-"+3 admin mari" — moderatorga 1–5 daraja berish; /staff, /ranklog, /access — moderatorlar, kim tayinlagan, buyruqlar darajasi
+/rank 3 (reply) — moderatorga 1–5 daraja berish, /rank 0 — olib tashlash; /staff, /ranklog, /access — moderatorlar, kim tayinlagan, buyruqlar darajasi
 /banlist, /amnesty, /kickinactive 30 — banlar ro'yxati, hammani bandan chiqarish, faol emaslarni chiqarish
 /reports, /warns — ko'rilmagan shikoyatlar, kimda nechta ogohlantirish
 
@@ -262,7 +262,7 @@ Bo'limlar: /help mod, /help kartalar, /help azo`,
 /mute@username, /unmute@username — чтобы я молчала в группе или вернулась
 /ignore@username, /unignore@username — ответом на сообщение участника: не отвечаю ему 24 часа или снова отвечаю
 /warn, /unwarn — предупреждение (на третьем мут на сутки), /ban причина, /kick — ответом на сообщение
-«+3 admin мари» — дать модератору ранг 1–5; /staff, /ranklog, /access — модераторы, кто назначил, ранги команд
+/rank 3 (reply) — дать модератору ранг 1–5, /rank 0 — снять; /staff, /ranklog, /access — модераторы, кто назначил, ранги команд
 /banlist, /amnesty, /kickinactive 30 — банлист, разбан всех, кик неактивных
 /reports, /warns — нерассмотренные жалобы, у кого сколько предупреждений
 
@@ -290,7 +290,7 @@ Reply to a member's message and ask me to delete or pin it, to mute or ban its a
 /mute@username, /unmute@username — make me stay quiet in the group, or bring me back
 /ignore@username, /unignore@username — as a reply to a member's message: I stop answering them for 24 hours, or answer them again
 /warn, /unwarn — a warning (the third mutes for a day), /ban reason, /kick — as a reply
-"+3 admin mari" — give a moderator rank 1–5; /staff, /ranklog, /access — moderators, who gave ranks, commands' ranks
+/rank 3 (reply) — give a moderator rank 1–5, /rank 0 — take it away; /staff, /ranklog, /access — moderators, who gave ranks, commands' ranks
 /banlist, /amnesty, /kickinactive 30 — the ban list, unban everyone, remove the inactive
 /reports, /warns — open reports, who has how many warnings
 
@@ -392,7 +392,7 @@ var helpSections = map[string]localText{
 /mute 1h, /unmute — mut; /ban sabab, /kick — ban va chiqarish
 /delete, /pin, /unpin — xabarni o'chirish, qadash
 /promote unvon, /demote — Telegram admin qilish (unvonsiz: «Moderator») va olish; /tag matn — teg (adminga unvon)
-"+3 admin" yoki "-admin" — moderator darajasi 1–5; /staff, /ranklog, /access
+/rank 3 yoki /rank 0 (reply) — moderator darajasi 1–5 berish yoki olish; /staff, /ranklog, /access
 /banlist — banlar va "bandan chiqarish" tugmalari; /amnesty — hammani chiqarish
 /reports — ko'rilmagan shikoyatlar; /warns — kimda nechta ogohlantirish
 /kickinactive 30 — 30 kun yozmaganlarni chiqarish
@@ -404,7 +404,7 @@ Meni jim qilish: /mute bot, qaytarish: /unmute`,
 /mute 1h, /unmute — мут; /ban причина, /kick — бан и кик
 /delete, /pin, /unpin — удалить, закрепить
 /promote звание, /demote — дать (без звания: «Moderator») и снять админку Telegram; /tag текст — тег (админу — звание)
-«+3 admin» или «-admin» — ранг модератора 1–5; /staff, /ranklog, /access
+/rank 3 или /rank 0 (reply) — дать или снять ранг модератора 1–5; /staff, /ranklog, /access
 /banlist — баны и кнопки разбана; /amnesty — разбан всех
 /reports — нерассмотренные жалобы; /warns — предупреждения
 /kickinactive 30 — кик тех, кто молчит 30 дней
@@ -415,7 +415,7 @@ Meni jim qilish: /mute bot, qaytarish: /unmute`,
 /mute 1h, /unmute — mute; /ban reason, /kick — ban and remove
 /delete, /pin, /unpin — delete, pin
 /promote title, /demote — make (titled "Moderator" by default) or unmake a Telegram admin; /tag text — a tag (an admin's title)
-"+3 admin" or "-admin" — a moderator's rank 1–5; /staff, /ranklog, /access
+/rank 3 or /rank 0 (reply) — give or take a moderator's rank 1–5; /staff, /ranklog, /access
 /banlist — bans with unban buttons; /amnesty — unban everyone
 /reports — open reports; /warns — who has warnings
 /kickinactive 30 — remove those silent for 30 days

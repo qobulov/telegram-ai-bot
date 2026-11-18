@@ -23,39 +23,28 @@ type RankBook interface {
 	SetCommandRank(ctx context.Context, chatID int64, code string, rank int) error
 }
 
+// rankUsage teaches /rank, the only way a rank is given or taken.
+const rankUsage = "A'zoning xabariga reply qilib yozing: \"/rank 3\" — 1–5 daraja berish, \"/rank 0\" — darajani olib tashlash."
+
 // rankLogShown is how many changes the rank log shows.
 const rankLogShown = 10
 
 // rankOrder is what a group message asks of the ranks: list them, show the
-// log or the commands' ranks, set a command's rank, or give a member a rank,
-// 0 taking it away.
+// log or the commands' ranks, set a command's rank, or give a member a rank
+// with /rank, 0 taking it away.
 type rankOrder struct {
-	kind string // "staff", "log", "access", "give", "mine"
+	kind string // "staff", "log", "access", "give", "mine", "usage"
 	rank int
 	code string
 }
 
 var (
-	plusRank   = regexp.MustCompile(`^\+([1-5])$`)
-	rankDigit  = regexp.MustCompile(`^[0-5]$`)
-	minusRank  = regexp.MustCompile(`^-[0-5]$`)
-	rankWords  = map[string]bool{"daraja": true, "даража": true, "дараже": true, "rank": true, "ранг": true, "повысить": true, "повысь": true, "понизить": true, "понизь": true}
-	staffWords = map[string]bool{"moderatorlar": true, "модераторы": true, "ранги": true, "darajalar": true, "staff": true}
-	takeWords  = map[string]bool{"-admin": true, "-админ": true, "-модер": true, "-moder": true, "-rank": true, "-ранг": true,
-		"-daraja": true, "разжаловать": true, "разжалуй": true}
+	rankDigit   = regexp.MustCompile(`^[0-5]$`)
+	staffWords  = map[string]bool{"moderatorlar": true, "модераторы": true, "ранги": true, "darajalar": true, "staff": true}
 	logPhrases  = map[string]bool{"kim tayinlagan": true, "kim tayinladi": true, "кто назначил": true, "ким тайинлаган": true}
-	takePhrases = map[string]bool{"darajani ol": true, "darajasini ol": true, "darajani olib tashla": true, "даражани ол": true, "даражасини ол": true,
-		"даражани олиб ташла": true, "снять ранг": true, "сними ранг": true}
 	minePhrases = map[string]bool{"darajam": true, "darajam qaysi": true, "darajam nechchi": true, "мени darajam qaysi": true, "meni darajam qaysi": true,
 		"даражам": true, "даражам қайси": true, "даражам кайси": true, "мени даражам кайси": true, "мой ранг": true, "какой у меня ранг": true, "my rank": true}
 )
-
-// isRankWord is a word that says the "+3" is a rank, not agreement: "admin",
-// "модер", "daraja".
-func isRankWord(w string) bool {
-	return isAdminWord(w) || strings.HasPrefix(w, "модер") || strings.HasPrefix(w, "moder") || rankWords[w] ||
-		strings.HasPrefix(w, "daraj") || strings.HasPrefix(w, "дараж")
-}
 
 // asksOwnRank reports "darajam qaysi" in any wording: a word of one's own
 // rank, "darajam", "даражам", among a few.
@@ -69,6 +58,8 @@ func asksOwnRank(words []string) bool {
 }
 
 // rankRequest reads a group message about ranks; ok is false for any other.
+// A rank is given or taken only with "/rank N" replying to the member: words
+// such as "+3 admin" are no order.
 func (s *Service) rankRequest(in incoming) (order rankOrder, ok bool) {
 	if !in.group || s.opts.Ranks == nil {
 		return rankOrder{}, false
@@ -85,7 +76,7 @@ func (s *Service) rankRequest(in incoming) (order rankOrder, ok bool) {
 			n, _ := strconv.Atoi(arg)
 			return rankOrder{kind: "give", rank: n}, true
 		}
-		return rankOrder{}, false
+		return rankOrder{kind: "usage"}, true
 	}
 	written, _ := in.msg.Content()
 	words := s.orderWords(written)
@@ -102,36 +93,8 @@ func (s *Service) rankRequest(in incoming) (order rankOrder, ok bool) {
 		return rankOrder{kind: "log"}, true
 	case minePhrases[joined] || asksOwnRank(words):
 		return rankOrder{kind: "mine"}, true
-	case takePhrases[joined] || (len(words) == 1 && takeWords[words[0]]):
-		return rankOrder{kind: "give"}, true
-	}
-	if minusRank.MatchString(words[0]) && len(words) > 1 && allRankWords(words[1:]) {
-		// "-1 admin mari" takes the rank, whatever the number.
-		return rankOrder{kind: "give"}, true
-	}
-	if m := plusRank.FindStringSubmatch(words[0]); m != nil && len(words) > 1 && allRankWords(words[1:]) {
-		n, _ := strconv.Atoi(m[1])
-		return rankOrder{kind: "give", rank: n}, true
-	}
-	if rankDigit.MatchString(words[0]) && len(words) >= 2 && isRankWord(words[1]) && allRankWords(words[2:]) {
-		n, _ := strconv.Atoi(words[0])
-		return rankOrder{kind: "give", rank: n}, true
-	}
-	if isRankWord(words[0]) && !isAdminWord(words[0]) && len(words) >= 2 && rankDigit.MatchString(words[1]) && allRankWords(words[2:]) {
-		n, _ := strconv.Atoi(words[1])
-		return rankOrder{kind: "give", rank: n}, true
 	}
 	return rankOrder{}, false
-}
-
-// allRankWords reports words that are each a rank word or a filler.
-func allRankWords(words []string) bool {
-	for _, w := range words {
-		if !isRankWord(w) && !modFillers[w] {
-			return false
-		}
-	}
-	return true
 }
 
 // accessOrder reads the commands' ranks: none shows them, "ban 3" sets one.
@@ -150,7 +113,7 @@ func accessOrder(args []string) (rankOrder, bool) {
 }
 
 // orderWords are the words of an order, lower case, without the bot's name
-// or the punctuation around them, signs kept: "+3", "-admin".
+// or the punctuation around them.
 func (s *Service) orderWords(text string) []string {
 	var words []string
 	for _, w := range strings.Fields(strings.ToLower(text)) {
@@ -158,11 +121,6 @@ func (s *Service) orderWords(text string) []string {
 			w = strings.Trim(w, ".,!?:;«»\"'`")
 		}
 		if w == "" || isWakeWord(w, s.opts.WakeWords) || strings.EqualFold(w, "@"+s.opts.Bot.Username) {
-			continue
-		}
-		if n := len(words); n > 0 && (words[n-1] == "-" || words[n-1] == "+") {
-			// "- админ": a sign written apart is still the word's.
-			words[n-1] += w
 			continue
 		}
 		words = append(words, w)
@@ -193,6 +151,8 @@ func (s *Service) rankCommand(ctx context.Context, in incoming) outcome {
 		return s.accessCommand(ctx, in, order)
 	case "mine":
 		return s.myRank(ctx, in)
+	case "usage":
+		return say(rankUsage)
 	}
 	return s.giveRank(ctx, in, order.rank)
 }
@@ -220,7 +180,7 @@ func (s *Service) askerRank(ctx context.Context, in incoming) (int, error) {
 func (s *Service) giveRank(ctx context.Context, in incoming, rank int) outcome {
 	asked, ok := s.withModTarget(in)
 	if !ok {
-		return say("Kimga? Moderatorning xabariga reply qilib yozing: \"+2 admin\", \"-admin\".")
+		return say("Kimga? " + rankUsage)
 	}
 	target := asked.msg.ReplyToMessage.From
 	if target == nil || target.IsBot || target.ID == in.userID {
@@ -268,7 +228,7 @@ func (s *Service) myRank(ctx context.Context, in incoming) outcome {
 	case mine > 0:
 		return say(fmt.Sprintf("%s Sizning darajangiz: %d.", stars(mine), mine))
 	}
-	return say("Sizda daraja yo'q. Uni guruh egasi yoki 4-darajali moderator xabaringizga reply qilib \"+2 admin mari\" deb beradi.")
+	return say("Sizda daraja yo'q. Uni guruh egasi yoki 4-darajali moderator xabaringizga reply qilib \"/rank 2\" deb beradi.")
 }
 
 // stars is a rank drawn: ⭐⭐⭐ for 3.
@@ -282,7 +242,7 @@ func (s *Service) staffList(ctx context.Context, chatID int64) outcome {
 	}
 	lines := s.adminLines(ctx, chatID)
 	if len(ranked) == 0 {
-		lines = append(lines, "", "🎖 Hozir hech kimda moderator darajasi yo'q. Berish: a'zoning xabariga reply qilib \"+1 admin mari\" (1–5).")
+		lines = append(lines, "", "🎖 Hozir hech kimda moderator darajasi yo'q. Berish: a'zoning xabariga reply qilib \"/rank 1\" (1–5), olish: \"/rank 0\".")
 		return say(strings.TrimSpace(strings.Join(lines, "\n")))
 	}
 	lines = append(lines, "", "🎖 Moderatorlar")

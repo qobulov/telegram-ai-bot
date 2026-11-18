@@ -74,28 +74,28 @@ func from(user int64, text string, to int64) telegram.Update {
 	return inGroup(msg)
 }
 
-// The creator gives ranks in a word, a moderator only below their own, the
-// staff and the log list them, "-admin" takes one away, and only rank 5 or
-// the creator sets a command's rank.
-func TestRanksAreGivenInWords(t *testing.T) {
+// The creator gives ranks with /rank N replying to the member, a moderator
+// only below their own, the staff and the log list them, "/rank 0" takes
+// one away, and only rank 5 or the creator sets a command's rank.
+func TestRanksAreGivenWithSlashRank(t *testing.T) {
 	const creator, moder, member = int64(10), int64(11), int64(12)
 	f := newFixture()
 	f.opts.WakeWords = []string{"мари", "mari"}
 	f.members.creator = creator
 	book := &fakeRankBook{ranks: map[int64]int{}, overrides: map[string]int{}}
 	f.opts.Ranks = book
-	sent := f.run(from(creator, "+4 админ мари", moder))
+	sent := f.run(from(creator, "/rank 4", moder))
 	if len(sent) == 0 {
 		t.Fatal("nothing sent")
 	}
 	if last := sent[len(sent)-1].text; !strings.Contains(last, "4-darajali") || book.ranks[moder] != 4 {
-		t.Fatalf("the creator's +4 = %q, ranks %v", last, book.ranks)
+		t.Fatalf("the creator's /rank 4 = %q, ranks %v", last, book.ranks)
 	}
-	sent = f.run(from(moder, "Мари +4 admin", member))
+	sent = f.run(from(moder, "/rank 4", member))
 	if last := sent[len(sent)-1].text; !strings.Contains(last, "past darajani") || book.ranks[member] != 0 {
 		t.Errorf("a rank 4 giving 4 = %q", last)
 	}
-	sent = f.run(from(moder, "mari daraja 2", member))
+	sent = f.run(from(moder, "/rank 2", member))
 	if last := sent[len(sent)-1].text; !strings.Contains(last, "2-darajali") || book.ranks[member] != 2 {
 		t.Errorf("a rank 4 giving 2 = %q", last)
 	}
@@ -103,9 +103,13 @@ func TestRanksAreGivenInWords(t *testing.T) {
 	if last := sent[len(sent)-1].text; !strings.Contains(last, "4-daraja") || !strings.Contains(last, "2-daraja") {
 		t.Errorf("staff = %q", last)
 	}
-	sent = f.run(from(moder, "-admin мари", member))
+	sent = f.run(from(member, "/rank 1", moder))
+	if last := sent[len(sent)-1].text; !strings.Contains(last, "kamida 4") || book.ranks[moder] != 4 {
+		t.Errorf("a rank 2 giving a rank = %q, ranks %v", last, book.ranks)
+	}
+	sent = f.run(from(moder, "/rank 0", member))
 	if last := sent[len(sent)-1].text; !strings.Contains(last, "moderator emas") || book.ranks[member] != 0 {
-		t.Errorf("-admin = %q", last)
+		t.Errorf("/rank 0 = %q", last)
 	}
 	sent = f.run(from(member, "/ranklog", 0))
 	if last := sent[len(sent)-1].text; !strings.Contains(last, "darajasi olindi") {
@@ -123,46 +127,71 @@ func TestRanksAreGivenInWords(t *testing.T) {
 	if last := sent[len(sent)-1].text; !strings.Contains(last, "2 · ban") {
 		t.Errorf("access list = %q", last)
 	}
-	// "+1" alone is agreement, not a rank.
-	if _, ok := New(f.opts).rankRequest(incoming{group: true, text: "+1", msg: groupMessage("+1")}); ok {
-		t.Error("+1 alone read as a rank")
+	sent = f.run(from(creator, "/rank", member))
+	if last := sent[len(sent)-1].text; !strings.Contains(last, "/rank 0") {
+		t.Errorf("/rank alone = %q", last)
+	}
+	sent = f.run(from(creator, "/rank 3", 0))
+	if last := sent[len(sent)-1].text; !strings.Contains(last, "Kimga?") {
+		t.Errorf("/rank with no reply = %q", last)
 	}
 }
 
-// Cyrillic rank orders are read too, and "darajam qaysi" tells the asker
-// their rank in code.
-func TestRanksInCyrillicAndOnesOwn(t *testing.T) {
+// A moderator cannot take the rank of one at their own rank or above; the
+// creator and the bot's owners stand above every rank and take any.
+func TestTakingARankFollowsTheRanks(t *testing.T) {
+	const creator, owner, moder, other = int64(10), int64(20), int64(11), int64(13)
+	f := newFixture()
+	f.members.creator = creator
+	f.opts.OwnerIDs = map[int64]bool{owner: true}
+	book := &fakeRankBook{ranks: map[int64]int{moder: 4, other: 5}, overrides: map[string]int{}}
+	f.opts.Ranks = book
+	sent := f.run(from(moder, "/rank 0", other))
+	if last := sent[len(sent)-1].text; !strings.Contains(last, "⛔") || book.ranks[other] != 5 {
+		t.Errorf("a rank 4 taking a rank 5 = %q, ranks %v", last, book.ranks)
+	}
+	f.run(from(owner, "/rank 0", other))
+	if book.ranks[other] != 0 {
+		t.Errorf("the owner's /rank 0 left rank %d", book.ranks[other])
+	}
+	f.run(from(creator, "/rank 5", moder))
+	if book.ranks[moder] != 5 {
+		t.Errorf("the creator's /rank 5 gave %d", book.ranks[moder])
+	}
+}
+
+// Words are no rank order any more, whoever writes them: "+3 admin mari"
+// and "-admin mari" replying to a member change no rank; "darajam qaysi"
+// still tells the asker theirs in code.
+func TestRankWordsAreNoOrder(t *testing.T) {
 	const creator, member = int64(10), int64(12)
 	f := newFixture()
 	f.opts.WakeWords = []string{"мари", "mari"}
 	f.members.creator = creator
-	book := &fakeRankBook{ranks: map[int64]int{}, overrides: map[string]int{}}
+	book := &fakeRankBook{ranks: map[int64]int{member: 2}, overrides: map[string]int{}}
 	f.opts.Ranks = book
-	sent := f.run(from(creator, "даража 3 мари", member))
-	if last := sent[len(sent)-1].text; !strings.Contains(last, "3-darajali") || book.ranks[member] != 3 {
-		t.Fatalf("даража 3 = %q, ranks %v", last, book.ranks)
-	}
-	sent = f.run(from(member, "mari darajam qaysi", 0))
-	if last := sent[len(sent)-1].text; !strings.Contains(last, "darajangiz: 3") {
-		t.Errorf("one's own = %q", last)
-	}
-	sent = f.run(from(creator, "даражани ол мари", member))
-	if last := sent[len(sent)-1].text; !strings.Contains(last, "moderator emas") || book.ranks[member] != 0 {
-		t.Errorf("даражани ол = %q", last)
-	}
-	// The wordings seen in a group that the code once left to the model.
-	for _, c := range []struct {
-		text string
-		rank int
-	}{{"+3 даражали мари", 3}, {"Мари 2 даража бен", 2}, {"мари 4 darajali qil", 4}} {
-		f.run(from(creator, c.text, member))
-		if book.ranks[member] != c.rank {
-			t.Errorf("%q: rank %d, want %d", c.text, book.ranks[member], c.rank)
+	service := New(f.opts)
+	for _, text := range []string{"+3 admin mari", "-admin mari", "+3 даражали мари", "Мари 2 даража бен", "даража 3 мари",
+		"- админ Мари", "-1 admin mari", "darajani ol", "сними ранг", "3 admin", "+1"} {
+		f.run(from(creator, text, member))
+		if book.ranks[member] != 2 || len(book.log) != 0 {
+			t.Errorf("%q changed a rank: %v, log %v", text, book.ranks, book.log)
+		}
+		if _, ok := service.rankRequest(incoming{group: true, text: text, msg: groupMessage(text)}); ok {
+			t.Errorf("%q read as a rank order", text)
 		}
 	}
+	sent := f.run(from(member, "mari darajam qaysi", 0))
+	if last := sent[len(sent)-1].text; !strings.Contains(last, "darajangiz: 2") {
+		t.Errorf("one's own = %q", last)
+	}
 	sent = f.run(from(member, "Мени даражам неччи мари", 0))
-	if last := sent[len(sent)-1].text; !strings.Contains(last, "darajangiz: 4") {
+	if last := sent[len(sent)-1].text; !strings.Contains(last, "darajangiz: 2") {
 		t.Errorf("даражам неччи = %q", last)
+	}
+	sent = f.run(from(14, "mari darajam qaysi", 0))
+	if last := sent[len(sent)-1].text; !strings.Contains(last, "/rank 2") {
+		t.Errorf("no rank = %q", last)
 	}
 }
 
@@ -185,42 +214,5 @@ func TestStaffShowsAdmins(t *testing.T) {
 	}
 	if strings.Contains(last, "somebot") {
 		t.Errorf("staff lists a bot: %q", last)
-	}
-}
-
-// "-1 admin mari" takes a rank as "-admin" does: refused to a member
-// without the rank to give ranks, done for the creator.
-func TestMinusNumberTakesARank(t *testing.T) {
-	const creator, member, other = int64(10), int64(12), int64(13)
-	f := newFixture()
-	f.opts.WakeWords = []string{"mari"}
-	f.members.creator = creator
-	book := &fakeRankBook{ranks: map[int64]int{member: 2}, overrides: map[string]int{}}
-	f.opts.Ranks = book
-	sent := f.run(from(other, "-1 admin mari", member))
-	if last := sent[len(sent)-1].text; !strings.Contains(last, "⛔") || book.ranks[member] != 2 {
-		t.Errorf("a member's -1 admin = %q, ranks %v", last, book.ranks)
-	}
-	f.run(from(creator, "-1 admin mari", member))
-	if book.ranks[member] != 0 {
-		t.Errorf("the creator's -1 admin left rank %d", book.ranks[member])
-	}
-}
-
-// "- админ Мари", the sign written apart, takes a rank as "-admin" does.
-func TestSignWrittenApart(t *testing.T) {
-	const creator, member = int64(10), int64(12)
-	f := newFixture()
-	f.opts.WakeWords = []string{"мари"}
-	f.members.creator = creator
-	book := &fakeRankBook{ranks: map[int64]int{member: 2}, overrides: map[string]int{}}
-	f.opts.Ranks = book
-	f.run(from(creator, "- админ Мари", member))
-	if book.ranks[member] != 0 {
-		t.Errorf("- админ left rank %d", book.ranks[member])
-	}
-	f.run(from(creator, "+ 3 даража мари", member))
-	if book.ranks[member] != 3 {
-		t.Errorf("+ 3 даража gave %d", book.ranks[member])
 	}
 }

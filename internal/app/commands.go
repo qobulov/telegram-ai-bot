@@ -63,6 +63,7 @@ var commandMenus = map[string][]telegram.BotCommand{
 		{Command: "banlist", Description: "Banlar ro'yxati, bandan chiqarish tugmalari"},
 		{Command: "reports", Description: "Ko'rib chiqilmagan shikoyatlar"},
 		{Command: "warns", Description: "Kimda nechta ogohlantirish (reply: bittasi)"},
+		{Command: "rank", Description: "Daraja berish: /rank 3, olish: /rank 0 (reply)"},
 		{Command: "ranklog", Description: "Kim kimga daraja bergan"},
 		{Command: "access", Description: "Buyruqlar darajasi: /access ban 2"},
 		{Command: "kickinactive", Description: "Faol emaslarni chiqarish: /kickinactive 30"},
