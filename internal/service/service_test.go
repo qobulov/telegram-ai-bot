@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -207,14 +208,21 @@ func (f *fakeRecorder) SetSentMessageID(_ context.Context, answerID, messageID i
 
 // fakeMembers answers the group-administrator check.
 type fakeMembers struct {
-	admins  map[int64]bool
-	creator int64
-	err     error
-	calls   int
+	admins map[int64]bool
+	rights map[int64][]string
+	// rightsErr fails AdminRights alone.
+	rightsErr error
+	creator   int64
+	err       error
+	calls     int
 }
 
 func (f *fakeMembers) GroupCreator(context.Context, int64) (int64, error) {
 	return f.creator, f.err
+}
+
+func (f *fakeMembers) AdminRights(_ context.Context, _, userID int64) (bool, []string, error) {
+	return f.admins[userID], f.rights[userID], cmp.Or(f.rightsErr, f.err)
 }
 
 func (f *fakeMembers) IsGroupAdmin(_ context.Context, _, userID int64) (bool, error) {

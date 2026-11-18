@@ -47,6 +47,9 @@ type Members interface {
 	// GroupCreator is the user ID of whoever created a group, 0 when
 	// Telegram does not say.
 	GroupCreator(ctx context.Context, chatID int64) (int64, error)
+	// AdminRights says whether a user administers a group and the admin
+	// rights Telegram gives them there, by their Bot API names.
+	AdminRights(ctx context.Context, chatID, userID int64) (admin bool, rights []string, err error)
 }
 
 // Muter stores whether the bot is muted in a chat.

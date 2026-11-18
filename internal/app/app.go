@@ -89,6 +89,16 @@ func (m groupMembers) IsGroupAdmin(ctx context.Context, chatID, userID int64) (b
 	return member.IsAdmin(), nil
 }
 
+// AdminRights says whether a member administers a group and the admin
+// rights they hold there, for /rights.
+func (m groupMembers) AdminRights(ctx context.Context, chatID, userID int64) (bool, []string, error) {
+	member, err := m.client.GetChatMember(ctx, chatID, userID)
+	if err != nil {
+		return false, nil, err
+	}
+	return member.IsAdmin(), member.Rights(), nil
+}
+
 // IsGroupCreator reports whether a member created a group, for the
 // punishments a group's creator may set.
 func (m groupMembers) IsGroupCreator(ctx context.Context, chatID, userID int64) (bool, error) {
