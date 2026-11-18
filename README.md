@@ -2351,8 +2351,14 @@ it restricted write again at the end; a restriction lasts an hour at
 most, should a game be left unfinished. The bot tells the group
 each morning and verdict, with the roles of the dead; the town wins when
 no killer is left, the mafia when they are as many as the rest, the
-maniac when left with one other. The winners get 150 of Dev jangi's coins
-each, the maniac 300.
+maniac when left with one other. The winners get card-game tokens, to
+open cards with in `/card`: one each, two in a game of ten or more, the
+maniac twice as many (`card_players.tokens`, a row made for a winner who
+never played cards). They are given in the transaction that keeps the
+game's end, so a game's winners are paid once, with its end or not at all;
+the group's last message and the end screen say how many. The page's
+rules hide behind the ⓘ by the room's count, in a sheet that opens by
+itself the first time a device opens the lobby (a `localStorage` flag).
 
 The server keeps each group's game as one row of `mafia_games` (migration
 49), changed with the row locked, and gives each page only what its

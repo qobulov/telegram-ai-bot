@@ -126,6 +126,7 @@
     const news = JSON.stringify(view.news || []);
     if (!before) shownNews = news;
     const died = before && before.me && before.me.alive && me.joined && me.alive === false;
+    if ((view.phase === "lobby" || view.phase === "") && !fatal && !chatOpen && $("overlay").hidden && firstRules()) openRules();
     if (playing && me.role && cardFor !== game && !shown(game)) { cardFor = game; showCard(me); }
     else if (before && before.seq !== view.seq && view.phase === "over") showEnd(view);
     else if (died && me.can_speak) showDeath(view);
@@ -147,6 +148,22 @@
       // Without storage the card shows again after a reload.
     }
     return false;
+  }
+
+  // firstRules tells whether this device never had the rules shown before,
+  // and remembers that they now have been; without storage they are not
+  // pushed again and again, the ⓘ still opens them.
+  let rulesAsked = false;
+  function firstRules() {
+    if (rulesAsked) return false;
+    rulesAsked = true;
+    try {
+      if (localStorage.getItem("mafia-rules-seen")) return false;
+      localStorage.setItem("mafia-rules-seen", "1");
+      return true;
+    } catch (error) {
+      return false;
+    }
   }
 
   // ---------- overlays ----------
@@ -207,7 +224,7 @@
     const won = me.team && me.team === view.winner;
     const title = WINNERS[view.winner] || "O'yin tugadi";
     overlay(`<div class="announce"><h2>${title}</h2>
-      <p>${me.joined ? (won ? "🏆 Siz g'oliblar safidasiz! Dev jangi tangasi berildi." : view.winner === "none" ? "Durang: hamma halok bo'ldi." : "😤 Bu safar yutqazdingiz") : ""}</p>
+      <p>${me.joined ? (won ? `🏆 Siz g'oliblar safidasiz! ${prizeText(view)}` :view.winner === "none" ? "Durang: hamma halok bo'ldi." : "😤 Bu safar yutqazdingiz") : ""}</p>
       <table>${(view.players || []).map((p) => `<tr class="${p.alive ? "" : "dead"}${isMe(p) ? " me" : ""}"><td>${p.alive ? "" : "💀 "}${esc(p.name)}</td><td>${esc(p.role_name || "")}</td></tr>`).join("")}</table>
       <div class="row"><button class="btn main" data-close>Yopish</button></div></div>`);
   }
@@ -218,6 +235,8 @@
   function myId() {
     try { return JSON.parse(atob(session.split(".")[0].replace(/-/g, "+").replace(/_/g, "/"))).u; } catch (error) { return 0; }
   }
+  // prizeText is the card tokens a winner of the ended game was given.
+  const prizeText = (view) => `+${Number(view.prize) || 1} 🎴 kartalar o'yini tokeni berildi (/card).`;
   function esc(text) { return String(text ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 
   function pendingAct() {
@@ -245,6 +264,8 @@
     const roleShown = Boolean(me.role) && ["night", "day", "vote"].includes(phase);
     $("role").hidden = !roleShown;
     $("title").hidden = roleShown;
+    $("infobtn").hidden = roleShown || Boolean(fatal);
+    if (state) $("rulescount").textContent = `${state.min_players}–${state.max_players}`;
     if (roleShown) $("role").textContent = me.role_name;
     document.body.className = phase === "day" || phase === "vote" ? "day" : "";
     $("phase").textContent = !state ? "…" : { "": "Xona yo'q", lobby: `Xona · ${state.players.length}/${state.max_players}`, night: `🌙 ${state.day}-tun`, day: `☀️ ${state.day}-kun`, vote: "🗳 Ovoz", over: "🏁 Tugadi" }[phase];
@@ -335,6 +356,34 @@
     render();
   }
 
+  // The rules' sheet rises from the bottom over a dimmed page, and closes as
+  // the chat's does, and by a tap on the dimmed page; focus goes back to
+  // the ⓘ.
+  let rulesOpen = false;
+  function openRules() {
+    if (rulesOpen || chatOpen) return;
+    rulesOpen = true;
+    $("rulescrim").hidden = false;
+    $("rulesheet").hidden = false;
+    $("app").inert = true;
+    $("infobtn").setAttribute("aria-expanded", "true");
+    $("rulesclose").focus();
+    if (backButton) backButton.show();
+    else try { history.pushState({ rules: true }, ""); } catch (error) { /* back then leaves the page */ }
+  }
+  function closeRules(fromHistory) {
+    if (!rulesOpen) return;
+    rulesOpen = false;
+    $("rulescrim").hidden = true;
+    $("rulesheet").hidden = true;
+    $("app").inert = false;
+    $("infobtn").setAttribute("aria-expanded", "false");
+    if (!$("infobtn").hidden) $("infobtn").focus();
+    else if (document.activeElement && $("rulesheet").contains(document.activeElement)) document.activeElement.blur();
+    if (backButton) backButton.hide();
+    else if (!fromHistory && history.state && history.state.rules) history.back();
+  }
+
   // sayLine sends a line to the room the page shows; typed is true for
   // the box's own words, cleared once sent, and false for a quick line.
   async function sayLine(text, typed) {
@@ -377,11 +426,7 @@
       const me = state.me || {};
       if (state.phase === "over" && state.winner) {
         const won = me.team && me.team === state.winner;
-        notes.push(`<div class="note secret"><b>${WINNERS[state.winner] || "O'yin tugadi"}</b>${me.joined ? (won ? " Siz g'oliblar safidasiz 🏆" : state.winner === "none" ? "" : " Bu safar yutqazdingiz.") : ""}</div>`);
-      }
-      if (state.phase === "" || state.phase === "lobby" || state.phase === "over") {
-        notes.push(`<div class="note">🎭 <b>Mafia</b> — guruh bilan o'ynaladi. Har kim yashirin rol oladi: Don va mafiya, komissar, shifokor, putana, manyak, omadli va tinch aholi. Tunda rollar shu sahifada harakat qiladi (mafiya o'z yashirin chatida kelishadi), kunduzi 💬 chatda yoki guruhda bahslashib, ovoz bilan bir kishini chiqarasiz.</div>`);
-        notes.push(`<div class="note">👥 ${state.min_players}–${state.max_players} kishi. G'oliblarga Dev jangi tangasi beriladi 💰</div>`);
+        notes.push(`<div class="note secret"><b>${WINNERS[state.winner] || "O'yin tugadi"}</b>${me.joined ? (won ? ` Siz g'oliblar safidasiz 🏆 ${prizeText(state)}` : state.winner === "none" ? "" : " Bu safar yutqazdingiz.") : ""}</div>`);
       }
       if (state.phase === "night" && !pendingAct()) notes.push(`<div class="note calm"><div class="big">🌙</div><b>Shahar uxlayapti…</b><small>Rollar tanlov qilmoqda. Tong otishini kuting.</small></div>`);
       if (state.phase === "day") notes.push(`<div class="note">💬 Bahslashing: kim mafiya? 💬 tugmasidagi chatda yoki guruhda yozing. Ovoz berish vaqt tugagach shu sahifada ochiladi.</div>`);
@@ -393,8 +438,8 @@
         notes.push(`<div class="note">👻 Siz o'yindan chiqdingiz. ${me.muted ? "🔇 O'yin tugaguncha guruhda yoza olmaysiz — so'nggi so'zni shu sahifadan yuboring." : "O'yinni kuzating, lekin guruhda tiriklarga maslahat bermang."}</div>`);
       }
     }
+    // The center stays, empty or not, to keep the chat button clear of the players.
     $("center").innerHTML = notes.join("");
-    $("center").hidden = notes.length === 0;
   }
 
   function renderBar() {
@@ -443,9 +488,15 @@
   $("role").addEventListener("click", () => { if (state && state.me && state.me.role) showCard(state.me, true); });
   $("chatfab").addEventListener("click", openChat);
   $("chatclose").addEventListener("click", () => closeChat());
-  addEventListener("popstate", () => closeChat(true));
-  if (backButton) backButton.onClick(() => closeChat());
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && chatOpen && $("overlay").hidden) closeChat(); });
+  $("infobtn").addEventListener("click", openRules);
+  for (const id of ["rulesclose", "rulesok", "rulescrim"]) $(id).addEventListener("click", () => closeRules());
+  addEventListener("popstate", () => { if (rulesOpen) closeRules(true); else closeChat(true); });
+  if (backButton) backButton.onClick(() => { if (rulesOpen) closeRules(); else closeChat(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (rulesOpen) closeRules();
+    else if (chatOpen && $("overlay").hidden) closeChat();
+  });
   $("chatbox").addEventListener("submit", (e) => { e.preventDefault(); sayLine($("chatline").value, true); });
   $("chips").addEventListener("click", (e) => { const chip = e.target.closest("[data-chip]"); if (chip) sayLine(chip.dataset.chip, false); });
 
