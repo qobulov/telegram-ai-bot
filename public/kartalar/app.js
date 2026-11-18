@@ -248,9 +248,9 @@
     return box;
   }
 
-  // SPECIAL are the cards the owners dressed by hand: a "Limited" tag and
+  // SPECIAL are the cards the owners dressed by hand: a "LIMITED" mark and
   // cherry petals drifting over the picture.
-  const SPECIAL = { 298761: { tag: "Limited", petals: true } };
+  const SPECIAL = { 298761: { tag: "LIMITED", petals: true } };
 
   // dress adds a special card's tag and petals; the large view has more
   // petals.

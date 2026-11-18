@@ -368,14 +368,27 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
   100% { opacity: 0; transform: translateY(-260px) translateX(8px); }
 }
 
-/* A special card (SPECIAL in app.js): a pink "Limited" tag at the top, between
-   the crown and the count, and cherry petals drifting down over the picture, under the frame. */
+/* A special card (SPECIAL in app.js): a gold "LIMITED" mark in the top
+   right corner, drawn like a game's edition logo (heavy slanted gold letters
+   with a dark edge and two green streaks after them), and cherry petals
+   drifting down over the picture, under the frame. A count moves below the
+   mark. */
 .special .limited {
-  position: absolute; top: 7px; left: 50%; transform: translateX(-50%); z-index: 5; padding: 2px 7px; border-radius: 999px;
-  font: 800 9px/1.4 Manrope, sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: #fff;
-  background: linear-gradient(135deg, #ff7eb3, #c2185b); box-shadow: 0 0 0 1px rgba(255, 220, 235, 0.7), 0 0 10px rgba(255, 110, 170, 0.6);
+  position: absolute; top: 5px; right: 20px; z-index: 5; padding: 1px 2px; pointer-events: none;
+  font: italic 900 11px/1.15 Unbounded, sans-serif; letter-spacing: 0.02em;
+  transform: skewX(-14deg);
+  color: transparent; -webkit-text-stroke: 0.7px #2a1a04;
+  background: linear-gradient(180deg, #fff7cf 0%, #ffe07a 40%, #e0a630 70%, #fff0b0 100%);
+  -webkit-background-clip: text; background-clip: text;
+  filter: drop-shadow(0 1px 0 #2a1a04) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.7)) drop-shadow(0 0 6px rgba(255, 200, 80, 0.55));
 }
-.front.special .limited { top: 14px; padding: 4px 11px; font-size: 12px; }
+.special .limited::after {
+  content: ""; position: absolute; top: 1px; bottom: 1px; left: 100%; width: 14px;
+  background: linear-gradient(108deg, transparent 0 8%, #b6ffd9 8% 34%, transparent 34% 52%, #3fe08e 52% 88%, transparent 88%);
+}
+.front.special .limited { top: 12px; right: 36px; font-size: 17px; }
+.front.special .limited::after { width: 22px; }
+.card.special .count { top: 24px; z-index: 5; }
 .special .petals { --fall: 240px; position: absolute; inset: 0; z-index: 2; overflow: hidden; border-radius: inherit; pointer-events: none; }
 .special .petals i {
   position: absolute; top: -8%; width: 9px; height: 7px; opacity: 0; will-change: transform;
