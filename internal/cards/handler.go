@@ -36,6 +36,12 @@ type Store interface {
 	FuseCard(ctx context.Context, userID, cardID int64, cost []int) (stars int, err error)
 	OpenEventCards(ctx context.Context, userID int64, name string, n int, ev storage.CardEvent, day storage.CardDay, now time.Time) (storage.EventOpening, error)
 	CardEventPulls(ctx context.Context, userID, card int64) (int, storage.Card, error)
+	SaveArenaTeam(ctx context.Context, userID int64, front [2]int64, back [3]int64, power int) error
+	ArenaTeam(ctx context.Context, userID int64) (front [2]int64, back [3]int64, ok bool, err error)
+	ArenaPlayerOf(ctx context.Context, userID int64, rules storage.ArenaRules) (storage.ArenaPlayer, error)
+	ArenaOpponents(ctx context.Context, userID int64, n int) ([]storage.ArenaPlayer, error)
+	RecordArenaBattle(ctx context.Context, attacker, defender, seed int64, attackerWon bool, rules storage.ArenaRules) (storage.ArenaOutcome, error)
+	ArenaTop(ctx context.Context, limit int) ([]storage.ArenaPlayer, error)
 }
 
 // Invoices makes links to invoices in Stars, for crystals bought in the app.
@@ -129,6 +135,11 @@ type request struct {
 	// Item is what "buy" buys, of ShopItems, or "invoice" sells, of
 	// CrystalPacks.
 	Item string `json:"item"`
+	// Front and Back are the cards of the team "arena_team" saves, two and
+	// three; Opponent is the player "arena_attack" attacks.
+	Front    []int64 `json:"front"`
+	Back     []int64 `json:"back"`
+	Opponent int64   `json:"opponent"`
 }
 
 type failure struct {
@@ -206,6 +217,12 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return h.unoffer(ctx, opened.User, req.Offer)
 	case "fuse":
 		return h.fuse(ctx, opened.User, req.Card)
+	case "arena":
+		return h.arenaView(ctx, opened.User)
+	case "arena_team":
+		return h.arenaTeam(ctx, opened.User, req.Front, req.Back)
+	case "arena_attack":
+		return h.arenaAttack(ctx, opened.User, req.Opponent)
 	}
 	return nil, errBadRequest
 }

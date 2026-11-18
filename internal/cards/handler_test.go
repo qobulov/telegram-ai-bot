@@ -52,6 +52,7 @@ type fakeStore struct {
 	pages    []storage.CatalogPage // the catalog pages asked for
 	stars    int                   // the held card's stars; 0 is ★1
 	fuseErr  error
+	arena    fakeArena
 }
 
 var (
@@ -66,7 +67,10 @@ func (f *fakeStore) SaveCardCatalog(context.Context, []storage.Card) error { ret
 func (f *fakeStore) CardCatalog(context.Context) ([]storage.Card, error) {
 	return []storage.Card{heldCard, lockedCard}, nil
 }
-func (f *fakeStore) OwnedCards(context.Context, int64, int) ([]storage.OwnedCard, error) {
+func (f *fakeStore) OwnedCards(_ context.Context, userID int64, _ int) ([]storage.OwnedCard, error) {
+	if held, ok := f.arena.held[userID]; ok {
+		return held, nil
+	}
 	return []storage.OwnedCard{{Card: heldCard, Count: 2, Stars: max(f.stars, 1)}}, nil
 }
 func (f *fakeStore) FuseCard(_ context.Context, _, cardID int64, cost []int) (int, error) {

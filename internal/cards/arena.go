@@ -1,0 +1,252 @@
+package cards
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/binary"
+	"errors"
+	"time"
+
+	"telegram-ai-bot/internal/arena"
+	"telegram-ai-bot/internal/miniapp"
+	"telegram-ai-bot/internal/storage"
+)
+
+// The arena's day: a player makes ArenaAttacks attacks and wins at most
+// ArenaTokens card tokens; ratings move by Elo with ArenaK. The arena offers
+// ArenaOpponentsShown opponents and its table lists arenaTopSize players.
+const (
+	ArenaAttacks        = 5
+	ArenaTokens         = 3
+	ArenaK              = 32
+	ArenaOpponentsShown = 3
+	arenaTopSize        = 10
+)
+
+// arenaRules are the day's rules at now: the day starts at midnight in
+// Tashkent, built there so that the store counts Tashkent's date.
+func arenaRules(now time.Time) storage.ArenaRules {
+	local := now.In(Location)
+	day := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, Location)
+	return storage.ArenaRules{Attacks: ArenaAttacks, Tokens: ArenaTokens, K: ArenaK, Day: day}
+}
+
+var (
+	classNames = map[arena.Class]string{arena.ClassTank: "tank", arena.ClassFighter: "fighter", arena.ClassMage: "mage"}
+	skillNames = map[arena.Skill]string{arena.NoSkill: "", arena.Strike: "strike", arena.Heal: "heal", arena.Shield: "shield"}
+)
+
+// fighterView is a card in the arena as the page draws it.
+type fighterView struct {
+	ID     int64  `json:"id"`
+	Name   string `json:"name"`
+	Image  string `json:"image"`
+	Rarity int    `json:"rarity"`
+	Stars  int    `json:"stars"`
+	Attack int    `json:"attack"`
+	Health int    `json:"health"`
+	Class  string `json:"class"`
+	Skill  string `json:"skill"`
+}
+
+// eventView is one thing that happened in a battle, for the page to replay.
+type eventView struct {
+	Round  int    `json:"round"`
+	Side   int    `json:"side"`
+	From   int    `json:"from"`
+	To     int    `json:"to"`
+	Kind   string `json:"kind"`
+	Amount int    `json:"amount"`
+	HP     int    `json:"hp"`
+}
+
+// fighters is a team in the arena: its fighters, front first, and their
+// cards, for the page.
+type fighters struct {
+	team  arena.Team
+	views []fighterView
+}
+
+// fightersOf makes a team of the cards ids, of the player's held, boosted by
+// their stars; ok is false if any is not held.
+func fightersOf(held []storage.OwnedCard, ids [5]int64) (fighters, bool) {
+	byID := make(map[int64]storage.OwnedCard, len(held))
+	for _, o := range held {
+		if o.Count > 0 {
+			byID[o.ID] = o
+		}
+	}
+	var slots [5]arena.Fighter
+	views := make([]fighterView, len(ids))
+	for i, id := range ids {
+		o, ok := byID[id]
+		if !ok {
+			return fighters{}, false
+		}
+		stars := min(max(o.Stars, 1), MaxStars)
+		attack, health := Boosted(o.Card, stars)
+		f := arena.FighterOf(o.ID, o.Name, o.Rarity, stars, attack, health)
+		slots[i] = f
+		views[i] = fighterView{ID: o.ID, Name: o.Name, Image: o.ImageURL, Rarity: o.Rarity, Stars: stars,
+			Attack: attack, Health: health, Class: classNames[f.Class], Skill: skillNames[f.Skill]}
+	}
+	team := arena.Team{Front: [2]arena.Fighter{slots[0], slots[1]}, Back: [3]arena.Fighter{slots[2], slots[3], slots[4]}}
+	return fighters{team, views}, true
+}
+
+// savedFighters is the player's saved team; ok is false without one or with
+// a card of it no longer held.
+func (h *handler) savedFighters(ctx context.Context, userID int64) (fighters, bool, error) {
+	front, back, ok, err := h.Store.ArenaTeam(ctx, userID)
+	if err != nil || !ok {
+		return fighters{}, false, err
+	}
+	held, err := h.Store.OwnedCards(ctx, userID, -1)
+	if err != nil {
+		return fighters{}, false, err
+	}
+	team, ok := fightersOf(held, [5]int64{front[0], front[1], back[0], back[1], back[2]})
+	return team, ok, nil
+}
+
+// arenaView is the arena: the player, their team (null without one they
+// hold), a few opponents near their rating and the table.
+func (h *handler) arenaView(ctx context.Context, user miniapp.User) (any, failure) {
+	player, err := h.Store.ArenaPlayerOf(ctx, user.ID, arenaRules(h.Now()))
+	if err != nil {
+		h.Logger.Error("could not read an arena player", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
+	team, ok, err := h.savedFighters(ctx, user.ID)
+	if err != nil {
+		h.Logger.Error("could not read an arena team", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
+	opponents, err := h.Store.ArenaOpponents(ctx, user.ID, ArenaOpponentsShown)
+	if err != nil {
+		h.Logger.Error("could not read arena opponents", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
+	top, err := h.Store.ArenaTop(ctx, arenaTopSize)
+	if err != nil {
+		h.Logger.Error("could not read the arena table", "error", err)
+		return nil, errUnavailable
+	}
+	others := make([]map[string]any, len(opponents))
+	for i, p := range opponents {
+		others[i] = map[string]any{"id": p.UserID, "name": p.Name, "rating": p.Rating, "power": p.Power}
+	}
+	rows := make([]map[string]any, len(top))
+	for i, p := range top {
+		rows[i] = map[string]any{"name": p.Name, "rating": p.Rating, "wins": p.Wins, "losses": p.Losses, "power": p.Power, "me": p.UserID == user.ID}
+	}
+	var views []fighterView
+	if ok {
+		views = team.views
+	}
+	return map[string]any{
+		"player": map[string]any{
+			"name": player.Name, "rating": player.Rating, "wins": player.Wins, "losses": player.Losses, "power": player.Power,
+			"attacks_left": player.AttacksLeft, "tokens_left": player.TokensLeft, "attacks": ArenaAttacks, "tokens": ArenaTokens,
+		},
+		"team": views, "opponents": others, "top": rows,
+	}, failure{}
+}
+
+// arenaTeam saves the player's team, two in front and three behind, its
+// power worked out here from the cards held and their stars, and gives the
+// arena. A team refused says why: "size", "repeat" or "not_held".
+func (h *handler) arenaTeam(ctx context.Context, user miniapp.User, front, back []int64) (any, failure) {
+	if len(front) != 2 || len(back) != 3 {
+		return map[string]any{"refused": "size"}, failure{}
+	}
+	ids := [5]int64{front[0], front[1], back[0], back[1], back[2]}
+	seen := map[int64]bool{}
+	for _, id := range ids {
+		if seen[id] {
+			return map[string]any{"refused": "repeat"}, failure{}
+		}
+		seen[id] = true
+	}
+	held, err := h.Store.OwnedCards(ctx, user.ID, -1)
+	if err != nil {
+		h.Logger.Error("could not read a player's cards", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
+	team, ok := fightersOf(held, ids)
+	if !ok {
+		return map[string]any{"refused": "not_held"}, failure{}
+	}
+	err = h.Store.SaveArenaTeam(ctx, user.ID, [2]int64{ids[0], ids[1]}, [3]int64{ids[2], ids[3], ids[4]}, team.team.Power())
+	switch {
+	case errors.Is(err, storage.ErrCardNotHeld):
+		return map[string]any{"refused": "not_held"}, failure{}
+	case errors.Is(err, storage.ErrArenaTeamRepeat):
+		return map[string]any{"refused": "repeat"}, failure{}
+	case err != nil:
+		h.Logger.Error("could not save an arena team", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
+	return h.arenaView(ctx, user)
+}
+
+// arenaAttack fights the player's saved team against the opponent's and
+// keeps the outcome. An attack refused says why: "self", "no_team" (the
+// player's team is missing or holds a card no longer held), "opponent_gone"
+// (so is the opponent's) or "no_attacks" (none left today).
+func (h *handler) arenaAttack(ctx context.Context, user miniapp.User, opponent int64) (any, failure) {
+	switch {
+	case opponent == 0:
+		return nil, errBadRequest
+	case opponent == user.ID:
+		return map[string]any{"refused": "self"}, failure{}
+	}
+	mine, ok, err := h.savedFighters(ctx, user.ID)
+	if err != nil {
+		h.Logger.Error("could not read an arena team", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
+	if !ok {
+		return map[string]any{"refused": "no_team"}, failure{}
+	}
+	theirs, ok, err := h.savedFighters(ctx, opponent)
+	if err != nil {
+		h.Logger.Error("could not read an arena team", "user_id", opponent, "error", err)
+		return nil, errUnavailable
+	}
+	if !ok {
+		return map[string]any{"refused": "opponent_gone"}, failure{}
+	}
+	seed, err := arenaSeed()
+	if err != nil {
+		h.Logger.Error("could not draw an arena seed", "error", err)
+		return nil, errUnavailable
+	}
+	result := arena.Battle(mine.team, theirs.team, seed)
+	outcome, err := h.Store.RecordArenaBattle(ctx, user.ID, opponent, seed, result.AttackerWon, arenaRules(h.Now()))
+	switch {
+	case errors.Is(err, storage.ErrArenaNoAttacks):
+		return map[string]any{"refused": "no_attacks"}, failure{}
+	case err != nil:
+		h.Logger.Error("could not record an arena battle", "user_id", user.ID, "opponent", opponent, "error", err)
+		return nil, errUnavailable
+	}
+	events := make([]eventView, len(result.Events))
+	for i, e := range result.Events {
+		events[i] = eventView{Round: e.Round, Side: e.Side, From: e.From, To: e.To, Kind: e.Kind, Amount: e.Amount, HP: e.HP}
+	}
+	return map[string]any{
+		"won": result.AttackerWon, "events": events, "attacker": mine.views, "defender": theirs.views,
+		"rating_change": outcome.RatingChange, "token": outcome.Token,
+		"attacks_left": outcome.AttacksLeft, "tokens_left": outcome.TokensLeft,
+	}, failure{}
+}
+
+// arenaSeed draws a battle's seed, which replays it, from crypto/rand.
+func arenaSeed() (int64, error) {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return 0, err
+	}
+	return int64(binary.BigEndian.Uint64(b[:])), nil
+}
