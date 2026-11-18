@@ -33,7 +33,7 @@
       marketHint: (n) => `Kartangizni qo'ying va evaziga kerakli kartani tanlang. Kimda o'sha karta bo'lsa, almashadi. ${n} tagacha taklif, 7 kun turadi.`,
       step1: "1. Qaysi kartangizni berasiz?", step2: "2. Evaziga qaysi kartani xohlaysiz?", mineSearch: "Kartalaringizdan qidiring", wantSearch: "Xohlagan karta nomini yozing",
       place: "Taklif qo'yish", placed: "✅ Taklif bozorga qo'yildi", swapped: (c) => `🔄 Almashildi! Siz ${c} oldingiz`, removed: "Taklif olib tashlandi",
-      refused: { uneven: "Kartalar tier'i yaqin bo'lishi kerak: Mifik faqat Mifik yoki Afsonaviyga almashadi", pair: "Bu o'yinchi bilan bugun 3 marta almashgansiz yoki sovg'a qilgansiz: kuniga 3 marta. Ertaga yana", over: "Bu taklif endi yo'q", gone: "Bu taklif endi yo'q", own: "Bu o'zingizning taklifingiz", not_held: "Sizda bu karta yo'q", same: "Bir xil kartani almashib bo'lmaydi", no_spare: "Faqat takror kartani sovg'a qilish mumkin" },
+      refused: { uneven: "Kartalar tier'i yaqin bo'lishi kerak: Mifik faqat Mifik yoki Afsonaviyga almashadi", over: "Bu taklif endi yo'q", gone: "Bu taklif endi yo'q", own: "Bu o'zingizning taklifingiz", not_held: "Sizda bu karta yo'q", same: "Bir xil kartani almashib bo'lmaydi", no_spare: "Faqat takror kartani sovg'a qilish mumkin" },
       offersLimit: (n) => `Bir vaqtda ${n} tagacha taklif qo'yish mumkin`, giftSpare: "Faqat takror (×2 va undan ko'p) kartani sovg'a qilish mumkin",
       shopTab: "Do'kon", shopBuyTitle: "💎 Kristall sotib olish", shopBuyHint: "Telegram Stars bilan to'lanadi, kristall darhol hisobingizga tushadi.", shopItemsTitle: "🛒 Kristallga xarid",
       wallet: (n) => `Sizda: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% foyda`,
@@ -65,7 +65,7 @@
       marketHint: (n) => `Выставьте свою карту и выберите, какую хотите взамен. У кого она есть — обменяется. До ${n} предложений, 7 дней.`,
       step1: "1. Какую карту отдаёте?", step2: "2. Какую хотите взамен?", mineSearch: "Поиск по вашим картам", wantSearch: "Название нужной карты",
       place: "Выставить", placed: "✅ Предложение выставлено", swapped: (c) => `🔄 Обмен! Вы получили ${c}`, removed: "Предложение снято",
-      refused: { uneven: "Редкость карт должна быть близкой: мифическая меняется только на мифическую или легендарную", pair: "С этим игроком вы уже обменялись или дарили 3 раза сегодня: 3 раза в день. Завтра снова", over: "Этого предложения уже нет", gone: "Этого предложения уже нет", own: "Это ваше предложение", not_held: "У вас нет этой карты", same: "Нельзя менять карту на ту же", no_spare: "Дарить можно только повторную карту" },
+      refused: { uneven: "Редкость карт должна быть близкой: мифическая меняется только на мифическую или легендарную", over: "Этого предложения уже нет", gone: "Этого предложения уже нет", own: "Это ваше предложение", not_held: "У вас нет этой карты", same: "Нельзя менять карту на ту же", no_spare: "Дарить можно только повторную карту" },
       offersLimit: (n) => `Одновременно можно выставить до ${n} предложений`, giftSpare: "Дарить можно только повторную карту (×2 и больше)",
       shopTab: "Магазин", shopBuyTitle: "💎 Купить кристаллы", shopBuyHint: "Оплата Telegram Stars, кристаллы приходят сразу.", shopItemsTitle: "🛒 За кристаллы",
       wallet: (n) => `У вас: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% выгоды`,
@@ -97,7 +97,7 @@
       marketHint: (n) => `Put up a card and pick the one you want for it. Whoever holds it can trade. Up to ${n} offers, for 7 days.`,
       step1: "1. Which card do you give?", step2: "2. Which card do you want?", mineSearch: "Search your cards", wantSearch: "Name of the card you want",
       place: "Put it up", placed: "✅ Your offer is up", swapped: (c) => `🔄 Traded! You got ${c}`, removed: "Offer taken down",
-      refused: { uneven: "The cards must be close in rarity: a Mythic goes only for a Mythic or a Legendary", pair: "You two already traded or gave cards 3 times today: 3 a day. Again tomorrow", over: "This offer is gone", gone: "This offer is gone", own: "This is your own offer", not_held: "You do not have that card", same: "A card cannot be traded for itself", no_spare: "Only a spare card may be given" },
+      refused: { uneven: "The cards must be close in rarity: a Mythic goes only for a Mythic or a Legendary", over: "This offer is gone", gone: "This offer is gone", own: "This is your own offer", not_held: "You do not have that card", same: "A card cannot be traded for itself", no_spare: "Only a spare card may be given" },
       offersLimit: (n) => `You may have up to ${n} offers at once`, giftSpare: "Only a spare card (×2 or more) may be given",
       shopTab: "Shop", shopBuyTitle: "💎 Buy crystals", shopBuyHint: "Paid in Telegram Stars; the crystals arrive at once.", shopItemsTitle: "🛒 For crystals",
       wallet: (n) => `You have: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% value`,
@@ -506,7 +506,7 @@
       try {
         const data = await api("gift", { card: card.id, to: chosen.id });
         if (data.refused) {
-          toast(data.refused === "limit" ? t.giftLimit(data.limit) : data.refused === "no_player" ? t.giftNoPlayer : data.refused === "no_spare" ? t.giftSpare : data.refused === "pair" ? t.refused.pair : t.giftGone);
+          toast(data.refused === "limit" ? t.giftLimit(data.limit) : data.refused === "no_player" ? t.giftNoPlayer : data.refused === "no_spare" ? t.giftSpare : t.giftGone);
           send.disabled = false;
           return;
         }

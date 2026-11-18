@@ -353,15 +353,6 @@ func TestTheCardMarket(t *testing.T) {
 	if out := call(8, map[string]any{"action": "take", "offer": 1}); out["refused"] != "gone" {
 		t.Errorf("an offer gone = %v", out)
 	}
-	store.takeErr = storage.ErrCardPairLimit
-	if out := call(8, map[string]any{"action": "take", "offer": 1}); out["refused"] != "pair" || out["limit"] != float64(storage.PairTradesPerDay) {
-		t.Errorf("a trade past the pair's day = %v", out)
-	}
-	store.giftErr = storage.ErrCardPairLimit
-	if out := call(8, map[string]any{"action": "gift", "card": 1, "to": 7}); out["refused"] != "pair" {
-		t.Errorf("a gift past the pair's day = %v", out)
-	}
-	store.takeErr, store.giftErr = nil, nil
 	call(7, map[string]any{"action": "offer", "card": 1, "want": 2})
 	if out := call(7, map[string]any{"action": "unoffer", "offer": 1}); len(out["offers"].([]any)) != 0 {
 		t.Errorf("market after calling off = %v", out)
