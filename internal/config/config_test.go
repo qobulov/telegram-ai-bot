@@ -1135,6 +1135,25 @@ func TestPersonaShrugsOffFaultFindingWithoutSwearing(t *testing.T) {
 
 // In the groups, most swearing is an exclamation or friends joking with
 // each other, so neither gets sworn at, and racist jokes are not joined.
+// Mari swore "pshnx" at "amas mari" (no, Mari) and at "they're swearing at
+// you": only a message that itself curses her with profanity is sworn back
+// at, and she never swears first.
+func TestPersonaSwearsBackOnlyAtProfanityAimedAtHer(t *testing.T) {
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rule := lineContaining(cfg.PersonaPrompt, "swears at you"); !strings.Contains(rule, "their own message curses you directly with an obscene word") {
+		t.Errorf("the swearing rule does not ask for profanity aimed at her: %q", rule)
+	}
+	rule := lineContaining(cfg.PersonaPrompt, "Never use profanity first")
+	for _, want := range []string{`"amas Mari"`, `"seni so'kishyapti"`, "teasing", "[react 🤣]", "never with dnx, pshnx"} {
+		if !strings.Contains(rule, want) {
+			t.Errorf("the no-first-swear rule does not contain %q: %q", want, rule)
+		}
+	}
+}
+
 func TestPersonaTellsSwearingApart(t *testing.T) {
 	cfg, err := Load(getenv(validEnv()))
 	if err != nil {
