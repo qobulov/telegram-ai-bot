@@ -2358,7 +2358,8 @@ for 1 token each (`event` reads it, `event_open` with `count` pulls). A pull
 rolls the usual rarities with the Mythic twice as likely, the extra
 taken from Common (Mythic 1%, Legendary 2.5%, Epic 9%, Rare 25%, Common
 62.5%); a Mythic is Satoko half the time (0.5%) and any other Mythic
-otherwise, and it opens at 2026-11-18 22:00 Tashkent (started again by the owners; before
+otherwise (a player holds her once at most: one who has her gets another
+Mythic, and the guarantee stops counting), and it opens at 2026-11-18 22:00 Tashkent (started again by the owners; before
 that the shop shows it as coming, with the time to its start, and refuses
 pulls as "soon"); the 200th pull in a row without her gives her (50 at first,
 then 130, 200 since the owners raised it on 2026-11-18, the Mythic odds
@@ -2386,7 +2387,7 @@ whole game it is (`CardDraw.Serial`, counted in `addCard` in the draw's
 transaction). When a draw holds a Mythic, the app celebrates it on the whole
 screen before the usual reveal: gold rays turning, 36 pieces of gold
 confetti (cherry petals among them for Satoko), the card rising, "🎉
-TABRIKLAYMIZ! MIFIK KARTA!", its name and its number ("No.000123", "o'yindagi
+TABRIKLAYMIZ! MIFIK KARTA!", its name and, for a limited card alone, its number ("No.000123", "o'yindagi
 123-nusxa"), with a success and a heavy haptic; a tap or "Davom etish" closes
 it, and several Mythics in one batch are celebrated in turn. With less
 motion asked for, the rays and confetti are left out.

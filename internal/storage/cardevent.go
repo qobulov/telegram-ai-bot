@@ -21,6 +21,8 @@ func (e *CardTokensError) Error() string { return "storage: too few tokens" }
 // CardEvent is a card offered for a time: each pull costs Price tokens, Roll
 // picks its rarity, and a Mythic is the event's Card when Pick says so, any
 // other Mythic when not. The Pity-th pull in a row without Card gives it.
+// A player holds Card once at most: one who has it gets other cards, the
+// pity no longer counting.
 type CardEvent struct {
 	Card  int64
 	Ends  time.Time
@@ -58,11 +60,14 @@ func (s *Store) OpenEventCards(ctx context.Context, userID int64, name string, n
 		if price := n * ev.Price; price > player.tokens {
 			return &CardTokensError{Tokens: player.tokens, Need: price}
 		}
-		if err := tx.QueryRow(ctx, `SELECT event_pulls FROM card_players WHERE user_id = $1`, userID).Scan(&open.Pulls); err != nil {
+		var held bool
+		if err := tx.QueryRow(ctx, `
+			SELECT event_pulls, EXISTS (SELECT 1 FROM card_owned WHERE user_id = $1 AND card_id = $2)
+			FROM card_players WHERE user_id = $1`, userID, ev.Card).Scan(&open.Pulls, &held); err != nil {
 			return err
 		}
 		for range n {
-			card, sure, err := eventCard(ctx, tx, ev, open.Pulls+1, player)
+			card, sure, err := eventCard(ctx, tx, ev, open.Pulls+1, player, held)
 			if err != nil {
 				return err
 			}
@@ -73,6 +78,9 @@ func (s *Store) OpenEventCards(ctx context.Context, userID int64, name string, n
 			open.Draws = append(open.Draws, draw)
 			open.Pulls++
 			if card.ID == ev.Card {
+				held = true
+			}
+			if held {
 				open.Pulls = 0
 			}
 		}
@@ -96,14 +104,15 @@ func (s *Store) OpenEventCards(ctx context.Context, userID int64, name string, n
 }
 
 // eventCard is the card of an event's pull, the pull-th in a row without
-// the event's card, and whether the pity made it sure.
-func eventCard(ctx context.Context, tx pgx.Tx, ev CardEvent, pull int, player cardPlayerRow) (Card, bool, error) {
-	if pull >= ev.Pity {
+// the event's card, and whether the pity made it sure; a player who holds
+// the event's card already gets another.
+func eventCard(ctx context.Context, tx pgx.Tx, ev CardEvent, pull int, player cardPlayerRow, held bool) (Card, bool, error) {
+	if !held && pull >= ev.Pity {
 		c, err := catalogCard(ctx, tx, ev.Card)
 		return c, true, err
 	}
 	rarity, raised := ev.Roll(player.sinceLegendary, player.sinceMythic)
-	if rarity == mythicRarity && ev.Pick() {
+	if rarity == mythicRarity && !held && ev.Pick() {
 		c, err := catalogCard(ctx, tx, ev.Card)
 		return c, raised, err
 	}

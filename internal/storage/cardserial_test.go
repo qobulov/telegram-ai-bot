@@ -60,12 +60,14 @@ func TestCardSerials(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want(pulled.Draws, satoko, 1)
+	// She comes once to a player: Bob's second forced pick is another Mythic.
+	want(pulled.Draws[:1], satoko, 1)
+	want(pulled.Draws[1:], gojo, 6)
 	ev.Pick = func() bool { return false }
 	if pulled, err = store.OpenEventCards(ctx, alice, "Alice", 1, ev, CardDay{}, now); err != nil {
 		t.Fatal(err)
 	}
-	want(pulled.Draws, gojo, 6)
+	want(pulled.Draws, gojo, 7)
 
 	// Forced Mythics, 40 of them, are never her outside the event.
 	for range 2 {
@@ -86,5 +88,5 @@ func TestCardSerials(t *testing.T) {
 			}
 		}
 	}
-	want(open.Draws, gojo, 37)
+	want(open.Draws, gojo, 38)
 }
