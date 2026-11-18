@@ -90,8 +90,6 @@ func (s *Service) rankRequest(in incoming) (order rankOrder, ok bool) {
 	}
 	joined := strings.Join(words, " ")
 	switch {
-	case words[0] == ".дк":
-		return accessOrder(words[1:])
 	case len(words) == 1 && staffWords[words[0]]:
 		return rankOrder{kind: "staff"}, true
 	case logPhrases[joined]:
@@ -122,9 +120,7 @@ func accessOrder(args []string) (rankOrder, bool) {
 func (s *Service) orderWords(text string) []string {
 	var words []string
 	for _, w := range strings.Fields(strings.ToLower(text)) {
-		if w != ".дк" {
-			w = strings.Trim(w, ".,!?:;«»\"'`")
-		}
+		w = strings.Trim(w, ".,!?:;«»\"'`")
 		if w == "" || isWakeWord(w, s.opts.WakeWords) || strings.EqualFold(w, "@"+s.opts.Bot.Username) {
 			continue
 		}
@@ -371,7 +367,7 @@ func (s *Service) accessCommand(ctx context.Context, in incoming, order rankOrde
 		return say(accessTable(overrides))
 	}
 	if _, known := ranks.Find(order.code); order.rank == -2 || !known {
-		return say("Masalan: \".дк ban 2\" — ban buyrug'i 2-darajadan ochiladi. Ro'yxat: \".дк\".")
+		return say("Masalan: /access ban 2 — ban buyrug'i 2-darajadan ochiladi. Ro'yxat: /access")
 	}
 	mine, err := s.askerRank(ctx, in)
 	if err != nil {
@@ -410,7 +406,7 @@ func accessTable(overrides map[string]int) string {
 		lines = append(lines, "", head)
 		lines = append(lines, byRank[rank]...)
 	}
-	return strings.Join(append(lines, "", "✏️ O'zgartirish: /access ban 2  (yoki \".дк ban 2\")"), "\n")
+	return strings.Join(append(lines, "", "✏️ O'zgartirish: /access ban 2 — ban 2-darajadan ochiladi"), "\n")
 }
 
 // location is the group's time zone for times shown.
