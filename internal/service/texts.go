@@ -161,12 +161,23 @@ var (
 		ru: "Ответ получился слишком длинным, спросите покороче.",
 		en: "The answer came out too long; ask for something shorter.",
 	}
-	// textDailyLimit takes the private chats' daily limit.
-	textDailyLimit = localText{
-		uz: "Bugungi limit tugadi: kuniga %d ta xabar. Ertaga yana yozing.",
-		ru: "Лимит на сегодня исчерпан: %d сообщений в день. Напишите завтра.",
-		en: "That's today's limit: %d messages a day. Write again tomorrow.",
+	// textFreeLimit says the day's free messages are over; it takes when
+	// they come back, textBackIn or textBackSoon.
+	textFreeLimit = localText{
+		uz: "Bugungi bepul xabarlar tugadi 🙂 Yangilari %s, yarim tunda keladi.",
+		ru: "Бесплатные сообщения на сегодня закончились 🙂 Новые появятся %s, в полночь.",
+		en: "That's all the free messages for today 🙂 New ones arrive %s, at midnight.",
 	}
+	// textDailyLimit is textFreeLimit for a premium user: it takes their
+	// daily limit and when it comes back.
+	textDailyLimit = localText{
+		uz: "Bugungi %d ta xabaringiz tugadi 🙂 Yangilari %s, yarim tunda keladi.",
+		ru: "Ваши %d сообщений на сегодня закончились 🙂 Новые появятся %s, в полночь.",
+		en: "That's your %d messages for today 🙂 New ones arrive %s, at midnight.",
+	}
+	// textBackIn takes the hours until the day's messages come back.
+	textBackIn      = localText{uz: "%d soatdan keyin", ru: "через %d ч.", en: "in about %d hours"}
+	textBackSoon    = localText{uz: "bir soat ichida", ru: "меньше чем через час", en: "in under an hour"}
 	textJoinChannel = localText{
 		uz: "❌ Botdan foydalanish uchun avval kanalga a'zo bo'ling, keyin «✅ Tasdiqlash» ni bosing.",
 		ru: "❌ Чтобы пользоваться ботом, подпишитесь на канал и нажмите «✅ Проверить».",

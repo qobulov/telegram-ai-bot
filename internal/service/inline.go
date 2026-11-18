@@ -138,7 +138,7 @@ func (s *Service) inlineResult(ctx context.Context, in incoming) (telegram.Inlin
 	}
 	reservation, _, allowed := s.takePrivateAnswer(ctx, in)
 	if !allowed {
-		return s.inlineNotice(in, fmt.Sprintf(textDailyLimit.to(in), s.opts.PrivateDailyLimit)), 0
+		return s.inlineNotice(in, s.freeLimitText(in)), 0
 	}
 	answer, err := s.opts.Replier.Reply(ctx, s.inlineRequest(in))
 	if err != nil || answer.Text == "" {

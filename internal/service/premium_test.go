@@ -133,6 +133,10 @@ func (f *fakePremium) StarPayments(_ context.Context, limit int) ([]storage.Star
 // premiumNow is the clock of the premium tests: noon in Tashkent.
 var premiumNow = time.Date(2026, 10, 29, 7, 0, 0, 0, time.UTC)
 
+// limitNoticeAtNoon is the free limit's notice at premiumNow, noon in
+// Tashkent, 12 hours before the messages come back.
+var limitNoticeAtNoon = fmt.Sprintf(textFreeLimit.uz, fmt.Sprintf(textBackIn.uz, 12))
+
 // withPremium sells premium, 100 Stars for 30 days of 5 answers a day,
 // over a private limit of 1.
 func withPremium(f *fixture) (*fakePrivateQuota, *fakePayments, *fakePremium) {
@@ -152,7 +156,7 @@ func TestLimitNoticeOffersPremiumOnce(t *testing.T) {
 
 	sent := f.run(textFrom(userID, "hi"), textFrom(userID, "again"), textFrom(userID, "and again"))
 
-	if len(sent) != 2 || !strings.HasPrefix(sent[1].text, fmt.Sprintf(textDailyLimit.uz, 1)) || !strings.Contains(sent[1].text, "100 Stars") {
+	if len(sent) != 2 || !strings.HasPrefix(sent[1].text, limitNoticeAtNoon) || !strings.Contains(sent[1].text, "100 Stars") {
 		t.Fatalf("sent = %+v, want the answer, then the notice with the offer", sent)
 	}
 	if len(payments.invoices) != 1 {
@@ -222,7 +226,7 @@ func TestNoPremiumWithoutAPrice(t *testing.T) {
 
 	sent := f.run(textFrom(userID, "hi"), textFrom(userID, "again"), textFrom(userID, "/premium"))
 
-	if len(sent) != 3 || sent[1].text != fmt.Sprintf(textDailyLimit.uz, 1) || sent[2].text != textNoPremium.uz || len(payments.invoices) != 0 {
+	if len(sent) != 3 || sent[1].text != limitNoticeAtNoon || sent[2].text != textNoPremium.uz || len(payments.invoices) != 0 {
 		t.Errorf("sent = %+v, invoices %+v; want the plain notice, no premium and no invoice", sent, payments.invoices)
 	}
 }
@@ -244,7 +248,7 @@ func TestPremiumUserGetsThePremiumLimit(t *testing.T) {
 	if calls := len(f.replier.recorded()); calls != 5 {
 		t.Errorf("model calls = %d, want the premium limit of 5", calls)
 	}
-	if len(sent) != 6 || sent[5].text != fmt.Sprintf(textDailyLimit.uz, 5) || len(payments.invoices) != 0 {
+	if len(sent) != 6 || sent[5].text != fmt.Sprintf(textDailyLimit.uz, 5, fmt.Sprintf(textBackIn.uz, 12)) || len(payments.invoices) != 0 {
 		t.Errorf("sent = %+v, invoices %d; want five answers and the premium limit's notice alone", sent, len(payments.invoices))
 	}
 }
@@ -501,4 +505,30 @@ func TestPaySupportNamesTheOwners(t *testing.T) {
 	f.opts.OwnerUsernames = []string{"pronium", "tursunoffm"}
 	sent := f.run(textFrom(userID, "/paysupport"))
 	expectOneReply(t, sent, "@pronium, @tursunoffm")
+}
+
+// The notice is one warm line saying when the messages come back, and a
+// bare greeting answered in code, like /start and /help, takes none of them.
+func TestLimitNoticeIsWarmAndGreetingsAreFree(t *testing.T) {
+	f := newFixture()
+	quota := withPrivateLimit(f, 1)
+	f.opts.QuickAnswers = true
+	f.opts.Now = func() time.Time { return time.Date(2026, 10, 29, 18, 30, 0, 0, time.UTC) } // 23:30 in Tashkent
+
+	sent := f.run(textFrom(userID, "Salom"), textFrom(userID, "/start"), textFrom(userID, "/help"), textFrom(userID, "hi there, a question"), textFrom(userID, "another"))
+
+	if asked, _ := quota.recorded(); len(asked) != 2 {
+		t.Errorf("quota asked %d times, want only the two messages for the model", len(asked))
+	}
+	last := sent[len(sent)-1].text
+	if want := fmt.Sprintf(textFreeLimit.uz, textBackSoon.uz); last != want {
+		t.Errorf("notice = %q, want %q", last, want)
+	}
+	for _, text := range []localText{textFreeLimit, textDailyLimit, textPremiumNudge} {
+		for _, line := range []string{text.uz, text.ru, text.en} {
+			if strings.Contains(line, "\n") || strings.Contains(strings.ToLower(line), "limit") {
+				t.Errorf("notice %q is not one warm line", line)
+			}
+		}
+	}
 }

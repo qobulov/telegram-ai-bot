@@ -158,7 +158,7 @@ func TestInlineQuestionsCountAgainstTheDailyLimit(t *testing.T) {
 
 	_, articles := f.askInline(inlineQuery(userID, "bir?"), inlineQuery(userID, "ikki?"), inlineQuery(9001, "uch?"))
 
-	if len(articles) != 3 || articles[0].ID != "answer" || articles[1].ID != "notice" || !strings.Contains(articles[1].Text, "1 ta") || articles[2].ID != "answer" {
+	if len(articles) != 3 || articles[0].ID != "answer" || articles[1].ID != "notice" || !strings.Contains(articles[1].Text, "bepul xabarlar tugadi") || articles[2].ID != "answer" {
 		t.Errorf("articles = %+v", articles)
 	}
 	if asked, _ := quota.recorded(); len(asked) != 2 {

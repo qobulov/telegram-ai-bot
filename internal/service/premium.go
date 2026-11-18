@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"telegram-ai-bot/internal/cards"
@@ -149,16 +150,33 @@ func (s *Service) limitReached(ctx context.Context, in incoming, notify bool) ou
 		return out
 	}
 	if _, ok := s.hasPremium(ctx, in.userID); ok {
-		out.text = fmt.Sprintf(textDailyLimit.to(in), s.premiumLimit())
+		out.text = fmt.Sprintf(textDailyLimit.to(in), s.premiumLimit(), s.backIn(in))
 		return out
 	}
-	out.text = fmt.Sprintf(textDailyLimit.to(in), s.opts.PrivateDailyLimit)
+	out.text = s.freeLimitText(in)
 	if s.sellsPremium() {
 		out.text += "\n\n" + s.premiumOffer(in)
 		out.invoice = true
 		s.premiumNudges.set(in.userID, true)
 	}
 	return out
+}
+
+// freeLimitText says, warmly, that the day's free messages are over and
+// when they come back.
+func (s *Service) freeLimitText(in incoming) string {
+	return fmt.Sprintf(textFreeLimit.to(in), s.backIn(in))
+}
+
+// backIn says when the day's messages come back: at the next midnight in
+// Location, where the quota's day starts.
+func (s *Service) backIn(in incoming) string {
+	now := s.opts.Now()
+	left := startOfDay(now, s.opts.Location).AddDate(0, 0, 1).Sub(now)
+	if left <= time.Hour {
+		return textBackSoon.to(in)
+	}
+	return fmt.Sprintf(textBackIn.to(in), int(math.Ceil(left.Hours())))
 }
 
 // nudgeDue reports whether a sender may be reminded of /premium now, and
@@ -460,9 +478,9 @@ var (
 	textPremiumLabel = localText{uz: "Premium, %d kun", ru: "Premium, %d дней", en: "Premium, %d days"}
 	// textPremiumNudge reminds a sender past the day's limit of premium.
 	textPremiumNudge = localText{
-		uz: "Bugungi limit tugadi. Ko'proq yozish uchun /premium ni bosing.",
-		ru: "Лимит на сегодня исчерпан. Чтобы писать больше, нажмите /premium.",
-		en: "Today's limit is used up. Tap /premium to write more.",
+		uz: "Bugungi bepul xabarlar tugadi 🙂 Hoziroq davom etamiz desangiz: /premium",
+		ru: "Бесплатные сообщения на сегодня закончились 🙂 Продолжить прямо сейчас: /premium",
+		en: "The free messages for today are over 🙂 To go on right now: /premium",
 	}
 	// textPremiumOffer takes the days, the premium limit and the price.
 	textPremiumOffer = localText{

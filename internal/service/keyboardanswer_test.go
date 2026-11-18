@@ -214,7 +214,7 @@ func TestToolsTakeNothingFromTheLimit(t *testing.T) {
 	f.replier.toolsUsed = 0
 	f.run(textFrom(userID, "salom")) // the day's one answer of talk
 	sent = f.run(textFrom(userID, "nima gap"))
-	if len(sent) != 4 || !strings.HasPrefix(sent[3].text, "Bugungi limit tugadi") {
+	if len(sent) != 4 || !strings.HasPrefix(sent[3].text, "Bugungi bepul xabarlar tugadi") {
 		t.Errorf("sent = %+v; want the notice past the limit", sent)
 	}
 

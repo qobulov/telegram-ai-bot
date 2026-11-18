@@ -1134,10 +1134,13 @@ all three can be changed with `/set`.
   until when the sender has it, and sends the invoice (`sendInvoice`), whose
   Pay button opens Telegram's payment. The day's one notice that the limit
   is reached carries the same offer and invoice, so it comes once a day at
-  most and only when it is wanted; someone who has premium is told the
+  most and only when it is wanted. The notice is one warm line, "Bugungi
+  bepul xabarlar tugadi 🙂 Yangilari 7 soatdan keyin, yarim tunda keladi.",
+  with the hours left until midnight in `GROUP_HISTORY_TIMEZONE`; commands and greetings
+  answered in code never count. Someone who has premium is told the
   premium limit and offered nothing. After it, a sender without premium
-  who writes on is reminded "Bugungi limit tugadi. Ko'proq yozish uchun
-  /premium ni bosing." at most once an hour (counted in each instance's
+  who writes on is reminded "Bugungi bepul xabarlar tugadi 🙂 Hoziroq davom
+  etamiz desangiz: /premium" at most once an hour (counted in each instance's
   memory), as one who missed the notice saw only a reaction. In a group `/premium` points to the
   private chat.
 - **The check.** Before taking the money Telegram asks the bot

@@ -3468,7 +3468,8 @@ func TestPrivateDailyLimitNoticeOnceThenSilence(t *testing.T) {
 	if calls := len(f.replier.recorded()); calls != 10 {
 		t.Errorf("model calls = %d, want 10", calls)
 	}
-	notice := fmt.Sprintf(textDailyLimit.uz, 10)
+	// 23 hours are left of the 17th in Tashkent.
+	notice := fmt.Sprintf(textFreeLimit.uz, fmt.Sprintf(textBackIn.uz, 23))
 	if len(sent) != 11 || sent[10].text != notice || sent[9].text != "echo: hi" {
 		t.Errorf("sent = %+v, want 10 answers, then one notice and silence", sent)
 	}
