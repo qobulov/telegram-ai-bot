@@ -578,7 +578,20 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .alive .body { clip-path: inset(43.5% 0 0 0); }
 .front .alive .hair { filter: url(#wind); }
 @keyframes alive { 50% { transform: scale(1.018, 1.028) translateY(-2px); } }
-@media (prefers-reduced-motion: reduce) { .alive i { animation: none; } .front .alive .hair { filter: none; } }
+/* Flowing hair (a SPECIAL card's): the face and body keep to the middle of
+   the cut-out and stay still, breathing; the long hair round them is the
+   cut-out again, its middle masked away, waved by #flow as by a wind. */
+.front .alive.flowing .hair, .front .alive.flowing .body {
+  filter: none;
+  -webkit-mask-image: radial-gradient(ellipse 30% 40% at 52% 46%, #000 62%, transparent 100%);
+  mask-image: radial-gradient(ellipse 30% 40% at 52% 46%, #000 62%, transparent 100%);
+}
+.front .alive.flowing .flow {
+  filter: url(#flow);
+  -webkit-mask-image: radial-gradient(ellipse 30% 40% at 52% 46%, transparent 62%, #000 100%);
+  mask-image: radial-gradient(ellipse 30% 40% at 52% 46%, transparent 62%, #000 100%);
+}
+@media (prefers-reduced-motion: reduce) { .alive i { animation: none; } .front .alive .hair, .front .alive .flow { filter: none; } }
 
 /* ---------- shop ---------- */
 .shop { display: grid; gap: 18px; padding: 8px 16px 0; }

@@ -250,8 +250,9 @@
 
   // SPECIAL are the cards the owners dressed by hand: a gold "LIMITED" mark
   // with a number under it (a mark, not a count of copies), cherry petals
-  // drifting over the picture and fireflies glowing among them.
-  const SPECIAL = { 298761: { tag: "LIMITED", serial: "No.000001", petals: true, fireflies: true } };
+  // drifting over the picture, fireflies glowing among them and, in the large
+  // view, long hair flowing in the wind while the face and body keep still.
+  const SPECIAL = { 298761: { tag: "LIMITED", serial: "No.000001", petals: true, fireflies: true, hair: true } };
 
   // dress adds a special card's mark, petals and fireflies; the large view
   // has more of them.
@@ -263,6 +264,15 @@
     if (special.petals) html += '<div class="petals" aria-hidden="true">' + "<i></i>".repeat(large ? 14 : 6) + "</div>";
     if (special.fireflies) html += '<div class="fireflies" aria-hidden="true">' + "<i></i>".repeat(large ? 9 : 4) + "</div>";
     el.insertAdjacentHTML("beforeend", html);
+    const living = el.querySelector(".alive");
+    if (special.hair && large && living) {
+      // flowing hair: the cut-out once more, its edges alone, waved by #flow
+      const flow = document.createElement("i");
+      flow.className = "flow";
+      flow.style.backgroundImage = `url("/kartalar/art/cut/${card.id}.webp")`;
+      living.classList.add("flowing");
+      living.append(flow);
+    }
     if (special.tag) {
       const mark = document.createElement("div");
       mark.className = "lmark";
