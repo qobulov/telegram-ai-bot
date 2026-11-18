@@ -55,7 +55,7 @@ func TestCardSerials(t *testing.T) {
 	want(open.Draws, gojo, 4)
 
 	end := now.Add(time.Hour)
-	ev := CardEvent{Card: satoko, Ends: end, Pity: 50, Price: 1, Roll: rarity(4), Pick: func() bool { return true }}
+	ev := CardEvent{Card: satoko, Ends: end, Pity: 130, Price: 1, Roll: rarity(4), Pick: func() bool { return true }}
 	pulled, err := store.OpenEventCards(ctx, bob, "Bob", 2, ev, CardDay{}, now)
 	if err != nil {
 		t.Fatal(err)

@@ -1296,7 +1296,7 @@
   // ---------- event ----------
 
   // The Firefly Wedding event: pulls for tokens at the top of the shop,
-  // with three times the Mythic odds, half of them Satoko, the 50th pull
+  // with three times the Mythic odds, half of them Satoko, the 130th pull
   // without her sure to give her. The server says whether it runs.
   const eventTexts = {
     uz: {

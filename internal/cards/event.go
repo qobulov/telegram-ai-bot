@@ -18,7 +18,7 @@ const (
 	EventCard        int64 = 298761 // Satoko Kirigaya
 	EventMythicBoost       = 3
 	EventShare             = 0.5
-	EventPity              = 50
+	EventPity              = 130
 	EventPrice             = 1 // tokens a pull
 	EventBatch             = 10
 )
