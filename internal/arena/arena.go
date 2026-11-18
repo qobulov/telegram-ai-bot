@@ -90,6 +90,15 @@ func (t Team) slots() [5]Fighter {
 	return [5]Fighter{t.Front[0], t.Front[1], t.Back[0], t.Back[1], t.Back[2]}
 }
 
+// Kinds of Event.
+const (
+	KindHit    = "hit"
+	KindStrike = "strike"
+	KindHeal   = "heal"
+	KindShield = "shield"
+	KindFall   = "fall"
+)
+
 // Event is one thing that happened. Side is 0 for the attacker's team and 1
 // for the defender's. A hit or strike goes From a slot of Side To a slot of
 // the other side; a heal goes From a slot To a slot of the same side; a
@@ -97,7 +106,7 @@ func (t Team) slots() [5]Fighter {
 // healing or shield, and HP the health of the slot To afterwards.
 type Event struct {
 	Round, Side, From, To int
-	Kind                  string // "hit", "strike", "heal", "shield", "fall"
+	Kind                  string // one of the Kind constants
 	Amount, HP            int
 }
 
@@ -123,7 +132,8 @@ type fight struct {
 	round  int
 }
 
-// Battle plays the two teams against each other.
+// Battle plays the two teams against each other. That a team is valid (five
+// distinct cards the player holds) is the caller's job.
 func Battle(attacker, defender Team, seed int64) Result {
 	f := &fight{rng: rand.New(rand.NewSource(seed))}
 	for side, team := range [2]Team{attacker, defender} {
@@ -143,9 +153,12 @@ func Battle(attacker, defender Team, seed int64) Result {
 			}
 		}
 	}
-	won := f.living(1) == 0
-	if f.living(0) > 0 && f.living(1) > 0 {
-		won = f.health(0) > f.health(1) // an exact tie goes to the defender
+	won := false // the defender wins an exact tie, empty teams included
+	switch {
+	case f.living(1) == 0:
+		won = f.living(0) > 0
+	case f.living(0) > 0:
+		won = f.health(0) > f.health(1)
 	}
 	return Result{AttackerWon: won, Rounds: f.round, Events: f.events}
 }
@@ -155,7 +168,7 @@ func (f *fight) startShields() {
 		for _, u := range side {
 			if u.alive() && u.Skill == Shield {
 				u.shield = int(ShieldShare * float64(u.Health))
-				f.emit(u.side, u.slot, u.slot, "shield", u.shield, u.hp)
+				f.emit(u.side, u.slot, u.slot, KindShield, u.shield, u.hp)
 			}
 		}
 	}
@@ -201,7 +214,7 @@ func (f *fight) order() []*unit {
 func (f *fight) act(u *unit) {
 	u.turns++
 	if u.Skill == Heal && u.turns%HealEvery == 0 {
-		if ally := f.weakestHurt(u.side); ally != nil {
+		if ally := f.weakestHurt(u.side); ally != nil && healAmount(ally) > 0 {
 			f.heal(u, ally)
 			return
 		}
@@ -211,10 +224,10 @@ func (f *fight) act(u *unit) {
 		return
 	}
 	if u.Skill == Strike && u.turns%StrikeEvery == 0 {
-		f.hit(u, target, StrikeFactor, "strike")
+		f.hit(u, target, StrikeFactor, KindStrike)
 		return
 	}
-	f.hit(u, target, 1, "hit")
+	f.hit(u, target, 1, KindHit)
 }
 
 // target is the first living front unit, or the first back one; a Mage picks
@@ -248,18 +261,19 @@ func firstLiving(us []*unit) *unit {
 	return nil
 }
 
-// weakestHurt is the living ally with the least health, if it is hurt.
+// weakestHurt is the hurt living ally with the least health, if any.
 func (f *fight) weakestHurt(side int) *unit {
 	var weakest *unit
 	for _, c := range f.teams[side] {
-		if c.alive() && (weakest == nil || c.hp < weakest.hp) {
+		if c.alive() && c.hp < c.Health && (weakest == nil || c.hp < weakest.hp) {
 			weakest = c
 		}
 	}
-	if weakest == nil || weakest.hp >= weakest.Health {
-		return nil
-	}
 	return weakest
+}
+
+func healAmount(to *unit) int {
+	return min(int(HealShare*float64(to.Health)), to.Health-to.hp)
 }
 
 func (f *fight) hit(from, to *unit, factor float64, kind string) {
@@ -277,14 +291,14 @@ func (f *fight) hit(from, to *unit, factor float64, kind string) {
 	to.hp = max(to.hp-rest, 0)
 	f.emit(from.side, from.slot, to.slot, kind, dmg, to.hp)
 	if !to.alive() {
-		f.emit(to.side, to.slot, to.slot, "fall", 0, 0)
+		f.emit(to.side, to.slot, to.slot, KindFall, 0, 0)
 	}
 }
 
 func (f *fight) heal(from, to *unit) {
-	amount := min(int(HealShare*float64(to.Health)), to.Health-to.hp)
+	amount := healAmount(to)
 	to.hp += amount
-	f.emit(from.side, from.slot, to.slot, "heal", amount, to.hp)
+	f.emit(from.side, from.slot, to.slot, KindHeal, amount, to.hp)
 }
 
 func (f *fight) emit(side, from, to int, kind string, amount, hp int) {

@@ -107,7 +107,8 @@ func TestTimeoutGoesByHealthLeft(t *testing.T) {
 	if r = Battle(d, a, 1); r.AttackerWon {
 		t.Error("healthier defender lost")
 	}
-	// Zero damage on both sides is an exact tie: the defender wins.
+	// Damage floors at 1, so identical zero-attack teams chip each other by 1
+	// a hit; the defender, acting second, is not behind at the end.
 	z := commonTeam(0, 400)
 	if r = Battle(z, z, 1); r.AttackerWon {
 		t.Error("exact tie went to the attacker")
@@ -124,7 +125,7 @@ func TestMageHitsTheBackRow(t *testing.T) {
 	d.Back[2] = FighterOf(6, "b2", 1, 1, 100, 700)
 	r := Battle(a, d, 5)
 	for _, e := range r.Events {
-		if e.Round == 1 && e.Side == 0 && e.From == 0 && e.Kind == "hit" {
+		if e.Round == 1 && e.Side == 0 && e.From == 0 && e.Kind == KindHit {
 			if e.To != 3 {
 				t.Fatalf("mage hit slot %d, want 3", e.To)
 			}
@@ -136,7 +137,7 @@ func TestMageHitsTheBackRow(t *testing.T) {
 
 func TestHealAndShieldFire(t *testing.T) {
 	var a, d Team
-	a.Front[0] = FighterOf(5, "shield", 4, 1, 50, 1000)   // Shield
+	a.Front[0] = FighterOf(5, KindShield, 4, 1, 50, 1000) // Shield
 	a.Front[1] = FighterOf(4, "healer", 4, 1, 50, 1000)   // Heal
 	a.Back[0] = FighterOf(3, "striker", 4, 1, 50, 1000)   // Strike
 	d.Front[0] = FighterOf(100, "wall", 1, 1, 150, 20000) // hurts the attackers
@@ -145,14 +146,14 @@ func TestHealAndShieldFire(t *testing.T) {
 	count := map[string]int{}
 	for _, e := range r.Events {
 		count[e.Kind]++
-		if e.Kind == "shield" && (e.Round != 0 || e.Amount != 300 || e.Side != 0) {
+		if e.Kind == KindShield && (e.Round != 0 || e.Amount != 300 || e.Side != 0) {
 			t.Errorf("bad shield event %+v", e)
 		}
-		if e.Kind == "heal" && (e.Side != 0 || e.Amount <= 0) {
+		if e.Kind == KindHeal && (e.Side != 0 || e.Amount <= 0) {
 			t.Errorf("bad heal event %+v", e)
 		}
 	}
-	for _, k := range []string{"shield", "heal", "strike", "hit"} {
+	for _, k := range []string{KindShield, KindHeal, KindStrike, KindHit} {
 		if count[k] == 0 {
 			t.Errorf("no %s event", k)
 		}
@@ -165,7 +166,31 @@ func TestFallIsEmitted(t *testing.T) {
 	d.Front[0] = FighterOf(2, "d", 1, 1, 10, 100)
 	r := Battle(a, d, 3)
 	last := r.Events[len(r.Events)-1]
-	if !r.AttackerWon || last.Kind != "fall" || last.Side != 1 || last.HP != 0 {
+	if !r.AttackerWon || last.Kind != KindFall || last.Side != 1 || last.HP != 0 {
 		t.Errorf("result %v, last event %+v", r.AttackerWon, last)
+	}
+}
+
+func TestHealGoesToTheHurtAllyNotTheLowestHP(t *testing.T) {
+	f := &fight{}
+	for slot := range f.teams[0] {
+		f.teams[0][slot] = &unit{} // empty slots
+	}
+	// slot 1: full health but the lowest hp; slot 2: hurt, with more hp.
+	f.teams[0][0] = &unit{Fighter: Fighter{Health: 1000}, side: 0, slot: 0, hp: 1000}
+	f.teams[0][1] = &unit{Fighter: Fighter{Health: 200}, side: 0, slot: 1, hp: 200}
+	f.teams[0][2] = &unit{Fighter: Fighter{Health: 1000}, side: 0, slot: 2, hp: 500}
+	if got := f.weakestHurt(0); got == nil || got.slot != 2 {
+		t.Fatalf("weakestHurt = %+v, want slot 2", got)
+	}
+	f.teams[0][2].hp = 1000
+	if got := f.weakestHurt(0); got != nil {
+		t.Errorf("nobody is hurt but got slot %d", got.slot)
+	}
+}
+
+func TestEmptyTeamsDefenderWins(t *testing.T) {
+	if r := Battle(Team{}, Team{}, 1); r.AttackerWon {
+		t.Error("two empty teams: attacker won")
 	}
 }
