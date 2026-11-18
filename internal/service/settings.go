@@ -44,9 +44,11 @@ type SettingsBook interface {
 	ClearSetting(ctx context.Context, chatID int64, name string) error
 }
 
-// MenuSetter sets the command menu one member sees in one group.
+// MenuSetter sets the command menu one member sees in one group, or takes
+// it away.
 type MenuSetter interface {
 	SetMemberCommands(ctx context.Context, chatID, userID int64, commands []telegram.BotCommand) error
+	DeleteMemberCommands(ctx context.Context, chatID, userID int64) error
 }
 
 // groupNumber is the group's own setting of name, if an owner made one.

@@ -45,10 +45,20 @@ func TestOwnerCommandsAreSilentInAGroup(t *testing.T) {
 	}
 }
 
-type fakeMenuSetter struct{ calls [][2]int64 }
+type fakeMenuSetter struct {
+	calls   [][2]int64
+	menus   [][]telegram.BotCommand
+	deleted [][2]int64
+}
 
-func (f *fakeMenuSetter) SetMemberCommands(_ context.Context, chatID, userID int64, _ []telegram.BotCommand) error {
+func (f *fakeMenuSetter) SetMemberCommands(_ context.Context, chatID, userID int64, commands []telegram.BotCommand) error {
 	f.calls = append(f.calls, [2]int64{chatID, userID})
+	f.menus = append(f.menus, commands)
+	return nil
+}
+
+func (f *fakeMenuSetter) DeleteMemberCommands(_ context.Context, chatID, userID int64) error {
+	f.deleted = append(f.deleted, [2]int64{chatID, userID})
 	return nil
 }
 

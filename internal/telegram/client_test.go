@@ -1478,6 +1478,24 @@ func TestSetMemberCommandsScopesToOneMember(t *testing.T) {
 	}
 }
 
+// A member's own menu is deleted in the scope it was set in, and no
+// commands are sent.
+func TestDeleteMemberCommandsScopesToOneMember(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":true}`)
+
+	if err := client.DeleteMemberCommands(context.Background(), -100, 9001); err != nil {
+		t.Fatal(err)
+	}
+	call := api.recorded()[0]
+	scope, _ := call.params["scope"].(map[string]any)
+	if call.method != "deleteMyCommands" || scope["type"] != "chat_member" || scope["chat_id"] != float64(-100) || scope["user_id"] != float64(9001) {
+		t.Errorf("call = %+v", call)
+	}
+	if _, sent := call.params["commands"]; sent {
+		t.Errorf("commands sent = %v, want none", call.params["commands"])
+	}
+}
+
 // A silent picture and message are sent without a sound.
 func TestSilentSendsDisableTheNotification(t *testing.T) {
 	var photo, message string

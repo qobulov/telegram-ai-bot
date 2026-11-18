@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"telegram-ai-bot/internal/ranks"
 	"telegram-ai-bot/internal/telegram"
 )
 
@@ -64,7 +65,7 @@ var commandMenus = map[string][]telegram.BotCommand{
 		{Command: "banlist", Description: "Banlar ro'yxati, bandan chiqarish tugmalari"},
 		{Command: "reports", Description: "Ko'rib chiqilmagan shikoyatlar"},
 		{Command: "warns", Description: "Kimda nechta ogohlantirish (reply: bittasi)"},
-		{Command: "rank", Description: "Daraja berish: /rank 3, olish: /rank 0 (reply)"},
+		{Command: "rank", Description: "Daraja: /rank 3 berish, /rank 0 olish, /rank ko'rish (reply)"},
 		{Command: "ranklog", Description: "Kim kimga daraja bergan"},
 		{Command: "access", Description: "Buyruqlar darajasi: /access ban 2"},
 		{Command: "kickinactive", Description: "Faol emaslarni chiqarish: /kickinactive 30"},
@@ -132,7 +133,7 @@ var ownerGroupMenu = []telegram.BotCommand{
 	{Command: "banlist", Description: "Banlar ro'yxati, bandan chiqarish tugmalari"},
 	{Command: "reports", Description: "Ko'rib chiqilmagan shikoyatlar"},
 	{Command: "warns", Description: "Kimda nechta ogohlantirish (reply: bittasi)"},
-	{Command: "rank", Description: "Daraja berish: /rank 3, olish: /rank 0 (reply)"},
+	{Command: "rank", Description: "Daraja: /rank 3 berish, /rank 0 olish, /rank ko'rish (reply)"},
 	{Command: "ranklog", Description: "Kim kimga daraja bergan"},
 	{Command: "access", Description: "Buyruqlar darajasi: /access ban 2"},
 	{Command: "kickinactive", Description: "Faol emaslarni chiqarish: /kickinactive 30"},
@@ -159,6 +160,53 @@ var ownerOnlyMenu = []telegram.BotCommand{
 
 // ownerMenu is every command the bot answers, in an owner's private chat.
 var ownerMenu = append(slices.Clone(ownerGroupMenu), ownerOnlyMenu...)
+
+// rankedCommands are the admins' commands a moderator with a rank may run
+// in a group without being its Telegram admin, each with the rank code
+// (internal/ranks) that opens it, "" for any rank: /ranklog asks none.
+// /ignore, /unignore and /invites_auto are left out, as they take a
+// Telegram admin or an owner whatever the rank.
+var rankedCommands = []struct{ name, code string }{
+	{"warn", "warn"}, {"unwarn", "warn"}, {"warns", "warn"},
+	{"mute", "mute"}, {"unmute", "mute"},
+	{"ban", "ban"}, {"unban", "ban"}, {"banlist", "banlist"}, {"reports", "ban"},
+	{"kick", "kick"},
+	{"pin", "pin"}, {"unpin", "pin"},
+	{"del", "delete"},
+	{"tag", "group"}, {"cleanservice", "group"},
+	{"kickinactive", "masskick"},
+	{"rank", "rank"}, {"ranklog", ""},
+	{"promote", "admin"}, {"demote", "admin"},
+	{"amnesty", "amnesty"},
+	{"access", "access"},
+}
+
+// RankMenu is what a moderator of rank sees in a group whose creator set
+// overrides of the commands' ranks: the commands their rank opens there,
+// then everyone's.
+func RankMenu(rank int, overrides map[string]int) []telegram.BotCommand {
+	described := make(map[string]string, len(ownerGroupMenu))
+	for _, c := range ownerGroupMenu {
+		described[c.Command] = c.Description
+	}
+	var menu []telegram.BotCommand
+	seen := map[string]bool{}
+	add := func(c telegram.BotCommand) {
+		if !seen[c.Command] {
+			seen[c.Command] = true
+			menu = append(menu, c)
+		}
+	}
+	for _, c := range rankedCommands {
+		if rank > 0 && (c.code == "" || ranks.Need(c.code, overrides) <= rank) {
+			add(telegram.BotCommand{Command: c.name, Description: described[c.name]})
+		}
+	}
+	for _, c := range membersMenu {
+		add(c)
+	}
+	return menu
+}
 
 // CommandSetter sets a command menu.
 type CommandSetter interface {

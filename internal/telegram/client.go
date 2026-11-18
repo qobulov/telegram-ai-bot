@@ -1281,13 +1281,19 @@ const (
 	ScopeAllChatAdmins = "all_chat_administrators"
 )
 
+type commandScope struct {
+	Type   string `json:"type"`
+	ChatID int64  `json:"chat_id,omitempty"`
+	UserID int64  `json:"user_id,omitempty"`
+}
+
 type setMyCommandsParams struct {
 	Commands []BotCommand `json:"commands"`
-	Scope    struct {
-		Type   string `json:"type"`
-		ChatID int64  `json:"chat_id,omitempty"`
-		UserID int64  `json:"user_id,omitempty"`
-	} `json:"scope"`
+	Scope    commandScope `json:"scope"`
+}
+
+type deleteMyCommandsParams struct {
+	Scope commandScope `json:"scope"`
 }
 
 // SetMyCommands sets the command menu for scope.
@@ -1339,6 +1345,14 @@ func (c *Client) SetMemberCommands(ctx context.Context, chatID, userID int64, co
 	params.Scope.Type, params.Scope.ChatID, params.Scope.UserID = "chat_member", chatID, userID
 	var ok bool
 	return c.call(ctx, "setMyCommands", params, &ok)
+}
+
+// DeleteMemberCommands takes away the menu SetMemberCommands set for one
+// member in one group, who then sees the group's usual one.
+func (c *Client) DeleteMemberCommands(ctx context.Context, chatID, userID int64) error {
+	params := deleteMyCommandsParams{Scope: commandScope{Type: "chat_member", ChatID: chatID, UserID: userID}}
+	var ok bool
+	return c.call(ctx, "deleteMyCommands", params, &ok)
 }
 
 // SetChatCommands sets the command menu of one chat, such as an owner's

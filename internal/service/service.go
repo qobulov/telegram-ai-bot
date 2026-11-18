@@ -314,6 +314,10 @@ type Options struct {
 	// write there; with either missing owners see the admins' menu.
 	OwnerMenu  []telegram.BotCommand
 	MenuSetter MenuSetter
+	// RankMenu is the menu of a moderator of rank in a group whose creator
+	// set overrides, which MenuSetter sets when they are given a rank and
+	// when they write there; nil leaves them the members' menu.
+	RankMenu func(rank int, overrides map[string]int) []telegram.BotCommand
 	// Settings keeps the owners' settings over the environment's, which
 	// CheckSetting checks before they are saved and Getenv reads; with
 	// Settings nil, /set and /settings do nothing.
@@ -480,6 +484,9 @@ type Service struct {
 	settings *recently[int64, map[string]string]
 	// ownerMenus are the groups and owners whose menu was set lately.
 	ownerMenus *recently[[2]int64, bool]
+	// rankMenus are the groups' members whose rank was lately read for
+	// their menu, with that rank.
+	rankMenus  *recently[[2]int64, int]
 	ownersHere *recently[int64, []string]
 	// creators are the groups' creators, by group, for limits they are
 	// spared.
@@ -606,6 +613,7 @@ func New(opts Options) *Service {
 		actives:         newRecently[int64, int](activeMemory, opts.Now),
 		settings:        newRecently[int64, map[string]string](settingsMemory, opts.Now),
 		ownerMenus:      newRecently[[2]int64, bool](ownerMenuMemory, opts.Now),
+		rankMenus:       newRecently[[2]int64, int](ownerMenuMemory, opts.Now),
 		ownersHere:      newRecently[int64, []string](activeMemory, opts.Now),
 		creators:        newRecently[int64, int64](creatorMemory, opts.Now),
 		aiChats:         newRecently[int64, bool](aiMemory, opts.Now),
@@ -874,6 +882,7 @@ func (s *Service) accept(update telegram.Update) (incoming, bool) {
 	case telegram.ChatTypeGroup, telegram.ChatTypeSupergroup:
 		s.noteMembers(msg)
 		s.showOwnerMenu(msg)
+		s.showRankMenu(msg)
 		in.scope = storage.Scope{ChatID: msg.Chat.ID} // shared by the group
 		in.group = true
 		if len(msg.NewChatMembers) > 0 {

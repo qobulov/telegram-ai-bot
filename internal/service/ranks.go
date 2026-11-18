@@ -10,6 +10,7 @@ import (
 
 	"telegram-ai-bot/internal/ranks"
 	"telegram-ai-bot/internal/storage"
+	"telegram-ai-bot/internal/telegram"
 )
 
 // RankBook keeps the moderators' ranks, 1 to 5, as Iris does: who has which
@@ -24,16 +25,17 @@ type RankBook interface {
 }
 
 // rankUsage teaches /rank, the only way a rank is given or taken.
-const rankUsage = "A'zoning xabariga reply qilib yozing: \"/rank 3\" — 1–5 daraja berish, \"/rank 0\" — darajani olib tashlash."
+const rankUsage = "A'zoning xabariga reply qilib yozing: \"/rank 3\" — 1–5 daraja berish, \"/rank 0\" — darajani olib tashlash, \"/rank\" — darajasini ko'rish."
 
 // rankLogShown is how many changes the rank log shows.
 const rankLogShown = 10
 
 // rankOrder is what a group message asks of the ranks: list them, show the
-// log or the commands' ranks, set a command's rank, or give a member a rank
-// with /rank, 0 taking it away.
+// log or the commands' ranks, set a command's rank, give a member a rank
+// with /rank, 0 taking it away, or with /rank alone replying to them say
+// theirs.
 type rankOrder struct {
-	kind string // "staff", "log", "access", "give", "mine", "usage"
+	kind string // "staff", "log", "access", "give", "mine", "theirs", "usage"
 	rank int
 	code string
 }
@@ -75,6 +77,9 @@ func (s *Service) rankRequest(in incoming) (order rankOrder, ok bool) {
 		if arg := strings.TrimSpace(commandArgument(in.text)); rankDigit.MatchString(arg) {
 			n, _ := strconv.Atoi(arg)
 			return rankOrder{kind: "give", rank: n}, true
+		}
+		if _, replied := s.withModTarget(in); replied && commandArgument(in.text) == "" {
+			return rankOrder{kind: "theirs"}, true
 		}
 		return rankOrder{kind: "usage"}, true
 	}
@@ -151,6 +156,8 @@ func (s *Service) rankCommand(ctx context.Context, in incoming) outcome {
 		return s.accessCommand(ctx, in, order)
 	case "mine":
 		return s.myRank(ctx, in)
+	case "theirs":
+		return s.theirRank(ctx, in)
 	case "usage":
 		return say(rankUsage)
 	}
@@ -160,19 +167,25 @@ func (s *Service) rankCommand(ctx context.Context, in incoming) outcome {
 // askerRank is the rank of the person asking: above every rank for the
 // group's creator and the bot's owners.
 func (s *Service) askerRank(ctx context.Context, in incoming) (int, error) {
-	if s.isOwner(in.msg.From) {
+	return s.memberRank(ctx, in.scope.ChatID, in.msg.From)
+}
+
+// memberRank is user's rank in the group: above every rank for its creator
+// and the bot's owners.
+func (s *Service) memberRank(ctx context.Context, chatID int64, user *telegram.User) (int, error) {
+	if s.isOwner(user) {
 		return ranks.Above, nil
 	}
 	if s.opts.Members != nil {
-		creator, err := s.opts.Members.GroupCreator(ctx, in.scope.ChatID)
+		creator, err := s.opts.Members.GroupCreator(ctx, chatID)
 		if err != nil {
 			return 0, err
 		}
-		if creator != 0 && creator == in.userID {
+		if creator != 0 && creator == user.ID {
 			return ranks.Above, nil
 		}
 	}
-	return s.opts.Ranks.RankOf(ctx, in.scope.ChatID, in.userID)
+	return s.opts.Ranks.RankOf(ctx, chatID, user.ID)
 }
 
 // giveRank gives the member replied to the rank, or takes theirs with 0:
@@ -208,6 +221,7 @@ func (s *Service) giveRank(ctx context.Context, in incoming, rank int) outcome {
 		s.opts.Logger.Error("could not set a rank", "chat_id", in.scope.ChatID, "error", err)
 		return say(textError.to(in))
 	}
+	s.rankMenuChanged(ctx, in.scope.ChatID, target, rank)
 	name := cardMarks.Replace(target.FirstName)
 	if rank == 0 {
 		return say("✅ " + name + " endi moderator emas.")
@@ -229,6 +243,25 @@ func (s *Service) myRank(ctx context.Context, in incoming) outcome {
 		return say(fmt.Sprintf("%s Sizning darajangiz: %d.", stars(mine), mine))
 	}
 	return say("Sizda daraja yo'q. Uni guruh egasi yoki 4-darajali moderator xabaringizga reply qilib \"/rank 2\" deb beradi.")
+}
+
+// theirRank says the rank of the member the asker's /rank replies to; anyone
+// may ask.
+func (s *Service) theirRank(ctx context.Context, in incoming) outcome {
+	asked, _ := s.withModTarget(in)
+	target := asked.msg.ReplyToMessage.From
+	rank, err := s.memberRank(ctx, in.scope.ChatID, target)
+	if err != nil {
+		return say(textError.to(in))
+	}
+	name := memberLabel(target.FirstName, target.Username, target.ID)
+	switch {
+	case rank >= ranks.Above:
+		return say("👑 " + name + " guruh egasi yoki bot egasi: hamma darajadan yuqori.")
+	case rank > 0:
+		return say(fmt.Sprintf("%s: %s %d-daraja", name, stars(rank), rank))
+	}
+	return say(name + ": darajasi yo'q (0).")
 }
 
 // stars is a rank drawn: ⭐⭐⭐ for 3.

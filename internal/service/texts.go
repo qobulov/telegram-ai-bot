@@ -234,7 +234,7 @@ A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yo
 /mute@username, /unmute@username — guruhda jim turishim yoki qaytishim
 /ignore@username, /unignore@username — a'zoning xabariga reply qilib: unga 24 soat javob bermayman yoki yana javob beraman
 /warn, /unwarn — ogohlantirish (3-sida 1 kunga mut), /ban sabab, /kick — a'zoga reply qilib
-/rank 3 (reply) — moderatorga 1–5 daraja berish, /rank 0 — olib tashlash; /staff, /ranklog, /access — moderatorlar, kim tayinlagan, buyruqlar darajasi
+/rank 3 (reply) — moderatorga 1–5 daraja berish, /rank 0 — olib tashlash, /rank — darajasini ko'rish; /staff, /ranklog, /access — moderatorlar, kim tayinlagan, buyruqlar darajasi
 /banlist, /amnesty, /kickinactive 30 — banlar ro'yxati, hammani bandan chiqarish, faol emaslarni chiqarish
 /reports, /warns — ko'rilmagan shikoyatlar, kimda nechta ogohlantirish
 
@@ -262,7 +262,7 @@ Bo'limlar: /help mod, /help kartalar, /help azo`,
 /mute@username, /unmute@username — чтобы я молчала в группе или вернулась
 /ignore@username, /unignore@username — ответом на сообщение участника: не отвечаю ему 24 часа или снова отвечаю
 /warn, /unwarn — предупреждение (на третьем мут на сутки), /ban причина, /kick — ответом на сообщение
-/rank 3 (reply) — дать модератору ранг 1–5, /rank 0 — снять; /staff, /ranklog, /access — модераторы, кто назначил, ранги команд
+/rank 3 (reply) — дать модератору ранг 1–5, /rank 0 — снять, /rank — посмотреть ранг; /staff, /ranklog, /access — модераторы, кто назначил, ранги команд
 /banlist, /amnesty, /kickinactive 30 — банлист, разбан всех, кик неактивных
 /reports, /warns — нерассмотренные жалобы, у кого сколько предупреждений
 
@@ -290,7 +290,7 @@ Reply to a member's message and ask me to delete or pin it, to mute or ban its a
 /mute@username, /unmute@username — make me stay quiet in the group, or bring me back
 /ignore@username, /unignore@username — as a reply to a member's message: I stop answering them for 24 hours, or answer them again
 /warn, /unwarn — a warning (the third mutes for a day), /ban reason, /kick — as a reply
-/rank 3 (reply) — give a moderator rank 1–5, /rank 0 — take it away; /staff, /ranklog, /access — moderators, who gave ranks, commands' ranks
+/rank 3 (reply) — give a moderator rank 1–5, /rank 0 — take it away, /rank — see their rank; /staff, /ranklog, /access — moderators, who gave ranks, commands' ranks
 /banlist, /amnesty, /kickinactive 30 — the ban list, unban everyone, remove the inactive
 /reports, /warns — open reports, who has how many warnings
 

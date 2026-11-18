@@ -214,3 +214,79 @@ func TestOwnerGroupMenuLeavesOutTheOwnersOwn(t *testing.T) {
 		}
 	}
 }
+
+func menuNames(menu []telegram.BotCommand) []string {
+	var names []string
+	for _, c := range menu {
+		names = append(names, c.Command)
+	}
+	return names
+}
+
+// A moderator's menu has what their rank opens, then everyone's commands,
+// each once and each one Telegram takes.
+func TestRankMenuFollowsTheRank(t *testing.T) {
+	valid := regexp.MustCompile(`^[a-z0-9_]{1,32}$`)
+	for rank := 1; rank <= 5; rank++ {
+		menu := RankMenu(rank, nil)
+		seen := map[string]bool{}
+		for _, c := range menu {
+			if seen[c.Command] || !valid.MatchString(c.Command) || c.Description == "" || len([]rune(c.Description)) > 256 {
+				t.Errorf("rank %d: %+v is twice or not a command Telegram takes", rank, c)
+			}
+			seen[c.Command] = true
+		}
+		if len(menu) > 100 {
+			t.Errorf("rank %d: %d commands, Telegram takes 100", rank, len(menu))
+		}
+		for _, c := range membersMenu {
+			if !seen[c.Command] {
+				t.Errorf("rank %d: /%s, everyone's, is missing", rank, c.Command)
+			}
+		}
+	}
+	first := menuNames(RankMenu(1, nil))
+	for _, want := range []string{"ban", "unban", "kick", "mute", "unmute", "warn", "unwarn", "warns", "banlist", "reports", "ranklog"} {
+		if !slices.Contains(first, want) {
+			t.Errorf("rank 1 menu %v lacks /%s", first, want)
+		}
+	}
+	for _, not := range []string{"pin", "del", "rank", "kickinactive", "promote", "amnesty", "access", "ignore", "invites_auto"} {
+		if slices.Contains(first, not) {
+			t.Errorf("rank 1 menu %v has /%s, which rank 1 does not open", first, not)
+		}
+	}
+	top := menuNames(RankMenu(5, nil))
+	for _, c := range rankedCommands {
+		if !slices.Contains(top, c.name) {
+			t.Errorf("rank 5 menu %v lacks /%s", top, c.name)
+		}
+	}
+	for _, not := range []string{"ignore", "unignore", "invites_auto"} {
+		if slices.Contains(top, not) {
+			t.Errorf("rank 5 menu has /%s, which takes a Telegram admin", not)
+		}
+	}
+}
+
+// A group's own ranks for the commands move them in or out of the menu.
+func TestRankMenuKeepsTheGroupsAccess(t *testing.T) {
+	menu := menuNames(RankMenu(2, map[string]int{"ban": 3, "delete": 2}))
+	if slices.Contains(menu, "ban") || slices.Contains(menu, "unban") || !slices.Contains(menu, "del") || !slices.Contains(menu, "pin") {
+		t.Errorf("rank 2 with ban at 3 and delete at 2: %v", menu)
+	}
+	if menu := menuNames(RankMenu(0, nil)); slices.Contains(menu, "ban") || len(menu) != len(membersMenu) {
+		t.Errorf("no rank: %v, want everyone's alone", menu)
+	}
+}
+
+// Every command ranks open in the menu is one the admins' menu or the
+// owners' has, so its description is there to reuse.
+func TestRankedCommandsAreKnown(t *testing.T) {
+	known := menuNames(ownerGroupMenu)
+	for _, c := range rankedCommands {
+		if !slices.Contains(known, c.name) {
+			t.Errorf("/%s has no description", c.name)
+		}
+	}
+}

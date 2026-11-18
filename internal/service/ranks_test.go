@@ -127,7 +127,7 @@ func TestRanksAreGivenWithSlashRank(t *testing.T) {
 	if last := sent[len(sent)-1].text; !strings.Contains(last, "2 · ban") {
 		t.Errorf("access list = %q", last)
 	}
-	sent = f.run(from(creator, "/rank", member))
+	sent = f.run(from(creator, "/rank", 0))
 	if last := sent[len(sent)-1].text; !strings.Contains(last, "/rank 0") {
 		t.Errorf("/rank alone = %q", last)
 	}
@@ -214,5 +214,91 @@ func TestStaffShowsAdmins(t *testing.T) {
 	}
 	if strings.Contains(last, "somebot") {
 		t.Errorf("staff lists a bot: %q", last)
+	}
+}
+
+// /rank alone replying to a member, the bot's name with it or not, says
+// their rank to anyone who asks and changes nothing; the creator and the
+// bot's owners stand above the ranks.
+func TestSlashRankAloneShowsTheirRank(t *testing.T) {
+	const creator, owner, moder, member = int64(10), int64(20), int64(11), int64(12)
+	f := newFixture()
+	f.members.creator = creator
+	f.opts.OwnerIDs = map[int64]bool{owner: true}
+	book := &fakeRankBook{ranks: map[int64]int{moder: 3}, overrides: map[string]int{}}
+	f.opts.Ranks = book
+	for _, c := range []struct {
+		text string
+		to   int64
+		want string
+	}{
+		{"/rank@" + f.opts.Bot.Username, moder, "Sam: ⭐⭐⭐ 3-daraja"},
+		{"/rank", moder, "Sam: ⭐⭐⭐ 3-daraja"},
+		{"/rank", 14, "Sam: darajasi yo'q (0)."},
+		{"/rank", creator, "hamma darajadan yuqori"},
+		{"/rank", owner, "hamma darajadan yuqori"},
+	} {
+		sent := f.run(from(member, c.text, c.to))
+		if len(sent) == 0 || !strings.Contains(sent[len(sent)-1].text, c.want) {
+			t.Errorf("%q replying to %d = %v, want %q", c.text, c.to, sent, c.want)
+		}
+	}
+	if book.ranks[moder] != 3 || len(book.log) != 0 {
+		t.Errorf("asking changed the ranks: %v, log %v", book.ranks, book.log)
+	}
+}
+
+// A moderator given a rank gets the menu of that rank in the group, and
+// loses it with /rank 0; a Telegram admin and the bot's owners are given
+// none, as their own menus hold more.
+func TestRankGivesAndTakesTheMenu(t *testing.T) {
+	const creator, owner, admin, member = int64(10), int64(20), int64(15), int64(12)
+	f := newFixture()
+	f.members.creator = creator
+	f.members.admins = map[int64]bool{creator: true, admin: true}
+	f.opts.OwnerIDs = map[int64]bool{owner: true}
+	f.opts.Ranks = &fakeRankBook{ranks: map[int64]int{}, overrides: map[string]int{}}
+	menus := &fakeMenuSetter{}
+	var asked []int
+	f.opts.MenuSetter = menus
+	f.opts.RankMenu = func(rank int, _ map[string]int) []telegram.BotCommand {
+		asked = append(asked, rank)
+		return []telegram.BotCommand{{Command: "ban", Description: "x"}}
+	}
+
+	f.run(from(creator, "/rank 3", member))
+	if len(menus.calls) != 1 || menus.calls[0] != [2]int64{groupID, member} || len(asked) != 1 || asked[0] != 3 {
+		t.Fatalf("after /rank 3: menus %v for ranks %v, want one for the member, of rank 3", menus.calls, asked)
+	}
+	f.run(from(creator, "/rank 0", member))
+	if len(menus.deleted) != 1 || menus.deleted[0] != [2]int64{groupID, member} {
+		t.Errorf("after /rank 0: deleted %v, want the member's menu", menus.deleted)
+	}
+	f.run(from(creator, "/rank 2", admin), from(creator, "/rank 2", owner))
+	if len(menus.calls) != 1 {
+		t.Errorf("an admin's and an owner's ranks set menus %v", menus.calls)
+	}
+}
+
+// A ranked member who writes is given the menu of their rank once; plain
+// members, admins and owners are not.
+func TestRankedMemberGetsTheMenuOnce(t *testing.T) {
+	const owner, admin, moder, member = int64(20), int64(15), int64(11), int64(12)
+	f := newFixture()
+	f.members.admins = map[int64]bool{admin: true}
+	f.opts.OwnerIDs = map[int64]bool{owner: true}
+	f.opts.Ranks = &fakeRankBook{ranks: map[int64]int{moder: 1, admin: 2, owner: 3}, overrides: map[string]int{}}
+	menus := &fakeMenuSetter{}
+	f.opts.MenuSetter = menus
+	f.opts.RankMenu = func(int, map[string]int) []telegram.BotCommand {
+		return []telegram.BotCommand{{Command: "ban", Description: "x"}}
+	}
+	second := from(moder, "yana", 0)
+	second.Message.MessageID = 31
+
+	f.run(from(moder, "salom", 0), second, from(member, "men a'zoman", 0), from(admin, "salom", 0), from(owner, "salom", 0))
+
+	if len(menus.calls) != 1 || menus.calls[0] != [2]int64{groupID, moder} {
+		t.Errorf("menus set = %v, want once, for the moderator", menus.calls)
 	}
 }
