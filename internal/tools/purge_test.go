@@ -147,3 +147,35 @@ func TestPurgeReachesABannedMember(t *testing.T) {
 		t.Errorf("calls = %q, want %q", env.telegram.made(), want)
 	}
 }
+
+// Purge is asked for however "xabar" is spelled: habar, xabarlar, хабар,
+// or in Russian; one message's "o'chir" stays a delete, and the other
+// actions take their x and h spellings too.
+func TestPurgeWordsSpelledEitherWay(t *testing.T) {
+	for words, want := range map[string]bool{
+		"barcha habarlarni o'chir":       true,
+		"barcha xabarlarni o'chir":       true,
+		"hamma habarini o'chir":          true,
+		"uning habarlarini o'chir":       true,
+		"барча хабарларини ўчир":         true,
+		"хабарларини учир":               true,
+		"ҳаммасини ўчир":                 true,
+		"удали все сообщения":            true,
+		"удали сообщения этого":          true,
+		"xabarni o'chir":                 false,
+		"habarni o'chir":                 false,
+		"Maria, buning hammasini o'chir": true,
+	} {
+		if got := askedFor(words, actionPurge); got != want {
+			t.Errorf("askedFor(%q, purge) = %t, want %t", words, got, want)
+		}
+	}
+	for words, action := range map[string]string{
+		"xabarni o'chir": actionDelete, "habarni o'chir": actionDelete, "хабарни ўчир": actionDelete,
+		"xaydab yubor": actionBan, "guruhdan xayda": actionKick, "ogoxlantir": actionWarn, "ruhsat ber": actionUnlock,
+	} {
+		if !askedFor(words, action) {
+			t.Errorf("askedFor(%q, %s) = false", words, action)
+		}
+	}
+}

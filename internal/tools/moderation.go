@@ -1436,9 +1436,9 @@ var actionWords = map[string][]string{
 	actionDelete: {"ochir", "delete", "del ", "sil", "olib tashla", "yoq qil", "удал", "сотри", "ўчир", "учир", "очир", "олиб ташла", "йўқ қил", "йок кил"},
 	actionMute:   {"mute", "mut ", "myut", "мут", "мют", "ovozsiz", "jim qil", "yozolmasin", "yoza olmasin", "yozmasin", "yozdirma", "заглуш", "молч", "readonly", "read only"},
 	actionUnmute: {"mute", "mut ", "мут", "мют", "ovozsiz", "yozsin", "yoza olsin", "ochib qoy", "ochvor", "разреш"},
-	actionBan:    {"ban", "бан", "blok", "chiqar", "hayda", "kick", "кик", "выгн", "выкин", "заблок", "блок", "чиқар", "чикар", "чказ", "чиказ", "чиқаз", "ҳайда", "хайда"},
+	actionBan:    {"ban", "бан", "blok", "chiqar", "hayda", "xayda", "kick", "кик", "выгн", "выкин", "заблок", "блок", "чиқар", "чикар", "чказ", "чиказ", "чиқаз", "ҳайда", "хайда"},
 	actionUnban:  {"ban", "бан", "blok", "qaytar", "верн", "разблок"},
-	actionKick:   {"kick", "кик", "chiqar", "chqaz", "chiqaz", "hayda", "выгн", "выкин", "удали из", "чиқар", "чикар", "чказ", "чиказ", "чиқаз", "ҳайда", "хайда"},
+	actionKick:   {"kick", "кик", "chiqar", "chqaz", "chiqaz", "hayda", "xayda", "выгн", "выкин", "удали из", "чиқар", "чикар", "чказ", "чиказ", "чиқаз", "ҳайда", "хайда"},
 	actionWarn:   warnWords,
 	actionUnwarn: warnWords,
 
@@ -1447,8 +1447,14 @@ var actionWords = map[string][]string{
 	actionPin:          {"pin", "пин", "qada", "қада", "када", "закреп"},
 	// Deleting one message is not clearing out them all: "tozala",
 	// "hammasini o'chir", "очисти", "удали все".
-	actionPurge: {"tozala", "hammasini ochir", "barchasini ochir", "hammasini del", "xabarlarini ochir", "hamma xabar", "barcha xabar",
-		"очист", "удали все", "удали всё", "удалить все", "удалить всё", "удали его сообщения", "purge", "clear", "clean"},
+	// Xabar is often typed habar, and in Cyrillic хабар.
+	actionPurge: {"tozala", "hammasini ochir", "barchasini ochir", "hammasini del",
+		"xabarlarini ochir", "habarlarini ochir", "xabarlarni ochir", "habarlarni ochir",
+		"hamma xabar", "barcha xabar", "hamma habar", "barcha habar",
+		"тозала", "ҳаммасини ўчир", "хаммасини учир", "хаммасини ўчир", "барчасини ўчир", "барчасини учир",
+		"хабарларини ўчир", "хабарларини учир", "хабарларни ўчир", "хабарларни учир", "ҳамма хабар", "хамма хабар", "барча хабар",
+		"очист", "удали все", "удали всё", "удалить все", "удалить всё", "удали его сообщения", "удали сообщения", "все сообщения",
+		"purge", "clear", "clean"},
 	// Asking about someone's stickers is enough: the model picks which.
 	actionNoStickers: {"stik", "stic", "стик", "gif", "гиф"},
 	actionStickers:   {"stik", "stic", "стик", "gif", "гиф"},
@@ -1473,7 +1479,7 @@ var actionWords = map[string][]string{
 	actionLock:             {"yop", "blok", "taqiq", "chekla", "ochir", "запрет", "закр", "огранич", "lock", "заблок"},
 	actionUndo: {"qaytar", "orqaga", "ortga", "bekor qil", "bekor kil", "undo", "верн", "отмен", "назад",
 		"қайтар", "кайтар", "орқага", "оркага", "бекор қил", "бекор кил", "бекор кл"},
-	actionUnlock: {"och", "ruxsat", "разреш", "откр", "unlock", "разблок"},
+	actionUnlock: {"och", "ruxsat", "ruhsat", "разреш", "откр", "unlock", "разблок"},
 	actionUnpin:  {"pin", "пин", "qada", "қада", "када", "закреп", "откреп"},
 }
 
@@ -1489,7 +1495,7 @@ var changeWords = []string{"ozgartir", "uzgartir", "almashtir", "change", "renam
 
 // warnWords ask for a warning, or to take one off: "varn ber", "пред",
 // "ogohlantir".
-var warnWords = []string{"warn", "varn", "варн", "пред", "ogohlantir", "огоҳлантир", "огохлантир", "ogoh"}
+var warnWords = []string{"warn", "varn", "варн", "пред", "ogohlantir", "ogoxlantir", "огоҳлантир", "огохлантир", "ogoh", "ogox"}
 
 // adminWords ask for something about adminship: "admin qil", "админка".
 var adminWords = []string{"admin", "админ", "promot", "demot"}

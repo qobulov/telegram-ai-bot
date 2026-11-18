@@ -1610,7 +1610,8 @@ check is made in code:
 - **Actions:** delete the message; purge, which deletes every message its
   author wrote in the group in the last hour, or the minutes asked for, two
   days at most, since Telegram deletes nothing older ("Maria, buning
-  hammasini o'chir", "tozala", "очисти", "удали все"); mute its author (an hour unless asked
+  hammasini o'chir", "tozala", "barcha xabarlarni o'chir", spelled "habar"
+  too, "хабарларини ўчир", "очисти", "удали все"); mute its author (an hour unless asked
   otherwise, at most a week; supergroups only) or unmute them; ban them, or
   unban; pin the message without a notification, or unpin it; take away a
   member's stickers and GIFs, or photos (a day unless asked otherwise), and
