@@ -251,6 +251,9 @@ type cardView struct {
 	Fuse       int `json:"fuse,omitempty"`
 	NextAttack int `json:"next_attack,omitempty"`
 	NextHealth int `json:"next_health,omitempty"`
+	// Serial is a limited card's number for its holder, which holder of it
+	// they are; 0 for others.
+	Serial int `json:"serial,omitempty"`
 }
 
 func (h *handler) held(c storage.Card, count int) cardView {
@@ -263,6 +266,7 @@ func (h *handler) owned(o storage.OwnedCard) cardView {
 	v := h.held(o.Card, o.Count)
 	v.Stars = min(max(o.Stars, 1), MaxStars)
 	v.Free = max(o.Count-1-o.Melted, 0)
+	v.Serial = o.Serial
 	v.Attack, v.Health = Boosted(o.Card, v.Stars)
 	if v.Stars < MaxStars {
 		v.Fuse = FuseCost[v.Stars]

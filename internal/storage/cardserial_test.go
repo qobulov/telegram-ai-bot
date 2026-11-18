@@ -90,3 +90,40 @@ func TestCardSerials(t *testing.T) {
 	}
 	want(open.Draws, gojo, 38)
 }
+
+// A limited card's holders are numbered by when each first got it: the
+// first holder's copy is 1, the next 2; other cards have none.
+func TestLimitedCardHoldersAreNumbered(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	const satoko = int64(298761)
+	if _, err := store.pool.Exec(ctx, `
+		INSERT INTO card_catalog (id, name, anime, image_url, favourites, rarity, attack, health, value, collection)
+		VALUES (298761, 'Satoko Kirigaya', 'Firefly Wedding', '', 0, 4, 1, 1, 4000, 'anime'), (1, 'Gojo', 'JJK', '', 0, 4, 1, 1, 4000, 'anime')
+		ON CONFLICT (id) DO NOTHING`); err != nil {
+		t.Fatal(err)
+	}
+	for i, user := range []int64{alice, bob} {
+		if _, err := store.pool.Exec(ctx, `INSERT INTO card_players (user_id, name) VALUES ($1, 'P') ON CONFLICT DO NOTHING`, user); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.pool.Exec(ctx, `INSERT INTO card_owned (user_id, card_id, count, first_at) VALUES ($1, $2, 1, now() - make_interval(mins => $3)), ($1, 1, 1, now())`,
+			user, satoko, 10-i); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for want, user := range map[int]int64{1: alice, 2: bob} {
+		cards, err := store.OwnedCards(ctx, user, 4)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range cards {
+			if c.ID == satoko && c.Serial != want {
+				t.Errorf("player %d's Satoko is No.%d, want %d", user, c.Serial, want)
+			}
+			if c.ID == 1 && c.Serial != 0 {
+				t.Errorf("a common Mythic got number %d", c.Serial)
+			}
+		}
+	}
+}

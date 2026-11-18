@@ -259,7 +259,7 @@
   // with a number under it (a mark, not a count of copies), cherry petals
   // drifting over the picture, fireflies glowing among them and, in the large
   // view, long hair flowing in the wind while the face and body keep still.
-  const SPECIAL = { 298761: { tag: "LIMITED", serial: "No.000001", petals: true, fireflies: true, hair: true, plate: "/kartalar/art/298761p.jpg" } };
+  const SPECIAL = { 298761: { tag: "LIMITED", petals: true, fireflies: true, hair: true, plate: "/kartalar/art/298761p.jpg" } };
 
   // dress adds a special card's mark, petals and fireflies; the large view
   // has more of them.
@@ -291,10 +291,11 @@
       tag.className = "limited";
       tag.textContent = special.tag;
       mark.append(tag);
-      if (special.serial) {
+      // the holder's own copy number, which holder of it they are
+      if (card.serial > 0) {
         const serial = document.createElement("span");
         serial.className = "serial";
-        serial.textContent = special.serial;
+        serial.textContent = serialMark(card.serial);
         mark.append(serial);
       }
       el.append(mark);

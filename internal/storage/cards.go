@@ -65,6 +65,9 @@ type OwnedCard struct {
 	Count  int
 	Melted int
 	Stars  int
+	// Serial is, for a limited card, which holder of it the player is, by
+	// when each first got it: their copy's number. 0 for other cards.
+	Serial int
 }
 
 // CardPlayer is a player on the table of points.
@@ -269,16 +272,20 @@ func (s *Store) CardCounts(ctx context.Context, userID int64) (total, owned map[
 // is negative, the rarest and most loved first.
 func (s *Store) OwnedCards(ctx context.Context, userID int64, rarity int) ([]OwnedCard, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT c.id, c.name, c.anime, c.image_url, c.favourites, c.rarity, c.attack, c.health, c.value, c.collection, o.count, o.melted, o.stars
+		SELECT c.id, c.name, c.anime, c.image_url, c.favourites, c.rarity, c.attack, c.health, c.value, c.collection, o.count, o.melted, o.stars,
+			CASE WHEN o.card_id = ANY($3) THEN (
+				SELECT count(*) FROM card_owned h
+				WHERE h.card_id = o.card_id AND (h.first_at, h.user_id) <= (o.first_at, o.user_id))::int
+			ELSE 0 END
 		FROM card_owned o JOIN card_catalog c ON c.id = o.card_id
 		WHERE o.user_id = $1 AND ($2 < 0 OR c.rarity = $2)
-		ORDER BY c.rarity DESC, c.favourites DESC`, userID, rarity)
+		ORDER BY c.rarity DESC, c.favourites DESC`, userID, rarity, limitedCardIDs())
 	if err != nil {
 		return nil, fmt.Errorf("storage: list a player's cards: %w", err)
 	}
 	cards, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (OwnedCard, error) {
 		var o OwnedCard
-		err := row.Scan(&o.ID, &o.Name, &o.Anime, &o.ImageURL, &o.Favourites, &o.Rarity, &o.Attack, &o.Health, &o.Value, &o.Collection, &o.Count, &o.Melted, &o.Stars)
+		err := row.Scan(&o.ID, &o.Name, &o.Anime, &o.ImageURL, &o.Favourites, &o.Rarity, &o.Attack, &o.Health, &o.Value, &o.Collection, &o.Count, &o.Melted, &o.Stars, &o.Serial)
 		return o, err
 	})
 	if err != nil {
