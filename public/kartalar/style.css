@@ -268,15 +268,9 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 
 /* giving a card: the large card makes way for a search and a list of players */
 .sheet { overflow-y: auto; }
-.gift-open { width: 100%; margin-top: 10px; }
-.sheet-card.giving > .face, .sheet-card.giving > .stats, .sheet-card.giving > .gift-open { display: none; }
+.sheet-card.giving > .face, .sheet-card.giving > .stats { display: none; }
 .sheet-card.giving { transform: none; }
 .gift { padding: 14px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
-.gift-head { display: flex; align-items: center; gap: 12px; }
-.gift-head img { width: 52px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 8px; }
-.gift-head span { display: grid; gap: 2px; min-width: 0; }
-.gift-head small { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; }
-.gift-head b { font: 700 16px Unbounded, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gift input { width: 100%; min-height: 44px; margin-top: 12px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--lacquer); color: var(--text); font: 600 16px Manrope, sans-serif; outline: 0; }
 .gift input:focus { border-color: var(--gold); }
 .gift-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; max-height: 40vh; overflow-y: auto; }
@@ -482,10 +476,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 
-/* gift note and market */
-.gift-open:disabled { opacity: 0.45; }
-.gift-note { margin: 6px 0 0; color: var(--muted); font-size: 12px; text-align: center; }
-.gift-note:empty { display: none; }
+/* market */
 .market-head { margin: 4px 16px 0; display: grid; gap: 10px; }
 .market-hint { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
 .market-head .sets { margin: 0; padding: 0; }

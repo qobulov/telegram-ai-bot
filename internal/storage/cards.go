@@ -68,9 +68,6 @@ type CardPlayer struct {
 	Name   string
 	Points int64
 	Cards  int
-	// Username is their @username without the @; only CardPlayersNamed
-	// reads it.
-	Username string
 	// FreeDay is the day the player was last given the day's tokens, as the
 	// midnight that began it, and Tokens how many they hold; only
 	// CardPlayerOf reads them.

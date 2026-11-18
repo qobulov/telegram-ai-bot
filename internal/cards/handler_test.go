@@ -46,8 +46,6 @@ type fakeStore struct {
 	draws    int
 	shards   int
 	tokens   int
-	gifts    []int64 // the card, then the player, of each gift
-	giftErr  error
 	offers   []storage.CardOffer
 	takeErr  error
 	offerErr error
@@ -106,24 +104,6 @@ func (f *fakeStore) MeltCards(_ context.Context, _ int64, rates []int) (int, int
 	f.shards += gained
 	return 3, gained, f.shards, nil
 }
-func (f *fakeStore) CardPlayersNamed(_ context.Context, name string, except int64, _ int) ([]storage.CardPlayer, error) {
-	var found []storage.CardPlayer
-	for _, p := range []storage.CardPlayer{{UserID: 7, Name: "Bek", Cards: 3}, {UserID: 8, Name: "Vali", Cards: 1}} {
-		if p.UserID != except && strings.Contains(strings.ToLower(p.Name), strings.ToLower(name)) {
-			found = append(found, p)
-		}
-	}
-	return found, nil
-}
-
-func (f *fakeStore) GiveCard(_ context.Context, _, _, to, cardID int64, _ storage.CardTradeRules) error {
-	if f.giftErr != nil {
-		return f.giftErr
-	}
-	f.gifts = append(f.gifts, cardID, to)
-	return nil
-}
-
 func (f *fakeStore) OfferCard(_ context.Context, from, give, want int64, rules storage.CardMarketRules) (int64, error) {
 	if f.offerErr != nil {
 		return 0, f.offerErr
@@ -284,42 +264,19 @@ func TestAppLanguage(t *testing.T) {
 	}
 }
 
-// The player finds whom to give a card among the others, gives it, and the
-// one given it is told; a gift refused says why.
-func TestACardIsGiven(t *testing.T) {
+// Cards change hands on the market alone: gifting and the list of players to
+// give to are gone.
+func TestGiftIsGone(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
-	store := &fakeStore{}
-	var told []string
-	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now },
-		Notify: func(_ context.Context, userID int64, text string) error {
-			told = append(told, fmt.Sprint(userID, ": ", text))
-			return nil
-		}})
+	h := NewHandler(Options{BotToken: testToken, Store: &fakeStore{}, Now: func() time.Time { return now }})
 	initData := signedInit(7, now)
-	call := func(fields map[string]any) (int, map[string]any) {
-		fields["init_data"] = initData
-		body, _ := json.Marshal(fields)
+	for _, action := range []string{"gift", "players"} {
+		body, _ := json.Marshal(map[string]any{"init_data": initData, "action": action, "card": 1, "to": 8})
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/cards", strings.NewReader(string(body))))
-		var out map[string]any
-		_ = json.Unmarshal(rec.Body.Bytes(), &out)
-		return rec.Code, out
-	}
-	_, out := call(map[string]any{"action": "players", "query": ""})
-	if players, _ := out["players"].([]any); len(players) != 1 || players[0].(map[string]any)["name"] != "Vali" {
-		t.Fatalf("players but the giver = %v", out)
-	}
-	if code, out := call(map[string]any{"action": "gift", "card": 1, "to": 8}); code != 200 || out["cards"] == nil {
-		t.Fatalf("gift = %d %v", code, out)
-	}
-	if len(store.gifts) != 2 || store.gifts[0] != 1 || store.gifts[1] != 8 {
-		t.Errorf("gifts = %v", store.gifts)
-	}
-	if len(told) != 1 || !strings.HasPrefix(told[0], "8: 🎁") || !strings.Contains(told[0], "**Gojo**") {
-		t.Errorf("told = %q", told)
-	}
-	if code, _ := call(map[string]any{"action": "gift", "card": 1, "to": 7}); code != http.StatusBadRequest {
-		t.Errorf("a gift to oneself = %d", code)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("action %q = %d, want 400", action, rec.Code)
+		}
 	}
 }
 
@@ -432,10 +389,6 @@ func TestTradesAreOfOneRarityAndNoLimitedCard(t *testing.T) {
 	store.takeErr = storage.ErrCardLimited
 	if _, out := call(map[string]any{"action": "take", "offer": 1}); out["refused"] != "limited" {
 		t.Errorf("taking a limited offer = %v", out)
-	}
-	store.giftErr = storage.ErrCardLimited
-	if _, out := call(map[string]any{"action": "gift", "card": 1, "to": 8}); out["refused"] != "limited" {
-		t.Errorf("a gift of a limited card = %v", out)
 	}
 }
 

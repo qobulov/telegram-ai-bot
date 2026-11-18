@@ -25,16 +25,13 @@
       welcomeButton: "Birinchi kartani olish", seeCollection: "Kolleksiyada ko'rish →",
       locked: (r, o) => `🔒 Bu ${r.toLowerCase()} karta hali yopiq. Uning tushish ehtimoli: ${o}.`,
       wait: (time) => `⏳ ${time}`,
-      gift: "🎁 Sovg'a qilish", giftSearch: "Ism yoki @username", giftHint: () => `Karta ochkolari bilan birga o'tadi.`,
-      giftTo: (name) => `🎁 ${name}ga yuborish`, giftSent: (card, name) => `🎁 ${card} → ${name}`, giftNone: "Bunday o'yinchi topilmadi",
-      giftLimit: (n) => `⏳ Kuniga ${n} ta karta berish mumkin. Ertaga yana.`, giftNoPlayer: "Bu o'yinchi hali karta ochmagan", giftGone: "Bu karta endi sizda yo'q", back: "← Orqaga",
       market: "Bozor", newOffer: "➕ Taklif qo'yish", filterAll: "Hammasi", filterCan: "Bera olaman", filterMine: "Mening",
       gives: "Beradi", wants: "Xohlaydi", swap: "🔄 Almashish", noCard: "Sizda yo'q", remove: "✕ Olib tashlash", yours: "⭐ Sizniki", marketEmpty: "Hozircha taklif yo'q",
       marketHint: (n) => `Kartangizni qo'ying va evaziga kerakli kartani tanlang. Kimda o'sha karta bo'lsa, almashadi. ${n} tagacha taklif, 7 kun turadi.`,
       step1: "1. Qaysi kartangizni berasiz?", step2: "2. Evaziga qaysi kartani xohlaysiz?", mineSearch: "Kartalaringizdan qidiring", wantSearch: "Xohlagan karta nomini yozing",
       place: "Taklif qo'yish", placed: "✅ Taklif bozorga qo'yildi", swapped: (c) => `🔄 Almashildi! Siz ${c} oldingiz`, removed: "Taklif olib tashlandi",
-      refused: { uneven: "Faqat bir xil darajadagi kartaga almashish mumkin", limited: "🔒 Limited kartani almashib yoki sovg'a qilib bo'lmaydi", over: "Bu taklif endi yo'q", gone: "Bu taklif endi yo'q", own: "Bu o'zingizning taklifingiz", not_held: "Sizda bu karta yo'q", same: "Bir xil kartani almashib bo'lmaydi", no_spare: "Faqat takror kartani sovg'a qilish mumkin" },
-      offersLimit: (n) => `Bir vaqtda ${n} tagacha taklif qo'yish mumkin`, giftSpare: "Faqat takror (×2 va undan ko'p) kartani sovg'a qilish mumkin",
+      refused: { uneven: "Faqat bir xil darajadagi kartaga almashish mumkin", limited: "🔒 Limited kartani almashib bo'lmaydi", over: "Bu taklif endi yo'q", gone: "Bu taklif endi yo'q", own: "Bu o'zingizning taklifingiz", not_held: "Sizda bu karta yo'q", same: "Bir xil kartani almashib bo'lmaydi" },
+      offersLimit: (n) => `Bir vaqtda ${n} tagacha taklif qo'yish mumkin`,
       shopTab: "Do'kon", shopBuyTitle: "💎 Kristall sotib olish", shopBuyHint: "Telegram Stars bilan to'lanadi, kristall darhol hisobingizga tushadi.", shopItemsTitle: "🛒 Kristallga xarid",
       wallet: (n) => `Sizda: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% foyda`,
       tokensItem: (n) => `${n} ta token`, tokensHint: (n) => `${n} ta karta ochadi, kutmasdan`, packItem: (r) => `${r} paket`, packHint: (n, r) => `${n} ta karta, kamida 1 ta ${r.toLowerCase()} kafolatlangan`,
@@ -57,16 +54,13 @@
       welcomeButton: "Получить первую карту", seeCollection: "Посмотреть в коллекции →",
       locked: (r, o) => `🔒 Эта карта (${r.toLowerCase()}) ещё закрыта. Шанс выпадения: ${o}.`,
       wait: (time) => `⏳ ${time}`,
-      gift: "🎁 Подарить", giftSearch: "Имя или @username", giftHint: () => `Карта переходит вместе с очками.`,
-      giftTo: (name) => `🎁 Отправить: ${name}`, giftSent: (card, name) => `🎁 ${card} → ${name}`, giftNone: "Игрок не найден",
-      giftLimit: (n) => `⏳ В день можно отдать ${n} карт. Завтра снова.`, giftNoPlayer: "Этот игрок ещё не открыл ни одной карты", giftGone: "Этой карты у вас уже нет", back: "← Назад",
       market: "Рынок", newOffer: "➕ Выставить", filterAll: "Все", filterCan: "Могу дать", filterMine: "Мои",
       gives: "Отдаёт", wants: "Хочет", swap: "🔄 Обменять", noCard: "Нет у вас", remove: "✕ Снять", yours: "⭐ Ваше", marketEmpty: "Пока предложений нет",
       marketHint: (n) => `Выставьте свою карту и выберите, какую хотите взамен. У кого она есть — обменяется. До ${n} предложений, 7 дней.`,
       step1: "1. Какую карту отдаёте?", step2: "2. Какую хотите взамен?", mineSearch: "Поиск по вашим картам", wantSearch: "Название нужной карты",
       place: "Выставить", placed: "✅ Предложение выставлено", swapped: (c) => `🔄 Обмен! Вы получили ${c}`, removed: "Предложение снято",
-      refused: { uneven: "Менять можно только на карту той же редкости", limited: "🔒 Лимитированную карту нельзя обменять или подарить", over: "Этого предложения уже нет", gone: "Этого предложения уже нет", own: "Это ваше предложение", not_held: "У вас нет этой карты", same: "Нельзя менять карту на ту же", no_spare: "Дарить можно только повторную карту" },
-      offersLimit: (n) => `Одновременно можно выставить до ${n} предложений`, giftSpare: "Дарить можно только повторную карту (×2 и больше)",
+      refused: { uneven: "Менять можно только на карту той же редкости", limited: "🔒 Лимитированную карту нельзя обменять", over: "Этого предложения уже нет", gone: "Этого предложения уже нет", own: "Это ваше предложение", not_held: "У вас нет этой карты", same: "Нельзя менять карту на ту же" },
+      offersLimit: (n) => `Одновременно можно выставить до ${n} предложений`,
       shopTab: "Магазин", shopBuyTitle: "💎 Купить кристаллы", shopBuyHint: "Оплата Telegram Stars, кристаллы приходят сразу.", shopItemsTitle: "🛒 За кристаллы",
       wallet: (n) => `У вас: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% выгоды`,
       tokensItem: (n) => `${n} токенов`, tokensHint: (n) => `Откроют ${n} карт без ожидания`, packItem: (r) => `Пак: ${r}`, packHint: (n, r) => `${n} карт, минимум одна ${r.toLowerCase()} гарантирована`,
@@ -89,16 +83,13 @@
       welcomeButton: "Draw your first card", seeCollection: "See it in the collection →",
       locked: (r, o) => `🔒 This ${r.toLowerCase()} card is still locked. Its odds: ${o}.`,
       wait: (time) => `⏳ ${time}`,
-      gift: "🎁 Give", giftSearch: "Name or @username", giftHint: () => `The card goes with its points.`,
-      giftTo: (name) => `🎁 Send to ${name}`, giftSent: (card, name) => `🎁 ${card} → ${name}`, giftNone: "No such player",
-      giftLimit: (n) => `⏳ You may give ${n} cards a day. Again tomorrow.`, giftNoPlayer: "This player has not opened a card yet", giftGone: "You no longer have this card", back: "← Back",
       market: "Market", newOffer: "➕ Make an offer", filterAll: "All", filterCan: "I can give", filterMine: "Mine",
       gives: "Gives", wants: "Wants", swap: "🔄 Trade", noCard: "You lack it", remove: "✕ Take down", yours: "⭐ Yours", marketEmpty: "No offers yet",
       marketHint: (n) => `Put up a card and pick the one you want for it. Whoever holds it can trade. Up to ${n} offers, for 7 days.`,
       step1: "1. Which card do you give?", step2: "2. Which card do you want?", mineSearch: "Search your cards", wantSearch: "Name of the card you want",
       place: "Put it up", placed: "✅ Your offer is up", swapped: (c) => `🔄 Traded! You got ${c}`, removed: "Offer taken down",
-      refused: { uneven: "A card may be traded only for one of the same rarity", limited: "🔒 A limited card cannot be traded or given", over: "This offer is gone", gone: "This offer is gone", own: "This is your own offer", not_held: "You do not have that card", same: "A card cannot be traded for itself", no_spare: "Only a spare card may be given" },
-      offersLimit: (n) => `You may have up to ${n} offers at once`, giftSpare: "Only a spare card (×2 or more) may be given",
+      refused: { uneven: "A card may be traded only for one of the same rarity", limited: "🔒 A limited card cannot be traded", over: "This offer is gone", gone: "This offer is gone", own: "This is your own offer", not_held: "You do not have that card", same: "A card cannot be traded for itself" },
+      offersLimit: (n) => `You may have up to ${n} offers at once`,
       shopTab: "Shop", shopBuyTitle: "💎 Buy crystals", shopBuyHint: "Paid in Telegram Stars; the crystals arrive at once.", shopItemsTitle: "🛒 For crystals",
       wallet: (n) => `You have: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% value`,
       tokensItem: (n) => `${n} tokens`, tokensHint: (n) => `Open ${n} cards without the wait`, packItem: (r) => `${r} pack`, packHint: (n, r) => `${n} cards, at least one ${r.toLowerCase()} guaranteed`,
@@ -448,24 +439,7 @@
     const sheet = $("sheetCard");
     sheet.textContent = "";
     sheet.classList.remove("giving");
-    const give = document.createElement("button");
-    give.type = "button";
-    give.className = "ghost gift-open";
-    give.textContent = t.gift;
-    // a limited card is never given; any other only by a spare copy
-    const canGive = card.spare && !card.limited;
-    const why = card.limited ? t.refused.limited : card.spare ? "" : t.giftSpare;
-    give.disabled = !canGive;
-    give.hidden = !!card.limited;
-    give.title = why;
-    give.addEventListener("click", (event) => {
-      event.stopPropagation();
-      if (canGive) giftPanel(card);
-    });
-    const giveNote = document.createElement("p");
-    giveNote.className = "gift-note";
-    giveNote.textContent = why;
-    sheet.append(face(card), statsOf(card), give, giveNote);
+    sheet.append(face(card), statsOf(card));
     tilt(sheet, card.rarity === 4);
     $("sheet").hidden = false;
     try { tg.BackButton.show(); } catch (_) { /* older clients */ }
@@ -501,84 +475,6 @@
   }
   $("sheet").addEventListener("click", closeSheet);
   try { tg.BackButton.onClick(closeSheet); } catch (_) { /* older clients */ }
-
-  // ---------- giving a card ----------
-
-  // giftPanel takes the large card's place with a search for the player to
-  // give it to, a list to pick from, and the button that sends it.
-  function giftPanel(card) {
-    const sheet = $("sheetCard");
-    tilt(sheet, false);
-    sheet.classList.add("giving");
-    const panel = document.createElement("div");
-    panel.className = "gift";
-    panel.addEventListener("click", (event) => event.stopPropagation());
-    panel.innerHTML = `<div class="gift-head"><img alt=""><span><small></small><b></b></span></div><input type="search" autocomplete="off" enterkeyhint="search"><ul class="gift-list"></ul><p class="gift-hint"></p><button type="button" class="draw gift-send" disabled></button><button type="button" class="link gift-back"></button>`;
-    picture(panel.querySelector(".gift-head img"), card.image);
-    panel.querySelector(".gift-head small").replaceChildren(tierIcon(card.rarity), t.rarities[card.rarity]);
-    panel.querySelector(".gift-head b").textContent = card.name;
-    const input = panel.querySelector("input");
-    input.placeholder = t.giftSearch;
-    panel.querySelector(".gift-hint").textContent = t.giftHint();
-    const send = panel.querySelector(".gift-send");
-    send.textContent = t.gift;
-    panel.querySelector(".gift-back").textContent = t.back;
-    panel.querySelector(".gift-back").addEventListener("click", () => open(card));
-    let chosen = null, timer = 0, asked = 0;
-    const list = panel.querySelector(".gift-list");
-    async function search() {
-      const mine = ++asked;
-      try {
-        const data = await api("players", { query: input.value });
-        if (mine !== asked) return;
-        list.textContent = "";
-        if (!data.players.length) list.innerHTML = `<li class="gift-empty">${t.giftNone}</li>`;
-        for (const player of data.players) {
-          const li = document.createElement("li");
-          const pick = document.createElement("button");
-          pick.type = "button";
-          pick.innerHTML = "<span><b></b><i></i></span><small></small>";
-          pick.querySelector("b").textContent = player.name || "?";
-          pick.querySelector("i").textContent = player.username ? "@" + player.username : "";
-          pick.querySelector("small").textContent = t.cards(player.cards);
-          pick.setAttribute("aria-pressed", String(chosen && chosen.id === player.id));
-          pick.addEventListener("click", () => {
-            chosen = player;
-            for (const other of list.querySelectorAll("button")) other.setAttribute("aria-pressed", String(other === pick));
-            send.textContent = t.giftTo(player.name || "?");
-            send.disabled = false;
-            haptic("light");
-          });
-          li.append(pick);
-          list.append(li);
-        }
-      } catch (error) {
-        notice(error);
-      }
-    }
-    input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(search, 250); });
-    send.addEventListener("click", async () => {
-      if (!chosen) return;
-      send.disabled = true;
-      try {
-        const data = await api("gift", { card: card.id, to: chosen.id });
-        if (data.refused) {
-          toast(data.refused === "limit" ? t.giftLimit(data.limit) : data.refused === "no_player" ? t.giftNoPlayer : data.refused === "no_spare" ? t.giftSpare : data.refused === "limited" ? t.refused.limited : t.giftGone);
-          send.disabled = false;
-          return;
-        }
-        applyState(data);
-        closeSheet();
-        toast(t.giftSent(card.name, chosen.name || "?"));
-        haptic("medium");
-      } catch (error) {
-        send.disabled = false;
-        notice(error);
-      }
-    });
-    sheet.append(panel);
-    search();
-  }
 
   let toastTimer = 0;
   function toast(text) {
@@ -756,7 +652,7 @@
   }
 
   // keep puts a card just opened into the collection: a copy is one more
-  // spare, which may be given or melted.
+  // spare, which may be melted.
   function keep(card) {
     if (card.count > 1) { spare += 1; spareWorth += [1, 3, 8, 20, 50][card.rarity] || 0; }
     const i = cards.findIndex((c) => c.id === card.id);
@@ -884,7 +780,7 @@
     try {
       const data = await api("take", { offer: o.id });
       if (data.refused) {
-        toast(data.refused === "limit" ? t.giftLimit(data.limit) : t.refused[data.refused] || t.unavailable);
+        toast(t.refused[data.refused] || t.unavailable);
         market();
         return;
       }

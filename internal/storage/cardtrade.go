@@ -75,34 +75,6 @@ type CardTradeRules struct {
 	Now time.Time
 }
 
-// CardPlayersNamed are the players whose name or @username holds name, in
-// any case, who have opened a card, all but except, the most points first;
-// at most limit. An empty name finds them all. A player's username is the one
-// a group they wrote in last saw.
-func (s *Store) CardPlayersNamed(ctx context.Context, name string, except int64, limit int) ([]CardPlayer, error) {
-	pattern := "%" + likeMarks.Replace(strings.TrimPrefix(strings.TrimSpace(name), "@")) + "%"
-	rows, err := s.pool.Query(ctx, `
-		SELECT p.user_id, p.name, coalesce(m.username, ''), p.points, p.cards FROM card_players p
-		LEFT JOIN LATERAL (
-			SELECT username FROM group_members
-			WHERE user_id = p.user_id AND username <> '' ORDER BY last_seen_at DESC LIMIT 1
-		) m ON true
-		WHERE p.draws > 0 AND p.user_id <> $1 AND (p.name ILIKE $2 OR m.username ILIKE $2)
-		ORDER BY p.points DESC, p.user_id LIMIT $3`, except, pattern, limit)
-	if err != nil {
-		return nil, fmt.Errorf("storage: find card players: %w", err)
-	}
-	players, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (CardPlayer, error) {
-		var p CardPlayer
-		err := row.Scan(&p.UserID, &p.Name, &p.Username, &p.Points, &p.Cards)
-		return p, err
-	})
-	if err != nil {
-		return nil, fmt.Errorf("storage: find card players: %w", err)
-	}
-	return players, nil
-}
-
 // likeMarks are what ILIKE would read in a name as other than itself.
 var likeMarks = strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`)
 
@@ -110,25 +82,6 @@ func scanCard(row pgx.CollectableRow) (Card, error) {
 	var c Card
 	err := row.Scan(&c.ID, &c.Name, &c.Anime, &c.ImageURL, &c.Favourites, &c.Rarity, &c.Attack, &c.Health, &c.Value, &c.Collection)
 	return c, err
-}
-
-// GiveCard gives a spare copy of the card from one player to another at
-// once, with its points, and records it: a player keeps their last copy not
-// melted, ErrCardLastCopy.
-func (s *Store) GiveCard(ctx context.Context, chatID, from, to, cardID int64, rules CardTradeRules) error {
-	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if err := lockTraders(ctx, tx, from, to); err != nil {
-			return err
-		}
-		if err := moveCard(ctx, tx, from, to, cardID, true); err != nil {
-			return err
-		}
-		_, err := tx.Exec(ctx, `
-			INSERT INTO card_trades (chat_id, from_id, to_id, give_card, status, created_at, done_at)
-			VALUES ($1, $2, $3, $4, 'done', $5, $5)`, chatID, from, to, cardID, rules.Now)
-		return err
-	})
-	return tradeError("give a card", err)
 }
 
 // CallOffCardTrade calls off the open trade, by either of its players, and

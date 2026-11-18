@@ -26,8 +26,6 @@ type Store interface {
 	CardTop(ctx context.Context, limit int) ([]storage.CardPlayer, error)
 	CardWallet(ctx context.Context, userID int64) (shards int, spares map[int]int, err error)
 	MeltCards(ctx context.Context, userID int64, rates []int) (melted, gained, shards int, err error)
-	CardPlayersNamed(ctx context.Context, name string, except int64, limit int) ([]storage.CardPlayer, error)
-	GiveCard(ctx context.Context, chatID, from, to, cardID int64, rules storage.CardTradeRules) error
 	OfferCard(ctx context.Context, from, give, want int64, rules storage.CardMarketRules) (int64, error)
 	CardMarket(ctx context.Context, viewer int64, rules storage.CardMarketRules, limit int) ([]storage.CardOffer, error)
 	TakeCardOffer(ctx context.Context, id, by int64, rules storage.CardTradeRules, keep time.Duration) (storage.CardTrade, error)
@@ -68,9 +66,6 @@ const (
 	initDataAge  = 24 * time.Hour
 	maxBodyBytes = 16 << 10
 	topSize      = 20
-	// playersShown is the most players a search for whom to give a card
-	// lists.
-	playersShown = 10
 	// OffersOpen is how many offers a player may have on the market, and
 	// OfferKeep how long one stays there.
 	OffersOpen = 5
@@ -111,11 +106,10 @@ func NewHandler(opts Options) http.Handler {
 type request struct {
 	InitData string `json:"init_data"`
 	Action   string `json:"action"`
-	// Query is the name searched for, for "players"; Card and To are the
-	// card given and the player it is given to, for "gift".
+	// Query is the name searched for, for "catalog"; Card is the card
+	// offered, for "offer".
 	Query string `json:"query"`
 	Card  int64  `json:"card"`
-	To    int64  `json:"to"`
 	// Want is the card wanted for Card, for "offer"; Offer is the offer
 	// taken or called off, for "take" and "unoffer".
 	Want  int64 `json:"want"`
@@ -187,10 +181,6 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return h.top(ctx, opened.User)
 	case "melt":
 		return h.melt(ctx, opened.User)
-	case "players":
-		return h.players(ctx, opened.User, req.Query)
-	case "gift":
-		return h.gift(ctx, opened.User, req.Card, req.To)
 	case "market":
 		return h.market(ctx, opened.User)
 	case "catalog":
@@ -362,75 +352,8 @@ func name(user miniapp.User) string {
 	return user.Username
 }
 
-// players are those the player may give a card to whose name holds query:
-// any who have opened a card but themselves, the most points first.
-func (h *handler) players(ctx context.Context, user miniapp.User, query string) (any, failure) {
-	found, err := h.Store.CardPlayersNamed(ctx, query, user.ID, playersShown)
-	if err != nil {
-		h.Logger.Error("could not find card players", "error", err)
-		return nil, errUnavailable
-	}
-	rows := make([]map[string]any, len(found))
-	for i, p := range found {
-		rows[i] = map[string]any{"id": p.UserID, "name": p.Name, "username": p.Username, "cards": p.Cards, "points": p.Points}
-	}
-	return map[string]any{"players": rows}, failure{}
-}
-
-// gift gives a copy of the player's card to another, with its points, and
-// tells them. A gift refused says why: "no_player", "not_held", "no_spare"
-// or "limited".
-func (h *handler) gift(ctx context.Context, user miniapp.User, cardID, to int64) (any, failure) {
-	if cardID == 0 || to == 0 || to == user.ID {
-		return nil, errBadRequest
-	}
-	err := h.Store.GiveCard(ctx, 0, user.ID, to, cardID, storage.CardTradeRules{Now: h.Now()})
-	switch {
-	case errors.Is(err, storage.ErrCardNoPlayer):
-		return map[string]any{"refused": "no_player"}, failure{}
-	case errors.Is(err, storage.ErrCardNotHeld):
-		return map[string]any{"refused": "not_held"}, failure{}
-	case errors.Is(err, storage.ErrCardLastCopy):
-		return map[string]any{"refused": "no_spare"}, failure{}
-	case errors.Is(err, storage.ErrCardLimited):
-		return map[string]any{"refused": "limited"}, failure{}
-	case err != nil:
-		h.Logger.Error("could not give a card", "user_id", user.ID, "error", err)
-		return nil, errUnavailable
-	}
-	h.tellGift(ctx, user, cardID, to)
-	return h.state(ctx, user)
-}
-
-// tellGift tells the player given a card who gave it, in the giver's
-// language; a message that does not go out is only logged.
-func (h *handler) tellGift(ctx context.Context, user miniapp.User, cardID, to int64) {
-	if h.Notify == nil {
-		return
-	}
-	card := ""
-	if owned, err := h.Store.OwnedCards(ctx, to, -1); err == nil {
-		for _, c := range owned {
-			if c.ID == cardID {
-				card = c.Name
-			}
-		}
-	}
-	text := strings.NewReplacer("{who}", giftMarks.Replace(name(user)), "{card}", giftMarks.Replace(card)).
-		Replace(giftTexts[appLanguage(user.Language)])
-	if err := h.Notify(ctx, to, text); err != nil {
-		h.Logger.Info("could not tell a player of a gift", "user_id", to, "error", err)
-	}
-}
-
-// giftMarks are what Telegram's formatting would read in a name as a mark.
-var giftMarks = strings.NewReplacer("*", "", "`", "", "[", "(", "]", ")")
-
-var giftTexts = map[string]string{
-	"uz": "🎁 {who} sizga karta sovg'a qildi: **{card}**!\nKolleksiyangiz: /card",
-	"ru": "🎁 {who} подарил вам карту: **{card}**!\nВаша коллекция: /card",
-	"en": "🎁 {who} gave you a card: **{card}**!\nYour collection: /card",
-}
+// nameMarks are what Telegram's formatting would read in a name as a mark.
+var nameMarks = strings.NewReplacer("*", "", "`", "", "[", "(", "]", ")")
 
 func marketRules(now time.Time) storage.CardMarketRules {
 	return storage.CardMarketRules{Open: OffersOpen, Keep: OfferKeep, Now: now}
@@ -570,7 +493,7 @@ func (h *handler) take(ctx context.Context, user miniapp.User, id int64) (any, f
 		return nil, errUnavailable
 	}
 	if h.Notify != nil {
-		text := strings.NewReplacer("{who}", giftMarks.Replace(name(user)), "{got}", giftMarks.Replace(trade.Take.Name), "{gave}", giftMarks.Replace(trade.Give.Name)).
+		text := strings.NewReplacer("{who}", nameMarks.Replace(name(user)), "{got}", nameMarks.Replace(trade.Take.Name), "{gave}", nameMarks.Replace(trade.Give.Name)).
 			Replace(takenTexts[appLanguage(user.Language)])
 		if err := h.Notify(ctx, trade.From, text); err != nil {
 			h.Logger.Info("could not tell a player of a trade", "user_id", trade.From, "error", err)
