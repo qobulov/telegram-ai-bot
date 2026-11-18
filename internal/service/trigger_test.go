@@ -222,8 +222,15 @@ func TestAddressByCommand(t *testing.T) {
 			replyingTo(groupMessage("/reset@OtherBot"), botID, "answer"), "", triggerNone,
 		},
 		"plain command as a reply to this bot": {
-			replyingTo(groupMessage("/help"), botID, "answer"), "", triggerNone,
+			replyingTo(groupMessage("/help"), botID, "answer"), "/help", triggerCommand,
 		},
+		"plain /start as a reply to this bot": {
+			replyingTo(groupMessage("/start"), botID, "answer"), "/start", triggerCommand,
+		},
+		"plain command as a reply to a member": {
+			replyingTo(groupMessage("/help"), 4242, "hello"), "", triggerNone,
+		},
+		"plain /start for nobody in particular":       {groupMessage("/start"), "", triggerNone},
 		"command for this bot followed by a new line": {groupMessage("/reset@MyBot\nplease"), "/reset@MyBot\nplease", triggerCommand},
 		"mention followed by another bot's command":   {groupMessage("@MyBot /reset@OtherBot", "@MyBot"), "", triggerNone},
 		"mention followed by a plain command":         {groupMessage("@MyBot /reset", "@MyBot"), "", triggerNone},
@@ -367,5 +374,19 @@ func TestWakeWordInAReplyToAnotherBot(t *testing.T) {
 	member.ReplyToMessage = &telegram.Message{MessageID: 6, From: &telegram.User{ID: 501, FirstName: "Sam"}, Chat: member.Chat, Text: "hi"}
 	if sent := f.run(inGroup(member)); len(sent) != 1 {
 		t.Errorf("a call replying to a member = %+v", sent)
+	}
+}
+
+// A member who answers the bot's "/help" notice with a bare "/help" gets the
+// help, while a bare "/help" said to nobody may be another bot's and is not
+// answered.
+func TestBareCommandReplyingToTheBotIsAnswered(t *testing.T) {
+	f := newFixture()
+	sent := f.run(inGroup(replyingTo(groupMessage("/help"), botID, "Yordam: /help")))
+	if len(sent) != 1 || !strings.Contains(sent[0].text, "/about") {
+		t.Errorf("a bare /help replying to the bot = %+v, want the help", sent)
+	}
+	if sent := newFixture().run(inGroup(groupMessage("/help"))); len(sent) != 0 {
+		t.Errorf("a bare /help to nobody = %+v, want silence", sent)
 	}
 }

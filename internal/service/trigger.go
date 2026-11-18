@@ -58,7 +58,9 @@ const (
 // and is ignored however the rest of the message addresses the bot; only the
 // bot's own commands no other bot has, ownCommands, count plain too, as the
 // bot's answers name them so ("Kartalar: /card") and a press of one in
-// a message sends it without the bot's name, which it ignored.
+// a message sends it without the bot's name, which it ignored. So does any
+// plain command sent as a reply to one of the bot's own messages: a member
+// who answers the bot's "/help" with "/help" means this bot, not another.
 func (s *Service) address(msg *telegram.Message) (string, trigger) {
 	text, how := s.addressedText(msg)
 	if how == triggerNone {
@@ -112,11 +114,12 @@ func (s *Service) orName(text string) string {
 }
 
 // plainCommand reports a command the bot answers in a group without its
-// name: one of ownCommands, or a moderation command replying to a member's
-// message, which a group whose admins moderate with commands sends so.
+// name: one of ownCommands, any command replying to the bot's own message,
+// or a moderation command, which a group whose admins moderate with commands
+// sends so.
 func (s *Service) plainCommand(msg *telegram.Message, text string) bool {
 	command := commandName(text)
-	if ownCommands[command] {
+	if ownCommands[command] || s.isFromBot(msg.ReplyToMessage) {
 		return true
 	}
 	// A moderation command is the bot's too without a reply, so that it can
