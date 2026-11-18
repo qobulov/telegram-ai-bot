@@ -248,6 +248,27 @@
     return box;
   }
 
+  // SPECIAL are the cards the owners dressed by hand: a "Limited" tag and
+  // cherry petals drifting over the picture.
+  const SPECIAL = { 298761: { tag: "Limited", petals: true } };
+
+  // dress adds a special card's tag and petals; the large view has more
+  // petals.
+  function dress(el, card, large) {
+    const special = SPECIAL[card.id];
+    if (!special) return;
+    el.classList.add("special");
+    if (special.petals) {
+      el.insertAdjacentHTML("beforeend", '<div class="petals" aria-hidden="true">' + "<i></i>".repeat(large ? 12 : 6) + "</div>");
+    }
+    if (special.tag) {
+      const tag = document.createElement("span");
+      tag.className = "limited";
+      tag.textContent = special.tag;
+      el.append(tag);
+    }
+  }
+
   function cardTile(card) {
     const tile = document.createElement("button");
     tile.type = "button";
@@ -274,6 +295,7 @@
       img.after(alive(card));
       tile.insertAdjacentHTML("beforeend", MYTHIC_DRESS);
     }
+    dress(tile, card, false);
     if (card.count > 1) {
       const count = document.createElement("span");
       count.className = "count";
@@ -375,6 +397,7 @@
       img.after(alive(card));
       front.insertAdjacentHTML("beforeend", MYTHIC_DRESS + '<em class="spark"></em><em class="spark"></em><div class="motes">' + "<i></i>".repeat(6) + "</div>");
     }
+    dress(front, card, true);
     return front;
   }
 
@@ -1069,6 +1092,7 @@
       img.after(alive(card));
       tile.insertAdjacentHTML("beforeend", MYTHIC_DRESS);
     }
+    dress(tile, card, false);
     if (count) tile.insertAdjacentHTML("beforeend", '<span class="owned" aria-hidden="true">✓</span>');
     tile.addEventListener("click", () => previewCard(card, count));
     return tile;

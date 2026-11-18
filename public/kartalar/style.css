@@ -368,6 +368,43 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
   100% { opacity: 0; transform: translateY(-260px) translateX(8px); }
 }
 
+/* A special card (SPECIAL in app.js): a pink "Limited" tag at the top, between
+   the crown and the count, and cherry petals drifting down over the picture, under the frame. */
+.special .limited {
+  position: absolute; top: 7px; left: 50%; transform: translateX(-50%); z-index: 5; padding: 2px 7px; border-radius: 999px;
+  font: 800 9px/1.4 Manrope, sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: #fff;
+  background: linear-gradient(135deg, #ff7eb3, #c2185b); box-shadow: 0 0 0 1px rgba(255, 220, 235, 0.7), 0 0 10px rgba(255, 110, 170, 0.6);
+}
+.front.special .limited { top: 14px; padding: 4px 11px; font-size: 12px; }
+.special .petals { --fall: 240px; position: absolute; inset: 0; z-index: 2; overflow: hidden; border-radius: inherit; pointer-events: none; }
+.special .petals i {
+  position: absolute; top: -8%; width: 9px; height: 7px; opacity: 0; will-change: transform;
+  background: radial-gradient(circle at 30% 30%, #fff0f6, #ffb3cf 60%, #f48fb1);
+  border-radius: 80% 0 80% 0; box-shadow: 0 0 4px rgba(255, 170, 200, 0.6);
+  animation: petal 7s linear infinite;
+}
+.front.special .petals { --fall: 620px; }
+.front.special .petals i { width: 13px; height: 10px; animation-duration: 9s; }
+.special .petals i:nth-child(1) { left: 8%; animation-delay: 0s; }
+.special .petals i:nth-child(2) { left: 26%; animation-delay: -1.6s; }
+.special .petals i:nth-child(3) { left: 44%; animation-delay: -3.1s; }
+.special .petals i:nth-child(4) { left: 62%; animation-delay: -4.7s; }
+.special .petals i:nth-child(5) { left: 80%; animation-delay: -2.4s; }
+.special .petals i:nth-child(6) { left: 92%; animation-delay: -5.8s; }
+.special .petals i:nth-child(7) { left: 15%; animation-delay: -6.6s; }
+.special .petals i:nth-child(8) { left: 35%; animation-delay: -0.8s; }
+.special .petals i:nth-child(9) { left: 53%; animation-delay: -7.4s; }
+.special .petals i:nth-child(10) { left: 71%; animation-delay: -3.9s; }
+.special .petals i:nth-child(11) { left: 3%; animation-delay: -5.1s; }
+.special .petals i:nth-child(12) { left: 86%; animation-delay: -8.2s; }
+@keyframes petal {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg); }
+  10% { opacity: 0.95; }
+  50% { transform: translate3d(18px, calc(var(--fall) * 0.5), 0) rotate(180deg); }
+  90% { opacity: 0.9; }
+  100% { opacity: 0; transform: translate3d(-10px, var(--fall), 0) rotate(360deg); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }

@@ -122,15 +122,17 @@ func ByOdds(roll func() Rarity) storage.CardRoll {
 	return func(int, int) (int, bool) { return int(roll()), false }
 }
 
-// mythicIDs are the Mythic cards' AniList IDs, 16 men and 10 women: the
+// mythicIDs are the Mythic cards' AniList IDs, 16 men and 11 women: the
 // leads of the best known series, Son Goku, Naruto, Luffy, Ichigo, Eren,
 // Edward Elric, Light, Tanjiro, Saitama, Gon, Lelouch, Spike, Guts, Jotaro and
 // Meliodas, Gojo, whom the owners made Mythic, and the best known women, Mikasa, Maomao, Frieren, Makima, Nezuko,
-// Emilia, Kurisu, Violet Evergarden, Zero Two and Mai Sakurajima.
+// Emilia, Kurisu, Violet Evergarden, Zero Two and Mai Sakurajima, and
+// Firefly Wedding's Satoko Kirigaya, whom the owners made Mythic (migration 94).
 var mythicIDs = map[int64]bool{
 	246: true, 17: true, 40: true, 5: true, 40882: true, 11: true, 80: true, 126071: true, 73935: true, 30: true,
 	417: true, 1: true, 422: true, 4003: true, 72921: true, 127691: true,
 	40881: true, 126824: true, 176754: true, 137080: true, 127518: true, 88572: true, 34470: true, 90169: true, 124381: true, 127222: true,
+	298761: true,
 }
 
 // legendaryIDs are the Legendary cards': the leads' legendary rivals and
@@ -149,10 +151,10 @@ var legendaryIDs = map[int64]bool{
 
 // epicIDs are the Epic cards chosen by hand, whatever their rank: The Seven
 // Deadly Sins' Elizabeth, Merlin, King, Diane, Zeldris, Mael and Gowther,
-// Firefly Wedding's Satoko Kirigaya and the Four Knights of the Apocalypse,
-// whom the players asked for.
+// Firefly Wedding's Shinpei Gotou (migration 94) and the Four Knights of the
+// Apocalypse, whom the players asked for.
 var epicIDs = map[int64]bool{
-	298761: true, 72923: true, 89180: true, 83801: true, 74653: true, 131559: true, 126851: true, 88823: true,
+	298762: true, 72923: true, 89180: true, 83801: true, 74653: true, 131559: true, 126851: true, 88823: true,
 	// Four Knights of the Apocalypse: Percival, Lancelot, Tristan, Gawain
 	// and Arthur, added by hand (migration 92).
 	206212: true, 265209: true, 249281: true, 282753: true, 122210: true,
