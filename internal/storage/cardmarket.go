@@ -139,7 +139,7 @@ func (s *Store) TakeCardOffer(ctx context.Context, id, by int64, rules CardTrade
 		}
 		// Checked once the cards are known to be held, in the transaction
 		// that a refusal rolls back.
-		if err := checkFair(ctx, tx, trade); err != nil {
+		if err := checkFair(ctx, tx, trade, rules.Now); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE card_trades SET status = 'done', to_id = $2, done_at = $3 WHERE id = $1`, id, by, rules.Now); err != nil {

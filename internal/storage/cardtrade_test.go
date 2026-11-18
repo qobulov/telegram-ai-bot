@@ -76,12 +76,22 @@ func TestCardsPassBetweenPlayers(t *testing.T) {
 	if err := store.GiveCard(ctx, -100, 1, 2, 10, rules); err != nil {
 		t.Fatal(err)
 	}
-	// There is no daily limit: a third gift the same day goes too.
-	if _, err := store.pool.Exec(ctx, `UPDATE card_owned SET count = 2 WHERE user_id = 1 AND card_id = 30`); err != nil {
+	// A third gift the same day goes too; a fourth between the two waits for
+	// the next day, and leaves the card where it was.
+	if _, err := store.pool.Exec(ctx, `UPDATE card_owned SET count = 3 WHERE user_id = 1 AND card_id = 30`); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.GiveCard(ctx, -100, 1, 2, 30, rules); err != nil {
 		t.Errorf("a third gift the same day = %v", err)
+	}
+	if err := store.GiveCard(ctx, -100, 1, 2, 30, rules); !errors.Is(err, ErrCardPairLimit) {
+		t.Errorf("a fourth gift the same day = %v", err)
+	}
+	if c, _ := held(1, 30); c != 2 {
+		t.Errorf("Alice's Naruto after the refused gift = %d", c)
+	}
+	if err := store.GiveCard(ctx, -100, 1, 2, 30, CardTradeRules{Now: rules.Now.Add(25 * time.Hour)}); err != nil {
+		t.Errorf("the fourth gift the next day = %v", err)
 	}
 	if err := store.GiveCard(ctx, -100, 2, 3, 20, rules); !errors.Is(err, ErrCardNoPlayer) {
 		t.Errorf("a gift to one who never drew = %v", err)
@@ -204,8 +214,9 @@ func TestTheMarketListsWhatTheViewerCanTakeFirst(t *testing.T) {
 }
 
 // A trade of cards more than one rarity apart is refused, as an offer and
-// as a take; two players trade with each other as often as they like.
-func TestTradesAreEvenAndUnlimited(t *testing.T) {
+// as a take; two players trade with each other PairTradesPerDay times a
+// day, either way round, and the next waits for the next day.
+func TestTradesAreEvenAndThreeADayAPair(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 	for _, q := range []string{
@@ -223,10 +234,10 @@ func TestTradesAreEvenAndUnlimited(t *testing.T) {
 	if _, err := store.OfferCard(ctx, 1, 30, 10, market); !errors.Is(err, ErrCardTradeUneven) {
 		t.Errorf("a Common put up for a Mythic = %v", err)
 	}
-	// Alice's Goku and Bob's Kakashi, one rarity apart, go back and forth
-	// eight times the same day: whoever holds Goku puts it up, the other takes it.
+	// Alice's Goku and Bob's Kakashi, one rarity apart, go back and forth:
+	// whoever holds Goku puts it up, the other takes it.
 	holder, other := int64(1), int64(2)
-	for i := 1; i <= 8; i++ {
+	for i := 1; i <= PairTradesPerDay; i++ {
 		id, err := store.OfferCard(ctx, holder, 10, 40, market)
 		if err != nil {
 			t.Fatalf("offer %d = %v", i, err)
@@ -235,5 +246,20 @@ func TestTradesAreEvenAndUnlimited(t *testing.T) {
 			t.Fatalf("trade %d = %v", i, err)
 		}
 		holder, other = other, holder
+	}
+	next, err := store.OfferCard(ctx, holder, 10, 40, market)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.TakeCardOffer(ctx, next, other, rules, market.Keep); !errors.Is(err, ErrCardPairLimit) {
+		t.Errorf("a trade past the day's = %v", err)
+	}
+	var goku int64
+	if err := store.pool.QueryRow(ctx, `SELECT user_id FROM card_owned WHERE card_id = 10`).Scan(&goku); err != nil || goku != holder {
+		t.Errorf("Goku after the refused trade is %d's, %v", goku, err)
+	}
+	rules.Now = now.Add(25 * time.Hour)
+	if _, err := store.TakeCardOffer(ctx, next, other, rules, market.Keep); err != nil {
+		t.Errorf("the trade the next day = %v", err)
 	}
 }

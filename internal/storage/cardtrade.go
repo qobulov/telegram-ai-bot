@@ -30,6 +30,9 @@ var (
 	// ErrCardTradeUneven is a trade of cards more than one rarity apart: a
 	// Common for a Mythic was how one player's cards went to another's.
 	ErrCardTradeUneven = errors.New("storage: cards too far apart in rarity")
+	// ErrCardPairLimit is a trade or a gift past PairTradesPerDay between the
+	// same two players in a day.
+	ErrCardPairLimit = errors.New("storage: these two passed enough cards today")
 )
 
 // CardOffersError is a player with as many offers on the market as they may
@@ -48,7 +51,7 @@ type CardTrade struct {
 }
 
 // CardTradeRules are what passing a card needs to know: the time it is done.
-// A player gives or trades as many cards a day as they like.
+// The same two players pass cards PairTradesPerDay times a day at most.
 type CardTradeRules struct {
 	Now time.Time
 }
@@ -99,6 +102,11 @@ func (s *Store) GiveCard(ctx context.Context, chatID, from, to, cardID int64, ru
 			return err
 		}
 		if err := moveCard(ctx, tx, from, to, cardID, true); err != nil {
+			return err
+		}
+		// Counted once the card is known to be a spare, in the transaction
+		// that a refusal rolls back.
+		if err := checkPair(ctx, tx, from, to, rules.Now); err != nil {
 			return err
 		}
 		_, err := tx.Exec(ctx, `
@@ -173,9 +181,36 @@ func checkEven(ctx context.Context, q interface {
 	return nil
 }
 
-// checkFair refuses a trade between two players of uneven cards.
-func checkFair(ctx context.Context, tx pgx.Tx, trade CardTrade) error {
-	return checkEven(ctx, tx, trade.Give.ID, trade.Take.ID)
+// checkFair refuses a trade between two players of uneven cards, or one past
+// the trades and gifts the two make in a day.
+func checkFair(ctx context.Context, tx pgx.Tx, trade CardTrade, now time.Time) error {
+	if err := checkEven(ctx, tx, trade.Give.ID, trade.Take.ID); err != nil {
+		return err
+	}
+	return checkPair(ctx, tx, trade.From, trade.To, now)
+}
+
+// PairTradesPerDay is how many trades and gifts, together and either way
+// round, the same two players make in a day: on 2026-11-16 one player took
+// 25, 18 and 9 trades a rarity up from three little-played accounts.
+const PairTradesPerDay = 3
+
+// checkPair refuses a trade or a gift past PairTradesPerDay between the two
+// players in the day before now. Both players' rows are locked, so two at
+// once are counted one after the other.
+func checkPair(ctx context.Context, tx pgx.Tx, a, b int64, now time.Time) error {
+	var passed int
+	err := tx.QueryRow(ctx, `
+		SELECT count(*) FROM card_trades WHERE status = 'done' AND done_at > $3
+			AND ((from_id = $1 AND to_id = $2) OR (from_id = $2 AND to_id = $1))`,
+		a, b, now.Add(-24*time.Hour)).Scan(&passed)
+	if err != nil {
+		return err
+	}
+	if passed >= PairTradesPerDay {
+		return ErrCardPairLimit
+	}
+	return nil
 }
 
 // moveCard moves one copy of the card, not melted, from one player to the
@@ -246,7 +281,7 @@ func tradeError(what string, err error) error {
 	switch {
 	case err == nil, errors.Is(err, ErrCardNotHeld), errors.Is(err, ErrCardNoPlayer), errors.Is(err, ErrCardTradeOver),
 		errors.Is(err, ErrCardLastCopy), errors.Is(err, ErrCardOfferGone), errors.Is(err, ErrCardOfferOwn),
-		errors.Is(err, ErrCardTradeUneven),
+		errors.Is(err, ErrCardTradeUneven), errors.Is(err, ErrCardPairLimit),
 		errors.As(err, &offers):
 		return err
 	}

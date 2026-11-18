@@ -366,7 +366,8 @@ func (h *handler) players(ctx context.Context, user miniapp.User, query string) 
 }
 
 // gift gives a copy of the player's card to another, with its points, and
-// tells them. A gift refused says why: "limit", "no_player" or "not_held".
+// tells them. A gift refused says why: "no_player", "not_held", "no_spare"
+// or "pair", with "limit" the cards the same two may pass in a day.
 func (h *handler) gift(ctx context.Context, user miniapp.User, cardID, to int64) (any, failure) {
 	if cardID == 0 || to == 0 || to == user.ID {
 		return nil, errBadRequest
@@ -379,6 +380,8 @@ func (h *handler) gift(ctx context.Context, user miniapp.User, cardID, to int64)
 		return map[string]any{"refused": "not_held"}, failure{}
 	case errors.Is(err, storage.ErrCardLastCopy):
 		return map[string]any{"refused": "no_spare"}, failure{}
+	case errors.Is(err, storage.ErrCardPairLimit):
+		return map[string]any{"refused": "pair", "limit": storage.PairTradesPerDay}, failure{}
 	case err != nil:
 		h.Logger.Error("could not give a card", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
@@ -510,7 +513,8 @@ func (h *handler) offer(ctx context.Context, user miniapp.User, give, want int64
 
 // take takes an offer: its player and this one each give the other their
 // card, and its player is told. An offer refused says why: "over",
-// "gone", "not_held", "limit" or "own".
+// "gone", "not_held", "uneven", "own" or "pair", with "limit" the cards the
+// same two may pass in a day.
 func (h *handler) take(ctx context.Context, user miniapp.User, id int64) (any, failure) {
 	if id == 0 {
 		return nil, errBadRequest
@@ -527,6 +531,8 @@ func (h *handler) take(ctx context.Context, user miniapp.User, id int64) (any, f
 		return map[string]any{"refused": "not_held"}, failure{}
 	case errors.Is(err, storage.ErrCardTradeUneven):
 		return map[string]any{"refused": "uneven"}, failure{}
+	case errors.Is(err, storage.ErrCardPairLimit):
+		return map[string]any{"refused": "pair", "limit": storage.PairTradesPerDay}, failure{}
 	case err != nil:
 		h.Logger.Error("could not take a card offer", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
