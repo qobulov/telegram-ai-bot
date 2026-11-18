@@ -460,6 +460,11 @@ func finishText(t *turn, answer string) (Answer, error) {
 		// the words are what the model wanted to say.
 		answer = words
 	}
+	if said, refused := moderationRefusal(t.messages); refused && claimsDone(answer) {
+		// The model said it was done when nothing was: the tool's own line
+		// is the truth.
+		answer = said
+	}
 	if t.req.LatinScript && uzscript.IsUzbekCyrillic(answer) {
 		answer = uzscript.Latin(answer)
 	}

@@ -66,6 +66,9 @@ type Caller struct {
 	// owner's Telegram Business account: what the bot sends there goes on
 	// the account's behalf, and ChatID is the customer's chat with it.
 	Business bool
+	// Language is the language the caller writes in, one of the Language
+	// constants, for what a tool tells them; "" for Uzbek.
+	Language string
 }
 
 // Sound is a Telegram file with sound in it. Size is zero when Telegram did

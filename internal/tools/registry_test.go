@@ -22,6 +22,8 @@ type envelope struct {
 	Error  struct {
 		Code    string `json:"code"`
 		Message string `json:"message"`
+		Said    string `json:"said"`
+		Note    string `json:"note"`
 	} `json:"error"`
 }
 

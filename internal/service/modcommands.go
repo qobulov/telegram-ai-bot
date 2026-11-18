@@ -211,6 +211,7 @@ func (s *Service) moderate(ctx context.Context, in incoming, fields map[string]a
 		Error struct {
 			Code    string `json:"code"`
 			Message string `json:"message"`
+			Said    string `json:"said"`
 		} `json:"error"`
 	}
 	if err := json.Unmarshal([]byte(s.opts.Tools.Execute(ctx, in.userID, "moderate", string(args))), &envelope); err != nil {
@@ -222,8 +223,10 @@ func (s *Service) moderate(ctx context.Context, in incoming, fields map[string]a
 		return say(envelope.Result.Said), ""
 	case envelope.OK:
 		return outcome{}, ""
+	case envelope.Error.Said != "":
+		return say("⛔ " + envelope.Error.Said), envelope.Error.Message
 	case envelope.Error.Message != "" && envelope.Error.Code != "execution_failed":
-		if text := modRefusalText(envelope.Error.Message); text != "" {
+		if text := tools.RefusalLine(envelope.Error.Message, tools.LanguageUzbek, ""); text != "" {
 			return say("⛔ " + text), envelope.Error.Message
 		}
 		s.opts.Logger.Warn("a moderation refusal has no Uzbek words", "message", envelope.Error.Message)

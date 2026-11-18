@@ -972,6 +972,9 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	defer stopTyping()
 	sink := &tools.Sink{}
 	caller := s.caller(in)
+	// Only the model's turns are told refusals in the asker's language:
+	// the commands answer in Uzbek, as the owner asked.
+	caller.Language = toolLanguage(in)
 	if in.group && caller.Owner {
 		caller.Words = s.withEarlierWords(ctx, in, caller.Words)
 	}

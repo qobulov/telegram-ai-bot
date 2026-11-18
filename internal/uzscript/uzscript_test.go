@@ -34,3 +34,21 @@ func TestIsUzbekCyrillic(t *testing.T) {
 		}
 	}
 }
+
+func TestCyrillic(t *testing.T) {
+	for latin, cyrillic := range map[string]string{
+		"Shahrisabz va Chirchiq":           "Шаҳрисабз ва Чирчиқ",
+		"O'zbekiston, G'afur":              "Ўзбекистон, Ғафур",
+		"Yer, yoki Yulduz, Yalta":          "Ер, ёки Юлдуз, Ялта",
+		"Ega emas":                         "Эга эмас",
+		"huquqi yo'q":                      "ҳуқуқи йўқ",
+		"ma'lumot":                         "маълумот",
+		"«mut qil» deb yozing yoki /mute":  "«мут қил» деб ёзинг ёки /mute",
+		"@some_user xabariga reply qiling": "@some_user хабарига реплай қилинг",
+		"https://t.me/x ga qarang":         "https://t.me/x га қаранг",
+	} {
+		if got := Cyrillic(latin); got != cyrillic {
+			t.Errorf("Cyrillic(%q) = %q, want %q", latin, got, cyrillic)
+		}
+	}
+}

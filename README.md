@@ -1744,7 +1744,19 @@ check is made in code:
 She is told to use the tool only when an admin or owner asks, never on her
 own initiative, and to say an action was done only when the tool reports
 it done; she then says so in one short line, like "Bajarildi: Bek @bek
-15:04 gacha yoza olmaydi".
+15:04 gacha yoza olmaydi". A refusal or a failure comes back with the line
+to send, `said` (`internal/tools/refusals.go`), in the asker's language and
+script (Uzbek in Latin or Cyrillic, Russian or English, as the turn's
+message reads): the real reason and what to do, "So'zingizda buyruq
+ko'rinmadi: «mut qil», «ban qil», «o'chir» deb yozing yoki /mute, /ban
+buyrug'ini ishlating", "Kimni? ... reply qiling yoki @username bilan
+yozing", and Telegram's own refusals in plain words (`CHAT_ADMIN_REQUIRED`
+or "not enough rights" as "Menda bu guruhda «...» huquqi yo'q: adminlar
+menga shu huquqni bersin", a member no longer there, a message that cannot
+be deleted). The model is told to send it word for word, and the code holds
+it to that: in a turn whose every `moderate` call failed, an answer that
+says it was done ("Bajarildi", "mutesiz", "готово", "done", ✅) is replaced
+by that line. The commands say the same lines, in Uzbek.
 
 ### Join requests
 

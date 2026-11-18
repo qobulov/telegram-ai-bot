@@ -406,7 +406,7 @@ func (m *Moderation) Tool() Tool {
 			"An invite_link may let only member_limit people join, or with join_request make each ask the admins to approve them, never both. revoke_link stops a link you made from working, and edit_link changes its text, minutes, member_limit (0 for none) or join_request; both act on link, or without it on the latest link you made here. " +
 			"undo: put back the last thing you did here with this tool, whatever it was; a deleted message never comes back. With force only when, told it was changed by hand since, they still want it back. " +
 			"For member actions without such a reply, or replying to their own message, it acts on the one member they tagged with @, once Telegram confirms who that is; when they named the member without a tag (\"Azamatni mute qil\"), pass member: never ask them to tag or reply instead; a member you acted on lately is found by name even after they left. A reply to your own notice (\"X bloklandi\") acts on the member it is about. " +
-			"It checks everyone's rights and does it at once, with no question, but only when the person's own message asks for it; say it is done only when it reports done.",
+			"It checks everyone's rights and does it at once, with no question, but only when the person's own message asks for it; say it is done only when it reports done. When it refuses or fails, its error has said: that line, word for word, is your whole reply; never give a reason of your own, never say it was done.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
@@ -449,7 +449,18 @@ type order struct {
 	invite inviteRequest
 }
 
+// run is runOrder, with each refusal's line for the chat in the asker's
+// language, so that the model has no reason of its own to make up.
 func (m *Moderation) run(ctx context.Context, raw json.RawMessage) (any, error) {
+	result, err := m.runOrder(ctx, raw)
+	if err == nil {
+		return result, nil
+	}
+	caller, _ := CallerFrom(ctx)
+	return nil, withRefusalLine(err, caller.Language, rightWords[neededRight[actionOf(raw)]])
+}
+
+func (m *Moderation) runOrder(ctx context.Context, raw json.RawMessage) (any, error) {
 	var args moderationArgs
 	if err := decodeArgs(raw, &args); err != nil {
 		return nil, err

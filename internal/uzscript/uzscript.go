@@ -1,4 +1,5 @@
-// Package uzscript writes Uzbek Cyrillic in the Latin alphabet.
+// Package uzscript writes Uzbek Cyrillic in the Latin alphabet, and Uzbek
+// Latin in Cyrillic.
 package uzscript
 
 import (
@@ -65,4 +66,77 @@ func capitalize(text string) string {
 		runes[0] = unicode.ToUpper(runes[0])
 	}
 	return string(runes)
+}
+
+// latinToCyrillic writes Uzbek Latin letters in Cyrillic; the digraphs and
+// the letters with an apostrophe are read first, in Cyrillic.
+var latinToCyrillic = map[string]string{
+	"a": "а", "b": "б", "c": "с", "d": "д", "e": "е", "f": "ф", "g": "г", "h": "ҳ", "i": "и", "j": "ж",
+	"k": "к", "l": "л", "m": "м", "n": "н", "o": "о", "p": "п", "q": "қ", "r": "р", "s": "с", "t": "т",
+	"u": "у", "v": "в", "w": "в", "x": "х", "y": "й", "z": "з",
+	"sh": "ш", "ch": "ч", "yo": "ё", "yu": "ю", "ya": "я", "ye": "е", "o'": "ў", "g'": "ғ",
+}
+
+// apostrophes are the marks Uzbek Latin is typed with for o', g' and the
+// sign ъ.
+const apostrophes = "'ʻʼ’‘`"
+
+// englishSpelled are English words Uzbek uses, written as they are said.
+var englishSpelled = strings.NewReplacer("reply", "replay", "Reply", "Replay")
+
+// Cyrillic writes Uzbek Latin in Cyrillic. A command, a @username and a
+// link stay as they are, as do other characters.
+func Cyrillic(text string) string {
+	var b strings.Builder
+	for _, word := range strings.SplitAfter(text, " ") {
+		if strings.HasPrefix(word, "/") || strings.HasPrefix(word, "@") || strings.Contains(word, "://") {
+			b.WriteString(word)
+			continue
+		}
+		b.WriteString(cyrillicWord(englishSpelled.Replace(word)))
+	}
+	return b.String()
+}
+
+// cyrillicWord is Cyrillic for one word and the space after it.
+func cyrillicWord(word string) string {
+	var b strings.Builder
+	runes := []rune(word)
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+		lower := unicode.ToLower(r)
+		if i+1 < len(runes) {
+			next := unicode.ToLower(runes[i+1])
+			if strings.ContainsRune(apostrophes, next) {
+				next = '\''
+			}
+			// "yo'q" is "йўқ": an o' after y is ў, not ё.
+			oFollows := next == 'o' && i+2 < len(runes) && strings.ContainsRune(apostrophes, runes[i+2])
+			if cyrillic, ok := latinToCyrillic[string([]rune{lower, next})]; ok && !(lower == 'y' && oFollows) {
+				b.WriteString(withCase(cyrillic, r))
+				i++
+				continue
+			}
+		}
+		cyrillic, ok := latinToCyrillic[string(lower)]
+		switch {
+		case strings.ContainsRune(apostrophes, r) && i > 0 && unicode.IsLetter(runes[i-1]):
+			cyrillic, ok = "ъ", true
+		case !ok:
+			b.WriteRune(r)
+			continue
+		case lower == 'e' && (i == 0 || !unicode.IsLetter(runes[i-1])):
+			cyrillic = "э"
+		}
+		b.WriteString(withCase(cyrillic, r))
+	}
+	return b.String()
+}
+
+// withCase is cyrillic in capitals when latin starts with one.
+func withCase(cyrillic string, latin rune) string {
+	if unicode.IsUpper(latin) {
+		return capitalize(cyrillic)
+	}
+	return cyrillic
 }

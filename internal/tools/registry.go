@@ -195,6 +195,10 @@ func (r *Registry) Execute(ctx context.Context, callerID int64, name, args strin
 		if errors.As(err, &hidden) {
 			r.logger.Warn("tool failed", "tool", name, "user_id", callerID, "error", hidden.Err)
 		}
+		var said *SaidError
+		if errors.As(err, &said) {
+			return failureSaid(errorCode(err), err.Error(), said.Said)
+		}
 		return failure(errorCode(err), err.Error())
 	}
 	return success(result, tool.MaxOutputBytes)
@@ -286,6 +290,10 @@ type resultEnvelope struct {
 type toolError struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+	// Said and Note are a SaidError's: the line to send, and what to do
+	// with it.
+	Said string `json:"said,omitempty"`
+	Note string `json:"note,omitempty"`
 }
 
 func success(result any, limit int) string {
@@ -300,7 +308,17 @@ func success(result any, limit int) string {
 }
 
 func failure(code, message string) string {
-	encoded, _ := json.Marshal(resultEnvelope{Error: &toolError{Code: code, Message: message}})
+	return failureSaid(code, message, "")
+}
+
+// failureSaid is failure with said, the line to send in place of any reason
+// of the model's own.
+func failureSaid(code, message, said string) string {
+	e := &toolError{Code: code, Message: message, Said: said}
+	if said != "" {
+		e.Note = refusalNote
+	}
+	encoded, _ := json.Marshal(resultEnvelope{Error: e})
 	return string(encoded)
 }
 

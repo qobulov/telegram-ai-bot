@@ -2,6 +2,8 @@ package service
 
 import (
 	"strings"
+
+	"telegram-ai-bot/internal/tools"
 	"unicode"
 	"unicode/utf8"
 )
@@ -56,6 +58,20 @@ func replyLanguage(text string) string {
 		return "English"
 	}
 	return latinUzbek
+}
+
+// toolLanguage is the language tools answer the writer of in in, as
+// languageOf reads it, with Uzbek typed in Cyrillic told apart.
+func toolLanguage(in incoming) string {
+	switch language := languageOf(in); {
+	case language == "ru":
+		return tools.LanguageRussian
+	case language == "en":
+		return tools.LanguageEnglish
+	case strings.HasSuffix(replyLanguage(in.text), "Cyrillic script"):
+		return tools.LanguageUzbekCyrillic
+	}
+	return tools.LanguageUzbek
 }
 
 // latinUzbek is replyLanguage's word for Uzbek in the Latin alphabet.
