@@ -9,6 +9,7 @@
 
   const texts = {
     uz: {
+      arenaTab: "Arena", arenaTeam: "⚔️ Jamoangiz", arenaSave: "Jamoani saqlash", arenaFoes: "🎯 Raqiblar", arenaRefresh: "🔄 Yangilash", topCards: "🎴 Kartalar", topArena: "⚔️ Arena",
       title: "Kartalar", collected: "to'plandi", animeTab: "Animelar", animeSearch: "Anime yoki personaj", animeBack: "← Barcha animelar", animeOwned: "✓ Sizda bor", animeMissing: "Sizda hali yo'q", animeEmpty: "Hech narsa topilmadi", collection: "Kolleksiya", draw: "Olish", top: "Reyting",
       search: "Kartani qidirish", rarities: ["Oddiy", "Noyob", "Epik", "Afsonaviy", "Mifik"],
       drawNow: "Karta olish", drawing: "Ochilmoqda…", next: (t) => `Keyingi karta: ${t}`, ready: "Karta tayyor!",
@@ -41,6 +42,7 @@
       paid: "✅ To'lov qabul qilindi, kristall qo'shilmoqda…", crystalsAdded: (n) => `💎 +${n} kristall qo'shildi!`, payFailed: "To'lov amalga oshmadi", bought: (n) => `🎟 +${n} token`, packOpened: (r) => `${r} paket`,
     },
     ru: {
+      arenaTab: "Арена", arenaTeam: "⚔️ Ваша команда", arenaSave: "Сохранить команду", arenaFoes: "🎯 Соперники", arenaRefresh: "🔄 Обновить", topCards: "🎴 Карты", topArena: "⚔️ Арена",
       title: "Карты", collected: "собрано", animeTab: "Аниме", animeSearch: "Аниме или персонаж", animeBack: "← Все аниме", animeOwned: "✓ Есть у вас", animeMissing: "Пока нет у вас", animeEmpty: "Ничего не найдено", collection: "Коллекция", draw: "Получить", top: "Рейтинг",
       search: "Поиск по картам", rarities: ["Обычная", "Редкая", "Эпическая", "Легендарная", "Мифическая"],
       drawNow: "Получить карту", drawing: "Открываем…", next: (t) => `Следующая карта: ${t}`, ready: "Карта готова!",
@@ -73,6 +75,7 @@
       paid: "✅ Оплата принята, кристаллы зачисляются…", crystalsAdded: (n) => `💎 +${n} кристаллов!`, payFailed: "Оплата не прошла", bought: (n) => `🎟 +${n} токенов`, packOpened: (r) => `Пак: ${r}`,
     },
     en: {
+      arenaTab: "Arena", arenaTeam: "⚔️ Your team", arenaSave: "Save the team", arenaFoes: "🎯 Opponents", arenaRefresh: "🔄 Refresh", topCards: "🎴 Cards", topArena: "⚔️ Arena",
       title: "Cards", collected: "collected", animeTab: "Anime", animeSearch: "Anime or character", animeBack: "← All anime", animeOwned: "✓ You have it", animeMissing: "Not yours yet", animeEmpty: "Nothing found", collection: "Collection", draw: "Draw", top: "Ranking",
       search: "Search cards", rarities: ["Common", "Rare", "Epic", "Legendary", "Mythic"],
       drawNow: "Draw a card", drawing: "Opening…", next: (t) => `Next card in ${t}`, ready: "A card is ready!",
@@ -149,7 +152,7 @@
       // A link may name the tab to open, as the market's old button does; otherwise a
       // newcomer starts at the draw and anyone else at their collection.
       const asked = new URLSearchParams(location.search).get("tab");
-      if (!opened) showTab(["collection", "draw", "market", "shop", "top"].includes(asked) ? asked : cards.some((c) => c.count > 0) ? "collection" : "draw");
+      if (!opened) showTab(["collection", "draw", "market", "shop", "arena", "top"].includes(asked) ? asked : cards.some((c) => c.count > 0) ? "collection" : "draw");
     } catch (error) {
       $("loading").hidden = true;
       if (!opened) showTab("collection");
@@ -1055,8 +1058,13 @@
   // ---------- ranking ----------
 
   async function ranking() {
+    for (const chip of document.querySelectorAll("#topKind button")) chip.setAttribute("aria-pressed", String(chip.dataset.k === topKind));
+    const asked = ++topAsked, kind = topKind;
     try {
-      const data = await api("top");
+      const data = await api(kind === "arena" ? "arena" : "top");
+      if (asked !== topAsked) return;
+      notice(null);
+      if (kind === "arena") { arenaTable(data.top || []); return; }
       const table = $("table");
       table.textContent = "";
       if (!data.top.length) table.innerHTML = `<p class="empty">${t.noTop}</p>`;
@@ -1070,9 +1078,8 @@
         li.querySelector(".pts").textContent = spaced(row.points);
         table.append(li);
       });
-      notice(null);
     } catch (error) {
-      notice(error);
+      if (asked === topAsked) notice(error);
     }
   }
 
@@ -1454,14 +1461,452 @@
     }
   }
 
+  // ---------- arena ----------
+
+  // The arena: a saved team of five, two in front and three behind, fights
+  // another player's saved team. The server plays the battle and keeps the
+  // ratings; the page only replays the events it gives. Five attacks a day,
+  // and a token for each win while the day's three last.
+  const arenaTexts = {
+    uz: {
+      rating: "Arena reytingi", record: (w, l) => `${w} g'alaba · ${l} mag'lubiyat`,
+      attacks: (n, m) => `⚔️ Bugungi hujumlar: ${n}/${m}`, tokens: (n, m) => `🎟 G'alaba tokenlari: ${n}/${m}`,
+      front: "Old qator", back: "Orqa qator", power: (n) => `⚡ ${n}`,
+      pick: "5 ta karta tanlang: 2 tasi oldinda, 3 tasi orqada. Yulduzlar kartani kuchaytiradi.",
+      unsaved: "O'zgarish hali saqlanmadi", savedHint: "Jamoa saqlangan. Almashtirish uchun uyachani bosing.",
+      slot: (row, n) => `${row} · ${n}-o'rin`, inTeam: "jamoada", saved: "✅ Jamoa saqlandi",
+      attack: "⚔️ Hujum", noFoes: "Hozircha raqib yo'q: boshqalar ham jamoa saqlasin", teamFirst: "Hujum uchun avval jamoani saqlang", noAttacks: "Bugungi hujumlar tugadi, ertaga qayting",
+      round: (n) => `Raund ${n}`, skip: "O'tkazib yuborish", won: "🏆 G'alaba!", lost: "💀 Mag'lubiyat", change: (d) => `Reyting ${d >= 0 ? "+" : "−"}${Math.abs(d)}`, token: "🎟 +1 token",
+      you: "Siz", topEmpty: "Arenada hali hech kim jang qilmagan", topRow: (w, l, p) => `${w} G · ${l} M · ⚡${p}`,
+      skills: { strike: "Kuchli zarba", heal: "Davolash", shield: "Qalqon" }, fell: (n) => `💀 ${n} yiqildi`,
+      refused: { size: "Jamoada 5 ta karta bo'lishi kerak", repeat: "Bitta kartani ikki marta qo'yib bo'lmaydi", not_held: "Jamoadagi karta endi sizda yo'q", no_attacks: "Bugungi 5 ta hujum tugadi", no_team: "Avval jamoani saqlang: undagi karta endi sizda yo'q", opponent_gone: "Bu raqib endi yo'q, ro'yxat yangilandi", self: "O'zingizga hujum qilib bo'lmaydi" },
+    },
+    ru: {
+      rating: "Рейтинг арены", record: (w, l) => `${w} побед · ${l} поражений`,
+      attacks: (n, m) => `⚔️ Атак сегодня: ${n}/${m}`, tokens: (n, m) => `🎟 Токенов за победы: ${n}/${m}`,
+      front: "Передний ряд", back: "Задний ряд", power: (n) => `⚡ ${n}`,
+      pick: "Выберите 5 карт: 2 впереди, 3 сзади. Звёзды усиливают карту.",
+      unsaved: "Изменения ещё не сохранены", savedHint: "Команда сохранена. Нажмите на ячейку, чтобы заменить карту.",
+      slot: (row, n) => `${row} · место ${n}`, inTeam: "в команде", saved: "✅ Команда сохранена",
+      attack: "⚔️ Атака", noFoes: "Пока нет соперников: пусть другие тоже сохранят команду", teamFirst: "Чтобы атаковать, сохраните команду", noAttacks: "Атаки на сегодня закончились, возвращайтесь завтра",
+      round: (n) => `Раунд ${n}`, skip: "Пропустить", won: "🏆 Победа!", lost: "💀 Поражение", change: (d) => `Рейтинг ${d >= 0 ? "+" : "−"}${Math.abs(d)}`, token: "🎟 +1 токен",
+      you: "Вы", topEmpty: "На арене ещё никто не сражался", topRow: (w, l, p) => `${w} В · ${l} П · ⚡${p}`,
+      skills: { strike: "Сильный удар", heal: "Лечение", shield: "Щит" }, fell: (n) => `💀 ${n} пал(а)`,
+      refused: { size: "В команде должно быть 5 карт", repeat: "Одну карту нельзя поставить дважды", not_held: "Карты из команды у вас больше нет", no_attacks: "5 атак на сегодня закончились", no_team: "Сначала сохраните команду: карты из неё у вас больше нет", opponent_gone: "Этого соперника больше нет, список обновлён", self: "Нельзя атаковать себя" },
+    },
+    en: {
+      rating: "Arena rating", record: (w, l) => `${w} wins · ${l} losses`,
+      attacks: (n, m) => `⚔️ Attacks today: ${n}/${m}`, tokens: (n, m) => `🎟 Win tokens: ${n}/${m}`,
+      front: "Front row", back: "Back row", power: (n) => `⚡ ${n}`,
+      pick: "Pick 5 cards: 2 in front, 3 behind. Stars make a card stronger.",
+      unsaved: "The change is not saved yet", savedHint: "Your team is saved. Tap a slot to swap a card.",
+      slot: (row, n) => `${row} · slot ${n}`, inTeam: "in the team", saved: "✅ Team saved",
+      attack: "⚔️ Attack", noFoes: "No opponents yet: others need to save a team too", teamFirst: "Save a team to attack", noAttacks: "No attacks left today; come back tomorrow",
+      round: (n) => `Round ${n}`, skip: "Skip", won: "🏆 Victory!", lost: "💀 Defeat", change: (d) => `Rating ${d >= 0 ? "+" : "−"}${Math.abs(d)}`, token: "🎟 +1 token",
+      you: "You", topEmpty: "Nobody has fought in the arena yet", topRow: (w, l, p) => `${w} W · ${l} L · ⚡${p}`,
+      skills: { strike: "Power strike", heal: "Heal", shield: "Shield" }, fell: (n) => `💀 ${n} fell`,
+      refused: { size: "A team needs 5 cards", repeat: "A card cannot be placed twice", not_held: "You no longer hold a card of the team", no_attacks: "Today's 5 attacks are used up", no_team: "Save a team first: you no longer hold one of its cards", opponent_gone: "This opponent is gone; the list is refreshed", self: "You cannot attack yourself" },
+    },
+  };
+  const at = arenaTexts[language] || arenaTexts.uz;
+  const CLASS_ICON = { tank: "🛡️", fighter: "⚔️", mage: "🔮" };
+  const SKILL_ICON = { strike: "💥", heal: "💚", shield: "🔰" };
+  const EMPTY_TEAM = [0, 0, 0, 0, 0];
+  let arenaData = null, arenaDraft = EMPTY_TEAM.slice(), arenaBusy = false;
+
+  // fighterOf is a held card as the arena draws it, its class and skill
+  // worked out as arena.FighterOf does, for a team not saved yet; a saved
+  // team's come from the server.
+  function fighterOf(card) {
+    const cls = card.health >= 4 * card.attack ? "tank" : card.health <= 3 * card.attack ? "mage" : "fighter";
+    const skill = card.rarity >= 3 ? ["strike", "heal", "shield"][card.id % 3] : "";
+    return { id: card.id, name: card.name, image: card.image, rarity: card.rarity, stars: card.stars || 1, attack: card.attack || 0, health: card.health || 0, class: cls, skill };
+  }
+  // powerOf is a team's power as arena.Team.Power counts it.
+  const powerOf = (team) => team.reduce((sum, f) => sum + (f ? f.attack + Math.floor(f.health / 4) : 0), 0);
+
+  // slotFighter is the card in a slot of the team being made, from the
+  // cards held now, so that a fusion since shows at once.
+  function slotFighter(id) {
+    if (!id) return null;
+    const card = cards.find((c) => c.id === id && c.count > 0);
+    if (card) return fighterOf(card);
+    return ((arenaData && arenaData.team) || []).find((f) => f.id === id) || null;
+  }
+
+  // fighterTile is a card in the arena: its picture, name, class and stars.
+  function fighterTile(f) {
+    const tile = document.createElement("div");
+    tile.className = "fighter" + (f.rarity >= 3 ? " foil" : "");
+    tile.style.setProperty("--c", COLORS[f.rarity]);
+    tile.innerHTML = '<img alt=""><span class="f-class"></span><span class="f-name"></span>';
+    picture(tile.querySelector("img"), f.image);
+    tile.querySelector(".f-class").textContent = (CLASS_ICON[f.class] || "") + (f.skill ? SKILL_ICON[f.skill] : "");
+    tile.querySelector(".f-name").textContent = f.name;
+    if (f.stars > 1) tile.insertAdjacentHTML("beforeend", `<span class="f-stars">★${f.stars}</span>`);
+    return tile;
+  }
+
+  async function arenaPage() {
+    try {
+      arenaShow(await api("arena"));
+      notice(null);
+    } catch (error) {
+      notice(error);
+    }
+  }
+
+  // arenaShow lays out the arena as the server gives it; a team null (none
+  // saved, or one with a card no longer held) is to be picked again.
+  function arenaShow(data) {
+    arenaData = data;
+    arenaDraft = data.team ? data.team.map((f) => f.id) : EMPTY_TEAM.slice();
+    arenaMe();
+    arenaTeam();
+    arenaFoes();
+  }
+
+  function arenaMe() {
+    const p = arenaData.player;
+    const box = $("arenaMe");
+    box.innerHTML = '<div class="arena-rating"><small></small><b></b><span></span></div><div class="arena-left"><span></span><span></span></div>';
+    box.querySelector(".arena-rating small").textContent = at.rating;
+    box.querySelector(".arena-rating b").textContent = spaced(p.rating);
+    box.querySelector(".arena-rating span").textContent = at.record(p.wins, p.losses);
+    const left = box.querySelectorAll(".arena-left span");
+    left[0].textContent = at.attacks(p.attacks_left, p.attacks);
+    left[1].textContent = at.tokens(p.tokens_left, p.tokens);
+  }
+
+  // arenaTeam draws the team being made, its live power, and the save
+  // button, on only for a full team that differs from the one saved.
+  function arenaTeam() {
+    const saved = (arenaData.team || []).map((f) => f.id);
+    const team = arenaDraft.map(slotFighter);
+    for (const [id, from, label] of [["arenaFront", 0, at.front], ["arenaBack", 2, at.back]]) {
+      const row = $(id);
+      row.textContent = "";
+      const em = document.createElement("em");
+      em.textContent = label;
+      row.append(em);
+      for (let slot = from; slot < from + (from ? 3 : 2); slot++) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "slot";
+        const f = team[slot];
+        if (f) button.append(fighterTile(f));
+        else button.innerHTML = '<span class="slot-plus" aria-hidden="true">+</span>';
+        button.setAttribute("aria-label", at.slot(label, from ? slot - 1 : slot + 1));
+        button.addEventListener("click", () => { haptic("light"); arenaPick(slot); });
+        row.append(button);
+      }
+    }
+    $("arenaPower").textContent = at.power(spaced(powerOf(team)));
+    const full = team.every(Boolean);
+    const changed = arenaDraft.some((id, i) => id !== saved[i]);
+    $("arenaSave").disabled = arenaBusy || !full || !changed;
+    $("arenaSave").hidden = saved.length > 0 && !changed;
+    $("arenaTeamHint").textContent = !full ? at.pick : changed ? at.unsaved : at.savedHint;
+  }
+
+  // arenaPick chooses the card for one slot from the cards held, the
+  // strongest first; one already in the team trades places with it.
+  function arenaPick(slot) {
+    let rarity = -1;
+    const panel = document.createElement("div");
+    panel.className = "gift arena-pick";
+    panel.innerHTML = '<b class="step"></b><input type="search" autocomplete="off"><div class="sets" role="group"></div><ul class="gift-list"></ul>';
+    panel.querySelector(".step").textContent = at.slot(slot < 2 ? at.front : at.back, slot < 2 ? slot + 1 : slot - 1);
+    const input = panel.querySelector("input");
+    input.placeholder = t.mineSearch;
+    const chips = panel.querySelector(".sets");
+    const held = cards.filter((c) => c.count > 0).map(fighterOf).sort((a, b) => powerOf([b]) - powerOf([a]));
+    for (const r of [-1, 4, 3, 2, 1, 0]) {
+      if (r >= 0 && !held.some((f) => f.rarity === r)) continue;
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.dataset.r = r;
+      if (r < 0) chip.textContent = t.allSets;
+      else { chip.style.setProperty("--c", COLORS[r]); chip.replaceChildren(tierIcon(r), t.rarities[r]); }
+      chip.addEventListener("click", () => { rarity = r; list(); haptic("light"); });
+      chips.append(chip);
+    }
+    function list() {
+      for (const chip of chips.children) chip.setAttribute("aria-pressed", String(Number(chip.dataset.r) === rarity));
+      const ul = panel.querySelector(".gift-list");
+      ul.textContent = "";
+      const q = input.value.trim().toLowerCase();
+      const shown = held.filter((f) => (rarity < 0 || f.rarity === rarity) && (!q || f.name.toLowerCase().includes(q))).slice(0, 60);
+      if (!shown.length) ul.innerHTML = `<li class="gift-empty">${t.none}</li>`;
+      for (const f of shown) {
+        const li = document.createElement("li");
+        const pick = document.createElement("button");
+        pick.type = "button";
+        pick.className = "pick";
+        pick.setAttribute("aria-pressed", String(arenaDraft[slot] === f.id));
+        const info = document.createElement("span");
+        info.className = "pick-stats";
+        const inTeam = arenaDraft.includes(f.id) && arenaDraft[slot] !== f.id;
+        info.textContent = `★${f.stars} · ${CLASS_ICON[f.class]} · ⚡${spaced(powerOf([f]))}` + (inTeam ? ` · ${at.inTeam}` : "");
+        pick.append(mini(f), info);
+        pick.addEventListener("click", () => {
+          const other = arenaDraft.indexOf(f.id);
+          if (other >= 0) arenaDraft[other] = arenaDraft[slot];
+          arenaDraft[slot] = f.id;
+          haptic("light");
+          closeSheet();
+          arenaTeam();
+        });
+        li.append(pick);
+        ul.append(li);
+      }
+    }
+    input.addEventListener("input", list);
+    list();
+    showPanel(panel);
+  }
+
+  $("arenaSave").addEventListener("click", async () => {
+    if (arenaBusy || !arenaData || arenaDraft.some((id) => !id)) return;
+    arenaBusy = true;
+    arenaTeam();
+    try {
+      const data = await api("arena_team", { front: arenaDraft.slice(0, 2), back: arenaDraft.slice(2) });
+      if (data.refused) {
+        toast(at.refused[data.refused] || t.unavailable);
+        return;
+      }
+      arenaShow(data);
+      toast(at.saved);
+      haptic("medium");
+    } catch (error) {
+      notice(error);
+    } finally {
+      arenaBusy = false;
+      arenaTeam();
+      arenaFoes();
+    }
+  });
+
+  // arenaFoes lists the opponents offered, each with its attack button,
+  // off without a saved team or with the day's attacks spent.
+  function arenaFoes() {
+    const list = $("arenaFoes");
+    list.textContent = "";
+    const p = arenaData.player;
+    const can = !!arenaData.team && p.attacks_left > 0;
+    const foes = arenaData.opponents || [];
+    if (!foes.length) list.innerHTML = `<li class="empty">${at.noFoes}</li>`;
+    for (const o of foes) {
+      const li = document.createElement("li");
+      li.className = "foe";
+      li.innerHTML = '<span class="who"><b></b><small></small></span><button type="button" class="draw small"></button>';
+      li.querySelector(".who b").textContent = o.name || "?";
+      li.querySelector(".who small").textContent = `🏅 ${spaced(o.rating)} · ⚡ ${spaced(o.power)}`;
+      const button = li.querySelector("button");
+      button.textContent = at.attack;
+      button.disabled = arenaBusy || !can;
+      button.addEventListener("click", () => arenaAttack(o));
+      list.append(li);
+    }
+    if (foes.length && !can) list.insertAdjacentHTML("beforeend", `<li class="foe-note">${arenaData.team ? at.noAttacks : at.teamFirst}</li>`);
+  }
+  $("arenaRefresh").addEventListener("click", () => { haptic("light"); arenaPage(); });
+
+  // arenaAttack fights an opponent, replays the battle, then asks for the
+  // arena again for the new rating and opponents. A token won is one more
+  // card to open.
+  async function arenaAttack(foe) {
+    if (arenaBusy) return;
+    arenaBusy = true;
+    arenaFoes();
+    haptic("medium");
+    try {
+      const data = await api("arena_attack", { opponent: foe.id });
+      if (data.refused) {
+        toast(at.refused[data.refused] || t.unavailable);
+        if (data.refused !== "self") await arenaPage();
+        return;
+      }
+      if (data.token) { tokens += 1; drawButton(); }
+      arenaData.player.attacks_left = data.attacks_left;
+      arenaData.player.tokens_left = data.tokens_left;
+      arenaMe();
+      await replay(data, foe);
+      await arenaPage();
+    } catch (error) {
+      notice(error);
+    } finally {
+      arenaBusy = false;
+      if (arenaData) arenaFoes();
+    }
+  }
+
+  // ---------- the battle's replay ----------
+
+  // replay shows the battle on the whole screen, the opponent above and the
+  // player below, the front rows facing: one event every STEP ms, a hit
+  // shaking its target and its HP bar falling, a skill flashing, a fallen
+  // card greyed. Skip, or less motion asked for, shows the end at once.
+  // Only transforms and opacity move, so that weak phones keep up.
+  const STEP = 350;
+  const lessMotion = () => !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+  function replay(data, foe) {
+    return new Promise((resolve) => {
+      const box = document.createElement("div");
+      box.className = "battle";
+      box.setAttribute("role", "dialog");
+      box.setAttribute("aria-label", at.attack);
+      box.innerHTML = '<div class="b-top"><b class="b-round"></b><button type="button" class="ghost b-skip"></button></div>' +
+        '<div class="b-side b-them"><small class="b-who"></small><div class="b-row rear"></div><div class="b-row fore"></div></div>' +
+        '<div class="b-vs" aria-hidden="true">VS</div>' +
+        '<div class="b-side b-us"><div class="b-row fore"></div><div class="b-row rear"></div><small class="b-who"></small></div>' +
+        '<p class="b-line" aria-live="polite"></p>' +
+        '<div class="b-result" hidden><b class="b-title"></b><span class="b-change"></span><span class="b-token"></span><button type="button" class="draw b-ok"></button></div>';
+      const units = [[], []];
+      for (const [side, list, sel] of [[0, data.attacker, ".b-us"], [1, data.defender, ".b-them"]]) {
+        const sideBox = box.querySelector(sel);
+        list.forEach((f, slot) => {
+          const tile = fighterTile(f);
+          tile.insertAdjacentHTML("beforeend", '<i class="hp"><i></i></i>');
+          sideBox.querySelector(slot < 2 ? ".fore" : ".rear").append(tile);
+          units[side][slot] = { el: tile, bar: tile.querySelector(".hp i"), hp: f.health, max: f.health || 1, f };
+        });
+      }
+      const whos = box.querySelectorAll(".b-who");
+      whos[0].textContent = foe.name || "?";
+      whos[1].textContent = at.you;
+      const roundBox = box.querySelector(".b-round"), line = box.querySelector(".b-line");
+      const skip = box.querySelector(".b-skip");
+      skip.textContent = at.skip;
+      const events = data.events || [];
+      let next = 0, timer = 0, done = false;
+
+      const move = (el, frames, ms) => { if (el.animate) el.animate(frames, { duration: ms, easing: "ease-out" }); };
+      function float(unit, text, kind) {
+        const n = document.createElement("span");
+        n.className = "f-float " + kind;
+        n.textContent = text;
+        unit.el.append(n);
+        if (!n.animate) { setTimeout(() => n.remove(), 700); return; }
+        n.animate([{ transform: "translate(-50%, 0)", opacity: 1 }, { transform: "translate(-50%, -28px)", opacity: 0 }], { duration: 750, easing: "ease-out" }).onfinish = () => n.remove();
+      }
+      function flash(unit, kind) {
+        const f = document.createElement("i");
+        f.className = "f-flash " + kind;
+        unit.el.append(f);
+        if (!f.animate) { setTimeout(() => f.remove(), 400); return; }
+        f.animate([{ opacity: 0 }, { opacity: 0.85 }, { opacity: 0 }], { duration: 420 }).onfinish = () => f.remove();
+      }
+
+      // apply puts one event on the board; shown, it also moves and is told.
+      function apply(e, shown) {
+        const foeSide = e.kind === "hit" || e.kind === "strike";
+        const actor = units[e.side][e.from];
+        const target = units[foeSide ? 1 - e.side : e.side][e.to];
+        if (!target) return;
+        target.hp = e.kind === "fall" ? 0 : e.hp;
+        target.bar.style.transform = `scaleX(${Math.max(0, Math.min(1, target.hp / target.max))})`;
+        if (e.kind === "fall") target.el.classList.add("fallen");
+        if (!shown) return;
+        if (e.round > 0) roundBox.textContent = at.round(e.round);
+        const name = (u) => (u ? u.f.name : "?");
+        if (foeSide) {
+          if (actor) move(actor.el, [{ transform: "none" }, { transform: `translateY(${e.side ? 8 : -8}px)` }, { transform: "none" }], 240);
+          move(target.el, [{ transform: "none" }, { transform: "translateX(-5px)" }, { transform: "translateX(5px)" }, { transform: "none" }], 260);
+          if (e.kind === "strike" && actor) flash(actor, "strike");
+          flash(target, "hurt");
+          float(target, `−${spaced(e.amount)}`, e.kind === "strike" ? "crit" : "dmg");
+          line.textContent = (e.kind === "strike" ? `${SKILL_ICON.strike} ${at.skills.strike}: ` : "") + `${name(actor)} → ${name(target)} −${spaced(e.amount)}`;
+          haptic(e.kind === "strike" ? "medium" : "light");
+        } else if (e.kind === "heal") {
+          if (actor) flash(actor, "heal");
+          flash(target, "heal");
+          float(target, `+${spaced(e.amount)}`, "heal");
+          line.textContent = `${SKILL_ICON.heal} ${at.skills.heal}: ${name(actor)} → ${name(target)} +${spaced(e.amount)}`;
+        } else if (e.kind === "shield") {
+          flash(target, "shield");
+          float(target, `🛡 ${spaced(e.amount)}`, "shield");
+          line.textContent = `${SKILL_ICON.shield} ${at.skills.shield}: ${name(target)} +${spaced(e.amount)}`;
+        } else if (e.kind === "fall") {
+          line.textContent = at.fell(name(target));
+        }
+      }
+
+      function step() {
+        if (done) return;
+        if (next >= events.length) { finish(); return; }
+        const e = events[next++];
+        apply(e, true);
+        // the shields at the start come together, quickly
+        timer = setTimeout(step, e.round === 0 ? 150 : STEP);
+      }
+      function finish() {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        while (next < events.length) apply(events[next++], false);
+        const last = events[events.length - 1];
+        roundBox.textContent = last && last.round > 0 ? at.round(last.round) : "";
+        skip.hidden = true;
+        line.textContent = "";
+        const result = box.querySelector(".b-result");
+        result.classList.add(data.won ? "won" : "lost");
+        result.querySelector(".b-title").textContent = data.won ? at.won : at.lost;
+        result.querySelector(".b-change").textContent = at.change(data.rating_change || 0);
+        const token = result.querySelector(".b-token");
+        token.textContent = data.token ? at.token : "";
+        token.hidden = !data.token;
+        result.hidden = false;
+        try { tg.HapticFeedback.notificationOccurred(data.won ? "success" : "error"); } catch (_) { /* outside Telegram */ }
+      }
+      skip.addEventListener("click", finish);
+      const ok = box.querySelector(".b-ok");
+      ok.textContent = t.carryOn;
+      ok.addEventListener("click", () => {
+        box.classList.add("leaving");
+        setTimeout(() => { box.remove(); resolve(); }, 200);
+      });
+      document.body.append(box);
+      if (lessMotion()) finish();
+      else timer = setTimeout(step, 450);
+    });
+  }
+
+  // ---------- the arena's table ----------
+
+  // The Reyting tab shows the cards' table or the arena's, by its chips.
+  let topKind = "cards", topAsked = 0;
+  for (const chip of document.querySelectorAll("#topKind button")) {
+    chip.addEventListener("click", () => { topKind = chip.dataset.k; haptic("light"); ranking(); });
+  }
+
+  function arenaTable(top) {
+    const table = $("table");
+    table.textContent = "";
+    if (!top.length) table.innerHTML = `<p class="empty">${at.topEmpty}</p>`;
+    top.forEach((row, i) => {
+      const li = document.createElement("li");
+      if (row.me) li.className = "me";
+      li.innerHTML = `<span class="pos"></span><span class="who"><b></b><small></small></span><span class="pts"></span>`;
+      li.querySelector(".pos").textContent = ["🥇", "🥈", "🥉"][i] || i + 1;
+      li.querySelector(".who b").textContent = row.name || "?";
+      li.querySelector(".who small").textContent = at.topRow(row.wins, row.losses, spaced(row.power));
+      li.querySelector(".pts").textContent = spaced(row.rating);
+      table.append(li);
+    });
+  }
+
   // ---------- tabs ----------
 
   function showTab(tab) {
     opened = tab;
     for (const button of document.querySelectorAll(".nav button")) button.classList.toggle("on", button.dataset.tab === tab);
     $("coinShards").classList.toggle("on", tab === "shop");
-    for (const name of ["collection", "draw", "market", "anime", "shop", "top"]) $(`tab-${name}`).hidden = name !== tab;
+    for (const name of ["collection", "draw", "market", "anime", "shop", "arena", "top"]) $(`tab-${name}`).hidden = name !== tab;
     if (tab === "top") ranking();
+    if (tab === "arena") arenaPage();
     if (tab === "shop") shop();
     if (tab === "anime") animePage();
     if (tab === "market") market();

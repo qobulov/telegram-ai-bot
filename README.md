@@ -2286,6 +2286,28 @@ The Animelar tab (`animes`) lists every anime, its seasons and sequels as one, w
 how many of its cards the player holds; an anime opens on all its cards with their
 pictures and names, the ones not held dimmed, so that a player sees what is there to
 collect. The Kolleksiya tab still hides the cards not held.
+The ⚔️ Arena tab is a 5 against 5 auto-battle of saved teams
+(`internal/arena`, the tables `arena_teams`, `arena_players` and
+`arena_battles` of migration 98). A player picks five of their cards, two in
+front and three behind, from a list of the cards held, the strongest first,
+with a search and the rarities as chips, and saves them (`arena_team` with
+`front` and `back`; refused `size`, `repeat` or `not_held`); the team's power
+(attack and a quarter of health, summed) is shown from the cards as they are
+now, stars included. The server boosts each card by its stars and gives it a
+class by its health to attack (tank, fighter, mage) and, from Legendary up, a
+skill (strike, heal or shield). `arena` gives the player's rating (Elo from
+1000, K 32), wins and losses, the day's attacks and win tokens left (5 and 3,
+the day starting at midnight in Tashkent), their team (null when none is saved
+or it holds a card no longer held, so it is picked again), three opponents
+near their rating and the table of ten. ⚔️ Hujum (`arena_attack`, `opponent`;
+refused `no_attacks`, `no_team`, `opponent_gone` or `self`) plays the battle
+on the server from a crypto/rand seed and records it; the page replays its
+events on the whole screen, one every 350 ms: a hit shakes its target and its
+HP bar falls, a skill flashes, a fallen card greys, and "O'tkazib yuborish"
+skips to the end, which less motion asked for shows at once. The end says
+won or lost, the rating's change and the token, a win's card token while the
+day's three last. The Reyting tab switches between the cards' table and the
+arena's (rating, wins, losses, power). No card is given or lost in the arena.
 Kartalar had an auto opener (`/autocard`, migration 65) that opened each
 player's cards and sent them to their private chat; the owners took it out,
 and migration 74 drops its columns: players open the day's cards themselves.

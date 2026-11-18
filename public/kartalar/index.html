@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Manrope:wght@500;600;800&display=swap" rel="stylesheet">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="style.css?v=48">
+  <link rel="stylesheet" href="style.css?v=49">
 </head>
 <body>
   <div class="grain" aria-hidden="true"></div>
@@ -142,7 +142,28 @@
       </div>
     </section>
 
+    <section class="tab" id="tab-arena" hidden>
+      <div class="arena">
+        <div class="arena-me" id="arenaMe"></div>
+        <div class="arena-block">
+          <div class="arena-head"><h2 class="shop-title" data-t="arenaTeam"></h2><b class="arena-power" id="arenaPower"></b></div>
+          <p class="market-hint" id="arenaTeamHint"></p>
+          <div class="arena-row" id="arenaFront"></div>
+          <div class="arena-row rear" id="arenaBack"></div>
+          <button type="button" class="draw" id="arenaSave" data-t="arenaSave" disabled></button>
+        </div>
+        <div class="arena-block">
+          <div class="arena-head"><h2 class="shop-title" data-t="arenaFoes"></h2><button type="button" class="ghost" id="arenaRefresh" data-t="arenaRefresh"></button></div>
+          <ul class="arena-foes" id="arenaFoes"></ul>
+        </div>
+      </div>
+    </section>
+
     <section class="tab" id="tab-top" hidden>
+      <div class="sets" id="topKind" role="group">
+        <button type="button" data-k="cards" data-t="topCards"></button>
+        <button type="button" data-k="arena" data-t="topArena"></button>
+      </div>
       <ol class="table" id="table"></ol>
     </section>
   </main>
@@ -152,6 +173,7 @@
     <button type="button" data-tab="draw"><span aria-hidden="true">✨</span><b data-t="draw"></b><i class="dot" id="readyDot" hidden></i></button>
     <button type="button" data-tab="market"><span aria-hidden="true">🔄</span><b data-t="market"></b></button>
     <button type="button" data-tab="anime"><span aria-hidden="true">📚</span><b data-t="animeTab"></b></button>
+    <button type="button" data-tab="arena"><span aria-hidden="true">⚔️</span><b data-t="arenaTab"></b></button>
     <button type="button" data-tab="top"><span aria-hidden="true">🏆</span><b data-t="top"></b></button>
   </nav>
 
@@ -162,6 +184,6 @@
 
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="app.js?v=48"></script>
+  <script src="app.js?v=49"></script>
 </body>
 </html>

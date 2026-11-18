@@ -255,7 +255,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 
 /* nav */
 .nav {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: grid; grid-template-columns: repeat(5, 1fr);
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: grid; grid-template-columns: repeat(6, 1fr);
   height: calc(var(--nav) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
   background: rgba(11, 10, 20, 0.92); backdrop-filter: blur(14px); border-top: 1px solid var(--line);
 }
@@ -717,3 +717,91 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 @media (prefers-reduced-motion: reduce) {
   .cel-rays, .cel-confetti { display: none; }
 }
+
+/* ---------- arena ---------- */
+.arena { display: grid; gap: 12px; margin: 4px 16px 0; }
+.arena-me { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; border-radius: 16px; background: linear-gradient(160deg, #241b3a, var(--panel)); border: 1px solid var(--line); }
+.arena-rating { display: grid; min-width: 0; }
+.arena-rating small { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.arena-rating b { font: 900 26px/1.1 Unbounded, sans-serif; color: var(--gold); }
+.arena-rating span { color: var(--muted); font-size: 12px; }
+.arena-left { display: grid; gap: 4px; justify-items: end; text-align: right; font-size: 12px; font-weight: 700; }
+.arena-block { padding: 14px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); display: grid; gap: 10px; }
+.arena-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.arena-head .shop-title { margin: 0; }
+.arena-head .ghost { min-height: 36px; padding: 0 12px; font-size: 13px; }
+.arena-power { font: 700 15px Unbounded, sans-serif; color: var(--gold); white-space: nowrap; }
+.arena-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.arena-row:not(.rear) { grid-template-columns: repeat(2, calc((100% - 16px) / 3)); justify-content: center; }
+.arena-row em { grid-column: 1 / -1; font-style: normal; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.arena-row:not(.rear) em { text-align: center; }
+.slot { position: relative; aspect-ratio: 3 / 4; padding: 0; border-radius: 12px; border: 1px dashed color-mix(in srgb, var(--gold) 40%, transparent); background: var(--lacquer); cursor: pointer; overflow: hidden; }
+.slot:active { transform: scale(0.97); }
+.slot-plus { display: grid; place-items: center; height: 100%; font: 500 28px Unbounded, sans-serif; color: color-mix(in srgb, var(--gold) 60%, transparent); }
+.slot .fighter { position: absolute; inset: 0; }
+#arenaSave { width: 100%; }
+.arena-foes { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.arena-foes .empty { margin: 10px 0; font-size: 14px; }
+.foe { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 58px; padding: 8px 10px 8px 14px; border-radius: 14px; background: var(--lacquer); border: 1px solid var(--line); }
+.foe .who { display: grid; min-width: 0; }
+.foe .who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.foe .who small { color: var(--muted); font-size: 12px; }
+.foe .draw { flex: none; }
+.foe-note { color: var(--muted); font-size: 13px; text-align: center; padding: 4px 0; }
+.arena-pick .sets { margin: 8px -14px 0; padding: 2px 14px; }
+.arena-pick .sets button { min-height: 34px; padding: 0 10px; font-size: 12px; }
+.arena-pick .gift-list { max-height: 50vh; }
+.arena-pick .pick-stats { flex: none; margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 600; text-align: right; }
+#topKind { margin: 0 0 8px; }
+
+/* a card in the arena: picture, name, class and stars, and in battle its HP */
+.fighter {
+  position: relative; aspect-ratio: 3 / 4; border-radius: 10px; overflow: hidden; isolation: isolate; background: var(--lacquer);
+  box-shadow: 0 0 0 1.5px var(--c) inset; transition: opacity 0.3s;
+}
+.fighter img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 20%; z-index: -1; }
+.fighter::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, transparent 50%, rgba(8, 6, 14, 0.92)); }
+.fighter .f-name { position: absolute; left: 5px; right: 5px; bottom: 5px; font: 800 10px/1.15 Manrope, sans-serif; text-shadow: 0 1px 3px #000; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.fighter .f-class { position: absolute; top: 4px; right: 4px; padding: 0 4px; border-radius: 999px; background: rgba(8, 6, 14, 0.75); font-size: 10px; line-height: 16px; }
+.fighter .f-stars { position: absolute; top: 4px; left: 4px; padding: 0 5px; border-radius: 999px; background: rgba(8, 6, 14, 0.75); font: 700 9px/16px Unbounded, sans-serif; color: var(--gold); }
+.fighter .hp { position: absolute; left: 5px; right: 5px; bottom: 19px; height: 4px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); overflow: hidden; }
+.fighter .hp i { display: block; height: 100%; background: linear-gradient(90deg, #4be37a, #b7f36b); transform-origin: left; transition: transform 0.3s ease-out; }
+.fighter.fallen { opacity: 0.35; filter: grayscale(1); }
+.f-flash { position: absolute; inset: 0; z-index: 3; opacity: 0; pointer-events: none; }
+.f-flash.hurt { background: radial-gradient(circle, rgba(255, 70, 70, 0.55), transparent 70%); }
+.f-flash.strike { background: radial-gradient(circle, rgba(255, 214, 110, 0.85), transparent 70%); }
+.f-flash.heal { background: radial-gradient(circle, rgba(90, 240, 140, 0.7), transparent 70%); }
+.f-flash.shield { background: radial-gradient(circle, rgba(90, 170, 255, 0.75), transparent 70%); }
+.f-float { position: absolute; left: 50%; top: 32%; z-index: 4; transform: translate(-50%, 0); font: 900 13px Unbounded, sans-serif; white-space: nowrap; pointer-events: none; text-shadow: 0 1px 0 #000, 0 0 6px #000; }
+.f-float.dmg { color: #ff7a7a; }
+.f-float.crit { color: #ffd25a; font-size: 15px; }
+.f-float.heal { color: #7dffa8; }
+.f-float.shield { color: #8cc6ff; font-size: 11px; }
+
+/* the battle's replay, on the whole screen */
+.battle {
+  position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; gap: 6px; overflow-y: auto;
+  padding: calc(12px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+  background: radial-gradient(90% 50% at 50% 50%, #2a1d44, var(--ink) 75%); animation: cel-in 0.25s ease;
+}
+.battle.leaving { animation: cel-out 0.2s ease forwards; }
+.b-top { display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 400px; min-height: 40px; }
+.b-round { font: 700 14px Unbounded, sans-serif; color: var(--gold); }
+.b-skip { min-height: 36px; font-size: 13px; }
+.b-side { display: grid; gap: 6px; width: 100%; max-width: 330px; }
+.b-who { text-align: center; color: var(--muted); font: 700 12px Manrope, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-us .b-who { color: var(--gold); }
+.b-row { display: flex; justify-content: center; gap: 6px; }
+.b-row .fighter { width: calc((100% - 12px) / 3); max-width: 88px; }
+.b-vs { font: 900 18px Unbounded, sans-serif; color: color-mix(in srgb, var(--gold) 70%, transparent); letter-spacing: 0.1em; }
+.b-line { min-height: 20px; margin: 4px 0 0; max-width: 360px; text-align: center; font-size: 13px; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-result { display: grid; justify-items: center; gap: 4px; width: 100%; max-width: 330px; margin-top: 4px; animation: cel-pop 0.4s ease both; }
+.b-result[hidden], .b-token[hidden] { display: none; }
+.b-title { font: 900 24px Unbounded, sans-serif; }
+.b-result.won .b-title { color: #ffe39a; text-shadow: 0 0 18px rgba(255, 200, 80, 0.6); }
+.b-result.lost .b-title { color: var(--muted); }
+.b-change { font: 700 15px Unbounded, sans-serif; }
+.b-result.won .b-change { color: #7dffa8; }
+.b-result.lost .b-change { color: #ff8a8a; }
+.b-token { font-weight: 800; color: var(--gold); }
+.b-ok { margin-top: 8px; }
