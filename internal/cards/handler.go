@@ -34,6 +34,8 @@ type Store interface {
 	CatalogCards(ctx context.Context, page storage.CatalogPage) ([]storage.Card, bool, error)
 	BuyCardTokens(ctx context.Context, userID int64, name string, tokens, price int) (storage.CardOpening, error)
 	OpenCardPack(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, price int, now time.Time) (storage.CardOpening, error)
+	OpenEventCards(ctx context.Context, userID int64, name string, n int, ev storage.CardEvent, day storage.CardDay, now time.Time) (storage.EventOpening, error)
+	CardEventPulls(ctx context.Context, userID, card int64) (int, storage.Card, error)
 }
 
 // Invoices makes links to invoices in Stars, for crystals bought in the app.
@@ -58,6 +60,10 @@ type Options struct {
 	Notify func(ctx context.Context, userID int64, text string) error
 	// Invoices sells crystals for Stars; nil sells none.
 	Invoices Invoices
+	// EventRoll draws an event pull's rarity, and EventPick whether its
+	// Mythic is the event's card; nil draws by the event's odds.
+	EventRoll func() Rarity
+	EventPick func() bool
 }
 
 const (
@@ -169,6 +175,10 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 	switch req.Action {
 	case "state":
 		return h.state(ctx, opened.User)
+	case "event":
+		return h.eventView(ctx, opened.User)
+	case "event_open":
+		return h.eventOpen(ctx, opened.User, req.Count)
 	case "shop":
 		return map[string]any{"items": ShopItems, "packs": CrystalPacks, "stars": h.Invoices != nil}, failure{}
 	case "buy":

@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Manrope:wght@500;600;800&display=swap" rel="stylesheet">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="style.css?v=43">
+  <link rel="stylesheet" href="style.css?v=44">
 </head>
 <body>
   <div class="grain" aria-hidden="true"></div>
@@ -119,6 +119,20 @@
 
     <section class="tab" id="tab-shop" hidden>
       <div class="shop">
+        <div class="event" id="event" hidden>
+          <div class="event-art" id="eventArt"></div>
+          <div class="event-info">
+            <span class="event-tag" id="eventTag"></span>
+            <h2 class="event-title" id="eventTitle"></h2>
+            <p class="event-ends" id="eventEnds"></p>
+            <p class="event-odds" id="eventOdds"></p>
+            <div class="event-pity"><span id="eventPity"></span><div class="progress"><i id="eventPityBar"></i></div></div>
+          </div>
+          <div class="event-buttons">
+            <button type="button" class="draw" id="eventOpen1"></button>
+            <button type="button" class="draw" id="eventOpen10"></button>
+          </div>
+        </div>
         <div class="shop-block">
           <h2 class="shop-title" data-t="shopBuyTitle"></h2>
           <p class="market-hint" data-t="shopBuyHint"></p>
@@ -152,6 +166,6 @@
 
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="app.js?v=43"></script>
+  <script src="app.js?v=44"></script>
 </body>
 </html>

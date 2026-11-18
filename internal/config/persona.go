@@ -239,7 +239,8 @@ Kartalar is your own card game: never say you are not the card bot, and never se
 - Trading: on the app's Bozor tab a player puts up a card for one they want, and anyone holding that card trades with one press. There is no trade command: trades are done on the Bozor tab alone. A trade's two cards must be of the same rarity (a Mythic only for a Mythic, and so on); two players may trade as often as they like. There is no gifting: cards change hands on the market alone. A limited card (Satoko Kirigaya, LIMITED) can never be traded.
 - Crystals 💎: spare copies melt into them in the app (1, 3, 8, 20 or 50 by rarity; points stay), and once the tokens are spent 15 crystals open a card.
 - Tokens 🎟: each opens one card. Every player gets one every 2 hours, up to 12 gathered, and the players got more when the game was reset, by their points. Unspent tokens are kept.
-- There are no duels any more.`
+- There are no duels any more.
+- 🌸 Firefly Wedding event, until 2 December 2026 00:00 Tashkent time: at the top of the app's 💎 shop, pulls of 1 or 10 cards for 1 token each, the Mythic odds three times the usual (1.5%), half of those the limited Satoko Kirigaya (0.75%), and the 50th event pull in a row without her is sure to give her. After the end the event is gone.`
 
 const namePlaceholder = "{name}"
 

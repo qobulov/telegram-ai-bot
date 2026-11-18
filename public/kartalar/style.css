@@ -610,3 +610,26 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .shop-item b { display: block; font: 700 14px Manrope, sans-serif; }
 .shop-item small { color: var(--muted); font-size: 12px; }
 .shop-item .ghost { white-space: nowrap; }
+
+/* ---------- event ---------- */
+/* The Firefly Wedding event sits at the top of the shop while it runs. */
+.event {
+  --sakura: #ff9ec7;
+  display: grid; grid-template-columns: 104px 1fr; gap: 12px 14px; align-items: center; padding: 14px; border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--sakura) 50%, transparent);
+  background: radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--sakura) 26%, transparent), transparent 60%),
+    linear-gradient(160deg, color-mix(in srgb, var(--r4) 14%, var(--panel)), var(--panel));
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--sakura) 18%, transparent);
+}
+.event[hidden] { display: none; }
+.event-art .card { width: 100%; }
+.event-info { display: grid; gap: 4px; min-width: 0; }
+.event-tag { justify-self: start; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--sakura) 22%, transparent); color: var(--sakura); font: 700 10px Unbounded, sans-serif; letter-spacing: 0.08em; }
+.event-title { margin: 0; font: 700 17px Unbounded, sans-serif; color: var(--text); }
+.event-ends { margin: 0; color: var(--gold); font: 700 13px Manrope, sans-serif; }
+.event-odds { margin: 0; color: var(--muted); font-size: 12px; }
+.event-pity { display: grid; gap: 4px; margin-top: 2px; font: 700 12px Manrope, sans-serif; color: var(--text); }
+.event-pity .progress { width: 100%; margin: 0; }
+.event-pity .progress i { background: linear-gradient(90deg, var(--sakura), var(--r4)); }
+.event-buttons { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.event-buttons .draw { width: 100%; min-height: 48px; font-size: 14px; }
