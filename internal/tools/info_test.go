@@ -69,8 +69,8 @@ func (fakeMemberInfo) CardCounts(context.Context, int64) (map[int]int, map[int]i
 func (fakeMemberInfo) CardPlayerOf(context.Context, int64) (storage.CardPlayer, time.Time, error) {
 	return storage.CardPlayer{Tokens: 4}, time.Time{}, nil
 }
-func (fakeMemberInfo) CardWallet(context.Context, int64) (int, map[int]int, error) {
-	return 30, nil, nil
+func (fakeMemberInfo) CardWallet(context.Context, int64) (int, error) {
+	return 30, nil
 }
 func (fakeMemberInfo) CardTop(context.Context, int) ([]storage.CardPlayer, error) {
 	return []storage.CardPlayer{{UserID: 1}, {UserID: userID}}, nil

@@ -156,7 +156,7 @@ type MemberInfoStore interface {
 	AuthorByUsername(ctx context.Context, chatID int64, username string) (int64, error)
 	CardCounts(ctx context.Context, userID int64) (total, owned map[int]int, points int64, err error)
 	CardPlayerOf(ctx context.Context, userID int64) (storage.CardPlayer, time.Time, error)
-	CardWallet(ctx context.Context, userID int64) (shards int, spares map[int]int, err error)
+	CardWallet(ctx context.Context, userID int64) (shards int, err error)
 	CardTop(ctx context.Context, limit int) ([]storage.CardPlayer, error)
 }
 
@@ -344,7 +344,7 @@ func addCardFacts(ctx context.Context, opts MemberInfoOptions, userID int64, out
 	if opts.NextToken != nil {
 		cards["next_token_in_minutes"] = int(time.Until(opts.NextToken(time.Now())).Minutes()) + 1
 	}
-	if shards, _, err := opts.Store.CardWallet(ctx, userID); err == nil {
+	if shards, err := opts.Store.CardWallet(ctx, userID); err == nil {
 		cards["crystals"] = shards
 	}
 	out["card_game"] = cards

@@ -24,7 +24,6 @@ type fakeCards struct {
 	days   []storage.CardDay
 	top    []storage.CardPlayer
 	shards map[int64]int
-	melted map[int64]int
 	duels  map[int64]bool
 	named  map[int64][]storage.Card
 	trades []*fakeTrade
@@ -34,7 +33,7 @@ func newFakeCards(picture string) *fakeCards {
 	return &fakeCards{
 		card: storage.Card{ID: 1, Name: "Gojo *Satoru*", Anime: "Jujutsu Kaisen", ImageURL: picture, Rarity: 4, Attack: 5130, Health: 18020, Value: 5000},
 		last: map[int64]time.Time{}, held: map[int64]int{}, used: map[int64]int{},
-		shards: map[int64]int{}, melted: map[int64]int{}, duels: map[int64]bool{},
+		shards: map[int64]int{}, duels: map[int64]bool{},
 		named: map[int64][]storage.Card{},
 	}
 }
@@ -46,22 +45,10 @@ func (f *fakeCards) CardPlayerOf(_ context.Context, userID int64) (storage.CardP
 	return storage.CardPlayer{UserID: userID, Name: "Bek", Cards: f.held[userID]}, f.last[userID], nil
 }
 
-// spare is the copies of the one card the player may melt.
-func (f *fakeCards) spare(userID int64) int { return max(0, f.held[userID]-1-f.melted[userID]) }
-
-func (f *fakeCards) CardWallet(_ context.Context, userID int64) (int, map[int]int, error) {
+func (f *fakeCards) CardWallet(_ context.Context, userID int64) (int, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.shards[userID], map[int]int{f.card.Rarity: f.spare(userID)}, nil
-}
-
-func (f *fakeCards) MeltCards(_ context.Context, userID int64, rates []int) (int, int, int, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	n := f.spare(userID)
-	f.melted[userID] += n
-	f.shards[userID] += n * rates[f.card.Rarity]
-	return n, n * rates[f.card.Rarity], f.shards[userID], nil
+	return f.shards[userID], nil
 }
 
 func (f *fakeCards) DuelTeam(_ context.Context, userID int64, _ int) ([]storage.Card, error) {

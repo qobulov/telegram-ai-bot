@@ -24,8 +24,7 @@ type Store interface {
 	OpenCards(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, cost int, day storage.CardDay, now time.Time) (storage.CardOpening, error)
 	GiveDayTokens(ctx context.Context, userID int64, name string, day storage.CardDay) (int, error)
 	CardTop(ctx context.Context, limit int) ([]storage.CardPlayer, error)
-	CardWallet(ctx context.Context, userID int64) (shards int, spares map[int]int, err error)
-	MeltCards(ctx context.Context, userID int64, rates []int) (melted, gained, shards int, err error)
+	CardWallet(ctx context.Context, userID int64) (shards int, err error)
 	OfferCard(ctx context.Context, from, give, want int64, rules storage.CardMarketRules) (int64, error)
 	CardMarket(ctx context.Context, viewer int64, rules storage.CardMarketRules, limit int) ([]storage.CardOffer, error)
 	TakeCardOffer(ctx context.Context, id, by int64, rules storage.CardTradeRules, keep time.Duration) (storage.CardTrade, error)
@@ -179,8 +178,6 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return h.open(ctx, opened.User, req.Count)
 	case "top":
 		return h.top(ctx, opened.User)
-	case "melt":
-		return h.melt(ctx, opened.User)
 	case "market":
 		return h.market(ctx, opened.User)
 	case "catalog":
@@ -213,9 +210,6 @@ type cardView struct {
 	Health int    `json:"health,omitempty"`
 	Value  int    `json:"value,omitempty"`
 	Count  int    `json:"count"`
-	// Spare is the copies held but one that are not melted, which may be
-	// given.
-	Spare int `json:"spare,omitempty"`
 	// Limited is a card that is never given or traded.
 	Limited bool `json:"limited,omitempty"`
 }
@@ -247,7 +241,6 @@ func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
 	for i, c := range catalog {
 		if o, ok := byID[c.ID]; ok && o.Count > 0 {
 			views[i] = h.held(c, o.Count)
-			views[i].Spare = max(0, o.Count-1-o.Melted)
 		} else {
 			views[i] = cardView{ID: c.ID, Rarity: c.Rarity, Set: c.Collection, Limited: storage.CardLimited(c.ID)}
 		}
@@ -264,17 +257,16 @@ func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
 		h.Logger.Error("could not read a card player", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
 	}
-	shards, spares, err := h.Store.CardWallet(ctx, user.ID)
+	shards, err := h.Store.CardWallet(ctx, user.ID)
 	if err != nil {
 		h.Logger.Error("could not read a player's shards", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
 	}
-	spare, worth := SpareWorth(spares)
 	return map[string]any{
 		"cards": views, "points": player.Points, "held": len(owned),
 		"tokens": Tokens(player, now), "given": given, "per_day": PerDay, "card_cost": CardCost, "batch": Batch,
 		"next_token_in": Today(now).Next().Sub(now).Milliseconds(),
-		"shards":        shards, "spare": spare, "spare_worth": worth,
+		"shards":        shards,
 	}, failure{}
 }
 
@@ -318,16 +310,6 @@ func appLanguage(code string) string {
 		return "ru"
 	}
 	return "en"
-}
-
-// melt melts the player's spare copies into shards.
-func (h *handler) melt(ctx context.Context, user miniapp.User) (any, failure) {
-	melted, gained, shards, err := h.Store.MeltCards(ctx, user.ID, ShardRates)
-	if err != nil {
-		h.Logger.Error("could not melt cards", "user_id", user.ID, "error", err)
-		return nil, errUnavailable
-	}
-	return map[string]any{"melted": melted, "gained": gained, "shards": shards}, failure{}
 }
 
 func (h *handler) top(ctx context.Context, user miniapp.User) (any, failure) {

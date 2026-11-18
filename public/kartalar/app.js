@@ -13,7 +13,7 @@
       search: "Kartani qidirish", rarities: ["Oddiy", "Noyob", "Epik", "Afsonaviy", "Mifik"],
       drawNow: "Karta olish", drawing: "Ochilmoqda…", next: (t) => `Keyingi karta: ${t}`, ready: "Karta tayyor!",
      
-      shardsTitle: "Kristallar", melt: (n, w) => `♻️ ${n} ta takrorni aylantirish → +${w} 💎`, noSpare: "♻️ Aylantirish uchun takror karta yo'q", melted: (n, g) => `♻️ ${n} ta karta → +${g} 💎`, shardsHint: "Takror kartalar kristalga aylanadi, ochko va reyting kamaymaydi. Kristal bilan kutmasdan karta oching yoki duelda tiking.", ratesLabel: "1 ta takror:", meltTitle: "Kristalga aylantirish", meltWarn: "Bu nusxalarni keyin sovg'a qilib bo'lmaydi. Har kartaning bittasi kolleksiyada qoladi.", meltDo: (w) => `♻️ Aylantirish · +${w} 💎`, cancel: "Bekor qilish",
+      shardsTitle: "Kristallar", shardsHint: "Kristal bilan kutmasdan karta oching yoki duelda tiking.", cancel: "Bekor qilish",
       open1: "1x", open10: "5x", costShort: "💎 yetmaydi", tokenHint: (d, c) => `🎟 Token bitta karta ochadi. Har 2 soatda +${d} token (12 tagacha yig'iladi), tugasa karta ${c} 💎`, nextToken: (time) => `⏳ Keyingi token: ${time}`, shardHint: (c) => `💎 Kristal: takror kartalardan. Token tugasa karta ${c} 💎`, given: (n) => `🎟 +${n} token berildi`, short: (n) => `💎 Yana ${n} kristal kerak`, openedTen: "5 ta karta", freshN: (n) => `🆕 ${n} ta yangi`, againN: (n) => `🔁 ${n} ta takror`, freshTag: "YANGI", carryOn: "Davom etish", noPoints: "ochko qo'shilmaydi", 
       fresh: "🆕 Yangi karta!", again: (n) => `🔁 Sizda endi ×${n}`, plus: (n) => `+${n} ochko`,
       attack: "Hujum", health: "Jon", value: "Ochko", cards: (n) => `${n} karta`, pts: "ochko",
@@ -42,7 +42,7 @@
       search: "Поиск по картам", rarities: ["Обычная", "Редкая", "Эпическая", "Легендарная", "Мифическая"],
       drawNow: "Получить карту", drawing: "Открываем…", next: (t) => `Следующая карта: ${t}`, ready: "Карта готова!",
      
-      shardsTitle: "Кристаллы", melt: (n, w) => `♻️ Расплавить повторы: ${n} → +${w} 💎`, noSpare: "♻️ Повторных карт нет", melted: (n, g) => `♻️ ${n} карт → +${g} 💎`, shardsHint: "Повторы становятся кристаллами, очки и рейтинг не уменьшаются. За кристаллы — карта без ожидания или ставка в дуэли.", ratesLabel: "1 повтор:", meltTitle: "Расплавить в кристаллы", meltWarn: "Эти копии потом нельзя будет подарить. По одной карте каждого вида останется в коллекции.", meltDo: (w) => `♻️ Расплавить · +${w} 💎`, cancel: "Отмена",
+      shardsTitle: "Кристаллы", shardsHint: "За кристаллы — карта без ожидания или ставка в дуэли.", cancel: "Отмена",
       open1: "1x", open10: "5x", costShort: "💎 не хватает", tokenHint: (d, c) => `🎟 Токен открывает одну карту. Каждые 2 часа +${d} (копится до 12), без токенов карта стоит ${c} 💎`, nextToken: (time) => `⏳ Следующий токен: ${time}`, shardHint: (c) => `💎 Кристаллы — из повторов. Без токенов карта стоит ${c} 💎`, given: (n) => `🎟 +${n} токен(ов)`, short: (n) => `💎 Нужно ещё ${n} кристаллов`, openedTen: "5 карт", freshN: (n) => `🆕 Новых: ${n}`, againN: (n) => `🔁 Повторов: ${n}`, freshTag: "НОВАЯ", carryOn: "Продолжить", noPoints: "очки не добавляются", 
       fresh: "🆕 Новая карта!", again: (n) => `🔁 Теперь у вас ×${n}`, plus: (n) => `+${n} очков`,
       attack: "Атака", health: "Жизнь", value: "Очки", cards: (n) => `${n} карт`, pts: "очков",
@@ -71,7 +71,7 @@
       search: "Search cards", rarities: ["Common", "Rare", "Epic", "Legendary", "Mythic"],
       drawNow: "Draw a card", drawing: "Opening…", next: (t) => `Next card in ${t}`, ready: "A card is ready!",
      
-      shardsTitle: "Crystals", melt: (n, w) => `♻️ Melt ${n} spares → +${w} 💎`, noSpare: "♻️ No spare cards to melt", melted: (n, g) => `♻️ ${n} cards → +${g} 💎`, shardsHint: "Spares melt into crystals; your points and ranking stay. Crystals open a card without the wait or make a duel's stake.", ratesLabel: "1 spare:", meltTitle: "Melt into crystals", meltWarn: "These copies cannot be given afterwards. One of each card stays in your collection.", meltDo: (w) => `♻️ Melt · +${w} 💎`, cancel: "Cancel",
+      shardsTitle: "Crystals", shardsHint: "Crystals open a card without the wait or make a duel's stake.", cancel: "Cancel",
       open1: "1x", open10: "5x", costShort: "💎 not enough", tokenHint: (d, c) => `🎟 A token opens one card. +${d} every 2 hours, up to 12 kept; with none, a card is ${c} 💎`, nextToken: (time) => `⏳ Next token: ${time}`, shardHint: (c) => `💎 Crystals come from spares. With no token, a card is ${c} 💎`, given: (n) => `🎟 +${n} tokens`, short: (n) => `💎 ${n} more crystals needed`, openedTen: "5 cards", freshN: (n) => `🆕 ${n} new`, againN: (n) => `🔁 ${n} again`, freshTag: "NEW", carryOn: "Continue", noPoints: "no points added", 
       fresh: "🆕 A new card!", again: (n) => `🔁 You now have ×${n}`, plus: (n) => `+${n} points`,
       attack: "Attack", health: "Life", value: "Points", cards: (n) => `${n} cards`, pts: "points",
@@ -111,7 +111,7 @@
   const haptic = (kind) => { try { tg.HapticFeedback.impactOccurred(kind); } catch (_) { /* outside Telegram */ } };
 
   let cards = [], points = 0, perDay = 2, drawing = false, query = "", opened = "", chosenSet = "";
-  let shards = 0, spare = 0, spareWorth = 0, cardCost = 15, batch = 5, tokens = 0, nextTokenAt = 0, refreshing = false;
+  let shards = 0, cardCost = 15, batch = 5, tokens = 0, nextTokenAt = 0, refreshing = false;
 
   // ---------- server ----------
 
@@ -153,8 +153,6 @@
     points = data.points;
     perDay = data.per_day || perDay;
     shards = data.shards || 0;
-    spare = data.spare || 0;
-    spareWorth = data.spare_worth || 0;
     cardCost = data.card_cost || cardCost;
     batch = data.batch || batch;
     nextTokenAt = Date.now() + (data.next_token_in || 0);
@@ -540,51 +538,8 @@
 
   function shardsPanel() {
     $("shardCount").textContent = spaced(shards);
-    $("melt").textContent = spare ? t.melt(spare, spareWorth) : t.noSpare;
-    $("melt").disabled = drawing || !spare;
     drawButton();
   }
-
-  // The melt is asked once more, with what goes: the spare copies, by card,
-  // and the crystals each makes, as it cannot be undone.
-  const RATES = [1, 3, 8, 20, 50];
-  $("melt").addEventListener("click", () => {
-    if (drawing || !spare) return;
-    const spares = cards.filter((c) => c.spare > 0).sort((a, b) => b.rarity - a.rarity);
-    const panel = document.createElement("div");
-    panel.className = "gift melt";
-    panel.innerHTML = '<b class="step"></b><ul class="gift-list melt-list"></ul><p class="gift-hint"></p><button type="button" class="draw gift-send"></button><button type="button" class="link gift-back"></button>';
-    panel.querySelector(".step").textContent = t.meltTitle;
-    const list = panel.querySelector(".melt-list");
-    for (const card of spares) {
-      const li = document.createElement("li");
-      li.className = "melt-row";
-      li.append(mini(card));
-      const gain = document.createElement("small");
-      gain.textContent = `×${card.spare} → +${card.spare * (RATES[card.rarity] || 0)} 💎`;
-      li.append(gain);
-      list.append(li);
-    }
-    panel.querySelector(".gift-hint").textContent = t.meltWarn;
-    const go = panel.querySelector(".gift-send");
-    go.textContent = t.meltDo(spareWorth);
-    panel.querySelector(".gift-back").textContent = t.cancel;
-    panel.querySelector(".gift-back").addEventListener("click", closeSheet);
-    go.addEventListener("click", async () => {
-      go.disabled = true;
-      try {
-        const data = await api("melt");
-        closeSheet();
-        haptic("medium");
-        if (data.melted) toast(t.melted(data.melted, data.gained));
-        applyState(await api("state"));
-      } catch (error) {
-        go.disabled = false;
-        notice(error);
-      }
-    });
-    showPanel(panel);
-  });
 
   $("open1").addEventListener("click", () => reveal(1));
   $("open10").addEventListener("click", () => reveal(batch));
@@ -651,12 +606,9 @@
     }
   }
 
-  // keep puts a card just opened into the collection: a copy is one more
-  // spare, which may be melted.
+  // keep puts a card just opened into the collection.
   function keep(card) {
-    if (card.count > 1) { spare += 1; spareWorth += [1, 3, 8, 20, 50][card.rarity] || 0; }
     const i = cards.findIndex((c) => c.id === card.id);
-    card.spare = card.count > 1 ? ((i >= 0 && cards[i].spare) || 0) + 1 : 0;
     if (i >= 0) cards[i] = card;
   }
 
@@ -697,8 +649,6 @@
     if (tile) tile.scrollIntoView({ block: "center", behavior: "smooth" });
   });
   $("welcomeDraw").addEventListener("click", () => showTab("draw"));
-
-  $("rates").replaceChildren(document.createTextNode(t.ratesLabel + " "), ...withTiers(RATES.map((n, r) => `{${r}}${n}`).join("  ")));
 
   const odds = $("odds");
   for (let rarity = 4; rarity >= 0; rarity--) {

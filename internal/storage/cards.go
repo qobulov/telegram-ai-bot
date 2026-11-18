@@ -55,7 +55,7 @@ const (
 )
 
 // OwnedCard is a card a player holds, how many of it, and how many of those
-// are melted into shards.
+// are used up (melted once into shards, now by fusion).
 type OwnedCard struct {
 	Card
 	Count  int

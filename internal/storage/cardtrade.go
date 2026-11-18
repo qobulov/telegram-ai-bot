@@ -159,7 +159,7 @@ func checkFair(ctx context.Context, tx pgx.Tx, trade CardTrade) error {
 // moveCard moves one copy of the card, not melted, from one player to the
 // other: the giver loses its points only with their last copy, and the
 // other gains them only when it is new to them. A player giving their last copy not melted no
-// longer holds the card; the melted ones went to shards and are gone with it.
+// longer holds the card; the used-up ones are gone with it.
 // spareOnly refuses that last copy, ErrCardLastCopy. A limited card never
 // moves, ErrCardLimited: every gift and trade comes this way.
 func moveCard(ctx context.Context, tx pgx.Tx, from, to, cardID int64, spareOnly bool) error {

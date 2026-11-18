@@ -222,7 +222,6 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .shards-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .shards-head b { font: 700 18px Unbounded, sans-serif; color: var(--gold); }
 .shards-head > span { font: 700 15px Manrope, sans-serif; color: var(--text); }
-.shards-actions { display: grid; gap: 8px; margin-top: 12px; }
 .ghost { min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); background: none; color: var(--gold); font: 700 14px Manrope, sans-serif; cursor: pointer; }
 .ghost:disabled { opacity: 0.4; cursor: default; }
 .shards-hint { margin: 10px 0 0; color: var(--muted); font-size: 12px; text-align: center; }
@@ -266,7 +265,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .stats b { font: 700 14px Unbounded, sans-serif; }
 @keyframes rise { from { opacity: 0; transform: translateY(24px) scale(0.96); } }
 
-/* giving a card: the large card makes way for a search and a list of players */
+/* a panel in place of the large card: the sheet shows it with .giving */
 .sheet { overflow-y: auto; }
 .sheet-card.giving > .face, .sheet-card.giving > .stats { display: none; }
 .sheet-card.giving { transform: none; }
@@ -507,12 +506,6 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 
 #newOffer { width: 100%; }
 
-/* crystals: the rates, and the melt asked once more */
-.rates { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 8px 0 0; color: var(--muted); font-size: 12px; }
-.rates .ti { margin-left: 4px; }
-.melt-list { max-height: 46vh; }
-.melt-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 52px; padding: 6px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--lacquer); }
-.melt-row small { flex: none; color: var(--gold); font-weight: 700; font-size: 13px; }
 
 
 

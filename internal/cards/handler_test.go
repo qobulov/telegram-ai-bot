@@ -96,14 +96,7 @@ func (f *fakeStore) OpenCards(ctx context.Context, userID int64, name string, n 
 	return open, nil
 }
 
-func (f *fakeStore) CardWallet(context.Context, int64) (int, map[int]int, error) {
-	return f.shards, map[int]int{0: 2, 4: 1}, nil
-}
-func (f *fakeStore) MeltCards(_ context.Context, _ int64, rates []int) (int, int, int, error) {
-	gained := 2*rates[0] + rates[4]
-	f.shards += gained
-	return 3, gained, f.shards, nil
-}
+func (f *fakeStore) CardWallet(context.Context, int64) (int, error) { return f.shards, nil }
 func (f *fakeStore) OfferCard(_ context.Context, from, give, want int64, rules storage.CardMarketRules) (int64, error) {
 	if f.offerErr != nil {
 		return 0, f.offerErr
@@ -241,18 +234,21 @@ func TestCardsAppOpensForTokensThenCrystals(t *testing.T) {
 	}
 }
 
-// The page shows the player's shards and what their spares melt into, and
-// melts them.
-func TestShardsInTheMiniApp(t *testing.T) {
+// The page shows the player's crystals, and melting spare copies into them
+// is gone: copies are used up by fusion alone.
+func TestMeltIsGone(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
-	store := &fakeStore{}
+	store := &fakeStore{shards: 5}
 	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }})
 	initData := signedInit(7, now)
-	if code, out := post(t, h, initData, "state"); code != 200 || out["spare"] != 3.0 || out["spare_worth"] != 52.0 {
+	if code, out := post(t, h, initData, "state"); code != 200 || out["shards"] != 5.0 {
 		t.Fatalf("state = %d %v", code, out)
 	}
-	if code, out := post(t, h, initData, "melt"); code != 200 || out["gained"] != 52.0 || out["shards"] != 52.0 {
-		t.Fatalf("melt = %d %v", code, out)
+	if code, _ := post(t, h, initData, "melt"); code != http.StatusBadRequest {
+		t.Errorf("melt = %d, want 400", code)
+	}
+	if store.shards != 5 {
+		t.Errorf("shards after a melt = %d, want 5", store.shards)
 	}
 }
 

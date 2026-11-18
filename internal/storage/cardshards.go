@@ -2,73 +2,17 @@ package storage
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
 )
 
-// CardWallet is the player's 💎 shards, and for each rarity the spare
-// copies of cards they hold that are not melted yet: all of a card's copies
-// but one.
-func (s *Store) CardWallet(ctx context.Context, userID int64) (shards int, spares map[int]int, err error) {
+// CardWallet is the player's 💎 crystals, which the shop spends.
+func (s *Store) CardWallet(ctx context.Context, userID int64) (shards int, err error) {
 	if err := s.pool.QueryRow(ctx, `SELECT coalesce((SELECT shards FROM card_players WHERE user_id = $1), 0)`, userID).Scan(&shards); err != nil {
-		return 0, nil, fmt.Errorf("storage: read a player's shards: %w", err)
+		return 0, fmt.Errorf("storage: read a player's shards: %w", err)
 	}
-	rows, err := s.pool.Query(ctx, `
-		SELECT c.rarity, sum(o.count - 1 - o.melted)::int FROM card_owned o JOIN card_catalog c ON c.id = o.card_id
-		WHERE o.user_id = $1 AND o.count - 1 - o.melted > 0 GROUP BY c.rarity`, userID)
-	if err != nil {
-		return 0, nil, fmt.Errorf("storage: count a player's spare cards: %w", err)
-	}
-	defer rows.Close()
-	spares = map[int]int{}
-	for rows.Next() {
-		var rarity, n int
-		if err := rows.Scan(&rarity, &n); err != nil {
-			return 0, nil, fmt.Errorf("storage: count a player's spare cards: %w", err)
-		}
-		spares[rarity] = n
-	}
-	if err := rows.Err(); err != nil {
-		return 0, nil, fmt.Errorf("storage: count a player's spare cards: %w", err)
-	}
-	return shards, spares, nil
-}
-
-// MeltCards melts the player's spare copies into shards, rates[r] for one of
-// rarity r: the copies stay held and counted in the points, so that melting
-// costs no place on the table. It gives how many it melted, the shards they
-// made and the player's shards after.
-func (s *Store) MeltCards(ctx context.Context, userID int64, rates []int) (melted, gained, shards int, err error) {
-	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		err := tx.QueryRow(ctx, `SELECT shards FROM card_players WHERE user_id = $1 FOR UPDATE`, userID).Scan(&shards)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		err = tx.QueryRow(ctx, `
-			WITH spare AS (
-				SELECT o.card_id, o.count - 1 - o.melted AS n, c.rarity
-				FROM card_owned o JOIN card_catalog c ON c.id = o.card_id
-				WHERE o.user_id = $1 AND o.count - 1 - o.melted > 0
-			), melt AS (
-				UPDATE card_owned o SET melted = o.count - 1 FROM spare
-				WHERE o.user_id = $1 AND o.card_id = spare.card_id
-			)
-			SELECT coalesce(sum(n), 0)::int, coalesce(sum(n * coalesce(($2::int[])[rarity + 1], 0)), 0)::int FROM spare`,
-			userID, rates).Scan(&melted, &gained)
-		if err != nil || gained == 0 {
-			return err
-		}
-		return tx.QueryRow(ctx, `UPDATE card_players SET shards = shards + $2 WHERE user_id = $1 RETURNING shards`, userID, gained).Scan(&shards)
-	})
-	if err != nil {
-		return 0, 0, 0, fmt.Errorf("storage: melt cards: %w", err)
-	}
-	return melted, gained, shards, nil
+	return shards, nil
 }
 
 // DuelTeam is the player's n strongest cards, by attack and health.

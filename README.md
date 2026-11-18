@@ -1324,8 +1324,8 @@ Each start sets the menu Telegram opens on "/" (`setMyCommands`, in
 same but `/start` for a group's members; and for its admins also `/mute`,
 `/unmute`, `/ignore` and `/unignore`. `/games` lists every game and
 `/card` to tap, the page games only while `WEBAPP_URL` serves
-them, and the Mini App holds the collection, the table and the shards (melting
-and a card out of turn); every command left out of the menu is answered all
+them, and the Mini App holds the collection, the table and the shards (a card
+out of turn, a duel's stake and the shop); every command left out of the menu is answered all
 the same. In a group the menu adds the bot's username itself. `/ranklog` is in
 no menu, the owner's or a rank's, as the owner asked, and is answered all the
 same. A failure is only logged.
@@ -2233,15 +2233,14 @@ each is drawn by its odds alone. A player's 30th draw without a Legendary and
 counts, `since_legendary` and `since_mythic` on `card_players`, migration 62,
 are still kept). In the Mini App a Mythic card glows: a rainbow foil runs over it, its gold
 glow breathes, it sparkles, and in the large view it leans with the finger or
-the phone, in CSS alone. A card drawn again gave only
-points, so its spare copies melt into 💎 crystals in the Mini App's draw tab
-(1, 3, 8, 20 or 50 by rarity, shown there), the copies still held and
-counted in the points so that melting costs no place on the table
-(`card_owned.melted`, migration 63); the melt is asked once more, listing
-each card's spares and the crystals they make, as melted copies can no
-longer be given. The Mini App's draw tab holds the crystals, which open cards
-once the tokens are spent. Crystals are melted in the Mini App alone: the bot has no
-commands for them.
+the phone, in CSS alone. A card drawn again gives only
+points. Spare copies once melted into 💎 crystals in the Mini App's draw tab; the
+owners took melting out (action `melt` answers 400, `TestMeltIsGone`), and the
+crystals players hold stay, for the shop and a card out of turn.
+`card_owned.melted` (migration 63) now counts the copies of a card used up, and
+the copies still held stay counted in the points. The Mini App's draw tab holds the
+crystals, which open cards once the tokens are spent. The bot has no commands
+for them.
 A player's 🎟 tokens (`card_players.tokens`, migration 80) each open one card,
 by the usual odds (Mythic 0.5%, Legendary 2.5%, Epic 9%, Rare 25%, Common 63%). Every player is given a token every 2 hours, the periods starting at even
 hours in Tashkent, when they next open the app or a card (`GiveDayTokens`, `free_day` marking the period
@@ -2288,8 +2287,8 @@ the other their card with its points, and the offer's player is told; an
 offer whose card its player no longer holds is called off when taken, and a
 player takes down their own (`unoffer`). A trade's two cards must be of the same rarity, a Mythic going only for a Mythic, as an offer and as a market take (`ErrCardTradeUneven`, "faqat bir xil darajadagi kartaga almashish mumkin"): one player's cards had gone to another's, Common cards for three Mythic in seven minutes, and later one rarity apart was still allowed. A limited card (`limitedCards` in `internal/storage/cardtrade.go`: Satoko Kirigaya, LIMITED No.000001) never changes hands: it is not offered, wanted or taken (`ErrCardLimited`, checked in `moveCard`, which every take goes through, and in the offer's check), and the page leaves it out of both lists of an offer (`limited` on each card). Offers placed before these rules, of two rarities or of a limited card, are left off the market and refused when taken; they are not changed in the database. The same two players trade as often as they like, and a player trades as many cards a day as they like: the daily limits were taken out. The market's cards show each card's tier; migration 75 called off the open offers the rule forbids. There is no trade command: `/trade`, which offered a card for a member's in
 a group, was taken out, and trades are done on the market alone. A card taken
-from the market may be the last copy, which leaves the collection (its melted copies, gone
-to shards, with it), its points passing only as it is new to its taker. With the pages served, the persona is told the game's facts
+from the market may be the last copy, which leaves the collection (its used-up copies
+with it), its points passing only as it is new to its taker. With the pages served, the persona is told the game's facts
 (`cardsNote`), as the model had said it was "not the card bot" and named
 commands there are none of; it teaches `/card` alone. The
 pictures are the characters' AniList pictures, the studios' art.

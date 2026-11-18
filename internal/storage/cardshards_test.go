@@ -5,8 +5,7 @@ import (
 	"testing"
 )
 
-// Spare copies melt into shards and stay counted in the points; shards draw
-// a card out of turn; a duel moves the stake once, however often its button
+// Shards draw a card out of turn; a duel moves the stake once, however often its button
 // is pressed.
 func TestShardsAndDuels(t *testing.T) {
 	store := newTestStore(t)
@@ -26,23 +25,6 @@ func TestShardsAndDuels(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	rates := []int{1, 3, 8, 20, 50}
-	if shards, spares, err := store.CardWallet(ctx, alice); err != nil || shards != 0 || spares[0] != 2 {
-		t.Fatalf("Alice's wallet = %d %v, %v", shards, spares, err)
-	}
-	melted, gained, shards, err := store.MeltCards(ctx, alice, rates)
-	if err != nil || melted != 2 || gained != 2 || shards != 2 {
-		t.Fatalf("melt = %d %d %d, %v", melted, gained, shards, err)
-	}
-	if melted, gained, _, err = store.MeltCards(ctx, alice, rates); err != nil || melted != 0 || gained != 0 {
-		t.Errorf("a second melt = %d %d, %v", melted, gained, err)
-	}
-	if _, _, _, err = store.MeltCards(ctx, 99, rates); err != nil {
-		t.Errorf("a melt by no player = %v", err)
-	}
-	if p, _, err := store.CardPlayerOf(ctx, alice); err != nil || p.Points != 5100 {
-		t.Errorf("Alice's points after melting = %d, %v", p.Points, err)
-	}
 
 	team, err := store.DuelTeam(ctx, alice, 3)
 	if err != nil || len(team) != 2 || team[0].ID != 1 {
@@ -57,8 +39,8 @@ func TestShardsAndDuels(t *testing.T) {
 	if moved, settled, err := store.ResolveDuel(ctx, -100, 5, alice, bob, 10); err != nil || settled || moved != 0 {
 		t.Errorf("the duel pressed again = %d %v, %v", moved, settled, err)
 	}
-	if shards, _, _ := store.CardWallet(ctx, alice); shards != 9 {
-		t.Errorf("Alice has %d shards after winning 7, want 9", shards)
+	if shards, _ := store.CardWallet(ctx, alice); shards != 7 {
+		t.Errorf("Alice has %d shards after winning 7, want 7", shards)
 	}
 	if _, settled, err := store.ResolveDuel(ctx, -100, 6, 0, 0, 0); err != nil || !settled {
 		t.Errorf("a refused duel = %v, %v", settled, err)

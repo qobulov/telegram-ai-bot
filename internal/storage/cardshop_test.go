@@ -45,7 +45,7 @@ func TestCardShop(t *testing.T) {
 	if marked, err := store.MarkCrystalRefunded(ctx, "c1"); err != nil || !marked {
 		t.Fatalf("refund = %v %v", marked, err)
 	}
-	if shards, _, _ := store.CardWallet(ctx, user); shards != 0 {
+	if shards, _ := store.CardWallet(ctx, user); shards != 0 {
 		t.Errorf("crystals after the refund = %d, want none left below 0", shards)
 	}
 	if marked, _ := store.MarkCrystalRefunded(ctx, "c1"); marked {
