@@ -266,3 +266,24 @@ func TestTheCatalogPagesThroughARarity(t *testing.T) {
 		t.Errorf("a limited card = %v", names(cards))
 	}
 }
+
+// With Open 0 a player may have as many offers open as they like.
+func TestTheCardMarketWithoutALimit(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	for _, q := range []string{
+		`INSERT INTO card_catalog (id, name, rarity, attack, health, value) SELECT g, 'Card ' || g, 1, 1, 1, 100 FROM generate_series(1, 8) g`,
+		`INSERT INTO card_players (user_id, name, points, cards, draws) VALUES (1, 'Alice', 700, 7, 7)`,
+		`INSERT INTO card_owned (user_id, card_id) SELECT 1, g FROM generate_series(1, 7) g`,
+	} {
+		if _, err := store.pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	market := CardMarketRules{Open: 0, Keep: 7 * 24 * time.Hour, Now: time.Now()}
+	for card := int64(1); card <= 7; card++ {
+		if _, err := store.OfferCard(ctx, 1, card, 8, market); err != nil {
+			t.Fatalf("offer %d: %v", card, err)
+		}
+	}
+}

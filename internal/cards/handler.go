@@ -91,9 +91,10 @@ const (
 	initDataAge  = 24 * time.Hour
 	maxBodyBytes = 16 << 10
 	topSize      = 20
-	// OffersOpen is how many offers a player may have on the market, and
-	// OfferKeep how long one stays there.
-	OffersOpen = 5
+	// OffersOpen is how many offers a player may have on the market, 0 for
+	// as many as they like (the owners lifted the limit of 5 on 2026-11-19),
+	// and OfferKeep how long one stays there.
+	OffersOpen = 0
 	OfferKeep  = 7 * 24 * time.Hour
 	// marketShown is the most offers the market lists, and catalogShown the
 	// most cards a search of the catalog finds; catalogPage is how many of a

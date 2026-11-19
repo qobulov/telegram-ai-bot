@@ -28,7 +28,7 @@
       wait: (time) => `⏳ ${time}`,
       market: "Bozor", newOffer: "➕ Taklif qo'yish", filterAll: "Hammasi", filterCan: "Bera olaman", filterMine: "Mening",
       gives: "Beradi", wants: "Xohlaydi", swap: "🔄 Almashish", noCard: "Sizda yo'q", remove: "✕ Olib tashlash", yours: "⭐ Sizniki", marketEmpty: "Hozircha taklif yo'q",
-      marketHint: (n) => `Kartangizni qo'ying va evaziga kerakli kartani tanlang. Kimda o'sha karta bo'lsa, almashadi. ${n} tagacha taklif, 7 kun turadi.`,
+      marketHint: () => `Kartangizni qo'ying va evaziga kerakli kartani tanlang. Kimda o'sha karta bo'lsa, almashadi. Taklif 7 kun turadi.`,
       step1: "1. Qaysi kartangizni berasiz?", step2: "2. Evaziga qaysi kartani xohlaysiz?", mineSearch: "Kartalaringizdan qidiring", wantSearch: "Xohlagan karta nomini yozing",
       place: "Taklif qo'yish", placed: "✅ Taklif bozorga qo'yildi", swapped: (c) => `🔄 Almashildi! Siz ${c} oldingiz`, removed: "Taklif olib tashlandi",
       refused: { uneven: "Faqat bir xil darajadagi kartaga almashish mumkin", limited: "🔒 Limited kartani almashib bo'lmaydi", over: "Bu taklif endi yo'q", gone: "Bu taklif endi yo'q", own: "Bu o'zingizning taklifingiz", not_held: "Sizda bu karta yo'q", same: "Bir xil kartani almashib bo'lmaydi", fused: "⭐ Yulduzli kartaning oxirgi nusxasini almashib bo'lmaydi" },
@@ -62,7 +62,7 @@
       wait: (time) => `⏳ ${time}`,
       market: "Рынок", newOffer: "➕ Выставить", filterAll: "Все", filterCan: "Могу дать", filterMine: "Мои",
       gives: "Отдаёт", wants: "Хочет", swap: "🔄 Обменять", noCard: "Нет у вас", remove: "✕ Снять", yours: "⭐ Ваше", marketEmpty: "Пока предложений нет",
-      marketHint: (n) => `Выставьте свою карту и выберите, какую хотите взамен. У кого она есть — обменяется. До ${n} предложений, 7 дней.`,
+      marketHint: () => `Выставьте свою карту и выберите, какую хотите взамен. У кого она есть — обменяется. Предложение висит 7 дней.`,
       step1: "1. Какую карту отдаёте?", step2: "2. Какую хотите взамен?", mineSearch: "Поиск по вашим картам", wantSearch: "Название нужной карты",
       place: "Выставить", placed: "✅ Предложение выставлено", swapped: (c) => `🔄 Обмен! Вы получили ${c}`, removed: "Предложение снято",
       refused: { uneven: "Менять можно только на карту той же редкости", limited: "🔒 Лимитированную карту нельзя обменять", over: "Этого предложения уже нет", gone: "Этого предложения уже нет", own: "Это ваше предложение", not_held: "У вас нет этой карты", same: "Нельзя менять карту на ту же", fused: "⭐ Последнюю копию звёздной карты нельзя обменять" },
@@ -96,7 +96,7 @@
       wait: (time) => `⏳ ${time}`,
       market: "Market", newOffer: "➕ Make an offer", filterAll: "All", filterCan: "I can give", filterMine: "Mine",
       gives: "Gives", wants: "Wants", swap: "🔄 Trade", noCard: "You lack it", remove: "✕ Take down", yours: "⭐ Yours", marketEmpty: "No offers yet",
-      marketHint: (n) => `Put up a card and pick the one you want for it. Whoever holds it can trade. Up to ${n} offers, for 7 days.`,
+      marketHint: () => `Put up a card and pick the one you want for it. Whoever holds it can trade. An offer stays for 7 days.`,
       step1: "1. Which card do you give?", step2: "2. Which card do you want?", mineSearch: "Search your cards", wantSearch: "Name of the card you want",
       place: "Put it up", placed: "✅ Your offer is up", swapped: (c) => `🔄 Traded! You got ${c}`, removed: "Offer taken down",
       refused: { uneven: "A card may be traded only for one of the same rarity", limited: "🔒 A limited card cannot be traded", over: "This offer is gone", gone: "This offer is gone", own: "This is your own offer", not_held: "You do not have that card", same: "A card cannot be traded for itself", fused: "⭐ The last copy of a starred card cannot be traded" },
@@ -913,7 +913,7 @@
 
   // ---------- market ----------
 
-  let offers = [], offerFilter = "all", openLimit = 5;
+  let offers = [], offerFilter = "all";
 
   // mini is a small card: its picture, rarity and name.
   function mini(card) {
@@ -931,7 +931,6 @@
     try {
       const data = await api("market");
       offers = data.offers || [];
-      openLimit = data.open_limit || openLimit;
       marketList();
       notice(null);
     } catch (error) {
@@ -940,7 +939,7 @@
   }
 
   function marketList() {
-    $("marketHint").textContent = t.marketHint(openLimit);
+    $("marketHint").textContent = t.marketHint();
     for (const chip of document.querySelectorAll("#marketFilter button")) chip.setAttribute("aria-pressed", String(chip.dataset.f === offerFilter));
     const list = $("offers");
     list.textContent = "";

@@ -25,7 +25,8 @@ type CardOffer struct {
 }
 
 // CardMarketRules bound the market: Open is how many offers a player may
-// have open, and an offer older than Keep is gone.
+// have open, 0 for as many as they like, and an offer older than Keep is
+// gone.
 type CardMarketRules struct {
 	Open int
 	Keep time.Duration
@@ -62,7 +63,7 @@ func (s *Store) OfferCard(ctx context.Context, from, give, want int64, rules Car
 			from, rules.Now.Add(-rules.Keep)).Scan(&open); err != nil {
 			return err
 		}
-		if open >= rules.Open {
+		if rules.Open > 0 && open >= rules.Open {
 			return &CardOffersError{Limit: rules.Open}
 		}
 		if err := checkEven(ctx, tx, give, want); err != nil {

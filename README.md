@@ -2357,7 +2357,7 @@ they pick from the catalog (`offer`): as soon as their card is picked the list
 shows the first 10 of that rarity, the most loved first, and 10 more each time
 it is scrolled to its end, a name typed narrowing it (`catalog` with `rarity`,
 `card` and `offset`, `CatalogCards`; without `rarity` it still searches the
-whole catalog by name); at most 5 open, each for 7 days;
+whole catalog by name); as many open as a player likes (the limit of 5 was lifted on 2026-11-19), each for 7 days;
 anyone who holds the card wanted presses 🔄 to take it (`take`), each giving
 the other their card with its points, and the offer's player is told; an
 offer whose card its player no longer holds is called off when taken, and a

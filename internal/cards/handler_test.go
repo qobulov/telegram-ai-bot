@@ -182,7 +182,7 @@ func (f *fakeStore) OfferCard(_ context.Context, from, give, want int64, rules s
 	if f.offerErr != nil {
 		return 0, f.offerErr
 	}
-	if len(f.offers) >= rules.Open {
+	if rules.Open > 0 && len(f.offers) >= rules.Open {
 		return 0, &storage.CardOffersError{Limit: rules.Open}
 	}
 	id := int64(len(f.offers) + 1)
