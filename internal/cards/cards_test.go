@@ -54,7 +54,7 @@ func TestChosenRarities(t *testing.T) {
 	if RarityOf(89334, 9) != Epic || RarityOf(99999, 400) != Common || RarityOf(88572, 7) != Mythic {
 		t.Errorf("Reigen at 9 = %v, an unknown at 400 = %v, Emilia = %v", RarityOf(89334, 9), RarityOf(99999, 400), RarityOf(88572, 7))
 	}
-	if len(mythicIDs) != 30 || len(legendaryIDs) != 73 || len(epicIDs) != 7 || RarityOf(298761, 900) != Mythic || RarityOf(298762, 900) != Epic {
+	if len(mythicIDs) != 31 || len(legendaryIDs) != 86 || RarityOf(203633, 900) != Mythic || RarityOf(341135, 900) != Legendary || len(epicIDs) != 7 || RarityOf(298761, 900) != Mythic || RarityOf(298762, 900) != Epic {
 		t.Errorf("chosen %d Mythic and %d Legendary", len(mythicIDs), len(legendaryIDs))
 	}
 	// The Seven Deadly Sins' knights raised (migration 101): Lancelot and
