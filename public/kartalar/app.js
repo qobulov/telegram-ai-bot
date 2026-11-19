@@ -2068,11 +2068,11 @@
       skills: { strike: "Kuchli zarba", heal: "Davolash", shield: "Qalqon", stun: "Hayratlantirish", poison: "Zahar", provoke: "Chaqiriq" }, fell: (n) => `💀 ${n} yiqildi`,
       skillInfo: { strike: "energiya to'lganda 1.8 barobar zarba", heal: "energiya to'lganda eng zaif yarador ittifoqchiga jonining 80% igacha qaytaradi", shield: "energiya to'lganda o'ziga va eng zaif ittifoqchiga jonining 45% i qalqon", stun: "energiya to'lganda urib, raqibning keyingi yurishini o'tkazdiradi", poison: "energiya to'lganda urib zaharlaydi: 3 yurish davomida 15% jon", provoke: "energiya to'lganda 3 raund raqib tank va jangchilarini o'ziga tortadi va zarbani 30% kam oladi" },
       tower: {
-        best: "Eng baland qavat", floorN: (n) => `${n}-qavat`, tries: "🗼 Urinishlar: cheksiz", none: "hali yo'q",
+        best: "Eng baland qavat", floorN: (n) => `${n}-qavat`, none: "hali yo'q",
         theme: (a, p) => `🎌 Bu hafta: ${a} +${p}%`, themeHint: "Shu anime kartalaringiz minorada kuchliroq: hujum va jon", noTheme: "Bu hafta mavzu yo'q",
         enemy: (n) => `🗼 ${n}-qavat`, reward: (c, k) => `Birinchi o'tish: +${c} 🪙` + (k ? ` · +${k} 🎟` : ""), fight: (n) => `⚔️ ${n}-qavatga jang`,
         noTeam: "Avval Arena bo'limida jamoa saqlang",
-        rule: () => `Urinishlar cheksiz. G'alaba keyingi qavatni ochadi va mukofot beradi, mag'lubiyat hech narsa olmaydi. Har 5-qavat +1 🎟, har 10-qavat +3 🎟`,
+        rule: () => `G'alaba keyingi qavatni ochadi va mukofot beradi, mag'lubiyat hech narsa bermaydi. Har 5-qavat +1 🎟, har 10-qavat +3 🎟`,
         cleared: (n) => `🗼 ${n}-qavat o'tildi!`, failed: (n) => `${n}-qavat o'tilmadi`, tokens: (n) => `🎟 +${n} token`,
         refused: { no_team: "Avval Arena bo'limida jamoa saqlang", no_floor: "Bu qavat hali tayyor emas", moved: "Bu qavat allaqachon o'tildi, sahifa yangilandi" },
       },
@@ -2113,11 +2113,11 @@
       skills: { strike: "Сильный удар", heal: "Лечение", shield: "Щит", stun: "Оглушение", poison: "Яд", provoke: "Провокация" }, fell: (n) => `💀 ${n} пал(а)`,
       skillInfo: { strike: "при полной энергии удар ×1.8", heal: "при полной энергии возвращает самому слабому раненому союзнику до 80% здоровья", shield: "при полной энергии щит в 45% здоровья себе и самому слабому союзнику", stun: "при полной энергии бьёт, и соперник пропускает следующий ход", poison: "при полной энергии бьёт и отравляет: 15% здоровья 3 хода", provoke: "при полной энергии 3 раунда притягивает танков и бойцов соперника и получает на 30% меньше урона" },
       tower: {
-        best: "Высший этаж", floorN: (n) => `Этаж ${n}`, tries: "🗼 Попытки: без ограничений", none: "пока нет",
+        best: "Высший этаж", floorN: (n) => `Этаж ${n}`, none: "пока нет",
         theme: (a, p) => `🎌 На этой неделе: ${a} +${p}%`, themeHint: "Ваши карты этого аниме в башне сильнее: атака и здоровье", noTheme: "На этой неделе темы нет",
         enemy: (n) => `🗼 Этаж ${n}`, reward: (c, k) => `За первое прохождение: +${c} 🪙` + (k ? ` · +${k} 🎟` : ""), fight: (n) => `⚔️ Бой за этаж ${n}`,
         noTeam: "Сначала сохраните команду в разделе Арена",
-        rule: () => `Попытки без ограничений. Победа открывает следующий этаж и даёт награду, поражение ничего не отнимает. Каждый 5-й этаж +1 🎟, каждый 10-й +3 🎟`,
+        rule: () => `Победа открывает следующий этаж и даёт награду, поражение ничего не даёт. Каждый 5-й этаж +1 🎟, каждый 10-й +3 🎟`,
         cleared: (n) => `🗼 Этаж ${n} пройден!`, failed: (n) => `Этаж ${n} не пройден`, tokens: (n) => `🎟 +${n} токен.`,
         refused: { no_team: "Сначала сохраните команду в разделе Арена", no_floor: "Этот этаж ещё не готов", moved: "Этот этаж уже пройден, страница обновлена" },
       },
@@ -2158,11 +2158,11 @@
       skills: { strike: "Power strike", heal: "Heal", shield: "Shield", stun: "Stun", poison: "Poison", provoke: "Provoke" }, fell: (n) => `💀 ${n} fell`,
       skillInfo: { strike: "when energy is full, hits ×1.8", heal: "when energy is full, gives the weakest hurt ally back up to 80% of its health", shield: "when energy is full, shields itself and its weakest ally for 45% of their health", stun: "when energy is full, hits and the target skips its next turn", poison: "when energy is full, hits and poisons: 15% health for 3 turns", provoke: "when energy is full, draws enemy tanks and fighters for 3 rounds and takes 30% less damage" },
       tower: {
-        best: "Highest floor", floorN: (n) => `Floor ${n}`, tries: "🗼 Attempts: unlimited", none: "none yet",
+        best: "Highest floor", floorN: (n) => `Floor ${n}`, none: "none yet",
         theme: (a, p) => `🎌 This week: ${a} +${p}%`, themeHint: "Your cards of this anime are stronger in the tower: attack and health", noTheme: "No theme this week",
         enemy: (n) => `🗼 Floor ${n}`, reward: (c, k) => `First clear: +${c} 🪙` + (k ? ` · +${k} 🎟` : ""), fight: (n) => `⚔️ Fight floor ${n}`,
         noTeam: "Save a team in the Arena first",
-        rule: () => `Unlimited attempts. A win opens the next floor and gives its reward, a loss costs nothing. Every 5th floor +1 🎟, every 10th +3 🎟`,
+        rule: () => `A win opens the next floor and gives its reward, a loss gives nothing. Every 5th floor +1 🎟, every 10th +3 🎟`,
         cleared: (n) => `🗼 Floor ${n} cleared!`, failed: (n) => `Floor ${n} not cleared`, tokens: (n) => `🎟 +${n} tokens`,
         refused: { no_team: "Save a team in the Arena first", no_floor: "This floor is not ready yet", moved: "This floor is cleared already; the page is refreshed" },
       },
@@ -2740,12 +2740,11 @@
     towerData = data;
     const tw = at.tower;
     const me = $("towerMe");
-    me.innerHTML = '<div class="arena-rating"><small></small><b></b></div><div class="arena-left"><span></span><span></span></div>';
+    me.innerHTML = '<div class="arena-rating"><small></small><b></b></div><div class="arena-left"><span></span></div>';
     me.querySelector(".arena-rating small").textContent = tw.best;
     me.querySelector(".arena-rating b").textContent = data.floor ? tw.floorN(data.floor) : tw.none;
     const left = me.querySelectorAll(".arena-left span");
-    left[0].textContent = tw.tries;
-    left[1].textContent = data.theme && data.theme.anime ? tw.theme(data.theme.anime, data.theme.bonus) : tw.noTheme;
+    left[0].textContent = data.theme && data.theme.anime ? tw.theme(data.theme.anime, data.theme.bonus) : tw.noTheme;
     $("towerTheme").textContent = data.theme && data.theme.anime ? tw.themeHint : "";
     $("towerTheme").hidden = !(data.theme && data.theme.anime);
     $("towerRule").textContent = tw.rule();
