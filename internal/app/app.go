@@ -392,6 +392,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		PrivateDailyLimit:     cfg.PrivateDailyLimit,
 		Payments:              bot.Client,
 		Crystals:              store,
+		Mail:                  store,
 		Premium:               store,
 		Cards:                 store,
 		PremiumPrice:          cfg.PremiumPrice,

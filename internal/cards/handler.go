@@ -46,6 +46,11 @@ type Store interface {
 	CardQuests(ctx context.Context, userID int64, day time.Time) (map[string]storage.QuestProgress, error)
 	ClaimCardQuest(ctx context.Context, userID int64, quest storage.CardQuest, reward int, now time.Time) error
 	AnimeRewardsClaimed(ctx context.Context, userID int64) ([]string, error)
+	CardInbox(ctx context.Context, userID int64) (boxes, unclaimed int, err error)
+	CardBoxes(ctx context.Context, userID int64) (map[string]int, error)
+	CardMailbox(ctx context.Context, userID int64, limit int) ([]storage.CardMail, error)
+	ClaimCardMail(ctx context.Context, userID int64, name string, id int64) (storage.CardMail, storage.CardOpening, bool, error)
+	OpenCardBox(ctx context.Context, userID int64, name, box string, crystals int) (shards, left int, err error)
 	ClaimAnimeReward(ctx context.Context, userID int64, name, anime string, tokens int) (after int, claimed bool, err error)
 }
 
@@ -75,6 +80,8 @@ type Options struct {
 	// Mythic is the event's card; nil draws by the event's odds.
 	EventRoll func() Rarity
 	EventPick func() bool
+	// BoxRoll draws a box's prize, 0 to n-1; nil is math/rand.
+	BoxRoll func(n int) int
 }
 
 const (
@@ -221,6 +228,12 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return h.animes(ctx, opened.User)
 	case "anime_claim":
 		return h.animeClaim(ctx, opened.User, req.Query)
+	case "inbox":
+		return h.inbox(ctx, opened.User)
+	case "mail_claim":
+		return h.mailClaim(ctx, opened.User, req.Offer)
+	case "box_open":
+		return h.boxOpen(ctx, opened.User, req.Item)
 	case "offer":
 		return h.offer(ctx, opened.User, req.Card, req.Want)
 	case "take":
@@ -344,12 +357,18 @@ func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
 		h.Logger.Error("could not read card quests", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
 	}
+	boxes, unclaimed, err := h.Store.CardInbox(ctx, user.ID)
+	if err != nil {
+		h.Logger.Error("could not count a player's inbox", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
 	return map[string]any{
 		"cards": views, "points": player.Points, "held": len(owned),
 		"tokens": Tokens(player, now), "given": given, "per_day": PerDay, "card_cost": CardCost, "batch": Batch,
 		"next_token_in": Today(now).Next().Sub(now).Milliseconds(),
 		"shards":        shards,
 		"quests":        map[string]any{"done": done, "ready": ready, "total": len(Quests(now)), "reset_in": questsResetIn(now)},
+		"inbox":         map[string]any{"boxes": boxes, "mail": unclaimed},
 	}, failure{}
 }
 

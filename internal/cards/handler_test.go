@@ -56,6 +56,8 @@ type fakeStore struct {
 	quests   fakeQuests
 	catalog  []storage.Card  // cards beyond heldCard and lockedCard
 	animes   map[string]bool // the anime rewards claimed
+	boxes    map[string]int
+	mail     []storage.CardMail
 }
 
 var (
@@ -69,6 +71,47 @@ func (f *fakeStore) CardCollections(context.Context) (map[string]int, error) {
 func (f *fakeStore) SaveCardCatalog(context.Context, []storage.Card) error { return nil }
 func (f *fakeStore) CardCatalog(context.Context) ([]storage.Card, error) {
 	return append([]storage.Card{heldCard, lockedCard}, f.catalog...), nil
+}
+func (f *fakeStore) CardInbox(context.Context, int64) (int, int, error) {
+	boxes, unclaimed := 0, 0
+	for _, n := range f.boxes {
+		boxes += n
+	}
+	for _, m := range f.mail {
+		if m.ClaimedAt == nil {
+			unclaimed++
+		}
+	}
+	return boxes, unclaimed, nil
+}
+func (f *fakeStore) CardBoxes(context.Context, int64) (map[string]int, error) { return f.boxes, nil }
+func (f *fakeStore) CardMailbox(context.Context, int64, int) ([]storage.CardMail, error) {
+	return f.mail, nil
+}
+func (f *fakeStore) ClaimCardMail(_ context.Context, userID int64, _ string, id int64) (storage.CardMail, storage.CardOpening, bool, error) {
+	for i, m := range f.mail {
+		if m.ID != id || m.UserID != userID || m.ClaimedAt != nil {
+			continue
+		}
+		now := time.Now()
+		f.mail[i].ClaimedAt = &now
+		if f.boxes == nil {
+			f.boxes = map[string]int{}
+		}
+		f.boxes[m.Box] += m.Boxes
+		f.tokens += m.Tokens
+		f.shards += m.Crystals
+		return m, storage.CardOpening{Tokens: f.tokens, Shards: f.shards}, true, nil
+	}
+	return storage.CardMail{}, storage.CardOpening{}, false, nil
+}
+func (f *fakeStore) OpenCardBox(_ context.Context, _ int64, _, box string, crystals int) (int, int, error) {
+	if f.boxes[box] <= 0 {
+		return 0, 0, storage.ErrNoCardBox
+	}
+	f.boxes[box]--
+	f.shards += crystals
+	return f.shards, f.boxes[box], nil
 }
 func (f *fakeStore) AnimeRewardsClaimed(context.Context, int64) ([]string, error) {
 	var claimed []string

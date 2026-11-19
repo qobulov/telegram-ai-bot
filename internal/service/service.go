@@ -197,6 +197,9 @@ type Options struct {
 	// none. Extras keeps reputation and a group's settings; nil turns them
 	// off.
 	Crystals CrystalBook
+	// Mail sends the owners' /gift to the cards app's mailbox; nil turns
+	// /gift off.
+	Mail CardMailer
 	// BoxRoll draws a diamond box's prize (0 to n-1); nil is math/rand.
 	BoxRoll func(n int) int
 	Extras  GroupExtras

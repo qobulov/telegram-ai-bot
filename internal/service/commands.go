@@ -790,7 +790,7 @@ func (s *Service) ignored(in incoming, rules []storage.GroupRule) bool {
 var privateOwnerCommands = map[string]bool{
 	"/aichat": true, "/limit": true, "/active": true, "/settings": true, "/set": true,
 	"/stats": true, "/model": true, "/aigroups": true, "/announce": true, "/payments": true,
-	"/refund": true, "/business": true, "/import_stickers": true,
+	"/refund": true, "/business": true, "/import_stickers": true, "/gift": true,
 }
 
 // retiredCommands are the card game's commands the app replaced: /card
@@ -1735,6 +1735,8 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 		return s.showPayments(ctx, in)
 	case "/refund":
 		return s.refund(ctx, in)
+	case "/gift":
+		return s.giftCommand(ctx, in)
 	case "/paysupport":
 		return s.paySupport(in)
 	case "/business":

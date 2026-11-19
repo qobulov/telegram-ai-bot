@@ -39,7 +39,7 @@
       shopTab: "Do'kon", shopBuyTitle: "💎 Kristall sotib olish", shopBuyHint: "Telegram Stars bilan to'lanadi, kristall darhol hisobingizga tushadi.", shopItemsTitle: "🛒 Kristallga xarid",
       wallet: (n) => `Sizda: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% foyda`,
       tokensItem: (n) => `${n} ta token`, tokensHint: (n) => `${n} ta karta ochadi, kutmasdan`, packItem: (r) => `${r} paket`, packHint: (n, r) => `${n} ta karta, kamida 1 ta ${r.toLowerCase()} kafolatlangan`,
-      boxTitle: "🎁 Almaz box", boxRange: (a, b) => `${a}–${b} 💎`, boxGot: "Almaz box ochildi!", boxLucky: "🔥 Omadingiz keldi!",
+      boxTitle: "🎁 Almaz box", bagBoxes: "🎁 Qutilar", bagMail: "📬 Pochta", bagNoBoxes: "Hozircha quti yo'q", bagNoMail: "Xat yo'q", bagOpen: "Ochish", bagClaim: "Olish", bagGift: "Sovg'a", bagClaimed: (s) => `✅ Olindi: ${s}`, bagBoxN: (n) => `${n} ta Almaz box`, bagTokensN: (n) => `${n} token`, bagCrystalsN: (n) => `${n} kristall`, boxRange: (a, b) => `${a}–${b} 💎`, boxGot: "Almaz box ochildi!", boxLucky: "🔥 Omadingiz keldi!",
       paid: "✅ To'lov qabul qilindi, kristall qo'shilmoqda…", crystalsAdded: (n) => `💎 +${n} kristall qo'shildi!`, payFailed: "To'lov amalga oshmadi", bought: (n) => `🎟 +${n} token`, packOpened: (r) => `${r} paket`,
     },
     ru: {
@@ -73,7 +73,7 @@
       shopTab: "Магазин", shopBuyTitle: "💎 Купить кристаллы", shopBuyHint: "Оплата Telegram Stars, кристаллы приходят сразу.", shopItemsTitle: "🛒 За кристаллы",
       wallet: (n) => `У вас: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% выгоды`,
       tokensItem: (n) => `${n} токенов`, tokensHint: (n) => `Откроют ${n} карт без ожидания`, packItem: (r) => `Пак: ${r}`, packHint: (n, r) => `${n} карт, минимум одна ${r.toLowerCase()} гарантирована`,
-      boxTitle: "🎁 Алмазный бокс", boxRange: (a, b) => `${a}–${b} 💎`, boxGot: "Алмазный бокс открыт!", boxLucky: "🔥 Вам повезло!",
+      boxTitle: "🎁 Алмазный бокс", bagBoxes: "🎁 Боксы", bagMail: "📬 Почта", bagNoBoxes: "Пока нет боксов", bagNoMail: "Писем нет", bagOpen: "Открыть", bagClaim: "Забрать", bagGift: "Подарок", bagClaimed: (s) => `✅ Получено: ${s}`, bagBoxN: (n) => `Алмазный бокс ×${n}`, bagTokensN: (n) => `${n} токенов`, bagCrystalsN: (n) => `${n} кристаллов`, boxRange: (a, b) => `${a}–${b} 💎`, boxGot: "Алмазный бокс открыт!", boxLucky: "🔥 Вам повезло!",
       paid: "✅ Оплата принята, кристаллы зачисляются…", crystalsAdded: (n) => `💎 +${n} кристаллов!`, payFailed: "Оплата не прошла", bought: (n) => `🎟 +${n} токенов`, packOpened: (r) => `Пак: ${r}`,
     },
     en: {
@@ -107,7 +107,7 @@
       shopTab: "Shop", shopBuyTitle: "💎 Buy crystals", shopBuyHint: "Paid in Telegram Stars; the crystals arrive at once.", shopItemsTitle: "🛒 For crystals",
       wallet: (n) => `You have: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% value`,
       tokensItem: (n) => `${n} tokens`, tokensHint: (n) => `Open ${n} cards without the wait`, packItem: (r) => `${r} pack`, packHint: (n, r) => `${n} cards, at least one ${r.toLowerCase()} guaranteed`,
-      boxTitle: "🎁 Diamond box", boxRange: (a, b) => `${a}–${b} 💎`, boxGot: "Diamond box opened!", boxLucky: "🔥 Lucky you!",
+      boxTitle: "🎁 Diamond box", bagBoxes: "🎁 Boxes", bagMail: "📬 Mail", bagNoBoxes: "No boxes yet", bagNoMail: "No letters", bagOpen: "Open", bagClaim: "Claim", bagGift: "Gift", bagClaimed: (s) => `✅ Claimed: ${s}`, bagBoxN: (n) => `${n} diamond box${n === 1 ? "" : "es"}`, bagTokensN: (n) => `${n} tokens`, bagCrystalsN: (n) => `${n} crystals`, boxRange: (a, b) => `${a}–${b} 💎`, boxGot: "Diamond box opened!", boxLucky: "🔥 Lucky you!",
       paid: "✅ Payment received, adding your crystals…", crystalsAdded: (n) => `💎 +${n} crystals!`, payFailed: "The payment did not go through", bought: (n) => `🎟 +${n} tokens`, packOpened: (r) => `${r} pack`,
     },
   };
@@ -175,6 +175,7 @@
     tokens = data.tokens || 0;
     if (data.given) toast(t.given(data.given));
     if (data.quests) questShow(data.quests);
+    if (data.inbox) bagBadge(data.inbox);
     shardsPanel();
     notice(null);
     header();
@@ -570,6 +571,7 @@
     node.textContent = text;
   }
   $("coinTokens").addEventListener("click", () => toast(t.tokenHint(perDay, cardCost)));
+  $("bagButton").addEventListener("click", openBag);
   $("coinShards").setAttribute("aria-label", t.shopTab);
   $("coinShards").addEventListener("click", () => showTab("shop"));
 
@@ -1354,6 +1356,140 @@
       list.append(item);
     }
     return panel;
+  }
+
+  // ---------- bag: boxes and mail ----------
+
+  // bagBadge counts on the 🎒 what waits: boxes held and letters to claim.
+  function bagBadge(inbox) {
+    const n = (inbox.boxes || 0) + (inbox.mail || 0);
+    const badge = $("bagBadge");
+    badge.hidden = n === 0;
+    badge.textContent = n > 9 ? "9+" : String(n);
+  }
+
+  async function openBag() {
+    haptic("light");
+    try {
+      const data = await api("inbox");
+      bagBadge({
+        boxes: (data.boxes || []).reduce((n, b) => n + b.count, 0),
+        mail: (data.mail || []).filter((m) => !m.claimed).length,
+      });
+      showPanel(bagPanel(data));
+    } catch (error) {
+      notice(error);
+    }
+  }
+
+  function boxRange(pack) {
+    return t.boxRange(spaced(pack.box[0].crystals), spaced(pack.box[pack.box.length - 1].crystals));
+  }
+
+  // bagPanel lists the boxes held, each with its count and an open button,
+  // and the letters, newest first, with their gifts and a claim button.
+  function bagPanel(data) {
+    const panel = document.createElement("div");
+    panel.className = "gift inbox";
+    const boxTitle = document.createElement("h3");
+    boxTitle.textContent = t.bagBoxes;
+    panel.append(boxTitle);
+    const boxes = (data.boxes || []).filter((b) => b.count > 0);
+    if (!boxes.length) panel.append(emptyLine(t.bagNoBoxes));
+    for (const b of boxes) {
+      const row = inboxRow("🎁", t.boxTitle.replace("🎁 ", "") + ` ×${b.count}`, boxRange({ box: b.box }));
+      const open = document.createElement("button");
+      open.type = "button";
+      open.textContent = t.bagOpen;
+      open.addEventListener("click", async () => {
+        open.disabled = true;
+        try {
+          const res = await api("box_open", { item: b.id });
+          if (res.refused) { openBag(); return; }
+          shards = res.shards ?? shards;
+          header();
+          shardsPanel();
+          const badge = $("bagBadge");
+          const left = Math.max(0, (parseInt(badge.textContent, 10) || 1) - 1);
+          badge.hidden = left === 0;
+          badge.textContent = String(left);
+          haptic("heavy");
+          showPanel(boxResultPanel({ box: [{ crystals: res.least }] }, res.won));
+        } catch (error) {
+          open.disabled = false;
+          notice(error);
+        }
+      });
+      row.append(open);
+      panel.append(row);
+    }
+    const mailTitle = document.createElement("h3");
+    mailTitle.textContent = t.bagMail;
+    panel.append(mailTitle);
+    const mail = data.mail || [];
+    if (!mail.length) panel.append(emptyLine(t.bagNoMail));
+    for (const m of mail) {
+      const gifts = mailGifts(m);
+      const row = inboxRow("📬", m.note || t.bagGift, gifts);
+      if (m.claimed) {
+        row.classList.add("done");
+        const mark = document.createElement("span");
+        mark.className = "done-mark";
+        mark.textContent = "✅";
+        row.append(mark);
+      } else {
+        const claim = document.createElement("button");
+        claim.type = "button";
+        claim.textContent = t.bagClaim;
+        claim.addEventListener("click", async () => {
+          claim.disabled = true;
+          try {
+            const res = await api("mail_claim", { offer: m.id });
+            if (!res.refused) {
+              tokens = res.tokens ?? tokens;
+              shards = res.shards ?? shards;
+              header();
+              shardsPanel();
+              drawButton();
+              toast(t.bagClaimed(gifts));
+              haptic("medium");
+            }
+            openBag();
+          } catch (error) {
+            claim.disabled = false;
+            notice(error);
+          }
+        });
+        row.append(claim);
+      }
+      panel.append(row);
+    }
+    return panel;
+  }
+
+  function mailGifts(m) {
+    const parts = [];
+    if (m.boxes) parts.push("🎁 " + t.bagBoxN(m.boxes));
+    if (m.tokens) parts.push("🎟 " + t.bagTokensN(m.tokens));
+    if (m.crystals) parts.push("💎 " + t.bagCrystalsN(spaced(m.crystals)));
+    return parts.join(" · ");
+  }
+
+  function inboxRow(icon, title, line) {
+    const row = document.createElement("div");
+    row.className = "inbox-row";
+    row.innerHTML = '<span class="ico"></span><span><b></b><small></small></span>';
+    row.querySelector(".ico").textContent = icon;
+    row.querySelector("b").textContent = title;
+    row.querySelector("small").textContent = line;
+    return row;
+  }
+
+  function emptyLine(text) {
+    const p = document.createElement("p");
+    p.className = "empty-line";
+    p.textContent = text;
+    return p;
   }
 
   // boxResultPanel shows what a box gave, big, with a word for a rare one.

@@ -63,6 +63,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
   background: var(--panel); border: 1px solid var(--line); color: var(--text); font: 700 14px Unbounded, sans-serif;
 }
 .coin span { font-size: 15px; }
+.coin b { white-space: nowrap; }
 /* The crystals' pill opens the shop, which has no tab of its own: a gold +
    says so, and the pill is lit while the shop is open. */
 .coin .plus {
@@ -82,6 +83,32 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 }
 .event-badge[hidden] { display: none; }
 @keyframes event-beat { 0%, 70%, 100% { transform: scale(1); } 80% { transform: scale(1.14); } 90% { transform: scale(0.98); } }
+/* The bag: boxes held and letters to claim, beside the points; a red count
+   while something waits. */
+.wallet-row { display: flex; align-items: center; gap: 8px; }
+.bag {
+  position: relative; display: grid; place-items: center; width: 30px; height: 26px; padding: 0; border-radius: 9px; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--line); font-size: 14px; line-height: 1;
+}
+.bag-badge {
+  position: absolute; top: -6px; right: -6px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; box-sizing: border-box;
+  font: 800 10px/16px Manrope, sans-serif; font-style: normal; text-align: center; color: #fff; background: #e5484d;
+}
+.bag-badge[hidden] { display: none; }
+.inbox { display: grid; gap: 10px; text-align: left; }
+.inbox h3 { margin: 4px 0 0; font: 700 13px Unbounded, sans-serif; color: var(--gold); }
+.inbox .empty-line { margin: 0; color: var(--muted); font-size: 13px; }
+.inbox-row {
+  display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px;
+  background: color-mix(in srgb, var(--gold) 8%, transparent);
+}
+.inbox-row .ico { font-size: 22px; text-align: center; }
+.inbox-row b { display: block; font: 700 13px Manrope, sans-serif; }
+.inbox-row small { display: block; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.inbox-row button { min-height: 34px; padding: 0 12px; border: 0; border-radius: 10px; cursor: pointer; font: 700 12px Unbounded, sans-serif; color: var(--ink); background: linear-gradient(135deg, #fff1c4, var(--gold)); }
+.inbox-row button:disabled { filter: grayscale(0.9) brightness(0.6); cursor: default; }
+.inbox-row.done { opacity: 0.55; }
+.inbox-row .done-mark { font-size: 16px; }
 .coin.bump { animation: bump 0.45s ease; }
 @keyframes bump { 40% { transform: scale(1.18); border-color: var(--gold); } }
 .points { display: flex; align-items: center; gap: 5px; padding: 0 4px; font: 700 13px Unbounded, sans-serif; color: var(--gold); }
