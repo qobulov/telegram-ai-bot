@@ -39,7 +39,7 @@
       shopTab: "Do'kon", shopBuyTitle: "💎 Kristall sotib olish", shopBuyHint: "Telegram Stars bilan to'lanadi, kristall darhol hisobingizga tushadi.", shopItemsTitle: "🛒 Kristallga xarid",
       wallet: (n) => `Sizda: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% foyda`,
       tokensItem: (n) => `${n} ta token`, tokensHint: (n) => `${n} ta karta ochadi, kutmasdan`, packItem: (r) => `${r} paket`, packHint: (n, r) => `${n} ta karta, kamida 1 ta ${r.toLowerCase()} kafolatlangan`,
-      boxTitle: "🎁 Almaz box", boxRange: (a, b) => `${a}–${b} 💎`, boxOdds: "Qancha ko'p bo'lsa, shuncha kam tushadi", boxOpened: (n) => `🎁 Almaz box: +${n} kristall!`, boxBuy: (n) => `Ochish · ${n} ⭐`, boxGot: "Almaz box ochildi!", boxLucky: "🔥 Omadingiz keldi!",
+      boxTitle: "🎁 Almaz box", boxRange: (a, b) => `${a}–${b} 💎`, boxOdds: "Qancha ko'p bo'lsa, shuncha kam tushadi", boxGot: "Almaz box ochildi!", boxLucky: "🔥 Omadingiz keldi!",
       paid: "✅ To'lov qabul qilindi, kristall qo'shilmoqda…", crystalsAdded: (n) => `💎 +${n} kristall qo'shildi!`, payFailed: "To'lov amalga oshmadi", bought: (n) => `🎟 +${n} token`, packOpened: (r) => `${r} paket`,
     },
     ru: {
@@ -73,7 +73,7 @@
       shopTab: "Магазин", shopBuyTitle: "💎 Купить кристаллы", shopBuyHint: "Оплата Telegram Stars, кристаллы приходят сразу.", shopItemsTitle: "🛒 За кристаллы",
       wallet: (n) => `У вас: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% выгоды`,
       tokensItem: (n) => `${n} токенов`, tokensHint: (n) => `Откроют ${n} карт без ожидания`, packItem: (r) => `Пак: ${r}`, packHint: (n, r) => `${n} карт, минимум одна ${r.toLowerCase()} гарантирована`,
-      boxTitle: "🎁 Алмазный бокс", boxRange: (a, b) => `${a}–${b} 💎`, boxOdds: "Чем больше, тем реже выпадает", boxOpened: (n) => `🎁 Алмазный бокс: +${n} кристаллов!`, boxBuy: (n) => `Открыть · ${n} ⭐`, boxGot: "Алмазный бокс открыт!", boxLucky: "🔥 Вам повезло!",
+      boxTitle: "🎁 Алмазный бокс", boxRange: (a, b) => `${a}–${b} 💎`, boxOdds: "Чем больше, тем реже выпадает", boxGot: "Алмазный бокс открыт!", boxLucky: "🔥 Вам повезло!",
       paid: "✅ Оплата принята, кристаллы зачисляются…", crystalsAdded: (n) => `💎 +${n} кристаллов!`, payFailed: "Оплата не прошла", bought: (n) => `🎟 +${n} токенов`, packOpened: (r) => `Пак: ${r}`,
     },
     en: {
@@ -107,7 +107,7 @@
       shopTab: "Shop", shopBuyTitle: "💎 Buy crystals", shopBuyHint: "Paid in Telegram Stars; the crystals arrive at once.", shopItemsTitle: "🛒 For crystals",
       wallet: (n) => `You have: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% value`,
       tokensItem: (n) => `${n} tokens`, tokensHint: (n) => `Open ${n} cards without the wait`, packItem: (r) => `${r} pack`, packHint: (n, r) => `${n} cards, at least one ${r.toLowerCase()} guaranteed`,
-      boxTitle: "🎁 Diamond box", boxRange: (a, b) => `${a}–${b} 💎`, boxOdds: "The more crystals, the rarer", boxOpened: (n) => `🎁 Diamond box: +${n} crystals!`, boxBuy: (n) => `Open · ${n} ⭐`, boxGot: "Diamond box opened!", boxLucky: "🔥 Lucky you!",
+      boxTitle: "🎁 Diamond box", boxRange: (a, b) => `${a}–${b} 💎`, boxOdds: "The more crystals, the rarer", boxGot: "Diamond box opened!", boxLucky: "🔥 Lucky you!",
       paid: "✅ Payment received, adding your crystals…", crystalsAdded: (n) => `💎 +${n} crystals!`, payFailed: "The payment did not go through", bought: (n) => `🎟 +${n} tokens`, packOpened: (r) => `${r} pack`,
     },
   };
@@ -1266,47 +1266,37 @@
     }
   }
 
-  // boxButton is the diamond box: a compact card, its name and range on the
-  // left and its price on the right, a tap opening its chances with a buy
-  // button there, so nothing is paid for without seeing them; ⓘ says so.
+  // boxButton is the diamond box: a compact card that buys it on a tap,
+  // with a small ⓘ in its corner that shows the chances, quietly.
   function boxButton(pack) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "pack-btn box-btn";
-    button.innerHTML = '<span class="box-icon">🎁</span><span class="box-text"><span class="box-title"></span><b></b></span><span class="stars"></span><span class="box-i" aria-hidden="true">ⓘ</span>';
-    button.querySelector(".box-title").textContent = t.boxTitle.replace("🎁 ", "");
-    button.querySelector("b").textContent = boxRange(pack);
-    button.querySelector(".stars").textContent = t.starsN(pack.stars);
-    button.addEventListener("click", () => showPanel(boxPanel(pack)));
-    return button;
+    const wrap = document.createElement("div");
+    wrap.className = "box-wrap";
+    wrap.innerHTML = '<button type="button" class="pack-btn box-btn"><span class="box-icon">🎁</span><span class="box-text"><span class="box-title"></span><b></b></span><span class="stars"></span></button><button type="button" class="box-i" aria-label="ⓘ">ⓘ</button>';
+    const buy = wrap.querySelector(".box-btn");
+    buy.querySelector(".box-title").textContent = t.boxTitle.replace("🎁 ", "");
+    buy.querySelector("b").textContent = t.boxRange(spaced(pack.box[0].crystals), spaced(pack.box[pack.box.length - 1].crystals));
+    buy.querySelector(".stars").textContent = t.starsN(pack.stars);
+    buy.disabled = !shopData.stars;
+    buy.addEventListener("click", () => buyCrystals(pack));
+    wrap.querySelector(".box-i").addEventListener("click", () => showPanel(boxInfoPanel(pack)));
+    return wrap;
   }
 
-  function boxRange(pack) {
-    return t.boxRange(spaced(pack.box[0].crystals), spaced(pack.box[pack.box.length - 1].crystals));
-  }
-
-  // boxPanel shows the box's prizes with their chances, the rarer ones
-  // brighter, and the button that buys it.
-  function boxPanel(pack) {
+  // boxInfoPanel is the box's prizes and chances in small print.
+  function boxInfoPanel(pack) {
     const panel = document.createElement("div");
-    panel.className = "gift box-panel";
-    panel.innerHTML = '<div class="box-hero">🎁</div><b class="box-name"></b><small class="box-hint"></small><ul class="box-odds"></ul><button type="button" class="draw box-buy"></button>';
-    panel.querySelector(".box-name").textContent = t.boxTitle.replace("🎁 ", "");
+    panel.className = "gift box-info";
+    panel.innerHTML = '<b class="box-name"></b><small class="box-hint"></small><ul class="box-odds"></ul>';
+    panel.querySelector(".box-name").textContent = t.boxTitle;
     panel.querySelector(".box-hint").textContent = t.boxOdds;
     const list = panel.querySelector(".box-odds");
-    pack.box.forEach((prize, i) => {
+    for (const prize of pack.box) {
       const item = document.createElement("li");
-      item.style.setProperty("--glow", `${Math.round((i / (pack.box.length - 1)) * 100)}%`);
-      item.innerHTML = "<span></span><i><em></em></i><b></b>";
-      item.querySelector("span").textContent = t.crystalsN(spaced(prize.crystals));
-      item.querySelector("em").style.width = `${Math.max(prize.percent, 2)}%`;
-      item.querySelector("b").textContent = `${prize.percent}%`;
+      item.innerHTML = "<span></span><span></span>";
+      item.children[0].textContent = t.crystalsN(spaced(prize.crystals));
+      item.children[1].textContent = `${prize.percent}%`;
       list.append(item);
-    });
-    const buy = panel.querySelector(".box-buy");
-    buy.textContent = t.boxBuy(pack.stars);
-    buy.disabled = !shopData.stars;
-    buy.addEventListener("click", () => { closeSheet(); buyCrystals(pack); });
+    }
     return panel;
   }
 
