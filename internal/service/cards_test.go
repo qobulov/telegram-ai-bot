@@ -275,9 +275,8 @@ func TestGamesMenuListsTheGames(t *testing.T) {
 	}
 }
 
-// The card game's old commands are gone: /card alone opens the app. In a
-// group they get no answer, named for the bot or not; in a private chat the
-// answer for a command the bot does not know.
+// The card game's old commands, still typed out of habit, open the app as
+// /card does, in a group, bare, and in a private chat.
 func TestRetiredCardCommands(t *testing.T) {
 	for _, command := range []string{"/cards", "/mycards", "/cardtop", "/market", "/duel", "/profile"} {
 		f := newFixture()
@@ -285,11 +284,11 @@ func TestRetiredCardCommands(t *testing.T) {
 		f.opts.CardsURL = "https://app/kartalar"
 		f.opts.Buttons = &fakeButtons{}
 		f.opts.Bot.Username = "testbot"
-		if sent := f.run(inGroup(groupMessage(command)), inGroup(groupMessage(command+"@testbot"))); len(sent) != 0 {
-			t.Errorf("%s in a group = %+v, want no answer", command, sent)
+		if sent := f.run(inGroup(groupMessage(command))); len(sent) != 1 || len(sent[0].buttons) != 1 {
+			t.Errorf("%s in a group = %+v, want the cards app's button", command, sent)
 		}
-		if sent := f.run(textFrom(userID, command)); len(sent) != 1 || sent[0].text != textUnknown.uz || len(sent[0].buttons) != 0 {
-			t.Errorf("%s in private = %+v, want the unknown command's answer", command, sent)
+		if sent := f.run(textFrom(userID, command)); len(sent) == 0 || len(sent[len(sent)-1].buttons) != 1 {
+			t.Errorf("%s in private = %+v, want the cards app's button", command, sent)
 		}
 	}
 }

@@ -131,7 +131,7 @@ func (s *Service) plainCommand(msg *telegram.Message, text string) bool {
 // ownCommands are the bot's commands that no other bot in its groups has:
 // "/game", "/mafia", "/start" or "/top" are other bots' too.
 var ownCommands = map[string]bool{
-	"/card": true, "/invites": true, "/invites_week": true, "/invites_month": true, "/invites_auto": true, "/teams": true, "/games": true,
+	"/card": true, "/cards": true, "/mycards": true, "/cardtop": true, "/market": true, "/duel": true, "/profile": true, "/invites": true, "/invites_week": true, "/invites_month": true, "/invites_auto": true, "/teams": true, "/games": true,
 	"/boss": true, "/snake": true, "/woodcutter": true, "/checkers": true, "/tictactoe": true,
 	"/staff": true, "/ranks": true, "/ranklog": true, "/access": true, "/rank": true,
 	"/banlist": true, "/amnesty": true, "/kickinactive": true,
