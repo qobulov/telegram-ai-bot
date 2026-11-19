@@ -320,6 +320,9 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .gift { padding: 14px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
 .gift input { width: 100%; min-height: 44px; margin-top: 12px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--lacquer); color: var(--text); font: 600 16px Manrope, sans-serif; outline: 0; }
 .gift input:focus { border-color: var(--gold); }
+.gift .want-rarity { margin: 10px -14px 0; padding: 2px 14px; }
+.gift .want-rarity[hidden] { display: none; }
+.gift .want-rarity button { min-height: 36px; padding: 0 12px; }
 .gift-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; max-height: 40vh; overflow-y: auto; }
 .gift-list button { width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--lacquer); color: var(--text); font: 700 15px Manrope, sans-serif; text-align: left; cursor: pointer; }
 .gift-list button span { display: grid; min-width: 0; }

@@ -67,9 +67,9 @@ func TestFuseCard(t *testing.T) {
 	}
 }
 
-// A card raised above ★1 stays with its holder: an offer giving it, once
-// its free copies are fused away, is called off on take (offer gone, not
-// "fused") and left off the market, and the last copy of a raised card is not offered.
+// A card raised above ★1 stays with its holder, spare copies or none: an
+// offer giving it, once fused, is called off on take (offer gone, not
+// "fused") and left off the market, and it is not offered again.
 func TestFuseThenOfferedCopyIsGone(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -91,38 +91,66 @@ func TestFuseThenOfferedCopyIsGone(t *testing.T) {
 	if _, err := store.FuseCard(ctx, 1, 10, fuseCost, CardQuest{}); err != nil {
 		t.Fatal(err)
 	}
+	// Copies drawn again are spare, yet the card stays: it is starred.
+	if _, err := store.pool.Exec(ctx, `UPDATE card_owned SET count = 4 WHERE user_id = 1 AND card_id = 10`); err != nil {
+		t.Fatal(err)
+	}
 	if offers, err := store.CardMarket(ctx, 2, market, 10); err != nil || len(offers) != 0 {
-		t.Errorf("the market shows a fused last copy: %+v, %v", offers, err)
+		t.Errorf("the market shows a starred card: %+v, %v", offers, err)
 	}
 	if _, err := store.TakeCardOffer(ctx, offer, 2, CardTradeRules{Now: now}, market.Keep, CardQuest{}); !errors.Is(err, ErrCardOfferGone) {
-		t.Errorf("taking a fused last copy = %v, want the offer gone", err)
+		t.Errorf("taking a starred card = %v, want the offer gone", err)
 	}
 	var status string
 	if err := store.pool.QueryRow(ctx, `SELECT status FROM card_trades WHERE id = $1`, offer).Scan(&status); err != nil || status != "off" {
-		t.Errorf("the offer of a fused last copy = %q, %v, want off", status, err)
+		t.Errorf("the offer of a starred card = %q, %v, want off", status, err)
 	}
 	if _, err := store.OfferCard(ctx, 1, 10, 20, market); !errors.Is(err, ErrCardFused) {
-		t.Errorf("offering a fused last copy = %v", err)
+		t.Errorf("offering a starred card with spare copies = %v", err)
 	}
 	var count, stars int
-	if err := store.pool.QueryRow(ctx, `SELECT count, stars FROM card_owned WHERE user_id = 1 AND card_id = 10`).Scan(&count, &stars); err != nil || count != 2 || stars != 2 {
+	if err := store.pool.QueryRow(ctx, `SELECT count, stars FROM card_owned WHERE user_id = 1 AND card_id = 10`).Scan(&count, &stars); err != nil || count != 4 || stars != 2 {
 		t.Errorf("Alice's Gojo = ×%d ★%d, %v", count, stars, err)
 	}
-	// A copy drawn again is free, and may be traded; the stars stay.
-	if _, err := store.pool.Exec(ctx, `UPDATE card_owned SET count = 3 WHERE user_id = 1 AND card_id = 10`); err != nil {
-		t.Fatal(err)
+	if err := store.pool.QueryRow(ctx, `SELECT count(*) FROM card_owned WHERE user_id = 2 AND card_id = 10`).Scan(&count); err != nil || count != 0 {
+		t.Errorf("Bob holds Gojo: %d, %v", count, err)
 	}
-	offer, err = store.OfferCard(ctx, 1, 10, 20, market)
+}
+
+// A taker whose own copy of the card wanted is starred cannot take the
+// offer: the market says so (not Can, Starred), and a take is refused,
+// ErrCardFused, with the offer left open and the cards where they were.
+func TestAStarredCardIsNotGivenForAnOffer(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	for _, q := range []string{
+		`INSERT INTO card_catalog (id, name, rarity, attack, health, value) VALUES (10, 'Gojo Satoru', 3, 1, 1, 5000), (20, 'Levi', 3, 1, 1, 1000)`,
+		`INSERT INTO card_players (user_id, name, points, cards, draws) VALUES (1, 'Alice', 5000, 1, 1), (2, 'Bob', 1000, 1, 3)`,
+		`INSERT INTO card_owned (user_id, card_id, count, stars) VALUES (1, 10, 1, 1), (2, 20, 3, 2)`,
+	} {
+		if _, err := store.pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	now := time.Now()
+	market := CardMarketRules{Keep: 7 * 24 * time.Hour, Now: now}
+	offer, err := store.OfferCard(ctx, 1, 10, 20, market)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.TakeCardOffer(ctx, offer, 2, CardTradeRules{Now: now}, market.Keep, CardQuest{}); err != nil {
-		t.Fatalf("taking a free copy = %v", err)
+	offers, err := store.CardMarket(ctx, 2, market, 10)
+	if err != nil || len(offers) != 1 || offers[0].Can || !offers[0].Starred {
+		t.Fatalf("Bob's market = %+v, %v; want the offer, not his to take", offers, err)
 	}
-	if err := store.pool.QueryRow(ctx, `SELECT count, stars FROM card_owned WHERE user_id = 1 AND card_id = 10`).Scan(&count, &stars); err != nil || count != 2 || stars != 2 {
-		t.Errorf("Alice's Gojo after = ×%d ★%d, %v", count, stars, err)
+	if _, err := store.TakeCardOffer(ctx, offer, 2, CardTradeRules{Now: now}, market.Keep, CardQuest{}); !errors.Is(err, ErrCardFused) {
+		t.Errorf("giving a starred card for an offer = %v", err)
 	}
-	if err := store.pool.QueryRow(ctx, `SELECT stars FROM card_owned WHERE user_id = 2 AND card_id = 10`).Scan(&stars); err != nil || stars != 1 {
-		t.Errorf("Bob's Gojo = ★%d, %v", stars, err)
+	var status string
+	if err := store.pool.QueryRow(ctx, `SELECT status FROM card_trades WHERE id = $1`, offer).Scan(&status); err != nil || status != "open" {
+		t.Errorf("the offer = %q, %v, want open", status, err)
+	}
+	var count int
+	if err := store.pool.QueryRow(ctx, `SELECT count FROM card_owned WHERE user_id = 1 AND card_id = 10`).Scan(&count); err != nil || count != 1 {
+		t.Errorf("Alice's Gojo = ×%d, %v", count, err)
 	}
 }

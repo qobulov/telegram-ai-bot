@@ -20,6 +20,7 @@ type CardOffer struct {
 	Give     Card
 	Want     Card
 	Can      bool
+	Starred  bool
 	Mine     bool
 	Created  time.Time
 }
@@ -43,7 +44,7 @@ func (s *Store) OfferCard(ctx context.Context, from, give, want int64, rules Car
 		var held, fused bool
 		err := tx.QueryRow(ctx, `
 			SELECT EXISTS (SELECT 1 FROM card_owned WHERE user_id = $1 AND card_id = $2),
-				EXISTS (SELECT 1 FROM card_owned WHERE user_id = $1 AND card_id = $2 AND stars > 1 AND count - melted < 2)
+				EXISTS (SELECT 1 FROM card_owned WHERE user_id = $1 AND card_id = $2 AND stars > 1)
 			FROM card_players WHERE user_id = $1 FOR UPDATE`, from, give).Scan(&held, &fused)
 		if errors.Is(err, pgx.ErrNoRows) || (err == nil && !held) {
 			return ErrCardNotHeld
@@ -51,8 +52,8 @@ func (s *Store) OfferCard(ctx context.Context, from, give, want int64, rules Car
 		if err != nil {
 			return err
 		}
-		// The last copy of a card raised above ★1 keeps its stars with its
-		// holder, so it is not offered.
+		// A card raised above ★1 keeps its stars with its holder, so it is
+		// never offered, spare copies or none.
 		if fused {
 			return ErrCardFused
 		}
@@ -78,27 +79,30 @@ func (s *Store) OfferCard(ctx context.Context, from, give, want int64, rules Car
 
 // CardMarket is the offers open on the market as viewer sees them: those
 // they can take first, then the newest; at most limit. An offer whose player
-// no longer holds the card offered, or holds only the last copy of it raised
-// above ★1, is left out, as taking it would fail, and
-// so is one placed before trades were of one rarity and of no limited card.
+// no longer holds the card offered, or has raised it above ★1, is left out,
+// as taking it would fail, and so is one placed before trades were of
+// rarities at most tradeRarityGap apart and of no limited card. Viewer
+// cannot take an offer whose wanted card they have raised above ★1:
+// Starred says so.
 func (s *Store) CardMarket(ctx context.Context, viewer int64, rules CardMarketRules, limit int) ([]CardOffer, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT t.id, t.from_id, coalesce(p.name, ''), t.created_at,
 			g.id, g.name, g.anime, g.image_url, g.favourites, g.rarity, g.attack, g.health, g.value, g.collection,
 			w.id, w.name, w.anime, w.image_url, w.favourites, w.rarity, w.attack, w.health, w.value, w.collection,
-			c.can
+			c.can, c.starred
 		FROM card_trades t
 		JOIN card_catalog g ON g.id = t.give_card
 		JOIN card_catalog w ON w.id = t.take_card
 		LEFT JOIN card_players p ON p.user_id = t.from_id
 		CROSS JOIN LATERAL (
-			SELECT t.from_id <> $1 AND EXISTS (SELECT 1 FROM card_owned o WHERE o.user_id = $1 AND o.card_id = t.take_card) AS can
+			SELECT t.from_id <> $1 AND EXISTS (SELECT 1 FROM card_owned o WHERE o.user_id = $1 AND o.card_id = t.take_card AND o.stars = 1) AS can,
+				EXISTS (SELECT 1 FROM card_owned o WHERE o.user_id = $1 AND o.card_id = t.take_card AND o.stars > 1) AS starred
 		) c
 		WHERE t.status = 'open' AND t.to_id IS NULL AND t.created_at > $2
 			AND EXISTS (SELECT 1 FROM card_owned o WHERE o.user_id = t.from_id AND o.card_id = t.give_card
-				AND (o.stars = 1 OR o.count - o.melted >= 2))
-			AND g.rarity = w.rarity AND NOT (t.give_card = ANY($4) OR t.take_card = ANY($4))
-		ORDER BY c.can DESC, t.created_at DESC, t.id DESC LIMIT $3`, viewer, rules.Now.Add(-rules.Keep), limit, limitedCardIDs())
+				AND o.stars = 1)
+			AND abs(g.rarity - w.rarity) <= $5 AND NOT (t.give_card = ANY($4) OR t.take_card = ANY($4))
+		ORDER BY c.can DESC, t.created_at DESC, t.id DESC LIMIT $3`, viewer, rules.Now.Add(-rules.Keep), limit, limitedCardIDs(), tradeRarityGap)
 	if err != nil {
 		return nil, fmt.Errorf("storage: read the card market: %w", err)
 	}
@@ -108,7 +112,7 @@ func (s *Store) CardMarket(ctx context.Context, viewer int64, rules CardMarketRu
 		err := row.Scan(&o.ID, &o.From, &o.FromName, &o.Created,
 			&g.ID, &g.Name, &g.Anime, &g.ImageURL, &g.Favourites, &g.Rarity, &g.Attack, &g.Health, &g.Value, &g.Collection,
 			&w.ID, &w.Name, &w.Anime, &w.ImageURL, &w.Favourites, &w.Rarity, &w.Attack, &w.Health, &w.Value, &w.Collection,
-			&o.Can)
+			&o.Can, &o.Starred)
 		o.Mine = o.From == viewer
 		return o, err
 	})
@@ -120,8 +124,8 @@ func (s *Store) CardMarket(ctx context.Context, viewer int64, rules CardMarketRu
 
 // TakeCardOffer takes the offer for by: its player gives by the card
 // offered and by gives them the card wanted, each with its points. An offer
-// whose player no longer holds a free copy of its card, gone or fused
-// away, is called off, ErrCardOfferGone. A trade done counts toward quest
+// whose player no longer holds its card, or has raised it above ★1, is
+// called off, ErrCardOfferGone. A trade done counts toward quest
 // for both its players.
 func (s *Store) TakeCardOffer(ctx context.Context, id, by int64, rules CardTradeRules, keep time.Duration, quest CardQuest) (CardTrade, error) {
 	var trade CardTrade
@@ -143,8 +147,8 @@ func (s *Store) TakeCardOffer(ctx context.Context, id, by int64, rules CardTrade
 			return err
 		}
 		if err := moveCard(ctx, tx, trade.From, by, trade.Give.ID); errors.Is(err, ErrCardNotHeld) || errors.Is(err, ErrCardFused) {
-			// The offerer no longer has a copy to give, whether sold away or
-			// fused into stars after the offer; the taker's own side failing
+			// The offerer no longer has a copy to give, whether traded away or
+			// raised above ★1 after the offer; the taker's own side failing
 			// stays what it is.
 			return ErrCardOfferGone
 		} else if err != nil {

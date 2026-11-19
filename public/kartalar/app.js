@@ -27,11 +27,11 @@
       locked: (r, o) => `🔒 Bu ${r.toLowerCase()} karta hali yopiq. Uning tushish ehtimoli: ${o}.`,
       wait: (time) => `⏳ ${time}`,
       market: "Bozor", newOffer: "➕ Taklif qo'yish", filterAll: "Hammasi", filterCan: "Bera olaman", filterMine: "Mening",
-      gives: "Beradi", wants: "Xohlaydi", swap: "🔄 Almashish", noCard: "Sizda yo'q", remove: "✕ Olib tashlash", yours: "⭐ Sizniki", marketEmpty: "Hozircha taklif yo'q",
+      gives: "Beradi", wants: "Xohlaydi", swap: "🔄 Almashish", noCard: "Sizda yo'q", starredCard: "⭐ Sizniki yulduzli", remove: "✕ Olib tashlash", yours: "⭐ Sizniki", marketEmpty: "Hozircha taklif yo'q",
       marketHint: () => `Kartangizni qo'ying va evaziga kerakli kartani tanlang. Kimda o'sha karta bo'lsa, almashadi. Taklif 7 kun turadi.`,
       step1: "1. Qaysi kartangizni berasiz?", step2: "2. Evaziga qaysi kartani xohlaysiz?", mineSearch: "Kartalaringizdan qidiring", wantSearch: "Xohlagan karta nomini yozing",
       place: "Taklif qo'yish", placed: "✅ Taklif bozorga qo'yildi", swapped: (c) => `🔄 Almashildi! Siz ${c} oldingiz`, removed: "Taklif olib tashlandi",
-      refused: { uneven: "Faqat bir xil darajadagi kartaga almashish mumkin", limited: "🔒 Limited kartani almashib bo'lmaydi", over: "Bu taklif endi yo'q", gone: "Bu taklif endi yo'q", own: "Bu o'zingizning taklifingiz", not_held: "Sizda bu karta yo'q", same: "Bir xil kartani almashib bo'lmaydi", fused: "⭐ Yulduzli kartaning oxirgi nusxasini almashib bo'lmaydi" },
+      refused: { uneven: "Faqat bir daraja yuqori yoki past kartaga almashish mumkin", limited: "🔒 Limited kartani almashib bo'lmaydi", over: "Bu taklif endi yo'q", gone: "Bu taklif endi yo'q", own: "Bu o'zingizning taklifingiz", not_held: "Sizda bu karta yo'q", same: "Bir xil kartani almashib bo'lmaydi", fused: "⭐ Yulduzli kartani almashib bo'lmaydi" },
       fuse: (a, b, n) => `⭐ ★${a} → ★${b} · ${n} nusxa`, fuseNext: (a, h) => `Keyin: Hujum ${a} · Jon ${h}`, fuseFree: (n) => `Bo'sh nusxa: ${n}`,
       fuseMax: "⭐ Eng yuqori daraja: ★5", fuseFew: (n) => `Yana ${n} ta nusxa kerak`, fused: (s) => `⭐ Karta ★${s} bo'ldi!`,
       fuseRefused: { max: "⭐ Karta allaqachon ★5", few: "Nusxalar yetmaydi", not_held: "Sizda bu karta yo'q" },
@@ -61,11 +61,11 @@
       locked: (r, o) => `🔒 Эта карта (${r.toLowerCase()}) ещё закрыта. Шанс выпадения: ${o}.`,
       wait: (time) => `⏳ ${time}`,
       market: "Рынок", newOffer: "➕ Выставить", filterAll: "Все", filterCan: "Могу дать", filterMine: "Мои",
-      gives: "Отдаёт", wants: "Хочет", swap: "🔄 Обменять", noCard: "Нет у вас", remove: "✕ Снять", yours: "⭐ Ваше", marketEmpty: "Пока предложений нет",
+      gives: "Отдаёт", wants: "Хочет", swap: "🔄 Обменять", noCard: "Нет у вас", starredCard: "⭐ Ваша звёздная", remove: "✕ Снять", yours: "⭐ Ваше", marketEmpty: "Пока предложений нет",
       marketHint: () => `Выставьте свою карту и выберите, какую хотите взамен. У кого она есть — обменяется. Предложение висит 7 дней.`,
       step1: "1. Какую карту отдаёте?", step2: "2. Какую хотите взамен?", mineSearch: "Поиск по вашим картам", wantSearch: "Название нужной карты",
       place: "Выставить", placed: "✅ Предложение выставлено", swapped: (c) => `🔄 Обмен! Вы получили ${c}`, removed: "Предложение снято",
-      refused: { uneven: "Менять можно только на карту той же редкости", limited: "🔒 Лимитированную карту нельзя обменять", over: "Этого предложения уже нет", gone: "Этого предложения уже нет", own: "Это ваше предложение", not_held: "У вас нет этой карты", same: "Нельзя менять карту на ту же", fused: "⭐ Последнюю копию звёздной карты нельзя обменять" },
+      refused: { uneven: "Менять можно на карту той же редкости или на одну выше/ниже", limited: "🔒 Лимитированную карту нельзя обменять", over: "Этого предложения уже нет", gone: "Этого предложения уже нет", own: "Это ваше предложение", not_held: "У вас нет этой карты", same: "Нельзя менять карту на ту же", fused: "⭐ Звёздную карту нельзя обменять" },
       fuse: (a, b, n) => `⭐ ★${a} → ★${b} · ${n} коп.`, fuseNext: (a, h) => `Станет: Атака ${a} · Жизнь ${h}`, fuseFree: (n) => `Свободных копий: ${n}`,
       fuseMax: "⭐ Высший уровень: ★5", fuseFew: (n) => `Нужно ещё копий: ${n}`, fused: (s) => `⭐ Карта стала ★${s}!`,
       fuseRefused: { max: "⭐ Карта уже ★5", few: "Не хватает копий", not_held: "У вас нет этой карты" },
@@ -95,11 +95,11 @@
       locked: (r, o) => `🔒 This ${r.toLowerCase()} card is still locked. Its odds: ${o}.`,
       wait: (time) => `⏳ ${time}`,
       market: "Market", newOffer: "➕ Make an offer", filterAll: "All", filterCan: "I can give", filterMine: "Mine",
-      gives: "Gives", wants: "Wants", swap: "🔄 Trade", noCard: "You lack it", remove: "✕ Take down", yours: "⭐ Yours", marketEmpty: "No offers yet",
+      gives: "Gives", wants: "Wants", swap: "🔄 Trade", noCard: "You lack it", starredCard: "⭐ Yours is starred", remove: "✕ Take down", yours: "⭐ Yours", marketEmpty: "No offers yet",
       marketHint: () => `Put up a card and pick the one you want for it. Whoever holds it can trade. An offer stays for 7 days.`,
       step1: "1. Which card do you give?", step2: "2. Which card do you want?", mineSearch: "Search your cards", wantSearch: "Name of the card you want",
       place: "Put it up", placed: "✅ Your offer is up", swapped: (c) => `🔄 Traded! You got ${c}`, removed: "Offer taken down",
-      refused: { uneven: "A card may be traded only for one of the same rarity", limited: "🔒 A limited card cannot be traded", over: "This offer is gone", gone: "This offer is gone", own: "This is your own offer", not_held: "You do not have that card", same: "A card cannot be traded for itself", fused: "⭐ The last copy of a starred card cannot be traded" },
+      refused: { uneven: "A card may be traded only for one of the same rarity or one step up or down", limited: "🔒 A limited card cannot be traded", over: "This offer is gone", gone: "This offer is gone", own: "This is your own offer", not_held: "You do not have that card", same: "A card cannot be traded for itself", fused: "⭐ A starred card cannot be traded" },
       fuse: (a, b, n) => `⭐ ★${a} → ★${b} · ${n} ${n === 1 ? "copy" : "copies"}`, fuseNext: (a, h) => `Then: Attack ${a} · Life ${h}`, fuseFree: (n) => `Free copies: ${n}`,
       fuseMax: "⭐ Top level: ★5", fuseFew: (n) => `${n} more ${n === 1 ? "copy" : "copies"} needed`, fused: (s) => `⭐ The card is now ★${s}!`,
       fuseRefused: { max: "⭐ The card is already ★5", few: "Not enough copies", not_held: "You do not have that card" },
@@ -964,7 +964,9 @@
         button.addEventListener("click", () => unoffer(o, button));
       } else {
         button.className = o.can ? "draw small" : "ghost";
-        button.textContent = o.can ? t.swap : t.noCard;
+        // a copy of the card wanted raised above ★1 never moves, so the
+        // offer is not for this player to take
+        button.textContent = o.can ? t.swap : o.starred ? t.starredCard : t.noCard;
         button.disabled = !o.can;
         button.addEventListener("click", () => takeOffer(o, button));
       }
@@ -1021,17 +1023,19 @@
   }
 
   // offerPanel makes an offer in two steps: a card of the player's, then the
-  // card they want for it, of the same rarity: the first ten of the catalog
-  // show at once, the most loved first, ten more as the list is scrolled
-  // down, a name typed narrowing them. A limited card is in neither list.
+  // card they want for it, of the same rarity or one up or down, chosen by
+  // its chips: the first ten of the catalog of that rarity show at once, the
+  // most loved first, ten more as the list is scrolled down, a name typed
+  // narrowing them. A limited card is in neither list, nor is a card of the
+  // player's raised above ★1, as its stars stay with them.
   function offerPanel() {
-    let give = null, want = null, timer = 0;
+    let give = null, want = null, timer = 0, wantRarity = 0;
     // the pages of the card wanted: asked counts the lists begun, so that a
     // page come late for an older list is dropped
     let asked = 0, offset = 0, more = false, loading = false;
     const panel = document.createElement("div");
     panel.className = "gift";
-    panel.innerHTML = '<b class="step"></b><input type="search" class="mine-q" autocomplete="off"><ul class="gift-list pick-mine"></ul><b class="step"></b><input type="search" class="want-q" autocomplete="off" disabled><ul class="gift-list pick-want"></ul><button type="button" class="draw gift-send" disabled></button>';
+    panel.innerHTML = '<b class="step"></b><input type="search" class="mine-q" autocomplete="off"><ul class="gift-list pick-mine"></ul><b class="step"></b><div class="sets want-rarity" role="group" hidden></div><input type="search" class="want-q" autocomplete="off" disabled><ul class="gift-list pick-want"></ul><button type="button" class="draw gift-send" disabled></button>';
     const steps = panel.querySelectorAll(".step");
     steps[0].textContent = t.step1;
     steps[1].textContent = t.step2;
@@ -1062,17 +1066,43 @@
       const list = panel.querySelector(".pick-mine");
       list.textContent = "";
       const q = mineQ.value.trim().toLowerCase();
-      const held = cards.filter((c) => c.count > 0 && !c.limited && (!q || c.name.toLowerCase().includes(q))).sort((a, b) => b.rarity - a.rarity).slice(0, 30);
+      const held = cards.filter((c) => c.count > 0 && !c.limited && !(c.stars > 1) && (!q || c.name.toLowerCase().includes(q))).sort((a, b) => b.rarity - a.rarity).slice(0, 30);
       if (!held.length) list.innerHTML = `<li class="gift-empty">${t.none}</li>`;
       for (const card of held) pickRow(list, card, give, choose);
+    }
+    // rarityChips are the rarities the card given may be traded for: its
+    // own, picked first, and the one below and above it there are.
+    const rarityBox = panel.querySelector(".want-rarity");
+    function rarityChips() {
+      rarityBox.textContent = "";
+      for (const r of [give.rarity - 1, give.rarity, give.rarity + 1]) {
+        if (r < 0 || r >= t.rarities.length) continue;
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.textContent = t.rarities[r];
+        chip.setAttribute("aria-pressed", String(r === wantRarity));
+        chip.addEventListener("click", () => {
+          if (r === wantRarity) return;
+          wantRarity = r;
+          want = null;
+          ready();
+          rarityChips();
+          wantList();
+          haptic("light");
+        });
+        rarityBox.append(chip);
+      }
+      rarityBox.hidden = false;
     }
     function choose(card) {
       const sameRarity = give && give.rarity === card.rarity;
       give = card;
-      steps[1].textContent = t.step2 + " · " + t.rarities[card.rarity];
+      if (!sameRarity) wantRarity = card.rarity;
+      steps[1].textContent = t.step2;
       wantQ.disabled = false;
       if (!sameRarity || (want && want.id === card.id)) want = null;
       ready();
+      rarityChips();
       wantList();
     }
 
@@ -1108,7 +1138,7 @@
       loading = true;
       sentinel.hidden = false;
       try {
-        const data = await api("catalog", { rarity: give.rarity, card: give.id, query: wantQ.value.trim(), offset });
+        const data = await api("catalog", { rarity: wantRarity, card: give.id, query: wantQ.value.trim(), offset });
         if (mine !== asked) return;
         for (const card of data.cards) pickRow(wanted, card, want, (c) => { want = c; ready(); }, sentinel);
         offset += data.cards.length;

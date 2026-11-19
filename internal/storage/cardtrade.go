@@ -19,17 +19,18 @@ var (
 	// ErrCardTradeOver is a trade already done, called off, too old, or
 	// offered to another player.
 	ErrCardTradeOver = errors.New("storage: card trade over")
-	// ErrCardFused is the last free copy of a card raised above ★1 offered
-	// or traded: its stars stay with its holder.
-	ErrCardFused = errors.New("storage: last copy of a fused card")
+	// ErrCardFused is a card raised above ★1 offered or traded, spare
+	// copies or none: its stars stay with its holder, and it never moves.
+	ErrCardFused = errors.New("storage: fused card")
 	// ErrCardOfferGone is an offer on the market whose player no longer
 	// holds the card offered; it is called off.
 	ErrCardOfferGone = errors.New("storage: card offer gone")
 	// ErrCardOfferOwn is a player taking their own offer.
 	ErrCardOfferOwn = errors.New("storage: own card offer")
-	// ErrCardTradeUneven is a trade of cards of different rarities: a Common
-	// for a Mythic was how one player's cards went to another's.
-	ErrCardTradeUneven = errors.New("storage: cards of different rarities")
+	// ErrCardTradeUneven is a trade of cards more than tradeRarityGap
+	// rarities apart: a Common for a Mythic was how one player's cards went
+	// to another's.
+	ErrCardTradeUneven = errors.New("storage: cards of rarities too far apart")
 	// ErrCardLimited is a limited card given, offered, wanted or traded: it
 	// stays with the player who drew it.
 	ErrCardLimited = errors.New("storage: limited card")
@@ -127,8 +128,8 @@ func lockTraders(ctx context.Context, tx pgx.Tx, from, to int64) error {
 }
 
 // tradeRarityGap is how many rarities apart a trade's two cards may be:
-// none, a Mythic goes for a Mythic alone.
-const tradeRarityGap = 0
+// one, an Epic goes for a Rare, an Epic or a Legendary, never two apart.
+const tradeRarityGap = 1
 
 // checkEven refuses a trade of two cards more than tradeRarityGap
 // rarities apart, or of a limited card.
@@ -160,10 +161,9 @@ func checkFair(ctx context.Context, tx pgx.Tx, trade CardTrade) error {
 // other: the giver loses its points only with their last copy, and the
 // other gains them only when it is new to them. A player giving their last
 // copy not melted no longer holds the card; the used-up ones are gone with
-// it. A card raised above ★1 keeps its stars with its holder, so its last
-// copy never moves, ErrCardFused, and the copy received is the other's own
-// stars; a limited card never moves, ErrCardLimited: every trade comes this
-// way.
+// it. A card raised above ★1 keeps its stars with its holder, so it never
+// moves, spare copies or none, ErrCardFused; a limited card never moves,
+// ErrCardLimited: every trade comes this way.
 func moveCard(ctx context.Context, tx pgx.Tx, from, to, cardID int64) error {
 	if CardLimited(cardID) {
 		return ErrCardLimited
@@ -178,7 +178,7 @@ func moveCard(ctx context.Context, tx pgx.Tx, from, to, cardID int64) error {
 	if err != nil {
 		return err
 	}
-	if stars > 1 && count-melted < 2 {
+	if stars > 1 {
 		return ErrCardFused
 	}
 	lost := 0

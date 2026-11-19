@@ -120,16 +120,16 @@ func TestTheMarketListsWhatTheViewerCanTakeFirst(t *testing.T) {
 	}
 }
 
-// A trade of cards of different rarities is refused, as an offer and as a
-// take, even one rarity apart; two players trade with each other as often
-// as they like.
+// A trade of cards two rarities apart or more is refused, as an offer and
+// as a take; one rarity apart, up or down, is listed and done; two players
+// trade with each other as often as they like.
 func TestTradesAreEvenAndUnlimited(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 	for _, q := range []string{
-		`INSERT INTO card_catalog (id, name, rarity, attack, health, value) VALUES (10, 'Goku', 4, 1, 1, 4000), (20, 'Vegeta', 3, 1, 1, 2000), (30, 'Extra', 0, 1, 1, 100), (40, 'Kakashi', 4, 1, 1, 2000)`,
-		`INSERT INTO card_players (user_id, name, points, cards, draws) VALUES (1, 'Alice', 6100, 3, 3), (2, 'Bob', 4000, 2, 2)`,
-		`INSERT INTO card_owned (user_id, card_id) VALUES (1, 10), (1, 20), (1, 30), (2, 40)`,
+		`INSERT INTO card_catalog (id, name, rarity, attack, health, value) VALUES (10, 'Goku', 4, 1, 1, 4000), (20, 'Vegeta', 3, 1, 1, 2000), (30, 'Extra', 0, 1, 1, 100), (40, 'Kakashi', 4, 1, 1, 2000), (50, 'Gohan', 2, 1, 1, 500)`,
+		`INSERT INTO card_players (user_id, name, points, cards, draws) VALUES (1, 'Alice', 6600, 4, 4), (2, 'Bob', 4000, 2, 2)`,
+		`INSERT INTO card_owned (user_id, card_id) VALUES (1, 10), (1, 20), (1, 30), (1, 50), (2, 40)`,
 	} {
 		if _, err := store.pool.Exec(ctx, q); err != nil {
 			t.Fatal(err)
@@ -141,15 +141,15 @@ func TestTradesAreEvenAndUnlimited(t *testing.T) {
 	if _, err := store.OfferCard(ctx, 1, 30, 10, market); !errors.Is(err, ErrCardTradeUneven) {
 		t.Errorf("a Common put up for a Mythic = %v", err)
 	}
-	if _, err := store.OfferCard(ctx, 1, 20, 40, market); !errors.Is(err, ErrCardTradeUneven) {
-		t.Errorf("a Legendary put up for a Mythic = %v", err)
+	if _, err := store.OfferCard(ctx, 1, 50, 40, market); !errors.Is(err, ErrCardTradeUneven) {
+		t.Errorf("an Epic put up for a Mythic = %v", err)
 	}
-	// An offer placed before, Vegeta for Kakashi, is not listed, and taking
+	// An offer placed before, Gohan for Kakashi, is not listed, and taking
 	// it is refused with the cards left where they were.
 	var old int64
 	if err := store.pool.QueryRow(ctx, `
 		INSERT INTO card_trades (chat_id, from_id, give_card, take_card, created_at)
-		VALUES (0, 1, 20, 40, $1) RETURNING id`, now).Scan(&old); err != nil {
+		VALUES (0, 1, 50, 40, $1) RETURNING id`, now).Scan(&old); err != nil {
 		t.Fatal(err)
 	}
 	if offers, err := store.CardMarket(ctx, 2, market, 10); err != nil || len(offers) != 0 {
@@ -161,10 +161,10 @@ func TestTradesAreEvenAndUnlimited(t *testing.T) {
 	if _, err := store.pool.Exec(ctx, `UPDATE card_trades SET status = 'off' WHERE id = $1`, old); err != nil {
 		t.Fatal(err)
 	}
-	var vegeta int
-	_ = store.pool.QueryRow(ctx, `SELECT count(*) FROM card_owned WHERE user_id = 1 AND card_id = 20`).Scan(&vegeta)
-	if vegeta != 1 {
-		t.Errorf("Alice's Vegeta after the refused take = %d", vegeta)
+	var gohan int
+	_ = store.pool.QueryRow(ctx, `SELECT count(*) FROM card_owned WHERE user_id = 1 AND card_id = 50`).Scan(&gohan)
+	if gohan != 1 {
+		t.Errorf("Alice's Gohan after the refused take = %d", gohan)
 	}
 	// Alice's Goku and Bob's Kakashi, both Mythic, go back and forth
 	// eight times the same day: whoever holds Goku puts it up, the other takes it.
@@ -178,6 +178,23 @@ func TestTradesAreEvenAndUnlimited(t *testing.T) {
 			t.Fatalf("trade %d = %v", i, err)
 		}
 		holder, other = other, holder
+	}
+	// One rarity up: Alice's Legendary Vegeta for Bob's Mythic Kakashi is
+	// listed for Bob and done.
+	up, err := store.OfferCard(ctx, 1, 20, 40, market)
+	if err != nil {
+		t.Fatalf("a Legendary put up for a Mythic = %v", err)
+	}
+	if offers, err := store.CardMarket(ctx, 2, market, 10); err != nil || len(offers) != 1 || offers[0].ID != up || !offers[0].Can {
+		t.Fatalf("Bob's market with an offer one rarity apart = %+v, %v", offers, err)
+	}
+	trade, err := store.TakeCardOffer(ctx, up, 2, rules, market.Keep, CardQuest{})
+	if err != nil || trade.Give.Name != "Vegeta" || trade.Take.Name != "Kakashi" {
+		t.Fatalf("a trade one rarity apart = %+v, %v", trade, err)
+	}
+	// One rarity down: Bob's Vegeta for Alice's Epic Gohan.
+	if _, err := store.OfferCard(ctx, 2, 20, 50, market); err != nil {
+		t.Errorf("a Legendary put up for an Epic = %v", err)
 	}
 }
 

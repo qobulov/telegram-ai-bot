@@ -470,7 +470,10 @@ type offerView struct {
 	Give cardView `json:"give"`
 	Want cardView `json:"want"`
 	Can  bool     `json:"can"`
-	Mine bool     `json:"mine"`
+	// Starred is an offer the player cannot take as their copy of the card
+	// it wants is raised above ★1, and so never traded.
+	Starred bool `json:"starred,omitempty"`
+	Mine    bool `json:"mine"`
 }
 
 // market is the offers open: the player's own, which they may call off, and
@@ -483,7 +486,7 @@ func (h *handler) market(ctx context.Context, user miniapp.User) (any, failure) 
 	}
 	views := make([]offerView, len(offers))
 	for i, o := range offers {
-		views[i] = offerView{ID: o.ID, Who: o.FromName, Give: h.held(o.Give, 0), Want: h.held(o.Want, 0), Can: o.Can, Mine: o.Mine}
+		views[i] = offerView{ID: o.ID, Who: o.FromName, Give: h.held(o.Give, 0), Want: h.held(o.Want, 0), Can: o.Can, Starred: o.Starred, Mine: o.Mine}
 	}
 	return map[string]any{"offers": views, "open_limit": OffersOpen}, failure{}
 }
