@@ -24,6 +24,7 @@ type Store interface {
 	OpenCards(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, cost int, day storage.CardDay, now time.Time, quest storage.CardQuest) (storage.CardOpening, error)
 	GiveDayTokens(ctx context.Context, userID int64, name string, day storage.CardDay) (int, error)
 	CardTop(ctx context.Context, limit int) ([]storage.CardPlayer, error)
+	CardPlace(ctx context.Context, userID int64) (storage.CardPlayer, int, int, error)
 	CardWallet(ctx context.Context, userID int64) (shards int, err error)
 	OfferCard(ctx context.Context, from, give, want int64, rules storage.CardMarketRules) (int64, error)
 	CardMarket(ctx context.Context, viewer int64, rules storage.CardMarketRules, limit int) ([]storage.CardOffer, error)
@@ -43,6 +44,7 @@ type Store interface {
 	RecordArenaBattle(ctx context.Context, attacker, defender, seed int64, attackerWon bool, rules storage.ArenaRules, quest storage.CardQuest) (storage.ArenaOutcome, error)
 	ArenaBattles(ctx context.Context, userID int64, limit int) ([]storage.ArenaBattle, error)
 	ArenaTop(ctx context.Context, limit int) ([]storage.ArenaPlayer, error)
+	ArenaPlace(ctx context.Context, userID int64) (place, total int, err error)
 	ArenaWeekPlace(ctx context.Context, userID int64, since time.Time) (int, error)
 	CardQuests(ctx context.Context, userID int64, day time.Time) (map[string]storage.QuestProgress, error)
 	ClaimCardQuest(ctx context.Context, userID int64, quest storage.CardQuest, reward int, now time.Time) error
@@ -426,7 +428,13 @@ func (h *handler) top(ctx context.Context, user miniapp.User) (any, failure) {
 	for i, p := range top {
 		rows[i] = map[string]any{"name": p.Name, "points": p.Points, "cards": p.Cards, "me": p.UserID == user.ID}
 	}
-	return map[string]any{"top": rows}, failure{}
+	me, place, total, err := h.Store.CardPlace(ctx, user.ID)
+	if err != nil {
+		h.Logger.Error("could not read a card place", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
+	mine := map[string]any{"place": place, "total": total, "name": me.Name, "points": me.Points, "cards": me.Cards}
+	return map[string]any{"top": rows, "me": mine}, failure{}
 }
 
 // name is how the player is named on the table: their first name, else

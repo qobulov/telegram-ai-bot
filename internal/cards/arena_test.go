@@ -95,6 +95,8 @@ func (f *fakeStore) ArenaBattles(_ context.Context, userID int64, limit int) ([]
 
 func (f *fakeStore) ArenaWeekPlace(context.Context, int64, time.Time) (int, error) { return 12, nil }
 
+func (f *fakeStore) ArenaPlace(context.Context, int64) (int, int, error) { return 7, 40, nil }
+
 func (f *fakeStore) ArenaTop(context.Context, int) ([]storage.ArenaPlayer, error) {
 	return []storage.ArenaPlayer{{UserID: 7, Name: "Bek", Rating: 1016, Wins: 1, Power: 100}}, nil
 }
@@ -172,6 +174,9 @@ func TestArenaView(t *testing.T) {
 	_, out := call(7, map[string]any{"action": "arena"})
 	if out["team"] != nil || len(out["opponents"].([]any)) != 0 || len(out["top"].([]any)) != 1 || len(out["history"].([]any)) != 0 {
 		t.Fatalf("arena without teams = %v", out)
+	}
+	if me := out["me"].(map[string]any); me["place"] != 7.0 || me["total"] != 40.0 {
+		t.Errorf("my arena place = %v", me)
 	}
 	if p := out["player"].(map[string]any); p["rating"] != 1000.0 || p["tickets"] != 8.0 || p["tickets_max"] != 8.0 || p["tokens_left"] != float64(ArenaTokens) {
 		t.Errorf("player = %v", p)

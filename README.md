@@ -2299,7 +2299,7 @@ shows 💫 and dims the card until its skipped turn, poison floats ☠ in green,
 a provoke flashes 😤, a fallen card greys, and "O'tkazib yuborish"
 skips to the end, which less motion asked for shows at once. The end says
 won or lost, the rating's change and the token, a win's card token while the
-day's three last. The Reyting tab switches between the cards' table and the
+day's three last. A player below either table's rows sees their own row under it (`me` in `top` and `arena`: `CardPlace`, `ArenaPlace`), with their place up to 100 and past it the share at or above them, "Top 35%". The Reyting tab switches between the cards' table and the
 arena's (rating, wins, losses, power). No card is given or lost in the arena.
 For a first-time player the tab starts with three steps, 1 Jamoa tuzing (2
 old, 3 orqa), 2 Raqib tanlang, 3 Jang, the one they are at lit (no team saved:

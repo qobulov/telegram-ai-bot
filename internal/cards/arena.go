@@ -192,6 +192,11 @@ func (h *handler) arenaView(ctx context.Context, user miniapp.User, shown []int6
 		h.Logger.Error("could not read the arena table", "error", err)
 		return nil, errUnavailable
 	}
+	tablePlace, tableSize, err := h.Store.ArenaPlace(ctx, user.ID)
+	if err != nil {
+		h.Logger.Error("could not read an arena place", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
 	weekStart := arenaWeekStart(h.Now())
 	place, err := h.Store.ArenaWeekPlace(ctx, user.ID, weekStart)
 	if err != nil {
@@ -226,6 +231,7 @@ func (h *handler) arenaView(ctx context.Context, user miniapp.User, shown []int6
 			"tokens_left": player.TokensLeft, "tokens": ArenaTokens,
 		},
 		"team": views, "opponents": others, "top": rows, "history": history,
+		"me": map[string]any{"place": tablePlace, "total": tableSize},
 		"week": map[string]any{
 			"place": place, "prize": arenaWeekPrize(place), "prizes": ArenaWeekPrizes,
 			"ends": weekStart.AddDate(0, 0, 7).UnixMilli(),

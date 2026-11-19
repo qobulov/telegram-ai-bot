@@ -150,6 +150,9 @@ func (f *fakeStore) FuseCard(_ context.Context, userID, cardID int64, cost []int
 func (f *fakeStore) CardPlayerOf(context.Context, int64) (storage.CardPlayer, time.Time, error) {
 	return storage.CardPlayer{Points: 10000, Cards: 1, FreeDay: f.day, Tokens: f.tokens}, time.Time{}, nil
 }
+func (f *fakeStore) CardPlace(_ context.Context, userID int64) (storage.CardPlayer, int, int, error) {
+	return storage.CardPlayer{UserID: userID, Name: "Bek", Points: 100, Cards: 2}, 150, 400, nil
+}
 func (f *fakeStore) CardTop(context.Context, int) ([]storage.CardPlayer, error) {
 	return []storage.CardPlayer{{UserID: 7, Name: "Bek", Points: 10000, Cards: 1}}, nil
 }
@@ -314,6 +317,9 @@ func TestCardsAppOpensForTokensThenCrystals(t *testing.T) {
 	}
 	if _, out := post(t, h, initData, "top"); len(out["top"].([]any)) != 1 || out["top"].([]any)[0].(map[string]any)["me"] != true {
 		t.Errorf("top = %v", out)
+	}
+	if _, out := post(t, h, initData, "top"); out["me"].(map[string]any)["place"] != 150.0 || out["me"].(map[string]any)["total"] != 400.0 {
+		t.Errorf("my place = %v", out["me"])
 	}
 }
 

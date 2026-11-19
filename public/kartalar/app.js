@@ -18,7 +18,7 @@
       open1: "1x", open10: "5x", costShort: "💎 yetmaydi", tokenHint: (d, c) => `🎟 Token bitta karta ochadi. Har 2 soatda +${d} token (12 tagacha yig'iladi), tugasa karta ${c} 💎`, nextToken: (time) => `⏳ Keyingi token: ${time}`, given: (n) => `🎟 +${n} token berildi`, short: (n) => `💎 Yana ${n} kristal kerak`, openedTen: "5 ta karta", freshN: (n) => `🆕 ${n} ta yangi`, againN: (n) => `🔁 ${n} ta takror`, freshTag: "YANGI", carryOn: "Davom etish", noPoints: "ochko qo'shilmaydi", 
       fresh: "🆕 Yangi karta!", again: (n) => `🔁 Sizda endi ×${n}`, plus: (n) => `+${n} ochko`,
       attack: "Hujum", health: "Jon", value: "Ochko", cards: (n) => `${n} karta`, pts: "ochko",
-      none: "Hech narsa topilmadi", noTop: "Hali hech kim karta olmagan",
+      none: "Hech narsa topilmadi", noTop: "Hali hech kim karta olmagan", topPct: (p) => `Top ${p}%`, youRow: "Siz",
       noTelegram: "Ilovani Telegram'da oching: botga /card yozing.", stale: "Ilova eskirdi, uni qayta oching.",
       unavailable: "Aloqa uzildi, birozdan keyin urinib ko'ring.",
       allSets: "Hammasi", pointsLabel: "ochko", loading: "Kartalar yuklanmoqda…", more: "Yuklanmoqda…",
@@ -52,7 +52,7 @@
       open1: "1x", open10: "5x", costShort: "💎 не хватает", tokenHint: (d, c) => `🎟 Токен открывает одну карту. Каждые 2 часа +${d} (копится до 12), без токенов карта стоит ${c} 💎`, nextToken: (time) => `⏳ Следующий токен: ${time}`, given: (n) => `🎟 +${n} токен(ов)`, short: (n) => `💎 Нужно ещё ${n} кристаллов`, openedTen: "5 карт", freshN: (n) => `🆕 Новых: ${n}`, againN: (n) => `🔁 Повторов: ${n}`, freshTag: "НОВАЯ", carryOn: "Продолжить", noPoints: "очки не добавляются", 
       fresh: "🆕 Новая карта!", again: (n) => `🔁 Теперь у вас ×${n}`, plus: (n) => `+${n} очков`,
       attack: "Атака", health: "Жизнь", value: "Очки", cards: (n) => `${n} карт`, pts: "очков",
-      none: "Ничего не найдено", noTop: "Ещё никто не получил карту",
+      none: "Ничего не найдено", noTop: "Ещё никто не получил карту", topPct: (p) => `Топ ${p}%`, youRow: "Вы",
       noTelegram: "Откройте приложение в Telegram: напишите боту /card.", stale: "Приложение устарело, откройте его снова.",
       unavailable: "Нет связи, попробуйте чуть позже.",
       allSets: "Все", pointsLabel: "очки", loading: "Загружаем карты…", more: "Загружаем…",
@@ -86,7 +86,7 @@
       open1: "1x", open10: "5x", costShort: "💎 not enough", tokenHint: (d, c) => `🎟 A token opens one card. +${d} every 2 hours, up to 12 kept; with none, a card is ${c} 💎`, nextToken: (time) => `⏳ Next token: ${time}`, given: (n) => `🎟 +${n} tokens`, short: (n) => `💎 ${n} more crystals needed`, openedTen: "5 cards", freshN: (n) => `🆕 ${n} new`, againN: (n) => `🔁 ${n} again`, freshTag: "NEW", carryOn: "Continue", noPoints: "no points added", 
       fresh: "🆕 A new card!", again: (n) => `🔁 You now have ×${n}`, plus: (n) => `+${n} points`,
       attack: "Attack", health: "Life", value: "Points", cards: (n) => `${n} cards`, pts: "points",
-      none: "Nothing found", noTop: "Nobody has drawn a card yet",
+      none: "Nothing found", noTop: "Nobody has drawn a card yet", topPct: (p) => `Top ${p}%`, youRow: "You",
       noTelegram: "Open the app in Telegram: send /card to the bot.", stale: "The app is out of date; open it again.",
       unavailable: "No connection; try again in a bit.",
       allSets: "All", pointsLabel: "points", loading: "Loading the cards…", more: "Loading…",
@@ -1166,7 +1166,7 @@
       if (asked !== topAsked) return;
       notice(null);
       $("arenaWeek").hidden = kind !== "arena";
-      if (kind === "arena") { arenaTable(data.top || []); arenaWeek(data.week); return; }
+      if (kind === "arena") { arenaTable(data.top || [], data.me, data.player); arenaWeek(data.week); return; }
       const table = $("table");
       table.textContent = "";
       if (!data.top.length) table.innerHTML = `<p class="empty">${t.noTop}</p>`;
@@ -1180,6 +1180,8 @@
         li.querySelector(".pts").textContent = spaced(row.points);
         table.append(li);
       });
+      const me = data.me;
+      if (me && me.place > data.top.length) table.append(placeRow(me.place, me.total, me.name, t.cards(me.cards), spaced(me.points)));
     } catch (error) {
       if (asked === topAsked) notice(error);
     }
@@ -2723,7 +2725,23 @@
     chip.addEventListener("click", () => { topKind = chip.dataset.k; haptic("light"); ranking(); });
   }
 
-  function arenaTable(top) {
+  // placeRow is the player's own row under a table they are not on: their
+  // place up to 100, and past it the share of players at or above them, so a
+  // place deep in a long table still reads well.
+  function placeRow(place, total, name, small, points) {
+    const li = document.createElement("li");
+    li.className = "me mine";
+    li.innerHTML = `<span class="pos"></span><span class="who"><b></b><small></small></span><span class="pts"></span>`;
+    const pos = li.querySelector(".pos");
+    if (place <= 100) pos.textContent = place;
+    else { pos.textContent = t.topPct(Math.max(1, Math.ceil((place * 100) / Math.max(total, 1)))); pos.classList.add("pct"); }
+    li.querySelector(".who b").textContent = name || t.youRow;
+    li.querySelector(".who small").textContent = small;
+    li.querySelector(".pts").textContent = points;
+    return li;
+  }
+
+  function arenaTable(top, me, player) {
     const table = $("table");
     table.textContent = "";
     if (!top.length) table.innerHTML = `<p class="empty">${at.topEmpty}</p>`;
@@ -2737,6 +2755,7 @@
       li.querySelector(".pts").textContent = spaced(row.rating);
       table.append(li);
     });
+    if (me && player && me.place > top.length) table.append(placeRow(me.place, me.total, player.name, at.topRow(player.wins, player.losses, spaced(player.power)), spaced(player.rating)));
   }
 
   // The week's prizes, the player's place now and the time left; the server

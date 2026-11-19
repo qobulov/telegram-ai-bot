@@ -280,6 +280,10 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
   border-radius: 14px; background: var(--panel); border: 1px solid var(--line);
 }
 .table li.me { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+.table li.mine { margin-top: 10px; }
+.table li.mine::before { content: "⋯"; position: absolute; top: -16px; left: 50%; color: var(--muted); }
+.table li { position: relative; }
+.table .pos.pct { font-size: 11px; line-height: 1.1; color: var(--gold); }
 .table .pos { font: 900 18px Unbounded, sans-serif; color: var(--muted); text-align: center; }
 .table li:nth-child(-n+3) .pos { color: var(--gold); }
 .table .who b { display: block; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
