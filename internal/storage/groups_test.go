@@ -99,9 +99,8 @@ func TestRecordGroupKeepsTheBotsStatus(t *testing.T) {
 	}
 }
 
-// A new database runs the one-file-per-table migrations and is recorded at
-// the version a database that ran the old ones is at, so both skip them
-// from then on.
+// A new database runs the merged schema and is recorded at the version a
+// database that ran the old migrations is at, so both skip it from then on.
 func TestNewDatabaseIsRecordedAtTheMergedVersion(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -109,7 +108,7 @@ func TestNewDatabaseIsRecordedAtTheMergedVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	latest := migrations[len(migrations)-1].version
+	latest := max(migrations[len(migrations)-1].version, mergedThrough)
 	if version, err := currentVersion(ctx, store.pool); err != nil || version != latest {
 		t.Errorf("version = %d, %v; want %d", version, err, latest)
 	}

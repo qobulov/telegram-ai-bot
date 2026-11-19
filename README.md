@@ -259,14 +259,19 @@ is deleted after `RETENTION_DAYS`. Owners' standing rules are kept until
 they expire, and the moderation audit until you delete it; see
 [Groups](#groups). The schema is
 defined by the files in
-[internal/storage/migrations/](internal/storage/migrations/), one file per
-table holding the table as it is now (migrations 1 to 22 were merged into
-them). A new database runs them and is recorded at version 22, then runs
-any newer file; a database that ran the old migrations is already there and
-skips them. A database
-part way through the old ones is refused: migrate it with a release from
-before the merge first. To change the schema later, add a new file numbered
-from 0023; do not edit one that has already been applied.
+[internal/storage/migrations/](internal/storage/migrations/):
+`0001_schema.sql` holds the whole schema as migrations 1 to 106 left it,
+merged into one file on 2026-11-19 by running them on an empty database and
+dumping it, with the rows they put there (21 cards, 138 card pictures) and
+row level security on every table, so Supabase's Data API shows its anon
+and authenticated roles nothing; the bot connects as the tables' owner,
+which it does not stop. A new database runs it and is recorded at version
+106, then runs any newer file; a database that ran the old migrations is
+already there and skips it. A database part way through the old ones is
+refused: migrate it with a release from before the merge first. To change
+the schema later, add a new file numbered from 0107, with `ALTER TABLE ...
+ENABLE ROW LEVEL SECURITY` for a new table; do not edit one that has
+already been applied.
 
 ## Configuration
 
