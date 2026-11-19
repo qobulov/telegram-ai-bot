@@ -2022,7 +2022,7 @@
       rules: "Qoidalar", ruleClasses: "Sinflar", ruleTriangle: "Strelka: kim kimni 25% kuchliroq uradi", ruleSkills: "Skillar · Legendar va Mifik kartalarda",
       ruleTickets: (m) => `🎫 Har hujum 1 tiket oladi: ${m} tagacha, har soatda 1 ta qaytadi`, ruleTokens: (n) => `🎟 G'alaba 1 karta tokeni beradi: kuniga ${n} tagacha`,
       ruleRating: "🏅 G'alaba reytingni oshiradi, mag'lubiyat tushiradi. Karta yo'qolmaydi", ruleWeek: "🏆 Har dushanba haftaning top 100 tasi token oladi", toTable: "Reytingni ko'rish →",
-      youVs: (a, b) => `Siz ⚡${a} · Raqib ⚡${b}`, levels: { easy: "Oson", even: "Teng", hard: "Qiyin" }, them: "Raqib",
+      levels: { easy: "Oson", even: "Teng", hard: "Qiyin" }, them: "Raqib",
       synergyNone: "🔗 Bir animedan 2 ta karta qo'ysangiz: +10%, 3 ta: +20%", synergyOn: (a, n, p) => `🔗 ${a} ×${n}: +${p}%`,
       rating: "Arena reytingi", record: (w, l) => `${w} g'alaba · ${l} mag'lubiyat`,
       tickets: (n, m) => `🎫 Arena tiketlari: ${n}/${m}`, nextTicket: (min) => (min >= 60 ? "· keyingisi 1 soatda" : `· keyingisi ${min} daqiqada`), tokens: (n, m) => `🎟 G'alaba tokenlari: ${n}/${m}`,
@@ -2036,7 +2036,8 @@
       week: "🏆 Haftalik mukofot", weekRule: "Har dushanba 08:00 da: hafta davomida kamida 1 marta hujum qilgan top 100 ga token pochtaga keladi", weekPlace: (n, p) => (n ? `Siz hozir ${n}-o'rindasiz${p ? ` · +${p} 🎟` : ""}` : "Mukofot uchun bu hafta kamida 1 marta hujum qiling"), weekEnds: (d, h) => (d ? `Hafta tugashiga ${d} kun ${h} soat` : `Hafta tugashiga ${h} soat`), weekRow: (a, b) => (a === b ? `${a}-o'rin` : `${a}–${b}`),
       you: "Siz", topEmpty: "Arenada hali hech kim jang qilmagan", topRow: (w, l, p) => `${w} G · ${l} M · ⚡${p}`,
       skills: { strike: "Kuchli zarba", heal: "Davolash", shield: "Qalqon", stun: "Hayratlantirish", poison: "Zahar", provoke: "Chaqiriq" }, fell: (n) => `💀 ${n} yiqildi`,
-      skillInfo: { strike: "har 3-yurishda 2.5 barobar zarba", heal: "har 4-yurishda eng zaif ittifoqchini davolaydi", shield: "jang boshida 30% qalqon", stun: "har 3-yurishda raqibning keyingi yurishini o'tkazdiradi", poison: "har 3-yurishda zaharlaydi: 3 yurish davomida 8% jon", provoke: "boshida va har 4-yurishda 2 raund raqib tank va jangchilarini o'ziga tortadi" },
+      skillInfo: { strike: "energiya to'lganda 1.8 barobar zarba", heal: "energiya to'lganda eng zaif yarador ittifoqchiga jonining 80% igacha qaytaradi", shield: "energiya to'lganda o'ziga va eng zaif ittifoqchiga jonining 45% i qalqon", stun: "energiya to'lganda urib, raqibning keyingi yurishini o'tkazdiradi", poison: "energiya to'lganda urib zaharlaydi: 3 yurish davomida 15% jon", provoke: "energiya to'lganda 3 raund raqib tank va jangchilarini o'ziga tortadi va zarbani 30% kam oladi" },
+      ruleEnergy: "🔋 Energiya: har yurish +34, zarba yeganda +10. 100 ga to'lganda karta skillini ishlatadi va energiya 0 ga tushadi",
       synergy: "🔗 Bir animedan 2 ta karta: +10% hujum va jon, 3 ta va ko'p: +20%", edgeRule: "⚡ Ustunlik: 🛡️ tank ⚔️ jangchidan, ⚔️ jangchi 🔮 sehrgardan, 🔮 sehrgar 🛡️ tankdan 25% kuchliroq urar", edge: "ustun",
       stunned: (n) => `💫 ${n} hayratda: yurish o'tdi`, poisoned: (n, d) => `☠ ${n} zahardan −${d}`,
       refused: { size: "Jamoada 5 ta karta bo'lishi kerak", repeat: "Bitta kartani ikki marta qo'yib bo'lmaydi", not_held: "Jamoadagi karta endi sizda yo'q", no_tickets: "Tiket qolmadi: har soatda 1 ta qo'shiladi", no_team: "Avval jamoani saqlang: undagi karta endi sizda yo'q", opponent_gone: "Bu raqib endi yo'q, ro'yxat yangilandi", self: "O'zingizga hujum qilib bo'lmaydi" },
@@ -2054,7 +2055,7 @@
       rules: "Правила", ruleClasses: "Классы", ruleTriangle: "Стрелка: кто кого бьёт на 25% сильнее", ruleSkills: "Навыки · у Легендарных и Мифических",
       ruleTickets: (m) => `🎫 Атака стоит 1 билет: до ${m}, каждый час возвращается 1`, ruleTokens: (n) => `🎟 Победа даёт токен на карту: до ${n} в день`,
       ruleRating: "🏅 Победа поднимает рейтинг, поражение снижает. Карты не теряются", ruleWeek: "🏆 Каждый понедельник топ 100 недели получают токены", toTable: "Смотреть рейтинг →",
-      youVs: (a, b) => `Вы ⚡${a} · Соперник ⚡${b}`, levels: { easy: "Легко", even: "Равный", hard: "Сложно" }, them: "Соперник",
+      levels: { easy: "Легко", even: "Равный", hard: "Сложно" }, them: "Соперник",
       synergyNone: "🔗 2 карты одного аниме: +10%, 3: +20%", synergyOn: (a, n, p) => `🔗 ${a} ×${n}: +${p}%`,
       rating: "Рейтинг арены", record: (w, l) => `${w} побед · ${l} поражений`,
       tickets: (n, m) => `🎫 Билеты арены: ${n}/${m}`, nextTicket: (min) => (min >= 60 ? "· следующий через 1 ч" : `· следующий через ${min} мин`), tokens: (n, m) => `🎟 Токенов за победы: ${n}/${m}`,
@@ -2068,7 +2069,8 @@
       week: "🏆 Награда недели", weekRule: "Каждый понедельник в 08:00: топ 100, атаковавшие на неделе хотя бы раз, получают токены почтой", weekPlace: (n, p) => (n ? `Сейчас вы на ${n}-м месте${p ? ` · +${p} 🎟` : ""}` : "Чтобы получить награду, атакуйте хотя бы раз на этой неделе"), weekEnds: (d, h) => (d ? `До конца недели ${d} дн ${h} ч` : `До конца недели ${h} ч`), weekRow: (a, b) => (a === b ? `${a} место` : `${a}–${b}`),
       you: "Вы", topEmpty: "На арене ещё никто не сражался", topRow: (w, l, p) => `${w} В · ${l} П · ⚡${p}`,
       skills: { strike: "Сильный удар", heal: "Лечение", shield: "Щит", stun: "Оглушение", poison: "Яд", provoke: "Провокация" }, fell: (n) => `💀 ${n} пал(а)`,
-      skillInfo: { strike: "каждый 3-й ход удар ×2.5", heal: "каждый 4-й ход лечит самого слабого союзника", shield: "щит 30% в начале боя", stun: "каждый 3-й ход соперник пропускает следующий ход", poison: "каждый 3-й ход отравляет: 8% здоровья 3 хода", provoke: "в начале и каждый 4-й ход 2 раунда притягивает танков и бойцов соперника" },
+      skillInfo: { strike: "при полной энергии удар ×1.8", heal: "при полной энергии возвращает самому слабому раненому союзнику до 80% здоровья", shield: "при полной энергии щит в 45% здоровья себе и самому слабому союзнику", stun: "при полной энергии бьёт, и соперник пропускает следующий ход", poison: "при полной энергии бьёт и отравляет: 15% здоровья 3 хода", provoke: "при полной энергии 3 раунда притягивает танков и бойцов соперника и получает на 30% меньше урона" },
+      ruleEnergy: "🔋 Энергия: +34 за каждый ход, +10 за полученный удар. На 100 карта применяет навык, и энергия падает до 0",
       synergy: "🔗 2 карты из одного аниме: +10% атаки и здоровья, 3 и больше: +20%", edgeRule: "⚡ Преимущество: 🛡️ танк бьёт ⚔️ бойца, ⚔️ боец 🔮 мага, 🔮 маг 🛡️ танка на 25% сильнее", edge: "преимущество",
       stunned: (n) => `💫 ${n} оглушён(а): ход пропущен`, poisoned: (n, d) => `☠ ${n} от яда −${d}`,
       refused: { size: "В команде должно быть 5 карт", repeat: "Одну карту нельзя поставить дважды", not_held: "Карты из команды у вас больше нет", no_tickets: "Билетов нет: каждый час добавляется 1", no_team: "Сначала сохраните команду: карты из неё у вас больше нет", opponent_gone: "Этого соперника больше нет, список обновлён", self: "Нельзя атаковать себя" },
@@ -2086,7 +2088,7 @@
       rules: "Rules", ruleClasses: "Classes", ruleTriangle: "Arrow: who hits whom 25% harder", ruleSkills: "Skills · on Legendary and Mythic cards",
       ruleTickets: (m) => `🎫 Each attack takes 1 ticket: up to ${m}, one back every hour`, ruleTokens: (n) => `🎟 A win gives a card token: up to ${n} a day`,
       ruleRating: "🏅 A win raises your rating, a loss lowers it. No card is lost", ruleWeek: "🏆 Every Monday the week's top 100 get tokens", toTable: "See the ranking →",
-      youVs: (a, b) => `You ⚡${a} · Them ⚡${b}`, levels: { easy: "Easy", even: "Even", hard: "Hard" }, them: "Opponent",
+      levels: { easy: "Easy", even: "Even", hard: "Hard" }, them: "Opponent",
       synergyNone: "🔗 2 cards of one anime: +10%, 3: +20%", synergyOn: (a, n, p) => `🔗 ${a} ×${n}: +${p}%`,
       rating: "Arena rating", record: (w, l) => `${w} wins · ${l} losses`,
       tickets: (n, m) => `🎫 Arena tickets: ${n}/${m}`, nextTicket: (min) => (min >= 60 ? "· next in 1 hour" : `· next in ${min} min`), tokens: (n, m) => `🎟 Win tokens: ${n}/${m}`,
@@ -2100,7 +2102,8 @@
       week: "🏆 Weekly prize", weekRule: "Every Monday at 08:00 the top 100 who attacked at least once that week get tokens by mail", weekPlace: (n, p) => (n ? `You are #${n} now${p ? ` · +${p} 🎟` : ""}` : "Attack at least once this week to earn a prize"), weekEnds: (d, h) => (d ? `Week ends in ${d}d ${h}h` : `Week ends in ${h}h`), weekRow: (a, b) => (a === b ? `#${a}` : `#${a}–${b}`),
       you: "You", topEmpty: "Nobody has fought in the arena yet", topRow: (w, l, p) => `${w} W · ${l} L · ⚡${p}`,
       skills: { strike: "Power strike", heal: "Heal", shield: "Shield", stun: "Stun", poison: "Poison", provoke: "Provoke" }, fell: (n) => `💀 ${n} fell`,
-      skillInfo: { strike: "every 3rd turn hits ×2.5", heal: "every 4th turn heals the weakest ally", shield: "a 30% shield at the start", stun: "every 3rd turn the target skips its next turn", poison: "every 3rd turn poisons: 8% health for 3 turns", provoke: "at the start and every 4th turn draws enemy tanks and fighters for 2 rounds" },
+      skillInfo: { strike: "when energy is full, hits ×1.8", heal: "when energy is full, gives the weakest hurt ally back up to 80% of its health", shield: "when energy is full, shields itself and its weakest ally for 45% of their health", stun: "when energy is full, hits and the target skips its next turn", poison: "when energy is full, hits and poisons: 15% health for 3 turns", provoke: "when energy is full, draws enemy tanks and fighters for 3 rounds and takes 30% less damage" },
+      ruleEnergy: "🔋 Energy: +34 each turn, +10 for each hit taken. At 100 the card uses its skill and drops to 0",
       synergy: "🔗 2 cards of one anime: +10% attack and health, 3 or more: +20%", edgeRule: "⚡ Edge: 🛡️ tank beats ⚔️ fighter, ⚔️ fighter beats 🔮 mage, 🔮 mage beats 🛡️ tank, for 25% more", edge: "edge",
       stunned: (n) => `💫 ${n} is stunned: turn skipped`, poisoned: (n, d) => `☠ ${n} takes −${d} from poison`,
       refused: { size: "A team needs 5 cards", repeat: "A card cannot be placed twice", not_held: "You no longer hold a card of the team", no_tickets: "No tickets left: one comes back every hour", no_team: "Save a team first: you no longer hold one of its cards", opponent_gone: "This opponent is gone; the list is refreshed", self: "You cannot attack yourself" },
@@ -2246,6 +2249,7 @@
       li.querySelector("p").append(at.skillInfo[k]);
       skills.append(li);
     }
+    add("p", "guide-line", at.ruleEnergy);
     add("p", "guide-line", at.ruleTickets(p.tickets_max));
     add("p", "guide-line", at.ruleTokens(p.tokens));
     add("p", "guide-line", at.ruleRating);
@@ -2497,7 +2501,7 @@
       li.innerHTML = '<span class="who"><span class="foe-name"><b></b></span><small class="foe-rating"></small><small class="foe-power"></small></span><button type="button" class="draw small"></button>';
       li.querySelector(".who b").textContent = o.name || "?";
       li.querySelector(".foe-rating").textContent = `🏅 ${spaced(o.rating)}`;
-      li.querySelector(".foe-power").textContent = mine ? at.youVs(spaced(mine), spaced(o.power)) : `⚡ ${spaced(o.power)}`;
+      li.querySelector(".foe-power").textContent = `⚡ ${spaced(o.power)}`;
       // how hard the opponent is, by its power to the team's saved
       if (mine) {
         const ratio = o.power / mine;
@@ -2563,6 +2567,14 @@
   const STEP = 350;
   // HITS are the events that go from one side to the other.
   const HITS = ["hit", "strike", "stun", "poison"];
+  // START_ENERGY is each class's energy at a battle's start, as arena.StartEnergy gives it.
+  const START_ENERGY = { tank: 30, fighter: 20, mage: 40 };
+  // energize fills a card's energy bar, lit when full on a card with a skill.
+  function energize(unit, energy) {
+    if (energy === undefined || !unit.en) return;
+    unit.en.style.transform = `scaleX(${Math.max(0, Math.min(1, energy / 100))})`;
+    unit.el.classList.toggle("charged", energy >= 100 && !!unit.f.skill);
+  }
   const lessMotion = () => !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 
   function replay(data, foe) {
@@ -2581,11 +2593,12 @@
         const sideBox = box.querySelector(sel);
         list.forEach((f, slot) => {
           const tile = fighterTile(f);
-          tile.insertAdjacentHTML("beforeend", '<i class="hp"><i></i></i><span class="hp-n"></span>');
+          tile.insertAdjacentHTML("beforeend", '<i class="hp"><i></i></i><i class="en"><i></i></i><span class="hp-n"></span>');
           sideBox.querySelector(slot < 2 ? ".fore" : ".rear").append(tile);
           const num = tile.querySelector(".hp-n");
           num.textContent = spaced(f.health);
-          units[side][slot] = { el: tile, bar: tile.querySelector(".hp i"), num, hp: f.health, max: f.health || 1, f, side };
+          units[side][slot] = { el: tile, bar: tile.querySelector(".hp i"), en: tile.querySelector(".en i"), num, hp: f.health, max: f.health || 1, f, side };
+          energize(units[side][slot], START_ENERGY[f.class] || 0);
         });
       }
       const whos = box.querySelectorAll(".b-who");
@@ -2623,6 +2636,8 @@
         const actor = units[e.side][e.from];
         const target = units[foeSide ? 1 - e.side : e.side][e.to];
         if (!target) return;
+        if (actor && e.kind !== "fall") energize(actor, e.energy);
+        if (e.kind !== "fall") energize(target, e.to_energy);
         target.hp = e.kind === "fall" ? 0 : e.hp;
         target.bar.style.transform = `scaleX(${Math.max(0, Math.min(1, target.hp / target.max))})`;
         target.num.textContent = spaced(Math.max(0, target.hp));
@@ -2659,9 +2674,10 @@
           float(target, `+${spaced(e.amount)}`, "heal");
           say(`${SKILL_ICON.heal} ${at.skills.heal}: `, name(actor), " → ", name(target), ` +${spaced(e.amount)}`);
         } else if (e.kind === "shield") {
+          if (actor && actor !== target) flash(actor, "shield");
           flash(target, "shield");
           float(target, `🛡 ${spaced(e.amount)}`, "shield");
-          say(`${SKILL_ICON.shield} ${at.skills.shield}: `, name(target), ` +${spaced(e.amount)}`);
+          say(`${SKILL_ICON.shield} ${at.skills.shield}: `, ...(actor && actor !== target ? [name(actor), " → "] : []), name(target), ` +${spaced(e.amount)}`);
         } else if (e.kind === "provoke") {
           flash(target, "provoke");
           float(target, SKILL_ICON.provoke, "provoke");
@@ -2682,8 +2698,7 @@
         if (next >= events.length) { finish(); return; }
         const e = events[next++];
         apply(e, true);
-        // the shields at the start come together, quickly
-        timer = setTimeout(step, e.round === 0 ? 150 : STEP);
+        timer = setTimeout(step, STEP);
       }
       function finish() {
         if (done) return;

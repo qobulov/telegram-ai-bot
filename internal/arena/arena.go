@@ -17,17 +17,29 @@ const (
 
 	MinSkillRarity = 3 // Legendary (3) and Mythic (4) carry a skill
 
-	StrikeEvery    = 3   // a Strike on every 3rd own turn
-	StrikeFactor   = 2.5 // ... for this times the attack
-	HealEvery      = 4   // a Heal on every 4th own turn
-	HealShare      = 0.25
-	ShieldShare    = 0.30
-	StunEvery      = 3    // a Stun on every 3rd own turn skips the target's next turn
-	PoisonEvery    = 3    // a Poison on every 3rd own turn ...
-	PoisonTurns    = 3    // ... hurts the target at the start of its next 3 turns
-	PoisonShare    = 0.08 // ... by this share of its health, past any shield
-	ProvokeEvery   = 4    // a Provoke at the start and on every 4th own turn ...
-	ProvokeRounds  = 2    // ... draws enemy Tanks and Fighters for 2 rounds
+	// Energy, as in Souls: a unit fills it by acting and by being hurt, and
+	// one with a skill uses it when a turn starts with it full, instead of
+	// its plain action, spending it all. A skipped (stunned) turn fills
+	// nothing.
+	EnergyMax       = 100
+	EnergyPerAction = 34 // after each own action but a skill
+	EnergyWhenHit   = 10 // each time it takes damage, a poison tick too
+	// The energy each class starts with, so that skills do not all come on
+	// the same turn; Mages, the fastest, come first.
+	StartEnergyTank    = 30
+	StartEnergyFighter = 20
+	StartEnergyMage    = 40
+
+	// The skills' numbers below were tuned on 2026-11-19 by simulating
+	// teams of five Mythics of one skill against mixed ones, until each
+	// skill won 45-52%.
+	StrikeFactor   = 1.8  // a Strike hits for this times the attack
+	HealShare      = 0.80 // a Heal gives the weakest hurt ally this share of its health, at most what it lost
+	ShieldShare    = 0.45 // a Shield gives itself and its weakest ally this share of their health
+	PoisonTurns    = 3    // a Poison hurts the target at the start of its next 3 turns ...
+	PoisonShare    = 0.15 // ... by this share of its health, past any shield
+	ProvokeRounds  = 3    // a Provoke draws enemy Tanks and Fighters for 3 more rounds ...
+	ProvokeGuard   = 0.7  // ... and takes this share of the damage meanwhile, so that it holds
 	EdgeFactor     = 1.25 // Tank beats Fighter, Fighter beats Mage, Mage beats Tank
 	DamageSpreadLo = 0.9
 	DamageSpreadHi = 1.1
@@ -86,6 +98,17 @@ func FighterOf(id int64, name string, rarity, stars, attack, health int) Fighter
 	return f
 }
 
+// StartEnergy is the energy a unit of class c starts a battle with.
+func StartEnergy(c Class) int {
+	switch c {
+	case ClassTank:
+		return StartEnergyTank
+	case ClassMage:
+		return StartEnergyMage
+	}
+	return StartEnergyFighter
+}
+
 // Team is two fighters in front and three behind: slots 0-1, then 2-4.
 type Team struct {
 	Front [2]Fighter
@@ -122,14 +145,16 @@ const (
 // Event is one thing that happened. Side is 0 for the attacker's team and 1
 // for the defender's. A hit, strike, stun or poison goes From a slot of Side
 // To a slot of the other side, Edge when its class beats the target's; a
-// heal goes From a slot To a slot of the same side; a shield, provoke,
-// stunned, poisoned and fall have From == To, the slot's own side. Amount is
-// the damage, healing or shield (0 for provoke, stunned and fall), and HP
-// the health of the slot To afterwards.
+// heal or a shield goes From a slot To a slot of the same side (a shield to
+// its caster too); a provoke, stunned, poisoned and fall have From == To,
+// the slot's own side. Amount is the damage, healing or shield (0 for
+// provoke, stunned and fall), HP the health of the slot To afterwards, and
+// Energy and ToEnergy the energy of the slots From and To afterwards.
 type Event struct {
 	Round, Side, From, To int
 	Kind                  string // one of the Kind constants
 	Amount, HP            int
+	Energy, ToEnergy      int
 	Edge                  bool
 }
 
@@ -143,7 +168,7 @@ type unit struct {
 	Fighter
 	side, slot int
 	hp, shield int
-	turns      int
+	energy     int
 	stunned    bool // skips its next turn
 	poisoned   int  // its turns left to be hurt by poison
 	provoking  int  // the last round it draws enemy Tanks and Fighters
@@ -151,23 +176,23 @@ type unit struct {
 
 func (u *unit) alive() bool { return u.hp > 0 }
 
+func (u *unit) gain(energy int) { u.energy = min(u.energy+energy, EnergyMax) }
+
 type fight struct {
 	teams  [2][5]*unit
 	rng    *rand.Rand
 	events []Event
 	round  int
+	// first is the side that acts first on a tie of speed and attack in
+	// round 1, the other in round 2 and so on, by the seed, so that
+	// neither side is favoured.
+	first int
 }
 
 // Battle plays the two teams against each other. That a team is valid (five
 // distinct cards the player holds) is the caller's job.
 func Battle(attacker, defender Team, seed int64) Result {
-	f := &fight{rng: rand.New(rand.NewSource(seed))}
-	for side, team := range [2]Team{attacker, defender} {
-		for slot, fighter := range team.slots() {
-			f.teams[side][slot] = &unit{Fighter: fighter, side: side, slot: slot, hp: fighter.Health}
-		}
-	}
-	f.start()
+	f := newFight(attacker, defender, seed)
 	for f.round < MaxRounds && f.living(0) > 0 && f.living(1) > 0 {
 		f.round++
 		for _, u := range f.order() {
@@ -189,22 +214,14 @@ func Battle(attacker, defender Team, seed int64) Result {
 	return Result{AttackerWon: won, Rounds: f.round, Events: f.events}
 }
 
-// start raises the shields and the first provokes, at round 0.
-func (f *fight) start() {
-	for _, side := range f.teams {
-		for _, u := range side {
-			if !u.alive() {
-				continue
-			}
-			switch u.Skill {
-			case Shield:
-				u.shield = int(ShieldShare * float64(u.Health))
-				f.emit(Event{Side: u.side, From: u.slot, To: u.slot, Kind: KindShield, Amount: u.shield, HP: u.hp})
-			case Provoke:
-				f.provoke(u)
-			}
+func newFight(attacker, defender Team, seed int64) *fight {
+	f := &fight{rng: rand.New(rand.NewSource(seed)), first: int(seed & 1)}
+	for side, team := range [2]Team{attacker, defender} {
+		for slot, fighter := range team.slots() {
+			f.teams[side][slot] = &unit{Fighter: fighter, side: side, slot: slot, hp: fighter.Health, energy: StartEnergy(fighter.Class)}
 		}
 	}
+	return f
 }
 
 func speed(c Class) int {
@@ -217,8 +234,8 @@ func speed(c Class) int {
 	return 1
 }
 
-// order lists the living units of both sides by speed, then attack, then the
-// attacker's side first, then slot.
+// order lists the living units of both sides by speed, then attack, then
+// the round's first side, then slot.
 func (f *fight) order() []*unit {
 	var all []*unit
 	for _, side := range f.teams {
@@ -228,6 +245,7 @@ func (f *fight) order() []*unit {
 			}
 		}
 	}
+	first := (f.first + f.round + 1) % 2
 	sort.SliceStable(all, func(i, j int) bool {
 		a, b := all[i], all[j]
 		if speed(a.Class) != speed(b.Class) {
@@ -237,7 +255,7 @@ func (f *fight) order() []*unit {
 			return a.Attack > b.Attack
 		}
 		if a.side != b.side {
-			return a.side < b.side
+			return a.side == first
 		}
 		return a.slot < b.slot
 	})
@@ -245,44 +263,74 @@ func (f *fight) order() []*unit {
 }
 
 // act is a unit's turn: poison hurts it first, a stun skips the rest, then
-// it heals, or hits with its skill or plainly.
+// it uses its skill with its energy full, or hits plainly.
 func (f *fight) act(u *unit) {
 	if f.poisonTick(u); !u.alive() {
 		return
 	}
 	if u.stunned {
 		u.stunned = false
-		f.emit(Event{Side: u.side, From: u.slot, To: u.slot, Kind: KindStunned, HP: u.hp})
+		f.record(KindStunned, u, u, 0, false)
 		return
 	}
-	u.turns++
-	if u.Skill == Heal && u.turns%HealEvery == 0 {
-		if ally := f.weakestHurt(u.side); ally != nil && healAmount(ally) > 0 {
-			f.heal(u, ally)
-			return
-		}
-	}
-	// A provoke costs no turn, as a shield costs none at the start.
-	if u.Skill == Provoke && u.turns%ProvokeEvery == 0 {
-		f.provoke(u)
+	if u.Skill != NoSkill && u.energy >= EnergyMax && f.useSkill(u) {
+		return
 	}
 	target := f.target(u)
 	if target == nil {
 		return
 	}
-	switch {
-	case u.Skill == Strike && u.turns%StrikeEvery == 0:
+	u.gain(EnergyPerAction)
+	f.hit(u, target, 1, KindHit)
+}
+
+// useSkill spends u's energy on its skill and says whether it did: a Heal
+// with nobody hurt keeps it for a turn that needs it.
+func (f *fight) useSkill(u *unit) bool {
+	switch u.Skill {
+	case Heal:
+		ally := f.weakestHurt(u.side)
+		if ally == nil || healAmount(ally) <= 0 {
+			return false
+		}
+		u.energy = 0
+		f.heal(u, ally)
+	case Shield:
+		u.energy = 0
+		f.shield(u, u)
+		if ally := f.weakestAlly(u); ally != nil {
+			f.shield(u, ally)
+		}
+	case Provoke:
+		u.energy = 0
+		f.provoke(u)
+		if target := f.target(u); target != nil {
+			f.hit(u, target, 1, KindHit)
+		}
+	default:
+		f.skillHit(u)
+	}
+	return true
+}
+
+// skillHit is a Strike, Stun or Poison on u's target.
+func (f *fight) skillHit(u *unit) {
+	target := f.target(u)
+	if target == nil {
+		return
+	}
+	u.energy = 0
+	switch u.Skill {
+	case Strike:
 		f.hit(u, target, StrikeFactor, KindStrike)
-	case u.Skill == Stun && u.turns%StunEvery == 0 && !target.stunned:
+	case Stun:
 		if f.hit(u, target, 1, KindStun); target.alive() {
 			target.stunned = true
 		}
-	case u.Skill == Poison && u.turns%PoisonEvery == 0:
+	case Poison:
 		if f.hit(u, target, 1, KindPoison); target.alive() {
 			target.poisoned = PoisonTurns
 		}
-	default:
-		f.hit(u, target, 1, KindHit)
 	}
 }
 
@@ -294,17 +342,18 @@ func (f *fight) poisonTick(u *unit) {
 	u.poisoned--
 	dmg := max(int(PoisonShare*float64(u.Health)), 1)
 	u.hp = max(u.hp-dmg, 0)
-	f.emit(Event{Side: u.side, From: u.slot, To: u.slot, Kind: KindPoisoned, Amount: dmg, HP: u.hp})
+	u.gain(EnergyWhenHit)
+	f.record(KindPoisoned, u, u, dmg, false)
 	if !u.alive() {
-		f.emit(Event{Side: u.side, From: u.slot, To: u.slot, Kind: KindFall})
+		f.record(KindFall, u, u, 0, false)
 	}
 }
 
 // provoke draws enemy Tanks and Fighters to u for the rest of this round
-// and the next ProvokeRounds; at round 0 that is rounds 1 and 2.
+// and the next ProvokeRounds.
 func (f *fight) provoke(u *unit) {
 	u.provoking = f.round + ProvokeRounds
-	f.emit(Event{Side: u.side, From: u.slot, To: u.slot, Kind: KindProvoke, HP: u.hp})
+	f.record(KindProvoke, u, u, 0, false)
 }
 
 // target is a living provoker for Tanks and Fighters, else the first living
@@ -367,6 +416,17 @@ func (f *fight) weakestHurt(side int) *unit {
 	return weakest
 }
 
+// weakestAlly is u's living ally, not u, with the least health, if any.
+func (f *fight) weakestAlly(u *unit) *unit {
+	var weakest *unit
+	for _, c := range f.teams[u.side] {
+		if c != u && c.alive() && (weakest == nil || c.hp < weakest.hp) {
+			weakest = c
+		}
+	}
+	return weakest
+}
+
 func healAmount(to *unit) int {
 	return min(int(HealShare*float64(to.Health)), to.Health-to.hp)
 }
@@ -387,6 +447,9 @@ func (f *fight) hit(from, to *unit, factor float64, kind string) {
 	if dmg < 1 {
 		dmg = 1
 	}
+	if to.provoking > 0 && to.provoking >= f.round {
+		dmg = max(int(float64(dmg)*ProvokeGuard+0.5), 1)
+	}
 	rest := dmg
 	if to.shield > 0 {
 		absorbed := min(rest, to.shield)
@@ -394,22 +457,32 @@ func (f *fight) hit(from, to *unit, factor float64, kind string) {
 		rest -= absorbed
 	}
 	to.hp = max(to.hp-rest, 0)
-	f.emit(Event{Side: from.side, From: from.slot, To: to.slot, Kind: kind, Amount: dmg, HP: to.hp, Edge: edged})
+	to.gain(EnergyWhenHit)
+	f.record(kind, from, to, dmg, edged)
 	if !to.alive() {
-		f.emit(Event{Side: to.side, From: to.slot, To: to.slot, Kind: KindFall})
+		f.record(KindFall, to, to, 0, false)
 	}
 }
 
 func (f *fight) heal(from, to *unit) {
 	amount := healAmount(to)
 	to.hp += amount
-	f.emit(Event{Side: from.side, From: from.slot, To: to.slot, Kind: KindHeal, Amount: amount, HP: to.hp})
+	f.record(KindHeal, from, to, amount, false)
 }
 
-// emit records e in the current round.
-func (f *fight) emit(e Event) {
-	e.Round = f.round
-	f.events = append(f.events, e)
+func (f *fight) shield(from, to *unit) {
+	amount := int(ShieldShare * float64(to.Health))
+	to.shield += amount
+	f.record(KindShield, from, to, amount, false)
+}
+
+// record keeps what from did to to in the current round, with both units'
+// health and energy as they are now.
+func (f *fight) record(kind string, from, to *unit, amount int, edged bool) {
+	f.events = append(f.events, Event{
+		Round: f.round, Side: from.side, From: from.slot, To: to.slot, Kind: kind,
+		Amount: amount, HP: to.hp, Energy: from.energy, ToEnergy: to.energy, Edge: edged,
+	})
 }
 
 func (f *fight) living(side int) int {

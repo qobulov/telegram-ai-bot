@@ -2267,13 +2267,30 @@ with a search and the rarities as chips, and saves them (`arena_team` with
 (attack and a quarter of health, summed) is shown from the cards as they are
 now, stars included. The server boosts each card by its stars and gives it a
 class by its health to attack (tank, fighter, mage) and, from Legendary up, a
-skill by its card id % 6: strike (every 3rd turn ×2.5), heal (every 4th turn
-the weakest hurt ally, 25%), shield (30% of health at the start), stun (every
-3rd turn the target skips its next turn, not again while stunned), poison
-(every 3rd turn the target loses 8% of its health, past shields, at the start
-of its next 3 turns; poisoning again sets 3 again) or provoke (at the start
-and every 4th turn, besides its hit, enemy tanks and fighters must hit it for
-the rest of that round and the next 2; mages still go for the back row).
+skill by its card id % 6. Skills run on energy, as in Souls: each card holds
+0 to 100 (`EnergyMax`), starts with 30 as a tank, 20 as a fighter or 40 as a
+mage (`StartEnergy`), gains 34 after each own action but a skill
+(`EnergyPerAction`) and 10 each time it takes damage, a poison tick too
+(`EnergyWhenHit`); a stunned card's skipped turn gains nothing. A card with a
+skill whose turn starts at 100 uses it instead of its plain hit and drops to
+0: strike (a hit ×1.8), heal (the weakest hurt ally gets back up to 80% of its
+health; with nobody hurt it hits plainly and keeps its energy), shield (itself
+and its ally with the least health each get a shield of 45% of their own
+health), stun (a hit, and the target skips its next turn), poison (a hit, and
+the target loses 15% of its health, past shields, at the start of its next 3
+turns) or provoke (besides its hit, enemy tanks and fighters must hit it for
+the rest of that round and the next 3, while it takes 70% of the damage;
+mages still go for the back row). Nothing comes free at the start any more.
+The numbers were tuned on 2026-11-19 by simulating teams of five Mythics of
+one skill against mixed ones, 20 000 battles each, half attacking: strike
+won 51.6%, heal 45.2%, shield 49.0%, stun 45.5%, poison 44.7%, provoke 45.8%
+(before, on the turn rhythm: shield 74%, strike 64%, stun 49%, poison 44%,
+provoke 38%, heal 32%). Cards of the same speed and attack used to act the
+attacker's first, which with the defender winning exact ties gave the
+attacker about 69% against an even team; the side first on such a tie is now
+the seed's in odd rounds and the other in even ones, and a team against
+itself wins 50.0% attacking. Each event says `energy` and `to_energy`, the
+energy of its `from` and `to` cards after it.
 The classes beat each other in a triangle, tank over fighter, fighter over
 mage, mage over tank: such a hit, a skill's too, does ×1.25 (`EdgeFactor`)
 and its event says `edge`. Cards of one anime in a team, seasons and sequels
@@ -2294,7 +2311,8 @@ battles, attacking or attacked (opponent, won, their own rating change).
 `no_team`, `opponent_gone` or `self`) plays the battle
 on the server from a crypto/rand seed and records it; the page replays its
 events on the whole screen, one every 350 ms: a hit shakes its target and its
-HP bar falls, a skill flashes, an edge hit's damage says ⚡, a stun
+HP bar falls, a thin energy bar under it fills from each event's energy and
+glows gold when full on a card with a skill, a skill flashes, an edge hit's damage says ⚡, a stun
 shows 💫 and dims the card until its skipped turn, poison floats ☠ in green,
 a provoke flashes 😤, a fallen card greys, and "O'tkazib yuborish"
 skips to the end, which less motion asked for shows at once. The end says
@@ -2305,14 +2323,15 @@ For a first-time player the tab starts with three steps, 1 Jamoa tuzing (2
 old, 3 orqa), 2 Raqib tanlang, 3 Jang, the one they are at lit (no team saved:
 step 1; while a battle is fought: step 3), each scrolling to its block; a
 folded "Qoidalar ⓘ" holds the classes' triangle as a small diagram with a line
-on each class, the synergy, the six skills with their icons, tickets, win
+on each class, the synergy, the six skills with their icons, the energy rule, tickets, win
 tokens, rating and the week's prizes with a link to the arena's table. A slot
 shows its card's class and skill as separate chips and its synergy badge, an
 empty one "+ Karta qo'shing", each row says what it is for (the front takes
 the hits first, mages hit the back), and under the team the animes raising
-each other (🔗 Naruto ×2: +10%). An opponent shows both powers (Siz ⚡ · Raqib
-⚡) and, by its power to the team saved, Oson (under 0.9), Teng (0.9 to 1.1)
-or Qiyin. The replay labels the sides Raqib and Siz, shows each card's health
+each other (🔗 Naruto ×2: +10%). An opponent shows its rating and its power
+alone (⚡ 39 419, the player's own left out as the owner asked on 2026-11-19)
+and, by its power to the team saved, Oson (under 0.9), Teng (0.9 to 1.1) or
+Qiyin. The replay labels the sides Raqib and Siz, shows each card's health
 left over its bar, and tells each action on a two-line panel between the
 sides, our cards' names in gold and theirs in red.
 A card opened large turns over, tapped or by the ↻ button under it (the sides

@@ -914,6 +914,10 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .fighter .f-stars { position: absolute; top: 4px; left: 4px; padding: 0 5px; border-radius: 999px; background: rgba(8, 6, 14, 0.75); font: 700 9px/16px Unbounded, sans-serif; color: var(--gold); }
 .fighter .hp { position: absolute; left: 5px; right: 5px; bottom: 19px; height: 5px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); overflow: hidden; }
 .fighter .hp i { display: block; height: 100%; background: linear-gradient(90deg, #4be37a, #b7f36b); transform-origin: left; transition: transform 0.3s ease-out; }
+/* the energy under the HP, lit when full on a card with a skill */
+.fighter .en { position: absolute; left: 5px; right: 5px; bottom: 26px; height: 3px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); overflow: hidden; }
+.fighter .en i { display: block; height: 100%; background: linear-gradient(90deg, #4aa8ff, #8fe3ff); transform-origin: left; transform: scaleX(0); transition: transform 0.3s ease-out; }
+.fighter.charged .en i { background: linear-gradient(90deg, #ffd25a, #fff1a8); box-shadow: 0 0 6px #ffd25a; }
 .fighter.fallen { opacity: 0.35; filter: grayscale(1); }
 .f-flash { position: absolute; inset: 0; z-index: 3; opacity: 0; pointer-events: none; }
 .f-flash.hurt { background: radial-gradient(circle, rgba(255, 70, 70, 0.55), transparent 70%); }
@@ -931,7 +935,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .fighter.stunned { opacity: 0.55; filter: saturate(0.4); }
 .fighter.poisoned { box-shadow: 0 0 0 1.5px var(--c) inset, 0 0 0 3px rgba(130, 230, 90, 0.55) inset; }
 .fighter .f-syn { position: absolute; left: 4px; bottom: 18px; padding: 0 5px; border-radius: 999px; background: rgba(8, 6, 14, 0.75); font: 700 9px/15px Manrope, sans-serif; color: #9fd8ff; }
-.b-row .fighter .f-syn { bottom: 25px; }
+.b-row .fighter .f-syn { bottom: 31px; }
 .arena-rules { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; }
 .arena-rules.on span { padding: 3px 9px; border-radius: 999px; background: rgba(159, 216, 255, 0.12); color: #9fd8ff; font-weight: 700; }
 .arena-pick .pick-skill { display: block; max-width: 180px; margin-top: 2px; font-size: 11px; font-weight: 500; white-space: normal; }
@@ -973,7 +977,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .b-ok { margin-top: 8px; }
 
 /* the HP left, over its bar, in battle */
-.fighter .hp-n { position: absolute; right: 5px; bottom: 25px; font: 800 10px/1 Manrope, sans-serif; font-variant-numeric: tabular-nums; color: #d9ffe4; text-shadow: 0 1px 2px #000, 0 0 4px #000; }
+.fighter .hp-n { position: absolute; right: 5px; bottom: 31px; font: 800 10px/1 Manrope, sans-serif; font-variant-numeric: tabular-nums; color: #d9ffe4; text-shadow: 0 1px 2px #000, 0 0 4px #000; }
 .fighter.fallen .hp-n { color: var(--muted); }
 
 /* the arena's three steps */

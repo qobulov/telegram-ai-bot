@@ -82,6 +82,10 @@ type eventView struct {
 	Amount int    `json:"amount"`
 	HP     int    `json:"hp"`
 	Edge   bool   `json:"edge"`
+	// Energy and ToEnergy are the energy of the slots From and To after it,
+	// for the page's energy bars.
+	Energy   int `json:"energy"`
+	ToEnergy int `json:"to_energy"`
 }
 
 // fighters is a team in the arena: its fighters, front first, and their
@@ -318,15 +322,19 @@ func (h *handler) arenaAttack(ctx context.Context, user miniapp.User, opponent i
 		h.Logger.Error("could not record an arena battle", "user_id", user.ID, "opponent", opponent, "error", err)
 		return nil, errUnavailable
 	}
-	events := make([]eventView, len(result.Events))
-	for i, e := range result.Events {
-		events[i] = eventView{Round: e.Round, Side: e.Side, From: e.From, To: e.To, Kind: e.Kind, Amount: e.Amount, HP: e.HP, Edge: e.Edge}
-	}
 	return map[string]any{
-		"won": result.AttackerWon, "events": events, "attacker": mine.views, "defender": theirs.views,
+		"won": result.AttackerWon, "events": eventViews(result.Events), "attacker": mine.views, "defender": theirs.views,
 		"rating_change": outcome.RatingChange, "token": outcome.Token,
 		"tickets": outcome.Tickets, "next_ticket_in": outcome.NextTicket.Milliseconds(), "tokens_left": outcome.TokensLeft,
 	}, failure{}
+}
+
+func eventViews(events []arena.Event) []eventView {
+	views := make([]eventView, len(events))
+	for i, e := range events {
+		views[i] = eventView{Round: e.Round, Side: e.Side, From: e.From, To: e.To, Kind: e.Kind, Amount: e.Amount, HP: e.HP, Edge: e.Edge, Energy: e.Energy, ToEnergy: e.ToEnergy}
+	}
+	return views
 }
 
 // arenaSeed draws a battle's seed, which replays it, from crypto/rand.

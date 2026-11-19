@@ -152,31 +152,6 @@ func TestMageHitsTheBackRow(t *testing.T) {
 	t.Fatal("mage never hit in round 1")
 }
 
-func TestHealAndShieldFire(t *testing.T) {
-	var a, d Team
-	a.Front[0] = FighterOf(8, KindShield, 4, 1, 50, 1000) // Shield
-	a.Front[1] = FighterOf(7, "healer", 4, 1, 50, 1000)   // Heal
-	a.Back[0] = FighterOf(6, "striker", 4, 1, 50, 1000)   // Strike
-	d.Front[0] = FighterOf(100, "wall", 1, 1, 150, 20000) // hurts the attackers
-	d.Front[1] = FighterOf(101, "wall2", 1, 1, 150, 20000)
-	r := Battle(a, d, 9)
-	count := map[string]int{}
-	for _, e := range r.Events {
-		count[e.Kind]++
-		if e.Kind == KindShield && (e.Round != 0 || e.Amount != 300 || e.Side != 0) {
-			t.Errorf("bad shield event %+v", e)
-		}
-		if e.Kind == KindHeal && (e.Side != 0 || e.Amount <= 0) {
-			t.Errorf("bad heal event %+v", e)
-		}
-	}
-	for _, k := range []string{KindShield, KindHeal, KindStrike, KindHit} {
-		if count[k] == 0 {
-			t.Errorf("no %s event", k)
-		}
-	}
-}
-
 func TestFallIsEmitted(t *testing.T) {
 	var a, d Team
 	a.Front[0] = FighterOf(1, "a", 1, 1, 500, 500)
@@ -246,122 +221,269 @@ func TestEdgeTriangle(t *testing.T) {
 	}
 }
 
-// stunWall is a defender of one Tank too tough to fall, with no shield.
-func stunWall() Team {
-	var d Team
-	d.Front[0] = FighterOf(100, "wall", 1, 1, 1, 1_000_000)
-	return d
+
+// soloFight is a fight of a against d in round 1, built as Battle builds
+// it, for a turn to be played by hand.
+func soloFight(a, d Team) *fight {
+	f := newFight(a, d, 2)
+	f.round = 1
+	return f
 }
 
-// A Stun on its 3rd turn skips the target's next turn; a second stunner
-// the same round only hits, as the target is stunned already.
-func TestStunSkipsATurn(t *testing.T) {
+// lastOf is the last event of kind, or a zero one.
+func lastOf(events []Event, kind string) Event {
+	for i := len(events) - 1; i >= 0; i-- {
+		if events[i].Kind == kind {
+			return events[i]
+		}
+	}
+	return Event{}
+}
+
+func TestStartEnergyByClass(t *testing.T) {
 	var a Team
-	a.Front[0] = FighterOf(9, "stun1", 3, 1, 100, 350) // Stun, Fighter
-	a.Front[1] = FighterOf(15, "stun2", 3, 1, 90, 350) // Stun, Fighter, acts after
-	r := Battle(a, stunWall(), 1)
-	stuns, wallActs := map[int]int{}, map[int][]string{}
-	for _, e := range r.Events {
-		if e.Kind == KindStun {
-			stuns[e.Round]++
-			if e.Side != 0 || e.To != 0 {
-				t.Errorf("bad stun %+v", e)
-			}
+	a.Front[0] = FighterOf(1, "tank", 1, 1, 100, 500)
+	a.Front[1] = FighterOf(2, "fighter", 1, 1, 100, 350)
+	a.Back[0] = FighterOf(3, "mage", 1, 1, 100, 200)
+	f := newFight(a, Team{}, 1)
+	for slot, want := range []int{StartEnergyTank, StartEnergyFighter, StartEnergyMage} {
+		if got := f.teams[0][slot].energy; got != want {
+			t.Errorf("slot %d starts with %d energy, want %d", slot, got, want)
 		}
-		if e.Side == 1 && e.From == 0 {
-			wallActs[e.Round] = append(wallActs[e.Round], e.Kind)
-		}
-	}
-	if stuns[3] != 1 || stuns[1] != 0 || stuns[2] != 0 {
-		t.Errorf("stuns by round = %v, want one in round 3", stuns)
-	}
-	if !reflect.DeepEqual(wallActs[3], []string{KindStunned}) {
-		t.Errorf("the wall's round 3 = %v, want only stunned", wallActs[3])
-	}
-	if !reflect.DeepEqual(wallActs[4], []string{KindHit}) {
-		t.Errorf("the wall's round 4 = %v, want a hit", wallActs[4])
 	}
 }
 
-// A Poison on its 3rd turn hurts the target by PoisonShare of its health at
-// the start of its next PoisonTurns turns, past its shield.
+// A plain hit fills the hitter by EnergyPerAction and the one hit by
+// EnergyWhenHit, both capped at EnergyMax, and the event says so.
+func TestEnergyGain(t *testing.T) {
+	var a Team
+	a.Front[0] = FighterOf(1, "a", 1, 1, 100, 350) // Fighter, no skill
+	f := soloFight(a, stunWall())
+	u, wall := f.teams[0][0], f.teams[1][0]
+	f.act(u)
+	e := lastOf(f.events, KindHit)
+	if e.Energy != StartEnergyFighter+EnergyPerAction || u.energy != e.Energy {
+		t.Errorf("hitter's energy %d (event %d), want %d", u.energy, e.Energy, StartEnergyFighter+EnergyPerAction)
+	}
+	if e.ToEnergy != StartEnergyTank+EnergyWhenHit || wall.energy != e.ToEnergy {
+		t.Errorf("wall's energy %d (event %d), want %d", wall.energy, e.ToEnergy, StartEnergyTank+EnergyWhenHit)
+	}
+	for range 5 {
+		f.act(u)
+	}
+	if u.energy != EnergyMax {
+		t.Errorf("a unit without a skill holds %d energy, want it capped at %d", u.energy, EnergyMax)
+	}
+	if lastOf(f.events, KindStrike).Kind != "" {
+		t.Error("a unit without a skill used one")
+	}
+}
+
+// A skill comes on the turn that starts with full energy, spends it all
+// and gains nothing for that turn.
+func TestSkillAtFullEnergy(t *testing.T) {
+	var a Team
+	a.Front[0] = FighterOf(6, "striker", 4, 1, 100, 350) // Strike, Fighter
+	f := soloFight(a, stunWall())
+	u := f.teams[0][0]
+	u.energy = EnergyMax - 1
+	f.act(u)
+	if e := f.events[len(f.events)-1]; e.Kind != KindHit || e.Energy != EnergyMax {
+		t.Fatalf("at %d energy: %+v, want a plain hit filling it", EnergyMax-1, e)
+	}
+	f.act(u)
+	e := f.events[len(f.events)-1]
+	if e.Kind != KindStrike || e.Energy != 0 || u.energy != 0 {
+		t.Errorf("at full energy: %+v, energy %d, want a strike spending it", e, u.energy)
+	}
+	if e.Amount < int(100*StrikeFactor*DamageSpreadLo) {
+		t.Errorf("strike for %d", e.Amount)
+	}
+}
+
+// A Heal with nobody hurt hits plainly and keeps its energy; with an ally
+// hurt it heals the weakest one and spends it.
+func TestHealWithNobodyHurtKeepsEnergy(t *testing.T) {
+	var a Team
+	a.Front[0] = FighterOf(7, "healer", 4, 1, 100, 350) // Heal
+	a.Front[1] = FighterOf(1, "ally", 1, 1, 100, 1000)
+	f := soloFight(a, stunWall())
+	u, ally := f.teams[0][0], f.teams[0][1]
+	u.energy = EnergyMax
+	f.act(u)
+	if e := f.events[len(f.events)-1]; e.Kind != KindHit || u.energy != EnergyMax {
+		t.Fatalf("nobody hurt: %+v, energy %d", e, u.energy)
+	}
+	ally.hp = 200
+	f.act(u)
+	e := f.events[len(f.events)-1]
+	if e.Kind != KindHeal || e.To != 1 || e.Amount != int(HealShare*1000) || u.energy != 0 {
+		t.Errorf("an ally hurt: %+v, energy %d", e, u.energy)
+	}
+}
+
+// A Shield shields its caster and its ally with the least health, each by
+// ShieldShare of its own health, and takes the turn.
+func TestShieldOnSelfAndWeakest(t *testing.T) {
+	var a Team
+	a.Front[0] = FighterOf(8, "shield", 4, 1, 100, 1000) // Shield, Tank
+	a.Front[1] = FighterOf(1, "strong", 1, 1, 100, 2000)
+	a.Back[0] = FighterOf(2, "weak", 1, 1, 100, 800)
+	f := soloFight(a, stunWall())
+	f.teams[0][2].hp = 300
+	u := f.teams[0][0]
+	u.energy = EnergyMax
+	f.act(u)
+	if len(f.events) != 2 {
+		t.Fatalf("events %+v, want two shields", f.events)
+	}
+	for i, want := range [][2]int{{0, int(ShieldShare * 1000)}, {2, int(ShieldShare * 800)}} {
+		e := f.events[i]
+		if e.Kind != KindShield || e.Side != 0 || e.From != 0 || e.To != want[0] || e.Amount != want[1] || e.Energy != 0 {
+			t.Errorf("shield %d = %+v, want to slot %d for %d", i, e, want[0], want[1])
+		}
+	}
+	if u.shield != int(ShieldShare*1000) || f.teams[0][2].shield != int(ShieldShare*800) || f.teams[0][1].shield != 0 {
+		t.Errorf("shields %d, %d, %d", u.shield, f.teams[0][1].shield, f.teams[0][2].shield)
+	}
+}
+
+// A stunned unit's turn is skipped and fills no energy.
+func TestStunnedTurnGainsNothing(t *testing.T) {
+	var a Team
+	a.Front[0] = FighterOf(9, "stunner", 4, 1, 100, 350) // Stun
+	f := soloFight(a, stunWall())
+	u, wall := f.teams[0][0], f.teams[1][0]
+	u.energy = EnergyMax
+	f.act(u)
+	if e := lastOf(f.events, KindStun); e.Kind == "" || !wall.stunned {
+		t.Fatalf("no stun: %+v", f.events)
+	}
+	before := wall.energy
+	f.act(wall)
+	e := f.events[len(f.events)-1]
+	if e.Kind != KindStunned || wall.energy != before || e.Energy != before || wall.stunned {
+		t.Errorf("stunned turn %+v, energy %d → %d", e, before, wall.energy)
+	}
+	f.act(wall)
+	if e := f.events[len(f.events)-1]; e.Kind != KindHit {
+		t.Errorf("the turn after a stun: %+v", e)
+	}
+}
+
+// A Poison hurts its target at the start of its next PoisonTurns turns by
+// PoisonShare of its health, past any shield, each tick filling energy.
 func TestPoisonTicks(t *testing.T) {
-	var a, d Team
-	a.Front[0] = FighterOf(10, "poisoner", 3, 1, 50, 175) // Poison, Fighter
-	d.Front[0] = FighterOf(8, "wall", 3, 1, 1, 1000)      // Shield, Tank
-	r := Battle(a, d, 1)
-	var ticks []Event
-	for _, e := range r.Events {
-		if e.Kind == KindPoisoned {
-			ticks = append(ticks, e)
-		}
-		if e.Kind == KindPoison && e.Round%PoisonEvery != 0 {
-			t.Errorf("poison in round %d", e.Round)
-		}
+	var a Team
+	a.Front[0] = FighterOf(10, "poisoner", 4, 1, 100, 350) // Poison
+	f := soloFight(a, stunWall())
+	u, wall := f.teams[0][0], f.teams[1][0]
+	u.energy = EnergyMax
+	f.act(u)
+	if wall.poisoned != PoisonTurns {
+		t.Fatalf("poisoned %d", wall.poisoned)
 	}
-	if len(ticks) < 3 {
-		t.Fatalf("ticks = %+v", ticks)
-	}
-	for i, e := range ticks[:3] {
-		if e.Round != 3+i || e.Side != 1 || e.From != 0 || e.To != 0 || e.Amount != 80 {
-			t.Errorf("tick %d = %+v", i, e)
+	wall.shield = 1_000_000
+	for i := range PoisonTurns + 1 {
+		hp, energy := wall.hp, wall.energy
+		f.act(wall)
+		tick := lastOf(f.events, KindPoisoned)
+		if i == PoisonTurns {
+			if wall.hp != hp {
+				t.Errorf("poison lasted past %d turns", PoisonTurns)
+			}
+			break
 		}
-	}
-	// The shield of 300 still holds after three hits of about 50: the poison goes past it.
-	if ticks[0].HP != 920 {
-		t.Errorf("hp after the first tick = %d, want 920", ticks[0].HP)
+		want := int(PoisonShare * float64(wall.Health))
+		if tick.Amount != want || wall.hp != hp-want || wall.energy < min(energy+EnergyWhenHit, EnergyMax) {
+			t.Errorf("tick %d = %+v, hp %d → %d, energy %d → %d", i, tick, hp, wall.hp, energy, wall.energy)
+		}
 	}
 }
 
-// Poison lasts PoisonTurns turns and can fell its unit.
-func TestPoisonRunsOutAndFells(t *testing.T) {
+// Poison can fell its unit.
+func TestPoisonFells(t *testing.T) {
 	f := &fight{}
-	u := &unit{Fighter: Fighter{Health: 1000}, hp: 1000, poisoned: PoisonTurns}
-	for range PoisonTurns + 2 {
-		f.poisonTick(u)
-	}
-	if len(f.events) != PoisonTurns || u.hp != 1000-PoisonTurns*80 || u.poisoned != 0 {
-		t.Errorf("events %+v, hp %d", f.events, u.hp)
-	}
-	f = &fight{}
-	u = &unit{Fighter: Fighter{Health: 10}, hp: 1, poisoned: 1} // 8% of 10 floors at 1
+	u := &unit{Fighter: Fighter{Health: 10}, hp: 1, poisoned: 1} // the share of 10 floors at 1
 	f.poisonTick(u)
 	if len(f.events) != 2 || f.events[0].Amount != 1 || f.events[0].HP != 0 || f.events[1].Kind != KindFall {
 		t.Errorf("a poison fall = %+v", f.events)
 	}
 }
 
-// A Provoke at the start draws enemy Tanks and Fighters for rounds 1 and 2,
-// again after its 4th turn; a Mage keeps to the back row's weakest.
+// A Provoke draws enemy Tanks and Fighters for the rest of the round and
+// ProvokeRounds more, hits besides, and takes ProvokeGuard of the damage
+// meanwhile; a Mage keeps to the back row's weakest.
 func TestProvokeRedirects(t *testing.T) {
 	var a, d Team
 	a.Front[0] = FighterOf(1, "fighter", 1, 1, 100, 350) // Fighter
 	a.Back[0] = FighterOf(2, "mage", 1, 1, 100, 200)     // Mage
 	d.Front[0] = FighterOf(100, "f0", 1, 1, 1, 1_000_000)
 	d.Front[1] = FighterOf(101, "f1", 1, 1, 1, 1_000_000)
-	d.Back[0] = FighterOf(11, "provoker", 3, 1, 1, 1_000_000) // Provoke, Tank, acts last
+	d.Back[0] = FighterOf(11, "provoker", 4, 1, 1, 1_000_000) // Provoke, Tank
 	d.Back[1] = FighterOf(102, "b1", 1, 1, 1, 500_000)        // the weakest behind
-	d.Back[2] = FighterOf(103, "b2", 1, 1, 1, 600_000)
-	r := Battle(a, d, 1)
-	provokes := []int{}
-	fighterHit := map[int]int{}
-	for _, e := range r.Events {
-		switch {
-		case e.Kind == KindProvoke:
-			provokes = append(provokes, e.Round)
-		case e.Side == 0 && e.From == 0 && e.Kind == KindHit:
-			fighterHit[e.Round] = e.To
-		case e.Side == 0 && e.From == 2 && e.To != 3:
-			t.Fatalf("the mage hit slot %d in round %d", e.To, e.Round)
+	f := soloFight(a, d)
+	p := f.teams[1][2]
+	p.energy = EnergyMax
+	f.act(p)
+	kinds := []string{f.events[0].Kind, f.events[1].Kind}
+	if !reflect.DeepEqual(kinds, []string{KindProvoke, KindHit}) || p.energy != 0 || p.provoking != 1+ProvokeRounds {
+		t.Fatalf("provoke: %+v, energy %d", f.events, p.energy)
+	}
+	if got := f.target(f.teams[0][0]); got != p {
+		t.Errorf("the fighter goes for slot %d", got.slot)
+	}
+	if got := f.target(f.teams[0][2]); got.slot != 3 {
+		t.Errorf("the mage goes for slot %d, want 3", got.slot)
+	}
+	f.hit(f.teams[0][0], p, 1, KindHit)
+	if e := f.events[len(f.events)-1]; e.Amount > int(100*DamageSpreadHi*ProvokeGuard+1) {
+		t.Errorf("the provoker took %d", e.Amount)
+	}
+	f.round = 1 + ProvokeRounds + 1
+	if got := f.target(f.teams[0][0]); got.slot != 0 {
+		t.Errorf("after the provoke the fighter goes for slot %d", got.slot)
+	}
+}
+
+// A tie of speed and attack goes to the seed's side in odd rounds and the
+// other in even ones, so that a team against itself wins half the time.
+func TestTieBreakIsFair(t *testing.T) {
+	team := commonTeam(100, 350)
+	for _, seed := range []int64{4, 5} {
+		f := newFight(team, team, seed)
+		for round := 1; round <= 2; round++ {
+			f.round = round
+			want := (int(seed&1) + round + 1) % 2
+			if got := f.order()[0].side; got != want {
+				t.Errorf("seed %d round %d: side %d acts first, want %d", seed, round, got, want)
+			}
 		}
 	}
-	if len(provokes) < 2 || provokes[0] != 0 || provokes[1] != 4 {
-		t.Errorf("provokes in rounds %v", provokes)
-	}
-	want := map[int]int{1: 2, 2: 2, 3: 0, 4: 0, 5: 2, 6: 2, 7: 0}
-	for round, slot := range want {
-		if fighterHit[round] != slot {
-			t.Errorf("round %d: the fighter hit slot %d, want %d", round, fighterHit[round], slot)
+	var mixed Team
+	for i := range 5 {
+		f := FighterOf(int64(i), "m", 4, 1, 100+10*i, 250+60*i)
+		if i < 2 {
+			mixed.Front[i] = f
+		} else {
+			mixed.Back[i-2] = f
 		}
 	}
+	wins := 0
+	const n = 2000
+	for seed := range int64(n) {
+		if Battle(mixed, mixed, seed).AttackerWon {
+			wins++
+		}
+	}
+	if wins < n*40/100 || wins > n*60/100 {
+		t.Errorf("a team against itself won %d of %d attacking", wins, n)
+	}
+}
+
+// stunWall is a defender of one Tank too tough to fall, with no skill.
+func stunWall() Team {
+	var d Team
+	d.Front[0] = FighterOf(100, "wall", 1, 1, 1, 1_000_000)
+	return d
 }
