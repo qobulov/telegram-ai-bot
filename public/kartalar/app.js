@@ -1336,21 +1336,21 @@
       left: (d, h, m) => (d ? `⏳ ${d} kun ${h} soat qoldi` : h ? `⏳ ${h} soat ${m} daqiqa qoldi` : `⏳ ${m} daqiqa qoldi`),
       odds: (m, s) => `👑 Mifik ${m} · 🌸 Satoko ${s}`, pity: (n, max) => `Satoko kafolati: ${n}/${max}`, owned: "✅ Satoko sizda bor — har kim faqat bir marta oladi",
       open: (n, price) => `${n} ta · ${n * price} 🎟`, short: (n) => `🎟 Yana ${n} ta token kerak`, over: "🌸 Event tugadi", starts: (h, m) => (h ? `⏳ ${h} soat ${m} daqiqadan keyin boshlanadi` : `⏳ ${m} daqiqadan keyin boshlanadi`), soon: "🌸 Event hali boshlanmadi",
-      pulled: (n) => `🌸 ${n} ta event karta`, got: "🌸 Satoko Kirigaya tushdi!", badge: "🌸 EVENT",
+      pulled: (n) => `🌸 ${n} ta event karta`, got: "🌸 Satoko Kirigaya tushdi!", badge: "🌸 EVENT", go: "Ochish ›",
     },
     ru: {
       title: "🌸 Firefly Wedding", tag: "ИВЕНТ · LIMITED",
       left: (d, h, m) => (d ? `⏳ Осталось ${d} дн. ${h} ч.` : h ? `⏳ Осталось ${h} ч. ${m} мин.` : `⏳ Осталось ${m} мин.`),
       odds: (m, s) => `👑 Мифическая ${m} · 🌸 Сатоко ${s}`, pity: (n, max) => `Гарант Сатоко: ${n}/${max}`, owned: "✅ Сатоко уже у вас — её можно получить только один раз",
       open: (n, price) => `${n} шт. · ${n * price} 🎟`, short: (n) => `🎟 Нужно ещё ${n} токенов`, over: "🌸 Ивент закончился", starts: (h, m) => (h ? `⏳ Начнётся через ${h} ч. ${m} мин.` : `⏳ Начнётся через ${m} мин.`), soon: "🌸 Ивент ещё не начался",
-      pulled: (n) => `🌸 Ивент-карты: ${n}`, got: "🌸 Выпала Сатоко Киригая!", badge: "🌸 ИВЕНТ",
+      pulled: (n) => `🌸 Ивент-карты: ${n}`, got: "🌸 Выпала Сатоко Киригая!", badge: "🌸 ИВЕНТ", go: "Открыть ›",
     },
     en: {
       title: "🌸 Firefly Wedding", tag: "EVENT · LIMITED",
       left: (d, h, m) => (d ? `⏳ ${d} days ${h} hours left` : h ? `⏳ ${h} hours ${m} minutes left` : `⏳ ${m} minutes left`),
       odds: (m, s) => `👑 Mythic ${m} · 🌸 Satoko ${s}`, pity: (n, max) => `Satoko guarantee: ${n}/${max}`, owned: "✅ You have Satoko — each player gets her once",
       open: (n, price) => `${n} · ${n * price} 🎟`, short: (n) => `🎟 ${n} more tokens needed`, over: "🌸 The event is over", starts: (h, m) => (h ? `⏳ Starts in ${h} hours ${m} minutes` : `⏳ Starts in ${m} minutes`), soon: "🌸 The event has not started yet",
-      pulled: (n) => `🌸 ${n} event cards`, got: "🌸 Satoko Kirigaya dropped!", badge: "🌸 EVENT",
+      pulled: (n) => `🌸 ${n} event cards`, got: "🌸 Satoko Kirigaya dropped!", badge: "🌸 EVENT", go: "Open ›",
     },
   };
   const et = eventTexts[language] || eventTexts.uz;
@@ -1361,7 +1361,31 @@
   $("eventBadge").textContent = et.badge;
   function eventMark() {
     $("eventBadge").hidden = !(eventData && (eventData.active || eventData.soon));
+    eventBanner();
   }
+
+  // eventBanner shows the event at the top of the first pages, the
+  // collection and the draw, while it runs or is coming; a tap opens the
+  // shop at the event.
+  $("eventBannerTag").textContent = et.tag;
+  $("eventBannerTitle").textContent = et.title;
+  $("eventBannerGo").textContent = et.go;
+  function eventBanner() {
+    const on = !!(eventData && (eventData.active || eventData.soon)) && (opened === "collection" || opened === "draw");
+    $("eventBanner").hidden = !on;
+    if (!on) return;
+    const image = eventData.card && eventData.card.image;
+    if (image && $("eventBannerArt").dataset.src !== image) {
+      $("eventBannerArt").dataset.src = image;
+      picture($("eventBannerArt"), image, true);
+    }
+    $("eventBannerLeft").textContent = $("eventEnds").textContent;
+  }
+  $("eventBanner").addEventListener("click", () => {
+    haptic("light");
+    showTab("shop");
+    setTimeout(() => $("event").scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+  });
 
   // eventBlock asks for the event and shows it while it runs; the app asks
   // once it has loaded, for the badge, and again whenever the shop opens.
@@ -1414,6 +1438,7 @@
     if (left <= 0) { $("event").hidden = true; eventData.active = false; eventMark(); return; }
     const minutes = Math.floor(left / 60000);
     $("eventEnds").textContent = et.left(Math.floor(minutes / 1440), Math.floor((minutes % 1440) / 60), minutes % 60);
+    eventBanner();
   }
   setInterval(eventLeft, 30000);
 
@@ -1956,6 +1981,7 @@
     if (tab === "anime") animePage();
     if (tab === "market") market();
     drawButton();
+    eventBanner();
     window.scrollTo(0, 0);
   }
   for (const button of document.querySelectorAll(".nav button")) {

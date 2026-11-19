@@ -638,6 +638,23 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
   box-shadow: 0 10px 30px color-mix(in srgb, var(--sakura) 18%, transparent);
 }
 .event[hidden] { display: none; }
+.event-banner {
+  --sakura: #ff9ec7;
+  display: grid; grid-template-columns: 56px 1fr auto; align-items: center; gap: 12px; width: 100%; margin: 0 0 12px;
+  padding: 10px 14px 10px 10px; border-radius: 16px; text-align: left; color: var(--text); cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--sakura) 50%, transparent);
+  background: radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--sakura) 28%, transparent), transparent 65%),
+    linear-gradient(160deg, color-mix(in srgb, var(--r4) 14%, var(--panel)), var(--panel));
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--sakura) 16%, transparent);
+}
+.event-banner[hidden] { display: none; }
+.event-banner:active { transform: scale(0.99); }
+.eb-art { width: 56px; height: 72px; border-radius: 10px; overflow: hidden; background: var(--lacquer); }
+.eb-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.eb-info { display: grid; gap: 3px; min-width: 0; }
+.eb-info b { font: 700 15px Unbounded, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eb-info small { color: var(--gold); font: 700 12px Manrope, sans-serif; }
+.eb-go { padding: 8px 12px; border-radius: 999px; background: var(--sakura); color: #2a0f1d; font: 800 13px Manrope, sans-serif; white-space: nowrap; }
 .event-art .card { width: 100%; }
 .event-info { display: grid; gap: 4px; min-width: 0; }
 .event-tag { justify-self: start; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--sakura) 22%, transparent); color: var(--sakura); font: 700 10px Unbounded, sans-serif; letter-spacing: 0.08em; }
