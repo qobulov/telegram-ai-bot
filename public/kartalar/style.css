@@ -913,6 +913,15 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .f-float.crit { color: #ffd25a; font-size: 15px; }
 .f-float.heal { color: #7dffa8; }
 .f-float.shield { color: #8cc6ff; font-size: 11px; }
+.f-float.poison { color: #9dff6b; }
+.f-float.stun, .f-float.provoke { font-size: 18px; }
+.f-flash.provoke { background: radial-gradient(circle, rgba(255, 140, 60, 0.8), transparent 70%); }
+.fighter.stunned { opacity: 0.55; filter: saturate(0.4); }
+.fighter.poisoned { box-shadow: 0 0 0 1.5px var(--c) inset, 0 0 0 3px rgba(130, 230, 90, 0.55) inset; }
+.fighter .f-syn { position: absolute; left: 4px; bottom: 18px; padding: 0 5px; border-radius: 999px; background: rgba(8, 6, 14, 0.75); font: 700 9px/15px Manrope, sans-serif; color: #9fd8ff; }
+.b-row .fighter .f-syn { bottom: 25px; }
+.arena-rules { white-space: pre-line; font-size: 12px; }
+.arena-pick .pick-skill { display: block; max-width: 180px; margin-top: 2px; font-size: 11px; font-weight: 500; white-space: normal; }
 
 /* the battle's replay, on the whole screen */
 .battle {

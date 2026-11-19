@@ -34,6 +34,15 @@ const (
 	arenaTopSize       = 10
 )
 
+// Anime synergy, as the owners asked: the cards of one anime in a team,
+// seasons and sequels as one (Franchise), raise each other's attack and
+// health by these percents, a pair by SynergyTwo, three or more by
+// SynergyThree. The page works it out the same way for a team not saved.
+const (
+	SynergyTwo   = 10
+	SynergyThree = 20
+)
+
 // arenaRules are the rules at now: the tokens' day starts at midnight in
 // Tashkent, built there so that the store counts Tashkent's date.
 func arenaRules(now time.Time) storage.ArenaRules {
@@ -42,7 +51,8 @@ func arenaRules(now time.Time) storage.ArenaRules {
 
 var (
 	classNames = map[arena.Class]string{arena.ClassTank: "tank", arena.ClassFighter: "fighter", arena.ClassMage: "mage"}
-	skillNames = map[arena.Skill]string{arena.NoSkill: "", arena.Strike: "strike", arena.Heal: "heal", arena.Shield: "shield"}
+	skillNames = map[arena.Skill]string{arena.NoSkill: "", arena.Strike: "strike", arena.Heal: "heal", arena.Shield: "shield",
+		arena.Stun: "stun", arena.Poison: "poison", arena.Provoke: "provoke"}
 )
 
 // fighterView is a card in the arena as the page draws it.
@@ -56,6 +66,10 @@ type fighterView struct {
 	Health int    `json:"health"`
 	Class  string `json:"class"`
 	Skill  string `json:"skill"`
+	// Anime is the card's anime as Franchise counts it, and Synergy the
+	// percent its Attack and Health are raised by for the team's others of it.
+	Anime   string `json:"anime"`
+	Synergy int    `json:"synergy"`
 }
 
 // eventView is one thing that happened in a battle, for the page to replay.
@@ -67,6 +81,7 @@ type eventView struct {
 	Kind   string `json:"kind"`
 	Amount int    `json:"amount"`
 	HP     int    `json:"hp"`
+	Edge   bool   `json:"edge"`
 }
 
 // fighters is a team in the arena: its fighters, front first, and their
@@ -77,7 +92,7 @@ type fighters struct {
 }
 
 // fightersOf makes a team of the cards ids, of the player's held, boosted by
-// their stars; ok is false if any is not held.
+// their stars, then by their anime synergy; ok is false if any is not held.
 func fightersOf(held []storage.OwnedCard, ids [5]int64) (fighters, bool) {
 	byID := make(map[int64]storage.OwnedCard, len(held))
 	for _, o := range held {
@@ -85,23 +100,55 @@ func fightersOf(held []storage.OwnedCard, ids [5]int64) (fighters, bool) {
 			byID[o.ID] = o
 		}
 	}
-	var slots [5]arena.Fighter
-	views := make([]fighterView, len(ids))
+	var owned [5]storage.OwnedCard
+	var animes [5]string
 	for i, id := range ids {
 		o, ok := byID[id]
 		if !ok {
 			return fighters{}, false
 		}
+		owned[i], animes[i] = o, Franchise(o.Anime)
+	}
+	bonus := synergies(animes)
+	var slots [5]arena.Fighter
+	views := make([]fighterView, len(ids))
+	for i, o := range owned {
 		stars := min(max(o.Stars, 1), MaxStars)
 		attack, health := Boosted(o.Card, stars)
+		attack, health = raised(attack, bonus[i]), raised(health, bonus[i])
 		f := arena.FighterOf(o.ID, o.Name, o.Rarity, stars, attack, health)
 		slots[i] = f
 		views[i] = fighterView{ID: o.ID, Name: o.Name, Image: o.ImageURL, Rarity: o.Rarity, Stars: stars,
-			Attack: attack, Health: health, Class: classNames[f.Class], Skill: skillNames[f.Skill]}
+			Attack: attack, Health: health, Class: classNames[f.Class], Skill: skillNames[f.Skill],
+			Anime: animes[i], Synergy: bonus[i]}
 	}
 	team := arena.Team{Front: [2]arena.Fighter{slots[0], slots[1]}, Back: [3]arena.Fighter{slots[2], slots[3], slots[4]}}
 	return fighters{team, views}, true
 }
+
+// synergies is each slot's synergy percent by the animes of the team's
+// cards; a card without an anime has none.
+func synergies(animes [5]string) [5]int {
+	count := map[string]int{}
+	for _, a := range animes {
+		count[a]++
+	}
+	var bonus [5]int
+	for i, a := range animes {
+		switch n := count[a]; {
+		case a == "" || n < 2:
+		case n == 2:
+			bonus[i] = SynergyTwo
+		default:
+			bonus[i] = SynergyThree
+		}
+	}
+	return bonus
+}
+
+// raised is n raised by percent, rounded, in whole numbers so that the
+// page gets the same.
+func raised(n, percent int) int { return (n*(100+percent) + 50) / 100 }
 
 // savedFighters is the player's saved team; ok is false without one or with
 // a card of it no longer held.
@@ -267,7 +314,7 @@ func (h *handler) arenaAttack(ctx context.Context, user miniapp.User, opponent i
 	}
 	events := make([]eventView, len(result.Events))
 	for i, e := range result.Events {
-		events[i] = eventView{Round: e.Round, Side: e.Side, From: e.From, To: e.To, Kind: e.Kind, Amount: e.Amount, HP: e.HP}
+		events[i] = eventView{Round: e.Round, Side: e.Side, From: e.From, To: e.To, Kind: e.Kind, Amount: e.Amount, HP: e.HP, Edge: e.Edge}
 	}
 	return map[string]any{
 		"won": result.AttackerWon, "events": events, "attacker": mine.views, "defender": theirs.views,

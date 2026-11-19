@@ -1936,7 +1936,10 @@
       round: (n) => `Raund ${n}`, skip: "O'tkazib yuborish", won: "🏆 G'alaba!", lost: "💀 Mag'lubiyat", change: (d) => `Reyting ${d >= 0 ? "+" : "−"}${Math.abs(d)}`, token: "🎟 +1 token",
       week: "🏆 Haftalik mukofot", weekRule: "Har dushanba 08:00 da: hafta davomida kamida 1 marta hujum qilgan top 100 ga token pochtaga keladi", weekPlace: (n, p) => (n ? `Siz hozir ${n}-o'rindasiz${p ? ` · +${p} 🎟` : ""}` : "Mukofot uchun bu hafta kamida 1 marta hujum qiling"), weekEnds: (d, h) => (d ? `Hafta tugashiga ${d} kun ${h} soat` : `Hafta tugashiga ${h} soat`), weekRow: (a, b) => (a === b ? `${a}-o'rin` : `${a}–${b}`),
       you: "Siz", topEmpty: "Arenada hali hech kim jang qilmagan", topRow: (w, l, p) => `${w} G · ${l} M · ⚡${p}`,
-      skills: { strike: "Kuchli zarba", heal: "Davolash", shield: "Qalqon" }, fell: (n) => `💀 ${n} yiqildi`,
+      skills: { strike: "Kuchli zarba", heal: "Davolash", shield: "Qalqon", stun: "Hayratlantirish", poison: "Zahar", provoke: "Chaqiriq" }, fell: (n) => `💀 ${n} yiqildi`,
+      skillInfo: { strike: "har 3-yurishda 2.5 barobar zarba", heal: "har 4-yurishda eng zaif ittifoqchini davolaydi", shield: "jang boshida 30% qalqon", stun: "har 3-yurishda raqibning keyingi yurishini o'tkazdiradi", poison: "har 3-yurishda zaharlaydi: 3 yurish davomida 8% jon", provoke: "boshida va har 4-yurishda 2 raund raqib tank va jangchilarini o'ziga tortadi" },
+      synergy: "🔗 Bir animedan 2 ta karta: +10% hujum va jon, 3 ta va ko'p: +20%", edgeRule: "⚡ Ustunlik: 🛡️ tank ⚔️ jangchidan, ⚔️ jangchi 🔮 sehrgardan, 🔮 sehrgar 🛡️ tankdan 25% kuchliroq urar", edge: "ustun",
+      stunned: (n) => `💫 ${n} hayratda: yurish o'tdi`, poisoned: (n, d) => `☠ ${n} zahardan −${d}`,
       refused: { size: "Jamoada 5 ta karta bo'lishi kerak", repeat: "Bitta kartani ikki marta qo'yib bo'lmaydi", not_held: "Jamoadagi karta endi sizda yo'q", no_tickets: "Tiket qolmadi: har soatda 1 ta qo'shiladi", no_team: "Avval jamoani saqlang: undagi karta endi sizda yo'q", opponent_gone: "Bu raqib endi yo'q, ro'yxat yangilandi", self: "O'zingizga hujum qilib bo'lmaydi" },
     },
     ru: {
@@ -1951,7 +1954,10 @@
       round: (n) => `Раунд ${n}`, skip: "Пропустить", won: "🏆 Победа!", lost: "💀 Поражение", change: (d) => `Рейтинг ${d >= 0 ? "+" : "−"}${Math.abs(d)}`, token: "🎟 +1 токен",
       week: "🏆 Награда недели", weekRule: "Каждый понедельник в 08:00: топ 100, атаковавшие на неделе хотя бы раз, получают токены почтой", weekPlace: (n, p) => (n ? `Сейчас вы на ${n}-м месте${p ? ` · +${p} 🎟` : ""}` : "Чтобы получить награду, атакуйте хотя бы раз на этой неделе"), weekEnds: (d, h) => (d ? `До конца недели ${d} дн ${h} ч` : `До конца недели ${h} ч`), weekRow: (a, b) => (a === b ? `${a} место` : `${a}–${b}`),
       you: "Вы", topEmpty: "На арене ещё никто не сражался", topRow: (w, l, p) => `${w} В · ${l} П · ⚡${p}`,
-      skills: { strike: "Сильный удар", heal: "Лечение", shield: "Щит" }, fell: (n) => `💀 ${n} пал(а)`,
+      skills: { strike: "Сильный удар", heal: "Лечение", shield: "Щит", stun: "Оглушение", poison: "Яд", provoke: "Провокация" }, fell: (n) => `💀 ${n} пал(а)`,
+      skillInfo: { strike: "каждый 3-й ход удар ×2.5", heal: "каждый 4-й ход лечит самого слабого союзника", shield: "щит 30% в начале боя", stun: "каждый 3-й ход соперник пропускает следующий ход", poison: "каждый 3-й ход отравляет: 8% здоровья 3 хода", provoke: "в начале и каждый 4-й ход 2 раунда притягивает танков и бойцов соперника" },
+      synergy: "🔗 2 карты из одного аниме: +10% атаки и здоровья, 3 и больше: +20%", edgeRule: "⚡ Преимущество: 🛡️ танк бьёт ⚔️ бойца, ⚔️ боец 🔮 мага, 🔮 маг 🛡️ танка на 25% сильнее", edge: "преимущество",
+      stunned: (n) => `💫 ${n} оглушён(а): ход пропущен`, poisoned: (n, d) => `☠ ${n} от яда −${d}`,
       refused: { size: "В команде должно быть 5 карт", repeat: "Одну карту нельзя поставить дважды", not_held: "Карты из команды у вас больше нет", no_tickets: "Билетов нет: каждый час добавляется 1", no_team: "Сначала сохраните команду: карты из неё у вас больше нет", opponent_gone: "Этого соперника больше нет, список обновлён", self: "Нельзя атаковать себя" },
     },
     en: {
@@ -1966,13 +1972,18 @@
       round: (n) => `Round ${n}`, skip: "Skip", won: "🏆 Victory!", lost: "💀 Defeat", change: (d) => `Rating ${d >= 0 ? "+" : "−"}${Math.abs(d)}`, token: "🎟 +1 token",
       week: "🏆 Weekly prize", weekRule: "Every Monday at 08:00 the top 100 who attacked at least once that week get tokens by mail", weekPlace: (n, p) => (n ? `You are #${n} now${p ? ` · +${p} 🎟` : ""}` : "Attack at least once this week to earn a prize"), weekEnds: (d, h) => (d ? `Week ends in ${d}d ${h}h` : `Week ends in ${h}h`), weekRow: (a, b) => (a === b ? `#${a}` : `#${a}–${b}`),
       you: "You", topEmpty: "Nobody has fought in the arena yet", topRow: (w, l, p) => `${w} W · ${l} L · ⚡${p}`,
-      skills: { strike: "Power strike", heal: "Heal", shield: "Shield" }, fell: (n) => `💀 ${n} fell`,
+      skills: { strike: "Power strike", heal: "Heal", shield: "Shield", stun: "Stun", poison: "Poison", provoke: "Provoke" }, fell: (n) => `💀 ${n} fell`,
+      skillInfo: { strike: "every 3rd turn hits ×2.5", heal: "every 4th turn heals the weakest ally", shield: "a 30% shield at the start", stun: "every 3rd turn the target skips its next turn", poison: "every 3rd turn poisons: 8% health for 3 turns", provoke: "at the start and every 4th turn draws enemy tanks and fighters for 2 rounds" },
+      synergy: "🔗 2 cards of one anime: +10% attack and health, 3 or more: +20%", edgeRule: "⚡ Edge: 🛡️ tank beats ⚔️ fighter, ⚔️ fighter beats 🔮 mage, 🔮 mage beats 🛡️ tank, for 25% more", edge: "edge",
+      stunned: (n) => `💫 ${n} is stunned: turn skipped`, poisoned: (n, d) => `☠ ${n} takes −${d} from poison`,
       refused: { size: "A team needs 5 cards", repeat: "A card cannot be placed twice", not_held: "You no longer hold a card of the team", no_tickets: "No tickets left: one comes back every hour", no_team: "Save a team first: you no longer hold one of its cards", opponent_gone: "This opponent is gone; the list is refreshed", self: "You cannot attack yourself" },
     },
   };
   const at = arenaTexts[language] || arenaTexts.uz;
   const CLASS_ICON = { tank: "🛡️", fighter: "⚔️", mage: "🔮" };
-  const SKILL_ICON = { strike: "💥", heal: "💚", shield: "🔰" };
+  const SKILL_ICON = { strike: "💥", heal: "💚", shield: "🔰", stun: "💫", poison: "☠", provoke: "😤" };
+  // SKILLS is the skills by card id, id % 6 picking one, as arena.FighterOf does.
+  const SKILLS = ["strike", "heal", "shield", "stun", "poison", "provoke"];
   const EMPTY_TEAM = [0, 0, 0, 0, 0];
   let arenaData = null, arenaDraft = EMPTY_TEAM.slice(), arenaBusy = false, ticketAt = 0;
 
@@ -1981,8 +1992,22 @@
   // team's come from the server.
   function fighterOf(card) {
     const cls = card.health >= 4 * card.attack ? "tank" : card.health <= 3 * card.attack ? "mage" : "fighter";
-    const skill = card.rarity >= 3 ? ["strike", "heal", "shield"][card.id % 3] : "";
-    return { id: card.id, name: card.name, image: card.image, rarity: card.rarity, stars: card.stars || 1, attack: card.attack || 0, health: card.health || 0, class: cls, skill };
+    const skill = card.rarity >= 3 ? SKILLS[((card.id % 6) + 6) % 6] : "";
+    return { id: card.id, name: card.name, image: card.image, rarity: card.rarity, stars: card.stars || 1, attack: card.attack || 0, health: card.health || 0, class: cls, skill, anime: franchise(card.anime || "") };
+  }
+  // withSynergy raises the team's cards of one anime as the server does:
+  // a pair by 10%, three or more by 20%, rounded the same in whole numbers.
+  // A fighter from the server has its synergy already and keeps it.
+  function withSynergy(team) {
+    const count = {};
+    for (const f of team) if (f && f.anime) count[f.anime] = (count[f.anime] || 0) + 1;
+    const raised = (n, p) => Math.floor((n * (100 + p) + 50) / 100);
+    return team.map((f) => {
+      if (!f || f.synergy !== undefined) return f;
+      const n = f.anime ? count[f.anime] : 0;
+      const synergy = n >= 3 ? 20 : n === 2 ? 10 : 0;
+      return { ...f, synergy, attack: raised(f.attack, synergy), health: raised(f.health, synergy) };
+    });
   }
   // powerOf is a team's power as arena.Team.Power counts it.
   const powerOf = (team) => team.reduce((sum, f) => sum + (f ? f.attack + Math.floor(f.health / 4) : 0), 0);
@@ -2006,6 +2031,7 @@
     tile.querySelector(".f-class").textContent = (CLASS_ICON[f.class] || "") + (f.skill ? SKILL_ICON[f.skill] : "");
     tile.querySelector(".f-name").textContent = f.name;
     if (f.stars > 1) tile.insertAdjacentHTML("beforeend", `<span class="f-stars">★${f.stars}</span>`);
+    if (f.synergy) tile.insertAdjacentHTML("beforeend", `<span class="f-syn">🔗+${f.synergy}%</span>`);
     return tile;
   }
 
@@ -2084,7 +2110,8 @@
   // button, on only for a full team that differs from the one saved.
   function arenaTeam() {
     const saved = (arenaData.team || []).map((f) => f.id);
-    const team = arenaDraft.map(slotFighter);
+    const team = withSynergy(arenaDraft.map(slotFighter));
+    $("arenaRules").textContent = `${at.synergy}\n${at.edgeRule}`;
     for (const [id, from, label] of [["arenaFront", 0, at.front], ["arenaBack", 2, at.back]]) {
       const row = $(id);
       row.textContent = "";
@@ -2150,6 +2177,12 @@
         info.className = "pick-stats";
         const inTeam = arenaDraft.includes(f.id) && arenaDraft[slot] !== f.id;
         info.textContent = `★${f.stars} · ${CLASS_ICON[f.class]} · ⚡${spaced(powerOf([f]))}` + (inTeam ? ` · ${at.inTeam}` : "");
+        if (f.skill) {
+          const skill = document.createElement("small");
+          skill.className = "pick-skill";
+          skill.textContent = `${SKILL_ICON[f.skill]} ${at.skills[f.skill]}: ${at.skillInfo[f.skill]}`;
+          info.append(skill);
+        }
         pick.append(mini(f), info);
         pick.addEventListener("click", () => {
           const other = arenaDraft.indexOf(f.id);
@@ -2260,6 +2293,8 @@
   // card greyed. Skip, or less motion asked for, shows the end at once.
   // Only transforms and opacity move, so that weak phones keep up.
   const STEP = 350;
+  // HITS are the events that go from one side to the other.
+  const HITS = ["hit", "strike", "stun", "poison"];
   const lessMotion = () => !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 
   function replay(data, foe) {
@@ -2312,24 +2347,32 @@
 
       // apply puts one event on the board; shown, it also moves and is told.
       function apply(e, shown) {
-        const foeSide = e.kind === "hit" || e.kind === "strike";
+        const foeSide = HITS.includes(e.kind);
         const actor = units[e.side][e.from];
         const target = units[foeSide ? 1 - e.side : e.side][e.to];
         if (!target) return;
         target.hp = e.kind === "fall" ? 0 : e.hp;
         target.bar.style.transform = `scaleX(${Math.max(0, Math.min(1, target.hp / target.max))})`;
         if (e.kind === "fall") target.el.classList.add("fallen");
+        // a stunned card dims until its skipped turn; a poisoned one is
+        // tinted for its turns of poison
+        if (e.kind === "stun") target.el.classList.add("stunned");
+        if (e.kind === "stunned" || e.kind === "fall") target.el.classList.remove("stunned");
+        if (e.kind === "poison") target.poison = 3;
+        if (e.kind === "poisoned") target.poison = Math.max(0, (target.poison || 0) - 1);
+        target.el.classList.toggle("poisoned", e.kind !== "fall" && target.poison > 0);
         if (!shown) return;
         if (e.round > 0) roundBox.textContent = at.round(e.round);
         const name = (u) => (u ? u.f.name : "?");
         if (foeSide) {
           if (actor) move(actor.el, [{ transform: "none" }, { transform: `translateY(${e.side ? 8 : -8}px)` }, { transform: "none" }], 240);
           move(target.el, [{ transform: "none" }, { transform: "translateX(-5px)" }, { transform: "translateX(5px)" }, { transform: "none" }], 260);
-          if (e.kind === "strike" && actor) flash(actor, "strike");
+          if (e.kind !== "hit" && actor) flash(actor, "strike");
           flash(target, "hurt");
-          float(target, `−${spaced(e.amount)}`, e.kind === "strike" ? "crit" : "dmg");
-          line.textContent = (e.kind === "strike" ? `${SKILL_ICON.strike} ${at.skills.strike}: ` : "") + `${name(actor)} → ${name(target)} −${spaced(e.amount)}`;
-          haptic(e.kind === "strike" ? "medium" : "light");
+          const mark = (e.kind === "stun" ? " 💫" : e.kind === "poison" ? " ☠" : "") + (e.edge ? " ⚡" : "");
+          float(target, `−${spaced(e.amount)}${mark}`, e.kind === "strike" ? "crit" : e.kind === "poison" ? "poison" : "dmg");
+          line.textContent = (e.kind !== "hit" ? `${SKILL_ICON[e.kind]} ${at.skills[e.kind]}: ` : "") + `${name(actor)} → ${name(target)} −${spaced(e.amount)}` + (e.edge ? ` · ⚡ ${at.edge}` : "");
+          haptic(e.kind === "hit" ? "light" : "medium");
         } else if (e.kind === "heal") {
           if (actor) flash(actor, "heal");
           flash(target, "heal");
@@ -2339,6 +2382,16 @@
           flash(target, "shield");
           float(target, `🛡 ${spaced(e.amount)}`, "shield");
           line.textContent = `${SKILL_ICON.shield} ${at.skills.shield}: ${name(target)} +${spaced(e.amount)}`;
+        } else if (e.kind === "provoke") {
+          flash(target, "provoke");
+          float(target, SKILL_ICON.provoke, "provoke");
+          line.textContent = `${SKILL_ICON.provoke} ${at.skills.provoke}: ${name(target)}`;
+        } else if (e.kind === "stunned") {
+          float(target, SKILL_ICON.stun, "stun");
+          line.textContent = at.stunned(name(target));
+        } else if (e.kind === "poisoned") {
+          float(target, `☠ −${spaced(e.amount)}`, "poison");
+          line.textContent = at.poisoned(name(target), spaced(e.amount));
         } else if (e.kind === "fall") {
           line.textContent = at.fell(name(target));
         }

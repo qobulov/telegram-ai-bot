@@ -2267,7 +2267,22 @@ with a search and the rarities as chips, and saves them (`arena_team` with
 (attack and a quarter of health, summed) is shown from the cards as they are
 now, stars included. The server boosts each card by its stars and gives it a
 class by its health to attack (tank, fighter, mage) and, from Legendary up, a
-skill (strike, heal or shield). `arena` gives the player's rating (Elo from
+skill by its card id % 6: strike (every 3rd turn ×2.5), heal (every 4th turn
+the weakest hurt ally, 25%), shield (30% of health at the start), stun (every
+3rd turn the target skips its next turn, not again while stunned), poison
+(every 3rd turn the target loses 8% of its health, past shields, at the start
+of its next 3 turns; poisoning again sets 3 again) or provoke (at the start
+and every 4th turn, besides its hit, enemy tanks and fighters must hit it for
+the rest of that round and the next 2; mages still go for the back row).
+The classes beat each other in a triangle, tank over fighter, fighter over
+mage, mage over tank: such a hit, a skill's too, does ×1.25 (`EdgeFactor`)
+and its event says `edge`. Cards of one anime in a team, seasons and sequels
+as one (`Franchise`, as the Animelar tab groups them), raise each other's
+attack and health after their stars, a pair by 10%, three or more by 20%
+(`SynergyTwo`, `SynergyThree`; two pairs each get 10%); the saved power
+includes it, each fighter of `arena` and `arena_attack` says its `anime` and
+`synergy`, and a slot shows 🔗 +10% or +20%. A defender's saved power is
+worked out again only when they save their team again. `arena` gives the player's rating (Elo from
 1000, K 32; the defender's moves too, the winner up and the loser down),
 wins and losses, their arena tickets (`tickets` of `tickets_max` 8, one coming
 back every hour, `next_ticket_in` ms to the next) and the day's win tokens left
@@ -2279,7 +2294,9 @@ battles, attacking or attacked (opponent, won, their own rating change).
 `no_team`, `opponent_gone` or `self`) plays the battle
 on the server from a crypto/rand seed and records it; the page replays its
 events on the whole screen, one every 350 ms: a hit shakes its target and its
-HP bar falls, a skill flashes, a fallen card greys, and "O'tkazib yuborish"
+HP bar falls, a skill flashes, an edge hit's damage says ⚡, a stun
+shows 💫 and dims the card until its skipped turn, poison floats ☠ in green,
+a provoke flashes 😤, a fallen card greys, and "O'tkazib yuborish"
 skips to the end, which less motion asked for shows at once. The end says
 won or lost, the rating's change and the token, a win's card token while the
 day's three last. The Reyting tab switches between the cards' table and the

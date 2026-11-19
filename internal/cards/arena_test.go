@@ -327,3 +327,84 @@ func TestPickOpponentsRefreshes(t *testing.T) {
 		t.Errorf("shuffled = %v, want the drawn ones listed nearest first", got)
 	}
 }
+
+// Cards of one anime in a team, seasons and sequels as one, raise each
+// other: a pair by SynergyTwo, three or more by SynergyThree, each pair on
+// its own; a card without an anime has none.
+func TestSynergies(t *testing.T) {
+	cases := []struct {
+		animes [5]string
+		want   [5]int
+	}{
+		{[5]string{"A", "B", "C", "D", "E"}, [5]int{}},
+		{[5]string{"A", "A", "C", "D", "E"}, [5]int{10, 10, 0, 0, 0}},
+		{[5]string{"A", "B", "A", "D", "A"}, [5]int{20, 0, 20, 0, 20}},
+		{[5]string{"A", "B", "A", "B", "E"}, [5]int{10, 10, 10, 10, 0}},
+		{[5]string{"A", "A", "A", "A", "A"}, [5]int{20, 20, 20, 20, 20}},
+		{[5]string{"", "", "C", "D", "E"}, [5]int{}},
+	}
+	for _, c := range cases {
+		if got := synergies(c.animes); got != c.want {
+			t.Errorf("synergies(%v) = %v, want %v", c.animes, got, c.want)
+		}
+	}
+	if raised(1200, 10) != 1320 || raised(3600, 20) != 4320 || raised(5, 10) != 6 || raised(777, 0) != 777 {
+		t.Error("raised rounds wrong")
+	}
+}
+
+// A team's synergy is by franchise, so two seasons count as one anime, and
+// it is in the fighters, their views and the team's power saved.
+func TestArenaTeamSynergy(t *testing.T) {
+	held := arenaCards()
+	held[0].Anime, held[1].Anime = "Attack on Titan", "Attack on Titan Season 3"
+	held[2].Anime, held[3].Anime, held[4].Anime = "Naruto", "Naruto: Shippuden", "Naruto"
+	team, ok := fightersOf(held, [5]int64{10, 11, 12, 13, 14})
+	if !ok {
+		t.Fatal("team not made")
+	}
+	plain, _ := fightersOf(arenaCards(), [5]int64{10, 11, 12, 13, 14})
+	for i, v := range team.views {
+		want := []int{10, 10, 20, 20, 20}[i]
+		base := plain.views[i]
+		if v.Synergy != want || v.Attack != raised(base.Attack, want) || v.Health != raised(base.Health, want) || plain.views[i].Synergy != 0 {
+			t.Errorf("slot %d = %+v, plain %+v", i, v, base)
+		}
+	}
+	if team.views[0].Anime != "Attack on Titan" || team.views[3].Anime != "Naruto" {
+		t.Errorf("animes %q %q", team.views[0].Anime, team.views[3].Anime)
+	}
+	if team.team.Power() <= plain.team.Power() || team.team.Front[0].Attack != team.views[0].Attack {
+		t.Errorf("power %d, plain %d", team.team.Power(), plain.team.Power())
+	}
+
+	now := time.Unix(1_800_000_000, 0)
+	store := &fakeStore{arena: fakeArena{held: map[int64][]storage.OwnedCard{7: held, 8: held}}}
+	call := arenaHandler(t, store, now)
+	_, out := call(7, map[string]any{"action": "arena_team", "front": arenaFront, "back": arenaBack})
+	if store.arena.power[7] != team.team.Power() {
+		t.Errorf("power saved %d, want %d", store.arena.power[7], team.team.Power())
+	}
+	if f := out["team"].([]any)[2].(map[string]any); f["synergy"] != 20.0 || f["anime"] != "Naruto" {
+		t.Errorf("a fighter's view = %v", f)
+	}
+	call(8, map[string]any{"action": "arena_team", "front": arenaFront, "back": arenaBack})
+	_, out = call(7, map[string]any{"action": "arena_attack", "opponent": 8})
+	edges := 0
+	for _, e := range out["events"].([]any) {
+		edge, ok := e.(map[string]any)["edge"].(bool)
+		if !ok {
+			t.Fatalf("an event without edge: %v", e)
+		}
+		if edge {
+			edges++
+		}
+	}
+	// The team has Mages and Tanks, and Mages beat Tanks.
+	if edges == 0 {
+		t.Error("no edge in the battle")
+	}
+	if d := out["defender"].([]any)[0].(map[string]any); d["synergy"] != 10.0 {
+		t.Errorf("the defender's view = %v", d)
+	}
+}
