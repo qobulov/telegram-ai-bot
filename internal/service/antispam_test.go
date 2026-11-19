@@ -39,7 +39,7 @@ func TestAntispamIsOnWithoutAnyRule(t *testing.T) {
 	f, _, moderator := protectFixture()
 	restrictor := f.opts.Restrictor.(*fakeRestrictor)
 
-	sent := f.run(append(floodOf(6, 100), inGroup(messageFrom(spammerID, "promo", "salom")))...)
+	sent := f.run(append(floodOf(floodMessages, 100), inGroup(messageFrom(spammerID, "promo", "salom")))...)
 
 	if len(restrictor.recorded()) != 1 || !slices.Equal(moderator.banned, []int64{spammerID}) {
 		t.Errorf("restrictions %+v, banned %v; want the flooder muted and the spammer banned", restrictor.recorded(), moderator.banned)
@@ -58,7 +58,7 @@ func TestAntispamOffAndOn(t *testing.T) {
 	if extras.settings[storage.SettingAntispamOff] != "flood,spam,newcomers" || len(sent) != 1 || strings.Count(sent[0].text, "❌") != 3 {
 		t.Fatalf("after off: setting %q, sent %+v", extras.settings[storage.SettingAntispamOff], sent)
 	}
-	f.run(append(floodOf(7, 100), inGroup(messageFrom(spammerID, "promo", "salom")))...)
+	f.run(append(floodOf(floodMessages+1, 100), inGroup(messageFrom(spammerID, "promo", "salom")))...)
 	if len(moderator.deleted)+len(moderator.banned)+len(f.opts.Restrictor.(*fakeRestrictor).recorded()) != 0 {
 		t.Errorf("guards acted while off: deleted %v, banned %v", moderator.deleted, moderator.banned)
 	}
@@ -82,19 +82,19 @@ func TestAntispamRefusesMembers(t *testing.T) {
 	}
 }
 
-// Ten messages within thirty seconds are a flood, even when fewer than six
-// fell within ten.
-func TestFloodGuardCatchesTenInThirtySeconds(t *testing.T) {
+// Twenty messages within thirty seconds are a flood, even when fewer than
+// ten fell within ten.
+func TestFloodGuardCatchesTwentyInThirtySeconds(t *testing.T) {
 	f, _, moderator := protectFixture()
-	for i := range 5 {
-		logAgo(f, flooderID, int64(90+i), fmt.Sprintf("eski %d", i), 20*time.Second)
+	for i := range floodLongMessages - 5 {
+		logAgo(f, flooderID, int64(60+i), fmt.Sprintf("eski %d", i), 20*time.Second)
 	}
 	sent := f.run(floodOf(5, 100)...)
 
 	if len(sent) != 1 || !strings.Contains(sent[0].text, "(flood)") {
-		t.Fatalf("sent = %+v, want a mute at the tenth", sent)
+		t.Fatalf("sent = %+v, want a mute at the twentieth", sent)
 	}
-	if !slices.Contains(moderator.deleted, 90) || !slices.Contains(moderator.deleted, 104) {
+	if !slices.Contains(moderator.deleted, 60) || !slices.Contains(moderator.deleted, int64(60+floodLongMessages-6)) || !slices.Contains(moderator.deleted, 104) {
 		t.Errorf("deleted %v, want the older ones too", moderator.deleted)
 	}
 }
@@ -159,7 +159,7 @@ func TestFloodMutesEscalate(t *testing.T) {
 		strikes.tookAt(storage.ModerationAction{ChatID: groupID, Action: storage.ActionFloodMute, TargetUserID: flooderID, UpdateID: -99}, time.Now().Add(-36*time.Hour))
 		start := time.Now()
 
-		sent := f.run(floodOf(6, 100)...)
+		sent := f.run(floodOf(floodMessages, 100)...)
 
 		done := f.opts.Restrictor.(*fakeRestrictor).recorded()
 		if len(sent) != 1 || !strings.Contains(sent[0].text, "(flood) "+want+" yozolmaydi") || len(done) != 1 {
@@ -232,7 +232,7 @@ func TestAntispamNeedsTheBotsRights(t *testing.T) {
 	link.MessageID = 200
 	link.Entities = []telegram.MessageEntity{entityAt("url", link.Text, "https://spam.example")}
 
-	sent := f.run(append(floodOf(7, 100), inGroup(messageFrom(spammerID, "promo", "salom")), inGroup(link))...)
+	sent := f.run(append(floodOf(floodMessages+1, 100), inGroup(messageFrom(spammerID, "promo", "salom")), inGroup(link))...)
 
 	if len(sent)+len(moderator.deleted)+len(moderator.banned)+len(f.opts.Restrictor.(*fakeRestrictor).recorded()) != 0 {
 		t.Errorf("sent %+v, deleted %v, banned %v; want nothing done", sent, moderator.deleted, moderator.banned)

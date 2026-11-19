@@ -1576,7 +1576,7 @@ nothing more, and the `group_rules` tool's `guard` and `unguard` of `spam` or
 rights cannot be learned, the guards do nothing and say nothing. Admins,
 owners, bots and posts on behalf of a chat are left alone.
 
-- **Flood.** A member floods who sends 6 messages within 10 seconds, 10 within
+- **Flood.** A member floods who sends 10 messages within 10 seconds, 20 within
   30 seconds, or the same text (folded to lower case and single spaces, a
   reply's "(to ...)" aside, at least 3 characters, not a command) or the same sticker, or
   picture with the same caption, 3 times within a minute, as the group log

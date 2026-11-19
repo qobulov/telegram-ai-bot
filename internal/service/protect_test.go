@@ -331,14 +331,14 @@ func TestGuardRulesAreToldToTheModel(t *testing.T) {
 
 const flooderID = int64(7707)
 
-// A member who sends six messages within ten seconds is muted for ten
-// minutes, once, and all six deleted; their messages still on the way are
-// only deleted.
+// A member who sends floodMessages within ten seconds is muted for ten
+// minutes, once, and all of them deleted; their messages still on the way
+// are only deleted.
 func TestFloodGuardMutesAMemberWhoFloods(t *testing.T) {
 	f, _, moderator := protectFixture(storage.RuleFloodGuard)
 	restrictor := f.opts.Restrictor.(*fakeRestrictor)
 	var updates []telegram.Update
-	for i := range 7 {
+	for i := range floodMessages + 1 {
 		msg := messageFrom(flooderID, "tez", fmt.Sprintf("xabar %d", i))
 		msg.MessageID = int64(100 + i)
 		updates = append(updates, inGroup(msg))
@@ -349,10 +349,14 @@ func TestFloodGuardMutesAMemberWhoFloods(t *testing.T) {
 	if want := "⚠️ @tez juda tez-tez yozgani uchun (flood) 10 daqiqa yozolmaydi."; len(sent) != 1 || sent[0].text != want {
 		t.Fatalf("sent = %+v, want one %q", sent, want)
 	}
-	// The sixth message is the flood: it, the five before and the seventh
+	// The last but one message is the flood: it, those before and the last
 	// are deleted.
-	if !slices.Equal(moderator.deleted, []int64{100, 101, 102, 103, 104, 105, 106}) {
-		t.Errorf("deleted %v, want all seven", moderator.deleted)
+	var all []int64
+	for i := range floodMessages + 1 {
+		all = append(all, int64(100+i))
+	}
+	if !slices.Equal(moderator.deleted, all) {
+		t.Errorf("deleted %v, want all %d", moderator.deleted, len(all))
 	}
 	if len(restrictor.done) != 1 || restrictor.done[0].UserID != flooderID || restrictor.done[0].Permissions != telegram.NoPermissions() {
 		t.Errorf("restrictions = %+v, want one mute", restrictor.done)
@@ -363,12 +367,12 @@ func TestFloodGuardMutesAMemberWhoFloods(t *testing.T) {
 func TestFloodGuardLeavesOrdinaryWritingAndAdminsAlone(t *testing.T) {
 	f, _, moderator := protectFixture(storage.RuleFloodGuard)
 	var updates []telegram.Update
-	for i := range 5 {
+	for i := range floodMessages - 1 {
 		msg := messageFrom(flooderID, "tez", fmt.Sprintf("xabar %d", i))
 		msg.MessageID = int64(100 + i)
 		updates = append(updates, inGroup(msg))
 	}
-	for i := range 8 {
+	for i := range floodMessages + 2 {
 		msg := messageFrom(guardAdminID, "adm", "e'lon")
 		msg.MessageID = int64(200 + i)
 		updates = append(updates, inGroup(msg))
