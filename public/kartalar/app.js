@@ -244,13 +244,21 @@
   // crown and two sparkles; the large view adds two more and rising motes.
   const MYTHIC_DRESS = '<i class="glint"></i><i class="frame"></i><span class="crest" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 8l4.5 4L12 4l4.5 8L21 8l-2 10H5z"/><rect x="5" y="19.5" width="14" height="2.2" rx="1.1"/></svg></span><em class="spark"></em><em class="spark"></em>';
 
+  // cutOf is a Mythic card's cut-out, named for its picture too: art is
+  // cached for a month, so a new picture under a new name brings its new
+  // cut-out with it.
+  function cutOf(card) {
+    const name = String(card.image || "").split("/").pop();
+    return `/kartalar/art/cut/${card.id}.webp${name ? `?p=${encodeURIComponent(name)}` : ""}`;
+  }
+
   // alive is a Mythic card's character, cut from the picture, laid over it
   // and moving: it breathes, and in the large view its hair stirs.
   function alive(card) {
     const box = document.createElement("div");
     box.className = "alive";
     box.setAttribute("aria-hidden", "true");
-    const cut = `url("/kartalar/art/cut/${card.id}.webp")`;
+    const cut = `url("${cutOf(card)}")`;
     for (const part of ["body", "hair"]) {
       const layer = document.createElement("i");
       layer.className = part;
@@ -281,7 +289,7 @@
       // flowing hair: the cut-out once more, its edges alone, waved by #flow
       const flow = document.createElement("i");
       flow.className = "flow";
-      flow.style.backgroundImage = `url("/kartalar/art/cut/${card.id}.webp")`;
+      flow.style.backgroundImage = `url("${cutOf(card)}")`;
       living.classList.add("flowing");
       living.append(flow);
       // the picture under it without her, so no still hair shows behind
