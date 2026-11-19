@@ -474,11 +474,95 @@
     return stats;
   }
 
+  // STAR_MULT is how much stronger a card of so many stars is, as
+  // cards.StarMultiplier counts it.
+  const STAR_MULT = [0, 1, 1.2, 1.45, 1.7, 2];
+  const BEATS = { tank: "fighter", fighter: "mage", mage: "tank" };
+  const WEAK_TO = { tank: "mage", fighter: "tank", mage: "fighter" };
+
+  // cardBack is the large card's back: the card as the arena sees it, its
+  // class, numbers, skill and anime, in the words of the arena's tab.
+  function cardBack(card) {
+    const f = fighterOf(card);
+    const stars = Math.min(Math.max(card.stars || 1, 1), 5);
+    const back = document.createElement("div");
+    back.className = "face info-side";
+    back.style.setProperty("--c", COLORS[card.rarity]);
+    back.innerHTML = '<div class="ib-head"><span class="rarity"></span><b></b></div>' +
+      '<div class="ib-stats"><div><small></small><b></b></div><div><small></small><b></b></div><div><small></small><b></b></div></div>' +
+      '<small class="ib-stars"></small>' +
+      '<div class="ib-row ib-class"><span class="ib-icon" aria-hidden="true"></span><div><b></b><p></p><p class="ib-tri"><span class="up"></span><span class="down"></span></p></div></div>' +
+      '<div class="ib-row ib-skill"><span class="ib-icon" aria-hidden="true"></span><div><b></b><p></p></div></div>' +
+      '<div class="ib-row ib-anime"><span class="ib-icon" aria-hidden="true">🔗</span><div><b></b><p></p></div></div>' +
+      '<small class="ib-hint"></small>';
+    back.querySelector(".ib-head .rarity").replaceChildren(tierIcon(card.rarity), t.rarities[card.rarity]);
+    back.querySelector(".ib-head b").textContent = card.name || "";
+    const known = card.attack > 0;
+    const cells = back.querySelectorAll(".ib-stats div");
+    for (const [i, label, value] of [[0, `⚔ ${t.attack}`, card.attack], [1, `❤ ${t.health}`, card.health], [2, `⚡ ${at.statPower}`, powerOf([f])]]) {
+      cells[i].querySelector("small").textContent = label;
+      cells[i].querySelector("b").textContent = known ? spaced(value) : "—";
+    }
+    back.querySelector(".ib-stars").textContent = at.starsLine(stars, STAR_MULT[stars].toFixed(2), STAR_MULT[5].toFixed(2));
+    const named = (c) => `${CLASS_ICON[c]} ${at.classes[c]}`;
+    const cls = back.querySelector(".ib-class");
+    cls.querySelector(".ib-icon").textContent = CLASS_ICON[f.class];
+    cls.querySelector("b").textContent = at.classes[f.class];
+    cls.querySelector("p").textContent = at.classInfo[f.class];
+    cls.querySelector(".up").textContent = "▲ " + at.beats(named(BEATS[f.class]));
+    cls.querySelector(".down").textContent = "▼ " + at.weakTo(named(WEAK_TO[f.class]));
+    const skill = back.querySelector(".ib-skill");
+    if (f.skill) {
+      skill.querySelector(".ib-icon").textContent = SKILL_ICON[f.skill];
+      skill.querySelector("b").textContent = at.skillTitle(at.skills[f.skill]);
+      skill.querySelector("p").textContent = at.skillInfo[f.skill];
+    } else {
+      skill.classList.add("none");
+      skill.querySelector(".ib-icon").textContent = "✧";
+      skill.querySelector("b").textContent = at.noSkillTitle;
+      skill.querySelector("p").textContent = at.noSkill;
+    }
+    const anime = back.querySelector(".ib-anime");
+    anime.querySelector("b").textContent = franchise(card.anime || "") || "—";
+    anime.querySelector("p").textContent = at.animeNote;
+    back.querySelector(".ib-hint").textContent = "↻ " + at.flipHint;
+    return back;
+  }
+
+  // turnable is the large card, front and back, and the button under it
+  // that turns it over, as a tap on the card itself does; with less motion
+  // asked for the sides only swap.
+  function turnable(card) {
+    const turn = document.createElement("div");
+    turn.className = "turn";
+    const front = face(card), back = cardBack(card);
+    turn.append(front, back);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "ghost turn-do";
+    const show = (turned) => {
+      turn.classList.toggle("turned", turned);
+      front.setAttribute("aria-hidden", String(turned));
+      back.setAttribute("aria-hidden", String(!turned));
+      button.textContent = turned ? at.flipBack : at.flip;
+      button.setAttribute("aria-pressed", String(turned));
+    };
+    const flip = (event) => {
+      event.stopPropagation();
+      show(!turn.classList.contains("turned"));
+      haptic("light");
+    };
+    turn.addEventListener("click", flip);
+    button.addEventListener("click", flip);
+    show(false);
+    return [turn, button];
+  }
+
   function open(card) {
     const sheet = $("sheetCard");
     sheet.textContent = "";
     sheet.classList.remove("giving");
-    sheet.append(face(card), statsOf(card));
+    sheet.append(...turnable(card), statsOf(card));
     if (card.stars) sheet.append(fusePanel(card));
     tilt(sheet, card.rarity === 4);
     $("sheet").hidden = false;
@@ -1272,7 +1356,7 @@
     const note = document.createElement("p");
     note.className = "preview-note";
     note.textContent = count ? t.animeOwned : t.animeMissing;
-    sheet.append(face(card), note);
+    sheet.append(...turnable(card), note);
     tilt(sheet, card.rarity === 4);
     $("sheet").hidden = false;
     try { tg.BackButton.show(); } catch (_) { /* older clients */ }
@@ -1925,6 +2009,20 @@
   // the day's three last. The history lists the last ten battles.
   const arenaTexts = {
     uz: {
+      classes: { tank: "Tank", fighter: "Jangchi", mage: "Sehrgar" },
+      classInfo: { tank: "Joni eng ko'p: oldda turib zarbalarni o'ziga oladi", fighter: "Eng yaqin raqibni uradi, avval old qatorni", mage: "Eng tez: orqa qatordagi eng zaif raqibni uradi" },
+      beats: (c) => `${c}ni yengadi`, weakTo: (c) => `${c}dan yengiladi`, statPower: "Kuch",
+      starsLine: (s, m, top) => (s < 5 ? `★${s}: kuch ×${m} · ★5 da ×${top}` : `★5: kuch ×${m}`),
+      skillTitle: (n) => `Skill: ${n}`, noSkillTitle: "Skill: yo'q", noSkill: "Skill Legendar va Mifik kartalarda bo'ladi",
+      animeNote: "Jamoada shu animedan 2 ta: +10%, 3 ta va ko'p: +20% hujum va jon",
+      flip: "↻ Arenadagi kuchi", flipBack: "↻ Old tomoni", flipHint: "Kartani bosib aylantiring",
+      stepsLabel: "Qanday o'ynaladi", steps: [["Jamoa tuzing", "2 old, 3 orqa"], ["Raqib tanlang", "Oson yoki Teng"], ["Jang", "avtomatik · 1 tiket"]],
+      frontNote: "zarbani birinchi oladi", backNote: "sehrgarlar shu yerni uradi", addCard: "Karta qo'shing",
+      rules: "Qoidalar", ruleClasses: "Sinflar", ruleTriangle: "Strelka: kim kimni 25% kuchliroq uradi", ruleSkills: "Skillar · Legendar va Mifik kartalarda",
+      ruleTickets: (m) => `🎫 Har hujum 1 tiket oladi: ${m} tagacha, har soatda 1 ta qaytadi`, ruleTokens: (n) => `🎟 G'alaba 1 karta tokeni beradi: kuniga ${n} tagacha`,
+      ruleRating: "🏅 G'alaba reytingni oshiradi, mag'lubiyat tushiradi. Karta yo'qolmaydi", ruleWeek: "🏆 Har dushanba haftaning top 100 tasi token oladi", toTable: "Reytingni ko'rish →",
+      youVs: (a, b) => `Siz ⚡${a} · Raqib ⚡${b}`, levels: { easy: "Oson", even: "Teng", hard: "Qiyin" }, them: "Raqib",
+      synergyNone: "🔗 Bir animedan 2 ta karta qo'ysangiz: +10%, 3 ta: +20%", synergyOn: (a, n, p) => `🔗 ${a} ×${n}: +${p}%`,
       rating: "Arena reytingi", record: (w, l) => `${w} g'alaba · ${l} mag'lubiyat`,
       tickets: (n, m) => `🎫 Arena tiketlari: ${n}/${m}`, nextTicket: (min) => (min >= 60 ? "· keyingisi 1 soatda" : `· keyingisi ${min} daqiqada`), tokens: (n, m) => `🎟 G'alaba tokenlari: ${n}/${m}`,
       histEmpty: "Hali jang bo'lmagan", histAttack: "⚔️ Hujum", histDefense: "🛡️ Himoya", histWon: "G'alaba", histLost: "Mag'lubiyat",
@@ -1943,6 +2041,20 @@
       refused: { size: "Jamoada 5 ta karta bo'lishi kerak", repeat: "Bitta kartani ikki marta qo'yib bo'lmaydi", not_held: "Jamoadagi karta endi sizda yo'q", no_tickets: "Tiket qolmadi: har soatda 1 ta qo'shiladi", no_team: "Avval jamoani saqlang: undagi karta endi sizda yo'q", opponent_gone: "Bu raqib endi yo'q, ro'yxat yangilandi", self: "O'zingizga hujum qilib bo'lmaydi" },
     },
     ru: {
+      classes: { tank: "Танк", fighter: "Боец", mage: "Маг" },
+      classInfo: { tank: "Больше всех здоровья: стоит впереди и принимает удары", fighter: "Бьёт ближайшего соперника, сначала передний ряд", mage: "Самый быстрый: бьёт самого слабого в заднем ряду" },
+      beats: (c) => `сильнее: ${c}`, weakTo: (c) => `слабее: ${c}`, statPower: "Сила",
+      starsLine: (s, m, top) => (s < 5 ? `★${s}: сила ×${m} · на ★5 ×${top}` : `★5: сила ×${m}`),
+      skillTitle: (n) => `Навык: ${n}`, noSkillTitle: "Навык: нет", noSkill: "Навыки есть у Легендарных и Мифических карт",
+      animeNote: "2 карты этого аниме в команде: +10%, 3 и больше: +20% атаки и здоровья",
+      flip: "↻ Сила на арене", flipBack: "↻ Лицевая сторона", flipHint: "Нажмите на карту, чтобы перевернуть",
+      stepsLabel: "Как играть", steps: [["Соберите команду", "2 впереди, 3 сзади"], ["Выберите соперника", "Легко или Равный"], ["Бой", "сам · 1 билет"]],
+      frontNote: "принимает удары первым", backNote: "сюда бьют маги", addCard: "Добавить карту",
+      rules: "Правила", ruleClasses: "Классы", ruleTriangle: "Стрелка: кто кого бьёт на 25% сильнее", ruleSkills: "Навыки · у Легендарных и Мифических",
+      ruleTickets: (m) => `🎫 Атака стоит 1 билет: до ${m}, каждый час возвращается 1`, ruleTokens: (n) => `🎟 Победа даёт токен на карту: до ${n} в день`,
+      ruleRating: "🏅 Победа поднимает рейтинг, поражение снижает. Карты не теряются", ruleWeek: "🏆 Каждый понедельник топ 100 недели получают токены", toTable: "Смотреть рейтинг →",
+      youVs: (a, b) => `Вы ⚡${a} · Соперник ⚡${b}`, levels: { easy: "Легко", even: "Равный", hard: "Сложно" }, them: "Соперник",
+      synergyNone: "🔗 2 карты одного аниме: +10%, 3: +20%", synergyOn: (a, n, p) => `🔗 ${a} ×${n}: +${p}%`,
       rating: "Рейтинг арены", record: (w, l) => `${w} побед · ${l} поражений`,
       tickets: (n, m) => `🎫 Билеты арены: ${n}/${m}`, nextTicket: (min) => (min >= 60 ? "· следующий через 1 ч" : `· следующий через ${min} мин`), tokens: (n, m) => `🎟 Токенов за победы: ${n}/${m}`,
       histEmpty: "Боёв ещё не было", histAttack: "⚔️ Атака", histDefense: "🛡️ Защита", histWon: "Победа", histLost: "Поражение",
@@ -1961,6 +2073,20 @@
       refused: { size: "В команде должно быть 5 карт", repeat: "Одну карту нельзя поставить дважды", not_held: "Карты из команды у вас больше нет", no_tickets: "Билетов нет: каждый час добавляется 1", no_team: "Сначала сохраните команду: карты из неё у вас больше нет", opponent_gone: "Этого соперника больше нет, список обновлён", self: "Нельзя атаковать себя" },
     },
     en: {
+      classes: { tank: "Tank", fighter: "Fighter", mage: "Mage" },
+      classInfo: { tank: "Most health: stands in front and takes the hits", fighter: "Hits the nearest enemy, the front row first", mage: "Fastest: hits the weakest enemy in the back row" },
+      beats: (c) => `strong vs ${c}`, weakTo: (c) => `weak vs ${c}`, statPower: "Power",
+      starsLine: (s, m, top) => (s < 5 ? `★${s}: power ×${m} · at ★5 ×${top}` : `★5: power ×${m}`),
+      skillTitle: (n) => `Skill: ${n}`, noSkillTitle: "Skill: none", noSkill: "Legendary and Mythic cards have skills",
+      animeNote: "2 cards of this anime in a team: +10%, 3 or more: +20% attack and health",
+      flip: "↻ Arena stats", flipBack: "↻ Front side", flipHint: "Tap the card to turn it over",
+      stepsLabel: "How to play", steps: [["Build a team", "2 front, 3 back"], ["Pick an opponent", "Easy or Even"], ["Battle", "automatic · 1 ticket"]],
+      frontNote: "takes the hits first", backNote: "mages hit here", addCard: "Add a card",
+      rules: "Rules", ruleClasses: "Classes", ruleTriangle: "Arrow: who hits whom 25% harder", ruleSkills: "Skills · on Legendary and Mythic cards",
+      ruleTickets: (m) => `🎫 Each attack takes 1 ticket: up to ${m}, one back every hour`, ruleTokens: (n) => `🎟 A win gives a card token: up to ${n} a day`,
+      ruleRating: "🏅 A win raises your rating, a loss lowers it. No card is lost", ruleWeek: "🏆 Every Monday the week's top 100 get tokens", toTable: "See the ranking →",
+      youVs: (a, b) => `You ⚡${a} · Them ⚡${b}`, levels: { easy: "Easy", even: "Even", hard: "Hard" }, them: "Opponent",
+      synergyNone: "🔗 2 cards of one anime: +10%, 3: +20%", synergyOn: (a, n, p) => `🔗 ${a} ×${n}: +${p}%`,
       rating: "Arena rating", record: (w, l) => `${w} wins · ${l} losses`,
       tickets: (n, m) => `🎫 Arena tickets: ${n}/${m}`, nextTicket: (min) => (min >= 60 ? "· next in 1 hour" : `· next in ${min} min`), tokens: (n, m) => `🎟 Win tokens: ${n}/${m}`,
       histEmpty: "No battles yet", histAttack: "⚔️ Attack", histDefense: "🛡️ Defense", histWon: "Victory", histLost: "Defeat",
@@ -2026,9 +2152,10 @@
     const tile = document.createElement("div");
     tile.className = "fighter" + (f.rarity >= 3 ? " foil" : "");
     tile.style.setProperty("--c", COLORS[f.rarity]);
-    tile.innerHTML = '<img alt=""><span class="f-class"></span><span class="f-name"></span>';
+    tile.innerHTML = '<img alt=""><span class="f-chips" aria-hidden="true"><span class="f-class"></span></span><span class="f-name"></span>';
     picture(tile.querySelector("img"), f.image);
-    tile.querySelector(".f-class").textContent = (CLASS_ICON[f.class] || "") + (f.skill ? SKILL_ICON[f.skill] : "");
+    tile.querySelector(".f-class").textContent = CLASS_ICON[f.class] || "";
+    if (f.skill) tile.querySelector(".f-chips").insertAdjacentHTML("beforeend", `<span class="f-skill">${SKILL_ICON[f.skill]}</span>`);
     tile.querySelector(".f-name").textContent = f.name;
     if (f.stars > 1) tile.insertAdjacentHTML("beforeend", `<span class="f-stars">★${f.stars}</span>`);
     if (f.synergy) tile.insertAdjacentHTML("beforeend", `<span class="f-syn">🔗+${f.synergy}%</span>`);
@@ -2053,10 +2180,110 @@
     arenaData = data;
     arenaDraft = data.team ? data.team.map((f) => f.id) : EMPTY_TEAM.slice();
     ticketAt = Date.now() + (data.player.next_ticket_in || 0);
+    arenaSteps();
+    arenaGuide();
     arenaMe();
     arenaTeam();
     arenaFoes();
     arenaHistory();
+  }
+
+  // arenaSteps is the three steps of a battle, the one the player is at
+  // lit: a team to save first, then an opponent, then the battle itself
+  // while it is fought. A step scrolls to its block.
+  function arenaSteps() {
+    const list = $("arenaSteps");
+    list.setAttribute("aria-label", at.stepsLabel);
+    const now = arenaBusy && arenaData.team ? 3 : arenaData.team ? 2 : 1;
+    list.textContent = "";
+    at.steps.forEach(([title, hint], i) => {
+      const n = i + 1;
+      const li = document.createElement("li");
+      li.className = n === now ? "now" : n < now ? "done" : "";
+      if (n === now) li.setAttribute("aria-current", "step");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.innerHTML = '<i aria-hidden="true"></i><b></b><small></small>';
+      button.querySelector("i").textContent = n < now ? "✓" : n;
+      button.querySelector("b").textContent = title;
+      button.querySelector("small").textContent = hint;
+      const to = n === 1 ? "arenaTeamBlock" : "arenaFoesBlock";
+      button.addEventListener("click", () => { haptic("light"); $(to).scrollIntoView({ behavior: lessMotion() ? "auto" : "smooth", block: "start" }); });
+      li.append(button);
+      list.append(li);
+    });
+  }
+
+  // arenaGuide is the rules, folded: the classes' triangle, the synergy,
+  // the six skills, tickets, tokens and the week's prizes.
+  function arenaGuide() {
+    $("arenaGuideTitle").textContent = `${at.rules} ⓘ`;
+    const p = arenaData.player;
+    const body = $("arenaGuideBody");
+    body.textContent = "";
+    const add = (tag, cls, text) => { const el = document.createElement(tag); if (cls) el.className = cls; if (text) el.textContent = text; body.append(el); return el; };
+    add("b", "guide-title", at.ruleClasses);
+    body.append(triangle());
+    add("small", "guide-caption", at.ruleTriangle);
+    const classes = add("ul", "guide-list");
+    for (const c of ["tank", "fighter", "mage"]) {
+      const li = document.createElement("li");
+      li.innerHTML = '<span aria-hidden="true"></span><p><b></b> </p>';
+      li.querySelector("span").textContent = CLASS_ICON[c];
+      li.querySelector("b").textContent = at.classes[c];
+      li.querySelector("p").append(at.classInfo[c]);
+      classes.append(li);
+    }
+    add("p", "guide-line", at.synergy);
+    add("b", "guide-title", at.ruleSkills);
+    const skills = add("ul", "guide-list");
+    for (const k of SKILLS) {
+      const li = document.createElement("li");
+      li.innerHTML = '<span aria-hidden="true"></span><p><b></b> </p>';
+      li.querySelector("span").textContent = SKILL_ICON[k];
+      li.querySelector("b").textContent = at.skills[k] + ":";
+      li.querySelector("p").append(at.skillInfo[k]);
+      skills.append(li);
+    }
+    add("p", "guide-line", at.ruleTickets(p.tickets_max));
+    add("p", "guide-line", at.ruleTokens(p.tokens));
+    add("p", "guide-line", at.ruleRating);
+    const week = add("p", "guide-line guide-week", at.ruleWeek);
+    const go = document.createElement("button");
+    go.type = "button";
+    go.className = "ghost";
+    go.textContent = at.toTable;
+    go.addEventListener("click", () => { topKind = "arena"; haptic("light"); showTab("top"); });
+    week.append(go);
+  }
+
+  // triangle draws the classes' edge, each arrow from the class that hits
+  // harder to the one it beats.
+  function triangle() {
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 280 160");
+    svg.setAttribute("class", "guide-tri");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", at.edgeRule);
+    const spots = { tank: [140, 30], fighter: [236, 112], mage: [44, 112] };
+    let html = '<defs><marker id="triArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>';
+    for (const c of ["tank", "fighter", "mage"]) {
+      const [x1, y1] = spots[c], [x2, y2] = spots[BEATS[c]];
+      const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy), k = 30 / len;
+      html += `<line x1="${(x1 + dx * k).toFixed(1)}" y1="${(y1 + dy * k).toFixed(1)}" x2="${(x2 - dx * k).toFixed(1)}" y2="${(y2 - dy * k).toFixed(1)}" stroke="currentColor" stroke-width="2" marker-end="url(#triArrow)"/>`;
+    }
+    svg.innerHTML = html;
+    for (const c of ["tank", "fighter", "mage"]) {
+      const [x, y] = spots[c];
+      const g = document.createElementNS(ns, "g");
+      g.innerHTML = `<circle cx="${x}" cy="${y}" r="21" class="tri-node"/><text x="${x}" y="${y + 6}" text-anchor="middle" font-size="18"></text><text x="${x}" y="${y + 37}" text-anchor="middle" class="tri-label"></text>`;
+      const texts = g.querySelectorAll("text");
+      texts[0].textContent = CLASS_ICON[c];
+      texts[1].textContent = at.classes[c];
+      svg.append(g);
+    }
+    return svg;
   }
 
   function arenaMe() {
@@ -2111,21 +2338,30 @@
   function arenaTeam() {
     const saved = (arenaData.team || []).map((f) => f.id);
     const team = withSynergy(arenaDraft.map(slotFighter));
-    $("arenaRules").textContent = `${at.synergy}\n${at.edgeRule}`;
-    for (const [id, from, label] of [["arenaFront", 0, at.front], ["arenaBack", 2, at.back]]) {
+    arenaSynergy(team);
+    for (const [id, from, label, note] of [["arenaFront", 0, at.front, at.frontNote], ["arenaBack", 2, at.back, at.backNote]]) {
       const row = $(id);
       row.textContent = "";
       const em = document.createElement("em");
-      em.textContent = label;
+      em.innerHTML = "<b></b> · ";
+      em.querySelector("b").textContent = label;
+      em.append(note);
       row.append(em);
       for (let slot = from; slot < from + (from ? 3 : 2); slot++) {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "slot";
         const f = team[slot];
-        if (f) button.append(fighterTile(f));
-        else button.innerHTML = '<span class="slot-plus" aria-hidden="true">+</span>';
-        button.setAttribute("aria-label", at.slot(label, from ? slot - 1 : slot + 1));
+        const place = at.slot(label, from ? slot - 1 : slot + 1);
+        if (f) {
+          button.append(fighterTile(f));
+          button.setAttribute("aria-label", `${place}: ${f.name}, ${at.classes[f.class]}` + (f.skill ? `, ${at.skills[f.skill]}` : "") + (f.synergy ? `, 🔗 +${f.synergy}%` : ""));
+        } else {
+          button.classList.add("empty-slot");
+          button.innerHTML = '<span class="slot-plus" aria-hidden="true"><b>+</b><small></small></span>';
+          button.querySelector("small").textContent = at.addCard;
+          button.setAttribute("aria-label", `${place}: ${at.addCard}`);
+        }
         button.addEventListener("click", () => { haptic("light"); arenaPick(slot); });
         row.append(button);
       }
@@ -2136,6 +2372,27 @@
     $("arenaSave").disabled = arenaBusy || !full || !changed;
     $("arenaSave").hidden = saved.length > 0 && !changed;
     $("arenaTeamHint").textContent = !full ? at.pick : changed ? at.unsaved : at.savedHint;
+  }
+
+  // arenaSynergy says under the team which of its animes raise each other,
+  // or how a pair would.
+  function arenaSynergy(team) {
+    const box = $("arenaRules");
+    box.textContent = "";
+    const seen = {};
+    for (const f of team) {
+      if (!f || !f.synergy) continue;
+      seen[f.anime] = seen[f.anime] || { n: 0, p: f.synergy };
+      seen[f.anime].n += 1;
+    }
+    const names = Object.keys(seen);
+    if (!names.length) { box.textContent = at.synergyNone; box.classList.remove("on"); return; }
+    box.classList.add("on");
+    for (const a of names) {
+      const chip = document.createElement("span");
+      chip.textContent = at.synergyOn(a, seen[a].n, seen[a].p);
+      box.append(chip);
+    }
   }
 
   // arenaPick chooses the card for one slot from the cards held, the
@@ -2231,15 +2488,24 @@
     const p = arenaData.player;
     const can = !!arenaData.team && p.tickets > 0;
     const foes = arenaData.opponents || [];
+    const mine = arenaData.team ? powerOf(arenaData.team) : 0;
     if (!foes.length) list.innerHTML = `<li class="empty">${at.noFoes}</li>`;
     for (const o of foes) {
       const li = document.createElement("li");
       li.className = "foe";
-      li.innerHTML = '<span class="who"><b></b><small></small></span><button type="button" class="draw small"></button>';
+      li.innerHTML = '<span class="who"><span class="foe-name"><b></b></span><small class="foe-rating"></small><small class="foe-power"></small></span><button type="button" class="draw small"></button>';
       li.querySelector(".who b").textContent = o.name || "?";
-      li.querySelector(".who small").textContent = `🏅 ${spaced(o.rating)} · ⚡ ${spaced(o.power)}`;
+      li.querySelector(".foe-rating").textContent = `🏅 ${spaced(o.rating)}`;
+      li.querySelector(".foe-power").textContent = mine ? at.youVs(spaced(mine), spaced(o.power)) : `⚡ ${spaced(o.power)}`;
+      // how hard the opponent is, by its power to the team's saved
+      if (mine) {
+        const ratio = o.power / mine;
+        const level = ratio < 0.9 ? "easy" : ratio <= 1.1 ? "even" : "hard";
+        li.querySelector(".foe-name").insertAdjacentHTML("beforeend", `<span class="foe-level ${level}">${at.levels[level]}</span>`);
+      }
       const button = li.querySelector("button");
       button.textContent = at.attack;
+      button.setAttribute("aria-label", `${at.attack}: ${o.name || "?"}`);
       button.disabled = arenaBusy || !can;
       button.addEventListener("click", () => arenaAttack(o));
       list.append(li);
@@ -2262,6 +2528,7 @@
     if (arenaBusy) return;
     arenaBusy = true;
     arenaFoes();
+    arenaSteps();
     haptic("medium");
     try {
       const data = await api("arena_attack", { opponent: foe.id });
@@ -2281,7 +2548,7 @@
       notice(error);
     } finally {
       arenaBusy = false;
-      if (arenaData) arenaFoes();
+      if (arenaData) { arenaFoes(); arenaSteps(); }
     }
   }
 
@@ -2305,23 +2572,27 @@
       box.setAttribute("aria-label", at.attack);
       box.innerHTML = '<div class="b-top"><b class="b-round"></b><button type="button" class="ghost b-skip"></button></div>' +
         '<div class="b-side b-them"><small class="b-who"></small><div class="b-row rear"></div><div class="b-row fore"></div></div>' +
-        '<div class="b-vs" aria-hidden="true">VS</div>' +
+        '<div class="b-mid"><span class="b-vs" aria-hidden="true">VS</span><p class="b-line" aria-live="polite"></p></div>' +
         '<div class="b-side b-us"><div class="b-row fore"></div><div class="b-row rear"></div><small class="b-who"></small></div>' +
-        '<p class="b-line" aria-live="polite"></p>' +
         '<div class="b-result" hidden><b class="b-title"></b><span class="b-change"></span><span class="b-token"></span><button type="button" class="draw b-ok"></button></div>';
       const units = [[], []];
       for (const [side, list, sel] of [[0, data.attacker, ".b-us"], [1, data.defender, ".b-them"]]) {
         const sideBox = box.querySelector(sel);
         list.forEach((f, slot) => {
           const tile = fighterTile(f);
-          tile.insertAdjacentHTML("beforeend", '<i class="hp"><i></i></i>');
+          tile.insertAdjacentHTML("beforeend", '<i class="hp"><i></i></i><span class="hp-n"></span>');
           sideBox.querySelector(slot < 2 ? ".fore" : ".rear").append(tile);
-          units[side][slot] = { el: tile, bar: tile.querySelector(".hp i"), hp: f.health, max: f.health || 1, f };
+          const num = tile.querySelector(".hp-n");
+          num.textContent = spaced(f.health);
+          units[side][slot] = { el: tile, bar: tile.querySelector(".hp i"), num, hp: f.health, max: f.health || 1, f, side };
         });
       }
       const whos = box.querySelectorAll(".b-who");
-      whos[0].textContent = foe.name || "?";
-      whos[1].textContent = at.you;
+      whos[0].innerHTML = "<b></b> ";
+      whos[0].querySelector("b").textContent = at.them;
+      whos[0].append(foe.name || "?");
+      whos[1].innerHTML = "<b></b>";
+      whos[1].querySelector("b").textContent = at.you;
       const roundBox = box.querySelector(".b-round"), line = box.querySelector(".b-line");
       const skip = box.querySelector(".b-skip");
       skip.textContent = at.skip;
@@ -2353,6 +2624,7 @@
         if (!target) return;
         target.hp = e.kind === "fall" ? 0 : e.hp;
         target.bar.style.transform = `scaleX(${Math.max(0, Math.min(1, target.hp / target.max))})`;
+        target.num.textContent = spaced(Math.max(0, target.hp));
         if (e.kind === "fall") target.el.classList.add("fallen");
         // a stunned card dims until its skipped turn; a poisoned one is
         // tinted for its turns of poison
@@ -2363,7 +2635,14 @@
         target.el.classList.toggle("poisoned", e.kind !== "fall" && target.poison > 0);
         if (!shown) return;
         if (e.round > 0) roundBox.textContent = at.round(e.round);
-        const name = (u) => (u ? u.f.name : "?");
+        // the line names each card in its side's colour, ours gold, theirs red
+        const name = (u) => {
+          const b = document.createElement("b");
+          b.className = u && u.side ? "them" : "us";
+          b.textContent = u ? u.f.name : "?";
+          return b;
+        };
+        const say = (...parts) => line.replaceChildren(...parts);
         if (foeSide) {
           if (actor) move(actor.el, [{ transform: "none" }, { transform: `translateY(${e.side ? 8 : -8}px)` }, { transform: "none" }], 240);
           move(target.el, [{ transform: "none" }, { transform: "translateX(-5px)" }, { transform: "translateX(5px)" }, { transform: "none" }], 260);
@@ -2371,29 +2650,29 @@
           flash(target, "hurt");
           const mark = (e.kind === "stun" ? " 💫" : e.kind === "poison" ? " ☠" : "") + (e.edge ? " ⚡" : "");
           float(target, `−${spaced(e.amount)}${mark}`, e.kind === "strike" ? "crit" : e.kind === "poison" ? "poison" : "dmg");
-          line.textContent = (e.kind !== "hit" ? `${SKILL_ICON[e.kind]} ${at.skills[e.kind]}: ` : "") + `${name(actor)} → ${name(target)} −${spaced(e.amount)}` + (e.edge ? ` · ⚡ ${at.edge}` : "");
+          say(e.kind !== "hit" ? `${SKILL_ICON[e.kind]} ${at.skills[e.kind]}: ` : "", name(actor), " → ", name(target), ` −${spaced(e.amount)}` + (e.edge ? ` · ⚡ ${at.edge}` : ""));
           haptic(e.kind === "hit" ? "light" : "medium");
         } else if (e.kind === "heal") {
           if (actor) flash(actor, "heal");
           flash(target, "heal");
           float(target, `+${spaced(e.amount)}`, "heal");
-          line.textContent = `${SKILL_ICON.heal} ${at.skills.heal}: ${name(actor)} → ${name(target)} +${spaced(e.amount)}`;
+          say(`${SKILL_ICON.heal} ${at.skills.heal}: `, name(actor), " → ", name(target), ` +${spaced(e.amount)}`);
         } else if (e.kind === "shield") {
           flash(target, "shield");
           float(target, `🛡 ${spaced(e.amount)}`, "shield");
-          line.textContent = `${SKILL_ICON.shield} ${at.skills.shield}: ${name(target)} +${spaced(e.amount)}`;
+          say(`${SKILL_ICON.shield} ${at.skills.shield}: `, name(target), ` +${spaced(e.amount)}`);
         } else if (e.kind === "provoke") {
           flash(target, "provoke");
           float(target, SKILL_ICON.provoke, "provoke");
-          line.textContent = `${SKILL_ICON.provoke} ${at.skills.provoke}: ${name(target)}`;
+          say(`${SKILL_ICON.provoke} ${at.skills.provoke}: `, name(target));
         } else if (e.kind === "stunned") {
           float(target, SKILL_ICON.stun, "stun");
-          line.textContent = at.stunned(name(target));
+          line.textContent = at.stunned(target.f.name);
         } else if (e.kind === "poisoned") {
           float(target, `☠ −${spaced(e.amount)}`, "poison");
-          line.textContent = at.poisoned(name(target), spaced(e.amount));
+          line.textContent = at.poisoned(target.f.name, spaced(e.amount));
         } else if (e.kind === "fall") {
-          line.textContent = at.fell(name(target));
+          line.textContent = at.fell(target.f.name);
         }
       }
 

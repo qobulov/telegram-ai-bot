@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Manrope:wght@500;600;800&display=swap" rel="stylesheet">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="style.css?v=68">
+  <link rel="stylesheet" href="style.css?v=69">
 </head>
 <body>
   <div class="grain" aria-hidden="true"></div>
@@ -159,8 +159,10 @@
 
     <section class="tab" id="tab-arena" hidden>
       <div class="arena">
+        <ol class="arena-steps" id="arenaSteps"></ol>
         <div class="arena-me" id="arenaMe"></div>
-        <div class="arena-block">
+        <details class="arena-guide" id="arenaGuide"><summary><span id="arenaGuideTitle"></span><i aria-hidden="true">▾</i></summary><div class="guide-body" id="arenaGuideBody"></div></details>
+        <div class="arena-block" id="arenaTeamBlock">
           <div class="arena-head"><h2 class="shop-title" data-t="arenaTeam"></h2><b class="arena-power" id="arenaPower"></b></div>
           <p class="market-hint" id="arenaTeamHint"></p>
           <div class="arena-row" id="arenaFront"></div>
@@ -168,7 +170,7 @@
           <p class="market-hint arena-rules" id="arenaRules"></p>
           <button type="button" class="draw" id="arenaSave" data-t="arenaSave" disabled></button>
         </div>
-        <div class="arena-block">
+        <div class="arena-block" id="arenaFoesBlock">
           <div class="arena-head"><h2 class="shop-title" data-t="arenaFoes"></h2><button type="button" class="ghost" id="arenaRefresh" data-t="arenaRefresh"></button></div>
           <ul class="arena-foes" id="arenaFoes"></ul>
         </div>
@@ -205,6 +207,6 @@
 
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="app.js?v=68"></script>
+  <script src="app.js?v=69"></script>
 </body>
 </html>

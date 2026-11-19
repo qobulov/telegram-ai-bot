@@ -2301,6 +2301,26 @@ skips to the end, which less motion asked for shows at once. The end says
 won or lost, the rating's change and the token, a win's card token while the
 day's three last. The Reyting tab switches between the cards' table and the
 arena's (rating, wins, losses, power). No card is given or lost in the arena.
+For a first-time player the tab starts with three steps, 1 Jamoa tuzing (2
+old, 3 orqa), 2 Raqib tanlang, 3 Jang, the one they are at lit (no team saved:
+step 1; while a battle is fought: step 3), each scrolling to its block; a
+folded "Qoidalar ⓘ" holds the classes' triangle as a small diagram with a line
+on each class, the synergy, the six skills with their icons, tickets, win
+tokens, rating and the week's prizes with a link to the arena's table. A slot
+shows its card's class and skill as separate chips and its synergy badge, an
+empty one "+ Karta qo'shing", each row says what it is for (the front takes
+the hits first, mages hit the back), and under the team the animes raising
+each other (🔗 Naruto ×2: +10%). An opponent shows both powers (Siz ⚡ · Raqib
+⚡) and, by its power to the team saved, Oson (under 0.9), Teng (0.9 to 1.1)
+or Qiyin. The replay labels the sides Raqib and Siz, shows each card's health
+left over its bar, and tells each action on a two-line panel between the
+sides, our cards' names in gold and theirs in red.
+A card opened large turns over, tapped or by the ↻ button under it (the sides
+only swap when less motion is asked for), to its back: its class with what it
+does and which class it beats and loses to, its attack, health and power with
+its stars' multiplier (★1 ×1.00 to ★5 ×2.00, as `StarMultiplier`), its skill
+and what it does, or that only Legendary and Mythic cards have one, and its
+anime with the synergy rule, in the player's language.
 Each week, Monday to Monday in Tashkent, pays the top 100 by rating among
 those who attacked in it, in tokens by mail (`internal/cards/arenaweek.go`,
 the table `arena_weeks` of migration 106, which pays a week once): 1st 50,
