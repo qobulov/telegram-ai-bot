@@ -2041,7 +2041,7 @@
         best: "Eng baland qavat", floorN: (n) => `${n}-qavat`, tries: (n, m) => `🗼 Urinishlar: ${n}/${m}`, none: "hali yo'q",
         theme: (a, p) => `🎌 Bu hafta: ${a} +${p}%`, themeHint: "Shu anime kartalaringiz minorada kuchliroq: hujum va jon", noTheme: "Bu hafta mavzu yo'q",
         enemy: (n) => `🗼 ${n}-qavat`, reward: (c, k) => `Birinchi o'tish: +${c} 🪙` + (k ? ` · +${k} 🎟` : ""), fight: (n) => `⚔️ ${n}-qavatga jang`,
-        yours: "Arenada saqlangan jamoangiz jang qiladi", noTeam: "Avval Arena bo'limida jamoa saqlang", noTries: "Bugungi urinishlar tugadi: ertaga yana",
+        noTeam: "Avval Arena bo'limida jamoa saqlang", noTries: "Bugungi urinishlar tugadi: ertaga yana",
         rule: (m) => `Har kuni ${m} urinish. G'alaba keyingi qavatni ochadi va mukofot beradi, mag'lubiyat faqat urinishni oladi. Har 5-qavat +1 🎟, har 10-qavat +3 🎟`,
         cleared: (n) => `🗼 ${n}-qavat o'tildi!`, failed: (n) => `${n}-qavat o'tilmadi`, tokens: (n) => `🎟 +${n} token`,
         refused: { no_team: "Avval Arena bo'limida jamoa saqlang", no_tries: "Bugungi urinishlar tugadi: ertaga yana", no_floor: "Bu qavat hali tayyor emas", moved: "Bu qavat allaqachon o'tildi, sahifa yangilandi" },
@@ -2086,7 +2086,7 @@
         best: "Высший этаж", floorN: (n) => `Этаж ${n}`, tries: (n, m) => `🗼 Попытки: ${n}/${m}`, none: "пока нет",
         theme: (a, p) => `🎌 На этой неделе: ${a} +${p}%`, themeHint: "Ваши карты этого аниме в башне сильнее: атака и здоровье", noTheme: "На этой неделе темы нет",
         enemy: (n) => `🗼 Этаж ${n}`, reward: (c, k) => `За первое прохождение: +${c} 🪙` + (k ? ` · +${k} 🎟` : ""), fight: (n) => `⚔️ Бой за этаж ${n}`,
-        yours: "Сражается команда, сохранённая на арене", noTeam: "Сначала сохраните команду в разделе Арена", noTries: "Попытки на сегодня закончились: завтра снова",
+        noTeam: "Сначала сохраните команду в разделе Арена", noTries: "Попытки на сегодня закончились: завтра снова",
         rule: (m) => `${m} попыток в день. Победа открывает следующий этаж и даёт награду, поражение отнимает только попытку. Каждый 5-й этаж +1 🎟, каждый 10-й +3 🎟`,
         cleared: (n) => `🗼 Этаж ${n} пройден!`, failed: (n) => `Этаж ${n} не пройден`, tokens: (n) => `🎟 +${n} токен.`,
         refused: { no_team: "Сначала сохраните команду в разделе Арена", no_tries: "Попытки на сегодня закончились: завтра снова", no_floor: "Этот этаж ещё не готов", moved: "Этот этаж уже пройден, страница обновлена" },
@@ -2131,7 +2131,7 @@
         best: "Highest floor", floorN: (n) => `Floor ${n}`, tries: (n, m) => `🗼 Attempts: ${n}/${m}`, none: "none yet",
         theme: (a, p) => `🎌 This week: ${a} +${p}%`, themeHint: "Your cards of this anime are stronger in the tower: attack and health", noTheme: "No theme this week",
         enemy: (n) => `🗼 Floor ${n}`, reward: (c, k) => `First clear: +${c} 🪙` + (k ? ` · +${k} 🎟` : ""), fight: (n) => `⚔️ Fight floor ${n}`,
-        yours: "Your team saved in the arena fights", noTeam: "Save a team in the Arena first", noTries: "No attempts left today: more tomorrow",
+        noTeam: "Save a team in the Arena first", noTries: "No attempts left today: more tomorrow",
         rule: (m) => `${m} attempts a day. A win opens the next floor and gives its reward, a loss only takes the attempt. Every 5th floor +1 🎟, every 10th +3 🎟`,
         cleared: (n) => `🗼 Floor ${n} cleared!`, failed: (n) => `Floor ${n} not cleared`, tokens: (n) => `🎟 +${n} tokens`,
         refused: { no_team: "Save a team in the Arena first", no_tries: "No attempts left today: more tomorrow", no_floor: "This floor is not ready yet", moved: "This floor is cleared already; the page is refreshed" },
@@ -2725,12 +2725,12 @@
     const enemy = data.enemy || [];
     towerRow("towerFront", enemy.slice(0, 2), at.front);
     towerRow("towerBack", enemy.slice(2), at.back);
+    // The tower fights with the team saved in the arena, changed there; only
+    // why the fight cannot start is said here.
     const team = data.team || [];
-    $("towerPower").textContent = team.length ? at.power(spaced(data.power)) : "";
-    towerRow("towerTeamFront", team.slice(0, 2), at.front);
-    towerRow("towerTeamBack", team.slice(2), at.back);
-    $("towerTeamFront").hidden = $("towerTeamBack").hidden = !team.length;
-    $("towerHint").textContent = !team.length ? tw.noTeam : data.tries_left <= 0 ? tw.noTries : tw.yours;
+    const hint = !team.length ? tw.noTeam : data.tries_left <= 0 ? tw.noTries : "";
+    $("towerHint").textContent = hint;
+    $("towerHint").hidden = !hint;
     const fight = $("towerFight");
     fight.textContent = tw.fight(data.next);
     fight.disabled = towerBusy || !team.length || !enemy.length || data.tries_left <= 0;
