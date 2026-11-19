@@ -794,8 +794,7 @@ var privateOwnerCommands = map[string]bool{
 }
 
 // retiredCommands are the card game's commands the app replaced: /card
-// alone opens it now, and these, still typed out of habit, open the app as
-// /card does, in a group too, rather than going unanswered.
+// alone opens it now, and in a group these get no answer at all.
 var retiredCommands = map[string]bool{
 	"/cards": true, "/mycards": true, "/cardtop": true, "/market": true, "/duel": true, "/profile": true,
 }
@@ -806,11 +805,8 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 	if pressedHelp(in) {
 		in.text = "/help"
 	}
-	if in.group && privateOwnerCommands[commandName(in.text)] {
+	if in.group && (privateOwnerCommands[commandName(in.text)] || retiredCommands[commandName(in.text)]) {
 		return outcome{}
-	}
-	if retiredCommands[commandName(in.text)] && s.opts.Cards != nil && s.opts.CardsURL != "" {
-		return outcome{text: textCardsApp.to(in), buttons: s.cardsAppButton(in)}
 	}
 	if out, ok := s.utilityCommand(in); ok {
 		return out

@@ -128,10 +128,14 @@ func (s *Service) plainCommand(msg *telegram.Message, text string) bool {
 	return moderates
 }
 
-// ownCommands are the bot's commands that no other bot in its groups has:
-// "/game", "/mafia", "/start" or "/top" are other bots' too.
+// ownCommands are the bot's commands it answers when sent bare in a group,
+// with no @name: all those it does in code, free of the model, the generic
+// /help, /start, /about, /game and /mafia among them, as the owners asked,
+// so that a group without AI has them as well. (Another bot in the group
+// may answer them too; a command named for another bot stays theirs.)
 var ownCommands = map[string]bool{
-	"/card": true, "/cards": true, "/mycards": true, "/cardtop": true, "/market": true, "/duel": true, "/profile": true, "/invites": true, "/invites_week": true, "/invites_month": true, "/invites_auto": true, "/teams": true, "/games": true,
+	"/help": true, "/start": true, "/about": true, "/game": true, "/mafia": true, "/premium": true, "/paysupport": true,
+	"/card": true, "/invites": true, "/invites_week": true, "/invites_month": true, "/invites_auto": true, "/teams": true, "/games": true,
 	"/boss": true, "/snake": true, "/woodcutter": true, "/checkers": true, "/tictactoe": true,
 	"/staff": true, "/ranks": true, "/ranklog": true, "/access": true, "/rank": true,
 	"/banlist": true, "/amnesty": true, "/kickinactive": true,

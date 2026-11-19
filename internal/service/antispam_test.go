@@ -137,13 +137,13 @@ func TestFloodGuardCatchesRepeats(t *testing.T) {
 	for i := range 4 {
 		msg := messageFrom(5353, "ha", "ha")
 		if i%2 == 1 {
-			msg.Text = "/mafia"
+			msg.Text = "/top"
 		}
 		msg.MessageID = int64(300 + i)
 		short = append(short, inGroup(msg))
 	}
 	if sent := f.run(short...); len(sent) != 0 || len(moderator.deleted) != 0 {
-		t.Errorf("\"ha\" and /mafia twice each: sent %+v, deleted %v", sent, moderator.deleted)
+		t.Errorf("\"ha\" and /top twice each: sent %+v, deleted %v", sent, moderator.deleted)
 	}
 }
 
