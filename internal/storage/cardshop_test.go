@@ -40,11 +40,11 @@ func TestCardShop(t *testing.T) {
 		t.Errorf("too few for tokens = %v", err)
 	}
 	mythic := func(int, int) (int, bool) { return 4, false }
-	open, err := store.OpenCardPack(ctx, user, "Ali", 2, mythic, 30, time.Now())
+	open, err := store.OpenCardPack(ctx, user, "Ali", 2, mythic, 30, time.Now(), CardQuest{})
 	if err != nil || len(open.Draws) != 2 || open.Shards != 10 || open.Tokens != 5 || open.Draws[0].Card.ID != 1 {
 		t.Fatalf("pack = %+v, %v", open, err)
 	}
-	if _, err := store.OpenCardPack(ctx, user, "Ali", 2, mythic, 30, time.Now()); !errors.As(err, &few) {
+	if _, err := store.OpenCardPack(ctx, user, "Ali", 2, mythic, 30, time.Now(), CardQuest{}); !errors.As(err, &few) {
 		t.Errorf("too few for a pack = %v", err)
 	}
 	if marked, err := store.MarkCrystalRefunded(ctx, "c1"); err != nil || !marked {

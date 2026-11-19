@@ -31,9 +31,7 @@ const (
 // arenaRules are the rules at now: the tokens' day starts at midnight in
 // Tashkent, built there so that the store counts Tashkent's date.
 func arenaRules(now time.Time) storage.ArenaRules {
-	local := now.In(Location)
-	day := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, Location)
-	return storage.ArenaRules{Tickets: ArenaTickets, TicketEvery: ArenaTicketEvery, Tokens: ArenaTokens, K: ArenaK, Day: day, Now: now}
+	return storage.ArenaRules{Tickets: ArenaTickets, TicketEvery: ArenaTicketEvery, Tokens: ArenaTokens, K: ArenaK, Day: DayStart(now), Now: now}
 }
 
 var (
@@ -239,7 +237,8 @@ func (h *handler) arenaAttack(ctx context.Context, user miniapp.User, opponent i
 		return nil, errUnavailable
 	}
 	result := arena.Battle(mine.team, theirs.team, seed)
-	outcome, err := h.Store.RecordArenaBattle(ctx, user.ID, opponent, seed, result.AttackerWon, arenaRules(h.Now()))
+	now := h.Now()
+	outcome, err := h.Store.RecordArenaBattle(ctx, user.ID, opponent, seed, result.AttackerWon, arenaRules(now), questOf(QuestArena, now))
 	switch {
 	case errors.Is(err, storage.ErrArenaNoTickets):
 		return map[string]any{"refused": "no_tickets"}, failure{}

@@ -2312,6 +2312,23 @@ skips to the end, which less motion asked for shows at once. The end says
 won or lost, the rating's change and the token, a win's card token while the
 day's three last. The Reyting tab switches between the cards' table and the
 arena's (rating, wins, losses, power). No card is given or lost in the arena.
+🎯 Kunlik topshiriqlar, the daily quests (`internal/cards/quests.go`, the
+table `card_quests` of migration 102), are four a day, new at midnight in
+Tashkent, 10 tokens in all: open 5 cards, by draws or shop packs (2 🎟), win
+an arena battle as the attacker (3), raise a card's star (2), and one event
+pull while the event runs, a 10-pull counting 10 (3), or, once it has ended
+(`EventEnds`), one market trade, counted for both its players (3); the
+targets and rewards are constants beside the event's. Each action counts
+toward its quest in its own transaction, so one refused counts nothing,
+and progress stops at the target. `quests` gives the day's quests with
+progress, target, reward and claimed, and `reset_in`, the time to the next
+midnight; the state carries `quests` (`done`, `ready`, `total`) for the dot
+on the button. `quest_claim` with `quest` adds a quest's tokens to
+`card_players.tokens` once, by a conditional update, so a double tap pays
+once; refused, it answers `not_done` or `claimed`. The entry sits at the top
+of Kolleksiya, under the event's banner, and opens the list in a sheet:
+each quest's progress bar, its reward and an "Olish" button once done (✅
+once claimed), with how many are done and the time until new ones.
 Kartalar had an auto opener (`/autocard`, migration 65) that opened each
 player's cards and sent them to their private chat; the owners took it out,
 and migration 74 drops its columns: players open the day's cards themselves.

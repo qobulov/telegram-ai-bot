@@ -43,7 +43,8 @@ type EventOpening struct {
 // day's tokens given first; each counts as any draw does, in points, cards
 // and the waits for a rare card. Once ev ends it returns ErrCardEventOver,
 // and with too few tokens it pulls none and returns a *CardTokensError.
-func (s *Store) OpenEventCards(ctx context.Context, userID int64, name string, n int, ev CardEvent, day CardDay, now time.Time) (EventOpening, error) {
+// The n pulls count toward quest.
+func (s *Store) OpenEventCards(ctx context.Context, userID int64, name string, n int, ev CardEvent, day CardDay, now time.Time, quest CardQuest) (EventOpening, error) {
 	if !now.Before(ev.Ends) {
 		return EventOpening{}, ErrCardEventOver
 	}
@@ -83,6 +84,9 @@ func (s *Store) OpenEventCards(ctx context.Context, userID int64, name string, n
 			if held {
 				open.Pulls = 0
 			}
+		}
+		if err := countQuest(ctx, tx, userID, quest, n); err != nil {
+			return err
 		}
 		err = tx.QueryRow(ctx, `
 			UPDATE card_players SET tokens = tokens - $2, event_pulls = $3, last_draw_at = $4

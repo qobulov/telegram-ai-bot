@@ -274,8 +274,9 @@ type arenaRow struct {
 // both ratings by Elo (never below 0), gives the attacker a token for a
 // win while the day's arena tokens last, and keeps the battle with its
 // seed and both players' rating changes. Defending changes only the
-// defender's rating, wins and losses, and takes no ticket.
-func (s *Store) RecordArenaBattle(ctx context.Context, attacker, defender, seed int64, attackerWon bool, rules ArenaRules) (ArenaOutcome, error) {
+// defender's rating, wins and losses, and takes no ticket. A win counts
+// toward quest for the attacker.
+func (s *Store) RecordArenaBattle(ctx context.Context, attacker, defender, seed int64, attackerWon bool, rules ArenaRules, quest CardQuest) (ArenaOutcome, error) {
 	var out ArenaOutcome
 	if attacker == defender {
 		return out, fmt.Errorf("storage: player %d attacking themselves", attacker)
@@ -306,6 +307,9 @@ func (s *Store) RecordArenaBattle(ctx context.Context, attacker, defender, seed 
 		won := 0
 		if attackerWon {
 			won = 1
+		}
+		if err := countQuest(ctx, tx, attacker, quest, won); err != nil {
+			return err
 		}
 		if _, err := tx.Exec(ctx, `
 			UPDATE arena_players SET rating = $2, wins = wins + $3, losses = losses + 1 - $3,

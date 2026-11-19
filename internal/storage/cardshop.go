@@ -36,8 +36,9 @@ func (s *Store) BuyCardTokens(ctx context.Context, userID int64, name string, to
 
 // OpenCardPack opens n cards for price crystals, roll picking each one's
 // rarity; with too few crystals it opens none and returns a
-// *CardFundsError. Tokens are left as they are.
-func (s *Store) OpenCardPack(ctx context.Context, userID int64, name string, n int, roll CardRoll, price int, now time.Time) (CardOpening, error) {
+// *CardFundsError. Tokens are left as they are. The n cards count toward
+// quest.
+func (s *Store) OpenCardPack(ctx context.Context, userID int64, name string, n int, roll CardRoll, price int, now time.Time, quest CardQuest) (CardOpening, error) {
 	var open CardOpening
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		player, err := lockCardPlayer(ctx, tx, userID, name)
@@ -53,6 +54,9 @@ func (s *Store) OpenCardPack(ctx context.Context, userID int64, name string, n i
 				return err
 			}
 			open.Draws = append(open.Draws, draw)
+		}
+		if err := countQuest(ctx, tx, userID, quest, n); err != nil {
+			return err
 		}
 		return tx.QueryRow(ctx, `UPDATE card_players SET shards = shards - $2, last_draw_at = $3 WHERE user_id = $1 RETURNING tokens, shards, points`,
 			userID, price, now).Scan(&open.Tokens, &open.Shards, &open.Points)

@@ -18,7 +18,7 @@ var eventCard = storage.Card{ID: EventCard, Name: "Satoko Kirigaya", Anime: "Fir
 
 // fakeStore has no event; eventStore keeps one, with the player's pulls
 // since Satoko.
-func (f *fakeStore) OpenEventCards(context.Context, int64, string, int, storage.CardEvent, storage.CardDay, time.Time) (storage.EventOpening, error) {
+func (f *fakeStore) OpenEventCards(context.Context, int64, string, int, storage.CardEvent, storage.CardDay, time.Time, storage.CardQuest) (storage.EventOpening, error) {
 	return storage.EventOpening{}, storage.ErrCardEventOver
 }
 func (f *fakeStore) CardEventPulls(context.Context, int64, int64) (int, storage.Card, error) {
@@ -30,7 +30,7 @@ type eventStore struct {
 	eventPulls int
 }
 
-func (f *eventStore) OpenEventCards(_ context.Context, _ int64, _ string, n int, ev storage.CardEvent, _ storage.CardDay, now time.Time) (storage.EventOpening, error) {
+func (f *eventStore) OpenEventCards(_ context.Context, userID int64, _ string, n int, ev storage.CardEvent, _ storage.CardDay, now time.Time, quest storage.CardQuest) (storage.EventOpening, error) {
 	if !now.Before(ev.Ends) {
 		return storage.EventOpening{}, storage.ErrCardEventOver
 	}
@@ -51,6 +51,7 @@ func (f *eventStore) OpenEventCards(_ context.Context, _ int64, _ string, n int,
 		}
 	}
 	open.Pulls = f.eventPulls
+	f.count(userID, quest, n)
 	return open, nil
 }
 

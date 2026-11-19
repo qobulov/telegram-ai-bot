@@ -118,7 +118,7 @@ func TestArenaElo(t *testing.T) {
 	ctx := context.Background()
 	seedArena(t, store)
 
-	out, err := store.RecordArenaBattle(ctx, 1, 2, 42, true, arenaRules)
+	out, err := store.RecordArenaBattle(ctx, 1, 2, 42, true, arenaRules, CardQuest{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,13 +145,13 @@ func TestArenaElo(t *testing.T) {
 
 	// Carol (3), new at 1000, loses to Dave (4) at 1000: −16; then, both
 	// at 5, she loses the 5 she has and Dave gains 16.
-	if out, err := store.RecordArenaBattle(ctx, 3, 4, 7, false, arenaRules); err != nil || out.RatingChange != -16 || out.Token {
+	if out, err := store.RecordArenaBattle(ctx, 3, 4, 7, false, arenaRules, CardQuest{}); err != nil || out.RatingChange != -16 || out.Token {
 		t.Errorf("a loss between equals = %+v, %v", out, err)
 	}
 	if _, err := store.pool.Exec(ctx, `UPDATE arena_players SET rating = 5 WHERE user_id IN (3, 4)`); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := store.RecordArenaBattle(ctx, 3, 4, 8, false, arenaRules); err != nil || out.RatingChange != -5 {
+	if out, err := store.RecordArenaBattle(ctx, 3, 4, 8, false, arenaRules, CardQuest{}); err != nil || out.RatingChange != -5 {
 		t.Errorf("a loss at 5 = %+v, %v", out, err)
 	}
 	if carol, _ := store.ArenaPlayerOf(ctx, 3, arenaRules); carol.Rating != 0 {
@@ -183,7 +183,7 @@ func TestTeamWithACardTradedAway(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.TakeCardOffer(ctx, offer, 2, CardTradeRules{Now: now}, market.Keep); err != nil {
+	if _, err := store.TakeCardOffer(ctx, offer, 2, CardTradeRules{Now: now}, market.Keep, CardQuest{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -196,10 +196,10 @@ func TestTeamWithACardTradedAway(t *testing.T) {
 	if front, back, ok, err := store.ArenaTeam(ctx, 1); err != nil || !ok || front != aliceFront || back != aliceBack {
 		t.Errorf("Alice's team = %v %v %v, %v", front, back, ok, err)
 	}
-	if _, err := store.RecordArenaBattle(ctx, 1, 2, 1, true, arenaRules); err != nil {
+	if _, err := store.RecordArenaBattle(ctx, 1, 2, 1, true, arenaRules, CardQuest{}); err != nil {
 		t.Errorf("Alice attacking = %v", err)
 	}
-	if _, err := store.RecordArenaBattle(ctx, 2, 1, 2, true, arenaRules); err != nil {
+	if _, err := store.RecordArenaBattle(ctx, 2, 1, 2, true, arenaRules, CardQuest{}); err != nil {
 		t.Errorf("Alice attacked = %v", err)
 	}
 	if opponents, err := store.ArenaOpponents(ctx, 1, 3); err != nil || len(opponents) != 1 || opponents[0].UserID != 2 {
@@ -226,7 +226,7 @@ func TestAttacksAreCountedUnderALock(t *testing.T) {
 			if i%2 == 1 {
 				attacker, defender, won = 2, 1, false
 			}
-			_, err := store.RecordArenaBattle(ctx, attacker, defender, int64(i), won, arenaRules)
+			_, err := store.RecordArenaBattle(ctx, attacker, defender, int64(i), won, arenaRules, CardQuest{})
 			errs <- err
 		}()
 	}
@@ -278,11 +278,11 @@ func TestArenaTicketsComeBackHourly(t *testing.T) {
 	seedArena(t, store)
 
 	for i := range 8 {
-		if _, err := store.RecordArenaBattle(ctx, 1, 2, int64(i), true, arenaRules); err != nil {
+		if _, err := store.RecordArenaBattle(ctx, 1, 2, int64(i), true, arenaRules, CardQuest{}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := store.RecordArenaBattle(ctx, 1, 2, 8, true, arenaRules); !errors.Is(err, ErrArenaNoTickets) {
+	if _, err := store.RecordArenaBattle(ctx, 1, 2, 8, true, arenaRules, CardQuest{}); !errors.Is(err, ErrArenaNoTickets) {
 		t.Fatalf("a ninth attack = %v", err)
 	}
 	if alice, _ := store.ArenaPlayerOf(ctx, 1, arenaRules); alice.Tickets != 0 || alice.NextTicket != time.Hour || alice.TokensLeft != 0 {
@@ -311,7 +311,7 @@ func TestArenaTicketsComeBackHourly(t *testing.T) {
 
 	// At 13:30 three are back; one spent leaves two, the half hour toward the
 	// next one kept.
-	out, err := store.RecordArenaBattle(ctx, 1, 2, 9, false, at(3*time.Hour+30*time.Minute))
+	out, err := store.RecordArenaBattle(ctx, 1, 2, 9, false, at(3*time.Hour+30*time.Minute), CardQuest{})
 	if err != nil || out.Tickets != 2 || out.NextTicket != 30*time.Minute {
 		t.Errorf("an attack at 13:30 = %+v, %v", out, err)
 	}
@@ -324,7 +324,7 @@ func TestArenaTicketsComeBackHourly(t *testing.T) {
 	if alice, _ := store.ArenaPlayerOf(ctx, 1, next); alice.Tickets != 8 || alice.TokensLeft != 3 {
 		t.Errorf("the next day = %+v", alice)
 	}
-	if out, err := store.RecordArenaBattle(ctx, 1, 2, 10, true, next); err != nil || out.Tickets != 7 || out.TokensLeft != 2 || !out.Token {
+	if out, err := store.RecordArenaBattle(ctx, 1, 2, 10, true, next, CardQuest{}); err != nil || out.Tickets != 7 || out.TokensLeft != 2 || !out.Token {
 		t.Errorf("the next day's attack = %+v, %v", out, err)
 	}
 	if got := cardTokens(t, store, 1); got != 4 {
@@ -344,10 +344,10 @@ func TestArenaBattleHistory(t *testing.T) {
 		t.Fatalf("no battles = %+v, %v", battles, err)
 	}
 	// Alice beats Bob (+16, Bob −16), then Bob attacks Alice and loses.
-	if _, err := store.RecordArenaBattle(ctx, 1, 2, 1, true, arenaRules); err != nil {
+	if _, err := store.RecordArenaBattle(ctx, 1, 2, 1, true, arenaRules, CardQuest{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.RecordArenaBattle(ctx, 2, 1, 2, false, arenaRules); err != nil {
+	if _, err := store.RecordArenaBattle(ctx, 2, 1, 2, false, arenaRules, CardQuest{}); err != nil {
 		t.Fatal(err)
 	}
 	alice, err := store.ArenaBattles(ctx, 1, 10)

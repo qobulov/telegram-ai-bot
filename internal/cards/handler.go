@@ -21,28 +21,30 @@ type Store interface {
 	CardCatalog(ctx context.Context) ([]storage.Card, error)
 	OwnedCards(ctx context.Context, userID int64, rarity int) ([]storage.OwnedCard, error)
 	CardPlayerOf(ctx context.Context, userID int64) (storage.CardPlayer, time.Time, error)
-	OpenCards(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, cost int, day storage.CardDay, now time.Time) (storage.CardOpening, error)
+	OpenCards(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, cost int, day storage.CardDay, now time.Time, quest storage.CardQuest) (storage.CardOpening, error)
 	GiveDayTokens(ctx context.Context, userID int64, name string, day storage.CardDay) (int, error)
 	CardTop(ctx context.Context, limit int) ([]storage.CardPlayer, error)
 	CardWallet(ctx context.Context, userID int64) (shards int, err error)
 	OfferCard(ctx context.Context, from, give, want int64, rules storage.CardMarketRules) (int64, error)
 	CardMarket(ctx context.Context, viewer int64, rules storage.CardMarketRules, limit int) ([]storage.CardOffer, error)
-	TakeCardOffer(ctx context.Context, id, by int64, rules storage.CardTradeRules, keep time.Duration) (storage.CardTrade, error)
+	TakeCardOffer(ctx context.Context, id, by int64, rules storage.CardTradeRules, keep time.Duration, quest storage.CardQuest) (storage.CardTrade, error)
 	CallOffCardTrade(ctx context.Context, id, by int64) (bool, error)
 	CatalogCardsNamed(ctx context.Context, name string, limit int) ([]storage.Card, error)
 	CatalogCards(ctx context.Context, page storage.CatalogPage) ([]storage.Card, bool, error)
 	BuyCardTokens(ctx context.Context, userID int64, name string, tokens, price int) (storage.CardOpening, error)
-	OpenCardPack(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, price int, now time.Time) (storage.CardOpening, error)
-	FuseCard(ctx context.Context, userID, cardID int64, cost []int) (stars int, err error)
-	OpenEventCards(ctx context.Context, userID int64, name string, n int, ev storage.CardEvent, day storage.CardDay, now time.Time) (storage.EventOpening, error)
+	OpenCardPack(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, price int, now time.Time, quest storage.CardQuest) (storage.CardOpening, error)
+	FuseCard(ctx context.Context, userID, cardID int64, cost []int, quest storage.CardQuest) (stars int, err error)
+	OpenEventCards(ctx context.Context, userID int64, name string, n int, ev storage.CardEvent, day storage.CardDay, now time.Time, quest storage.CardQuest) (storage.EventOpening, error)
 	CardEventPulls(ctx context.Context, userID, card int64) (int, storage.Card, error)
 	SaveArenaTeam(ctx context.Context, userID int64, front [2]int64, back [3]int64, power int) error
 	ArenaTeam(ctx context.Context, userID int64) (front [2]int64, back [3]int64, ok bool, err error)
 	ArenaPlayerOf(ctx context.Context, userID int64, rules storage.ArenaRules) (storage.ArenaPlayer, error)
 	ArenaOpponents(ctx context.Context, userID int64, n int) ([]storage.ArenaPlayer, error)
-	RecordArenaBattle(ctx context.Context, attacker, defender, seed int64, attackerWon bool, rules storage.ArenaRules) (storage.ArenaOutcome, error)
+	RecordArenaBattle(ctx context.Context, attacker, defender, seed int64, attackerWon bool, rules storage.ArenaRules, quest storage.CardQuest) (storage.ArenaOutcome, error)
 	ArenaBattles(ctx context.Context, userID int64, limit int) ([]storage.ArenaBattle, error)
 	ArenaTop(ctx context.Context, limit int) ([]storage.ArenaPlayer, error)
+	CardQuests(ctx context.Context, userID int64, day time.Time) (map[string]storage.QuestProgress, error)
+	ClaimCardQuest(ctx context.Context, userID int64, quest storage.CardQuest, reward int, now time.Time) error
 }
 
 // Invoices makes links to invoices in Stars, for crystals bought in the app.
@@ -141,6 +143,8 @@ type request struct {
 	Front    []int64 `json:"front"`
 	Back     []int64 `json:"back"`
 	Opponent int64   `json:"opponent"`
+	// Quest is the daily quest "quest_claim" claims.
+	Quest string `json:"quest"`
 }
 
 type failure struct {
@@ -224,6 +228,10 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return h.arenaTeam(ctx, opened.User, req.Front, req.Back)
 	case "arena_attack":
 		return h.arenaAttack(ctx, opened.User, req.Opponent)
+	case "quests":
+		return h.quests(ctx, opened.User)
+	case "quest_claim":
+		return h.claimQuest(ctx, opened.User, req.Quest)
 	}
 	return nil, errBadRequest
 }
@@ -321,11 +329,17 @@ func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
 		h.Logger.Error("could not read a player's shards", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
 	}
+	_, done, ready, err := h.questList(ctx, user.ID, now)
+	if err != nil {
+		h.Logger.Error("could not read card quests", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
 	return map[string]any{
 		"cards": views, "points": player.Points, "held": len(owned),
 		"tokens": Tokens(player, now), "given": given, "per_day": PerDay, "card_cost": CardCost, "batch": Batch,
 		"next_token_in": Today(now).Next().Sub(now).Milliseconds(),
 		"shards":        shards,
+		"quests":        map[string]any{"done": done, "ready": ready, "total": len(Quests(now)), "reset_in": questsResetIn(now)},
 	}, failure{}
 }
 
@@ -340,7 +354,7 @@ func (h *handler) open(ctx context.Context, user miniapp.User, n int) (any, fail
 		return nil, errUnavailable
 	}
 	now := h.Now()
-	opened, err := h.Store.OpenCards(ctx, user.ID, name(user), n, ByOdds(h.Roll), CardCost, Today(now), now)
+	opened, err := h.Store.OpenCards(ctx, user.ID, name(user), n, ByOdds(h.Roll), CardCost, Today(now), now, questOf(QuestOpen, now))
 	var few *storage.CardFundsError
 	switch {
 	case errors.As(err, &few):
@@ -517,7 +531,8 @@ func (h *handler) take(ctx context.Context, user miniapp.User, id int64) (any, f
 	if id == 0 {
 		return nil, errBadRequest
 	}
-	trade, err := h.Store.TakeCardOffer(ctx, id, user.ID, storage.CardTradeRules{Now: h.Now()}, OfferKeep)
+	now := h.Now()
+	trade, err := h.Store.TakeCardOffer(ctx, id, user.ID, storage.CardTradeRules{Now: now}, OfferKeep, questOf(QuestMarket, now))
 	switch {
 	case errors.Is(err, storage.ErrCardTradeOver):
 		return map[string]any{"refused": "over"}, failure{}
@@ -560,7 +575,7 @@ func (h *handler) fuse(ctx context.Context, user miniapp.User, cardID int64) (an
 	if cardID == 0 {
 		return nil, errBadRequest
 	}
-	stars, err := h.Store.FuseCard(ctx, user.ID, cardID, FuseCost[:])
+	stars, err := h.Store.FuseCard(ctx, user.ID, cardID, FuseCost[:], questOf(QuestFuse, h.Now()))
 	switch {
 	case errors.Is(err, storage.ErrCardMaxStars):
 		return map[string]any{"refused": "max"}, failure{}

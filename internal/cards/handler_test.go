@@ -53,6 +53,7 @@ type fakeStore struct {
 	stars    int                   // the held card's stars; 0 is ★1
 	fuseErr  error
 	arena    fakeArena
+	quests   fakeQuests
 }
 
 var (
@@ -73,7 +74,7 @@ func (f *fakeStore) OwnedCards(_ context.Context, userID int64, _ int) ([]storag
 	}
 	return []storage.OwnedCard{{Card: heldCard, Count: 2, Stars: max(f.stars, 1)}}, nil
 }
-func (f *fakeStore) FuseCard(_ context.Context, _, cardID int64, cost []int) (int, error) {
+func (f *fakeStore) FuseCard(_ context.Context, userID, cardID int64, cost []int, quest storage.CardQuest) (int, error) {
 	if f.fuseErr != nil {
 		return 0, f.fuseErr
 	}
@@ -81,6 +82,7 @@ func (f *fakeStore) FuseCard(_ context.Context, _, cardID int64, cost []int) (in
 		return 0, storage.ErrCardNotHeld
 	}
 	f.stars = max(f.stars, 1) + 1
+	f.count(userID, quest, 1)
 	return f.stars, nil
 }
 func (f *fakeStore) CardPlayerOf(context.Context, int64) (storage.CardPlayer, time.Time, error) {
@@ -96,7 +98,7 @@ func (f *fakeStore) GiveDayTokens(_ context.Context, _ int64, _ string, day stor
 	f.day, f.tokens = day.Start, f.tokens+day.PerDay
 	return day.PerDay, nil
 }
-func (f *fakeStore) OpenCards(ctx context.Context, userID int64, name string, n int, _ storage.CardRoll, cost int, day storage.CardDay, _ time.Time) (storage.CardOpening, error) {
+func (f *fakeStore) OpenCards(ctx context.Context, userID int64, name string, n int, _ storage.CardRoll, cost int, day storage.CardDay, _ time.Time, quest storage.CardQuest) (storage.CardOpening, error) {
 	given, _ := f.GiveDayTokens(ctx, userID, name, day)
 	tokens := min(f.tokens, n)
 	if shards := (n - tokens) * cost; shards > f.shards {
@@ -105,6 +107,7 @@ func (f *fakeStore) OpenCards(ctx context.Context, userID int64, name string, n 
 		f.tokens, f.shards = f.tokens-tokens, f.shards-shards
 	}
 	f.draws += n
+	f.count(userID, quest, n)
 	open := storage.CardOpening{Tokens: f.tokens, Shards: f.shards, Points: 15000, Given: given}
 	for range n {
 		open.Draws = append(open.Draws, storage.CardDraw{Card: heldCard, Count: 3, Points: 15000, Serial: 123})
@@ -132,12 +135,14 @@ func (f *fakeStore) CardMarket(_ context.Context, viewer int64, _ storage.CardMa
 	}
 	return out, nil
 }
-func (f *fakeStore) TakeCardOffer(_ context.Context, id, by int64, _ storage.CardTradeRules, _ time.Duration) (storage.CardTrade, error) {
+func (f *fakeStore) TakeCardOffer(_ context.Context, id, by int64, _ storage.CardTradeRules, _ time.Duration, quest storage.CardQuest) (storage.CardTrade, error) {
 	if f.takeErr != nil {
 		return storage.CardTrade{}, f.takeErr
 	}
 	o := f.offers[id-1]
 	f.offers = append(f.offers[:id-1], f.offers[id:]...)
+	f.count(by, quest, 1)
+	f.count(o.From, quest, 1)
 	return storage.CardTrade{ID: id, From: o.From, To: by, Give: o.Give, Take: o.Want}, nil
 }
 func (f *fakeStore) CallOffCardTrade(_ context.Context, id, by int64) (bool, error) {

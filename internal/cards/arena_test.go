@@ -61,7 +61,7 @@ func (f *fakeStore) ArenaOpponents(_ context.Context, userID int64, n int) ([]st
 	return out, nil
 }
 
-func (f *fakeStore) RecordArenaBattle(_ context.Context, attacker, defender, _ int64, won bool, rules storage.ArenaRules) (storage.ArenaOutcome, error) {
+func (f *fakeStore) RecordArenaBattle(_ context.Context, attacker, defender, _ int64, won bool, rules storage.ArenaRules, quest storage.CardQuest) (storage.ArenaOutcome, error) {
 	if attacker == defender {
 		return storage.ArenaOutcome{}, errors.New("attacking oneself")
 	}
@@ -76,6 +76,7 @@ func (f *fakeStore) RecordArenaBattle(_ context.Context, attacker, defender, _ i
 	change := -16
 	if won {
 		change = 16
+		f.count(attacker, quest, 1)
 	}
 	f.arena.battles[attacker] = append(f.arena.battles[attacker], storage.ArenaBattle{At: rules.Now, Attacked: true, OpponentID: defender, Opponent: "Ali", Won: won, RatingChange: change})
 	f.arena.battles[defender] = append(f.arena.battles[defender], storage.ArenaBattle{At: rules.Now, OpponentID: attacker, Opponent: "Bek", Won: !won, RatingChange: -change})

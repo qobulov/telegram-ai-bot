@@ -49,18 +49,18 @@ func TestTheCardMarket(t *testing.T) {
 	if offers, _ = store.CardMarket(ctx, 1, market, 10); !offers[0].Mine || offers[0].Can {
 		t.Errorf("Alice's market = %+v", offers[0])
 	}
-	if _, err := store.TakeCardOffer(ctx, levi, 1, rules, market.Keep); !errors.Is(err, ErrCardOfferOwn) {
+	if _, err := store.TakeCardOffer(ctx, levi, 1, rules, market.Keep, CardQuest{}); !errors.Is(err, ErrCardOfferOwn) {
 		t.Errorf("taking one's own offer = %v", err)
 	}
-	trade, err := store.TakeCardOffer(ctx, levi, 2, rules, market.Keep)
+	trade, err := store.TakeCardOffer(ctx, levi, 2, rules, market.Keep, CardQuest{})
 	if err != nil || trade.Give.Name != "Levi" || trade.Take.Name != "Hinata Hyuuga" || trade.From != 1 || trade.To != 2 {
 		t.Fatalf("trade = %+v, %v", trade, err)
 	}
-	if _, err := store.TakeCardOffer(ctx, levi, 2, rules, market.Keep); !errors.Is(err, ErrCardTradeOver) {
+	if _, err := store.TakeCardOffer(ctx, levi, 2, rules, market.Keep, CardQuest{}); !errors.Is(err, ErrCardTradeOver) {
 		t.Errorf("taken twice = %v", err)
 	}
 	// Bob holds no Hinata now: he cannot take the Gojo offer.
-	if _, err := store.TakeCardOffer(ctx, gojo, 2, rules, market.Keep); !errors.Is(err, ErrCardNotHeld) {
+	if _, err := store.TakeCardOffer(ctx, gojo, 2, rules, market.Keep, CardQuest{}); !errors.Is(err, ErrCardNotHeld) {
 		t.Errorf("taking without the card wanted = %v", err)
 	}
 	// Alice gives her Gojo away elsewhere: her offer of it is called off.
@@ -70,7 +70,7 @@ func TestTheCardMarket(t *testing.T) {
 	if _, err := store.pool.Exec(ctx, `INSERT INTO card_owned (user_id, card_id) VALUES (2, 30)`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.TakeCardOffer(ctx, gojo, 2, rules, market.Keep); !errors.Is(err, ErrCardOfferGone) {
+	if _, err := store.TakeCardOffer(ctx, gojo, 2, rules, market.Keep, CardQuest{}); !errors.Is(err, ErrCardOfferGone) {
 		t.Errorf("an offer whose card is gone = %v", err)
 	}
 	if offers, _ = store.CardMarket(ctx, 2, market, 10); len(offers) != 0 {
@@ -155,7 +155,7 @@ func TestTradesAreEvenAndUnlimited(t *testing.T) {
 	if offers, err := store.CardMarket(ctx, 2, market, 10); err != nil || len(offers) != 0 {
 		t.Errorf("the market with an uneven offer = %+v, %v", offers, err)
 	}
-	if _, err := store.TakeCardOffer(ctx, old, 2, rules, market.Keep); !errors.Is(err, ErrCardTradeUneven) {
+	if _, err := store.TakeCardOffer(ctx, old, 2, rules, market.Keep, CardQuest{}); !errors.Is(err, ErrCardTradeUneven) {
 		t.Errorf("taking an uneven offer = %v", err)
 	}
 	if _, err := store.pool.Exec(ctx, `UPDATE card_trades SET status = 'off' WHERE id = $1`, old); err != nil {
@@ -174,7 +174,7 @@ func TestTradesAreEvenAndUnlimited(t *testing.T) {
 		if err != nil {
 			t.Fatalf("offer %d = %v", i, err)
 		}
-		if _, err := store.TakeCardOffer(ctx, id, other, rules, market.Keep); err != nil {
+		if _, err := store.TakeCardOffer(ctx, id, other, rules, market.Keep, CardQuest{}); err != nil {
 			t.Fatalf("trade %d = %v", i, err)
 		}
 		holder, other = other, holder
@@ -216,7 +216,7 @@ func TestALimitedCardStaysPut(t *testing.T) {
 	if offers, err := store.CardMarket(ctx, 2, market, 10); err != nil || len(offers) != 0 {
 		t.Errorf("the market with a limited offer = %+v, %v", offers, err)
 	}
-	if _, err := store.TakeCardOffer(ctx, old, 2, rules, market.Keep); !errors.Is(err, ErrCardLimited) {
+	if _, err := store.TakeCardOffer(ctx, old, 2, rules, market.Keep, CardQuest{}); !errors.Is(err, ErrCardLimited) {
 		t.Errorf("taking a limited offer = %v", err)
 	}
 	var count int

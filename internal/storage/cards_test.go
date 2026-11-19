@@ -56,18 +56,18 @@ func TestCardsAreDrawnAndCollected(t *testing.T) {
 	start := time.Date(2026, 11, 16, 0, 0, 0, 0, time.UTC)
 	now := start.Add(10 * time.Hour)
 	day := CardDay{Start: start, PerDay: 2}
-	open, err := store.OpenCards(ctx, alice, "Alice", 1, rarity(4), 15, day, now)
+	open, err := store.OpenCards(ctx, alice, "Alice", 1, rarity(4), 15, day, now, CardQuest{})
 	if err != nil || len(open.Draws) != 1 || open.Given != 2 || open.Tokens != 1 || open.Points != 5000 {
 		t.Fatalf("first opening = %+v, %v", open, err)
 	}
 	if d := open.Draws[0]; d.Card.ID != 1 || !d.New || d.Count != 1 {
 		t.Fatalf("first card = %+v", d)
 	}
-	if open, err = store.OpenCards(ctx, alice, "Alice", 1, rarity(4), 15, day, now.Add(time.Minute)); err != nil || open.Given != 0 || open.Tokens != 0 || open.Draws[0].New || open.Draws[0].Count != 2 || open.Points != 5000 {
+	if open, err = store.OpenCards(ctx, alice, "Alice", 1, rarity(4), 15, day, now.Add(time.Minute), CardQuest{}); err != nil || open.Given != 0 || open.Tokens != 0 || open.Draws[0].New || open.Draws[0].Count != 2 || open.Points != 5000 {
 		t.Fatalf("the same card again = %+v, %v; want no points for the copy and no second gift", open, err)
 	}
 	// No token and no crystals: nothing opens, and it says what is short.
-	_, err = store.OpenCards(ctx, alice, "Alice", 1, rarity(0), 15, day, now.Add(2*time.Hour))
+	_, err = store.OpenCards(ctx, alice, "Alice", 1, rarity(0), 15, day, now.Add(2*time.Hour), CardQuest{})
 	var few *CardFundsError
 	if !errors.As(err, &few) || few.Tokens != 0 || few.Shards != 0 || few.Need != 15 {
 		t.Fatalf("a card with nothing to pay = %v", err)
@@ -76,13 +76,13 @@ func TestCardsAreDrawnAndCollected(t *testing.T) {
 	if _, err := store.pool.Exec(ctx, `UPDATE card_players SET tokens = 1, shards = 134 WHERE user_id = $1`, alice); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = store.OpenCards(ctx, alice, "Alice", 10, rarity(4), 15, day, now); !errors.As(err, &few) || few.Need != 135 || few.Shards != 134 {
+	if _, err = store.OpenCards(ctx, alice, "Alice", 10, rarity(4), 15, day, now, CardQuest{}); !errors.As(err, &few) || few.Need != 135 || few.Shards != 134 {
 		t.Fatalf("ten for one token and 134 crystals = %v; want refused, 135 needed", err)
 	}
 	if _, err := store.pool.Exec(ctx, `UPDATE card_players SET shards = 140 WHERE user_id = $1`, alice); err != nil {
 		t.Fatal(err)
 	}
-	if open, err = store.OpenCards(ctx, alice, "Alice", 10, rarity(4), 15, day, now); err != nil || len(open.Draws) != 10 || open.Tokens != 0 || open.Shards != 5 {
+	if open, err = store.OpenCards(ctx, alice, "Alice", 10, rarity(4), 15, day, now, CardQuest{}); err != nil || len(open.Draws) != 10 || open.Tokens != 0 || open.Shards != 5 {
 		t.Fatalf("ten for one token and 135 crystals = %+v, %v", open, err)
 	}
 	// The next day brings two tokens more.
@@ -96,16 +96,16 @@ func TestCardsAreDrawnAndCollected(t *testing.T) {
 	if p, _, _ := store.CardPlayerOf(ctx, alice); p.Tokens != 2 || !p.FreeDay.Equal(nextDay.Start) {
 		t.Errorf("Alice after the next day's gift = %+v", p)
 	}
-	if open, err = store.OpenCards(ctx, alice, "Alice", 1, rarity(4), 15, nextDay, start.AddDate(0, 0, 1).Add(time.Hour)); err != nil || open.Tokens != 1 || open.Draws[0].Count != 13 {
+	if open, err = store.OpenCards(ctx, alice, "Alice", 1, rarity(4), 15, nextDay, start.AddDate(0, 0, 1).Add(time.Hour), CardQuest{}); err != nil || open.Tokens != 1 || open.Draws[0].Count != 13 {
 		t.Fatalf("the next day's first = %+v, %v", open, err)
 	}
-	if open, err = store.OpenCards(ctx, bob, "Bob", 1, rarity(0), 15, CardDay{}, now); !errors.As(err, &few) {
+	if open, err = store.OpenCards(ctx, bob, "Bob", 1, rarity(0), 15, CardDay{}, now, CardQuest{}); !errors.As(err, &few) {
 		t.Fatalf("Bob with no day's tokens and nothing = %+v, %v", open, err)
 	}
 	if _, err := store.pool.Exec(ctx, `INSERT INTO card_players (user_id, name, tokens) VALUES ($1, 'Bob', 2)`, bob); err != nil {
 		t.Fatal(err)
 	}
-	open, err = store.OpenCards(ctx, bob, "Bob", 1, rarity(0), 15, CardDay{}, now)
+	open, err = store.OpenCards(ctx, bob, "Bob", 1, rarity(0), 15, CardDay{}, now, CardQuest{})
 	if err != nil || open.Draws[0].Card.ID != 2 || open.Points != 100 {
 		t.Fatalf("Bob's card = %+v, %v", open, err)
 	}

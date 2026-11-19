@@ -43,13 +43,13 @@ func TestCardEventPulls(t *testing.T) {
 
 	setTokens(5)
 	var few *CardTokensError
-	if _, err := store.OpenEventCards(ctx, player, "Ann", 10, ev, CardDay{}, now); !errors.As(err, &few) || few.Tokens != 5 || few.Need != 10 {
+	if _, err := store.OpenEventCards(ctx, player, "Ann", 10, ev, CardDay{}, now, CardQuest{}); !errors.As(err, &few) || few.Tokens != 5 || few.Need != 10 {
 		t.Fatalf("ten pulls with five tokens = %v %+v", err, few)
 	}
-	if _, err := store.OpenEventCards(ctx, player, "Ann", 1, ev, CardDay{}, end); !errors.Is(err, ErrCardEventOver) {
+	if _, err := store.OpenEventCards(ctx, player, "Ann", 1, ev, CardDay{}, end, CardQuest{}); !errors.Is(err, ErrCardEventOver) {
 		t.Fatalf("a pull at the end = %v", err)
 	}
-	open, err := store.OpenEventCards(ctx, player, "Ann", 1, ev, CardDay{}, now)
+	open, err := store.OpenEventCards(ctx, player, "Ann", 1, ev, CardDay{}, now, CardQuest{})
 	if err != nil || len(open.Draws) != 1 || open.Tokens != 4 || open.Pulls != 1 || open.Draws[0].Card.ID != 2 {
 		t.Fatalf("one pull = %+v, %v", open, err)
 	}
@@ -57,14 +57,14 @@ func TestCardEventPulls(t *testing.T) {
 	// 199 pulls without her, and the 200th gives her, sure.
 	setTokens(300)
 	for range 19 {
-		if open, err = store.OpenEventCards(ctx, player, "Ann", 10, ev, CardDay{}, now); err != nil {
+		if open, err = store.OpenEventCards(ctx, player, "Ann", 10, ev, CardDay{}, now, CardQuest{}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if open.Pulls != 191 || open.Tokens != 110 {
 		t.Fatalf("after 191 pulls = %d pulls, %d tokens", open.Pulls, open.Tokens)
 	}
-	if open, err = store.OpenEventCards(ctx, player, "Ann", 10, ev, CardDay{}, now); err != nil {
+	if open, err = store.OpenEventCards(ctx, player, "Ann", 10, ev, CardDay{}, now, CardQuest{}); err != nil {
 		t.Fatal(err)
 	}
 	for i, d := range open.Draws {
@@ -79,7 +79,7 @@ func TestCardEventPulls(t *testing.T) {
 	// She is held once at most: holding her, the pick gives another Mythic
 	// and the pity no longer counts.
 	ev.Roll, ev.Pick = rarity(4), func() bool { return true }
-	if open, err = store.OpenEventCards(ctx, player, "Ann", 10, ev, CardDay{}, now); err != nil {
+	if open, err = store.OpenEventCards(ctx, player, "Ann", 10, ev, CardDay{}, now, CardQuest{}); err != nil {
 		t.Fatal(err)
 	}
 	for i, d := range open.Draws {
@@ -126,7 +126,7 @@ func TestTheLimitedCardOncePerPlayer(t *testing.T) {
 	}
 	end := time.Date(2026, 12, 2, 0, 0, 0, 0, time.UTC)
 	ev := CardEvent{Card: satoko, Ends: end, Pity: 200, Price: 1, Roll: rarity(4), Pick: func() bool { return true }}
-	open, err := store.OpenEventCards(ctx, player, "Ann", 10, ev, CardDay{}, end.Add(-time.Hour))
+	open, err := store.OpenEventCards(ctx, player, "Ann", 10, ev, CardDay{}, end.Add(-time.Hour), CardQuest{})
 	if err != nil {
 		t.Fatal(err)
 	}

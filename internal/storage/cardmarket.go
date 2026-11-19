@@ -120,8 +120,9 @@ func (s *Store) CardMarket(ctx context.Context, viewer int64, rules CardMarketRu
 // TakeCardOffer takes the offer for by: its player gives by the card
 // offered and by gives them the card wanted, each with its points. An offer
 // whose player no longer holds a free copy of its card, gone or fused
-// away, is called off, ErrCardOfferGone.
-func (s *Store) TakeCardOffer(ctx context.Context, id, by int64, rules CardTradeRules, keep time.Duration) (CardTrade, error) {
+// away, is called off, ErrCardOfferGone. A trade done counts toward quest
+// for both its players.
+func (s *Store) TakeCardOffer(ctx context.Context, id, by int64, rules CardTradeRules, keep time.Duration, quest CardQuest) (CardTrade, error) {
 	var trade CardTrade
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		err := tx.QueryRow(ctx, `
@@ -158,6 +159,11 @@ func (s *Store) TakeCardOffer(ctx context.Context, id, by int64, rules CardTrade
 		}
 		if _, err := tx.Exec(ctx, `UPDATE card_trades SET status = 'done', to_id = $2, done_at = $3 WHERE id = $1`, id, by, rules.Now); err != nil {
 			return err
+		}
+		for _, player := range []int64{by, trade.From} {
+			if err := countQuest(ctx, tx, player, quest, 1); err != nil {
+				return err
+			}
 		}
 		return readCards(ctx, tx, &trade.Give, &trade.Take)
 	})

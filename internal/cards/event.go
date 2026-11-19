@@ -78,7 +78,7 @@ func (h *handler) eventView(ctx context.Context, user miniapp.User) (any, failur
 	}
 	return map[string]any{
 		"owned":  owned,
-		"active": !now.Before(EventStarts) && now.Before(EventEnds), "soon": now.Before(EventStarts),
+		"active": eventRuns(now), "soon": now.Before(EventStarts),
 		"starts_in": max(0, EventStarts.Sub(now).Milliseconds()),
 		"ends_at":   EventEnds.UnixMilli(), "ends_in": max(0, EventEnds.Sub(now).Milliseconds()),
 		"pity": pulls, "pity_max": EventPity, "odds": EventOdds(), "share": EventShare,
@@ -108,7 +108,7 @@ func (h *handler) eventOpen(ctx context.Context, user miniapp.User, n int) (any,
 		Card: EventCard, Ends: EventEnds, Pity: EventPity, Price: EventPrice,
 		Roll: ByOdds(h.eventRoll), Pick: h.eventPick,
 	}
-	opened, err := h.Store.OpenEventCards(ctx, user.ID, name(user), n, ev, Today(now), now)
+	opened, err := h.Store.OpenEventCards(ctx, user.ID, name(user), n, ev, Today(now), now, questOf(QuestEvent, now))
 	var few *storage.CardTokensError
 	switch {
 	case errors.Is(err, storage.ErrCardEventOver):

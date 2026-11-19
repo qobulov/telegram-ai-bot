@@ -18,8 +18,8 @@ var (
 
 // FuseCard raises the player's card one star, using up cost[stars] of its
 // free copies, those beyond the one kept and the ones used up before; it
-// gives the card's stars after.
-func (s *Store) FuseCard(ctx context.Context, userID, cardID int64, cost []int) (int, error) {
+// gives the card's stars after. A star raised counts toward quest.
+func (s *Store) FuseCard(ctx context.Context, userID, cardID int64, cost []int, quest CardQuest) (int, error) {
 	var stars int
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		var count, melted int
@@ -36,9 +36,12 @@ func (s *Store) FuseCard(ctx context.Context, userID, cardID int64, cost []int) 
 		case count-1-melted < cost[stars]:
 			return ErrCardFewCopies
 		}
-		return tx.QueryRow(ctx, `
+		if err := tx.QueryRow(ctx, `
 			UPDATE card_owned SET melted = melted + $3, stars = stars + 1
-			WHERE user_id = $1 AND card_id = $2 RETURNING stars`, userID, cardID, cost[stars]).Scan(&stars)
+			WHERE user_id = $1 AND card_id = $2 RETURNING stars`, userID, cardID, cost[stars]).Scan(&stars); err != nil {
+			return err
+		}
+		return countQuest(ctx, tx, userID, quest, 1)
 	})
 	switch {
 	case err == nil:

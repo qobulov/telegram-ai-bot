@@ -21,7 +21,7 @@ func (f *fakeStore) BuyCardTokens(_ context.Context, _ int64, _ string, tokens, 
 	return storage.CardOpening{Tokens: f.tokens, Shards: f.shards}, nil
 }
 
-func (f *fakeStore) OpenCardPack(_ context.Context, _ int64, _ string, n int, roll storage.CardRoll, price int, _ time.Time) (storage.CardOpening, error) {
+func (f *fakeStore) OpenCardPack(_ context.Context, userID int64, _ string, n int, roll storage.CardRoll, price int, _ time.Time, quest storage.CardQuest) (storage.CardOpening, error) {
 	if price > f.shards {
 		return storage.CardOpening{}, &storage.CardFundsError{Tokens: f.tokens, Shards: f.shards, Need: price}
 	}
@@ -33,6 +33,7 @@ func (f *fakeStore) OpenCardPack(_ context.Context, _ int64, _ string, n int, ro
 		card.Rarity = rarity
 		open.Draws = append(open.Draws, storage.CardDraw{Card: card, Count: 1, New: true, Serial: i + 1})
 	}
+	f.count(userID, quest, n)
 	return open, nil
 }
 

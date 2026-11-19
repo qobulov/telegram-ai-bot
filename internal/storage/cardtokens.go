@@ -37,8 +37,8 @@ type CardOpening struct {
 // given first, at the day's first opening. With too few to pay for all n it
 // opens none and returns a *CardFundsError. A player who turned on the card
 // reminders, and has spent their last token, gets one for the next
-// midnight.
-func (s *Store) OpenCards(ctx context.Context, userID int64, name string, n int, roll CardRoll, cost int, day CardDay, now time.Time) (CardOpening, error) {
+// midnight. The n cards count toward quest.
+func (s *Store) OpenCards(ctx context.Context, userID int64, name string, n int, roll CardRoll, cost int, day CardDay, now time.Time, quest CardQuest) (CardOpening, error) {
 	var open CardOpening
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		player, err := lockCardPlayer(ctx, tx, userID, name)
@@ -60,6 +60,9 @@ func (s *Store) OpenCards(ctx context.Context, userID int64, name string, n int,
 				return err
 			}
 			open.Draws = append(open.Draws, draw)
+		}
+		if err := countQuest(ctx, tx, userID, quest, n); err != nil {
+			return err
 		}
 		err = tx.QueryRow(ctx, `
 			UPDATE card_players SET tokens = tokens - $2, shards = shards - $3, last_draw_at = $4

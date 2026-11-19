@@ -44,19 +44,19 @@ func TestCardSerials(t *testing.T) {
 		}
 	}
 
-	open, err := store.OpenCards(ctx, alice, "Alice", 3, rarity(4), 15, CardDay{}, now)
+	open, err := store.OpenCards(ctx, alice, "Alice", 3, rarity(4), 15, CardDay{}, now, CardQuest{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	want(open.Draws, gojo, 1)
-	if open, err = store.OpenCardPack(ctx, bob, "Bob", 2, rarity(4), 0, now); err != nil {
+	if open, err = store.OpenCardPack(ctx, bob, "Bob", 2, rarity(4), 0, now, CardQuest{}); err != nil {
 		t.Fatal(err)
 	}
 	want(open.Draws, gojo, 4)
 
 	end := now.Add(time.Hour)
 	ev := CardEvent{Card: satoko, Ends: end, Pity: 130, Price: 1, Roll: rarity(4), Pick: func() bool { return true }}
-	pulled, err := store.OpenEventCards(ctx, bob, "Bob", 2, ev, CardDay{}, now)
+	pulled, err := store.OpenEventCards(ctx, bob, "Bob", 2, ev, CardDay{}, now, CardQuest{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,14 +64,14 @@ func TestCardSerials(t *testing.T) {
 	want(pulled.Draws[:1], satoko, 1)
 	want(pulled.Draws[1:], gojo, 6)
 	ev.Pick = func() bool { return false }
-	if pulled, err = store.OpenEventCards(ctx, alice, "Alice", 1, ev, CardDay{}, now); err != nil {
+	if pulled, err = store.OpenEventCards(ctx, alice, "Alice", 1, ev, CardDay{}, now, CardQuest{}); err != nil {
 		t.Fatal(err)
 	}
 	want(pulled.Draws, gojo, 7)
 
 	// Forced Mythics, 40 of them, are never her outside the event.
 	for range 2 {
-		if open, err = store.OpenCards(ctx, alice, "Alice", 10, rarity(4), 15, CardDay{}, now); err != nil {
+		if open, err = store.OpenCards(ctx, alice, "Alice", 10, rarity(4), 15, CardDay{}, now, CardQuest{}); err != nil {
 			t.Fatal(err)
 		}
 		for _, d := range open.Draws {
@@ -79,7 +79,7 @@ func TestCardSerials(t *testing.T) {
 				t.Fatal("a draw gave the limited card")
 			}
 		}
-		if open, err = store.OpenCardPack(ctx, bob, "Bob", 10, rarity(4), 0, now); err != nil {
+		if open, err = store.OpenCardPack(ctx, bob, "Bob", 10, rarity(4), 0, now, CardQuest{}); err != nil {
 			t.Fatal(err)
 		}
 		for _, d := range open.Draws {

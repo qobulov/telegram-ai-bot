@@ -41,28 +41,28 @@ func TestFuseCard(t *testing.T) {
 		t.Errorf("a card drawn is ★%d", o.Stars)
 	}
 	for want := 2; want <= 3; want++ {
-		if stars, err := store.FuseCard(ctx, 1, 10, fuseCost); err != nil || stars != want {
+		if stars, err := store.FuseCard(ctx, 1, 10, fuseCost, CardQuest{}); err != nil || stars != want {
 			t.Fatalf("fused = ★%d, %v; want ★%d", stars, err, want)
 		}
 	}
 	if o := held(10); o.Stars != 3 || o.Melted != 3 || o.Count != 4 {
 		t.Errorf("after two fusions = %+v", o)
 	}
-	if _, err := store.FuseCard(ctx, 1, 10, fuseCost); !errors.Is(err, ErrCardFewCopies) {
+	if _, err := store.FuseCard(ctx, 1, 10, fuseCost, CardQuest{}); !errors.Is(err, ErrCardFewCopies) {
 		t.Errorf("fused with too few copies = %v", err)
 	}
 	for want := 2; want <= 5; want++ {
-		if stars, err := store.FuseCard(ctx, 1, 20, fuseCost); err != nil || stars != want {
+		if stars, err := store.FuseCard(ctx, 1, 20, fuseCost, CardQuest{}); err != nil || stars != want {
 			t.Fatalf("Levi fused = ★%d, %v; want ★%d", stars, err, want)
 		}
 	}
-	if _, err := store.FuseCard(ctx, 1, 20, fuseCost); !errors.Is(err, ErrCardMaxStars) {
+	if _, err := store.FuseCard(ctx, 1, 20, fuseCost, CardQuest{}); !errors.Is(err, ErrCardMaxStars) {
 		t.Errorf("fused past ★5 = %v", err)
 	}
 	if o := held(20); o.Stars != 5 || o.Melted != 10 {
 		t.Errorf("Levi at ★5 = %+v", o)
 	}
-	if _, err := store.FuseCard(ctx, 2, 10, fuseCost); !errors.Is(err, ErrCardNotHeld) {
+	if _, err := store.FuseCard(ctx, 2, 10, fuseCost, CardQuest{}); !errors.Is(err, ErrCardNotHeld) {
 		t.Errorf("fused a card not held = %v", err)
 	}
 }
@@ -88,13 +88,13 @@ func TestFuseThenOfferedCopyIsGone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.FuseCard(ctx, 1, 10, fuseCost); err != nil {
+	if _, err := store.FuseCard(ctx, 1, 10, fuseCost, CardQuest{}); err != nil {
 		t.Fatal(err)
 	}
 	if offers, err := store.CardMarket(ctx, 2, market, 10); err != nil || len(offers) != 0 {
 		t.Errorf("the market shows a fused last copy: %+v, %v", offers, err)
 	}
-	if _, err := store.TakeCardOffer(ctx, offer, 2, CardTradeRules{Now: now}, market.Keep); !errors.Is(err, ErrCardOfferGone) {
+	if _, err := store.TakeCardOffer(ctx, offer, 2, CardTradeRules{Now: now}, market.Keep, CardQuest{}); !errors.Is(err, ErrCardOfferGone) {
 		t.Errorf("taking a fused last copy = %v, want the offer gone", err)
 	}
 	var status string
@@ -116,7 +116,7 @@ func TestFuseThenOfferedCopyIsGone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.TakeCardOffer(ctx, offer, 2, CardTradeRules{Now: now}, market.Keep); err != nil {
+	if _, err := store.TakeCardOffer(ctx, offer, 2, CardTradeRules{Now: now}, market.Keep, CardQuest{}); err != nil {
 		t.Fatalf("taking a free copy = %v", err)
 	}
 	if err := store.pool.QueryRow(ctx, `SELECT count, stars FROM card_owned WHERE user_id = 1 AND card_id = 10`).Scan(&count, &stars); err != nil || count != 2 || stars != 2 {

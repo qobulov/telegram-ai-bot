@@ -28,7 +28,8 @@ func (h *handler) buy(ctx context.Context, user miniapp.User, id string) (any, f
 			h.Logger.Error("could not fill the card catalog", "error", err)
 			return nil, errUnavailable
 		}
-		after, err = h.Store.OpenCardPack(ctx, user.ID, name(user), item.Cards, PackRoll(h.Roll, item.Cards, item.Least), item.Price, h.Now())
+		now := h.Now()
+		after, err = h.Store.OpenCardPack(ctx, user.ID, name(user), item.Cards, PackRoll(h.Roll, item.Cards, item.Least), item.Price, now, questOf(QuestOpen, now))
 	}
 	var few *storage.CardFundsError
 	switch {

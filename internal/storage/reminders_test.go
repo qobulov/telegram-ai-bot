@@ -156,7 +156,7 @@ func TestCardRemindersFollowDraws(t *testing.T) {
 	now := time.Now().Truncate(time.Second)
 	day := CardDay{Start: now.Add(-time.Hour), PerDay: 1}
 
-	if _, err := store.OpenCards(ctx, alice, "Alice", 1, rarity(0), 15, day, now); err != nil {
+	if _, err := store.OpenCards(ctx, alice, "Alice", 1, rarity(0), 15, day, now, CardQuest{}); err != nil {
 		t.Fatal(err)
 	}
 	if waiting, _ := store.WaitingReminders(ctx, alice, alice); len(waiting) != 0 {
@@ -183,7 +183,7 @@ func TestCardRemindersFollowDraws(t *testing.T) {
 	if _, err := store.pool.Exec(ctx, `UPDATE card_players SET tokens = 1 WHERE user_id = $1`, alice); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.OpenCards(ctx, alice, "Alice", 1, rarity(0), 15, day, next); err != nil {
+	if _, err := store.OpenCards(ctx, alice, "Alice", 1, rarity(0), 15, day, next, CardQuest{}); err != nil {
 		t.Fatal(err)
 	}
 	if waiting, _ := store.WaitingReminders(ctx, alice, alice); len(waiting) != 0 {
