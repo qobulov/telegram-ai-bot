@@ -38,9 +38,9 @@ const (
 	// included, or the same text or sticker repeatMessages times within
 	// repeatWindow. floodLogLimit bounds the group log read to count them,
 	// and maxFloodDeleted the member's messages deleted for it.
-	floodMessages     = 10
+	floodMessages     = 15
 	floodWindow       = 10 * time.Second
-	floodLongMessages = 20
+	floodLongMessages = 30
 	floodLongWindow   = 30 * time.Second
 	repeatMessages    = 3
 	repeatWindow      = time.Minute
