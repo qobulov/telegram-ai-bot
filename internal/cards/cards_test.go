@@ -92,7 +92,10 @@ func TestFetchCatalog(t *testing.T) {
 			}
 			characters = append(characters, map[string]any{
 				"id": id, "name": map[string]string{"full": fmt.Sprintf(" Hero %d ", id)}, "image": map[string]string{"large": image},
-				"favourites": 100000 - id, "media": map[string]any{"nodes": []any{map[string]any{"title": map[string]string{"romaji": "Romaji", "english": ""}}}},
+				"favourites": 100000 - id, "media": map[string]any{"edges": []any{
+					map[string]any{"characterRole": "BACKGROUND", "node": map[string]any{"title": map[string]string{"romaji": "Cameo", "english": "Cameo"}}},
+					map[string]any{"characterRole": "MAIN", "node": map[string]any{"title": map[string]string{"romaji": "Romaji", "english": ""}}},
+				}},
 			})
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"Page": map[string]any{"characters": characters}}})
@@ -148,7 +151,7 @@ func TestEnsureAddsOnlyNewCards(t *testing.T) {
 			id := (req.Variables.Page-1)*req.Variables.PerPage + i + 1
 			characters = append(characters, map[string]any{
 				"id": id, "name": map[string]string{"full": fmt.Sprintf("Hero %d", id)}, "image": map[string]string{"large": "https://img/x.png"},
-				"favourites": 100000 - id, "media": map[string]any{"nodes": []any{}},
+				"favourites": 100000 - id, "media": map[string]any{"edges": []any{}},
 			})
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"Page": map[string]any{"characters": characters}}})

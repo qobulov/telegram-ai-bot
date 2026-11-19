@@ -337,14 +337,7 @@ func FetchCatalog(ctx context.Context, client *http.Client, baseURL string) ([]s
 			if len(catalog) == CatalogSize || c.Image.Large == "" {
 				continue
 			}
-			anime := ""
-			if len(c.Media.Nodes) > 0 {
-				anime = c.Media.Nodes[0].Title.English
-				if anime == "" {
-					anime = c.Media.Nodes[0].Title.Romaji
-				}
-			}
-			catalog = append(catalog, Card(c.ID, strings.TrimSpace(c.Name.Full), anime, c.Image.Large, c.Favourites, len(catalog)))
+			catalog = append(catalog, Card(c.ID, strings.TrimSpace(c.Name.Full), c.anime(), c.Image.Large, c.Favourites, len(catalog)))
 		}
 		if len(characters) < perPage {
 			break
@@ -366,20 +359,42 @@ type aniListCharacter struct {
 	} `json:"image"`
 	Favourites int `json:"favourites"`
 	Media      struct {
-		Nodes []struct {
-			Title struct {
-				Romaji  string `json:"romaji"`
-				English string `json:"english"`
-			} `json:"title"`
-		} `json:"nodes"`
+		Edges []struct {
+			Role string `json:"characterRole"`
+			Node struct {
+				Title struct {
+					Romaji  string `json:"romaji"`
+					English string `json:"english"`
+				} `json:"title"`
+			} `json:"node"`
+		} `json:"edges"`
 	} `json:"media"`
+}
+
+// anime is the character's most popular anime in which they have a part:
+// a cameo (BACKGROUND) is passed over, as AniList would otherwise name
+// Saiki or Kuroko after a show they only pass through; with only cameos,
+// the most popular is taken.
+func (c aniListCharacter) anime() string {
+	edges := c.Media.Edges
+	if len(edges) == 0 {
+		return ""
+	}
+	pick := edges[0]
+	for _, e := range edges {
+		if e.Role != "BACKGROUND" {
+			pick = e
+			break
+		}
+	}
+	return cmp.Or(pick.Node.Title.English, pick.Node.Title.Romaji)
 }
 
 const charactersQuery = `query ($page: Int, $perPage: Int) {
   Page(page: $page, perPage: $perPage) {
     characters(sort: FAVOURITES_DESC) {
       id name { full } image { large } favourites
-      media(perPage: 1, sort: POPULARITY_DESC) { nodes { title { romaji english } } }
+      media(perPage: 6, sort: POPULARITY_DESC, type: ANIME) { edges { characterRole node { title { romaji english } } } }
     }
   }
 }`
