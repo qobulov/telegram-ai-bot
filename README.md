@@ -2347,6 +2347,22 @@ the table `arena_weeks` of migration 106, which pays a week once): 1st 50,
 100th 5. The daily cleanup cron, at 08:00 in Tashkent, pays the last week
 ended; the arena's table shows the prizes, the player's place this week
 (`week` in `arena`) and the time left.
+Each attack also gives the attacker arena coins, won or lost, as the owners
+asked on 2026-11-19: 10 for a win and 5 for a loss (`ArenaCoinsWin`,
+`ArenaCoinsLoss` in `internal/cards/arenashop.go`), credited in
+`RecordArenaBattle`'s transaction (the columns `coins`, `shop_day` and
+`shop_tokens` of `arena_players`, migration 110); the weekly prizes stay
+tokens. `arena` gives `coins` in `player` and the shop in `shop` (its items,
+`tokens_daily`, `tokens_left` today, `coins_win`, `coins_loss`); the arena's
+header shows 🪙 120 and a battle's end +10 🪙 (`coins_won` and `coins` in
+`arena_attack`). The "🪙 Arena do'koni" block sells, in one transaction each
+(`arena_shop` with `item`; refused `coins` when short): 1 🎟 token for 30
+coins, at most 10 a day by Tashkent's day (`BuyArenaToken`, refused `daily`),
+so that tokens stay scarce; an Epic pack of 5 cards with one sure Epic for
+150 (`epic`); and a Legendary pack of 5 with one sure Legendary for 450
+(`legendary`). The packs are drawn as the crystal shop's (`PackRoll`, the
+same `drawPack` as `OpenCardPack`, in `OpenArenaPack`), count toward the
+daily opening quest, and open with the same panel and Mythic celebration.
 🎯 Kunlik topshiriqlar, the daily quests (`internal/cards/quests.go`, the
 table `card_quests` of migration 102), are four a day, new at midnight in
 Tashkent, 10 tokens in all: open 5 cards, by draws or shop packs (2 🎟), win

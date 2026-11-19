@@ -9,7 +9,7 @@
 
   const texts = {
     uz: {
-      arenaTab: "Arena", arenaTeam: "⚔️ Jamoangiz", arenaSave: "Jamoani saqlash", arenaFoes: "🎯 Raqiblar", arenaHistory: "📜 Janglar tarixi", arenaRefresh: "🔄 Yangilash", topCards: "🎴 Kartalar", topArena: "⚔️ Arena",
+      arenaTab: "Arena", arenaShop: "🪙 Arena do'koni", arenaTeam: "⚔️ Jamoangiz", arenaSave: "Jamoani saqlash", arenaFoes: "🎯 Raqiblar", arenaHistory: "📜 Janglar tarixi", arenaRefresh: "🔄 Yangilash", topCards: "🎴 Kartalar", topArena: "⚔️ Arena",
       title: "Kartalar", collected: "to'plandi", animeTab: "Animelar", animeSearch: "Anime yoki personaj", animeBack: "← Barcha animelar", animeOwned: "✓ Sizda bor", animeMissing: "Sizda hali yo'q", animeEmpty: "Hech narsa topilmadi", animeGoal: (n) => `🎟 Hammasini yig'ing: +${n} token`, animeClaim: (n) => `🎁 ${n} token olish`, animeClaimed: (n) => `✅ ${n} token olingan`, animeGot: (n) => `🎟 +${n} token! Kolleksiya to'liq`, collection: "Kolleksiya", draw: "Olish", top: "Reyting",
       search: "Kartani qidirish", rarities: ["Oddiy", "Noyob", "Epik", "Afsonaviy", "Mifik"],
       drawNow: "Karta olish", drawing: "Ochilmoqda…", next: (t) => `Keyingi karta: ${t}`, ready: "Karta tayyor!",
@@ -43,7 +43,7 @@
       paid: "✅ To'lov qabul qilindi, kristall qo'shilmoqda…", crystalsAdded: (n) => `💎 +${n} kristall qo'shildi!`, payFailed: "To'lov amalga oshmadi", bought: (n) => `🎟 +${n} token`, packOpened: (r) => `${r} paket`,
     },
     ru: {
-      arenaTab: "Арена", arenaTeam: "⚔️ Ваша команда", arenaSave: "Сохранить команду", arenaFoes: "🎯 Соперники", arenaHistory: "📜 История боёв", arenaRefresh: "🔄 Обновить", topCards: "🎴 Карты", topArena: "⚔️ Арена",
+      arenaTab: "Арена", arenaShop: "🪙 Магазин арены", arenaTeam: "⚔️ Ваша команда", arenaSave: "Сохранить команду", arenaFoes: "🎯 Соперники", arenaHistory: "📜 История боёв", arenaRefresh: "🔄 Обновить", topCards: "🎴 Карты", topArena: "⚔️ Арена",
       title: "Карты", collected: "собрано", animeTab: "Аниме", animeSearch: "Аниме или персонаж", animeBack: "← Все аниме", animeOwned: "✓ Есть у вас", animeMissing: "Пока нет у вас", animeEmpty: "Ничего не найдено", animeGoal: (n) => `🎟 Соберите всех: +${n} токенов`, animeClaim: (n) => `🎁 Забрать ${n} токенов`, animeClaimed: (n) => `✅ ${n} токенов получено`, animeGot: (n) => `🎟 +${n} токенов! Коллекция собрана`, collection: "Коллекция", draw: "Получить", top: "Рейтинг",
       search: "Поиск по картам", rarities: ["Обычная", "Редкая", "Эпическая", "Легендарная", "Мифическая"],
       drawNow: "Получить карту", drawing: "Открываем…", next: (t) => `Следующая карта: ${t}`, ready: "Карта готова!",
@@ -77,7 +77,7 @@
       paid: "✅ Оплата принята, кристаллы зачисляются…", crystalsAdded: (n) => `💎 +${n} кристаллов!`, payFailed: "Оплата не прошла", bought: (n) => `🎟 +${n} токенов`, packOpened: (r) => `Пак: ${r}`,
     },
     en: {
-      arenaTab: "Arena", arenaTeam: "⚔️ Your team", arenaSave: "Save the team", arenaFoes: "🎯 Opponents", arenaHistory: "📜 Battle history", arenaRefresh: "🔄 Refresh", topCards: "🎴 Cards", topArena: "⚔️ Arena",
+      arenaTab: "Arena", arenaShop: "🪙 Arena shop", arenaTeam: "⚔️ Your team", arenaSave: "Save the team", arenaFoes: "🎯 Opponents", arenaHistory: "📜 Battle history", arenaRefresh: "🔄 Refresh", topCards: "🎴 Cards", topArena: "⚔️ Arena",
       title: "Cards", collected: "collected", animeTab: "Anime", animeSearch: "Anime or character", animeBack: "← All anime", animeOwned: "✓ You have it", animeMissing: "Not yours yet", animeEmpty: "Nothing found", animeGoal: (n) => `🎟 Collect them all: +${n} tokens`, animeClaim: (n) => `🎁 Claim ${n} tokens`, animeClaimed: (n) => `✅ ${n} tokens claimed`, animeGot: (n) => `🎟 +${n} tokens! Collection complete`, collection: "Collection", draw: "Draw", top: "Ranking",
       search: "Search cards", rarities: ["Common", "Rare", "Epic", "Legendary", "Mythic"],
       drawNow: "Draw a card", drawing: "Opening…", next: (t) => `Next card in ${t}`, ready: "A card is ready!",
@@ -2037,6 +2037,9 @@
       you: "Siz", topEmpty: "Arenada hali hech kim jang qilmagan", topRow: (w, l, p) => `${w} G · ${l} M · ⚡${p}`,
       skills: { strike: "Kuchli zarba", heal: "Davolash", shield: "Qalqon", stun: "Hayratlantirish", poison: "Zahar", provoke: "Chaqiriq" }, fell: (n) => `💀 ${n} yiqildi`,
       skillInfo: { strike: "energiya to'lganda 1.8 barobar zarba", heal: "energiya to'lganda eng zaif yarador ittifoqchiga jonining 80% igacha qaytaradi", shield: "energiya to'lganda o'ziga va eng zaif ittifoqchiga jonining 45% i qalqon", stun: "energiya to'lganda urib, raqibning keyingi yurishini o'tkazdiradi", poison: "energiya to'lganda urib zaharlaydi: 3 yurish davomida 15% jon", provoke: "energiya to'lganda 3 raund raqib tank va jangchilarini o'ziga tortadi va zarbani 30% kam oladi" },
+      coins: (n) => `🪙 ${n}`, coinsWon: (n) => `+${n} 🪙`, ruleCoins: (w, l) => `🪙 Har hujum tanga beradi: g'alaba +${w}, mag'lubiyat +${l}. Tangalar Arena do'konida sarflanadi`,
+      shopHint: (w, l) => `Har hujum: g'alaba +${w} 🪙, mag'lubiyat +${l} 🪙`, shopToken: "1 ta 🎟 token", shopTokenHint: (left, d) => `Bugun yana ${left} ta (kuniga ${d} tagacha)`,
+      shopRefused: { coins: "Tanga yetmaydi: arenada hujum qiling", daily: "Bugungi tokenlar olindi: ertaga yana" },
       ruleEnergy: "🔋 Energiya: har yurish +34, zarba yeganda +10. 100 ga to'lganda karta skillini ishlatadi va energiya 0 ga tushadi",
       synergy: "🔗 Bir animedan 2 ta karta: +10% hujum va jon, 3 ta va ko'p: +20%", edgeRule: "⚡ Ustunlik: 🛡️ tank ⚔️ jangchidan, ⚔️ jangchi 🔮 sehrgardan, 🔮 sehrgar 🛡️ tankdan 25% kuchliroq urar", edge: "ustun",
       stunned: (n) => `💫 ${n} hayratda: yurish o'tdi`, poisoned: (n, d) => `☠ ${n} zahardan −${d}`,
@@ -2070,6 +2073,9 @@
       you: "Вы", topEmpty: "На арене ещё никто не сражался", topRow: (w, l, p) => `${w} В · ${l} П · ⚡${p}`,
       skills: { strike: "Сильный удар", heal: "Лечение", shield: "Щит", stun: "Оглушение", poison: "Яд", provoke: "Провокация" }, fell: (n) => `💀 ${n} пал(а)`,
       skillInfo: { strike: "при полной энергии удар ×1.8", heal: "при полной энергии возвращает самому слабому раненому союзнику до 80% здоровья", shield: "при полной энергии щит в 45% здоровья себе и самому слабому союзнику", stun: "при полной энергии бьёт, и соперник пропускает следующий ход", poison: "при полной энергии бьёт и отравляет: 15% здоровья 3 хода", provoke: "при полной энергии 3 раунда притягивает танков и бойцов соперника и получает на 30% меньше урона" },
+      coins: (n) => `🪙 ${n}`, coinsWon: (n) => `+${n} 🪙`, ruleCoins: (w, l) => `🪙 Каждая атака даёт монеты: победа +${w}, поражение +${l}. Их тратят в магазине арены`,
+      shopHint: (w, l) => `За атаку: победа +${w} 🪙, поражение +${l} 🪙`, shopToken: "1 🎟 токен", shopTokenHint: (left, d) => `Сегодня ещё ${left} (до ${d} в день)`,
+      shopRefused: { coins: "Не хватает монет: атакуйте на арене", daily: "Токены на сегодня куплены: завтра снова" },
       ruleEnergy: "🔋 Энергия: +34 за каждый ход, +10 за полученный удар. На 100 карта применяет навык, и энергия падает до 0",
       synergy: "🔗 2 карты из одного аниме: +10% атаки и здоровья, 3 и больше: +20%", edgeRule: "⚡ Преимущество: 🛡️ танк бьёт ⚔️ бойца, ⚔️ боец 🔮 мага, 🔮 маг 🛡️ танка на 25% сильнее", edge: "преимущество",
       stunned: (n) => `💫 ${n} оглушён(а): ход пропущен`, poisoned: (n, d) => `☠ ${n} от яда −${d}`,
@@ -2103,6 +2109,9 @@
       you: "You", topEmpty: "Nobody has fought in the arena yet", topRow: (w, l, p) => `${w} W · ${l} L · ⚡${p}`,
       skills: { strike: "Power strike", heal: "Heal", shield: "Shield", stun: "Stun", poison: "Poison", provoke: "Provoke" }, fell: (n) => `💀 ${n} fell`,
       skillInfo: { strike: "when energy is full, hits ×1.8", heal: "when energy is full, gives the weakest hurt ally back up to 80% of its health", shield: "when energy is full, shields itself and its weakest ally for 45% of their health", stun: "when energy is full, hits and the target skips its next turn", poison: "when energy is full, hits and poisons: 15% health for 3 turns", provoke: "when energy is full, draws enemy tanks and fighters for 3 rounds and takes 30% less damage" },
+      coins: (n) => `🪙 ${n}`, coinsWon: (n) => `+${n} 🪙`, ruleCoins: (w, l) => `🪙 Each attack gives coins: a win +${w}, a loss +${l}. Spend them in the arena shop`,
+      shopHint: (w, l) => `Each attack: a win +${w} 🪙, a loss +${l} 🪙`, shopToken: "1 🎟 token", shopTokenHint: (left, d) => `${left} more today (up to ${d} a day)`,
+      shopRefused: { coins: "Not enough coins: attack in the arena", daily: "Today's tokens are bought: more tomorrow" },
       ruleEnergy: "🔋 Energy: +34 each turn, +10 for each hit taken. At 100 the card uses its skill and drops to 0",
       synergy: "🔗 2 cards of one anime: +10% attack and health, 3 or more: +20%", edgeRule: "⚡ Edge: 🛡️ tank beats ⚔️ fighter, ⚔️ fighter beats 🔮 mage, 🔮 mage beats 🛡️ tank, for 25% more", edge: "edge",
       stunned: (n) => `💫 ${n} is stunned: turn skipped`, poisoned: (n, d) => `☠ ${n} takes −${d} from poison`,
@@ -2189,6 +2198,7 @@
     arenaMe();
     arenaTeam();
     arenaFoes();
+    arenaShopList();
     arenaHistory();
   }
 
@@ -2252,6 +2262,7 @@
     add("p", "guide-line", at.ruleEnergy);
     add("p", "guide-line", at.ruleTickets(p.tickets_max));
     add("p", "guide-line", at.ruleTokens(p.tokens));
+    if (arenaData.shop) add("p", "guide-line", at.ruleCoins(arenaData.shop.coins_win, arenaData.shop.coins_loss));
     add("p", "guide-line", at.ruleRating);
     const week = add("p", "guide-line guide-week", at.ruleWeek);
     const go = document.createElement("button");
@@ -2294,13 +2305,77 @@
   function arenaMe() {
     const p = arenaData.player;
     const box = $("arenaMe");
-    box.innerHTML = '<div class="arena-rating"><small></small><b></b><span></span></div><div class="arena-left"><span></span><span></span></div>';
+    box.innerHTML = '<div class="arena-rating"><small></small><b></b><span></span></div><div class="arena-left"><b class="arena-coins"></b><span></span><span></span></div>';
     box.querySelector(".arena-rating small").textContent = at.rating;
     box.querySelector(".arena-rating b").textContent = spaced(p.rating);
     box.querySelector(".arena-rating span").textContent = at.record(p.wins, p.losses);
     const left = box.querySelectorAll(".arena-left span");
     left[0].textContent = at.tickets(p.tickets, p.tickets_max) + (p.tickets < p.tickets_max ? " " + at.nextTicket(Math.max(1, Math.ceil((ticketAt - Date.now()) / 60000))) : "");
     left[1].textContent = at.tokens(p.tokens_left, p.tokens);
+    box.querySelector(".arena-coins").textContent = at.coins(spaced(p.coins || 0));
+  }
+
+  // arenaShopList is the arena's shop: a token, a few a day, and packs with a
+  // sure Epic or Legendary, for arena coins, opened as the crystal shop's.
+  function arenaShopList() {
+    const shop = arenaData.shop;
+    const block = $("arenaShopBlock");
+    block.hidden = !shop;
+    if (!shop) return;
+    const coins = arenaData.player.coins || 0;
+    $("arenaShopCoins").textContent = at.coins(spaced(coins));
+    $("arenaShopHint").textContent = at.shopHint(shop.coins_win, shop.coins_loss);
+    const list = $("arenaShopItems");
+    list.replaceChildren();
+    for (const item of shop.items) {
+      const row = document.createElement("li");
+      row.className = "shop-item";
+      const rarity = t.rarities[item.least || 0];
+      row.style.setProperty("--tier", item.tokens ? "var(--r1)" : COLORS[item.least || 0]);
+      row.innerHTML = '<span class="icon"></span><div><b></b><small></small></div><button type="button" class="ghost"></button>';
+      row.querySelector(".icon").textContent = item.tokens ? "🎟" : RARITY_ICON[item.least || 0];
+      row.querySelector("b").textContent = item.tokens ? at.shopToken : t.packItem(rarity);
+      row.querySelector("small").textContent = item.tokens ? at.shopTokenHint(shop.tokens_left, shop.tokens_daily) : t.packHint(item.cards, rarity);
+      const button = row.querySelector("button");
+      button.textContent = at.coins(spaced(item.price));
+      button.disabled = buying || item.price > coins || (item.tokens && shop.tokens_left <= 0);
+      button.addEventListener("click", () => arenaBuy(item));
+      list.append(row);
+    }
+  }
+
+  // arenaBuy buys an arena shop item, laying a pack out as the crystal
+  // shop does.
+  async function arenaBuy(item) {
+    if (buying) return;
+    buying = true;
+    arenaShopList();
+    haptic("medium");
+    try {
+      const data = await api("arena_shop", { item: item.id });
+      if (data.refused) { toast(at.shopRefused[data.refused] || t.unavailable); return; }
+      tokens = data.tokens ?? tokens;
+      shards = data.shards ?? shards;
+      arenaData.player.coins = data.coins;
+      if (item.tokens) {
+        arenaData.shop.tokens_left = Math.max(0, arenaData.shop.tokens_left - item.tokens);
+        toast(t.bought(item.tokens));
+      } else {
+        const drawn = data.drawn.map((d) => ({ card: d.card, fresh: d.new, serial: d.serial }));
+        for (const { card } of drawn) keep(card);
+        points = data.points ?? points;
+        header();
+        shelves();
+        await celebrateMythics(drawn);
+        openedPanel(drawn, t.packOpened(t.rarities[item.least || 0]));
+      }
+    } catch (error) {
+      notice(error);
+    } finally {
+      buying = false;
+      drawButton();
+      if (arenaData) { arenaMe(); arenaShopList(); }
+    }
   }
 
   // arenaTick brings a ticket back on the page when its hour is up, as the
@@ -2546,6 +2621,7 @@
       arenaData.player.tickets = data.tickets;
       ticketAt = Date.now() + (data.next_ticket_in || 0);
       arenaData.player.tokens_left = data.tokens_left;
+      if (data.coins !== undefined) arenaData.player.coins = data.coins;
       arenaMe();
       await replay(data, foe);
       await arenaPage();
@@ -2587,7 +2663,7 @@
         '<div class="b-side b-them"><small class="b-who"></small><div class="b-row rear"></div><div class="b-row fore"></div></div>' +
         '<div class="b-mid"><span class="b-vs" aria-hidden="true">VS</span><p class="b-line" aria-live="polite"></p></div>' +
         '<div class="b-side b-us"><div class="b-row fore"></div><div class="b-row rear"></div><small class="b-who"></small></div>' +
-        '<div class="b-result" hidden><b class="b-title"></b><span class="b-change"></span><span class="b-token"></span><button type="button" class="draw b-ok"></button></div>';
+        '<div class="b-result" hidden><b class="b-title"></b><span class="b-change"></span><span class="b-token"></span><span class="b-coins"></span><button type="button" class="draw b-ok"></button></div>';
       const units = [[], []];
       for (const [side, list, sel] of [[0, data.attacker, ".b-us"], [1, data.defender, ".b-them"]]) {
         const sideBox = box.querySelector(sel);
@@ -2716,6 +2792,9 @@
         const token = result.querySelector(".b-token");
         token.textContent = data.token ? at.token : "";
         token.hidden = !data.token;
+        const coins = result.querySelector(".b-coins");
+        coins.textContent = data.coins_won ? at.coinsWon(data.coins_won) : "";
+        coins.hidden = !data.coins_won;
         result.hidden = false;
         try { tg.HapticFeedback.notificationOccurred(data.won ? "success" : "error"); } catch (_) { /* outside Telegram */ }
       }

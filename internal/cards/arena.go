@@ -46,7 +46,8 @@ const (
 // arenaRules are the rules at now: the tokens' day starts at midnight in
 // Tashkent, built there so that the store counts Tashkent's date.
 func arenaRules(now time.Time) storage.ArenaRules {
-	return storage.ArenaRules{Tickets: ArenaTickets, TicketEvery: ArenaTicketEvery, Tokens: ArenaTokens, K: ArenaK, Day: DayStart(now), Now: now}
+	return storage.ArenaRules{Tickets: ArenaTickets, TicketEvery: ArenaTicketEvery, Tokens: ArenaTokens, K: ArenaK,
+		CoinsWin: ArenaCoinsWin, CoinsLoss: ArenaCoinsLoss, Day: DayStart(now), Now: now}
 }
 
 var (
@@ -232,7 +233,11 @@ func (h *handler) arenaView(ctx context.Context, user miniapp.User, shown []int6
 		"player": map[string]any{
 			"name": player.Name, "rating": player.Rating, "wins": player.Wins, "losses": player.Losses, "power": player.Power,
 			"tickets": player.Tickets, "tickets_max": ArenaTickets, "next_ticket_in": player.NextTicket.Milliseconds(),
-			"tokens_left": player.TokensLeft, "tokens": ArenaTokens,
+			"tokens_left": player.TokensLeft, "tokens": ArenaTokens, "coins": player.Coins,
+		},
+		"shop": map[string]any{
+			"items": ArenaShopItems, "tokens_daily": ArenaShopTokensDaily, "tokens_left": max(ArenaShopTokensDaily-player.ShopTokens, 0),
+			"coins_win": ArenaCoinsWin, "coins_loss": ArenaCoinsLoss,
 		},
 		"team": views, "opponents": others, "top": rows, "history": history,
 		"me": map[string]any{"place": tablePlace, "total": tableSize},
@@ -326,6 +331,7 @@ func (h *handler) arenaAttack(ctx context.Context, user miniapp.User, opponent i
 		"won": result.AttackerWon, "events": eventViews(result.Events), "attacker": mine.views, "defender": theirs.views,
 		"rating_change": outcome.RatingChange, "token": outcome.Token,
 		"tickets": outcome.Tickets, "next_ticket_in": outcome.NextTicket.Milliseconds(), "tokens_left": outcome.TokensLeft,
+		"coins": outcome.Coins, "coins_won": outcome.CoinsWon,
 	}, failure{}
 }
 

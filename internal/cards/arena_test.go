@@ -23,6 +23,8 @@ type fakeArena struct {
 	attacks map[int64]int
 	battles map[int64][]storage.ArenaBattle // newest last
 	rules   []storage.ArenaRules            // the rules each battle was recorded by
+	coins   map[int64]int
+	bought  map[int64]int // arena shop tokens bought, on any day
 }
 
 func (f *fakeStore) SaveArenaTeam(_ context.Context, userID int64, front [2]int64, back [3]int64, power int) error {
@@ -49,7 +51,8 @@ func (f *fakeStore) ArenaTeam(_ context.Context, userID int64) ([2]int64, [3]int
 }
 
 func (f *fakeStore) ArenaPlayerOf(_ context.Context, userID int64, rules storage.ArenaRules) (storage.ArenaPlayer, error) {
-	return storage.ArenaPlayer{UserID: userID, Name: "Bek", Rating: 1000, Tickets: rules.Tickets - f.arena.attacks[userID], TokensLeft: rules.Tokens, Power: f.arena.power[userID]}, nil
+	return storage.ArenaPlayer{UserID: userID, Name: "Bek", Rating: 1000, Tickets: rules.Tickets - f.arena.attacks[userID], TokensLeft: rules.Tokens,
+		Power: f.arena.power[userID], Coins: f.arena.coins[userID], ShopTokens: f.arena.bought[userID]}, nil
 }
 
 func (f *fakeStore) ArenaOpponents(_ context.Context, userID int64, n int) ([]storage.ArenaPlayer, error) {
@@ -74,14 +77,19 @@ func (f *fakeStore) RecordArenaBattle(_ context.Context, attacker, defender, _ i
 	}
 	f.arena.attacks[attacker]++
 	f.arena.rules = append(f.arena.rules, rules)
-	change := -16
+	if f.arena.coins == nil {
+		f.arena.coins = map[int64]int{}
+	}
+	change, coins := -16, rules.CoinsLoss
 	if won {
-		change = 16
+		change, coins = 16, rules.CoinsWin
 		f.count(attacker, quest, 1)
 	}
+	f.arena.coins[attacker] += coins
 	f.arena.battles[attacker] = append(f.arena.battles[attacker], storage.ArenaBattle{At: rules.Now, Attacked: true, OpponentID: defender, Opponent: "Ali", Won: won, RatingChange: change})
 	f.arena.battles[defender] = append(f.arena.battles[defender], storage.ArenaBattle{At: rules.Now, OpponentID: attacker, Opponent: "Bek", Won: !won, RatingChange: -change})
-	return storage.ArenaOutcome{RatingChange: change, Token: won, Tickets: rules.Tickets - f.arena.attacks[attacker], TokensLeft: rules.Tokens, NextTicket: rules.TicketEvery}, nil
+	return storage.ArenaOutcome{RatingChange: change, Token: won, Tickets: rules.Tickets - f.arena.attacks[attacker], TokensLeft: rules.Tokens, NextTicket: rules.TicketEvery,
+		CoinsWon: coins, Coins: f.arena.coins[attacker]}, nil
 }
 
 func (f *fakeStore) ArenaBattles(_ context.Context, userID int64, limit int) ([]storage.ArenaBattle, error) {

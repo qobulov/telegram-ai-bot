@@ -859,6 +859,9 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .arena-rating small { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
 .arena-rating b { font: 900 26px/1.1 Unbounded, sans-serif; color: var(--gold); white-space: nowrap; }
 .arena-rating span { color: var(--muted); font-size: 12px; }
+.arena-coins { font: 800 15px Unbounded, sans-serif; color: #ffd25a; white-space: nowrap; }
+.b-coins { font-weight: 800; color: #ffd25a; }
+.b-coins[hidden] { display: none; }
 .arena-left { display: grid; gap: 4px; justify-items: end; text-align: right; font-size: 12px; font-weight: 700; }
 .arena-block { padding: 14px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); display: grid; gap: 10px; }
 .arena-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }

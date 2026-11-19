@@ -25,11 +25,13 @@ const arenaStartRating = 1000
 // coming back every TicketEvery, each attack taking one; Tokens they win a
 // day and the Elo K. Day is the start of today in Tashkent; its date, in
 // its own location, is the day the tokens count. Now is the time the
-// tickets are counted at.
+// tickets are counted at. CoinsWin and CoinsLoss are the arena coins an
+// attack gives the attacker, won or lost.
 type ArenaRules struct {
-	Tickets, Tokens, K int
-	TicketEvery        time.Duration
-	Day, Now           time.Time
+	Tickets, Tokens, K  int
+	CoinsWin, CoinsLoss int
+	TicketEvery         time.Duration
+	Day, Now            time.Time
 }
 
 // day is the date the rules' counters count, as Postgres reads a DATE.
@@ -59,22 +61,25 @@ func (r ArenaRules) nextTicket(held int, since time.Time) time.Duration {
 
 // ArenaPlayer is a player as the arena knows them: their name, rating,
 // wins and losses, the tickets they hold and the wait for the next, the
-// day's tokens left (all three counted only by ArenaPlayerOf), and their
+// day's tokens left, their arena coins and the tokens they bought in the
+// arena's shop today (all five counted only by ArenaPlayerOf), and their
 // saved team's power, 0 without one.
 type ArenaPlayer struct {
 	UserID                                           int64
 	Name                                             string
 	Rating, Wins, Losses, Tickets, TokensLeft, Power int
+	Coins, ShopTokens                                int
 	NextTicket                                       time.Duration
 }
 
 // ArenaOutcome is what an attack changed for the attacker: their rating,
 // whether it won them a token, the tickets left and the wait for the next,
-// and the day's tokens left.
+// the day's tokens left, and the coins it gave and the coins after.
 type ArenaOutcome struct {
 	RatingChange        int
 	Token               bool
 	Tickets, TokensLeft int
+	CoinsWon, Coins     int
 	NextTicket          time.Duration
 }
 
@@ -163,12 +168,13 @@ func (s *Store) ArenaPlayerOf(ctx context.Context, userID int64, rules ArenaRule
 		SELECT coalesce(c.name, ''), coalesce(p.rating, $3), coalesce(p.wins, 0), coalesce(p.losses, 0),
 			coalesce(p.tickets, 0), p.tickets_at,
 			CASE WHEN p.tokens_day = $2::date THEN p.tokens_won ELSE 0 END,
-			coalesce(t.power, 0)
+			coalesce(t.power, 0), coalesce(p.coins, 0),
+			CASE WHEN p.shop_day = $2::date THEN p.shop_tokens ELSE 0 END
 		FROM (SELECT $1::bigint AS user_id) u
 		LEFT JOIN arena_players p USING (user_id)
 		LEFT JOIN card_players c USING (user_id)
 		LEFT JOIN arena_teams t USING (user_id)`, userID, rules.day(), arenaStartRating).
-		Scan(&p.Name, &p.Rating, &p.Wins, &p.Losses, &stored, &at, &tokens, &p.Power)
+		Scan(&p.Name, &p.Rating, &p.Wins, &p.Losses, &stored, &at, &tokens, &p.Power, &p.Coins, &p.ShopTokens)
 	if err != nil {
 		return p, fmt.Errorf("storage: read the arena player: %w", err)
 	}
@@ -274,8 +280,9 @@ type arenaRow struct {
 // both ratings by Elo (never below 0), gives the attacker a token for a
 // win while the day's arena tokens last, and keeps the battle with its
 // seed and both players' rating changes. Defending changes only the
-// defender's rating, wins and losses, and takes no ticket. A win counts
-// toward quest for the attacker.
+// defender's rating, wins and losses, and takes no ticket. The attacker
+// gets the rules' coins, won or lost. A win counts toward quest for the
+// attacker.
 func (s *Store) RecordArenaBattle(ctx context.Context, attacker, defender, seed int64, attackerWon bool, rules ArenaRules, quest CardQuest) (ArenaOutcome, error) {
 	var out ArenaOutcome
 	if attacker == defender {
@@ -304,19 +311,20 @@ func (s *Store) RecordArenaBattle(ctx context.Context, attacker, defender, seed 
 		if out.Token {
 			a.tokensWon++
 		}
-		won := 0
+		won, coins := 0, rules.CoinsLoss
 		if attackerWon {
-			won = 1
+			won, coins = 1, rules.CoinsWin
 		}
 		if err := countQuest(ctx, tx, attacker, quest, won); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `
+		if err := tx.QueryRow(ctx, `
 			UPDATE arena_players SET rating = $2, wins = wins + $3, losses = losses + 1 - $3,
-				tickets = $5, tickets_at = $6, tokens_day = $4::date, tokens_won = $7
-			WHERE user_id = $1`, attacker, ratingA, won, rules.day(), held, since, a.tokensWon); err != nil {
+				tickets = $5, tickets_at = $6, tokens_day = $4::date, tokens_won = $7, coins = coins + $8
+			WHERE user_id = $1 RETURNING coins`, attacker, ratingA, won, rules.day(), held, since, a.tokensWon, coins).Scan(&out.Coins); err != nil {
 			return err
 		}
+		out.CoinsWon = coins
 		if _, err := tx.Exec(ctx, `
 			UPDATE arena_players SET rating = $2, wins = wins + 1 - $3, losses = losses + $3 WHERE user_id = $1`,
 			defender, ratingD, won); err != nil {

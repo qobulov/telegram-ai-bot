@@ -48,14 +48,7 @@ func (s *Store) OpenCardPack(ctx context.Context, userID int64, name string, n i
 		if player.shards < price {
 			return &CardFundsError{Tokens: player.tokens, Shards: player.shards, Need: price}
 		}
-		for range n {
-			draw, err := giveCard(ctx, tx, userID, name, "", roll, player)
-			if err != nil {
-				return err
-			}
-			open.Draws = append(open.Draws, draw)
-		}
-		if err := countQuest(ctx, tx, userID, quest, n); err != nil {
+		if open.Draws, err = drawPack(ctx, tx, userID, name, n, roll, player, quest); err != nil {
 			return err
 		}
 		return tx.QueryRow(ctx, `UPDATE card_players SET shards = shards - $2, last_draw_at = $3 WHERE user_id = $1 RETURNING tokens, shards, points`,
@@ -69,6 +62,20 @@ func (s *Store) OpenCardPack(ctx context.Context, userID int64, name string, n i
 		return CardOpening{}, fmt.Errorf("storage: open a card pack: %w", err)
 	}
 	return open, nil
+}
+
+// drawPack gives the player n cards, roll picking each one's rarity, and
+// counts them toward quest; the player's row is locked already.
+func drawPack(ctx context.Context, tx pgx.Tx, userID int64, name string, n int, roll CardRoll, player cardPlayerRow, quest CardQuest) ([]CardDraw, error) {
+	draws := make([]CardDraw, 0, n)
+	for range n {
+		draw, err := giveCard(ctx, tx, userID, name, "", roll, player)
+		if err != nil {
+			return nil, err
+		}
+		draws = append(draws, draw)
+	}
+	return draws, countQuest(ctx, tx, userID, quest, n)
 }
 
 // CrystalPurchase is crystals bought for Stars.

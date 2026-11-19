@@ -46,6 +46,8 @@ type Store interface {
 	ArenaTop(ctx context.Context, limit int) ([]storage.ArenaPlayer, error)
 	ArenaPlace(ctx context.Context, userID int64) (place, total int, err error)
 	ArenaWeekPlace(ctx context.Context, userID int64, since time.Time) (int, error)
+	BuyArenaToken(ctx context.Context, userID int64, name string, price, daily int, day time.Time) (coins, tokens int, err error)
+	OpenArenaPack(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, price int, now time.Time, quest storage.CardQuest) (storage.CardOpening, int, error)
 	CardQuests(ctx context.Context, userID int64, day time.Time) (map[string]storage.QuestProgress, error)
 	ClaimCardQuest(ctx context.Context, userID int64, quest storage.CardQuest, reward int, now time.Time) error
 	AnimeRewardsClaimed(ctx context.Context, userID int64) ([]string, error)
@@ -151,8 +153,8 @@ type request struct {
 	// Shown is the opponents the arena shows now, for "arena": a refresh
 	// offers others while there are.
 	Shown []int64 `json:"shown"`
-	// Item is what "buy" buys, of ShopItems, or "invoice" sells, of
-	// CrystalPacks.
+	// Item is what "buy" buys, of ShopItems, "arena_shop" of
+	// ArenaShopItems, or "invoice" sells, of CrystalPacks.
 	Item string `json:"item"`
 	// Front and Back are the cards of the team "arena_team" saves, two and
 	// three; Opponent is the player "arena_attack" attacks.
@@ -252,6 +254,8 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return h.arenaTeam(ctx, opened.User, req.Front, req.Back)
 	case "arena_attack":
 		return h.arenaAttack(ctx, opened.User, req.Opponent)
+	case "arena_shop":
+		return h.arenaShop(ctx, opened.User, req.Item)
 	case "quests":
 		return h.quests(ctx, opened.User)
 	case "quest_claim":
