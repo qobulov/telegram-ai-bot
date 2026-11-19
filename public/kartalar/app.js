@@ -2694,7 +2694,7 @@
   // ---------- the tower ----------
 
   // The Tower of Souls: floors of fixed teams, fought with the arena team
-  // saved, ten attempts a day; the week's anime raises its cards there.
+  // saved, as often as the player likes; the week's anime raises its cards there.
   // The Arena tab switches between the arena and the tower by its chips.
   let arenaMode = "arena", towerData = null, towerBusy = false;
   for (const chip of document.querySelectorAll("#arenaMode button")) {
