@@ -1861,9 +1861,12 @@
     return tile;
   }
 
-  async function arenaPage() {
+  // arenaPage loads the arena; a refresh sends the opponents shown, so that
+  // others come in their place.
+  async function arenaPage(refresh) {
     try {
-      arenaShow(await api("arena"));
+      const shown = refresh && arenaData ? (arenaData.opponents || []).map((o) => o.id) : [];
+      arenaShow(await api("arena", { shown }));
       notice(null);
     } catch (error) {
       notice(error);
@@ -2062,7 +2065,14 @@
     }
     if (foes.length && !can) list.insertAdjacentHTML("beforeend", `<li class="foe-note">${arenaData.team ? at.noAttacks : at.teamFirst}</li>`);
   }
-  $("arenaRefresh").addEventListener("click", () => { haptic("light"); arenaPage(); });
+  $("arenaRefresh").addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    if (button.disabled) return;
+    button.disabled = true;
+    haptic("light");
+    await arenaPage(true);
+    button.disabled = false;
+  });
 
   // arenaAttack fights an opponent, replays the battle, then asks for the
   // arena again for the new rating and opponents. A token won is one more

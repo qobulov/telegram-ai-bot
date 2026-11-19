@@ -137,6 +137,9 @@ type request struct {
 	Offset int  `json:"offset"`
 	// Count is how many cards "open" opens: 1 or Batch.
 	Count int `json:"count"`
+	// Shown is the opponents the arena shows now, for "arena": a refresh
+	// offers others while there are.
+	Shown []int64 `json:"shown"`
 	// Item is what "buy" buys, of ShopItems, or "invoice" sells, of
 	// CrystalPacks.
 	Item string `json:"item"`
@@ -227,7 +230,7 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 	case "fuse":
 		return h.fuse(ctx, opened.User, req.Card)
 	case "arena":
-		return h.arenaView(ctx, opened.User)
+		return h.arenaView(ctx, opened.User, req.Shown)
 	case "arena_team":
 		return h.arenaTeam(ctx, opened.User, req.Front, req.Back)
 	case "arena_attack":

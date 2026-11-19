@@ -1,10 +1,13 @@
 package cards
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
+	mrand "math/rand/v2"
+	"slices"
 	"time"
 
 	"telegram-ai-bot/internal/arena"
@@ -24,8 +27,11 @@ const (
 	ArenaTokens         = 3
 	ArenaK              = 32
 	ArenaOpponentsShown = 3
-	ArenaHistory        = 10
-	arenaTopSize        = 10
+	// arenaOpponentsPool is how many players nearest in rating the shown
+	// opponents are drawn from, so that refreshing brings others.
+	arenaOpponentsPool = 15
+	ArenaHistory       = 10
+	arenaTopSize       = 10
 )
 
 // arenaRules are the rules at now: the tokens' day starts at midnight in
@@ -115,7 +121,9 @@ func (h *handler) savedFighters(ctx context.Context, userID int64) (fighters, bo
 // arenaView is the arena: the player, their team (null without one they
 // hold), a few opponents near their rating, the table and the player's
 // last battles.
-func (h *handler) arenaView(ctx context.Context, user miniapp.User) (any, failure) {
+// arenaView is the arena for the player; shown is the opponents they see
+// now, whom a refresh leaves out while there are others to offer.
+func (h *handler) arenaView(ctx context.Context, user miniapp.User, shown []int64) (any, failure) {
 	player, err := h.Store.ArenaPlayerOf(ctx, user.ID, arenaRules(h.Now()))
 	if err != nil {
 		h.Logger.Error("could not read an arena player", "user_id", user.ID, "error", err)
@@ -126,11 +134,12 @@ func (h *handler) arenaView(ctx context.Context, user miniapp.User) (any, failur
 		h.Logger.Error("could not read an arena team", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
 	}
-	opponents, err := h.Store.ArenaOpponents(ctx, user.ID, ArenaOpponentsShown)
+	pool, err := h.Store.ArenaOpponents(ctx, user.ID, arenaOpponentsPool)
 	if err != nil {
 		h.Logger.Error("could not read arena opponents", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
 	}
+	opponents := pickOpponents(pool, shown, ArenaOpponentsShown, mrand.Shuffle)
 	top, err := h.Store.ArenaTop(ctx, arenaTopSize)
 	if err != nil {
 		h.Logger.Error("could not read the arena table", "error", err)
@@ -201,7 +210,7 @@ func (h *handler) arenaTeam(ctx context.Context, user miniapp.User, front, back 
 		h.Logger.Error("could not save an arena team", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
 	}
-	return h.arenaView(ctx, user)
+	return h.arenaView(ctx, user, nil)
 }
 
 // arenaAttack fights the player's saved team against the opponent's and
@@ -264,4 +273,36 @@ func arenaSeed() (int64, error) {
 		return 0, err
 	}
 	return int64(binary.BigEndian.Uint64(b[:])), nil
+}
+
+// pickOpponents draws n of pool, the players nearest in rating, in a random
+// order by shuffle, the ones not in shown first; they are then listed
+// nearest first, as pool was.
+func pickOpponents(pool []storage.ArenaPlayer, shown []int64, n int, shuffle func(int, func(int, int))) []storage.ArenaPlayer {
+	seen := map[int64]bool{}
+	for _, id := range shown {
+		seen[id] = true
+	}
+	order := make([]int, len(pool))
+	for i := range order {
+		order[i] = i
+	}
+	shuffle(len(order), func(i, j int) { order[i], order[j] = order[j], order[i] })
+	slices.SortStableFunc(order, func(a, b int) int {
+		return cmp.Compare(b2i(seen[pool[a].UserID]), b2i(seen[pool[b].UserID]))
+	})
+	order = order[:min(n, len(order))]
+	slices.Sort(order)
+	picked := make([]storage.ArenaPlayer, len(order))
+	for i, at := range order {
+		picked[i] = pool[at]
+	}
+	return picked
+}
+
+func b2i(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }

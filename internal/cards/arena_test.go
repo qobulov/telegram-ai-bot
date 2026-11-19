@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -242,5 +243,42 @@ func TestArenaAttack(t *testing.T) {
 	}
 	if code, _ := call(8, map[string]any{"action": "arena_attack"}); code != http.StatusBadRequest {
 		t.Errorf("an attack on no one = %d", code)
+	}
+}
+
+// A refresh offers opponents other than those shown while the pool has
+// them, listed nearest in rating first, and falls back on the shown ones.
+func TestPickOpponentsRefreshes(t *testing.T) {
+	pool := make([]storage.ArenaPlayer, 6)
+	for i := range pool {
+		pool[i] = storage.ArenaPlayer{UserID: int64(i + 1)}
+	}
+	keep := func(int, func(int, int)) {} // no shuffle: the pool's order
+	ids := func(ps []storage.ArenaPlayer) []int64 {
+		out := make([]int64, len(ps))
+		for i, p := range ps {
+			out[i] = p.UserID
+		}
+		return out
+	}
+	if got := ids(pickOpponents(pool, nil, 3, keep)); !slices.Equal(got, []int64{1, 2, 3}) {
+		t.Errorf("first = %v", got)
+	}
+	if got := ids(pickOpponents(pool, []int64{1, 2, 3}, 3, keep)); !slices.Equal(got, []int64{4, 5, 6}) {
+		t.Errorf("refresh = %v, want the others", got)
+	}
+	if got := ids(pickOpponents(pool, []int64{1, 2, 3, 4, 5}, 3, keep)); !slices.Equal(got, []int64{1, 2, 6}) {
+		t.Errorf("few others = %v, want the other one and the nearest shown", got)
+	}
+	if got := ids(pickOpponents(pool[:2], nil, 3, keep)); !slices.Equal(got, []int64{1, 2}) {
+		t.Errorf("a small pool = %v", got)
+	}
+	reversed := func(n int, swap func(int, int)) {
+		for i := 0; i < n/2; i++ {
+			swap(i, n-1-i)
+		}
+	}
+	if got := ids(pickOpponents(pool, nil, 3, reversed)); !slices.Equal(got, []int64{4, 5, 6}) {
+		t.Errorf("shuffled = %v, want the drawn ones listed nearest first", got)
 	}
 }
