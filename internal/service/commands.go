@@ -126,9 +126,10 @@ func (s *Service) process(in incoming) {
 		s.noteSkip(in, "small_group", "")
 		return
 	}
-	// A group where too few people wrote lately gets nothing at all, as
-	// the owners asked; only they are answered there.
-	if s.tooQuiet(ctx, in) {
+	// A group where too few people wrote lately gets no talk, as the owners
+	// asked; only they are answered there. Its commands still work: they are
+	// done in code, free of the model, as in a group without AI.
+	if !strings.HasPrefix(in.text, "/") && s.tooQuiet(ctx, in) {
 		s.passOver(in)
 		s.noteSkip(in, "quiet_group", "")
 		return

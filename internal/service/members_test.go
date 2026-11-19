@@ -529,6 +529,17 @@ func TestQuietGroupIsNotAnswered(t *testing.T) {
 	}
 }
 
+// A quiet group's commands still work: they ask no model.
+func TestQuietGroupStillAnswersCommands(t *testing.T) {
+	f := newFixture()
+	f.opts.MinActiveMembers, f.opts.ActiveWindow = 5, 72*time.Hour
+	f.opts.ActiveCounter = &fakeActives{count: 2}
+	sent := f.run(inGroup(groupMessage("/id")))
+	if len(sent) != 1 || !strings.Contains(sent[0].text, "ID") || len(f.replier.recorded()) != 0 {
+		t.Errorf("/id in a quiet group = %+v, model calls %d; want the IDs and no model", sent, len(f.replier.recorded()))
+	}
+}
+
 // A group's count is read once for a while, not for every message.
 func TestActiveCountIsReadOnceForAWhile(t *testing.T) {
 	f := newFixture()
