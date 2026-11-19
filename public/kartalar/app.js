@@ -336,10 +336,12 @@
       stars.textContent = `★${card.stars}`;
       tile.append(stars);
     }
-    if (card.count > 1) {
+    // The copies left, the one kept and the free ones: those used up for
+    // stars are gone, so a card with no free copy shows no count.
+    if (card.free > 0) {
       const count = document.createElement("span");
       count.className = "count";
-      count.textContent = `×${card.count}`;
+      count.textContent = `×${card.free + 1}`;
       tile.append(count);
     }
     tile.addEventListener("click", () => open(card));
@@ -661,7 +663,7 @@
       flip.classList.remove("shuffle");
       flip.classList.add("shown");
       haptic(best.card.rarity >= 3 ? "heavy" : "light");
-      $("result").replaceChildren(...withTiers(best.fresh ? `${t.fresh} · ${t.plus(spaced(best.card.value))}` : `${t.again(best.card.count)} · ${t.noPoints}`));
+      $("result").replaceChildren(...withTiers(best.fresh ? `${t.fresh} · ${t.plus(spaced(best.card.value))}` : `${t.again((best.card.free || 0) + 1)} · ${t.noPoints}`));
       $("drawnStats").replaceChildren(statsOf(best.card));
       lastDrawn = best.card.id;
       $("seeCollection").hidden = false;
@@ -1477,7 +1479,7 @@
         open(card);
         const note = document.createElement("p");
         note.className = "result";
-        note.replaceChildren(...withTiers(fresh ? `${t.fresh} · ${t.plus(spaced(card.value))}` : `${t.again(card.count)} · ${t.noPoints}`));
+        note.replaceChildren(...withTiers(fresh ? `${t.fresh} · ${t.plus(spaced(card.value))}` : `${t.again((card.free || 0) + 1)} · ${t.noPoints}`));
         $("sheetCard").prepend(note);
       }
       if (drawn.some((d) => d.card.id === eventData.card.id)) { haptic("heavy"); toast(et.got); }
