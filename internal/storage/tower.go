@@ -11,24 +11,21 @@ import (
 
 // Errors of the tower.
 var (
-	// ErrTowerNoTries is a fight with the day's attempts used up.
-	ErrTowerNoTries = errors.New("storage: no tower attempts left today")
 	// ErrTowerFloorMoved is a fight for a floor that is no longer the
 	// player's next, another fight having cleared it meanwhile.
 	ErrTowerFloorMoved = errors.New("storage: the tower floor fought is not the next")
 )
 
 // TowerPlayer is a player in the tower: the highest floor they cleared, 0
-// for none, and the attempts they used today.
+// for none, and the fights they had today (which seed the next one's battle).
 type TowerPlayer struct {
 	Floor, Tries int
 }
 
-// TowerRules are a tower fight's: Tries a player has a day, Day the start
+// TowerRules are a tower fight's: Day the start
 // of today in Tashkent (its date, in its own location, is the day counted),
 // and the Coins and Tokens a win gives.
 type TowerRules struct {
-	Tries         int
 	Day           time.Time
 	Coins, Tokens int
 }
@@ -36,7 +33,7 @@ type TowerRules struct {
 func (r TowerRules) day() string { return r.Day.Format(time.DateOnly) }
 
 // TowerOutcome is what a fight changed: the floor cleared now, the
-// attempts used today, and the player's arena coins and card tokens after
+// fights had today, and the player's arena coins and card tokens after
 // (both 0 for a loss, which gives nothing).
 type TowerOutcome struct {
 	Floor, Tries  int
@@ -60,8 +57,7 @@ func (s *Store) TowerPlayerOf(ctx context.Context, userID int64, day time.Time) 
 }
 
 // RecordTowerFight records the player's fight for floor, in one
-// transaction: it takes one of the day's attempts, ErrTowerNoTries with
-// none, and ErrTowerFloorMoved when floor is not their next; a win clears
+// transaction: it counts one more of the day's fights, ErrTowerFloorMoved when floor is not their next; a win clears
 // the floor and gives the rules' arena coins and card tokens.
 func (s *Store) RecordTowerFight(ctx context.Context, userID int64, name string, floor int, won bool, rules TowerRules) (TowerOutcome, error) {
 	var out TowerOutcome
@@ -70,8 +66,6 @@ func (s *Store) RecordTowerFight(ctx context.Context, userID int64, name string,
 		switch {
 		case err != nil:
 			return err
-		case p.Tries >= rules.Tries:
-			return ErrTowerNoTries
 		case p.Floor+1 != floor:
 			return ErrTowerFloorMoved
 		}
@@ -89,7 +83,7 @@ func (s *Store) RecordTowerFight(ctx context.Context, userID int64, name string,
 		}
 		return giveTowerReward(ctx, tx, userID, name, rules, &out)
 	})
-	if errors.Is(err, ErrTowerNoTries) || errors.Is(err, ErrTowerFloorMoved) {
+	if errors.Is(err, ErrTowerFloorMoved) {
 		return TowerOutcome{}, err
 	}
 	if err != nil {

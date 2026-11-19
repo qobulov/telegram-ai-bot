@@ -17,14 +17,14 @@ import (
 
 // The Tower of Souls, as the owners asked on 2026-11-19: floors of fixed
 // enemy teams, each built from the catalog by its number alone, fought with
-// the arena team saved, TowerTries a day. Each week, Monday to Monday in
+// the arena team saved, as many times as the player likes (the daily limit
+// of 10 was taken off as the owners asked on 2026-11-19). Each week, Monday to Monday in
 // Tashkent, one anime of at least TowerThemeLeast cards raises its cards'
 // attack and health by TowerThemeBonus percent, in the tower only. Floor
 // 1's team has TowerBasePower and each floor TowerGrowth times the one
 // before; its cards rise in rarity every few floors and a star every
 // TowerStarsEvery floors.
 const (
-	TowerTries      = 10
 	TowerThemeBonus = 20
 	TowerThemeLeast = 5
 	TowerBasePower  = 5000
@@ -230,7 +230,7 @@ func (h *handler) towerView(ctx context.Context, user miniapp.User) (any, failur
 	}
 	coins, tokens := towerReward(t.next)
 	view := map[string]any{
-		"floor": t.player.Floor, "next": t.next, "tries": TowerTries, "tries_left": max(TowerTries-t.player.Tries, 0),
+		"floor": t.player.Floor, "next": t.next,
 		"theme":  map[string]any{"anime": t.theme, "bonus": TowerThemeBonus},
 		"reward": map[string]any{"coins": coins, "tokens": tokens},
 		"enemy":  nil, "enemy_power": 0, "team": nil, "power": 0,
@@ -245,8 +245,7 @@ func (h *handler) towerView(ctx context.Context, user miniapp.User) (any, failur
 }
 
 // towerFight fights the player's next floor with their saved team, raised
-// by the week's theme. A fight refused says why: "no_team", "no_tries",
-// "no_floor" (the catalog too small for it) or "moved" (another fight
+// by the week's theme. A fight refused says why: "no_team", "no_floor" (the catalog too small for it) or "moved" (another fight
 // cleared it meanwhile).
 func (h *handler) towerFight(ctx context.Context, user miniapp.User) (any, failure) {
 	t, err := h.towerOf(ctx, user.ID)
@@ -259,16 +258,12 @@ func (h *handler) towerFight(ctx context.Context, user miniapp.User) (any, failu
 		return map[string]any{"refused": "no_team"}, failure{}
 	case !t.hasEnemy:
 		return map[string]any{"refused": "no_floor"}, failure{}
-	case t.player.Tries >= TowerTries:
-		return map[string]any{"refused": "no_tries"}, failure{}
 	}
 	result := arena.Battle(t.mine.team, t.enemy.team, towerSeed(user.ID, t.next, t.player.Tries))
 	coins, tokens := towerReward(t.next)
-	rules := storage.TowerRules{Tries: TowerTries, Day: t.dayStarted, Coins: coins, Tokens: tokens}
+	rules := storage.TowerRules{Day: t.dayStarted, Coins: coins, Tokens: tokens}
 	out, err := h.Store.RecordTowerFight(ctx, user.ID, name(user), t.next, result.AttackerWon, rules)
 	switch {
-	case errors.Is(err, storage.ErrTowerNoTries):
-		return map[string]any{"refused": "no_tries"}, failure{}
 	case errors.Is(err, storage.ErrTowerFloorMoved):
 		return map[string]any{"refused": "moved"}, failure{}
 	case err != nil:
@@ -277,7 +272,7 @@ func (h *handler) towerFight(ctx context.Context, user miniapp.User) (any, failu
 	}
 	fight := map[string]any{
 		"won": result.AttackerWon, "events": eventViews(result.Events), "attacker": t.mine.views, "defender": t.enemy.views,
-		"fought": t.next, "floor": out.Floor, "tries_left": max(TowerTries-out.Tries, 0),
+		"fought": t.next, "floor": out.Floor,
 	}
 	if result.AttackerWon {
 		fight["coins_won"], fight["tokens_won"], fight["coins"], fight["tokens"] = coins, tokens, out.Coins, out.Tokens

@@ -2378,17 +2378,17 @@ below (`TowerPower`). Each week, Monday to Monday in Tashkent, one anime
 (`Franchise`) of at least 5 cards, picked by the week's date, is the theme
 ("🎌 Bu hafta: Naruto +20%"): the player's cards of it get +20% attack and
 health in the tower only, on top of their synergy, and show 🎌 +20%. The
-player fights the next floor with their saved arena team, 10 attempts a day
-(`TowerTries`): `tower` gives the floor cleared, the next floor's team and
-power, the attempts left, the theme, the next floor's reward and the
+player fights the next floor with their saved arena team, as often as they
+like (no daily limit, as the owners asked on 2026-11-19): `tower` gives the floor cleared, the next floor's team and
+power, the theme, the next floor's reward and the
 player's team with its power under the theme; `tower_fight` plays the
 battle on the server (`arena.Battle`, its seed from the player, the floor
-and the day's attempt) and records it in one transaction
-(`RecordTowerFight`; refused `no_team`, `no_tries`, `no_floor` or `moved`),
+and the day's fight count) and records it in one transaction
+(`RecordTowerFight`; refused `no_team`, `no_floor` or `moved`),
 and the page replays it as an arena battle, ending with "46-qavat o'tildi"
 or "o'tilmadi". A win clears the floor and gives, once as each floor is
 cleared once, 10 + 2 × floor arena coins, and 3 card tokens on every 10th
-floor or 1 on every other 5th; a loss gives nothing but takes the attempt.
+floor or 1 on every other 5th; a loss gives nothing.
 🎯 Kunlik topshiriqlar, the daily quests (`internal/cards/quests.go`, the
 table `card_quests` of migration 102), are four a day, new at midnight in
 Tashkent, 10 tokens in all: open 5 cards, by draws or shop packs (2 🎟), win

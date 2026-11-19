@@ -25,8 +25,6 @@ func (f *fakeStore) RecordTowerFight(_ context.Context, userID int64, _ string, 
 		f.tower = fakeTower{floor: map[int64]int{}, tries: map[int64]int{}}
 	}
 	switch {
-	case f.tower.tries[userID] >= rules.Tries:
-		return storage.TowerOutcome{}, storage.ErrTowerNoTries
 	case f.tower.floor[userID]+1 != floor:
 		return storage.TowerOutcome{}, storage.ErrTowerFloorMoved
 	}
@@ -176,8 +174,7 @@ func TestThemeRaisesOnlyItsCards(t *testing.T) {
 }
 
 // The tower fights the next floor with the saved team: a win clears it and
-// gives its reward, a loss nothing but the attempt, and after TowerTries a
-// day it refuses.
+// gives its reward, a loss nothing, and there is no daily limit.
 func TestTowerFights(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	strong := arenaCards()
@@ -193,7 +190,7 @@ func TestTowerFights(t *testing.T) {
 		call(user, map[string]any{"action": "arena_team", "front": arenaFront, "back": arenaBack})
 	}
 	_, view := call(7, map[string]any{"action": "tower"})
-	if view["next"] != float64(1) || view["tries_left"] != float64(TowerTries) || len(view["enemy"].([]any)) != 5 || view["enemy_power"].(float64) < float64(TowerPower(1))*0.99 {
+	if view["next"] != float64(1) || len(view["enemy"].([]any)) != 5 || view["enemy_power"].(float64) < float64(TowerPower(1))*0.99 {
 		t.Fatalf("the tower = %v", view)
 	}
 	_, out := call(7, map[string]any{"action": "tower_fight"})
@@ -209,16 +206,13 @@ func TestTowerFights(t *testing.T) {
 
 	store.tower.floor[8] = 30
 	coins := store.arena.coins[8]
-	for i := range TowerTries {
+	for i := range 25 {
 		_, out := call(8, map[string]any{"action": "tower_fight"})
-		if out["won"] != false || out["floor"] != float64(30) || out["coins_won"] != nil || out["tries_left"] != float64(TowerTries-1-i) {
+		if out["won"] != false || out["floor"] != float64(30) || out["coins_won"] != nil {
 			t.Fatalf("a weak team's attempt %d = %v", i, out)
 		}
 	}
 	if store.arena.coins[8] != coins {
 		t.Error("a loss gave coins")
-	}
-	if _, out := call(8, map[string]any{"action": "tower_fight"}); out["refused"] != "no_tries" {
-		t.Errorf("past %d attempts = %v", TowerTries, out)
 	}
 }
