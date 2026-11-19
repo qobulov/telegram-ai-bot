@@ -39,7 +39,7 @@
       shopTab: "Do'kon", shopBuyTitle: "💎 Kristall sotib olish", shopBuyHint: "Telegram Stars bilan to'lanadi, kristall darhol hisobingizga tushadi.", shopItemsTitle: "🛒 Kristallga xarid",
       wallet: (n) => `Sizda: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% foyda`,
       tokensItem: (n) => `${n} ta token`, tokensHint: (n) => `${n} ta karta ochadi, kutmasdan`, packItem: (r) => `${r} paket`, packHint: (n, r) => `${n} ta karta, kamida 1 ta ${r.toLowerCase()} kafolatlangan`,
-      boxTitle: "🎁 Almaz box", boxRange: (a, b) => `${a}–${b} 💎`, boxOdds: "Qancha ko'p bo'lsa, shuncha kam tushadi", boxGot: "Almaz box ochildi!", boxLucky: "🔥 Omadingiz keldi!",
+      boxTitle: "🎁 Almaz box", boxRange: (a, b) => `${a}–${b} 💎`, boxGot: "Almaz box ochildi!", boxLucky: "🔥 Omadingiz keldi!",
       paid: "✅ To'lov qabul qilindi, kristall qo'shilmoqda…", crystalsAdded: (n) => `💎 +${n} kristall qo'shildi!`, payFailed: "To'lov amalga oshmadi", bought: (n) => `🎟 +${n} token`, packOpened: (r) => `${r} paket`,
     },
     ru: {
@@ -73,7 +73,7 @@
       shopTab: "Магазин", shopBuyTitle: "💎 Купить кристаллы", shopBuyHint: "Оплата Telegram Stars, кристаллы приходят сразу.", shopItemsTitle: "🛒 За кристаллы",
       wallet: (n) => `У вас: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% выгоды`,
       tokensItem: (n) => `${n} токенов`, tokensHint: (n) => `Откроют ${n} карт без ожидания`, packItem: (r) => `Пак: ${r}`, packHint: (n, r) => `${n} карт, минимум одна ${r.toLowerCase()} гарантирована`,
-      boxTitle: "🎁 Алмазный бокс", boxRange: (a, b) => `${a}–${b} 💎`, boxOdds: "Чем больше, тем реже выпадает", boxGot: "Алмазный бокс открыт!", boxLucky: "🔥 Вам повезло!",
+      boxTitle: "🎁 Алмазный бокс", boxRange: (a, b) => `${a}–${b} 💎`, boxGot: "Алмазный бокс открыт!", boxLucky: "🔥 Вам повезло!",
       paid: "✅ Оплата принята, кристаллы зачисляются…", crystalsAdded: (n) => `💎 +${n} кристаллов!`, payFailed: "Оплата не прошла", bought: (n) => `🎟 +${n} токенов`, packOpened: (r) => `Пак: ${r}`,
     },
     en: {
@@ -107,7 +107,7 @@
       shopTab: "Shop", shopBuyTitle: "💎 Buy crystals", shopBuyHint: "Paid in Telegram Stars; the crystals arrive at once.", shopItemsTitle: "🛒 For crystals",
       wallet: (n) => `You have: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% value`,
       tokensItem: (n) => `${n} tokens`, tokensHint: (n) => `Open ${n} cards without the wait`, packItem: (r) => `${r} pack`, packHint: (n, r) => `${n} cards, at least one ${r.toLowerCase()} guaranteed`,
-      boxTitle: "🎁 Diamond box", boxRange: (a, b) => `${a}–${b} 💎`, boxOdds: "The more crystals, the rarer", boxGot: "Diamond box opened!", boxLucky: "🔥 Lucky you!",
+      boxTitle: "🎁 Diamond box", boxRange: (a, b) => `${a}–${b} 💎`, boxGot: "Diamond box opened!", boxLucky: "🔥 Lucky you!",
       paid: "✅ Payment received, adding your crystals…", crystalsAdded: (n) => `💎 +${n} crystals!`, payFailed: "The payment did not go through", bought: (n) => `🎟 +${n} tokens`, packOpened: (r) => `${r} pack`,
     },
   };
@@ -1282,13 +1282,11 @@
     return wrap;
   }
 
-  // boxInfoPanel is the box's prizes and chances in small print.
+  // boxInfoPanel is just the box's prizes and chances, in small print.
   function boxInfoPanel(pack) {
     const panel = document.createElement("div");
     panel.className = "gift box-info";
-    panel.innerHTML = '<b class="box-name"></b><small class="box-hint"></small><ul class="box-odds"></ul>';
-    panel.querySelector(".box-name").textContent = t.boxTitle;
-    panel.querySelector(".box-hint").textContent = t.boxOdds;
+    panel.innerHTML = '<ul class="box-odds"></ul>';
     const list = panel.querySelector(".box-odds");
     for (const prize of pack.box) {
       const item = document.createElement("li");
