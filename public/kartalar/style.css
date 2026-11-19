@@ -268,6 +268,12 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .odds b { color: var(--c); }
 
 /* ranking */
+.arena-week { margin: 4px 16px 10px; padding: 14px; border-radius: 18px; background: var(--panel); border: 1px solid var(--gold); display: grid; gap: 6px; }
+.arena-week b { font: 800 15px Unbounded, sans-serif; color: var(--gold); }
+.arena-week small { color: var(--muted); }
+.arena-week p { margin: 0; font-weight: 800; }
+.arena-week .prizes { display: flex; flex-wrap: wrap; gap: 6px; }
+.arena-week .prizes span { padding: 3px 8px; border-radius: 999px; background: var(--line); font-size: 12px; font-weight: 700; }
 .table { list-style: none; margin: 4px 16px; padding: 0; display: grid; gap: 8px; }
 .table li {
   display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 10px; min-height: 56px; padding: 8px 14px;

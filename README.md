@@ -2279,6 +2279,13 @@ skips to the end, which less motion asked for shows at once. The end says
 won or lost, the rating's change and the token, a win's card token while the
 day's three last. The Reyting tab switches between the cards' table and the
 arena's (rating, wins, losses, power). No card is given or lost in the arena.
+Each week, Monday to Monday in Tashkent, pays the top 100 by rating among
+those who attacked in it, in tokens by mail (`internal/cards/arenaweek.go`,
+the table `arena_weeks` of migration 106, which pays a week once): 1st 50,
+2nd 40, 3rd 30, 4th to 10th 20, 11th to 30th 15, 31st to 50th 10, 51st to
+100th 5. The daily cleanup cron, at 08:00 in Tashkent, pays the last week
+ended; the arena's table shows the prizes, the player's place this week
+(`week` in `arena`) and the time left.
 🎯 Kunlik topshiriqlar, the daily quests (`internal/cards/quests.go`, the
 table `card_quests` of migration 102), are four a day, new at midnight in
 Tashkent, 10 tokens in all: open 5 cards, by draws or shop packs (2 🎟), win

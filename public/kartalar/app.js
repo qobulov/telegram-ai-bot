@@ -1074,7 +1074,8 @@
       const data = await api(kind === "arena" ? "arena" : "top");
       if (asked !== topAsked) return;
       notice(null);
-      if (kind === "arena") { arenaTable(data.top || []); return; }
+      $("arenaWeek").hidden = kind !== "arena";
+      if (kind === "arena") { arenaTable(data.top || []); arenaWeek(data.week); return; }
       const table = $("table");
       table.textContent = "";
       if (!data.top.length) table.innerHTML = `<p class="empty">${t.noTop}</p>`;
@@ -1925,6 +1926,7 @@
       slot: (row, n) => `${row} · ${n}-o'rin`, inTeam: "jamoada", saved: "✅ Jamoa saqlandi",
       attack: "⚔️ Hujum", noFoes: "Hozircha raqib yo'q: boshqalar ham jamoa saqlasin", teamFirst: "Hujum uchun avval jamoani saqlang", noAttacks: "Tiketlar tugadi: har soatda 1 ta qo'shiladi",
       round: (n) => `Raund ${n}`, skip: "O'tkazib yuborish", won: "🏆 G'alaba!", lost: "💀 Mag'lubiyat", change: (d) => `Reyting ${d >= 0 ? "+" : "−"}${Math.abs(d)}`, token: "🎟 +1 token",
+      week: "🏆 Haftalik mukofot", weekRule: "Har dushanba 08:00 da: hafta davomida kamida 1 marta hujum qilgan top 100 ga token pochtaga keladi", weekPlace: (n, p) => (n ? `Siz hozir ${n}-o'rindasiz${p ? ` · +${p} 🎟` : ""}` : "Mukofot uchun bu hafta kamida 1 marta hujum qiling"), weekEnds: (d, h) => (d ? `Hafta tugashiga ${d} kun ${h} soat` : `Hafta tugashiga ${h} soat`), weekRow: (a, b) => (a === b ? `${a}-o'rin` : `${a}–${b}`),
       you: "Siz", topEmpty: "Arenada hali hech kim jang qilmagan", topRow: (w, l, p) => `${w} G · ${l} M · ⚡${p}`,
       skills: { strike: "Kuchli zarba", heal: "Davolash", shield: "Qalqon" }, fell: (n) => `💀 ${n} yiqildi`,
       refused: { size: "Jamoada 5 ta karta bo'lishi kerak", repeat: "Bitta kartani ikki marta qo'yib bo'lmaydi", not_held: "Jamoadagi karta endi sizda yo'q", no_tickets: "Tiket qolmadi: har soatda 1 ta qo'shiladi", no_team: "Avval jamoani saqlang: undagi karta endi sizda yo'q", opponent_gone: "Bu raqib endi yo'q, ro'yxat yangilandi", self: "O'zingizga hujum qilib bo'lmaydi" },
@@ -1939,6 +1941,7 @@
       slot: (row, n) => `${row} · место ${n}`, inTeam: "в команде", saved: "✅ Команда сохранена",
       attack: "⚔️ Атака", noFoes: "Пока нет соперников: пусть другие тоже сохранят команду", teamFirst: "Чтобы атаковать, сохраните команду", noAttacks: "Билеты закончились: каждый час добавляется 1",
       round: (n) => `Раунд ${n}`, skip: "Пропустить", won: "🏆 Победа!", lost: "💀 Поражение", change: (d) => `Рейтинг ${d >= 0 ? "+" : "−"}${Math.abs(d)}`, token: "🎟 +1 токен",
+      week: "🏆 Награда недели", weekRule: "Каждый понедельник в 08:00: топ 100, атаковавшие на неделе хотя бы раз, получают токены почтой", weekPlace: (n, p) => (n ? `Сейчас вы на ${n}-м месте${p ? ` · +${p} 🎟` : ""}` : "Чтобы получить награду, атакуйте хотя бы раз на этой неделе"), weekEnds: (d, h) => (d ? `До конца недели ${d} дн ${h} ч` : `До конца недели ${h} ч`), weekRow: (a, b) => (a === b ? `${a} место` : `${a}–${b}`),
       you: "Вы", topEmpty: "На арене ещё никто не сражался", topRow: (w, l, p) => `${w} В · ${l} П · ⚡${p}`,
       skills: { strike: "Сильный удар", heal: "Лечение", shield: "Щит" }, fell: (n) => `💀 ${n} пал(а)`,
       refused: { size: "В команде должно быть 5 карт", repeat: "Одну карту нельзя поставить дважды", not_held: "Карты из команды у вас больше нет", no_tickets: "Билетов нет: каждый час добавляется 1", no_team: "Сначала сохраните команду: карты из неё у вас больше нет", opponent_gone: "Этого соперника больше нет, список обновлён", self: "Нельзя атаковать себя" },
@@ -1953,6 +1956,7 @@
       slot: (row, n) => `${row} · slot ${n}`, inTeam: "in the team", saved: "✅ Team saved",
       attack: "⚔️ Attack", noFoes: "No opponents yet: others need to save a team too", teamFirst: "Save a team to attack", noAttacks: "No tickets left: one comes back every hour",
       round: (n) => `Round ${n}`, skip: "Skip", won: "🏆 Victory!", lost: "💀 Defeat", change: (d) => `Rating ${d >= 0 ? "+" : "−"}${Math.abs(d)}`, token: "🎟 +1 token",
+      week: "🏆 Weekly prize", weekRule: "Every Monday at 08:00 the top 100 who attacked at least once that week get tokens by mail", weekPlace: (n, p) => (n ? `You are #${n} now${p ? ` · +${p} 🎟` : ""}` : "Attack at least once this week to earn a prize"), weekEnds: (d, h) => (d ? `Week ends in ${d}d ${h}h` : `Week ends in ${h}h`), weekRow: (a, b) => (a === b ? `#${a}` : `#${a}–${b}`),
       you: "You", topEmpty: "Nobody has fought in the arena yet", topRow: (w, l, p) => `${w} W · ${l} L · ⚡${p}`,
       skills: { strike: "Power strike", heal: "Heal", shield: "Shield" }, fell: (n) => `💀 ${n} fell`,
       refused: { size: "A team needs 5 cards", repeat: "A card cannot be placed twice", not_held: "You no longer hold a card of the team", no_tickets: "No tickets left: one comes back every hour", no_team: "Save a team first: you no longer hold one of its cards", opponent_gone: "This opponent is gone; the list is refreshed", self: "You cannot attack yourself" },
@@ -2394,6 +2398,27 @@
       li.querySelector(".pts").textContent = spaced(row.rating);
       table.append(li);
     });
+  }
+
+  // The week's prizes, the player's place now and the time left; the server
+  // pays them each Monday.
+  function arenaWeek(week) {
+    const box = $("arenaWeek");
+    box.textContent = "";
+    if (!week) { box.hidden = true; return; }
+    const left = Math.max(0, week.ends - Date.now()), hours = Math.floor(left / 3600000);
+    const head = document.createElement("b"), rule = document.createElement("small"), mine = document.createElement("p"), ends = document.createElement("small"), list = document.createElement("div");
+    head.textContent = at.week;
+    rule.textContent = at.weekRule;
+    mine.textContent = at.weekPlace(week.place, week.prize);
+    ends.textContent = at.weekEnds(Math.floor(hours / 24), hours % 24);
+    list.className = "prizes";
+    for (const p of week.prizes || []) {
+      const chip = document.createElement("span");
+      chip.textContent = `${at.weekRow(p.from, p.to)}: ${p.tokens} 🎟`;
+      list.append(chip);
+    }
+    box.append(head, rule, list, mine, ends);
   }
 
   // ---------- tabs ----------

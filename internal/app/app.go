@@ -872,7 +872,8 @@ type Cleanup struct {
 // NewCleanup builds the scheduled-cleanup endpoint. Each authorised call
 // declines the join requests whose button was not pressed in time, which
 // the webhook's updates did not notice, deletes messages older than
-// RETENTION_DAYS, and reports what it removed.
+// RETENTION_DAYS, pays the arena's last week if it is not paid yet, and
+// reports what it removed.
 func NewCleanup(ctx context.Context, cfg config.Config, logger *slog.Logger) (*Cleanup, error) {
 	if cfg.CronSecret == "" {
 		return nil, errors.New("CRON_SECRET is required for the cleanup endpoint")
@@ -892,6 +893,11 @@ func NewCleanup(ctx context.Context, cfg config.Config, logger *slog.Logger) (*C
 			awards := service.InviteAwardOptions{Book: store, Telegram: client, Location: cfg.Location, Now: time.Now(), Logger: logger}
 			if _, err := service.PostInviteAwards(ctx, awards); err != nil {
 				logger.Warn("could not post the invite awards", "error", err)
+			}
+			if paid, err := cards.PayArenaWeek(ctx, store, time.Now()); err != nil {
+				logger.Warn("could not pay the arena week", "error", err)
+			} else if paid > 0 {
+				logger.Info("paid the arena week", "players", paid)
 			}
 			return expire(ctx, cfg, store, logger)
 		},

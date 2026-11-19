@@ -43,6 +43,7 @@ type Store interface {
 	RecordArenaBattle(ctx context.Context, attacker, defender, seed int64, attackerWon bool, rules storage.ArenaRules, quest storage.CardQuest) (storage.ArenaOutcome, error)
 	ArenaBattles(ctx context.Context, userID int64, limit int) ([]storage.ArenaBattle, error)
 	ArenaTop(ctx context.Context, limit int) ([]storage.ArenaPlayer, error)
+	ArenaWeekPlace(ctx context.Context, userID int64, since time.Time) (int, error)
 	CardQuests(ctx context.Context, userID int64, day time.Time) (map[string]storage.QuestProgress, error)
 	ClaimCardQuest(ctx context.Context, userID int64, quest storage.CardQuest, reward int, now time.Time) error
 	AnimeRewardsClaimed(ctx context.Context, userID int64) ([]string, error)

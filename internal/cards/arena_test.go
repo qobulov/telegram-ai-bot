@@ -93,6 +93,8 @@ func (f *fakeStore) ArenaBattles(_ context.Context, userID int64, limit int) ([]
 	return out, nil
 }
 
+func (f *fakeStore) ArenaWeekPlace(context.Context, int64, time.Time) (int, error) { return 12, nil }
+
 func (f *fakeStore) ArenaTop(context.Context, int) ([]storage.ArenaPlayer, error) {
 	return []storage.ArenaPlayer{{UserID: 7, Name: "Bek", Rating: 1016, Wins: 1, Power: 100}}, nil
 }
@@ -183,6 +185,49 @@ func TestArenaView(t *testing.T) {
 	if row := out["top"].([]any)[0].(map[string]any); row["me"] != true || row["rating"] != 1016.0 {
 		t.Errorf("top = %v", row)
 	}
+	// The fake places the player 12th: 11 to 30 get 15 tokens.
+	if week := out["week"].(map[string]any); week["place"] != 12.0 || week["prize"] != 15.0 || len(week["prizes"].([]any)) != len(ArenaWeekPrizes) || week["ends"] != float64(arenaWeekStart(now).AddDate(0, 0, 7).UnixMilli()) {
+		t.Errorf("week = %v", week)
+	}
+}
+
+// A week runs from Monday midnight in Tashkent; the one paid is the last
+// one ended.
+func TestArenaWeek(t *testing.T) {
+	// Sunday 22 November 2026, 23:30 in Tashkent, then Monday 23rd 00:10.
+	sunday := time.Date(2026, 11, 22, 23, 30, 0, 0, Location)
+	monday := time.Date(2026, 11, 23, 0, 10, 0, 0, Location)
+	if got, want := arenaWeekStart(sunday), time.Date(2026, 11, 16, 0, 0, 0, 0, Location); !got.Equal(want) {
+		t.Errorf("week of Sunday starts %v, want %v", got, want)
+	}
+	if got, want := arenaWeekStart(monday), time.Date(2026, 11, 23, 0, 0, 0, 0, Location); !got.Equal(want) {
+		t.Errorf("week of Monday starts %v, want %v", got, want)
+	}
+	payer := &fakeWeekPayer{}
+	if _, err := PayArenaWeek(context.Background(), payer, monday.Add(8*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if !payer.since.Equal(time.Date(2026, 11, 16, 0, 0, 0, 0, Location)) || !payer.until.Equal(time.Date(2026, 11, 23, 0, 0, 0, 0, Location)) {
+		t.Errorf("paid %v to %v", payer.since, payer.until)
+	}
+	if payer.note != "🏆 Arena haftalik mukofoti: 3-o'rin" {
+		t.Errorf("note = %q", payer.note)
+	}
+	for place, want := range map[int]int{1: 50, 2: 40, 3: 30, 10: 20, 11: 15, 50: 10, 100: 5, 101: 0, 0: 0} {
+		if got := arenaWeekPrize(place); got != want {
+			t.Errorf("prize for %d = %d, want %d", place, got, want)
+		}
+	}
+}
+
+type fakeWeekPayer struct {
+	since, until time.Time
+	note         string
+}
+
+func (f *fakeWeekPayer) PayArenaWeek(_ context.Context, since, until time.Time, _ []storage.ArenaPrize, note func(int) string) (int, bool, error) {
+	f.since, f.until, f.note = since, until, note(3)
+	return 0, true, nil
 }
 
 // An attack fights the two saved teams and gives the events to replay, the
