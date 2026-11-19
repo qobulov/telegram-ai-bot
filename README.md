@@ -2288,7 +2288,7 @@ pictures and names, the ones not held dimmed, so that a player sees what is ther
 collect. The Kolleksiya tab still hides the cards not held.
 The ⚔️ Arena tab is a 5 against 5 auto-battle of saved teams
 (`internal/arena`, the tables `arena_teams`, `arena_players` and
-`arena_battles` of migration 98). A player picks five of their cards, two in
+`arena_battles` of migrations 98 and 100). A player picks five of their cards, two in
 front and three behind, from a list of the cards held, the strongest first,
 with a search and the rarities as chips, and saves them (`arena_team` with
 `front` and `back`; refused `size`, `repeat` or `not_held`); the team's power
@@ -2296,11 +2296,15 @@ with a search and the rarities as chips, and saves them (`arena_team` with
 now, stars included. The server boosts each card by its stars and gives it a
 class by its health to attack (tank, fighter, mage) and, from Legendary up, a
 skill (strike, heal or shield). `arena` gives the player's rating (Elo from
-1000, K 32), wins and losses, the day's attacks and win tokens left (5 and 3,
-the day starting at midnight in Tashkent), their team (null when none is saved
-or it holds a card no longer held, so it is picked again), three opponents
-near their rating and the table of ten. ⚔️ Hujum (`arena_attack`, `opponent`;
-refused `no_attacks`, `no_team`, `opponent_gone` or `self`) plays the battle
+1000, K 32; the defender's moves too, the winner up and the loser down),
+wins and losses, their arena tickets (`tickets` of `tickets_max` 8, one coming
+back every hour, `next_ticket_in` ms to the next) and the day's win tokens left
+(3, the day starting at midnight in Tashkent), their team (null when none is
+saved or it holds a card no longer held, so it is picked again), three
+opponents near their rating, the table of ten and `history`, their last 10
+battles, attacking or attacked (opponent, won, their own rating change).
+⚔️ Hujum (`arena_attack`, `opponent`; takes a ticket; refused `no_tickets`,
+`no_team`, `opponent_gone` or `self`) plays the battle
 on the server from a crypto/rand seed and records it; the page replays its
 events on the whole screen, one every 350 ms: a hit shakes its target and its
 HP bar falls, a skill flashes, a fallen card greys, and "O'tkazib yuborish"

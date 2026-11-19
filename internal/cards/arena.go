@@ -12,23 +12,28 @@ import (
 	"telegram-ai-bot/internal/storage"
 )
 
-// The arena's day: a player makes ArenaAttacks attacks and wins at most
-// ArenaTokens card tokens; ratings move by Elo with ArenaK. The arena offers
-// ArenaOpponentsShown opponents and its table lists arenaTopSize players.
+// The arena, as the owners asked: a player holds at most ArenaTickets
+// tickets, one coming back every ArenaTicketEvery, and each attack takes
+// one; they win at most ArenaTokens card tokens a day; ratings move by Elo
+// with ArenaK, the attacker's and the defender's both. The arena offers
+// ArenaOpponentsShown opponents, its table lists arenaTopSize players and
+// the history a player's last ArenaHistory battles.
 const (
-	ArenaAttacks        = 5
+	ArenaTickets        = 8
+	ArenaTicketEvery    = time.Hour
 	ArenaTokens         = 3
 	ArenaK              = 32
 	ArenaOpponentsShown = 3
+	ArenaHistory        = 10
 	arenaTopSize        = 10
 )
 
-// arenaRules are the day's rules at now: the day starts at midnight in
+// arenaRules are the rules at now: the tokens' day starts at midnight in
 // Tashkent, built there so that the store counts Tashkent's date.
 func arenaRules(now time.Time) storage.ArenaRules {
 	local := now.In(Location)
 	day := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, Location)
-	return storage.ArenaRules{Attacks: ArenaAttacks, Tokens: ArenaTokens, K: ArenaK, Day: day}
+	return storage.ArenaRules{Tickets: ArenaTickets, TicketEvery: ArenaTicketEvery, Tokens: ArenaTokens, K: ArenaK, Day: day, Now: now}
 }
 
 var (
@@ -110,7 +115,8 @@ func (h *handler) savedFighters(ctx context.Context, userID int64) (fighters, bo
 }
 
 // arenaView is the arena: the player, their team (null without one they
-// hold), a few opponents near their rating and the table.
+// hold), a few opponents near their rating, the table and the player's
+// last battles.
 func (h *handler) arenaView(ctx context.Context, user miniapp.User) (any, failure) {
 	player, err := h.Store.ArenaPlayerOf(ctx, user.ID, arenaRules(h.Now()))
 	if err != nil {
@@ -132,6 +138,15 @@ func (h *handler) arenaView(ctx context.Context, user miniapp.User) (any, failur
 		h.Logger.Error("could not read the arena table", "error", err)
 		return nil, errUnavailable
 	}
+	battles, err := h.Store.ArenaBattles(ctx, user.ID, ArenaHistory)
+	if err != nil {
+		h.Logger.Error("could not read arena battles", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
+	history := make([]map[string]any, len(battles))
+	for i, b := range battles {
+		history[i] = map[string]any{"at": b.At.UnixMilli(), "attacked": b.Attacked, "opponent": b.Opponent, "won": b.Won, "rating_change": b.RatingChange}
+	}
 	others := make([]map[string]any, len(opponents))
 	for i, p := range opponents {
 		others[i] = map[string]any{"id": p.UserID, "name": p.Name, "rating": p.Rating, "power": p.Power}
@@ -147,9 +162,10 @@ func (h *handler) arenaView(ctx context.Context, user miniapp.User) (any, failur
 	return map[string]any{
 		"player": map[string]any{
 			"name": player.Name, "rating": player.Rating, "wins": player.Wins, "losses": player.Losses, "power": player.Power,
-			"attacks_left": player.AttacksLeft, "tokens_left": player.TokensLeft, "attacks": ArenaAttacks, "tokens": ArenaTokens,
+			"tickets": player.Tickets, "tickets_max": ArenaTickets, "next_ticket_in": player.NextTicket.Milliseconds(),
+			"tokens_left": player.TokensLeft, "tokens": ArenaTokens,
 		},
-		"team": views, "opponents": others, "top": rows,
+		"team": views, "opponents": others, "top": rows, "history": history,
 	}, failure{}
 }
 
@@ -193,7 +209,7 @@ func (h *handler) arenaTeam(ctx context.Context, user miniapp.User, front, back 
 // arenaAttack fights the player's saved team against the opponent's and
 // keeps the outcome. An attack refused says why: "self", "no_team" (the
 // player's team is missing or holds a card no longer held), "opponent_gone"
-// (so is the opponent's) or "no_attacks" (none left today).
+// (so is the opponent's) or "no_tickets" (none left).
 func (h *handler) arenaAttack(ctx context.Context, user miniapp.User, opponent int64) (any, failure) {
 	switch {
 	case opponent == 0:
@@ -225,8 +241,8 @@ func (h *handler) arenaAttack(ctx context.Context, user miniapp.User, opponent i
 	result := arena.Battle(mine.team, theirs.team, seed)
 	outcome, err := h.Store.RecordArenaBattle(ctx, user.ID, opponent, seed, result.AttackerWon, arenaRules(h.Now()))
 	switch {
-	case errors.Is(err, storage.ErrArenaNoAttacks):
-		return map[string]any{"refused": "no_attacks"}, failure{}
+	case errors.Is(err, storage.ErrArenaNoTickets):
+		return map[string]any{"refused": "no_tickets"}, failure{}
 	case err != nil:
 		h.Logger.Error("could not record an arena battle", "user_id", user.ID, "opponent", opponent, "error", err)
 		return nil, errUnavailable
@@ -238,7 +254,7 @@ func (h *handler) arenaAttack(ctx context.Context, user miniapp.User, opponent i
 	return map[string]any{
 		"won": result.AttackerWon, "events": events, "attacker": mine.views, "defender": theirs.views,
 		"rating_change": outcome.RatingChange, "token": outcome.Token,
-		"attacks_left": outcome.AttacksLeft, "tokens_left": outcome.TokensLeft,
+		"tickets": outcome.Tickets, "next_ticket_in": outcome.NextTicket.Milliseconds(), "tokens_left": outcome.TokensLeft,
 	}, failure{}
 }
 

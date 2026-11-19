@@ -12,7 +12,10 @@ import (
 // before, so a date read in UTC would be the wrong one.
 var arenaDay = time.Date(2026, 11, 18, 0, 0, 0, 0, time.FixedZone("Asia/Tashkent", 5*60*60))
 
-var arenaRules = ArenaRules{Attacks: 5, Tokens: 3, K: 32, Day: arenaDay}
+// arenaNow is 10:00 that day; tickets are counted at it.
+var arenaNow = arenaDay.Add(10 * time.Hour)
+
+var arenaRules = ArenaRules{Tickets: 8, TicketEvery: time.Hour, Tokens: 3, K: 32, Day: arenaDay, Now: arenaNow}
 
 var (
 	aliceFront = [2]int64{1, 2}
@@ -77,11 +80,11 @@ func TestArenaTeamSavedAndRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := ArenaPlayer{UserID: 1, Name: "Alice", Rating: 1000, AttacksLeft: 5, TokensLeft: 3, Power: 7000}
+	want := ArenaPlayer{UserID: 1, Name: "Alice", Rating: 1000, Tickets: 8, TokensLeft: 3, Power: 7000}
 	if player != want {
 		t.Errorf("ArenaPlayerOf = %+v, want %+v", player, want)
 	}
-	if player, err := store.ArenaPlayerOf(ctx, 99, arenaRules); err != nil || player != (ArenaPlayer{UserID: 99, Rating: 1000, AttacksLeft: 5, TokensLeft: 3}) {
+	if player, err := store.ArenaPlayerOf(ctx, 99, arenaRules); err != nil || player != (ArenaPlayer{UserID: 99, Rating: 1000, Tickets: 8, TokensLeft: 3}) {
 		t.Errorf("a stranger = %+v, %v", player, err)
 	}
 }
@@ -119,7 +122,7 @@ func TestArenaElo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out != (ArenaOutcome{RatingChange: 16, Token: true, AttacksLeft: 4, TokensLeft: 2}) {
+	if out != (ArenaOutcome{RatingChange: 16, Token: true, Tickets: 7, TokensLeft: 2, NextTicket: time.Hour}) {
 		t.Errorf("a win between equals = %+v", out)
 	}
 	alice, _ := store.ArenaPlayerOf(ctx, 1, arenaRules)
@@ -127,7 +130,7 @@ func TestArenaElo(t *testing.T) {
 	if alice.Rating != 1016 || alice.Wins != 1 || bob.Rating != 984 || bob.Losses != 1 {
 		t.Errorf("after the win: Alice %+v, Bob %+v", alice, bob)
 	}
-	if bob.AttacksLeft != 5 || bob.TokensLeft != 3 || cardTokens(t, store, 2) != 0 {
+	if bob.Tickets != 8 || bob.TokensLeft != 3 || cardTokens(t, store, 2) != 0 {
 		t.Errorf("defending changed Bob's day: %+v", bob)
 	}
 	if cardTokens(t, store, 1) != 1 {
@@ -135,9 +138,9 @@ func TestArenaElo(t *testing.T) {
 	}
 	var attacker, defender, seed int64
 	var won bool
-	var change int
-	if err := store.pool.QueryRow(ctx, `SELECT attacker, defender, seed, attacker_won, rating_change FROM arena_battles`).Scan(&attacker, &defender, &seed, &won, &change); err != nil || attacker != 1 || defender != 2 || seed != 42 || !won || change != 16 {
-		t.Errorf("battle = %d %d %d %v %d, %v", attacker, defender, seed, won, change, err)
+	var change, defenderChange int
+	if err := store.pool.QueryRow(ctx, `SELECT attacker, defender, seed, attacker_won, rating_change, defender_change FROM arena_battles`).Scan(&attacker, &defender, &seed, &won, &change, &defenderChange); err != nil || attacker != 1 || defender != 2 || seed != 42 || !won || change != 16 || defenderChange != -16 {
+		t.Errorf("battle = %d %d %d %v %d %d, %v", attacker, defender, seed, won, change, defenderChange, err)
 	}
 
 	// Carol (3), new at 1000, loses to Dave (4) at 1000: −16; then, both
@@ -205,7 +208,7 @@ func TestTeamWithACardTradedAway(t *testing.T) {
 }
 
 // Review Focus 2: attacks at once are counted one after the other: never a
-// sixth attack, a fourth token or a rating counted twice, and two players
+// ninth attack, a fourth token or a rating counted twice, and two players
 // attacking each other at once do not deadlock.
 func TestAttacksAreCountedUnderALock(t *testing.T) {
 	store := newTestStore(t)
@@ -234,21 +237,21 @@ func TestAttacksAreCountedUnderALock(t *testing.T) {
 		switch {
 		case err == nil:
 			done++
-		case errors.Is(err, ErrArenaNoAttacks):
+		case errors.Is(err, ErrArenaNoTickets):
 			refused++
 		default:
 			t.Errorf("RecordArenaBattle: %v", err)
 		}
 	}
-	if done != 10 || refused != 10 {
-		t.Errorf("%d attacks done, %d refused; want 10 and 10", done, refused)
+	if done != 16 || refused != 4 {
+		t.Errorf("%d attacks done, %d refused; want 16 and 4", done, refused)
 	}
 	alice, _ := store.ArenaPlayerOf(ctx, 1, arenaRules)
 	bob, _ := store.ArenaPlayerOf(ctx, 2, arenaRules)
-	if alice.Wins != 10 || alice.Losses != 0 || bob.Wins != 0 || bob.Losses != 10 {
+	if alice.Wins != 16 || alice.Losses != 0 || bob.Wins != 0 || bob.Losses != 16 {
 		t.Errorf("Alice %+v, Bob %+v", alice, bob)
 	}
-	if alice.AttacksLeft != 0 || alice.TokensLeft != 0 || bob.AttacksLeft != 0 || bob.TokensLeft != 3 {
+	if alice.Tickets != 0 || alice.TokensLeft != 0 || bob.Tickets != 0 || bob.TokensLeft != 3 {
 		t.Errorf("days: Alice %+v, Bob %+v", alice, bob)
 	}
 	if alice.Rating+bob.Rating != 2000 || alice.Rating <= 1000 {
@@ -261,45 +264,111 @@ func TestAttacksAreCountedUnderALock(t *testing.T) {
 		t.Errorf("Bob's tokens = %d, want 0", got)
 	}
 	var mine, his int
-	if err := store.pool.QueryRow(ctx, `SELECT count(*) FILTER (WHERE attacker = 1), count(*) FILTER (WHERE attacker = 2) FROM arena_battles`).Scan(&mine, &his); err != nil || mine != 5 || his != 5 {
+	if err := store.pool.QueryRow(ctx, `SELECT count(*) FILTER (WHERE attacker = 1), count(*) FILTER (WHERE attacker = 2) FROM arena_battles`).Scan(&mine, &his); err != nil || mine != 8 || his != 8 {
 		t.Errorf("battles recorded: Alice's %d, Bob's %d, %v", mine, his, err)
 	}
 }
 
-// Review Focus 3: counters holding yesterday's date start again on the
-// Tashkent day after.
-func TestArenaDayStartsAtTashkentMidnight(t *testing.T) {
+// Tickets: eight at most, each attack takes one and the ninth is refused;
+// one comes back each hour after the stock stopped being full, never more
+// than eight; the day's tokens start again on the Tashkent day after.
+func TestArenaTicketsComeBackHourly(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 	seedArena(t, store)
 
-	for i := range 5 {
+	for i := range 8 {
 		if _, err := store.RecordArenaBattle(ctx, 1, 2, int64(i), true, arenaRules); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := store.RecordArenaBattle(ctx, 1, 2, 5, true, arenaRules); !errors.Is(err, ErrArenaNoAttacks) {
-		t.Fatalf("a sixth attack = %v", err)
+	if _, err := store.RecordArenaBattle(ctx, 1, 2, 8, true, arenaRules); !errors.Is(err, ErrArenaNoTickets) {
+		t.Fatalf("a ninth attack = %v", err)
 	}
-	if alice, _ := store.ArenaPlayerOf(ctx, 1, arenaRules); alice.AttacksLeft != 0 || alice.TokensLeft != 0 {
-		t.Errorf("at the day's end = %+v", alice)
-	}
-	var day string
-	if err := store.pool.QueryRow(ctx, `SELECT attacks_day::text FROM arena_players WHERE user_id = 1`).Scan(&day); err != nil || day != "2026-11-18" {
-		t.Errorf("attacks_day = %q, %v; want the Tashkent date", day, err)
+	if alice, _ := store.ArenaPlayerOf(ctx, 1, arenaRules); alice.Tickets != 0 || alice.NextTicket != time.Hour || alice.TokensLeft != 0 {
+		t.Errorf("with the tickets spent = %+v", alice)
 	}
 
-	next := arenaRules
+	at := func(d time.Duration) ArenaRules {
+		r := arenaRules
+		r.Now = arenaNow.Add(d)
+		return r
+	}
+	for _, c := range []struct {
+		after   time.Duration
+		tickets int
+		next    time.Duration
+	}{
+		{30 * time.Minute, 0, 30 * time.Minute},
+		{time.Hour, 1, time.Hour},
+		{3*time.Hour + 30*time.Minute, 3, 30 * time.Minute},
+		{20 * time.Hour, 8, 0},
+	} {
+		if alice, _ := store.ArenaPlayerOf(ctx, 1, at(c.after)); alice.Tickets != c.tickets || alice.NextTicket != c.next {
+			t.Errorf("after %v: %d tickets, next in %v; want %d, %v", c.after, alice.Tickets, alice.NextTicket, c.tickets, c.next)
+		}
+	}
+
+	// At 13:30 three are back; one spent leaves two, the half hour toward the
+	// next one kept.
+	out, err := store.RecordArenaBattle(ctx, 1, 2, 9, false, at(3*time.Hour+30*time.Minute))
+	if err != nil || out.Tickets != 2 || out.NextTicket != 30*time.Minute {
+		t.Errorf("an attack at 13:30 = %+v, %v", out, err)
+	}
+	if alice, _ := store.ArenaPlayerOf(ctx, 1, at(4*time.Hour)); alice.Tickets != 3 || alice.NextTicket != time.Hour {
+		t.Errorf("at 14:00 = %+v", alice)
+	}
+
+	next := at(24 * time.Hour)
 	next.Day = arenaDay.AddDate(0, 0, 1)
-	if alice, _ := store.ArenaPlayerOf(ctx, 1, next); alice.AttacksLeft != 5 || alice.TokensLeft != 3 {
+	if alice, _ := store.ArenaPlayerOf(ctx, 1, next); alice.Tickets != 8 || alice.TokensLeft != 3 {
 		t.Errorf("the next day = %+v", alice)
 	}
-	out, err := store.RecordArenaBattle(ctx, 1, 2, 6, true, next)
-	if err != nil || out.AttacksLeft != 4 || out.TokensLeft != 2 || !out.Token {
+	if out, err := store.RecordArenaBattle(ctx, 1, 2, 10, true, next); err != nil || out.Tickets != 7 || out.TokensLeft != 2 || !out.Token {
 		t.Errorf("the next day's attack = %+v, %v", out, err)
 	}
 	if got := cardTokens(t, store, 1); got != 4 {
 		t.Errorf("Alice's tokens = %d, want 4", got)
+	}
+}
+
+// The battle history shows a player's battles, attacking and attacked, the
+// newest first, each with the other player, who won as they see it, and
+// their own rating change; at most limit.
+func TestArenaBattleHistory(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	seedArena(t, store)
+
+	if battles, err := store.ArenaBattles(ctx, 1, 10); err != nil || len(battles) != 0 {
+		t.Fatalf("no battles = %+v, %v", battles, err)
+	}
+	// Alice beats Bob (+16, Bob −16), then Bob attacks Alice and loses.
+	if _, err := store.RecordArenaBattle(ctx, 1, 2, 1, true, arenaRules); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.RecordArenaBattle(ctx, 2, 1, 2, false, arenaRules); err != nil {
+		t.Fatal(err)
+	}
+	alice, err := store.ArenaBattles(ctx, 1, 10)
+	if err != nil || len(alice) != 2 {
+		t.Fatalf("Alice's battles = %+v, %v", alice, err)
+	}
+	if b := alice[0]; b.Attacked || b.OpponentID != 2 || b.Opponent != "Bob" || !b.Won || b.RatingChange <= 0 {
+		t.Errorf("Alice defending = %+v", b)
+	}
+	if b := alice[1]; !b.Attacked || b.OpponentID != 2 || !b.Won || b.RatingChange != 16 {
+		t.Errorf("Alice attacking = %+v", b)
+	}
+	bob, _ := store.ArenaBattles(ctx, 2, 10)
+	if len(bob) != 2 || !bob[0].Attacked || bob[0].Won || bob[0].RatingChange != -alice[0].RatingChange || bob[1].Attacked || bob[1].RatingChange != -16 {
+		t.Errorf("Bob's battles = %+v", bob)
+	}
+	if bobRow, _ := store.ArenaPlayerOf(ctx, 2, arenaRules); bobRow.Rating != 1000-16+bob[0].RatingChange {
+		t.Errorf("Bob's rating %d does not match his history %+v", bobRow.Rating, bob)
+	}
+	if last, _ := store.ArenaBattles(ctx, 1, 1); len(last) != 1 || last[0].Attacked {
+		t.Errorf("the latest battle = %+v", last)
 	}
 }
 

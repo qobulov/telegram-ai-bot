@@ -14,13 +14,14 @@ import (
 )
 
 // fakeArena keeps the arena of fakeStore: the cards each player holds, their
-// saved teams and the day's attacks made.
+// saved teams, the attacks made and the battles fought.
 type fakeArena struct {
 	held    map[int64][]storage.OwnedCard
 	teams   map[int64][5]int64
 	power   map[int64]int
 	attacks map[int64]int
-	rules   []storage.ArenaRules // the rules each battle was recorded by
+	battles map[int64][]storage.ArenaBattle // newest last
+	rules   []storage.ArenaRules            // the rules each battle was recorded by
 }
 
 func (f *fakeStore) SaveArenaTeam(_ context.Context, userID int64, front [2]int64, back [3]int64, power int) error {
@@ -47,7 +48,7 @@ func (f *fakeStore) ArenaTeam(_ context.Context, userID int64) ([2]int64, [3]int
 }
 
 func (f *fakeStore) ArenaPlayerOf(_ context.Context, userID int64, rules storage.ArenaRules) (storage.ArenaPlayer, error) {
-	return storage.ArenaPlayer{UserID: userID, Name: "Bek", Rating: 1000, AttacksLeft: rules.Attacks - f.arena.attacks[userID], TokensLeft: rules.Tokens, Power: f.arena.power[userID]}, nil
+	return storage.ArenaPlayer{UserID: userID, Name: "Bek", Rating: 1000, Tickets: rules.Tickets - f.arena.attacks[userID], TokensLeft: rules.Tokens, Power: f.arena.power[userID]}, nil
 }
 
 func (f *fakeStore) ArenaOpponents(_ context.Context, userID int64, n int) ([]storage.ArenaPlayer, error) {
@@ -64,11 +65,11 @@ func (f *fakeStore) RecordArenaBattle(_ context.Context, attacker, defender, _ i
 	if attacker == defender {
 		return storage.ArenaOutcome{}, errors.New("attacking oneself")
 	}
-	if f.arena.attacks[attacker] >= rules.Attacks {
-		return storage.ArenaOutcome{}, storage.ErrArenaNoAttacks
+	if f.arena.attacks[attacker] >= rules.Tickets {
+		return storage.ArenaOutcome{}, storage.ErrArenaNoTickets
 	}
 	if f.arena.attacks == nil {
-		f.arena.attacks = map[int64]int{}
+		f.arena.attacks, f.arena.battles = map[int64]int{}, map[int64][]storage.ArenaBattle{}
 	}
 	f.arena.attacks[attacker]++
 	f.arena.rules = append(f.arena.rules, rules)
@@ -76,7 +77,18 @@ func (f *fakeStore) RecordArenaBattle(_ context.Context, attacker, defender, _ i
 	if won {
 		change = 16
 	}
-	return storage.ArenaOutcome{RatingChange: change, Token: won, AttacksLeft: rules.Attacks - f.arena.attacks[attacker], TokensLeft: rules.Tokens}, nil
+	f.arena.battles[attacker] = append(f.arena.battles[attacker], storage.ArenaBattle{At: rules.Now, Attacked: true, OpponentID: defender, Opponent: "Ali", Won: won, RatingChange: change})
+	f.arena.battles[defender] = append(f.arena.battles[defender], storage.ArenaBattle{At: rules.Now, OpponentID: attacker, Opponent: "Bek", Won: !won, RatingChange: -change})
+	return storage.ArenaOutcome{RatingChange: change, Token: won, Tickets: rules.Tickets - f.arena.attacks[attacker], TokensLeft: rules.Tokens, NextTicket: rules.TicketEvery}, nil
+}
+
+func (f *fakeStore) ArenaBattles(_ context.Context, userID int64, limit int) ([]storage.ArenaBattle, error) {
+	mine := f.arena.battles[userID]
+	var out []storage.ArenaBattle
+	for i := len(mine) - 1; i >= 0 && len(out) < limit; i-- {
+		out = append(out, mine[i])
+	}
+	return out, nil
 }
 
 func (f *fakeStore) ArenaTop(context.Context, int) ([]storage.ArenaPlayer, error) {
@@ -147,17 +159,17 @@ func TestArenaTeamIsSavedWithItsPower(t *testing.T) {
 	}
 }
 
-// The arena shows the player, their team, opponents and the table; a player
-// without a team has none.
+// The arena shows the player with their tickets, their team, opponents,
+// the table and their battle history; a player without a team has none.
 func TestArenaView(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	store := &fakeStore{arena: fakeArena{held: map[int64][]storage.OwnedCard{7: arenaCards(), 8: arenaCards()}}}
 	call := arenaHandler(t, store, now)
 	_, out := call(7, map[string]any{"action": "arena"})
-	if out["team"] != nil || len(out["opponents"].([]any)) != 0 || len(out["top"].([]any)) != 1 {
+	if out["team"] != nil || len(out["opponents"].([]any)) != 0 || len(out["top"].([]any)) != 1 || len(out["history"].([]any)) != 0 {
 		t.Fatalf("arena without teams = %v", out)
 	}
-	if p := out["player"].(map[string]any); p["rating"] != 1000.0 || p["attacks_left"] != float64(ArenaAttacks) || p["tokens_left"] != float64(ArenaTokens) {
+	if p := out["player"].(map[string]any); p["rating"] != 1000.0 || p["tickets"] != 8.0 || p["tickets_max"] != 8.0 || p["tokens_left"] != float64(ArenaTokens) {
 		t.Errorf("player = %v", p)
 	}
 	call(8, map[string]any{"action": "arena_team", "front": arenaFront, "back": arenaBack})
@@ -172,8 +184,9 @@ func TestArenaView(t *testing.T) {
 }
 
 // An attack fights the two saved teams and gives the events to replay, the
-// fighters of both sides and what it changed; the sixth of a day is refused,
-// as is an attack without a team or on a player whose team is gone.
+// fighters of both sides and what it changed; one with no ticket left is
+// refused, as is an attack without a team or on a player whose team is
+// gone. The defender's history shows each battle, the newest first.
 func TestArenaAttack(t *testing.T) {
 	now := time.Date(2026, 11, 18, 23, 30, 0, 0, Location)
 	store := &fakeStore{arena: fakeArena{held: map[int64][]storage.OwnedCard{7: arenaCards(), 8: arenaCards(), 9: arenaCards()}}}
@@ -188,7 +201,7 @@ func TestArenaAttack(t *testing.T) {
 	call(8, map[string]any{"action": "arena_team", "front": arenaFront, "back": arenaBack})
 	code, out := call(7, map[string]any{"action": "arena_attack", "opponent": 8})
 	events, _ := out["events"].([]any)
-	if code != http.StatusOK || len(events) == 0 || out["attacks_left"] != float64(ArenaAttacks-1) || out["won"] == nil || out["rating_change"] == nil || out["token"] == nil || out["tokens_left"] == nil {
+	if code != http.StatusOK || len(events) == 0 || out["tickets"] != float64(ArenaTickets-1) || out["next_ticket_in"] != float64(time.Hour/time.Millisecond) || out["won"] == nil || out["rating_change"] == nil || out["token"] == nil || out["tokens_left"] == nil {
 		t.Fatalf("attack = %d %v", code, out)
 	}
 	if e := events[0].(map[string]any); e["kind"] == nil || e["round"] == nil || e["hp"] == nil {
@@ -197,14 +210,22 @@ func TestArenaAttack(t *testing.T) {
 	if a, d := out["attacker"].([]any), out["defender"].([]any); len(a) != 5 || len(d) != 5 || d[0].(map[string]any)["attack"] != 1200.0 {
 		t.Errorf("fighters = %v %v", a, d)
 	}
-	if day := store.arena.rules[0].Day; !day.Equal(time.Date(2026, 11, 18, 0, 0, 0, 0, Location)) || day.Location() != Location {
-		t.Errorf("the arena day = %v", day)
+	if r := store.arena.rules[0]; !r.Day.Equal(time.Date(2026, 11, 18, 0, 0, 0, 0, Location)) || r.Day.Location() != Location || !r.Now.Equal(now) || r.Tickets != 8 || r.TicketEvery != time.Hour {
+		t.Errorf("the arena rules = %+v", r)
 	}
-	for range ArenaAttacks - 1 {
+	for range ArenaTickets - 1 {
 		call(7, map[string]any{"action": "arena_attack", "opponent": 8})
 	}
-	if _, out := call(7, map[string]any{"action": "arena_attack", "opponent": 8}); out["refused"] != "no_attacks" || out["events"] != nil {
-		t.Errorf("the sixth attack = %v", out)
+	if _, out := call(7, map[string]any{"action": "arena_attack", "opponent": 8}); out["refused"] != "no_tickets" || out["events"] != nil {
+		t.Errorf("an attack with no ticket = %v", out)
+	}
+	_, out = call(8, map[string]any{"action": "arena"})
+	history, _ := out["history"].([]any)
+	if len(history) != ArenaTickets {
+		t.Fatalf("player 8's history = %v", out["history"])
+	}
+	if b := history[0].(map[string]any); b["attacked"] != false || b["opponent"] != "Bek" || b["won"] == nil || b["rating_change"] == nil || b["at"] != float64(now.UnixMilli()) {
+		t.Errorf("a battle defended = %v", b)
 	}
 	// Player 9 saves a team, then trades a card of it away.
 	call(9, map[string]any{"action": "arena_team", "front": arenaFront, "back": arenaBack})

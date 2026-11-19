@@ -9,7 +9,7 @@
 
   const texts = {
     uz: {
-      arenaTab: "Arena", arenaTeam: "⚔️ Jamoangiz", arenaSave: "Jamoani saqlash", arenaFoes: "🎯 Raqiblar", arenaRefresh: "🔄 Yangilash", topCards: "🎴 Kartalar", topArena: "⚔️ Arena",
+      arenaTab: "Arena", arenaTeam: "⚔️ Jamoangiz", arenaSave: "Jamoani saqlash", arenaFoes: "🎯 Raqiblar", arenaHistory: "📜 Janglar tarixi", arenaRefresh: "🔄 Yangilash", topCards: "🎴 Kartalar", topArena: "⚔️ Arena",
       title: "Kartalar", collected: "to'plandi", animeTab: "Animelar", animeSearch: "Anime yoki personaj", animeBack: "← Barcha animelar", animeOwned: "✓ Sizda bor", animeMissing: "Sizda hali yo'q", animeEmpty: "Hech narsa topilmadi", collection: "Kolleksiya", draw: "Olish", top: "Reyting",
       search: "Kartani qidirish", rarities: ["Oddiy", "Noyob", "Epik", "Afsonaviy", "Mifik"],
       drawNow: "Karta olish", drawing: "Ochilmoqda…", next: (t) => `Keyingi karta: ${t}`, ready: "Karta tayyor!",
@@ -42,7 +42,7 @@
       paid: "✅ To'lov qabul qilindi, kristall qo'shilmoqda…", crystalsAdded: (n) => `💎 +${n} kristall qo'shildi!`, payFailed: "To'lov amalga oshmadi", bought: (n) => `🎟 +${n} token`, packOpened: (r) => `${r} paket`,
     },
     ru: {
-      arenaTab: "Арена", arenaTeam: "⚔️ Ваша команда", arenaSave: "Сохранить команду", arenaFoes: "🎯 Соперники", arenaRefresh: "🔄 Обновить", topCards: "🎴 Карты", topArena: "⚔️ Арена",
+      arenaTab: "Арена", arenaTeam: "⚔️ Ваша команда", arenaSave: "Сохранить команду", arenaFoes: "🎯 Соперники", arenaHistory: "📜 История боёв", arenaRefresh: "🔄 Обновить", topCards: "🎴 Карты", topArena: "⚔️ Арена",
       title: "Карты", collected: "собрано", animeTab: "Аниме", animeSearch: "Аниме или персонаж", animeBack: "← Все аниме", animeOwned: "✓ Есть у вас", animeMissing: "Пока нет у вас", animeEmpty: "Ничего не найдено", collection: "Коллекция", draw: "Получить", top: "Рейтинг",
       search: "Поиск по картам", rarities: ["Обычная", "Редкая", "Эпическая", "Легендарная", "Мифическая"],
       drawNow: "Получить карту", drawing: "Открываем…", next: (t) => `Следующая карта: ${t}`, ready: "Карта готова!",
@@ -75,7 +75,7 @@
       paid: "✅ Оплата принята, кристаллы зачисляются…", crystalsAdded: (n) => `💎 +${n} кристаллов!`, payFailed: "Оплата не прошла", bought: (n) => `🎟 +${n} токенов`, packOpened: (r) => `Пак: ${r}`,
     },
     en: {
-      arenaTab: "Arena", arenaTeam: "⚔️ Your team", arenaSave: "Save the team", arenaFoes: "🎯 Opponents", arenaRefresh: "🔄 Refresh", topCards: "🎴 Cards", topArena: "⚔️ Arena",
+      arenaTab: "Arena", arenaTeam: "⚔️ Your team", arenaSave: "Save the team", arenaFoes: "🎯 Opponents", arenaHistory: "📜 Battle history", arenaRefresh: "🔄 Refresh", topCards: "🎴 Cards", topArena: "⚔️ Arena",
       title: "Cards", collected: "collected", animeTab: "Anime", animeSearch: "Anime or character", animeBack: "← All anime", animeOwned: "✓ You have it", animeMissing: "Not yours yet", animeEmpty: "Nothing found", collection: "Collection", draw: "Draw", top: "Ranking",
       search: "Search cards", rarities: ["Common", "Rare", "Epic", "Legendary", "Mythic"],
       drawNow: "Draw a card", drawing: "Opening…", next: (t) => `Next card in ${t}`, ready: "A card is ready!",
@@ -1468,54 +1468,58 @@
 
   // The arena: a saved team of five, two in front and three behind, fights
   // another player's saved team. The server plays the battle and keeps the
-  // ratings; the page only replays the events it gives. Five attacks a day,
-  // and a token for each win while the day's three last.
+  // ratings; the page only replays the events it gives. Each attack takes a
+  // ticket, eight at most, one back every hour, and a win gives a token while
+  // the day's three last. The history lists the last ten battles.
   const arenaTexts = {
     uz: {
       rating: "Arena reytingi", record: (w, l) => `${w} g'alaba · ${l} mag'lubiyat`,
-      attacks: (n, m) => `⚔️ Bugungi hujumlar: ${n}/${m}`, tokens: (n, m) => `🎟 G'alaba tokenlari: ${n}/${m}`,
+      tickets: (n, m) => `🎫 Arena tiketlari: ${n}/${m}`, nextTicket: (min) => (min >= 60 ? "· keyingisi 1 soatda" : `· keyingisi ${min} daqiqada`), tokens: (n, m) => `🎟 G'alaba tokenlari: ${n}/${m}`,
+      histEmpty: "Hali jang bo'lmagan", histAttack: "⚔️ Hujum", histDefense: "🛡️ Himoya", histWon: "G'alaba", histLost: "Mag'lubiyat",
       front: "Old qator", back: "Orqa qator", power: (n) => `⚡ ${n}`,
       pick: "5 ta karta tanlang: 2 tasi oldinda, 3 tasi orqada. Yulduzlar kartani kuchaytiradi.",
       unsaved: "O'zgarish hali saqlanmadi", savedHint: "Jamoa saqlangan. Almashtirish uchun uyachani bosing.",
       slot: (row, n) => `${row} · ${n}-o'rin`, inTeam: "jamoada", saved: "✅ Jamoa saqlandi",
-      attack: "⚔️ Hujum", noFoes: "Hozircha raqib yo'q: boshqalar ham jamoa saqlasin", teamFirst: "Hujum uchun avval jamoani saqlang", noAttacks: "Bugungi hujumlar tugadi, ertaga qayting",
+      attack: "⚔️ Hujum", noFoes: "Hozircha raqib yo'q: boshqalar ham jamoa saqlasin", teamFirst: "Hujum uchun avval jamoani saqlang", noAttacks: "Tiketlar tugadi: har soatda 1 ta qo'shiladi",
       round: (n) => `Raund ${n}`, skip: "O'tkazib yuborish", won: "🏆 G'alaba!", lost: "💀 Mag'lubiyat", change: (d) => `Reyting ${d >= 0 ? "+" : "−"}${Math.abs(d)}`, token: "🎟 +1 token",
       you: "Siz", topEmpty: "Arenada hali hech kim jang qilmagan", topRow: (w, l, p) => `${w} G · ${l} M · ⚡${p}`,
       skills: { strike: "Kuchli zarba", heal: "Davolash", shield: "Qalqon" }, fell: (n) => `💀 ${n} yiqildi`,
-      refused: { size: "Jamoada 5 ta karta bo'lishi kerak", repeat: "Bitta kartani ikki marta qo'yib bo'lmaydi", not_held: "Jamoadagi karta endi sizda yo'q", no_attacks: "Bugungi 5 ta hujum tugadi", no_team: "Avval jamoani saqlang: undagi karta endi sizda yo'q", opponent_gone: "Bu raqib endi yo'q, ro'yxat yangilandi", self: "O'zingizga hujum qilib bo'lmaydi" },
+      refused: { size: "Jamoada 5 ta karta bo'lishi kerak", repeat: "Bitta kartani ikki marta qo'yib bo'lmaydi", not_held: "Jamoadagi karta endi sizda yo'q", no_tickets: "Tiket qolmadi: har soatda 1 ta qo'shiladi", no_team: "Avval jamoani saqlang: undagi karta endi sizda yo'q", opponent_gone: "Bu raqib endi yo'q, ro'yxat yangilandi", self: "O'zingizga hujum qilib bo'lmaydi" },
     },
     ru: {
       rating: "Рейтинг арены", record: (w, l) => `${w} побед · ${l} поражений`,
-      attacks: (n, m) => `⚔️ Атак сегодня: ${n}/${m}`, tokens: (n, m) => `🎟 Токенов за победы: ${n}/${m}`,
+      tickets: (n, m) => `🎫 Билеты арены: ${n}/${m}`, nextTicket: (min) => (min >= 60 ? "· следующий через 1 ч" : `· следующий через ${min} мин`), tokens: (n, m) => `🎟 Токенов за победы: ${n}/${m}`,
+      histEmpty: "Боёв ещё не было", histAttack: "⚔️ Атака", histDefense: "🛡️ Защита", histWon: "Победа", histLost: "Поражение",
       front: "Передний ряд", back: "Задний ряд", power: (n) => `⚡ ${n}`,
       pick: "Выберите 5 карт: 2 впереди, 3 сзади. Звёзды усиливают карту.",
       unsaved: "Изменения ещё не сохранены", savedHint: "Команда сохранена. Нажмите на ячейку, чтобы заменить карту.",
       slot: (row, n) => `${row} · место ${n}`, inTeam: "в команде", saved: "✅ Команда сохранена",
-      attack: "⚔️ Атака", noFoes: "Пока нет соперников: пусть другие тоже сохранят команду", teamFirst: "Чтобы атаковать, сохраните команду", noAttacks: "Атаки на сегодня закончились, возвращайтесь завтра",
+      attack: "⚔️ Атака", noFoes: "Пока нет соперников: пусть другие тоже сохранят команду", teamFirst: "Чтобы атаковать, сохраните команду", noAttacks: "Билеты закончились: каждый час добавляется 1",
       round: (n) => `Раунд ${n}`, skip: "Пропустить", won: "🏆 Победа!", lost: "💀 Поражение", change: (d) => `Рейтинг ${d >= 0 ? "+" : "−"}${Math.abs(d)}`, token: "🎟 +1 токен",
       you: "Вы", topEmpty: "На арене ещё никто не сражался", topRow: (w, l, p) => `${w} В · ${l} П · ⚡${p}`,
       skills: { strike: "Сильный удар", heal: "Лечение", shield: "Щит" }, fell: (n) => `💀 ${n} пал(а)`,
-      refused: { size: "В команде должно быть 5 карт", repeat: "Одну карту нельзя поставить дважды", not_held: "Карты из команды у вас больше нет", no_attacks: "5 атак на сегодня закончились", no_team: "Сначала сохраните команду: карты из неё у вас больше нет", opponent_gone: "Этого соперника больше нет, список обновлён", self: "Нельзя атаковать себя" },
+      refused: { size: "В команде должно быть 5 карт", repeat: "Одну карту нельзя поставить дважды", not_held: "Карты из команды у вас больше нет", no_tickets: "Билетов нет: каждый час добавляется 1", no_team: "Сначала сохраните команду: карты из неё у вас больше нет", opponent_gone: "Этого соперника больше нет, список обновлён", self: "Нельзя атаковать себя" },
     },
     en: {
       rating: "Arena rating", record: (w, l) => `${w} wins · ${l} losses`,
-      attacks: (n, m) => `⚔️ Attacks today: ${n}/${m}`, tokens: (n, m) => `🎟 Win tokens: ${n}/${m}`,
+      tickets: (n, m) => `🎫 Arena tickets: ${n}/${m}`, nextTicket: (min) => (min >= 60 ? "· next in 1 hour" : `· next in ${min} min`), tokens: (n, m) => `🎟 Win tokens: ${n}/${m}`,
+      histEmpty: "No battles yet", histAttack: "⚔️ Attack", histDefense: "🛡️ Defense", histWon: "Victory", histLost: "Defeat",
       front: "Front row", back: "Back row", power: (n) => `⚡ ${n}`,
       pick: "Pick 5 cards: 2 in front, 3 behind. Stars make a card stronger.",
       unsaved: "The change is not saved yet", savedHint: "Your team is saved. Tap a slot to swap a card.",
       slot: (row, n) => `${row} · slot ${n}`, inTeam: "in the team", saved: "✅ Team saved",
-      attack: "⚔️ Attack", noFoes: "No opponents yet: others need to save a team too", teamFirst: "Save a team to attack", noAttacks: "No attacks left today; come back tomorrow",
+      attack: "⚔️ Attack", noFoes: "No opponents yet: others need to save a team too", teamFirst: "Save a team to attack", noAttacks: "No tickets left: one comes back every hour",
       round: (n) => `Round ${n}`, skip: "Skip", won: "🏆 Victory!", lost: "💀 Defeat", change: (d) => `Rating ${d >= 0 ? "+" : "−"}${Math.abs(d)}`, token: "🎟 +1 token",
       you: "You", topEmpty: "Nobody has fought in the arena yet", topRow: (w, l, p) => `${w} W · ${l} L · ⚡${p}`,
       skills: { strike: "Power strike", heal: "Heal", shield: "Shield" }, fell: (n) => `💀 ${n} fell`,
-      refused: { size: "A team needs 5 cards", repeat: "A card cannot be placed twice", not_held: "You no longer hold a card of the team", no_attacks: "Today's 5 attacks are used up", no_team: "Save a team first: you no longer hold one of its cards", opponent_gone: "This opponent is gone; the list is refreshed", self: "You cannot attack yourself" },
+      refused: { size: "A team needs 5 cards", repeat: "A card cannot be placed twice", not_held: "You no longer hold a card of the team", no_tickets: "No tickets left: one comes back every hour", no_team: "Save a team first: you no longer hold one of its cards", opponent_gone: "This opponent is gone; the list is refreshed", self: "You cannot attack yourself" },
     },
   };
   const at = arenaTexts[language] || arenaTexts.uz;
   const CLASS_ICON = { tank: "🛡️", fighter: "⚔️", mage: "🔮" };
   const SKILL_ICON = { strike: "💥", heal: "💚", shield: "🔰" };
   const EMPTY_TEAM = [0, 0, 0, 0, 0];
-  let arenaData = null, arenaDraft = EMPTY_TEAM.slice(), arenaBusy = false;
+  let arenaData = null, arenaDraft = EMPTY_TEAM.slice(), arenaBusy = false, ticketAt = 0;
 
   // fighterOf is a held card as the arena draws it, its class and skill
   // worked out as arena.FighterOf does, for a team not saved yet; a saved
@@ -1564,9 +1568,11 @@
   function arenaShow(data) {
     arenaData = data;
     arenaDraft = data.team ? data.team.map((f) => f.id) : EMPTY_TEAM.slice();
+    ticketAt = Date.now() + (data.player.next_ticket_in || 0);
     arenaMe();
     arenaTeam();
     arenaFoes();
+    arenaHistory();
   }
 
   function arenaMe() {
@@ -1577,8 +1583,43 @@
     box.querySelector(".arena-rating b").textContent = spaced(p.rating);
     box.querySelector(".arena-rating span").textContent = at.record(p.wins, p.losses);
     const left = box.querySelectorAll(".arena-left span");
-    left[0].textContent = at.attacks(p.attacks_left, p.attacks);
+    left[0].textContent = at.tickets(p.tickets, p.tickets_max) + (p.tickets < p.tickets_max ? " " + at.nextTicket(Math.max(1, Math.ceil((ticketAt - Date.now()) / 60000))) : "");
     left[1].textContent = at.tokens(p.tokens_left, p.tokens);
+  }
+
+  // arenaTick brings a ticket back on the page when its hour is up, as the
+  // server counts it, and keeps the wait shown current.
+  function arenaTick() {
+    if (!arenaData) return;
+    const p = arenaData.player;
+    if (p.tickets >= p.tickets_max) return;
+    if (Date.now() >= ticketAt) {
+      p.tickets += 1;
+      ticketAt += 3600000;
+      arenaFoes();
+    }
+    arenaMe();
+  }
+  setInterval(arenaTick, 30000);
+
+  // arenaHistory lists the player's last battles, attacking or attacked,
+  // each with the opponent, the outcome and the rating's change.
+  function arenaHistory() {
+    const list = $("arenaHistory");
+    list.textContent = "";
+    const battles = arenaData.history || [];
+    if (!battles.length) list.innerHTML = `<li class="empty">${at.histEmpty}</li>`;
+    for (const b of battles) {
+      const li = document.createElement("li");
+      li.className = "foe hist " + (b.won ? "won" : "lost");
+      li.innerHTML = '<span class="who"><b></b><small></small></span><span class="hist-change"></span>';
+      li.querySelector(".who b").textContent = b.opponent || "?";
+      const when = new Date(b.at).toLocaleString(language === "en" ? "en-GB" : language, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+      li.querySelector(".who small").textContent = `${b.attacked ? at.histAttack : at.histDefense} · ${b.won ? at.histWon : at.histLost} · ${when}`;
+      const d = b.rating_change;
+      li.querySelector(".hist-change").textContent = `${d >= 0 ? "+" : "−"}${Math.abs(d)}`;
+      list.append(li);
+    }
   }
 
   // arenaTeam draws the team being made, its live power, and the save
@@ -1692,12 +1733,12 @@
   });
 
   // arenaFoes lists the opponents offered, each with its attack button,
-  // off without a saved team or with the day's attacks spent.
+  // off without a saved team or with no ticket left.
   function arenaFoes() {
     const list = $("arenaFoes");
     list.textContent = "";
     const p = arenaData.player;
-    const can = !!arenaData.team && p.attacks_left > 0;
+    const can = !!arenaData.team && p.tickets > 0;
     const foes = arenaData.opponents || [];
     if (!foes.length) list.innerHTML = `<li class="empty">${at.noFoes}</li>`;
     for (const o of foes) {
@@ -1732,7 +1773,8 @@
         return;
       }
       if (data.token) { tokens += 1; drawButton(); }
-      arenaData.player.attacks_left = data.attacks_left;
+      arenaData.player.tickets = data.tickets;
+      ticketAt = Date.now() + (data.next_ticket_in || 0);
       arenaData.player.tokens_left = data.tokens_left;
       arenaMe();
       await replay(data, foe);

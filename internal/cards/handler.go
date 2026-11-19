@@ -41,6 +41,7 @@ type Store interface {
 	ArenaPlayerOf(ctx context.Context, userID int64, rules storage.ArenaRules) (storage.ArenaPlayer, error)
 	ArenaOpponents(ctx context.Context, userID int64, n int) ([]storage.ArenaPlayer, error)
 	RecordArenaBattle(ctx context.Context, attacker, defender, seed int64, attackerWon bool, rules storage.ArenaRules) (storage.ArenaOutcome, error)
+	ArenaBattles(ctx context.Context, userID int64, limit int) ([]storage.ArenaBattle, error)
 	ArenaTop(ctx context.Context, limit int) ([]storage.ArenaPlayer, error)
 }
 

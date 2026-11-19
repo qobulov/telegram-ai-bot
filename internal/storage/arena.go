@@ -14,39 +14,79 @@ import (
 var (
 	// ErrArenaTeamRepeat is a team holding one card twice.
 	ErrArenaTeamRepeat = errors.New("storage: a card twice in the arena team")
-	// ErrArenaNoAttacks is an attack past the day's last.
-	ErrArenaNoAttacks = errors.New("storage: no arena attacks left today")
+	// ErrArenaNoTickets is an attack with no ticket left.
+	ErrArenaNoTickets = errors.New("storage: no arena tickets left")
 )
 
 // arenaStartRating is a player's rating before their first battle.
 const arenaStartRating = 1000
 
-// ArenaRules are the day's limits of the arena: attacks a player makes,
-// tokens they win and the Elo K. Day is the start of today in Tashkent;
-// its date, in its own location, is the day the counters count.
+// ArenaRules are the arena's limits: Tickets a player holds at most, one
+// coming back every TicketEvery, each attack taking one; Tokens they win a
+// day and the Elo K. Day is the start of today in Tashkent; its date, in
+// its own location, is the day the tokens count. Now is the time the
+// tickets are counted at.
 type ArenaRules struct {
-	Attacks, Tokens, K int
-	Day                time.Time
+	Tickets, Tokens, K int
+	TicketEvery        time.Duration
+	Day, Now           time.Time
 }
 
 // day is the date the rules' counters count, as Postgres reads a DATE.
 func (r ArenaRules) day() string { return r.Day.Format(time.DateOnly) }
 
+// tickets are the tickets a player holds now, of stored counted at at (nil
+// for a full stock), and when the hour toward the next one started.
+func (r ArenaRules) tickets(stored int, at *time.Time) (held int, since time.Time) {
+	if at == nil || r.TicketEvery <= 0 {
+		return r.Tickets, r.Now
+	}
+	gained := max(int(r.Now.Sub(*at)/r.TicketEvery), 0)
+	held = min(stored+gained, r.Tickets)
+	if held >= r.Tickets {
+		return r.Tickets, r.Now
+	}
+	return held, at.Add(time.Duration(gained) * r.TicketEvery)
+}
+
+// nextTicket is the wait for the next ticket, 0 with the stock full.
+func (r ArenaRules) nextTicket(held int, since time.Time) time.Duration {
+	if held >= r.Tickets {
+		return 0
+	}
+	return max(since.Add(r.TicketEvery).Sub(r.Now), 0)
+}
+
 // ArenaPlayer is a player as the arena knows them: their name, rating,
-// wins and losses, the day's attacks and tokens left (counted only by
-// ArenaPlayerOf), and their saved team's power, 0 without one.
+// wins and losses, the tickets they hold and the wait for the next, the
+// day's tokens left (all three counted only by ArenaPlayerOf), and their
+// saved team's power, 0 without one.
 type ArenaPlayer struct {
-	UserID                                               int64
-	Name                                                 string
-	Rating, Wins, Losses, AttacksLeft, TokensLeft, Power int
+	UserID                                           int64
+	Name                                             string
+	Rating, Wins, Losses, Tickets, TokensLeft, Power int
+	NextTicket                                       time.Duration
 }
 
 // ArenaOutcome is what an attack changed for the attacker: their rating,
-// whether it won them a token, and the day's attacks and tokens left.
+// whether it won them a token, the tickets left and the wait for the next,
+// and the day's tokens left.
 type ArenaOutcome struct {
-	RatingChange            int
-	Token                   bool
-	AttacksLeft, TokensLeft int
+	RatingChange        int
+	Token               bool
+	Tickets, TokensLeft int
+	NextTicket          time.Duration
+}
+
+// ArenaBattle is a battle as one of its players sees it: when, whether they
+// attacked, the other player, whether they won and their rating's change.
+type ArenaBattle struct {
+	At           time.Time
+	Attacked     bool
+	OpponentID   int64
+	Opponent     string
+	Won          bool
+	RatingChange int
 }
 
 // SaveArenaTeam saves the player's team, replacing the one before. The five
@@ -112,27 +152,60 @@ func (s *Store) ArenaTeam(ctx context.Context, userID int64) (front [2]int64, ba
 	return front, back, true, nil
 }
 
-// ArenaPlayerOf reads the player, with the day's attacks and tokens left;
-// one who never fought is at the start rating with the whole day left.
+// ArenaPlayerOf reads the player, with the tickets they hold now and the
+// day's tokens left; one who never fought is at the start rating with a
+// full stock and the whole day left.
 func (s *Store) ArenaPlayerOf(ctx context.Context, userID int64, rules ArenaRules) (ArenaPlayer, error) {
 	p := ArenaPlayer{UserID: userID}
-	var attacks, tokens int
+	var stored, tokens int
+	var at *time.Time
 	err := s.pool.QueryRow(ctx, `
 		SELECT coalesce(c.name, ''), coalesce(p.rating, $3), coalesce(p.wins, 0), coalesce(p.losses, 0),
-			CASE WHEN p.attacks_day = $2::date THEN p.attacks ELSE 0 END,
+			coalesce(p.tickets, 0), p.tickets_at,
 			CASE WHEN p.tokens_day = $2::date THEN p.tokens_won ELSE 0 END,
 			coalesce(t.power, 0)
 		FROM (SELECT $1::bigint AS user_id) u
 		LEFT JOIN arena_players p USING (user_id)
 		LEFT JOIN card_players c USING (user_id)
 		LEFT JOIN arena_teams t USING (user_id)`, userID, rules.day(), arenaStartRating).
-		Scan(&p.Name, &p.Rating, &p.Wins, &p.Losses, &attacks, &tokens, &p.Power)
+		Scan(&p.Name, &p.Rating, &p.Wins, &p.Losses, &stored, &at, &tokens, &p.Power)
 	if err != nil {
 		return p, fmt.Errorf("storage: read the arena player: %w", err)
 	}
-	p.AttacksLeft = max(rules.Attacks-attacks, 0)
+	held, since := rules.tickets(stored, at)
+	p.Tickets, p.NextTicket = held, rules.nextTicket(held, since)
 	p.TokensLeft = max(rules.Tokens-tokens, 0)
 	return p, nil
+}
+
+// ArenaBattles are the player's latest battles, attacking or attacked, at
+// most limit, the newest first.
+func (s *Store) ArenaBattles(ctx context.Context, userID int64, limit int) ([]ArenaBattle, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT b.at, b.attacked, b.opponent, coalesce(c.name, ''), b.won, b.change
+		FROM (
+			SELECT id, at, true AS attacked, defender AS opponent, attacker_won AS won, rating_change AS change
+			FROM arena_battles WHERE attacker = $1
+			UNION ALL
+			SELECT id, at, false, attacker, NOT attacker_won, defender_change
+			FROM arena_battles WHERE defender = $1
+			ORDER BY id DESC
+			LIMIT $2
+		) b
+		LEFT JOIN card_players c ON c.user_id = b.opponent
+		ORDER BY b.id DESC`, userID, max(limit, 0))
+	if err != nil {
+		return nil, fmt.Errorf("storage: read arena battles: %w", err)
+	}
+	battles, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (ArenaBattle, error) {
+		var b ArenaBattle
+		err := row.Scan(&b.At, &b.Attacked, &b.OpponentID, &b.Opponent, &b.Won, &b.RatingChange)
+		return b, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("storage: read arena battles: %w", err)
+	}
+	return battles, nil
 }
 
 // ArenaOpponents gives at most n players the player may attack, nearest to
@@ -188,18 +261,20 @@ func scanArenaPlayers(rows pgx.Rows) ([]ArenaPlayer, error) {
 	return players, nil
 }
 
-// arenaRow is a player's arena row, its counters already those of the day.
+// arenaRow is a player's arena row, its tokens already those of the day
+// and its tickets as stored.
 type arenaRow struct {
-	rating, attacks, tokensWon int
+	rating, tickets, tokensWon int
+	ticketsAt                  *time.Time
 }
 
 // RecordArenaBattle records the attacker's battle against the defender, in
 // one transaction with both players' rows locked, the lower ID first: it
-// takes one of the attacker's day's attacks, ErrArenaNoAttacks past the
-// last, moves both ratings by Elo (never below 0), gives the attacker a
-// token for a win while the day's arena tokens last, and keeps the battle
-// with its seed. Defending changes only the defender's rating, wins and
-// losses.
+// takes one of the attacker's tickets, ErrArenaNoTickets with none, moves
+// both ratings by Elo (never below 0), gives the attacker a token for a
+// win while the day's arena tokens last, and keeps the battle with its
+// seed and both players' rating changes. Defending changes only the
+// defender's rating, wins and losses, and takes no ticket.
 func (s *Store) RecordArenaBattle(ctx context.Context, attacker, defender, seed int64, attackerWon bool, rules ArenaRules) (ArenaOutcome, error) {
 	var out ArenaOutcome
 	if attacker == defender {
@@ -211,9 +286,11 @@ func (s *Store) RecordArenaBattle(ctx context.Context, attacker, defender, seed 
 			return err
 		}
 		a, d := rows[attacker], rows[defender]
-		if a.attacks >= rules.Attacks {
-			return ErrArenaNoAttacks
+		held, since := rules.tickets(a.tickets, a.ticketsAt)
+		if held < 1 {
+			return ErrArenaNoTickets
 		}
+		held--
 		ratingA, ratingD := arenaElo(a.rating, d.rating, rules.K, attackerWon)
 		out.RatingChange = ratingA - a.rating
 		if attackerWon && a.tokensWon < rules.Tokens {
@@ -226,15 +303,14 @@ func (s *Store) RecordArenaBattle(ctx context.Context, attacker, defender, seed 
 		if out.Token {
 			a.tokensWon++
 		}
-		a.attacks++
 		won := 0
 		if attackerWon {
 			won = 1
 		}
 		if _, err := tx.Exec(ctx, `
 			UPDATE arena_players SET rating = $2, wins = wins + $3, losses = losses + 1 - $3,
-				attacks_day = $4::date, attacks = $5, tokens_day = $4::date, tokens_won = $6
-			WHERE user_id = $1`, attacker, ratingA, won, rules.day(), a.attacks, a.tokensWon); err != nil {
+				tickets = $5, tickets_at = $6, tokens_day = $4::date, tokens_won = $7
+			WHERE user_id = $1`, attacker, ratingA, won, rules.day(), held, since, a.tokensWon); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `
@@ -243,16 +319,17 @@ func (s *Store) RecordArenaBattle(ctx context.Context, attacker, defender, seed 
 			return err
 		}
 		_, err = tx.Exec(ctx, `
-			INSERT INTO arena_battles (attacker, defender, seed, attacker_won, rating_change) VALUES ($1, $2, $3, $4, $5)`,
-			attacker, defender, seed, attackerWon, out.RatingChange)
-		out.AttacksLeft = max(rules.Attacks-a.attacks, 0)
+			INSERT INTO arena_battles (attacker, defender, seed, attacker_won, rating_change, defender_change)
+			VALUES ($1, $2, $3, $4, $5, $6)`,
+			attacker, defender, seed, attackerWon, out.RatingChange, ratingD-d.rating)
+		out.Tickets, out.NextTicket = held, rules.nextTicket(held, since)
 		out.TokensLeft = max(rules.Tokens-a.tokensWon, 0)
 		return err
 	})
 	switch {
 	case err == nil:
 		return out, nil
-	case errors.Is(err, ErrArenaNoAttacks):
+	case errors.Is(err, ErrArenaNoTickets):
 		return ArenaOutcome{}, err
 	}
 	return ArenaOutcome{}, fmt.Errorf("storage: record an arena battle: %w", err)
@@ -260,7 +337,7 @@ func (s *Store) RecordArenaBattle(ctx context.Context, attacker, defender, seed 
 
 // lockArenaPlayers makes the players' arena rows where missing and locks
 // them, the lower ID first so that two players attacking each other at once
-// wait for one another instead of deadlocking. Counters of a day before
+// wait for one another instead of deadlocking. Tokens won on a day before
 // day read as 0.
 func lockArenaPlayers(ctx context.Context, tx pgx.Tx, day string, a, b int64) (map[int64]arenaRow, error) {
 	ids := []int64{min(a, b), max(a, b)}
@@ -272,10 +349,9 @@ func lockArenaPlayers(ctx context.Context, tx pgx.Tx, day string, a, b int64) (m
 	for _, id := range ids {
 		var r arenaRow
 		err := tx.QueryRow(ctx, `
-			SELECT rating,
-				CASE WHEN attacks_day = $2::date THEN attacks ELSE 0 END,
+			SELECT rating, tickets, tickets_at,
 				CASE WHEN tokens_day = $2::date THEN tokens_won ELSE 0 END
-			FROM arena_players WHERE user_id = $1 FOR UPDATE`, id, day).Scan(&r.rating, &r.attacks, &r.tokensWon)
+			FROM arena_players WHERE user_id = $1 FOR UPDATE`, id, day).Scan(&r.rating, &r.tickets, &r.ticketsAt, &r.tokensWon)
 		if err != nil {
 			return nil, err
 		}
