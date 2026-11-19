@@ -10,7 +10,7 @@
   const texts = {
     uz: {
       arenaTab: "Arena", arenaTeam: "⚔️ Jamoangiz", arenaSave: "Jamoani saqlash", arenaFoes: "🎯 Raqiblar", arenaHistory: "📜 Janglar tarixi", arenaRefresh: "🔄 Yangilash", topCards: "🎴 Kartalar", topArena: "⚔️ Arena",
-      title: "Kartalar", collected: "to'plandi", animeTab: "Animelar", animeSearch: "Anime yoki personaj", animeBack: "← Barcha animelar", animeOwned: "✓ Sizda bor", animeMissing: "Sizda hali yo'q", animeEmpty: "Hech narsa topilmadi", collection: "Kolleksiya", draw: "Olish", top: "Reyting",
+      title: "Kartalar", collected: "to'plandi", animeTab: "Animelar", animeSearch: "Anime yoki personaj", animeBack: "← Barcha animelar", animeOwned: "✓ Sizda bor", animeMissing: "Sizda hali yo'q", animeEmpty: "Hech narsa topilmadi", animeGoal: (n) => `🎟 Hammasini yig'ing: +${n} token`, animeClaim: (n) => `🎁 ${n} token olish`, animeClaimed: (n) => `✅ ${n} token olingan`, animeGot: (n) => `🎟 +${n} token! Kolleksiya to'liq`, collection: "Kolleksiya", draw: "Olish", top: "Reyting",
       search: "Kartani qidirish", rarities: ["Oddiy", "Noyob", "Epik", "Afsonaviy", "Mifik"],
       drawNow: "Karta olish", drawing: "Ochilmoqda…", next: (t) => `Keyingi karta: ${t}`, ready: "Karta tayyor!",
      
@@ -44,7 +44,7 @@
     },
     ru: {
       arenaTab: "Арена", arenaTeam: "⚔️ Ваша команда", arenaSave: "Сохранить команду", arenaFoes: "🎯 Соперники", arenaHistory: "📜 История боёв", arenaRefresh: "🔄 Обновить", topCards: "🎴 Карты", topArena: "⚔️ Арена",
-      title: "Карты", collected: "собрано", animeTab: "Аниме", animeSearch: "Аниме или персонаж", animeBack: "← Все аниме", animeOwned: "✓ Есть у вас", animeMissing: "Пока нет у вас", animeEmpty: "Ничего не найдено", collection: "Коллекция", draw: "Получить", top: "Рейтинг",
+      title: "Карты", collected: "собрано", animeTab: "Аниме", animeSearch: "Аниме или персонаж", animeBack: "← Все аниме", animeOwned: "✓ Есть у вас", animeMissing: "Пока нет у вас", animeEmpty: "Ничего не найдено", animeGoal: (n) => `🎟 Соберите всех: +${n} токенов`, animeClaim: (n) => `🎁 Забрать ${n} токенов`, animeClaimed: (n) => `✅ ${n} токенов получено`, animeGot: (n) => `🎟 +${n} токенов! Коллекция собрана`, collection: "Коллекция", draw: "Получить", top: "Рейтинг",
       search: "Поиск по картам", rarities: ["Обычная", "Редкая", "Эпическая", "Легендарная", "Мифическая"],
       drawNow: "Получить карту", drawing: "Открываем…", next: (t) => `Следующая карта: ${t}`, ready: "Карта готова!",
      
@@ -78,7 +78,7 @@
     },
     en: {
       arenaTab: "Arena", arenaTeam: "⚔️ Your team", arenaSave: "Save the team", arenaFoes: "🎯 Opponents", arenaHistory: "📜 Battle history", arenaRefresh: "🔄 Refresh", topCards: "🎴 Cards", topArena: "⚔️ Arena",
-      title: "Cards", collected: "collected", animeTab: "Anime", animeSearch: "Anime or character", animeBack: "← All anime", animeOwned: "✓ You have it", animeMissing: "Not yours yet", animeEmpty: "Nothing found", collection: "Collection", draw: "Draw", top: "Ranking",
+      title: "Cards", collected: "collected", animeTab: "Anime", animeSearch: "Anime or character", animeBack: "← All anime", animeOwned: "✓ You have it", animeMissing: "Not yours yet", animeEmpty: "Nothing found", animeGoal: (n) => `🎟 Collect them all: +${n} tokens`, animeClaim: (n) => `🎁 Claim ${n} tokens`, animeClaimed: (n) => `✅ ${n} tokens claimed`, animeGot: (n) => `🎟 +${n} tokens! Collection complete`, collection: "Collection", draw: "Draw", top: "Ranking",
       search: "Search cards", rarities: ["Common", "Rare", "Epic", "Legendary", "Mythic"],
       drawNow: "Draw a card", drawing: "Opening…", next: (t) => `Next card in ${t}`, ready: "A card is ready!",
      
@@ -1101,17 +1101,32 @@
     if (anime.startsWith("Fate/")) return "Fate";
     return FRANCHISES.find((f) => anime.startsWith(f)) || anime;
   }
-  let catalogAll = null, animeQuery = "";
+  let catalogAll = null, animeQuery = "", animeClaimed = new Set(), animeReward = null;
   async function animePage() {
     if (!catalogAll) {
       try {
-        catalogAll = (await api("animes")).cards;
+        const data = await api("animes");
+        catalogAll = data.cards;
+        animeClaimed = new Set(data.claimed || []);
+        animeReward = data.reward || null;
       } catch (error) {
         notice(error);
         return;
       }
     }
     animeList();
+  }
+  // animeGoal is an anime's collection: the cards it needs (limited ones
+  // aside), how many are held, and its reward's state: none (too small),
+  // open, ready (all held) or claimed.
+  function animeGoal(name, list) {
+    const need = list.filter((c) => !c.limited);
+    const held = need.filter((c) => heldCount(c.id)).length;
+    let state = "none";
+    if (animeReward && need.length >= animeReward.least) {
+      state = animeClaimed.has(name) ? "claimed" : held === need.length ? "ready" : "open";
+    }
+    return { need: need.length, held, state };
   }
   function heldCount(id) {
     const own = cards.find((c) => c.id === id);
@@ -1125,7 +1140,7 @@
     const q = animeQuery.trim().toLowerCase();
     const groups = new Map();
     for (const card of catalogAll) {
-      const name = franchise(card.anime || "");
+      const name = card.franchise || franchise(card.anime || "");
       if (!groups.has(name)) groups.set(name, []);
       groups.get(name).push(card);
     }
@@ -1151,9 +1166,16 @@
         dots.append(dot);
       }
       text.append(title, dots);
+      const goal = animeGoal(name, list);
       const held = document.createElement("span");
       held.className = "held";
-      held.innerHTML = `${list.filter((c) => heldCount(c.id)).length} <em>/ ${list.length}</em>`;
+      held.innerHTML = `${goal.held} <em>/ ${goal.need}</em>`;
+      if (goal.state !== "none") {
+        const tag = document.createElement("i");
+        tag.className = "goal " + goal.state;
+        tag.textContent = goal.state === "claimed" ? "✅" : goal.state === "ready" ? "🎁" : `🎟${animeReward.tokens}`;
+        held.append(tag);
+      }
       row.append(img, text, held);
       row.addEventListener("click", () => { animeCards(name, list); haptic("light"); });
       root.append(row);
@@ -1164,12 +1186,48 @@
     $("animeList").hidden = true;
     $("animeCards").hidden = false;
     $("animeTitle").textContent = name;
-    $("animeHeld").textContent = `${list.filter((c) => heldCount(c.id)).length} / ${list.length}`;
+    const goal = animeGoal(name, list);
+    $("animeHeld").textContent = `${goal.held} / ${goal.need}`;
+    animeRewardBar(name, list, goal);
     const grid = $("animeGrid");
     grid.textContent = "";
     for (const card of list) grid.append(previewTile(card, heldCount(card.id)));
     window.scrollTo(0, 0);
   }
+  // animeRewardBar is the anime's reward under its title: what collecting
+  // it gives, the button to take it once all is held, or that it was taken.
+  function animeRewardBar(name, list, goal) {
+    const bar = $("animeReward");
+    bar.hidden = goal.state === "none";
+    bar.textContent = "";
+    bar.className = "anime-reward " + goal.state;
+    if (bar.hidden) return;
+    if (goal.state !== "ready") {
+      bar.textContent = goal.state === "claimed" ? t.animeClaimed(animeReward.tokens) : t.animeGoal(animeReward.tokens);
+      return;
+    }
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "draw";
+    button.textContent = t.animeClaim(animeReward.tokens);
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        const data = await api("anime_claim", { query: name });
+        tokens = data.tokens ?? tokens;
+        if (data.given || data.refused === "claimed") animeClaimed.add(name);
+        if (data.given) { toast(t.animeGot(data.given)); haptic("heavy"); }
+        header();
+        drawButton();
+        animeCards(name, list);
+      } catch (error) {
+        button.disabled = false;
+        notice(error);
+      }
+    });
+    bar.append(button);
+  }
+
   // previewTile shows a card whether it is held or not: its picture and name,
   // dimmed and unmarked while the player does not have it.
   function previewTile(card, count) {

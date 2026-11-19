@@ -54,6 +54,8 @@ type fakeStore struct {
 	fuseErr  error
 	arena    fakeArena
 	quests   fakeQuests
+	catalog  []storage.Card  // cards beyond heldCard and lockedCard
+	animes   map[string]bool // the anime rewards claimed
 }
 
 var (
@@ -66,7 +68,24 @@ func (f *fakeStore) CardCollections(context.Context) (map[string]int, error) {
 }
 func (f *fakeStore) SaveCardCatalog(context.Context, []storage.Card) error { return nil }
 func (f *fakeStore) CardCatalog(context.Context) ([]storage.Card, error) {
-	return []storage.Card{heldCard, lockedCard}, nil
+	return append([]storage.Card{heldCard, lockedCard}, f.catalog...), nil
+}
+func (f *fakeStore) AnimeRewardsClaimed(context.Context, int64) ([]string, error) {
+	var claimed []string
+	for anime := range f.animes {
+		claimed = append(claimed, anime)
+	}
+	return claimed, nil
+}
+func (f *fakeStore) ClaimAnimeReward(_ context.Context, _ int64, _, anime string, tokens int) (int, bool, error) {
+	if f.animes[anime] {
+		return f.tokens, false, nil
+	}
+	if f.animes == nil {
+		f.animes = map[string]bool{}
+	}
+	f.animes[anime], f.tokens = true, f.tokens+tokens
+	return f.tokens, true, nil
 }
 func (f *fakeStore) OwnedCards(_ context.Context, userID int64, _ int) ([]storage.OwnedCard, error) {
 	if held, ok := f.arena.held[userID]; ok {

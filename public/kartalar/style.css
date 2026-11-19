@@ -535,6 +535,14 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .anime-row .held { font: 700 13px Unbounded, sans-serif; color: var(--gold); white-space: nowrap; }
 .anime-row .held em { font-style: normal; color: var(--muted); font-weight: 500; }
 .anime-back { margin: 0 0 10px; }
+.anime-row .held .goal { display: block; margin-top: 4px; font: 700 11px Manrope, sans-serif; font-style: normal; text-align: right; color: var(--muted); }
+.anime-row .held .goal.ready { color: var(--gold); font-size: 15px; animation: goal-pulse 1.6s ease-in-out infinite; }
+@keyframes goal-pulse { 50% { transform: scale(1.2); } }
+@media (prefers-reduced-motion: reduce) { .anime-row .held .goal.ready { animation: none; } }
+.anime-reward { margin: -4px 0 12px; padding: 10px 12px; border-radius: 12px; font: 600 13px Manrope, sans-serif; color: var(--muted); background: color-mix(in srgb, var(--gold) 8%, transparent); }
+.anime-reward.claimed { color: var(--text); }
+.anime-reward.ready { padding: 0; background: none; }
+.anime-reward .draw { width: 100%; min-height: 48px; font-size: 14px; }
 .anime-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .anime-head h2 { margin: 0; font: 800 17px/1.25 Manrope, sans-serif; }
 .anime-head span { font: 700 14px Unbounded, sans-serif; color: var(--gold); white-space: nowrap; }

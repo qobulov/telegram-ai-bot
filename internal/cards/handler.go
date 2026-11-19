@@ -45,6 +45,8 @@ type Store interface {
 	ArenaTop(ctx context.Context, limit int) ([]storage.ArenaPlayer, error)
 	CardQuests(ctx context.Context, userID int64, day time.Time) (map[string]storage.QuestProgress, error)
 	ClaimCardQuest(ctx context.Context, userID int64, quest storage.CardQuest, reward int, now time.Time) error
+	AnimeRewardsClaimed(ctx context.Context, userID int64) ([]string, error)
+	ClaimAnimeReward(ctx context.Context, userID int64, name, anime string, tokens int) (after int, claimed bool, err error)
 }
 
 // Invoices makes links to invoices in Stars, for crystals bought in the app.
@@ -213,7 +215,9 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		}
 		return h.catalogSearch(ctx, req.Query)
 	case "animes":
-		return h.animes(ctx)
+		return h.animes(ctx, opened.User)
+	case "anime_claim":
+		return h.animeClaim(ctx, opened.User, req.Query)
 	case "offer":
 		return h.offer(ctx, opened.User, req.Card, req.Want)
 	case "take":
@@ -244,11 +248,14 @@ type cardView struct {
 	Set    string `json:"set"`
 	Name   string `json:"name,omitempty"`
 	Anime  string `json:"anime,omitempty"`
-	Image  string `json:"image,omitempty"`
-	Attack int    `json:"attack,omitempty"`
-	Health int    `json:"health,omitempty"`
-	Value  int    `json:"value,omitempty"`
-	Count  int    `json:"count"`
+	// Franchise is the anime a card counts as, seasons and sequels as one
+	// (the anime list only).
+	Franchise string `json:"franchise,omitempty"`
+	Image     string `json:"image,omitempty"`
+	Attack    int    `json:"attack,omitempty"`
+	Health    int    `json:"health,omitempty"`
+	Value     int    `json:"value,omitempty"`
+	Count     int    `json:"count"`
 	// Limited is a card that is never traded.
 	Limited bool `json:"limited,omitempty"`
 	// Stars are a card held's, which raise its Attack and Health; Free are
@@ -439,9 +446,11 @@ func (h *handler) market(ctx context.Context, user miniapp.User) (any, failure) 
 	return map[string]any{"offers": views, "open_limit": OffersOpen}, failure{}
 }
 
-// animes is the whole catalog with every card's name and picture, so that
-// a player may look through each anime's cards, held or not.
-func (h *handler) animes(ctx context.Context) (any, failure) {
+// animes is the whole catalog with every card's name, picture and anime as
+// players know it, so that a player may look through each anime's cards,
+// held or not, with the animes whose collection reward they took and the
+// reward's rule.
+func (h *handler) animes(ctx context.Context, user miniapp.User) (any, failure) {
 	if err := h.catalog.Ensure(ctx); err != nil {
 		h.Logger.Error("could not fill the card catalog", "error", err)
 		return nil, errUnavailable
@@ -454,8 +463,16 @@ func (h *handler) animes(ctx context.Context) (any, failure) {
 	views := make([]cardView, len(catalog))
 	for i, c := range catalog {
 		views[i] = h.held(c, 0)
+		views[i].Franchise = Franchise(c.Anime)
 	}
-	return map[string]any{"cards": views}, failure{}
+	claimed, err := h.Store.AnimeRewardsClaimed(ctx, user.ID)
+	if err != nil {
+		h.Logger.Error("could not read a player's anime rewards", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
+	return map[string]any{
+		"cards": views, "claimed": claimed, "reward": map[string]int{"tokens": AnimeRewardTokens, "least": AnimeRewardLeast},
+	}, failure{}
 }
 
 // catalogSearch finds the cards of the catalog by name, for the card a
