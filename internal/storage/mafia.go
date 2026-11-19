@@ -83,7 +83,7 @@ func (s *Store) changeStateTx(ctx context.Context, table string, chatID int64, c
 			refused = err
 			return err
 		}
-		_, err = tx.Exec(ctx, `UPDATE `+table+` SET state = $2, updated_at = now() WHERE chat_id = $1`, chatID, changed)
+		_, err = tx.Exec(ctx, `UPDATE `+table+` SET state = $2, updated_at = now() WHERE chat_id = $1`, chatID, string(changed))
 		return err
 	})
 	if refused != nil {

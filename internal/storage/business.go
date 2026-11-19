@@ -240,7 +240,7 @@ func (s *Store) SaveBusinessChecklist(ctx context.Context, c BusinessChecklist) 
 		INSERT INTO business_checklists (connection_id, chat_id, message_id, title, tasks)
 		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (connection_id, chat_id, message_id) DO UPDATE SET title = EXCLUDED.title, tasks = EXCLUDED.tasks`,
-		c.ConnectionID, c.ChatID, c.MessageID, c.Title, tasks)
+		c.ConnectionID, c.ChatID, c.MessageID, c.Title, string(tasks))
 	if err != nil {
 		return fmt.Errorf("storage: save business checklist: %w", err)
 	}

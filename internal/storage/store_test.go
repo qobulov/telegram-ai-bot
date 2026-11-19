@@ -39,6 +39,12 @@ func newTestStore(t *testing.T) *Store {
 	if url == "" {
 		t.Skip("TEST_DB_POSTGRES_URL is not set; skipping PostgreSQL integration test")
 	}
+	// Production reaches Supabase through its transaction pooler in pgx's
+	// exec mode, which types parameters by their Go types alone; the tests
+	// run the same way so that a []byte or []string meant as JSON fails here.
+	if !strings.Contains(url, "default_query_exec_mode") {
+		url += map[bool]string{true: "&", false: "?"}[strings.Contains(url, "?")] + "default_query_exec_mode=exec"
+	}
 	ctx := context.Background()
 	store, err := Open(ctx, url)
 	if err != nil {

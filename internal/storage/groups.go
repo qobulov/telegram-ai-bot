@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -145,9 +146,13 @@ func (s *Store) SetBotRights(ctx context.Context, chatID int64, status string, r
 
 // rightsArray keeps "holds none" apart from "not known": no rights are
 // stored as an empty JSON array, never as NULL.
-func rightsArray(rights []string) []string {
+func rightsArray(rights []string) string {
 	if rights == nil {
-		return []string{}
+		rights = []string{}
 	}
-	return rights
+	// JSON text, not a []string: in pgx's exec mode, which Supabase's pooler
+	// needs, a []string goes as a Postgres array literal, '{a,b}', which
+	// jsonb reads as an object.
+	encoded, _ := json.Marshal(rights)
+	return string(encoded)
 }

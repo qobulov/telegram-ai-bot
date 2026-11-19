@@ -173,7 +173,9 @@ func nullJSON(raw json.RawMessage) any {
 	if len(raw) == 0 {
 		return nil
 	}
-	return []byte(raw)
+	// A string, not bytes: through Supabase's pooler queries run in pgx's
+	// exec mode, which sends bytes as bytea and so as no JSON at all.
+	return string(raw)
 }
 
 // ModerationBy counts the actions taken for a person since a moment, in
