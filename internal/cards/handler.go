@@ -47,6 +47,8 @@ type Store interface {
 	ArenaPlace(ctx context.Context, userID int64) (place, total int, err error)
 	ArenaWeekPlace(ctx context.Context, userID int64, since time.Time) (int, error)
 	BuyArenaToken(ctx context.Context, userID int64, name string, price, daily int, day time.Time) (coins, tokens int, err error)
+	TowerPlayerOf(ctx context.Context, userID int64, day time.Time) (storage.TowerPlayer, error)
+	RecordTowerFight(ctx context.Context, userID int64, name string, floor int, won bool, rules storage.TowerRules) (storage.TowerOutcome, error)
 	OpenArenaPack(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, price int, now time.Time, quest storage.CardQuest) (storage.CardOpening, int, error)
 	CardQuests(ctx context.Context, userID int64, day time.Time) (map[string]storage.QuestProgress, error)
 	ClaimCardQuest(ctx context.Context, userID int64, quest storage.CardQuest, reward int, now time.Time) error
@@ -254,6 +256,10 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return h.arenaTeam(ctx, opened.User, req.Front, req.Back)
 	case "arena_attack":
 		return h.arenaAttack(ctx, opened.User, req.Opponent)
+	case "tower":
+		return h.towerView(ctx, opened.User)
+	case "tower_fight":
+		return h.towerFight(ctx, opened.User)
 	case "arena_shop":
 		return h.arenaShop(ctx, opened.User, req.Item)
 	case "quests":

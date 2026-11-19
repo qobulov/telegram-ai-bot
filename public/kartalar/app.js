@@ -9,7 +9,7 @@
 
   const texts = {
     uz: {
-      arenaTab: "Arena", arenaShop: "🪙 Arena do'koni", arenaTeam: "⚔️ Jamoangiz", arenaSave: "Jamoani saqlash", arenaFoes: "🎯 Raqiblar", arenaHistory: "📜 Janglar tarixi", arenaRefresh: "🔄 Yangilash", topCards: "🎴 Kartalar", topArena: "⚔️ Arena",
+      arenaTab: "Arena", towerTab: "🗼 Minora", arenaShop: "🪙 Arena do'koni", arenaTeam: "⚔️ Jamoangiz", arenaSave: "Jamoani saqlash", arenaFoes: "🎯 Raqiblar", arenaHistory: "📜 Janglar tarixi", arenaRefresh: "🔄 Yangilash", topCards: "🎴 Kartalar", topArena: "⚔️ Arena",
       title: "Kartalar", collected: "to'plandi", animeTab: "Animelar", animeSearch: "Anime yoki personaj", animeBack: "← Barcha animelar", animeOwned: "✓ Sizda bor", animeMissing: "Sizda hali yo'q", animeEmpty: "Hech narsa topilmadi", animeGoal: (n) => `🎟 Hammasini yig'ing: +${n} token`, animeClaim: (n) => `🎁 ${n} token olish`, animeClaimed: (n) => `✅ ${n} token olingan`, animeGot: (n) => `🎟 +${n} token! Kolleksiya to'liq`, collection: "Kolleksiya", draw: "Olish", top: "Reyting",
       search: "Kartani qidirish", rarities: ["Oddiy", "Noyob", "Epik", "Afsonaviy", "Mifik"],
       drawNow: "Karta olish", drawing: "Ochilmoqda…", next: (t) => `Keyingi karta: ${t}`, ready: "Karta tayyor!",
@@ -43,7 +43,7 @@
       paid: "✅ To'lov qabul qilindi, kristall qo'shilmoqda…", crystalsAdded: (n) => `💎 +${n} kristall qo'shildi!`, payFailed: "To'lov amalga oshmadi", bought: (n) => `🎟 +${n} token`, packOpened: (r) => `${r} paket`,
     },
     ru: {
-      arenaTab: "Арена", arenaShop: "🪙 Магазин арены", arenaTeam: "⚔️ Ваша команда", arenaSave: "Сохранить команду", arenaFoes: "🎯 Соперники", arenaHistory: "📜 История боёв", arenaRefresh: "🔄 Обновить", topCards: "🎴 Карты", topArena: "⚔️ Арена",
+      arenaTab: "Арена", towerTab: "🗼 Башня", arenaShop: "🪙 Магазин арены", arenaTeam: "⚔️ Ваша команда", arenaSave: "Сохранить команду", arenaFoes: "🎯 Соперники", arenaHistory: "📜 История боёв", arenaRefresh: "🔄 Обновить", topCards: "🎴 Карты", topArena: "⚔️ Арена",
       title: "Карты", collected: "собрано", animeTab: "Аниме", animeSearch: "Аниме или персонаж", animeBack: "← Все аниме", animeOwned: "✓ Есть у вас", animeMissing: "Пока нет у вас", animeEmpty: "Ничего не найдено", animeGoal: (n) => `🎟 Соберите всех: +${n} токенов`, animeClaim: (n) => `🎁 Забрать ${n} токенов`, animeClaimed: (n) => `✅ ${n} токенов получено`, animeGot: (n) => `🎟 +${n} токенов! Коллекция собрана`, collection: "Коллекция", draw: "Получить", top: "Рейтинг",
       search: "Поиск по картам", rarities: ["Обычная", "Редкая", "Эпическая", "Легендарная", "Мифическая"],
       drawNow: "Получить карту", drawing: "Открываем…", next: (t) => `Следующая карта: ${t}`, ready: "Карта готова!",
@@ -77,7 +77,7 @@
       paid: "✅ Оплата принята, кристаллы зачисляются…", crystalsAdded: (n) => `💎 +${n} кристаллов!`, payFailed: "Оплата не прошла", bought: (n) => `🎟 +${n} токенов`, packOpened: (r) => `Пак: ${r}`,
     },
     en: {
-      arenaTab: "Arena", arenaShop: "🪙 Arena shop", arenaTeam: "⚔️ Your team", arenaSave: "Save the team", arenaFoes: "🎯 Opponents", arenaHistory: "📜 Battle history", arenaRefresh: "🔄 Refresh", topCards: "🎴 Cards", topArena: "⚔️ Arena",
+      arenaTab: "Arena", towerTab: "🗼 Tower", arenaShop: "🪙 Arena shop", arenaTeam: "⚔️ Your team", arenaSave: "Save the team", arenaFoes: "🎯 Opponents", arenaHistory: "📜 Battle history", arenaRefresh: "🔄 Refresh", topCards: "🎴 Cards", topArena: "⚔️ Arena",
       title: "Cards", collected: "collected", animeTab: "Anime", animeSearch: "Anime or character", animeBack: "← All anime", animeOwned: "✓ You have it", animeMissing: "Not yours yet", animeEmpty: "Nothing found", animeGoal: (n) => `🎟 Collect them all: +${n} tokens`, animeClaim: (n) => `🎁 Claim ${n} tokens`, animeClaimed: (n) => `✅ ${n} tokens claimed`, animeGot: (n) => `🎟 +${n} tokens! Collection complete`, collection: "Collection", draw: "Draw", top: "Ranking",
       search: "Search cards", rarities: ["Common", "Rare", "Epic", "Legendary", "Mythic"],
       drawNow: "Draw a card", drawing: "Opening…", next: (t) => `Next card in ${t}`, ready: "A card is ready!",
@@ -2037,6 +2037,15 @@
       you: "Siz", topEmpty: "Arenada hali hech kim jang qilmagan", topRow: (w, l, p) => `${w} G · ${l} M · ⚡${p}`,
       skills: { strike: "Kuchli zarba", heal: "Davolash", shield: "Qalqon", stun: "Hayratlantirish", poison: "Zahar", provoke: "Chaqiriq" }, fell: (n) => `💀 ${n} yiqildi`,
       skillInfo: { strike: "energiya to'lganda 1.8 barobar zarba", heal: "energiya to'lganda eng zaif yarador ittifoqchiga jonining 80% igacha qaytaradi", shield: "energiya to'lganda o'ziga va eng zaif ittifoqchiga jonining 45% i qalqon", stun: "energiya to'lganda urib, raqibning keyingi yurishini o'tkazdiradi", poison: "energiya to'lganda urib zaharlaydi: 3 yurish davomida 15% jon", provoke: "energiya to'lganda 3 raund raqib tank va jangchilarini o'ziga tortadi va zarbani 30% kam oladi" },
+      tower: {
+        best: "Eng baland qavat", floorN: (n) => `${n}-qavat`, tries: (n, m) => `🗼 Urinishlar: ${n}/${m}`, none: "hali yo'q",
+        theme: (a, p) => `🎌 Bu hafta: ${a} +${p}%`, themeHint: "Shu anime kartalaringiz minorada kuchliroq: hujum va jon", noTheme: "Bu hafta mavzu yo'q",
+        enemy: (n) => `🗼 ${n}-qavat`, reward: (c, k) => `Birinchi o'tish: +${c} 🪙` + (k ? ` · +${k} 🎟` : ""), fight: (n) => `⚔️ ${n}-qavatga jang`,
+        yours: "Arenada saqlangan jamoangiz jang qiladi", noTeam: "Avval Arena bo'limida jamoa saqlang", noTries: "Bugungi urinishlar tugadi: ertaga yana",
+        rule: (m) => `Har kuni ${m} urinish. G'alaba keyingi qavatni ochadi va mukofot beradi, mag'lubiyat faqat urinishni oladi. Har 5-qavat +1 🎟, har 10-qavat +3 🎟`,
+        cleared: (n) => `🗼 ${n}-qavat o'tildi!`, failed: (n) => `${n}-qavat o'tilmadi`, tokens: (n) => `🎟 +${n} token`,
+        refused: { no_team: "Avval Arena bo'limida jamoa saqlang", no_tries: "Bugungi urinishlar tugadi: ertaga yana", no_floor: "Bu qavat hali tayyor emas", moved: "Bu qavat allaqachon o'tildi, sahifa yangilandi" },
+      },
       coins: (n) => `🪙 ${n}`, coinsWon: (n) => `+${n} 🪙`, ruleCoins: (w, l) => `🪙 Har hujum tanga beradi: g'alaba +${w}, mag'lubiyat +${l}. Tangalar Arena do'konida sarflanadi`,
       shopHint: (w, l) => `Har hujum: g'alaba +${w} 🪙, mag'lubiyat +${l} 🪙`, shopToken: "1 ta 🎟 token", shopTokenHint: (left, d) => `Bugun yana ${left} ta (kuniga ${d} tagacha)`,
       shopRefused: { coins: "Tanga yetmaydi: arenada hujum qiling", daily: "Bugungi tokenlar olindi: ertaga yana" },
@@ -2073,6 +2082,15 @@
       you: "Вы", topEmpty: "На арене ещё никто не сражался", topRow: (w, l, p) => `${w} В · ${l} П · ⚡${p}`,
       skills: { strike: "Сильный удар", heal: "Лечение", shield: "Щит", stun: "Оглушение", poison: "Яд", provoke: "Провокация" }, fell: (n) => `💀 ${n} пал(а)`,
       skillInfo: { strike: "при полной энергии удар ×1.8", heal: "при полной энергии возвращает самому слабому раненому союзнику до 80% здоровья", shield: "при полной энергии щит в 45% здоровья себе и самому слабому союзнику", stun: "при полной энергии бьёт, и соперник пропускает следующий ход", poison: "при полной энергии бьёт и отравляет: 15% здоровья 3 хода", provoke: "при полной энергии 3 раунда притягивает танков и бойцов соперника и получает на 30% меньше урона" },
+      tower: {
+        best: "Высший этаж", floorN: (n) => `Этаж ${n}`, tries: (n, m) => `🗼 Попытки: ${n}/${m}`, none: "пока нет",
+        theme: (a, p) => `🎌 На этой неделе: ${a} +${p}%`, themeHint: "Ваши карты этого аниме в башне сильнее: атака и здоровье", noTheme: "На этой неделе темы нет",
+        enemy: (n) => `🗼 Этаж ${n}`, reward: (c, k) => `За первое прохождение: +${c} 🪙` + (k ? ` · +${k} 🎟` : ""), fight: (n) => `⚔️ Бой за этаж ${n}`,
+        yours: "Сражается команда, сохранённая на арене", noTeam: "Сначала сохраните команду в разделе Арена", noTries: "Попытки на сегодня закончились: завтра снова",
+        rule: (m) => `${m} попыток в день. Победа открывает следующий этаж и даёт награду, поражение отнимает только попытку. Каждый 5-й этаж +1 🎟, каждый 10-й +3 🎟`,
+        cleared: (n) => `🗼 Этаж ${n} пройден!`, failed: (n) => `Этаж ${n} не пройден`, tokens: (n) => `🎟 +${n} токен.`,
+        refused: { no_team: "Сначала сохраните команду в разделе Арена", no_tries: "Попытки на сегодня закончились: завтра снова", no_floor: "Этот этаж ещё не готов", moved: "Этот этаж уже пройден, страница обновлена" },
+      },
       coins: (n) => `🪙 ${n}`, coinsWon: (n) => `+${n} 🪙`, ruleCoins: (w, l) => `🪙 Каждая атака даёт монеты: победа +${w}, поражение +${l}. Их тратят в магазине арены`,
       shopHint: (w, l) => `За атаку: победа +${w} 🪙, поражение +${l} 🪙`, shopToken: "1 🎟 токен", shopTokenHint: (left, d) => `Сегодня ещё ${left} (до ${d} в день)`,
       shopRefused: { coins: "Не хватает монет: атакуйте на арене", daily: "Токены на сегодня куплены: завтра снова" },
@@ -2109,6 +2127,15 @@
       you: "You", topEmpty: "Nobody has fought in the arena yet", topRow: (w, l, p) => `${w} W · ${l} L · ⚡${p}`,
       skills: { strike: "Power strike", heal: "Heal", shield: "Shield", stun: "Stun", poison: "Poison", provoke: "Provoke" }, fell: (n) => `💀 ${n} fell`,
       skillInfo: { strike: "when energy is full, hits ×1.8", heal: "when energy is full, gives the weakest hurt ally back up to 80% of its health", shield: "when energy is full, shields itself and its weakest ally for 45% of their health", stun: "when energy is full, hits and the target skips its next turn", poison: "when energy is full, hits and poisons: 15% health for 3 turns", provoke: "when energy is full, draws enemy tanks and fighters for 3 rounds and takes 30% less damage" },
+      tower: {
+        best: "Highest floor", floorN: (n) => `Floor ${n}`, tries: (n, m) => `🗼 Attempts: ${n}/${m}`, none: "none yet",
+        theme: (a, p) => `🎌 This week: ${a} +${p}%`, themeHint: "Your cards of this anime are stronger in the tower: attack and health", noTheme: "No theme this week",
+        enemy: (n) => `🗼 Floor ${n}`, reward: (c, k) => `First clear: +${c} 🪙` + (k ? ` · +${k} 🎟` : ""), fight: (n) => `⚔️ Fight floor ${n}`,
+        yours: "Your team saved in the arena fights", noTeam: "Save a team in the Arena first", noTries: "No attempts left today: more tomorrow",
+        rule: (m) => `${m} attempts a day. A win opens the next floor and gives its reward, a loss only takes the attempt. Every 5th floor +1 🎟, every 10th +3 🎟`,
+        cleared: (n) => `🗼 Floor ${n} cleared!`, failed: (n) => `Floor ${n} not cleared`, tokens: (n) => `🎟 +${n} tokens`,
+        refused: { no_team: "Save a team in the Arena first", no_tries: "No attempts left today: more tomorrow", no_floor: "This floor is not ready yet", moved: "This floor is cleared already; the page is refreshed" },
+      },
       coins: (n) => `🪙 ${n}`, coinsWon: (n) => `+${n} 🪙`, ruleCoins: (w, l) => `🪙 Each attack gives coins: a win +${w}, a loss +${l}. Spend them in the arena shop`,
       shopHint: (w, l) => `Each attack: a win +${w} 🪙, a loss +${l} 🪙`, shopToken: "1 🎟 token", shopTokenHint: (left, d) => `${left} more today (up to ${d} a day)`,
       shopRefused: { coins: "Not enough coins: attack in the arena", daily: "Today's tokens are bought: more tomorrow" },
@@ -2172,6 +2199,7 @@
     tile.querySelector(".f-name").textContent = f.name;
     if (f.stars > 1) tile.insertAdjacentHTML("beforeend", `<span class="f-stars">★${f.stars}</span>`);
     if (f.synergy) tile.insertAdjacentHTML("beforeend", `<span class="f-syn">🔗+${f.synergy}%</span>`);
+    if (f.theme) tile.insertAdjacentHTML("beforeend", `<span class="f-theme">🎌+${f.theme}%</span>`);
     return tile;
   }
 
@@ -2633,6 +2661,105 @@
     }
   }
 
+  // ---------- the tower ----------
+
+  // The Tower of Souls: floors of fixed teams, fought with the arena team
+  // saved, ten attempts a day; the week's anime raises its cards there.
+  // The Arena tab switches between the arena and the tower by its chips.
+  let arenaMode = "arena", towerData = null, towerBusy = false;
+  for (const chip of document.querySelectorAll("#arenaMode button")) {
+    chip.addEventListener("click", () => { arenaMode = chip.dataset.m; haptic("light"); arenaOpen(); });
+  }
+
+  // arenaOpen shows the arena or the tower, as the chips say.
+  function arenaOpen() {
+    for (const chip of document.querySelectorAll("#arenaMode button")) chip.setAttribute("aria-pressed", String(chip.dataset.m === arenaMode));
+    $("arenaMain").hidden = arenaMode !== "arena";
+    $("towerMain").hidden = arenaMode !== "tower";
+    if (arenaMode === "tower") towerPage();
+    else arenaPage();
+  }
+
+  async function towerPage() {
+    try {
+      towerShow(await api("tower"));
+      notice(null);
+    } catch (error) {
+      notice(error);
+    }
+  }
+
+  // towerRow lays fighters out in a row of the tower, two in front or three
+  // behind, as the arena's team is.
+  function towerRow(id, list, label) {
+    const row = $(id);
+    row.textContent = "";
+    const em = document.createElement("em");
+    em.innerHTML = "<b></b>";
+    em.querySelector("b").textContent = label;
+    row.append(em);
+    for (const f of list) {
+      const slot = document.createElement("div");
+      slot.className = "slot";
+      slot.append(fighterTile(f));
+      row.append(slot);
+    }
+  }
+
+  function towerShow(data) {
+    towerData = data;
+    const tw = at.tower;
+    const me = $("towerMe");
+    me.innerHTML = '<div class="arena-rating"><small></small><b></b></div><div class="arena-left"><span></span><span></span></div>';
+    me.querySelector(".arena-rating small").textContent = tw.best;
+    me.querySelector(".arena-rating b").textContent = data.floor ? tw.floorN(data.floor) : tw.none;
+    const left = me.querySelectorAll(".arena-left span");
+    left[0].textContent = tw.tries(data.tries_left, data.tries);
+    left[1].textContent = data.theme && data.theme.anime ? tw.theme(data.theme.anime, data.theme.bonus) : tw.noTheme;
+    $("towerTheme").textContent = data.theme && data.theme.anime ? tw.themeHint : "";
+    $("towerTheme").hidden = !(data.theme && data.theme.anime);
+    $("towerRule").textContent = tw.rule(data.tries);
+    $("towerFloorTitle").textContent = tw.enemy(data.next);
+    $("towerEnemyPower").textContent = at.power(spaced(data.enemy_power || 0));
+    $("towerReward").textContent = tw.reward(data.reward.coins, data.reward.tokens);
+    const enemy = data.enemy || [];
+    towerRow("towerFront", enemy.slice(0, 2), at.front);
+    towerRow("towerBack", enemy.slice(2), at.back);
+    const team = data.team || [];
+    $("towerPower").textContent = team.length ? at.power(spaced(data.power)) : "";
+    towerRow("towerTeamFront", team.slice(0, 2), at.front);
+    towerRow("towerTeamBack", team.slice(2), at.back);
+    $("towerTeamFront").hidden = $("towerTeamBack").hidden = !team.length;
+    $("towerHint").textContent = !team.length ? tw.noTeam : data.tries_left <= 0 ? tw.noTries : tw.yours;
+    const fight = $("towerFight");
+    fight.textContent = tw.fight(data.next);
+    fight.disabled = towerBusy || !team.length || !enemy.length || data.tries_left <= 0;
+  }
+
+  $("towerFight").addEventListener("click", async () => {
+    if (towerBusy || !towerData) return;
+    towerBusy = true;
+    towerShow(towerData);
+    haptic("medium");
+    try {
+      const data = await api("tower_fight");
+      if (data.refused) {
+        toast(at.tower.refused[data.refused] || t.unavailable);
+        await towerPage();
+        return;
+      }
+      if (data.tokens !== undefined) { tokens = data.tokens; drawButton(); }
+      if (data.coins !== undefined && arenaData) arenaData.player.coins = data.coins;
+      await replay(data, { name: at.tower.floorN(data.fought) });
+      await towerPage();
+    } catch (error) {
+      notice(error);
+    } finally {
+      towerBusy = false;
+      if (towerData) towerShow(towerData);
+    }
+  });
+
   // ---------- the battle's replay ----------
 
   // replay shows the battle on the whole screen, the opponent above and the
@@ -2788,10 +2915,10 @@
         const result = box.querySelector(".b-result");
         result.classList.add(data.won ? "won" : "lost");
         result.querySelector(".b-title").textContent = data.won ? at.won : at.lost;
-        result.querySelector(".b-change").textContent = at.change(data.rating_change || 0);
+        result.querySelector(".b-change").textContent = data.fought ? (data.won ? at.tower.cleared(data.fought) : at.tower.failed(data.fought)) : at.change(data.rating_change || 0);
         const token = result.querySelector(".b-token");
-        token.textContent = data.token ? at.token : "";
-        token.hidden = !data.token;
+        token.textContent = data.token ? at.token : data.tokens_won ? at.tower.tokens(data.tokens_won) : "";
+        token.hidden = !token.textContent;
         const coins = result.querySelector(".b-coins");
         coins.textContent = data.coins_won ? at.coinsWon(data.coins_won) : "";
         coins.hidden = !data.coins_won;
@@ -2882,7 +3009,7 @@
     $("coinShards").classList.toggle("on", tab === "shop");
     for (const name of ["collection", "draw", "market", "anime", "shop", "arena", "top"]) $(`tab-${name}`).hidden = name !== tab;
     if (tab === "top") ranking();
-    if (tab === "arena") arenaPage();
+    if (tab === "arena") arenaOpen();
     if (tab === "shop") shop();
     if (tab === "anime") animePage();
     if (tab === "market") market();

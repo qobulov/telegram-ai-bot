@@ -53,6 +53,7 @@ type fakeStore struct {
 	stars    int                   // the held card's stars; 0 is ★1
 	fuseErr  error
 	arena    fakeArena
+	tower    fakeTower
 	quests   fakeQuests
 	catalog  []storage.Card  // cards beyond heldCard and lockedCard
 	animes   map[string]bool // the anime rewards claimed

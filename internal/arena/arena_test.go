@@ -221,7 +221,6 @@ func TestEdgeTriangle(t *testing.T) {
 	}
 }
 
-
 // soloFight is a fight of a against d in round 1, built as Battle builds
 // it, for a turn to be played by hand.
 func soloFight(a, d Team) *fight {

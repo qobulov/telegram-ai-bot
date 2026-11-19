@@ -2363,6 +2363,32 @@ so that tokens stay scarce; an Epic pack of 5 cards with one sure Epic for
 (`legendary`). The packs are drawn as the crystal shop's (`PackRoll`, the
 same `drawPack` as `OpenCardPack`, in `OpenArenaPack`), count toward the
 daily opening quest, and open with the same panel and Mythic celebration.
+The Arena tab's chips switch between the arena and 🗼 Minora, the Tower of
+Souls, as the owners asked on 2026-11-19 (`internal/cards/tower.go`, the
+table `tower_players` of migration 114: the highest floor cleared and the
+day's attempts by Tashkent's date, with row level security). Each floor is a
+fixed enemy team built from the catalog by its number alone (`towerTeam`): a
+seed from the floor draws five distinct cards, limited ones left out, between
+two rarities that rise with the floor (Common and Rare to floor 9, Rare and
+Epic from 10, Epic and Legendary from 20, Legendary and Mythic from 40, the
+higher one more often further into each band), at ★1 rising a star every 15
+floors to ★5, the two toughest by health to attack in front, their numbers
+scaled so that floor 1 has power 5 000 and each floor 7% more than the one
+below (`TowerPower`). Each week, Monday to Monday in Tashkent, one anime
+(`Franchise`) of at least 5 cards, picked by the week's date, is the theme
+("🎌 Bu hafta: Naruto +20%"): the player's cards of it get +20% attack and
+health in the tower only, on top of their synergy, and show 🎌 +20%. The
+player fights the next floor with their saved arena team, 10 attempts a day
+(`TowerTries`): `tower` gives the floor cleared, the next floor's team and
+power, the attempts left, the theme, the next floor's reward and the
+player's team with its power under the theme; `tower_fight` plays the
+battle on the server (`arena.Battle`, its seed from the player, the floor
+and the day's attempt) and records it in one transaction
+(`RecordTowerFight`; refused `no_team`, `no_tries`, `no_floor` or `moved`),
+and the page replays it as an arena battle, ending with "46-qavat o'tildi"
+or "o'tilmadi". A win clears the floor and gives, once as each floor is
+cleared once, 10 + 2 × floor arena coins, and 3 card tokens on every 10th
+floor or 1 on every other 5th; a loss gives nothing but takes the attempt.
 🎯 Kunlik topshiriqlar, the daily quests (`internal/cards/quests.go`, the
 table `card_quests` of migration 102), are four a day, new at midnight in
 Tashkent, 10 tokens in all: open 5 cards, by draws or shop packs (2 🎟), win

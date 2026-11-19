@@ -71,6 +71,9 @@ type fighterView struct {
 	// percent its Attack and Health are raised by for the team's others of it.
 	Anime   string `json:"anime"`
 	Synergy int    `json:"synergy"`
+	// Theme is the percent the tower's anime of the week raises it by, 0
+	// outside the tower.
+	Theme int `json:"theme,omitempty"`
 }
 
 // eventView is one thing that happened in a battle, for the page to replay.
@@ -99,6 +102,12 @@ type fighters struct {
 // fightersOf makes a team of the cards ids, of the player's held, boosted by
 // their stars, then by their anime synergy; ok is false if any is not held.
 func fightersOf(held []storage.OwnedCard, ids [5]int64) (fighters, bool) {
+	return themedFighters(held, ids, "")
+}
+
+// themedFighters is fightersOf with the cards of theme, an anime as
+// Franchise counts it, raised by TowerThemeBonus besides; "" is none.
+func themedFighters(held []storage.OwnedCard, ids [5]int64, theme string) (fighters, bool) {
 	byID := make(map[int64]storage.OwnedCard, len(held))
 	for _, o := range held {
 		if o.Count > 0 {
@@ -119,13 +128,17 @@ func fightersOf(held []storage.OwnedCard, ids [5]int64) (fighters, bool) {
 	views := make([]fighterView, len(ids))
 	for i, o := range owned {
 		stars := min(max(o.Stars, 1), MaxStars)
+		themed := 0
+		if theme != "" && animes[i] == theme {
+			themed = TowerThemeBonus
+		}
 		attack, health := Boosted(o.Card, stars)
-		attack, health = raised(attack, bonus[i]), raised(health, bonus[i])
+		attack, health = raised(attack, bonus[i]+themed), raised(health, bonus[i]+themed)
 		f := arena.FighterOf(o.ID, o.Name, o.Rarity, stars, attack, health)
 		slots[i] = f
 		views[i] = fighterView{ID: o.ID, Name: o.Name, Image: o.ImageURL, Rarity: o.Rarity, Stars: stars,
 			Attack: attack, Health: health, Class: classNames[f.Class], Skill: skillNames[f.Skill],
-			Anime: animes[i], Synergy: bonus[i]}
+			Anime: animes[i], Synergy: bonus[i], Theme: themed}
 	}
 	team := arena.Team{Front: [2]arena.Fighter{slots[0], slots[1]}, Back: [3]arena.Fighter{slots[2], slots[3], slots[4]}}
 	return fighters{team, views}, true
@@ -158,6 +171,11 @@ func raised(n, percent int) int { return (n*(100+percent) + 50) / 100 }
 // savedFighters is the player's saved team; ok is false without one or with
 // a card of it no longer held.
 func (h *handler) savedFighters(ctx context.Context, userID int64) (fighters, bool, error) {
+	return h.themedSaved(ctx, userID, "")
+}
+
+// themedSaved is savedFighters with theme's cards raised, as themedFighters.
+func (h *handler) themedSaved(ctx context.Context, userID int64, theme string) (fighters, bool, error) {
 	front, back, ok, err := h.Store.ArenaTeam(ctx, userID)
 	if err != nil || !ok {
 		return fighters{}, false, err
@@ -166,7 +184,7 @@ func (h *handler) savedFighters(ctx context.Context, userID int64) (fighters, bo
 	if err != nil {
 		return fighters{}, false, err
 	}
-	team, ok := fightersOf(held, [5]int64{front[0], front[1], back[0], back[1], back[2]})
+	team, ok := themedFighters(held, [5]int64{front[0], front[1], back[0], back[1], back[2]}, theme)
 	return team, ok, nil
 }
 

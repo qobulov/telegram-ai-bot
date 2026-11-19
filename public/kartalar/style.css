@@ -939,6 +939,10 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .fighter.poisoned { box-shadow: 0 0 0 1.5px var(--c) inset, 0 0 0 3px rgba(130, 230, 90, 0.55) inset; }
 .fighter .f-syn { position: absolute; left: 4px; bottom: 18px; padding: 0 5px; border-radius: 999px; background: rgba(8, 6, 14, 0.75); font: 700 9px/15px Manrope, sans-serif; color: #9fd8ff; }
 .b-row .fighter .f-syn { bottom: 31px; }
+.fighter .f-theme { position: absolute; left: 4px; top: 23px; padding: 0 5px; border-radius: 999px; background: rgba(8, 6, 14, 0.75); font: 700 9px/15px Manrope, sans-serif; color: #ffb3c7; }
+.arena-mode { padding: 0 0 10px; }
+.tower-theme { color: #ffb3c7; }
+#towerMain .arena-row[hidden], .tower-theme[hidden] { display: none; }
 .arena-rules { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; }
 .arena-rules.on span { padding: 3px 9px; border-radius: 999px; background: rgba(159, 216, 255, 0.12); color: #9fd8ff; font-weight: 700; }
 .arena-pick .pick-skill { display: block; max-width: 180px; margin-top: 2px; font-size: 11px; font-weight: 500; white-space: normal; }
@@ -1059,3 +1063,4 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
   .sheet-card .turn > .info-side { transform: none; }
   .turn > .face { transition: none; }
 }
+#towerMain .slot { cursor: default; }

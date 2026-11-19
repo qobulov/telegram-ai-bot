@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Manrope:wght@500;600;800&display=swap" rel="stylesheet">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="style.css?v=73">
+  <link rel="stylesheet" href="style.css?v=74">
 </head>
 <body>
   <div class="grain" aria-hidden="true"></div>
@@ -158,7 +158,11 @@
     </section>
 
     <section class="tab" id="tab-arena" hidden>
-      <div class="arena">
+      <div class="sets arena-mode" id="arenaMode" role="group">
+        <button type="button" data-m="arena" data-t="arenaTab"></button>
+        <button type="button" data-m="tower" data-t="towerTab"></button>
+      </div>
+      <div class="arena" id="arenaMain">
         <ol class="arena-steps" id="arenaSteps"></ol>
         <div class="arena-me" id="arenaMe"></div>
         <details class="arena-guide" id="arenaGuide"><summary><span id="arenaGuideTitle"></span><i aria-hidden="true">▾</i></summary><div class="guide-body" id="arenaGuideBody"></div></details>
@@ -182,6 +186,24 @@
         <div class="arena-block">
           <div class="arena-head"><h2 class="shop-title" data-t="arenaHistory"></h2></div>
           <ul class="arena-foes" id="arenaHistory"></ul>
+        </div>
+      </div>
+      <div class="arena" id="towerMain" hidden>
+        <div class="arena-me" id="towerMe"></div>
+        <p class="market-hint tower-theme" id="towerTheme"></p>
+        <div class="arena-block">
+          <div class="arena-head"><h2 class="shop-title" id="towerFloorTitle"></h2><b class="arena-power" id="towerEnemyPower"></b></div>
+          <p class="market-hint" id="towerReward"></p>
+          <div class="arena-row" id="towerFront"></div>
+          <div class="arena-row rear" id="towerBack"></div>
+        </div>
+        <div class="arena-block">
+          <div class="arena-head"><h2 class="shop-title" data-t="arenaTeam"></h2><b class="arena-power" id="towerPower"></b></div>
+          <p class="market-hint" id="towerHint"></p>
+          <div class="arena-row" id="towerTeamFront"></div>
+          <div class="arena-row rear" id="towerTeamBack"></div>
+          <button type="button" class="draw" id="towerFight"></button>
+          <p class="market-hint" id="towerRule"></p>
         </div>
       </div>
     </section>
@@ -212,6 +234,6 @@
 
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="app.js?v=73"></script>
+  <script src="app.js?v=74"></script>
 </body>
 </html>
