@@ -171,6 +171,7 @@
     nextTokenAt = Date.now() + (data.next_token_in || 0);
     tokens = data.tokens || 0;
     if (data.given) toast(t.given(data.given));
+    if (data.quests) questShow(data.quests);
     shardsPanel();
     notice(null);
     header();
@@ -1489,6 +1490,167 @@
     }
   }
 
+  // ---------- daily quests ----------
+
+  // The daily quests: four a day, new at midnight in Tashkent, 10 tokens in
+  // all. The server counts them as the actions happen; the page lists them
+  // in a sheet and claims each one's tokens. The state says how many are
+  // done and ready, for the entry at the top of the collection and its dot.
+  const questTexts = {
+    uz: {
+      title: "🎯 Kunlik topshiriqlar", entry: "Kunlik topshiriqlar", claim: "Olish",
+      names: { open: (n) => `${n} ta karta oching`, arena: () => "Arenada hujum qilib yuting", fuse: () => "Kartani 1 yulduzga ko'taring", event: () => "Eventda 1 ta karta oching", market: () => "Bozorda 1 marta almashing" },
+      reset: (h, m) => (h ? `Yangilanishiga ${h} soat ${m} daqiqa` : `Yangilanishiga ${m} daqiqa`),
+      line: (n) => (n ? `🎁 ${n} ta mukofot tayyor` : "Har kuni 4 ta topshiriq · 10 🎟"),
+      allDone: "✅ Bugungi topshiriqlar bajarildi. Ertaga yangilari keladi!",
+      got: (n) => `🎟 +${n} token olindi`,
+      refused: { not_done: "Topshiriq hali bajarilmagan", claimed: "Bu mukofot allaqachon olingan" },
+    },
+    ru: {
+      title: "🎯 Ежедневные задания", entry: "Ежедневные задания", claim: "Забрать",
+      names: { open: (n) => `Откройте ${n} карт`, arena: () => "Победите в атаке на арене", fuse: () => "Повысьте карту на 1 звезду", event: () => "Откройте 1 карту ивента", market: () => "Совершите 1 обмен на рынке" },
+      reset: (h, m) => (h ? `Обновление через ${h} ч. ${m} мин.` : `Обновление через ${m} мин.`),
+      line: (n) => (n ? `🎁 Готово наград: ${n}` : "4 задания в день · 10 🎟"),
+      allDone: "✅ Задания на сегодня выполнены. Завтра будут новые!",
+      got: (n) => `🎟 +${n} токенов`,
+      refused: { not_done: "Задание ещё не выполнено", claimed: "Награда уже получена" },
+    },
+    en: {
+      title: "🎯 Daily quests", entry: "Daily quests", claim: "Claim",
+      names: { open: (n) => `Open ${n} cards`, arena: () => "Win an arena attack", fuse: () => "Raise a card by 1 star", event: () => "Open 1 event card", market: () => "Make 1 market trade" },
+      reset: (h, m) => (h ? `New quests in ${h} h ${m} min` : `New quests in ${m} min`),
+      line: (n) => (n ? `🎁 ${n} ${n === 1 ? "reward" : "rewards"} ready` : "4 quests a day · 10 🎟"),
+      allDone: "✅ All of today's quests are done. New ones come tomorrow!",
+      got: (n) => `🎟 +${n} tokens`,
+      refused: { not_done: "This quest is not done yet", claimed: "This reward was claimed already" },
+    },
+  };
+  const qt = questTexts[language] || questTexts.uz;
+  const QUEST_ICON = { open: "🎴", arena: "⚔️", fuse: "⭐", event: "🌸", market: "🔄" };
+  let questSummary = null, questList = null, questResetAt = 0, claiming = false;
+
+  // questShow keeps what the server said of the day's quests: the counts,
+  // the time to new ones and, from "quests", the list itself.
+  function questShow(data) {
+    questSummary = { done: data.done, ready: data.ready, total: data.total };
+    questResetAt = Date.now() + (data.reset_in || 0);
+    if (data.quests) questList = data.quests;
+    questEntry();
+  }
+
+  // questEntry shows the quests' entry on the collection: how many are
+  // done, and a dot while a reward waits.
+  $("questEntryTitle").textContent = qt.entry;
+  function questEntry() {
+    const on = !!questSummary && opened === "collection";
+    $("questEntry").hidden = !on;
+    if (!on) return;
+    $("questEntryCount").textContent = `${questSummary.done}/${questSummary.total}`;
+    $("questEntryLine").textContent = qt.line(questSummary.ready);
+    $("questDot").hidden = !questSummary.ready;
+    $("questEntry").classList.toggle("ready", questSummary.ready > 0);
+  }
+  $("questEntry").addEventListener("click", () => { haptic("light"); openQuests(); });
+
+  async function openQuests() {
+    try {
+      questShow(await api("quests"));
+    } catch (error) {
+      notice(error);
+      return;
+    }
+    showPanel(questPanel());
+  }
+
+  // questPanel lists the day's quests: each one's icon, name, progress and
+  // reward, and its claim button once done.
+  function questPanel() {
+    const panel = document.createElement("div");
+    panel.className = "quests";
+    panel.innerHTML = `<div class="quests-head"><h2 class="shop-title"></h2><b class="quests-done"></b></div><p class="quests-reset"></p><ul class="quest-list"></ul>`;
+    panel.querySelector(".shop-title").textContent = qt.title;
+    panel.querySelector(".quests-done").textContent = `${questSummary.done}/${questSummary.total}`;
+    const list = panel.querySelector(".quest-list");
+    for (const q of questList) {
+      const li = document.createElement("li");
+      li.className = "quest" + (q.claimed ? " claimed" : q.done ? " done" : "");
+      li.innerHTML = `<span class="quest-icon" aria-hidden="true"></span><span class="quest-body"><b></b><span class="quest-bar"><span class="progress"><i></i></span><small></small></span></span><span class="quest-side"><em></em></span>`;
+      li.querySelector(".quest-icon").textContent = QUEST_ICON[q.id] || "🎯";
+      li.querySelector("b").textContent = qt.names[q.id] ? qt.names[q.id](q.target) : q.id;
+      li.querySelector(".progress i").style.width = `${Math.min(100, (q.progress / q.target) * 100)}%`;
+      li.querySelector("small").textContent = `${q.progress}/${q.target}`;
+      li.querySelector("em").textContent = `+${q.reward} 🎟`;
+      const side = li.querySelector(".quest-side");
+      if (q.claimed) {
+        const check = document.createElement("span");
+        check.className = "quest-check";
+        check.textContent = "✅";
+        side.append(check);
+      } else if (q.done) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "draw small";
+        button.textContent = qt.claim;
+        button.addEventListener("click", () => claimQuest(q, button));
+        side.append(button);
+      }
+      list.append(li);
+    }
+    if (questList.length && questList.every((q) => q.claimed)) {
+      const all = document.createElement("p");
+      all.className = "quests-all";
+      all.textContent = qt.allDone;
+      panel.append(all);
+    }
+    questTick(panel);
+    return panel;
+  }
+
+  // claimQuest takes a quest's tokens; a claim refused says why, and the
+  // list is asked for again.
+  async function claimQuest(q, button) {
+    if (claiming) return;
+    claiming = true;
+    button.disabled = true;
+    try {
+      const data = await api("quest_claim", { quest: q.id });
+      if (data.refused) {
+        toast(qt.refused[data.refused] || t.unavailable);
+        await openQuests();
+        return;
+      }
+      tokens = data.tokens ?? tokens;
+      questShow(data);
+      drawButton();
+      showPanel(questPanel());
+      toast(qt.got(data.claimed));
+      haptic("medium");
+    } catch (error) {
+      notice(error);
+    } finally {
+      claiming = false;
+      button.disabled = false;
+    }
+  }
+
+  // questTick counts down to new quests in the open list, and at midnight
+  // asks for the new day's.
+  function questTick(panel) {
+    const box = (panel || $("sheetCard")).querySelector(".quests-reset");
+    if (questResetAt && Date.now() >= questResetAt) {
+      questResetAt = 0;
+      api("quests").then((data) => {
+        questShow(data);
+        if (!$("sheet").hidden && $("sheetCard").querySelector(".quests")) showPanel(questPanel());
+      }).catch(() => {});
+      return;
+    }
+    if (!box || !questResetAt) return;
+    const m = Math.floor((questResetAt - Date.now()) / 60000);
+    box.textContent = `⏳ ${qt.reset(Math.floor(m / 60), m % 60)}`;
+  }
+  setInterval(() => questTick(), 30000);
+
   // ---------- arena ----------
 
   // The arena: a saved team of five, two in front and three behind, fights
@@ -1971,6 +2133,7 @@
   // ---------- tabs ----------
 
   function showTab(tab) {
+    const was = opened;
     opened = tab;
     for (const button of document.querySelectorAll(".nav button")) button.classList.toggle("on", button.dataset.tab === tab);
     $("coinShards").classList.toggle("on", tab === "shop");
@@ -1980,8 +2143,12 @@
     if (tab === "shop") shop();
     if (tab === "anime") animePage();
     if (tab === "market") market();
+    // Coming back to the collection asks for the quests again, as cards
+    // opened or battles won elsewhere may have done one.
+    if (tab === "collection" && was && was !== "collection" && questSummary) api("quests").then(questShow).catch(() => {});
     drawButton();
     eventBanner();
+    questEntry();
     window.scrollTo(0, 0);
   }
   for (const button of document.querySelectorAll(".nav button")) {
