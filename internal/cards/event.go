@@ -11,16 +11,16 @@ import (
 )
 
 // The Firefly Wedding event, as the owners asked: for two weeks the shop
-// sells pulls for tokens with twice the Mythic odds, half of the
-// Mythic ones Satoko Kirigaya, the limited card, and the EventPity-th pull
-// in a row without her sure to give her.
+// sells pulls for tokens at the usual odds (no Mythic boost since
+// 2026-11-19), EventShare of the Mythic ones Satoko Kirigaya, the limited
+// card: 0.4% a pull, under the Mythic's 0.5%. The EventPity-th pull in a
+// row without her is sure to give her.
 const (
-	EventCard        int64 = 298761 // Satoko Kirigaya
-	EventMythicBoost       = 2
-	EventShare             = 0.5
-	EventPity              = 200
-	EventPrice             = 1 // tokens a pull
-	EventBatch             = 10
+	EventCard  int64 = 298761 // Satoko Kirigaya
+	EventShare       = 0.8
+	EventPity        = 300
+	EventPrice       = 1 // tokens a pull
+	EventBatch       = 10
 )
 
 // EventStarts is when the event (started again by the owners) opens:
@@ -31,15 +31,10 @@ var (
 	EventEnds   = time.Date(2026, 12, 2, 0, 0, 0, 0, Location)
 )
 
-// EventRoll draws an event pull's rarity from a number in [0, 1000): the
-// usual odds but a Mythic EventMythicBoost times as likely, the extra taken
-// from Common.
+// EventRoll draws an event pull's rarity from a number in [0, 1000), at
+// the usual odds.
 func EventRoll(n int) Rarity {
-	extra := rules[Mythic].odds * (EventMythicBoost - 1)
-	if n < rules[Mythic].odds+extra {
-		return Mythic
-	}
-	return Roll(n - extra)
+	return Roll(n)
 }
 
 // EventOdds are an event pull's odds of each rarity in a thousand, the most

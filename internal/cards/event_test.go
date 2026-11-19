@@ -58,13 +58,12 @@ func (f *eventStore) CardEventPulls(context.Context, int64, int64) (int, storage
 	return f.eventPulls, eventCard, nil
 }
 
-// An event pull's odds are the usual ones with the Mythic twice as
-// likely, the extra taken from Common.
+// An event pull's odds are the usual ones.
 func TestEventOdds(t *testing.T) {
-	if got := EventOdds(); !slices.Equal(got, []int{625, 250, 90, 25, 10}) {
+	if got := EventOdds(); !slices.Equal(got, []int{630, 250, 90, 25, 5}) {
 		t.Errorf("event odds = %v", got)
 	}
-	if EventRoll(9) != Mythic || EventRoll(10) != Legendary || EventRoll(999) != Common {
+	if EventRoll(4) != Mythic || EventRoll(5) != Legendary || EventRoll(999) != Common {
 		t.Error("the event roll's edges moved")
 	}
 }
@@ -95,7 +94,7 @@ func TestTheCardEvent(t *testing.T) {
 	if code != 200 || out["active"] != true || out["pity"] != 37.0 || out["pity_max"] != float64(EventPity) || out["ends_in"] != float64(50*time.Hour/time.Millisecond) || card["name"] != "Satoko Kirigaya" || card["limited"] != true {
 		t.Fatalf("event = %d %v", code, out)
 	}
-	if odds := out["odds"].([]any); len(odds) != 5 || odds[4] != 10.0 {
+	if odds := out["odds"].([]any); len(odds) != 5 || odds[4] != 5.0 || out["share"] != 0.8 || out["pity_max"] != 300.0 {
 		t.Errorf("odds = %v", odds)
 	}
 
