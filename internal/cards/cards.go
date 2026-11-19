@@ -129,17 +129,17 @@ func ByOdds(roll func() Rarity) storage.CardRoll {
 // Emilia, Kurisu, Violet Evergarden, Zero Two and Mai Sakurajima, and
 // Firefly Wedding's Satoko Kirigaya, whom the owners made Mythic (migration 94),
 // and the Four Knights' Lancelot and Tristan, whom they made Mythic too
-// (migration 101).
+// (migration 101), and Escanor, whom they made Mythic (migration 108).
 var mythicIDs = map[int64]bool{
 	246: true, 17: true, 40: true, 5: true, 40882: true, 11: true, 80: true, 126071: true, 73935: true, 30: true,
 	417: true, 1: true, 422: true, 4003: true, 72921: true, 127691: true,
 	40881: true, 126824: true, 176754: true, 137080: true, 127518: true, 88572: true, 34470: true, 90169: true, 124381: true, 127222: true,
-	298761: true, 265209: true, 249281: true,
+	298761: true, 265209: true, 249281: true, 90202: true,
 }
 
 // legendaryIDs are the Legendary cards': the leads' legendary rivals and
 // companions, Vegeta, Sasuke, Kakashi, Itachi, Levi, L, Zoro, Killua and
-// their like, Escanor and Ban, and other well known leads, Deku, Itadori,
+// their like, Ban, and other well known leads, Deku, Itadori,
 // Shinji, Kaneki, Denji, Gintoki, Natsu, Asta, Yusuke, Mob, Hanamichi,
 // Thorfinn, Rimuru and theirs, and the best known women, Rem, Rei Ayanami,
 // Power, Kaguya Shinomiya, Marin Kitagawa, Megumin, Robin, Asuka, Hitagi
@@ -148,7 +148,7 @@ var mythicIDs = map[int64]bool{
 // Seven Deadly Sins' Zeldris and Estarossa (Mael) and the Four Knights'
 // Gawain and Percival, made Legendary at their asking (migration 101).
 var legendaryIDs = map[int64]bool{
-	90202: true, 77605: true, 913: true, 13: true, 85: true, 14: true, 53901: true, 2535: true, 2423: true, 62: true,
+	77605: true, 913: true, 13: true, 85: true, 14: true, 53901: true, 2535: true, 2423: true, 62: true,
 	305: true, 727: true, 2072: true, 13767: true, 45627: true, 46494: true, 46496: true, 71: true, 75: true, 27: true,
 	28: true, 31: true, 133701: true, 126635: true, 68: true, 12: true, 88892: true, 89220: true, 129133: true,
 	129131: true, 129130: true, 6356: true, 10529: true, 4004: true, 162: true, 2075: true, 2257: true, 601: true, 10138: true,

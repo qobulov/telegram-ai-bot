@@ -48,13 +48,13 @@ func TestCardNumbers(t *testing.T) {
 // rank: Son Goku is Mythic at 130, Gojo Mythic at 1, Sasuke Legendary; anyone else is at
 // most Epic, however loved.
 func TestChosenRarities(t *testing.T) {
-	if RarityOf(246, 130) != Mythic || RarityOf(17, 32) != Mythic || RarityOf(127691, 0) != Mythic || RarityOf(913, 190) != Legendary {
+	if RarityOf(246, 130) != Mythic || RarityOf(17, 32) != Mythic || RarityOf(127691, 0) != Mythic || RarityOf(90202, 50) != Mythic || RarityOf(913, 190) != Legendary {
 		t.Error("a chosen character's rarity")
 	}
 	if RarityOf(89334, 9) != Epic || RarityOf(99999, 400) != Common || RarityOf(88572, 7) != Mythic {
 		t.Errorf("Reigen at 9 = %v, an unknown at 400 = %v, Emilia = %v", RarityOf(89334, 9), RarityOf(99999, 400), RarityOf(88572, 7))
 	}
-	if len(mythicIDs) != 29 || len(legendaryIDs) != 74 || len(epicIDs) != 7 || RarityOf(298761, 900) != Mythic || RarityOf(298762, 900) != Epic {
+	if len(mythicIDs) != 30 || len(legendaryIDs) != 73 || len(epicIDs) != 7 || RarityOf(298761, 900) != Mythic || RarityOf(298762, 900) != Epic {
 		t.Errorf("chosen %d Mythic and %d Legendary", len(mythicIDs), len(legendaryIDs))
 	}
 	// The Seven Deadly Sins' knights raised (migration 101): Lancelot and
