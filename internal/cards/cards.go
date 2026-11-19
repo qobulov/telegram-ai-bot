@@ -130,12 +130,13 @@ func ByOdds(roll func() Rarity) storage.CardRoll {
 // Firefly Wedding's Satoko Kirigaya, whom the owners made Mythic (migration 94),
 // and the Four Knights' Lancelot and Tristan, whom they made Mythic too
 // (migration 101), Escanor, whom they made Mythic (migration 108), and
-// Record of Ragnarok's Qin Shi Huang (migration 109).
+// Record of Ragnarok's Qin Shi Huang (migration 109), and Solo Leveling's
+// Sung Jinwoo (migration 113).
 var mythicIDs = map[int64]bool{
 	246: true, 17: true, 40: true, 5: true, 40882: true, 11: true, 80: true, 126071: true, 73935: true, 30: true,
 	417: true, 1: true, 422: true, 4003: true, 72921: true, 127691: true,
 	40881: true, 126824: true, 176754: true, 137080: true, 127518: true, 88572: true, 34470: true, 90169: true, 124381: true, 127222: true,
-	298761: true, 265209: true, 249281: true, 90202: true, 203633: true,
+	298761: true, 265209: true, 249281: true, 90202: true, 203633: true, 129928: true,
 }
 
 // legendaryIDs are the Legendary cards': the leads' legendary rivals and
@@ -148,7 +149,8 @@ var mythicIDs = map[int64]bool{
 // last twelve made Legendary at the owners' asking (migration 99), and The
 // Seven Deadly Sins' Zeldris and Estarossa (Mael) and the Four Knights'
 // Gawain and Percival, made Legendary at their asking (migration 101), and
-// Record of Ragnarok's fighters, Brunhilde to Leonidas (migration 109).
+// Record of Ragnarok's fighters, Brunhilde to Leonidas (migration 109), and
+// the best loved Epics, Reigen to Yato (migration 113).
 var legendaryIDs = map[int64]bool{
 	77605: true, 913: true, 13: true, 85: true, 14: true, 53901: true, 2535: true, 2423: true, 62: true,
 	305: true, 727: true, 2072: true, 13767: true, 45627: true, 46494: true, 46496: true, 71: true, 75: true, 27: true,
@@ -160,6 +162,8 @@ var legendaryIDs = map[int64]bool{
 	723: true, 36828: true, 131559: true, 126851: true, 282753: true, 206212: true,
 	140636: true, 140646: true, 140650: true, 252553: true, 140641: true, 252554: true, 140638: true,
 	156052: true, 284632: true, 140645: true, 168999: true, 140640: true, 341135: true,
+	89334: true, 497: true, 13020: true, 130050: true, 67065: true, 257562: true, 38005: true,
+	133704: true, 123212: true, 90107: true, 89198: true, 64771: true, 84677: true,
 }
 
 // epicIDs are the Epic cards chosen by hand, whatever their rank: The Seven
