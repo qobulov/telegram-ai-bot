@@ -1266,21 +1266,38 @@
     }
   }
 
-  // boxButton is the diamond box: a prize from its range, each with its
-  // chance shown, the more crystals the rarer.
+  // boxButton is the diamond box, one short row: its range and price, and
+  // an ⓘ button that shows each prize's chance, the more crystals the rarer.
   function boxButton(pack) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "pack-btn box-btn";
-    button.innerHTML = '<span class="box-title"></span><b></b><span class="stars"></span><small></small><span class="box-odds"></span>';
-    button.querySelector(".box-title").textContent = t.boxTitle;
-    button.querySelector("b").textContent = t.boxRange(spaced(pack.box[0].crystals), spaced(pack.box[pack.box.length - 1].crystals));
-    button.querySelector(".stars").textContent = t.starsN(pack.stars);
-    button.querySelector("small").textContent = t.boxOdds;
-    button.querySelector(".box-odds").textContent = pack.box.map((p) => `${spaced(p.crystals)} · ${p.percent}%`).join("   ");
-    button.disabled = !shopData.stars;
-    button.addEventListener("click", () => buyCrystals(pack));
-    return button;
+    const row = document.createElement("div");
+    row.className = "box-row";
+    row.innerHTML = '<button type="button" class="pack-btn box-btn"><span class="box-title"></span><b></b><span class="stars"></span></button><button type="button" class="box-info" aria-label="ⓘ">ⓘ</button>';
+    const buy = row.querySelector(".box-btn");
+    buy.querySelector(".box-title").textContent = t.boxTitle;
+    buy.querySelector("b").textContent = t.boxRange(spaced(pack.box[0].crystals), spaced(pack.box[pack.box.length - 1].crystals));
+    buy.querySelector(".stars").textContent = t.starsN(pack.stars);
+    buy.disabled = !shopData.stars;
+    buy.addEventListener("click", () => buyCrystals(pack));
+    row.querySelector(".box-info").addEventListener("click", () => showPanel(boxOddsPanel(pack)));
+    return row;
+  }
+
+  // boxOddsPanel lists the box's prizes with their chances.
+  function boxOddsPanel(pack) {
+    const panel = document.createElement("div");
+    panel.className = "gift box-odds-panel";
+    panel.innerHTML = '<b class="step"></b><small></small><ul class="box-odds"></ul>';
+    panel.querySelector(".step").textContent = t.boxTitle;
+    panel.querySelector("small").textContent = t.boxOdds;
+    const list = panel.querySelector(".box-odds");
+    for (const prize of pack.box) {
+      const item = document.createElement("li");
+      item.innerHTML = "<span></span><b></b>";
+      item.querySelector("span").textContent = t.crystalsN(spaced(prize.crystals));
+      item.querySelector("b").textContent = `${prize.percent}%`;
+      list.append(item);
+    }
+    return panel;
   }
 
   // buyItem buys tokens or a pack for crystals, laying a pack out as a

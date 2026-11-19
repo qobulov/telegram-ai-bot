@@ -605,13 +605,21 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .pack-btn small { color: var(--muted); min-height: 1em; }
 .pack-btn .stars { color: var(--r4); font-weight: 800; font-size: 15px; }
 .pack-btn:disabled { opacity: 0.5; cursor: default; }
+.box-row { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 .box-btn {
-  grid-column: 1 / -1; padding: 16px 12px;
+  grid-template-columns: auto 1fr auto; align-items: center; justify-items: start; gap: 10px; padding: 10px 14px;
   border-color: color-mix(in srgb, var(--gold) 60%, transparent);
-  background: linear-gradient(160deg, color-mix(in srgb, var(--gold) 26%, transparent), color-mix(in srgb, var(--r3) 14%, transparent) 70%);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--gold) 24%, transparent), color-mix(in srgb, var(--r3) 12%, transparent) 70%);
 }
-.box-btn .box-title { font: 800 15px Unbounded, sans-serif; color: var(--gold); }
-.box-btn .box-odds { color: var(--muted); font-size: 11px; line-height: 1.5; text-align: center; white-space: pre-wrap; }
+.box-btn .box-title { font: 800 13px Unbounded, sans-serif; color: var(--gold); }
+.box-btn b { font-size: 15px; justify-self: center; }
+.box-info {
+  width: 44px; border-radius: 16px; cursor: pointer; font-size: 18px; color: var(--gold);
+  border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); background: color-mix(in srgb, var(--gold) 10%, transparent);
+}
+.box-odds { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; }
+.box-odds li { display: flex; justify-content: space-between; padding: 8px 12px; border-radius: 12px; background: color-mix(in srgb, var(--gold) 10%, transparent); }
+.box-odds li b { color: var(--gold); }
 .shop-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .shop-item {
   display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px;
