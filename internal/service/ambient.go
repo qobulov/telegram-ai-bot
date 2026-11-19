@@ -49,7 +49,8 @@ const (
 type ChatLog interface {
 	AppendGroupMessage(ctx context.Context, m storage.GroupMessage) error
 	GroupMessagesSince(ctx context.Context, chatID int64, since time.Time, limit int) ([]storage.GroupMessage, error)
-	ClearGroupMessages(ctx context.Context, chatID int64) error
+	// GroupContextSince leaves out what was said before the last mute change.
+	GroupContextSince(ctx context.Context, chatID int64, since time.Time, limit int) ([]storage.GroupMessage, error)
 	// AuthorMessageCount counts a member's logged messages, up to limit.
 	AuthorMessageCount(ctx context.Context, chatID, authorID int64, limit int) (int, error)
 }
@@ -120,7 +121,7 @@ func (a *ambient) block(chatID int64, now time.Time) string {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
 	defer cancel()
-	messages, err := a.log.GroupMessagesSince(ctx, chatID, now.Add(-ambientWindow), a.size)
+	messages, err := a.log.GroupContextSince(ctx, chatID, now.Add(-ambientWindow), a.size)
 	if err != nil {
 		a.logger.Warn("could not read the group log", "chat_id", chatID, "error", err)
 		return ""
@@ -180,15 +181,4 @@ func (a *ambient) compact(messages []storage.GroupMessage) []string {
 		lastTime, lastAuthor = at, m.AuthorName
 	}
 	return lines
-}
-
-func (a *ambient) clear(chatID int64) {
-	if a.log == nil {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
-	defer cancel()
-	if err := a.log.ClearGroupMessages(ctx, chatID); err != nil {
-		a.logger.Warn("could not clear the group log", "chat_id", chatID, "error", err)
-	}
 }

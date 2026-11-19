@@ -265,7 +265,7 @@ func (s *Service) namedMembersMessage(in incoming, name string) int64 {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
 	defer cancel()
-	recent, err := s.ambient.log.GroupMessagesSince(ctx, in.scope.ChatID, s.opts.Now().Add(-namedWindow), s.ambient.size)
+	recent, err := s.ambient.log.GroupContextSince(ctx, in.scope.ChatID, s.opts.Now().Add(-namedWindow), s.ambient.size)
 	if err != nil {
 		s.opts.Logger.Warn("could not read the group log for a named member", "chat_id", in.scope.ChatID, "error", err)
 		return 0
@@ -1329,7 +1329,7 @@ func (s *Service) withEarlierWords(ctx context.Context, in incoming, words strin
 	}
 	ctx, cancel := context.WithTimeout(ctx, logTimeout)
 	defer cancel()
-	recent, err := s.ambient.log.GroupMessagesSince(ctx, in.scope.ChatID, s.opts.Now().Add(-earlierWordsWindow), s.ambient.size)
+	recent, err := s.ambient.log.GroupContextSince(ctx, in.scope.ChatID, s.opts.Now().Add(-earlierWordsWindow), s.ambient.size)
 	if err != nil {
 		s.opts.Logger.Warn("could not read an owner's earlier messages", "chat_id", in.scope.ChatID, "error", err)
 		return words
@@ -1861,19 +1861,15 @@ func (s *Service) setMuted(ctx context.Context, in incoming, muted bool) string 
 	if refusal := s.refuseUnlessManager(ctx, in); refusal != "" {
 		return refusal
 	}
-	was := s.isMutedLately(in.scope.ChatID)
 	if err := s.opts.Muter.SetMuted(ctx, in.scope.ChatID, muted, in.userID); err != nil {
 		s.opts.Logger.Error("mute change failed", "user_id", in.userID, "chat_id", in.scope.ChatID, "error", err)
 		return textError.to(in)
 	}
 	s.markMuted(in.scope.ChatID, muted)
 	s.opts.Logger.Info("mute changed", "user_id", in.userID, "chat_id", in.scope.ChatID, "muted", muted)
-	// What was said before or during the mute should not resurface after it.
-	// A /mute or /unmute that changes nothing keeps the log: owners sent
-	// /unmute to groups that were never muted, and each wiped the day.
-	if was != muted {
-		s.ambient.clear(in.scope.ChatID)
-	}
+	// What was said before or during the mute does not resurface after it:
+	// the bot reads back only what came after the change (GroupContextSince).
+	// The log is kept: wiping it emptied the group's statistics.
 	if muted {
 		return fmt.Sprintf(textMuted, s.opts.Bot.Username)
 	}

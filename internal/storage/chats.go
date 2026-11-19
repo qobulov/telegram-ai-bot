@@ -8,11 +8,16 @@ import (
 )
 
 // SetMuted records whether the bot is muted in a chat, and who decided.
+// updated_at is when the mute last changed: GroupContextSince reads nothing
+// older, so it moves only on a change, and an /unmute of a chat never muted
+// leaves it at -infinity.
 func (s *Store) SetMuted(ctx context.Context, chatID int64, muted bool, by int64) error {
 	_, err := s.pool.Exec(ctx, `
-		INSERT INTO chats (chat_id, muted, updated_by) VALUES ($1, $2, $3)
+		INSERT INTO chats (chat_id, muted, updated_by, updated_at)
+		VALUES ($1, $2::boolean, $3, CASE WHEN $2::boolean THEN now() ELSE '-infinity'::timestamptz END)
 		ON CONFLICT (chat_id) DO UPDATE
-		SET muted = EXCLUDED.muted, updated_by = EXCLUDED.updated_by, updated_at = now()`,
+		SET muted = EXCLUDED.muted, updated_by = EXCLUDED.updated_by,
+		    updated_at = CASE WHEN chats.muted IS DISTINCT FROM EXCLUDED.muted THEN now() ELSE chats.updated_at END`,
 		chatID, muted, nonZero(by))
 	if err != nil {
 		return fmt.Errorf("storage: set muted: %w", err)

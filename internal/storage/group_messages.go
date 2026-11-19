@@ -54,17 +54,31 @@ func (s *Store) AppendGroupMessage(ctx context.Context, m GroupMessage) error {
 }
 
 // GroupMessagesSince returns up to limit of a group's newest messages sent
-// at or after since, oldest first.
+// at or after since, oldest first: the whole log, for the statistics, the
+// flood guard and the owners.
 func (s *Store) GroupMessagesSince(ctx context.Context, chatID int64, since time.Time, limit int) ([]GroupMessage, error) {
+	return s.groupMessages(ctx, chatID, since, limit, false)
+}
+
+// GroupContextSince is GroupMessagesSince for what the bot reads back when
+// it answers: nothing from before the group last muted or unmuted it, so
+// that what was said before or during a mute never resurfaces. The log
+// itself is kept, for the statistics (it used to be wiped on each change).
+func (s *Store) GroupContextSince(ctx context.Context, chatID int64, since time.Time, limit int) ([]GroupMessage, error) {
+	return s.groupMessages(ctx, chatID, since, limit, true)
+}
+
+func (s *Store) groupMessages(ctx context.Context, chatID int64, since time.Time, limit int, afterMute bool) ([]GroupMessage, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT chat_id, coalesce(message_id, 0), coalesce(author_id, 0), author_name, text, created_at
 		FROM (
 			SELECT * FROM group_messages
 			WHERE chat_id = $1 AND created_at >= $2
+				AND (NOT $4 OR created_at >= coalesce((SELECT updated_at FROM chats WHERE chat_id = $1), $2))
 			ORDER BY created_at DESC, id DESC
 			LIMIT $3
 		) recent
-		ORDER BY created_at, id`, chatID, since, limit)
+		ORDER BY created_at, id`, chatID, since, limit, afterMute)
 	if err != nil {
 		return nil, fmt.Errorf("storage: read group messages: %w", err)
 	}

@@ -240,13 +240,27 @@ type fakeMuter struct {
 	mu    sync.Mutex
 	calls []muteCall
 	err   error
+	// muted is each chat's stored state, and log is told of a change, as the
+	// store moves chats.updated_at only then.
+	muted map[int64]bool
+	log   *memoryLog
 }
 
 func (f *fakeMuter) SetMuted(_ context.Context, chatID int64, muted bool, by int64) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, muteCall{chatID: chatID, muted: muted, by: by})
-	return f.err
+	if f.err != nil {
+		return f.err
+	}
+	if f.muted == nil {
+		f.muted = map[int64]bool{}
+	}
+	if f.muted[chatID] != muted && f.log != nil {
+		f.log.noteMuteChange(chatID)
+	}
+	f.muted[chatID] = muted
+	return nil
 }
 
 const groupAdminID = int64(4001)
@@ -407,6 +421,7 @@ func newFixture() *fixture {
 		media: newFakeMedia(), chatLog: newMemoryLog(), transcriber: &fakeTranscriber{text: "salom dunyo"},
 		botQuota: &fakeBotQuota{}, reactor: &fakeReactor{}, chatActor: &fakeChatActor{},
 	}
+	f.muter.log = f.chatLog
 	f.opts = Options{
 		Sender:        f.sender,
 		Replier:       f.replier,
@@ -1782,9 +1797,10 @@ func TestMutedGroupGetsNoBusyReplies(t *testing.T) {
 func TestChatterSeenWhileMutedDoesNotSurfaceAfterUnmute(t *testing.T) {
 	f := newFixture()
 	f.opts.MutedChats = []int64{groupID}
+	f.muter.muted = map[int64]bool{groupID: true}
 	s := New(f.opts)
 	// Simulates the race where a message is remembered just before /mute is
-	// applied: whatever is in the buffer at unmute time must be discarded.
+	// applied: what was said before the unmute must not surface after it.
 	s.ambient.add(groupID, 0, 4242, "Ann", "said while muted")
 
 	s.Handle(inGroup(asAdmin(groupMessage("/unmute@MyBot"))))
@@ -2062,14 +2078,19 @@ func TestPrivateMessagesAreNeverLogged(t *testing.T) {
 	}
 }
 
-func TestMutedGroupIsNotLogged(t *testing.T) {
+// A muted group's chatter is logged, for its statistics, as plain text,
+// and the bot stays silent there.
+func TestMutedGroupIsLoggedForItsStatistics(t *testing.T) {
 	f := newFixture()
 	f.opts.MutedChats = []int64{groupID}
 
 	f.run(inGroup(groupMessage("chatting while muted")), inGroup(groupMessage("Mira, hi?")))
 
-	if len(f.chatLog.messages) != 0 {
+	if len(f.chatLog.messages) == 0 || f.chatLog.messages[0].Text != "chatting while muted" {
 		t.Errorf("log = %+v", f.chatLog.messages)
+	}
+	if calls := f.replier.recorded(); len(calls) != 0 {
+		t.Errorf("the model was asked in a muted group: %d calls", len(calls))
 	}
 }
 

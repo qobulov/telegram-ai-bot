@@ -963,9 +963,16 @@ func (s *Service) acceptGroup(in incoming) (incoming, bool) {
 	}
 	if how == triggerNone {
 		// Checked in this order so that, with the buffer off, an ordinary
-		// group message costs no mute lookup at all.
-		if s.ambient.enabled() && !s.isMutedLately(in.scope.ChatID) {
-			s.remember(in.msg)
+		// group message costs no mute lookup at all. A muted group's chatter
+		// is still logged, for its statistics, but plainly: no transcription
+		// or model call for a group the bot is not answering, and the bot
+		// never reads it back (GroupContextSince starts at the unmute).
+		if s.ambient.enabled() {
+			if s.isMutedLately(in.scope.ChatID) {
+				s.rememberPlainly(in.msg)
+			} else {
+				s.remember(in.msg)
+			}
 		}
 		return incoming{}, false
 	}
@@ -994,6 +1001,17 @@ func (s *Service) remember(msg *telegram.Message) {
 		return
 	}
 	s.logMessage(msg)
+}
+
+// rememberPlainly logs a message as its text, or a photo, sticker or voice
+// message by its label: nothing is asked of a model.
+func (s *Service) rememberPlainly(msg *telegram.Message) {
+	if m, isMedia := s.mediaOf(msg); isMedia {
+		s.logUnheard(msg, m)
+		return
+	}
+	content, _ := msg.Content()
+	s.logFrom(msg, withForward(msg, content))
 }
 
 // logUnheard logs a voice message by its label alone, untranscribed.

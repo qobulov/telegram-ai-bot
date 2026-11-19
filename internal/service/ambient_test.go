@@ -24,6 +24,8 @@ type memoryLog struct {
 	failWith error
 	// since is the start of the last window that was read.
 	since time.Time
+	// muteChanged is when each chat was last muted or unmuted.
+	muteChanged map[int64]time.Time
 }
 
 func newMemoryLog() *memoryLog {
@@ -61,17 +63,25 @@ func (m *memoryLog) GroupMessagesSince(_ context.Context, chatID int64, since ti
 	return out, nil
 }
 
-func (m *memoryLog) ClearGroupMessages(_ context.Context, chatID int64) error {
+// GroupContextSince leaves out what came before the chat's last mute
+// change, as the store does with chats.updated_at.
+func (m *memoryLog) GroupContextSince(ctx context.Context, chatID int64, since time.Time, limit int) ([]storage.GroupMessage, error) {
+	m.mu.Lock()
+	if at, ok := m.muteChanged[chatID]; ok && at.After(since) {
+		since = at
+	}
+	m.mu.Unlock()
+	return m.GroupMessagesSince(ctx, chatID, since, limit)
+}
+
+// noteMuteChange notes when a chat's mute changed, for GroupContextSince.
+func (m *memoryLog) noteMuteChange(chatID int64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	kept := m.messages[:0]
-	for _, msg := range m.messages {
-		if msg.ChatID != chatID {
-			kept = append(kept, msg)
-		}
+	if m.muteChanged == nil {
+		m.muteChanged = map[int64]time.Time{}
 	}
-	m.messages = kept
-	return nil
+	m.muteChanged[chatID] = m.now()
 }
 
 func (m *memoryLog) AuthorMessageCount(_ context.Context, chatID, authorID int64, limit int) (int, error) {
@@ -291,13 +301,26 @@ func TestBlankMessagesAreNotLogged(t *testing.T) {
 	}
 }
 
-func TestClearForgetsTheChat(t *testing.T) {
-	a, _ := newTestAmbient(10)
+// A mute change hides what was said before it from the bot's context, but
+// keeps it in the log, for the statistics.
+func TestMuteChangeHidesOlderContextAndKeepsTheLog(t *testing.T) {
+	a, log := newTestAmbient(10)
+	now := time.Now()
+	log.now = func() time.Time { return now }
 	a.add(groupID, 0, 1, "Ann", "hello")
-	a.clear(groupID)
+	now = now.Add(time.Second)
+	log.noteMuteChange(groupID)
 
-	if block := a.block(groupID, time.Now()); block != "" {
-		t.Errorf("block after clear = %q", block)
+	if block := a.block(groupID, now); block != "" {
+		t.Errorf("block after a mute change = %q", block)
+	}
+	if len(log.messages) != 1 {
+		t.Errorf("the log lost the message: %+v", log.messages)
+	}
+	now = now.Add(time.Second)
+	a.add(groupID, 0, 1, "Ann", "after")
+	if block := a.block(groupID, now); !strings.Contains(block, "after") || strings.Contains(block, "hello") {
+		t.Errorf("block = %q, want only what came after the change", block)
 	}
 }
 

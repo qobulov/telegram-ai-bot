@@ -40,7 +40,7 @@ const (
 
 // GroupLog reads a group's logged messages.
 type GroupLog interface {
-	GroupMessagesSince(ctx context.Context, chatID int64, since time.Time, limit int) ([]storage.GroupMessage, error)
+	GroupContextSince(ctx context.Context, chatID int64, since time.Time, limit int) ([]storage.GroupMessage, error)
 }
 
 // CatchUpOptions configures the catch_up tool. Store is required.
@@ -92,7 +92,7 @@ func catchUp(ctx context.Context, opts CatchUpOptions, raw json.RawMessage) (any
 		return nil, &DeniedError{Message: catchUpNotInAGroup}
 	}
 	now := opts.now()
-	messages, err := opts.Store.GroupMessagesSince(ctx, caller.ChatID, now.Add(-catchUpWindow), maxCatchUpMessages)
+	messages, err := opts.Store.GroupContextSince(ctx, caller.ChatID, now.Add(-catchUpWindow), maxCatchUpMessages)
 	if err != nil {
 		return nil, &InternalError{Err: err, Message: catchUpUnavailable}
 	}

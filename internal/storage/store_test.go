@@ -1188,3 +1188,54 @@ func TestHistoryStartMovesInSteps(t *testing.T) {
 		t.Errorf("the start changed %d times: %q", changes, firsts)
 	}
 }
+
+// The bot's context starts at the last mute change, which an /unmute of a
+// chat never muted does not move; the log itself keeps everything.
+func TestGroupContextStartsAtTheMuteChange(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	const group = int64(-100777)
+	say := func(id int64, text string) {
+		t.Helper()
+		if err := store.AppendGroupMessage(ctx, GroupMessage{ChatID: group, MessageID: id, AuthorID: 5, AuthorName: "Ann", Text: text}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	texts := func(ms []GroupMessage) []string {
+		out := make([]string, len(ms))
+		for i, m := range ms {
+			out[i] = m.Text
+		}
+		return out
+	}
+	since := time.Now().Add(-time.Hour)
+	say(1, "before")
+	if err := store.SetMuted(ctx, group, false, 9); err != nil { // never muted: nothing changes
+		t.Fatal(err)
+	}
+	if got, _ := store.GroupContextSince(ctx, group, since, 10); len(got) != 1 {
+		t.Fatalf("an unmute of a chat never muted hid the context: %v", texts(got))
+	}
+	if err := store.SetMuted(ctx, group, true, 9); err != nil {
+		t.Fatal(err)
+	}
+	say(2, "while muted")
+	if err := store.SetMuted(ctx, group, false, 9); err != nil {
+		t.Fatal(err)
+	}
+	say(3, "after")
+	got, err := store.GroupContextSince(ctx, group, since, 10)
+	if err != nil || len(got) != 1 || got[0].Text != "after" {
+		t.Fatalf("context = %v, %v; want only what came after the unmute", texts(got), err)
+	}
+	all, err := store.GroupMessagesSince(ctx, group, since, 10)
+	if err != nil || len(all) != 3 {
+		t.Fatalf("log = %v, %v; want all three kept", texts(all), err)
+	}
+	if err := store.SetMuted(ctx, group, false, 9); err != nil { // again: no change
+		t.Fatal(err)
+	}
+	if got, _ := store.GroupContextSince(ctx, group, since, 10); len(got) != 1 {
+		t.Errorf("a repeated unmute moved the context's start: %v", texts(got))
+	}
+}

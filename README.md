@@ -1436,7 +1436,7 @@ come back in her answer to another member of the same group.
 
 | Command       | Who          | Effect                                                                              |
 | ------------- | ------------ | ----------------------------------------------------------------------------------- |
-| `/mute@Bot`   | group admins | She stops reacting in this group, and stops keeping recent messages, until unmuted. |
+| `/mute@Bot`   | group admins | She stops reacting in this group until unmuted. Its messages are still logged, plainly, for its statistics, and she never reads back what was said before the last mute change. |
 | `/unmute@Bot` | group admins | She is back.                                                                        |
 | `/ignore@Bot`, as a reply to a member's message | group admins | She does not answer that member, or react to them, for 24 hours. |
 | `/unignore@Bot`, as a reply to a member's message | group admins | She answers them again. |

@@ -29,6 +29,10 @@ func (f *fakeGroupLog) GroupMessagesSince(_ context.Context, chatID int64, since
 	return out[max(0, len(out)-limit):], f.err
 }
 
+func (f *fakeGroupLog) GroupContextSince(ctx context.Context, chatID int64, since time.Time, limit int) ([]storage.GroupMessage, error) {
+	return f.GroupMessagesSince(ctx, chatID, since, limit)
+}
+
 func logged(id, author int64, name, text string, ago time.Duration) storage.GroupMessage {
 	return storage.GroupMessage{ChatID: groupA, MessageID: id, AuthorID: author, AuthorName: name, Text: text, SentAt: rulesNow.Add(-ago)}
 }
