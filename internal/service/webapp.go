@@ -40,7 +40,7 @@ func (s *Service) statsCommand(in incoming) outcome {
 	return outcome{text: textStatsPrivate.to(in), buttons: [][]telegram.Button{{button}}}
 }
 
-// gameCommand answers /game, /snake, /woodcutter and /boss with the game itself, which Telegram
+// gameCommand answers /woodcutter, /boss and /mafia with the game itself, which Telegram
 // shows with its Play button and table of scores.
 func (s *Service) gameCommand(ctx context.Context, in incoming, shortName string) outcome {
 	if s.opts.Game == nil || s.opts.GameTable == nil {
@@ -75,7 +75,7 @@ func (s *Service) gameCommand(ctx context.Context, in incoming, shortName string
 // menu no longer lists one by one.
 func (s *Service) gamesMenu(in incoming) outcome {
 	lang := languageOf(in)
-	text := textGamesTitle.to(in) + "\n" + textGamesDooz.to(in)
+	text := textGamesTitle.to(in)
 	if s.opts.Teams != nil {
 		text += "\n" + textGamesTeams.to(in)
 	}
@@ -90,11 +90,6 @@ func (s *Service) gamesMenu(in incoming) outcome {
 
 var (
 	textGamesTitle = localText{uz: "🎮 **O'yinlar** — bosing va o'ynang:", ru: "🎮 **Игры** — нажмите и играйте:", en: "🎮 **Games** — tap one to play:"}
-	textGamesDooz  = localText{
-		uz: "/tictactoe — Dooz (X-O): do'stingiz yoki men bilan",
-		ru: "/tictactoe — крестики-нолики: с другом или со мной",
-		en: "/tictactoe — tic-tac-toe: with a friend or with me",
-	}
 	textGamesTeams = localText{
 		uz: "/teams — MLBB: o'yinchilarni tasodifiy 2 jamoaga bo'lish (10+ kishi)",
 		ru: "/teams — MLBB: случайно разделить игроков на 2 команды (от 10 человек)",

@@ -69,8 +69,6 @@ func TestGameEndpointDealsAPlay(t *testing.T) {
 	cfg := config.Config{TelegramToken: "1:test", TelegramAPIURL: "http://127.0.0.1:1", WebAppURL: "https://maria.example"}
 	handler := gameHandler(cfg, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	for _, play := range []struct{ game, path, dealt string }{
-		{game.ShortName, "/game/", `"rounds":[`},
-		{game.IlonShortName, "/game/ilon/", `"rules":{`},
 		{game.OtinchiShortName, "/game/otinchi/", `"drain_cap":`},
 	} {
 		page, _ := newGame(cfg).PlayURL(play.game, game.Player{UserID: hookUser, ChatID: hookGroup, MessageID: 5})

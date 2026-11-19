@@ -46,25 +46,25 @@ func TestStatsIsTheOwnersAlone(t *testing.T) {
 	}
 }
 
-// ADMIN_COMMANDS can keep /game for administrators, as any command.
+// ADMIN_COMMANDS can keep /woodcutter for administrators, as any command.
 func TestGameCanBeAdminsOnly(t *testing.T) {
 	f := newFixture()
 	table := &fakeGameTable{}
 	f.opts.Game, f.opts.GameTable = fakeGameLinks{}, table
-	f.opts.AdminCommands = map[string]bool{"/game": true}
+	f.opts.AdminCommands = map[string]bool{"/woodcutter": true}
 
-	sent := f.run(textFrom(userID, "/game"))
+	sent := f.run(textFrom(userID, "/woodcutter"))
 
 	if len(sent) != 1 || sent[0].text != textForbidden || len(table.games) != 0 {
 		t.Errorf("sent = %+v, games %+v; want it refused", sent, table.games)
 	}
 }
 
-// Without the pages' address, /stats and /game are unknown commands.
+// Without the pages' address, /stats and /woodcutter are unknown commands.
 func TestStatsAndGameOffWithoutTheAddress(t *testing.T) {
 	f := newFixture()
 
-	sent := f.run(textFrom(userID, "/stats"), textFrom(userID, "/game"))
+	sent := f.run(textFrom(userID, "/stats"), textFrom(userID, "/woodcutter"))
 
 	if len(sent) != 2 || sent[0].text != textUnknown.uz || sent[1].text != textUnknown.uz || len(sent[0].buttons) != 0 {
 		t.Errorf("sent = %+v, want two unknown-command replies", sent)
@@ -103,23 +103,28 @@ func (f *fakeGameTable) AnswerGameCallback(_ context.Context, id, url string) er
 type fakeGameLinks struct{}
 
 func (fakeGameLinks) PlayURL(shortName string, p game.Player) (string, bool) {
-	page := map[string]string{game.ShortName: "game/", game.IlonShortName: "game/ilon/", game.OtinchiShortName: "game/otinchi/", game.BossShortName: "game/boss/"}[shortName]
+	page := map[string]string{game.OtinchiShortName: "game/otinchi/", game.BossShortName: "game/boss/", game.MafiaShortName: "game/mafiya/"}[shortName]
 	return fmt.Sprintf("https://maria.example/%s?for=%d,%d,%d,%s", page, p.UserID, p.ChatID, p.MessageID, p.InlineMessageID), page != ""
 }
 
-// /game posts Tarozi, /snake Kosmik ilon, /woodcutter O'tinchi and /boss Dev
-// jangi, as a reply in a group, and nothing more is written.
+// /woodcutter posts O'tinchi, /boss Dev jangi and /mafia Mafia, as a reply
+// in a group, and nothing more is written; the removed games' /game and
+// /snake are unknown commands, and in a group get no answer.
 func TestGameCommandSendsTheGame(t *testing.T) {
 	f := newFixture()
 	table := &fakeGameTable{}
 	f.opts.Game, f.opts.GameTable = fakeGameLinks{}, table
 
-	sent := f.run(inGroup(groupMessage("/game@MyBot")), textFrom(userID, "/game"), textFrom(userID, "/snake"), textFrom(userID, "/woodcutter"), textFrom(userID, "/boss"))
+	sent := f.run(inGroup(groupMessage("/woodcutter@MyBot")), textFrom(userID, "/woodcutter"), textFrom(userID, "/boss"), textFrom(userID, "/mafia"),
+		inGroup(groupMessage("/game")), inGroup(groupMessage("/snake")), textFrom(userID, "/game"), textFrom(userID, "/snake"))
 
-	if len(sent) != 0 {
-		t.Errorf("sent %+v besides the game", sent)
+	if len(sent) != 2 || sent[0].text != textUnknown.uz || sent[1].text != textUnknown.uz {
+		t.Errorf("sent %+v besides the games; want two unknown-command replies", sent)
 	}
-	for _, want := range []sentGame{{groupID, 30, game.ShortName}, {userID, 0, game.ShortName}, {userID, 0, game.IlonShortName}, {userID, 0, game.OtinchiShortName}, {userID, 0, game.BossShortName}} {
+	if len(table.games) != 4 {
+		t.Errorf("games = %+v, want four", table.games)
+	}
+	for _, want := range []sentGame{{groupID, 30, game.OtinchiShortName}, {userID, 0, game.OtinchiShortName}, {userID, 0, game.BossShortName}, {userID, 0, game.MafiaShortName}} {
 		if !slices.Contains(table.games, want) {
 			t.Errorf("games = %+v, want %+v among them", table.games, want)
 		}
@@ -130,7 +135,7 @@ func TestGameCommandFailureIsSaid(t *testing.T) {
 	f := newFixture()
 	f.opts.Game, f.opts.GameTable = fakeGameLinks{}, &fakeGameTable{err: errors.New("Bad Request: GAME_SHORTNAME_INVALID")}
 
-	sent := f.run(textFrom(userID, "/game"))
+	sent := f.run(textFrom(userID, "/woodcutter"))
 
 	expectOneReply(t, sent, textError.uz)
 }
@@ -151,19 +156,19 @@ func TestPlayPressOpensTheGameForThePresser(t *testing.T) {
 	gameMessage := &telegram.Message{MessageID: 500, Chat: telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup}}
 
 	sent := f.run(
-		press("1", game.ShortName, bek, gameMessage, ""),
-		press("2", game.ShortName, bek, nil, "inl"),
-		press("3", "other", bek, gameMessage, ""),
-		press("4", game.IlonShortName, bek, gameMessage, ""),
+		press("1", game.OtinchiShortName, bek, gameMessage, ""),
+		press("2", game.OtinchiShortName, bek, nil, "inl"),
+		press("3", "tarozi", bek, gameMessage, ""),
+		press("4", game.BossShortName, bek, gameMessage, ""),
 	)
 
 	if len(sent) != 0 {
 		t.Errorf("sent %+v", sent)
 	}
 	want := map[string]string{
-		"1": fmt.Sprintf("https://maria.example/game/?for=%d,%d,500,", userID, groupID),
-		"2": fmt.Sprintf("https://maria.example/game/?for=%d,0,0,inl", userID),
-		"4": fmt.Sprintf("https://maria.example/game/ilon/?for=%d,%d,500,", userID, groupID),
+		"1": fmt.Sprintf("https://maria.example/game/otinchi/?for=%d,%d,500,", userID, groupID),
+		"2": fmt.Sprintf("https://maria.example/game/otinchi/?for=%d,0,0,inl", userID),
+		"4": fmt.Sprintf("https://maria.example/game/boss/?for=%d,%d,500,", userID, groupID),
 	}
 	if !maps.Equal(table.answers, want) {
 		t.Errorf("answers = %v, want %v", table.answers, want)

@@ -7,21 +7,11 @@ tartibi README'ning Mini App va o'yinlar bo'limida.
 
 | Rasm | Nom | Qisqa nom | Buyruq |
 |---|---|---|---|
-| ![](tarozi.png) | Tarozi | `tarozi` | `/game` |
-| ![](kosmik-ilon.png) | Kosmik ilon | `ilon` | `/snake` |
 | ![](otinchi.png) | O'tinchi | `otinchi` | `/woodcutter` |
 | ![](dev-jangi.png) | Dev jangi | `boss` | `/boss` |
 | ![](mafia.png) | Mafia | `mafiya` | `/mafia` |
 
 ## Tavsiflar
-
-**Tarozi** — `tarozi.png`
-
-> Bozor tarozisi: qaysi palla og'irroq? Mevalarni tez qo'shing, 40 soniyada eng ko'p ochko to'plang va guruhda rekord qo'ying.
-
-**Kosmik ilon** — `kosmik-ilon.png`
-
-> Kosmosdagi ilon: sayyoralarni yeb o'sing, darajadan darajaga o'ting, bonuslarni yig'ing!
 
 **O'tinchi** — `otinchi.png`
 
@@ -36,6 +26,8 @@ tartibi README'ning Mini App va o'yinlar bo'limida.
 > Shahar uxlaydi, mafiya uyg'onadi! Yashirin rolingizni oling: Don, Komissar, Shifokor, Manyak… Tunda harakat qiling, kunduzi bahslashib mafiyani toping. Guruh bilan 5 kishidan.
 
 Rasmni o'zgartirish yoki tavsifni yangilash uchun: `/mygames` → o'yin → *Edit*.
+Tarozi (`tarozi`) va Kosmik ilon (`ilon`) olib tashlangan: BotFather'da ham
+o'chirilgan, bot ularni endi yubormaydi.
 
 ## Kartalar (Mini App)
 

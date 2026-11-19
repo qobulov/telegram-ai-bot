@@ -12,18 +12,16 @@ import (
 	"telegram-ai-bot/internal/mafia"
 	"telegram-ai-bot/internal/miniapp"
 	"telegram-ai-bot/internal/raid"
-	"telegram-ai-bot/internal/shashkaapp"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 )
 
 // The pages WEBAPP_URL serves, from public/: the group dashboard Mini App,
-// the game and the draughts Mini App.
+// the games and the Kartalar Mini App.
 const (
-	statsPath   = "/stats/"
-	gamePath    = "/game/"
-	shashkaPath = "/shashka/"
-	cardsPath   = "/kartalar/"
+	statsPath = "/stats/"
+	gamePath  = "/game/"
+	cardsPath = "/kartalar/"
 )
 
 // cardsPage is the Kartalar Mini App's page, "" when WEBAPP_URL is not set.
@@ -55,15 +53,6 @@ func NewCards(ctx context.Context, cfg config.Config, logger *slog.Logger) (*End
 	}
 	handler := cards.NewHandler(cards.Options{BotToken: cfg.TelegramToken, Store: store, Logger: logger, Notify: notify, Invoices: client})
 	return &Endpoint{Handler: handler, Close: store.Close}, nil
-}
-
-// ShashkaPage is the draughts Mini App's page, "" when WEBAPP_URL is not
-// set.
-func ShashkaPage(cfg config.Config) string {
-	if cfg.WebAppURL == "" {
-		return ""
-	}
-	return cfg.WebAppURL + shashkaPath
 }
 
 // menuAppText labels the private chats' menu button.
@@ -224,36 +213,5 @@ func NewMafia(ctx context.Context, cfg config.Config, logger *slog.Logger) (*End
 	}
 	client := telegram.NewClient(telegram.Options{Token: cfg.TelegramToken, BaseURL: cfg.TelegramAPIURL, Logger: logger})
 	handler := mafia.NewHandler(mafia.Options{Sessions: sessions, Store: store, Telegram: client, Logger: logger})
-	return &Endpoint{Handler: handler, Close: store.Close}, nil
-}
-
-// NewShashka builds the draughts Mini App's API: it keeps the games and
-// ratings in the database, and asks Telegram who the bot is, for the
-// invites' links.
-func NewShashka(ctx context.Context, cfg config.Config, logger *slog.Logger) (*Endpoint, error) {
-	if cfg.WebAppURL == "" {
-		return nil, errNoPages
-	}
-	store, err := storage.Open(ctx, cfg.DatabaseURL)
-	if err != nil {
-		return nil, err
-	}
-	if err := store.CheckSchema(ctx); err != nil {
-		store.Close()
-		return nil, err
-	}
-	bot, err := Connect(ctx, cfg, logger)
-	if err != nil {
-		store.Close()
-		return nil, err
-	}
-	handler := shashkaapp.NewHandler(shashkaapp.Options{
-		BotToken:    cfg.TelegramToken,
-		BotUsername: bot.User.Username,
-		PageURL:     ShashkaPage(cfg),
-		Store:       store,
-		Messenger:   bot.Client,
-		Logger:      logger,
-	})
 	return &Endpoint{Handler: handler, Close: store.Close}, nil
 }

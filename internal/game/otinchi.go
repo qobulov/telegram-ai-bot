@@ -72,7 +72,7 @@ func (g *Game) StartOtinchi(sessionToken string) (string, OtinchiPlay, error) {
 		return "", OtinchiPlay{}, ErrToken
 	}
 	r := run{Player: s.Player, Game: OtinchiShortName, Started: g.now().UnixMilli(), Seed: newSeed()}
-	return g.sign(kindRun, r), OtinchiPlay{Seed: ilonSeed(r.Seed), Rules: otinchiRules}, nil
+	return g.sign(kindRun, r), OtinchiPlay{Seed: otinchiSeed(r.Seed), Rules: otinchiRules}, nil
 }
 
 // FinishOtinchi scores a play of O'tinchi: sides has an L or an R for each
@@ -86,7 +86,7 @@ func (g *Game) FinishOtinchi(runToken, sides string, times []int) (Result, error
 		// The page says it took longer than the server saw pass.
 		return Result{Player: r.Player}, ErrImplausible
 	}
-	score, err := ScoreOtinchi(ilonSeed(r.Seed), sides, times)
+	score, err := ScoreOtinchi(otinchiSeed(r.Seed), sides, times)
 	if err != nil {
 		return Result{Player: r.Player}, err
 	}
@@ -193,4 +193,9 @@ func (t *otinchiTree) next() uint32 {
 	x ^= x << 5
 	t.random = x
 	return x
+}
+
+// otinchiSeed is the page's random numbers' seed: xorshift needs one not 0.
+func otinchiSeed(seed uint64) uint32 {
+	return uint32(seed) | 1
 }

@@ -55,7 +55,7 @@ func TestTeamsLobby(t *testing.T) {
 	}
 	token := lobbies.lobby(groupID).Token
 	press := func(id int64, action string) telegram.Update {
-		return doozPlayer(int(id), &telegram.User{ID: id, FirstName: "P" + string(rune('A'+id%26))}, chat, "", teamsData+action+":"+token)
+		return pressUpdate(int(id), &telegram.User{ID: id, FirstName: "P" + string(rune('A'+id%26))}, chat, "", teamsData+action+":"+token)
 	}
 	var updates []telegram.Update
 	for id := int64(2); id <= 12; id++ {

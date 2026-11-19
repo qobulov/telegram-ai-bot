@@ -293,7 +293,7 @@ func (s *Service) ownInvites(ctx context.Context, chatID int64, user *telegram.U
 		return "", err
 	}
 	return strings.Join([]string{
-		"📨 " + cardMarks.Replace(doozName(user)) + " olib kelganlar",
+		"📨 " + cardMarks.Replace(displayName(user)) + " olib kelganlar",
 		fmt.Sprintf("Jami: %d, guruhda qolgan: %d", all.Added, all.Stayed),
 		fmt.Sprintf("Shu hafta: %d, qolgan: %d", week.Added, week.Stayed),
 	}, "\n"), nil

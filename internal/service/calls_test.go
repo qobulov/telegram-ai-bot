@@ -87,7 +87,7 @@ func TestReportsAndWarns(t *testing.T) {
 
 	chat := telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup}
 	press := func(id int64, data string) telegram.Update {
-		return doozPlayer(int(id), &telegram.User{ID: id, FirstName: "M"}, chat, "", data)
+		return pressUpdate(int(id), &telegram.User{ID: id, FirstName: "M"}, chat, "", data)
 	}
 	f.run(press(21, "rp:b:1"))
 	if len(moderator.banned) != 0 || !buttons.answers[len(buttons.answers)-1].alert {
@@ -122,7 +122,7 @@ func TestBanVoteCancelAndExpiry(t *testing.T) {
 	press := func(id int64, side string) telegram.Update {
 		var vote banVote
 		_ = json.Unmarshal(votes.states[groupID], &vote)
-		return doozPlayer(int(id), &telegram.User{ID: id, FirstName: "V"}, chat, "", voteBanData+side+":"+vote.Token)
+		return pressUpdate(int(id), &telegram.User{ID: id, FirstName: "V"}, chat, "", voteBanData+side+":"+vote.Token)
 	}
 
 	f.run(from(20, "/voteban", 30))
@@ -191,7 +191,7 @@ func TestCallsReportsAndBanVotes(t *testing.T) {
 	_ = json.Unmarshal(votes.states[groupID], &vote)
 	chat := telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup}
 	press := func(id int64, side string) telegram.Update {
-		return doozPlayer(int(id), &telegram.User{ID: id, FirstName: "V"}, chat, "", voteBanData+side+":"+vote.Token)
+		return pressUpdate(int(id), &telegram.User{ID: id, FirstName: "V"}, chat, "", voteBanData+side+":"+vote.Token)
 	}
 	f.run(press(30, "y"), press(21, "y"), press(21, "y"), press(22, "n"), press(23, "y"), press(24, "y"))
 	if len(moderator.banned) != 0 {

@@ -59,7 +59,7 @@ func TestBanListUnbanButton(t *testing.T) {
 	}
 	chat := telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup}
 	press := func(id int64) telegram.Update {
-		return doozPlayer(int(id), &telegram.User{ID: id, FirstName: "M"}, chat, "", unbanData+"70")
+		return pressUpdate(int(id), &telegram.User{ID: id, FirstName: "M"}, chat, "", unbanData+"70")
 	}
 	f.run(press(member))
 	if len(moderator.unbanned) != 0 {

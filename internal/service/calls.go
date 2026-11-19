@@ -165,7 +165,7 @@ func (s *Service) callAdmins(ctx context.Context, in incoming) outcome {
 	if err != nil || len(tags) == 0 {
 		return say("Adminlar ro'yxatini hozir olib bo'lmadi.")
 	}
-	return say("📣 " + cardMarks.Replace(doozName(in.msg.From)) + " adminlarni chaqiryapti: " + strings.Join(tags, " "))
+	return say("📣 " + cardMarks.Replace(displayName(in.msg.From)) + " adminlarni chaqiryapti: " + strings.Join(tags, " "))
 }
 
 // report tells the admins and moderators about the message replied to,
@@ -190,13 +190,13 @@ func (s *Service) report(ctx context.Context, in incoming) outcome {
 	if quote == "" {
 		quote = "(rasm, stiker yoki boshqa xabar)"
 	}
-	text := fmt.Sprintf("🚨 Shikoyat: %s → %s\n«%s»\n%s", cardMarks.Replace(doozName(in.msg.From)), cardMarks.Replace(doozName(replied.From)), quote, strings.Join(tags, " "))
+	text := fmt.Sprintf("🚨 Shikoyat: %s → %s\n«%s»\n%s", cardMarks.Replace(displayName(in.msg.From)), cardMarks.Replace(displayName(replied.From)), quote, strings.Join(tags, " "))
 	if s.opts.Reports == nil || s.opts.Buttons == nil {
 		return say(text)
 	}
 	id, err := s.opts.Reports.AddReport(ctx, storage.Report{
-		ChatID: in.scope.ChatID, ReporterID: in.userID, ReporterName: doozName(in.msg.From),
-		TargetID: replied.From.ID, TargetName: doozName(replied.From), MessageID: replied.MessageID, Quote: quote,
+		ChatID: in.scope.ChatID, ReporterID: in.userID, ReporterName: displayName(in.msg.From),
+		TargetID: replied.From.ID, TargetName: displayName(replied.From), MessageID: replied.MessageID, Quote: quote,
 	})
 	if err != nil {
 		s.opts.Logger.Warn("could not keep a report", "chat_id", in.scope.ChatID, "error", err)
@@ -247,7 +247,7 @@ func (s *Service) pressedReport(q *telegram.CallbackQuery) {
 		}
 	}
 	answer(verdict, false)
-	text := fmt.Sprintf("🚨 Shikoyat: %s → %s\n«%s»\n%s — %s", cardMarks.Replace(r.ReporterName), cardMarks.Replace(r.TargetName), r.Quote, verdict, cardMarks.Replace(doozName(q.From)))
+	text := fmt.Sprintf("🚨 Shikoyat: %s → %s\n«%s»\n%s — %s", cardMarks.Replace(r.ReporterName), cardMarks.Replace(r.TargetName), r.Quote, verdict, cardMarks.Replace(displayName(q.From)))
 	_ = s.opts.Buttons.EditMessageText(ctx, q.Message.Chat.ID, q.Message.MessageID, text)
 }
 
@@ -336,7 +336,7 @@ func (s *Service) openBanVote(ctx context.Context, in incoming) outcome {
 		}
 	}
 	vote := banVote{
-		Token: strconv.FormatInt(rand.Int64N(1<<40), 36), Target: target.ID, Name: doozName(target),
+		Token: strconv.FormatInt(rand.Int64N(1<<40), 36), Target: target.ID, Name: displayName(target),
 		Starter: in.userID, Yes: []int64{in.userID}, Until: time.Now().Add(voteBanLasts).Unix(),
 	}
 	err := s.opts.BanVotes.ChangeBanVote(ctx, in.scope.ChatID, func(state []byte) ([]byte, error) {

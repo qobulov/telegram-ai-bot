@@ -12,8 +12,8 @@ import (
 	"telegram-ai-bot/internal/telegram"
 )
 
-// maxBodyBytes bounds a request: a play of Tarozi's answers are a few
-// kilobytes, a long one of Kosmik ilon's turns some tens.
+// maxBodyBytes bounds a request: a long play of O'tinchi's chops is some
+// tens of kilobytes.
 const maxBodyBytes = 256 << 10
 
 // Telegram keeps the game's scores on each game message, and has the
@@ -43,8 +43,8 @@ type handler struct {
 	logger   *slog.Logger
 }
 
-// Handler serves the pages' requests: "start" deals a play for a session,
-// of the game it is for, "finish" scores one, sets the score and records
+// Handler serves the pages' requests: "start" deals a play of O'tinchi for
+// a session, "finish" scores one, sets the score and records
 // it, and "table" is the game's table: from records across all chats, or
 // when records is nil or fails, the game message's from Telegram. A GET
 // with an avatar token is that player's photo.
@@ -61,24 +61,9 @@ type request struct {
 	// Run the one start gave, for finish.
 	Session string `json:"session"`
 	Run     string `json:"run"`
-	Answers string `json:"answers"`
-	Times   []int  `json:"times"`
-	// Turns and Ticks are a play of Kosmik ilon's, for finish; Sides and
-	// Times one of O'tinchi's.
-	Turns []int  `json:"turns"`
-	Ticks int    `json:"ticks"`
+	// Sides and Times are a play of O'tinchi's, for finish.
 	Sides string `json:"sides"`
-}
-
-type started struct {
-	Run     string  `json:"run"`
-	Seconds int     `json:"seconds"`
-	Rounds  []Round `json:"rounds"`
-}
-
-type startedIlon struct {
-	Run string `json:"run"`
-	IlonPlay
+	Times []int  `json:"times"`
 }
 
 type startedOtinchi struct {
@@ -149,45 +134,18 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 }
 
 func (h *handler) start(req request) (any, failure) {
-	s, err := h.game.session(req.Session)
+	run, play, err := h.game.StartOtinchi(req.Session)
 	if err != nil {
 		return nil, errToken
 	}
-	switch s.Game {
-	case IlonShortName:
-		run, play, err := h.game.StartIlon(req.Session)
-		if err != nil {
-			return nil, errToken
-		}
-		return startedIlon{Run: run, IlonPlay: play}, failure{}
-	case OtinchiShortName:
-		run, play, err := h.game.StartOtinchi(req.Session)
-		if err != nil {
-			return nil, errToken
-		}
-		return startedOtinchi{Run: run, OtinchiPlay: play}, failure{}
-	}
-	run, dealt, err := h.game.Start(req.Session)
-	if err != nil {
-		return nil, errToken
-	}
-	return started{Run: run, Seconds: Seconds, Rounds: dealt}, failure{}
+	return startedOtinchi{Run: run, OtinchiPlay: play}, failure{}
 }
 
 // finish scores a play and sets the score on the game message, where
 // Telegram keeps each player's best, then records it; the table follows.
 func (h *handler) finish(ctx context.Context, req request) (any, failure) {
-	var result Result
-	var err error
-	name := gameName(h.game.runGame(req.Run))
-	switch name {
-	case IlonShortName:
-		result, err = h.game.FinishIlon(req.Run, req.Turns, req.Ticks)
-	case OtinchiShortName:
-		result, err = h.game.FinishOtinchi(req.Run, req.Sides, req.Times)
-	default:
-		result, err = h.game.Finish(req.Run, req.Answers, req.Times)
-	}
+	name := OtinchiShortName
+	result, err := h.game.FinishOtinchi(req.Run, req.Sides, req.Times)
 	switch {
 	case errors.Is(err, ErrToken):
 		return nil, errToken
@@ -211,14 +169,6 @@ func (h *handler) finish(ctx context.Context, req request) (any, failure) {
 		h.logger.Warn("could not read the game's scores", "user_id", result.Player.UserID, "error", err)
 	}
 	return finished{Score: result.Score, Improved: improved, Table: table}, failure{}
-}
-
-// gameName is the short name of a run's game: Tarozi's runs name none.
-func gameName(name string) string {
-	if name == "" {
-		return ShortName
-	}
-	return name
 }
 
 // record keeps a scored play in the database; Telegram has the score

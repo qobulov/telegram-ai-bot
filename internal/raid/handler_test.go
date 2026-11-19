@@ -151,8 +151,8 @@ var member = game.Player{UserID: 7, Name: "Bek", ChatID: -100200, MessageID: 5}
 // boss with the player's hero.
 func TestRaidWantsItsOwnSession(t *testing.T) {
 	f := newFixture()
-	if code, out := f.post(t, map[string]any{"session": f.session(t, game.ShortName, member), "action": "state"}); code != http.StatusUnauthorized || out["error"] != "session" {
-		t.Fatalf("Tarozi's session got %d %v", code, out)
+	if code, out := f.post(t, map[string]any{"session": f.session(t, game.OtinchiShortName, member), "action": "state"}); code != http.StatusUnauthorized || out["error"] != "session" {
+		t.Fatalf("O'tinchi's session got %d %v", code, out)
 	}
 	code, out := f.post(t, map[string]any{"session": f.session(t, game.BossShortName, member), "action": "state"})
 	boss, _ := out["boss"].(map[string]any)

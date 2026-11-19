@@ -26,14 +26,14 @@ LAYERS = {
     "tools": ("Tool'lar va tashqi API", ["internal/tools", "internal/webapi", "internal/webapi/internal/genplaces", "internal/webapi/internal/placename", "internal/guards", "internal/gifs", "internal/stickers", "internal/doctext", "internal/doctext/testdata"]),
     "data": ("Saqlash", ["internal/storage"]),
     "telegram": ("Telegram API", ["internal/telegram"]),
-    "games": ("O'yinlar va Mini App", ["internal/game", "internal/mafia", "internal/raid", "internal/dooz", "internal/shashka", "internal/shashkaapp", "internal/miniapp", "public/game", "public/shashka", "public/stats"]),
+    "games": ("O'yinlar va Mini App", ["internal/game", "internal/mafia", "internal/raid", "internal/miniapp", "public/game", "public/stats"]),
     "docs": ("Hujjatlar va g'oyalar", ["(root) README.md", "docs/superpowers/specs", "docs/superpowers/plans"]),
 }
 LAYER_OF = {p: k for k, (_, ps) in LAYERS.items() for p in ps}
 
 DESC = {
     "cmd/bot": "Long polling bilan ishga tushirish va migratsiya buyrug'i (make migrate).",
-    "api": "Vercel funksiyalari: /api/webhook, /api/game, /api/shashka, /api/stats, /api/cron.",
+    "api": "Vercel funksiyalari: /api/webhook, /api/game, /api/raid, /api/mafia, /api/cards, /api/stats, /api/cron.",
     "serverless": "Vercel funksiyalari chaqiradigan handlerlar: lazy builder, sxema tekshiruvi.",
     "internal/app": "Botni qismlardan yig'adi: store, agent, tool'lar, menyular, Mini App'lar.",
     "internal/config": "Muhit o'zgaruvchilaridan sozlamalarni o'qiydi va tekshiradi.",
@@ -52,13 +52,9 @@ DESC = {
     "internal/doctext": "Word, PDF va matn fayllaridan matnni ajratadi.",
     "internal/storage": "PostgreSQL: foydalanuvchi, suhbat, guruh, o'yin, reyting jadvallari.",
     "internal/telegram": "Bot API mijozi: polling, xabar yuborish, admin amallari.",
-    "internal/game": "Tarozi: bozor tarozisi HTML5 o'yini, ochko serverda hisoblanadi.",
-    "internal/dooz": "Dooz (X-O): butun o'yin tugma ma'lumotida, bot uch darajada.",
-    "internal/shashka": "Rus shashkasi qoidalari va alpha-beta bot.",
-    "internal/shashkaapp": "Shashka Mini App API: navbat, taklif, soat, Elo reyting.",
+    "internal/game": "O'tinchi HTML5 o'yini va o'yinlar sessiyasi, ochko serverda hisoblanadi.",
     "internal/miniapp": "Guruh statistikasi Mini App'i, init data HMAC bilan.",
-    "public/game": "Tarozi o'yinining sahifasi.",
-    "public/shashka": "Shashka Mini App sahifasi: lobbi, qidiruv, taxta.",
+    "public/game": "O'yinlar sahifalari: O'tinchi, Dev jangi, Mafia.",
     "public/stats": "Guruh statistikasi dashboard sahifasi.",
     "(root) README.md": "Loyiha hujjati: arxitektura, xavfsizlik va dizayn qarorlari.",
     "docs/superpowers/specs": "Dizayn spetsifikatsiyalari: nega shunday qurilgan.",

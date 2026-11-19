@@ -839,9 +839,6 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.gifAnswer(in, topic)
 	}
 	if commandName(in.text) == "/start" {
-		if out, ok := s.startShashka(in); ok {
-			return out
-		}
 		if out, ok := s.startCards(in); ok {
 			return out
 		}
@@ -853,10 +850,6 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.premiumCommand(ctx, in)
 	case commandName(in.text) == "/stats":
 		return s.statsCommand(in)
-	case commandName(in.text) == "/game":
-		return s.gameCommand(ctx, in, game.ShortName)
-	case commandName(in.text) == "/snake":
-		return s.gameCommand(ctx, in, game.IlonShortName)
 	case commandName(in.text) == "/woodcutter":
 		return s.gameCommand(ctx, in, game.OtinchiShortName)
 	case commandName(in.text) == "/boss":
@@ -865,10 +858,6 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.gameCommand(ctx, in, game.MafiaShortName)
 	case commandName(in.text) == "/games":
 		return s.gamesMenu(in)
-	case commandName(in.text) == "/tictactoe":
-		return s.doozCommand(in)
-	case commandName(in.text) == "/checkers":
-		return s.shashkaCommand(ctx, in)
 	case s.opts.Cards != nil && s.opts.CardsURL != "" && isCardDraw(in):
 		return outcome{text: textCardsApp.to(in), buttons: s.cardsAppButton(in)}
 	case s.opts.Teams != nil && s.opts.Buttons != nil && commandName(in.text) == "/teams":
@@ -1117,7 +1106,7 @@ func (s *Service) start(ctx context.Context, in incoming) outcome {
 // thanks once every channel is joined, and otherwise a box asks to join
 // them first; nothing is written in the chat either way. A press of the
 // button under a join request is pressedJoin's, of a game's Play button
-// pressedGame's, and of a dooz game's pressedDooz's.
+// pressedGame's.
 func (s *Service) pressed(q *telegram.CallbackQuery) {
 	if q.GameShortName != "" {
 		s.pressedGame(q)
@@ -1132,10 +1121,6 @@ func (s *Service) pressed(q *telegram.CallbackQuery) {
 	}
 	if strings.HasPrefix(q.Data, menuData) {
 		s.pressedMenu(q)
-		return
-	}
-	if strings.HasPrefix(q.Data, doozData) {
-		s.pressedDooz(q)
 		return
 	}
 	if strings.HasPrefix(q.Data, teamsData) && s.opts.Teams != nil {

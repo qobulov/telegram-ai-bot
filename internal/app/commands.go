@@ -30,7 +30,6 @@ var membersMenu = []telegram.BotCommand{
 	{Command: "staff", Description: "Moderatorlar ro'yxati"},
 	{Command: "id", Description: "Sizning va chatning ID'si"},
 	{Command: "weather", Description: "Ob-havo: /weather Toshkent"},
-	{Command: "tictactoe", Description: "X-O: do'stingiz yoki men bilan"},
 }
 
 // commandMenus are the commands Telegram lists on "/": in private chats,
@@ -84,13 +83,9 @@ var ownerGroupMenu = []telegram.BotCommand{
 	{Command: "about", Description: "Bot haqida"},
 	{Command: "card", Description: "Kartalar o'yini: har 2 soatda token, 1x/5x ochish, kolleksiya"},
 	{Command: "games", Description: "Barcha o'yinlar"},
-	{Command: "game", Description: "Tarozi o'yini"},
-	{Command: "snake", Description: "Kosmik ilon o'yini"},
 	{Command: "woodcutter", Description: "O'tinchi: daraxtni chop, shoxlardan qoch"},
 	{Command: "boss", Description: "Dev jangi: guruh bilan birga devni uring"},
 	{Command: "mafia", Description: "Mafia: guruh bilan, yashirin rollar, 5+ kishi"},
-	{Command: "tictactoe", Description: "X-O: do'stingiz yoki men bilan"},
-	{Command: "checkers", Description: "Shashka: tasodifiy raqib, do'st yoki men bilan"},
 	{Command: "teams", Description: "MLBB: o'yinchilarni tasodifiy 2 jamoaga bo'lish"},
 	{Command: "mylink", Description: "Shaxsiy taklif havolangiz: kirganlar sizga hisoblanadi"},
 	{Command: "invites", Description: "Kim nechta odam qo'shdi: bugun, hafta, oy, hammasi, o'zingizniki"},

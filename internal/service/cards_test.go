@@ -265,12 +265,15 @@ func TestGamesMenuListsTheGames(t *testing.T) {
 	f := newFixture()
 	f.opts.Cards = newFakeCards("")
 	sent := f.run(textFrom(userID, "/games"))
-	if len(sent) != 1 || !strings.Contains(sent[0].text, "/tictactoe") || strings.Contains(sent[0].text, "/boss") || !strings.Contains(sent[0].text, "/card") || strings.Contains(sent[0].text, "/duel") {
+	if len(sent) != 1 || strings.Contains(sent[0].text, "/tictactoe") || strings.Contains(sent[0].text, "/boss") || !strings.Contains(sent[0].text, "/card") || strings.Contains(sent[0].text, "/duel") {
 		t.Fatalf("games without pages = %+v", sent)
 	}
 	f.opts.Game, f.opts.GameTable = fakeGameLinks{}, &fakeGameTable{}
 	sent = f.run(inGroup(groupMessage("/games")))
-	if len(sent) != 2 || !strings.Contains(sent[1].text, "/boss") || !strings.Contains(sent[1].text, "/checkers") {
+	if len(sent) != 2 || !strings.Contains(sent[1].text, "/boss") || !strings.Contains(sent[1].text, "/woodcutter") || !strings.Contains(sent[1].text, "/mafia") {
+		t.Errorf("games in a group = %+v", sent)
+	}
+	if text := sent[1].text; strings.Contains(text, "/checkers") || strings.Contains(text, "/snake") || strings.Contains(text, "/game ") || strings.Contains(text, "/tictactoe") {
 		t.Errorf("games in a group = %+v", sent)
 	}
 }

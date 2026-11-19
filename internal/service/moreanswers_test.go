@@ -187,10 +187,10 @@ func TestMoreItemsAnswerWithTheirTools(t *testing.T) {
 	}
 }
 
-// Each game, Tarozi to Dev jangi, is the game's own message; nothing else is
+// Each game, O'tinchi to Mafia, is the game's own message; nothing else is
 // sent with it.
 func TestGamesAreTheGameAlone(t *testing.T) {
-	for _, name := range []string{"tarozi", "ilon", "otinchi", "boss"} {
+	for _, name := range []string{"otinchi", "boss", "mafiya"} {
 		f := newFixture()
 		runner := withToolRunner(f)
 		runner.answers["send_game"] = succeeded(`{"sent":true}`)
@@ -220,7 +220,7 @@ func TestMoreItemsSayFailures(t *testing.T) {
 		{"unknown place", "place", "Atlantida", "send_location", refused("invalid_arguments"), textPlaceUnknown},
 		{"day's pictures", "draw", "qal'a", "generate_image", refused("daily_limit"), textDrawLimit},
 		{"picture refused", "draw", "qal'a", "generate_image", refused("invalid_arguments"), textDrawRefused},
-		{"two games", "tarozi", "", "send_game", refused("invalid_arguments"), textGameTooSoon},
+		{"two games", "otinchi", "", "send_game", refused("invalid_arguments"), textGameTooSoon},
 		{"quiet week", "quakes", "", "earthquakes", succeeded(`{"earthquakes":[]}`), textNoQuakes},
 	} {
 		t.Run(c.name, func(t *testing.T) {

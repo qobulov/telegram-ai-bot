@@ -54,16 +54,11 @@ cmd/bot/main.go                 long-polling command; migrate and webhook subcom
 api/webhook.go                  serverless function that receives updates by webhook
 api/stats.go, api/game.go       serverless functions behind the dashboard and the games
 api/raid.go                     serverless function behind Dev jangi, the boss raid
-api/shashka.go                  serverless function behind the draughts Mini App
-public/stats, public/game       static pages: the group dashboard Mini App, Tarozi, and under game/ Kosmik ilon, O'tinchi and Dev jangi
-public/shashka                  static page: the draughts Mini App
+public/stats, public/game       static pages: the group dashboard Mini App, and under game/ O'tinchi, Dev jangi and Mafia
 internal/app                    assembles the bot for either way of running it
 internal/miniapp                the dashboard's API: Telegram init data check, membership check, statistics
-internal/game                   the games Tarozi, Kosmik ilon and O'tinchi: signed sessions, dealing plays, scoring them
+internal/game                   the games' signed sessions, and O'tinchi: dealing plays, scoring them
 internal/raid                   Dev jangi, the boss raid: a chat's shared boss, hits counted on the server, upgrades, kill announcements
-internal/dooz                   dooz (noughts and crosses): the board, its encoding in buttons, the bot's moves
-internal/shashka                Russian draughts: the rules, the position's encoding, the bot's search
-internal/shashkaapp             the draughts Mini App's API: init data check, invites, the queue, moves, clocks, ratings
 internal/webhook                HTTP handler for webhook updates, with secret check
 internal/config                 load .env + environment, validate
 internal/telegram               Bot API client: long polling, sending, message splitting
@@ -107,7 +102,6 @@ flowchart TD
     game["internal/game"]
     mafia["mafia"]
     raid["raid"]
-    shashka["shashkaapp"]
     miniapp["miniapp"]
   end
 
@@ -128,7 +122,6 @@ flowchart TD
   tools --> stickers
   mafia --> game
   raid --> game
-  shashka --> miniapp
   service --> games
   service --> storage
   tools --> storage
@@ -227,11 +220,6 @@ business_checklists(connection_id -> business_connections, chat_id,
                     message_id, title, tasks jsonb, sent_at,
                     PK (connection_id, chat_id, message_id))
 group_boosts(chat_id, boost_id, created_at, PK (chat_id, boost_id))
-shashka_players(user_id PK, name, language, rating, wins, losses, draws, updated_at)
-shashka_games(id PK, kind, level, white_id, black_id, position, status, last_path,
-              captured, version, invite_code UNIQUE, rated, deadline, winner,
-              reason, white_change, black_change, created_at, updated_at)
-shashka_queue(user_id PK, rating, joined_at)
 raid_bosses(chat_id PK, level, hp, max_hp, updated_at)
 raid_members(chat_id, user_id, name, level, damage, total, scored_at, updated_at,
              PK (chat_id, user_id))
@@ -315,7 +303,7 @@ in the environment win over the file.
 | `DB_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
 | `TELEGRAM_WEBHOOK_SECRET` | empty | Only for webhook deployments; see [Vercel deployment](#vercel-deployment-webhook) |
 | `CRON_SECRET` | empty | Only on Vercel: protects the daily cleanup endpoint and the reminders endpoint |
-| `WEBAPP_URL` | empty | The Vercel deployment's `https://` address, such as `https://maria.vercel.app`, where `public/` is served: turns on the [dashboard](#dashboard-mini-app) (`/stats`, the private chats' menu button) and the games [Tarozi](#the-game-tarozi), [Kosmik ilon](#kosmik-ilon), [O'tinchi](#otinchi) and [Dev jangi](#dev-jangi) (`/game`, `/snake`, `/woodcutter`, `/boss`, the `send_game` tool). Empty turns them off |
+| `WEBAPP_URL` | empty | The Vercel deployment's `https://` address, such as `https://maria.vercel.app`, where `public/` is served: turns on the [dashboard](#dashboard-mini-app) (`/stats`, the private chats' menu button) and the [games](#the-games) [O'tinchi](#otinchi), [Dev jangi](#dev-jangi) and Mafia (`/woodcutter`, `/boss`, `/mafia`, the `send_game` tool). Empty turns them off |
 | `MAX_OUTPUT_TOKENS`           | `8192`                         | Longest model reply, in tokens, thinking included |
 | `AI_REASONING_EFFORT`         | `low` (Gemini)                 | How hard Gemini thinks before answering: `none`, `minimal`, `low`, `medium`, `high`, or `default` for the model's own. Thinking is paid as output and takes from `MAX_OUTPUT_TOKENS`; the lite models refuse `none`. Each request logs its tokens as `model usage` |
 | `CHAT_REASONING_EFFORT` | `minimal` | How hard the chat model thinks before a reply in words alone (Gemini): `none`, `minimal`, `low`, `medium`, `high` or `default`. At `low` it spent 500 to 800 thinking tokens, seconds, on a one-line joke |
@@ -410,7 +398,7 @@ the message it is working on before exiting.
 
 Bot commands: `/start`, `/help`,
 `/model`, `/about`, `/premium`, `/paysupport`, with `WEBAPP_URL` set
-`/stats`, `/game`, `/snake`, `/woodcutter` and `/boss`, for owners `/payments` and `/refund`, and
+`/stats`, `/woodcutter`, `/boss` and `/mafia`, for owners `/payments` and `/refund`, and
 in groups `/mute`, `/unmute`, `/ignore` and `/unignore`.
 
 ## Tests
@@ -1047,7 +1035,7 @@ languages, and the buttons that need a value ask for it first
   (`internal/service/moremenu.go`): 🕌 Din (prayer times, the Quran),
   📰 Yangiliklar (Uzbekistan's, the world's), 🎬 Ko'ngilochar (films, anime,
   music, YouTube, a cat, trivia, a fun fact), ⚽ Sport (the table, matches and
-  top scorers of six leagues), 🕹 O'yinlar (Shashka, Dooz, Dev jangi, Kosmik ilon, O'tinchi, Tarozi, free games, a Steam
+  top scorers of six leagues), 🕹 O'yinlar (Dev jangi, Mafia, O'tinchi, free games, a Steam
   price), 📚 O'qish (Wikipedia, an English word, synonyms, papers) and
   🛠 Foydali (a QR code, a drawing, a place on the map, holidays, crypto,
   earthquakes, a web search). An item is answered at once, asks for its
@@ -1384,7 +1372,7 @@ match "maria" unless you add it:
 word.
 
 **Commands** in a group need the bot's username (`/help@MyMariaBot`). A plain
-`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/card`, `/invites`, `/invites_week`, `/invites_month`, `/boss`, `/snake`, `/woodcutter`, `/checkers` and `/tictactoe`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username. The commands' names are English; their old Uzbek ones (`/karta`, `/kartalar`, `/qoshganlar` and the rest) are not answered any more.
+`/help` is ignored, because it may be meant for another bot. Only the bot's own commands no other bot has, `/card`, `/invites`, `/invites_week`, `/invites_month`, `/boss` and `/woodcutter`, are answered plain too: its answers name them so, and a press of one in a message sends it without the username. The commands' names are English; their old Uzbek ones (`/karta`, `/kartalar`, `/qoshganlar` and the rest) are not answered any more.
 
 ### Example
 
@@ -2087,50 +2075,44 @@ gave it. The function believes nothing else:
 Members are shown by the name the group log has for them, with their
 @username; only the owners can see it.
 
-### The game: Tarozi
+### The games
 
-With `WEBAPP_URL` set, `/game`, in a group or a private chat, posts the
-bot's own game with `sendGame`, and so does the `send_game` tool when
-someone asks to play a game ("o'yin o'ynaymiz", "скинь игру"; dice stay
-with `send_dice`), once per message and twice per chat in 10 minutes,
-counted in `moderation_actions` as `game`.
-
-Tarozi is a bazaar scale. A price board gives four fruits a weight from 1
-to 9 each, and changes every 6 weighings; each weighing puts fruits on the
-two pans, one to four on each as the play goes on, and the player says
-which pan goes down, or that they balance. A play lasts 40 seconds; a right
-answer is 10 points and 2 more for each right one before it in a row (at
-most 10 more), a wrong one takes 5 off. The page is `public/game/`, plain
-HTML, and follows the device's light or dark mode.
+With `WEBAPP_URL` set, `/woodcutter`, `/boss` and `/mafia`, in a group or a
+private chat, post the bot's own games with `sendGame`, and so does the
+`send_game` tool when someone asks to play a game ("o'yin o'ynaymiz",
+"скинь игру"; O'tinchi when no game is named; dice stay with `send_dice`),
+once per message and twice per chat in 10 minutes, counted in
+`moderation_actions` as `game`. The games are O'tinchi, Dev jangi and Mafia,
+below; Tarozi, Kosmik ilon, Shashka and Dooz were removed on 2026-11-19
+(migration 105 drops their scores and tables), and their commands, `/game`,
+`/snake`, `/checkers` and `/tictactoe`, are unknown ones now: nothing in a
+group, the unknown-command answer in a private chat.
 
 Telegram keeps the scores: each game message has its own table, which it
-shows under the message. The page shows the bot's own table instead, from
-the database across all chats (below), and Telegram's only when the
+shows under the message. O'tinchi's page shows the bot's own table instead,
+from the database across all chats (below), and Telegram's only when the
 database cannot be read (`getGameHighScores`).
 The score is not taken from the page:
 
 - A press of Play reaches the bot as a callback query, answered with the
   page's address and a **session token** the bot signed (HMAC-SHA256, its
-  key made from the bot token) naming the player, the game message and the
-  time; it opens plays for an hour.
+  key made from the bot token) naming the player, the game, the game
+  message and the time; it opens plays for an hour, and only of its game.
 - Each play is **dealt by the server** from a fresh random seed (`start`),
-  and comes with a run token that holds the seed and the start time.
-- The page sends back only the **answers and when each was given**
-  (`finish`); the server deals the same rounds from the seed and **counts
-  the score itself**. It refuses a play with answers under 300 ms apart,
-  after the 40 seconds, more than were dealt, or spread over more time than
-  the server saw pass since the start, and run tokens older than 10
-  minutes. Then it sets the score on the session's game message for the
-  session's player (`setGameScore`; Telegram keeps each player's best).
+  and comes with a run token that holds the game, the seed and the start
+  time.
+- The page sends back only **what the player did and when** (`finish`); the
+  server plays it again from the seed and **counts the score itself**, then
+  sets it on the session's game message for the session's player
+  (`setGameScore`; Telegram keeps each player's best).
 
 The bot keeps the scores too, for tables of its own: each play scored of
-Tarozi, Kosmik ilon and O'tinchi counts in the player's row of
-`game_scores` for that game and chat (migration 48), with their best and
-when it was made, their last score and how many plays they scored. A
-play the database does not take is still set on Telegram. The page's
-table is made from it: the first 10 players of the game by their best in
-any chat, ties sharing a place, and the player's own row under them when
-they are further down.
+O'tinchi counts in the player's row of `game_scores` for that game and chat
+(migration 48), with their best and when it was made, their last score and
+how many plays they scored. A play the database does not take is still set
+on Telegram. The page's table is made from it: the first 10 players of the
+game by their best in any chat, ties sharing a place, and the player's own
+row under them when they are further down.
 
 The tables and Dev jangi show the players' profile photos: each row the
 server lists carries the address of its player's photo at
@@ -2141,39 +2123,8 @@ address, which holds the bot's token, never reaches a page. A player
 without a photo, or who shows it only to their contacts, keeps their
 initial.
 
-A bot can still answer as fast as the limits allow, but not faster, and
+A bot can still play as fast as the limits allow, but not faster, and
 cannot name its score, another player or another message.
-
-### Kosmik ilon
-
-`/snake` posts the bot's second game the same way, and `send_game` takes it
-when asked by name ("ilon o'ynaymiz"; Tarozi when no game is named). It is a
-snake in space (`public/game/ilon/`, `internal/game/ilon.go`): the field,
-15 by 21, wraps at its edges; the snake moves a cell a tick, turned by a
-swipe or the arrow keys, and grows by two for each planet it eats. A planet
-is 10 points times the level, twice or three times that when eaten within
-30 ticks of the one before (the combo). Every 10 planets it reaches the
-next level, 100 points times the level it leaves: the snake starts again
-from three cells, on another of six fields of walls, and each tick is 14 ms
-quicker, from 150 ms to 60 ms. After a planet, one time in three, a bonus
-shows for 50 ticks: a star of 50 points times the level, an ice clock that
-makes the next 60 ticks half as long again, or a ghost that lets the snake
-pass through walls and itself for 40 ticks. Running into a wall or itself
-ends the play.
-
-It shares Tarozi's sessions, its `/api/game` and its scoring rule: the
-session and run tokens name which game they are for, and a play of one
-cannot be started or finished as the other's. `start` gives the play's
-seed and the rules, walls and timings included; the page plays them in
-`sim.js` and sends back only its **turns, each with its tick, and how many
-ticks went by**. The server plays the turns again from the seed with the
-same rules in Go and **counts the score itself**; it refuses turns out of
-order, after the end, or a play whose snake did not crash in its last tick.
-The ticks' lengths say how long the play took at the least, and a play sent
-in sooner than that after its start is refused, so it cannot be played
-faster than the page lets a person. A test plays whole games with an
-autopilot and has `node` score them with `sim.js`, which must match the
-server's score to the point.
 
 ### O'tinchi
 
@@ -2545,74 +2496,6 @@ has one lobby, the latest `/teams`'s, kept in `team_lobbies` (migration 72)
 and changed with the row locked; an older lobby's buttons say it is closed.
 It is played in the group's own message, as Telegram opens no Mini App from
 a group's button.
-
-### Shashka (draughts Mini App)
-
-With `WEBAPP_URL` set, `/checkers` opens Russian draughts, played against
-people or the bot in a Mini App (`public/shashka`, `internal/shashkaapp`,
-`internal/shashka`), with no model and no limit. Nothing needs setting up in
-@BotFather.
-
-- **Opening it.** In a private chat `/checkers`, and «📋 Ko'proq» →
-  🕹 O'yinlar → ♟ Shashka, answer with the Mini App's button. A group cannot
-  have one, so there `/checkers` makes the sender's invite and posts it with
-  «⚔️ Qabul qilish», a link to `https://t.me/<bot>?start=sh_<code>`: the bot's
-  private chat answers that `/start` with the button into the game, for
-  whoever takes it and for the sender too, who sees their invite waiting.
-- **Opponents.** ⚔️ Raqib topish pairs the player with someone else asking,
-  the nearest in rating first (a wait lapses unless the page asks again
-  within 10 seconds, which it does every 2.5); 👥 Do'stni chaqirish makes an
-  invite whose link the page shares, and the inviter is told in their
-  private chat when it is taken; 🤖 Maria bilan plays the bot at 😊 Oson,
-  🙂 O'rta or 😈 Qiyin (an alpha-beta search to depth 2, 4 or 7, the last
-  capped at 150,000 nodes, about 40 ms).
-- **Rules.** Russian draughts: men capture backwards too, capturing is a
-  must but any capture may be chosen, a capture is taken to its end, a man
-  crowned mid-capture goes on as a king, kings fly, and pieces taken are
-  lifted only after the move (the Turkish strike). A side with no move
-  loses; 15 moves each of kings alone without a capture is a draw. The
-  server checks every move against the rules and sends the page the legal
-  ones, which is all the page knows of them.
-- **Clock and ratings.** Against a person each move has 90 seconds, and the
-  side whose time runs out loses when the game is next looked at. Games
-  against people move both ratings by Elo (K = 32, from 1200) and count in
-  the players' records; 🏆 Reyting lists the best 20. Games against the bot
-  count in neither.
-
-Each action the page sends carries the init data Telegram signed, checked
-as the dashboard's is, which alone says who plays. A move names the
-game's version it was made on and is saved only at that version, so two
-requests at once cannot both move; pairing holds one advisory lock. A
-player has one game at a time: a new one takes back their invite and gives
-up a game against the bot, but not a game against a person, which is shown
-instead. Games over and invites no one took are deleted after 30 days by
-the daily cleanup.
-
-### Dooz
-
-`/tictactoe` is noughts and crosses, played on nine buttons under one message,
-with no model and no limit (`internal/service/dooz.go`,
-`internal/dooz`).
-
-- In a group it opens a game for whoever sent it: «⚔️ Qo'shilish» lets
-  any other member take ⭕, «🤖 Maria bilan» lets the opener play the bot
-  instead, at the medium level.
-- In a private chat, and from «📋 Ko'proq» → 🕹 O'yinlar, it offers the
-  bot's levels: 😊 Oson takes a win it sees and blocks half the time,
-  🙂 O'rta takes and blocks wins and plays a third of its other moves at
-  random, 😈 Qiyin never loses (a full game-tree search).
-- Each press edits the message: the board, whose turn it is, the winner
-  with the winning line marked, or a draw. A press out of turn, on a taken
-  cell or by someone not in the game gets a box saying so and changes
-  nothing. «🔁 Yana o'ynash» starts the next game: the players change
-  marks, so whoever moved second starts, and the series' score is shown.
-
-Nothing is stored: the board, the two players' IDs, the level and the
-score are in each button's data (at most 50 of its 64 bytes), and the
-players' names in the message's first line, «❌ Ali  ⚔️  ⭕ Vali», which
-the next press reads back. Since anyone can send a button's data, it is
-checked as it is decoded: a board no game could reach, the same person on
-both sides or a bot game without the bot is refused.
 
 ### Limits
 
@@ -3123,7 +3006,7 @@ games' own table of scores migration 48, Mafia migration 49.
 1. **Deploy**, then **set `WEBAPP_URL`** in Vercel to the deployment's
    production address, for example `https://maria.vercel.app` (no trailing
    path), and deploy again. Check the pages: `https://YOUR-APP.vercel.app/stats/`
-   says it opens inside Telegram, and `/game/` asks for `/game`.
+   says it opens inside Telegram, and `/game/otinchi/` asks for `/woodcutter`.
 2. **The dashboard, in @BotFather:** `/mybots` → the bot → *Bot Settings* →
    *Configure Mini App* → *Enable Mini App*, and send
    `https://YOUR-APP.vercel.app/stats/` as its URL. This is the bot's main
@@ -3131,18 +3014,18 @@ games' own table of scores migration 48, Mafia migration 49.
    button of the owners' private chats is set by the bot itself at each
    start.
 3. **The games, in @BotFather:** `/newgame` → the bot → accept the terms →
-   a title (`Tarozi`), a short description, a 640×360 photo (and optionally
-   a GIF) → the short name **`tarozi`**, exactly, which the bot sends the
-   game by. Each game's photo and description are in docs/botfather/. Then `/newgame` again for each of the others: title `Kosmik
-   ilon`, short name **`ilon`**; `O'tinchi`, **`otinchi`**; `Dev jangi`,
-   **`boss`**. No URL is asked for: the bot gives
-   `https://YOUR-APP.vercel.app/game/` and `/game/ilon/`, `/game/otinchi/`,
-   `/game/boss/` with each press of Play. Dev jangi needs migrations 45 to 47
-   and the games' scores migration 48, Mafia (`mafiya`, at
-   `/game/mafiya/`) migration 49. Maydon, a team battle, was removed
-   (migration 69 drops its rooms); its game can be deleted in @BotFather
-   with `/deletegame`.
-4. As an owner, send `/stats`, `/game`, `/snake`, `/woodcutter` and `/boss` in a
+   a title (`O'tinchi`), a short description, a 640×360 photo (and optionally
+   a GIF) → the short name **`otinchi`**, exactly, which the bot sends the
+   game by. Each game's photo and description are in docs/botfather/. Then
+   `/newgame` again for each of the others: `Dev jangi`, **`boss`**; `Mafia`,
+   **`mafiya`**. No URL is asked for: the bot gives
+   `https://YOUR-APP.vercel.app/game/otinchi/`, `/game/boss/` and
+   `/game/mafiya/` with each press of Play. Dev jangi needs migrations 45 to
+   47 and the games' scores migration 48, Mafia migration 49. Maydon, a team
+   battle, was removed (migration 69 drops its rooms), and so were Tarozi
+   (`tarozi`) and Kosmik ilon (`ilon`) (migration 105 drops their scores);
+   their games can be deleted in @BotFather with `/deletegame`.
+4. As an owner, send `/stats`, `/woodcutter`, `/boss` and `/mafia` in a
    group and in a private chat.
 
 Until step 2 the group links open nothing; until step 3 a game's command

@@ -453,7 +453,6 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		opts.StatsURL = statsPage(cfg)
 		opts.CardsURL = cardsPage(cfg)
 		opts.Game, opts.GameTable = g, bot.Client
-		opts.ShashkaURL, opts.ShashkaInvites = ShashkaPage(cfg), store
 	}
 	if mode.Serverless {
 		opts.Workers, opts.QueueSize = 0, 0
@@ -474,7 +473,7 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 		builtin = append(builtin, imageTool(cfg, store))
 	}
 	if cfg.WebAppURL != "" {
-		builtin = append(builtin, tools.GameTool(tools.GameOptions{Sender: bot.Client, Store: store, Games: []string{game.ShortName, game.IlonShortName, game.OtinchiShortName, game.BossShortName, game.MafiaShortName}}))
+		builtin = append(builtin, tools.GameTool(tools.GameOptions{Sender: bot.Client, Store: store, Games: []string{game.OtinchiShortName, game.BossShortName, game.MafiaShortName}}))
 	}
 	// Any group's admins, and any member for a poll or the admin list, may
 	// use these, so they are there with or without owners.
@@ -980,18 +979,9 @@ const (
 // or failed.
 const reminderKeep = 7 * 24 * time.Hour
 
-// shashkaKeep is how long a draughts game over, or an invite no one took,
-// is kept, whatever the retention of the chats.
-const shashkaKeep = 30 * 24 * time.Hour
-
-// expire applies the retention policy once, and deletes old draughts games
-// and the reminders done with.
+// expire applies the retention policy once, and deletes the reminders
+// done with.
 func expire(ctx context.Context, cfg config.Config, store *storage.Store, logger *slog.Logger) (storage.Expired, error) {
-	if deleted, err := store.DeleteOldShashkaGames(ctx, time.Now().Add(-shashkaKeep)); err != nil {
-		logger.Warn("could not delete old shashka games", "error", err)
-	} else if deleted > 0 {
-		logger.Info("old shashka games deleted", "games", deleted)
-	}
 	if deleted, err := store.ExpireQuietGroups(ctx, time.Now().Add(-quietGroupKeep), time.Now().Add(-quietGroupDays)); err != nil {
 		logger.Warn("could not trim the quiet groups' logs", "error", err)
 	} else if deleted > 0 {

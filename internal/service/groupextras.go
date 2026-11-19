@@ -99,7 +99,7 @@ func (s *Service) reputation(ctx context.Context, in incoming) outcome {
 	if err != nil {
 		return say(textError.to(in))
 	}
-	name := cardMarks.Replace(doozName(who))
+	name := cardMarks.Replace(displayName(who))
 	if points == 0 {
 		return say("⭐ " + name + ": hali reputatsiya yo'q. Foydali xabarga reply qilib \"+\" yoki \"rahmat\" yozilsa, +1 bo'ladi.")
 	}

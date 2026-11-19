@@ -235,8 +235,7 @@ Suhbatimizning oxirgi qismini eslab qolaman. %s %s
 Buyruqlar:
 /start — salomlashish
 /help — shu yordam
-/about — bot haqida
-/tictactoe — Dooz (X-O): guruhda do'stingiz bilan yoki men bilan%s
+/about — bot haqida%s
 
 Guruhda meni ismim bilan chaqiring, @username bilan belgilang yoki xabarimga reply qiling. U yerda buyruqqa username qo'shiladi: /help@username. Guruh men bilan bitta umumiy suhbatda.
 
@@ -263,8 +262,7 @@ Bo'limlar: /help mod, /help kartalar, /help azo`,
 Команды:
 /start — приветствие
 /help — эта справка
-/about — о боте
-/tictactoe — крестики-нолики: с другом в группе или со мной%s
+/about — о боте%s
 
 В группе зовите меня по имени, упоминайте (@username) или отвечайте на моё сообщение. Там к команде добавляется username: /help@username. У группы со мной один общий разговор.
 
@@ -291,8 +289,7 @@ I remember the recent part of our conversation. %s %s
 Commands:
 /start — welcome message
 /help — this help
-/about — about this bot
-/tictactoe — tic-tac-toe: with a friend in a group, or with me%s
+/about — about this bot%s
 
 In a group, call me by name, mention me (@username) or reply to one of my messages. Commands there need my username, like /help@username. A group shares one conversation with me.
 
@@ -360,9 +357,9 @@ type Abilities struct {
 // helpPages are the games' commands, in each language, listed after /about
 // when the pages are on. /stats, for the owners alone, is not listed.
 var helpPages = map[string]string{
-	"uz": "\n/game — Tarozi o'yini\n/snake — Kosmik ilon o'yini\n/woodcutter — O'tinchi: daraxtni chop, shoxlardan qoch\n/boss — Dev jangi: guruh bilan birga devni uring\n/mafia — Mafia: guruh bilan, yashirin rollar, 5+ kishi\n/checkers — shashka: tasodifiy raqib, do'st yoki men bilan, reyting bilan",
-	"ru": "\n/game — игра «Tarozi»\n/snake — игра «Космическая змейка»\n/woodcutter — «Дровосек»: руби дерево, уворачивайся от веток\n/boss — «Битва с дэвом»: бейте дэва всей группой\n/mafia — «Мафия»: всей группой, тайные роли, от 5 человек\n/checkers — шашки: со случайным соперником, другом или со мной, с рейтингом",
-	"en": "\n/game — the Tarozi game\n/snake — the space snake game\n/woodcutter — the woodcutter: chop the tree, dodge the branches\n/boss — the boss raid: hit the giant with the whole group\n/mafia — Mafia: with the group, secret roles, 5 or more\n/checkers — draughts: a random opponent, a friend or me, with ratings",
+	"uz": "\n/woodcutter — O'tinchi: daraxtni chop, shoxlardan qoch\n/boss — Dev jangi: guruh bilan birga devni uring\n/mafia — Mafia: guruh bilan, yashirin rollar, 5+ kishi",
+	"ru": "\n/woodcutter — «Дровосек»: руби дерево, уворачивайся от веток\n/boss — «Битва с дэвом»: бейте дэва всей группой\n/mafia — «Мафия»: всей группой, тайные роли, от 5 человек",
+	"en": "\n/woodcutter — the woodcutter: chop the tree, dodge the branches\n/boss — the boss raid: hit the giant with the whole group\n/mafia — Mafia: with the group, secret roles, 5 or more",
 }
 
 // HelpText describes the bot's commands and what it can do with these
@@ -460,19 +457,19 @@ In the app: the collection, the market (trades), the ranking
 /admins — adminlarni chaqirish, /rights — huquqlaringiz
 Xabarga reply qilib "+" yoki "rahmat" — reputatsiya; /rep, /toprep — reyting
 /mylink — shaxsiy taklif havolangiz, /invites — takliflar reytingi va o'zingizniki
-/id, /ping, /calc 2+2, /weather Toshkent, /tictactoe`,
+/id, /ping, /calc 2+2, /weather Toshkent`,
 		ru: `👥 Для всех
 /report — ответом на сообщение: жалоба админам
 /voteban — ответом на сообщение: голосование за бан (5 «да»); начавший может отменить
 /admins — позвать админов, /rights — ваши права
 /mylink — личная ссылка, /invites — рейтинг приглашений и ваш счёт
-/id, /ping, /calc 2+2, /weather Ташкент, /tictactoe`,
+/id, /ping, /calc 2+2, /weather Ташкент`,
 		en: `👥 For everyone
 /report — as a reply: report to the admins
 /voteban — as a reply: vote to ban (5 "yes"); the one who started may cancel
 /admins — call the admins, /rights — what you may do
 /mylink — your invite link, /invites — the invite table and your own count
-/id, /ping, /calc 2+2, /weather Tashkent, /tictactoe`,
+/id, /ping, /calc 2+2, /weather Tashkent`,
 	},
 }
 

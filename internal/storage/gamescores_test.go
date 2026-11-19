@@ -18,7 +18,7 @@ func TestRecordGameScore(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := store.RecordGameScore(ctx, GameScore{Game: "ilon", ChatID: -5, UserID: 7, Score: 9, At: at}); err != nil {
+	if err := store.RecordGameScore(ctx, GameScore{Game: "boss", ChatID: -5, UserID: 7, Score: 9, At: at}); err != nil {
 		t.Fatal(err)
 	}
 	var name string
@@ -49,7 +49,7 @@ func TestGameTable(t *testing.T) {
 		{Game: "otinchi", ChatID: 0, UserID: 2, Name: "Vali", Score: 90},
 		{Game: "otinchi", ChatID: -1, UserID: 3, Name: "Gani", Score: 90},
 		{Game: "otinchi", ChatID: -1, UserID: 4, Name: "Bek", Score: 10},
-		{Game: "ilon", ChatID: -1, UserID: 5, Name: "Sher", Score: 999},
+		{Game: "boss", ChatID: -1, UserID: 5, Name: "Sher", Score: 999},
 	} {
 		s.At = at.Add(time.Duration(i) * time.Second)
 		if err := store.RecordGameScore(ctx, s); err != nil {

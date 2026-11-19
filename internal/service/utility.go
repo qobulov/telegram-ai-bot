@@ -43,7 +43,7 @@ func (s *Service) utilityCommand(in incoming) (outcome, bool) {
 // to.
 func idText(in incoming) string {
 	if r := in.msg.ReplyToMessage; r != nil && r.From != nil {
-		return fmt.Sprintf("🆔 %s: `%d`", cardMarks.Replace(doozName(r.From)), r.From.ID)
+		return fmt.Sprintf("🆔 %s: `%d`", cardMarks.Replace(displayName(r.From)), r.From.ID)
 	}
 	lines := []string{fmt.Sprintf("🆔 Sizning ID: `%d`", in.userID)}
 	if in.group {

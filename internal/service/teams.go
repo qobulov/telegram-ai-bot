@@ -69,7 +69,7 @@ func (s *Service) teamsCommand(ctx context.Context, in incoming) outcome {
 		Token:   strconv.FormatInt(rand.Int64N(1<<40), 36),
 		Owner:   in.userID,
 		Lang:    appLanguage(in.msg.From),
-		Players: []teamPlayer{{ID: in.userID, Name: doozName(in.msg.From)}},
+		Players: []teamPlayer{{ID: in.userID, Name: displayName(in.msg.From)}},
 	}
 	err := s.opts.Teams.ChangeTeamLobby(ctx, in.msg.Chat.ID, func([]byte) ([]byte, error) { return json.Marshal(lobby) })
 	if err != nil {
@@ -138,7 +138,7 @@ func (s *Service) teamsPress(ctx context.Context, q *telegram.CallbackQuery, lob
 		if len(lobby.Players) >= teamsMax {
 			return fmt.Sprintf(textTeamsFull.inLanguage(lang), teamsMax)
 		}
-		lobby.Players = append(lobby.Players, teamPlayer{ID: q.From.ID, Name: doozName(q.From)})
+		lobby.Players = append(lobby.Players, teamPlayer{ID: q.From.ID, Name: displayName(q.From)})
 		lobby.unsplit()
 	case "l":
 		if in < 0 {

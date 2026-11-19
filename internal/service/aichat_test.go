@@ -66,7 +66,7 @@ func TestAIGroupsButtons(t *testing.T) {
 		t.Fatalf("menu = %+v", last.buttons)
 	}
 	press := func(from int64) telegram.Update {
-		return doozPlayer(int(from), &telegram.User{ID: from}, telegram.Chat{ID: from, Type: telegram.ChatTypePrivate}, "", last.buttons[0][0].Data)
+		return pressUpdate(int(from), &telegram.User{ID: from}, telegram.Chat{ID: from, Type: telegram.ChatTypePrivate}, "", last.buttons[0][0].Data)
 	}
 	f.run(press(5))
 	if extras.settings[storage.SettingAI] != "" {

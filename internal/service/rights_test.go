@@ -74,7 +74,7 @@ func lastText(sent []sentMessage) string {
 func TestHelpSections(t *testing.T) {
 	f := newFixture()
 	sent := f.run(textFrom(userID, "/help mod"))
-	if last := sent[len(sent)-1].text; !strings.Contains(last, "Moderatsiya") || strings.Contains(last, "tictactoe") {
+	if last := sent[len(sent)-1].text; !strings.Contains(last, "Moderatsiya") || strings.Contains(last, "/about") {
 		t.Errorf("/help mod = %q", last)
 	}
 	sent = f.run(textFrom(userID, "/help"))

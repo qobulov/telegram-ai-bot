@@ -83,41 +83,47 @@ func post(t *testing.T, h http.Handler, body any) (int, map[string]any) {
 	return rec.Code, got
 }
 
-// The page starts a play, sends its answers, and gets the score the server
+// chopped is a play of O'tinchi started for p through h, chopped chops
+// pieces, and the clock moved on past it: the run token, the sides and
+// times to send, and the score they make.
+func chopped(t *testing.T, g *Game, h http.Handler, c *clock, p Player, chops int) (string, string, []int, int) {
+	t.Helper()
+	status, start := post(t, h, request{Action: "start", Session: sessionOf(t, playURL(t, g, OtinchiShortName, p))})
+	if status != http.StatusOK {
+		t.Fatalf("start: %d %v", status, start)
+	}
+	seed := uint32(start["seed"].(float64))
+	sides, times, want := woodcutter(seed, chops, 200)
+	c.now = c.now.Add(time.Duration(times[len(times)-1])*time.Millisecond + time.Second)
+	return start["run"].(string), sides, times, want
+}
+
+// The page starts a play, sends its chops, and gets the score the server
 // counted, set on the game message for the session's player, with the
 // table.
 func TestHandlerPlaysAGame(t *testing.T) {
 	g, c := newTestGame()
 	scores := &fakeScores{}
 	h := g.Handler(scores, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	session := sessionOf(t, playURL(t, g, ShortName, player))
-
-	status, start := post(t, h, request{Action: "start", Session: session})
-	if status != http.StatusOK || start["seconds"] != float64(Seconds) || len(start["rounds"].([]any)) != rounds {
-		t.Fatalf("start: %d %v", status, start["seconds"])
+	run, sides, times, want := chopped(t, g, h, c, player, 20)
+	if want <= 0 {
+		t.Fatalf("the play scores %d", want)
 	}
-	run := start["run"].(string)
-	var r struct {
-		Rounds []Round `json:"rounds"`
-	}
-	raw, _ := json.Marshal(start)
-	_ = json.Unmarshal(raw, &r)
-	answers, times := rightAnswers(r.Rounds, 3)
-	c.now = c.now.Add(5 * time.Second)
 
-	status, done := post(t, h, request{Action: "finish", Run: run, Answers: answers, Times: times})
-	if status != http.StatusOK || done["score"] != float64(36) || done["improved"] != true {
+	status, done := post(t, h, request{Action: "finish", Run: run, Sides: sides, Times: times})
+	if status != http.StatusOK || done["score"] != float64(want) || done["improved"] != true {
 		t.Fatalf("finish: %d %v", status, done)
 	}
-	want := telegram.GameMessage{UserID: 42, ChatID: -100123, MessageID: 77}
-	if len(scores.set) != 1 || scores.set[0] != want || scores.score != 36 {
-		t.Errorf("set %+v = %d, want %+v = 36", scores.set, scores.score, want)
+	wantMessage := telegram.GameMessage{UserID: 42, ChatID: -100123, MessageID: 77}
+	if len(scores.set) != 1 || scores.set[0] != wantMessage || scores.score != want {
+		t.Errorf("set %+v = %d, want %+v = %d", scores.set, scores.score, wantMessage, want)
 	}
 	table := done["table"].([]any)
 	if len(table) != 2 || table[1].(map[string]any)["me"] != true || table[0].(map[string]any)["name"] != "Ali" {
 		t.Errorf("table = %v", table)
 	}
 
+	session := sessionOf(t, playURL(t, g, OtinchiShortName, player))
 	status, got := post(t, h, request{Action: "table", Session: session})
 	if status != http.StatusOK || len(got["table"].([]any)) != 2 {
 		t.Errorf("table: %d %v", status, got)
@@ -129,7 +135,7 @@ func TestHandlerRefusesWhatIsNotAPlay(t *testing.T) {
 	g, _ := newTestGame()
 	scores := &fakeScores{}
 	h := g.Handler(scores, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	session := sessionOf(t, playURL(t, g, ShortName, player))
+	session := sessionOf(t, playURL(t, g, OtinchiShortName, player))
 	_, start := post(t, h, request{Action: "start", Session: session})
 	run := start["run"].(string)
 
@@ -138,10 +144,11 @@ func TestHandlerRefusesWhatIsNotAPlay(t *testing.T) {
 		status int
 		code   string
 	}{
-		"forged session": {request{Action: "start", Session: "e30.AAAA"}, http.StatusUnauthorized, "session"},
-		"session as run": {request{Action: "finish", Run: session}, http.StatusUnauthorized, "session"},
-		"too fast":       {request{Action: "finish", Run: run, Answers: "LL", Times: []int{10, 20}}, http.StatusUnprocessableEntity, "implausible"},
-		"no action":      {request{Session: session}, http.StatusBadRequest, "bad_request"},
+		"forged session":  {request{Action: "start", Session: "e30.AAAA"}, http.StatusUnauthorized, "session"},
+		"another's start": {request{Action: "start", Session: sessionOf(t, playURL(t, g, BossShortName, player))}, http.StatusUnauthorized, "session"},
+		"session as run":  {request{Action: "finish", Run: session}, http.StatusUnauthorized, "session"},
+		"too fast":        {request{Action: "finish", Run: run, Sides: "LL", Times: []int{0, 10}}, http.StatusUnprocessableEntity, "implausible"},
+		"no action":       {request{Session: session}, http.StatusBadRequest, "bad_request"},
 	}
 	for name, c := range cases {
 		if status, got := post(t, h, c.body); status != c.status || got["error"] != c.code {
@@ -162,33 +169,14 @@ func TestHandlerRefusesWhatIsNotAPlay(t *testing.T) {
 func TestHandlerWhenTheScoreIsNotSet(t *testing.T) {
 	g, c := newTestGame()
 	h := g.Handler(&fakeScores{err: errors.New("timeout")}, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	run, dealt, _ := g.Start(sessionOf(t, playURL(t, g, ShortName, player)))
-	answers, times := rightAnswers(dealt, 1)
-	c.now = c.now.Add(2 * time.Second)
+	run, sides, times, _ := chopped(t, g, h, c, player, 10)
 
-	if status, got := post(t, h, request{Action: "finish", Run: run, Answers: answers, Times: times}); status != http.StatusBadGateway || got["error"] != "unavailable" {
+	if status, got := post(t, h, request{Action: "finish", Run: run, Sides: sides, Times: times}); status != http.StatusBadGateway || got["error"] != "unavailable" {
 		t.Errorf("%d %v", status, got)
 	}
 }
 
-// A play that scored nothing sets no score, which would only put the player
-// at the bottom of the table.
-func TestHandlerSetsNoZero(t *testing.T) {
-	g, c := newTestGame()
-	scores := &fakeScores{}
-	h := g.Handler(scores, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	run, _, _ := g.Start(sessionOf(t, playURL(t, g, ShortName, player)))
-	c.now = c.now.Add(time.Second)
-
-	if status, got := post(t, h, request{Action: "finish", Run: run}); status != http.StatusOK || got["score"] != float64(0) || got["improved"] != false {
-		t.Errorf("%d %v", status, got)
-	}
-	if len(scores.set) != 0 {
-		t.Errorf("set %+v", scores.set)
-	}
-}
-
-// Each play scored is recorded under its game, for the session's player in
+// Each play scored is recorded under O'tinchi, for the session's player in
 // their chat; one Telegram does not take is not, and one the database does
 // not take is the player's all the same.
 func TestHandlerRecordsThePlays(t *testing.T) {
@@ -199,38 +187,25 @@ func TestHandlerRecordsThePlays(t *testing.T) {
 	named := player
 	named.Name = "Bek"
 
-	run, dealt, _ := g.Start(sessionOf(t, playURL(t, g, ShortName, named)))
-	answers, times := rightAnswers(dealt, 3)
-	c.now = c.now.Add(5 * time.Second)
-	if status, got := post(t, h, request{Action: "finish", Run: run, Answers: answers, Times: times}); status != http.StatusOK {
-		t.Fatalf("Tarozi: %d %v", status, got)
-	}
-	run, play, _ := g.StartOtinchi(sessionOf(t, playURL(t, g, OtinchiShortName, named)))
-	sides, chops, want := woodcutter(play.Seed, 20, 200)
-	c.now = c.now.Add(time.Duration(chops[len(chops)-1])*time.Millisecond + time.Second)
-	if status, got := post(t, h, request{Action: "finish", Run: run, Sides: sides, Times: chops}); status != http.StatusOK {
+	run, sides, times, want := chopped(t, g, h, c, named, 20)
+	if status, got := post(t, h, request{Action: "finish", Run: run, Sides: sides, Times: times}); status != http.StatusOK {
 		t.Fatalf("O'tinchi: %d %v", status, got)
 	}
-	if len(records.got) != 2 {
+	if len(records.got) != 1 {
 		t.Fatalf("recorded %+v", records.got)
 	}
-	tarozi, otinchi := records.got[0], records.got[1]
-	if tarozi.Game != ShortName || tarozi.Score != 36 || tarozi.UserID != 42 || tarozi.ChatID != -100123 || tarozi.Name != "Bek" {
-		t.Errorf("Tarozi's play: %+v", tarozi)
-	}
-	if otinchi.Game != OtinchiShortName || otinchi.Score != want || !otinchi.At.Equal(c.now) {
+	otinchi := records.got[0]
+	if otinchi.Game != OtinchiShortName || otinchi.Score != want || otinchi.UserID != 42 || otinchi.ChatID != -100123 || otinchi.Name != "Bek" || !otinchi.At.Equal(c.now) {
 		t.Errorf("O'tinchi's play: %+v, want %d at %v", otinchi, want, c.now)
 	}
 
-	run, dealt, _ = g.Start(sessionOf(t, playURL(t, g, ShortName, named)))
-	answers, times = rightAnswers(dealt, 1)
-	c.now = c.now.Add(2 * time.Second)
+	run, sides, times, _ = chopped(t, g, h, c, named, 10)
 	refused := g.Handler(&fakeScores{err: errors.New("timeout")}, records, logger)
-	if status, _ := post(t, refused, request{Action: "finish", Run: run, Answers: answers, Times: times}); status != http.StatusBadGateway || len(records.got) != 2 {
+	if status, _ := post(t, refused, request{Action: "finish", Run: run, Sides: sides, Times: times}); status != http.StatusBadGateway || len(records.got) != 1 {
 		t.Errorf("a score Telegram refused: %d, recorded %d", status, len(records.got))
 	}
 	records.err = errors.New("database down")
-	if status, got := post(t, h, request{Action: "finish", Run: run, Answers: answers, Times: times}); status != http.StatusOK || got["score"].(float64) <= 0 {
+	if status, got := post(t, h, request{Action: "finish", Run: run, Sides: sides, Times: times}); status != http.StatusOK || got["score"].(float64) <= 0 {
 		t.Errorf("a play the database refused: %d %v", status, got)
 	}
 }
@@ -252,8 +227,8 @@ func TestHandlerTableFromTheRecords(t *testing.T) {
 	if first["name"] != "Vali" || first["score"] != 900.0 || first["me"] != false || mine["position"] != float64(tableSize+2) || mine["me"] != true {
 		t.Errorf("table = %v", table)
 	}
-	if _, got := post(t, h, request{Action: "table", Session: sessionOf(t, playURL(t, g, ShortName, player))}); records.asked[1] != ShortName {
-		t.Errorf("Tarozi's table asked for %v: %v", records.asked, got)
+	if _, got := post(t, h, request{Action: "table", Session: sessionOf(t, playURL(t, g, BossShortName, player))}); records.asked[1] != BossShortName {
+		t.Errorf("Dev jangi's table asked for %v: %v", records.asked, got)
 	}
 
 	records.tableErr = errors.New("unreachable")

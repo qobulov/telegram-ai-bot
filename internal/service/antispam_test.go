@@ -252,7 +252,7 @@ func TestAntispamButtons(t *testing.T) {
 	}
 	chat := telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup}
 	press := func(user int64) telegram.Update {
-		return doozPlayer(int(user), &telegram.User{ID: user, FirstName: "U"}, chat, "", sent[0].buttons[0][0].Data)
+		return pressUpdate(int(user), &telegram.User{ID: user, FirstName: "U"}, chat, "", sent[0].buttons[0][0].Data)
 	}
 
 	f.run(press(5151))

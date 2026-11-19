@@ -52,7 +52,7 @@ func (s *Service) myLink(ctx context.Context, in incoming) outcome {
 		return say(textError.to(in))
 	}
 	if !found {
-		name := memberLinkPrefix + strconv.FormatInt(in.userID, 10) + " " + doozName(in.msg.From)
+		name := memberLinkPrefix + strconv.FormatInt(in.userID, 10) + " " + displayName(in.msg.From)
 		if r := []rune(name); len(r) > 32 {
 			name = string(r[:32])
 		}
@@ -64,7 +64,7 @@ func (s *Service) myLink(ctx context.Context, in incoming) outcome {
 			s.opts.Logger.Warn("could not keep a member's link", "chat_id", chatID, "error", err)
 		}
 	}
-	return say("🔗 " + cardMarks.Replace(doozName(in.msg.From)) + ", shaxsiy havolangiz:\n" + link +
+	return say("🔗 " + cardMarks.Replace(displayName(in.msg.From)) + ", shaxsiy havolangiz:\n" + link +
 		"\nShu havola orqali kirganlar sizga hisoblanadi: /invites")
 }
 

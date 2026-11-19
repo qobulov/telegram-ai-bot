@@ -96,7 +96,7 @@ func TestOtinchiRefusesPlaysThatDidNotHappen(t *testing.T) {
 }
 
 // A play sent in sooner than its chops took is refused; one played out is
-// scored, for the session's player, and only as O'tinchi's.
+// scored, for the session's player.
 func TestFinishOtinchiWantsTheTimeTheChopsTake(t *testing.T) {
 	g, c := newTestGame()
 	link := playURL(t, g, OtinchiShortName, player)
@@ -104,15 +104,9 @@ func TestFinishOtinchiWantsTheTimeTheChopsTake(t *testing.T) {
 		t.Fatalf("O'tinchi's page is %s", link)
 	}
 	session := sessionOf(t, link)
-	if _, _, err := g.StartIlon(session); !errors.Is(err, ErrToken) {
-		t.Errorf("Kosmik ilon started from O'tinchi's session: %v", err)
-	}
 	run, play, err := g.StartOtinchi(session)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if _, err := g.FinishIlon(run, nil, 1); !errors.Is(err, ErrToken) {
-		t.Errorf("O'tinchi's run finished as Kosmik ilon's: %v", err)
 	}
 	sides, times, want := woodcutter(play.Seed, 40, 200)
 	took := time.Duration(times[len(times)-1]) * time.Millisecond

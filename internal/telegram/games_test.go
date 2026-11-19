@@ -9,13 +9,13 @@ import (
 func TestSendGameSendsExactParams(t *testing.T) {
 	client, api := newTestClient(t, `{"ok":true,"result":{"message_id":77}}`)
 
-	id, err := client.SendGame(context.Background(), -100123, "tarozi", 9)
+	id, err := client.SendGame(context.Background(), -100123, "otinchi", 9)
 	if err != nil || id != 77 {
 		t.Fatalf("SendGame = %d, %v; want 77", id, err)
 	}
 	want := map[string]any{
 		"chat_id":          float64(-100123),
-		"game_short_name":  "tarozi",
+		"game_short_name":  "otinchi",
 		"reply_parameters": map[string]any{"message_id": float64(9), "allow_sending_without_reply": true},
 	}
 	if sent := api.recorded()[0]; sent.method != "sendGame" || !reflect.DeepEqual(sent.params, want) {
