@@ -39,7 +39,7 @@
       shopTab: "Do'kon", shopBuyTitle: "💎 Kristall sotib olish", shopBuyHint: "Telegram Stars bilan to'lanadi, kristall darhol hisobingizga tushadi.", shopItemsTitle: "🛒 Kristallga xarid",
       wallet: (n) => `Sizda: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% foyda`,
       tokensItem: (n) => `${n} ta token`, tokensHint: (n) => `${n} ta karta ochadi, kutmasdan`, packItem: (r) => `${r} paket`, packHint: (n, r) => `${n} ta karta, kamida 1 ta ${r.toLowerCase()} kafolatlangan`,
-      boxTitle: "🎁 Almaz box", boxRange: (a, b) => `${a}–${b} 💎`, boxOdds: "Qancha ko'p bo'lsa, shuncha kam tushadi", boxOpened: (n) => `🎁 Almaz box: +${n} kristall!`,
+      boxTitle: "🎁 Almaz box", boxRange: (a, b) => `${a}–${b} 💎`, boxOdds: "Qancha ko'p bo'lsa, shuncha kam tushadi", boxOpened: (n) => `🎁 Almaz box: +${n} kristall!`, boxBuy: (n) => `Ochish · ${n} ⭐`, boxGot: "Almaz box ochildi!", boxLucky: "🔥 Omadingiz keldi!",
       paid: "✅ To'lov qabul qilindi, kristall qo'shilmoqda…", crystalsAdded: (n) => `💎 +${n} kristall qo'shildi!`, payFailed: "To'lov amalga oshmadi", bought: (n) => `🎟 +${n} token`, packOpened: (r) => `${r} paket`,
     },
     ru: {
@@ -73,7 +73,7 @@
       shopTab: "Магазин", shopBuyTitle: "💎 Купить кристаллы", shopBuyHint: "Оплата Telegram Stars, кристаллы приходят сразу.", shopItemsTitle: "🛒 За кристаллы",
       wallet: (n) => `У вас: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% выгоды`,
       tokensItem: (n) => `${n} токенов`, tokensHint: (n) => `Откроют ${n} карт без ожидания`, packItem: (r) => `Пак: ${r}`, packHint: (n, r) => `${n} карт, минимум одна ${r.toLowerCase()} гарантирована`,
-      boxTitle: "🎁 Алмазный бокс", boxRange: (a, b) => `${a}–${b} 💎`, boxOdds: "Чем больше, тем реже выпадает", boxOpened: (n) => `🎁 Алмазный бокс: +${n} кристаллов!`,
+      boxTitle: "🎁 Алмазный бокс", boxRange: (a, b) => `${a}–${b} 💎`, boxOdds: "Чем больше, тем реже выпадает", boxOpened: (n) => `🎁 Алмазный бокс: +${n} кристаллов!`, boxBuy: (n) => `Открыть · ${n} ⭐`, boxGot: "Алмазный бокс открыт!", boxLucky: "🔥 Вам повезло!",
       paid: "✅ Оплата принята, кристаллы зачисляются…", crystalsAdded: (n) => `💎 +${n} кристаллов!`, payFailed: "Оплата не прошла", bought: (n) => `🎟 +${n} токенов`, packOpened: (r) => `Пак: ${r}`,
     },
     en: {
@@ -107,7 +107,7 @@
       shopTab: "Shop", shopBuyTitle: "💎 Buy crystals", shopBuyHint: "Paid in Telegram Stars; the crystals arrive at once.", shopItemsTitle: "🛒 For crystals",
       wallet: (n) => `You have: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% value`,
       tokensItem: (n) => `${n} tokens`, tokensHint: (n) => `Open ${n} cards without the wait`, packItem: (r) => `${r} pack`, packHint: (n, r) => `${n} cards, at least one ${r.toLowerCase()} guaranteed`,
-      boxTitle: "🎁 Diamond box", boxRange: (a, b) => `${a}–${b} 💎`, boxOdds: "The more crystals, the rarer", boxOpened: (n) => `🎁 Diamond box: +${n} crystals!`,
+      boxTitle: "🎁 Diamond box", boxRange: (a, b) => `${a}–${b} 💎`, boxOdds: "The more crystals, the rarer", boxOpened: (n) => `🎁 Diamond box: +${n} crystals!`, boxBuy: (n) => `Open · ${n} ⭐`, boxGot: "Diamond box opened!", boxLucky: "🔥 Lucky you!",
       paid: "✅ Payment received, adding your crystals…", crystalsAdded: (n) => `💎 +${n} crystals!`, payFailed: "The payment did not go through", bought: (n) => `🎟 +${n} tokens`, packOpened: (r) => `${r} pack`,
     },
   };
@@ -1266,37 +1266,62 @@
     }
   }
 
-  // boxButton is the diamond box, one short row: its range and price, and
-  // an ⓘ button that shows each prize's chance, the more crystals the rarer.
+  // boxButton is the diamond box: a compact card, its name and range on the
+  // left and its price on the right, a tap opening its chances with a buy
+  // button there, so nothing is paid for without seeing them; ⓘ says so.
   function boxButton(pack) {
-    const row = document.createElement("div");
-    row.className = "box-row";
-    row.innerHTML = '<button type="button" class="pack-btn box-btn"><span class="box-title"></span><b></b><span class="stars"></span></button><button type="button" class="box-info" aria-label="ⓘ">ⓘ</button>';
-    const buy = row.querySelector(".box-btn");
-    buy.querySelector(".box-title").textContent = t.boxTitle;
-    buy.querySelector("b").textContent = t.boxRange(spaced(pack.box[0].crystals), spaced(pack.box[pack.box.length - 1].crystals));
-    buy.querySelector(".stars").textContent = t.starsN(pack.stars);
-    buy.disabled = !shopData.stars;
-    buy.addEventListener("click", () => buyCrystals(pack));
-    row.querySelector(".box-info").addEventListener("click", () => showPanel(boxOddsPanel(pack)));
-    return row;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "pack-btn box-btn";
+    button.innerHTML = '<span class="box-icon">🎁</span><span class="box-text"><span class="box-title"></span><b></b></span><span class="stars"></span><span class="box-i" aria-hidden="true">ⓘ</span>';
+    button.querySelector(".box-title").textContent = t.boxTitle.replace("🎁 ", "");
+    button.querySelector("b").textContent = boxRange(pack);
+    button.querySelector(".stars").textContent = t.starsN(pack.stars);
+    button.addEventListener("click", () => showPanel(boxPanel(pack)));
+    return button;
   }
 
-  // boxOddsPanel lists the box's prizes with their chances.
-  function boxOddsPanel(pack) {
+  function boxRange(pack) {
+    return t.boxRange(spaced(pack.box[0].crystals), spaced(pack.box[pack.box.length - 1].crystals));
+  }
+
+  // boxPanel shows the box's prizes with their chances, the rarer ones
+  // brighter, and the button that buys it.
+  function boxPanel(pack) {
     const panel = document.createElement("div");
-    panel.className = "gift box-odds-panel";
-    panel.innerHTML = '<b class="step"></b><small></small><ul class="box-odds"></ul>';
-    panel.querySelector(".step").textContent = t.boxTitle;
-    panel.querySelector("small").textContent = t.boxOdds;
+    panel.className = "gift box-panel";
+    panel.innerHTML = '<div class="box-hero">🎁</div><b class="box-name"></b><small class="box-hint"></small><ul class="box-odds"></ul><button type="button" class="draw box-buy"></button>';
+    panel.querySelector(".box-name").textContent = t.boxTitle.replace("🎁 ", "");
+    panel.querySelector(".box-hint").textContent = t.boxOdds;
     const list = panel.querySelector(".box-odds");
-    for (const prize of pack.box) {
+    pack.box.forEach((prize, i) => {
       const item = document.createElement("li");
-      item.innerHTML = "<span></span><b></b>";
+      item.style.setProperty("--glow", `${Math.round((i / (pack.box.length - 1)) * 100)}%`);
+      item.innerHTML = "<span></span><i><em></em></i><b></b>";
       item.querySelector("span").textContent = t.crystalsN(spaced(prize.crystals));
+      item.querySelector("em").style.width = `${Math.max(prize.percent, 2)}%`;
       item.querySelector("b").textContent = `${prize.percent}%`;
       list.append(item);
-    }
+    });
+    const buy = panel.querySelector(".box-buy");
+    buy.textContent = t.boxBuy(pack.stars);
+    buy.disabled = !shopData.stars;
+    buy.addEventListener("click", () => { closeSheet(); buyCrystals(pack); });
+    return panel;
+  }
+
+  // boxResultPanel shows what a box gave, big, with a word for a rare one.
+  function boxResultPanel(pack, came) {
+    const panel = document.createElement("div");
+    panel.className = "gift box-panel box-result";
+    const rare = came > pack.box[0].crystals;
+    panel.innerHTML = '<div class="box-hero open">🎁</div><small class="box-hint"></small><b class="box-won"></b><small class="box-lucky"></small><button type="button" class="draw box-ok"></button>';
+    panel.querySelector(".box-hint").textContent = t.boxGot;
+    panel.querySelector(".box-won").textContent = `+${spaced(came)} 💎`;
+    panel.querySelector(".box-lucky").textContent = rare ? t.boxLucky : "";
+    const ok = panel.querySelector(".box-ok");
+    ok.textContent = t.carryOn;
+    ok.addEventListener("click", closeSheet);
     return panel;
   }
 
@@ -1364,7 +1389,8 @@
         applyState(await api("state"));
         if (shards >= before + pack.crystals) {
           const came = shards - before;
-          toast(pack.box ? t.boxOpened(spaced(came)) : t.crystalsAdded(pack.crystals));
+          if (pack.box) showPanel(boxResultPanel(pack, came));
+          else toast(t.crystalsAdded(pack.crystals));
           haptic("heavy");
           shop();
           return;
