@@ -91,3 +91,22 @@ func TestCrystalPayments(t *testing.T) {
 		t.Errorf("refunded = %v", crystals.refunded)
 	}
 }
+
+func TestDiamondBoxPayment(t *testing.T) {
+	f := newFixture()
+	_, payments, _ := withPremium(f)
+	crystals := &fakeCrystals{charges: map[string]int{}}
+	f.opts.Crystals = crystals
+	f.opts.BoxRoll = func(n int) int { return n - 1 } // the last percent: the rarest prize
+	s := New(f.opts)
+	payload := fmt.Sprintf("cr:%d:box", userID)
+	s.HandleNow(checkoutUpdate(userID, payload, 129))
+	s.HandleNow(checkoutUpdate(userID, payload, 99))
+	if len(payments.answers) != 2 || !payments.answers[0].ok || payments.answers[1].refusal != textCrystalsChanged.uz {
+		t.Fatalf("answers = %+v", payments.answers)
+	}
+	sent := f.run(paymentUpdate(userID, "ch_box", payload, 129))
+	if crystals.shards != 5000 || len(sent) != 1 || !strings.Contains(sent[0].text, "Almaz box") || !strings.Contains(sent[0].text, "+5000") {
+		t.Fatalf("shards = %d, sent %+v", crystals.shards, sent)
+	}
+}

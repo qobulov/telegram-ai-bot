@@ -197,7 +197,9 @@ type Options struct {
 	// none. Extras keeps reputation and a group's settings; nil turns them
 	// off.
 	Crystals CrystalBook
-	Extras   GroupExtras
+	// BoxRoll draws a diamond box's prize (0 to n-1); nil is math/rand.
+	BoxRoll func(n int) int
+	Extras  GroupExtras
 	// Reports keeps the members' reports, and WarnList their warnings, for
 	// /reports and /warns; nil turns each off.
 	Reports  ReportBook

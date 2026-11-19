@@ -109,3 +109,38 @@ func TestShop(t *testing.T) {
 		t.Error("a premium payload read as crystals")
 	}
 }
+
+func TestDiamondBoxDraw(t *testing.T) {
+	box, ok := CrystalPackByID("box")
+	if !ok || box.Stars != 129 || box.Crystals != 1500 {
+		t.Fatalf("box = %+v, %v", box, ok)
+	}
+	total, mean := 0, 0
+	for _, p := range box.Box {
+		total += p.Percent
+		mean += p.Crystals * p.Percent
+	}
+	if total != 100 {
+		t.Fatalf("the chances add up to %d%%", total)
+	}
+	if mean/100 != 1870 {
+		t.Errorf("a box gives %d on average, want the 1870 the owners chose", mean/100)
+	}
+	for i := 1; i < len(box.Box); i++ {
+		if box.Box[i].Crystals <= box.Box[i-1].Crystals || box.Box[i].Percent > box.Box[i-1].Percent {
+			t.Errorf("prize %d: more crystals must be no likelier", i)
+		}
+	}
+	got := map[int]int{}
+	for r := range total {
+		got[box.Draw(func(int) int { return r })]++
+	}
+	for _, p := range box.Box {
+		if got[p.Crystals] != p.Percent {
+			t.Errorf("%d crystals drawn %d times in 100, want %d", p.Crystals, got[p.Crystals], p.Percent)
+		}
+	}
+	if plain, _ := CrystalPackByID("c300"); plain.Draw(func(int) int { panic("no roll") }) != 300 {
+		t.Error("a plain pack gives its crystals")
+	}
+}

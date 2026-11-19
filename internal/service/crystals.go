@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
 
 	"telegram-ai-bot/internal/cards"
 	"telegram-ai-bot/internal/storage"
@@ -19,6 +20,7 @@ type CrystalBook interface {
 var (
 	textCrystalsOff      = localText{uz: "Kristall sotuvi hozir yopiq.", ru: "Продажа кристаллов сейчас закрыта.", en: "Crystals are not on sale now."}
 	textCrystalsChanged  = localText{uz: "Narx o'zgargan: ilovani qayta ochib, yana sotib oling.", ru: "Цена изменилась: откройте приложение заново.", en: "The price changed: open the app again."}
+	textCrystalsBox      = localText{uz: "🎁 Almaz box ochildi: +%d kristall! Endi sizda %d 💎. Do'kon: /card", ru: "🎁 Алмазный бокс открыт: +%d кристаллов! Теперь у вас %d 💎. Магазин: /card", en: "🎁 Diamond box opened: +%d crystals! You now have %d 💎. Shop: /card"}
 	textCrystalsThanks   = localText{uz: "💎 +%d kristall qo'shildi! Endi sizda %d 💎. Do'kon: /card", ru: "💎 +%d кристаллов! Теперь у вас %d 💎. Магазин: /card", en: "💎 +%d crystals! You now have %d 💎. Shop: /card"}
 	textCrystalsNotSaved = localText{uz: "To'lov qabul qilindi, lekin kristallni yozib bo'lmadi. Egalari tez orada qo'shadi yoki pulni qaytaradi.", ru: "Оплата принята, но кристаллы не записались. Владельцы скоро добавят их или вернут деньги.", en: "The payment went through but the crystals could not be added; the owners will add them or refund it."}
 )
@@ -55,7 +57,7 @@ func (s *Service) recordCrystals(msg *telegram.Message) {
 		return
 	}
 	userID, pack, _ := cards.ParseCrystalPayload(paid.InvoicePayload)
-	crystals := pack.Crystals
+	crystals := pack.Draw(s.boxRoll())
 	if userID != msg.From.ID || paid.Currency != telegram.Stars || paid.TotalAmount != pack.Stars {
 		s.opts.Logger.Error("a crystal payment does not match its pack; kept without crystals, for a refund",
 			"user_id", msg.From.ID, "charge_id", paid.TelegramPaymentChargeID, "payload", paid.InvoicePayload, "stars", paid.TotalAmount)
@@ -77,8 +79,21 @@ func (s *Service) recordCrystals(msg *telegram.Message) {
 		s.reply(in, textCrystalsNotSaved.to(in))
 		return
 	}
-	s.opts.Logger.Info("crystals bought", "user_id", msg.From.ID, "stars", paid.TotalAmount, "crystals", crystals)
-	s.reply(in, fmt.Sprintf(textCrystalsThanks.to(in), crystals, shards))
+	s.opts.Logger.Info("crystals bought", "user_id", msg.From.ID, "stars", paid.TotalAmount, "crystals", crystals, "pack", pack.ID)
+	thanks := textCrystalsThanks
+	if len(pack.Box) > 0 {
+		thanks = textCrystalsBox
+	}
+	s.reply(in, fmt.Sprintf(thanks.to(in), crystals, shards))
+}
+
+// boxRoll is the roll a diamond box's prize is drawn by: the options' when
+// a test sets one.
+func (s *Service) boxRoll() func(int) int {
+	if s.opts.BoxRoll != nil {
+		return s.opts.BoxRoll
+	}
+	return rand.IntN
 }
 
 // refundCrystals takes back a refunded payment's crystals.

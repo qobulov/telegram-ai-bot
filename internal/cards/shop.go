@@ -8,19 +8,62 @@ import (
 	"telegram-ai-bot/internal/storage"
 )
 
-// CrystalPack is crystals sold for Telegram Stars.
+// CrystalPack is crystals sold for Telegram Stars. A box (Box set) gives
+// one of its prizes, drawn when the payment goes through; Crystals is then
+// the least it gives.
 type CrystalPack struct {
-	ID       string `json:"id"`
-	Crystals int    `json:"crystals"`
-	Stars    int    `json:"stars"`
+	ID       string     `json:"id"`
+	Crystals int        `json:"crystals"`
+	Stars    int        `json:"stars"`
+	Box      []BoxPrize `json:"box,omitempty"`
 }
 
-// CrystalPacks are the crystals on sale, the bigger the cheaper each.
+// BoxPrize is a box's prize and its chance in percent.
+type BoxPrize struct {
+	Crystals int `json:"crystals"`
+	Percent  int `json:"percent"`
+}
+
+// DiamondBox is the 💎 box of 2026-11-19, as the owners asked: 1500 to 5000
+// crystals, the more the rarer, about 1870 on average for 129 Stars (the
+// 1500 pack is 99).
+var DiamondBox = []BoxPrize{
+	{Crystals: 1500, Percent: 60},
+	{Crystals: 2000, Percent: 22},
+	{Crystals: 2500, Percent: 10},
+	{Crystals: 3000, Percent: 5},
+	{Crystals: 4000, Percent: 2},
+	{Crystals: 5000, Percent: 1},
+}
+
+// CrystalPacks are the crystals on sale, the bigger the cheaper each, and
+// the diamond box.
 var CrystalPacks = []CrystalPack{
 	{ID: "c100", Crystals: 100, Stars: 10},
 	{ID: "c300", Crystals: 300, Stars: 25},
 	{ID: "c700", Crystals: 700, Stars: 50},
 	{ID: "c1500", Crystals: 1500, Stars: 99},
+	{ID: "box", Crystals: 1500, Stars: 129, Box: DiamondBox},
+}
+
+// Draw is the crystals a payment for the pack gives: its crystals, or a
+// box's prize by roll, which answers a number from 0 to n-1.
+func (p CrystalPack) Draw(roll func(n int) int) int {
+	if len(p.Box) == 0 {
+		return p.Crystals
+	}
+	total := 0
+	for _, prize := range p.Box {
+		total += prize.Percent
+	}
+	r := roll(total)
+	for _, prize := range p.Box {
+		if r < prize.Percent {
+			return prize.Crystals
+		}
+		r -= prize.Percent
+	}
+	return p.Box[len(p.Box)-1].Crystals
 }
 
 // ShopItem is what crystals buy in the shop: tokens, or a pack of Cards

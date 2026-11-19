@@ -54,13 +54,20 @@ func (h *handler) invoice(ctx context.Context, user miniapp.User, id string) (an
 	if !ok || h.Invoices == nil {
 		return nil, errBadRequest
 	}
-	link, err := h.Invoices.CreateInvoiceLink(ctx, telegram.Invoice{
+	invoice := telegram.Invoice{
 		Title:       fmt.Sprintf("💎 %d kristall", pack.Crystals),
 		Description: fmt.Sprintf("Kartalar o'yini uchun %d kristall: token, karta paketlari va karta ochish uchun.", pack.Crystals),
 		Payload:     CrystalPayload(user.ID, pack),
 		Label:       fmt.Sprintf("%d kristall", pack.Crystals),
 		Price:       pack.Stars,
-	})
+	}
+	if len(pack.Box) > 0 {
+		most := pack.Box[len(pack.Box)-1].Crystals
+		invoice.Title = "🎁 Almaz box"
+		invoice.Description = fmt.Sprintf("Kartalar o'yini uchun %d dan %d gacha kristall: qancha ko'p bo'lsa, shuncha kam tushadi.", pack.Crystals, most)
+		invoice.Label = "Almaz box"
+	}
+	link, err := h.Invoices.CreateInvoiceLink(ctx, invoice)
 	if err != nil {
 		h.Logger.Error("could not make a crystal invoice", "user_id", user.ID, "pack", id, "error", err)
 		return nil, errUnavailable

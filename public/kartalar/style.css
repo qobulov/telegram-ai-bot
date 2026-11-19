@@ -605,6 +605,13 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .pack-btn small { color: var(--muted); min-height: 1em; }
 .pack-btn .stars { color: var(--r4); font-weight: 800; font-size: 15px; }
 .pack-btn:disabled { opacity: 0.5; cursor: default; }
+.box-btn {
+  grid-column: 1 / -1; padding: 16px 12px;
+  border-color: color-mix(in srgb, var(--gold) 60%, transparent);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--gold) 26%, transparent), color-mix(in srgb, var(--r3) 14%, transparent) 70%);
+}
+.box-btn .box-title { font: 800 15px Unbounded, sans-serif; color: var(--gold); }
+.box-btn .box-odds { color: var(--muted); font-size: 11px; line-height: 1.5; text-align: center; white-space: pre-wrap; }
 .shop-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .shop-item {
   display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px;

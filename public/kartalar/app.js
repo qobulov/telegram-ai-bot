@@ -39,6 +39,7 @@
       shopTab: "Do'kon", shopBuyTitle: "💎 Kristall sotib olish", shopBuyHint: "Telegram Stars bilan to'lanadi, kristall darhol hisobingizga tushadi.", shopItemsTitle: "🛒 Kristallga xarid",
       wallet: (n) => `Sizda: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% foyda`,
       tokensItem: (n) => `${n} ta token`, tokensHint: (n) => `${n} ta karta ochadi, kutmasdan`, packItem: (r) => `${r} paket`, packHint: (n, r) => `${n} ta karta, kamida 1 ta ${r.toLowerCase()} kafolatlangan`,
+      boxTitle: "🎁 Almaz box", boxRange: (a, b) => `${a}–${b} 💎`, boxOdds: "Qancha ko'p bo'lsa, shuncha kam tushadi", boxOpened: (n) => `🎁 Almaz box: +${n} kristall!`,
       paid: "✅ To'lov qabul qilindi, kristall qo'shilmoqda…", crystalsAdded: (n) => `💎 +${n} kristall qo'shildi!`, payFailed: "To'lov amalga oshmadi", bought: (n) => `🎟 +${n} token`, packOpened: (r) => `${r} paket`,
     },
     ru: {
@@ -72,6 +73,7 @@
       shopTab: "Магазин", shopBuyTitle: "💎 Купить кристаллы", shopBuyHint: "Оплата Telegram Stars, кристаллы приходят сразу.", shopItemsTitle: "🛒 За кристаллы",
       wallet: (n) => `У вас: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% выгоды`,
       tokensItem: (n) => `${n} токенов`, tokensHint: (n) => `Откроют ${n} карт без ожидания`, packItem: (r) => `Пак: ${r}`, packHint: (n, r) => `${n} карт, минимум одна ${r.toLowerCase()} гарантирована`,
+      boxTitle: "🎁 Алмазный бокс", boxRange: (a, b) => `${a}–${b} 💎`, boxOdds: "Чем больше, тем реже выпадает", boxOpened: (n) => `🎁 Алмазный бокс: +${n} кристаллов!`,
       paid: "✅ Оплата принята, кристаллы зачисляются…", crystalsAdded: (n) => `💎 +${n} кристаллов!`, payFailed: "Оплата не прошла", bought: (n) => `🎟 +${n} токенов`, packOpened: (r) => `Пак: ${r}`,
     },
     en: {
@@ -105,6 +107,7 @@
       shopTab: "Shop", shopBuyTitle: "💎 Buy crystals", shopBuyHint: "Paid in Telegram Stars; the crystals arrive at once.", shopItemsTitle: "🛒 For crystals",
       wallet: (n) => `You have: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% value`,
       tokensItem: (n) => `${n} tokens`, tokensHint: (n) => `Open ${n} cards without the wait`, packItem: (r) => `${r} pack`, packHint: (n, r) => `${n} cards, at least one ${r.toLowerCase()} guaranteed`,
+      boxTitle: "🎁 Diamond box", boxRange: (a, b) => `${a}–${b} 💎`, boxOdds: "The more crystals, the rarer", boxOpened: (n) => `🎁 Diamond box: +${n} crystals!`,
       paid: "✅ Payment received, adding your crystals…", crystalsAdded: (n) => `💎 +${n} crystals!`, payFailed: "The payment did not go through", bought: (n) => `🎟 +${n} tokens`, packOpened: (r) => `${r} pack`,
     },
   };
@@ -1231,6 +1234,7 @@
     packs.replaceChildren();
     const base = shopData.packs[0] ? shopData.packs[0].crystals / shopData.packs[0].stars : 0;
     for (const pack of shopData.packs) {
+      if (pack.box) { packs.append(boxButton(pack)); continue; }
       const button = document.createElement("button");
       button.type = "button";
       button.className = "pack-btn";
@@ -1260,6 +1264,23 @@
       button.addEventListener("click", () => buyItem(item));
       list.append(row);
     }
+  }
+
+  // boxButton is the diamond box: a prize from its range, each with its
+  // chance shown, the more crystals the rarer.
+  function boxButton(pack) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "pack-btn box-btn";
+    button.innerHTML = '<span class="box-title"></span><b></b><span class="stars"></span><small></small><span class="box-odds"></span>';
+    button.querySelector(".box-title").textContent = t.boxTitle;
+    button.querySelector("b").textContent = t.boxRange(spaced(pack.box[0].crystals), spaced(pack.box[pack.box.length - 1].crystals));
+    button.querySelector(".stars").textContent = t.starsN(pack.stars);
+    button.querySelector("small").textContent = t.boxOdds;
+    button.querySelector(".box-odds").textContent = pack.box.map((p) => `${spaced(p.crystals)} · ${p.percent}%`).join("   ");
+    button.disabled = !shopData.stars;
+    button.addEventListener("click", () => buyCrystals(pack));
+    return button;
   }
 
   // buyItem buys tokens or a pack for crystals, laying a pack out as a
@@ -1307,7 +1328,7 @@
         buying = false;
         if (status === "paid") {
           toast(t.paid);
-          awaitCrystals(shards, pack.crystals, 0);
+          awaitCrystals(shards, pack, 0);
         } else if (status === "failed") {
           toast(t.payFailed);
         }
@@ -1318,13 +1339,21 @@
     }
   }
 
-  function awaitCrystals(before, crystals, tries) {
+  // awaitCrystals asks the state until the pack's crystals are there; a
+  // box tells what it gave by how many came (at least its least prize).
+  function awaitCrystals(before, pack, tries) {
     setTimeout(async () => {
       try {
         applyState(await api("state"));
-        if (shards >= before + crystals) { toast(t.crystalsAdded(crystals)); haptic("heavy"); shop(); return; }
+        if (shards >= before + pack.crystals) {
+          const came = shards - before;
+          toast(pack.box ? t.boxOpened(spaced(came)) : t.crystalsAdded(pack.crystals));
+          haptic("heavy");
+          shop();
+          return;
+        }
       } catch (_) { /* asked again below */ }
-      if (tries < 8) awaitCrystals(before, crystals, tries + 1);
+      if (tries < 8) awaitCrystals(before, pack, tries + 1);
     }, 1500);
   }
 
