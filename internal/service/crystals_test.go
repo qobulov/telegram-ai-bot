@@ -16,6 +16,7 @@ type fakeCrystals struct {
 	shards   int
 	charges  map[string]int
 	refunded []string
+	payments []storage.CrystalPayment
 }
 
 func (f *fakeCrystals) RecordCrystalPurchase(_ context.Context, p storage.CrystalPurchase) (int, bool, error) {
@@ -34,6 +35,29 @@ func (f *fakeCrystals) MarkCrystalRefunded(_ context.Context, chargeID string) (
 	defer f.mu.Unlock()
 	f.refunded = append(f.refunded, chargeID)
 	return true, nil
+}
+
+func (f *fakeCrystals) CrystalPayments(context.Context, int) ([]storage.CrystalPayment, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.payments, nil
+}
+
+// An owner's /payments lists the crystal purchases too, even with no
+// premium payment at all.
+func TestPaymentsListCrystalPurchases(t *testing.T) {
+	f := newFixture()
+	withPremium(f)
+	f.opts.OwnerIDs = map[int64]bool{premiumOwner: true}
+	f.opts.Crystals = &fakeCrystals{payments: []storage.CrystalPayment{
+		{ChargeID: "ch_9", UserID: 42, Name: "Shahruh", Stars: 99, Crystals: 1500, PaidAt: premiumNow},
+	}}
+
+	sent := f.run(ownerWrites("/payments"))
+
+	if len(sent) != 1 || !strings.Contains(sent[0].text, "So'nggi kristall to'lovlari:") || !strings.Contains(sent[0].text, "Shahruh (42): 99 ⭐, 1500 💎") || strings.Contains(sent[0].text, "premium") {
+		t.Fatalf("sent = %+v", sent)
+	}
 }
 
 // A crystal payment is checked against the pack on sale and its buyer,

@@ -370,8 +370,8 @@ func (s *Service) refusePaymentsCommand(in incoming) string {
 	return ""
 }
 
-// showPayments answers an owner's /payments: the latest payments, newest
-// first.
+// showPayments answers an owner's /payments: the latest premium payments,
+// then the latest crystal purchases, each newest first.
 func (s *Service) showPayments(ctx context.Context, in incoming) string {
 	if refusal := s.refusePaymentsCommand(in); refusal != "" {
 		return refusal
@@ -381,19 +381,50 @@ func (s *Service) showPayments(ctx context.Context, in incoming) string {
 		s.opts.Logger.Error("could not list payments", "error", err)
 		return textError.to(in)
 	}
-	if len(payments) == 0 {
+	crystals, err := s.crystalPayments(ctx)
+	if err != nil {
+		s.opts.Logger.Error("could not list crystal payments", "error", err)
+		return textError.to(in)
+	}
+	if len(payments) == 0 && len(crystals) == 0 {
 		return textNoPayments
 	}
-	lines := []string{"So'nggi to'lovlar:"}
-	for _, p := range payments {
-		line := fmt.Sprintf("• %s — %s (%d): %d ⭐, %d kun", p.PaidAt.In(s.opts.Location).Format(paymentTime), payerName(p), p.UserID, p.Stars, p.Days)
-		if !p.RefundedAt.IsZero() {
-			line += ", qaytarilgan"
+	var lines []string
+	if len(payments) > 0 {
+		lines = append(lines, "So'nggi premium to'lovlar:")
+		for _, p := range payments {
+			line := fmt.Sprintf("• %s — %s (%d): %d ⭐, %d kun", p.PaidAt.In(s.opts.Location).Format(paymentTime), payerName(p), p.UserID, p.Stars, p.Days)
+			lines = append(lines, line+refundedMark(p.RefundedAt))
 		}
-		lines = append(lines, line)
+		lines = append(lines, "", "Qaytarish: /refund ID yoki /refund @username — oxirgi to'lovi qaytadi, premiumi tugaydi.")
 	}
-	lines = append(lines, "", "Qaytarish: /refund ID yoki /refund @username — oxirgi to'lovi qaytadi, premiumi tugaydi.")
+	if len(crystals) > 0 {
+		if len(lines) > 0 {
+			lines = append(lines, "")
+		}
+		lines = append(lines, "So'nggi kristall to'lovlari:")
+		for _, p := range crystals {
+			line := fmt.Sprintf("• %s — %s (%d): %d ⭐, %d 💎", p.PaidAt.In(s.opts.Location).Format(paymentTime), p.Name, p.UserID, p.Stars, p.Crystals)
+			lines = append(lines, line+refundedMark(p.RefundedAt))
+		}
+	}
 	return strings.Join(lines, "\n")
+}
+
+// crystalPayments are the latest crystal purchases, none when crystals are
+// not sold.
+func (s *Service) crystalPayments(ctx context.Context) ([]storage.CrystalPayment, error) {
+	if s.opts.Crystals == nil {
+		return nil, nil
+	}
+	return s.opts.Crystals.CrystalPayments(ctx, paymentsListed)
+}
+
+func refundedMark(refundedAt time.Time) string {
+	if refundedAt.IsZero() {
+		return ""
+	}
+	return ", qaytarilgan"
 }
 
 // payerName is who made a payment, as Telegram named them then.

@@ -98,6 +98,49 @@ func (s *Store) RecordCrystalPurchase(ctx context.Context, p CrystalPurchase) (s
 	return shards, recorded, nil
 }
 
+// CrystalPayment is a kept crystal purchase, with its buyer's name in the
+// cards game.
+type CrystalPayment struct {
+	ChargeID   string
+	UserID     int64
+	Name       string
+	Stars      int
+	Crystals   int
+	PaidAt     time.Time
+	RefundedAt time.Time // zero when not refunded
+}
+
+// CrystalPayments are the latest crystal purchases, at most limit, newest
+// first.
+func (s *Store) CrystalPayments(ctx context.Context, limit int) ([]CrystalPayment, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT p.charge_id, p.user_id, coalesce(cp.name, ''), p.stars, p.crystals, p.created_at, p.refunded_at
+		FROM crystal_purchases p
+		LEFT JOIN card_players cp ON cp.user_id = p.user_id
+		ORDER BY p.created_at DESC
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("storage: crystal payments: %w", err)
+	}
+	defer rows.Close()
+	var payments []CrystalPayment
+	for rows.Next() {
+		var p CrystalPayment
+		var refunded *time.Time
+		if err := rows.Scan(&p.ChargeID, &p.UserID, &p.Name, &p.Stars, &p.Crystals, &p.PaidAt, &refunded); err != nil {
+			return nil, fmt.Errorf("storage: read crystal payment: %w", err)
+		}
+		if refunded != nil {
+			p.RefundedAt = *refunded
+		}
+		payments = append(payments, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("storage: crystal payments: %w", err)
+	}
+	return payments, nil
+}
+
 // MarkCrystalRefunded takes back a refunded purchase's crystals, as many as
 // the player still has, and reports whether it was a purchase not yet
 // marked.
