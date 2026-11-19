@@ -95,7 +95,7 @@ func TestTheCardEvent(t *testing.T) {
 	if code != 200 || out["active"] != true || out["pity"] != 37.0 || out["pity_max"] != float64(EventPity) || out["ends_in"] != float64(50*time.Hour/time.Millisecond) || card["name"] != "Satoko Kirigaya" || card["limited"] != true {
 		t.Fatalf("event = %d %v", code, out)
 	}
-	if odds := out["odds"].([]any); len(odds) != 5 || odds[4] != 5.0 || out["share"] != 0.8 || out["pity_max"] != 300.0 {
+	if odds := out["odds"].([]any); len(odds) != 5 || odds[4] != 5.0 || out["share"] != 0.8 || out["pity_max"] != 200.0 {
 		t.Errorf("odds = %v", odds)
 	}
 

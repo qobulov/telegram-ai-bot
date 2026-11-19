@@ -155,9 +155,9 @@ type cardPlayerRow struct {
 
 // WelcomeTokens are the tokens a player new to the cards is given when their
 // row is made, until WelcomeUntil: the owners' welcome of 2026-11-18, for
-// two weeks (the players there then were given as many once, by hand).
+// two weeks (the players there then were given 99 once, by hand; 69 for rows made since 2026-11-19).
 var (
-	WelcomeTokens = 99
+	WelcomeTokens = 69
 	WelcomeUntil  = time.Date(2026, 12, 2, 0, 0, 0, 0, time.FixedZone("Asia/Tashkent", 5*60*60))
 )
 

@@ -18,7 +18,7 @@ import (
 const (
 	EventCard  int64 = 298761 // Satoko Kirigaya
 	EventShare       = 0.8
-	EventPity        = 300
+	EventPity        = 200
 	EventPrice       = 1 // tokens a pull
 	EventBatch       = 10
 )

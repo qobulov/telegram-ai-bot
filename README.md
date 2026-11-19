@@ -2374,15 +2374,15 @@ The 🌸 Firefly Wedding event, as the owners asked, runs until 2026-12-02
 00:00 Tashkent (`internal/cards/event.go`: `EventCard`, `EventEnds`,
 `EventShare`, `EventPity`, `EventPrice`). While it runs
 the shop opens on its block: Satoko Kirigaya's card, the time left, the odds,
-the player's pity ("Satoko kafolati: 37/300") and two buttons, 1 and 10 pulls
+the player's pity ("Satoko kafolati: 37/200") and two buttons, 1 and 10 pulls
 for 1 token each (`event` reads it, `event_open` with `count` pulls). A pull
 rolls the usual rarities (Mythic 0.5%, Legendary 2.5%, Epic 9%, Rare 25%,
 Common 63%; the 2x Mythic boost was dropped on 2026-11-19); a Mythic is
 Satoko 0.8 of the time (0.4% a pull) and any other Mythic otherwise (a player holds her once at most: one who has her gets another
 Mythic, and the guarantee stops counting), and it opens at 2026-11-18 22:00 Tashkent (started again by the owners; before
 that the shop shows it as coming, with the time to its start, and refuses
-pulls as "soon"); the 300th pull in a row without her gives her (50 at first,
-then 130, 200 on 2026-11-18 and 300 since 2026-11-19; counters kept), the count
+pulls as "soon"); the 200th pull in a row without her gives her (50 at first,
+then 130, 200 on 2026-11-18, 300 on 2026-11-19 and 200 again later that day; counters kept), the count
 (`card_players.event_pulls`, migration 95) starting again whenever she drops
 from the event (`OpenEventCards`, one transaction under the player's row
 lock). Pulls count as draws do, in points, cards and `since_*`; the day's
