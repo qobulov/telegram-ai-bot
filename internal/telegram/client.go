@@ -1363,3 +1363,12 @@ func (c *Client) SetChatCommands(ctx context.Context, chatID int64, commands []B
 	var ok bool
 	return c.call(ctx, "setMyCommands", params, &ok)
 }
+
+// SetChatAdminCommands sets the command menu the admins of one group see,
+// over the menu for every group's admins.
+func (c *Client) SetChatAdminCommands(ctx context.Context, chatID int64, commands []BotCommand) error {
+	params := setMyCommandsParams{Commands: commands}
+	params.Scope.Type, params.Scope.ChatID = "chat_administrators", chatID
+	var ok bool
+	return c.call(ctx, "setMyCommands", params, &ok)
+}

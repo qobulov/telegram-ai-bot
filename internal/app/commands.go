@@ -46,30 +46,64 @@ var commandMenus = map[string][]telegram.BotCommand{
 		{Command: "id", Description: "Sizning ID'ingiz"},
 	},
 	telegram.ScopeAllGroupChats: membersMenu,
-	telegram.ScopeAllChatAdmins: append([]telegram.BotCommand{
-		{Command: "warn", Description: "Ogohlantirish, 3-sida 1 kunga mut (reply yoki @user)"},
-		{Command: "unwarn", Description: "Bitta ogohlantirishni olib tashlash"},
-		{Command: "mute", Description: "Mut: /mute 1h (reply yoki @user); botni: /mute bot"},
-		{Command: "unmute", Description: "Mutdan chiqarish yoki botni gapirtirish"},
-		{Command: "ban", Description: "Ban: /ban sabab (reply yoki @user)"},
-		{Command: "unban", Description: "Bandan chiqarish (reply yoki @user)"},
-		{Command: "kick", Description: "Guruhdan chiqarish (reply yoki @user)"},
-		{Command: "del", Description: "Xabarni o'chirish (reply)"},
-		{Command: "pin", Description: "Xabarni qadash (reply)"},
-		{Command: "promote", Description: "Admin qilish: /promote Unvon (reply yoki @user)"},
-		{Command: "demote", Description: "Adminlikni olish (reply yoki @user)"},
-		{Command: "tag", Description: "Teg yoki unvon: /tag Matn (reply yoki @user)"},
-		{Command: "banlist", Description: "Banlar ro'yxati, bandan chiqarish tugmalari"},
-		{Command: "reports", Description: "Ko'rib chiqilmagan shikoyatlar"},
-		{Command: "warns", Description: "Kimda nechta ogohlantirish (reply: bittasi)"},
-		{Command: "rank", Description: "Daraja: /rank 3 berish, /rank 0 olish, /rank ko'rish (reply)"},
-		{Command: "access", Description: "Buyruqlar darajasi: /access ban 2"},
-		{Command: "kickinactive", Description: "Faol emaslarni chiqarish: /kickinactive 30"},
-		{Command: "amnesty", Description: "Hammani bandan chiqarish"},
-		{Command: "ignore", Description: "A'zoga 24 soat javob bermaslik (reply)"},
-		{Command: "cleanservice", Description: "\"Kirdi/chiqdi\" xabarlarini o'chirish (yoqish/o'chirish)"},
-		{Command: "antispam", Description: "Antispam: flood, spamerlar, yangi a'zolar havolasi (tugmalar)"},
-	}, membersMenu...),
+	telegram.ScopeAllChatAdmins: adminMenu(func([]string) bool { return true }),
+}
+
+// adminCommands are the admins' commands, each with the rights of the bot
+// any one of which it needs to carry them out, as the moderate tool checks
+// them (neededRight in internal/tools/moderation.go); none is needed for a
+// command the bot does with no right. /reports is settled by deleting or
+// banning, and /antispam deletes, mutes and bans; /tag tags a member with
+// the tags right and titles an admin with the promote one.
+var adminCommands = []struct {
+	command telegram.BotCommand
+	anyOf   []string
+}{
+	{telegram.BotCommand{Command: "warn", Description: "Ogohlantirish, 3-sida 1 kunga mut (reply yoki @user)"}, restrict},
+	{telegram.BotCommand{Command: "unwarn", Description: "Bitta ogohlantirishni olib tashlash"}, restrict},
+	{telegram.BotCommand{Command: "mute", Description: "Mut: /mute 1h (reply yoki @user); botni: /mute bot"}, restrict},
+	{telegram.BotCommand{Command: "unmute", Description: "Mutdan chiqarish yoki botni gapirtirish"}, restrict},
+	{telegram.BotCommand{Command: "ban", Description: "Ban: /ban sabab (reply yoki @user)"}, restrict},
+	{telegram.BotCommand{Command: "unban", Description: "Bandan chiqarish (reply yoki @user)"}, restrict},
+	{telegram.BotCommand{Command: "kick", Description: "Guruhdan chiqarish (reply yoki @user)"}, restrict},
+	{telegram.BotCommand{Command: "del", Description: "Xabarni o'chirish (reply)"}, []string{telegram.RightDeleteMessages}},
+	{telegram.BotCommand{Command: "pin", Description: "Xabarni qadash (reply)"}, []string{telegram.RightPinMessages}},
+	{telegram.BotCommand{Command: "unpin", Description: "Qadalgan xabarni olib tashlash"}, []string{telegram.RightPinMessages}},
+	{telegram.BotCommand{Command: "promote", Description: "Admin qilish: /promote Unvon (reply yoki @user)"}, []string{telegram.RightPromoteMembers}},
+	{telegram.BotCommand{Command: "demote", Description: "Adminlikni olish (reply yoki @user)"}, []string{telegram.RightPromoteMembers}},
+	{telegram.BotCommand{Command: "tag", Description: "Teg yoki unvon: /tag Matn (reply yoki @user)"}, []string{telegram.RightManageTags, telegram.RightPromoteMembers}},
+	{telegram.BotCommand{Command: "banlist", Description: "Banlar ro'yxati, bandan chiqarish tugmalari"}, restrict},
+	{telegram.BotCommand{Command: "reports", Description: "Ko'rib chiqilmagan shikoyatlar"}, []string{telegram.RightRestrictMembers, telegram.RightDeleteMessages}},
+	{telegram.BotCommand{Command: "warns", Description: "Kimda nechta ogohlantirish (reply: bittasi)"}, restrict},
+	{telegram.BotCommand{Command: "rank", Description: "Daraja: /rank 3 berish, /rank 0 olish, /rank ko'rish (reply)"}, nil},
+	{telegram.BotCommand{Command: "access", Description: "Buyruqlar darajasi: /access ban 2"}, nil},
+	{telegram.BotCommand{Command: "kickinactive", Description: "Faol emaslarni chiqarish: /kickinactive 30"}, restrict},
+	{telegram.BotCommand{Command: "amnesty", Description: "Hammani bandan chiqarish"}, restrict},
+	{telegram.BotCommand{Command: "ignore", Description: "A'zoga 24 soat javob bermaslik (reply)"}, nil},
+	{telegram.BotCommand{Command: "cleanservice", Description: "\"Kirdi/chiqdi\" xabarlarini o'chirish (yoqish/o'chirish)"}, []string{telegram.RightDeleteMessages}},
+	{telegram.BotCommand{Command: "antispam", Description: "Antispam: flood, spamerlar, yangi a'zolar havolasi (tugmalar)"}, []string{telegram.RightRestrictMembers, telegram.RightDeleteMessages}},
+}
+
+var restrict = []string{telegram.RightRestrictMembers}
+
+// GroupAdminMenu is what a group's admins see there when the bot holds
+// rights in it: the admins' commands those rights let it carry out, then
+// everyone's. With no rights, as a mere member, it is everyone's alone.
+func GroupAdminMenu(rights []string) []telegram.BotCommand {
+	return adminMenu(func(anyOf []string) bool {
+		return len(anyOf) == 0 && len(rights) > 0 || slices.ContainsFunc(anyOf, func(r string) bool { return slices.Contains(rights, r) })
+	})
+}
+
+// adminMenu is the admins' commands open lets in, then everyone's.
+func adminMenu(open func(anyOf []string) bool) []telegram.BotCommand {
+	var menu []telegram.BotCommand
+	for _, c := range adminCommands {
+		if open(c.anyOf) {
+			menu = append(menu, c.command)
+		}
+	}
+	return append(menu, membersMenu...)
 }
 
 // ownerGroupMenu is what an owner sees in a group they write in: every

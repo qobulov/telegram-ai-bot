@@ -403,6 +403,8 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		OwnerMenu:             ownerGroupMenu,
 		MenuSetter:            bot.Client,
 		RankMenu:              RankMenu,
+		AdminMenu:             GroupAdminMenu,
+		AdminMenuSetter:       bot.Client,
 		Settings:              store,
 		CheckSetting: func(setting config.Setting, value string) error {
 			return config.CheckSetting(os.Getenv, setting, value)

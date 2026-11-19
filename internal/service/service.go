@@ -325,6 +325,12 @@ type Options struct {
 	// set overrides, which MenuSetter sets when they are given a rank and
 	// when they write there; nil leaves them the members' menu.
 	RankMenu func(rank int, overrides map[string]int) []telegram.BotCommand
+	// AdminMenu is the menu a group's admins see there, from the rights the
+	// bot holds in it, which AdminMenuSetter sets when the bot's membership
+	// changes and, once a day, when someone writes there; with either nil
+	// they see the menu for every group's admins.
+	AdminMenu       func(rights []string) []telegram.BotCommand
+	AdminMenuSetter AdminMenuSetter
 	// Settings keeps the owners' settings over the environment's, which
 	// CheckSetting checks before they are saved and Getenv reads; with
 	// Settings nil, /set and /settings do nothing.
@@ -488,7 +494,9 @@ type Service struct {
 	ownerMenus *recently[[2]int64, bool]
 	// rankMenus are the groups' members whose rank was lately read for
 	// their menu, with that rank.
-	rankMenus  *recently[[2]int64, int]
+	rankMenus *recently[[2]int64, int]
+	// adminMenus are the groups whose admins' menu was set lately.
+	adminMenus *recently[int64, bool]
 	ownersHere *recently[int64, []string]
 	// creators are the groups' creators, by group, for limits they are
 	// spared.
@@ -616,6 +624,7 @@ func New(opts Options) *Service {
 		settings:        newRecently[int64, map[string]string](settingsMemory, opts.Now),
 		ownerMenus:      newRecently[[2]int64, bool](ownerMenuMemory, opts.Now),
 		rankMenus:       newRecently[[2]int64, int](ownerMenuMemory, opts.Now),
+		adminMenus:      newRecently[int64, bool](ownerMenuMemory, opts.Now),
 		ownersHere:      newRecently[int64, []string](activeMemory, opts.Now),
 		creators:        newRecently[int64, int64](creatorMemory, opts.Now),
 		aiChats:         newRecently[int64, bool](aiMemory, opts.Now),
@@ -708,6 +717,7 @@ func (s *Service) handledApart(update telegram.Update) bool {
 	switch {
 	case update.MyChatMember != nil:
 		s.recordMembership(update.MyChatMember)
+		s.adminMenuChanged(update.MyChatMember)
 	case update.ChatMember != nil:
 		s.recordMember(update.ChatMember)
 	case update.CallbackQuery != nil:
@@ -885,6 +895,7 @@ func (s *Service) accept(update telegram.Update) (incoming, bool) {
 		s.noteMembers(msg)
 		s.showOwnerMenu(msg)
 		s.showRankMenu(msg)
+		s.showAdminMenu(msg.Chat.ID)
 		in.scope = storage.Scope{ChatID: msg.Chat.ID} // shared by the group
 		in.group = true
 		if len(msg.NewChatMembers) > 0 {

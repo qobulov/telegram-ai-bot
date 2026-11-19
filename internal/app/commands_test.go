@@ -294,3 +294,55 @@ func TestRankedCommandsAreKnown(t *testing.T) {
 		}
 	}
 }
+
+func commandNames(menu []telegram.BotCommand) []string {
+	names := make([]string, len(menu))
+	for i, c := range menu {
+		names[i] = c.Command
+	}
+	return names
+}
+
+// A group's admins see the moderation commands the bot's rights there let
+// it carry out, then everyone's: none where it is no admin, the restricting
+// ones alone where it may only restrict, all of them with every right.
+func TestGroupAdminMenuFollowsTheBotsRights(t *testing.T) {
+	members := commandNames(membersMenu)
+	if got := commandNames(GroupAdminMenu(nil)); !slices.Equal(got, members) {
+		t.Errorf("no rights: %v, want the members' menu alone", got)
+	}
+
+	restrictOnly := commandNames(GroupAdminMenu([]string{telegram.RightRestrictMembers}))
+	for _, want := range []string{"warn", "unwarn", "mute", "unmute", "ban", "unban", "kick", "kickinactive", "amnesty", "banlist", "warns", "reports", "antispam", "rank", "access", "ignore"} {
+		if !slices.Contains(restrictOnly, want) {
+			t.Errorf("restrict only: /%s missing from %v", want, restrictOnly)
+		}
+	}
+	for _, not := range []string{"del", "pin", "unpin", "promote", "demote", "tag", "cleanservice"} {
+		if slices.Contains(restrictOnly, not) {
+			t.Errorf("restrict only: /%s in %v", not, restrictOnly)
+		}
+	}
+	if !slices.Equal(restrictOnly[len(restrictOnly)-len(members):], members) {
+		t.Errorf("restrict only: %v does not end with the members' menu", restrictOnly)
+	}
+
+	deleteOnly := commandNames(GroupAdminMenu([]string{telegram.RightDeleteMessages}))
+	for _, want := range []string{"del", "cleanservice", "reports", "antispam"} {
+		if !slices.Contains(deleteOnly, want) {
+			t.Errorf("delete only: /%s missing from %v", want, deleteOnly)
+		}
+	}
+	if slices.Contains(deleteOnly, "ban") {
+		t.Errorf("delete only: /ban in %v", deleteOnly)
+	}
+	if tags := commandNames(GroupAdminMenu([]string{telegram.RightManageTags})); !slices.Contains(tags, "tag") || slices.Contains(tags, "promote") {
+		t.Errorf("tags only: %v, want /tag and no /promote", tags)
+	}
+
+	full := GroupAdminMenu([]string{telegram.RightDeleteMessages, telegram.RightRestrictMembers, telegram.RightPinMessages,
+		telegram.RightPromoteMembers, telegram.RightManageTags, telegram.RightChangeInfo, telegram.RightInviteUsers})
+	if !slices.Equal(full, commandMenus[telegram.ScopeAllChatAdmins]) {
+		t.Errorf("every right: %v, want the menu of every group's admins %v", commandNames(full), commandNames(commandMenus[telegram.ScopeAllChatAdmins]))
+	}
+}

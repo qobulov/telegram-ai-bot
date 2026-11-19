@@ -1333,6 +1333,22 @@ menu again. The bot's owners keep their own, and Telegram admins the
 admins' one, which a member's menu would hide; a change made with `/access`
 reaches the menus within a day. A failure is only logged.
 
+A group's Telegram admins see there the moderation commands the bot can
+carry out in it, by its own rights (`chat_administrators` scope,
+`GroupAdminMenu` in the same file, set in `internal/service/adminmenu.go`):
+restricting members opens `/warn`, `/unwarn`, `/mute`, `/unmute`, `/ban`,
+`/unban`, `/kick`, `/kickinactive`, `/amnesty`, `/banlist` and `/warns`;
+deleting `/del` and `/cleanservice`; either of the two `/reports` and
+`/antispam`; pinning `/pin` and `/unpin`; adding admins `/promote` and
+`/demote`, and tags or adding admins `/tag`; while `/rank`, `/access` and
+`/ignore`, which take no right of the bot's, come with any right. Where the
+bot is no admin its admins see everyone's commands alone. The menu is set on
+each `my_chat_member` update, when the bot is added, promoted, demoted or
+given other rights, and, for groups joined before, from the stored rights
+once a day per instance when someone writes there. The menu for every
+group's admins stays as the fallback; owners and ranked moderators keep
+their own menus over it. A failure is only logged.
+
 Each start also sets the admin rights she asks for when someone makes her an
 admin (`setMyDefaultAdministratorRights`, `groupAdminRights` and
 `channelAdminRights` in the same file), which Telegram's dialog then shows

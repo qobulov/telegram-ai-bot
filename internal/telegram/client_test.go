@@ -1496,6 +1496,20 @@ func TestDeleteMemberCommandsScopesToOneMember(t *testing.T) {
 	}
 }
 
+// A group's admins' menu names the group and no member.
+func TestSetChatAdminCommandsScopesToOneGroupsAdmins(t *testing.T) {
+	client, api := newTestClient(t, `{"ok":true,"result":true}`)
+
+	if err := client.SetChatAdminCommands(context.Background(), -100, []BotCommand{{Command: "ban", Description: "x"}}); err != nil {
+		t.Fatal(err)
+	}
+	call := api.recorded()[0]
+	scope, _ := call.params["scope"].(map[string]any)
+	if call.method != "setMyCommands" || len(scope) != 2 || scope["type"] != "chat_administrators" || scope["chat_id"] != float64(-100) {
+		t.Errorf("call = %+v", call)
+	}
+}
+
 // A silent picture and message are sent without a sound.
 func TestSilentSendsDisableTheNotification(t *testing.T) {
 	var photo, message string
