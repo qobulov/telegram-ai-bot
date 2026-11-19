@@ -1615,7 +1615,7 @@
       li.innerHTML = '<span class="who"><b></b><small></small></span><span class="hist-change"></span>';
       li.querySelector(".who b").textContent = b.opponent || "?";
       const when = new Date(b.at).toLocaleString(language === "en" ? "en-GB" : language, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-      li.querySelector(".who small").textContent = `${b.attacked ? at.histAttack : at.histDefense} · ${b.won ? at.histWon : at.histLost} · ${when}`;
+      li.querySelector(".who small").textContent = `${b.won ? "✅" : "❌"} ${b.won ? at.histWon : at.histLost} · ${b.attacked ? at.histAttack : at.histDefense} · ${when}`;
       const d = b.rating_change;
       li.querySelector(".hist-change").textContent = `${d >= 0 ? "+" : "−"}${Math.abs(d)}`;
       list.append(li);

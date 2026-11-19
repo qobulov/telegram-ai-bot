@@ -752,6 +752,8 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .hist-change { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; }
 .hist.won .hist-change { color: #3fae5a; }
 .hist.lost .hist-change { color: #e0565b; }
+.hist.won { border-left: 3px solid #3fae5a; background: linear-gradient(90deg, rgba(63, 174, 90, 0.10), transparent 60%), var(--lacquer); }
+.hist.lost { border-left: 3px solid #e0565b; background: linear-gradient(90deg, rgba(224, 86, 91, 0.10), transparent 60%), var(--lacquer); }
 .arena-pick .sets { margin: 8px -14px 0; padding: 2px 14px; }
 .arena-pick .sets button { min-height: 34px; padding: 0 10px; font-size: 12px; }
 .arena-pick .gift-list { max-height: 50vh; }
