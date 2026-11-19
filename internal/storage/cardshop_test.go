@@ -12,6 +12,11 @@ import (
 func TestCardShop(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
+	// Migrations seed some Mythics (the Four Knights' Lancelot and Tristan);
+	// the packs here draw from this test's cards alone.
+	if _, err := store.pool.Exec(ctx, `DELETE FROM card_catalog WHERE rarity = 4`); err != nil {
+		t.Fatal(err)
+	}
 	if err := store.SaveCardCatalog(ctx, []Card{
 		{ID: 1, Name: "Gojo", Rarity: 4, Attack: 5000, Health: 20000, Value: 5000},
 		{ID: 2, Name: "Usopp", Rarity: 0, Attack: 400, Health: 1500, Value: 100},

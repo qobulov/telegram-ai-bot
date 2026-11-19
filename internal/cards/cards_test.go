@@ -54,8 +54,16 @@ func TestChosenRarities(t *testing.T) {
 	if RarityOf(89334, 9) != Epic || RarityOf(99999, 400) != Common || RarityOf(88572, 7) != Mythic {
 		t.Errorf("Reigen at 9 = %v, an unknown at 400 = %v, Emilia = %v", RarityOf(89334, 9), RarityOf(99999, 400), RarityOf(88572, 7))
 	}
-	if len(mythicIDs) != 27 || len(legendaryIDs) != 70 || len(epicIDs) != 13 || RarityOf(298761, 900) != Mythic || RarityOf(298762, 900) != Epic {
+	if len(mythicIDs) != 29 || len(legendaryIDs) != 74 || len(epicIDs) != 7 || RarityOf(298761, 900) != Mythic || RarityOf(298762, 900) != Epic {
 		t.Errorf("chosen %d Mythic and %d Legendary", len(mythicIDs), len(legendaryIDs))
+	}
+	// The Seven Deadly Sins' knights raised (migration 101): Lancelot and
+	// Tristan Mythic, Zeldris, Mael, Gawain and Percival Legendary; Arthur
+	// stays Epic.
+	for id, want := range map[int64]Rarity{265209: Mythic, 249281: Mythic, 131559: Legendary, 126851: Legendary, 282753: Legendary, 206212: Legendary, 122210: Epic} {
+		if got := RarityOf(id, 1400); got != want {
+			t.Errorf("RarityOf(%d) = %v, want %v", id, got, want)
+		}
 	}
 	// The best known women made Legendary (migration 99), at any rank.
 	for _, id := range []int64{137079, 120649, 133676, 89361, 61, 94, 22037, 138102, 133700, 138100, 723, 36828} {

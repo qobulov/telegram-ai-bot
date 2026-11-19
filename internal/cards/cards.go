@@ -127,12 +127,14 @@ func ByOdds(roll func() Rarity) storage.CardRoll {
 // Edward Elric, Light, Tanjiro, Saitama, Gon, Lelouch, Spike, Guts, Jotaro and
 // Meliodas, Gojo, whom the owners made Mythic, and the best known women, Mikasa, Maomao, Frieren, Makima, Nezuko,
 // Emilia, Kurisu, Violet Evergarden, Zero Two and Mai Sakurajima, and
-// Firefly Wedding's Satoko Kirigaya, whom the owners made Mythic (migration 94).
+// Firefly Wedding's Satoko Kirigaya, whom the owners made Mythic (migration 94),
+// and the Four Knights' Lancelot and Tristan, whom they made Mythic too
+// (migration 101).
 var mythicIDs = map[int64]bool{
 	246: true, 17: true, 40: true, 5: true, 40882: true, 11: true, 80: true, 126071: true, 73935: true, 30: true,
 	417: true, 1: true, 422: true, 4003: true, 72921: true, 127691: true,
 	40881: true, 126824: true, 176754: true, 137080: true, 127518: true, 88572: true, 34470: true, 90169: true, 124381: true, 127222: true,
-	298761: true,
+	298761: true, 265209: true, 249281: true,
 }
 
 // legendaryIDs are the Legendary cards': the leads' legendary rivals and
@@ -142,7 +144,9 @@ var mythicIDs = map[int64]bool{
 // Thorfinn, Rimuru and theirs, and the best known women, Rem, Rei Ayanami,
 // Power, Kaguya Shinomiya, Marin Kitagawa, Megumin, Robin, Asuka, Hitagi
 // Senjougahara, Yor and Anya Forger, Nobara Kugisaki, Nami and Asuna, the
-// last twelve made Legendary at the owners' asking (migration 99).
+// last twelve made Legendary at the owners' asking (migration 99), and The
+// Seven Deadly Sins' Zeldris and Estarossa (Mael) and the Four Knights'
+// Gawain and Percival, made Legendary at their asking (migration 101).
 var legendaryIDs = map[int64]bool{
 	90202: true, 77605: true, 913: true, 13: true, 85: true, 14: true, 53901: true, 2535: true, 2423: true, 62: true,
 	305: true, 727: true, 2072: true, 13767: true, 45627: true, 46494: true, 46496: true, 71: true, 75: true, 27: true,
@@ -151,18 +155,17 @@ var legendaryIDs = map[int64]bool{
 	123962: true, 124142: true, 88573: true, 35252: true, 138101: true, 64769: true, 88575: true, 86: true, 89028: true, 127212: true,
 	89: true, 87275: true, 130102: true, 672: true, 5187: true, 123285: true, 729: true, 89616: true, 310: true,
 	137079: true, 120649: true, 133676: true, 89361: true, 61: true, 94: true, 22037: true, 138102: true, 133700: true, 138100: true,
-	723: true, 36828: true,
+	723: true, 36828: true, 131559: true, 126851: true, 282753: true, 206212: true,
 }
 
 // epicIDs are the Epic cards chosen by hand, whatever their rank: The Seven
-// Deadly Sins' Elizabeth, Merlin, King, Diane, Zeldris, Mael and Gowther,
-// Firefly Wedding's Shinpei Gotou (migration 94) and the Four Knights of the
-// Apocalypse, whom the players asked for.
+// Deadly Sins' Elizabeth, Merlin, King, Diane and Gowther, Firefly Wedding's
+// Shinpei Gotou (migration 94) and the Four Knights of the Apocalypse's
+// Arthur, whom the players asked for (migration 92); its other four knights,
+// Zeldris and Mael rose higher (migration 101).
 var epicIDs = map[int64]bool{
-	298762: true, 72923: true, 89180: true, 83801: true, 74653: true, 131559: true, 126851: true, 88823: true,
-	// Four Knights of the Apocalypse: Percival, Lancelot, Tristan, Gawain
-	// and Arthur, added by hand (migration 92).
-	206212: true, 265209: true, 249281: true, 282753: true, 122210: true,
+	298762: true, 72923: true, 89180: true, 83801: true, 74653: true, 88823: true,
+	122210: true,
 }
 
 // RarityOf is the rarity of a character at rank among the most loved, from

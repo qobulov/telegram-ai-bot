@@ -231,6 +231,11 @@ func TestALimitedCardStaysPut(t *testing.T) {
 func TestTheCatalogPagesThroughARarity(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
+	// Migrations seed some Mythics (the Four Knights' Lancelot and Tristan);
+	// the pages here are of this test's cards alone.
+	if _, err := store.pool.Exec(ctx, `DELETE FROM card_catalog WHERE rarity = 4`); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := store.pool.Exec(ctx, `
 		INSERT INTO card_catalog (id, name, rarity, attack, health, value, favourites) VALUES
 		(298761, 'Satoko Kirigaya', 4, 1, 1, 1, 9999), (1, 'Gojo', 4, 1, 1, 1, 500), (2, 'Goku', 4, 1, 1, 1, 400),
