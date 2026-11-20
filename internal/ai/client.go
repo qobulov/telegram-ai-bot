@@ -44,8 +44,11 @@ type Options struct {
 	// answers, such as "low"; "" leaves it to the model. Thinking is paid
 	// as output and takes from MaxTokens.
 	ReasoningEffort string
-	HTTPClient      *http.Client
-	Logger          *slog.Logger
+	// TranscribeEffort is how hard the model thinks before it writes a
+	// voice message down; "" keeps ReasoningEffort.
+	TranscribeEffort string
+	HTTPClient       *http.Client
+	Logger           *slog.Logger
 }
 
 // Client talks to the model provider. It is safe for concurrent use.
@@ -267,7 +270,7 @@ func (c *Client) Transcribe(ctx context.Context, audio []byte) (string, error) {
 		Role:    RoleUser,
 		Content: transcribePrompt,
 		Parts:   []ContentPart{AudioPart(AudioLabel, audio)},
-	}}})
+	}}, ReasoningEffort: c.opts.TranscribeEffort})
 	if err != nil {
 		return "", fmt.Errorf("transcribe: %w", err)
 	}
@@ -315,6 +318,9 @@ func (c *Client) payload(req Request, model string, withTools bool) chatRequest 
 		Messages:        req.Messages,
 		MaxTokens:       c.opts.MaxTokens,
 		ReasoningEffort: c.opts.ReasoningEffort,
+	}
+	if req.ReasoningEffort != "" {
+		payload.ReasoningEffort = req.ReasoningEffort
 	}
 	if !withTools {
 		return payload

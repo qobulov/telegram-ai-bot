@@ -624,7 +624,10 @@ Voice messages are turned into text first, and the transcript is what the
 model reads and what is stored: `<voice message, 38 s> "..."`. In groups
 every voice message is transcribed as it arrives, even when it does not
 address the bot, so that "what did he say?" or "write it as text" can be
-answered later from the group log. Each one costs one extra model request.
+answered later from the group log. Each one costs one extra model request,
+made with minimal thinking whatever `AI_REASONING_EFFORT` is (`none` stays
+`none`): at `low` the model thought 150 to 1,700 tokens over transcripts of
+6 to 80, nearly all that a voice message cost.
 
 Several pictures in one answer, such as two heroes' portraits or a picture
 drawn twice, go as one album (Telegram's `sendMediaGroup`, up to 10 a

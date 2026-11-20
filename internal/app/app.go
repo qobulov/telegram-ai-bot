@@ -309,10 +309,11 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		MaxAttempts: 2 * (1 + len(cfg.FallbackModels)),
 		HTTPClient:  &http.Client{Timeout: cfg.RequestTimeout},
 		// A stuck attempt is retried well before the turn runs out of time.
-		AttemptTimeout:  attemptTimeout,
-		FallbackModels:  cfg.FallbackModels,
-		ReasoningEffort: cfg.ReasoningEffort,
-		Logger:          logger,
+		AttemptTimeout:   attemptTimeout,
+		FallbackModels:   cfg.FallbackModels,
+		ReasoningEffort:  cfg.ReasoningEffort,
+		TranscribeEffort: transcribeReasoning(cfg),
+		Logger:           logger,
 	})
 	router, chat := chatRouting(cfg, logger)
 	assistant := agent.New(agent.Options{
@@ -739,6 +740,19 @@ func judgeReasoning(effort string) string {
 		return effort
 	}
 	return judgeEffort
+}
+
+// transcribeReasoning is how hard the model thinks before it writes a
+// voice message down: minimal, unless thinking is off. At low it thought
+// 150 to 1,700 tokens over transcripts of 6 to 80 (logs of 2026-11-19),
+// nearly all that a voice message cost, for words that are heard, not
+// worked out. Only Gemini hears voice messages; other providers keep
+// ReasoningEffort.
+func transcribeReasoning(cfg config.Config) string {
+	if !cfg.AudioInput || cfg.ReasoningEffort == "none" {
+		return cfg.ReasoningEffort
+	}
+	return "minimal"
 }
 
 // stickerLabeller is the model that looks at stickers on import. It gets

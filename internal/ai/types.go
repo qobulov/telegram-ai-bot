@@ -156,6 +156,9 @@ type Request struct {
 	Tools    []ToolDefinition
 	// ForbidTools tells the model it must answer in text, which ends a tool loop.
 	ForbidTools bool
+	// ReasoningEffort is how hard the model thinks for this request alone;
+	// "" keeps the client's Options.ReasoningEffort.
+	ReasoningEffort string
 }
 
 // APIError is a failure reported by the model provider.

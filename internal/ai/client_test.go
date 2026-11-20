@@ -599,6 +599,37 @@ func TestTranscribeSendsTheAudioAndReturnsTheText(t *testing.T) {
 	}
 }
 
+// A voice message is written down with the transcription's thinking and an
+// answer with the answers': at low, Gemini thought up to 1,700 tokens over
+// a transcript of 80. Without TranscribeEffort both think alike.
+func TestTranscribeThinksAsTold(t *testing.T) {
+	transcript := reply{status: 200, body: `{"choices":[{"message":{"role":"assistant","content":"salom"}}]}`}
+	client, rec := newTestClient(t, transcript, reply{status: 200, body: plainReply})
+	client.opts.ReasoningEffort, client.opts.TranscribeEffort = "low", "minimal"
+
+	if _, err := client.Transcribe(context.Background(), []byte("OggS-voice")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Complete(context.Background(), userRequest()); err != nil {
+		t.Fatal(err)
+	}
+	if got := rec.requests[0]["reasoning_effort"]; got != "minimal" {
+		t.Errorf("transcription reasoning_effort = %v, want minimal", got)
+	}
+	if got := rec.requests[1]["reasoning_effort"]; got != "low" {
+		t.Errorf("answer reasoning_effort = %v, want low", got)
+	}
+
+	same, rec2 := newTestClient(t, transcript)
+	same.opts.ReasoningEffort = "low"
+	if _, err := same.Transcribe(context.Background(), []byte("OggS-voice")); err != nil {
+		t.Fatal(err)
+	}
+	if got := rec2.requests[0]["reasoning_effort"]; got != "low" {
+		t.Errorf("without TranscribeEffort, reasoning_effort = %v, want low", got)
+	}
+}
+
 // Gemini 3 signs each tool call and refuses the follow-up request unless the
 // signature comes back with the call ("Function call is missing a
 // thought_signature").

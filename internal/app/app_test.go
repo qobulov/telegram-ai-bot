@@ -525,6 +525,19 @@ func TestBotRightsFallsBackToTelegramAndStores(t *testing.T) {
 	}
 }
 
+// Voice messages are written down with minimal thinking whatever answers
+// do, unless thinking is off; a provider that cannot hear keeps its own.
+func TestTranscriptionThinksLittle(t *testing.T) {
+	for effort, want := range map[string]string{"": "minimal", "none": "none", "minimal": "minimal", "low": "minimal", "medium": "minimal", "high": "minimal"} {
+		if got := transcribeReasoning(config.Config{AudioInput: true, ReasoningEffort: effort}); got != want {
+			t.Errorf("transcribeReasoning(%q) = %q, want %q", effort, got, want)
+		}
+	}
+	if got := transcribeReasoning(config.Config{ReasoningEffort: "low"}); got != "low" {
+		t.Errorf("without voice input = %q, want low", got)
+	}
+}
+
 // PROMPT_SIZES, when set, logs how big each part of a group turn's request
 // to the model is: the system prompt, the tool definitions and the rest.
 func TestPromptSizes(t *testing.T) {
