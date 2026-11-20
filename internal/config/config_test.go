@@ -1706,7 +1706,10 @@ func TestPersonaNeverInventsPersonalFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 	rule := lineContaining(cfg.FullPersona(), "Do not invent personal facts")
-	for _, want := range []string{"your owners", "age, birth year", "not even in a joke or a comparison", "never add a fact that was not"} {
+	// Nor an event or a reason: asked whether an owner's gift was fair, it
+	// said tokens had run out and called bribery an investment (2026-11-20).
+	for _, want := range []string{"your owners", "age, birth year", "not even in a joke or a comparison", "never add a fact that was not",
+		"never make up an event, a reason or a rule", "never praise what is unfair or wrong"} {
 		if !strings.Contains(rule, want) {
 			t.Errorf("the rule does not contain %q: %q", want, rule)
 		}
