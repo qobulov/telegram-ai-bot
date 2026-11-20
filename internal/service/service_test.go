@@ -4000,7 +4000,7 @@ func TestUnansweredMessagesAreRecordedWithWhy(t *testing.T) {
 	f.opts.GroupRatePerMinute = 1
 
 	f.run(inGroup(groupMessage("just chatting")), inGroup(groupMessage("@MyBot hi", "@MyBot")), inGroup(groupMessage("@MyBot again", "@MyBot")))
-	f.replier.err = &ai.APIError{Status: 429, Message: "quota"}
+	f.replier.err = &ai.APIError{Status: 429, Message: "Too many requests, slow down"}
 	f.opts.GroupRatePerMinute = 5
 	f.run(inGroup(groupMessage("@MyBot once more", "@MyBot")))
 
@@ -4010,7 +4010,7 @@ func TestUnansweredMessagesAreRecordedWithWhy(t *testing.T) {
 	if skip := skips.skips[0]; skip.ChatID == 0 || skip.UserID == 0 || skip.MessageID == 0 || skip.Detail != "" {
 		t.Errorf("skip = %+v, want its chat, member and message, and no error", skip)
 	}
-	if skip := skips.skips[1]; !strings.Contains(skip.Detail, "quota") {
+	if skip := skips.skips[1]; !strings.Contains(skip.Detail, "Too many requests") {
 		t.Errorf("overloaded skip detail = %q, want the provider's error", skip.Detail)
 	}
 }

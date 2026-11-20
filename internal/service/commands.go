@@ -1522,6 +1522,11 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 	case errors.Is(err, agent.ErrDuplicate):
 		log.Info("duplicate update skipped")
 		return outcome{duplicate: true}
+	case ai.IsOutOfCredits(err):
+		// Until someone pays or the quota renews every message fails the
+		// same way: the chat is told a few times, then left in peace.
+		log.Error("the model provider's credits or quota ran out", "error", err)
+		return outcome{text: s.aiLimitNotice(in), skipped: "ai_limit", skipDetail: err.Error()}
 	case ai.IsOverloaded(err):
 		log.Warn("model provider overloaded or over its limits", "error", err)
 		return outcome{text: textOverloaded.to(in), skipped: "overloaded", skipDetail: err.Error()}

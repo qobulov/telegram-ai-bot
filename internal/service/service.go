@@ -276,6 +276,10 @@ type Options struct {
 	// Skips records the messages addressed to the bot that it did not
 	// answer, and why. Nil records nothing.
 	Skips SkipLog
+	// AILimits counts each chat's replies lost to the AI's credits or quota
+	// running out, so that it is told only a few times. Nil counts in this
+	// process alone.
+	AILimits AILimitLog
 	// PrivateQuota counts the answers each user gets in private chats: at
 	// most PrivateDailyLimit a day, from midnight in Location. Owners are not
 	// counted. Nil, or a limit of 0, does not limit.
@@ -463,6 +467,7 @@ type Service struct {
 	cardsCatalog *cards.Catalog
 
 	opts        Options
+	aiLimits    AILimitLog
 	userLimiter *limiter
 	ambient     *ambient
 	queues      []chan incoming
@@ -653,6 +658,10 @@ func New(opts Options) *Service {
 		s.workers.Go(func() { s.work(queue) })
 	}
 	s.notifier.Go(s.sendBusyNotices)
+	s.aiLimits = opts.AILimits
+	if s.aiLimits == nil {
+		s.aiLimits = &memoryAILimits{}
+	}
 	return s
 }
 

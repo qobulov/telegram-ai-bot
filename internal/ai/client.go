@@ -284,6 +284,22 @@ func IsOverloaded(err error) bool {
 	return apiErr.Status == http.StatusTooManyRequests || apiErr.Status == http.StatusServiceUnavailable
 }
 
+// IsOutOfCredits reports that the account's credits or quota ran out: 402,
+// as Gemini answers once prepaid credits are spent, or 429 naming a quota,
+// as the free tier answers past its limits. It lasts until someone pays or
+// the quota renews, so asking again soon does not help.
+func IsOutOfCredits(err error) bool {
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	if apiErr.Status == http.StatusPaymentRequired {
+		return true
+	}
+	message := strings.ToLower(apiErr.Message)
+	return apiErr.Status == http.StatusTooManyRequests && (strings.Contains(message, "quota") || strings.Contains(message, "resource_exhausted") || strings.Contains(message, "credits"))
+}
+
 type chatRequest struct {
 	Model           string           `json:"model"`
 	Messages        []Message        `json:"messages"`

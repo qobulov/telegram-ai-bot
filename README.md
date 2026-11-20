@@ -462,6 +462,16 @@ minutes) or did not answer in time (skipped for 10 minutes, so a slow model
 does not make every reply wait 20 seconds). If every model is busy, the user is told
 the AI is overloaded and to try again in a minute.
 
+When the account's credits or quota run out (`402`, as Gemini answers once
+prepaid credits are spent, or a `429` naming a quota; `ai.IsOutOfCredits`),
+every message would fail the same way until someone pays. So a chat is told
+three times at most in one outage, as the owners asked on 2026-11-20: first
+plainly that the AI limit ran out, then twice jokingly, and after that the
+bot stays quiet (`internal/service/ailimit.go`, counted per chat in
+`ai_limit_notices`, migration 118). Each lost reply is still recorded with
+the reason `ai_limit`; a chat with no such failure for 6 hours counts from
+the first notice again.
+
 If the model rejects a request because it cannot use tools, the bot logs
 `model does not support tool calling; continuing without tools`, answers
 without tools, and stays in that mode until it is restarted. In that mode the
