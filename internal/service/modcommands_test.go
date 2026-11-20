@@ -112,6 +112,31 @@ func TestModOrderReplyingToTheBotsAnswer(t *testing.T) {
 	}
 }
 
+// /pin and /unpin pin the message replied to whoever wrote it: the bot's
+// own answer is pinned, not the member it was about, and so is the asker's
+// own message.
+func TestPinAnyMessage(t *testing.T) {
+	f := newFixture()
+	f.members.admins = map[int64]bool{userID: true}
+	runner := withToolRunner(f)
+	runner.answers["moderate"] = `{"ok":true,"result":{"done":true,"said":"Bajarildi."}}`
+	first := groupMessage("@MyBot shu bolani tinchlantir", "@MyBot")
+	first.ReplyToMessage = &telegram.Message{MessageID: 9, From: &telegram.User{ID: 501, FirstName: "Sam"}, Chat: first.Chat, Text: "Yo bob turila"}
+	toBot := groupMessage("/pin")
+	toBot.MessageID = 31
+	toBot.ReplyToMessage = &telegram.Message{MessageID: 1001, From: &telegram.User{ID: botID, IsBot: true}, Chat: toBot.Chat, Text: "Qoidalar: ..."}
+	toSelf := groupMessage("/unpin")
+	toSelf.MessageID = 32
+	toSelf.ReplyToMessage = &telegram.Message{MessageID: 1002, From: toSelf.From, Chat: toSelf.Chat, Text: "E'lon"}
+	sent := f.run(inGroup(first), inGroup(toBot), inGroup(toSelf))
+	if len(runner.asked) != 2 || !strings.Contains(runner.asked[0], `"action":"pin"`) || !strings.Contains(runner.asked[1], `"action":"unpin"`) {
+		t.Fatalf("asked %v, sent %+v", runner.asked, sent)
+	}
+	if len(sent) != 3 || sent[1].text != "Bajarildi." || sent[2].text != "Bajarildi." || len(f.replier.recorded()) != 1 {
+		t.Fatalf("sent %+v, model asked %d times", sent, len(f.replier.recorded()))
+	}
+}
+
 // A moderation command with no reply asks whom, to an admin, and stays
 // silent to a member, whose command may be another bot's; a bare /mute asks
 // too, and only "/mute bot" quiets the bot.

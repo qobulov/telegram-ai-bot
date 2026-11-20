@@ -696,10 +696,10 @@ func TestModerateNeedsBotRight(t *testing.T) {
 func TestModerateRefusesImmuneTargets(t *testing.T) {
 	creator := telegram.ChatMember{Status: "creator"}
 	noRights := admin()
-	// The person asking and the bot may have their own messages deleted or
-	// pinned; everyone else here is kept off even that.
+	// The person asking and the bot may have their own messages deleted;
+	// everyone else here is kept off even that. Pins touch no one, below.
 	members := []string{"mute", "ban"}
-	everything := []string{"mute", "ban", "delete", "pin"}
+	everything := []string{"mute", "ban", "delete"}
 	const immuneWords = "I can't do that to"
 	cases := map[string]struct {
 		target  *Target
@@ -731,6 +731,35 @@ func TestModerateRefusesImmuneTargets(t *testing.T) {
 
 				expectRefusal(t, got, "forbidden", c.refusal)
 				env.nothingActed(t)
+			})
+		}
+	}
+}
+
+// A pin is about the message, not its author: an owner's, the creator's,
+// an admin's and a linked channel's are pinned as anyone's.
+func TestModeratePinsAnyonesMessage(t *testing.T) {
+	creator := telegram.ChatMember{Status: "creator"}
+	noRights := admin()
+	cases := map[string]struct {
+		target *Target
+		member *telegram.ChatMember
+	}{
+		"an owner":                {&Target{MessageID: 29, UserID: 9002, Name: "Muhammad", Owner: true}, nil},
+		"the creator":             {bekTarget(), &creator},
+		"an administrator":        {bekTarget(), &noRights},
+		"a linked channel's post": {&Target{MessageID: 29, UserID: 777000, Name: "Telegram"}, nil},
+	}
+	for name, c := range cases {
+		for _, action := range []string{"pin", "unpin"} {
+			t.Run(name+" "+action, func(t *testing.T) {
+				env := newModerationEnv(t)
+				if c.member != nil {
+					env.chat.set(c.target.UserID, *c.member)
+				}
+				if said := env.act(t, asking(100, c.target), `{"action":"`+action+`"}`); !strings.HasPrefix(said, "Bajarildi:") {
+					t.Errorf("%s said %q", action, said)
+				}
 			})
 		}
 	}

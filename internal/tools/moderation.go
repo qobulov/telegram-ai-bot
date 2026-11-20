@@ -1021,6 +1021,11 @@ func (m *Moderation) checkBot(ctx context.Context, chatID int64, right string) e
 // it may be deleted or pinned, and the channel banned, but no member's
 // action fits a channel.
 func (m *Moderation) checkTarget(ctx context.Context, o order) error {
+	if o.action == actionPin || o.action == actionUnpin {
+		// A pin touches no one: an admin's, an owner's or the creator's
+		// message is pinned as anyone's.
+		return nil
+	}
 	if o.target.ChannelID != 0 {
 		return channelOnly(o.action)
 	}

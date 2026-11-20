@@ -42,6 +42,11 @@ func (s *Service) modRequest(in incoming) (asked incoming, action string, minute
 	if !in.group {
 		return in, "", 0, "", false
 	}
+	if command := modCommands[commandName(in.text)]; onMessage(command) && repliesToAMessage(in) {
+		// "/pin" is about the message, not its author: the bot's own and
+		// the asker's own are pinned as anyone's.
+		return in, command, 0, "", true
+	}
 	asked, ok = s.withModTarget(in)
 	if command, isCommand := modCommands[commandName(in.text)]; isCommand && (ok || s.tagsAMember(in)) {
 		// "/demote @user": the moderate tool finds the member tagged.
@@ -56,6 +61,19 @@ func (s *Service) modRequest(in incoming) (asked incoming, action string, minute
 	written, _ := in.msg.Content()
 	action, minutes, ok = s.modWords(written)
 	return asked, action, minutes, "", ok
+}
+
+// onMessage reports a command's action on the message replied to rather
+// than on its author.
+func onMessage(action string) bool {
+	return action == "pin" || action == "unpin"
+}
+
+// repliesToAMessage reports a message replying to one that can be acted on:
+// not a service message such as a forum topic's start.
+func repliesToAMessage(in incoming) bool {
+	replied := in.msg.ReplyToMessage
+	return replied != nil && replied.From != nil && !replied.IsService()
 }
 
 // tagsAMember reports a message that itself tags a member other than the
