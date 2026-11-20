@@ -146,6 +146,22 @@ func (s *Store) ExpireQuietGroups(ctx context.Context, before, quietSince time.T
 	return tag.RowsAffected(), nil
 }
 
+// ExpireGroupsWithoutAI removes the logged messages older than before in the
+// groups whose owners did not turn AI on: the owners keep nothing of those,
+// and their lines, kept without words for the flood guard alone, are needed
+// for a minute. It reports how many it removed.
+func (s *Store) ExpireGroupsWithoutAI(ctx context.Context, before time.Time) (int64, error) {
+	tag, err := s.pool.Exec(ctx, `
+		DELETE FROM group_messages m
+		WHERE m.created_at < $1
+		  AND NOT EXISTS (SELECT 1 FROM group_settings g WHERE g.chat_id = m.chat_id AND g.key = $2 AND g.value = 'on')`,
+		before, SettingAI)
+	if err != nil {
+		return 0, fmt.Errorf("storage: expire groups without AI: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}
+
 // ClearGroupMessages deletes a group's logged messages.
 func (s *Store) ClearGroupMessages(ctx context.Context, chatID int64) error {
 	if _, err := s.pool.Exec(ctx, `DELETE FROM group_messages WHERE chat_id = $1`, chatID); err != nil {

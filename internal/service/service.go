@@ -644,6 +644,7 @@ func New(opts Options) *Service {
 		typingDelay:     typingWait,
 		inlineDeadline:  inlineDeadline,
 	}
+	s.ambient.logs = s.groupAIOn
 	for _, chatID := range opts.MutedChats {
 		s.muted[chatID] = true
 	}

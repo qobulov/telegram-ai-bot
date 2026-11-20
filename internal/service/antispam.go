@@ -112,8 +112,12 @@ func ownGroupLink(link, username string) bool {
 }
 
 // isNewcomer reports a member with fewer than newcomerMessages messages in
-// the group's log. When the log cannot say, they are not.
+// the group's log. When the log cannot say, they are not, as in a group
+// without AI, whose messages are not logged.
 func (s *Service) isNewcomer(ctx context.Context, msg *telegram.Message) bool {
+	if !s.groupAIOn(ctx, msg.Chat.ID) {
+		return false
+	}
 	n, err := s.ambient.log.AuthorMessageCount(ctx, msg.Chat.ID, msg.From.ID, newcomerMessages)
 	if err != nil {
 		s.opts.Logger.Warn("guards: could not count a member's messages", "chat_id", msg.Chat.ID, "error", err)

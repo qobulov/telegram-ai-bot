@@ -1,8 +1,10 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"testing"
@@ -177,6 +179,7 @@ func TestFloodMutesEscalate(t *testing.T) {
 // link to the group itself.
 func TestNewcomerLinksAreDeleted(t *testing.T) {
 	f, _, moderator := protectFixture()
+	f.opts.Extras.(*memoryExtras).settings[storage.SettingAI] = "on"
 	link := func(userID, messageID int64, text, url string) telegram.Update {
 		msg := messageFrom(userID, "yangi", text)
 		msg.MessageID = messageID
@@ -208,6 +211,7 @@ func TestNewcomerLinksAreDeleted(t *testing.T) {
 // link stays.
 func TestNewcomerForwardsAndButtonsAreDeleted(t *testing.T) {
 	f, _, moderator := protectFixture()
+	f.opts.Extras.(*memoryExtras).settings[storage.SettingAI] = "on"
 	forward := messageFrom(5353, "yangi", "zo'r post")
 	forward.ForwardOrigin = &telegram.MessageOrigin{Type: "channel", Chat: &telegram.Chat{ID: -100777, Title: "Promo"}}
 	buttons := messageFrom(5252, "b", "bosing")
@@ -270,5 +274,42 @@ func TestAntispamButtons(t *testing.T) {
 	f.run(press(groupAdminID))
 	if extras.settings[storage.SettingAntispamOff] != "" {
 		t.Errorf("after the second press: %q", extras.settings[storage.SettingAntispamOff])
+	}
+}
+
+// A group without AI keeps no words: a member's line is logged with no name
+// and a hash for its text, which still tells a repeat, the bot's own lines
+// are not logged, and with no log to say who is new no newcomer's link is
+// taken for one.
+func TestGroupWithoutAIKeepsNoWords(t *testing.T) {
+	botLog := &memoryLog{}
+	quiet := newAmbient(botLog, 10, nil, slog.New(slog.DiscardHandler))
+	quiet.logs = func(context.Context, int64) bool { return false }
+	quiet.add(groupID, 0, 1, botAuthor, "salom, men botman")
+	if len(botLog.messages) != 0 {
+		t.Errorf("the bot's line was logged: %+v", botLog.messages)
+	}
+
+	f, _, moderator := protectFixture()
+	link := messageFrom(5353, "yangi", "kanalim: t.me/promo_kanal")
+	link.MessageID = 100
+	link.Entities = []telegram.MessageEntity{entityAt("url", link.Text, "t.me/promo_kanal")}
+	f.run(inGroup(link), inGroup(messageFrom(flooderID, "tez", "salom hammaga")))
+
+	if len(moderator.deleted) != 0 {
+		t.Errorf("deleted %v; a group without AI has no newcomers", moderator.deleted)
+	}
+	f.chatLog.mu.Lock()
+	defer f.chatLog.mu.Unlock()
+	if len(f.chatLog.messages) != 2 {
+		t.Fatalf("logged %+v, want the two members' lines alone", f.chatLog.messages)
+	}
+	for _, m := range f.chatLog.messages {
+		if m.AuthorName != "" || !strings.HasPrefix(m.Text, hiddenMark) || strings.Contains(m.Text, "salom") {
+			t.Errorf("logged %+v, want no name and no words", m)
+		}
+	}
+	if got := f.chatLog.messages[1].Text; got != hiddenLine(normalRepeat("salom hammaga")) {
+		t.Errorf("line %q is not the repeat key's hash", got)
 	}
 }
