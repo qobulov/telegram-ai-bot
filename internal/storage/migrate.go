@@ -54,6 +54,14 @@ func loadMigrations() ([]migration, error) {
 		migrations = append(migrations, migration{version: version, name: base, sql: string(content)})
 	}
 	sort.Slice(migrations, func(i, j int) bool { return migrations[i].version < migrations[j].version })
+	// Two files of one number would leave the second unrun wherever the
+	// first was applied, as the version is recorded once: work on two
+	// branches gave 0107 and 0118 twice on 2026-11-20.
+	for i := 1; i < len(migrations); i++ {
+		if migrations[i].version == migrations[i-1].version {
+			return nil, fmt.Errorf("storage: migrations %q and %q have the same number", migrations[i-1].name, migrations[i].name)
+		}
+	}
 	return migrations, nil
 }
 
