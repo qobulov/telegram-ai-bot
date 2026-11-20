@@ -1483,7 +1483,8 @@ asked on 2026-11-20: with all three on it turns them all off, and otherwise
 all on, saying which and that the next `/antispam` does the other; under it
 is one line each, ✅ or ❌, and a button each that switches it (anyone else
 pressing gets a box and changes nothing); `/antispam off` and `/antispam on`
-still set all three. What a group turned off
+still set all three. In a group without AI the newcomer line is ⚪ and says it does
+not work there, as no log is kept to tell a newcomer by. What a group turned off
 is kept in `group_settings` under `antispam_off` ("flood,spam,newcomers"), with
 no migration; the `spam_guard` and `flood_guard` rules owners set before mean
 nothing more, and the `group_rules` tool's `guard` and `unguard` of `spam` or

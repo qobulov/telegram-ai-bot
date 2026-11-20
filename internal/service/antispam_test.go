@@ -336,3 +336,20 @@ func TestAntispamSwitchesWithNoWord(t *testing.T) {
 		t.Errorf("with one off: setting %q, want all on", extras.settings[storage.SettingAntispamOff])
 	}
 }
+
+// In a group without AI the menu does not promise the newcomer guard, which
+// has no log there to tell a newcomer by; with AI it is on as usual.
+func TestAntispamMenuSaysTheNewcomerGuardNeedsAI(t *testing.T) {
+	f, _, _ := protectFixture()
+	sent := f.run(from(groupAdminID, "/antispam on", 0))
+	if len(sent) != 1 || !strings.Contains(sent[0].text, "⚪ Yangi a'zolar") || !strings.Contains(sent[0].text, "AI o'chiq") {
+		t.Fatalf("without AI: %q", sent[0].text)
+	}
+
+	f, _, _ = protectFixture()
+	f.opts.Extras.(*memoryExtras).settings[storage.SettingAI] = "on"
+	sent = f.run(from(groupAdminID, "/antispam on", 0))
+	if len(sent) != 1 || !strings.Contains(sent[0].text, "✅ Yangi a'zolar") || strings.Contains(sent[0].text, "AI o'chiq") {
+		t.Errorf("with AI: %q", sent[0].text)
+	}
+}

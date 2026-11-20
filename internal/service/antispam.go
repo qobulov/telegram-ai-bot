@@ -228,12 +228,18 @@ func (s *Service) antispamMenu(ctx context.Context, chatID int64) (string, [][]t
 	}
 	lines := []string{"🛡 Antispam"}
 	var row []telegram.Button
+	aiOn := s.groupAIOn(ctx, chatID)
 	for _, g := range antispamGuards {
 		mark := "✅"
 		if off[g.key] {
 			mark = "❌"
 		}
-		lines = append(lines, mark+" "+g.says)
+		says := g.says
+		if g.key == antispamNewcomers && !aiOn && !off[g.key] {
+			// A group without AI keeps no log to tell a newcomer by.
+			mark, says = "⚪", says+" (bu guruhda AI o'chiq, shuning uchun ishlamaydi: kim yangi ekanini bilish uchun xabarlar saqlanmaydi)"
+		}
+		lines = append(lines, mark+" "+says)
 		row = append(row, telegram.Button{Text: mark + " " + g.name, Data: antispamData + g.key})
 	}
 	if restrict, del := s.botMay(ctx, chatID); !restrict || !del {
