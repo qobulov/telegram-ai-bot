@@ -472,8 +472,7 @@ model may guess at the time or at arithmetic.
 The persona (`internal/config/persona.go`) goes with every request, so
 what only some messages need is added only to them: how to treat an owner
 and carry out their orders (`ownerOrdersNote`) when an owner writes the
-message or one of the recent lines (`ownerNearby`), and the card game's
-facts when the message is about it. Who the owners are, how they are
+message or one of the recent lines (`ownerNearby`). Who the owners are, how they are
 recognised and that this is a secret stay in the persona for everyone.
 
 The bot plays a character instead of acting as an assistant. Out of the box
@@ -2331,11 +2330,10 @@ a group, was taken out, and trades are done on the market alone. A card taken
 from the market may be the last copy of a card at ★1, which leaves the collection (its used-up copies
 with it), its points passing only as it is new to its taker. With the pages served, the model is told the game's facts
 (`cardsNote`), as it had said it was "not the card bot" and named
-commands there are none of; it teaches `/card` alone. Since 2026-11-20 the
-facts go only with a message about the game, or one after such a question
-(`cardWords` in `internal/agent/agent.go`), as they cost every request
-about a thousand tokens; they cover the arena, its shop, the weekly prize
-and Minora too. The
+commands there are none of; it teaches `/card` alone. Since 2026-11-20, as the owners asked, it
+holds no rules, odds or prizes: only that the game is hers and opens with
+`/card`, and that its rules are in the app, so that it costs every request
+little. The
 pictures are the characters' AniList pictures, the studios' art.
 
 The cards come from AniList alone. Trading cards from PokéWallet (one set

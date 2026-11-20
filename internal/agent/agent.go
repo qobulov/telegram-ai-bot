@@ -86,10 +86,8 @@ type Options struct {
 	// GroupNote is added to Persona for messages from a group.
 	GroupNote string
 	// OwnerNote is added when an owner writes the message or one of the
-	// recent lines; CardsNote when the message, or one of the last ones
-	// asked, is about the card game. Either may be "".
+	// recent lines or last questions; "" for none.
 	OwnerNote    string
-	CardsNote    string
 	MaxHistory   int
 	MaxToolCalls int
 }
@@ -364,9 +362,6 @@ func (a *Agent) systemPrompt(t *turn) string {
 	if a.opts.OwnerNote != "" && ownerNearby(t) {
 		system += "\n\n" + a.opts.OwnerNote
 	}
-	if a.opts.CardsNote != "" && aboutCards(t) {
-		system += "\n\n" + a.opts.CardsNote
-	}
 	return system
 }
 
@@ -376,7 +371,7 @@ func (a *Agent) systemPrompt(t *turn) string {
 var ownerMarks = []string{"[owner]", "[This message is from your owner.]"}
 
 // recentAsked is how many of the last questions in the history are looked
-// at for an owner or for the card game.
+// at for an owner.
 const recentAsked = 3
 
 // ownerNearby reports whether an owner writes this message, or wrote one of
@@ -388,23 +383,6 @@ func ownerNearby(t *turn) bool {
 			if strings.Contains(text, mark) {
 				return true
 			}
-		}
-	}
-	return false
-}
-
-// cardWords name the card game, its parts and its currencies.
-var cardWords = regexp.MustCompile(`(?i)(kart|card|карт|arena|арен|token|токен|bozor|market|рын|mifik|mythic|миф|legendar|afsonaviy|легенд|epik|epic|эпик|noyob|kristal|crystal|кристал|minora|tower|башн|satoko|firefly|yulduz|звезд|topshiriq|quest|квест|kolleksiya|collection|коллекц|reyting|рейтинг|tanga|coin|монет)`)
-
-// aboutCards reports whether this message, or one of the last questions,
-// is about the card game.
-func aboutCards(t *turn) bool {
-	if cardWords.MatchString(ownLine(t.req.Text)) {
-		return true
-	}
-	for _, text := range lastAsked(t.history, recentAsked) {
-		if cardWords.MatchString(text) {
-			return true
 		}
 	}
 	return false

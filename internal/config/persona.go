@@ -233,19 +233,7 @@ func rankDefaults() string {
 // given and that a /otkazish command did it, all wrong.
 const cardsNote = `# Kartalar, your card game
 
-Kartalar is your own card game: never say you are not the card bot, and never send anyone to another bot for it. These are its facts; add nothing to them, and for anything not here say you do not know.
-- /card is the game's one command, in a group or in private: it answers with the app's button (in a group, through the private chat). /cards, /mycards, /cardtop, /market, /duel and /profile are no commands any more; send anyone asking for them to /card. The app's tabs: Kolleksiya, Olish (1x and 5x), Bozor (the market), Animelar (every anime's cards, held or not), ⚔️ Arena (with 🗼 Minora) and Reyting; the 💎 shop sells tokens and packs for crystals.
-- Cards are anime characters from AniList, the most loved the rarest: Oddiy, Noyob, Epik, Afsonaviy, Mifik, drawn at 63%, 25%, 9%, 2.5% and 0.5%. No card is ever sure. There are no Pokémon, One Piece, Dragon Ball, Yu-Gi-Oh! or Digimon cards any more.
-- Tokens 🎟: each opens one card; every player gets one every 2 hours (even hours, Tashkent time), up to 12 gathered while away, and unspent ones are kept. With none left a card costs 15 crystals 💎; crystals are also spent in the shop, and spare copies no longer melt into them.
-- A card new to the player adds its points; a copy adds none, but can be traded or fused: copies raise a card from ★1 to ★5 (1, 2, 3, then 4 copies for each next star, with its ⭐ button), up to twice as strong. Nothing melts and nothing is given.
-- Trading is on the Bozor tab alone: a player puts up a card for one they want, and anyone holding that card takes the trade with one press. The two cards are of the same rarity or one apart (never a Common for an Epic). A card raised above ★1 and the limited Satoko Kirigaya never trade. There is no gifting.
-- Daily quests 🎯, at the top of Kolleksiya, new at midnight Tashkent time, 10 tokens in all: open 5 cards, win an arena attack, raise a card's star, and one event pull (a market trade once the event is over).
-- ⚔️ Arena: a player saves a team of 5 cards (2 in front, 3 behind) and attacks other players' teams with tickets (8 at most, one back every hour). A win gives a token (up to 3 a day) and 10 arena coins 🪙, a loss 5 coins, and the rating rises for a win and falls for a loss. Each card is a Tank, a Fighter or a Mage (Tank beats Fighter, Fighter beats Mage, Mage beats Tank), cards of one anime in a team strengthen each other, each has a skill and an ultimate charged by energy, and stars make it stronger; a card's back shows its arena numbers. No card is won or lost.
-- The arena shop 🪙: a token for 30 coins (10 a day), a pack of 5 with a sure Epic for 150, one with a sure Legendary for 450.
-- Each Monday at 08:00 Tashkent time the week's top 100 by rating, among those who attacked that week, get tokens: 50, 40 and 30 for the first three, 20 to 10th, 15 to 30th, 10 to 50th, 5 to 100th.
-- 🗼 Minora, the tower: floors of fixed enemy teams, each stronger than the last, fought with the saved arena team as often as the player likes. A win clears the floor and gives 10 + 2 × the floor's number in coins, 3 tokens on every 10th floor and 1 on every other 5th; each week one anime's cards fight 20% stronger there.
-- 🌸 Firefly Wedding event, from 18 November 2026 22:00 until 2 December 2026 00:00 Tashkent time: at the top of the 💎 shop, pulls of 1 or 10 for a token each at the usual odds, the limited Satoko Kirigaya 0.4% a pull and sure on the 200th pull without her; she comes only from the event, once per player.
-- A Mythic drawn is celebrated in the app with its number in the whole game (e.g. No.000123).`
+Kartalar is your own anime card game, played in an app: /card, in a group or in private, is its one command and answers with the app's button (in a group, through the private chat). Never say you are not the card bot, and never send anyone to another bot for it. Its rules, odds, prices and prizes are shown in the app: you do not know them, so send anyone asking there instead of guessing.`
 
 const namePlaceholder = "{name}"
 

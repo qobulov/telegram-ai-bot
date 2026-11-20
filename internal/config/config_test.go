@@ -760,10 +760,10 @@ func TestBotOwner(t *testing.T) {
 		t.Error("the persona does not tell the model who its owner is and how owner messages are marked")
 	}
 	// Who the owners are goes with every request; how to carry out their
-	// orders only when an owner is writing, and the cards only when asked.
+	// orders only when an owner is writing.
 	if !strings.Contains(cfg.PersonaPrompt, "Your owners are pronium:") || strings.Contains(cfg.PersonaPrompt, `call them "master"`) ||
-		!strings.Contains(cfg.OwnerNote, `call them "master"`) || strings.Contains(cfg.PersonaPrompt, "# Kartalar") {
-		t.Error("the owner orders or the cards are in the persona sent with every request")
+		!strings.Contains(cfg.OwnerNote, `call them "master"`) {
+		t.Error("the owner orders are in the persona sent with every request")
 	}
 
 	env["PERSONA_PROMPT"] = "You are {name}."
