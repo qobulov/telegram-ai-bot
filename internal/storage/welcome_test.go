@@ -5,6 +5,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // TestMain turns the welcome tokens off, as the tests count tokens from
@@ -27,22 +29,25 @@ func TestWelcomeTokens(t *testing.T) {
 		_ = store.pool.QueryRow(ctx, `SELECT tokens FROM card_players WHERE user_id = $1`, id).Scan(&n)
 		return n
 	}
-	if err := store.SetCardAutoRemind(ctx, alice, "Alice", 0, "uz"); err != nil {
-		t.Fatal(err)
+	makeRow := func(id int64, name string) {
+		t.Helper()
+		if err := pgx.BeginFunc(ctx, store.pool, func(tx pgx.Tx) error {
+			_, err := lockCardPlayer(ctx, tx, id, name)
+			return err
+		}); err != nil {
+			t.Fatal(err)
+		}
 	}
+	makeRow(alice, "Alice")
 	if n := tokens(alice); n != WelcomeTokens {
-		t.Errorf("a player made by the reminder has %d tokens, want %d", n, WelcomeTokens)
+		t.Errorf("a new player has %d tokens, want %d", n, WelcomeTokens)
 	}
-	if err := store.SetCardAutoRemind(ctx, alice, "Alice", 0, "uz"); err != nil {
-		t.Fatal(err)
-	}
+	makeRow(alice, "Alice")
 	if n := tokens(alice); n != WelcomeTokens {
-		t.Errorf("the reminder set again gave %d tokens, want %d once", n, WelcomeTokens)
+		t.Errorf("the row made again gave %d tokens, want %d once", n, WelcomeTokens)
 	}
 	WelcomeUntil = time.Now().Add(-time.Hour)
-	if err := store.SetCardAutoRemind(ctx, bob, "Bob", 0, "uz"); err != nil {
-		t.Fatal(err)
-	}
+	makeRow(bob, "Bob")
 	if n := tokens(bob); n != 0 {
 		t.Errorf("after the welcome, a new player has %d tokens", n)
 	}

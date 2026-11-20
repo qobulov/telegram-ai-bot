@@ -22,7 +22,6 @@ import (
 	"telegram-ai-bot/internal/game"
 	"telegram-ai-bot/internal/gifs"
 	"telegram-ai-bot/internal/guards"
-	"telegram-ai-bot/internal/reminders"
 	"telegram-ai-bot/internal/service"
 	"telegram-ai-bot/internal/stickers"
 	"telegram-ai-bot/internal/storage"
@@ -492,7 +491,6 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 		tools.MemberInfoTool(tools.MemberInfoOptions{Store: store, Telegram: bot.Client, Tokens: cards.Tokens, NextToken: func(now time.Time) time.Time { return cards.Today(now).Next() }, Location: cfg.Location}),
 		tools.PunishmentsTool(tools.PunishmentsOptions{Store: store, Creators: groupMembers{client: bot.Client, botID: bot.User.ID}, BotID: bot.User.ID, Location: cfg.Location}),
 		tools.JoinCaptchaTool(tools.JoinCaptchaOptions{Store: store, Rights: groupMembers{client: bot.Client, botID: bot.User.ID}}),
-		tools.RemindersTool(tools.RemindersOptions{Store: store, CardDay: cards.Today, Location: cfg.Location}),
 	)
 	// Only owners known by ID can be written to, and only they are. Only
 	// their business accounts are used, too: the account speaks for whoever
@@ -790,10 +788,6 @@ type Webhook struct {
 	Handler http.Handler
 	// Bot is the account updates are handled as.
 	Bot Bot
-	// DueWork opens the auto opener's cards and sends the reminders that
-	// are due, as the reminders endpoint does; WithDueWork runs it beside
-	// the updates.
-	DueWork func(ctx context.Context) (reminders.Summary, error)
 	// Close releases the database pool. A serverless function never calls
 	// it; tests and other hosts do.
 	Close func()
@@ -848,7 +842,6 @@ func newWebhook(ctx context.Context, cfg config.Config, store *storage.Store, lo
 	return &Webhook{
 		Handler: handler,
 		Bot:     bot,
-		DueWork: ReminderJob(cfg, store, bot, logger),
 		Close: func() {
 			svc.Close()
 			store.Close()
@@ -909,72 +902,6 @@ func NewCleanup(ctx context.Context, cfg config.Config, logger *slog.Logger) (*C
 	return &Cleanup{Handler: handler, Close: store.Close}, nil
 }
 
-// Reminders is the endpoint an outside scheduler, cron-job.org on Vercel's
-// free plan, calls every minute to send the reminders that are due.
-type Reminders struct {
-	Handler http.Handler
-	// Close releases the database pool.
-	Close func()
-}
-
-// NewReminders builds the reminders endpoint. It is authenticated as the
-// cleanup is, with CRON_SECRET, and each authorised call sends the
-// reminders due and reports how many went out.
-func NewReminders(ctx context.Context, cfg config.Config, logger *slog.Logger) (*Reminders, error) {
-	if cfg.CronSecret == "" {
-		return nil, errors.New("CRON_SECRET is required for the reminders endpoint")
-	}
-	store, err := storage.Open(ctx, cfg.DatabaseURL)
-	if err != nil {
-		return nil, err
-	}
-	if err := store.CheckSchema(ctx); err != nil {
-		store.Close()
-		return nil, err
-	}
-	bot, err := Connect(ctx, cfg, logger)
-	if err != nil {
-		store.Close()
-		return nil, err
-	}
-	handler, err := RemindersHandler(cfg.CronSecret, ReminderJob(cfg, store, bot, logger), logger)
-	if err != nil {
-		store.Close()
-		return nil, err
-	}
-	return &Reminders{Handler: handler, Close: store.Close}, nil
-}
-
-// RemindersHandler answers a call with the secret by running job, and
-// refuses one without it.
-func RemindersHandler(secret string, job func(ctx context.Context) (reminders.Summary, error), logger *slog.Logger) (http.Handler, error) {
-	return cron.NewHandler(cron.Options{
-		Secret: secret,
-		Logger: logger,
-		Run:    func(ctx context.Context) (any, error) { return job(ctx) },
-	})
-}
-
-// ReminderJob sends the reminders that are due, for the endpoint and for
-// the long-polling command's ticker alike.
-func ReminderJob(cfg config.Config, store *storage.Store, bot Bot, logger *slog.Logger) func(ctx context.Context) (reminders.Summary, error) {
-	opts := reminders.Options{
-		Store:       store,
-		Sender:      bot.Client,
-		CardsURL:    cardsPage(cfg),
-		BotUsername: bot.User.Username,
-		CardDay:     cards.Today,
-		Logger:      logger,
-	}
-	return func(ctx context.Context) (reminders.Summary, error) {
-		summary, err := reminders.Fire(ctx, opts)
-		if summary != (reminders.Summary{}) {
-			logger.Info("reminders sent", "sent", summary.Sent, "skipped", summary.Skipped, "failed", summary.Failed, "retried", summary.Retried)
-		}
-		return summary, err
-	}
-}
-
 // quietGroupKeep is how long a group's messages are kept where the bot has
 // not answered for quietGroupDays, whatever RETENTION_DAYS says: the week's
 // statistics, and a day more.
@@ -983,22 +910,12 @@ const (
 	quietGroupDays = 7 * 24 * time.Hour
 )
 
-// reminderKeep is how long a reminder is kept once it was sent, skipped
-// or failed.
-const reminderKeep = 7 * 24 * time.Hour
-
-// expire applies the retention policy once, and deletes the reminders
-// done with.
+// expire applies the retention policy once.
 func expire(ctx context.Context, cfg config.Config, store *storage.Store, logger *slog.Logger) (storage.Expired, error) {
 	if deleted, err := store.ExpireQuietGroups(ctx, time.Now().Add(-quietGroupKeep), time.Now().Add(-quietGroupDays)); err != nil {
 		logger.Warn("could not trim the quiet groups' logs", "error", err)
 	} else if deleted > 0 {
 		logger.Info("quiet groups' old messages deleted", "messages", deleted)
-	}
-	if deleted, err := store.DeleteOldReminders(ctx, time.Now().Add(-reminderKeep)); err != nil {
-		logger.Warn("could not delete old reminders", "error", err)
-	} else if deleted > 0 {
-		logger.Info("old reminders deleted", "reminders", deleted)
 	}
 	if cfg.RetentionDays == 0 {
 		return storage.Expired{}, nil

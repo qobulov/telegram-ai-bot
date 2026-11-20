@@ -117,7 +117,7 @@ var webhook = &lazy{name: "webhook", build: func(ctx context.Context, cfg config
 		return nil, nil, err
 	}
 	logger.Info("webhook ready", "username", hook.Bot.User.Username, "name", cfg.BotDisplayName, "model", cfg.Model)
-	return app.WithDueWork(hook.Handler, hook.DueWork, time.Minute, logger), hook.Close, nil
+	return hook.Handler, hook.Close, nil
 }}
 
 var cleanup = &lazy{name: "cleanup", build: func(ctx context.Context, cfg config.Config, logger *slog.Logger) (http.Handler, func(), error) {
@@ -167,17 +167,6 @@ var mafias = &lazy{name: "mafia", build: func(ctx context.Context, cfg config.Co
 	}
 	return endpoint.Handler, endpoint.Close, nil
 }}
-
-var reminderJobs = &lazy{name: "reminders", build: func(ctx context.Context, cfg config.Config, logger *slog.Logger) (http.Handler, func(), error) {
-	job, err := app.NewReminders(ctx, cfg, logger)
-	if err != nil {
-		return nil, nil, err
-	}
-	return job.Handler, job.Close, nil
-}}
-
-// Reminders sends the reminders that are due when cron-job.org calls it.
-func Reminders(w http.ResponseWriter, r *http.Request) { reminderJobs.serve(w, r) }
 
 // Mafia answers the Mafia game.
 func Mafia(w http.ResponseWriter, r *http.Request) { mafias.serve(w, r) }

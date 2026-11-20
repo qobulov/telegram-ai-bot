@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"telegram-ai-bot/internal/reminders"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 )
@@ -203,10 +202,10 @@ func awardText(a storage.InviteAward, since, last time.Time, top []storage.Invit
 		if i < len(awardMedals) {
 			place = awardMedals[i]
 		}
-		lines = append(lines, fmt.Sprintf(textAwardLine.inLanguage(lang), place, reminders.Mention(c.UserID, c.Name), c.Stayed))
+		lines = append(lines, fmt.Sprintf(textAwardLine.inLanguage(lang), place, mentionMember(c.UserID, c.Name), c.Stayed))
 	}
 	if owner != nil {
-		lines = append(lines, "", fmt.Sprintf(textAwardOwner.inLanguage(lang), reminders.Mention(owner.ID, owner.FirstName)))
+		lines = append(lines, "", fmt.Sprintf(textAwardOwner.inLanguage(lang), mentionMember(owner.ID, owner.FirstName)))
 	}
 	return strings.Join(lines, "\n")
 }

@@ -88,14 +88,10 @@ func (s *Store) OpenEventCards(ctx context.Context, userID int64, name string, n
 		if err := countQuest(ctx, tx, userID, quest, n); err != nil {
 			return err
 		}
-		err = tx.QueryRow(ctx, `
+		return tx.QueryRow(ctx, `
 			UPDATE card_players SET tokens = tokens - $2, event_pulls = $3, last_draw_at = $4
 			WHERE user_id = $1 RETURNING tokens, shards, points`, userID, n*ev.Price, open.Pulls, now).
 			Scan(&open.Tokens, &open.Shards, &open.Points)
-		if err != nil || open.Tokens > 0 {
-			return err
-		}
-		return remindAtNextDay(ctx, tx, userID, day.Next())
 	})
 	var few *CardTokensError
 	if errors.As(err, &few) {
