@@ -9,7 +9,7 @@ import (
 )
 
 // In a group without AI the model is never asked: talk gets one notice and
-// then silence, while commands, /weather and the bot's owners still go.
+// then silence, while commands and the bot's owners still go.
 func TestGroupWithoutAI(t *testing.T) {
 	f := newFixture()
 	f.opts.Extras = newMemoryExtras()
@@ -27,14 +27,14 @@ func TestGroupWithoutAI(t *testing.T) {
 		t.Errorf("a command = %q", last)
 	}
 	before := len(f.replier.recorded())
-	f.run(inGroup(groupMessage("/weather Toshkent")))
-	if len(f.replier.recorded()) != before+1 {
-		t.Errorf("/weather did not reach its tool")
+	shown := len(sent)
+	if sent = f.run(inGroup(groupMessage("/weather Toshkent"))); len(sent) != shown || len(f.replier.recorded()) != before {
+		t.Errorf("/weather, no command any more, got %+v", sent[shown:])
 	}
 	owner := groupMessage("Mira, salom")
 	owner.From = &telegram.User{ID: 77, FirstName: "Aziz"}
 	f.run(inGroup(owner))
-	if len(f.replier.recorded()) != before+2 {
+	if len(f.replier.recorded()) != before+1 {
 		t.Errorf("an owner was not answered")
 	}
 }

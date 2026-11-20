@@ -798,6 +798,7 @@ var privateOwnerCommands = map[string]bool{
 // alone opens it now, and in a group these get no answer at all.
 var retiredCommands = map[string]bool{
 	"/cards": true, "/mycards": true, "/cardtop": true, "/market": true, "/duel": true, "/profile": true,
+	"/calc": true, "/weather": true,
 }
 
 // respond decides what to send back. An empty outcome sends nothing. rules
@@ -811,11 +812,6 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 	}
 	if out, ok := s.utilityCommand(in); ok {
 		return out
-	}
-	if question, ok := weatherQuestion(in.text); ok {
-		// /weather is a tool, asked through the model: it works in a group
-		// without AI too, and takes nothing from the quota.
-		in.text, in.toolCommand = question, true
 	}
 	if s.isRankCommand(in) {
 		return s.rankCommand(ctx, in)
@@ -937,17 +933,15 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 	// A group without AI gets no talk; one with it takes an answer from its
 	// quota here, where the model is asked, and not for the commands and
 	// orders done in code before.
-	if in.group && in.aiOff && !in.toolCommand {
+	if in.group && in.aiOff {
 		return s.aiOff(in)
 	}
-	if !in.toolCommand {
-		groupReply, allowed := s.mayAnswerInGroup(in)
-		if !allowed {
-			s.passOver(in)
-			return outcome{skipped: "group_quota", passedOver: true}
-		}
-		in.groupReply = groupReply
+	groupReply, allowed := s.mayAnswerInGroup(in)
+	if !allowed {
+		s.passOver(in)
+		return outcome{skipped: "group_quota", passedOver: true}
 	}
+	in.groupReply = groupReply
 	// Past the day's limit the sender gets the notice, and no model is
 	// asked at all, the router included.
 	reservation, notify, allowed := s.takePrivateAnswer(ctx, in)

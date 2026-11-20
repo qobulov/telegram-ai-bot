@@ -562,10 +562,8 @@ type incoming struct {
 	// groupReply is the answer taken from the group's quota for this
 	// message, to give back if the turn answers nothing; 0 when none was.
 	groupReply int64
-	// aiOff marks a group message where the model may not be asked, and
-	// toolCommand a command done by a tool through the model, as /weather,
-	// which goes all the same.
-	aiOff, toolCommand bool
+	// aiOff marks a group message where the model may not be asked.
+	aiOff bool
 	// unanswered marks a private message PRIVATE_CHATS does not answer: it
 	// gets a reaction, chosen in code, and nothing else.
 	unanswered bool

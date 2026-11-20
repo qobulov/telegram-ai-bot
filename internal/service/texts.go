@@ -251,7 +251,7 @@ A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yo
 Hamma uchun:
 /card — kartalar o'yini (har 2 soatda token), /mylink — shaxsiy taklif havolangiz, /invites — kim nechta odam qo'shdi (tugmalar: bugun, hafta, oy, hammasi, o'zingizniki)
 /admins — adminlarni chaqirish, /report va /voteban — xabarga reply qilib shikoyat yoki ban uchun ovoz, /rights — huquqlaringiz
-/id, /ping, /calc 2+2, /weather Toshkent
+/id, /ping
 
 Bo'limlar: /help mod, /help kartalar, /help azo`,
 	"ru": `Пишите мне: отвечаю на узбекском, русском или английском — на вашем языке.
@@ -278,7 +278,7 @@ Bo'limlar: /help mod, /help kartalar, /help azo`,
 Для всех:
 /card — игра в карты (токен каждые 2 часа), /mylink — ваша личная ссылка-приглашение, /invites — кто сколько добавил (кнопки: сегодня, неделя, месяц, всё, мои)
 /admins — позвать админов, /report и /voteban — ответом на сообщение: жалоба или голосование за бан, /rights — ваши права
-/id, /ping, /calc 2+2, /weather Ташкент
+/id, /ping
 
 Разделы: /help mod, /help cards, /help member`,
 	"en": `Talk to me and I will answer, in Uzbek, Russian or English, matching your language.
@@ -305,7 +305,7 @@ Reply to a member's message and ask me to delete or pin it, to mute or ban its a
 For everyone:
 /card — the card game (a token every 2 hours), /mylink — your own invite link, /invites — who brought how many (buttons: today, week, month, all, mine)
 /admins — call the admins, /report and /voteban — as a reply: report, or vote to ban, /rights — what you may do
-/id, /ping, /calc 2+2, /weather Tashkent
+/id, /ping
 
 Sections: /help mod, /help cards, /help member`,
 }
@@ -452,19 +452,19 @@ In the app: the collection, the market (trades), the ranking
 /admins — adminlarni chaqirish, /rights — huquqlaringiz
 Xabarga reply qilib "+" yoki "rahmat" — reputatsiya; /rep, /toprep — reyting
 /mylink — shaxsiy taklif havolangiz, /invites — takliflar reytingi va o'zingizniki
-/id, /ping, /calc 2+2, /weather Toshkent`,
+/id, /ping`,
 		ru: `👥 Для всех
 /report — ответом на сообщение: жалоба админам
 /voteban — ответом на сообщение: голосование за бан (5 «да»); начавший может отменить
 /admins — позвать админов, /rights — ваши права
 /mylink — личная ссылка, /invites — рейтинг приглашений и ваш счёт
-/id, /ping, /calc 2+2, /weather Ташкент`,
+/id, /ping`,
 		en: `👥 For everyone
 /report — as a reply: report to the admins
 /voteban — as a reply: vote to ban (5 "yes"); the one who started may cancel
 /admins — call the admins, /rights — what you may do
 /mylink — your invite link, /invites — the invite table and your own count
-/id, /ping, /calc 2+2, /weather Tashkent`,
+/id, /ping`,
 	},
 }
 

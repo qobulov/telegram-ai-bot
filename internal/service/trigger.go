@@ -140,7 +140,7 @@ var ownCommands = map[string]bool{
 	"/staff": true, "/ranks": true, "/ranklog": true, "/access": true, "/rank": true,
 	"/banlist": true, "/amnesty": true, "/kickinactive": true,
 	"/admins": true, "/report": true, "/voteban": true,
-	"/ping": true, "/id": true, "/calc": true, "/weather": true,
+	"/ping": true, "/id": true,
 	"/mylink": true, "/reports": true, "/warns": true, "/rights": true, "/myinvites": true,
 	"/rep": true, "/toprep": true, "/cleanservice": true, "/antispam": true,
 }

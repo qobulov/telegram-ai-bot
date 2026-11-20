@@ -29,7 +29,6 @@ var membersMenu = []telegram.BotCommand{
 	{Command: "voteban", Description: "Ban uchun ovoz berish: xabarga reply qiling"},
 	{Command: "staff", Description: "Moderatorlar ro'yxati"},
 	{Command: "id", Description: "Sizning va chatning ID'si"},
-	{Command: "weather", Description: "Ob-havo: /weather Toshkent"},
 }
 
 // commandMenus are the commands Telegram lists on "/": in private chats,
@@ -42,7 +41,6 @@ var commandMenus = map[string][]telegram.BotCommand{
 		{Command: "help", Description: "Yordam va buyruqlar"},
 		{Command: "card", Description: "Kartalar o'yini: har 2 soatda token, 1x/5x ochish, kolleksiya"},
 		{Command: "games", Description: "Barcha o'yinlar"},
-		{Command: "calc", Description: "Kalkulyator: /calc 2+2"},
 		{Command: "id", Description: "Sizning ID'ingiz"},
 	},
 	telegram.ScopeAllGroupChats: membersMenu,
@@ -132,8 +130,6 @@ var ownerGroupMenu = []telegram.BotCommand{
 	{Command: "staff", Description: "Moderatorlar ro'yxati"},
 	{Command: "id", Description: "Sizning va chatning ID'si"},
 	{Command: "ping", Description: "Bot ishlayaptimi: javob vaqti"},
-	{Command: "calc", Description: "Kalkulyator: /calc 2+2"},
-	{Command: "weather", Description: "Ob-havo: /weather Toshkent"},
 	{Command: "premium", Description: "Premium: nima beradi, sotib olish yoki uzaytirish"},
 	{Command: "paysupport", Description: "To'lov bo'yicha kimga yozish"},
 	{Command: "warn", Description: "Ogohlantirish, 3-sida 1 kunga mut (reply yoki @user)"},
