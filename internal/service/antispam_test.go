@@ -57,7 +57,7 @@ func TestAntispamOffAndOn(t *testing.T) {
 	extras := f.opts.Extras.(*memoryExtras)
 
 	sent := f.run(from(groupAdminID, "/antispam off", 0))
-	if extras.settings[storage.SettingAntispamOff] != "flood,spam,newcomers" || len(sent) != 1 || strings.Count(sent[0].text, "❌") != 3 {
+	if extras.settings[storage.SettingAntispamOff] != "flood,spam,newcomers" || len(sent) != 1 || strings.Count(sent[0].text, "❌") != 4 {
 		t.Fatalf("after off: setting %q, sent %+v", extras.settings[storage.SettingAntispamOff], sent)
 	}
 	f.run(append(floodOf(floodMessages+1, 100), inGroup(messageFrom(spammerID, "promo", "salom")))...)
@@ -250,7 +250,7 @@ func TestAntispamButtons(t *testing.T) {
 	buttons := &fakeButtons{}
 	f.opts.Buttons = buttons
 	extras := f.opts.Extras.(*memoryExtras)
-	sent := f.run(from(groupAdminID, "/antispam", 0))
+	sent := f.run(from(groupAdminID, "/antispam on", 0))
 	if len(sent) != 1 || len(sent[0].buttons) != 1 || len(sent[0].buttons[0]) != 3 || sent[0].buttons[0][0].Text != "✅ Flood" {
 		t.Fatalf("menu = %+v", sent)
 	}
@@ -311,5 +311,28 @@ func TestGroupWithoutAIKeepsNoWords(t *testing.T) {
 	}
 	if got := f.chatLog.messages[1].Text; got != hiddenLine(normalRepeat("salom hammaga")) {
 		t.Errorf("line %q is not the repeat key's hash", got)
+	}
+}
+
+// /antispam alone switches the guards: sent once with them on it turns them
+// all off, and sent again all on, saying which and what the next one does.
+func TestAntispamSwitchesWithNoWord(t *testing.T) {
+	f, _, _ := protectFixture()
+	extras := f.opts.Extras.(*memoryExtras)
+
+	sent := f.run(from(groupAdminID, "/antispam", 0))
+	if extras.settings[storage.SettingAntispamOff] != "flood,spam,newcomers" || len(sent) != 1 || !strings.HasPrefix(sent[0].text, "❌ Antispam o'chirildi") {
+		t.Fatalf("first: setting %q, sent %+v", extras.settings[storage.SettingAntispamOff], sent)
+	}
+	sent = f.run(from(groupAdminID, "/antispam", 0))
+	if last := sent[len(sent)-1]; extras.settings[storage.SettingAntispamOff] != "" || !strings.HasPrefix(last.text, "✅ Antispam yoqildi") {
+		t.Fatalf("second: setting %q, sent %+v", extras.settings[storage.SettingAntispamOff], sent)
+	}
+
+	// With one guard off, it turns them all on, not off.
+	extras.settings[storage.SettingAntispamOff] = "flood"
+	f.run(from(groupAdminID, "/antispam", 0))
+	if extras.settings[storage.SettingAntispamOff] != "" {
+		t.Errorf("with one off: setting %q, want all on", extras.settings[storage.SettingAntispamOff])
 	}
 }

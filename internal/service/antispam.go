@@ -35,7 +35,7 @@ const (
 // antispamGuards are the guards /antispam shows, in its order, with their
 // buttons' names.
 var antispamGuards = []struct{ key, name, says string }{
-	{antispamFlood, "Flood", "Flood: 10 soniyada 6 ta, 30 soniyada 10 ta xabar yoki 1 daqiqada bir xil xabar/stiker 3 marta — xabarlari o'chiriladi va mut: 10 daqiqa, keyin 1 soat, keyin 1 kun"},
+	{antispamFlood, "Flood", "Flood: 10 soniyada 10 ta, 30 soniyada 20 ta xabar yoki 1 daqiqada bir xil xabar/stiker 3 marta — xabarlari o'chiriladi va mut: 10 daqiqa, keyin 1 soat, keyin 1 kun"},
 	{antispamSpam, "Spamerlar", "Spamerlar ro'yxati (CAS, lols.bot): ro'yxatdagilar guruhdan chiqariladi"},
 	{antispamNewcomers, "Yangi a'zolar", "Yangi a'zolar: guruhda 5 tadan kam yozganlarning havola, reklama, tugmali xabar va kanal postlari o'chiriladi, ikkinchisida 1 soat mut"},
 }
@@ -164,28 +164,43 @@ func (s *Service) stopNewcomerLink(ctx context.Context, in incoming, mayMute boo
 	s.postGuard(msg, "🔇 "+mentionOf(msg.From)+" yana havola yubordi: "+durationWords(newcomerMute)+" yozolmaydi.")
 }
 
-// antispamCommand answers /antispam in a group: alone, the guards with a
-// button for each; "on" or "off" switches them all first.
+// antispamCommand answers /antispam in a group, switching the guards: with
+// every guard on it turns them all off, and otherwise all on, so that it is
+// sent once to turn it on and again to turn it off, with no word after it;
+// the menu that follows has a button for each guard. "on" or "off" after it
+// still sets them all so.
 func (s *Service) antispamCommand(ctx context.Context, in incoming) outcome {
 	if allowed, err := s.mayModerate(ctx, in, "group"); err != nil || !allowed {
 		return say("⛔ Antispamni guruh adminlari yoki moderatorlar sozlaydi.")
 	}
 	chatID := in.scope.ChatID
+	off, ok := s.antispamOff(ctx, chatID)
+	if !ok {
+		return say(textError.to(in))
+	}
+	turnOn := len(off) > 0
 	switch strings.ToLower(strings.TrimSpace(commandArgument(in.text))) {
 	case "on", "yoq", "ha":
-		if !s.setAntispamOff(ctx, chatID, nil, in.userID) {
-			return say(textError.to(in))
-		}
+		turnOn = true
 	case "off", "o'chir", "ochir", "yo'q":
-		if !s.setAntispamOff(ctx, chatID, map[string]bool{antispamFlood: true, antispamSpam: true, antispamNewcomers: true}, in.userID) {
-			return say(textError.to(in))
-		}
+		turnOn = false
+	}
+	all := map[string]bool{antispamFlood: true, antispamSpam: true, antispamNewcomers: true}
+	if turnOn {
+		all = nil
+	}
+	if !s.setAntispamOff(ctx, chatID, all, in.userID) {
+		return say(textError.to(in))
 	}
 	text, buttons, ok := s.antispamMenu(ctx, chatID)
 	if !ok {
 		return say(textError.to(in))
 	}
-	return outcome{text: text, buttons: buttons}
+	state := "❌ Antispam o'chirildi. Yana /antispam yuborsangiz, yoqiladi."
+	if turnOn {
+		state = "✅ Antispam yoqildi. Yana /antispam yuborsangiz, o'chadi."
+	}
+	return outcome{text: state + "\n\n" + text, buttons: buttons}
 }
 
 // setAntispamOff keeps the guards a group turned off and forgets its
@@ -224,7 +239,7 @@ func (s *Service) antispamMenu(ctx context.Context, chatID int64) (string, [][]t
 	if restrict, del := s.botMay(ctx, chatID); !restrict || !del {
 		lines = append(lines, "", "⚠️ Ishlashi uchun menga xabarlarni o'chirish va a'zolarni cheklash huquqlarini bering.")
 	}
-	lines = append(lines, "", "Tugmani bossangiz, o'sha himoya yoqiladi yoki o'chadi. Hammasi: /antispam on yoki /antispam off. Adminlarga tegilmaydi.")
+	lines = append(lines, "", "Tugmani bossangiz, o'sha himoya yoqiladi yoki o'chadi. Adminlarga tegilmaydi.")
 	return strings.Join(lines, "\n"), [][]telegram.Button{row}, true
 }
 
