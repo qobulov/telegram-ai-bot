@@ -226,16 +226,31 @@ func TestArenaWeek(t *testing.T) {
 	if payer.note != "🏆 Arena haftalik mukofoti: 3-o'rin" {
 		t.Errorf("note = %q", payer.note)
 	}
-	for place, want := range map[int]int{1: 50, 2: 40, 3: 30, 10: 20, 11: 15, 50: 10, 100: 5, 101: 0, 0: 0} {
-		if got := arenaWeekPrize(place); got != want {
+	// The tokens are every week's alike; the event week's top 5 also get
+	// diamond boxes, 3, 2, then 1 each, and no other week does.
+	event, next := arenaWeekPrizes(ArenaEventWeek), arenaWeekPrizes(ArenaEventWeek.AddDate(0, 0, 7))
+	for place, want := range map[int]int{1: 50, 2: 40, 3: 30, 5: 20, 10: 20, 11: 15, 50: 10, 100: 5, 101: 0, 0: 0} {
+		if got := arenaWeekPrize(next, place).Tokens; got != want {
 			t.Errorf("prize for %d = %d, want %d", place, got, want)
 		}
-	}
-	// The top 5 get diamond boxes too: 3, 2, then 1 each.
-	for place, want := range map[int]int{1: 3, 2: 2, 3: 1, 4: 1, 5: 1, 6: 0, 0: 0} {
-		if got := arenaWeekBoxes(place); got != want {
-			t.Errorf("boxes for %d = %d, want %d", place, got, want)
+		if got := arenaWeekPrize(event, place).Tokens; got != want {
+			t.Errorf("event prize for %d = %d tokens, want %d", place, got, want)
 		}
+	}
+	for place, want := range map[int]int{1: 3, 2: 2, 3: 1, 4: 1, 5: 1, 6: 0, 0: 0} {
+		if got := arenaWeekPrize(event, place).Boxes; got != want {
+			t.Errorf("event boxes for %d = %d, want %d", place, got, want)
+		}
+		if got := arenaWeekPrize(next, place).Boxes; got != 0 {
+			t.Errorf("the week after the event gives %d boxes to %d", got, place)
+		}
+	}
+	if !ArenaEventWeek.Equal(time.Date(2026, 11, 16, 0, 0, 0, 0, Location)) || ArenaEventWeek.Weekday() != time.Monday {
+		t.Errorf("event week = %v", ArenaEventWeek)
+	}
+	// Paid on Monday 23 November, the week ended is the event's.
+	if len(payer.prizes) == 0 || payer.prizes[0].Boxes != 3 {
+		t.Errorf("the event week was paid with %+v, want 3 boxes to the first", payer.prizes)
 	}
 	if _, ok := BoxByID(arenaWeekBox); !ok {
 		t.Errorf("the week's box %q is no box the inventory holds", arenaWeekBox)
@@ -245,10 +260,11 @@ func TestArenaWeek(t *testing.T) {
 type fakeWeekPayer struct {
 	since, until time.Time
 	note         string
+	prizes       []storage.ArenaPrize
 }
 
-func (f *fakeWeekPayer) PayArenaWeek(_ context.Context, since, until time.Time, _ []storage.ArenaPrize, note func(int) string) (int, bool, error) {
-	f.since, f.until, f.note = since, until, note(3)
+func (f *fakeWeekPayer) PayArenaWeek(_ context.Context, since, until time.Time, prizes []storage.ArenaPrize, note func(int) string) (int, bool, error) {
+	f.since, f.until, f.note, f.prizes = since, until, note(3), prizes
 	return 0, true, nil
 }
 

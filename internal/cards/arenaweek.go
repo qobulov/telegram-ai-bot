@@ -8,11 +8,27 @@ import (
 	"telegram-ai-bot/internal/storage"
 )
 
-// ArenaWeekPrizes are the arena's weekly prizes, as the owners asked on
-// 2026-11-19: card tokens to the top 100 who attacked in the week, Monday
-// to Monday in Tashkent, by rating; and since 2026-11-20 diamond boxes to
-// the top 5: 3 to the first, 2 to the second, 1 to the third to fifth.
+// ArenaWeekPrizes are the arena's weekly prizes in card tokens, as the
+// owners asked on 2026-11-19: the top 100 who attacked in the week, Monday
+// to Monday in Tashkent, by rating.
 var ArenaWeekPrizes = []storage.ArenaPrize{
+	{From: 1, To: 1, Tokens: 50},
+	{From: 2, To: 2, Tokens: 40},
+	{From: 3, To: 3, Tokens: 30},
+	{From: 4, To: 10, Tokens: 20},
+	{From: 11, To: 30, Tokens: 15},
+	{From: 31, To: 50, Tokens: 10},
+	{From: 51, To: 100, Tokens: 5},
+}
+
+// ArenaEventWeek is the week of the arena's box event, as the owners asked
+// on 2026-11-20: that week alone its top 5 also get diamond boxes, 3 to the
+// first, 2 to the second, 1 each to the third to fifth; the tokens are the
+// week's as ever.
+var ArenaEventWeek = time.Date(2026, 11, 16, 0, 0, 0, 0, Location)
+
+// arenaEventPrizes are ArenaWeekPrizes with the event's boxes.
+var arenaEventPrizes = []storage.ArenaPrize{
 	{From: 1, To: 1, Tokens: 50, Boxes: 3, Box: arenaWeekBox},
 	{From: 2, To: 2, Tokens: 40, Boxes: 2, Box: arenaWeekBox},
 	{From: 3, To: 3, Tokens: 30, Boxes: 1, Box: arenaWeekBox},
@@ -21,6 +37,14 @@ var ArenaWeekPrizes = []storage.ArenaPrize{
 	{From: 11, To: 30, Tokens: 15},
 	{From: 31, To: 50, Tokens: 10},
 	{From: 51, To: 100, Tokens: 5},
+}
+
+// arenaWeekPrizes are the prizes of the week that began at week.
+func arenaWeekPrizes(week time.Time) []storage.ArenaPrize {
+	if week.Equal(ArenaEventWeek) {
+		return arenaEventPrizes
+	}
+	return ArenaWeekPrizes
 }
 
 // ArenaWeekPayer pays an arena week.
@@ -38,7 +62,8 @@ func arenaWeekStart(now time.Time) time.Time {
 // gives the players paid.
 func PayArenaWeek(ctx context.Context, store ArenaWeekPayer, now time.Time) (int, error) {
 	until := arenaWeekStart(now)
-	players, _, err := store.PayArenaWeek(ctx, until.AddDate(0, 0, -7), until, ArenaWeekPrizes, arenaWeekNote)
+	since := until.AddDate(0, 0, -7)
+	players, _, err := store.PayArenaWeek(ctx, since, until, arenaWeekPrizes(since), arenaWeekNote)
 	return players, err
 }
 
@@ -46,25 +71,15 @@ func arenaWeekNote(place int) string {
 	return fmt.Sprintf("🏆 Arena haftalik mukofoti: %d-o'rin", place)
 }
 
-// arenaWeekBox is the box the week's top places get: the diamond box.
+// arenaWeekBox is the box the event's top places get: the diamond box.
 const arenaWeekBox = "box"
 
-// arenaWeekBoxes is the diamond boxes for place this week, 0 for none.
-func arenaWeekBoxes(place int) int {
-	for _, p := range ArenaWeekPrizes {
+// arenaWeekPrize is place's prize among prizes, none for no place.
+func arenaWeekPrize(prizes []storage.ArenaPrize, place int) storage.ArenaPrize {
+	for _, p := range prizes {
 		if place >= p.From && place <= p.To {
-			return p.Boxes
+			return p
 		}
 	}
-	return 0
-}
-
-// arenaWeekPrize is the tokens for place this week, 0 for none.
-func arenaWeekPrize(place int) int {
-	for _, p := range ArenaWeekPrizes {
-		if place >= p.From && place <= p.To {
-			return p.Tokens
-		}
-	}
-	return 0
+	return storage.ArenaPrize{}
 }

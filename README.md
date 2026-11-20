@@ -2253,10 +2253,12 @@ Each week, Monday to Monday in Tashkent, pays the top 100 by rating among
 those who attacked in it, in tokens by mail (`internal/cards/arenaweek.go`,
 the table `arena_weeks` of migration 106, which pays a week once): 1st 50,
 2nd 40, 3rd 30, 4th to 10th 20, 11th to 30th 15, 31st to 50th 10, 51st to
-100th 5. The top 5 also get diamond boxes in the same letter, as the owners
-asked on 2026-11-20: 3 to the 1st, 2 to the 2nd, 1 each to the 3rd to 5th
-(`Boxes` of `storage.ArenaPrize`, the box "box"), shown as 🎁 by the prizes
-in the app. The daily cleanup cron, at 08:00 in Tashkent, pays the last week
+100th 5. As an event, the owners asked on 2026-11-20, the week of 16
+November (`ArenaEventWeek`, paid on 23 November) also gives its top 5
+diamond boxes in the same letter: 3 to the 1st, 2 to the 2nd, 1 each to the
+3rd to 5th (`Boxes` of `storage.ArenaPrize`, the box "box"); that week the
+app shows an event line and 🎁 by the prizes, and no other week has boxes.
+The daily cleanup cron, at 08:00 in Tashkent, pays the last week
 ended; the arena's table shows the prizes, the player's place this week
 (`week` in `arena`) and the time left.
 Each attack also gives the attacker arena coins, won or lost, as the owners
