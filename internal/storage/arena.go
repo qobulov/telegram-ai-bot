@@ -277,7 +277,7 @@ type arenaRow struct {
 // RecordArenaBattle records the attacker's battle against the defender, in
 // one transaction with both players' rows locked, the lower ID first: it
 // takes one of the attacker's tickets, ErrArenaNoTickets with none, moves
-// both ratings by Elo (never below 0), gives the attacker a token for a
+// the ratings by Elo (arenaElo: a defender who holds gets +0), gives the attacker a token for a
 // win while the day's arena tokens last, and keeps the battle with its
 // seed and both players' rating changes. Defending changes only the
 // defender's rating, wins and losses, and takes no ticket. The attacker
@@ -373,8 +373,10 @@ func lockArenaPlayers(ctx context.Context, tx pgx.Tx, day string, a, b int64) (m
 }
 
 // arenaElo gives the attacker's and defender's ratings after the battle:
-// each moves by round(k × (score − expected)), the attacker expecting
-// 1 / (1 + 10^((defender − attacker) / 400)), and neither goes below 0.
+// the attacker moves by round(k × (score − expected)), expecting
+// 1 / (1 + 10^((defender − attacker) / 400)). A defender who loses drops by
+// the same amount; one who holds gains nothing (+0): rating is earned by
+// attacking. Neither goes below 0.
 func arenaElo(attacker, defender, k int, attackerWon bool) (int, int) {
 	expected := 1 / (1 + math.Pow(10, float64(defender-attacker)/400))
 	score := 0.0
@@ -382,5 +384,8 @@ func arenaElo(attacker, defender, k int, attackerWon bool) (int, int) {
 		score = 1
 	}
 	change := int(math.Round(float64(k) * (score - expected)))
+	if !attackerWon {
+		return max(attacker+change, 0), defender
+	}
 	return max(attacker+change, 0), max(defender-change, 0)
 }

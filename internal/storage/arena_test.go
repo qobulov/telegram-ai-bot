@@ -143,10 +143,18 @@ func TestArenaElo(t *testing.T) {
 		t.Errorf("battle = %d %d %d %v %d %d, %v", attacker, defender, seed, won, change, defenderChange, err)
 	}
 
-	// Carol (3), new at 1000, loses to Dave (4) at 1000: −16; then, both
-	// at 5, she loses the 5 she has and Dave gains 16.
+	// Carol (3), new at 1000, loses to Dave (4) at 1000: −16, and Dave, who
+	// held, gets +0; then, both at 5, she loses the 5 she has and Dave
+	// still gets nothing.
 	if out, err := store.RecordArenaBattle(ctx, 3, 4, 7, false, arenaRules, CardQuest{}); err != nil || out.RatingChange != -16 || out.Token {
 		t.Errorf("a loss between equals = %+v, %v", out, err)
+	}
+	if dave, _ := store.ArenaPlayerOf(ctx, 4, arenaRules); dave.Rating != 1000 || dave.Wins != 1 {
+		t.Errorf("Dave after holding = %+v, want rating 1000 and a win", dave)
+	}
+	var held int
+	if err := store.pool.QueryRow(ctx, `SELECT defender_change FROM arena_battles WHERE seed = 7`).Scan(&held); err != nil || held != 0 {
+		t.Errorf("the holder's change = %d, %v; want 0", held, err)
 	}
 	if _, err := store.pool.Exec(ctx, `UPDATE arena_players SET rating = 5 WHERE user_id IN (3, 4)`); err != nil {
 		t.Fatal(err)
@@ -162,7 +170,7 @@ func TestArenaElo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(top) != 3 || top[0].UserID != 1 || top[0].Name != "Alice" || top[0].Wins != 1 || top[1].UserID != 2 || top[2].UserID != 4 || top[2].Rating != 21 {
+	if len(top) != 3 || top[0].UserID != 1 || top[0].Name != "Alice" || top[0].Wins != 1 || top[1].UserID != 2 || top[2].UserID != 4 || top[2].Rating != 5 {
 		t.Errorf("ArenaTop = %+v", top)
 	}
 }
@@ -254,7 +262,20 @@ func TestAttacksAreCountedUnderALock(t *testing.T) {
 	if alice.Tickets != 0 || alice.TokensLeft != 0 || bob.Tickets != 0 || bob.TokensLeft != 3 {
 		t.Errorf("days: Alice %+v, Bob %+v", alice, bob)
 	}
-	if alice.Rating+bob.Rating != 2000 || alice.Rating <= 1000 {
+	// No lost update: each rating is 1000 plus the changes its battles
+	// recorded (a defender who holds adds 0, so the sum is no longer 2000).
+	for _, p := range []ArenaPlayer{alice, bob} {
+		var changes int
+		if err := store.pool.QueryRow(ctx, `
+			SELECT coalesce(sum(CASE WHEN attacker = $1 THEN rating_change ELSE defender_change END), 0)
+			FROM arena_battles WHERE attacker = $1 OR defender = $1`, p.UserID).Scan(&changes); err != nil {
+			t.Fatal(err)
+		}
+		if p.Rating != 1000+changes {
+			t.Errorf("player %d's rating %d, want 1000%+d from the battles", p.UserID, p.Rating, changes)
+		}
+	}
+	if alice.Rating <= 1000 || bob.Rating >= 1000 {
 		t.Errorf("ratings Alice %d, Bob %d", alice.Rating, bob.Rating)
 	}
 	if got := cardTokens(t, store, 1); got != 3 {
@@ -343,7 +364,8 @@ func TestArenaBattleHistory(t *testing.T) {
 	if battles, err := store.ArenaBattles(ctx, 1, 10); err != nil || len(battles) != 0 {
 		t.Fatalf("no battles = %+v, %v", battles, err)
 	}
-	// Alice beats Bob (+16, Bob −16), then Bob attacks Alice and loses.
+	// Alice beats Bob (+16, Bob −16), then Bob attacks Alice and loses: he
+	// drops, she holds at +0.
 	if _, err := store.RecordArenaBattle(ctx, 1, 2, 1, true, arenaRules, CardQuest{}); err != nil {
 		t.Fatal(err)
 	}
@@ -354,14 +376,14 @@ func TestArenaBattleHistory(t *testing.T) {
 	if err != nil || len(alice) != 2 {
 		t.Fatalf("Alice's battles = %+v, %v", alice, err)
 	}
-	if b := alice[0]; b.Attacked || b.OpponentID != 2 || b.Opponent != "Bob" || !b.Won || b.RatingChange <= 0 {
-		t.Errorf("Alice defending = %+v", b)
+	if b := alice[0]; b.Attacked || b.OpponentID != 2 || b.Opponent != "Bob" || !b.Won || b.RatingChange != 0 {
+		t.Errorf("Alice defending = %+v, want a win at +0", b)
 	}
 	if b := alice[1]; !b.Attacked || b.OpponentID != 2 || !b.Won || b.RatingChange != 16 {
 		t.Errorf("Alice attacking = %+v", b)
 	}
 	bob, _ := store.ArenaBattles(ctx, 2, 10)
-	if len(bob) != 2 || !bob[0].Attacked || bob[0].Won || bob[0].RatingChange != -alice[0].RatingChange || bob[1].Attacked || bob[1].RatingChange != -16 {
+	if len(bob) != 2 || !bob[0].Attacked || bob[0].Won || bob[0].RatingChange >= 0 || bob[1].Attacked || bob[1].RatingChange != -16 {
 		t.Errorf("Bob's battles = %+v", bob)
 	}
 	if bobRow, _ := store.ArenaPlayerOf(ctx, 2, arenaRules); bobRow.Rating != 1000-16+bob[0].RatingChange {
