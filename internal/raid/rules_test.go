@@ -38,6 +38,26 @@ func TestStrikeCountsWhatAPersonTaps(t *testing.T) {
 	}
 }
 
+// No more than DailyTaps of a hero's taps count in a day; the next day
+// they count again.
+func TestStrikeStopsAtTheDaysTaps(t *testing.T) {
+	now := time.Date(2026, 11, 20, 15, 0, 0, 0, time.UTC)
+	hero := storage.RaidHero{Sword: 1, Seed: 12345, QuestDay: Day(now), QuestTaps: DailyTaps - 3}
+	if counted, _ := Strike(&hero, 10, time.Second, now); counted != 3 || TapsLeft(hero, now) != 0 {
+		t.Fatalf("near the day's end counted %d, %d left", counted, TapsLeft(hero, now))
+	}
+	if counted, damage := Strike(&hero, 10, time.Second, now); counted != 0 || damage != 0 {
+		t.Errorf("past the day's taps counted %d for %d", counted, damage)
+	}
+	tomorrow := now.Add(24 * time.Hour)
+	if TapsLeft(hero, tomorrow) != DailyTaps {
+		t.Errorf("tomorrow %d left", TapsLeft(hero, tomorrow))
+	}
+	if counted, _ := Strike(&hero, 10, time.Second, tomorrow); counted != 10 {
+		t.Errorf("tomorrow counted %d", counted)
+	}
+}
+
 // About the chance's share of taps are critical, each three blows' damage.
 func TestCriticalBlows(t *testing.T) {
 	hero := storage.RaidHero{Sword: 5, Crit: 5, Seed: 987654321}

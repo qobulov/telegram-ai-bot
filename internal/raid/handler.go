@@ -389,7 +389,7 @@ func heroView(h storage.RaidHero, now time.Time) map[string]any {
 			"buff": map[string]int64{"ready_in": left(h.BuffReady), "active_for": left(h.BuffUntil), "times": buffTimes, "every": buffEvery.Milliseconds()},
 			"ult":  map[string]any{"charge": h.UltCharge, "need": ultTaps, "armed": h.UltArmed, "times": ultTimes},
 		},
-		"quests": quests, "streak": h.Streak,
+		"quests": quests, "streak": h.Streak, "taps_left": TapsLeft(h, now), "daily_taps": DailyTaps,
 		"coins": h.Coins, "sword": h.Sword, "crit": h.Crit, "seed": h.Seed, "taps": h.Taps,
 		"tap_damage": TapDamage(h.Sword), "crit_chance": CritChance(h.Crit),
 		"next": map[string]any{

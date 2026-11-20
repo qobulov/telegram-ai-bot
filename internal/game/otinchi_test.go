@@ -11,7 +11,8 @@ import (
 	"time"
 )
 
-// woodcutter chops a play of seed gap ms apart: from the side neither the
+// woodcutter chops a play of seed about gap ms apart, unevenly as a hand
+// does: from the side neither the
 // piece in reach nor the one above has a branch on, until it has chopped
 // chops pieces, and then, at the first branch near, from that branch's
 // side, which ends the play. It gives the sides, the times and the score.
@@ -19,7 +20,7 @@ func woodcutter(seed uint32, chops, gap int) (string, []int, int) {
 	tree := &otinchiTree{random: seed}
 	var sides strings.Builder
 	var times []int
-	score := 0
+	score, at := 0, 0
 	for i := 0; ; i++ {
 		here, golden := tree.at(i)
 		above, _ := tree.at(i + 1)
@@ -33,7 +34,10 @@ func woodcutter(seed uint32, chops, gap int) (string, []int, int) {
 			side = here
 		}
 		sides.WriteByte(map[int]byte{sideLeft: 'L', sideRight: 'R'}[side])
-		times = append(times, i*gap)
+		if i > 0 {
+			at += gap + (i*37%11-5)*gap/20
+		}
+		times = append(times, at)
 		if here == side || above == side {
 			return sides.String(), times, score
 		}
@@ -92,6 +96,38 @@ func TestOtinchiRefusesPlaysThatDidNotHappen(t *testing.T) {
 		if _, err := ScoreOtinchi(seed, play.sides, play.times); !errors.Is(err, ErrImplausible) {
 			t.Errorf("%s: got %v", name, err)
 		}
+	}
+}
+
+// A script's chops are refused: as even as a clock, or quicker than a hand
+// for long. A hand's quick burst is not.
+func TestOtinchiRefusesAScriptsRhythm(t *testing.T) {
+	seed := uint32(4242)
+	sides, _, _ := woodcutter(seed, 200, 120)
+	even := make([]int, len(sides))
+	for i := range even {
+		even[i] = i * 120
+	}
+	if _, err := ScoreOtinchi(seed, sides, even); !errors.Is(err, ErrImplausible) {
+		t.Errorf("an even rhythm: %v", err)
+	}
+	fast := make([]int, len(sides))
+	for i := 1; i < len(fast); i++ {
+		fast[i] = fast[i-1] + 72 + i%3*4
+	}
+	if _, err := ScoreOtinchi(seed, sides, fast); !errors.Is(err, ErrImplausible) {
+		t.Errorf("a long run under %d ms a chop: %v", otinchiFastGap, err)
+	}
+	burst := make([]int, len(sides))
+	for i := 1; i < len(burst); i++ {
+		gap := 115 + i%7*6
+		if i%50 < 20 {
+			gap = 72 + i%3*4
+		}
+		burst[i] = burst[i-1] + gap
+	}
+	if _, err := ScoreOtinchi(seed, sides, burst); err != nil {
+		t.Errorf("a hand's quick bursts: %v", err)
 	}
 }
 

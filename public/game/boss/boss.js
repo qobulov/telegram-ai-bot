@@ -16,7 +16,7 @@
       chief: "BOSH DEV", buff: "Kuch", ult: "Ulti", ready: "Tayyor!",
       buffOn: "Kuch! ×3", ultOn: "ULTI tayyor! Uring!",
       quests: "Kundalik vazifalar", questsReset: "Vazifalar har kuni yarim tunda yangilanadi.",
-      questNames: ["300 marta ur", "1 ta dev yiqitishda qatnash", "Mahoratni 3 marta ishlat"], claim: "Olish", claimed: "Olindi ✓",
+      questNames: ["300 marta ur", "1 ta dev yiqitishda qatnash", "Mahoratni 3 marta ishlat"], claim: "Olish", claimed: "Olindi ✓", tired: "Bugungi zarbalar tugadi 💤 Ertaga davom etamiz!",
       streak: (n) => `🔥 ${n} kun ketma-ket`, gift: (n, s) => `🎁 Kunlik sovg'a: +${n} 💰<br><small>🔥 ${s}-kun ketma-ket</small>`, got: (n) => `+${n} 💰`,
       table: "Reyting", thisBoss: "Shu dev", allTime: "Umumiy", place: (n) => `${n}-o'rin`,
       titles: ["Yangi jangchi", "Botir", "Bahodir", "Pahlavon", "Qahramon", "Alpomish"], sword: "Qilich", crit: "Krit",
@@ -36,7 +36,7 @@
       chief: "ГЛАВНЫЙ", buff: "Сила", ult: "Ульта", ready: "Готово!",
       buffOn: "Сила! ×3", ultOn: "УЛЬТА готова! Бейте!",
       quests: "Ежедневные задания", questsReset: "Задания обновляются каждую полночь.",
-      questNames: ["Ударить 300 раз", "Помочь победить 1 дэва", "Применить умение 3 раза"], claim: "Забрать", claimed: "Получено ✓",
+      questNames: ["Ударить 300 раз", "Помочь победить 1 дэва", "Применить умение 3 раза"], claim: "Забрать", claimed: "Получено ✓", tired: "Удары на сегодня закончились 💤 Продолжим завтра!",
       streak: (n) => `🔥 ${n} дн. подряд`, gift: (n, s) => `🎁 Ежедневный подарок: +${n} 💰<br><small>🔥 ${s}-й день подряд</small>`, got: (n) => `+${n} 💰`,
       table: "Рейтинг", thisBoss: "Этот дэв", allTime: "Всего", place: (n) => `${n}-е место`,
       titles: ["Новобранец", "Батыр", "Богатырь", "Пахлавон", "Герой", "Алпамыш"], sword: "Меч", crit: "Крит",
@@ -56,7 +56,7 @@
       chief: "CHIEF", buff: "Power", ult: "Ultimate", ready: "Ready!",
       buffOn: "Power! ×3", ultOn: "ULTIMATE ready! Strike!",
       quests: "Daily quests", questsReset: "Quests renew every midnight.",
-      questNames: ["Hit 300 times", "Help defeat 1 giant", "Use a skill 3 times"], claim: "Claim", claimed: "Claimed ✓",
+      questNames: ["Hit 300 times", "Help defeat 1 giant", "Use a skill 3 times"], claim: "Claim", claimed: "Claimed ✓", tired: "No more hits today 💤 Come back tomorrow!",
       streak: (n) => `🔥 ${n} ${n === 1 ? "day" : "days"} in a row`, gift: (n, s) => `🎁 Daily gift: +${n} 💰<br><small>🔥 day ${s} in a row</small>`, got: (n) => `+${n} 💰`,
       table: "Ranking", thisBoss: "This giant", allTime: "All time", place: (n) => `#${n}`,
       titles: ["Recruit", "Brave", "Warrior", "Champion", "Hero", "Alpomish"], sword: "Sword", crit: "Crit",
@@ -233,6 +233,10 @@
     const now = performance.now();
     while (tapTimes.length && now - tapTimes[0] > 1000) tapTimes.shift();
     if (tapTimes.length >= tapsPerSecond) return; // the server would not count it
+    if (hero.taps_left !== undefined && hero.taps_left - pending - inflight <= 0) {
+      message(t.tired); // the day's taps are used up; the server would not count it
+      return;
+    }
     tapTimes.push(now);
     const index = hero.taps + inflight + pending;
     // The server strikes an armed Ulti with the first blow of a batch: one

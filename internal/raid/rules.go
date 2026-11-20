@@ -26,6 +26,10 @@ const (
 	TapsPerSecond = 12
 	tapBurst      = 4
 	maxSince      = 2 * time.Second
+	// DailyTaps is the most taps counted for a hero in a day, about 35
+	// minutes at the fastest: an autoclicker held at the limit all day
+	// gains no more than a keen player does.
+	DailyTaps = 25000
 	// A critical blow does critTimes a blow's damage.
 	critTimes = 3
 	// The upgrades' highest levels.
@@ -121,7 +125,7 @@ func Critical(seed uint32, tap int64, chance int) bool {
 func Strike(hero *storage.RaidHero, taps int, since time.Duration, now time.Time) (int, int64) {
 	hero.OnDay(Day(now))
 	since = min(max(since, 0), maxSince)
-	counted := min(max(taps, 0), int(since*TapsPerSecond/time.Second)+tapBurst)
+	counted := min(max(taps, 0), int(since*TapsPerSecond/time.Second)+tapBurst, TapsLeft(*hero, now))
 	blow, chance := TapDamage(hero.Sword), CritChance(hero.Crit)
 	buff := now.Before(hero.BuffUntil.Add(skillGrace))
 	var damage int64
@@ -142,6 +146,14 @@ func Strike(hero *storage.RaidHero, taps int, since time.Duration, now time.Time
 	hero.UltCharge = min(hero.UltCharge+counted, ultTaps)
 	hero.QuestTaps += counted
 	return counted, damage
+}
+
+// TapsLeft is how many more of the hero's taps count today.
+func TapsLeft(hero storage.RaidHero, now time.Time) int {
+	if !hero.QuestDay.Equal(Day(now)) {
+		return DailyTaps
+	}
+	return max(DailyTaps-hero.QuestTaps, 0)
 }
 
 // Reward is the coins one with a sword at sword who hit a killed boss with

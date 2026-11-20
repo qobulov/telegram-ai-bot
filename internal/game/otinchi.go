@@ -1,6 +1,7 @@
 package game
 
 import (
+	"math"
 	"time"
 )
 
@@ -31,6 +32,14 @@ const (
 	otinchiSafe       = 3
 	otinchiMaxChops   = 5000
 	otinchiRunAge     = time.Hour
+	// A hand's chops are never as even as a script's, nor as quick for
+	// long: from otinchiEvenChops chops on, gaps that vary by less than
+	// otinchiEvenSpread of their mean are refused, and so are
+	// otinchiFastChops chops in a row averaging under otinchiFastGap ms.
+	otinchiEvenChops  = 40
+	otinchiEvenSpread = 0.06
+	otinchiFastChops  = 150
+	otinchiFastGap    = 80
 )
 
 // The sides of a branch and of the woodcutter.
@@ -101,6 +110,9 @@ func ScoreOtinchi(seed uint32, sides string, times []int) (int, error) {
 	if len(sides) == 0 || len(sides) != len(times) || len(sides) > otinchiMaxChops || times[0] != 0 {
 		return 0, ErrImplausible
 	}
+	if machineRhythm(times) {
+		return 0, ErrImplausible
+	}
 	tree := &otinchiTree{random: seed}
 	left, chops, score := otinchiStartMs, 0, 0
 	last := len(sides) - 1
@@ -142,6 +154,29 @@ func ScoreOtinchi(seed uint32, sides string, times []int) (int, error) {
 		left = min(otinchiMostMs, left+max(otinchiLeastBonus, otinchiFirstBonus-chops))
 	}
 	return score, nil
+}
+
+// machineRhythm reports chops timed as a script times them: too evenly,
+// or too quickly for too long.
+func machineRhythm(times []int) bool {
+	gaps := len(times) - 1
+	if gaps >= otinchiEvenChops {
+		mean := float64(times[gaps]-times[0]) / float64(gaps)
+		var sum float64
+		for i := 1; i <= gaps; i++ {
+			d := float64(times[i]-times[i-1]) - mean
+			sum += d * d
+		}
+		if math.Sqrt(sum/float64(gaps)) < otinchiEvenSpread*mean {
+			return true
+		}
+	}
+	for i := otinchiFastChops; i <= gaps; i++ {
+		if times[i]-times[i-otinchiFastChops] < otinchiFastChops*otinchiFastGap {
+			return true
+		}
+	}
+	return false
 }
 
 // otinchiDrain is how much of the time bar gap milliseconds take after
