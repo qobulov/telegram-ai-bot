@@ -35,8 +35,11 @@ import (
 // are refused with a "busy" reply.
 const queuePerWorker = 8
 
-// attemptTimeout bounds one request to the model provider.
-const attemptTimeout = 20 * time.Second
+// attemptTimeout bounds one request to the model provider. At 20 seconds two
+// busy models used 40 of a turn's 55 before the fallback that answered was
+// asked, and the member got "Javob berish juda cho'zilib ketdi" (2026-11-20);
+// a model that answers at all does so well within 12.
+const attemptTimeout = 12 * time.Second
 
 // Bot is the Telegram client together with the account it acts as.
 type Bot struct {
