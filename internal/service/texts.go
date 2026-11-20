@@ -314,12 +314,11 @@ Sections: /help mod, /help cards, /help member`,
 // in each language: what she sees, without and with listening; what she
 // does, without and with drawing; and what she looks up, without and with
 // football.
-var helpAbilities = map[string][6]string{
+var helpAbilities = map[string][5]string{
 	"uz": {
 		"Rasm, stiker va GIF'larni, video va dumaloq videolarning bir kadrini ko'raman, PDF, Word va matnli fayllarni o'qiyman.",
 		"Rasm, stiker va GIF'larni, video va dumaloq videolarning bir kadrini ko'raman, ovozli xabarlarni eshitaman, PDF, Word va matnli fayllarni o'qiyman.",
 		"Istalgan joyning vaqtini aytaman, guruhda so'rovnoma tuzaman va o'tkazib yuborgan suhbatingizni qisqacha aytib beraman, guruhning eng faollarini aytaman.",
-		"So'rasangiz rasm chizaman, istalgan joyning vaqtini aytaman, guruhda so'rovnoma tuzaman va o'tkazib yuborgan suhbatingizni qisqacha aytib beraman, guruhning eng faollarini aytaman.",
 		"Valyuta kursi, ob-havo va havo sifati, namoz vaqtlari, yangiliklar, Vikipediya va kripto narxlarini, Mobile Legends qahramonlari statistikasi, build va skinlarini topaman, qo'shiq, kino va video qidiraman, havoladagi maqolani o'qib beraman, Qur'on oyatlarini ma'nosi bilan topaman. Viktorina savoli, qiziq fakt, kitob, retsept, oltin narxi, shaxmat va Formula 1 natijalarini ham topaman. O'qish uchun: ilmiy maqolalar, inglizcha sinonimlar va davlatlar statistikasi.",
 		"Valyuta kursi, ob-havo va havo sifati, namoz vaqtlari, yangiliklar, Vikipediya, futbol natijalari va kripto narxlarini, Mobile Legends qahramonlari statistikasi, build va skinlarini topaman, qo'shiq, kino va video qidiraman, havoladagi maqolani o'qib beraman, Qur'on oyatlarini ma'nosi bilan topaman. Viktorina savoli, qiziq fakt, kitob, retsept, oltin narxi, shaxmat va Formula 1 natijalarini ham topaman. O'qish uchun: ilmiy maqolalar, inglizcha sinonimlar va davlatlar statistikasi.",
 	},
@@ -327,7 +326,6 @@ var helpAbilities = map[string][6]string{
 		"Вижу фото, стикеры и GIF, кадр из видео и кружочков, читаю PDF, Word и текстовые файлы.",
 		"Вижу фото, стикеры и GIF, кадр из видео и кружочков, слушаю голосовые, читаю PDF, Word и текстовые файлы.",
 		"Скажу время в любой точке, сделаю опрос в группе и кратко перескажу, о чём там говорили без вас, и назову самых активных.",
-		"Нарисую картинку по просьбе, скажу время в любой точке, сделаю опрос в группе и кратко перескажу, о чём там говорили без вас, и назову самых активных.",
 		"Найду курсы валют, погоду и качество воздуха, время намаза, новости, Википедию и цены криптовалют, статистику, сборки и скины героев Mobile Legends, песни, фильмы и видео, прочитаю статью по ссылке, найду аяты Корана с переводом. А ещё вопрос для викторины, интересный факт, книги, рецепты, цену золота, шахматы и Формулу 1. Для учёбы: научные статьи, английские синонимы и статистика стран.",
 		"Найду курсы валют, погоду и качество воздуха, время намаза, новости, Википедию, результаты футбола и цены криптовалют, статистику, сборки и скины героев Mobile Legends, песни, фильмы и видео, прочитаю статью по ссылке, найду аяты Корана с переводом. А ещё вопрос для викторины, интересный факт, книги, рецепты, цену золота, шахматы и Формулу 1. Для учёбы: научные статьи, английские синонимы и статистика стран.",
 	},
@@ -335,20 +333,17 @@ var helpAbilities = map[string][6]string{
 		"I can see photos, stickers and GIFs, a frame of videos and round videos, and read PDF, Word and text files.",
 		"I can see photos, stickers and GIFs, a frame of videos and round videos; I listen to voice messages and read PDF, Word and text files.",
 		"I can tell the time anywhere, make a poll in a group, recap what you missed there and name its most active members.",
-		"I can draw a picture when you ask, tell the time anywhere, make a poll in a group, recap what you missed there and name its most active members.",
 		"I can look up exchange rates, the weather and air quality, prayer times, news headlines, Wikipedia and crypto prices, Mobile Legends hero statistics, builds and skins, find songs, films and videos, read an article from a link, and find Quran verses with their meaning. Also trivia questions, fun facts, books, recipes, the gold price, chess and Formula 1 results. For study: scholarly papers, English synonyms and country statistics.",
 		"I can look up exchange rates, the weather and air quality, prayer times, news headlines, Wikipedia, football results and crypto prices, Mobile Legends hero statistics, builds and skins, find songs, films and videos, read an article from a link, and find Quran verses with their meaning. Also trivia questions, fun facts, books, recipes, the gold price, chess and Formula 1 results. For study: scholarly papers, English synonyms and country statistics.",
 	},
 }
 
-// Abilities are what a deployment may lack: drawing needs the image tool,
-// listening needs a provider that hears audio and football needs a
-// football-data.org token. The help names only those present, because
-// get_bot_help hands it to the model, which would otherwise promise a
-// picture, a transcript or a score it cannot give. Pages needs WEBAPP_URL,
+// Abilities are what a deployment may lack: listening needs a provider that
+// hears audio and football needs a football-data.org token. The help names
+// only those present, because get_bot_help hands it to the model, which
+// would otherwise promise a transcript or a score it cannot give. Pages needs WEBAPP_URL,
 // where the dashboard and the game are served.
 type Abilities struct {
-	Draw     bool
 	Listen   bool
 	Football bool
 	Pages    bool
@@ -385,7 +380,7 @@ func HelpTextIn(lang string, abilities Abilities) string {
 	if abilities.Pages {
 		pages = helpPages[lang]
 	}
-	return fmt.Sprintf(helpTexts[lang], pick(0, abilities.Listen), pick(2, abilities.Draw), pick(4, abilities.Football), pages)
+	return fmt.Sprintf(helpTexts[lang], pick(0, abilities.Listen), phrases[2], pick(3, abilities.Football), pages)
 }
 
 // textMuteWhom answers a /mute with no member replied to and no word for

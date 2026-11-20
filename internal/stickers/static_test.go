@@ -89,35 +89,3 @@ func TestStaticRefusesWhatIsNoPicture(t *testing.T) {
 		t.Errorf("err = %v, want ErrNotAPicture", err)
 	}
 }
-
-// The white around a drawing becomes transparent; the drawing, and the
-// white inside its outline, stay.
-func TestDrawnClearsTheWhiteAroundTheDrawing(t *testing.T) {
-	drawing := filled(400, 400, color.White)
-	for y := 100; y < 300; y++ {
-		for x := 100; x < 300; x++ {
-			drawing.Set(x, y, color.Black)
-		}
-	}
-	for y := 150; y < 250; y++ {
-		for x := 150; x < 250; x++ {
-			drawing.Set(x, y, color.White)
-		}
-	}
-	var picture bytes.Buffer
-	if err := png.Encode(&picture, drawing); err != nil {
-		t.Fatal(err)
-	}
-	sticker, err := Drawn(picture.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
-	img := pngOf(t, sticker)
-	alpha := func(x, y int) uint32 { _, _, _, a := img.At(x, y).RGBA(); return a }
-	if alpha(5, 5) != 0 || alpha(500, 256) != 0 {
-		t.Errorf("the background is not transparent: %d, %d", alpha(5, 5), alpha(500, 256))
-	}
-	if alpha(160, 160) != 0xFFFF || alpha(256, 256) != 0xFFFF {
-		t.Errorf("the drawing was cleared: outline %d, inside %d", alpha(160, 160), alpha(256, 256))
-	}
-}

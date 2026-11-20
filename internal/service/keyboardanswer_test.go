@@ -29,7 +29,7 @@ func (f *fakeToolRunner) Execute(ctx context.Context, _ int64, name, args string
 	// As the tools that make pictures or find songs put them in the sink.
 	if sink, ok := tools.SinkFrom(ctx); ok {
 		switch {
-		case name == "mlbb" && mlbbPictured(args), name == "cat_picture", name == "qr_code", name == "generate_image":
+		case name == "mlbb" && mlbbPictured(args), name == "cat_picture", name == "qr_code":
 			sink.Add(tools.Drawing{Data: []byte("JPEG"), MimeType: "image/jpeg"})
 		case name == "music_search":
 			sink.AddAudio(tools.Audio{Data: []byte("MP3"), Title: "Yurak", Performer: "Shohruhxon"})

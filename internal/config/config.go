@@ -99,12 +99,6 @@ type Config struct {
 	SightengineSecret string
 	CASKey            string
 
-	// Image generation, Gemini only. Owners have no daily limit.
-	ImagesEnabled   bool
-	ImageModel      string
-	ImageBaseURL    string
-	DailyImageLimit int
-
 	// Media limits: the largest file the bot downloads, and the longest
 	// voice message it listens to.
 	MaxMediaBytes   int64
@@ -280,19 +274,13 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.BotRepliesPer10Min = r.integer("BOT_REPLIES_PER_10_MIN", 5, 0)
 	cfg.PersonaPrompt = strings.ReplaceAll(r.text("PERSONA_PROMPT", defaultPersona), namePlaceholder, cfg.BotDisplayName)
 	cfg.PersonaPrompt += "\n\n" + strings.ReplaceAll(modelNote, modelPlaceholder, providerLabel(cfg.AIProvider)+" ("+cfg.Model+")")
-	cfg.ImagesEnabled = cfg.AIProvider == providerGemini && r.boolean("ENABLE_IMAGE_GENERATION", true)
+	cfg.PersonaPrompt += "\n\n" + noDrawingNote
 	if cfg.AIProvider == providerGemini {
 		cfg.ReasoningEffort = r.reasoningEffort("AI_REASONING_EFFORT", "low")
 		cfg.ChatReasoningEffort = r.reasoningEffort("CHAT_REASONING_EFFORT", "minimal")
 	}
 	cfg.RouterModel = r.text("ROUTER_MODEL", "")
 	cfg.ChatModel = r.text("CHAT_MODEL", cfg.Model)
-	cfg.ImageModel = r.text("IMAGE_MODEL", "gemini-3.1-flash-image")
-	cfg.ImageBaseURL = strings.TrimSuffix(cfg.AIBaseURL, "/openai")
-	cfg.DailyImageLimit = r.integer("DAILY_IMAGE_LIMIT", 2, 0)
-	if cfg.ImagesEnabled {
-		cfg.PersonaPrompt += "\n\n" + imageNote
-	}
 	if len(cfg.OwnerUsernames) > 0 {
 		cfg.PersonaPrompt += "\n\n" + strings.ReplaceAll(ownerNote, ownerPlaceholder, nameList(cfg.OwnerUsernames))
 		cfg.OwnerNote = ownerOrdersNote

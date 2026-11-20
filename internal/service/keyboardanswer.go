@@ -19,12 +19,7 @@ type ToolRunner interface {
 }
 
 // keyboardTimeout bounds a keyboard button's tool: a live rate or forecast.
-// drawTimeout bounds a picture drawn from the menu, which the image model
-// takes longer to make: the tool itself allows 50 s.
-const (
-	keyboardTimeout = 20 * time.Second
-	drawTimeout     = 60 * time.Second
-)
+const keyboardTimeout = 20 * time.Second
 
 // keyboardAnswer answers the private keyboard in code, so that it takes
 // nothing from the day's answers, which pay for the model: the time at
@@ -118,11 +113,7 @@ func (s *Service) runToolInto(ctx context.Context, in incoming, name, args strin
 // "daily_limit", or "unreadable"; "" when it succeeded. An answer written
 // in code tells a search that found nothing from a service that is down.
 func (s *Service) toolFailure(ctx context.Context, in incoming, name, args string, out any, sink *tools.Sink) string {
-	timeout := keyboardTimeout
-	if name == "generate_image" {
-		timeout = drawTimeout
-	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel := context.WithTimeout(ctx, keyboardTimeout)
 	defer cancel()
 	ctx = tools.WithTurn(ctx, s.caller(in), sink)
 	var envelope struct {

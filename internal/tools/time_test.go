@@ -8,6 +8,9 @@ import (
 	"time"
 )
 
+// tashkent is the groups' time zone, which the tools' tests count days in.
+var tashkent, _ = time.LoadLocation("Asia/Tashkent")
+
 type timeResult struct {
 	Time     string `json:"time"`
 	Timezone string `json:"timezone"`

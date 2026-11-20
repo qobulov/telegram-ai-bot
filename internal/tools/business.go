@@ -87,8 +87,8 @@ func StoryTool(opts StoryOptions) Tool {
 	return Tool{
 		Name: "post_story",
 		Description: "Post a picture as a story on the owner's Telegram Business account, which they connected to you. " +
-			"Only when the owner asks for a story in words. The picture is the one drawn or made in this same turn " +
-			"(call generate_image or make_meme first), or else the photo the owner sent with the request or replied to. " +
+			"Only when the owner asks for a story in words. The picture is the one made in this same turn " +
+			"(call make_meme first), or else the photo the owner sent with the request or replied to. " +
 			"Optional caption; hours is how long it stays up: 6, 12, 24 (default) or 48.",
 		Schema: json.RawMessage(`{
 			"type": "object",

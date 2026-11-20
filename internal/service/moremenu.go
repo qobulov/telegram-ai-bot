@@ -127,10 +127,6 @@ var moreSections = []moreSection{
 			lt("🔳 QR kodga nima yozay?", "🔳 Что записать в QR-код?", "🔳 What should the QR code hold?"),
 			lt("Masalan: https://t.me/...", "Например: https://t.me/...", "For example: https://t.me/..."),
 			lt("QR kod yasa: %s", "Сделай QR-код: %s", "Make a QR code of: %s"))},
-		{key: "draw", label: lt("🎨 Rasm chizish", "🎨 Нарисовать", "🎨 Draw"), ask: asking(
-			lt("🎨 Nima chizay?", "🎨 Что нарисовать?", "🎨 What should I draw?"),
-			lt("Masalan: tog'dagi qal'a", "Например: замок в горах", "For example: a castle in the mountains"),
-			lt("Rasm chiz: %s", "Нарисуй: %s", "Draw: %s"))},
 		{key: "place", label: lt("📍 Xaritada joy", "📍 Место на карте", "📍 A place on the map"), ask: asking(
 			lt("📍 Qaysi joy?", "📍 Какое место?", "📍 Which place?"),
 			lt("Masalan: Samarqand", "Например: Самарканд", "For example: Samarkand"),

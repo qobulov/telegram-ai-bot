@@ -17,9 +17,9 @@ import (
 )
 
 const (
-	// stickerSetTimeout allows for drawing the sticker first, as
-	// generate_image does; the turn's own deadline still applies.
-	stickerSetTimeout = imageTimeout
+	// stickerSetTimeout allows for uploading the sticker and the model's
+	// look at it; the turn's own deadline still applies.
+	stickerSetTimeout = 30 * time.Second
 	// stickersPerDay is how many stickers each owner adds a day, owners
 	// though they are: Telegram paces additions to a set, and a static set
 	// holds 120.
@@ -32,14 +32,11 @@ const (
 	// ownSetPrefix starts the set's name, which Telegram requires to end in
 	// "_by_" and the bot's username.
 	ownSetPrefix = "maria"
-	// stickerStyle asks the image model for a picture Drawn can cut out.
-	stickerStyle = "\n\nDraw it as a single die-cut sticker: one subject, centred, bold clean outline, flat bright colours, on a plain solid white background with nothing else on it."
 )
 
 const (
 	stickerSetOwnersOnly = "only my owners can change my sticker set"
-	stickerNoPicture     = "there is no picture in the message: ask the owner to send the photo with the request or reply to one, or give a prompt to draw the sticker"
-	stickerNoDrawing     = "drawing is turned off here, so the sticker cannot be drawn; ask for a photo instead"
+	stickerNoPicture     = "there is no picture in the message: ask the owner to send the photo with the request or reply to one"
 	stickerUnreadable    = "this picture cannot be read; ask for it as a photo"
 	stickerTooDetailed   = "this picture is too detailed to fit Telegram's 512 KB for a sticker; try another"
 	stickerNotReplied    = "reply to the sticker to take out of the set, with the request"
@@ -83,8 +80,6 @@ type StickerSetOptions struct {
 	Store    StickerSetStore
 	// Learner, when set, makes new stickers ones the bot sends.
 	Learner StickerLearner
-	// Drawer, when set, draws a sticker from a prompt.
-	Drawer ImageGenerator
 	// BotUsername ends the set's name.
 	BotUsername string
 	// Title is the set's title when it is made.
@@ -102,13 +97,11 @@ func OwnStickerSetName(botUsername string) string {
 type stickerSetArgs struct {
 	Action string   `json:"action"`
 	Emoji  []string `json:"emoji"`
-	Prompt string   `json:"prompt"`
 	Title  string   `json:"title"`
 }
 
 // StickerSetTool lets the bot's owners fill a sticker set of the bot's own
-// from the chat: a photo they send or reply to, or a picture the bot draws,
-// becomes a sticker in it, and a sticker of it they reply to is taken out.
+// from the chat: a photo they send or reply to becomes a sticker in it, and a sticker of it they reply to is taken out.
 // The set belongs on Telegram to the owner who made it, and every later
 // sticker is added as them.
 func StickerSetTool(opts StickerSetOptions) Tool {
@@ -123,7 +116,7 @@ func StickerSetTool(opts StickerSetOptions) Tool {
 	return Tool{
 		Name: "sticker_set",
 		Description: "Owners only: your own Telegram sticker set. " +
-			"add: makes the picture in the owner's message, or in the one they replied to, a sticker in the set, or, with prompt, draws the sticker first; give 1 to 3 emoji for its mood. The new sticker is sent to the chat. " +
+			"add: makes the picture in the owner's message, or in the one they replied to, a sticker in the set; give 1 to 3 emoji for its mood. The new sticker is sent to the chat. " +
 			"remove: takes out the sticker of the set the owner replied to. title: renames the set. link: the set's link, title and size. " +
 			"Use it only when an owner asks (\"stiker qil\", \"stikerpakka qo'sh\", \"стикер сделай\"); never say a sticker was added unless the tool says so.",
 		Schema: json.RawMessage(`{
@@ -131,7 +124,6 @@ func StickerSetTool(opts StickerSetOptions) Tool {
 			"properties": {
 				"action": {"type": "string", "enum": ["add", "remove", "title", "link"]},
 				"emoji": {"type": "array", "items": {"type": "string"}, "maxItems": 20, "description": "For add: the emoji the sticker stands for, each on its own, such as [\"😂\"]."},
-				"prompt": {"type": "string", "description": "For add, only when the owner asks you to draw the sticker: what to draw, in English, with details. Leave it out to use the picture in the message."},
 				"title": {"type": "string", "description": "For title: the set's new title, at most 64 characters."}
 			},
 			"required": ["action"],
@@ -182,23 +174,16 @@ func (s ownStickerSet) add(ctx context.Context, caller Caller, args stickerSetAr
 	if err != nil {
 		return nil, err
 	}
-	prompt := strings.TrimSpace(args.Prompt)
-	switch {
-	case utf8.RuneCountInString(prompt) > maxImagePrompt:
-		return nil, &ArgumentError{Message: fmt.Sprintf("prompt must be at most %d characters", maxImagePrompt)}
-	case prompt == "" && len(caller.Picture) == 0:
+	if len(caller.Picture) == 0 {
 		return nil, &ArgumentError{Message: stickerNoPicture}
-	case prompt != "" && s.Drawer == nil:
-		return nil, &DeniedError{Message: stickerNoDrawing}
 	}
-	// Owners have no limit on pictures, but they do on stickers: the
-	// limit is Telegram's pace, not a cost.
+	// Owners have a limit on stickers: Telegram's pace.
 	limited := Caller{UserID: caller.UserID, ChatID: caller.ChatID}
 	reservation, err := reserveToday(ctx, limited, daily{limit: stickersPerDay, location: s.Location, now: s.Now, what: "stickers"}, s.Store.ReserveStickerUpload)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.put(ctx, caller, prompt, emoji); err != nil {
+	if err := s.put(ctx, caller, emoji); err != nil {
 		_ = s.Store.ReleaseStickerUpload(context.WithoutCancel(ctx), reservation)
 		return nil, err
 	}
@@ -207,8 +192,8 @@ func (s ownStickerSet) add(ctx context.Context, caller Caller, args stickerSetAr
 
 // put makes the sticker and adds it to the set, as the set's owner, or
 // makes the set with it, as the asking owner's.
-func (s ownStickerSet) put(ctx context.Context, caller Caller, prompt string, emoji []string) error {
-	png, err := s.picture(ctx, caller.Picture, prompt)
+func (s ownStickerSet) put(ctx context.Context, caller Caller, emoji []string) error {
+	png, err := stickerPicture(stickers.Static(caller.Picture))
 	if err != nil {
 		return err
 	}
@@ -246,19 +231,6 @@ func (s ownStickerSet) create(ctx context.Context, owner int64, sticker telegram
 	// added to it the same way.
 	_ = s.Store.SaveOwnStickerSet(context.WithoutCancel(ctx), s.name, owner)
 	return nil
-}
-
-// picture is the sticker's PNG: the caller's picture, or one drawn from
-// prompt with its white background cut away.
-func (s ownStickerSet) picture(ctx context.Context, picture []byte, prompt string) ([]byte, error) {
-	if prompt == "" {
-		return stickerPicture(stickers.Static(picture))
-	}
-	drawn, err := s.Drawer.Generate(ctx, prompt+stickerStyle)
-	if err != nil {
-		return nil, drawingError(err)
-	}
-	return stickerPicture(stickers.Drawn(drawn.Data))
 }
 
 func stickerPicture(png []byte, err error) ([]byte, error) {

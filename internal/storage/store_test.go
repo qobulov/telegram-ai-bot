@@ -113,7 +113,7 @@ func TestMigrateIsIdempotent(t *testing.T) {
 func TestMigrateReportsAppliedCount(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
-	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, group_messages, image_generations, bot_replies, groups, broadcasts, group_replies, group_rules, moderation_actions, private_messages, group_members, owner_notices, user_profiles, bot_stickers, sticker_sends, skipped_messages, settings, channels, star_payments, premium_users, join_requests, own_sticker_sets, sticker_uploads, picture_verdicts, business_checklists, business_replies, business_chats, business_connections, group_boosts, raid_bosses, raid_members, raid_heroes, game_scores, mafia_games, song_recognitions, card_owned, card_players, card_catalog, card_duels, card_pictures, card_trades, arena_teams, arena_players, arena_battles, group_invites, invite_awards, team_lobbies, member_warns, member_ranks, rank_log, command_ranks, ban_votes, member_links, reports, group_settings, member_reputation, reputation_log, group_notes, crystal_purchases, card_quests, card_anime_rewards, card_boxes, card_mail, arena_weeks, tower_players, ai_limit_notices, schema_migrations CASCADE`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, group_messages, bot_replies, groups, broadcasts, group_replies, group_rules, moderation_actions, private_messages, group_members, owner_notices, user_profiles, bot_stickers, sticker_sends, skipped_messages, settings, channels, star_payments, premium_users, join_requests, own_sticker_sets, sticker_uploads, picture_verdicts, business_checklists, business_replies, business_chats, business_connections, group_boosts, raid_bosses, raid_members, raid_heroes, game_scores, mafia_games, song_recognitions, card_owned, card_players, card_catalog, card_duels, card_pictures, card_trades, arena_teams, arena_players, arena_battles, group_invites, invite_awards, team_lobbies, member_warns, member_ranks, rank_log, command_ranks, ban_votes, member_links, reports, group_settings, member_reputation, reputation_log, crystal_purchases, card_quests, card_anime_rewards, card_boxes, card_mail, arena_weeks, tower_players, ai_limit_notices, schema_migrations CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 
@@ -879,25 +879,25 @@ func TestExpireAlsoRemovesOldGroupMessages(t *testing.T) {
 	}
 }
 
-func TestImageReservationsAreCountedPerUserPerDay(t *testing.T) {
+func TestDailyReservationsAreCountedPerUserPerDay(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 	today := time.Now().Add(-time.Hour)
 
 	for i := range 2 {
-		id, ok, err := store.ReserveImage(ctx, alice, group, today, 2)
+		id, ok, err := store.ReserveSong(ctx, alice, group, today, 2)
 		if err != nil || !ok || id == 0 {
 			t.Fatalf("reservation %d: id = %d, ok = %v, err = %v", i+1, id, ok, err)
 		}
 	}
-	if _, ok, err := store.ReserveImage(ctx, alice, group, today, 2); err != nil || ok {
+	if _, ok, err := store.ReserveSong(ctx, alice, group, today, 2); err != nil || ok {
 		t.Errorf("third reservation: ok = %v, err = %v; the daily limit is 2", ok, err)
 	}
-	if _, ok, _ := store.ReserveImage(ctx, bob, group, today, 2); !ok {
+	if _, ok, _ := store.ReserveSong(ctx, bob, group, today, 2); !ok {
 		t.Error("another user was refused because of alice's count")
 	}
-	if _, ok, _ := store.ReserveImage(ctx, alice, group, time.Now().Add(time.Hour), 2); !ok {
-		t.Error("yesterday's images counted against a new day")
+	if _, ok, _ := store.ReserveSong(ctx, alice, group, time.Now().Add(time.Hour), 2); !ok {
+		t.Error("yesterday's songs counted against a new day")
 	}
 }
 
@@ -905,13 +905,13 @@ func TestReleasedReservationDoesNotCount(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 	since := time.Now().Add(-time.Hour)
-	id, _, _ := store.ReserveImage(ctx, alice, group, since, 1)
+	id, _, _ := store.ReserveSong(ctx, alice, group, since, 1)
 
-	if err := store.ReleaseImage(ctx, id); err != nil {
-		t.Fatalf("ReleaseImage: %v", err)
+	if err := store.ReleaseSong(ctx, id); err != nil {
+		t.Fatalf("ReleaseSong: %v", err)
 	}
-	if _, ok, _ := store.ReserveImage(ctx, alice, group, since, 1); !ok {
-		t.Error("a failed generation still used up the day's only image")
+	if _, ok, _ := store.ReserveSong(ctx, alice, group, since, 1); !ok {
+		t.Error("a failed recognition still used up the day's only song")
 	}
 }
 
@@ -924,7 +924,7 @@ func TestConcurrentReservationsRespectTheLimit(t *testing.T) {
 	var wg sync.WaitGroup
 	for range 8 {
 		wg.Go(func() {
-			if _, ok, err := store.ReserveImage(ctx, alice, group, since, 2); err == nil && ok {
+			if _, ok, err := store.ReserveSong(ctx, alice, group, since, 2); err == nil && ok {
 				granted.Add(1)
 			}
 		})

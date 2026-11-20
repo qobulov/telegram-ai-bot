@@ -1691,7 +1691,7 @@ func (s *Service) runCommand(ctx context.Context, in incoming) string {
 		if section, ok := helpSectionNames[strings.ToLower(strings.TrimSpace(commandArgument(in.text)))]; ok {
 			return helpSections[section].to(in)
 		}
-		help := HelpTextIn(languageOf(in), Abilities{Draw: s.opts.ImagesEnabled, Listen: s.canListen(), Football: s.opts.FootballEnabled, Pages: s.opts.StatsURL != ""})
+		help := HelpTextIn(languageOf(in), Abilities{Listen: s.canListen(), Football: s.opts.FootballEnabled, Pages: s.opts.StatsURL != ""})
 		if s.opts.Bot.Username != "" {
 			// The bot's own username makes the group commands tappable.
 			help = strings.ReplaceAll(help, "@username", "@"+s.opts.Bot.Username)

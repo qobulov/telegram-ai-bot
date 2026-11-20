@@ -28,7 +28,7 @@ func init() {
 		"table": tableAnswer, "matches": matchesAnswer, "scorers": scorersAnswer,
 		"otinchi": gameAnswer("otinchi"), "boss": gameAnswer("boss"), "mafiya": gameAnswer("mafiya"), "free_games": freeGamesAnswer, "steam": steamAnswer,
 		"wiki": wikiAnswer, "english": englishAnswer, "synonyms": synonymsAnswer, "papers": papersAnswer,
-		"qr": qrAnswer, "draw": drawAnswer, "place": placeAnswer, "holidays": holidaysAnswer,
+		"qr": qrAnswer, "place": placeAnswer, "holidays": holidaysAnswer,
 		"crypto": cryptoAnswer, "quakes": quakesAnswer, "search": searchAnswer,
 	} {
 		codeAnswers[key] = answer
@@ -838,25 +838,6 @@ func qrAnswer(ctx context.Context, s *Service, in incoming, text string) outcome
 	return pictureItem(ctx, s, in, "qr_code", map[string]string{"text": text}, "🔳 "+truncate(text, 200))
 }
 
-// drawAnswer draws what was written. The tool keeps the day's limit of
-// pictures, and a refusal says which it was: the limit, a picture the
-// image model will not make, or a model that is busy.
-func drawAnswer(ctx context.Context, s *Service, in incoming, prompt string) outcome {
-	var drawn struct{}
-	sink, failure := s.itemResult(ctx, in, "generate_image", map[string]string{"prompt": prompt}, &drawn)
-	switch failure {
-	case "":
-		if pictures := sink.Take(); len(pictures) > 0 {
-			return pictureAnswer("🎨 "+truncate(prompt, 200), pictures)
-		}
-	case "daily_limit":
-		return say(textDrawLimit.to(in))
-	case "invalid_arguments":
-		return say(textDrawRefused.to(in))
-	}
-	return say(textDrawFailed.to(in))
-}
-
 // placeAnswer sends the place's pin, then names the place found, so that
 // a wrong match is seen, with the keyboard the question hid.
 func placeAnswer(ctx context.Context, s *Service, in incoming, place string) outcome {
@@ -1139,9 +1120,6 @@ var (
 	textPapers = lt("🎓 **Ilmiy maqolalar: %s**", "🎓 **Научные статьи: %s**", "🎓 **Papers on %s**")
 	textCited  = lt("%d marta iqtibos keltirilgan", "цитирований: %d", "cited %d times")
 
-	textDrawLimit    = lt("🎨 Bugungi rasmlaringiz tugadi. Yarim tundan keyin yana chizaman.", "🎨 Картинки на сегодня закончились. После полуночи нарисую снова.", "🎨 You've had today's pictures. I'll draw again after midnight.")
-	textDrawRefused  = lt("🎨 Buni chiza olmayman. Boshqa narsani so'rang.", "🎨 Это я нарисовать не могу. Попросите что-нибудь другое.", "🎨 I can't draw that. Ask for something else.")
-	textDrawFailed   = lt("🎨 Hozir chiza olmadim, birozdan keyin qayta urinib ko'ring.", "🎨 Сейчас не получилось нарисовать, попробуйте чуть позже.", "🎨 I couldn't draw just now; try again in a little while.")
 	textPlaceUnknown = lt(
 		"📍 Bunday joyni topa olmadim. Shahar, tuman yoki viloyat nomini yozing.",
 		"📍 Не нашла такое место. Напишите название города, района или области.",

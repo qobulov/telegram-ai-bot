@@ -381,7 +381,6 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		MaxVoiceSeconds:    cfg.MaxVoiceSeconds,
 		AudioInput:         cfg.AudioInput,
 		Transcriber:        transcriber(cfg, model),
-		ImagesEnabled:      cfg.ImagesEnabled,
 		FootballEnabled:    cfg.FootballDataToken != "",
 
 		GroupReplies:          store,
@@ -466,15 +465,12 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 }
 
 // builtinTools are the tools the model may call in this deployment: the help
-// and the image tool follow what is enabled, and the time is the groups'.
+// follows what is enabled, and the time is the groups'.
 // moderate is made by the caller, which also hands its confirmations to the
 // service.
 func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate tools.Tool) []tools.Tool {
-	help := service.HelpText(service.Abilities{Draw: cfg.ImagesEnabled, Listen: cfg.AudioInput, Football: cfg.FootballDataToken != "", Pages: cfg.WebAppURL != ""})
+	help := service.HelpText(service.Abilities{Listen: cfg.AudioInput, Football: cfg.FootballDataToken != "", Pages: cfg.WebAppURL != ""})
 	builtin := tools.Builtin(help, cfg.Location)
-	if cfg.ImagesEnabled {
-		builtin = append(builtin, imageTool(cfg, store))
-	}
 	if cfg.WebAppURL != "" {
 		builtin = append(builtin, tools.GameTool(tools.GameOptions{Sender: bot.Client, Store: store, Games: []string{game.OtinchiShortName, game.BossShortName, game.MafiaShortName}}))
 	}
@@ -628,23 +624,9 @@ func liveDataTools(cfg config.Config, store *storage.Store, bot Bot) []tools.Too
 	return webapi.Tools(opts)
 }
 
-// imageTool draws with Gemini and counts pictures in the database.
-func imageTool(cfg config.Config, store *storage.Store) tools.Tool {
-	return tools.ImageTool(tools.ImageOptions{
-		Generator: ai.NewImageClient(ai.ImageOptions{
-			BaseURL: cfg.ImageBaseURL,
-			APIKey:  cfg.AIAPIKey,
-			Model:   cfg.ImageModel,
-		}),
-		Quota:      store,
-		DailyLimit: cfg.DailyImageLimit,
-		Location:   cfg.Location,
-	})
-}
-
-// stickerSetTool lets owners fill the bot's own sticker set. It draws with
-// the image model when drawing is on, and the stickers it adds are looked
-// at as an imported pack's are, so that she sends them too.
+// stickerSetTool lets owners fill the bot's own sticker set from photos;
+// the stickers it adds are looked at as an imported pack's are, so that she
+// sends them too.
 func stickerSetTool(cfg config.Config, store *storage.Store, bot Bot, logger *slog.Logger) tools.Tool {
 	opts := tools.StickerSetOptions{
 		Telegram:    bot.Client,
@@ -653,9 +635,6 @@ func stickerSetTool(cfg config.Config, store *storage.Store, bot Bot, logger *sl
 		BotUsername: bot.User.Username,
 		Title:       cfg.BotDisplayName,
 		Location:    cfg.Location,
-	}
-	if cfg.ImagesEnabled {
-		opts.Drawer = ai.NewImageClient(ai.ImageOptions{BaseURL: cfg.ImageBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.ImageModel})
 	}
 	return tools.StickerSetTool(opts)
 }

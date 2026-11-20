@@ -2,22 +2,11 @@ package tools
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
-	"telegram-ai-bot/internal/ai"
 	"telegram-ai-bot/internal/telegram"
-)
-
-const (
-	maxImagePrompt = 2000
-	// imageTimeout allows for slow image models; the turn's own deadline
-	// still applies.
-	imageTimeout = 50 * time.Second
 )
 
 // Caller is who a turn is for and where its answer goes. Every field comes
@@ -265,96 +254,13 @@ func SinkFrom(ctx context.Context) (*Sink, bool) {
 	return t.sink, ok && t.sink != nil
 }
 
-// ImageGenerator draws a picture from a prompt.
-type ImageGenerator interface {
-	Generate(ctx context.Context, prompt string) (ai.Image, error)
-}
-
-// ImageQuota counts pictures per user per day.
-type ImageQuota interface {
-	ReserveImage(ctx context.Context, userID, chatID int64, since time.Time, limit int) (int64, bool, error)
-	ReleaseImage(ctx context.Context, id int64) error
-}
-
-// ImageOptions configures the generate_image tool.
-type ImageOptions struct {
-	Generator ImageGenerator
-	Quota     ImageQuota
-	// DailyLimit is how many pictures a user who is not an owner may get
-	// per day.
-	DailyLimit int
-	// Location decides when a day starts.
-	Location *time.Location
-	Now      func() time.Time
-}
-
-// LimitError reports that the caller has used up their pictures for today.
+// LimitError reports that the caller has used up a daily allowance, such as
+// their stickers for today.
 type LimitError struct {
 	Message string
 }
 
 func (e *LimitError) Error() string { return e.Message }
-
-type imageArgs struct {
-	Prompt string `json:"prompt"`
-}
-
-// ImageTool lets the model draw a picture, which is sent to the chat with
-// its answer. Owners have no limit; everyone else gets DailyLimit a day.
-func ImageTool(opts ImageOptions) Tool {
-	if opts.Now == nil {
-		opts.Now = time.Now
-	}
-	if opts.Location == nil {
-		opts.Location = time.UTC
-	}
-	return Tool{
-		Name:        "generate_image",
-		Description: "Draw a picture and send it to the chat with your reply. Use it only when someone asks for a picture, drawing or image. Write the prompt in English and make it detailed.",
-		Schema: json.RawMessage(`{
-			"type": "object",
-			"properties": {
-				"prompt": {"type": "string", "description": "What to draw, in English, with style and details."}
-			},
-			"required": ["prompt"],
-			"additionalProperties": false
-		}`),
-		Timeout: imageTimeout,
-		Run: func(ctx context.Context, raw json.RawMessage) (any, error) {
-			return drawImage(ctx, opts, raw)
-		},
-	}
-}
-
-func drawImage(ctx context.Context, opts ImageOptions, raw json.RawMessage) (any, error) {
-	var args imageArgs
-	if err := decodeArgs(raw, &args); err != nil {
-		return nil, err
-	}
-	prompt := strings.TrimSpace(args.Prompt)
-	if prompt == "" || len([]rune(prompt)) > maxImagePrompt {
-		return nil, &ArgumentError{Message: fmt.Sprintf("prompt must be 1 to %d characters", maxImagePrompt)}
-	}
-	t, ok := ctx.Value(turnKey{}).(turn)
-	if !ok || t.sink == nil {
-		return nil, errors.New("pictures cannot be sent from here")
-	}
-	reservation, err := reserve(ctx, opts, t.caller)
-	if err != nil {
-		return nil, err
-	}
-	image, err := opts.Generator.Generate(ctx, prompt)
-	if err != nil {
-		_ = opts.Quota.ReleaseImage(context.WithoutCancel(ctx), reservation)
-		return nil, drawingError(err)
-	}
-	t.sink.Add(Drawing{Data: image.Data, MimeType: image.MimeType})
-	return map[string]any{"drawn": true, "note": "The picture is sent with your reply. Comment on it briefly; do not describe it at length."}, nil
-}
-
-func reserve(ctx context.Context, opts ImageOptions, caller Caller) (int64, error) {
-	return reserveToday(ctx, caller, daily{limit: opts.DailyLimit, location: opts.Location, now: opts.Now, what: "pictures"}, opts.Quota.ReserveImage)
-}
 
 // daily is a per-user daily limit: limit things a day, counted from
 // midnight where location is; owners have none.
@@ -382,16 +288,4 @@ func reserveToday(ctx context.Context, caller Caller, d daily, reserve func(ctx 
 		return 0, &LimitError{Message: fmt.Sprintf("this person has used their %d %s for today; more after midnight", d.limit, d.what)}
 	}
 	return id, nil
-}
-
-// drawingError tells the model what went wrong in words it can pass on.
-func drawingError(err error) error {
-	switch {
-	case ai.IsOverloaded(err):
-		return errors.New("drawing is not available right now (the image service is busy or out of quota)")
-	case errors.Is(err, ai.ErrNoImage):
-		return &ArgumentError{Message: "the image model would not draw this: " + err.Error()}
-	default:
-		return errors.New("the picture could not be drawn")
-	}
 }

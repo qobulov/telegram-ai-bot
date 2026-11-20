@@ -8,22 +8,11 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// ReserveImage takes one of the user's pictures for the day, counted from
-// since. It reports false when limit pictures were already drawn; a
-// negative limit means no limit. A per-user lock makes the count and the
-// insert one step, so simultaneous requests cannot slip past the limit.
-// The returned ID is for ReleaseImage when drawing then fails.
-func (s *Store) ReserveImage(ctx context.Context, userID, chatID int64, since time.Time, limit int) (int64, bool, error) {
-	return s.reserveDaily(ctx, dailyImages, userID, chatID, since, limit)
-}
-
-// ReleaseImage gives back a reservation whose picture could not be drawn.
-func (s *Store) ReleaseImage(ctx context.Context, id int64) error {
-	return s.releaseDaily(ctx, dailyImages, id)
-}
-
-// ReserveSong takes one of the user's song recognitions for the day, as
-// ReserveImage takes a picture.
+// ReserveSong takes one of the user's song recognitions for the day, counted
+// from since. It reports false when limit were already made; a negative
+// limit means no limit. A per-user lock makes the count and the insert one
+// step, so simultaneous requests cannot slip past the limit. The returned ID
+// is for ReleaseSong when the recognition then fails.
 func (s *Store) ReserveSong(ctx context.Context, userID, chatID int64, since time.Time, limit int) (int64, bool, error) {
 	return s.reserveDaily(ctx, dailySongs, userID, chatID, since, limit)
 }
@@ -41,10 +30,7 @@ type dailyKind struct {
 	salt  int64
 }
 
-var (
-	dailyImages = dailyKind{table: "image_generations", salt: 0x494d4147} // "IMAG"
-	dailySongs  = dailyKind{table: "song_recognitions", salt: 0x534f4e47} // "SONG"
-)
+var dailySongs = dailyKind{table: "song_recognitions", salt: 0x534f4e47} // "SONG"
 
 func (s *Store) reserveDaily(ctx context.Context, kind dailyKind, userID, chatID int64, since time.Time, limit int) (int64, bool, error) {
 	var id int64

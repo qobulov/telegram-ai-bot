@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"telegram-ai-bot/internal/ai"
 	"telegram-ai-bot/internal/stickers"
 	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
@@ -123,14 +122,6 @@ func (f *fakeLearner) Import(_ context.Context, name string) (stickers.Report, e
 	return stickers.Report{Pack: name}, nil
 }
 
-// pictureDrawer draws a red square on white.
-type pictureDrawer struct{ prompts []string }
-
-func (d *pictureDrawer) Generate(_ context.Context, prompt string) (ai.Image, error) {
-	d.prompts = append(d.prompts, prompt)
-	return ai.Image{Data: testPicture(800, 800), MimeType: "image/png"}, nil
-}
-
 // testPicture is a w by h PNG: white, with a red square in the middle.
 func testPicture(w, h int) []byte {
 	img := image.NewRGBA(image.Rect(0, 0, w, h))
@@ -152,14 +143,13 @@ type stickerSetFixture struct {
 	api     *fakeStickerAPI
 	store   *fakeStickerStore
 	learner *fakeLearner
-	drawer  *pictureDrawer
 	tool    Tool
 }
 
 func newStickerSetFixture() *stickerSetFixture {
-	f := &stickerSetFixture{api: &fakeStickerAPI{}, store: &fakeStickerStore{}, learner: &fakeLearner{}, drawer: &pictureDrawer{}}
+	f := &stickerSetFixture{api: &fakeStickerAPI{}, store: &fakeStickerStore{}, learner: &fakeLearner{}}
 	f.tool = StickerSetTool(StickerSetOptions{
-		Telegram: f.api, Store: f.store, Learner: f.learner, Drawer: f.drawer,
+		Telegram: f.api, Store: f.store, Learner: f.learner,
 		BotUsername: "mariabot", Title: "Maria",
 	})
 	return f
@@ -242,28 +232,6 @@ func TestLaterStickersAreAddedAsTheSetsOwner(t *testing.T) {
 	}
 	if f.api.calls[0] != "upload as 2" || f.api.calls[1] != "add to maria_by_mariabot as 2: up1 [🥲]" || len(f.store.saved) != 0 {
 		t.Errorf("calls = %q, saved %q", f.api.calls, f.store.saved)
-	}
-}
-
-// Asked to draw, the bot draws a sticker and cuts the white around it.
-func TestADrawnStickerHasNoWhiteBox(t *testing.T) {
-	f := newStickerSetFixture()
-	f.store.owner = userID
-
-	env, _ := f.run(t, stickerOwner(userID), `{"action":"add","emoji":["🐱"],"prompt":"a grumpy cat"}`)
-
-	if !env.OK || len(f.drawer.prompts) != 1 || !strings.HasPrefix(f.drawer.prompts[0], "a grumpy cat") || !strings.Contains(f.drawer.prompts[0], "white background") {
-		t.Fatalf("env = %+v, prompts %q", env, f.drawer.prompts)
-	}
-	img, err := png.Decode(bytes.NewReader(f.api.uploaded))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, _, _, a := img.At(2, 2).RGBA(); a != 0 {
-		t.Errorf("the corner is not transparent: alpha %d", a)
-	}
-	if _, _, _, a := img.At(256, 256).RGBA(); a != 0xFFFF {
-		t.Errorf("the drawing was cut away: alpha %d", a)
 	}
 }
 

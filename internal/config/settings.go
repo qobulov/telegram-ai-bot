@@ -34,8 +34,6 @@ var Settings = []Setting{
 	{Name: "PREMIUM_DAILY_LIMIT", Max: 10000, About: "premiumda shaxsiy chatda kuniga javoblar"},
 	{Name: "BUSINESS_DAILY_LIMIT", Max: 10000, About: "biznes akkauntda har bir mijozga kuniga javoblar (0 cheksiz)"},
 	{Name: "USER_RATE_LIMIT_PER_MINUTE", Max: 120, About: "bir odamga daqiqasiga javoblar"},
-	{Name: "DAILY_IMAGE_LIMIT", Max: 100, About: "kuniga rasm chizish (0 o'chiq)"},
-	{Name: "ENABLE_IMAGE_GENERATION", About: "rasm chizish: true yoki false"},
 	{Name: "ENABLE_REPLY_TRIGGER", About: "botga reply qilinganda javob: true yoki false"},
 	{Name: "ENABLE_WAKE_WORD_TRIGGER", About: "ismini aytganda javob: true yoki false"},
 	{Name: "ENABLE_USERNAME_MENTION", About: "@username bilan chaqirilganda javob: true yoki false"},

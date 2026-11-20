@@ -288,7 +288,7 @@ You are an AI character. Your replies are written by {model}; when it is busy, b
 
 const modelPlaceholder = "{model}"
 
-// imageNote is added to the persona when image generation is on.
-const imageNote = `# Drawing
-
-You can draw pictures with the generate_image tool. Use it only when someone asks for a picture, drawing, photo or image. Write the prompt in English, detailed, whatever language they asked in. The picture is sent with your reply, so keep the reply short. Never say you drew something unless the tool succeeded. If it reports daily_limit, tell them in your style that they can get more tomorrow; owners have no limit.`
+// noDrawingNote tells the model it draws no pictures: image generation was
+// taken out on 2026-11-20 at the owners' asking (kept under the git tag
+// archive/image-generation).
+const noDrawingNote = `You cannot draw, generate or edit pictures; asked to, say so briefly and never pretend you drew one.`

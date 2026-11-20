@@ -125,8 +125,6 @@ func TestMoreItemsAnswerWithTheirTools(t *testing.T) {
 			want:   []string{"Ilmiy maqolalar: genetics", "• **Deep learning** (2015)\nYann LeCun, Yoshua Bengio · Nature · 50000 marta iqtibos keltirilgan\nhttps://doi.org/10.1038/nature14539"}},
 		{key: "qr", value: "https://t.me/mira", tool: "qr_code", result: `{"sent":true}`,
 			args: []string{`qr_code {"text":"https://t.me/mira"}`}, want: []string{"🔳 https://t.me/mira"}, photo: true},
-		{key: "draw", value: "qal'a", tool: "generate_image", result: `{"drawn":true}`,
-			args: []string{`generate_image {"prompt":"qal'a"}`}, want: []string{"🎨 qal'a"}, photo: true},
 		{key: "place", value: "Samarqand", tool: "send_location", result: `{"sent":true,"place":"Samarqand"}`,
 			args: []string{`send_location {"place":"Samarqand"}`}, want: []string{"📍 Samarqand"}},
 		{key: "holidays", tool: "holidays",
@@ -218,8 +216,6 @@ func TestMoreItemsSayFailures(t *testing.T) {
 		{"empty", "news_uz", "", "news_headlines", succeeded(`{"items":[]}`), textNothingFound},
 		{"unknown town", "prayer", "Parij", "prayer_times", refused("invalid_arguments"), textPrayerUnknown},
 		{"unknown place", "place", "Atlantida", "send_location", refused("invalid_arguments"), textPlaceUnknown},
-		{"day's pictures", "draw", "qal'a", "generate_image", refused("daily_limit"), textDrawLimit},
-		{"picture refused", "draw", "qal'a", "generate_image", refused("invalid_arguments"), textDrawRefused},
 		{"two games", "otinchi", "", "send_game", refused("invalid_arguments"), textGameTooSoon},
 		{"quiet week", "quakes", "", "earthquakes", succeeded(`{"earthquakes":[]}`), textNoQuakes},
 	} {

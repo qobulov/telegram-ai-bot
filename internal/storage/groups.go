@@ -18,10 +18,9 @@ type Overview struct {
 	Users              int `json:"users"`
 	UsersToday         int `json:"users_today"`
 	GroupMessagesToday int `json:"group_messages_today"`
-	ImagesToday        int `json:"images_today"`
 }
 
-// Overview counts the groups, users, messages and pictures the bot knows of.
+// Overview counts the groups, users and messages the bot knows of.
 func (s *Store) Overview(ctx context.Context, since time.Time) (Overview, error) {
 	var o Overview
 	err := s.pool.QueryRow(ctx, `
@@ -30,9 +29,8 @@ func (s *Store) Overview(ctx context.Context, since time.Time) (Overview, error)
 			(SELECT count(*) FROM chats WHERE muted AND chat_id IN (SELECT chat_id FROM groups)),
 			(SELECT count(*) FROM users),
 			(SELECT count(*) FROM users WHERE last_seen_at >= $1),
-			(SELECT count(*) FROM group_messages WHERE created_at >= $1),
-			(SELECT count(*) FROM image_generations WHERE created_at >= $1)`, since).
-		Scan(&o.Groups, &o.MutedGroups, &o.Users, &o.UsersToday, &o.GroupMessagesToday, &o.ImagesToday)
+			(SELECT count(*) FROM group_messages WHERE created_at >= $1)`, since).
+		Scan(&o.Groups, &o.MutedGroups, &o.Users, &o.UsersToday, &o.GroupMessagesToday)
 	if err != nil {
 		return Overview{}, fmt.Errorf("storage: overview: %w", err)
 	}

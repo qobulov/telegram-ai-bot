@@ -389,9 +389,6 @@ func (s *Store) Expire(ctx context.Context, maxAge time.Duration) (Expired, erro
 		}
 		expired.GroupMessages = tag.RowsAffected()
 		// Limits are counted per day, so older records are no longer needed.
-		if _, err = tx.Exec(ctx, `DELETE FROM image_generations WHERE created_at < $1`, cutoff); err != nil {
-			return err
-		}
 		if _, err = tx.Exec(ctx, `DELETE FROM song_recognitions WHERE created_at < $1`, cutoff); err != nil {
 			return err
 		}

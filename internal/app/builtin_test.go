@@ -23,12 +23,11 @@ func TestBuiltinToolsFollowTheConfiguration(t *testing.T) {
 		t.Fatal(err)
 	}
 	cases := map[string]struct {
-		cfg         config.Config
-		draw, voice bool
+		cfg   config.Config
+		voice bool
 	}{
-		"listens":               {config.Config{Location: tashkent, AudioInput: true}, false, true},
-		"draws":                 {config.Config{Location: tashkent, ImagesEnabled: true}, true, false},
-		"cannot draw or listen": {config.Config{Location: tashkent}, false, false},
+		"listens":       {config.Config{Location: tashkent, AudioInput: true}, true},
+		"cannot listen": {config.Config{Location: tashkent}, false},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -45,14 +44,14 @@ func TestBuiltinToolsFollowTheConfiguration(t *testing.T) {
 				Help string `json:"help"`
 			}
 			runTool(t, builtin, "get_bot_help", &help)
-			if got := strings.Contains(help.Help, "draw a picture"); got != tc.draw {
-				t.Errorf("help offers drawing = %t, want %t", got, tc.draw)
+			if strings.Contains(help.Help, "draw a picture") {
+				t.Errorf("help offers drawing, which the bot no longer does")
 			}
 			if got := strings.Contains(help.Help, "voice messages"); got != tc.voice {
 				t.Errorf("help offers listening = %t, want %t", got, tc.voice)
 			}
-			if got := hasTool(builtin, "generate_image"); got != tc.draw {
-				t.Errorf("generate_image registered = %t, want %t", got, tc.draw)
+			if hasTool(builtin, "generate_image") {
+				t.Errorf("generate_image is registered")
 			}
 		})
 	}

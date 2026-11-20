@@ -906,7 +906,7 @@ func TestHelpListsLiveDataAndFootballOnlyWhenConfigured(t *testing.T) {
 }
 
 func TestHelpMentionsModerationAndPolls(t *testing.T) {
-	help := HelpText(Abilities{Draw: true, Listen: true})
+	help := HelpText(Abilities{Listen: true})
 	for _, want := range []string{
 		"Uzbek", "Russian", "English",
 		"photos", "stickers", "GIFs", "round videos",
@@ -937,17 +937,16 @@ func TestHelpMentionsModerationAndPolls(t *testing.T) {
 	}
 }
 
-// /help offers drawing and listening only when this deployment can do them,
-// as the voice handling and the registered tools decide.
+// /help offers listening only when this deployment can do it, as the voice
+// handling decides, and never drawing, which the bot no longer does.
 func TestHelpPromisesOnlyWhatTheBotCanDo(t *testing.T) {
 	cases := map[string]struct {
-		change      func(*fixture)
-		draw, voice bool
+		change func(*fixture)
+		voice  bool
 	}{
-		"listens, cannot draw":   {func(*fixture) {}, false, true},
-		"draws":                  {func(f *fixture) { f.opts.ImagesEnabled = true }, true, true},
-		"provider without audio": {func(f *fixture) { f.opts.AudioInput = false }, false, false},
-		"no transcriber":         {func(f *fixture) { f.opts.Transcriber = nil }, false, false},
+		"listens":                {func(*fixture) {}, true},
+		"provider without audio": {func(f *fixture) { f.opts.AudioInput = false }, false},
+		"no transcriber":         {func(f *fixture) { f.opts.Transcriber = nil }, false},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -957,8 +956,8 @@ func TestHelpPromisesOnlyWhatTheBotCanDo(t *testing.T) {
 			sent := f.run(textFrom(userID, "/help"))
 
 			expectOneReply(t, sent, "/about")
-			if got := strings.Contains(sent[0].text, "rasm chizaman"); got != tc.draw {
-				t.Errorf("offers drawing = %t, want %t:\n%s", got, tc.draw, sent[0].text)
+			if strings.Contains(sent[0].text, "rasm chizaman") {
+				t.Errorf("offers drawing:\n%s", sent[0].text)
 			}
 			if got := strings.Contains(sent[0].text, "ovozli xabarlarni eshitaman"); got != tc.voice {
 				t.Errorf("offers listening = %t, want %t:\n%s", got, tc.voice, sent[0].text)
