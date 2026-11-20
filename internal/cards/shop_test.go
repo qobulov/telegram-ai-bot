@@ -123,8 +123,8 @@ func TestDiamondBoxDraw(t *testing.T) {
 	if total != 100 {
 		t.Fatalf("the chances add up to %d%%", total)
 	}
-	if mean/100 != 1870 {
-		t.Errorf("a box gives %d on average, want the 1870 the owners chose", mean/100)
+	if mean/100 != 1995 {
+		t.Errorf("a box gives %d on average, want the 1995 the owners chose", mean/100)
 	}
 	for i := 1; i < len(box.Box); i++ {
 		if box.Box[i].Crystals <= box.Box[i-1].Crystals || box.Box[i].Percent > box.Box[i-1].Percent {

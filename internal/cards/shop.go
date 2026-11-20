@@ -25,15 +25,16 @@ type BoxPrize struct {
 }
 
 // DiamondBox is the 💎 box of 2026-11-19, as the owners asked: 1500 to 5000
-// crystals, the more the rarer, about 1870 on average for 129 Stars (the
-// 1500 pack is 99).
+// crystals, the more the rarer, about 1995 on average for 129 Stars (the
+// 1500 pack is 99). On 2026-11-20 the owners lowered 1500 from 60% to 50%
+// and spread the 10 points over the bigger prizes.
 var DiamondBox = []BoxPrize{
-	{Crystals: 1500, Percent: 60},
-	{Crystals: 2000, Percent: 22},
-	{Crystals: 2500, Percent: 10},
-	{Crystals: 3000, Percent: 5},
-	{Crystals: 4000, Percent: 2},
-	{Crystals: 5000, Percent: 1},
+	{Crystals: 1500, Percent: 50},
+	{Crystals: 2000, Percent: 26},
+	{Crystals: 2500, Percent: 13},
+	{Crystals: 3000, Percent: 6},
+	{Crystals: 4000, Percent: 3},
+	{Crystals: 5000, Percent: 2},
 }
 
 // CrystalPacks are the crystals on sale, the bigger the cheaper each, and
