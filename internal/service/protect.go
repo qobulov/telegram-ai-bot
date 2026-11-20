@@ -591,7 +591,7 @@ func (s *Service) flooding(ctx context.Context, msg *telegram.Message) ([]int64,
 		if !m.SentAt.Before(now.Add(-floodLongWindow)) {
 			steady++
 		}
-		if key != "" && loggedRepeatKey(m.Text) == key {
+		if key != "" && (loggedRepeatKey(m.Text) == key || m.Text == hiddenLine(key)) {
 			same++
 		}
 	}

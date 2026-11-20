@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"log/slog"
 	"slices"
 	"strings"
@@ -63,6 +65,9 @@ type ambient struct {
 	size     int
 	location *time.Location
 	logger   *slog.Logger
+	// logs reports whether a chat's messages are kept: nil keeps every
+	// chat's.
+	logs func(ctx context.Context, chatID int64) bool
 }
 
 // newAmbient gives the model up to size of the last ambientWindow's messages,
@@ -108,9 +113,29 @@ func (a *ambient) append(m storage.GroupMessage) {
 	m.Text = truncate(m.Text, maxAmbientChars)
 	ctx, cancel := context.WithTimeout(context.Background(), logTimeout)
 	defer cancel()
+	if a.logs != nil && !a.logs(ctx, m.ChatID) {
+		// A group without AI keeps no words: a member's line is only who
+		// and when, with a hash the flood guard tells repeats by, and the
+		// bot's own lines are not kept at all.
+		if m.AuthorName == botAuthor {
+			return
+		}
+		m.AuthorName, m.Text = "", hiddenLine(loggedRepeatKey(m.Text))
+	}
 	if err := a.log.AppendGroupMessage(ctx, m); err != nil {
 		a.logger.Warn("could not log group message", "chat_id", m.ChatID, "error", err)
 	}
+}
+
+// hiddenMark starts a line logged without its words.
+const hiddenMark = "⌗"
+
+// hiddenLine stands in for a line of a group without AI: a short hash of
+// its repeat key, the same for the same text, from which the text cannot be
+// read back.
+func hiddenLine(key string) string {
+	sum := sha256.Sum256([]byte(key))
+	return hiddenMark + hex.EncodeToString(sum[:6])
 }
 
 // block returns the chat's messages of the last ambientWindow between their

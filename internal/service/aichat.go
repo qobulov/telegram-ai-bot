@@ -24,19 +24,29 @@ const (
 // turned it on for, with /aigroups; an owner of the bot always may. Without
 // a store every group may.
 func (s *Service) aiAllowed(ctx context.Context, in incoming) bool {
-	if !in.group || s.opts.Extras == nil || s.isOwner(in.msg.From) {
+	if !in.group || s.isOwner(in.msg.From) {
 		return true
 	}
-	if on, ok := s.aiChats.get(in.scope.ChatID); ok {
+	return s.groupAIOn(ctx, in.scope.ChatID)
+}
+
+// groupAIOn reports whether an owner turned AI on for a group, whoever is
+// writing there; without a store every group has it. Only such a group's
+// messages are logged, as the owners want nothing kept of the others.
+func (s *Service) groupAIOn(ctx context.Context, chatID int64) bool {
+	if s.opts.Extras == nil {
+		return true
+	}
+	if on, ok := s.aiChats.get(chatID); ok {
 		return on
 	}
-	value, err := s.opts.Extras.GroupSetting(ctx, in.scope.ChatID, storage.SettingAI)
+	value, err := s.opts.Extras.GroupSetting(ctx, chatID, storage.SettingAI)
 	if err != nil {
-		s.opts.Logger.Warn("could not read a group's AI setting", "chat_id", in.scope.ChatID, "error", err)
+		s.opts.Logger.Warn("could not read a group's AI setting", "chat_id", chatID, "error", err)
 		return false
 	}
 	on := value == "on"
-	s.aiChats.set(in.scope.ChatID, on)
+	s.aiChats.set(chatID, on)
 	return on
 }
 

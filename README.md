@@ -797,7 +797,13 @@ Telegram starts sending `my_chat_member`. The
 still are. In a group the bot has not answered for 7 days, the daily cleanup
 keeps only the last 8 days of messages whatever `RETENTION_DAYS` says: there
 the log serves only the week's statistics, and one such group held over a
-third of all messages. Channels come only from `my_chat_member` (the bot never asks for
+third of all messages. A group whose owners did not turn AI on (`/aigroups`)
+keeps no words, as the owners asked on 2026-11-20: a member's line is logged
+with no name and, for its text, a short hash of the flood guard's repeat key
+(`⌗` and 12 hex digits), from which the text cannot be read back, so the
+flood and repeat guards still work there; the bot's own lines are not
+logged; the newcomer guard, which needs a member's past messages, is off
+there; and the daily cleanup keeps only such a group's last day. Channels come only from `my_chat_member` (the bot never asks for
 channel posts) and are kept apart, in `channels`, so that the overview, the
 statistics and `bot_database groups` stay about groups; a channel the bot
 was made an admin of before this upgrade is recorded once its rights change,

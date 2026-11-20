@@ -910,6 +910,9 @@ func NewCleanup(ctx context.Context, cfg config.Config, logger *slog.Logger) (*C
 const (
 	quietGroupKeep = 8 * 24 * time.Hour
 	quietGroupDays = 7 * 24 * time.Hour
+	// noAIGroupKeep is how long a group without AI keeps its lines, which
+	// have no words and serve the flood guard's minute alone.
+	noAIGroupKeep = 24 * time.Hour
 )
 
 // expire applies the retention policy once.
@@ -918,6 +921,11 @@ func expire(ctx context.Context, cfg config.Config, store *storage.Store, logger
 		logger.Warn("could not trim the quiet groups' logs", "error", err)
 	} else if deleted > 0 {
 		logger.Info("quiet groups' old messages deleted", "messages", deleted)
+	}
+	if deleted, err := store.ExpireGroupsWithoutAI(ctx, time.Now().Add(-noAIGroupKeep)); err != nil {
+		logger.Warn("could not trim the logs of groups without AI", "error", err)
+	} else if deleted > 0 {
+		logger.Info("old messages of groups without AI deleted", "messages", deleted)
 	}
 	if cfg.RetentionDays == 0 {
 		return storage.Expired{}, nil
