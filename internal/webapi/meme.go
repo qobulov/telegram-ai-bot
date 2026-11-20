@@ -45,15 +45,8 @@ type memeTemplate struct {
 
 func (a *apis) memeTool() tools.Tool {
 	return tools.Tool{
-		Name: "make_meme",
-		Description: "Make a meme from one of Imgflip's hundred popular templates and send it as a picture. Use it when someone asks for a meme (\"mem qil\", \"мем сделай\"). " +
-			"Pick the template that fits this joke best, from the whole range, not the same few: a template used in this chat's last few memes is refused unless the asker named it, with others offered. " +
-			"texts go in the template's boxes in Imgflip's order, mostly top to bottom. Some, with their boxes: Drake Hotline Bling: rejected, preferred; Distracted Boyfriend: the other woman, the boyfriend, the girlfriend; " +
-			"Two Buttons: the two buttons, the one sweating; Expanding Brain: four ideas, each \"smarter\"; Gru's Plan: four steps, the last one the bad surprise; Left Exit 12 Off Ramp: the straight road, the exit, the car; " +
-			"Batman Slapping Robin: Robin's line, Batman's; Woman Yelling At Cat: her accusation, the cat's reply; UNO Draw 25 Cards: the card's demand, the one who draws 25; Is This A Pigeon: the man, the butterfly, the wrong guess; " +
-			"Tuxedo Winnie The Pooh: the plain way, the fancy way; Epic Handshake: one side, the other, what they share; Change My Mind: the claim; Mocking Spongebob: the line mocked, then mocked; " +
-			"Running Away Balloon, Bike Fall, Panik Kalm Panik, Anakin Padme 4 Panel, They're The Same Picture, Hide the Pain Harold, Sad Pablo Escobar, Waiting Skeleton, Disaster Girl, Monkey Puppet, Always Has Been, Roll Safe Think About It, One Does Not Simply, Buff Doge vs. Cheems and more. " +
-			"Write the texts in the asker's language and script, short.",
+		Name:        "make_meme",
+		Description: "Make a meme from one of Imgflip's hundred popular templates and send it as a picture, when someone asks for a meme (\"mem qil\", \"мем сделай\"). Pick the template that fits this joke best from the whole range, not the same few: one used in this chat's last few memes is refused unless the asker named it. texts fill the boxes in Imgflip's order, mostly top to bottom: Drake Hotline Bling: rejected, preferred; Distracted Boyfriend: the other woman, the boyfriend, the girlfriend; Two Buttons: the two buttons, the one sweating; Expanding Brain: four ever \"smarter\" ideas; Gru's Plan: four steps, the last the bad surprise; Batman Slapping Robin: Robin's line, Batman's; Woman Yelling At Cat: her accusation, the cat's reply. Others: Left Exit 12 Off Ramp, UNO Draw 25 Cards, Is This A Pigeon, Tuxedo Winnie The Pooh, Epic Handshake, Change My Mind, Mocking Spongebob, Panik Kalm Panik, Hide the Pain Harold, Waiting Skeleton, Disaster Girl, Always Has Been, Buff Doge vs. Cheems and more. Write the texts short, in the asker's language and script.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {

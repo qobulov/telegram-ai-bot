@@ -37,11 +37,10 @@ type CommandRanker interface {
 // there and, with commandRanks, what each moderator rank opens there.
 func GroupInfoTool(telegramAPI GroupInfoReader, botID int64, commandRanks CommandRanker) Tool {
 	return Tool{
-		Name: "group_info",
-		Description: "This group as Telegram has it now: title, public link, description (bio), member count, admins count, whether it has topics, what members may send, its latest pinned message, its sticker pack, which admin rights you yourself hold here, and rank_table: what each moderator rank (1 to 5) opens in this group, as its /access sets it. " +
-			"Call it before you say what a rank gives or anything about the group, even when the chat or your earlier answers seem to say it, whenever someone asks about the group's bio or description, link, size, rules of what may be sent, the pinned message, what you are able to do here, or what a rank gives (\"guruh biosi\", \"guruhda nechta odam\", \"qanday huquqing bor\", \"3-daraja nima beradi\", \"описание группы\"); never guess.",
-		Schema:    json.RawMessage(`{"type": "object", "properties": {}, "additionalProperties": false}`),
-		GroupOnly: true,
+		Name:        "group_info",
+		Description: "This group as Telegram has it now: title, link, description, member and admin counts, topics, what members may send, the latest pinned message, its sticker pack, your own admin rights here, and rank_table, what each moderator rank (1 to 5) opens here. Call it, never guess, whenever someone asks about the group's description, link, size, what may be sent, the pinned message, what you can do here or what a rank gives (\"guruh biosi\", \"qanday huquqing bor\", \"3-daraja nima beradi\", \"описание группы\"), even when the chat or your earlier answers seem to say it.",
+		Schema:      json.RawMessage(`{"type": "object", "properties": {}, "additionalProperties": false}`),
+		GroupOnly:   true,
 		Run: func(ctx context.Context, _ json.RawMessage) (any, error) {
 			caller, ok := CallerFrom(ctx)
 			if !ok || caller.ChatID >= 0 {
@@ -180,9 +179,8 @@ type memberInfoArgs struct {
 // activity and card game.
 func MemberInfoTool(opts MemberInfoOptions) Tool {
 	return Tool{
-		Name: "member_info",
-		Description: "Everything known about the asker in this group (whose: me, the default), or about the member their message replies to (replied) or the one they tagged with @ (tagged): Telegram status and admin title or tag, moderator rank (1–5), warnings with the last reason, mutes and bans received, messages written today and this week, when last seen, who brought them in, how many people they brought, and their card game points, place, cards, tokens, minutes to the next token and crystals. " +
-			"Call it before you state anyone's cards, points, tokens, crystals, rank, warnings or messages, even when the chat or your earlier answers seem to say them: they change, and memory is wrong. Use it whenever someone asks about themselves or a member (\"men haqimda\", \"darajam qaysi\", \"nechta ogohlantirishim bor\", \"nechta xabar yozdim\", \"kim qo'shgan meni\", \"ochkoim\", \"мой ранг\", \"сколько у меня предупреждений\"); answer only from what it gives.",
+		Name:        "member_info",
+		Description: "What is known about the asker in this group (whose me, the default), the member they replied to (replied) or tagged (tagged): status and admin title or tag, moderator rank (1–5), warnings and the last reason, mutes and bans, messages today and this week, last seen, who brought them in and how many they brought, and their card points, place, cards, tokens, next token and crystals. Call it whenever someone asks about themselves or a member (\"men haqimda\", \"darajam qaysi\", \"nechta ogohlantirishim bor\", \"мой ранг\"), and before you state anyone's cards, points, tokens, crystals, rank, warnings or messages, even when the chat or your earlier answers seem to say them: they change. Answer only from what it gives.",
 		Schema: json.RawMessage(`{"type": "object", "properties": {
 			"whose": {"type": "string", "enum": ["me", "replied", "tagged"], "description": "me, the default; replied for the member their message replies to; tagged for the one member they tagged."}
 		}, "additionalProperties": false}`),
