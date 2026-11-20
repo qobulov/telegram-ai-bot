@@ -1481,6 +1481,17 @@ func TestMembersMuteAttemptsAreRefused(t *testing.T) {
 	}
 }
 
+// /ignore pressed in the menu comes without the bot's name, and is still
+// the bot's.
+func TestBareIgnoreIsTheBots(t *testing.T) {
+	f := newFixture()
+	f.opts.Rules = &fakeRuleBook{}
+	sent := f.run(commandReplyingTo(boss, bek, "/ignore"))
+	if len(sent) != 1 || sent[0].text != "Okay, I won't answer Bek @bek for the next 24 hours." {
+		t.Errorf("sent = %+v, want the bare /ignore done", sent)
+	}
+}
+
 // A busy group is when admins need /ignore and moderation most, and when
 // the quota is full.
 func TestManagersCommandsAndModerationRequestsPassAFullQuota(t *testing.T) {

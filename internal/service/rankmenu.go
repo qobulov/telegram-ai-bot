@@ -66,6 +66,12 @@ func (s *Service) setRankMenu(ctx context.Context, chatID int64, member *telegra
 			return
 		}
 		if admin {
+			// A menu left from before they were made admin would hide the
+			// admins' one.
+			if err := s.opts.MenuSetter.DeleteMemberCommands(ctx, chatID, member.ID); err != nil {
+				s.opts.Logger.Warn("could not take an admin's rank menu away", "chat_id", chatID, "error", err)
+				return
+			}
 			s.rankMenus.set(key, rank)
 			return
 		}

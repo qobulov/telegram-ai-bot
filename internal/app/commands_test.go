@@ -346,3 +346,20 @@ func TestGroupAdminMenuFollowsTheBotsRights(t *testing.T) {
 		t.Errorf("every right: %v, want the menu of every group's admins %v", commandNames(full), commandNames(commandMenus[telegram.ScopeAllChatAdmins]))
 	}
 }
+
+// Admins may run /unignore and /invites_auto, so their menu lists them; a
+// ranked moderator's /mute promises nothing about muting the bot, which
+// takes a Telegram admin.
+func TestMenusListWhatTheirRoleMayRun(t *testing.T) {
+	admins := commandNames(commandMenus[telegram.ScopeAllChatAdmins])
+	for _, want := range []string{"ignore", "unignore", "invites_auto"} {
+		if !slices.Contains(admins, want) {
+			t.Errorf("the admins' menu lacks /%s", want)
+		}
+	}
+	for _, c := range RankMenu(5, nil) {
+		if (c.Command == "mute" || c.Command == "unmute") && strings.Contains(c.Description, "bot") {
+			t.Errorf("a moderator's /%s = %q, which they cannot do to the bot", c.Command, c.Description)
+		}
+	}
+}

@@ -78,8 +78,10 @@ var adminCommands = []struct {
 	{telegram.BotCommand{Command: "kickinactive", Description: "Faol emaslarni chiqarish: /kickinactive 30"}, restrict},
 	{telegram.BotCommand{Command: "amnesty", Description: "Hammani bandan chiqarish"}, restrict},
 	{telegram.BotCommand{Command: "ignore", Description: "A'zoga 24 soat javob bermaslik (reply)"}, nil},
+	{telegram.BotCommand{Command: "unignore", Description: "A'zoga yana javob berish (reply)"}, nil},
 	{telegram.BotCommand{Command: "cleanservice", Description: "\"Kirdi/chiqdi\" xabarlarini o'chirish (yoqish/o'chirish)"}, []string{telegram.RightDeleteMessages}},
 	{telegram.BotCommand{Command: "antispam", Description: "Antispam: flood, spamerlar, yangi a'zolar havolasi (tugmalar)"}, []string{telegram.RightRestrictMembers, telegram.RightDeleteMessages}},
+	{telegram.BotCommand{Command: "invites_auto", Description: "Takliflar reytingini avto-e'lon qilish, yoki off"}, nil},
 }
 
 var restrict = []string{telegram.RightRestrictMembers}
@@ -205,6 +207,9 @@ func RankMenu(rank int, overrides map[string]int) []telegram.BotCommand {
 	for _, c := range ownerGroupMenu {
 		described[c.Command] = c.Description
 	}
+	// Muting the bot itself takes a Telegram admin.
+	described["mute"] = "Mut: /mute 1h (reply yoki @user)"
+	described["unmute"] = "Mutdan chiqarish (reply yoki @user)"
 	var menu []telegram.BotCommand
 	seen := map[string]bool{}
 	add := func(c telegram.BotCommand) {

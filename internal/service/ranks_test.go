@@ -301,6 +301,11 @@ func TestRankedMemberGetsTheMenuOnce(t *testing.T) {
 	if len(menus.calls) != 1 || menus.calls[0] != [2]int64{groupID, moder} {
 		t.Errorf("menus set = %v, want once, for the moderator", menus.calls)
 	}
+	// A ranked admin's menu from before they were made admin is taken away,
+	// as it would hide the admins' one.
+	if len(menus.deleted) != 1 || menus.deleted[0] != [2]int64{groupID, admin} {
+		t.Errorf("menus taken away = %v, want the ranked admin's", menus.deleted)
+	}
 }
 
 // A rank given to a message written as a channel, as an anonymous admin or
