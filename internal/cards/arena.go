@@ -260,7 +260,7 @@ func (h *handler) arenaView(ctx context.Context, user miniapp.User, shown []int6
 		"team": views, "opponents": others, "top": rows, "history": history,
 		"me": map[string]any{"place": tablePlace, "total": tableSize},
 		"week": map[string]any{
-			"place": place, "prize": arenaWeekPrize(place), "prizes": ArenaWeekPrizes,
+			"place": place, "prize": arenaWeekPrize(place), "boxes": arenaWeekBoxes(place), "prizes": ArenaWeekPrizes,
 			"ends": weekStart.AddDate(0, 0, 7).UnixMilli(),
 		},
 	}, failure{}

@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-var weekPrizes = []ArenaPrize{{1, 1, 50}, {2, 3, 30}, {4, 5, 10}}
+var weekPrizes = []ArenaPrize{{From: 1, To: 1, Tokens: 50, Boxes: 3, Box: "box"}, {From: 2, To: 3, Tokens: 30}, {From: 4, To: 5, Tokens: 10, Boxes: 1, Box: "box"}}
 
 // The week is paid once, by rating, to those who attacked within it only,
 // as far as the prizes go.
@@ -41,17 +41,17 @@ func TestPayArenaWeek(t *testing.T) {
 	if err != nil || !paid || players != 4 {
 		t.Fatalf("paid %d (%v), %v; want 4", players, paid, err)
 	}
-	want := map[int64]string{1: "place 1/50", 2: "place 2/30", 4: "place 3/30", 5: "place 4/10"}
-	rows, _ := store.pool.Query(ctx, `SELECT user_id, note, tokens FROM card_mail`)
+	want := map[int64]string{1: "place 1/50/box3", 2: "place 2/30/0", 4: "place 3/30/0", 5: "place 4/10/box1"}
+	rows, _ := store.pool.Query(ctx, `SELECT user_id, note, tokens, box, boxes FROM card_mail`)
 	got := map[int64]string{}
 	for rows.Next() {
 		var id int64
-		var n string
-		var tok int
-		if err := rows.Scan(&id, &n, &tok); err != nil {
+		var n, box string
+		var tok, boxes int
+		if err := rows.Scan(&id, &n, &tok, &box, &boxes); err != nil {
 			t.Fatal(err)
 		}
-		got[id] = fmt.Sprintf("%s/%d", n, tok)
+		got[id] = fmt.Sprintf("%s/%d/%s%d", n, tok, box, boxes)
 	}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Errorf("mail = %v, want %v", got, want)

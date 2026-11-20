@@ -8,22 +8,24 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// ArenaPrize gives Tokens to each of the places From through To, the first
-// place being 1.
+// ArenaPrize gives Tokens, and Boxes of the box Box, to each of the places
+// From through To, the first place being 1.
 type ArenaPrize struct {
-	From   int `json:"from"`
-	To     int `json:"to"`
-	Tokens int `json:"tokens"`
+	From   int    `json:"from"`
+	To     int    `json:"to"`
+	Tokens int    `json:"tokens"`
+	Boxes  int    `json:"boxes,omitempty"`
+	Box    string `json:"box,omitempty"`
 }
 
-// prizeAt is the tokens for place, 0 for one no prize covers.
-func prizeAt(prizes []ArenaPrize, place int) int {
+// prizeAt is the prize for place, none for one no prize covers.
+func prizeAt(prizes []ArenaPrize, place int) ArenaPrize {
 	for _, p := range prizes {
 		if place >= p.From && place <= p.To {
-			return p.Tokens
+			return p
 		}
 	}
-	return 0
+	return ArenaPrize{}
 }
 
 // PayArenaWeek pays the arena's week from since until until, once: the
@@ -54,16 +56,23 @@ func (s *Store) PayArenaWeek(ctx context.Context, since, until time.Time, prizes
 			return err
 		}
 		var users []int64
-		var notes []string
-		var tokens []int32
+		var notes, boxes []string
+		var tokens, counts []int32
 		for i, userID := range winners {
-			if n := prizeAt(prizes, i+1); n > 0 {
-				users, notes, tokens = append(users, userID), append(notes, note(i+1)), append(tokens, int32(n))
+			p := prizeAt(prizes, i+1)
+			if p.Tokens == 0 && p.Boxes == 0 {
+				continue
 			}
+			box := ""
+			if p.Boxes > 0 {
+				box = p.Box
+			}
+			users, notes, tokens = append(users, userID), append(notes, note(i+1)), append(tokens, int32(p.Tokens))
+			boxes, counts = append(boxes, box), append(counts, int32(p.Boxes))
 		}
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO card_mail (user_id, note, tokens)
-			SELECT * FROM unnest($1::bigint[], $2::text[], $3::int[])`, users, notes, tokens); err != nil {
+			INSERT INTO card_mail (user_id, note, tokens, box, boxes)
+			SELECT * FROM unnest($1::bigint[], $2::text[], $3::int[], $4::text[], $5::int[])`, users, notes, tokens, boxes, counts); err != nil {
 			return err
 		}
 		players = len(users)

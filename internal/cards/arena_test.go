@@ -231,6 +231,15 @@ func TestArenaWeek(t *testing.T) {
 			t.Errorf("prize for %d = %d, want %d", place, got, want)
 		}
 	}
+	// The top 5 get diamond boxes too: 3, 2, then 1 each.
+	for place, want := range map[int]int{1: 3, 2: 2, 3: 1, 4: 1, 5: 1, 6: 0, 0: 0} {
+		if got := arenaWeekBoxes(place); got != want {
+			t.Errorf("boxes for %d = %d, want %d", place, got, want)
+		}
+	}
+	if _, ok := BoxByID(arenaWeekBox); !ok {
+		t.Errorf("the week's box %q is no box the inventory holds", arenaWeekBox)
+	}
 }
 
 type fakeWeekPayer struct {
