@@ -353,3 +353,14 @@ func TestAntispamMenuSaysTheNewcomerGuardNeedsAI(t *testing.T) {
 		t.Errorf("with AI: %q", sent[0].text)
 	}
 }
+
+// The menu says the flood guard's present numbers, which are read from the
+// guard's own limits, so raising them cannot leave the menu behind.
+func TestAntispamMenuSaysTheFloodLimits(t *testing.T) {
+	f, _, _ := protectFixture()
+	sent := f.run(from(groupAdminID, "/antispam on", 0))
+	want := fmt.Sprintf("%d soniyada %d ta, %d soniyada %d ta xabar", int(floodWindow.Seconds()), floodMessages, int(floodLongWindow.Seconds()), floodLongMessages)
+	if len(sent) != 1 || !strings.Contains(sent[0].text, want) {
+		t.Errorf("menu %q does not say %q", sent[0].text, want)
+	}
+}

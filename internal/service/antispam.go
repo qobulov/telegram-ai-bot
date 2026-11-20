@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"slices"
 	"strings"
@@ -35,7 +36,8 @@ const (
 // antispamGuards are the guards /antispam shows, in its order, with their
 // buttons' names.
 var antispamGuards = []struct{ key, name, says string }{
-	{antispamFlood, "Flood", "Flood: 10 soniyada 10 ta, 30 soniyada 20 ta xabar yoki 1 daqiqada bir xil xabar/stiker 3 marta — xabarlari o'chiriladi va mut: 10 daqiqa, keyin 1 soat, keyin 1 kun"},
+	{antispamFlood, "Flood", fmt.Sprintf("Flood: %d soniyada %d ta, %d soniyada %d ta xabar yoki 1 daqiqada bir xil xabar/stiker %d marta — ",
+		int(floodWindow.Seconds()), floodMessages, int(floodLongWindow.Seconds()), floodLongMessages, repeatMessages) + "xabarlari o'chiriladi va mut: 10 daqiqa, keyin 1 soat, keyin 1 kun"},
 	{antispamSpam, "Spamerlar", "Spamerlar ro'yxati (CAS, lols.bot): ro'yxatdagilar guruhdan chiqariladi"},
 	{antispamNewcomers, "Yangi a'zolar", "Yangi a'zolar: guruhda 5 tadan kam yozganlarning havola, reklama, tugmali xabar va kanal postlari o'chiriladi, ikkinchisida 1 soat mut"},
 }
