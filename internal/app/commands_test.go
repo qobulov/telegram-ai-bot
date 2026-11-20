@@ -152,60 +152,75 @@ func (f *fakeChatCommandSetter) SetChatCommands(_ context.Context, chatID int64,
 	return nil
 }
 
-// Each owner gets every command in their private chat's menu.
+// Each owner gets their private chat's menu: what works there, then the
+// owners' own commands.
 func TestOwnerPrivateMenus(t *testing.T) {
 	setter := &fakeChatCommandSetter{set: map[int64][]telegram.BotCommand{}}
 	SetOwnerMenus(context.Background(), setter, map[int64]bool{7: true, 8: true}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	for _, owner := range []int64{7, 8} {
 		if !slices.Equal(setter.set[owner], ownerMenu) {
-			t.Errorf("owner %d menu = %v, want every command", owner, setter.set[owner])
+			t.Errorf("owner %d menu = %v, want the owners' private menu", owner, setter.set[owner])
 		}
 	}
 }
 
-// The owners' menu holds every command of the others' menus and the
-// owners' own, each once, as many as Telegram takes, each one it accepts.
+// The owners' menus are commands Telegram takes, each once and at most
+// 100: in a group every command of the others' menus, in private what works
+// there and the owners' own, none of the group-only ones.
 func TestOwnerMenuHoldsEveryCommand(t *testing.T) {
-	if len(ownerMenu) > 100 {
-		t.Errorf("owners' menu has %d commands, Telegram takes 100", len(ownerMenu))
-	}
 	valid := regexp.MustCompile(`^[a-z0-9_]{1,32}$`)
-	seen := map[string]bool{}
-	for _, c := range ownerMenu {
-		if seen[c.Command] {
-			t.Errorf("/%s twice in the owners' menu", c.Command)
+	names := func(menu []telegram.BotCommand, which string) map[string]bool {
+		if len(menu) > 100 {
+			t.Errorf("the %s menu has %d commands, Telegram takes 100", which, len(menu))
 		}
-		seen[c.Command] = true
-		if !valid.MatchString(c.Command) || c.Description == "" || len([]rune(c.Description)) > 256 {
-			t.Errorf("%+v is not a command Telegram takes", c)
+		seen := map[string]bool{}
+		for _, c := range menu {
+			if seen[c.Command] {
+				t.Errorf("/%s twice in the %s menu", c.Command, which)
+			}
+			seen[c.Command] = true
+			if !valid.MatchString(c.Command) || c.Description == "" || len([]rune(c.Description)) > 256 {
+				t.Errorf("%+v is not a command Telegram takes", c)
+			}
 		}
+		return seen
 	}
-	for scope, commands := range commandMenus {
-		for _, c := range commands {
-			if !seen[c.Command] {
-				t.Errorf("/%s of the %s menu is missing from the owners' menu", c.Command, scope)
+	group, private := names(ownerGroupMenu, "owners' group"), names(ownerMenu, "owners' private")
+	for _, scope := range []string{telegram.ScopeAllGroupChats, telegram.ScopeAllChatAdmins} {
+		for _, c := range commandMenus[scope] {
+			if !group[c.Command] {
+				t.Errorf("/%s of the %s menu is missing from the owners' group menu", c.Command, scope)
 			}
 		}
 	}
-	for _, command := range []string{"aigroups", "announce", "payments", "refund",
-		"model", "stats", "settings", "set", "business", "import_stickers", "premium", "paysupport",
-		"woodcutter", "boss", "mafia", "card", "teams", "invites", "invites_auto", "unpin", "unignore", "ping", "about"} {
-		if !seen[command] {
-			t.Errorf("/%s is missing from the owners' menu", command)
+	for _, command := range []string{"premium", "paysupport", "woodcutter", "boss", "mafia", "card", "teams", "invites", "invites_auto", "unpin", "unignore", "ping", "about"} {
+		if !group[command] {
+			t.Errorf("/%s is missing from the owners' group menu", command)
 		}
 	}
-	for _, gone := range []string{"game", "snake", "tictactoe", "checkers"} {
-		if seen[gone] {
-			t.Errorf("/%s, a removed game's, is in the owners' menu", gone)
+	for _, command := range []string{"aigroups", "announce", "payments", "refund", "model", "stats", "settings", "set", "business", "import_stickers",
+		"start", "help", "card", "games", "id", "premium", "paysupport"} {
+		if !private[command] {
+			t.Errorf("/%s is missing from the owners' private menu", command)
+		}
+	}
+	for _, groupOnly := range []string{"ban", "mute", "warn", "rank", "access", "rep", "toprep", "report", "voteban", "staff", "rights", "mylink", "invites", "invites_auto", "teams", "mafia", "ignore"} {
+		if private[groupOnly] {
+			t.Errorf("/%s, which works in groups alone, is in the owners' private menu", groupOnly)
+		}
+	}
+	for _, gone := range []string{"game", "snake", "tictactoe", "checkers", "calc", "weather"} {
+		if group[gone] || private[gone] {
+			t.Errorf("/%s, a removed command, is in an owners' menu", gone)
 		}
 	}
 }
 
-// In a group an owner's menu is the owners' menu without their own
-// commands, which work only in private.
+// In a group an owner's menu leaves out their own commands, which work
+// only in private.
 func TestOwnerGroupMenuLeavesOutTheOwnersOwn(t *testing.T) {
-	if want := len(ownerGroupMenu) + len(ownerOnlyMenu); len(ownerMenu) != want {
-		t.Errorf("owners' menu has %d commands, want %d", len(ownerMenu), want)
+	if want := len(ownerPrivateMenu) + len(ownerOnlyMenu); len(ownerMenu) != want {
+		t.Errorf("owners' private menu has %d commands, want %d", len(ownerMenu), want)
 	}
 	for _, c := range ownerGroupMenu {
 		if slices.ContainsFunc(ownerOnlyMenu, func(o telegram.BotCommand) bool { return o.Command == c.Command }) {

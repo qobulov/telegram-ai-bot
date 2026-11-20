@@ -175,8 +175,27 @@ var ownerOnlyMenu = []telegram.BotCommand{
 	{Command: "import_stickers", Description: "Stiker to'plamini import qilish: havola yoki nom (owner)"},
 }
 
-// ownerMenu is every command the bot answers, in an owner's private chat.
-var ownerMenu = append(slices.Clone(ownerGroupMenu), ownerOnlyMenu...)
+// ownerPrivateMenu are the commands of ownerGroupMenu that also work in a
+// private chat, as the owners asked on 2026-11-20: the moderation, rank,
+// reputation, invite, /teams and Mafia ones work in groups alone, and an
+// owner has them there.
+var ownerPrivateMenu = []telegram.BotCommand{
+	{Command: "start", Description: "Salomlashish"},
+	{Command: "help", Description: "Yordam va buyruqlar"},
+	{Command: "about", Description: "Bot haqida"},
+	{Command: "card", Description: "Kartalar o'yini: har 2 soatda token, 1x/5x ochish, kolleksiya"},
+	{Command: "games", Description: "Barcha o'yinlar"},
+	{Command: "woodcutter", Description: "O'tinchi: daraxtni chop, shoxlardan qoch"},
+	{Command: "boss", Description: "Dev jangi: guruh bilan birga devni uring"},
+	{Command: "id", Description: "Sizning ID'ingiz"},
+	{Command: "ping", Description: "Bot ishlayaptimi: javob vaqti"},
+	{Command: "premium", Description: "Premium: nima beradi, sotib olish yoki uzaytirish"},
+	{Command: "paysupport", Description: "To'lov bo'yicha kimga yozish"},
+}
+
+// ownerMenu is an owner's private chat menu: what works there, then the
+// owners' own commands.
+var ownerMenu = append(slices.Clone(ownerPrivateMenu), ownerOnlyMenu...)
 
 // rankedCommands are the admins' commands a moderator with a rank may run
 // in a group without being its Telegram admin, each with the rank code
