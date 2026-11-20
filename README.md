@@ -469,6 +469,13 @@ model may guess at the time or at arithmetic.
 
 ## The character
 
+The persona (`internal/config/persona.go`) goes with every request, so
+what only some messages need is added only to them: how to treat an owner
+and carry out their orders (`ownerOrdersNote`) when an owner writes the
+message or one of the recent lines (`ownerNearby`), and the card game's
+facts when the message is about it. Who the owners are, how they are
+recognised and that this is a secret stay in the persona for everyone.
+
 The bot plays a character instead of acting as an assistant. Out of the box
 she is **Maria**: funny, playful and warm, calm when pushed, and good
 company rather than the group's troll. She teases only someone who is
@@ -2322,9 +2329,13 @@ offer whose card its player no longer holds is called off when taken, and a
 player takes down their own (`unoffer`). A trade's two cards must be at most one rarity apart (`tradeRarityGap`), Common for Rare, Rare for Epic, Epic for Legendary, Legendary for Mythic, never two apart, as an offer and as a market take (`ErrCardTradeUneven`, "faqat bir daraja yuqori yoki past kartaga almashish mumkin"), as the owners asked on 2026-11-19: one player's cards had gone to another's, Common cards for three Mythic in seven minutes, and trades were held to one rarity until then. A card a player has raised above ★1 never moves, spare copies or none, as the owners asked on 2026-11-19 (`ErrCardFused`, "⭐ yulduzli kartani almashib bo'lmaydi", checked in `OfferCard` and `moveCard`; until then only its last copy stayed): the page leaves it out of the cards to give, an offer whose player raised its card is left off the market and called off when taken, and an offer wanting a card the viewer has raised shows ⭐ in place of 🔄 (`can` false, `starred`). A limited card (`limitedCards` in `internal/storage/cardtrade.go`: Satoko Kirigaya, LIMITED No.000001) never changes hands: it is not offered, wanted or taken (`ErrCardLimited`, checked in `moveCard`, which every take goes through, and in the offer's check), and the page leaves it out of both lists of an offer (`limited` on each card). Offers placed before these rules, of two rarities or of a limited card, are left off the market and refused when taken; they are not changed in the database. The same two players trade as often as they like, and a player trades as many cards a day as they like: the daily limits were taken out. The market's cards show each card's tier; migration 75 called off the open offers the rule forbids. There is no trade command: `/trade`, which offered a card for a member's in
 a group, was taken out, and trades are done on the market alone. A card taken
 from the market may be the last copy of a card at ★1, which leaves the collection (its used-up copies
-with it), its points passing only as it is new to its taker. With the pages served, the persona is told the game's facts
-(`cardsNote`), as the model had said it was "not the card bot" and named
-commands there are none of; it teaches `/card` alone. The
+with it), its points passing only as it is new to its taker. With the pages served, the model is told the game's facts
+(`cardsNote`), as it had said it was "not the card bot" and named
+commands there are none of; it teaches `/card` alone. Since 2026-11-20 the
+facts go only with a message about the game, or one after such a question
+(`cardWords` in `internal/agent/agent.go`), as they cost every request
+about a thousand tokens; they cover the arena, its shop, the weekly prize
+and Minora too. The
 pictures are the characters' AniList pictures, the studios' art.
 
 The cards come from AniList alone. Trading cards from PokéWallet (one set

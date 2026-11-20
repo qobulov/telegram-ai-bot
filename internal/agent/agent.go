@@ -84,7 +84,12 @@ type Options struct {
 	// Persona is the character's instructions, sent with every request.
 	Persona string
 	// GroupNote is added to Persona for messages from a group.
-	GroupNote    string
+	GroupNote string
+	// OwnerNote is added when an owner writes the message or one of the
+	// recent lines; CardsNote when the message, or one of the last ones
+	// asked, is about the card game. Either may be "".
+	OwnerNote    string
+	CardsNote    string
 	MaxHistory   int
 	MaxToolCalls int
 }
@@ -317,7 +322,7 @@ func finishedByTool(ctx context.Context) (string, bool) {
 
 func (a *Agent) prompt(t *turn) []ai.Message {
 	messages := make([]ai.Message, 0, 1+len(t.history)+len(t.messages))
-	system := a.systemPrompt(t.req)
+	system := a.systemPrompt(t)
 	if t.toolAsText {
 		system += "\n\n" + toolAsTextNote
 	}
@@ -351,11 +356,69 @@ const noPicturesNote = "(The picture or video with this message could not be sho
 // one of them made up, for a question asked as a joke.
 const heroCheckNote = "[Before you name, deny or compare any game hero in your answer, check it: Mobile Legends heroes with the mlbb tool (hero, or heroes for a list by role), another game's with web_search. Never from memory, even for a joke.]"
 
-func (a *Agent) systemPrompt(req Request) string {
-	if req.Group {
-		return a.opts.Persona + "\n\n" + a.opts.GroupNote
+func (a *Agent) systemPrompt(t *turn) string {
+	system := a.opts.Persona
+	if t.req.Group {
+		system += "\n\n" + a.opts.GroupNote
 	}
-	return a.opts.Persona
+	if a.opts.OwnerNote != "" && ownerNearby(t) {
+		system += "\n\n" + a.opts.OwnerNote
+	}
+	if a.opts.CardsNote != "" && aboutCards(t) {
+		system += "\n\n" + a.opts.CardsNote
+	}
+	return system
+}
+
+// ownerMarks are what the service puts on an owner's words: after their
+// name in a group, and before their message in a private chat. Typing one
+// only adds the owner rules to the prompt; it proves nothing.
+var ownerMarks = []string{"[owner]", "[This message is from your owner.]"}
+
+// recentAsked is how many of the last questions in the history are looked
+// at for an owner or for the card game.
+const recentAsked = 3
+
+// ownerNearby reports whether an owner writes this message, or wrote one of
+// the recent group lines or the last questions.
+func ownerNearby(t *turn) bool {
+	texts := append([]string{t.req.Text, t.req.Context}, lastAsked(t.history, recentAsked)...)
+	for _, text := range texts {
+		for _, mark := range ownerMarks {
+			if strings.Contains(text, mark) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// cardWords name the card game, its parts and its currencies.
+var cardWords = regexp.MustCompile(`(?i)(kart|card|карт|arena|арен|token|токен|bozor|market|рын|mifik|mythic|миф|legendar|afsonaviy|легенд|epik|epic|эпик|noyob|kristal|crystal|кристал|minora|tower|башн|satoko|firefly|yulduz|звезд|topshiriq|quest|квест|kolleksiya|collection|коллекц|reyting|рейтинг|tanga|coin|монет)`)
+
+// aboutCards reports whether this message, or one of the last questions,
+// is about the card game.
+func aboutCards(t *turn) bool {
+	if cardWords.MatchString(ownLine(t.req.Text)) {
+		return true
+	}
+	for _, text := range lastAsked(t.history, recentAsked) {
+		if cardWords.MatchString(text) {
+			return true
+		}
+	}
+	return false
+}
+
+// lastAsked is the content of the last n user messages of history.
+func lastAsked(history []ai.Message, n int) []string {
+	var asked []string
+	for i := len(history) - 1; i >= 0 && len(asked) < n; i-- {
+		if history[i].Role == ai.RoleUser {
+			asked = append(asked, history[i].Content)
+		}
+	}
+	return asked
 }
 
 // toolAsTextNote is added to the system prompt after the model wrote a tool

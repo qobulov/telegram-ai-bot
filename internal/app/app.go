@@ -321,6 +321,8 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Name:         cfg.BotDisplayName,
 		Persona:      withNewHeroes(cfg, bot),
 		GroupNote:    cfg.GroupNote,
+		OwnerNote:    cfg.OwnerNote,
+		CardsNote:    cfg.CardsNote,
 		MaxHistory:   cfg.MaxHistoryMessages,
 		MaxToolCalls: cfg.MaxToolCallsPerTurn,
 	})

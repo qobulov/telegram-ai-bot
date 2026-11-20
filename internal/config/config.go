@@ -117,6 +117,11 @@ type Config struct {
 	BotDisplayName string
 	PersonaPrompt  string
 	GroupNote      string
+	// OwnerNote, how to treat an owner and carry out their orders, is added
+	// only when an owner writes or wrote lately; CardsNote, Kartalar's
+	// facts, only to a message about the game. Both are "" when off.
+	OwnerNote string
+	CardsNote string
 
 	MaxHistoryMessages     int
 	MaxToolCallsPerTurn    int
@@ -292,6 +297,7 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	if len(cfg.OwnerUsernames) > 0 {
 		cfg.PersonaPrompt += "\n\n" + strings.ReplaceAll(ownerNote, ownerPlaceholder, nameList(cfg.OwnerUsernames))
+		cfg.OwnerNote = ownerOrdersNote
 	}
 	cfg.FootballDataToken = r.apiKey("FOOTBALL_DATA_TOKEN")
 	cfg.GiphyAPIKey = r.apiKey("GIPHY_API_KEY")
@@ -310,7 +316,7 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.WakeWords = r.wakeWords(cfg)
 	cfg.WebAppURL = r.webAppURL("WEBAPP_URL")
 	if cfg.WebAppURL != "" {
-		cfg.PersonaPrompt += "\n\n" + cardsNote
+		cfg.CardsNote = cardsNote
 	}
 	r.checkRemovedVariables()
 	r.checkGroupSettings(cfg)
@@ -734,4 +740,16 @@ func splitList(value string) []string {
 		}
 	}
 	return items
+}
+
+// FullPersona is the persona with every note that may be added to it, as
+// a message from an owner about the cards would get it.
+func (c Config) FullPersona() string {
+	persona := c.PersonaPrompt
+	for _, note := range []string{c.OwnerNote, c.CardsNote} {
+		if note != "" {
+			persona += "\n\n" + note
+		}
+	}
+	return persona
 }
