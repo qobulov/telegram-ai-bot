@@ -798,7 +798,7 @@ var privateOwnerCommands = map[string]bool{
 // alone opens it now, and in a group these get no answer at all.
 var retiredCommands = map[string]bool{
 	"/cards": true, "/mycards": true, "/cardtop": true, "/market": true, "/duel": true, "/profile": true,
-	"/calc": true, "/weather": true,
+	"/calc": true, "/weather": true, "/kickinactive": true,
 }
 
 // respond decides what to send back. An empty outcome sends nothing. rules

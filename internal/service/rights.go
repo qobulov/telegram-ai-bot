@@ -68,7 +68,7 @@ func rankLines(byRank []ranks.Command) []string {
 // holder, as the moderate tool checks them (neededRight in
 // internal/tools/moderation.go): the person asking must hold the right.
 var rightCommands = []struct{ right, line string }{
-	{telegram.RightRestrictMembers, "• /mute, /unmute, /ban, /unban, /kick, /warn, /unwarn, /amnesty, /kickinactive — a'zolarni cheklash; stiker va rasm cheklovi"},
+	{telegram.RightRestrictMembers, "• /mute, /unmute, /ban, /unban, /kick, /warn, /unwarn, /amnesty — a'zolarni cheklash; stiker va rasm cheklovi"},
 	{telegram.RightDeleteMessages, "• /del — xabarni o'chirish, ko'p xabarni o'chirish"},
 	{telegram.RightPinMessages, "• /pin, /unpin — xabarni qadash"},
 	{telegram.RightPromoteMembers, "• /promote, /demote — admin qilish va adminlikni olish, adminlar unvoni"},
@@ -88,7 +88,7 @@ var rankRights = map[string][]string{
 	"ban": {telegram.RightRestrictMembers}, "kick": {telegram.RightRestrictMembers},
 	"mute": {telegram.RightRestrictMembers}, "warn": {telegram.RightRestrictMembers},
 	"media": {telegram.RightRestrictMembers}, "amnesty": {telegram.RightRestrictMembers},
-	"masskick": {telegram.RightRestrictMembers}, "pin": {telegram.RightPinMessages},
+	"pin":    {telegram.RightPinMessages},
 	"delete": {telegram.RightDeleteMessages}, "purge": {telegram.RightDeleteMessages},
 	"admin": {telegram.RightPromoteMembers}, "banlist": {},
 	"group": {telegram.RightChangeInfo, telegram.RightInviteUsers, telegram.RightRestrictMembers, telegram.RightManageTags},

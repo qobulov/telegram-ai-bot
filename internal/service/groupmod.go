@@ -22,27 +22,16 @@ type BanList interface {
 const banListShown = 30
 
 // groupOrder is a group message asking for something done to the whole
-// group: "/banlist", "/amnesty", "/kickinactive 30" ("ha" confirming it).
+// group: "/banlist", "/amnesty".
 func (s *Service) groupOrder(in incoming) (fields map[string]any, ok bool) {
 	if !in.group {
 		return nil, false
 	}
-	words := strings.Fields(strings.ToLower(commandArgument(in.text)))
 	switch commandName(in.text) {
 	case "/banlist":
 		return map[string]any{"action": "banlist"}, s.opts.BanList != nil
 	case "/amnesty":
 		return map[string]any{"action": "amnesty"}, s.opts.Tools != nil
-	case "/kickinactive":
-		days, force := 0, false
-		for _, w := range words {
-			if n, err := strconv.Atoi(w); err == nil {
-				days = n
-			} else if w == "ha" || w == "да" || w == "yes" || w == "confirm" {
-				force = true
-			}
-		}
-		return map[string]any{"action": "kick_inactive", "days": days, "force": force}, s.opts.Tools != nil
 	}
 	written, _ := in.msg.Content()
 	switch strings.Join(s.orderWords(written), " ") {

@@ -138,7 +138,7 @@ var ownCommands = map[string]bool{
 	"/card": true, "/invites": true, "/invites_week": true, "/invites_month": true, "/invites_auto": true, "/teams": true, "/games": true,
 	"/boss": true, "/woodcutter": true,
 	"/staff": true, "/ranks": true, "/ranklog": true, "/access": true, "/rank": true,
-	"/banlist": true, "/amnesty": true, "/kickinactive": true,
+	"/banlist": true, "/amnesty": true,
 	"/admins": true, "/report": true, "/voteban": true,
 	"/ping": true, "/id": true,
 	"/mylink": true, "/reports": true, "/warns": true, "/rights": true, "/myinvites": true,

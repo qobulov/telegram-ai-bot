@@ -245,7 +245,7 @@ A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yo
 /ignore@username, /unignore@username — a'zoning xabariga reply qilib: unga 24 soat javob bermayman yoki yana javob beraman
 /warn, /unwarn — ogohlantirish (3-sida 1 kunga mut), /ban sabab, /kick — a'zoga reply qilib
 /rank 3 (reply) — moderatorga 1–5 daraja berish, /rank 0 — olib tashlash, /rank — darajasini ko'rish; /staff, /ranklog, /access — moderatorlar, kim tayinlagan, buyruqlar darajasi
-/banlist, /amnesty, /kickinactive 30 — banlar ro'yxati, hammani bandan chiqarish, faol emaslarni chiqarish
+/banlist, /amnesty — banlar ro'yxati, hammani bandan chiqarish
 /reports, /warns — ko'rilmagan shikoyatlar, kimda nechta ogohlantirish
 
 Hamma uchun:
@@ -272,7 +272,7 @@ Bo'limlar: /help mod, /help kartalar, /help azo`,
 /ignore@username, /unignore@username — ответом на сообщение участника: не отвечаю ему 24 часа или снова отвечаю
 /warn, /unwarn — предупреждение (на третьем мут на сутки), /ban причина, /kick — ответом на сообщение
 /rank 3 (reply) — дать модератору ранг 1–5, /rank 0 — снять, /rank — посмотреть ранг; /staff, /ranklog, /access — модераторы, кто назначил, ранги команд
-/banlist, /amnesty, /kickinactive 30 — банлист, разбан всех, кик неактивных
+/banlist, /amnesty — банлист, разбан всех
 /reports, /warns — нерассмотренные жалобы, у кого сколько предупреждений
 
 Для всех:
@@ -299,7 +299,7 @@ Reply to a member's message and ask me to delete or pin it, to mute or ban its a
 /ignore@username, /unignore@username — as a reply to a member's message: I stop answering them for 24 hours, or answer them again
 /warn, /unwarn — a warning (the third mutes for a day), /ban reason, /kick — as a reply
 /rank 3 (reply) — give a moderator rank 1–5, /rank 0 — take it away, /rank — see their rank; /staff, /ranklog, /access — moderators, who gave ranks, commands' ranks
-/banlist, /amnesty, /kickinactive 30 — the ban list, unban everyone, remove the inactive
+/banlist, /amnesty — the ban list, unban everyone
 /reports, /warns — open reports, who has how many warnings
 
 For everyone:
@@ -421,7 +421,6 @@ var helpSections = map[string]localText{
 /rank 3 yoki /rank 0 (reply) — moderator darajasi 1–5 berish yoki olish; /staff, /ranklog, /access
 /banlist — banlar va "bandan chiqarish" tugmalari; /amnesty — hammani chiqarish
 /reports — ko'rilmagan shikoyatlar; /warns — kimda nechta ogohlantirish
-/kickinactive 30 — 30 kun yozmaganlarni chiqarish
 /cleanservice — "kirdi", "chiqdi", "qadadi" xabarlarini o'chirishni yoqish yoki o'chirish
 /antispam — flood, spamerlar va yangi a'zolar havolasiga qarshi himoya: tugmalar bilan yoqish yoki o'chirish (odatda yoqilgan)
 "orqaga qaytar" — oxirgi amalni bekor qilish
@@ -434,7 +433,6 @@ Meni jim qilish: /mute bot, qaytarish: /unmute`,
 /rank 3 или /rank 0 (reply) — дать или снять ранг модератора 1–5; /staff, /ranklog, /access
 /banlist — баны и кнопки разбана; /amnesty — разбан всех
 /reports — нерассмотренные жалобы; /warns — предупреждения
-/kickinactive 30 — кик тех, кто молчит 30 дней
 /antispam — защита от флуда, спамеров и ссылок новичков: кнопки вкл/выкл (по умолчанию включена)
 «верни» — отменить последнее
 Чтобы я молчала: /mute bot, вернуть: /unmute`,
@@ -446,7 +444,6 @@ Meni jim qilish: /mute bot, qaytarish: /unmute`,
 /rank 3 or /rank 0 (reply) — give or take a moderator's rank 1–5; /staff, /ranklog, /access
 /banlist — bans with unban buttons; /amnesty — unban everyone
 /reports — open reports; /warns — who has warnings
-/kickinactive 30 — remove those silent for 30 days
 /antispam — the flood, spammer and newcomer-link guards: buttons to switch them (on by default)
 "undo" — undo the last action
 To quiet me: /mute bot, to bring me back: /unmute`,

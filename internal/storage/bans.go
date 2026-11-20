@@ -50,29 +50,6 @@ func (s *Store) BannedMembers(ctx context.Context, chatID int64, limit int) ([]B
 	return banned, nil
 }
 
-// InactiveMembers are the chat's members, not bots, the bot last saw write
-// before since, the longest silent first.
-func (s *Store) InactiveMembers(ctx context.Context, chatID int64, since time.Time, limit int) ([]GroupMember, error) {
-	rows, err := s.pool.Query(ctx, `
-		SELECT user_id, coalesce(first_name, ''), coalesce(username, '')
-		FROM group_members
-		WHERE chat_id = $1 AND NOT is_bot AND coalesce(status, 'member') IN ('member', 'restricted')
-			AND last_seen_at < $2
-		ORDER BY last_seen_at LIMIT $3`, chatID, since, limit)
-	if err != nil {
-		return nil, fmt.Errorf("storage: list inactive members: %w", err)
-	}
-	members, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (GroupMember, error) {
-		m := GroupMember{ChatID: chatID}
-		err := row.Scan(&m.UserID, &m.FirstName, &m.Username)
-		return m, err
-	})
-	if err != nil {
-		return nil, fmt.Errorf("storage: list inactive members: %w", err)
-	}
-	return members, nil
-}
-
 // ModerationTargets are the members the bot acted on in the chat since a
 // time, the latest first, with the names the group log last saw them by,
 // also once they have left or were banned: whom a reply to the bot's notice,

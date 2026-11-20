@@ -270,7 +270,7 @@ func TestRankMenuFollowsTheRank(t *testing.T) {
 			t.Errorf("rank 1 menu %v lacks /%s", first, want)
 		}
 	}
-	for _, not := range []string{"ranklog", "pin", "del", "rank", "kickinactive", "promote", "amnesty", "access", "ignore", "invites_auto"} {
+	for _, not := range []string{"ranklog", "pin", "del", "rank", "promote", "amnesty", "access", "ignore", "invites_auto"} {
 		if slices.Contains(first, not) {
 			t.Errorf("rank 1 menu %v has /%s, which rank 1 does not open", first, not)
 		}
@@ -328,7 +328,7 @@ func TestGroupAdminMenuFollowsTheBotsRights(t *testing.T) {
 	}
 
 	restrictOnly := commandNames(GroupAdminMenu([]string{telegram.RightRestrictMembers}))
-	for _, want := range []string{"warn", "unwarn", "mute", "unmute", "ban", "unban", "kick", "kickinactive", "amnesty", "banlist", "warns", "reports", "antispam", "rank", "access", "ignore"} {
+	for _, want := range []string{"warn", "unwarn", "mute", "unmute", "ban", "unban", "kick", "amnesty", "banlist", "warns", "reports", "antispam", "rank", "access", "ignore"} {
 		if !slices.Contains(restrictOnly, want) {
 			t.Errorf("restrict only: /%s missing from %v", want, restrictOnly)
 		}

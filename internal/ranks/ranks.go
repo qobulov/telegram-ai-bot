@@ -32,7 +32,6 @@ var Commands = []Command{
 	{"undo", "Oxirgi amalni bekor qilish", 3},
 	{"banlist", "Banlar ro'yxati", 1},
 	{"purge", "Ko'p xabarni o'chirish", 4},
-	{"masskick", "Faol emaslarni ommaviy chiqarish", 4},
 	{"group", "Guruh sozlamalari: nom, rasm, havola, yopish", 4},
 	{"rank", "Daraja berish va olish", 4},
 	{"admin", "Telegram adminligini berish va olish", 5},
@@ -50,7 +49,7 @@ var actions = map[string]string{
 	"set_sticker_set": "group", "delete_sticker_set": "group", "invite_link": "group", "revoke_link": "group",
 	"edit_link": "group", "lock": "group", "unlock": "group", "member_tag": "group",
 	"promote": "admin", "demote": "admin", "admin_title": "admin",
-	"amnesty": "amnesty", "kick_inactive": "masskick",
+	"amnesty": "amnesty",
 }
 
 // CodeOf is the command a moderate action is, or "" for one ranks do not
