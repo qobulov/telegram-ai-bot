@@ -1356,7 +1356,10 @@
 
   // previewTile shows a card whether it is held or not: its picture and name,
   // dimmed and unmarked while the player does not have it.
-  function previewTile(card, count) {
+  // held, when given, is what its preview says the player has, apart from
+  // how the tile is drawn: the event's banner draws its card in full for
+  // everyone.
+  function previewTile(card, count, held = count) {
     const tile = document.createElement("button");
     tile.type = "button";
     tile.className = "card" + (count ? "" : " missing");
@@ -1377,7 +1380,7 @@
     }
     dress(tile, card, false);
     if (count) tile.insertAdjacentHTML("beforeend", '<span class="owned" aria-hidden="true">✓</span>');
-    tile.addEventListener("click", () => previewCard(card, count));
+    tile.addEventListener("click", () => previewCard(card, held));
     return tile;
   }
   function previewCard(card, count) {
@@ -1782,7 +1785,7 @@
     $("event").hidden = !(eventData.active || eventData.soon);
     eventMark();
     if (!eventData.active && !eventData.soon) return;
-    const tile = previewTile(eventData.card, 1);
+    const tile = previewTile(eventData.card, 1, eventData.owned ? 1 : 0);
     const mark = tile.querySelector(".owned");
     if (mark) mark.remove();
     $("eventArt").replaceChildren(tile);
