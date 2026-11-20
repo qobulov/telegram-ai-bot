@@ -177,8 +177,8 @@ var ownerOnlyMenu = []telegram.BotCommand{
 
 // ownerPrivateMenu are the commands of ownerGroupMenu that also work in a
 // private chat, as the owners asked on 2026-11-20: the moderation, rank,
-// reputation, invite, /teams and Mafia ones work in groups alone, and an
-// owner has them there.
+// reputation, invite, /teams, Mafia and Dev jangi ones are for groups, and
+// an owner has them there.
 var ownerPrivateMenu = []telegram.BotCommand{
 	{Command: "start", Description: "Salomlashish"},
 	{Command: "help", Description: "Yordam va buyruqlar"},
@@ -186,7 +186,6 @@ var ownerPrivateMenu = []telegram.BotCommand{
 	{Command: "card", Description: "Kartalar o'yini: har 2 soatda token, 1x/5x ochish, kolleksiya"},
 	{Command: "games", Description: "Barcha o'yinlar"},
 	{Command: "woodcutter", Description: "O'tinchi: daraxtni chop, shoxlardan qoch"},
-	{Command: "boss", Description: "Dev jangi: guruh bilan birga devni uring"},
 	{Command: "id", Description: "Sizning ID'ingiz"},
 	{Command: "ping", Description: "Bot ishlayaptimi: javob vaqti"},
 	{Command: "premium", Description: "Premium: nima beradi, sotib olish yoki uzaytirish"},

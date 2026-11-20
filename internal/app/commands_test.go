@@ -204,7 +204,7 @@ func TestOwnerMenuHoldsEveryCommand(t *testing.T) {
 			t.Errorf("/%s is missing from the owners' private menu", command)
 		}
 	}
-	for _, groupOnly := range []string{"ban", "mute", "warn", "rank", "access", "rep", "toprep", "report", "voteban", "staff", "rights", "mylink", "invites", "invites_auto", "teams", "mafia", "ignore"} {
+	for _, groupOnly := range []string{"ban", "mute", "warn", "rank", "access", "rep", "toprep", "report", "voteban", "staff", "rights", "mylink", "invites", "invites_auto", "teams", "mafia", "boss", "ignore"} {
 		if private[groupOnly] {
 			t.Errorf("/%s, which works in groups alone, is in the owners' private menu", groupOnly)
 		}

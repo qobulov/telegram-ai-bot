@@ -365,6 +365,29 @@ func HelpText(abilities Abilities) string {
 }
 
 // HelpTextIn is the help in lang, "uz", "ru" or "en", as /help sends it.
+// privateHelp are, in each language, where the help's group part starts
+// and what a private chat gets in its place: the commands that work there,
+// and where the group's are, as the owners asked on 2026-11-20.
+var privateHelp = map[string][2]string{
+	"uz": {"\n\nGuruhda meni ismim bilan chaqiring", "\n\nYana: /card — kartalar o'yini, /games — o'yinlar, /id, /ping\n\nGuruh buyruqlari guruhning o'zida: /help@username"},
+	"ru": {"\n\nВ группе зовите меня по имени", "\n\nЕщё: /card — игра в карты, /games — игры, /id, /ping\n\nКоманды группы — в самой группе: /help@username"},
+	"en": {"\n\nIn a group, call me by name", "\n\nAlso: /card — the card game, /games — games, /id, /ping\n\nThe group's commands are in the group itself: /help@username"},
+}
+
+// PrivateHelpTextIn is the help of a private chat: HelpTextIn without the
+// group's part, whose commands work in groups alone.
+func PrivateHelpTextIn(lang string, abilities Abilities) string {
+	if _, ok := privateHelp[lang]; !ok {
+		lang = "en"
+	}
+	help := HelpTextIn(lang, abilities)
+	cut := privateHelp[lang]
+	if at := strings.Index(help, cut[0]); at >= 0 {
+		return help[:at] + cut[1]
+	}
+	return help
+}
+
 func HelpTextIn(lang string, abilities Abilities) string {
 	phrases, ok := helpAbilities[lang]
 	if !ok {

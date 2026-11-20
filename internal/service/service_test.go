@@ -3945,17 +3945,26 @@ func TestCheckButtonAnswersWithoutWriting(t *testing.T) {
 	}
 }
 
-// /help writes the group commands with the bot's own username, so they can
-// be tapped: "/mute@mira_bot", not "/mute@username".
+// /help in a group writes its commands with the bot's own username, so they
+// can be tapped: "/mute@mira_bot", not "/mute@username". In a private chat
+// it leaves the group's commands out and says where they are.
 func TestHelpNamesTheBotsUsername(t *testing.T) {
 	f := newFixture()
 	f.opts.Bot.Username = "mira_bot"
 
-	sent := f.run(textFrom(userID, "/help"))
+	sent := f.run(inGroup(groupMessage("/help@mira_bot")))
 
 	expectOneReply(t, sent, "/mute@mira_bot, /unmute@mira_bot")
 	if strings.Contains(sent[0].text, "@username") {
 		t.Errorf("help still says @username: %q", sent[0].text)
+	}
+
+	private := newFixture()
+	private.opts.Bot.Username = "mira_bot"
+	sent = private.run(textFrom(userID, "/help"))
+	if len(sent) != 1 || strings.Contains(sent[0].text, "/mute") || strings.Contains(sent[0].text, "/report") || strings.Contains(sent[0].text, "/rank") ||
+		!strings.Contains(sent[0].text, "/help@mira_bot") || !strings.Contains(sent[0].text, "/card") {
+		t.Errorf("private help = %+v, want no group commands, /card, and where the group's are", sent)
 	}
 }
 
