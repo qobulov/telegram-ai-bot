@@ -248,18 +248,29 @@
   // cutOf is a Mythic card's cut-out, named for its picture too: art is
   // cached for a month, so a new picture under a new name brings its new
   // cut-out with it.
-  function cutOf(card) {
-    const name = String(card.image || "").split("/").pop();
-    return `/kartalar/art/cut/${card.id}.webp${name ? `?p=${encodeURIComponent(name)}` : ""}`;
+  // LARGE_ART is a picture the owners chose for a card's large view alone,
+  // the small tile keeping its own; its cut-out is art/cut/<id>L.webp.
+  const LARGE_ART = { 90202: "/kartalar/art/90202L.jpg" };
+
+  // largeImage is the picture of a card's large view.
+  function largeImage(card) {
+    return LARGE_ART[card.id] || card.image;
+  }
+
+  // cutOf is the cut-out of a card's picture, of its large view's with large.
+  function cutOf(card, large) {
+    const big = Boolean(large && LARGE_ART[card.id]);
+    const name = String(big ? LARGE_ART[card.id] : card.image || "").split("/").pop();
+    return `/kartalar/art/cut/${card.id}${big ? "L" : ""}.webp${name ? `?p=${encodeURIComponent(name)}` : ""}`;
   }
 
   // alive is a Mythic card's character, cut from the picture, laid over it
   // and moving: it breathes, and in the large view its hair stirs.
-  function alive(card) {
+  function alive(card, large) {
     const box = document.createElement("div");
     box.className = "alive";
     box.setAttribute("aria-hidden", "true");
-    const cut = `url("${cutOf(card)}")`;
+    const cut = `url("${cutOf(card, large)}")`;
     for (const part of ["body", "hair"]) {
       const layer = document.createElement("i");
       layer.className = part;
@@ -290,7 +301,7 @@
       // flowing hair: the cut-out once more, its edges alone, waved by #flow
       const flow = document.createElement("i");
       flow.className = "flow";
-      flow.style.backgroundImage = `url("${cutOf(card)}")`;
+      flow.style.backgroundImage = `url("${cutOf(card, true)}")`;
       living.classList.add("flowing");
       living.append(flow);
       // the picture under it without her, so no still hair shows behind
@@ -440,7 +451,7 @@
     front.style.setProperty("--c", COLORS[card.rarity]);
     const img = new Image();
     img.alt = card.name;
-    picture(img, card.image, true);
+    picture(img, largeImage(card), true);
     const plate = document.createElement("div");
     plate.className = "plate";
     const rarity = document.createElement("span");
@@ -461,7 +472,7 @@
     front.append(plate);
     if (card.rarity === 4) {
       front.classList.add("mythic");
-      img.after(alive(card));
+      img.after(alive(card, true));
       front.insertAdjacentHTML("beforeend", MYTHIC_DRESS + '<em class="spark"></em><em class="spark"></em><div class="motes">' + "<i></i>".repeat(6) + "</div>");
     }
     dress(front, card, true);
