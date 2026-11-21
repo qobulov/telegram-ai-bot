@@ -73,7 +73,9 @@ type ShopItem struct {
 	ID     string `json:"id"`
 	Price  int    `json:"price"`
 	Tokens int    `json:"tokens,omitempty"`
-	Cards  int    `json:"cards,omitempty"`
+	// Tickets are arena tickets, sold only in the arena's shop.
+	Tickets int `json:"tickets,omitempty"`
+	Cards   int `json:"cards,omitempty"`
 	// Least is the rarity a pack is sure to hold one of.
 	Least Rarity `json:"least,omitempty"`
 }

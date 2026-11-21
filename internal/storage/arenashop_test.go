@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 )
 
 func arenaCoins(t *testing.T, store *Store, userID int64) int {
@@ -81,6 +82,40 @@ func TestBuyArenaToken(t *testing.T) {
 	}
 	if _, _, err := store.BuyArenaToken(ctx, 9, "Nobody", 30, 2, arenaDay); !errors.Is(err, ErrArenaCoins) {
 		t.Errorf("a player never in the arena = %v", err)
+	}
+}
+
+// A ticket takes its price in coins and adds one to the tickets held,
+// keeping the hour toward the next free one; refused with the tickets full
+// or too few coins.
+func TestBuyArenaTicket(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	seedArena(t, store)
+	setArenaCoins(t, store, 1, 100)
+	if _, _, _, err := store.BuyArenaTicket(ctx, 1, 20, arenaRules); !errors.Is(err, ErrArenaTicketsFull) {
+		t.Fatalf("a ticket with all 8 held = %v, want ErrArenaTicketsFull", err)
+	}
+	for i := range 2 {
+		if _, err := store.RecordArenaBattle(ctx, 1, 2, int64(i), true, arenaRules, CardQuest{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	later := arenaRules
+	later.Now = arenaNow.Add(20 * time.Minute)
+	coins, tickets, next, err := store.BuyArenaTicket(ctx, 1, 20, later)
+	if err != nil || coins != 80 || tickets != 7 || next != 40*time.Minute {
+		t.Fatalf("a ticket = %d coins, %d tickets, next in %v, %v", coins, tickets, next, err)
+	}
+	if p, _ := store.ArenaPlayerOf(ctx, 1, later); p.Tickets != 7 || p.Coins != 80 {
+		t.Errorf("after a ticket: %+v", p)
+	}
+	setArenaCoins(t, store, 1, 19)
+	if _, _, _, err := store.BuyArenaTicket(ctx, 1, 20, later); !errors.Is(err, ErrArenaCoins) {
+		t.Fatalf("with 19 coins = %v, want ErrArenaCoins", err)
+	}
+	if p, _ := store.ArenaPlayerOf(ctx, 1, later); p.Tickets != 7 || p.Coins != 19 {
+		t.Errorf("a refused ticket changed the player: %+v", p)
 	}
 }
 

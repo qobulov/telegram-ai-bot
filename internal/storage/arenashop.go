@@ -15,6 +15,8 @@ var (
 	ErrArenaCoins = errors.New("storage: too few arena coins")
 	// ErrArenaShopDaily is a token bought past the day's limit.
 	ErrArenaShopDaily = errors.New("storage: the day's arena shop tokens are bought")
+	// ErrArenaTicketsFull is a ticket bought with the stock already full.
+	ErrArenaTicketsFull = errors.New("storage: the arena tickets are full")
 )
 
 // arenaWallet is a player's arena coins and the tokens they bought in the
@@ -106,4 +108,44 @@ func (s *Store) OpenArenaPack(ctx context.Context, userID int64, name string, n 
 		return CardOpening{}, 0, fmt.Errorf("storage: open an arena pack: %w", err)
 	}
 	return open, coins, nil
+}
+
+// BuyArenaTicket buys the player one arena ticket for price arena coins,
+// counting the tickets they hold as RecordArenaBattle does: ErrArenaCoins
+// with too few coins, ErrArenaTicketsFull with rules.Tickets already held.
+// The hour toward the next free ticket keeps running. It gives the coins
+// and the tickets after, and the wait for the next free one.
+func (s *Store) BuyArenaTicket(ctx context.Context, userID int64, price int, rules ArenaRules) (coins, tickets int, next time.Duration, err error) {
+	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `INSERT INTO arena_players (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING`, userID); err != nil {
+			return err
+		}
+		var (
+			stored int
+			at     *time.Time
+		)
+		if err := tx.QueryRow(ctx, `SELECT coins, tickets, tickets_at FROM arena_players WHERE user_id = $1 FOR UPDATE`,
+			userID).Scan(&coins, &stored, &at); err != nil {
+			return err
+		}
+		held, since := rules.tickets(stored, at)
+		switch {
+		case held >= rules.Tickets:
+			return ErrArenaTicketsFull
+		case coins < price:
+			return ErrArenaCoins
+		}
+		tickets = held + 1
+		next = rules.nextTicket(tickets, since)
+		return tx.QueryRow(ctx, `
+			UPDATE arena_players SET coins = coins - $2, tickets = $3, tickets_at = $4
+			WHERE user_id = $1 RETURNING coins`, userID, price, tickets, since).Scan(&coins)
+	})
+	if errors.Is(err, ErrArenaCoins) || errors.Is(err, ErrArenaTicketsFull) {
+		return 0, 0, 0, err
+	}
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("storage: buy an arena ticket: %w", err)
+	}
+	return coins, tickets, next, nil
 }

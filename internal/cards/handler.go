@@ -47,6 +47,7 @@ type Store interface {
 	ArenaPlace(ctx context.Context, userID int64) (place, total int, err error)
 	ArenaWeekPlace(ctx context.Context, userID int64, since time.Time) (int, error)
 	BuyArenaToken(ctx context.Context, userID int64, name string, price, daily int, day time.Time) (coins, tokens int, err error)
+	BuyArenaTicket(ctx context.Context, userID int64, price int, rules storage.ArenaRules) (coins, tickets int, next time.Duration, err error)
 	TowerPlayerOf(ctx context.Context, userID int64, day time.Time) (storage.TowerPlayer, error)
 	RecordTowerFight(ctx context.Context, userID int64, name string, floor int, won bool, rules storage.TowerRules) (storage.TowerOutcome, error)
 	OpenArenaPack(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, price int, now time.Time, quest storage.CardQuest) (storage.CardOpening, int, error)

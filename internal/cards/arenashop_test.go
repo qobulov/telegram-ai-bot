@@ -24,6 +24,19 @@ func (f *fakeStore) BuyArenaToken(_ context.Context, userID int64, _ string, pri
 	return f.arena.coins[userID], f.tokens, nil
 }
 
+// BuyArenaTicket gives back one of the attacks the fake counts.
+func (f *fakeStore) BuyArenaTicket(_ context.Context, userID int64, price int, rules storage.ArenaRules) (int, int, time.Duration, error) {
+	switch {
+	case f.arena.attacks[userID] <= 0:
+		return 0, 0, 0, storage.ErrArenaTicketsFull
+	case f.arena.coins[userID] < price:
+		return 0, 0, 0, storage.ErrArenaCoins
+	}
+	f.arena.coins[userID] -= price
+	f.arena.attacks[userID]--
+	return f.arena.coins[userID], rules.Tickets - f.arena.attacks[userID], rules.TicketEvery, nil
+}
+
 func (f *fakeStore) OpenArenaPack(_ context.Context, userID int64, _ string, n int, roll storage.CardRoll, price int, _ time.Time, quest storage.CardQuest) (storage.CardOpening, int, error) {
 	if f.arena.coins[userID] < price {
 		return storage.CardOpening{}, 0, storage.ErrArenaCoins
@@ -85,6 +98,19 @@ func TestArenaCoinsAndShop(t *testing.T) {
 	}
 	if got := drawn[4].(map[string]any)["card"].(map[string]any)["rarity"]; got != float64(Legendary) {
 		t.Errorf("the pack's sure card is of rarity %v", got)
+	}
+	ticket, _ := arenaShopItem("ticket")
+	store.arena.coins[7] = ticket.Price - 1
+	if _, out := call(7, map[string]any{"action": "arena_shop", "item": "ticket"}); out["refused"] != "coins" {
+		t.Errorf("a ticket with too few coins = %v", out)
+	}
+	store.arena.coins[7] = ticket.Price
+	if _, out := call(7, map[string]any{"action": "arena_shop", "item": "ticket"}); out["coins"] != 0.0 || out["tickets"] != float64(ArenaTickets) || out["next_ticket_in"] == nil {
+		t.Fatalf("a ticket = %v", out)
+	}
+	store.arena.coins[7] = 1000
+	if _, out := call(7, map[string]any{"action": "arena_shop", "item": "ticket"}); out["refused"] != "tickets_full" || store.arena.coins[7] != 1000 {
+		t.Errorf("a ticket with the tickets full = %v", out)
 	}
 	store.arena.coins[7] = 449
 	if _, out := call(7, map[string]any{"action": "arena_shop", "item": "legendary"}); out["refused"] != "coins" || store.arena.coins[7] != 449 {

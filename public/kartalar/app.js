@@ -2223,8 +2223,8 @@
         refused: { no_team: "Avval Arena bo'limida jamoa saqlang", no_floor: "Bu qavat hali tayyor emas", moved: "Bu qavat allaqachon o'tildi, sahifa yangilandi" },
       },
       coins: (n) => `🪙 ${n}`, coinsWon: (n) => `+${n} 🪙`, ruleCoins: (w, l) => `🪙 Har hujum tanga beradi: g'alaba +${w}, mag'lubiyat +${l}. Tangalar Arena do'konida sarflanadi`,
-      shopHint: (w, l) => `Har hujum: g'alaba +${w} 🪙, mag'lubiyat +${l} 🪙`, shopToken: "1 ta 🎟 token", shopTokenHint: (left, d) => `Bugun yana ${left} ta (kuniga ${d} tagacha)`,
-      shopRefused: { coins: "Tanga yetmaydi: arenada hujum qiling", daily: "Bugungi tokenlar olindi: ertaga yana" },
+      shopHint: (w, l) => `Har hujum: g'alaba +${w} 🪙, mag'lubiyat +${l} 🪙`, shopToken: "1 ta 🎟 token", shopTicket: "1 ta 🎫 arena tiketi", shopTicketHint: (n, m) => (n >= m ? `Tiketlar to'la: ${n}/${m}` : `Hozir ${n}/${m}, hujum uchun`), shopTokenHint: (left, d) => `Bugun yana ${left} ta (kuniga ${d} tagacha)`,
+      shopRefused: { coins: "Tanga yetmaydi: arenada hujum qiling", daily: "Bugungi tokenlar olindi: ertaga yana", tickets_full: "Tiketlar to'la: avval hujum qiling" },
       ruleEnergy: "🔋 Energiya: har yurish +34, zarba yeganda +10. 100 ga to'lganda karta skillini ishlatadi va energiya 0 ga tushadi",
       synergy: "🔗 Bir animedan 2 ta karta: +10% hujum va jon, 3 ta va ko'p: +20%", edgeRule: "⚡ Ustunlik: 🛡️ tank ⚔️ jangchidan, ⚔️ jangchi 🔮 sehrgardan, 🔮 sehrgar 🛡️ tankdan 25% kuchliroq urar", edge: "ustun",
       stunned: (n) => `💫 ${n} hayratda: yurish o'tdi`, poisoned: (n, d) => `☠ ${n} zahardan −${d}`,
@@ -2267,8 +2267,8 @@
         refused: { no_team: "Сначала сохраните команду в разделе Арена", no_floor: "Этот этаж ещё не готов", moved: "Этот этаж уже пройден, страница обновлена" },
       },
       coins: (n) => `🪙 ${n}`, coinsWon: (n) => `+${n} 🪙`, ruleCoins: (w, l) => `🪙 Каждая атака даёт монеты: победа +${w}, поражение +${l}. Их тратят в магазине арены`,
-      shopHint: (w, l) => `За атаку: победа +${w} 🪙, поражение +${l} 🪙`, shopToken: "1 🎟 токен", shopTokenHint: (left, d) => `Сегодня ещё ${left} (до ${d} в день)`,
-      shopRefused: { coins: "Не хватает монет: атакуйте на арене", daily: "Токены на сегодня куплены: завтра снова" },
+      shopHint: (w, l) => `За атаку: победа +${w} 🪙, поражение +${l} 🪙`, shopToken: "1 🎟 токен", shopTicket: "1 🎫 билет арены", shopTicketHint: (n, m) => (n >= m ? `Билеты полные: ${n}/${m}` : `Сейчас ${n}/${m}, для атаки`), shopTokenHint: (left, d) => `Сегодня ещё ${left} (до ${d} в день)`,
+      shopRefused: { coins: "Не хватает монет: атакуйте на арене", daily: "Токены на сегодня куплены: завтра снова", tickets_full: "Билеты полные: сначала атакуйте" },
       ruleEnergy: "🔋 Энергия: +34 за каждый ход, +10 за полученный удар. На 100 карта применяет навык, и энергия падает до 0",
       synergy: "🔗 2 карты из одного аниме: +10% атаки и здоровья, 3 и больше: +20%", edgeRule: "⚡ Преимущество: 🛡️ танк бьёт ⚔️ бойца, ⚔️ боец 🔮 мага, 🔮 маг 🛡️ танка на 25% сильнее", edge: "преимущество",
       stunned: (n) => `💫 ${n} оглушён(а): ход пропущен`, poisoned: (n, d) => `☠ ${n} от яда −${d}`,
@@ -2311,8 +2311,8 @@
         refused: { no_team: "Save a team in the Arena first", no_floor: "This floor is not ready yet", moved: "This floor is cleared already; the page is refreshed" },
       },
       coins: (n) => `🪙 ${n}`, coinsWon: (n) => `+${n} 🪙`, ruleCoins: (w, l) => `🪙 Each attack gives coins: a win +${w}, a loss +${l}. Spend them in the arena shop`,
-      shopHint: (w, l) => `Each attack: a win +${w} 🪙, a loss +${l} 🪙`, shopToken: "1 🎟 token", shopTokenHint: (left, d) => `${left} more today (up to ${d} a day)`,
-      shopRefused: { coins: "Not enough coins: attack in the arena", daily: "Today's tokens are bought: more tomorrow" },
+      shopHint: (w, l) => `Each attack: a win +${w} 🪙, a loss +${l} 🪙`, shopToken: "1 🎟 token", shopTicket: "1 🎫 arena ticket", shopTicketHint: (n, m) => (n >= m ? `Tickets full: ${n}/${m}` : `${n}/${m} now, for an attack`), shopTokenHint: (left, d) => `${left} more today (up to ${d} a day)`,
+      shopRefused: { coins: "Not enough coins: attack in the arena", daily: "Today's tokens are bought: more tomorrow", tickets_full: "Tickets are full: attack first" },
       ruleEnergy: "🔋 Energy: +34 each turn, +10 for each hit taken. At 100 the card uses its skill and drops to 0",
       synergy: "🔗 2 cards of one anime: +10% attack and health, 3 or more: +20%", edgeRule: "⚡ Edge: 🛡️ tank beats ⚔️ fighter, ⚔️ fighter beats 🔮 mage, 🔮 mage beats 🛡️ tank, for 25% more", edge: "edge",
       stunned: (n) => `💫 ${n} is stunned: turn skipped`, poisoned: (n, d) => `☠ ${n} takes −${d} from poison`,
@@ -2490,7 +2490,8 @@
     box.querySelector(".arena-coins").textContent = at.coins(spaced(p.coins || 0));
   }
 
-  // arenaShopList is the arena's shop: a token, a few a day, and packs with a
+  // arenaShopList is the arena's shop: a token, a few a day, an arena
+  // ticket while the tickets are not full, and packs with a
   // sure Epic or Legendary, for arena coins, opened as the crystal shop's.
   function arenaShopList() {
     const shop = arenaData.shop;
@@ -2506,14 +2507,16 @@
       const row = document.createElement("li");
       row.className = "shop-item";
       const rarity = t.rarities[item.least || 0];
-      row.style.setProperty("--tier", item.tokens ? "var(--r1)" : COLORS[item.least || 0]);
+      const p = arenaData.player;
+      row.style.setProperty("--tier", item.tokens || item.tickets ? "var(--r1)" : COLORS[item.least || 0]);
       row.innerHTML = '<span class="icon"></span><div><b></b><small></small></div><button type="button" class="ghost"></button>';
-      row.querySelector(".icon").textContent = item.tokens ? "🎟" : RARITY_ICON[item.least || 0];
-      row.querySelector("b").textContent = item.tokens ? at.shopToken : t.packItem(rarity);
-      row.querySelector("small").textContent = item.tokens ? at.shopTokenHint(shop.tokens_left, shop.tokens_daily) : t.packHint(item.cards, rarity);
+      row.querySelector(".icon").textContent = item.tickets ? "🎫" : item.tokens ? "🎟" : RARITY_ICON[item.least || 0];
+      row.querySelector("b").textContent = item.tickets ? at.shopTicket : item.tokens ? at.shopToken : t.packItem(rarity);
+      row.querySelector("small").textContent = item.tickets ? at.shopTicketHint(p.tickets, p.tickets_max)
+        : item.tokens ? at.shopTokenHint(shop.tokens_left, shop.tokens_daily) : t.packHint(item.cards, rarity);
       const button = row.querySelector("button");
       button.textContent = at.coins(spaced(item.price));
-      button.disabled = buying || item.price > coins || (item.tokens && shop.tokens_left <= 0);
+      button.disabled = buying || item.price > coins || (item.tokens && shop.tokens_left <= 0) || (item.tickets && p.tickets >= p.tickets_max);
       button.addEventListener("click", () => arenaBuy(item));
       list.append(row);
     }
@@ -2532,7 +2535,12 @@
       tokens = data.tokens ?? tokens;
       shards = data.shards ?? shards;
       arenaData.player.coins = data.coins;
-      if (item.tokens) {
+      if (item.tickets) {
+        arenaData.player.tickets = data.tickets;
+        ticketAt = Date.now() + (data.next_ticket_in || 0);
+        toast(at.shopTicket.replace(/^1/, "+1"));
+        arenaFoes();
+      } else if (item.tokens) {
         arenaData.shop.tokens_left = Math.max(0, arenaData.shop.tokens_left - item.tokens);
         toast(t.bought(item.tokens));
       } else {
