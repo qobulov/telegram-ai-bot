@@ -754,8 +754,7 @@ admin (`targets` lists them). The owner's own words must ask her to leave
 
 `/words` in a group, with no model, lists the top 10 writers by words of the
 last 7 days (today counted, Tashkent time), then, under a line, the asker's
-own place when they are not among them, and the chat (@username, else its
-title), with buttons that switch it in place to the last 30 days (the
+own place when they are not among them, with buttons that switch it in place to the last 30 days (the
 presser's place then shows); `/words oy` opens on 30 days. Every member's message is counted as it comes,
 its text or caption split on spaces, in `member_words` (one row per group,
 member and day), so groups without AI, which keep no words in

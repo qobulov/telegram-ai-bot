@@ -60,7 +60,7 @@ func TestWordsAreCounted(t *testing.T) {
 }
 
 // /words lists the top 10 of the last 7 days, the asker's own place under
-// it when they are not in it, and the chat, with buttons for 7 and 30 days;
+// it when they are not in it, with buttons for 7 and 30 days;
 // in private it says it works in a group.
 func TestWordTable(t *testing.T) {
 	f := newFixture()
@@ -74,7 +74,7 @@ func TestWordTable(t *testing.T) {
 	asked.From = &telegram.User{ID: 501, FirstName: "Sam"}
 	sent := f.run(inGroup(asked))
 	last := sent[len(sent)-1]
-	for _, want := range []string{"Top-10", "oxirgi 7 kun", "1. Ali — 12 345 so'z", "2. Vali — 1 234 so'z", "---------------------\n76. Sam — 692 so'z", "Chat: @tovbotn"} {
+	for _, want := range []string{"Top-10", "oxirgi 7 kun", "1. Ali — 12 345 so'z", "2. Vali — 1 234 so'z", "---------------------\n76. Sam — 692 so'z"} {
 		if !strings.Contains(last.text, want) {
 			t.Fatalf("table = %q, want %q in it", last.text, want)
 		}
@@ -93,7 +93,7 @@ func TestWordTable(t *testing.T) {
 		Message: &telegram.Message{MessageID: 77, Chat: telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup, Title: "Guruh"}},
 	}})
 	if len(buttons.edits) != 1 || !strings.Contains(buttons.edits[0], "oxirgi 30 kun") || strings.Contains(buttons.edits[0], "-----") ||
-		!strings.Contains(buttons.edits[0], "Chat: Guruh") || buttons.menus[0][0][1].Text != "✅ 30 kun" {
+		strings.Contains(buttons.edits[0], "Guruh") || buttons.menus[0][0][1].Text != "✅ 30 kun" {
 		t.Fatalf("month press: edits %q, menus %+v", buttons.edits, buttons.menus)
 	}
 	if days := int(today.Sub(book.since).Hours()/24 + 0.5); days != 29 {

@@ -45,7 +45,7 @@ func (s *Service) countWords(msg *telegram.Message) {
 
 // wordTable answers /words [oy] in a group: the top 10 writers of the last
 // 7 days, or 30 with "oy", by words, the asker's own place under them when
-// they are not among them, and the chat, with buttons that switch the period
+// they are not among them, with buttons that switch the period
 // in place. It asks no model.
 func (s *Service) wordTable(ctx context.Context, in incoming) outcome {
 	if !in.group {
@@ -97,22 +97,11 @@ func (s *Service) wordTableText(ctx context.Context, chat *telegram.Chat, period
 			lines = append(lines, "---------------------", wordLine(place, own, language))
 		}
 	}
-	if name := chatName(chat); name != "" {
-		lines = append(lines, "", fmt.Sprintf(textWordsChat.inLanguage(language), name))
-	}
 	return strings.Join(lines, "\n"), nil
 }
 
 func wordLine(place int, c storage.WordCount, language string) string {
 	return fmt.Sprintf(textWordsLine.inLanguage(language), place, cardMarks.Replace(c.Name), spacedInt(c.Words))
-}
-
-// chatName is how the table names its chat: @username, else the title.
-func chatName(chat *telegram.Chat) string {
-	if chat.Username != "" {
-		return "@" + chat.Username
-	}
-	return chat.Title
 }
 
 var wordButtonNames = map[string]localText{
@@ -172,7 +161,6 @@ var (
 	}
 	textWordsTitle       = localText{uz: "🗣 Top-10 so'zamollar · %s", ru: "🗣 Топ-10 болтунов · %s", en: "🗣 Top 10 talkers · %s"}
 	textWordsLine        = localText{uz: "%d. %s — %s so'z", ru: "%d. %s — %s слов", en: "%d. %s — %s words"}
-	textWordsChat        = localText{uz: "Chat: %s", ru: "Чат: %s", en: "Chat: %s"}
 	textWordsNone        = localText{uz: "Bu davrda hali hech kim yozmagan.", ru: "За этот период ещё никто не писал.", en: "Nobody has written in this period yet."}
 	textWordsGroupOnly   = localText{uz: "✍️ /words guruhda ishlaydi.", ru: "✍️ /words работает в группе.", en: "✍️ /words works in a group."}
 	textWordsUnavailable = localText{uz: "Hisobni hozir o'qib bo'lmadi, birozdan keyin urinib ko'ring.", ru: "Сейчас не удалось прочитать счёт, попробуйте позже.", en: "Could not read the count right now; try again in a bit."}
