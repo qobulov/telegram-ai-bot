@@ -250,7 +250,7 @@
   // cut-out with it.
   // LARGE_ART is a picture the owners chose for a card's large view alone,
   // the small tile keeping its own; its cut-out is art/cut/<id>L.webp.
-  const LARGE_ART = { 90202: "/kartalar/art/90202L.jpg" };
+  const LARGE_ART = {};
 
   // largeImage is the picture of a card's large view.
   function largeImage(card) {
