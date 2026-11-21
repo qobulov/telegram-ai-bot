@@ -97,7 +97,7 @@ func TestTowerPowerGrowsWithTheFloor(t *testing.T) {
 			t.Errorf("floor %d: power %d, want about %d", floor, power, TowerPower(floor))
 		}
 		if last > 0 {
-			if g := float64(power) / float64(last); g < 1.05 || g > 1.09 {
+			if g := float64(power) / float64(last); g < TowerGrowth-0.02 || g > TowerGrowth+0.02 {
 				t.Errorf("floor %d: power ×%.3f on the floor below", floor, g)
 			}
 		}

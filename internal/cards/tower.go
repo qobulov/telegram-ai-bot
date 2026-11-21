@@ -22,14 +22,15 @@ import (
 // Tashkent, one anime of at least TowerThemeLeast cards raises its cards'
 // attack and health by TowerThemeBonus percent, in the tower only. Floor
 // 1's team has TowerBasePower and each floor TowerGrowth times the one
-// before (6500 since 2026-11-21, from 5000: players cleared floors of their
-// own team's power by trying again until they won, 46 floors in two days); its cards rise in rarity every few floors and a star every
+// before (since 2026-11-21 8000 and 1.05, from 5000 and 1.07: players
+// cleared floors of their own team's power by trying again, 46 floors in
+// two days, and +30% on every floor then grew too fast for the owners); its cards rise in rarity every few floors and a star every
 // TowerStarsEvery floors.
 const (
 	TowerThemeBonus = 20
 	TowerThemeLeast = 5
-	TowerBasePower  = 6500
-	TowerGrowth     = 1.07
+	TowerBasePower  = 8000
+	TowerGrowth     = 1.05
 	TowerStarsEvery = 15
 	// towerSalt keeps a floor's draw apart from any other seeded by a number.
 	towerSalt = 0x746f776572
