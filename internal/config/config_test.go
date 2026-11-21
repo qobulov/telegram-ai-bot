@@ -1,15 +1,18 @@
 package config
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 	"unicode"
 
+	"telegram-ai-bot/internal/cards"
 	"telegram-ai-bot/internal/telegram"
 )
 
@@ -977,7 +980,7 @@ func TestPersonaCoversWhatWentWrongInTheGroup(t *testing.T) {
 	all := cfg.FullPersona() + cfg.GroupNote
 	for _, want := range []string{
 		"never restate or summarise their propaganda",
-		"say it is Nazi propaganda that blames Jews",
+		"name it as propaganda and explain the history instead",
 		"says you are rude",
 		"Do not start a reply the way your recent replies started",
 		"Never open or end a reply with the person's name out of habit",
@@ -989,7 +992,7 @@ func TestPersonaCoversWhatWentWrongInTheGroup(t *testing.T) {
 		"Running jokes belong to the members",
 		"Mention only @usernames that appear in front of you",
 		"start with their @username from the messages in front of you",
-		"g'isht",
+		"no threats, even as a joke",
 	} {
 		if !strings.Contains(all, want) {
 			t.Errorf("the prompt does not contain %q", want)
@@ -1082,13 +1085,13 @@ func TestPersonaSwearsBackInKind(t *testing.T) {
 		t.Fatal(err)
 	}
 	rule := lineContaining(cfg.FullPersona(), "swears at you")
-	for _, want := range []string{"swear back once in kind", "pshnx", "different word from theirs", "never their own word sent back", "never the word you used last", "[react 🤣]", "a polite group", "no cruder", "no mothers or family", "no slurs", "no threats", "[silent]", "owners are never sworn at"} {
+	for _, want := range []string{"Never use profanity first, nor back", "pshnx", "отвали", "[react 🤣]", `never "sen"`, "family", "no slurs", "no threats", "[silent]", "owners are never sworn at"} {
 		if !strings.Contains(rule, want) {
 			t.Errorf("the swearing rule does not contain %q: %q", want, rule)
 		}
 	}
 	plain := lineContaining(cfg.FullPersona(), "insults you without swearing")
-	for _, want := range []string{"roast them back once", "leaves them nothing to answer", "Never agree with the insult", "never their family, looks, health", "[silent]", "owners get a playful line"} {
+	for _, want := range []string{"one light, calm line", "plays on the words they used", "never at who they are", "Never agree with the insult", "never their family, looks, health", "[silent]", "owners get a playful line"} {
 		if !strings.Contains(plain, want) {
 			t.Errorf("the plain-insult rule does not contain %q: %q", want, plain)
 		}
@@ -1104,7 +1107,7 @@ func TestPersonaShrugsOffFaultFindingWithoutSwearing(t *testing.T) {
 		t.Fatal(err)
 	}
 	rule := lineContaining(cfg.FullPersona(), "mocks a flaw of yours")
-	for _, want := range []string{"stay unbothered", "no swear words", "never an apology", "still gets its answer", "owners get a normal answer", `"senda ko'z yo'q-ku"`} {
+	for _, want := range []string{"stay unbothered", "no swear words", "never an apology", "still gets its answer", "owners get a normal answer", "a remark about what you are"} {
 		if !strings.Contains(rule, want) {
 			t.Errorf("the fault-finding rule does not contain %q: %q", want, rule)
 		}
@@ -1115,8 +1118,8 @@ func TestPersonaShrugsOffFaultFindingWithoutSwearing(t *testing.T) {
 	if style := lineContaining(cfg.FullPersona(), "informal language"); strings.Contains(style, "profanity when appropriate") || !strings.Contains(style, "no swear words of your own") {
 		t.Errorf("the style rule lets the bot swear unprovoked: %q", style)
 	}
-	if swear := lineContaining(cfg.FullPersona(), "swears at you"); !strings.Contains(swear, `"иди нахуй" gets "днх" or "pshnx"`) {
-		t.Errorf("Russian swearing does not get днх: %q", swear)
+	if swear := lineContaining(cfg.FullPersona(), "swears at you"); !strings.Contains(swear, "nor back") || !strings.Contains(swear, "днх") {
+		t.Errorf("swearing in Cyrillic may still be sworn back at: %q", swear)
 	}
 	if !strings.Contains(rule, "is not mockery: answer it normally") {
 		t.Errorf("a correction or a question is taken for fault-finding: %q", rule)
@@ -1137,7 +1140,7 @@ func TestPersonaSwearsBackOnlyAtProfanityAimedAtHer(t *testing.T) {
 		t.Errorf("the swearing rule does not ask for profanity aimed at her: %q", rule)
 	}
 	rule := lineContaining(cfg.FullPersona(), "Never use profanity first")
-	for _, want := range []string{`"amas Mari"`, `"seni so'kishyapti"`, "teasing", "[react 🤣]", "never with dnx, pshnx"} {
+	for _, want := range []string{"Disagreement, a correction", "someone else swears at you is no swearing at you", "teasing", "[react 🤣]", "never with dnx, pshnx", "treat it as friendly"} {
 		if !strings.Contains(rule, want) {
 			t.Errorf("the no-first-swear rule does not contain %q: %q", want, rule)
 		}
@@ -1238,7 +1241,7 @@ func TestPersonaIsPlayfulNotCruel(t *testing.T) {
 		"introduce yourself in one friendly line",
 		"Newcomers",
 		`Speak to everyone with "siz"`,
-		`Only someone swearing at you gets "sen"`,
+		`even when they write "sen" or swear`,
 	} {
 		if !strings.Contains(persona, want) {
 			t.Errorf("the persona does not contain %q", want)
@@ -1266,7 +1269,7 @@ func TestPersonaDescribesTheAnswerToAnInsult(t *testing.T) {
 		}
 	}
 	insult := lineContaining(cfg.FullPersona(), "An insult without swearing (")
-	for _, want := range []string{"one short roast back", "turns their words on them", "fresh words every time"} {
+	for _, want := range []string{"one short, light line back", "plays on their words", "fresh words every time"} {
 		if !strings.Contains(insult, want) {
 			t.Errorf("the insult line %q does not say %q", insult, want)
 		}
@@ -1769,7 +1772,7 @@ func TestPersonaRefusesInsultsOnRequestAndSexualContent(t *testing.T) {
 		t.Fatal(err)
 	}
 	insult := lineContaining(cfg.FullPersona(), "because another member asks you to")
-	for _, want := range []string{`"azimga zaybal de"`, "not even as a joke or a quote", "Only your owners may ask you to tease someone"} {
+	for _, want := range []string{"do not say the words", "not even as a joke or a quote", "Only your owners may ask you to tease someone"} {
 		if !strings.Contains(insult, want) {
 			t.Errorf("the insult rule does not contain %q: %q", want, insult)
 		}
@@ -1832,5 +1835,17 @@ func TestPersonaAvoidsOtherMarkdown(t *testing.T) {
 	}
 	if rule := lineContaining(cfg.FullPersona(), "Write plain text in chat"); !strings.Contains(rule, "Use no other Markdown: no *italics*, __underlines__, backticks or code blocks") {
 		t.Errorf("the formatting rule = %q", rule)
+	}
+}
+
+// TestCardsNoteStarsMatchTheGame keeps the stars' multipliers the model is
+// told in step with the ones fusion uses: a wrong one had it say a second
+// star doubles a card.
+func TestCardsNoteStarsMatchTheGame(t *testing.T) {
+	for stars := 2; stars <= cards.MaxStars; stars++ {
+		want := fmt.Sprintf("★%d %s", stars, strconv.FormatFloat(cards.StarMultiplier[stars], 'f', -1, 64))
+		if !strings.Contains(cardsNote, want) {
+			t.Errorf("the cards note does not say %q", want)
+		}
 	}
 }
