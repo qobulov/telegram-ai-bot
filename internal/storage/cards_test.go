@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -129,3 +130,55 @@ func TestCardsAreDrawnAndCollected(t *testing.T) {
 
 // rarity is a roll that always picks r.
 func rarity(r int) CardRoll { return func(int, int) (int, bool) { return r, false } }
+
+// A batch counts each card's wait from the one before it: the roll of the
+// card after a sure Legendary starts from nought again.
+func TestOpenCardsCountsTheWaitInABatch(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	for _, q := range []string{`DELETE FROM card_pictures`, `DELETE FROM card_catalog`} {
+		if _, err := store.pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	catalog := []Card{
+		{ID: 1, Name: "Gojo", Anime: "JJK", Rarity: 3, Value: 2000},
+		{ID: 2, Name: "Levi", Anime: "AoT", Rarity: 0, Value: 100},
+	}
+	if err := store.SaveCardCatalog(ctx, catalog); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Date(2026, 11, 21, 0, 0, 0, 0, time.UTC)
+	day := CardDay{Start: start, PerDay: 5}
+	if _, err := store.GiveDayTokens(ctx, alice, "Alice", day); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.pool.Exec(ctx, `UPDATE card_players SET since_legendary = 97, since_mythic = 10 WHERE user_id = $1`, alice); err != nil {
+		t.Fatal(err)
+	}
+	var seen []int
+	roll := func(sinceLegendary, sinceMythic int) (int, bool) {
+		seen = append(seen, sinceLegendary)
+		if sinceLegendary+1 >= 100 {
+			return 3, true
+		}
+		return 0, false
+	}
+	open, err := store.OpenCards(ctx, alice, "Alice", 5, roll, 15, day, start.Add(time.Hour), CardQuest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []int{97, 98, 99, 0, 1}; fmt.Sprint(seen) != fmt.Sprint(want) {
+		t.Fatalf("waits rolled = %v; want %v", seen, want)
+	}
+	if d := open.Draws[2]; d.Card.ID != 1 || !d.Guaranteed {
+		t.Fatalf("third card = %+v; want the sure Legendary", d)
+	}
+	last := open.Draws[4]
+	if last.SinceLegendary != 2 || last.SinceMythic != 15 {
+		t.Fatalf("after the batch = %d, %d; want 2, 15", last.SinceLegendary, last.SinceMythic)
+	}
+	if p, _, _ := store.CardPlayerOf(ctx, alice); p.SinceLegendary != 2 || p.SinceMythic != 15 {
+		t.Fatalf("the player's wait = %d, %d; want 2, 15", p.SinceLegendary, p.SinceMythic)
+	}
+}

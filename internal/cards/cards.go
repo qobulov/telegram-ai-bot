@@ -122,6 +122,39 @@ func ByOdds(roll func() Rarity) storage.CardRoll {
 	return func(int, int) (int, bool) { return int(roll()), false }
 }
 
+// LegendaryPity and MythicPity are the cards opened in a row without a
+// Legendary or better, and without a Mythic, the last of which is sure to
+// be one, as the owners asked on 2026-11-21.
+const (
+	LegendaryPity = 100
+	MythicPity    = 200
+)
+
+// WithPity draws a rarity by roll, raised to Mythic on a player's
+// MythicPity-th card in a row without one, and to Legendary on their
+// LegendaryPity-th without one or better.
+func WithPity(roll func() Rarity) storage.CardRoll {
+	return func(sinceLegendary, sinceMythic int) (int, bool) {
+		r := roll()
+		switch {
+		case r < Mythic && sinceMythic+1 >= MythicPity:
+			return int(Mythic), true
+		case r < Legendary && sinceLegendary+1 >= LegendaryPity:
+			return int(Legendary), true
+		}
+		return int(r), false
+	}
+}
+
+// pityView is a player's wait for their sure Legendary and Mythic as the
+// app shows it.
+func pityView(sinceLegendary, sinceMythic int) map[string]any {
+	return map[string]any{
+		"legendary": min(sinceLegendary, LegendaryPity-1), "legendary_max": LegendaryPity,
+		"mythic": min(sinceMythic, MythicPity-1), "mythic_max": MythicPity,
+	}
+}
+
 // mythicIDs are the Mythic cards' AniList IDs, 16 men and 11 women: the
 // leads of the best known series, Son Goku, Naruto, Luffy, Ichigo, Eren,
 // Edward Elric, Light, Tanjiro, Saitama, Gon, Lelouch, Spike, Guts, Jotaro and

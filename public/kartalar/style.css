@@ -245,6 +245,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .draw:active { transform: scale(0.97); }
 .draw:disabled { filter: grayscale(0.9) brightness(0.6); cursor: default; box-shadow: none; }
 .timer { margin: 10px 0 0; color: var(--muted); font: 600 14px Unbounded, sans-serif; min-height: 20px; }
+.timer.pity { margin-top: 4px; font-size: 12px; }
 .auto { display: flex; align-items: center; gap: 14px; margin: 18px auto 0; max-width: 360px; padding: 12px 14px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); text-align: left; }
 .auto-text { flex: 1; display: grid; gap: 3px; }
 .auto-text b { font: 700 14px Manrope, sans-serif; color: var(--text); }

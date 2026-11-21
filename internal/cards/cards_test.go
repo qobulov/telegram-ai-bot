@@ -214,3 +214,28 @@ func TestFetchPictureOfAPath(t *testing.T) {
 		t.Errorf("picture = %q, %v", data, err)
 	}
 }
+
+// The 100th card in a row without a Legendary or better is one for sure,
+// and the 200th without a Mythic is a Mythic; a roll as good or better is
+// left as it is.
+func TestWithPity(t *testing.T) {
+	common := WithPity(func() Rarity { return Common })
+	mythic := WithPity(func() Rarity { return Mythic })
+	for _, c := range []struct {
+		roll                        func(int, int) (int, bool)
+		sinceLegendary, sinceMythic int
+		want                        Rarity
+		sure                        bool
+	}{
+		{common, 0, 0, Common, false},
+		{common, 98, 98, Common, false},
+		{common, 99, 99, Legendary, true},
+		{common, 10, 199, Mythic, true},
+		{common, 99, 199, Mythic, true},
+		{mythic, 99, 199, Mythic, false},
+	} {
+		if r, sure := c.roll(c.sinceLegendary, c.sinceMythic); Rarity(r) != c.want || sure != c.sure {
+			t.Errorf("after %d and %d: %d, %v; want %d, %v", c.sinceLegendary, c.sinceMythic, r, sure, c.want, c.sure)
+		}
+	}
+}

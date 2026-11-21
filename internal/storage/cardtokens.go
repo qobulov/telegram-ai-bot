@@ -57,6 +57,8 @@ func (s *Store) OpenCards(ctx context.Context, userID int64, name string, n int,
 			if err != nil {
 				return err
 			}
+			// The next card counts the wait this one left.
+			player.sinceLegendary, player.sinceMythic = draw.SinceLegendary, draw.SinceMythic
 			open.Draws = append(open.Draws, draw)
 		}
 		if err := countQuest(ctx, tx, userID, quest, n); err != nil {

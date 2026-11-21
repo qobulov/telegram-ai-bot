@@ -82,6 +82,10 @@ type CardPlayer struct {
 	FreeDay  time.Time
 	FreeUsed int
 	Tokens   int
+	// SinceLegendary and SinceMythic are the cards the player drew in a
+	// row since their last Legendary or better and last Mythic.
+	SinceLegendary int
+	SinceMythic    int
 }
 
 // CardDay is a period as the tokens count it: when it began, the tokens a
@@ -337,8 +341,8 @@ func (s *Store) CardCatalog(ctx context.Context) ([]Card, error) {
 func (s *Store) CardPlayerOf(ctx context.Context, userID int64) (CardPlayer, time.Time, error) {
 	p := CardPlayer{UserID: userID}
 	var last, freeDay *time.Time
-	err := s.pool.QueryRow(ctx, `SELECT name, points, cards, last_draw_at, free_day, free_used, tokens FROM card_players WHERE user_id = $1`, userID).
-		Scan(&p.Name, &p.Points, &p.Cards, &last, &freeDay, &p.FreeUsed, &p.Tokens)
+	err := s.pool.QueryRow(ctx, `SELECT name, points, cards, last_draw_at, free_day, free_used, tokens, since_legendary, since_mythic FROM card_players WHERE user_id = $1`, userID).
+		Scan(&p.Name, &p.Points, &p.Cards, &last, &freeDay, &p.FreeUsed, &p.Tokens, &p.SinceLegendary, &p.SinceMythic)
 	if freeDay != nil {
 		p.FreeDay = *freeDay
 	}

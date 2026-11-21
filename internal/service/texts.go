@@ -452,16 +452,19 @@ To quiet me: /mute bot, to bring me back: /unmute`,
 		uz: `🃏 Kartalar
 /card — o'yinni ochish: hammasi ilovada
 Har 2 soatda 1 token (12 tagacha yig'iladi), 1x yoki 5x ochish, token tugasa kristallga
+🛡 Kafolat: 100 ta kartada Afsonaviy bo'lmasa — 100-si Afsonaviy, 200 tada Mifik bo'lmasa — 200-si Mifik
 Ilovada: kolleksiya, bozor (almashish), reyting
 💎 Do'kon (ilovada): kristallni Telegram Stars bilan sotib olish; kristallga token va kafolatli paketlar (Epik, Afsonaviy, Mifik)`,
 		ru: `🃏 Карты
 /card — открыть игру: всё в приложении
 Токен каждые 2 часа (копится до 12), открытие 1x или 5x, без токенов — за кристаллы
+🛡 Гарант: 100-я карта без легендарки — легендарка, 200-я без мифика — мифик
 В приложении: коллекция, рынок (обмен), рейтинг
 💎 Магазин (в приложении): кристаллы за Telegram Stars; за кристаллы — токены и паки с гарантией (эпик, легендарка, мифик)`,
 		en: `🃏 Cards
 /card — open the game: it is all in the app
 A token every 2 hours (up to 12 saved), open 1x or 5x, crystals once tokens run out
+🛡 Guarantee: the 100th card without a Legendary is one, the 200th without a Mythic is a Mythic
 In the app: the collection, the market (trades), the ranking
 💎 Shop (in the app): crystals for Telegram Stars; crystals buy tokens and packs with a sure Epic, Legendary or Mythic`,
 	},

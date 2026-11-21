@@ -380,6 +380,7 @@ func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
 		"cards": views, "points": player.Points, "held": len(owned),
 		"tokens": Tokens(player, now), "given": given, "per_day": PerDay, "card_cost": CardCost, "batch": Batch,
 		"next_token_in": Today(now).Next().Sub(now).Milliseconds(),
+		"pity":          pityView(player.SinceLegendary, player.SinceMythic),
 		"shards":        shards,
 		"quests":        map[string]any{"done": done, "ready": ready, "total": len(Quests(now)), "reset_in": questsResetIn(now)},
 		"inbox":         map[string]any{"boxes": boxes, "mail": unclaimed},
@@ -397,7 +398,7 @@ func (h *handler) open(ctx context.Context, user miniapp.User, n int) (any, fail
 		return nil, errUnavailable
 	}
 	now := h.Now()
-	opened, err := h.Store.OpenCards(ctx, user.ID, name(user), n, ByOdds(h.Roll), CardCost, Today(now), now, questOf(QuestOpen, now))
+	opened, err := h.Store.OpenCards(ctx, user.ID, name(user), n, WithPity(h.Roll), CardCost, Today(now), now, questOf(QuestOpen, now))
 	var few *storage.CardFundsError
 	switch {
 	case errors.As(err, &few):
@@ -408,10 +409,12 @@ func (h *handler) open(ctx context.Context, user miniapp.User, n int) (any, fail
 	}
 	drawn := make([]map[string]any, len(opened.Draws))
 	for i, d := range opened.Draws {
-		drawn[i] = map[string]any{"card": h.held(d.Card, d.Count), "new": d.New, "serial": d.Serial}
+		drawn[i] = map[string]any{"card": h.held(d.Card, d.Count), "new": d.New, "serial": d.Serial, "sure": d.Guaranteed}
 	}
+	last := opened.Draws[len(opened.Draws)-1]
 	return map[string]any{
 		"drawn": drawn, "points": opened.Points, "tokens": opened.Tokens, "shards": opened.Shards, "given": opened.Given,
+		"pity": pityView(last.SinceLegendary, last.SinceMythic),
 	}, failure{}
 }
 

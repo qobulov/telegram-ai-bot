@@ -73,6 +73,8 @@ func drawPack(ctx context.Context, tx pgx.Tx, userID int64, name string, n int, 
 		if err != nil {
 			return nil, err
 		}
+		// The next card counts the wait this one left.
+		player.sinceLegendary, player.sinceMythic = draw.SinceLegendary, draw.SinceMythic
 		draws = append(draws, draw)
 	}
 	return draws, countQuest(ctx, tx, userID, quest, n)
