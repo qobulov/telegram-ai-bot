@@ -180,6 +180,30 @@ func TestMapRequestsSkipTheRouter(t *testing.T) {
 	}
 }
 
+// The weather is the get_weather tool's: asked "пагода", the router took it
+// for small talk and the chat model guessed (2026-11-21).
+func TestWeatherQuestionsSkipTheRouter(t *testing.T) {
+	for msg, full := range map[string]bool{
+		"Ali: пагода":                    true,
+		"Ali: Toshkentda ob-havo qanday": true,
+		"Ali: обу-ҳаво қандай":           true,
+		"Ali: какая погода в Самарканде": true,
+		"Ali: bugun harorat necha":       true,
+		"Ali: havo yaxshi ekan bugun":    false,
+		"Ali: Mari nima gap":             false,
+	} {
+		f, router, _ := routedFixture("CHAT", text("chat"), text("full"))
+		req := request(1, msg)
+		req.Group = true
+
+		answer, err := f.agent.Reply(context.Background(), req)
+
+		if err != nil || (answer.Route == RouteFull) != full || (len(router.requests) == 0) != full {
+			t.Errorf("%q: route %q, router asked %d times; want full %v", msg, answer.Route, len(router.requests), full)
+		}
+	}
+}
+
 // A game question carries the reminder to check heroes in the request, but
 // the saved question is the plain text.
 func TestGameQuestionsRemindToCheckHeroes(t *testing.T) {

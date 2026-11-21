@@ -18,6 +18,9 @@ type Overview struct {
 	Users              int `json:"users"`
 	UsersToday         int `json:"users_today"`
 	GroupMessagesToday int `json:"group_messages_today"`
+	// CardPlayers is who ever drew a card, CardPlayersToday who drew since.
+	CardPlayers      int `json:"card_players"`
+	CardPlayersToday int `json:"card_players_today"`
 }
 
 // Overview counts the groups, users and messages the bot knows of.
@@ -29,8 +32,10 @@ func (s *Store) Overview(ctx context.Context, since time.Time) (Overview, error)
 			(SELECT count(*) FROM chats WHERE muted AND chat_id IN (SELECT chat_id FROM groups)),
 			(SELECT count(*) FROM users),
 			(SELECT count(*) FROM users WHERE last_seen_at >= $1),
-			(SELECT count(*) FROM group_messages WHERE created_at >= $1)`, since).
-		Scan(&o.Groups, &o.MutedGroups, &o.Users, &o.UsersToday, &o.GroupMessagesToday)
+			(SELECT count(*) FROM group_messages WHERE created_at >= $1),
+			(SELECT count(*) FROM card_players),
+			(SELECT count(*) FROM card_players WHERE last_draw_at >= $1)`, since).
+		Scan(&o.Groups, &o.MutedGroups, &o.Users, &o.UsersToday, &o.GroupMessagesToday, &o.CardPlayers, &o.CardPlayersToday)
 	if err != nil {
 		return Overview{}, fmt.Errorf("storage: overview: %w", err)
 	}

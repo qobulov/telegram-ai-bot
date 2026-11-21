@@ -65,11 +65,16 @@ func TestOverviewCountsWhatTheBotKnows(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Card players too: one drew today, one days ago.
+	if _, err := store.pool.Exec(ctx, `INSERT INTO card_players (user_id, last_draw_at) VALUES ($1, now()), ($2, now() - interval '3 days')`, alice, bob); err != nil {
+		t.Fatal(err)
+	}
+
 	got, err := store.Overview(ctx, time.Now().Add(-time.Hour))
 	if err != nil {
 		t.Fatalf("Overview: %v", err)
 	}
-	want := Overview{Groups: 2, MutedGroups: 1, Users: 2, UsersToday: 1, GroupMessagesToday: 3}
+	want := Overview{Groups: 2, MutedGroups: 1, Users: 2, UsersToday: 1, GroupMessagesToday: 3, CardPlayers: 2, CardPlayersToday: 1}
 	if got != want {
 		t.Errorf("overview = %+v, want %+v", got, want)
 	}
