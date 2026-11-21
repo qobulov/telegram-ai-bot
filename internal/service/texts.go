@@ -249,7 +249,7 @@ A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yo
 /reports, /warns — ko'rilmagan shikoyatlar, kimda nechta ogohlantirish
 
 Hamma uchun:
-/card — kartalar o'yini (har 2 soatda token), /mylink — shaxsiy taklif havolangiz, /invites — kim nechta odam qo'shdi (tugmalar: bugun, hafta, oy, hammasi, o'zingizniki)
+/card — kartalar o'yini (har 2 soatda token), /mylink — shaxsiy taklif havolangiz, /words — kim nechta so'z yozdi (7 kun, 30 kun, o'zingiz), /invites — kim nechta odam qo'shdi (tugmalar: bugun, hafta, oy, hammasi, o'zingizniki)
 /admins — adminlarni chaqirish, /report va /voteban — xabarga reply qilib shikoyat yoki ban uchun ovoz, /rights — huquqlaringiz
 /id, /ping
 
@@ -276,7 +276,7 @@ Bo'limlar: /help mod, /help kartalar, /help azo`,
 /reports, /warns — нерассмотренные жалобы, у кого сколько предупреждений
 
 Для всех:
-/card — игра в карты (токен каждые 2 часа), /mylink — ваша личная ссылка-приглашение, /invites — кто сколько добавил (кнопки: сегодня, неделя, месяц, всё, мои)
+/card — игра в карты (токен каждые 2 часа), /mylink — ваша личная ссылка-приглашение, /words — кто сколько слов написал (7 дней, 30 дней, мои), /invites — кто сколько добавил (кнопки: сегодня, неделя, месяц, всё, мои)
 /admins — позвать админов, /report и /voteban — ответом на сообщение: жалоба или голосование за бан, /rights — ваши права
 /id, /ping
 
@@ -303,7 +303,7 @@ Reply to a member's message and ask me to delete or pin it, to mute or ban its a
 /reports, /warns — open reports, who has how many warnings
 
 For everyone:
-/card — the card game (a token every 2 hours), /mylink — your own invite link, /invites — who brought how many (buttons: today, week, month, all, mine)
+/card — the card game (a token every 2 hours), /mylink — your own invite link, /words — who wrote how many words (7 days, 30 days, mine), /invites — who brought how many (buttons: today, week, month, all, mine)
 /admins — call the admins, /report and /voteban — as a reply: report, or vote to ban, /rights — what you may do
 /id, /ping
 
@@ -474,19 +474,19 @@ In the app: the collection, the market (trades), the ranking
 /voteban — xabarga reply qilib ban uchun ovoz (5 ta "ha"); boshlagan a'zo bekor qila oladi
 /admins — adminlarni chaqirish, /rights — huquqlaringiz
 Xabarga reply qilib "+" yoki "rahmat" — reputatsiya; /rep, /toprep — reyting
-/mylink — shaxsiy taklif havolangiz, /invites — takliflar reytingi va o'zingizniki
+/mylink — shaxsiy taklif havolangiz, /invites — takliflar reytingi va o'zingizniki, /words — so'zlar reytingi (7 va 30 kun)
 /id, /ping`,
 		ru: `👥 Для всех
 /report — ответом на сообщение: жалоба админам
 /voteban — ответом на сообщение: голосование за бан (5 «да»); начавший может отменить
 /admins — позвать админов, /rights — ваши права
-/mylink — личная ссылка, /invites — рейтинг приглашений и ваш счёт
+/mylink — личная ссылка, /invites — рейтинг приглашений и ваш счёт, /words — рейтинг по словам (7 и 30 дней)
 /id, /ping`,
 		en: `👥 For everyone
 /report — as a reply: report to the admins
 /voteban — as a reply: vote to ban (5 "yes"); the one who started may cancel
 /admins — call the admins, /rights — what you may do
-/mylink — your invite link, /invites — the invite table and your own count
+/mylink — your invite link, /invites — the invite table and your own count, /words — the word table (7 and 30 days)
 /id, /ping`,
 	},
 }

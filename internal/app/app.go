@@ -338,6 +338,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Groups:          store,
 		Roster:          store,
 		Invites:         store,
+		Words:           store,
 		Teams:           store,
 		Ranks:           store,
 		BanList:         store,

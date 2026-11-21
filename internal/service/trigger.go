@@ -141,7 +141,7 @@ var ownCommands = map[string]bool{
 	"/banlist": true, "/amnesty": true,
 	"/admins": true, "/report": true, "/voteban": true,
 	"/ping": true, "/id": true,
-	"/mylink": true, "/reports": true, "/warns": true, "/rights": true, "/myinvites": true,
+	"/mylink": true, "/reports": true, "/warns": true, "/rights": true, "/myinvites": true, "/words": true,
 	"/rep": true, "/toprep": true, "/cleanservice": true, "/antispam": true,
 	"/ignore": true, "/unignore": true,
 }
