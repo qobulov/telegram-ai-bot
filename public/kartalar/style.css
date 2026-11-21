@@ -700,6 +700,9 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
   background: rgba(8, 6, 14, 0.75); font: 700 11px Unbounded, sans-serif; color: var(--gold);
 }
 .card.special .stars { top: 34px; }
+/* a Mythic's crown sits top left: its stars go just right of it */
+.card.mythic .stars { left: 32px; }
+.front.mythic .stars { top: 15px; left: 48px; }
 .plate-stars { display: block; margin-top: 2px; color: var(--gold); font-size: 13px; letter-spacing: 2px; }
 .fuse { margin-top: 10px; text-align: center; }
 .fuse .fuse-do { width: 100%; }
