@@ -899,8 +899,10 @@
 
   // celebrate shows a Mythic just drawn on the whole screen before the
   // draw's usual reveal: light turning behind it, gold confetti (and cherry
-  // petals for a card dressed with them), the card rising, and which copy of
-  // it in the whole game this is. A tap or the button closes it. Only
+  // petals for a card dressed with them), the card rising, and, for a limited
+  // card alone, which copy of it in the whole game this is: the count of
+  // others' draws (a card's whole life, from before it was Mythic) means
+  // nothing on them. A tap or the button closes it. Only
   // transforms and opacity move, so that weak phones keep up; with less
   // motion asked for, the card and the words stand still.
   const celebrateTexts = {
@@ -933,7 +935,7 @@
       box.querySelector(".cel-title").textContent = ct.title;
       box.querySelector(".cel-name").textContent = card.name;
       // the number is a limited card's alone, which each player gets once
-      if (serial > 0 && (card.limited || SPECIAL[card.id])) {
+      if (serial > 0 && card.limited) {
         box.querySelector(".cel-no").textContent = serialMark(serial);
         box.querySelector(".cel-serial small").textContent = ct.copy(serial);
       } else {
