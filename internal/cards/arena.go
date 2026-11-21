@@ -134,7 +134,7 @@ func themedFighters(held []storage.OwnedCard, ids [5]int64, theme string) (fight
 		}
 		attack, health := Boosted(o.Card, stars)
 		attack, health = raised(attack, bonus[i]+themed), raised(health, bonus[i]+themed)
-		f := arena.FighterOf(o.ID, o.Name, o.Rarity, stars, attack, health)
+		f := fighterOf(o.ID, o.Name, o.Rarity, stars, attack, health)
 		slots[i] = f
 		views[i] = fighterView{ID: o.ID, Name: o.Name, Image: o.ImageURL, Rarity: o.Rarity, Stars: stars,
 			Attack: attack, Health: health, Class: classNames[f.Class], Skill: skillNames[f.Skill],

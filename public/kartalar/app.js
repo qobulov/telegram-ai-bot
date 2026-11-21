@@ -2261,11 +2261,11 @@
   let arenaData = null, arenaDraft = EMPTY_TEAM.slice(), arenaBusy = false, ticketAt = 0;
 
   // fighterOf is a held card as the arena draws it, its class and skill
-  // worked out as arena.FighterOf does, for a team not saved yet; a saved
+  // the hand-picked role the server sends or worked out as arena.FighterOf does, for a team not saved yet; a saved
   // team's come from the server.
   function fighterOf(card) {
-    const cls = card.health >= 4 * card.attack ? "tank" : card.health <= 3 * card.attack ? "mage" : "fighter";
-    const skill = card.rarity >= 3 ? SKILLS[((card.id % 6) + 6) % 6] : "";
+    const cls = card.class || (card.health >= 4 * card.attack ? "tank" : card.health <= 3 * card.attack ? "mage" : "fighter");
+    const skill = card.rarity >= 3 ? card.skill || SKILLS[((card.id % 6) + 6) % 6] : "";
     return { id: card.id, name: card.name, image: card.image, rarity: card.rarity, stars: card.stars || 1, attack: card.attack || 0, health: card.health || 0, class: cls, skill, anime: franchise(card.anime || "") };
   }
   // withSynergy raises the team's cards of one anime as the server does:

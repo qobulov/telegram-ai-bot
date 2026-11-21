@@ -300,10 +300,17 @@ type cardView struct {
 	// Serial is a limited card's number for its holder, which holder of it
 	// they are; 0 for others.
 	Serial int `json:"serial,omitempty"`
+	// Class and Skill are a card's role picked by hand (roles), so
+	// that the page shows it as the arena fights it; empty for the others,
+	// which the page works out as arena.FighterOf does.
+	Class string `json:"class,omitempty"`
+	Skill string `json:"skill,omitempty"`
 }
 
 func (h *handler) held(c storage.Card, count int) cardView {
-	return cardView{ID: c.ID, Rarity: c.Rarity, Set: c.Collection, Name: c.Name, Anime: c.Anime, Image: c.ImageURL, Attack: c.Attack, Health: c.Health, Value: c.Value, Count: count, Limited: storage.CardLimited(c.ID)}
+	v := cardView{ID: c.ID, Rarity: c.Rarity, Set: c.Collection, Name: c.Name, Anime: c.Anime, Image: c.ImageURL, Attack: c.Attack, Health: c.Health, Value: c.Value, Count: count, Limited: storage.CardLimited(c.ID)}
+	v.Class, v.Skill = roleNames(c.ID, c.Rarity)
+	return v
 }
 
 // owned is a card the player holds, with its stars and what fusing it

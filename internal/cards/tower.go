@@ -22,12 +22,13 @@ import (
 // Tashkent, one anime of at least TowerThemeLeast cards raises its cards'
 // attack and health by TowerThemeBonus percent, in the tower only. Floor
 // 1's team has TowerBasePower and each floor TowerGrowth times the one
-// before; its cards rise in rarity every few floors and a star every
+// before (6500 since 2026-11-21, from 5000: players cleared floors of their
+// own team's power by trying again until they won, 46 floors in two days); its cards rise in rarity every few floors and a star every
 // TowerStarsEvery floors.
 const (
 	TowerThemeBonus = 20
 	TowerThemeLeast = 5
-	TowerBasePower  = 5000
+	TowerBasePower  = 6500
 	TowerGrowth     = 1.07
 	TowerStarsEvery = 15
 	// towerSalt keeps a floor's draw apart from any other seeded by a number.
@@ -104,7 +105,7 @@ func towerTeam(catalog []storage.Card, floor int) (fighters, bool) {
 	for i, c := range picked {
 		attack, health := Boosted(c, stars)
 		attack, health = int(math.Round(float64(attack)*scale)), int(math.Round(float64(health)*scale))
-		f := arena.FighterOf(c.ID, c.Name, c.Rarity, stars, attack, health)
+		f := fighterOf(c.ID, c.Name, c.Rarity, stars, attack, health)
 		slots[i] = f
 		views[i] = fighterView{ID: c.ID, Name: c.Name, Image: c.ImageURL, Rarity: c.Rarity, Stars: stars,
 			Attack: attack, Health: health, Class: classNames[f.Class], Skill: skillNames[f.Skill], Anime: Franchise(c.Anime)}
