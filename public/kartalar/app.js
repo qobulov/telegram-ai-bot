@@ -16,7 +16,7 @@
      
       cancel: "Bekor qilish",
       open1: "1x", open10: "5x", costShort: "💎 yetmaydi", tokenHint: (d, c) => `🎟 Token bitta karta ochadi. Har 2 soatda +${d} token (12 tagacha yig'iladi), tugasa karta ${c} 💎`, nextToken: (time) => `⏳ Keyingi token: ${time}`, pity: (l, lm, m, mm) => `🛡 Kafolat: Lega ${l}/${lm} · Mifik ${m}/${mm}`, sureTag: "KAFOLAT", given: (n) => `🎟 +${n} token berildi`, short: (n) => `💎 Yana ${n} kristal kerak`, openedTen: "5 ta karta", freshN: (n) => `🆕 ${n} ta yangi`, againN: (n) => `🔁 ${n} ta takror`, freshTag: "YANGI", carryOn: "Davom etish", noPoints: "ochko qo'shilmaydi", 
-      fresh: "🆕 Yangi karta!", again: (n) => `🔁 Sizda endi ×${n}`, plus: (n) => `+${n} ochko`,
+      fresh: "🆕 Yangi karta!", again: (n) => `🔁 Takror · bo'sh nusxa ×${n}`, plus: (n) => `+${n} ochko`,
       attack: "Hujum", health: "Jon", value: "Ochko", cards: (n) => `${n} karta`, pts: "ochko",
       none: "Hech narsa topilmadi", noTop: "Hali hech kim karta olmagan", topPct: (p) => `Top ${p}%`, youRow: "Siz",
       noTelegram: "Ilovani Telegram'da oching: botga /card yozing.", stale: "Ilova eskirdi, uni qayta oching.",
@@ -32,7 +32,7 @@
       step1: "1. Qaysi kartangizni berasiz?", step2: "2. Evaziga qaysi kartani xohlaysiz?", mineSearch: "Kartalaringizdan qidiring", wantSearch: "Xohlagan karta nomini yozing",
       place: "Taklif qo'yish", placed: "✅ Taklif bozorga qo'yildi", swapped: (c) => `🔄 Almashildi! Siz ${c} oldingiz`, removed: "Taklif olib tashlandi",
       refused: { uneven: "Faqat bir daraja yuqori yoki past kartaga almashish mumkin", limited: "🔒 Limited kartani almashib bo'lmaydi", over: "Bu taklif endi yo'q", gone: "Bu taklif endi yo'q", own: "Bu o'zingizning taklifingiz", not_held: "Sizda bu karta yo'q", same: "Bir xil kartani almashib bo'lmaydi", fused: "⭐ Yulduzli kartani almashib bo'lmaydi" },
-      fuse: (a, b, n) => `⭐ ★${a} → ★${b} · ${n} nusxa`, fuseNext: (a, h) => `Keyin: Hujum ${a} · Jon ${h}`, fuseFree: (n) => `Bo'sh nusxa: ${n}`,
+      fuse: (a, b, f, n) => `⭐ ★${a} → ★${b} · ${f}/${n} nusxa`, fuseNext: (a, h) => `Keyin: Hujum ${a} · Jon ${h}`, fuseFree: (n) => `Bo'sh nusxa: ${n}`,
       fuseMax: "⭐ Eng yuqori daraja: ★5", fuseFew: (n) => `Yana ${n} ta nusxa kerak`, fused: (s) => `⭐ Karta ★${s} bo'ldi!`,
       fuseRefused: { max: "⭐ Karta allaqachon ★5", few: "Nusxalar yetmaydi", not_held: "Sizda bu karta yo'q" },
       offersLimit: (n) => `Bir vaqtda ${n} tagacha taklif qo'yish mumkin`,
@@ -50,7 +50,7 @@
      
       cancel: "Отмена",
       open1: "1x", open10: "5x", costShort: "💎 не хватает", tokenHint: (d, c) => `🎟 Токен открывает одну карту. Каждые 2 часа +${d} (копится до 12), без токенов карта стоит ${c} 💎`, nextToken: (time) => `⏳ Следующий токен: ${time}`, pity: (l, lm, m, mm) => `🛡 Гарант: Легенда ${l}/${lm} · Миф ${m}/${mm}`, sureTag: "ГАРАНТ", given: (n) => `🎟 +${n} токен(ов)`, short: (n) => `💎 Нужно ещё ${n} кристаллов`, openedTen: "5 карт", freshN: (n) => `🆕 Новых: ${n}`, againN: (n) => `🔁 Повторов: ${n}`, freshTag: "НОВАЯ", carryOn: "Продолжить", noPoints: "очки не добавляются", 
-      fresh: "🆕 Новая карта!", again: (n) => `🔁 Теперь у вас ×${n}`, plus: (n) => `+${n} очков`,
+      fresh: "🆕 Новая карта!", again: (n) => `🔁 Повтор · свободных копий ×${n}`, plus: (n) => `+${n} очков`,
       attack: "Атака", health: "Жизнь", value: "Очки", cards: (n) => `${n} карт`, pts: "очков",
       none: "Ничего не найдено", noTop: "Ещё никто не получил карту", topPct: (p) => `Топ ${p}%`, youRow: "Вы",
       noTelegram: "Откройте приложение в Telegram: напишите боту /card.", stale: "Приложение устарело, откройте его снова.",
@@ -66,7 +66,7 @@
       step1: "1. Какую карту отдаёте?", step2: "2. Какую хотите взамен?", mineSearch: "Поиск по вашим картам", wantSearch: "Название нужной карты",
       place: "Выставить", placed: "✅ Предложение выставлено", swapped: (c) => `🔄 Обмен! Вы получили ${c}`, removed: "Предложение снято",
       refused: { uneven: "Менять можно на карту той же редкости или на одну выше/ниже", limited: "🔒 Лимитированную карту нельзя обменять", over: "Этого предложения уже нет", gone: "Этого предложения уже нет", own: "Это ваше предложение", not_held: "У вас нет этой карты", same: "Нельзя менять карту на ту же", fused: "⭐ Звёздную карту нельзя обменять" },
-      fuse: (a, b, n) => `⭐ ★${a} → ★${b} · ${n} коп.`, fuseNext: (a, h) => `Станет: Атака ${a} · Жизнь ${h}`, fuseFree: (n) => `Свободных копий: ${n}`,
+      fuse: (a, b, f, n) => `⭐ ★${a} → ★${b} · ${f}/${n} коп.`, fuseNext: (a, h) => `Станет: Атака ${a} · Жизнь ${h}`, fuseFree: (n) => `Свободных копий: ${n}`,
       fuseMax: "⭐ Высший уровень: ★5", fuseFew: (n) => `Нужно ещё копий: ${n}`, fused: (s) => `⭐ Карта стала ★${s}!`,
       fuseRefused: { max: "⭐ Карта уже ★5", few: "Не хватает копий", not_held: "У вас нет этой карты" },
       offersLimit: (n) => `Одновременно можно выставить до ${n} предложений`,
@@ -84,7 +84,7 @@
      
       cancel: "Cancel",
       open1: "1x", open10: "5x", costShort: "💎 not enough", tokenHint: (d, c) => `🎟 A token opens one card. +${d} every 2 hours, up to 12 kept; with none, a card is ${c} 💎`, nextToken: (time) => `⏳ Next token: ${time}`, pity: (l, lm, m, mm) => `🛡 Guarantee: Legendary ${l}/${lm} · Mythic ${m}/${mm}`, sureTag: "GUARANTEED", given: (n) => `🎟 +${n} tokens`, short: (n) => `💎 ${n} more crystals needed`, openedTen: "5 cards", freshN: (n) => `🆕 ${n} new`, againN: (n) => `🔁 ${n} again`, freshTag: "NEW", carryOn: "Continue", noPoints: "no points added", 
-      fresh: "🆕 A new card!", again: (n) => `🔁 You now have ×${n}`, plus: (n) => `+${n} points`,
+      fresh: "🆕 A new card!", again: (n) => `🔁 Repeat · free copies ×${n}`, plus: (n) => `+${n} points`,
       attack: "Attack", health: "Life", value: "Points", cards: (n) => `${n} cards`, pts: "points",
       none: "Nothing found", noTop: "Nobody has drawn a card yet", topPct: (p) => `Top ${p}%`, youRow: "You",
       noTelegram: "Open the app in Telegram: send /card to the bot.", stale: "The app is out of date; open it again.",
@@ -100,7 +100,7 @@
       step1: "1. Which card do you give?", step2: "2. Which card do you want?", mineSearch: "Search your cards", wantSearch: "Name of the card you want",
       place: "Put it up", placed: "✅ Your offer is up", swapped: (c) => `🔄 Traded! You got ${c}`, removed: "Offer taken down",
       refused: { uneven: "A card may be traded only for one of the same rarity or one step up or down", limited: "🔒 A limited card cannot be traded", over: "This offer is gone", gone: "This offer is gone", own: "This is your own offer", not_held: "You do not have that card", same: "A card cannot be traded for itself", fused: "⭐ A starred card cannot be traded" },
-      fuse: (a, b, n) => `⭐ ★${a} → ★${b} · ${n} ${n === 1 ? "copy" : "copies"}`, fuseNext: (a, h) => `Then: Attack ${a} · Life ${h}`, fuseFree: (n) => `Free copies: ${n}`,
+      fuse: (a, b, f, n) => `⭐ ★${a} → ★${b} · ${f}/${n} ${n === 1 ? "copy" : "copies"}`, fuseNext: (a, h) => `Then: Attack ${a} · Life ${h}`, fuseFree: (n) => `Free copies: ${n}`,
       fuseMax: "⭐ Top level: ★5", fuseFew: (n) => `${n} more ${n === 1 ? "copy" : "copies"} needed`, fused: (s) => `⭐ The card is now ★${s}!`,
       fuseRefused: { max: "⭐ The card is already ★5", few: "Not enough copies", not_held: "You do not have that card" },
       offersLimit: (n) => `You may have up to ${n} offers at once`,
@@ -349,12 +349,12 @@
       stars.textContent = `★${card.stars}`;
       tile.append(stars);
     }
-    // The copies left, the one kept and the free ones: those used up for
-    // stars are gone, so a card with no free copy shows no count.
+    // The free copies, the ones a star can use: the one kept and those used
+    // up for stars are not counted, so ×2 is two copies toward the next star.
     if (card.free > 0) {
       const count = document.createElement("span");
       count.className = "count";
-      count.textContent = `×${card.free + 1}`;
+      count.textContent = `×${card.free}`;
       tile.append(count);
     }
     tile.addEventListener("click", () => open(card));
@@ -586,7 +586,7 @@
       button.disabled = true;
       hint.textContent = t.fuseFree(card.free || 0);
     } else {
-      button.textContent = t.fuse(card.stars, card.stars + 1, card.fuse);
+      button.textContent = t.fuse(card.stars, card.stars + 1, Math.min(card.free || 0, card.fuse), card.fuse);
       button.disabled = (card.free || 0) < card.fuse;
       hint.textContent = (button.disabled ? t.fuseFew(card.fuse - (card.free || 0)) + " · " : "") + t.fuseNext(spaced(card.next_attack), spaced(card.next_health));
     }
@@ -768,7 +768,7 @@
       flip.classList.remove("shuffle");
       flip.classList.add("shown");
       haptic(best.card.rarity >= 3 ? "heavy" : "light");
-      $("result").replaceChildren(...withTiers(best.fresh ? `${t.fresh} · ${t.plus(spaced(best.card.value))}` : `${t.again((best.card.free || 0) + 1)} · ${t.noPoints}`));
+      $("result").replaceChildren(...withTiers(best.fresh ? `${t.fresh} · ${t.plus(spaced(best.card.value))}` : `${t.again(best.card.free || 0)} · ${t.noPoints}`));
       $("drawnStats").replaceChildren(statsOf(best.card));
       lastDrawn = best.card.id;
       $("seeCollection").hidden = false;
@@ -1868,7 +1868,7 @@
         open(card);
         const note = document.createElement("p");
         note.className = "result";
-        note.replaceChildren(...withTiers(fresh ? `${t.fresh} · ${t.plus(spaced(card.value))}` : `${t.again((card.free || 0) + 1)} · ${t.noPoints}`));
+        note.replaceChildren(...withTiers(fresh ? `${t.fresh} · ${t.plus(spaced(card.value))}` : `${t.again(card.free || 0)} · ${t.noPoints}`));
         $("sheetCard").prepend(note);
       }
       if (drawn.some((d) => d.card.id === eventData.card.id)) { haptic("heavy"); toast(et.got); }
