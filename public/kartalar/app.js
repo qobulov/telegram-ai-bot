@@ -349,16 +349,22 @@
       stars.textContent = `★${card.stars}`;
       tile.append(stars);
     }
-    // The copies left, the one kept and the free ones: those used up for
-    // stars are gone, so a card with no free copy shows no count.
+    // The copies held: a ★1 card counts itself, a starred one only its free
+    // copies; those used up for stars are gone.
     if (card.free > 0) {
       const count = document.createElement("span");
       count.className = "count";
-      count.textContent = `×${card.free + 1}`;
+      count.textContent = `×${copies(card)}`;
       tile.append(count);
     }
     tile.addEventListener("click", () => open(card));
     return tile;
+  }
+
+  // copies is how many copies of a card the player has: a ★1 card itself
+  // and its free ones, a starred card its free ones only.
+  function copies(card) {
+    return (card.free || 0) + (card.stars > 1 ? 0 : 1);
   }
 
   function setChips() {
@@ -768,7 +774,7 @@
       flip.classList.remove("shuffle");
       flip.classList.add("shown");
       haptic(best.card.rarity >= 3 ? "heavy" : "light");
-      $("result").replaceChildren(...withTiers(best.fresh ? `${t.fresh} · ${t.plus(spaced(best.card.value))}` : `${t.again((best.card.free || 0) + 1)} · ${t.noPoints}`));
+      $("result").replaceChildren(...withTiers(best.fresh ? `${t.fresh} · ${t.plus(spaced(best.card.value))}` : `${t.again(copies(best.card))} · ${t.noPoints}`));
       $("drawnStats").replaceChildren(statsOf(best.card));
       lastDrawn = best.card.id;
       $("seeCollection").hidden = false;
@@ -1868,7 +1874,7 @@
         open(card);
         const note = document.createElement("p");
         note.className = "result";
-        note.replaceChildren(...withTiers(fresh ? `${t.fresh} · ${t.plus(spaced(card.value))}` : `${t.again((card.free || 0) + 1)} · ${t.noPoints}`));
+        note.replaceChildren(...withTiers(fresh ? `${t.fresh} · ${t.plus(spaced(card.value))}` : `${t.again(copies(card))} · ${t.noPoints}`));
         $("sheetCard").prepend(note);
       }
       if (drawn.some((d) => d.card.id === eventData.card.id)) { haptic("heavy"); toast(et.got); }
