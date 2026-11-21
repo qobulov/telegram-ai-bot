@@ -2956,6 +2956,108 @@
   }
   const lessMotion = () => !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 
+  // The battle's numbers, shown under its result as the owners asked on
+  // 2026-11-21: for each card the damage it dealt (a poison's ticks counted
+  // to the card that poisoned), the health it lost (a shield's share not
+  // lost), what it healed and shielded, and the cards it felled; the card
+  // that dealt the most is the MVP.
+  const statsTexts = {
+    uz: { title: "📊 Jang statistikasi", mvp: (name, n) => `🏅 MVP: ${name} · ⚔️ ${n}`, legend: "⚔️ bergan zarba · 🩸 yo'qotgan jon · 💚 davo va qalqon · 💀 yiqitgan" },
+    ru: { title: "📊 Статистика боя", mvp: (name, n) => `🏅 MVP: ${name} · ⚔️ ${n}`, legend: "⚔️ нанесённый урон · 🩸 потерянное здоровье · 💚 лечение и щиты · 💀 убийства" },
+    en: { title: "📊 Battle stats", mvp: (name, n) => `🏅 MVP: ${name} · ⚔️ ${n}`, legend: "⚔️ damage dealt · 🩸 health lost · 💚 healing and shields · 💀 knockouts" },
+  };
+  const st = statsTexts[language] || statsTexts.uz;
+
+  // battleStats are each side's cards with their numbers, worked out from
+  // the battle's events by following every card's health.
+  function battleStats(data) {
+    const sides = [data.attacker || [], data.defender || []].map((list) =>
+      list.map((f) => ({ f, dealt: 0, taken: 0, healed: 0, shielded: 0, kills: 0, hp: f.health })));
+    const poisoner = new Map();
+    let hitter = null;
+    for (const e of data.events || []) {
+      const foeSide = HITS.includes(e.kind);
+      const actor = sides[e.side] && sides[e.side][e.from];
+      const target = sides[foeSide ? 1 - e.side : e.side] && sides[foeSide ? 1 - e.side : e.side][e.to];
+      if (!target) continue;
+      if (foeSide || e.kind === "poisoned") {
+        // a poison's tick names the poisoned card alone: it counts to the
+        // card that poisoned it last
+        hitter = foeSide ? actor : poisoner.get(target);
+        if (hitter) hitter.dealt += e.amount;
+        target.taken += Math.max(0, target.hp - e.hp);
+        target.hp = e.hp;
+        if (e.kind === "poison" && actor) poisoner.set(target, actor);
+      } else if (e.kind === "heal") {
+        if (actor) actor.healed += e.amount;
+        target.hp = e.hp;
+      } else if (e.kind === "shield") {
+        if (actor) actor.shielded += e.amount;
+      } else if (e.kind === "fall") {
+        // a card falls right after the blow that felled it
+        if (hitter && hitter !== target) hitter.kills++;
+        target.hp = 0;
+      }
+    }
+    return sides;
+  }
+
+  // statsBlock is the battle's numbers as a table for each side, the MVP
+  // first; big numbers are shortened to thousands to fit a phone.
+  function statsBlock(data) {
+    const sides = battleStats(data);
+    const all = sides.flat();
+    const mvp = all.reduce((a, b) => (!a || b.dealt > a.dealt ? b : a), null);
+    const most = Math.max(1, mvp ? mvp.dealt : 0);
+    const short = (n) => (n >= 100000 ? `${Math.round(n / 1000)}k` : n >= 10000 ? `${(n / 1000).toFixed(1)}k` : spaced(n));
+    const box = document.createElement("div");
+    box.className = "b-stats";
+    const title = document.createElement("b");
+    title.className = "bs-title";
+    title.textContent = st.title;
+    box.append(title);
+    if (mvp && mvp.dealt > 0) {
+      const top = document.createElement("p");
+      top.className = "bs-mvp";
+      top.textContent = st.mvp(mvp.f.name, short(mvp.dealt));
+      box.append(top);
+    }
+    sides.forEach((list, side) => {
+      const part = document.createElement("div");
+      part.className = "bs-side " + (side ? "them" : "us");
+      const head = document.createElement("div");
+      head.className = "bs-head";
+      for (const text of [side ? at.them : at.you, "⚔️", "🩸", "💚", "💀"]) {
+        const cell = document.createElement("span");
+        cell.textContent = text;
+        head.append(cell);
+      }
+      part.append(head);
+      for (const u of list) {
+        const row = document.createElement("div");
+        row.className = "bs-row" + (u.hp <= 0 ? " fallen" : "") + (u === mvp && mvp.dealt > 0 ? " mvp" : "");
+        const who = document.createElement("span");
+        who.className = "bs-name";
+        who.innerHTML = '<b></b><i class="bs-bar"><i></i></i>';
+        who.querySelector("b").textContent = u.f.name;
+        who.querySelector(".bs-bar i").style.width = `${Math.round((u.dealt / most) * 100)}%`;
+        row.append(who);
+        for (const n of [u.dealt, u.taken, u.healed + u.shielded, u.kills]) {
+          const cell = document.createElement("span");
+          cell.textContent = n ? short(n) : "—";
+          row.append(cell);
+        }
+        part.append(row);
+      }
+      box.append(part);
+    });
+    const legend = document.createElement("p");
+    legend.className = "bs-legend";
+    legend.textContent = st.legend;
+    box.append(legend);
+    return box;
+  }
+
   function replay(data, foe) {
     return new Promise((resolve) => {
       const box = document.createElement("div");
@@ -3099,6 +3201,7 @@
         const coins = result.querySelector(".b-coins");
         coins.textContent = data.coins_won ? at.coinsWon(data.coins_won) : "";
         coins.hidden = !data.coins_won;
+        result.querySelector(".b-ok").before(statsBlock(data));
         result.hidden = false;
         try { tg.HapticFeedback.notificationOccurred(data.won ? "success" : "error"); } catch (_) { /* outside Telegram */ }
       }

@@ -1186,6 +1186,27 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .b-result.lost .b-change { color: #ff8a8a; }
 .b-token { font-weight: 800; color: var(--gold); }
 .b-ok { margin-top: 8px; }
+/* the battle's numbers under its result: a table for each side, the MVP
+   first; the panel scrolls when they make it taller than the screen */
+.b-result { max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain; }
+.b-stats { justify-self: stretch; display: grid; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font: 600 12px Manrope, sans-serif; color: var(--text); }
+.bs-title { justify-self: center; font: 700 13px Unbounded, sans-serif; color: var(--gold); }
+.bs-mvp { margin: 0; text-align: center; color: #ffe39a; font-weight: 800; }
+.bs-side { display: grid; gap: 4px; }
+.bs-head, .bs-row { display: grid; grid-template-columns: minmax(0, 1fr) repeat(4, 42px); align-items: center; gap: 4px; }
+.bs-head { color: var(--muted); font-size: 11px; }
+.bs-head span:first-child { font-weight: 800; }
+.bs-side.us .bs-head span:first-child { color: var(--gold); }
+.bs-side.them .bs-head span:first-child { color: #ff8a8a; }
+.bs-head span:not(:first-child), .bs-row span:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+.bs-name { min-width: 0; display: grid; gap: 2px; }
+.bs-name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.bs-bar { display: block; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.bs-bar i { display: block; height: 100%; background: linear-gradient(90deg, #ffd25a, #ff8a3d); }
+.bs-side.them .bs-bar i { background: linear-gradient(90deg, #ff8a8a, #ff4d6d); }
+.bs-row.fallen .bs-name b { opacity: 0.55; }
+.bs-row.mvp .bs-name b::after { content: " 🏅"; }
+.bs-legend { margin: 0; color: var(--muted); font-size: 10.5px; text-align: center; line-height: 1.4; }
 
 /* the HP left, over its bar, in battle */
 .fighter .hp-n { position: absolute; right: 5px; bottom: 31px; font: 800 10px/1 Manrope, sans-serif; font-variant-numeric: tabular-nums; color: #d9ffe4; text-shadow: 0 1px 2px #000, 0 0 4px #000; }
