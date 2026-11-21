@@ -536,23 +536,22 @@
     return back;
   }
 
-  // turnable is the large card, front and back, and the button under it
-  // that turns it over, as a tap on the card itself does; with less motion
-  // asked for the sides only swap.
+  // turnable is the large card, front and back; a tap on it turns it over
+  // (Enter or Space from the keyboard). With less motion asked for the sides
+  // only swap.
   function turnable(card) {
     const turn = document.createElement("div");
     turn.className = "turn";
+    turn.setAttribute("role", "button");
+    turn.tabIndex = 0;
+    turn.setAttribute("aria-label", at.flipHint);
     const front = face(card), back = cardBack(card);
     turn.append(front, back);
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "ghost turn-do";
     const show = (turned) => {
       turn.classList.toggle("turned", turned);
       front.setAttribute("aria-hidden", String(turned));
       back.setAttribute("aria-hidden", String(!turned));
-      button.textContent = turned ? at.flipBack : at.flip;
-      button.setAttribute("aria-pressed", String(turned));
+      turn.setAttribute("aria-pressed", String(turned));
     };
     const flip = (event) => {
       event.stopPropagation();
@@ -560,9 +559,13 @@
       haptic("light");
     };
     turn.addEventListener("click", flip);
-    button.addEventListener("click", flip);
+    turn.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      flip(event);
+    });
     show(false);
-    return [turn, button];
+    return [turn];
   }
 
   function open(card) {
@@ -2063,7 +2066,7 @@
       starsLine: (s, m, top) => (s < 5 ? `★${s}: kuch ×${m} · ★5 da ×${top}` : `★5: kuch ×${m}`),
       skillTitle: (n) => `Skill: ${n}`, noSkillTitle: "Skill: yo'q", noSkill: "Skill Legendar va Mifik kartalarda bo'ladi",
       animeNote: "Jamoada shu animedan 2 ta: +10%, 3 ta va ko'p: +20% hujum va jon",
-      flip: "↻ Arenadagi kuchi", flipBack: "↻ Old tomoni", flipHint: "Kartani bosib aylantiring",
+      flipHint: "Kartani bosib aylantiring",
       frontNote: "zarbani birinchi oladi", backNote: "sehrgarlar shu yerni uradi", addCard: "Karta qo'shing",
       rules: "Qoidalar", ruleClasses: "Sinflar", ruleTriangle: "Strelka: kim kimni 25% kuchliroq uradi", ruleSkills: "Skillar · Legendar va Mifik kartalarda",
       ruleTickets: (m) => `🎫 Har hujum 1 tiket oladi: ${m} tagacha, har soatda 1 ta qaytadi`, ruleTokens: (n) => `🎟 G'alaba 1 karta tokeni beradi: kuniga ${n} tagacha`,
@@ -2107,7 +2110,7 @@
       starsLine: (s, m, top) => (s < 5 ? `★${s}: сила ×${m} · на ★5 ×${top}` : `★5: сила ×${m}`),
       skillTitle: (n) => `Навык: ${n}`, noSkillTitle: "Навык: нет", noSkill: "Навыки есть у Легендарных и Мифических карт",
       animeNote: "2 карты этого аниме в команде: +10%, 3 и больше: +20% атаки и здоровья",
-      flip: "↻ Сила на арене", flipBack: "↻ Лицевая сторона", flipHint: "Нажмите на карту, чтобы перевернуть",
+      flipHint: "Нажмите на карту, чтобы перевернуть",
       frontNote: "принимает удары первым", backNote: "сюда бьют маги", addCard: "Добавить карту",
       rules: "Правила", ruleClasses: "Классы", ruleTriangle: "Стрелка: кто кого бьёт на 25% сильнее", ruleSkills: "Навыки · у Легендарных и Мифических",
       ruleTickets: (m) => `🎫 Атака стоит 1 билет: до ${m}, каждый час возвращается 1`, ruleTokens: (n) => `🎟 Победа даёт токен на карту: до ${n} в день`,
@@ -2151,7 +2154,7 @@
       starsLine: (s, m, top) => (s < 5 ? `★${s}: power ×${m} · at ★5 ×${top}` : `★5: power ×${m}`),
       skillTitle: (n) => `Skill: ${n}`, noSkillTitle: "Skill: none", noSkill: "Legendary and Mythic cards have skills",
       animeNote: "2 cards of this anime in a team: +10%, 3 or more: +20% attack and health",
-      flip: "↻ Arena stats", flipBack: "↻ Front side", flipHint: "Tap the card to turn it over",
+      flipHint: "Tap the card to turn it over",
       frontNote: "takes the hits first", backNote: "mages hit here", addCard: "Add a card",
       rules: "Rules", ruleClasses: "Classes", ruleTriangle: "Arrow: who hits whom 25% harder", ruleSkills: "Skills · on Legendary and Mythic cards",
       ruleTickets: (m) => `🎫 Each attack takes 1 ticket: up to ${m}, one back every hour`, ruleTokens: (n) => `🎟 A win gives a card token: up to ${n} a day`,
