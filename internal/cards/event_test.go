@@ -126,8 +126,33 @@ func TestTheCardEvent(t *testing.T) {
 	if out := pull(1); out["refused"] != "over" {
 		t.Errorf("a pull after the end = %v", out)
 	}
+	if _, out := post(t, h, signedInit(7, now), "events"); len(out["events"].([]any)) != 1 {
+		t.Errorf("the events once Firefly ended = %v, want Demon Slayer's alone", out)
+	}
+	now = lastEventEnd()
 	if _, out := post(t, h, signedInit(7, now), "events"); len(out["events"].([]any)) != 0 {
 		t.Errorf("the events after both ended = %v", out)
+	}
+}
+
+// lastEventEnd is when the last event ends.
+func lastEventEnd() time.Time {
+	var last time.Time
+	for _, e := range Events {
+		if e.Ends.After(last) {
+			last = e.Ends
+		}
+	}
+	return last
+}
+
+// The Firefly event ends as Monday 2026-11-23 begins in Tashkent.
+func TestTheFireflyEventEndsOnMonday(t *testing.T) {
+	if want := time.Date(2026, 11, 23, 0, 0, 0, 0, Location); !firefly.Ends.Equal(want) || firefly.Ends.Weekday() != time.Monday {
+		t.Errorf("the Firefly event ends %v, want %v", firefly.Ends, want)
+	}
+	if firefly.runs(firefly.Ends) || !firefly.runs(firefly.Ends.Add(-time.Second)) {
+		t.Error("the Firefly event should run to its end and no further")
 	}
 }
 

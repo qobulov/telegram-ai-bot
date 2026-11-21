@@ -201,7 +201,7 @@ func TestQuestsTurnToTheMarketWhenTheEventEnds(t *testing.T) {
 		t.Errorf("claiming the market quest while the event runs = %v", out)
 	}
 
-	now = firefly.Ends
+	now = lastEventEnd()
 	if got := strings.Join(ids(7), ","); got != "open,arena,fuse,market" {
 		t.Errorf("quests after the event = %s", got)
 	}
