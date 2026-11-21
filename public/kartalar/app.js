@@ -310,6 +310,7 @@
     141918: { fx: "moon", glow: ["#f1dcff", "#9a4dff"] }, // Kokushibo: the moon
     149220: { fx: "sun", glow: ["#ffe6a8", "#ff5a1f"] }, // Yoriichi: the sun
     129132: { fx: "blood", glow: ["#ff8a8a", "#b0002a"] }, // Muzan: blood
+    127518: { fx: "blood", glow: ["#ffc2dd", "#ff3d8b"] }, // Nezuko: her exploding blood, pink
     141694: { fx: "compass", glow: ["#a8f6ff", "#ff2e7e"] }, // Akaza: his compass
   };
 
