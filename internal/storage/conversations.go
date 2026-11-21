@@ -388,6 +388,10 @@ func (s *Store) Expire(ctx context.Context, maxAge time.Duration) (Expired, erro
 			return err
 		}
 		expired.GroupMessages = tag.RowsAffected()
+		// Transcripts go with the messages they were made for.
+		if _, err = tx.Exec(ctx, `DELETE FROM voice_transcripts WHERE created_at < $1`, cutoff); err != nil {
+			return err
+		}
 		// Limits are counted per day, so older records are no longer needed.
 		if _, err = tx.Exec(ctx, `DELETE FROM song_recognitions WHERE created_at < $1`, cutoff); err != nil {
 			return err

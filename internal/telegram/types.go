@@ -320,10 +320,13 @@ type Animation struct {
 
 // Voice is a voice message: OGG audio encoded with Opus.
 type Voice struct {
-	FileID   string `json:"file_id"`
-	Duration int    `json:"duration"` // seconds
-	MimeType string `json:"mime_type"`
-	FileSize int64  `json:"file_size"`
+	FileID string `json:"file_id"`
+	// FileUniqueID is the same for one file in every chat, so a transcript
+	// can be kept by it.
+	FileUniqueID string `json:"file_unique_id"`
+	Duration     int    `json:"duration"` // seconds
+	MimeType     string `json:"mime_type"`
+	FileSize     int64  `json:"file_size"`
 }
 
 // Video is a video file. Only its thumbnail can be shown as an image.

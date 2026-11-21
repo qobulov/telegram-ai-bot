@@ -367,6 +367,9 @@ type Options struct {
 	// them for verdictMemory, in this instance only.
 	PictureJudge    PictureJudge
 	PictureVerdicts PictureVerdicts
+	// VoiceTranscripts keeps each voice message's transcript by its file;
+	// nil transcribes it every time it is read.
+	VoiceTranscripts VoiceTranscripts
 	// Judge is the model asked whom a message the guard caught is aimed at.
 	Judge InsultJudge
 	// Writer writes an owner's announcement, from their recent words, when

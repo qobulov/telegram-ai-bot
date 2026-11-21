@@ -432,6 +432,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		GroupModerator:   bot.Client,
 		PictureJudge:     pictureJudge(cfg, logger),
 		PictureVerdicts:  store,
+		VoiceTranscripts: store,
 		Judge:            swearJudge(cfg, logger),
 		Writer:           announcementWriter(cfg, logger),
 		Recent:           store,

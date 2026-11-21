@@ -294,6 +294,62 @@ func TestVoiceIsTranscribedOnceForQuestionAndLog(t *testing.T) {
 	}
 }
 
+// memoryTranscripts keeps transcripts by file for the service's tests.
+type memoryTranscripts struct {
+	mu    sync.Mutex
+	words map[string]string
+}
+
+func (m *memoryTranscripts) VoiceTranscript(_ context.Context, id string) (string, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	words, ok := m.words[id]
+	return words, ok, nil
+}
+
+func (m *memoryTranscripts) SaveVoiceTranscript(_ context.Context, id, words string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.words == nil {
+		m.words = map[string]string{}
+	}
+	if _, ok := m.words[id]; !ok {
+		m.words[id] = words
+	}
+	return nil
+}
+
+// A voice message transcribed once is not sent to the model again when it
+// comes back: the kept transcript is read by its file; a failed
+// transcription is not kept, so that it is tried again.
+func TestVoiceTranscriptIsKeptByItsFile(t *testing.T) {
+	voice := &telegram.Voice{FileID: "voice", FileUniqueID: "u-voice", Duration: 5}
+	f := newFixture()
+	f.opts.VoiceTranscripts = &memoryTranscripts{}
+
+	f.run(privateWith(func(m *telegram.Message) { m.Voice = voice }))
+	f.run(privateWith(func(m *telegram.Message) { m.Voice = voice; m.MessageID++ }))
+
+	if n := f.transcriber.count(); n != 1 {
+		t.Errorf("transcriptions = %d, want 1", n)
+	}
+	for _, call := range f.replier.recorded() {
+		if call.req.Text != `<voice message, 5 s> "salom dunyo"` {
+			t.Errorf("text = %q", call.req.Text)
+		}
+	}
+
+	failing := newFixture()
+	failing.opts.VoiceTranscripts = &memoryTranscripts{}
+	failing.transcriber.failWith = errors.New("model provider: status 503")
+	failing.run(privateWith(func(m *telegram.Message) { m.Voice = voice }))
+	failing.transcriber.failWith = nil
+	failing.run(privateWith(func(m *telegram.Message) { m.Voice = voice; m.MessageID++ }))
+	if n := failing.transcriber.count(); n != 2 {
+		t.Errorf("after a failure, transcriptions = %d, want 2", n)
+	}
+}
+
 func TestFailedTranscriptionIsSaidPlainly(t *testing.T) {
 	f := newFixture()
 	f.transcriber.failWith = errors.New("model provider: status 503")

@@ -62,6 +62,10 @@ type Client struct {
 	// noTools is set once the configured model turns out not to support tool
 	// calling, so later requests skip the doomed first attempt.
 	noTools atomic.Bool
+	// raisedEffort holds, per model, the reasoning effort sent instead of
+	// "minimal" once the model answered that it does not support it: such
+	// a model failed every chat turn and transcription until then.
+	raisedEffort sync.Map
 }
 
 // NewClient returns a Client, filling in defaults for optional settings.
@@ -121,6 +125,13 @@ func (c *Client) completeWithRetry(ctx context.Context, req Request, withTools b
 			c.logUsage(model, used)
 		}
 		c.noteUnusable(ctx, model, err)
+		if isEffortUnsupported(err) && attempt < c.opts.MaxAttempts {
+			// Once per model: the same model again, now at low.
+			if _, seen := c.raisedEffort.LoadOrStore(model, "low"); !seen {
+				c.opts.Logger.Warn("model refused the thinking level; retrying at low", "model", model)
+				continue
+			}
+		}
 		if err == nil || attempt >= c.opts.MaxAttempts || !c.isRetryable(ctx, err) {
 			return msg, err
 		}
@@ -322,6 +333,9 @@ func (c *Client) payload(req Request, model string, withTools bool) chatRequest 
 	if req.ReasoningEffort != "" {
 		payload.ReasoningEffort = req.ReasoningEffort
 	}
+	if raised, ok := c.raisedEffort.Load(model); ok && payload.ReasoningEffort == "minimal" {
+		payload.ReasoningEffort = raised.(string)
+	}
 	if !withTools {
 		return payload
 	}
@@ -441,6 +455,17 @@ func isDecodeError(err error) bool {
 	var syntaxErr *json.SyntaxError
 	var typeErr *json.UnmarshalTypeError
 	return errors.As(err, &syntaxErr) || errors.As(err, &typeErr)
+}
+
+// isEffortUnsupported reports a model refusing the thinking level asked,
+// such as "Thinking level MINIMAL is not supported for this model".
+func isEffortUnsupported(err error) bool {
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) || apiErr.Status != http.StatusBadRequest {
+		return false
+	}
+	message := strings.ToLower(apiErr.Message)
+	return strings.Contains(message, "thinking") && strings.Contains(message, "not supported")
 }
 
 func isToolsUnsupported(err error) bool {

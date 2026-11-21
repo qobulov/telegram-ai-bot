@@ -602,6 +602,38 @@ func TestTranscribeSendsTheAudioAndReturnsTheText(t *testing.T) {
 // A voice message is written down with the transcription's thinking and an
 // answer with the answers': at low, Gemini thought up to 1,700 tokens over
 // a transcript of 80. Without TranscribeEffort both think alike.
+// A model refusing "minimal" thinking is asked again at low, once, and
+// later requests go to it at low straight away; one that refuses low too
+// fails as before, with no third try.
+func TestAModelRefusingMinimalThinkingIsAskedAtLow(t *testing.T) {
+	refused := reply{status: 400, body: `{"error":{"message":"Thinking level MINIMAL is not supported for this model."}}`}
+	client, rec := newTestClient(t, refused, reply{status: 200, body: plainReply}, reply{status: 200, body: plainReply})
+	client.opts.ReasoningEffort = "minimal"
+
+	for range 2 {
+		if _, err := client.Complete(context.Background(), userRequest()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(rec.requests) != 3 {
+		t.Fatalf("requests = %d, want 3: refused, retried at low, then low at once", len(rec.requests))
+	}
+	for i, want := range []string{"minimal", "low", "low"} {
+		if got := rec.requests[i]["reasoning_effort"]; got != want {
+			t.Errorf("request %d reasoning_effort = %v, want %s", i, got, want)
+		}
+	}
+
+	stubborn, rec2 := newTestClient(t, refused)
+	stubborn.opts.ReasoningEffort = "minimal"
+	if _, err := stubborn.Complete(context.Background(), userRequest()); err == nil {
+		t.Error("a model refusing low too still answered")
+	}
+	if len(rec2.requests) != 2 {
+		t.Errorf("requests = %d, want 2", len(rec2.requests))
+	}
+}
+
 func TestTranscribeThinksAsTold(t *testing.T) {
 	transcript := reply{status: 200, body: `{"choices":[{"message":{"role":"assistant","content":"salom"}}]}`}
 	client, rec := newTestClient(t, transcript, reply{status: 200, body: plainReply})

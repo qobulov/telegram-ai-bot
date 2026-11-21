@@ -44,7 +44,10 @@ type media struct {
 	// model can take in (an animated sticker without a thumbnail, a voice
 	// message the provider cannot hear, a file, a song, a poll).
 	fileID string
-	audio  bool
+	// uniqueID is the file's Telegram ID that is the same in every chat,
+	// set for a voice message, whose transcript is kept by it.
+	uniqueID string
+	audio    bool
 	// document is the kind of a file the model can read, as doctext.Kind
 	// names it; "" for anything else.
 	document string
@@ -190,7 +193,7 @@ func (s *Service) voiceMedia(voice *telegram.Voice) media {
 	case voice.Duration > s.opts.MaxVoiceSeconds:
 		return media{label: label + "; too long to listen to>"}
 	default:
-		return media{label: label + ">", fileID: voice.FileID, audio: true}
+		return media{label: label + ">", fileID: voice.FileID, uniqueID: voice.FileUniqueID, audio: true}
 	}
 }
 
@@ -246,6 +249,9 @@ func memberNote(msg *telegram.Message) string {
 }
 
 func (s *Service) transcript(ctx context.Context, msg *telegram.Message, m media) string {
+	if words, ok := s.keptTranscript(ctx, m.uniqueID); ok {
+		return transcriptLabel(m, words)
+	}
 	unheard := strings.TrimSuffix(m.label, ">") + "; it could not be transcribed>"
 	downloadCtx, cancel := context.WithTimeout(ctx, mediaTimeout)
 	audio, err := s.opts.Media.DownloadFile(downloadCtx, m.fileID, s.opts.MaxMediaBytes)
@@ -262,10 +268,50 @@ func (s *Service) transcript(ctx context.Context, msg *telegram.Message, m media
 		return unheard
 	}
 	words = truncate(oneLine(words), maxTranscriptChars)
+	s.keepTranscript(ctx, m.uniqueID, words)
+	return transcriptLabel(m, words)
+}
+
+// transcriptLabel is a voice message's label with its transcript, words
+// already cut to one line; "" is a message with no speech.
+func transcriptLabel(m media, words string) string {
 	if words == "" {
 		return strings.TrimSuffix(m.label, ">") + "; no speech>"
 	}
 	return m.label + ` "` + strings.ReplaceAll(words, `"`, "'") + `"`
+}
+
+// VoiceTranscripts keeps each voice message's transcript by its file, so
+// that a voice message logged once is not sent to the model again each
+// time someone replies to it.
+type VoiceTranscripts interface {
+	VoiceTranscript(ctx context.Context, fileUniqueID string) (words string, found bool, err error)
+	SaveVoiceTranscript(ctx context.Context, fileUniqueID, words string) error
+}
+
+// keptTranscript is the transcript kept for a voice file, if any; a store
+// that fails only costs a transcription.
+func (s *Service) keptTranscript(ctx context.Context, fileUniqueID string) (string, bool) {
+	if s.opts.VoiceTranscripts == nil || fileUniqueID == "" {
+		return "", false
+	}
+	words, found, err := s.opts.VoiceTranscripts.VoiceTranscript(ctx, fileUniqueID)
+	if err != nil {
+		s.opts.Logger.Warn("could not read a kept transcript", "error", err)
+		return "", false
+	}
+	return words, found
+}
+
+// keepTranscript keeps a transcript that was made; a failed transcription
+// is never kept, so that it is tried again.
+func (s *Service) keepTranscript(ctx context.Context, fileUniqueID, words string) {
+	if s.opts.VoiceTranscripts == nil || fileUniqueID == "" {
+		return
+	}
+	if err := s.opts.VoiceTranscripts.SaveVoiceTranscript(ctx, fileUniqueID, words); err != nil {
+		s.opts.Logger.Warn("could not keep a transcript", "error", err)
+	}
 }
 
 // firstPicture is the bytes of the first image among parts, for the tools
