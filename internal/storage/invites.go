@@ -85,7 +85,7 @@ func (s *Store) InviteTop(ctx context.Context, chatID int64, q InviteQuery) ([]I
 		FROM group_invites
 		WHERE chat_id = $1 AND joined_at >= $2 AND ($5::timestamptz IS NULL OR joined_at < $5) AND ($3::bigint = 0 OR inviter_id = $3)
 		GROUP BY inviter_id
-		HAVING $3 <> 0 OR count(*) FILTER (WHERE left_at IS NULL) > 0
+		HAVING $3::bigint <> 0 OR count(*) FILTER (WHERE left_at IS NULL) > 0
 		ORDER BY 4 DESC, 3, inviter_id
 		LIMIT $4`, chatID, q.Since, q.Inviter, q.Limit, until)
 	if err != nil {

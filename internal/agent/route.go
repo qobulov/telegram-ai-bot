@@ -107,6 +107,12 @@ var mapWords = regexp.MustCompile(`(?i)(lokatsiya|lakatsiya|локаци|xarita|
 // asking the router.
 var weatherWords = regexp.MustCompile(`(?i)(ob-?havo|obu-?havo|обу?-?ҳаво|обу?-?хаво|погод|пагод|weather|harorat|ҳарорат|температур)`)
 
+// statsWords ask for the group's statistics or ranking, which only the
+// group_stats and member_info tools know: asked "top aktiv hafta", the
+// router took it for small talk and the chat model said "you are first all
+// week" without looking (2026-11-21).
+var statsWords = regexp.MustCompile(`(?i)(aktiv|faol|актив|фаол|statistik|статистик|reyting|рейтинг|\bmvp\b)`)
+
 // ownLine is the asker's own words: the last line of the turn's text,
 // after the speaker's name, without what they quoted.
 func ownLine(text string) string {
@@ -127,7 +133,7 @@ var toolsMarker = regexp.MustCompile(`(?i)^\s*[\[(<]\s*tools\s*[\])>]\s*$`)
 // model was asked.
 func (a *Agent) tryChat(ctx context.Context, t *turn) (Answer, bool, error) {
 	own := ownLine(t.req.Text)
-	if a.opts.Router == nil || a.opts.ChatModel == nil || len(t.req.Attachments) > 0 || gameWords.MatchString(own) || mapWords.MatchString(own) || weatherWords.MatchString(own) || playerID.MatchString(t.req.Text) || !a.wantsChat(ctx, t) {
+	if a.opts.Router == nil || a.opts.ChatModel == nil || len(t.req.Attachments) > 0 || gameWords.MatchString(own) || mapWords.MatchString(own) || weatherWords.MatchString(own) || statsWords.MatchString(own) || playerID.MatchString(t.req.Text) || !a.wantsChat(ctx, t) {
 		return Answer{}, false, nil
 	}
 	messages := a.prompt(t)

@@ -204,6 +204,29 @@ func TestWeatherQuestionsSkipTheRouter(t *testing.T) {
 	}
 }
 
+// The group's statistics are group_stats': asked "top aktiv hafta", the
+// router took it for small talk and the chat model guessed (2026-11-21).
+func TestStatsQuestionsSkipTheRouter(t *testing.T) {
+	for msg, full := range map[string]bool{
+		"Ali: top aktiv hafta":      true,
+		"Ali: eng faol kim":         true,
+		"Ali: статистика группы":    true,
+		"Ali: guruh reytingi":       true,
+		"Ali: bugun kayfiyat zo'r":  false,
+		"Ali: Mari, nima qilyapsiz": false,
+	} {
+		f, router, _ := routedFixture("CHAT", text("chat"), text("full"))
+		req := request(1, msg)
+		req.Group = true
+
+		answer, err := f.agent.Reply(context.Background(), req)
+
+		if err != nil || (answer.Route == RouteFull) != full || (len(router.requests) == 0) != full {
+			t.Errorf("%q: route %q, router asked %d times; want full %v", msg, answer.Route, len(router.requests), full)
+		}
+	}
+}
+
 // A game question carries the reminder to check heroes in the request, but
 // the saved question is the plain text.
 func TestGameQuestionsRemindToCheckHeroes(t *testing.T) {

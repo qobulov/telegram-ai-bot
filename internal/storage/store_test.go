@@ -35,6 +35,15 @@ func inGroup(userID int64) Scope {
 // only at a disposable database. Without the variable the test is skipped.
 func newTestStore(t *testing.T) *Store {
 	t.Helper()
+	return newTestStoreIn(t, "exec")
+}
+
+// newTestStoreIn is newTestStore with pgx's query exec mode given, unless
+// TEST_DB_POSTGRES_URL names one. Production's pooler has behaved as the
+// simple protocol does, typing a parameter by what it is compared with: a
+// big Telegram ID compared with 0 failed as an integer there (2026-11-21).
+func newTestStoreIn(t *testing.T, mode string) *Store {
+	t.Helper()
 	url := os.Getenv("TEST_DB_POSTGRES_URL")
 	if url == "" {
 		t.Skip("TEST_DB_POSTGRES_URL is not set; skipping PostgreSQL integration test")
@@ -43,7 +52,7 @@ func newTestStore(t *testing.T) *Store {
 	// exec mode, which types parameters by their Go types alone; the tests
 	// run the same way so that a []byte or []string meant as JSON fails here.
 	if !strings.Contains(url, "default_query_exec_mode") {
-		url += map[bool]string{true: "&", false: "?"}[strings.Contains(url, "?")] + "default_query_exec_mode=exec"
+		url += map[bool]string{true: "&", false: "?"}[strings.Contains(url, "?")] + "default_query_exec_mode=" + mode
 	}
 	ctx := context.Background()
 	store, err := Open(ctx, url)

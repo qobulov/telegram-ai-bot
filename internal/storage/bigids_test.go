@@ -9,8 +9,16 @@ import (
 // Telegram's IDs pass int4's range: a user's 8 292 769 065, a group's
 // -1001392088384. Every query that compares a parameter with 0 must still
 // take them.
+// Both query modes: production's pooler types a parameter as the simple
+// protocol does, which the exec mode alone missed (member_info failed for a
+// member with a big ID, 2026-11-21).
 func TestQueriesTakeBigIDs(t *testing.T) {
-	store := newTestStore(t)
+	for _, mode := range []string{"exec", "simple_protocol"} {
+		t.Run(mode, func(t *testing.T) { queriesTakeBigIDs(t, newTestStoreIn(t, mode)) })
+	}
+}
+
+func queriesTakeBigIDs(t *testing.T, store *Store) {
 	ctx := context.Background()
 	const chat, user, other = int64(-1001392088384), int64(8292769065), int64(7366268491)
 
