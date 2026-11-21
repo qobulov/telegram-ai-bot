@@ -23,14 +23,14 @@ var ArenaWeekPrizes = []storage.ArenaPrize{
 }
 
 // ArenaEventWeek is the week of the arena's box event, as the owners asked
-// on 2026-11-20: that week its top 5 get more diamond boxes, 5 to the first,
+// on 2026-11-20: that week its top 5 get more diamond boxes, 4 to the first,
 // 3 to the second, 2 to the third and 1 each to the fourth and fifth; the
 // tokens are the week's as ever.
 var ArenaEventWeek = time.Date(2026, 11, 16, 0, 0, 0, 0, Location)
 
 // arenaEventPrizes are ArenaWeekPrizes with the event's boxes.
 var arenaEventPrizes = []storage.ArenaPrize{
-	{From: 1, To: 1, Tokens: 100, Boxes: 5, Box: arenaWeekBox},
+	{From: 1, To: 1, Tokens: 100, Boxes: 4, Box: arenaWeekBox},
 	{From: 2, To: 2, Tokens: 75, Boxes: 3, Box: arenaWeekBox},
 	{From: 3, To: 3, Tokens: 50, Boxes: 2, Box: arenaWeekBox},
 	{From: 4, To: 5, Tokens: 20, Boxes: 1, Box: arenaWeekBox},

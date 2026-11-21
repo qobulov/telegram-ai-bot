@@ -233,7 +233,7 @@ func TestArenaWeek(t *testing.T) {
 		t.Errorf("note = %q", payer.note)
 	}
 	// The tokens are every week's alike; every week's top 3 get diamond
-	// boxes, 3, 2 and 1, and the event week's top 5 get 5, 3, 2, 1 and 1.
+	// boxes, 3, 2 and 1, and the event week's top 5 get 4, 3, 2, 1 and 1.
 	event, next := arenaWeekPrizes(ArenaEventWeek), arenaWeekPrizes(ArenaEventWeek.AddDate(0, 0, 7))
 	for place, want := range map[int]int{1: 100, 2: 75, 3: 50, 5: 20, 10: 20, 11: 15, 50: 10, 100: 5, 101: 0, 0: 0} {
 		if got := arenaWeekPrize(next, place).Tokens; got != want {
@@ -243,7 +243,7 @@ func TestArenaWeek(t *testing.T) {
 			t.Errorf("event prize for %d = %d tokens, want %d", place, got, want)
 		}
 	}
-	for place, want := range map[int][2]int{1: {5, 3}, 2: {3, 2}, 3: {2, 1}, 4: {1, 0}, 5: {1, 0}, 6: {0, 0}, 0: {0, 0}} {
+	for place, want := range map[int][2]int{1: {4, 3}, 2: {3, 2}, 3: {2, 1}, 4: {1, 0}, 5: {1, 0}, 6: {0, 0}, 0: {0, 0}} {
 		if got := arenaWeekPrize(event, place).Boxes; got != want[0] {
 			t.Errorf("event boxes for %d = %d, want %d", place, got, want[0])
 		}
@@ -255,8 +255,8 @@ func TestArenaWeek(t *testing.T) {
 		t.Errorf("event week = %v", ArenaEventWeek)
 	}
 	// Paid on Monday 23 November, the week ended is the event's.
-	if len(payer.prizes) == 0 || payer.prizes[0].Boxes != 5 {
-		t.Errorf("the event week was paid with %+v, want 5 boxes to the first", payer.prizes)
+	if len(payer.prizes) == 0 || payer.prizes[0].Boxes != 4 {
+		t.Errorf("the event week was paid with %+v, want 4 boxes to the first", payer.prizes)
 	}
 	if _, ok := BoxByID(arenaWeekBox); !ok {
 		t.Errorf("the week's box %q is no box the inventory holds", arenaWeekBox)
