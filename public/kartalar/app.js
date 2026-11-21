@@ -2059,7 +2059,6 @@
       skillTitle: (n) => `Skill: ${n}`, noSkillTitle: "Skill: yo'q", noSkill: "Skill Legendar va Mifik kartalarda bo'ladi",
       animeNote: "Jamoada shu animedan 2 ta: +10%, 3 ta va ko'p: +20% hujum va jon",
       flip: "↻ Arenadagi kuchi", flipBack: "↻ Old tomoni", flipHint: "Kartani bosib aylantiring",
-      stepsLabel: "Qanday o'ynaladi", steps: [["Jamoa tuzing", "2 old, 3 orqa"], ["Raqib tanlang", "Oson yoki Teng"], ["Jang", "avtomatik · 1 tiket"]],
       frontNote: "zarbani birinchi oladi", backNote: "sehrgarlar shu yerni uradi", addCard: "Karta qo'shing",
       rules: "Qoidalar", ruleClasses: "Sinflar", ruleTriangle: "Strelka: kim kimni 25% kuchliroq uradi", ruleSkills: "Skillar · Legendar va Mifik kartalarda",
       ruleTickets: (m) => `🎫 Har hujum 1 tiket oladi: ${m} tagacha, har soatda 1 ta qaytadi`, ruleTokens: (n) => `🎟 G'alaba 1 karta tokeni beradi: kuniga ${n} tagacha`,
@@ -2104,7 +2103,6 @@
       skillTitle: (n) => `Навык: ${n}`, noSkillTitle: "Навык: нет", noSkill: "Навыки есть у Легендарных и Мифических карт",
       animeNote: "2 карты этого аниме в команде: +10%, 3 и больше: +20% атаки и здоровья",
       flip: "↻ Сила на арене", flipBack: "↻ Лицевая сторона", flipHint: "Нажмите на карту, чтобы перевернуть",
-      stepsLabel: "Как играть", steps: [["Соберите команду", "2 впереди, 3 сзади"], ["Выберите соперника", "Легко или Равный"], ["Бой", "сам · 1 билет"]],
       frontNote: "принимает удары первым", backNote: "сюда бьют маги", addCard: "Добавить карту",
       rules: "Правила", ruleClasses: "Классы", ruleTriangle: "Стрелка: кто кого бьёт на 25% сильнее", ruleSkills: "Навыки · у Легендарных и Мифических",
       ruleTickets: (m) => `🎫 Атака стоит 1 билет: до ${m}, каждый час возвращается 1`, ruleTokens: (n) => `🎟 Победа даёт токен на карту: до ${n} в день`,
@@ -2149,7 +2147,6 @@
       skillTitle: (n) => `Skill: ${n}`, noSkillTitle: "Skill: none", noSkill: "Legendary and Mythic cards have skills",
       animeNote: "2 cards of this anime in a team: +10%, 3 or more: +20% attack and health",
       flip: "↻ Arena stats", flipBack: "↻ Front side", flipHint: "Tap the card to turn it over",
-      stepsLabel: "How to play", steps: [["Build a team", "2 front, 3 back"], ["Pick an opponent", "Easy or Even"], ["Battle", "automatic · 1 ticket"]],
       frontNote: "takes the hits first", backNote: "mages hit here", addCard: "Add a card",
       rules: "Rules", ruleClasses: "Classes", ruleTriangle: "Arrow: who hits whom 25% harder", ruleSkills: "Skills · on Legendary and Mythic cards",
       ruleTickets: (m) => `🎫 Each attack takes 1 ticket: up to ${m}, one back every hour`, ruleTokens: (n) => `🎟 A win gives a card token: up to ${n} a day`,
@@ -2263,39 +2260,12 @@
     arenaData = data;
     arenaDraft = data.team ? data.team.map((f) => f.id) : EMPTY_TEAM.slice();
     ticketAt = Date.now() + (data.player.next_ticket_in || 0);
-    arenaSteps();
     arenaGuide();
     arenaMe();
     arenaTeam();
     arenaFoes();
     arenaShopList();
     arenaHistory();
-  }
-
-  // arenaSteps is the three steps of a battle, the one the player is at
-  // lit: a team to save first, then an opponent, then the battle itself
-  // while it is fought. A step scrolls to its block.
-  function arenaSteps() {
-    const list = $("arenaSteps");
-    list.setAttribute("aria-label", at.stepsLabel);
-    const now = arenaBusy && arenaData.team ? 3 : arenaData.team ? 2 : 1;
-    list.textContent = "";
-    at.steps.forEach(([title, hint], i) => {
-      const n = i + 1;
-      const li = document.createElement("li");
-      li.className = n === now ? "now" : n < now ? "done" : "";
-      if (n === now) li.setAttribute("aria-current", "step");
-      const button = document.createElement("button");
-      button.type = "button";
-      button.innerHTML = '<i aria-hidden="true"></i><b></b><small></small>';
-      button.querySelector("i").textContent = n < now ? "✓" : n;
-      button.querySelector("b").textContent = title;
-      button.querySelector("small").textContent = hint;
-      const to = n === 1 ? "arenaTeamBlock" : "arenaFoesBlock";
-      button.addEventListener("click", () => { haptic("light"); $(to).scrollIntoView({ behavior: lessMotion() ? "auto" : "smooth", block: "start" }); });
-      li.append(button);
-      list.append(li);
-    });
   }
 
   // arenaGuide is the rules, folded: the classes' triangle, the synergy,
@@ -2678,7 +2648,6 @@
     if (arenaBusy) return;
     arenaBusy = true;
     arenaFoes();
-    arenaSteps();
     haptic("medium");
     try {
       const data = await api("arena_attack", { opponent: foe.id });
@@ -2699,7 +2668,7 @@
       notice(error);
     } finally {
       arenaBusy = false;
-      if (arenaData) { arenaFoes(); arenaSteps(); }
+      if (arenaData) arenaFoes();
     }
   }
 
