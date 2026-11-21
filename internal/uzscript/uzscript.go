@@ -3,6 +3,7 @@
 package uzscript
 
 import (
+	"regexp"
 	"strings"
 	"unicode"
 )
@@ -38,11 +39,46 @@ func Latin(text string) string {
 	return b.String()
 }
 
-// IsUzbekCyrillic reports text written mostly in Cyrillic, names in Latin
-// letters such as "Mobile Legends" aside, with letters of Uzbek's own,
-// which Russian does not have.
-func IsUzbekCyrillic(text string) bool {
+// letterRun is a run of letters, with the apostrophes Uzbek Latin writes
+// inside words.
+var letterRun = regexp.MustCompile("[\\p{L}\\p{M}'ʻʼ’‘`]+")
+
+// OneScript writes each word that mixes Cyrillic and Latin letters, as the
+// model now and then writes one ("Эшиuryapman", 2026-11-21), wholly in the
+// script most letters of the text's other words are in, the mixed words'
+// own aside. A @username or /command stays.
+func OneScript(text string) string {
+	if c, l := letters(text); c == 0 || l == 0 {
+		return text
+	}
 	cyrillic, latin := 0, 0
+	for _, word := range letterRun.FindAllString(text, -1) {
+		if c, l := letters(word); c == 0 || l == 0 {
+			cyrillic, latin = cyrillic+c, latin+l
+		}
+	}
+	var b strings.Builder
+	last := 0
+	for _, at := range letterRun.FindAllStringIndex(text, -1) {
+		word := text[at[0]:at[1]]
+		c, l := letters(word)
+		if c == 0 || l == 0 || at[0] > 0 && strings.ContainsRune("@/", rune(text[at[0]-1])) {
+			continue
+		}
+		b.WriteString(text[last:at[0]])
+		if cyrillic > latin {
+			b.WriteString(cyrillicWord(word))
+		} else {
+			b.WriteString(Latin(word))
+		}
+		last = at[1]
+	}
+	b.WriteString(text[last:])
+	return b.String()
+}
+
+// letters counts text's Cyrillic and Latin letters.
+func letters(text string) (cyrillic, latin int) {
 	for _, r := range text {
 		switch {
 		case unicode.Is(unicode.Cyrillic, r):
@@ -51,6 +87,14 @@ func IsUzbekCyrillic(text string) bool {
 			latin++
 		}
 	}
+	return cyrillic, latin
+}
+
+// IsUzbekCyrillic reports text written mostly in Cyrillic, names in Latin
+// letters such as "Mobile Legends" aside, with letters of Uzbek's own,
+// which Russian does not have.
+func IsUzbekCyrillic(text string) bool {
+	cyrillic, latin := letters(text)
 	return cyrillic > latin && strings.ContainsAny(strings.ToLower(text), "ўқғҳ")
 }
 

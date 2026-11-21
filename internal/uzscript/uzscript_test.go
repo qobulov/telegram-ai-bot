@@ -52,3 +52,20 @@ func TestCyrillic(t *testing.T) {
 		}
 	}
 }
+
+// A word mixing the scripts takes the script most of the text is in; a
+// word in one script, a @username and a text in one script stay.
+func TestOneScript(t *testing.T) {
+	for text, want := range map[string]string{
+		"Эшиuryapman, Шахрух.":             "Эшиуряпман, Шахрух.",
+		"Salom, dostlarим, qalaysiz?":      "Salom, dostlarim, qalaysiz?",
+		"Ha, taxtni egallab turibmiz.":     "Ha, taxtni egallab turibmiz.",
+		"Хавотир олманг, @Unbrokevb.":      "Хавотир олманг, @Unbrokevb.",
+		"Мобиле Legends яхши, Эшиuryapman": "Мобиле Legends яхши, Эшиуряпман",
+		"": "",
+	} {
+		if got := OneScript(text); got != want {
+			t.Errorf("OneScript(%q) = %q, want %q", text, got, want)
+		}
+	}
+}

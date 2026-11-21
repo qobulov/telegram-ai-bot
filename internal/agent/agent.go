@@ -511,6 +511,7 @@ func finishText(t *turn, answer string) (Answer, error) {
 		answer = said
 	}
 	answer = currentCommands(answer)
+	answer = uzscript.OneScript(answer)
 	if t.laughsALot {
 		answer = withoutTrailingLaugh(answer)
 	}
