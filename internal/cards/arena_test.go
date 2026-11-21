@@ -235,7 +235,7 @@ func TestArenaWeek(t *testing.T) {
 	// The tokens are every week's alike; every week's top 3 get diamond
 	// boxes, 3, 2 and 1, and the event week's top 5 get 4, 3, 2, 1 and 1.
 	event, next := arenaWeekPrizes(ArenaEventWeek), arenaWeekPrizes(ArenaEventWeek.AddDate(0, 0, 7))
-	for place, want := range map[int]int{1: 100, 2: 75, 3: 50, 5: 20, 10: 20, 11: 15, 50: 10, 100: 5, 101: 0, 0: 0} {
+	for place, want := range map[int]int{1: 100, 2: 75, 3: 50, 4: 25, 5: 25, 6: 20, 10: 20, 11: 15, 50: 10, 100: 5, 101: 0, 0: 0} {
 		if got := arenaWeekPrize(next, place).Tokens; got != want {
 			t.Errorf("prize for %d = %d, want %d", place, got, want)
 		}

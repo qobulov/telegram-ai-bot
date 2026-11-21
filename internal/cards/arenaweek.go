@@ -11,12 +11,14 @@ import (
 // ArenaWeekPrizes are the arena's weekly prizes in card tokens, as the
 // owners asked on 2026-11-19: the top 100 who attacked in the week, Monday
 // to Monday in Tashkent, by rating. The top 3 get more since 2026-11-21, as
-// the owners asked: 100, 75 and 50 tokens with 3, 2 and 1 diamond boxes.
+// the owners asked: 100, 75 and 50 tokens with 3, 2 and 1 diamond boxes,
+// and the fourth and fifth 25 tokens.
 var ArenaWeekPrizes = []storage.ArenaPrize{
 	{From: 1, To: 1, Tokens: 100, Boxes: 3, Box: arenaWeekBox},
 	{From: 2, To: 2, Tokens: 75, Boxes: 2, Box: arenaWeekBox},
 	{From: 3, To: 3, Tokens: 50, Boxes: 1, Box: arenaWeekBox},
-	{From: 4, To: 10, Tokens: 20},
+	{From: 4, To: 5, Tokens: 25},
+	{From: 6, To: 10, Tokens: 20},
 	{From: 11, To: 30, Tokens: 15},
 	{From: 31, To: 50, Tokens: 10},
 	{From: 51, To: 100, Tokens: 5},
@@ -33,7 +35,7 @@ var arenaEventPrizes = []storage.ArenaPrize{
 	{From: 1, To: 1, Tokens: 100, Boxes: 4, Box: arenaWeekBox},
 	{From: 2, To: 2, Tokens: 75, Boxes: 3, Box: arenaWeekBox},
 	{From: 3, To: 3, Tokens: 50, Boxes: 2, Box: arenaWeekBox},
-	{From: 4, To: 5, Tokens: 20, Boxes: 1, Box: arenaWeekBox},
+	{From: 4, To: 5, Tokens: 25, Boxes: 1, Box: arenaWeekBox},
 	{From: 6, To: 10, Tokens: 20},
 	{From: 11, To: 30, Tokens: 15},
 	{From: 31, To: 50, Tokens: 10},
