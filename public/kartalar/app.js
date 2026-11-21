@@ -257,6 +257,20 @@
     return LARGE_ART[card.id] || card.image;
   }
 
+  // PLATED are the Mythics that have a plate: their picture with the
+  // character taken out, laid under the breathing cut-out so that the still
+  // one behind it does not show; named for the picture like the cut-outs.
+  const PLATED = new Set([1, 5, 11, 17, 27, 28, 30, 40, 80, 246, 417, 422, 4003, 34470, 40881, 40882, 45627, 72921, 73935, 88572, 90169, 90202, 124381, 126071, 126824, 127222, 127518, 127691, 128130, 129928, 137080, 176754, 249281, 265209, 298761, 341936]);
+
+  // underImage is the picture a Mythic's cut-out lies on: its plate when it
+  // has one for that picture, else the picture itself.
+  function underImage(card, large) {
+    const own = large ? largeImage(card) : card.image;
+    if (card.rarity !== 4 || !PLATED.has(card.id) || own !== card.image) return own;
+    const name = String(card.image || "").split("/").pop();
+    return `/kartalar/art/plate/${card.id}.jpg${name ? `?p=${encodeURIComponent(name)}` : ""}`;
+  }
+
   // cutOf is the cut-out of a card's picture, of its large view's with large.
   function cutOf(card, large) {
     const big = Boolean(large && LARGE_ART[card.id]);
@@ -284,15 +298,11 @@
   // with a number under it (a mark, not a count of copies), cherry petals
   // drifting over the picture, fireflies glowing among them and, in the large
   // view, long hair flowing in the wind while the face and body keep still.
-  // Killua (27): his picture without him (under) beneath his cut-out, so
-  // lightning cracks behind him and a blue halo flickers round him.
-  // Kurapika (28) and Gojo (127691): their pictures without them under their
-  // cut-outs, so that only the breathing one shows.
+  // Killua (27): lightning cracking behind him, between his plate and his
+  // cut-out, and a blue halo flickering round him.
   const SPECIAL = {
-    298761: { tag: "LIMITED", petals: true, fireflies: true, hair: true, plate: "/kartalar/art/298761p.jpg" },
-    27: { bolts: true, under: "/kartalar/art/27p.jpg" },
-    28: { under: "/kartalar/art/28p.jpg" },
-    127691: { under: "/kartalar/art/127691p.jpg" },
+    298761: { tag: "LIMITED", petals: true, fireflies: true, hair: true },
+    27: { bolts: true },
   };
 
   // dress adds a special card's mark, petals, fireflies or lightning; the
@@ -316,10 +326,6 @@
       aura.style.backgroundImage = living.querySelector("i").style.backgroundImage;
       living.prepend(aura);
     }
-    if (special.under) {
-      const base = el.querySelector("img");
-      if (base) picture(base, special.under, large);
-    }
     if (special.hair && large && living) {
       // flowing hair: the cut-out once more, its edges alone, waved by #flow
       const flow = document.createElement("i");
@@ -327,10 +333,6 @@
       flow.style.backgroundImage = `url("${cutOf(card, true)}")`;
       living.classList.add("flowing");
       living.append(flow);
-      // the picture under it without her, so no still hair shows behind
-      // the moving one
-      const base = el.querySelector("img");
-      if (special.plate && base) base.src = special.plate;
     }
     if (special.tag) {
       const mark = document.createElement("div");
@@ -367,7 +369,7 @@
     const img = new Image();
     img.loading = "lazy";
     img.alt = "";
-    picture(img, card.image);
+    picture(img, underImage(card));
     const name = document.createElement("span");
     name.className = "name";
     name.textContent = card.name;
@@ -474,7 +476,7 @@
     front.style.setProperty("--c", COLORS[card.rarity]);
     const img = new Image();
     img.alt = card.name;
-    picture(img, largeImage(card), true);
+    picture(img, underImage(card, true), true);
     const plate = document.createElement("div");
     plate.className = "plate";
     const rarity = document.createElement("span");
@@ -1420,7 +1422,7 @@
     const img = new Image();
     img.loading = "lazy";
     img.alt = "";
-    picture(img, card.image);
+    picture(img, underImage(card));
     const name = document.createElement("span");
     name.className = "name";
     name.textContent = card.name;
