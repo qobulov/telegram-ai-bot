@@ -2082,7 +2082,7 @@
       rules: "Qoidalar", ruleClasses: "Sinflar", ruleTriangle: "Strelka: kim kimni 25% kuchliroq uradi", ruleSkills: "Skillar · Legendar va Mifik kartalarda",
       ruleTickets: (m) => `🎫 Har hujum 1 tiket oladi: ${m} tagacha, har soatda 1 ta qaytadi`, ruleTokens: (n) => `🎟 G'alaba 1 karta tokeni beradi: kuniga ${n} tagacha`,
       ruleRating: "🏅 G'alaba reytingni oshiradi, mag'lubiyat tushiradi. Karta yo'qolmaydi", ruleWeek: "🏆 Har dushanba haftaning top 100 tasi token oladi", toTable: "Reytingni ko'rish →",
-      levels: { easy: "Oson", even: "Teng", hard: "Qiyin" }, them: "Raqib",
+      foeTeam: "Jamoasini ko'rish", noFoeTeam: "Jamoasi hali saqlanmagan", them: "Raqib",
       synergyNone: "🔗 Bir animedan 2 ta karta qo'ysangiz: +10%, 3 ta: +20%", synergyOn: (a, n, p) => `🔗 ${a} ×${n}: +${p}%`,
       rating: "Arena reytingi", record: (w, l) => `${w} g'alaba · ${l} mag'lubiyat`,
       tickets: (n, m) => `🎫 Arena tiketlari: ${n}/${m}`, nextTicket: (min) => (min >= 60 ? "· keyingisi 1 soatda" : `· keyingisi ${min} daqiqada`), tokens: (n, m) => `🎟 G'alaba tokenlari: ${n}/${m}`,
@@ -2126,7 +2126,7 @@
       rules: "Правила", ruleClasses: "Классы", ruleTriangle: "Стрелка: кто кого бьёт на 25% сильнее", ruleSkills: "Навыки · у Легендарных и Мифических",
       ruleTickets: (m) => `🎫 Атака стоит 1 билет: до ${m}, каждый час возвращается 1`, ruleTokens: (n) => `🎟 Победа даёт токен на карту: до ${n} в день`,
       ruleRating: "🏅 Победа поднимает рейтинг, поражение снижает. Карты не теряются", ruleWeek: "🏆 Каждый понедельник топ 100 недели получают токены", toTable: "Смотреть рейтинг →",
-      levels: { easy: "Легко", even: "Равный", hard: "Сложно" }, them: "Соперник",
+      foeTeam: "Посмотреть команду", noFoeTeam: "Команда ещё не сохранена", them: "Соперник",
       synergyNone: "🔗 2 карты одного аниме: +10%, 3: +20%", synergyOn: (a, n, p) => `🔗 ${a} ×${n}: +${p}%`,
       rating: "Рейтинг арены", record: (w, l) => `${w} побед · ${l} поражений`,
       tickets: (n, m) => `🎫 Билеты арены: ${n}/${m}`, nextTicket: (min) => (min >= 60 ? "· следующий через 1 ч" : `· следующий через ${min} мин`), tokens: (n, m) => `🎟 Токенов за победы: ${n}/${m}`,
@@ -2170,7 +2170,7 @@
       rules: "Rules", ruleClasses: "Classes", ruleTriangle: "Arrow: who hits whom 25% harder", ruleSkills: "Skills · on Legendary and Mythic cards",
       ruleTickets: (m) => `🎫 Each attack takes 1 ticket: up to ${m}, one back every hour`, ruleTokens: (n) => `🎟 A win gives a card token: up to ${n} a day`,
       ruleRating: "🏅 A win raises your rating, a loss lowers it. No card is lost", ruleWeek: "🏆 Every Monday the week's top 100 get tokens", toTable: "See the ranking →",
-      levels: { easy: "Easy", even: "Even", hard: "Hard" }, them: "Opponent",
+      foeTeam: "View team", noFoeTeam: "No team saved yet", them: "Opponent",
       synergyNone: "🔗 2 cards of one anime: +10%, 3: +20%", synergyOn: (a, n, p) => `🔗 ${a} ×${n}: +${p}%`,
       rating: "Arena rating", record: (w, l) => `${w} wins · ${l} losses`,
       tickets: (n, m) => `🎫 Arena tickets: ${n}/${m}`, nextTicket: (min) => (min >= 60 ? "· next in 1 hour" : `· next in ${min} min`), tokens: (n, m) => `🎟 Win tokens: ${n}/${m}`,
@@ -2627,22 +2627,16 @@
     const p = arenaData.player;
     const can = !!arenaData.team && p.tickets > 0;
     const foes = arenaData.opponents || [];
-    const mine = arenaData.team ? powerOf(arenaData.team) : 0;
     if (!foes.length) list.innerHTML = `<li class="empty">${at.noFoes}</li>`;
     for (const o of foes) {
       const li = document.createElement("li");
       li.className = "foe";
-      li.innerHTML = '<span class="who"><span class="foe-name"><b></b></span><small class="foe-rating"></small><small class="foe-power"></small></span><button type="button" class="draw small"></button>';
+      li.innerHTML = '<button type="button" class="who" aria-expanded="false"><span class="foe-name"><b></b><span class="foe-eye" aria-hidden="true">👁</span></span><small class="foe-rating"></small><small class="foe-power"></small></button><button type="button" class="draw small"></button><div class="foe-team" hidden></div>';
       li.querySelector(".who b").textContent = o.name || "?";
       li.querySelector(".foe-rating").textContent = `🏅 ${spaced(o.rating)}`;
       li.querySelector(".foe-power").textContent = `⚡ ${spaced(o.power)}`;
-      // how hard the opponent is, by its power to the team's saved
-      if (mine) {
-        const ratio = o.power / mine;
-        const level = ratio < 0.9 ? "easy" : ratio <= 1.1 ? "even" : "hard";
-        li.querySelector(".foe-name").insertAdjacentHTML("beforeend", `<span class="foe-level ${level}">${at.levels[level]}</span>`);
-      }
-      const button = li.querySelector("button");
+      foeView(li, o);
+      const button = li.querySelector(".draw");
       button.textContent = at.attack;
       button.setAttribute("aria-label", `${at.attack}: ${o.name || "?"}`);
       button.disabled = arenaBusy || !can;
@@ -2651,6 +2645,33 @@
     }
     if (foes.length && !can) list.insertAdjacentHTML("beforeend", `<li class="foe-note">${arenaData.team ? at.noAttacks : at.teamFirst}</li>`);
   }
+
+  // foeView lets the player open an opponent's team under its name, the
+  // front row and the back row as the attack will meet them.
+  function foeView(li, foe) {
+    const view = li.querySelector(".who");
+    const panel = li.querySelector(".foe-team");
+    view.setAttribute("aria-label", `${at.foeTeam}: ${foe.name || "?"}`);
+    view.addEventListener("click", () => {
+      const open = panel.hidden;
+      haptic("light");
+      if (open && !panel.childElementCount) {
+        const team = foe.team || [];
+        if (!team.length) panel.innerHTML = `<p class="foe-note">${at.noFoeTeam}</p>`;
+        for (const [list, label, rear] of [[team.slice(0, 2), at.front, false], [team.slice(2), at.back, true]]) {
+          if (!list.length) continue;
+          const row = document.createElement("div");
+          row.className = rear ? "arena-row rear" : "arena-row";
+          teamRow(row, list, label);
+          panel.append(row);
+        }
+      }
+      panel.hidden = !open;
+      view.setAttribute("aria-expanded", String(open));
+      li.classList.toggle("open", open);
+    });
+  }
+
   $("arenaRefresh").addEventListener("click", async (event) => {
     const button = event.currentTarget;
     if (button.disabled) return;
@@ -2721,8 +2742,10 @@
 
   // towerRow lays fighters out in a row of the tower, two in front or three
   // behind, as the arena's team is.
-  function towerRow(id, list, label) {
-    const row = $(id);
+  function towerRow(id, list, label) { teamRow($(id), list, label); }
+
+  // teamRow fills a row of a team with its cards, its label first.
+  function teamRow(row, list, label) {
     row.textContent = "";
     const em = document.createElement("em");
     em.innerHTML = "<b></b>";

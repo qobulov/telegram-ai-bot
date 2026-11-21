@@ -195,6 +195,12 @@ func TestArenaView(t *testing.T) {
 	if len(opponents) != 1 || opponents[0].(map[string]any)["id"] != 8.0 || opponents[0].(map[string]any)["power"].(float64) <= 0 {
 		t.Errorf("opponents = %v", out["opponents"])
 	}
+	// The player can look at the opponent's team before attacking.
+	if len(opponents) == 1 {
+		if team, _ := opponents[0].(map[string]any)["team"].([]any); len(team) != 5 {
+			t.Errorf("opponent team = %v, want 5 fighters", opponents[0].(map[string]any)["team"])
+		}
+	}
 	if row := out["top"].([]any)[0].(map[string]any); row["me"] != true || row["rating"] != 1016.0 {
 		t.Errorf("top = %v", row)
 	}

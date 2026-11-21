@@ -188,6 +188,20 @@ func (h *handler) themedSaved(ctx context.Context, userID int64, theme string) (
 	return team, ok, nil
 }
 
+// foeTeam is an opponent's saved team as an attack would meet it, so that
+// the player can look at it first; nil when it cannot be read.
+func (h *handler) foeTeam(ctx context.Context, userID int64) []fighterView {
+	team, ok, err := h.savedFighters(ctx, userID)
+	if err != nil {
+		h.Logger.Warn("could not read an opponent's team", "user_id", userID, "error", err)
+		return nil
+	}
+	if !ok {
+		return nil
+	}
+	return team.views
+}
+
 // arenaView is the arena: the player, their team (null without one they
 // hold), a few opponents near their rating, the table and the player's
 // last battles.
@@ -238,7 +252,7 @@ func (h *handler) arenaView(ctx context.Context, user miniapp.User, shown []int6
 	}
 	others := make([]map[string]any, len(opponents))
 	for i, p := range opponents {
-		others[i] = map[string]any{"id": p.UserID, "name": p.Name, "rating": p.Rating, "power": p.Power}
+		others[i] = map[string]any{"id": p.UserID, "name": p.Name, "rating": p.Rating, "power": p.Power, "team": h.foeTeam(ctx, p.UserID)}
 	}
 	rows := make([]map[string]any, len(top))
 	for i, p := range top {

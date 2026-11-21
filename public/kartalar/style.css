@@ -892,8 +892,11 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 #arenaSave { width: 100%; }
 .arena-foes { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .arena-foes .empty { margin: 10px 0; font-size: 14px; }
-.foe { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 58px; padding: 8px 10px 8px 14px; border-radius: 14px; background: var(--lacquer); border: 1px solid var(--line); }
-.foe .who { display: grid; min-width: 0; }
+.foe { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; min-height: 58px; padding: 8px 10px 8px 14px; border-radius: 14px; background: var(--lacquer); border: 1px solid var(--line); }
+.foe .who { display: grid; flex: 1; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.foe .foe-eye { flex: none; font-size: 13px; opacity: 0.7; transition: opacity 0.2s; }
+.foe.open .foe-eye { opacity: 1; }
+.foe-team { flex-basis: 100%; display: grid; gap: 8px; padding: 6px 0 4px; }
 .foe .who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .foe .who small { color: var(--muted); font-size: 12px; }
 .foe .draw { flex: none; }
@@ -1023,10 +1026,6 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 /* an opponent: its name and how hard it is, its rating, both powers */
 .foe .foe-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .foe .foe-name b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.foe-level { flex: none; padding: 1px 8px; border-radius: 999px; font: 800 10px/16px Manrope, sans-serif; text-transform: uppercase; letter-spacing: 0.05em; }
-.foe-level.easy { background: rgba(63, 174, 90, 0.18); color: #7dffa8; }
-.foe-level.even { background: rgba(232, 200, 120, 0.18); color: var(--gold); }
-.foe-level.hard { background: rgba(224, 86, 91, 0.2); color: #ff8a8a; }
 .foe .foe-power { color: var(--text); font-weight: 700; }
 
 /* the large card turned over: its back is the card as the arena sees it */
