@@ -43,11 +43,45 @@ func Latin(text string) string {
 // inside words.
 var letterRun = regexp.MustCompile("[\\p{L}\\p{M}'ʻʼ’‘`]+")
 
+// nameWithEnding is a name in Latin with an Uzbek Cyrillic ending after an
+// apostrophe, "Telegram'да", which is written so on purpose.
+var nameWithEnding = regexp.MustCompile("^\\p{Lu}\\p{Latin}*['ʻʼ’‘`]\\p{Cyrillic}+$")
+
 // OneScript writes each word that mixes Cyrillic and Latin letters, as the
 // model now and then writes one ("Эшиuryapman", 2026-11-21), wholly in the
 // script most letters of the text's other words are in, the mixed words'
-// own aside. A @username or /command stays.
+// own aside; then, in Uzbek Cyrillic, the Latin words in small letters
+// ("бу buyruq озгина", the same day). A @username or /command stays.
 func OneScript(text string) string {
+	text = mendMixedWords(text)
+	if IsUzbekCyrillic(text) {
+		text = cyrillicSmallWords(text)
+	}
+	return text
+}
+
+// cyrillicSmallWords writes in Cyrillic the Latin words of an Uzbek
+// Cyrillic text that are all small letters, names and brands having
+// capitals ("Telegram"); a link, @username or /command stays.
+func cyrillicSmallWords(text string) string {
+	parts := strings.SplitAfter(text, " ")
+	for i, part := range parts {
+		if strings.Contains(part, "://") || strings.Contains(part, "www.") || strings.HasPrefix(part, "@") || strings.HasPrefix(part, "/") {
+			continue
+		}
+		parts[i] = letterRun.ReplaceAllStringFunc(part, func(word string) string {
+			if c, l := letters(word); c > 0 || l < 2 || word != strings.ToLower(word) {
+				return word
+			}
+			return cyrillicWord(word)
+		})
+	}
+	return strings.Join(parts, "")
+}
+
+// mendMixedWords writes each word mixing the scripts in the script of the
+// text's other words.
+func mendMixedWords(text string) string {
 	if c, l := letters(text); c == 0 || l == 0 {
 		return text
 	}
@@ -62,7 +96,7 @@ func OneScript(text string) string {
 	for _, at := range letterRun.FindAllStringIndex(text, -1) {
 		word := text[at[0]:at[1]]
 		c, l := letters(word)
-		if c == 0 || l == 0 || at[0] > 0 && strings.ContainsRune("@/", rune(text[at[0]-1])) {
+		if c == 0 || l == 0 || nameWithEnding.MatchString(word) || at[0] > 0 && strings.ContainsRune("@/", rune(text[at[0]-1])) {
 			continue
 		}
 		b.WriteString(text[last:at[0]])

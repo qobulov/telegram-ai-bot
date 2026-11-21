@@ -54,7 +54,9 @@ func TestCyrillic(t *testing.T) {
 }
 
 // A word mixing the scripts takes the script most of the text is in; a
-// word in one script, a @username and a text in one script stay.
+// word in one script, a @username and a text in one script stay; in Uzbek
+// Cyrillic a Latin word in small letters is written in Cyrillic, a name, a
+// link, a @username and a /command not, and Russian keeps its Latin words.
 func TestOneScript(t *testing.T) {
 	for text, want := range map[string]string{
 		"Эшиuryapman, Шахрух.":             "Эшиуряпман, Шахрух.",
@@ -63,6 +65,9 @@ func TestOneScript(t *testing.T) {
 		"Хавотир олманг, @Unbrokevb.":      "Хавотир олманг, @Unbrokevb.",
 		"Мобиле Legends яхши, Эшиuryapman": "Мобиле Legends яхши, Эшиуряпман",
 		"": "",
+		"Устозим, бу buyruq озгина дам олишни талаб қилса ҳам.":         "Устозим, бу буйруқ озгина дам олишни талаб қилса ҳам.",
+		"Telegram'да қидиринг: https://t.me/x ёки @bot, /card ҳам бор.": "Telegram'да қидиринг: https://t.me/x ёки @bot, /card ҳам бор.",
+		"Это просто ok, без узбекских букв.":                            "Это просто ok, без узбекских букв.",
 	} {
 		if got := OneScript(text); got != want {
 			t.Errorf("OneScript(%q) = %q, want %q", text, got, want)
