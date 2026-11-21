@@ -286,9 +286,13 @@
   // view, long hair flowing in the wind while the face and body keep still.
   // Killua (27): his picture without him (under) beneath his cut-out, so
   // lightning cracks behind him and a blue halo flickers round him.
+  // Kurapika (28) and Gojo (127691): their pictures without them under their
+  // cut-outs, so that only the breathing one shows.
   const SPECIAL = {
     298761: { tag: "LIMITED", petals: true, fireflies: true, hair: true, plate: "/kartalar/art/298761p.jpg" },
     27: { bolts: true, under: "/kartalar/art/27p.jpg" },
+    28: { under: "/kartalar/art/28p.jpg" },
+    127691: { under: "/kartalar/art/127691p.jpg" },
   };
 
   // dress adds a special card's mark, petals, fireflies or lightning; the
