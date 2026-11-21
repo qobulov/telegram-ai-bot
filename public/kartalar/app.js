@@ -14,7 +14,7 @@
       search: "Kartani qidirish", rarities: ["Oddiy", "Noyob", "Epik", "Afsonaviy", "Mifik"],
       drawNow: "Karta olish", drawing: "Ochilmoqda…", next: (t) => `Keyingi karta: ${t}`, ready: "Karta tayyor!",
      
-      shardsTitle: "Kristallar", shardsHint: "Kristal bilan kutmasdan karta oching, do'konda token va paketlar oling.", cancel: "Bekor qilish",
+      cancel: "Bekor qilish",
       open1: "1x", open10: "5x", costShort: "💎 yetmaydi", tokenHint: (d, c) => `🎟 Token bitta karta ochadi. Har 2 soatda +${d} token (12 tagacha yig'iladi), tugasa karta ${c} 💎`, nextToken: (time) => `⏳ Keyingi token: ${time}`, pity: (l, lm, m, mm) => `🛡 Kafolat: Lega ${l}/${lm} · Mifik ${m}/${mm}`, sureTag: "KAFOLAT", given: (n) => `🎟 +${n} token berildi`, short: (n) => `💎 Yana ${n} kristal kerak`, openedTen: "5 ta karta", freshN: (n) => `🆕 ${n} ta yangi`, againN: (n) => `🔁 ${n} ta takror`, freshTag: "YANGI", carryOn: "Davom etish", noPoints: "ochko qo'shilmaydi", 
       fresh: "🆕 Yangi karta!", again: (n) => `🔁 Sizda endi ×${n}`, plus: (n) => `+${n} ochko`,
       attack: "Hujum", health: "Jon", value: "Ochko", cards: (n) => `${n} karta`, pts: "ochko",
@@ -48,7 +48,7 @@
       search: "Поиск по картам", rarities: ["Обычная", "Редкая", "Эпическая", "Легендарная", "Мифическая"],
       drawNow: "Получить карту", drawing: "Открываем…", next: (t) => `Следующая карта: ${t}`, ready: "Карта готова!",
      
-      shardsTitle: "Кристаллы", shardsHint: "За кристаллы — карта без ожидания, а в магазине — токены и наборы.", cancel: "Отмена",
+      cancel: "Отмена",
       open1: "1x", open10: "5x", costShort: "💎 не хватает", tokenHint: (d, c) => `🎟 Токен открывает одну карту. Каждые 2 часа +${d} (копится до 12), без токенов карта стоит ${c} 💎`, nextToken: (time) => `⏳ Следующий токен: ${time}`, pity: (l, lm, m, mm) => `🛡 Гарант: Легенда ${l}/${lm} · Миф ${m}/${mm}`, sureTag: "ГАРАНТ", given: (n) => `🎟 +${n} токен(ов)`, short: (n) => `💎 Нужно ещё ${n} кристаллов`, openedTen: "5 карт", freshN: (n) => `🆕 Новых: ${n}`, againN: (n) => `🔁 Повторов: ${n}`, freshTag: "НОВАЯ", carryOn: "Продолжить", noPoints: "очки не добавляются", 
       fresh: "🆕 Новая карта!", again: (n) => `🔁 Теперь у вас ×${n}`, plus: (n) => `+${n} очков`,
       attack: "Атака", health: "Жизнь", value: "Очки", cards: (n) => `${n} карт`, pts: "очков",
@@ -82,7 +82,7 @@
       search: "Search cards", rarities: ["Common", "Rare", "Epic", "Legendary", "Mythic"],
       drawNow: "Draw a card", drawing: "Opening…", next: (t) => `Next card in ${t}`, ready: "A card is ready!",
      
-      shardsTitle: "Crystals", shardsHint: "Crystals open a card without the wait and buy tokens and packs in the shop.", cancel: "Cancel",
+      cancel: "Cancel",
       open1: "1x", open10: "5x", costShort: "💎 not enough", tokenHint: (d, c) => `🎟 A token opens one card. +${d} every 2 hours, up to 12 kept; with none, a card is ${c} 💎`, nextToken: (time) => `⏳ Next token: ${time}`, pity: (l, lm, m, mm) => `🛡 Guarantee: Legendary ${l}/${lm} · Mythic ${m}/${mm}`, sureTag: "GUARANTEED", given: (n) => `🎟 +${n} tokens`, short: (n) => `💎 ${n} more crystals needed`, openedTen: "5 cards", freshN: (n) => `🆕 ${n} new`, againN: (n) => `🔁 ${n} again`, freshTag: "NEW", carryOn: "Continue", noPoints: "no points added", 
       fresh: "🆕 A new card!", again: (n) => `🔁 You now have ×${n}`, plus: (n) => `+${n} points`,
       attack: "Attack", health: "Life", value: "Points", cards: (n) => `${n} cards`, pts: "points",
@@ -713,7 +713,6 @@
   // ---------- shards ----------
 
   function shardsPanel() {
-    $("shardCount").textContent = spaced(shards);
     drawButton();
   }
 

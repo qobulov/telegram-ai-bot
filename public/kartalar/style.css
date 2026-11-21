@@ -257,13 +257,8 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .switch[aria-checked="true"] span { transform: translateX(20px); background: var(--gold); }
 .switch:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .switch, .switch span { transition: none; } }
-.shards { margin: 18px auto 0; max-width: 360px; padding: 14px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
-.shards-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.shards-head b { font: 700 18px Unbounded, sans-serif; color: var(--gold); }
-.shards-head > span { font: 700 15px Manrope, sans-serif; color: var(--text); }
 .ghost { min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); background: none; color: var(--gold); font: 700 14px Manrope, sans-serif; cursor: pointer; }
 .ghost:disabled { opacity: 0.4; cursor: default; }
-.shards-hint { margin: 10px 0 0; color: var(--muted); font-size: 12px; text-align: center; }
 .odds { list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; padding: 0; margin: 18px 0 0; }
 .odds li { padding: 5px 10px; border-radius: 999px; font-size: 12px; background: var(--panel); border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); }
 .odds b { color: var(--c); }
