@@ -114,6 +114,10 @@ func TestTheCardEvent(t *testing.T) {
 	if out := pull(firefly.Batch); out["tokens"] != 0.0 || len(out["drawn"].([]any)) != firefly.Batch || out["pity"] != 10.0 {
 		t.Fatalf("ten pulls = %v", out)
 	}
+	store.tokens = BigBatch
+	if out := pull(BigBatch); len(out["drawn"].([]any)) != BigBatch || out["tokens"] != 0.0 {
+		t.Fatalf("fifty pulls = %v", out)
+	}
 	if out := pull(3); out["code"] != float64(http.StatusBadRequest) {
 		t.Errorf("three pulls = %v", out)
 	}

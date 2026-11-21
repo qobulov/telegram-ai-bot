@@ -776,7 +776,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .preview-note { margin: 10px 0 0; text-align: center; font: 600 13px Manrope, sans-serif; color: var(--muted); }
 
 /* opening one card or ten: a token each, crystals once there are none */
-.opens { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: min(100%, 360px); margin: 0 auto; }
+.opens { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; width: min(100%, 360px); margin: 0 auto; }
 .open-btn { width: 100%; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; }
 .open-btn b { font: 700 16px Unbounded, sans-serif; }
 .open-btn small { font: 700 12px Manrope, sans-serif; opacity: 0.8; }
@@ -789,6 +789,10 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .opened-grid .card { width: calc((100% - 20px) / 3); animation: deal 0.5s cubic-bezier(.2, 1.2, .4, 1) both; }
 .opened-grid:has(> .card:nth-child(7)) { gap: 8px; }
 .opened-grid:has(> .card:nth-child(7)) .card { width: calc((100% - 24px) / 4); }
+.opened-grid:has(> .card:nth-child(21)) { gap: 6px; }
+.opened-grid:has(> .card:nth-child(21)) .card { width: calc((100% - 24px) / 5); }
+.opened-grid:has(> .card:nth-child(21)) .card .name { font-size: 9px; left: 5px; right: 5px; bottom: 5px; }
+.opened-grid:has(> .card:nth-child(21)) .card .fresh { font-size: 8px; padding: 1px 4px; }
 .opened-grid .card .name { font-size: 11px; left: 7px; right: 7px; bottom: 7px; text-align: left; }
 .opened-grid .card .fresh {
   position: absolute; top: 6px; right: 6px; z-index: 4; padding: 2px 7px; border-radius: 999px;
@@ -936,7 +940,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .event-pity { display: grid; gap: 4px; margin-top: 2px; font: 700 12px Manrope, sans-serif; color: var(--text); }
 .event-pity .progress { width: 100%; margin: 0; }
 .event-pity .progress i { background: linear-gradient(90deg, var(--sakura), var(--r4)); }
-.event-buttons { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.event-buttons { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 .event-buttons .draw { width: 100%; min-height: 48px; font-size: 14px; }
 
 /* ---------- daily quests ---------- */

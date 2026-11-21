@@ -164,11 +164,11 @@ func (h *handler) eventView(ctx context.Context, user miniapp.User, e Event) (an
 		"starts_in": max(0, e.Starts.Sub(now).Milliseconds()),
 		"ends_at":   e.Ends.UnixMilli(), "ends_in": max(0, e.Ends.Sub(now).Milliseconds()),
 		"pity": pulls, "pity_max": e.Pity, "odds": e.odds(), "share": e.Share,
-		"price": e.Price, "batch": e.Batch, "cards": views,
+		"price": e.Price, "batch": e.Batch, "big_batch": BigBatch, "cards": views,
 	}, failure{}
 }
 
-// eventOpen pulls 1 or the event's batch of its cards for tokens. A pull
+// eventOpen pulls 1, the event's batch or BigBatch of its cards for tokens. A pull
 // refused says why: "soon" before it starts, "over" once it has ended or
 // with no event, "funds" with too few tokens.
 func (h *handler) eventOpen(ctx context.Context, user miniapp.User, key string, n int) (any, failure) {
@@ -177,7 +177,7 @@ func (h *handler) eventOpen(ctx context.Context, user miniapp.User, key string, 
 	if !ok {
 		return map[string]any{"refused": "over"}, failure{}
 	}
-	if n != 1 && n != e.Batch {
+	if n != 1 && n != e.Batch && n != BigBatch {
 		return nil, errBadRequest
 	}
 	if now.Before(e.Starts) {

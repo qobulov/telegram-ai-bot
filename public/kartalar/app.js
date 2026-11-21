@@ -15,7 +15,7 @@
       drawNow: "Karta olish", drawing: "Ochilmoqda…", next: (t) => `Keyingi karta: ${t}`, ready: "Karta tayyor!",
      
       cancel: "Bekor qilish",
-      open1: "1x", open10: "5x", costShort: "💎 yetmaydi", tokenHint: (d, c) => `🎟 Token bitta karta ochadi. Har 2 soatda +${d} token (12 tagacha yig'iladi), tugasa karta ${c} 💎`, nextToken: (time) => `⏳ Keyingi token: ${time}`, pity: (l, lm, m, mm) => `🛡 Kafolat: Lega ${l}/${lm} · Mifik ${m}/${mm}`, sureTag: "KAFOLAT", given: (n) => `🎟 +${n} token berildi`, short: (n) => `💎 Yana ${n} kristal kerak`, openedTen: "5 ta karta", freshN: (n) => `🆕 ${n} ta yangi`, againN: (n) => `🔁 ${n} ta takror`, freshTag: "YANGI", carryOn: "Davom etish", noPoints: "ochko qo'shilmaydi", 
+      open1: "1x", open10: "5x", open50: "50x", costShort: "💎 yetmaydi", tokenHint: (d, c) => `🎟 Token bitta karta ochadi. Har 2 soatda +${d} token (12 tagacha yig'iladi), tugasa karta ${c} 💎`, nextToken: (time) => `⏳ Keyingi token: ${time}`, pity: (l, lm, m, mm) => `🛡 Kafolat: Lega ${l}/${lm} · Mifik ${m}/${mm}`, sureTag: "KAFOLAT", given: (n) => `🎟 +${n} token berildi`, short: (n) => `💎 Yana ${n} kristal kerak`, openedN: (n) => `${n} ta karta`, freshN: (n) => `🆕 ${n} ta yangi`, againN: (n) => `🔁 ${n} ta takror`, freshTag: "YANGI", carryOn: "Davom etish", noPoints: "ochko qo'shilmaydi", 
       fresh: "🆕 Yangi karta!", again: (n) => `🔁 Sizda endi ×${n}`, plus: (n) => `+${n} ochko`,
       attack: "Hujum", health: "Jon", value: "Ochko", cards: (n) => `${n} karta`, pts: "ochko",
       none: "Hech narsa topilmadi", noTop: "Hali hech kim karta olmagan", topPct: (p) => `Top ${p}%`, youRow: "Siz",
@@ -49,7 +49,7 @@
       drawNow: "Получить карту", drawing: "Открываем…", next: (t) => `Следующая карта: ${t}`, ready: "Карта готова!",
      
       cancel: "Отмена",
-      open1: "1x", open10: "5x", costShort: "💎 не хватает", tokenHint: (d, c) => `🎟 Токен открывает одну карту. Каждые 2 часа +${d} (копится до 12), без токенов карта стоит ${c} 💎`, nextToken: (time) => `⏳ Следующий токен: ${time}`, pity: (l, lm, m, mm) => `🛡 Гарант: Легенда ${l}/${lm} · Миф ${m}/${mm}`, sureTag: "ГАРАНТ", given: (n) => `🎟 +${n} токен(ов)`, short: (n) => `💎 Нужно ещё ${n} кристаллов`, openedTen: "5 карт", freshN: (n) => `🆕 Новых: ${n}`, againN: (n) => `🔁 Повторов: ${n}`, freshTag: "НОВАЯ", carryOn: "Продолжить", noPoints: "очки не добавляются", 
+      open1: "1x", open10: "5x", open50: "50x", costShort: "💎 не хватает", tokenHint: (d, c) => `🎟 Токен открывает одну карту. Каждые 2 часа +${d} (копится до 12), без токенов карта стоит ${c} 💎`, nextToken: (time) => `⏳ Следующий токен: ${time}`, pity: (l, lm, m, mm) => `🛡 Гарант: Легенда ${l}/${lm} · Миф ${m}/${mm}`, sureTag: "ГАРАНТ", given: (n) => `🎟 +${n} токен(ов)`, short: (n) => `💎 Нужно ещё ${n} кристаллов`, openedN: (n) => `${n} карт`, freshN: (n) => `🆕 Новых: ${n}`, againN: (n) => `🔁 Повторов: ${n}`, freshTag: "НОВАЯ", carryOn: "Продолжить", noPoints: "очки не добавляются", 
       fresh: "🆕 Новая карта!", again: (n) => `🔁 Теперь у вас ×${n}`, plus: (n) => `+${n} очков`,
       attack: "Атака", health: "Жизнь", value: "Очки", cards: (n) => `${n} карт`, pts: "очков",
       none: "Ничего не найдено", noTop: "Ещё никто не получил карту", topPct: (p) => `Топ ${p}%`, youRow: "Вы",
@@ -83,7 +83,7 @@
       drawNow: "Draw a card", drawing: "Opening…", next: (t) => `Next card in ${t}`, ready: "A card is ready!",
      
       cancel: "Cancel",
-      open1: "1x", open10: "5x", costShort: "💎 not enough", tokenHint: (d, c) => `🎟 A token opens one card. +${d} every 2 hours, up to 12 kept; with none, a card is ${c} 💎`, nextToken: (time) => `⏳ Next token: ${time}`, pity: (l, lm, m, mm) => `🛡 Guarantee: Legendary ${l}/${lm} · Mythic ${m}/${mm}`, sureTag: "GUARANTEED", given: (n) => `🎟 +${n} tokens`, short: (n) => `💎 ${n} more crystals needed`, openedTen: "5 cards", freshN: (n) => `🆕 ${n} new`, againN: (n) => `🔁 ${n} again`, freshTag: "NEW", carryOn: "Continue", noPoints: "no points added", 
+      open1: "1x", open10: "5x", open50: "50x", costShort: "💎 not enough", tokenHint: (d, c) => `🎟 A token opens one card. +${d} every 2 hours, up to 12 kept; with none, a card is ${c} 💎`, nextToken: (time) => `⏳ Next token: ${time}`, pity: (l, lm, m, mm) => `🛡 Guarantee: Legendary ${l}/${lm} · Mythic ${m}/${mm}`, sureTag: "GUARANTEED", given: (n) => `🎟 +${n} tokens`, short: (n) => `💎 ${n} more crystals needed`, openedN: (n) => `${n} cards`, freshN: (n) => `🆕 ${n} new`, againN: (n) => `🔁 ${n} again`, freshTag: "NEW", carryOn: "Continue", noPoints: "no points added", 
       fresh: "🆕 A new card!", again: (n) => `🔁 You now have ×${n}`, plus: (n) => `+${n} points`,
       attack: "Attack", health: "Life", value: "Points", cards: (n) => `${n} cards`, pts: "points",
       none: "Nothing found", noTop: "Nobody has drawn a card yet", topPct: (p) => `Top ${p}%`, youRow: "You",
@@ -126,7 +126,7 @@
   const haptic = (kind) => { try { tg.HapticFeedback.impactOccurred(kind); } catch (_) { /* outside Telegram */ } };
 
   let cards = [], points = 0, perDay = 2, drawing = false, query = "", opened = "", chosenSet = "";
-  let shards = 0, cardCost = 15, batch = 5, tokens = 0, nextTokenAt = 0, refreshing = false;
+  let shards = 0, cardCost = 15, batch = 5, bigBatch = 50, tokens = 0, nextTokenAt = 0, refreshing = false;
 
   // ---------- server ----------
 
@@ -171,6 +171,7 @@
     shards = data.shards || 0;
     cardCost = data.card_cost || cardCost;
     batch = data.batch || batch;
+    bigBatch = data.big_batch || bigBatch;
     nextTokenAt = Date.now() + (data.next_token_in || 0);
     tokens = data.tokens || 0;
     pityLine(data.pity);
@@ -750,7 +751,7 @@
     return [c.tokens ? `🎟 ${c.tokens}` : "", c.shards ? `💎 ${spaced(c.shards)}` : ""].filter(Boolean).join(" + ");
   }
   function drawButton() {
-    for (const [id, n] of [["open1", 1], ["open10", batch]]) {
+    for (const [id, n] of [["open1", 1], ["open10", batch], ["open50", bigBatch]]) {
       $(id).disabled = drawing || cost(n).shards > shards;
       $(id + "Cost").textContent = drawing ? t.drawing : costLabel(n);
     }
@@ -789,6 +790,7 @@
 
   $("open1").addEventListener("click", () => reveal(1));
   $("open10").addEventListener("click", () => reveal(batch));
+  $("open50").addEventListener("click", () => reveal(bigBatch));
 
   // reveal opens n cards, for tokens and then crystals: one turns on the
   // deck, a batch is laid out together.
@@ -875,12 +877,14 @@
     const panel = document.createElement("div");
     panel.className = "opened";
     panel.innerHTML = '<div class="opened-head"><b></b><span></span></div><div class="opened-grid"></div><button type="button" class="draw opened-ok"></button>';
-    panel.querySelector(".opened-head b").textContent = title || t.openedTen;
+    panel.querySelector(".opened-head b").textContent = title || t.openedN(drawn.length);
     panel.querySelector(".opened-head span").textContent = [fresh ? t.freshN(fresh) : "", drawn.length - fresh ? t.againN(drawn.length - fresh) : ""].filter(Boolean).join(" · ");
     const grid = panel.querySelector(".opened-grid");
+    // the tiles are dealt one after another within 2.4 s, however many
+    const deal = Math.min(0.09, 2.4 / drawn.length);
     [...drawn].sort((a, b) => b.card.rarity - a.card.rarity).forEach(({ card, fresh }, i) => {
       const tile = cardTile(card);
-      tile.style.animationDelay = `${i * 0.09}s`;
+      tile.style.animationDelay = `${i * deal}s`;
       if (fresh) {
         const tag = document.createElement("span");
         tag.className = "fresh";
@@ -1912,6 +1916,7 @@
     box.querySelector(".event-odds").textContent = OWN_ODDS_ONLY.has(ev.key) ? `${face.icon} ${face.name} ${own}` : et.odds(percent(mythic), face.icon, face.name, own);
     box.querySelector(".event-one").addEventListener("click", () => eventPull(ev, 1));
     box.querySelector(".event-batch").addEventListener("click", () => eventPull(ev, ev.batch));
+    box.querySelector(".event-big").addEventListener("click", () => eventPull(ev, ev.big_batch || 50));
     eventPity(ev);
     return box;
   }
@@ -1932,7 +1937,7 @@
     const face = eventFace(ev);
     ev.box.querySelector(".event-pity-text").textContent = ev.owned ? face.owned : et.pity(face.name, ev.pity, ev.pity_max);
     ev.box.querySelector(".event-pity-bar").style.width = ev.owned ? "100%" : `${Math.min(100, (ev.pity / ev.pity_max) * 100)}%`;
-    for (const [part, n] of [[".event-one", 1], [".event-batch", ev.batch]]) {
+    for (const [part, n] of [[".event-one", 1], [".event-batch", ev.batch], [".event-big", ev.big_batch || 50]]) {
       const button = ev.box.querySelector(part);
       button.textContent = et.open(n, ev.price);
       button.disabled = pulling || !ev.active;
@@ -3318,7 +3323,7 @@
   if (!tg || !tg.initData) {
     $("notice").textContent = t.noTelegram;
     $("notice").hidden = false;
-    $("open1").disabled = $("open10").disabled = true;
+    $("open1").disabled = $("open10").disabled = $("open50").disabled = true;
     return;
   }
   tg.ready();

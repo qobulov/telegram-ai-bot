@@ -150,7 +150,7 @@ type request struct {
 	// Card; without Rarity it searches the whole catalog by Query.
 	Rarity *int `json:"rarity"`
 	Offset int  `json:"offset"`
-	// Count is how many cards "open" opens: 1 or Batch, or "event_open" of
+	// Count is how many cards "open" opens: 1, Batch or BigBatch, or "event_open" of
 	// the event Event names, by its key.
 	Count int    `json:"count"`
 	Event string `json:"event"`
@@ -387,7 +387,7 @@ func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
 	}
 	return map[string]any{
 		"cards": views, "points": player.Points, "held": len(owned),
-		"tokens": Tokens(player, now), "given": given, "per_day": PerDay, "card_cost": CardCost, "batch": Batch,
+		"tokens": Tokens(player, now), "given": given, "per_day": PerDay, "card_cost": CardCost, "batch": Batch, "big_batch": BigBatch,
 		"next_token_in": Today(now).Next().Sub(now).Milliseconds(),
 		"pity":          pityView(player.SinceLegendary, player.SinceMythic),
 		"shards":        shards,
@@ -396,10 +396,10 @@ func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
 	}, failure{}
 }
 
-// open opens 1 or Batch cards, each for a token or, with none left, for
+// open opens 1, Batch or BigBatch cards, each for a token or, with none left, for
 // CardCost crystals; with too few of both it says what the player has.
 func (h *handler) open(ctx context.Context, user miniapp.User, n int) (any, failure) {
-	if n != 1 && n != Batch {
+	if n != 1 && n != Batch && n != BigBatch {
 		return nil, errBadRequest
 	}
 	if err := h.catalog.Ensure(ctx); err != nil {

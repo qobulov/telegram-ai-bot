@@ -297,7 +297,7 @@ func TestCardsAppOpensForTokensThenCrystals(t *testing.T) {
 		out["code"] = float64(rec.Code)
 		return out
 	}
-	if code, out := post(t, h, initData, "state"); code != 200 || out["tokens"] != 2.0 || out["given"] != 1.0 || out["next_token_in"] == nil || out["card_cost"] != float64(CardCost) || out["batch"] != float64(Batch) {
+	if code, out := post(t, h, initData, "state"); code != 200 || out["tokens"] != 2.0 || out["given"] != 1.0 || out["next_token_in"] == nil || out["card_cost"] != float64(CardCost) || out["batch"] != float64(Batch) || out["big_batch"] != float64(BigBatch) {
 		t.Fatalf("state = %d %v", code, out)
 	}
 	if out := open(1); out["tokens"] != 1.0 || len(out["drawn"].([]any)) != 1 || out["drawn"].([]any)[0].(map[string]any)["card"].(map[string]any)["name"] != "Gojo" || out["drawn"].([]any)[0].(map[string]any)["serial"] != 123.0 {
@@ -313,7 +313,11 @@ func TestCardsAppOpensForTokensThenCrystals(t *testing.T) {
 	if out := open(3); out["code"] != float64(http.StatusBadRequest) {
 		t.Errorf("three at once = %v", out)
 	}
-	if store.draws != 1+Batch {
+	store.shards = BigBatch * CardCost
+	if out := open(BigBatch); out["shards"] != 0.0 || len(out["drawn"].([]any)) != BigBatch {
+		t.Fatalf("fifty with crystals for fifty = %v", out)
+	}
+	if store.draws != 1+Batch+BigBatch {
 		t.Errorf("draws = %d", store.draws)
 	}
 	if _, out := post(t, h, initData, "top"); len(out["top"].([]any)) != 1 || out["top"].([]any)[0].(map[string]any)["me"] != true {
