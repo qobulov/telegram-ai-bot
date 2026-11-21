@@ -211,6 +211,21 @@ func TestPollSent(t *testing.T) {
 	}
 }
 
+// A poll with a right answer is a quiz, one answer a voter, as a "viktorina
+// poll" asks.
+func TestQuizPollSent(t *testing.T) {
+	env := newPollEnv(t)
+
+	got := env.poll(memberAsking(groupA, 100), `{"question":"Area 51 qaysi shtatda?","options":["Arizona","Nevada","Utah","New Mexico"],"correct":1,"multiple":true}`)
+
+	if !got.OK {
+		t.Fatalf("create_poll = %+v %s, want a quiz sent", got, got.Result)
+	}
+	if polls := env.sender.sent(); len(polls) != 1 || !polls[0].Quiz || polls[0].Correct != 1 || polls[0].Multiple || polls[0].Options[1] != "Nevada" {
+		t.Errorf("polls = %+v, want one quiz whose right answer is Nevada", polls)
+	}
+}
+
 func TestPollAtTheLimitsIsSent(t *testing.T) {
 	env := newPollEnv(t)
 	options := make([]string, 10)
@@ -229,17 +244,19 @@ func TestPollAtTheLimitsIsSent(t *testing.T) {
 
 func TestPollValidation(t *testing.T) {
 	cases := map[string]string{
-		"one option":             `{"question":"Lunch?","options":["Plov"]}`,
-		"no options":             `{"question":"Lunch?","options":[]}`,
-		"eleven options":         `{"question":"Lunch?","options":["1","2","3","4","5","6","7","8","9","10","11"]}`,
-		"duplicate options":      `{"question":"Lunch?","options":["Plov"," plov "]}`,
-		"an empty option":        `{"question":"Lunch?","options":["Plov","  "]}`,
-		"a 101-character option": `{"question":"Lunch?","options":["Plov","` + strings.Repeat("я", 101) + `"]}`,
-		"an empty question":      `{"question":"   ","options":["Plov","Lagman"]}`,
-		"no question":            `{"options":["Plov","Lagman"]}`,
-		"a 301-rune question":    `{"question":"` + strings.Repeat("я", 301) + `","options":["Plov","Lagman"]}`,
-		"an unknown argument":    `{"question":"Lunch?","options":["Plov","Lagman"],"chat_id":-100222}`,
-		"multiple as text":       `{"question":"Lunch?","options":["Plov","Lagman"],"multiple":"yes"}`,
+		"one option":                      `{"question":"Lunch?","options":["Plov"]}`,
+		"no options":                      `{"question":"Lunch?","options":[]}`,
+		"eleven options":                  `{"question":"Lunch?","options":["1","2","3","4","5","6","7","8","9","10","11"]}`,
+		"duplicate options":               `{"question":"Lunch?","options":["Plov"," plov "]}`,
+		"an empty option":                 `{"question":"Lunch?","options":["Plov","  "]}`,
+		"a 101-character option":          `{"question":"Lunch?","options":["Plov","` + strings.Repeat("я", 101) + `"]}`,
+		"an empty question":               `{"question":"   ","options":["Plov","Lagman"]}`,
+		"no question":                     `{"options":["Plov","Lagman"]}`,
+		"a 301-rune question":             `{"question":"` + strings.Repeat("я", 301) + `","options":["Plov","Lagman"]}`,
+		"an unknown argument":             `{"question":"Lunch?","options":["Plov","Lagman"],"chat_id":-100222}`,
+		"multiple as text":                `{"question":"Lunch?","options":["Plov","Lagman"],"multiple":"yes"}`,
+		"a quiz answer past the options":  `{"question":"Lunch?","options":["Plov","Lagman"],"correct":2}`,
+		"a quiz answer below the options": `{"question":"Lunch?","options":["Plov","Lagman"],"correct":-1}`,
 	}
 	for name, args := range cases {
 		t.Run(name, func(t *testing.T) {

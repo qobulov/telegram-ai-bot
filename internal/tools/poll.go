@@ -103,6 +103,9 @@ type pollArgs struct {
 	Question string   `json:"question"`
 	Options  []string `json:"options"`
 	Multiple bool     `json:"multiple"`
+	// Correct, when given, makes the poll a quiz whose right answer is
+	// Options[*Correct].
+	Correct *int `json:"correct"`
 }
 
 // PollTool lets anyone in a group have the bot post an anonymous poll there,
@@ -116,14 +119,15 @@ func PollTool(opts PollOptions) Tool {
 	p := polls{opts}
 	return Tool{
 		Name:        "create_poll",
-		Description: "Post an anonymous poll in this group when anyone asks for a poll, a vote, or a quiz (\"viktorina\", \"so'rovnoma\", \"голосование\") about something they name, one every 10 minutes per group: the question is theirs, such as whether to do it (\"viktorina kerak X ni mif qilishga\" -> \"X ni Mythic qilaylikmi?\" with yes and no), never a random trivia question. It appears by itself: do not repeat its question or options, reply in one short line at most. stop closes your poll they replied to, else your latest, when they ask to end it (\"so'rovnomani yop\", \"закрой опрос\"), and gives the final counts; only who asked for it, admins or your owners may.",
+		Description: "Post an anonymous poll in this group when anyone asks for a poll, a vote, or a quiz (\"viktorina\", \"so'rovnoma\", \"голосование\") about something they name, one every 10 minutes per group: the question is theirs, such as whether to do it (\"viktorina kerak X ni mif qilishga\" -> \"X ni Mythic qilaylikmi?\" with yes and no), never a random trivia question, but for a quiz poll they ask for with no subject (\"viktorina poll tashla\"): then take fun's trivia and post it here with correct. It appears by itself: do not repeat its question or options, reply in one short line at most. stop closes your poll they replied to, else your latest, when they ask to end it (\"so'rovnomani yop\", \"закрой опрос\"), and gives the final counts; only who asked for it, admins or your owners may.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
 				"action": {"type": "string", "enum": ["create", "stop"], "description": "create (the default) posts a poll; stop closes one and needs nothing else."},
 				"question": {"type": "string", "description": "For create: the question, 1 to 300 characters, in the language of the person asking."},
 				"options": {"type": "array", "items": {"type": "string"}, "minItems": 2, "maxItems": 10, "description": "For create: 2 to 10 different answers, each 1 to 100 characters."},
-				"multiple": {"type": "boolean", "description": "For create: whether a voter may pick more than one answer. Default false."}
+				"multiple": {"type": "boolean", "description": "For create: whether a voter may pick more than one answer. Default false."},
+				"correct": {"type": "integer", "minimum": 0, "maximum": 9, "description": "For a quiz poll: the place of the right answer in options, from 0; the poll then shows it once voted."}
 			},
 			"additionalProperties": false
 		}`),
@@ -296,7 +300,16 @@ func newPoll(caller Caller, args pollArgs) (telegram.OutgoingPoll, error) {
 	if err != nil {
 		return telegram.OutgoingPoll{}, err
 	}
-	return telegram.OutgoingPoll{ChatID: caller.ChatID, Question: question, Options: options, Multiple: args.Multiple, ReplyToMessageID: caller.MessageID}, nil
+	poll := telegram.OutgoingPoll{ChatID: caller.ChatID, Question: question, Options: options, Multiple: args.Multiple, ReplyToMessageID: caller.MessageID}
+	// A quiz poll, as the owners asked on 2026-11-21 for a "viktorina poll":
+	// one right answer, so one choice a voter.
+	if args.Correct != nil {
+		if *args.Correct < 0 || *args.Correct >= len(options) {
+			return telegram.OutgoingPoll{}, &ArgumentError{Message: "correct must be the place of one of the options, from 0"}
+		}
+		poll.Quiz, poll.Correct, poll.Multiple = true, *args.Correct, false
+	}
+	return poll, nil
 }
 
 // checkedOptions trims the options and refuses two that differ only in case
