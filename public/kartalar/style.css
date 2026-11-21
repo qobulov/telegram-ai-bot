@@ -1193,7 +1193,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .bs-title { justify-self: center; font: 700 13px Unbounded, sans-serif; color: var(--gold); }
 .bs-mvp { margin: 0; text-align: center; color: #ffe39a; font-weight: 800; }
 .bs-side { display: grid; gap: 4px; }
-.bs-head, .bs-row { display: grid; grid-template-columns: minmax(0, 1fr) repeat(4, 42px); align-items: center; gap: 4px; }
+.bs-head, .bs-row { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, 50px); align-items: center; gap: 4px; }
 .bs-head { color: var(--muted); font-size: 11px; }
 .bs-head span:first-child { font-weight: 800; }
 .bs-side.us .bs-head span:first-child { color: var(--gold); }
