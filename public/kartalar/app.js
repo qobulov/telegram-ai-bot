@@ -284,24 +284,38 @@
   // with a number under it (a mark, not a count of copies), cherry petals
   // drifting over the picture, fireflies glowing among them and, in the large
   // view, long hair flowing in the wind while the face and body keep still.
-  // Killua (27): lightning cracking over the card and a blue glow round it.
+  // Killua (27): his picture without him (under) beneath his cut-out, so
+  // lightning cracks behind him and a blue halo flickers round him.
   const SPECIAL = {
     298761: { tag: "LIMITED", petals: true, fireflies: true, hair: true, plate: "/kartalar/art/298761p.jpg" },
-    27: { bolts: true },
+    27: { bolts: true, under: "/kartalar/art/27p.jpg" },
   };
 
-  // dress adds a special card's mark, petals and fireflies; the large view
-  // has more of them.
+  // dress adds a special card's mark, petals, fireflies or lightning; the
+  // large view has more of them.
   function dress(el, card, large) {
     const special = SPECIAL[card.id] || (card.limited ? { tag: "LIMITED" } : null);
     if (!special) return;
     el.classList.add("special");
     let html = "";
     if (special.petals) html += '<div class="petals" aria-hidden="true">' + "<i></i>".repeat(large ? 14 : 6) + "</div>";
-    if (special.bolts) html += '<div class="bolts" aria-hidden="true">' + "<i></i>".repeat(large ? 7 : 4) + "</div>";
+    if (special.bolts) html += '<div class="bolts ahead" aria-hidden="true">' + "<i></i>".repeat(large ? 2 : 1) + "</div>";
     if (special.fireflies) html += '<div class="fireflies" aria-hidden="true">' + "<i></i>".repeat(large ? 9 : 4) + "</div>";
     el.insertAdjacentHTML("beforeend", html);
     const living = el.querySelector(".alive");
+    if (special.bolts && living) {
+      // most of the lightning behind him, between the picture and his cut-out
+      living.insertAdjacentHTML("beforebegin", '<div class="bolts behind" aria-hidden="true">' + "<i></i>".repeat(large ? 7 : 4) + "</div>");
+      // his halo: the cut-out once more under him, glowing blue
+      const aura = document.createElement("i");
+      aura.className = "aura";
+      aura.style.backgroundImage = living.querySelector("i").style.backgroundImage;
+      living.prepend(aura);
+    }
+    if (special.under) {
+      const base = el.querySelector("img");
+      if (base) picture(base, special.under, large);
+    }
     if (special.hair && large && living) {
       // flowing hair: the cut-out once more, its edges alone, waved by #flow
       const flow = document.createElement("i");
