@@ -407,6 +407,9 @@ func (s *Store) Expire(ctx context.Context, maxAge time.Duration) (Expired, erro
 		if _, err = tx.Exec(ctx, `DELETE FROM skipped_messages WHERE created_at < $1`, cutoff); err != nil {
 			return err
 		}
+		if _, err = tx.Exec(ctx, `DELETE FROM member_words WHERE day < $1::date`, cutoff); err != nil {
+			return err
+		}
 		if _, err = tx.Exec(ctx, `DELETE FROM group_rules WHERE expires_at < now()`); err != nil {
 			return err
 		}

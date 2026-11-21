@@ -182,6 +182,8 @@ type Options struct {
 	// Invites keeps who brought whom into each group, for /invites; nil
 	// keeps none.
 	Invites InviteBook
+	// Words counts the words members write, for /words; nil turns it off.
+	Words WordBook
 	// Teams keeps the groups' MLBB team lobbies, for /teams; nil turns it
 	// off.
 	Teams TeamLobbyBook
@@ -1043,6 +1045,7 @@ func (s *Service) logMessage(msg *telegram.Message) {
 // logFrom adds a message from a member, or from an allowed bot, to the
 // group's log, as text: the one place where the log's member lines are made.
 func (s *Service) logFrom(msg *telegram.Message, text string) {
+	s.countWords(msg)
 	s.ambient.addMessage(msg, s.taggedLabel(msg.From, msg.SenderTag), s.logText(msg, text))
 }
 

@@ -752,6 +752,16 @@ chiq" from anywhere, for a group she is in or a channel where she is an
 admin (`targets` lists them). The owner's own words must ask her to leave
 (chiq, ket, leave, выйди…), so the model cannot leave on its own.
 
+`/words` in a group, with no model, lists who wrote the most words in the
+last 7 days (today counted, Tashkent time), each with their messages, with
+buttons that switch it in place to the last 30 days and a "✍️ Meniki" button
+that tells the presser alone, in a box, their own words and messages for both;
+`/words oy` opens on 30 days. Every member's message is counted as it comes,
+its text or caption split on spaces, in `member_words` (one row per group,
+member and day), so groups without AI, which keep no words in
+`group_messages`, count too; bots' messages are not counted, and days older
+than `RETENTION_DAYS` are deleted.
+
 `/invites` in a group, with no model, lists who brought how many people in
 who are still there, this week (from Monday, Tashkent time) by default, with
 buttons under it that switch it in place to today, the week, the month or all

@@ -864,6 +864,8 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.myInvites(ctx, in)
 	case s.opts.Invites != nil && invitePeriods[commandName(in.text)]:
 		return s.inviteTable(ctx, in)
+	case s.opts.Words != nil && commandName(in.text) == "/words":
+		return s.wordTable(ctx, in)
 	case in.group && s.opts.Extras != nil && commandName(in.text) == "/rep":
 		return s.reputation(ctx, in)
 	case in.group && s.opts.Extras != nil && commandName(in.text) == "/toprep":
@@ -1123,6 +1125,10 @@ func (s *Service) pressed(q *telegram.CallbackQuery) {
 	}
 	if strings.HasPrefix(q.Data, inviteData) && s.opts.Invites != nil {
 		s.pressedInvites(q)
+		return
+	}
+	if strings.HasPrefix(q.Data, wordData) && s.opts.Words != nil && s.opts.Buttons != nil {
+		s.pressedWords(q)
 		return
 	}
 	if strings.HasPrefix(q.Data, antispamData) && s.opts.Extras != nil {
