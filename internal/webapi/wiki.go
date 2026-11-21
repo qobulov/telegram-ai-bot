@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -95,7 +96,13 @@ func (a *apis) wiki(ctx context.Context, raw json.RawMessage) (any, error) {
 type wikiPage struct {
 	Title   string `json:"title"`
 	Extract string `json:"extract"`
+	Index   int    `json:"index"`
 }
+
+// wikiCandidates is how many of a search's results are weighed for one
+// whose title is the query's: the first alone gave "Fall Out Boy" for Joy
+// Boy (2026-11-21).
+const wikiCandidates = 5
 
 // wikiSummary tries the asked language and then the wider ones. Uzbek
 // Wikipedia is written in Latin, so a Cyrillic query is transliterated
@@ -123,15 +130,18 @@ func (a *apis) wikiSummary(ctx context.Context, query, lang string) (wikiSummary
 	return wikiSummary{}, argumentError("Wikipedia has no article for %q; try another spelling or language", query)
 }
 
-// wikiSearch returns the best match's plain-text introduction, or a zero
-// page when there is none (Wikipedia then answers without "query").
+// wikiSearch returns the plain-text introduction of the best match whose
+// title holds every word of the search, or a zero page when none does
+// (Wikipedia answers without "query" when it finds nothing at all), so that
+// the next language, or the web, is tried instead of a wrong article.
 func (a *apis) wikiSearch(ctx context.Context, lang, search string) (wikiPage, error) {
 	key := "wiki:" + lang + ":" + strings.ToLower(search)
 	return remember(a.cache, key, wikiTTL, func() (wikiPage, error) {
 		query := url.Values{
 			"action": {"query"}, "format": {"json"}, "formatversion": {"2"},
-			"generator": {"search"}, "gsrsearch": {search}, "gsrlimit": {"1"},
-			"prop": {"extracts"}, "exintro": {"1"}, "explaintext": {"1"}, "exchars": {strconv.Itoa(maxExtract)}, "redirects": {"1"},
+			"generator": {"search"}, "gsrsearch": {search}, "gsrlimit": {strconv.Itoa(wikiCandidates)},
+			"prop": {"extracts"}, "exintro": {"1"}, "explaintext": {"1"}, "exchars": {strconv.Itoa(maxExtract)},
+			"exlimit": {strconv.Itoa(wikiCandidates)}, "redirects": {"1"},
 		}
 		var answer struct {
 			Query struct {
@@ -139,11 +149,31 @@ func (a *apis) wikiSearch(ctx context.Context, lang, search string) (wikiPage, e
 			} `json:"query"`
 		}
 		err := a.client.getJSON(ctx, call{service: "Wikipedia", url: fmt.Sprintf(a.urls.Wikipedia, lang) + "/w/api.php?" + query.Encode()}, &answer)
-		if err != nil || len(answer.Query.Pages) == 0 {
+		if err != nil {
 			return wikiPage{}, err
 		}
-		return answer.Query.Pages[0], nil
+		pages := answer.Query.Pages
+		slices.SortStableFunc(pages, func(a, b wikiPage) int { return cmp.Compare(a.Index, b.Index) })
+		for _, page := range pages {
+			if titleNames(page.Title, search) {
+				return page, nil
+			}
+		}
+		return wikiPage{}, nil
 	})
+}
+
+// titleNames reports whether every word of search is in title, letter case
+// and apostrophes aside: "Navoi" is in "Alisher Navoiy", "Joy Boy" is not
+// in "Fall Out Boy".
+func titleNames(title, search string) bool {
+	folded := foldForSearch(title)
+	for _, word := range strings.Fields(foldForSearch(search)) {
+		if !strings.Contains(folded, strings.Trim(word, ".,!?\"'«»()")) {
+			return false
+		}
+	}
+	return true
 }
 
 // cleanExtract drops what reads badly when quoted: Russian stress marks,

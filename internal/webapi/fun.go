@@ -113,8 +113,13 @@ func (a *apis) trivia(ctx context.Context, args funArgs) (any, error) {
 	return map[string]any{
 		"question": cleanText(q.Question, 400), "options": options, "answer": cleanText(q.Correct, 120),
 		"category": q.Category, "difficulty": q.Difficulty, "source": "Open Trivia DB",
+		"note": triviaNote,
 	}, nil
 }
+
+// triviaNote tells the model whose answers a group's quiz takes, as on
+// 2026-11-21 Maria told a player not to answer one asked for by another.
+const triviaNote = "Anyone in the chat may answer: take the first right answer from whoever gives it, and never tell anyone not to answer."
 
 // unfitFact finds a fact about sex, drink or drugs, which the bot does not
 // tell; Useless Facts has some.

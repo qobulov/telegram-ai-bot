@@ -36,6 +36,9 @@ func wikiRoutes(t *testing.T) map[string]stub {
 		uzSearch + "?gsrsearch=Alisher Navoiy":    ok(fixture(t, "wiki_uz_navoiy.json")),
 		ruSearch + "?gsrsearch=Навои":             ok(fixture(t, "wiki_ru_navoi.json")),
 		enSearch + "?gsrsearch=Cristiano Ronaldo": ok(fixture(t, "wiki_en_ronaldo.json")),
+		ruSearch + "?gsrsearch=Joy Boy":           ok(`{"query":{"pages":[{"index":1,"title":"Fall Out Boy","extract":"Fall Out Boy — американская поп-рок группа."}]}}`),
+		enSearch + "?gsrsearch=Joy Boy": ok(`{"query":{"pages":[{"index":2,"title":"Joy Boy (One Piece)","extract":"Joy Boy is a figure of the Void Century."},` +
+			`{"index":1,"title":"List of One Piece characters","extract":"The One Piece manga features an extensive cast."}]}}`),
 		"/wiki/ru/api/rest_v1/feed/onthisday/selected/10/16": ok(fixture(t, "wiki_onthisday_ru.json")),
 		"/wiki/en/api/rest_v1/feed/onthisday/selected/10/16": ok(fixture(t, "wiki_onthisday_en.json")),
 		"/wiki/uz/api/rest_v1/feed/onthisday/selected/10/16": {status: http.StatusNotFound, body: fixture(t, "wiki_onthisday_uz.json")},
@@ -60,7 +63,7 @@ func TestWikiLookup(t *testing.T) {
 				}
 				request := u.requests(uzSearch)[0]
 				query := request.URL.Query()
-				if query.Get("exintro") != "1" || query.Get("explaintext") != "1" || query.Get("gsrlimit") != "1" || request.Header.Get("User-Agent") == "" {
+				if query.Get("exintro") != "1" || query.Get("explaintext") != "1" || query.Get("gsrlimit") != "5" || request.Header.Get("User-Agent") == "" {
 					t.Errorf("request = %s", request.URL)
 				}
 			},
@@ -88,6 +91,15 @@ func TestWikiLookup(t *testing.T) {
 				}
 				if got := u.requests(uzSearch)[0].URL.Query().Get("gsrsearch"); got != "Navoi" {
 					t.Errorf("Uzbek search for %q, want the Latin spelling", got)
+				}
+			},
+		},
+		{
+			name: "a result whose title is not the query is passed over for the next language's",
+			args: `{"query":"Joy Boy","lang":"ru"}`,
+			check: func(t *testing.T, r wikiResult, _ *upstream) {
+				if r.Lang != "en" || r.Title != "Joy Boy (One Piece)" {
+					t.Errorf("result = %+v, want the English article named Joy Boy", r)
 				}
 			},
 		},

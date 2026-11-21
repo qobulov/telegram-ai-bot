@@ -16,7 +16,11 @@ func TestTriviaGivesShuffledOptionsWithTheAnswer(t *testing.T) {
 		Question string   `json:"question"`
 		Options  []string `json:"options"`
 		Answer   string   `json:"answer"`
+		Note     string   `json:"note"`
 	}](t, run(t, u.options(), "fun", `{"action":"trivia","category":"geography","difficulty":"easy"}`))
+	if out.Note != triviaNote {
+		t.Errorf("trivia note = %q, want who may answer", out.Note)
+	}
 
 	if out.Question != `What is the capital of "Uzbekistan"?` || out.Answer != "Tashkent" || len(out.Options) != 4 || !slices.Contains(out.Options, "Tashkent") {
 		t.Errorf("trivia = %+v", out)
