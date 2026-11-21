@@ -2776,7 +2776,11 @@
   // shaking its target and its HP bar falling, a skill flashing, a fallen
   // card greyed. Skip, or less motion asked for, shows the end at once.
   // Only transforms and opacity move, so that weak phones keep up.
-  const STEP = 350;
+  // 650 since 2026-11-21: at 350 the owners found the battle too fast to follow.
+  const STEP = 650;
+  // SKIP_POINTS is the card points a player needs for the battle's Skip
+  // button, as the owners asked on 2026-11-21.
+  const SKIP_POINTS = 200000;
   // HITS are the events that go from one side to the other.
   const HITS = ["hit", "strike", "stun", "poison"];
   // START_ENERGY is each class's energy at a battle's start, as arena.StartEnergy gives it.
@@ -2822,6 +2826,7 @@
       const roundBox = box.querySelector(".b-round"), line = box.querySelector(".b-line");
       const skip = box.querySelector(".b-skip");
       skip.textContent = at.skip;
+      skip.hidden = points < SKIP_POINTS;
       const events = data.events || [];
       let next = 0, timer = 0, done = false;
 
