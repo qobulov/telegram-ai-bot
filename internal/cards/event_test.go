@@ -3,6 +3,7 @@ package cards
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -158,8 +159,8 @@ func fireflyView(t *testing.T, h http.Handler, initData string) (int, map[string
 }
 
 // The Demon Slayer event runs a week from 2026-11-21 19:30 in Tashkent with
-// its six cards, 0.6% a pull (a Mythic 6 in a thousand, every one of them
-// its own, the Commons 629) and a sure one on the 300th; while both run the
+// its six cards, 0.6% a pull beside other Mythics' usual 0.5% (a Mythic 11 in
+// a thousand, the Commons 624) and a sure one on the 300th; while both run the
 // shop lists both, and a pull names its event. No anime's collection needs
 // its cards.
 func TestTheDemonSlayerEvent(t *testing.T) {
@@ -168,8 +169,11 @@ func TestTheDemonSlayerEvent(t *testing.T) {
 		ds.Ends.Sub(ds.Starts) != 7*24*time.Hour || !ds.Starts.Equal(time.Date(2026, 11, 21, 19, 30, 0, 0, Location)) {
 		t.Fatalf("the Demon Slayer event = %+v", ds)
 	}
-	if got := ds.odds(); !slices.Equal(got, []int{629, 250, 90, 25, 6}) || ds.Share != 1 || ds.roll(5) != Mythic || ds.roll(6) != Legendary || ds.roll(999) != Common {
-		t.Errorf("the Demon Slayer odds = %v, share %v", got, ds.Share)
+	if got := ds.odds(); !slices.Equal(got, []int{624, 250, 90, 25, 11}) || ds.roll(10) != Mythic || ds.roll(11) != Legendary || ds.roll(999) != Common {
+		t.Errorf("the Demon Slayer odds = %v", got)
+	}
+	if own := math.Round(float64(ds.odds()[Mythic]) * ds.Share); own != 6 || ds.mythicShown() != 5 || firefly.mythicShown() != 5 {
+		t.Errorf("the Demon Slayer cards are %v in a thousand, the Mythics shown %d and the Firefly's %d; want 6, 5 and 5", own, ds.mythicShown(), firefly.mythicShown())
 	}
 	if got := firefly.odds(); !slices.Equal(got, EventOdds()) {
 		t.Errorf("the Firefly odds = %v, want the usual", got)

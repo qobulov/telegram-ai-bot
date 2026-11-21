@@ -1902,8 +1902,10 @@
     box.querySelector(".event-tag").textContent = face.tag;
     box.querySelector(".event-title").textContent = face.title;
     const percent = (n) => `${n / 10}%`;
+    // the Mythic the server says to show: of an event with odds of its own,
+    // the other Mythics' beside its cards'
     const mythic = ev.odds[4];
-    box.querySelector(".event-odds").textContent = et.odds(percent(mythic), face.icon, face.name, percent(mythic * ev.share));
+    box.querySelector(".event-odds").textContent = et.odds(percent(ev.mythic_shown ?? mythic), face.icon, face.name, percent(Math.round(mythic * ev.share)));
     box.querySelector(".event-one").addEventListener("click", () => eventPull(ev, 1));
     box.querySelector(".event-batch").addEventListener("click", () => eventPull(ev, ev.batch));
     eventPity(ev);

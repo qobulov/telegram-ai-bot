@@ -3,6 +3,7 @@ package cards
 import (
 	"context"
 	"errors"
+	"math"
 	"math/rand/v2"
 	"slices"
 	"time"
@@ -37,13 +38,13 @@ type Event struct {
 //
 // The Demon Slayer event, as the owners asked on 2026-11-21: for a week its
 // six Mythics, which nothing else gives (storage.DemonSlayerCards), 0.6% a
-// pull (raised from 0.4% the same day: a Mythic is 6 in a thousand, every
-// one of them the event's), and a sure one only on the 300th pull in a row
-// without one.
+// pull beside the usual 0.5% of other Mythics (as the owners asked the same
+// day: a Mythic is 11 in a thousand, 6 of them the event's), and a sure one
+// only on the 300th pull in a row without one.
 var Events = []Event{
 	{Key: "firefly", Cards: []int64{298761}, Once: true, Share: 0.8, Pity: 200, Price: 1, Batch: 10,
 		Starts: time.Date(2026, 11, 18, 22, 0, 0, 0, Location), Ends: time.Date(2026, 12, 2, 0, 0, 0, 0, Location)},
-	{Key: "demon-slayer", Cards: storage.DemonSlayerCards, Mythic: 6, Share: 1, Pity: 300, Price: 1, Batch: 10,
+	{Key: "demon-slayer", Cards: storage.DemonSlayerCards, Mythic: 11, Share: 6.0 / 11, Pity: 300, Price: 1, Batch: 10,
 		Starts: time.Date(2026, 11, 21, 19, 30, 0, 0, Location), Ends: time.Date(2026, 11, 28, 19, 30, 0, 0, Location)},
 }
 
@@ -88,6 +89,17 @@ func (e Event) roll(n int) Rarity {
 // EventOdds are an event pull's odds of each rarity in a thousand at the
 // usual odds, the most common first.
 func EventOdds() []int { return Event{}.odds() }
+
+// mythicShown is the odds in a thousand the shop shows for a Mythic: of an
+// event with its own odds, those of the Mythics not its own (the usual 0.5%
+// beside its cards'), of any other all of them.
+func (e Event) mythicShown() int {
+	m := e.odds()[Mythic]
+	if e.Mythic == 0 {
+		return m
+	}
+	return m - int(math.Round(float64(m)*e.Share))
+}
 
 // odds are a pull's odds of each rarity of the event in a thousand.
 func (e Event) odds() []int {
@@ -163,7 +175,7 @@ func (h *handler) eventView(ctx context.Context, user miniapp.User, e Event) (an
 		"active": e.runs(now), "soon": now.Before(e.Starts),
 		"starts_in": max(0, e.Starts.Sub(now).Milliseconds()),
 		"ends_at":   e.Ends.UnixMilli(), "ends_in": max(0, e.Ends.Sub(now).Milliseconds()),
-		"pity": pulls, "pity_max": e.Pity, "odds": e.odds(), "share": e.Share,
+		"pity": pulls, "pity_max": e.Pity, "odds": e.odds(), "share": e.Share, "mythic_shown": e.mythicShown(),
 		"price": e.Price, "batch": e.Batch, "cards": views,
 	}, failure{}
 }
