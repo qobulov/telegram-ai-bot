@@ -360,6 +360,7 @@
       living.append(flow);
     }
     if (special.tag) {
+      el.classList.add("marked");
       const mark = document.createElement("div");
       mark.className = "lmark";
       const tag = document.createElement("span");
