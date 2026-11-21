@@ -14,13 +14,15 @@ import (
 // Event is a time when the shop sells pulls of cards for tokens, at the
 // usual odds: Share of the Mythics drawn are the event's Cards, the rest
 // other Mythics, and the Pity-th pull in a row without one of Cards gives
-// one, of those the player lacks if any. A Once event's card is limited: a
-// player holds it once at most. Key names the event to the app and its
-// pity count.
+// one, of those the player lacks if any. Mythic, when not 0, is the
+// event's odds of a Mythic in a thousand, taken from the Commons. A Once
+// event's card is limited: a player holds it once at most. Key names the
+// event to the app and its pity count.
 type Event struct {
 	Key          string
 	Cards        []int64
 	Once         bool
+	Mythic       int
 	Share        float64
 	Pity         int
 	Price, Batch int
@@ -34,12 +36,14 @@ type Event struct {
 // the 200th pull in a row without her gives her.
 //
 // The Demon Slayer event, as the owners asked on 2026-11-21: for a week its
-// six Mythics, which nothing else gives (storage.DemonSlayerCards), 0.4% a
-// pull, and a sure one only on the 300th pull in a row without one.
+// six Mythics, which nothing else gives (storage.DemonSlayerCards), 0.6% a
+// pull (raised from 0.4% the same day: a Mythic is 6 in a thousand, every
+// one of them the event's), and a sure one only on the 300th pull in a row
+// without one.
 var Events = []Event{
 	{Key: "firefly", Cards: []int64{298761}, Once: true, Share: 0.8, Pity: 200, Price: 1, Batch: 10,
 		Starts: time.Date(2026, 11, 18, 22, 0, 0, 0, Location), Ends: time.Date(2026, 12, 2, 0, 0, 0, 0, Location)},
-	{Key: "demon-slayer", Cards: storage.DemonSlayerCards, Share: 0.8, Pity: 300, Price: 1, Batch: 10,
+	{Key: "demon-slayer", Cards: storage.DemonSlayerCards, Mythic: 6, Share: 1, Pity: 300, Price: 1, Batch: 10,
 		Starts: time.Date(2026, 11, 21, 19, 30, 0, 0, Location), Ends: time.Date(2026, 11, 28, 19, 30, 0, 0, Location)},
 }
 
@@ -68,21 +72,40 @@ func EventRoll(n int) Rarity {
 	return Roll(n)
 }
 
-// EventOdds are an event pull's odds of each rarity in a thousand, the most
-// common first.
-func EventOdds() []int {
+// roll draws a pull's rarity of the event from a number in [0, 1000): its
+// own odds of a Mythic first, if it has them, the rest as usual but for the
+// Commons they came from.
+func (e Event) roll(n int) Rarity {
+	if e.Mythic == 0 {
+		return EventRoll(n)
+	}
+	if n < e.Mythic {
+		return Mythic
+	}
+	return Roll(n - e.Mythic + rules[Mythic].odds)
+}
+
+// EventOdds are an event pull's odds of each rarity in a thousand at the
+// usual odds, the most common first.
+func EventOdds() []int { return Event{}.odds() }
+
+// odds are a pull's odds of each rarity of the event in a thousand.
+func (e Event) odds() []int {
 	odds := make([]int, len(Rarities))
 	for n := range 1000 {
-		odds[EventRoll(n)]++
+		odds[e.roll(n)]++
 	}
 	return odds
 }
 
-func (h *handler) eventRoll() Rarity {
-	if h.EventRoll != nil {
-		return h.EventRoll()
+// eventRoll draws a pull's rarity of the event.
+func (h *handler) eventRoll(e Event) func() Rarity {
+	return func() Rarity {
+		if h.EventRoll != nil {
+			return h.EventRoll()
+		}
+		return e.roll(rand.IntN(1000))
 	}
-	return EventRoll(rand.IntN(1000))
 }
 
 // eventPick says whether an event pull's Mythic is one of the event's
@@ -140,7 +163,7 @@ func (h *handler) eventView(ctx context.Context, user miniapp.User, e Event) (an
 		"active": e.runs(now), "soon": now.Before(e.Starts),
 		"starts_in": max(0, e.Starts.Sub(now).Milliseconds()),
 		"ends_at":   e.Ends.UnixMilli(), "ends_in": max(0, e.Ends.Sub(now).Milliseconds()),
-		"pity": pulls, "pity_max": e.Pity, "odds": EventOdds(), "share": e.Share,
+		"pity": pulls, "pity_max": e.Pity, "odds": e.odds(), "share": e.Share,
 		"price": e.Price, "batch": e.Batch, "cards": views,
 	}, failure{}
 }
@@ -169,7 +192,7 @@ func (h *handler) eventOpen(ctx context.Context, user miniapp.User, key string, 
 	}
 	ev := storage.CardEvent{
 		Key: e.Key, Cards: e.Cards, Once: e.Once, Ends: e.Ends, Pity: e.Pity, Price: e.Price,
-		Roll: ByOdds(h.eventRoll), Pick: h.eventPick(e.Share),
+		Roll: ByOdds(h.eventRoll(e)), Pick: h.eventPick(e.Share),
 	}
 	opened, err := h.Store.OpenEventCards(ctx, user.ID, name(user), n, ev, Today(now), now, questOf(QuestEvent, now))
 	var few *storage.CardTokensError

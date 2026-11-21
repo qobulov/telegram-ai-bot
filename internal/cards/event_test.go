@@ -158,13 +158,21 @@ func fireflyView(t *testing.T, h http.Handler, initData string) (int, map[string
 }
 
 // The Demon Slayer event runs a week from 2026-11-21 19:30 in Tashkent with
-// its six cards, a sure one on the 300th pull; while both run the shop lists
-// both, and a pull names its event. No anime's collection needs its cards.
+// its six cards, 0.6% a pull (a Mythic 6 in a thousand, every one of them
+// its own, the Commons 629) and a sure one on the 300th; while both run the
+// shop lists both, and a pull names its event. No anime's collection needs
+// its cards.
 func TestTheDemonSlayerEvent(t *testing.T) {
 	ds := Events[1]
 	if ds.Key != "demon-slayer" || ds.Pity != 300 || ds.Once || len(ds.Cards) != 6 || ds.Price != 1 ||
 		ds.Ends.Sub(ds.Starts) != 7*24*time.Hour || !ds.Starts.Equal(time.Date(2026, 11, 21, 19, 30, 0, 0, Location)) {
 		t.Fatalf("the Demon Slayer event = %+v", ds)
+	}
+	if got := ds.odds(); !slices.Equal(got, []int{629, 250, 90, 25, 6}) || ds.Share != 1 || ds.roll(5) != Mythic || ds.roll(6) != Legendary || ds.roll(999) != Common {
+		t.Errorf("the Demon Slayer odds = %v, share %v", got, ds.Share)
+	}
+	if got := firefly.odds(); !slices.Equal(got, EventOdds()) {
+		t.Errorf("the Firefly odds = %v, want the usual", got)
 	}
 	now := ds.Starts.Add(time.Hour)
 	if !eventRuns(now) || !firefly.runs(now) {
