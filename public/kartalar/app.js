@@ -284,7 +284,11 @@
   // with a number under it (a mark, not a count of copies), cherry petals
   // drifting over the picture, fireflies glowing among them and, in the large
   // view, long hair flowing in the wind while the face and body keep still.
-  const SPECIAL = { 298761: { tag: "LIMITED", petals: true, fireflies: true, hair: true, plate: "/kartalar/art/298761p.jpg" } };
+  // Killua (27): lightning cracking over the card and a blue glow round it.
+  const SPECIAL = {
+    298761: { tag: "LIMITED", petals: true, fireflies: true, hair: true, plate: "/kartalar/art/298761p.jpg" },
+    27: { bolts: true },
+  };
 
   // dress adds a special card's mark, petals and fireflies; the large view
   // has more of them.
@@ -294,6 +298,7 @@
     el.classList.add("special");
     let html = "";
     if (special.petals) html += '<div class="petals" aria-hidden="true">' + "<i></i>".repeat(large ? 14 : 6) + "</div>";
+    if (special.bolts) html += '<div class="bolts" aria-hidden="true">' + "<i></i>".repeat(large ? 7 : 4) + "</div>";
     if (special.fireflies) html += '<div class="fireflies" aria-hidden="true">' + "<i></i>".repeat(large ? 9 : 4) + "</div>";
     el.insertAdjacentHTML("beforeend", html);
     const living = el.querySelector(".alive");

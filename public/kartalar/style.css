@@ -480,6 +480,39 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .special .petals i:nth-child(13) { left: 48%; animation-delay: -2.9s; }
 .special .petals i:nth-child(14) { left: 20%; animation-delay: -4.2s; }
 
+/* lightning: zigzag bolts flashing over the card above the plate, a blue
+   flash with the first, and a blue glow round it, which only the large view
+   pulses (the grid paints it once) */
+.card.special:has(.bolts) { box-shadow: 0 0 0 1px rgba(127, 220, 255, 0.6), 0 10px 26px rgba(0, 0, 0, 0.55), 0 0 18px rgba(90, 200, 255, 0.45); }
+.front.special:has(.bolts) { animation: zap-glow 2.4s ease-in-out infinite; }
+.special .bolts { position: absolute; inset: 0 0 30% 0; z-index: 2; overflow: hidden; border-radius: inherit; pointer-events: none; }
+.special .bolts::before {
+  content: ""; position: absolute; inset: 0; opacity: 0;
+  background: radial-gradient(circle at 50% 45%, rgba(170, 235, 255, 0.4), transparent 70%);
+  animation: zap 2.6s steps(1, end) infinite;
+}
+.special .bolts i {
+  position: absolute; width: 14px; height: 46px; opacity: 0; will-change: opacity;
+  background: linear-gradient(180deg, #ffffff, #9ff0ff 45%, #3cb8ff);
+  clip-path: polygon(55% 0, 20% 48%, 48% 48%, 25% 100%, 82% 40%, 54% 40%, 78% 0);
+  filter: drop-shadow(0 0 4px #8fe6ff) drop-shadow(0 0 10px #39a8ff);
+  animation: zap 2.6s steps(1, end) infinite;
+}
+.front.special .bolts i { width: 26px; height: 90px; }
+.special .bolts i:nth-child(1) { left: 10%; top: 12%; animation-delay: 0s; transform: rotate(-12deg); }
+.special .bolts i:nth-child(2) { left: 74%; top: 22%; animation-delay: -0.9s; transform: rotate(18deg); }
+.special .bolts i:nth-child(3) { left: 30%; top: 58%; animation-delay: -1.7s; transform: rotate(-30deg); }
+.special .bolts i:nth-child(4) { left: 82%; top: 64%; animation-delay: -2.2s; transform: rotate(8deg); }
+.special .bolts i:nth-child(5) { left: 50%; top: 8%; animation-delay: -0.4s; transform: rotate(25deg); }
+.special .bolts i:nth-child(6) { left: 6%; top: 74%; animation-delay: -1.3s; transform: rotate(-6deg); }
+.special .bolts i:nth-child(7) { left: 62%; top: 44%; animation-delay: -2s; transform: rotate(-20deg); }
+@keyframes zap { 0%, 100% { opacity: 0; } 4% { opacity: 1; } 7% { opacity: 0.2; } 9% { opacity: 0.95; } 13% { opacity: 0; } }
+@keyframes zap-glow {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(127, 220, 255, 0.5), 0 10px 26px rgba(0, 0, 0, 0.55), 0 0 18px rgba(90, 200, 255, 0.3); }
+  50% { box-shadow: 0 0 0 1.5px rgba(184, 240, 255, 0.85), 0 10px 26px rgba(0, 0, 0, 0.55), 0 0 40px rgba(90, 200, 255, 0.7); }
+}
+@media (prefers-reduced-motion: reduce) { .special .bolts i, .special .bolts::before, .front.special:has(.bolts) { animation: none; } }
+
 .special .fireflies { position: absolute; inset: 0; z-index: 2; overflow: hidden; border-radius: inherit; pointer-events: none; }
 .special .fireflies i {
   position: absolute; width: 4px; height: 4px; border-radius: 50%; opacity: 0; will-change: transform, opacity;
