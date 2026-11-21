@@ -92,7 +92,7 @@ func memberTag(name string, userID int64) string {
 func MembersTool(opts MembersOptions) Tool {
 	return Tool{
 		Name:           "group_members",
-		Description:    "The members you have seen in this group, admins marked, and the group's member count, when someone asks who is in the group or how many (group_admins lists only the admins). Also to call, wake or tag members (\"uyg'ot\", \"chaqir\", \"teg qil\") whose @username you do not have: tag them by the @username listed, or one without it by writing their tag exactly as listed, such as [Mayor](tg://user?id=123).",
+		Description:    "The members you have seen in this group, admins marked, and the group's member count, when someone asks who is in the group or how many (group_admins lists only the admins). Also to call, wake or tag members (\"uyg'ot\", \"chaqir\", \"teg qil\"; \"hammani chaqir\" or \"botlarni chaqir\" to a game is everyone, \"bot\" being gamers' word for a weak player, tagged in one invitation) whose @username you do not have: tag them by the @username listed, or one without it by writing their tag exactly as listed, such as [Mayor](tg://user?id=123).",
 		Schema:         json.RawMessage(`{"type": "object", "properties": {}, "additionalProperties": false}`),
 		GroupOnly:      true,
 		MaxOutputBytes: membersOutputBytes,
