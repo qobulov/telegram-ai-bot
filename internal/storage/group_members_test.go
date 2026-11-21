@@ -81,14 +81,14 @@ func TestProfileIsSetChangedAndCleared(t *testing.T) {
 	if p, err := store.Profile(ctx, alice); err != nil || !p.Empty() || p.UserID != alice {
 		t.Fatalf("no profile = %+v, %v", p, err)
 	}
-	if err := store.SetProfile(ctx, UserProfile{UserID: alice, CallName: "Aziz aka", Siz: true}); err != nil {
+	if err := store.SetProfile(ctx, UserProfile{UserID: alice, CallName: "Aziz aka"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.SetProfile(ctx, UserProfile{UserID: alice, CallName: "Aziz", Siz: true}); err != nil {
+	if err := store.SetProfile(ctx, UserProfile{UserID: alice, CallName: "Aziz"}); err != nil {
 		t.Fatal(err)
 	}
-	if p, _ := store.Profile(ctx, alice); p.CallName != "Aziz" || !p.Siz {
-		t.Errorf("profile = %+v, want Aziz with siz", p)
+	if p, _ := store.Profile(ctx, alice); p.CallName != "Aziz" {
+		t.Errorf("profile = %+v, want Aziz", p)
 	}
 	if p, _ := store.Profile(ctx, bob); !p.Empty() {
 		t.Errorf("another user has %+v", p)

@@ -174,11 +174,11 @@ func (f fakeProfileBook) Profile(_ context.Context, userID int64) (storage.UserP
 	return p, nil
 }
 
-// What a person asked to be called, and "siz", reach every turn of theirs,
+// What a person asked to be called reaches every turn of theirs,
 // in any group; no one else's turn carries it.
 func TestProfileReachesThePersonsTurns(t *testing.T) {
 	f := newFixture()
-	f.opts.Profiles = fakeProfileBook{userID: {CallName: "Aziz aka", Siz: true}}
+	f.opts.Profiles = fakeProfileBook{userID: {CallName: "Aziz aka"}}
 	other := groupMessage("Mira, salom")
 	other.From = &telegram.User{ID: 4242, FirstName: "Ann"}
 
@@ -347,9 +347,9 @@ func TestTheGroupSizeLimitIsASetting(t *testing.T) {
 	}
 }
 
-// Someone the swear guard caught swearing at the bot in this chat is to be
-// spoken to with "sen"; anyone else keeps the persona's "siz".
-func TestWhoSworeAtTheBotGetsSen(t *testing.T) {
+// Nobody is to be spoken to with "sen", not even someone the swear guard
+// caught swearing at the bot: the owners chose "siz" for everyone.
+func TestNobodyIsToldToGetSen(t *testing.T) {
 	cases := map[string]struct {
 		owner   bool
 		strikes []storage.ModerationAction
@@ -359,7 +359,6 @@ func TestWhoSworeAtTheBotGetsSen(t *testing.T) {
 		"an owner": {owner: true},
 		"swore at the bot here": {
 			strikes: []storage.ModerationAction{{ChatID: groupID, TargetUserID: userID, Action: storage.ActionSwearAtBot}},
-			want:    true,
 		},
 		"swore at the bot elsewhere": {
 			strikes: []storage.ModerationAction{{ChatID: -100999, TargetUserID: userID, Action: storage.ActionSwearAtBot}},
@@ -382,8 +381,8 @@ func TestWhoSworeAtTheBotGetsSen(t *testing.T) {
 			if len(calls) != 1 {
 				t.Fatalf("model calls = %d", len(calls))
 			}
-			if got := strings.Contains(calls[0].req.Context, senLine); got != c.want {
-				t.Errorf("sen line = %v, want %v; context %q", got, c.want, calls[0].req.Context)
+			if strings.Contains(calls[0].req.Context, `"sen"`) {
+				t.Errorf("the context asks for sen: %q", calls[0].req.Context)
 			}
 		})
 	}

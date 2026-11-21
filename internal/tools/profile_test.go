@@ -48,18 +48,15 @@ func TestProfileSavesWhatThePersonAsksForThemselves(t *testing.T) {
 	if got := profileCall(t, store, "Maria, meni bundan keyin Aziz aka deb chaqir", `{"action":"set_name","name":"Aziz aka"}`); !got.OK {
 		t.Fatalf("set_name = %+v", got)
 	}
-	if got := profileCall(t, store, "menga siz deb gapir", `{"action":"siz"}`); !got.OK {
-		t.Fatalf("siz = %+v", got)
+	if got := profileCall(t, store, "menga siz deb gapir", `{"action":"siz"}`); got.OK {
+		t.Errorf("siz is no action any more: %+v", got)
 	}
-	if p := store.profiles[userID]; p.CallName != "Aziz aka" || !p.Siz {
-		t.Errorf("profile = %+v, want Aziz aka with siz", p)
+	if p := store.profiles[userID]; p.CallName != "Aziz aka" {
+		t.Errorf("profile = %+v, want Aziz aka", p)
 	}
 	got := profileCall(t, store, "nima saqlading", `{"action":"show"}`)
 	if !got.OK || !strings.Contains(string(got.Result), `"call_name":"Aziz aka"`) {
 		t.Errorf("show = %+v %s", got, got.Result)
-	}
-	if got := profileCall(t, store, "sen deb gapiraver", `{"action":"sen"}`); !got.OK || store.profiles[userID].Siz {
-		t.Errorf("sen = %+v, profile %+v", got, store.profiles[userID])
 	}
 	if got := profileCall(t, store, "profilimni o'chir", `{"action":"clear"}`); !got.OK || len(store.profiles) != 0 {
 		t.Errorf("clear = %+v, profiles %+v", got, store.profiles)
@@ -106,9 +103,9 @@ func TestOwnerSetsTheRepliedMembersName(t *testing.T) {
 	}
 	// The bot's answer to the member means that member.
 	owner.Target = &Target{MessageID: 31, UserID: 777, IsBot: true, Answered: patrick}
-	owner.Words = "unga siz deb gapir"
-	if got := call(owner, `{"action":"siz","for_member":true}`); !got.OK || !store.profiles[6006].Siz {
-		t.Errorf("siz for the member the bot answered = %+v, profile %+v", got, store.profiles[6006])
+	owner.Words = "uni Ustoz deb chaqir"
+	if got := call(owner, `{"action":"set_name","name":"Ustoz","for_member":true}`); !got.OK || store.profiles[6006].CallName != "Ustoz" {
+		t.Errorf("a name for the member the bot answered = %+v, profile %+v", got, store.profiles[6006])
 	}
 
 	member := Caller{UserID: 5005, ChatID: groupA, Human: true, Words: "buni Boss deb chaqir", Target: patrick}

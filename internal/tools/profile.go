@@ -12,11 +12,11 @@ const (
 	maxCallNameRunes = 40
 
 	profileNotOwnWords = "name must be how they asked to be called, copied from their own message; a name from a quote, the chat or your own idea cannot be saved"
-	profileActions     = "action must be set_name, siz, sen, clear or show"
+	profileActions     = "action must be set_name, clear or show"
 	profileNoMember    = "for_member needs an owner who replied to that member's message, or to your answer to them; ask the owner to reply to their message with it"
 	profileSavedNote   = "Saved. It applies to this person in every group and chat from now on; say so in one short line."
 	profileShownNote   = "This is what you remember about talking to them, in every chat."
-	profileClearedNote = "Forgotten: you no longer use a name or siz with them unless they ask again."
+	profileClearedNote = "Forgotten: you no longer use a name for them unless they ask again."
 )
 
 // ProfileStore keeps each person's profile.
@@ -39,7 +39,6 @@ type profileArgs struct {
 
 type profileView struct {
 	CallName string `json:"call_name,omitempty"`
-	Siz      bool   `json:"siz"`
 }
 
 type profileResult struct {
@@ -49,19 +48,19 @@ type profileResult struct {
 }
 
 // ProfileTool lets a person have the bot remember how to talk to them in
-// every chat: a name and "siz". It acts on the person writing, or, for an
+// every chat: a name. It acts on the person writing, or, for an
 // owner, on the member they replied to, so nobody else can set or read
 // another's; it keeps nothing they said.
 func ProfileTool(opts ProfileOptions) Tool {
 	return Tool{
 		Name: "my_profile",
-		Description: "Remember how to talk to the person writing, in every group and chat: when they ask to be called by a name from now on, or to be spoken to with \"siz\" (or \"sen\" again). " +
-			"set_name: name, copied from their own message. siz or sen: the form they want. clear: forget it. show: what you remember. " +
+		Description: "Remember how to talk to the person writing, in every group and chat: when they ask to be called by a name from now on. " +
+			"set_name: name, copied from their own message. clear: forget it. show: what you remember. " +
 			"For the person themselves; only an owner may set it for someone else, with for_member true, for the member whose message they replied to or whom your replied-to answer answered (\"uni Ustoz deb chaqir\").",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["set_name", "siz", "sen", "clear", "show"]},
+				"action": {"type": "string", "enum": ["set_name", "clear", "show"]},
 				"name": {"type": "string", "description": "For set_name: how they asked to be called."},
 				"for_member": {"type": "boolean", "description": "Owners only: true to change the profile of the member the owner replied to."}
 			},
@@ -95,7 +94,7 @@ func changeProfile(ctx context.Context, opts ProfileOptions, raw json.RawMessage
 	note := profileSavedNote
 	switch args.Action {
 	case "show":
-		return profileResult{Member: member, Profile: profileView{CallName: p.CallName, Siz: p.Siz}, Note: profileShownNote}, nil
+		return profileResult{Member: member, Profile: profileView{CallName: p.CallName}, Note: profileShownNote}, nil
 	case "set_name":
 		name, err := ruleText(args.Name, maxCallNameRunes)
 		if err != nil {
@@ -106,10 +105,6 @@ func changeProfile(ctx context.Context, opts ProfileOptions, raw json.RawMessage
 		}
 		// One line: the name goes into every later turn's header.
 		p.CallName = strings.Join(strings.Fields(name), " ")
-	case "siz":
-		p.Siz = true
-	case "sen":
-		p.Siz = false
 	case "clear":
 		p = storage.UserProfile{UserID: whose}
 		note = profileClearedNote
@@ -119,7 +114,7 @@ func changeProfile(ctx context.Context, opts ProfileOptions, raw json.RawMessage
 	if err := opts.Store.SetProfile(ctx, p); err != nil {
 		return nil, internal(err)
 	}
-	return profileResult{Member: member, Profile: profileView{CallName: p.CallName, Siz: p.Siz}, Note: note}, nil
+	return profileResult{Member: member, Profile: profileView{CallName: p.CallName}, Note: note}, nil
 }
 
 // profileOwner is whose profile a call changes, and that member's name when

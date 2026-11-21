@@ -118,8 +118,8 @@ type ProfileBook interface {
 
 // profileLine tells the model how to talk to the person writing: by the
 // name they or an owner asked for in every chat, unless an owner's own form
-// of address wins, and with "sen" when they swore at the bot; "siz", for
-// everyone else, is the persona's. It is "" when there is nothing to tell.
+// of address wins; "siz", for everyone, is the persona's, even for someone
+// who swore at the bot, as the owners decided on 2026-11-21. It is "" when there is nothing to tell.
 func (s *Service) profileLine(ctx context.Context, in incoming, rules []storage.GroupRule) string {
 	if in.fromBot {
 		return ""
@@ -130,14 +130,8 @@ func (s *Service) profileLine(ctx context.Context, in incoming, rules []storage.
 	if name := s.callName(ctx, in); name != "" && s.addressFor(rules, in) == "" {
 		lines = append(lines, `[In every chat, the person writing is to be called "`+inQuotes(name)+`".]`)
 	}
-	if s.sworeAtBot(ctx, in) {
-		lines = append(lines, senLine)
-	}
 	return strings.Join(lines, "\n")
 }
-
-// senLine tells the model to drop "siz" for someone who swore at it.
-const senLine = `[The person writing swore at you today: speak to them with "sen" ("ты" in Russian), not "siz".]`
 
 // callName is the name the person writing asked to be called, "" when they
 // asked for none or it cannot be read.
@@ -151,20 +145,6 @@ func (s *Service) callName(ctx context.Context, in incoming) string {
 		return ""
 	}
 	return p.CallName
-}
-
-// sworeAtBot reports a person the swear guard caught swearing at the bot in
-// this chat within swearWindow.
-func (s *Service) sworeAtBot(ctx context.Context, in incoming) bool {
-	if s.opts.Strikes == nil || !in.group {
-		return false
-	}
-	n, err := s.opts.Strikes.SwearStrikes(ctx, in.msg.Chat.ID, in.userID, storage.ActionSwearAtBot, s.opts.Now().Add(-swearWindow))
-	if err != nil {
-		s.opts.Logger.Warn("could not count swearing at the bot", "user_id", in.userID, "error", err)
-		return false
-	}
-	return n > 0
 }
 
 // guardLines tell the model what a guard on in the group does without it.
