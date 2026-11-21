@@ -794,6 +794,12 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .opened-grid:has(> .card:nth-child(21)) .card .name { font-size: 9px; left: 5px; right: 5px; bottom: 5px; }
 .opened-grid:has(> .card:nth-child(21)) .card .fresh { font-size: 8px; padding: 1px 4px; }
 .opened-grid .card .name { font-size: 11px; left: 7px; right: 7px; bottom: 7px; text-align: left; }
+/* how many of a card the batch gave, under its count */
+.opened-grid .card .times {
+  position: absolute; top: 28px; right: 6px; z-index: 4; padding: 1px 6px; border-radius: 999px;
+  background: #7dffa8; color: var(--ink); font: 800 10px Unbounded, sans-serif;
+}
+.opened-grid:has(> .card:nth-child(21)) .card .times { top: 22px; font-size: 8px; padding: 1px 4px; }
 .opened-grid .card .fresh {
   position: absolute; top: 6px; right: 6px; z-index: 4; padding: 2px 7px; border-radius: 999px;
   background: var(--gold); color: var(--ink); font: 800 9px Unbounded, sans-serif; letter-spacing: 0.06em;

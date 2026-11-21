@@ -880,9 +880,21 @@
     panel.querySelector(".opened-head b").textContent = title || t.openedN(drawn.length);
     panel.querySelector(".opened-head span").textContent = [fresh ? t.freshN(fresh) : "", drawn.length - fresh ? t.againN(drawn.length - fresh) : ""].filter(Boolean).join(" · ");
     const grid = panel.querySelector(".opened-grid");
+    // a card drawn more than once is laid out once, as the owners asked on
+    // 2026-11-21: its tile shows the copies held after the batch, and +n for
+    // how many the batch gave
+    const merged = new Map();
+    for (const d of drawn) {
+      const seen = merged.get(d.card.id);
+      if (!seen) { merged.set(d.card.id, { card: d.card, fresh: d.fresh, times: 1 }); continue; }
+      seen.times++;
+      seen.fresh = seen.fresh || d.fresh;
+      if ((d.card.count || 0) > (seen.card.count || 0)) seen.card = d.card;
+    }
+    const tiles = [...merged.values()].sort((a, b) => b.card.rarity - a.card.rarity);
     // the tiles are dealt one after another within 2.4 s, however many
-    const deal = Math.min(0.09, 2.4 / drawn.length);
-    [...drawn].sort((a, b) => b.card.rarity - a.card.rarity).forEach(({ card, fresh }, i) => {
+    const deal = Math.min(0.09, 2.4 / tiles.length);
+    tiles.forEach(({ card, fresh, times }, i) => {
       const tile = cardTile(card);
       tile.style.animationDelay = `${i * deal}s`;
       if (fresh) {
@@ -890,6 +902,12 @@
         tag.className = "fresh";
         tag.textContent = t.freshTag;
         tile.append(tag);
+      }
+      if (times > 1) {
+        const got = document.createElement("span");
+        got.className = "times";
+        got.textContent = `+${times}`;
+        tile.append(got);
       }
       grid.append(tile);
     });
@@ -970,9 +988,15 @@
     });
   }
 
-  // celebrateMythics celebrates each Mythic of a draw in turn.
+  // celebrateMythics celebrates each Mythic of a draw in turn, a card drawn
+  // more than once only once, as its batch's panel lays it out once.
   async function celebrateMythics(drawn) {
-    for (const d of drawn) if (d.card.rarity === 4) await celebrate(d.card, d.serial);
+    const seen = new Set();
+    for (const d of drawn) {
+      if (d.card.rarity !== 4 || seen.has(d.card.id)) continue;
+      seen.add(d.card.id);
+      await celebrate(d.card, d.serial);
+    }
   }
 
   // The deck itself is pressed as often as the button: it draws too.
