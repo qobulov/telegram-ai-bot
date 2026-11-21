@@ -42,4 +42,11 @@ func TestWordTop(t *testing.T) {
 	if len(mine) != 1 || mine[0].Words != 120 || mine[0].Messages != 2 {
 		t.Fatalf("own month = %+v", mine)
 	}
+	place, own, err := store.WordPlace(ctx, chat, day.AddDate(0, 0, -6), 1)
+	if err != nil || place != 3 || own.Words != 12 || own.Name != "Ali B" {
+		t.Fatalf("Ali's place = %d %+v %v", place, own, err)
+	}
+	if place, _, err := store.WordPlace(ctx, chat, day.AddDate(0, 0, -6), 42); err != nil || place != 0 {
+		t.Fatalf("a silent member's place = %d %v", place, err)
+	}
 }

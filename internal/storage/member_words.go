@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -51,4 +52,26 @@ func (s *Store) WordTop(ctx context.Context, chatID int64, since time.Time, user
 		return nil, fmt.Errorf("storage: word top: %w", err)
 	}
 	return top, nil
+}
+
+// WordPlace is a member's place among a group's writers from day since on,
+// counted as WordTop orders them, with their count; place 0 when they wrote
+// nothing then.
+func (s *Store) WordPlace(ctx context.Context, chatID int64, since time.Time, user int64) (int, WordCount, error) {
+	var place int
+	c := WordCount{UserID: user}
+	err := s.pool.QueryRow(ctx, `
+		SELECT place, name, words, messages FROM (
+			SELECT user_id, (array_agg(name ORDER BY day DESC))[1] AS name, sum(words)::int AS words, sum(messages)::int AS messages,
+				row_number() OVER (ORDER BY sum(words) DESC, sum(messages) DESC, user_id)::int AS place
+			FROM member_words WHERE chat_id = $1 AND day >= $2 GROUP BY user_id
+		) t WHERE user_id = $3`,
+		chatID, since.Format(time.DateOnly), user).Scan(&place, &c.Name, &c.Words, &c.Messages)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, c, nil
+	}
+	if err != nil {
+		return 0, c, fmt.Errorf("storage: word place: %w", err)
+	}
+	return place, c, nil
 }

@@ -31,10 +31,17 @@ func (f *fakeWordBook) WordTop(_ context.Context, _ int64, since time.Time, user
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.since, f.user = since, user
-	if user != 0 {
-		return []storage.WordCount{{UserID: user, Name: "Vali", Words: 1234, Messages: 56}}, nil
-	}
 	return []storage.WordCount{{UserID: 1, Name: "Ali", Words: 12345, Messages: 600}, {UserID: 2, Name: "Vali", Words: 1234, Messages: 56}}, nil
+}
+
+func (f *fakeWordBook) WordPlace(_ context.Context, _ int64, _ time.Time, user int64) (int, storage.WordCount, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.user = user
+	if user == 2 {
+		return 2, storage.WordCount{UserID: 2, Name: "Vali", Words: 1234}, nil
+	}
+	return 76, storage.WordCount{UserID: user, Name: "Sam", Words: 692}, nil
 }
 
 // A member's message is counted by its words; a bot's is not.
@@ -52,8 +59,9 @@ func TestWordsAreCounted(t *testing.T) {
 	}
 }
 
-// /words lists the last 7 days, with buttons for 30 days and the presser's
-// own count; in private it says it works in a group.
+// /words lists the top 10 of the last 7 days, the asker's own place under
+// it when they are not in it, and the chat, with buttons for 7 and 30 days;
+// in private it says it works in a group.
 func TestWordTable(t *testing.T) {
 	f := newFixture()
 	book, buttons := &fakeWordBook{}, &fakeButtons{}
@@ -61,36 +69,35 @@ func TestWordTable(t *testing.T) {
 	now := time.Date(2026, 11, 21, 15, 0, 0, 0, f.opts.Location)
 	f.opts.Now = func() time.Time { return now }
 
-	sent := f.run(inGroup(groupMessage("/words")))
+	asked := groupMessage("/words")
+	asked.Chat.Username = "tovbotn"
+	asked.From = &telegram.User{ID: 501, FirstName: "Sam"}
+	sent := f.run(inGroup(asked))
 	last := sent[len(sent)-1]
-	if !strings.Contains(last.text, "1. Ali — 12 345 so'z (600 xabar)") || !strings.Contains(last.text, "oxirgi 7 kun") {
-		t.Fatalf("table = %q", last.text)
+	for _, want := range []string{"Top-10", "oxirgi 7 kun", "1. Ali — 12 345 so'z", "2. Vali — 1 234 so'z", "---------------------\n76. Sam — 692 so'z", "Chat: @tovbotn"} {
+		if !strings.Contains(last.text, want) {
+			t.Fatalf("table = %q, want %q in it", last.text, want)
+		}
 	}
 	today := startOfDay(f.opts.Now(), f.opts.Location)
 	if days := int(today.Sub(book.since).Hours()/24 + 0.5); days != 6 {
 		t.Errorf("7 days start %d days back", days)
 	}
 	menu := last.buttons
-	if len(menu) != 1 || len(menu[0]) != 3 || menu[0][0].Text != "✅ 7 kun" || menu[0][1].Data != "wrd:month" || menu[0][2].Data != "wrd:me" {
+	if len(menu) != 1 || len(menu[0]) != 2 || menu[0][0].Text != "✅ 7 kun" || menu[0][1].Data != "wrd:month" {
 		t.Fatalf("buttons = %+v", menu)
 	}
-	press := func(id int64, data string, from int64) telegram.Update {
-		return telegram.Update{UpdateID: 990 + id, CallbackQuery: &telegram.CallbackQuery{
-			ID: fmt.Sprint(id), From: &telegram.User{ID: from, FirstName: "Vali"}, Data: data,
-			Message: &telegram.Message{MessageID: 77, Chat: telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup}},
-		}}
-	}
-	f.run(press(1, "wrd:month", 9))
-	if len(buttons.edits) != 1 || !strings.Contains(buttons.edits[0], "oxirgi 30 kun") || buttons.menus[0][0][1].Text != "✅ 30 kun" {
+	// Vali, in the top, gets no line of their own under it.
+	f.run(telegram.Update{UpdateID: 991, CallbackQuery: &telegram.CallbackQuery{
+		ID: "1", From: &telegram.User{ID: 2, FirstName: "Vali"}, Data: "wrd:month",
+		Message: &telegram.Message{MessageID: 77, Chat: telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup, Title: "Guruh"}},
+	}})
+	if len(buttons.edits) != 1 || !strings.Contains(buttons.edits[0], "oxirgi 30 kun") || strings.Contains(buttons.edits[0], "-----") ||
+		!strings.Contains(buttons.edits[0], "Chat: Guruh") || buttons.menus[0][0][1].Text != "✅ 30 kun" {
 		t.Fatalf("month press: edits %q, menus %+v", buttons.edits, buttons.menus)
 	}
 	if days := int(today.Sub(book.since).Hours()/24 + 0.5); days != 29 {
 		t.Errorf("30 days start %d days back", days)
-	}
-	f.run(press(2, "wrd:me", 2))
-	answer := buttons.answers[len(buttons.answers)-1]
-	if !answer.alert || !strings.Contains(answer.text, "7 kun: 1 234 so'z, 56 xabar") || book.user != 2 || len(buttons.edits) != 1 {
-		t.Errorf("own press = %+v (user %d), edits %d", answer, book.user, len(buttons.edits))
 	}
 	if sent := f.run(textFrom(userID, "/words")); !strings.Contains(sent[len(sent)-1].text, "guruhda") {
 		t.Errorf("in private = %+v", sent[len(sent)-1])
