@@ -164,12 +164,14 @@ func pityView(sinceLegendary, sinceMythic int) map[string]any {
 // and the Four Knights' Lancelot and Tristan, whom they made Mythic too
 // (migration 101), Escanor, whom they made Mythic (migration 108), and
 // Record of Ragnarok's Qin Shi Huang (migration 109), and Solo Leveling's
-// Sung Jinwoo (migration 113).
+// Sung Jinwoo (migration 113), and One Piece's Joy Boy and Imu (migration
+// 129).
 var mythicIDs = map[int64]bool{
 	246: true, 17: true, 40: true, 5: true, 40882: true, 11: true, 80: true, 126071: true, 73935: true, 30: true,
 	417: true, 1: true, 422: true, 4003: true, 72921: true, 127691: true,
 	40881: true, 126824: true, 176754: true, 137080: true, 127518: true, 88572: true, 34470: true, 90169: true, 124381: true, 127222: true,
 	298761: true, 265209: true, 249281: true, 90202: true, 203633: true, 129928: true,
+	341936: true, 128130: true,
 }
 
 // legendaryIDs are the Legendary cards': the leads' legendary rivals and
