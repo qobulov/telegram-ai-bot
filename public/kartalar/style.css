@@ -899,6 +899,13 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
   box-shadow: 0 10px 30px color-mix(in srgb, var(--sakura) 18%, transparent);
 }
 .event[hidden] { display: none; }
+.events { display: grid; gap: 14px; }
+.events:empty { display: none; }
+/* an event of several cards shows them in a row of three above the rest;
+   Demon Slayer's is crimson */
+.event.many { grid-template-columns: 1fr; }
+.event.many .event-art { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.event[data-key="demon-slayer"], .event-banner[data-key="demon-slayer"] { --sakura: #ff5a6e; }
 .event-banner {
   --sakura: #ff9ec7;
   display: grid; grid-template-columns: 56px 1fr auto; align-items: center; gap: 12px; width: calc(100% - 32px); margin: 0 16px 12px;

@@ -42,11 +42,12 @@ func Franchise(anime string) string {
 }
 
 // AnimeCards is the IDs of anime's cards that its collection needs: the
-// catalog's cards of that franchise, limited ones left out.
+// catalog's cards of that franchise, those only an event gives (limited or
+// not) left out, as no draw gives them.
 func AnimeCards(catalog []storage.Card, anime string) []int64 {
 	var ids []int64
 	for _, c := range catalog {
-		if !storage.CardLimited(c.ID) && Franchise(c.Anime) == anime {
+		if !storage.CardLimited(c.ID) && !storage.CardEventOnly(c.ID) && Franchise(c.Anime) == anime {
 			ids = append(ids, c.ID)
 		}
 	}

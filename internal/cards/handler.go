@@ -36,7 +36,7 @@ type Store interface {
 	OpenCardPack(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, price int, now time.Time, quest storage.CardQuest) (storage.CardOpening, error)
 	FuseCard(ctx context.Context, userID, cardID int64, cost []int, quest storage.CardQuest) (stars int, err error)
 	OpenEventCards(ctx context.Context, userID int64, name string, n int, ev storage.CardEvent, day storage.CardDay, now time.Time, quest storage.CardQuest) (storage.EventOpening, error)
-	CardEventPulls(ctx context.Context, userID, card int64) (int, storage.Card, error)
+	CardEventPulls(ctx context.Context, userID int64, key string, cards []int64) (int, []storage.Card, error)
 	SaveArenaTeam(ctx context.Context, userID int64, front [2]int64, back [3]int64, power int) error
 	ArenaTeam(ctx context.Context, userID int64) (front [2]int64, back [3]int64, ok bool, err error)
 	ArenaPlayerOf(ctx context.Context, userID int64, rules storage.ArenaRules) (storage.ArenaPlayer, error)
@@ -84,7 +84,7 @@ type Options struct {
 	// Invoices sells crystals for Stars; nil sells none.
 	Invoices Invoices
 	// EventRoll draws an event pull's rarity, and EventPick whether its
-	// Mythic is the event's card; nil draws by the event's odds.
+	// Mythic is one of the event's cards; nil draws by the event's odds.
 	EventRoll func() Rarity
 	EventPick func() bool
 	// BoxRoll draws a box's prize, 0 to n-1; nil is math/rand.
@@ -150,8 +150,10 @@ type request struct {
 	// Card; without Rarity it searches the whole catalog by Query.
 	Rarity *int `json:"rarity"`
 	Offset int  `json:"offset"`
-	// Count is how many cards "open" opens: 1 or Batch.
-	Count int `json:"count"`
+	// Count is how many cards "open" opens: 1 or Batch, or "event_open" of
+	// the event Event names, by its key.
+	Count int    `json:"count"`
+	Event string `json:"event"`
 	// Shown is the opponents the arena shows now, for "arena": a refresh
 	// offers others while there are.
 	Shown []int64 `json:"shown"`
@@ -211,10 +213,10 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 	switch req.Action {
 	case "state":
 		return h.state(ctx, opened.User)
-	case "event":
-		return h.eventView(ctx, opened.User)
+	case "events":
+		return h.events(ctx, opened.User)
 	case "event_open":
-		return h.eventOpen(ctx, opened.User, req.Count)
+		return h.eventOpen(ctx, opened.User, req.Event, req.Count)
 	case "shop":
 		return map[string]any{"items": ShopItems, "packs": CrystalPacks, "stars": h.Invoices != nil}, failure{}
 	case "buy":

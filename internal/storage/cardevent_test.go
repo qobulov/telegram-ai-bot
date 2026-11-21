@@ -39,7 +39,7 @@ func TestCardEventPulls(t *testing.T) {
 	end := time.Date(2026, 12, 2, 0, 0, 0, 0, time.UTC)
 	now := end.Add(-time.Hour)
 	never := func() bool { return false }
-	ev := CardEvent{Card: satoko, Ends: end, Pity: 200, Price: 1, Roll: rarity(0), Pick: never}
+	ev := CardEvent{Key: fireflyEvent, Cards: []int64{satoko}, Once: true, Ends: end, Pity: 200, Price: 1, Roll: rarity(0), Pick: never}
 
 	setTokens(5)
 	var few *CardTokensError
@@ -94,10 +94,10 @@ func TestCardEventPulls(t *testing.T) {
 	if err := store.pool.QueryRow(ctx, `SELECT event_pulls, draws FROM card_players WHERE user_id = $1`, player).Scan(&pulls, &draws); err != nil || pulls != 0 || draws != 211 {
 		t.Fatalf("event_pulls = %d, draws = %d, %v", pulls, draws, err)
 	}
-	if got, card, err := store.CardEventPulls(ctx, player, satoko); err != nil || got != 0 || card.Name != "Satoko Kirigaya" {
-		t.Fatalf("CardEventPulls = %d %+v %v", got, card, err)
+	if got, cards, err := store.CardEventPulls(ctx, player, fireflyEvent, []int64{satoko}); err != nil || got != 0 || len(cards) != 1 || cards[0].Name != "Satoko Kirigaya" {
+		t.Fatalf("CardEventPulls = %d %+v %v", got, cards, err)
 	}
-	if got, _, err := store.CardEventPulls(ctx, 999, satoko); err != nil || got != 0 {
+	if got, _, err := store.CardEventPulls(ctx, 999, fireflyEvent, []int64{satoko}); err != nil || got != 0 {
 		t.Fatalf("a newcomer's pulls = %d %v", got, err)
 	}
 }
@@ -125,7 +125,7 @@ func TestTheLimitedCardOncePerPlayer(t *testing.T) {
 		t.Fatal(err)
 	}
 	end := time.Date(2026, 12, 2, 0, 0, 0, 0, time.UTC)
-	ev := CardEvent{Card: satoko, Ends: end, Pity: 200, Price: 1, Roll: rarity(4), Pick: func() bool { return true }}
+	ev := CardEvent{Key: fireflyEvent, Cards: []int64{satoko}, Once: true, Ends: end, Pity: 200, Price: 1, Roll: rarity(4), Pick: func() bool { return true }}
 	open, err := store.OpenEventCards(ctx, player, "Ann", 10, ev, CardDay{}, end.Add(-time.Hour), CardQuest{})
 	if err != nil {
 		t.Fatal(err)

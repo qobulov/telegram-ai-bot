@@ -46,11 +46,6 @@ func DayStart(now time.Time) time.Time {
 	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, Location)
 }
 
-// eventRuns is whether the event is open at now.
-func eventRuns(now time.Time) bool {
-	return !now.Before(EventStarts) && now.Before(EventEnds)
-}
-
 // Quests are the day's quests at now, in the order the app lists them.
 func Quests(now time.Time) []Quest {
 	last := Quest{QuestMarket, QuestMarketTarget, QuestMarketReward}

@@ -1786,144 +1786,196 @@
     }, 1500);
   }
 
-  // ---------- event ----------
+  // ---------- events ----------
 
-  // The Firefly Wedding event: pulls for tokens at the top of the shop,
-  // at the usual odds, 0.4% of them Satoko, the 300th pull
-  // without her sure to give her. The server says whether it runs.
+  // The events: pulls for tokens at the top of the shop, at the usual odds,
+  // a share of the Mythics the event's own cards, a sure one after so many
+  // pulls in a row without. The server lists those running or coming, the
+  // newest last: the Firefly Wedding's limited Satoko and Demon Slayer's six
+  // Mythics, which nothing else gives.
   const eventTexts = {
     uz: {
-      title: "🌸 Firefly Wedding", tag: "EVENT · LIMITED",
       left: (d, h, m) => (d ? `⏳ ${d} kun ${h} soat qoldi` : h ? `⏳ ${h} soat ${m} daqiqa qoldi` : `⏳ ${m} daqiqa qoldi`),
-      odds: (m, s) => `👑 Mifik ${m} · 🌸 Satoko ${s}`, pity: (n, max) => `Satoko kafolati: ${n}/${max}`, owned: "✅ Satoko sizda bor — har kim faqat bir marta oladi",
-      open: (n, price) => `${n * price} 🎟`, short: (n) => `🎟 Yana ${n} ta token kerak`, over: "🌸 Event tugadi", starts: (h, m) => (h ? `⏳ ${h} soat ${m} daqiqadan keyin boshlanadi` : `⏳ ${m} daqiqadan keyin boshlanadi`), soon: "🌸 Event hali boshlanmadi",
-      pulled: (n) => `🌸 ${n} ta event karta`, got: "🌸 Satoko Kirigaya tushdi!", badge: "🌸 EVENT", go: "Ochish ›",
+      odds: (m, icon, name, s) => `👑 Mifik ${m} · ${icon} ${name} ${s}`, pity: (name, n, max) => `${name} kafolati: ${n}/${max}`,
+      open: (n, price) => `${n * price} 🎟`, short: (n) => `🎟 Yana ${n} ta token kerak`, over: "Event tugadi", starts: (h, m) => (h ? `⏳ ${h} soat ${m} daqiqadan keyin boshlanadi` : `⏳ ${m} daqiqadan keyin boshlanadi`), soon: "Event hali boshlanmadi",
+      pulled: (icon, n) => `${icon} ${n} ta event karta`, got: (icon, name) => `${icon} ${name} tushdi!`, badge: (icon) => `${icon} EVENT`, go: "Ochish ›",
+      firefly: { icon: "🌸", title: "🌸 Firefly Wedding", tag: "EVENT · LIMITED", name: "Satoko", owned: "✅ Satoko sizda bor — har kim faqat bir marta oladi" },
+      "demon-slayer": { icon: "⚔️", title: "⚔️ Demon Slayer", tag: "EVENT · 6 MIF", name: "Demon Slayer" },
     },
     ru: {
-      title: "🌸 Firefly Wedding", tag: "ИВЕНТ · LIMITED",
       left: (d, h, m) => (d ? `⏳ Осталось ${d} дн. ${h} ч.` : h ? `⏳ Осталось ${h} ч. ${m} мин.` : `⏳ Осталось ${m} мин.`),
-      odds: (m, s) => `👑 Мифическая ${m} · 🌸 Сатоко ${s}`, pity: (n, max) => `Гарант Сатоко: ${n}/${max}`, owned: "✅ Сатоко уже у вас — её можно получить только один раз",
-      open: (n, price) => `${n * price} 🎟`, short: (n) => `🎟 Нужно ещё ${n} токенов`, over: "🌸 Ивент закончился", starts: (h, m) => (h ? `⏳ Начнётся через ${h} ч. ${m} мин.` : `⏳ Начнётся через ${m} мин.`), soon: "🌸 Ивент ещё не начался",
-      pulled: (n) => `🌸 Ивент-карты: ${n}`, got: "🌸 Выпала Сатоко Киригая!", badge: "🌸 ИВЕНТ", go: "Открыть ›",
+      odds: (m, icon, name, s) => `👑 Мифическая ${m} · ${icon} ${name} ${s}`, pity: (name, n, max) => `Гарант ${name}: ${n}/${max}`,
+      open: (n, price) => `${n * price} 🎟`, short: (n) => `🎟 Нужно ещё ${n} токенов`, over: "Ивент закончился", starts: (h, m) => (h ? `⏳ Начнётся через ${h} ч. ${m} мин.` : `⏳ Начнётся через ${m} мин.`), soon: "Ивент ещё не начался",
+      pulled: (icon, n) => `${icon} Ивент-карты: ${n}`, got: (icon, name) => `${icon} Выпал(а) ${name}!`, badge: (icon) => `${icon} ИВЕНТ`, go: "Открыть ›",
+      firefly: { icon: "🌸", title: "🌸 Firefly Wedding", tag: "ИВЕНТ · LIMITED", name: "Сатоко", owned: "✅ Сатоко уже у вас — её можно получить только один раз" },
+      "demon-slayer": { icon: "⚔️", title: "⚔️ Demon Slayer", tag: "ИВЕНТ · 6 МИФ", name: "Demon Slayer" },
     },
     en: {
-      title: "🌸 Firefly Wedding", tag: "EVENT · LIMITED",
       left: (d, h, m) => (d ? `⏳ ${d} days ${h} hours left` : h ? `⏳ ${h} hours ${m} minutes left` : `⏳ ${m} minutes left`),
-      odds: (m, s) => `👑 Mythic ${m} · 🌸 Satoko ${s}`, pity: (n, max) => `Satoko guarantee: ${n}/${max}`, owned: "✅ You have Satoko — each player gets her once",
-      open: (n, price) => `${n * price} 🎟`, short: (n) => `🎟 ${n} more tokens needed`, over: "🌸 The event is over", starts: (h, m) => (h ? `⏳ Starts in ${h} hours ${m} minutes` : `⏳ Starts in ${m} minutes`), soon: "🌸 The event has not started yet",
-      pulled: (n) => `🌸 ${n} event cards`, got: "🌸 Satoko Kirigaya dropped!", badge: "🌸 EVENT", go: "Open ›",
+      odds: (m, icon, name, s) => `👑 Mythic ${m} · ${icon} ${name} ${s}`, pity: (name, n, max) => `${name} guarantee: ${n}/${max}`,
+      open: (n, price) => `${n * price} 🎟`, short: (n) => `🎟 ${n} more tokens needed`, over: "The event is over", starts: (h, m) => (h ? `⏳ Starts in ${h} hours ${m} minutes` : `⏳ Starts in ${m} minutes`), soon: "The event has not started yet",
+      pulled: (icon, n) => `${icon} ${n} event cards`, got: (icon, name) => `${icon} ${name} dropped!`, badge: (icon) => `${icon} EVENT`, go: "Open ›",
+      firefly: { icon: "🌸", title: "🌸 Firefly Wedding", tag: "EVENT · LIMITED", name: "Satoko", owned: "✅ You have Satoko — each player gets her once" },
+      "demon-slayer": { icon: "⚔️", title: "⚔️ Demon Slayer", tag: "EVENT · 6 MYTHIC", name: "Demon Slayer" },
     },
   };
   const et = eventTexts[language] || eventTexts.uz;
-  let eventData = null, eventEndsAt = 0, eventStartsAt = 0, pulling = false;
+  let events = [], pulling = false, bannerKey = "";
 
-  // eventMark shows the event's badge on the crystals' pill, which opens
-  // the shop, while the event runs, so that players notice it.
-  $("eventBadge").textContent = et.badge;
+  // eventFace is an event's own texts.
+  const eventFace = (ev) => et[ev.key] || et.firefly;
+
+  // eventsShown are the events running or coming, the newest last.
+  const eventsShown = () => events.filter((ev) => ev.active || ev.soon);
+
+  // eventMark shows the newest event's badge on the crystals' pill, which
+  // opens the shop, while any runs or is coming, so that players notice it.
   function eventMark() {
-    $("eventBadge").hidden = !(eventData && (eventData.active || eventData.soon));
+    const shown = eventsShown();
+    const last = shown[shown.length - 1];
+    $("eventBadge").hidden = !last;
+    if (last) $("eventBadge").textContent = et.badge(eventFace(last).icon);
     eventBanner();
   }
 
-  // eventBanner shows the event at the top of the first pages, the
+  // eventBanner shows the newest event at the top of the first pages, the
   // collection and the draw, while it runs or is coming; a tap opens the
-  // shop at the event.
-  $("eventBannerTag").textContent = et.tag;
-  $("eventBannerTitle").textContent = et.title;
+  // shop at it.
   $("eventBannerGo").textContent = et.go;
   function eventBanner() {
-    const on = !!(eventData && (eventData.active || eventData.soon)) && (opened === "collection" || opened === "draw");
+    const shown = eventsShown();
+    const ev = shown[shown.length - 1];
+    const on = !!ev && (opened === "collection" || opened === "draw");
     $("eventBanner").hidden = !on;
     if (!on) return;
-    const image = eventData.card && eventData.card.image;
+    const face = eventFace(ev);
+    bannerKey = ev.key;
+    $("eventBanner").dataset.key = ev.key;
+    $("eventBannerTag").textContent = face.tag;
+    $("eventBannerTitle").textContent = face.title;
+    const image = ev.cards[0] && ev.cards[0].image;
     if (image && $("eventBannerArt").dataset.src !== image) {
       $("eventBannerArt").dataset.src = image;
       picture($("eventBannerArt"), image, true);
     }
-    $("eventBannerLeft").textContent = $("eventEnds").textContent;
+    $("eventBannerLeft").textContent = ev.box.querySelector(".event-ends").textContent;
   }
   $("eventBanner").addEventListener("click", () => {
     haptic("light");
     showTab("shop");
-    setTimeout(() => $("event").scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+    setTimeout(() => {
+      const box = $("events").querySelector(`[data-key="${bannerKey}"]`);
+      if (box) box.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 300);
   });
 
-  // eventBlock asks for the event and shows it while it runs; the app asks
-  // once it has loaded, for the badge, and again whenever the shop opens.
+  // eventBlock asks for the events and shows each while it runs or is
+  // coming; the app asks once it has loaded, for the badge, and again
+  // whenever the shop opens.
   async function eventBlock() {
+    let data;
     try {
-      eventData = await api("event");
+      data = await api("events");
     } catch (_) {
-      $("event").hidden = true;
       return;
     }
-    eventEndsAt = Date.now() + (eventData.ends_in || 0);
-    eventStartsAt = Date.now() + (eventData.starts_in || 0);
-    $("event").hidden = !(eventData.active || eventData.soon);
-    eventMark();
-    if (!eventData.active && !eventData.soon) return;
-    const tile = previewTile(eventData.card, 1, eventData.owned ? 1 : 0);
-    const mark = tile.querySelector(".owned");
-    if (mark) mark.remove();
-    $("eventArt").replaceChildren(tile);
-    $("eventTag").textContent = et.tag;
-    $("eventTitle").textContent = et.title;
-    const percent = (n) => `${n / 10}%`;
-    const mythic = eventData.odds[4];
-    $("eventOdds").textContent = et.odds(percent(mythic), percent(mythic * eventData.share));
-    eventPity();
+    const now = Date.now();
+    events = (data.events || []).map((ev) => ({ ...ev, endsAt: now + (ev.ends_in || 0), startsAt: now + (ev.starts_in || 0) }));
+    $("events").replaceChildren(...events.map(eventSection));
     eventLeft();
+    eventMark();
   }
 
-  function eventPity() {
-    $("eventPity").textContent = eventData.owned ? et.owned : et.pity(eventData.pity, eventData.pity_max);
-    $("eventPityBar").style.width = eventData.owned ? "100%" : `${Math.min(100, (eventData.pity / eventData.pity_max) * 100)}%`;
-    for (const [id, n] of [["eventOpen1", 1], ["eventOpen10", eventData.batch]]) {
-      $(id).textContent = et.open(n, eventData.price);
-      $(id).disabled = pulling || !eventData.active;
+  // eventSection is an event's block in the shop, from the template.
+  function eventSection(ev) {
+    const face = eventFace(ev);
+    const box = $("eventTemplate").content.firstElementChild.cloneNode(true);
+    box.dataset.key = ev.key;
+    box.classList.toggle("many", ev.cards.length > 1);
+    box.hidden = !(ev.active || ev.soon);
+    ev.box = box;
+    eventArt(ev);
+    box.querySelector(".event-tag").textContent = face.tag;
+    box.querySelector(".event-title").textContent = face.title;
+    const percent = (n) => `${n / 10}%`;
+    const mythic = ev.odds[4];
+    box.querySelector(".event-odds").textContent = et.odds(percent(mythic), face.icon, face.name, percent(mythic * ev.share));
+    box.querySelector(".event-one").addEventListener("click", () => eventPull(ev, 1));
+    box.querySelector(".event-batch").addEventListener("click", () => eventPull(ev, ev.batch));
+    eventPity(ev);
+    return box;
+  }
+
+  // eventArt draws an event's cards in full; of several, those the player
+  // holds keep their tick.
+  function eventArt(ev) {
+    const tiles = ev.cards.map((card) => {
+      const tile = previewTile(card, 1, ev.once ? (ev.owned ? 1 : 0) : card.count);
+      const mark = tile.querySelector(".owned");
+      if (mark && (ev.once || !card.count)) mark.remove();
+      return tile;
+    });
+    ev.box.querySelector(".event-art").replaceChildren(...tiles);
+  }
+
+  function eventPity(ev) {
+    const face = eventFace(ev);
+    ev.box.querySelector(".event-pity-text").textContent = ev.owned ? face.owned : et.pity(face.name, ev.pity, ev.pity_max);
+    ev.box.querySelector(".event-pity-bar").style.width = ev.owned ? "100%" : `${Math.min(100, (ev.pity / ev.pity_max) * 100)}%`;
+    for (const [part, n] of [[".event-one", 1], [".event-batch", ev.batch]]) {
+      const button = ev.box.querySelector(part);
+      button.textContent = et.open(n, ev.price);
+      button.disabled = pulling || !ev.active;
     }
   }
 
-  // eventLeft counts down to the event's end, and hides it then.
+  // eventLeft counts down to each event's start or end, and hides one that
+  // has ended.
   function eventLeft() {
-    if (!eventData) return;
-    if (eventData.soon) {
-      const wait = eventStartsAt - Date.now();
-      if (wait <= 0) { eventBlock(); return; }
-      const m = Math.ceil(wait / 60000);
-      $("eventEnds").textContent = et.starts(Math.floor(m / 60), m % 60);
-      return;
+    for (const ev of events) {
+      const ends = ev.box.querySelector(".event-ends");
+      if (ev.soon) {
+        const wait = ev.startsAt - Date.now();
+        if (wait <= 0) { eventBlock(); return; }
+        const m = Math.ceil(wait / 60000);
+        ends.textContent = et.starts(Math.floor(m / 60), m % 60);
+        continue;
+      }
+      if (!ev.active) continue;
+      const left = ev.endsAt - Date.now();
+      if (left <= 0) { ev.box.hidden = true; ev.active = false; eventMark(); continue; }
+      const minutes = Math.floor(left / 60000);
+      ends.textContent = et.left(Math.floor(minutes / 1440), Math.floor((minutes % 1440) / 60), minutes % 60);
     }
-    if (!eventData.active) return;
-    const left = eventEndsAt - Date.now();
-    if (left <= 0) { $("event").hidden = true; eventData.active = false; eventMark(); return; }
-    const minutes = Math.floor(left / 60000);
-    $("eventEnds").textContent = et.left(Math.floor(minutes / 1440), Math.floor((minutes % 1440) / 60), minutes % 60);
     eventBanner();
   }
   setInterval(eventLeft, 30000);
 
-  $("eventOpen1").addEventListener("click", () => eventPull(1));
-  $("eventOpen10").addEventListener("click", () => eventPull(eventData ? eventData.batch : 10));
-
-  // eventPull pulls n event cards for tokens, one shown large as a card
-  // opened is, more laid out as a batch is.
-  async function eventPull(n) {
-    if (pulling || !eventData || !eventData.active) return;
-    if (tokens < n * eventData.price) { toast(et.short(n * eventData.price - tokens)); return; }
+  // eventPull pulls n of an event's cards for tokens, one shown large as a
+  // card opened is, more laid out as a batch is.
+  async function eventPull(ev, n) {
+    if (pulling || !ev.active) return;
+    if (tokens < n * ev.price) { toast(et.short(n * ev.price - tokens)); return; }
     pulling = true;
-    eventPity();
+    events.forEach(eventPity);
     haptic("medium");
+    const face = eventFace(ev);
     try {
-      const data = await api("event_open", { count: n });
+      const data = await api("event_open", { event: ev.key, count: n });
       if (data.refused === "soon") { toast(et.soon); return; }
-      if (data.refused === "over") { toast(et.over); $("event").hidden = true; eventData.active = false; eventMark(); return; }
+      if (data.refused === "over") { toast(et.over); ev.box.hidden = true; ev.active = false; eventMark(); return; }
       if (data.refused === "funds") { tokens = data.tokens ?? tokens; toast(et.short(data.short)); return; }
       tokens = data.tokens ?? tokens;
       shards = data.shards ?? shards;
       points = data.points ?? points;
-      eventData.pity = data.pity;
-      if (data.drawn.some((d) => d.card && d.card.id === eventData.card.id)) eventData.owned = true;
+      ev.pity = data.pity;
+      const won = data.drawn.filter((d) => d.event);
+      for (const d of won) {
+        const card = ev.cards.find((c) => c.id === d.card.id);
+        if (card) card.count = d.card.count;
+      }
+      if (ev.once && won.length) ev.owned = true;
+      if (won.length) eventArt(ev);
       if (data.given) toast(t.given(data.given));
       const drawn = data.drawn.map((d) => ({ card: d.card, fresh: d.new, serial: d.serial }));
       for (const { card } of drawn) keep(card);
@@ -1931,7 +1983,7 @@
       shelves();
       await celebrateMythics(drawn);
       if (drawn.length > 1) {
-        openedPanel(drawn, et.pulled(drawn.length));
+        openedPanel(drawn, et.pulled(face.icon, drawn.length));
       } else {
         const { card, fresh } = drawn[0];
         open(card);
@@ -1940,12 +1992,12 @@
         note.replaceChildren(...withTiers(fresh ? `${t.fresh} · ${t.plus(spaced(card.value))}` : `${t.again(copies(card))} · ${t.noPoints}`));
         $("sheetCard").prepend(note);
       }
-      if (drawn.some((d) => d.card.id === eventData.card.id)) { haptic("heavy"); toast(et.got); }
+      if (won.length) { haptic("heavy"); toast(et.got(face.icon, won[0].card.name)); }
     } catch (error) {
       notice(error);
     } finally {
       pulling = false;
-      eventPity();
+      events.forEach(eventPity);
       drawButton();
     }
   }

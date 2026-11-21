@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -45,6 +46,18 @@ var limitedCards = map[int64]bool{
 // CardLimited reports whether the card is limited and so never changes
 // hands.
 func CardLimited(id int64) bool { return limitedCards[id] }
+
+// DemonSlayerCards are the Demon Slayer event's Mythics (Giyu, Zenitsu,
+// Kokushibo, Yoriichi, Muzan and Akaza), which only that event gives, as the
+// owners asked on 2026-11-21: no draw, pack or other event does.
+var DemonSlayerCards = []int64{130050, 129131, 141918, 149220, 129132, 141694}
+
+// CardEventOnly reports whether only an event gives the card.
+func CardEventOnly(id int64) bool { return slices.Contains(DemonSlayerCards, id) }
+
+// undrawnCardIDs are the cards no draw gives: the limited ones and those
+// only an event gives.
+func undrawnCardIDs() []int64 { return append(limitedCardIDs(), DemonSlayerCards...) }
 
 // limitedCardIDs are the limited cards' IDs, for a query to leave them out.
 func limitedCardIDs() []int64 {

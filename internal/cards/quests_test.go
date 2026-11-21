@@ -106,7 +106,7 @@ func weakCards() []storage.OwnedCard {
 // draw and in a shop pack, an arena win as the attacker, a star raised and
 // event pulls, a 5x pull counting 5; progress stops at the target.
 func TestQuestsCountTheirActions(t *testing.T) {
-	now := EventEnds.Add(-50 * time.Hour)
+	now := firefly.Ends.Add(-50 * time.Hour)
 	store := &eventStore{fakeStore: &fakeStore{day: PeriodStart(now), tokens: 20, shards: 500,
 		arena: fakeArena{held: map[int64][]storage.OwnedCard{7: arenaCards(), 8: weakCards()}}}}
 	store.arena.held[7] = append(store.arena.held[7], storage.OwnedCard{Card: heldCard, Count: 2, Stars: 1})
@@ -162,7 +162,7 @@ func TestQuestsCountTheirActions(t *testing.T) {
 	}
 
 	call(7, map[string]any{"action": "fuse", "card": heldCard.ID})
-	call(7, map[string]any{"action": "event_open", "count": EventBatch})
+	call(7, map[string]any{"action": "event_open", "event": "firefly", "count": firefly.Batch})
 	out = call(7, map[string]any{"action": "quests"})
 	if got := progressOf(t, out); got["open"] != 5 || got["arena"] != 1 || got["fuse"] != 1 || got["event"] != 1 {
 		t.Errorf("after every action = %v", got)
@@ -179,7 +179,7 @@ func TestQuestsCountTheirActions(t *testing.T) {
 // nothing; once it has ended it is a market trade, counted for both players,
 // and pulls are refused.
 func TestQuestsTurnToTheMarketWhenTheEventEnds(t *testing.T) {
-	now := EventEnds.Add(-time.Minute)
+	now := firefly.Ends.Add(-time.Minute)
 	store := &eventStore{fakeStore: &fakeStore{day: PeriodStart(now), tokens: 5}}
 	call := questCaller(store, &now)
 	ids := func(user int64) []string {
@@ -201,7 +201,7 @@ func TestQuestsTurnToTheMarketWhenTheEventEnds(t *testing.T) {
 		t.Errorf("claiming the market quest while the event runs = %v", out)
 	}
 
-	now = EventEnds
+	now = firefly.Ends
 	if got := strings.Join(ids(7), ","); got != "open,arena,fuse,market" {
 		t.Errorf("quests after the event = %s", got)
 	}

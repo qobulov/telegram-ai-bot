@@ -191,7 +191,7 @@ func lockCardPlayer(ctx context.Context, tx pgx.Tx, userID int64, name string) (
 // collection or of any when it is "", and counts it as addCard does.
 func giveCard(ctx context.Context, tx pgx.Tx, userID int64, name, collection string, roll CardRoll, player cardPlayerRow) (CardDraw, error) {
 	rarity, guaranteed := roll(player.sinceLegendary, player.sinceMythic)
-	card, err := randomCard(ctx, tx, rarity, collection, 0)
+	card, err := randomCard(ctx, tx, rarity, collection, nil)
 	if err != nil {
 		return CardDraw{Guaranteed: guaranteed}, err
 	}
@@ -199,14 +199,14 @@ func giveCard(ctx context.Context, tx pgx.Tx, userID int64, name, collection str
 }
 
 // randomCard is a card of rarity at random, of collection or of any when it
-// is "", and never the card but nor a limited card, which only its event
-// gives.
-func randomCard(ctx context.Context, tx pgx.Tx, rarity int, collection string, but int64) (Card, error) {
+// is "", and never one of but nor a card no draw gives (a limited card or
+// one only its event gives).
+func randomCard(ctx context.Context, tx pgx.Tx, rarity int, collection string, but []int64) (Card, error) {
 	var c Card
 	err := tx.QueryRow(ctx, `
 		SELECT id, name, anime, image_url, favourites, rarity, attack, health, value, collection
-		FROM card_catalog WHERE rarity = $1 AND ($2 = '' OR collection = $2) AND id <> $3 AND id <> ALL($4)
-		ORDER BY random() LIMIT 1`, rarity, collection, but, limitedCardIDs()).
+		FROM card_catalog WHERE rarity = $1 AND ($2 = '' OR collection = $2) AND id <> ALL($3::bigint[]) AND id <> ALL($4::bigint[])
+		ORDER BY random() LIMIT 1`, rarity, collection, append([]int64{}, but...), undrawnCardIDs()).
 		Scan(&c.ID, &c.Name, &c.Anime, &c.ImageURL, &c.Favourites, &c.Rarity, &c.Attack, &c.Health, &c.Value, &c.Collection)
 	return c, err
 }

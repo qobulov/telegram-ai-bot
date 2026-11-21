@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -18,18 +19,49 @@ type CardTokensError struct{ Tokens, Need int }
 
 func (e *CardTokensError) Error() string { return "storage: too few tokens" }
 
-// CardEvent is a card offered for a time: each pull costs Price tokens, Roll
-// picks its rarity, and a Mythic is the event's Card when Pick says so, any
-// other Mythic when not. The Pity-th pull in a row without Card gives it.
-// A player holds Card once at most: one who has it gets other cards, the
-// pity no longer counting.
+// CardEvent is cards offered for a time: each pull costs Price tokens, Roll
+// picks its rarity, and a Mythic is one of the event's Cards when Pick says
+// so, any other Mythic when not. The Pity-th pull in a row without one of
+// Cards gives one, of those the player lacks if any; Key names the count.
+// A Once event's card is held once at most: one who has it gets other cards,
+// the pity no longer counting.
 type CardEvent struct {
-	Card  int64
+	Key   string
+	Cards []int64
+	Once  bool
 	Ends  time.Time
 	Pity  int
 	Price int
 	Roll  CardRoll
 	Pick  func() bool
+}
+
+// fireflyEvent is the first event's key: it counts its pulls in
+// card_players.event_pulls, where it began; later events count theirs in
+// card_event_pulls.
+const fireflyEvent = "firefly"
+
+// eventPulls is the player's pulls of the event in a row without its cards.
+func eventPulls(ctx context.Context, tx pgx.Tx, userID int64, key string) (int, error) {
+	var pulls int
+	if key == fireflyEvent {
+		err := tx.QueryRow(ctx, `SELECT coalesce((SELECT event_pulls FROM card_players WHERE user_id = $1), 0)`, userID).Scan(&pulls)
+		return pulls, err
+	}
+	err := tx.QueryRow(ctx, `SELECT coalesce((SELECT pulls FROM card_event_pulls WHERE user_id = $1 AND event = $2), 0)`, userID, key).Scan(&pulls)
+	return pulls, err
+}
+
+// saveEventPulls keeps the player's pulls of the event in a row.
+func saveEventPulls(ctx context.Context, tx pgx.Tx, userID int64, key string, pulls int) error {
+	if key == fireflyEvent {
+		_, err := tx.Exec(ctx, `UPDATE card_players SET event_pulls = $2 WHERE user_id = $1`, userID, pulls)
+		return err
+	}
+	_, err := tx.Exec(ctx, `
+		INSERT INTO card_event_pulls (user_id, event, pulls) VALUES ($1, $2, $3)
+		ON CONFLICT (user_id, event) DO UPDATE SET pulls = $3`, userID, key, pulls)
+	return err
 }
 
 // EventOpening is an opening of event pulls, and the pulls in a row since
@@ -61,14 +93,18 @@ func (s *Store) OpenEventCards(ctx context.Context, userID int64, name string, n
 		if price := n * ev.Price; price > player.tokens {
 			return &CardTokensError{Tokens: player.tokens, Need: price}
 		}
-		var held bool
-		if err := tx.QueryRow(ctx, `
-			SELECT event_pulls, EXISTS (SELECT 1 FROM card_owned WHERE user_id = $1 AND card_id = $2)
-			FROM card_players WHERE user_id = $1`, userID, ev.Card).Scan(&open.Pulls, &held); err != nil {
+		if open.Pulls, err = eventPulls(ctx, tx, userID, ev.Key); err != nil {
 			return err
 		}
+		held := false
+		if ev.Once {
+			if err := tx.QueryRow(ctx, `
+				SELECT EXISTS (SELECT 1 FROM card_owned WHERE user_id = $1 AND card_id = ANY($2))`, userID, ev.Cards).Scan(&held); err != nil {
+				return err
+			}
+		}
 		for range n {
-			card, sure, err := eventCard(ctx, tx, ev, open.Pulls+1, player, held)
+			card, sure, err := eventCard(ctx, tx, userID, ev, open.Pulls+1, player, held)
 			if err != nil {
 				return err
 			}
@@ -78,8 +114,9 @@ func (s *Store) OpenEventCards(ctx context.Context, userID int64, name string, n
 			}
 			open.Draws = append(open.Draws, draw)
 			open.Pulls++
-			if card.ID == ev.Card {
-				held = true
+			if slices.Contains(ev.Cards, card.ID) {
+				open.Pulls = 0
+				held = ev.Once
 			}
 			if held {
 				open.Pulls = 0
@@ -88,9 +125,12 @@ func (s *Store) OpenEventCards(ctx context.Context, userID int64, name string, n
 		if err := countQuest(ctx, tx, userID, quest, n); err != nil {
 			return err
 		}
+		if err := saveEventPulls(ctx, tx, userID, ev.Key, open.Pulls); err != nil {
+			return err
+		}
 		return tx.QueryRow(ctx, `
-			UPDATE card_players SET tokens = tokens - $2, event_pulls = $3, last_draw_at = $4
-			WHERE user_id = $1 RETURNING tokens, shards, points`, userID, n*ev.Price, open.Pulls, now).
+			UPDATE card_players SET tokens = tokens - $2, last_draw_at = $3
+			WHERE user_id = $1 RETURNING tokens, shards, points`, userID, n*ev.Price, now).
 			Scan(&open.Tokens, &open.Shards, &open.Points)
 	})
 	var few *CardTokensError
@@ -104,20 +144,33 @@ func (s *Store) OpenEventCards(ctx context.Context, userID int64, name string, n
 }
 
 // eventCard is the card of an event's pull, the pull-th in a row without
-// the event's card, and whether the pity made it sure; a player who holds
-// the event's card already gets another.
-func eventCard(ctx context.Context, tx pgx.Tx, ev CardEvent, pull int, player cardPlayerRow, held bool) (Card, bool, error) {
+// the event's cards, and whether the pity made it sure; a player who holds a
+// Once event's card already gets another.
+func eventCard(ctx context.Context, tx pgx.Tx, userID int64, ev CardEvent, pull int, player cardPlayerRow, held bool) (Card, bool, error) {
 	if !held && pull >= ev.Pity {
-		c, err := catalogCard(ctx, tx, ev.Card)
+		c, err := pickEventCard(ctx, tx, userID, ev.Cards)
 		return c, true, err
 	}
 	rarity, raised := ev.Roll(player.sinceLegendary, player.sinceMythic)
 	if rarity == mythicRarity && !held && ev.Pick() {
-		c, err := catalogCard(ctx, tx, ev.Card)
+		c, err := pickEventCard(ctx, tx, userID, ev.Cards)
 		return c, raised, err
 	}
-	c, err := randomCard(ctx, tx, rarity, "", ev.Card)
+	c, err := randomCard(ctx, tx, rarity, "", ev.Cards)
 	return c, raised, err
+}
+
+// pickEventCard is one of an event's cards at random, of those the player
+// lacks while there are.
+func pickEventCard(ctx context.Context, tx pgx.Tx, userID int64, cards []int64) (Card, error) {
+	var c Card
+	err := tx.QueryRow(ctx, `
+		SELECT c.id, c.name, c.anime, c.image_url, c.favourites, c.rarity, c.attack, c.health, c.value, c.collection
+		FROM card_catalog c WHERE c.id = ANY($1)
+		ORDER BY EXISTS (SELECT 1 FROM card_owned o WHERE o.user_id = $2 AND o.card_id = c.id AND o.count > 0), random()
+		LIMIT 1`, cards, userID).
+		Scan(&c.ID, &c.Name, &c.Anime, &c.ImageURL, &c.Favourites, &c.Rarity, &c.Attack, &c.Health, &c.Value, &c.Collection)
+	return c, err
 }
 
 // catalogCard is the card of the catalog by its ID.
@@ -130,21 +183,27 @@ func catalogCard(ctx context.Context, tx pgx.Tx, id int64) (Card, error) {
 	return c, err
 }
 
-// CardEventPulls is the player's event pulls in a row since the event's
-// card, and the event's card from the catalog.
-func (s *Store) CardEventPulls(ctx context.Context, userID, card int64) (int, Card, error) {
+// CardEventPulls is the player's pulls of the event key in a row since one
+// of its cards, and its cards from the catalog, in their order.
+func (s *Store) CardEventPulls(ctx context.Context, userID int64, key string, cards []int64) (int, []Card, error) {
 	var pulls int
-	var c Card
+	found := make([]Card, 0, len(cards))
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if err := tx.QueryRow(ctx, `SELECT coalesce((SELECT event_pulls FROM card_players WHERE user_id = $1), 0)`, userID).Scan(&pulls); err != nil {
+		var err error
+		if pulls, err = eventPulls(ctx, tx, userID, key); err != nil {
 			return err
 		}
-		var err error
-		c, err = catalogCard(ctx, tx, card)
-		return err
+		for _, id := range cards {
+			c, err := catalogCard(ctx, tx, id)
+			if err != nil {
+				return err
+			}
+			found = append(found, c)
+		}
+		return nil
 	})
 	if err != nil {
-		return 0, Card{}, fmt.Errorf("storage: read a player's event pulls: %w", err)
+		return 0, nil, fmt.Errorf("storage: read a player's event pulls: %w", err)
 	}
-	return pulls, c, nil
+	return pulls, found, nil
 }

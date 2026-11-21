@@ -127,20 +127,23 @@
 
     <section class="tab" id="tab-shop" hidden>
       <div class="shop">
-        <div class="event" id="event" hidden>
-          <div class="event-art" id="eventArt"></div>
-          <div class="event-info">
-            <span class="event-tag" id="eventTag"></span>
-            <h2 class="event-title" id="eventTitle"></h2>
-            <p class="event-ends" id="eventEnds"></p>
-            <p class="event-odds" id="eventOdds"></p>
-            <div class="event-pity"><span id="eventPity"></span><div class="progress"><i id="eventPityBar"></i></div></div>
+        <div class="events" id="events"></div>
+        <template id="eventTemplate">
+          <div class="event">
+            <div class="event-art"></div>
+            <div class="event-info">
+              <span class="event-tag"></span>
+              <h2 class="event-title"></h2>
+              <p class="event-ends"></p>
+              <p class="event-odds"></p>
+              <div class="event-pity"><span class="event-pity-text"></span><div class="progress"><i class="event-pity-bar"></i></div></div>
+            </div>
+            <div class="event-buttons">
+              <button type="button" class="draw event-one"></button>
+              <button type="button" class="draw event-batch"></button>
+            </div>
           </div>
-          <div class="event-buttons">
-            <button type="button" class="draw" id="eventOpen1"></button>
-            <button type="button" class="draw" id="eventOpen10"></button>
-          </div>
-        </div>
+        </template>
         <div class="shop-block">
           <h2 class="shop-title" data-t="shopBuyTitle"></h2>
           <p class="market-hint" data-t="shopBuyHint"></p>

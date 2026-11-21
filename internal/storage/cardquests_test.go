@@ -67,7 +67,7 @@ func TestQuestsCountWithTheirActions(t *testing.T) {
 		t.Errorf("a refused opening counted %+v", got)
 	}
 
-	ev := CardEvent{Card: 20, Ends: arenaNow.Add(time.Hour), Pity: 1000, Price: 1, Roll: rarity(3), Pick: func() bool { return false }}
+	ev := CardEvent{Key: "test", Cards: []int64{20}, Ends: arenaNow.Add(time.Hour), Pity: 1000, Price: 1, Roll: rarity(3), Pick: func() bool { return false }}
 	if _, err := store.OpenEventCards(ctx, 1, "Alice", 2, ev, CardDay{}, arenaNow, quest("event", 5)); err != nil {
 		t.Fatal(err)
 	}
