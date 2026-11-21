@@ -26,6 +26,7 @@ const (
 		"Misol: /gift @Unbrokeb box 2 Tabriklaymiz!\n" +
 		"@user o'rniga Telegram ID ham bo'ladi."
 	textGiftUnknownUser = "%s topilmadi: bot uni hech bir guruhda ko'rmagan. Telegram ID bilan yozing."
+	textGiftTooMany     = "Bitta /gift bilan eng ko'pi %s yuborsa bo'ladi (adashib qo'shilgan nolga qarshi). Ko'proq kerak bo'lsa, bir necha marta yuboring."
 	textGiftSent        = "📬 %s ga yuborildi: %s.\nIlovada 🎒 → Pochta orqali oladi."
 	textGiftNotNotified = "\n⚠️ Unga xabar yetmadi (botga hali yozmagan), lekin sovg'a pochtasida turibdi."
 	textGiftNotice      = "📬 Sizga sovg'a keldi: %s!\nKartalar ilovasida 🎒 → Pochta: /card"
@@ -44,8 +45,11 @@ func (s *Service) giftCommand(ctx context.Context, in incoming) string {
 	kind := strings.ToLower(fields[2])
 	limit, known := maxGift[kind]
 	amount, err := strconv.Atoi(fields[3])
-	if !known || err != nil || amount < 1 || amount > limit {
+	if !known || err != nil || amount < 1 {
 		return textGiftUsage
+	}
+	if amount > limit {
+		return fmt.Sprintf(textGiftTooMany, giftLabel(kind, limit))
 	}
 	who := fields[1]
 	userID, err := strconv.ParseInt(who, 10, 64)
