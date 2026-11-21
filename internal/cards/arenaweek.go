@@ -10,11 +10,12 @@ import (
 
 // ArenaWeekPrizes are the arena's weekly prizes in card tokens, as the
 // owners asked on 2026-11-19: the top 100 who attacked in the week, Monday
-// to Monday in Tashkent, by rating.
+// to Monday in Tashkent, by rating. The top 3 get more since 2026-11-21, as
+// the owners asked: 100, 75 and 50 tokens with 3, 2 and 1 diamond boxes.
 var ArenaWeekPrizes = []storage.ArenaPrize{
-	{From: 1, To: 1, Tokens: 50},
-	{From: 2, To: 2, Tokens: 40},
-	{From: 3, To: 3, Tokens: 30},
+	{From: 1, To: 1, Tokens: 100, Boxes: 3, Box: arenaWeekBox},
+	{From: 2, To: 2, Tokens: 75, Boxes: 2, Box: arenaWeekBox},
+	{From: 3, To: 3, Tokens: 50, Boxes: 1, Box: arenaWeekBox},
 	{From: 4, To: 10, Tokens: 20},
 	{From: 11, To: 30, Tokens: 15},
 	{From: 31, To: 50, Tokens: 10},
@@ -22,16 +23,16 @@ var ArenaWeekPrizes = []storage.ArenaPrize{
 }
 
 // ArenaEventWeek is the week of the arena's box event, as the owners asked
-// on 2026-11-20: that week alone its top 5 also get diamond boxes, 3 to the
-// first, 2 to the second, 1 each to the third to fifth; the tokens are the
-// week's as ever.
+// on 2026-11-20: that week its top 5 get more diamond boxes, 5 to the first,
+// 3 to the second, 2 to the third and 1 each to the fourth and fifth; the
+// tokens are the week's as ever.
 var ArenaEventWeek = time.Date(2026, 11, 16, 0, 0, 0, 0, Location)
 
 // arenaEventPrizes are ArenaWeekPrizes with the event's boxes.
 var arenaEventPrizes = []storage.ArenaPrize{
-	{From: 1, To: 1, Tokens: 50, Boxes: 3, Box: arenaWeekBox},
-	{From: 2, To: 2, Tokens: 40, Boxes: 2, Box: arenaWeekBox},
-	{From: 3, To: 3, Tokens: 30, Boxes: 1, Box: arenaWeekBox},
+	{From: 1, To: 1, Tokens: 100, Boxes: 5, Box: arenaWeekBox},
+	{From: 2, To: 2, Tokens: 75, Boxes: 3, Box: arenaWeekBox},
+	{From: 3, To: 3, Tokens: 50, Boxes: 2, Box: arenaWeekBox},
 	{From: 4, To: 5, Tokens: 20, Boxes: 1, Box: arenaWeekBox},
 	{From: 6, To: 10, Tokens: 20},
 	{From: 11, To: 30, Tokens: 15},
