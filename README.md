@@ -2084,7 +2084,7 @@ it two), the day starting at midnight
 in Tashkent, owners' too (in a private chat the word "karta" does too); the
 fourth is told the new ones come tomorrow, with no count of the time left
 (`card_players.free_day` and `free_used`, migration 73). The cards are AniList's 1500 most loved
-characters (500 until the players found too many anime missing), fetched the first time a card is drawn, a page asked again after a pause when AniList says it is busy (`internal/cards`, kept in
+characters (500 until the players found too many anime missing), and since 2026-11-21 (migration 122) 414 Common cards more: the next best loved, to rank 1800, and up to three main characters of each popular or 2026 anime that had none, each with a picture of its own; fetched the first time a card is drawn, a page asked again after a pause when AniList says it is busy (`internal/cards`, kept in
 `card_catalog`, migration 52). Its 👑 Mifik and 🔥 Afsonaviy are the
 characters anime fans at large know, not today's votes, chosen by hand in
 `internal/cards` (`mythicIDs`, `legendaryIDs`): the 26 Mifik are 16 men, the
