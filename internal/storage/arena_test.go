@@ -446,3 +446,33 @@ func TestOpponentsWhenFewHaveTeams(t *testing.T) {
 		t.Errorf("a newcomer's opponent = %+v, %v", opponents, err)
 	}
 }
+
+// A player whose rating is frozen keeps it, attacking or defending, won or
+// lost; the opponent's rating moves as before.
+func TestArenaRatingFrozen(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	seedArena(t, store)
+	if _, err := store.pool.Exec(ctx, `
+		INSERT INTO arena_players (user_id, rating_frozen) VALUES (1, true), (2, true)
+		ON CONFLICT (user_id) DO UPDATE SET rating_frozen = true`); err != nil {
+		t.Fatal(err)
+	}
+
+	if out, err := store.RecordArenaBattle(ctx, 1, 3, 1, true, arenaRules, CardQuest{}); err != nil || out.RatingChange != 0 {
+		t.Errorf("a frozen attacker's win = %+v, %v; want change 0", out, err)
+	}
+	if out, err := store.RecordArenaBattle(ctx, 4, 2, 2, true, arenaRules, CardQuest{}); err != nil || out.RatingChange != 16 {
+		t.Errorf("a win over a frozen defender = %+v, %v; want +16", out, err)
+	}
+	alice, _ := store.ArenaPlayerOf(ctx, 1, arenaRules)
+	bob, _ := store.ArenaPlayerOf(ctx, 2, arenaRules)
+	carol, _ := store.ArenaPlayerOf(ctx, 3, arenaRules)
+	dave, _ := store.ArenaPlayerOf(ctx, 4, arenaRules)
+	if alice.Rating != 1000 || alice.Wins != 1 || bob.Rating != 1000 || bob.Losses != 1 {
+		t.Errorf("frozen players moved: Alice %+v, Bob %+v", alice, bob)
+	}
+	if carol.Rating != 984 || dave.Rating != 1016 {
+		t.Errorf("opponents: Carol %d, Dave %d; want 984 and 1016", carol.Rating, dave.Rating)
+	}
+}

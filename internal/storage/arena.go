@@ -272,12 +272,14 @@ func scanArenaPlayers(rows pgx.Rows) ([]ArenaPlayer, error) {
 type arenaRow struct {
 	rating, tickets, tokensWon int
 	ticketsAt                  *time.Time
+	frozen                     bool
 }
 
 // RecordArenaBattle records the attacker's battle against the defender, in
 // one transaction with both players' rows locked, the lower ID first: it
 // takes one of the attacker's tickets, ErrArenaNoTickets with none, moves
-// the ratings by Elo (arenaElo: a defender who holds gets +0), gives the attacker a token for a
+// the ratings by Elo (arenaElo: a defender who holds gets +0; a player
+// whose rating_frozen the owners set keeps their rating), gives the attacker a token for a
 // win while the day's arena tokens last, and keeps the battle with its
 // seed and both players' rating changes. Defending changes only the
 // defender's rating, wins and losses, and takes no ticket. The attacker
@@ -300,6 +302,12 @@ func (s *Store) RecordArenaBattle(ctx context.Context, attacker, defender, seed 
 		}
 		held--
 		ratingA, ratingD := arenaElo(a.rating, d.rating, rules.K, attackerWon)
+		if a.frozen {
+			ratingA = a.rating
+		}
+		if d.frozen {
+			ratingD = d.rating
+		}
 		out.RatingChange = ratingA - a.rating
 		if attackerWon && a.tokensWon < rules.Tokens {
 			tag, err := tx.Exec(ctx, `UPDATE card_players SET tokens = tokens + 1 WHERE user_id = $1`, attacker)
@@ -362,8 +370,8 @@ func lockArenaPlayers(ctx context.Context, tx pgx.Tx, day string, a, b int64) (m
 		var r arenaRow
 		err := tx.QueryRow(ctx, `
 			SELECT rating, tickets, tickets_at,
-				CASE WHEN tokens_day = $2::date THEN tokens_won ELSE 0 END
-			FROM arena_players WHERE user_id = $1 FOR UPDATE`, id, day).Scan(&r.rating, &r.tickets, &r.ticketsAt, &r.tokensWon)
+				CASE WHEN tokens_day = $2::date THEN tokens_won ELSE 0 END, rating_frozen
+			FROM arena_players WHERE user_id = $1 FOR UPDATE`, id, day).Scan(&r.rating, &r.tickets, &r.ticketsAt, &r.tokensWon, &r.frozen)
 		if err != nil {
 			return nil, err
 		}
