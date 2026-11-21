@@ -260,7 +260,8 @@
   // PLATED are the Mythics that have a plate: their picture with the
   // character taken out, laid under the breathing cut-out so that the still
   // one behind it does not show; named for the picture like the cut-outs.
-  const PLATED = new Set([1, 5, 11, 17, 27, 28, 30, 40, 80, 246, 417, 422, 4003, 34470, 40881, 40882, 45627, 72921, 73935, 88572, 90169, 90202, 124381, 126071, 126824, 127222, 127518, 127691, 128130, 129928, 137080, 176754, 249281, 265209, 298761, 341936]);
+  const PLATED = new Set([1, 5, 11, 17, 27, 28, 30, 40, 80, 246, 417, 422, 4003, 34470, 40881, 40882, 45627, 72921, 73935, 88572, 90169, 90202, 124381, 126071, 126824, 127222, 127518, 127691, 128130, 129928, 137080, 176754, 249281, 265209, 298761, 341936,
+    130050, 129131, 141918, 149220, 129132, 141694]);
 
   // underImage is the picture a Mythic's cut-out lies on: its plate when it
   // has one for that picture, else the picture itself.
@@ -298,14 +299,32 @@
   // with a number under it (a mark, not a count of copies), cherry petals
   // drifting over the picture, fireflies glowing among them and, in the large
   // view, long hair flowing in the wind while the face and body keep still.
-  // Killua (27): lightning cracking behind him, between his plate and his
-  // cut-out, and a blue halo flickering round him.
+  // fx is a card's own effect (.fx in the styles), drawn mostly behind the
+  // character, between its plate and its cut-out, with a halo round it;
+  // glow is its two colours, the core and the glow round it.
   const SPECIAL = {
     298761: { tag: "LIMITED", petals: true, fireflies: true, hair: true },
-    27: { bolts: true },
+    27: { fx: "bolts", glow: ["#9feaff", "#2a9dff"] }, // Killua: lightning
+    129131: { fx: "bolts", glow: ["#fff1a0", "#ffae00"] }, // Zenitsu: thunder
+    130050: { fx: "water", glow: ["#c6f1ff", "#1e8fff"] }, // Giyu: water
+    141918: { fx: "moon", glow: ["#f1dcff", "#9a4dff"] }, // Kokushibo: the moon
+    149220: { fx: "sun", glow: ["#ffe6a8", "#ff5a1f"] }, // Yoriichi: the sun
+    129132: { fx: "blood", glow: ["#ff8a8a", "#b0002a"] }, // Muzan: blood
+    141694: { fx: "compass", glow: ["#a8f6ff", "#ff2e7e"] }, // Akaza: his compass
   };
 
-  // dress adds a special card's mark, petals, fireflies or lightning; the
+  // FX_PARTS is how many pieces each effect draws behind the character and
+  // in front of it, in the grid and in the large view.
+  const FX_PARTS = {
+    bolts: { behind: [4, 7], ahead: [1, 2] },
+    water: { behind: [2, 3], ahead: [4, 6] },
+    moon: { behind: [3, 5], ahead: [3, 5] },
+    sun: { behind: [2, 2], ahead: [4, 6] },
+    blood: { behind: [2, 3], ahead: [3, 5] },
+    compass: { behind: [2, 2], ahead: [4, 6] },
+  };
+
+  // dress adds a special card's mark, petals, fireflies or own effect; the
   // large view has more of them.
   function dress(el, card, large) {
     const special = SPECIAL[card.id] || (card.limited ? { tag: "LIMITED" } : null);
@@ -313,14 +332,19 @@
     el.classList.add("special");
     let html = "";
     if (special.petals) html += '<div class="petals" aria-hidden="true">' + "<i></i>".repeat(large ? 14 : 6) + "</div>";
-    if (special.bolts) html += '<div class="bolts ahead" aria-hidden="true">' + "<i></i>".repeat(large ? 2 : 1) + "</div>";
     if (special.fireflies) html += '<div class="fireflies" aria-hidden="true">' + "<i></i>".repeat(large ? 9 : 4) + "</div>";
     el.insertAdjacentHTML("beforeend", html);
     const living = el.querySelector(".alive");
-    if (special.bolts && living) {
-      // most of the lightning behind him, between the picture and his cut-out
-      living.insertAdjacentHTML("beforebegin", '<div class="bolts behind" aria-hidden="true">' + "<i></i>".repeat(large ? 7 : 4) + "</div>");
-      // his halo: the cut-out once more under him, glowing blue
+    if (special.fx && living) {
+      const parts = FX_PARTS[special.fx];
+      const pieces = (n) => "<i></i>".repeat(n[large ? 1 : 0]);
+      el.classList.add("fx-" + special.fx);
+      el.style.setProperty("--fx1", special.glow[0]);
+      el.style.setProperty("--fx2", special.glow[1]);
+      // most of it behind the character, between the plate and the cut-out
+      living.insertAdjacentHTML("beforebegin", `<div class="fx behind" aria-hidden="true">${pieces(parts.behind)}</div>`);
+      el.insertAdjacentHTML("beforeend", `<div class="fx ahead" aria-hidden="true">${pieces(parts.ahead)}</div>`);
+      // the halo: the cut-out once more under the character, glowing
       const aura = document.createElement("i");
       aura.className = "aura";
       aura.style.backgroundImage = living.querySelector("i").style.backgroundImage;

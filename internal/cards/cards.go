@@ -165,14 +165,16 @@ func pityView(sinceLegendary, sinceMythic int) map[string]any {
 // (migration 101), Escanor, whom they made Mythic (migration 108), and
 // Record of Ragnarok's Qin Shi Huang (migration 109), and Solo Leveling's
 // Sung Jinwoo (migration 113), One Piece's Joy Boy and Imu (migration 129),
-// Attack on Titan's Levi (migration 130), and Hunter x Hunter's Killua and
-// Kurapika (migration 131).
+// Attack on Titan's Levi (migration 130), Hunter x Hunter's Killua and
+// Kurapika (migration 131), and Demon Slayer's Giyu, Zenitsu, Kokushibo,
+// Yoriichi, Muzan and Akaza (migration 132).
 var mythicIDs = map[int64]bool{
 	246: true, 17: true, 40: true, 5: true, 40882: true, 11: true, 80: true, 126071: true, 73935: true, 30: true,
 	417: true, 1: true, 422: true, 4003: true, 72921: true, 127691: true,
 	40881: true, 126824: true, 176754: true, 137080: true, 127518: true, 88572: true, 34470: true, 90169: true, 124381: true, 127222: true,
 	298761: true, 265209: true, 249281: true, 90202: true, 203633: true, 129928: true,
 	341936: true, 128130: true, 45627: true, 27: true, 28: true,
+	130050: true, 129131: true, 141918: true, 149220: true, 129132: true, 141694: true,
 }
 
 // legendaryIDs are the Legendary cards': the leads' legendary rivals and
@@ -191,14 +193,14 @@ var legendaryIDs = map[int64]bool{
 	77605: true, 913: true, 13: true, 85: true, 14: true, 53901: true, 2535: true, 2423: true, 62: true,
 	305: true, 727: true, 2072: true, 13767: true, 46494: true, 46496: true, 71: true, 75: true,
 	31: true, 133701: true, 126635: true, 68: true, 12: true, 88892: true, 89220: true, 129133: true,
-	129131: true, 129130: true, 6356: true, 10529: true, 4004: true, 162: true, 2075: true, 2257: true, 601: true, 10138: true,
+	129130: true, 6356: true, 10529: true, 4004: true, 162: true, 2075: true, 2257: true, 601: true, 10138: true,
 	123962: true, 124142: true, 88573: true, 35252: true, 138101: true, 64769: true, 88575: true, 86: true, 89028: true, 127212: true,
 	89: true, 87275: true, 130102: true, 672: true, 5187: true, 123285: true, 729: true, 89616: true, 310: true,
 	137079: true, 120649: true, 133676: true, 89361: true, 61: true, 94: true, 22037: true, 138102: true, 133700: true, 138100: true,
 	723: true, 36828: true, 131559: true, 126851: true, 282753: true, 206212: true,
 	140636: true, 140646: true, 140650: true, 252553: true, 140641: true, 252554: true, 140638: true,
 	156052: true, 284632: true, 140645: true, 168999: true, 140640: true, 341135: true,
-	89334: true, 497: true, 13020: true, 130050: true, 67065: true, 257562: true, 38005: true,
+	89334: true, 497: true, 13020: true, 67065: true, 257562: true, 38005: true,
 	133704: true, 123212: true, 90107: true, 89198: true, 64771: true, 84677: true,
 }
 
