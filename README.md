@@ -301,7 +301,7 @@ in the environment win over the file.
 | `DB_POSTGRES_URL`             | required                       | PostgreSQL connection string                                                                                 |
 | `TELEGRAM_WEBHOOK_SECRET` | empty | Only for webhook deployments; see [Vercel deployment](#vercel-deployment-webhook) |
 | `CRON_SECRET` | empty | Only on Vercel: protects the daily cleanup endpoint |
-| `WEBAPP_URL` | empty | The Vercel deployment's `https://` address, such as `https://maria.vercel.app`, where `public/` is served: turns on the [dashboard](#dashboard-mini-app) (`/stats`, the private chats' menu button) and the [games](#the-games) [O'tinchi](#otinchi), [Dev jangi](#dev-jangi) and Mafia (`/woodcutter`, `/boss`, `/mafia`, the `send_game` tool). Empty turns them off |
+| `WEBAPP_URL` | empty | The Vercel deployment's `https://` address, such as `https://maria.vercel.app`, where `public/` is served: turns on the [dashboard](#dashboard-mini-app) (`/stats`) and the [games](#the-games) [O'tinchi](#otinchi), [Dev jangi](#dev-jangi) and Mafia (`/woodcutter`, `/boss`, `/mafia`, the `send_game` tool). Empty turns them off |
 | `MAX_OUTPUT_TOKENS`           | `8192`                         | Longest model reply, in tokens, thinking included |
 | `AI_REASONING_EFFORT`         | `low` (Gemini)                 | How hard Gemini thinks before answering: `none`, `minimal`, `low`, `medium`, `high`, or `default` for the model's own. Thinking is paid as output and takes from `MAX_OUTPUT_TOKENS`; the lite models refuse `none`. Each request logs its tokens as `model usage` |
 | `CHAT_REASONING_EFFORT` | `minimal` | How hard the chat model thinks before a reply in words alone (Gemini): `none`, `minimal`, `low`, `medium`, `high` or `default`. At `low` it spent 500 to 800 thinking tokens, seconds, on a one-line joke |
@@ -1997,11 +1997,10 @@ or `/help`.
   `https://t.me/<bot>?startapp=g<group ID without the minus>`, which opens
   it inside Telegram with the group in `start_param`.
 - **In a private chat** an owner's `/stats` answers with a Mini App
-  button, and the menu button of each owner's private chat opens it too
-  (`setChatMenuButton` for that chat, set at each start while `WEBAPP_URL`
-  is set, when everyone else's is put back to the commands; without it the
-  buttons are left as they are). Opened without a group, it lists the
-  groups the bot is in, to pick one.
+  button. Opened without a group, it lists the groups the bot is in, to
+  pick one. The menu button of every private chat, the owners' too, shows
+  the commands (`setChatMenuButton` at each start; the owners' dashboard
+  button was removed on 2026-11-21).
 
 The page asks `/api/stats` for the numbers, sending the init data Telegram
 gave it. The function believes nothing else:

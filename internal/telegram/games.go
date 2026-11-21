@@ -132,6 +132,12 @@ func (c *Client) SetMenuWebApp(ctx context.Context, chatID int64, text, url stri
 	return c.call(ctx, "setChatMenuButton", params, nil)
 }
 
+// SetChatMenuCommands puts the menu button of one private chat back to the
+// list of commands, undoing SetMenuWebApp there.
+func (c *Client) SetChatMenuCommands(ctx context.Context, chatID int64) error {
+	return c.call(ctx, "setChatMenuButton", setChatMenuButtonParams{ChatID: chatID, MenuButton: menuButton{Type: "commands"}}, nil)
+}
+
 // SetMenuCommands puts the default menu button of private chats back to
 // the list of commands.
 func (c *Client) SetMenuCommands(ctx context.Context) error {

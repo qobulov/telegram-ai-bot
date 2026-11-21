@@ -55,9 +55,6 @@ func NewCards(ctx context.Context, cfg config.Config, logger *slog.Logger) (*End
 	return &Endpoint{Handler: handler, Close: store.Close}, nil
 }
 
-// menuAppText labels the private chats' menu button.
-const menuAppText = "📊 Statistika"
-
 // statsPage is the dashboard's page, "" when WEBAPP_URL is not set.
 func statsPage(cfg config.Config) string {
 	if cfg.WebAppURL == "" {
@@ -76,28 +73,22 @@ func newGame(cfg config.Config) *game.Game {
 
 // MenuAppSetter sets what the private chats' menu button opens.
 type MenuAppSetter interface {
-	SetMenuWebApp(ctx context.Context, chatID int64, text, url string) error
+	SetChatMenuCommands(ctx context.Context, chatID int64) error
 	SetMenuCommands(ctx context.Context) error
 }
 
-// SetMenuApp makes the menu button of the owners' private chats open the
-// dashboard while WEBAPP_URL is set, and puts everyone else's back to the
-// commands, as an earlier version opened it for all. It logs a failure:
-// /stats opens the dashboard too. Without WEBAPP_URL the buttons are left
-// as they are, so that one set in @BotFather stays.
+// SetMenuApp puts every private chat's menu button to the commands, the
+// owners' too: their dashboard button is gone, as the owners asked on
+// 2026-11-21 (/stats still opens the dashboard). It logs a failure.
 func SetMenuApp(ctx context.Context, setter MenuAppSetter, cfg config.Config, logger *slog.Logger) {
-	page := statsPage(cfg)
-	if page == "" {
-		return
-	}
 	ctx, cancel := context.WithTimeout(ctx, commandsTimeout)
 	defer cancel()
 	if err := setter.SetMenuCommands(ctx); err != nil {
 		logger.Warn("could not put the menu button back to the commands", "error", err)
 	}
 	for ownerID := range cfg.OwnerIDs {
-		if err := setter.SetMenuWebApp(ctx, ownerID, menuAppText, page); err != nil {
-			logger.Warn("could not set an owner's menu button to the dashboard", "user_id", ownerID, "error", err)
+		if err := setter.SetChatMenuCommands(ctx, ownerID); err != nil {
+			logger.Warn("could not put an owner's menu button back to the commands", "user_id", ownerID, "error", err)
 		}
 	}
 }
