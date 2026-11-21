@@ -172,8 +172,8 @@ func TestTheDemonSlayerEvent(t *testing.T) {
 	if got := ds.odds(); !slices.Equal(got, []int{624, 250, 90, 25, 11}) || ds.roll(10) != Mythic || ds.roll(11) != Legendary || ds.roll(999) != Common {
 		t.Errorf("the Demon Slayer odds = %v", got)
 	}
-	if own := math.Round(float64(ds.odds()[Mythic]) * ds.Share); own != 6 || ds.mythicShown() != 5 || firefly.mythicShown() != 5 {
-		t.Errorf("the Demon Slayer cards are %v in a thousand, the Mythics shown %d and the Firefly's %d; want 6, 5 and 5", own, ds.mythicShown(), firefly.mythicShown())
+	if own := math.Round(float64(ds.odds()[Mythic]) * ds.Share); own != 6 {
+		t.Errorf("the Demon Slayer cards are %v in a thousand, want 6", own)
 	}
 	if got := firefly.odds(); !slices.Equal(got, EventOdds()) {
 		t.Errorf("the Firefly odds = %v, want the usual", got)

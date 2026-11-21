@@ -3,7 +3,6 @@ package cards
 import (
 	"context"
 	"errors"
-	"math"
 	"math/rand/v2"
 	"slices"
 	"time"
@@ -90,17 +89,6 @@ func (e Event) roll(n int) Rarity {
 // usual odds, the most common first.
 func EventOdds() []int { return Event{}.odds() }
 
-// mythicShown is the odds in a thousand the shop shows for a Mythic: of an
-// event with its own odds, those of the Mythics not its own (the usual 0.5%
-// beside its cards'), of any other all of them.
-func (e Event) mythicShown() int {
-	m := e.odds()[Mythic]
-	if e.Mythic == 0 {
-		return m
-	}
-	return m - int(math.Round(float64(m)*e.Share))
-}
-
 // odds are a pull's odds of each rarity of the event in a thousand.
 func (e Event) odds() []int {
 	odds := make([]int, len(Rarities))
@@ -175,7 +163,7 @@ func (h *handler) eventView(ctx context.Context, user miniapp.User, e Event) (an
 		"active": e.runs(now), "soon": now.Before(e.Starts),
 		"starts_in": max(0, e.Starts.Sub(now).Milliseconds()),
 		"ends_at":   e.Ends.UnixMilli(), "ends_in": max(0, e.Ends.Sub(now).Milliseconds()),
-		"pity": pulls, "pity_max": e.Pity, "odds": e.odds(), "share": e.Share, "mythic_shown": e.mythicShown(),
+		"pity": pulls, "pity_max": e.Pity, "odds": e.odds(), "share": e.Share,
 		"price": e.Price, "batch": e.Batch, "cards": views,
 	}, failure{}
 }

@@ -1826,6 +1826,10 @@
   const et = eventTexts[language] || eventTexts.uz;
   let events = [], pulling = false, bannerKey = "";
 
+  // OWN_ODDS_ONLY are the events whose block shows their cards' odds alone,
+  // not a Mythic's beside them: Demon Slayer's, as the owners asked.
+  const OWN_ODDS_ONLY = new Set(["demon-slayer"]);
+
   // eventFace is an event's own texts.
   const eventFace = (ev) => et[ev.key] || et.firefly;
 
@@ -1902,10 +1906,10 @@
     box.querySelector(".event-tag").textContent = face.tag;
     box.querySelector(".event-title").textContent = face.title;
     const percent = (n) => `${n / 10}%`;
-    // the Mythic the server says to show: of an event with odds of its own,
-    // the other Mythics' beside its cards'
-    const mythic = ev.odds[4];
-    box.querySelector(".event-odds").textContent = et.odds(percent(ev.mythic_shown ?? mythic), face.icon, face.name, percent(Math.round(mythic * ev.share)));
+    // an event's cards' odds, beside a Mythic's but for the events that show
+    // their own alone
+    const mythic = ev.odds[4], own = percent(Math.round(mythic * ev.share));
+    box.querySelector(".event-odds").textContent = OWN_ODDS_ONLY.has(ev.key) ? `${face.icon} ${face.name} ${own}` : et.odds(percent(mythic), face.icon, face.name, own);
     box.querySelector(".event-one").addEventListener("click", () => eventPull(ev, 1));
     box.querySelector(".event-batch").addEventListener("click", () => eventPull(ev, ev.batch));
     eventPity(ev);
