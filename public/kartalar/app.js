@@ -2631,7 +2631,7 @@
     for (const o of foes) {
       const li = document.createElement("li");
       li.className = "foe";
-      li.innerHTML = '<button type="button" class="who" aria-expanded="false"><span class="foe-name"><b></b><span class="foe-eye" aria-hidden="true">👁</span></span><small class="foe-rating"></small><small class="foe-power"></small></button><button type="button" class="draw small"></button><div class="foe-team" hidden></div>';
+      li.innerHTML = '<button type="button" class="who" aria-haspopup="dialog"><span class="foe-name"><b></b><span class="foe-eye" aria-hidden="true">👁</span></span><small class="foe-rating"></small><small class="foe-power"></small></button><button type="button" class="draw small"></button>';
       li.querySelector(".who b").textContent = o.name || "?";
       li.querySelector(".foe-rating").textContent = `🏅 ${spaced(o.rating)}`;
       li.querySelector(".foe-power").textContent = `⚡ ${spaced(o.power)}`;
@@ -2646,30 +2646,45 @@
     if (foes.length && !can) list.insertAdjacentHTML("beforeend", `<li class="foe-note">${arenaData.team ? at.noAttacks : at.teamFirst}</li>`);
   }
 
-  // foeView lets the player open an opponent's team under its name, the
-  // front row and the back row as the attack will meet them.
+  // foeView opens an opponent's team in the sheet when its name is tapped:
+  // the front row and the back row as the attack will meet them.
   function foeView(li, foe) {
     const view = li.querySelector(".who");
-    const panel = li.querySelector(".foe-team");
     view.setAttribute("aria-label", `${at.foeTeam}: ${foe.name || "?"}`);
     view.addEventListener("click", () => {
-      const open = panel.hidden;
       haptic("light");
-      if (open && !panel.childElementCount) {
-        const team = foe.team || [];
-        if (!team.length) panel.innerHTML = `<p class="foe-note">${at.noFoeTeam}</p>`;
-        for (const [list, label, rear] of [[team.slice(0, 2), at.front, false], [team.slice(2), at.back, true]]) {
-          if (!list.length) continue;
-          const row = document.createElement("div");
-          row.className = rear ? "arena-row rear" : "arena-row";
-          teamRow(row, list, label);
-          panel.append(row);
-        }
-      }
-      panel.hidden = !open;
-      view.setAttribute("aria-expanded", String(open));
-      li.classList.toggle("open", open);
+      showPanel(foePanel(foe));
     });
+  }
+
+  function foePanel(foe) {
+    const panel = document.createElement("div");
+    panel.className = "gift foe-sheet";
+    panel.innerHTML = '<h3 class="shop-title"></h3><p class="foe-stats"><small></small><small></small></p>';
+    panel.querySelector("h3").textContent = foe.name || "?";
+    const stats = panel.querySelectorAll(".foe-stats small");
+    stats[0].textContent = `🏅 ${spaced(foe.rating)}`;
+    stats[1].textContent = `⚡ ${spaced(foe.power)}`;
+    const team = foe.team || [];
+    if (!team.length) panel.insertAdjacentHTML("beforeend", `<p class="foe-note">${at.noFoeTeam}</p>`);
+    for (const [list, label, rear] of [[team.slice(0, 2), at.front, false], [team.slice(2), at.back, true]]) {
+      if (!list.length) continue;
+      const row = document.createElement("div");
+      row.className = rear ? "arena-row rear" : "arena-row";
+      teamRow(row, list, label);
+      panel.append(row);
+    }
+    const attack = document.createElement("button");
+    attack.type = "button";
+    attack.className = "draw";
+    attack.textContent = at.attack;
+    attack.disabled = arenaBusy || !arenaData.team || arenaData.player.tickets <= 0;
+    attack.addEventListener("click", () => {
+      closeSheet();
+      arenaAttack(foe);
+    });
+    panel.append(attack);
+    return panel;
   }
 
   $("arenaRefresh").addEventListener("click", async (event) => {

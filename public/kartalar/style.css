@@ -892,11 +892,13 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 #arenaSave { width: 100%; }
 .arena-foes { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .arena-foes .empty { margin: 10px 0; font-size: 14px; }
-.foe { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; min-height: 58px; padding: 8px 10px 8px 14px; border-radius: 14px; background: var(--lacquer); border: 1px solid var(--line); }
+.foe { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 58px; padding: 8px 10px 8px 14px; border-radius: 14px; background: var(--lacquer); border: 1px solid var(--line); }
 .foe .who { display: grid; flex: 1; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .foe .foe-eye { flex: none; font-size: 13px; opacity: 0.7; transition: opacity 0.2s; }
-.foe.open .foe-eye { opacity: 1; }
-.foe-team { flex-basis: 100%; display: grid; gap: 8px; padding: 6px 0 4px; }
+.foe-sheet { display: grid; gap: 10px; }
+.foe-sheet h3 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.foe-stats { display: flex; gap: 14px; margin: -4px 0 0; color: var(--muted); font-size: 13px; }
+.foe-sheet .draw { width: 100%; margin-top: 4px; }
 .foe .who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .foe .who small { color: var(--muted); font-size: 12px; }
 .foe .draw { flex: none; }
