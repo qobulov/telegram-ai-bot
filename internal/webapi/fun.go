@@ -30,7 +30,7 @@ var triviaCategories = map[string]int{
 func (a *apis) funTool() tools.Tool {
 	return tools.Tool{
 		Name: "fun",
-		Description: "Light fun: trivia gives a quiz question with its options and answer (category, difficulty optional; ask it and keep the answer until they guess), fact a random fact, advice a piece of advice, quote a famous quote with its author, dog sends a dog picture, joke a clean joke. " +
+		Description: "Light fun: trivia a random quiz question with options and answer (keep the answer until they guess), only for a quiz with no subject of theirs: one about something they name is create_poll's, fact a random fact, advice a piece of advice, quote a famous quote with its author, dog sends a dog picture, joke a clean joke. " +
 			"They are in English: say them in the asker's language.",
 		Schema: json.RawMessage(`{
 			"type": "object",

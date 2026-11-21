@@ -116,7 +116,7 @@ func PollTool(opts PollOptions) Tool {
 	p := polls{opts}
 	return Tool{
 		Name:        "create_poll",
-		Description: "Post an anonymous poll in this group when anyone asks for a poll or a vote, one every 10 minutes per group. It appears by itself: do not repeat its question or options, reply in one short line at most. stop closes your poll they replied to, else your latest, when they ask to end it (\"so'rovnomani yop\", \"закрой опрос\"), and gives the final counts; only who asked for it, admins or your owners may.",
+		Description: "Post an anonymous poll in this group when anyone asks for a poll, a vote, or a quiz (\"viktorina\", \"so'rovnoma\", \"голосование\") about something they name, one every 10 minutes per group: the question is theirs, such as whether to do it (\"viktorina kerak X ni mif qilishga\" -> \"X ni Mythic qilaylikmi?\" with yes and no), never a random trivia question. It appears by itself: do not repeat its question or options, reply in one short line at most. stop closes your poll they replied to, else your latest, when they ask to end it (\"so'rovnomani yop\", \"закрой опрос\"), and gives the final counts; only who asked for it, admins or your owners may.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
