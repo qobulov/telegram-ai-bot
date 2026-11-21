@@ -101,7 +101,7 @@ func (s *Service) wordTableText(ctx context.Context, chat *telegram.Chat, period
 }
 
 func wordLine(place int, c storage.WordCount, language string) string {
-	return fmt.Sprintf(textWordsLine.inLanguage(language), place, cardMarks.Replace(c.Name), spacedInt(c.Words))
+	return fmt.Sprintf(textWordsLine.inLanguage(language), place, cardMarks.Replace(c.Name), spacedInt(c.Words), spacedInt(c.Messages))
 }
 
 var wordButtonNames = map[string]localText{
@@ -160,7 +160,7 @@ var (
 		"month": {uz: "oxirgi 30 kun", ru: "за 30 дней", en: "the last 30 days"},
 	}
 	textWordsTitle       = localText{uz: "🗣 Top-10 so'zamollar · %s", ru: "🗣 Топ-10 болтунов · %s", en: "🗣 Top 10 talkers · %s"}
-	textWordsLine        = localText{uz: "%d. %s — %s so'z", ru: "%d. %s — %s слов", en: "%d. %s — %s words"}
+	textWordsLine        = localText{uz: "%d. %s — %s so'z, %s xabar", ru: "%d. %s — %s слов, %s сообщ.", en: "%d. %s — %s words, %s messages"}
 	textWordsNone        = localText{uz: "Bu davrda hali hech kim yozmagan.", ru: "За этот период ещё никто не писал.", en: "Nobody has written in this period yet."}
 	textWordsGroupOnly   = localText{uz: "✍️ /words guruhda ishlaydi.", ru: "✍️ /words работает в группе.", en: "✍️ /words works in a group."}
 	textWordsUnavailable = localText{uz: "Hisobni hozir o'qib bo'lmadi, birozdan keyin urinib ko'ring.", ru: "Сейчас не удалось прочитать счёт, попробуйте позже.", en: "Could not read the count right now; try again in a bit."}

@@ -41,7 +41,7 @@ func (f *fakeWordBook) WordPlace(_ context.Context, _ int64, _ time.Time, user i
 	if user == 2 {
 		return 2, storage.WordCount{UserID: 2, Name: "Vali", Words: 1234}, nil
 	}
-	return 76, storage.WordCount{UserID: user, Name: "Sam", Words: 692}, nil
+	return 76, storage.WordCount{UserID: user, Name: "Sam", Words: 692, Messages: 31}, nil
 }
 
 // A member's message is counted by its words; a bot's is not.
@@ -74,7 +74,7 @@ func TestWordTable(t *testing.T) {
 	asked.From = &telegram.User{ID: 501, FirstName: "Sam"}
 	sent := f.run(inGroup(asked))
 	last := sent[len(sent)-1]
-	for _, want := range []string{"Top-10", "oxirgi 7 kun", "1. Ali — 12 345 so'z", "2. Vali — 1 234 so'z", "---------------------\n76. Sam — 692 so'z"} {
+	for _, want := range []string{"Top-10", "oxirgi 7 kun", "1. Ali — 12 345 so'z, 600 xabar", "2. Vali — 1 234 so'z, 56 xabar", "---------------------\n76. Sam — 692 so'z, 31 xabar"} {
 		if !strings.Contains(last.text, want) {
 			t.Fatalf("table = %q, want %q in it", last.text, want)
 		}

@@ -752,7 +752,7 @@ chiq" from anywhere, for a group she is in or a channel where she is an
 admin (`targets` lists them). The owner's own words must ask her to leave
 (chiq, ket, leave, выйди…), so the model cannot leave on its own.
 
-`/words` in a group, with no model, lists the top 10 writers by words of the
+`/words` in a group, with no model, lists the top 10 writers by words, each with their messages, of the
 last 7 days (today counted, Tashkent time), then, under a line, the asker's
 own place when they are not among them, with buttons that switch it in place to the last 30 days (the
 presser's place then shows); `/words oy` opens on 30 days. Every member's message is counted as it comes,
