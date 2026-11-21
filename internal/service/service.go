@@ -1054,18 +1054,40 @@ func (s *Service) logFrom(msg *telegram.Message, text string) {
 
 // logText is how a message is written in the log. A reply first says whom it
 // answers, "(to Ann @ann) no way", so that the log shows who is talking to
-// whom; the bot is "You", as in its own lines. A message with no text stays
-// empty and so is not logged.
+// whom; the bot is "You", as in its own lines. A reply to another bot also
+// gives the start of what that bot said, "(to Mira @mira «…») like this",
+// as Telegram never shows a bot another bot's messages: on 2026-11-21 Maria
+// was asked to rate the members "like this" after Mira did, and could not
+// see what. A message with no text stays empty and so is not logged.
 func (s *Service) logText(msg *telegram.Message, text string) string {
 	replied := msg.ReplyToMessage
 	if text == "" || replied == nil || replied.From == nil {
 		return text
 	}
 	addressee := plainLabel(replied.From)
-	if s.isFromBot(replied) {
+	switch {
+	case s.isFromBot(replied):
 		addressee = botAuthor
+	case replied.From.IsBot:
+		if said := otherBotSaid(replied); said != "" {
+			addressee += " «" + said + "»"
+		}
 	}
 	return "(to " + addressee + ") " + text
+}
+
+// otherBotSaidRunes is how much of another bot's message a reply to it
+// keeps in the log.
+const otherBotSaidRunes = 300
+
+// otherBotSaid is the start of another bot's message, on one line, cut at
+// otherBotSaidRunes.
+func otherBotSaid(msg *telegram.Message) string {
+	said := strings.Join(strings.Fields(cmp.Or(msg.Text, msg.Caption)), " ")
+	if runes := []rune(said); len(runes) > otherBotSaidRunes {
+		said = string(runes[:otherBotSaidRunes]) + "…"
+	}
+	return said
 }
 
 // rememberInBackground transcribes off the polling loop, which must not wait

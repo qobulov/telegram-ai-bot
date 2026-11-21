@@ -2307,6 +2307,28 @@ func stickerReply() *telegram.Message {
 	return msg
 }
 
+// A reply to another bot keeps the start of what that bot said in the log,
+// which the bot never sees otherwise; a reply to a member keeps only whom.
+func TestReplyToAnotherBotLogsWhatItSaid(t *testing.T) {
+	f := newFixture()
+	toMira := groupMessage("shunaqa baho ber")
+	toMira.ReplyToMessage = &telegram.Message{MessageID: 29, From: &telegram.User{ID: 999001, FirstName: "Mira", Username: "mira", IsBot: true},
+		Text: "Baholar:\n• @TuTuruu_RRQ — Joy Boy\n• @pronium — Endzi"}
+	toAnn := groupMessage("ha")
+	toAnn.MessageID = 31
+	toAnn.ReplyToMessage = &telegram.Message{MessageID: 28, From: &telegram.User{ID: 778, FirstName: "Ann"}, Text: "qalaysiz"}
+
+	f.run(inGroup(toMira), inGroup(toAnn))
+
+	want := []string{"Bek: (to Mira @mira «Baholar: • @TuTuruu_RRQ — Joy Boy • @pronium — Endzi») shunaqa baho ber", "Bek: (to Ann) ha"}
+	if got := f.chatLog.texts(groupID); !reflect.DeepEqual(got, want) {
+		t.Errorf("log = %q\nwant  %q", got, want)
+	}
+	if long := otherBotSaid(&telegram.Message{Text: strings.Repeat("я", 400)}); len([]rune(long)) != otherBotSaidRunes+1 {
+		t.Errorf("a long message kept %d runes, want %d and the ellipsis", len([]rune(long)), otherBotSaidRunes)
+	}
+}
+
 func TestApplauseReplyGetsReactionNotAnswer(t *testing.T) {
 	f := newFixture()
 	quota := &fakeGroupQuota{}
