@@ -154,3 +154,39 @@ func TestAStarredCardIsNotGivenForAnOffer(t *testing.T) {
 		t.Errorf("Alice's Gojo = ×%d, %v", count, err)
 	}
 }
+
+// A reset takes a card back to ★1 for free: the copies its stars used are
+// free again, those melted into shards before stay gone; a card at ★1 or not
+// held is refused.
+func TestResetCardStars(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	for _, q := range []string{
+		`INSERT INTO card_catalog (id, name, rarity, attack, health, value) VALUES (10, 'Gojo Satoru', 4, 5000, 18000, 4000), (20, 'Levi', 3, 1, 1, 2000)`,
+		`INSERT INTO card_players (user_id, name, points, cards) VALUES (1, 'Alice', 6000, 2)`,
+		`INSERT INTO card_owned (user_id, card_id, count, melted, stars) VALUES (1, 10, 13, 12, 5), (1, 20, 3, 0, 1)`,
+	} {
+		if _, err := store.pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cost := []int{0, 1, 2, 3, 4}
+	// ★5 used 1+2+3+4 = 10 copies; 2 more were melted into shards before.
+	free, err := store.ResetCardStars(ctx, 1, 10, cost)
+	if err != nil || free != 10 {
+		t.Fatalf("reset = %d, %v; want 10 free copies", free, err)
+	}
+	var count, melted, stars, points int
+	if err := store.pool.QueryRow(ctx, `SELECT o.count, o.melted, o.stars, p.points FROM card_owned o JOIN card_players p ON p.user_id = o.user_id WHERE o.user_id = 1 AND o.card_id = 10`).Scan(&count, &melted, &stars, &points); err != nil {
+		t.Fatal(err)
+	}
+	if count != 13 || melted != 2 || stars != 1 || points != 6000 {
+		t.Errorf("after the reset: count %d melted %d stars %d points %d", count, melted, stars, points)
+	}
+	if _, err := store.ResetCardStars(ctx, 1, 20, cost); !errors.Is(err, ErrCardNotFused) {
+		t.Errorf("a reset at ★1 = %v, want ErrCardNotFused", err)
+	}
+	if _, err := store.ResetCardStars(ctx, 1, 99, cost); !errors.Is(err, ErrCardNotHeld) {
+		t.Errorf("a reset of a card not held = %v, want ErrCardNotHeld", err)
+	}
+}

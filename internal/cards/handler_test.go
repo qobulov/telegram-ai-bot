@@ -52,6 +52,7 @@ type fakeStore struct {
 	pages    []storage.CatalogPage // the catalog pages asked for
 	stars    int                   // the held card's stars; 0 is ★1
 	fuseErr  error
+	resetErr error
 	arena    fakeArena
 	tower    fakeTower
 	quests   fakeQuests
@@ -147,6 +148,16 @@ func (f *fakeStore) FuseCard(_ context.Context, userID, cardID int64, cost []int
 	f.stars = max(f.stars, 1) + 1
 	f.count(userID, quest, 1)
 	return f.stars, nil
+}
+func (f *fakeStore) ResetCardStars(_ context.Context, _, cardID int64, _ []int) (int, error) {
+	if f.resetErr != nil {
+		return 0, f.resetErr
+	}
+	if cardID != heldCard.ID {
+		return 0, storage.ErrCardNotHeld
+	}
+	f.stars = 1
+	return 2, nil
 }
 func (f *fakeStore) CardPlayerOf(context.Context, int64) (storage.CardPlayer, time.Time, error) {
 	return storage.CardPlayer{Points: 10000, Cards: 1, FreeDay: f.day, Tokens: f.tokens}, time.Time{}, nil
@@ -533,6 +544,17 @@ func TestTheAppFuses(t *testing.T) {
 			t.Errorf("%v = %v", err, out)
 		}
 	}
+	store.fuseErr = nil
+	if code, out := call(map[string]any{"action": "reset_stars", "card": heldCard.ID}); code != http.StatusOK || out["reset"] != 2.0 || gojo(out)["stars"] != 1.0 {
+		t.Errorf("reset = %d %v", code, out)
+	}
+	for err, refused := range map[error]string{storage.ErrCardNotFused: "not_fused", storage.ErrCardNotHeld: "not_held"} {
+		store.resetErr = err
+		if _, out := call(map[string]any{"action": "reset_stars", "card": heldCard.ID}); out["refused"] != refused {
+			t.Errorf("a reset refused by %v = %v", err, out)
+		}
+	}
+	store.resetErr = nil
 	store.offerErr, store.takeErr = storage.ErrCardFused, storage.ErrCardFused
 	if _, out := call(map[string]any{"action": "offer", "card": 1, "want": 2}); out["refused"] != "fused" {
 		t.Errorf("an offer of a fused last copy = %v", out)

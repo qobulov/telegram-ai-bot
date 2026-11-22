@@ -35,6 +35,7 @@ type Store interface {
 	BuyCardTokens(ctx context.Context, userID int64, name string, tokens, price int) (storage.CardOpening, error)
 	OpenCardPack(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, price int, now time.Time, quest storage.CardQuest) (storage.CardOpening, error)
 	FuseCard(ctx context.Context, userID, cardID int64, cost []int, quest storage.CardQuest) (stars int, err error)
+	ResetCardStars(ctx context.Context, userID, cardID int64, cost []int) (free int, err error)
 	OpenEventCards(ctx context.Context, userID int64, name string, n int, ev storage.CardEvent, day storage.CardDay, now time.Time, quest storage.CardQuest) (storage.EventOpening, error)
 	CardEventPulls(ctx context.Context, userID int64, key string, cards []int64) (int, []storage.Card, error)
 	SaveArenaTeam(ctx context.Context, userID int64, front [2]int64, back [3]int64, power int) error
@@ -255,6 +256,8 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return h.take(ctx, opened.User, req.Offer)
 	case "unoffer":
 		return h.unoffer(ctx, opened.User, req.Offer)
+	case "reset_stars":
+		return h.resetStars(ctx, opened.User, req.Card)
 	case "fuse":
 		return h.fuse(ctx, opened.User, req.Card)
 	case "arena":
@@ -667,6 +670,32 @@ func (h *handler) take(ctx context.Context, user miniapp.User, id int64) (any, f
 	}
 	result := state.(map[string]any)
 	result["got"] = h.held(trade.Give, 1)
+	return result, failure{}
+}
+
+// resetStars takes the player's card back to ★1 for free, its stars' copies
+// free again, and gives the state with "reset", its free copies now. A reset
+// refused says why: "not_fused" or "not_held".
+func (h *handler) resetStars(ctx context.Context, user miniapp.User, cardID int64) (any, failure) {
+	if cardID == 0 {
+		return nil, errBadRequest
+	}
+	free, err := h.Store.ResetCardStars(ctx, user.ID, cardID, FuseCost[:])
+	switch {
+	case errors.Is(err, storage.ErrCardNotFused):
+		return map[string]any{"refused": "not_fused"}, failure{}
+	case errors.Is(err, storage.ErrCardNotHeld):
+		return map[string]any{"refused": "not_held"}, failure{}
+	case err != nil:
+		h.Logger.Error("could not reset a card's stars", "user_id", user.ID, "card_id", cardID, "error", err)
+		return nil, errUnavailable
+	}
+	state, fail := h.state(ctx, user)
+	if fail != (failure{}) {
+		return nil, fail
+	}
+	result := state.(map[string]any)
+	result["reset"] = free
 	return result, failure{}
 }
 

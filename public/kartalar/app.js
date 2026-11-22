@@ -33,7 +33,7 @@
       place: "Taklif qo'yish", placed: "✅ Taklif bozorga qo'yildi", swapped: (c) => `🔄 Almashildi! Siz ${c} oldingiz`, removed: "Taklif olib tashlandi",
       refused: { uneven: "Faqat bir daraja yuqori yoki past kartaga almashish mumkin", limited: "🔒 Limited kartani almashib bo'lmaydi", over: "Bu taklif endi yo'q", gone: "Bu taklif endi yo'q", own: "Bu o'zingizning taklifingiz", not_held: "Sizda bu karta yo'q", same: "Bir xil kartani almashib bo'lmaydi", fused: "⭐ Yulduzli kartani almashib bo'lmaydi" },
       fuse: (a, b, n) => `⭐ ★${a} → ★${b} · ${n} nusxa`, fuseNext: (a, h) => `Keyin: Hujum ${a} · Jon ${h}`, fuseFree: (n) => `Bo'sh nusxa: ${n}`,
-      fuseMax: "⭐ Eng yuqori daraja: ★5", fuseFew: (n) => `Yana ${n} ta nusxa kerak`, fused: (s) => `⭐ Karta ★${s} bo'ldi!`,
+      fuseMax: "⭐ Eng yuqori daraja: ★5", resetStars: (s) => `↺ Yulduzni tiklash: ★${s} → ★1`, resetAsk: (name, s, n) => `${name} ★${s} dan ★1 ga qaytadi, ${n} ta nusxa bo'sh nusxa bo'lib qaytadi. Bepul. Davom etasizmi?`, resetDone: (n) => `↺ Karta ★1 ga qaytdi · bo'sh nusxa: ${n}`, resetRefused: { not_fused: "Bu karta allaqachon ★1", not_held: "Bu karta sizda yo'q" }, fuseFew: (n) => `Yana ${n} ta nusxa kerak`, fused: (s) => `⭐ Karta ★${s} bo'ldi!`,
       fuseRefused: { max: "⭐ Karta allaqachon ★5", few: "Nusxalar yetmaydi", not_held: "Sizda bu karta yo'q" },
       offersLimit: (n) => `Bir vaqtda ${n} tagacha taklif qo'yish mumkin`,
       shopTab: "Do'kon", shopBuyTitle: "💎 Kristall sotib olish", shopBuyHint: "Telegram Stars bilan to'lanadi, kristall darhol hisobingizga tushadi.", shopItemsTitle: "🛒 Kristallga xarid",
@@ -67,7 +67,7 @@
       place: "Выставить", placed: "✅ Предложение выставлено", swapped: (c) => `🔄 Обмен! Вы получили ${c}`, removed: "Предложение снято",
       refused: { uneven: "Менять можно на карту той же редкости или на одну выше/ниже", limited: "🔒 Лимитированную карту нельзя обменять", over: "Этого предложения уже нет", gone: "Этого предложения уже нет", own: "Это ваше предложение", not_held: "У вас нет этой карты", same: "Нельзя менять карту на ту же", fused: "⭐ Звёздную карту нельзя обменять" },
       fuse: (a, b, n) => `⭐ ★${a} → ★${b} · ${n} коп.`, fuseNext: (a, h) => `Станет: Атака ${a} · Жизнь ${h}`, fuseFree: (n) => `Свободных копий: ${n}`,
-      fuseMax: "⭐ Высший уровень: ★5", fuseFew: (n) => `Нужно ещё копий: ${n}`, fused: (s) => `⭐ Карта стала ★${s}!`,
+      fuseMax: "⭐ Высший уровень: ★5", resetStars: (s) => `↺ Сбросить звёзды: ★${s} → ★1`, resetAsk: (name, s, n) => `${name} вернётся с ★${s} на ★1, ${n} копий станут свободными. Бесплатно. Продолжить?`, resetDone: (n) => `↺ Карта снова ★1 · свободных копий: ${n}`, resetRefused: { not_fused: "Эта карта уже ★1", not_held: "У вас нет этой карты" }, fuseFew: (n) => `Нужно ещё копий: ${n}`, fused: (s) => `⭐ Карта стала ★${s}!`,
       fuseRefused: { max: "⭐ Карта уже ★5", few: "Не хватает копий", not_held: "У вас нет этой карты" },
       offersLimit: (n) => `Одновременно можно выставить до ${n} предложений`,
       shopTab: "Магазин", shopBuyTitle: "💎 Купить кристаллы", shopBuyHint: "Оплата Telegram Stars, кристаллы приходят сразу.", shopItemsTitle: "🛒 За кристаллы",
@@ -101,7 +101,7 @@
       place: "Put it up", placed: "✅ Your offer is up", swapped: (c) => `🔄 Traded! You got ${c}`, removed: "Offer taken down",
       refused: { uneven: "A card may be traded only for one of the same rarity or one step up or down", limited: "🔒 A limited card cannot be traded", over: "This offer is gone", gone: "This offer is gone", own: "This is your own offer", not_held: "You do not have that card", same: "A card cannot be traded for itself", fused: "⭐ A starred card cannot be traded" },
       fuse: (a, b, n) => `⭐ ★${a} → ★${b} · ${n} ${n === 1 ? "copy" : "copies"}`, fuseNext: (a, h) => `Then: Attack ${a} · Life ${h}`, fuseFree: (n) => `Free copies: ${n}`,
-      fuseMax: "⭐ Top level: ★5", fuseFew: (n) => `${n} more ${n === 1 ? "copy" : "copies"} needed`, fused: (s) => `⭐ The card is now ★${s}!`,
+      fuseMax: "⭐ Top level: ★5", resetStars: (s) => `↺ Reset stars: ★${s} → ★1`, resetAsk: (name, s, n) => `${name} goes back from ★${s} to ★1 and ${n} copies become free copies again. Free. Go on?`, resetDone: (n) => `↺ The card is ★1 again · free copies: ${n}`, resetRefused: { not_fused: "This card is already ★1", not_held: "You don't have this card" }, fuseFew: (n) => `${n} more ${n === 1 ? "copy" : "copies"} needed`, fused: (s) => `⭐ The card is now ★${s}!`,
       fuseRefused: { max: "⭐ The card is already ★5", few: "Not enough copies", not_held: "You do not have that card" },
       offersLimit: (n) => `You may have up to ${n} offers at once`,
       shopTab: "Shop", shopBuyTitle: "💎 Buy crystals", shopBuyHint: "Paid in Telegram Stars; the crystals arrive at once.", shopItemsTitle: "🛒 For crystals",
@@ -703,7 +703,45 @@
       }
     });
     box.append(button, hint);
+    if (card.stars > 1) box.append(resetButton(card));
     return box;
+  }
+
+  // RESET_BACK is how many copies a card's stars used up, by its stars, as
+  // FuseCost spends them: a reset gives them back.
+  const RESET_BACK = [0, 0, 1, 3, 6, 10];
+
+  // resetButton takes a starred card back to ★1 for free, as the owners
+  // asked on 2026-11-22, after the player says yes: its stars' copies are
+  // free copies again.
+  function resetButton(card) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "ghost fuse-reset";
+    button.textContent = t.resetStars(card.stars);
+    const ask = (text) => new Promise((done) => {
+      try { tg.showConfirm(text, done); } catch (_) { done(window.confirm(text)); }
+    });
+    button.addEventListener("click", async () => {
+      if (!(await ask(t.resetAsk(card.name, card.stars, RESET_BACK[card.stars] || 0)))) return;
+      button.disabled = true;
+      try {
+        const data = await api("reset_stars", { card: card.id });
+        if (data.refused) {
+          toast(t.resetRefused[data.refused] || t.unavailable);
+          return;
+        }
+        haptic("medium");
+        applyState(data);
+        toast(t.resetDone(data.reset));
+        const now = cards.find((c) => c.id === card.id);
+        if (now) open(now);
+      } catch (error) {
+        button.disabled = false;
+        notice(error);
+      }
+    });
+    return button;
   }
 
   // A Mythic card in the large view leans toward the finger, or as the

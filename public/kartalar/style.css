@@ -1119,6 +1119,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .fuse { margin-top: 10px; text-align: center; }
 .fuse .fuse-do { width: 100%; }
 .fuse small { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; }
+.fuse .fuse-reset { width: 100%; margin-top: 8px; font-size: 13px; }
 .sheet-card.giving > .fuse { display: none; }
 
 /* ---------- event ---------- */
