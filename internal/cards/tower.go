@@ -24,13 +24,18 @@ import (
 // 1's team has TowerBasePower and each floor TowerGrowth times the one
 // before (since 2026-11-21 12000 and 1.03, from 5000 and 1.07: players
 // cleared floors of their own team's power by trying again, 46 floors in
-// two days, and the owners asked for floors that grow slowly); its cards
-// rise in rarity every few floors and a star every TowerStarsEvery floors.
+// two days, and the owners asked for floors that grow slowly), up to floor
+// TowerBend; above it each floor only TowerStep stronger than the one
+// before, as the owners asked on 2026-11-22: the floors grew apart too fast
+// (+2800 a floor by the 70th). Its cards rise in rarity every few floors and
+// a star every TowerStarsEvery floors.
 const (
 	TowerThemeBonus = 20
 	TowerThemeLeast = 5
 	TowerBasePower  = 12000
 	TowerGrowth     = 1.03
+	TowerBend       = 30
+	TowerStep       = 850
 	TowerStarsEvery = 15
 	// towerSalt keeps a floor's draw apart from any other seeded by a number.
 	towerSalt = 0x746f776572
@@ -66,9 +71,14 @@ func towerHigher(floor int) float64 {
 
 func towerStars(floor int) int { return min(1+(floor-1)/TowerStarsEvery, MaxStars) }
 
-// TowerPower is the power of floor's enemy team.
+// TowerPower is the power of floor's enemy team: TowerGrowth times the
+// floor below's up to TowerBend, TowerStep more than it after.
 func TowerPower(floor int) int {
-	return int(math.Round(TowerBasePower * math.Pow(TowerGrowth, float64(floor-1))))
+	grown := func(f int) int { return int(math.Round(TowerBasePower * math.Pow(TowerGrowth, float64(f-1)))) }
+	if floor <= TowerBend {
+		return grown(floor)
+	}
+	return grown(TowerBend) + TowerStep*(floor-TowerBend)
 }
 
 // towerReward is what clearing floor gives, the first time, which is the

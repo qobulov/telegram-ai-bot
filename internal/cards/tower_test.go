@@ -85,8 +85,9 @@ func TestTowerTeamIsDeterministic(t *testing.T) {
 	}
 }
 
-// Each floor's team is about TowerGrowth stronger than the one before, of
-// rarer cards and more stars higher up.
+// Each floor's team is about TowerGrowth stronger than the one before up to
+// TowerBend and TowerStep stronger after, of rarer cards and more stars
+// higher up.
 func TestTowerPowerGrowsWithTheFloor(t *testing.T) {
 	catalog := towerCatalog()
 	last := 0
@@ -96,9 +97,14 @@ func TestTowerPowerGrowsWithTheFloor(t *testing.T) {
 		if diff := float64(power)/float64(TowerPower(floor)) - 1; diff > 0.01 || diff < -0.01 {
 			t.Errorf("floor %d: power %d, want about %d", floor, power, TowerPower(floor))
 		}
-		if last > 0 {
+		if last > 0 && floor <= TowerBend {
 			if g := float64(power) / float64(last); g < TowerGrowth-0.02 || g > TowerGrowth+0.02 {
 				t.Errorf("floor %d: power ×%.3f on the floor below", floor, g)
+			}
+		}
+		if last > 0 && floor > TowerBend {
+			if d := power - last; d < TowerStep-300 || d > TowerStep+300 {
+				t.Errorf("floor %d: power %+d on the floor below, want about +%d", floor, d, TowerStep)
 			}
 		}
 		last = power
