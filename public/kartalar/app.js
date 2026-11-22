@@ -897,6 +897,17 @@
     tiles.forEach(({ card, fresh, times }, i) => {
       const tile = cardTile(card);
       tile.style.animationDelay = `${i * deal}s`;
+      // a batch's tile shows the copies held, the card and its free copies,
+      // not its stars, as the owners asked: a starred card showed ★2 here
+      // and no count
+      for (const extra of tile.querySelectorAll(".stars, .count")) extra.remove();
+      const held = (card.free || 0) + 1;
+      if (held > 1) {
+        const count = document.createElement("span");
+        count.className = "count";
+        count.textContent = `×${held}`;
+        tile.append(count);
+      }
       if (fresh) {
         const tag = document.createElement("span");
         tag.className = "fresh";
