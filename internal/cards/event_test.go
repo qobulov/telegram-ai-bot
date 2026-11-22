@@ -259,19 +259,20 @@ func (f *pickStore) OpenEventCards(ctx context.Context, userID int64, name strin
 	return f.eventStore.OpenEventCards(ctx, userID, name, n, ev, day, now, quest)
 }
 
-// The Black Clover event runs the week after Demon Slayer's, set out as that
-// one is, with its six Mythics alone.
+// The Black Clover event runs a week from Wednesday 2026-11-25 19:30, beside
+// Demon Slayer's for its last days, set out as that one is, with its six
+// Mythics alone.
 func TestTheBlackCloverEvent(t *testing.T) {
 	bc := Events[2]
 	if bc.Key != "black-clover" || bc.AtRarity || len(bc.Cards) != 6 || !slices.Equal(bc.sure(), bc.Cards) || bc.Mythic != 11 || bc.Pity != 300 || bc.Share != 6.0/11 ||
-		!bc.Starts.Equal(Events[1].Ends) || bc.Ends.Sub(bc.Starts) != 7*24*time.Hour {
+		!bc.Starts.Equal(time.Date(2026, 11, 25, 19, 30, 0, 0, Location)) || bc.Ends.Sub(bc.Starts) != 7*24*time.Hour {
 		t.Fatalf("the Black Clover event = %+v", bc)
 	}
 	if !slices.Equal(Events[1].sure(), Events[1].Cards) {
 		t.Error("Demon Slayer's pity should count all its cards")
 	}
-	if bc.runs(Events[1].Ends.Add(-time.Second)) || !bc.runs(bc.Starts) {
-		t.Error("the Black Clover event should begin as Demon Slayer's ends")
+	if bc.runs(bc.Starts.Add(-time.Second)) || !bc.runs(bc.Starts) || !bc.runs(Events[1].Ends.Add(-time.Second)) {
+		t.Error("the Black Clover event should begin on Wednesday and run beside Demon Slayer's last days")
 	}
 	// The shop shows it as coming only in the day before it starts.
 	keys := func(now time.Time) []string {

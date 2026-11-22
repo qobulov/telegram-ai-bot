@@ -42,8 +42,9 @@ type Event struct {
 // 2026-11-23 begins in Tashkent, as the owners asked on 2026-11-21, not on
 // 2026-12-02.
 //
-// The Black Clover event, as the owners asked on 2026-11-22: for the week
-// after Demon Slayer's, set out as that one is, its six Mythics, Asta, Yuno,
+// The Black Clover event, as the owners asked on 2026-11-22: for a week from
+// Wednesday 2026-11-25 19:30 in Tashkent, its last three days beside Demon
+// Slayer's, set out as that one is, its six Mythics, Asta, Yuno,
 // Julius, Mereoleona, Yami and Noelle, which nothing else gives
 // (storage.BlackCloverCards), 0.6% a pull beside the usual 0.5% of other
 // Mythics, and a sure one on the 300th pull in a row without one.
@@ -59,7 +60,7 @@ var Events = []Event{
 	{Key: "demon-slayer", Cards: storage.DemonSlayerCards, Mythic: 11, Share: 6.0 / 11, Pity: 300, Price: 1, Batch: 10,
 		Starts: time.Date(2026, 11, 21, 19, 30, 0, 0, Location), Ends: time.Date(2026, 11, 28, 19, 30, 0, 0, Location)},
 	{Key: "black-clover", Cards: storage.BlackCloverCards, Mythic: 11, Share: 6.0 / 11, Pity: 300, Price: 1, Batch: 10,
-		Starts: time.Date(2026, 11, 28, 19, 30, 0, 0, Location), Ends: time.Date(2026, 12, 5, 19, 30, 0, 0, Location)},
+		Starts: time.Date(2026, 11, 25, 19, 30, 0, 0, Location), Ends: time.Date(2026, 12, 2, 19, 30, 0, 0, Location)},
 }
 
 // sure are the cards the event's pity counts and gives.
