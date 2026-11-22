@@ -255,11 +255,17 @@ func Card(id int64, name, anime, image string, favourites, rank int) storage.Car
 // CardOf is the card of a character of rarity r, its numbers within r's.
 func CardOf(id int64, name, anime, image string, favourites int, r Rarity) storage.Card {
 	rl := rules[r]
-	return storage.Card{
+	card := storage.Card{
 		ID: id, Name: name, Anime: anime, ImageURL: image, Favourites: favourites, Rarity: int(r), Value: rl.value, Collection: "anime",
 		Attack: rounded(between(id, "attack", rl.attackLeast, rl.attackMost)),
 		Health: rounded(between(id, "health", rl.healthLeast, rl.healthMost)),
 	}
+	if r == Mythic {
+		if attack, health, ok := mythicStats(id); ok {
+			card.Attack, card.Health = attack, health
+		}
+	}
+	return card
 }
 
 // between is a number in [least, most] that id and what always give.

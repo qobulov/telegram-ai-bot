@@ -150,6 +150,11 @@ var roles = map[int64]role{
 	13020:  {arena.ClassFighter, arena.Stun},   // Askeladd
 	10138:  {arena.ClassFighter, arena.Strike}, // Thorfinn Karlsefni
 	729:    {arena.ClassMage, arena.Strike},    // Yuusuke Urameshi
+	123284: {arena.ClassMage, arena.Strike},    // Yuno: his wind's blades
+	124435: {arena.ClassMage, arena.Stun},      // Julius Novachrono: time stopped
+	124522: {arena.ClassFighter, arena.Poison}, // Mereoleona Vermillion: her fire burning on
+	124440: {arena.ClassFighter, arena.Strike}, // Yami Sukehiro: his dimension slash
+	123283: {arena.ClassMage, arena.Shield},    // Noelle Silva: her Valkyrie armour
 }
 
 // fighterOf is arena.FighterOf with the card's hand-picked role, if it has one.
