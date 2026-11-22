@@ -93,3 +93,63 @@ func TestAnEventOfSeveralCards(t *testing.T) {
 		}
 	}
 }
+
+// An event whose cards come at the rarity rolled gives one of its cards of
+// that rarity when the pick says so, and another card when it has none of
+// it; only its sure card resets the pity, which gives it.
+func TestAnEventAtTheRarityRolled(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	const player = int64(91)
+	asta, yuno := BlackCloverCards[0], BlackCloverCards[3]
+	for _, q := range []string{`DELETE FROM card_pictures`, `DELETE FROM card_catalog`} {
+		if _, err := store.pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	catalog := []Card{
+		{ID: asta, Name: "Asta", Anime: "Black Clover", Rarity: 3, Value: 2000},
+		{ID: yuno, Name: "Yuno", Anime: "Black Clover", Rarity: 0, Value: 100},
+		{ID: 1, Name: "Levi", Anime: "AoT", Rarity: 0, Value: 100},
+		{ID: 2, Name: "Gojo", Anime: "JJK", Rarity: 4, Value: 4000},
+	}
+	if err := store.SaveCardCatalog(ctx, catalog); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.pool.Exec(ctx, `INSERT INTO card_players (user_id, name, tokens) VALUES ($1, 'Ann', 100)`, player); err != nil {
+		t.Fatal(err)
+	}
+	end := time.Date(2026, 12, 5, 19, 30, 0, 0, time.UTC)
+	now := end.Add(-time.Hour)
+	roll, pick := 0, true
+	ev := CardEvent{Key: "black-clover", Cards: []int64{asta, yuno}, AtRarity: true, Sure: []int64{asta}, Ends: end, Pity: 100, Price: 1,
+		Roll: func(int, int) (int, bool) { return roll, false }, Pick: func() bool { return pick }}
+
+	open, err := store.OpenEventCards(ctx, player, "Ann", 3, ev, CardDay{}, now, CardQuest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range open.Draws {
+		if d.Card.ID != yuno {
+			t.Fatalf("a picked Common = %+v, want Yuno, the event's Common", d.Card)
+		}
+	}
+	if open.Pulls != 3 {
+		t.Errorf("pulls = %d, want 3: a Common of the event is not its sure card", open.Pulls)
+	}
+	roll = 4
+	if open, err = store.OpenEventCards(ctx, player, "Ann", 1, ev, CardDay{}, now, CardQuest{}); err != nil || open.Draws[0].Card.ID != 2 {
+		t.Fatalf("a picked Mythic = %+v %v, want Gojo, the event having no Mythic", open, err)
+	}
+	roll, pick = 3, true
+	if open, err = store.OpenEventCards(ctx, player, "Ann", 1, ev, CardDay{}, now, CardQuest{}); err != nil || open.Draws[0].Card.ID != asta || open.Pulls != 0 {
+		t.Fatalf("a picked Legendary = %+v %v, want Asta and the pity begun again", open, err)
+	}
+	if _, err := store.pool.Exec(ctx, `UPDATE card_event_pulls SET pulls = 99 WHERE user_id = $1`, player); err != nil {
+		t.Fatal(err)
+	}
+	roll, pick = 0, false
+	if open, err = store.OpenEventCards(ctx, player, "Ann", 1, ev, CardDay{}, now, CardQuest{}); err != nil || open.Draws[0].Card.ID != asta || !open.Draws[0].Guaranteed {
+		t.Fatalf("the 100th pull = %+v %v, want a sure Asta", open, err)
+	}
+}

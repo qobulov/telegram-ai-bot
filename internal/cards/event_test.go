@@ -258,3 +258,37 @@ func (f *pickStore) OpenEventCards(ctx context.Context, userID int64, name strin
 	*f.picked = ev
 	return f.eventStore.OpenEventCards(ctx, userID, name, n, ev, day, now, quest)
 }
+
+// The Black Clover event runs the week after Demon Slayer's with its 19
+// cards at the rarity rolled, 80% of the pulls of each, and a sure Asta on
+// the 100th pull in a row without him.
+func TestTheBlackCloverEvent(t *testing.T) {
+	bc := Events[2]
+	if bc.Key != "black-clover" || !bc.AtRarity || len(bc.Cards) != 19 || !slices.Equal(bc.sure(), []int64{astaCard}) || bc.Pity != 100 || bc.Share != 0.8 ||
+		!bc.Starts.Equal(Events[1].Ends) || bc.Ends.Sub(bc.Starts) != 7*24*time.Hour {
+		t.Fatalf("the Black Clover event = %+v", bc)
+	}
+	if !slices.Equal(Events[1].sure(), Events[1].Cards) {
+		t.Error("Demon Slayer's pity should count all its cards")
+	}
+	if bc.runs(Events[1].Ends.Add(-time.Second)) || !bc.runs(bc.Starts) {
+		t.Error("the Black Clover event should begin as Demon Slayer's ends")
+	}
+	// The shop shows it as coming only in the day before it starts.
+	keys := func(now time.Time) []string {
+		store := &eventStore{fakeStore: &fakeStore{day: PeriodStart(now)}}
+		h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }})
+		var got []string
+		_, out := post(t, h, signedInit(7, now), "events")
+		for _, e := range out["events"].([]any) {
+			got = append(got, e.(map[string]any)["key"].(string))
+		}
+		return got
+	}
+	if got := keys(bc.Starts.Add(-25 * time.Hour)); slices.Contains(got, "black-clover") {
+		t.Errorf("events 25 hours before = %v, want Black Clover not yet shown", got)
+	}
+	if got := keys(bc.Starts.Add(-23 * time.Hour)); !slices.Equal(got, []string{"demon-slayer", "black-clover"}) {
+		t.Errorf("events 23 hours before = %v, want Demon Slayer's and the coming Black Clover's", got)
+	}
+}

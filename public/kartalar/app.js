@@ -1879,6 +1879,7 @@
       pulled: (icon, n) => `${icon} ${n} ta event karta`, got: (icon, name) => `${icon} ${name} tushdi!`, badge: (icon) => `${icon} EVENT`, go: "Ochish ›",
       firefly: { icon: "🌸", title: "🌸 Firefly Wedding", tag: "EVENT · LIMITED", name: "Satoko", owned: "✅ Satoko sizda bor — har kim faqat bir marta oladi" },
       "demon-slayer": { icon: "⚔️", title: "⚔️ Demon Slayer", tag: "EVENT · 6 MIF", name: "Demon Slayer" },
+      "black-clover": { icon: "🍀", title: "🍀 Black Clover", tag: "EVENT · 19 KARTA", name: "Black Clover", sure: "Asta" },
     },
     ru: {
       left: (d, h, m) => (d ? `⏳ Осталось ${d} дн. ${h} ч.` : h ? `⏳ Осталось ${h} ч. ${m} мин.` : `⏳ Осталось ${m} мин.`),
@@ -1887,6 +1888,7 @@
       pulled: (icon, n) => `${icon} Ивент-карты: ${n}`, got: (icon, name) => `${icon} Выпал(а) ${name}!`, badge: (icon) => `${icon} ИВЕНТ`, go: "Открыть ›",
       firefly: { icon: "🌸", title: "🌸 Firefly Wedding", tag: "ИВЕНТ · LIMITED", name: "Сатоко", owned: "✅ Сатоко уже у вас — её можно получить только один раз" },
       "demon-slayer": { icon: "⚔️", title: "⚔️ Demon Slayer", tag: "ИВЕНТ · 6 МИФ", name: "Demon Slayer" },
+      "black-clover": { icon: "🍀", title: "🍀 Black Clover", tag: "ИВЕНТ · 19 КАРТ", name: "Black Clover", sure: "Аста" },
     },
     en: {
       left: (d, h, m) => (d ? `⏳ ${d} days ${h} hours left` : h ? `⏳ ${h} hours ${m} minutes left` : `⏳ ${m} minutes left`),
@@ -1895,6 +1897,7 @@
       pulled: (icon, n) => `${icon} ${n} event cards`, got: (icon, name) => `${icon} ${name} dropped!`, badge: (icon) => `${icon} EVENT`, go: "Open ›",
       firefly: { icon: "🌸", title: "🌸 Firefly Wedding", tag: "EVENT · LIMITED", name: "Satoko", owned: "✅ You have Satoko — each player gets her once" },
       "demon-slayer": { icon: "⚔️", title: "⚔️ Demon Slayer", tag: "EVENT · 6 MYTHIC", name: "Demon Slayer" },
+      "black-clover": { icon: "🍀", title: "🍀 Black Clover", tag: "EVENT · 19 CARDS", name: "Black Clover", sure: "Asta" },
     },
   };
   const et = eventTexts[language] || eventTexts.uz;
@@ -1910,11 +1913,19 @@
   // eventsShown are the events running or coming, the newest last.
   const eventsShown = () => events.filter((ev) => ev.active || ev.soon);
 
-  // eventMark shows the newest event's badge on the crystals' pill, which
-  // opens the shop, while any runs or is coming, so that players notice it.
-  function eventMark() {
+  // eventFirst is the event to put forward: the newest running, else the
+  // newest coming.
+  function eventFirst() {
     const shown = eventsShown();
-    const last = shown[shown.length - 1];
+    const running = shown.filter((ev) => ev.active);
+    return (running.length ? running : shown).at(-1);
+  }
+
+  // eventMark shows the event put forward's badge on the crystals' pill,
+  // which opens the shop, while any runs or is coming, so that players
+  // notice it.
+  function eventMark() {
+    const last = eventFirst();
     $("eventBadge").hidden = !last;
     if (last) $("eventBadge").textContent = et.badge(eventFace(last).icon);
     eventBanner();
@@ -1925,8 +1936,7 @@
   // shop at it.
   $("eventBannerGo").textContent = et.go;
   function eventBanner() {
-    const shown = eventsShown();
-    const ev = shown[shown.length - 1];
+    const ev = eventFirst();
     const on = !!ev && (opened === "collection" || opened === "draw");
     $("eventBanner").hidden = !on;
     if (!on) return;
@@ -1983,7 +1993,12 @@
     // an event's cards' odds, beside a Mythic's but for the events that show
     // their own alone
     const mythic = ev.odds[4], own = percent(Math.round(mythic * ev.share));
-    box.querySelector(".event-odds").textContent = OWN_ODDS_ONLY.has(ev.key) ? `${face.icon} ${face.name} ${own}` : et.odds(percent(mythic), face.icon, face.name, own);
+    // an event whose cards come at any rarity shows how often a pull is one
+    // of them, and how often its sure card
+    const round = (n) => `${Math.round(n) / 10}%`;
+    box.querySelector(".event-odds").textContent = ev.at_rarity
+      ? `${face.icon} ${face.name} ${round(ev.event_odds)} · 🔥 ${face.sure} ${round(ev.sure_odds)}`
+      : OWN_ODDS_ONLY.has(ev.key) ? `${face.icon} ${face.name} ${own}` : et.odds(percent(mythic), face.icon, face.name, own);
     box.querySelector(".event-one").addEventListener("click", () => eventPull(ev, 1));
     box.querySelector(".event-batch").addEventListener("click", () => eventPull(ev, ev.batch));
     box.querySelector(".event-big").addEventListener("click", () => eventPull(ev, ev.big_batch || 50));
@@ -1993,8 +2008,10 @@
 
   // eventArt draws an event's cards in full; of several, those the player
   // holds keep their tick.
+  // An event of many cards shows its six rarest, which the server lists
+  // first.
   function eventArt(ev) {
-    const tiles = ev.cards.map((card) => {
+    const tiles = ev.cards.slice(0, 6).map((card) => {
       const tile = previewTile(card, 1, ev.once ? (ev.owned ? 1 : 0) : card.count);
       const mark = tile.querySelector(".owned");
       if (mark && (ev.once || !card.count)) mark.remove();
@@ -2005,7 +2022,7 @@
 
   function eventPity(ev) {
     const face = eventFace(ev);
-    ev.box.querySelector(".event-pity-text").textContent = ev.owned ? face.owned : et.pity(face.name, ev.pity, ev.pity_max);
+    ev.box.querySelector(".event-pity-text").textContent = ev.owned ? face.owned : et.pity(face.sure || face.name, ev.pity, ev.pity_max);
     ev.box.querySelector(".event-pity-bar").style.width = ev.owned ? "100%" : `${Math.min(100, (ev.pity / ev.pity_max) * 100)}%`;
     for (const [part, n] of [[".event-one", 1], [".event-batch", ev.batch], [".event-big", ev.big_batch || 50]]) {
       const button = ev.box.querySelector(part);
@@ -2077,7 +2094,8 @@
         note.replaceChildren(...withTiers(fresh ? `${t.fresh} · ${t.plus(spaced(card.value))}` : `${t.again(copies(card))} · ${t.noPoints}`));
         $("sheetCard").prepend(note);
       }
-      if (won.length) { haptic("heavy"); toast(et.got(face.icon, won[0].card.name)); }
+      const prized = won.filter((d) => d.prize ?? true);
+      if (prized.length) { haptic("heavy"); toast(et.got(face.icon, prized[0].card.name)); }
     } catch (error) {
       notice(error);
     } finally {

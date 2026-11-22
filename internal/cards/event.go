@@ -17,11 +17,16 @@ import (
 // one, of those the player lacks if any. Mythic, when not 0, is the
 // event's odds of a Mythic in a thousand, taken from the Commons. A Once
 // event's card is limited: a player holds it once at most. Key names the
-// event to the app and its pity count.
+// event to the app and its pity count. An AtRarity event's cards come at
+// the rarity rolled, Share of the pulls of a rarity it has cards of, not
+// only as Mythics; Sure, when given, are the cards its pity counts and
+// gives, else Cards.
 type Event struct {
 	Key          string
 	Cards        []int64
 	Once         bool
+	AtRarity     bool
+	Sure         []int64
 	Mythic       int
 	Share        float64
 	Pity         int
@@ -37,6 +42,11 @@ type Event struct {
 // 2026-11-23 begins in Tashkent, as the owners asked on 2026-11-21, not on
 // 2026-12-02.
 //
+// The Black Clover event, as the owners asked on 2026-11-22: for the week
+// after Demon Slayer's its 19 cards, which nothing else gives
+// (storage.BlackCloverCards), come at the rarity rolled, 80% of the pulls of
+// each, and Asta, the rarest, is sure on the 100th pull in a row without him.
+//
 // The Demon Slayer event, as the owners asked on 2026-11-21: for a week its
 // six Mythics, which nothing else gives (storage.DemonSlayerCards), 0.6% a
 // pull beside the usual 0.5% of other Mythics (as the owners asked the same
@@ -47,6 +57,19 @@ var Events = []Event{
 		Starts: time.Date(2026, 11, 18, 22, 0, 0, 0, Location), Ends: time.Date(2026, 11, 23, 0, 0, 0, 0, Location)},
 	{Key: "demon-slayer", Cards: storage.DemonSlayerCards, Mythic: 11, Share: 6.0 / 11, Pity: 300, Price: 1, Batch: 10,
 		Starts: time.Date(2026, 11, 21, 19, 30, 0, 0, Location), Ends: time.Date(2026, 11, 28, 19, 30, 0, 0, Location)},
+	{Key: "black-clover", Cards: storage.BlackCloverCards, AtRarity: true, Sure: []int64{astaCard}, Share: 0.8, Pity: 100, Price: 1, Batch: 10,
+		Starts: time.Date(2026, 11, 28, 19, 30, 0, 0, Location), Ends: time.Date(2026, 12, 5, 19, 30, 0, 0, Location)},
+}
+
+// astaCard is Asta, Black Clover's rarest card, its event's sure one.
+const astaCard int64 = 123285
+
+// sure are the cards the event's pity counts and gives.
+func (e Event) sure() []int64 {
+	if len(e.Sure) > 0 {
+		return e.Sure
+	}
+	return e.Cards
 }
 
 // runs is whether the event is open at now.
@@ -121,13 +144,17 @@ func (h *handler) eventPick(share float64) func() bool {
 	}
 }
 
-// events are the events the shop shows, those running or coming, each as
-// eventView gives it.
+// eventShownBefore is how long before it starts the shop shows an event
+// as coming: a week ahead it would stand over the one running.
+const eventShownBefore = 24 * time.Hour
+
+// events are the events the shop shows, those running or starting within
+// eventShownBefore, each as eventView gives it.
 func (h *handler) events(ctx context.Context, user miniapp.User) (any, failure) {
 	now := h.Now()
 	views := []any{}
 	for _, e := range Events {
-		if !now.Before(e.Ends) {
+		if !now.Before(e.Ends) || e.Starts.Sub(now) > eventShownBefore {
 			continue
 		}
 		view, fail := h.eventView(ctx, user, e)
@@ -156,12 +183,27 @@ func (h *handler) eventView(ctx context.Context, user miniapp.User, e Event) (an
 	}
 	views := make([]cardView, len(cards))
 	owned := false
+	odds := e.odds()
+	// eventOdds and sureOdds are a pull's odds in a thousand of one of the
+	// event's cards and of one of its sure ones, for an AtRarity event.
+	ofRarity := map[int]int{}
+	for _, c := range cards {
+		ofRarity[c.Rarity]++
+	}
+	eventOdds, sureOdds := 0.0, 0.0
+	for r := range ofRarity {
+		eventOdds += float64(odds[r]) * e.Share
+	}
 	for i, c := range cards {
 		views[i] = h.held(c, held[c.ID])
 		owned = owned || held[c.ID] > 0
+		if slices.Contains(e.sure(), c.ID) {
+			sureOdds += float64(odds[c.Rarity]) * e.Share / float64(ofRarity[c.Rarity])
+		}
 	}
 	return map[string]any{
 		"key": e.Key, "once": e.Once, "owned": e.Once && owned,
+		"at_rarity": e.AtRarity, "event_odds": eventOdds, "sure_odds": sureOdds,
 		"active": e.runs(now), "soon": now.Before(e.Starts),
 		"starts_in": max(0, e.Starts.Sub(now).Milliseconds()),
 		"ends_at":   e.Ends.UnixMilli(), "ends_in": max(0, e.Ends.Sub(now).Milliseconds()),
@@ -193,7 +235,7 @@ func (h *handler) eventOpen(ctx context.Context, user miniapp.User, key string, 
 		return nil, errUnavailable
 	}
 	ev := storage.CardEvent{
-		Key: e.Key, Cards: e.Cards, Once: e.Once, Ends: e.Ends, Pity: e.Pity, Price: e.Price,
+		Key: e.Key, Cards: e.Cards, Once: e.Once, AtRarity: e.AtRarity, Sure: e.Sure, Ends: e.Ends, Pity: e.Pity, Price: e.Price,
 		Roll: ByOdds(h.eventRoll(e)), Pick: h.eventPick(e.Share),
 	}
 	opened, err := h.Store.OpenEventCards(ctx, user.ID, name(user), n, ev, Today(now), now, questOf(QuestEvent, now))
@@ -210,7 +252,7 @@ func (h *handler) eventOpen(ctx context.Context, user miniapp.User, key string, 
 	drawn := make([]map[string]any, len(opened.Draws))
 	for i, d := range opened.Draws {
 		drawn[i] = map[string]any{"card": h.held(d.Card, d.Count), "new": d.New, "sure": d.Guaranteed, "serial": d.Serial,
-			"event": slices.Contains(e.Cards, d.Card.ID)}
+			"event": slices.Contains(e.Cards, d.Card.ID), "prize": slices.Contains(e.sure(), d.Card.ID)}
 	}
 	return map[string]any{
 		"key": e.Key, "drawn": drawn, "points": opened.Points, "tokens": opened.Tokens, "shards": opened.Shards, "given": opened.Given,

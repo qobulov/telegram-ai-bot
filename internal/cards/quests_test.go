@@ -249,7 +249,8 @@ func TestQuestsStartAgainAtTashkentMidnight(t *testing.T) {
 // A quest done is claimed once for its tokens; one not done or claimed
 // already is refused with the reason, and an unknown quest is a bad request.
 func TestQuestClaim(t *testing.T) {
-	now := time.Date(2026, 12, 5, 12, 0, 0, 0, Location)
+	// after every event, when there is no event quest to claim
+	now := lastEventEnd().Add(12 * time.Hour)
 	store := &fakeStore{day: PeriodStart(now), tokens: 1}
 	call := questCaller(store, &now)
 	if out := call(7, map[string]any{"action": "quest_claim", "quest": QuestFuse}); out["refused"] != "not_done" {

@@ -24,16 +24,29 @@ func (e *CardTokensError) Error() string { return "storage: too few tokens" }
 // so, any other Mythic when not. The Pity-th pull in a row without one of
 // Cards gives one, of those the player lacks if any; Key names the count.
 // A Once event's card is held once at most: one who has it gets other cards,
-// the pity no longer counting.
+// the pity no longer counting. An AtRarity event's cards come at the rarity
+// rolled, any of them, not only a Mythic: Pick says whether a pull of a
+// rarity it has cards of is one of them. Sure, when given, are the cards
+// the pity counts and gives, else Cards.
 type CardEvent struct {
-	Key   string
-	Cards []int64
-	Once  bool
-	Ends  time.Time
-	Pity  int
-	Price int
-	Roll  CardRoll
-	Pick  func() bool
+	Key      string
+	Cards    []int64
+	Once     bool
+	AtRarity bool
+	Sure     []int64
+	Ends     time.Time
+	Pity     int
+	Price    int
+	Roll     CardRoll
+	Pick     func() bool
+}
+
+// sure are the cards the event's pity counts and gives.
+func (ev CardEvent) sure() []int64 {
+	if len(ev.Sure) > 0 {
+		return ev.Sure
+	}
+	return ev.Cards
 }
 
 // fireflyEvent is the first event's key: it counts its pulls in
@@ -114,7 +127,7 @@ func (s *Store) OpenEventCards(ctx context.Context, userID int64, name string, n
 			}
 			open.Draws = append(open.Draws, draw)
 			open.Pulls++
-			if slices.Contains(ev.Cards, card.ID) {
+			if slices.Contains(ev.sure(), card.ID) {
 				open.Pulls = 0
 				held = ev.Once
 			}
@@ -148,27 +161,34 @@ func (s *Store) OpenEventCards(ctx context.Context, userID int64, name string, n
 // Once event's card already gets another.
 func eventCard(ctx context.Context, tx pgx.Tx, userID int64, ev CardEvent, pull int, player cardPlayerRow, held bool) (Card, bool, error) {
 	if !held && pull >= ev.Pity {
-		c, err := pickEventCard(ctx, tx, userID, ev.Cards)
+		c, err := pickEventCard(ctx, tx, userID, ev.sure(), -1)
 		return c, true, err
 	}
 	rarity, raised := ev.Roll(player.sinceLegendary, player.sinceMythic)
-	if rarity == mythicRarity && !held && ev.Pick() {
-		c, err := pickEventCard(ctx, tx, userID, ev.Cards)
-		return c, raised, err
+	if (ev.AtRarity || rarity == mythicRarity) && !held && ev.Pick() {
+		of := -1
+		if ev.AtRarity {
+			of = rarity
+		}
+		c, err := pickEventCard(ctx, tx, userID, ev.Cards, of)
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return c, raised, err
+		}
 	}
 	c, err := randomCard(ctx, tx, rarity, "", ev.Cards)
 	return c, raised, err
 }
 
-// pickEventCard is one of an event's cards at random, of those the player
-// lacks while there are.
-func pickEventCard(ctx context.Context, tx pgx.Tx, userID int64, cards []int64) (Card, error) {
+// pickEventCard is one of an event's cards at random, of rarity or of any
+// when it is negative, of those the player lacks while there are, the
+// rarest first; pgx.ErrNoRows when the event has none of that rarity.
+func pickEventCard(ctx context.Context, tx pgx.Tx, userID int64, cards []int64, rarity int) (Card, error) {
 	var c Card
 	err := tx.QueryRow(ctx, `
 		SELECT c.id, c.name, c.anime, c.image_url, c.favourites, c.rarity, c.attack, c.health, c.value, c.collection
-		FROM card_catalog c WHERE c.id = ANY($1)
-		ORDER BY EXISTS (SELECT 1 FROM card_owned o WHERE o.user_id = $2 AND o.card_id = c.id AND o.count > 0), random()
-		LIMIT 1`, cards, userID).
+		FROM card_catalog c WHERE c.id = ANY($1) AND ($3::int < 0 OR c.rarity = $3::int)
+		ORDER BY EXISTS (SELECT 1 FROM card_owned o WHERE o.user_id = $2 AND o.card_id = c.id AND o.count > 0), c.rarity DESC, random()
+		LIMIT 1`, cards, userID, rarity).
 		Scan(&c.ID, &c.Name, &c.Anime, &c.ImageURL, &c.Favourites, &c.Rarity, &c.Attack, &c.Health, &c.Value, &c.Collection)
 	return c, err
 }
