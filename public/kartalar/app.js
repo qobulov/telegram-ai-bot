@@ -1058,14 +1058,28 @@
     }
   }
 
+  // OFFER_FILTERS are the market's filters: "all" holds the player's own
+  // offers too, marked, so one just placed is seen on the market; "can" is
+  // others' the player can take; "mine" the player's own.
+  const OFFER_FILTERS = {
+    all: () => true,
+    can: (o) => o.can && !o.mine,
+    mine: (o) => o.mine,
+  };
+
   function marketList() {
     $("marketHint").textContent = t.marketHint();
-    for (const chip of document.querySelectorAll("#marketFilter button")) chip.setAttribute("aria-pressed", String(chip.dataset.f === offerFilter));
+    // each filter shows how many offers it holds, as the owners asked
+    const labels = { all: t.filterAll, can: t.filterCan, mine: t.filterMine };
+    for (const chip of document.querySelectorAll("#marketFilter button")) {
+      chip.setAttribute("aria-pressed", String(chip.dataset.f === offerFilter));
+      const count = document.createElement("small");
+      count.textContent = offers.filter(OFFER_FILTERS[chip.dataset.f]).length;
+      chip.replaceChildren(labels[chip.dataset.f], count);
+    }
     const list = $("offers");
     list.textContent = "";
-    // "All" holds the player's own offers too, marked, so one just placed is
-    // seen on the market; "can" is others' the player can take.
-    const shown = offers.filter((o) => offerFilter === "all" ? true : offerFilter === "can" ? o.can && !o.mine : o.mine);
+    const shown = offers.filter(OFFER_FILTERS[offerFilter] || OFFER_FILTERS.all);
     if (!shown.length) list.innerHTML = `<li class="empty">${t.marketEmpty}</li>`;
     for (const o of shown) {
       const li = document.createElement("li");
