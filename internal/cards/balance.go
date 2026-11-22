@@ -16,11 +16,29 @@ const (
 // the lowest can still beat one of the highest, and on the whole as strong as
 // the Mythics were before (9485 on average), so that they stand no further
 // above the rest.
-var tierPower = [...]int{tierB: 8800, tierA: 9500, tierS: 10200}
+var tierPower = [...]int{tierB: 8820, tierA: 9520, tierS: 10220}
 
 // classShape is each class's health to attack: a Tank much life and little
 // attack, a Mage the other way round.
 var classShape = map[arena.Class]float64{arena.ClassTank: 5.0, arena.ClassFighter: 3.6, arena.ClassMage: 2.6}
+
+// classPower and skillPower scale a Mythic's power by its role, as the
+// owners asked on 2026-11-22 that Mythics of one tier not all be as strong.
+// They were found by simulating 40000 battles of random Mythic teams, so that
+// each class and each skill wins about half its battles (all within 48-52%):
+// a Mage, striking first and hard, needs less power for it, and Heal, which
+// mends only a loss, a little more.
+var (
+	classPower = map[arena.Class]float64{arena.ClassTank: 1.03, arena.ClassFighter: 1.02, arena.ClassMage: 0.94}
+	skillPower = map[arena.Skill]float64{
+		arena.Stun: 1.005, arena.Heal: 1.03, arena.Shield: 0.99, arena.Provoke: 0.99, arena.Poison: 1.00, arena.Strike: 1.00,
+	}
+)
+
+// mythicSpread is how far either way a Mythic's own power may lie from its
+// tier and role's: those of one tier and class are spread evenly across it,
+// by their ids, so that no two are alike.
+const mythicSpread = 0.045
 
 // mythicTiers are the Mythics' tiers, as the owners asked on 2026-11-22 that
 // each be as strong as its character and no one by the luck of its id.
@@ -35,8 +53,33 @@ var mythicTiers = map[int64]tier{
 	127222: tierB, 298761: tierB, 127518: tierB, 124381: tierB, 123283: tierB, // Mai, Satoko, Nezuko, Zero Two, Noelle
 }
 
-// mythicStats are a tiered Mythic's attack and health at ★1, by its tier
-// and its hand-picked class; ok is false for any other card.
+// mythicPower is a tiered Mythic's power at ★1: its tier's, scaled by its
+// role and spread among those of its tier and class.
+func mythicPower(id int64, t tier, r role) float64 {
+	return float64(tierPower[t]) * classPower[r.class] * skillPower[r.skill] * (1 + mythicSpreadOf(id, t, r))
+}
+
+// mythicSpreadOf is where id lies among the Mythics of tier t and r's class,
+// from -mythicSpread for the lowest id to +mythicSpread for the highest.
+func mythicSpreadOf(id int64, t tier, r role) float64 {
+	below, all := 0, 0
+	for other, ot := range mythicTiers {
+		if ot != t || roles[other].class != r.class {
+			continue
+		}
+		all++
+		if other < id {
+			below++
+		}
+	}
+	if all < 2 {
+		return 0
+	}
+	return mythicSpread * (2*float64(below)/float64(all-1) - 1)
+}
+
+// mythicStats are a tiered Mythic's attack and health at ★1, its power
+// shaped by its hand-picked class; ok is false for any other card.
 func mythicStats(id int64) (attack, health int, ok bool) {
 	t, ok := mythicTiers[id]
 	r, picked := roles[id]
@@ -44,6 +87,6 @@ func mythicStats(id int64) (attack, health int, ok bool) {
 		return 0, 0, false
 	}
 	shape := classShape[r.class]
-	a := float64(tierPower[t]) / (1 + shape/4)
+	a := mythicPower(id, t, r) / (1 + shape/4)
 	return rounded(int(a)), rounded(int(a * shape)), true
 }
