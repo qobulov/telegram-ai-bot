@@ -126,8 +126,8 @@ func TestTheCardEvent(t *testing.T) {
 	if out := pull(1); out["refused"] != "over" {
 		t.Errorf("a pull after the end = %v", out)
 	}
-	if _, out := post(t, h, signedInit(7, now), "events"); len(out["events"].([]any)) != 1 {
-		t.Errorf("the events once Firefly ended = %v, want Demon Slayer's alone", out)
+	if _, out := post(t, h, signedInit(7, now), "events"); len(out["events"].([]any)) != 2 {
+		t.Errorf("the events once Firefly ended = %v, want Demon Slayer's and the coming Black Clover's", out)
 	}
 	now = lastEventEnd()
 	if _, out := post(t, h, signedInit(7, now), "events"); len(out["events"].([]any)) != 0 {
@@ -274,7 +274,7 @@ func TestTheBlackCloverEvent(t *testing.T) {
 	if bc.runs(bc.Starts.Add(-time.Second)) || !bc.runs(bc.Starts) || !bc.runs(Events[1].Ends.Add(-time.Second)) {
 		t.Error("the Black Clover event should begin on Wednesday and run beside Demon Slayer's last days")
 	}
-	// The shop shows it as coming only in the day before it starts.
+	// The shop shows it as coming from 2026-11-22, the owners' wish.
 	keys := func(now time.Time) []string {
 		store := &eventStore{fakeStore: &fakeStore{day: PeriodStart(now)}}
 		h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }})
@@ -285,8 +285,11 @@ func TestTheBlackCloverEvent(t *testing.T) {
 		}
 		return got
 	}
-	if got := keys(bc.Starts.Add(-25 * time.Hour)); slices.Contains(got, "black-clover") {
-		t.Errorf("events 25 hours before = %v, want Black Clover not yet shown", got)
+	if got := keys(bc.Shown.Add(-time.Minute)); slices.Contains(got, "black-clover") {
+		t.Errorf("events before it is shown = %v, want Black Clover not yet shown", got)
+	}
+	if got := keys(bc.Shown.Add(time.Hour)); !slices.Contains(got, "black-clover") {
+		t.Errorf("events once it is shown = %v, want the coming Black Clover's", got)
 	}
 	if got := keys(bc.Starts.Add(-23 * time.Hour)); !slices.Equal(got, []string{"demon-slayer", "black-clover"}) {
 		t.Errorf("events 23 hours before = %v, want Demon Slayer's and the coming Black Clover's", got)

@@ -1875,7 +1875,7 @@
     uz: {
       left: (d, h, m) => (d ? `⏳ ${d} kun ${h} soat qoldi` : h ? `⏳ ${h} soat ${m} daqiqa qoldi` : `⏳ ${m} daqiqa qoldi`),
       odds: (m, icon, name, s) => `👑 Mifik ${m} · ${icon} ${name} ${s}`, pity: (name, n, max) => `${name} kafolati: ${n}/${max}`,
-      open: (n, price) => `${n * price} 🎟`, short: (n) => `🎟 Yana ${n} ta token kerak`, over: "Event tugadi", starts: (h, m) => (h ? `⏳ ${h} soat ${m} daqiqadan keyin boshlanadi` : `⏳ ${m} daqiqadan keyin boshlanadi`), soon: "Event hali boshlanmadi",
+      open: (n, price) => `${n * price} 🎟`, short: (n) => `🎟 Yana ${n} ta token kerak`, over: "Event tugadi", starts: (d, h, m) => (d ? `⏳ ${d} kun ${h} soatdan keyin boshlanadi` : h ? `⏳ ${h} soat ${m} daqiqadan keyin boshlanadi` : `⏳ ${m} daqiqadan keyin boshlanadi`), soon: "Event hali boshlanmadi",
       pulled: (icon, n) => `${icon} ${n} ta event karta`, got: (icon, name) => `${icon} ${name} tushdi!`, badge: (icon) => `${icon} EVENT`, go: "Ochish ›",
       firefly: { icon: "🌸", title: "🌸 Firefly Wedding", tag: "EVENT · LIMITED", name: "Satoko", owned: "✅ Satoko sizda bor — har kim faqat bir marta oladi" },
       "demon-slayer": { icon: "⚔️", title: "⚔️ Demon Slayer", tag: "EVENT · 6 MIF", name: "Demon Slayer" },
@@ -1884,7 +1884,7 @@
     ru: {
       left: (d, h, m) => (d ? `⏳ Осталось ${d} дн. ${h} ч.` : h ? `⏳ Осталось ${h} ч. ${m} мин.` : `⏳ Осталось ${m} мин.`),
       odds: (m, icon, name, s) => `👑 Мифическая ${m} · ${icon} ${name} ${s}`, pity: (name, n, max) => `Гарант ${name}: ${n}/${max}`,
-      open: (n, price) => `${n * price} 🎟`, short: (n) => `🎟 Нужно ещё ${n} токенов`, over: "Ивент закончился", starts: (h, m) => (h ? `⏳ Начнётся через ${h} ч. ${m} мин.` : `⏳ Начнётся через ${m} мин.`), soon: "Ивент ещё не начался",
+      open: (n, price) => `${n * price} 🎟`, short: (n) => `🎟 Нужно ещё ${n} токенов`, over: "Ивент закончился", starts: (d, h, m) => (d ? `⏳ Начнётся через ${d} дн. ${h} ч.` : h ? `⏳ Начнётся через ${h} ч. ${m} мин.` : `⏳ Начнётся через ${m} мин.`), soon: "Ивент ещё не начался",
       pulled: (icon, n) => `${icon} Ивент-карты: ${n}`, got: (icon, name) => `${icon} Выпал(а) ${name}!`, badge: (icon) => `${icon} ИВЕНТ`, go: "Открыть ›",
       firefly: { icon: "🌸", title: "🌸 Firefly Wedding", tag: "ИВЕНТ · LIMITED", name: "Сатоко", owned: "✅ Сатоко уже у вас — её можно получить только один раз" },
       "demon-slayer": { icon: "⚔️", title: "⚔️ Demon Slayer", tag: "ИВЕНТ · 6 МИФ", name: "Demon Slayer" },
@@ -1893,7 +1893,7 @@
     en: {
       left: (d, h, m) => (d ? `⏳ ${d} days ${h} hours left` : h ? `⏳ ${h} hours ${m} minutes left` : `⏳ ${m} minutes left`),
       odds: (m, icon, name, s) => `👑 Mythic ${m} · ${icon} ${name} ${s}`, pity: (name, n, max) => `${name} guarantee: ${n}/${max}`,
-      open: (n, price) => `${n * price} 🎟`, short: (n) => `🎟 ${n} more tokens needed`, over: "The event is over", starts: (h, m) => (h ? `⏳ Starts in ${h} hours ${m} minutes` : `⏳ Starts in ${m} minutes`), soon: "The event has not started yet",
+      open: (n, price) => `${n * price} 🎟`, short: (n) => `🎟 ${n} more tokens needed`, over: "The event is over", starts: (d, h, m) => (d ? `⏳ Starts in ${d} days ${h} hours` : h ? `⏳ Starts in ${h} hours ${m} minutes` : `⏳ Starts in ${m} minutes`), soon: "The event has not started yet",
       pulled: (icon, n) => `${icon} ${n} event cards`, got: (icon, name) => `${icon} ${name} dropped!`, badge: (icon) => `${icon} EVENT`, go: "Open ›",
       firefly: { icon: "🌸", title: "🌸 Firefly Wedding", tag: "EVENT · LIMITED", name: "Satoko", owned: "✅ You have Satoko — each player gets her once" },
       "demon-slayer": { icon: "⚔️", title: "⚔️ Demon Slayer", tag: "EVENT · 6 MYTHIC", name: "Demon Slayer" },
@@ -2041,7 +2041,7 @@
         const wait = ev.startsAt - Date.now();
         if (wait <= 0) { eventBlock(); return; }
         const m = Math.ceil(wait / 60000);
-        ends.textContent = et.starts(Math.floor(m / 60), m % 60);
+        ends.textContent = et.starts(Math.floor(m / 1440), Math.floor((m % 1440) / 60), m % 60);
         continue;
       }
       if (!ev.active) continue;

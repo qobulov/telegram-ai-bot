@@ -20,7 +20,8 @@ import (
 // event to the app and its pity count. An AtRarity event's cards come at
 // the rarity rolled, Share of the pulls of a rarity it has cards of, not
 // only as Mythics; Sure, when given, are the cards its pity counts and
-// gives, else Cards.
+// gives, else Cards. Shown, when set, is when the shop begins to show it as
+// coming, else eventShownBefore its start.
 type Event struct {
 	Key          string
 	Cards        []int64
@@ -32,6 +33,7 @@ type Event struct {
 	Pity         int
 	Price, Batch int
 	Starts, Ends time.Time
+	Shown        time.Time
 }
 
 // Events are the events, in the order the shop shows them.
@@ -44,7 +46,8 @@ type Event struct {
 //
 // The Black Clover event, as the owners asked on 2026-11-22: for a week from
 // Wednesday 2026-11-25 19:30 in Tashkent, its last three days beside Demon
-// Slayer's, set out as that one is, its six Mythics, Asta, Yuno,
+// Slayer's, shown as coming from 2026-11-22 (not to be opened before it
+// starts), set out as that one is, its six Mythics, Asta, Yuno,
 // Julius, Mereoleona, Yami and Noelle, which nothing else gives
 // (storage.BlackCloverCards), 0.6% a pull beside the usual 0.5% of other
 // Mythics, and a sure one on the 300th pull in a row without one.
@@ -60,7 +63,8 @@ var Events = []Event{
 	{Key: "demon-slayer", Cards: storage.DemonSlayerCards, Mythic: 11, Share: 6.0 / 11, Pity: 300, Price: 1, Batch: 10,
 		Starts: time.Date(2026, 11, 21, 19, 30, 0, 0, Location), Ends: time.Date(2026, 11, 28, 19, 30, 0, 0, Location)},
 	{Key: "black-clover", Cards: storage.BlackCloverCards, Mythic: 11, Share: 6.0 / 11, Pity: 300, Price: 1, Batch: 10,
-		Starts: time.Date(2026, 11, 25, 19, 30, 0, 0, Location), Ends: time.Date(2026, 12, 2, 19, 30, 0, 0, Location)},
+		Starts: time.Date(2026, 11, 25, 19, 30, 0, 0, Location), Ends: time.Date(2026, 12, 2, 19, 30, 0, 0, Location),
+		Shown: time.Date(2026, 11, 22, 0, 0, 0, 0, Location)},
 }
 
 // sure are the cards the event's pity counts and gives.
@@ -69,6 +73,14 @@ func (e Event) sure() []int64 {
 		return e.Sure
 	}
 	return e.Cards
+}
+
+// shownFrom is when the shop begins to show the event.
+func (e Event) shownFrom() time.Time {
+	if !e.Shown.IsZero() {
+		return e.Shown
+	}
+	return e.Starts.Add(-eventShownBefore)
 }
 
 // runs is whether the event is open at now.
@@ -153,7 +165,7 @@ func (h *handler) events(ctx context.Context, user miniapp.User) (any, failure) 
 	now := h.Now()
 	views := []any{}
 	for _, e := range Events {
-		if !now.Before(e.Ends) || e.Starts.Sub(now) > eventShownBefore {
+		if !now.Before(e.Ends) || now.Before(e.shownFrom()) {
 			continue
 		}
 		view, fail := h.eventView(ctx, user, e)
