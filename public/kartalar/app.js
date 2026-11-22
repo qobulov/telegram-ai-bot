@@ -3050,8 +3050,9 @@
   // 650 since 2026-11-21: at 350 the owners found the battle too fast to follow.
   const STEP = 650;
   // SKIP_POINTS is the card points a player needs for the battle's Skip
-  // button, as the owners asked on 2026-11-21.
-  const SKIP_POINTS = 200000;
+  // button, as the owners asked on 2026-11-21 (150000 since 2026-11-22, from
+  // 200000).
+  const SKIP_POINTS = 150000;
   // HITS are the events that go from one side to the other.
   const HITS = ["hit", "strike", "stun", "poison"];
   // START_ENERGY is each class's energy at a battle's start, as arena.StartEnergy gives it.
