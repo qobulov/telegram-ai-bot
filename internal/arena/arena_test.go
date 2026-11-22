@@ -25,10 +25,10 @@ func TestFighterOfIsStable(t *testing.T) {
 		class          Class
 	}{
 		{100, 400, ClassTank},
-		{100, 399, ClassFighter},
-		{100, 301, ClassFighter},
-		{100, 300, ClassMage},
-		{100, 200, ClassMage},
+		{100, 399, ClassDealer},
+		{100, 301, ClassDealer},
+		{100, 300, ClassSupport},
+		{100, 200, ClassSupport},
 	}
 	for _, c := range cases {
 		if got := FighterOf(1, "x", 1, 1, c.attack, c.health).Class; got != c.class {
@@ -194,12 +194,14 @@ func TestEdgeTriangle(t *testing.T) {
 		from, to Class
 		edge     bool
 	}{
-		{ClassTank, ClassFighter, true},
-		{ClassFighter, ClassMage, true},
-		{ClassMage, ClassTank, true},
-		{ClassFighter, ClassTank, false},
-		{ClassMage, ClassFighter, false},
-		{ClassTank, ClassMage, false},
+		{ClassTank, ClassDealer, true},
+		{ClassDealer, ClassSupport, true},
+		{ClassSupport, ClassHealer, true},
+		{ClassHealer, ClassTank, true},
+		{ClassDealer, ClassTank, false},
+		{ClassSupport, ClassDealer, false},
+		{ClassTank, ClassSupport, false},
+		{ClassHealer, ClassSupport, false},
 		{ClassTank, ClassTank, false},
 	}
 	for _, c := range cases {
@@ -245,7 +247,7 @@ func TestStartEnergyByClass(t *testing.T) {
 	a.Front[1] = FighterOf(2, "fighter", 1, 1, 100, 350)
 	a.Back[0] = FighterOf(3, "mage", 1, 1, 100, 200)
 	f := newFight(a, Team{}, 1)
-	for slot, want := range []int{StartEnergyTank, StartEnergyFighter, StartEnergyMage} {
+	for slot, want := range []int{StartEnergyTank, StartEnergyDealer, StartEnergySupport} {
 		if got := f.teams[0][slot].energy; got != want {
 			t.Errorf("slot %d starts with %d energy, want %d", slot, got, want)
 		}
@@ -261,8 +263,8 @@ func TestEnergyGain(t *testing.T) {
 	u, wall := f.teams[0][0], f.teams[1][0]
 	f.act(u)
 	e := lastOf(f.events, KindHit)
-	if e.Energy != StartEnergyFighter+EnergyPerAction || u.energy != e.Energy {
-		t.Errorf("hitter's energy %d (event %d), want %d", u.energy, e.Energy, StartEnergyFighter+EnergyPerAction)
+	if e.Energy != StartEnergyDealer+EnergyPerAction || u.energy != e.Energy {
+		t.Errorf("hitter's energy %d (event %d), want %d", u.energy, e.Energy, StartEnergyDealer+EnergyPerAction)
 	}
 	if e.ToEnergy != StartEnergyTank+EnergyWhenHit || wall.energy != e.ToEnergy {
 		t.Errorf("wall's energy %d (event %d), want %d", wall.energy, e.ToEnergy, StartEnergyTank+EnergyWhenHit)

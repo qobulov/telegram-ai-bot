@@ -13,7 +13,7 @@ const (
 	MaxRounds = 30 // after this many rounds the team with more health left wins
 
 	TankRatio = 4.0 // health/attack at or above this is a Tank
-	MageRatio = 3.0 // health/attack at or below this is a Mage
+	MageRatio = 3.0 // health/attack at or below this is a Support
 
 	MinSkillRarity = 3 // Legendary (3) and Mythic (4) carry a skill
 
@@ -24,11 +24,12 @@ const (
 	EnergyMax       = 100
 	EnergyPerAction = 34 // after each own action but a skill
 	EnergyWhenHit   = 10 // each time it takes damage, a poison tick too
-	// The energy each class starts with, so that skills do not all come on
-	// the same turn; Mages, the fastest, come first.
+	// The energy each role starts with, so that skills do not all come on
+	// the same turn; Supports, the fastest, come first.
 	StartEnergyTank    = 30
-	StartEnergyFighter = 20
-	StartEnergyMage    = 40
+	StartEnergyDealer  = 20
+	StartEnergySupport = 40
+	StartEnergyHealer  = 30
 
 	// The skills' numbers below were tuned on 2026-11-19 by simulating
 	// teams of five Mythics of one skill against mixed ones, until each
@@ -38,20 +39,24 @@ const (
 	ShieldShare    = 0.45 // a Shield gives itself and its weakest ally this share of their health
 	PoisonTurns    = 3    // a Poison hurts the target at the start of its next 3 turns ...
 	PoisonShare    = 0.15 // ... by this share of its health, past any shield
-	ProvokeRounds  = 3    // a Provoke draws enemy Tanks and Fighters for 3 more rounds ...
+	ProvokeRounds  = 3    // a Provoke draws enemy Tanks, Dealers and Healers for 3 more rounds ...
 	ProvokeGuard   = 0.7  // ... and takes this share of the damage meanwhile, so that it holds
-	EdgeFactor     = 1.25 // Tank beats Fighter, Fighter beats Mage, Mage beats Tank
+	EdgeFactor     = 1.25 // Tank beats Dealer, Dealer Support, Support Healer, Healer Tank
 	DamageSpreadLo = 0.9
 	DamageSpreadHi = 1.1
 )
 
-// Class is named ClassX because Fighter is the card type.
+// Class is a fighter's role, as in Souls since the owners asked on
+// 2026-11-22: a Tank holds the front, a Dealer deals the damage, a Support,
+// the fastest, hits the weakest in the back row, and a Healer mends. It is
+// named ClassX because Fighter is the card type.
 type Class int
 
 const (
 	ClassTank Class = iota
-	ClassFighter
-	ClassMage
+	ClassDealer
+	ClassSupport
+	ClassHealer
 )
 
 type Skill int
@@ -84,12 +89,12 @@ type Fighter struct {
 // FighterOf makes a fighter, giving it its class by its health to attack
 // ratio and, from Legendary up, a skill by its card id.
 func FighterOf(id int64, name string, rarity, stars, attack, health int) Fighter {
-	f := Fighter{CardID: id, Name: name, Rarity: rarity, Stars: stars, Attack: attack, Health: health, Class: ClassFighter}
+	f := Fighter{CardID: id, Name: name, Rarity: rarity, Stars: stars, Attack: attack, Health: health, Class: ClassDealer}
 	switch {
 	case float64(health) >= TankRatio*float64(attack):
 		f.Class = ClassTank
 	case float64(health) <= MageRatio*float64(attack):
-		f.Class = ClassMage
+		f.Class = ClassSupport
 	}
 	if rarity >= MinSkillRarity {
 		n := int64(len(skillPool))
@@ -103,10 +108,12 @@ func StartEnergy(c Class) int {
 	switch c {
 	case ClassTank:
 		return StartEnergyTank
-	case ClassMage:
-		return StartEnergyMage
+	case ClassSupport:
+		return StartEnergySupport
+	case ClassHealer:
+		return StartEnergyHealer
 	}
-	return StartEnergyFighter
+	return StartEnergyDealer
 }
 
 // Team is two fighters in front and three behind: slots 0-1, then 2-4.
@@ -171,7 +178,7 @@ type unit struct {
 	energy     int
 	stunned    bool // skips its next turn
 	poisoned   int  // its turns left to be hurt by poison
-	provoking  int  // the last round it draws enemy Tanks and Fighters
+	provoking  int  // the last round it draws enemy Tanks, Dealers and Healers
 }
 
 func (u *unit) alive() bool { return u.hp > 0 }
@@ -226,9 +233,9 @@ func newFight(attacker, defender Team, seed int64) *fight {
 
 func speed(c Class) int {
 	switch c {
-	case ClassMage:
+	case ClassSupport:
 		return 3
-	case ClassFighter:
+	case ClassDealer, ClassHealer:
 		return 2
 	}
 	return 1
@@ -349,19 +356,19 @@ func (f *fight) poisonTick(u *unit) {
 	}
 }
 
-// provoke draws enemy Tanks and Fighters to u for the rest of this round
+// provoke draws enemy Tanks, Dealers and Healers to u for the rest of this round
 // and the next ProvokeRounds.
 func (f *fight) provoke(u *unit) {
 	u.provoking = f.round + ProvokeRounds
 	f.record(KindProvoke, u, u, 0, false)
 }
 
-// target is a living provoker for Tanks and Fighters, else the first living
-// front unit, or the first back one; a Mage ignores provokers and picks the
+// target is a living provoker for Tanks, Dealers and Healers, else the first
+// living front unit, or the first back one; a Support ignores provokers and picks the
 // back unit with the least health, else the front.
 func (f *fight) target(u *unit) *unit {
 	foes := f.teams[1-u.side]
-	if u.Class == ClassMage {
+	if u.Class == ClassSupport {
 		return mageTarget(foes)
 	}
 	if c := f.provoker(foes); c != nil {
@@ -431,10 +438,10 @@ func healAmount(to *unit) int {
 	return min(int(HealShare*float64(to.Health)), to.Health-to.hp)
 }
 
-// edge is whether a's class beats b's: Tank beats Fighter, Fighter beats
-// Mage, Mage beats Tank.
+// edge is whether a's role beats b's, round the circle of four: Tank beats
+// Dealer, Dealer Support, Support Healer, Healer Tank.
 func edge(a, b Class) bool {
-	return a == ClassTank && b == ClassFighter || a == ClassFighter && b == ClassMage || a == ClassMage && b == ClassTank
+	return b == (a+1)%4
 }
 
 func (f *fight) hit(from, to *unit, factor float64, kind string) {

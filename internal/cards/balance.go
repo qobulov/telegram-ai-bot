@@ -16,22 +16,21 @@ const (
 // the lowest can still beat one of the highest, and on the whole as strong as
 // the Mythics were before (9485 on average), so that they stand no further
 // above the rest.
-var tierPower = [...]int{tierB: 8820, tierA: 9520, tierS: 10220}
+var tierPower = [...]int{tierB: 8760, tierA: 9460, tierS: 10160}
 
-// classShape is each class's health to attack: a Tank much life and little
-// attack, a Mage the other way round.
-var classShape = map[arena.Class]float64{arena.ClassTank: 5.0, arena.ClassFighter: 3.6, arena.ClassMage: 2.6}
+// classShape is each role's health to attack: a Tank much life and little
+// attack, a Support the other way round, a Healer, standing long, between.
+var classShape = map[arena.Class]float64{arena.ClassTank: 5.0, arena.ClassDealer: 3.4, arena.ClassSupport: 2.8, arena.ClassHealer: 3.8}
 
 // classPower and skillPower scale a Mythic's power by its role, as the
 // owners asked on 2026-11-22 that Mythics of one tier not all be as strong.
 // They were found by simulating 40000 battles of random Mythic teams, so that
-// each class and each skill wins about half its battles (all within 48-52%):
-// a Mage, striking first and hard, needs less power for it, and Heal, which
-// mends only a loss, a little more.
+// each of Souls' four roles and each skill wins about half its battles (all
+// within 49-51.5%): a Healer, dealing little, needs more power for it.
 var (
-	classPower = map[arena.Class]float64{arena.ClassTank: 1.03, arena.ClassFighter: 1.02, arena.ClassMage: 0.94}
+	classPower = map[arena.Class]float64{arena.ClassTank: 1.02, arena.ClassDealer: 0.99, arena.ClassSupport: 0.99, arena.ClassHealer: 1.04}
 	skillPower = map[arena.Skill]float64{
-		arena.Stun: 1.005, arena.Heal: 1.03, arena.Shield: 0.99, arena.Provoke: 0.99, arena.Poison: 1.00, arena.Strike: 1.00,
+		arena.Stun: 1.02, arena.Heal: 1.03, arena.Shield: 1.00, arena.Provoke: 0.99, arena.Poison: 1.02, arena.Strike: 0.985,
 	}
 )
 

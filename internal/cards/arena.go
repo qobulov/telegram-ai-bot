@@ -53,7 +53,7 @@ func arenaRules(now time.Time) storage.ArenaRules {
 }
 
 var (
-	classNames = map[arena.Class]string{arena.ClassTank: "tank", arena.ClassFighter: "fighter", arena.ClassMage: "mage"}
+	classNames = map[arena.Class]string{arena.ClassTank: "tank", arena.ClassDealer: "dealer", arena.ClassSupport: "support", arena.ClassHealer: "healer"}
 	skillNames = map[arena.Skill]string{arena.NoSkill: "", arena.Strike: "strike", arena.Heal: "heal", arena.Shield: "shield",
 		arena.Stun: "stun", arena.Poison: "poison", arena.Provoke: "provoke"}
 )

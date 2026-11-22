@@ -22,15 +22,15 @@ func TestRoles(t *testing.T) {
 	roles = handPicked
 	t.Cleanup(func() { roles = nil })
 
-	// Saitama's numbers alone would make him a Mage.
-	if f := fighterOf(73935, "Saitama", int(Mythic), 1, 5800, 15610); f.Class != arena.ClassFighter || f.Skill != arena.Strike {
-		t.Errorf("Saitama = class %v skill %v, want a Fighter with Strike", f.Class, f.Skill)
+	// Saitama's numbers alone would make him a Support.
+	if f := fighterOf(73935, "Saitama", int(Mythic), 1, 5800, 15610); f.Class != arena.ClassDealer || f.Skill != arena.Strike {
+		t.Errorf("Saitama = class %v skill %v, want a Dealer with Strike", f.Class, f.Skill)
 	}
 	// Gojo's numbers alone would make him a Tank.
-	if f := fighterOf(127691, "Satoru Gojou", int(Mythic), 1, 4500, 21890); f.Class != arena.ClassMage || f.Skill != arena.Shield {
-		t.Errorf("Gojo = class %v skill %v, want a Mage with Shield", f.Class, f.Skill)
+	if f := fighterOf(127691, "Satoru Gojou", int(Mythic), 1, 4500, 21890); f.Class != arena.ClassSupport || f.Skill != arena.Shield {
+		t.Errorf("Gojo = class %v skill %v, want a Support with Shield", f.Class, f.Skill)
 	}
-	if class, skill := roleNames(127691, int(Mythic)); class != "mage" || skill != "shield" {
+	if class, skill := roleNames(127691, int(Mythic)); class != "support" || skill != "shield" {
 		t.Errorf("Gojo's role for the page = %q %q", class, skill)
 	}
 	if f, want := fighterOf(999999999, "nobody", int(Common), 1, 100, 500), arena.FighterOf(999999999, "nobody", int(Common), 1, 100, 500); f != want {
@@ -38,6 +38,10 @@ func TestRoles(t *testing.T) {
 	}
 	if class, skill := roleNames(999999999, int(Common)); class != "" || skill != "" {
 		t.Errorf("a card without a role for the page = %q %q", class, skill)
+	}
+	// Emilia heals: a Healer.
+	if f := fighterOf(88572, "Emilia", int(Mythic), 1, 4000, 15000); f.Class != arena.ClassHealer || f.Skill != arena.Heal {
+		t.Errorf("Emilia = class %v skill %v, want a Healer with Heal", f.Class, f.Skill)
 	}
 	for id, r := range roles {
 		if r.skill == arena.NoSkill || classNames[r.class] == "" {

@@ -115,6 +115,9 @@ func arenaCards() []storage.OwnedCard {
 	cards := make([]storage.OwnedCard, 5)
 	for i := range cards {
 		c := storage.Card{ID: int64(10 + i), Name: "Hero", ImageURL: "https://img/h.png", Rarity: i % 5, Attack: 1000, Health: 3000 + 1000*i}
+		if i == 1 {
+			c.Health = 3500 // a Dealer, between the Support and the Tanks
+		}
 		cards[i] = storage.OwnedCard{Card: c, Count: 1, Stars: 2}
 	}
 	return cards
@@ -152,7 +155,7 @@ func TestArenaTeamIsSavedWithItsPower(t *testing.T) {
 		t.Fatalf("saved = %v, power %d", out, store.arena.power[7])
 	}
 	// ★2 is ×1.2: 1000 attack is 1200, 3000 health 3600.
-	if f := team[0].(map[string]any); f["id"] != 10.0 || f["stars"] != 2.0 || f["attack"] != 1200.0 || f["health"] != 3600.0 || f["class"] != "mage" || f["image"] != "https://img/h.png" {
+	if f := team[0].(map[string]any); f["id"] != 10.0 || f["stars"] != 2.0 || f["attack"] != 1200.0 || f["health"] != 3600.0 || f["class"] != "support" || f["image"] != "https://img/h.png" {
 		t.Errorf("first fighter = %v", f)
 	}
 	if f := team[4].(map[string]any); f["rarity"] != 4.0 || f["skill"] == "" || f["class"] != "tank" {
@@ -444,7 +447,7 @@ func TestArenaTeamSynergy(t *testing.T) {
 			edges++
 		}
 	}
-	// The team has Mages and Tanks, and Mages beat Tanks.
+	// The team has a Support, a Dealer and Tanks: Tanks beat Dealers, Dealers Supports.
 	if edges == 0 {
 		t.Error("no edge in the battle")
 	}
