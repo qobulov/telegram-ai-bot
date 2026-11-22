@@ -167,7 +167,8 @@ func pityView(sinceLegendary, sinceMythic int) map[string]any {
 // Sung Jinwoo (migration 113), One Piece's Joy Boy and Imu (migration 129),
 // Attack on Titan's Levi (migration 130), Hunter x Hunter's Killua and
 // Kurapika (migration 131), and Demon Slayer's Giyu, Zenitsu, Kokushibo,
-// Yoriichi, Muzan and Akaza (migration 132).
+// Yoriichi, Muzan and Akaza (migration 132), and Black Clover's Asta, Yuno,
+// Julius, Mereoleona, Yami and Noelle (migration 135).
 var mythicIDs = map[int64]bool{
 	246: true, 17: true, 40: true, 5: true, 40882: true, 11: true, 80: true, 126071: true, 73935: true, 30: true,
 	417: true, 1: true, 422: true, 4003: true, 72921: true, 127691: true,
@@ -175,12 +176,13 @@ var mythicIDs = map[int64]bool{
 	298761: true, 265209: true, 249281: true, 90202: true, 203633: true, 129928: true,
 	341936: true, 128130: true, 45627: true, 27: true, 28: true,
 	130050: true, 129131: true, 141918: true, 149220: true, 129132: true, 141694: true,
+	123285: true, 123284: true, 124435: true, 124522: true, 124440: true, 123283: true,
 }
 
 // legendaryIDs are the Legendary cards': the leads' legendary rivals and
 // companions, Vegeta, Sasuke, Kakashi, Itachi, Levi, L, Zoro, Killua and
 // their like, Ban, and other well known leads, Deku, Itadori,
-// Shinji, Kaneki, Denji, Gintoki, Natsu, Asta, Yusuke, Mob, Hanamichi,
+// Shinji, Kaneki, Denji, Gintoki, Natsu, Yusuke, Mob, Hanamichi,
 // Thorfinn, Rimuru and theirs, and the best known women, Rem, Rei Ayanami,
 // Power, Kaguya Shinomiya, Marin Kitagawa, Megumin, Robin, Asuka, Hitagi
 // Senjougahara, Yor and Anya Forger, Nobara Kugisaki, Nami and Asuna, the
@@ -195,7 +197,7 @@ var legendaryIDs = map[int64]bool{
 	31: true, 133701: true, 126635: true, 68: true, 12: true, 88892: true, 89220: true, 129133: true,
 	129130: true, 6356: true, 10529: true, 4004: true, 162: true, 2075: true, 2257: true, 601: true, 10138: true,
 	123962: true, 124142: true, 88573: true, 35252: true, 138101: true, 64769: true, 88575: true, 86: true, 89028: true, 127212: true,
-	89: true, 87275: true, 130102: true, 672: true, 5187: true, 123285: true, 729: true, 89616: true, 310: true,
+	89: true, 87275: true, 130102: true, 672: true, 5187: true, 729: true, 89616: true, 310: true,
 	137079: true, 120649: true, 133676: true, 89361: true, 61: true, 94: true, 22037: true, 138102: true, 133700: true, 138100: true,
 	723: true, 36828: true, 131559: true, 126851: true, 282753: true, 206212: true,
 	140636: true, 140646: true, 140650: true, 252553: true, 140641: true, 252554: true, 140638: true,

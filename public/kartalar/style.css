@@ -652,13 +652,232 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 }
 @keyframes zap { 0%, 100% { opacity: 0; } 4% { opacity: 1; } 7% { opacity: 0.2; } 9% { opacity: 0.95; } 13% { opacity: 0; } }
 
+/* anti-magic (Asta): black jagged blades flashing red round him, a dark
+   haze behind, black flakes rising like his Black Form's */
+.special.fx-antimagic .fx.behind i {
+  width: 16px; height: 58px; opacity: 0;
+  background: linear-gradient(180deg, #000, #1a0000 55%, var(--fx2));
+  clip-path: polygon(50% 0, 66% 22%, 58% 30%, 80% 52%, 62% 58%, 72% 100%, 34% 62%, 46% 54%, 22% 34%, 42% 28%);
+  filter: drop-shadow(0 0 2px var(--fx1)) drop-shadow(0 0 8px var(--fx2));
+  animation: fx-cleave 2.4s ease-out infinite;
+}
+.front.special.fx-antimagic .fx.behind i { width: 32px; height: 120px; }
+.fx-antimagic .fx.behind i:nth-child(1) { left: 8%; top: 10%; --tilt: -24deg; animation-delay: 0s; }
+.fx-antimagic .fx.behind i:nth-child(2) { left: 76%; top: 16%; --tilt: 22deg; animation-delay: -0.8s; }
+.fx-antimagic .fx.behind i:nth-child(3) { left: 24%; top: 50%; --tilt: -40deg; animation-delay: -1.5s; }
+.fx-antimagic .fx.behind i:nth-child(4) { left: 84%; top: 54%; --tilt: 34deg; animation-delay: -0.3s; }
+.fx-antimagic .fx.behind i:nth-child(5) { left: 48%; top: 2%; --tilt: 6deg; animation-delay: -1.9s; }
+.fx-antimagic .fx.behind i:nth-child(6) { left: 2%; top: 40%; --tilt: -60deg; animation-delay: -1.1s; }
+.fx-antimagic .fx.behind i:nth-child(7) { left: 64%; top: 36%; --tilt: 50deg; animation-delay: -2.1s; }
+@keyframes fx-cleave {
+  0% { opacity: 0; transform: rotate(var(--tilt)) scale(0.3); }
+  10% { opacity: 1; transform: rotate(var(--tilt)) scale(1.1); }
+  16% { opacity: 0.4; }
+  22% { opacity: 1; }
+  60% { opacity: 0.7; transform: rotate(var(--tilt)) scale(1); }
+  100% { opacity: 0; transform: rotate(var(--tilt)) scale(0.8); }
+}
+.fx-antimagic .fx.behind::before {
+  background: radial-gradient(ellipse at 50% 48%, color-mix(in srgb, var(--fx2) 55%, transparent), rgba(0, 0, 0, 0.75) 62%, rgba(0, 0, 0, 0.9));
+  animation: fx-breathe 2.6s ease-in-out infinite;
+}
+.fx-antimagic .fx.ahead i {
+  width: 6px; height: 6px; border-radius: 1px;
+  background: #050505; box-shadow: 0 0 3px var(--fx1), 0 0 7px var(--fx2);
+  animation: fx-flake 3.4s ease-in infinite;
+}
+.front.special.fx-antimagic .fx.ahead i { width: 10px; height: 10px; }
+@keyframes fx-flake {
+  0% { opacity: 0; transform: translateY(0) rotate(0deg) scale(0.6); }
+  15% { opacity: 1; }
+  80% { opacity: 0.8; }
+  100% { opacity: 0; transform: translate(14px, var(--rise)) rotate(320deg) scale(1); }
+}
+
+/* Asta's sword, swung from his hand, its red burning brighter at the
+   swing's end */
+.alive .sword {
+  transform-origin: 36% 56%;
+  filter: drop-shadow(0 0 3px var(--fx1)) drop-shadow(0 0 9px var(--fx2));
+  animation: fx-swing 2.8s ease-in-out infinite;
+}
+.card .alive .sword { filter: drop-shadow(0 0 2px var(--fx1)) drop-shadow(0 0 5px var(--fx2)); }
+@keyframes fx-swing {
+  0%, 100% { transform: rotate(-4deg); filter: drop-shadow(0 0 3px var(--fx1)) drop-shadow(0 0 8px var(--fx2)); }
+  45% { transform: rotate(7deg) translateY(-1%); filter: drop-shadow(0 0 6px var(--fx1)) drop-shadow(0 0 18px var(--fx1)) brightness(1.25); }
+  55% { transform: rotate(6deg) translateY(-1%); }
+}
+
+/* wind (Yuno): a spirit's ring turning fast behind him and gusts sweeping
+   across, in front too */
+.fx-wind .fx.behind i:first-child {
+  left: 50%; top: 45%; width: 118%; aspect-ratio: 1; border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0 55%, color-mix(in srgb, var(--fx2) 70%, transparent) 75%, var(--fx1) 84%, #fff 86%, transparent 90%);
+  -webkit-mask: radial-gradient(closest-side, transparent 86%, #000 89%, #000 93%, transparent 96%);
+  mask: radial-gradient(closest-side, transparent 86%, #000 89%, #000 93%, transparent 96%);
+  transform: translate(-50%, -50%);
+  animation: fx-turn 1.4s linear infinite;
+}
+.fx-wind .fx i:not(:first-child), .fx-wind .fx.ahead i {
+  left: 0; bottom: auto; width: 46%; height: 2px; border-radius: 2px; opacity: 0; box-shadow: none;
+  background: linear-gradient(90deg, transparent, var(--fx2) 30%, var(--fx1) 60%, #fff 75%, transparent);
+  filter: drop-shadow(0 0 3px var(--fx2));
+  animation: fx-gust 1.9s ease-in-out infinite;
+}
+.front.special.fx-wind .fx i:not(:first-child), .front.special.fx-wind .fx.ahead i { width: 46%; height: 3px; }
+.fx-wind .fx.behind i:nth-child(2) { top: 18%; animation-delay: -0.3s; }
+.fx-wind .fx.behind i:nth-child(3) { top: 38%; animation-delay: -1.1s; animation-duration: 1.5s; }
+.fx-wind .fx.behind i:nth-child(4) { top: 62%; animation-delay: -0.7s; animation-duration: 2.3s; }
+.fx-wind .fx.behind i:nth-child(5) { top: 8%; animation-delay: -1.5s; }
+.fx-wind .fx.behind i:nth-child(6) { top: 76%; animation-delay: -0.1s; animation-duration: 1.6s; }
+.fx-wind .fx.ahead i:nth-child(1) { top: 30%; animation-delay: -0.9s; animation-duration: 2.1s; }
+.fx-wind .fx.ahead i:nth-child(2) { top: 64%; animation-delay: -0.2s; }
+.fx-wind .fx.ahead i:nth-child(3) { top: 48%; animation-delay: -1.4s; animation-duration: 1.7s; }
+@keyframes fx-gust {
+  0% { opacity: 0; transform: translate(-100%, 6px) scaleX(0.6); }
+  25% { opacity: 1; }
+  70% { opacity: 0.8; }
+  100% { opacity: 0; transform: translate(240%, -10px) scaleX(1.1); }
+}
+.fx-wind .fx.behind::before { background: radial-gradient(ellipse at 50% 45%, color-mix(in srgb, var(--fx2) 35%, transparent), transparent 70%); animation: fx-breathe 2s ease-in-out infinite; }
+
+/* time (Julius): a clock's dial behind him, its hands going round, the
+   seconds' one fast */
+.fx-clock .fx.behind i:nth-child(1) {
+  left: 50%; top: 45%; width: 104%; aspect-ratio: 1; border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--fx1) 70%, transparent);
+  background: repeating-conic-gradient(from -2deg, var(--fx1) 0 4deg, transparent 4deg 30deg);
+  -webkit-mask: radial-gradient(closest-side, transparent 84%, #000 86%);
+  mask: radial-gradient(closest-side, transparent 84%, #000 86%);
+  filter: drop-shadow(0 0 4px var(--fx2));
+  transform: translate(-50%, -50%);
+  animation: fx-turn 60s linear infinite;
+}
+.fx-clock .fx.behind i:nth-child(n+2) {
+  left: 50%; top: 45%; width: 3px; height: 42%; border-radius: 3px;
+  background: linear-gradient(0deg, color-mix(in srgb, var(--fx2) 60%, transparent), var(--fx1) 70%, #fff);
+  filter: drop-shadow(0 0 4px var(--fx2));
+  transform-origin: 50% 100%;
+  animation: fx-hand 4s linear infinite;
+}
+.front.special.fx-clock .fx.behind i:nth-child(n+2) { width: 5px; }
+.fx-clock .fx.behind i:nth-child(3) { height: 28%; width: 5px; animation-duration: 40s; }
+.front.special.fx-clock .fx.behind i:nth-child(3) { width: 8px; }
+.fx-clock .fx.behind i:nth-child(4) { height: 46%; width: 1px; animation-duration: 1.2s; animation-timing-function: steps(12, end); }
+.front.special.fx-clock .fx.behind i:nth-child(4) { width: 2px; }
+@keyframes fx-hand { from { transform: translate(-50%, -100%) rotate(0deg); } to { transform: translate(-50%, -100%) rotate(360deg); } }
+.fx-clock .fx.behind::before { background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--fx2) 40%, transparent), transparent 58%); animation: fx-breathe 1.2s ease-in-out infinite; }
+
+/* fire (Mereoleona): flames leaping up behind her, embers rising in front */
+.fx-fire .fx.behind i {
+  bottom: -12%; width: 34%; height: 52%; opacity: 0;
+  border-radius: 50% 50% 45% 45% / 62% 62% 38% 38%;
+  background: radial-gradient(ellipse at 50% 78%, #fff 0, var(--fx1) 22%, var(--fx2) 50%, transparent 72%);
+  filter: blur(1px) drop-shadow(0 0 6px var(--fx2));
+  transform-origin: 50% 100%;
+  animation: fx-flame 1.3s ease-in-out infinite;
+}
+.fx-fire .fx.behind i:nth-child(1) { left: -6%; animation-delay: 0s; }
+.fx-fire .fx.behind i:nth-child(2) { left: 68%; animation-delay: -0.5s; animation-duration: 1.1s; }
+.fx-fire .fx.behind i:nth-child(3) { left: 28%; height: 66%; animation-delay: -0.9s; animation-duration: 1.5s; }
+.fx-fire .fx.behind i:nth-child(4) { left: 48%; animation-delay: -0.3s; }
+.fx-fire .fx.behind i:nth-child(5) { left: 12%; height: 40%; animation-delay: -0.7s; animation-duration: 1.2s; }
+.fx-fire .fx.behind i:nth-child(6) { left: 82%; height: 44%; animation-delay: -1.1s; }
+@keyframes fx-flame {
+  0% { opacity: 0; transform: scale(0.6, 0.4) translateY(0); }
+  25% { opacity: 1; transform: scale(1, 1.05) translateY(-4%); }
+  55% { opacity: 0.85; transform: scale(0.85, 1.25) translateY(-12%) skewX(4deg); }
+  100% { opacity: 0; transform: scale(0.5, 1.5) translateY(-30%) skewX(-4deg); }
+}
+.fx-fire .fx.behind::before { background: linear-gradient(0deg, color-mix(in srgb, var(--fx2) 60%, transparent), color-mix(in srgb, var(--fx1) 18%, transparent) 45%, transparent 75%); animation: fx-breathe 1.6s ease-in-out infinite; }
+.fx-fire .fx.ahead i { animation-duration: 2.4s; }
+
+/* darkness (Yami): black smoke edged in violet turning round him, and his
+   dimension slash, a white-violet cut flashing across the card */
+.fx-dark .fx.behind i:nth-child(-n+2) {
+  left: 50%; top: 48%; width: 125%; aspect-ratio: 1; border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0 30%, rgba(0, 0, 0, 0.85) 52%, color-mix(in srgb, var(--fx2) 80%, transparent) 66%, var(--fx1) 70%, transparent 76%);
+  -webkit-mask: radial-gradient(closest-side, transparent 62%, #000 72%, #000 88%, transparent 98%);
+  mask: radial-gradient(closest-side, transparent 62%, #000 72%, #000 88%, transparent 98%);
+  filter: blur(1.5px);
+  transform: translate(-50%, -50%);
+  animation: fx-turn 3.6s linear infinite;
+}
+.fx-dark .fx.behind i:nth-child(2) { width: 92%; animation-duration: 2.5s; animation-direction: reverse; }
+.fx-dark .fx.behind i:nth-child(n+3) {
+  left: -20%; top: 50%; width: 140%; height: 3px; border-radius: 3px; opacity: 0;
+  background: linear-gradient(90deg, transparent, var(--fx2) 15%, var(--fx1) 40%, #fff 50%, var(--fx1) 60%, var(--fx2) 85%, transparent);
+  filter: drop-shadow(0 0 4px var(--fx1)) drop-shadow(0 0 10px var(--fx2));
+  transform: rotate(-32deg) scaleX(0);
+  animation: fx-slice 3.2s ease-out infinite;
+}
+.front.special.fx-dark .fx.behind i:nth-child(n+3) { height: 5px; }
+.fx-dark .fx.behind i:nth-child(4) { top: 30%; --cut: 24deg; animation-delay: -1.1s; }
+.fx-dark .fx.behind i:nth-child(5) { top: 68%; --cut: -12deg; animation-delay: -2.2s; }
+@keyframes fx-slice {
+  0% { opacity: 0; transform: rotate(var(--cut, -32deg)) scaleX(0); }
+  6% { opacity: 1; transform: rotate(var(--cut, -32deg)) scaleX(1); }
+  14% { opacity: 0.9; }
+  40%, 100% { opacity: 0; transform: rotate(var(--cut, -32deg)) scaleX(1) scaleY(0.2); }
+}
+.fx-dark .fx.behind::before { background: radial-gradient(ellipse at 50% 48%, color-mix(in srgb, var(--fx2) 45%, transparent), rgba(0, 0, 0, 0.55) 70%); animation: fx-breathe 3s ease-in-out infinite; }
+.fx-dark .fx.ahead i {
+  width: 6px; height: 6px; border-radius: 1px;
+  background: #0a0010; box-shadow: 0 0 3px var(--fx1), 0 0 8px var(--fx2);
+  animation: fx-flake 3.8s ease-in infinite;
+}
+.front.special.fx-dark .fx.ahead i { width: 10px; height: 10px; }
+
+/* the sea (Noelle): her halo burning bright, two rings of water turning
+   round her, drops of water falling like feathers, bubbles rising */
+.fx-valkyrie .fx.behind i:nth-child(1) {
+  left: 49.5%; top: 7.7%; width: 33%; aspect-ratio: 4 / 1; border-radius: 50%;
+  border: 2px solid var(--fx1);
+  box-shadow: 0 0 6px var(--fx1), 0 0 14px var(--fx2), inset 0 0 6px var(--fx2);
+  transform: translate(-50%, -50%);
+  animation: fx-halo 2.4s ease-in-out infinite;
+}
+.front.special.fx-valkyrie .fx.behind i:nth-child(1) { border-width: 3px; }
+@keyframes fx-halo {
+  0%, 100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 1; transform: translate(-50%, -60%) scale(1.08); box-shadow: 0 0 10px #fff, 0 0 24px var(--fx1), inset 0 0 8px var(--fx1); }
+}
+.fx-valkyrie .fx.behind i:nth-child(2), .fx-valkyrie .fx.behind i:nth-child(3) {
+  left: 50%; top: 52%; width: 120%; aspect-ratio: 1; border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0 50%, color-mix(in srgb, var(--fx2) 70%, transparent) 72%, var(--fx1) 82%, #fff 85%, transparent 90%);
+  -webkit-mask: radial-gradient(closest-side, transparent 80%, #000 84%, #000 93%, transparent 97%);
+  mask: radial-gradient(closest-side, transparent 80%, #000 84%, #000 93%, transparent 97%);
+  transform: translate(-50%, -50%);
+  animation: fx-turn 3.4s linear infinite;
+}
+.fx-valkyrie .fx.behind i:nth-child(3) { width: 92%; animation-duration: 2.6s; animation-direction: reverse; }
+.fx-valkyrie .fx.behind i:nth-child(n+4) {
+  top: -10%; width: 4px; height: 12px; border-radius: 50% 50% 50% 50% / 70% 70% 30% 30%; opacity: 0;
+  background: linear-gradient(180deg, #fff, var(--fx1) 50%, var(--fx2));
+  filter: drop-shadow(0 0 3px var(--fx2));
+  animation: fx-fall 3s ease-in infinite;
+}
+.front.special.fx-valkyrie .fx.behind i:nth-child(n+4) { width: 6px; height: 18px; }
+.fx-valkyrie .fx.behind i:nth-child(4) { left: 12%; animation-delay: -0.4s; }
+.fx-valkyrie .fx.behind i:nth-child(5) { left: 84%; animation-delay: -1.6s; animation-duration: 3.6s; }
+.fx-valkyrie .fx.behind i:nth-child(6) { left: 30%; animation-delay: -2.3s; animation-duration: 2.7s; }
+.fx-valkyrie .fx.behind i:nth-child(7) { left: 68%; animation-delay: -1s; }
+@keyframes fx-fall {
+  0% { opacity: 0; transform: translateY(0) rotate(-8deg); }
+  15% { opacity: 1; }
+  85% { opacity: 0.8; }
+  100% { opacity: 0; transform: translateY(calc(var(--rise) * -1.1)) rotate(8deg); }
+}
+.fx-valkyrie .fx.behind::before { background: radial-gradient(ellipse at 50% 40%, color-mix(in srgb, var(--fx2) 40%, transparent), transparent 70%); animation: fx-breathe 3s ease-in-out infinite; }
+.fx-valkyrie .fx.ahead i { background: radial-gradient(circle at 35% 35%, #fff, color-mix(in srgb, var(--fx1) 40%, transparent) 45%, transparent 70%); box-shadow: 0 0 4px var(--fx2), inset 0 0 2px #fff; animation-duration: 4.2s; }
+
 /* the halo: crackling for lightning, breathing for the rest */
 .alive .aura {
   filter: drop-shadow(0 0 4px var(--fx1)) drop-shadow(0 0 12px var(--fx2));
   animation: alive 3.2s ease-in-out infinite, fx-breathe 2.8s ease-in-out infinite;
 }
 .card .alive .aura { filter: drop-shadow(0 0 2px var(--fx1)) drop-shadow(0 0 6px var(--fx2)); }
-.fx-bolts .alive .aura { animation: alive 3.2s ease-in-out infinite, crackle 1.9s steps(1, end) infinite; }
+.fx-bolts .alive .aura, .fx-antimagic .alive .aura { animation: alive 3.2s ease-in-out infinite, crackle 1.9s steps(1, end) infinite; }
 @keyframes crackle { 0%, 100% { opacity: 0.55; } 8% { opacity: 1; } 11% { opacity: 0.35; } 30% { opacity: 0.85; } 52% { opacity: 0.5; } 55% { opacity: 1; } 74% { opacity: 0.7; } }
 @media (prefers-reduced-motion: reduce) { .special .fx i, .special .fx::before, .front.special[class*="fx-"] { animation: none; } }
 
@@ -920,6 +1139,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .event.many { grid-template-columns: 1fr; }
 .event.many .event-art { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .event[data-key="demon-slayer"], .event-banner[data-key="demon-slayer"] { --sakura: #ff5a6e; }
+.event[data-key="black-clover"], .event-banner[data-key="black-clover"] { --sakura: #3ddc84; }
 .event-banner {
   --sakura: #ff9ec7;
   display: grid; grid-template-columns: 56px 1fr auto; align-items: center; gap: 12px; width: calc(100% - 32px); margin: 0 16px 12px;

@@ -262,7 +262,7 @@
   // character taken out, laid under the breathing cut-out so that the still
   // one behind it does not show; named for the picture like the cut-outs.
   const PLATED = new Set([1, 5, 11, 17, 27, 28, 30, 40, 80, 246, 417, 422, 4003, 34470, 40881, 40882, 45627, 72921, 73935, 88572, 90169, 90202, 124381, 126071, 126824, 127222, 127518, 127691, 128130, 129928, 137080, 176754, 249281, 265209, 298761, 341936,
-    130050, 129131, 141918, 149220, 129132, 141694]);
+    130050, 129131, 141918, 149220, 129132, 141694, 123285, 123284, 124435, 124522, 124440, 123283]);
 
   // underImage is the picture a Mythic's cut-out lies on: its plate when it
   // has one for that picture, else the picture itself.
@@ -302,7 +302,9 @@
   // view, long hair flowing in the wind while the face and body keep still.
   // fx is a card's own effect (.fx in the styles), drawn mostly behind the
   // character, between its plate and its cut-out, with a halo round it;
-  // glow is its two colours, the core and the glow round it.
+  // glow is its two colours, the core and the glow round it. sword is a
+  // weapon cut out on its own (art/cut/<id>s.webp, taken off the plate too),
+  // which swings from the hand and burns.
   const SPECIAL = {
     298761: { tag: "LIMITED", petals: true, fireflies: true, hair: true },
     27: { fx: "bolts", glow: ["#9feaff", "#2a9dff"] }, // Killua: lightning
@@ -313,6 +315,12 @@
     129132: { fx: "blood", glow: ["#ff8a8a", "#b0002a"] }, // Muzan: blood
     127518: { fx: "blood", glow: ["#ffc2dd", "#ff3d8b"] }, // Nezuko: her exploding blood, pink
     141694: { fx: "compass", glow: ["#a8f6ff", "#ff2e7e"] }, // Akaza: his compass
+    123285: { fx: "antimagic", glow: ["#ff4a3d", "#8a0000"], sword: true }, // Asta: anti-magic, his sword swinging
+    123284: { fx: "wind", glow: ["#e2ffe9", "#2ecc71"] }, // Yuno: wind
+    124435: { fx: "clock", glow: ["#d8ecff", "#3d7bff"] }, // Julius: time
+    124522: { fx: "fire", glow: ["#ffd36b", "#ff4d00"] }, // Mereoleona: fire
+    124440: { fx: "dark", glow: ["#e4c7ff", "#6a1bb0"] }, // Yami: darkness, its dimension slash
+    123283: { fx: "valkyrie", glow: ["#d8fbff", "#1fa8ff"] }, // Noelle: the sea, her Valkyrie dress
   };
 
   // FX_PARTS is how many pieces each effect draws behind the character and
@@ -324,6 +332,12 @@
     sun: { behind: [2, 2], ahead: [4, 6] },
     blood: { behind: [2, 3], ahead: [3, 5] },
     compass: { behind: [2, 2], ahead: [4, 6] },
+    antimagic: { behind: [4, 7], ahead: [4, 6] },
+    wind: { behind: [4, 6], ahead: [2, 3] },
+    clock: { behind: [4, 4], ahead: [3, 5] },
+    fire: { behind: [4, 6], ahead: [4, 6] },
+    dark: { behind: [4, 5], ahead: [4, 6] },
+    valkyrie: { behind: [5, 7], ahead: [5, 6] },
   };
 
   // dress adds a special card's mark, petals, fireflies or own effect; the
@@ -351,6 +365,12 @@
       aura.className = "aura";
       aura.style.backgroundImage = living.querySelector("i").style.backgroundImage;
       living.prepend(aura);
+    }
+    if (special.sword && living) {
+      const sword = document.createElement("i");
+      sword.className = "sword";
+      sword.style.backgroundImage = `url("/kartalar/art/cut/${card.id}s.webp")`;
+      living.append(sword);
     }
     if (special.hair && large && living) {
       // flowing hair: the cut-out once more, its edges alone, waved by #flow

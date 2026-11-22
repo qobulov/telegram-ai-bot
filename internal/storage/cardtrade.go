@@ -52,13 +52,12 @@ func CardLimited(id int64) bool { return limitedCards[id] }
 // owners asked on 2026-11-21: no draw, pack or other event does.
 var DemonSlayerCards = []int64{130050, 129131, 141918, 149220, 129132, 141694}
 
-// BlackCloverCards are all of Black Clover's cards, which only its event
-// is to give, as the owners asked on 2026-11-22: no draw, pack or other
-// event gives them; whoever holds some keeps them.
-var BlackCloverCards = []int64{
-	123285, 124440, 123283, 123284, 124522, 124435, 124449, 126948, 124459, 124436,
-	124447, 124438, 124433, 124434, 187268, 124439, 192196, 124521, 124442,
-}
+// BlackCloverCards are Black Clover's six Mythics, Asta, Yuno, Julius,
+// Mereoleona, Yami and Noelle, which only its event is to give, as the
+// owners asked on 2026-11-22: no draw, pack or other event gives them. Its
+// other cards, kept from draws for a while, are drawn again, the event
+// giving only these.
+var BlackCloverCards = []int64{123285, 123284, 124435, 124522, 124440, 123283}
 
 // CardEventOnly reports whether only an event gives the card.
 func CardEventOnly(id int64) bool {
