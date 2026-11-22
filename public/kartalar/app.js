@@ -2301,7 +2301,7 @@
       slot: (row, n) => `${row} · ${n}-o'rin`, inTeam: "jamoada", saved: "✅ Jamoa saqlandi",
       attack: "⚔️ Hujum", noFoes: "Hozircha raqib yo'q: boshqalar ham jamoa saqlasin", teamFirst: "Hujum uchun avval jamoani saqlang", noAttacks: "Tiketlar tugadi: har soatda 1 ta qo'shiladi",
       round: (n) => `Raund ${n}`, skip: "O'tkazib yuborish", won: "🏆 G'alaba!", lost: "💀 Mag'lubiyat", change: (d) => `Reyting ${d >= 0 ? "+" : "−"}${Math.abs(d)}`, token: "🎟 +1 token",
-      week: "🏆 Haftalik mukofot", weekRule: "Har dushanba 08:00 da: hafta davomida kamida 1 marta hujum qilgan top 100 ga token pochtaga keladi", weekEvent: "🎉 Event: bu hafta top 5 ga almaz box ham beriladi", weekPlace: (n, p, b) => (n ? `Siz hozir ${n}-o'rindasiz${p ? ` · +${p} 🎟` : ""}${b ? ` · +${b} 🎁` : ""}` : "Mukofot uchun bu hafta kamida 1 marta hujum qiling"), weekEnds: (d, h) => (d ? `Hafta tugashiga ${d} kun ${h} soat` : `Hafta tugashiga ${h} soat`), weekRow: (a, b) => (a === b ? `${a}-o'rin` : `${a}–${b}`),
+      week: "🏆 Haftalik mukofot", weekRule: "Har dushanba 08:00 da: hafta davomida kamida 1 marta hujum qilgan top 100 ga token pochtaga keladi", weekEvent: "🎉 Event: bu hafta top 5 ga almaz box ham beriladi", weekPlace: (n, p, b) => (n ? `Siz hozir ${n}-o'rindasiz${p ? ` · +${p} 🎟` : ""}${b ? ` · +${b} 🎁` : ""}` : "Mukofot uchun bu hafta kamida 1 marta hujum qiling"), weekEnds: (d, h, m) => (d ? `Hafta tugashiga ${d} kun ${h} soat ${m} daqiqa` : `Hafta tugashiga ${h} soat ${m} daqiqa`), weekRow: (a, b) => (a === b ? `${a}-o'rin` : `${a}–${b}`),
       you: "Siz", topEmpty: "Arenada hali hech kim jang qilmagan", topRow: (w, l, p) => `${w} G · ${l} M · ⚡${p}`,
       skills: { strike: "Kuchli zarba", heal: "Davolash", shield: "Qalqon", stun: "Hayratlantirish", poison: "Zahar", provoke: "Chaqiriq" }, fell: (n) => `💀 ${n} yiqildi`,
       skillInfo: { strike: "energiya to'lganda 1.8 barobar zarba", heal: "energiya to'lganda eng zaif yarador ittifoqchiga jonining 80% igacha qaytaradi", shield: "energiya to'lganda o'ziga va eng zaif ittifoqchiga jonining 45% i qalqon", stun: "energiya to'lganda urib, raqibning keyingi yurishini o'tkazdiradi", poison: "energiya to'lganda urib zaharlaydi: 3 yurish davomida 15% jon", provoke: "energiya to'lganda 3 raund raqib tank, hujumchi va tabiblarini o'ziga tortadi va zarbani 30% kam oladi" },
@@ -2345,7 +2345,7 @@
       slot: (row, n) => `${row} · место ${n}`, inTeam: "в команде", saved: "✅ Команда сохранена",
       attack: "⚔️ Атака", noFoes: "Пока нет соперников: пусть другие тоже сохранят команду", teamFirst: "Чтобы атаковать, сохраните команду", noAttacks: "Билеты закончились: каждый час добавляется 1",
       round: (n) => `Раунд ${n}`, skip: "Пропустить", won: "🏆 Победа!", lost: "💀 Поражение", change: (d) => `Рейтинг ${d >= 0 ? "+" : "−"}${Math.abs(d)}`, token: "🎟 +1 токен",
-      week: "🏆 Награда недели", weekRule: "Каждый понедельник в 08:00: топ 100, атаковавшие на неделе хотя бы раз, получают токены почтой", weekEvent: "🎉 Ивент: на этой неделе топ 5 получат ещё и алмазные боксы", weekPlace: (n, p, b) => (n ? `Сейчас вы на ${n}-м месте${p ? ` · +${p} 🎟` : ""}${b ? ` · +${b} 🎁` : ""}` : "Чтобы получить награду, атакуйте хотя бы раз на этой неделе"), weekEnds: (d, h) => (d ? `До конца недели ${d} дн ${h} ч` : `До конца недели ${h} ч`), weekRow: (a, b) => (a === b ? `${a} место` : `${a}–${b}`),
+      week: "🏆 Награда недели", weekRule: "Каждый понедельник в 08:00: топ 100, атаковавшие на неделе хотя бы раз, получают токены почтой", weekEvent: "🎉 Ивент: на этой неделе топ 5 получат ещё и алмазные боксы", weekPlace: (n, p, b) => (n ? `Сейчас вы на ${n}-м месте${p ? ` · +${p} 🎟` : ""}${b ? ` · +${b} 🎁` : ""}` : "Чтобы получить награду, атакуйте хотя бы раз на этой неделе"), weekEnds: (d, h, m) => (d ? `До конца недели ${d} дн ${h} ч ${m} мин` : `До конца недели ${h} ч ${m} мин`), weekRow: (a, b) => (a === b ? `${a} место` : `${a}–${b}`),
       you: "Вы", topEmpty: "На арене ещё никто не сражался", topRow: (w, l, p) => `${w} В · ${l} П · ⚡${p}`,
       skills: { strike: "Сильный удар", heal: "Лечение", shield: "Щит", stun: "Оглушение", poison: "Яд", provoke: "Провокация" }, fell: (n) => `💀 ${n} пал(а)`,
       skillInfo: { strike: "при полной энергии удар ×1.8", heal: "при полной энергии возвращает самому слабому раненому союзнику до 80% здоровья", shield: "при полной энергии щит в 45% здоровья себе и самому слабому союзнику", stun: "при полной энергии бьёт, и соперник пропускает следующий ход", poison: "при полной энергии бьёт и отравляет: 15% здоровья 3 хода", provoke: "при полной энергии 3 раунда притягивает танков, атакующих и лекарей соперника и получает на 30% меньше урона" },
@@ -2389,7 +2389,7 @@
       slot: (row, n) => `${row} · slot ${n}`, inTeam: "in the team", saved: "✅ Team saved",
       attack: "⚔️ Attack", noFoes: "No opponents yet: others need to save a team too", teamFirst: "Save a team to attack", noAttacks: "No tickets left: one comes back every hour",
       round: (n) => `Round ${n}`, skip: "Skip", won: "🏆 Victory!", lost: "💀 Defeat", change: (d) => `Rating ${d >= 0 ? "+" : "−"}${Math.abs(d)}`, token: "🎟 +1 token",
-      week: "🏆 Weekly prize", weekRule: "Every Monday at 08:00 the top 100 who attacked at least once that week get tokens by mail", weekEvent: "🎉 Event: this week the top 5 get diamond boxes too", weekPlace: (n, p, b) => (n ? `You are #${n} now${p ? ` · +${p} 🎟` : ""}${b ? ` · +${b} 🎁` : ""}` : "Attack at least once this week to earn a prize"), weekEnds: (d, h) => (d ? `Week ends in ${d}d ${h}h` : `Week ends in ${h}h`), weekRow: (a, b) => (a === b ? `#${a}` : `#${a}–${b}`),
+      week: "🏆 Weekly prize", weekRule: "Every Monday at 08:00 the top 100 who attacked at least once that week get tokens by mail", weekEvent: "🎉 Event: this week the top 5 get diamond boxes too", weekPlace: (n, p, b) => (n ? `You are #${n} now${p ? ` · +${p} 🎟` : ""}${b ? ` · +${b} 🎁` : ""}` : "Attack at least once this week to earn a prize"), weekEnds: (d, h, m) => (d ? `Week ends in ${d}d ${h}h ${m}m` : `Week ends in ${h}h ${m}m`), weekRow: (a, b) => (a === b ? `#${a}` : `#${a}–${b}`),
       you: "You", topEmpty: "Nobody has fought in the arena yet", topRow: (w, l, p) => `${w} W · ${l} L · ⚡${p}`,
       skills: { strike: "Power strike", heal: "Heal", shield: "Shield", stun: "Stun", poison: "Poison", provoke: "Provoke" }, fell: (n) => `💀 ${n} fell`,
       skillInfo: { strike: "when energy is full, hits ×1.8", heal: "when energy is full, gives the weakest hurt ally back up to 80% of its health", shield: "when energy is full, shields itself and its weakest ally for 45% of their health", stun: "when energy is full, hits and the target skips its next turn", poison: "when energy is full, hits and poisons: 15% health for 3 turns", provoke: "when energy is full, draws enemy tanks, dealers and healers for 3 rounds and takes 30% less damage" },
@@ -3394,7 +3394,7 @@
     const box = $("arenaWeek");
     box.textContent = "";
     if (!week) { box.hidden = true; return; }
-    const left = Math.max(0, week.ends - Date.now()), hours = Math.floor(left / 3600000);
+    const left = Math.max(0, week.ends - Date.now()), hours = Math.floor(left / 3600000), minutes = Math.floor(left / 60000) % 60;
     const head = document.createElement("b"), rule = document.createElement("small"), mine = document.createElement("p"), ends = document.createElement("small"), list = document.createElement("div");
     head.textContent = at.week;
     rule.textContent = at.weekRule;
@@ -3403,7 +3403,7 @@
     event.textContent = at.weekEvent;
     event.hidden = !week.event;
     mine.textContent = at.weekPlace(week.place, week.prize, week.boxes);
-    ends.textContent = at.weekEnds(Math.floor(hours / 24), hours % 24);
+    ends.textContent = at.weekEnds(Math.floor(hours / 24), hours % 24, minutes);
     list.className = "prizes";
     for (const p of week.prizes || []) {
       const chip = document.createElement("span");
