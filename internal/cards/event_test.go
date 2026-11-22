@@ -234,7 +234,7 @@ func TestTheDemonSlayerEvent(t *testing.T) {
 	if got := AnimeCards(catalog, "Demon Slayer"); !slices.Equal(got, []int64{126071}) {
 		t.Errorf("the Demon Slayer collection needs %v, want Tanjiro alone", got)
 	}
-	// Black Clover's cards are all its event's, from 2026-11-22: its
+	// Black Clover's Mythics are all its event's, from 2026-11-22: its
 	// collection needs none, and the page is told which cards they are.
 	asta := storage.Card{ID: storage.BlackCloverCards[0], Name: "Asta", Anime: "Black Clover", Rarity: 3}
 	if got := AnimeCards([]storage.Card{asta, {ID: 1, Anime: "Black Clover"}}, "Black Clover"); !slices.Equal(got, []int64{1}) {
@@ -259,12 +259,11 @@ func (f *pickStore) OpenEventCards(ctx context.Context, userID int64, name strin
 	return f.eventStore.OpenEventCards(ctx, userID, name, n, ev, day, now, quest)
 }
 
-// The Black Clover event runs the week after Demon Slayer's with its 19
-// cards at the rarity rolled, 80% of the pulls of each, and a sure Asta on
-// the 100th pull in a row without him.
+// The Black Clover event runs the week after Demon Slayer's, set out as that
+// one is, with its six Mythics alone.
 func TestTheBlackCloverEvent(t *testing.T) {
 	bc := Events[2]
-	if bc.Key != "black-clover" || !bc.AtRarity || len(bc.Cards) != 19 || !slices.Equal(bc.sure(), []int64{astaCard}) || bc.Pity != 100 || bc.Share != 0.8 ||
+	if bc.Key != "black-clover" || bc.AtRarity || len(bc.Cards) != 6 || !slices.Equal(bc.sure(), bc.Cards) || bc.Mythic != 11 || bc.Pity != 300 || bc.Share != 6.0/11 ||
 		!bc.Starts.Equal(Events[1].Ends) || bc.Ends.Sub(bc.Starts) != 7*24*time.Hour {
 		t.Fatalf("the Black Clover event = %+v", bc)
 	}

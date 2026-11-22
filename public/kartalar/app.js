@@ -1879,7 +1879,7 @@
       pulled: (icon, n) => `${icon} ${n} ta event karta`, got: (icon, name) => `${icon} ${name} tushdi!`, badge: (icon) => `${icon} EVENT`, go: "Ochish ›",
       firefly: { icon: "🌸", title: "🌸 Firefly Wedding", tag: "EVENT · LIMITED", name: "Satoko", owned: "✅ Satoko sizda bor — har kim faqat bir marta oladi" },
       "demon-slayer": { icon: "⚔️", title: "⚔️ Demon Slayer", tag: "EVENT · 6 MIF", name: "Demon Slayer" },
-      "black-clover": { icon: "🍀", title: "🍀 Black Clover", tag: "EVENT · 19 KARTA", name: "Black Clover", sure: "Asta" },
+      "black-clover": { icon: "🍀", title: "🍀 Black Clover", tag: "EVENT · 6 MIF", name: "Black Clover" },
     },
     ru: {
       left: (d, h, m) => (d ? `⏳ Осталось ${d} дн. ${h} ч.` : h ? `⏳ Осталось ${h} ч. ${m} мин.` : `⏳ Осталось ${m} мин.`),
@@ -1888,7 +1888,7 @@
       pulled: (icon, n) => `${icon} Ивент-карты: ${n}`, got: (icon, name) => `${icon} Выпал(а) ${name}!`, badge: (icon) => `${icon} ИВЕНТ`, go: "Открыть ›",
       firefly: { icon: "🌸", title: "🌸 Firefly Wedding", tag: "ИВЕНТ · LIMITED", name: "Сатоко", owned: "✅ Сатоко уже у вас — её можно получить только один раз" },
       "demon-slayer": { icon: "⚔️", title: "⚔️ Demon Slayer", tag: "ИВЕНТ · 6 МИФ", name: "Demon Slayer" },
-      "black-clover": { icon: "🍀", title: "🍀 Black Clover", tag: "ИВЕНТ · 19 КАРТ", name: "Black Clover", sure: "Аста" },
+      "black-clover": { icon: "🍀", title: "🍀 Black Clover", tag: "ИВЕНТ · 6 МИФ", name: "Black Clover" },
     },
     en: {
       left: (d, h, m) => (d ? `⏳ ${d} days ${h} hours left` : h ? `⏳ ${h} hours ${m} minutes left` : `⏳ ${m} minutes left`),
@@ -1897,15 +1897,16 @@
       pulled: (icon, n) => `${icon} ${n} event cards`, got: (icon, name) => `${icon} ${name} dropped!`, badge: (icon) => `${icon} EVENT`, go: "Open ›",
       firefly: { icon: "🌸", title: "🌸 Firefly Wedding", tag: "EVENT · LIMITED", name: "Satoko", owned: "✅ You have Satoko — each player gets her once" },
       "demon-slayer": { icon: "⚔️", title: "⚔️ Demon Slayer", tag: "EVENT · 6 MYTHIC", name: "Demon Slayer" },
-      "black-clover": { icon: "🍀", title: "🍀 Black Clover", tag: "EVENT · 19 CARDS", name: "Black Clover", sure: "Asta" },
+      "black-clover": { icon: "🍀", title: "🍀 Black Clover", tag: "EVENT · 6 MYTHIC", name: "Black Clover" },
     },
   };
   const et = eventTexts[language] || eventTexts.uz;
   let events = [], pulling = false, bannerKey = "";
 
   // OWN_ODDS_ONLY are the events whose block shows their cards' odds alone,
-  // not a Mythic's beside them: Demon Slayer's, as the owners asked.
-  const OWN_ODDS_ONLY = new Set(["demon-slayer"]);
+  // not a Mythic's beside them: Demon Slayer's, as the owners asked, and
+  // Black Clover's, set out as it is.
+  const OWN_ODDS_ONLY = new Set(["demon-slayer", "black-clover"]);
 
   // eventFace is an event's own texts.
   const eventFace = (ev) => et[ev.key] || et.firefly;

@@ -43,9 +43,10 @@ type Event struct {
 // 2026-12-02.
 //
 // The Black Clover event, as the owners asked on 2026-11-22: for the week
-// after Demon Slayer's its 19 cards, which nothing else gives
-// (storage.BlackCloverCards), come at the rarity rolled, 80% of the pulls of
-// each, and Asta, the rarest, is sure on the 100th pull in a row without him.
+// after Demon Slayer's, set out as that one is, its six Mythics, Asta, Yuno,
+// Julius, Mereoleona, Yami and Noelle, which nothing else gives
+// (storage.BlackCloverCards), 0.6% a pull beside the usual 0.5% of other
+// Mythics, and a sure one on the 300th pull in a row without one.
 //
 // The Demon Slayer event, as the owners asked on 2026-11-21: for a week its
 // six Mythics, which nothing else gives (storage.DemonSlayerCards), 0.6% a
@@ -57,12 +58,9 @@ var Events = []Event{
 		Starts: time.Date(2026, 11, 18, 22, 0, 0, 0, Location), Ends: time.Date(2026, 11, 23, 0, 0, 0, 0, Location)},
 	{Key: "demon-slayer", Cards: storage.DemonSlayerCards, Mythic: 11, Share: 6.0 / 11, Pity: 300, Price: 1, Batch: 10,
 		Starts: time.Date(2026, 11, 21, 19, 30, 0, 0, Location), Ends: time.Date(2026, 11, 28, 19, 30, 0, 0, Location)},
-	{Key: "black-clover", Cards: storage.BlackCloverCards, AtRarity: true, Sure: []int64{astaCard}, Share: 0.8, Pity: 100, Price: 1, Batch: 10,
+	{Key: "black-clover", Cards: storage.BlackCloverCards, Mythic: 11, Share: 6.0 / 11, Pity: 300, Price: 1, Batch: 10,
 		Starts: time.Date(2026, 11, 28, 19, 30, 0, 0, Location), Ends: time.Date(2026, 12, 5, 19, 30, 0, 0, Location)},
 }
-
-// astaCard is Asta, Black Clover's rarest card, its event's sure one.
-const astaCard int64 = 123285
 
 // sure are the cards the event's pity counts and gives.
 func (e Event) sure() []int64 {
