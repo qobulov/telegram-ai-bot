@@ -10,7 +10,8 @@ import (
 // An event of several cards counts its own pulls apart from the Firefly
 // event's; a Mythic the pick names is one of its cards, those the player
 // lacks first, and a holder still gets them (it is not Once); its pity gives
-// one too. No other pull gives a card only an event gives.
+// one too. No other pull gives a card only an event gives, a Black Clover
+// one included.
 func TestAnEventOfSeveralCards(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -21,7 +22,9 @@ func TestAnEventOfSeveralCards(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	asta := BlackCloverCards[0]
 	catalog := []Card{
+		{ID: asta, Name: "Asta", Anime: "Black Clover", Rarity: 4, Value: 4000},
 		{ID: giyu, Name: "Giyu", Anime: "Demon Slayer", Rarity: 4, Value: 4000},
 		{ID: zenitsu, Name: "Zenitsu", Anime: "Demon Slayer", Rarity: 4, Value: 4000},
 		{ID: 1, Name: "Gojo", Anime: "JJK", Rarity: 4, Value: 4000},

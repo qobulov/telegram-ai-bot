@@ -291,6 +291,9 @@ type cardView struct {
 	Count     int    `json:"count"`
 	// Limited is a card that is never traded.
 	Limited bool `json:"limited,omitempty"`
+	// EventOnly is a card only an event gives, which no anime's collection
+	// needs.
+	EventOnly bool `json:"event_only,omitempty"`
 	// Stars are a card held's, which raise its Attack and Health; Free are
 	// its copies beyond the one kept and those used up, Fuse the free copies
 	// its next star needs (0 at the most stars), and NextAttack and
@@ -311,7 +314,7 @@ type cardView struct {
 }
 
 func (h *handler) held(c storage.Card, count int) cardView {
-	v := cardView{ID: c.ID, Rarity: c.Rarity, Set: c.Collection, Name: c.Name, Anime: c.Anime, Image: c.ImageURL, Attack: c.Attack, Health: c.Health, Value: c.Value, Count: count, Limited: storage.CardLimited(c.ID)}
+	v := cardView{ID: c.ID, Rarity: c.Rarity, Set: c.Collection, Name: c.Name, Anime: c.Anime, Image: c.ImageURL, Attack: c.Attack, Health: c.Health, Value: c.Value, Count: count, Limited: storage.CardLimited(c.ID), EventOnly: storage.CardEventOnly(c.ID)}
 	v.Class, v.Skill = roleNames(c.ID, c.Rarity)
 	return v
 }

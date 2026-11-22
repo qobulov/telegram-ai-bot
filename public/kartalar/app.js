@@ -1362,11 +1362,12 @@
     }
     animeList();
   }
-  // animeGoal is an anime's collection: the cards it needs (limited ones
-  // aside), how many are held, and its reward's state: none (too small),
-  // open, ready (all held) or claimed.
+  // animeGoal is an anime's collection: the cards it needs (those only an
+  // event gives, limited or not, aside, as the server counts them), how many
+  // are held, and its reward's state: none (too small), open, ready (all
+  // held) or claimed.
   function animeGoal(name, list) {
-    const need = list.filter((c) => !c.limited);
+    const need = list.filter((c) => !c.limited && !c.event_only);
     const held = need.filter((c) => heldCount(c.id)).length;
     let state = "none";
     if (animeReward && need.length >= animeReward.least) {

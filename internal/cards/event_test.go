@@ -234,6 +234,18 @@ func TestTheDemonSlayerEvent(t *testing.T) {
 	if got := AnimeCards(catalog, "Demon Slayer"); !slices.Equal(got, []int64{126071}) {
 		t.Errorf("the Demon Slayer collection needs %v, want Tanjiro alone", got)
 	}
+	// Black Clover's cards are all its event's, from 2026-11-22: its
+	// collection needs none, and the page is told which cards they are.
+	asta := storage.Card{ID: storage.BlackCloverCards[0], Name: "Asta", Anime: "Black Clover", Rarity: 3}
+	if got := AnimeCards([]storage.Card{asta, {ID: 1, Anime: "Black Clover"}}, "Black Clover"); !slices.Equal(got, []int64{1}) {
+		t.Errorf("the Black Clover collection needs %v, want only the card not its event's", got)
+	}
+	if v := (&handler{}).held(asta, 1); !v.EventOnly || v.Limited {
+		t.Errorf("Asta's view = %+v, want it marked as only an event's", v)
+	}
+	if v := (&handler{}).held(storage.Card{ID: 126071}, 1); v.EventOnly {
+		t.Errorf("Tanjiro's view = %+v, want it drawn as any card", v)
+	}
 }
 
 // pickStore keeps the event of the last pull.

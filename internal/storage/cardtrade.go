@@ -52,12 +52,25 @@ func CardLimited(id int64) bool { return limitedCards[id] }
 // owners asked on 2026-11-21: no draw, pack or other event does.
 var DemonSlayerCards = []int64{130050, 129131, 141918, 149220, 129132, 141694}
 
+// BlackCloverCards are all of Black Clover's cards, which only its event
+// is to give, as the owners asked on 2026-11-22: no draw, pack or other
+// event gives them; whoever holds some keeps them.
+var BlackCloverCards = []int64{
+	123285, 124440, 123283, 123284, 124522, 124435, 124449, 126948, 124459, 124436,
+	124447, 124438, 124433, 124434, 187268, 124439, 192196, 124521, 124442,
+}
+
 // CardEventOnly reports whether only an event gives the card.
-func CardEventOnly(id int64) bool { return slices.Contains(DemonSlayerCards, id) }
+func CardEventOnly(id int64) bool {
+	return slices.Contains(DemonSlayerCards, id) || slices.Contains(BlackCloverCards, id)
+}
 
 // undrawnCardIDs are the cards no draw gives: the limited ones and those
 // only an event gives.
-func undrawnCardIDs() []int64 { return append(limitedCardIDs(), DemonSlayerCards...) }
+func undrawnCardIDs() []int64 {
+	ids := append(limitedCardIDs(), DemonSlayerCards...)
+	return append(ids, BlackCloverCards...)
+}
 
 // limitedCardIDs are the limited cards' IDs, for a query to leave them out.
 func limitedCardIDs() []int64 {
