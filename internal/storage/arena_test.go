@@ -447,8 +447,8 @@ func TestOpponentsWhenFewHaveTeams(t *testing.T) {
 	}
 }
 
-// A player whose rating is frozen keeps it, attacking or defending, won or
-// lost; the opponent's rating moves as before.
+// A battle with a player whose rating is frozen moves neither rating,
+// attacking or defending, won or lost; wins and losses still count.
 func TestArenaRatingFrozen(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -462,8 +462,8 @@ func TestArenaRatingFrozen(t *testing.T) {
 	if out, err := store.RecordArenaBattle(ctx, 1, 3, 1, true, arenaRules, CardQuest{}); err != nil || out.RatingChange != 0 {
 		t.Errorf("a frozen attacker's win = %+v, %v; want change 0", out, err)
 	}
-	if out, err := store.RecordArenaBattle(ctx, 4, 2, 2, true, arenaRules, CardQuest{}); err != nil || out.RatingChange != 16 {
-		t.Errorf("a win over a frozen defender = %+v, %v; want +16", out, err)
+	if out, err := store.RecordArenaBattle(ctx, 4, 2, 2, true, arenaRules, CardQuest{}); err != nil || out.RatingChange != 0 {
+		t.Errorf("a win over a frozen defender = %+v, %v; want change 0", out, err)
 	}
 	alice, _ := store.ArenaPlayerOf(ctx, 1, arenaRules)
 	bob, _ := store.ArenaPlayerOf(ctx, 2, arenaRules)
@@ -472,7 +472,7 @@ func TestArenaRatingFrozen(t *testing.T) {
 	if alice.Rating != 1000 || alice.Wins != 1 || bob.Rating != 1000 || bob.Losses != 1 {
 		t.Errorf("frozen players moved: Alice %+v, Bob %+v", alice, bob)
 	}
-	if carol.Rating != 984 || dave.Rating != 1016 {
-		t.Errorf("opponents: Carol %d, Dave %d; want 984 and 1016", carol.Rating, dave.Rating)
+	if carol.Rating != 1000 || dave.Rating != 1000 || dave.Wins != 1 || carol.Losses != 1 {
+		t.Errorf("opponents: Carol %+v, Dave %+v; want both at 1000", carol, dave)
 	}
 }

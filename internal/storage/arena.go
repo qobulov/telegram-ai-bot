@@ -278,8 +278,10 @@ type arenaRow struct {
 // RecordArenaBattle records the attacker's battle against the defender, in
 // one transaction with both players' rows locked, the lower ID first: it
 // takes one of the attacker's tickets, ErrArenaNoTickets with none, moves
-// the ratings by Elo (arenaElo: a defender who holds gets +0; a player
-// whose rating_frozen the owners set keeps their rating), gives the attacker a token for a
+// the ratings by Elo (arenaElo: a defender who holds gets +0), but for a
+// battle with a player whose rating_frozen the owners set, which moves
+// neither rating, as the owners asked on 2026-11-22: their opponents were
+// losing rating to them; gives the attacker a token for a
 // win while the day's arena tokens last, and keeps the battle with its
 // seed and both players' rating changes. Defending changes only the
 // defender's rating, wins and losses, and takes no ticket. The attacker
@@ -302,11 +304,8 @@ func (s *Store) RecordArenaBattle(ctx context.Context, attacker, defender, seed 
 		}
 		held--
 		ratingA, ratingD := arenaElo(a.rating, d.rating, rules.K, attackerWon)
-		if a.frozen {
-			ratingA = a.rating
-		}
-		if d.frozen {
-			ratingD = d.rating
+		if a.frozen || d.frozen {
+			ratingA, ratingD = a.rating, d.rating
 		}
 		out.RatingChange = ratingA - a.rating
 		if attackerWon && a.tokensWon < rules.Tokens {
