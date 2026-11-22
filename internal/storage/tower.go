@@ -120,3 +120,49 @@ func giveTowerReward(ctx context.Context, tx pgx.Tx, userID int64, name string, 
 	return tx.QueryRow(ctx, `UPDATE card_players SET tokens = tokens + $2 WHERE user_id = $1 RETURNING tokens`,
 		userID, rules.Tokens).Scan(&out.Tokens)
 }
+
+// TowerRow is a player on the tower's table: the highest floor they cleared.
+type TowerRow struct {
+	UserID int64
+	Name   string
+	Floor  int
+}
+
+// towerRanked ranks the players who cleared a floor, the highest first, then
+// by user id, as the owners asked on 2026-11-22 for a table of the tower.
+const towerRanked = `
+	SELECT t.user_id, coalesce(c.name, '') AS name, t.floor, row_number() OVER (ORDER BY t.floor DESC, t.user_id) AS place
+	FROM tower_players t LEFT JOIN card_players c ON c.user_id = t.user_id
+	WHERE t.floor > 0`
+
+// TowerTop are the limit players highest in the tower.
+func (s *Store) TowerTop(ctx context.Context, limit int) ([]TowerRow, error) {
+	rows, err := s.pool.Query(ctx, `SELECT user_id, name, floor FROM (`+towerRanked+`) r ORDER BY place LIMIT $1`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("storage: read the tower table: %w", err)
+	}
+	top, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (TowerRow, error) {
+		var r TowerRow
+		return r, row.Scan(&r.UserID, &r.Name, &r.Floor)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("storage: read the tower table: %w", err)
+	}
+	return top, nil
+}
+
+// TowerPlace is the player's row and place on the tower's table and how
+// many are on it; place 0 for one who has cleared no floor.
+func (s *Store) TowerPlace(ctx context.Context, userID int64) (me TowerRow, place, total int, err error) {
+	err = s.pool.QueryRow(ctx, `
+		WITH ranked AS (`+towerRanked+`)
+		SELECT user_id, name, floor, place, (SELECT count(*) FROM ranked) FROM ranked WHERE user_id = $1`, userID).
+		Scan(&me.UserID, &me.Name, &me.Floor, &place, &total)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return TowerRow{}, 0, 0, nil
+	}
+	if err != nil {
+		return TowerRow{}, 0, 0, fmt.Errorf("storage: read a tower place: %w", err)
+	}
+	return me, place, total, nil
+}

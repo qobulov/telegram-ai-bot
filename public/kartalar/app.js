@@ -9,7 +9,7 @@
 
   const texts = {
     uz: {
-      arenaTab: "Arena", towerTab: "🗼 Minora", arenaShop: "🪙 Arena do'koni", arenaTeam: "⚔️ Jamoangiz", arenaSave: "Jamoani saqlash", arenaFoes: "🎯 Raqiblar", arenaHistory: "📜 Janglar tarixi", arenaRefresh: "🔄 Yangilash", topCards: "🎴 Kartalar", topArena: "⚔️ Arena",
+      arenaTab: "Arena", towerTab: "🗼 Minora", arenaShop: "🪙 Arena do'koni", arenaTeam: "⚔️ Jamoangiz", arenaSave: "Jamoani saqlash", arenaFoes: "🎯 Raqiblar", arenaHistory: "📜 Janglar tarixi", arenaRefresh: "🔄 Yangilash", topCards: "🎴 Kartalar", topArena: "⚔️ Arena", topTower: "🗼 Minora", towerRow: (n) => `${n}-qavat`, noTowerTop: "Hali hech kim minoradan qavat o'tmagan",
       title: "Kartalar", collected: "to'plandi", animeTab: "Animelar", animeSearch: "Anime yoki personaj", animeBack: "← Barcha animelar", animeOwned: "✓ Sizda bor", animeMissing: "Sizda hali yo'q", animeEmpty: "Hech narsa topilmadi", animeGoal: (n) => `🎟 Hammasini yig'ing: +${n} token`, animeClaim: (n) => `🎁 ${n} token olish`, animeClaimed: (n) => `✅ ${n} token olingan`, animeGot: (n) => `🎟 +${n} token! Kolleksiya to'liq`, collection: "Kolleksiya", draw: "Olish", top: "Reyting",
       search: "Kartani qidirish", rarities: ["Oddiy", "Noyob", "Epik", "Afsonaviy", "Mifik"],
       drawNow: "Karta olish", drawing: "Ochilmoqda…", next: (t) => `Keyingi karta: ${t}`, ready: "Karta tayyor!",
@@ -43,7 +43,7 @@
       paid: "✅ To'lov qabul qilindi, kristall qo'shilmoqda…", crystalsAdded: (n) => `💎 +${n} kristall qo'shildi!`, payFailed: "To'lov amalga oshmadi", bought: (n) => `🎟 +${n} token`, packOpened: (r) => `${r} paket`,
     },
     ru: {
-      arenaTab: "Арена", towerTab: "🗼 Башня", arenaShop: "🪙 Магазин арены", arenaTeam: "⚔️ Ваша команда", arenaSave: "Сохранить команду", arenaFoes: "🎯 Соперники", arenaHistory: "📜 История боёв", arenaRefresh: "🔄 Обновить", topCards: "🎴 Карты", topArena: "⚔️ Арена",
+      arenaTab: "Арена", towerTab: "🗼 Башня", arenaShop: "🪙 Магазин арены", arenaTeam: "⚔️ Ваша команда", arenaSave: "Сохранить команду", arenaFoes: "🎯 Соперники", arenaHistory: "📜 История боёв", arenaRefresh: "🔄 Обновить", topCards: "🎴 Карты", topArena: "⚔️ Арена", topTower: "🗼 Башня", towerRow: (n) => `${n} этаж`, noTowerTop: "Ещё никто не прошёл этаж башни",
       title: "Карты", collected: "собрано", animeTab: "Аниме", animeSearch: "Аниме или персонаж", animeBack: "← Все аниме", animeOwned: "✓ Есть у вас", animeMissing: "Пока нет у вас", animeEmpty: "Ничего не найдено", animeGoal: (n) => `🎟 Соберите всех: +${n} токенов`, animeClaim: (n) => `🎁 Забрать ${n} токенов`, animeClaimed: (n) => `✅ ${n} токенов получено`, animeGot: (n) => `🎟 +${n} токенов! Коллекция собрана`, collection: "Коллекция", draw: "Получить", top: "Рейтинг",
       search: "Поиск по картам", rarities: ["Обычная", "Редкая", "Эпическая", "Легендарная", "Мифическая"],
       drawNow: "Получить карту", drawing: "Открываем…", next: (t) => `Следующая карта: ${t}`, ready: "Карта готова!",
@@ -77,7 +77,7 @@
       paid: "✅ Оплата принята, кристаллы зачисляются…", crystalsAdded: (n) => `💎 +${n} кристаллов!`, payFailed: "Оплата не прошла", bought: (n) => `🎟 +${n} токенов`, packOpened: (r) => `Пак: ${r}`,
     },
     en: {
-      arenaTab: "Arena", towerTab: "🗼 Tower", arenaShop: "🪙 Arena shop", arenaTeam: "⚔️ Your team", arenaSave: "Save the team", arenaFoes: "🎯 Opponents", arenaHistory: "📜 Battle history", arenaRefresh: "🔄 Refresh", topCards: "🎴 Cards", topArena: "⚔️ Arena",
+      arenaTab: "Arena", towerTab: "🗼 Tower", arenaShop: "🪙 Arena shop", arenaTeam: "⚔️ Your team", arenaSave: "Save the team", arenaFoes: "🎯 Opponents", arenaHistory: "📜 Battle history", arenaRefresh: "🔄 Refresh", topCards: "🎴 Cards", topArena: "⚔️ Arena", topTower: "🗼 Tower", towerRow: (n) => `Floor ${n}`, noTowerTop: "Nobody has cleared a tower floor yet",
       title: "Cards", collected: "collected", animeTab: "Anime", animeSearch: "Anime or character", animeBack: "← All anime", animeOwned: "✓ You have it", animeMissing: "Not yours yet", animeEmpty: "Nothing found", animeGoal: (n) => `🎟 Collect them all: +${n} tokens`, animeClaim: (n) => `🎁 Claim ${n} tokens`, animeClaimed: (n) => `✅ ${n} tokens claimed`, animeGot: (n) => `🎟 +${n} tokens! Collection complete`, collection: "Collection", draw: "Draw", top: "Ranking",
       search: "Search cards", rarities: ["Common", "Rare", "Epic", "Legendary", "Mythic"],
       drawNow: "Draw a card", drawing: "Opening…", next: (t) => `Next card in ${t}`, ready: "A card is ready!",
@@ -1348,11 +1348,12 @@
     for (const chip of document.querySelectorAll("#topKind button")) chip.setAttribute("aria-pressed", String(chip.dataset.k === topKind));
     const asked = ++topAsked, kind = topKind;
     try {
-      const data = await api(kind === "arena" ? "arena" : "top");
+      const data = await api(kind === "arena" ? "arena" : kind === "tower" ? "tower_top" : "top");
       if (asked !== topAsked) return;
       notice(null);
       $("arenaWeek").hidden = kind !== "arena";
       if (kind === "arena") { arenaTable(data.top || [], data.me, data.player); arenaWeek(data.week); return; }
+      if (kind === "tower") { towerTable(data.top || [], data.me); return; }
       const table = $("table");
       table.textContent = "";
       if (!data.top.length) table.innerHTML = `<p class="empty">${t.noTop}</p>`;
@@ -3348,6 +3349,26 @@
     li.querySelector(".who small").textContent = small;
     li.querySelector(".pts").textContent = points;
     return li;
+  }
+
+  // towerTable is the tower's table: the players highest in it, as the
+  // owners asked on 2026-11-22, and the player's own row below if they are
+  // not on it.
+  function towerTable(top, me) {
+    const table = $("table");
+    table.textContent = "";
+    if (!top.length) table.innerHTML = `<p class="empty">${t.noTowerTop}</p>`;
+    top.forEach((row, i) => {
+      const li = document.createElement("li");
+      if (row.me) li.className = "me";
+      li.innerHTML = `<span class="pos"></span><span class="who"><b></b><small></small></span><span class="pts"></span>`;
+      li.querySelector(".pos").textContent = ["🥇", "🥈", "🥉"][i] || i + 1;
+      li.querySelector(".who b").textContent = row.name || "?";
+      li.querySelector(".who small").textContent = t.towerRow(row.floor);
+      li.querySelector(".pts").textContent = `🗼 ${row.floor}`;
+      table.append(li);
+    });
+    if (me && me.place > top.length) table.append(placeRow(me.place, me.total, me.name, t.towerRow(me.floor), `🗼 ${me.floor}`));
   }
 
   function arenaTable(top, me, player) {

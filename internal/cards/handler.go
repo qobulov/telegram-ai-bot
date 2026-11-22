@@ -50,6 +50,8 @@ type Store interface {
 	BuyArenaTicket(ctx context.Context, userID int64, price int, rules storage.ArenaRules) (coins, tickets int, next time.Duration, err error)
 	TowerPlayerOf(ctx context.Context, userID int64, day time.Time) (storage.TowerPlayer, error)
 	RecordTowerFight(ctx context.Context, userID int64, name string, floor int, won bool, rules storage.TowerRules) (storage.TowerOutcome, error)
+	TowerTop(ctx context.Context, limit int) ([]storage.TowerRow, error)
+	TowerPlace(ctx context.Context, userID int64) (storage.TowerRow, int, int, error)
 	OpenArenaPack(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, price int, now time.Time, quest storage.CardQuest) (storage.CardOpening, int, error)
 	CardQuests(ctx context.Context, userID int64, day time.Time) (map[string]storage.QuestProgress, error)
 	ClaimCardQuest(ctx context.Context, userID int64, quest storage.CardQuest, reward int, now time.Time) error
@@ -228,6 +230,8 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return h.open(ctx, opened.User, req.Count)
 	case "top":
 		return h.top(ctx, opened.User)
+	case "tower_top":
+		return h.towerTop(ctx, opened.User)
 	case "market":
 		return h.market(ctx, opened.User)
 	case "catalog":
@@ -461,6 +465,26 @@ func (h *handler) top(ctx context.Context, user miniapp.User) (any, failure) {
 	}
 	mine := map[string]any{"place": place, "total": total, "name": me.Name, "points": me.Points, "cards": me.Cards}
 	return map[string]any{"top": rows, "me": mine}, failure{}
+}
+
+// towerTop is the tower's table: the players highest in it, and the
+// player's own place.
+func (h *handler) towerTop(ctx context.Context, user miniapp.User) (any, failure) {
+	top, err := h.Store.TowerTop(ctx, topSize)
+	if err != nil {
+		h.Logger.Error("could not read the tower table", "error", err)
+		return nil, errUnavailable
+	}
+	rows := make([]map[string]any, len(top))
+	for i, r := range top {
+		rows[i] = map[string]any{"name": r.Name, "floor": r.Floor, "me": r.UserID == user.ID}
+	}
+	me, place, total, err := h.Store.TowerPlace(ctx, user.ID)
+	if err != nil {
+		h.Logger.Error("could not read a tower place", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
+	return map[string]any{"top": rows, "me": map[string]any{"place": place, "total": total, "name": me.Name, "floor": me.Floor}}, failure{}
 }
 
 // name is how the player is named on the table: their first name, else

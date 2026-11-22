@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -14,6 +15,32 @@ import (
 type fakeTower struct {
 	floor map[int64]int
 	tries map[int64]int // on any day
+}
+
+func (f *fakeStore) TowerTop(_ context.Context, limit int) ([]storage.TowerRow, error) {
+	var top []storage.TowerRow
+	for id, floor := range f.tower.floor {
+		if floor > 0 {
+			top = append(top, storage.TowerRow{UserID: id, Name: fmt.Sprintf("P%d", id), Floor: floor})
+		}
+	}
+	slices.SortFunc(top, func(a, b storage.TowerRow) int {
+		if a.Floor != b.Floor {
+			return b.Floor - a.Floor
+		}
+		return int(a.UserID - b.UserID)
+	})
+	return top[:min(limit, len(top))], nil
+}
+
+func (f *fakeStore) TowerPlace(ctx context.Context, userID int64) (storage.TowerRow, int, int, error) {
+	top, _ := f.TowerTop(ctx, 1<<30)
+	for i, r := range top {
+		if r.UserID == userID {
+			return r, i + 1, len(top), nil
+		}
+	}
+	return storage.TowerRow{}, 0, len(top), nil
 }
 
 func (f *fakeStore) TowerPlayerOf(_ context.Context, userID int64, _ time.Time) (storage.TowerPlayer, error) {
@@ -220,5 +247,25 @@ func TestTowerFights(t *testing.T) {
 	}
 	if store.arena.coins[8] != coins {
 		t.Error("a loss gave coins")
+	}
+}
+
+// The tower's table lists the players highest in it, the highest first, and
+// the player's own place.
+func TestTowerTable(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	store := &fakeStore{tower: fakeTower{floor: map[int64]int{7: 12, 8: 40, 9: 0, 10: 40}, tries: map[int64]int{}}}
+	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }})
+	_, out := post(t, h, signedInit(7, now), "tower_top")
+	top := out["top"].([]any)
+	if len(top) != 3 {
+		t.Fatalf("table = %v, want the three who cleared a floor", top)
+	}
+	first, last := top[0].(map[string]any), top[2].(map[string]any)
+	if first["floor"] != 40.0 || first["name"] != "P8" || last["floor"] != 12.0 || last["me"] != true {
+		t.Errorf("table = %v", top)
+	}
+	if me := out["me"].(map[string]any); me["place"] != 3.0 || me["total"] != 3.0 || me["floor"] != 12.0 {
+		t.Errorf("my place = %v", me)
 	}
 }
