@@ -54,21 +54,29 @@ var DemonSlayerCards = []int64{130050, 129131, 141918, 149220, 129132, 141694}
 
 // BlackCloverCards are Black Clover's six Mythics, Asta, Yuno, Julius,
 // Mereoleona, Yami and Noelle, which only its event is to give, as the
-// owners asked on 2026-11-22: no draw, pack or other event gives them. Its
-// other cards, kept from draws for a while, are drawn again, the event
-// giving only these.
+// owners asked on 2026-11-22: no draw, pack or other event gives them.
 var BlackCloverCards = []int64{123285, 123284, 124435, 124522, 124440, 123283}
 
-// CardEventOnly reports whether only an event gives the card.
+// BlackCloverClosed are Black Clover's thirteen other cards, which the
+// owners closed to draws too on 2026-11-22: nothing gives them for now, nor
+// does any collection need them.
+var BlackCloverClosed = []int64{
+	124449, 126948, 124459, 124436, 124447, 124438, 124433, 124434, 187268, 124439,
+	192196, 124521, 124442,
+}
+
+// CardEventOnly reports whether no draw gives the card: only an event, or,
+// for a card closed, nothing for now.
 func CardEventOnly(id int64) bool {
-	return slices.Contains(DemonSlayerCards, id) || slices.Contains(BlackCloverCards, id)
+	return slices.Contains(DemonSlayerCards, id) || slices.Contains(BlackCloverCards, id) || slices.Contains(BlackCloverClosed, id)
 }
 
 // undrawnCardIDs are the cards no draw gives: the limited ones and those
 // only an event gives.
 func undrawnCardIDs() []int64 {
 	ids := append(limitedCardIDs(), DemonSlayerCards...)
-	return append(ids, BlackCloverCards...)
+	ids = append(ids, BlackCloverCards...)
+	return append(ids, BlackCloverClosed...)
 }
 
 // limitedCardIDs are the limited cards' IDs, for a query to leave them out.
