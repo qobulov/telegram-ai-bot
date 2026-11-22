@@ -381,10 +381,10 @@ func TestSynergies(t *testing.T) {
 		want   [5]int
 	}{
 		{[5]string{"A", "B", "C", "D", "E"}, [5]int{}},
-		{[5]string{"A", "A", "C", "D", "E"}, [5]int{10, 10, 0, 0, 0}},
-		{[5]string{"A", "B", "A", "D", "A"}, [5]int{20, 0, 20, 0, 20}},
-		{[5]string{"A", "B", "A", "B", "E"}, [5]int{10, 10, 10, 10, 0}},
-		{[5]string{"A", "A", "A", "A", "A"}, [5]int{20, 20, 20, 20, 20}},
+		{[5]string{"A", "A", "C", "D", "E"}, [5]int{SynergyTwo, SynergyTwo, 0, 0, 0}},
+		{[5]string{"A", "B", "A", "D", "A"}, [5]int{SynergyThree, 0, SynergyThree, 0, SynergyThree}},
+		{[5]string{"A", "B", "A", "B", "E"}, [5]int{SynergyTwo, SynergyTwo, SynergyTwo, SynergyTwo, 0}},
+		{[5]string{"A", "A", "A", "A", "A"}, [5]int{SynergyThree, SynergyThree, SynergyThree, SynergyThree, SynergyThree}},
 		{[5]string{"", "", "C", "D", "E"}, [5]int{}},
 	}
 	for _, c := range cases {
@@ -409,7 +409,7 @@ func TestArenaTeamSynergy(t *testing.T) {
 	}
 	plain, _ := fightersOf(arenaCards(), [5]int64{10, 11, 12, 13, 14})
 	for i, v := range team.views {
-		want := []int{10, 10, 20, 20, 20}[i]
+		want := []int{SynergyTwo, SynergyTwo, SynergyThree, SynergyThree, SynergyThree}[i]
 		base := plain.views[i]
 		if v.Synergy != want || v.Attack != raised(base.Attack, want) || v.Health != raised(base.Health, want) || plain.views[i].Synergy != 0 {
 			t.Errorf("slot %d = %+v, plain %+v", i, v, base)
@@ -429,7 +429,7 @@ func TestArenaTeamSynergy(t *testing.T) {
 	if store.arena.power[7] != team.team.Power() {
 		t.Errorf("power saved %d, want %d", store.arena.power[7], team.team.Power())
 	}
-	if f := out["team"].([]any)[2].(map[string]any); f["synergy"] != 20.0 || f["anime"] != "Naruto" {
+	if f := out["team"].([]any)[2].(map[string]any); f["synergy"] != float64(SynergyThree) || f["anime"] != "Naruto" {
 		t.Errorf("a fighter's view = %v", f)
 	}
 	call(8, map[string]any{"action": "arena_team", "front": arenaFront, "back": arenaBack})
@@ -448,7 +448,7 @@ func TestArenaTeamSynergy(t *testing.T) {
 	if edges == 0 {
 		t.Error("no edge in the battle")
 	}
-	if d := out["defender"].([]any)[0].(map[string]any); d["synergy"] != 10.0 {
+	if d := out["defender"].([]any)[0].(map[string]any); d["synergy"] != float64(SynergyTwo) {
 		t.Errorf("the defender's view = %v", d)
 	}
 }

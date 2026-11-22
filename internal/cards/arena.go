@@ -37,10 +37,12 @@ const (
 // Anime synergy, as the owners asked: the cards of one anime in a team,
 // seasons and sequels as one (Franchise), raise each other's attack and
 // health by these percents, a pair by SynergyTwo, three or more by
-// SynergyThree. The page works it out the same way for a team not saved.
+// SynergyThree (since 2026-11-22 half what they were, 10 and 20, as the
+// owners asked: a team of one anime stood too far above the rest). The page
+// works it out the same way for a team not saved.
 const (
-	SynergyTwo   = 10
-	SynergyThree = 20
+	SynergyTwo   = 5
+	SynergyThree = 10
 )
 
 // arenaRules are the rules at now: the tokens' day starts at midnight in
