@@ -699,7 +699,7 @@ func TestAttachmentsAreSentWithTheQuestionButNeverSaved(t *testing.T) {
 // It is never sent as text.
 func TestStickerMarkerIsTakenOut(t *testing.T) {
 	cases := map[string]struct{ text, sticker, saved string }{
-		"Voy, yana maqtanish 😂 [sticker sarcasm]": {"Voy, yana maqtanish 😂", "", "Voy, yana maqtanish 😂"},
+		"Voy, yana maqtanish 😂 [sticker sarcasm]": {"Voy, yana maqtanish", "", "Voy, yana maqtanish"},
 		"[Sticker Funny]":                       {"", "funny", "<sticker funny>"},
 		"<sticker sad>":                         {"", "sad", "<sticker sad>"},
 		"Tabriklayman! [sticker celebration]\n": {"Tabriklayman!", "", "Tabriklayman!"},
@@ -922,5 +922,51 @@ func TestMusingIsNotSent(t *testing.T) {
 		if isMusing(answer) {
 			t.Errorf("isMusing(%q) = true, want it sent", answer)
 		}
+	}
+}
+
+// An answer that calls someone "sen" is asked for again with "siz", once;
+// a quote with "sen" in it, or an owner's own form, is left as it is.
+func TestSenIsAskedAgainWithSiz(t *testing.T) {
+	f := newFixture(text("Kartalarni o'zing yig'asan endi."), text("Kartalarni o'zingiz yig'asiz endi."))
+	answer, err := f.agent.Reply(context.Background(), request(1, "menga karta ber"))
+	if err != nil || answer.Text != "Kartalarni o'zingiz yig'asiz endi." || len(f.model.requests) != 2 {
+		t.Fatalf("answer = %q, %v after %d requests", answer.Text, err, len(f.model.requests))
+	}
+	if sys := f.model.requests[1].Messages[0].Content; !strings.Contains(sys, sizNote) {
+		t.Error("the second request did not ask for siz")
+	}
+	for _, kept := range []string{"Румийдан: «Сен денгиздаги бир томчи эмассан»", "Eshitaman, tinchlikmi?", "Senat yig'ilishi bo'ldi."} {
+		if usesSen(kept) {
+			t.Errorf("usesSen(%q) = true", kept)
+		}
+	}
+}
+
+// A complaint gets the note against jokes; a plain message does not.
+func TestComplaintGetsANote(t *testing.T) {
+	f := newFixture(text("Skrinshot tashlang, egalarimga yetkazaman."))
+	if _, err := f.agent.Reply(context.Background(), request(1, "Bu yerda korruptsiya bo'lyapti, kimdir nazorat qiladimi?")); err != nil {
+		t.Fatal(err)
+	}
+	msgs := f.model.requests[0].Messages
+	if !strings.Contains(msgs[len(msgs)-1].Content, complaintNote) {
+		t.Error("the complaint went without its note")
+	}
+	f = newFixture(text("Salom"))
+	_, _ = f.agent.Reply(context.Background(), request(1, "salom"))
+	msgs = f.model.requests[0].Messages
+	if strings.Contains(msgs[len(msgs)-1].Content, complaintNote) {
+		t.Error("a greeting got the complaint note")
+	}
+}
+
+// Backticks around a command go; a code block stays.
+func TestTicksAreTakenOff(t *testing.T) {
+	if got := withoutTicks("Kunlik imkoniyat uchun `/card` buyrug'ini bosing."); got != "Kunlik imkoniyat uchun /card buyrug'ini bosing." {
+		t.Errorf("got %q", got)
+	}
+	if code := "```go\nfmt.Println(`x`)\n```"; withoutTicks(code) != code {
+		t.Error("a code block lost its ticks")
 	}
 }

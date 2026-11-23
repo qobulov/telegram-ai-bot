@@ -265,7 +265,7 @@ func TestServeAnswersWakeWordWithRecentChatterEndToEnd(t *testing.T) {
 	})
 
 	sent := env.waitForSend(t)
-	if sent["text"] != "Ann, compile your facts first 😂" || sent["chat_id"] != float64(e2eGroup) {
+	if sent["text"] != "Ann, compile your facts first" || sent["chat_id"] != float64(e2eGroup) {
 		t.Errorf("bot sent %v", sent)
 	}
 	reply, _ := sent["reply_parameters"].(map[string]any)
@@ -297,7 +297,7 @@ func TestServeAnswersWakeWordWithRecentChatterEndToEnd(t *testing.T) {
 	}
 
 	groupHistory := env.history(t, storage.Scope{ChatID: e2eGroup})
-	if len(groupHistory) != 2 || groupHistory[0].Content != "Bek: who is right?" || groupHistory[1].Content != "Ann, compile your facts first 😂" {
+	if len(groupHistory) != 2 || groupHistory[0].Content != "Bek: who is right?" || groupHistory[1].Content != "Ann, compile your facts first" {
 		t.Errorf("shared group history = %+v", groupHistory)
 	}
 	if private := env.history(t, privateScope(e2eMember)); len(private) != 0 {

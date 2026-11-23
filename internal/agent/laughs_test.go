@@ -43,8 +43,8 @@ func TestHistoryLosesTrailingLaughs(t *testing.T) {
 	}
 }
 
-// Two of the last five answers in the chat laughing make the next answer
-// lose its own trailing laugh; one does not.
+// Every answer loses its trailing laugh, since 2026-11-23 whatever the
+// answers before it did; a laugh alone stays.
 func TestLaughingHabitIsBroken(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -52,9 +52,9 @@ func TestLaughingHabitIsBroken(t *testing.T) {
 		want    string
 	}{
 		{"two of five laugh", []ai.Message{user("a"), text("Ha 😂"), user("b"), text("Yo'q"), user("c"), text("Voy 🤣")}, "Rejissyor yana"},
-		{"one laughs", []ai.Message{user("a"), text("Ha 😂"), user("b"), text("Yo'q")}, "Rejissyor yana 😂"},
+		{"one laughs", []ai.Message{user("a"), text("Ha 😂"), user("b"), text("Yo'q")}, "Rejissyor yana"},
 		{"old laughs", []ai.Message{user("a"), text("Ha 😂"), user("b"), text("Ha 😂"),
-			user("c"), text("1"), user("d"), text("2"), user("e"), text("3"), user("f"), text("4"), user("g"), text("5")}, "Rejissyor yana 😂"},
+			user("c"), text("1"), user("d"), text("2"), user("e"), text("3"), user("f"), text("4"), user("g"), text("5")}, "Rejissyor yana"},
 	}
 	for _, c := range cases {
 		f := newFixture(text("Rejissyor yana 😂"))

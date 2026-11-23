@@ -191,10 +191,9 @@ func (a *Agent) Reply(ctx context.Context, req Request) (Answer, error) {
 	}
 
 	t := &turn{
-		req:        req,
-		history:    sanitize(history),
-		messages:   []ai.Message{{Role: ai.RoleUser, Content: req.Text}},
-		laughsALot: laughsALot(history),
+		req:      req,
+		history:  sanitize(history),
+		messages: []ai.Message{{Role: ai.RoleUser, Content: req.Text}},
 	}
 	answer, err := a.run(ctx, t)
 	if err != nil {
@@ -231,6 +230,9 @@ type turn struct {
 	// toolAsText is set once the model wrote a tool call as text, so that
 	// the next request tells it to call the tool instead.
 	toolAsText bool
+	// saidSen is set once the model called someone "sen" with no owner's
+	// form allowing it, so that the next request asks for "siz".
+	saidSen bool
 	// askedAgain is set once the model answered nothing and was asked
 	// again; emptyReason is why it stopped, as the provider said; and
 	// noPictures once the provider's filter refused the turn with its
@@ -240,9 +242,6 @@ type turn struct {
 	noPictures  bool
 	// route is the path the turn takes when it is not the chat one.
 	route string
-	// laughsALot is set when the bot's recent answers in the chat laugh
-	// too often, so that this one does not end with a laugh too.
-	laughsALot bool
 }
 
 // run alternates between the model and its tool calls until the model
@@ -292,6 +291,10 @@ func (a *Agent) runFull(ctx context.Context, t *turn) (Answer, error) {
 				}
 			}
 			if !writesToolCall(reply.Content, definitions) {
+				if !t.saidSen && usesSen(reply.Content) && !senAllowed(t) {
+					t.saidSen = true
+					continue
+				}
 				return finish(t, reply)
 			}
 			if t.toolAsText {
@@ -324,6 +327,9 @@ func (a *Agent) prompt(t *turn) []ai.Message {
 	if t.toolAsText {
 		system += "\n\n" + toolAsTextNote
 	}
+	if t.saidSen {
+		system += "\n\n" + sizNote
+	}
 	messages = append(messages, ai.Message{Role: ai.RoleSystem, Content: system})
 	messages = append(messages, t.history...)
 	messages = append(messages, t.messages...)
@@ -341,6 +347,9 @@ func (a *Agent) prompt(t *turn) []ai.Message {
 	}
 	if gameWords.MatchString(ownLine(t.req.Text)) {
 		question.Content += "\n\n" + heroCheckNote
+	}
+	if complaintWords.MatchString(ownLine(t.req.Text)) {
+		question.Content += "\n\n" + complaintNote
 	}
 	return messages
 }
@@ -514,10 +523,9 @@ func finishText(t *turn, answer string) (Answer, error) {
 		answer = said
 	}
 	answer = currentCommands(answer)
+	answer = withoutTicks(answer)
 	answer = uzscript.OneScript(answer)
-	if t.laughsALot {
-		answer = withoutTrailingLaugh(answer)
-	}
+	answer = withoutTrailingLaugh(answer)
 	if t.req.LatinScript && uzscript.IsUzbekCyrillic(answer) {
 		answer = uzscript.Latin(answer)
 	}
@@ -753,4 +761,47 @@ func (a *Agent) save(ctx context.Context, t *turn) (int64, error) {
 		return 0, ErrDuplicate
 	}
 	return answerID, err
+}
+
+// complaintWords find a member's complaint of unfairness or a fault, which
+// the bot once answered with a joke that made up a culprit ("the inspector
+// himself asked for a Mythic card", 2026-11-22).
+var complaintWords = regexp.MustCompile(`(?i)(korrup|коррупц|adolatsiz|adolatdan|nohaq|noxaq|нохақ|адолатсиз|aldov|aldash|aldayap|firib|фириб|обман|нечестн|несправедлив|shikoyat|шикоят|жалоб|nazorat qil|назорат|ishlamayap|ишламаяп|не работает|yo'qoldi|yoqoldi|йўқолди|пропал|kelmadi|келмади|не пришл)`)
+
+// complaintNote goes with a complaint, in that request only.
+const complaintNote = "[This message is a complaint about fairness or a fault. Answer it seriously, with no joke: say only what you know, never invent a cause or blame anyone; for your own features ask for a screenshot and pass it on with notify_owner, as your honesty rules say.]"
+
+// sizNote follows an answer that called someone "sen".
+const sizNote = `Your last answer called someone "sen". Nobody here asked for that form: write your answer again speaking to everyone with "siz" ("вы"), the same meaning in the same words otherwise.`
+
+// senWords are the "sen" forms of Uzbek, in either script: the pronoun and
+// "o'zing", the plainest sign of it.
+var senWords = regexp.MustCompile(`(?i)(^|[^\p{L}'ʻʼ‘’])(sen|seni|senga|sening|sendan|senda|o['ʻʼ‘’]?zing|o['ʻʼ‘’]?zingni|o['ʻʼ‘’]?zingga|сен|сени|сенга|сенинг|сендан|ўзинг|ўзингни|ўзингга)([^\p{L}'ʻʼ‘’]|$)`)
+
+// quoted finds text in quotation marks, a poem's line or someone's words,
+// where "sen" is not the bot speaking.
+var quoted = regexp.MustCompile(`«[^»]*»|"[^"]*"|“[^”]*”`)
+
+// usesSen reports an answer that calls someone "sen" outside quotes.
+func usesSen(answer string) bool {
+	return senWords.MatchString(quoted.ReplaceAllString(answer, " "))
+}
+
+// senAllowed reports a turn whose header gives the owner writing a form of
+// address of their own, which may be "sen".
+func senAllowed(t *turn) bool {
+	return strings.Contains(t.req.Context, "[Address the owner who is writing as:") || strings.Contains(t.req.Text, "[Address the owner who is writing as:")
+}
+
+// ticks finds a word or command in backticks, which Telegram shows as they
+// are: "`/card`".
+var ticks = regexp.MustCompile("`([^`\n]{1,40})`")
+
+// withoutTicks is answer without backticks around words, unless it holds a
+// block of code, which someone asked for.
+func withoutTicks(answer string) string {
+	if strings.Contains(answer, "```") {
+		return answer
+	}
+	return ticks.ReplaceAllString(answer, "$1")
 }
