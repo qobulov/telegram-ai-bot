@@ -10,18 +10,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Manrope:wght@500;600;800&display=swap" rel="stylesheet">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="style.css?v=121">
+  <link rel="stylesheet" href="style.css?v=122">
 </head>
 <body>
   <div class="grain" aria-hidden="true"></div>
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="wind" x="-5%" y="-5%" width="110%" height="110%">
-    <feTurbulence type="fractalNoise" baseFrequency="0.012 0.03" numOctaves="2" seed="3" result="n"><animate attributeName="baseFrequency" dur="6s" values="0.012 0.03;0.016 0.036;0.012 0.03" repeatCount="indefinite"/></feTurbulence>
-    <feDisplacementMap in="SourceGraphic" in2="n" scale="6"><animate attributeName="scale" dur="3.2s" values="3;8;3" repeatCount="indefinite"/></feDisplacementMap>
-  </filter><filter id="flow" x="-8%" y="-4%" width="116%" height="108%">
-    <feTurbulence type="fractalNoise" baseFrequency="0.005 0.022" numOctaves="2" seed="7" result="t"/>
-    <feOffset in="t" dx="0" dy="0" result="n"><animate attributeName="dy" dur="5.5s" values="0;46;0" repeatCount="indefinite"/><animate attributeName="dx" dur="7s" values="0;-18;0" repeatCount="indefinite"/></feOffset>
-    <feDisplacementMap in="SourceGraphic" in2="n" xChannelSelector="R" yChannelSelector="G" scale="9"><animate attributeName="scale" dur="4.2s" values="6;14;8;12;6" repeatCount="indefinite"/></feDisplacementMap>
-  </filter></svg>
   <header class="top">
     <div class="brand">
       <span class="seal" aria-hidden="true">札</span>
@@ -231,6 +223,6 @@
 
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <script src="app.js?v=121"></script>
+  <script src="app.js?v=122"></script>
 </body>
 </html>

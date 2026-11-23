@@ -373,7 +373,7 @@
       living.append(sword);
     }
     if (special.hair && large && living) {
-      // flowing hair: the cut-out once more, its edges alone, waved by #flow
+      // flowing hair: the cut-out once more, its edges alone
       const flow = document.createElement("i");
       flow.className = "flow";
       flow.style.backgroundImage = `url("${cutOf(card, true)}")`;
@@ -397,6 +397,17 @@
       }
       el.append(mark);
     }
+  }
+
+  // onScreen marks a tile .live while it is in view: only live tiles move,
+  // as a long grid all moving at once overheated phones.
+  const onScreen = "IntersectionObserver" in window
+    ? new IntersectionObserver((seen) => { for (const e of seen) e.target.classList.toggle("live", e.isIntersecting); }, { rootMargin: "80px 0px" })
+    : null;
+  function watch(tile) {
+    if (onScreen) onScreen.observe(tile);
+    else tile.classList.add("live");
+    return tile;
   }
 
   function cardTile(card) {
@@ -441,7 +452,7 @@
       tile.append(count);
     }
     tile.addEventListener("click", () => open(card));
-    return tile;
+    return watch(tile);
   }
 
   // copies is how many copies of a card the player has: a ★1 card itself
@@ -763,10 +774,20 @@
     const box = e.currentTarget.getBoundingClientRect();
     lean((e.clientX - box.left) / box.width * 2 - 1, (e.clientY - box.top) / box.height * 2 - 1);
   });
+  // The phone reports its tilt many times a frame; the card leans once a
+  // frame, and only while the large view is open.
+  let leaning = 0, leanTo = null;
   window.addEventListener("deviceorientation", (e) => {
-    if (e.gamma == null || e.beta == null) return;
-    lean(Math.max(-1, Math.min(1, e.gamma / 30)), Math.max(-1, Math.min(1, (e.beta - 45) / 30)));
+    if (!tilted || e.gamma == null || e.beta == null) return;
+    leanTo = [Math.max(-1, Math.min(1, e.gamma / 30)), Math.max(-1, Math.min(1, (e.beta - 45) / 30))];
+    if (!leaning) leaning = requestAnimationFrame(() => { leaning = 0; if (leanTo) lean(leanTo[0], leanTo[1]); });
   });
+  // Nothing moves while the app is in the background.
+  function sleep() {
+    document.documentElement.classList.toggle("asleep", document.hidden || (tg && tg.isActive === false));
+  }
+  document.addEventListener("visibilitychange", sleep);
+  try { tg.onEvent("activated", sleep); tg.onEvent("deactivated", sleep); } catch (_) { /* older clients */ }
   function closeSheet() {
     tilted = null;
     $("sheet").hidden = true;
@@ -1577,7 +1598,7 @@
     dress(tile, card, false);
     if (count) tile.insertAdjacentHTML("beforeend", '<span class="owned" aria-hidden="true">✓</span>');
     tile.addEventListener("click", () => previewCard(card, held));
-    return tile;
+    return watch(tile);
   }
   function previewCard(card, count) {
     const sheet = $("sheetCard");

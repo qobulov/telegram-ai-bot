@@ -293,7 +293,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .nav {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: grid; grid-template-columns: repeat(6, 1fr);
   height: calc(var(--nav) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
-  background: rgba(11, 10, 20, 0.92); backdrop-filter: blur(14px); border-top: 1px solid var(--line);
+  background: rgba(11, 10, 20, 0.97); border-top: 1px solid var(--line);
 }
 .nav button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 0; background: none; color: var(--muted); cursor: pointer; }
 .nav button span { font-size: 20px; filter: grayscale(1) opacity(0.6); transition: filter 0.2s; }
@@ -302,7 +302,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .nav button.on span { filter: none; }
 
 /* sheet */
-.sheet { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 24px; background: rgba(5, 4, 10, 0.78); backdrop-filter: blur(6px); }
+.sheet { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 24px; background: rgba(5, 4, 10, 0.88); }
 .sheet[hidden] { display: none; }
 .sheet-card { width: min(84vw, 330px); animation: rise 0.35s cubic-bezier(.2, .8, .2, 1); }
 .sheet-card .face { position: relative; aspect-ratio: 2 / 3; transform: none; }
@@ -703,8 +703,8 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 }
 .card .alive .sword { filter: drop-shadow(0 0 2px var(--fx1)) drop-shadow(0 0 5px var(--fx2)); }
 @keyframes fx-swing {
-  0%, 100% { transform: rotate(-4deg); filter: drop-shadow(0 0 3px var(--fx1)) drop-shadow(0 0 8px var(--fx2)); }
-  45% { transform: rotate(7deg) translateY(-1%); filter: drop-shadow(0 0 6px var(--fx1)) drop-shadow(0 0 18px var(--fx1)) brightness(1.25); }
+  0%, 100% { transform: rotate(-4deg); }
+  45% { transform: rotate(7deg) translateY(-1%); }
   55% { transform: rotate(6deg) translateY(-1%); }
 }
 
@@ -1033,22 +1033,20 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .alive i { position: absolute; inset: 0; background: center / cover no-repeat; transform-origin: 50% 100%; animation: alive 3.2s ease-in-out infinite; will-change: transform; }
 .alive .hair { clip-path: inset(0 0 56% 0); }
 .alive .body { clip-path: inset(43.5% 0 0 0); }
-.front .alive .hair { filter: url(#wind); }
 @keyframes alive { 50% { transform: scale(1.018, 1.028) translateY(-2px); } }
 /* Flowing hair (a SPECIAL card's): the face and body keep to the middle of
    the cut-out and stay still, breathing; the long hair round them is the
-   cut-out again, its middle masked away, waved by #flow as by a wind. */
+   cut-out again, its middle masked away, breathing with the rest. */
 .front .alive.flowing .hair, .front .alive.flowing .body {
   filter: none;
   -webkit-mask-image: radial-gradient(ellipse 30% 40% at 52% 46%, #000 62%, transparent 100%);
   mask-image: radial-gradient(ellipse 30% 40% at 52% 46%, #000 62%, transparent 100%);
 }
 .front .alive.flowing .flow {
-  filter: url(#flow);
   -webkit-mask-image: radial-gradient(ellipse 30% 40% at 52% 46%, transparent 62%, #000 100%);
   mask-image: radial-gradient(ellipse 30% 40% at 52% 46%, transparent 62%, #000 100%);
 }
-@media (prefers-reduced-motion: reduce) { .alive i { animation: none; } .front .alive .hair, .front .alive .flow { filter: none; } }
+@media (prefers-reduced-motion: reduce) { .alive i { animation: none; } }
 
 /* ---------- shop ---------- */
 .shop { display: grid; gap: 18px; padding: 8px 16px 0; }
@@ -1508,3 +1506,9 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
   .turn > .face { transition: none; }
 }
 #towerMain .slot { cursor: default; }
+
+/* Phones overheated and froze with every card in a long grid moving at once:
+   a tile moves only while it is on screen (.live, set as it scrolls into
+   view), and nothing moves while the app is in the background (.asleep). */
+.card:not(.live)::before, .card:not(.live) *, .card:not(.live) *::before, .card:not(.live) *::after { animation: none !important; will-change: auto !important; }
+.asleep *, .asleep *::before, .asleep *::after { animation-play-state: paused !important; }
