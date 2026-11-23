@@ -135,6 +135,16 @@ func (f *fakeStore) ClaimAnimeReward(_ context.Context, _ int64, _, anime string
 	f.animes[anime], f.tokens = true, f.tokens+tokens
 	return f.tokens, true, nil
 }
+func (f *fakeStore) OwnedCardsOf(ctx context.Context, userID int64, ids []int64) ([]storage.OwnedCard, error) {
+	all, err := f.OwnedCards(ctx, userID, -1)
+	var some []storage.OwnedCard
+	for _, c := range all {
+		if slices.Contains(ids, c.ID) {
+			some = append(some, c)
+		}
+	}
+	return some, err
+}
 func (f *fakeStore) OwnedCards(_ context.Context, userID int64, _ int) ([]storage.OwnedCard, error) {
 	if held, ok := f.arena.held[userID]; ok {
 		return held, nil

@@ -62,7 +62,7 @@ func (h *handler) animeClaim(ctx context.Context, user miniapp.User, anime strin
 		h.Logger.Error("could not fill the card catalog", "error", err)
 		return nil, errUnavailable
 	}
-	catalog, err := h.Store.CardCatalog(ctx)
+	catalog, err := h.cardCatalog(ctx)
 	if err != nil {
 		h.Logger.Error("could not read the card catalog", "error", err)
 		return nil, errUnavailable

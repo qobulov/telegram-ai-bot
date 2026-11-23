@@ -216,7 +216,7 @@ func (h *handler) towerOf(ctx context.Context, userID int64) (tower, error) {
 	if err := h.catalog.Ensure(ctx); err != nil {
 		return tower{}, fmt.Errorf("fill the card catalog: %w", err)
 	}
-	catalog, err := h.Store.CardCatalog(ctx)
+	catalog, err := h.cardCatalog(ctx)
 	if err != nil {
 		return tower{}, fmt.Errorf("read the card catalog: %w", err)
 	}

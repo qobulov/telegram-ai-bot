@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -21,6 +22,7 @@ type Store interface {
 	CatalogStore
 	CardCatalog(ctx context.Context) ([]storage.Card, error)
 	OwnedCards(ctx context.Context, userID int64, rarity int) ([]storage.OwnedCard, error)
+	OwnedCardsOf(ctx context.Context, userID int64, ids []int64) ([]storage.OwnedCard, error)
 	CardPlayerOf(ctx context.Context, userID int64) (storage.CardPlayer, time.Time, error)
 	OpenCards(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, cost int, day storage.CardDay, now time.Time, quest storage.CardQuest) (storage.CardOpening, error)
 	GiveDayTokens(ctx context.Context, userID int64, name string, day storage.CardDay) (int, error)
@@ -122,6 +124,32 @@ type handler struct {
 	// paidWeek is the start, in Unix seconds, of the arena week this
 	// instance last saw paid, so that it asks no more until the next.
 	paidWeek atomic.Int64
+	// cached is the card catalog as last read, and when, kept for
+	// catalogKeep so that every request does not read it whole.
+	cacheMu  sync.Mutex
+	cached   []storage.Card
+	cachedAt time.Time
+}
+
+// catalogKeep is how long a catalog read is used before it is read again:
+// it changes only when cards are added or reworked, and reading its 2000
+// cards on each request was much of the database's traffic, as the owners
+// saw on 2026-11-23.
+const catalogKeep = 5 * time.Minute
+
+// cardCatalog is the card catalog, read at most once every catalogKeep.
+func (h *handler) cardCatalog(ctx context.Context) ([]storage.Card, error) {
+	h.cacheMu.Lock()
+	defer h.cacheMu.Unlock()
+	if h.cached != nil && time.Since(h.cachedAt) < catalogKeep {
+		return h.cached, nil
+	}
+	catalog, err := h.Store.CardCatalog(ctx)
+	if err != nil {
+		return nil, err
+	}
+	h.cached, h.cachedAt = catalog, time.Now()
+	return catalog, nil
 }
 
 // NewHandler serves the Kartalar Mini App: "state" is the catalog, with
@@ -353,7 +381,7 @@ func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
 		h.Logger.Error("could not fill the card catalog", "error", err)
 		return nil, errUnavailable
 	}
-	catalog, err := h.Store.CardCatalog(ctx)
+	catalog, err := h.cardCatalog(ctx)
 	if err != nil {
 		h.Logger.Error("could not read the card catalog", "error", err)
 		return nil, errUnavailable
@@ -550,7 +578,7 @@ func (h *handler) animes(ctx context.Context, user miniapp.User) (any, failure) 
 		h.Logger.Error("could not fill the card catalog", "error", err)
 		return nil, errUnavailable
 	}
-	catalog, err := h.Store.CardCatalog(ctx)
+	catalog, err := h.cardCatalog(ctx)
 	if err != nil {
 		h.Logger.Error("could not read the card catalog", "error", err)
 		return nil, errUnavailable

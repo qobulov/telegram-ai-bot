@@ -182,11 +182,12 @@ func (h *handler) themedSaved(ctx context.Context, userID int64, theme string) (
 	if err != nil || !ok {
 		return fighters{}, false, err
 	}
-	held, err := h.Store.OwnedCards(ctx, userID, -1)
+	ids := [5]int64{front[0], front[1], back[0], back[1], back[2]}
+	held, err := h.Store.OwnedCardsOf(ctx, userID, ids[:])
 	if err != nil {
 		return fighters{}, false, err
 	}
-	team, ok := themedFighters(held, [5]int64{front[0], front[1], back[0], back[1], back[2]}, theme)
+	team, ok := themedFighters(held, ids, theme)
 	return team, ok, nil
 }
 
@@ -299,7 +300,7 @@ func (h *handler) arenaTeam(ctx context.Context, user miniapp.User, front, back 
 		}
 		seen[id] = true
 	}
-	held, err := h.Store.OwnedCards(ctx, user.ID, -1)
+	held, err := h.Store.OwnedCardsOf(ctx, user.ID, ids[:])
 	if err != nil {
 		h.Logger.Error("could not read a player's cards", "user_id", user.ID, "error", err)
 		return nil, errUnavailable

@@ -275,6 +275,23 @@ func (s *Store) CardCounts(ctx context.Context, userID int64) (total, owned map[
 // OwnedCards are the player's cards of rarity, or of every rarity when it
 // is negative, the rarest and most loved first.
 func (s *Store) OwnedCards(ctx context.Context, userID int64, rarity int) ([]OwnedCard, error) {
+	return s.ownedCards(ctx, userID, rarity, nil)
+}
+
+// OwnedCardsOf are those of the player's cards whose ids are given, as
+// OwnedCards gives them: an arena team's five, not the whole collection
+// (reading whole collections for every team shown was most of the
+// database's traffic, as the owners saw on 2026-11-23).
+func (s *Store) OwnedCardsOf(ctx context.Context, userID int64, ids []int64) ([]OwnedCard, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	return s.ownedCards(ctx, userID, -1, ids)
+}
+
+// ownedCards are the player's cards of rarity (all at -1), only those of ids
+// unless ids is nil.
+func (s *Store) ownedCards(ctx context.Context, userID int64, rarity int, ids []int64) ([]OwnedCard, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT c.id, c.name, c.anime, c.image_url, c.favourites, c.rarity, c.attack, c.health, c.value, c.collection, o.count, o.melted, o.stars,
 			CASE WHEN o.card_id = ANY($3) THEN (
@@ -282,8 +299,8 @@ func (s *Store) OwnedCards(ctx context.Context, userID int64, rarity int) ([]Own
 				WHERE h.card_id = o.card_id AND (h.first_at, h.user_id) <= (o.first_at, o.user_id))::int
 			ELSE 0 END
 		FROM card_owned o JOIN card_catalog c ON c.id = o.card_id
-		WHERE o.user_id = $1 AND ($2 < 0 OR c.rarity = $2)
-		ORDER BY c.rarity DESC, c.favourites DESC`, userID, rarity, limitedCardIDs())
+		WHERE o.user_id = $1 AND ($2 < 0 OR c.rarity = $2) AND ($4::bigint[] IS NULL OR o.card_id = ANY($4))
+		ORDER BY c.rarity DESC, c.favourites DESC`, userID, rarity, limitedCardIDs(), ids)
 	if err != nil {
 		return nil, fmt.Errorf("storage: list a player's cards: %w", err)
 	}
