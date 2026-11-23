@@ -1092,7 +1092,7 @@ func TestPersonaSwearsBackInKind(t *testing.T) {
 		}
 	}
 	plain := lineContaining(cfg.FullPersona(), "insults you without swearing")
-	for _, want := range []string{"one light, calm line", "plays on the words they used", "never at who they are", "Never agree with the insult", "never their family, looks, health", "[silent]", "owners get a playful line"} {
+	for _, want := range []string{"one light, calm line", "plays on the words they used", "never at who they are", "nor at their life", "short and simple", "anyone gets at first read", "no metaphor", "Never agree with the insult", "never their family, looks, health", "[silent]", "owners get a playful line"} {
 		if !strings.Contains(plain, want) {
 			t.Errorf("the plain-insult rule does not contain %q: %q", want, plain)
 		}
