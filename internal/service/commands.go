@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net/http"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -209,6 +210,9 @@ func (s *Service) deliver(in incoming, out *outcome) int64 {
 		if in.replyTo == 0 && out.toName != "" {
 			in.replyTo = s.namedMembersMessage(in, out.toName)
 		}
+	}
+	if in.group {
+		out.text = withoutLeadingTag(out.text, s.repliedUsernames(in, out)...)
 	}
 	if id := s.sendDocuments(in, out); id != 0 {
 		// A file is the answer, its text the caption.
@@ -1924,4 +1928,60 @@ func commandName(text string) string {
 	}
 	name, _, _ := strings.Cut(words[0], "@")
 	return strings.ToLower(name)
+}
+
+// repliedUsernames are the @usernames of the member the answer goes to as a
+// reply: the asker, or, for an answer meant for another member, the one
+// whose message the asker replied to, or the one the model named.
+func (s *Service) repliedUsernames(in incoming, out *outcome) []string {
+	var names []string
+	if !out.toReplied && in.msg.From != nil {
+		names = append(names, in.msg.From.Username)
+	}
+	if out.toReplied {
+		if replied := in.msg.ReplyToMessage; replied != nil && replied.From != nil && replied.MessageID == in.replyTo {
+			names = append(names, replied.From.Username)
+		}
+		if m := tagIn.FindStringSubmatch(out.toName); m != nil {
+			names = append(names, m[1])
+		}
+	}
+	return names
+}
+
+// leadingTag is an @username at the start of an answer, with the comma or
+// colon after it.
+var leadingTag = regexp.MustCompile(`^\s*@([A-Za-z0-9_]{4,32})\b[,:!]?\s*`)
+
+// tagIn finds an @username anywhere in a name the model gave.
+var tagIn = regexp.MustCompile(`@([A-Za-z0-9_]{4,32})\b`)
+
+// withoutLeadingTag is text without the @username it starts with when that
+// is one of usernames: the answer goes as a reply to that member's message,
+// which tags them already, and the owners saw members tagged twice, by the
+// reply and again in the words, on 2026-11-23.
+func withoutLeadingTag(text string, usernames ...string) string {
+	m := leadingTag.FindStringSubmatch(text)
+	if m == nil {
+		return text
+	}
+	for _, u := range usernames {
+		if u != "" && strings.EqualFold(u, m[1]) {
+			rest := text[len(m[0]):]
+			if strings.TrimSpace(rest) == "" {
+				return text
+			}
+			return upperFirst(rest)
+		}
+	}
+	return text
+}
+
+// upperFirst is text with its first letter in capitals.
+func upperFirst(text string) string {
+	r, size := utf8.DecodeRuneInString(text)
+	if r == utf8.RuneError || !unicode.IsLower(r) {
+		return text
+	}
+	return string(unicode.ToUpper(r)) + text[size:]
 }
