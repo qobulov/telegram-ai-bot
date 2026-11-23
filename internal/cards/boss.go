@@ -34,6 +34,49 @@ const (
 	BossCoinsMost   = 40
 )
 
+// BossWeekPrizes are the boss's weekly prizes, as the owners asked on
+// 2026-11-23: on Monday at 00:00 in Tashkent the players of the week's best
+// fights get card tokens, and the top 3 diamond boxes, in the mail.
+var BossWeekPrizes = []storage.ArenaPrize{
+	{From: 1, To: 1, Tokens: 60, Boxes: 2, Box: arenaWeekBox},
+	{From: 2, To: 2, Tokens: 45, Boxes: 1, Box: arenaWeekBox},
+	{From: 3, To: 3, Tokens: 30, Boxes: 1, Box: arenaWeekBox},
+	{From: 4, To: 5, Tokens: 20},
+	{From: 6, To: 10, Tokens: 15},
+	{From: 11, To: 30, Tokens: 10},
+	{From: 31, To: 50, Tokens: 5},
+}
+
+// BossWeekPayer pays a boss week.
+type BossWeekPayer interface {
+	PayBossWeek(ctx context.Context, week time.Time, prizes []storage.ArenaPrize, note func(place int) string) (int, bool, error)
+}
+
+// PayBossWeek pays the boss's last week ended by now, if it is not paid
+// yet, and gives the players paid.
+func PayBossWeek(ctx context.Context, store BossWeekPayer, now time.Time) (int, error) {
+	players, _, err := store.PayBossWeek(ctx, arenaWeekStart(now).AddDate(0, 0, -7), BossWeekPrizes, bossWeekNote)
+	return players, err
+}
+
+func bossWeekNote(place int) string {
+	return fmt.Sprintf("👹 Boss haftalik mukofoti: %d-o'rin", place)
+}
+
+// payBossWeek pays the boss week that ended the first time anyone opens the
+// boss after Monday's midnight; the daily cron pays it too, if no one came.
+func (h *handler) payBossWeek(ctx context.Context) {
+	week := arenaWeekStart(h.Now()).Unix()
+	if h.paidBossWeek.Load() == week {
+		return
+	}
+	if _, err := PayBossWeek(ctx, h.Store, h.Now()); err != nil {
+		h.Logger.Warn("could not pay the boss week", "error", err)
+		return
+	}
+	h.paidBossWeek.Store(week)
+}
+
 // bossLevel is the boss's level after a week's damage of total.
 func bossLevel(total int64) int { return 1 + int(total/BossLevelDamage) }
 
@@ -147,6 +190,13 @@ func (h *handler) bossView(ctx context.Context, user miniapp.User) (any, failure
 	if b.hasTeam {
 		view["team"], view["power"] = b.mine.views, b.mine.team.Power()
 	}
+	_, place, _, err := h.Store.BossPlace(ctx, b.rules.Week, user.ID)
+	if err != nil {
+		h.Logger.Error("could not read a boss place", "user_id", user.ID, "error", err)
+		return nil, errUnavailable
+	}
+	prize := arenaWeekPrize(BossWeekPrizes, place)
+	view["week"] = map[string]any{"place": place, "prize": prize.Tokens, "boxes": prize.Boxes, "prizes": BossWeekPrizes}
 	return view, failure{}
 }
 

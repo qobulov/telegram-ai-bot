@@ -2381,6 +2381,8 @@
         fight: "👹 Bossga hujum", noTeam: "Avval Arena bo'limida jamoa saqlang", noTries: "Bugungi janglar tugadi: ertaga yana",
         coins: (b, per, most) => `🪙 Har jang: ${b} tanga va har ${per} zarbaga yana 1, ${most} tagacha`,
         rule: (rage, growth, m) => `Boss hech qachon yiqilmaydi: jamoangiz yiqilguncha urasiz, hisob — bergan zarbangiz. U har yurishda butun jamoangizni uradi va har raundda ${rage}% kuchayadi. Hamma bergan zarba uni darajama-daraja kuchaytiradi: har daraja +${growth}% hujum. Kuniga ${m} ta jang, har dushanba yangi boss`,
+        noBest: "Mukofot uchun bu hafta bossga kamida 1 marta hujum qiling",
+        prizeRule: "Har dushanba 00:00 da: haftaning eng katta zarba bergan top 50 o'yinchisiga token, top 3 ga almaz box ham pochtaga keladi",
         title: "👹 Boss jangi tugadi", dealt: (d) => `💥 ${d} zarba berdingiz`, record: "🏅 Haftalik rekord!",
         refused: { no_team: "Avval Arena bo'limida jamoa saqlang", no_boss: "Boss hali tayyor emas", no_tries: "Bugungi janglar tugadi: ertaga yana" },
       },
@@ -2435,6 +2437,8 @@
         fight: "👹 Атаковать босса", noTeam: "Сначала сохраните команду в разделе Арена", noTries: "Бои на сегодня закончились: завтра снова",
         coins: (b, per, most) => `🪙 Каждый бой: ${b} монет и ещё 1 за каждые ${per} урона, до ${most}`,
         rule: (rage, growth, m) => `Босс никогда не падает: бейте, пока стоит ваша команда, счёт — нанесённый урон. Каждый ход он бьёт всю вашу команду и каждый раунд становится на ${rage}% сильнее. Урон всех игроков повышает его уровень: каждый уровень +${growth}% атаки. ${m} боя в день, каждый понедельник новый босс`,
+        noBest: "Чтобы получить награду, атакуйте босса хотя бы раз на этой неделе",
+        prizeRule: "Каждый понедельник в 00:00: топ 50 по лучшему удару недели получают токены почтой, топ 3 ещё и алмазные боксы",
         title: "👹 Бой с боссом окончен", dealt: (d) => `💥 Вы нанесли ${d} урона`, record: "🏅 Рекорд недели!",
         refused: { no_team: "Сначала сохраните команду в разделе Арена", no_boss: "Босс ещё не готов", no_tries: "Бои на сегодня закончились: завтра снова" },
       },
@@ -2489,6 +2493,8 @@
         fight: "👹 Attack the boss", noTeam: "Save a team in the Arena first", noTries: "No fights left today: come back tomorrow",
         coins: (b, per, most) => `🪙 Each fight: ${b} coins and 1 more per ${per} damage, up to ${most}`,
         rule: (rage, growth, m) => `The boss never falls: you hit it until your team falls, and the damage dealt is your score. Each turn it hits your whole team and each round it grows ${rage}% stronger. Everyone's damage raises its level: each level +${growth}% attack. ${m} fights a day, a new boss every Monday`,
+        noBest: "Fight the boss at least once this week for a prize",
+        prizeRule: "Every Monday at 00:00: the top 50 by the week's best fight get tokens in the mail, and the top 3 diamond boxes too",
         title: "👹 The boss fight is over", dealt: (d) => `💥 You dealt ${d} damage`, record: "🏅 Best of your week!",
         refused: { no_team: "Save a team in the Arena first", no_boss: "The boss is not ready yet", no_tries: "No fights left today: come back tomorrow" },
       },
@@ -3191,6 +3197,27 @@
     $("bossRule").textContent = bt.rule(data.rage, data.growth, data.tries_max);
     const left = Math.max(0, data.ends - Date.now()), hours = Math.floor(left / 3600000);
     $("bossEnds").textContent = at.weekEnds(Math.floor(hours / 24), hours % 24, Math.floor((left % 3600000) / 60000));
+    bossPrizes(data.week);
+  }
+
+  // bossPrizes lays out the boss's weekly prizes as the arena's are, with
+  // the player's place and prize now.
+  function bossPrizes(week) {
+    const box = $("bossPrizes");
+    box.textContent = "";
+    box.hidden = !week;
+    if (!week) return;
+    const head = document.createElement("b"), rule = document.createElement("small"), mine = document.createElement("p"), list = document.createElement("div");
+    head.textContent = at.week;
+    rule.textContent = at.boss.prizeRule;
+    mine.textContent = week.place ? at.weekPlace(week.place, week.prize, week.boxes) : at.boss.noBest;
+    list.className = "prizes";
+    for (const p of week.prizes || []) {
+      const chip = document.createElement("span");
+      chip.textContent = `${at.weekRow(p.from, p.to)}: ${p.tokens} 🎟${p.boxes ? ` + ${p.boxes} 🎁` : ""}`;
+      list.append(chip);
+    }
+    box.append(head, rule, list, mine);
   }
 
   $("bossFight").addEventListener("click", async () => {

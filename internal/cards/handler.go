@@ -64,6 +64,7 @@ type Store interface {
 	RecordBossFight(ctx context.Context, userID int64, damage int64, rules storage.BossRules) (storage.BossOutcome, error)
 	BossTop(ctx context.Context, week time.Time, limit int) ([]storage.BossRow, error)
 	BossPlace(ctx context.Context, week time.Time, userID int64) (storage.BossRow, int, int, error)
+	PayBossWeek(ctx context.Context, week time.Time, prizes []storage.ArenaPrize, note func(place int) string) (int, bool, error)
 	OpenArenaPack(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, price int, now time.Time, quest storage.CardQuest) (storage.CardOpening, int, error)
 	CardQuests(ctx context.Context, userID int64, day time.Time) (map[string]storage.QuestProgress, error)
 	ClaimCardQuest(ctx context.Context, userID int64, quest storage.CardQuest, reward int, now time.Time) error
@@ -131,6 +132,8 @@ type handler struct {
 	// paidWeek is the start, in Unix seconds, of the arena week this
 	// instance last saw paid, so that it asks no more until the next.
 	paidWeek atomic.Int64
+	// paidBossWeek is paidWeek for the boss's weekly prizes.
+	paidBossWeek atomic.Int64
 	// cached is the card catalog as last read, and when, kept for
 	// catalogKeep so that every request does not read it whole.
 	cacheMu  sync.Mutex
@@ -346,10 +349,13 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 	case "tower_fight":
 		return h.towerFight(ctx, opened.User)
 	case "boss":
+		h.payBossWeek(ctx)
 		return h.bossView(ctx, opened.User)
 	case "boss_fight":
+		h.payBossWeek(ctx)
 		return h.bossFight(ctx, opened.User)
 	case "boss_top":
+		h.payBossWeek(ctx)
 		return h.bossTop(ctx, opened.User)
 	case "arena_shop":
 		return h.arenaShop(ctx, opened.User, req.Item)

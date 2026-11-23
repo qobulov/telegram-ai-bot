@@ -892,6 +892,11 @@ func NewCleanup(ctx context.Context, cfg config.Config, logger *slog.Logger) (*C
 			} else if paid > 0 {
 				logger.Info("paid the arena week", "players", paid)
 			}
+			if paid, err := cards.PayBossWeek(ctx, store, time.Now()); err != nil {
+				logger.Warn("could not pay the boss week", "error", err)
+			} else if paid > 0 {
+				logger.Info("paid the boss week", "players", paid)
+			}
 			return expire(ctx, cfg, store, logger)
 		},
 	})

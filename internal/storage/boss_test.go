@@ -73,3 +73,49 @@ func TestBossTable(t *testing.T) {
 		t.Errorf("a stranger's place = %d, %v", place, err)
 	}
 }
+
+// A boss week is paid once: its players by their best fight get the prizes
+// of their places in the mail, and another week's fights count for nothing.
+func TestPayBossWeek(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	seedArena(t, store)
+	rules := bossRules
+	rules.Tries = 9
+	for _, f := range []struct {
+		user   int64
+		damage int64
+	}{{1, 100}, {2, 900}, {1, 300}} {
+		if _, err := store.RecordBossFight(ctx, f.user, f.damage, rules); err != nil {
+			t.Fatal(err)
+		}
+	}
+	later := rules
+	later.Week = rules.Week.AddDate(0, 0, 7)
+	if _, err := store.RecordBossFight(ctx, 1, 5000, later); err != nil {
+		t.Fatal(err)
+	}
+	prizes := []ArenaPrize{{From: 1, To: 1, Tokens: 10, Boxes: 1, Box: "box"}, {From: 2, To: 2, Tokens: 4}}
+	note := func(place int) string { return "place " + string(rune('0'+place)) }
+	players, paid, err := store.PayBossWeek(ctx, rules.Week, prizes, note)
+	if err != nil || !paid || players != 2 {
+		t.Fatalf("paid %d, %v, %v", players, paid, err)
+	}
+	var bobTokens, bobBoxes, aliceTokens int
+	var bobNote string
+	if err := store.pool.QueryRow(ctx, `SELECT tokens, boxes, note FROM card_mail WHERE user_id = 2`).Scan(&bobTokens, &bobBoxes, &bobNote); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.pool.QueryRow(ctx, `SELECT tokens FROM card_mail WHERE user_id = 1`).Scan(&aliceTokens); err != nil {
+		t.Fatal(err)
+	}
+	if bobTokens != 10 || bobBoxes != 1 || bobNote != "place 1" || aliceTokens != 4 {
+		t.Errorf("Bob %d tokens %d boxes %q, Alice %d tokens", bobTokens, bobBoxes, bobNote, aliceTokens)
+	}
+	if _, paid, err := store.PayBossWeek(ctx, rules.Week, prizes, note); err != nil || paid {
+		t.Errorf("paid again: %v, %v", paid, err)
+	}
+	if countRows(t, store, "card_mail") != 2 {
+		t.Error("a second payment sent mail")
+	}
+}

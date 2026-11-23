@@ -55,15 +55,16 @@ type fakeStore struct {
 	fuseErr  error
 	resetErr error
 	// weeksPaid are the arena weeks paid, by their start.
-	weeksPaid []time.Time
-	arena     fakeArena
-	tower     fakeTower
-	boss      []fakeBossFight
-	quests    fakeQuests
-	catalog   []storage.Card  // cards beyond heldCard and lockedCard
-	animes    map[string]bool // the anime rewards claimed
-	boxes     map[string]int
-	mail      []storage.CardMail
+	weeksPaid     []time.Time
+	arena         fakeArena
+	tower         fakeTower
+	boss          []fakeBossFight
+	bossWeeksPaid []time.Time
+	quests        fakeQuests
+	catalog       []storage.Card  // cards beyond heldCard and lockedCard
+	animes        map[string]bool // the anime rewards claimed
+	boxes         map[string]int
+	mail          []storage.CardMail
 }
 
 var (

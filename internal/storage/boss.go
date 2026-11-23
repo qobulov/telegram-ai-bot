@@ -139,3 +139,59 @@ func (s *Store) BossPlace(ctx context.Context, week time.Time, userID int64) (me
 	}
 	return me, place, total, nil
 }
+
+// PayBossWeek pays the boss's week begun at week, once: the players of the
+// best fights that week, ranked as the table ranks them, get prizes by
+// their place in the mail, with note(place). paid is false for a week paid
+// before.
+func (s *Store) PayBossWeek(ctx context.Context, week time.Time, prizes []ArenaPrize, note func(place int) string) (players int, paid bool, err error) {
+	places := 0
+	for _, p := range prizes {
+		places = max(places, p.To)
+	}
+	day := week.Format(time.DateOnly)
+	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `INSERT INTO boss_weeks (week) VALUES ($1::date) ON CONFLICT DO NOTHING`, day)
+		if err != nil || tag.RowsAffected() == 0 {
+			return err
+		}
+		paid = true
+		rows, err := tx.Query(ctx, `
+			SELECT user_id FROM boss_fights WHERE week = $1::date
+			GROUP BY user_id ORDER BY max(damage) DESC, user_id LIMIT $2`, day, places)
+		if err != nil {
+			return err
+		}
+		winners, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+		if err != nil {
+			return err
+		}
+		var users []int64
+		var notes, boxes []string
+		var tokens, counts []int32
+		for i, userID := range winners {
+			p := prizeAt(prizes, i+1)
+			if p.Tokens == 0 && p.Boxes == 0 {
+				continue
+			}
+			box := ""
+			if p.Boxes > 0 {
+				box = p.Box
+			}
+			users, notes, tokens = append(users, userID), append(notes, note(i+1)), append(tokens, int32(p.Tokens))
+			boxes, counts = append(boxes, box), append(counts, int32(p.Boxes))
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO card_mail (user_id, note, tokens, box, boxes)
+			SELECT * FROM unnest($1::bigint[], $2::text[], $3::int[], $4::text[], $5::int[])`, users, notes, tokens, boxes, counts); err != nil {
+			return err
+		}
+		players = len(users)
+		_, err = tx.Exec(ctx, `UPDATE boss_weeks SET players = $2 WHERE week = $1::date`, day, players)
+		return err
+	})
+	if err != nil {
+		return 0, false, fmt.Errorf("storage: pay the boss week: %w", err)
+	}
+	return players, paid, nil
+}

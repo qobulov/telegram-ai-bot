@@ -167,3 +167,31 @@ func TestBossFights(t *testing.T) {
 		t.Errorf("the next day's fight = %v", out)
 	}
 }
+
+func (f *fakeStore) PayBossWeek(_ context.Context, week time.Time, _ []storage.ArenaPrize, _ func(int) string) (int, bool, error) {
+	if slices.ContainsFunc(f.bossWeeksPaid, week.Equal) {
+		return 0, false, nil
+	}
+	f.bossWeeksPaid = append(f.bossWeeksPaid, week)
+	return 1, true, nil
+}
+
+// Opening the boss pays the week before, once, and shows the player's place
+// and prize this week.
+func TestBossWeekPrizes(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	store := &fakeStore{catalog: towerCatalog(), arena: fakeArena{held: map[int64][]storage.OwnedCard{7: arenaCards()}}}
+	call := arenaHandler(t, store, now)
+	call(7, map[string]any{"action": "arena_team", "front": arenaFront, "back": arenaBack})
+	call(7, map[string]any{"action": "boss_fight"})
+	_, view := call(7, map[string]any{"action": "boss"})
+	call(7, map[string]any{"action": "boss_top"})
+	last := arenaWeekStart(now).AddDate(0, 0, -7)
+	if len(store.bossWeeksPaid) != 1 || !store.bossWeeksPaid[0].Equal(last) {
+		t.Errorf("weeks paid = %v, want only %v", store.bossWeeksPaid, last)
+	}
+	week := view["week"].(map[string]any)
+	if week["place"] != 1.0 || week["prize"] != float64(BossWeekPrizes[0].Tokens) || week["boxes"] != float64(BossWeekPrizes[0].Boxes) || len(week["prizes"].([]any)) != len(BossWeekPrizes) {
+		t.Errorf("the week = %v", week)
+	}
+}
