@@ -1085,7 +1085,7 @@ func TestPersonaSwearsBackInKind(t *testing.T) {
 		t.Fatal(err)
 	}
 	rule := lineContaining(cfg.FullPersona(), "swears at you")
-	for _, want := range []string{"Never use profanity first, nor back", "pshnx", "отвали", "[react 🤣]", `never "sen"`, "family", "no slurs", "no threats", "[silent]", "owners are never sworn at"} {
+	for _, want := range []string{"Never use profanity first", "gets it back once", "no cruder", "pshnx", "отвали", "[react 🤣]", `no "sen" beyond that one word`, "family", "nothing sexual", "no slurs", "no threats", "[silent]", "owners are never sworn at", "upset or hurt"} {
 		if !strings.Contains(rule, want) {
 			t.Errorf("the swearing rule does not contain %q: %q", want, rule)
 		}
@@ -1118,8 +1118,8 @@ func TestPersonaShrugsOffFaultFindingWithoutSwearing(t *testing.T) {
 	if style := lineContaining(cfg.FullPersona(), "informal language"); strings.Contains(style, "profanity when appropriate") || !strings.Contains(style, "no swear words of your own") {
 		t.Errorf("the style rule lets the bot swear unprovoked: %q", style)
 	}
-	if swear := lineContaining(cfg.FullPersona(), "swears at you"); !strings.Contains(swear, "nor back") || !strings.Contains(swear, "днх") {
-		t.Errorf("swearing in Cyrillic may still be sworn back at: %q", swear)
+	if swear := lineContaining(cfg.FullPersona(), "swears at you"); !strings.Contains(swear, "Never use profanity first") || !strings.Contains(swear, "днх") {
+		t.Errorf("the swearing rule lost its limits: %q", swear)
 	}
 	if !strings.Contains(rule, "is not mockery: answer it normally") {
 		t.Errorf("a correction or a question is taken for fault-finding: %q", rule)
@@ -1140,7 +1140,7 @@ func TestPersonaSwearsBackOnlyAtProfanityAimedAtHer(t *testing.T) {
 		t.Errorf("the swearing rule does not ask for profanity aimed at her: %q", rule)
 	}
 	rule := lineContaining(cfg.FullPersona(), "Never use profanity first")
-	for _, want := range []string{"Disagreement, a correction", "someone else swears at you is no swearing at you", "teasing", "[react 🤣]", "never with dnx, pshnx", "treat it as friendly"} {
+	for _, want := range []string{"Disagreement, a correction", "someone else swears at you is no swearing at you", "teasing", "[react 🤣]", "no cruder", "treat it as friendly"} {
 		if !strings.Contains(rule, want) {
 			t.Errorf("the no-first-swear rule does not contain %q: %q", want, rule)
 		}
