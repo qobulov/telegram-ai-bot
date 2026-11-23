@@ -76,6 +76,8 @@ type fighterView struct {
 	// Theme is the percent the tower's anime of the week raises it by, 0
 	// outside the tower.
 	Theme int `json:"theme,omitempty"`
+	// Boss marks the boss, whose health is endless.
+	Boss bool `json:"boss,omitempty"`
 }
 
 // eventView is one thing that happened in a battle, for the page to replay.

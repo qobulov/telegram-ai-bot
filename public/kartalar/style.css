@@ -1512,3 +1512,19 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
    view), and nothing moves while the app is in the background (.asleep). */
 .card:not(.live)::before, .card:not(.live) *, .card:not(.live) *::before, .card:not(.live) *::after { animation: none !important; will-change: auto !important; }
 .asleep *, .asleep *::before, .asleep *::after { animation-play-state: paused !important; }
+
+/* the boss: one large card of endless health, a bar of the week's damage
+   toward its next level */
+.boss-stage { display: flex; justify-content: center; margin: 4px 0 10px; }
+.boss-stage .fighter { width: min(52%, 220px); border-radius: 14px; box-shadow: 0 0 0 2px var(--c) inset, 0 0 18px rgba(224, 86, 91, 0.35); }
+.boss-stage .fighter .f-name { font-size: 14px; bottom: 48px; }
+.fighter .f-endless, .fighter .f-atk { position: absolute; left: 6px; padding: 1px 7px; border-radius: 999px; background: rgba(8, 6, 14, 0.8); font: 800 11px/16px Manrope, sans-serif; white-space: nowrap; }
+.fighter .f-endless { bottom: 8px; color: #ff9c9c; }
+.fighter .f-atk { bottom: 27px; color: var(--gold); }
+.boss-week { color: var(--text); font-weight: 700; }
+.boss-bar { height: 8px; margin: 6px 0 4px; border-radius: 999px; background: rgba(0, 0, 0, 0.45); overflow: hidden; }
+.boss-bar i { display: block; height: 100%; background: linear-gradient(90deg, #e0565b, #ffb36b); transform-origin: left; transform: scaleX(0); transition: transform 0.4s ease-out; }
+.b-row .fighter.boss { width: min(calc((100% - 12px) * 0.5), calc((100vh - 200px) * 0.26)); max-width: 160px; }
+@supports (height: 100dvh) { .b-row .fighter.boss { width: min(calc((100% - 12px) * 0.5), calc((100dvh - 200px) * 0.26)); } }
+.b-row .fighter.boss .hp-n { display: block; font-size: 12px; color: #ffd0a0; }
+.b-row .fighter.boss .hp i { background: linear-gradient(90deg, #e0565b, #b06bff); }

@@ -58,6 +58,7 @@ type fakeStore struct {
 	weeksPaid []time.Time
 	arena     fakeArena
 	tower     fakeTower
+	boss      []fakeBossFight
 	quests    fakeQuests
 	catalog   []storage.Card  // cards beyond heldCard and lockedCard
 	animes    map[string]bool // the anime rewards claimed

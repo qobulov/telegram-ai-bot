@@ -59,6 +59,11 @@ type Store interface {
 	RecordTowerFight(ctx context.Context, userID int64, name string, floor int, won bool, rules storage.TowerRules) (storage.TowerOutcome, error)
 	TowerTop(ctx context.Context, limit int) ([]storage.TowerRow, error)
 	TowerPlace(ctx context.Context, userID int64) (storage.TowerRow, int, int, error)
+	BossWeek(ctx context.Context, week time.Time) (int64, error)
+	BossPlayerOf(ctx context.Context, userID int64, rules storage.BossRules) (storage.BossPlayer, error)
+	RecordBossFight(ctx context.Context, userID int64, damage int64, rules storage.BossRules) (storage.BossOutcome, error)
+	BossTop(ctx context.Context, week time.Time, limit int) ([]storage.BossRow, error)
+	BossPlace(ctx context.Context, week time.Time, userID int64) (storage.BossRow, int, int, error)
 	OpenArenaPack(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, price int, now time.Time, quest storage.CardQuest) (storage.CardOpening, int, error)
 	CardQuests(ctx context.Context, userID int64, day time.Time) (map[string]storage.QuestProgress, error)
 	ClaimCardQuest(ctx context.Context, userID int64, quest storage.CardQuest, reward int, now time.Time) error
@@ -340,6 +345,12 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return h.towerView(ctx, opened.User)
 	case "tower_fight":
 		return h.towerFight(ctx, opened.User)
+	case "boss":
+		return h.bossView(ctx, opened.User)
+	case "boss_fight":
+		return h.bossFight(ctx, opened.User)
+	case "boss_top":
+		return h.bossTop(ctx, opened.User)
 	case "arena_shop":
 		return h.arenaShop(ctx, opened.User, req.Item)
 	case "quests":

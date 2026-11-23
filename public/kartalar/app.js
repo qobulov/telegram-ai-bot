@@ -9,7 +9,7 @@
 
   const texts = {
     uz: {
-      arenaTab: "Arena", towerTab: "🗼 Minora", arenaShop: "🪙 Arena do'koni", arenaTeam: "⚔️ Jamoangiz", arenaSave: "Jamoani saqlash", arenaFoes: "🎯 Raqiblar", arenaHistory: "📜 Janglar tarixi", arenaRefresh: "🔄 Yangilash", topCards: "🎴 Kartalar", topArena: "⚔️ Arena", topTower: "🗼 Minora", towerRow: (n) => `${n}-qavat`, noTowerTop: "Hali hech kim minoradan qavat o'tmagan",
+      arenaTab: "Arena", towerTab: "🗼 Minora", arenaShop: "🪙 Arena do'koni", arenaTeam: "⚔️ Jamoangiz", arenaSave: "Jamoani saqlash", arenaFoes: "🎯 Raqiblar", arenaHistory: "📜 Janglar tarixi", arenaRefresh: "🔄 Yangilash", topCards: "🎴 Kartalar", topArena: "⚔️ Arena", topTower: "🗼 Minora", towerRow: (n) => `${n}-qavat`, noTowerTop: "Hali hech kim minoradan qavat o'tmagan", bossTab: "👹 Boss", topBoss: "👹 Boss", bossRow: (n) => `eng zo'r jang: 💥 ${n}`, noBossTop: "Bu hafta hali hech kim bossga hujum qilmagan",
       title: "Kartalar", collected: "to'plandi", animeTab: "Animelar", animeSearch: "Anime yoki personaj", animeBack: "← Barcha animelar", animeOwned: "✓ Sizda bor", animeMissing: "Sizda hali yo'q", animeEmpty: "Hech narsa topilmadi", animeGoal: (n) => `🎟 Hammasini yig'ing: +${n} token`, animeClaim: (n) => `🎁 ${n} token olish`, animeClaimed: (n) => `✅ ${n} token olingan`, animeGot: (n) => `🎟 +${n} token! Kolleksiya to'liq`, collection: "Kolleksiya", draw: "Olish", top: "Reyting",
       search: "Kartani qidirish", rarities: ["Oddiy", "Noyob", "Epik", "Afsonaviy", "Mifik"],
       drawNow: "Karta olish", drawing: "Ochilmoqda…", next: (t) => `Keyingi karta: ${t}`, ready: "Karta tayyor!",
@@ -43,7 +43,7 @@
       paid: "✅ To'lov qabul qilindi, kristall qo'shilmoqda…", crystalsAdded: (n) => `💎 +${n} kristall qo'shildi!`, payFailed: "To'lov amalga oshmadi", bought: (n) => `🎟 +${n} token`, packOpened: (r) => `${r} paket`,
     },
     ru: {
-      arenaTab: "Арена", towerTab: "🗼 Башня", arenaShop: "🪙 Магазин арены", arenaTeam: "⚔️ Ваша команда", arenaSave: "Сохранить команду", arenaFoes: "🎯 Соперники", arenaHistory: "📜 История боёв", arenaRefresh: "🔄 Обновить", topCards: "🎴 Карты", topArena: "⚔️ Арена", topTower: "🗼 Башня", towerRow: (n) => `${n} этаж`, noTowerTop: "Ещё никто не прошёл этаж башни",
+      arenaTab: "Арена", towerTab: "🗼 Башня", arenaShop: "🪙 Магазин арены", arenaTeam: "⚔️ Ваша команда", arenaSave: "Сохранить команду", arenaFoes: "🎯 Соперники", arenaHistory: "📜 История боёв", arenaRefresh: "🔄 Обновить", topCards: "🎴 Карты", topArena: "⚔️ Арена", topTower: "🗼 Башня", towerRow: (n) => `${n} этаж`, noTowerTop: "Ещё никто не прошёл этаж башни", bossTab: "👹 Босс", topBoss: "👹 Босс", bossRow: (n) => `лучший бой: 💥 ${n}`, noBossTop: "На этой неделе босса ещё никто не атаковал",
       title: "Карты", collected: "собрано", animeTab: "Аниме", animeSearch: "Аниме или персонаж", animeBack: "← Все аниме", animeOwned: "✓ Есть у вас", animeMissing: "Пока нет у вас", animeEmpty: "Ничего не найдено", animeGoal: (n) => `🎟 Соберите всех: +${n} токенов`, animeClaim: (n) => `🎁 Забрать ${n} токенов`, animeClaimed: (n) => `✅ ${n} токенов получено`, animeGot: (n) => `🎟 +${n} токенов! Коллекция собрана`, collection: "Коллекция", draw: "Получить", top: "Рейтинг",
       search: "Поиск по картам", rarities: ["Обычная", "Редкая", "Эпическая", "Легендарная", "Мифическая"],
       drawNow: "Получить карту", drawing: "Открываем…", next: (t) => `Следующая карта: ${t}`, ready: "Карта готова!",
@@ -77,7 +77,7 @@
       paid: "✅ Оплата принята, кристаллы зачисляются…", crystalsAdded: (n) => `💎 +${n} кристаллов!`, payFailed: "Оплата не прошла", bought: (n) => `🎟 +${n} токенов`, packOpened: (r) => `Пак: ${r}`,
     },
     en: {
-      arenaTab: "Arena", towerTab: "🗼 Tower", arenaShop: "🪙 Arena shop", arenaTeam: "⚔️ Your team", arenaSave: "Save the team", arenaFoes: "🎯 Opponents", arenaHistory: "📜 Battle history", arenaRefresh: "🔄 Refresh", topCards: "🎴 Cards", topArena: "⚔️ Arena", topTower: "🗼 Tower", towerRow: (n) => `Floor ${n}`, noTowerTop: "Nobody has cleared a tower floor yet",
+      arenaTab: "Arena", towerTab: "🗼 Tower", arenaShop: "🪙 Arena shop", arenaTeam: "⚔️ Your team", arenaSave: "Save the team", arenaFoes: "🎯 Opponents", arenaHistory: "📜 Battle history", arenaRefresh: "🔄 Refresh", topCards: "🎴 Cards", topArena: "⚔️ Arena", topTower: "🗼 Tower", towerRow: (n) => `Floor ${n}`, noTowerTop: "Nobody has cleared a tower floor yet", bossTab: "👹 Boss", topBoss: "👹 Boss", bossRow: (n) => `best fight: 💥 ${n}`, noBossTop: "Nobody has fought the boss this week yet",
       title: "Cards", collected: "collected", animeTab: "Anime", animeSearch: "Anime or character", animeBack: "← All anime", animeOwned: "✓ You have it", animeMissing: "Not yours yet", animeEmpty: "Nothing found", animeGoal: (n) => `🎟 Collect them all: +${n} tokens`, animeClaim: (n) => `🎁 Claim ${n} tokens`, animeClaimed: (n) => `✅ ${n} tokens claimed`, animeGot: (n) => `🎟 +${n} tokens! Collection complete`, collection: "Collection", draw: "Draw", top: "Ranking",
       search: "Search cards", rarities: ["Common", "Rare", "Epic", "Legendary", "Mythic"],
       drawNow: "Draw a card", drawing: "Opening…", next: (t) => `Next card in ${t}`, ready: "A card is ready!",
@@ -1407,12 +1407,13 @@
     for (const chip of document.querySelectorAll("#topKind button")) chip.setAttribute("aria-pressed", String(chip.dataset.k === topKind));
     const asked = ++topAsked, kind = topKind;
     try {
-      const data = await api(kind === "arena" ? "arena" : kind === "tower" ? "tower_top" : "top");
+      const data = await api(kind === "arena" ? "arena" : kind === "tower" ? "tower_top" : kind === "boss" ? "boss_top" : "top");
       if (asked !== topAsked) return;
       notice(null);
       $("arenaWeek").hidden = kind !== "arena";
       if (kind === "arena") { arenaTable(data.top || [], data.me, data.player); arenaWeek(data.week); return; }
       if (kind === "tower") { towerTable(data.top || [], data.me); return; }
+      if (kind === "boss") { bossTable(data.top || [], data.me); return; }
       const table = $("table");
       table.textContent = "";
       if (!data.top.length) table.innerHTML = `<p class="empty">${t.noTop}</p>`;
@@ -2373,6 +2374,16 @@
         cleared: (n) => `🗼 ${n}-qavat o'tildi!`, failed: (n) => `${n}-qavat o'tilmadi`, tokens: (n) => `🎟 +${n} token`,
         refused: { no_team: "Avval Arena bo'limida jamoa saqlang", no_floor: "Bu qavat hali tayyor emas", moved: "Bu qavat allaqachon o'tildi, sahifa yangilandi" },
       },
+      boss: {
+        best: "Haftalik rekordingiz", none: "hali yo'q", tries: (n, m) => `⚔️ Bugun qolgan janglar: ${n}/${m}`,
+        level: (n) => `👹 ${n}-daraja`, endless: "♾️ Joni cheksiz", attack: (n) => `⚔️ Hujumi ${n}`,
+        week: (d) => `Bu hafta hamma birga urdi: 💥 ${d}`, next: (d, n) => `${n}-darajagacha yana 💥 ${d}`,
+        fight: "👹 Bossga hujum", noTeam: "Avval Arena bo'limida jamoa saqlang", noTries: "Bugungi janglar tugadi: ertaga yana",
+        coins: (b, per, most) => `🪙 Har jang: ${b} tanga va har ${per} zarbaga yana 1, ${most} tagacha`,
+        rule: (rage, growth, m) => `Boss hech qachon yiqilmaydi: jamoangiz yiqilguncha urasiz, hisob — bergan zarbangiz. U har yurishda butun jamoangizni uradi va har raundda ${rage}% kuchayadi. Hamma bergan zarba uni darajama-daraja kuchaytiradi: har daraja +${growth}% hujum. Kuniga ${m} ta jang, har dushanba yangi boss`,
+        title: "👹 Boss jangi tugadi", dealt: (d) => `💥 ${d} zarba berdingiz`, record: "🏅 Haftalik rekord!",
+        refused: { no_team: "Avval Arena bo'limida jamoa saqlang", no_boss: "Boss hali tayyor emas", no_tries: "Bugungi janglar tugadi: ertaga yana" },
+      },
       coins: (n) => `🪙 ${n}`, coinsWon: (n) => `+${n} 🪙`, ruleCoins: (w, l) => `🪙 Har hujum tanga beradi: g'alaba +${w}, mag'lubiyat +${l}. Tangalar Arena do'konida sarflanadi`,
       shopHint: (w, l) => `Har hujum: g'alaba +${w} 🪙, mag'lubiyat +${l} 🪙`, shopToken: "1 ta 🎟 token", shopTicket: "1 ta 🎫 arena tiketi", shopTicketHint: (n, m) => (n >= m ? `Tiketlar to'la: ${n}/${m}` : `Hozir ${n}/${m}, hujum uchun`), shopTokenHint: (left, d) => `Bugun yana ${left} ta (kuniga ${d} tagacha)`,
       shopRefused: { coins: "Tanga yetmaydi: arenada hujum qiling", daily: "Bugungi tokenlar olindi: ertaga yana", tickets_full: "Tiketlar to'la: avval hujum qiling" },
@@ -2417,6 +2428,16 @@
         cleared: (n) => `🗼 Этаж ${n} пройден!`, failed: (n) => `Этаж ${n} не пройден`, tokens: (n) => `🎟 +${n} токен.`,
         refused: { no_team: "Сначала сохраните команду в разделе Арена", no_floor: "Этот этаж ещё не готов", moved: "Этот этаж уже пройден, страница обновлена" },
       },
+      boss: {
+        best: "Ваш рекорд недели", none: "пока нет", tries: (n, m) => `⚔️ Осталось боёв сегодня: ${n}/${m}`,
+        level: (n) => `👹 Уровень ${n}`, endless: "♾️ Бесконечное здоровье", attack: (n) => `⚔️ Атака ${n}`,
+        week: (d) => `За неделю все вместе нанесли: 💥 ${d}`, next: (d, n) => `До уровня ${n} ещё 💥 ${d}`,
+        fight: "👹 Атаковать босса", noTeam: "Сначала сохраните команду в разделе Арена", noTries: "Бои на сегодня закончились: завтра снова",
+        coins: (b, per, most) => `🪙 Каждый бой: ${b} монет и ещё 1 за каждые ${per} урона, до ${most}`,
+        rule: (rage, growth, m) => `Босс никогда не падает: бейте, пока стоит ваша команда, счёт — нанесённый урон. Каждый ход он бьёт всю вашу команду и каждый раунд становится на ${rage}% сильнее. Урон всех игроков повышает его уровень: каждый уровень +${growth}% атаки. ${m} боя в день, каждый понедельник новый босс`,
+        title: "👹 Бой с боссом окончен", dealt: (d) => `💥 Вы нанесли ${d} урона`, record: "🏅 Рекорд недели!",
+        refused: { no_team: "Сначала сохраните команду в разделе Арена", no_boss: "Босс ещё не готов", no_tries: "Бои на сегодня закончились: завтра снова" },
+      },
       coins: (n) => `🪙 ${n}`, coinsWon: (n) => `+${n} 🪙`, ruleCoins: (w, l) => `🪙 Каждая атака даёт монеты: победа +${w}, поражение +${l}. Их тратят в магазине арены`,
       shopHint: (w, l) => `За атаку: победа +${w} 🪙, поражение +${l} 🪙`, shopToken: "1 🎟 токен", shopTicket: "1 🎫 билет арены", shopTicketHint: (n, m) => (n >= m ? `Билеты полные: ${n}/${m}` : `Сейчас ${n}/${m}, для атаки`), shopTokenHint: (left, d) => `Сегодня ещё ${left} (до ${d} в день)`,
       shopRefused: { coins: "Не хватает монет: атакуйте на арене", daily: "Токены на сегодня куплены: завтра снова", tickets_full: "Билеты полные: сначала атакуйте" },
@@ -2460,6 +2481,16 @@
         rule: () => `A win opens the next floor and gives its reward, a loss gives nothing. Every 5th floor +1 🎟, every 10th +3 🎟`,
         cleared: (n) => `🗼 Floor ${n} cleared!`, failed: (n) => `Floor ${n} not cleared`, tokens: (n) => `🎟 +${n} tokens`,
         refused: { no_team: "Save a team in the Arena first", no_floor: "This floor is not ready yet", moved: "This floor is cleared already; the page is refreshed" },
+      },
+      boss: {
+        best: "Your best this week", none: "none yet", tries: (n, m) => `⚔️ Fights left today: ${n}/${m}`,
+        level: (n) => `👹 Level ${n}`, endless: "♾️ Endless health", attack: (n) => `⚔️ Attack ${n}`,
+        week: (d) => `Everyone this week dealt: 💥 ${d}`, next: (d, n) => `💥 ${d} more to level ${n}`,
+        fight: "👹 Attack the boss", noTeam: "Save a team in the Arena first", noTries: "No fights left today: come back tomorrow",
+        coins: (b, per, most) => `🪙 Each fight: ${b} coins and 1 more per ${per} damage, up to ${most}`,
+        rule: (rage, growth, m) => `The boss never falls: you hit it until your team falls, and the damage dealt is your score. Each turn it hits your whole team and each round it grows ${rage}% stronger. Everyone's damage raises its level: each level +${growth}% attack. ${m} fights a day, a new boss every Monday`,
+        title: "👹 The boss fight is over", dealt: (d) => `💥 You dealt ${d} damage`, record: "🏅 Best of your week!",
+        refused: { no_team: "Save a team in the Arena first", no_boss: "The boss is not ready yet", no_tries: "No fights left today: come back tomorrow" },
       },
       coins: (n) => `🪙 ${n}`, coinsWon: (n) => `+${n} 🪙`, ruleCoins: (w, l) => `🪙 Each attack gives coins: a win +${w}, a loss +${l}. Spend them in the arena shop`,
       shopHint: (w, l) => `Each attack: a win +${w} 🪙, a loss +${l} 🪙`, shopToken: "1 🎟 token", shopTicket: "1 🎫 arena ticket", shopTicketHint: (n, m) => (n >= m ? `Tickets full: ${n}/${m}` : `${n}/${m} now, for an attack`), shopTokenHint: (left, d) => `${left} more today (up to ${d} a day)`,
@@ -3017,7 +3048,9 @@
     for (const chip of document.querySelectorAll("#arenaMode button")) chip.setAttribute("aria-pressed", String(chip.dataset.m === arenaMode));
     $("arenaMain").hidden = arenaMode !== "arena";
     $("towerMain").hidden = arenaMode !== "tower";
+    $("bossMain").hidden = arenaMode !== "boss";
     if (arenaMode === "tower") towerPage();
+    else if (arenaMode === "boss") bossPage();
     else arenaPage();
   }
 
@@ -3102,6 +3135,88 @@
     }
   });
 
+  // ---------- the boss ----------
+
+  // The week's boss: endless health, fought with the arena team saved a few
+  // times a day; what counts is the damage dealt it, and everyone's damage
+  // of the week raises its level.
+  let bossData = null, bossBusy = false;
+  function big(n) {
+    return n >= 1e9 ? `${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e4 ? `${Math.round(n / 1000)}k` : spaced(n);
+  }
+
+  async function bossPage() {
+    try {
+      bossShow(await api("boss"));
+      notice(null);
+    } catch (error) {
+      notice(error);
+    }
+  }
+
+  function bossShow(data) {
+    bossData = data;
+    const bt = at.boss;
+    const me = $("bossMe");
+    me.innerHTML = '<div class="arena-rating"><small></small><b></b></div><div class="arena-left"><span></span></div>';
+    me.querySelector(".arena-rating small").textContent = bt.best;
+    me.querySelector(".arena-rating b").textContent = data.best ? `💥 ${big(data.best)}` : bt.none;
+    me.querySelector(".arena-left span").textContent = bt.tries(Math.max(0, data.tries_max - data.tries), data.tries_max);
+    const boss = data.boss;
+    $("bossName").textContent = boss ? boss.name : "";
+    $("bossLevel").textContent = bt.level(data.level);
+    const stage = $("bossStage");
+    stage.textContent = "";
+    if (boss) {
+      const tile = fighterTile(boss);
+      tile.classList.add("boss");
+      tile.insertAdjacentHTML("beforeend", '<span class="f-endless"></span><span class="f-atk"></span>');
+      tile.querySelector(".f-endless").textContent = bt.endless;
+      tile.querySelector(".f-atk").textContent = bt.attack(spaced(boss.attack));
+      stage.append(tile);
+    }
+    // the bar fills toward the next level, each level the same damage
+    const per = data.next_level / Math.max(data.level, 1);
+    $("bossWeek").textContent = bt.week(big(data.week_damage));
+    $("bossBar").style.transform = `scaleX(${Math.min(1, Math.max(0, (data.week_damage - (data.level - 1) * per) / per))})`;
+    $("bossNext").textContent = bt.next(big(Math.max(0, data.next_level - data.week_damage)), data.level + 1);
+    const team = data.team || [];
+    const hint = !team.length ? bt.noTeam : data.tries >= data.tries_max ? bt.noTries : "";
+    $("bossHint").textContent = hint;
+    $("bossHint").hidden = !hint;
+    const fight = $("bossFight");
+    fight.textContent = bt.fight;
+    fight.disabled = bossBusy || !team.length || !boss || data.tries >= data.tries_max;
+    $("bossCoins").textContent = bt.coins(data.coins.base, big(data.coins.per), data.coins.most);
+    $("bossRule").textContent = bt.rule(data.rage, data.growth, data.tries_max);
+    const left = Math.max(0, data.ends - Date.now()), hours = Math.floor(left / 3600000);
+    $("bossEnds").textContent = at.weekEnds(Math.floor(hours / 24), hours % 24, Math.floor((left % 3600000) / 60000));
+  }
+
+  $("bossFight").addEventListener("click", async () => {
+    if (bossBusy || !bossData) return;
+    bossBusy = true;
+    bossShow(bossData);
+    haptic("medium");
+    try {
+      const data = await api("boss_fight");
+      if (data.refused) {
+        toast(at.boss.refused[data.refused] || t.unavailable);
+        await bossPage();
+        return;
+      }
+      if (data.coins !== undefined && arenaData) arenaData.player.coins = data.coins;
+      data.record = data.damage > (bossData.best || 0);
+      await replay(data, { name: bossData.boss ? bossData.boss.name : "" });
+      await bossPage();
+    } catch (error) {
+      notice(error);
+    } finally {
+      bossBusy = false;
+      if (bossData) bossShow(bossData);
+    }
+  });
+
   // ---------- the battle's replay ----------
 
   // replay shows the battle on the whole screen, the opponent above and the
@@ -3143,7 +3258,7 @@
   // the battle's events by following every card's health.
   function battleStats(data) {
     const sides = [data.attacker || [], data.defender || []].map((list) =>
-      list.map((f) => ({ f, dealt: 0, taken: 0, healed: 0, shielded: 0, hp: f.health })));
+      list.map((f) => ({ f, dealt: 0, taken: 0, healed: 0, shielded: 0, hp: f.boss ? 1 : f.health })));
     const poisoner = new Map();
     for (const e of data.events || []) {
       const foeSide = HITS.includes(e.kind);
@@ -3155,8 +3270,12 @@
         // card that poisoned it last
         const hitter = foeSide ? actor : poisoner.get(target);
         if (hitter) hitter.dealt += e.amount;
-        target.taken += Math.max(0, target.hp - e.hp);
-        target.hp = e.hp;
+        // the boss's health never falls: what it is dealt is what it took
+        if (target.f.boss) target.taken += e.amount;
+        else {
+          target.taken += Math.max(0, target.hp - e.hp);
+          target.hp = e.hp;
+        }
         if (e.kind === "poison" && actor) poisoner.set(target, actor);
       } else if (e.kind === "heal") {
         if (actor) actor.healed += e.amount;
@@ -3174,7 +3293,7 @@
   // first; big numbers are shortened to thousands to fit a phone.
   function statsBlock(data) {
     const sides = battleStats(data);
-    const all = sides.flat();
+    const all = data.boss ? sides[0] : sides.flat();
     const mvp = all.reduce((a, b) => (!a || b.dealt > a.dealt ? b : a), null);
     const most = Math.max(1, mvp ? mvp.dealt : 0);
     const short = (n) => (n >= 100000 ? `${Math.round(n / 1000)}k` : n >= 10000 ? `${(n / 1000).toFixed(1)}k` : spaced(n));
@@ -3245,8 +3364,9 @@
           tile.insertAdjacentHTML("beforeend", '<i class="hp"><i></i></i><i class="en"><i></i></i><span class="hp-n"></span>');
           sideBox.querySelector(slot < 2 ? ".fore" : ".rear").append(tile);
           const num = tile.querySelector(".hp-n");
-          num.textContent = spaced(f.health);
-          units[side][slot] = { el: tile, bar: tile.querySelector(".hp i"), en: tile.querySelector(".en i"), num, hp: f.health, max: f.health || 1, f, side };
+          num.textContent = f.boss ? "♾️" : spaced(f.health);
+          if (f.boss) tile.classList.add("boss");
+          units[side][slot] = { el: tile, bar: tile.querySelector(".hp i"), en: tile.querySelector(".en i"), num, hp: f.health, max: f.health || 1, f, side, dealt: 0 };
           energize(units[side][slot], START_ENERGY[f.class] || 0);
         });
       }
@@ -3288,9 +3408,15 @@
         if (!target) return;
         if (actor && e.kind !== "fall") energize(actor, e.energy);
         if (e.kind !== "fall") energize(target, e.to_energy);
-        target.hp = e.kind === "fall" ? 0 : e.hp;
-        target.bar.style.transform = `scaleX(${Math.max(0, Math.min(1, target.hp / target.max))})`;
-        target.num.textContent = spaced(Math.max(0, target.hp));
+        if (target.f.boss) {
+          // the boss's health is endless: it counts what it is dealt instead
+          if (foeSide || e.kind === "poisoned") target.dealt += e.amount;
+          target.num.textContent = target.dealt ? `💥 ${big(target.dealt)}` : "♾️";
+        } else {
+          target.hp = e.kind === "fall" ? 0 : e.hp;
+          target.bar.style.transform = `scaleX(${Math.max(0, Math.min(1, target.hp / target.max))})`;
+          target.num.textContent = spaced(Math.max(0, target.hp));
+        }
         if (e.kind === "fall") target.el.classList.add("fallen");
         // a stunned card dims until its skipped turn; a poisoned one is
         // tinted for its turns of poison
@@ -3360,18 +3486,18 @@
         skip.hidden = true;
         line.textContent = "";
         const result = box.querySelector(".b-result");
-        result.classList.add(data.won ? "won" : "lost");
-        result.querySelector(".b-title").textContent = data.won ? at.won : at.lost;
-        result.querySelector(".b-change").textContent = data.fought ? (data.won ? at.tower.cleared(data.fought) : at.tower.failed(data.fought)) : at.change(data.rating_change || 0);
+        result.classList.add(data.won || data.boss ? "won" : "lost");
+        result.querySelector(".b-title").textContent = data.boss ? at.boss.title : data.won ? at.won : at.lost;
+        result.querySelector(".b-change").textContent = data.boss ? at.boss.dealt(spaced(data.damage)) : data.fought ? (data.won ? at.tower.cleared(data.fought) : at.tower.failed(data.fought)) : at.change(data.rating_change || 0);
         const token = result.querySelector(".b-token");
-        token.textContent = data.token ? at.token : data.tokens_won ? at.tower.tokens(data.tokens_won) : "";
+        token.textContent = data.boss ? (data.record ? at.boss.record : "") : data.token ? at.token : data.tokens_won ? at.tower.tokens(data.tokens_won) : "";
         token.hidden = !token.textContent;
         const coins = result.querySelector(".b-coins");
         coins.textContent = data.coins_won ? at.coinsWon(data.coins_won) : "";
         coins.hidden = !data.coins_won;
         result.querySelector(".b-ok").before(statsBlock(data));
         result.hidden = false;
-        try { tg.HapticFeedback.notificationOccurred(data.won ? "success" : "error"); } catch (_) { /* outside Telegram */ }
+        try { tg.HapticFeedback.notificationOccurred(data.won || data.boss ? "success" : "error"); } catch (_) { /* outside Telegram */ }
       }
       skip.addEventListener("click", finish);
       const ok = box.querySelector(".b-ok");
@@ -3428,6 +3554,25 @@
       table.append(li);
     });
     if (me && me.place > top.length) table.append(placeRow(me.place, me.total, me.name, t.towerRow(me.floor), `🗼 ${me.floor}`));
+  }
+
+  // bossTable is the boss's table of the week: the players of the best
+  // fights, as the tower's is laid out.
+  function bossTable(top, me) {
+    const table = $("table");
+    table.textContent = "";
+    if (!top.length) table.innerHTML = `<p class="empty">${t.noBossTop}</p>`;
+    top.forEach((row, i) => {
+      const li = document.createElement("li");
+      if (row.me) li.className = "me";
+      li.innerHTML = `<span class="pos"></span><span class="who"><b></b><small></small></span><span class="pts"></span>`;
+      li.querySelector(".pos").textContent = ["🥇", "🥈", "🥉"][i] || i + 1;
+      li.querySelector(".who b").textContent = row.name || "?";
+      li.querySelector(".who small").textContent = t.bossRow(spaced(row.best));
+      li.querySelector(".pts").textContent = `💥 ${big(row.best)}`;
+      table.append(li);
+    });
+    if (me && me.place > top.length) table.append(placeRow(me.place, me.total, me.name, t.bossRow(spaced(me.best)), `💥 ${big(me.best)}`));
   }
 
   function arenaTable(top, me, player) {

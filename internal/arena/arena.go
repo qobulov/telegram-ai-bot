@@ -34,14 +34,17 @@ const (
 	// The skills' numbers below were tuned on 2026-11-19 by simulating
 	// teams of five Mythics of one skill against mixed ones, until each
 	// skill won 45-52%.
-	StrikeFactor   = 1.8  // a Strike hits for this times the attack
-	HealShare      = 0.80 // a Heal gives the weakest hurt ally this share of its health, at most what it lost
-	ShieldShare    = 0.45 // a Shield gives itself and its weakest ally this share of their health
-	PoisonTurns    = 3    // a Poison hurts the target at the start of its next 3 turns ...
-	PoisonShare    = 0.15 // ... by this share of its health, past any shield
-	ProvokeRounds  = 3    // a Provoke draws enemy Tanks, Dealers and Healers for 3 more rounds ...
-	ProvokeGuard   = 0.7  // ... and takes this share of the damage meanwhile, so that it holds
-	EdgeFactor     = 1.25 // Tank beats Dealer, Dealer Support, Support Healer, Healer Tank
+	StrikeFactor  = 1.8  // a Strike hits for this times the attack
+	HealShare     = 0.80 // a Heal gives the weakest hurt ally this share of its health, at most what it lost
+	ShieldShare   = 0.45 // a Shield gives itself and its weakest ally this share of their health
+	PoisonTurns   = 3    // a Poison hurts the target at the start of its next 3 turns ...
+	PoisonShare   = 0.15 // ... by this share of its health, past any shield
+	ProvokeRounds = 3    // a Provoke draws enemy Tanks, Dealers and Healers for 3 more rounds ...
+	ProvokeGuard  = 0.7  // ... and takes this share of the damage meanwhile, so that it holds
+	EdgeFactor    = 1.25 // Tank beats Dealer, Dealer Support, Support Healer, Healer Tank
+	// BossPoison is a Poison's tick on a boss, as a share of the poisoner's
+	// attack, the boss's own health being endless.
+	BossPoison     = 0.6
 	DamageSpreadLo = 0.9
 	DamageSpreadHi = 1.1
 )
@@ -179,6 +182,12 @@ type unit struct {
 	stunned    bool // skips its next turn
 	poisoned   int  // its turns left to be hurt by poison
 	provoking  int  // the last round it draws enemy Tanks, Dealers and Healers
+	poisonDmg  int  // a boss's poison tick, by its poisoner's attack
+	// boss is a unit that never falls: what it is dealt is counted instead
+	// of taken off its health, it hits every living foe each turn, and its
+	// attack rises by rage of itself each round after the first.
+	boss bool
+	rage float64
 }
 
 func (u *unit) alive() bool { return u.hp > 0 }
@@ -194,12 +203,49 @@ type fight struct {
 	// round 1, the other in round 2 and so on, by the seed, so that
 	// neither side is favoured.
 	first int
+	// bossDealt is all the damage dealt to a boss.
+	bossDealt int
 }
 
 // Battle plays the two teams against each other. That a team is valid (five
 // distinct cards the player holds) is the caller's job.
 func Battle(attacker, defender Team, seed int64) Result {
 	f := newFight(attacker, defender, seed)
+	f.run()
+	won := false // the defender wins an exact tie, empty teams included
+	switch {
+	case f.living(1) == 0:
+		won = f.living(0) > 0
+	case f.living(0) > 0:
+		won = f.health(0) > f.health(1)
+	}
+	return Result{AttackerWon: won, Rounds: f.round, Events: f.events}
+}
+
+// BossResult is a boss fight: all the damage the team dealt the boss, the
+// rounds fought and the events to replay them.
+type BossResult struct {
+	Damage, Rounds int
+	Events         []Event
+}
+
+// bossHP is a boss's health as events tell it; it never changes.
+const bossHP = 1 << 30
+
+// BossBattle plays team against boss, a lone foe in the defender's first
+// slot that never falls: each turn it hits every living card of the team,
+// its attack raised by rage times the rounds gone before, so the fight ends
+// when the team falls or after MaxRounds. Its Health is not used.
+func BossBattle(team Team, boss Fighter, rage float64, seed int64) BossResult {
+	f := newFight(team, Team{Front: [2]Fighter{boss}}, seed)
+	b := f.teams[1][0]
+	b.boss, b.rage, b.hp = true, rage, bossHP
+	f.run()
+	return BossResult{Damage: f.bossDealt, Rounds: f.round, Events: f.events}
+}
+
+// run plays rounds until a side has fallen or MaxRounds are over.
+func (f *fight) run() {
 	for f.round < MaxRounds && f.living(0) > 0 && f.living(1) > 0 {
 		f.round++
 		for _, u := range f.order() {
@@ -211,14 +257,6 @@ func Battle(attacker, defender Team, seed int64) Result {
 			}
 		}
 	}
-	won := false // the defender wins an exact tie, empty teams included
-	switch {
-	case f.living(1) == 0:
-		won = f.living(0) > 0
-	case f.living(0) > 0:
-		won = f.health(0) > f.health(1)
-	}
-	return Result{AttackerWon: won, Rounds: f.round, Events: f.events}
 }
 
 func newFight(attacker, defender Team, seed int64) *fight {
@@ -280,6 +318,10 @@ func (f *fight) act(u *unit) {
 		f.record(KindStunned, u, u, 0, false)
 		return
 	}
+	if u.boss {
+		f.cleave(u)
+		return
+	}
 	if u.Skill != NoSkill && u.energy >= EnergyMax && f.useSkill(u) {
 		return
 	}
@@ -289,6 +331,16 @@ func (f *fight) act(u *unit) {
 	}
 	u.gain(EnergyPerAction)
 	f.hit(u, target, 1, KindHit)
+}
+
+// cleave is a boss's turn: it hits every living foe, harder each round.
+func (f *fight) cleave(u *unit) {
+	factor := 1 + u.rage*float64(f.round-1)
+	for _, foe := range f.teams[1-u.side] {
+		if foe.alive() {
+			f.hit(u, foe, factor, KindHit)
+		}
+	}
 }
 
 // useSkill spends u's energy on its skill and says whether it did: a Heal
@@ -337,6 +389,7 @@ func (f *fight) skillHit(u *unit) {
 	case Poison:
 		if f.hit(u, target, 1, KindPoison); target.alive() {
 			target.poisoned = PoisonTurns
+			target.poisonDmg = max(int(BossPoison*float64(u.Attack)), 1)
 		}
 	}
 }
@@ -348,7 +401,10 @@ func (f *fight) poisonTick(u *unit) {
 	}
 	u.poisoned--
 	dmg := max(int(PoisonShare*float64(u.Health)), 1)
-	u.hp = max(u.hp-dmg, 0)
+	if u.boss {
+		dmg = u.poisonDmg
+	}
+	f.hurt(u, dmg)
 	u.gain(EnergyWhenHit)
 	f.record(KindPoisoned, u, u, dmg, false)
 	if !u.alive() {
@@ -463,12 +519,21 @@ func (f *fight) hit(from, to *unit, factor float64, kind string) {
 		to.shield -= absorbed
 		rest -= absorbed
 	}
-	to.hp = max(to.hp-rest, 0)
+	f.hurt(to, rest)
 	to.gain(EnergyWhenHit)
 	f.record(kind, from, to, dmg, edged)
 	if !to.alive() {
 		f.record(KindFall, to, to, 0, false)
 	}
+}
+
+// hurt takes dmg off u's health, or, for a boss, counts it as dealt.
+func (f *fight) hurt(u *unit, dmg int) {
+	if u.boss {
+		f.bossDealt += dmg
+		return
+	}
+	u.hp = max(u.hp-dmg, 0)
 }
 
 func (f *fight) heal(from, to *unit) {

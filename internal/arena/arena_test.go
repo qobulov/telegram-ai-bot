@@ -488,3 +488,60 @@ func stunWall() Team {
 	d.Front[0] = FighterOf(100, "wall", 1, 1, 1, 1_000_000)
 	return d
 }
+
+// A boss never falls, hits every living card each turn, harder each round,
+// and the damage dealt it is the sum of the team's hits on it.
+func TestBossBattle(t *testing.T) {
+	boss := FighterOf(99, "boss", 4, 5, 100, 400)
+	got := BossBattle(commonTeam(50, 1000), boss, 0.5, 7)
+	if got.Rounds == 0 || got.Rounds >= MaxRounds {
+		t.Fatalf("rounds %d, want the team to fall before %d", got.Rounds, MaxRounds)
+	}
+	dealt, hitsByRound := 0, map[int]int{}
+	for _, e := range got.Events {
+		switch {
+		case e.Side == 0 && e.To == 0 && (e.Kind == KindHit || e.Kind == KindStrike):
+			dealt += e.Amount
+		case e.Side == 1 && e.Kind == KindFall:
+			t.Fatalf("the boss fell: %+v", e)
+		case e.Side == 1 && e.Kind == KindHit:
+			hitsByRound[e.Round]++
+			if e.HP < 0 {
+				t.Fatalf("negative health %+v", e)
+			}
+		}
+	}
+	if dealt != got.Damage || dealt == 0 {
+		t.Errorf("damage %d, the events say %d", got.Damage, dealt)
+	}
+	if hitsByRound[1] != 5 {
+		t.Errorf("round 1: the boss hit %d cards, want all 5", hitsByRound[1])
+	}
+	again := BossBattle(commonTeam(50, 1000), boss, 0.5, 7)
+	if !reflect.DeepEqual(got, again) {
+		t.Error("the same seed gave another boss fight")
+	}
+}
+
+// A boss's rage makes a team that would hold forever fall in the end, and
+// with no rage a strong team lasts all MaxRounds.
+func TestBossRage(t *testing.T) {
+	boss := FighterOf(99, "boss", 4, 5, 10, 400)
+	if r := BossBattle(commonTeam(50, 3000), boss, 0, 1); r.Rounds != MaxRounds {
+		t.Errorf("no rage: %d rounds, want %d", r.Rounds, MaxRounds)
+	}
+	if r := BossBattle(commonTeam(50, 3000), boss, 1, 1); r.Rounds >= MaxRounds {
+		t.Errorf("rage 1: %d rounds, want fewer than %d", r.Rounds, MaxRounds)
+	}
+}
+
+// A poisoned boss is hurt by a share of its poisoner's attack, counted as
+// dealt, its health untouched.
+func TestBossPoison(t *testing.T) {
+	f := &fight{}
+	u := &unit{Fighter: Fighter{Health: 10}, hp: bossHP, boss: true, poisoned: 1, poisonDmg: 30}
+	f.poisonTick(u)
+	if f.bossDealt != 30 || u.hp != bossHP || len(f.events) != 1 || f.events[0].Amount != 30 {
+		t.Errorf("dealt %d, hp %d, events %+v", f.bossDealt, u.hp, f.events)
+	}
+}
