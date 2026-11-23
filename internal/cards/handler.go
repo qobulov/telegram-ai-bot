@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"telegram-ai-bot/internal/miniapp"
@@ -24,6 +25,7 @@ type Store interface {
 	OpenCards(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, cost int, day storage.CardDay, now time.Time, quest storage.CardQuest) (storage.CardOpening, error)
 	GiveDayTokens(ctx context.Context, userID int64, name string, day storage.CardDay) (int, error)
 	CardTop(ctx context.Context, limit int) ([]storage.CardPlayer, error)
+	ArenaWeekPayer
 	CardPlace(ctx context.Context, userID int64) (storage.CardPlayer, int, int, error)
 	CardWallet(ctx context.Context, userID int64) (shards int, err error)
 	OfferCard(ctx context.Context, from, give, want int64, rules storage.CardMarketRules) (int64, error)
@@ -117,6 +119,9 @@ const (
 type handler struct {
 	Options
 	catalog *Catalog
+	// paidWeek is the start, in Unix seconds, of the arena week this
+	// instance last saw paid, so that it asks no more until the next.
+	paidWeek atomic.Int64
 }
 
 // NewHandler serves the Kartalar Mini App: "state" is the catalog, with
@@ -136,7 +141,7 @@ func NewHandler(opts Options) http.Handler {
 	if opts.HTTPClient == nil {
 		opts.HTTPClient = &http.Client{Timeout: 10 * time.Second}
 	}
-	return &handler{opts, &Catalog{Store: opts.Store, Client: opts.HTTPClient, AniList: opts.AniList, Logger: opts.Logger}}
+	return &handler{Options: opts, catalog: &Catalog{Store: opts.Store, Client: opts.HTTPClient, AniList: opts.AniList, Logger: opts.Logger}}
 }
 
 type request struct {
@@ -261,10 +266,12 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 	case "fuse":
 		return h.fuse(ctx, opened.User, req.Card)
 	case "arena":
+		h.payArenaWeek(ctx)
 		return h.arenaView(ctx, opened.User, req.Shown)
 	case "arena_team":
 		return h.arenaTeam(ctx, opened.User, req.Front, req.Back)
 	case "arena_attack":
+		h.payArenaWeek(ctx)
 		return h.arenaAttack(ctx, opened.User, req.Opponent)
 	case "tower":
 		return h.towerView(ctx, opened.User)

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -53,13 +54,15 @@ type fakeStore struct {
 	stars    int                   // the held card's stars; 0 is ★1
 	fuseErr  error
 	resetErr error
-	arena    fakeArena
-	tower    fakeTower
-	quests   fakeQuests
-	catalog  []storage.Card  // cards beyond heldCard and lockedCard
-	animes   map[string]bool // the anime rewards claimed
-	boxes    map[string]int
-	mail     []storage.CardMail
+	// weeksPaid are the arena weeks paid, by their start.
+	weeksPaid []time.Time
+	arena     fakeArena
+	tower     fakeTower
+	quests    fakeQuests
+	catalog   []storage.Card  // cards beyond heldCard and lockedCard
+	animes    map[string]bool // the anime rewards claimed
+	boxes     map[string]int
+	mail      []storage.CardMail
 }
 
 var (
@@ -148,6 +151,13 @@ func (f *fakeStore) FuseCard(_ context.Context, userID, cardID int64, cost []int
 	f.stars = max(f.stars, 1) + 1
 	f.count(userID, quest, 1)
 	return f.stars, nil
+}
+func (f *fakeStore) PayArenaWeek(_ context.Context, since, _ time.Time, _ []storage.ArenaPrize, _ func(int) string) (int, bool, error) {
+	if slices.ContainsFunc(f.weeksPaid, since.Equal) {
+		return 0, false, nil
+	}
+	f.weeksPaid = append(f.weeksPaid, since)
+	return 1, true, nil
 }
 func (f *fakeStore) ResetCardStars(_ context.Context, _, cardID int64, _ []int) (int, error) {
 	if f.resetErr != nil {

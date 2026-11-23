@@ -28,10 +28,14 @@ func prizeAt(prizes []ArenaPrize, place int) ArenaPrize {
 	return ArenaPrize{}
 }
 
+// ArenaRatingStart is the rating a player starts each arena week with.
+const ArenaRatingStart = 1000
+
 // PayArenaWeek pays the arena's week from since until until, once: the
 // players who attacked within it, by rating, then wins, get their place's
-// prize as a letter whose note is note(place). It gives the players paid,
-// and paid false for a week paid before.
+// prize as a letter whose note is note(place); then, as the owners asked on
+// 2026-11-22, every rating not frozen starts again at ArenaRatingStart. It
+// gives the players paid, and paid false for a week paid before.
 func (s *Store) PayArenaWeek(ctx context.Context, since, until time.Time, prizes []ArenaPrize, note func(place int) string) (players int, paid bool, err error) {
 	places := 0
 	for _, p := range prizes {
@@ -76,7 +80,10 @@ func (s *Store) PayArenaWeek(ctx context.Context, since, until time.Time, prizes
 			return err
 		}
 		players = len(users)
-		_, err = tx.Exec(ctx, `UPDATE arena_weeks SET players = $2 WHERE week = $1::date`, since.Format(time.DateOnly), players)
+		if _, err := tx.Exec(ctx, `UPDATE arena_weeks SET players = $2 WHERE week = $1::date`, since.Format(time.DateOnly), players); err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, `UPDATE arena_players SET rating = $1 WHERE NOT rating_frozen AND rating <> $1`, ArenaRatingStart)
 		return err
 	})
 	if err != nil {

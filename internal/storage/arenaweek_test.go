@@ -67,3 +67,28 @@ func TestPayArenaWeek(t *testing.T) {
 		}
 	}
 }
+
+// Once a week is paid every rating not frozen starts again at
+// ArenaRatingStart; a frozen one keeps its own.
+func TestArenaWeekResetsRatings(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	for _, q := range []string{
+		`INSERT INTO card_players (user_id, name) VALUES (1, 'Ann'), (2, 'Bob'), (3, 'Cy')`,
+		`INSERT INTO arena_players (user_id, rating, rating_frozen) VALUES (1, 1800, false), (2, 400, false), (3, 1200, true)`,
+	} {
+		if _, err := store.pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	since := time.Date(2026, 11, 23, 0, 0, 0, 0, time.UTC)
+	if _, paid, err := store.PayArenaWeek(ctx, since, since.AddDate(0, 0, 7), nil, func(int) string { return "" }); err != nil || !paid {
+		t.Fatalf("pay = %v %v", paid, err)
+	}
+	for id, want := range map[int64]int{1: ArenaRatingStart, 2: ArenaRatingStart, 3: 1200} {
+		var rating int
+		if err := store.pool.QueryRow(ctx, `SELECT rating FROM arena_players WHERE user_id = $1`, id).Scan(&rating); err != nil || rating != want {
+			t.Errorf("player %d's rating = %d %v, want %d", id, rating, err, want)
+		}
+	}
+}

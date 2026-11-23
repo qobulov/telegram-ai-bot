@@ -455,3 +455,17 @@ func TestArenaTeamSynergy(t *testing.T) {
 		t.Errorf("the defender's view = %v", d)
 	}
 }
+
+// The week that ended is paid the first time a player opens the arena or
+// attacks after Monday's midnight, once, before the new week's battles.
+func TestArenaWeekPaidAtMidnight(t *testing.T) {
+	monday := arenaWeekStart(time.Date(2026, 11, 30, 12, 0, 0, 0, Location))
+	now := monday.Add(time.Minute)
+	store := &fakeStore{}
+	call := arenaHandler(t, store, now)
+	call(7, map[string]any{"action": "arena"})
+	call(8, map[string]any{"action": "arena"})
+	if len(store.weeksPaid) != 1 || !store.weeksPaid[0].Equal(monday.AddDate(0, 0, -7)) {
+		t.Fatalf("weeks paid = %v, want only the week before %v", store.weeksPaid, monday)
+	}
+}

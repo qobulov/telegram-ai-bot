@@ -86,3 +86,19 @@ func arenaWeekPrize(prizes []storage.ArenaPrize, place int) storage.ArenaPrize {
 	}
 	return storage.ArenaPrize{}
 }
+
+// payArenaWeek pays the week that ended, the first time any player opens the
+// arena or attacks after Monday's midnight, before the new week's battles
+// move a rating, as the owners asked on 2026-11-22 that prizes go at 00:00;
+// the daily cron pays it too, if no one came.
+func (h *handler) payArenaWeek(ctx context.Context) {
+	week := arenaWeekStart(h.Now()).Unix()
+	if h.paidWeek.Load() == week {
+		return
+	}
+	if _, err := PayArenaWeek(ctx, h.Store, h.Now()); err != nil {
+		h.Logger.Warn("could not pay the arena week", "error", err)
+		return
+	}
+	h.paidWeek.Store(week)
+}
