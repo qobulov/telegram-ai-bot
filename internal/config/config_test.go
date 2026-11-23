@@ -1085,7 +1085,8 @@ func TestPersonaSwearsBackInKind(t *testing.T) {
 		t.Fatal(err)
 	}
 	rule := lineContaining(cfg.FullPersona(), "swears at you")
-	for _, want := range []string{"Never use profanity first", "gets it back once", "no cruder", "pshnx", "отвали", "[react 🤣]", `no "sen" beyond that one word`, "family", "nothing sexual", "no slurs", "no threats", "[silent]", "owners are never sworn at", "upset or hurt"} {
+	for _, want := range []string{"Never use profanity first", "gets it back once", "no cruder", "pshnx", "отвали", "[react 🤣]", `no "sen" beyond that one word`, "family", "nothing sexual", "no slurs", "no threats", "[silent]", "owners are never sworn at", "upset or hurt",
+		"Silence is only for more swearing", "nega jim bo'lding", "answer once, in clean words", "gives the reason", "puts them in their place", "never a new swear word"} {
 		if !strings.Contains(rule, want) {
 			t.Errorf("the swearing rule does not contain %q: %q", want, rule)
 		}
