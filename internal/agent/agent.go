@@ -484,6 +484,9 @@ func finishText(t *turn, answer string) (Answer, error) {
 		}
 		answer = rest
 	}
+	if isMusing(answer) {
+		return Answer{}, ErrLeakedThinking
+	}
 	if marker := mediaMarkers.FindStringSubmatch(answer); marker != nil {
 		kind, media := strings.ToLower(marker[1]), strings.Join(strings.Fields(strings.ToLower(marker[2])), " ")
 		answer = tidy(mediaMarkers.ReplaceAllString(answer, " "))
@@ -539,6 +542,27 @@ func afterLeakedPlan(answer string) (string, bool) {
 		return answer, false
 	}
 	return strings.TrimSpace(answer[sentences[len(sentences)-1][1]:]), true
+}
+
+// musingStart is how the model begins when it thinks aloud, in English,
+// instead of answering, as it did on 2026-11-22 in a group: "Wait, who is
+// Abo? In the recent messages or members, let's see: maybe @…", and on
+// 2026-10-26: "Let's check if there's any specific…".
+var musingStart = regexp.MustCompile(`^(?:Wait|Hmm+|Okay so|OK so|Alright so)\b[,.!?:]?\s|^Let(?:'s| me) (?:check|see|look|figure out|think)\b`)
+
+// musingWords are what such thinking talks about, and an answer to a member
+// seldom does.
+var musingWords = regexp.MustCompile(`(?i)\b(?:let's (?:see|check|look)|let me (?:see|check|think)|recent messages|in the (?:history|members)|maybe @|who (?:is|was) [A-Z]|the user|if there's any|wait,)`)
+
+// isMusing reports an answer that is the model thinking aloud: it starts as
+// thinking does and talks of what thinking talks of, or starts with "Wait"
+// at all, which no reply to a member needs.
+func isMusing(answer string) bool {
+	rest := strings.TrimSpace(answer)
+	if !musingStart.MatchString(rest) {
+		return false
+	}
+	return strings.HasPrefix(rest, "Wait") || len(musingWords.FindAllString(rest, -1)) >= 1
 }
 
 // mediaMarkers finds "[sticker funny]", "[gif facepalm]" and a GIF of a

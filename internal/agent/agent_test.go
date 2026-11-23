@@ -896,3 +896,31 @@ func TestLatinScriptTurnsUzbekCyrillicAnswersIntoLatin(t *testing.T) {
 		t.Errorf("a Russian answer = %q, %v; want it as it is", answer.Text, err)
 	}
 }
+
+// The model thinking aloud in English, as it did in a group, is not sent;
+// an answer that only happens to start alike is.
+func TestMusingIsNotSent(t *testing.T) {
+	for _, musing := range []string{
+		"Wait, who is Abo? In the recent messages or members, let's see: maybe @Abutzzy (Abdumannonov) or Abrik @Abrik17? Wait, let's check who Nishonboev replied to.",
+		"Let's check if there's any specific undisputed action king like GTA or CoD or Elden Ring. In general, Elden Ring, GTA, and Call of Duty series dominate.",
+		"Hmm, let me check the recent messages first.",
+	} {
+		if !isMusing(musing) {
+			t.Errorf("isMusing(%q) = false", musing)
+		}
+		if _, err := finishText(&turn{}, musing); !errors.Is(err, ErrLeakedThinking) {
+			t.Errorf("finishText(%q) = %v, want ErrLeakedThinking", musing, err)
+		}
+	}
+	for _, answer := range []string{
+		"Waiting for the match too, it starts at nine.",
+		"Let's go! Who's first?",
+		"Okay, 4.",
+		"Hmm, bu qiziq savol. Javobi: 42.",
+		"Eshitaman, tinchlikmi?",
+	} {
+		if isMusing(answer) {
+			t.Errorf("isMusing(%q) = true, want it sent", answer)
+		}
+	}
+}
