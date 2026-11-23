@@ -50,6 +50,11 @@ func replyLanguage(text string) string {
 		return ""
 	case strings.ContainsAny(lower, "ўқғҳ"):
 		return "Uzbek, in Cyrillic script"
+	case !strings.ContainsAny(lower, "ыщ") && uzbekCyrillicCount(words) > 0 && uzbekCyrillicCount(words) >= countIn(words, russianWords):
+		// Uzbek typed in Cyrillic without its own letters, with a Russian
+		// "да" or "не" in it, as "Да айтма" and "Не блдик нмалигини" were,
+		// which got Russian answers on 2026-11-22.
+		return "Uzbek, in Cyrillic script"
 	case mostlyCyrillic(words, cyrillic > latin || russian) && russian:
 		return "Russian"
 	case mostlyCyrillic(words, cyrillic > latin):
@@ -121,11 +126,51 @@ func isUzbekWord(w string) bool {
 		strings.HasSuffix(w, "man") || strings.HasSuffix(w, "san") || strings.HasSuffix(w, "mi")
 }
 
+// uzbekCyrillicEndings are endings of Uzbek words typed in Cyrillic that
+// Russian words do not have.
+var uzbekCyrillicEndings = []string{"нинг", "ларни", "лари", "япти", "япман", "япсан", "ябди", "ворди", "ворбти", "ворман", "ибди", "дик", "дингиз", "лигини", "масин", "моқда", "вотти", "вотман", "сизми", "санми", "манми"}
+
+// isUzbekCyrillicWord reports a common Uzbek word, or one with an Uzbek
+// ending, typed in Cyrillic without Uzbek's own letters.
+func isUzbekCyrillicWord(w string) bool {
+	if uzbekCyrillicWords[w] {
+		return true
+	}
+	for _, end := range uzbekCyrillicEndings {
+		if strings.HasSuffix(w, end) && len([]rune(w)) > len([]rune(end)) {
+			return true
+		}
+	}
+	return false
+}
+
+// uzbekCyrillicCount is how many of words are Uzbek typed in Cyrillic.
+func uzbekCyrillicCount(words []string) int {
+	n := 0
+	for _, w := range words {
+		if isUzbekCyrillicWord(w) {
+			n++
+		}
+	}
+	return n
+}
+
+// countIn is how many of words are in set.
+func countIn(words []string, set map[string]bool) int {
+	n := 0
+	for _, w := range words {
+		if set[w] {
+			n++
+		}
+	}
+	return n
+}
+
 // uzbekInCyrillic reports Uzbek typed in Cyrillic without its own letters,
 // as "слайд килиб бер": by its common words and endings.
 func uzbekInCyrillic(text string) bool {
 	for _, w := range strings.FieldsFunc(strings.ToLower(text), func(r rune) bool { return !unicode.IsLetter(r) }) {
-		if uzbekCyrillicWords[w] || strings.HasSuffix(w, "нинг") || strings.HasSuffix(w, "ларни") || strings.HasSuffix(w, "лари") {
+		if isUzbekCyrillicWord(w) {
 			return true
 		}
 	}
@@ -164,7 +209,8 @@ var (
 	uzbekWords = wordSet("nima", "qanday", "rahmat", "salom")
 	// uzbekCyrillicWords are common Uzbek words with no letter of Uzbek's
 	// own, which Russian does not have.
-	uzbekCyrillicWords = wordSet("ва", "бу", "учун", "керак", "килиб", "бер", "беринг", "нима", "кандай", "менга", "билан", "хам", "эмас", "рахмат", "салом")
-	russianWords       = wordSet("как", "что", "это", "ты", "вы", "я", "не", "да", "нет", "привет", "спасибо", "пожалуйста",
+	uzbekCyrillicWords = wordSet("ва", "бу", "учун", "керак", "килиб", "бер", "беринг", "нима", "кандай", "менга", "билан", "хам", "эмас", "рахмат", "салом",
+		"нма", "нега", "айтма", "айт", "йок", "шу", "мана", "ана", "кил", "килдим", "бор", "борми", "йокми", "экан", "акан", "сан", "ман", "мен", "сен", "уни", "буни", "нимага", "канака", "канча", "хали", "энди", "кани", "мари", "хоп")
+	russianWords = wordSet("как", "что", "это", "ты", "вы", "я", "не", "да", "нет", "привет", "спасибо", "пожалуйста",
 		"где", "когда", "почему", "сегодня")
 )
