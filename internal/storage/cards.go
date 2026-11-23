@@ -315,6 +315,38 @@ func (s *Store) ownedCards(ctx context.Context, userID int64, rarity int, ids []
 	return cards, nil
 }
 
+// OwnedCopy is a card the player holds by its id alone, its catalog numbers
+// left to the catalog the caller already has.
+type OwnedCopy struct {
+	CardID                       int64
+	Count, Melted, Stars, Serial int
+}
+
+// OwnedCopies are the player's cards as OwnedCards gives them, but by id
+// alone, without the catalog's names, animes and pictures, which made most
+// of what a collection sent from the database (the owners saw Supabase's
+// egress pass its limit on 2026-11-23).
+func (s *Store) OwnedCopies(ctx context.Context, userID int64) ([]OwnedCopy, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT o.card_id, o.count, o.melted, o.stars,
+			CASE WHEN o.card_id = ANY($2) THEN (
+				SELECT count(*) FROM card_owned h
+				WHERE h.card_id = o.card_id AND (h.first_at, h.user_id) <= (o.first_at, o.user_id))::int
+			ELSE 0 END
+		FROM card_owned o WHERE o.user_id = $1`, userID, limitedCardIDs())
+	if err != nil {
+		return nil, fmt.Errorf("storage: list a player's copies: %w", err)
+	}
+	copies, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (OwnedCopy, error) {
+		var c OwnedCopy
+		return c, row.Scan(&c.CardID, &c.Count, &c.Melted, &c.Stars, &c.Serial)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("storage: list a player's copies: %w", err)
+	}
+	return copies, nil
+}
+
 // CardTop is the players with the most points.
 func (s *Store) CardTop(ctx context.Context, limit int) ([]CardPlayer, error) {
 	rows, err := s.pool.Query(ctx, `

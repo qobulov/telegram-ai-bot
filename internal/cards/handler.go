@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -23,6 +24,7 @@ type Store interface {
 	CardCatalog(ctx context.Context) ([]storage.Card, error)
 	OwnedCards(ctx context.Context, userID int64, rarity int) ([]storage.OwnedCard, error)
 	OwnedCardsOf(ctx context.Context, userID int64, ids []int64) ([]storage.OwnedCard, error)
+	OwnedCopies(ctx context.Context, userID int64) ([]storage.OwnedCopy, error)
 	CardPlayerOf(ctx context.Context, userID int64) (storage.CardPlayer, time.Time, error)
 	OpenCards(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, cost int, day storage.CardDay, now time.Time, quest storage.CardQuest) (storage.CardOpening, error)
 	GiveDayTokens(ctx context.Context, userID int64, name string, day storage.CardDay) (int, error)
@@ -136,6 +138,39 @@ type handler struct {
 // cards on each request was much of the database's traffic, as the owners
 // saw on 2026-11-23.
 const catalogKeep = 5 * time.Minute
+
+// ownedCards are the player's cards of rarity (all at -1), as
+// Store.OwnedCards gives them, the rarest and most loved first, but read by
+// id alone and filled from the cached catalog; a card the catalog read does
+// not have yet sends it to Store.OwnedCards.
+func (h *handler) ownedCards(ctx context.Context, userID int64, rarity int) ([]storage.OwnedCard, error) {
+	catalog, err := h.cardCatalog(ctx)
+	if err != nil {
+		return nil, err
+	}
+	copies, err := h.Store.OwnedCopies(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	at := make(map[int64]int, len(catalog))
+	for i, c := range catalog {
+		at[c.ID] = i
+	}
+	owned := make([]storage.OwnedCard, 0, len(copies))
+	for _, c := range copies {
+		i, ok := at[c.CardID]
+		if !ok {
+			return h.Store.OwnedCards(ctx, userID, rarity)
+		}
+		if rarity >= 0 && catalog[i].Rarity != rarity {
+			continue
+		}
+		owned = append(owned, storage.OwnedCard{Card: catalog[i], Count: c.Count, Melted: c.Melted, Stars: c.Stars, Serial: c.Serial})
+	}
+	// the catalog's own order: the rarest, then the most loved, first
+	slices.SortStableFunc(owned, func(a, b storage.OwnedCard) int { return at[a.ID] - at[b.ID] })
+	return owned, nil
+}
 
 // cardCatalog is the card catalog, read at most once every catalogKeep.
 func (h *handler) cardCatalog(ctx context.Context) ([]storage.Card, error) {
@@ -386,7 +421,7 @@ func (h *handler) state(ctx context.Context, user miniapp.User) (any, failure) {
 		h.Logger.Error("could not read the card catalog", "error", err)
 		return nil, errUnavailable
 	}
-	owned, err := h.Store.OwnedCards(ctx, user.ID, -1)
+	owned, err := h.ownedCards(ctx, user.ID, -1)
 	if err != nil {
 		h.Logger.Error("could not read a player's cards", "user_id", user.ID, "error", err)
 		return nil, errUnavailable

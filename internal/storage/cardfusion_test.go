@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 )
@@ -188,5 +189,32 @@ func TestResetCardStars(t *testing.T) {
 	}
 	if _, err := store.ResetCardStars(ctx, 1, 99, cost); !errors.Is(err, ErrCardNotHeld) {
 		t.Errorf("a reset of a card not held = %v, want ErrCardNotHeld", err)
+	}
+}
+
+// A player's copies are their cards by id with their counts and stars, as
+// OwnedCards gives them.
+func TestOwnedCopies(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	for _, q := range []string{
+		`INSERT INTO card_catalog (id, name, rarity, attack, health, value) VALUES (10, 'Gojo Satoru', 4, 5000, 18000, 4000), (20, 'Levi', 3, 1, 1, 2000)`,
+		`INSERT INTO card_players (user_id, name) VALUES (1, 'Alice'), (2, 'Bob')`,
+		`INSERT INTO card_owned (user_id, card_id, count, melted, stars) VALUES (1, 10, 4, 1, 2), (1, 20, 1, 0, 1), (2, 20, 3, 0, 1)`,
+	} {
+		if _, err := store.pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	copies, err := store.OwnedCopies(ctx, 1)
+	if err != nil || len(copies) != 2 {
+		t.Fatalf("copies = %+v, %v", copies, err)
+	}
+	full, _ := store.OwnedCards(ctx, 1, -1)
+	for _, o := range full {
+		i := slices.IndexFunc(copies, func(c OwnedCopy) bool { return c.CardID == o.ID })
+		if i < 0 || copies[i].Count != o.Count || copies[i].Melted != o.Melted || copies[i].Stars != o.Stars || copies[i].Serial != o.Serial {
+			t.Errorf("card %d: copy %+v, owned %+v", o.ID, copies, o)
+		}
 	}
 }

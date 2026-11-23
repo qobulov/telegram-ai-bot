@@ -71,7 +71,7 @@ func (h *handler) animeClaim(ctx context.Context, user miniapp.User, anime strin
 	if len(need) < AnimeRewardLeast {
 		return map[string]any{"refused": "small"}, failure{}
 	}
-	owned, err := h.Store.OwnedCards(ctx, user.ID, -1)
+	owned, err := h.ownedCards(ctx, user.ID, -1)
 	if err != nil {
 		h.Logger.Error("could not read a player's cards", "user_id", user.ID, "error", err)
 		return nil, errUnavailable

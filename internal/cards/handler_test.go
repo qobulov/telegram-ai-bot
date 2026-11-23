@@ -135,6 +135,14 @@ func (f *fakeStore) ClaimAnimeReward(_ context.Context, _ int64, _, anime string
 	f.animes[anime], f.tokens = true, f.tokens+tokens
 	return f.tokens, true, nil
 }
+func (f *fakeStore) OwnedCopies(ctx context.Context, userID int64) ([]storage.OwnedCopy, error) {
+	all, err := f.OwnedCards(ctx, userID, -1)
+	copies := make([]storage.OwnedCopy, len(all))
+	for i, c := range all {
+		copies[i] = storage.OwnedCopy{CardID: c.ID, Count: c.Count, Melted: c.Melted, Stars: c.Stars, Serial: c.Serial}
+	}
+	return copies, err
+}
 func (f *fakeStore) OwnedCardsOf(ctx context.Context, userID int64, ids []int64) ([]storage.OwnedCard, error) {
 	all, err := f.OwnedCards(ctx, userID, -1)
 	var some []storage.OwnedCard

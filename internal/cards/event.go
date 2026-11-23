@@ -187,7 +187,7 @@ func (h *handler) eventView(ctx context.Context, user miniapp.User, e Event) (an
 		return nil, errUnavailable
 	}
 	held := map[int64]int{}
-	if owned, err := h.Store.OwnedCards(ctx, user.ID, int(Mythic)); err == nil {
+	if owned, err := h.ownedCards(ctx, user.ID, int(Mythic)); err == nil {
 		for _, c := range owned {
 			held[c.ID] = c.Count
 		}
