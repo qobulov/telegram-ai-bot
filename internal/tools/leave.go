@@ -23,6 +23,16 @@ var leaveWords = []string{
 // the agent's package cannot be imported here.
 const silentAnswer = "[silent]"
 
+// GroupLister lists the groups the bot knows.
+type GroupLister interface {
+	Groups(ctx context.Context, since time.Time, limit int) ([]storage.GroupSummary, error)
+}
+
+// ChannelLister lists the channels the bot has been made an admin of.
+type ChannelLister interface {
+	Channels(ctx context.Context, limit int) ([]storage.ChannelSummary, error)
+}
+
 // Leaver posts in a chat and leaves it.
 type Leaver interface {
 	SendToGroup(ctx context.Context, chatID int64, text string) error
@@ -46,8 +56,8 @@ const leaveTimeout = 15 * time.Second
 
 const (
 	leaveNotAsked = "the owner's own words do not ask the bot to leave; it stays. Leave only when they say so, as \"bu guruhdan chiqib ket\" does"
-	leaveNoChat   = "say which group or channel to leave: chat_id from send_to_groups targets, or ask in that group itself"
-	leaveUnknown  = "chat_id is no group the bot is in or channel where it is an admin; take it from send_to_groups targets"
+	leaveNoChat   = "say which group or channel to leave: chat_id from bot_database groups, or ask in that group itself"
+	leaveUnknown  = "chat_id is no group the bot is in or channel where it is an admin; take it from bot_database groups"
 	leaveGoodbye  = "👋 Xayr! Egamning buyrug'i bilan guruhdan chiqyapman."
 )
 
@@ -61,12 +71,12 @@ func LeaveTool(opts LeaveOptions) Tool {
 		Name: "leave_chat",
 		Description: "Owners only. Make the bot leave a group or a channel, when the owner asks it to (\"bu guruhdan chiqib ket\", \"X kanaldan chiq\"). " +
 			"Without chat_id it leaves the group it is asked in, saying goodbye itself: then write nothing more. " +
-			"With chat_id, from send_to_groups targets, it leaves that group or channel; then tell the owner it did. " +
+			"With chat_id, from bot_database groups, it leaves that group or channel; then tell the owner it did. " +
 			"Never call it unless the owner asked to leave in their own message.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"chat_id": {"type": "integer", "description": "The group or channel to leave, from send_to_groups targets. Omit it to leave the group the owner asks in."}
+				"chat_id": {"type": "integer", "description": "The group or channel to leave, from bot_database groups. Omit it to leave the group the owner asks in."}
 			},
 			"additionalProperties": false
 		}`),

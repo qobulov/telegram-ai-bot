@@ -128,17 +128,11 @@ var (
 		ru: "Сейчас я очень занята, напишите через минуту.",
 		en: "I'm very busy right now, write again in a minute.",
 	}
-	// textBlocked answers a message the model provider's filter refused;
-	// textBlockedOwner tells an owner how to post an announcement anyway.
+	// textBlocked answers a message the model provider's filter refused.
 	textBlocked = localText{
 		uz: "🚫 Bu xabarga javob bera olmayman: model uni taqiqlangan kontent deb to'xtatdi. Boshqacha yozib ko'ring.",
 		ru: "🚫 Не могу ответить на это: модель остановила запрос как запрещённый контент. Попробуйте написать иначе.",
 		en: "🚫 I can't answer this: the model stopped it as prohibited content. Try putting it another way.",
-	}
-	textBlockedOwner = localText{
-		uz: "🚫 Gemini bu so'rovni taqiqlangan kontent deb to'xtatdi, javob yoza olmadim. E'lon bo'lsa, o'zim yuboraman: videoga reply qilib /announce hammaga <tavsif> (yoki faqat guruhlarga: /announce <tavsif>).",
-		ru: "🚫 Gemini остановил запрос как запрещённый контент, я не смогла ответить. Если это объявление, отправлю сама: ответом на видео /announce всем <описание> (или только в группы: /announce <описание>).",
-		en: "🚫 Gemini stopped this as prohibited content, so I couldn't answer. For an announcement, I'll post it myself: in reply to the video, /announce everyone <caption> (or groups only: /announce <caption>).",
 	}
 	textError = localText{
 		uz: "Nimadir xato ketdi, birozdan keyin qayta yozing.",

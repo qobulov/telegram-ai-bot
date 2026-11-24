@@ -213,7 +213,8 @@ func (b botAccount) Photo(ctx context.Context) ([]byte, string, bool, error) {
 // maxAvatarBytes bounds the profile photo downloaded to be described.
 const maxAvatarBytes = 2 << 20
 
-// groupSender posts an owner's confirmed broadcast in a group or a channel.
+// groupSender says goodbye in a group or a channel and leaves it, for the
+// leave_chat tool.
 type groupSender struct {
 	client *telegram.Client
 }
@@ -225,11 +226,6 @@ func (g groupSender) SendToGroup(ctx context.Context, chatID int64, text string)
 
 func (g groupSender) LeaveChat(ctx context.Context, chatID int64) error {
 	return g.client.LeaveChat(ctx, chatID)
-}
-
-func (g groupSender) CopyToChat(ctx context.Context, chatID, fromChatID, messageID int64, caption string) error {
-	_, err := g.client.CopyMessage(ctx, chatID, fromChatID, messageID, caption)
-	return err
 }
 
 // pinSender sends the send_location tool's pins as venues: a pin on the
@@ -438,8 +434,6 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		PictureVerdicts:  store,
 		VoiceTranscripts: store,
 		Judge:            swearJudge(cfg, logger),
-		Writer:           announcementWriter(cfg, logger),
-		Recent:           store,
 		Sworn:            store,
 		Joins:            store,
 		JoinGate:         bot.Client,
@@ -521,13 +515,6 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 				Store:    store,
 				Members:  groupMembers{client: bot.Client, botID: bot.User.ID},
 				Location: cfg.Location,
-			}),
-			tools.BroadcastTool(tools.BroadcastOptions{
-				Groups:   store,
-				Channels: store,
-				Private:  store,
-				Drafts:   store,
-				Sender:   groupSender{client: bot.Client},
 			}),
 			tools.LeaveTool(tools.LeaveOptions{
 				Groups:   store,
@@ -682,28 +669,6 @@ func swearJudge(cfg config.Config, logger *slog.Logger) *ai.Client {
 		Logger:          logger,
 	})
 }
-
-// announcementWriter is the model that writes an owner's announcement
-// when the main model's provider refused the turn: the main model, asked
-// with no persona and no picture, a few hundred words at most.
-func announcementWriter(cfg config.Config, logger *slog.Logger) *ai.Client {
-	return ai.NewClient(ai.Options{
-		BaseURL:         cfg.AIBaseURL,
-		APIKey:          cfg.AIAPIKey,
-		Model:           cfg.Model,
-		FallbackModels:  cfg.FallbackModels,
-		ReasoningEffort: judgeReasoning(cfg.ReasoningEffort),
-		MaxTokens:       writerTokens,
-		MaxAttempts:     2,
-		HTTPClient:      &http.Client{Timeout: cfg.RequestTimeout},
-		AttemptTimeout:  attemptTimeout,
-		Logger:          logger,
-	})
-}
-
-// writerTokens bounds an announcement the writer writes, 600 letters and
-// what thinking it does.
-const writerTokens = 1536
 
 // chatRouting is the router of ROUTER_MODEL and the chat model of
 // CHAT_MODEL, both nil without a router. The router gives one word, as the

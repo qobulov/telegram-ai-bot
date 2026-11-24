@@ -86,13 +86,13 @@ flowchart TD
   app["internal/app<br/>wires everything"]
 
   subgraph core["Conversation"]
-    service["internal/service<br/>commands, ads, announcements, guards"]
+    service["internal/service<br/>commands, guards"]
     agent["internal/agent<br/>model loop, tool calls"]
     ai["internal/ai<br/>Gemini client"]
   end
 
   subgraph abilities["Abilities"]
-    tools["internal/tools<br/>moderate, send_to_groups, leave_chat…"]
+    tools["internal/tools<br/>moderate, leave_chat…"]
     webapi["internal/webapi<br/>mlbb, weather, currency, football…"]
     stickers["internal/stickers"]
   end
@@ -194,8 +194,6 @@ private_messages(id PK, user_id, denied, created_at)
 star_payments(charge_id PK, user_id, first_name, username, stars, days,
               paid_at, refunded_at)
 premium_users(user_id PK, until)
-broadcasts(id PK, owner_id, update_id, text, chat_ids bigint[],
-           copy_chat_id, copy_message_id, created_at, sent_at)
 channels(chat_id PK, title, username, bot_status, bot_rights jsonb,
          first_seen_at, last_seen_at)
 group_rules(id PK, chat_id (0 for every group), kind, user_id, user_name,
@@ -317,7 +315,7 @@ in the environment win over the file.
 | `PREMIUM_DAYS` | `30` | Days one purchase of premium lasts; buying again before it ends adds them to its end |
 | `PREMIUM_DAILY_LIMIT` | `50` | Answers a day in private chats while premium lasts; premium is sold only when this is above `PRIVATE_DAILY_LIMIT` |
 | `BUSINESS_DAILY_LIMIT` | `30` | Answers each customer gets per day from an owner's [business account](#telegram-business), from midnight in `GROUP_HISTORY_TIMEZONE`; past it, nothing, not even a notice. Failed turns are not counted; `0` turns it off. Counted in the database |
-| `PRIVATE_CHATS` | `on` | Whom she answers in private chats: `on` everyone, `owners` the owners only, `off` nobody, so that she works in groups only. A private message that is not answered gets only a friendly reaction picked at random in code, never a notice, and the model is not asked. A group smaller than `GROUP_MIN_MEMBERS` counts as a private chat here, so that a small group cannot get around it; there, someone who is not answered gets only a 👀 reaction, and no call is made to the model, not even to transcribe a voice message. With `off`, owners cannot use private-chat tools such as broadcasts either |
+| `PRIVATE_CHATS` | `on` | Whom she answers in private chats: `on` everyone, `owners` the owners only, `off` nobody, so that she works in groups only. A private message that is not answered gets only a friendly reaction picked at random in code, never a notice, and the model is not asked. A group smaller than `GROUP_MIN_MEMBERS` counts as a private chat here, so that a small group cannot get around it; there, someone who is not answered gets only a 👀 reaction, and no call is made to the model, not even to transcribe a voice message. With `off`, owners cannot use private-chat tools either |
 | `REQUEST_TIMEOUT_SECONDS`     | `45`                           | Time budget for answering one message                                                                        |
 | `MAX_INPUT_CHARS`             | `4000`                         | Longest user message accepted                                                                                |
 | `RETENTION_DAYS` | `1` | Chat history is kept this many days, then deleted; `0` keeps it forever |
@@ -693,63 +691,11 @@ user the model names; the owner's own words must ask for a gift ("sovg'a",
 pay for is refused with how many Stars are missing. Stars reach the balance
 from premium and can be bought for the bot in @BotFather.
 
-Owners can also have the bot post in its groups ("Maria, guruhlarga master
-qaytdi deb yoz") with the owner-only `send_to_groups` tool. It works in two
-steps: the bot first shows the exact text and the groups, and sends only after
-the owner says yes in a later message, within 10 minutes. The code refuses a
-confirmation made in the same message as the draft, so the model cannot send
-on its own.
-
-A broadcast goes to every group the bot is in unless the owner says
-otherwise: to its channels instead ("kanallarga yoz"), to both, or to the
-groups and channels they pick (`targets` lists them with their IDs). A
-channel counts only while the bot is an admin there with the right to post
-messages. Instead of text, an owner may reply to a message (a photo, a
-video, a post, in the private chat or a group) and ask for it to be sent
-("shuni hamma guruhlarga yubor"): it is copied as it is, with Telegram's
-`copyMessage`, so it carries no "forwarded from" line, after the same yes.
-With text too, the copy goes under that text as its new caption (a
-description for a video), and the owner first gets the post in their private
-chat as a preview. Neither the text nor a copied message may call or tag
-someone to summon them.
-
-A broadcast can also go to the private chats of everyone who wrote to the
-bot in private ("hammaning lichkasiga yubor": `to` is `users`, or `all` for
-the groups, channels and private chats together), up to 200 of the most
-recent, leaving out the owner; a bot may not write first to anyone else.
-Users who blocked the bot are counted, not named.
-
-An owner's keyboard has one button, «📢 Reklama berish»: it asks for the ad,
-opening the reply box, and the photo or video sent in reply is taken as the
-ad whatever its caption (a reply with neither is asked again).
-An owner's photo or video sent to the bot in private with an ad's caption
-(a price, "akk", "sotiladi", a skin…) is taken in code, the model never
-asked: the bot answers with where to post it (the groups, everyone, private
-chats only, or not at all), then with where the draft goes and Send and
-Drop buttons; the post is copied as it is, caption and all. An owner's
-photo or video the provider's filter refused is offered the same way.
-
-The owners' `/announce` does the same in code, without the model, whose
-provider may refuse a sale's words or a video's picture: `/announce <text>` for
-the groups, `/announce hammaga <text>` for the groups and private chats,
-`/announce lichkaga <text>` for private chats only, in reply to a photo or a
-video for it under the text; the preview comes first, then `/announce ha`
-sends it and `/announce bekor` drops it. When the provider's filter refuses a
-turn that has a picture, the turn is asked again without it; when it
-refuses the words, a private chat is told so, and an owner how to post with
-`/announce`, instead of "try again". An owner's refused words that ask for an
-announcement ("e'lon", "guruhlarga", "lichkaga", "hammaga"…) are taken
-apart from the main model: the same model, told nothing but to write an
-announcement, writes it from the owner's last few messages, it is drafted
-for the groups, or the private chats too when the words name them, under the
-replied photo or video if any, and the preview comes with Send and Drop
-buttons.
-
 Owners can also have her leave a group or a channel with the owner-only
 `leave_chat` tool: "bu guruhdan chiqib ket" in the group itself, where she
 says goodbye before she goes and writes nothing after, or "X guruhdan
 chiq" from anywhere, for a group she is in or a channel where she is an
-admin (`targets` lists them). The owner's own words must ask her to leave
+admin (`bot_database` groups lists the groups). The owner's own words must ask her to leave
 (chiq, ket, leave, выйди…), so the model cannot leave on its own.
 
 `/words` in a group, with no model, lists the top 10 writers by words, each with their messages, of the
@@ -1278,8 +1224,7 @@ admin (`setMyDefaultAdministratorRights`, `groupAdminRights` and
 `channelAdminRights` in the same file), which Telegram's dialog then shows
 ticked: in groups the ones her features use, *Delete messages*, *Ban users*,
 *Pin messages*, *Invite users*, *Manage topics*, *Change group info* and *Add
-new admins*; in channels *Post messages* and *Edit messages*, for the owners'
-broadcasts. Whoever adds her can still untick any of them, and she only ever
+new admins*; in channels *Post messages* and *Edit messages*. Whoever adds her can still untick any of them, and she only ever
 uses a right both she and the admin asking hold. A failure is only logged.
 
 Each start also sets the profile's bio and description (`internal/app/profile.go`),
@@ -1558,7 +1503,7 @@ calling the bot by name, "Мут мари 1 минутга", "Maria, ban", "за
 минут", "mute him for 2 hours", "chiqar" (an action word
 in Uzbek, Russian or English,
 perhaps a length, and nothing else, so that talk about muting still goes to
-the model, which once asked back instead of muting, and refused one adminship order in three); adminship goes the same way, "admin qil", "админ бекор кил", "adminlikdan ol", "сними админа", and a warning, "varn ber", "пред", "ogohlantir": the third warning mutes the member for a day and their count starts again (`member_warns`, migration 83); moderators' ranks, 1 to 5, as Iris keeps them (`internal/ranks`, `member_ranks`, `rank_log`, `command_ranks`, migration 84): the group's creator and the owners stand above every rank and give any; a moderator whose rank opens giving ranks (4 unless set) gives one below their own only with `/rank 2` replying to the member, and `/rank 0` takes it away, while `/rank` alone replying to a member says their rank to anyone who asks: words such as "+3 admin Mari", "Mari daraja 2" or "-admin Mari" are no order, and the model has no tool to give ranks, so it teaches `/rank` instead; a ranked member may have the bot do each moderate action their rank opens without the Telegram right, never on a member of their rank or higher; `/staff` lists the ranks, `/ranklog` who gave which, and `/access` the rank each command needs, the defaults Iris's, which rank 5 or the creator changes, "/access ban 2"; `/banlist` lists those the bot banned since the last amnesty, with why and who, to admins and moderators; `/amnesty` (rank 5) unbans them all; any member calls the admins and moderators with `/admins` (once in three minutes a group), reports the message replied to with `/report` (once in two minutes a member), the quote and the tags in one line, and opens a vote to ban the member replied to with `/voteban`, buttons for and against, five votes for banning them within thirty minutes, one vote a member, never the target's, never on an admin or an owner (`ban_votes`, migration 85), cancelled by its starter or a moderator, and closed as not banned when pressed after its time; a report is kept (`reports`, migration 88) with buttons for a moderator to mark it seen, ban the reported member or reject it, the first press settling it, and `/reports` lists a week's open ones; a warning keeps its reason and lapses after 30 days, `/warns` listing them; `/banlist` has an unban button for each of its latest ten; `/rights` ("huquqlarim") lists what the asker's rank opens, and for a Telegram admin the commands their own admin rights open (read with `getChatMember`, by the rule the moderate tool applies: restricting members opens `/mute` to `/amnesty`, deleting `/del`, pinning `/pin` and `/unpin`, adding admins `/promote` and `/demote`, tags `/tag`, the group's info and invite links their orders in words), the ones every admin has (`/banlist`, `/reports`, `/warns`, `/cleanservice`, `/ignore`, `/unignore`, `/invites_auto`, `/mute bot`) and what their rank adds that their rights do not, one line saying only that they are an admin when Telegram cannot be asked; `/myinvites` counts the asker's own invites; talk with the model is only for the groups an owner turned it on for (`group_settings` key `ai`; `/aigroups` in private lists the bot's groups as ✅/❌ buttons that switch it); the owners' own commands (`/settings`, `/set`, `/stats`, `/model`, `/aigroups`, `/announce`, `/payments`, `/refund`, `/business`, `/import_stickers`) work only in private: in a group they, and the former group switches `/aichat`, `/limit` and `/active`, get no answer, and an owner's menu there leaves them out: elsewhere the commands, games, moderation, reputation, guards and `/weather` all work without any quota, talk to the bot gets "AI suhbat yoqilmagan" once in six hours and is otherwise noted as chatter, and no voice message is transcribed; where AI is on the group's quota is taken only when the model is asked, not for the commands and orders done in code; the cards app has a 💎 shop: crystals sold for Telegram Stars by an invoice link the app opens (`createInvoiceLink`, `openInvoice`), its payload `cr:<user>:<pack>` checked before the payment and the crystals added once per charge (`crystal_purchases`, migration 90) and taken back on a refund, with a 🎁 diamond box since 2026-11-19 (pack `box`, 129 Stars, `cards.DiamondBox`) whose prize is drawn when the payment goes through: 1500 crystals 50%, 2000 26%, 2500 13%, 3000 6%, 4000 3%, 5000 2% (since 2026-11-20; 60/22/10/5/2/1 before), about 1995 on average, the odds shown on its button, and an anime's collection, held whole, gives 10 tokens once for an anime of at least 5 cards (seasons and sequels as one, `cards.Franchise`; limited cards aside; `card_anime_rewards`, migration 103), taken with the Animelar tab's button (`anime_claim`), a 🎒 bag beside the points holding the player's unopened boxes (`card_boxes`, `box_open`, the prize drawn by the box's odds) and their mail (`card_mail`, migration 104; `inbox`, `mail_claim`), whose gifts the owners send in private with `/gift @user box 2 [note]` (or `tokens`, `crystals`; a Telegram ID also works), the player told by the bot, and crystals buy tokens (5 for 60, 12 for 135) and 5-card packs with one sure Epic (120), Legendary (350) or Mythic (2000), the last card raised only when none before it was as rare; a reply of "+", "rahmat", "raxmat", "рахмат", "спс" or the like, with a filler such as "aka" or an emoji, to a member gives them a reputation point, once an hour from the same member, marked with 👍 and unanswered, `/rep` and `/toprep` showing it (`member_reputation`, `reputation_log`); and `/cleanservice` switches deleting join, leave, pin and other service messages (`group_settings`, migration 89; its old `group_notes` table was dropped in migration 119); the model reads the group itself with `group_info` (its bio, link, size, admins, what members may send, the pinned message and the bot's own rights) and a member with `member_info` (the asker, the member replied to or tagged: Telegram status, title or tag, rank, warnings and the last reason, mutes and bans received, messages today and this week, last seen, who brought them, whom they brought, and their card points, place, tokens and crystals); moderation commands take the member replied to or one tagged, "/demote @user", a tagged one answered only for those who may moderate; `/promote` makes the member replied to a Telegram admin, "/promote Streamer" with that title and "Moderator" without one, as in words, `/demote` takes it back, and `/tag` sets a member's tag, or the title of an admin the bot made; and `/help mod`, `/help kartalar` and `/help azo` are the help's parts; and everyday commands are answered in code: `/ping`, `/id` (the member replied to, or the asker's and the chat's) and `/calc` (+ - * / ^ %, parentheses), while `/weather Toshkent` is asked of the model, which looks it up; the model reads the invite table itself with `invite_stats` (the top, the asker's own or the member replied to's, for today, the week, the month or all time); and `/mylink` gives a member their own invite link, made once by the bot with the member's ID in its name (`member_links`, migration 86), so that whoever joins by it counts for that member: a group's public link tells the bot nothing, and an admin's link only who made it; "бер", "qil" and the
+the model, which once asked back instead of muting, and refused one adminship order in three); adminship goes the same way, "admin qil", "админ бекор кил", "adminlikdan ol", "сними админа", and a warning, "varn ber", "пред", "ogohlantir": the third warning mutes the member for a day and their count starts again (`member_warns`, migration 83); moderators' ranks, 1 to 5, as Iris keeps them (`internal/ranks`, `member_ranks`, `rank_log`, `command_ranks`, migration 84): the group's creator and the owners stand above every rank and give any; a moderator whose rank opens giving ranks (4 unless set) gives one below their own only with `/rank 2` replying to the member, and `/rank 0` takes it away, while `/rank` alone replying to a member says their rank to anyone who asks: words such as "+3 admin Mari", "Mari daraja 2" or "-admin Mari" are no order, and the model has no tool to give ranks, so it teaches `/rank` instead; a ranked member may have the bot do each moderate action their rank opens without the Telegram right, never on a member of their rank or higher; `/staff` lists the ranks, `/ranklog` who gave which, and `/access` the rank each command needs, the defaults Iris's, which rank 5 or the creator changes, "/access ban 2"; `/banlist` lists those the bot banned since the last amnesty, with why and who, to admins and moderators; `/amnesty` (rank 5) unbans them all; any member calls the admins and moderators with `/admins` (once in three minutes a group), reports the message replied to with `/report` (once in two minutes a member), the quote and the tags in one line, and opens a vote to ban the member replied to with `/voteban`, buttons for and against, five votes for banning them within thirty minutes, one vote a member, never the target's, never on an admin or an owner (`ban_votes`, migration 85), cancelled by its starter or a moderator, and closed as not banned when pressed after its time; a report is kept (`reports`, migration 88) with buttons for a moderator to mark it seen, ban the reported member or reject it, the first press settling it, and `/reports` lists a week's open ones; a warning keeps its reason and lapses after 30 days, `/warns` listing them; `/banlist` has an unban button for each of its latest ten; `/rights` ("huquqlarim") lists what the asker's rank opens, and for a Telegram admin the commands their own admin rights open (read with `getChatMember`, by the rule the moderate tool applies: restricting members opens `/mute` to `/amnesty`, deleting `/del`, pinning `/pin` and `/unpin`, adding admins `/promote` and `/demote`, tags `/tag`, the group's info and invite links their orders in words), the ones every admin has (`/banlist`, `/reports`, `/warns`, `/cleanservice`, `/ignore`, `/unignore`, `/invites_auto`, `/mute bot`) and what their rank adds that their rights do not, one line saying only that they are an admin when Telegram cannot be asked; `/myinvites` counts the asker's own invites; talk with the model is only for the groups an owner turned it on for (`group_settings` key `ai`; `/aigroups` in private lists the bot's groups as ✅/❌ buttons that switch it); the owners' own commands (`/settings`, `/set`, `/stats`, `/model`, `/aigroups`, `/payments`, `/refund`, `/business`, `/import_stickers`) work only in private: in a group they, and the former group switches `/aichat`, `/limit` and `/active`, get no answer, and an owner's menu there leaves them out: elsewhere the commands, games, moderation, reputation, guards and `/weather` all work without any quota, talk to the bot gets "AI suhbat yoqilmagan" once in six hours and is otherwise noted as chatter, and no voice message is transcribed; where AI is on the group's quota is taken only when the model is asked, not for the commands and orders done in code; the cards app has a 💎 shop: crystals sold for Telegram Stars by an invoice link the app opens (`createInvoiceLink`, `openInvoice`), its payload `cr:<user>:<pack>` checked before the payment and the crystals added once per charge (`crystal_purchases`, migration 90) and taken back on a refund, with a 🎁 diamond box since 2026-11-19 (pack `box`, 129 Stars, `cards.DiamondBox`) whose prize is drawn when the payment goes through: 1500 crystals 50%, 2000 26%, 2500 13%, 3000 6%, 4000 3%, 5000 2% (since 2026-11-20; 60/22/10/5/2/1 before), about 1995 on average, the odds shown on its button, and an anime's collection, held whole, gives 10 tokens once for an anime of at least 5 cards (seasons and sequels as one, `cards.Franchise`; limited cards aside; `card_anime_rewards`, migration 103), taken with the Animelar tab's button (`anime_claim`), a 🎒 bag beside the points holding the player's unopened boxes (`card_boxes`, `box_open`, the prize drawn by the box's odds) and their mail (`card_mail`, migration 104; `inbox`, `mail_claim`), whose gifts the owners send in private with `/gift @user box 2 [note]` (or `tokens`, `crystals`; a Telegram ID also works), the player told by the bot, and crystals buy tokens (5 for 60, 12 for 135) and 5-card packs with one sure Epic (120), Legendary (350) or Mythic (2000), the last card raised only when none before it was as rare; a reply of "+", "rahmat", "raxmat", "рахмат", "спс" or the like, with a filler such as "aka" or an emoji, to a member gives them a reputation point, once an hour from the same member, marked with 👍 and unanswered, `/rep` and `/toprep` showing it (`member_reputation`, `reputation_log`); and `/cleanservice` switches deleting join, leave, pin and other service messages (`group_settings`, migration 89; its old `group_notes` table was dropped in migration 119); the model reads the group itself with `group_info` (its bio, link, size, admins, what members may send, the pinned message and the bot's own rights) and a member with `member_info` (the asker, the member replied to or tagged: Telegram status, title or tag, rank, warnings and the last reason, mutes and bans received, messages today and this week, last seen, who brought them, whom they brought, and their card points, place, tokens and crystals); moderation commands take the member replied to or one tagged, "/demote @user", a tagged one answered only for those who may moderate; `/promote` makes the member replied to a Telegram admin, "/promote Streamer" with that title and "Moderator" without one, as in words, `/demote` takes it back, and `/tag` sets a member's tag, or the title of an admin the bot made; and `/help mod`, `/help kartalar` and `/help azo` are the help's parts; and everyday commands are answered in code: `/ping`, `/id` (the member replied to, or the asker's and the chat's) and `/calc` (+ - * / ^ %, parentheses), while `/weather Toshkent` is asked of the model, which looks it up; the model reads the invite table itself with `invite_stats` (the top, the asker's own or the member replied to's, for today, the week, the month or all time); and `/mylink` gives a member their own invite link, made once by the bot with the member's ID in its name (`member_links`, migration 86), so that whoever joins by it counts for that member: a group's public link tells the bot nothing, and an admin's link only who made it; "бер", "qil" and the
 like may go with it. Replying to the bot's own answer about a member, such
 an order reaches that member: "Мут бер" after the bot answered "mute him"
 (the bot remembers whom each of its answers in the last hour was about).
@@ -2953,13 +2898,12 @@ Run `set-webhook` again after this update: the bot now asks Telegram for
 when the webhook was last set. Until then the member list still fills from
 messages, joins and leaves.
 
-The forum topics, invite link limits and channel broadcasts need migration
-0039 (the `channels` table and two columns of `broadcasts`) applied with
+The forum topics, invite link limits and channels need migration
+0039 (the `channels` table and two columns of the former `broadcasts`) applied with
 `make migrate` before deploying; the new version refuses to start on the old
 schema. They ask Telegram for no new kind of update, so the webhook needs no
 `set-webhook`. Give Maria *Manage topics* in forum groups where she should
-act on topics (and *Delete messages* to delete one), and add her to a
-channel as an admin with *Post messages* for broadcasts to reach it.
+act on topics (and *Delete messages* to delete one).
 
 Her own sticker set needs migration 0042 (`own_sticker_sets` and
 `sticker_uploads`) applied with `make migrate` before deploying; it changes

@@ -379,11 +379,6 @@ type Options struct {
 	VoiceTranscripts VoiceTranscripts
 	// Judge is the model asked whom a message the guard caught is aimed at.
 	Judge InsultJudge
-	// Writer writes an owner's announcement, from their recent words, when
-	// the main model's provider refused the turn that asked for it; Recent
-	// gives those words. Without either, the owner is pointed to /announce.
-	Writer AnnouncementWriter
-	Recent RecentMessages
 	// Sworn tells whether the swear guard caught a message already, so that
 	// editing it is no second swear; nil counts every edit that swears.
 	Sworn SwearRecord

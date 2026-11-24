@@ -421,10 +421,7 @@ func (s *Store) Expire(ctx context.Context, maxAge time.Duration) (Expired, erro
 			return err
 		}
 		// Owner notices count per day, so two days' are more than enough.
-		if _, err = tx.Exec(ctx, `DELETE FROM owner_notices WHERE created_at < now() - interval '2 days'`); err != nil {
-			return err
-		}
-		_, err = tx.Exec(ctx, `DELETE FROM broadcasts WHERE created_at < $1`, cutoff)
+		_, err = tx.Exec(ctx, `DELETE FROM owner_notices WHERE created_at < now() - interval '2 days'`)
 		return err
 	})
 	if err != nil {

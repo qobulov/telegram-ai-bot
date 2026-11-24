@@ -20,6 +20,9 @@ const alice, bob = int64(1001), int64(1002)
 // group is a supergroup chat ID; Telegram's are negative.
 const group = int64(-1001234567890)
 
+// owner is an owner of the bot.
+const owner = int64(9001)
+
 // private is the scope of a user's one-to-one chat with the bot, where the
 // chat ID equals the user ID.
 func private(userID int64) Scope {
@@ -122,7 +125,7 @@ func TestMigrateIsIdempotent(t *testing.T) {
 func TestMigrateReportsAppliedCount(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
-	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, group_messages, bot_replies, groups, broadcasts, group_replies, group_rules, moderation_actions, private_messages, group_members, owner_notices, user_profiles, bot_stickers, sticker_sends, skipped_messages, settings, channels, star_payments, premium_users, join_requests, own_sticker_sets, sticker_uploads, picture_verdicts, business_checklists, business_replies, business_chats, business_connections, group_boosts, raid_bosses, raid_members, raid_heroes, game_scores, mafia_games, song_recognitions, card_owned, card_players, card_catalog, card_duels, card_pictures, card_trades, arena_teams, arena_players, arena_battles, group_invites, invite_awards, team_lobbies, member_warns, member_ranks, rank_log, command_ranks, ban_votes, member_links, reports, group_settings, member_reputation, reputation_log, crystal_purchases, card_quests, card_event_pulls, card_anime_rewards, card_boxes, card_mail, arena_weeks, tower_players, boss_fights, boss_weeks, kassa_entries, kassa_books, ai_limit_notices, failure_notices, member_words, voice_transcripts, schema_migrations CASCADE`); err != nil {
+	if _, err := store.pool.Exec(ctx, `DROP TABLE messages, conversations, users, chats, group_messages, bot_replies, groups, group_replies, group_rules, moderation_actions, private_messages, group_members, owner_notices, user_profiles, bot_stickers, sticker_sends, skipped_messages, settings, channels, star_payments, premium_users, join_requests, own_sticker_sets, sticker_uploads, picture_verdicts, business_checklists, business_replies, business_chats, business_connections, group_boosts, raid_bosses, raid_members, raid_heroes, game_scores, mafia_games, song_recognitions, card_owned, card_players, card_catalog, card_duels, card_pictures, card_trades, arena_teams, arena_players, arena_battles, group_invites, invite_awards, team_lobbies, member_warns, member_ranks, rank_log, command_ranks, ban_votes, member_links, reports, group_settings, member_reputation, reputation_log, crystal_purchases, card_quests, card_event_pulls, card_anime_rewards, card_boxes, card_mail, arena_weeks, tower_players, boss_fights, boss_weeks, kassa_entries, kassa_books, ai_limit_notices, failure_notices, member_words, voice_transcripts, schema_migrations CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 

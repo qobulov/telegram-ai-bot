@@ -546,7 +546,7 @@ type ChatPhoto struct {
 }
 
 // Chat types. A channel's posts are not handled by the bot; only its
-// standing there is recorded, for its owners' broadcasts. In a group a
+// standing there is recorded. In a group a
 // message may be posted on behalf of one.
 const (
 	ChatTypePrivate    = "private"

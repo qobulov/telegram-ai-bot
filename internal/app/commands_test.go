@@ -198,7 +198,7 @@ func TestOwnerMenuHoldsEveryCommand(t *testing.T) {
 			t.Errorf("/%s is missing from the owners' group menu", command)
 		}
 	}
-	for _, command := range []string{"aigroups", "announce", "payments", "refund", "model", "stats", "settings", "set", "business", "import_stickers",
+	for _, command := range []string{"aigroups", "payments", "refund", "model", "stats", "settings", "set", "business", "import_stickers",
 		"start", "help", "card", "games", "id", "premium", "paysupport"} {
 		if !private[command] {
 			t.Errorf("/%s is missing from the owners' private menu", command)

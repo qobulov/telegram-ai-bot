@@ -5,7 +5,40 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
+
+	"telegram-ai-bot/internal/storage"
+	"telegram-ai-bot/internal/telegram"
 )
+
+type fakeChannels struct{}
+
+const (
+	channelNews  = int64(-1009001)
+	channelQuiet = int64(-1009002)
+	channelGone  = int64(-1009003)
+)
+
+func (fakeChannels) Channels(context.Context, int) ([]storage.ChannelSummary, error) {
+	post := []string{telegram.RightPostMessages}
+	return []storage.ChannelSummary{
+		{ChatID: channelNews, Title: "News", BotStatus: "administrator", Rights: post},
+		{ChatID: channelQuiet, Title: "Quiet", BotStatus: "administrator", Rights: []string{telegram.RightInviteUsers}},
+		{ChatID: channelGone, Title: "Gone", BotStatus: "kicked", Rights: post},
+	}, nil
+}
+
+type groupsWithStatus struct{ fakeDatabase }
+
+const groupC = int64(-100333)
+
+func (groupsWithStatus) Groups(context.Context, time.Time, int) ([]storage.GroupSummary, error) {
+	return []storage.GroupSummary{
+		{ChatID: groupA, Title: "Devs", BotStatus: "administrator"},
+		{ChatID: groupB, Title: "Old", BotStatus: "kicked"},
+		{ChatID: groupC, Title: "Pub"},
+	}, nil
+}
 
 // fakeLeaver records what it posted and which chats it left.
 type fakeLeaver struct {

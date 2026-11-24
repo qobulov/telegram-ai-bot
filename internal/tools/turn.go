@@ -20,8 +20,7 @@ type Caller struct {
 	Owner bool
 	// Human is false when another bot is asking.
 	Human bool
-	// UpdateID is the Telegram update being answered. A broadcast drafted
-	// in one update can only be confirmed in another.
+	// UpdateID is the Telegram update being answered.
 	UpdateID int64
 	// MessageID is the message being answered.
 	MessageID int64

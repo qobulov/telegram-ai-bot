@@ -169,7 +169,6 @@ var ownerOnlyMenu = []telegram.BotCommand{
 	{Command: "stats", Description: "Statistika paneli (owner)"},
 	{Command: "model", Description: "Qaysi model ishlayapti (owner)"},
 	{Command: "aigroups", Description: "AI suhbat yoqilgan guruhlarni tanlash (owner)"},
-	{Command: "announce", Description: "Guruhlarga e'lon yuborish (owner)"},
 	{Command: "payments", Description: "Stars to'lovlari (owner)"},
 	{Command: "refund", Description: "To'lovni qaytarish: /refund ID yoki @user (owner)"},
 	{Command: "business", Description: "Business hisob javoblari: /business on|off (owner)"},
@@ -270,9 +269,8 @@ var groupAdminRights = telegram.AdministratorRights{
 	CanManageTags:      true,
 }
 
-// channelAdminRights are what the bot asks for in a channel: to post and
-// edit there, for the owners' broadcasts. Being an admin at all also lets
-// it see who joined a channel required in private chats.
+// channelAdminRights are what the bot asks for in a channel. Being an
+// admin there lets it see who joined a channel required in private chats.
 var channelAdminRights = telegram.AdministratorRights{
 	CanManageChat:   true,
 	CanPostMessages: true,

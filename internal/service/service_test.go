@@ -610,8 +610,8 @@ func TestEmptyAnswerIsSilentInAGroup(t *testing.T) {
 	expectOneReply(t, f.run(textFrom(userID, "hi")), textsFailure[failureError][0].uz)
 }
 
-// A turn the provider's filter refused says so in a private chat, and to
-// an owner how to post an announcement with /announce; a group hears nothing.
+// A turn the provider's filter refused says so in a private chat, to an
+// owner as to anyone; a group hears nothing.
 func TestBlockedTurnSaysWhy(t *testing.T) {
 	blocked := fmt.Errorf("agent: %w: %w (finish reason content_filter)", ai.ErrEmptyResponse, ai.ErrBlocked)
 	f := newFixture()
@@ -623,7 +623,7 @@ func TestBlockedTurnSaysWhy(t *testing.T) {
 	f.replier.err = blocked
 	owner := textFrom(9001, "e'lon ber")
 	owner.Message.From.Username = "Pronium"
-	if sent := f.run(owner); len(sent) != 1 || !strings.Contains(sent[0].text, "/announce hammaga") {
+	if sent := f.run(owner); len(sent) != 1 || sent[0].text != textBlocked.uz {
 		t.Errorf("the owner was told %+v", sent)
 	}
 
@@ -2782,7 +2782,7 @@ func (f *fakeGroups) RecordChannel(_ context.Context, c storage.GroupStatus) err
 }
 
 // A channel the bot is made an admin of is recorded apart from the groups,
-// with its right to post, for the owners' broadcasts.
+// with its right to post.
 func TestBeingMadeAChannelAdminIsRecorded(t *testing.T) {
 	f := newFixture()
 	groups := &fakeGroups{}
