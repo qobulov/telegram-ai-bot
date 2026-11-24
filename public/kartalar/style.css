@@ -1548,7 +1548,8 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .pod.p1 .pod-face { width: 56px; height: 56px; font-size: 24px; }
 .pod b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 800 12px Manrope, sans-serif; }
 .pod-score { font: 900 14px Unbounded, sans-serif; color: var(--pc); white-space: nowrap; }
-.pod small { color: var(--muted); font-size: 10.5px; white-space: nowrap; }
+.pod small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: 10.5px; white-space: nowrap; }
+.pod-score { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .table li.pinned { position: sticky; bottom: 76px; z-index: 2; background: rgb(28, 22, 40); box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.45); }
 #bossMe .arena-rating b { font-size: 20px; white-space: nowrap; }
 #bossMe .arena-left { min-width: 0; text-align: right; }

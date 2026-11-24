@@ -3602,6 +3602,7 @@
       rows: data.top || [], me: data.me || {}, empty: t.noBossTop, ends: data.ends,
       score: (row) => (bossByTotal ? `💥 ${big(row.sum || 0)}` : `👹 ${row.level || 0}`),
       detail: (row) => (bossByTotal ? t.bossRow(spaced(row.best || 0)) : `💥 ${big(row.best || 0)}`),
+      podiumDetail: (row) => (bossByTotal ? `🏅 ${big(row.best || 0)}` : `💥 ${big(row.best || 0)}`),
       chips: [[false, t.bossByLevel], [true, t.bossByTotal]].map(([byTotal, label]) => ({
         label, on: byTotal === bossByTotal,
         pick: () => { if (bossByTotal !== byTotal) { bossByTotal = byTotal; ranking(); } },
@@ -3669,7 +3670,8 @@
         cell.querySelector(".pod-face").textContent = [...(row.name || "?").trim()][0] || "?";
         cell.querySelector("b").textContent = row.name || "?";
         cell.querySelector(".pod-score").textContent = o.score(row);
-        cell.querySelector("small").textContent = o.detail(row);
+        // a podium's cell is narrow: its own short line where a table has one
+        cell.querySelector("small").textContent = (o.podiumDetail || o.detail)(row);
       }
       podium.append(cell);
     }
@@ -3700,6 +3702,7 @@
     rankBoard({
       rows: data.top || [], me, empty: at.topEmpty, ends: week && week.ends,
       score: (row) => `🏅 ${spaced(row.rating || 0)}`, detail: (row) => at.topRow(row.wins || 0, row.losses || 0, spaced(row.power || 0)),
+      podiumDetail: (row) => `⚡${big(row.power || 0)}`,
       prizes: week ? () => showPanel(weekPanel(week, at.weekRule, week.event ? at.weekEvent : "")) : null,
     });
   }
