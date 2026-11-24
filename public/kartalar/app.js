@@ -2386,7 +2386,7 @@
       boss: {
         best: "Haftalik rekordingiz", none: "hali yo'q", tries: (n, m) => `⚔️ Bugun qolgan janglar: ${n}/${m}`,
         start: "👹 1-darajadan", endless: "♾️ Darajalar cheksiz", attack: (n) => `⚔️ Hujumi ${n}`, bestLevel: (n, d) => `👹 ${n}-daraja · 💥 ${d}`,
-        week: (d) => `Bu hafta hamma birga urdi: 💥 ${d}`, levelUp: (n) => `👹 Boss ${n}-darajaga chiqdi!`, reached: (n, d) => `👹 ${n}-darajagacha yetdingiz · 💥 ${d}`,
+        week: (d) => `Bu hafta hamma birga urdi: 💥 ${d}`, levelUp: (n) => `👹 Boss ${n}-darajaga chiqdi!`, reached: (n, d) => `👹 ${n}-darajagacha yetdingiz\n💥 ${d} zarba`,
         fight: "👹 Bossga hujum", noTeam: "Avval Arena bo'limida jamoa saqlang", noTries: "Bugungi janglar tugadi: ertaga yana",
         coins: (b, per, most) => `🪙 Har jang: ${b} tanga va har ${per} zarbaga yana 1, ${most} tagacha`,
         rule: (hpg, ag, m) => `Har jang boss 1-darajadan boshlanadi. Har darajada uning joni bor: uni tugatsangiz, boss keyingi darajaga chiqadi, joni ${hpg} barobar, hujumi +${ag}% oshadi. Jamoangiz yiqilguncha qaysi darajagacha yetsangiz, natijangiz shu. Boss har yurishda tasodifiy bitta kartangizni uradi. Kuniga ${m} ta jang, har dushanba yangi boss`,
@@ -2442,7 +2442,7 @@
       boss: {
         best: "Ваш рекорд недели", none: "пока нет", tries: (n, m) => `⚔️ Осталось боёв сегодня: ${n}/${m}`,
         start: "👹 С 1 уровня", endless: "♾️ Уровни бесконечны", attack: (n) => `⚔️ Атака ${n}`, bestLevel: (n, d) => `👹 Уровень ${n} · 💥 ${d}`,
-        week: (d) => `За неделю все вместе нанесли: 💥 ${d}`, levelUp: (n) => `👹 Босс поднялся на уровень ${n}!`, reached: (n, d) => `👹 Вы дошли до уровня ${n} · 💥 ${d}`,
+        week: (d) => `За неделю все вместе нанесли: 💥 ${d}`, levelUp: (n) => `👹 Босс поднялся на уровень ${n}!`, reached: (n, d) => `👹 Вы дошли до уровня ${n}\n💥 ${d} урона`,
         fight: "👹 Атаковать босса", noTeam: "Сначала сохраните команду в разделе Арена", noTries: "Бои на сегодня закончились: завтра снова",
         coins: (b, per, most) => `🪙 Каждый бой: ${b} монет и ещё 1 за каждые ${per} урона, до ${most}`,
         rule: (hpg, ag, m) => `Каждый бой босс начинает с 1 уровня. У каждого уровня своё здоровье: снесите его, и босс поднимется на уровень, здоровье ×${hpg}, атака +${ag}%. Ваш результат — уровень, до которого вы дойдёте, пока стоит команда. Каждый ход босс бьёт одну случайную карту. ${m} боя в день, каждый понедельник новый босс`,
@@ -2498,7 +2498,7 @@
       boss: {
         best: "Your best this week", none: "none yet", tries: (n, m) => `⚔️ Fights left today: ${n}/${m}`,
         start: "👹 From level 1", endless: "♾️ Endless levels", attack: (n) => `⚔️ Attack ${n}`, bestLevel: (n, d) => `👹 Level ${n} · 💥 ${d}`,
-        week: (d) => `Everyone this week dealt: 💥 ${d}`, levelUp: (n) => `👹 The boss reached level ${n}!`, reached: (n, d) => `👹 You reached level ${n} · 💥 ${d}`,
+        week: (d) => `Everyone this week dealt: 💥 ${d}`, levelUp: (n) => `👹 The boss reached level ${n}!`, reached: (n, d) => `👹 You reached level ${n}\n💥 ${d} damage`,
         fight: "👹 Attack the boss", noTeam: "Save a team in the Arena first", noTries: "No fights left today: come back tomorrow",
         coins: (b, per, most) => `🪙 Each fight: ${b} coins and 1 more per ${per} damage, up to ${most}`,
         rule: (hpg, ag, m) => `Each fight starts the boss at level 1. Each level has its own health: spend it and the boss goes up a level, health ×${hpg}, attack +${ag}%. Your score is the level you reach before your team falls. Each turn the boss hits one random card. ${m} fights a day, a new boss every Monday`,
