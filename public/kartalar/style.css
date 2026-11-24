@@ -293,7 +293,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .nav {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: grid; grid-template-columns: repeat(6, 1fr);
   height: calc(var(--nav) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
-  background: rgba(11, 10, 20, 0.97); border-top: 1px solid var(--line);
+  background: rgb(11, 10, 20); border-top: 1px solid var(--line);
 }
 .nav button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 0; background: none; color: var(--muted); cursor: pointer; }
 .nav button span { font-size: 20px; filter: grayscale(1) opacity(0.6); transition: filter 0.2s; }
@@ -1550,7 +1550,9 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .pod-score { font: 900 14px Unbounded, sans-serif; color: var(--pc); white-space: nowrap; }
 .pod small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: 10.5px; white-space: nowrap; }
 .pod-score { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-.table li.pinned { position: sticky; bottom: 76px; z-index: 2; background: rgb(28, 22, 40); box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.45); }
+.table li.pinned { position: sticky; bottom: calc(var(--nav) + env(safe-area-inset-bottom) + 8px); z-index: 2; background: rgb(28, 22, 40); box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.45); }
+/* room under the last rows, so that they scroll clear of the pinned row */
+.table.has-pinned { padding-bottom: 88px; }
 #bossMe .arena-rating b { font-size: 20px; white-space: nowrap; }
 #bossMe .arena-left { min-width: 0; text-align: right; }
 

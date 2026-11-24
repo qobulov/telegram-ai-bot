@@ -1427,6 +1427,7 @@
       rankBoard({
         rows: data.top || [], me, empty: t.noTop,
         score: (row) => `🎴 ${spaced(row.points || 0)}`, detail: (row) => t.cards(row.cards || 0),
+        podiumScore: (row) => `🎴 ${big(row.points || 0)}`,
       });
     } catch (error) {
       if (asked === topAsked) notice(error);
@@ -3619,6 +3620,7 @@
   function rankBoard(o) {
     const table = $("table");
     table.textContent = "";
+    table.classList.toggle("has-pinned", !!(o.me && o.me.place > 3));
     if (o.ends || o.prizes || o.chips) {
       const head = document.createElement("li");
       head.className = "boss-head";
@@ -3669,7 +3671,7 @@
         cell.querySelector(".pod-rank").textContent = i + 1;
         cell.querySelector(".pod-face").textContent = [...(row.name || "?").trim()][0] || "?";
         cell.querySelector("b").textContent = row.name || "?";
-        cell.querySelector(".pod-score").textContent = o.score(row);
+        cell.querySelector(".pod-score").textContent = (o.podiumScore || o.score)(row);
         // a podium's cell is narrow: its own short line where a table has one
         cell.querySelector("small").textContent = (o.podiumDetail || o.detail)(row);
       }
