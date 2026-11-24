@@ -43,7 +43,8 @@ button { font: inherit; color: inherit; }
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: calc(14px + env(safe-area-inset-top)) 16px 12px;
 }
-.brand { display: flex; align-items: center; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1 1 auto; }
+.brand > div { min-width: 0; }
 .seal {
   display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px;
   font: 900 22px/1 serif; color: var(--ink);
@@ -53,10 +54,10 @@ button { font: inherit; color: inherit; }
 h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em; }
 .sub { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
 .sub b { color: var(--gold); }
-.progress { width: 130px; height: 4px; margin-top: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.progress { width: 100%; max-width: 130px; height: 4px; margin-top: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
 .progress i, .shelf-bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--gold-deep), var(--gold)); transition: width 0.6s ease; }
 /* the wallet, as games keep it: icons and numbers, top right */
-.wallet { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.wallet { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: 0 0 auto; }
 .coins { display: flex; gap: 6px; }
 .coin {
   display: flex; align-items: center; gap: 5px; min-height: 32px; padding: 0 11px 0 8px; border-radius: 999px; cursor: pointer;
@@ -302,7 +303,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .nav button.on span { filter: none; }
 
 /* sheet */
-.sheet { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 24px; background: rgba(5, 4, 10, 0.88); }
+.sheet { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 24px; background: rgba(5, 4, 10, 0.96); }
 .sheet[hidden] { display: none; }
 .sheet-card { width: min(84vw, 330px); animation: rise 0.35s cubic-bezier(.2, .8, .2, 1); }
 .sheet-card .face { position: relative; aspect-ratio: 2 / 3; transform: none; }
@@ -948,7 +949,8 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .mini img { flex: none; width: 40px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 6px; box-shadow: 0 0 0 1.5px var(--c); }
 .mini span { display: grid; min-width: 0; }
 .mini small { display: flex; align-items: center; gap: 3px; color: var(--c); font-size: 10px; font-weight: 700; }
-.mini b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* a card's name on two lines at most: one cut "Muzan Kibut…" said too little */
+.mini b { font-size: 13px; line-height: 1.2; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
 .gift .step { display: block; margin-top: 4px; font: 700 14px Manrope, sans-serif; }
 .gift .step + input { margin-top: 8px; }
 .gift .gift-list + .step { margin-top: 14px; }
@@ -1561,3 +1563,28 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .board-prizes { padding: 7px 14px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--gold) 60%, transparent); background: linear-gradient(180deg, rgba(255, 210, 90, 0.16), rgba(255, 210, 90, 0.05)); color: var(--gold); font: 800 12px Manrope, sans-serif; }
 .board-prizes.wide { width: 100%; padding: 11px 14px; font-size: 13px; }
 .week-panel { margin: 0; }
+
+/* a narrow phone: the header's title and wallet tighten so that the page
+   keeps the screen's width (at 375 they made it 390, cutting the right) */
+@media (max-width: 400px) {
+  .top { gap: 8px; padding-left: 12px; padding-right: 12px; }
+  .brand { gap: 8px; }
+  .seal { width: 38px; height: 38px; font-size: 19px; border-radius: 10px; }
+  h1 { font-size: 19px; }
+  .sub { font-size: 12px; white-space: nowrap; }
+  .coins { gap: 4px; }
+  .coin { min-height: 30px; padding: 0 8px 0 6px; gap: 3px; font-size: 13px; }
+  .coin span { font-size: 13px; }
+  .coin .plus { width: 16px; height: 16px; font-size: 12px; }
+  .points { font-size: 12px; }
+}
+
+/* the table's and the arena's chips share the width, so that the last is
+   never cut at the screen's edge */
+#topKind, #arenaMode { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+#topKind button, #arenaMode button { padding: 0 6px; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 400px) { #topKind button { font-size: 12px; } }
+
+/* the boss page's prizes are a button alone, no block around it */
+#bossPrizes { padding: 0; border: 0; background: none; box-shadow: none; }
+@media (max-width: 370px) { #topKind { gap: 5px; } #topKind button { font-size: 11px; padding: 0 3px; } }

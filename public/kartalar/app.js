@@ -3219,7 +3219,7 @@
     const gift = document.createElement("button");
     gift.type = "button";
     gift.className = "board-prizes wide";
-    gift.textContent = week.place ? `${t.prizesButton} · ${at.weekPlace(week.place, week.prize, week.boxes)}` : t.prizesButton;
+    gift.textContent = week.place ? `${t.prizesButton} · ${at.weekRow(week.place, week.place)}` : t.prizesButton;
     gift.addEventListener("click", () => { haptic("light"); showPanel(weekPanel({ ...week, ends: bossData && bossData.ends }, at.boss.prizeRule, "")); });
     box.append(gift);
   }
@@ -3601,7 +3601,8 @@
   function bossTable(data) {
     rankBoard({
       rows: data.top || [], me: data.me || {}, empty: t.noBossTop, ends: data.ends,
-      score: (row) => (bossByTotal ? `💥 ${big(row.sum || 0)}` : `👹 ${row.level || 0}`),
+      // a fight before the levels came (2026-11-24) has none: "—", not 0
+      score: (row) => (bossByTotal ? `💥 ${big(row.sum || 0)}` : `👹 ${row.level || "—"}`),
       detail: (row) => (bossByTotal ? t.bossRow(spaced(row.best || 0)) : `💥 ${big(row.best || 0)}`),
       podiumDetail: (row) => (bossByTotal ? `🏅 ${big(row.best || 0)}` : `💥 ${big(row.best || 0)}`),
       chips: [[false, t.bossByLevel], [true, t.bossByTotal]].map(([byTotal, label]) => ({
