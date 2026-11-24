@@ -84,7 +84,7 @@ func (s *Store) BossPlayerOf(ctx context.Context, userID int64, rules BossRules)
 // RecordBossFight records the player's fight dealing damage and gives its
 // coins, in one transaction that locks the player's arena row; it takes one
 // of their tickets, ErrBossNoTries with none, unless the rules are
-// Unlimited.
+// Unlimited, whose fight counts on no table and for no prize.
 func (s *Store) RecordBossFight(ctx context.Context, userID int64, damage int64, level int, rules BossRules) (BossOutcome, error) {
 	var out BossOutcome
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
@@ -98,8 +98,8 @@ func (s *Store) RecordBossFight(ctx context.Context, userID int64, damage int64,
 				return err
 			}
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO boss_fights (user_id, week, damage, level, fought_at) VALUES ($1, $2::date, $3, $4, $5)`,
-			userID, rules.week(), damage, level, rules.Now); err != nil {
+		if _, err := tx.Exec(ctx, `INSERT INTO boss_fights (user_id, week, damage, level, fought_at, ranked) VALUES ($1, $2::date, $3, $4, $5, $6)`,
+			userID, rules.week(), damage, level, rules.Now, !rules.Unlimited); err != nil {
 			return err
 		}
 		return tx.QueryRow(ctx, `UPDATE arena_players SET coins = coins + $2 WHERE user_id = $1 RETURNING coins`,
@@ -152,6 +152,7 @@ type BossRow struct {
 
 // bossRanked ranks the week's players by their best level, then their best
 // damage, or, with byTotal, by all their damage of the week; then by id.
+// Unlimited fights are left out.
 func bossRanked(byTotal bool) string {
 	order := "b.level DESC, b.best DESC"
 	if byTotal {
@@ -161,7 +162,7 @@ func bossRanked(byTotal bool) string {
 	SELECT b.user_id, coalesce(c.name, '') AS name, b.best, b.level, b.total,
 		row_number() OVER (ORDER BY ` + order + `, b.user_id) AS place
 	FROM (SELECT user_id, max(damage) AS best, max(level) AS level, sum(damage)::bigint AS total
-		FROM boss_fights WHERE week = $1::date GROUP BY user_id) b
+		FROM boss_fights WHERE week = $1::date AND ranked GROUP BY user_id) b
 	LEFT JOIN card_players c ON c.user_id = b.user_id`
 }
 
@@ -216,7 +217,7 @@ func (s *Store) PayBossWeek(ctx context.Context, week time.Time, prizes []ArenaP
 		}
 		paid = true
 		rows, err := tx.Query(ctx, `
-			SELECT user_id FROM boss_fights WHERE week = $1::date
+			SELECT user_id FROM boss_fights WHERE week = $1::date AND ranked
 			GROUP BY user_id ORDER BY max(level) DESC, max(damage) DESC, user_id LIMIT $2`, day, places)
 		if err != nil {
 			return err

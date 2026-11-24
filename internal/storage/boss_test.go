@@ -47,6 +47,9 @@ func TestRecordBossFight(t *testing.T) {
 	if _, err := store.RecordBossFight(ctx, 2, 1000, 4, free); err != nil {
 		t.Errorf("an unlimited fight = %v", err)
 	}
+	if top, _ := store.BossTop(ctx, bossRules.Week, 10, true); len(top) != 1 || top[0].UserID != 1 {
+		t.Errorf("the table = %+v, want the unlimited fight left out", top)
+	}
 	if total, err := store.BossWeek(ctx, bossRules.Week); err != nil || total != 1900 {
 		t.Errorf("the week = %d, %v; want 1900", total, err)
 	}
@@ -111,6 +114,11 @@ func TestPayBossWeek(t *testing.T) {
 	later := rules
 	later.Week = rules.Week.AddDate(0, 0, 7)
 	if _, err := store.RecordBossFight(ctx, 1, 5000, 9, later); err != nil {
+		t.Fatal(err)
+	}
+	owner := rules
+	owner.Unlimited = true
+	if _, err := store.RecordBossFight(ctx, 3, 9000, 20, owner); err != nil {
 		t.Fatal(err)
 	}
 	prizes := []ArenaPrize{{From: 1, To: 1, Tokens: 10, Boxes: 1, Box: "box"}, {From: 2, To: 2, Tokens: 4}}
