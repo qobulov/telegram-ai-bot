@@ -49,7 +49,7 @@ func TestRoutingEval(t *testing.T) {
 	var main agent.Model = fullPathSkipped{}
 	if os.Getenv("ROUTING_EVAL_FULL") == "1" {
 		main = ai.NewClient(ai.Options{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.Model, MaxTokens: cfg.MaxOutputTokens,
-			ReasoningEffort: cfg.ReasoningEffort, MaxAttempts: 2, Logger: logger})
+			ReasoningEffort: cfg.ReasoningEffort, MaxAttempts: 2, Logger: logger, PromptCache: true})
 	}
 	bot := Bot{Client: telegram.NewClient(telegram.Options{Token: "1:eval"}), User: telegram.User{ID: 1, Username: "evalbot"}}
 	available := append(builtinTools(cfg, nil, bot, tools.NewModeration(tools.ModerationOptions{}).Tool()), liveDataTools(cfg, nil, bot)...)

@@ -314,6 +314,9 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		ReasoningEffort:  cfg.ReasoningEffort,
 		TranscribeEffort: transcribeReasoning(cfg),
 		Logger:           logger,
+		// The persona and the tools, the same each turn, are cached on
+		// Gemini and paid at a tenth.
+		PromptCache: true,
 	})
 	router, chat := chatRouting(cfg, logger)
 	assistant := agent.New(agent.Options{

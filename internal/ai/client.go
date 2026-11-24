@@ -49,6 +49,9 @@ type Options struct {
 	TranscribeEffort string
 	HTTPClient       *http.Client
 	Logger           *slog.Logger
+	// PromptCache caches the system prompt and tools of requests with tools
+	// on Gemini, for Model only (see cache.go); other providers ignore it.
+	PromptCache bool
 }
 
 // Client talks to the model provider. It is safe for concurrent use.
@@ -66,6 +69,8 @@ type Client struct {
 	// "minimal" once the model answered that it does not support it: such
 	// a model failed every chat turn and transcription until then.
 	raisedEffort sync.Map
+	// cache holds Gemini's caches of the prompt, nil when off.
+	cache *promptCache
 }
 
 // NewClient returns a Client, filling in defaults for optional settings.
@@ -85,7 +90,11 @@ func NewClient(opts Options) *Client {
 		opts.Logger = slog.Default()
 	}
 	opts.BaseURL = strings.TrimRight(opts.BaseURL, "/")
-	return &Client{opts: opts, now: time.Now}
+	c := &Client{opts: opts, now: time.Now}
+	if opts.PromptCache {
+		c.cache = newPromptCache(opts.BaseURL, opts.APIKey, opts.HTTPClient, func() time.Time { return c.now() })
+	}
+	return c
 }
 
 // Complete sends the conversation and returns the assistant's next message.
@@ -116,11 +125,25 @@ func (c *Client) completeWithRetry(ctx context.Context, req Request, withTools b
 	next := 0
 	for attempt := 1; ; attempt++ {
 		model := models[next]
-		body, err := json.Marshal(c.payload(req, model, withTools))
+		payload := c.payload(req, model, withTools)
+		body, err := json.Marshal(payload)
 		if err != nil {
 			return Message{}, fmt.Errorf("encode request: %w", err)
 		}
-		msg, used, err := c.attempt(ctx, body)
+		cacheKey, cached := c.cachedBody(ctx, payload, req)
+		var msg Message
+		var used usage
+		if cached != nil {
+			msg, used, err = c.attempt(ctx, cached)
+			if isCacheRefused(err) {
+				// The cache is gone or refused: the same request whole.
+				c.opts.Logger.Warn("model refused the prompt cache; sending it whole", "model", model, "error", err)
+				c.cache.drop(cacheKey)
+				msg, used, err = c.attempt(ctx, body)
+			}
+		} else {
+			msg, used, err = c.attempt(ctx, body)
+		}
 		if err == nil {
 			c.logUsage(model, used)
 		}
@@ -149,6 +172,25 @@ func (c *Client) completeWithRetry(ctx context.Context, req Request, withTools b
 			return Message{}, err
 		}
 	}
+}
+
+// cachedBody is payload with the prompt cached, when caching is on, the
+// model is the configured one, the request has tools it may call and a
+// system prompt first; nil to send payload whole. key names the cache.
+func (c *Client) cachedBody(ctx context.Context, payload chatRequest, req Request) (key string, body []byte) {
+	if c.cache == nil || payload.Model != c.opts.Model || len(payload.Tools) == 0 || payload.ToolChoice != "" ||
+		len(payload.Messages) < 2 || payload.Messages[0].Role != RoleSystem {
+		return "", nil
+	}
+	key, name := c.cache.name(ctx, payload.Model, payload.Messages[0].Content, payload.Tools)
+	if name == "" {
+		return "", nil
+	}
+	encoded, err := json.Marshal(withCache(payload, name))
+	if err != nil {
+		return "", nil
+	}
+	return key, encoded
 }
 
 // noteUnusable skips a model for a while when its quota ran out, the
