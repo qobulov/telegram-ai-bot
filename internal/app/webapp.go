@@ -79,7 +79,8 @@ func NewCards(ctx context.Context, cfg config.Config, logger *slog.Logger) (*End
 		_, err := client.SendMessage(ctx, telegram.Outgoing{ChatID: userID, Text: text})
 		return err
 	}
-	handler := cards.NewHandler(cards.Options{BotToken: cfg.TelegramToken, Store: store, Logger: logger, Notify: notify, Invoices: client})
+	handler := cards.NewHandler(cards.Options{BotToken: cfg.TelegramToken, Store: store, Logger: logger, Notify: notify, Invoices: client,
+		Unlimited: func(userID int64) bool { return cfg.OwnerIDs[userID] }})
 	return &Endpoint{Handler: handler, Close: store.Close}, nil
 }
 

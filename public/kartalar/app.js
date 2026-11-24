@@ -3176,7 +3176,9 @@
     me.innerHTML = '<div class="arena-rating"><small></small><b></b></div><div class="arena-left"><span></span></div>';
     me.querySelector(".arena-rating small").textContent = bt.best;
     me.querySelector(".arena-rating b").textContent = data.best ? `💥 ${big(data.best)}` : bt.none;
-    me.querySelector(".arena-left span").textContent = bt.tries(Math.max(0, data.tries_max - data.tries), data.tries_max);
+    // an owner plays without the daily limit
+    const out = !data.unlimited && data.tries >= data.tries_max;
+    me.querySelector(".arena-left span").textContent = data.unlimited ? bt.tries("∞", "∞") : bt.tries(Math.max(0, data.tries_max - data.tries), data.tries_max);
     const boss = data.boss;
     $("bossName").textContent = boss ? boss.name : "";
     $("bossLevel").textContent = bt.level(data.level);
@@ -3196,12 +3198,12 @@
     $("bossBar").style.transform = `scaleX(${Math.min(1, Math.max(0, (data.week_damage - (data.level - 1) * per) / per))})`;
     $("bossNext").textContent = bt.next(big(Math.max(0, data.next_level - data.week_damage)), data.level + 1);
     const team = data.team || [];
-    const hint = !team.length ? bt.noTeam : data.tries >= data.tries_max ? bt.noTries : "";
+    const hint = !team.length ? bt.noTeam : out ? bt.noTries : "";
     $("bossHint").textContent = hint;
     $("bossHint").hidden = !hint;
     const fight = $("bossFight");
     fight.textContent = bt.fight;
-    fight.disabled = bossBusy || !team.length || !boss || data.tries >= data.tries_max;
+    fight.disabled = bossBusy || !team.length || !boss || out;
     $("bossCoins").textContent = bt.coins(data.coins.base, big(data.coins.per), data.coins.most);
     $("bossRule").textContent = bt.rule(data.rage, data.growth, data.tries_max);
     const left = Math.max(0, data.ends - Date.now()), hours = Math.floor(left / 3600000);

@@ -108,6 +108,14 @@ type Options struct {
 	EventPick func() bool
 	// BoxRoll draws a box's prize, 0 to n-1; nil is math/rand.
 	BoxRoll func(n int) int
+	// Unlimited reports a player the game's daily limits do not bind, the
+	// bot's owners, as they asked on 2026-11-24; nil binds everyone.
+	Unlimited func(userID int64) bool
+}
+
+// unlimited reports whether userID plays without the daily limits.
+func (h *handler) unlimited(userID int64) bool {
+	return h.Unlimited != nil && h.Unlimited(userID)
 }
 
 const (

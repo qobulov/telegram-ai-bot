@@ -153,6 +153,9 @@ func (h *handler) bossOf(ctx context.Context, userID int64) (boss, error) {
 	}
 	now := h.Now()
 	b := boss{rules: storage.BossRules{Week: arenaWeekStart(now), Day: DayStart(now), Now: now, Tries: BossTries}}
+	if h.unlimited(userID) {
+		b.rules.Tries = math.MaxInt32
+	}
 	if b.total, err = h.Store.BossWeek(ctx, b.rules.Week); err != nil {
 		return boss{}, err
 	}
@@ -180,7 +183,7 @@ func (h *handler) bossView(ctx context.Context, user miniapp.User) (any, failure
 	view := map[string]any{
 		"boss": nil, "level": b.level, "week_damage": b.total,
 		"next_level": int64(b.level) * BossLevelDamage, "growth": int(BossLevelGrowth * 100), "rage": int(BossRage * 100),
-		"tries": b.player.Tries, "tries_max": BossTries, "best": b.player.Best,
+		"tries": b.player.Tries, "tries_max": BossTries, "best": b.player.Best, "unlimited": h.unlimited(user.ID),
 		"coins": map[string]any{"base": BossCoinsBase, "per": BossCoinsPer, "most": BossCoinsMost},
 		"ends":  b.rules.Week.AddDate(0, 0, 7).UnixMilli(), "team": nil, "power": 0,
 	}
@@ -214,7 +217,7 @@ func (h *handler) bossFight(ctx context.Context, user miniapp.User) (any, failur
 		return map[string]any{"refused": "no_team"}, failure{}
 	case !b.hasBoss:
 		return map[string]any{"refused": "no_boss"}, failure{}
-	case b.player.Tries >= BossTries:
+	case b.player.Tries >= b.rules.Tries:
 		return map[string]any{"refused": "no_tries"}, failure{}
 	}
 	result := arena.BossBattle(b.mine.team, b.fighter, BossRage, bossSeed(user.ID, b.rules.Day, b.player.Tries))
@@ -230,7 +233,7 @@ func (h *handler) bossFight(ctx context.Context, user miniapp.User) (any, failur
 	return map[string]any{
 		"boss": true, "won": false, "damage": result.Damage, "best": max(b.player.Best, int64(result.Damage)),
 		"events": eventViews(result.Events), "attacker": b.mine.views, "defender": []fighterView{b.view},
-		"tries": out.Tries, "tries_max": BossTries, "coins_won": b.rules.Coins, "coins": out.Coins,
+		"tries": out.Tries, "tries_max": BossTries, "unlimited": h.unlimited(user.ID), "coins_won": b.rules.Coins, "coins": out.Coins,
 	}, failure{}
 }
 

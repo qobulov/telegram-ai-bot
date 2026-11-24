@@ -2,7 +2,11 @@ package cards
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -193,5 +197,38 @@ func TestBossWeekPrizes(t *testing.T) {
 	week := view["week"].(map[string]any)
 	if week["place"] != 1.0 || week["prize"] != float64(BossWeekPrizes[0].Tokens) || week["boxes"] != float64(BossWeekPrizes[0].Boxes) || len(week["prizes"].([]any)) != len(BossWeekPrizes) {
 		t.Errorf("the week = %v", week)
+	}
+}
+
+// An owner fights the boss past the day's limit; anyone else is held to it.
+func TestBossOwnerIsUnlimited(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	store := &fakeStore{catalog: towerCatalog(), arena: fakeArena{held: map[int64][]storage.OwnedCard{7: arenaCards(), 8: arenaCards()}}}
+	h := NewHandler(Options{BotToken: testToken, Store: store, Now: func() time.Time { return now }, Unlimited: func(id int64) bool { return id == 7 }})
+	call := func(user int64, fields map[string]any) map[string]any {
+		fields["init_data"] = signedInit(user, now)
+		body, _ := json.Marshal(fields)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/cards", strings.NewReader(string(body))))
+		var out map[string]any
+		_ = json.Unmarshal(rec.Body.Bytes(), &out)
+		return out
+	}
+	for _, user := range []int64{7, 8} {
+		call(user, map[string]any{"action": "arena_team", "front": arenaFront, "back": arenaBack})
+	}
+	for i := range BossTries + 3 {
+		if out := call(7, map[string]any{"action": "boss_fight"}); out["boss"] != true || out["unlimited"] != true {
+			t.Fatalf("the owner's fight %d = %v", i, out)
+		}
+	}
+	for range BossTries {
+		call(8, map[string]any{"action": "boss_fight"})
+	}
+	if out := call(8, map[string]any{"action": "boss_fight"}); out["refused"] != "no_tries" {
+		t.Errorf("a player past the limit = %v", out)
+	}
+	if view := call(7, map[string]any{"action": "boss"}); view["unlimited"] != true {
+		t.Errorf("the owner's boss page = %v", view)
 	}
 }
