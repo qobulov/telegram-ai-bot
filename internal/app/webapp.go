@@ -48,7 +48,7 @@ func NewKassa(ctx context.Context, cfg config.Config, logger *slog.Logger) (*End
 		store.Close()
 		return nil, err
 	}
-	handler := kassa.NewHandler(kassa.Options{BotToken: cfg.TelegramToken, Store: store, Logger: logger})
+	handler := kassa.NewHandler(kassa.Options{BotToken: cfg.TelegramToken, Store: store, Sessions: newGame(cfg), Logger: logger})
 	return &Endpoint{Handler: handler, Close: store.Close}, nil
 }
 

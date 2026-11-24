@@ -48,6 +48,9 @@ h2 { margin: 24px 4px 8px; font-size: 13px; font-weight: 600; color: var(--hint)
 .tile-hint { color: var(--hint); font-size: 13px; }
 .chev { color: var(--hint); width: 18px; height: 18px; }
 
+.back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; margin: -4px 0 6px -6px; padding: 0 10px 0 4px; border: 0; background: none; color: var(--accent); font-size: 16px; cursor: pointer; }
+.ic.flip { transform: scaleX(-1); }
+
 /* A book: its sum on top, then the entries by day. */
 .summary { background: var(--card); border-radius: var(--r-lg); padding: 18px 20px; display: flex; flex-direction: column; }
 .summary-label { color: var(--hint); font-size: 14px; }

@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="light dark">
   <title>Kassa</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -57,6 +57,7 @@
     </section>
 
     <section id="book" class="view" hidden>
+      <button type="button" class="back" id="backBtn" hidden><svg class="ic flip"><use href="#i-chev"/></svg><span data-t="backText">Orqaga</span></button>
       <div class="summary">
         <span class="summary-label" id="bookLabel">Qoldiq</span>
         <strong class="summary-sum" id="bookSum">0</strong>
@@ -95,6 +96,6 @@
   </form>
 
   <div class="toast" id="toast" role="status" hidden></div>
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>

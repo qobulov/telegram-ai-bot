@@ -55,6 +55,14 @@ func TestPlayURLOpensEachGamesPage(t *testing.T) {
 			t.Errorf("%s's session: %+v %q %v", name, got, game, err)
 		}
 	}
+	link := playURL(t, g, KassaShortName, player)
+	if !strings.HasPrefix(link, "https://example.com/kassa/?s=") {
+		t.Errorf("Kassa's page is %s, want the sibling of the games' address", link)
+	}
+	kassaURL, _ := url.Parse(link)
+	if got, game, err := g.Session(kassaURL.Query().Get("s")); err != nil || got != player || game != KassaShortName {
+		t.Errorf("Kassa's session: %+v %q %v", got, game, err)
+	}
 	for _, gone := range []string{"tarozi", "ilon", ""} {
 		if link, ok := g.PlayURL(gone, player); ok {
 			t.Errorf("%q has a page: %s", gone, link)

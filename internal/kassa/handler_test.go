@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"telegram-ai-bot/internal/game"
 	"telegram-ai-bot/internal/storage"
 )
 
@@ -142,5 +143,33 @@ func TestKassaHandler(t *testing.T) {
 	}
 	if _, got := post(t, h, map[string]any{"init_data": them, "action": "state"}); len(got["out"].([]any)) != 0 {
 		t.Fatalf("another user sees %v", got["out"])
+	}
+}
+
+// A press of Play on the "kassa" game opens the page without init data:
+// its session says whose book it is, and another game's session does not.
+func TestKassaGameSession(t *testing.T) {
+	now := time.Date(2026, 11, 24, 4, 0, 0, 0, time.UTC)
+	games := game.New(testToken, "https://example.com/game/", func() time.Time { return now })
+	store := &fakeStore{entries: map[int64][]storage.KassaEntry{7: {{ID: 1, Kind: storage.KassaIn, Amount: 900}}}}
+	h := NewHandler(Options{BotToken: testToken, Store: store, Sessions: games, Now: func() time.Time { return now }})
+	session := func(name string) string {
+		link, ok := games.PlayURL(name, game.Player{UserID: 7, ChatID: 7, MessageID: 1})
+		if !ok {
+			t.Fatalf("no page for %s", name)
+		}
+		u, _ := url.Parse(link)
+		return u.Query().Get("s")
+	}
+
+	code, got := post(t, h, map[string]any{"session": session(game.KassaShortName), "action": "state"})
+	if code != http.StatusOK || got["totals"].(map[string]any)["balance"] != float64(900) {
+		t.Fatalf("kassa session = %d %v", code, got)
+	}
+	if _, got := post(t, h, map[string]any{"session": session(game.MafiaShortName), "action": "state"}); got["error"] != "forged" {
+		t.Errorf("mafia's session: %v, want forged", got["error"])
+	}
+	if _, got := post(t, h, map[string]any{"session": "made.up", "action": "state"}); got["error"] != "stale" {
+		t.Errorf("a made-up session: %v, want stale", got["error"])
 	}
 }

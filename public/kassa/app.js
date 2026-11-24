@@ -1,10 +1,24 @@
 "use strict";
 (() => {
   const tg = window.Telegram && window.Telegram.WebApp;
+  // A Mini App has init data; a press of Play on the "kassa" game opens the
+  // page in Telegram's browser with the bot's session in ?s= instead, and
+  // without Telegram's back button or popups.
+  const session = new URLSearchParams(location.search).get("s") || "";
+  const inApp = !!(tg && tg.initData);
+  const auth = inApp ? { init_data: tg.initData } : { session };
+  const back = {
+    show() { if (inApp) back.show(); else $("backBtn").hidden = false; },
+    hide() { if (inApp) back.hide(); else $("backBtn").hidden = true; },
+  };
+  const confirmBox = (text, done) => {
+    if (inApp && tg.showConfirm) tg.showConfirm(text, done);
+    else done(window.confirm(text));
+  };
   const lang = ((tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code) || "uz").slice(0, 2) === "ru" ? "ru" : "uz";
   const T = {
     uz: {
-      balance: "Qoldiq", in: "Kirim", out: "Chiqim", inHint: "Pul tushdi", outHint: "Pul ishlatildi", recent: "So'nggi yozuvlar",
+      balance: "Qoldiq", in: "Kirim", out: "Chiqim", inHint: "Pul tushdi", backText: "Orqaga", outHint: "Pul ishlatildi", recent: "So'nggi yozuvlar",
       date: "Sana", note: "Ma'lumot", save: "Saqlash", saving: "Saqlanmoqda…", today: "Bugun", yesterday: "Kecha", otherDay: "Boshqa sana",
       addIn: "Kirim qo'shish", addOut: "Chiqim qo'shish", amountIn: "Qancha pul tushdi", amountOut: "Qancha ishlatildi",
       totalIn: "Jami kirim", totalOut: "Jami chiqim", count: (n) => `${n} ta yozuv`, noNote: "Izohsiz",
@@ -18,7 +32,7 @@
       err: { amount: "Summani kiriting", day: "Sanani to'g'ri tanlang", note: "Ma'lumot juda uzun", stale: "Sahifa eskirdi, qayta oching", forged: "Kassani bot orqali oching", not_found: "Yozuv topilmadi", net: "Internet yoki server xatosi, qayta urinib ko'ring" },
     },
     ru: {
-      balance: "Остаток", in: "Приход", out: "Расход", inHint: "Деньги пришли", outHint: "Деньги потрачены", recent: "Последние записи",
+      balance: "Остаток", in: "Приход", out: "Расход", inHint: "Деньги пришли", backText: "Назад", outHint: "Деньги потрачены", recent: "Последние записи",
       date: "Дата", note: "Описание", save: "Сохранить", saving: "Сохраняем…", today: "Сегодня", yesterday: "Вчера", otherDay: "Другая дата",
       addIn: "Добавить приход", addOut: "Добавить расход", amountIn: "Сколько пришло", amountOut: "Сколько потрачено",
       totalIn: "Всего приход", totalOut: "Всего расход", count: (n) => `записей: ${n}`, noNote: "Без описания",
@@ -36,7 +50,7 @@
   const $ = (id) => document.getElementById(id);
   const spaced = (n) => Math.abs(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
   const money = (n) => (n < 0 ? "−" : "") + spaced(n) + " so'm";
-  const haptic = (kind) => { try { tg.HapticFeedback.notificationOccurred(kind); } catch (_) {} };
+  const haptic = (kind) => { try { if (inApp) tg.HapticFeedback.notificationOccurred(kind); } catch (_) {} };
   const shiftDay = (s, days) => { const d = new Date(s + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() - days); return d.toISOString().slice(0, 10); };
 
   let data = null;
@@ -66,7 +80,7 @@
   async function call(action, extra) {
     let res;
     try {
-      res = await fetch("/api/kassa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ init_data: tg.initData, action, ...extra }) });
+      res = await fetch("/api/kassa", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...auth, action, ...extra }) });
     } catch (_) { throw new Error("net"); }
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error || "net");
@@ -168,13 +182,13 @@
     $("bar").hidden = kind === null;
 
     if (kind === null) {
-      if (!sheetKind) tg.BackButton.hide();
+      if (!sheetKind) back.hide();
       const recent = withKind(data.in, "in").concat(withKind(data.out, "out"))
         .sort((a, b) => (a.day === b.day ? b.id - a.id : a.day < b.day ? 1 : -1)).slice(0, 8);
       $("recent").replaceChildren(recent.length ? entryList(recent, true) : emptyState(null));
       return;
     }
-    tg.BackButton.show();
+    back.show();
     const items = withKind(data[kind], kind);
     const sumEl = $("bookSum");
     if (kind === "out") {
@@ -232,7 +246,7 @@
     $("scrim").hidden = false;
     $("sheet").hidden = false;
     $("bar").hidden = true;
-    tg.BackButton.show();
+    back.show();
     setTimeout(() => $("amount").focus(), 60);
   }
 
@@ -245,7 +259,7 @@
   }
 
   function remove(id) {
-    tg.showConfirm(T.del, async (ok) => {
+    confirmBox(T.del, async (ok) => {
       if (!ok) return;
       try {
         data = await call("delete", { id });
@@ -288,19 +302,23 @@
 
   async function start() {
     const state = $("state");
-    if (!tg || !tg.initData) {
+    if (!inApp && !session) {
       $("skeleton").hidden = true;
       state.textContent = T.openInTg;
       state.hidden = false;
       return;
     }
-    tg.ready();
-    tg.expand();
-    tg.BackButton.onClick(() => {
+    const goBack = () => {
       if (sheetKind) { closeSheet(); return; }
       kind = null;
       render();
-    });
+    };
+    if (inApp) {
+      tg.ready();
+      tg.expand();
+      tg.BackButton.onClick(goBack);
+    }
+    $("backBtn").addEventListener("click", goBack);
     try {
       data = await call("state");
       $("skeleton").hidden = true;

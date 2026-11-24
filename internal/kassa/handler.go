@@ -15,6 +15,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"telegram-ai-bot/internal/game"
 	"telegram-ai-bot/internal/miniapp"
 	"telegram-ai-bot/internal/storage"
 )
@@ -27,10 +28,18 @@ type Store interface {
 	DeleteKassaEntry(ctx context.Context, userID, id int64) error
 }
 
-// Options configure the handler; Now defaults to time.Now.
+// Sessions reads the session a game link opened the page with: a press of
+// Play on the "kassa" game, whose page Telegram opens without init data.
+type Sessions interface {
+	Session(token string) (game.Player, string, error)
+}
+
+// Options configure the handler; Now defaults to time.Now, and Sessions nil
+// takes init data alone.
 type Options struct {
 	BotToken string
 	Store    Store
+	Sessions Sessions
 	Logger   *slog.Logger
 	Now      func() time.Time
 }
@@ -64,6 +73,7 @@ type handler struct{ Options }
 
 type request struct {
 	InitData string `json:"init_data"`
+	Session  string `json:"session"`
 	Action   string `json:"action"`
 	Kind     string `json:"kind"`
 	Amount   int64  `json:"amount"`
@@ -123,14 +133,11 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 	if err := json.NewDecoder(io.LimitReader(r.Body, maxBodyBytes)).Decode(&req); err != nil {
 		return nil, errBadRequest
 	}
-	opened, err := miniapp.Validate(req.InitData, h.BotToken, h.Now(), initDataAge)
-	switch {
-	case errors.Is(err, miniapp.ErrStale):
-		return nil, errStale
-	case err != nil:
-		return nil, errForged
+	userID, fail := h.user(req)
+	if fail != (failure{}) {
+		return nil, fail
 	}
-	ctx, userID := r.Context(), opened.User.ID
+	ctx := r.Context()
 	switch req.Action {
 	case "state":
 		return h.state(ctx, userID)
@@ -140,6 +147,29 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return h.remove(ctx, userID, req.ID)
 	}
 	return nil, errBadRequest
+}
+
+// user is whose book is asked for: from the init data of the Mini App, or
+// from the session of a game link when there is none.
+func (h *handler) user(req request) (int64, failure) {
+	if req.InitData == "" && req.Session != "" && h.Sessions != nil {
+		player, name, err := h.Sessions.Session(req.Session)
+		switch {
+		case errors.Is(err, game.ErrToken):
+			return 0, errStale
+		case err != nil || name != game.KassaShortName || player.UserID <= 0:
+			return 0, errForged
+		}
+		return player.UserID, failure{}
+	}
+	opened, err := miniapp.Validate(req.InitData, h.BotToken, h.Now(), initDataAge)
+	switch {
+	case errors.Is(err, miniapp.ErrStale):
+		return 0, errStale
+	case err != nil:
+		return 0, errForged
+	}
+	return opened.User.ID, failure{}
 }
 
 func (h *handler) add(ctx context.Context, userID int64, req request) (any, failure) {

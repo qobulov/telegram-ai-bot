@@ -33,12 +33,21 @@ const BossShortName = "boss"
 // opens its page with a session.
 const MafiaShortName = "mafiya"
 
+// KassaShortName is Kassa's short name, as it is registered with
+// @BotFather's /newgame, so that a game link opens the cash book too. Its
+// page is not a game's: it lies beside the games' address, at
+// KassaPage, and this package only opens it with a session.
+const KassaShortName = "kassa"
+
 // OtinchiPath, BossPath and MafiaPath are where O'tinchi's, Dev jangi's
 // and Mafia's pages are, under the games' address.
 const (
 	OtinchiPath = "otinchi/"
 	BossPath    = "boss/"
 	MafiaPath   = "mafiya/"
+	// KassaPage is resolved against the games' address: Kassa's page is
+	// public/kassa, a sibling of public/game.
+	KassaPage = "../kassa/"
 )
 
 const (
@@ -120,11 +129,26 @@ func (g *Game) PlayURL(shortName string, p Player) (link string, ok bool) {
 		page += BossPath
 	case MafiaShortName:
 		page += MafiaPath
+	case KassaShortName:
+		page = resolve(page, KassaPage)
 	default:
 		return "", false
 	}
 	token := g.sign(kindSession, session{Player: p, Game: shortName, Issued: g.now().Unix()})
 	return page + "?s=" + url.QueryEscape(token), true
+}
+
+// resolve is ref against base, base itself when either does not parse.
+func resolve(base, ref string) string {
+	b, err := url.Parse(base)
+	if err != nil {
+		return base
+	}
+	r, err := url.Parse(ref)
+	if err != nil {
+		return base
+	}
+	return b.ResolveReference(r).String()
 }
 
 // Player is whom a current session is for.
