@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="light dark">
   <title>Kassa</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -16,21 +16,39 @@
     <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></symbol>
     <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
     <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h13v4M3 7v10a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2zM16 14h.01"/></symbol>
+    <symbol id="i-dots" viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01"/></symbol>
   </svg>
 
   <main id="app">
-    <!-- Loading skeleton, then the error text if the book cannot load. -->
     <section id="skeleton" class="skeleton" aria-hidden="true">
       <div class="sk hero-sk"></div>
-      <div class="sk-row"><div class="sk tile-sk"></div><div class="sk tile-sk"></div></div>
       <div class="sk line-sk"></div><div class="sk line-sk"></div><div class="sk line-sk"></div>
     </section>
     <section id="state" class="state" role="status" hidden></section>
 
-    <section id="home" class="view" hidden>
+    <!-- Shown outside a Mini App, where Telegram has no back button. -->
+    <button type="button" class="back" id="backBtn" hidden><svg class="ic flip"><use href="#i-chev"/></svg><span id="backText">Orqaga</span></button>
+
+    <!-- All books. -->
+    <section id="books" class="view" hidden>
+      <div class="hero">
+        <span class="hero-label"><svg class="ic sm"><use href="#i-wallet"/></svg><span data-t="allBalance">Jami qoldiq</span></span>
+        <strong class="hero-sum" id="allBalance">0</strong>
+        <div class="hero-split">
+          <div><span class="dot in"></span><span data-t="in">Kirim</span><b id="allIn">0</b></div>
+          <div><span class="dot out"></span><span data-t="out">Chiqim</span><b id="allOut">0</b></div>
+        </div>
+      </div>
+      <h2 data-t="myBooks">Kassalarim</h2>
+      <div class="rows" id="bookList"></div>
+    </section>
+
+    <!-- One book. -->
+    <section id="kassa" class="view" hidden>
       <div class="hero">
         <div class="hero-top">
-          <span class="hero-label"><svg class="ic sm"><use href="#i-wallet"/></svg><span data-t="balance">Qoldiq</span></span>
+          <span class="hero-label"><svg class="ic sm"><use href="#i-wallet"/></svg><span id="kassaName">Kassa</span></span>
+          <button type="button" class="hero-more" id="moreBtn" aria-label="Sozlamalar"><svg class="ic"><use href="#i-dots"/></svg></button>
         </div>
         <strong class="hero-sum" id="homeBalance">0</strong>
         <div class="hero-split">
@@ -38,7 +56,6 @@
           <div><span class="dot out"></span><span data-t="out">Chiqim</span><b id="homeOut">0</b></div>
         </div>
       </div>
-
       <div class="tiles">
         <button type="button" class="tile" data-open="in">
           <span class="badge in"><svg class="ic"><use href="#i-in"/></svg></span>
@@ -51,13 +68,12 @@
           <svg class="ic chev"><use href="#i-chev"/></svg>
         </button>
       </div>
-
       <h2 data-t="recent">So'nggi yozuvlar</h2>
       <div id="recent"></div>
     </section>
 
+    <!-- A book's money in or out. -->
     <section id="book" class="view" hidden>
-      <button type="button" class="back" id="backBtn" hidden><svg class="ic flip"><use href="#i-chev"/></svg><span data-t="backText">Orqaga</span></button>
       <div class="summary">
         <span class="summary-label" id="bookLabel">Qoldiq</span>
         <strong class="summary-sum" id="bookSum">0</strong>
@@ -72,6 +88,7 @@
   </div>
 
   <div class="scrim" id="scrim" hidden></div>
+
   <form class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" autocomplete="off" hidden>
     <div class="grip" aria-hidden="true"></div>
     <h3 id="sheetTitle">Kirim</h3>
@@ -95,7 +112,19 @@
     <button type="submit" class="primary" id="save"><span data-t="save">Saqlash</span></button>
   </form>
 
+  <form class="sheet" id="bookSheet" role="dialog" aria-modal="true" aria-labelledby="bookSheetTitle" autocomplete="off" hidden>
+    <div class="grip" aria-hidden="true"></div>
+    <h3 id="bookSheetTitle">Yangi kassa</h3>
+    <label class="field">
+      <span class="field-label" data-t="bookName">Kassa nomi</span>
+      <input type="text" id="bookName" maxlength="40" enterkeyhint="done">
+    </label>
+    <div class="name-chips chips" id="nameChips"></div>
+    <button type="submit" class="primary" id="bookSave"><span data-t="save">Saqlash</span></button>
+    <button type="button" class="danger" id="bookDelete" hidden><svg class="ic"><use href="#i-trash"/></svg><span data-t="deleteBook">Kassani o'chirish</span></button>
+  </form>
+
   <div class="toast" id="toast" role="status" hidden></div>
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>

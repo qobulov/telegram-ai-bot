@@ -13,45 +13,86 @@ func TestKassa(t *testing.T) {
 	const user, other = int64(7_000_000_001), int64(42)
 	day := func(s string) time.Time { d, _ := time.Parse(time.DateOnly, s); return d }
 
+	home, err := store.CreateKassaBook(ctx, user, "Uy")
+	if err != nil {
+		t.Fatalf("CreateKassaBook: %v", err)
+	}
+	shop, _ := store.CreateKassaBook(ctx, user, "Do'kon")
+	theirs, _ := store.CreateKassaBook(ctx, other, "Boshqa")
+
 	for _, e := range []KassaEntry{
 		{Kind: KassaIn, Amount: 500_000, Note: "oylik", Day: day("2026-11-20")},
 		{Kind: KassaIn, Amount: 100_000, Note: "qarz qaytdi", Day: day("2026-11-22")},
 		{Kind: KassaOut, Amount: 120_000, Note: "bozor", Day: day("2026-11-21")},
 	} {
-		if _, err := store.AddKassaEntry(ctx, user, e); err != nil {
+		if _, err := store.AddKassaEntry(ctx, user, home, e); err != nil {
 			t.Fatalf("AddKassaEntry: %v", err)
 		}
 	}
-	otherID, err := store.AddKassaEntry(ctx, other, KassaEntry{Kind: KassaOut, Amount: 1, Day: day("2026-11-21")})
-	if err != nil {
-		t.Fatalf("AddKassaEntry other: %v", err)
+	if _, err := store.AddKassaEntry(ctx, user, shop, KassaEntry{Kind: KassaIn, Amount: 7, Day: day("2026-11-21")}); err != nil {
+		t.Fatalf("AddKassaEntry shop: %v", err)
 	}
+	if _, err := store.AddKassaEntry(ctx, user, theirs, KassaEntry{Kind: KassaIn, Amount: 1, Day: day("2026-11-21")}); !errors.Is(err, ErrNoKassaBook) {
+		t.Fatalf("writing to another user's book: %v, want ErrNoKassaBook", err)
+	}
+	otherEntry, _ := store.AddKassaEntry(ctx, other, theirs, KassaEntry{Kind: KassaOut, Amount: 1, Day: day("2026-11-21")})
 
-	totals, err := store.KassaTotals(ctx, user)
+	books, err := store.KassaBooks(ctx, user)
 	if err != nil {
-		t.Fatalf("KassaTotals: %v", err)
+		t.Fatalf("KassaBooks: %v", err)
 	}
-	if totals != (KassaTotals{In: 600_000, Out: 120_000, Balance: 480_000}) {
-		t.Fatalf("totals = %+v", totals)
+	if len(books) != 2 || books[0].Name != "Uy" || books[0].Totals != (KassaTotals{In: 600_000, Out: 120_000, Balance: 480_000}) || books[1].Totals.Balance != 7 {
+		t.Fatalf("books = %+v", books)
 	}
-	in, err := store.KassaEntries(ctx, user, KassaIn, 10)
+	in, err := store.KassaEntries(ctx, user, home, KassaIn, 10)
 	if err != nil {
 		t.Fatalf("KassaEntries: %v", err)
 	}
-	if len(in) != 2 || in[0].Note != "qarz qaytdi" || in[1].Amount != 500_000 || !in[0].Day.Equal(day("2026-11-22")) {
+	if len(in) != 2 || in[0].Note != "qarz qaytdi" || !in[0].Day.Equal(day("2026-11-22")) {
 		t.Fatalf("in = %+v, want newest day first", in)
 	}
+	if got, _ := store.KassaEntries(ctx, user, theirs, KassaOut, 10); len(got) != 0 {
+		t.Fatalf("another user's entries leaked: %+v", got)
+	}
 
-	if err := store.DeleteKassaEntry(ctx, user, otherID); !errors.Is(err, ErrNoKassaEntry) {
-		t.Fatalf("deleting another user's entry: %v, want ErrNoKassaEntry", err)
+	if err := store.DeleteKassaEntry(ctx, user, otherEntry); !errors.Is(err, ErrNoKassaEntry) {
+		t.Fatalf("deleting another user's entry: %v", err)
 	}
 	if err := store.DeleteKassaEntry(ctx, user, in[0].ID); err != nil {
 		t.Fatalf("DeleteKassaEntry: %v", err)
 	}
-	if totals, _ := store.KassaTotals(ctx, user); totals.Balance != 380_000 {
-		t.Fatalf("balance after delete = %d, want 380000", totals.Balance)
+	if b, _ := store.KassaBook(ctx, user, home); b.Totals.Balance != 380_000 || b.Name != "Uy" {
+		t.Fatalf("book after delete = %+v", b)
 	}
-	if totals, _ := store.KassaTotals(ctx, 999); totals != (KassaTotals{}) {
-		t.Fatalf("empty book totals = %+v", totals)
+	if _, err := store.KassaBook(ctx, user, theirs); !errors.Is(err, ErrNoKassaBook) {
+		t.Fatalf("reading another user's book: %v", err)
+	}
+
+	if err := store.RenameKassaBook(ctx, user, shop, "Magazin"); err != nil {
+		t.Fatalf("RenameKassaBook: %v", err)
+	}
+	if err := store.RenameKassaBook(ctx, user, theirs, "x"); !errors.Is(err, ErrNoKassaBook) {
+		t.Fatalf("renaming another user's book: %v", err)
+	}
+	if err := store.DeleteKassaBook(ctx, user, theirs); !errors.Is(err, ErrNoKassaBook) {
+		t.Fatalf("deleting another user's book: %v", err)
+	}
+	if err := store.DeleteKassaBook(ctx, user, home); err != nil {
+		t.Fatalf("DeleteKassaBook: %v", err)
+	}
+	if books, _ := store.KassaBooks(ctx, user); len(books) != 1 || books[0].Name != "Magazin" {
+		t.Fatalf("books after delete = %+v", books)
+	}
+	if got, _ := store.KassaEntries(ctx, user, home, KassaIn, 10); len(got) != 0 {
+		t.Fatalf("a deleted book's entries remain: %+v", got)
+	}
+
+	for i := 1; i < MaxKassaBooks; i++ {
+		if _, err := store.CreateKassaBook(ctx, user, "k"); err != nil {
+			t.Fatalf("book %d: %v", i, err)
+		}
+	}
+	if _, err := store.CreateKassaBook(ctx, user, "one too many"); !errors.Is(err, ErrKassaBooksFull) {
+		t.Fatalf("book past the limit: %v, want ErrKassaBooksFull", err)
 	}
 }
