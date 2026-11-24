@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -46,6 +47,7 @@ type promptCache struct {
 	key    string
 	client *http.Client
 	now    func() time.Time
+	logger *slog.Logger
 
 	mu      sync.Mutex
 	entries map[string]*cacheEntry
@@ -108,11 +110,20 @@ func (p *promptCache) name(ctx context.Context, model, system string, tools []To
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if err != nil {
+		p.log().Warn("could not make the prompt cache; sending prompts whole", "model", model, "error", err)
 		e.failed = now.Add(cacheBackoff)
 		return key, ""
 	}
+	p.log().Info("prompt cache made", "model", model, "name", name)
 	e.name, e.expires = name, now.Add(cacheTTL-cacheMargin)
 	return key, name
+}
+
+func (p *promptCache) log() *slog.Logger {
+	if p.logger == nil {
+		return slog.Default()
+	}
+	return p.logger
 }
 
 // drop forgets key's cache, which the provider refused, and holds the

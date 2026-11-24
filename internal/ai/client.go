@@ -93,6 +93,9 @@ func NewClient(opts Options) *Client {
 	c := &Client{opts: opts, now: time.Now}
 	if opts.PromptCache {
 		c.cache = newPromptCache(opts.BaseURL, opts.APIKey, opts.HTTPClient, func() time.Time { return c.now() })
+		if c.cache != nil {
+			c.cache.logger = opts.Logger
+		}
 	}
 	return c
 }
