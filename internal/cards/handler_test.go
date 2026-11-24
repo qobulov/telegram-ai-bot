@@ -65,6 +65,8 @@ type fakeStore struct {
 	animes        map[string]bool // the anime rewards claimed
 	boxes         map[string]int
 	mail          []storage.CardMail
+	materials     int
+	spare         map[int]int // spare copies by rarity
 }
 
 var (

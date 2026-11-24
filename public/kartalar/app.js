@@ -39,6 +39,7 @@
       shopTab: "Do'kon", shopBuyTitle: "💎 Kristall sotib olish", shopBuyHint: "Telegram Stars bilan to'lanadi, kristall darhol hisobingizga tushadi.", shopItemsTitle: "🛒 Kristallga xarid",
       wallet: (n) => `Sizda: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% foyda`,
       tokensItem: (n) => `${n} ta token`, tokensHint: (n) => `${n} ta karta ochadi, kutmasdan`, packItem: (r) => `${r} paket`, packHint: (n, r) => `${n} ta karta, kamida 1 ta ${r.toLowerCase()} kafolatlangan`,
+      matTitle: (n) => `🧱 Materiallar: ${n}`, matHint: "Oddiy va Noyob kartalarning ortiqcha nusxalari materialga aylanadi, har kartaning 1 nusxasi va yulduzlari qoladi. Material bilan quti oling", matSpare: (r, n) => `${r}: ${n} ta ortiqcha nusxa`, matGain: (n, per) => `+${n} 🧱 · nusxasi ${per} 🧱`, matNone: "Ortiqcha nusxa yo'q", matDo: "Parchalash", matAsk: (r, n, g) => `${n} ta ortiqcha ${r} nusxa parchalanadi, +${g} 🧱 olasiz. Har kartaning 1 nusxasi va yulduzlari qoladi. Qaytarib bo'lmaydi. Davom etasizmi?`, matDone: (n, g) => `🧱 ${n} ta nusxa parchalandi · +${g}`, matBox: (r) => `${r} quti`, matBoxHint: (r) => `1 ta ${r} karta`, matFew: "Material yetmaydi",
       boxTitle: "🎁 Almaz box", bagBoxes: "🎁 Qutilar", bagMail: "📬 Pochta", bagNoBoxes: "Hozircha quti yo'q", bagNoMail: "Xat yo'q", bagOpen: "Ochish", bagClaim: "Olish", bagGift: "Sovg'a", bagClaimed: (s) => `✅ Olindi: ${s}`, bagBoxN: (n) => `${n} ta Almaz box`, bagTokensN: (n) => `${n} token`, bagCrystalsN: (n) => `${n} kristall`, boxRange: (a, b) => `${a}–${b} 💎`, boxGot: "Almaz box ochildi!", boxLucky: "🔥 Omadingiz keldi!",
       paid: "✅ To'lov qabul qilindi, kristall qo'shilmoqda…", crystalsAdded: (n) => `💎 +${n} kristall qo'shildi!`, payFailed: "To'lov amalga oshmadi", bought: (n) => `🎟 +${n} token`, packOpened: (r) => `${r} paket`,
     },
@@ -73,6 +74,7 @@
       shopTab: "Магазин", shopBuyTitle: "💎 Купить кристаллы", shopBuyHint: "Оплата Telegram Stars, кристаллы приходят сразу.", shopItemsTitle: "🛒 За кристаллы",
       wallet: (n) => `У вас: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% выгоды`,
       tokensItem: (n) => `${n} токенов`, tokensHint: (n) => `Откроют ${n} карт без ожидания`, packItem: (r) => `Пак: ${r}`, packHint: (n, r) => `${n} карт, минимум одна ${r.toLowerCase()} гарантирована`,
+      matTitle: (n) => `🧱 Материалы: ${n}`, matHint: "Лишние копии обычных и редких карт превращаются в материалы, у каждой карты остаются 1 копия и звёзды. За материалы — боксы", matSpare: (r, n) => `${r}: лишних копий ${n}`, matGain: (n, per) => `+${n} 🧱 · копия ${per} 🧱`, matNone: "Лишних копий нет", matDo: "Разобрать", matAsk: (r, n, g) => `Будут разобраны лишние копии (${r}): ${n}. Вы получите +${g} 🧱. У каждой карты останутся 1 копия и звёзды. Отменить нельзя. Продолжить?`, matDone: (n, g) => `🧱 Разобрано копий: ${n} · +${g}`, matBox: (r) => `Бокс: ${r}`, matBoxHint: (r) => `Одна карта: ${r}`, matFew: "Не хватает материалов",
       boxTitle: "🎁 Алмазный бокс", bagBoxes: "🎁 Боксы", bagMail: "📬 Почта", bagNoBoxes: "Пока нет боксов", bagNoMail: "Писем нет", bagOpen: "Открыть", bagClaim: "Забрать", bagGift: "Подарок", bagClaimed: (s) => `✅ Получено: ${s}`, bagBoxN: (n) => `Алмазный бокс ×${n}`, bagTokensN: (n) => `${n} токенов`, bagCrystalsN: (n) => `${n} кристаллов`, boxRange: (a, b) => `${a}–${b} 💎`, boxGot: "Алмазный бокс открыт!", boxLucky: "🔥 Вам повезло!",
       paid: "✅ Оплата принята, кристаллы зачисляются…", crystalsAdded: (n) => `💎 +${n} кристаллов!`, payFailed: "Оплата не прошла", bought: (n) => `🎟 +${n} токенов`, packOpened: (r) => `Пак: ${r}`,
     },
@@ -107,6 +109,7 @@
       shopTab: "Shop", shopBuyTitle: "💎 Buy crystals", shopBuyHint: "Paid in Telegram Stars; the crystals arrive at once.", shopItemsTitle: "🛒 For crystals",
       wallet: (n) => `You have: ${n} 💎`, crystalsN: (n) => `${n} 💎`, starsN: (n) => `${n} ⭐`, buyFor: (n) => `${n} 💎`, bonus: (p) => `+${p}% value`,
       tokensItem: (n) => `${n} tokens`, tokensHint: (n) => `Open ${n} cards without the wait`, packItem: (r) => `${r} pack`, packHint: (n, r) => `${n} cards, at least one ${r.toLowerCase()} guaranteed`,
+      matTitle: (n) => `🧱 Materials: ${n}`, matHint: "Spare copies of Common and Rare cards break into materials; every card keeps 1 copy and its stars. Materials buy boxes", matSpare: (r, n) => `${r}: ${n} spare ${n === 1 ? "copy" : "copies"}`, matGain: (n, per) => `+${n} 🧱 · ${per} 🧱 a copy`, matNone: "No spare copies", matDo: "Break", matAsk: (r, n, g) => `${n} spare ${r} ${n === 1 ? "copy" : "copies"} will break into +${g} 🧱. Every card keeps 1 copy and its stars. This can't be undone. Go on?`, matDone: (n, g) => `🧱 ${n} ${n === 1 ? "copy" : "copies"} broken · +${g}`, matBox: (r) => `${r} box`, matBoxHint: (r) => `1 ${r} card`, matFew: "Not enough materials",
       boxTitle: "🎁 Diamond box", bagBoxes: "🎁 Boxes", bagMail: "📬 Mail", bagNoBoxes: "No boxes yet", bagNoMail: "No letters", bagOpen: "Open", bagClaim: "Claim", bagGift: "Gift", bagClaimed: (s) => `✅ Claimed: ${s}`, bagBoxN: (n) => `${n} diamond box${n === 1 ? "" : "es"}`, bagTokensN: (n) => `${n} tokens`, bagCrystalsN: (n) => `${n} crystals`, boxRange: (a, b) => `${a}–${b} 💎`, boxGot: "Diamond box opened!", boxLucky: "🔥 Lucky you!",
       paid: "✅ Payment received, adding your crystals…", crystalsAdded: (n) => `💎 +${n} crystals!`, payFailed: "The payment did not go through", bought: (n) => `🎟 +${n} tokens`, packOpened: (r) => `${r} pack`,
     },
@@ -1716,7 +1719,8 @@
   async function openBag() {
     haptic("light");
     try {
-      const data = await api("inbox");
+      const [data, salvage] = await Promise.all([api("inbox"), api("salvage").catch(() => null)]);
+      data.salvage = salvage;
       bagBadge({
         boxes: (data.boxes || []).reduce((n, b) => n + b.count, 0),
         mail: (data.mail || []).filter((m) => !m.claimed).length,
@@ -1736,6 +1740,7 @@
   function bagPanel(data) {
     const panel = document.createElement("div");
     panel.className = "gift inbox";
+    if (data.salvage) materialsBlock(panel, data.salvage);
     const boxTitle = document.createElement("h3");
     boxTitle.textContent = t.bagBoxes;
     panel.append(boxTitle);
@@ -1810,6 +1815,82 @@
       panel.append(row);
     }
     return panel;
+  }
+
+  // materialsBlock is the bag's 🧱: the materials held, the spare Common
+  // and Rare copies that break into them, and the boxes they buy, each of
+  // one Epic, Legendary or Mythic card.
+  let salvaging = false;
+  function materialsBlock(panel, data) {
+    const title = document.createElement("h3");
+    title.textContent = t.matTitle(spaced(data.materials));
+    const hint = emptyLine(t.matHint);
+    panel.append(title, hint);
+    for (const s of data.salvage) {
+      const name = t.rarities[s.rarity];
+      const row = inboxRow(RARITY_ICON[s.rarity], t.matSpare(name, spaced(s.spare)), s.spare ? t.matGain(spaced(s.spare * s.per), s.per) : t.matNone);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = t.matDo;
+      button.disabled = salvaging || !s.spare;
+      button.addEventListener("click", async () => {
+        if (salvaging || !(await ask(t.matAsk(name, s.spare, s.spare * s.per)))) return;
+        salvaging = true;
+        button.disabled = true;
+        try {
+          const res = await api("salvage_do", { rarity: s.rarity });
+          toast(t.matDone(res.broken, res.gained));
+          haptic("medium");
+          // the cards' free copies changed: read them again
+          applyState(await api("state"));
+        } catch (error) {
+          notice(error);
+        } finally {
+          salvaging = false;
+          openBag();
+        }
+      });
+      row.append(button);
+      panel.append(row);
+    }
+    for (const box of data.boxes) {
+      const name = t.rarities[box.rarity];
+      const row = inboxRow(RARITY_ICON[box.rarity], t.matBox(name), t.matBoxHint(name));
+      row.style.setProperty("--tier", COLORS[box.rarity]);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = `${spaced(box.price)} 🧱`;
+      button.disabled = salvaging || box.price > data.materials;
+      button.addEventListener("click", () => materialBoxOpen(box, button));
+      row.append(button);
+      panel.append(row);
+    }
+  }
+
+  // materialBoxOpen buys a material box and shows its card as a pack's.
+  async function materialBoxOpen(box, button) {
+    if (salvaging) return;
+    salvaging = true;
+    button.disabled = true;
+    haptic("medium");
+    try {
+      const data = await api("material_box", { item: box.id });
+      if (data.refused) { toast(t.matFew); openBag(); return; }
+      tokens = data.tokens ?? tokens;
+      shards = data.shards ?? shards;
+      const drawn = data.drawn.map((d) => ({ card: d.card, fresh: d.new, serial: d.serial }));
+      for (const { card } of drawn) keep(card);
+      points = data.points ?? points;
+      header();
+      shelves();
+      await celebrateMythics(drawn);
+      openedPanel(drawn, t.matBox(t.rarities[box.rarity]));
+    } catch (error) {
+      button.disabled = false;
+      notice(error);
+    } finally {
+      salvaging = false;
+    }
   }
 
   function mailGifts(m) {

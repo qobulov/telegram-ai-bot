@@ -69,6 +69,9 @@ type Store interface {
 	BossPlace(ctx context.Context, week time.Time, userID int64, byTotal bool) (storage.BossRow, int, int, error)
 	PayBossWeek(ctx context.Context, week time.Time, prizes []storage.ArenaPrize, note func(place int) string) (int, bool, error)
 	OpenArenaPack(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, price int, now time.Time, quest storage.CardQuest) (storage.CardOpening, int, error)
+	CardSpares(ctx context.Context, userID int64) (storage.SpareCards, error)
+	SalvageCards(ctx context.Context, userID int64, name string, rarity, per int) (copies, materials int, err error)
+	OpenMaterialBox(ctx context.Context, userID int64, name string, roll storage.CardRoll, price int, now time.Time, quest storage.CardQuest) (storage.CardOpening, int, error)
 	CardQuests(ctx context.Context, userID int64, day time.Time) (map[string]storage.QuestProgress, error)
 	ClaimCardQuest(ctx context.Context, userID int64, quest storage.CardQuest, reward int, now time.Time) error
 	AnimeRewardsClaimed(ctx context.Context, userID int64) ([]string, error)
@@ -322,7 +325,8 @@ type request struct {
 	Want  int64 `json:"want"`
 	Offer int64 `json:"offer"`
 	// Rarity and Offset page "catalog" through the cards of one rarity, but
-	// Card; without Rarity it searches the whole catalog by Query.
+	// Card; without Rarity it searches the whole catalog by Query. Rarity is
+	// also the spare copies "salvage_do" breaks.
 	Rarity *int `json:"rarity"`
 	Offset int  `json:"offset"`
 	// Count is how many cards "open" opens: 1, Batch or BigBatch, or "event_open" of
@@ -333,7 +337,8 @@ type request struct {
 	// offers others while there are.
 	Shown []int64 `json:"shown"`
 	// Item is what "buy" buys, of ShopItems, "arena_shop" of
-	// ArenaShopItems, or "invoice" sells, of CrystalPacks.
+	// ArenaShopItems, "material_box" of MaterialBoxes, or "invoice" sells,
+	// of CrystalPacks.
 	Item string `json:"item"`
 	// Front and Back are the cards of the team "arena_team" saves, two and
 	// three; Opponent is the player "arena_attack" attacks.
@@ -454,6 +459,12 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return h.bossTop(ctx, opened.User, req.Query == "total")
 	case "arena_shop":
 		return h.arenaShop(ctx, opened.User, req.Item)
+	case "salvage":
+		return h.salvageView(ctx, opened.User)
+	case "salvage_do":
+		return h.salvage(ctx, opened.User, req.Rarity)
+	case "material_box":
+		return h.materialBoxOpen(ctx, opened.User, req.Item)
 	case "quests":
 		return h.quests(ctx, opened.User)
 	case "quest_claim":
