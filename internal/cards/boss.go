@@ -18,14 +18,16 @@ import (
 // grows stronger. Each week, Monday to Monday in Tashkent, one Mythic of
 // the catalog is the boss of everyone. It never falls: the player's saved
 // arena team fights it until the team falls or arena.MaxRounds are over,
-// and what counts is the damage dealt it. It hits every card of the team
-// each turn, BossRage harder each round, and the week's damage of all the
+// and what counts is the damage dealt it. It hits one card of the team at
+// random each turn (every card until 2026-11-24, when the owners asked for
+// one, and its attack was doubled so that a team still falls), BossRage
+// harder each round, and the week's damage of all the
 // players raises its level, every BossLevelDamage, each level BossLevelGrowth
 // more attack. A player has BossTries fights a day; each gives arena coins
 // by its damage, and the week's table ranks the best fights.
 const (
 	BossTries       = 3
-	BossAttack      = 1500
+	BossAttack      = 3000
 	BossRage        = 0.12
 	BossLevelDamage = 3_000_000
 	BossLevelGrowth = 0.06

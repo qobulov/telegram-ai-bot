@@ -489,15 +489,15 @@ func stunWall() Team {
 	return d
 }
 
-// A boss never falls, hits every living card each turn, harder each round,
-// and the damage dealt it is the sum of the team's hits on it.
+// A boss never falls, hits one living card at random each turn, harder each
+// round, and the damage dealt it is the sum of the team's hits on it.
 func TestBossBattle(t *testing.T) {
 	boss := FighterOf(99, "boss", 4, 5, 100, 400)
 	got := BossBattle(commonTeam(50, 1000), boss, 0.5, 7)
 	if got.Rounds == 0 || got.Rounds >= MaxRounds {
 		t.Fatalf("rounds %d, want the team to fall before %d", got.Rounds, MaxRounds)
 	}
-	dealt, hitsByRound := 0, map[int]int{}
+	dealt, hitsByRound, targets := 0, map[int]int{}, map[int]bool{}
 	for _, e := range got.Events {
 		switch {
 		case e.Side == 0 && e.To == 0 && (e.Kind == KindHit || e.Kind == KindStrike):
@@ -506,6 +506,7 @@ func TestBossBattle(t *testing.T) {
 			t.Fatalf("the boss fell: %+v", e)
 		case e.Side == 1 && e.Kind == KindHit:
 			hitsByRound[e.Round]++
+			targets[e.To] = true
 			if e.HP < 0 {
 				t.Fatalf("negative health %+v", e)
 			}
@@ -514,8 +515,13 @@ func TestBossBattle(t *testing.T) {
 	if dealt != got.Damage || dealt == 0 {
 		t.Errorf("damage %d, the events say %d", got.Damage, dealt)
 	}
-	if hitsByRound[1] != 5 {
-		t.Errorf("round 1: the boss hit %d cards, want all 5", hitsByRound[1])
+	for round, hits := range hitsByRound {
+		if hits != 1 {
+			t.Errorf("round %d: the boss hit %d cards, want 1", round, hits)
+		}
+	}
+	if len(targets) < 3 {
+		t.Errorf("the boss hit only cards %v, want them picked at random", targets)
 	}
 	again := BossBattle(commonTeam(50, 1000), boss, 0.5, 7)
 	if !reflect.DeepEqual(got, again) {
@@ -527,10 +533,10 @@ func TestBossBattle(t *testing.T) {
 // with no rage a strong team lasts all MaxRounds.
 func TestBossRage(t *testing.T) {
 	boss := FighterOf(99, "boss", 4, 5, 10, 400)
-	if r := BossBattle(commonTeam(50, 3000), boss, 0, 1); r.Rounds != MaxRounds {
+	if r := BossBattle(commonTeam(50, 500), boss, 0, 1); r.Rounds != MaxRounds {
 		t.Errorf("no rage: %d rounds, want %d", r.Rounds, MaxRounds)
 	}
-	if r := BossBattle(commonTeam(50, 3000), boss, 1, 1); r.Rounds >= MaxRounds {
+	if r := BossBattle(commonTeam(50, 500), boss, 1, 1); r.Rounds >= MaxRounds {
 		t.Errorf("rage 1: %d rounds, want fewer than %d", r.Rounds, MaxRounds)
 	}
 }

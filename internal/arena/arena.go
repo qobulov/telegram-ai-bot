@@ -184,7 +184,7 @@ type unit struct {
 	provoking  int  // the last round it draws enemy Tanks, Dealers and Healers
 	poisonDmg  int  // a boss's poison tick, by its poisoner's attack
 	// boss is a unit that never falls: what it is dealt is counted instead
-	// of taken off its health, it hits every living foe each turn, and its
+	// of taken off its health, it hits one living foe at random each turn, and its
 	// attack rises by rage of itself each round after the first.
 	boss bool
 	rage float64
@@ -233,7 +233,7 @@ type BossResult struct {
 const bossHP = 1 << 30
 
 // BossBattle plays team against boss, a lone foe in the defender's first
-// slot that never falls: each turn it hits every living card of the team,
+// slot that never falls: each turn it hits one living card of the team at random,
 // its attack raised by rage times the rounds gone before, so the fight ends
 // when the team falls or after MaxRounds. Its Health is not used.
 func BossBattle(team Team, boss Fighter, rage float64, seed int64) BossResult {
@@ -319,7 +319,7 @@ func (f *fight) act(u *unit) {
 		return
 	}
 	if u.boss {
-		f.cleave(u)
+		f.bossTurn(u)
 		return
 	}
 	if u.Skill != NoSkill && u.energy >= EnergyMax && f.useSkill(u) {
@@ -333,14 +333,19 @@ func (f *fight) act(u *unit) {
 	f.hit(u, target, 1, KindHit)
 }
 
-// cleave is a boss's turn: it hits every living foe, harder each round.
-func (f *fight) cleave(u *unit) {
-	factor := 1 + u.rage*float64(f.round-1)
+// bossTurn is a boss's turn: it hits one living foe picked at random, as
+// the owners asked on 2026-11-24 (it hit them all before), harder each round.
+func (f *fight) bossTurn(u *unit) {
+	var living []*unit
 	for _, foe := range f.teams[1-u.side] {
 		if foe.alive() {
-			f.hit(u, foe, factor, KindHit)
+			living = append(living, foe)
 		}
 	}
+	if len(living) == 0 {
+		return
+	}
+	f.hit(u, living[f.rng.Intn(len(living))], 1+u.rage*float64(f.round-1), KindHit)
 }
 
 // useSkill spends u's energy on its skill and says whether it did: a Heal
