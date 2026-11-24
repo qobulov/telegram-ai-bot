@@ -250,7 +250,8 @@ func (f *fakeStore) OfferCard(_ context.Context, from, give, want int64, rules s
 func (f *fakeStore) CardMarket(_ context.Context, viewer int64, _ storage.CardMarketRules, _ int) ([]storage.CardOffer, error) {
 	out := make([]storage.CardOffer, len(f.offers))
 	for i, o := range f.offers {
-		o.Mine = o.From == viewer
+		// the store gives the cards by id alone, as the database does
+		o.Mine, o.Give, o.Want = o.From == viewer, storage.Card{ID: o.Give.ID}, storage.Card{ID: o.Want.ID}
 		out[i] = o
 	}
 	return out, nil
@@ -457,6 +458,9 @@ func TestTheCardMarket(t *testing.T) {
 	}
 	if offers, _ = call(8, map[string]any{"action": "market"})["offers"].([]any); len(offers) != 1 || offers[0].(map[string]any)["mine"] != false {
 		t.Fatalf("another's market = %v", offers)
+	}
+	if o := offers[0].(map[string]any); o["give"].(map[string]any)["name"] != "Gojo" || o["want"].(map[string]any)["name"] != "Levi" {
+		t.Errorf("the offer's cards are not filled from the catalog: %v", o)
 	}
 	out = call(8, map[string]any{"action": "take", "offer": 1})
 	if got, _ := out["got"].(map[string]any); got["name"] != "Gojo" || out["cards"] == nil {

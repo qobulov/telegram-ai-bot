@@ -83,13 +83,12 @@ func (s *Store) OfferCard(ctx context.Context, from, give, want int64, rules Car
 // as taking it would fail, and so is one placed before trades were of
 // rarities at most tradeRarityGap apart and of no limited card. Viewer
 // cannot take an offer whose wanted card they have raised above ★1:
-// Starred says so.
+// Starred says so. Give and Want hold only their card ids, as the owners
+// asked on 2026-11-24 when Supabase's egress passed its limit: the caller
+// fills them from the catalog it keeps.
 func (s *Store) CardMarket(ctx context.Context, viewer int64, rules CardMarketRules, limit int) ([]CardOffer, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT t.id, t.from_id, coalesce(p.name, ''), t.created_at,
-			g.id, g.name, g.anime, g.image_url, g.favourites, g.rarity, g.attack, g.health, g.value, g.collection,
-			w.id, w.name, w.anime, w.image_url, w.favourites, w.rarity, w.attack, w.health, w.value, w.collection,
-			c.can, c.starred
+		SELECT t.id, t.from_id, coalesce(p.name, ''), t.created_at, g.id, w.id, c.can, c.starred
 		FROM card_trades t
 		JOIN card_catalog g ON g.id = t.give_card
 		JOIN card_catalog w ON w.id = t.take_card
@@ -108,11 +107,7 @@ func (s *Store) CardMarket(ctx context.Context, viewer int64, rules CardMarketRu
 	}
 	offers, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (CardOffer, error) {
 		var o CardOffer
-		g, w := &o.Give, &o.Want
-		err := row.Scan(&o.ID, &o.From, &o.FromName, &o.Created,
-			&g.ID, &g.Name, &g.Anime, &g.ImageURL, &g.Favourites, &g.Rarity, &g.Attack, &g.Health, &g.Value, &g.Collection,
-			&w.ID, &w.Name, &w.Anime, &w.ImageURL, &w.Favourites, &w.Rarity, &w.Attack, &w.Health, &w.Value, &w.Collection,
-			&o.Can, &o.Starred)
+		err := row.Scan(&o.ID, &o.From, &o.FromName, &o.Created, &o.Give.ID, &o.Want.ID, &o.Can, &o.Starred)
 		o.Mine = o.From == viewer
 		return o, err
 	})

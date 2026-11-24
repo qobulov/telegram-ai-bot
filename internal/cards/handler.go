@@ -211,6 +211,51 @@ func (h *handler) ownedCardsOf(ctx context.Context, userID int64, ids []int64) (
 	return owned, nil
 }
 
+// catalogByID is the cached catalog by card id, read anew when an offer
+// names a card it does not have yet.
+func (h *handler) catalogByID(ctx context.Context, offers []storage.CardOffer) (map[int64]storage.Card, error) {
+	index := func(catalog []storage.Card) map[int64]storage.Card {
+		byID := make(map[int64]storage.Card, len(catalog))
+		for _, c := range catalog {
+			byID[c.ID] = c
+		}
+		return byID
+	}
+	catalog, err := h.cardCatalog(ctx)
+	if err != nil {
+		return nil, err
+	}
+	byID := index(catalog)
+	for _, o := range offers {
+		if _, ok := byID[o.Give.ID]; !ok {
+			return index(h.freshCatalog(ctx, catalog)), nil
+		}
+		if _, ok := byID[o.Want.ID]; !ok {
+			return index(h.freshCatalog(ctx, catalog)), nil
+		}
+	}
+	return byID, nil
+}
+
+// freshCatalog reads the catalog again and keeps it, or gives stale back
+// when it cannot be read.
+func (h *handler) freshCatalog(ctx context.Context, stale []storage.Card) []storage.Card {
+	stamp, err := h.Store.CardCatalogStamp(ctx)
+	if err != nil {
+		h.Logger.Warn("could not read the card catalog's stamp again", "error", err)
+		return stale
+	}
+	catalog, err := h.Store.CardCatalog(ctx)
+	if err != nil {
+		h.Logger.Warn("could not read the card catalog again", "error", err)
+		return stale
+	}
+	h.cacheMu.Lock()
+	h.cached, h.cachedStamp, h.cachedAt = catalog, stamp, time.Now()
+	h.cacheMu.Unlock()
+	return catalog
+}
+
 // cardCatalog is the card catalog. Once every catalogKeep only its stamp
 // is read, and the catalog itself only when the stamp changed, so that a
 // card reworked in the database shows within catalogKeep.
@@ -655,9 +700,19 @@ func (h *handler) market(ctx context.Context, user miniapp.User) (any, failure) 
 		h.Logger.Error("could not read the card market", "error", err)
 		return nil, errUnavailable
 	}
-	views := make([]offerView, len(offers))
-	for i, o := range offers {
-		views[i] = offerView{ID: o.ID, Who: o.FromName, Give: h.held(o.Give, 0), Want: h.held(o.Want, 0), Can: o.Can, Starred: o.Starred, Mine: o.Mine}
+	byID, err := h.catalogByID(ctx, offers)
+	if err != nil {
+		h.Logger.Error("could not read the card catalog", "error", err)
+		return nil, errUnavailable
+	}
+	views := make([]offerView, 0, len(offers))
+	for _, o := range offers {
+		give, okGive := byID[o.Give.ID]
+		want, okWant := byID[o.Want.ID]
+		if !okGive || !okWant {
+			continue
+		}
+		views = append(views, offerView{ID: o.ID, Who: o.FromName, Give: h.held(give, 0), Want: h.held(want, 0), Can: o.Can, Starred: o.Starred, Mine: o.Mine})
 	}
 	return map[string]any{"offers": views, "open_limit": OffersOpen}, failure{}
 }

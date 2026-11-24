@@ -43,7 +43,7 @@ func TestTheCardMarket(t *testing.T) {
 		t.Errorf("a third offer = %v", err)
 	}
 	offers, err := store.CardMarket(ctx, 2, market, 10)
-	if err != nil || len(offers) != 2 || offers[0].ID != gojo || !offers[0].Can || offers[0].Mine || offers[0].FromName != "Alice" || offers[1].Want.Name != "Hinata Hyuuga" {
+	if err != nil || len(offers) != 2 || offers[0].ID != gojo || !offers[0].Can || offers[0].Mine || offers[0].FromName != "Alice" || offers[1].Want.ID == 0 {
 		t.Fatalf("Bob's market = %+v, %v", offers, err)
 	}
 	if offers, _ = store.CardMarket(ctx, 1, market, 10); !offers[0].Mine || offers[0].Can {
