@@ -26,11 +26,12 @@ type MaterialBox struct {
 // 11, a Legendary once in 40 and a Mythic once in 200, and its Common and
 // Rare copies break into about 1.1 materials a draw: a box costs about six
 // times the materials of the draws that would give its card, so that
-// salvage helps, and drawing stays the way to cards.
+// salvage helps, and drawing stays the way to cards. The Mythic box costs
+// 2000 since 2026-11-24, as the owners asked, from 1500.
 var MaterialBoxes = []MaterialBox{
 	{ID: "epic", Rarity: Epic, Price: 80},
 	{ID: "legendary", Rarity: Legendary, Price: 400},
-	{ID: "mythic", Rarity: Mythic, Price: 1500},
+	{ID: "mythic", Rarity: Mythic, Price: 2000},
 }
 
 func materialBox(id string) (MaterialBox, bool) {
