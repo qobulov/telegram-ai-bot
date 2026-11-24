@@ -32,6 +32,11 @@ const (
 	membersNote         = "These are the members I have seen in this group, most recently seen first: by their messages, by joining, or by Telegram telling me. It is not everyone: members who have not written or joined since I started keeping the list are missing. known is how many I have seen; total, when given, is how many members the group has. role marks admins; a member without a role is a regular member, except your owners, who are never regular members. Never guess about anyone not listed."
 	membersNoAdminsNote = "The admins could not be checked just now, so roles are missing."
 	membersCutNote      = "%d more members I have seen are left out of this list."
+	// membersNotAdminNote is for an asker who is not an admin, as the owners
+	// asked on 2026-11-24: calling everyone is for admins, and an answer
+	// tagging more than three members for anyone else is sent with its
+	// tags as plain names.
+	membersNotAdminNote = "The asker is not an admin of this group: calling, waking or tagging everyone, or more than three members at once, is for admins only. If they ask for that, say so kindly in one line and tag no one; list names without @ or tags. Tagging one to three members they name is fine."
 )
 
 // MemberLister reads the members seen in a group.
@@ -165,6 +170,8 @@ func listMembers(ctx context.Context, opts MembersOptions, raw json.RawMessage) 
 	notes := []string{membersNote}
 	if adminErr != nil {
 		notes = append(notes, membersNoAdminsNote)
+	} else if roles[caller.UserID] == "" && !caller.Owner && !opts.Owners[caller.UserID] {
+		notes = append(notes, membersNotAdminNote)
 	}
 	if leftOut := known - len(members); leftOut > 0 {
 		notes = append(notes, fmt.Sprintf(membersCutNote, leftOut))

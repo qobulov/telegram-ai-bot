@@ -161,3 +161,24 @@ func TestMembersWithoutAUsernameGetATag(t *testing.T) {
 		t.Errorf("tags = %q", tags)
 	}
 }
+
+// One who is not an admin is told that calling everyone is for admins; an
+// admin, or an owner, is not.
+func TestMembersTellsNonAdminsMassTagsAreForAdmins(t *testing.T) {
+	roster := &fakeRoster{
+		members: []storage.GroupMember{seen(userID, "Ali", "ali"), seen(memberID, "Bek", "bek"), seen(7007, "Said", "")},
+		admins:  []telegram.ChatMember{listedAdmin("creator", telegram.User{ID: memberID})},
+	}
+	as := func(id int64) context.Context {
+		return WithTurn(context.Background(), Caller{UserID: id, ChatID: groupA, Human: true, UpdateID: 1, MessageID: 50}, &Sink{})
+	}
+	for _, c := range []struct {
+		who  int64
+		told bool
+	}{{7007, true}, {memberID, false}, {userID, false}} {
+		got, list := askMembers(t, roster, as(c.who))
+		if !got.OK || strings.Contains(list.Note, "for admins only") != c.told {
+			t.Errorf("asked by %d: note %q, want told %v", c.who, list.Note, c.told)
+		}
+	}
+}

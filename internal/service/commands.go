@@ -992,6 +992,7 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 		s.giveBackAnswer(in, reservation)
 	}
 	out := s.answerOf(in, answer, err, started)
+	out.text = s.withoutMassTags(ctx, in, out.text)
 	out.drawings = drawings
 	out.documents = documents
 	out.audios = audios
