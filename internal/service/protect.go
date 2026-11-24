@@ -37,15 +37,18 @@ const (
 	// floodLongMessages within floodLongWindow, the message at hand
 	// included, or the same text or sticker repeatMessages times within
 	// repeatWindow. floodLogLimit bounds the group log read to count them,
-	// and maxFloodDeleted the member's messages deleted for it.
-	floodMessages     = 15
+	// and maxFloodDeleted the member's messages deleted for it. Raised on
+	// 2026-11-24 from 15, 30 and 3, as the owners asked: a member of a
+	// group of game bots sending one command 14 times in 9 seconds was
+	// muted.
+	floodMessages     = 25
 	floodWindow       = 10 * time.Second
-	floodLongMessages = 30
+	floodLongMessages = 50
 	floodLongWindow   = 30 * time.Second
-	repeatMessages    = 3
+	repeatMessages    = 5
 	repeatWindow      = time.Minute
-	floodLogLimit     = 100
-	maxFloodDeleted   = 30
+	floodLogLimit     = 200
+	maxFloodDeleted   = 50
 	// A flooding member muted within floodInFlight only has the messages
 	// still on the way deleted. Mutes escalate over floodMemory: 10
 	// minutes, then an hour, then a day.

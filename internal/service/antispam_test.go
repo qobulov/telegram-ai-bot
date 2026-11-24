@@ -101,19 +101,21 @@ func TestFloodGuardCatchesTwentyInThirtySeconds(t *testing.T) {
 	}
 }
 
-// The same text three times within a minute is a flood; so is the same
-// sticker. Short words such as "ha", and commands, are not.
+// The same text repeatMessages times within a minute is a flood; so is the
+// same sticker. Short words such as "ha", and commands, are not.
 func TestFloodGuardCatchesRepeats(t *testing.T) {
 	f, _, _ := protectFixture()
 	logAgo(f, flooderID, 90, "(to Ann) Salom   HAMMAGA", 40*time.Second)
-	logAgo(f, flooderID, 91, "salom hammaga", 30*time.Second)
+	for i := range repeatMessages - 2 {
+		logAgo(f, flooderID, int64(91+i), "salom hammaga", time.Duration(30-i)*time.Second)
+	}
 	if sent := f.run(inGroup(messageFrom(flooderID, "tez", "salom hammaga"))); len(sent) != 1 || !strings.Contains(sent[0].text, "(flood)") {
 		t.Errorf("text repeat: sent = %+v", sent)
 	}
 
 	f, _, _ = protectFixture()
 	var stickers []telegram.Update
-	for i := range 3 {
+	for i := range repeatMessages {
 		msg := messageFrom(5252, "st", "")
 		msg.MessageID = int64(200 + i)
 		msg.Sticker = &telegram.Sticker{FileID: "s", FileUniqueID: "s1", Emoji: "😂"}
