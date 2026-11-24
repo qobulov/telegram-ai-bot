@@ -1424,21 +1424,23 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .b-stats { justify-self: stretch; display: grid; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font: 600 12px Manrope, sans-serif; color: var(--text); }
 .bs-title { justify-self: center; font: 700 13px Unbounded, sans-serif; color: var(--gold); }
 .bs-mvp { margin: 0; text-align: center; color: #ffe39a; font-weight: 800; }
-.bs-side { display: grid; gap: 4px; }
-.bs-head, .bs-row { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, 50px); align-items: center; gap: 4px; }
-.bs-head { color: var(--muted); font-size: 11px; }
-.bs-head span:first-child { font-weight: 800; }
-.bs-side.us .bs-head span:first-child { color: var(--gold); }
-.bs-side.them .bs-head span:first-child { color: #ff8a8a; }
-.bs-head span:not(:first-child), .bs-row span:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
-.bs-name { min-width: 0; display: grid; gap: 2px; }
-.bs-name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
-.bs-bar { display: block; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
-.bs-bar i { display: block; height: 100%; background: linear-gradient(90deg, #ffd25a, #ff8a3d); }
-.bs-side.them .bs-bar i { background: linear-gradient(90deg, #ff8a8a, #ff4d6d); }
-.bs-row.fallen .bs-name b { opacity: 0.55; }
-.bs-row.mvp .bs-name b::after { content: " 🏅"; }
-.bs-legend { margin: 0; color: var(--muted); font-size: 10.5px; text-align: center; line-height: 1.4; }
+.bs-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.bs-tabs button { padding: 7px 2px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.04); color: var(--muted); font: 700 10.5px Manrope, sans-serif; white-space: nowrap; }
+.bs-tabs button[aria-selected="true"] { background: linear-gradient(180deg, #ffe39a, #e0b04a); color: #1b1408; border-color: transparent; }
+.bs-list { display: grid; gap: 5px; }
+.bs-who { margin-top: 4px; font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+.bs-who.us { color: var(--gold); }
+.bs-who.them { color: #ff8a8a; }
+.bs-line { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 10px; background: rgba(255, 255, 255, 0.035); }
+.bs-line img { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; object-position: 50% 20%; background: var(--lacquer); }
+.bs-mid { min-width: 0; display: grid; gap: 4px; }
+.bs-mid b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.bs-num { font: 800 13px Manrope, sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bs-line .bs-bar { height: 5px; }
+.bs-line.them .bs-bar i { background: linear-gradient(90deg, #ff8a8a, #ff4d6d); }
+.bs-line.fallen img, .bs-line.fallen b { opacity: 0.5; }
+.bs-line.mvp { box-shadow: 0 0 0 1px rgba(255, 210, 90, 0.5) inset; }
+.bs-line.mvp b::after { content: " 🏅"; }
 
 /* the HP left, over its bar, in battle */
 .fighter .hp-n { position: absolute; right: 5px; bottom: 31px; font: 800 10px/1 Manrope, sans-serif; font-variant-numeric: tabular-nums; color: #d9ffe4; text-shadow: 0 1px 2px #000, 0 0 4px #000; }
@@ -1528,3 +1530,23 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 @supports (height: 100dvh) { .b-row .fighter.boss { width: min(calc((100% - 12px) * 0.5), calc((100dvh - 200px) * 0.26)); } }
 .b-row .fighter.boss .hp-n { display: block; font-size: 12px; color: #ffd0a0; }
 .b-row .fighter.boss .hp i { background: linear-gradient(90deg, #e0565b, #b06bff); }
+
+/* the boss's table: the week's end and two chips, the top three on a
+   podium, the player's own row kept at the bottom */
+.table .boss-head { display: grid; grid-template-columns: 1fr; gap: 8px; justify-items: center; padding: 4px 0 8px; background: none; border: 0; box-shadow: none; }
+.table .boss-head small { color: var(--muted); font-weight: 700; }
+.table .boss-head .sets { margin: 0; }
+.table .podium { display: grid; grid-template-columns: 1fr 1.15fr 1fr; align-items: end; gap: 8px; padding: 6px 0 12px; background: none; border: 0; box-shadow: none; }
+.pod { display: grid; justify-items: center; gap: 3px; padding: 12px 6px 10px; border-radius: 16px; text-align: center; min-width: 0;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--pc) 22%, transparent), rgba(255, 255, 255, 0.03)); border: 1px solid color-mix(in srgb, var(--pc) 55%, transparent); }
+.pod.p1 { --pc: #ffd25a; padding-top: 18px; padding-bottom: 16px; }
+.pod.p2 { --pc: #c9d2e0; }
+.pod.p3 { --pc: #e0915a; }
+.pod.me { box-shadow: 0 0 0 2px var(--gold) inset; }
+.pod-rank { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--pc); color: #1b1408; font: 900 13px Unbounded, sans-serif; }
+.pod-face { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; background: rgba(8, 6, 14, 0.7); border: 2px solid var(--pc); font: 800 20px Unbounded, sans-serif; color: var(--pc); }
+.pod.p1 .pod-face { width: 56px; height: 56px; font-size: 24px; }
+.pod b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 800 12px Manrope, sans-serif; }
+.pod-score { font: 900 14px Unbounded, sans-serif; color: var(--pc); white-space: nowrap; }
+.pod small { color: var(--muted); font-size: 10.5px; white-space: nowrap; }
+.table li.pinned { position: sticky; bottom: 76px; z-index: 2; background: rgb(28, 22, 40); box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.45); }

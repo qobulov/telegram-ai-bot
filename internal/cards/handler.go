@@ -65,8 +65,8 @@ type Store interface {
 	BossWeek(ctx context.Context, week time.Time) (int64, error)
 	BossPlayerOf(ctx context.Context, userID int64, rules storage.BossRules) (storage.BossPlayer, error)
 	RecordBossFight(ctx context.Context, userID int64, damage int64, level int, rules storage.BossRules) (storage.BossOutcome, error)
-	BossTop(ctx context.Context, week time.Time, limit int) ([]storage.BossRow, error)
-	BossPlace(ctx context.Context, week time.Time, userID int64) (storage.BossRow, int, int, error)
+	BossTop(ctx context.Context, week time.Time, limit int, byTotal bool) ([]storage.BossRow, error)
+	BossPlace(ctx context.Context, week time.Time, userID int64, byTotal bool) (storage.BossRow, int, int, error)
 	PayBossWeek(ctx context.Context, week time.Time, prizes []storage.ArenaPrize, note func(place int) string) (int, bool, error)
 	OpenArenaPack(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, price int, now time.Time, quest storage.CardQuest) (storage.CardOpening, int, error)
 	CardQuests(ctx context.Context, userID int64, day time.Time) (map[string]storage.QuestProgress, error)
@@ -451,7 +451,7 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return h.bossFight(ctx, opened.User)
 	case "boss_top":
 		h.payBossWeek(ctx)
-		return h.bossTop(ctx, opened.User)
+		return h.bossTop(ctx, opened.User, req.Query == "total")
 	case "arena_shop":
 		return h.arenaShop(ctx, opened.User, req.Item)
 	case "quests":

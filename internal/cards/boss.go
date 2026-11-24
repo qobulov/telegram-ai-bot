@@ -188,7 +188,7 @@ func (h *handler) bossView(ctx context.Context, user miniapp.User) (any, failure
 	if b.hasTeam {
 		view["team"], view["power"] = b.mine.views, b.mine.team.Power()
 	}
-	_, place, _, err := h.Store.BossPlace(ctx, b.rules.Week, user.ID)
+	_, place, _, err := h.Store.BossPlace(ctx, b.rules.Week, user.ID, false)
 	if err != nil {
 		h.Logger.Error("could not read a boss place", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
@@ -233,23 +233,27 @@ func (h *handler) bossFight(ctx context.Context, user miniapp.User) (any, failur
 	}, failure{}
 }
 
-// bossTop is the week's boss table: the players of the best fights, and the
-// player's own place.
-func (h *handler) bossTop(ctx context.Context, user miniapp.User) (any, failure) {
+// bossTop is the week's boss table: the players of the best fights, or,
+// byTotal, of the most damage, the player's own place, and when the week
+// ends.
+func (h *handler) bossTop(ctx context.Context, user miniapp.User, byTotal bool) (any, failure) {
 	week := arenaWeekStart(h.Now())
-	top, err := h.Store.BossTop(ctx, week, topSize)
+	top, err := h.Store.BossTop(ctx, week, topSize, byTotal)
 	if err != nil {
 		h.Logger.Error("could not read the boss table", "error", err)
 		return nil, errUnavailable
 	}
 	rows := make([]map[string]any, len(top))
 	for i, r := range top {
-		rows[i] = map[string]any{"name": r.Name, "best": r.Best, "level": r.Level, "me": r.UserID == user.ID}
+		rows[i] = map[string]any{"name": r.Name, "best": r.Best, "level": r.Level, "sum": r.Total, "me": r.UserID == user.ID}
 	}
-	me, place, total, err := h.Store.BossPlace(ctx, week, user.ID)
+	me, place, total, err := h.Store.BossPlace(ctx, week, user.ID, byTotal)
 	if err != nil {
 		h.Logger.Error("could not read a boss place", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
 	}
-	return map[string]any{"top": rows, "me": map[string]any{"place": place, "total": total, "name": me.Name, "best": me.Best, "level": me.Level}}, failure{}
+	return map[string]any{
+		"top": rows, "by_total": byTotal, "ends": week.AddDate(0, 0, 7).UnixMilli(),
+		"me": map[string]any{"place": place, "total": total, "name": me.Name, "best": me.Best, "level": me.Level, "sum": me.Total},
+	}, failure{}
 }

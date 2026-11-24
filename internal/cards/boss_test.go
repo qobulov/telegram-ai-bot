@@ -61,19 +61,23 @@ func (f *fakeStore) RecordBossFight(ctx context.Context, userID int64, damage in
 	return storage.BossOutcome{Tries: p.Tries + 1, Coins: f.arena.coins[userID]}, nil
 }
 
-func (f *fakeStore) BossTop(_ context.Context, week time.Time, limit int) ([]storage.BossRow, error) {
-	best, level := map[int64]int64{}, map[int64]int{}
+func (f *fakeStore) BossTop(_ context.Context, week time.Time, limit int, byTotal bool) ([]storage.BossRow, error) {
+	best, level, sum := map[int64]int64{}, map[int64]int{}, map[int64]int64{}
 	for _, b := range f.boss {
 		if b.week.Equal(week) {
 			best[b.user], level[b.user] = max(best[b.user], b.damage), max(level[b.user], b.level)
+			sum[b.user] += b.damage
 		}
 	}
 	var top []storage.BossRow
 	for id, d := range best {
-		top = append(top, storage.BossRow{UserID: id, Best: d, Level: level[id]})
+		top = append(top, storage.BossRow{UserID: id, Best: d, Level: level[id], Total: sum[id]})
 	}
 	slices.SortFunc(top, func(a, b storage.BossRow) int {
-		if a.Level != b.Level {
+		if byTotal && a.Total != b.Total {
+			return int(b.Total - a.Total)
+		}
+		if !byTotal && a.Level != b.Level {
 			return b.Level - a.Level
 		}
 		if a.Best != b.Best {
@@ -84,8 +88,8 @@ func (f *fakeStore) BossTop(_ context.Context, week time.Time, limit int) ([]sto
 	return top[:min(limit, len(top))], nil
 }
 
-func (f *fakeStore) BossPlace(ctx context.Context, week time.Time, userID int64) (storage.BossRow, int, int, error) {
-	top, _ := f.BossTop(ctx, week, 1<<30)
+func (f *fakeStore) BossPlace(ctx context.Context, week time.Time, userID int64, byTotal bool) (storage.BossRow, int, int, error) {
+	top, _ := f.BossTop(ctx, week, 1<<30, byTotal)
 	for i, r := range top {
 		if r.UserID == userID {
 			return r, i + 1, len(top), nil

@@ -63,14 +63,21 @@ func TestBossTable(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	top, err := store.BossTop(ctx, bossRules.Week, 10)
+	top, err := store.BossTop(ctx, bossRules.Week, 10, false)
 	if err != nil || len(top) != 2 || top[0].Name != "Alice" || top[0].Level != 6 || top[0].Best != 900 || top[1].Level != 5 || top[1].Best != 5000 {
 		t.Fatalf("top = %+v, %v", top, err)
 	}
-	if me, place, total, err := store.BossPlace(ctx, bossRules.Week, 2); err != nil || place != 2 || total != 2 || me.Best != 5000 || me.Level != 5 {
+	if me, place, total, err := store.BossPlace(ctx, bossRules.Week, 2, false); err != nil || place != 2 || total != 2 || me.Best != 5000 || me.Level != 5 {
 		t.Errorf("Bob's place = %+v %d of %d, %v", me, place, total, err)
 	}
-	if _, place, _, err := store.BossPlace(ctx, bossRules.Week, 3); err != nil || place != 0 {
+	// by all the damage of the week, Bob's 5000 beats Alice's 100 and 900
+	if total, err := store.BossTop(ctx, bossRules.Week, 10, true); err != nil || len(total) != 2 || total[0].UserID != 2 || total[0].Total != 5000 || total[1].Total != 1000 {
+		t.Errorf("top by total = %+v, %v", total, err)
+	}
+	if me, place, _, err := store.BossPlace(ctx, bossRules.Week, 1, true); err != nil || place != 2 || me.Total != 1000 {
+		t.Errorf("Alice's place by total = %+v %d, %v", me, place, err)
+	}
+	if _, place, _, err := store.BossPlace(ctx, bossRules.Week, 3, false); err != nil || place != 0 {
 		t.Errorf("a stranger's place = %d, %v", place, err)
 	}
 }
