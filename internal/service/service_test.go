@@ -589,7 +589,7 @@ func TestAgentErrorShowsGenericError(t *testing.T) {
 
 	sent := f.run(textFrom(userID, "hi"))
 
-	expectOneReply(t, sent, textError.uz)
+	expectOneReply(t, sent, textsFailure[failureError][0].uz)
 	if strings.Contains(sent[0].text, "sk-or-secret") || strings.Contains(sent[0].text, "401") {
 		t.Errorf("reply leaks the internal error: %q", sent[0].text)
 	}
@@ -607,7 +607,7 @@ func TestEmptyAnswerIsSilentInAGroup(t *testing.T) {
 
 	f = newFixture()
 	f.replier.err = fmt.Errorf("agent: %w", ai.ErrEmptyResponse)
-	expectOneReply(t, f.run(textFrom(userID, "hi")), textError.uz)
+	expectOneReply(t, f.run(textFrom(userID, "hi")), textsFailure[failureError][0].uz)
 }
 
 // A turn the provider's filter refused says so in a private chat, and to
@@ -647,7 +647,7 @@ func TestAgentTimeoutShowsTimeoutText(t *testing.T) {
 	f := newFixture()
 	f.replier.err = context.DeadlineExceeded
 
-	expectOneReply(t, f.run(textFrom(userID, "hi")), textTimeout.uz)
+	expectOneReply(t, f.run(textFrom(userID, "hi")), textsFailure[failureTimeout][0].uz)
 }
 
 func TestTimeoutReplyIsDeliveredAfterTheTurnDeadline(t *testing.T) {
@@ -655,7 +655,7 @@ func TestTimeoutReplyIsDeliveredAfterTheTurnDeadline(t *testing.T) {
 	f.opts.TurnTimeout = 20 * time.Millisecond
 	f.replier.waitForDeadline = true
 
-	expectOneReply(t, f.run(textFrom(userID, "hi")), textTimeout.uz)
+	expectOneReply(t, f.run(textFrom(userID, "hi")), textsFailure[failureTimeout][0].uz)
 }
 
 func TestDuplicateUpdateIsSilent(t *testing.T) {
@@ -1626,8 +1626,8 @@ func TestGroupErrorsAreSentAsReplies(t *testing.T) {
 		err  error
 		want string
 	}{
-		"provider error": {errors.New("openrouter: status 502: upstream sk-or-secret"), textError.uz},
-		"timeout":        {context.DeadlineExceeded, textTimeout.uz},
+		"provider error": {errors.New("openrouter: status 502: upstream sk-or-secret"), textsFailure[failureError][0].uz},
+		"timeout":        {context.DeadlineExceeded, textsFailure[failureTimeout][0].uz},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -1939,7 +1939,7 @@ func TestOverloadedProviderGetsItsOwnMessage(t *testing.T) {
 
 		sent := f.run(inGroup(groupMessage("Mira, alive?")))
 
-		expectOneReply(t, sent, textOverloaded.uz)
+		expectOneReply(t, sent, textsFailure[failureOverloaded][0].uz)
 		if sent[0].replyTo != 30 {
 			t.Errorf("status %d: the notice does not reply to the message: %+v", status, sent[0])
 		}
@@ -3606,7 +3606,7 @@ func TestFailedTurnReleasesItsReservation(t *testing.T) {
 		f.opts.TurnTimeout = 20 * time.Millisecond
 		f.replier.waitForDeadline = true
 
-		expectOneReply(t, f.run(textFrom(userID, "hi")), textTimeout.uz)
+		expectOneReply(t, f.run(textFrom(userID, "hi")), textsFailure[failureTimeout][0].uz)
 		if _, released := quota.recorded(); len(released) != 1 {
 			t.Errorf("released = %v; a turn out of time must still give its answer back", released)
 		}
@@ -4076,5 +4076,27 @@ func TestGroupCreatorHasNoLimits(t *testing.T) {
 	g.members.creator = userID + 1
 	if sent := g.run(inGroup(groupMessage("@MyBot one", "@MyBot")), inGroup(groupMessage("@MyBot two", "@MyBot"))); len(sent) != 1 {
 		t.Errorf("a member got %+v", sent)
+	}
+}
+
+// A chat whose replies fail is told with a joke, a different one each time,
+// three times at most in a run of failures; then the bot stays quiet until
+// an hour passes without one.
+func TestFailuresAreToldWithAJokeThreeTimes(t *testing.T) {
+	f := newFixture()
+	failures := &memoryFailures{}
+	f.opts.Failures = failures
+	f.replier.err = errors.New("boom")
+	sent := f.run(textFrom(userID, "a"), textFrom(userID, "b"), textFrom(userID, "c"), textFrom(userID, "d"))
+	if len(sent) != failureNotices {
+		t.Fatalf("sent %d replies to 4 failures, want %d: %+v", len(sent), failureNotices, sent)
+	}
+	for i, m := range sent {
+		if m.text != textsFailure[failureError][i].uz {
+			t.Errorf("reply %d = %q, want %q", i, m.text, textsFailure[failureError][i].uz)
+		}
+	}
+	if n, _ := failures.NoteFailure(context.Background(), userID, time.Now().Add(2*failureQuiet), failureQuiet); n != 1 {
+		t.Errorf("after an hour's quiet the count is %d, want 1", n)
 	}
 }

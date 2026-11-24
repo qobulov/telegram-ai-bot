@@ -1536,15 +1536,15 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 		return outcome{text: s.aiLimitNotice(in), skipped: "ai_limit", skipDetail: err.Error()}
 	case ai.IsOverloaded(err):
 		log.Warn("model provider overloaded or over its limits", "error", err)
-		return outcome{text: textOverloaded.to(in), skipped: "overloaded", skipDetail: err.Error()}
+		return outcome{text: s.failureNotice(in, failureOverloaded), skipped: "overloaded", skipDetail: err.Error()}
 	case errors.Is(err, context.DeadlineExceeded):
 		log.Warn("turn timed out")
-		return outcome{text: textTimeout.to(in), skipped: "timeout", skipDetail: err.Error()}
+		return outcome{text: s.failureNotice(in, failureTimeout), skipped: "timeout", skipDetail: err.Error()}
 	default:
 		// The error is logged in full but never shown: it can carry provider
 		// or database details the user must not see.
 		log.Error("turn failed", "error", err)
-		return outcome{text: textError.to(in), skipped: "error", skipDetail: err.Error()}
+		return outcome{text: s.failureNotice(in, failureError), skipped: "error", skipDetail: err.Error()}
 	}
 }
 

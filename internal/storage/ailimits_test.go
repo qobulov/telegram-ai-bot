@@ -25,3 +25,21 @@ func TestNoteAILimitCountsAnOutage(t *testing.T) {
 		t.Errorf("after a quiet time = %d, want 1 again", n)
 	}
 }
+
+// A chat's failures count up within a run and start anew after quiet.
+func TestNoteFailure(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	now := time.Date(2026, 11, 24, 12, 0, 0, 0, time.UTC)
+	for want := 1; want <= 3; want++ {
+		if n, err := store.NoteFailure(ctx, -100, now, time.Hour); err != nil || n != want {
+			t.Fatalf("failure %d = %d, %v", want, n, err)
+		}
+	}
+	if n, _ := store.NoteFailure(ctx, -200, now, time.Hour); n != 1 {
+		t.Errorf("another chat counts %d, want 1", n)
+	}
+	if n, _ := store.NoteFailure(ctx, -100, now.Add(2*time.Hour), time.Hour); n != 1 {
+		t.Errorf("after the quiet = %d, want 1", n)
+	}
+}

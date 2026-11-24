@@ -282,6 +282,10 @@ type Options struct {
 	// running out, so that it is told only a few times. Nil counts in this
 	// process alone.
 	AILimits AILimitLog
+	// Failures counts each chat's replies lost to an error, a timeout or
+	// an overloaded model, so that it is told with a joke only a few times.
+	// Nil counts in this process alone.
+	Failures FailureLog
 	// PrivateQuota counts the answers each user gets in private chats: at
 	// most PrivateDailyLimit a day, from midnight in Location. Owners are not
 	// counted. Nil, or a limit of 0, does not limit.
@@ -473,6 +477,7 @@ type Service struct {
 
 	opts        Options
 	aiLimits    AILimitLog
+	failures    FailureLog
 	userLimiter *limiter
 	ambient     *ambient
 	queues      []chan incoming
@@ -662,6 +667,10 @@ func New(opts Options) *Service {
 		s.workers.Go(func() { s.work(queue) })
 	}
 	s.notifier.Go(s.sendBusyNotices)
+	s.failures = opts.Failures
+	if s.failures == nil {
+		s.failures = &memoryFailures{}
+	}
 	s.aiLimits = opts.AILimits
 	if s.aiLimits == nil {
 		s.aiLimits = &memoryAILimits{}
