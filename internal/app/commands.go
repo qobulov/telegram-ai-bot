@@ -42,6 +42,7 @@ var commandMenus = map[string][]telegram.BotCommand{
 		{Command: "help", Description: "Yordam va buyruqlar"},
 		{Command: "card", Description: "Kartalar o'yini: har 2 soatda token, 1x/5x ochish, kolleksiya"},
 		{Command: "games", Description: "Barcha o'yinlar"},
+		{Command: "kassa", Description: "Kassa: kirim, chiqim va qoldiq"},
 		{Command: "id", Description: "Sizning ID'ingiz"},
 	},
 	telegram.ScopeAllGroupChats: membersMenu,

@@ -838,6 +838,9 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 	if topic, ok := s.gifRequest(in); ok {
 		return s.gifAnswer(in, topic)
 	}
+	if isKassa(in) {
+		return s.kassaCommand(in)
+	}
 	if commandName(in.text) == "/start" {
 		if out, ok := s.startCards(in); ok {
 			return out

@@ -460,6 +460,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 	if g := newGame(cfg); g != nil {
 		opts.StatsURL = statsPage(cfg)
 		opts.CardsURL = cardsPage(cfg)
+		opts.KassaURL = kassaPage(cfg)
 		opts.Game, opts.GameTable = g, bot.Client
 	}
 	if mode.Serverless {

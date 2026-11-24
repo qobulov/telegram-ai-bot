@@ -300,7 +300,10 @@ type Options struct {
 	CardsAPI string
 	// CardsURL is the page of Kartalar's Mini App, which /card and its
 	// buttons open; "" for none.
-	CardsURL          string
+	CardsURL string
+	// KassaURL is the page of Kassa, the cash book Mini App, which /kassa
+	// opens; "" for none.
+	KassaURL          string
 	PremiumPrice      int
 	PremiumDays       int
 	PremiumDailyLimit int

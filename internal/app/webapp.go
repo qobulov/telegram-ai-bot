@@ -9,6 +9,7 @@ import (
 	"telegram-ai-bot/internal/cards"
 	"telegram-ai-bot/internal/config"
 	"telegram-ai-bot/internal/game"
+	"telegram-ai-bot/internal/kassa"
 	"telegram-ai-bot/internal/mafia"
 	"telegram-ai-bot/internal/miniapp"
 	"telegram-ai-bot/internal/raid"
@@ -17,12 +18,39 @@ import (
 )
 
 // The pages WEBAPP_URL serves, from public/: the group dashboard Mini App,
-// the games and the Kartalar Mini App.
+// the games, the Kartalar Mini App and Kassa, the cash book.
 const (
 	statsPath = "/stats/"
 	gamePath  = "/game/"
 	cardsPath = "/kartalar/"
+	kassaPath = "/kassa/"
 )
+
+// kassaPage is the Kassa Mini App's page, "" when WEBAPP_URL is not set.
+func kassaPage(cfg config.Config) string {
+	if cfg.WebAppURL == "" {
+		return ""
+	}
+	return cfg.WebAppURL + kassaPath
+}
+
+// NewKassa builds the Kassa Mini App's API: each user's cash book, kept in
+// the database.
+func NewKassa(ctx context.Context, cfg config.Config, logger *slog.Logger) (*Endpoint, error) {
+	if cfg.WebAppURL == "" {
+		return nil, errNoPages
+	}
+	store, err := storage.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return nil, err
+	}
+	if err := store.CheckSchema(ctx); err != nil {
+		store.Close()
+		return nil, err
+	}
+	handler := kassa.NewHandler(kassa.Options{BotToken: cfg.TelegramToken, Store: store, Logger: logger})
+	return &Endpoint{Handler: handler, Close: store.Close}, nil
+}
 
 // cardsPage is the Kartalar Mini App's page, "" when WEBAPP_URL is not set.
 func cardsPage(cfg config.Config) string {

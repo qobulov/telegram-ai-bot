@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>Kassa</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+  <main id="app" aria-live="polite">
+    <section id="state" class="state" hidden></section>
+
+    <section id="home" class="view" hidden>
+      <p class="eyebrow" data-t="kassa">Kassa</p>
+      <div class="balance">
+        <span class="label" data-t="balance">Qoldiq</span>
+        <strong class="money" id="homeBalance">0</strong>
+      </div>
+      <div class="tiles">
+        <button type="button" class="tile in" data-open="in">
+          <span class="icon">↓</span>
+          <span class="name" data-t="in">Kirim</span>
+          <span class="sum" id="homeIn">0</span>
+        </button>
+        <button type="button" class="tile out" data-open="out">
+          <span class="icon">↑</span>
+          <span class="name" data-t="out">Chiqim</span>
+          <span class="sum" id="homeOut">0</span>
+        </button>
+      </div>
+    </section>
+
+    <section id="book" class="view" hidden>
+      <div class="balance" id="bookTop">
+        <span class="label" id="bookLabel">Qoldiq</span>
+        <strong class="money" id="bookSum">0</strong>
+      </div>
+      <form id="form" class="card form" autocomplete="off">
+        <label>
+          <span data-t="date">Sana</span>
+          <input type="date" id="day" required>
+        </label>
+        <label>
+          <span id="amountLabel">Summa</span>
+          <input type="text" id="amount" inputmode="numeric" placeholder="0" required>
+        </label>
+        <label>
+          <span data-t="note">Ma'lumot</span>
+          <input type="text" id="note" maxlength="300">
+        </label>
+        <button type="submit" class="save" id="save" data-t="save">Saqlash</button>
+      </form>
+      <h2 id="listTitle">Yozuvlar</h2>
+      <ul class="list" id="list"></ul>
+      <p class="empty" id="empty" data-t="empty" hidden>Hali yozuv yo'q</p>
+    </section>
+  </main>
+  <div class="toast" id="toast" hidden></div>
+  <script src="app.js?v=1"></script>
+</body>
+</html>
