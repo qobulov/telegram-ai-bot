@@ -1552,3 +1552,9 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .table li.pinned { position: sticky; bottom: 76px; z-index: 2; background: rgb(28, 22, 40); box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.45); }
 #bossMe .arena-rating b { font-size: 20px; white-space: nowrap; }
 #bossMe .arena-left { min-width: 0; text-align: right; }
+
+/* a table's head line: when its week ends and the button to its prizes */
+.board-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px; }
+.board-prizes { padding: 7px 14px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--gold) 60%, transparent); background: linear-gradient(180deg, rgba(255, 210, 90, 0.16), rgba(255, 210, 90, 0.05)); color: var(--gold); font: 800 12px Manrope, sans-serif; }
+.board-prizes.wide { width: 100%; padding: 11px 14px; font-size: 13px; }
+.week-panel { margin: 0; }

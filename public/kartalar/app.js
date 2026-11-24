@@ -9,7 +9,7 @@
 
   const texts = {
     uz: {
-      arenaTab: "Arena", towerTab: "🗼 Minora", arenaShop: "🪙 Arena do'koni", arenaTeam: "⚔️ Jamoangiz", arenaSave: "Jamoani saqlash", arenaFoes: "🎯 Raqiblar", arenaHistory: "📜 Janglar tarixi", arenaRefresh: "🔄 Yangilash", topCards: "🎴 Kartalar", topArena: "⚔️ Arena", topTower: "🗼 Minora", towerRow: (n) => `${n}-qavat`, noTowerTop: "Hali hech kim minoradan qavat o'tmagan", bossTab: "👹 Boss", topBoss: "👹 Boss", bossByLevel: "👹 Daraja", bossByTotal: "💥 Jami zarba", bossRow: (n) => `eng zo'r jang: 💥 ${n}`, noBossTop: "Bu hafta hali hech kim bossga hujum qilmagan",
+      arenaTab: "Arena", towerTab: "🗼 Minora", arenaShop: "🪙 Arena do'koni", arenaTeam: "⚔️ Jamoangiz", arenaSave: "Jamoani saqlash", arenaFoes: "🎯 Raqiblar", arenaHistory: "📜 Janglar tarixi", arenaRefresh: "🔄 Yangilash", topCards: "🎴 Kartalar", topArena: "⚔️ Arena", topTower: "🗼 Minora", towerRow: (n) => `${n}-qavat`, noTowerTop: "Hali hech kim minoradan qavat o'tmagan", bossTab: "👹 Boss", topBoss: "👹 Boss", bossByLevel: "👹 Daraja", bossByTotal: "💥 Jami zarba", prizesButton: "🎁 Mukofotlar", bossRow: (n) => `eng zo'r jang: 💥 ${n}`, noBossTop: "Bu hafta hali hech kim bossga hujum qilmagan",
       title: "Kartalar", collected: "to'plandi", animeTab: "Animelar", animeSearch: "Anime yoki personaj", animeBack: "← Barcha animelar", animeOwned: "✓ Sizda bor", animeMissing: "Sizda hali yo'q", animeEmpty: "Hech narsa topilmadi", animeGoal: (n) => `🎟 Hammasini yig'ing: +${n} token`, animeClaim: (n) => `🎁 ${n} token olish`, animeClaimed: (n) => `✅ ${n} token olingan`, animeGot: (n) => `🎟 +${n} token! Kolleksiya to'liq`, collection: "Kolleksiya", draw: "Olish", top: "Reyting",
       search: "Kartani qidirish", rarities: ["Oddiy", "Noyob", "Epik", "Afsonaviy", "Mifik"],
       drawNow: "Karta olish", drawing: "Ochilmoqda…", next: (t) => `Keyingi karta: ${t}`, ready: "Karta tayyor!",
@@ -43,7 +43,7 @@
       paid: "✅ To'lov qabul qilindi, kristall qo'shilmoqda…", crystalsAdded: (n) => `💎 +${n} kristall qo'shildi!`, payFailed: "To'lov amalga oshmadi", bought: (n) => `🎟 +${n} token`, packOpened: (r) => `${r} paket`,
     },
     ru: {
-      arenaTab: "Арена", towerTab: "🗼 Башня", arenaShop: "🪙 Магазин арены", arenaTeam: "⚔️ Ваша команда", arenaSave: "Сохранить команду", arenaFoes: "🎯 Соперники", arenaHistory: "📜 История боёв", arenaRefresh: "🔄 Обновить", topCards: "🎴 Карты", topArena: "⚔️ Арена", topTower: "🗼 Башня", towerRow: (n) => `${n} этаж`, noTowerTop: "Ещё никто не прошёл этаж башни", bossTab: "👹 Босс", topBoss: "👹 Босс", bossByLevel: "👹 Уровень", bossByTotal: "💥 Весь урон", bossRow: (n) => `лучший бой: 💥 ${n}`, noBossTop: "На этой неделе босса ещё никто не атаковал",
+      arenaTab: "Арена", towerTab: "🗼 Башня", arenaShop: "🪙 Магазин арены", arenaTeam: "⚔️ Ваша команда", arenaSave: "Сохранить команду", arenaFoes: "🎯 Соперники", arenaHistory: "📜 История боёв", arenaRefresh: "🔄 Обновить", topCards: "🎴 Карты", topArena: "⚔️ Арена", topTower: "🗼 Башня", towerRow: (n) => `${n} этаж`, noTowerTop: "Ещё никто не прошёл этаж башни", bossTab: "👹 Босс", topBoss: "👹 Босс", bossByLevel: "👹 Уровень", bossByTotal: "💥 Весь урон", prizesButton: "🎁 Награды", bossRow: (n) => `лучший бой: 💥 ${n}`, noBossTop: "На этой неделе босса ещё никто не атаковал",
       title: "Карты", collected: "собрано", animeTab: "Аниме", animeSearch: "Аниме или персонаж", animeBack: "← Все аниме", animeOwned: "✓ Есть у вас", animeMissing: "Пока нет у вас", animeEmpty: "Ничего не найдено", animeGoal: (n) => `🎟 Соберите всех: +${n} токенов`, animeClaim: (n) => `🎁 Забрать ${n} токенов`, animeClaimed: (n) => `✅ ${n} токенов получено`, animeGot: (n) => `🎟 +${n} токенов! Коллекция собрана`, collection: "Коллекция", draw: "Получить", top: "Рейтинг",
       search: "Поиск по картам", rarities: ["Обычная", "Редкая", "Эпическая", "Легендарная", "Мифическая"],
       drawNow: "Получить карту", drawing: "Открываем…", next: (t) => `Следующая карта: ${t}`, ready: "Карта готова!",
@@ -77,7 +77,7 @@
       paid: "✅ Оплата принята, кристаллы зачисляются…", crystalsAdded: (n) => `💎 +${n} кристаллов!`, payFailed: "Оплата не прошла", bought: (n) => `🎟 +${n} токенов`, packOpened: (r) => `Пак: ${r}`,
     },
     en: {
-      arenaTab: "Arena", towerTab: "🗼 Tower", arenaShop: "🪙 Arena shop", arenaTeam: "⚔️ Your team", arenaSave: "Save the team", arenaFoes: "🎯 Opponents", arenaHistory: "📜 Battle history", arenaRefresh: "🔄 Refresh", topCards: "🎴 Cards", topArena: "⚔️ Arena", topTower: "🗼 Tower", towerRow: (n) => `Floor ${n}`, noTowerTop: "Nobody has cleared a tower floor yet", bossTab: "👹 Boss", topBoss: "👹 Boss", bossByLevel: "👹 Level", bossByTotal: "💥 Total damage", bossRow: (n) => `best fight: 💥 ${n}`, noBossTop: "Nobody has fought the boss this week yet",
+      arenaTab: "Arena", towerTab: "🗼 Tower", arenaShop: "🪙 Arena shop", arenaTeam: "⚔️ Your team", arenaSave: "Save the team", arenaFoes: "🎯 Opponents", arenaHistory: "📜 Battle history", arenaRefresh: "🔄 Refresh", topCards: "🎴 Cards", topArena: "⚔️ Arena", topTower: "🗼 Tower", towerRow: (n) => `Floor ${n}`, noTowerTop: "Nobody has cleared a tower floor yet", bossTab: "👹 Boss", topBoss: "👹 Boss", bossByLevel: "👹 Level", bossByTotal: "💥 Total damage", prizesButton: "🎁 Prizes", bossRow: (n) => `best fight: 💥 ${n}`, noBossTop: "Nobody has fought the boss this week yet",
       title: "Cards", collected: "collected", animeTab: "Anime", animeSearch: "Anime or character", animeBack: "← All anime", animeOwned: "✓ You have it", animeMissing: "Not yours yet", animeEmpty: "Nothing found", animeGoal: (n) => `🎟 Collect them all: +${n} tokens`, animeClaim: (n) => `🎁 Claim ${n} tokens`, animeClaimed: (n) => `✅ ${n} tokens claimed`, animeGot: (n) => `🎟 +${n} tokens! Collection complete`, collection: "Collection", draw: "Draw", top: "Ranking",
       search: "Search cards", rarities: ["Common", "Rare", "Epic", "Legendary", "Mythic"],
       drawNow: "Draw a card", drawing: "Opening…", next: (t) => `Next card in ${t}`, ready: "A card is ready!",
@@ -1419,25 +1419,15 @@
       const data = await api(kind === "arena" ? "arena" : kind === "tower" ? "tower_top" : kind === "boss" ? "boss_top" : "top", kind === "boss" && bossByTotal ? { query: "total" } : undefined);
       if (asked !== topAsked) return;
       notice(null);
-      $("arenaWeek").hidden = kind !== "arena";
-      if (kind === "arena") { arenaTable(data.top || [], data.me, data.player); arenaWeek(data.week); return; }
+      $("arenaWeek").hidden = true;
+      if (kind === "arena") { arenaTable(data); return; }
       if (kind === "tower") { towerTable(data.top || [], data.me); return; }
       if (kind === "boss") { bossTable(data); return; }
-      const table = $("table");
-      table.textContent = "";
-      if (!data.top.length) table.innerHTML = `<p class="empty">${t.noTop}</p>`;
-      data.top.forEach((row, i) => {
-        const li = document.createElement("li");
-        if (row.me) li.className = "me";
-        li.innerHTML = `<span class="pos"></span><span class="who"><b></b><small></small></span><span class="pts"></span>`;
-        li.querySelector(".pos").textContent = ["🥇", "🥈", "🥉"][i] || i + 1;
-        li.querySelector(".who b").textContent = row.name || "?";
-        li.querySelector(".who small").textContent = t.cards(row.cards);
-        li.querySelector(".pts").textContent = spaced(row.points);
-        table.append(li);
+      const me = data.me || {};
+      rankBoard({
+        rows: data.top || [], me, empty: t.noTop,
+        score: (row) => `🎴 ${spaced(row.points || 0)}`, detail: (row) => t.cards(row.cards || 0),
       });
-      const me = data.me;
-      if (me && me.place > data.top.length) table.append(placeRow(me.place, me.total, me.name, t.cards(me.cards), spaced(me.points)));
     } catch (error) {
       if (asked === topAsked) notice(error);
     }
@@ -3225,17 +3215,12 @@
     box.textContent = "";
     box.hidden = !week;
     if (!week) return;
-    const head = document.createElement("b"), rule = document.createElement("small"), mine = document.createElement("p"), list = document.createElement("div");
-    head.textContent = at.week;
-    rule.textContent = at.boss.prizeRule;
-    mine.textContent = week.place ? at.weekPlace(week.place, week.prize, week.boxes) : at.boss.noBest;
-    list.className = "prizes";
-    for (const p of week.prizes || []) {
-      const chip = document.createElement("span");
-      chip.textContent = `${at.weekRow(p.from, p.to)}: ${p.tokens} 🎟${p.boxes ? ` + ${p.boxes} 🎁` : ""}`;
-      list.append(chip);
-    }
-    box.append(head, rule, list, mine);
+    const gift = document.createElement("button");
+    gift.type = "button";
+    gift.className = "board-prizes wide";
+    gift.textContent = week.place ? `${t.prizesButton} · ${at.weekPlace(week.place, week.prize, week.boxes)}` : t.prizesButton;
+    gift.addEventListener("click", () => { haptic("light"); showPanel(weekPanel({ ...week, ends: bossData && bossData.ends }, at.boss.prizeRule, "")); });
+    box.append(gift);
   }
 
   $("bossFight").addEventListener("click", async () => {
@@ -3606,56 +3591,76 @@
   // owners asked on 2026-11-22, and the player's own row below if they are
   // not on it.
   function towerTable(top, me) {
-    const table = $("table");
-    table.textContent = "";
-    if (!top.length) table.innerHTML = `<p class="empty">${t.noTowerTop}</p>`;
-    top.forEach((row, i) => {
-      const li = document.createElement("li");
-      if (row.me) li.className = "me";
-      li.innerHTML = `<span class="pos"></span><span class="who"><b></b><small></small></span><span class="pts"></span>`;
-      li.querySelector(".pos").textContent = ["🥇", "🥈", "🥉"][i] || i + 1;
-      li.querySelector(".who b").textContent = row.name || "?";
-      li.querySelector(".who small").textContent = t.towerRow(row.floor);
-      li.querySelector(".pts").textContent = `🗼 ${row.floor}`;
-      table.append(li);
-    });
-    if (me && me.place > top.length) table.append(placeRow(me.place, me.total, me.name, t.towerRow(me.floor), `🗼 ${me.floor}`));
+    rankBoard({ rows: top, me: me || {}, empty: t.noTowerTop, score: (row) => `🗼 ${row.floor || 0}`, detail: (row) => t.towerRow(row.floor || 0) });
   }
 
-  // bossTable is the boss's table of the week, as the owners asked on
-  // 2026-11-24 after a game they liked: when the week ends, two chips (the
-  // best level, or all the damage of the week), the top three on a podium,
-  // the second and third beside the first, the rest in rows, and the
-  // player's own row kept at the bottom.
+  // bossTable is the boss's table of the week: two chips (the best level,
+  // or all the damage of the week) and the week's prizes behind a button.
   let bossByTotal = false;
   function bossTable(data) {
+    rankBoard({
+      rows: data.top || [], me: data.me || {}, empty: t.noBossTop, ends: data.ends,
+      score: (row) => (bossByTotal ? `💥 ${big(row.sum || 0)}` : `👹 ${row.level || 0}`),
+      detail: (row) => (bossByTotal ? t.bossRow(spaced(row.best || 0)) : `💥 ${big(row.best || 0)}`),
+      chips: [[false, t.bossByLevel], [true, t.bossByTotal]].map(([byTotal, label]) => ({
+        label, on: byTotal === bossByTotal,
+        pick: () => { if (bossByTotal !== byTotal) { bossByTotal = byTotal; ranking(); } },
+      })),
+      prizes: data.week ? () => showPanel(weekPanel(data.week, at.boss.prizeRule, "")) : null,
+    });
+  }
+
+  // rankBoard lays out a table as the owners asked on 2026-11-24 after a
+  // game they liked, the same for every table: when its week ends and its
+  // prizes behind a button, its chips, the top three on a podium with the
+  // first in the middle, the rest in rows, and the player's own row kept at
+  // the bottom of the screen. score and detail say a row's numbers.
+  function rankBoard(o) {
     const table = $("table");
     table.textContent = "";
-    const top = data.top || [], me = data.me || {};
-    const score = (row) => (bossByTotal ? `💥 ${big(row.sum || 0)}` : `👹 ${row.level || 0}`);
-    const detail = (row) => (bossByTotal ? t.bossRow(spaced(row.best || 0)) : `💥 ${big(row.best || 0)}`);
-    const head = document.createElement("li");
-    head.className = "boss-head";
-    const left = Math.max(0, (data.ends || 0) - Date.now()), hours = Math.floor(left / 3600000);
-    head.innerHTML = '<small></small><div class="sets"></div>';
-    head.querySelector("small").textContent = "⏳ " + at.weekEnds(Math.floor(hours / 24), hours % 24, Math.floor((left % 3600000) / 60000));
-    for (const [byTotal, label] of [[false, t.bossByLevel], [true, t.bossByTotal]]) {
-      const chip = document.createElement("button");
-      chip.type = "button";
-      chip.textContent = label;
-      chip.setAttribute("aria-pressed", String(byTotal === bossByTotal));
-      chip.addEventListener("click", () => { if (bossByTotal !== byTotal) { bossByTotal = byTotal; haptic("light"); ranking(); } });
-      head.querySelector(".sets").append(chip);
+    if (o.ends || o.prizes || o.chips) {
+      const head = document.createElement("li");
+      head.className = "boss-head";
+      const line = document.createElement("div");
+      line.className = "board-line";
+      if (o.ends) {
+        const left = Math.max(0, o.ends - Date.now()), hours = Math.floor(left / 3600000);
+        const ends = document.createElement("small");
+        ends.textContent = "⏳ " + at.weekEnds(Math.floor(hours / 24), hours % 24, Math.floor((left % 3600000) / 60000));
+        line.append(ends);
+      }
+      if (o.prizes) {
+        const gift = document.createElement("button");
+        gift.type = "button";
+        gift.className = "board-prizes";
+        gift.textContent = t.prizesButton;
+        gift.addEventListener("click", () => { haptic("light"); o.prizes(); });
+        line.append(gift);
+      }
+      head.append(line);
+      if (o.chips) {
+        const sets = document.createElement("div");
+        sets.className = "sets";
+        for (const c of o.chips) {
+          const chip = document.createElement("button");
+          chip.type = "button";
+          chip.textContent = c.label;
+          chip.setAttribute("aria-pressed", String(c.on));
+          chip.addEventListener("click", () => { haptic("light"); c.pick(); });
+          sets.append(chip);
+        }
+        head.append(sets);
+      }
+      table.append(head);
     }
-    table.append(head);
-    if (!top.length) {
-      table.insertAdjacentHTML("beforeend", `<p class="empty">${t.noBossTop}</p>`);
+    if (!o.rows.length) {
+      table.insertAdjacentHTML("beforeend", `<p class="empty">${o.empty}</p>`);
       return;
     }
     const podium = document.createElement("li");
     podium.className = "podium";
     for (const i of [1, 0, 2]) {
-      const row = top[i];
+      const row = o.rows[i];
       const cell = document.createElement("div");
       cell.className = `pod p${i + 1}` + (row && row.me ? " me" : "");
       if (row) {
@@ -3663,61 +3668,61 @@
         cell.querySelector(".pod-rank").textContent = i + 1;
         cell.querySelector(".pod-face").textContent = [...(row.name || "?").trim()][0] || "?";
         cell.querySelector("b").textContent = row.name || "?";
-        cell.querySelector(".pod-score").textContent = score(row);
-        cell.querySelector("small").textContent = detail(row);
+        cell.querySelector(".pod-score").textContent = o.score(row);
+        cell.querySelector("small").textContent = o.detail(row);
       }
       podium.append(cell);
     }
     table.append(podium);
-    top.slice(3).forEach((row, i) => {
+    o.rows.slice(3).forEach((row, i) => {
       const li = document.createElement("li");
       if (row.me) li.className = "me";
       li.innerHTML = `<span class="pos"></span><span class="who"><b></b><small></small></span><span class="pts"></span>`;
       li.querySelector(".pos").textContent = i + 4;
       li.querySelector(".who b").textContent = row.name || "?";
-      li.querySelector(".who small").textContent = detail(row);
-      li.querySelector(".pts").textContent = score(row);
+      li.querySelector(".who small").textContent = o.detail(row);
+      li.querySelector(".pts").textContent = o.score(row);
       table.append(li);
     });
-    if (me.place > 0) {
-      const mine = placeRow(me.place, me.total, me.name, detail(me), score(me));
+    // the player's own row, unless the podium already shows them
+    const me = o.me;
+    if (me && me.place > 3) {
+      const mine = placeRow(me.place, me.total, me.name, o.detail(me), o.score(me));
       mine.classList.add("pinned");
       table.append(mine);
     }
   }
 
-  function arenaTable(top, me, player) {
-    const table = $("table");
-    table.textContent = "";
-    if (!top.length) table.innerHTML = `<p class="empty">${at.topEmpty}</p>`;
-    top.forEach((row, i) => {
-      const li = document.createElement("li");
-      if (row.me) li.className = "me";
-      li.innerHTML = `<span class="pos"></span><span class="who"><b></b><small></small></span><span class="pts"></span>`;
-      li.querySelector(".pos").textContent = ["🥇", "🥈", "🥉"][i] || i + 1;
-      li.querySelector(".who b").textContent = row.name || "?";
-      li.querySelector(".who small").textContent = at.topRow(row.wins, row.losses, spaced(row.power));
-      li.querySelector(".pts").textContent = spaced(row.rating);
-      table.append(li);
+  // arenaTable is the arena's table, the week's prizes behind a button.
+  function arenaTable(data) {
+    const player = data.player || {}, week = data.week;
+    const me = { ...(data.me || {}), name: player.name, wins: player.wins, losses: player.losses, power: player.power, rating: player.rating };
+    rankBoard({
+      rows: data.top || [], me, empty: at.topEmpty, ends: week && week.ends,
+      score: (row) => `🏅 ${spaced(row.rating || 0)}`, detail: (row) => at.topRow(row.wins || 0, row.losses || 0, spaced(row.power || 0)),
+      prizes: week ? () => showPanel(weekPanel(week, at.weekRule, week.event ? at.weekEvent : "")) : null,
     });
-    if (me && player && me.place > top.length) table.append(placeRow(me.place, me.total, player.name, at.topRow(player.wins, player.losses, spaced(player.power)), spaced(player.rating)));
   }
 
   // The week's prizes, the player's place now and the time left; the server
   // pays them each Monday.
-  function arenaWeek(week) {
-    const box = $("arenaWeek");
-    box.textContent = "";
-    if (!week) { box.hidden = true; return; }
+  // weekPanel is a week's prizes as a panel: the rule, each place's prize,
+  // the player's place and prize now, and when the week ends.
+  function weekPanel(week, ruleText, eventText) {
+    const box = document.createElement("div");
+    box.className = "arena-week week-panel";
     const left = Math.max(0, week.ends - Date.now()), hours = Math.floor(left / 3600000), minutes = Math.floor(left / 60000) % 60;
     const head = document.createElement("b"), rule = document.createElement("small"), mine = document.createElement("p"), ends = document.createElement("small"), list = document.createElement("div");
     head.textContent = at.week;
-    rule.textContent = at.weekRule;
-    const event = document.createElement("p");
-    event.className = "weekEvent";
-    event.textContent = at.weekEvent;
-    event.hidden = !week.event;
-    mine.textContent = at.weekPlace(week.place, week.prize, week.boxes);
+    rule.textContent = ruleText;
+    box.append(head);
+    if (eventText) {
+      const event = document.createElement("p");
+      event.className = "weekEvent";
+      event.textContent = eventText;
+      box.append(event);
+    }
+    mine.textContent = week.place ? at.weekPlace(week.place, week.prize, week.boxes) : at.boss.noBest;
     ends.textContent = at.weekEnds(Math.floor(hours / 24), hours % 24, minutes);
     list.className = "prizes";
     for (const p of week.prizes || []) {
@@ -3725,7 +3730,9 @@
       chip.textContent = `${at.weekRow(p.from, p.to)}: ${p.tokens} 🎟${p.boxes ? ` + ${p.boxes} 🎁` : ""}`;
       list.append(chip);
     }
-    box.append(head, event, rule, list, mine, ends);
+    box.append(rule, list, mine);
+    if (week.ends) box.append(ends);
+    return box;
   }
 
   // ---------- tabs ----------

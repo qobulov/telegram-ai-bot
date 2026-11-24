@@ -252,8 +252,18 @@ func (h *handler) bossTop(ctx context.Context, user miniapp.User, byTotal bool) 
 		h.Logger.Error("could not read a boss place", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
 	}
+	// the prizes go by the best level, whichever chip the table shows
+	prizePlace := place
+	if byTotal {
+		if _, prizePlace, _, err = h.Store.BossPlace(ctx, week, user.ID, false); err != nil {
+			h.Logger.Error("could not read a boss place", "user_id", user.ID, "error", err)
+			return nil, errUnavailable
+		}
+	}
+	prize := arenaWeekPrize(BossWeekPrizes, prizePlace)
 	return map[string]any{
 		"top": rows, "by_total": byTotal, "ends": week.AddDate(0, 0, 7).UnixMilli(),
-		"me": map[string]any{"place": place, "total": total, "name": me.Name, "best": me.Best, "level": me.Level, "sum": me.Total},
+		"me":   map[string]any{"place": place, "total": total, "name": me.Name, "best": me.Best, "level": me.Level, "sum": me.Total},
+		"week": map[string]any{"place": prizePlace, "prize": prize.Tokens, "boxes": prize.Boxes, "prizes": BossWeekPrizes, "ends": week.AddDate(0, 0, 7).UnixMilli()},
 	}, failure{}
 }

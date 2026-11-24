@@ -169,6 +169,9 @@ func TestBossFights(t *testing.T) {
 		t.Errorf("after the day = %v, want %v dealt", view, dealt)
 	}
 	_, top := call(7, map[string]any{"action": "boss_top"})
+	if week, _ := top["week"].(map[string]any); week == nil || week["place"] != 1.0 || len(week["prizes"].([]any)) != len(BossWeekPrizes) {
+		t.Errorf("the table's prizes = %v", top["week"])
+	}
 	if rows := top["top"].([]any); len(rows) != 1 || rows[0].(map[string]any)["me"] != true || rows[0].(map[string]any)["level"].(float64) < 1 || top["me"].(map[string]any)["place"] != 1.0 {
 		t.Errorf("the table = %v", top)
 	}
