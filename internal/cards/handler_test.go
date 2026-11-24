@@ -148,6 +148,16 @@ func (f *fakeStore) OwnedCopies(ctx context.Context, userID int64) ([]storage.Ow
 	}
 	return copies, err
 }
+func (f *fakeStore) OwnedCopiesOf(ctx context.Context, userID int64, ids []int64) ([]storage.OwnedCopy, error) {
+	all, err := f.OwnedCopies(ctx, userID)
+	var some []storage.OwnedCopy
+	for _, c := range all {
+		if slices.Contains(ids, c.CardID) {
+			some = append(some, c)
+		}
+	}
+	return some, err
+}
 func (f *fakeStore) OwnedCardsOf(ctx context.Context, userID int64, ids []int64) ([]storage.OwnedCard, error) {
 	all, err := f.OwnedCards(ctx, userID, -1)
 	var some []storage.OwnedCard

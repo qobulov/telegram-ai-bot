@@ -327,13 +327,39 @@ type OwnedCopy struct {
 // of what a collection sent from the database (the owners saw Supabase's
 // egress pass its limit on 2026-11-23).
 func (s *Store) OwnedCopies(ctx context.Context, userID int64) ([]OwnedCopy, error) {
+	return s.ownedCopies(ctx, userID, nil)
+}
+
+// OwnedCopiesOf are OwnedCopies of ids alone.
+func (s *Store) OwnedCopiesOf(ctx context.Context, userID int64, ids []int64) ([]OwnedCopy, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	return s.ownedCopies(ctx, userID, ids)
+}
+
+// ownedCopies reads the player's copies, of ids unless nil, in two parts,
+// as the owners asked on 2026-11-24 when Supabase's egress passed its limit
+// threefold: the plain ones, one copy at ★1 and none melted, most of a
+// collection, come as one array of ids, the others row by row.
+func (s *Store) ownedCopies(ctx context.Context, userID int64, ids []int64) ([]OwnedCopy, error) {
+	const plain = `o.count = 1 AND o.melted = 0 AND o.stars = 1 AND NOT o.card_id = ANY($2)`
+	var plainIDs []int64
+	if err := s.pool.QueryRow(ctx, `
+		SELECT coalesce(array_agg(o.card_id), '{}') FROM card_owned o
+		WHERE o.user_id = $1 AND ($3::bigint[] IS NULL OR o.card_id = ANY($3)) AND `+plain,
+		userID, limitedCardIDs(), ids).Scan(&plainIDs); err != nil {
+		return nil, fmt.Errorf("storage: list a player's copies: %w", err)
+	}
 	rows, err := s.pool.Query(ctx, `
 		SELECT o.card_id, o.count, o.melted, o.stars,
 			CASE WHEN o.card_id = ANY($2) THEN (
 				SELECT count(*) FROM card_owned h
 				WHERE h.card_id = o.card_id AND (h.first_at, h.user_id) <= (o.first_at, o.user_id))::int
 			ELSE 0 END
-		FROM card_owned o WHERE o.user_id = $1`, userID, limitedCardIDs())
+		FROM card_owned o
+		WHERE o.user_id = $1 AND ($3::bigint[] IS NULL OR o.card_id = ANY($3)) AND NOT (`+plain+`)`,
+		userID, limitedCardIDs(), ids)
 	if err != nil {
 		return nil, fmt.Errorf("storage: list a player's copies: %w", err)
 	}
@@ -343,6 +369,9 @@ func (s *Store) OwnedCopies(ctx context.Context, userID int64) ([]OwnedCopy, err
 	})
 	if err != nil {
 		return nil, fmt.Errorf("storage: list a player's copies: %w", err)
+	}
+	for _, id := range plainIDs {
+		copies = append(copies, OwnedCopy{CardID: id, Count: 1, Stars: 1})
 	}
 	return copies, nil
 }

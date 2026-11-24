@@ -25,6 +25,7 @@ type Store interface {
 	CardCatalogStamp(ctx context.Context) (string, error)
 	OwnedCards(ctx context.Context, userID int64, rarity int) ([]storage.OwnedCard, error)
 	OwnedCardsOf(ctx context.Context, userID int64, ids []int64) ([]storage.OwnedCard, error)
+	OwnedCopiesOf(ctx context.Context, userID int64, ids []int64) ([]storage.OwnedCopy, error)
 	OwnedCopies(ctx context.Context, userID int64) ([]storage.OwnedCopy, error)
 	CardPlayerOf(ctx context.Context, userID int64) (storage.CardPlayer, time.Time, error)
 	OpenCards(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, cost int, day storage.CardDay, now time.Time, quest storage.CardQuest) (storage.CardOpening, error)
@@ -180,6 +181,33 @@ func (h *handler) ownedCards(ctx context.Context, userID int64, rarity int) ([]s
 	}
 	// the catalog's own order: the rarest, then the most loved, first
 	slices.SortStableFunc(owned, func(a, b storage.OwnedCard) int { return at[a.ID] - at[b.ID] })
+	return owned, nil
+}
+
+// ownedCardsOf are the player's cards of ids, as Store.OwnedCardsOf gives
+// them, but read by id alone and filled from the cached catalog, as
+// ownedCards; a card the catalog read does not have sends it to the store.
+func (h *handler) ownedCardsOf(ctx context.Context, userID int64, ids []int64) ([]storage.OwnedCard, error) {
+	catalog, err := h.cardCatalog(ctx)
+	if err != nil {
+		return nil, err
+	}
+	copies, err := h.Store.OwnedCopiesOf(ctx, userID, ids)
+	if err != nil {
+		return nil, err
+	}
+	at := make(map[int64]int, len(catalog))
+	for i, c := range catalog {
+		at[c.ID] = i
+	}
+	owned := make([]storage.OwnedCard, 0, len(copies))
+	for _, c := range copies {
+		i, ok := at[c.CardID]
+		if !ok {
+			return h.Store.OwnedCardsOf(ctx, userID, ids)
+		}
+		owned = append(owned, storage.OwnedCard{Card: catalog[i], Count: c.Count, Melted: c.Melted, Stars: c.Stars, Serial: c.Serial})
+	}
 	return owned, nil
 }
 

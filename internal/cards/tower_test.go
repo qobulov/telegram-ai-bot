@@ -214,7 +214,16 @@ func TestTowerFights(t *testing.T) {
 	for i := range strong {
 		strong[i].Attack, strong[i].Health, strong[i].Stars = 100_000, 400_000, 5
 	}
-	store := &fakeStore{catalog: towerCatalog(), arena: fakeArena{held: map[int64][]storage.OwnedCard{7: strong, 8: arenaCards()}}}
+	catalog := towerCatalog()
+	for _, c := range strong {
+		// a held card's numbers are its catalog's, as the database joins them
+		if i := slices.IndexFunc(catalog, func(k storage.Card) bool { return k.ID == c.ID }); i >= 0 {
+			catalog[i] = c.Card
+		} else {
+			catalog = append(catalog, c.Card)
+		}
+	}
+	store := &fakeStore{catalog: catalog, arena: fakeArena{held: map[int64][]storage.OwnedCard{7: strong, 8: arenaCards()}}}
 	call := arenaHandler(t, store, now)
 	if _, out := call(7, map[string]any{"action": "tower_fight"}); out["refused"] != "no_team" {
 		t.Fatalf("with no team = %v", out)
@@ -237,7 +246,12 @@ func TestTowerFights(t *testing.T) {
 		t.Errorf("after five wins: floor %d, tokens %d", store.tower.floor[7], store.tokens)
 	}
 
-	store.tower.floor[8] = 30
+	// the weak team's cards are the catalog's own, in a store of their own:
+	// a card is as strong for everyone who holds it
+	store = &fakeStore{catalog: towerCatalog(), arena: fakeArena{held: map[int64][]storage.OwnedCard{8: arenaCards()}}}
+	call = arenaHandler(t, store, now)
+	call(8, map[string]any{"action": "arena_team", "front": arenaFront, "back": arenaBack})
+	store.tower = fakeTower{floor: map[int64]int{8: 30}, tries: map[int64]int{}}
 	coins := store.arena.coins[8]
 	for i := range 25 {
 		_, out := call(8, map[string]any{"action": "tower_fight"})

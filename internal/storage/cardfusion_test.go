@@ -198,16 +198,20 @@ func TestOwnedCopies(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 	for _, q := range []string{
-		`INSERT INTO card_catalog (id, name, rarity, attack, health, value) VALUES (10, 'Gojo Satoru', 4, 5000, 18000, 4000), (20, 'Levi', 3, 1, 1, 2000)`,
+		`INSERT INTO card_catalog (id, name, rarity, attack, health, value) VALUES (10, 'Gojo Satoru', 4, 5000, 18000, 4000), (20, 'Levi', 3, 1, 1, 2000), (298761, 'Limited', 4, 1, 1, 9000)`,
 		`INSERT INTO card_players (user_id, name) VALUES (1, 'Alice'), (2, 'Bob')`,
-		`INSERT INTO card_owned (user_id, card_id, count, melted, stars) VALUES (1, 10, 4, 1, 2), (1, 20, 1, 0, 1), (2, 20, 3, 0, 1)`,
+		`INSERT INTO card_owned (user_id, card_id, count, melted, stars, first_at) VALUES (1, 10, 4, 1, 2, now()), (1, 20, 1, 0, 1, now()), (2, 20, 3, 0, 1, now()),
+			(2, 298761, 1, 0, 1, now() - interval '1 day'), (1, 298761, 1, 0, 1, now())`,
 	} {
 		if _, err := store.pool.Exec(ctx, q); err != nil {
 			t.Fatal(err)
 		}
 	}
+	if some, err := store.OwnedCopiesOf(ctx, 1, []int64{20, 99}); err != nil || len(some) != 1 || some[0] != (OwnedCopy{CardID: 20, Count: 1, Stars: 1}) {
+		t.Errorf("copies of 20 and 99 = %+v, %v", some, err)
+	}
 	copies, err := store.OwnedCopies(ctx, 1)
-	if err != nil || len(copies) != 2 {
+	if err != nil || len(copies) != 3 {
 		t.Fatalf("copies = %+v, %v", copies, err)
 	}
 	full, _ := store.OwnedCards(ctx, 1, -1)
