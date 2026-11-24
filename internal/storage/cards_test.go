@@ -218,3 +218,27 @@ func TestCardCatalogStamp(t *testing.T) {
 		t.Errorf("a reworked card kept the stamp %q", first)
 	}
 }
+
+// OwnedCounts gives the copies held of only the cards asked for, and
+// leaves out a card never held.
+func TestOwnedCounts(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	for _, q := range []string{
+		`DELETE FROM card_pictures`, `DELETE FROM card_catalog`,
+		`INSERT INTO card_catalog (id, name, anime, image_url, favourites, rarity, attack, health, value, collection) VALUES
+			(1, 'Gojo', 'JJK', '', 0, 4, 0, 0, 0, 'anime'), (2, 'Levi', 'AoT', '', 0, 0, 0, 0, 0, 'anime'), (3, 'Eren', 'AoT', '', 0, 0, 0, 0, 0, 'anime')`,
+		`INSERT INTO card_owned (user_id, card_id, count) VALUES (77, 1, 3), (77, 2, 1), (78, 3, 5)`,
+	} {
+		if _, err := store.pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	counts, err := store.OwnedCounts(ctx, 77, []int64{1, 3})
+	if err != nil || len(counts) != 1 || counts[1] != 3 {
+		t.Errorf("counts = %v, %v; want only card 1 with 3", counts, err)
+	}
+	if none, err := store.OwnedCounts(ctx, 77, nil); err != nil || len(none) != 0 {
+		t.Errorf("no cards asked: %v, %v", none, err)
+	}
+}

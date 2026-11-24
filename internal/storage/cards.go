@@ -315,6 +315,31 @@ func (s *Store) ownedCards(ctx context.Context, userID int64, rarity int, ids []
 	return cards, nil
 }
 
+// OwnedCounts are how many of each of the cards ids the player holds, a
+// card they never had left out: a few rows where OwnedCopies reads the
+// whole collection, which the event shop and the anime reward once did on
+// each opening of the app.
+func (s *Store) OwnedCounts(ctx context.Context, userID int64, ids []int64) (map[int64]int, error) {
+	counts := make(map[int64]int, len(ids))
+	if len(ids) == 0 {
+		return counts, nil
+	}
+	rows, err := s.pool.Query(ctx, `SELECT card_id, count FROM card_owned WHERE user_id = $1 AND card_id = ANY($2)`, userID, ids)
+	if err != nil {
+		return nil, fmt.Errorf("storage: count a player's cards: %w", err)
+	}
+	var id int64
+	var n int
+	_, err = pgx.ForEachRow(rows, []any{&id, &n}, func() error {
+		counts[id] = n
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("storage: count a player's cards: %w", err)
+	}
+	return counts, nil
+}
+
 // OwnedCopy is a card the player holds by its id alone, its catalog numbers
 // left to the catalog the caller already has.
 type OwnedCopy struct {

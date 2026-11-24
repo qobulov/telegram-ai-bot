@@ -71,17 +71,13 @@ func (h *handler) animeClaim(ctx context.Context, user miniapp.User, anime strin
 	if len(need) < AnimeRewardLeast {
 		return map[string]any{"refused": "small"}, failure{}
 	}
-	owned, err := h.ownedCards(ctx, user.ID, -1)
+	held, err := h.Store.OwnedCounts(ctx, user.ID, need)
 	if err != nil {
 		h.Logger.Error("could not read a player's cards", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
 	}
-	held := map[int64]bool{}
-	for _, o := range owned {
-		held[o.Card.ID] = o.Count > 0
-	}
 	for _, id := range need {
-		if !held[id] {
+		if held[id] <= 0 {
 			return map[string]any{"refused": "missing"}, failure{}
 		}
 	}

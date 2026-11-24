@@ -158,6 +158,14 @@ func (f *fakeStore) OwnedCopiesOf(ctx context.Context, userID int64, ids []int64
 	}
 	return some, err
 }
+func (f *fakeStore) OwnedCounts(ctx context.Context, userID int64, ids []int64) (map[int64]int, error) {
+	some, err := f.OwnedCopiesOf(ctx, userID, ids)
+	counts := map[int64]int{}
+	for _, c := range some {
+		counts[c.CardID] = c.Count
+	}
+	return counts, err
+}
 func (f *fakeStore) OwnedCardsOf(ctx context.Context, userID int64, ids []int64) ([]storage.OwnedCard, error) {
 	all, err := f.OwnedCards(ctx, userID, -1)
 	var some []storage.OwnedCard

@@ -186,11 +186,17 @@ func (h *handler) eventView(ctx context.Context, user miniapp.User, e Event) (an
 		h.Logger.Error("could not read the card event", "user_id", user.ID, "event", e.Key, "error", err)
 		return nil, errUnavailable
 	}
+	// Only the event's own Mythic cards are counted, as when the whole
+	// collection was read for them.
 	held := map[int64]int{}
-	if owned, err := h.ownedCards(ctx, user.ID, int(Mythic)); err == nil {
-		for _, c := range owned {
-			held[c.ID] = c.Count
+	ids := make([]int64, 0, len(cards))
+	for _, c := range cards {
+		if c.Rarity == int(Mythic) {
+			ids = append(ids, c.ID)
 		}
+	}
+	if counts, err := h.Store.OwnedCounts(ctx, user.ID, ids); err == nil {
+		held = counts
 	}
 	views := make([]cardView, len(cards))
 	owned := false

@@ -27,6 +27,7 @@ type Store interface {
 	OwnedCardsOf(ctx context.Context, userID int64, ids []int64) ([]storage.OwnedCard, error)
 	OwnedCopiesOf(ctx context.Context, userID int64, ids []int64) ([]storage.OwnedCopy, error)
 	OwnedCopies(ctx context.Context, userID int64) ([]storage.OwnedCopy, error)
+	OwnedCounts(ctx context.Context, userID int64, ids []int64) (map[int64]int, error)
 	CardPlayerOf(ctx context.Context, userID int64) (storage.CardPlayer, time.Time, error)
 	OpenCards(ctx context.Context, userID int64, name string, n int, roll storage.CardRoll, cost int, day storage.CardDay, now time.Time, quest storage.CardQuest) (storage.CardOpening, error)
 	GiveDayTokens(ctx context.Context, userID int64, name string, day storage.CardDay) (int, error)
