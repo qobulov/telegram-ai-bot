@@ -6,58 +6,95 @@
   <meta name="color-scheme" content="light dark">
   <title>Kassa</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="style.css?v=1">
+  <link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
-  <main id="app" aria-live="polite">
-    <section id="state" class="state" hidden></section>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-in" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+    <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h13v4M3 7v10a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2zM16 14h.01"/></symbol>
+  </svg>
+
+  <main id="app">
+    <!-- Loading skeleton, then the error text if the book cannot load. -->
+    <section id="skeleton" class="skeleton" aria-hidden="true">
+      <div class="sk hero-sk"></div>
+      <div class="sk-row"><div class="sk tile-sk"></div><div class="sk tile-sk"></div></div>
+      <div class="sk line-sk"></div><div class="sk line-sk"></div><div class="sk line-sk"></div>
+    </section>
+    <section id="state" class="state" role="status" hidden></section>
 
     <section id="home" class="view" hidden>
-      <p class="eyebrow" data-t="kassa">Kassa</p>
-      <div class="balance">
-        <span class="label" data-t="balance">Qoldiq</span>
-        <strong class="money" id="homeBalance">0</strong>
+      <div class="hero">
+        <div class="hero-top">
+          <span class="hero-label"><svg class="ic sm"><use href="#i-wallet"/></svg><span data-t="balance">Qoldiq</span></span>
+        </div>
+        <strong class="hero-sum" id="homeBalance">0</strong>
+        <div class="hero-split">
+          <div><span class="dot in"></span><span data-t="in">Kirim</span><b id="homeIn">0</b></div>
+          <div><span class="dot out"></span><span data-t="out">Chiqim</span><b id="homeOut">0</b></div>
+        </div>
       </div>
+
       <div class="tiles">
-        <button type="button" class="tile in" data-open="in">
-          <span class="icon">↓</span>
-          <span class="name" data-t="in">Kirim</span>
-          <span class="sum" id="homeIn">0</span>
+        <button type="button" class="tile" data-open="in">
+          <span class="badge in"><svg class="ic"><use href="#i-in"/></svg></span>
+          <span class="tile-text"><span class="tile-name" data-t="in">Kirim</span><span class="tile-hint" data-t="inHint">Pul tushdi</span></span>
+          <svg class="ic chev"><use href="#i-chev"/></svg>
         </button>
-        <button type="button" class="tile out" data-open="out">
-          <span class="icon">↑</span>
-          <span class="name" data-t="out">Chiqim</span>
-          <span class="sum" id="homeOut">0</span>
+        <button type="button" class="tile" data-open="out">
+          <span class="badge out"><svg class="ic"><use href="#i-out"/></svg></span>
+          <span class="tile-text"><span class="tile-name" data-t="out">Chiqim</span><span class="tile-hint" data-t="outHint">Pul ishlatildi</span></span>
+          <svg class="ic chev"><use href="#i-chev"/></svg>
         </button>
       </div>
+
+      <h2 data-t="recent">So'nggi yozuvlar</h2>
+      <div id="recent"></div>
     </section>
 
     <section id="book" class="view" hidden>
-      <div class="balance" id="bookTop">
-        <span class="label" id="bookLabel">Qoldiq</span>
-        <strong class="money" id="bookSum">0</strong>
+      <div class="summary">
+        <span class="summary-label" id="bookLabel">Qoldiq</span>
+        <strong class="summary-sum" id="bookSum">0</strong>
+        <span class="summary-sub" id="bookSub"></span>
       </div>
-      <form id="form" class="card form" autocomplete="off">
-        <label>
-          <span data-t="date">Sana</span>
-          <input type="date" id="day" required>
-        </label>
-        <label>
-          <span id="amountLabel">Summa</span>
-          <input type="text" id="amount" inputmode="numeric" placeholder="0" required>
-        </label>
-        <label>
-          <span data-t="note">Ma'lumot</span>
-          <input type="text" id="note" maxlength="300">
-        </label>
-        <button type="submit" class="save" id="save" data-t="save">Saqlash</button>
-      </form>
-      <h2 id="listTitle">Yozuvlar</h2>
-      <ul class="list" id="list"></ul>
-      <p class="empty" id="empty" data-t="empty" hidden>Hali yozuv yo'q</p>
+      <div id="entries"></div>
     </section>
   </main>
-  <div class="toast" id="toast" hidden></div>
-  <script src="app.js?v=1"></script>
+
+  <div class="bar" id="bar" hidden>
+    <button type="button" class="primary" id="addBtn"><svg class="ic"><use href="#i-plus"/></svg><span id="addText">Qo'shish</span></button>
+  </div>
+
+  <div class="scrim" id="scrim" hidden></div>
+  <form class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" autocomplete="off" hidden>
+    <div class="grip" aria-hidden="true"></div>
+    <h3 id="sheetTitle">Kirim</h3>
+    <label class="amount-field">
+      <span class="field-label" id="amountLabel">Summa</span>
+      <span class="amount-wrap"><input type="text" id="amount" inputmode="numeric" enterkeyhint="next" placeholder="0" aria-describedby="amountHelp"><span class="cur">so'm</span></span>
+      <span class="help" id="amountHelp" aria-live="polite"></span>
+    </label>
+    <div class="field">
+      <span class="field-label" data-t="date">Sana</span>
+      <div class="chips" role="group">
+        <button type="button" class="chip" data-day="0" data-t="today">Bugun</button>
+        <button type="button" class="chip" data-day="1" data-t="yesterday">Kecha</button>
+        <label class="chip date-chip"><input type="date" id="day" aria-label="Sana"><span id="dayText"></span></label>
+      </div>
+    </div>
+    <label class="field">
+      <span class="field-label" data-t="note">Ma'lumot</span>
+      <input type="text" id="note" maxlength="300" enterkeyhint="done">
+    </label>
+    <button type="submit" class="primary" id="save"><span data-t="save">Saqlash</span></button>
+  </form>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script src="app.js?v=2"></script>
 </body>
 </html>
