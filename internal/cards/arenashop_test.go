@@ -96,8 +96,14 @@ func TestArenaCoinsAndShop(t *testing.T) {
 	if len(drawn) != 5 || out["coins"] != float64(970-450) {
 		t.Fatalf("a Legendary pack = %v", out)
 	}
-	if got := drawn[4].(map[string]any)["card"].(map[string]any)["rarity"]; got != float64(Legendary) {
-		t.Errorf("the pack's sure card is of rarity %v", got)
+	// The pack promises one card of Legendary or better: the last is raised
+	// to it only when none before came out so, so it is the best that counts.
+	best := 0.0
+	for _, d := range drawn {
+		best = max(best, d.(map[string]any)["card"].(map[string]any)["rarity"].(float64))
+	}
+	if best < float64(Legendary) {
+		t.Errorf("the pack's best card is of rarity %v, want Legendary or better", best)
 	}
 	ticket, _ := arenaShopItem("ticket")
 	store.arena.coins[7] = ticket.Price - 1
