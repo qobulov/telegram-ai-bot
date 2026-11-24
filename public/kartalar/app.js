@@ -2385,8 +2385,8 @@
       },
       boss: {
         best: "Haftalik rekordingiz", none: "hali yo'q", tries: (n, m) => `⚔️ Bugun qolgan janglar: ${n}/${m}`,
-        start: "👹 1-darajadan", endless: "♾️ Darajalar cheksiz", attack: (n) => `⚔️ Hujumi ${n}`, bestLevel: (n, d) => `👹 ${n}-daraja · 💥 ${d}`,
-        week: (d) => `Bu hafta hamma birga urdi: 💥 ${d}`, levelUp: (n) => `👹 Boss ${n}-darajaga chiqdi!`, reached: (n, d) => `👹 ${n}-darajagacha yetdingiz\n💥 ${d} zarba`,
+        start: "👹 1-darajadan", endless: "♾️ Darajalar cheksiz", attack: (n) => `⚔️ Hujumi ${n}`, bestLevel: (n, d) => `👹 ${n} · 💥 ${d}`,
+        week: (d) => `Bu hafta hamma birga urdi: 💥 ${d}`, levelUp: (n) => `👹 Boss ${n}-darajaga chiqdi!`, levelTitle: (n) => `👹 ${n}-daraja`, dealtLine: (d, c) => `💥 ${d} zarba · +${c} 🪙`,
         fight: "👹 Bossga hujum", noTeam: "Avval Arena bo'limida jamoa saqlang", noTries: "Bugungi janglar tugadi: ertaga yana",
         coins: (b, per, most) => `🪙 Har jang: ${b} tanga va har ${per} zarbaga yana 1, ${most} tagacha`,
         rule: (hpg, ag, m) => `Har jang boss 1-darajadan boshlanadi. Har darajada uning joni bor: uni tugatsangiz, boss keyingi darajaga chiqadi, joni ${hpg} barobar, hujumi +${ag}% oshadi. Jamoangiz yiqilguncha qaysi darajagacha yetsangiz, natijangiz shu. Boss har yurishda tasodifiy bitta kartangizni uradi. Kuniga ${m} ta jang, har dushanba yangi boss`,
@@ -2441,8 +2441,8 @@
       },
       boss: {
         best: "Ваш рекорд недели", none: "пока нет", tries: (n, m) => `⚔️ Осталось боёв сегодня: ${n}/${m}`,
-        start: "👹 С 1 уровня", endless: "♾️ Уровни бесконечны", attack: (n) => `⚔️ Атака ${n}`, bestLevel: (n, d) => `👹 Уровень ${n} · 💥 ${d}`,
-        week: (d) => `За неделю все вместе нанесли: 💥 ${d}`, levelUp: (n) => `👹 Босс поднялся на уровень ${n}!`, reached: (n, d) => `👹 Вы дошли до уровня ${n}\n💥 ${d} урона`,
+        start: "👹 С 1 уровня", endless: "♾️ Уровни бесконечны", attack: (n) => `⚔️ Атака ${n}`, bestLevel: (n, d) => `👹 ${n} · 💥 ${d}`,
+        week: (d) => `За неделю все вместе нанесли: 💥 ${d}`, levelUp: (n) => `👹 Босс поднялся на уровень ${n}!`, levelTitle: (n) => `👹 Уровень ${n}`, dealtLine: (d, c) => `💥 ${d} урона · +${c} 🪙`,
         fight: "👹 Атаковать босса", noTeam: "Сначала сохраните команду в разделе Арена", noTries: "Бои на сегодня закончились: завтра снова",
         coins: (b, per, most) => `🪙 Каждый бой: ${b} монет и ещё 1 за каждые ${per} урона, до ${most}`,
         rule: (hpg, ag, m) => `Каждый бой босс начинает с 1 уровня. У каждого уровня своё здоровье: снесите его, и босс поднимется на уровень, здоровье ×${hpg}, атака +${ag}%. Ваш результат — уровень, до которого вы дойдёте, пока стоит команда. Каждый ход босс бьёт одну случайную карту. ${m} боя в день, каждый понедельник новый босс`,
@@ -2497,8 +2497,8 @@
       },
       boss: {
         best: "Your best this week", none: "none yet", tries: (n, m) => `⚔️ Fights left today: ${n}/${m}`,
-        start: "👹 From level 1", endless: "♾️ Endless levels", attack: (n) => `⚔️ Attack ${n}`, bestLevel: (n, d) => `👹 Level ${n} · 💥 ${d}`,
-        week: (d) => `Everyone this week dealt: 💥 ${d}`, levelUp: (n) => `👹 The boss reached level ${n}!`, reached: (n, d) => `👹 You reached level ${n}\n💥 ${d} damage`,
+        start: "👹 From level 1", endless: "♾️ Endless levels", attack: (n) => `⚔️ Attack ${n}`, bestLevel: (n, d) => `👹 ${n} · 💥 ${d}`,
+        week: (d) => `Everyone this week dealt: 💥 ${d}`, levelUp: (n) => `👹 The boss reached level ${n}!`, levelTitle: (n) => `👹 Level ${n}`, dealtLine: (d, c) => `💥 ${d} damage · +${c} 🪙`,
         fight: "👹 Attack the boss", noTeam: "Save a team in the Arena first", noTries: "No fights left today: come back tomorrow",
         coins: (b, per, most) => `🪙 Each fight: ${b} coins and 1 more per ${per} damage, up to ${most}`,
         rule: (hpg, ag, m) => `Each fight starts the boss at level 1. Each level has its own health: spend it and the boss goes up a level, health ×${hpg}, attack +${ag}%. Your score is the level you reach before your team falls. Each turn the boss hits one random card. ${m} fights a day, a new boss every Monday`,
@@ -3551,14 +3551,16 @@
         line.textContent = "";
         const result = box.querySelector(".b-result");
         result.classList.add(data.won || data.boss ? "won" : "lost");
-        result.querySelector(".b-title").textContent = data.boss ? at.boss.title : data.won ? at.won : at.lost;
-        result.querySelector(".b-change").textContent = data.boss ? at.boss.reached(data.level, spaced(data.damage)) : data.fought ? (data.won ? at.tower.cleared(data.fought) : at.tower.failed(data.fought)) : at.change(data.rating_change || 0);
+        // a boss fight's end is two short lines: the level reached, then the
+        // damage and the coins
+        result.querySelector(".b-title").textContent = data.boss ? at.boss.levelTitle(data.level) : data.won ? at.won : at.lost;
+        result.querySelector(".b-change").textContent = data.boss ? at.boss.dealtLine(spaced(data.damage), data.coins_won || 0) : data.fought ? (data.won ? at.tower.cleared(data.fought) : at.tower.failed(data.fought)) : at.change(data.rating_change || 0);
         const token = result.querySelector(".b-token");
         token.textContent = data.boss ? (data.record ? at.boss.record : "") : data.token ? at.token : data.tokens_won ? at.tower.tokens(data.tokens_won) : "";
         token.hidden = !token.textContent;
         const coins = result.querySelector(".b-coins");
         coins.textContent = data.coins_won ? at.coinsWon(data.coins_won) : "";
-        coins.hidden = !data.coins_won;
+        coins.hidden = !data.coins_won || data.boss;
         result.querySelector(".b-ok").before(statsBlock(data));
         result.hidden = false;
         try { tg.HapticFeedback.notificationOccurred(data.won || data.boss ? "success" : "error"); } catch (_) { /* outside Telegram */ }

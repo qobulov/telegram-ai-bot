@@ -1410,7 +1410,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 /* the result over the battle, in the middle of the screen, so that the fighters keep their room */
 .b-result { position: fixed; left: 16px; right: 16px; top: 50%; translate: 0 -50%; z-index: 31; margin: 0 auto; padding: 18px 16px; border-radius: 20px; background: rgb(12, 9, 20); border: 1px solid var(--line); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 0 100vmax rgba(5, 4, 10, 0.72); display: grid; justify-items: center; gap: 4px; width: auto; max-width: 330px; animation: cel-pop 0.4s ease both; }
 .b-result[hidden], .b-token[hidden] { display: none; }
-.b-title { font: 900 24px Unbounded, sans-serif; }
+.b-title { font: 900 24px Unbounded, sans-serif; text-align: center; }
 .b-result.won .b-title { color: #ffe39a; text-shadow: 0 0 18px rgba(255, 200, 80, 0.6); }
 .b-result.lost .b-title { color: var(--muted); }
 .b-change { font: 700 15px Unbounded, sans-serif; text-align: center; white-space: pre-line; }
@@ -1550,3 +1550,5 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 .pod-score { font: 900 14px Unbounded, sans-serif; color: var(--pc); white-space: nowrap; }
 .pod small { color: var(--muted); font-size: 10.5px; white-space: nowrap; }
 .table li.pinned { position: sticky; bottom: 76px; z-index: 2; background: rgb(28, 22, 40); box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.45); }
+#bossMe .arena-rating b { font-size: 20px; white-space: nowrap; }
+#bossMe .arena-left { min-width: 0; text-align: right; }
