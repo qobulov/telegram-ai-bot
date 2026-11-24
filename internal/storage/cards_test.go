@@ -182,3 +182,39 @@ func TestOpenCardsCountsTheWaitInABatch(t *testing.T) {
 		t.Fatalf("the player's wait = %d, %d; want 2, 15", p.SinceLegendary, p.SinceMythic)
 	}
 }
+
+// The catalog's stamp changes when a card is reworked, and not when one is
+// only drawn, which every opening does.
+func TestCardCatalogStamp(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	for _, q := range []string{`DELETE FROM card_pictures`, `DELETE FROM card_catalog`} {
+		if _, err := store.pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := store.SaveCardCatalog(ctx, []Card{{ID: 1, Name: "Gojo", Anime: "JJK", ImageURL: "https://img/1.png", Rarity: 4, Value: 5000}}); err != nil {
+		t.Fatal(err)
+	}
+	stamp := func() string {
+		t.Helper()
+		s, err := store.CardCatalogStamp(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	first := stamp()
+	if _, err := store.pool.Exec(ctx, `UPDATE card_catalog SET drawn = drawn + 1 WHERE id = 1`); err != nil {
+		t.Fatal(err)
+	}
+	if again := stamp(); again != first {
+		t.Errorf("a draw changed the stamp: %q, then %q", first, again)
+	}
+	if _, err := store.pool.Exec(ctx, `UPDATE card_catalog SET attack = 6000 WHERE id = 1`); err != nil {
+		t.Fatal(err)
+	}
+	if reworked := stamp(); reworked == first {
+		t.Errorf("a reworked card kept the stamp %q", first)
+	}
+}

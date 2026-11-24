@@ -79,6 +79,9 @@ func (f *fakeStore) SaveCardCatalog(context.Context, []storage.Card) error { ret
 func (f *fakeStore) CardCatalog(context.Context) ([]storage.Card, error) {
 	return append([]storage.Card{heldCard, lockedCard}, f.catalog...), nil
 }
+func (f *fakeStore) CardCatalogStamp(context.Context) (string, error) {
+	return fmt.Sprint(len(f.catalog)), nil
+}
 func (f *fakeStore) CardInbox(context.Context, int64) (int, int, error) {
 	boxes, unclaimed := 0, 0
 	for _, n := range f.boxes {

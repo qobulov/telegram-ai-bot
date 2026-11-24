@@ -22,6 +22,7 @@ import (
 type Store interface {
 	CatalogStore
 	CardCatalog(ctx context.Context) ([]storage.Card, error)
+	CardCatalogStamp(ctx context.Context) (string, error)
 	OwnedCards(ctx context.Context, userID int64, rarity int) ([]storage.OwnedCard, error)
 	OwnedCardsOf(ctx context.Context, userID int64, ids []int64) ([]storage.OwnedCard, error)
 	OwnedCopies(ctx context.Context, userID int64) ([]storage.OwnedCopy, error)
@@ -134,17 +135,19 @@ type handler struct {
 	paidWeek atomic.Int64
 	// paidBossWeek is paidWeek for the boss's weekly prizes.
 	paidBossWeek atomic.Int64
-	// cached is the card catalog as last read, and when, kept for
-	// catalogKeep so that every request does not read it whole.
-	cacheMu  sync.Mutex
-	cached   []storage.Card
-	cachedAt time.Time
+	// cached is the card catalog as last read, its stamp, and when the
+	// stamp was last checked: see cardCatalog.
+	cacheMu     sync.Mutex
+	cached      []storage.Card
+	cachedStamp string
+	cachedAt    time.Time
 }
 
-// catalogKeep is how long a catalog read is used before it is read again:
-// it changes only when cards are added or reworked, and reading its 2000
-// cards on each request was much of the database's traffic, as the owners
-// saw on 2026-11-23.
+// catalogKeep is how long a catalog read is used before its stamp is
+// checked again. It changes only when cards are added or reworked, and
+// reading its 2000 cards whole, on each request and then every five
+// minutes, was most of the database's traffic, as the owners saw on
+// 2026-11-23 and 2026-11-24.
 const catalogKeep = 5 * time.Minute
 
 // ownedCards are the player's cards of rarity (all at -1), as
@@ -180,18 +183,28 @@ func (h *handler) ownedCards(ctx context.Context, userID int64, rarity int) ([]s
 	return owned, nil
 }
 
-// cardCatalog is the card catalog, read at most once every catalogKeep.
+// cardCatalog is the card catalog. Once every catalogKeep only its stamp
+// is read, and the catalog itself only when the stamp changed, so that a
+// card reworked in the database shows within catalogKeep.
 func (h *handler) cardCatalog(ctx context.Context) ([]storage.Card, error) {
 	h.cacheMu.Lock()
 	defer h.cacheMu.Unlock()
 	if h.cached != nil && time.Since(h.cachedAt) < catalogKeep {
 		return h.cached, nil
 	}
+	stamp, err := h.Store.CardCatalogStamp(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if h.cached != nil && stamp == h.cachedStamp {
+		h.cachedAt = time.Now()
+		return h.cached, nil
+	}
 	catalog, err := h.Store.CardCatalog(ctx)
 	if err != nil {
 		return nil, err
 	}
-	h.cached, h.cachedAt = catalog, time.Now()
+	h.cached, h.cachedStamp, h.cachedAt = catalog, stamp, time.Now()
 	return catalog, nil
 }
 

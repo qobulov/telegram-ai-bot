@@ -366,6 +366,22 @@ func (s *Store) CardTop(ctx context.Context, limit int) ([]CardPlayer, error) {
 	return top, nil
 }
 
+// CardCatalogStamp is a fingerprint of what CardCatalog reads: it changes
+// when any card's name, picture, rarity or numbers change, or a card comes
+// or goes, and a few bytes cross the network instead of the whole catalog.
+func (s *Store) CardCatalogStamp(ctx context.Context) (string, error) {
+	var stamp string
+	err := s.pool.QueryRow(ctx, `
+		SELECT count(*) || ':' || coalesce(md5(string_agg(
+			concat_ws('|', id, name, anime, image_url, favourites, rarity, attack, health, value, collection),
+			',' ORDER BY id)), '')
+		FROM card_catalog`).Scan(&stamp)
+	if err != nil {
+		return "", fmt.Errorf("storage: read the card catalog's stamp: %w", err)
+	}
+	return stamp, nil
+}
+
 // CardCatalog is every card, the rarest and most loved first.
 func (s *Store) CardCatalog(ctx context.Context) ([]Card, error) {
 	rows, err := s.pool.Query(ctx, `
