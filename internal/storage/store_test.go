@@ -1257,3 +1257,23 @@ func TestGroupContextStartsAtTheMuteChange(t *testing.T) {
 		t.Errorf("a repeated unmute moved the context's start: %v", texts(got))
 	}
 }
+
+// ReleaseConnections leaves no connection open, and the store connects
+// again when next asked.
+func TestReleaseConnections(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	if err := store.Ping(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if open := store.pool.Stat().TotalConns(); open == 0 {
+		t.Fatal("no connection was open to begin with")
+	}
+	ReleaseConnections()
+	if open := store.pool.Stat().TotalConns(); open != 0 {
+		t.Errorf("%d connections still open after the release", open)
+	}
+	if err := store.Ping(ctx); err != nil {
+		t.Errorf("the store does not connect again: %v", err)
+	}
+}

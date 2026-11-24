@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -35,12 +36,39 @@ func Open(ctx context.Context, databaseURL string) (*Store, error) {
 		pool.Close()
 		return nil, err
 	}
+	openStores.Lock()
+	openStores.all[store] = struct{}{}
+	openStores.Unlock()
 	return store, nil
 }
 
+// openStores are the stores of this process not closed yet, for
+// ReleaseConnections.
+var openStores = struct {
+	sync.Mutex
+	all map[*Store]struct{}
+}{all: map[*Store]struct{}{}}
+
 // Close releases all connections.
 func (s *Store) Close() {
+	openStores.Lock()
+	delete(openStores.all, s)
+	openStores.Unlock()
 	s.pool.Close()
+}
+
+// ReleaseConnections closes the connections of every open store: the idle
+// ones at once, those in use when they are given back. The stores stay
+// usable and connect again when next asked. A serverless instance calls it
+// when its last request is done, before it is frozen: a frozen instance
+// cannot close the connections it holds, and a database that allows few,
+// as Aiven's free plan does, then refuses everyone else.
+func ReleaseConnections() {
+	openStores.Lock()
+	defer openStores.Unlock()
+	for s := range openStores.all {
+		s.pool.Reset()
+	}
 }
 
 // Ping checks that the database answers.

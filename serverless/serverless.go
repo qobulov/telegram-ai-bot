@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 	_ "time/tzdata" // time zones for the group log and get_current_time; the host has none
 
@@ -46,7 +47,17 @@ type lazy struct {
 	checked  time.Time
 }
 
+// inFlight counts this instance's requests being served; the last one to
+// finish releases the database connections (see storage.ReleaseConnections).
+var inFlight atomic.Int64
+
 func (l *lazy) serve(w http.ResponseWriter, r *http.Request) {
+	inFlight.Add(1)
+	defer func() {
+		if inFlight.Add(-1) == 0 {
+			storage.ReleaseConnections()
+		}
+	}()
 	handler, err := l.ready()
 	if err != nil {
 		// The error names missing settings, never their values.
