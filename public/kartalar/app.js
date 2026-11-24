@@ -30,7 +30,7 @@
       gives: "Beradi", wants: "Xohlaydi", swap: "🔄 Almashish", noCard: "Sizda yo'q", starredCard: "⭐ Sizniki yulduzli", remove: "✕ Olib tashlash", yours: "⭐ Sizniki", marketEmpty: "Hozircha taklif yo'q",
       marketHint: () => `Kartangizni qo'ying va evaziga kerakli kartani tanlang. Kimda o'sha karta bo'lsa, almashadi. Taklif 7 kun turadi.`,
       step1: "1. Qaysi kartangizni berasiz?", step2: "2. Evaziga qaysi kartani xohlaysiz?", mineSearch: "Kartalaringizdan qidiring", wantSearch: "Xohlagan karta nomini yozing",
-      place: "Taklif qo'yish", placed: "✅ Taklif bozorga qo'yildi", swapped: (c) => `🔄 Almashildi! Siz ${c} oldingiz`, removed: "Taklif olib tashlandi",
+      place: "Taklif qo'yish", placed: "✅ Taklif bozorga qo'yildi", takeAsk: (give, get) => `${give} kartangizni berib, ${get} olasiz. Almashasizmi?`, placeAsk: (give, want) => `${give} kartangizni ${want} ga almashtirish taklifini bozorga qo'yasizmi?`, swapped: (c) => `🔄 Almashildi! Siz ${c} oldingiz`, removed: "Taklif olib tashlandi",
       refused: { uneven: "Faqat bir daraja yuqori yoki past kartaga almashish mumkin", limited: "🔒 Limited kartani almashib bo'lmaydi", over: "Bu taklif endi yo'q", gone: "Bu taklif endi yo'q", own: "Bu o'zingizning taklifingiz", not_held: "Sizda bu karta yo'q", same: "Bir xil kartani almashib bo'lmaydi", fused: "⭐ Yulduzli kartani almashib bo'lmaydi" },
       fuse: (a, b, n) => `⭐ ★${a} → ★${b} · ${n} nusxa`, fuseNext: (a, h) => `Keyin: Hujum ${a} · Jon ${h}`, fuseFree: (n) => `Bo'sh nusxa: ${n}`,
       fuseMax: "⭐ Eng yuqori daraja: ★5", resetStars: (s) => `↺ Yulduzni tiklash: ★${s} → ★1`, resetAsk: (name, s, n) => `${name} ★${s} dan ★1 ga qaytadi, ${n} ta nusxa bo'sh nusxa bo'lib qaytadi. Bepul. Davom etasizmi?`, resetDone: (n) => `↺ Karta ★1 ga qaytdi · bo'sh nusxa: ${n}`, resetRefused: { not_fused: "Bu karta allaqachon ★1", not_held: "Bu karta sizda yo'q" }, fuseFew: (n) => `Yana ${n} ta nusxa kerak`, fused: (s) => `⭐ Karta ★${s} bo'ldi!`,
@@ -64,7 +64,7 @@
       gives: "Отдаёт", wants: "Хочет", swap: "🔄 Обменять", noCard: "Нет у вас", starredCard: "⭐ Ваша звёздная", remove: "✕ Снять", yours: "⭐ Ваше", marketEmpty: "Пока предложений нет",
       marketHint: () => `Выставьте свою карту и выберите, какую хотите взамен. У кого она есть — обменяется. Предложение висит 7 дней.`,
       step1: "1. Какую карту отдаёте?", step2: "2. Какую хотите взамен?", mineSearch: "Поиск по вашим картам", wantSearch: "Название нужной карты",
-      place: "Выставить", placed: "✅ Предложение выставлено", swapped: (c) => `🔄 Обмен! Вы получили ${c}`, removed: "Предложение снято",
+      place: "Выставить", placed: "✅ Предложение выставлено", takeAsk: (give, get) => `Вы отдадите ${give} и получите ${get}. Обменять?`, placeAsk: (give, want) => `Выставить на рынок обмен ${give} на ${want}?`, swapped: (c) => `🔄 Обмен! Вы получили ${c}`, removed: "Предложение снято",
       refused: { uneven: "Менять можно на карту той же редкости или на одну выше/ниже", limited: "🔒 Лимитированную карту нельзя обменять", over: "Этого предложения уже нет", gone: "Этого предложения уже нет", own: "Это ваше предложение", not_held: "У вас нет этой карты", same: "Нельзя менять карту на ту же", fused: "⭐ Звёздную карту нельзя обменять" },
       fuse: (a, b, n) => `⭐ ★${a} → ★${b} · ${n} коп.`, fuseNext: (a, h) => `Станет: Атака ${a} · Жизнь ${h}`, fuseFree: (n) => `Свободных копий: ${n}`,
       fuseMax: "⭐ Высший уровень: ★5", resetStars: (s) => `↺ Сбросить звёзды: ★${s} → ★1`, resetAsk: (name, s, n) => `${name} вернётся с ★${s} на ★1, ${n} копий станут свободными. Бесплатно. Продолжить?`, resetDone: (n) => `↺ Карта снова ★1 · свободных копий: ${n}`, resetRefused: { not_fused: "Эта карта уже ★1", not_held: "У вас нет этой карты" }, fuseFew: (n) => `Нужно ещё копий: ${n}`, fused: (s) => `⭐ Карта стала ★${s}!`,
@@ -98,7 +98,7 @@
       gives: "Gives", wants: "Wants", swap: "🔄 Trade", noCard: "You lack it", starredCard: "⭐ Yours is starred", remove: "✕ Take down", yours: "⭐ Yours", marketEmpty: "No offers yet",
       marketHint: () => `Put up a card and pick the one you want for it. Whoever holds it can trade. An offer stays for 7 days.`,
       step1: "1. Which card do you give?", step2: "2. Which card do you want?", mineSearch: "Search your cards", wantSearch: "Name of the card you want",
-      place: "Put it up", placed: "✅ Your offer is up", swapped: (c) => `🔄 Traded! You got ${c}`, removed: "Offer taken down",
+      place: "Put it up", placed: "✅ Your offer is up", takeAsk: (give, get) => `You give ${give} and get ${get}. Trade?`, placeAsk: (give, want) => `Put up an offer of ${give} for ${want}?`, swapped: (c) => `🔄 Traded! You got ${c}`, removed: "Offer taken down",
       refused: { uneven: "A card may be traded only for one of the same rarity or one step up or down", limited: "🔒 A limited card cannot be traded", over: "This offer is gone", gone: "This offer is gone", own: "This is your own offer", not_held: "You do not have that card", same: "A card cannot be traded for itself", fused: "⭐ A starred card cannot be traded" },
       fuse: (a, b, n) => `⭐ ★${a} → ★${b} · ${n} ${n === 1 ? "copy" : "copies"}`, fuseNext: (a, h) => `Then: Attack ${a} · Life ${h}`, fuseFree: (n) => `Free copies: ${n}`,
       fuseMax: "⭐ Top level: ★5", resetStars: (s) => `↺ Reset stars: ★${s} → ★1`, resetAsk: (name, s, n) => `${name} goes back from ★${s} to ★1 and ${n} copies become free copies again. Free. Go on?`, resetDone: (n) => `↺ The card is ★1 again · free copies: ${n}`, resetRefused: { not_fused: "This card is already ★1", not_held: "You don't have this card" }, fuseFew: (n) => `${n} more ${n === 1 ? "copy" : "copies"} needed`, fused: (s) => `⭐ The card is now ★${s}!`,
@@ -139,6 +139,14 @@
     const data = await response.json().catch(() => ({ error: "unavailable" }));
     if (!response.ok || data.error) throw new Error(data.error || "unavailable");
     return data;
+  }
+
+  // ask asks the player yes or no in Telegram's own dialog, or the
+  // browser's outside Telegram.
+  function ask(text) {
+    return new Promise((done) => {
+      try { tg.showConfirm(text, done); } catch (_) { done(window.confirm(text)); }
+    });
   }
 
   function notice(error) {
@@ -730,9 +738,6 @@
     button.type = "button";
     button.className = "ghost fuse-reset";
     button.textContent = t.resetStars(card.stars);
-    const ask = (text) => new Promise((done) => {
-      try { tg.showConfirm(text, done); } catch (_) { done(window.confirm(text)); }
-    });
     button.addEventListener("click", async () => {
       if (!(await ask(t.resetAsk(card.name, card.stars, RESET_BACK[card.stars] || 0)))) return;
       button.disabled = true;
@@ -1193,7 +1198,10 @@
     chip.addEventListener("click", () => { offerFilter = chip.dataset.f; marketList(); haptic("light"); });
   }
 
+  // takeOffer swaps after the player says yes, as the owners asked on
+  // 2026-11-24: a tap by mistake gave a card away.
   async function takeOffer(o, button) {
+    if (!(await ask(t.takeAsk(o.want.name, o.give.name)))) return;
     button.disabled = true;
     try {
       const data = await api("take", { offer: o.id });
@@ -1377,6 +1385,7 @@
     wantQ.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(wantList, 250); });
     send.addEventListener("click", async () => {
       if (!give || !want) return;
+      if (!(await ask(t.placeAsk(give.name, want.name)))) return;
       send.disabled = true;
       try {
         const data = await api("offer", { card: give.id, want: want.id });
@@ -3406,7 +3415,8 @@
       const roundBox = box.querySelector(".b-round"), line = box.querySelector(".b-line");
       const skip = box.querySelector(".b-skip");
       skip.textContent = at.skip;
-      skip.hidden = points < SKIP_POINTS;
+      // a boss fight runs to the team's end, up to 30 rounds: anyone may skip it
+      skip.hidden = !data.boss && points < SKIP_POINTS;
       const events = data.events || [];
       let next = 0, timer = 0, done = false;
 
