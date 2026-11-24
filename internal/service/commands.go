@@ -499,6 +499,7 @@ func (s *Service) replyPhoto(in incoming, drawing tools.Drawing, caption string,
 		BusinessConnectionID: in.businessConnectionID(),
 		Buttons:              buttons,
 		Keyboard:             keyboard,
+		KeyboardHint:         hintFor(in, keyboard),
 	})
 	if err != nil {
 		s.opts.Logger.Error("send photo failed", "chat_id", in.msg.Chat.ID, "error", err)

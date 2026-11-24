@@ -31,6 +31,20 @@ var (
 	keyboardOldWeather = localText{uz: "🌤 Toshkent ob-havosi", ru: "🌤 Погода в Ташкенте", en: "🌤 Weather in Tashkent"}
 )
 
+// textKeyboardHint is the hint in the message box under the keyboard. Set
+// with every keyboard, it clears a question's hint that Telegram's apps
+// keep after the question is gone, such as the former ad button's
+// "Rasm yoki video + tavsif".
+var textKeyboardHint = localText{uz: "Xabar yozing…", ru: "Напишите сообщение…", en: "Write a message…"}
+
+// hintFor is the hint to send with keyboard: none without one.
+func hintFor(in incoming, keyboard [][]string) string {
+	if len(keyboard) == 0 {
+		return ""
+	}
+	return textKeyboardHint.to(in)
+}
+
 // keyboardRows are the keyboard's buttons, two to a row. A meme is asked
 // for in words: the owners took its button off.
 var keyboardRows = [][]localText{

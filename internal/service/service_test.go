@@ -36,10 +36,11 @@ type sentMessage struct {
 	buttons [][]telegram.Button
 	// business is the business connection it was sent through, if any.
 	business string
-	// keyboard, ask and effect are a text message's.
-	keyboard [][]string
-	ask      string
-	effect   string
+	// keyboard, its hint, ask and effect are a text message's.
+	keyboard     [][]string
+	keyboardHint string
+	ask          string
+	effect       string
 }
 
 type fakeSender struct {
@@ -55,7 +56,7 @@ func (f *fakeSender) SendMessage(ctx context.Context, msg telegram.Outgoing) (in
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.sent = append(f.sent, sentMessage{chatID: msg.ChatID, text: msg.Text, replyTo: msg.ReplyToMessageID, buttons: msg.Buttons, business: msg.BusinessConnectionID, keyboard: msg.Keyboard, ask: msg.Ask, effect: msg.Effect})
+	f.sent = append(f.sent, sentMessage{chatID: msg.ChatID, text: msg.Text, replyTo: msg.ReplyToMessageID, buttons: msg.Buttons, business: msg.BusinessConnectionID, keyboard: msg.Keyboard, keyboardHint: msg.KeyboardHint, ask: msg.Ask, effect: msg.Effect})
 	return int64(1000 + len(f.sent)), nil
 }
 

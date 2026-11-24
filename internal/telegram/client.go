@@ -257,6 +257,8 @@ type Photo struct {
 	// Keyboard, in a private chat, puts the keyboard back with the picture,
 	// as Outgoing's does. A picture has Buttons or Keyboard, not both.
 	Keyboard [][]string
+	// KeyboardHint is Outgoing's KeyboardHint.
+	KeyboardHint string
 	// Silent sends it without a sound, as a card opened for the player.
 	Silent bool
 }
@@ -281,7 +283,7 @@ func (c *Client) SendPhoto(ctx context.Context, photo Photo) (int64, error) {
 		fields["disable_notification"] = "true"
 	}
 	if len(photo.Buttons)+len(photo.Keyboard) > 0 {
-		encoded, err := json.Marshal(markup(Outgoing{Buttons: photo.Buttons, Keyboard: photo.Keyboard}))
+		encoded, err := json.Marshal(markup(Outgoing{Buttons: photo.Buttons, Keyboard: photo.Keyboard, KeyboardHint: photo.KeyboardHint}))
 		if err != nil {
 			return 0, fmt.Errorf("telegram sendPhoto: encode: %w", err)
 		}
@@ -605,8 +607,9 @@ type inlineKeyboard struct {
 // being persistent, the user can hide it and open it again with the
 // keyboard icon Telegram puts in the message box.
 type replyKeyboard struct {
-	Keyboard       [][]keyboardButton `json:"keyboard"`
-	ResizeKeyboard bool               `json:"resize_keyboard"`
+	Keyboard              [][]keyboardButton `json:"keyboard"`
+	ResizeKeyboard        bool               `json:"resize_keyboard"`
+	InputFieldPlaceholder string             `json:"input_field_placeholder,omitempty"`
 }
 
 type keyboardButton struct {
@@ -635,7 +638,7 @@ func markup(msg Outgoing) any {
 				rows[i] = append(rows[i], keyboardButton{Text: text})
 			}
 		}
-		return &replyKeyboard{Keyboard: rows, ResizeKeyboard: true}
+		return &replyKeyboard{Keyboard: rows, ResizeKeyboard: true, InputFieldPlaceholder: msg.KeyboardHint}
 	}
 	return nil
 }

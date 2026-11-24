@@ -1278,12 +1278,12 @@ func TestSendMessageSendsAKeyboard(t *testing.T) {
 	client, api := newTestClient(t, okSent)
 	keyboard := [][]string{{"😂 Mem", "🕐 Soat nechi?"}, {"❓ Yordam"}}
 
-	if _, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: "- salom", Keyboard: keyboard}); err != nil {
+	if _, err := client.SendMessage(context.Background(), Outgoing{ChatID: 42, Text: "- salom", Keyboard: keyboard, KeyboardHint: "Xabar yozing…"}); err != nil {
 		t.Fatalf("SendMessage: %v", err)
 	}
 	sent := api.recorded()[0]
 	markup, _ := json.Marshal(sent.params["reply_markup"])
-	want := `{"keyboard":[[{"text":"😂 Mem"},{"text":"🕐 Soat nechi?"}],[{"text":"❓ Yordam"}]],"resize_keyboard":true}`
+	want := `{"input_field_placeholder":"Xabar yozing…","keyboard":[[{"text":"😂 Mem"},{"text":"🕐 Soat nechi?"}],[{"text":"❓ Yordam"}]],"resize_keyboard":true}`
 	if sent.method != "sendMessage" || string(markup) != want {
 		t.Errorf("call %s, reply_markup = %s\nwant %s", sent.method, markup, want)
 	}

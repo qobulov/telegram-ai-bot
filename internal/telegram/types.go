@@ -571,6 +571,10 @@ type Outgoing struct {
 	// phone's keyboard, each sending its own text as if typed; it stays
 	// after the message. A message has Buttons or Keyboard, not both.
 	Keyboard [][]string
+	// KeyboardHint is the hint in the message box under Keyboard. It
+	// replaces a hint an earlier Ask left there, which Telegram's apps
+	// otherwise keep.
+	KeyboardHint string
 	// Effect is the ID of an animation played over the message, such as
 	// EffectParty, which Telegram plays only in private chats.
 	Effect string

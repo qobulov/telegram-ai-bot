@@ -31,6 +31,11 @@ func TestStartAndHelpBringTheKeyboard(t *testing.T) {
 	if sent[2].keyboard != nil || sent[3].keyboard != nil {
 		t.Errorf("/about and an answer carry a keyboard: %q, %q", sent[2].keyboard, sent[3].keyboard)
 	}
+	// The keyboard brings its own hint, which clears an earlier question's
+	// that Telegram's apps keep.
+	if sent[0].keyboardHint != textKeyboardHint.uz || sent[1].keyboardHint != textKeyboardHint.ru || sent[3].keyboardHint != "" {
+		t.Errorf("hints = %q, %q, %q", sent[0].keyboardHint, sent[1].keyboardHint, sent[3].keyboardHint)
+	}
 
 }
 

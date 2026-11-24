@@ -1367,6 +1367,9 @@ func (s *Service) send(in incoming, msg telegram.Outgoing) int64 {
 	defer cancel()
 	msg.ChatID, msg.ReplyToMessageID = in.msg.Chat.ID, in.replyTarget()
 	msg.BusinessConnectionID = in.businessConnectionID()
+	if msg.KeyboardHint == "" {
+		msg.KeyboardHint = hintFor(in, msg.Keyboard)
+	}
 	sentID, err := s.opts.Sender.SendMessage(ctx, msg)
 	if err != nil {
 		s.opts.Logger.Error("send message failed", "chat_id", in.msg.Chat.ID, "error", err)
