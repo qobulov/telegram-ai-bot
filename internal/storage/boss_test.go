@@ -4,42 +4,51 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 )
 
-var bossRules = BossRules{Week: arenaDay.AddDate(0, 0, -2), Day: arenaDay, Now: arenaNow, Tries: 2, Coins: 7}
+var bossRules = BossRules{Week: arenaDay.AddDate(0, 0, -2), Day: arenaDay, Now: arenaNow, Tickets: 2, TicketEvery: time.Hour, Coins: 7}
 
-// A boss fight counts one of the day's, up to its Tries, gives its coins and
-// adds its damage to the week; the next day counts from 0 again.
+// A boss fight takes one of the player's tickets, ErrBossNoTries with none,
+// gives its coins and adds its damage to the week; a ticket comes back each
+// hour, up to the most; an unlimited player takes none.
 func TestRecordBossFight(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 	seedArena(t, store)
 
-	if p, err := store.BossPlayerOf(ctx, 1, bossRules); err != nil || p != (BossPlayer{}) {
+	if p, err := store.BossPlayerOf(ctx, 1, bossRules); err != nil || p != (BossPlayer{Tickets: 2}) {
 		t.Fatalf("never fought = %+v, %v", p, err)
 	}
-	if out, err := store.RecordBossFight(ctx, 1, 500, 3, bossRules); err != nil || out != (BossOutcome{Tries: 1, Coins: 7}) {
+	if out, err := store.RecordBossFight(ctx, 1, 500, 3, bossRules); err != nil || out != (BossOutcome{Tickets: 1, Coins: 7, NextTicket: time.Hour}) {
 		t.Fatalf("a fight = %+v, %v", out, err)
 	}
-	if out, err := store.RecordBossFight(ctx, 1, 300, 2, bossRules); err != nil || out != (BossOutcome{Tries: 2, Coins: 14}) {
+	later := bossRules
+	later.Now = arenaNow.Add(20 * time.Minute)
+	if out, err := store.RecordBossFight(ctx, 1, 300, 2, later); err != nil || out != (BossOutcome{Tickets: 0, Coins: 14, NextTicket: 40 * time.Minute}) {
 		t.Fatalf("a second = %+v, %v", out, err)
 	}
-	if _, err := store.RecordBossFight(ctx, 1, 900, 5, bossRules); !errors.Is(err, ErrBossNoTries) {
+	if _, err := store.RecordBossFight(ctx, 1, 900, 5, later); !errors.Is(err, ErrBossNoTries) {
 		t.Errorf("a third = %v, want ErrBossNoTries", err)
 	}
-	if p, err := store.BossPlayerOf(ctx, 1, bossRules); err != nil || p != (BossPlayer{Best: 500, BestLevel: 3, Tries: 2}) {
-		t.Errorf("after the day = %+v, %v", p, err)
+	if p, err := store.BossPlayerOf(ctx, 1, later); err != nil || p != (BossPlayer{Best: 500, BestLevel: 3, Tries: 2, Tickets: 0, NextTicket: 40 * time.Minute}) {
+		t.Errorf("out of tickets = %+v, %v", p, err)
 	}
-	next := bossRules
-	next.Day, next.Now = arenaDay.AddDate(0, 0, 1), arenaNow.AddDate(0, 0, 1)
-	if out, err := store.RecordBossFight(ctx, 2, 1000, 4, next); err != nil || out.Tries != 1 {
-		t.Errorf("Bob the next day = %+v, %v", out, err)
+	hour := bossRules
+	hour.Now = arenaNow.Add(time.Hour + time.Minute)
+	if p, _ := store.BossPlayerOf(ctx, 1, hour); p.Tickets != 1 {
+		t.Errorf("an hour on = %+v, want a ticket back", p)
 	}
-	if p, _ := store.BossPlayerOf(ctx, 1, next); p.Tries != 0 || p.Best != 500 {
-		t.Errorf("Alice the next day = %+v", p)
+	if out, err := store.RecordBossFight(ctx, 1, 100, 1, hour); err != nil || out.Tickets != 0 {
+		t.Errorf("the ticket back = %+v, %v", out, err)
 	}
-	if total, err := store.BossWeek(ctx, bossRules.Week); err != nil || total != 1800 {
-		t.Errorf("the week = %d, %v; want 1800", total, err)
+	free := later
+	free.Unlimited = true
+	if _, err := store.RecordBossFight(ctx, 2, 1000, 4, free); err != nil {
+		t.Errorf("an unlimited fight = %v", err)
+	}
+	if total, err := store.BossWeek(ctx, bossRules.Week); err != nil || total != 1900 {
+		t.Errorf("the week = %d, %v; want 1900", total, err)
 	}
 	if total, _ := store.BossWeek(ctx, bossRules.Week.AddDate(0, 0, 7)); total != 0 {
 		t.Errorf("the next week = %d, want 0", total)
@@ -58,7 +67,7 @@ func TestBossTable(t *testing.T) {
 		level  int
 	}{{1, 100, 6}, {1, 900, 4}, {2, 5000, 5}} {
 		rules := bossRules
-		rules.Tries = 5
+		rules.Tickets = 5
 		if _, err := store.RecordBossFight(ctx, f.user, f.damage, f.level, rules); err != nil {
 			t.Fatal(err)
 		}
@@ -89,7 +98,7 @@ func TestPayBossWeek(t *testing.T) {
 	ctx := context.Background()
 	seedArena(t, store)
 	rules := bossRules
-	rules.Tries = 9
+	rules.Tickets = 9
 	for _, f := range []struct {
 		user   int64
 		damage int64

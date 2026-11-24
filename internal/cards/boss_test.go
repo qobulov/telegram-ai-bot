@@ -20,6 +20,7 @@ type fakeBossFight struct {
 	at     time.Time
 	damage int64
 	level  int
+	free   bool
 }
 
 func (f *fakeStore) BossWeek(_ context.Context, week time.Time) (int64, error) {
@@ -45,20 +46,50 @@ func (f *fakeStore) BossPlayerOf(_ context.Context, userID int64, rules storage.
 			p.Tries++
 		}
 	}
+	p.Tickets, p.NextTicket = f.bossTickets(userID, rules)
 	return p, nil
+}
+
+// bossTickets replays a player's fights: each takes a ticket, one comes back
+// every rules.TicketEvery up to rules.Tickets.
+func (f *fakeStore) bossTickets(userID int64, rules storage.BossRules) (int, time.Duration) {
+	held, since := rules.Tickets, time.Time{}
+	refill := func(at time.Time) {
+		if held >= rules.Tickets {
+			return
+		}
+		back := int(at.Sub(since) / rules.TicketEvery)
+		held, since = min(held+back, rules.Tickets), since.Add(time.Duration(back)*rules.TicketEvery)
+	}
+	for _, b := range f.boss {
+		if b.user != userID || b.free {
+			continue
+		}
+		refill(b.at)
+		if held == rules.Tickets {
+			since = b.at
+		}
+		held--
+	}
+	refill(rules.Now)
+	if held >= rules.Tickets {
+		return held, 0
+	}
+	return held, since.Add(rules.TicketEvery).Sub(rules.Now)
 }
 
 func (f *fakeStore) RecordBossFight(ctx context.Context, userID int64, damage int64, level int, rules storage.BossRules) (storage.BossOutcome, error) {
 	p, _ := f.BossPlayerOf(ctx, userID, rules)
-	if p.Tries >= rules.Tries {
+	if !rules.Unlimited && p.Tickets < 1 {
 		return storage.BossOutcome{}, storage.ErrBossNoTries
 	}
 	if f.arena.coins == nil {
 		f.arena.coins = map[int64]int{}
 	}
-	f.boss = append(f.boss, fakeBossFight{user: userID, week: rules.Week, at: rules.Now, damage: damage, level: level})
+	f.boss = append(f.boss, fakeBossFight{user: userID, week: rules.Week, at: rules.Now, damage: damage, level: level, free: rules.Unlimited})
 	f.arena.coins[userID] += rules.Coins
-	return storage.BossOutcome{Tries: p.Tries + 1, Coins: f.arena.coins[userID]}, nil
+	tickets, next := f.bossTickets(userID, rules)
+	return storage.BossOutcome{Tickets: tickets, NextTicket: next, Coins: f.arena.coins[userID]}, nil
 }
 
 func (f *fakeStore) BossTop(_ context.Context, week time.Time, limit int, byTotal bool) ([]storage.BossRow, error) {
@@ -138,9 +169,9 @@ func TestBossGrowth(t *testing.T) {
 	}
 }
 
-// The boss is fought with the saved team BossTries times a day; each fight
-// gives coins by its damage, adds it to the week and the table, and the
-// next day gives fights again.
+// The boss is fought with the saved team while tickets last; each fight
+// gives coins by its damage, adds it to the week and the table, and a
+// ticket comes back each hour.
 func TestBossFights(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	store := &fakeStore{catalog: towerCatalog(), arena: fakeArena{held: map[int64][]storage.OwnedCard{7: arenaCards()}}}
@@ -150,23 +181,23 @@ func TestBossFights(t *testing.T) {
 	}
 	call(7, map[string]any{"action": "arena_team", "front": arenaFront, "back": arenaBack})
 	_, view := call(7, map[string]any{"action": "boss"})
-	if b, ok := view["boss"].(map[string]any); !ok || b["boss"] != true || view["best_level"] != 0.0 || view["levels"] == nil || view["tries"] != 0.0 || len(view["team"].([]any)) != 5 {
+	if b, ok := view["boss"].(map[string]any); !ok || b["boss"] != true || view["best_level"] != 0.0 || view["levels"] == nil || view["tickets"] != float64(BossTickets) || len(view["team"].([]any)) != 5 {
 		t.Fatalf("the boss = %v", view)
 	}
 	var dealt float64
-	for i := range BossTries {
+	for i := range BossTickets {
 		_, out := call(7, map[string]any{"action": "boss_fight"})
 		damage, _ := out["damage"].(float64)
-		if out["boss"] != true || damage <= 0 || out["tries"] != float64(i+1) || out["coins_won"] != float64(bossCoins(int(damage))) || len(out["defender"].([]any)) != 1 {
+		if out["boss"] != true || damage <= 0 || out["tickets"] != float64(BossTickets-i-1) || out["coins_won"] != float64(bossCoins(int(damage))) || len(out["defender"].([]any)) != 1 {
 			t.Fatalf("fight %d = %v", i, out)
 		}
 		dealt += damage
 	}
 	if _, out := call(7, map[string]any{"action": "boss_fight"}); out["refused"] != "no_tries" {
-		t.Errorf("a fight past the day's = %v", out)
+		t.Errorf("a fight with no ticket = %v", out)
 	}
-	if _, view := call(7, map[string]any{"action": "boss"}); view["week_damage"] != dealt || view["tries"] != float64(BossTries) {
-		t.Errorf("after the day = %v, want %v dealt", view, dealt)
+	if _, view := call(7, map[string]any{"action": "boss"}); view["week_damage"] != dealt || view["tickets"] != 0.0 || view["next_ticket_in"] != float64(time.Hour.Milliseconds()) {
+		t.Errorf("out of tickets = %v, want %v dealt", view, dealt)
 	}
 	_, top := call(7, map[string]any{"action": "boss_top"})
 	if week, _ := top["week"].(map[string]any); week == nil || week["place"] != 1.0 || len(week["prizes"].([]any)) != len(BossWeekPrizes) {
@@ -175,9 +206,9 @@ func TestBossFights(t *testing.T) {
 	if rows := top["top"].([]any); len(rows) != 1 || rows[0].(map[string]any)["me"] != true || rows[0].(map[string]any)["level"].(float64) < 1 || top["me"].(map[string]any)["place"] != 1.0 {
 		t.Errorf("the table = %v", top)
 	}
-	next := arenaHandler(t, store, now.Add(24*time.Hour))
-	if _, out := next(7, map[string]any{"action": "boss_fight"}); out["tries"] != 1.0 {
-		t.Errorf("the next day's fight = %v", out)
+	next := arenaHandler(t, store, now.Add(time.Hour))
+	if _, out := next(7, map[string]any{"action": "boss_fight"}); out["boss"] != true || out["tickets"] != 0.0 {
+		t.Errorf("the hour's ticket = %v", out)
 	}
 }
 
@@ -209,7 +240,7 @@ func TestBossWeekPrizes(t *testing.T) {
 	}
 }
 
-// An owner fights the boss past the day's limit; anyone else is held to it.
+// An owner fights the boss with no tickets; anyone else is held to it.
 func TestBossOwnerIsUnlimited(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	store := &fakeStore{catalog: towerCatalog(), arena: fakeArena{held: map[int64][]storage.OwnedCard{7: arenaCards(), 8: arenaCards()}}}
@@ -226,12 +257,12 @@ func TestBossOwnerIsUnlimited(t *testing.T) {
 	for _, user := range []int64{7, 8} {
 		call(user, map[string]any{"action": "arena_team", "front": arenaFront, "back": arenaBack})
 	}
-	for i := range BossTries + 3 {
+	for i := range BossTickets + 3 {
 		if out := call(7, map[string]any{"action": "boss_fight"}); out["boss"] != true || out["unlimited"] != true {
 			t.Fatalf("the owner's fight %d = %v", i, out)
 		}
 	}
-	for range BossTries {
+	for range BossTickets {
 		call(8, map[string]any{"action": "boss_fight"})
 	}
 	if out := call(8, map[string]any{"action": "boss_fight"}); out["refused"] != "no_tries" {

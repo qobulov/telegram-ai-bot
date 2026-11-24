@@ -9,31 +9,44 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// ErrBossNoTries is a boss fight past the day's limit.
-var ErrBossNoTries = errors.New("storage: no boss fight left today")
+// ErrBossNoTries is a boss fight with no ticket left.
+var ErrBossNoTries = errors.New("storage: no boss ticket left")
 
 // BossRules are a boss fight's: Week the Monday that began its week and
 // Day the midnight that began its day, both in Tashkent, Now when it is
-// fought, Tries the fights a day allows and Coins the arena coins it gives.
+// fought, Tickets the most a player holds, one coming back every
+// TicketEvery and each fight taking one (none with Unlimited), and Coins
+// the arena coins it gives.
 type BossRules struct {
 	Week, Day, Now time.Time
-	Tries, Coins   int
+	Tickets, Coins int
+	TicketEvery    time.Duration
+	Unlimited      bool
 }
 
 func (r BossRules) week() string { return r.Week.Format(time.DateOnly) }
 
-// BossPlayer is a player against the week's boss: their best damage and
-// best level in a fight this week and the fights they had today.
-type BossPlayer struct {
-	Best      int64
-	BestLevel int
-	Tries     int
+// arena is the rules' tickets as the arena counts its own.
+func (r BossRules) arena() ArenaRules {
+	return ArenaRules{Tickets: r.Tickets, TicketEvery: r.TicketEvery, Now: r.Now}
 }
 
-// BossOutcome is what a fight changed: the fights had today and the
-// player's arena coins after.
+// BossPlayer is a player against the week's boss: their best damage and
+// best level in a fight this week, the fights they had today (which seed
+// the next), and the tickets they hold now and the wait for the next.
+type BossPlayer struct {
+	Best       int64
+	BestLevel  int
+	Tries      int
+	Tickets    int
+	NextTicket time.Duration
+}
+
+// BossOutcome is what a fight changed: the tickets left and the wait for
+// the next, and the player's arena coins after.
 type BossOutcome struct {
-	Tries, Coins int
+	Tickets, Coins int
+	NextTicket     time.Duration
 }
 
 // BossWeek is all the damage dealt the boss in the week begun at week.
@@ -58,12 +71,20 @@ func (s *Store) BossPlayerOf(ctx context.Context, userID int64, rules BossRules)
 	if err != nil {
 		return BossPlayer{}, fmt.Errorf("storage: read a boss player: %w", err)
 	}
+	stored, at := rules.Tickets, (*time.Time)(nil)
+	err = s.pool.QueryRow(ctx, `SELECT tickets, tickets_at FROM boss_tickets WHERE user_id = $1`, userID).Scan(&stored, &at)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return BossPlayer{}, fmt.Errorf("storage: read a boss player's tickets: %w", err)
+	}
+	held, since := rules.arena().tickets(stored, at)
+	p.Tickets, p.NextTicket = held, rules.arena().nextTicket(held, since)
 	return p, nil
 }
 
 // RecordBossFight records the player's fight dealing damage and gives its
-// coins, in one transaction that locks the player's arena row; a fight past
-// the day's Tries is ErrBossNoTries.
+// coins, in one transaction that locks the player's arena row; it takes one
+// of their tickets, ErrBossNoTries with none, unless the rules are
+// Unlimited.
 func (s *Store) RecordBossFight(ctx context.Context, userID int64, damage int64, level int, rules BossRules) (BossOutcome, error) {
 	var out BossOutcome
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
@@ -72,14 +93,11 @@ func (s *Store) RecordBossFight(ctx context.Context, userID int64, damage int64,
 			ON CONFLICT (user_id) DO UPDATE SET coins = arena_players.coins`, userID); err != nil {
 			return err
 		}
-		if err := tx.QueryRow(ctx, `SELECT count(*) FROM boss_fights WHERE user_id = $1 AND fought_at >= $2`,
-			userID, rules.Day).Scan(&out.Tries); err != nil {
-			return err
+		if !rules.Unlimited {
+			if err := takeBossTicket(ctx, tx, userID, rules, &out); err != nil {
+				return err
+			}
 		}
-		if out.Tries >= rules.Tries {
-			return ErrBossNoTries
-		}
-		out.Tries++
 		if _, err := tx.Exec(ctx, `INSERT INTO boss_fights (user_id, week, damage, level, fought_at) VALUES ($1, $2::date, $3, $4, $5)`,
 			userID, rules.week(), damage, level, rules.Now); err != nil {
 			return err
@@ -94,6 +112,32 @@ func (s *Store) RecordBossFight(ctx context.Context, userID int64, damage int64,
 		return BossOutcome{}, fmt.Errorf("storage: record a boss fight: %w", err)
 	}
 	return out, nil
+}
+
+// takeBossTicket takes one of the player's boss tickets, counted as the
+// arena counts its own, ErrBossNoTries with none; out gets the tickets left
+// and the wait for the next.
+func takeBossTicket(ctx context.Context, tx pgx.Tx, userID int64, rules BossRules, out *BossOutcome) error {
+	if _, err := tx.Exec(ctx, `INSERT INTO boss_tickets (user_id, tickets) VALUES ($1, $2) ON CONFLICT (user_id) DO NOTHING`,
+		userID, rules.Tickets); err != nil {
+		return err
+	}
+	var stored int
+	var at *time.Time
+	if err := tx.QueryRow(ctx, `SELECT tickets, tickets_at FROM boss_tickets WHERE user_id = $1 FOR UPDATE`, userID).
+		Scan(&stored, &at); err != nil {
+		return err
+	}
+	held, since := rules.arena().tickets(stored, at)
+	if held < 1 {
+		return ErrBossNoTries
+	}
+	held--
+	if _, err := tx.Exec(ctx, `UPDATE boss_tickets SET tickets = $2, tickets_at = $3 WHERE user_id = $1`, userID, held, since); err != nil {
+		return err
+	}
+	out.Tickets, out.NextTicket = held, rules.arena().nextTicket(held, since)
+	return nil
 }
 
 // BossRow is a player on the boss's table: their best level, best damage

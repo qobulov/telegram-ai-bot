@@ -2375,16 +2375,16 @@
         refused: { no_team: "Avval Arena bo'limida jamoa saqlang", no_floor: "Bu qavat hali tayyor emas", moved: "Bu qavat allaqachon o'tildi, sahifa yangilandi" },
       },
       boss: {
-        best: "Haftalik rekordingiz", none: "hali yo'q", tries: (n, m) => `⚔️ Bugun qolgan janglar: ${n}/${m}`,
+        best: "Haftalik rekordingiz", none: "hali yo'q", tries: (n, m) => `⚔️ Janglar: ${n}/${m}`,
         start: "👹 1-darajadan", endless: "♾️ Darajalar cheksiz", attack: (n) => `⚔️ Hujumi ${n}`, bestLevel: (n, d) => `👹 ${n} · 💥 ${d}`,
         week: (d) => `Bu hafta hamma birga urdi: 💥 ${d}`, levelUp: (n) => `👹 Boss ${n}-darajaga chiqdi!`, levelTitle: (n) => `👹 ${n}-daraja`, dealtLine: (d, c) => `💥 ${d} zarba · +${c} 🪙`,
-        fight: "👹 Bossga hujum", noTeam: "Avval Arena bo'limida jamoa saqlang", noTries: "Bugungi janglar tugadi: ertaga yana",
+        fight: "👹 Bossga hujum", noTeam: "Avval Arena bo'limida jamoa saqlang", noTries: "Janglar tugadi: har soatda 1 ta qo'shiladi",
         coins: (b, per, most) => `🪙 Har jang: ${b} tanga va har ${per} zarbaga yana 1, ${most} tagacha`,
-        rule: (hpg, ag, m) => `Har jang boss 1-darajadan boshlanadi. Har darajada uning joni bor: uni tugatsangiz, boss keyingi darajaga chiqadi, joni ${hpg} barobar, hujumi +${ag}% oshadi. Jamoangiz yiqilguncha qaysi darajagacha yetsangiz, natijangiz shu. Boss har yurishda tasodifiy bitta kartangizni uradi. Kuniga ${m} ta jang, har dushanba yangi boss`,
+        rule: (hpg, ag, m) => `Har jang boss 1-darajadan boshlanadi. Har darajada uning joni bor: uni tugatsangiz, boss keyingi darajaga chiqadi, joni ${hpg} barobar, hujumi +${ag}% oshadi. Jamoangiz yiqilguncha qaysi darajagacha yetsangiz, natijangiz shu. Boss har yurishda tasodifiy bitta kartangizni uradi. ${m} tagacha jang zaxirasi, har soatda +1, har dushanba yangi boss`,
         noBest: "Mukofot uchun bu hafta bossga kamida 1 marta hujum qiling",
         prizeRule: "Har dushanba 00:00 da: haftaning eng yuqori darajaga yetgan top 50 o'yinchisiga token, top 3 ga almaz box ham pochtaga keladi",
         title: "👹 Boss jangi tugadi", dealt: (d) => `💥 ${d} zarba berdingiz`, record: "🏅 Haftalik rekord!",
-        refused: { no_team: "Avval Arena bo'limida jamoa saqlang", no_boss: "Boss hali tayyor emas", no_tries: "Bugungi janglar tugadi: ertaga yana" },
+        refused: { no_team: "Avval Arena bo'limida jamoa saqlang", no_boss: "Boss hali tayyor emas", no_tries: "Janglar tugadi: har soatda 1 ta qo'shiladi" },
       },
       coins: (n) => `🪙 ${n}`, coinsWon: (n) => `+${n} 🪙`, ruleCoins: (w, l) => `🪙 Har hujum tanga beradi: g'alaba +${w}, mag'lubiyat +${l}. Tangalar Arena do'konida sarflanadi`,
       shopHint: (w, l) => `Har hujum: g'alaba +${w} 🪙, mag'lubiyat +${l} 🪙`, shopToken: "1 ta 🎟 token", shopTicket: "1 ta 🎫 arena tiketi", shopTicketHint: (n, m) => (n >= m ? `Tiketlar to'la: ${n}/${m}` : `Hozir ${n}/${m}, hujum uchun`), shopTokenHint: (left, d) => `Bugun yana ${left} ta (kuniga ${d} tagacha)`,
@@ -2431,16 +2431,16 @@
         refused: { no_team: "Сначала сохраните команду в разделе Арена", no_floor: "Этот этаж ещё не готов", moved: "Этот этаж уже пройден, страница обновлена" },
       },
       boss: {
-        best: "Ваш рекорд недели", none: "пока нет", tries: (n, m) => `⚔️ Осталось боёв сегодня: ${n}/${m}`,
+        best: "Ваш рекорд недели", none: "пока нет", tries: (n, m) => `⚔️ Бои: ${n}/${m}`,
         start: "👹 С 1 уровня", endless: "♾️ Уровни бесконечны", attack: (n) => `⚔️ Атака ${n}`, bestLevel: (n, d) => `👹 ${n} · 💥 ${d}`,
         week: (d) => `За неделю все вместе нанесли: 💥 ${d}`, levelUp: (n) => `👹 Босс поднялся на уровень ${n}!`, levelTitle: (n) => `👹 Уровень ${n}`, dealtLine: (d, c) => `💥 ${d} урона · +${c} 🪙`,
-        fight: "👹 Атаковать босса", noTeam: "Сначала сохраните команду в разделе Арена", noTries: "Бои на сегодня закончились: завтра снова",
+        fight: "👹 Атаковать босса", noTeam: "Сначала сохраните команду в разделе Арена", noTries: "Бои закончились: каждый час +1",
         coins: (b, per, most) => `🪙 Каждый бой: ${b} монет и ещё 1 за каждые ${per} урона, до ${most}`,
-        rule: (hpg, ag, m) => `Каждый бой босс начинает с 1 уровня. У каждого уровня своё здоровье: снесите его, и босс поднимется на уровень, здоровье ×${hpg}, атака +${ag}%. Ваш результат — уровень, до которого вы дойдёте, пока стоит команда. Каждый ход босс бьёт одну случайную карту. ${m} боя в день, каждый понедельник новый босс`,
+        rule: (hpg, ag, m) => `Каждый бой босс начинает с 1 уровня. У каждого уровня своё здоровье: снесите его, и босс поднимется на уровень, здоровье ×${hpg}, атака +${ag}%. Ваш результат — уровень, до которого вы дойдёте, пока стоит команда. Каждый ход босс бьёт одну случайную карту. Запас до ${m} боёв, каждый час +1, каждый понедельник новый босс`,
         noBest: "Чтобы получить награду, атакуйте босса хотя бы раз на этой неделе",
         prizeRule: "Каждый понедельник в 00:00: топ 50 по высшему уровню недели получают токены почтой, топ 3 ещё и алмазные боксы",
         title: "👹 Бой с боссом окончен", dealt: (d) => `💥 Вы нанесли ${d} урона`, record: "🏅 Рекорд недели!",
-        refused: { no_team: "Сначала сохраните команду в разделе Арена", no_boss: "Босс ещё не готов", no_tries: "Бои на сегодня закончились: завтра снова" },
+        refused: { no_team: "Сначала сохраните команду в разделе Арена", no_boss: "Босс ещё не готов", no_tries: "Бои закончились: каждый час +1" },
       },
       coins: (n) => `🪙 ${n}`, coinsWon: (n) => `+${n} 🪙`, ruleCoins: (w, l) => `🪙 Каждая атака даёт монеты: победа +${w}, поражение +${l}. Их тратят в магазине арены`,
       shopHint: (w, l) => `За атаку: победа +${w} 🪙, поражение +${l} 🪙`, shopToken: "1 🎟 токен", shopTicket: "1 🎫 билет арены", shopTicketHint: (n, m) => (n >= m ? `Билеты полные: ${n}/${m}` : `Сейчас ${n}/${m}, для атаки`), shopTokenHint: (left, d) => `Сегодня ещё ${left} (до ${d} в день)`,
@@ -2487,16 +2487,16 @@
         refused: { no_team: "Save a team in the Arena first", no_floor: "This floor is not ready yet", moved: "This floor is cleared already; the page is refreshed" },
       },
       boss: {
-        best: "Your best this week", none: "none yet", tries: (n, m) => `⚔️ Fights left today: ${n}/${m}`,
+        best: "Your best this week", none: "none yet", tries: (n, m) => `⚔️ Fights: ${n}/${m}`,
         start: "👹 From level 1", endless: "♾️ Endless levels", attack: (n) => `⚔️ Attack ${n}`, bestLevel: (n, d) => `👹 ${n} · 💥 ${d}`,
         week: (d) => `Everyone this week dealt: 💥 ${d}`, levelUp: (n) => `👹 The boss reached level ${n}!`, levelTitle: (n) => `👹 Level ${n}`, dealtLine: (d, c) => `💥 ${d} damage · +${c} 🪙`,
-        fight: "👹 Attack the boss", noTeam: "Save a team in the Arena first", noTries: "No fights left today: come back tomorrow",
+        fight: "👹 Attack the boss", noTeam: "Save a team in the Arena first", noTries: "No fights left: one comes back every hour",
         coins: (b, per, most) => `🪙 Each fight: ${b} coins and 1 more per ${per} damage, up to ${most}`,
-        rule: (hpg, ag, m) => `Each fight starts the boss at level 1. Each level has its own health: spend it and the boss goes up a level, health ×${hpg}, attack +${ag}%. Your score is the level you reach before your team falls. Each turn the boss hits one random card. ${m} fights a day, a new boss every Monday`,
+        rule: (hpg, ag, m) => `Each fight starts the boss at level 1. Each level has its own health: spend it and the boss goes up a level, health ×${hpg}, attack +${ag}%. Your score is the level you reach before your team falls. Each turn the boss hits one random card. Up to ${m} fights in stock, +1 every hour, a new boss every Monday`,
         noBest: "Fight the boss at least once this week for a prize",
         prizeRule: "Every Monday at 00:00: the top 50 by the week's highest level get tokens in the mail, and the top 3 diamond boxes too",
         title: "👹 The boss fight is over", dealt: (d) => `💥 You dealt ${d} damage`, record: "🏅 Best of your week!",
-        refused: { no_team: "Save a team in the Arena first", no_boss: "The boss is not ready yet", no_tries: "No fights left today: come back tomorrow" },
+        refused: { no_team: "Save a team in the Arena first", no_boss: "The boss is not ready yet", no_tries: "No fights left: one comes back every hour" },
       },
       coins: (n) => `🪙 ${n}`, coinsWon: (n) => `+${n} 🪙`, ruleCoins: (w, l) => `🪙 Each attack gives coins: a win +${w}, a loss +${l}. Spend them in the arena shop`,
       shopHint: (w, l) => `Each attack: a win +${w} 🪙, a loss +${l} 🪙`, shopToken: "1 🎟 token", shopTicket: "1 🎫 arena ticket", shopTicketHint: (n, m) => (n >= m ? `Tickets full: ${n}/${m}` : `${n}/${m} now, for an attack`), shopTokenHint: (left, d) => `${left} more today (up to ${d} a day)`,
@@ -3175,9 +3175,11 @@
     me.innerHTML = '<div class="arena-rating"><small></small><b></b></div><div class="arena-left"><span></span></div>';
     me.querySelector(".arena-rating small").textContent = bt.best;
     me.querySelector(".arena-rating b").textContent = data.best_level ? bt.bestLevel(data.best_level, big(data.best)) : bt.none;
-    // an owner plays without the daily limit
-    const out = !data.unlimited && data.tries >= data.tries_max;
-    me.querySelector(".arena-left span").textContent = data.unlimited ? bt.tries("∞", "∞") : bt.tries(Math.max(0, data.tries_max - data.tries), data.tries_max);
+    // fights are tickets, one back every hour; an owner plays without them
+    if (data.ticketAt === undefined) data.ticketAt = Date.now() + (data.next_ticket_in || 0);
+    const out = !data.unlimited && data.tickets < 1;
+    me.querySelector(".arena-left span").textContent = data.unlimited ? bt.tries("∞", "∞")
+      : bt.tries(data.tickets, data.tickets_max) + (data.tickets < data.tickets_max ? " " + at.nextTicket(Math.max(1, Math.ceil((data.ticketAt - Date.now()) / 60000))) : "");
     const boss = data.boss;
     $("bossName").textContent = boss ? boss.name : "";
     $("bossLevel").textContent = bt.start;
@@ -3203,7 +3205,7 @@
     fight.textContent = bt.fight;
     fight.disabled = bossBusy || !team.length || !boss || out;
     $("bossCoins").textContent = bt.coins(data.coins.base, big(data.coins.per), data.coins.most);
-    $("bossRule").textContent = bt.rule(data.levels.hp_growth, data.levels.attack_growth, data.tries_max);
+    $("bossRule").textContent = bt.rule(data.levels.hp_growth, data.levels.attack_growth, data.tickets_max);
     const left = Math.max(0, data.ends - Date.now()), hours = Math.floor(left / 3600000);
     $("bossEnds").textContent = at.weekEnds(Math.floor(hours / 24), hours % 24, Math.floor((left % 3600000) / 60000));
     bossPrizes(data.week);

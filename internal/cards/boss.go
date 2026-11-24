@@ -22,11 +22,13 @@ import (
 // first and BossHPGrowth times the one before after, and spent, the boss goes
 // up a level with BossAttackGrowth times the attack; what counts is the
 // level reached, then the damage dealt. It hits one card of the team at
-// random each turn (every card until 2026-11-24). A player has BossTries
-// fights a day; each gives arena coins by its damage, and the week's table
+// random each turn (every card until 2026-11-24). A player holds up to
+// BossTickets fights, one coming back every BossTicketEvery (three a day
+// until 2026-11-24, when the owners asked for these); each fight gives arena coins by its damage, and the week's table
 // ranks the best levels.
 const (
-	BossTries        = 3
+	BossTickets      = 10
+	BossTicketEvery  = time.Hour
 	BossAttack       = 3000
 	BossHP           = 50_000
 	BossHPGrowth     = 1.15
@@ -148,10 +150,8 @@ func (h *handler) bossOf(ctx context.Context, userID int64) (boss, error) {
 		return boss{}, fmt.Errorf("read the card catalog: %w", err)
 	}
 	now := h.Now()
-	b := boss{rules: storage.BossRules{Week: arenaWeekStart(now), Day: DayStart(now), Now: now, Tries: BossTries}}
-	if h.unlimited(userID) {
-		b.rules.Tries = math.MaxInt32
-	}
+	b := boss{rules: storage.BossRules{Week: arenaWeekStart(now), Day: DayStart(now), Now: now,
+		Tickets: BossTickets, TicketEvery: BossTicketEvery, Unlimited: h.unlimited(userID)}}
 	if b.total, err = h.Store.BossWeek(ctx, b.rules.Week); err != nil {
 		return boss{}, err
 	}
@@ -177,8 +177,9 @@ func (h *handler) bossView(ctx context.Context, user miniapp.User) (any, failure
 	}
 	view := map[string]any{
 		"boss": nil, "week_damage": b.total,
-		"levels": map[string]any{"hp": BossHP, "hp_growth": BossHPGrowth, "attack_growth": int(math.Round((BossAttackGrowth - 1) * 100))},
-		"tries":  b.player.Tries, "tries_max": BossTries, "best": b.player.Best, "best_level": b.player.BestLevel, "unlimited": h.unlimited(user.ID),
+		"levels":  map[string]any{"hp": BossHP, "hp_growth": BossHPGrowth, "attack_growth": int(math.Round((BossAttackGrowth - 1) * 100))},
+		"tickets": b.player.Tickets, "tickets_max": BossTickets, "next_ticket_in": b.player.NextTicket.Milliseconds(),
+		"best": b.player.Best, "best_level": b.player.BestLevel, "unlimited": h.unlimited(user.ID),
 		"coins": map[string]any{"base": BossCoinsBase, "per": BossCoinsPer, "most": BossCoinsMost},
 		"ends":  b.rules.Week.AddDate(0, 0, 7).UnixMilli(), "team": nil, "power": 0,
 	}
@@ -200,7 +201,7 @@ func (h *handler) bossView(ctx context.Context, user miniapp.User) (any, failure
 
 // bossFight fights the week's boss with the player's saved team. A fight
 // refused says why: "no_team", "no_boss" (the catalog has none) or
-// "no_tries" (the day's fights are used).
+// "no_tries" (no ticket left).
 func (h *handler) bossFight(ctx context.Context, user miniapp.User) (any, failure) {
 	b, err := h.bossOf(ctx, user.ID)
 	if err != nil {
@@ -212,7 +213,7 @@ func (h *handler) bossFight(ctx context.Context, user miniapp.User) (any, failur
 		return map[string]any{"refused": "no_team"}, failure{}
 	case !b.hasBoss:
 		return map[string]any{"refused": "no_boss"}, failure{}
-	case b.player.Tries >= b.rules.Tries:
+	case !b.rules.Unlimited && b.player.Tickets < 1:
 		return map[string]any{"refused": "no_tries"}, failure{}
 	}
 	result := arena.BossBattle(b.mine.team, b.fighter, bossLevels, bossSeed(user.ID, b.rules.Day, b.player.Tries))
@@ -229,7 +230,8 @@ func (h *handler) bossFight(ctx context.Context, user miniapp.User) (any, failur
 		"boss": true, "won": false, "damage": result.Damage, "level": result.Level, "best_level": max(b.player.BestLevel, result.Level),
 		"levels": map[string]any{"hp": BossHP, "hp_growth": BossHPGrowth}, "best": max(b.player.Best, int64(result.Damage)),
 		"events": eventViews(result.Events), "attacker": b.mine.views, "defender": []fighterView{b.view},
-		"tries": out.Tries, "tries_max": BossTries, "unlimited": h.unlimited(user.ID), "coins_won": b.rules.Coins, "coins": out.Coins,
+		"tickets": out.Tickets, "tickets_max": BossTickets, "next_ticket_in": out.NextTicket.Milliseconds(),
+		"unlimited": h.unlimited(user.ID), "coins_won": b.rules.Coins, "coins": out.Coins,
 	}, failure{}
 }
 
