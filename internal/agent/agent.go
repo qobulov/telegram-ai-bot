@@ -522,6 +522,10 @@ func finishText(t *turn, answer string) (Answer, error) {
 		// is the truth.
 		answer = said
 	}
+	if weatherFailed(t.messages) && givesWeather(answer) {
+		// The model told a forecast the tool never gave.
+		answer = weatherLine(answer)
+	}
 	answer = currentCommands(answer)
 	answer = withoutTicks(answer)
 	answer = uzscript.OneScript(answer)
