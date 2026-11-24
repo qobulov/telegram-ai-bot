@@ -22,11 +22,12 @@ type BossRules struct {
 
 func (r BossRules) week() string { return r.Week.Format(time.DateOnly) }
 
-// BossPlayer is a player against the week's boss: their best damage in a
-// fight this week and the fights they had today.
+// BossPlayer is a player against the week's boss: their best damage and
+// best level in a fight this week and the fights they had today.
 type BossPlayer struct {
-	Best  int64
-	Tries int
+	Best      int64
+	BestLevel int
+	Tries     int
 }
 
 // BossOutcome is what a fight changed: the fights had today and the
@@ -50,9 +51,10 @@ func (s *Store) BossWeek(ctx context.Context, week time.Time) (int64, error) {
 func (s *Store) BossPlayerOf(ctx context.Context, userID int64, rules BossRules) (BossPlayer, error) {
 	var p BossPlayer
 	err := s.pool.QueryRow(ctx, `
-		SELECT coalesce(max(damage) FILTER (WHERE week = $2::date), 0)::bigint, count(*) FILTER (WHERE fought_at >= $3)
+		SELECT coalesce(max(damage) FILTER (WHERE week = $2::date), 0)::bigint,
+			coalesce(max(level) FILTER (WHERE week = $2::date), 0)::int, count(*) FILTER (WHERE fought_at >= $3)
 		FROM boss_fights WHERE user_id = $1 AND (week = $2::date OR fought_at >= $3)`,
-		userID, rules.week(), rules.Day).Scan(&p.Best, &p.Tries)
+		userID, rules.week(), rules.Day).Scan(&p.Best, &p.BestLevel, &p.Tries)
 	if err != nil {
 		return BossPlayer{}, fmt.Errorf("storage: read a boss player: %w", err)
 	}
@@ -62,7 +64,7 @@ func (s *Store) BossPlayerOf(ctx context.Context, userID int64, rules BossRules)
 // RecordBossFight records the player's fight dealing damage and gives its
 // coins, in one transaction that locks the player's arena row; a fight past
 // the day's Tries is ErrBossNoTries.
-func (s *Store) RecordBossFight(ctx context.Context, userID int64, damage int64, rules BossRules) (BossOutcome, error) {
+func (s *Store) RecordBossFight(ctx context.Context, userID int64, damage int64, level int, rules BossRules) (BossOutcome, error) {
 	var out BossOutcome
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `
@@ -78,8 +80,8 @@ func (s *Store) RecordBossFight(ctx context.Context, userID int64, damage int64,
 			return ErrBossNoTries
 		}
 		out.Tries++
-		if _, err := tx.Exec(ctx, `INSERT INTO boss_fights (user_id, week, damage, fought_at) VALUES ($1, $2::date, $3, $4)`,
-			userID, rules.week(), damage, rules.Now); err != nil {
+		if _, err := tx.Exec(ctx, `INSERT INTO boss_fights (user_id, week, damage, level, fought_at) VALUES ($1, $2::date, $3, $4, $5)`,
+			userID, rules.week(), damage, level, rules.Now); err != nil {
 			return err
 		}
 		return tx.QueryRow(ctx, `UPDATE arena_players SET coins = coins + $2 WHERE user_id = $1 RETURNING coins`,
@@ -94,29 +96,33 @@ func (s *Store) RecordBossFight(ctx context.Context, userID int64, damage int64,
 	return out, nil
 }
 
-// BossRow is a player on the boss's table: their best damage of the week.
+// BossRow is a player on the boss's table: their best level and best
+// damage of the week.
 type BossRow struct {
 	UserID int64
 	Name   string
 	Best   int64
+	Level  int
 }
 
-// bossRanked ranks the week's players by their best fight, then by id.
+// bossRanked ranks the week's players by their best level, then their best
+// damage, then by id.
 const bossRanked = `
-	SELECT b.user_id, coalesce(c.name, '') AS name, b.best, row_number() OVER (ORDER BY b.best DESC, b.user_id) AS place
-	FROM (SELECT user_id, max(damage) AS best FROM boss_fights WHERE week = $1::date GROUP BY user_id) b
+	SELECT b.user_id, coalesce(c.name, '') AS name, b.best, b.level,
+		row_number() OVER (ORDER BY b.level DESC, b.best DESC, b.user_id) AS place
+	FROM (SELECT user_id, max(damage) AS best, max(level) AS level FROM boss_fights WHERE week = $1::date GROUP BY user_id) b
 	LEFT JOIN card_players c ON c.user_id = b.user_id`
 
 // BossTop are the limit players of the week begun at week with the best fights.
 func (s *Store) BossTop(ctx context.Context, week time.Time, limit int) ([]BossRow, error) {
-	rows, err := s.pool.Query(ctx, `SELECT user_id, name, best FROM (`+bossRanked+`) r ORDER BY place LIMIT $2`,
+	rows, err := s.pool.Query(ctx, `SELECT user_id, name, best, level FROM (`+bossRanked+`) r ORDER BY place LIMIT $2`,
 		week.Format(time.DateOnly), limit)
 	if err != nil {
 		return nil, fmt.Errorf("storage: read the boss table: %w", err)
 	}
 	top, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (BossRow, error) {
 		var r BossRow
-		return r, row.Scan(&r.UserID, &r.Name, &r.Best)
+		return r, row.Scan(&r.UserID, &r.Name, &r.Best, &r.Level)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("storage: read the boss table: %w", err)
@@ -129,8 +135,8 @@ func (s *Store) BossTop(ctx context.Context, week time.Time, limit int) ([]BossR
 func (s *Store) BossPlace(ctx context.Context, week time.Time, userID int64) (me BossRow, place, total int, err error) {
 	err = s.pool.QueryRow(ctx, `
 		WITH ranked AS (`+bossRanked+`)
-		SELECT user_id, name, best, place, (SELECT count(*) FROM ranked) FROM ranked WHERE user_id = $2`,
-		week.Format(time.DateOnly), userID).Scan(&me.UserID, &me.Name, &me.Best, &place, &total)
+		SELECT user_id, name, best, level, place, (SELECT count(*) FROM ranked) FROM ranked WHERE user_id = $2`,
+		week.Format(time.DateOnly), userID).Scan(&me.UserID, &me.Name, &me.Best, &me.Level, &place, &total)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return BossRow{}, 0, 0, nil
 	}
@@ -158,7 +164,7 @@ func (s *Store) PayBossWeek(ctx context.Context, week time.Time, prizes []ArenaP
 		paid = true
 		rows, err := tx.Query(ctx, `
 			SELECT user_id FROM boss_fights WHERE week = $1::date
-			GROUP BY user_id ORDER BY max(damage) DESC, user_id LIMIT $2`, day, places)
+			GROUP BY user_id ORDER BY max(level) DESC, max(damage) DESC, user_id LIMIT $2`, day, places)
 		if err != nil {
 			return err
 		}

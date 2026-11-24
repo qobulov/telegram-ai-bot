@@ -4,6 +4,7 @@
 package arena
 
 import (
+	"math"
 	"math/rand"
 	"sort"
 )
@@ -183,9 +184,10 @@ type unit struct {
 	poisoned   int  // its turns left to be hurt by poison
 	provoking  int  // the last round it draws enemy Tanks, Dealers and Healers
 	poisonDmg  int  // a boss's poison tick, by its poisoner's attack
-	// boss is a unit that never falls: what it is dealt is counted instead
-	// of taken off its health, it hits one living foe at random each turn, and its
-	// attack rises by rage of itself each round after the first.
+	// boss is a unit that never falls: each level's health spent, it goes
+	// up a level, its health and attack growing, it hits one living foe at
+	// random each turn, and its attack rises by rage of itself each round
+	// after the first.
 	boss bool
 	rage float64
 }
@@ -203,8 +205,14 @@ type fight struct {
 	// round 1, the other in round 2 and so on, by the seed, so that
 	// neither side is favoured.
 	first int
-	// bossDealt is all the damage dealt to a boss.
-	bossDealt int
+	// bossDealt is all the damage dealt to a boss, bossLevel the level it
+	// is at, bossLevelHP that level's whole health, bossBase its attack at
+	// level 1 and bossLevels how it grows.
+	bossDealt   int
+	bossLevel   int
+	bossLevelHP int
+	bossBase    int
+	bossLevels  BossLevels
 }
 
 // Battle plays the two teams against each other. That a team is valid (five
@@ -223,25 +231,48 @@ func Battle(attacker, defender Team, seed int64) Result {
 }
 
 // BossResult is a boss fight: all the damage the team dealt the boss, the
-// rounds fought and the events to replay them.
+// level it reached, the rounds fought and the events to replay them.
 type BossResult struct {
-	Damage, Rounds int
-	Events         []Event
+	Damage, Level, Rounds int
+	Events                []Event
 }
 
-// bossHP is a boss's health as events tell it; it never changes.
-const bossHP = 1 << 30
+// BossLevels are how a boss grows, as the owners asked on 2026-11-24: HP is
+// its first level's health and each level's is HPGrowth times the one
+// before; its attack is AttackGrowth times more each level, and Rage more
+// each round after the first besides.
+type BossLevels struct {
+	HP                     int
+	HPGrowth, AttackGrowth float64
+	Rage                   float64
+}
+
+// LevelHP is the whole health of level of a boss growing as levels say;
+// the page works it out the same way, rounding each level's.
+func (l BossLevels) LevelHP(level int) int {
+	hp := l.HP
+	for range level - 1 {
+		hp = int(math.Round(float64(hp) * l.HPGrowth))
+	}
+	return hp
+}
+
+// KindLevel is a boss going up a level: Amount is the new level and HP the
+// health of it left.
+const KindLevel = "level"
 
 // BossBattle plays team against boss, a lone foe in the defender's first
-// slot that never falls: each turn it hits one living card of the team at random,
-// its attack raised by rage times the rounds gone before, so the fight ends
-// when the team falls or after MaxRounds. Its Health is not used.
-func BossBattle(team Team, boss Fighter, rage float64, seed int64) BossResult {
+// slot that never falls: each level's health spent, it goes up a level, its
+// health and attack growing as levels say, and each turn it hits one living
+// card of the team at random, so the fight ends when the team falls or
+// after MaxRounds. Its Health is not used.
+func BossBattle(team Team, boss Fighter, levels BossLevels, seed int64) BossResult {
 	f := newFight(team, Team{Front: [2]Fighter{boss}}, seed)
 	b := f.teams[1][0]
-	b.boss, b.rage, b.hp = true, rage, bossHP
+	b.boss, b.rage, b.hp = true, levels.Rage, levels.HP
+	f.bossLevel, f.bossLevelHP, f.bossBase, f.bossLevels = 1, levels.HP, boss.Attack, levels
 	f.run()
-	return BossResult{Damage: f.bossDealt, Rounds: f.round, Events: f.events}
+	return BossResult{Damage: f.bossDealt, Level: f.bossLevel, Rounds: f.round, Events: f.events}
 }
 
 // run plays rounds until a side has fallen or MaxRounds are over.
@@ -532,13 +563,23 @@ func (f *fight) hit(from, to *unit, factor float64, kind string) {
 	}
 }
 
-// hurt takes dmg off u's health, or, for a boss, counts it as dealt.
+// hurt takes dmg off u's health; a boss's spent takes it up a level, as
+// many as dmg spends, the rest going on into the next.
 func (f *fight) hurt(u *unit, dmg int) {
-	if u.boss {
-		f.bossDealt += dmg
+	if !u.boss {
+		u.hp = max(u.hp-dmg, 0)
 		return
 	}
-	u.hp = max(u.hp-dmg, 0)
+	f.bossDealt += dmg
+	u.hp -= dmg
+	for u.hp <= 0 {
+		f.bossLevel++
+		f.bossLevelHP = f.bossLevels.LevelHP(f.bossLevel)
+		u.hp += f.bossLevelHP
+		u.Attack = int(math.Round(float64(f.bossBase) * math.Pow(f.bossLevels.AttackGrowth, float64(f.bossLevel-1))))
+		f.events = append(f.events, Event{Round: f.round, Side: u.side, From: u.slot, To: u.slot, Kind: KindLevel,
+			Amount: f.bossLevel, HP: max(u.hp, 0), Energy: u.energy, ToEnergy: u.energy})
+	}
 }
 
 func (f *fight) heal(from, to *unit) {

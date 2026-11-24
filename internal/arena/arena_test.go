@@ -493,7 +493,7 @@ func stunWall() Team {
 // round, and the damage dealt it is the sum of the team's hits on it.
 func TestBossBattle(t *testing.T) {
 	boss := FighterOf(99, "boss", 4, 5, 100, 400)
-	got := BossBattle(commonTeam(50, 1000), boss, 0.5, 7)
+	got := BossBattle(commonTeam(50, 1000), boss, BossLevels{HP: 1 << 30, HPGrowth: 1, AttackGrowth: 1, Rage: 0.5}, 7)
 	if got.Rounds == 0 || got.Rounds >= MaxRounds {
 		t.Fatalf("rounds %d, want the team to fall before %d", got.Rounds, MaxRounds)
 	}
@@ -523,7 +523,7 @@ func TestBossBattle(t *testing.T) {
 	if len(targets) < 3 {
 		t.Errorf("the boss hit only cards %v, want them picked at random", targets)
 	}
-	again := BossBattle(commonTeam(50, 1000), boss, 0.5, 7)
+	again := BossBattle(commonTeam(50, 1000), boss, BossLevels{HP: 1 << 30, HPGrowth: 1, AttackGrowth: 1, Rage: 0.5}, 7)
 	if !reflect.DeepEqual(got, again) {
 		t.Error("the same seed gave another boss fight")
 	}
@@ -533,21 +533,46 @@ func TestBossBattle(t *testing.T) {
 // with no rage a strong team lasts all MaxRounds.
 func TestBossRage(t *testing.T) {
 	boss := FighterOf(99, "boss", 4, 5, 10, 400)
-	if r := BossBattle(commonTeam(50, 500), boss, 0, 1); r.Rounds != MaxRounds {
+	if r := BossBattle(commonTeam(50, 500), boss, BossLevels{HP: 1 << 30, HPGrowth: 1, AttackGrowth: 1}, 1); r.Rounds != MaxRounds {
 		t.Errorf("no rage: %d rounds, want %d", r.Rounds, MaxRounds)
 	}
-	if r := BossBattle(commonTeam(50, 500), boss, 1, 1); r.Rounds >= MaxRounds {
+	if r := BossBattle(commonTeam(50, 500), boss, BossLevels{HP: 1 << 30, HPGrowth: 1, AttackGrowth: 1, Rage: 1}, 1); r.Rounds >= MaxRounds {
 		t.Errorf("rage 1: %d rounds, want fewer than %d", r.Rounds, MaxRounds)
 	}
 }
 
 // A poisoned boss is hurt by a share of its poisoner's attack, counted as
-// dealt, its health untouched.
+// dealt and taken off its level's health.
 func TestBossPoison(t *testing.T) {
-	f := &fight{}
-	u := &unit{Fighter: Fighter{Health: 10}, hp: bossHP, boss: true, poisoned: 1, poisonDmg: 30}
+	f := &fight{bossLevel: 1, bossLevels: BossLevels{HP: 1000, HPGrowth: 2, AttackGrowth: 1}}
+	u := &unit{Fighter: Fighter{Health: 10}, hp: 1000, boss: true, poisoned: 1, poisonDmg: 30}
 	f.poisonTick(u)
-	if f.bossDealt != 30 || u.hp != bossHP || len(f.events) != 1 || f.events[0].Amount != 30 {
+	if f.bossDealt != 30 || u.hp != 970 || len(f.events) != 1 || f.events[0].Amount != 30 {
 		t.Errorf("dealt %d, hp %d, events %+v", f.bossDealt, u.hp, f.events)
+	}
+}
+
+// A boss whose level's health is spent goes up a level, as many as a hit
+// spends, the rest of the hit going into the next; each level has
+// HPGrowth times the health and AttackGrowth times the attack.
+func TestBossLevels(t *testing.T) {
+	levels := BossLevels{HP: 100, HPGrowth: 2, AttackGrowth: 1.5}
+	if levels.LevelHP(1) != 100 || levels.LevelHP(3) != 400 {
+		t.Fatalf("level health %d, %d", levels.LevelHP(1), levels.LevelHP(3))
+	}
+	f := &fight{bossLevel: 1, bossLevelHP: 100, bossBase: 10, bossLevels: levels}
+	u := &unit{Fighter: Fighter{Attack: 10}, hp: 100, boss: true}
+	f.hurt(u, 350) // 100 for level 1, 200 for level 2, 50 into level 3
+	if f.bossLevel != 3 || u.hp != 350 || u.Attack != 23 || f.bossDealt != 350 {
+		t.Fatalf("level %d, hp %d, attack %d, dealt %d", f.bossLevel, u.hp, u.Attack, f.bossDealt)
+	}
+	if len(f.events) != 2 || f.events[0].Kind != KindLevel || f.events[0].Amount != 2 || f.events[1].Amount != 3 || f.events[1].HP != 350 {
+		t.Errorf("events %+v", f.events)
+	}
+	// a strong team against a weak boss climbs levels in a fight
+	boss := FighterOf(99, "boss", 4, 5, 10, 400)
+	r := BossBattle(commonTeam(500, 5000), boss, BossLevels{HP: 2000, HPGrowth: 1.2, AttackGrowth: 1.1}, 3)
+	if r.Level < 5 {
+		t.Errorf("reached level %d, want 5 or more", r.Level)
 	}
 }

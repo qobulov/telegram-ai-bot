@@ -19,6 +19,7 @@ type fakeBossFight struct {
 	week   time.Time
 	at     time.Time
 	damage int64
+	level  int
 }
 
 func (f *fakeStore) BossWeek(_ context.Context, week time.Time) (int64, error) {
@@ -38,7 +39,7 @@ func (f *fakeStore) BossPlayerOf(_ context.Context, userID int64, rules storage.
 			continue
 		}
 		if b.week.Equal(rules.Week) {
-			p.Best = max(p.Best, b.damage)
+			p.Best, p.BestLevel = max(p.Best, b.damage), max(p.BestLevel, b.level)
 		}
 		if !b.at.Before(rules.Day) {
 			p.Tries++
@@ -47,7 +48,7 @@ func (f *fakeStore) BossPlayerOf(_ context.Context, userID int64, rules storage.
 	return p, nil
 }
 
-func (f *fakeStore) RecordBossFight(ctx context.Context, userID int64, damage int64, rules storage.BossRules) (storage.BossOutcome, error) {
+func (f *fakeStore) RecordBossFight(ctx context.Context, userID int64, damage int64, level int, rules storage.BossRules) (storage.BossOutcome, error) {
 	p, _ := f.BossPlayerOf(ctx, userID, rules)
 	if p.Tries >= rules.Tries {
 		return storage.BossOutcome{}, storage.ErrBossNoTries
@@ -55,23 +56,26 @@ func (f *fakeStore) RecordBossFight(ctx context.Context, userID int64, damage in
 	if f.arena.coins == nil {
 		f.arena.coins = map[int64]int{}
 	}
-	f.boss = append(f.boss, fakeBossFight{user: userID, week: rules.Week, at: rules.Now, damage: damage})
+	f.boss = append(f.boss, fakeBossFight{user: userID, week: rules.Week, at: rules.Now, damage: damage, level: level})
 	f.arena.coins[userID] += rules.Coins
 	return storage.BossOutcome{Tries: p.Tries + 1, Coins: f.arena.coins[userID]}, nil
 }
 
 func (f *fakeStore) BossTop(_ context.Context, week time.Time, limit int) ([]storage.BossRow, error) {
-	best := map[int64]int64{}
+	best, level := map[int64]int64{}, map[int64]int{}
 	for _, b := range f.boss {
 		if b.week.Equal(week) {
-			best[b.user] = max(best[b.user], b.damage)
+			best[b.user], level[b.user] = max(best[b.user], b.damage), max(level[b.user], b.level)
 		}
 	}
 	var top []storage.BossRow
 	for id, d := range best {
-		top = append(top, storage.BossRow{UserID: id, Best: d})
+		top = append(top, storage.BossRow{UserID: id, Best: d, Level: level[id]})
 	}
 	slices.SortFunc(top, func(a, b storage.BossRow) int {
+		if a.Level != b.Level {
+			return b.Level - a.Level
+		}
 		if a.Best != b.Best {
 			return int(b.Best - a.Best)
 		}
@@ -118,14 +122,12 @@ func TestBossCard(t *testing.T) {
 	}
 }
 
-// The boss's level rises every BossLevelDamage of the week, its attack with
-// it; a fight's coins rise with its damage up to the most.
+// The boss starts a fight at level 1 with BossHP, each level more; a
+// fight's coins rise with its damage up to the most.
 func TestBossGrowth(t *testing.T) {
-	if bossLevel(0) != 1 || bossLevel(BossLevelDamage-1) != 1 || bossLevel(BossLevelDamage) != 2 || bossLevel(5*BossLevelDamage) != 6 {
-		t.Error("the boss's levels")
-	}
-	if bossAttack(1) != BossAttack || bossAttack(2) <= bossAttack(1) {
-		t.Errorf("attack: %d at 1, %d at 2", bossAttack(1), bossAttack(2))
+	boss, view := bossFighter(towerCatalog()[len(towerCatalog())-1])
+	if boss.Attack != BossAttack || view.Health != BossHP || bossLevels.LevelHP(2) <= bossLevels.LevelHP(1) {
+		t.Errorf("the boss at level 1 = %+v, level 2 health %d", view, bossLevels.LevelHP(2))
 	}
 	if bossCoins(0) != BossCoinsBase || bossCoins(BossCoinsPer*3) != BossCoinsBase+3 || bossCoins(1<<40) != BossCoinsMost {
 		t.Error("the boss's coins")
@@ -144,7 +146,7 @@ func TestBossFights(t *testing.T) {
 	}
 	call(7, map[string]any{"action": "arena_team", "front": arenaFront, "back": arenaBack})
 	_, view := call(7, map[string]any{"action": "boss"})
-	if b, ok := view["boss"].(map[string]any); !ok || b["boss"] != true || view["level"] != 1.0 || view["tries"] != 0.0 || len(view["team"].([]any)) != 5 {
+	if b, ok := view["boss"].(map[string]any); !ok || b["boss"] != true || view["best_level"] != 0.0 || view["levels"] == nil || view["tries"] != 0.0 || len(view["team"].([]any)) != 5 {
 		t.Fatalf("the boss = %v", view)
 	}
 	var dealt float64
@@ -163,7 +165,7 @@ func TestBossFights(t *testing.T) {
 		t.Errorf("after the day = %v, want %v dealt", view, dealt)
 	}
 	_, top := call(7, map[string]any{"action": "boss_top"})
-	if rows := top["top"].([]any); len(rows) != 1 || rows[0].(map[string]any)["me"] != true || top["me"].(map[string]any)["place"] != 1.0 {
+	if rows := top["top"].([]any); len(rows) != 1 || rows[0].(map[string]any)["me"] != true || rows[0].(map[string]any)["level"].(float64) < 1 || top["me"].(map[string]any)["place"] != 1.0 {
 		t.Errorf("the table = %v", top)
 	}
 	next := arenaHandler(t, store, now.Add(24*time.Hour))

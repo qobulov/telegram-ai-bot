@@ -64,7 +64,7 @@ type Store interface {
 	TowerPlace(ctx context.Context, userID int64) (storage.TowerRow, int, int, error)
 	BossWeek(ctx context.Context, week time.Time) (int64, error)
 	BossPlayerOf(ctx context.Context, userID int64, rules storage.BossRules) (storage.BossPlayer, error)
-	RecordBossFight(ctx context.Context, userID int64, damage int64, rules storage.BossRules) (storage.BossOutcome, error)
+	RecordBossFight(ctx context.Context, userID int64, damage int64, level int, rules storage.BossRules) (storage.BossOutcome, error)
 	BossTop(ctx context.Context, week time.Time, limit int) ([]storage.BossRow, error)
 	BossPlace(ctx context.Context, week time.Time, userID int64) (storage.BossRow, int, int, error)
 	PayBossWeek(ctx context.Context, week time.Time, prizes []storage.ArenaPrize, note func(place int) string) (int, bool, error)

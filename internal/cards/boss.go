@@ -14,27 +14,30 @@ import (
 	"telegram-ai-bot/internal/storage"
 )
 
-// The boss, as the owners asked on 2026-11-23: a foe of endless health that
-// grows stronger. Each week, Monday to Monday in Tashkent, one Mythic of
-// the catalog is the boss of everyone. It never falls: the player's saved
-// arena team fights it until the team falls or arena.MaxRounds are over,
-// and what counts is the damage dealt it. It hits one card of the team at
-// random each turn (every card until 2026-11-24, when the owners asked for
-// one, and its attack was doubled so that a team still falls), BossRage
-// harder each round, and the week's damage of all the
-// players raises its level, every BossLevelDamage, each level BossLevelGrowth
-// more attack. A player has BossTries fights a day; each gives arena coins
-// by its damage, and the week's table ranks the best fights.
+// The boss, as the owners asked on 2026-11-23: a foe that grows stronger.
+// Each week, Monday to Monday in Tashkent, one Mythic of the catalog is the
+// boss of everyone. The player's saved arena team fights it until the team
+// falls or arena.MaxRounds are over. Since 2026-11-24, as the owners asked,
+// each fight starts it at level 1: each level has its health, BossHP at the
+// first and BossHPGrowth times the one before after, and spent, the boss goes
+// up a level with BossAttackGrowth times the attack; what counts is the
+// level reached, then the damage dealt. It hits one card of the team at
+// random each turn (every card until 2026-11-24). A player has BossTries
+// fights a day; each gives arena coins by its damage, and the week's table
+// ranks the best levels.
 const (
-	BossTries       = 3
-	BossAttack      = 3000
-	BossRage        = 0.12
-	BossLevelDamage = 3_000_000
-	BossLevelGrowth = 0.06
-	BossCoinsBase   = 5
-	BossCoinsPer    = 25_000
-	BossCoinsMost   = 40
+	BossTries        = 3
+	BossAttack       = 3000
+	BossHP           = 50_000
+	BossHPGrowth     = 1.15
+	BossAttackGrowth = 1.2
+	BossCoinsBase    = 5
+	BossCoinsPer     = 25_000
+	BossCoinsMost    = 40
 )
+
+// bossLevels are how the boss grows in a fight.
+var bossLevels = arena.BossLevels{HP: BossHP, HPGrowth: BossHPGrowth, AttackGrowth: BossAttackGrowth}
 
 // BossWeekPrizes are the boss's weekly prizes, as the owners asked on
 // 2026-11-23: on Monday at 00:00 in Tashkent the players of the week's best
@@ -79,14 +82,6 @@ func (h *handler) payBossWeek(ctx context.Context) {
 	h.paidBossWeek.Store(week)
 }
 
-// bossLevel is the boss's level after a week's damage of total.
-func bossLevel(total int64) int { return 1 + int(total/BossLevelDamage) }
-
-// bossAttack is the boss's attack, before its rage, at level.
-func bossAttack(level int) int {
-	return int(math.Round(BossAttack * (1 + BossLevelGrowth*float64(level-1))))
-}
-
 // bossCoins are the arena coins a fight dealing damage gives.
 func bossCoins(damage int) int { return min(BossCoinsBase+damage/BossCoinsPer, BossCoinsMost) }
 
@@ -113,14 +108,14 @@ func bossCard(catalog []storage.Card, week time.Time) (storage.Card, bool) {
 	return pool[h.Sum32()%uint32(len(pool))], true
 }
 
-// bossFighter is the boss of card at level: the card's role, by its stats at
-// the most stars, with the boss's attack and no skill.
-func bossFighter(c storage.Card, level int) (arena.Fighter, fighterView) {
+// bossFighter is the boss of card at level 1: the card's role, by its stats
+// at the most stars, with the boss's attack and health and no skill.
+func bossFighter(c storage.Card) (arena.Fighter, fighterView) {
 	attack, health := Boosted(c, MaxStars)
 	f := fighterOf(c.ID, c.Name, c.Rarity, MaxStars, attack, health)
-	f.Attack, f.Skill = bossAttack(level), arena.NoSkill
+	f.Attack, f.Health, f.Skill = BossAttack, BossHP, arena.NoSkill
 	view := fighterView{ID: c.ID, Name: c.Name, Image: c.ImageURL, Rarity: c.Rarity, Stars: MaxStars,
-		Attack: f.Attack, Class: classNames[f.Class], Anime: Franchise(c.Anime), Boss: true}
+		Attack: f.Attack, Health: f.Health, Class: classNames[f.Class], Anime: Franchise(c.Anime), Boss: true}
 	return f, view
 }
 
@@ -137,7 +132,6 @@ type boss struct {
 	rules   storage.BossRules
 	player  storage.BossPlayer
 	total   int64
-	level   int
 	fighter arena.Fighter
 	view    fighterView
 	hasBoss bool
@@ -164,9 +158,8 @@ func (h *handler) bossOf(ctx context.Context, userID int64) (boss, error) {
 	if b.player, err = h.Store.BossPlayerOf(ctx, userID, b.rules); err != nil {
 		return boss{}, err
 	}
-	b.level = bossLevel(b.total)
 	if card, ok := bossCard(catalog, b.rules.Week); ok {
-		b.fighter, b.view = bossFighter(card, b.level)
+		b.fighter, b.view = bossFighter(card)
 		b.hasBoss = true
 	}
 	if b.mine, b.hasTeam, err = h.themedSaved(ctx, userID, ""); err != nil {
@@ -183,9 +176,9 @@ func (h *handler) bossView(ctx context.Context, user miniapp.User) (any, failure
 		return nil, errUnavailable
 	}
 	view := map[string]any{
-		"boss": nil, "level": b.level, "week_damage": b.total,
-		"next_level": int64(b.level) * BossLevelDamage, "growth": int(BossLevelGrowth * 100), "rage": int(BossRage * 100),
-		"tries": b.player.Tries, "tries_max": BossTries, "best": b.player.Best, "unlimited": h.unlimited(user.ID),
+		"boss": nil, "week_damage": b.total,
+		"levels": map[string]any{"hp": BossHP, "hp_growth": BossHPGrowth, "attack_growth": int(math.Round((BossAttackGrowth - 1) * 100))},
+		"tries":  b.player.Tries, "tries_max": BossTries, "best": b.player.Best, "best_level": b.player.BestLevel, "unlimited": h.unlimited(user.ID),
 		"coins": map[string]any{"base": BossCoinsBase, "per": BossCoinsPer, "most": BossCoinsMost},
 		"ends":  b.rules.Week.AddDate(0, 0, 7).UnixMilli(), "team": nil, "power": 0,
 	}
@@ -222,9 +215,9 @@ func (h *handler) bossFight(ctx context.Context, user miniapp.User) (any, failur
 	case b.player.Tries >= b.rules.Tries:
 		return map[string]any{"refused": "no_tries"}, failure{}
 	}
-	result := arena.BossBattle(b.mine.team, b.fighter, BossRage, bossSeed(user.ID, b.rules.Day, b.player.Tries))
+	result := arena.BossBattle(b.mine.team, b.fighter, bossLevels, bossSeed(user.ID, b.rules.Day, b.player.Tries))
 	b.rules.Coins = bossCoins(result.Damage)
-	out, err := h.Store.RecordBossFight(ctx, user.ID, int64(result.Damage), b.rules)
+	out, err := h.Store.RecordBossFight(ctx, user.ID, int64(result.Damage), result.Level, b.rules)
 	switch {
 	case errors.Is(err, storage.ErrBossNoTries):
 		return map[string]any{"refused": "no_tries"}, failure{}
@@ -233,7 +226,8 @@ func (h *handler) bossFight(ctx context.Context, user miniapp.User) (any, failur
 		return nil, errUnavailable
 	}
 	return map[string]any{
-		"boss": true, "won": false, "damage": result.Damage, "best": max(b.player.Best, int64(result.Damage)),
+		"boss": true, "won": false, "damage": result.Damage, "level": result.Level, "best_level": max(b.player.BestLevel, result.Level),
+		"levels": map[string]any{"hp": BossHP, "hp_growth": BossHPGrowth}, "best": max(b.player.Best, int64(result.Damage)),
 		"events": eventViews(result.Events), "attacker": b.mine.views, "defender": []fighterView{b.view},
 		"tries": out.Tries, "tries_max": BossTries, "unlimited": h.unlimited(user.ID), "coins_won": b.rules.Coins, "coins": out.Coins,
 	}, failure{}
@@ -250,12 +244,12 @@ func (h *handler) bossTop(ctx context.Context, user miniapp.User) (any, failure)
 	}
 	rows := make([]map[string]any, len(top))
 	for i, r := range top {
-		rows[i] = map[string]any{"name": r.Name, "best": r.Best, "me": r.UserID == user.ID}
+		rows[i] = map[string]any{"name": r.Name, "best": r.Best, "level": r.Level, "me": r.UserID == user.ID}
 	}
 	me, place, total, err := h.Store.BossPlace(ctx, week, user.ID)
 	if err != nil {
 		h.Logger.Error("could not read a boss place", "user_id", user.ID, "error", err)
 		return nil, errUnavailable
 	}
-	return map[string]any{"top": rows, "me": map[string]any{"place": place, "total": total, "name": me.Name, "best": me.Best}}, failure{}
+	return map[string]any{"top": rows, "me": map[string]any{"place": place, "total": total, "name": me.Name, "best": me.Best, "level": me.Level}}, failure{}
 }

@@ -18,21 +18,21 @@ func TestRecordBossFight(t *testing.T) {
 	if p, err := store.BossPlayerOf(ctx, 1, bossRules); err != nil || p != (BossPlayer{}) {
 		t.Fatalf("never fought = %+v, %v", p, err)
 	}
-	if out, err := store.RecordBossFight(ctx, 1, 500, bossRules); err != nil || out != (BossOutcome{Tries: 1, Coins: 7}) {
+	if out, err := store.RecordBossFight(ctx, 1, 500, 3, bossRules); err != nil || out != (BossOutcome{Tries: 1, Coins: 7}) {
 		t.Fatalf("a fight = %+v, %v", out, err)
 	}
-	if out, err := store.RecordBossFight(ctx, 1, 300, bossRules); err != nil || out != (BossOutcome{Tries: 2, Coins: 14}) {
+	if out, err := store.RecordBossFight(ctx, 1, 300, 2, bossRules); err != nil || out != (BossOutcome{Tries: 2, Coins: 14}) {
 		t.Fatalf("a second = %+v, %v", out, err)
 	}
-	if _, err := store.RecordBossFight(ctx, 1, 900, bossRules); !errors.Is(err, ErrBossNoTries) {
+	if _, err := store.RecordBossFight(ctx, 1, 900, 5, bossRules); !errors.Is(err, ErrBossNoTries) {
 		t.Errorf("a third = %v, want ErrBossNoTries", err)
 	}
-	if p, err := store.BossPlayerOf(ctx, 1, bossRules); err != nil || p != (BossPlayer{Best: 500, Tries: 2}) {
+	if p, err := store.BossPlayerOf(ctx, 1, bossRules); err != nil || p != (BossPlayer{Best: 500, BestLevel: 3, Tries: 2}) {
 		t.Errorf("after the day = %+v, %v", p, err)
 	}
 	next := bossRules
 	next.Day, next.Now = arenaDay.AddDate(0, 0, 1), arenaNow.AddDate(0, 0, 1)
-	if out, err := store.RecordBossFight(ctx, 2, 1000, next); err != nil || out.Tries != 1 {
+	if out, err := store.RecordBossFight(ctx, 2, 1000, 4, next); err != nil || out.Tries != 1 {
 		t.Errorf("Bob the next day = %+v, %v", out, err)
 	}
 	if p, _ := store.BossPlayerOf(ctx, 1, next); p.Tries != 0 || p.Best != 500 {
@@ -47,7 +47,7 @@ func TestRecordBossFight(t *testing.T) {
 }
 
 // The boss's table ranks the week's players by their best fight and gives a
-// player their place.
+// player their place; a higher level beats more damage.
 func TestBossTable(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
@@ -55,18 +55,19 @@ func TestBossTable(t *testing.T) {
 	for _, f := range []struct {
 		user   int64
 		damage int64
-	}{{1, 100}, {1, 900}, {2, 500}} {
+		level  int
+	}{{1, 100, 6}, {1, 900, 4}, {2, 5000, 5}} {
 		rules := bossRules
 		rules.Tries = 5
-		if _, err := store.RecordBossFight(ctx, f.user, f.damage, rules); err != nil {
+		if _, err := store.RecordBossFight(ctx, f.user, f.damage, f.level, rules); err != nil {
 			t.Fatal(err)
 		}
 	}
 	top, err := store.BossTop(ctx, bossRules.Week, 10)
-	if err != nil || len(top) != 2 || top[0].Name != "Alice" || top[0].Best != 900 || top[1].Best != 500 {
+	if err != nil || len(top) != 2 || top[0].Name != "Alice" || top[0].Level != 6 || top[0].Best != 900 || top[1].Level != 5 || top[1].Best != 5000 {
 		t.Fatalf("top = %+v, %v", top, err)
 	}
-	if me, place, total, err := store.BossPlace(ctx, bossRules.Week, 2); err != nil || place != 2 || total != 2 || me.Best != 500 {
+	if me, place, total, err := store.BossPlace(ctx, bossRules.Week, 2); err != nil || place != 2 || total != 2 || me.Best != 5000 || me.Level != 5 {
 		t.Errorf("Bob's place = %+v %d of %d, %v", me, place, total, err)
 	}
 	if _, place, _, err := store.BossPlace(ctx, bossRules.Week, 3); err != nil || place != 0 {
@@ -85,14 +86,15 @@ func TestPayBossWeek(t *testing.T) {
 	for _, f := range []struct {
 		user   int64
 		damage int64
-	}{{1, 100}, {2, 900}, {1, 300}} {
-		if _, err := store.RecordBossFight(ctx, f.user, f.damage, rules); err != nil {
+		level  int
+	}{{1, 100, 1}, {2, 900, 3}, {1, 300, 2}} {
+		if _, err := store.RecordBossFight(ctx, f.user, f.damage, f.level, rules); err != nil {
 			t.Fatal(err)
 		}
 	}
 	later := rules
 	later.Week = rules.Week.AddDate(0, 0, 7)
-	if _, err := store.RecordBossFight(ctx, 1, 5000, later); err != nil {
+	if _, err := store.RecordBossFight(ctx, 1, 5000, 9, later); err != nil {
 		t.Fatal(err)
 	}
 	prizes := []ArenaPrize{{From: 1, To: 1, Tokens: 10, Boxes: 1, Box: "box"}, {From: 2, To: 2, Tokens: 4}}

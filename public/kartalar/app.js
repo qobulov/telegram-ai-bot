@@ -2385,13 +2385,13 @@
       },
       boss: {
         best: "Haftalik rekordingiz", none: "hali yo'q", tries: (n, m) => `⚔️ Bugun qolgan janglar: ${n}/${m}`,
-        level: (n) => `👹 ${n}-daraja`, endless: "♾️ Joni cheksiz", attack: (n) => `⚔️ Hujumi ${n}`,
-        week: (d) => `Bu hafta hamma birga urdi: 💥 ${d}`, next: (d, n) => `${n}-darajagacha yana 💥 ${d}`,
+        start: "👹 1-darajadan", endless: "♾️ Darajalar cheksiz", attack: (n) => `⚔️ Hujumi ${n}`, bestLevel: (n, d) => `👹 ${n}-daraja · 💥 ${d}`,
+        week: (d) => `Bu hafta hamma birga urdi: 💥 ${d}`, levelUp: (n) => `👹 Boss ${n}-darajaga chiqdi!`, reached: (n, d) => `👹 ${n}-darajagacha yetdingiz · 💥 ${d}`,
         fight: "👹 Bossga hujum", noTeam: "Avval Arena bo'limida jamoa saqlang", noTries: "Bugungi janglar tugadi: ertaga yana",
         coins: (b, per, most) => `🪙 Har jang: ${b} tanga va har ${per} zarbaga yana 1, ${most} tagacha`,
-        rule: (rage, growth, m) => `Boss hech qachon yiqilmaydi: jamoangiz yiqilguncha urasiz, hisob — bergan zarbangiz. U har yurishda jamoangizdan tasodifiy bitta kartani uradi va har raundda ${rage}% kuchayadi. Hamma bergan zarba uni darajama-daraja kuchaytiradi: har daraja +${growth}% hujum. Kuniga ${m} ta jang, har dushanba yangi boss`,
+        rule: (hpg, ag, m) => `Har jang boss 1-darajadan boshlanadi. Har darajada uning joni bor: uni tugatsangiz, boss keyingi darajaga chiqadi, joni ${hpg} barobar, hujumi +${ag}% oshadi. Jamoangiz yiqilguncha qaysi darajagacha yetsangiz, natijangiz shu. Boss har yurishda tasodifiy bitta kartangizni uradi. Kuniga ${m} ta jang, har dushanba yangi boss`,
         noBest: "Mukofot uchun bu hafta bossga kamida 1 marta hujum qiling",
-        prizeRule: "Har dushanba 00:00 da: haftaning eng katta zarba bergan top 50 o'yinchisiga token, top 3 ga almaz box ham pochtaga keladi",
+        prizeRule: "Har dushanba 00:00 da: haftaning eng yuqori darajaga yetgan top 50 o'yinchisiga token, top 3 ga almaz box ham pochtaga keladi",
         title: "👹 Boss jangi tugadi", dealt: (d) => `💥 ${d} zarba berdingiz`, record: "🏅 Haftalik rekord!",
         refused: { no_team: "Avval Arena bo'limida jamoa saqlang", no_boss: "Boss hali tayyor emas", no_tries: "Bugungi janglar tugadi: ertaga yana" },
       },
@@ -2441,13 +2441,13 @@
       },
       boss: {
         best: "Ваш рекорд недели", none: "пока нет", tries: (n, m) => `⚔️ Осталось боёв сегодня: ${n}/${m}`,
-        level: (n) => `👹 Уровень ${n}`, endless: "♾️ Бесконечное здоровье", attack: (n) => `⚔️ Атака ${n}`,
-        week: (d) => `За неделю все вместе нанесли: 💥 ${d}`, next: (d, n) => `До уровня ${n} ещё 💥 ${d}`,
+        start: "👹 С 1 уровня", endless: "♾️ Уровни бесконечны", attack: (n) => `⚔️ Атака ${n}`, bestLevel: (n, d) => `👹 Уровень ${n} · 💥 ${d}`,
+        week: (d) => `За неделю все вместе нанесли: 💥 ${d}`, levelUp: (n) => `👹 Босс поднялся на уровень ${n}!`, reached: (n, d) => `👹 Вы дошли до уровня ${n} · 💥 ${d}`,
         fight: "👹 Атаковать босса", noTeam: "Сначала сохраните команду в разделе Арена", noTries: "Бои на сегодня закончились: завтра снова",
         coins: (b, per, most) => `🪙 Каждый бой: ${b} монет и ещё 1 за каждые ${per} урона, до ${most}`,
-        rule: (rage, growth, m) => `Босс никогда не падает: бейте, пока стоит ваша команда, счёт — нанесённый урон. Каждый ход он бьёт одну случайную карту вашей команды и каждый раунд становится на ${rage}% сильнее. Урон всех игроков повышает его уровень: каждый уровень +${growth}% атаки. ${m} боя в день, каждый понедельник новый босс`,
+        rule: (hpg, ag, m) => `Каждый бой босс начинает с 1 уровня. У каждого уровня своё здоровье: снесите его, и босс поднимется на уровень, здоровье ×${hpg}, атака +${ag}%. Ваш результат — уровень, до которого вы дойдёте, пока стоит команда. Каждый ход босс бьёт одну случайную карту. ${m} боя в день, каждый понедельник новый босс`,
         noBest: "Чтобы получить награду, атакуйте босса хотя бы раз на этой неделе",
-        prizeRule: "Каждый понедельник в 00:00: топ 50 по лучшему удару недели получают токены почтой, топ 3 ещё и алмазные боксы",
+        prizeRule: "Каждый понедельник в 00:00: топ 50 по высшему уровню недели получают токены почтой, топ 3 ещё и алмазные боксы",
         title: "👹 Бой с боссом окончен", dealt: (d) => `💥 Вы нанесли ${d} урона`, record: "🏅 Рекорд недели!",
         refused: { no_team: "Сначала сохраните команду в разделе Арена", no_boss: "Босс ещё не готов", no_tries: "Бои на сегодня закончились: завтра снова" },
       },
@@ -2497,13 +2497,13 @@
       },
       boss: {
         best: "Your best this week", none: "none yet", tries: (n, m) => `⚔️ Fights left today: ${n}/${m}`,
-        level: (n) => `👹 Level ${n}`, endless: "♾️ Endless health", attack: (n) => `⚔️ Attack ${n}`,
-        week: (d) => `Everyone this week dealt: 💥 ${d}`, next: (d, n) => `💥 ${d} more to level ${n}`,
+        start: "👹 From level 1", endless: "♾️ Endless levels", attack: (n) => `⚔️ Attack ${n}`, bestLevel: (n, d) => `👹 Level ${n} · 💥 ${d}`,
+        week: (d) => `Everyone this week dealt: 💥 ${d}`, levelUp: (n) => `👹 The boss reached level ${n}!`, reached: (n, d) => `👹 You reached level ${n} · 💥 ${d}`,
         fight: "👹 Attack the boss", noTeam: "Save a team in the Arena first", noTries: "No fights left today: come back tomorrow",
         coins: (b, per, most) => `🪙 Each fight: ${b} coins and 1 more per ${per} damage, up to ${most}`,
-        rule: (rage, growth, m) => `The boss never falls: you hit it until your team falls, and the damage dealt is your score. Each turn it hits one random card of your team and each round it grows ${rage}% stronger. Everyone's damage raises its level: each level +${growth}% attack. ${m} fights a day, a new boss every Monday`,
+        rule: (hpg, ag, m) => `Each fight starts the boss at level 1. Each level has its own health: spend it and the boss goes up a level, health ×${hpg}, attack +${ag}%. Your score is the level you reach before your team falls. Each turn the boss hits one random card. ${m} fights a day, a new boss every Monday`,
         noBest: "Fight the boss at least once this week for a prize",
-        prizeRule: "Every Monday at 00:00: the top 50 by the week's best fight get tokens in the mail, and the top 3 diamond boxes too",
+        prizeRule: "Every Monday at 00:00: the top 50 by the week's highest level get tokens in the mail, and the top 3 diamond boxes too",
         title: "👹 The boss fight is over", dealt: (d) => `💥 You dealt ${d} damage`, record: "🏅 Best of your week!",
         refused: { no_team: "Save a team in the Arena first", no_boss: "The boss is not ready yet", no_tries: "No fights left today: come back tomorrow" },
       },
@@ -3156,6 +3156,14 @@
   // times a day; what counts is the damage dealt it, and everyone's damage
   // of the week raises its level.
   let bossData = null, bossBusy = false;
+  // bossLevelHP is a boss level's whole health, as the server works it out:
+  // each level the one before times its growth, rounded.
+  function bossLevelHP(levels, level) {
+    let hp = levels.hp;
+    for (let l = 1; l < level; l++) hp = Math.round(hp * levels.hp_growth);
+    return hp;
+  }
+
   function big(n) {
     return n >= 1e9 ? `${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e4 ? `${Math.round(n / 1000)}k` : spaced(n);
   }
@@ -3175,13 +3183,13 @@
     const me = $("bossMe");
     me.innerHTML = '<div class="arena-rating"><small></small><b></b></div><div class="arena-left"><span></span></div>';
     me.querySelector(".arena-rating small").textContent = bt.best;
-    me.querySelector(".arena-rating b").textContent = data.best ? `💥 ${big(data.best)}` : bt.none;
+    me.querySelector(".arena-rating b").textContent = data.best_level ? bt.bestLevel(data.best_level, big(data.best)) : bt.none;
     // an owner plays without the daily limit
     const out = !data.unlimited && data.tries >= data.tries_max;
     me.querySelector(".arena-left span").textContent = data.unlimited ? bt.tries("∞", "∞") : bt.tries(Math.max(0, data.tries_max - data.tries), data.tries_max);
     const boss = data.boss;
     $("bossName").textContent = boss ? boss.name : "";
-    $("bossLevel").textContent = bt.level(data.level);
+    $("bossLevel").textContent = bt.start;
     const stage = $("bossStage");
     stage.textContent = "";
     if (boss) {
@@ -3192,11 +3200,10 @@
       tile.querySelector(".f-atk").textContent = bt.attack(spaced(boss.attack));
       stage.append(tile);
     }
-    // the bar fills toward the next level, each level the same damage
-    const per = data.next_level / Math.max(data.level, 1);
+    // each fight starts the boss at level 1: no level of the week to fill
     $("bossWeek").textContent = bt.week(big(data.week_damage));
-    $("bossBar").style.transform = `scaleX(${Math.min(1, Math.max(0, (data.week_damage - (data.level - 1) * per) / per))})`;
-    $("bossNext").textContent = bt.next(big(Math.max(0, data.next_level - data.week_damage)), data.level + 1);
+    $("bossBar").parentElement.hidden = true;
+    $("bossNext").hidden = true;
     const team = data.team || [];
     const hint = !team.length ? bt.noTeam : out ? bt.noTries : "";
     $("bossHint").textContent = hint;
@@ -3205,7 +3212,7 @@
     fight.textContent = bt.fight;
     fight.disabled = bossBusy || !team.length || !boss || out;
     $("bossCoins").textContent = bt.coins(data.coins.base, big(data.coins.per), data.coins.most);
-    $("bossRule").textContent = bt.rule(data.rage, data.growth, data.tries_max);
+    $("bossRule").textContent = bt.rule(data.levels.hp_growth, data.levels.attack_growth, data.tries_max);
     const left = Math.max(0, data.ends - Date.now()), hours = Math.floor(left / 3600000);
     $("bossEnds").textContent = at.weekEnds(Math.floor(hours / 24), hours % 24, Math.floor((left % 3600000) / 60000));
     bossPrizes(data.week);
@@ -3244,7 +3251,7 @@
         return;
       }
       if (data.coins !== undefined && arenaData) arenaData.player.coins = data.coins;
-      data.record = data.damage > (bossData.best || 0);
+      data.record = data.level > (bossData.best_level || 0) || (data.level === bossData.best_level && data.damage > (bossData.best || 0));
       await replay(data, { name: bossData.boss ? bossData.boss.name : "" });
       await bossPage();
     } catch (error) {
@@ -3402,9 +3409,9 @@
           tile.insertAdjacentHTML("beforeend", '<i class="hp"><i></i></i><i class="en"><i></i></i><span class="hp-n"></span>');
           sideBox.querySelector(slot < 2 ? ".fore" : ".rear").append(tile);
           const num = tile.querySelector(".hp-n");
-          num.textContent = f.boss ? "♾️" : spaced(f.health);
+          num.textContent = f.boss ? "Lv 1" : spaced(f.health);
           if (f.boss) tile.classList.add("boss");
-          units[side][slot] = { el: tile, bar: tile.querySelector(".hp i"), en: tile.querySelector(".en i"), num, hp: f.health, max: f.health || 1, f, side, dealt: 0 };
+          units[side][slot] = { el: tile, bar: tile.querySelector(".hp i"), en: tile.querySelector(".en i"), num, hp: f.health, max: f.health || 1, f, side, dealt: 0, level: 1 };
           energize(units[side][slot], START_ENERGY[f.class] || 0);
         });
       }
@@ -3448,9 +3455,15 @@
         if (actor && e.kind !== "fall") energize(actor, e.energy);
         if (e.kind !== "fall") energize(target, e.to_energy);
         if (target.f.boss) {
-          // the boss's health is endless: it counts what it is dealt instead
+          // the boss has a health for each level: spent, it goes up a level
           if (foeSide || e.kind === "poisoned") target.dealt += e.amount;
-          target.num.textContent = target.dealt ? `💥 ${big(target.dealt)}` : "♾️";
+          if (e.kind === "level") {
+            target.level = e.amount;
+            target.max = bossLevelHP(data.levels, e.amount);
+          }
+          target.hp = e.hp;
+          target.bar.style.transform = `scaleX(${Math.max(0, Math.min(1, target.hp / target.max))})`;
+          target.num.textContent = `Lv ${target.level} · 💥 ${big(target.dealt)}`;
         } else {
           target.hp = e.kind === "fall" ? 0 : e.hp;
           target.bar.style.transform = `scaleX(${Math.max(0, Math.min(1, target.hp / target.max))})`;
@@ -3505,6 +3518,11 @@
           line.textContent = at.poisoned(target.f.name, spaced(e.amount));
         } else if (e.kind === "fall") {
           line.textContent = at.fell(target.f.name);
+        } else if (e.kind === "level") {
+          flash(target, "strike");
+          float(target, `Lv ${e.amount}`, "crit");
+          line.textContent = at.boss.levelUp(e.amount);
+          haptic("heavy");
         }
       }
 
@@ -3527,7 +3545,7 @@
         const result = box.querySelector(".b-result");
         result.classList.add(data.won || data.boss ? "won" : "lost");
         result.querySelector(".b-title").textContent = data.boss ? at.boss.title : data.won ? at.won : at.lost;
-        result.querySelector(".b-change").textContent = data.boss ? at.boss.dealt(spaced(data.damage)) : data.fought ? (data.won ? at.tower.cleared(data.fought) : at.tower.failed(data.fought)) : at.change(data.rating_change || 0);
+        result.querySelector(".b-change").textContent = data.boss ? at.boss.reached(data.level, spaced(data.damage)) : data.fought ? (data.won ? at.tower.cleared(data.fought) : at.tower.failed(data.fought)) : at.change(data.rating_change || 0);
         const token = result.querySelector(".b-token");
         token.textContent = data.boss ? (data.record ? at.boss.record : "") : data.token ? at.token : data.tokens_won ? at.tower.tokens(data.tokens_won) : "";
         token.hidden = !token.textContent;
@@ -3608,10 +3626,10 @@
       li.querySelector(".pos").textContent = ["🥇", "🥈", "🥉"][i] || i + 1;
       li.querySelector(".who b").textContent = row.name || "?";
       li.querySelector(".who small").textContent = t.bossRow(spaced(row.best));
-      li.querySelector(".pts").textContent = `💥 ${big(row.best)}`;
+      li.querySelector(".pts").textContent = `👹 ${row.level || 0}`;
       table.append(li);
     });
-    if (me && me.place > top.length) table.append(placeRow(me.place, me.total, me.name, t.bossRow(spaced(me.best)), `💥 ${big(me.best)}`));
+    if (me && me.place > top.length) table.append(placeRow(me.place, me.total, me.name, t.bossRow(spaced(me.best)), `👹 ${me.level || 0}`));
   }
 
   function arenaTable(top, me, player) {
