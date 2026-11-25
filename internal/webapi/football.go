@@ -121,7 +121,7 @@ type scorerRow struct {
 func (a *apis) footballTool() tools.Tool {
 	return tools.Tool{
 		Name:        "football",
-		Description: "Football from football-data.org: league table, the current matchday's matches, or top scorers, for the top European leagues, Champions League, Euro and World Cup. Scores can lag a few minutes: call them latest, not live.",
+		Description: "Football from football-data.org: league table, the current matchday's matches (with the last matchday's results for a few days after it), or top scorers, for the top European leagues, Champions League, Euro and World Cup. Scores can lag a few minutes: call them latest, not live.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
@@ -386,7 +386,10 @@ func (m footballMatch) finished() bool {
 }
 
 // matches gives the current matchday, or the next one once every match
-// of the current one is over; with a team, its last result comes too.
+// of the current one is over; with a team, its last result comes too, and
+// so do all the finished matchday's results while they are fresh: asked
+// for yesterday's games the day after a matchday, the model was given only
+// the next one's fixtures and made a score up (2026-11-24).
 // Competitions without a current matchday list upcoming matches: TIMED
 // ones (date and time fixed) as well as SCHEDULED, because the status
 // filter is a plain list.
@@ -413,13 +416,29 @@ func (a *apis) matches(ctx context.Context, code, team string) (matchesOutput, e
 	if allFinished(shown.Matches) {
 		next, err := askFootball[matchesAnswer](ctx, a, code+"/matches?matchday="+strconv.Itoa(*current+1))
 		if err == nil && len(next.Matches) > 0 {
-			if team != "" {
+			if team != "" || a.fresh(shown.Matches) {
 				previous = shown.Matches
 			}
 			shown, out.Matchday = next, *current+1
 		}
 	}
 	return a.matchList(out, team, previous, shown.Matches), nil
+}
+
+// freshResults is how long a finished matchday's results are shown beside
+// the next matchday's fixtures.
+const freshResults = 4 * 24 * time.Hour
+
+// fresh reports whether the last of the matches kicked off within
+// freshResults.
+func (a *apis) fresh(matches []footballMatch) bool {
+	var last time.Time
+	for _, m := range matches {
+		if m.UTCDate.After(last) {
+			last = m.UTCDate
+		}
+	}
+	return a.now().Sub(last) < freshResults
 }
 
 func allFinished(matches []footballMatch) bool {

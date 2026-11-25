@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 type footballResult struct {
@@ -343,5 +344,16 @@ func TestTeamFilterPrefersTheClosestMatch(t *testing.T) {
 		if strings.Join(got, ",") != strings.Join(test.want, ",") || filter.found() != (len(test.want) > 0) {
 			t.Errorf("%q names %v, want %v", test.team, got, test.want)
 		}
+	}
+}
+
+// The day after a matchday, its results come before the next one's
+// fixtures, so that yesterday's games are there to tell.
+func TestFootballKeepsAFreshMatchdaysResults(t *testing.T) {
+	opts := footballOptions(newUpstream(t, footballRoutes(t)))
+	opts.Now = func() time.Time { return time.Date(2026, 10, 5, 12, 0, 0, 0, tashkent) }
+	r := result[footballResult](t, run(t, opts, "football", `{"action":"matches"}`))
+	if len(r.Matches) != 20 || r.Matches[0].Status != "finished" || r.Matches[0].Score == "" || r.Matches[19].Status != "scheduled" {
+		t.Errorf("matches = %+v", r.Matches)
 	}
 }
