@@ -120,7 +120,9 @@ func bossCard(catalog []storage.Card, week time.Time) (storage.Card, bool) {
 func bossFighter(c storage.Card) (arena.Fighter, fighterView) {
 	attack, health := Boosted(c, MaxStars)
 	f := fighterOf(c.ID, c.Name, c.Rarity, MaxStars, attack, health)
-	f.Attack, f.Health, f.Skill = BossAttack, BossHP, arena.NoSkill
+	// the boss fights with neither skill nor kit: its passive (a dodge, an
+	// armour) would make one week's boss far harder than another's
+	f.Attack, f.Health, f.Skill, f.Kit = BossAttack, BossHP, arena.NoSkill, nil
 	view := fighterView{ID: c.ID, Name: c.Name, Image: c.ImageURL, Rarity: c.Rarity, Stars: MaxStars,
 		Attack: f.Attack, Health: f.Health, Class: classNames[f.Class], Anime: Franchise(c.Anime), Boss: true}
 	return f, view

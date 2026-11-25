@@ -88,6 +88,9 @@ type Fighter struct {
 	Attack, Health int
 	Class          Class
 	Skill          Skill
+	// Kit is a Mythic's own Passive and Ultimate, in place of Skill; nil
+	// for the others.
+	Kit *Kit
 }
 
 // FighterOf makes a fighter, giving it its class by its health to attack
@@ -167,6 +170,8 @@ type Event struct {
 	Amount, HP            int
 	Energy, ToEnergy      int
 	Edge                  bool
+	// Ult is the Ultimate the event is of, "" for any other.
+	Ult string
 }
 
 type Result struct {
@@ -180,10 +185,10 @@ type unit struct {
 	side, slot int
 	hp, shield int
 	energy     int
-	stunned    bool // skips its next turn
-	poisoned   int  // its turns left to be hurt by poison
-	provoking  int  // the last round it draws enemy Tanks, Dealers and Healers
-	poisonDmg  int  // a boss's poison tick, by its poisoner's attack
+	stun       int // its next turns to skip
+	poisoned   int // its turns left to be hurt by poison
+	provoking  int // the last round it draws enemy Tanks, Dealers and Healers
+	poisonDmg  int // a boss's poison tick, by its poisoner's attack
 	// boss is a unit that never falls: each level's health spent, it goes
 	// up a level, its health and attack growing, it hits one living foe at
 	// random each turn, and its attack rises by rage of itself each round
@@ -215,6 +220,8 @@ type fight struct {
 	bossLevels  BossLevels
 	// rounds is the most rounds the fight lasts: MaxRounds, or a boss's.
 	rounds int
+	// casting is the Ultimate being cast, which its events name.
+	casting string
 }
 
 // Battle plays the two teams against each other. That a team is valid (five
@@ -306,6 +313,7 @@ func newFight(attacker, defender Team, seed int64) *fight {
 			f.teams[side][slot] = &unit{Fighter: fighter, side: side, slot: slot, hp: fighter.Health, energy: StartEnergy(fighter.Class)}
 		}
 	}
+	f.applyKits()
 	return f
 }
 
@@ -353,8 +361,8 @@ func (f *fight) act(u *unit) {
 	if f.poisonTick(u); !u.alive() {
 		return
 	}
-	if u.stunned {
-		u.stunned = false
+	if u.stun > 0 {
+		u.stun--
 		f.record(KindStunned, u, u, 0, false)
 		return
 	}
@@ -362,7 +370,12 @@ func (f *fight) act(u *unit) {
 		f.bossTurn(u)
 		return
 	}
-	if u.Skill != NoSkill && u.energy >= EnergyMax && f.useSkill(u) {
+	f.regen(u)
+	if u.Kit != nil {
+		if u.energy >= EnergyMax && f.useUlt(u) {
+			return
+		}
+	} else if u.Skill != NoSkill && u.energy >= EnergyMax && f.useSkill(u) {
 		return
 	}
 	target := f.target(u)
@@ -440,7 +453,7 @@ func (f *fight) skillHit(u *unit) {
 		f.hit(u, target, StrikeFactor, KindStrike)
 	case Stun:
 		if f.hit(u, target, 1, KindStun); target.alive() {
-			target.stunned = true
+			target.stun = max(target.stun, 1)
 		}
 	case Poison:
 		if f.hit(u, target, 1, KindPoison); target.alive() {
@@ -557,9 +570,32 @@ func edge(a, b Class) bool {
 }
 
 func (f *fight) hit(from, to *unit, factor float64, kind string) {
+	f.strike(from, to, factor, kind, false)
+}
+
+// strike is a hit of factor times from's attack on to, past to's shield
+// with pierce, with both units' passives at work; it gives the damage dealt,
+// or -1 for a hit dodged.
+func (f *fight) strike(from, to *unit, factor float64, kind string, pierce bool) int {
+	if v := to.passive(Dodge); v > 0 && f.rng.Float64() < v {
+		f.record(KindMiss, from, to, 0, false)
+		return -1
+	}
 	edged := edge(from.Class, to.Class)
 	if edged {
 		factor *= EdgeFactor
+	}
+	if v := from.passive(Berserk); v > 0 && 2*from.hp < from.Health {
+		factor *= 1 + v
+	}
+	if v := from.passive(Executioner); v > 0 && to.hp < int(ExecuteBelow*float64(to.Health)) {
+		factor *= 1 + v
+	}
+	if v := from.passive(Crit); v > 0 && f.rng.Float64() < v {
+		factor *= CritFactor
+		if kind == KindHit {
+			kind = KindStrike
+		}
 	}
 	spread := DamageSpreadLo + (DamageSpreadHi-DamageSpreadLo)*f.rng.Float64()
 	dmg := int(float64(from.Attack)*factor*spread + 0.5)
@@ -569,8 +605,11 @@ func (f *fight) hit(from, to *unit, factor float64, kind string) {
 	if to.provoking > 0 && to.provoking >= f.round {
 		dmg = max(int(float64(dmg)*ProvokeGuard+0.5), 1)
 	}
+	if v := to.passive(Armor); v > 0 {
+		dmg = max(int(float64(dmg)*(1-v)+0.5), 1)
+	}
 	rest := dmg
-	if to.shield > 0 {
+	if to.shield > 0 && !pierce {
 		absorbed := min(rest, to.shield)
 		to.shield -= absorbed
 		rest -= absorbed
@@ -581,6 +620,18 @@ func (f *fight) hit(from, to *unit, factor float64, kind string) {
 	if !to.alive() {
 		f.record(KindFall, to, to, 0, false)
 	}
+	if v := to.passive(Thorns); v > 0 && from.alive() && rest > 0 {
+		back := max(int(v*float64(rest)), 1)
+		f.hurt(from, back)
+		f.record(KindHit, to, from, back, false)
+		if !from.alive() {
+			f.record(KindFall, from, from, 0, false)
+		}
+	}
+	if v := from.passive(Vampire); v > 0 && from.alive() {
+		f.healAmountBy(from, from, int(v*float64(dmg)))
+	}
+	return dmg
 }
 
 // hurt takes dmg off u's health; a boss's spent takes it up a level, as
@@ -619,7 +670,7 @@ func (f *fight) shield(from, to *unit) {
 func (f *fight) record(kind string, from, to *unit, amount int, edged bool) {
 	f.events = append(f.events, Event{
 		Round: f.round, Side: from.side, From: from.slot, To: to.slot, Kind: kind,
-		Amount: amount, HP: to.hp, Energy: from.energy, ToEnergy: to.energy, Edge: edged,
+		Amount: amount, HP: to.hp, Energy: from.energy, ToEnergy: to.energy, Edge: edged, Ult: f.casting,
 	})
 }
 

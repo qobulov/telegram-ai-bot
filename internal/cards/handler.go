@@ -516,11 +516,14 @@ type cardView struct {
 	// which the page works out as arena.FighterOf does.
 	Class string `json:"class,omitempty"`
 	Skill string `json:"skill,omitempty"`
+	// Kit is a Mythic's own Passive and Ultimate, in place of Skill.
+	Kit *kitView `json:"kit,omitempty"`
 }
 
 func (h *handler) held(c storage.Card, count int) cardView {
 	v := cardView{ID: c.ID, Rarity: c.Rarity, Set: c.Collection, Name: c.Name, Anime: c.Anime, Image: c.ImageURL, Attack: c.Attack, Health: c.Health, Value: c.Value, Count: count, Limited: storage.CardLimited(c.ID), EventOnly: storage.CardEventOnly(c.ID)}
 	v.Class, v.Skill = roleNames(c.ID, c.Rarity)
+	v.Kit = kitViewOf(c.ID, c.Rarity)
 	return v
 }
 

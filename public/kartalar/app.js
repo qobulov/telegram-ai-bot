@@ -609,6 +609,7 @@
       '<small class="ib-stars"></small>' +
       '<div class="ib-row ib-class"><span class="ib-icon" aria-hidden="true"></span><div><b></b><p></p></div></div>' +
       '<div class="ib-row ib-skill"><span class="ib-icon" aria-hidden="true"></span><div><b></b><p></p></div></div>' +
+      '<div class="ib-row ib-passive" hidden><span class="ib-icon" aria-hidden="true">🔆</span><div><b></b><p></p></div></div>' +
       '<div class="ib-row ib-anime"><span class="ib-icon" aria-hidden="true">🔗</span><div><b></b><p></p></div></div>' +
       '<small class="ib-hint"></small>';
     back.querySelector(".ib-head .rarity").replaceChildren(tierIcon(card.rarity), t.rarities[card.rarity]);
@@ -623,7 +624,16 @@
     cls.querySelector("b").textContent = at.classes[f.class];
     cls.querySelector("p").textContent = at.classInfo[f.class];
     const skill = back.querySelector(".ib-skill");
-    if (f.skill) {
+    if (f.kit) {
+      // a Mythic's own Ultimate and Passive, as heroes have in MLBB
+      skill.querySelector(".ib-icon").textContent = "✨";
+      skill.querySelector("b").textContent = at.ultTitle(f.kit.ult.name);
+      skill.querySelector("p").textContent = ultText(f.kit.ult);
+      const passive = back.querySelector(".ib-passive");
+      passive.hidden = false;
+      passive.querySelector("b").textContent = at.passiveTitle(passiveName(f.kit.passive));
+      passive.querySelector("p").textContent = passiveText(f.kit.passive);
+    } else if (f.skill) {
       skill.querySelector(".ib-icon").textContent = SKILL_ICON[f.skill];
       skill.querySelector("b").textContent = at.skillTitle(at.skills[f.skill]);
       skill.querySelector("p").textContent = at.skillInfo[f.skill];
@@ -2421,11 +2431,11 @@
       classInfo: { tank: "Joni eng ko'p: oldda turib zarbalarni o'ziga oladi", dealer: "Asosiy zararni beradi: eng yaqin raqibni, avval old qatorni uradi", support: "Eng tez: orqa qatordagi eng zaif raqibni uradi, dushmanni to'xtatadi", healer: "Jamoani davolaydi va uzoq turadi" },
       statPower: "Kuch",
       starsLine: (s, m, top) => (s < 5 ? `★${s}: kuch ×${m} · ★5 da ×${top}` : `★5: kuch ×${m}`),
-      skillTitle: (n) => `Skill: ${n}`, noSkillTitle: "Skill: yo'q", noSkill: "Skill Legendar va Mifik kartalarda bo'ladi",
+      skillTitle: (n) => `Skill: ${n}`, ultTitle: (n) => `Ultimate: ${n}`, passiveTitle: (n) => `Passiv: ${n}`, miss: "qochdi", noSkillTitle: "Skill: yo'q", noSkill: "Skill Legendar va Mifik kartalarda bo'ladi",
       animeNote: "Jamoada shu animedan 2 ta: +5%, 3 ta va ko'p: +10% hujum va jon",
       flipHint: "Kartani bosib aylantiring",
       frontNote: "zarbani birinchi oladi", backNote: "yordamchilar shu yerni uradi", addCard: "Karta qo'shing",
-      rules: "Qoidalar", ruleClasses: "Rollar", ruleTriangle: "Strelka: kim kimni 25% kuchliroq uradi", ruleSkills: "Skillar · Legendar va Mifik kartalarda",
+      rules: "Qoidalar", ruleClasses: "Rollar", ruleTriangle: "Strelka: kim kimni 25% kuchliroq uradi", ruleSkills: "Skillar · Legendar kartalarda; har Mifning o'z ultimate va passivi bor",
       ruleTickets: (m) => `🎫 Har hujum 1 tiket oladi: ${m} tagacha, har soatda 1 ta qaytadi`, ruleTokens: (n) => `🎟 G'alaba 1 karta tokeni beradi: kuniga ${n} tagacha`,
       ruleRating: "🏅 G'alaba reytingni oshiradi, mag'lubiyat tushiradi. Karta yo'qolmaydi", ruleWeek: "🏆 Har dushanba 00:00 da haftaning top 100 tasi token oladi, reyting 1000 ga qaytadi", toTable: "Reytingni ko'rish →",
       foeTeam: "Jamoasini ko'rish", noFoeTeam: "Jamoasi hali saqlanmagan", them: "Raqib",
@@ -2477,11 +2487,11 @@
       classInfo: { tank: "Больше всех здоровья: стоит впереди и принимает удары", dealer: "Наносит основной урон: бьёт ближайшего соперника, сначала передний ряд", support: "Самый быстрый: бьёт самого слабого в заднем ряду и сдерживает врага", healer: "Лечит команду и держится долго" },
       statPower: "Сила",
       starsLine: (s, m, top) => (s < 5 ? `★${s}: сила ×${m} · на ★5 ×${top}` : `★5: сила ×${m}`),
-      skillTitle: (n) => `Навык: ${n}`, noSkillTitle: "Навык: нет", noSkill: "Навыки есть у Легендарных и Мифических карт",
+      skillTitle: (n) => `Навык: ${n}`, ultTitle: (n) => `Ульта: ${n}`, passiveTitle: (n) => `Пассивка: ${n}`, miss: "уклонился", noSkillTitle: "Навык: нет", noSkill: "Навыки есть у Легендарных и Мифических карт",
       animeNote: "2 карты этого аниме в команде: +5%, 3 и больше: +10% атаки и здоровья",
       flipHint: "Нажмите на карту, чтобы перевернуть",
       frontNote: "принимает удары первым", backNote: "сюда бьёт поддержка", addCard: "Добавить карту",
-      rules: "Правила", ruleClasses: "Роли", ruleTriangle: "Стрелка: кто кого бьёт на 25% сильнее", ruleSkills: "Навыки · у Легендарных и Мифических",
+      rules: "Правила", ruleClasses: "Роли", ruleTriangle: "Стрелка: кто кого бьёт на 25% сильнее", ruleSkills: "Навыки · у Легендарных; у каждой Мифической своя ульта и пассивка",
       ruleTickets: (m) => `🎫 Атака стоит 1 билет: до ${m}, каждый час возвращается 1`, ruleTokens: (n) => `🎟 Победа даёт токен на карту: до ${n} в день`,
       ruleRating: "🏅 Победа поднимает рейтинг, поражение снижает. Карты не теряются", ruleWeek: "🏆 Каждый понедельник в 00:00 топ 100 недели получают токены, рейтинг снова 1000", toTable: "Смотреть рейтинг →",
       foeTeam: "Посмотреть команду", noFoeTeam: "Команда ещё не сохранена", them: "Соперник",
@@ -2533,11 +2543,11 @@
       classInfo: { tank: "Most health: stands in front and takes the hits", dealer: "Deals the damage: hits the nearest enemy, the front row first", support: "Fastest: hits the weakest enemy in the back row and holds the enemy back", healer: "Mends the team and lasts long" },
       statPower: "Power",
       starsLine: (s, m, top) => (s < 5 ? `★${s}: power ×${m} · at ★5 ×${top}` : `★5: power ×${m}`),
-      skillTitle: (n) => `Skill: ${n}`, noSkillTitle: "Skill: none", noSkill: "Legendary and Mythic cards have skills",
+      skillTitle: (n) => `Skill: ${n}`, ultTitle: (n) => `Ultimate: ${n}`, passiveTitle: (n) => `Passive: ${n}`, miss: "dodged", noSkillTitle: "Skill: none", noSkill: "Legendary and Mythic cards have skills",
       animeNote: "2 cards of this anime in a team: +5%, 3 or more: +10% attack and health",
       flipHint: "Tap the card to turn it over",
       frontNote: "takes the hits first", backNote: "supports hit here", addCard: "Add a card",
-      rules: "Rules", ruleClasses: "Roles", ruleTriangle: "Arrow: who hits whom 25% harder", ruleSkills: "Skills · on Legendary and Mythic cards",
+      rules: "Rules", ruleClasses: "Roles", ruleTriangle: "Arrow: who hits whom 25% harder", ruleSkills: "Skills · on Legendary cards; each Mythic has its own Ultimate and Passive",
       ruleTickets: (m) => `🎫 Each attack takes 1 ticket: up to ${m}, one back every hour`, ruleTokens: (n) => `🎟 A win gives a card token: up to ${n} a day`,
       ruleRating: "🏅 A win raises your rating, a loss lowers it. No card is lost", ruleWeek: "🏆 Every Monday at 00:00 the week's top 100 get tokens and ratings go back to 1000", toTable: "See the ranking →",
       foeTeam: "View team", noFoeTeam: "No team saved yet", them: "Opponent",
@@ -2588,6 +2598,58 @@
   const at = arenaTexts[language] || arenaTexts.uz;
   const CLASS_ICON = { tank: "🛡️", dealer: "⚔️", support: "🔮", healer: "💚" };
   const SKILL_ICON = { strike: "💥", heal: "💚", shield: "🔰", stun: "💫", poison: "☠", provoke: "😤" };
+  // kitWords word a Mythic's kit in each language: what its Ultimate does,
+  // part by part as the server sends it, and its Passive.
+  const kitWords = {
+    uz: {
+      start: "Energiya to'lganda: ", target: { normal: "nishonga", all: "barcha dushmanga", back_weakest: "orqadagi eng zaif dushmanga", front: "old qatordagi dushmanlarga", two: "2 ta tasodifiy dushmanga", strongest: "eng kuchli dushmanga" },
+      provoke: "dushmanni o'ziga tortadi", who: { self: "o'ziga", weakest: "eng zaif hamrohiga", self_weakest: "o'ziga va eng zaif hamrohiga", all: "butun jamoaga" },
+      shield: (w, p) => `${w} jonining ${p}% i qalqon beradi`, healWho: { self: "o'zini", weakest: "eng zaif hamrohini", all: "butun jamoani" }, heal: (w, p) => `${w} jonining ${p}% iga davolaydi`,
+      hit: (t, x) => `${t} ×${x} zarba beradi`, stun: (n) => `${n} yurish karaxt qiladi`, poison: "zaharlaydi", pierce: "qalqonni teshib o'tadi",
+      execute: (p) => `joni 30% dan kam bo'lsa +${p}% zarba`, lifesteal: (p) => `zarbaning ${p}% i joniga qaytadi`,
+      passive: { berserk: "Berserk", armor: "Zirh", vampire: "Vampir", thorns: "Tikan", dodge: "Chaqqonlik", crit: "Krit", regen: "Tiklanish", aura: "Aura", executioner: "Jallod", swift: "Tezkor" },
+      passiveText: { berserk: (p) => `joni 50% dan pastda hujumi +${p}%`, armor: (p) => `${p}% kamroq zarar oladi`, vampire: (p) => `zarbasining ${p}% i joniga qaytadi`, thorns: (p) => `olgan zararining ${p}% ini qaytaradi`, dodge: (p) => `${p}% ehtimol bilan zarbadan qochadi`, crit: (p) => `${p}% ehtimol bilan ×1.6 uradi`, regen: (p) => `har yurishda jonining ${p}% i tiklanadi`, aura: (p) => `butun jamoaning hujumi +${p}%`, executioner: (p) => `joni 30% dan kam dushmanga +${p}% zarba`, swift: (v) => `jangni +${v} energiya bilan boshlaydi` },
+    },
+    ru: {
+      start: "При полной энергии: ", target: { normal: "по цели", all: "по всем врагам", back_weakest: "по самому слабому врагу сзади", front: "по врагам в первом ряду", two: "по 2 случайным врагам", strongest: "по самому сильному врагу" },
+      provoke: "притягивает врагов к себе", who: { self: "себе", weakest: "самому слабому союзнику", self_weakest: "себе и самому слабому союзнику", all: "всей команде" },
+      shield: (w, p) => `щит в ${p}% здоровья ${w}`, healWho: { self: "себя", weakest: "самого слабого союзника", all: "всю команду" }, heal: (w, p) => `лечит ${w} на ${p}% здоровья`,
+      hit: (t, x) => `удар ×${x} ${t}`, stun: (n) => `оглушает на ${n} ход.`, poison: "отравляет", pierce: "пробивает щит",
+      execute: (p) => `+${p}% урона по цели ниже 30% здоровья`, lifesteal: (p) => `${p}% урона возвращается в здоровье`,
+      passive: { berserk: "Берсерк", armor: "Броня", vampire: "Вампиризм", thorns: "Шипы", dodge: "Уклонение", crit: "Крит", regen: "Регенерация", aura: "Аура", executioner: "Палач", swift: "Быстрота" },
+      passiveText: { berserk: (p) => `атака +${p}% ниже 50% здоровья`, armor: (p) => `получает на ${p}% меньше урона`, vampire: (p) => `${p}% урона возвращается в здоровье`, thorns: (p) => `возвращает ${p}% полученного урона`, dodge: (p) => `уклоняется от удара с шансом ${p}%`, crit: (p) => `с шансом ${p}% бьёт ×1.6`, regen: (p) => `восстанавливает ${p}% здоровья каждый ход`, aura: (p) => `атака всей команды +${p}%`, executioner: (p) => `+${p}% урона по врагам ниже 30% здоровья`, swift: (v) => `начинает бой с +${v} энергии` },
+    },
+    en: {
+      start: "When energy is full: ", target: { normal: "its target", all: "every foe", back_weakest: "the weakest foe behind", front: "the foes in front", two: "2 random foes", strongest: "the strongest foe" },
+      provoke: "draws the foes to itself", who: { self: "itself", weakest: "its weakest ally", self_weakest: "itself and its weakest ally", all: "the whole team" },
+      shield: (w, p) => `shields ${w} for ${p}% of health`, healWho: { self: "itself", weakest: "its weakest ally", all: "the whole team" }, heal: (w, p) => `heals ${w} for ${p}% of health`,
+      hit: (t, x) => `hits ${t} ×${x}`, stun: (n) => `stuns for ${n} turn${n > 1 ? "s" : ""}`, poison: "poisons", pierce: "pierces shields",
+      execute: (p) => `+${p}% damage below 30% health`, lifesteal: (p) => `heals ${p}% of the damage dealt`,
+      passive: { berserk: "Berserk", armor: "Armour", vampire: "Lifesteal", thorns: "Thorns", dodge: "Dodge", crit: "Crit", regen: "Regen", aura: "Aura", executioner: "Executioner", swift: "Swift" },
+      passiveText: { berserk: (p) => `attack +${p}% below 50% health`, armor: (p) => `takes ${p}% less damage`, vampire: (p) => `heals ${p}% of the damage it deals`, thorns: (p) => `sends ${p}% of the damage taken back`, dodge: (p) => `dodges a hit at a ${p}% chance`, crit: (p) => `hits ×1.6 at a ${p}% chance`, regen: (p) => `heals ${p}% of its health each turn`, aura: (p) => `the whole team's attack +${p}%`, executioner: (p) => `+${p}% damage to foes below 30% health`, swift: (v) => `starts with +${v} energy` },
+    },
+  };
+  const kw = kitWords[language] || kitWords.uz;
+  const pct = (x) => Math.round(x * 100);
+  function ultText(u) {
+    const parts = [];
+    if (u.provoke) parts.push(kw.provoke);
+    if (u.shield) parts.push(kw.shield(kw.who[u.shield], pct(u.shield_share)));
+    if (u.heal) parts.push(kw.heal(kw.healWho[u.heal], pct(u.heal_share)));
+    if (u.factor) parts.push(kw.hit(kw.target[u.target] || kw.target.normal, u.factor));
+    if (u.stun) parts.push(kw.stun(u.stun));
+    if (u.poison) parts.push(kw.poison);
+    if (u.pierce) parts.push(kw.pierce);
+    if (u.execute) parts.push(kw.execute(pct(u.execute)));
+    if (u.lifesteal) parts.push(kw.lifesteal(pct(u.lifesteal)));
+    return kw.start + parts.join(", ");
+  }
+  function passiveName(p) { return kw.passive[p.kind] || p.kind; }
+  function passiveText(p) {
+    const say = kw.passiveText[p.kind];
+    if (!say) return "";
+    return say(p.kind === "swift" ? p.value : pct(p.value));
+  }
   // SKILLS is the skills by card id, id % 6 picking one, as arena.FighterOf does.
   const SKILLS = ["strike", "heal", "shield", "stun", "poison", "provoke"];
   const EMPTY_TEAM = [0, 0, 0, 0, 0];
@@ -2620,7 +2682,7 @@
   function fighterOf(card) {
     const cls = card.class || (card.health >= 4 * card.attack ? "tank" : card.health <= 3 * card.attack ? "support" : "dealer");
     const skill = card.rarity >= 3 ? card.skill || SKILLS[((card.id % 6) + 6) % 6] : "";
-    return { id: card.id, name: card.name, image: card.image, rarity: card.rarity, stars: card.stars || 1, attack: card.attack || 0, health: card.health || 0, class: cls, skill, anime: franchise(card.anime || "") };
+    return { id: card.id, name: card.name, image: card.image, rarity: card.rarity, stars: card.stars || 1, attack: card.attack || 0, health: card.health || 0, class: cls, skill, kit: card.kit || null, anime: franchise(card.anime || "") };
   }
   // withSynergy raises the team's cards of one anime as the server does:
   // a pair by 5%, three or more by 10%, rounded the same in whole numbers.
@@ -2656,7 +2718,8 @@
     tile.innerHTML = '<img alt=""><span class="f-chips" aria-hidden="true"><span class="f-class"></span></span><span class="f-name"></span>';
     picture(tile.querySelector("img"), f.image);
     tile.querySelector(".f-class").textContent = CLASS_ICON[f.class] || "";
-    if (f.skill) tile.querySelector(".f-chips").insertAdjacentHTML("beforeend", `<span class="f-skill">${SKILL_ICON[f.skill]}</span>`);
+    if (f.kit) tile.querySelector(".f-chips").insertAdjacentHTML("beforeend", '<span class="f-skill">✨</span>');
+    else if (f.skill) tile.querySelector(".f-chips").insertAdjacentHTML("beforeend", `<span class="f-skill">${SKILL_ICON[f.skill]}</span>`);
     tile.querySelector(".f-name").textContent = f.name;
     if (f.stars > 1) tile.insertAdjacentHTML("beforeend", `<span class="f-stars">★${f.stars}</span>`);
     if (f.synergy) tile.insertAdjacentHTML("beforeend", `<span class="f-syn">🔗+${f.synergy}%</span>`);
@@ -2987,7 +3050,12 @@
         info.className = "pick-stats";
         const inTeam = teamDrafts[arenaMode].includes(f.id) && teamDrafts[arenaMode][slot] !== f.id;
         info.textContent = `★${f.stars} · ${CLASS_ICON[f.class]} · ⚡${spaced(powerOf([f]))}` + (inTeam ? ` · ${at.inTeam}` : "");
-        if (f.skill) {
+        if (f.kit) {
+          const skill = document.createElement("small");
+          skill.className = "pick-skill";
+          skill.textContent = `✨ ${f.kit.ult.name}: ${ultText(f.kit.ult)} · ${passiveName(f.kit.passive)}`;
+          info.append(skill);
+        } else if (f.skill) {
           const skill = document.createElement("small");
           skill.className = "pick-skill";
           skill.textContent = `${SKILL_ICON[f.skill]} ${at.skills[f.skill]}: ${at.skillInfo[f.skill]}`;
@@ -3381,7 +3449,7 @@
   // 200000).
   const SKIP_POINTS = 150000;
   // HITS are the events that go from one side to the other.
-  const HITS = ["hit", "strike", "stun", "poison"];
+  const HITS = ["hit", "strike", "stun", "poison", "miss"];
   // START_ENERGY is each class's energy at a battle's start, as arena.StartEnergy gives it.
   const START_ENERGY = { tank: 30, dealer: 20, support: 40, healer: 30 };
   // energize fills a card's energy bar, lit when full on a card with a skill.
@@ -3602,26 +3670,32 @@
         if (foeSide) {
           if (actor) move(actor.el, [{ transform: "none" }, { transform: `translateY(${e.side ? 8 : -8}px)` }, { transform: "none" }], 240);
           move(target.el, [{ transform: "none" }, { transform: "translateX(-5px)" }, { transform: "translateX(5px)" }, { transform: "none" }], 260);
-          if (e.kind !== "hit" && actor) flash(actor, "strike");
+          if (e.kind === "miss") {
+            float(target, `💨 ${at.miss}`, "dmg");
+            say(e.ult ? `✨ ${e.ult}: ` : "", name(actor), " → ", name(target), ` · 💨 ${at.miss}`);
+            return;
+          }
+          if ((e.kind !== "hit" || e.ult) && actor) flash(actor, "strike");
           flash(target, "hurt");
           const mark = (e.kind === "stun" ? " 💫" : e.kind === "poison" ? " ☠" : "") + (e.edge ? " ⚡" : "");
           float(target, `−${spaced(e.amount)}${mark}`, e.kind === "strike" ? "crit" : e.kind === "poison" ? "poison" : "dmg");
-          say(e.kind !== "hit" ? `${SKILL_ICON[e.kind]} ${at.skills[e.kind]}: ` : "", name(actor), " → ", name(target), ` −${spaced(e.amount)}` + (e.edge ? ` · ⚡ ${at.edge}` : ""));
+          const by = e.ult ? `✨ ${e.ult}: ` : e.kind !== "hit" ? `${SKILL_ICON[e.kind]} ${at.skills[e.kind]}: ` : "";
+          say(by, name(actor), " → ", name(target), ` −${spaced(e.amount)}` + (e.edge ? ` · ⚡ ${at.edge}` : ""));
           haptic(e.kind === "hit" ? "light" : "medium");
         } else if (e.kind === "heal") {
           if (actor) flash(actor, "heal");
           flash(target, "heal");
           float(target, `+${spaced(e.amount)}`, "heal");
-          say(`${SKILL_ICON.heal} ${at.skills.heal}: `, name(actor), " → ", name(target), ` +${spaced(e.amount)}`);
+          say(e.ult ? `✨ ${e.ult}: ` : `${SKILL_ICON.heal} ${at.skills.heal}: `, name(actor), " → ", name(target), ` +${spaced(e.amount)}`);
         } else if (e.kind === "shield") {
           if (actor && actor !== target) flash(actor, "shield");
           flash(target, "shield");
           float(target, `🛡 ${spaced(e.amount)}`, "shield");
-          say(`${SKILL_ICON.shield} ${at.skills.shield}: `, ...(actor && actor !== target ? [name(actor), " → "] : []), name(target), ` +${spaced(e.amount)}`);
+          say(e.ult ? `✨ ${e.ult}: ` : `${SKILL_ICON.shield} ${at.skills.shield}: `, ...(actor && actor !== target ? [name(actor), " → "] : []), name(target), ` +${spaced(e.amount)}`);
         } else if (e.kind === "provoke") {
           flash(target, "provoke");
           float(target, SKILL_ICON.provoke, "provoke");
-          say(`${SKILL_ICON.provoke} ${at.skills.provoke}: `, name(target));
+          say(e.ult ? `✨ ${e.ult}: ` : `${SKILL_ICON.provoke} ${at.skills.provoke}: `, name(target));
         } else if (e.kind === "stunned") {
           float(target, SKILL_ICON.stun, "stun");
           line.textContent = at.stunned(target.f.name);

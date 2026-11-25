@@ -62,49 +62,64 @@ func mythicPower(id int64, t tier, r role) float64 {
 	return float64(tierPower[t]) * classPower[r.class] * skillPower[r.skill] * (1 + mythicSpreadOf(id, t, r)) * boost
 }
 
-// mythicBoost raises the Mythics that lost more than the rest, as the
-// owners asked on 2026-11-25: in 3000 random Mythic teams at ★5 Spike's won
-// 21% below the average and Violet's, Lelouch's, Edward's, Light's and
-// Noelle's 13-15% below. Every Mythic below the average was raised, round by
-// round of the same simulation (4000 teams, 60 battles each), until each won
-// within 5% of it; none was lowered, so Mythics are some 7% stronger on the
-// whole than before. Yoriichi, 15% above, was left as he is.
+// mythicBoost scales each Mythic's power so that, with its kit (its own
+// Passive and Ultimate, since 2026-11-25), it wins as much as the others:
+// round by round of simulating 4000 random Mythic teams at ★5, 60 battles
+// each, every Mythic's power was moved against how far its teams won above
+// or below the average, until all were within 2% of it (they were 34% apart
+// with the kits alone, Imu's Domination and Lelouch's Geass above, Light and
+// Kurapika below). On the whole Mythics are as strong as before the kits.
+// (Before the kits, on 2026-11-25 too, it raised only those below.)
 var mythicBoost = map[int64]float64{
-	417:    1.258, // Lelouch Lamperouge
-	34470:  1.243, // Kurisu Makise
-	1:      1.216, // Spike Spiegel
-	11:     1.183, // Edward Elric
-	422:    1.176, // Guts
-	90169:  1.163, // Violet Evergarden
-	88572:  1.156, // Emilia
-	123283: 1.152, // Noelle Silva
-	80:     1.141, // Light Yagami
-	127222: 1.141, // Mai Sakurajima
-	124381: 1.137, // Zero Two
-	30:     1.116, // Gon Freecss
-	28:     1.101, // Kurapika
-	45627:  1.093, // Levi
-	40881:  1.083, // Mikasa Ackerman
-	4003:   1.085, // Joutarou Kuujou
-	27:     1.078, // Killua Zoldyck
-	126824: 1.076, // Maomao
-	40882:  1.066, // Eren Yeager
-	123284: 1.065, // Yuno
-	298761: 1.063, // Satoko Kirigaya
-	127691: 1.054, // Satoru Gojou
-	137080: 1.051, // Makima
-	124440: 1.050, // Yami Sukehiro
-	203633: 1.050, // Qin Shi Huang
-	5:      1.049, // Ichigo Kurosaki
-	127518: 1.048, // Nezuko Kamado
-	176754: 1.041, // Frieren
-	124435: 1.040, // Julius Novachrono
-	123285: 1.035, // Asta
-	40:     1.026, // Luffy Monkey
-	126071: 1.027, // Tanjirou Kamado
-	265209: 1.022, // Lancelot
-	246:    1.015, // Gokuu Son
-	249281: 1.013, // Tristan Liones
+	34470:  1.464, // Kurisu Makise
+	80:     1.236, // Light Yagami
+	11:     1.224, // Edward Elric
+	422:    1.218, // Guts
+	1:      1.217, // Spike Spiegel
+	90169:  1.194, // Violet Evergarden
+	123283: 1.193, // Noelle Silva
+	124381: 1.191, // Zero Two
+	28:     1.176, // Kurapika
+	88572:  1.155, // Emilia
+	127222: 1.144, // Mai Sakurajima
+	30:     1.143, // Gon Freecss
+	298761: 1.129, // Satoko Kirigaya
+	5:      1.125, // Ichigo Kurosaki
+	45627:  1.112, // Levi
+	176754: 1.112, // Frieren
+	40881:  1.109, // Mikasa Ackerman
+	126824: 1.084, // Maomao
+	4003:   1.078, // Joutarou Kuujou
+	124440: 1.076, // Yami Sukehiro
+	40882:  1.071, // Eren Yeager
+	127518: 1.070, // Nezuko Kamado
+	123284: 1.070, // Yuno
+	126071: 1.057, // Tanjirou Kamado
+	246:    1.054, // Gokuu Son
+	141918: 1.050, // Kokushibo
+	137080: 1.048, // Makima
+	40:     1.045, // Luffy Monkey
+	27:     1.039, // Killua Zoldyck
+	17:     1.038, // Naruto Uzumaki
+	249281: 1.038, // Tristan Liones
+	141694: 1.038, // Akaza
+	124522: 1.031, // Mereoleona Vermillion
+	127691: 1.016, // Satoru Gojou
+	129928: 1.010, // Jin-U Seong
+	123285: 1.010, // Asta
+	341936: 1.009, // Joy Boy
+	73935:  1.008, // Saitama
+	203633: 1.007, // Qin Shi Huang
+	265209: 1.005, // Lancelot
+	90202:  1.004, // Escanor
+	129132: 0.998, // Muzan Kibutsuji
+	130050: 0.996, // Giyuu Tomioka
+	129131: 0.993, // Zenitsu Agatsuma
+	72921:  0.980, // Meliodas
+	149220: 0.940, // Yoriichi Tsugikuni
+	124435: 0.912, // Julius Novachrono
+	417:    0.890, // Lelouch Lamperouge
+	128130: 0.663, // Imu
 }
 
 // mythicSpreadOf is where id lies among the Mythics of tier t and r's class,

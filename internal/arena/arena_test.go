@@ -360,13 +360,13 @@ func TestStunnedTurnGainsNothing(t *testing.T) {
 	u, wall := f.teams[0][0], f.teams[1][0]
 	u.energy = EnergyMax
 	f.act(u)
-	if e := lastOf(f.events, KindStun); e.Kind == "" || !wall.stunned {
+	if e := lastOf(f.events, KindStun); e.Kind == "" || wall.stun == 0 {
 		t.Fatalf("no stun: %+v", f.events)
 	}
 	before := wall.energy
 	f.act(wall)
 	e := f.events[len(f.events)-1]
-	if e.Kind != KindStunned || wall.energy != before || e.Energy != before || wall.stunned {
+	if e.Kind != KindStunned || wall.energy != before || e.Energy != before || wall.stun != 0 {
 		t.Errorf("stunned turn %+v, energy %d → %d", e, before, wall.energy)
 	}
 	f.act(wall)

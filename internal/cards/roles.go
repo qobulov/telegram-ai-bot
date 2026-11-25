@@ -168,6 +168,9 @@ func fighterOf(id int64, name string, rarity, stars, attack, health int) arena.F
 			f.Skill = r.skill
 		}
 	}
+	if k, ok := kitOf(id, rarity); ok {
+		f.Kit = &k
+	}
 	return f
 }
 

@@ -69,6 +69,8 @@ type fighterView struct {
 	Health int    `json:"health"`
 	Class  string `json:"class"`
 	Skill  string `json:"skill"`
+	// Kit is a Mythic's own Passive and Ultimate, in place of Skill.
+	Kit *kitView `json:"kit,omitempty"`
 	// Anime is the card's anime as Franchise counts it, and Synergy the
 	// percent its Attack and Health are raised by for the team's others of it.
 	Anime   string `json:"anime"`
@@ -94,6 +96,8 @@ type eventView struct {
 	// for the page's energy bars.
 	Energy   int `json:"energy"`
 	ToEnergy int `json:"to_energy"`
+	// Ult is the Ultimate the event is of, when it is.
+	Ult string `json:"ult,omitempty"`
 }
 
 // fighters is a team in the arena: its fighters, front first, and their
@@ -141,7 +145,7 @@ func themedFighters(held []storage.OwnedCard, ids [5]int64, theme string) (fight
 		f := fighterOf(o.ID, o.Name, o.Rarity, stars, attack, health)
 		slots[i] = f
 		views[i] = fighterView{ID: o.ID, Name: o.Name, Image: o.ImageURL, Rarity: o.Rarity, Stars: stars,
-			Attack: attack, Health: health, Class: classNames[f.Class], Skill: skillNames[f.Skill],
+			Attack: attack, Health: health, Class: classNames[f.Class], Skill: skillNames[f.Skill], Kit: kitViewOf(o.ID, o.Rarity),
 			Anime: animes[i], Synergy: bonus[i], Theme: themed}
 	}
 	team := arena.Team{Front: [2]arena.Fighter{slots[0], slots[1]}, Back: [3]arena.Fighter{slots[2], slots[3], slots[4]}}
@@ -413,7 +417,7 @@ func (h *handler) arenaAttack(ctx context.Context, user miniapp.User, opponent i
 func eventViews(events []arena.Event) []eventView {
 	views := make([]eventView, len(events))
 	for i, e := range events {
-		views[i] = eventView{Round: e.Round, Side: e.Side, From: e.From, To: e.To, Kind: e.Kind, Amount: e.Amount, HP: e.HP, Edge: e.Edge, Energy: e.Energy, ToEnergy: e.ToEnergy}
+		views[i] = eventView{Round: e.Round, Side: e.Side, From: e.From, To: e.To, Kind: e.Kind, Amount: e.Amount, HP: e.HP, Edge: e.Edge, Energy: e.Energy, ToEnergy: e.ToEnergy, Ult: e.Ult}
 	}
 	return views
 }
