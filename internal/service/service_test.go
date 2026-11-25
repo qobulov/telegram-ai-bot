@@ -1267,13 +1267,15 @@ func TestMentionWhileReplyingToMemberQuotesThatMember(t *testing.T) {
 	}
 }
 
+// A bare mention is answered without the model, since 2026-11-25; its
+// saved text is the bot's name.
 func TestBareMentionSendsTheBotsName(t *testing.T) {
 	f := newFixture()
 
-	f.run(inGroup(groupMessage("@MyBot", "@MyBot")))
+	sent := f.run(inGroup(groupMessage("@MyBot", "@MyBot")))
 
-	if req := f.replier.recorded()[0].req; req.Text != "Bek: Mira" {
-		t.Errorf("text = %q", req.Text)
+	if len(sent) != 1 || strings.HasPrefix(sent[0].text, "echo:") || len(f.replier.recorded()) != 0 {
+		t.Errorf("sent %+v, recorded %+v", sent, f.replier.recorded())
 	}
 }
 

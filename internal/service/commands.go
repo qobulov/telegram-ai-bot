@@ -944,6 +944,9 @@ func (s *Service) ask(ctx context.Context, in incoming, rules []storage.GroupRul
 		return outcome{skipped: "group_quota", passedOver: true}
 	}
 	in.groupReply = groupReply
+	if out, ok := s.nameCallAnswer(ctx, in); ok {
+		return out
+	}
 	// Past the day's limit the sender gets the notice, and no model is
 	// asked at all, the router included.
 	reservation, notify, allowed := s.takePrivateAnswer(ctx, in)
