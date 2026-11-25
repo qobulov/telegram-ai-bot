@@ -457,6 +457,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 	if cfg.GiphyAPIKey != "" {
 		opts.GIFs = &gifs.Client{APIKey: cfg.GiphyAPIKey, HTTPClient: &http.Client{Timeout: giphyTimeout}}
 		opts.AnimationSender, opts.MediaSlots = bot.Client, store
+		opts.PraiseGIFs = service.PraiseGIFLinks(cfg.WebAppURL)
 	}
 	if g := newGame(cfg); g != nil {
 		opts.StatsURL = statsPage(cfg)

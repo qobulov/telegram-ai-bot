@@ -403,6 +403,9 @@ type Options struct {
 	GIFs            GIFSearcher
 	AnimationSender AnimationSender
 	MediaSlots      MediaSlots
+	// PraiseGIFs are the bot's own GIFs a praise of it is answered with,
+	// [gif praised]; none falls back to a search.
+	PraiseGIFs []string
 	// AudioSender sends the sounds a tool found, such as a song's preview;
 	// nil sends none.
 	// ClipSender sends the clips the guard answers a swear at the bot with;

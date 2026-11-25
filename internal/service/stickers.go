@@ -149,7 +149,7 @@ func (s *Service) sendGIF(in incoming, category string, gap time.Duration) (int6
 	if err != nil || !claimed {
 		return 0, false
 	}
-	links, err := s.opts.GIFs.Search(ctx, category)
+	links, err := s.gifLinks(ctx, category)
 	if err != nil || len(links) == 0 {
 		s.opts.Logger.Warn("could not find a GIF", "chat_id", in.msg.Chat.ID, "category", category, "error", err)
 		return 0, true
@@ -160,6 +160,15 @@ func (s *Service) sendGIF(in incoming, category string, gap time.Duration) (int6
 		return 0, true
 	}
 	return sentID, true
+}
+
+// gifLinks are the GIFs to pick from for category: the bot's own for a
+// praise of it, else a search's.
+func (s *Service) gifLinks(ctx context.Context, category string) ([]string, error) {
+	if category == PraiseGIF && len(s.opts.PraiseGIFs) > 0 {
+		return s.opts.PraiseGIFs, nil
+	}
+	return s.opts.GIFs.Search(ctx, category)
 }
 
 // FileSender sends a document.

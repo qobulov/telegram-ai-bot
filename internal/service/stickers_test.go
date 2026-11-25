@@ -373,3 +373,16 @@ func TestAudioAfterTheAnswerLeavesTheAnswer(t *testing.T) {
 		t.Errorf("audio = %q", audio.sent)
 	}
 }
+
+// A praise's GIF is one of the bot's own when it has any, a search's
+// otherwise.
+func TestPraiseGIFsAreTheBotsOwn(t *testing.T) {
+	s := &Service{opts: Options{PraiseGIFs: []string{"https://site/gifs/a.mp4"}}}
+	links, err := s.gifLinks(context.Background(), PraiseGIF)
+	if err != nil || len(links) != 1 || links[0] != "https://site/gifs/a.mp4" {
+		t.Errorf("links = %v, %v", links, err)
+	}
+	if got := PraiseGIFLinks("https://site/"); len(got) != len(praiseGIFFiles) {
+		t.Errorf("links on the site = %v", got)
+	}
+}
