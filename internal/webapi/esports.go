@@ -28,27 +28,31 @@ const (
 var mplLeagues = map[string]string{"id": "MPL Indonesia", "ph": "MPL Philippines", "my": "MPL Malaysia", "kh": "MPL Cambodia"}
 
 type mplArgs struct {
-	Action string `json:"action"`
-	League string `json:"league"`
-	Team   string `json:"team"`
+	Action   string `json:"action"`
+	League   string `json:"league"`
+	Team     string `json:"team"`
+	Opponent string `json:"opponent"`
 }
 
 func (a *apis) mplTool() tools.Tool {
 	return tools.Tool{
 		Name: "mpl",
-		Description: "Mobile Legends pro leagues, this season: MPL Indonesia (id), Philippines (ph), Malaysia (my), Cambodia (kh). standings: the table. matches: latest results and next matches, of one team if named. " +
-			"playoffs: playoff matches, scores and the champion. Not M-series or other tournaments.",
+		Description: "Mobile Legends pro leagues this season: MPL id, ph, my, kh. standings. matches: results and next, of a team if named. playoffs: with the champion. " +
+			"match: a team's last played match game by game, players' heroes and KDA. stats: top players, heroes picked, banned, won, and teams. mvp. Not M-series.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["standings", "matches", "playoffs"]},
+				"action": {"type": "string", "enum": ["standings", "matches", "playoffs", "match", "stats", "mvp"]},
 				"league": {"type": "string", "enum": ["id", "ph", "my", "kh"]},
-				"team": {"type": "string", "description": "For matches: a team's short or full name, as \"ONIC\" or \"Aurora\"."}
+				"team": {"type": "string", "description": "For matches and match: a team's short or full name, as \"ONIC\" or \"Aurora\"."},
+				"opponent": {"type": "string", "description": "For match: the other team, for their last match against each other."}
 			},
 			"required": ["action", "league"],
 			"additionalProperties": false
 		}`),
-		Timeout:        patientTimeout,
+		// A match's details follow its schedule and playoffs, each up to
+		// patientTimeout when Rone Arena is busy.
+		Timeout:        3 * patientTimeout,
 		MaxOutputBytes: mlbbOutputBytes,
 		Run:            a.mpl,
 	}
@@ -81,6 +85,7 @@ func (r mplWL) String() string {
 }
 
 type mplMatch struct {
+	ID      string  `json:"match_id"`
 	StartAt string  `json:"start_at"`
 	Team1   mplTeam `json:"team1"`
 	Team2   mplTeam `json:"team2"`
@@ -112,8 +117,14 @@ func (a *apis) mpl(ctx context.Context, raw json.RawMessage) (any, error) {
 		return a.mplMatches(ctx, args.League, league, strings.TrimSpace(args.Team))
 	case "playoffs":
 		return a.mplPlayoffs(ctx, args.League, league)
+	case "match":
+		return a.mplMatch(ctx, args.League, league, strings.TrimSpace(args.Team), strings.TrimSpace(args.Opponent))
+	case "stats":
+		return a.mplStats(ctx, args.League, league)
+	case "mvp":
+		return a.mplMVP(ctx, args.League, league)
 	}
-	return nil, argumentError("action must be standings, matches or playoffs")
+	return nil, argumentError("action must be standings, matches, playoffs, match, stats or mvp")
 }
 
 func esportsGet[T any](ctx context.Context, a *apis, league, what string) (T, error) {
@@ -152,7 +163,9 @@ func (a *apis) mplStandings(ctx context.Context, code, league string) (any, erro
 	return map[string]any{"league": league, "standings": table, "source": esportsSource, "note": esportsNote}, nil
 }
 
-func (a *apis) mplMatches(ctx context.Context, code, league, team string) (any, error) {
+// seasonMatches are the season's matches, the playoffs too, oldest first,
+// of team when it is not empty.
+func (a *apis) seasonMatches(ctx context.Context, code, league, team string) ([]mplMatch, error) {
 	answer, err := esportsGet[struct {
 		Weeks []struct {
 			Days []mplDay `json:"days"`
@@ -177,6 +190,14 @@ func (a *apis) mplMatches(ctx context.Context, code, league, team string) (any, 
 		}
 	}
 	slices.SortStableFunc(all, func(x, y mplMatch) int { return cmp.Compare(x.StartAt, y.StartAt) })
+	return all, nil
+}
+
+func (a *apis) mplMatches(ctx context.Context, code, league, team string) (any, error) {
+	all, err := a.seasonMatches(ctx, code, league, team)
+	if err != nil {
+		return nil, err
+	}
 	var played, next []mplMatch
 	unrecorded := 0
 	for _, m := range all {

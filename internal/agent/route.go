@@ -86,7 +86,7 @@ func (a *Agent) answerInline(ctx context.Context, req Request) (Answer, error) {
 // banter, and the chat model then named heroes from memory, denying newer
 // ones; it goes to the full path without asking the router. No small talk
 // in the eval's groups had them.
-var gameWords = regexp.MustCompile(`(?i)(^|[^\p{L}])(mlbb|млбб|dota|дота|mobile legends|hero|qahramon|қаҳрамон|каҳрамон|skin|скин|build|билд|lega|лега|buff|бафф?|nerf|нерф|patch|патч|mpl|мпл|esport|киберспорт|kibersport)`)
+var gameWords = regexp.MustCompile(`(?i)(^|[^\p{L}])(mlbb|млбб|dota|дота|mobile legends|hero|qahramon|қаҳрамон|каҳрамон|skin|скин|build|билд|lega|лега|buff|бафф?|nerf|нерф|patch|патч|mpl|мпл|esport|киберспорт|kibersport|wallpaper|обои)`)
 
 // playerID is a Mobile Legends account as players write it, its ID and
 // server: "1586840150 (16698)". Asked "nikiz nma" in reply to one, the
