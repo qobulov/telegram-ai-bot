@@ -256,6 +256,7 @@ func Tools(opts Options) []tools.Tool {
 		a.musicTool(),
 		a.mlbbTool(),
 		a.mlbbNewsTool(),
+		a.mplTool(),
 		a.quakeTool(),
 		a.qrTool(),
 		a.freeGamesTool(),
