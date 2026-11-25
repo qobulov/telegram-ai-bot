@@ -210,7 +210,11 @@ func (a *Agent) Reply(ctx context.Context, req Request) (Answer, error) {
 func (a *Agent) saveFixed(ctx context.Context, req Request) (Answer, error) {
 	answer := *req.Fixed
 	content := answer.Text
-	if content == "" {
+	switch {
+	case content != "":
+	case answer.GIF != "":
+		content = "<gif " + answer.GIF + ">"
+	default:
 		content = "<reacted " + answer.Reaction + ">"
 	}
 	t := &turn{req: req, messages: []ai.Message{{Role: ai.RoleUser, Content: req.Text}, {Role: ai.RoleAssistant, Content: content}}}
