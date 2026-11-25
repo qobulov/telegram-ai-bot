@@ -16,6 +16,9 @@ var praiseGIFFiles = []string{
 	"praise-gloria-strike.mp4",       // a burst among the stars, her eyes, her pose with the spear
 	"praise-sunbringer-closeups.mp4", // Sunbringer's face, a strike and her eyes
 	"praise-lady-sunbringer.mp4",     // "Lady Sunbringer", her face and the moon
+	"praise-gloria-vortex.mp4",       // lightning, a blue vortex and a pillar of crystal
+	"praise-gloria-flight.mp4",       // a blue city, red flames, her flight
+	"praise-gloria-slash.mp4",        // her spear's blade flashing, a white swirl
 }
 
 // PraiseGIFLinks are the bot's own GIFs' addresses on the site at base.
