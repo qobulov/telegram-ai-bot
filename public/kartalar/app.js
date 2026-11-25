@@ -3053,7 +3053,9 @@
         if (f.kit) {
           const skill = document.createElement("small");
           skill.className = "pick-skill";
-          skill.textContent = `✨ ${f.kit.ult.name}: ${ultText(f.kit.ult)} · ${passiveName(f.kit.passive)}`;
+          // the names only: the whole kit is on the card's back, and here it
+          // squeezed the card's name out (2026-11-25)
+          skill.textContent = `✨ ${f.kit.ult.name} · 🔆 ${passiveName(f.kit.passive)}`;
           info.append(skill);
         } else if (f.skill) {
           const skill = document.createElement("small");

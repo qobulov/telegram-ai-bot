@@ -1379,7 +1379,7 @@ h1 { margin: 0; font: 700 22px/1.1 Unbounded, sans-serif; letter-spacing: 0.02em
 #towerFight { display: block; width: 100%; }
 .arena-rules { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; }
 .arena-rules.on span { padding: 3px 9px; border-radius: 999px; background: rgba(159, 216, 255, 0.12); color: #9fd8ff; font-weight: 700; }
-.arena-pick .pick-skill { display: block; max-width: 180px; margin-top: 2px; font-size: 11px; font-weight: 500; white-space: normal; }
+.arena-pick .pick-skill { display: block; max-width: 160px; margin-top: 2px; margin-left: auto; font-size: 11px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* the battle's replay, on the whole screen */
 .battle {
