@@ -10,10 +10,12 @@ const PraiseGIF = "praised"
 // praiseGIFFiles are the bot's own GIFs in public/gifs, added as the owners
 // send videos.
 var praiseGIFFiles = []string{
-	"praise-number-one.mp4", // "Sorry but I'm number one", Sunbringer's silhouette
-	"praise-eyes.mp4",       // Sunbringer's eyes, then the crystal in her hands
-	"praise-glance.mp4",     // Sunbringer's glance over her shoulder
-	"praise-pose.mp4",       // Sunbringer's pose, then her face
+	"praise-number-one.mp4",          // "Lady Sunbringer", then "Sorry but I'm number one"
+	"praise-number-one-poses.mp4",    // Sunbringer's face, glowing eye and poses
+	"praise-gloria-faces.mp4",        // Sunbringer's faces and eyes, cut after cut
+	"praise-gloria-strike.mp4",       // a burst among the stars, her eyes, her pose with the spear
+	"praise-sunbringer-closeups.mp4", // Sunbringer's face, a strike and her eyes
+	"praise-lady-sunbringer.mp4",     // "Lady Sunbringer", her face and the moon
 }
 
 // PraiseGIFLinks are the bot's own GIFs' addresses on the site at base.
