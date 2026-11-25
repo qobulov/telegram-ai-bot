@@ -88,3 +88,61 @@ func TestLaunchesAreTheNextOnes(t *testing.T) {
 		t.Errorf("launches = %s", env.raw)
 	}
 }
+
+const (
+	dotaSvenStats     = `[{"name":"npc_dota_hero_sven","localized_name":"Sven","primary_attr":"str","attack_type":"Melee","roles":["Carry"],"pub_pick":100,"pub_win":51,"pro_pick":1,"pro_win":1,"pro_ban":0}]`
+	dotaHeroAbilities = `{"npc_dota_hero_sven":{"abilities":["sven_storm_bolt","generic_hidden","sven_great_cleave"]}}`
+	dotaAbilities     = `{
+		"sven_storm_bolt":{"dname":"Storm Hammer","desc":"Sven unleashes his magical gauntlet.","behavior":["Unit Target","AOE"],"dmg_type":"Magical","dmg":["80","160"],"cd":["18","16"],"mc":"110","attrib":[{"header":"STUN DURATION:","value":["1","1.25"]},{"header":"X:","value":false},{"header":"HEAL:","value":"0"}]},
+		"sven_great_cleave":{"dname":"Great Cleave","desc":"Cleaves.","behavior":"Passive","cd":null,"mc":false}}`
+	dotaItems = `{
+		"black_king_bar":{"dname":"Black King Bar","cost":4050,"cd":95,"mc":50,"notes":"No reset.","attrib":[{"display":"+ {value} Strength","value":"10"},{"key":"max_level","value":"3"}],"abilities":[{"type":"active","title":"Avatar","description":"Magic resistance."}],"components":["mithril_hammer","ogre_axe"]},
+		"recipe_black_king_bar":{"dname":"Black King Bar Recipe","cost":1450},
+		"mithril_hammer":{"dname":"Mithril Hammer","cost":1600,"components":null},
+		"ogre_axe":{"dname":"Ogre Axe","cost":1000,"components":null}}`
+)
+
+// A hero's skills come from the game's texts, the hidden ones left out.
+func TestDotaHeroGivesItsSkills(t *testing.T) {
+	u := newUpstream(t, map[string]stub{"/opendota/api/heroStats": ok(dotaSvenStats),
+		"/opendota/api/constants/hero_abilities": ok(dotaHeroAbilities), "/opendota/api/constants/abilities": ok(dotaAbilities)})
+
+	env := run(t, u.options(), "games", `{"action":"dota_hero","name":"sven"}`)
+
+	for _, want := range []string{`"name":"Storm Hammer"`, `"cooldown":"18 / 16"`, `"damage_type":"Magical"`, `"mana":"110"`, `"STUN DURATION: 1 / 1.25"`, `"name":"Great Cleave"`, `"kind":"Passive"`} {
+		if !env.OK || !strings.Contains(env.raw, want) {
+			t.Errorf("hero lacks %s: %s", want, env.raw)
+		}
+	}
+	if strings.Contains(env.raw, "generic") || strings.Contains(env.raw, "X:") || strings.Contains(env.raw, "HEAL") {
+		t.Errorf("hero has a hidden skill or an empty value: %s", env.raw)
+	}
+}
+
+// A hero is still answered when its skills cannot be read.
+func TestDotaHeroWithoutSkills(t *testing.T) {
+	u := newUpstream(t, map[string]stub{"/opendota/api/heroStats": ok(dotaSvenStats)})
+
+	env := run(t, u.options(), "games", `{"action":"dota_hero","name":"Sven"}`)
+
+	if !env.OK || strings.Contains(env.raw, `"skills":`) {
+		t.Errorf("hero = %s", env.raw)
+	}
+}
+
+func TestDotaItem(t *testing.T) {
+	u := newUpstream(t, map[string]stub{"/opendota/api/constants/items": ok(dotaItems)})
+
+	wantError(t, run(t, u.options(), "games", `{"action":"dota_item","name":"Saber"}`), "invalid_arguments", "no Dota 2 item")
+	if env := run(t, u.options(), "games", `{"action":"dota_item","name":"BKB"}`); !strings.Contains(env.raw, `"item":"Black King Bar"`) {
+		t.Errorf("BKB = %s", env.raw)
+	}
+
+	env := run(t, u.options(), "games", `{"action":"dota_item","name":"black king"}`)
+
+	for _, want := range []string{`"item":"Black King Bar"`, `"cost":4050`, `"built_from":["Mithril Hammer","Ogre Axe","Recipe"]`, `"+ 10 Strength"`, `"active Avatar: Magic resistance."`, `"cooldown":"95"`} {
+		if !env.OK || !strings.Contains(env.raw, want) {
+			t.Errorf("item lacks %s: %s", want, env.raw)
+		}
+	}
+}

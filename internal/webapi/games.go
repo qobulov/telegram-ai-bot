@@ -36,18 +36,19 @@ func (a *apis) gamesTool() tools.Tool {
 	return tools.Tool{
 		Name: "games",
 		Description: "steam_game: a PC game's Steam price in Uzbekistan, discount, genres, release, Metacritic score, minimum PC requirements and how many play it on Steam right now. " +
-			"dota_hero: a Dota 2 hero's attribute, roles and public and pro win, pick and ban rates; dota_meta: the heroes winning most and the pros' most picked and banned. Mobile Legends is the mlbb tool's.",
+			"dota_hero: a Dota 2 hero's roles, win, pick and ban rates and skills; dota_item: an item's cost, parts, stats and effects; dota_meta: the heroes winning most, the pros' most picked and banned. MLBB is mlbb's.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["steam_game", "dota_hero", "dota_meta"]},
-				"name": {"type": "string", "description": "The game's or hero's English name, as \"Elden Ring\" or \"Pudge\"."}
+				"action": {"type": "string", "enum": ["steam_game", "dota_hero", "dota_item", "dota_meta"]},
+				"name": {"type": "string", "description": "The game's, hero's or item's English name, as \"Elden Ring\", \"Pudge\" or \"Black King Bar\"."}
 			},
 			"required": ["action"],
 			"additionalProperties": false
 		}`),
-		Timeout: patientTimeout,
-		Run:     a.games,
+		Timeout:        patientTimeout,
+		MaxOutputBytes: mlbbOutputBytes,
+		Run:            a.games,
 	}
 }
 
@@ -71,10 +72,15 @@ func (a *apis) games(ctx context.Context, raw json.RawMessage) (any, error) {
 			return nil, argumentError("name the hero")
 		}
 		return a.dotaHero(ctx, name)
+	case "dota_item":
+		if name == "" {
+			return nil, argumentError("name the item")
+		}
+		return a.dotaItemInfo(ctx, name)
 	case "dota_meta":
 		return a.dotaMeta(ctx)
 	}
-	return nil, argumentError("action must be steam_game, dota_hero or dota_meta")
+	return nil, argumentError("action must be steam_game, dota_hero, dota_item or dota_meta")
 }
 
 // --- Steam ---
@@ -192,6 +198,7 @@ func (a *apis) playersNow(ctx context.Context, id int) (int, bool) {
 // --- Dota 2 (OpenDota) ---
 
 type dotaHero struct {
+	Key        string   `json:"name"`
 	Name       string   `json:"localized_name"`
 	Attribute  string   `json:"primary_attr"`
 	AttackType string   `json:"attack_type"`
@@ -223,12 +230,16 @@ func (a *apis) dotaHero(ctx context.Context, name string) (any, error) {
 	if !ok {
 		return nil, argumentError("no Dota 2 hero is called %q; give its English name", name)
 	}
-	return map[string]any{
+	out := map[string]any{
 		"hero": h.Name, "attribute": cmp.Or(dotaAttributes[h.Attribute], h.Attribute), "attack": h.AttackType, "roles": h.Roles,
 		"public": map[string]any{"win_rate": winRate(h.PubWin, h.PubPick), "matches": h.PubPick},
 		"pro":    map[string]any{"win_rate": winRate(h.ProWin, h.ProPick), "picks": h.ProPick, "bans": h.ProBan},
-		"source": "OpenDota, recent matches",
-	}, nil
+		"source": "OpenDota, recent matches; skills from the game's own texts",
+	}
+	if skills := a.dotaSkills(ctx, h.Key); len(skills) > 0 {
+		out["skills"] = skills
+	}
+	return out, nil
 }
 
 func (a *apis) dotaMeta(ctx context.Context) (any, error) {

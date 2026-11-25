@@ -27,7 +27,7 @@ const (
 	dexSource = "MLBBDex (mlbbdex.com), from the Mobile Legends Wiki"
 	dexNote   = "From the wiki, which adds new skins weeks late: the newest may be missing, or only in also_in_artwork, " +
 		"names from the hero's artwork without details, which may also be an older name of a listed skin. " +
-		"Supreme is the tier players call Legend. For a skin's tier or date that is not here, or upcoming skins and events, use web_search."
+		"Supreme is the tier players call Legend. For upcoming skins and heroes use mlbb_news upcoming; for a skin's tier or date that is not here, web_search."
 	dexService = "MLBBDex"
 	// maxSkins keeps the answer within mlbbOutputBytes; the newest are kept.
 	maxSkins     = 20

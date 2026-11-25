@@ -92,6 +92,7 @@ type BaseURLs struct {
 	Deezer            string
 	RoneArena         string
 	MLBBDex           string
+	MLBBWiki          string
 	Tavily            string
 	TMDB              string
 	YouTube           string
@@ -152,6 +153,7 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.Deezer = cmp.Or(b.Deezer, "https://api.deezer.com")
 	b.RoneArena = cmp.Or(b.RoneArena, "https://arena.rone.dev")
 	b.MLBBDex = cmp.Or(b.MLBBDex, "https://mlbbdex.com")
+	b.MLBBWiki = cmp.Or(b.MLBBWiki, "https://mobile-legends.fandom.com")
 	b.Tavily = cmp.Or(b.Tavily, "https://api.tavily.com")
 	b.TMDB = cmp.Or(b.TMDB, "https://api.themoviedb.org")
 	b.YouTube = cmp.Or(b.YouTube, "https://www.googleapis.com/youtube/v3")
@@ -253,6 +255,7 @@ func Tools(opts Options) []tools.Tool {
 		a.cryptoTool(),
 		a.musicTool(),
 		a.mlbbTool(),
+		a.mlbbNewsTool(),
 		a.quakeTool(),
 		a.qrTool(),
 		a.freeGamesTool(),
