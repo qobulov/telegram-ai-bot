@@ -17,7 +17,11 @@ import (
 // The boss, as the owners asked on 2026-11-23: a foe that grows stronger.
 // Each week, Monday to Monday in Tashkent, one Mythic of the catalog is the
 // boss of everyone. The player's saved arena team fights it until the team
-// falls or arena.MaxRounds are over. Since 2026-11-24, as the owners asked,
+// falls, or after BossRounds (arena.MaxRounds until 2026-11-25, when the
+// owners found most fights ended by the clock, the boss's growth hardly
+// mattering and the best teams all stuck at levels 13-14; with the clock out
+// of the way the boss's own growth ends them, holding out counts and the
+// best spread to 15). Since 2026-11-24, as the owners asked,
 // each fight starts it at level 1: each level has its health, BossHP at the
 // first and BossHPGrowth times the one before after, and spent, the boss goes
 // up a level with BossAttackGrowth times the attack; what counts is the
@@ -33,13 +37,14 @@ const (
 	BossHP           = 50_000
 	BossHPGrowth     = 1.15
 	BossAttackGrowth = 1.2
+	BossRounds       = 100 // only a guard: no team simulated lasted near it
 	BossCoinsBase    = 5
 	BossCoinsPer     = 25_000
 	BossCoinsMost    = 40
 )
 
 // bossLevels are how the boss grows in a fight.
-var bossLevels = arena.BossLevels{HP: BossHP, HPGrowth: BossHPGrowth, AttackGrowth: BossAttackGrowth}
+var bossLevels = arena.BossLevels{HP: BossHP, HPGrowth: BossHPGrowth, AttackGrowth: BossAttackGrowth, Rounds: BossRounds}
 
 // BossWeekPrizes are the boss's weekly prizes, as the owners asked on
 // 2026-11-23: on Monday at 00:00 in Tashkent the players of the week's best

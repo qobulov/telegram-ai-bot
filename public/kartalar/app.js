@@ -3539,7 +3539,7 @@
       const roundBox = box.querySelector(".b-round"), line = box.querySelector(".b-line");
       const skip = box.querySelector(".b-skip");
       skip.textContent = at.skip;
-      // a boss fight runs to the team's end, up to 30 rounds: anyone may skip it
+      // a boss fight runs to the team's end, which can be long: anyone may skip it
       skip.hidden = !data.boss && points < SKIP_POINTS;
       const events = data.events || [];
       let next = 0, timer = 0, done = false;

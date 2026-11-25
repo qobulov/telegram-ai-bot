@@ -576,3 +576,20 @@ func TestBossLevels(t *testing.T) {
 		t.Errorf("reached level %d, want 5 or more", r.Level)
 	}
 }
+
+// A boss fight lasts past MaxRounds when its levels allow more rounds, and
+// ends when the team falls.
+func TestBossRounds(t *testing.T) {
+	team := Team{Front: [2]Fighter{FighterOf(1, "a", 4, 5, 9000, 60000), FighterOf(2, "b", 4, 5, 9000, 60000)},
+		Back: [3]Fighter{FighterOf(3, "c", 4, 5, 9000, 60000), FighterOf(4, "d", 4, 5, 9000, 60000), FighterOf(5, "e", 4, 5, 9000, 60000)}}
+	boss := FighterOf(9, "boss", 4, 1, 3000, 1)
+	levels := BossLevels{HP: 50000, HPGrowth: 1.15, AttackGrowth: 1.2}
+	if r := BossBattle(team, boss, levels, 1); r.Rounds > MaxRounds {
+		t.Errorf("without Rounds the fight lasted %d rounds, past %d", r.Rounds, MaxRounds)
+	}
+	levels.Rounds = 200
+	r := BossBattle(team, boss, levels, 1)
+	if r.Rounds <= MaxRounds || r.Rounds >= 200 {
+		t.Errorf("with Rounds 200 the fight lasted %d rounds, want past %d and ended by the team falling", r.Rounds, MaxRounds)
+	}
+}

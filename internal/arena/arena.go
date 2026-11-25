@@ -213,6 +213,8 @@ type fight struct {
 	bossLevelHP int
 	bossBase    int
 	bossLevels  BossLevels
+	// rounds is the most rounds the fight lasts: MaxRounds, or a boss's.
+	rounds int
 }
 
 // Battle plays the two teams against each other. That a team is valid (five
@@ -245,6 +247,10 @@ type BossLevels struct {
 	HP                     int
 	HPGrowth, AttackGrowth float64
 	Rage                   float64
+	// Rounds is the most rounds a boss fight lasts, MaxRounds when 0: since
+	// 2026-11-25, as the owners asked, more, so that a boss fight ends with
+	// the team falling, not the clock, and holding out counts.
+	Rounds int
 }
 
 // LevelHP is the whole health of level of a boss growing as levels say;
@@ -271,13 +277,16 @@ func BossBattle(team Team, boss Fighter, levels BossLevels, seed int64) BossResu
 	b := f.teams[1][0]
 	b.boss, b.rage, b.hp = true, levels.Rage, levels.HP
 	f.bossLevel, f.bossLevelHP, f.bossBase, f.bossLevels = 1, levels.HP, boss.Attack, levels
+	if levels.Rounds > 0 {
+		f.rounds = levels.Rounds
+	}
 	f.run()
 	return BossResult{Damage: f.bossDealt, Level: f.bossLevel, Rounds: f.round, Events: f.events}
 }
 
-// run plays rounds until a side has fallen or MaxRounds are over.
+// run plays rounds until a side has fallen or its rounds are over.
 func (f *fight) run() {
-	for f.round < MaxRounds && f.living(0) > 0 && f.living(1) > 0 {
+	for f.round < f.rounds && f.living(0) > 0 && f.living(1) > 0 {
 		f.round++
 		for _, u := range f.order() {
 			if f.living(0) == 0 || f.living(1) == 0 {
@@ -291,7 +300,7 @@ func (f *fight) run() {
 }
 
 func newFight(attacker, defender Team, seed int64) *fight {
-	f := &fight{rng: rand.New(rand.NewSource(seed)), first: int(seed & 1)}
+	f := &fight{rng: rand.New(rand.NewSource(seed)), first: int(seed & 1), rounds: MaxRounds}
 	for side, team := range [2]Team{attacker, defender} {
 		for slot, fighter := range team.slots() {
 			f.teams[side][slot] = &unit{Fighter: fighter, side: side, slot: slot, hp: fighter.Health, energy: StartEnergy(fighter.Class)}
