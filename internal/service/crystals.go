@@ -15,6 +15,7 @@ type CrystalBook interface {
 	RecordCrystalPurchase(ctx context.Context, p storage.CrystalPurchase) (shards int, recorded bool, err error)
 	MarkCrystalRefunded(ctx context.Context, chargeID string) (bool, error)
 	CrystalPayments(ctx context.Context, limit int) ([]storage.CrystalPayment, error)
+	StarPayers(ctx context.Context, limit int) ([]storage.StarPayer, int, error)
 }
 
 var (

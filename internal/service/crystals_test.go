@@ -37,6 +37,13 @@ func (f *fakeCrystals) MarkCrystalRefunded(_ context.Context, chargeID string) (
 	return true, nil
 }
 
+func (f *fakeCrystals) StarPayers(context.Context, int) ([]storage.StarPayer, int, error) {
+	if len(f.payments) == 0 {
+		return nil, 0, nil
+	}
+	return []storage.StarPayer{{UserID: 42, Name: "Shahruh", Stars: 150}}, 400, nil
+}
+
 func (f *fakeCrystals) CrystalPayments(context.Context, int) ([]storage.CrystalPayment, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -55,7 +62,7 @@ func TestPaymentsListCrystalPurchases(t *testing.T) {
 
 	sent := f.run(ownerWrites("/payments"))
 
-	if len(sent) != 1 || !strings.Contains(sent[0].text, "So'nggi kristall to'lovlari:") || !strings.Contains(sent[0].text, "Shahruh (42): 99 ⭐, 1500 💎") || strings.Contains(sent[0].text, "premium") {
+	if len(sent) != 1 || !strings.Contains(sent[0].text, "So'nggi kristall to'lovlari:") || !strings.Contains(sent[0].text, "Shahruh (42): 99 ⭐, 1500 💎") || !strings.Contains(sent[0].text, "Jami to'langan (qaytarilganlarsiz): 400 ⭐") || !strings.Contains(sent[0].text, "• Shahruh (42): 150 ⭐") || strings.Contains(sent[0].text, "premium") {
 		t.Fatalf("sent = %+v", sent)
 	}
 }

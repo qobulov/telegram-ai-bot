@@ -1,6 +1,7 @@
 package service
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -371,7 +372,9 @@ func (s *Service) refusePaymentsCommand(in incoming) string {
 }
 
 // showPayments answers an owner's /payments: the latest premium payments,
-// then the latest crystal purchases, each newest first.
+// then the latest crystal purchases, each newest first, then who paid the
+// most Stars in all, as the owners asked on 2026-11-25 when the bot could
+// not say how much one player had paid.
 func (s *Service) showPayments(ctx context.Context, in incoming) string {
 	if refusal := s.refusePaymentsCommand(in); refusal != "" {
 		return refusal
@@ -408,7 +411,29 @@ func (s *Service) showPayments(ctx context.Context, in incoming) string {
 			lines = append(lines, line+refundedMark(p.RefundedAt))
 		}
 	}
-	return strings.Join(lines, "\n")
+	return strings.Join(append(lines, s.payersLines(ctx)...), "\n")
+}
+
+// payersLines are who paid the most Stars in all, premium and crystals,
+// refunds left out, and what everyone paid; none when crystals are not sold
+// or the totals cannot be read.
+func (s *Service) payersLines(ctx context.Context) []string {
+	if s.opts.Crystals == nil {
+		return nil
+	}
+	payers, total, err := s.opts.Crystals.StarPayers(ctx, paymentsListed)
+	if err != nil {
+		s.opts.Logger.Error("could not total the payments", "error", err)
+		return nil
+	}
+	if len(payers) == 0 {
+		return nil
+	}
+	lines := []string{"", fmt.Sprintf("Jami to'langan (qaytarilganlarsiz): %d ⭐. Eng ko'p to'laganlar:", total)}
+	for _, p := range payers {
+		lines = append(lines, fmt.Sprintf("• %s (%d): %d ⭐", cmp.Or(p.Name, "—"), p.UserID, p.Stars))
+	}
+	return lines
 }
 
 // crystalPayments are the latest crystal purchases, none when crystals are

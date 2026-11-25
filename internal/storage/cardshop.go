@@ -179,3 +179,44 @@ func (s *Store) MarkCrystalRefunded(ctx context.Context, chargeID string) (bool,
 	}
 	return marked, nil
 }
+
+// StarPayer is a player by all the Stars they paid, premium and crystals,
+// refunded payments left out.
+type StarPayer struct {
+	UserID int64
+	Name   string
+	Stars  int
+}
+
+// StarPayers are the players who paid the most Stars, at most limit, and
+// the Stars all players paid.
+func (s *Store) StarPayers(ctx context.Context, limit int) ([]StarPayer, int, error) {
+	rows, err := s.pool.Query(ctx, `
+		WITH paid AS (
+			SELECT user_id, stars FROM crystal_purchases WHERE refunded_at IS NULL
+			UNION ALL
+			SELECT user_id, stars FROM star_payments WHERE refunded_at IS NULL),
+		payers AS (SELECT user_id, sum(stars)::int AS stars FROM paid GROUP BY user_id)
+		SELECT p.user_id, coalesce(cp.name, ''), p.stars, (SELECT coalesce(sum(stars), 0)::int FROM payers)
+		FROM payers p LEFT JOIN card_players cp ON cp.user_id = p.user_id
+		ORDER BY p.stars DESC, p.user_id LIMIT $1`, limit)
+	if err != nil {
+		return nil, 0, fmt.Errorf("storage: star payers: %w", err)
+	}
+	defer rows.Close()
+	var (
+		payers []StarPayer
+		total  int
+	)
+	for rows.Next() {
+		var p StarPayer
+		if err := rows.Scan(&p.UserID, &p.Name, &p.Stars, &total); err != nil {
+			return nil, 0, fmt.Errorf("storage: read a star payer: %w", err)
+		}
+		payers = append(payers, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("storage: star payers: %w", err)
+	}
+	return payers, total, nil
+}

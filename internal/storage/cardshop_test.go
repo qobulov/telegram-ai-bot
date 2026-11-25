@@ -57,3 +57,24 @@ func TestCardShop(t *testing.T) {
 		t.Error("refunded twice")
 	}
 }
+
+// The payers are ranked by all their Stars, premium and crystals, a refund
+// left out, with what everyone paid.
+func TestStarPayers(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	for _, q := range []string{
+		`INSERT INTO card_players (user_id, name) VALUES (1, 'Alice'), (2, 'Bob')`,
+		`INSERT INTO crystal_purchases (charge_id, user_id, stars, crystals) VALUES ('a', 1, 99, 1500), ('b', 2, 129, 2000)`,
+		`INSERT INTO crystal_purchases (charge_id, user_id, stars, crystals, refunded_at) VALUES ('c', 2, 500, 9000, now())`,
+		`INSERT INTO star_payments (charge_id, user_id, stars, days) VALUES ('d', 1, 50, 30), ('e', 3, 10, 7)`,
+	} {
+		if _, err := store.pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	payers, total, err := store.StarPayers(ctx, 2)
+	if err != nil || total != 288 || len(payers) != 2 || payers[0] != (StarPayer{UserID: 1, Name: "Alice", Stars: 149}) || payers[1].Stars != 129 {
+		t.Errorf("payers = %+v, total %d, %v", payers, total, err)
+	}
+}
