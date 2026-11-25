@@ -592,10 +592,12 @@
   // Souls' four roles, since 2026-11-22, round a circle: each beats the next.
   const ROLES = ["tank", "dealer", "support", "healer"];
   const BEATS = { tank: "dealer", dealer: "support", support: "healer", healer: "tank" };
-  const WEAK_TO = { tank: "healer", dealer: "tank", support: "dealer", healer: "support" };
 
   // cardBack is the large card's back: the card as the arena sees it, its
-  // class, numbers, skill and anime, in the words of the arena's tab.
+  // power, class, skill and anime, in the words of the arena's tab. Its
+  // attack and life are left to the numbers under the card, and its class's
+  // strong and weak foes to the arena's rules, as the owners asked on
+  // 2026-11-25: they were said twice.
   function cardBack(card) {
     const f = fighterOf(card);
     const stars = Math.min(Math.max(card.stars || 1, 1), 5);
@@ -603,28 +605,23 @@
     back.className = "face info-side";
     back.style.setProperty("--c", COLORS[card.rarity]);
     back.innerHTML = '<div class="ib-head"><span class="rarity"></span><b></b></div>' +
-      '<div class="ib-stats"><div><small></small><b></b></div><div><small></small><b></b></div><div><small></small><b></b></div></div>' +
+      '<div class="ib-stats"><div><small></small><b></b></div></div>' +
       '<small class="ib-stars"></small>' +
-      '<div class="ib-row ib-class"><span class="ib-icon" aria-hidden="true"></span><div><b></b><p></p><p class="ib-tri"><span class="up"></span><span class="down"></span></p></div></div>' +
+      '<div class="ib-row ib-class"><span class="ib-icon" aria-hidden="true"></span><div><b></b><p></p></div></div>' +
       '<div class="ib-row ib-skill"><span class="ib-icon" aria-hidden="true"></span><div><b></b><p></p></div></div>' +
       '<div class="ib-row ib-anime"><span class="ib-icon" aria-hidden="true">🔗</span><div><b></b><p></p></div></div>' +
       '<small class="ib-hint"></small>';
     back.querySelector(".ib-head .rarity").replaceChildren(tierIcon(card.rarity), t.rarities[card.rarity]);
     back.querySelector(".ib-head b").textContent = card.name || "";
     const known = card.attack > 0;
-    const cells = back.querySelectorAll(".ib-stats div");
-    for (const [i, label, value] of [[0, `⚔ ${t.attack}`, card.attack], [1, `❤ ${t.health}`, card.health], [2, `⚡ ${at.statPower}`, powerOf([f])]]) {
-      cells[i].querySelector("small").textContent = label;
-      cells[i].querySelector("b").textContent = known ? spaced(value) : "—";
-    }
+    const power = back.querySelector(".ib-stats div");
+    power.querySelector("small").textContent = `⚡ ${at.statPower}`;
+    power.querySelector("b").textContent = known ? spaced(powerOf([f])) : "—";
     back.querySelector(".ib-stars").textContent = at.starsLine(stars, STAR_MULT[stars].toFixed(2), STAR_MULT[5].toFixed(2));
-    const named = (c) => `${CLASS_ICON[c]} ${at.classes[c]}`;
     const cls = back.querySelector(".ib-class");
     cls.querySelector(".ib-icon").textContent = CLASS_ICON[f.class];
     cls.querySelector("b").textContent = at.classes[f.class];
     cls.querySelector("p").textContent = at.classInfo[f.class];
-    cls.querySelector(".up").textContent = "▲ " + at.beats(named(BEATS[f.class]));
-    cls.querySelector(".down").textContent = "▼ " + at.weakTo(named(WEAK_TO[f.class]));
     const skill = back.querySelector(".ib-skill");
     if (f.skill) {
       skill.querySelector(".ib-icon").textContent = SKILL_ICON[f.skill];
@@ -2422,7 +2419,7 @@
     uz: {
       classes: { tank: "Tank", dealer: "Hujumchi", support: "Yordamchi", healer: "Tabib" },
       classInfo: { tank: "Joni eng ko'p: oldda turib zarbalarni o'ziga oladi", dealer: "Asosiy zararni beradi: eng yaqin raqibni, avval old qatorni uradi", support: "Eng tez: orqa qatordagi eng zaif raqibni uradi, dushmanni to'xtatadi", healer: "Jamoani davolaydi va uzoq turadi" },
-      beats: (c) => `${c}ni yengadi`, weakTo: (c) => `${c}dan yengiladi`, statPower: "Kuch",
+      statPower: "Kuch",
       starsLine: (s, m, top) => (s < 5 ? `★${s}: kuch ×${m} · ★5 da ×${top}` : `★5: kuch ×${m}`),
       skillTitle: (n) => `Skill: ${n}`, noSkillTitle: "Skill: yo'q", noSkill: "Skill Legendar va Mifik kartalarda bo'ladi",
       animeNote: "Jamoada shu animedan 2 ta: +5%, 3 ta va ko'p: +10% hujum va jon",
@@ -2478,7 +2475,7 @@
     ru: {
       classes: { tank: "Танк", dealer: "Атакующий", support: "Поддержка", healer: "Лекарь" },
       classInfo: { tank: "Больше всех здоровья: стоит впереди и принимает удары", dealer: "Наносит основной урон: бьёт ближайшего соперника, сначала передний ряд", support: "Самый быстрый: бьёт самого слабого в заднем ряду и сдерживает врага", healer: "Лечит команду и держится долго" },
-      beats: (c) => `сильнее: ${c}`, weakTo: (c) => `слабее: ${c}`, statPower: "Сила",
+      statPower: "Сила",
       starsLine: (s, m, top) => (s < 5 ? `★${s}: сила ×${m} · на ★5 ×${top}` : `★5: сила ×${m}`),
       skillTitle: (n) => `Навык: ${n}`, noSkillTitle: "Навык: нет", noSkill: "Навыки есть у Легендарных и Мифических карт",
       animeNote: "2 карты этого аниме в команде: +5%, 3 и больше: +10% атаки и здоровья",
@@ -2534,7 +2531,7 @@
     en: {
       classes: { tank: "Tank", dealer: "Dealer", support: "Support", healer: "Healer" },
       classInfo: { tank: "Most health: stands in front and takes the hits", dealer: "Deals the damage: hits the nearest enemy, the front row first", support: "Fastest: hits the weakest enemy in the back row and holds the enemy back", healer: "Mends the team and lasts long" },
-      beats: (c) => `strong vs ${c}`, weakTo: (c) => `weak vs ${c}`, statPower: "Power",
+      statPower: "Power",
       starsLine: (s, m, top) => (s < 5 ? `★${s}: power ×${m} · at ★5 ×${top}` : `★5: power ×${m}`),
       skillTitle: (n) => `Skill: ${n}`, noSkillTitle: "Skill: none", noSkill: "Legendary and Mythic cards have skills",
       animeNote: "2 cards of this anime in a team: +5%, 3 or more: +10% attack and health",
