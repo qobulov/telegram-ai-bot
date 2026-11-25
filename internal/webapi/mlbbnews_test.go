@@ -6,37 +6,6 @@ import (
 	"testing"
 )
 
-const patchIndex = `Patch Notes from Newest to Oldest.
-
-<hr>[[Patch Notes 2.2.16|Patch Notes 2.2.16 (2026-09-16)]]
-[[File:Patch Notes 2.2.16.png|thumb|left|270x270px]]
-• Revamp Hero: {{hi|Masha}} & {{hi|Bruno}}<br>
-• Hero Adjustments<br>
-{{clr}}
-<hr>[[Patch Notes 2.1.90|Patch Notes 2.1.90 (2026-07-08)]]
-• Hero Adjustments: {{hi|Aulus}}<br>
-{{clr}}`
-
-const patchPage = `== II. Hero Adjustments ==
-: The following uses {{pci|buff}} {{pci|nerf}} to indicate Buff and Nerf.
-
-{{hi|Aulus}} {{pci|buff}}
-: Aulus takes too long to ramp up.
-
-: {{ai|The Power of Axe|Skill 2}} {{pci|buff}}
-* '''New Effect:''' The first cast stuns targets hit for 0.3s.
-* Cooldown: 7s → 10-8s
-{{clr}}
-
-{{hi|Edith}} {{pci|buff}}
-: Stronger.
-{{clr}}
-
-== III. Battlefield Adjustments ==
-{{hi|Edith}} {{pci|nerf}}
-: In Mythical Honor, weaker.
-{{clr}}`
-
 const upcomingPage = `==Hero==
 ===New heroes===
 <gallery>
@@ -56,22 +25,6 @@ func wikiAnswer(text string) string {
 	return fmt.Sprintf(`{"parse":{"wikitext":{"*":%q}}}`, text)
 }
 
-func TestPatchListAndHeroChanges(t *testing.T) {
-	patches := patchList(patchIndex)
-	if len(patches) != 2 || patches[0].Page != "Patch Notes 2.2.16" || patches[0].Title != "Patch Notes 2.2.16 (2026-09-16)" || patches[0].Highlights[0] != "Revamp Hero: Masha & Bruno" {
-		t.Fatalf("patches = %+v", patches)
-	}
-	changes := heroChanges(patchPage)
-	if len(changes) != 3 || changes[0].Hero != "Aulus" || changes[2].Change != "nerf" {
-		t.Fatalf("changes = %+v", changes)
-	}
-	for _, want := range []string{"Aulus takes too long to ramp up.", "The Power of Axe (Skill 2) [buff]", "New Effect: The first cast stuns", "Cooldown: 7s → 10-8s"} {
-		if !strings.Contains(changes[0].Text, want) {
-			t.Errorf("Aulus's changes lack %q: %s", want, changes[0].Text)
-		}
-	}
-}
-
 func TestUpcomingSectionsSkipCommentedGalleries(t *testing.T) {
 	sections := upcomingSections(upcomingPage)
 	got := fmt.Sprint(sections)
@@ -80,21 +33,57 @@ func TestUpcomingSectionsSkipCommentedGalleries(t *testing.T) {
 	}
 }
 
-// The overview names each hero once, with every kind of change it had.
-func TestMLBBPatchOverview(t *testing.T) {
-	u := newUpstream(t, map[string]stub{"/mlwiki/api.php": ok(wikiAnswer(patchIndex + "\n" + patchPage))})
+const (
+	dexPatches = `{"data":[{"version":"2.2.23","date":"2026-11-11"},{"version":"2.2.16a","date":"2026-10-14"}]}`
+	dexPatch23 = `{"data":{"version":"2.2.23","date":"2026-11-11",
+		"sections":[{"anchor":null,"title":null,"html":"<p>Highlights of patch 2.2.23:</p><ul><li>Revamped Hero Popol and Kupa</li></ul>"}],
+		"newHeroes":[{"name":"Popol and Kupa","epithet":"Icefield Companions","feature":"A marksman who fights alongside Kupa."}],
+		"adjustments":[{"name":"Aldous","type":"buff","intro":"Less downtime.","sections":[{"name":"Contract: Explosion","category":"Skill 2","type":"buff",
+			"changes":[{"label":"Cooldown","before":"12-9.5s","after":"8s at all levels"},{"text":"New Effect: more damage."}]}]}]}}`
+	dexPatch16a = `{"data":{"version":"2.2.16a","date":"2026-10-14","adjustments":[{"name":"Fanny","type":"nerf","intro":"","sections":[]}]}}`
+	dexEvents   = `{"data":[{"name":"StarLight skin: Tideborn Sailor (Kalea)","kind":"starlight","start":"2026-11-01T00:00:00.000Z","end":"2026-11-30T23:59:59.999Z"}]}`
+)
+
+func TestMLBBPatch(t *testing.T) {
+	u := newUpstream(t, map[string]stub{"/dex/api/v1/patches": ok(dexPatches), "/dex/api/v1/patches/2.2.23": ok(dexPatch23), "/dex/api/v1/patches/2.2.16a": ok(dexPatch16a)})
 
 	env := run(t, u.options(), "mlbb_news", `{"action":"patch"}`)
+	for _, want := range []string{`"patch":"2.2.23"`, `"date":"2026-11-11"`, `"heroes":["Aldous: buff"]`, `"new_or_revamped_heroes":["Popol and Kupa, Icefield Companions"]`, "Revamped Hero Popol and Kupa", `"previous":"2.2.16a (2026-10-14)"`} {
+		if !env.OK || !strings.Contains(env.raw, want) {
+			t.Errorf("patch lacks %s: %s", want, env.raw)
+		}
+	}
+	env = run(t, u.options(), "mlbb_news", `{"action":"patch","hero":"aldous"}`)
+	if !env.OK || !strings.Contains(env.raw, `"Skill 2, Contract: Explosion [buff]: Cooldown: 12-9.5s → 8s at all levels; New Effect: more damage."`) {
+		t.Errorf("Aldous = %s", env.raw)
+	}
+	if env = run(t, u.options(), "mlbb_news", `{"action":"patch","hero":"Fanny"}`); !strings.Contains(env.raw, `"patch":"2.2.16a"`) || !strings.Contains(env.raw, `"change":"nerf"`) {
+		t.Errorf("Fanny, in the patch before = %s", env.raw)
+	}
+	if env = run(t, u.options(), "mlbb_news", `{"action":"patch","hero":"popol"}`); !strings.Contains(env.raw, `"change":"revamp"`) {
+		t.Errorf("Popol = %s", env.raw)
+	}
+	if env = run(t, u.options(), "mlbb_news", `{"action":"patch","hero":"Miya"}`); !strings.Contains(env.raw, `"changed":false`) {
+		t.Errorf("Miya = %s", env.raw)
+	}
+}
 
-	if !env.OK || !strings.Contains(env.raw, `"heroes":["Aulus: buff","Edith: buff, nerf"]`) || !strings.Contains(env.raw, `"patch":"Patch Notes 2.2.16 (2026-09-16)"`) {
-		t.Errorf("patch = %s", env.raw)
+func TestMLBBEvents(t *testing.T) {
+	u := newUpstream(t, map[string]stub{"/dex/api/v1/events": ok(dexEvents)})
+
+	env := run(t, u.options(), "mlbb_news", `{"action":"events"}`)
+
+	if !env.OK || !strings.Contains(env.raw, `"from":"2026-11-01"`) || !strings.Contains(env.raw, `"until":"2026-11-30"`) || !strings.Contains(env.raw, "Tideborn Sailor") {
+		t.Errorf("events = %s", env.raw)
 	}
-	env = run(t, u.options(), "mlbb_news", `{"action":"patch","hero":"edith"}`)
-	if !env.OK || !strings.Contains(env.raw, `"change":"buff, nerf"`) || !strings.Contains(env.raw, "Mythical Honor") {
-		t.Errorf("Edith = %s", env.raw)
-	}
-	env = run(t, u.options(), "mlbb_news", `{"action":"patch","hero":"Fanny"}`)
-	if !env.OK || !strings.Contains(env.raw, `"changed":false`) {
-		t.Errorf("Fanny = %s", env.raw)
+}
+
+func TestMLBBUpcoming(t *testing.T) {
+	u := newUpstream(t, map[string]stub{"/mlwiki/api.php": ok(wikiAnswer(upcomingPage))})
+
+	env := run(t, u.options(), "mlbb_news", `{"action":"upcoming"}`)
+
+	if !env.OK || !strings.Contains(env.raw, "Dori (Mage) - TBA") || !strings.Contains(env.raw, "unconfirmed") && !strings.Contains(env.raw, "none of it is confirmed") {
+		t.Errorf("upcoming = %s", env.raw)
 	}
 }

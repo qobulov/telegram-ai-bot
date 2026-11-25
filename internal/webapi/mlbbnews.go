@@ -5,17 +5,17 @@ import (
 	"encoding/json"
 	"net/url"
 	"regexp"
-	"slices"
 	"strings"
 	"time"
 
 	"telegram-ai-bot/internal/tools"
 )
 
-// mlbb_news answers what changed in Mobile Legends and what is coming, from
-// the Mobile Legends Wiki, as the owners asked on 2026-11-25: asked which
-// heroes the last patch buffed or when a skin comes, the bot searched the
-// web five and six times over.
+// mlbb_news answers what changed in Mobile Legends and what is coming, as
+// the owners asked on 2026-11-25: asked which heroes the last patch buffed
+// or when a skin comes, the bot searched the web five and six times over.
+// Patches and events are MLBBDex's, which has a patch within days, laid
+// out hero by hero; the leaks are the Mobile Legends Wiki's.
 
 const (
 	newsWikiService = "the Mobile Legends Wiki"
@@ -23,9 +23,11 @@ const (
 	newsPageLimit   = 1 << 20
 	// newsPatchesSearched are the patches a hero's changes are looked for in.
 	newsPatchesSearched = 3
-	shownHeroChanges    = 2500
 	shownPerSection     = 20
-	newsSource          = "the Mobile Legends Wiki (mobile-legends.fandom.com), which adds a patch days or weeks after it comes out"
+	shownIntro          = 300
+	patchSource         = "MLBBDex (mlbbdex.com), from the official patch notes"
+	eventsSource        = "MLBBDex (mlbbdex.com), from the Mobile Legends Wiki"
+	upcomingSource      = "the Mobile Legends Wiki (mobile-legends.fandom.com)"
 	upcomingNote        = "Gathered by the wiki from leakers: none of it is confirmed, dates are unknown and it may change or be cancelled. Say so."
 )
 
@@ -37,12 +39,12 @@ type mlbbNewsArgs struct {
 func (a *apis) mlbbNewsTool() tools.Tool {
 	return tools.Tool{
 		Name: "mlbb_news",
-		Description: "Mobile Legends news from its wiki. patch: the latest patch's date, highlights and the heroes buffed, nerfed or adjusted; with hero, that hero's changes in the last patches. " +
-			"upcoming: heroes, revamps and skins leakers say are coming, unconfirmed. Use it for buffs, nerfs, patch notes and new heroes or skins.",
+		Description: "Mobile Legends news. patch: the latest patch's date, highlights, new or revamped heroes and the heroes buffed, nerfed or adjusted; with hero, its changes in the last patches. " +
+			"events: this and next month's StarLight and Collector skins with dates. upcoming: what leakers say is coming, unconfirmed.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"action": {"type": "string", "enum": ["patch", "upcoming"]},
+				"action": {"type": "string", "enum": ["patch", "events", "upcoming"]},
 				"hero": {"type": "string", "description": "For patch: one hero's changes."}
 			},
 			"required": ["action"],
@@ -62,10 +64,191 @@ func (a *apis) mlbbNews(ctx context.Context, raw json.RawMessage) (any, error) {
 	switch args.Action {
 	case "patch":
 		return a.mlbbPatch(ctx, strings.TrimSpace(args.Hero))
+	case "events":
+		return a.mlbbEvents(ctx)
 	case "upcoming":
 		return a.mlbbUpcoming(ctx)
 	}
-	return nil, argumentError("action must be patch or upcoming")
+	return nil, argumentError("action must be patch, events or upcoming")
+}
+
+func dexGet[T any](ctx context.Context, a *apis, path string) (T, error) {
+	link := a.urls.MLBBDex + path
+	return remember(a.cache, "dex-news:"+link, mlbbNewsTTL, func() (T, error) {
+		var out struct {
+			Data T `json:"data"`
+		}
+		err := a.patient.getJSON(ctx, call{service: dexService, url: link, limit: newsPageLimit}, &out)
+		return out.Data, err
+	})
+}
+
+type dexPatchEntry struct {
+	Version string `json:"version"`
+	Date    string `json:"date"`
+}
+
+type dexChange struct {
+	Label  string `json:"label"`
+	Before string `json:"before"`
+	After  string `json:"after"`
+	Text   string `json:"text"`
+}
+
+func (c dexChange) line() string {
+	if c.Label != "" {
+		return cleanText(c.Label+": "+c.Before+" → "+c.After, shownIntro)
+	}
+	return cleanText(c.Text, shownIntro)
+}
+
+type dexAdjustment struct {
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	Intro    string `json:"intro"`
+	Sections []struct {
+		Name     string      `json:"name"`
+		Category string      `json:"category"`
+		Type     string      `json:"type"`
+		Changes  []dexChange `json:"changes"`
+	} `json:"sections"`
+}
+
+type dexPatch struct {
+	Version   string          `json:"version"`
+	Date      string          `json:"date"`
+	Sections  []dexSection    `json:"sections"`
+	NewHeroes []dexNewHero    `json:"newHeroes"`
+	Changes   []dexAdjustment `json:"adjustments"`
+}
+
+type dexSection struct {
+	Title *string `json:"title"`
+	HTML  string  `json:"html"`
+}
+
+type dexNewHero struct {
+	Name    string `json:"name"`
+	Epithet string `json:"epithet"`
+	Feature string `json:"feature"`
+}
+
+func (a *apis) mlbbPatch(ctx context.Context, hero string) (any, error) {
+	patches, err := dexGet[[]dexPatchEntry](ctx, a, "/api/v1/patches")
+	if err != nil {
+		return nil, err
+	}
+	if len(patches) == 0 {
+		return nil, argumentError("%s lists no patches", dexService)
+	}
+	if hero != "" {
+		return a.heroInPatches(ctx, patches, hero)
+	}
+	latest, err := a.dexPatch(ctx, patches[0].Version)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]any{"patch": latest.Version, "date": latest.Date, "source": patchSource,
+		"note": "For what changed for a hero, call again with hero."}
+	if len(latest.Sections) > 0 && latest.Sections[0].Title == nil {
+		out["highlights"] = cleanText(latest.Sections[0].HTML, 600)
+	}
+	var revamped []string
+	for _, h := range latest.NewHeroes {
+		revamped = append(revamped, strings.TrimSpace(h.Name+", "+h.Epithet))
+	}
+	if len(revamped) > 0 {
+		out["new_or_revamped_heroes"] = revamped
+	}
+	var heroes []string
+	for _, c := range latest.Changes {
+		heroes = append(heroes, c.Name+": "+c.Type)
+	}
+	out["heroes"] = heroes
+	if len(patches) > 1 {
+		out["previous"] = patches[1].Version + " (" + patches[1].Date + ")"
+	}
+	return out, nil
+}
+
+func (a *apis) dexPatch(ctx context.Context, version string) (dexPatch, error) {
+	return dexGet[dexPatch](ctx, a, "/api/v1/patches/"+url.PathEscape(version))
+}
+
+func (a *apis) heroInPatches(ctx context.Context, patches []dexPatchEntry, hero string) (any, error) {
+	want := lettersOf(hero)
+	searched := patches[:min(len(patches), newsPatchesSearched)]
+	for _, p := range searched {
+		patch, err := a.dexPatch(ctx, p.Version)
+		if err != nil {
+			continue
+		}
+		for _, c := range patch.Changes {
+			if lettersOf(c.Name) == want {
+				out := map[string]any{"hero": c.Name, "patch": patch.Version, "date": patch.Date, "change": c.Type,
+					"changes": adjustmentLines(c), "source": patchSource}
+				if why := cleanText(c.Intro, shownIntro); why != "" {
+					out["why"] = why
+				}
+				return out, nil
+			}
+		}
+		for _, h := range patch.NewHeroes {
+			if strings.Contains(lettersOf(h.Name), want) {
+				return map[string]any{"hero": h.Name, "patch": patch.Version, "date": patch.Date, "change": "revamp",
+					"what": cleanText(h.Feature, shownIntro), "source": patchSource}, nil
+			}
+		}
+	}
+	var titles []string
+	for _, p := range searched {
+		titles = append(titles, p.Version+" ("+p.Date+")")
+	}
+	return map[string]any{"hero": hero, "changed": false, "patches_searched": titles,
+		"note": "No change to this hero in these patches.", "source": patchSource}, nil
+}
+
+// adjustmentLines are a hero's changes, skill by skill: "Skill 2,
+// Contract: Explosion [buff]: Cooldown: 12-9.5s → 8s at all levels".
+func adjustmentLines(c dexAdjustment) []string {
+	var lines []string
+	for _, s := range c.Sections {
+		var changes []string
+		for _, ch := range s.Changes {
+			changes = append(changes, ch.line())
+		}
+		head := strings.Trim(s.Category+", "+s.Name, ", ")
+		lines = append(lines, head+" ["+s.Type+"]: "+strings.Join(changes, "; "))
+	}
+	return lines
+}
+
+type dexEvent struct {
+	Name  string `json:"name"`
+	Kind  string `json:"kind"`
+	Start string `json:"start"`
+	End   string `json:"end"`
+}
+
+func (a *apis) mlbbEvents(ctx context.Context) (any, error) {
+	events, err := dexGet[[]dexEvent](ctx, a, "/api/v1/events")
+	if err != nil {
+		return nil, err
+	}
+	var list []map[string]string
+	for _, e := range events {
+		list = append(list, map[string]string{"event": cleanText(e.Name, 120), "kind": e.Kind, "from": day(e.Start), "until": day(e.End)})
+	}
+	return map[string]any{"events": list, "source": eventsSource,
+		"note": "Only the monthly StarLight and Collector skins; for other events say you do not know them."}, nil
+}
+
+// day is a timestamp's date, "2026-11-30".
+func day(stamp string) string {
+	if len(stamp) >= len("2006-01-02") {
+		return stamp[:len("2006-01-02")]
+	}
+	return stamp
 }
 
 // wikiText is a wiki page's source.
@@ -88,145 +271,6 @@ func (a *apis) wikiText(ctx context.Context, page string) (string, error) {
 	})
 }
 
-// patchEntry is one patch in the wiki's list, newest first.
-type patchEntry struct {
-	Page       string
-	Title      string
-	Highlights []string
-}
-
-var patchLink = regexp.MustCompile(`\[\[(Patch Notes [^|\]]+)\|([^\]]+)\]\]`)
-
-// patchList is the wiki's list of patches, newest first.
-func patchList(text string) []patchEntry {
-	var list []patchEntry
-	for _, block := range strings.Split(text, "<hr>") {
-		m := patchLink.FindStringSubmatch(block)
-		if m == nil {
-			continue
-		}
-		entry := patchEntry{Page: m[1], Title: m[2]}
-		for _, line := range strings.Split(block, "\n") {
-			if strings.HasPrefix(strings.TrimSpace(line), "•") {
-				entry.Highlights = append(entry.Highlights, wikiPlain(strings.TrimPrefix(strings.TrimSpace(line), "•")))
-			}
-		}
-		list = append(list, entry)
-	}
-	return list
-}
-
-// heroChange is a hero's entry in a patch's adjustments.
-type heroChange struct {
-	Hero   string
-	Change string
-	Text   string
-}
-
-var heroHead = regexp.MustCompile(`^\{\{hi\|([^}|]+)[^}]*\}\}\s*\{\{pci\|(buff|nerf|adjust)\}\}\s*$`)
-
-// heroChanges are the heroes a patch's page changes, in its order, each
-// with its whole entry.
-func heroChanges(text string) []heroChange {
-	var changes []heroChange
-	var current *heroChange
-	for _, line := range strings.Split(text, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if m := heroHead.FindStringSubmatch(trimmed); m != nil {
-			changes = append(changes, heroChange{Hero: m[1], Change: m[2]})
-			current = &changes[len(changes)-1]
-			continue
-		}
-		if current == nil {
-			continue
-		}
-		if strings.HasPrefix(trimmed, "{{clr}}") || strings.HasPrefix(trimmed, "==") {
-			current = nil
-			continue
-		}
-		if plain := wikiPlain(trimmed); plain != "" {
-			if current.Text != "" {
-				current.Text += " • "
-			}
-			current.Text += plain
-		}
-	}
-	return changes
-}
-
-func (a *apis) mlbbPatch(ctx context.Context, hero string) (any, error) {
-	index, err := a.wikiText(ctx, "Patch notes")
-	if err != nil {
-		return nil, err
-	}
-	patches := patchList(index)
-	if len(patches) == 0 {
-		return nil, argumentError("%s's list of patches could not be read", newsWikiService)
-	}
-	if hero != "" {
-		return a.heroInPatches(ctx, patches, hero)
-	}
-	latest := patches[0]
-	out := map[string]any{"patch": latest.Title, "highlights": latest.Highlights, "source": newsSource}
-	if text, err := a.wikiText(ctx, latest.Page); err == nil {
-		var heroes []string
-		kinds := map[string][]string{}
-		for _, c := range heroChanges(text) {
-			if _, seen := kinds[c.Hero]; !seen {
-				heroes = append(heroes, c.Hero)
-			}
-			if !slices.Contains(kinds[c.Hero], c.Change) {
-				kinds[c.Hero] = append(kinds[c.Hero], c.Change)
-			}
-		}
-		for i, h := range heroes {
-			heroes[i] = h + ": " + strings.Join(kinds[h], ", ")
-		}
-		if len(heroes) > 0 {
-			out["heroes"] = heroes
-			out["note"] = "For what changed for a hero, call again with hero."
-		}
-	}
-	if len(patches) > 1 {
-		out["previous"] = patches[1].Title
-	}
-	return out, nil
-}
-
-func (a *apis) heroInPatches(ctx context.Context, patches []patchEntry, hero string) (any, error) {
-	want := lettersOf(hero)
-	for _, p := range patches[:min(len(patches), newsPatchesSearched)] {
-		text, err := a.wikiText(ctx, p.Page)
-		if err != nil {
-			continue
-		}
-		var found []heroChange
-		for _, c := range heroChanges(text) {
-			if lettersOf(c.Hero) == want {
-				found = append(found, c)
-			}
-		}
-		if len(found) == 0 {
-			continue
-		}
-		var kinds, texts []string
-		for _, c := range found {
-			if !slices.Contains(kinds, c.Change) {
-				kinds = append(kinds, c.Change)
-			}
-			texts = append(texts, c.Text)
-		}
-		return map[string]any{"hero": found[0].Hero, "patch": p.Title, "change": strings.Join(kinds, ", "),
-			"changes": cleanText(strings.Join(texts, " • "), shownHeroChanges), "source": newsSource}, nil
-	}
-	titles := make([]string, 0, newsPatchesSearched)
-	for _, p := range patches[:min(len(patches), newsPatchesSearched)] {
-		titles = append(titles, p.Title)
-	}
-	return map[string]any{"hero": hero, "changed": false, "patches_searched": titles,
-		"note": "The wiki lists no change to this hero in these patches; a newer patch may not be on it yet.", "source": newsSource}, nil
-}
-
 var (
 	wikiComment = regexp.MustCompile(`(?s)<!--.*?-->`)
 	wikiHeading = regexp.MustCompile(`^(=+)\s*(.*?)\s*=+\s*$`)
@@ -238,7 +282,7 @@ func (a *apis) mlbbUpcoming(ctx context.Context) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"upcoming": upcomingSections(text), "note": upcomingNote, "source": newsSource}, nil
+	return map[string]any{"upcoming": upcomingSections(text), "note": upcomingNote, "source": upcomingSource}, nil
 }
 
 // upcomingSections are the page's galleries by their headings, those the
@@ -276,30 +320,17 @@ func upcomingSections(text string) []map[string]any {
 }
 
 var (
-	wikiTemplateArgs = regexp.MustCompile(`\{\{(?:ai|hi|ii|si)\|([^}|]+)(?:\|([^}|]+))?[^}]*\}\}`)
-	wikiChangeTag    = regexp.MustCompile(`\{\{pci\|(buff|nerf|adjust)\}\}`)
-	wikiTemplate     = regexp.MustCompile(`\{\{[^{}]*\}\}`)
-	wikiLinkText     = regexp.MustCompile(`\[\[(?:[^|\]]*\|)?([^\]]+)\]\]`)
-	wikiExternal     = regexp.MustCompile(`\[https?://\S+\s+([^\]]+)\]`)
-	wikiTag          = regexp.MustCompile(`<[^>]+>`)
+	wikiTemplate = regexp.MustCompile(`\{\{[^{}]*\}\}`)
+	wikiLinkText = regexp.MustCompile(`\[\[(?:[^|\]]*\|)?([^\]]+)\]\]`)
+	wikiTag      = regexp.MustCompile(`<[^>]+>`)
 )
 
-// wikiPlain is wiki markup as plain text: "{{ai|Skill 2}} {{pci|buff}}"
-// becomes "Skill 2 [buff]", "[[Fanny]]" becomes "Fanny".
+// wikiPlain is wiki markup as plain text: "”'[[Dori]] (Mage)”'" becomes
+// "Dori (Mage)".
 func wikiPlain(text string) string {
-	text = wikiChangeTag.ReplaceAllString(text, "[$1]")
-	text = wikiTemplateArgs.ReplaceAllStringFunc(text, func(m string) string {
-		parts := wikiTemplateArgs.FindStringSubmatch(m)
-		if parts[2] != "" {
-			return parts[1] + " (" + parts[2] + ")"
-		}
-		return parts[1]
-	})
 	text = wikiTemplate.ReplaceAllString(text, "")
 	text = wikiLinkText.ReplaceAllString(text, "$1")
-	text = wikiExternal.ReplaceAllString(text, "$1")
 	text = wikiTag.ReplaceAllString(text, " ")
 	text = strings.NewReplacer("'''", "", "''", "").Replace(text)
-	text = strings.TrimLeft(strings.TrimSpace(text), ":*# ")
 	return strings.Join(strings.Fields(text), " ")
 }
