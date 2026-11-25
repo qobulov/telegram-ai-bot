@@ -24,11 +24,14 @@ func (s *Service) nameCallAnswer(ctx context.Context, in incoming) (outcome, boo
 	if in.msg.ReplyToMessage != nil || s.hasMedia(in) || !s.onlyName(in) {
 		return outcome{}, false
 	}
+	// the name the member asked to be called by goes into the line, as the
+	// owners asked on 2026-11-25: "Labbay, qirolicham?"
+	callName := strings.TrimSpace(s.callName(ctx, in))
 	lines := nameCallLines
-	if s.isOwner(in.msg.From) {
+	if s.isOwner(in.msg.From) && callName == "" {
 		lines = nameCallOwnerLines
 	}
-	answer := agent.Answer{Text: lines[rand.IntN(len(lines))].to(in)}
+	answer := agent.Answer{Text: withCallName(lines[rand.IntN(len(lines))].to(in), callName)}
 	saved, err := s.opts.Replier.Reply(ctx, agent.Request{
 		Scope: in.scope, UserID: in.userID, UpdateID: in.updateID, MessageID: in.msg.MessageID,
 		Text: in.text, Fixed: &answer,
@@ -41,6 +44,18 @@ func (s *Service) nameCallAnswer(ctx context.Context, in incoming) (outcome, boo
 		saved = answer
 	}
 	return outcome{text: saved.Text, answerID: saved.ID}, true
+}
+
+// withCallName puts name after a line's first words: "Labbay?" becomes
+// "Labbay, qirolicham?" and "Ha, nima bo'ldi?" "Ha, qirolicham, nima bo'ldi?".
+func withCallName(line, name string) string {
+	if name == "" {
+		return line
+	}
+	if i := strings.IndexAny(line, ",.?!"); i >= 0 {
+		return line[:i] + ", " + name + line[i:]
+	}
+	return line + ", " + name
 }
 
 // onlyName reports a message whose every word is one of the bot's names or

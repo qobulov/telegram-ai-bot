@@ -35,3 +35,17 @@ func TestBareNameIsAnsweredWithoutTheModel(t *testing.T) {
 		}
 	}
 }
+
+// A member's call name goes into the line after its first words.
+func TestWithCallName(t *testing.T) {
+	for _, c := range [][3]string{
+		{"Labbay?", "qirolicham", "Labbay, qirolicham?"},
+		{"Ha, nima bo'ldi?", "qirolicham", "Ha, qirolicham, nima bo'ldi?"},
+		{"Eshitaman.", "", "Eshitaman."},
+		{"Слушаю.", "Ustoz", "Слушаю, Ustoz."},
+	} {
+		if got := withCallName(c[0], c[1]); got != c[2] {
+			t.Errorf("withCallName(%q, %q) = %q, want %q", c[0], c[1], got, c[2])
+		}
+	}
+}
