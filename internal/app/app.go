@@ -210,6 +210,16 @@ func (b botAccount) Photo(ctx context.Context) ([]byte, string, bool, error) {
 	return b.ProfilePhoto(ctx, b.id, maxAvatarBytes)
 }
 
+// memberPhoto downloads a member's profile photo, nil without a client.
+func memberPhoto(bot Bot) func(ctx context.Context, userID int64) ([]byte, string, bool, error) {
+	if bot.Client == nil {
+		return nil
+	}
+	return func(ctx context.Context, userID int64) ([]byte, string, bool, error) {
+		return bot.Client.ProfilePhoto(ctx, userID, maxAvatarBytes)
+	}
+}
+
 // maxAvatarBytes bounds the profile photo downloaded to be described.
 const maxAvatarBytes = 2 << 20
 
@@ -280,10 +290,11 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 	if len(cfg.OwnerUsernames) > 0 && len(cfg.OwnerIDs) == 0 {
 		logger.Warn("BOT_OWNER_IDS is not set: owners are known only by username, which can change hands, so they moderate only with their own admin rights")
 	}
-	available := append(builtinTools(cfg, store, bot, moderation.Tool()), liveDataTools(cfg, store, bot)...)
+	eyes := stickerLabeller(cfg, logger, record)
+	available := append(builtinTools(cfg, store, bot, moderation.Tool(), eyes), liveDataTools(cfg, store, bot)...)
 	available = append(available, moderation.TopicsTool(bot.Client), tools.BotProfileTool(tools.BotProfileOptions{
 		Account: botAccount{Client: bot.Client, id: bot.User.ID},
-		Eyes:    stickerLabeller(cfg, logger, record),
+		Eyes:    eyes,
 	}))
 	// Gifts spend the bot's Stars, so only owners known by ID may send them:
 	// a username can change hands.
@@ -477,7 +488,8 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 // follows what is enabled, and the time is the groups'.
 // moderate is made by the caller, which also hands its confirmations to the
 // service.
-func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate tools.Tool) []tools.Tool {
+// eyes look at members' profile photos; nil leaves them unseen.
+func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate tools.Tool, eyes tools.Eyes) []tools.Tool {
 	help := service.HelpText(service.Abilities{Listen: cfg.AudioInput, Football: cfg.FootballDataToken != "", Pages: cfg.WebAppURL != ""})
 	builtin := tools.Builtin(help, cfg.Location)
 	if cfg.WebAppURL != "" {
@@ -495,7 +507,8 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 		tools.GroupStatsTool(tools.GroupStatsOptions{Store: store, BotID: bot.User.ID, Location: cfg.Location}),
 		tools.InviteStatsTool(tools.InviteStatsOptions{Store: store, Location: cfg.Location}),
 		tools.GroupInfoTool(bot.Client, bot.User.ID, store),
-		tools.MemberInfoTool(tools.MemberInfoOptions{Store: store, Telegram: bot.Client, Tokens: cards.Tokens, NextToken: func(now time.Time) time.Time { return cards.Today(now).Next() }, Location: cfg.Location}),
+		tools.MemberInfoTool(tools.MemberInfoOptions{Store: store, Telegram: bot.Client, Tokens: cards.Tokens, NextToken: func(now time.Time) time.Time { return cards.Today(now).Next() }, Location: cfg.Location,
+			Photo: memberPhoto(bot), Eyes: eyes}),
 		tools.PunishmentsTool(tools.PunishmentsOptions{Store: store, Creators: groupMembers{client: bot.Client, botID: bot.User.ID}, BotID: bot.User.ID, Location: cfg.Location}),
 		tools.JoinCaptchaTool(tools.JoinCaptchaOptions{Store: store, Rights: groupMembers{client: bot.Client, botID: bot.User.ID}}),
 	)

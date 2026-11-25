@@ -227,6 +227,29 @@ func TestStatsQuestionsSkipTheRouter(t *testing.T) {
 	}
 }
 
+// A member's profile picture is member_info's: asked to comment on the
+// players' pictures, the chat model said it could not see them.
+func TestPhotoQuestionsSkipTheRouter(t *testing.T) {
+	for msg, full := range map[string]bool{
+		"Ali: avatarimga baho ber":                  true,
+		"Ali: profil rasmlariga koment berchi":      true,
+		"Ali: оцени аву":                            true,
+		"Ali: Mari, ava qalay":                      true,
+		"Ali: havo zo'r, Mari, bugun kayfiyat a'lo": false,
+		"Ali: Javohir qayerda":                      false,
+	} {
+		f, router, _ := routedFixture("CHAT", text("chat"), text("full"))
+		req := request(1, msg)
+		req.Group = true
+
+		answer, err := f.agent.Reply(context.Background(), req)
+
+		if err != nil || (answer.Route == RouteFull) != full || (len(router.requests) == 0) != full {
+			t.Errorf("%q: route %q, router asked %d times; want full %v", msg, answer.Route, len(router.requests), full)
+		}
+	}
+}
+
 // A game question carries the reminder to check heroes in the request, but
 // the saved question is the plain text.
 func TestGameQuestionsRemindToCheckHeroes(t *testing.T) {

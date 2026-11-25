@@ -63,7 +63,7 @@ type botProfileArgs struct {
 // bio and description are set at each start from the app's own texts, so
 // they are not offered here.
 func BotProfileTool(opts BotProfileOptions) Tool {
-	avatars := &avatarDescriptions{eyes: opts.Eyes}
+	avatars := &avatarDescriptions{eyes: opts.Eyes, prompt: avatarPrompt}
 	return Tool{
 		Name: "bot_profile",
 		Description: "Your own Telegram profile. show: your name, bio, description and what your profile photo shows; use it when asked about them. " +
@@ -135,12 +135,16 @@ func showBotProfile(ctx context.Context, account BotAccount, avatars *avatarDesc
 	return map[string]any{"profile": profiles, "photo": avatars.of(ctx, account)}, nil
 }
 
-// avatarDescriptions are what the bot's profile photos show, by photo, so
-// that each is looked at once.
+// maxSeenAvatars bounds the descriptions kept; past it they start over.
+const maxSeenAvatars = 500
+
+// avatarDescriptions are what profile photos show, the bot's own or a
+// member's, by photo, so that each is looked at once.
 type avatarDescriptions struct {
-	eyes Eyes
-	mu   sync.Mutex
-	seen map[string]string
+	eyes   Eyes
+	prompt string
+	mu     sync.Mutex
+	seen   map[string]string
 }
 
 // of is what the bot's current photo shows: "none" without one, and
@@ -168,14 +172,14 @@ func (a *avatarDescriptions) describe(ctx context.Context, id string, data []byt
 		return shows
 	}
 	reply, err := a.eyes.Complete(ctx, ai.Request{Messages: []ai.Message{{
-		Role: ai.RoleUser, Content: avatarPrompt, Parts: []ai.ContentPart{ai.ImagePart("image/jpeg", data)},
+		Role: ai.RoleUser, Content: a.prompt, Parts: []ai.ContentPart{ai.ImagePart("image/jpeg", data)},
 	}}})
 	if err != nil {
 		return ""
 	}
 	shows = strings.TrimSpace(reply.Content)
 	a.mu.Lock()
-	if a.seen == nil {
+	if a.seen == nil || len(a.seen) >= maxSeenAvatars {
 		a.seen = map[string]string{}
 	}
 	a.seen[id] = shows

@@ -52,7 +52,7 @@ func TestRoutingEval(t *testing.T) {
 			ReasoningEffort: cfg.ReasoningEffort, MaxAttempts: 2, Logger: logger, PromptCache: true})
 	}
 	bot := Bot{Client: telegram.NewClient(telegram.Options{Token: "1:eval"}), User: telegram.User{ID: 1, Username: "evalbot"}}
-	available := append(builtinTools(cfg, nil, bot, tools.NewModeration(tools.ModerationOptions{}).Tool()), liveDataTools(cfg, nil, bot)...)
+	available := append(builtinTools(cfg, nil, bot, tools.NewModeration(tools.ModerationOptions{}).Tool(), nil), liveDataTools(cfg, nil, bot)...)
 	registry, err := tools.NewRegistry(cfg.IsAdmin, logger, available...)
 	if err != nil {
 		t.Fatal(err)

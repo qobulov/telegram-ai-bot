@@ -15,8 +15,15 @@ import (
 const (
 	infoUnavailable = "that could not be read just now; try again later"
 	pinnedRunes     = 300
-	memberInfoNote  = "Tell the asker what they asked for from these facts alone, briefly, in their language; never add a number or a rank that is not here. " +
+	// memberInfoTimeout leaves room to fetch and look at a photo.
+	memberInfoTimeout = 30 * time.Second
+	memberInfoNote    = "Tell the asker what they asked for from these facts alone, briefly, in their language; never add a number or a rank that is not here. " +
 		"Messages are those the bot saw; rank 0 means no moderator rank; warnings lapse after 30 days, the third mutes for a day."
+	// memberPhotoPrompt asks the model what a member's photo shows, in
+	// enough detail to comment on it.
+	memberPhotoPrompt = "This is a group member's Telegram profile picture. In English, in two to four sentences, say plainly what it shows, for a playful comment on it: " +
+		"who or what (a person, an anime or game character, an animal, an object, a meme), the pose and expression, the clothes or style, the background, any text on it, the colours and the mood. Never guess who a real person is."
+	memberPhotoNote = "photo.shows is their profile picture as you see it. Comment on it as asked, playfully and kindly: tease the choice of picture, the pose, the style or the background, never a real person's body, face, skin, weight or looks, nor their family. has false: they have no photo, or hide it from bots."
 )
 
 // GroupInfoReader asks Telegram about a group.
@@ -168,30 +175,39 @@ type MemberInfoOptions struct {
 	// NextToken is when the next card token comes.
 	NextToken func(now time.Time) time.Time
 	Location  *time.Location
+	// Photo is a member's current profile photo and its unique ID; ok is
+	// false when they have none. Nil, or nil Eyes, offers no photo.
+	Photo func(ctx context.Context, userID int64) (data []byte, id string, ok bool, err error)
+	// Eyes describe the profile photo.
+	Eyes Eyes
 }
 
 type memberInfoArgs struct {
 	Whose string `json:"whose"`
+	Photo bool   `json:"photo"`
 }
 
 // MemberInfoTool tells a member about themselves, or about the member they
 // replied to or tagged: their standing in Telegram, rank, warnings, invites,
 // activity and card game.
 func MemberInfoTool(opts MemberInfoOptions) Tool {
+	avatars := &avatarDescriptions{eyes: opts.Eyes, prompt: memberPhotoPrompt}
 	return Tool{
 		Name:        "member_info",
-		Description: "What is known about the asker in this group (whose me, the default), the member they replied to (replied) or tagged (tagged): status and admin title or tag, moderator rank (1–5), warnings and the last reason, mutes and bans, messages today and this week, last seen, who brought them in and how many they brought, and their card points, place, cards, tokens, next token and crystals. Call it whenever someone asks about themselves or a member (\"men haqimda\", \"darajam qaysi\", \"nechta ogohlantirishim bor\", \"мой ранг\"), and before you state anyone's cards, points, tokens, crystals, rank, warnings or messages, even when the chat or your earlier answers seem to say them: they change. Answer only from what it gives.",
+		Description: "What is known about the asker in this group (whose me, the default), the member they replied to (replied) or tagged (tagged): status and admin title or tag, moderator rank (1–5), warnings and the last reason, mutes and bans, messages today and this week, last seen, who brought them in and how many they brought, and their card points, place, cards, tokens, next token and crystals. Call it whenever someone asks about themselves or a member (\"men haqimda\", \"darajam qaysi\", \"nechta ogohlantirishim bor\", \"мой ранг\"), and before you state anyone's cards, points, tokens, crystals, rank, warnings or messages, even when the chat or your earlier answers seem to say them: they change. Answer only from what it gives. photo: also what their profile picture shows, when asked to look at, rate or comment on it (\"avatarimga baho ber\", \"profil rasmiga komment\", \"оцени аву\").",
 		Schema: json.RawMessage(`{"type": "object", "properties": {
-			"whose": {"type": "string", "enum": ["me", "replied", "tagged"], "description": "me, the default; replied for the member their message replies to; tagged for the one member they tagged."}
+			"whose": {"type": "string", "enum": ["me", "replied", "tagged"], "description": "me, the default; replied for the member their message replies to; tagged for the one member they tagged."},
+			"photo": {"type": "boolean", "description": "Also look at their profile picture."}
 		}, "additionalProperties": false}`),
 		GroupOnly: true,
+		Timeout:   memberInfoTimeout,
 		Run: func(ctx context.Context, raw json.RawMessage) (any, error) {
-			return memberInfo(ctx, opts, raw)
+			return memberInfo(ctx, opts, avatars, raw)
 		},
 	}
 }
 
-func memberInfo(ctx context.Context, opts MemberInfoOptions, raw json.RawMessage) (any, error) {
+func memberInfo(ctx context.Context, opts MemberInfoOptions, avatars *avatarDescriptions, raw json.RawMessage) (any, error) {
 	var args memberInfoArgs
 	if err := decodeArgs(raw, &args); err != nil {
 		return nil, err
@@ -215,7 +231,30 @@ func memberInfo(ctx context.Context, opts MemberInfoOptions, raw json.RawMessage
 		return nil, err
 	}
 	addCardFacts(ctx, opts, userID, out)
+	if args.Photo {
+		out["photo"] = memberPhoto(ctx, opts, avatars, userID)
+		out["note"] = memberInfoNote + " " + memberPhotoNote
+	}
 	return out, nil
+}
+
+// memberPhoto is what a member's profile photo shows.
+func memberPhoto(ctx context.Context, opts MemberInfoOptions, avatars *avatarDescriptions, userID int64) map[string]any {
+	if opts.Photo == nil || opts.Eyes == nil {
+		return map[string]any{"error": "you cannot look at profile pictures here; say so"}
+	}
+	data, id, ok, err := opts.Photo(ctx, userID)
+	switch {
+	case err != nil:
+		return map[string]any{"error": "the photo could not be fetched just now"}
+	case !ok:
+		return map[string]any{"has": false}
+	}
+	shows := avatars.describe(ctx, id, data)
+	if shows == "" {
+		return map[string]any{"has": true, "error": "the photo could not be looked at just now"}
+	}
+	return map[string]any{"has": true, "shows": shows}
 }
 
 // infoTarget is the member asked about.

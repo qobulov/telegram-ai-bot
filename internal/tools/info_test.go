@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -99,5 +100,44 @@ func TestMemberInfo(t *testing.T) {
 	}
 	if _, err := tool.Run(ctx, json.RawMessage(`{"whose":"tagged"}`)); err == nil {
 		t.Error("a tag with no one tagged was answered")
+	}
+}
+
+func TestMemberInfoPhoto(t *testing.T) {
+	asked := map[int64]int{}
+	const otherID = int64(3)
+	photos := map[int64][]byte{otherID: []byte("JPEG")}
+	eyes := &fakeEyes{}
+	tool := MemberInfoTool(MemberInfoOptions{Store: fakeMemberInfo{}, Telegram: fakeGroupInfo{},
+		Tokens: func(p storage.CardPlayer, _ time.Time) int { return p.Tokens },
+		Photo: func(_ context.Context, id int64) ([]byte, string, bool, error) {
+			asked[id]++
+			return photos[id], fmt.Sprint("photo-", id), photos[id] != nil, nil
+		},
+		Eyes: eyes})
+	replied := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, Target: &Target{UserID: otherID}}, &Sink{})
+	for range 2 {
+		got, err := tool.Run(replied, json.RawMessage(`{"whose":"replied","photo":true}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		photo := got.(map[string]any)["photo"].(map[string]any)
+		if photo["has"] != true || photo["shows"] != "A girl with pink hair, anime style." {
+			t.Errorf("photo = %v", photo)
+		}
+		if note := got.(map[string]any)["note"].(string); !strings.Contains(note, "never a real person's body") {
+			t.Errorf("note = %q, want the kindness rule", note)
+		}
+	}
+	if eyes.looked != 1 {
+		t.Errorf("the same photo was looked at %d times, want once", eyes.looked)
+	}
+	mine := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true}, &Sink{})
+	got, err := tool.Run(mine, json.RawMessage(`{"photo":true}`))
+	if err != nil || got.(map[string]any)["photo"].(map[string]any)["has"] != false {
+		t.Errorf("no photo = %v, %v", got, err)
+	}
+	if got, _ := tool.Run(mine, json.RawMessage(`{}`)); got.(map[string]any)["photo"] != nil || asked[userID] != 1 {
+		t.Errorf("a photo was fetched unasked: %v, %d", got, asked[userID])
 	}
 }

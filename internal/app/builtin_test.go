@@ -31,7 +31,7 @@ func TestBuiltinToolsFollowTheConfiguration(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			builtin := builtinTools(tc.cfg, nil, Bot{User: telegram.User{ID: 777}}, tools.NewModeration(tools.ModerationOptions{}).Tool())
+			builtin := builtinTools(tc.cfg, nil, Bot{User: telegram.User{ID: 777}}, tools.NewModeration(tools.ModerationOptions{}).Tool(), nil)
 
 			var now struct {
 				Timezone string `json:"timezone"`
@@ -95,7 +95,7 @@ func TestLiveDataToolsFollowTheConfiguration(t *testing.T) {
 		if got := hasTool(live, "football"); got != (token != "") {
 			t.Errorf("token %q: football registered = %t", token, got)
 		}
-		builtin := builtinTools(cfg, nil, bot, tools.NewModeration(tools.ModerationOptions{}).Tool())
+		builtin := builtinTools(cfg, nil, bot, tools.NewModeration(tools.ModerationOptions{}).Tool(), nil)
 		if _, err := tools.NewRegistry(cfg.IsAdmin, nil, append(builtin, live...)...); err != nil {
 			t.Errorf("token %q: NewRegistry: %v", token, err)
 		}
@@ -147,7 +147,7 @@ func TestGroupAdminsKnowsTheBotAndItsOwners(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			builtin := builtinTools(tc.cfg, nil, bot, tools.NewModeration(tools.ModerationOptions{}).Tool())
+			builtin := builtinTools(tc.cfg, nil, bot, tools.NewModeration(tools.ModerationOptions{}).Tool(), nil)
 			registry, err := tools.NewRegistry(tc.cfg.IsAdmin, nil, builtin...)
 			if err != nil {
 				t.Fatal(err)
