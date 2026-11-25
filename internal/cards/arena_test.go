@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -24,7 +25,31 @@ type fakeArena struct {
 	battles map[int64][]storage.ArenaBattle // newest last
 	rules   []storage.ArenaRules            // the rules each battle was recorded by
 	coins   map[int64]int
-	bought  map[int64]int // arena shop tokens bought, on any day
+	bought  map[int64]int       // arena shop tokens bought, on any day
+	modes   map[string][5]int64 // the boss's and tower's teams, by "user/mode"
+}
+
+func (f *fakeStore) SaveModeTeam(_ context.Context, userID int64, mode string, front [2]int64, back [3]int64) error {
+	held := map[int64]bool{}
+	for _, o := range f.arena.held[userID] {
+		held[o.ID] = o.Count > 0
+	}
+	ids := [5]int64{front[0], front[1], back[0], back[1], back[2]}
+	for _, id := range ids {
+		if !held[id] {
+			return storage.ErrCardNotHeld
+		}
+	}
+	if f.arena.modes == nil {
+		f.arena.modes = map[string][5]int64{}
+	}
+	f.arena.modes[fmt.Sprint(userID, "/", mode)] = ids
+	return nil
+}
+
+func (f *fakeStore) ModeTeam(_ context.Context, userID int64, mode string) ([2]int64, [3]int64, bool, error) {
+	ids, ok := f.arena.modes[fmt.Sprint(userID, "/", mode)]
+	return [2]int64{ids[0], ids[1]}, [3]int64{ids[2], ids[3], ids[4]}, ok, nil
 }
 
 func (f *fakeStore) SaveArenaTeam(_ context.Context, userID int64, front [2]int64, back [3]int64, power int) error {
@@ -467,5 +492,40 @@ func TestArenaWeekPaidAtMidnight(t *testing.T) {
 	call(8, map[string]any{"action": "arena"})
 	if len(store.weeksPaid) != 1 || !store.weeksPaid[0].Equal(monday.AddDate(0, 0, -7)) {
 		t.Fatalf("weeks paid = %v, want only the week before %v", store.weeksPaid, monday)
+	}
+}
+
+// The boss and the tower fight with the arena team until a team of their
+// own is saved; saving one leaves the arena's and the other mode's alone.
+func TestModeTeams(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	store := &fakeStore{catalog: towerCatalog(), arena: fakeArena{held: map[int64][]storage.OwnedCard{7: arenaCards()}}}
+	call := arenaHandler(t, store, now)
+	call(7, map[string]any{"action": "arena_team", "front": arenaFront, "back": arenaBack})
+	ids := func(view map[string]any) []float64 {
+		var out []float64
+		for _, f := range view["team"].([]any) {
+			out = append(out, f.(map[string]any)["id"].(float64))
+		}
+		return out
+	}
+	if _, view := call(7, map[string]any{"action": "boss"}); view["own_team"] != false || ids(view)[0] != 10 {
+		t.Fatalf("the boss before = %v", view)
+	}
+	_, view := call(7, map[string]any{"action": "arena_team", "mode": "boss", "front": []int64{14, 13}, "back": []int64{12, 11, 10}})
+	if view["own_team"] != true || ids(view)[0] != 14 || view["boss"] == nil {
+		t.Fatalf("the boss team saved = %v", view)
+	}
+	if _, arena := call(7, map[string]any{"action": "arena"}); ids(arena)[0] != 10 {
+		t.Errorf("the arena team = %v", ids(arena))
+	}
+	if _, tower := call(7, map[string]any{"action": "tower"}); tower["own_team"] != false || ids(tower)[0] != 10 {
+		t.Errorf("the tower = %v", tower)
+	}
+	if code, _ := call(7, map[string]any{"action": "arena_team", "mode": "raid", "front": arenaFront, "back": arenaBack}); code != 400 {
+		t.Errorf("an unknown mode = %d", code)
+	}
+	if _, out := call(7, map[string]any{"action": "arena_team", "mode": "tower", "front": []int64{14, 99}, "back": []int64{12, 11, 10}}); out["refused"] != "not_held" {
+		t.Errorf("a card not held = %v", out)
 	}
 }

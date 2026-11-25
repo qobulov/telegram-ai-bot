@@ -178,19 +178,42 @@ func (h *handler) savedFighters(ctx context.Context, userID int64) (fighters, bo
 	return h.themedSaved(ctx, userID, "")
 }
 
+// The modes with a team of their own, as the owners asked on 2026-11-25;
+// a player who saved none there fights with their arena team.
+const (
+	teamBoss  = "boss"
+	teamTower = "tower"
+)
+
 // themedSaved is savedFighters with theme's cards raised, as themedFighters.
 func (h *handler) themedSaved(ctx context.Context, userID int64, theme string) (fighters, bool, error) {
-	front, back, ok, err := h.Store.ArenaTeam(ctx, userID)
-	if err != nil || !ok {
-		return fighters{}, false, err
+	team, ok, _, err := h.modeSaved(ctx, userID, "", theme)
+	return team, ok, err
+}
+
+// modeSaved is the player's team for mode, teamBoss or teamTower, or their
+// arena team for "" or when they saved none for mode; own reports one of
+// mode's own.
+func (h *handler) modeSaved(ctx context.Context, userID int64, mode, theme string) (team fighters, ok, own bool, err error) {
+	var front [2]int64
+	var back [3]int64
+	if mode != "" {
+		if front, back, own, err = h.Store.ModeTeam(ctx, userID, mode); err != nil {
+			return fighters{}, false, false, err
+		}
+	}
+	if !own {
+		if front, back, ok, err = h.Store.ArenaTeam(ctx, userID); err != nil || !ok {
+			return fighters{}, false, false, err
+		}
 	}
 	ids := [5]int64{front[0], front[1], back[0], back[1], back[2]}
 	held, err := h.ownedCardsOf(ctx, userID, ids[:])
 	if err != nil {
-		return fighters{}, false, err
+		return fighters{}, false, false, err
 	}
-	team, ok := themedFighters(held, ids, theme)
-	return team, ok, nil
+	team, ok = themedFighters(held, ids, theme)
+	return team, ok, own, nil
 }
 
 // foeTeam is an opponent's saved team as an attack would meet it, so that
@@ -290,7 +313,10 @@ func (h *handler) arenaView(ctx context.Context, user miniapp.User, shown []int6
 // arenaTeam saves the player's team, two in front and three behind, its
 // power worked out here from the cards held and their stars, and gives the
 // arena. A team refused says why: "size", "repeat" or "not_held".
-func (h *handler) arenaTeam(ctx context.Context, user miniapp.User, front, back []int64) (any, failure) {
+func (h *handler) arenaTeam(ctx context.Context, user miniapp.User, mode string, front, back []int64) (any, failure) {
+	if mode != "" && mode != "arena" && mode != teamBoss && mode != teamTower {
+		return nil, errBadRequest
+	}
 	if len(front) != 2 || len(back) != 3 {
 		return map[string]any{"refused": "size"}, failure{}
 	}
@@ -311,15 +337,25 @@ func (h *handler) arenaTeam(ctx context.Context, user miniapp.User, front, back 
 	if !ok {
 		return map[string]any{"refused": "not_held"}, failure{}
 	}
-	err = h.Store.SaveArenaTeam(ctx, user.ID, [2]int64{ids[0], ids[1]}, [3]int64{ids[2], ids[3], ids[4]}, team.team.Power())
+	if mode == teamBoss || mode == teamTower {
+		err = h.Store.SaveModeTeam(ctx, user.ID, mode, [2]int64{ids[0], ids[1]}, [3]int64{ids[2], ids[3], ids[4]})
+	} else {
+		err = h.Store.SaveArenaTeam(ctx, user.ID, [2]int64{ids[0], ids[1]}, [3]int64{ids[2], ids[3], ids[4]}, team.team.Power())
+	}
 	switch {
 	case errors.Is(err, storage.ErrCardNotHeld):
 		return map[string]any{"refused": "not_held"}, failure{}
 	case errors.Is(err, storage.ErrArenaTeamRepeat):
 		return map[string]any{"refused": "repeat"}, failure{}
 	case err != nil:
-		h.Logger.Error("could not save an arena team", "user_id", user.ID, "error", err)
+		h.Logger.Error("could not save a team", "user_id", user.ID, "mode", mode, "error", err)
 		return nil, errUnavailable
+	}
+	switch mode {
+	case teamBoss:
+		return h.bossView(ctx, user)
+	case teamTower:
+		return h.towerView(ctx, user)
 	}
 	return h.arenaView(ctx, user, nil)
 }

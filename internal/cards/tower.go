@@ -208,6 +208,7 @@ type tower struct {
 	mine       fighters
 	hasEnemy   bool
 	hasTeam    bool
+	ownTeam    bool // a team saved for the tower, not the arena team
 	next       int
 	dayStarted time.Time
 }
@@ -227,7 +228,7 @@ func (h *handler) towerOf(ctx context.Context, userID int64) (tower, error) {
 	}
 	t.next = t.player.Floor + 1
 	t.enemy, t.hasEnemy = towerTeam(catalog, t.next)
-	if t.mine, t.hasTeam, err = h.themedSaved(ctx, userID, t.theme); err != nil {
+	if t.mine, t.hasTeam, t.ownTeam, err = h.modeSaved(ctx, userID, teamTower, t.theme); err != nil {
 		return tower{}, err
 	}
 	return t, nil
@@ -245,7 +246,7 @@ func (h *handler) towerView(ctx context.Context, user miniapp.User) (any, failur
 		"floor": t.player.Floor, "next": t.next,
 		"theme":  map[string]any{"anime": t.theme, "bonus": TowerThemeBonus},
 		"reward": map[string]any{"coins": coins, "tokens": tokens},
-		"enemy":  nil, "enemy_power": 0, "team": nil, "power": 0,
+		"enemy":  nil, "enemy_power": 0, "team": nil, "power": 0, "own_team": t.ownTeam,
 	}
 	if t.hasEnemy {
 		view["enemy"], view["enemy_power"] = t.enemy.views, t.enemy.team.Power()

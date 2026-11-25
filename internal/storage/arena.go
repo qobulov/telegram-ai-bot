@@ -97,18 +97,10 @@ type ArenaBattle struct {
 // SaveArenaTeam saves the player's team, replacing the one before. The five
 // cards must be distinct, ErrArenaTeamRepeat, and held, ErrCardNotHeld.
 func (s *Store) SaveArenaTeam(ctx context.Context, userID int64, front [2]int64, back [3]int64, power int) error {
-	cards := append(front[:], back[:]...)
-	if hasRepeat(cards) {
-		return ErrArenaTeamRepeat
+	if err := s.checkTeam(ctx, userID, front, back); err != nil {
+		return err
 	}
-	held, err := s.heldOf(ctx, userID, cards)
-	if err != nil {
-		return fmt.Errorf("storage: read the arena team's cards: %w", err)
-	}
-	if held != len(cards) {
-		return ErrCardNotHeld
-	}
-	_, err = s.pool.Exec(ctx, `
+	_, err := s.pool.Exec(ctx, `
 		INSERT INTO arena_teams (user_id, front, back, power) VALUES ($1, $2, $3, $4)
 		ON CONFLICT (user_id) DO UPDATE SET front = $2, back = $3, power = $4, updated_at = now()`,
 		userID, front[:], back[:], power)
@@ -116,6 +108,58 @@ func (s *Store) SaveArenaTeam(ctx context.Context, userID int64, front [2]int64,
 		return fmt.Errorf("storage: save the arena team: %w", err)
 	}
 	return nil
+}
+
+// checkTeam refuses a team of a card twice, ErrArenaTeamRepeat, or of a
+// card the player does not hold, ErrCardNotHeld.
+func (s *Store) checkTeam(ctx context.Context, userID int64, front [2]int64, back [3]int64) error {
+	cards := append(front[:], back[:]...)
+	if hasRepeat(cards) {
+		return ErrArenaTeamRepeat
+	}
+	held, err := s.heldOf(ctx, userID, cards)
+	if err != nil {
+		return fmt.Errorf("storage: read the team's cards: %w", err)
+	}
+	if held != len(cards) {
+		return ErrCardNotHeld
+	}
+	return nil
+}
+
+// SaveModeTeam saves the player's team for mode, "boss" or "tower",
+// replacing the one before, checked as SaveArenaTeam checks a team.
+func (s *Store) SaveModeTeam(ctx context.Context, userID int64, mode string, front [2]int64, back [3]int64) error {
+	if err := s.checkTeam(ctx, userID, front, back); err != nil {
+		return err
+	}
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO mode_teams (user_id, mode, front, back) VALUES ($1, $2, $3, $4)
+		ON CONFLICT (user_id, mode) DO UPDATE SET front = $3, back = $4, updated_at = now()`,
+		userID, mode, front[:], back[:])
+	if err != nil {
+		return fmt.Errorf("storage: save the %s team: %w", mode, err)
+	}
+	return nil
+}
+
+// ModeTeam reads the player's team for mode; ok is false when they have
+// none. Its cards are as saved, whether or not all are still held.
+func (s *Store) ModeTeam(ctx context.Context, userID int64, mode string) (front [2]int64, back [3]int64, ok bool, err error) {
+	var f, b []int64
+	err = s.pool.QueryRow(ctx, `SELECT front, back FROM mode_teams WHERE user_id = $1 AND mode = $2`, userID, mode).Scan(&f, &b)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return front, back, false, nil
+	}
+	if err != nil {
+		return front, back, false, fmt.Errorf("storage: read the %s team: %w", mode, err)
+	}
+	if len(f) != len(front) || len(b) != len(back) {
+		return front, back, false, fmt.Errorf("storage: %s team of %d has %d in front and %d behind", mode, userID, len(f), len(b))
+	}
+	copy(front[:], f)
+	copy(back[:], b)
+	return front, back, true, nil
 }
 
 func hasRepeat(ids []int64) bool {

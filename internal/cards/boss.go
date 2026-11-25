@@ -139,6 +139,8 @@ type boss struct {
 	hasBoss bool
 	mine    fighters
 	hasTeam bool
+	// ownTeam is a team saved for the boss, not the arena team.
+	ownTeam bool
 }
 
 func (h *handler) bossOf(ctx context.Context, userID int64) (boss, error) {
@@ -162,7 +164,7 @@ func (h *handler) bossOf(ctx context.Context, userID int64) (boss, error) {
 		b.fighter, b.view = bossFighter(card)
 		b.hasBoss = true
 	}
-	if b.mine, b.hasTeam, err = h.themedSaved(ctx, userID, ""); err != nil {
+	if b.mine, b.hasTeam, b.ownTeam, err = h.modeSaved(ctx, userID, teamBoss, ""); err != nil {
 		return boss{}, err
 	}
 	return b, nil
@@ -181,7 +183,7 @@ func (h *handler) bossView(ctx context.Context, user miniapp.User) (any, failure
 		"tickets": b.player.Tickets, "tickets_max": BossTickets, "next_ticket_in": b.player.NextTicket.Milliseconds(),
 		"best": b.player.Best, "best_level": b.player.BestLevel, "unlimited": h.unlimited(user.ID),
 		"coins": map[string]any{"base": BossCoinsBase, "per": BossCoinsPer, "most": BossCoinsMost},
-		"ends":  b.rules.Week.AddDate(0, 0, 7).UnixMilli(), "team": nil, "power": 0,
+		"ends":  b.rules.Week.AddDate(0, 0, 7).UnixMilli(), "team": nil, "power": 0, "own_team": b.ownTeam,
 	}
 	if b.hasBoss {
 		view["boss"] = b.view

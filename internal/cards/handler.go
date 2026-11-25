@@ -49,6 +49,8 @@ type Store interface {
 	CardEventPulls(ctx context.Context, userID int64, key string, cards []int64) (int, []storage.Card, error)
 	SaveArenaTeam(ctx context.Context, userID int64, front [2]int64, back [3]int64, power int) error
 	ArenaTeam(ctx context.Context, userID int64) (front [2]int64, back [3]int64, ok bool, err error)
+	SaveModeTeam(ctx context.Context, userID int64, mode string, front [2]int64, back [3]int64) error
+	ModeTeam(ctx context.Context, userID int64, mode string) (front [2]int64, back [3]int64, ok bool, err error)
 	ArenaPlayerOf(ctx context.Context, userID int64, rules storage.ArenaRules) (storage.ArenaPlayer, error)
 	ArenaOpponents(ctx context.Context, userID int64, n int) ([]storage.ArenaPlayer, error)
 	RecordArenaBattle(ctx context.Context, attacker, defender, seed int64, attackerWon bool, rules storage.ArenaRules, quest storage.CardQuest) (storage.ArenaOutcome, error)
@@ -347,6 +349,9 @@ type request struct {
 	Opponent int64   `json:"opponent"`
 	// Quest is the daily quest "quest_claim" claims.
 	Quest string `json:"quest"`
+	// Mode is whose team "arena_team" saves: "" or "arena" for the arena,
+	// "boss" or "tower" for theirs.
+	Mode string `json:"mode"`
 }
 
 type failure struct {
@@ -440,7 +445,7 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		h.payArenaWeek(ctx)
 		return h.arenaView(ctx, opened.User, req.Shown)
 	case "arena_team":
-		return h.arenaTeam(ctx, opened.User, req.Front, req.Back)
+		return h.arenaTeam(ctx, opened.User, req.Mode, req.Front, req.Back)
 	case "arena_attack":
 		h.payArenaWeek(ctx)
 		return h.arenaAttack(ctx, opened.User, req.Opponent)

@@ -2438,7 +2438,7 @@
       histEmpty: "Hali jang bo'lmagan", histAttack: "⚔️ Hujum", histDefense: "🛡️ Himoya", histWon: "G'alaba", histLost: "Mag'lubiyat",
       front: "Old qator", back: "Orqa qator", power: (n) => `⚡ ${n}`,
       pick: "5 ta karta tanlang: 2 tasi oldinda, 3 tasi orqada. Yulduzlar kartani kuchaytiradi.",
-      unsaved: "O'zgarish hali saqlanmadi", savedHint: "Jamoa saqlangan. Almashtirish uchun uyachani bosing.",
+      unsaved: "O'zgarish hali saqlanmadi", teamTitle: { arena: "⚔️ Arena jamoasi", tower: "🗼 Minora jamoasi", boss: "👹 Boss jamoasi" }, teamFallback: "Hozir arena jamoangiz ishlatilmoqda. Kartalarni almashtirib, shu yerga alohida jamoa saqlang.", savedHint: "Jamoa saqlangan. Almashtirish uchun uyachani bosing.",
       slot: (row, n) => `${row} · ${n}-o'rin`, inTeam: "jamoada", saved: "✅ Jamoa saqlandi",
       attack: "⚔️ Hujum", noFoes: "Hozircha raqib yo'q: boshqalar ham jamoa saqlasin", teamFirst: "Hujum uchun avval jamoani saqlang", noAttacks: "Tiketlar tugadi: har soatda 1 ta qo'shiladi",
       round: (n) => `Raund ${n}`, skip: "O'tkazib yuborish", won: "🏆 G'alaba!", lost: "💀 Mag'lubiyat", change: (d) => `Reyting ${d >= 0 ? "+" : "−"}${Math.abs(d)}`, token: "🎟 +1 token",
@@ -2450,7 +2450,7 @@
         best: "Eng baland qavat", floorN: (n) => `${n}-qavat`, none: "hali yo'q",
         theme: (a, p) => `🎌 Bu hafta: ${a} +${p}%`, themeHint: "Shu anime kartalaringiz minorada kuchliroq: hujum va jon", noTheme: "Bu hafta mavzu yo'q",
         enemy: (n) => `🗼 ${n}-qavat`, reward: (c, k) => `Birinchi o'tish: +${c} 🪙` + (k ? ` · +${k} 🎟` : ""), fight: (n) => `⚔️ ${n}-qavatga jang`,
-        noTeam: "Avval Arena bo'limida jamoa saqlang",
+        noTeam: "Avval yuqorida jamoa tanlang",
         rule: () => `G'alaba keyingi qavatni ochadi va mukofot beradi, mag'lubiyat hech narsa bermaydi. Har 5-qavat +1 🎟, har 10-qavat +3 🎟`,
         cleared: (n) => `🗼 ${n}-qavat o'tildi!`, failed: (n) => `${n}-qavat o'tilmadi`, tokens: (n) => `🎟 +${n} token`,
         refused: { no_team: "Avval Arena bo'limida jamoa saqlang", no_floor: "Bu qavat hali tayyor emas", moved: "Bu qavat allaqachon o'tildi, sahifa yangilandi" },
@@ -2459,7 +2459,7 @@
         best: "Haftalik rekordingiz", none: "hali yo'q", tries: (n, m) => `⚔️ Janglar: ${n}/${m}`,
         start: "👹 1-darajadan", endless: "♾️ Darajalar cheksiz", attack: (n) => `⚔️ Hujumi ${n}`, bestLevel: (n, d) => `👹 ${n} · 💥 ${d}`,
         week: (d) => `Bu hafta hamma birga urdi: 💥 ${d}`, levelUp: (n) => `👹 Boss ${n}-darajaga chiqdi!`, levelTitle: (n) => `👹 ${n}-daraja`, dealtLine: (d, c) => `💥 ${d} zarba · +${c} 🪙`,
-        fight: "👹 Bossga hujum", noTeam: "Avval Arena bo'limida jamoa saqlang", noTries: "Janglar tugadi: har soatda 1 ta qo'shiladi",
+        fight: "👹 Bossga hujum", noTeam: "Avval yuqorida jamoa tanlang", noTries: "Janglar tugadi: har soatda 1 ta qo'shiladi",
         coins: (b, per, most) => `🪙 Har jang: ${b} tanga va har ${per} zarbaga yana 1, ${most} tagacha`,
         rule: (hpg, ag, m) => `Har jang boss 1-darajadan boshlanadi. Har darajada uning joni bor: uni tugatsangiz, boss keyingi darajaga chiqadi, joni ${hpg} barobar, hujumi +${ag}% oshadi. Jamoangiz yiqilguncha qaysi darajagacha yetsangiz, natijangiz shu. Boss har yurishda tasodifiy bitta kartangizni uradi. ${m} tagacha jang zaxirasi, har soatda +1, har dushanba yangi boss`,
         noBest: "Mukofot uchun bu hafta bossga kamida 1 marta hujum qiling",
@@ -2494,7 +2494,7 @@
       histEmpty: "Боёв ещё не было", histAttack: "⚔️ Атака", histDefense: "🛡️ Защита", histWon: "Победа", histLost: "Поражение",
       front: "Передний ряд", back: "Задний ряд", power: (n) => `⚡ ${n}`,
       pick: "Выберите 5 карт: 2 впереди, 3 сзади. Звёзды усиливают карту.",
-      unsaved: "Изменения ещё не сохранены", savedHint: "Команда сохранена. Нажмите на ячейку, чтобы заменить карту.",
+      unsaved: "Изменения ещё не сохранены", teamTitle: { arena: "⚔️ Команда арены", tower: "🗼 Команда башни", boss: "👹 Команда на босса" }, teamFallback: "Сейчас используется команда арены. Поменяйте карты и сохраните здесь отдельную команду.", savedHint: "Команда сохранена. Нажмите на ячейку, чтобы заменить карту.",
       slot: (row, n) => `${row} · место ${n}`, inTeam: "в команде", saved: "✅ Команда сохранена",
       attack: "⚔️ Атака", noFoes: "Пока нет соперников: пусть другие тоже сохранят команду", teamFirst: "Чтобы атаковать, сохраните команду", noAttacks: "Билеты закончились: каждый час добавляется 1",
       round: (n) => `Раунд ${n}`, skip: "Пропустить", won: "🏆 Победа!", lost: "💀 Поражение", change: (d) => `Рейтинг ${d >= 0 ? "+" : "−"}${Math.abs(d)}`, token: "🎟 +1 токен",
@@ -2506,7 +2506,7 @@
         best: "Высший этаж", floorN: (n) => `Этаж ${n}`, none: "пока нет",
         theme: (a, p) => `🎌 На этой неделе: ${a} +${p}%`, themeHint: "Ваши карты этого аниме в башне сильнее: атака и здоровье", noTheme: "На этой неделе темы нет",
         enemy: (n) => `🗼 Этаж ${n}`, reward: (c, k) => `За первое прохождение: +${c} 🪙` + (k ? ` · +${k} 🎟` : ""), fight: (n) => `⚔️ Бой за этаж ${n}`,
-        noTeam: "Сначала сохраните команду в разделе Арена",
+        noTeam: "Сначала выберите команду выше",
         rule: () => `Победа открывает следующий этаж и даёт награду, поражение ничего не даёт. Каждый 5-й этаж +1 🎟, каждый 10-й +3 🎟`,
         cleared: (n) => `🗼 Этаж ${n} пройден!`, failed: (n) => `Этаж ${n} не пройден`, tokens: (n) => `🎟 +${n} токен.`,
         refused: { no_team: "Сначала сохраните команду в разделе Арена", no_floor: "Этот этаж ещё не готов", moved: "Этот этаж уже пройден, страница обновлена" },
@@ -2515,7 +2515,7 @@
         best: "Ваш рекорд недели", none: "пока нет", tries: (n, m) => `⚔️ Бои: ${n}/${m}`,
         start: "👹 С 1 уровня", endless: "♾️ Уровни бесконечны", attack: (n) => `⚔️ Атака ${n}`, bestLevel: (n, d) => `👹 ${n} · 💥 ${d}`,
         week: (d) => `За неделю все вместе нанесли: 💥 ${d}`, levelUp: (n) => `👹 Босс поднялся на уровень ${n}!`, levelTitle: (n) => `👹 Уровень ${n}`, dealtLine: (d, c) => `💥 ${d} урона · +${c} 🪙`,
-        fight: "👹 Атаковать босса", noTeam: "Сначала сохраните команду в разделе Арена", noTries: "Бои закончились: каждый час +1",
+        fight: "👹 Атаковать босса", noTeam: "Сначала выберите команду выше", noTries: "Бои закончились: каждый час +1",
         coins: (b, per, most) => `🪙 Каждый бой: ${b} монет и ещё 1 за каждые ${per} урона, до ${most}`,
         rule: (hpg, ag, m) => `Каждый бой босс начинает с 1 уровня. У каждого уровня своё здоровье: снесите его, и босс поднимется на уровень, здоровье ×${hpg}, атака +${ag}%. Ваш результат — уровень, до которого вы дойдёте, пока стоит команда. Каждый ход босс бьёт одну случайную карту. Запас до ${m} боёв, каждый час +1, каждый понедельник новый босс`,
         noBest: "Чтобы получить награду, атакуйте босса хотя бы раз на этой неделе",
@@ -2550,7 +2550,7 @@
       histEmpty: "No battles yet", histAttack: "⚔️ Attack", histDefense: "🛡️ Defense", histWon: "Victory", histLost: "Defeat",
       front: "Front row", back: "Back row", power: (n) => `⚡ ${n}`,
       pick: "Pick 5 cards: 2 in front, 3 behind. Stars make a card stronger.",
-      unsaved: "The change is not saved yet", savedHint: "Your team is saved. Tap a slot to swap a card.",
+      unsaved: "The change is not saved yet", teamTitle: { arena: "⚔️ Arena team", tower: "🗼 Tower team", boss: "👹 Boss team" }, teamFallback: "Your arena team is used here now. Swap cards and save a team of its own here.", savedHint: "Your team is saved. Tap a slot to swap a card.",
       slot: (row, n) => `${row} · slot ${n}`, inTeam: "in the team", saved: "✅ Team saved",
       attack: "⚔️ Attack", noFoes: "No opponents yet: others need to save a team too", teamFirst: "Save a team to attack", noAttacks: "No tickets left: one comes back every hour",
       round: (n) => `Round ${n}`, skip: "Skip", won: "🏆 Victory!", lost: "💀 Defeat", change: (d) => `Rating ${d >= 0 ? "+" : "−"}${Math.abs(d)}`, token: "🎟 +1 token",
@@ -2562,7 +2562,7 @@
         best: "Highest floor", floorN: (n) => `Floor ${n}`, none: "none yet",
         theme: (a, p) => `🎌 This week: ${a} +${p}%`, themeHint: "Your cards of this anime are stronger in the tower: attack and health", noTheme: "No theme this week",
         enemy: (n) => `🗼 Floor ${n}`, reward: (c, k) => `First clear: +${c} 🪙` + (k ? ` · +${k} 🎟` : ""), fight: (n) => `⚔️ Fight floor ${n}`,
-        noTeam: "Save a team in the Arena first",
+        noTeam: "Pick a team above first",
         rule: () => `A win opens the next floor and gives its reward, a loss gives nothing. Every 5th floor +1 🎟, every 10th +3 🎟`,
         cleared: (n) => `🗼 Floor ${n} cleared!`, failed: (n) => `Floor ${n} not cleared`, tokens: (n) => `🎟 +${n} tokens`,
         refused: { no_team: "Save a team in the Arena first", no_floor: "This floor is not ready yet", moved: "This floor is cleared already; the page is refreshed" },
@@ -2571,7 +2571,7 @@
         best: "Your best this week", none: "none yet", tries: (n, m) => `⚔️ Fights: ${n}/${m}`,
         start: "👹 From level 1", endless: "♾️ Endless levels", attack: (n) => `⚔️ Attack ${n}`, bestLevel: (n, d) => `👹 ${n} · 💥 ${d}`,
         week: (d) => `Everyone this week dealt: 💥 ${d}`, levelUp: (n) => `👹 The boss reached level ${n}!`, levelTitle: (n) => `👹 Level ${n}`, dealtLine: (d, c) => `💥 ${d} damage · +${c} 🪙`,
-        fight: "👹 Attack the boss", noTeam: "Save a team in the Arena first", noTries: "No fights left: one comes back every hour",
+        fight: "👹 Attack the boss", noTeam: "Pick a team above first", noTries: "No fights left: one comes back every hour",
         coins: (b, per, most) => `🪙 Each fight: ${b} coins and 1 more per ${per} damage, up to ${most}`,
         rule: (hpg, ag, m) => `Each fight starts the boss at level 1. Each level has its own health: spend it and the boss goes up a level, health ×${hpg}, attack +${ag}%. Your score is the level you reach before your team falls. Each turn the boss hits one random card. Up to ${m} fights in stock, +1 every hour, a new boss every Monday`,
         noBest: "Fight the boss at least once this week for a prize",
@@ -2594,7 +2594,28 @@
   // SKILLS is the skills by card id, id % 6 picking one, as arena.FighterOf does.
   const SKILLS = ["strike", "heal", "shield", "stun", "poison", "provoke"];
   const EMPTY_TEAM = [0, 0, 0, 0, 0];
-  let arenaData = null, arenaDraft = EMPTY_TEAM.slice(), arenaBusy = false, ticketAt = 0;
+  let arenaData = null, arenaBusy = false, ticketAt = 0;
+  // teamDrafts are the teams being made, one for each mode, as the owners
+  // asked on 2026-11-25: the arena, the tower and the boss each have their
+  // own; teamFrom is the data each draft was last taken from.
+  const teamDrafts = { arena: EMPTY_TEAM.slice(), tower: EMPTY_TEAM.slice(), boss: EMPTY_TEAM.slice() };
+  const teamFrom = {};
+  function syncDraft(mode, data) {
+    if (teamFrom[mode] === data) return;
+    teamFrom[mode] = data;
+    teamDrafts[mode] = data.team ? data.team.map((f) => f.id) : EMPTY_TEAM.slice();
+  }
+  // savedTeam is the ids of the team saved for the mode shown: for the
+  // tower and the boss only one of their own, not the arena team they fall
+  // back on.
+  function savedTeam() {
+    const d = arenaMode === "arena" ? arenaData : arenaMode === "tower" ? towerData : bossData;
+    if (!d || !d.team || (arenaMode !== "arena" && !d.own_team)) return [];
+    return d.team.map((f) => f.id);
+  }
+  function modeData() {
+    return arenaMode === "arena" ? arenaData : arenaMode === "tower" ? towerData : bossData;
+  }
 
   // fighterOf is a held card as the arena draws it, its class and skill
   // the hand-picked role the server sends or worked out as arena.FighterOf does, for a team not saved yet; a saved
@@ -2662,7 +2683,7 @@
   // saved, or one with a card no longer held) is to be picked again.
   function arenaShow(data) {
     arenaData = data;
-    arenaDraft = data.team ? data.team.map((f) => f.id) : EMPTY_TEAM.slice();
+    syncDraft("arena", data);
     ticketAt = Date.now() + (data.player.next_ticket_in || 0);
     arenaGuide();
     arenaMe();
@@ -2868,8 +2889,10 @@
   // arenaTeam draws the team being made, its live power, and the save
   // button, on only for a full team that differs from the one saved.
   function arenaTeam() {
-    const saved = (arenaData.team || []).map((f) => f.id);
-    const team = withSynergy(arenaDraft.map(slotFighter));
+    const saved = savedTeam();
+    const d = modeData();
+    $("arenaTeamTitle").textContent = at.teamTitle[arenaMode];
+    const team = withSynergy(teamDrafts[arenaMode].map(slotFighter));
     arenaSynergy(team);
     for (const [id, from, label, note] of [["arenaFront", 0, at.front, at.frontNote], ["arenaBack", 2, at.back, at.backNote]]) {
       const row = $(id);
@@ -2900,10 +2923,11 @@
     }
     $("arenaPower").textContent = at.power(spaced(powerOf(team)));
     const full = team.every(Boolean);
-    const changed = arenaDraft.some((id, i) => id !== saved[i]);
-    $("arenaSave").disabled = arenaBusy || !full || !changed;
+    const changed = teamDrafts[arenaMode].some((id, i) => id !== saved[i]);
+    $("arenaSave").disabled = arenaBusy || !full || !changed || !d;
     $("arenaSave").hidden = saved.length > 0 && !changed;
-    $("arenaTeamHint").textContent = !full ? at.pick : changed ? at.unsaved : at.savedHint;
+    const fallback = arenaMode !== "arena" && d && d.team && !d.own_team;
+    $("arenaTeamHint").textContent = !full ? at.pick : fallback ? at.teamFallback : changed ? at.unsaved : at.savedHint;
   }
 
   // arenaSynergy says under the team which of its animes raise each other,
@@ -2961,10 +2985,10 @@
         const pick = document.createElement("button");
         pick.type = "button";
         pick.className = "pick";
-        pick.setAttribute("aria-pressed", String(arenaDraft[slot] === f.id));
+        pick.setAttribute("aria-pressed", String(teamDrafts[arenaMode][slot] === f.id));
         const info = document.createElement("span");
         info.className = "pick-stats";
-        const inTeam = arenaDraft.includes(f.id) && arenaDraft[slot] !== f.id;
+        const inTeam = teamDrafts[arenaMode].includes(f.id) && teamDrafts[arenaMode][slot] !== f.id;
         info.textContent = `★${f.stars} · ${CLASS_ICON[f.class]} · ⚡${spaced(powerOf([f]))}` + (inTeam ? ` · ${at.inTeam}` : "");
         if (f.skill) {
           const skill = document.createElement("small");
@@ -2974,9 +2998,9 @@
         }
         pick.append(mini(f), info);
         pick.addEventListener("click", () => {
-          const other = arenaDraft.indexOf(f.id);
-          if (other >= 0) arenaDraft[other] = arenaDraft[slot];
-          arenaDraft[slot] = f.id;
+          const other = teamDrafts[arenaMode].indexOf(f.id);
+          if (other >= 0) teamDrafts[arenaMode][other] = teamDrafts[arenaMode][slot];
+          teamDrafts[arenaMode][slot] = f.id;
           haptic("light");
           closeSheet();
           arenaTeam();
@@ -2991,16 +3015,21 @@
   }
 
   $("arenaSave").addEventListener("click", async () => {
-    if (arenaBusy || !arenaData || arenaDraft.some((id) => !id)) return;
+    const mode = arenaMode;
+    if (arenaBusy || !modeData() || teamDrafts[mode].some((id) => !id)) return;
     arenaBusy = true;
     arenaTeam();
     try {
-      const data = await api("arena_team", { front: arenaDraft.slice(0, 2), back: arenaDraft.slice(2) });
+      const draft = teamDrafts[mode];
+      const data = await api("arena_team", { front: draft.slice(0, 2), back: draft.slice(2), mode });
       if (data.refused) {
         toast(at.refused[data.refused] || t.unavailable);
         return;
       }
-      arenaShow(data);
+      teamFrom[mode] = null;
+      if (mode === "tower") towerShow(data);
+      else if (mode === "boss") bossShow(data);
+      else arenaShow(data);
       toast(at.saved);
       haptic("medium");
     } catch (error) {
@@ -3008,7 +3037,7 @@
     } finally {
       arenaBusy = false;
       arenaTeam();
-      arenaFoes();
+      if (arenaData) arenaFoes();
     }
   });
 
@@ -3122,8 +3151,8 @@
 
   // ---------- the tower ----------
 
-  // The Tower of Souls: floors of fixed teams, fought with the arena team
-  // saved, as often as the player likes; the week's anime raises its cards there.
+  // The Tower of Souls: floors of fixed teams, fought with the tower's team
+  // (the arena's until one is saved), as often as the player likes; the week's anime raises its cards there.
   // The Arena tab switches between the arena and the tower by its chips.
   let arenaMode = "arena", towerData = null, towerBusy = false;
   for (const chip of document.querySelectorAll("#arenaMode button")) {
@@ -3136,6 +3165,12 @@
     $("arenaMain").hidden = arenaMode !== "arena";
     $("towerMain").hidden = arenaMode !== "tower";
     $("bossMain").hidden = arenaMode !== "boss";
+    // one team block, moved into the mode shown, edits that mode's team
+    const block = $("arenaTeamBlock");
+    if (arenaMode === "tower") $("towerTheme").after(block);
+    else if (arenaMode === "boss") $("bossPrizes").after(block);
+    else $("arenaGuide").after(block);
+    arenaTeam();
     if (arenaMode === "tower") towerPage();
     else if (arenaMode === "boss") bossPage();
     else arenaPage();
@@ -3171,6 +3206,8 @@
 
   function towerShow(data) {
     towerData = data;
+    syncDraft("tower", data);
+    if (arenaMode === "tower") arenaTeam();
     const tw = at.tower;
     const me = $("towerMe");
     me.innerHTML = '<div class="arena-rating"><small></small><b></b></div><div class="arena-left"><span></span></div>';
@@ -3187,8 +3224,8 @@
     const enemy = data.enemy || [];
     towerRow("towerFront", enemy.slice(0, 2), at.front);
     towerRow("towerBack", enemy.slice(2), at.back);
-    // The tower fights with the team saved in the arena, changed there; only
-    // why the fight cannot start is said here.
+    // The tower fights with its own team, or the arena's until one is
+    // saved; only why the fight cannot start is said here.
     const team = data.team || [];
     const hint = !team.length ? tw.noTeam : "";
     $("towerHint").textContent = hint;
@@ -3251,6 +3288,8 @@
 
   function bossShow(data) {
     bossData = data;
+    syncDraft("boss", data);
+    if (arenaMode === "boss") arenaTeam();
     const bt = at.boss;
     const me = $("bossMe");
     me.innerHTML = '<div class="arena-rating"><small></small><b></b></div><div class="arena-left"><span></span></div>';

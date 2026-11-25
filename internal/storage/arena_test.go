@@ -476,3 +476,36 @@ func TestArenaRatingFrozen(t *testing.T) {
 		t.Errorf("opponents: Carol %+v, Dave %+v; want both at 1000", carol, dave)
 	}
 }
+
+// A boss or tower team is saved apart from the arena's, checked the same
+// way, and read back; a player without one has none.
+func TestModeTeams(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	seedArena(t, store)
+	if _, _, ok, err := store.ModeTeam(ctx, 1, "boss"); err != nil || ok {
+		t.Fatalf("none saved = %v, %v", ok, err)
+	}
+	if err := store.SaveModeTeam(ctx, 1, "boss", [2]int64{1, 2}, [3]int64{3, 4, 5}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveModeTeam(ctx, 1, "tower", [2]int64{6, 7}, [3]int64{8, 9, 10}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveModeTeam(ctx, 1, "boss", [2]int64{1, 2}, [3]int64{3, 4, 11}); !errors.Is(err, ErrCardNotHeld) {
+		t.Errorf("a card not held = %v", err)
+	}
+	if err := store.SaveModeTeam(ctx, 1, "boss", [2]int64{1, 2}, [3]int64{3, 4, 1}); !errors.Is(err, ErrArenaTeamRepeat) {
+		t.Errorf("a card twice = %v", err)
+	}
+	front, back, ok, err := store.ModeTeam(ctx, 1, "boss")
+	if err != nil || !ok || front != [2]int64{1, 2} || back != [3]int64{3, 4, 5} {
+		t.Errorf("boss team = %v %v %v %v", front, back, ok, err)
+	}
+	if front, _, _, _ := store.ModeTeam(ctx, 1, "tower"); front != [2]int64{6, 7} {
+		t.Errorf("tower team front = %v", front)
+	}
+	if _, _, ok, _ := store.ArenaTeam(ctx, 1); ok {
+		t.Error("the arena team was saved too")
+	}
+}
