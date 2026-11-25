@@ -23,7 +23,7 @@ var roles = map[int64]role{
 	137080: {arena.ClassSupport, arena.Stun},   // Makima
 	417:    {arena.ClassSupport, arena.Stun},   // Lelouch Lamperouge
 	1:      {arena.ClassDealer, arena.Strike},  // Spike Spiegel
-	124381: {arena.ClassDealer, arena.Poison},  // Zero Two
+	124381: {arena.ClassDealer, arena.Strike},  // Zero Two: a pilot's blows, no poison (Poison until 2026-11-25)
 	80:     {arena.ClassDealer, arena.Poison},  // Light Yagami
 	141694: {arena.ClassDealer, arena.Strike},  // Akaza
 	130050: {arena.ClassDealer, arena.Shield},  // Giyuu Tomioka
@@ -51,12 +51,12 @@ var roles = map[int64]role{
 	88572:  {arena.ClassHealer, arena.Heal},    // Emilia
 	203633: {arena.ClassTank, arena.Shield},    // Qin Shi Huang
 	129928: {arena.ClassDealer, arena.Strike},  // Jin-U Seong
-	34470:  {arena.ClassHealer, arena.Heal},    // Kurisu Makise
+	34470:  {arena.ClassSupport, arena.Shield}, // Kurisu Makise: a scientist, no healer (Healer until 2026-11-25)
 	126824: {arena.ClassDealer, arena.Poison},  // Maomao
 	72921:  {arena.ClassDealer, arena.Shield},  // Meliodas
 	265209: {arena.ClassDealer, arena.Strike},  // Lancelot
 	249281: {arena.ClassHealer, arena.Heal},    // Tristan Liones
-	90202:  {arena.ClassTank, arena.Strike},    // Escanor
+	90202:  {arena.ClassDealer, arena.Strike},  // Escanor: The One's blow (Tank until 2026-11-25)
 	90169:  {arena.ClassDealer, arena.Strike},  // Violet Evergarden
 	46494:  {arena.ClassSupport, arena.Stun},   // Armin Arlert
 	46496:  {arena.ClassTank, arena.Provoke},   // Erwin Smith

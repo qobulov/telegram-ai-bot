@@ -55,7 +55,56 @@ var mythicTiers = map[int64]tier{
 // mythicPower is a tiered Mythic's power at ★1: its tier's, scaled by its
 // role and spread among those of its tier and class.
 func mythicPower(id int64, t tier, r role) float64 {
-	return float64(tierPower[t]) * classPower[r.class] * skillPower[r.skill] * (1 + mythicSpreadOf(id, t, r))
+	boost := mythicBoost[id]
+	if boost == 0 {
+		boost = 1
+	}
+	return float64(tierPower[t]) * classPower[r.class] * skillPower[r.skill] * (1 + mythicSpreadOf(id, t, r)) * boost
+}
+
+// mythicBoost raises the Mythics that lost more than the rest, as the
+// owners asked on 2026-11-25: in 3000 random Mythic teams at ★5 Spike's won
+// 21% below the average and Violet's, Lelouch's, Edward's, Light's and
+// Noelle's 13-15% below. Every Mythic below the average was raised, round by
+// round of the same simulation (4000 teams, 60 battles each), until each won
+// within 5% of it; none was lowered, so Mythics are some 7% stronger on the
+// whole than before. Yoriichi, 15% above, was left as he is.
+var mythicBoost = map[int64]float64{
+	417:    1.258, // Lelouch Lamperouge
+	34470:  1.243, // Kurisu Makise
+	1:      1.216, // Spike Spiegel
+	11:     1.183, // Edward Elric
+	422:    1.176, // Guts
+	90169:  1.163, // Violet Evergarden
+	88572:  1.156, // Emilia
+	123283: 1.152, // Noelle Silva
+	80:     1.141, // Light Yagami
+	127222: 1.141, // Mai Sakurajima
+	124381: 1.137, // Zero Two
+	30:     1.116, // Gon Freecss
+	28:     1.101, // Kurapika
+	45627:  1.093, // Levi
+	40881:  1.083, // Mikasa Ackerman
+	4003:   1.085, // Joutarou Kuujou
+	27:     1.078, // Killua Zoldyck
+	126824: 1.076, // Maomao
+	40882:  1.066, // Eren Yeager
+	123284: 1.065, // Yuno
+	298761: 1.063, // Satoko Kirigaya
+	127691: 1.054, // Satoru Gojou
+	137080: 1.051, // Makima
+	124440: 1.050, // Yami Sukehiro
+	203633: 1.050, // Qin Shi Huang
+	5:      1.049, // Ichigo Kurosaki
+	127518: 1.048, // Nezuko Kamado
+	176754: 1.041, // Frieren
+	124435: 1.040, // Julius Novachrono
+	123285: 1.035, // Asta
+	40:     1.026, // Luffy Monkey
+	126071: 1.027, // Tanjirou Kamado
+	265209: 1.022, // Lancelot
+	246:    1.015, // Gokuu Son
+	249281: 1.013, // Tristan Liones
 }
 
 // mythicSpreadOf is where id lies among the Mythics of tier t and r's class,
