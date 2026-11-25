@@ -80,11 +80,19 @@ const (
 	CritFactor   = 1.6  // a Crit's hit, times the attack
 	ExecuteBelow = 0.3  // an Execute or Executioner bites below this share of health
 	AuraMost     = 0.25 // a side's Auras raise its attack at most this much
-	BossStunMost = 1    // a boss skips at most one turn to a stun
 )
 
 // KindMiss is a hit dodged: Amount 0.
 const KindMiss = "miss"
+
+// stunFor stuns u for turns, unless it is a boss, which no stun holds, or
+// its turn after a stun's end guards it.
+func (u *unit) stunFor(turns int) {
+	if u.boss || u.stunGuard {
+		return
+	}
+	u.stun = max(u.stun, turns)
+}
 
 func (u *unit) passive(k PassiveKind) float64 {
 	if u.Kit == nil || u.Kit.Passive.Kind != k {
@@ -171,11 +179,7 @@ func (f *fight) useUlt(u *unit) bool {
 			continue
 		}
 		if ult.Stun > 0 {
-			turns := ult.Stun
-			if to.boss {
-				turns = BossStunMost
-			}
-			to.stun = max(to.stun, turns)
+			to.stunFor(ult.Stun)
 		}
 		if ult.Poison {
 			to.poisoned = PoisonTurns

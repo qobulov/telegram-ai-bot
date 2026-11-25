@@ -186,9 +186,13 @@ type unit struct {
 	hp, shield int
 	energy     int
 	stun       int // its next turns to skip
-	poisoned   int // its turns left to be hurt by poison
-	provoking  int // the last round it draws enemy Tanks, Dealers and Healers
-	poisonDmg  int // a boss's poison tick, by its poisoner's attack
+	// stunGuard is a turn after a stun ends, in which a new stun takes no
+	// hold, as the owners asked on 2026-11-25: stunners in turn kept a foe,
+	// a boss above all, stunned without end.
+	stunGuard bool
+	poisoned  int // its turns left to be hurt by poison
+	provoking int // the last round it draws enemy Tanks, Dealers and Healers
+	poisonDmg int // a boss's poison tick, by its poisoner's attack
 	// boss is a unit that never falls: each level's health spent, it goes
 	// up a level, its health and attack growing, it hits one living foe at
 	// random each turn, and its attack rises by rage of itself each round
@@ -363,9 +367,11 @@ func (f *fight) act(u *unit) {
 	}
 	if u.stun > 0 {
 		u.stun--
+		u.stunGuard = u.stun == 0
 		f.record(KindStunned, u, u, 0, false)
 		return
 	}
+	defer func() { u.stunGuard = false }()
 	if u.boss {
 		f.bossTurn(u)
 		return
@@ -453,7 +459,7 @@ func (f *fight) skillHit(u *unit) {
 		f.hit(u, target, StrikeFactor, KindStrike)
 	case Stun:
 		if f.hit(u, target, 1, KindStun); target.alive() {
-			target.stun = max(target.stun, 1)
+			target.stunFor(1)
 		}
 	case Poison:
 		if f.hit(u, target, 1, KindPoison); target.alive() {

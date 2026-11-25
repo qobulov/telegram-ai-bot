@@ -120,3 +120,31 @@ func TestPierceAndLifesteal(t *testing.T) {
 		t.Errorf("lifesteal: hp %d", u.hp)
 	}
 }
+
+// A stun holds no boss, and none holds a unit in its turn after a stun.
+func TestStunGuardAndBoss(t *testing.T) {
+	u := &unit{Fighter: FighterOf(1, "u", 1, 1, 10, 100), hp: 100}
+	u.stunFor(1)
+	f := soloFight(Team{}, Team{})
+	f.act(u)
+	if u.stun != 0 || !u.stunGuard {
+		t.Fatalf("after the stunned turn: stun %d, guard %v", u.stun, u.stunGuard)
+	}
+	u.stunFor(2)
+	if u.stun != 0 {
+		t.Errorf("stunned again in its guarded turn: %d", u.stun)
+	}
+	f.act(u)
+	if u.stunGuard {
+		t.Error("the guard outlived its turn")
+	}
+	u.stunFor(1)
+	if u.stun != 1 {
+		t.Errorf("not stunned after the guard: %d", u.stun)
+	}
+	boss := &unit{Fighter: FighterOf(2, "boss", 4, 1, 10, 100), hp: 100, boss: true}
+	boss.stunFor(2)
+	if boss.stun != 0 {
+		t.Errorf("a boss stunned for %d", boss.stun)
+	}
+}
