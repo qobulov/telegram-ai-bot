@@ -416,6 +416,7 @@ var helpSections = map[string]localText{
 /banlist — banlar va "bandan chiqarish" tugmalari; /amnesty — hammani chiqarish
 /reports — ko'rilmagan shikoyatlar; /warns — kimda nechta ogohlantirish
 /cleanservice — "kirdi", "chiqdi", "qadadi" xabarlarini o'chirishni yoqish yoki o'chirish
+/weekawards — har dushanba haftalik nominatsiyalar (gapdon, tungi boyqush, kulgichi, mute chempioni, omadli): yoqish yoki o'chirish
 /antispam — flood, spamerlar va yangi a'zolar havolasiga qarshi himoya: tugmalar bilan yoqish yoki o'chirish (odatda yoqilgan)
 "orqaga qaytar" — oxirgi amalni bekor qilish
 Meni jim qilish: /mute bot, qaytarish: /unmute`,

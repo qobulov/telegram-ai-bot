@@ -83,6 +83,7 @@ var adminCommands = []struct {
 	{telegram.BotCommand{Command: "cleanservice", Description: "\"Kirdi/chiqdi\" xabarlarini o'chirish (yoqish/o'chirish)"}, []string{telegram.RightDeleteMessages}},
 	{telegram.BotCommand{Command: "antispam", Description: "Antispam: flood, spamerlar, yangi a'zolar havolasi (tugmalar)"}, []string{telegram.RightRestrictMembers, telegram.RightDeleteMessages}},
 	{telegram.BotCommand{Command: "invites_auto", Description: "Takliflar reytingini avto-e'lon qilish, yoki off"}, nil},
+	{telegram.BotCommand{Command: "weekawards", Description: "Haftalik nominatsiyalar (yoqish/o'chirish)"}, nil},
 }
 
 var restrict = []string{telegram.RightRestrictMembers}
@@ -160,6 +161,7 @@ var ownerGroupMenu = []telegram.BotCommand{
 	{Command: "cleanservice", Description: "\"Kirdi/chiqdi\" xabarlarini o'chirish (yoqish/o'chirish)"},
 	{Command: "antispam", Description: "Antispam: flood, spamerlar, yangi a'zolar havolasi (tugmalar)"},
 	{Command: "invites_auto", Description: "Takliflar reytingini avto-e'lon qilish, yoki off"},
+	{Command: "weekawards", Description: "Haftalik nominatsiyalar (yoqish/o'chirish)"},
 }
 
 // ownerOnlyMenu are the owners' own commands, answered only in private.
@@ -209,7 +211,7 @@ var rankedCommands = []struct{ name, code string }{
 	{"kick", "kick"},
 	{"pin", "pin"}, {"unpin", "pin"},
 	{"del", "delete"},
-	{"tag", "group"}, {"cleanservice", "group"}, {"antispam", "group"},
+	{"tag", "group"}, {"cleanservice", "group"}, {"antispam", "group"}, {"weekawards", "group"},
 	{"rank", "rank"},
 	{"promote", "admin"}, {"demote", "admin"},
 	{"amnesty", "amnesty"},

@@ -490,6 +490,8 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 // service.
 // eyes look at members' profile photos; nil leaves them unseen.
 func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate tools.Tool, eyes tools.Eyes) []tools.Tool {
+	members := tools.MemberInfoOptions{Store: store, Telegram: bot.Client, Tokens: cards.Tokens, NextToken: func(now time.Time) time.Time { return cards.Today(now).Next() }, Location: cfg.Location,
+		Photo: memberPhoto(bot), Eyes: eyes}
 	help := service.HelpText(service.Abilities{Listen: cfg.AudioInput, Football: cfg.FootballDataToken != "", Pages: cfg.WebAppURL != ""})
 	builtin := tools.Builtin(help, cfg.Location)
 	if cfg.WebAppURL != "" {
@@ -507,8 +509,8 @@ func builtinTools(cfg config.Config, store *storage.Store, bot Bot, moderate too
 		tools.GroupStatsTool(tools.GroupStatsOptions{Store: store, BotID: bot.User.ID, Location: cfg.Location}),
 		tools.InviteStatsTool(tools.InviteStatsOptions{Store: store, Location: cfg.Location}),
 		tools.GroupInfoTool(bot.Client, bot.User.ID, store),
-		tools.MemberInfoTool(tools.MemberInfoOptions{Store: store, Telegram: bot.Client, Tokens: cards.Tokens, NextToken: func(now time.Time) time.Time { return cards.Today(now).Next() }, Location: cfg.Location,
-			Photo: memberPhoto(bot), Eyes: eyes}),
+		tools.MemberInfoTool(members),
+		tools.ShipTool(members),
 		tools.PunishmentsTool(tools.PunishmentsOptions{Store: store, Creators: groupMembers{client: bot.Client, botID: bot.User.ID}, BotID: bot.User.ID, Location: cfg.Location}),
 		tools.JoinCaptchaTool(tools.JoinCaptchaOptions{Store: store, Rights: groupMembers{client: bot.Client, botID: bot.User.ID}}),
 	)
@@ -902,6 +904,12 @@ func NewCleanup(ctx context.Context, cfg config.Config, logger *slog.Logger) (*C
 			awards := service.InviteAwardOptions{Book: store, Telegram: client, Location: cfg.Location, Now: time.Now(), Logger: logger}
 			if _, err := service.PostInviteAwards(ctx, awards); err != nil {
 				logger.Warn("could not post the invite awards", "error", err)
+			}
+			week := service.WeekAwardOptions{Book: store, Telegram: client, Location: cfg.Location, Now: time.Now(), NotLucky: cfg.OwnerIDs, Logger: logger}
+			if posted, err := service.PostWeekAwards(ctx, week); err != nil {
+				logger.Warn("could not post the week's awards", "error", err)
+			} else if posted > 0 {
+				logger.Info("posted the week's awards", "groups", posted)
 			}
 			if paid, err := cards.PayArenaWeek(ctx, store, time.Now()); err != nil {
 				logger.Warn("could not pay the arena week", "error", err)

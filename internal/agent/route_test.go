@@ -250,6 +250,28 @@ func TestPhotoQuestionsSkipTheRouter(t *testing.T) {
 	}
 }
 
+// Two members' match is the ship tool's percent, never one made up.
+func TestShipQuestionsSkipTheRouter(t *testing.T) {
+	for msg, full := range map[string]bool{
+		"Ali: @vali bilan mosligimiz qancha": true,
+		"Ali: Mari, ship qil @a @b":          true,
+		"Ali: совместимость с @vali":         true,
+		"Ali: biz mosmi":                     true,
+		"Ali: Mari, nima gap":                false,
+		"Ali: shipping qachon keladi":        false,
+	} {
+		f, router, _ := routedFixture("CHAT", text("chat"), text("full"))
+		req := request(1, msg)
+		req.Group = true
+
+		answer, err := f.agent.Reply(context.Background(), req)
+
+		if err != nil || (answer.Route == RouteFull) != full || (len(router.requests) == 0) != full {
+			t.Errorf("%q: route %q, router asked %d times; want full %v", msg, answer.Route, len(router.requests), full)
+		}
+	}
+}
+
 // A game question carries the reminder to check heroes in the request, but
 // the saved question is the plain text.
 func TestGameQuestionsRemindToCheckHeroes(t *testing.T) {

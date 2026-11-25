@@ -880,6 +880,8 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.reputationTop(ctx, in)
 	case in.group && s.opts.Extras != nil && commandName(in.text) == "/cleanservice":
 		return s.setCleanService(ctx, in)
+	case in.group && s.opts.Extras != nil && commandName(in.text) == "/weekawards":
+		return s.setWeekAwards(ctx, in)
 	case in.group && s.opts.Extras != nil && commandName(in.text) == "/antispam":
 		return s.antispamCommand(ctx, in)
 	case !in.group && s.opts.Extras != nil && s.opts.Buttons != nil && commandName(in.text) == "/aigroups":
