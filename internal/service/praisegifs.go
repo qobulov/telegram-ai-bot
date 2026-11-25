@@ -11,14 +11,12 @@ const PraiseGIF = "praised"
 // send videos.
 var praiseGIFFiles = []string{
 	"praise-number-one.mp4",          // "Lady Sunbringer", then "Sorry but I'm number one"
-	"praise-number-one-poses.mp4",    // Sunbringer's face, glowing eye and poses
-	"praise-gloria-faces.mp4",        // Sunbringer's faces and eyes, cut after cut
-	"praise-gloria-strike.mp4",       // a burst among the stars, her eyes, her pose with the spear
-	"praise-sunbringer-closeups.mp4", // Sunbringer's face, a strike and her eyes
-	"praise-lady-sunbringer.mp4",     // "Lady Sunbringer", her face and the moon
-	"praise-gloria-vortex.mp4",       // lightning, a blue vortex and a pillar of crystal
-	"praise-gloria-flight.mp4",       // a blue city, red flames, her flight
-	"praise-gloria-slash.mp4",        // her spear's blade flashing, a white swirl
+	"praise-number-one-poses.mp4",    // her face, glowing eye and poses
+	"praise-gloria-faces.mp4",        // her spear, her outfit and three faces
+	"praise-sunbringer-closeups.mp4", // her face, a strike over the sea, her outfit
+	"praise-sunbringer-gem.mp4",      // her profile, her eyes, the crystal in her hands
+	"praise-glance.mp4",              // her glance with the sword
+	"praise-pose.mp4",                // her pose, then her face
 }
 
 // PraiseGIFLinks are the bot's own GIFs' addresses on the site at base.
