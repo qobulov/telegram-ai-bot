@@ -97,7 +97,7 @@ func (s *Service) answerInline(q *telegram.InlineQuery) {
 		return
 	}
 	in := inlineIncoming(q)
-	ctx, cancel := context.WithTimeout(context.Background(), s.inlineDeadline)
+	ctx, cancel := context.WithTimeout(in.callerContext(), s.inlineDeadline)
 	article, cache := s.inlineResult(ctx, in)
 	cancel()
 	ctx, cancel = context.WithTimeout(context.Background(), inlineSendTimeout)

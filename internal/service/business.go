@@ -183,7 +183,7 @@ func (s *Service) seeBusinessChat(ctx context.Context, connection storage.Busine
 // notice, a refusal or an error, which would come from the owner's account:
 // past a limit, or when the turn fails, the bot says nothing.
 func (s *Service) processBusiness(in incoming) {
-	ctx, cancel := context.WithTimeout(context.Background(), s.opts.TurnTimeout)
+	ctx, cancel := context.WithTimeout(in.callerContext(), s.opts.TurnTimeout)
 	defer cancel()
 	if _, limited := s.rateLimited(in); limited {
 		s.noteSkip(in, "flood", "")

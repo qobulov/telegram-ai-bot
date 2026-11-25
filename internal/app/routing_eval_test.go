@@ -45,7 +45,7 @@ func TestRoutingEval(t *testing.T) {
 	usage := &usageLog{}
 	logger := slog.New(usage)
 	cfg := evalConfig(t, key)
-	router, chat := chatRouting(cfg, logger)
+	router, chat := chatRouting(cfg, logger, nil)
 	var main agent.Model = fullPathSkipped{}
 	if os.Getenv("ROUTING_EVAL_FULL") == "1" {
 		main = ai.NewClient(ai.Options{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.Model, MaxTokens: cfg.MaxOutputTokens,

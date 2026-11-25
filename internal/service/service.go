@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"telegram-ai-bot/internal/agent"
+	"telegram-ai-bot/internal/ai"
 	"telegram-ai-bot/internal/cards"
 	"telegram-ai-bot/internal/config"
 	"telegram-ai-bot/internal/storage"
@@ -610,6 +611,12 @@ func (in incoming) queueKey() uint64 {
 		return uint64(in.scope.ChatID)
 	}
 	return uint64(in.userID)
+}
+
+// callerContext is a fresh context whose model requests are recorded as
+// made for this chat and member.
+func (in incoming) callerContext() context.Context {
+	return ai.WithCaller(context.Background(), ai.Caller{ChatID: in.scope.ChatID, UserID: in.userID})
 }
 
 // New starts the workers and returns the Service. Call Close to stop it.

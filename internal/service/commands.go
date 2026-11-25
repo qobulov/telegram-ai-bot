@@ -85,7 +85,7 @@ func (s *Service) process(in incoming) {
 		s.processBusiness(in)
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), s.opts.TurnTimeout)
+	ctx, cancel := context.WithTimeout(in.callerContext(), s.opts.TurnTimeout)
 	defer cancel()
 
 	// A private message nobody may answer gets a reaction only, chosen here

@@ -257,6 +257,7 @@ func membershipError(err error) error {
 
 // NewService wires the tools, the model client, the agent and the service.
 func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, logger *slog.Logger) (*service.Service, error) {
+	record := usageRecorder(store, logger)
 	moderation := tools.NewModeration(tools.ModerationOptions{
 		BotID:    bot.User.ID,
 		Members:  bot.Client,
@@ -282,7 +283,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 	available := append(builtinTools(cfg, store, bot, moderation.Tool()), liveDataTools(cfg, store, bot)...)
 	available = append(available, moderation.TopicsTool(bot.Client), tools.BotProfileTool(tools.BotProfileOptions{
 		Account: botAccount{Client: bot.Client, id: bot.User.ID},
-		Eyes:    stickerLabeller(cfg, logger),
+		Eyes:    stickerLabeller(cfg, logger, record),
 	}))
 	// Gifts spend the bot's Stars, so only owners known by ID may send them:
 	// a username can change hands.
@@ -313,8 +314,10 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		// The persona and the tools, the same each turn, are cached on
 		// Gemini and paid at a tenth.
 		PromptCache: true,
+		Purpose:     "chat",
+		Record:      record,
 	})
-	router, chat := chatRouting(cfg, logger)
+	router, chat := chatRouting(cfg, logger, record)
 	assistant := agent.New(agent.Options{
 		Store:        store,
 		Model:        model,
@@ -430,10 +433,10 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		Restrictor:       bot.Client,
 		Guards:           checker(cfg),
 		GroupModerator:   bot.Client,
-		PictureJudge:     pictureJudge(cfg, logger),
+		PictureJudge:     pictureJudge(cfg, logger, record),
 		PictureVerdicts:  store,
 		VoiceTranscripts: store,
-		Judge:            swearJudge(cfg, logger),
+		Judge:            swearJudge(cfg, logger, record),
 		Sworn:            store,
 		Joins:            store,
 		JoinGate:         bot.Client,
@@ -443,7 +446,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		AudioSender:      bot.Client,
 		Files:            bot.Client,
 		StickerSender:    bot.Client,
-		StickerImporter:  &stickers.Importer{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger), Workers: stickerWorkers, Logger: logger},
+		StickerImporter:  &stickers.Importer{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger, record), Workers: stickerWorkers, Logger: logger},
 		Answers:          store,
 		Inline:           bot.Client,
 
@@ -551,6 +554,25 @@ func checker(cfg config.Config) *guards.Checker {
 	})
 }
 
+// usageRecord saves what a model request cost.
+type usageRecord = func(context.Context, ai.Usage)
+
+// usageWriteTimeout bounds saving a request's usage, which runs before the
+// answer goes out: on serverless hosting nothing may be left running.
+const usageWriteTimeout = 2 * time.Second
+
+// usageRecorder saves every model request's tokens in model_usage. A save
+// that fails is logged and the answer goes on.
+func usageRecorder(store *storage.Store, logger *slog.Logger) usageRecord {
+	return func(ctx context.Context, u ai.Usage) {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), usageWriteTimeout)
+		defer cancel()
+		if err := store.RecordModelUsage(ctx, u); err != nil {
+			logger.Warn("could not save model usage", "purpose", u.Purpose, "model", u.Model, "error", err)
+		}
+	}
+}
+
 // pictureJudgeTokens is room for the picture judge's one word and its
 // thinking: Gemini thinks about a picture even at low effort.
 const pictureJudgeTokens = 1024
@@ -560,7 +582,7 @@ const pictureJudgeTokens = 1024
 // set, with the main model and its fallbacks behind it when it is busy;
 // the main model otherwise. A one-word answer, so it thinks little.
 // Gemini's light models see pictures as the main ones do.
-func pictureJudge(cfg config.Config, logger *slog.Logger) *ai.Client {
+func pictureJudge(cfg config.Config, logger *slog.Logger, record usageRecord) *ai.Client {
 	model, fallbacks := cfg.Model, cfg.FallbackModels
 	if cfg.RouterModel != "" {
 		model, fallbacks = cfg.RouterModel, append([]string{cfg.Model}, cfg.FallbackModels...)
@@ -576,6 +598,8 @@ func pictureJudge(cfg config.Config, logger *slog.Logger) *ai.Client {
 		HTTPClient:      &http.Client{Timeout: cfg.RequestTimeout},
 		AttemptTimeout:  attemptTimeout,
 		Logger:          logger,
+		Purpose:         "picture_judge",
+		Record:          record,
 	})
 }
 
@@ -629,7 +653,7 @@ func stickerSetTool(cfg config.Config, store *storage.Store, bot Bot, logger *sl
 	opts := tools.StickerSetOptions{
 		Telegram:    bot.Client,
 		Store:       store,
-		Learner:     &stickers.Importer{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger), Workers: 1, Logger: logger},
+		Learner:     &stickers.Importer{Telegram: bot.Client, Store: store, Model: stickerLabeller(cfg, logger, usageRecorder(store, logger)), Workers: 1, Logger: logger},
 		BotUsername: bot.User.Username,
 		Title:       cfg.BotDisplayName,
 		Location:    cfg.Location,
@@ -655,7 +679,7 @@ const judgeEffort = "low"
 // swearJudge asks whom swearing is aimed at: a one-word answer to a short
 // prompt, so it gets few tokens and thinks little, on the main model and
 // its fallbacks, which judge better than a lighter one.
-func swearJudge(cfg config.Config, logger *slog.Logger) *ai.Client {
+func swearJudge(cfg config.Config, logger *slog.Logger, record usageRecord) *ai.Client {
 	return ai.NewClient(ai.Options{
 		BaseURL:         cfg.AIBaseURL,
 		APIKey:          cfg.AIAPIKey,
@@ -667,6 +691,8 @@ func swearJudge(cfg config.Config, logger *slog.Logger) *ai.Client {
 		HTTPClient:      &http.Client{Timeout: cfg.RequestTimeout},
 		AttemptTimeout:  attemptTimeout,
 		Logger:          logger,
+		Purpose:         "swear_judge",
+		Record:          record,
 	})
 }
 
@@ -674,7 +700,7 @@ func swearJudge(cfg config.Config, logger *slog.Logger) *ai.Client {
 // CHAT_MODEL, both nil without a router. The router gives one word, as the
 // swear judge does; a chat model that fails hands the turn to the main
 // model and its fallbacks.
-func chatRouting(cfg config.Config, logger *slog.Logger) (router, chat agent.Model) {
+func chatRouting(cfg config.Config, logger *slog.Logger, record usageRecord) (router, chat agent.Model) {
 	if cfg.RouterModel == "" {
 		return nil, nil
 	}
@@ -688,6 +714,8 @@ func chatRouting(cfg config.Config, logger *slog.Logger) (router, chat agent.Mod
 		HTTPClient:      &http.Client{Timeout: cfg.RequestTimeout},
 		AttemptTimeout:  attemptTimeout,
 		Logger:          logger,
+		Purpose:         "router",
+		Record:          record,
 	})
 	chat = ai.NewClient(ai.Options{
 		BaseURL:         cfg.AIBaseURL,
@@ -700,6 +728,8 @@ func chatRouting(cfg config.Config, logger *slog.Logger) (router, chat agent.Mod
 		HTTPClient:      &http.Client{Timeout: cfg.RequestTimeout},
 		AttemptTimeout:  attemptTimeout,
 		Logger:          logger,
+		Purpose:         "chat_light",
+		Record:          record,
 	})
 	return router, chat
 }
@@ -730,7 +760,7 @@ func transcribeReasoning(cfg config.Config) string {
 // stickerLabeller is the model that looks at stickers on import. It gets
 // more room than an answer: Gemini spends output tokens thinking, and with
 // a small limit a fifth of its labels came back cut off.
-func stickerLabeller(cfg config.Config, logger *slog.Logger) *ai.Client {
+func stickerLabeller(cfg config.Config, logger *slog.Logger, record usageRecord) *ai.Client {
 	return ai.NewClient(ai.Options{
 		BaseURL:         cfg.AIBaseURL,
 		APIKey:          cfg.AIAPIKey,
@@ -741,6 +771,8 @@ func stickerLabeller(cfg config.Config, logger *slog.Logger) *ai.Client {
 		HTTPClient:      &http.Client{Timeout: cfg.RequestTimeout},
 		AttemptTimeout:  attemptTimeout,
 		Logger:          logger,
+		Purpose:         "sticker_labeller",
+		Record:          record,
 	})
 }
 

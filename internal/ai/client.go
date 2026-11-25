@@ -52,6 +52,12 @@ type Options struct {
 	// PromptCache caches the system prompt and tools of requests with tools
 	// on Gemini, for Model only (see cache.go); other providers ignore it.
 	PromptCache bool
+	// Purpose names what the client is for, such as "chat" or "judge", in
+	// the Usage it records.
+	Purpose string
+	// Record, when set, is given the usage of every request that succeeded,
+	// before Complete returns.
+	Record func(context.Context, Usage)
 }
 
 // Client talks to the model provider. It is safe for concurrent use.
@@ -149,6 +155,7 @@ func (c *Client) completeWithRetry(ctx context.Context, req Request, withTools b
 		}
 		if err == nil {
 			c.logUsage(model, used)
+			c.record(ctx, model, used)
 		}
 		c.noteUnusable(ctx, model, err)
 		if isEffortUnsupported(err) && attempt < c.opts.MaxAttempts {
