@@ -1,21 +1,16 @@
 package webapi
 
 import (
-	"cmp"
 	"context"
 	"fmt"
-	"slices"
 	"strings"
 )
 
-// MLBBDex and Rone Arena both count the game's ranked matches, as the
-// owners asked on 2026-11-25: what one lacks the other gives, and where
-// both give it, the code takes the better and gives Maria one answer. A
-// hero's rates are MLBBDex's for all ranks, measured that day, else Rone
-// Arena's; its counters are those both name first, then the rest; its
-// builds are both sources' together, the most played first, each once.
+// Each answer takes one source, as the owners asked on 2026-11-25, so no
+// work is done twice: a hero's counters and builds are Rone Arena's, from
+// the game's academy, and MLBBDex's only when Rone Arena gives none.
 
-const shownMergedBuilds = 5
+const shownDexBuilds = 5
 
 type dexCounter struct {
 	Slug      string  `json:"slug"`
@@ -59,9 +54,9 @@ func (a *apis) dexSlug(ctx context.Context, name string) (string, map[string]str
 	return slug, names, nil
 }
 
-// mergeCounters puts MLBBDex's counters for rank into the hero's: those
-// both sources name first, then Rone Arena's other ones, then MLBBDex's.
-func (a *apis) mergeCounters(ctx context.Context, out *mlbbHeroOutput, rank string) {
+// dexCountersInto gives the hero MLBBDex's counters for rank, when Rone
+// Arena did not answer.
+func (a *apis) dexCountersInto(ctx context.Context, out *mlbbHeroOutput, rank string) {
 	slug, names, err := a.dexSlug(ctx, out.Hero)
 	if err != nil {
 		return
@@ -71,10 +66,10 @@ func (a *apis) mergeCounters(ctx context.Context, out *mlbbHeroOutput, rank stri
 		return
 	}
 	ranked := counters[rank]
-	out.CounteredBy = mergeMatchups(out.CounteredBy, dexMatchups(ranked.Weak, names))
-	out.StrongAgainst = mergeMatchups(out.StrongAgainst, dexMatchups(ranked.Strong, names))
-	if len(ranked.Weak)+len(ranked.Strong) > 0 {
-		out.Note += "; counters are MLBBDex's and Rone Arena's together, those both name first"
+	out.CounteredBy = dexMatchups(ranked.Weak, names)
+	out.StrongAgainst = dexMatchups(ranked.Strong, names)
+	if len(out.CounteredBy)+len(out.StrongAgainst) > 0 {
+		out.Note += "; counters are MLBBDex's"
 	}
 }
 
@@ -88,29 +83,8 @@ func dexMatchups(counters []dexCounter, names map[string]string) []mlbbMatchup {
 	return out
 }
 
-// mergeMatchups is the heroes in both lists first, in Rone Arena's order,
-// then the rest of Rone Arena's, then the rest of MLBBDex's.
-func mergeMatchups(rone, dex []mlbbMatchup) []mlbbMatchup {
-	inDex := func(m mlbbMatchup) bool {
-		return slices.ContainsFunc(dex, func(d mlbbMatchup) bool { return normalizeName(d.Hero) == normalizeName(m.Hero) })
-	}
-	var both, roneOnly, dexOnly []mlbbMatchup
-	for _, m := range rone {
-		if inDex(m) {
-			both = append(both, m)
-		} else {
-			roneOnly = append(roneOnly, m)
-		}
-	}
-	for _, d := range dex {
-		if !slices.ContainsFunc(rone, func(m mlbbMatchup) bool { return normalizeName(m.Hero) == normalizeName(d.Hero) }) {
-			dexOnly = append(dexOnly, d)
-		}
-	}
-	return slices.Concat(both, roneOnly, dexOnly)
-}
-
-// dexBuildsFor are MLBBDex's builds for the hero's lane and rank.
+// dexBuildsFor are MLBBDex's builds for the hero's lane and rank, most
+// played first as MLBBDex lists them.
 func (a *apis) dexBuildsFor(ctx context.Context, hero, lane, rank string) []mlbbBuild {
 	slug, _, err := a.dexSlug(ctx, hero)
 	if err != nil {
@@ -139,38 +113,4 @@ func cleanNames(names []string) []string {
 		out = append(out, cleanText(n, maxHeroName))
 	}
 	return out
-}
-
-// mergeBuilds is both sources' builds together, the most played first: a
-// build both give, by its items, spell and emblem, is kept once, with the
-// higher pick rate.
-func mergeBuilds(rone, dex []mlbbBuild) []mlbbBuild {
-	var merged []mlbbBuild
-	for _, b := range slices.Concat(rone, dex) {
-		i := slices.IndexFunc(merged, func(m mlbbBuild) bool { return sameBuild(m, b) })
-		switch {
-		case i < 0:
-			merged = append(merged, b)
-		case rateValue(b.PickRate) > rateValue(merged[i].PickRate):
-			merged[i] = b
-		}
-	}
-	slices.SortStableFunc(merged, func(x, y mlbbBuild) int { return cmp.Compare(rateValue(y.PickRate), rateValue(x.PickRate)) })
-	return merged[:min(len(merged), shownMergedBuilds)]
-}
-
-func sameBuild(x, y mlbbBuild) bool {
-	key := func(b mlbbBuild) string {
-		items := slices.Clone(b.Items)
-		slices.Sort(items)
-		return strings.ToLower(strings.Join(items, "|") + "/" + b.Spell + "/" + b.Emblem)
-	}
-	return key(x) == key(y)
-}
-
-// rateValue is "52.3%" as 52.3.
-func rateValue(rate string) float64 {
-	var v float64
-	fmt.Sscanf(strings.TrimSuffix(rate, "%"), "%g", &v)
-	return v
 }

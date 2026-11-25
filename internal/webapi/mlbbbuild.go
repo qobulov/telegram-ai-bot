@@ -166,7 +166,7 @@ func (a *apis) mlbbBuild(ctx context.Context, name, lane, rank string) (mlbbBuil
 	if buildsErr != nil || len(builds.Builds) == 0 {
 		// Rone Arena has none: MLBBDex's are the answer, as text.
 		if dex := a.dexBuildsFor(ctx, hero.name, hero.lane, rank); len(dex) > 0 {
-			return mlbbBuildOutput{Hero: hero.name, Lane: hero.lane, Rank: rank, Builds: mergeBuilds(nil, dex), Source: dexSource,
+			return mlbbBuildOutput{Hero: hero.name, Lane: hero.lane, Rank: rank, Builds: dex[:min(len(dex), shownDexBuilds)], Source: dexSource,
 				Note: "MLBBDex's builds, as Rone Arena gave none; no picture is sent"}, nil
 		}
 	}
@@ -204,15 +204,6 @@ func (a *apis) mlbbBuild(ctx context.Context, name, lane, rank string) (mlbbBuil
 		out.Note += finishNote
 	}
 	out.Note += a.sendBuildCard(ctx, out, sorted[0], finish, items, talents)
-	if dex := a.dexBuildsFor(ctx, hero.name, hero.lane, rank); len(dex) > 0 {
-		pictured := out.Builds[0]
-		out.Builds = mergeBuilds(out.Builds, dex)
-		out.Source += "; " + dexSource
-		out.Note += "; the builds are both sources' together, the most played first"
-		if i := slices.IndexFunc(out.Builds, func(b mlbbBuild) bool { return sameBuild(b, pictured) }); i != 0 {
-			out.Note += fmt.Sprintf("; the picture shows the game academy's most used build, which is not the first here (%d of the list, 0 for none)", i+1)
-		}
-	}
 	return out, nil
 }
 

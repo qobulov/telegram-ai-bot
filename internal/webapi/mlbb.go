@@ -389,7 +389,9 @@ func (a *apis) mlbbHero(ctx context.Context, name, rank string, picture bool) (m
 	if out.Hero == "" {
 		out.Hero = names[id]
 	}
-	a.mergeCounters(ctx, &out, rank)
+	if roneErr != nil {
+		a.dexCountersInto(ctx, &out, rank)
+	}
 	if picture {
 		out.Note = a.sendHeroPicture(ctx, out.Note, profile.Data.Images.Portrait, cmp.Or(detail.Hero.Data.Picture, detail.Hero.Data.Card))
 	}
