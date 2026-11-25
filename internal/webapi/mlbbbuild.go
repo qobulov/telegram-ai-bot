@@ -59,9 +59,13 @@ type mlbbBuildOutput struct {
 	Rank       string      `json:"rank"`
 	Builds     []mlbbBuild `json:"builds"`
 	FinishWith []string    `json:"finish_with,omitempty"`
-	Guides     int         `json:"guides_counted,omitempty"`
-	Source     string      `json:"source"`
-	Note       string      `json:"note"`
+	// DexBuilds are MLBBDex's for the same lane and rank, and ItemsInBoth
+	// the items both sources' builds have.
+	DexBuilds   []mlbbBuild `json:"mlbbdex_builds,omitempty"`
+	ItemsInBoth []string    `json:"items_in_both,omitempty"`
+	Guides      int         `json:"guides_counted,omitempty"`
+	Source      string      `json:"source"`
+	Note        string      `json:"note"`
 }
 
 // arenaGuide is a guide a player wrote on the academy; its first list of
@@ -163,6 +167,13 @@ func (a *apis) mlbbBuild(ctx context.Context, name, lane, rank string) (mlbbBuil
 		})
 	})
 	wg.Wait()
+	if buildsErr != nil || len(builds.Builds) == 0 {
+		// Rone Arena has none: MLBBDex's are the answer, as text.
+		if dex, _ := a.dexBuildsFor(ctx, hero.name, hero.lane, rank, nil); len(dex) > 0 {
+			return mlbbBuildOutput{Hero: hero.name, Lane: hero.lane, Rank: rank, Builds: dex, Source: dexSource,
+				Note: "MLBBDex's builds, as Rone Arena gave none; no picture is sent"}, nil
+		}
+	}
 	if buildsErr != nil {
 		return mlbbBuildOutput{}, buildsErr
 	}
@@ -195,6 +206,10 @@ func (a *apis) mlbbBuild(ctx context.Context, name, lane, rank string) (mlbbBuil
 	if len(finish) > 0 {
 		out.FinishWith = entryNames(items, finish)
 		out.Note += finishNote
+	}
+	out.DexBuilds, out.ItemsInBoth = a.dexBuildsFor(ctx, hero.name, hero.lane, rank, out.Builds)
+	if len(out.DexBuilds) > 0 {
+		out.Note += "; mlbbdex_builds are MLBBDex's for the same lane and rank, items_in_both what both sources build: say where they agree"
 	}
 	out.Note += a.sendBuildCard(ctx, out, sorted[0], finish, items, talents)
 	return out, nil

@@ -144,6 +144,7 @@ type mlbbHeroOutput struct {
 	StrongAgainst []mlbbMatchup     `json:"strong_against"`
 	CounteredBy   []mlbbMatchup     `json:"countered_by"`
 	GoodPartners  []string          `json:"good_partners"`
+	Compared      *mlbbCompared     `json:"compared,omitempty"`
 	Source        string            `json:"source"`
 	Note          string            `json:"note"`
 }
@@ -378,17 +379,20 @@ func (a *apis) mlbbHero(ctx context.Context, name, rank string, picture bool) (m
 	} else {
 		out.Note += "; Rone Arena did not answer, so the rates by rank, counters, partners and tips are missing: say so if asked"
 	}
+	roneRates := out.mlbbRates
 	if profileErr == nil {
 		applyDexProfile(&out, profile)
 		out.Source = dexSource + "; " + mlbbSource
 	}
+	var dexRates mlbbRates
 	if rates, measured, ok := rankings.find(names[id]); rankingsErr == nil && ok {
-		out.mlbbRates, out.RatesMeasured = rates, measured
+		out.mlbbRates, out.RatesMeasured, dexRates = rates, measured, rates
 		out.Note += "; win, pick and ban rates and the tier are MLBBDex's, measured on rates_measured"
 	}
 	if out.Hero == "" {
 		out.Hero = names[id]
 	}
+	out.Compared = a.compareHero(ctx, out, roneRates, dexRates, rank)
 	if picture {
 		out.Note = a.sendHeroPicture(ctx, out.Note, profile.Data.Images.Portrait, cmp.Or(detail.Hero.Data.Picture, detail.Hero.Data.Card))
 	}
