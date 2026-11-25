@@ -49,3 +49,19 @@ func TestWithCallName(t *testing.T) {
 		}
 	}
 }
+
+// A bare name call in a group is answered in Uzbek, in Russian only for a
+// Cyrillic name from a Russian app, whatever other app the member uses.
+func TestBareNameLanguage(t *testing.T) {
+	f := newFixture()
+	msg := groupMessage("Mira")
+	msg.From.LanguageCode = "en"
+	sent := f.run(inGroup(msg))
+	english := map[string]bool{}
+	for _, l := range nameCallLines {
+		english[l.en] = true
+	}
+	if len(sent) != 1 || english[sent[0].text] {
+		t.Errorf("sent %+v, want Uzbek", sent)
+	}
+}

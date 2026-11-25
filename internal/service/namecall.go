@@ -31,7 +31,7 @@ func (s *Service) nameCallAnswer(ctx context.Context, in incoming) (outcome, boo
 	if s.isOwner(in.msg.From) && callName == "" {
 		lines = nameCallOwnerLines
 	}
-	answer := agent.Answer{Text: withCallName(lines[rand.IntN(len(lines))].to(in), callName)}
+	answer := agent.Answer{Text: withCallName(lines[rand.IntN(len(lines))].inLanguage(nameCallLanguage(in)), callName)}
 	saved, err := s.opts.Replier.Reply(ctx, agent.Request{
 		Scope: in.scope, UserID: in.userID, UpdateID: in.updateID, MessageID: in.msg.MessageID,
 		Text: in.text, Fixed: &answer,
@@ -44,6 +44,21 @@ func (s *Service) nameCallAnswer(ctx context.Context, in incoming) (outcome, boo
 		saved = answer
 	}
 	return outcome{text: saved.Text, answerID: saved.ID}, true
+}
+
+// nameCallLanguage is the language a bare name call is answered in: a
+// name alone says too little, and the app's language misled (an Uzbek
+// group's "mari" was answered in English, 2026-11-25); in a group a name in
+// Cyrillic from a Russian app is answered in Russian, any other in Uzbek.
+func nameCallLanguage(in incoming) string {
+	if !in.group {
+		return languageOf(in)
+	}
+	text, _ := in.msg.Content()
+	if strings.IndexFunc(text, func(r rune) bool { return unicode.Is(unicode.Cyrillic, r) }) >= 0 && appLanguage(in.msg.From) == "ru" {
+		return "ru"
+	}
+	return "uz"
 }
 
 // withCallName puts name after a line's first words: "Labbay?" becomes

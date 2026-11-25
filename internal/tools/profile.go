@@ -54,7 +54,7 @@ type profileResult struct {
 func ProfileTool(opts ProfileOptions) Tool {
 	return Tool{
 		Name: "my_profile",
-		Description: "Remember how to talk to the person writing, in every group and chat: when they ask to be called by a name from now on. " +
+		Description: "Remember how to talk to the person writing, in every group and chat: when they ask to be called by a name from now on (\"meni Qirolicham deb chaqir\", \"Qirolicham deb chaqir menga\", \"менга Устоз де\", \"call me Boss\"). Agreeing to a name without this call saves nothing. " +
 			"set_name: name, copied from their own message. clear: forget it. show: what you remember. " +
 			"For the person themselves; only an owner may set it for someone else, with for_member true, for the member whose message they replied to or whom your replied-to answer answered (\"uni Ustoz deb chaqir\").",
 		Schema: json.RawMessage(`{
