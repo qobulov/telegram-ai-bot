@@ -37,7 +37,7 @@ const (
 	// skill won 45-52%.
 	StrikeFactor  = 1.8  // a Strike hits for this times the attack
 	HealShare     = 0.80 // a Heal gives the weakest hurt ally this share of its health, at most what it lost
-	ShieldShare   = 0.45 // a Shield gives itself and its weakest ally this share of their health
+	ShieldShare   = 0.30 // a Shield gives itself and its weakest ally this share of their health (0.45 until 2026-11-25, when it came to hit as well)
 	PoisonTurns   = 3    // a Poison hurts the target at the start of its next 3 turns ...
 	PoisonShare   = 0.15 // ... by this share of its health, past any shield
 	ProvokeRounds = 3    // a Provoke draws enemy Tanks, Dealers and Healers for 3 more rounds ...
@@ -392,6 +392,8 @@ func (f *fight) bossTurn(u *unit) {
 // with nobody hurt keeps it for a turn that needs it.
 func (f *fight) useSkill(u *unit) bool {
 	switch u.Skill {
+	// A Heal or a Shield hits as well, since 2026-11-25, as the owners asked:
+	// its turn went on the skill alone, while every other skill hits.
 	case Heal:
 		ally := f.weakestHurt(u.side)
 		if ally == nil || healAmount(ally) <= 0 {
@@ -399,12 +401,14 @@ func (f *fight) useSkill(u *unit) bool {
 		}
 		u.energy = 0
 		f.heal(u, ally)
+		f.skillAndHit(u)
 	case Shield:
 		u.energy = 0
 		f.shield(u, u)
 		if ally := f.weakestAlly(u); ally != nil {
 			f.shield(u, ally)
 		}
+		f.skillAndHit(u)
 	case Provoke:
 		u.energy = 0
 		f.provoke(u)
@@ -418,6 +422,13 @@ func (f *fight) useSkill(u *unit) bool {
 }
 
 // skillHit is a Strike, Stun or Poison on u's target.
+// skillAndHit is the plain hit a Heal or a Shield adds to its skill.
+func (f *fight) skillAndHit(u *unit) {
+	if target := f.target(u); target != nil {
+		f.hit(u, target, 1, KindHit)
+	}
+}
+
 func (f *fight) skillHit(u *unit) {
 	target := f.target(u)
 	if target == nil {

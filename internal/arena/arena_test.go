@@ -303,7 +303,7 @@ func TestSkillAtFullEnergy(t *testing.T) {
 }
 
 // A Heal with nobody hurt hits plainly and keeps its energy; with an ally
-// hurt it heals the weakest one and spends it.
+// hurt it heals the weakest one, spends it and hits as well.
 func TestHealWithNobodyHurtKeepsEnergy(t *testing.T) {
 	var a Team
 	a.Front[0] = FighterOf(7, "healer", 4, 1, 100, 350) // Heal
@@ -317,14 +317,17 @@ func TestHealWithNobodyHurtKeepsEnergy(t *testing.T) {
 	}
 	ally.hp = 200
 	f.act(u)
-	e := f.events[len(f.events)-1]
+	if hit := f.events[len(f.events)-1]; hit.Kind != KindHit || hit.From != 0 || hit.Side != 0 {
+		t.Errorf("after the heal: %+v, want its hit", hit)
+	}
+	e := f.events[len(f.events)-2]
 	if e.Kind != KindHeal || e.To != 1 || e.Amount != int(HealShare*1000) || u.energy != 0 {
 		t.Errorf("an ally hurt: %+v, energy %d", e, u.energy)
 	}
 }
 
 // A Shield shields its caster and its ally with the least health, each by
-// ShieldShare of its own health, and takes the turn.
+// ShieldShare of its own health, then hits.
 func TestShieldOnSelfAndWeakest(t *testing.T) {
 	var a Team
 	a.Front[0] = FighterOf(8, "shield", 4, 1, 100, 1000) // Shield, Tank
@@ -335,8 +338,8 @@ func TestShieldOnSelfAndWeakest(t *testing.T) {
 	u := f.teams[0][0]
 	u.energy = EnergyMax
 	f.act(u)
-	if len(f.events) != 2 {
-		t.Fatalf("events %+v, want two shields", f.events)
+	if len(f.events) != 3 || f.events[2].Kind != KindHit || f.events[2].From != 0 {
+		t.Fatalf("events %+v, want two shields and a hit", f.events)
 	}
 	for i, want := range [][2]int{{0, int(ShieldShare * 1000)}, {2, int(ShieldShare * 800)}} {
 		e := f.events[i]
