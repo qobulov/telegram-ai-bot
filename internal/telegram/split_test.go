@@ -27,6 +27,16 @@ func TestSplitPrefersLineBreaks(t *testing.T) {
 	}
 }
 
+// A blank line in the second half is cut at before a line break is, so
+// that a hero's part of a patch's notes stays in one message.
+func TestSplitPrefersBlankLines(t *testing.T) {
+	text := "Aldous\n⟫ a\n⟫ b\n\nLukas\n⟫ c\n⟫ d"
+	chunks := Split(text, 24)
+	if len(chunks) != 2 || chunks[0] != "Aldous\n⟫ a\n⟫ b\n\n" || chunks[1] != "Lukas\n⟫ c\n⟫ d" {
+		t.Errorf("chunks = %q", chunks)
+	}
+}
+
 func TestSplitFallsBackToSpaces(t *testing.T) {
 	chunks := Split("alpha beta gamma", 12)
 	if len(chunks) != 2 || chunks[0] != "alpha beta " || chunks[1] != "gamma" {

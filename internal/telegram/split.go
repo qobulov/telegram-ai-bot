@@ -38,7 +38,13 @@ func prefixEnd(text string, limit int) int {
 	return len(text)
 }
 
+// breakPoint cuts at a blank line when one falls in the second half, so
+// that a paragraph, such as a hero's part of a patch's notes, stays in one
+// message; else at a line break, else at a space.
 func breakPoint(text string, end int) int {
+	if i := strings.LastIndex(text[:end], "\n\n"); i >= end/2 {
+		return i + 2
+	}
 	for _, separator := range []byte{'\n', ' '} {
 		if i := strings.LastIndexByte(text[:end], separator); i >= end/2 {
 			return i + 1
