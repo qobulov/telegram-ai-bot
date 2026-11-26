@@ -56,7 +56,7 @@ func TestMLBBPatch(t *testing.T) {
 	u := newUpstream(t, map[string]stub{"/dex/api/v1/patches": ok(dexPatches), "/dex/api/v1/patches/2.2.23": ok(dexPatch23), "/dex/api/v1/patches/2.2.16a": ok(dexPatch16a)})
 
 	env := run(t, u.options(), "mlbb_news", `{"action":"patch"}`)
-	for _, want := range []string{`"patch":"2.2.23"`, `"date":"2026-11-11"`, `"heroes":["Aldous: buff"]`, `"new_or_revamped_heroes":["Popol and Kupa, Icefield Companions"]`, "Revamped Hero Popol and Kupa", `"previous":"2.2.16a (2026-10-14)"`, `"hero_changes":["Aldous (buff): Skill 2, Contract: Explosion [buff]: Cooldown: 12-9.5s → 8s at all levels; New Effect: more damage."]`, "never from a web search"} {
+	for _, want := range []string{`"patch":"2.2.23"`, `"date":"2026-11-11"`, `"heroes":["Aldous: buff"]`, `"new_or_revamped_heroes":["Popol and Kupa, Icefield Companions"]`, "Revamped Hero Popol and Kupa", `"previous":"2.2.16a (2026-10-14)"`, `🌟 Aldous ↑\nLess downtime.\n\n[Skill 2 · Contract: Explosion] (↑)\nCooldown: 12-9.5s → 8s at all levels\nNew Effect: more damage.`, "🌟 Popol and Kupa, Icefield Companions (revamp)", "never from a web search"} {
 		if !env.OK || !strings.Contains(env.raw, want) {
 			t.Errorf("patch lacks %s: %s", want, env.raw)
 		}
@@ -80,7 +80,7 @@ func TestMLBBPatchNotesParts(t *testing.T) {
 	u := newUpstream(t, map[string]stub{"/dex/api/v1/patches": ok(dexPatches), "/dex/api/v1/patches/2.2.16": ok(dexPatch16)})
 
 	env := run(t, u.options(), "mlbb_news", `{"action":"patch","version":"2.2.16"}`)
-	for _, want := range []string{`"heroes":["Aulus: buff"]`, `"new_or_revamped_heroes":["Masha, the Wild-oats Fist","Bruno, The Protector"]`, `"other_sections":["V. Game Modes/Mode Adjustments"]`, `"hero_changes":["Aulus (buff): Ultimate, Cleaving Axe [nerf]: Base Damage: 150-270 → 110-270"]`} {
+	for _, want := range []string{`"heroes":["Aulus: buff"]`, `"new_or_revamped_heroes":["Masha, the Wild-oats Fist","Bruno, The Protector"]`, `"other_sections":["V. Game Modes/Mode Adjustments"]`, `🌟 Aulus ↑\nRamps up faster.\n\n[Ultimate · Cleaving Axe] (↓)\nBase Damage: 150-270 → 110-270`, "🌟 Bruno, The Protector (revamp)"} {
 		if !env.OK || !strings.Contains(env.raw, want) {
 			t.Errorf("2.2.16 lacks %s: %s", want, env.raw)
 		}
