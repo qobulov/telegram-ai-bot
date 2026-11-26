@@ -61,7 +61,7 @@ func (a *apis) mlbbNewsTool() tools.Tool {
 			"additionalProperties": false
 		}`),
 		Timeout:        patientTimeout,
-		MaxOutputBytes: mlbbOutputBytes,
+		MaxOutputBytes: newsOutputBytes,
 		Run:            a.mlbbNews,
 	}
 }
@@ -190,7 +190,8 @@ func (a *apis) mlbbPatch(ctx context.Context, ask patchAsk) (any, error) {
 		return patchSection(latest, ask.section), nil
 	}
 	out := map[string]any{"patch": latest.Version, "date": latest.Date, "source": patchSource,
-		"note": "For what changed for a hero, call again with hero; for a part of the notes, with section."}
+		"note": "hero_changes has each hero's changes skill by skill with the numbers before → after: answer what changed from it, never from a web search. " +
+			"For a hero in hero_changes_left, call again with hero; for a part of the notes, with section. " + heroChangeNote}
 	if len(latest.Sections) > 0 && latest.Sections[0].Title == nil {
 		out["highlights"] = cleanText(latest.Sections[0].HTML, 600)
 	}
@@ -211,6 +212,11 @@ func (a *apis) mlbbPatch(ctx context.Context, ask patchAsk) (any, error) {
 		}
 	}
 	out["heroes"] = heroes
+	changes, left := heroChanges(latest)
+	out["hero_changes"] = changes
+	if len(left) > 0 {
+		out["hero_changes_left"] = left
+	}
 	if others := otherSections(latest); len(others) > 0 {
 		out["other_sections"] = others
 	}
@@ -260,6 +266,32 @@ func (a *apis) heroInPatches(ctx context.Context, searched []dexPatchEntry, hero
 	}
 	return map[string]any{"hero": hero, "changed": false, "patches_searched": titles,
 		"note": "No change to this hero in these patches.", "source": patchSource}, nil
+}
+
+// newsOutputBytes leave room for every hero's changes in a patch, which
+// players ask for whole: "before after stat ber".
+const (
+	newsOutputBytes  = 12000
+	heroChangesBytes = 8000
+)
+
+// heroChanges are the patch's heroes' changes, one line a hero, as many as
+// heroChangesBytes hold; left are the heroes cut, to be asked one by one.
+func heroChanges(patch dexPatch) (changes, left []string) {
+	size := 0
+	for _, c := range patch.Changes {
+		best, _ := heroAdjustment(patch, lettersOf(c.Name))
+		if len(best.Sections) == 0 || slices.ContainsFunc(changes, func(l string) bool { return strings.HasPrefix(l, best.Name+" (") }) {
+			continue
+		}
+		line := best.Name + " (" + best.Type + "): " + strings.Join(adjustmentLines(best), " | ")
+		if size += len(line); size > heroChangesBytes {
+			left = append(left, best.Name)
+			continue
+		}
+		changes = append(changes, line)
+	}
+	return changes, left
 }
 
 // heroAdjustment is the patch's adjustment of the hero, the fullest when it
