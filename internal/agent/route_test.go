@@ -208,12 +208,14 @@ func TestWeatherQuestionsSkipTheRouter(t *testing.T) {
 // router took it for small talk and the chat model guessed (2026-11-21).
 func TestStatsQuestionsSkipTheRouter(t *testing.T) {
 	for msg, full := range map[string]bool{
-		"Ali: top aktiv hafta":      true,
-		"Ali: eng faol kim":         true,
-		"Ali: статистика группы":    true,
-		"Ali: guruh reytingi":       true,
-		"Ali: bugun kayfiyat zo'r":  false,
-		"Ali: Mari, nima qilyapsiz": false,
+		"Ali: top aktiv hafta":             true,
+		"Ali: eng faol kim":                true,
+		"Ali: статистика группы":           true,
+		"Ali: guruh reytingi":              true,
+		"Ali: mani kartalarimni bilasanmi": true,
+		"Ali: nechta karta bor menda":      true,
+		"Ali: bugun kayfiyat zo'r":         false,
+		"Ali: Mari, nima qilyapsiz":        false,
 	} {
 		f, router, _ := routedFixture("CHAT", text("chat"), text("full"))
 		req := request(1, msg)

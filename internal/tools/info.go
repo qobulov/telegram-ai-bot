@@ -23,7 +23,7 @@ const (
 	// enough detail to comment on it.
 	memberPhotoPrompt = "This is a group member's Telegram profile picture. In English, in two to four sentences, say plainly what it shows, for a playful comment on it: " +
 		"who or what (a person, an anime or game character, an animal, an object, a meme), the pose and expression, the clothes or style, the background, any text on it, the colours and the mood. Never guess who a real person is."
-	memberPhotoNote = "photo.shows is their profile picture as you see it. Comment on it as asked, playfully and kindly: tease the choice of picture, the pose, the style or the background, never a real person's body, face, skin, weight or looks, nor their family. has false: they have no photo, or hide it from bots."
+	memberPhotoNote = "photo.shows is their profile picture as you see it. Comment on it as asked, playfully and kindly: tease the choice of picture, the pose, the style or the background, never a real person's body, face, skin, weight or looks, nor their family. You see only the picture they have now: never say it changed or compare it with an earlier one. has false: they have no photo, or hide it from bots."
 )
 
 // GroupInfoReader asks Telegram about a group.

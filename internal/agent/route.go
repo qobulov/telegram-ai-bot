@@ -110,8 +110,10 @@ var weatherWords = regexp.MustCompile(`(?i)(ob-?havo|obu-?havo|обу?-?ҳаво
 // statsWords ask for the group's statistics or ranking, which only the
 // group_stats and member_info tools know: asked "top aktiv hafta", the
 // router took it for small talk and the chat model said "you are first all
-// week" without looking (2026-11-21).
-var statsWords = regexp.MustCompile(`(?i)(aktiv|faol|актив|фаол|statistik|статистик|reyting|рейтинг|\bmvp\b)`)
+// week" without looking (2026-11-21). A player's own cards and tokens are
+// member_info's: asked "kartalarimni bilasanmi", the chat model said it
+// keeps no list of them (2026-11-26).
+var statsWords = regexp.MustCompile(`(?i)(aktiv|faol|актив|фаол|statistik|статистик|reyting|рейтинг|\bmvp\b|kartalarim|kartam|nechta karta|мои карт|моих карт|my cards|tokenim|tokenlarim|токен)`)
 
 // photoWords ask about a member's profile picture, which only member_info
 // looks at: asked to comment on the players' pictures, the chat model said

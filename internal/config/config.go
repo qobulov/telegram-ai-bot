@@ -304,6 +304,9 @@ func Load(getenv func(string) string) (Config, error) {
 	if cfg.WebAppURL != "" {
 		cfg.PersonaPrompt += "\n\n" + cardsNote
 	}
+	if len(cfg.RequiredChannels) > 0 {
+		cfg.PersonaPrompt += "\n\n" + channelsNote
+	}
 	r.checkRemovedVariables()
 	r.checkGroupSettings(cfg)
 	if err := errors.Join(r.errs...); err != nil {
