@@ -27,13 +27,15 @@ func (e *CardTokensError) Error() string { return "storage: too few tokens" }
 // the pity no longer counting. An AtRarity event's cards come at the rarity
 // rolled, any of them, not only a Mythic: Pick says whether a pull of a
 // rarity it has cards of is one of them. Sure, when given, are the cards
-// the pity counts and gives, else Cards.
+// the pity counts and gives, else Cards. Extra are cards no draw gives that
+// the event's pulls give at their rarity like any other.
 type CardEvent struct {
 	Key      string
 	Cards    []int64
 	Once     bool
 	AtRarity bool
 	Sure     []int64
+	Extra    []int64
 	Ends     time.Time
 	Pity     int
 	Price    int
@@ -175,8 +177,23 @@ func eventCard(ctx context.Context, tx pgx.Tx, userID int64, ev CardEvent, pull 
 			return c, raised, err
 		}
 	}
-	c, err := randomCard(ctx, tx, rarity, "", ev.Cards)
+	c, err := randomEventCard(ctx, tx, rarity, ev.Cards, ev.Extra)
 	return c, raised, err
+}
+
+// randomEventCard is a card of rarity at random, as randomCard picks one,
+// but that extra, cards no draw gives, may be among them; never one of but.
+func randomEventCard(ctx context.Context, tx pgx.Tx, rarity int, but, extra []int64) (Card, error) {
+	if len(extra) == 0 {
+		return randomCard(ctx, tx, rarity, "", but)
+	}
+	var c Card
+	err := tx.QueryRow(ctx, `
+		SELECT id, name, anime, image_url, favourites, rarity, attack, health, value, collection
+		FROM card_catalog WHERE rarity = $1 AND id <> ALL($2::bigint[]) AND (id <> ALL($3::bigint[]) OR id = ANY($4::bigint[]))
+		ORDER BY random() LIMIT 1`, rarity, append([]int64{}, but...), undrawnCardIDs(), extra).
+		Scan(&c.ID, &c.Name, &c.Anime, &c.ImageURL, &c.Favourites, &c.Rarity, &c.Attack, &c.Health, &c.Value, &c.Collection)
+	return c, err
 }
 
 // pickEventCard is one of an event's cards at random, of rarity or of any

@@ -28,6 +28,7 @@ type Event struct {
 	Once         bool
 	AtRarity     bool
 	Sure         []int64
+	Extra        []int64
 	Mythic       int
 	Share        float64
 	Pity         int
@@ -50,7 +51,10 @@ type Event struct {
 // starts), set out as that one is, its six Mythics, Asta, Yuno,
 // Julius, Mereoleona, Yami and Noelle, which nothing else gives
 // (storage.BlackCloverCards), 0.6% a pull beside the usual 0.5% of other
-// Mythics, and a sure one on the 300th pull in a row without one.
+// Mythics, and a sure one on the 300th pull in a row without one. Its
+// pulls also give Black Clover's thirteen other cards, closed to every
+// other draw, at their rarity like any card, as the owners asked on
+// 2026-11-26 (storage.BlackCloverClosed).
 //
 // The Demon Slayer event, as the owners asked on 2026-11-21: for a week its
 // six Mythics, which nothing else gives (storage.DemonSlayerCards), 0.6% a
@@ -62,7 +66,7 @@ var Events = []Event{
 		Starts: time.Date(2026, 11, 18, 22, 0, 0, 0, Location), Ends: time.Date(2026, 11, 23, 0, 0, 0, 0, Location)},
 	{Key: "demon-slayer", Cards: storage.DemonSlayerCards, Mythic: 11, Share: 6.0 / 11, Pity: 300, Price: 1, Batch: 10,
 		Starts: time.Date(2026, 11, 21, 19, 30, 0, 0, Location), Ends: time.Date(2026, 11, 28, 19, 30, 0, 0, Location)},
-	{Key: "black-clover", Cards: storage.BlackCloverCards, Mythic: 11, Share: 6.0 / 11, Pity: 300, Price: 1, Batch: 10,
+	{Key: "black-clover", Cards: storage.BlackCloverCards, Extra: storage.BlackCloverClosed, Mythic: 11, Share: 6.0 / 11, Pity: 300, Price: 1, Batch: 10,
 		Starts: time.Date(2026, 11, 25, 19, 30, 0, 0, Location), Ends: time.Date(2026, 12, 2, 19, 30, 0, 0, Location),
 		Shown: time.Date(2026, 11, 22, 0, 0, 0, 0, Location)},
 }
@@ -252,7 +256,7 @@ func (h *handler) eventOpen(ctx context.Context, user miniapp.User, key string, 
 		return nil, errUnavailable
 	}
 	ev := storage.CardEvent{
-		Key: e.Key, Cards: e.Cards, Once: e.Once, AtRarity: e.AtRarity, Sure: e.Sure, Ends: e.Ends, Pity: e.Pity, Price: e.Price,
+		Key: e.Key, Cards: e.Cards, Once: e.Once, AtRarity: e.AtRarity, Sure: e.Sure, Extra: e.Extra, Ends: e.Ends, Pity: e.Pity, Price: e.Price,
 		Roll: ByOdds(h.eventRoll(e)), Pick: h.eventPick(e.Share),
 	}
 	opened, err := h.Store.OpenEventCards(ctx, user.ID, name(user), n, ev, Today(now), now, questOf(QuestEvent, now))

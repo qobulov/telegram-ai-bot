@@ -58,8 +58,9 @@ var DemonSlayerCards = []int64{130050, 129131, 141918, 149220, 129132, 141694}
 var BlackCloverCards = []int64{123285, 123284, 124435, 124522, 124440, 123283}
 
 // BlackCloverClosed are Black Clover's thirteen other cards, which the
-// owners closed to draws too on 2026-11-22: nothing gives them for now, nor
-// does any collection need them.
+// owners closed to draws on 2026-11-22: only the Black Clover event's pulls
+// give them, as the owners asked on 2026-11-26 (cards.Events), and no
+// collection needs them.
 var BlackCloverClosed = []int64{
 	124449, 126948, 124459, 124436, 124447, 124438, 124433, 124434, 187268, 124439,
 	192196, 124521, 124442,
