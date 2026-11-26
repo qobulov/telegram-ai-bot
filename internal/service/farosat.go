@@ -30,37 +30,18 @@ const (
 	farosatMostGain = 12
 )
 
-var (
-	textFarosatHead  = localText{uz: "🧠 **FAROSAT** · %s", ru: "🧠 **ФАРОСАТ** · %s", en: "🧠 **FAROSAT** · %s"}
-	textFarosatUp    = localText{uz: "📈 Bugun: **+%d gram**", ru: "📈 Сегодня: **+%d г**", en: "📈 Today: **+%d grams**"}
-	textFarosatDown  = localText{uz: "📉 Bugun: **−%d gram**", ru: "📉 Сегодня: **−%d г**", en: "📉 Today: **−%d grams**"}
-	textFarosatTaken = localText{
-		uz: "✅ Bugungi farosatingizni allaqachon oldingiz",
-		ru: "✅ Сегодняшнюю фаросат вы уже получили",
-		en: "✅ You already took today's farosat",
-	}
-	textFarosatTotal = localText{uz: "⚖️ Jami: **%d gram**", ru: "⚖️ Всего: **%d г**", en: "⚖️ Total: **%d grams**"}
-	textFarosatPlace = localText{uz: "🏆 Guruhda: **%d-o'rin**", ru: "🏆 В группе: **%d-е место**", en: "🏆 In the group: **place %d**"}
-	textFarosatNext  = localText{uz: "🕛 Keyingisi yarim tundan keyin", ru: "🕛 Следующая после полуночи", en: "🕛 The next one after midnight"}
-	// A day's take says how it went: a big gain, a small one, a loss.
-	textFarosatBig   = localText{uz: "🔥 Bugun aql charaqlayapti!", ru: "🔥 Сегодня ум так и сияет!", en: "🔥 Your mind is sparkling today!"}
-	textFarosatSmall = localText{uz: "🌱 Oz-ozdan, lekin o'syapti", ru: "🌱 Понемногу, но растёт", en: "🌱 Little by little, it grows"}
-	textFarosatLost  = localText{uz: "😅 Voy, bugun biroz kamaydi", ru: "😅 Ой, сегодня немного убавилось", en: "😅 Oops, a little less today"}
-	textFarosatTop   = localText{uz: "🏆 **FAROSAT REYTINGI · TOP %d**", ru: "🏆 **РЕЙТИНГ ФАРОСАТ · ТОП %d**", en: "🏆 **FAROSAT RANKING · TOP %d**"}
-	textFarosatTake  = localText{uz: "🧠 /farosat — bugungi farosatingizni oling", ru: "🧠 /farosat — получите фаросат на сегодня", en: "🧠 /farosat — take today's farosat"}
-	textFarosatNone  = localText{
-		uz: "🧠 Hali hech kim farosat olmagan. /farosat yozing!",
-		ru: "🧠 Пока никто не получил фаросат. Напишите /farosat!",
-		en: "🧠 Nobody has taken their farosat yet. Write /farosat!",
-	}
-	textFarosatGrams = localText{uz: "gram", ru: "г", en: "grams"}
+// The answers are word for word the other bot's, in Uzbek alone, as the
+// owners asked: its players know them.
+const (
+	textFarosatUp    = "🧠 %s, farosatingiz +%d gram oshdi.\n🧠 Hozir: %d gram"
+	textFarosatDown  = "🧠 %s, farosatingiz %d gram kamaydi.\n🧠 Hozir: %d gram"
+	textFarosatTaken = "%s, bugungi ulushingizni allaqachon oldingiz.\n🧠 Farosatingiz: %d gram\n🕛 Keyingisi yarim tundan keyin"
+	textFarosatTop   = "🏆 Chat reytingi — TOP %d"
+	textFarosatNone  = "🧠 Hali hech kim farosat olmagan. /farosat yozing!"
+	// farosatNameShown is how much of a name the ranking shows, the rest
+	// cut to "...".
+	farosatNameShown = 17
 )
-
-// farosatRule sets a card's head off from its body and its foot.
-const farosatRule = "━━━━━━━━━━━━━━"
-
-// farosatBigGain is a gain told as a big one.
-const farosatBigGain = 9
 
 // farosatGain is a day's gain, at random.
 func farosatGain() int {
@@ -78,38 +59,31 @@ func (s *Service) farosat(ctx context.Context, in incoming) outcome {
 	}
 	name := cardMarks.Replace(displayName(in.msg.From))
 	gain := farosatGain()
-	grams, place, taken, err := s.opts.Farosat.TakeFarosat(ctx, in.scope.ChatID, in.userID, name, startOfDay(s.opts.Now(), location), gain)
+	grams, _, taken, err := s.opts.Farosat.TakeFarosat(ctx, in.scope.ChatID, in.userID, name, startOfDay(s.opts.Now(), location), gain)
 	if err != nil {
 		s.opts.Logger.Warn("could not take farosat", "chat_id", in.scope.ChatID, "error", err)
 		return say(textError.to(in))
 	}
-	return say(farosatCard(in, name, gain, taken, grams, place))
-}
-
-// farosatCard is a take's answer: whose it is, the day's change, the total,
-// the place, and when the next one comes.
-func farosatCard(in incoming, name string, gain int, taken bool, grams, place int) string {
-	var today, mood string
 	switch {
 	case !taken:
-		today = textFarosatTaken.to(in)
+		return say(fmt.Sprintf(textFarosatTaken, name, grams))
 	case gain < 0:
-		today, mood = fmt.Sprintf(textFarosatDown.to(in), -gain), textFarosatLost.to(in)
-	case gain >= farosatBigGain:
-		today, mood = fmt.Sprintf(textFarosatUp.to(in), gain), textFarosatBig.to(in)
+		return say(fmt.Sprintf(textFarosatDown, name, -gain, grams))
 	default:
-		today, mood = fmt.Sprintf(textFarosatUp.to(in), gain), textFarosatSmall.to(in)
+		return say(fmt.Sprintf(textFarosatUp, name, gain, grams))
 	}
-	lines := []string{fmt.Sprintf(textFarosatHead.to(in), name), farosatRule, today}
-	if mood != "" {
-		lines = append(lines, mood)
-	}
-	lines = append(lines, "", fmt.Sprintf(textFarosatTotal.to(in), grams), fmt.Sprintf(textFarosatPlace.to(in), place),
-		farosatRule, textFarosatNext.to(in))
-	return strings.Join(lines, "\n")
 }
 
 var farosatMedals = []string{"🥇", "🥈", "🥉"}
+
+// farosatName is a name as the ranking shows it, a long one cut short.
+func farosatName(name string) string {
+	runes := []rune(name)
+	if len(runes) <= farosatNameShown {
+		return name
+	}
+	return string(runes[:farosatNameShown]) + "..."
+}
 
 // farosatTop answers /topfarosat with the group's ranking.
 func (s *Service) farosatTop(ctx context.Context, in incoming, limit int) outcome {
@@ -119,19 +93,15 @@ func (s *Service) farosatTop(ctx context.Context, in incoming, limit int) outcom
 		return say(textError.to(in))
 	}
 	if len(top) == 0 {
-		return say(textFarosatNone.to(in))
+		return say(textFarosatNone)
 	}
-	lines := []string{fmt.Sprintf(textFarosatTop.to(in), limit), farosatRule}
+	lines := []string{fmt.Sprintf(textFarosatTop, limit)}
 	for i, r := range top {
 		place := fmt.Sprintf("%d.", i+1)
 		if i < len(farosatMedals) {
 			place = farosatMedals[i]
 		}
-		lines = append(lines, fmt.Sprintf("%s %s — **%d** %s", place, r.Name, r.Grams, textFarosatGrams.to(in)))
-		if i == len(farosatMedals)-1 && len(top) > len(farosatMedals) {
-			lines = append(lines, "")
-		}
+		lines = append(lines, fmt.Sprintf("%s %s — %d gram", place, farosatName(r.Name), r.Grams))
 	}
-	lines = append(lines, farosatRule, textFarosatTake.to(in))
 	return say(strings.Join(lines, "\n"))
 }
