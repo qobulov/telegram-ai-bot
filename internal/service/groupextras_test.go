@@ -44,14 +44,6 @@ func (m *memoryExtras) GiveRep(_ context.Context, _, from, to int64) (int, error
 	m.rep[to]++
 	return m.rep[to], nil
 }
-func (m *memoryExtras) RepOf(_ context.Context, _, userID int64) (int, int, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.rep[userID] == 0 {
-		return 0, 0, nil
-	}
-	return m.rep[userID], 1, nil
-}
 func (m *memoryExtras) GroupsWithSetting(_ context.Context, key, value string) ([]storage.GroupWithSetting, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -74,7 +66,7 @@ func (m *memoryExtras) RepTop(context.Context, int64, int) ([]storage.MemberRep,
 }
 
 // "+" or "rahmat" to a member gives them a point once, marked with a
-// reaction and unanswered; /rep and /toprep show it; a "+" to oneself or
+// reaction and unanswered; /toprep shows it; a "+" to oneself or
 // to the bot counts nothing.
 func TestReputationByThanks(t *testing.T) {
 	f := newFixture()
@@ -83,10 +75,6 @@ func TestReputationByThanks(t *testing.T) {
 	sent := f.run(from(20, "+", 30), from(20, "rahmat", 30), from(21, "Rahmat", 30), from(30, "+", 30))
 	if extras.rep[30] != 2 || len(reactor.recorded()) != 2 || len(sent) != 0 {
 		t.Fatalf("rep = %v, reactions %d, sent %+v", extras.rep, len(reactor.recorded()), sent)
-	}
-	sent = f.run(from(20, "/rep", 30))
-	if last := sent[len(sent)-1].text; !strings.Contains(last, "2 reputatsiya") {
-		t.Errorf("/rep = %q", last)
 	}
 	sent = f.run(from(20, "/toprep", 0))
 	if last := sent[len(sent)-1].text; !strings.Contains(last, "Sam — 2") {

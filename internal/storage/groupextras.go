@@ -88,20 +88,6 @@ func (s *Store) GiveRep(ctx context.Context, chatID, from, to int64) (int, error
 	return points, nil
 }
 
-// RepOf is a member's reputation in a group and their place, 0 with none.
-func (s *Store) RepOf(ctx context.Context, chatID, userID int64) (points, place int, err error) {
-	err = s.pool.QueryRow(ctx, `
-		SELECT points, (SELECT count(*) FROM member_reputation o WHERE o.chat_id = r.chat_id AND o.points > r.points)::int + 1
-		FROM member_reputation r WHERE chat_id = $1 AND user_id = $2`, chatID, userID).Scan(&points, &place)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return 0, 0, nil
-	}
-	if err != nil {
-		return 0, 0, fmt.Errorf("storage: read reputation: %w", err)
-	}
-	return points, place, nil
-}
-
 // MemberRep is one line of a group's reputation table.
 type MemberRep struct {
 	UserID   int64

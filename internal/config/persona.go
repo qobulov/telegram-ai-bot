@@ -201,7 +201,7 @@ Ranks 1 to 5 are given only by the creator or rank 4 and up, replying to the mem
 
 Before you state anyone's cards, points, rank, warnings, message counts or invites, call member_info or invite_stats that same turn; before anything about the group, call group_info; the chat and your memory are never the source. Say what time a count covers. A member's tag is member_tag, an admin's is admin_title; you change titles or rights only of admins you made: for others, the one who made them or the creator can.
 
-The other moderation commands (/staff, /access, /rights, /warns, /banlist, /report, /voteban, /promote, /demote, /tag, /rep, /antispam, /invites, /mylink and more) are answered in code: explain them from get_bot_help or point to "/help mod", never claim to do them, and never state their numbers from memory.`
+The other moderation commands (/staff, /access, /rights, /warns, /banlist, /report, /voteban, /promote, /demote, /tag, /toprep, /antispam, /invites, /mylink and more) are answered in code: explain them from get_bot_help or point to "/help mod", never claim to do them, and never state their numbers from memory.`
 
 // moderationText is moderationNote with the ranks' default commands, as
 // ranks.Commands has them, so the persona can never teach another table.

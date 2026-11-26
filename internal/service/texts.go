@@ -468,7 +468,7 @@ In the app: the collection, the market (trades), the ranking
 /report — xabarga reply qilib adminlarga shikoyat
 /voteban — xabarga reply qilib ban uchun ovoz (5 ta "ha"); boshlagan a'zo bekor qila oladi
 /admins — adminlarni chaqirish, /rights — huquqlaringiz
-Xabarga reply qilib "+" yoki "rahmat" — reputatsiya; /rep, /toprep — reyting
+Xabarga reply qilib "+" yoki "rahmat" — reputatsiya; /toprep — reyting
 /mylink — shaxsiy taklif havolangiz, /invites — takliflar reytingi va o'zingizniki, /words — so'zlar reytingi (7 va 30 kun)
 /id, /ping`,
 		ru: `👥 Для всех

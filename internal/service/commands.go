@@ -874,8 +874,6 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.inviteTable(ctx, in)
 	case s.opts.Words != nil && commandName(in.text) == "/words":
 		return s.wordTable(ctx, in)
-	case in.group && s.opts.Extras != nil && commandName(in.text) == "/rep":
-		return s.reputation(ctx, in)
 	case in.group && s.opts.Extras != nil && commandName(in.text) == "/toprep":
 		return s.reputationTop(ctx, in)
 	case in.group && s.opts.Extras != nil && commandName(in.text) == "/cleanservice":

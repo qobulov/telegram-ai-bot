@@ -17,7 +17,6 @@ type GroupExtras interface {
 	GroupSetting(ctx context.Context, chatID int64, key string) (string, error)
 	SetGroupSetting(ctx context.Context, chatID int64, key, value string, by int64) error
 	GiveRep(ctx context.Context, chatID, from, to int64) (int, error)
-	RepOf(ctx context.Context, chatID, userID int64) (points, place int, err error)
 	RepTop(ctx context.Context, chatID int64, limit int) ([]storage.MemberRep, error)
 	GroupsWithSetting(ctx context.Context, key, value string) ([]storage.GroupWithSetting, error)
 	Groups(ctx context.Context, since time.Time, limit int) ([]storage.GroupSummary, error)
@@ -88,23 +87,6 @@ func (s *Service) thanked(in incoming) bool {
 
 // repShown is how many members /toprep lists.
 const repShown = 10
-
-// reputation answers /rep, of the asker or the member replied to.
-func (s *Service) reputation(ctx context.Context, in incoming) outcome {
-	who := in.msg.From
-	if r := in.msg.ReplyToMessage; r != nil && r.From != nil && !r.From.IsBot {
-		who = r.From
-	}
-	points, place, err := s.opts.Extras.RepOf(ctx, in.scope.ChatID, who.ID)
-	if err != nil {
-		return say(textError.to(in))
-	}
-	name := cardMarks.Replace(displayName(who))
-	if points == 0 {
-		return say("⭐ " + name + ": hali reputatsiya yo'q. Foydali xabarga reply qilib \"+\" yoki \"rahmat\" yozilsa, +1 bo'ladi.")
-	}
-	return say(fmt.Sprintf("⭐ %s: %d reputatsiya, guruhda %d-o'rin.", name, points, place))
-}
 
 // reputationTop answers /toprep: the group's most thanked members.
 func (s *Service) reputationTop(ctx context.Context, in incoming) outcome {

@@ -41,13 +41,7 @@ func TestReputation(t *testing.T) {
 		t.Errorf("from another = %d", n)
 	}
 	_, _ = store.GiveRep(ctx, chat, b, c)
-	if points, place, _ := store.RepOf(ctx, chat, c); points != 1 || place != 2 {
-		t.Errorf("c = %d, place %d", points, place)
-	}
 	if top, _ := store.RepTop(ctx, chat, 10); len(top) != 2 || top[0].UserID != b {
 		t.Errorf("top = %+v", top)
-	}
-	if points, place, _ := store.RepOf(ctx, chat, 99); points != 0 || place != 0 {
-		t.Errorf("none = %d %d", points, place)
 	}
 }
