@@ -77,8 +77,15 @@ func (s *Store) OfferCard(ctx context.Context, from, give, want int64, rules Car
 	return id, tradeError("offer a card", err)
 }
 
-// CardMarket is the offers open on the market as viewer sees them: those
-// they can take first, then the newest; at most limit. An offer whose player
+// ownOffersShown is the most of a player's own offers the market lists them,
+// apart from the others' limit: under the others' limit alone, theirs, which
+// they can never take, came last and fell off a market of hundreds, as the
+// owners saw players' offers go unseen on 2026-11-26.
+const ownOffersShown = 200
+
+// CardMarket is the offers open on the market as viewer sees them: their own
+// first, at most ownOffersShown, then others' they can take, then the
+// newest; at most limit of others'. An offer whose player
 // no longer holds the card offered, or has raised it above ★1, is left out,
 // as taking it would fail, and so is one placed before trades were of
 // rarities at most tradeRarityGap apart and of no limited card. Viewer
@@ -88,20 +95,25 @@ func (s *Store) OfferCard(ctx context.Context, from, give, want int64, rules Car
 // fills them from the catalog it keeps.
 func (s *Store) CardMarket(ctx context.Context, viewer int64, rules CardMarketRules, limit int) ([]CardOffer, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT t.id, t.from_id, coalesce(p.name, ''), t.created_at, g.id, w.id, c.can, c.starred
-		FROM card_trades t
-		JOIN card_catalog g ON g.id = t.give_card
-		JOIN card_catalog w ON w.id = t.take_card
-		LEFT JOIN card_players p ON p.user_id = t.from_id
-		CROSS JOIN LATERAL (
-			SELECT t.from_id <> $1 AND EXISTS (SELECT 1 FROM card_owned o WHERE o.user_id = $1 AND o.card_id = t.take_card AND o.stars = 1) AS can,
-				EXISTS (SELECT 1 FROM card_owned o WHERE o.user_id = $1 AND o.card_id = t.take_card AND o.stars > 1) AS starred
-		) c
-		WHERE t.status = 'open' AND t.to_id IS NULL AND t.created_at > $2
-			AND EXISTS (SELECT 1 FROM card_owned o WHERE o.user_id = t.from_id AND o.card_id = t.give_card
-				AND o.stars = 1)
-			AND abs(g.rarity - w.rarity) <= $5 AND NOT (t.give_card = ANY($4) OR t.take_card = ANY($4))
-		ORDER BY c.can DESC, t.created_at DESC, t.id DESC LIMIT $3`, viewer, rules.Now.Add(-rules.Keep), limit, limitedCardIDs(), tradeRarityGap)
+		SELECT id, from_id, name, created_at, give, want, can, starred FROM (
+			SELECT t.id, t.from_id, coalesce(p.name, '') AS name, t.created_at, g.id AS give, w.id AS want, c.can, c.starred,
+				t.from_id = $1 AS mine,
+				row_number() OVER (PARTITION BY t.from_id = $1 ORDER BY c.can DESC, t.created_at DESC, t.id DESC) AS place
+			FROM card_trades t
+			JOIN card_catalog g ON g.id = t.give_card
+			JOIN card_catalog w ON w.id = t.take_card
+			LEFT JOIN card_players p ON p.user_id = t.from_id
+			CROSS JOIN LATERAL (
+				SELECT t.from_id <> $1 AND EXISTS (SELECT 1 FROM card_owned o WHERE o.user_id = $1 AND o.card_id = t.take_card AND o.stars = 1) AS can,
+					EXISTS (SELECT 1 FROM card_owned o WHERE o.user_id = $1 AND o.card_id = t.take_card AND o.stars > 1) AS starred
+			) c
+			WHERE t.status = 'open' AND t.to_id IS NULL AND t.created_at > $2
+				AND EXISTS (SELECT 1 FROM card_owned o WHERE o.user_id = t.from_id AND o.card_id = t.give_card
+					AND o.stars = 1)
+				AND abs(g.rarity - w.rarity) <= $5 AND NOT (t.give_card = ANY($4) OR t.take_card = ANY($4))
+		) m
+		WHERE place <= CASE WHEN mine THEN $6::bigint ELSE $3::bigint END
+		ORDER BY mine DESC, can DESC, created_at DESC, id DESC`, viewer, rules.Now.Add(-rules.Keep), limit, limitedCardIDs(), tradeRarityGap, ownOffersShown)
 	if err != nil {
 		return nil, fmt.Errorf("storage: read the card market: %w", err)
 	}

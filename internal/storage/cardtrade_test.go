@@ -304,3 +304,31 @@ func TestTheCardMarketWithoutALimit(t *testing.T) {
 		}
 	}
 }
+
+// A player's own offers are listed apart from the others' limit: on a
+// market of hundreds they came last, never takeable by their player, and
+// fell off it.
+func TestOwnOffersOutlastTheMarketLimit(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	for _, q := range []string{
+		`INSERT INTO card_catalog (id, name, rarity, attack, health, value) VALUES (10, 'Gojo Satoru', 3, 1, 1, 5000), (20, 'Levi', 3, 1, 1, 1000), (30, 'Hinata Hyuuga', 3, 1, 1, 100)`,
+		`INSERT INTO card_players (user_id, name, points, cards, draws) VALUES (1, 'Alice', 6000, 2, 2), (2, 'Bob', 100, 1, 1)`,
+		`INSERT INTO card_owned (user_id, card_id) VALUES (1, 10), (1, 20), (2, 30)`,
+	} {
+		if _, err := store.pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	now := time.Now()
+	market := CardMarketRules{Keep: 7 * 24 * time.Hour, Now: now}
+	for _, o := range [][3]int64{{1, 10, 30}, {1, 20, 30}, {2, 30, 10}} {
+		if _, err := store.OfferCard(ctx, o[0], o[1], o[2], market); err != nil {
+			t.Fatal(err)
+		}
+	}
+	offers, err := store.CardMarket(ctx, 2, market, 1)
+	if err != nil || len(offers) != 2 || !offers[0].Mine || offers[1].Mine || !offers[1].Can {
+		t.Fatalf("Bob's market, the others' limit 1 = %+v, %v", offers, err)
+	}
+}
