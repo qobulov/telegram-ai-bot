@@ -47,3 +47,40 @@ func TestTurnsWithoutASinkGoOn(t *testing.T) {
 		t.Errorf("answer = %q, err = %v, requests = %d", answer.Text, err, len(f.model.requests))
 	}
 }
+
+// notesTools sends the notes when mlbb_news is asked to, as the real tool does.
+type notesTools struct {
+	fakeTools
+	args string
+}
+
+func (f *notesTools) Execute(ctx context.Context, callerID int64, name, args string) string {
+	if sink, ok := tools.SinkFrom(ctx); ok && name == "mlbb_news" {
+		f.args = args
+		sink.Finish("📋 Patch 2.2.23")
+	}
+	return `{"ok":true}`
+}
+
+// A request for a patch's notes gets the notes the tool sends, the model
+// not asked: left to it, it wrote its earlier list of names again.
+func TestPatchNotesAreSentWithoutTheModel(t *testing.T) {
+	for _, words := range []string{"mari patch notes tasha", "patchni tashla", "патч ноутс скинь"} {
+		f := newFixture(text("never asked for"))
+		notes := &notesTools{}
+		f.agent.opts.Tools = notes
+		ctx := tools.WithTurn(context.Background(), tools.Caller{UserID: testUser}, &tools.Sink{})
+
+		answer, err := f.agent.Reply(ctx, request(1, words))
+
+		if err != nil || answer.Text != "📋 Patch 2.2.23" || len(f.model.requests) != 0 || notes.args != `{"action":"patch","send_notes":true}` {
+			t.Fatalf("%q: answer %q, err %v, model asked %d times, args %q", words, answer.Text, err, len(f.model.requests), notes.args)
+		}
+	}
+	f := newFixture(text("Patch 2.2.23 da Xavier buff oldi."))
+	f.agent.opts.Tools = &notesTools{}
+	ctx := tools.WithTurn(context.Background(), tools.Caller{UserID: testUser}, &tools.Sink{})
+	if answer, _ := f.agent.Reply(ctx, request(1, "patchda kim buff oldi")); answer.Text != "Patch 2.2.23 da Xavier buff oldi." {
+		t.Errorf("a question about the patch = %q", answer.Text)
+	}
+}

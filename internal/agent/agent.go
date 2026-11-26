@@ -4,6 +4,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -253,6 +254,11 @@ type turn struct {
 // model is told to stop using tools, and after MaxToolCalls+2 requests the
 // turn fails with ErrToolLoop.
 func (a *Agent) run(ctx context.Context, t *turn) (Answer, error) {
+	if patchNotesWords.MatchString(ownLine(t.req.Text)) {
+		if answer, done := a.sendPatchNotes(ctx, t); done {
+			return answer, nil
+		}
+	}
 	if answer, done, err := a.tryChat(ctx, t); done {
 		return answer, err
 	}
@@ -313,6 +319,36 @@ func (a *Agent) runFull(ctx context.Context, t *turn) (Answer, error) {
 		}
 	}
 	return Answer{}, ErrToolLoop
+}
+
+// patchNotesWords ask for a patch's notes themselves: "patch notes tasha",
+// "patchni tashla".
+var patchNotesWords = regexp.MustCompile(`(?i)(patch|патч)\p{L}*\s*(notes?|ноутс|нотс)|(patch|патч)\p{L}*\s+(tasha|tashla|tashlab|ber|скинь|кинь)\b`)
+
+// patchNotesCall is mlbb_news asked to send the notes. Its signature is
+// Gemini's documented stand-in for a call the model did not make, so that
+// the saved call is accepted when it comes back with later turns.
+var patchNotesCall = ai.ToolCall{Type: "function",
+	Function:     ai.FunctionCall{Name: "mlbb_news", Arguments: `{"action":"patch","send_notes":true}`},
+	ExtraContent: json.RawMessage(`{"google":{"thought_signature":"skip_thought_signature_validator"}}`)}
+
+// sendPatchNotes answers a request for a patch's notes with the notes the
+// tool sends, the model not asked: left to it, it called no tool and wrote
+// its earlier list of names again, as the owners saw on 2026-11-26. done is
+// false when the tool did not send them; the turn then goes on as ever.
+func (a *Agent) sendPatchNotes(ctx context.Context, t *turn) (Answer, bool) {
+	call := patchNotesCall
+	call.ID = fmt.Sprintf("call_%d_notes", t.req.UpdateID)
+	before := len(t.messages)
+	a.runTools(ctx, t, ai.Message{Role: ai.RoleAssistant, ToolCalls: []ai.ToolCall{call}})
+	text, done := finishedByTool(ctx)
+	if !done {
+		t.messages, t.toolsUsed = t.messages[:before], 0
+		return Answer{}, false
+	}
+	answer, err := finish(t, ai.Message{Role: ai.RoleAssistant, Content: text})
+	answer.Route, answer.ToolsUsed = RouteFull, t.toolsUsed
+	return answer, err == nil
 }
 
 // finishedByTool is the answer a tool ended the turn with, such as the
