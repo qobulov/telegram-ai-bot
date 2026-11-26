@@ -10,6 +10,7 @@ import (
 // /tod is answered in code with its three buttons; a press asks the model as
 // if the presser had written the button's command, in reply to /tod.
 func TestPartyGameButtons(t *testing.T) {
+	partyPressed.Clear()
 	f := newFixture()
 	f.opts.Buttons = &fakeButtons{}
 
@@ -27,6 +28,11 @@ func TestPartyGameButtons(t *testing.T) {
 	if !strings.Contains(req.Text, "Vali") || !strings.Contains(req.Text, "jur'at ber") || req.UserID != 77 {
 		t.Errorf("press asked %q for user %d, want Vali's dare", req.Text, req.UserID)
 	}
+	// One game a message: a second press, by anyone, asks nothing.
+	f.run(pressUpdate(3, &telegram.User{ID: 78, FirstName: "Gani"}, telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup}, "Truth or Dare", "tod:/haqiqat"))
+	if n := len(f.replier.recorded()); n != 1 {
+		t.Errorf("model calls after a second press = %d, want 1", n)
+	}
 }
 
 // The commands behind the buttons work when typed too.
@@ -43,6 +49,7 @@ func TestPartyCommandsAskTheModel(t *testing.T) {
 // /ship bare gives the random match's button, whose press asks for one;
 // with a member replied to, the model matches them with the sender.
 func TestShipCommand(t *testing.T) {
+	partyPressed.Clear()
 	f := newFixture()
 	f.opts.Buttons = &fakeButtons{}
 
