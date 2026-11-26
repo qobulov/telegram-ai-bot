@@ -61,6 +61,12 @@ func (fakeMemberInfo) Warns(context.Context, int64, int64, int) ([]storage.Membe
 func (fakeMemberInfo) InviteTop(_ context.Context, _ int64, q storage.InviteQuery) ([]storage.InviterCount, error) {
 	return []storage.InviterCount{{UserID: q.Inviter, Added: 5, Stayed: 4}}, nil
 }
+
+// GroupMessagesSince: the asker, member 3 twice and a post with no author
+// wrote lately.
+func (fakeMemberInfo) GroupMessagesSince(context.Context, int64, time.Time, int) ([]storage.GroupMessage, error) {
+	return []storage.GroupMessage{{AuthorID: userID}, {AuthorID: 3}, {AuthorID: 3}, {AuthorID: 0}}, nil
+}
 func (fakeMemberInfo) AuthorByUsername(context.Context, int64, string) (int64, error) {
 	return memberID, nil
 }

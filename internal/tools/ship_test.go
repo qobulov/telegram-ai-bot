@@ -41,6 +41,13 @@ func TestShip(t *testing.T) {
 	if _, err := tool.Run(alone, json.RawMessage(`{}`)); err == nil {
 		t.Error("a match with no one named was answered")
 	}
+	// At random, the asker is matched with another who wrote lately.
+	if got, err := tool.Run(alone, json.RawMessage(`{"random":true}`)); err != nil || got.(map[string]any)["second"] == nil {
+		t.Errorf("random = %v, %v", got, err)
+	}
+	if a, b, err := randomPair(context.Background(), MemberInfoOptions{Store: fakeMemberInfo{}}, Caller{UserID: userID, ChatID: groupA}); err != nil || a != userID || b != 3 {
+		t.Errorf("random pair = %d, %d, %v; want the asker and member 3", a, b, err)
+	}
 	twice := WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, Mentions: []Mention{{UserID: otherID}, {UserID: otherID}}}, &Sink{})
 	if _, err := tool.Run(twice, json.RawMessage(`{}`)); err == nil {
 		t.Error("one member matched with themselves")

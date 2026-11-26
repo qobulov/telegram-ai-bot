@@ -160,6 +160,7 @@ type MemberInfoStore interface {
 	Warns(ctx context.Context, chatID, userID int64, limit int) ([]storage.MemberWarn, error)
 	InviteTop(ctx context.Context, chatID int64, q storage.InviteQuery) ([]storage.InviterCount, error)
 	AuthorByUsername(ctx context.Context, chatID int64, username string) (int64, error)
+	GroupMessagesSince(ctx context.Context, chatID int64, since time.Time, limit int) ([]storage.GroupMessage, error)
 	CardCounts(ctx context.Context, userID int64) (total, owned map[int]int, points int64, err error)
 	CardPlayerOf(ctx context.Context, userID int64) (storage.CardPlayer, time.Time, error)
 	CardWallet(ctx context.Context, userID int64) (shards int, err error)

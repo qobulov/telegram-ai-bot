@@ -888,6 +888,8 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.myRights(ctx, in)
 	case commandName(in.text) == "/tod":
 		return partyGame(in)
+	case in.group && commandName(in.text) == "/ship":
+		return s.shipGame(ctx, in, rules)
 	case partyCommands[commandName(in.text)] != "":
 		// A party game's command is asked of the model as the words it
 		// stands for, so that it puts the question in the chat's language.

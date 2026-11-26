@@ -243,7 +243,7 @@ A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yo
 /reports, /warns — ko'rilmagan shikoyatlar, kimda nechta ogohlantirish
 
 Hamma uchun:
-/card — kartalar o'yini (har 2 soatda token), /tod — Truth or Dare: haqiqat, jur'at va "Nimani tanlarding?" tugmalari, /mylink — shaxsiy taklif havolangiz, /words — top-10 so'zamollar (7 va 30 kun), /invites — kim nechta odam qo'shdi (tugmalar: bugun, hafta, oy, hammasi, o'zingizniki)
+/card — kartalar o'yini (har 2 soatda token), /tod — Truth or Dare: haqiqat, jur'at va "Nimani tanlarding?" tugmalari, /ship — moslik (tugma bilan tasodifiy juft yoki reply/teg bilan), /mylink — shaxsiy taklif havolangiz, /words — top-10 so'zamollar (7 va 30 kun), /invites — kim nechta odam qo'shdi (tugmalar: bugun, hafta, oy, hammasi, o'zingizniki)
 /admins — adminlarni chaqirish, /report va /voteban — xabarga reply qilib shikoyat yoki ban uchun ovoz, /rights — huquqlaringiz
 /id, /ping
 
@@ -270,7 +270,7 @@ Bo'limlar: /help mod, /help kartalar, /help azo`,
 /reports, /warns — нерассмотренные жалобы, у кого сколько предупреждений
 
 Для всех:
-/card — игра в карты (токен каждые 2 часа), /tod — правда или действие: кнопки «Правда», «Действие» и «Что выберешь?», /mylink — ваша личная ссылка-приглашение, /words — топ-10 болтунов (7 и 30 дней), /invites — кто сколько добавил (кнопки: сегодня, неделя, месяц, всё, мои)
+/card — игра в карты (токен каждые 2 часа), /tod — правда или действие: кнопки «Правда», «Действие» и «Что выберешь?», /ship — совместимость (случайная пара кнопкой или ответом/отметкой), /mylink — ваша личная ссылка-приглашение, /words — топ-10 болтунов (7 и 30 дней), /invites — кто сколько добавил (кнопки: сегодня, неделя, месяц, всё, мои)
 /admins — позвать админов, /report и /voteban — ответом на сообщение: жалоба или голосование за бан, /rights — ваши права
 /id, /ping
 
@@ -297,7 +297,7 @@ Reply to a member's message and ask me to delete or pin it, to mute or ban its a
 /reports, /warns — open reports, who has how many warnings
 
 For everyone:
-/card — the card game (a token every 2 hours), /tod — Truth or Dare: Truth, Dare and Would You Rather buttons, /mylink — your own invite link, /words — the top 10 talkers (7 and 30 days), /invites — who brought how many (buttons: today, week, month, all, mine)
+/card — the card game (a token every 2 hours), /tod — Truth or Dare: Truth, Dare and Would You Rather buttons, /ship — match (a random one by button, or by reply or tag), /mylink — your own invite link, /words — the top 10 talkers (7 and 30 days), /invites — who brought how many (buttons: today, week, month, all, mine)
 /admins — call the admins, /report and /voteban — as a reply: report, or vote to ban, /rights — what you may do
 /id, /ping
 

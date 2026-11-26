@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"math/rand/v2"
+	"slices"
 	"time"
 
 	"telegram-ai-bot/internal/storage"
@@ -21,23 +23,35 @@ func ShipTool(opts MemberInfoOptions) Tool {
 	avatars := &avatarDescriptions{eyes: opts.Eyes, prompt: memberPhotoPrompt}
 	return Tool{
 		Name: "ship",
-		Description: "How well two members match today (\"moslik\", \"ship qil\", \"@Ali va @Vali mosmi\", \"совместимость\"): the two they tagged, the one tagged and the asker, or the one they replied to and the asker. " +
-			"Gives the percent and facts about each for a playful verdict. Call it every time: never make a percent up.",
-		Schema:    json.RawMessage(`{"type": "object", "properties": {}, "additionalProperties": false}`),
+		Description: "How well two members match today (\"moslik\", \"ship qil\", \"@Ali va @Vali mosmi\", \"совместимость\"): the two they tagged, the one tagged and the asker, the one they replied to and the asker, " +
+			"or with random the asker and a member picked at random among those who wrote lately (\"menga juft top\"). Gives the percent and facts about each for a playful verdict. Call it every time: never make a percent up.",
+		Schema: json.RawMessage(`{"type": "object", "properties": {
+			"random": {"type": "boolean", "description": "Match the asker with a member picked at random."}
+		}, "additionalProperties": false}`),
 		GroupOnly: true,
 		Timeout:   memberInfoTimeout,
-		Run: func(ctx context.Context, _ json.RawMessage) (any, error) {
-			return ship(ctx, opts, avatars)
+		Run: func(ctx context.Context, raw json.RawMessage) (any, error) {
+			var args struct {
+				Random bool `json:"random"`
+			}
+			if err := decodeArgs(raw, &args); err != nil {
+				return nil, err
+			}
+			return ship(ctx, opts, avatars, args.Random)
 		},
 	}
 }
 
-func ship(ctx context.Context, opts MemberInfoOptions, avatars *avatarDescriptions) (any, error) {
+func ship(ctx context.Context, opts MemberInfoOptions, avatars *avatarDescriptions, random bool) (any, error) {
 	caller, ok := CallerFrom(ctx)
 	if !ok || caller.ChatID >= 0 {
 		return nil, &DeniedError{Message: statsNotInAGroup}
 	}
-	a, b, err := shipPair(ctx, opts, caller)
+	pair := shipPair
+	if random {
+		pair = randomPair
+	}
+	a, b, err := pair(ctx, opts, caller)
 	if err != nil {
 		return nil, err
 	}
@@ -78,6 +92,28 @@ func shipPair(ctx context.Context, opts MemberInfoOptions, caller Caller) (int64
 		return ids[0], ids[1], nil
 	}
 	return 0, 0, &DeniedError{Message: "ask them to tag one or two members, or to reply to the member to match with"}
+}
+
+// shipRecent is how far back a random match's members wrote.
+const shipRecent = 72 * time.Hour
+
+// randomPair is the asker and a member picked at random among the others
+// who wrote in the group lately.
+func randomPair(ctx context.Context, opts MemberInfoOptions, caller Caller) (int64, int64, error) {
+	messages, err := opts.Store.GroupMessagesSince(ctx, caller.ChatID, time.Now().Add(-shipRecent), 500)
+	if err != nil {
+		return 0, 0, &InternalError{Err: err, Message: infoUnavailable}
+	}
+	var others []int64
+	for _, m := range messages {
+		if m.AuthorID > 0 && m.AuthorID != caller.UserID && !slices.Contains(others, m.AuthorID) {
+			others = append(others, m.AuthorID)
+		}
+	}
+	if len(others) == 0 {
+		return 0, 0, &DeniedError{Message: "nobody else wrote here lately to be matched with; say so"}
+	}
+	return caller.UserID, others[rand.IntN(len(others))], nil
 }
 
 // mentioned is the member a tag names.

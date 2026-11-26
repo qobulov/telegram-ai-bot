@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"telegram-ai-bot/internal/storage"
 	"telegram-ai-bot/internal/telegram"
 )
 
@@ -23,6 +24,7 @@ var partyCommands = map[string]string{
 	"/haqiqat": "haqiqat ber",
 	"/jurat":   "jur'at ber",
 	"/tanla":   "nimani tanlarding, would you rather savoli ber",
+	"/shipme":  "ship qil: menga guruhda yaqinda yozganlardan tasodifiy juft top (random)",
 }
 
 var (
@@ -35,6 +37,28 @@ var (
 	textPartyDare  = localText{uz: "😈 Jur'at", ru: "😈 Действие", en: "😈 Dare"}
 	textPartyWYR   = localText{uz: "🤔 Nimani tanlarding?", ru: "🤔 Что выберешь?", en: "🤔 Would you rather?"}
 )
+
+var (
+	textShip = localText{
+		uz: "💘 **Moslik!** Tugmani bosing: bosgan odamga guruhdan tasodifiy juft topaman. Aniq odam bilan: uning xabariga reply qilib yoki teg qilib /ship yozing.",
+		ru: "💘 **Совместимость!** Нажмите кнопку: найду нажавшему случайную пару из группы. С конкретным человеком: ответьте на его сообщение или отметьте его с /ship.",
+		en: "💘 **Match!** Press the button: I find whoever presses it a random match from the group. With someone in particular: reply to them or tag them with /ship.",
+	}
+	textShipMe = localText{uz: "💘 Menga juft top", ru: "💘 Найди мне пару", en: "💘 Find me a match"}
+)
+
+// shipGame answers /ship: with a member replied to or tagged, the model
+// matches them with the sender; bare, it gives the button for a random
+// match.
+func (s *Service) shipGame(ctx context.Context, in incoming, rules []storage.GroupRule) outcome {
+	replied := in.msg.ReplyToMessage != nil && in.msg.ReplyToMessage.From != nil && !in.msg.ReplyToMessage.From.IsBot
+	if replied || len(s.mentions(in)) > 0 {
+		in.text = "ship qil"
+		in.described = in.text
+		return s.ask(ctx, in, rules)
+	}
+	return outcome{text: textShip.to(in), buttons: [][]telegram.Button{{{Text: textShipMe.to(in), Data: partyData + "/shipme"}}}}
+}
 
 // partyGame answers /tod with its buttons.
 func partyGame(in incoming) outcome {
