@@ -46,7 +46,7 @@ func TestFarosat(t *testing.T) {
 		t.Errorf("second take = %+v", sent)
 	}
 	sent = f.run(inGroup(groupMessage("/topfarosat")))
-	if last := sent[len(sent)-1].text; !strings.Contains(last, "🏆 Chat reytingi — TOP 10") || !strings.Contains(last, "🥇 Ali — 215 gram") {
+	if last := sent[len(sent)-1].text; !strings.Contains(last, "🏆 Chat reytingi — TOP 10\n\n🥇 Ali — 215 gram") {
 		t.Errorf("top = %+v", sent)
 	}
 	sent = f.run(inGroup(groupMessage("/topfarosat 30")))

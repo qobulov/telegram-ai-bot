@@ -95,7 +95,7 @@ func (s *Service) farosatTop(ctx context.Context, in incoming, limit int) outcom
 	if len(top) == 0 {
 		return say(textFarosatNone)
 	}
-	lines := []string{fmt.Sprintf(textFarosatTop, limit)}
+	lines := []string{fmt.Sprintf(textFarosatTop, limit), ""}
 	for i, r := range top {
 		place := fmt.Sprintf("%d.", i+1)
 		if i < len(farosatMedals) {
