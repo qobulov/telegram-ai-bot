@@ -138,3 +138,18 @@ func TestMLBBUpcoming(t *testing.T) {
 		t.Errorf("upcoming = %s", env.raw)
 	}
 }
+
+// Asked for the notes themselves, the tool sends them and ends the turn:
+// left to the model, they came back as a list of names.
+func TestMLBBPatchNotesSent(t *testing.T) {
+	u := newUpstream(t, map[string]stub{"/dex/api/v1/patches": ok(dexPatches), "/dex/api/v1/patches/2.2.23": ok(dexPatch23), "/dex/api/v1/patches/2.2.16a": ok(dexPatch16a)})
+
+	env, sink := runTool(t, u, "mlbb_news", `{"action":"patch","send_notes":true}`)
+	text, done := sink.Finished()
+	if !env.OK || !done || !strings.HasPrefix(text, "📋 Patch 2.2.23 · 2026-11-11\n\n") || !strings.Contains(text, "🌟 Aldous ↑\nLess downtime.\n\n[Skill 2 · Contract: Explosion] (↑)\nCooldown: 12-9.5s → 8s at all levels") {
+		t.Fatalf("sent %v %q, result %s", done, text, env.raw)
+	}
+	if _, sink = runTool(t, u, "mlbb_news", `{"action":"patch"}`); func() bool { _, done := sink.Finished(); return done }() {
+		t.Errorf("notes sent unasked")
+	}
+}

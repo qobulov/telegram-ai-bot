@@ -41,6 +41,7 @@ type mlbbNewsArgs struct {
 	Hero    string `json:"hero"`
 	Version string `json:"version"`
 	Section string `json:"section"`
+	Send    bool   `json:"send_notes"`
 }
 
 func (a *apis) mlbbNewsTool() tools.Tool {
@@ -55,7 +56,8 @@ func (a *apis) mlbbNewsTool() tools.Tool {
 				"action": {"type": "string", "enum": ["patch", "events", "upcoming"]},
 				"hero": {"type": "string", "description": "For patch: one hero's changes."},
 				"version": {"type": "string", "description": "For patch: a patch's version, such as 2.2.16; left out, the latest."},
-				"section": {"type": "string", "description": "For patch: a part of its notes by title, as other_sections lists them."}
+				"section": {"type": "string", "description": "For patch: a part of its notes by title, as other_sections lists them."},
+				"send_notes": {"type": "boolean", "description": "For patch: true when asked for the patch notes themselves (\"patch notes tasha\"): they go to the chat whole, as the game lays them out, and the turn ends."}
 			},
 			"required": ["action"],
 			"additionalProperties": false
@@ -73,7 +75,7 @@ func (a *apis) mlbbNews(ctx context.Context, raw json.RawMessage) (any, error) {
 	}
 	switch args.Action {
 	case "patch":
-		return a.mlbbPatch(ctx, patchAsk{hero: strings.TrimSpace(args.Hero), version: patchVersion(args.Version), section: strings.TrimSpace(args.Section)})
+		return a.mlbbPatch(ctx, patchAsk{hero: strings.TrimSpace(args.Hero), version: patchVersion(args.Version), section: strings.TrimSpace(args.Section), send: args.Send})
 	case "events":
 		return a.mlbbEvents(ctx)
 	case "upcoming":
@@ -155,6 +157,7 @@ func patchVersion(version string) string {
 // version, a part of its notes.
 type patchAsk struct {
 	hero, version, section string
+	send                   bool
 }
 
 func (a *apis) mlbbPatch(ctx context.Context, ask patchAsk) (any, error) {
@@ -213,6 +216,12 @@ func (a *apis) mlbbPatch(ctx context.Context, ask patchAsk) (any, error) {
 	}
 	out["heroes"] = heroes
 	notes, left := patchNotes(latest)
+	if sink, ok := tools.SinkFrom(ctx); ok && ask.send && hero == "" {
+		// Sent by code: left to the model, the notes came back as a
+		// list of names, as the owners saw.
+		sink.Finish(sentNotes(latest, notes, left))
+		return map[string]any{"patch": latest.Version, "sent": true, "note": "The notes were sent to the chat; add nothing."}, nil
+	}
 	out["notes"] = notes
 	if len(left) > 0 {
 		out["notes_left"] = left
@@ -275,6 +284,16 @@ const (
 	newsOutputBytes = 14000
 	patchNotesBytes = 10000
 )
+
+// sentNotes are the notes as they go to the chat: the patch's version and
+// date, the notes, and the heroes left out, to be asked by name.
+func sentNotes(patch dexPatch, notes string, left []string) string {
+	text := "📋 Patch " + patch.Version + " · " + patch.Date + "\n\n" + notes
+	if len(left) > 0 {
+		text += "\n\n➕ " + strings.Join(left, ", ") + ": nomini yozib so'rang"
+	}
+	return text
+}
 
 // patchArrows mark a change as the game's notes do.
 var patchArrows = map[string]string{"buff": "↑", "nerf": "↓", "adjust": "↑↓"}
