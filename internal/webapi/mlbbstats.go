@@ -6,9 +6,8 @@ import (
 	"strings"
 )
 
-// Each answer takes one source, as the owners asked on 2026-11-25, so no
-// work is done twice: a hero's counters and builds are Rone Arena's, from
-// the game's academy, and MLBBDex's only when Rone Arena gives none.
+// A hero's counters and builds by rank, from MLBBDex, which measures them
+// from the game's ranked statistics.
 
 const shownDexBuilds = 5
 
@@ -54,8 +53,8 @@ func (a *apis) dexSlug(ctx context.Context, name string) (string, map[string]str
 	return slug, names, nil
 }
 
-// dexCountersInto gives the hero MLBBDex's counters for rank, when Rone
-// Arena did not answer.
+// dexCountersInto gives the hero its counters for rank; out keeps none when
+// MLBBDex does not answer.
 func (a *apis) dexCountersInto(ctx context.Context, out *mlbbHeroOutput, rank string) {
 	slug, names, err := a.dexSlug(ctx, out.Hero)
 	if err != nil {
@@ -68,9 +67,6 @@ func (a *apis) dexCountersInto(ctx context.Context, out *mlbbHeroOutput, rank st
 	ranked := counters[rank]
 	out.CounteredBy = dexMatchups(ranked.Weak, names)
 	out.StrongAgainst = dexMatchups(ranked.Strong, names)
-	if len(out.CounteredBy)+len(out.StrongAgainst) > 0 {
-		out.Note += "; counters are MLBBDex's"
-	}
 }
 
 func dexMatchups(counters []dexCounter, names map[string]string) []mlbbMatchup {

@@ -1,11 +1,8 @@
 package webapi
 
 import (
-	"context"
 	"strings"
 	"testing"
-
-	"telegram-ai-bot/internal/tools"
 )
 
 const (
@@ -54,24 +51,4 @@ func TestMPLMatchDetails(t *testing.T) {
 		}
 	}
 	wantError(t, run(t, u.options(), "mpl", `{"action":"match","league":"ph","team":"onic","opponent":"tnc"}`), "invalid_arguments", "no played")
-}
-
-func TestMLBBWallpaper(t *testing.T) {
-	u := newUpstream(t, map[string]stub{"/arena/api/heroes": ok(arenaHeroes), "/wall": ok("\xff\xd8\xff\xe0JPEG")})
-	u.routes["/arena/api/heroes/84/wallpapers"] = ok(`{"data":{"records":[
-		{"data":{"heroid":[1,2,84],"pictures":[{"resolution":"1920x1080","url":"https://all.example/x.jpg"}]}},
-		{"data":{"heroid":[84],"pictures":[{"resolution":"2560x1440","url":"` + u.server.URL + `/wall?url=a"},{"resolution":"1920x1080","url":"` + u.server.URL + `/wall?url=b"}]}}]}}`)
-	sink := &tools.Sink{}
-	ctx := tools.WithTurn(context.Background(), tools.Caller{UserID: 1, ChatID: 1, Human: true}, sink)
-
-	out := newRegistry(t, u.options()).Execute(ctx, 1, "mlbb", `{"action":"wallpaper","hero":"Ling"}`)
-
-	d, sent := sink.LastDrawing()
-	if !strings.Contains(out, `"wallpapers":1`) || !sent || d.MimeType != "image/jpeg" {
-		t.Errorf("wallpaper = %s, sent %v", out, sent)
-	}
-	fetched := u.requests("/wall")
-	if len(fetched) != 1 || fetched[0].URL.Query().Get("url") != "b" || fetched[0].URL.Query().Get("w") != "1280" {
-		t.Errorf("fetched %v, want the 1920 picture shrunk", fetched)
-	}
 }

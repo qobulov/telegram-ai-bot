@@ -124,8 +124,7 @@ func counterAnswer(ctx context.Context, s *Service, in incoming, name string) ou
 		return say(textHeroUnknown.to(in))
 	}
 	if len(hero.CounteredBy) == 0 {
-		// Rone Arena, which has the counters, may be down while MLBBDex
-		// still gives the profile.
+		// The counters may not load while the profile does.
 		return say(textNoCounters.to(in))
 	}
 	lines := []string{fmt.Sprintf(textCountersOf.to(in), hero.Hero)}

@@ -18,14 +18,16 @@ import (
 	"telegram-ai-bot/internal/tools"
 )
 
-// MLBBDex is the first source for Mobile Legends: heroes, their profiles,
-// skills, skins and the rates of all ranks; Rone Arena gives only what it
-// lacks. Its data comes from the Mobile Legends Wiki, which lags new skins
-// by weeks; the newest often appear only among its artwork names. Its
-// rankings are measured about once a week.
+// MLBBDex is the mlbb tool's one source: heroes, their profiles, skills,
+// skins, items, rates, counters and builds. Its profiles come from the
+// Mobile Legends Wiki, which lags new skins by weeks, the newest often only
+// among its artwork names; its rates, counters and builds from the game's
+// ranked statistics, measured daily.
 const (
 	dexSource = "MLBBDex (mlbbdex.com), from the Mobile Legends Wiki"
-	dexNote   = "From the wiki, which adds new skins weeks late: the newest may be missing, or only in also_in_artwork, " +
+	// statsSource is MLBBDex's rates, counters and builds.
+	statsSource = "MLBBDex (mlbbdex.com), from the game's ranked statistics"
+	dexNote     = "From the wiki, which adds new skins weeks late: the newest may be missing, or only in also_in_artwork, " +
 		"names from the hero's artwork without details, which may also be an older name of a listed skin. " +
 		"Supreme is the tier players call Legend. For upcoming skins and heroes use mlbb_news upcoming; for a skin's tier or date that is not here, web_search."
 	dexService = "MLBBDex"
@@ -287,8 +289,7 @@ func asJPEG(data []byte) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-// applyDexProfile puts MLBBDex's profile of a hero over Rone Arena's,
-// keeping Rone Arena's wherever MLBBDex has nothing.
+// applyDexProfile puts MLBBDex's profile of a hero into out.
 func applyDexProfile(out *mlbbHeroOutput, hero dexHero) {
 	d := hero.Data
 	out.Title = cleanText(d.Title, maxHeroName)
@@ -333,6 +334,16 @@ func applyDexProfile(out *mlbbHeroOutput, hero dexHero) {
 		}
 		out.Note += "; " + analysisNote
 	}
+}
+
+func nonEmpty(labels []string) []string {
+	var out []string
+	for _, l := range labels {
+		if l = cleanText(l, maxHeroName); l != "" {
+			out = append(out, l)
+		}
+	}
+	return out
 }
 
 func points(texts []string) []string {

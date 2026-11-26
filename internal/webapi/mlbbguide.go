@@ -5,42 +5,23 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"net/url"
 	"slices"
 	"sync"
 )
 
-// What makes the bot a coach: how to play a hero, an item's stats, the
-// heroes to pick against the enemy and with the team, and the wins needed to
-// reach a win rate.
+// What makes the bot a coach: an item's stats, the heroes to pick against
+// the enemy and the wins needed to reach a win rate.
 const (
-	shownCombo = 600
-	shownItem  = 300
-	// maxEnemies and maxAllies are a team of five with one pick still to
-	// make; draftPicks are how many picks a draft answer gives.
-	maxEnemies = 5
-	maxAllies  = 4
-	draftPicks = 5
-	// synergyWeight makes a good teammate count half as much as a counter.
-	synergyWeight     = 0.5
+	shownItem = 300
+	// maxEnemies is a full enemy team; draftPicks are how many picks a
+	// draft answer gives.
+	maxEnemies        = 5
+	draftPicks        = 5
 	maxWinrateMatches = 100_000
 
-	comboNote   = "The game's academy's advice, in English: give it in the asker's language and your own words."
-	draftNote   = "Picks scored from ranked games of the last 7 days: why says how each pick changes an enemy's or a teammate's win rate. Name the top picks with their reasons."
+	draftNote   = "Picks scored from MLBBDex's ranked statistics: why says by how much each pick beats an enemy or loses to one, in win-rate points. Name the top picks with their reasons."
 	winrateNote = "Wins in a row, with no loss, from the current matches and win rate."
 )
-
-type mlbbCombo struct {
-	Title string `json:"title"`
-	How   string `json:"how"`
-}
-
-type mlbbCombosOutput struct {
-	Hero   string      `json:"hero"`
-	Combos []mlbbCombo `json:"combos"`
-	Source string      `json:"source"`
-	Note   string      `json:"note"`
-}
 
 type mlbbItemOutput struct {
 	Item     string   `json:"item"`
@@ -63,8 +44,7 @@ type mlbbDraftPick struct {
 }
 
 type mlbbDraftOutput struct {
-	Enemies []string        `json:"enemies,omitempty"`
-	Allies  []string        `json:"allies,omitempty"`
+	Enemies []string        `json:"enemies"`
 	Lane    string          `json:"lane,omitempty"`
 	Rank    string          `json:"rank"`
 	Picks   []mlbbDraftPick `json:"picks"`
@@ -80,11 +60,6 @@ type mlbbWinrateOutput struct {
 	Note       string `json:"note"`
 }
 
-type arenaCombo struct {
-	Title string `json:"title"`
-	Desc  string `json:"desc"`
-}
-
 type dexItem struct {
 	Name     string   `json:"name"`
 	Summary  string   `json:"summary"`
@@ -96,35 +71,6 @@ type dexItem struct {
 	Active   string   `json:"active"`
 	Recipe   []string `json:"recipe"`
 	BestFor  string   `json:"bestFor"`
-}
-
-// mlbbCombos is the academy's advice on how to play a hero, which MLBBDex
-// does not have.
-func (a *apis) mlbbCombos(ctx context.Context, name string) (mlbbCombosOutput, error) {
-	names, err := a.mlbbHeroes(ctx)
-	if err != nil {
-		return mlbbCombosOutput{}, err
-	}
-	id, err := findHero(names, name)
-	if err != nil {
-		return mlbbCombosOutput{}, err
-	}
-	combos, err := remember(a.cache, fmt.Sprintf("mlbb:combos:%d", id), mlbbHeroesTTL, func() ([]arenaCombo, error) {
-		return arenaList[arenaCombo](ctx, a, fmt.Sprintf("/api/heroes/%d/skill-combos", id))
-	})
-	if err != nil {
-		return mlbbCombosOutput{}, err
-	}
-	out := mlbbCombosOutput{Hero: names[id], Combos: []mlbbCombo{}, Source: arenaService + ", the game's academy", Note: comboNote}
-	for _, c := range combos {
-		if how := cleanText(c.Desc, shownCombo); how != "" {
-			out.Combos = append(out.Combos, mlbbCombo{Title: cleanText(c.Title, maxHeroName), How: how})
-		}
-	}
-	if len(out.Combos) == 0 {
-		return mlbbCombosOutput{}, fmt.Errorf("%s has no advice on playing %s", arenaService, names[id])
-	}
-	return out, nil
 }
 
 // mlbbItem is an item's stats from MLBBDex.
@@ -162,76 +108,74 @@ func (a *apis) mlbbItem(ctx context.Context, name string) (mlbbItemOutput, error
 	}, nil
 }
 
-// mlbbDraft scores the heroes to pick against enemies and with allies, by
-// how each changes their win rate in ranked games: a hero that lowers an
-// enemy's win rate counts for it, one an enemy beats against it, and one
-// that raises a teammate's half as much. A hero whose statistics will not
-// load is left out rather than failing the draft.
-func (a *apis) mlbbDraft(ctx context.Context, enemies, allies []string, lane, rank string) (mlbbDraftOutput, error) {
-	if len(enemies)+len(allies) == 0 || len(enemies) > maxEnemies || len(allies) > maxAllies {
-		return mlbbDraftOutput{}, argumentError("give 1 to %d enemies and up to %d allies picked so far", maxEnemies, maxAllies)
+// mlbbDraft scores the heroes to pick against the enemy's, from each enemy's
+// counters at rank on MLBBDex: a hero an enemy loses to counts for it by
+// the win-rate points of that matchup, one an enemy beats against it. An
+// enemy whose counters will not load is left out rather than failing the
+// draft.
+func (a *apis) mlbbDraft(ctx context.Context, enemies []string, lane, rank string) (mlbbDraftOutput, error) {
+	if len(enemies) == 0 || len(enemies) > maxEnemies {
+		return mlbbDraftOutput{}, argumentError("give 1 to %d enemy heroes picked so far", maxEnemies)
 	}
 	if lane != "" && !slices.Contains(mlbbLanes, lane) {
 		return mlbbDraftOutput{}, argumentError("lane must be one of %v", mlbbLanes)
 	}
-	names, err := a.mlbbHeroes(ctx)
+	heroes, err := a.dexHeroes(ctx)
 	if err != nil {
 		return mlbbDraftOutput{}, err
 	}
-	enemyIDs, err := heroIDs(names, enemies)
-	if err != nil {
-		return mlbbDraftOutput{}, err
+	nameOf, slugOf := map[string]string{}, map[string]string{}
+	for _, h := range heroes {
+		nameOf[h.Slug], slugOf[h.Name] = h.Name, h.Slug
 	}
-	allyIDs, err := heroIDs(names, allies)
-	if err != nil {
-		return mlbbDraftOutput{}, err
+	var picked []string
+	for _, e := range enemies {
+		found, err := matchHero(dexNames(heroes), e)
+		if err != nil {
+			return mlbbDraftOutput{}, err
+		}
+		if !slices.Contains(picked, found) {
+			picked = append(picked, found)
+		}
 	}
-	against := make([]arenaStats, len(enemyIDs))
-	with := make([]arenaStats, len(allyIDs))
+	against := make([]dexCounters, len(picked))
 	var wg sync.WaitGroup
-	for i, id := range enemyIDs {
-		wg.Go(func() { against[i], _ = a.arenaCounters(ctx, id, rank) })
-	}
-	for i, id := range allyIDs {
-		wg.Go(func() { with[i], _ = a.arenaCompatibility(ctx, id, rank) })
+	for i, enemy := range picked {
+		wg.Go(func() { against[i], _ = dexGet[dexCounters](ctx, a, "/api/v1/heroes/"+slugOf[enemy]+"/counters") })
 	}
 	wg.Wait()
 
-	score := map[int]float64{}
-	why := map[int][]string{}
-	add := func(id int, points float64, reason string) {
-		score[id] += points
-		why[id] = append(why[id], reason)
-	}
-	for i, e := range against {
-		for _, s := range e.Lowering {
-			add(s.ID, -s.Change, fmt.Sprintf("counters %s (%s)", names[enemyIDs[i]], signedPercent(-s.Change)))
-		}
-		for _, s := range e.Raising {
-			add(s.ID, -s.Change, fmt.Sprintf("weak against %s (%s)", names[enemyIDs[i]], signedPercent(-s.Change)))
+	score := map[string]float64{}
+	why := map[string][]string{}
+	add := func(hero string, points float64, reason string) {
+		if hero != "" {
+			score[hero] += points
+			why[hero] = append(why[hero], reason)
 		}
 	}
-	for i, t := range with {
-		for _, s := range t.Raising {
-			add(s.ID, synergyWeight*s.Change, fmt.Sprintf("good with %s (%s)", names[allyIDs[i]], signedPercent(s.Change)))
+	for i, counters := range against {
+		ranked := counters[rank]
+		for _, c := range ranked.Weak {
+			add(nameOf[c.Slug], -c.Advantage, fmt.Sprintf("counters %s (%+.1f%%)", picked[i], -c.Advantage))
+		}
+		for _, c := range ranked.Strong {
+			add(nameOf[c.Slug], -c.Advantage, fmt.Sprintf("weak against %s (%+.1f%%)", picked[i], -c.Advantage))
 		}
 	}
 	if len(score) == 0 {
-		return mlbbDraftOutput{}, fmt.Errorf("%s gave no statistics for these heroes now", arenaService)
+		return mlbbDraftOutput{}, fmt.Errorf("%s gave no statistics for these heroes now", dexService)
 	}
-	picked := slices.Concat(enemyIDs, allyIDs)
 	inLane := a.laneFilter(ctx, lane)
-	var candidates []int
-	for id, points := range score {
-		if points > 0 && names[id] != "" && !slices.Contains(picked, id) && inLane(names[id]) {
-			candidates = append(candidates, id)
+	var candidates []string
+	for hero, points := range score {
+		if points > 0 && !slices.Contains(picked, hero) && inLane(hero) {
+			candidates = append(candidates, hero)
 		}
 	}
-	slices.SortFunc(candidates, func(x, y int) int { return cmp.Or(cmp.Compare(score[y], score[x]), cmp.Compare(x, y)) })
-	out := mlbbDraftOutput{Enemies: heroNamesOf(names, enemyIDs), Allies: heroNamesOf(names, allyIDs), Lane: lane, Rank: rank,
-		Picks: []mlbbDraftPick{}, Source: mlbbSource, Note: draftNote}
-	for _, id := range candidates[:min(len(candidates), draftPicks)] {
-		out.Picks = append(out.Picks, mlbbDraftPick{Hero: names[id], Score: signedPercent(score[id]), Why: why[id]})
+	slices.SortFunc(candidates, func(x, y string) int { return cmp.Or(cmp.Compare(score[y], score[x]), cmp.Compare(x, y)) })
+	out := mlbbDraftOutput{Enemies: picked, Lane: lane, Rank: rank, Picks: []mlbbDraftPick{}, Source: statsSource, Note: draftNote}
+	for _, hero := range candidates[:min(len(candidates), draftPicks)] {
+		out.Picks = append(out.Picks, mlbbDraftPick{Hero: hero, Score: fmt.Sprintf("%+.1f%%", score[hero]), Why: why[hero]})
 	}
 	return out, nil
 }
@@ -254,43 +198,6 @@ func (a *apis) laneFilter(ctx context.Context, lane string) func(string) bool {
 		}
 	}
 	return func(hero string) bool { return slices.Contains(keep, normalizeName(hero)) }
-}
-
-func (a *apis) arenaCompatibility(ctx context.Context, id int, rank string) (arenaStats, error) {
-	return remember(a.cache, fmt.Sprintf("mlbb:compatibility:%d:%s", id, rank), mlbbTTL, func() (arenaStats, error) {
-		query := url.Values{"days": {mlbbDays}, "rank": {rank}}
-		stats, err := arenaList[arenaStats](ctx, a, fmt.Sprintf("/api/heroes/%d/compatibility?%s", id, query.Encode()))
-		if err != nil || len(stats) == 0 {
-			return arenaStats{}, err
-		}
-		return stats[0], nil
-	})
-}
-
-func heroIDs(names map[int]string, heroes []string) ([]int, error) {
-	var ids []int
-	for _, h := range heroes {
-		id, err := findHero(names, h)
-		if err != nil {
-			return nil, err
-		}
-		if !slices.Contains(ids, id) {
-			ids = append(ids, id)
-		}
-	}
-	return ids, nil
-}
-
-func heroNamesOf(names map[int]string, ids []int) []string {
-	var out []string
-	for _, id := range ids {
-		out = append(out, names[id])
-	}
-	return out
-}
-
-func signedPercent(change float64) string {
-	return fmt.Sprintf("%+.1f%%", change*100)
 }
 
 // mlbbWinrate is how many wins in a row lift winRate over matches to
