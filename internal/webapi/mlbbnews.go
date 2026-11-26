@@ -29,8 +29,8 @@ const (
 	patchSource         = "MLBBDex (mlbbdex.com), from the official patch notes"
 	// heroChangeNote keeps a hero's mixed change whole, as the owners saw a
 	// nerfed ultimate told as "changed a little" under a buff on 2026-11-26.
-	heroChangeNote = "Lay each hero out as the game's own patch notes do: [Hero] (↑) for a buff, (↓) a nerf, (~) an adjust, then each skill as [Passive] (↑), [Skill 1] (↓), [Ultimate] (~), " +
-		"each with its numbers before >> after, as marked; never soften a nerf into \"changed\", and when the hero's change is a buff but a skill was nerfed, say so."
+	heroChangeNote = "Answer with notes, laid out as given, in the asker's language: 🌟 the hero with ↑ for a buff, ↓ a nerf, ↑↓ an adjust, the why, then each skill as [Skill · Name] (↑) with its lines before → after. " +
+		"Keep every line, arrow and number; never soften a nerf into \"changed\" or sum the skills up in a sentence."
 	eventsSource   = "MLBBDex (mlbbdex.com), from the Mobile Legends Wiki"
 	upcomingSource = "the Mobile Legends Wiki (mobile-legends.fandom.com)"
 	upcomingNote   = "Gathered by the wiki from leakers: none of it is confirmed, dates are unknown and it may change or be cancelled. Say so."
@@ -194,7 +194,8 @@ func (a *apis) mlbbPatch(ctx context.Context, ask patchAsk) (any, error) {
 	}
 	out := map[string]any{"patch": latest.Version, "date": latest.Date, "source": patchSource,
 		"note": "notes are the patch notes laid out as the game's own: asked for the patch notes, send notes whole, in the asker's language, keeping every hero, line, arrow and number as given, adding and summing up nothing. " +
-			"Asked what changed for one hero, answer from its part of notes; never from a web search. For a hero in notes_left, call again with hero; for a part of the notes, with section."}
+			"Any answer about this patch keeps the notes' layout: a hero named as 🌟 Name ↑ (↓ nerf, ↑↓ adjust), and what changed for it as its block from notes, copied whole; never a plain list or a sentence. " +
+			"Never answer from a web search. For a hero in notes_left, call again with hero; for a part of the notes, with section."}
 	if len(latest.Sections) > 0 && latest.Sections[0].Title == nil {
 		out["highlights"] = cleanText(latest.Sections[0].HTML, 600)
 	}
@@ -250,12 +251,8 @@ func (a *apis) heroInPatches(ctx context.Context, searched []dexPatchEntry, hero
 			continue
 		}
 		if c, ok := heroAdjustment(patch, want); ok {
-			out := map[string]any{"hero": c.Name, "patch": patch.Version, "date": patch.Date, "change": c.Type,
-				"changes": adjustmentLines(c), "note": heroChangeNote, "source": patchSource}
-			if why := cleanText(c.Intro, shownIntro); why != "" {
-				out["why"] = why
-			}
-			return out, nil
+			return map[string]any{"hero": c.Name, "patch": patch.Version, "date": patch.Date, "change": c.Type,
+				"notes": heroNotes(c), "note": heroChangeNote, "source": patchSource}, nil
 		}
 		for _, h := range patch.NewHeroes {
 			if strings.Contains(lettersOf(h.Name), want) {
@@ -284,6 +281,27 @@ const (
 	newsOutputBytes = 14000
 	patchNotesBytes = 10000
 )
+
+// heroNotes are one hero's changes laid out as the game's notes do: its
+// arrow and why, then each skill as [Skill · Name] (↑) with its lines.
+func heroNotes(c dexAdjustment) string {
+	var b strings.Builder
+	b.WriteString("🌟 " + c.Name + " " + patchArrow(c.Type) + "\n")
+	if why := cleanText(c.Intro, shownIntro); why != "" {
+		b.WriteString(why + "\n")
+	}
+	for _, sec := range c.Sections {
+		head := sec.Name
+		if sec.Category != "" && sec.Category != sec.Name {
+			head = sec.Category + " · " + sec.Name
+		}
+		b.WriteString("\n[" + head + "] (" + patchArrow(sec.Type) + ")\n")
+		for _, ch := range sec.Changes {
+			b.WriteString(ch.line() + "\n")
+		}
+	}
+	return strings.TrimSpace(b.String())
+}
 
 // sentNotes are the notes as they go to the chat: the patch's version and
 // date, the notes, and the heroes left out, to be asked by name.
@@ -331,22 +349,7 @@ func patchNotes(patch dexPatch) (notes string, left []string) {
 			continue
 		}
 		done = append(done, best.Name)
-		var part strings.Builder
-		part.WriteString("🌟 " + best.Name + " " + patchArrow(best.Type) + "\n")
-		if why := cleanText(best.Intro, shownIntro); why != "" {
-			part.WriteString(why + "\n")
-		}
-		for _, sec := range best.Sections {
-			head := sec.Name
-			if sec.Category != "" && sec.Category != sec.Name {
-				head = sec.Category + " · " + sec.Name
-			}
-			part.WriteString("\n[" + head + "] (" + patchArrow(sec.Type) + ")\n")
-			for _, ch := range sec.Changes {
-				part.WriteString(ch.line() + "\n")
-			}
-		}
-		add(best.Name, part.String()+"\n")
+		add(best.Name, heroNotes(best)+"\n\n")
 	}
 	return strings.TrimSpace(b.String()), left
 }
@@ -452,21 +455,6 @@ func patchSection(patch dexPatch, want string) map[string]any {
 	}
 	return map[string]any{"patch": patch.Version, "section": want, "found": false, "other_sections": otherSections(patch),
 		"note": "No such part in these notes: say so."}
-}
-
-// adjustmentLines are a hero's changes, skill by skill: "Skill 2,
-// Contract: Explosion [buff]: Cooldown: 12-9.5s → 8s at all levels".
-func adjustmentLines(c dexAdjustment) []string {
-	var lines []string
-	for _, s := range c.Sections {
-		var changes []string
-		for _, ch := range s.Changes {
-			changes = append(changes, ch.line())
-		}
-		head := strings.Trim(s.Category+", "+s.Name, ", ")
-		lines = append(lines, head+" ["+s.Type+"]: "+strings.Join(changes, "; "))
-	}
-	return lines
 }
 
 type dexEvent struct {

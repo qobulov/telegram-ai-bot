@@ -56,13 +56,13 @@ func TestMLBBPatch(t *testing.T) {
 	u := newUpstream(t, map[string]stub{"/dex/api/v1/patches": ok(dexPatches), "/dex/api/v1/patches/2.2.23": ok(dexPatch23), "/dex/api/v1/patches/2.2.16a": ok(dexPatch16a)})
 
 	env := run(t, u.options(), "mlbb_news", `{"action":"patch"}`)
-	for _, want := range []string{`"patch":"2.2.23"`, `"date":"2026-11-11"`, `"heroes":["Aldous: buff"]`, `"new_or_revamped_heroes":["Popol and Kupa, Icefield Companions"]`, "Revamped Hero Popol and Kupa", `"previous":"2.2.16a (2026-10-14)"`, `🌟 Aldous ↑\nLess downtime.\n\n[Skill 2 · Contract: Explosion] (↑)\nCooldown: 12-9.5s → 8s at all levels\nNew Effect: more damage.`, "🌟 Popol and Kupa, Icefield Companions (revamp)", "never from a web search"} {
+	for _, want := range []string{`"patch":"2.2.23"`, `"date":"2026-11-11"`, `"heroes":["Aldous: buff"]`, `"new_or_revamped_heroes":["Popol and Kupa, Icefield Companions"]`, "Revamped Hero Popol and Kupa", `"previous":"2.2.16a (2026-10-14)"`, `🌟 Aldous ↑\nLess downtime.\n\n[Skill 2 · Contract: Explosion] (↑)\nCooldown: 12-9.5s → 8s at all levels\nNew Effect: more damage.`, "🌟 Popol and Kupa, Icefield Companions (revamp)", "Never answer from a web search", "never a plain list"} {
 		if !env.OK || !strings.Contains(env.raw, want) {
 			t.Errorf("patch lacks %s: %s", want, env.raw)
 		}
 	}
 	env = run(t, u.options(), "mlbb_news", `{"action":"patch","hero":"aldous"}`)
-	if !env.OK || !strings.Contains(env.raw, `"Skill 2, Contract: Explosion [buff]: Cooldown: 12-9.5s → 8s at all levels; New Effect: more damage."`) {
+	if !env.OK || !strings.Contains(env.raw, `"notes":"🌟 Aldous ↑\nLess downtime.\n\n[Skill 2 · Contract: Explosion] (↑)\nCooldown: 12-9.5s → 8s at all levels\nNew Effect: more damage."`) {
 		t.Errorf("Aldous = %s", env.raw)
 	}
 	if env = run(t, u.options(), "mlbb_news", `{"action":"patch","hero":"Fanny"}`); !strings.Contains(env.raw, `"patch":"2.2.16a"`) || !strings.Contains(env.raw, `"change":"nerf"`) || !strings.Contains(env.raw, "never soften a nerf") {
@@ -85,7 +85,7 @@ func TestMLBBPatchNotesParts(t *testing.T) {
 			t.Errorf("2.2.16 lacks %s: %s", want, env.raw)
 		}
 	}
-	if env = run(t, u.options(), "mlbb_news", `{"action":"patch","version":"2.2.16","hero":"aulus"}`); !strings.Contains(env.raw, `Ultimate, Cleaving Axe [nerf]: Base Damage: 150-270 → 110-270`) {
+	if env = run(t, u.options(), "mlbb_news", `{"action":"patch","version":"2.2.16","hero":"aulus"}`); !strings.Contains(env.raw, `[Ultimate · Cleaving Axe] (↓)\nBase Damage: 150-270 → 110-270`) {
 		t.Errorf("Aulus, listed twice = %s", env.raw)
 	}
 	if env = run(t, u.options(), "mlbb_news", `{"action":"patch","version":"2.2.16","hero":"Bruno"}`); !strings.Contains(env.raw, `"change":"revamp"`) || !strings.Contains(env.raw, "Mana Cost: 60 → 90") || strings.Contains(env.raw, "Berserker") {
