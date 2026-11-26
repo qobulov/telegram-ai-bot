@@ -74,22 +74,16 @@ func (s *Service) farosat(ctx context.Context, in incoming) outcome {
 	}
 }
 
-var (
-	farosatMedals = []string{"🥇", "🥈", "🥉"}
-	// farosatKeycaps number the places after the medals, as far as ten.
-	farosatKeycaps = []string{"4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"}
-)
+var farosatMedals = []string{"🥇", "🥈", "🥉"}
 
 // farosatRule sets the ranking's title and its medals off from the rest.
 const farosatRule = "━━━━━━━━━━━━━━━"
 
-// farosatPlace is a place's mark: a medal, a keycap, or its number.
+// farosatPlace is a place's mark: a medal for the first three, its
+// number after.
 func farosatPlace(i int) string {
-	switch {
-	case i < len(farosatMedals):
+	if i < len(farosatMedals) {
 		return farosatMedals[i]
-	case i < len(farosatMedals)+len(farosatKeycaps):
-		return farosatKeycaps[i-len(farosatMedals)]
 	}
 	return fmt.Sprintf("%d.", i+1)
 }

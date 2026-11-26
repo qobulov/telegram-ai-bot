@@ -53,7 +53,7 @@ func TestFarosat(t *testing.T) {
 	if !strings.Contains(sent[len(sent)-1].text, "TOP 30") {
 		t.Errorf("top 30 = %q", sent[len(sent)-1].text)
 	}
-	for i, want := range map[int]string{0: "🥇", 2: "🥉", 3: "4️⃣", 9: "🔟", 10: "11.", 29: "30."} {
+	for i, want := range map[int]string{0: "🥇", 2: "🥉", 3: "4.", 9: "10.", 29: "30."} {
 		if got := farosatPlace(i); got != want {
 			t.Errorf("place %d = %q, want %q", i+1, got, want)
 		}
