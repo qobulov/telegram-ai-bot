@@ -29,8 +29,8 @@ const (
 	patchSource         = "MLBBDex (mlbbdex.com), from the official patch notes"
 	// heroChangeNote keeps a hero's mixed change whole, as the owners saw a
 	// nerfed ultimate told as "changed a little" under a buff on 2026-11-26.
-	heroChangeNote = "Say for each skill whether it was a buff, nerf or adjust, as marked, with its numbers before → after; " +
-		"never soften a nerf into \"changed\", and when the hero's change is a buff but a skill was nerfed, say so."
+	heroChangeNote = "Lay each hero out as the game's own patch notes do: [Hero] (↑) for a buff, (↓) a nerf, (~) an adjust, then each skill as [Passive] (↑), [Skill 1] (↓), [Ultimate] (~), " +
+		"each with its numbers before >> after, as marked; never soften a nerf into \"changed\", and when the hero's change is a buff but a skill was nerfed, say so."
 	eventsSource   = "MLBBDex (mlbbdex.com), from the Mobile Legends Wiki"
 	upcomingSource = "the Mobile Legends Wiki (mobile-legends.fandom.com)"
 	upcomingNote   = "Gathered by the wiki from leakers: none of it is confirmed, dates are unknown and it may change or be cancelled. Say so."
