@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/draw"
+	"image/png"
 	"net/http"
 	"reflect"
 	"slices"
@@ -196,9 +200,43 @@ func TestEditDistance(t *testing.T) {
 	}
 }
 
-// The builds are MLBBDex's for the hero's main lane and the rank, the more
-// played first; a lane with none is an error.
+const (
+	// arenaLingBuilds names a spell, an emblem, talents and items by ID,
+	// the less used build first; 9999 is an item the list does not know.
+	arenaLingBuilds = `{"code":0,"data":{"records":[{"data":{"heroid":84,"build":[
+		{"battleskill":{"data":{"__data":{"skillname":"Flicker"}}},"emblem":{"data":{"emblemname":"Fighter"}},
+		 "new_rune_skill":[],"equipid":[3002],"build_win_rate":0.5,"build_pick_rate":0.0501},
+		{"battleskill":{"data":{"__data":{"skillname":"Retribution"}}},"emblem":{"data":{"emblemname":"Assassin"}},
+		 "new_rune_skill":[1211,122],"equipid":[3003,3002,9999],"build_win_rate":0.5831,"build_pick_rate":0.3604}]}}]}}`
+	arenaItems   = `{"code":0,"data":{"records":[{"data":{"equipid":3003,"equipname":"Berserker's Fury"}},{"data":{"equipid":3002,"equipname":"Haas' Claws"}}]}}`
+	arenaEmblems = `{"code":0,"data":{"records":[{"data":{"giftid":1211,"emblemskill":{"skillname":"Fatal"}}},{"data":{"giftid":122,"emblemskill":{"skillname":"Seasoned Hunter"}}}]}}`
+)
+
+// The build is the academy's, for the hero MLBBDex names and its main
+// lane, asked by name; an item the academy's list does not know is left out.
 func TestMLBBBuild(t *testing.T) {
+	u := newUpstream(t, map[string]stub{
+		"/dex/api/v1/heroes":                    ok(dexLingList),
+		"/arena/api/academy/heroes/Ling/builds": ok(arenaLingBuilds),
+		"/arena/api/academy/equipment":          ok(arenaItems),
+		"/arena/api/academy/emblems":            ok(arenaEmblems),
+	})
+
+	out := result[mlbbBuildOutput](t, run(t, u.options(), "mlbb", `{"action":"build","hero":"ling","rank":"mythic"}`))
+
+	want := mlbbBuild{Spell: "Retribution", Emblem: "Assassin", Talents: []string{"Fatal", "Seasoned Hunter"}, Items: []string{"Berserker's Fury", "Haas' Claws"}, WinRate: "58.3%", PickRate: "36.0%"}
+	if len(out.Builds) != 2 || !reflect.DeepEqual(out.Builds[0], want) || out.Builds[1].Spell != "Flicker" || out.Hero != "Ling" || out.Lane != "jungle" || out.Rank != "mythic" {
+		t.Errorf("build = %+v, want the hero's main lane and the unknown item left out", out)
+	}
+	if q := u.requests("/arena/api/academy/heroes/Ling/builds")[0].URL.Query(); q.Get("lane") != "jungle" || q.Get("rank") != "mythic" {
+		t.Errorf("query = %v", q)
+	}
+}
+
+// With the academy down, the builds are MLBBDex's, as text, for the hero's
+// main lane and the rank, the more played first; a lane with none is an
+// error.
+func TestMLBBBuildFromMLBBDexWhenTheAcademyFails(t *testing.T) {
 	u := newUpstream(t, map[string]stub{"/dex/api/v1/heroes": ok(dexLingList), "/dex/api/v1/heroes/ling/builds": ok(dexLingBuilds)})
 
 	out := result[mlbbBuildOutput](t, run(t, u.options(), "mlbb", `{"action":"build","hero":"ling"}`))
@@ -212,6 +250,84 @@ func TestMLBBBuild(t *testing.T) {
 	}
 	if env := run(t, u.options(), "mlbb", `{"action":"build","hero":"Ling","lane":"gold"}`); env.OK || !strings.Contains(env.raw, "no builds") {
 		t.Errorf("no builds: %s", env.raw)
+	}
+}
+
+// The first build goes as one PNG, even when its icons will not load; the
+// test server's icons are not https, so they are left blank.
+func TestMLBBBuildSendsOnePicture(t *testing.T) {
+	u := newUpstream(t, map[string]stub{
+		"/dex/api/v1/heroes":                    ok(dexLingList),
+		"/arena/api/academy/heroes/Ling/builds": ok(arenaLingBuilds),
+		"/arena/api/academy/equipment":          ok(arenaItems),
+		"/arena/api/academy/emblems":            ok(arenaEmblems),
+	})
+	sink := &tools.Sink{}
+	ctx := tools.WithTurn(context.Background(), tools.Caller{UserID: 1, ChatID: -100, Human: true}, sink)
+	var env envelope
+	if err := json.Unmarshal([]byte(newRegistry(t, u.options()).Execute(ctx, 1, "mlbb", `{"action":"build","hero":"Ling","lane":"jungle"}`)), &env); err != nil {
+		t.Fatal(err)
+	}
+	env.raw = string(env.Result)
+	out := result[mlbbBuildOutput](t, env)
+	drawings := sink.Take()
+	if len(drawings) != 1 || drawings[0].MimeType != "image/png" || !strings.Contains(out.Note, "one picture") {
+		t.Fatalf("drawings = %d, note = %q", len(drawings), out.Note)
+	}
+	card, err := png.Decode(bytes.NewReader(drawings[0].Data))
+	// Spell, emblem and two talents make the widest row.
+	if err != nil || card.Bounds().Dx() != 2*cardPadding+4*cardCell {
+		t.Errorf("card = %v, %v", card.Bounds(), err)
+	}
+}
+
+func TestDrawBuildCard(t *testing.T) {
+	red := image.NewRGBA(image.Rect(0, 0, 100, 100))
+	draw.Draw(red, red.Bounds(), image.NewUniform(color.RGBA{R: 0xff, A: 0xff}), image.Point{}, draw.Src)
+	data, err := drawBuildCard(buildCard{Title: "Ling · Jungle", Subtitle: "Win rate 58.3%", Rows: []cardRow{
+		{Heading: "Core items", Icons: []cardIcon{{Name: "Berserker's Fury", Picture: red}, {Name: "A name long enough to need two lines and more"}}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	card, err := png.Decode(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	top := cardPadding + cardTitle + cardHeading
+	centre := func(cell int) color.Color {
+		return card.At(cardPadding+cell*cardCell+cardCell/2, top+cardIconSize/2)
+	}
+	if r, g, b, _ := centre(0).RGBA(); r>>8 != 0xff || g != 0 || b != 0 {
+		t.Errorf("the icon's centre is %v, want red", centre(0))
+	}
+	if r, g, b, _ := centre(1).RGBA(); uint8(r>>8) != cardMissing.R || uint8(g>>8) != cardMissing.G || uint8(b>>8) != cardMissing.B {
+		t.Errorf("the missing icon's centre is %v, want the blank colour", centre(1))
+	}
+}
+
+// The boots and the last two items are the ones most guides add besides
+// the core; guides with too few items do not count, and too few guides
+// give nothing.
+func TestFinishing(t *testing.T) {
+	items := map[int]arenaEntry{1: {Name: "Core"}, 2: {Name: "Swift Boots"}, 3: {Name: "Tough Boots"}, 4: {Name: "Malefic Gun"}, 5: {Name: "Sea Halberd"}, 6: {Name: "Rose Gold Meteor"}, 7: {Name: "Immortality"}}
+	guide := func(ids ...int) arenaGuide {
+		var g arenaGuide
+		g.Data.Equips = append(g.Data.Equips, struct {
+			IDs []int `json:"equip_ids"`
+		}{IDs: ids})
+		return g
+	}
+	guides := []arenaGuide{
+		guide(1, 2, 4, 5, 6, 7), guide(1, 2, 4, 5, 6, 7), guide(1, 2, 4, 5, 7, 7),
+		guide(1, 3, 4, 6, 7, 5), guide(1, 2, 4, 6, 5, 3), guide(2, 4),
+	}
+	finish, counted := finishing([]int{1}, guides, items)
+	if !slices.Equal(finish, []int{2, 4, 5}) || counted != 5 {
+		t.Errorf("finishing = %v from %d guides, want Swift Boots, Malefic Gun, Sea Halberd from 5", finish, counted)
+	}
+	if finish, counted := finishing([]int{1}, guides[:4], items); finish != nil || counted != 0 {
+		t.Errorf("four guides gave %v", finish)
 	}
 }
 

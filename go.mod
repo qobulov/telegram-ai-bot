@@ -16,4 +16,5 @@ require (
 	github.com/jackc/puddle/v2 v2.2.3 // indirect
 	github.com/richardlehane/msoleps v1.0.6 // indirect
 	golang.org/x/sync v0.25.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
 )
