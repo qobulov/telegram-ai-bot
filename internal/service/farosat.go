@@ -29,8 +29,8 @@ const (
 	// A day's gain: farosatLoss of the takes lose 1 to farosatMostLoss
 	// grams, the others gain 1 to farosatMostGain.
 	farosatLoss     = 0.15
-	farosatMostLoss = 5
-	farosatMostGain = 12
+	farosatMostLoss = 10
+	farosatMostGain = 10
 )
 
 // The answers are word for word the other bot's, in Uzbek alone, as the
