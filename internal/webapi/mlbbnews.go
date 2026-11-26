@@ -227,7 +227,8 @@ func (a *apis) mlbbPatch(ctx context.Context, ask patchAsk) (any, error) {
 }
 
 func (a *apis) dexPatch(ctx context.Context, version string) (dexPatch, error) {
-	return dexGet[dexPatch](ctx, a, "/api/v1/patches/"+url.PathEscape(version))
+	// English is the default today; asked for, it stays so.
+	return dexGet[dexPatch](ctx, a, "/api/v1/patches/"+url.PathEscape(version)+"?locale=en")
 }
 
 // heroInPatches looks for hero's changes in the patches searched, the
