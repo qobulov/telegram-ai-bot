@@ -144,7 +144,7 @@ var ownCommands = map[string]bool{
 	"/mylink": true, "/reports": true, "/warns": true, "/rights": true, "/myinvites": true, "/words": true,
 	"/toprep": true, "/cleanservice": true, "/antispam": true, "/weekawards": true,
 	"/ignore": true, "/unignore": true,
-	"/haqiqat": true, "/jurat": true, "/tanla": true, "/tod": true, "/ship": true, "/shipme": true,
+	"/ship": true, "/shipme": true,
 	"/farosat": true, "/topfarosat": true,
 }
 

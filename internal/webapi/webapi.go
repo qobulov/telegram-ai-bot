@@ -93,7 +93,6 @@ type BaseURLs struct {
 	RoneArena         string
 	MLBBDex           string
 	MLBBWiki          string
-	TruthOrDare       string
 	Tavily            string
 	TMDB              string
 	YouTube           string
@@ -155,7 +154,6 @@ func (b BaseURLs) withDefaults() BaseURLs {
 	b.RoneArena = cmp.Or(b.RoneArena, "https://arena.rone.dev")
 	b.MLBBDex = cmp.Or(b.MLBBDex, "https://mlbbdex.com")
 	b.MLBBWiki = cmp.Or(b.MLBBWiki, "https://mobile-legends.fandom.com")
-	b.TruthOrDare = cmp.Or(b.TruthOrDare, "https://api.truthordarebot.xyz")
 	b.Tavily = cmp.Or(b.Tavily, "https://api.tavily.com")
 	b.TMDB = cmp.Or(b.TMDB, "https://api.themoviedb.org")
 	b.YouTube = cmp.Or(b.YouTube, "https://www.googleapis.com/youtube/v3")
@@ -259,7 +257,6 @@ func Tools(opts Options) []tools.Tool {
 		a.mlbbTool(),
 		a.mlbbNewsTool(),
 		a.mplTool(),
-		a.partyTool(),
 		a.quakeTool(),
 		a.qrTool(),
 		a.freeGamesTool(),

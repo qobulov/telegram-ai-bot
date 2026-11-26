@@ -125,10 +125,6 @@ var photoWords = regexp.MustCompile(`(?i)(avatar|аватар|(^|[^\p{L}])(ava|�
 // gives: the chat model would make one up.
 var shipWords = regexp.MustCompile(`(?i)(moslig|mosmi|мослиг|мосми|совместим|(^|[^\p{L}])(ship|шип)([^\p{L}]|$))`)
 
-// partyWords start Truth or Dare or Would You Rather, whose questions only
-// the party_game tool gives: the chat model would ask the same few.
-var partyWords = regexp.MustCompile(`(?i)((^|[^\p{L}'])(haqiqat|jur'?at|truth|dare)([^\p{L}']|$)|правда или действие|nimani tanlarding|would you rather)`)
-
 // ownLine is the asker's own words: the last line of the turn's text,
 // after the speaker's name, without what they quoted.
 func ownLine(text string) string {
@@ -149,7 +145,7 @@ var toolsMarker = regexp.MustCompile(`(?i)^\s*[\[(<]\s*tools\s*[\])>]\s*$`)
 // model was asked.
 func (a *Agent) tryChat(ctx context.Context, t *turn) (Answer, bool, error) {
 	own := ownLine(t.req.Text)
-	if a.opts.Router == nil || a.opts.ChatModel == nil || len(t.req.Attachments) > 0 || gameWords.MatchString(own) || mapWords.MatchString(own) || weatherWords.MatchString(own) || statsWords.MatchString(own) || photoWords.MatchString(own) || shipWords.MatchString(own) || partyWords.MatchString(own) || playerID.MatchString(t.req.Text) || !a.wantsChat(ctx, t) {
+	if a.opts.Router == nil || a.opts.ChatModel == nil || len(t.req.Attachments) > 0 || gameWords.MatchString(own) || mapWords.MatchString(own) || weatherWords.MatchString(own) || statsWords.MatchString(own) || photoWords.MatchString(own) || shipWords.MatchString(own) || playerID.MatchString(t.req.Text) || !a.wantsChat(ctx, t) {
 		return Answer{}, false, nil
 	}
 	messages := a.prompt(t)

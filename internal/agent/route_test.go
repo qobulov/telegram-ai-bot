@@ -274,29 +274,6 @@ func TestShipQuestionsSkipTheRouter(t *testing.T) {
 	}
 }
 
-// Truth or Dare's questions are the party_game tool's.
-func TestPartyGamesSkipTheRouter(t *testing.T) {
-	for msg, full := range map[string]bool{
-		"Ali: Mari, haqiqat":             true,
-		"Ali: jur'at ber":                true,
-		"Ali: truth or dare o'ynaymiz":   true,
-		"Ali: Mari, nimani tanlarding":   true,
-		"Ali: давай правда или действие": true,
-		"Ali: haqiqatan zo'r ekan":       false,
-		"Ali: Mari nima gap":             false,
-	} {
-		f, router, _ := routedFixture("CHAT", text("chat"), text("full"))
-		req := request(1, msg)
-		req.Group = true
-
-		answer, err := f.agent.Reply(context.Background(), req)
-
-		if err != nil || (answer.Route == RouteFull) != full || (len(router.requests) == 0) != full {
-			t.Errorf("%q: route %q, router asked %d times; want full %v", msg, answer.Route, len(router.requests), full)
-		}
-	}
-}
-
 // A game question carries the reminder to check heroes in the request, but
 // the saved question is the plain text.
 func TestGameQuestionsRemindToCheckHeroes(t *testing.T) {
