@@ -89,9 +89,49 @@ func (f *formatter) block(code string) {
 	f.write(code)
 }
 
-// prose writes text outside code blocks: its bullets and headings first,
-// then its inline marks.
+// QuoteMark starts a line of a collapsed quote: consecutive lines starting
+// with it become one expandable blockquote, shown a few lines high until it
+// is tapped, as patch notes are sent. A mark no one types, it never starts
+// a line of a model's reply.
+const QuoteMark = "⟫"
+
+var quoteLines = regexp.MustCompile(`(?m)(?:^` + QuoteMark + `[ ]?[^\n]*(?:\n|$))+`)
+
+// prose writes text outside code blocks, its collapsed quotes as
+// expandable blockquotes holding their own marks.
 func (f *formatter) prose(text string) {
+	last := 0
+	for _, m := range quoteLines.FindAllStringIndex(text, -1) {
+		f.plain(text[last:m[0]])
+		f.quote(text[m[0]:m[1]])
+		last = m[1]
+	}
+	f.plain(text[last:])
+}
+
+// quote writes a collapsed quote's lines, their marks taken off, inside one
+// expandable blockquote; the entity goes before those inside it.
+func (f *formatter) quote(lines string) {
+	trailing := strings.HasSuffix(lines, "\n")
+	var body []string
+	for _, line := range strings.Split(strings.TrimSuffix(lines, "\n"), "\n") {
+		line = strings.TrimPrefix(line, QuoteMark)
+		body = append(body, strings.TrimPrefix(line, " "))
+	}
+	start, at := f.units, len(f.entities)
+	f.plain(strings.Join(body, "\n"))
+	if length := f.units - start; length > 0 {
+		quote := messageEntity{Type: "expandable_blockquote", Offset: start, Length: length}
+		f.entities = append(f.entities[:at], append([]messageEntity{quote}, f.entities[at:]...)...)
+	}
+	if trailing {
+		f.write("\n")
+	}
+}
+
+// plain writes text outside code blocks and quotes: its bullets and
+// headings first, then its inline marks.
+func (f *formatter) plain(text string) {
 	text = bulletMarks.ReplaceAllString(text, "• ")
 	text = headingMarks.ReplaceAllStringFunc(text, func(line string) string {
 		title := headingMarks.FindStringSubmatch(line)[1]

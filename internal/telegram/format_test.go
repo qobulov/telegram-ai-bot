@@ -30,6 +30,9 @@ func TestFormattedMarksBoldCodeHeadingsAndBullets(t *testing.T) {
 		"tag": {"[無敵•мᴀʏoʀ](tg://user?id=5539888451), tur!", "無敵•мᴀʏoʀ, tur!", []messageEntity{{"text_link", 0, 8, "tg://user?id=5539888451"}}},
 		// A web link shows its address: no address hides behind words.
 		"not a tag": {"[ko'r](https://t.me/x) [a](tg://user?id=x)", "ko'r (https://t.me/x) [a](tg://user?id=x)", nil},
+		// Lines marked ⟫ are one collapsed quote, holding their own marks.
+		"quote": {"**Aldous ↑**\n⟫ _why_\n⟫\n⟫ • CD: 12 → 8\nend", "Aldous ↑\nwhy\n\n• CD: 12 → 8\nend",
+			[]messageEntity{{"bold", 0, 8, ""}, {"expandable_blockquote", 9, 17, ""}, {"italic", 9, 3, ""}}},
 	} {
 		text, entities := formatted(c.in)
 		if text != c.text || !reflect.DeepEqual(entities, c.entities) {

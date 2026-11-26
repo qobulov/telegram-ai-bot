@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"telegram-ai-bot/internal/telegram"
 	"telegram-ai-bot/internal/tools"
 )
 
@@ -285,22 +286,35 @@ const (
 // heroNotes are one hero's changes laid out as the game's notes do: its
 // arrow and why, then each skill as [Skill · Name] (↑) with its lines.
 func heroNotes(c dexAdjustment) string {
-	var b strings.Builder
-	b.WriteString("**🌟 " + c.Name + " " + patchArrow(c.Type) + "**\n")
+	var body []string
 	if why := noteText(c.Intro, shownWhy); why != "" {
-		b.WriteString("_" + why + "_\n")
+		body = append(body, "_"+why+"_", "")
 	}
 	for _, sec := range c.Sections {
 		head := sec.Name
 		if sec.Category != "" && sec.Category != sec.Name {
 			head = sec.Category + " · " + sec.Name
 		}
-		b.WriteString("\n**[" + head + "] (" + patchArrow(sec.Type) + ")**\n")
+		body = append(body, "**["+head+"] ("+patchArrow(sec.Type)+")**")
 		for _, ch := range sec.Changes {
-			b.WriteString("• " + noteMarks.Replace(ch.line()) + "\n")
+			body = append(body, "• "+noteMarks.Replace(ch.line()))
 		}
+		body = append(body, "")
 	}
-	return strings.TrimSpace(b.String())
+	return "**🌟 " + c.Name + " " + patchArrow(c.Type) + "**\n" + quoted(body)
+}
+
+// quoted are lines in a collapsed quote, as the game's notes are shown in
+// channels: a few lines high until tapped. Blank lines at its ends go.
+func quoted(lines []string) string {
+	for len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+	out := make([]string, len(lines))
+	for i, line := range lines {
+		out[i] = strings.TrimSpace(telegram.QuoteMark + " " + line)
+	}
+	return strings.Join(out, "\n")
 }
 
 // shownWhy caps the why under a hero in the notes, long enough for most.
@@ -350,10 +364,10 @@ func patchNotes(patch dexPatch) (notes string, left []string) {
 		b.WriteString(part)
 	}
 	for _, r := range revampedHeroes(patch) {
-		add(r.title, "**🌟 "+r.title+" (revamp)**\n_"+noteText(r.text, shownIntro)+"_\n\n")
+		add(r.title, "**🌟 "+r.title+" (revamp)**\n"+quoted([]string{"_" + noteText(r.text, shownIntro) + "_"})+"\n\n")
 	}
 	for _, h := range patch.NewHeroes {
-		add(h.Name, "**🌟 "+strings.TrimSpace(h.Name+", "+h.Epithet)+" (revamp)**\n_"+noteText(h.Feature, shownIntro)+"_\n\n")
+		add(h.Name, "**🌟 "+strings.TrimSpace(h.Name+", "+h.Epithet)+" (revamp)**\n"+quoted([]string{"_" + noteText(h.Feature, shownIntro) + "_"})+"\n\n")
 	}
 	var done []string
 	for _, c := range patch.Changes {
