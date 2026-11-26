@@ -886,6 +886,8 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.aiGroupsCommand(ctx, in)
 	case in.group && s.opts.Ranks != nil && s.isRightsQuestion(in.text):
 		return s.myRights(ctx, in)
+	case commandName(in.text) == "/tod":
+		return partyGame(in)
 	case partyCommands[commandName(in.text)] != "":
 		// A party game's command is asked of the model as the words it
 		// stands for, so that it puts the question in the chat's language.
@@ -1122,6 +1124,10 @@ func (s *Service) pressed(q *telegram.CallbackQuery) {
 	}
 	if strings.HasPrefix(q.Data, menuData) {
 		s.pressedMenu(q)
+		return
+	}
+	if strings.HasPrefix(q.Data, partyData) {
+		s.pressedParty(q)
 		return
 	}
 	if strings.HasPrefix(q.Data, teamsData) && s.opts.Teams != nil {
