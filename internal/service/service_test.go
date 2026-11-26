@@ -113,6 +113,8 @@ type fakeReplier struct {
 	buttons [][]telegram.Button
 	// documents are files it makes, as a tool may.
 	documents []tools.Document
+	// whole answers as a tool sending a patch's notes does.
+	whole bool
 	// answer replaces the echo when set.
 	answer string
 	// reaction, when set, is answered instead of text, as the agent does
@@ -179,7 +181,7 @@ func (f *fakeReplier) Reply(ctx context.Context, req agent.Request) (agent.Answe
 		return agent.Answer{Text: f.answer, Sticker: f.sticker, GIF: f.gif, ID: 9001}, nil
 	}
 	if f.answer != "" {
-		return agent.Answer{Text: f.answer, ToReplied: f.toReplied, To: f.to, ID: 9001, ToolsUsed: f.toolsUsed}, nil
+		return agent.Answer{Text: f.answer, ToReplied: f.toReplied, To: f.to, ID: 9001, ToolsUsed: f.toolsUsed, Whole: f.whole}, nil
 	}
 	return agent.Answer{Text: "echo: " + strings.TrimPrefix(text, req.AuthorName+": "), ID: 9001, ToolsUsed: f.toolsUsed}, nil
 }
@@ -1365,6 +1367,19 @@ func TestGroupAnswerIsCutToTheConfiguredLength(t *testing.T) {
 	private.opts.MaxInputChars = 500
 	if sent := private.run(textFrom(userID, long)); len([]rune(sent[0].text)) <= 20 {
 		t.Errorf("a private answer was cut: %q", sent[0].text)
+	}
+}
+
+// An answer long by design, a patch's notes, goes whole to a group.
+func TestAWholeAnswerIsNotCutInAGroup(t *testing.T) {
+	f := newFixture()
+	f.opts.MaxGroupReplyChars = 20
+	f.replier.answer, f.replier.whole = strings.Repeat("я", 100), true
+
+	sent := f.run(inGroup(groupMessage("@MyBot patch notes tasha", "@MyBot")))
+
+	if len(sent) != 1 || len([]rune(sent[0].text)) != 100 {
+		t.Fatalf("sent = %+v", sent)
 	}
 }
 

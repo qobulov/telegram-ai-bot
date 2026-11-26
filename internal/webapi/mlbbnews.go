@@ -220,7 +220,7 @@ func (a *apis) mlbbPatch(ctx context.Context, ask patchAsk) (any, error) {
 	if sink, ok := tools.SinkFrom(ctx); ok && ask.send && hero == "" {
 		// Sent by code: left to the model, the notes came back as a
 		// list of names, as the owners saw.
-		sink.Finish(sentNotes(latest, notes, left))
+		sink.FinishWhole(sentNotes(latest, notes, left))
 		return map[string]any{"patch": latest.Version, "sent": true, "note": "The notes were sent to the chat; add nothing."}, nil
 	}
 	out["notes"] = notes

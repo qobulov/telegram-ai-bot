@@ -140,6 +140,8 @@ type Sink struct {
 	documents []Document
 	final     string
 	buttons   [][]telegram.Button
+	// whole is an answer sent whole even to a group (FinishWhole).
+	whole bool
 }
 
 // SetButtons keeps link buttons to go under the answer.
@@ -178,6 +180,22 @@ func (s *Sink) Finish(text string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.final = text
+}
+
+// FinishWhole ends the turn as Finish does with an answer long by design,
+// such as a patch's notes, which goes whole even to a group, in as many
+// messages as it takes, where a group's answers are cut to one.
+func (s *Sink) FinishWhole(text string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.final, s.whole = text, true
+}
+
+// Whole reports an answer ended with FinishWhole.
+func (s *Sink) Whole() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.whole
 }
 
 // Finished is the answer a tool ended the turn with, if one did.

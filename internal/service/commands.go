@@ -1497,7 +1497,11 @@ func (s *Service) answerOf(in incoming, answer agent.Answer, err error, started 
 		return outcome{reaction: answer.Reaction, answerID: answer.ID}
 	case err == nil:
 		log.Info("turn completed", "route", answer.Route)
-		out := outcome{text: s.fitted(in, answer.Text), answerID: answer.ID, toReplied: answer.ToReplied, toName: answer.To, effect: effectFor(in, answer.Text)}
+		text := answer.Text
+		if !answer.Whole {
+			text = s.fitted(in, text)
+		}
+		out := outcome{text: text, answerID: answer.ID, toReplied: answer.ToReplied, toName: answer.To, effect: effectFor(in, answer.Text)}
 		if answer.Text == "" {
 			// A sticker or a GIF is an answer of its own, never one more
 			// message after the words.

@@ -146,7 +146,7 @@ func TestMLBBPatchNotesSent(t *testing.T) {
 
 	env, sink := runTool(t, u, "mlbb_news", `{"action":"patch","send_notes":true}`)
 	text, done := sink.Finished()
-	if !env.OK || !done || !strings.HasPrefix(text, "📋 **Patch 2.2.23** · 2026-11-11\n\n") || !strings.Contains(text, "**🌟 Aldous ↑**\n_Less downtime._\n\n**[Skill 2 · Contract: Explosion] (↑)**\n• Cooldown: 12-9.5s → 8s at all levels") {
+	if !env.OK || !done || !sink.Whole() || !strings.HasPrefix(text, "📋 **Patch 2.2.23** · 2026-11-11\n\n") || !strings.Contains(text, "**🌟 Aldous ↑**\n_Less downtime._\n\n**[Skill 2 · Contract: Explosion] (↑)**\n• Cooldown: 12-9.5s → 8s at all levels") {
 		t.Fatalf("sent %v %q, result %s", done, text, env.raw)
 	}
 	if _, sink = runTool(t, u, "mlbb_news", `{"action":"patch"}`); func() bool { _, done := sink.Finished(); return done }() {

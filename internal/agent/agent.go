@@ -168,6 +168,9 @@ type Answer struct {
 	Route string
 	// ToolsUsed is how many tools the turn called.
 	ToolsUsed int
+	// Whole is an answer long by design, a patch's notes, to send whole
+	// even in a group, where answers are cut to one message.
+	Whole bool
 }
 
 // Reply answers the user's message and saves the whole turn. Nothing is
@@ -315,7 +318,9 @@ func (a *Agent) runFull(ctx context.Context, t *turn) (Answer, error) {
 		}
 		a.runTools(ctx, t, reply)
 		if text, done := finishedByTool(ctx); done {
-			return finish(t, ai.Message{Role: ai.RoleAssistant, Content: text})
+			answer, err := finish(t, ai.Message{Role: ai.RoleAssistant, Content: text})
+			answer.Whole = finishedWhole(ctx)
+			return answer, err
 		}
 	}
 	return Answer{}, ErrToolLoop
@@ -347,7 +352,7 @@ func (a *Agent) sendPatchNotes(ctx context.Context, t *turn) (Answer, bool) {
 		return Answer{}, false
 	}
 	answer, err := finish(t, ai.Message{Role: ai.RoleAssistant, Content: text})
-	answer.Route, answer.ToolsUsed = RouteFull, t.toolsUsed
+	answer.Route, answer.ToolsUsed, answer.Whole = RouteFull, t.toolsUsed, finishedWhole(ctx)
 	return answer, err == nil
 }
 
@@ -359,6 +364,12 @@ func finishedByTool(ctx context.Context) (string, bool) {
 		return "", false
 	}
 	return sink.Finished()
+}
+
+// finishedWhole reports a tool's answer to send whole even in a group.
+func finishedWhole(ctx context.Context) bool {
+	sink, ok := tools.SinkFrom(ctx)
+	return ok && sink.Whole()
 }
 
 func (a *Agent) prompt(t *turn) []ai.Message {

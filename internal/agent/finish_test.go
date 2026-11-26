@@ -57,7 +57,7 @@ type notesTools struct {
 func (f *notesTools) Execute(ctx context.Context, callerID int64, name, args string) string {
 	if sink, ok := tools.SinkFrom(ctx); ok && name == "mlbb_news" {
 		f.args = args
-		sink.Finish("📋 Patch 2.2.23")
+		sink.FinishWhole("📋 Patch 2.2.23")
 	}
 	return `{"ok":true}`
 }
@@ -73,7 +73,7 @@ func TestPatchNotesAreSentWithoutTheModel(t *testing.T) {
 
 		answer, err := f.agent.Reply(ctx, request(1, words))
 
-		if err != nil || answer.Text != "📋 Patch 2.2.23" || len(f.model.requests) != 0 || notes.args != `{"action":"patch","send_notes":true}` {
+		if err != nil || answer.Text != "📋 Patch 2.2.23" || !answer.Whole || len(f.model.requests) != 0 || notes.args != `{"action":"patch","send_notes":true}` {
 			t.Fatalf("%q: answer %q, err %v, model asked %d times, args %q", words, answer.Text, err, len(f.model.requests), notes.args)
 		}
 	}
