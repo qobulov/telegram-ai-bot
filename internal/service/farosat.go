@@ -74,15 +74,33 @@ func (s *Service) farosat(ctx context.Context, in incoming) outcome {
 	}
 }
 
-var farosatMedals = []string{"🥇", "🥈", "🥉"}
+var (
+	farosatMedals = []string{"🥇", "🥈", "🥉"}
+	// farosatKeycaps number the places after the medals, as far as ten.
+	farosatKeycaps = []string{"4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"}
+)
+
+// farosatRule sets the ranking's title and its medals off from the rest.
+const farosatRule = "━━━━━━━━━━━━━━━"
+
+// farosatPlace is a place's mark: a medal, a keycap, or its number.
+func farosatPlace(i int) string {
+	switch {
+	case i < len(farosatMedals):
+		return farosatMedals[i]
+	case i < len(farosatMedals)+len(farosatKeycaps):
+		return farosatKeycaps[i-len(farosatMedals)]
+	}
+	return fmt.Sprintf("%d.", i+1)
+}
 
 // farosatName is a name as the ranking shows it, a long one cut short.
 func farosatName(name string) string {
-	runes := []rune(name)
+	runes := []rune(strings.TrimSpace(name))
 	if len(runes) <= farosatNameShown {
-		return name
+		return string(runes)
 	}
-	return string(runes[:farosatNameShown]) + "..."
+	return strings.TrimSpace(string(runes[:farosatNameShown])) + "..."
 }
 
 // farosatTop answers /topfarosat with the group's ranking.
@@ -95,13 +113,12 @@ func (s *Service) farosatTop(ctx context.Context, in incoming, limit int) outcom
 	if len(top) == 0 {
 		return say(textFarosatNone)
 	}
-	lines := []string{fmt.Sprintf(textFarosatTop, limit), ""}
+	lines := []string{"**" + fmt.Sprintf(textFarosatTop, limit) + "**", farosatRule}
 	for i, r := range top {
-		place := fmt.Sprintf("%d.", i+1)
-		if i < len(farosatMedals) {
-			place = farosatMedals[i]
+		if i == len(farosatMedals) {
+			lines = append(lines, farosatRule)
 		}
-		lines = append(lines, fmt.Sprintf("%s %s — %d gram", place, farosatName(r.Name), r.Grams))
+		lines = append(lines, fmt.Sprintf("%s %s — **%d** gram", farosatPlace(i), farosatName(r.Name), r.Grams))
 	}
 	return say(strings.Join(lines, "\n"))
 }

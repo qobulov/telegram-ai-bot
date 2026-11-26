@@ -46,12 +46,17 @@ func TestFarosat(t *testing.T) {
 		t.Errorf("second take = %+v", sent)
 	}
 	sent = f.run(inGroup(groupMessage("/topfarosat")))
-	if last := sent[len(sent)-1].text; !strings.Contains(last, "🏆 Chat reytingi — TOP 10\n\n🥇 Ali — 215 gram") {
+	if last := sent[len(sent)-1].text; !strings.Contains(last, "**🏆 Chat reytingi — TOP 10**\n━━━━━━━━━━━━━━━\n🥇 Ali — **215** gram\n🥈 Vali — **203** gram") {
 		t.Errorf("top = %+v", sent)
 	}
 	sent = f.run(inGroup(groupMessage("/topfarosat 30")))
 	if !strings.Contains(sent[len(sent)-1].text, "TOP 30") {
 		t.Errorf("top 30 = %q", sent[len(sent)-1].text)
+	}
+	for i, want := range map[int]string{0: "🥇", 2: "🥉", 3: "4️⃣", 9: "🔟", 10: "11.", 29: "30."} {
+		if got := farosatPlace(i); got != want {
+			t.Errorf("place %d = %q, want %q", i+1, got, want)
+		}
 	}
 	if got := farosatName("Стр.Лнт. Турсунов—͟͟͞͞𖣘"); got != "Стр.Лнт. Турсунов..." {
 		t.Errorf("a long name = %q", got)
