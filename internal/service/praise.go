@@ -20,12 +20,25 @@ const praiseMostWords = 4
 // praiseWords are the words of a praise, folded to lower case.
 var praiseWords = map[string]bool{}
 
+// praiseFillers are the words said around a praise that do not change it,
+// "ux malades", "voy zo'r", as the owners saw "ux malades" answered in words.
+var praiseFillers = map[string]bool{}
+
+// praisePhrases are praises of more than one word, made one before the
+// words are counted: "gap yo'q" is praise, "gap" alone is not.
+var praisePhrases = strings.NewReplacer("gap yo'q", "gapyoq", "gap yoq", "gapyoq", "gap yo", "gapyoq", "nu ty", "", "ну ты", "")
+
 func init() {
 	for _, w := range strings.Fields(`zo'r zor zo'rsan zorsan zo'rsiz zorsiz zo'r-ku barakalla barakallo malades molodes molodets maladets
 		qoyil qoyilmaqom aqlli aqllisan aqllisiz ofarin rahmat raxmat yashavor yashang super kuchli ajoyib klass klassno imba
 		молодец молодчина умница умничка класс красава супер браво спасибо
-		good nice great smart awesome amazing thanks the best eng zo'risiz zo'risan zorisan zorisiz zo'risiz`) {
+		good nice great smart awesome amazing thanks the best eng zo'risiz zo'risan zorisan zorisiz zo'risiz
+		gapyoq maladis molodis maladec molodec chotki zo'rku zorku`) {
 		praiseWords[w] = true
+	}
+	for _, w := range strings.Fields(`ux uh uf uff voy vay vau vaw wow vo oh oho o e eh a ah bro brat bratan aka opa ana mana
+		вау ого ох ой о бро wow omg oh`) {
+		praiseFillers[w] = true
 	}
 	// a thanks alone is not praise enough to be answered with a GIF
 	for _, w := range []string{"rahmat", "raxmat", "спасибо", "thanks"} {
@@ -67,20 +80,36 @@ func (s *Service) toBot(in incoming) bool {
 // praiseMostWords of them, with the bot's name, emoji and punctuation.
 func (s *Service) onlyPraise(in incoming) bool {
 	text, _ := in.msg.Content()
-	words := strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
+	text = praisePhrases.Replace(strings.NewReplacer("ʻ", "'", "’", "'").Replace(strings.ToLower(text)))
+	words := strings.FieldsFunc(text, func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '\'' && r != 'ʻ' && r != '’' && r != '-'
 	})
 	praised := 0
 	for _, w := range words {
-		w = strings.NewReplacer("ʻ", "'", "’", "'").Replace(strings.Trim(w, "-'"))
+		w = strings.Trim(w, "-'")
 		switch {
 		case w == "":
-		case praiseWords[w]:
+		case praiseWords[w] || praiseWords[squeezed(w)]:
 			praised++
+		case praiseFillers[w] || praiseFillers[squeezed(w)]:
 		case isWakeWord(w, s.opts.WakeWords), s.opts.Bot.Username != "" && strings.EqualFold(w, s.opts.Bot.Username), w == "apa", w == "siz", w == "sen", w == "san", w == "ты", w == "you", w == "are", w == "bot", w == "бот":
 		default:
 			return false
 		}
 	}
 	return praised > 0 && praised <= praiseMostWords && len(words) <= praiseMostWords+2
+}
+
+// squeezed is a word with its drawn-out letters made one, "zoooor" "zor",
+// "uxxx" "ux".
+func squeezed(word string) string {
+	var b strings.Builder
+	var last rune
+	for _, r := range word {
+		if r != last {
+			b.WriteRune(r)
+		}
+		last = r
+	}
+	return b.String()
 }

@@ -15,7 +15,7 @@ func TestShortPraiseGetsTheBotsGIF(t *testing.T) {
 		m.ReplyToMessage = &telegram.Message{MessageID: 9, From: &telegram.User{ID: botID, IsBot: true}, Text: "hazil", Chat: m.Chat}
 		return m
 	}
-	for _, text := range []string{"Молодец", "zo'rsan", "Apa siz eng zo'risiz 👀", "good bot", "умница!"} {
+	for _, text := range []string{"Молодец", "zo'rsan", "Apa siz eng zo'risiz 👀", "good bot", "умница!", "ux malades", "Uxxx maladeeees", "voy zoooor", "gap yo'q", "bro imba 🔥", "вау молодец"} {
 		f := newFixture()
 		f.opts.PraiseGIFs = []string{"https://site/gifs/a.mp4"}
 		f.run(inGroup(toBot(text)))
@@ -23,7 +23,7 @@ func TestShortPraiseGetsTheBotsGIF(t *testing.T) {
 			t.Errorf("%q went to the model", text)
 		}
 	}
-	for _, text := range []string{"zo'r gap aytding, endi menga kino top", "rahmat", "bot"} {
+	for _, text := range []string{"zo'r gap aytding, endi menga kino top", "rahmat", "bot", "ux", "gap bor", "voy nima bo'ldi"} {
 		f := newFixture()
 		f.opts.PraiseGIFs = []string{"https://site/gifs/a.mp4"}
 		f.run(inGroup(toBot(text)))
