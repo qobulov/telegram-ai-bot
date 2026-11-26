@@ -889,11 +889,7 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 	case in.group && s.opts.Farosat != nil && commandName(in.text) == "/farosat":
 		return s.farosat(ctx, in)
 	case in.group && s.opts.Farosat != nil && commandName(in.text) == "/topfarosat":
-		limit := 10
-		if strings.TrimSpace(commandArgument(in.text)) == "30" {
-			limit = 30
-		}
-		return s.farosatTop(ctx, in, limit)
+		return s.farosatTop(ctx, in, farosatSize(commandArgument(in.text)))
 	case in.group && commandName(in.text) == "/ship":
 		return s.shipGame(ctx, in, rules)
 	case partyCommands[commandName(in.text)] != "":
@@ -1136,6 +1132,10 @@ func (s *Service) pressed(q *telegram.CallbackQuery) {
 	}
 	if strings.HasPrefix(q.Data, partyData) {
 		s.pressedParty(q)
+		return
+	}
+	if strings.HasPrefix(q.Data, farosatData) && s.opts.Farosat != nil {
+		s.pressedFarosat(q)
 		return
 	}
 	if strings.HasPrefix(q.Data, teamsData) && s.opts.Teams != nil {

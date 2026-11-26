@@ -793,6 +793,15 @@ func TestChatAndMemberMethodsSendExactParams(t *testing.T) {
 				"reply_markup": map[string]any{"inline_keyboard": []any{[]any{map[string]any{"text": "⬅️", "callback_data": "kb:more:"}}}}},
 		},
 		{
+			// An edit's Markdown is formatted as a send's is.
+			method: "editMessageText",
+			call: func(c *Client) error {
+				return c.EditMessageMenu(ctx, 42, 70, "**TOP 10**", nil)
+			},
+			want: map[string]any{"chat_id": float64(42), "message_id": float64(70), "text": "TOP 10",
+				"entities": []any{map[string]any{"type": "bold", "offset": float64(0), "length": float64(6)}}},
+		},
+		{
 			method: "setChatMemberTag",
 			call:   func(c *Client) error { return c.SetChatMemberTag(ctx, -100123, 42, "Pro") },
 			want:   map[string]any{"chat_id": float64(-100123), "user_id": float64(42), "tag": "Pro"},

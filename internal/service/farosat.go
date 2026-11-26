@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"math/rand/v2"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	"telegram-ai-bot/internal/storage"
+	"telegram-ai-bot/internal/telegram"
 )
 
 // Farosat is a daily game in groups, as the owners asked on 2026-11-26, in
@@ -97,15 +100,31 @@ func farosatName(name string) string {
 	return strings.TrimSpace(string(runes[:farosatNameShown])) + "..."
 }
 
-// farosatTop answers /topfarosat with the group's ranking.
+// farosatData starts a ranking button's data, followed by its size.
+const farosatData = "frs:"
+
+// farosatSizes are the rankings' sizes, a button each under the ranking.
+var farosatSizes = []int{10, 30, 50}
+
+// farosatTop answers /topfarosat with the group's ranking and the buttons
+// to show it at another size.
 func (s *Service) farosatTop(ctx context.Context, in incoming, limit int) outcome {
-	top, err := s.opts.Farosat.FarosatTop(ctx, in.scope.ChatID, limit)
+	text, err := s.farosatTopText(ctx, in.scope.ChatID, limit)
 	if err != nil {
 		s.opts.Logger.Warn("could not read the farosat ranking", "chat_id", in.scope.ChatID, "error", err)
 		return say(textError.to(in))
 	}
+	return outcome{text: text, buttons: farosatButtons(limit)}
+}
+
+// farosatTopText is the group's ranking at its size.
+func (s *Service) farosatTopText(ctx context.Context, chatID int64, limit int) (string, error) {
+	top, err := s.opts.Farosat.FarosatTop(ctx, chatID, limit)
+	if err != nil {
+		return "", err
+	}
 	if len(top) == 0 {
-		return say(textFarosatNone)
+		return textFarosatNone, nil
 	}
 	lines := []string{"**" + fmt.Sprintf(textFarosatTop, limit) + "**", farosatRule}
 	for i, r := range top {
@@ -114,5 +133,44 @@ func (s *Service) farosatTop(ctx context.Context, in incoming, limit int) outcom
 		}
 		lines = append(lines, fmt.Sprintf("%s %s — **%d** gram", farosatPlace(i), farosatName(r.Name), r.Grams))
 	}
-	return say(strings.Join(lines, "\n"))
+	return strings.Join(lines, "\n"), nil
+}
+
+// farosatButtons are the ranking's sizes, the one shown ticked.
+func farosatButtons(shown int) [][]telegram.Button {
+	row := make([]telegram.Button, 0, len(farosatSizes))
+	for _, size := range farosatSizes {
+		name := fmt.Sprintf("TOP %d", size)
+		if size == shown {
+			name = "✅ " + name
+		}
+		row = append(row, telegram.Button{Text: name, Data: fmt.Sprintf("%s%d", farosatData, size)})
+	}
+	return [][]telegram.Button{row}
+}
+
+// farosatSize is a ranking size asked for, by a button or after
+// /topfarosat; 10 for any other.
+func farosatSize(asked string) int {
+	if n, err := strconv.Atoi(strings.TrimSpace(asked)); err == nil && slices.Contains(farosatSizes, n) {
+		return n
+	}
+	return farosatSizes[0]
+}
+
+// pressedFarosat shows the ranking at the size pressed, in place.
+func (s *Service) pressedFarosat(q *telegram.CallbackQuery) {
+	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
+	defer cancel()
+	limit := farosatSize(strings.TrimPrefix(q.Data, farosatData))
+	text, err := s.farosatTopText(ctx, q.Message.Chat.ID, limit)
+	if err != nil {
+		s.opts.Logger.Warn("could not read the farosat ranking", "chat_id", q.Message.Chat.ID, "error", err)
+		_ = s.opts.Buttons.AnswerCallbackQuery(ctx, q.ID, textError.inLanguage("uz"), true)
+		return
+	}
+	_ = s.opts.Buttons.AnswerCallbackQuery(ctx, q.ID, "", false)
+	if err := s.opts.Buttons.EditMessageMenu(ctx, q.Message.Chat.ID, q.Message.MessageID, text, farosatButtons(limit)); err != nil {
+		s.opts.Logger.Debug("could not switch the farosat ranking", "chat_id", q.Message.Chat.ID, "error", err)
+	}
 }

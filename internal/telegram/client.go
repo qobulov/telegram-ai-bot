@@ -171,6 +171,7 @@ type editMessageMenuParams struct {
 	ChatID      int64           `json:"chat_id"`
 	MessageID   int64           `json:"message_id"`
 	Text        string          `json:"text"`
+	Entities    []messageEntity `json:"entities,omitempty"`
 	ReplyMarkup *inlineKeyboard `json:"reply_markup,omitempty"`
 }
 
@@ -178,7 +179,10 @@ type editMessageMenuParams struct {
 // buttons under it, so that a menu changes in place instead of filling the
 // chat.
 func (c *Client) EditMessageMenu(ctx context.Context, chatID, messageID int64, text string, buttons [][]Button) error {
-	params := editMessageMenuParams{ChatID: chatID, MessageID: messageID, Text: text}
+	// Formatted as a sent message is, so that a menu's bold stays bold
+	// when it changes.
+	text, entities := formatted(text)
+	params := editMessageMenuParams{ChatID: chatID, MessageID: messageID, Text: text, Entities: entities}
 	if len(buttons) > 0 {
 		params.ReplyMarkup = &inlineKeyboard{InlineKeyboard: buttons}
 	}

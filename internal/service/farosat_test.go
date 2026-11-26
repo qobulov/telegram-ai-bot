@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"telegram-ai-bot/internal/storage"
+	"telegram-ai-bot/internal/telegram"
 )
 
 type memoryFarosat struct {
@@ -70,3 +71,32 @@ func TestFarosat(t *testing.T) {
 		}
 	}
 }
+
+// /topfarosat has a button for each size under it; a press shows that
+// size in place, ticked.
+func TestFarosatRankingButtons(t *testing.T) {
+	f := newFixture()
+	buttons := &fakeButtons{}
+	f.opts.Buttons = buttons
+	f.opts.Farosat = &memoryFarosat{grams: map[int64]int{}, day: map[int64]string{}}
+
+	sent := f.run(inGroup(groupMessage("/topfarosat")))
+	menu := sent[len(sent)-1].buttons
+	if len(menu) != 1 || len(menu[0]) != 3 || menu[0][0].Text != "✅ TOP 10" || menu[0][2].Data != "frs:50" {
+		t.Fatalf("buttons = %+v", menu)
+	}
+	f.run(telegram.Update{UpdateID: 992, CallbackQuery: &telegram.CallbackQuery{
+		ID: "1", From: &telegram.User{ID: 2, FirstName: "Vali"}, Data: "frs:50",
+		Message: &telegram.Message{MessageID: 77, Chat: telegram.Chat{ID: groupID, Type: telegram.ChatTypeSupergroup}},
+	}})
+	if len(buttons.edits) != 1 || !strings.Contains(buttons.edits[0], "TOP 50") || buttons.menus[0][0][2].Text != "✅ TOP 50" {
+		t.Fatalf("50 press: edits %q, menus %+v", buttons.edits, buttons.menus)
+	}
+	if got := farosatSize("30"); got != 30 {
+		t.Errorf("/topfarosat 30 = %d", got)
+	}
+	if got := farosatSize("7"); got != 10 {
+		t.Errorf("/topfarosat 7 = %d", got)
+	}
+}
+
