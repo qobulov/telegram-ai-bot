@@ -40,20 +40,22 @@ type mlbbNewsArgs struct {
 	Action  string `json:"action"`
 	Hero    string `json:"hero"`
 	Version string `json:"version"`
+	Section string `json:"section"`
 }
 
 func (a *apis) mlbbNewsTool() tools.Tool {
 	return tools.Tool{
 		Name: "mlbb_news",
-		Description: "Mobile Legends news. patch: the latest patch's date, highlights, new or revamped heroes and the heroes buffed, nerfed or adjusted; with hero, its changes in the last patches; " +
-			"with version (such as 2.2.16), that patch instead, alone. " +
-			"events: this and next month's StarLight and Collector skins with dates. upcoming: what leakers say is coming, unconfirmed.",
+		Description: "Mobile Legends news. patch: the latest patch's highlights, new or revamped heroes and heroes buffed, nerfed or adjusted; " +
+			"hero: its changes in the last patches; version: that patch alone; section: a part of the notes, such as Battlefield or Brawl. " +
+			"events: this and next month's StarLight and Collector skins. upcoming: leaks, unconfirmed.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
 				"action": {"type": "string", "enum": ["patch", "events", "upcoming"]},
 				"hero": {"type": "string", "description": "For patch: one hero's changes."},
-				"version": {"type": "string", "description": "For patch: a patch's version, such as 2.2.16; left out, the latest."}
+				"version": {"type": "string", "description": "For patch: a patch's version, such as 2.2.16; left out, the latest."},
+				"section": {"type": "string", "description": "For patch: a part of its notes by title, as other_sections lists them."}
 			},
 			"required": ["action"],
 			"additionalProperties": false
@@ -71,7 +73,7 @@ func (a *apis) mlbbNews(ctx context.Context, raw json.RawMessage) (any, error) {
 	}
 	switch args.Action {
 	case "patch":
-		return a.mlbbPatch(ctx, strings.TrimSpace(args.Hero), patchVersion(args.Version))
+		return a.mlbbPatch(ctx, patchAsk{hero: strings.TrimSpace(args.Hero), version: patchVersion(args.Version), section: strings.TrimSpace(args.Section)})
 	case "events":
 		return a.mlbbEvents(ctx)
 	case "upcoming":
@@ -149,7 +151,14 @@ func patchVersion(version string) string {
 	return strings.TrimPrefix(version, "v")
 }
 
-func (a *apis) mlbbPatch(ctx context.Context, hero, version string) (any, error) {
+// patchAsk is what mlbb_news is asked of a patch: a hero's changes, a
+// version, a part of its notes.
+type patchAsk struct {
+	hero, version, section string
+}
+
+func (a *apis) mlbbPatch(ctx context.Context, ask patchAsk) (any, error) {
+	hero, version := ask.hero, ask.version
 	patches, err := dexGet[[]dexPatchEntry](ctx, a, "/api/v1/patches")
 	if err != nil {
 		return nil, err
@@ -177,8 +186,11 @@ func (a *apis) mlbbPatch(ctx context.Context, hero, version string) (any, error)
 		}
 		return nil, err
 	}
+	if ask.section != "" {
+		return patchSection(latest, ask.section), nil
+	}
 	out := map[string]any{"patch": latest.Version, "date": latest.Date, "source": patchSource,
-		"note": "For what changed for a hero, call again with hero."}
+		"note": "For what changed for a hero, call again with hero; for a part of the notes, with section."}
 	if len(latest.Sections) > 0 && latest.Sections[0].Title == nil {
 		out["highlights"] = cleanText(latest.Sections[0].HTML, 600)
 	}
@@ -186,14 +198,22 @@ func (a *apis) mlbbPatch(ctx context.Context, hero, version string) (any, error)
 	for _, h := range latest.NewHeroes {
 		revamped = append(revamped, strings.TrimSpace(h.Name+", "+h.Epithet))
 	}
+	for _, r := range revampedHeroes(latest) {
+		revamped = append(revamped, r.title)
+	}
 	if len(revamped) > 0 {
 		out["new_or_revamped_heroes"] = revamped
 	}
 	var heroes []string
 	for _, c := range latest.Changes {
-		heroes = append(heroes, c.Name+": "+c.Type)
+		if line := c.Name + ": " + c.Type; !slices.Contains(heroes, line) {
+			heroes = append(heroes, line)
+		}
 	}
 	out["heroes"] = heroes
+	if others := otherSections(latest); len(others) > 0 {
+		out["other_sections"] = others
+	}
 	if len(patches) > 1 {
 		out["previous"] = patches[1].Version + " (" + patches[1].Date + ")"
 	}
@@ -213,20 +233,24 @@ func (a *apis) heroInPatches(ctx context.Context, searched []dexPatchEntry, hero
 		if err != nil {
 			continue
 		}
-		for _, c := range patch.Changes {
-			if lettersOf(c.Name) == want {
-				out := map[string]any{"hero": c.Name, "patch": patch.Version, "date": patch.Date, "change": c.Type,
-					"changes": adjustmentLines(c), "note": heroChangeNote, "source": patchSource}
-				if why := cleanText(c.Intro, shownIntro); why != "" {
-					out["why"] = why
-				}
-				return out, nil
+		if c, ok := heroAdjustment(patch, want); ok {
+			out := map[string]any{"hero": c.Name, "patch": patch.Version, "date": patch.Date, "change": c.Type,
+				"changes": adjustmentLines(c), "note": heroChangeNote, "source": patchSource}
+			if why := cleanText(c.Intro, shownIntro); why != "" {
+				out["why"] = why
 			}
+			return out, nil
 		}
 		for _, h := range patch.NewHeroes {
 			if strings.Contains(lettersOf(h.Name), want) {
 				return map[string]any{"hero": h.Name, "patch": patch.Version, "date": patch.Date, "change": "revamp",
 					"what": cleanText(h.Feature, shownIntro), "source": patchSource}, nil
+			}
+		}
+		for _, r := range revampedHeroes(patch) {
+			if strings.Contains(lettersOf(r.title), want) {
+				return map[string]any{"hero": r.title, "patch": patch.Version, "date": patch.Date, "change": "revamp",
+					"what": r.text, "note": heroChangeNote, "source": patchSource}, nil
 			}
 		}
 	}
@@ -236,6 +260,109 @@ func (a *apis) heroInPatches(ctx context.Context, searched []dexPatchEntry, hero
 	}
 	return map[string]any{"hero": hero, "changed": false, "patches_searched": titles,
 		"note": "No change to this hero in these patches.", "source": patchSource}, nil
+}
+
+// heroAdjustment is the patch's adjustment of the hero, the fullest when it
+// is listed more than once: the notes list some heroes twice, once empty.
+func heroAdjustment(patch dexPatch, want string) (dexAdjustment, bool) {
+	var best dexAdjustment
+	found := false
+	for _, c := range patch.Changes {
+		if lettersOf(c.Name) == want && (!found || len(c.Sections) > len(best.Sections)) {
+			best, found = c, true
+		}
+	}
+	return best, found
+}
+
+// A revamp is a hero remade in a patch, which the notes tell in the text of
+// their Revamped Hero part, one heading a hero, and not hero by hero.
+type revamp struct {
+	title, text string
+}
+
+var (
+	patchHeading = regexp.MustCompile(`(?s)<h3[^>]*>(.*?)</h3>`)
+	// unshownSections are parts of the notes with nothing of their own.
+	unshownSections = []string{"references", "undocumented changes", "other", "hero adjustments"}
+)
+
+const (
+	shownRevamp  = 3000
+	shownSection = 4000
+)
+
+func revampedHeroes(patch dexPatch) []revamp {
+	var out []revamp
+	for _, sec := range patch.Sections {
+		if sec.Title == nil || !strings.Contains(strings.ToLower(*sec.Title), "revamped hero") {
+			continue
+		}
+		for _, part := range headedParts(sec.HTML, shownRevamp) {
+			if at := strings.LastIndex(part.title, "Hero:"); at >= 0 {
+				part.title = strings.TrimSpace(part.title[at+len("Hero:"):])
+			}
+			out = append(out, part)
+		}
+	}
+	return out
+}
+
+// headedParts are a section's parts under its headings, as text.
+func headedParts(text string, limit int) []revamp {
+	var parts []revamp
+	heads := patchHeading.FindAllStringSubmatchIndex(text, -1)
+	for i, h := range heads {
+		end := len(text)
+		if i+1 < len(heads) {
+			end = heads[i+1][0]
+		}
+		parts = append(parts, revamp{title: cleanText(text[h[2]:h[3]], shownIntro), text: cleanText(text[h[1]:end], limit)})
+	}
+	return parts
+}
+
+// otherSections are the titles of the notes' parts besides the heroes'.
+func otherSections(patch dexPatch) []string {
+	var titles []string
+	for _, sec := range patch.Sections {
+		if sec.Title == nil || slices.Contains(unshownSections, strings.ToLower(trimNumbering(*sec.Title))) ||
+			strings.Contains(strings.ToLower(*sec.Title), "revamped hero") || len(cleanText(sec.HTML, 10)) < 3 {
+			continue
+		}
+		titles = append(titles, *sec.Title)
+	}
+	return titles
+}
+
+// trimNumbering drops a title's "III. " numbering.
+func trimNumbering(title string) string {
+	if at := strings.Index(title, ". "); at >= 0 && at <= 5 {
+		return title[at+2:]
+	}
+	return title
+}
+
+// patchSection is the part of the notes whose title, or a heading in it,
+// holds want, as text.
+func patchSection(patch dexPatch, want string) map[string]any {
+	const note = "Tell what is asked from it; buffs as buffs, nerfs as nerfs, with numbers."
+	want = lettersOf(want)
+	for _, sec := range patch.Sections {
+		if sec.Title != nil && want != "" && strings.Contains(lettersOf(*sec.Title), want) {
+			return map[string]any{"patch": patch.Version, "section": *sec.Title, "text": cleanText(sec.HTML, shownSection),
+				"note": note, "source": patchSource}
+		}
+	}
+	for _, sec := range patch.Sections {
+		for _, part := range headedParts(sec.HTML, shownSection) {
+			if want != "" && strings.Contains(lettersOf(part.title), want) {
+				return map[string]any{"patch": patch.Version, "section": part.title, "text": part.text, "note": note, "source": patchSource}
+			}
+		}
+	}
+	return map[string]any{"patch": patch.Version, "section": want, "found": false, "other_sections": otherSections(patch),
+		"note": "No such part in these notes: say so."}
 }
 
 // adjustmentLines are a hero's changes, skill by skill: "Skill 2,

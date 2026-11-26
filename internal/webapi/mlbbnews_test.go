@@ -40,6 +40,14 @@ const (
 		"newHeroes":[{"name":"Popol and Kupa","epithet":"Icefield Companions","feature":"A marksman who fights alongside Kupa."}],
 		"adjustments":[{"name":"Aldous","type":"buff","intro":"Less downtime.","sections":[{"name":"Contract: Explosion","category":"Skill 2","type":"buff",
 			"changes":[{"label":"Cooldown","before":"12-9.5s","after":"8s at all levels"},{"text":"New Effect: more damage."}]}]}]}}`
+	dexPatch16 = `{"data":{"version":"2.2.16","date":"2026-09-16","newHeroes":[],
+		"sections":[{"anchor":null,"title":null,"html":"<p>September update.</p>"},
+			{"title":"I. Revamped Hero","html":"<h3 id=\"a\"><span>1. 10th Anniversary Revamped Hero: Masha, the Wild-oats Fist</span></h3><p>A Berserker.</p><h3 id=\"b\"><span>2. 10th Anniversary Revamped Hero: Bruno, The Protector</span></h3><p><b>Skill 2 - Slide BUFF</b></p><ul><li>Mana Cost: 60 → 90</li></ul>"},
+			{"title":"II. Hero Adjustments","html":"","role":"adjustments"},
+			{"title":"V. Game Modes/Mode Adjustments","html":"<h3 id=\"a-brawl\"><span>A. Brawl</span></h3><p>Dyrroth NERF</p><ul><li>DMG +14% → +8%</li></ul>"},
+			{"title":"References","html":""}],
+		"adjustments":[{"name":"Aulus","type":"buff","intro":"","sections":[]},
+			{"name":"Aulus","type":"buff","intro":"Ramps up faster.","sections":[{"name":"Cleaving Axe","category":"Ultimate","type":"nerf","changes":[{"label":"Base Damage","before":"150-270","after":"110-270"}]}]}]}}`
 	dexPatch16a = `{"data":{"version":"2.2.16a","date":"2026-10-14","adjustments":[{"name":"Fanny","type":"nerf","intro":"","sections":[]}]}}`
 	dexEvents   = `{"data":[{"name":"StarLight skin: Tideborn Sailor (Kalea)","kind":"starlight","start":"2026-11-01T00:00:00.000Z","end":"2026-11-30T23:59:59.999Z"}]}`
 )
@@ -65,6 +73,29 @@ func TestMLBBPatch(t *testing.T) {
 	}
 	if env = run(t, u.options(), "mlbb_news", `{"action":"patch","hero":"Miya"}`); !strings.Contains(env.raw, `"changed":false`) {
 		t.Errorf("Miya = %s", env.raw)
+	}
+}
+
+func TestMLBBPatchNotesParts(t *testing.T) {
+	u := newUpstream(t, map[string]stub{"/dex/api/v1/patches": ok(dexPatches), "/dex/api/v1/patches/2.2.16": ok(dexPatch16)})
+
+	env := run(t, u.options(), "mlbb_news", `{"action":"patch","version":"2.2.16"}`)
+	for _, want := range []string{`"heroes":["Aulus: buff"]`, `"new_or_revamped_heroes":["Masha, the Wild-oats Fist","Bruno, The Protector"]`, `"other_sections":["V. Game Modes/Mode Adjustments"]`} {
+		if !env.OK || !strings.Contains(env.raw, want) {
+			t.Errorf("2.2.16 lacks %s: %s", want, env.raw)
+		}
+	}
+	if env = run(t, u.options(), "mlbb_news", `{"action":"patch","version":"2.2.16","hero":"aulus"}`); !strings.Contains(env.raw, `Ultimate, Cleaving Axe [nerf]: Base Damage: 150-270 → 110-270`) {
+		t.Errorf("Aulus, listed twice = %s", env.raw)
+	}
+	if env = run(t, u.options(), "mlbb_news", `{"action":"patch","version":"2.2.16","hero":"Bruno"}`); !strings.Contains(env.raw, `"change":"revamp"`) || !strings.Contains(env.raw, "Mana Cost: 60 → 90") || strings.Contains(env.raw, "Berserker") {
+		t.Errorf("Bruno, revamped = %s", env.raw)
+	}
+	if env = run(t, u.options(), "mlbb_news", `{"action":"patch","version":"2.2.16","section":"brawl"}`); !strings.Contains(env.raw, `"section":"A. Brawl"`) || !strings.Contains(env.raw, "DMG +14% → +8%") {
+		t.Errorf("Brawl = %s", env.raw)
+	}
+	if env = run(t, u.options(), "mlbb_news", `{"action":"patch","version":"2.2.16","section":"ranked"}`); !strings.Contains(env.raw, `"found":false`) {
+		t.Errorf("a part not there = %s", env.raw)
 	}
 }
 
