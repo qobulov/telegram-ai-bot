@@ -46,12 +46,29 @@ func TestFarosat(t *testing.T) {
 		t.Errorf("second take = %+v", sent)
 	}
 	sent = f.run(inGroup(groupMessage("/topfarosat")))
-	if last := sent[len(sent)-1].text; !strings.Contains(last, "TOP 10") || !strings.Contains(last, "🥇 Ali — 215 gram") {
+	if last := sent[len(sent)-1].text; !strings.Contains(last, "TOP 10") || !strings.Contains(last, "🥇 Ali — **215** gram") || !strings.Contains(last, "/farosat") {
 		t.Errorf("top = %+v", sent)
 	}
 	sent = f.run(inGroup(groupMessage("/topfarosat 30")))
 	if !strings.Contains(sent[len(sent)-1].text, "TOP 30") {
 		t.Errorf("top 30 = %q", sent[len(sent)-1].text)
+	}
+	for _, c := range []struct {
+		gain  int
+		taken bool
+		want  []string
+	}{
+		{10, true, []string{"**+10 gram**", "charaqlayapti", "**25 gram**", "**3-o'rin**", "yarim tundan keyin"}},
+		{2, true, []string{"**+2 gram**", "Oz-ozdan"}},
+		{-3, true, []string{"**−3 gram**", "kamaydi"}},
+		{0, false, []string{"allaqachon oldingiz", "**25 gram**"}},
+	} {
+		card := farosatCard(incoming{msg: groupMessage("/farosat"), text: "/farosat"}, "Ali", c.gain, c.taken, 25, 3)
+		for _, want := range c.want {
+			if !strings.Contains(card, want) {
+				t.Errorf("card for %d lacks %q:\n%s", c.gain, want, card)
+			}
+		}
 	}
 	if n := len(f.replier.recorded()); n != 0 {
 		t.Errorf("the model was asked %d times", n)

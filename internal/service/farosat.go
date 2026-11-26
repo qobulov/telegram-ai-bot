@@ -31,29 +31,36 @@ const (
 )
 
 var (
-	textFarosatUp = localText{
-		uz: "🧠 %s, bugun farosatingiz **+%d gram** o'sdi!\nEndi: **%d gram** · guruhda %d-o'rin\n🕛 Keyingisi yarim tundan keyin",
-		ru: "🧠 %s, сегодня ваша фаросат выросла на **+%d г**!\nТеперь: **%d г** · %d-е место в группе\n🕛 Следующая после полуночи",
-		en: "🧠 %s, your farosat grew **+%d grams** today!\nNow: **%d grams** · place %d in the group\n🕛 The next one after midnight",
-	}
-	textFarosatDown = localText{
-		uz: "🧠 %s, voy, bugun farosatingiz **%d gram** kamaydi 😅\nEndi: **%d gram** · guruhda %d-o'rin\n🕛 Keyingisi yarim tundan keyin",
-		ru: "🧠 %s, ой, сегодня ваша фаросат уменьшилась на **%d г** 😅\nТеперь: **%d г** · %d-е место в группе\n🕛 Следующая после полуночи",
-		en: "🧠 %s, oops, your farosat shrank **%d grams** today 😅\nNow: **%d grams** · place %d in the group\n🕛 The next one after midnight",
-	}
+	textFarosatHead  = localText{uz: "🧠 **FAROSAT** · %s", ru: "🧠 **ФАРОСАТ** · %s", en: "🧠 **FAROSAT** · %s"}
+	textFarosatUp    = localText{uz: "📈 Bugun: **+%d gram**", ru: "📈 Сегодня: **+%d г**", en: "📈 Today: **+%d grams**"}
+	textFarosatDown  = localText{uz: "📉 Bugun: **−%d gram**", ru: "📉 Сегодня: **−%d г**", en: "📉 Today: **−%d grams**"}
 	textFarosatTaken = localText{
-		uz: "🧠 %s, bugungi farosatingizni allaqachon oldingiz.\nFarosatingiz: **%d gram** · guruhda %d-o'rin\n🕛 Keyingisi yarim tundan keyin",
-		ru: "🧠 %s, сегодняшнюю фаросат вы уже получили.\nВаша фаросат: **%d г** · %d-е место в группе\n🕛 Следующая после полуночи",
-		en: "🧠 %s, you already took today's farosat.\nYour farosat: **%d grams** · place %d in the group\n🕛 The next one after midnight",
+		uz: "✅ Bugungi farosatingizni allaqachon oldingiz",
+		ru: "✅ Сегодняшнюю фаросат вы уже получили",
+		en: "✅ You already took today's farosat",
 	}
-	textFarosatTop  = localText{uz: "🏆 **Farosat reytingi — TOP %d**", ru: "🏆 **Рейтинг фаросат — ТОП %d**", en: "🏆 **Farosat ranking — TOP %d**"}
-	textFarosatNone = localText{
+	textFarosatTotal = localText{uz: "⚖️ Jami: **%d gram**", ru: "⚖️ Всего: **%d г**", en: "⚖️ Total: **%d grams**"}
+	textFarosatPlace = localText{uz: "🏆 Guruhda: **%d-o'rin**", ru: "🏆 В группе: **%d-е место**", en: "🏆 In the group: **place %d**"}
+	textFarosatNext  = localText{uz: "🕛 Keyingisi yarim tundan keyin", ru: "🕛 Следующая после полуночи", en: "🕛 The next one after midnight"}
+	// A day's take says how it went: a big gain, a small one, a loss.
+	textFarosatBig   = localText{uz: "🔥 Bugun aql charaqlayapti!", ru: "🔥 Сегодня ум так и сияет!", en: "🔥 Your mind is sparkling today!"}
+	textFarosatSmall = localText{uz: "🌱 Oz-ozdan, lekin o'syapti", ru: "🌱 Понемногу, но растёт", en: "🌱 Little by little, it grows"}
+	textFarosatLost  = localText{uz: "😅 Voy, bugun biroz kamaydi", ru: "😅 Ой, сегодня немного убавилось", en: "😅 Oops, a little less today"}
+	textFarosatTop   = localText{uz: "🏆 **FAROSAT REYTINGI · TOP %d**", ru: "🏆 **РЕЙТИНГ ФАРОСАТ · ТОП %d**", en: "🏆 **FAROSAT RANKING · TOP %d**"}
+	textFarosatTake  = localText{uz: "🧠 /farosat — bugungi farosatingizni oling", ru: "🧠 /farosat — получите фаросат на сегодня", en: "🧠 /farosat — take today's farosat"}
+	textFarosatNone  = localText{
 		uz: "🧠 Hali hech kim farosat olmagan. /farosat yozing!",
 		ru: "🧠 Пока никто не получил фаросат. Напишите /farosat!",
 		en: "🧠 Nobody has taken their farosat yet. Write /farosat!",
 	}
 	textFarosatGrams = localText{uz: "gram", ru: "г", en: "grams"}
 )
+
+// farosatRule sets a card's head off from its body and its foot.
+const farosatRule = "━━━━━━━━━━━━━━"
+
+// farosatBigGain is a gain told as a big one.
+const farosatBigGain = 9
 
 // farosatGain is a day's gain, at random.
 func farosatGain() int {
@@ -76,14 +83,30 @@ func (s *Service) farosat(ctx context.Context, in incoming) outcome {
 		s.opts.Logger.Warn("could not take farosat", "chat_id", in.scope.ChatID, "error", err)
 		return say(textError.to(in))
 	}
+	return say(farosatCard(in, name, gain, taken, grams, place))
+}
+
+// farosatCard is a take's answer: whose it is, the day's change, the total,
+// the place, and when the next one comes.
+func farosatCard(in incoming, name string, gain int, taken bool, grams, place int) string {
+	var today, mood string
 	switch {
 	case !taken:
-		return say(fmt.Sprintf(textFarosatTaken.to(in), name, grams, place))
+		today = textFarosatTaken.to(in)
 	case gain < 0:
-		return say(fmt.Sprintf(textFarosatDown.to(in), name, -gain, grams, place))
+		today, mood = fmt.Sprintf(textFarosatDown.to(in), -gain), textFarosatLost.to(in)
+	case gain >= farosatBigGain:
+		today, mood = fmt.Sprintf(textFarosatUp.to(in), gain), textFarosatBig.to(in)
 	default:
-		return say(fmt.Sprintf(textFarosatUp.to(in), name, gain, grams, place))
+		today, mood = fmt.Sprintf(textFarosatUp.to(in), gain), textFarosatSmall.to(in)
 	}
+	lines := []string{fmt.Sprintf(textFarosatHead.to(in), name), farosatRule, today}
+	if mood != "" {
+		lines = append(lines, mood)
+	}
+	lines = append(lines, "", fmt.Sprintf(textFarosatTotal.to(in), grams), fmt.Sprintf(textFarosatPlace.to(in), place),
+		farosatRule, textFarosatNext.to(in))
+	return strings.Join(lines, "\n")
 }
 
 var farosatMedals = []string{"🥇", "🥈", "🥉"}
@@ -98,13 +121,17 @@ func (s *Service) farosatTop(ctx context.Context, in incoming, limit int) outcom
 	if len(top) == 0 {
 		return say(textFarosatNone.to(in))
 	}
-	lines := []string{fmt.Sprintf(textFarosatTop.to(in), limit)}
+	lines := []string{fmt.Sprintf(textFarosatTop.to(in), limit), farosatRule}
 	for i, r := range top {
 		place := fmt.Sprintf("%d.", i+1)
 		if i < len(farosatMedals) {
 			place = farosatMedals[i]
 		}
-		lines = append(lines, fmt.Sprintf("%s %s — %d %s", place, r.Name, r.Grams, textFarosatGrams.to(in)))
+		lines = append(lines, fmt.Sprintf("%s %s — **%d** %s", place, r.Name, r.Grams, textFarosatGrams.to(in)))
+		if i == len(farosatMedals)-1 && len(top) > len(farosatMedals) {
+			lines = append(lines, "")
+		}
 	}
+	lines = append(lines, farosatRule, textFarosatTake.to(in))
 	return say(strings.Join(lines, "\n"))
 }
