@@ -2439,7 +2439,7 @@
       ruleTickets: (m) => `🎫 Har hujum 1 tiket oladi: ${m} tagacha, har soatda 1 ta qaytadi`, ruleTokens: (n) => `🎟 G'alaba 1 karta tokeni beradi: kuniga ${n} tagacha`,
       ruleRating: "🏅 G'alaba reytingni oshiradi, mag'lubiyat tushiradi. Karta yo'qolmaydi", ruleWeek: "🏆 Har dushanba 00:00 da haftaning top 100 tasi token oladi, reyting 1000 ga qaytadi", toTable: "Reytingni ko'rish →",
       foeTeam: "Jamoasini ko'rish", noFoeTeam: "Jamoasi hali saqlanmagan", them: "Raqib",
-      synergyNone: "🔗 Bir animedan 2 ta karta qo'ysangiz: +5%, 3 ta: +10%", synergyOn: (a, n, p) => `🔗 ${a} ×${n}: +${p}%`,
+      synergyNone: "🔗 Bir animedan 2+2: +10%, 3: +12%, 3+2: +15%, 4: +17%, 5: +20% — butun jamoaga", synergyOn: (a, n, p) => `🔗 ${a}: +${p}% 👥`,
       rating: "Arena reytingi", record: (w, l) => `${w} g'alaba · ${l} mag'lubiyat`,
       tickets: (n, m) => `🎫 Arena tiketlari: ${n}/${m}`, nextTicket: (min) => (min >= 60 ? "· keyingisi 1 soatda" : `· keyingisi ${min} daqiqada`), tokens: (n, m) => `🎟 G'alaba tokenlari: ${n}/${m}`,
       histEmpty: "Hali jang bo'lmagan", histAttack: "⚔️ Hujum", histDefense: "🛡️ Himoya", histWon: "G'alaba", histLost: "Mag'lubiyat",
@@ -2478,7 +2478,7 @@
       shopHint: (w, l) => `Har hujum: g'alaba +${w} 🪙, mag'lubiyat +${l} 🪙`, shopToken: "1 ta 🎟 token", shopTicket: "1 ta 🎫 arena tiketi", shopTicketHint: (n, m) => (n >= m ? `Tiketlar to'la: ${n}/${m}` : `Hozir ${n}/${m}, hujum uchun`), shopTokenHint: (left, d) => `Bugun yana ${left} ta (kuniga ${d} tagacha)`,
       shopRefused: { coins: "Tanga yetmaydi: arenada hujum qiling", daily: "Bugungi tokenlar olindi: ertaga yana", tickets_full: "Tiketlar to'la: avval hujum qiling" },
       ruleEnergy: "🔋 Energiya: har yurish +34, zarba yeganda +10. 100 ga to'lganda karta skillini ishlatadi va energiya 0 ga tushadi",
-      synergy: "🔗 Bir animedan 2 ta karta: +5% hujum va jon, 3 ta va ko'p: +10%", edgeRule: "⚡ Ustunlik: 🛡️ tank ⚔️ hujumchidan, ⚔️ hujumchi 🔮 yordamchidan, 🔮 yordamchi 💚 tabibdan, 💚 tabib 🛡️ tankdan 25% kuchliroq urar", edge: "ustun",
+      synergy: "🔗 Bir animedan kartalar butun jamoaning hujum va jonini oshiradi: 2+2 — +10%, 3 — +12%, 3+2 — +15%, 4 — +17%, 5 — +20%", edgeRule: "⚡ Ustunlik: 🛡️ tank ⚔️ hujumchidan, ⚔️ hujumchi 🔮 yordamchidan, 🔮 yordamchi 💚 tabibdan, 💚 tabib 🛡️ tankdan 25% kuchliroq urar", edge: "ustun",
       stunned: (n) => `💫 ${n} hayratda: yurish o'tdi`, poisoned: (n, d) => `☠ ${n} zahardan −${d}`,
       refused: { size: "Jamoada 5 ta karta bo'lishi kerak", repeat: "Bitta kartani ikki marta qo'yib bo'lmaydi", not_held: "Jamoadagi karta endi sizda yo'q", no_tickets: "Tiket qolmadi: har soatda 1 ta qo'shiladi", no_team: "Avval jamoani saqlang: undagi karta endi sizda yo'q", opponent_gone: "Bu raqib endi yo'q, ro'yxat yangilandi", self: "O'zingizga hujum qilib bo'lmaydi" },
     },
@@ -2495,7 +2495,7 @@
       ruleTickets: (m) => `🎫 Атака стоит 1 билет: до ${m}, каждый час возвращается 1`, ruleTokens: (n) => `🎟 Победа даёт токен на карту: до ${n} в день`,
       ruleRating: "🏅 Победа поднимает рейтинг, поражение снижает. Карты не теряются", ruleWeek: "🏆 Каждый понедельник в 00:00 топ 100 недели получают токены, рейтинг снова 1000", toTable: "Смотреть рейтинг →",
       foeTeam: "Посмотреть команду", noFoeTeam: "Команда ещё не сохранена", them: "Соперник",
-      synergyNone: "🔗 2 карты одного аниме: +5%, 3: +10%", synergyOn: (a, n, p) => `🔗 ${a} ×${n}: +${p}%`,
+      synergyNone: "🔗 Одного аниме 2+2: +10%, 3: +12%, 3+2: +15%, 4: +17%, 5: +20% — всей команде", synergyOn: (a, n, p) => `🔗 ${a}: +${p}% 👥`,
       rating: "Рейтинг арены", record: (w, l) => `${w} побед · ${l} поражений`,
       tickets: (n, m) => `🎫 Билеты арены: ${n}/${m}`, nextTicket: (min) => (min >= 60 ? "· следующий через 1 ч" : `· следующий через ${min} мин`), tokens: (n, m) => `🎟 Токенов за победы: ${n}/${m}`,
       histEmpty: "Боёв ещё не было", histAttack: "⚔️ Атака", histDefense: "🛡️ Защита", histWon: "Победа", histLost: "Поражение",
@@ -2534,7 +2534,7 @@
       shopHint: (w, l) => `За атаку: победа +${w} 🪙, поражение +${l} 🪙`, shopToken: "1 🎟 токен", shopTicket: "1 🎫 билет арены", shopTicketHint: (n, m) => (n >= m ? `Билеты полные: ${n}/${m}` : `Сейчас ${n}/${m}, для атаки`), shopTokenHint: (left, d) => `Сегодня ещё ${left} (до ${d} в день)`,
       shopRefused: { coins: "Не хватает монет: атакуйте на арене", daily: "Токены на сегодня куплены: завтра снова", tickets_full: "Билеты полные: сначала атакуйте" },
       ruleEnergy: "🔋 Энергия: +34 за каждый ход, +10 за полученный удар. На 100 карта применяет навык, и энергия падает до 0",
-      synergy: "🔗 2 карты из одного аниме: +5% атаки и здоровья, 3 и больше: +10%", edgeRule: "⚡ Преимущество: 🛡️ танк бьёт ⚔️ атакующего, ⚔️ атакующий 🔮 поддержку, 🔮 поддержка 💚 лекаря, 💚 лекарь 🛡️ танка на 25% сильнее", edge: "преимущество",
+      synergy: "🔗 Карты одного аниме поднимают атаку и здоровье всей команды: 2+2 — +10%, 3 — +12%, 3+2 — +15%, 4 — +17%, 5 — +20%", edgeRule: "⚡ Преимущество: 🛡️ танк бьёт ⚔️ атакующего, ⚔️ атакующий 🔮 поддержку, 🔮 поддержка 💚 лекаря, 💚 лекарь 🛡️ танка на 25% сильнее", edge: "преимущество",
       stunned: (n) => `💫 ${n} оглушён(а): ход пропущен`, poisoned: (n, d) => `☠ ${n} от яда −${d}`,
       refused: { size: "В команде должно быть 5 карт", repeat: "Одну карту нельзя поставить дважды", not_held: "Карты из команды у вас больше нет", no_tickets: "Билетов нет: каждый час добавляется 1", no_team: "Сначала сохраните команду: карты из неё у вас больше нет", opponent_gone: "Этого соперника больше нет, список обновлён", self: "Нельзя атаковать себя" },
     },
@@ -2551,7 +2551,7 @@
       ruleTickets: (m) => `🎫 Each attack takes 1 ticket: up to ${m}, one back every hour`, ruleTokens: (n) => `🎟 A win gives a card token: up to ${n} a day`,
       ruleRating: "🏅 A win raises your rating, a loss lowers it. No card is lost", ruleWeek: "🏆 Every Monday at 00:00 the week's top 100 get tokens and ratings go back to 1000", toTable: "See the ranking →",
       foeTeam: "View team", noFoeTeam: "No team saved yet", them: "Opponent",
-      synergyNone: "🔗 2 cards of one anime: +5%, 3: +10%", synergyOn: (a, n, p) => `🔗 ${a} ×${n}: +${p}%`,
+      synergyNone: "🔗 Of one anime 2+2: +10%, 3: +12%, 3+2: +15%, 4: +17%, 5: +20% — to the whole team", synergyOn: (a, n, p) => `🔗 ${a}: +${p}% 👥`,
       rating: "Arena rating", record: (w, l) => `${w} wins · ${l} losses`,
       tickets: (n, m) => `🎫 Arena tickets: ${n}/${m}`, nextTicket: (min) => (min >= 60 ? "· next in 1 hour" : `· next in ${min} min`), tokens: (n, m) => `🎟 Win tokens: ${n}/${m}`,
       histEmpty: "No battles yet", histAttack: "⚔️ Attack", histDefense: "🛡️ Defense", histWon: "Victory", histLost: "Defeat",
@@ -2590,7 +2590,7 @@
       shopHint: (w, l) => `Each attack: a win +${w} 🪙, a loss +${l} 🪙`, shopToken: "1 🎟 token", shopTicket: "1 🎫 arena ticket", shopTicketHint: (n, m) => (n >= m ? `Tickets full: ${n}/${m}` : `${n}/${m} now, for an attack`), shopTokenHint: (left, d) => `${left} more today (up to ${d} a day)`,
       shopRefused: { coins: "Not enough coins: attack in the arena", daily: "Today's tokens are bought: more tomorrow", tickets_full: "Tickets are full: attack first" },
       ruleEnergy: "🔋 Energy: +34 each turn, +10 for each hit taken. At 100 the card uses its skill and drops to 0",
-      synergy: "🔗 2 cards of one anime: +5% attack and health, 3 or more: +10%", edgeRule: "⚡ Edge: 🛡️ tank beats ⚔️ dealer, ⚔️ dealer beats 🔮 support, 🔮 support beats 💚 healer, 💚 healer beats 🛡️ tank, for 25% more", edge: "edge",
+      synergy: "🔗 Cards of one anime raise the whole team's attack and health: 2+2 — +10%, 3 — +12%, 3+2 — +15%, 4 — +17%, 5 — +20%", edgeRule: "⚡ Edge: 🛡️ tank beats ⚔️ dealer, ⚔️ dealer beats 🔮 support, 🔮 support beats 💚 healer, 💚 healer beats 🛡️ tank, for 25% more", edge: "edge",
       stunned: (n) => `💫 ${n} is stunned: turn skipped`, poisoned: (n, d) => `☠ ${n} takes −${d} from poison`,
       refused: { size: "A team needs 5 cards", repeat: "A card cannot be placed twice", not_held: "You no longer hold a card of the team", no_tickets: "No tickets left: one comes back every hour", no_team: "Save a team first: you no longer hold one of its cards", opponent_gone: "This opponent is gone; the list is refreshed", self: "You cannot attack yourself" },
     },
@@ -2684,17 +2684,19 @@
     const skill = card.rarity >= 3 ? card.skill || SKILLS[((card.id % 6) + 6) % 6] : "";
     return { id: card.id, name: card.name, image: card.image, rarity: card.rarity, stars: card.stars || 1, attack: card.attack || 0, health: card.health || 0, class: cls, skill, kit: card.kit || null, anime: franchise(card.anime || "") };
   }
-  // withSynergy raises the team's cards of one anime as the server does:
-  // a pair by 5%, three or more by 10%, rounded the same in whole numbers.
+  // withSynergy raises the whole team by its cards of one anime as the
+  // server does: two pairs 10%, three 12%, three and a pair 15%, four 17%,
+  // five 20%, a lone pair nothing, rounded the same in whole numbers.
   // A fighter from the server has its synergy already and keeps it.
   function withSynergy(team) {
     const count = {};
     for (const f of team) if (f && f.anime) count[f.anime] = (count[f.anime] || 0) + 1;
+    const [first = 0, second = 0] = Object.values(count).sort((a, b) => b - a);
+    const team_ = first >= 5 ? 20 : first === 4 ? 17 : first === 3 && second === 2 ? 15 : first === 3 ? 12 : first === 2 && second === 2 ? 10 : 0;
     const raised = (n, p) => Math.floor((n * (100 + p) + 50) / 100);
     return team.map((f) => {
       if (!f || f.synergy !== undefined) return f;
-      const n = f.anime ? count[f.anime] : 0;
-      const synergy = n >= 3 ? 10 : n === 2 ? 5 : 0;
+      const synergy = team_;
       return { ...f, synergy, attack: raised(f.attack, synergy), health: raised(f.health, synergy) };
     });
   }
@@ -2990,25 +2992,26 @@
     $("arenaTeamHint").textContent = !full ? at.pick : fallback ? at.teamFallback : changed ? at.unsaved : at.savedHint;
   }
 
-  // arenaSynergy says under the team which of its animes raise each other,
-  // or how a pair would.
+  // arenaSynergy says under the team which of its animes raise it and by
+  // how much, or how they would.
   function arenaSynergy(team) {
     const box = $("arenaRules");
     box.textContent = "";
     const seen = {};
     for (const f of team) {
-      if (!f || !f.synergy) continue;
+      if (!f || !f.synergy || !f.anime) continue;
       seen[f.anime] = seen[f.anime] || { n: 0, p: f.synergy };
       seen[f.anime].n += 1;
     }
+    for (const a of Object.keys(seen)) if (seen[a].n < 2) delete seen[a];
     const names = Object.keys(seen);
     if (!names.length) { box.textContent = at.synergyNone; box.classList.remove("on"); return; }
     box.classList.add("on");
-    for (const a of names) {
-      const chip = document.createElement("span");
-      chip.textContent = at.synergyOn(a, seen[a].n, seen[a].p);
-      box.append(chip);
-    }
+    // One chip for the team: its percent is the whole team's, not each anime's.
+    const chip = document.createElement("span");
+    names.sort((x, y) => seen[y].n - seen[x].n);
+    chip.textContent = at.synergyOn(names.map((x) => `${x} ×${seen[x].n}`).join(" + "), "", seen[names[0]].p);
+    box.append(chip);
   }
 
   // arenaPick chooses the card for one slot from the cards held, the

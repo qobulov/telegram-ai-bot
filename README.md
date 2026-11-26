@@ -2162,12 +2162,13 @@ itself wins 50.0% attacking. Each event says `energy` and `to_energy`, the
 energy of its `from` and `to` cards after it.
 The classes beat each other in a triangle, tank over fighter, fighter over
 mage, mage over tank: such a hit, a skill's too, does ×1.25 (`EdgeFactor`)
-and its event says `edge`. Cards of one anime in a team, seasons and sequels
-as one (`Franchise`, as the Animelar tab groups them), raise each other's
-attack and health after their stars, a pair by 10%, three or more by 20%
-(`SynergyTwo`, `SynergyThree`; two pairs each get 10%); the saved power
-includes it, each fighter of `arena` and `arena_attack` says its `anime` and
-`synergy`, and a slot shows 🔗 +10% or +20%. A defender's saved power is
+and its event says `edge`. By its cards of one anime, seasons and sequels as one (`Franchise`, as the
+Animelar tab groups them), a team's every card gains attack and health after
+its stars: two pairs 10%, three 12%, three and a pair 15%, four 17%, five
+20% (`SynergyTwoPairs`, `SynergyThree`, `SynergyFull`, `SynergyFour`,
+`SynergyFive`; a lone pair gains nothing); the saved power includes it, each
+fighter of `arena` and `arena_attack` says its `anime` and `synergy`, a slot
+shows 🔗 +15% and so on, and one chip under the team names its animes. A defender's saved power is
 worked out again only when they save their team again. `arena` gives the player's rating (Elo from
 1000, K 32; the defender's moves too, the winner up and the loser down),
 wins and losses, their arena tickets (`tickets` of `tickets_max` 8, one coming

@@ -400,20 +400,25 @@ func TestPickOpponentsRefreshes(t *testing.T) {
 	}
 }
 
-// Cards of one anime in a team, seasons and sequels as one, raise each
-// other: a pair by SynergyTwo, three or more by SynergyThree, each pair on
-// its own; a card without an anime has none.
+// By its groups of cards of one anime a team's every card is raised: two
+// pairs, three, three and a pair, four, five; a lone pair and cards without
+// an anime count for nothing.
+func all(p int) [5]int { return [5]int{p, p, p, p, p} }
+
 func TestSynergies(t *testing.T) {
 	cases := []struct {
 		animes [5]string
 		want   [5]int
 	}{
 		{[5]string{"A", "B", "C", "D", "E"}, [5]int{}},
-		{[5]string{"A", "A", "C", "D", "E"}, [5]int{SynergyTwo, SynergyTwo, 0, 0, 0}},
-		{[5]string{"A", "B", "A", "D", "A"}, [5]int{SynergyThree, 0, SynergyThree, 0, SynergyThree}},
-		{[5]string{"A", "B", "A", "B", "E"}, [5]int{SynergyTwo, SynergyTwo, SynergyTwo, SynergyTwo, 0}},
-		{[5]string{"A", "A", "A", "A", "A"}, [5]int{SynergyThree, SynergyThree, SynergyThree, SynergyThree, SynergyThree}},
-		{[5]string{"", "", "C", "D", "E"}, [5]int{}},
+		{[5]string{"A", "A", "C", "D", "E"}, [5]int{}},
+		{[5]string{"A", "B", "A", "B", "E"}, all(SynergyTwoPairs)},
+		{[5]string{"A", "B", "A", "D", "A"}, all(SynergyThree)},
+		{[5]string{"A", "B", "A", "B", "A"}, all(SynergyFull)},
+		{[5]string{"A", "A", "A", "E", "A"}, all(SynergyFour)},
+		{[5]string{"A", "A", "A", "A", "A"}, all(SynergyFive)},
+		{[5]string{"", "", "", "D", "E"}, [5]int{}},
+		{[5]string{"", "", "C", "C", "C"}, all(SynergyThree)},
 	}
 	for _, c := range cases {
 		if got := synergies(c.animes); got != c.want {
@@ -437,7 +442,7 @@ func TestArenaTeamSynergy(t *testing.T) {
 	}
 	plain, _ := fightersOf(arenaCards(), [5]int64{10, 11, 12, 13, 14})
 	for i, v := range team.views {
-		want := []int{SynergyTwo, SynergyTwo, SynergyThree, SynergyThree, SynergyThree}[i]
+		want := SynergyFull
 		base := plain.views[i]
 		if v.Synergy != want || v.Attack != raised(base.Attack, want) || v.Health != raised(base.Health, want) || plain.views[i].Synergy != 0 {
 			t.Errorf("slot %d = %+v, plain %+v", i, v, base)
@@ -457,7 +462,7 @@ func TestArenaTeamSynergy(t *testing.T) {
 	if store.arena.power[7] != team.team.Power() {
 		t.Errorf("power saved %d, want %d", store.arena.power[7], team.team.Power())
 	}
-	if f := out["team"].([]any)[2].(map[string]any); f["synergy"] != float64(SynergyThree) || f["anime"] != "Naruto" {
+	if f := out["team"].([]any)[2].(map[string]any); f["synergy"] != float64(SynergyFull) || f["anime"] != "Naruto" {
 		t.Errorf("a fighter's view = %v", f)
 	}
 	call(8, map[string]any{"action": "arena_team", "front": arenaFront, "back": arenaBack})
@@ -476,7 +481,7 @@ func TestArenaTeamSynergy(t *testing.T) {
 	if edges == 0 {
 		t.Error("no edge in the battle")
 	}
-	if d := out["defender"].([]any)[0].(map[string]any); d["synergy"] != float64(SynergyTwo) {
+	if d := out["defender"].([]any)[0].(map[string]any); d["synergy"] != float64(SynergyFull) {
 		t.Errorf("the defender's view = %v", d)
 	}
 }

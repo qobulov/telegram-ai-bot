@@ -34,15 +34,20 @@ const (
 	arenaTopSize       = 10
 )
 
-// Anime synergy, as the owners asked: the cards of one anime in a team,
-// seasons and sequels as one (Franchise), raise each other's attack and
-// health by these percents, a pair by SynergyTwo, three or more by
-// SynergyThree (since 2026-11-22 half what they were, 10 and 20, as the
-// owners asked: a team of one anime stood too far above the rest). The page
-// works it out the same way for a team not saved.
+// Anime synergy, as the owners asked on 2026-11-26 after another game's
+// racial bonus: by how many cards of one anime a team has, seasons and
+// sequels as one (Franchise), every card of the team gains these percents
+// of attack and health: two pairs SynergyTwoPairs, three SynergyThree,
+// three and a pair SynergyFull, four SynergyFour, five SynergyFive; a lone
+// pair gains nothing. (Until then only the cards of the anime gained, 5% a
+// pair and 10% three or more.) The page works it out the same way for a
+// team not saved.
 const (
-	SynergyTwo   = 5
-	SynergyThree = 10
+	SynergyTwoPairs = 10
+	SynergyThree    = 12
+	SynergyFull     = 15
+	SynergyFour     = 17
+	SynergyFive     = 20
 )
 
 // arenaRules are the rules at now: the tokens' day starts at midnight in
@@ -153,23 +158,43 @@ func themedFighters(held []storage.OwnedCard, ids [5]int64, theme string) (fight
 }
 
 // synergies is each slot's synergy percent by the animes of the team's
-// cards; a card without an anime has none.
+// cards, the same for every slot; a card without an anime counts for none.
 func synergies(animes [5]string) [5]int {
+	p := teamSynergy(animes)
+	return [5]int{p, p, p, p, p}
+}
+
+// teamSynergy is the team's synergy percent by its two largest groups of
+// cards of one anime.
+func teamSynergy(animes [5]string) int {
 	count := map[string]int{}
 	for _, a := range animes {
-		count[a]++
-	}
-	var bonus [5]int
-	for i, a := range animes {
-		switch n := count[a]; {
-		case a == "" || n < 2:
-		case n == 2:
-			bonus[i] = SynergyTwo
-		default:
-			bonus[i] = SynergyThree
+		if a != "" {
+			count[a]++
 		}
 	}
-	return bonus
+	first, second := 0, 0
+	for _, n := range count {
+		switch {
+		case n > first:
+			first, second = n, first
+		case n > second:
+			second = n
+		}
+	}
+	switch {
+	case first >= 5:
+		return SynergyFive
+	case first == 4:
+		return SynergyFour
+	case first == 3 && second == 2:
+		return SynergyFull
+	case first == 3:
+		return SynergyThree
+	case first == 2 && second == 2:
+		return SynergyTwoPairs
+	}
+	return 0
 }
 
 // raised is n raised by percent, rounded, in whole numbers so that the
