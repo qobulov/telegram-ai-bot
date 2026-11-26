@@ -205,6 +205,8 @@ type Options struct {
 	// BoxRoll draws a diamond box's prize (0 to n-1); nil is math/rand.
 	BoxRoll func(n int) int
 	Extras  GroupExtras
+	// Farosat keeps the farosat game; nil leaves /farosat and /top out.
+	Farosat FarosatStore
 	// Reports keeps the members' reports, and WarnList their warnings, for
 	// /reports and /warns; nil turns each off.
 	Reports  ReportBook

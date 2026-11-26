@@ -205,7 +205,7 @@ func TestSpaced(t *testing.T) {
 func TestOwnCommandsAreAnsweredPlainInAGroup(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("\x89PNG")) }))
 	defer server.Close()
-	for text, want := range map[string]int{"/card": 1, "/Card": 1, "/kartalarim": 0, "/games": 1, "/card@OtherBot": 0, "/top": 0} {
+	for text, want := range map[string]int{"/card": 1, "/Card": 1, "/kartalarim": 0, "/games": 1, "/card@OtherBot": 0, "/dick": 0} {
 		f := newFixture()
 		f.opts.Cards = newFakeCards(server.URL + "/g.png")
 		f.opts.CardsURL = "https://app/kartalar"

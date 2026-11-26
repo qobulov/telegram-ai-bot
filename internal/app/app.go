@@ -359,6 +359,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		MemberLinks:     store,
 		Reports:         store,
 		Extras:          store,
+		Farosat:         store,
 		WarnList:        store,
 		LinkMaker:       bot.Client,
 		Profiles:        store,

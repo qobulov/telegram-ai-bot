@@ -886,6 +886,12 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.aiGroupsCommand(ctx, in)
 	case in.group && s.opts.Ranks != nil && s.isRightsQuestion(in.text):
 		return s.myRights(ctx, in)
+	case in.group && s.opts.Farosat != nil && commandName(in.text) == "/farosat":
+		return s.farosat(ctx, in)
+	case in.group && s.opts.Farosat != nil && commandName(in.text) == "/top":
+		return s.farosatTop(ctx, in, 10)
+	case in.group && s.opts.Farosat != nil && commandName(in.text) == "/top30":
+		return s.farosatTop(ctx, in, 30)
 	case commandName(in.text) == "/tod":
 		return partyGame(in)
 	case in.group && commandName(in.text) == "/ship":

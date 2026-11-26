@@ -230,9 +230,9 @@ func TestAddressByCommand(t *testing.T) {
 			replyingTo(groupMessage("/start"), botID, "answer"), "/start", triggerCommand,
 		},
 		"plain command as a reply to a member": {
-			replyingTo(groupMessage("/top"), 4242, "hello"), "", triggerNone,
+			replyingTo(groupMessage("/dick"), 4242, "hello"), "", triggerNone,
 		},
-		"another bot's plain command for nobody":      {groupMessage("/top"), "", triggerNone},
+		"another bot's plain command for nobody":      {groupMessage("/dick"), "", triggerNone},
 		"plain /start, the bot's, for nobody":         {groupMessage("/start"), "/start", triggerCommand},
 		"command for this bot followed by a new line": {groupMessage("/reset@MyBot\nplease"), "/reset@MyBot\nplease", triggerCommand},
 		"mention followed by another bot's command":   {groupMessage("@MyBot /reset@OtherBot", "@MyBot"), "", triggerNone},
@@ -382,7 +382,7 @@ func TestWakeWordInAReplyToAnotherBot(t *testing.T) {
 
 // A member who answers the bot's "/help" notice with a bare "/help" gets the
 // help, and so does a bare "/help" said to nobody, the bot's commands being
-// answered bare; another bot's bare command, "/top", is not.
+// answered bare; another bot's bare command, "/dick", is not.
 func TestBareCommandReplyingToTheBotIsAnswered(t *testing.T) {
 	f := newFixture()
 	sent := f.run(inGroup(replyingTo(groupMessage("/help"), botID, "Yordam: /help")))
@@ -392,8 +392,8 @@ func TestBareCommandReplyingToTheBotIsAnswered(t *testing.T) {
 	if sent := newFixture().run(inGroup(groupMessage("/help"))); len(sent) != 1 || !strings.Contains(sent[0].text, "/about") {
 		t.Errorf("a bare /help to nobody = %+v, want the help", sent)
 	}
-	if sent := newFixture().run(inGroup(groupMessage("/top"))); len(sent) != 0 {
-		t.Errorf("another bot's bare /top = %+v, want silence", sent)
+	if sent := newFixture().run(inGroup(groupMessage("/dick"))); len(sent) != 0 {
+		t.Errorf("another bot's bare /dick = %+v, want silence", sent)
 	}
 }
 
