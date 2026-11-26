@@ -286,27 +286,40 @@ const (
 // arrow and why, then each skill as [Skill · Name] (↑) with its lines.
 func heroNotes(c dexAdjustment) string {
 	var b strings.Builder
-	b.WriteString("🌟 " + c.Name + " " + patchArrow(c.Type) + "\n")
-	if why := cleanText(c.Intro, shownIntro); why != "" {
-		b.WriteString(why + "\n")
+	b.WriteString("**🌟 " + c.Name + " " + patchArrow(c.Type) + "**\n")
+	if why := noteText(c.Intro, shownWhy); why != "" {
+		b.WriteString("_" + why + "_\n")
 	}
 	for _, sec := range c.Sections {
 		head := sec.Name
 		if sec.Category != "" && sec.Category != sec.Name {
 			head = sec.Category + " · " + sec.Name
 		}
-		b.WriteString("\n[" + head + "] (" + patchArrow(sec.Type) + ")\n")
+		b.WriteString("\n**[" + head + "] (" + patchArrow(sec.Type) + ")**\n")
 		for _, ch := range sec.Changes {
-			b.WriteString(ch.line() + "\n")
+			b.WriteString("• " + noteMarks.Replace(ch.line()) + "\n")
 		}
 	}
 	return strings.TrimSpace(b.String())
 }
 
+// shownWhy caps the why under a hero in the notes, long enough for most.
+const shownWhy = 500
+
+// noteMarks keep the notes' own text from reading as formatting: a star in
+// "(+3* Hero Level)" is a times sign, and an underscore would end the why's
+// italics.
+var noteMarks = strings.NewReplacer("*", "×", "_", " ", "`", "'")
+
+// noteText is a note's text, cut to limit, its marks made harmless.
+func noteText(text string, limit int) string {
+	return noteMarks.Replace(cleanText(text, limit))
+}
+
 // sentNotes are the notes as they go to the chat: the patch's version and
 // date, the notes, and the heroes left out, to be asked by name.
 func sentNotes(patch dexPatch, notes string, left []string) string {
-	text := "📋 Patch " + patch.Version + " · " + patch.Date + "\n\n" + notes
+	text := "📋 **Patch " + patch.Version + "** · " + patch.Date + "\n\n" + notes
 	if len(left) > 0 {
 		text += "\n\n➕ " + strings.Join(left, ", ") + ": nomini yozib so'rang"
 	}
@@ -337,10 +350,10 @@ func patchNotes(patch dexPatch) (notes string, left []string) {
 		b.WriteString(part)
 	}
 	for _, r := range revampedHeroes(patch) {
-		add(r.title, "🌟 "+r.title+" (revamp)\n"+cleanText(r.text, shownIntro)+"\n\n")
+		add(r.title, "**🌟 "+r.title+" (revamp)**\n_"+noteText(r.text, shownIntro)+"_\n\n")
 	}
 	for _, h := range patch.NewHeroes {
-		add(h.Name, "🌟 "+strings.TrimSpace(h.Name+", "+h.Epithet)+" (revamp)\n"+cleanText(h.Feature, shownIntro)+"\n\n")
+		add(h.Name, "**🌟 "+strings.TrimSpace(h.Name+", "+h.Epithet)+" (revamp)**\n_"+noteText(h.Feature, shownIntro)+"_\n\n")
 	}
 	var done []string
 	for _, c := range patch.Changes {
