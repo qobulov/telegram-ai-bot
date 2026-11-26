@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -36,20 +37,23 @@ const (
 )
 
 type mlbbNewsArgs struct {
-	Action string `json:"action"`
-	Hero   string `json:"hero"`
+	Action  string `json:"action"`
+	Hero    string `json:"hero"`
+	Version string `json:"version"`
 }
 
 func (a *apis) mlbbNewsTool() tools.Tool {
 	return tools.Tool{
 		Name: "mlbb_news",
-		Description: "Mobile Legends news. patch: the latest patch's date, highlights, new or revamped heroes and the heroes buffed, nerfed or adjusted; with hero, its changes in the last patches. " +
+		Description: "Mobile Legends news. patch: the latest patch's date, highlights, new or revamped heroes and the heroes buffed, nerfed or adjusted; with hero, its changes in the last patches; " +
+			"with version (such as 2.2.16), that patch instead, alone. " +
 			"events: this and next month's StarLight and Collector skins with dates. upcoming: what leakers say is coming, unconfirmed.",
 		Schema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
 				"action": {"type": "string", "enum": ["patch", "events", "upcoming"]},
-				"hero": {"type": "string", "description": "For patch: one hero's changes."}
+				"hero": {"type": "string", "description": "For patch: one hero's changes."},
+				"version": {"type": "string", "description": "For patch: a patch's version, such as 2.2.16; left out, the latest."}
 			},
 			"required": ["action"],
 			"additionalProperties": false
@@ -67,7 +71,7 @@ func (a *apis) mlbbNews(ctx context.Context, raw json.RawMessage) (any, error) {
 	}
 	switch args.Action {
 	case "patch":
-		return a.mlbbPatch(ctx, strings.TrimSpace(args.Hero))
+		return a.mlbbPatch(ctx, strings.TrimSpace(args.Hero), patchVersion(args.Version))
 	case "events":
 		return a.mlbbEvents(ctx)
 	case "upcoming":
@@ -137,7 +141,15 @@ type dexNewHero struct {
 	Feature string `json:"feature"`
 }
 
-func (a *apis) mlbbPatch(ctx context.Context, hero string) (any, error) {
+// patchVersion is a version as players write it: "v2.2.16" or "Patch
+// 2.2.16" is 2.2.16.
+func patchVersion(version string) string {
+	version = strings.ToLower(strings.TrimSpace(version))
+	version = strings.TrimSpace(strings.TrimPrefix(version, "patch"))
+	return strings.TrimPrefix(version, "v")
+}
+
+func (a *apis) mlbbPatch(ctx context.Context, hero, version string) (any, error) {
 	patches, err := dexGet[[]dexPatchEntry](ctx, a, "/api/v1/patches")
 	if err != nil {
 		return nil, err
@@ -145,11 +157,24 @@ func (a *apis) mlbbPatch(ctx context.Context, hero string) (any, error) {
 	if len(patches) == 0 {
 		return nil, argumentError("%s lists no patches", dexService)
 	}
+	searched := patches[:min(len(patches), newsPatchesSearched)]
+	if version != "" {
+		i := slices.IndexFunc(patches, func(p dexPatchEntry) bool { return strings.EqualFold(p.Version, version) })
+		if i < 0 {
+			return map[string]any{"version": version, "known": false, "latest": patches[0].Version,
+				"note": "No such patch: say so, and that the latest is " + patches[0].Version + "."}, nil
+		}
+		patches, searched = patches[i:], patches[i:i+1]
+	}
 	if hero != "" {
-		return a.heroInPatches(ctx, patches, hero)
+		return a.heroInPatches(ctx, searched, hero)
 	}
 	latest, err := a.dexPatch(ctx, patches[0].Version)
 	if err != nil {
+		if version != "" {
+			return map[string]any{"patch": patches[0].Version, "date": patches[0].Date, "notes": false,
+				"note": "This patch's notes are not to be had: say so.", "source": patchSource}, nil
+		}
 		return nil, err
 	}
 	out := map[string]any{"patch": latest.Version, "date": latest.Date, "source": patchSource,
@@ -179,9 +204,10 @@ func (a *apis) dexPatch(ctx context.Context, version string) (dexPatch, error) {
 	return dexGet[dexPatch](ctx, a, "/api/v1/patches/"+url.PathEscape(version))
 }
 
-func (a *apis) heroInPatches(ctx context.Context, patches []dexPatchEntry, hero string) (any, error) {
+// heroInPatches looks for hero's changes in the patches searched, the
+// latest first.
+func (a *apis) heroInPatches(ctx context.Context, searched []dexPatchEntry, hero string) (any, error) {
 	want := lettersOf(hero)
-	searched := patches[:min(len(patches), newsPatchesSearched)]
 	for _, p := range searched {
 		patch, err := a.dexPatch(ctx, p.Version)
 		if err != nil {

@@ -34,7 +34,7 @@ func TestUpcomingSectionsSkipCommentedGalleries(t *testing.T) {
 }
 
 const (
-	dexPatches = `{"data":[{"version":"2.2.23","date":"2026-11-11"},{"version":"2.2.16a","date":"2026-10-14"}]}`
+	dexPatches = `{"data":[{"version":"2.2.23","date":"2026-11-11"},{"version":"2.2.16a","date":"2026-10-14"},{"version":"2.2.16","date":"2026-09-16"}]}`
 	dexPatch23 = `{"data":{"version":"2.2.23","date":"2026-11-11",
 		"sections":[{"anchor":null,"title":null,"html":"<p>Highlights of patch 2.2.23:</p><ul><li>Revamped Hero Popol and Kupa</li></ul>"}],
 		"newHeroes":[{"name":"Popol and Kupa","epithet":"Icefield Companions","feature":"A marksman who fights alongside Kupa."}],
@@ -65,6 +65,26 @@ func TestMLBBPatch(t *testing.T) {
 	}
 	if env = run(t, u.options(), "mlbb_news", `{"action":"patch","hero":"Miya"}`); !strings.Contains(env.raw, `"changed":false`) {
 		t.Errorf("Miya = %s", env.raw)
+	}
+}
+
+func TestMLBBPatchVersion(t *testing.T) {
+	u := newUpstream(t, map[string]stub{"/dex/api/v1/patches": ok(dexPatches), "/dex/api/v1/patches/2.2.23": ok(dexPatch23), "/dex/api/v1/patches/2.2.16a": ok(dexPatch16a)})
+
+	env := run(t, u.options(), "mlbb_news", `{"action":"patch","version":"Patch 2.2.16A"}`)
+	for _, want := range []string{`"patch":"2.2.16a"`, `"heroes":["Fanny: nerf"]`, `"previous":"2.2.16 (2026-09-16)"`} {
+		if !env.OK || !strings.Contains(env.raw, want) {
+			t.Errorf("2.2.16a lacks %s: %s", want, env.raw)
+		}
+	}
+	if env = run(t, u.options(), "mlbb_news", `{"action":"patch","version":"v2.2.16a","hero":"Aldous"}`); !strings.Contains(env.raw, `"changed":false`) || !strings.Contains(env.raw, `"patches_searched":["2.2.16a (2026-10-14)"]`) {
+		t.Errorf("Aldous in 2.2.16a alone = %s", env.raw)
+	}
+	if env = run(t, u.options(), "mlbb_news", `{"action":"patch","version":"2.2.16"}`); !env.OK || !strings.Contains(env.raw, `"notes":false`) {
+		t.Errorf("2.2.16, its notes missing = %s", env.raw)
+	}
+	if env = run(t, u.options(), "mlbb_news", `{"action":"patch","version":"9.9.9"}`); !env.OK || !strings.Contains(env.raw, `"known":false`) || !strings.Contains(env.raw, `"latest":"2.2.23"`) {
+		t.Errorf("9.9.9 = %s", env.raw)
 	}
 }
 
