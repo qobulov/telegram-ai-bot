@@ -14,7 +14,8 @@ import (
 )
 
 const shipNote = "percent is their match today, the same all day: say it exactly, then a short, funny verdict in their language built on these facts (their pictures, how much they write, their cards), " +
-	"as friends, a duo in games or a pair, kindly: never sexual, never a real person's body or looks, never one of them put down. Tag no one else."
+	"as friends, a duo in games or a pair, kindly: never sexual, never a real person's body or looks, never one of them put down. " +
+	"Name each of them by their tag, written exactly as given, so that both are tagged; tag no one else."
 
 // ShipTool matches two members, as the owners asked on 2026-11-25: a
 // percent that holds for the day, and what is known of each for Maria's
@@ -144,6 +145,10 @@ func shipFacts(ctx context.Context, opts MemberInfoOptions, avatars *avatarDescr
 	facts := map[string]any{}
 	if member, err := opts.Telegram.GetChatMember(ctx, chatID, userID); err == nil && member.User != nil {
 		facts["name"] = member.User.FirstName
+		facts["tag"] = memberTag(member.User.FirstName, userID)
+		if member.User.Username != "" {
+			facts["tag"] = "@" + member.User.Username
+		}
 	}
 	day := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
 	if activity, err := opts.Store.MemberActivityOf(ctx, chatID, userID, day); err == nil {

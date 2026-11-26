@@ -27,6 +27,9 @@ func TestShip(t *testing.T) {
 	if percent < 0 || percent > 100 {
 		t.Errorf("percent = %d", percent)
 	}
+	if tag, _ := out["second"].(map[string]any)["tag"].(string); tag == "" {
+		t.Errorf("no tag in %v", out["second"])
+	}
 	if out["first"].(map[string]any)["photo"].(map[string]any)["shows"] == nil {
 		t.Errorf("no photo in %v", out["first"])
 	}

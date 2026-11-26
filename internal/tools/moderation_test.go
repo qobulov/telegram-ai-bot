@@ -1363,6 +1363,15 @@ func TestModeratePromotesAndDemotes(t *testing.T) {
 	if calls[2] != fmt.Sprintf("promoteChatMember %+v %d %d", telegram.AdminRights{}, groupA, memberID) || calls[3] != fmt.Sprintf("setChatAdministratorCustomTitle Moderator %d %d", groupA, memberID) {
 		t.Errorf("calls = %q", calls)
 	}
+	// An empty title, which Telegram takes but does not show, is taken off
+	// by making them a member and an admin again with the rights they had.
+	ctx = WithTurn(context.Background(), Caller{UserID: userID, ChatID: groupA, Human: true, UpdateID: 443, MessageID: 443, Target: bekTarget(), Words: "unvonini olib tashla"}, &Sink{})
+	env.act(t, ctx, `{"action":"admin_title","text":""}`)
+	calls = env.telegram.made()
+	kept := telegram.AdminRights{CanDeleteMessages: true}
+	if len(calls) != 6 || calls[4] != fmt.Sprintf("promoteChatMember %+v %d %d", telegram.AdminRights{}, groupA, memberID) || calls[5] != fmt.Sprintf("promoteChatMember %+v %d %d", kept, groupA, memberID) {
+		t.Errorf("calls = %q", calls)
+	}
 }
 
 // A regular member's tag is set by those holding the tags right, the bot

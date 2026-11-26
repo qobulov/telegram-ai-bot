@@ -1176,6 +1176,9 @@ func (m *Moderation) send(ctx context.Context, o order) error {
 	case actionDemote:
 		return m.opts.Telegram.PromoteChatMember(ctx, chatID, userID, telegram.AdminRights{})
 	case actionAdminTitle:
+		if o.text == "" {
+			return m.clearAdminTitle(ctx, chatID, userID)
+		}
 		return m.opts.Telegram.SetChatAdministratorCustomTitle(ctx, chatID, userID, o.text)
 	case actionMemberTag:
 		return m.opts.Telegram.SetChatMemberTag(ctx, chatID, userID, o.text)
@@ -1232,6 +1235,26 @@ func (m *Moderation) promote(ctx context.Context, chatID, userID int64) error {
 		CanRestrictMembers: me.CanRestrictMembers,
 		CanPinMessages:     me.CanPinMessages,
 		CanInviteUsers:     me.CanInviteUsers,
+	})
+}
+
+// clearAdminTitle takes an admin's title off. Telegram says done to an
+// empty title but leaves the old one shown, as the owners saw on
+// 2026-11-26, so the admin is made a member and an admin again with the
+// rights they had, which leaves them none.
+func (m *Moderation) clearAdminTitle(ctx context.Context, chatID, userID int64) error {
+	admin, err := m.opts.Members.GetChatMember(ctx, chatID, userID)
+	if err != nil {
+		return err
+	}
+	if err := m.opts.Telegram.PromoteChatMember(ctx, chatID, userID, telegram.AdminRights{}); err != nil {
+		return err
+	}
+	return m.opts.Telegram.PromoteChatMember(ctx, chatID, userID, telegram.AdminRights{
+		CanDeleteMessages:  admin.CanDeleteMessages,
+		CanRestrictMembers: admin.CanRestrictMembers,
+		CanPinMessages:     admin.CanPinMessages,
+		CanInviteUsers:     admin.CanInviteUsers,
 	})
 }
 
