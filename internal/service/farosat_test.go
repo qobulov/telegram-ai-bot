@@ -99,4 +99,3 @@ func TestFarosatRankingButtons(t *testing.T) {
 		t.Errorf("/topfarosat 7 = %d", got)
 	}
 }
-
