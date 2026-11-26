@@ -888,10 +888,12 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.myRights(ctx, in)
 	case in.group && s.opts.Farosat != nil && commandName(in.text) == "/farosat":
 		return s.farosat(ctx, in)
-	case in.group && s.opts.Farosat != nil && commandName(in.text) == "/top":
-		return s.farosatTop(ctx, in, 10)
-	case in.group && s.opts.Farosat != nil && commandName(in.text) == "/top30":
-		return s.farosatTop(ctx, in, 30)
+	case in.group && s.opts.Farosat != nil && commandName(in.text) == "/topfarosat":
+		limit := 10
+		if strings.TrimSpace(commandArgument(in.text)) == "30" {
+			limit = 30
+		}
+		return s.farosatTop(ctx, in, limit)
 	case commandName(in.text) == "/tod":
 		return partyGame(in)
 	case in.group && commandName(in.text) == "/ship":

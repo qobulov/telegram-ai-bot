@@ -31,7 +31,7 @@ func (m *memoryFarosat) FarosatTop(context.Context, int64, int) ([]storage.Faros
 	return []storage.FarosatRow{{UserID: 1, Name: "Ali", Grams: 215}, {UserID: 2, Name: "Vali", Grams: 203}}, nil
 }
 
-// /farosat is taken once a day, in code; /top ranks the group.
+// /farosat is taken once a day, in code; /topfarosat ranks the group.
 func TestFarosat(t *testing.T) {
 	f := newFixture()
 	store := &memoryFarosat{grams: map[int64]int{}, day: map[int64]string{}}
@@ -45,9 +45,13 @@ func TestFarosat(t *testing.T) {
 	if !strings.Contains(sent[len(sent)-1].text, "allaqachon oldingiz") {
 		t.Errorf("second take = %+v", sent)
 	}
-	sent = f.run(inGroup(groupMessage("/top")))
+	sent = f.run(inGroup(groupMessage("/topfarosat")))
 	if last := sent[len(sent)-1].text; !strings.Contains(last, "TOP 10") || !strings.Contains(last, "🥇 Ali — 215 gram") {
 		t.Errorf("top = %+v", sent)
+	}
+	sent = f.run(inGroup(groupMessage("/topfarosat 30")))
+	if !strings.Contains(sent[len(sent)-1].text, "TOP 30") {
+		t.Errorf("top 30 = %q", sent[len(sent)-1].text)
 	}
 	if n := len(f.replier.recorded()); n != 0 {
 		t.Errorf("the model was asked %d times", n)

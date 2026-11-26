@@ -145,7 +145,7 @@ var ownCommands = map[string]bool{
 	"/toprep": true, "/cleanservice": true, "/antispam": true, "/weekawards": true,
 	"/ignore": true, "/unignore": true,
 	"/haqiqat": true, "/jurat": true, "/tanla": true, "/tod": true, "/ship": true, "/shipme": true,
-	"/farosat": true, "/top": true, "/top30": true,
+	"/farosat": true, "/topfarosat": true,
 }
 
 // commandTarget reports whether text is a command and which bot it names:

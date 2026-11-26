@@ -13,8 +13,8 @@ import (
 // Farosat is a daily game in groups, as the owners asked on 2026-11-26, in
 // place of another bot's: once a day /farosat grows a member's farosat
 // ("sense") by some grams, or now and then shrinks it a little, the day
-// turning at midnight in the bot's time zone; /top and /top30 rank the
-// group. It is answered in code, the model never asked.
+// turning at midnight in the bot's time zone; /topfarosat ranks the group,
+// its top 10, or its top 30 with "30". It is answered in code, the model never asked.
 
 // FarosatStore keeps the groups' farosat.
 type FarosatStore interface {
@@ -88,7 +88,7 @@ func (s *Service) farosat(ctx context.Context, in incoming) outcome {
 
 var farosatMedals = []string{"🥇", "🥈", "🥉"}
 
-// farosatTop answers /top and /top30 with the group's ranking.
+// farosatTop answers /topfarosat with the group's ranking.
 func (s *Service) farosatTop(ctx context.Context, in incoming, limit int) outcome {
 	top, err := s.opts.Farosat.FarosatTop(ctx, in.scope.ChatID, limit)
 	if err != nil {
