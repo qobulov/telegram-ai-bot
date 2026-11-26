@@ -57,7 +57,7 @@ func TestMLBBPatch(t *testing.T) {
 	if !env.OK || !strings.Contains(env.raw, `"Skill 2, Contract: Explosion [buff]: Cooldown: 12-9.5s → 8s at all levels; New Effect: more damage."`) {
 		t.Errorf("Aldous = %s", env.raw)
 	}
-	if env = run(t, u.options(), "mlbb_news", `{"action":"patch","hero":"Fanny"}`); !strings.Contains(env.raw, `"patch":"2.2.16a"`) || !strings.Contains(env.raw, `"change":"nerf"`) {
+	if env = run(t, u.options(), "mlbb_news", `{"action":"patch","hero":"Fanny"}`); !strings.Contains(env.raw, `"patch":"2.2.16a"`) || !strings.Contains(env.raw, `"change":"nerf"`) || !strings.Contains(env.raw, "never soften a nerf") {
 		t.Errorf("Fanny, in the patch before = %s", env.raw)
 	}
 	if env = run(t, u.options(), "mlbb_news", `{"action":"patch","hero":"popol"}`); !strings.Contains(env.raw, `"change":"revamp"`) {

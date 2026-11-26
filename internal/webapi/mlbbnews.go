@@ -26,9 +26,13 @@ const (
 	shownPerSection     = 20
 	shownIntro          = 300
 	patchSource         = "MLBBDex (mlbbdex.com), from the official patch notes"
-	eventsSource        = "MLBBDex (mlbbdex.com), from the Mobile Legends Wiki"
-	upcomingSource      = "the Mobile Legends Wiki (mobile-legends.fandom.com)"
-	upcomingNote        = "Gathered by the wiki from leakers: none of it is confirmed, dates are unknown and it may change or be cancelled. Say so."
+	// heroChangeNote keeps a hero's mixed change whole, as the owners saw a
+	// nerfed ultimate told as "changed a little" under a buff on 2026-11-26.
+	heroChangeNote = "Say for each skill whether it was a buff, nerf or adjust, as marked, with its numbers before → after; " +
+		"never soften a nerf into \"changed\", and when the hero's change is a buff but a skill was nerfed, say so."
+	eventsSource   = "MLBBDex (mlbbdex.com), from the Mobile Legends Wiki"
+	upcomingSource = "the Mobile Legends Wiki (mobile-legends.fandom.com)"
+	upcomingNote   = "Gathered by the wiki from leakers: none of it is confirmed, dates are unknown and it may change or be cancelled. Say so."
 )
 
 type mlbbNewsArgs struct {
@@ -186,7 +190,7 @@ func (a *apis) heroInPatches(ctx context.Context, patches []dexPatchEntry, hero 
 		for _, c := range patch.Changes {
 			if lettersOf(c.Name) == want {
 				out := map[string]any{"hero": c.Name, "patch": patch.Version, "date": patch.Date, "change": c.Type,
-					"changes": adjustmentLines(c), "source": patchSource}
+					"changes": adjustmentLines(c), "note": heroChangeNote, "source": patchSource}
 				if why := cleanText(c.Intro, shownIntro); why != "" {
 					out["why"] = why
 				}
