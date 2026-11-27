@@ -209,7 +209,7 @@
     $("shop").style.setProperty("--tier", color);
     $("packTier").textContent = p.name;
     $("packGrams").textContent = fmt(p.stars);
-    $("buy").textContent = buyHint(p);
+    $("crystal").setAttribute("aria-label", `${p.name}: ${fmt(p.stars)} gram, ⭐ ${fmt(p.stars)} — sotib olish`);
     const dots = $("packDots");
     dots.textContent = "";
     packs.forEach((_, j) => {
@@ -221,10 +221,8 @@
   }
   $("packPrev").addEventListener("click", () => showPack(packIndex - 1));
   $("packNext").addEventListener("click", () => showPack(packIndex + 1));
-  // buyHint says how to buy the pack on view: a tap on its crystal.
-  function buyHint(p) { return `👆 Kristallni bosing · ⭐ ${fmt(p.stars)}`; }
-  $("buy").addEventListener("click", () => buy(data.packs[packIndex], $("buy")));
-  $("buy").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); buy(data.packs[packIndex], $("buy")); } });
+  // The crystal on view is the pack's buy button, for the keyboard too.
+  $("crystal").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); buy(data.packs[packIndex], $("crystal")); } });
 
   function renderPackGrid() {
     const box = $("packs");
@@ -290,7 +288,7 @@
 
   function buy(pack, button) {
     const before = data.grams;
-    const label = button.id === "buy" ? buyHint(pack) : `Sotib olish · ⭐ ${fmt(pack.stars)}`;
+    const label = button.id === "crystal" ? "" : `Sotib olish · ⭐ ${fmt(pack.stars)}`;
     pay(button, "invoice", { pack: pack.id }, () => data.grams !== before, label);
   }
 
@@ -778,7 +776,7 @@
   if (crystal3d) {
     crystal3d.swipe((by) => showPack(packIndex + by));
     // A tap on the crystal on view buys its pack.
-    crystal3d.tap(() => buy(data.packs[packIndex], $("buy")));
+    crystal3d.tap(() => buy(data.packs[packIndex], $("crystal")));
   }
   load(false);
 })();

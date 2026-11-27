@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap">
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
   <canvas id="sky" aria-hidden="true"></canvas>
@@ -61,19 +61,18 @@
       <p class="shop-lead">Farosat do'koni · <b>1 ⭐ = 1 gram</b></p>
       <div class="stage shop-stage" id="shopStage">
         <button type="button" class="nav prev" id="packPrev" aria-label="Oldingi paket">‹</button>
-        <canvas id="crystal" aria-label="Paket"></canvas>
+        <canvas id="crystal" role="button" tabindex="0" aria-label="Paketni sotib olish"></canvas>
         <button type="button" class="nav next" id="packNext" aria-label="Keyingi paket">›</button>
       </div>
       <div class="pack-info" id="packInfo">
         <span class="tier" id="packTier">Uchqun</span>
         <strong class="pack-grams"><span id="packGrams">50</span> <small>gram</small></strong>
         <div class="dots" id="packDots"></div>
-        <p class="tap-hint" id="buy" role="button" tabindex="0">👆 Kristallni bosing · ⭐ 5</p>
       </div>
       <div class="packs" id="packs" hidden></div>
       <p class="shop-note">Gramm shu guruhdagi farosatingizga qo'shiladi va reytingda hisoblanadi. To'lov Telegram Stars orqali, gramm bir necha soniyada qo'shiladi.</p>
     </section>
   </main>
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

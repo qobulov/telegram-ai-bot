@@ -135,9 +135,6 @@ body {
 }
 .buy:disabled { opacity: 0.6; cursor: progress; }
 .buy:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
-.tap-hint { margin: 2px 0 0; font-weight: 700; color: var(--tier, var(--star)); cursor: pointer; }
-.tap-hint:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 6px; }
-.tap-hint[data-busy] { opacity: 0.6; cursor: progress; }
 .credit { margin: 0; text-align: center; font-size: 0.75rem; color: var(--dim); }
 .credit a { color: var(--dim); }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -171,3 +168,4 @@ body {
 .toast { align-self: center; margin: 0; padding: 7px 14px; border-radius: 999px; background: var(--panel); border: 1px solid var(--tier, var(--panel-line)); font-size: 0.85rem; font-weight: 600; }
 @media (max-width: 360px) { .packs { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+#crystal:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; border-radius: 16px; }
