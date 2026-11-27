@@ -14,43 +14,88 @@ type FarosatRow struct {
 	UserID int64
 	Name   string
 	Grams  int
+	Elite  bool
 }
 
-// TakeFarosat adds gain to a member's farosat in a group once on day, and
-// gives their total, their place in the group and whether this was the
-// day's first take; a second take on the same day changes nothing.
-func (s *Store) TakeFarosat(ctx context.Context, chatID, userID int64, name string, day time.Time, gain int) (grams, place int, taken bool, err error) {
+// FarosatGains are a day's gain drawn for a plain member and for one of
+// the elite; TakeFarosat adds the one that is theirs.
+type FarosatGains struct {
+	Plain, Elite int
+}
+
+// FarosatTake is a day's take: the member's farosat after it, the gain
+// added, their place in the group, whether this was the day's first take,
+// and whether they are of the elite.
+type FarosatTake struct {
+	Grams, Gain, Place int
+	Taken, Elite       bool
+}
+
+// TakeFarosat adds the day's gain to a member's farosat in a group once on
+// day; a second take on the same day changes nothing.
+func (s *Store) TakeFarosat(ctx context.Context, chatID, userID int64, name string, day time.Time, gains FarosatGains) (FarosatTake, error) {
+	var take FarosatTake
 	date := day.Format("2006-01-02")
-	err = s.pool.QueryRow(ctx, `
+	err := s.pool.QueryRow(ctx, `
 		INSERT INTO farosat (chat_id, user_id, name, grams, last_day) VALUES ($1, $2, $3, $5, $4::date)
-		ON CONFLICT (chat_id, user_id) DO UPDATE SET grams = farosat.grams + $5, last_day = $4::date, name = $3, updated_at = now()
+		ON CONFLICT (chat_id, user_id) DO UPDATE
+		SET grams = farosat.grams + CASE WHEN farosat.elite THEN $6 ELSE $5 END, last_day = $4::date, name = $3, updated_at = now()
 		WHERE farosat.last_day IS DISTINCT FROM $4::date
-		RETURNING grams`, chatID, userID, name, date, gain).Scan(&grams)
-	taken = err == nil
+		RETURNING grams, elite`, chatID, userID, name, date, gains.Plain, gains.Elite).Scan(&take.Grams, &take.Elite)
+	take.Taken = err == nil
 	if errors.Is(err, pgx.ErrNoRows) {
-		err = s.pool.QueryRow(ctx, `SELECT grams FROM farosat WHERE chat_id = $1 AND user_id = $2`, chatID, userID).Scan(&grams)
+		err = s.pool.QueryRow(ctx, `SELECT grams, elite FROM farosat WHERE chat_id = $1 AND user_id = $2`, chatID, userID).Scan(&take.Grams, &take.Elite)
 	}
 	if err != nil {
-		return 0, 0, false, fmt.Errorf("storage: take farosat: %w", err)
+		return FarosatTake{}, fmt.Errorf("storage: take farosat: %w", err)
 	}
-	err = s.pool.QueryRow(ctx, `SELECT count(*) + 1 FROM farosat WHERE chat_id = $1 AND grams > $2`, chatID, grams).Scan(&place)
+	if take.Taken {
+		take.Gain = gains.Plain
+		if take.Elite {
+			take.Gain = gains.Elite
+		}
+	}
+	err = s.pool.QueryRow(ctx, `SELECT count(*) + 1 FROM farosat WHERE chat_id = $1 AND grams > $2`, chatID, take.Grams).Scan(&take.Place)
 	if err != nil {
-		return 0, 0, false, fmt.Errorf("storage: farosat place: %w", err)
+		return FarosatTake{}, fmt.Errorf("storage: farosat place: %w", err)
 	}
-	return grams, place, taken, nil
+	return take, nil
+}
+
+// JoinFarosatElite takes price grams from a member's farosat in a group
+// and makes them one of the elite, once and only with price grams to give;
+// became is false, and nothing taken, otherwise. grams and elite are their
+// farosat and standing after.
+func (s *Store) JoinFarosatElite(ctx context.Context, chatID, userID int64, price int) (grams int, elite, became bool, err error) {
+	err = s.pool.QueryRow(ctx, `
+		UPDATE farosat SET grams = grams - $3, elite = true, updated_at = now()
+		WHERE chat_id = $1 AND user_id = $2 AND grams >= $3 AND NOT elite
+		RETURNING grams`, chatID, userID, price).Scan(&grams)
+	if err == nil {
+		return grams, true, true, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return 0, false, false, fmt.Errorf("storage: join the farosat elite: %w", err)
+	}
+	err = s.pool.QueryRow(ctx, `
+		SELECT coalesce(max(grams), 0), coalesce(bool_or(elite), false) FROM farosat WHERE chat_id = $1 AND user_id = $2`, chatID, userID).Scan(&grams, &elite)
+	if err != nil {
+		return 0, false, false, fmt.Errorf("storage: join the farosat elite: %w", err)
+	}
+	return grams, elite, false, nil
 }
 
 // FarosatTop is a group's members by farosat, the most first.
 func (s *Store) FarosatTop(ctx context.Context, chatID int64, limit int) ([]FarosatRow, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT user_id, name, grams FROM farosat WHERE chat_id = $1
+		SELECT user_id, name, grams, elite FROM farosat WHERE chat_id = $1
 		ORDER BY grams DESC, updated_at LIMIT $2`, chatID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("storage: farosat top: %w", err)
 	}
 	top, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (FarosatRow, error) {
 		var r FarosatRow
-		err := row.Scan(&r.UserID, &r.Name, &r.Grams)
+		err := row.Scan(&r.UserID, &r.Name, &r.Grams, &r.Elite)
 		return r, err
 	})
 	if err != nil {

@@ -243,7 +243,7 @@ A'zoning xabariga reply qilib, uni o'chirishni yoki qadashni, muallifini mute yo
 /reports, /warns — ko'rilmagan shikoyatlar, kimda nechta ogohlantirish
 
 Hamma uchun:
-/card — kartalar o'yini (har 2 soatda token), /ship — moslik (tugma bilan tasodifiy juft yoki reply/teg bilan), /farosat — kunlik farosat, /topfarosat — farosat reytingi, /mylink — shaxsiy taklif havolangiz, /words — top-10 so'zamollar (7 va 30 kun), /invites — kim nechta odam qo'shdi (tugmalar: bugun, hafta, oy, hammasi, o'zingizniki)
+/card — kartalar o'yini (har 2 soatda token), /ship — moslik (tugma bilan tasodifiy juft yoki reply/teg bilan), /farosat — kunlik farosat, /topfarosat — farosat reytingi, /elita — 300 gram evaziga elita (kuniga +20–30 gram), /mylink — shaxsiy taklif havolangiz, /words — top-10 so'zamollar (7 va 30 kun), /invites — kim nechta odam qo'shdi (tugmalar: bugun, hafta, oy, hammasi, o'zingizniki)
 /admins — adminlarni chaqirish, /report va /voteban — xabarga reply qilib shikoyat yoki ban uchun ovoz, /rights — huquqlaringiz
 /id, /ping
 
@@ -270,7 +270,7 @@ Bo'limlar: /help mod, /help kartalar, /help azo`,
 /reports, /warns — нерассмотренные жалобы, у кого сколько предупреждений
 
 Для всех:
-/card — игра в карты (токен каждые 2 часа), /ship — совместимость (случайная пара кнопкой или ответом/отметкой), /farosat — фаросат на день, /topfarosat — рейтинг фаросат, /mylink — ваша личная ссылка-приглашение, /words — топ-10 болтунов (7 и 30 дней), /invites — кто сколько добавил (кнопки: сегодня, неделя, месяц, всё, мои)
+/card — игра в карты (токен каждые 2 часа), /ship — совместимость (случайная пара кнопкой или ответом/отметкой), /farosat — фаросат на день, /topfarosat — рейтинг фаросат, /elita — элита за 300 грамм (+20–30 грамм в день), /mylink — ваша личная ссылка-приглашение, /words — топ-10 болтунов (7 и 30 дней), /invites — кто сколько добавил (кнопки: сегодня, неделя, месяц, всё, мои)
 /admins — позвать админов, /report и /voteban — ответом на сообщение: жалоба или голосование за бан, /rights — ваши права
 /id, /ping
 

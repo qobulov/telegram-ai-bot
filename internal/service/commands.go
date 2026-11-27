@@ -891,6 +891,8 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		return s.myRights(ctx, in)
 	case in.group && s.opts.Farosat != nil && commandName(in.text) == "/farosat":
 		return s.farosat(ctx, in)
+	case in.group && s.opts.Farosat != nil && commandName(in.text) == "/elita":
+		return s.joinFarosatElite(ctx, in)
 	case in.group && s.opts.Farosat != nil && commandName(in.text) == "/topfarosat":
 		return s.farosatTop(ctx, in, farosatSize(commandArgument(in.text)))
 	case in.group && commandName(in.text) == "/ship":

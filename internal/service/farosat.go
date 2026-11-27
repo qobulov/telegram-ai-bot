@@ -17,11 +17,14 @@ import (
 // place of another bot's: once a day /farosat grows a member's farosat
 // ("sense") by some grams, or now and then shrinks it a little, the day
 // turning at midnight in the bot's time zone; /topfarosat ranks the group,
-// its top 10, or its top 30 with "30". It is answered in code, the model never asked.
+// its top 10, or its top 30 with "30"; /elita gives up 300 grams to join
+// the elite, whose farosat grows faster. It is answered in code, the model
+// never asked.
 
 // FarosatStore keeps the groups' farosat.
 type FarosatStore interface {
-	TakeFarosat(ctx context.Context, chatID, userID int64, name string, day time.Time, gain int) (grams, place int, taken bool, err error)
+	TakeFarosat(ctx context.Context, chatID, userID int64, name string, day time.Time, gains storage.FarosatGains) (storage.FarosatTake, error)
+	JoinFarosatElite(ctx context.Context, chatID, userID int64, price int) (grams int, elite, became bool, err error)
 	FarosatTop(ctx context.Context, chatID int64, limit int) ([]storage.FarosatRow, error)
 	RecordFarosatPurchase(ctx context.Context, p storage.FarosatPurchase) (grams int, recorded bool, err error)
 	RefundFarosatPurchase(ctx context.Context, chargeID string) (found bool, err error)
@@ -29,12 +32,25 @@ type FarosatStore interface {
 	RefundFarosatGalaxy(ctx context.Context, chargeID string) (found bool, err error)
 }
 
+// farosatRange is how much a day's take may gain or lose.
+type farosatRange struct {
+	leastGain, mostGain, leastLoss, mostLoss int
+}
+
+var (
+	// farosatPlain is a member's day: 1 to 10 grams more, or now and then
+	// 1 to 10 less.
+	farosatPlain = farosatRange{1, 10, 1, 10}
+	// farosatElite is the elite's, as the owners asked on 2026-11-27: 20 to
+	// 30 grams more, or only 1 or 2 less.
+	farosatElite = farosatRange{20, 30, 1, 2}
+)
+
 const (
-	// A day's gain: farosatLoss of the takes lose 1 to farosatMostLoss
-	// grams, the others gain 1 to farosatMostGain.
-	farosatLoss     = 0.05
-	farosatMostLoss = 10
-	farosatMostGain = 10
+	// farosatLoss of the takes lose grams, the others gain.
+	farosatLoss = 0.05
+	// farosatElitePrice is what joining the elite costs.
+	farosatElitePrice = 300
 )
 
 // The answers are word for word the other bot's, in Uzbek alone, as the
@@ -45,17 +61,20 @@ const (
 	textFarosatTaken = "%s, bugungi ulushingizni allaqachon oldingiz.\n🧠 Farosatingiz: %d gram\n🕛 Keyingisi yarim tundan keyin"
 	textFarosatTop   = "🏆 Chat reytingi — TOP %d"
 	textFarosatNone  = "🧠 Hali hech kim farosat olmagan. /farosat yozing!"
+	textEliteJoined  = "💎 %s, siz endi ELITA a'zosisiz!\n🧠 300 gram sarflandi. Hozir: %d gram\n📈 Endi har kuni +20–30 gram, kamaysa ham atigi 1–2 gram."
+	textEliteAlready = "💎 %s, siz allaqachon elitadasiz: har kuni +20–30 gram.\n🧠 Farosatingiz: %d gram"
+	textEliteShort   = "🔒 %s, elitaga kirish uchun 300 gram kerak.\n🧠 Sizda: %d gram — yana %d gram yig'ing."
 	// farosatNameShown is how much of a name the ranking shows, the rest
 	// cut to "...".
 	farosatNameShown = 17
 )
 
-// farosatGain is a day's gain, at random.
-func farosatGain() int {
+// gain is a day's gain in the range, at random.
+func (r farosatRange) gain() int {
 	if rand.Float64() < farosatLoss {
-		return -1 - rand.IntN(farosatMostLoss)
+		return -r.leastLoss - rand.IntN(r.mostLoss-r.leastLoss+1)
 	}
-	return 1 + rand.IntN(farosatMostGain)
+	return r.leastGain + rand.IntN(r.mostGain-r.leastGain+1)
 }
 
 // farosat answers /farosat: the day's take, or the total when it is taken.
@@ -65,19 +84,43 @@ func (s *Service) farosat(ctx context.Context, in incoming) outcome {
 		location = time.UTC
 	}
 	name := cardMarks.Replace(displayName(in.msg.From))
-	gain := farosatGain()
-	grams, _, taken, err := s.opts.Farosat.TakeFarosat(ctx, in.scope.ChatID, in.userID, name, startOfDay(s.opts.Now(), location), gain)
+	gains := storage.FarosatGains{Plain: farosatPlain.gain(), Elite: farosatElite.gain()}
+	take, err := s.opts.Farosat.TakeFarosat(ctx, in.scope.ChatID, in.userID, name, startOfDay(s.opts.Now(), location), gains)
 	if err != nil {
 		s.opts.Logger.Warn("could not take farosat", "chat_id", in.scope.ChatID, "error", err)
 		return say(textError.to(in))
 	}
+	var text string
 	switch {
-	case !taken:
-		return s.withFarosatApp(in, say(fmt.Sprintf(textFarosatTaken, name, grams)))
-	case gain < 0:
-		return s.withFarosatApp(in, say(fmt.Sprintf(textFarosatDown, name, -gain, grams)))
+	case !take.Taken:
+		text = fmt.Sprintf(textFarosatTaken, name, take.Grams)
+	case take.Gain < 0:
+		text = fmt.Sprintf(textFarosatDown, name, -take.Gain, take.Grams)
 	default:
-		return s.withFarosatApp(in, say(fmt.Sprintf(textFarosatUp, name, gain, grams)))
+		text = fmt.Sprintf(textFarosatUp, name, take.Gain, take.Grams)
+	}
+	if take.Elite {
+		text = "💎 " + strings.TrimPrefix(text, "🧠 ")
+	}
+	return s.withFarosatApp(in, say(text))
+}
+
+// joinFarosatElite answers /elita: 300 grams given up to join the elite, or why
+// not.
+func (s *Service) joinFarosatElite(ctx context.Context, in incoming) outcome {
+	name := cardMarks.Replace(displayName(in.msg.From))
+	grams, elite, became, err := s.opts.Farosat.JoinFarosatElite(ctx, in.scope.ChatID, in.userID, farosatElitePrice)
+	if err != nil {
+		s.opts.Logger.Warn("could not join the farosat elite", "chat_id", in.scope.ChatID, "error", err)
+		return say(textError.to(in))
+	}
+	switch {
+	case became:
+		return say(fmt.Sprintf(textEliteJoined, name, grams))
+	case elite:
+		return say(fmt.Sprintf(textEliteAlready, name, grams))
+	default:
+		return say(fmt.Sprintf(textEliteShort, name, grams, farosatElitePrice-grams))
 	}
 }
 
@@ -135,7 +178,11 @@ func (s *Service) farosatTopText(ctx context.Context, chatID int64, limit int) (
 		if i == len(farosatMedals) {
 			lines = append(lines, farosatRule)
 		}
-		lines = append(lines, fmt.Sprintf("%s %s — **%d** gram", farosatPlace(i), farosatName(r.Name), r.Grams))
+		mark := ""
+		if r.Elite {
+			mark = " 💎"
+		}
+		lines = append(lines, fmt.Sprintf("%s %s%s — **%d** gram", farosatPlace(i), farosatName(r.Name), mark, r.Grams))
 	}
 	return strings.Join(lines, "\n"), nil
 }

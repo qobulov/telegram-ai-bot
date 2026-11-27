@@ -18,17 +18,37 @@ type memoryFarosat struct {
 	day      map[int64]string
 	charges  map[string]bool
 	galaxies []int
+	elite    map[int64]bool
 }
 
-func (m *memoryFarosat) TakeFarosat(_ context.Context, _, userID int64, _ string, day time.Time, gain int) (int, int, bool, error) {
+func (m *memoryFarosat) TakeFarosat(_ context.Context, _, userID int64, _ string, day time.Time, gains storage.FarosatGains) (storage.FarosatTake, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	taken := m.day[userID] != day.Format("2006-01-02")
-	if taken {
-		m.grams[userID] += gain
+	take := storage.FarosatTake{Taken: m.day[userID] != day.Format("2006-01-02"), Elite: m.elite[userID], Place: 1}
+	if take.Taken {
+		take.Gain = gains.Plain
+		if take.Elite {
+			take.Gain = gains.Elite
+		}
+		m.grams[userID] += take.Gain
 		m.day[userID] = day.Format("2006-01-02")
 	}
-	return m.grams[userID], 1, taken, nil
+	take.Grams = m.grams[userID]
+	return take, nil
+}
+
+func (m *memoryFarosat) JoinFarosatElite(_ context.Context, _, userID int64, price int) (int, bool, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.elite[userID] || m.grams[userID] < price {
+		return m.grams[userID], m.elite[userID], false, nil
+	}
+	if m.elite == nil {
+		m.elite = map[int64]bool{}
+	}
+	m.elite[userID] = true
+	m.grams[userID] -= price
+	return m.grams[userID], true, true, nil
 }
 
 func (m *memoryFarosat) RecordFarosatPurchase(_ context.Context, p storage.FarosatPurchase) (int, bool, error) {
@@ -102,10 +122,44 @@ func TestFarosat(t *testing.T) {
 	if n := len(f.replier.recorded()); n != 0 {
 		t.Errorf("the model was asked %d times", n)
 	}
-	for range 200 {
-		if g := farosatGain(); g == 0 || g < -farosatMostLoss || g > farosatMostGain {
-			t.Fatalf("gain = %d", g)
+	for range 500 {
+		if g := farosatPlain.gain(); g == 0 || g < -10 || g > 10 {
+			t.Fatalf("a plain gain = %d", g)
 		}
+		if g := farosatElite.gain(); g < -2 || (g > -1 && g < 20) || g > 30 {
+			t.Fatalf("an elite gain = %d", g)
+		}
+	}
+}
+
+// /elita wants 300 grams, takes them once, and from then on the day's take
+// is the elite's, marked 💎.
+func TestFarosatElite(t *testing.T) {
+	f := newFixture()
+	store := &memoryFarosat{grams: map[int64]int{}, day: map[int64]string{}}
+	f.opts.Farosat = store
+	user := groupMessage("/elita").From.ID
+
+	store.grams[user] = 120
+	if sent := f.run(inGroup(groupMessage("/elita"))); !strings.Contains(sent[len(sent)-1].text, "300 gram kerak.\n🧠 Sizda: 120 gram — yana 180 gram") {
+		t.Fatalf("short = %+v", sent)
+	}
+	store.grams[user] = 310
+	if sent := f.run(inGroup(groupMessage("/elita"))); !strings.Contains(sent[len(sent)-1].text, "ELITA a'zosisiz!\n🧠 300 gram sarflandi. Hozir: 10 gram") {
+		t.Fatalf("joined = %+v", sent)
+	}
+	if sent := f.run(inGroup(groupMessage("/elita"))); !strings.Contains(sent[len(sent)-1].text, "allaqachon elitadasiz") || store.grams[user] != 10 {
+		t.Fatalf("again = %+v", sent)
+	}
+	sent := f.run(inGroup(groupMessage("/farosat")))
+	if last := sent[len(sent)-1].text; !strings.HasPrefix(last, "💎 ") {
+		t.Errorf("an elite take = %q", last)
+	}
+	if g := store.grams[user] - 10; g != -1 && g != -2 && (g < 20 || g > 30) {
+		t.Errorf("an elite gain = %d", g)
+	}
+	if n := len(f.replier.recorded()); n != 0 {
+		t.Errorf("the model was asked %d times", n)
 	}
 }
 

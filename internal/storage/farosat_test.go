@@ -11,7 +11,7 @@ import (
 func TestFarosatPurchases(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
-	if _, _, _, err := store.TakeFarosat(ctx, -100, 2, "Vali", time.Now(), 30); err != nil {
+	if _, err := store.TakeFarosat(ctx, -100, 2, "Vali", time.Now(), FarosatGains{Plain: 30, Elite: 25}); err != nil {
 		t.Fatal(err)
 	}
 	buy := FarosatPurchase{ChargeID: "c1", ChatID: -100, UserID: 1, Name: "Ali", Stars: 50, Grams: 50}
@@ -60,5 +60,38 @@ func TestFarosatGalaxies(t *testing.T) {
 	}
 	if ids, _ := store.FarosatGalaxies(ctx, -100, 1); len(ids) != 0 {
 		t.Errorf("after the refund = %v", ids)
+	}
+}
+
+// /elita takes 300 grams once a member has them and makes them one of the
+// elite, whose day's take is the elite's gain from then on.
+func TestFarosatElite(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	day := time.Date(2026, 11, 27, 0, 0, 0, 0, time.UTC)
+	if take, err := store.TakeFarosat(ctx, -100, 1, "Ali", day, FarosatGains{Plain: 7, Elite: 25}); err != nil || take.Grams != 7 || take.Gain != 7 || take.Elite || !take.Taken {
+		t.Fatalf("a plain take = %+v %v", take, err)
+	}
+	if grams, elite, became, err := store.JoinFarosatElite(ctx, -100, 1, 300); err != nil || became || elite || grams != 7 {
+		t.Fatalf("short of 300 = %d %v %v %v", grams, elite, became, err)
+	}
+	if grams, elite, became, err := store.JoinFarosatElite(ctx, -100, 9, 300); err != nil || became || elite || grams != 0 {
+		t.Fatalf("a member without farosat = %d %v %v %v", grams, elite, became, err)
+	}
+	if _, _, err := store.RecordFarosatPurchase(ctx, FarosatPurchase{ChargeID: "c", ChatID: -100, UserID: 1, Stars: 300, Grams: 300}); err != nil {
+		t.Fatal(err)
+	}
+	if grams, elite, became, err := store.JoinFarosatElite(ctx, -100, 1, 300); err != nil || !became || !elite || grams != 7 {
+		t.Fatalf("joined = %d %v %v %v", grams, elite, became, err)
+	}
+	if _, elite, became, _ := store.JoinFarosatElite(ctx, -100, 1, 300); became || !elite {
+		t.Errorf("joined twice: %v %v", became, elite)
+	}
+	take, err := store.TakeFarosat(ctx, -100, 1, "Ali", day.AddDate(0, 0, 1), FarosatGains{Plain: 7, Elite: 25})
+	if err != nil || take.Gain != 25 || take.Grams != 32 || !take.Elite {
+		t.Fatalf("an elite take = %+v %v", take, err)
+	}
+	if top, err := store.FarosatTop(ctx, -100, 10); err != nil || len(top) != 1 || !top[0].Elite {
+		t.Errorf("top = %+v %v", top, err)
 	}
 }
