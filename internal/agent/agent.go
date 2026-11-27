@@ -824,7 +824,7 @@ func (a *Agent) save(ctx context.Context, t *turn) (int64, error) {
 var complaintWords = regexp.MustCompile(`(?i)(korrup|коррупц|adolatsiz|adolatdan|nohaq|noxaq|нохақ|адолатсиз|aldov|aldash|aldayap|firib|фириб|обман|нечестн|несправедлив|shikoyat|шикоят|жалоб|nazorat qil|назорат|ishlamayap|ишламаяп|не работает|yo'qoldi|yoqoldi|йўқолди|пропал|kelmadi|келмади|не пришл)`)
 
 // complaintNote goes with a complaint, in that request only.
-const complaintNote = "[This message is a complaint about fairness or a fault. Answer it seriously, with no joke: say only what you know, never invent a cause or blame anyone; for your own features ask for a screenshot and pass it on with notify_owner, as your honesty rules say.]"
+const complaintNote = "[This message is a complaint about fairness or a fault. Answer it seriously, with no joke: say only what you know, never invent a cause or blame anyone; for your own features ask for a screenshot and pass it on with notify_owner, as your honesty rules say. A result of your games of chance, such as a /farosat day, is not a fault: say plainly it is chance, the same for everyone, and how the game works; ask for no screenshot.]"
 
 // sizNote follows an answer that called someone "sen".
 const sizNote = `Your last answer called someone "sen". Nobody here asked for that form: write your answer again speaking to everyone with "siz" ("вы"), the same meaning in the same words otherwise.`
