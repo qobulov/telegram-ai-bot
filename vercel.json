@@ -29,6 +29,9 @@
     },
     "api/kassa.go": {
       "maxDuration": 15
+    },
+    "api/farosat.go": {
+      "maxDuration": 15
     }
   },
   "crons": [

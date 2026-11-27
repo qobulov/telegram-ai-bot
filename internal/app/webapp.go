@@ -8,6 +8,7 @@ import (
 
 	"telegram-ai-bot/internal/cards"
 	"telegram-ai-bot/internal/config"
+	"telegram-ai-bot/internal/farosat"
 	"telegram-ai-bot/internal/game"
 	"telegram-ai-bot/internal/kassa"
 	"telegram-ai-bot/internal/mafia"
@@ -24,7 +25,37 @@ const (
 	gamePath  = "/game/"
 	cardsPath = "/kartalar/"
 	kassaPath = "/kassa/"
+	// farosatPath is the Farosat Mini App: a member's galaxies and the
+	// shop where farosat is bought with Stars.
+	farosatPath = "/farosat/"
 )
+
+// farosatPage is the Farosat Mini App's page, "" when WEBAPP_URL is not set.
+func farosatPage(cfg config.Config) string {
+	if cfg.WebAppURL == "" {
+		return ""
+	}
+	return cfg.WebAppURL + farosatPath
+}
+
+// NewFarosat builds the Farosat Mini App's API: a member's farosat in a
+// group, the galaxies it opens and the invoices for its packs.
+func NewFarosat(ctx context.Context, cfg config.Config, logger *slog.Logger) (*Endpoint, error) {
+	if cfg.WebAppURL == "" {
+		return nil, errNoPages
+	}
+	store, err := storage.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return nil, err
+	}
+	if err := store.CheckSchema(ctx); err != nil {
+		store.Close()
+		return nil, err
+	}
+	client := telegram.NewClient(telegram.Options{Token: cfg.TelegramToken, BaseURL: cfg.TelegramAPIURL, Logger: logger})
+	handler := farosat.NewHandler(farosat.Options{BotToken: cfg.TelegramToken, Store: store, Invoices: client, Logger: logger})
+	return &Endpoint{Handler: handler, Close: store.Close}, nil
+}
 
 // kassaPage is the Kassa Mini App's page, "" when WEBAPP_URL is not set.
 func kassaPage(cfg config.Config) string {

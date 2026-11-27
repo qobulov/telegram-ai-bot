@@ -23,6 +23,8 @@ import (
 type FarosatStore interface {
 	TakeFarosat(ctx context.Context, chatID, userID int64, name string, day time.Time, gain int) (grams, place int, taken bool, err error)
 	FarosatTop(ctx context.Context, chatID int64, limit int) ([]storage.FarosatRow, error)
+	RecordFarosatPurchase(ctx context.Context, p storage.FarosatPurchase) (grams int, recorded bool, err error)
+	RefundFarosatPurchase(ctx context.Context, chargeID string) (found bool, err error)
 }
 
 const (
@@ -69,11 +71,11 @@ func (s *Service) farosat(ctx context.Context, in incoming) outcome {
 	}
 	switch {
 	case !taken:
-		return say(fmt.Sprintf(textFarosatTaken, name, grams))
+		return s.withFarosatApp(in, say(fmt.Sprintf(textFarosatTaken, name, grams)))
 	case gain < 0:
-		return say(fmt.Sprintf(textFarosatDown, name, -gain, grams))
+		return s.withFarosatApp(in, say(fmt.Sprintf(textFarosatDown, name, -gain, grams)))
 	default:
-		return say(fmt.Sprintf(textFarosatUp, name, gain, grams))
+		return s.withFarosatApp(in, say(fmt.Sprintf(textFarosatUp, name, gain, grams)))
 	}
 }
 
@@ -114,7 +116,7 @@ func (s *Service) farosatTop(ctx context.Context, in incoming, limit int) outcom
 		s.opts.Logger.Warn("could not read the farosat ranking", "chat_id", in.scope.ChatID, "error", err)
 		return say(textError.to(in))
 	}
-	return outcome{text: text, buttons: farosatButtons(limit)}
+	return s.withFarosatApp(in, outcome{text: text, buttons: farosatButtons(limit)})
 }
 
 // farosatTopText is the group's ranking at its size.
@@ -170,7 +172,11 @@ func (s *Service) pressedFarosat(q *telegram.CallbackQuery) {
 		return
 	}
 	_ = s.opts.Buttons.AnswerCallbackQuery(ctx, q.ID, "", false)
-	if err := s.opts.Buttons.EditMessageMenu(ctx, q.Message.Chat.ID, q.Message.MessageID, text, farosatButtons(limit)); err != nil {
+	buttons := farosatButtons(limit)
+	if row := s.farosatAppButton(q.Message.Chat.ID); row != nil {
+		buttons = append(buttons, row)
+	}
+	if err := s.opts.Buttons.EditMessageMenu(ctx, q.Message.Chat.ID, q.Message.MessageID, text, buttons); err != nil {
 		s.opts.Logger.Debug("could not switch the farosat ranking", "chat_id", q.Message.Chat.ID, "error", err)
 	}
 }

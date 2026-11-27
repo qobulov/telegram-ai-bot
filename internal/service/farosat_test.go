@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -12,9 +13,10 @@ import (
 )
 
 type memoryFarosat struct {
-	mu    sync.Mutex
-	grams map[int64]int
-	day   map[int64]string
+	mu      sync.Mutex
+	grams   map[int64]int
+	day     map[int64]string
+	charges map[string]bool
 }
 
 func (m *memoryFarosat) TakeFarosat(_ context.Context, _, userID int64, _ string, day time.Time, gain int) (int, int, bool, error) {
@@ -26,6 +28,24 @@ func (m *memoryFarosat) TakeFarosat(_ context.Context, _, userID int64, _ string
 		m.day[userID] = day.Format("2006-01-02")
 	}
 	return m.grams[userID], 1, taken, nil
+}
+
+func (m *memoryFarosat) RecordFarosatPurchase(_ context.Context, p storage.FarosatPurchase) (int, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.charges == nil {
+		m.charges = map[string]bool{}
+	}
+	if m.charges[p.ChargeID] {
+		return m.grams[p.UserID], false, nil
+	}
+	m.charges[p.ChargeID] = true
+	m.grams[p.UserID] += p.Grams
+	return m.grams[p.UserID], true, nil
+}
+
+func (m *memoryFarosat) RefundFarosatPurchase(context.Context, string) (bool, error) {
+	return false, nil
 }
 
 func (m *memoryFarosat) FarosatTop(context.Context, int64, int) ([]storage.FarosatRow, error) {
@@ -97,5 +117,38 @@ func TestFarosatRankingButtons(t *testing.T) {
 	}
 	if got := farosatSize("7"); got != 10 {
 		t.Errorf("/topfarosat 7 = %d", got)
+	}
+}
+
+// /farosat and /topfarosat carry the app's button, a link to the private
+// chat, where "/start farosat_g<chat>" opens the app for that group; a
+// payment for a pack adds its grams once.
+func TestFarosatApp(t *testing.T) {
+	f := newFixture()
+	payments := &fakePayments{}
+	store := &memoryFarosat{grams: map[int64]int{}, day: map[int64]string{}}
+	f.opts.Farosat, f.opts.Payments, f.opts.FarosatURL = store, payments, "https://app/farosat/"
+
+	sent := f.run(inGroup(groupMessage("/farosat")))
+	rows := sent[len(sent)-1].buttons
+	if len(rows) == 0 || rows[len(rows)-1][0].URL != "https://t.me/"+botUsername+"?start=farosat_g"+strconv.FormatInt(-groupID, 10) {
+		t.Fatalf("buttons = %+v", rows)
+	}
+	sent = f.run(textFrom(userID, "/start farosat_g"+strconv.FormatInt(-groupID, 10)))
+	if b := sent[len(sent)-1].buttons; len(b) != 1 || b[0][0].WebApp == nil || b[0][0].WebApp.URL != "https://app/farosat/?g=g"+strconv.FormatInt(-groupID, 10) {
+		t.Fatalf("start = %+v", sent)
+	}
+
+	payload := "frs:" + strconv.FormatInt(userID, 10) + ":" + strconv.FormatInt(groupID, 10) + ":g100"
+	New(f.opts).HandleNow(checkoutUpdate(userID, payload, 100))
+	New(f.opts).HandleNow(checkoutUpdate(userID, payload, 80))
+	if len(payments.answers) != 2 || !payments.answers[0].ok || payments.answers[1].ok {
+		t.Fatalf("checks = %+v", payments.answers)
+	}
+	before, sentBefore := store.grams[userID], len(sent)
+	payment := paymentUpdate(userID, "ch_f", payload, 100)
+	sent = f.run(payment, payment)
+	if store.grams[userID] != before+100 || len(sent) != sentBefore+1 || !strings.Contains(sent[len(sent)-1].text, "+100 gram") {
+		t.Errorf("after the payment %d (was %d), sent %+v", store.grams[userID], before, sent)
 	}
 }

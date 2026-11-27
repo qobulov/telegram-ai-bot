@@ -58,3 +58,75 @@ func (s *Store) FarosatTop(ctx context.Context, chatID int64, limit int) ([]Faro
 	}
 	return top, nil
 }
+
+// FarosatOf is a member's farosat in a group and their place in its
+// ranking; a member who never took any has 0 and the place after the last.
+func (s *Store) FarosatOf(ctx context.Context, chatID, userID int64) (grams, place int, err error) {
+	err = s.pool.QueryRow(ctx, `
+		SELECT coalesce((SELECT grams FROM farosat WHERE chat_id = $1 AND user_id = $2), 0)`, chatID, userID).Scan(&grams)
+	if err == nil {
+		err = s.pool.QueryRow(ctx, `SELECT count(*) + 1 FROM farosat WHERE chat_id = $1 AND grams > $2`, chatID, grams).Scan(&place)
+	}
+	if err != nil {
+		return 0, 0, fmt.Errorf("storage: a member's farosat: %w", err)
+	}
+	return grams, place, nil
+}
+
+// FarosatPurchase is farosat bought with Stars for a group.
+type FarosatPurchase struct {
+	ChargeID string
+	ChatID   int64
+	UserID   int64
+	Name     string
+	Stars    int
+	Grams    int
+}
+
+// RecordFarosatPurchase keeps a payment once and adds its grams to the
+// buyer's farosat in its group, giving their farosat after; recorded is
+// false, and nothing added, for a payment kept before.
+func (s *Store) RecordFarosatPurchase(ctx context.Context, p FarosatPurchase) (grams int, recorded bool, err error) {
+	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `
+			INSERT INTO farosat_purchases (charge_id, chat_id, user_id, stars, grams) VALUES ($1, $2, $3, $4, $5)
+			ON CONFLICT DO NOTHING`, p.ChargeID, p.ChatID, p.UserID, p.Stars, p.Grams)
+		if err != nil || tag.RowsAffected() == 0 {
+			return err
+		}
+		recorded = true
+		return tx.QueryRow(ctx, `
+			INSERT INTO farosat (chat_id, user_id, name, grams) VALUES ($1, $2, $3, $4)
+			ON CONFLICT (chat_id, user_id) DO UPDATE SET grams = farosat.grams + $4, name = coalesce(nullif($3, ''), farosat.name), updated_at = now()
+			RETURNING grams`, p.ChatID, p.UserID, p.Name, p.Grams).Scan(&grams)
+	})
+	if err != nil {
+		return 0, false, fmt.Errorf("storage: record a farosat purchase: %w", err)
+	}
+	return grams, recorded, nil
+}
+
+// RefundFarosatPurchase takes a refunded payment's grams back, once; found
+// is false for a charge not kept or refunded before.
+func (s *Store) RefundFarosatPurchase(ctx context.Context, chargeID string) (found bool, err error) {
+	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		var chatID, userID int64
+		var grams int
+		err := tx.QueryRow(ctx, `
+			UPDATE farosat_purchases SET refunded_at = now() WHERE charge_id = $1 AND refunded_at IS NULL
+			RETURNING chat_id, user_id, grams`, chargeID).Scan(&chatID, &userID, &grams)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		found = true
+		_, err = tx.Exec(ctx, `UPDATE farosat SET grams = grams - $3, updated_at = now() WHERE chat_id = $1 AND user_id = $2`, chatID, userID, grams)
+		return err
+	})
+	if err != nil {
+		return false, fmt.Errorf("storage: refund a farosat purchase: %w", err)
+	}
+	return found, nil
+}

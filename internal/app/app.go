@@ -475,6 +475,7 @@ func NewService(cfg config.Config, store *storage.Store, bot Bot, mode Mode, log
 		opts.StatsURL = statsPage(cfg)
 		opts.CardsURL = cardsPage(cfg)
 		opts.KassaURL = kassaPage(cfg)
+		opts.FarosatURL = farosatPage(cfg)
 		opts.Game, opts.GameTable = g, bot.Client
 	}
 	if mode.Serverless {

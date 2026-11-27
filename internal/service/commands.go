@@ -846,6 +846,9 @@ func (s *Service) respond(ctx context.Context, in incoming, rules []storage.Grou
 		if out, ok := s.startCards(in); ok {
 			return out
 		}
+		if out, ok := s.startFarosat(in); ok {
+			return out
+		}
 	}
 	switch {
 	case !in.group && commandName(in.text) == "/start" && len(s.opts.RequiredChannels) > 0:

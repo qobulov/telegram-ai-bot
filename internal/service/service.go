@@ -308,6 +308,9 @@ type Options struct {
 	// CardsURL is the page of Kartalar's Mini App, which /card and its
 	// buttons open; "" for none.
 	CardsURL string
+	// FarosatURL is the page of the Farosat Mini App, its galaxies and shop,
+	// opened from under /farosat and /topfarosat; "" leaves its button out.
+	FarosatURL string
 	// KassaURL is the page of Kassa, the cash book Mini App, which /kassa
 	// opens; "" for none.
 	KassaURL          string

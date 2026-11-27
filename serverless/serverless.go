@@ -187,6 +187,17 @@ var kassas = &lazy{name: "kassa", build: func(ctx context.Context, cfg config.Co
 	return endpoint.Handler, endpoint.Close, nil
 }}
 
+var farosats = &lazy{name: "farosat", build: func(ctx context.Context, cfg config.Config, logger *slog.Logger) (http.Handler, func(), error) {
+	endpoint, err := app.NewFarosat(ctx, cfg, logger)
+	if err != nil {
+		return nil, nil, err
+	}
+	return endpoint.Handler, endpoint.Close, nil
+}}
+
+// Farosat answers the Farosat Mini App, its galaxies and shop.
+func Farosat(w http.ResponseWriter, r *http.Request) { farosats.serve(w, r) }
+
 // Kassa answers the Kassa cash book Mini App.
 func Kassa(w http.ResponseWriter, r *http.Request) { kassas.serve(w, r) }
 

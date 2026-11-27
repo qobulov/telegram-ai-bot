@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>Farosat</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap">
+  <link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+  <canvas id="sky" aria-hidden="true"></canvas>
+  <main id="app">
+    <header class="top">
+      <h1>Galaktikalar</h1>
+      <p class="tally" id="tally">&nbsp;</p>
+    </header>
+
+    <nav class="tabs" role="tablist">
+      <button type="button" role="tab" id="tabGalaxies" aria-selected="true">🌌 Galaktikalar</button>
+      <button type="button" role="tab" id="tabShop" aria-selected="false">⭐ Do'kon</button>
+    </nav>
+
+    <section id="state" class="state" role="status" hidden></section>
+
+    <section id="galaxies" class="view">
+      <div class="stage">
+        <button type="button" class="nav prev" id="prev" aria-label="Oldingi galaktika">‹</button>
+        <canvas id="galaxy" aria-label="Galaktika"></canvas>
+        <button type="button" class="nav next" id="next" aria-label="Keyingi galaktika">›</button>
+      </div>
+      <article class="card" id="card">
+        <div class="card-head">
+          <span class="meta" id="meta">#1</span>
+          <span class="chip" id="chip">Ochilgan</span>
+        </div>
+        <h2 id="name">Somon yo'li</h2>
+        <p class="sub" id="sub"></p>
+        <p class="fact" id="fact"></p>
+        <div class="progress" id="progress" hidden>
+          <div class="bar"><span id="barFill"></span></div>
+          <p id="need"></p>
+        </div>
+      </article>
+    </section>
+
+    <section id="shop" class="view" hidden>
+      <p class="shop-lead">Farosat grammlari: <b>1 ⭐ = 1 gram</b>. Gramm shu guruhdagi farosatingizga qo'shiladi va reytingda hisoblanadi.</p>
+      <div class="packs" id="packs"></div>
+      <p class="shop-note">To'lov Telegram Stars orqali. Gramm to'lovdan keyin bir necha soniyada qo'shiladi.</p>
+    </section>
+  </main>
+  <script src="app.js?v=1"></script>
+</body>
+</html>

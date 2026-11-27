@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"telegram-ai-bot/internal/cards"
+	"telegram-ai-bot/internal/farosat"
 	"time"
 
 	"telegram-ai-bot/internal/storage"
@@ -261,6 +262,10 @@ func (s *Service) checkout(q *telegram.PreCheckoutQuery) {
 		s.checkoutCrystals(q)
 		return
 	}
+	if _, _, _, isFarosat := farosat.ParsePayload(q.InvoicePayload); isFarosat {
+		s.checkoutFarosat(q)
+		return
+	}
 	in := incoming{msg: &telegram.Message{From: q.From}} // for the language
 	refusal := s.checkoutRefusal(q)
 	ctx, cancel := context.WithTimeout(context.Background(), checkoutTimeout)
@@ -298,6 +303,10 @@ func (s *Service) recordPayment(msg *telegram.Message) {
 	paid := msg.SuccessfulPayment
 	if _, _, isCrystal := cards.ParseCrystalPayload(paid.InvoicePayload); isCrystal {
 		s.recordCrystals(msg)
+		return
+	}
+	if _, _, _, isFarosat := farosat.ParsePayload(paid.InvoicePayload); isFarosat {
+		s.recordFarosat(msg)
 		return
 	}
 	if s.opts.Premium == nil || msg.From == nil {
@@ -344,6 +353,10 @@ func (s *Service) recordPayment(msg *telegram.Message) {
 func (s *Service) noteRefund(msg *telegram.Message) {
 	if _, _, isCrystal := cards.ParseCrystalPayload(msg.RefundedPayment.InvoicePayload); isCrystal {
 		s.refundCrystals(msg)
+		return
+	}
+	if _, _, _, isFarosat := farosat.ParsePayload(msg.RefundedPayment.InvoicePayload); isFarosat {
+		s.refundFarosat(msg)
 		return
 	}
 	if s.opts.Premium == nil {
