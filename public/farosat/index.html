@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap">
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
   <canvas id="sky" aria-hidden="true"></canvas>
@@ -35,9 +35,12 @@
         <input id="search" type="search" placeholder="Qidirish…" autocomplete="off">
         <button type="button" class="here" id="here">📍 Men turgan joy</button>
       </div>
-      <div class="stage">
+      <div class="stage" id="galaxyStage">
         <button type="button" class="nav prev" id="prev" aria-label="Oldingi galaktika">‹</button>
         <canvas id="galaxy" aria-label="Galaktika"></canvas>
+        <p class="space-name" id="spaceName"></p>
+        <button type="button" class="space-open" id="spaceOpen" hidden>🌌 Kosmosda ochish</button>
+        <button type="button" class="space-close" id="spaceClose" aria-label="Yopish" hidden>✕</button>
         <button type="button" class="nav next" id="next" aria-label="Keyingi galaktika">›</button>
       </div>
       <article class="card" id="card">
@@ -73,6 +76,6 @@
       <p class="shop-note">Gramm shu guruhdagi farosatingizga qo'shiladi va reytingda hisoblanadi. To'lov Telegram Stars orqali, gramm bir necha soniyada qo'shiladi.</p>
     </section>
   </main>
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>

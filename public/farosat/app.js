@@ -55,6 +55,7 @@
     applyView(index);
     if (!keep && params.get("tab") === "shop") tab(true);
     if (!keep && params.get("pack")) showPack(Number(params.get("pack")) || 0);
+    if (!keep && params.get("space") && galaxy3d) $("spaceOpen").click();
   }
 
   // ---- Filter, search and the galaxy on view ------------------------------
@@ -150,7 +151,7 @@
     }
     $("prev").disabled = pos <= 0;
     $("next").disabled = pos === view.length - 1;
-    (galaxy3d || galaxy).set(g);
+    galaxy.set(g);
   }
 
   function step(by) {
@@ -159,7 +160,7 @@
   }
   $("prev").addEventListener("click", () => step(-1));
   $("next").addEventListener("click", () => step(1));
-  // A swipe changes the galaxy on the flat drawing; in 3D a drag turns it.
+  // A swipe changes the galaxy on the flat drawing; in 3D a finger turns it.
   let touchX = null;
   $("galaxy").addEventListener("touchstart", (e) => { touchX = e.touches[0].clientX; }, { passive: true });
   $("galaxy").addEventListener("touchend", (e) => {
@@ -406,8 +407,10 @@
     return out;
   }
 
-  // galaxy draws the galaxy on view, turning slowly; a locked one is dim.
-  const galaxy = (function () {
+  // flatGalaxy draws the galaxy on view flat, turning slowly, where WebGL
+  // is not to be had; a locked one is dim. It is made only then: a canvas
+  // that gave out a 2D context gives no WebGL one.
+  function flatGalaxy() {
     const canvas = $("galaxy");
     const ctx = canvas.getContext("2d");
     let current = null, points = [], tilt = 0.55, angle = 0, frame = 0;
@@ -467,7 +470,7 @@
         if (reduced) draw(); else loop();
       },
     };
-  })();
+  }
 
   // ---- 3D -----------------------------------------------------------------
 
@@ -501,20 +504,6 @@
     return new THREE.CanvasTexture(c);
   }
 
-  // drag turns an object by pointer: x around its axis, y its tilt.
-  function drag(canvas, onMove) {
-    let last = null;
-    canvas.addEventListener("pointerdown", (e) => { last = [e.clientX, e.clientY]; canvas.setPointerCapture(e.pointerId); });
-    canvas.addEventListener("pointermove", (e) => {
-      if (!last) return;
-      onMove(e.clientX - last[0], e.clientY - last[1]);
-      last = [e.clientX, e.clientY];
-    });
-    const stop = () => { last = null; };
-    canvas.addEventListener("pointerup", stop);
-    canvas.addEventListener("pointercancel", stop);
-  }
-
   // galaxyTilt is how far from edge-on each kind is seen, in radians.
   const galaxyTilt = { spiral: 1.0, barred: 1.05, ring: 1.2, lenticular: 0.22, edge: 0.07, elliptical: 0.5, irregular: 0.9, merger: 0.8 };
 
@@ -537,27 +526,147 @@
     });
   }
 
+  // galaxy3d draws the galaxy on view as a cloud of stars in space. A finger
+  // turns it any way, with a flick it keeps turning a while; two fingers or
+  // the wheel bring it near or far, a double tap sets it back. "Kosmosda
+  // ochish" opens it over the whole screen among stars of its own.
   const galaxy3d = (function () {
     const canvas = $("galaxy");
     const renderer = webgl(canvas);
     if (!renderer) return null;
+    const stage = $("galaxyStage");
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10);
-    camera.position.set(0, 0, 1.3);
-    const tilt = new THREE.Group();
-    const spin = new THREE.Group();
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 20);
+    const turn = new THREE.Group(); // the member's turning
+    const tilt = new THREE.Group(); // how the galaxy is seen from Earth
+    const spin = new THREE.Group(); // its own slow turning
+    turn.add(tilt);
     tilt.add(spin);
-    scene.add(tilt);
+    scene.add(turn);
     const dot = glowTexture();
-    let baseTilt = 1, userTilt = 0;
-    drag(canvas, (dx, dy) => {
-      spin.rotation.y += dx * 0.008;
-      userTilt = Math.max(-0.7, Math.min(0.7, userTilt + dy * 0.006));
+    const sky = backdrop();
+    scene.add(sky);
+    let zoom = 1.3, open = false, velocity = null;
+
+    // backdrop is far stars all round, seen only in open space, so that
+    // turning shows the galaxy moving among them.
+    function backdrop() {
+      const r = rng(424242);
+      const n = 1600;
+      const pos = new Float32Array(n * 3);
+      const col = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) {
+        const u = r() * 2 - 1, a = r() * Math.PI * 2, d = 5 + r() * 4;
+        const k = Math.sqrt(1 - u * u);
+        pos.set([d * k * Math.cos(a), d * u, d * k * Math.sin(a)], i * 3);
+        const b = 0.35 + r() * 0.65, warm = r();
+        col.set([b * (warm > 0.8 ? 1 : 0.85), b * 0.9, b * (warm < 0.3 ? 1 : 0.85)], i * 3);
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      geometry.setAttribute("color", new THREE.BufferAttribute(col, 3));
+      const points = new THREE.Points(geometry, new THREE.PointsMaterial({ size: 0.07, map: dot, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+      points.visible = false;
+      return points;
+    }
+
+    // rotate turns the galaxy by a drag of dx, dy pixels, about the axis
+    // across the drag as the camera sees it.
+    function rotate(dx, dy) {
+      const len = Math.hypot(dx, dy);
+      if (!len) return;
+      const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(dy / len, dx / len, 0), len * 0.009);
+      turn.quaternion.premultiply(q);
+      sky.quaternion.premultiply(q);
+    }
+    function setZoom(z) { zoom = Math.max(0.35, Math.min(4, z)); }
+    // fit is the distance the whole galaxy is seen from: further on a tall,
+    // narrow screen, where less of it fits across.
+    function fit() { return 1.3 / Math.min(1, camera.aspect * 1.1); }
+    function reset() {
+      turn.quaternion.identity();
+      sky.quaternion.identity();
+      velocity = null;
+      zoom = fit();
+    }
+
+    const fingers = new Map();
+    let pinch = null, lastTap = 0;
+    canvas.addEventListener("pointerdown", (e) => {
+      canvas.setPointerCapture(e.pointerId);
+      fingers.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now() });
+      velocity = null;
+      if (fingers.size === 2) {
+        const [a, b] = [...fingers.values()];
+        pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), zoom };
+      }
+      const now = performance.now();
+      if (fingers.size === 1 && now - lastTap < 300) reset();
+      lastTap = now;
     });
+    canvas.addEventListener("pointermove", (e) => {
+      const f = fingers.get(e.pointerId);
+      if (!f) return;
+      const now = performance.now();
+      const dx = e.clientX - f.x, dy = e.clientY - f.y;
+      fingers.set(e.pointerId, { x: e.clientX, y: e.clientY, t: now, dx, dy, dt: now - f.t });
+      if (pinch && fingers.size >= 2) {
+        const [a, b] = [...fingers.values()];
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        if (dist > 10) setZoom(pinch.zoom * (pinch.dist / dist));
+        return;
+      }
+      if (fingers.size === 1) {
+        rotate(dx, dy);
+        lastTap = Math.abs(dx) + Math.abs(dy) > 6 ? 0 : lastTap;
+      }
+    });
+    const lift = (e) => {
+      const f = fingers.get(e.pointerId);
+      fingers.delete(e.pointerId);
+      if (fingers.size < 2) pinch = null;
+      // A flick keeps the galaxy turning, slowing down.
+      if (f && f.dt && !pinch && fingers.size === 0 && performance.now() - f.t < 80) {
+        velocity = [f.dx * (16 / Math.max(8, f.dt)), f.dy * (16 / Math.max(8, f.dt))];
+      }
+    };
+    canvas.addEventListener("pointerup", lift);
+    canvas.addEventListener("pointercancel", lift);
+    canvas.addEventListener("wheel", (e) => { e.preventDefault(); setZoom(zoom * Math.exp(e.deltaY * 0.0015)); }, { passive: false });
+    canvas.addEventListener("dblclick", reset);
+
+    // Open space: the stage over the whole screen; Telegram's back button,
+    // the cross or Escape close it.
+    function setOpen(on) {
+      open = on;
+      stage.classList.toggle("space", on);
+      document.body.classList.toggle("in-space", on);
+      sky.visible = on;
+      $("spaceOpen").hidden = on;
+      $("spaceClose").hidden = !on;
+      if (tg && tg.BackButton) {
+        if (on) { tg.BackButton.show(); tg.BackButton.onClick(close); } else { tg.BackButton.offClick(close); tg.BackButton.hide(); }
+      }
+      if (on && tg && tg.expand) tg.expand();
+      size();
+      reset();
+    }
+    const close = () => setOpen(false);
+    $("spaceOpen").addEventListener("click", () => setOpen(true));
+    $("spaceClose").addEventListener("click", close);
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && open) close(); });
 
     function size() {
-      const w = canvas.clientWidth || 360;
-      renderer.setSize(w, w, false);
+      if (open) {
+        const w = window.innerWidth, h = window.innerHeight;
+        renderer.setSize(w, h, false);
+        camera.aspect = w / h;
+      } else {
+        const w = canvas.clientWidth || 360;
+        renderer.setSize(w, w, false);
+        camera.aspect = 1;
+      }
+      camera.updateProjectionMatrix();
     }
     function clear() {
       for (const child of [...spin.children]) {
@@ -566,13 +675,13 @@
         if (child.material) child.material.dispose();
       }
     }
-    function cloud(points, size, open) {
+    function cloud(points, size, lit) {
       const pos = new Float32Array(points.length * 3);
       const col = new Float32Array(points.length * 3);
       points.forEach((p, i) => {
         pos.set([p[0], p[1], p[2]], i * 3);
         const a = p[7];
-        if (open) {
+        if (lit) {
           col.set([(p[4] / 255) * a, (p[5] / 255) * a, (p[6] / 255) * a], i * 3);
         } else {
           const grey = ((p[4] + p[5] + p[6]) / 765) * a * 0.32;
@@ -587,12 +696,19 @@
     }
     function loop() {
       if (!$("galaxies").hidden) {
-        if (!reduced) spin.rotation.y += 0.0022;
-        tilt.rotation.x = baseTilt + userTilt;
+        if (velocity) {
+          rotate(velocity[0], velocity[1]);
+          velocity = [velocity[0] * 0.95, velocity[1] * 0.95];
+          if (Math.hypot(velocity[0], velocity[1]) < 0.05) velocity = null;
+        }
+        if (!reduced && !fingers.size) spin.rotation.y += 0.0022;
+        camera.position.z += (zoom - camera.position.z) * 0.2;
         renderer.render(scene, camera);
       }
       requestAnimationFrame(loop);
     }
+    camera.position.z = zoom;
+    $("spaceOpen").hidden = false;
     window.addEventListener("resize", size);
     requestAnimationFrame(loop);
     return {
@@ -604,13 +720,17 @@
         const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: dot, color: g.open ? 0xffe2b8 : 0x6a6a88, transparent: true, opacity: g.open ? 0.55 : 0.25, blending: THREE.AdditiveBlending, depthWrite: false }));
         glow.scale.set(0.6, 0.6, 1);
         spin.add(glow);
-        baseTilt = galaxyTilt[g.kind] !== undefined ? galaxyTilt[g.kind] : 1;
-        userTilt = 0;
+        tilt.rotation.x = galaxyTilt[g.kind] !== undefined ? galaxyTilt[g.kind] : 1;
+        turn.quaternion.identity();
+        velocity = null;
         spin.rotation.y = (g.id * 1.3) % (Math.PI * 2);
+        $("spaceName").textContent = g.name;
         size();
       },
     };
   })();
+
+  const galaxy = galaxy3d || flatGalaxy();
 
   // crystal3d is the shop's carousel: each pack a faceted shape of its own
   // colour, more faces the bigger it is, the one on view large over a ring,

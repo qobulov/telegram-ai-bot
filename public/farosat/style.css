@@ -59,7 +59,7 @@ body {
 .state { text-align: center; color: var(--dim); padding: 28px 8px; }
 
 .stage { position: relative; display: flex; align-items: center; justify-content: center; }
-#galaxy { width: min(100%, 420px); aspect-ratio: 1; max-width: 100%; touch-action: pan-y; }
+#galaxy { width: min(100%, 420px); aspect-ratio: 1; max-width: 100%; touch-action: none; }
 .nav {
   position: absolute;
   top: 50%;
@@ -169,3 +169,59 @@ body {
 @media (max-width: 360px) { .packs { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 #crystal:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; border-radius: 16px; }
+
+.space-open {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-line);
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+.space-name, .space-close { display: none; }
+.stage.space {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: radial-gradient(ellipse at center, #0b0f2a 0%, #03040c 70%);
+}
+.stage.space #galaxy { width: 100vw; height: 100vh; height: 100dvh; aspect-ratio: auto; max-width: none; }
+.stage.space .nav { z-index: 2; }
+.stage.space .nav.prev { left: 12px; }
+.stage.space .nav.next { right: 12px; }
+.stage.space .space-name {
+  display: block;
+  position: absolute;
+  top: calc(18px + env(safe-area-inset-top));
+  left: 0;
+  right: 0;
+  margin: 0;
+  text-align: center;
+  font-weight: 800;
+  font-size: 1.15rem;
+  pointer-events: none;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+}
+.stage.space .space-close {
+  display: block;
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  right: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--panel-line);
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+.space-open:focus-visible, .space-close:focus-visible { outline: 2px solid var(--nebula); outline-offset: 2px; }
+body.in-space { overflow: hidden; }
