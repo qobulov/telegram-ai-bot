@@ -50,6 +50,7 @@
     $("tally").innerHTML = `🪐 <b>${data.open}</b> ta koinotingizda · 🧠 <b>${fmt(data.grams)}</b> gram · <b>${data.place}</b>-o'rin`;
     renderPacks();
     show(index);
+    if (!keep && params.get("tab") === "shop") tab(true);
   }
 
   // ---- The galaxy on view ----------------------------------------------
@@ -75,15 +76,16 @@
     }
     $("prev").disabled = index === 0;
     $("next").disabled = index === list.length - 1;
-    galaxy.set(g);
+    (galaxy3d || galaxy).set(g);
   }
 
   $("prev").addEventListener("click", () => show(index - 1));
   $("next").addEventListener("click", () => show(index + 1));
+  // A swipe changes the galaxy on the flat drawing; in 3D a drag turns it.
   let touchX = null;
   $("galaxy").addEventListener("touchstart", (e) => { touchX = e.touches[0].clientX; }, { passive: true });
   $("galaxy").addEventListener("touchend", (e) => {
-    if (touchX === null) return;
+    if (touchX === null || galaxy3d) return;
     const dx = e.changedTouches[0].clientX - touchX;
     touchX = null;
     if (Math.abs(dx) > 40) show(index + (dx < 0 ? 1 : -1));
@@ -100,7 +102,43 @@
   $("tabGalaxies").addEventListener("click", () => tab(false));
   $("tabShop").addEventListener("click", () => tab(true));
 
+  // renderPacks shows the packs: one at a time as a turning crystal in 3D,
+  // else as a grid.
+  let packIndex = 0;
   function renderPacks() {
+    if (crystal3d) {
+      showPack(packIndex);
+      return;
+    }
+    $("shopStage").hidden = true;
+    $("packInfo").hidden = true;
+    $("packs").hidden = false;
+    renderPackGrid();
+  }
+
+  function showPack(i) {
+    const packs = data.packs;
+    packIndex = (i + packs.length) % packs.length;
+    const p = packs[packIndex];
+    const color = TIERS[packIndex % TIERS.length];
+    $("shop").style.setProperty("--tier", color);
+    $("packTier").textContent = p.name;
+    $("packGrams").textContent = fmt(p.stars);
+    $("buy").textContent = `Sotib olish · ⭐ ${fmt(p.stars)}`;
+    const dots = $("packDots");
+    dots.textContent = "";
+    packs.forEach((_, j) => {
+      const dot = document.createElement("span");
+      if (j === packIndex) dot.className = "on";
+      dots.appendChild(dot);
+    });
+    crystal3d.set(packIndex, color);
+  }
+  $("packPrev").addEventListener("click", () => showPack(packIndex - 1));
+  $("packNext").addEventListener("click", () => showPack(packIndex + 1));
+  $("buy").addEventListener("click", () => buy(data.packs[packIndex], $("buy")));
+
+  function renderPackGrid() {
     const box = $("packs");
     box.textContent = "";
     for (const p of data.packs) {
@@ -307,6 +345,239 @@
         size();
         cancelAnimationFrame(frame);
         if (reduced) draw(); else loop();
+      },
+    };
+  })();
+
+  // ---- 3D -----------------------------------------------------------------
+
+  // TIERS colour the packs, the smallest first.
+  const TIERS = ["#8fd3ff", "#9b8cff", "#5ef2c2", "#ffd36b"];
+
+  // webgl is a renderer on canvas, or null where WebGL is not to be had,
+  // and the page draws flat instead.
+  function webgl(canvas) {
+    if (!window.THREE) return null;
+    try {
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      return renderer;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // glowTexture is a soft round dot, the shape of every star.
+  function glowTexture() {
+    const c = document.createElement("canvas");
+    c.width = c.height = 64;
+    const x = c.getContext("2d");
+    const grad = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, "rgba(255,255,255,1)");
+    grad.addColorStop(0.25, "rgba(255,255,255,0.8)");
+    grad.addColorStop(1, "rgba(255,255,255,0)");
+    x.fillStyle = grad;
+    x.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  }
+
+  // drag turns an object by pointer: x around its axis, y its tilt.
+  function drag(canvas, onMove) {
+    let last = null;
+    canvas.addEventListener("pointerdown", (e) => { last = [e.clientX, e.clientY]; canvas.setPointerCapture(e.pointerId); });
+    canvas.addEventListener("pointermove", (e) => {
+      if (!last) return;
+      onMove(e.clientX - last[0], e.clientY - last[1]);
+      last = [e.clientX, e.clientY];
+    });
+    const stop = () => { last = null; };
+    canvas.addEventListener("pointerup", stop);
+    canvas.addEventListener("pointercancel", stop);
+  }
+
+  // galaxyTilt is how far from edge-on each kind is seen, in radians.
+  const galaxyTilt = { spiral: 1.0, barred: 1.05, ring: 1.2, lenticular: 0.22, edge: 0.07, elliptical: 0.5, irregular: 0.9, merger: 0.8 };
+
+  // points3d are a galaxy's stars in space: its disc lies flat, a few stars
+  // thick, its bulge round; an elliptical is a ball.
+  function points3d(g) {
+    const r = rng(g.id * 31 + 5);
+    const flat = stars(g.kind === "edge" ? Object.assign({}, g, { kind: "spiral" }) : g);
+    return flat.map((p) => {
+      const [x, y] = p;
+      const dist = Math.hypot(x, y);
+      let z;
+      switch (g.kind) {
+        case "elliptical": z = gauss(r) * 0.09; break;
+        case "irregular": z = gauss(r) * 0.06; break;
+        case "merger": z = gauss(r) * 0.02 + (x > 0 ? 0.35 * y : -0.25 * y); break;
+        default: z = dist < 0.08 ? gauss(r) * 0.045 : gauss(r) * 0.012 * (1 - Math.min(1, dist * 1.8));
+      }
+      return [x, z, y, p[2], p[3], p[4], p[5], p[6]];
+    });
+  }
+
+  const galaxy3d = (function () {
+    const canvas = $("galaxy");
+    const renderer = webgl(canvas);
+    if (!renderer) return null;
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10);
+    camera.position.set(0, 0, 1.3);
+    const tilt = new THREE.Group();
+    const spin = new THREE.Group();
+    tilt.add(spin);
+    scene.add(tilt);
+    const dot = glowTexture();
+    let baseTilt = 1, userTilt = 0;
+    drag(canvas, (dx, dy) => {
+      spin.rotation.y += dx * 0.008;
+      userTilt = Math.max(-0.7, Math.min(0.7, userTilt + dy * 0.006));
+    });
+
+    function size() {
+      const w = canvas.clientWidth || 360;
+      renderer.setSize(w, w, false);
+    }
+    function clear() {
+      for (const child of [...spin.children]) {
+        spin.remove(child);
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) child.material.dispose();
+      }
+    }
+    function cloud(points, size, open) {
+      const pos = new Float32Array(points.length * 3);
+      const col = new Float32Array(points.length * 3);
+      points.forEach((p, i) => {
+        pos.set([p[0], p[1], p[2]], i * 3);
+        const a = p[7];
+        if (open) {
+          col.set([(p[4] / 255) * a, (p[5] / 255) * a, (p[6] / 255) * a], i * 3);
+        } else {
+          const grey = ((p[4] + p[5] + p[6]) / 765) * a * 0.32;
+          col.set([grey, grey, grey * 1.15], i * 3);
+        }
+      });
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      geometry.setAttribute("color", new THREE.BufferAttribute(col, 3));
+      const material = new THREE.PointsMaterial({ size, map: dot, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true });
+      return new THREE.Points(geometry, material);
+    }
+    function loop() {
+      if (!$("galaxies").hidden) {
+        if (!reduced) spin.rotation.y += 0.0022;
+        tilt.rotation.x = baseTilt + userTilt;
+        renderer.render(scene, camera);
+      }
+      requestAnimationFrame(loop);
+    }
+    window.addEventListener("resize", size);
+    requestAnimationFrame(loop);
+    return {
+      set(g) {
+        clear();
+        const points = points3d(g);
+        spin.add(cloud(points.filter((p) => p[3] < 1.1), 0.011, g.open));
+        spin.add(cloud(points.filter((p) => p[3] >= 1.1), 0.02, g.open));
+        const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: dot, color: g.open ? 0xffe2b8 : 0x6a6a88, transparent: true, opacity: g.open ? 0.55 : 0.25, blending: THREE.AdditiveBlending, depthWrite: false }));
+        glow.scale.set(0.45, 0.45, 1);
+        spin.add(glow);
+        baseTilt = galaxyTilt[g.kind] !== undefined ? galaxyTilt[g.kind] : 1;
+        userTilt = 0;
+        spin.rotation.y = (g.id * 1.3) % (Math.PI * 2);
+        size();
+      },
+    };
+  })();
+
+  // crystal3d is the shop's pack on view: a faceted crystal, more faces
+  // the bigger the pack, with its glow and a ring of sparks.
+  const crystal3d = (function () {
+    const canvas = $("crystal");
+    const renderer = webgl(canvas);
+    if (!renderer) return null;
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 10);
+    camera.position.set(0, 0.1, 1.6);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+    const rim = new THREE.DirectionalLight(0xffffff, 0.9);
+    rim.position.set(-0.5, 1.5, -1.5);
+    scene.add(rim);
+    const key = new THREE.PointLight(0xffffff, 1.3);
+    key.position.set(1.2, 1.4, 2);
+    scene.add(key);
+    const tint = new THREE.PointLight(0xffffff, 1.1);
+    tint.position.set(-1.4, -0.6, 1);
+    scene.add(tint);
+    const holder = new THREE.Group();
+    scene.add(holder);
+    const dot = glowTexture();
+    const shapes = [
+      () => new THREE.OctahedronGeometry(0.3).scale(0.8, 1.45, 0.8),
+      () => new THREE.OctahedronGeometry(0.36),
+      () => new THREE.DodecahedronGeometry(0.36),
+      () => new THREE.IcosahedronGeometry(0.37, 1),
+    ];
+    let grow = 1, tilt = 0;
+    drag(canvas, (dx, dy) => {
+      holder.rotation.y += dx * 0.01;
+      tilt = Math.max(-0.8, Math.min(0.8, tilt + dy * 0.006));
+    });
+    function size() {
+      const w = canvas.clientWidth || 320;
+      renderer.setSize(w, w, false);
+    }
+    function clear() {
+      for (const child of [...holder.children]) {
+        holder.remove(child);
+        child.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+      }
+    }
+    let gem = null, ring = null;
+    function loop() {
+      if (!$("shop").hidden) {
+        grow += (1 - grow) * 0.12;
+        holder.scale.setScalar(grow);
+        if (!reduced) {
+          holder.rotation.y += 0.008;
+          if (ring) ring.rotation.z -= 0.004;
+        }
+        holder.rotation.x = 0.35 + tilt;
+        if (gem) gem.position.y = reduced ? 0 : Math.sin(performance.now() / 700) * 0.025;
+        renderer.render(scene, camera);
+      }
+      requestAnimationFrame(loop);
+    }
+    window.addEventListener("resize", size);
+    requestAnimationFrame(loop);
+    return {
+      set(i, hex) {
+        clear();
+        const color = new THREE.Color(hex);
+        tint.color = color;
+        const geometry = shapes[i % shapes.length]();
+        gem = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.22, metalness: 0.55, roughness: 0.12, flatShading: true, transparent: true, opacity: 0.94 }));
+        gem.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 })));
+        holder.add(gem);
+        const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: dot, color, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false }));
+        halo.scale.set(1.3, 1.3, 1);
+        holder.add(halo);
+        const r = rng(i + 3);
+        const count = 120 + i * 90;
+        const pos = new Float32Array(count * 3);
+        for (let k = 0; k < count; k++) {
+          const ang = r() * Math.PI * 2, rad = 0.5 + gauss(r) * 0.03;
+          pos.set([Math.cos(ang) * rad, gauss(r) * 0.015, Math.sin(ang) * rad], k * 3);
+        }
+        const sparks = new THREE.BufferGeometry();
+        sparks.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+        ring = new THREE.Points(sparks, new THREE.PointsMaterial({ size: 0.022, map: dot, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+        ring.rotation.x = Math.PI / 2 - 0.25;
+        holder.add(ring);
+        grow = 0.3;
+        size();
       },
     };
   })();
