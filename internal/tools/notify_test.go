@@ -164,3 +164,24 @@ func TestNotifyOwnerRefusals(t *testing.T) {
 		}
 	})
 }
+
+// A reply such as "Nohaqlik" reaches the owners with the message it answers
+// and a link to it, or they cannot tell what it is about (2026-11-27).
+func TestNotifyOwnerCarriesTheRepliedMessage(t *testing.T) {
+	env := newNotifyEnv(t)
+	caller := Caller{UserID: userID, ChatID: groupA, Name: "Umarxon @u", Human: true, UpdateID: 100, MessageID: 50, Words: "Nohaqlik",
+		Target: &Target{MessageID: 49, UserID: 777, Name: "Maria", IsBot: true, Text: "🧠 Bek, farosatingiz +10 gram oshdi."}}
+	if got := env.notify(WithTurn(context.Background(), caller, &Sink{}), `{}`); !got.OK {
+		t.Fatalf("notify = %+v", got)
+	}
+	text := env.chats.sent[0].Text
+	if !strings.Contains(text, "Nohaqlik") || !strings.Contains(text, "farosatingiz +10 gram oshdi") || !strings.Contains(text, "(Maria)") {
+		t.Errorf("message = %q", text)
+	}
+	if got := messageLink(-1001234567, 50); got != "https://t.me/c/1234567/50" {
+		t.Errorf("link = %q", got)
+	}
+	if got := messageLink(-4567, 50); got != "" {
+		t.Errorf("basic group link = %q", got)
+	}
+}

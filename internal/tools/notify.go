@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -156,8 +157,10 @@ func pickOwners(ctx context.Context, opts NotifyOptions, named string) ([]ownerC
 	return owners, nil
 }
 
-// noticeText is what an owner gets: where it came from, who asked, and
-// their words.
+// noticeText is what an owner gets: where it came from, who asked, their
+// words, and the message they answered, without which a reply such as
+// "Nohaqlik" says nothing of what it is about (2026-11-27), with a link to
+// it in a supergroup.
 func noticeText(ctx context.Context, opts NotifyOptions, caller Caller, words string) string {
 	group := "guruh"
 	if chat, err := opts.Telegram.GetChat(ctx, caller.ChatID); err == nil && chat.Title != "" {
@@ -167,7 +170,34 @@ func noticeText(ctx context.Context, opts NotifyOptions, caller Caller, words st
 	if who == "" {
 		who = "A'zo"
 	}
-	return "📩 " + group + "dan xabar\n" + who + " so'radi:\n" + cutRunes(words, maxNoticeRunes)
+	text := "📩 " + group + "dan xabar\n" + who + " so'radi:\n" + cutRunes(words, maxNoticeRunes)
+	if replied := repliedTo(caller); replied != "" {
+		text += "\n\n" + replied
+	}
+	if link := messageLink(caller.ChatID, caller.MessageID); link != "" {
+		text += "\n\n🔗 " + link
+	}
+	return text
+}
+
+// repliedTo is the message the caller answered, by someone else: their own
+// is already in their words.
+func repliedTo(caller Caller) string {
+	target := caller.Target
+	if target == nil || target.UserID == caller.UserID || strings.TrimSpace(target.Text) == "" {
+		return ""
+	}
+	return "↩️ Bunga javoban (" + target.Name + "):\n" + strings.TrimSpace(target.Text)
+}
+
+// messageLink is a link to a message in a supergroup, which opens for the
+// group's members; other chats have none.
+func messageLink(chatID, messageID int64) string {
+	id, ok := strings.CutPrefix(strconv.FormatInt(chatID, 10), "-100")
+	if !ok || messageID == 0 {
+		return ""
+	}
+	return "https://t.me/c/" + id + "/" + strconv.FormatInt(messageID, 10)
 }
 
 func (opts NotifyOptions) now() time.Time {
