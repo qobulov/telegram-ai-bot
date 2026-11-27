@@ -209,7 +209,7 @@
     $("shop").style.setProperty("--tier", color);
     $("packTier").textContent = p.name;
     $("packGrams").textContent = fmt(p.stars);
-    $("buy").textContent = `Sotib olish · ⭐ ${fmt(p.stars)}`;
+    $("buy").textContent = buyHint(p);
     const dots = $("packDots");
     dots.textContent = "";
     packs.forEach((_, j) => {
@@ -221,7 +221,10 @@
   }
   $("packPrev").addEventListener("click", () => showPack(packIndex - 1));
   $("packNext").addEventListener("click", () => showPack(packIndex + 1));
+  // buyHint says how to buy the pack on view: a tap on its crystal.
+  function buyHint(p) { return `👆 Kristallni bosing · ⭐ ${fmt(p.stars)}`; }
   $("buy").addEventListener("click", () => buy(data.packs[packIndex], $("buy")));
+  $("buy").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); buy(data.packs[packIndex], $("buy")); } });
 
   function renderPackGrid() {
     const box = $("packs");
@@ -253,10 +256,12 @@
   // looks again until done() is true, as the bot hears of the payment
   // a moment after the page does.
   async function pay(button, action, extra, done, label) {
+    if (button.dataset.busy) return;
     const before = button.textContent;
     button.disabled = true;
+    button.dataset.busy = "1";
     button.textContent = "Ochilmoqda…";
-    const restore = () => { button.disabled = false; button.textContent = label || before; };
+    const restore = () => { button.disabled = false; delete button.dataset.busy; button.textContent = label || before; };
     try {
       const { link } = await api(action, extra);
       if (!tg || !tg.openInvoice) { location.href = link; return; }
@@ -285,7 +290,8 @@
 
   function buy(pack, button) {
     const before = data.grams;
-    pay(button, "invoice", { pack: pack.id }, () => data.grams !== before, `Sotib olish · ⭐ ${fmt(pack.stars)}`);
+    const label = button.id === "buy" ? buyHint(pack) : `Sotib olish · ⭐ ${fmt(pack.stars)}`;
+    pay(button, "invoice", { pack: pack.id }, () => data.grams !== before, label);
   }
 
   // ---- Drawing -----------------------------------------------------------
@@ -663,16 +669,17 @@
     halo.scale.set(1.3, 1.3, 1);
     scene.add(halo);
 
-    let items = [], current = 0, slide = 0, spin = 0, onSwipe = null;
+    let items = [], current = 0, slide = 0, spin = 0, onSwipe = null, onTap = null;
     // A swipe moves the carousel; a small drag only turns the shape.
     let start = null;
     canvas.addEventListener("pointerdown", (e) => { start = [e.clientX, e.clientY, spin]; canvas.setPointerCapture(e.pointerId); });
     canvas.addEventListener("pointermove", (e) => { if (start) spin = start[2] + (e.clientX - start[0]) * 0.01; });
     const end = (e) => {
       if (!start) return;
-      const dx = e.clientX - start[0];
+      const dx = e.clientX - start[0], dy = e.clientY - start[1];
       start = null;
       if (Math.abs(dx) > 45 && onSwipe) onSwipe(dx < 0 ? 1 : -1);
+      else if (Math.abs(dx) < 8 && Math.abs(dy) < 8 && onTap) onTap();
     };
     canvas.addEventListener("pointerup", end);
     canvas.addEventListener("pointercancel", () => { start = null; });
@@ -724,6 +731,7 @@
     }, 16);
     return {
       swipe(fn) { onSwipe = fn; },
+      tap(fn) { onTap = fn; },
       set(i, hex, count) {
         if (items.length !== count) {
           build(count);
@@ -767,6 +775,10 @@
     window.addEventListener("resize", paint);
   })();
 
-  if (crystal3d) crystal3d.swipe((by) => showPack(packIndex + by));
+  if (crystal3d) {
+    crystal3d.swipe((by) => showPack(packIndex + by));
+    // A tap on the crystal on view buys its pack.
+    crystal3d.tap(() => buy(data.packs[packIndex], $("buy")));
+  }
   load(false);
 })();
