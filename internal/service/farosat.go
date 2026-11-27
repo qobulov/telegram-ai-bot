@@ -28,7 +28,7 @@ type FarosatStore interface {
 const (
 	// A day's gain: farosatLoss of the takes lose 1 to farosatMostLoss
 	// grams, the others gain 1 to farosatMostGain.
-	farosatLoss     = 0.15
+	farosatLoss     = 0.05
 	farosatMostLoss = 10
 	farosatMostGain = 10
 )
