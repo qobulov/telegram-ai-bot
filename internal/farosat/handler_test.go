@@ -99,7 +99,7 @@ func TestFarosatApp(t *testing.T) {
 	if code != http.StatusOK || invoices.got.Price != 30 || invoices.got.Payload != "frsg:7:-100123:13" {
 		t.Fatalf("galaxy invoice = %d %v %+v", code, out, invoices.got)
 	}
-	for _, id := range []int{12, 3, 1, 99} {
+	for _, id := range []int{12, 3, 1, 999} {
 		if code, _ = call(t, h, map[string]any{"init_data": init, "group": "g100123", "action": "galaxy_invoice", "galaxy": id}); code == http.StatusOK {
 			t.Errorf("galaxy %d sold: %d", id, code)
 		}
