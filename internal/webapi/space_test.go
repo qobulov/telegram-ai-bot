@@ -1,6 +1,7 @@
 package webapi
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -53,5 +54,27 @@ func TestSpaceSky(t *testing.T) {
 	}
 	if env = run(t, u.options(), "space", `{"action":"comet"}`); env.OK {
 		t.Errorf("an unknown action = %s", env.raw)
+	}
+}
+
+// In daylight only the Moon and Venus are called visible; the rest that are
+// up are named as lost in the Sun's light.
+func TestSpaceDaylight(t *testing.T) {
+	u := newUpstream(t, map[string]stub{
+		"/space/api/v1/visible": ok(`{"sun":{"condition":"daylight"},"objects":[{"name":"Venus","object_type":"Terrestrial planet","mag":-4.87,"altitude_deg":37,"azimuth_deg":180},
+			{"name":"Jupiter","object_type":"Gas giant","mag":-2.18,"altitude_deg":23,"azimuth_deg":270},{"name":"Moon","object_type":"Moon","mag":-10,"altitude_deg":30,"azimuth_deg":90},{"name":"Vega","object_type":"Star","mag":0.03,"altitude_deg":46,"azimuth_deg":90}]}`),
+	})
+	env := run(t, u.options(), "space", `{"action":"visible"}`)
+	var got struct {
+		Result struct {
+			Up     []struct{ Name string } `json:"up"`
+			Unseen []string                `json:"above_horizon_unseen"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(env.raw), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Result.Up) != 2 || got.Result.Up[0].Name != "Venus" || got.Result.Up[1].Name != "Moon" || strings.Join(got.Result.Unseen, ",") != "Jupiter,Vega" {
+		t.Errorf("daylight sky = %s", env.raw)
 	}
 }

@@ -313,8 +313,13 @@ func (a *apis) spaceVisible(ctx context.Context, lat, lon float64) (any, error) 
 		return nil, err
 	}
 	up := make([]map[string]any, 0, len(got.Objects))
+	var faint []string
 	for _, o := range got.Objects {
 		if o.Name == "Sun" {
+			continue
+		}
+		if !seenByEye(got.Sun.Condition, o.Name, o.Mag) {
+			faint = append(faint, o.Name)
 			continue
 		}
 		row := map[string]any{"name": o.Name, "type": o.ObjectType}
@@ -329,8 +334,23 @@ func (a *apis) spaceVisible(ctx context.Context, lat, lon float64) (any, error) 
 		}
 		up = append(up, row)
 	}
-	return map[string]any{"sky": got.Sun.Condition, "up": up, "time_tashkent": a.now().In(a.location).Format("15:04"),
-		"note": "Brightest first. In daylight only the Moon and the brightest planets show: say so.", "source": spaceSource}, nil
+	out := map[string]any{"sky": got.Sun.Condition, "up": up, "time_tashkent": a.now().In(a.location).Format("15:04"),
+		"note": "up is what the eye can see now, brightest first. above_horizon_unseen are up but lost in the Sun's light: never call them visible. With up empty, say nothing can be seen by eye now and when it gets dark.", "source": spaceSource}
+	if len(faint) > 0 {
+		out["above_horizon_unseen"] = faint
+	}
+	return out, nil
+}
+
+// seenByEye is whether an object of magnitude mag shows to the naked eye
+// under the sky condition: in daylight only the Moon and Venus, at dusk
+// the brightest stars and planets, at night all the catalogue gives.
+func seenByEye(condition, name string, mag *float64) bool {
+	if name == "Moon" {
+		return true
+	}
+	limit, dim := map[string]float64{"daylight": -3.5, "civil twilight": 1, "nautical twilight": 3}[condition]
+	return !dim || (mag != nil && *mag <= limit)
 }
 
 func fmtCoord(v float64) string { return strconv.FormatFloat(v, 'f', 2, 64) }
