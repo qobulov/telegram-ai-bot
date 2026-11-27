@@ -44,7 +44,9 @@ type fakeStore struct {
 	bought []int
 }
 
-func (f fakeStore) FarosatGalaxies(context.Context, int64, int64) ([]int, error) { return f.bought, nil }
+func (f fakeStore) FarosatGalaxies(context.Context, int64, int64) ([]int, error) {
+	return f.bought, nil
+}
 
 func (f fakeStore) FarosatOf(_ context.Context, chatID, userID int64) (int, int, error) {
 	if chatID != -100123 {

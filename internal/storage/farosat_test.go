@@ -62,4 +62,3 @@ func TestFarosatGalaxies(t *testing.T) {
 		t.Errorf("after the refund = %v", ids)
 	}
 }
-
