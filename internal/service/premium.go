@@ -266,6 +266,10 @@ func (s *Service) checkout(q *telegram.PreCheckoutQuery) {
 		s.checkoutFarosat(q)
 		return
 	}
+	if _, _, _, isGalaxy := farosat.ParseGalaxyPayload(q.InvoicePayload); isGalaxy {
+		s.checkoutGalaxy(q)
+		return
+	}
 	in := incoming{msg: &telegram.Message{From: q.From}} // for the language
 	refusal := s.checkoutRefusal(q)
 	ctx, cancel := context.WithTimeout(context.Background(), checkoutTimeout)
@@ -307,6 +311,10 @@ func (s *Service) recordPayment(msg *telegram.Message) {
 	}
 	if _, _, _, isFarosat := farosat.ParsePayload(paid.InvoicePayload); isFarosat {
 		s.recordFarosat(msg)
+		return
+	}
+	if _, _, _, isGalaxy := farosat.ParseGalaxyPayload(paid.InvoicePayload); isGalaxy {
+		s.recordGalaxy(msg)
 		return
 	}
 	if s.opts.Premium == nil || msg.From == nil {
@@ -357,6 +365,10 @@ func (s *Service) noteRefund(msg *telegram.Message) {
 	}
 	if _, _, _, isFarosat := farosat.ParsePayload(msg.RefundedPayment.InvoicePayload); isFarosat {
 		s.refundFarosat(msg)
+		return
+	}
+	if _, _, _, isGalaxy := farosat.ParseGalaxyPayload(msg.RefundedPayment.InvoicePayload); isGalaxy {
+		s.refundGalaxy(msg)
 		return
 	}
 	if s.opts.Premium == nil {

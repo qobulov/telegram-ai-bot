@@ -37,3 +37,29 @@ func TestFarosatPurchases(t *testing.T) {
 		t.Errorf("after the refund = %d", grams)
 	}
 }
+
+// A galaxy bought is kept once and open until its payment is refunded.
+func TestFarosatGalaxies(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+	buy := FarosatGalaxyPurchase{ChargeID: "g1", ChatID: -100, UserID: 1, Galaxy: 12, Stars: 50}
+	if recorded, err := store.RecordFarosatGalaxy(ctx, buy); err != nil || !recorded {
+		t.Fatalf("record = %v %v", recorded, err)
+	}
+	if recorded, _ := store.RecordFarosatGalaxy(ctx, buy); recorded {
+		t.Error("recorded twice")
+	}
+	if ids, err := store.FarosatGalaxies(ctx, -100, 1); err != nil || len(ids) != 1 || ids[0] != 12 {
+		t.Fatalf("galaxies = %v %v", ids, err)
+	}
+	if ids, _ := store.FarosatGalaxies(ctx, -200, 1); len(ids) != 0 {
+		t.Errorf("another group's = %v", ids)
+	}
+	if found, err := store.RefundFarosatGalaxy(ctx, "g1"); err != nil || !found {
+		t.Fatalf("refund = %v %v", found, err)
+	}
+	if ids, _ := store.FarosatGalaxies(ctx, -100, 1); len(ids) != 0 {
+		t.Errorf("after the refund = %v", ids)
+	}
+}
+

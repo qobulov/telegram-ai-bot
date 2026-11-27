@@ -25,6 +25,8 @@ type FarosatStore interface {
 	FarosatTop(ctx context.Context, chatID int64, limit int) ([]storage.FarosatRow, error)
 	RecordFarosatPurchase(ctx context.Context, p storage.FarosatPurchase) (grams int, recorded bool, err error)
 	RefundFarosatPurchase(ctx context.Context, chargeID string) (found bool, err error)
+	RecordFarosatGalaxy(ctx context.Context, p storage.FarosatGalaxyPurchase) (recorded bool, err error)
+	RefundFarosatGalaxy(ctx context.Context, chargeID string) (found bool, err error)
 }
 
 const (

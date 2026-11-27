@@ -12,7 +12,8 @@
   const fmt = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 
   let data = null;
-  let index = 0;
+  let index = 0; // the galaxy on view, by its place in data.galaxies
+  let view = []; // the galaxies the filter and search let through
 
   async function api(action, extra) {
     const res = await fetch("/api/farosat", {
@@ -29,6 +30,7 @@
     no_group: "Ilovani guruhdagi «🌌 Farosat ilovasi» tugmasi orqali oching.",
     stale: "Sahifa eskirdi: ilovani yopib, qayta oching.",
     forged: "Ilovani Telegram ichida oching.",
+    open: "Bu galaktika allaqachon ochilgan.",
   };
 
   function showError(code) {
@@ -46,23 +48,91 @@
       showError(e.message);
       return;
     }
-    if (!keep) index = Math.max(0, data.open - 1);
     $("tally").innerHTML = `🪐 <b>${data.open}</b> ta koinotingizda · 🧠 <b>${fmt(data.grams)}</b> gram · <b>${data.place}</b>-o'rin`;
     renderPacks();
-    show(index);
+    fillFilter();
+    if (!keep) index = here();
+    applyView(index);
     if (!keep && params.get("tab") === "shop") tab(true);
+    if (!keep && params.get("pack")) showPack(Number(params.get("pack")) || 0);
   }
 
-  // ---- The galaxy on view ----------------------------------------------
+  // ---- Filter, search and the galaxy on view ------------------------------
+
+  const filters = [
+    ["all", "Hammasi", () => true],
+    ["open", "Ochilgan", (g) => g.open],
+    ["closed", "Yopiq", (g) => !g.open],
+    ["buyable", "Sotib olsa bo'ladi", (g) => !g.open && g.stars > 0],
+    ["small", "Kichik", (g) => g.size === "small"],
+    ["medium", "O'rta", (g) => g.size === "medium"],
+    ["large", "Yirik", (g) => g.size === "large"],
+  ];
+
+  function fillFilter() {
+    const select = $("filter");
+    const chosen = select.value || "all";
+    select.textContent = "";
+    for (const [key, label, keep] of filters) {
+      const option = document.createElement("option");
+      option.value = key;
+      option.textContent = `${label} · ${data.galaxies.filter(keep).length}`;
+      select.appendChild(option);
+    }
+    select.value = chosen;
+  }
+
+  // here is the galaxy the member's farosat has reached last.
+  function here() {
+    let at = 0;
+    data.galaxies.forEach((g, i) => { if (data.grams >= g.grams) at = i; });
+    return at;
+  }
+
+  // applyView keeps the galaxies the filter and search let through, and
+  // shows wanted when it is among them, else the first.
+  function applyView(wanted) {
+    const keep = (filters.find((f) => f[0] === $("filter").value) || filters[0])[2];
+    const query = $("search").value.trim().toLowerCase();
+    view = [];
+    data.galaxies.forEach((g, i) => {
+      if (keep(g) && (!query || g.name.toLowerCase().includes(query))) view.push(i);
+    });
+    if (!view.length) {
+      empty();
+      return;
+    }
+    show(view.includes(wanted) ? wanted : view[0]);
+  }
+
+  function empty() {
+    $("card").hidden = false;
+    $("meta").textContent = "";
+    $("chip").textContent = "";
+    $("name").textContent = "Hech narsa topilmadi";
+    $("sub").textContent = "Boshqa so'z bilan qidiring yoki saralashni o'zgartiring.";
+    $("fact").textContent = "";
+    $("progress").hidden = true;
+    $("prev").disabled = $("next").disabled = true;
+  }
+
+  $("filter").addEventListener("change", () => applyView(index));
+  $("search").addEventListener("input", () => applyView(index));
+  $("here").addEventListener("click", () => {
+    $("filter").value = "all";
+    $("search").value = "";
+    applyView(here());
+  });
 
   function show(i) {
     const list = data.galaxies;
-    index = Math.min(Math.max(i, 0), list.length - 1);
+    index = i;
     const g = list[index];
+    const pos = view.indexOf(index);
     $("meta").textContent = `#${g.id} / ${list.length} · ${fmt(g.grams)} gram`;
     const chip = $("chip");
-    chip.textContent = g.open ? "Ochilgan" : "Yetib borilmagan";
-    chip.classList.toggle("locked", !g.open);
+    chip.textContent = g.bought ? "Sotib olingan" : g.open ? "Ochilgan" : "Yetib borilmagan";
+    chip.className = "chip" + (g.bought ? " bought" : g.open ? "" : " locked");
     $("name").textContent = g.name;
     $("sub").textContent = `${g.class} · ${g.distance}`;
     $("fact").textContent = g.fact;
@@ -73,14 +143,22 @@
       const share = Math.max(0, Math.min(1, (data.grams - prev) / Math.max(1, g.grams - prev)));
       $("barFill").style.width = `${Math.round(share * 100)}%`;
       $("need").textContent = `🔒 Yana ${fmt(g.grams - data.grams)} gram kerak`;
+      const openBuy = $("openBuy");
+      openBuy.hidden = !g.stars;
+      openBuy.disabled = false;
+      openBuy.textContent = `⭐ ${g.stars} Stars bilan hozir ochish`;
     }
-    $("prev").disabled = index === 0;
-    $("next").disabled = index === list.length - 1;
+    $("prev").disabled = pos <= 0;
+    $("next").disabled = pos === view.length - 1;
     (galaxy3d || galaxy).set(g);
   }
 
-  $("prev").addEventListener("click", () => show(index - 1));
-  $("next").addEventListener("click", () => show(index + 1));
+  function step(by) {
+    const pos = view.indexOf(index) + by;
+    if (pos >= 0 && pos < view.length) show(view[pos]);
+  }
+  $("prev").addEventListener("click", () => step(-1));
+  $("next").addEventListener("click", () => step(1));
   // A swipe changes the galaxy on the flat drawing; in 3D a drag turns it.
   let touchX = null;
   $("galaxy").addEventListener("touchstart", (e) => { touchX = e.touches[0].clientX; }, { passive: true });
@@ -88,7 +166,12 @@
     if (touchX === null || galaxy3d) return;
     const dx = e.changedTouches[0].clientX - touchX;
     touchX = null;
-    if (Math.abs(dx) > 40) show(index + (dx < 0 ? 1 : -1));
+    if (Math.abs(dx) > 40) step(dx < 0 ? 1 : -1);
+  });
+
+  $("openBuy").addEventListener("click", () => {
+    const g = data.galaxies[index];
+    pay($("openBuy"), "galaxy_invoice", { galaxy: g.id }, () => data.galaxies[index].open, null);
   });
 
   // ---- Tabs and shop -----------------------------------------------------
@@ -118,7 +201,9 @@
 
   function showPack(i) {
     const packs = data.packs;
-    packIndex = (i + packs.length) % packs.length;
+    packIndex = Math.max(0, Math.min(packs.length - 1, i));
+    $("packPrev").disabled = packIndex === 0;
+    $("packNext").disabled = packIndex === packs.length - 1;
     const p = packs[packIndex];
     const color = TIERS[packIndex % TIERS.length];
     $("shop").style.setProperty("--tier", color);
@@ -132,7 +217,7 @@
       if (j === packIndex) dot.className = "on";
       dots.appendChild(dot);
     });
-    crystal3d.set(packIndex, color);
+    crystal3d.set(packIndex, color, packs.length);
   }
   $("packPrev").addEventListener("click", () => showPack(packIndex - 1));
   $("packNext").addEventListener("click", () => showPack(packIndex + 1));
@@ -154,30 +239,53 @@
     }
   }
 
-  async function buy(pack, button) {
+  // toast says how a payment went, for a few seconds.
+  let toastTimer = 0;
+  function toast(text) {
+    const el = $("toast");
+    el.textContent = text;
+    el.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.hidden = true; }, 3500);
+  }
+
+  // pay opens the invoice action makes, says how it went, and on payment
+  // looks again until done() is true, as the bot hears of the payment
+  // a moment after the page does.
+  async function pay(button, action, extra, done, label) {
+    const before = button.textContent;
     button.disabled = true;
+    button.textContent = "Ochilmoqda…";
+    const restore = () => { button.disabled = false; button.textContent = label || before; };
     try {
-      const { link } = await api("invoice", { pack: pack.id });
+      const { link } = await api(action, extra);
       if (!tg || !tg.openInvoice) { location.href = link; return; }
       tg.openInvoice(link, (status) => {
-        button.disabled = false;
+        restore();
         if (status === "paid") {
           if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
-          // The grams come with Telegram's word to the bot: look again
-          // a few times, until they are there.
-          const before = data.grams;
+          toast("✅ To'lov qabul qilindi");
           let tries = 0;
           const again = async () => {
             await load(true);
-            if (data.grams === before && ++tries < 5) setTimeout(again, 1500);
+            if (!done() && ++tries < 6) setTimeout(again, 1500);
           };
           setTimeout(again, 1200);
+        } else if (status === "cancelled") {
+          toast("To'lov bekor qilindi");
+        } else if (status === "failed") {
+          toast("To'lov amalga oshmadi");
         }
       });
     } catch (e) {
-      button.disabled = false;
-      if (tg && tg.showAlert) tg.showAlert(errors[e.message] || "To'lovni ochib bo'lmadi, qayta urinib ko'ring.");
+      restore();
+      toast(errors[e.message] || "To'lovni ochib bo'lmadi, qayta urinib ko'ring.");
     }
+  }
+
+  function buy(pack, button) {
+    const before = data.grams;
+    pay(button, "invoice", { pack: pack.id }, () => data.grams !== before, `Sotib olish · ⭐ ${fmt(pack.stars)}`);
   }
 
   // ---- Drawing -----------------------------------------------------------
@@ -206,17 +314,25 @@
       for (let i = 0; i < n; i++) push(gauss(r) * spread, gauss(r) * spread, 0.6 + r() * 1.4, color, 0.5 + r() * 0.5);
     };
     const spiral = (arms, twist, barLen) => {
-      bulge(900, 0.055, core);
+      bulge(1700, 0.055, core);
       if (barLen) for (let i = 0; i < 700; i++) push((r() - 0.5) * barLen, gauss(r) * 0.025, 0.7 + r(), gold, 0.6);
       for (let a = 0; a < arms; a++) {
         const base = (a / arms) * Math.PI * 2;
-        for (let i = 0; i < 1500; i++) {
+        for (let k = 0; k < 9; k++) {
+          // Knots of young stars along the arm, pink as their gas glows.
+          const t = 0.25 + r() * 0.7;
+          const rad = (barLen ? barLen / 2 : 0.06) + t * 0.42;
+          const ang = base + t * twist;
+          const kx = Math.cos(ang) * rad, ky = Math.sin(ang) * rad;
+          for (let j = 0; j < 26; j++) push(kx + gauss(r) * 0.008, ky + gauss(r) * 0.008, 0.8 + r() * 1.2, r() < 0.7 ? pink : white, 0.55 + r() * 0.45);
+        }
+        for (let i = 0; i < 2600; i++) {
           const t = Math.pow(r(), 0.8);
           const rad = (barLen ? barLen / 2 : 0.06) + t * 0.42;
           const ang = base + t * twist + gauss(r) * 0.09;
           const jitter = gauss(r) * 0.012 * (1 + t);
           const x = Math.cos(ang) * rad + jitter, y = Math.sin(ang) * rad + jitter;
-          const c = r() < 0.05 ? pink : (r() < 0.55 ? blue : white);
+          const c = r() < 0.03 ? pink : (r() < 0.55 ? blue : white);
           push(x, y, 0.5 + r() * 1.1, c, 0.35 + r() * 0.55);
         }
       }
@@ -352,7 +468,7 @@
   // ---- 3D -----------------------------------------------------------------
 
   // TIERS colour the packs, the smallest first.
-  const TIERS = ["#8fd3ff", "#9b8cff", "#5ef2c2", "#ffd36b"];
+  const TIERS = ["#8fd3ff", "#ff7ac8", "#9b8cff", "#5ef2c2", "#9df27a", "#ffa45c", "#ff6b7a", "#ffd36b"];
 
   // webgl is a renderer on canvas, or null where WebGL is not to be had,
   // and the page draws flat instead.
@@ -482,7 +598,7 @@
         spin.add(cloud(points.filter((p) => p[3] < 1.1), 0.011, g.open));
         spin.add(cloud(points.filter((p) => p[3] >= 1.1), 0.02, g.open));
         const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: dot, color: g.open ? 0xffe2b8 : 0x6a6a88, transparent: true, opacity: g.open ? 0.55 : 0.25, blending: THREE.AdditiveBlending, depthWrite: false }));
-        glow.scale.set(0.45, 0.45, 1);
+        glow.scale.set(0.6, 0.6, 1);
         spin.add(glow);
         baseTilt = galaxyTilt[g.kind] !== undefined ? galaxyTilt[g.kind] : 1;
         userTilt = 0;
@@ -492,91 +608,134 @@
     };
   })();
 
-  // crystal3d is the shop's pack on view: a faceted crystal, more faces
-  // the bigger the pack, with its glow and a ring of sparks.
+  // crystal3d is the shop's carousel: each pack a faceted shape of its own
+  // colour, more faces the bigger it is, the one on view large over a ring,
+  // its neighbours small at the sides; a swipe moves it.
   const crystal3d = (function () {
     const canvas = $("crystal");
     const renderer = webgl(canvas);
     if (!renderer) return null;
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 10);
-    camera.position.set(0, 0.1, 1.6);
+    camera.position.set(0, 0.16, 1.75);
+    camera.lookAt(0, -0.04, 0);
     scene.add(new THREE.AmbientLight(0xffffff, 0.3));
-    const rim = new THREE.DirectionalLight(0xffffff, 0.9);
-    rim.position.set(-0.5, 1.5, -1.5);
-    scene.add(rim);
     const key = new THREE.PointLight(0xffffff, 1.3);
     key.position.set(1.2, 1.4, 2);
     scene.add(key);
+    const rim = new THREE.DirectionalLight(0xffffff, 0.9);
+    rim.position.set(-0.5, 1.5, -1.5);
+    scene.add(rim);
     const tint = new THREE.PointLight(0xffffff, 1.1);
     tint.position.set(-1.4, -0.6, 1);
     scene.add(tint);
-    const holder = new THREE.Group();
-    scene.add(holder);
     const dot = glowTexture();
     const shapes = [
       () => new THREE.OctahedronGeometry(0.3).scale(0.8, 1.45, 0.8),
+      () => new THREE.TetrahedronGeometry(0.36),
       () => new THREE.OctahedronGeometry(0.36),
-      () => new THREE.DodecahedronGeometry(0.36),
+      () => new THREE.BoxGeometry(0.42, 0.42, 0.42),
+      () => new THREE.DodecahedronGeometry(0.35),
+      () => new THREE.IcosahedronGeometry(0.36),
+      () => new THREE.TorusGeometry(0.25, 0.1, 12, 36),
       () => new THREE.IcosahedronGeometry(0.37, 1),
     ];
-    let grow = 1, tilt = 0;
-    drag(canvas, (dx, dy) => {
-      holder.rotation.y += dx * 0.01;
-      tilt = Math.max(-0.8, Math.min(0.8, tilt + dy * 0.006));
-    });
+    function gem(i, color) {
+      const geometry = shapes[i % shapes.length]();
+      const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.22, metalness: 0.55, roughness: 0.12, flatShading: true, transparent: true, opacity: 0.95 }));
+      mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry, 20), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 })));
+      return mesh;
+    }
+    // The ring the pack on view stands over, and its glow.
+    const pedestal = new THREE.Group();
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.01, 8, 80), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 }));
+    ring.rotation.x = Math.PI / 2;
+    pedestal.add(ring);
+    const outer = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.004, 6, 90), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 }));
+    outer.rotation.x = Math.PI / 2;
+    pedestal.add(outer);
+    const pool = new THREE.Sprite(new THREE.SpriteMaterial({ map: dot, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }));
+    pool.scale.set(0.95, 0.3, 1);
+    pedestal.add(pool);
+    pedestal.position.y = -0.36;
+    scene.add(pedestal);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: dot, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }));
+    halo.scale.set(1.3, 1.3, 1);
+    scene.add(halo);
+
+    let items = [], current = 0, slide = 0, spin = 0, onSwipe = null;
+    // A swipe moves the carousel; a small drag only turns the shape.
+    let start = null;
+    canvas.addEventListener("pointerdown", (e) => { start = [e.clientX, e.clientY, spin]; canvas.setPointerCapture(e.pointerId); });
+    canvas.addEventListener("pointermove", (e) => { if (start) spin = start[2] + (e.clientX - start[0]) * 0.01; });
+    const end = (e) => {
+      if (!start) return;
+      const dx = e.clientX - start[0];
+      start = null;
+      if (Math.abs(dx) > 45 && onSwipe) onSwipe(dx < 0 ? 1 : -1);
+    };
+    canvas.addEventListener("pointerup", end);
+    canvas.addEventListener("pointercancel", () => { start = null; });
+
     function size() {
       const w = canvas.clientWidth || 320;
       renderer.setSize(w, w, false);
     }
-    function clear() {
-      for (const child of [...holder.children]) {
-        holder.remove(child);
-        child.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+    function build(count) {
+      for (const item of items) {
+        scene.remove(item);
+        item.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+      }
+      items = [];
+      for (let i = 0; i < count; i++) {
+        const item = gem(i, new THREE.Color(TIERS[i % TIERS.length]));
+        scene.add(item);
+        items.push(item);
       }
     }
-    let gem = null, ring = null;
     function loop() {
-      if (!$("shop").hidden) {
-        grow += (1 - grow) * 0.12;
-        holder.scale.setScalar(grow);
-        if (!reduced) {
-          holder.rotation.y += 0.008;
-          if (ring) ring.rotation.z -= 0.004;
-        }
-        holder.rotation.x = 0.35 + tilt;
-        if (gem) gem.position.y = reduced ? 0 : Math.sin(performance.now() / 700) * 0.025;
+      if (!$("shop").hidden && items.length) {
+        slide += (current - slide) * 0.14;
+        const t = performance.now() / 1000;
+        items.forEach((item, i) => {
+          const off = i - slide;
+          const near = Math.abs(off);
+          item.visible = near < 1.6;
+          item.position.set(off * 0.6, near < 0.5 ? (reduced ? 0 : Math.sin(t * 1.4) * 0.025) : -0.05, -near * 0.5);
+          item.scale.setScalar(Math.max(0.32, 1 - near * 0.6));
+          item.material.opacity = Math.max(0.35, 0.95 - near * 0.5);
+          if (!reduced) item.rotation.y += near < 0.5 ? 0.008 : 0.003;
+          item.rotation.x = 0.3;
+        });
+        if (!reduced) { ring.rotation.z += 0.004; outer.rotation.z -= 0.002; }
         renderer.render(scene, camera);
       }
       requestAnimationFrame(loop);
     }
     window.addEventListener("resize", size);
     requestAnimationFrame(loop);
+    let spinApplied = 0;
+    setInterval(() => {
+      // A drag adds its turn to the shape on view.
+      if (items[current] && spin !== spinApplied) {
+        items[current].rotation.y += spin - spinApplied;
+        spinApplied = spin;
+      }
+    }, 16);
     return {
-      set(i, hex) {
-        clear();
+      swipe(fn) { onSwipe = fn; },
+      set(i, hex, count) {
+        if (items.length !== count) {
+          build(count);
+          slide = i;
+        }
+        current = i;
         const color = new THREE.Color(hex);
         tint.color = color;
-        const geometry = shapes[i % shapes.length]();
-        gem = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.22, metalness: 0.55, roughness: 0.12, flatShading: true, transparent: true, opacity: 0.94 }));
-        gem.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 })));
-        holder.add(gem);
-        const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: dot, color, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false }));
-        halo.scale.set(1.3, 1.3, 1);
-        holder.add(halo);
-        const r = rng(i + 3);
-        const count = 120 + i * 90;
-        const pos = new Float32Array(count * 3);
-        for (let k = 0; k < count; k++) {
-          const ang = r() * Math.PI * 2, rad = 0.5 + gauss(r) * 0.03;
-          pos.set([Math.cos(ang) * rad, gauss(r) * 0.015, Math.sin(ang) * rad], k * 3);
-        }
-        const sparks = new THREE.BufferGeometry();
-        sparks.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-        ring = new THREE.Points(sparks, new THREE.PointsMaterial({ size: 0.022, map: dot, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-        ring.rotation.x = Math.PI / 2 - 0.25;
-        holder.add(ring);
-        grow = 0.3;
+        ring.material.color = color;
+        outer.material.color = color;
+        pool.material.color = color;
+        halo.material.color = color;
         size();
       },
     };
@@ -608,5 +767,6 @@
     window.addEventListener("resize", paint);
   })();
 
+  if (crystal3d) crystal3d.swipe((by) => showPack(packIndex + by));
   load(false);
 })();

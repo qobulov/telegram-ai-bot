@@ -20,6 +20,7 @@ import (
 // Store is the groups' farosat.
 type Store interface {
 	FarosatOf(ctx context.Context, chatID, userID int64) (grams, place int, err error)
+	FarosatGalaxies(ctx context.Context, chatID, userID int64) ([]int, error)
 }
 
 // Invoices makes the link a Stars payment is made at.
@@ -48,9 +49,13 @@ func (p Pack) Grams() int { return p.Stars }
 
 // Packs are the packs on sale, the smallest first.
 var Packs = []Pack{
-	{"g50", 50, "Uchqun"},
-	{"g100", 100, "Fikr"},
-	{"g250", 250, "Zakovat"},
+	{"g5", 5, "Uchqun"},
+	{"g10", 10, "Fikr"},
+	{"g20", 20, "Zehn"},
+	{"g50", 50, "Zakovat"},
+	{"g100", 100, "Idrok"},
+	{"g200", 200, "Donolik"},
+	{"g300", 300, "Hikmat"},
 	{"g500", 500, "Daho"},
 }
 
@@ -72,6 +77,36 @@ const payloadPrefix = "frs:"
 // the group chatID.
 func Payload(userID, chatID int64, pack Pack) string {
 	return fmt.Sprintf("%s%d:%d:%s", payloadPrefix, userID, chatID, pack.ID)
+}
+
+// galaxyPrefix starts a galaxy invoice's payload, "frsg:<user>:<chat>:<id>".
+const galaxyPrefix = "frsg:"
+
+// GalaxyPayload is the payload of an invoice opening galaxy for userID in
+// the group chatID.
+func GalaxyPayload(userID, chatID int64, galaxy Galaxy) string {
+	return fmt.Sprintf("%s%d:%d:%d", galaxyPrefix, userID, chatID, galaxy.ID)
+}
+
+// ParseGalaxyPayload reads a galaxy invoice's payload; ok is false for any
+// other, or a galaxy not for sale.
+func ParseGalaxyPayload(payload string) (userID, chatID int64, galaxy Galaxy, ok bool) {
+	rest, found := strings.CutPrefix(payload, galaxyPrefix)
+	if !found {
+		return 0, 0, Galaxy{}, false
+	}
+	parts := strings.Split(rest, ":")
+	if len(parts) != 3 {
+		return 0, 0, Galaxy{}, false
+	}
+	userID, errUser := strconv.ParseInt(parts[0], 10, 64)
+	chatID, errChat := strconv.ParseInt(parts[1], 10, 64)
+	id, errID := strconv.Atoi(parts[2])
+	galaxy, ok = GalaxyByID(id)
+	if errUser != nil || errChat != nil || errID != nil || chatID >= 0 || !ok || galaxy.Stars() == 0 {
+		return 0, 0, Galaxy{}, false
+	}
+	return userID, chatID, galaxy, true
 }
 
 // ParsePayload reads a farosat invoice's payload; ok is false for any other.
@@ -116,12 +151,15 @@ type request struct {
 	Group    string `json:"group"`
 	Action   string `json:"action"`
 	Pack     string `json:"pack"`
+	Galaxy   int    `json:"galaxy"`
 }
 
 // galaxyView is a galaxy as the page shows it, open or not.
 type galaxyView struct {
 	Galaxy
-	Open bool `json:"open"`
+	Open   bool `json:"open"`
+	Bought bool `json:"bought"`
+	Price  int  `json:"stars"`
 }
 
 // state is the member's farosat in the group and the collection.
@@ -144,6 +182,7 @@ var (
 	errForged      = failure{http.StatusUnauthorized, "forged"}
 	errStale       = failure{http.StatusUnauthorized, "stale"}
 	errNoGroup     = failure{http.StatusBadRequest, "no_group"}
+	errOpen        = failure{http.StatusConflict, "open"}
 	errUnavailable = failure{http.StatusBadGateway, "unavailable"}
 )
 
@@ -185,6 +224,8 @@ func (h *handler) serve(r *http.Request) (any, failure) {
 		return h.state(r.Context(), opened.User.ID, chatID)
 	case "invoice":
 		return h.invoice(r.Context(), opened.User, chatID, req.Pack)
+	case "galaxy_invoice":
+		return h.galaxyInvoice(r.Context(), opened.User, chatID, req.Galaxy)
 	}
 	return nil, errBadRequest
 }
@@ -196,15 +237,65 @@ func (h *handler) state(ctx context.Context, userID, chatID int64) (any, failure
 		h.Logger.Error("farosat app: could not read farosat", "user_id", userID, "chat_id", chatID, "error", err)
 		return nil, errUnavailable
 	}
+	bought, err := h.boughtGalaxies(ctx, chatID, userID)
+	if err != nil {
+		return nil, errUnavailable
+	}
 	out := state{Grams: grams, Place: place, Galaxies: make([]galaxyView, len(Galaxies)), Packs: Packs}
 	for i, g := range Galaxies {
-		open := grams >= g.Grams
+		open := grams >= g.Grams || bought[g.ID]
 		if open {
 			out.Open++
 		}
-		out.Galaxies[i] = galaxyView{Galaxy: g, Open: open}
+		out.Galaxies[i] = galaxyView{Galaxy: g, Open: open, Bought: bought[g.ID], Price: g.Stars()}
 	}
 	return out, failure{}
+}
+
+// boughtGalaxies are the galaxies the member opened for Stars in the group.
+func (h *handler) boughtGalaxies(ctx context.Context, chatID, userID int64) (map[int]bool, error) {
+	ids, err := h.Store.FarosatGalaxies(ctx, chatID, userID)
+	if err != nil {
+		h.Logger.Error("farosat app: could not read bought galaxies", "user_id", userID, "chat_id", chatID, "error", err)
+		return nil, err
+	}
+	bought := make(map[int]bool, len(ids))
+	for _, id := range ids {
+		bought[id] = true
+	}
+	return bought, nil
+}
+
+// galaxyInvoice makes the link to open a galaxy for Stars; one already open
+// is not sold.
+func (h *handler) galaxyInvoice(ctx context.Context, user miniapp.User, chatID int64, id int) (any, failure) {
+	galaxy, ok := GalaxyByID(id)
+	if !ok || galaxy.Stars() == 0 || h.Invoices == nil {
+		return nil, errBadRequest
+	}
+	grams, _, err := h.Store.FarosatOf(ctx, chatID, user.ID)
+	if err != nil {
+		return nil, errUnavailable
+	}
+	bought, err := h.boughtGalaxies(ctx, chatID, user.ID)
+	if err != nil {
+		return nil, errUnavailable
+	}
+	if grams >= galaxy.Grams || bought[galaxy.ID] {
+		return nil, errOpen
+	}
+	link, err := h.Invoices.CreateInvoiceLink(ctx, telegram.Invoice{
+		Title:       "🌌 " + galaxy.Name,
+		Description: fmt.Sprintf("Farosat ilovasida %s galaktikasi sizga ochiladi va doim ochiq qoladi.", galaxy.Name),
+		Payload:     GalaxyPayload(user.ID, chatID, galaxy),
+		Label:       galaxy.Name,
+		Price:       galaxy.Stars(),
+	})
+	if err != nil {
+		h.Logger.Error("farosat app: could not make a galaxy invoice", "user_id", user.ID, "galaxy", id, "error", err)
+		return nil, errUnavailable
+	}
+	return map[string]any{"link": link}, failure{}
 }
 
 // invoice makes the link to pay for a pack in Stars, made out to the member

@@ -13,10 +13,11 @@ import (
 )
 
 type memoryFarosat struct {
-	mu      sync.Mutex
-	grams   map[int64]int
-	day     map[int64]string
-	charges map[string]bool
+	mu       sync.Mutex
+	grams    map[int64]int
+	day      map[int64]string
+	charges  map[string]bool
+	galaxies []int
 }
 
 func (m *memoryFarosat) TakeFarosat(_ context.Context, _, userID int64, _ string, day time.Time, gain int) (int, int, bool, error) {
@@ -47,6 +48,22 @@ func (m *memoryFarosat) RecordFarosatPurchase(_ context.Context, p storage.Faros
 func (m *memoryFarosat) RefundFarosatPurchase(context.Context, string) (bool, error) {
 	return false, nil
 }
+
+func (m *memoryFarosat) RecordFarosatGalaxy(_ context.Context, p storage.FarosatGalaxyPurchase) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.charges == nil {
+		m.charges = map[string]bool{}
+	}
+	if m.charges[p.ChargeID] {
+		return false, nil
+	}
+	m.charges[p.ChargeID] = true
+	m.galaxies = append(m.galaxies, p.Galaxy)
+	return true, nil
+}
+
+func (m *memoryFarosat) RefundFarosatGalaxy(context.Context, string) (bool, error) { return false, nil }
 
 func (m *memoryFarosat) FarosatTop(context.Context, int64, int) ([]storage.FarosatRow, error) {
 	return []storage.FarosatRow{{UserID: 1, Name: "Ali", Grams: 215}, {UserID: 2, Name: "Vali", Grams: 203}}, nil
@@ -150,5 +167,14 @@ func TestFarosatApp(t *testing.T) {
 	sent = f.run(payment, payment)
 	if store.grams[userID] != before+100 || len(sent) != sentBefore+1 || !strings.Contains(sent[len(sent)-1].text, "+100 gram") {
 		t.Errorf("after the payment %d (was %d), sent %+v", store.grams[userID], before, sent)
+	}
+	galaxy := "frsg:" + strconv.FormatInt(userID, 10) + ":" + strconv.FormatInt(groupID, 10) + ":13"
+	New(f.opts).HandleNow(checkoutUpdate(userID, galaxy, 30))
+	if last := payments.answers[len(payments.answers)-1]; !last.ok {
+		t.Errorf("a galaxy's check = %+v", last)
+	}
+	sent = f.run(paymentUpdate(userID, "ch_g", galaxy, 30))
+	if len(store.galaxies) != 1 || store.galaxies[0] != 13 || !strings.Contains(sent[len(sent)-1].text, "Sigaret galaktikasi") {
+		t.Errorf("galaxies %v, sent %q", store.galaxies, sent[len(sent)-1].text)
 	}
 }

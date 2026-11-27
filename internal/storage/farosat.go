@@ -130,3 +130,50 @@ func (s *Store) RefundFarosatPurchase(ctx context.Context, chargeID string) (fou
 	}
 	return found, nil
 }
+
+// FarosatGalaxies are the galaxies a member opened for Stars in a group,
+// those refunded left out.
+func (s *Store) FarosatGalaxies(ctx context.Context, chatID, userID int64) ([]int, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT DISTINCT galaxy_id FROM farosat_galaxies
+		WHERE chat_id = $1 AND user_id = $2 AND refunded_at IS NULL ORDER BY galaxy_id`, chatID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("storage: farosat galaxies: %w", err)
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[int])
+	if err != nil {
+		return nil, fmt.Errorf("storage: farosat galaxies: %w", err)
+	}
+	return ids, nil
+}
+
+// FarosatGalaxyPurchase is a galaxy opened for Stars in a group.
+type FarosatGalaxyPurchase struct {
+	ChargeID string
+	ChatID   int64
+	UserID   int64
+	Galaxy   int
+	Stars    int
+}
+
+// RecordFarosatGalaxy keeps a galaxy's payment once; recorded is false for
+// one kept before.
+func (s *Store) RecordFarosatGalaxy(ctx context.Context, p FarosatGalaxyPurchase) (recorded bool, err error) {
+	tag, err := s.pool.Exec(ctx, `
+		INSERT INTO farosat_galaxies (charge_id, chat_id, user_id, galaxy_id, stars) VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT DO NOTHING`, p.ChargeID, p.ChatID, p.UserID, p.Galaxy, p.Stars)
+	if err != nil {
+		return false, fmt.Errorf("storage: record a farosat galaxy: %w", err)
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+// RefundFarosatGalaxy closes a refunded galaxy again, once; found is false
+// for a charge not kept or refunded before.
+func (s *Store) RefundFarosatGalaxy(ctx context.Context, chargeID string) (found bool, err error) {
+	tag, err := s.pool.Exec(ctx, `UPDATE farosat_galaxies SET refunded_at = now() WHERE charge_id = $1 AND refunded_at IS NULL`, chargeID)
+	if err != nil {
+		return false, fmt.Errorf("storage: refund a farosat galaxy: %w", err)
+	}
+	return tag.RowsAffected() == 1, nil
+}

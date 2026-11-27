@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap">
-  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
   <canvas id="sky" aria-hidden="true"></canvas>
@@ -24,9 +24,17 @@
       <button type="button" role="tab" id="tabShop" aria-selected="false">⭐ Do'kon</button>
     </nav>
 
+    <p class="toast" id="toast" role="status" hidden></p>
     <section id="state" class="state" role="status" hidden></section>
 
     <section id="galaxies" class="view">
+      <div class="tools">
+        <label class="visually-hidden" for="filter">Saralash</label>
+        <select id="filter"></select>
+        <label class="visually-hidden" for="search">Qidirish</label>
+        <input id="search" type="search" placeholder="Qidirish…" autocomplete="off">
+        <button type="button" class="here" id="here">📍 Men turgan joy</button>
+      </div>
       <div class="stage">
         <button type="button" class="nav prev" id="prev" aria-label="Oldingi galaktika">‹</button>
         <canvas id="galaxy" aria-label="Galaktika"></canvas>
@@ -43,6 +51,7 @@
         <div class="progress" id="progress" hidden>
           <div class="bar"><span id="barFill"></span></div>
           <p id="need"></p>
+          <button type="button" class="open-buy" id="openBuy">⭐ Stars bilan ochish</button>
         </div>
       </article>
     </section>
@@ -64,6 +73,6 @@
       <p class="shop-note">Gramm shu guruhdagi farosatingizga qo'shiladi va reytingda hisoblanadi. To'lov Telegram Stars orqali, gramm bir necha soniyada qo'shiladi.</p>
     </section>
   </main>
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>

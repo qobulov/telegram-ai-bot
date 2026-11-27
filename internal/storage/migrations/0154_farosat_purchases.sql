@@ -12,3 +12,18 @@ CREATE TABLE IF NOT EXISTS farosat_purchases (
     paid_at     timestamp with time zone NOT NULL DEFAULT now(),
     refunded_at timestamp with time zone
 );
+
+-- Galaxies of the Farosat Mini App opened for Stars before a member's
+-- farosat reaches them: a galaxy a payment, kept open for good unless the
+-- payment is refunded.
+CREATE TABLE IF NOT EXISTS farosat_galaxies (
+    charge_id   text PRIMARY KEY,
+    chat_id     bigint NOT NULL,
+    user_id     bigint NOT NULL,
+    galaxy_id   integer NOT NULL,
+    stars       integer NOT NULL,
+    paid_at     timestamp with time zone NOT NULL DEFAULT now(),
+    refunded_at timestamp with time zone
+);
+
+CREATE INDEX IF NOT EXISTS farosat_galaxies_member ON farosat_galaxies (chat_id, user_id) WHERE refunded_at IS NULL;
