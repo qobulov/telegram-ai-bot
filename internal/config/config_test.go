@@ -1849,3 +1849,24 @@ func TestCardsNoteStarsMatchTheGame(t *testing.T) {
 		}
 	}
 }
+
+// A member said the farosat game favoured the owners and Mari joked of a
+// secret scenario; another asked for the farosat top and got their card
+// place; an owner asked for rank 5 and was told both to write /rank 5
+// himself and that someone else must give it (2026-11-28).
+func TestNotesKeepFarosatAndOwnersRanksStraight(t *testing.T) {
+	for _, want := range []string{"never play along with a joke that hints at a secret scenario", "Grams are not card points", "never give a card place or points instead"} {
+		if !strings.Contains(cardsNote, want) {
+			t.Errorf("the cards note does not contain %q", want)
+		}
+	}
+	cfg, err := Load(getenv(validEnv()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"no one ranks themselves", "they are above every rank already"} {
+		if !strings.Contains(cfg.GroupNote, want) {
+			t.Errorf("the group note does not contain %q", want)
+		}
+	}
+}
