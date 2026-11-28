@@ -35,15 +35,18 @@ type FarosatStore interface {
 // farosatRange is how much a day's take may gain or lose.
 type farosatRange struct {
 	leastGain, mostGain, leastLoss, mostLoss int
+	// smallFirst makes each gram more of a gain rarer than the one before:
+	// out of 1 to 10, 1 comes ten times as often as 10.
+	smallFirst bool
 }
 
 var (
-	// farosatPlain is a member's day: 1 to 10 grams more, or now and then
-	// 1 to 10 less.
-	farosatPlain = farosatRange{1, 10, 1, 10}
+	// farosatPlain is a member's day: 1 to 10 grams more, the big gains
+	// rarer as the owners asked on 2026-11-28, or now and then 1 to 10 less.
+	farosatPlain = farosatRange{leastGain: 1, mostGain: 10, leastLoss: 1, mostLoss: 10, smallFirst: true}
 	// farosatElite is the elite's, as the owners asked on 2026-11-27: 20 to
 	// 30 grams more, or only 1 or 2 less.
-	farosatElite = farosatRange{20, 30, 1, 2}
+	farosatElite = farosatRange{leastGain: 20, mostGain: 30, leastLoss: 1, mostLoss: 2}
 )
 
 const (
@@ -74,7 +77,22 @@ func (r farosatRange) gain() int {
 	if rand.Float64() < farosatLoss {
 		return -r.leastLoss - rand.IntN(r.mostLoss-r.leastLoss+1)
 	}
-	return r.leastGain + rand.IntN(r.mostGain-r.leastGain+1)
+	span := r.mostGain - r.leastGain + 1
+	if !r.smallFirst {
+		return r.leastGain + rand.IntN(span)
+	}
+	return r.leastGain + smallFirst(rand.IntN(span*(span+1)/2), span)
+}
+
+// smallFirst is the step that draw, out of span*(span+1)/2, falls on when
+// step 0 holds span draws, step 1 one fewer, and the last step one.
+func smallFirst(draw, span int) int {
+	for step := 0; ; step++ {
+		if draw < span-step {
+			return step
+		}
+		draw -= span - step
+	}
 }
 
 // farosat answers /farosat: the day's take, or the total when it is taken.

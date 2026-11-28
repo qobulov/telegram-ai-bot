@@ -232,3 +232,17 @@ func TestFarosatApp(t *testing.T) {
 		t.Errorf("galaxies %v, sent %q", store.galaxies, sent[len(sent)-1].text)
 	}
 }
+
+// A plain day's big gains are rarer, as the owners asked on 2026-11-28: of
+// the 55 draws, 1 gram takes 10 and 10 grams one.
+func TestFarosatBigGainsAreRarer(t *testing.T) {
+	counts := make([]int, 10)
+	for draw := range 55 {
+		counts[smallFirst(draw, 10)]++
+	}
+	for step, n := range counts {
+		if n != 10-step {
+			t.Fatalf("step %d holds %d draws, want %d", step, n, 10-step)
+		}
+	}
+}
