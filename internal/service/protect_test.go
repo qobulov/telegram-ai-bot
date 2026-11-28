@@ -219,7 +219,7 @@ func TestSpamGuardBansListedJoinersAndWelcomesTheOthers(t *testing.T) {
 	for i, m := range sent {
 		texts[i] = m.text
 	}
-	if len(sent) != 2 || !strings.Contains(texts[0], "Promo spamerlar ro'yxatida (CAS)") || texts[1] != "Xush kelibsiz, Ann!" {
+	if len(sent) != 2 || !strings.Contains(texts[0], "[Promo](tg://user?id=6606) spamerlar ro'yxatida (CAS)") || texts[1] != "Xush kelibsiz, Ann!" {
 		t.Errorf("sent = %q, want the ban notice and a welcome for Ann alone", texts)
 	}
 	if !slices.Equal(moderator.banned, []int64{spammerID}) || len(moderator.deleted) != 0 {

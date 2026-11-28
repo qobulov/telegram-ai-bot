@@ -366,3 +366,17 @@ func TestAntispamMenuSaysTheFloodLimits(t *testing.T) {
 		t.Errorf("menu %q does not say %q", sent[0].text, want)
 	}
 }
+
+// A guard's notice tags the member it is about: by @username, or by ID for
+// one without, whom a spam notice once only named (2026-11-28).
+func TestGuardNoticesTagTheMember(t *testing.T) {
+	if got := mentionOf(&telegram.User{ID: 7, FirstName: "Ann", Username: "ann"}); got != "@ann" {
+		t.Errorf("with a username = %q", got)
+	}
+	if got := mentionOf(&telegram.User{ID: 7, FirstName: "Ann [x]"}); got != "[Ann x](tg://user?id=7)" {
+		t.Errorf("without a username = %q", got)
+	}
+	if got := mentionOf(nil); got != someone {
+		t.Errorf("no user = %q", got)
+	}
+}

@@ -462,11 +462,15 @@ func roleOf(admins []telegram.ChatMember, userID int64) string {
 	return ""
 }
 
-// mentionOf tags a member by @username, which notifies them; one without
-// a username is named.
+// mentionOf tags a member by @username, or by ID when they have none, as
+// the owners asked on 2026-11-28: a spam notice named a member without a
+// username, and nobody was told.
 func mentionOf(user *telegram.User) string {
+	if user == nil {
+		return someone
+	}
 	if user.Username != "" {
 		return "@" + user.Username
 	}
-	return plainLabel(user)
+	return mentionMember(user.ID, plainLabel(user))
 }
